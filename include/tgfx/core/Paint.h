@@ -67,7 +67,8 @@ class Paint {
    * Sets alpha and RGB used when stroking and filling. The color is four floating point values,
    * unpremultiplied.
    */
-  void setColor(Color newColor, const std::shared_ptr<ColorSpace>& colorSpace = ColorSpace::MakeSRGB()) {
+  void setColor(Color newColor,
+                const std::shared_ptr<ColorSpace>& colorSpace = ColorSpace::MakeSRGB()) {
     fill.color = newColor;
     fill.colorSpace = colorSpace;
   }

@@ -22,5 +22,5 @@
 namespace tgfx {
 
 void ConvertPixels(const ImageInfo& srcInfo, const void* srcPixels, const ImageInfo& dstInfo,
-                          void* dstPixels, bool isConvertColorSpace = false);
+                   void* dstPixels, bool isConvertColorSpace = false);
 }  // namespace tgfx

@@ -33,9 +33,10 @@ class RenderTargetProxy {
    * renderTarget is valid for the lifetime of the returned RenderTarget. Returns nullptr if the
    * context is nullptr or the backend renderTarget is invalid.
    */
-  static std::shared_ptr<RenderTargetProxy> MakeFrom(Context* context,
-                                                     const BackendRenderTarget& backendRenderTarget,
-                                                     ImageOrigin origin = ImageOrigin::TopLeft, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+  static std::shared_ptr<RenderTargetProxy> MakeFrom(
+      Context* context, const BackendRenderTarget& backendRenderTarget,
+      ImageOrigin origin = ImageOrigin::TopLeft,
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
   /**
    * Creates a new RenderTargetProxy instance with the specified context, width, height, sample
    * count, mipmap state, and origin. If `isAlphaOnly` is true, it will try to use the ALPHA_8

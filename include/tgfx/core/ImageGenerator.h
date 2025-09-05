@@ -19,7 +19,6 @@
 #pragma once
 
 #include <utility>
-
 #include "tgfx/core/ImageBuffer.h"
 
 namespace tgfx {
@@ -84,7 +83,9 @@ class ImageGenerator {
   }
 
  protected:
-  ImageGenerator(int width, int height, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB()) : _width(width), _height(height), _colorSpace(std::move(colorSpace)) {
+  ImageGenerator(int width, int height,
+                 std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB())
+      : _width(width), _height(height), _colorSpace(std::move(colorSpace)) {
   }
 
   virtual std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const = 0;

@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include <cstdint>
 #include <cstddef>
+#include <cstdint>
 
 namespace tgfx {
 namespace checksum {
@@ -31,5 +31,5 @@ namespace checksum {
  * See: https://github.com/wangyi-fudan/wyhash
  */
 uint32_t Hash32(const void* data, size_t bytes, uint32_t seed = 0);
-}
+}  // namespace checksum
 }  // namespace tgfx

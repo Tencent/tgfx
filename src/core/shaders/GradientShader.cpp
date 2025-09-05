@@ -109,7 +109,8 @@ static PlacementPtr<FragmentProcessor> MakeColorizer(const Context* context, con
 }
 
 GradientShader::GradientShader(const std::vector<Color>& colors,
-                               const std::vector<float>& positions, const Matrix& pointsToUnit, std::shared_ptr<ColorSpace> colorSpace)
+                               const std::vector<float>& positions, const Matrix& pointsToUnit,
+                               std::shared_ptr<ColorSpace> colorSpace)
     : pointsToUnit(pointsToUnit), colorSpace(std::move(colorSpace)) {
   colorsAreOpaque = true;
   for (auto& color : colors) {
@@ -158,12 +159,13 @@ GradientShader::GradientShader(const std::vector<Color>& colors,
 // gradient's tile mode
 static PlacementPtr<FragmentProcessor> MakeGradient(const Context* context,
                                                     const GradientShader& shader,
-                                                    PlacementPtr<FragmentProcessor> layout, const ColorSpaceXformSteps& steps) {
+                                                    PlacementPtr<FragmentProcessor> layout,
+                                                    const ColorSpaceXformSteps& steps) {
   if (layout == nullptr) {
     return nullptr;
   }
 
-  for(auto& color : shader.originalColors) {
+  for (auto& color : shader.originalColors) {
     steps.apply(const_cast<float*>(color.array()));
   }
   // All gradients are colorized the same way, regardless of layout
@@ -204,8 +206,10 @@ static std::array<Point, 2> UnitMatrixToPoints(const Matrix& matrix) {
 
 LinearGradientShader::LinearGradientShader(const Point& startPoint, const Point& endPoint,
                                            const std::vector<Color>& colors,
-                                           const std::vector<float>& positions, std::shared_ptr<ColorSpace> colorSpace)
-    : GradientShader(colors, positions, PointsToUnitMatrix(startPoint, endPoint), std::move(colorSpace)) {
+                                           const std::vector<float>& positions,
+                                           std::shared_ptr<ColorSpace> colorSpace)
+    : GradientShader(colors, positions, PointsToUnitMatrix(startPoint, endPoint),
+                     std::move(colorSpace)) {
 }
 
 PlacementPtr<FragmentProcessor> LinearGradientShader::asFragmentProcessor(
@@ -215,9 +219,11 @@ PlacementPtr<FragmentProcessor> LinearGradientShader::asFragmentProcessor(
     totalMatrix.preConcat(*uvMatrix);
   }
   auto dstColorSpace = args.dstColorSpace;
-  ColorSpaceXformSteps steps(colorSpace.get(), AlphaType::Unpremultiplied, dstColorSpace.get(), AlphaType::Unpremultiplied);
+  ColorSpaceXformSteps steps(colorSpace.get(), AlphaType::Unpremultiplied, dstColorSpace.get(),
+                             AlphaType::Unpremultiplied);
   return MakeGradient(args.context, *this,
-                      LinearGradientLayout::Make(args.context->drawingBuffer(), totalMatrix), steps);
+                      LinearGradientLayout::Make(args.context->drawingBuffer(), totalMatrix),
+                      steps);
 }
 
 GradientType LinearGradientShader::asGradient(GradientInfo* info) const {
@@ -246,7 +252,8 @@ static std::tuple<Point, float> UnitMatrixToRadial(const Matrix& matrix) {
 
 RadialGradientShader::RadialGradientShader(const Point& center, float radius,
                                            const std::vector<Color>& colors,
-                                           const std::vector<float>& positions, std::shared_ptr<ColorSpace> colorSpace)
+                                           const std::vector<float>& positions,
+                                           std::shared_ptr<ColorSpace> colorSpace)
     : GradientShader(colors, positions, RadialToUnitMatrix(center, radius), std::move(colorSpace)) {
 }
 
@@ -257,9 +264,11 @@ PlacementPtr<FragmentProcessor> RadialGradientShader::asFragmentProcessor(
     totalMatrix.preConcat(*uvMatrix);
   }
   auto dstColorSpace = args.dstColorSpace;
-  ColorSpaceXformSteps steps(colorSpace.get(), AlphaType::Unpremultiplied, dstColorSpace.get(), AlphaType::Unpremultiplied);
+  ColorSpaceXformSteps steps(colorSpace.get(), AlphaType::Unpremultiplied, dstColorSpace.get(),
+                             AlphaType::Unpremultiplied);
   return MakeGradient(args.context, *this,
-                      RadialGradientLayout::Make(args.context->drawingBuffer(), totalMatrix), steps);
+                      RadialGradientLayout::Make(args.context->drawingBuffer(), totalMatrix),
+                      steps);
 }
 
 GradientType RadialGradientShader::asGradient(GradientInfo* info) const {
@@ -273,9 +282,11 @@ GradientType RadialGradientShader::asGradient(GradientInfo* info) const {
 
 ConicGradientShader::ConicGradientShader(const Point& center, float t0, float t1,
                                          const std::vector<Color>& colors,
-                                         const std::vector<float>& positions, std::shared_ptr<ColorSpace> colorSpace)
-    : GradientShader(colors, positions, Matrix::MakeTrans(-center.x, -center.y), std::move(colorSpace)), bias(-t0),
-      scale(1.f / (t1 - t0)) {
+                                         const std::vector<float>& positions,
+                                         std::shared_ptr<ColorSpace> colorSpace)
+    : GradientShader(colors, positions, Matrix::MakeTrans(-center.x, -center.y),
+                     std::move(colorSpace)),
+      bias(-t0), scale(1.f / (t1 - t0)) {
 }
 
 PlacementPtr<FragmentProcessor> ConicGradientShader::asFragmentProcessor(
@@ -285,7 +296,8 @@ PlacementPtr<FragmentProcessor> ConicGradientShader::asFragmentProcessor(
     totalMatrix.preConcat(*uvMatrix);
   }
   auto dstColorSpace = args.dstColorSpace;
-  ColorSpaceXformSteps steps(colorSpace.get(), AlphaType::Unpremultiplied, dstColorSpace.get(), AlphaType::Unpremultiplied);
+  ColorSpaceXformSteps steps(colorSpace.get(), AlphaType::Unpremultiplied, dstColorSpace.get(),
+                             AlphaType::Unpremultiplied);
   return MakeGradient(
       args.context, *this,
       ConicGradientLayout::Make(args.context->drawingBuffer(), totalMatrix, bias, scale), steps);
@@ -325,8 +337,10 @@ static std::tuple<Point, float> UnitMatrixToDiamondHalfDiagonal(const Matrix& ma
 
 DiamondGradientShader::DiamondGradientShader(const Point& center, float halfDiagonal,
                                              const std::vector<Color>& colors,
-                                             const std::vector<float>& positions, std::shared_ptr<ColorSpace> colorSpace)
-    : GradientShader(colors, positions, DiamondHalfDiagonalToUnitMatrix(center, halfDiagonal), std::move(colorSpace)) {
+                                             const std::vector<float>& positions,
+                                             std::shared_ptr<ColorSpace> colorSpace)
+    : GradientShader(colors, positions, DiamondHalfDiagonalToUnitMatrix(center, halfDiagonal),
+                     std::move(colorSpace)) {
 }
 
 PlacementPtr<FragmentProcessor> DiamondGradientShader::asFragmentProcessor(
@@ -336,7 +350,8 @@ PlacementPtr<FragmentProcessor> DiamondGradientShader::asFragmentProcessor(
     totalMatrix.preConcat(*uvMatrix);
   }
   auto dstColorSpace = args.dstColorSpace;
-  ColorSpaceXformSteps steps(colorSpace.get(), AlphaType::Unpremultiplied, dstColorSpace.get(), AlphaType::Unpremultiplied);
+  ColorSpaceXformSteps steps(colorSpace.get(), AlphaType::Unpremultiplied, dstColorSpace.get(),
+                             AlphaType::Unpremultiplied);
   auto layout = DiamondGradientLayout::Make(args.context->drawingBuffer(), totalMatrix);
   return MakeGradient(args.context, *this, std::move(layout), steps);
 }
@@ -352,7 +367,8 @@ GradientType DiamondGradientShader::asGradient(GradientInfo* info) const {
 
 std::shared_ptr<Shader> Shader::MakeLinearGradient(const Point& startPoint, const Point& endPoint,
                                                    const std::vector<Color>& colors,
-                                                   const std::vector<float>& positions, std::shared_ptr<ColorSpace> colorSpace) {
+                                                   const std::vector<float>& positions,
+                                                   std::shared_ptr<ColorSpace> colorSpace) {
   if (!std::isfinite(Point::Distance(endPoint, startPoint)) || colors.empty()) {
     return nullptr;
   }
@@ -366,14 +382,16 @@ std::shared_ptr<Shader> Shader::MakeLinearGradient(const Point& startPoint, cons
     // once start and end are exactly the same, so just use the end color for a stable solution.
     return Shader::MakeColorShader(colors[0], colorSpace);
   }
-  auto shader = std::make_shared<LinearGradientShader>(startPoint, endPoint, colors, positions, std::move(colorSpace));
+  auto shader = std::make_shared<LinearGradientShader>(startPoint, endPoint, colors, positions,
+                                                       std::move(colorSpace));
   shader->weakThis = shader;
   return shader;
 }
 
 std::shared_ptr<Shader> Shader::MakeRadialGradient(const Point& center, float radius,
                                                    const std::vector<Color>& colors,
-                                                   const std::vector<float>& positions, std::shared_ptr<ColorSpace> colorSpace) {
+                                                   const std::vector<float>& positions,
+                                                   std::shared_ptr<ColorSpace> colorSpace) {
   if (radius < 0 || colors.empty()) {
     return nullptr;
   }
@@ -385,14 +403,16 @@ std::shared_ptr<Shader> Shader::MakeRadialGradient(const Point& center, float ra
     // Degenerate gradient optimization, and no special logic needed for clamped radial gradient
     return Shader::MakeColorShader(colors[colors.size() - 1], colorSpace);
   }
-  auto shader = std::make_shared<RadialGradientShader>(center, radius, colors, positions, std::move(colorSpace));
+  auto shader = std::make_shared<RadialGradientShader>(center, radius, colors, positions,
+                                                       std::move(colorSpace));
   shader->weakThis = shader;
   return shader;
 }
 
 std::shared_ptr<Shader> Shader::MakeConicGradient(const Point& center, float startAngle,
                                                   float endAngle, const std::vector<Color>& colors,
-                                                  const std::vector<float>& positions, std::shared_ptr<ColorSpace> colorSpace) {
+                                                  const std::vector<float>& positions,
+                                                  std::shared_ptr<ColorSpace> colorSpace) {
   if (colors.empty()) {
     return nullptr;
   }
@@ -407,7 +427,8 @@ std::shared_ptr<Shader> Shader::MakeConicGradient(const Point& center, float sta
 
 std::shared_ptr<Shader> Shader::MakeDiamondGradient(const Point& center, float halfDiagonal,
                                                     const std::vector<Color>& colors,
-                                                    const std::vector<float>& positions, std::shared_ptr<ColorSpace> colorSpace) {
+                                                    const std::vector<float>& positions,
+                                                    std::shared_ptr<ColorSpace> colorSpace) {
   if (halfDiagonal < 0 || colors.empty()) {
     return nullptr;
   }
@@ -419,7 +440,8 @@ std::shared_ptr<Shader> Shader::MakeDiamondGradient(const Point& center, float h
     // Degenerate gradient optimization, and no special logic needed for clamped diamond gradient
     return Shader::MakeColorShader(colors[colors.size() - 1], colorSpace);
   }
-  auto shader = std::make_shared<DiamondGradientShader>(center, halfDiagonal, colors, positions, std::move(colorSpace));
+  auto shader = std::make_shared<DiamondGradientShader>(center, halfDiagonal, colors, positions,
+                                                        std::move(colorSpace));
   shader->weakThis = shader;
   return shader;
 }

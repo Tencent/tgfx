@@ -154,12 +154,12 @@ Rect RenderContext::getClipBounds(const Path& clip) {
   return bounds;
 }
 
-void RenderContext::convertFill(const Fill& fill, Fill& dstFill)
-{
+void RenderContext::convertFill(const Fill& fill, Fill& dstFill) {
   auto dstColorSpace = renderTarget->getColorSpace();
   dstFill = fill;
-  if(!ColorSpace::Equals(dstColorSpace.get(), dstFill.colorSpace.get())) {
-    ColorSpaceXformSteps steps(dstFill.colorSpace.get(), AlphaType::Unpremultiplied, dstColorSpace.get(), AlphaType::Unpremultiplied);
+  if (!ColorSpace::Equals(dstColorSpace.get(), dstFill.colorSpace.get())) {
+    ColorSpaceXformSteps steps(dstFill.colorSpace.get(), AlphaType::Unpremultiplied,
+                               dstColorSpace.get(), AlphaType::Unpremultiplied);
     steps.apply(dstFill.color.array());
   }
 }

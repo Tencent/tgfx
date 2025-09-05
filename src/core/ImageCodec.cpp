@@ -18,16 +18,15 @@
 
 #include "tgfx/core/ImageCodec.h"
 #include <src/skcms_public.h>
-
 #include "BoxFilterDownsample.h"
 #include "core/PixelBuffer.h"
+#include "core/utils/PixelsConvertUtil.h"
 #include "core/utils/USE.h"
 #include "core/utils/WeakMap.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Stream.h"
-#include "core/utils/PixelsConvertUtil.h"
 
 #if defined(TGFX_USE_WEBP_DECODE) || defined(TGFX_USE_WEBP_ENCODE)
 #include "core/codecs/webp/WebpCodec.h"
@@ -153,16 +152,18 @@ std::shared_ptr<Data> ImageCodec::Encode(const Pixmap& pixmap, EncodedFormat for
   return nullptr;
 }
 
-bool ImageCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels, bool isConvertColorSpace) const {
-  if(!isConvertColorSpace) {
-   dstInfo.setColorSpace(colorSpace());
+bool ImageCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels,
+                            bool isConvertColorSpace) const {
+  if (!isConvertColorSpace) {
+    dstInfo.setColorSpace(colorSpace());
   }
   if (dstInfo.width() > width() || dstInfo.height() > height()) {
     return false;
   }
   if (dstInfo.width() == width() && dstInfo.height() == height()) {
-    bool result = onReadPixels(dstInfo.colorType(), dstInfo.alphaType(), dstInfo.rowBytes(), dstPixels);
-    if(isConvertColorSpace) {
+    bool result =
+        onReadPixels(dstInfo.colorType(), dstInfo.alphaType(), dstInfo.rowBytes(), dstPixels);
+    if (isConvertColorSpace) {
       ConvertPixels(dstInfo.makeColorSpace(colorSpace()), dstPixels, dstInfo, dstPixels, true);
     }
     return result;
@@ -195,7 +196,7 @@ bool ImageCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels, bool isCo
     return false;
   }
   auto result = onReadPixels(colorType, dstInfo.alphaType(), srcRowBytes, buffer.data());
-  if(isConvertColorSpace) {
+  if (isConvertColorSpace) {
     auto srcColorSpace = colorSpace();
     auto srcInfo = dstInfo.makeColorType(colorType, srcRowBytes);
     ConvertPixels(srcInfo.makeColorSpace(srcColorSpace), dstPixels, dstInfo, dstPixels, true);

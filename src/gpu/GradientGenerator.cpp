@@ -17,14 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GradientGenerator.h"
-
 #include <utility>
 #include "core/PixelBuffer.h"
 
 namespace tgfx {
 static constexpr int GradientWidth = 256;
 
-GradientGenerator::GradientGenerator(const Color* colors, const float* positions, int count, std::shared_ptr<ColorSpace> colorSpace)
+GradientGenerator::GradientGenerator(const Color* colors, const float* positions, int count,
+                                     std::shared_ptr<ColorSpace> colorSpace)
     : ImageGenerator(GradientWidth, 1, std::move(colorSpace)), colors(colors, colors + count),
       positions(positions, positions + count) {
 }

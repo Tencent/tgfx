@@ -18,31 +18,36 @@
 
 #pragma once
 #include "FragmentProcessor.h"
-#include "tgfx/core/ColorSpaceXformSteps.h"
 #include "gpu/ColorSpaceXformHelper.h"
+#include "tgfx/core/ColorSpaceXformSteps.h"
 
 namespace tgfx {
 
 class ColorSpaceXformEffect : public FragmentProcessor {
  public:
-  static PlacementPtr<FragmentProcessor> Make(BlockBuffer* buffer, PlacementPtr<FragmentProcessor> child,
-                                                 ColorSpace* src, AlphaType srcAT,
-                                                 ColorSpace* dst, AlphaType dstAT);
+  static PlacementPtr<FragmentProcessor> Make(BlockBuffer* buffer,
+                                              PlacementPtr<FragmentProcessor> child,
+                                              ColorSpace* src, AlphaType srcAT, ColorSpace* dst,
+                                              AlphaType dstAT);
 
-  static PlacementPtr<FragmentProcessor> Make(BlockBuffer* buffer, PlacementPtr<FragmentProcessor> child,
-                                                 std::shared_ptr<ColorSpaceXformSteps> colorXform);
+  static PlacementPtr<FragmentProcessor> Make(BlockBuffer* buffer,
+                                              PlacementPtr<FragmentProcessor> child,
+                                              std::shared_ptr<ColorSpaceXformSteps> colorXform);
 
   ColorSpaceXformEffect(PlacementPtr<FragmentProcessor> child,
-                      std::shared_ptr<ColorSpaceXformSteps> colorXform);
+                        std::shared_ptr<ColorSpaceXformSteps> colorXform);
 
   std::string name() const override {
     return "ColorSpaceXformEffect";
   }
 
-  const ColorSpaceXformSteps* colorXform() const {return colorSpaceXformSteps.get(); }
+  const ColorSpaceXformSteps* colorXform() const {
+    return colorSpaceXformSteps.get();
+  }
 
   void emitCode(EmitArgs& args) const override;
-private:
+
+ private:
   DEFINE_PROCESSOR_CLASS_ID
   void onSetData(UniformBuffer*) const override;
   void onComputeProcessorKey(BytesKey* bytesKey) const override;

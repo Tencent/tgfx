@@ -54,7 +54,8 @@ class ShaderBuilder {
    */
   void appendTextureLookup(SamplerHandle samplerHandle, const std::string& coordName);
 
-  void appendColorGamutXform(std::string* out, const char* srcColor, ColorSpaceXformHelper* colorXformHelper);
+  void appendColorGamutXform(std::string* out, const char* srcColor,
+                             ColorSpaceXformHelper* colorXformHelper);
 
   /**
    * Called by Processors to add code to one of the shaders.

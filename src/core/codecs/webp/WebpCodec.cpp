@@ -49,8 +49,8 @@ std::shared_ptr<ImageCodec> WebpCodec::MakeFrom(std::shared_ptr<Data> imageBytes
   if (info.width == 0 || info.height == 0) {
     return nullptr;
   }
-  return std::shared_ptr<ImageCodec>(
-      new WebpCodec(info.width, info.height, info.orientation, "", std::move(imageBytes), info.colorSpace));
+  return std::shared_ptr<ImageCodec>(new WebpCodec(info.width, info.height, info.orientation, "",
+                                                   std::move(imageBytes), info.colorSpace));
 }
 
 static WEBP_CSP_MODE webp_decode_mode(ColorType dstCT, bool premultiply) {

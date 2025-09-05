@@ -90,11 +90,13 @@ class ImageCodec : public ImageGenerator {
   * using a box filter algorithm to fit dstInfo. Only downscaling is supported. Returns true
   * if decoding succeeds, false otherwise.
   */
-  virtual bool readPixels(const ImageInfo& dstInfo, void* dstPixels, bool isConvertColorSpace = false) const;
+  virtual bool readPixels(const ImageInfo& dstInfo, void* dstPixels,
+                          bool isConvertColorSpace = false) const;
 
  protected:
-  ImageCodec(int width, int height, Orientation orientation = Orientation::TopLeft, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB())
-      : ImageGenerator(width, height,colorSpace), _orientation(orientation) {
+  ImageCodec(int width, int height, Orientation orientation = Orientation::TopLeft,
+             std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB())
+      : ImageGenerator(width, height, colorSpace), _orientation(orientation) {
   }
 
   std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;

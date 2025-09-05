@@ -17,10 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/codecs/webp/WebpUtility.h"
+#include <src/skcms_public.h>
 #include <cstdint>
 #include <cstdio>
-#include <src/skcms_public.h>
-
 #include "core/utils/Log.h"
 #include "core/utils/OrientationHelper.h"
 #include "webp/decode.h"
@@ -300,7 +299,7 @@ DecodeInfo WebpUtility::getDecodeInfo(const std::string& filePath) {
         ICCProfile profile;
         gfx::skcms_Parse(profiler, chunk_size, reinterpret_cast<gfx::skcms_ICCProfile*>(&profile));
         decodeInfo.colorSpace = ColorSpace::Make(profile);
-        if(decodeInfo.colorSpace == nullptr) {
+        if (decodeInfo.colorSpace == nullptr) {
           decodeInfo.colorSpace = ColorSpace::MakeSRGB();
         }
         if (chunk_size_padded <= webpFile._end - webpFile._start) {
@@ -320,7 +319,8 @@ DecodeInfo WebpUtility::getDecodeInfo(const std::string& filePath) {
       }
     }
     if (needBreak) break;
-  } while ((!foundColorSpace || !foundOrientation) && (fileLength - webpFile._start) >= RIFF_HEADER_SIZE);
+  } while ((!foundColorSpace || !foundOrientation) &&
+           (fileLength - webpFile._start) >= RIFF_HEADER_SIZE);
   free(chunkHeader);
   fclose(infile);
   return decodeInfo;
@@ -364,12 +364,13 @@ DecodeInfo WebpUtility::getDecodeInfo(const void* fileBytes, size_t byteLength) 
   ICCProfile profile;
   {
     WebPChunkIterator chunkIterator;
-    if(WebPDemuxGetChunk(demux, "ICCP", 1, &chunkIterator)) {
+    if (WebPDemuxGetChunk(demux, "ICCP", 1, &chunkIterator)) {
       auto chunk = Data::MakeWithCopy(chunkIterator.chunk.bytes, chunkIterator.chunk.size);
-      gfx::skcms_Parse(chunk->data(), chunk->size(), reinterpret_cast<gfx::skcms_ICCProfile*>(&profile));
+      gfx::skcms_Parse(chunk->data(), chunk->size(),
+                       reinterpret_cast<gfx::skcms_ICCProfile*>(&profile));
       colorSpace = ColorSpace::Make(profile);
     }
-    if(colorSpace == nullptr) {
+    if (colorSpace == nullptr) {
       colorSpace = ColorSpace::MakeSRGB();
     }
     WebPDemuxReleaseChunkIterator(&chunkIterator);

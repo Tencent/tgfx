@@ -646,7 +646,8 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const F
     return;
   }
   auto colorSpace = renderTarget->getColorSpace();
-  FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty()), drawScale, colorSpace};
+  FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty()), drawScale,
+                 colorSpace};
   if (fill.shader) {
     if (auto processor = FragmentProcessor::Make(fill.shader, args)) {
       op->addColorFP(std::move(processor));

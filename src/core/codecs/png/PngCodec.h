@@ -45,7 +45,8 @@ class PngCodec : public ImageCodec {
                                                   std::shared_ptr<Data> byteData);
 
   PngCodec(int width, int height, Orientation orientation, bool isAlphaOnly, std::string filePath,
-           std::shared_ptr<Data> fileData, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB())
+           std::shared_ptr<Data> fileData,
+           std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB())
       : ImageCodec(width, height, orientation, colorSpace), _isAlphaOnly(isAlphaOnly),
         fileData(std::move(fileData)), filePath(std::move(filePath)) {
   }

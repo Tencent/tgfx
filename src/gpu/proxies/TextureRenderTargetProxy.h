@@ -79,7 +79,8 @@ class TextureRenderTargetProxy : public DefaultTextureProxy,
 
   TextureRenderTargetProxy(int width, int height, PixelFormat format, int sampleCount,
                            bool mipmapped = false, ImageOrigin origin = ImageOrigin::TopLeft,
-                           bool externallyOwned = false, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+                           bool externallyOwned = false,
+                           std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   std::shared_ptr<TextureView> onMakeTexture(Context* context) const override;
 

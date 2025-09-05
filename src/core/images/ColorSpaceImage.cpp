@@ -18,10 +18,10 @@
 
 #include "ColorSpaceImage.h"
 #include "core/utils/PlacementPtr.h"
-#include "gpu/processors/TiledTextureEffect.h"
-#include "gpu/processors/ColorSpaceXformEffect.h"
 #include "gpu/BackingFit.h"
 #include "gpu/TPArgs.h"
+#include "gpu/processors/ColorSpaceXformEffect.h"
+#include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
 
@@ -29,11 +29,13 @@ std::shared_ptr<TextureProxy> ColorSpaceImage::lockTextureProxy(const TPArgs& ar
   return _sourceImage->lockTextureProxy(args);
 }
 
-PlacementPtr<FragmentProcessor> ColorSpaceImage::asFragmentProcessor(const FPArgs& args,
-    const SamplingArgs& samplingArgs, const Matrix* uvMatrix) const {
+PlacementPtr<FragmentProcessor> ColorSpaceImage::asFragmentProcessor(
+    const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix) const {
   auto fragmentProcessor = _sourceImage->asFragmentProcessor(args, samplingArgs, uvMatrix);
-  if(fragmentProcessor) {
-    return ColorSpaceXformEffect::Make(args.context->drawingBuffer(), std::move(fragmentProcessor), _sourceImage->colorSpace().get(), AlphaType::Premultiplied, _colorSpace.get(), AlphaType::Premultiplied);
+  if (fragmentProcessor) {
+    return ColorSpaceXformEffect::Make(args.context->drawingBuffer(), std::move(fragmentProcessor),
+                                       _sourceImage->colorSpace().get(), AlphaType::Premultiplied,
+                                       _colorSpace.get(), AlphaType::Premultiplied);
   }
   return fragmentProcessor;
 }

@@ -33,14 +33,15 @@ std::shared_ptr<Image> DecodedImage::MakeFrom(std::shared_ptr<ImageGenerator> ge
   auto height = generator->height();
   auto alphaOnly = generator->isAlphaOnly();
   auto source = ImageSource::MakeFrom(generator, tryHardware, asyncDecoding);
-  auto image = std::shared_ptr<DecodedImage>(
-      new DecodedImage(width, height, alphaOnly, std::move(source), mipmapped, generator->colorSpace()));
+  auto image = std::shared_ptr<DecodedImage>(new DecodedImage(
+      width, height, alphaOnly, std::move(source), mipmapped, generator->colorSpace()));
   image->weakThis = image;
   return image;
 }
 
 DecodedImage::DecodedImage(int width, int height, bool alphaOnly,
-                           std::shared_ptr<DataSource<ImageBuffer>> source, bool mipmapped, std::shared_ptr<ColorSpace> colorSpace)
+                           std::shared_ptr<DataSource<ImageBuffer>> source, bool mipmapped,
+                           std::shared_ptr<ColorSpace> colorSpace)
     : PixelImage(mipmapped), _width(width), _height(height), _alphaOnly(alphaOnly),
       source(std::move(source)), _colorSpace(std::move(colorSpace)) {
 }

@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/ImageGenerator.h"
 #include "tgfx/core/ImageInfo.h"
@@ -29,7 +30,6 @@
 #include "tgfx/gpu/ImageOrigin.h"
 #include "tgfx/platform/HardwareBuffer.h"
 #include "tgfx/platform/NativeImage.h"
-#include "tgfx/core/ColorSpace.h"
 
 namespace tgfx {
 template <typename T>

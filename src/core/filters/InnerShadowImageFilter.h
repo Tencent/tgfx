@@ -24,7 +24,8 @@ namespace tgfx {
 class InnerShadowImageFilter : public ImageFilter {
  public:
   InnerShadowImageFilter(float dx, float dy, float blurrinessX, float blurrinessY,
-                         const Color& color, bool shadowOnly, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+                         const Color& color, bool shadowOnly,
+                         std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   float dx = 0.0f;
   float dy = 0.0f;

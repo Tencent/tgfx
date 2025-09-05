@@ -16,15 +16,15 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <utility>
-
 #include "tgfx/core/Bitmap.h"
+#include <utility>
 #include "core/PixelRef.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
 
 namespace tgfx {
-Bitmap::Bitmap(int width, int height, bool alphaOnly, bool tryHardware, std::shared_ptr<ColorSpace> colorSpace) {
+Bitmap::Bitmap(int width, int height, bool alphaOnly, bool tryHardware,
+               std::shared_ptr<ColorSpace> colorSpace) {
   allocPixels(width, height, alphaOnly, tryHardware);
   _info.setColorSpace(colorSpace);
   pixelRef->info().setColorSpace(colorSpace);
@@ -91,7 +91,7 @@ void Bitmap::unlockPixels() const {
 
 void Bitmap::setColorSpace(const std::shared_ptr<ColorSpace>& colorSpace) const {
   _info.setColorSpace(colorSpace);
-  if(pixelRef) {
+  if (pixelRef) {
     pixelRef->info().setColorSpace(colorSpace);
   }
 }

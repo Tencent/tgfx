@@ -18,7 +18,6 @@
 
 #include "tgfx/core/Image.h"
 #include <memory>
-
 #include "ColorSpaceImage.h"
 #include "core/images/CodecImage.h"
 #include "core/images/FilterImage.h"
@@ -126,7 +125,7 @@ std::shared_ptr<Image> Image::MakeAdopted(Context* context, const BackendTexture
 }
 
 std::shared_ptr<Image> Image::makeColorSpace(std::shared_ptr<ColorSpace> colorSpace) const {
-  if(isAlphaOnly()) {
+  if (isAlphaOnly()) {
     return weakThis.lock();
   }
   auto result = std::make_shared<ColorSpaceImage>(std::move(colorSpace), weakThis.lock());

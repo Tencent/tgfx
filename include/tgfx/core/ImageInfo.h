@@ -23,8 +23,8 @@
 #include <cstddef>
 #include <cstring>
 #include "tgfx/core/AlphaType.h"
-#include "tgfx/core/ColorType.h"
 #include "tgfx/core/ColorSpace.h"
+#include "tgfx/core/ColorType.h"
 
 namespace tgfx {
 /**
@@ -42,7 +42,8 @@ class ImageInfo {
    * combination is supported. Returns an empty ImageInfo if validating fails.
    */
   static ImageInfo Make(int width, int height, ColorType colorType,
-                        AlphaType alphaType = AlphaType::Premultiplied, size_t rowBytes = 0, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+                        AlphaType alphaType = AlphaType::Premultiplied, size_t rowBytes = 0,
+                        std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   static size_t GetBytesPerPixel(ColorType colorType);
 
@@ -198,9 +199,10 @@ class ImageInfo {
   }
 
  private:
-  ImageInfo(int width, int height, ColorType colorType, AlphaType alphaType, size_t rowBytes, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB())
+  ImageInfo(int width, int height, ColorType colorType, AlphaType alphaType, size_t rowBytes,
+            std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB())
       : _width(width), _height(height), _colorType(colorType), _alphaType(alphaType),
-        _rowBytes(rowBytes), _colorSpace(std::move(colorSpace)){
+        _rowBytes(rowBytes), _colorSpace(std::move(colorSpace)) {
   }
 
   int _width = 0;

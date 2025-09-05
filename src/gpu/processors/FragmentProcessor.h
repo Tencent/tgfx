@@ -40,8 +40,10 @@ class FPArgs {
  public:
   FPArgs() = default;
 
-  FPArgs(Context* context, uint32_t renderFlags, const Rect& drawRect, float drawScale = 1.0f, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB())
-      : context(context), renderFlags(renderFlags), drawRect(drawRect), drawScale(drawScale), dstColorSpace(std::move(colorSpace)) {
+  FPArgs(Context* context, uint32_t renderFlags, const Rect& drawRect, float drawScale = 1.0f,
+         std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB())
+      : context(context), renderFlags(renderFlags), drawRect(drawRect), drawScale(drawScale),
+        dstColorSpace(std::move(colorSpace)) {
   }
 
   Context* context = nullptr;

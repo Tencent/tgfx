@@ -20,11 +20,10 @@
 #include <csetjmp>
 #include <iostream>
 #include <utility>
-
 #include "core/utils/MathExtra.h"
 #include "core/utils/OrientationHelper.h"
-#include "skcms.h"
 #include "core/utils/PixelsConvertUtil.h"
+#include "skcms.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Pixmap.h"
@@ -89,7 +88,7 @@ bool ExtractICCProfile(jpeg_decompress_struct* cinfo, std::vector<uint8_t>& iccP
         std::memcmp(marker->data, "ICC_PROFILE", 12) == 0) {
       iccProfileData.insert(iccProfileData.end(), marker->data + 14,
                             marker->data + marker->data_length);
-        }
+    }
     marker = marker->next;
   }
   return !iccProfileData.empty();
@@ -123,13 +122,13 @@ std::shared_ptr<ImageCodec> JpegCodec::MakeFromData(const std::string& filePath,
     if (jpeg_read_header(&cinfo, TRUE) != JPEG_HEADER_OK) break;
     orientation = get_exif_orientation(&cinfo);
     std::vector<uint8_t> iccProfileData;
-    if(ExtractICCProfile(&cinfo, iccProfileData)) {
+    if (ExtractICCProfile(&cinfo, iccProfileData)) {
       gfx::skcms_ICCProfile profile;
-      if(ParseICCProfile(iccProfileData, &profile)) {
-       cs = ColorSpace::Make(*reinterpret_cast<ICCProfile*>(&profile));
+      if (ParseICCProfile(iccProfileData, &profile)) {
+        cs = ColorSpace::Make(*reinterpret_cast<ICCProfile*>(&profile));
       }
     }
-    if(!cs) {
+    if (!cs) {
       cs = ColorSpace::MakeSRGB();
     }
   } while (false);
@@ -149,10 +148,10 @@ bool ConvertCMYKPixels(void* dst, const gfx::skcms_ICCProfile cmykProfile,
   switch (dstInfo.colorType()) {
     case ColorType::BGRA_8888:
       dstPixelFormat = gfx::skcms_PixelFormat_BGRA_8888;
-    break;
+      break;
     case ColorType::RGBA_8888:
       dstPixelFormat = gfx::skcms_PixelFormat_RGBA_8888;
-    break;
+      break;
     default:
       return false;
   }
@@ -199,14 +198,15 @@ uint32_t JpegCodec::getScaledDimensions(int newWidth, int newHeight) const {
   return 0;
 }
 
-bool JpegCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels, bool isConvertColorSpace) const {
-  if(!isConvertColorSpace) {
+bool JpegCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels,
+                           bool isConvertColorSpace) const {
+  if (!isConvertColorSpace) {
     dstInfo.setColorSpace(colorSpace());
   }
   if (auto scaleDimensions = getScaledDimensions(dstInfo.width(), dstInfo.height())) {
-    bool result = readScaledPixels(dstInfo.colorType(), dstInfo.alphaType(), dstInfo.rowBytes(), dstPixels,
-                            scaleDimensions);
-    if(isConvertColorSpace) {
+    bool result = readScaledPixels(dstInfo.colorType(), dstInfo.alphaType(), dstInfo.rowBytes(),
+                                   dstPixels, scaleDimensions);
+    if (isConvertColorSpace) {
       ConvertPixels(dstInfo.makeColorSpace(colorSpace()), dstPixels, dstInfo, dstPixels, true);
     }
     return result;

@@ -67,7 +67,8 @@ class ExternalRenderTargetProxy : public RenderTargetProxy {
   std::shared_ptr<RenderTarget> renderTarget = nullptr;
   std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB();
 
-  explicit ExternalRenderTargetProxy(std::shared_ptr<RenderTarget> renderTarget, std::shared_ptr<ColorSpace> colorSpace)
+  explicit ExternalRenderTargetProxy(std::shared_ptr<RenderTarget> renderTarget,
+                                     std::shared_ptr<ColorSpace> colorSpace)
       : renderTarget(std::move(renderTarget)), colorSpace(std::move(colorSpace)) {
   }
 

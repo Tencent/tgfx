@@ -187,7 +187,8 @@ void Canvas::clear(const Color& color, const std::shared_ptr<ColorSpace>& colorS
   drawColor(color, BlendMode::Src, colorSpace);
 }
 
-void Canvas::drawColor(const Color& color, BlendMode blendMode, const std::shared_ptr<ColorSpace>& colorSpace) {
+void Canvas::drawColor(const Color& color, BlendMode blendMode,
+                       const std::shared_ptr<ColorSpace>& colorSpace) {
   drawFill(*mcState, {color, blendMode, false, colorSpace});
 }
 

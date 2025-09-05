@@ -20,7 +20,6 @@
 
 #include <array>
 #include <memory>
-
 #include "ColorSpace.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Color.h"
@@ -48,7 +47,8 @@ class ColorFilter {
    * Creates a new ColorFilter that applies blends between the constant color (src) and input color
    * (dst) based on the BlendMode.
    */
-  static std::shared_ptr<ColorFilter> Blend(Color color, BlendMode mode, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+  static std::shared_ptr<ColorFilter> Blend(
+      Color color, BlendMode mode, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Creates a new ColorFilter that transforms the color using the given 4x5 matrix. The matrix can
@@ -115,7 +115,9 @@ class ColorFilter {
   virtual bool isEqual(const ColorFilter* colorFilter) const = 0;
 
  private:
-  virtual PlacementPtr<FragmentProcessor> asFragmentProcessor(Context* context, std::shared_ptr<ColorSpace> dstColorSpace = ColorSpace::MakeSRGB()) const = 0;
+  virtual PlacementPtr<FragmentProcessor> asFragmentProcessor(
+      Context* context,
+      std::shared_ptr<ColorSpace> dstColorSpace = ColorSpace::MakeSRGB()) const = 0;
 
   friend class OpsCompositor;
   friend class ColorFilterShader;

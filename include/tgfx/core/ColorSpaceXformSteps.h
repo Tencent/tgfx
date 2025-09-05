@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "tgfx/core/ColorSpace.h"
 #include <cstdint>
+#include "tgfx/core/ColorSpace.h"
 
 namespace tgfx {
 
@@ -28,33 +28,29 @@ enum class AlphaType;
 struct ColorSpaceXformSteps {
 
   struct Flags {
-    bool unpremul         = false;
-    bool linearize        = false;
-    bool src_ootf         = false;
-    bool gamut_transform  = false;
-    bool dst_ootf         = false;
-    bool encode           = false;
-    bool premul           = false;
+    bool unpremul = false;
+    bool linearize = false;
+    bool src_ootf = false;
+    bool gamut_transform = false;
+    bool dst_ootf = false;
+    bool encode = false;
+    bool premul = false;
 
     constexpr uint32_t mask() const {
-      return (unpremul        ?  1 : 0)
-           | (linearize       ?  2 : 0)
-           | (src_ootf        ? 32 : 0)
-           | (gamut_transform ?  4 : 0)
-           | (dst_ootf        ? 64 : 0)
-           | (encode          ?  8 : 0)
-           | (premul          ? 16 : 0);
+      return (unpremul ? 1 : 0) | (linearize ? 2 : 0) | (src_ootf ? 32 : 0) |
+             (gamut_transform ? 4 : 0) | (dst_ootf ? 64 : 0) | (encode ? 8 : 0) | (premul ? 16 : 0);
     }
   };
 
-  ColorSpaceXformSteps() {}
-  ColorSpaceXformSteps(const ColorSpace* src, AlphaType srcAT,
-                         const ColorSpace* dst, AlphaType dstAT);
+  ColorSpaceXformSteps() {
+  }
+  ColorSpaceXformSteps(const ColorSpace* src, AlphaType srcAT, const ColorSpace* dst,
+                       AlphaType dstAT);
 
   template <typename S, typename D>
   ColorSpaceXformSteps(const S& src, const D& dst)
-      : ColorSpaceXformSteps(src.colorSpace(), src.alphaType(),
-                               dst.colorSpace(), dst.alphaType()) {}
+      : ColorSpaceXformSteps(src.colorSpace(), src.alphaType(), dst.colorSpace(), dst.alphaType()) {
+  }
 
   void apply(float rgba[4]) const;
 
@@ -62,12 +58,12 @@ struct ColorSpaceXformSteps {
 
   Flags fFlags;
 
-  TransferFunction fSrcTF,     // Apply for linearize.
-                         fDstTFInv;  // Apply for encode.
-  float fSrcToDstMatrix[9];          // Apply this 3x3 *column*-major matrix for gamut_transform.
-  float fSrcOotf[4];                 // Apply ootf with these r,g,b coefficients and gamma before
+  TransferFunction fSrcTF,   // Apply for linearize.
+      fDstTFInv;             // Apply for encode.
+  float fSrcToDstMatrix[9];  // Apply this 3x3 *column*-major matrix for gamut_transform.
+  float fSrcOotf[4];         // Apply ootf with these r,g,b coefficients and gamma before
   // gamut_transform.
-  float fDstOotf[4];                 // Apply ootf with these r,g,b coefficients and gamma after
+  float fDstOotf[4];  // Apply ootf with these r,g,b coefficients and gamma after
   // gamut_transform.
 };
 

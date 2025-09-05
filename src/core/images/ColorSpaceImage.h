@@ -21,9 +21,10 @@
 
 namespace tgfx {
 class ColorSpaceImage : public Image {
-public:
+ public:
   ColorSpaceImage(std::shared_ptr<ColorSpace> colorSpace, std::shared_ptr<Image> image)
-    :_colorSpace(std::move(colorSpace)), _sourceImage(std::move(image)){}
+      : _colorSpace(std::move(colorSpace)), _sourceImage(std::move(image)) {
+  }
 
   ~ColorSpaceImage() override = default;
 
@@ -76,7 +77,7 @@ public:
     return image->makeColorSpace(_colorSpace);
   }
 
-protected:
+ protected:
   Type type() const override {
     return Type::ColorSpace;
   }
@@ -87,7 +88,7 @@ protected:
   }
 
   std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override {
-    auto image =  _sourceImage->onMakeMipmapped(enabled);
+    auto image = _sourceImage->onMakeMipmapped(enabled);
     return image->makeColorSpace(_colorSpace);
   }
 
@@ -101,21 +102,25 @@ protected:
     return image->makeColorSpace(_colorSpace);
   }
 
-  std::shared_ptr<Image> onMakeWithFilter(std::shared_ptr<ImageFilter> filter, Point* offset, const Rect* clipRect) const override {
+  std::shared_ptr<Image> onMakeWithFilter(std::shared_ptr<ImageFilter> filter, Point* offset,
+                                          const Rect* clipRect) const override {
     auto image = _sourceImage->onMakeWithFilter(filter, offset, clipRect);
     return image->makeColorSpace(_colorSpace);
   }
 
   std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
-                                           const SamplingOptions& sampling) const override{
+                                      const SamplingOptions& sampling) const override {
     auto scaledImage = _sourceImage->onMakeScaled(newWidth, newHeight, sampling);
     return scaledImage->makeColorSpace(_colorSpace);
   }
 
   std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
 
-  PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix) const override;
-private:
+  PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
+                                                      const SamplingArgs& samplingArgs,
+                                                      const Matrix* uvMatrix) const override;
+
+ private:
   std::shared_ptr<ColorSpace> _colorSpace;
   std::shared_ptr<Image> _sourceImage;
 };

@@ -99,13 +99,14 @@ void ShaderBuilder::appendTextureLookup(SamplerHandle samplerHandle, const std::
 }
 
 void ShaderBuilder::appendColorGamutXform(std::string* out, const char* srcColor,
-    ColorSpaceXformHelper* colorXformHelper) {
-  if(!colorXformHelper || colorXformHelper->isNoop()) {
+                                          ColorSpaceXformHelper* colorXformHelper) {
+  if (!colorXformHelper || colorXformHelper->isNoop()) {
     *out = srcColor;
     return;
   }
 
-  auto emitTFFunc = [this](const char* name, const char* tfVar0, const char* tfVar1, gfx::skcms_TFType tfType) {
+  auto emitTFFunc = [this](const char* name, const char* tfVar0, const char* tfVar1,
+                           gfx::skcms_TFType tfType) {
     std::string funcName = this->getMangledFunctionName(name);
     std::string function;
     char buffer[256];
@@ -152,13 +153,17 @@ void ShaderBuilder::appendColorGamutXform(std::string* out, const char* srcColor
   };
 
   std::string srcTFFunctionName;
-  if(colorXformHelper->applySrcTF()) {
-    srcTFFunctionName = emitTFFunc("src_tf", colorXformHelper->srcTFUniform0().c_str(), colorXformHelper->srcTFUniform1().c_str(), colorXformHelper->srcTFType());
+  if (colorXformHelper->applySrcTF()) {
+    srcTFFunctionName =
+        emitTFFunc("src_tf", colorXformHelper->srcTFUniform0().c_str(),
+                   colorXformHelper->srcTFUniform1().c_str(), colorXformHelper->srcTFType());
   }
 
   std::string dstTFFunctionName;
-  if(colorXformHelper->applyDstTF()) {
-    dstTFFunctionName = emitTFFunc("dst_tf", colorXformHelper->dstTFUniform0().c_str(), colorXformHelper->dstTFUniform1().c_str(), colorXformHelper->dstTFType());
+  if (colorXformHelper->applyDstTF()) {
+    dstTFFunctionName =
+        emitTFFunc("dst_tf", colorXformHelper->dstTFUniform0().c_str(),
+                   colorXformHelper->dstTFUniform1().c_str(), colorXformHelper->dstTFType());
   }
 
   auto emitOOTFFunc = [this](const char* name, const char* ootfVar) {
@@ -178,24 +183,25 @@ void ShaderBuilder::appendColorGamutXform(std::string* out, const char* srcColor
   };
 
   std::string srcOOTFFuncName;
-  if(colorXformHelper->applySrcOOTF()) {
+  if (colorXformHelper->applySrcOOTF()) {
     srcOOTFFuncName = emitOOTFFunc("src_ootf", colorXformHelper->srcOOTFUniform().c_str());
   }
 
   std::string dstOOTFFuncName;
-  if(colorXformHelper->applyDstOOTF()) {
+  if (colorXformHelper->applyDstOOTF()) {
     dstOOTFFuncName = emitOOTFFunc("dst_ootf", colorXformHelper->dstOOTFUniform().c_str());
   }
 
   std::string gamutXformFuncName;
-  if(colorXformHelper->applyGamutXform()) {
+  if (colorXformHelper->applyGamutXform()) {
     gamutXformFuncName = this->getMangledFunctionName("gamut_xform");
     std::string function;
     char buffer[256];
     snprintf(buffer, sizeof(buffer), "vec4 %s(vec4 color)\n", gamutXformFuncName.c_str());
     function += buffer;
     function += "{\n";
-    snprintf(buffer, sizeof(buffer), "\tcolor.rgb = (%s * color.rgb);\n", colorXformHelper->gamutXformUniform().c_str());
+    snprintf(buffer, sizeof(buffer), "\tcolor.rgb = (%s * color.rgb);\n",
+             colorXformHelper->gamutXformUniform().c_str());
     function += buffer;
     function += "\treturn color;\n";
     function += "}\n";
@@ -209,11 +215,12 @@ void ShaderBuilder::appendColorGamutXform(std::string* out, const char* srcColor
     snprintf(buffer, sizeof(buffer), "vec4 %s(vec4 color)\n", colorXformFuncName.c_str());
     function += buffer;
     function += "{\n";
-    if(colorXformHelper->applyUnpremul()) {
+    if (colorXformHelper->applyUnpremul()) {
       function += "\tfloat alpha = color.a;\n";
-      function += "\tcolor = alpha > 0.0 ? vec4(color.rgb / alpha, alpha) : vec4(0.0, 0.0, 0.0, 0.0);\n";
+      function +=
+          "\tcolor = alpha > 0.0 ? vec4(color.rgb / alpha, alpha) : vec4(0.0, 0.0, 0.0, 0.0);\n";
     }
-    if(colorXformHelper->applySrcTF()) {
+    if (colorXformHelper->applySrcTF()) {
       snprintf(buffer, sizeof(buffer), "\tcolor.r = %s(color.r);\n", srcTFFunctionName.c_str());
       function += buffer;
       snprintf(buffer, sizeof(buffer), "\tcolor.g = %s(color.g);\n", srcTFFunctionName.c_str());
@@ -221,19 +228,19 @@ void ShaderBuilder::appendColorGamutXform(std::string* out, const char* srcColor
       snprintf(buffer, sizeof(buffer), "\tcolor.b = %s(color.b);\n", srcTFFunctionName.c_str());
       function += buffer;
     }
-    if(colorXformHelper->applySrcOOTF()) {
+    if (colorXformHelper->applySrcOOTF()) {
       snprintf(buffer, sizeof(buffer), "\tcolor.rgb = %s(color.rgb);\n", srcOOTFFuncName.c_str());
       function += buffer;
     }
-    if(colorXformHelper->applyGamutXform()) {
+    if (colorXformHelper->applyGamutXform()) {
       snprintf(buffer, sizeof(buffer), "\tcolor = %s(color);\n", gamutXformFuncName.c_str());
       function += buffer;
     }
-    if(colorXformHelper->applyDstOOTF()) {
+    if (colorXformHelper->applyDstOOTF()) {
       snprintf(buffer, sizeof(buffer), "\tcolor.rgb = %s(color.rgb);\n", dstOOTFFuncName.c_str());
       function += buffer;
     }
-    if(colorXformHelper->applyDstTF()) {
+    if (colorXformHelper->applyDstTF()) {
       snprintf(buffer, sizeof(buffer), "\tcolor.r = %s(color.r);\n", dstTFFunctionName.c_str());
       function += buffer;
       snprintf(buffer, sizeof(buffer), "\tcolor.g = %s(color.g);\n", dstTFFunctionName.c_str());
@@ -241,7 +248,7 @@ void ShaderBuilder::appendColorGamutXform(std::string* out, const char* srcColor
       snprintf(buffer, sizeof(buffer), "\tcolor.b = %s(color.b);\n", dstTFFunctionName.c_str());
       function += buffer;
     }
-    if(colorXformHelper->applyPremul()) {
+    if (colorXformHelper->applyPremul()) {
       function += "\tcolor.rgb *= color.a;\n";
     }
     function += "\treturn color;\n";

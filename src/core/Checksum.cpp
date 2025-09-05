@@ -115,8 +115,8 @@ static inline uint64_t wyhash(const void* key, size_t len, uint64_t seed, const 
 }
 
 // the default secret parameters
-static const uint64_t _wyp[4] = {
-  0xa0761d6478bd642full, 0xe7037ed1a0b428dbull, 0x8ebc6af09c88c6e3ull, 0x589965cc75374cc3ull};
+static const uint64_t _wyp[4] = {0xa0761d6478bd642full, 0xe7037ed1a0b428dbull,
+                                 0x8ebc6af09c88c6e3ull, 0x589965cc75374cc3ull};
 
 uint32_t checksum::Hash32(const void* data, size_t bytes, uint32_t seed) {
   return static_cast<uint32_t>(wyhash(data, bytes, seed, _wyp));

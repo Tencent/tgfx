@@ -23,7 +23,8 @@
 namespace tgfx {
 class ColorShader : public Shader {
  public:
-  explicit ColorShader(Color color, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB()) : color(color), colorSpace(std::move(colorSpace)) {
+  explicit ColorShader(Color color, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB())
+      : color(color), colorSpace(std::move(colorSpace)) {
   }
 
   bool isOpaque() const override;

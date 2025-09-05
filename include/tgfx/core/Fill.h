@@ -37,8 +37,10 @@ class Fill {
   /**
    * Constructs a Fill with the specified color, blend mode, and antialiasing.
    */
-  Fill(const Color& color, BlendMode blendMode, bool antiAlias = true, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB())
-      : color(color), blendMode(blendMode), antiAlias(antiAlias), colorSpace(std::move(colorSpace)) {
+  Fill(const Color& color, BlendMode blendMode, bool antiAlias = true,
+       std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB())
+      : color(color), blendMode(blendMode), antiAlias(antiAlias),
+        colorSpace(std::move(colorSpace)) {
   }
 
   /**

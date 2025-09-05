@@ -131,7 +131,8 @@ Pixmap Pixmap::makeSubset(const Rect& subset) const {
   return {srcInfo, srcPixels};
 }
 
-bool Pixmap::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int srcY, bool isConvertColorSpace) const {
+bool Pixmap::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int srcY,
+                        bool isConvertColorSpace) const {
   if (_pixels == nullptr || dstPixels == nullptr) {
     return false;
   }

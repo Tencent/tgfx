@@ -68,8 +68,9 @@ class ImageFilter {
    * @param blurrinessY   The blur radius for the shadow, along the Y axis.
    * @param color         The color of the drop shadow.
    */
-  static std::shared_ptr<ImageFilter> DropShadow(float dx, float dy, float blurrinessX,
-                                                 float blurrinessY, const Color& color, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+  static std::shared_ptr<ImageFilter> DropShadow(
+      float dx, float dy, float blurrinessX, float blurrinessY, const Color& color,
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Create a filter that renders a drop shadow, in exactly the same manner as the DropShadow(),
@@ -80,8 +81,9 @@ class ImageFilter {
    * @param blurrinessY   The blur radius for the shadow, along the Y axis.
    * @param color         The color of the drop shadow.
    */
-  static std::shared_ptr<ImageFilter> DropShadowOnly(float dx, float dy, float blurrinessX,
-                                                     float blurrinessY, const Color& color, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+  static std::shared_ptr<ImageFilter> DropShadowOnly(
+      float dx, float dy, float blurrinessX, float blurrinessY, const Color& color,
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Create a filter that draws an inner shadow over the input content. This filter produces an image
@@ -92,8 +94,9 @@ class ImageFilter {
    * @param blurrinessY   The blur radius for the shadow, along the Y axis.
    * @param color         The color of the inner shadow.
    */
-  static std::shared_ptr<ImageFilter> InnerShadow(float dx, float dy, float blurrinessX,
-                                                  float blurrinessY, const Color& color, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+  static std::shared_ptr<ImageFilter> InnerShadow(
+      float dx, float dy, float blurrinessX, float blurrinessY, const Color& color,
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Create a filter that renders an inner shadow, in exactly the same manner as the InnerShadow(),
@@ -104,8 +107,9 @@ class ImageFilter {
    * @param blurrinessY   The blur radius for the shadow, along the Y axis.
    * @param color         The color of the inner shadow.
    */
-  static std::shared_ptr<ImageFilter> InnerShadowOnly(float dx, float dy, float blurrinessX,
-                                                      float blurrinessY, const Color& color, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+  static std::shared_ptr<ImageFilter> InnerShadowOnly(
+      float dx, float dy, float blurrinessX, float blurrinessY, const Color& color,
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Create a filter that applies the given color filter to the input image.

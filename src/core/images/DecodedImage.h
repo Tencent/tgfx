@@ -62,6 +62,7 @@ class DecodedImage : public PixelImage {
   std::shared_ptr<DataSource<ImageBuffer>> source = nullptr;
   std::shared_ptr<ColorSpace> _colorSpace = ColorSpace::MakeSRGB();
   DecodedImage(int width, int height, bool alphaOnly,
-               std::shared_ptr<DataSource<ImageBuffer>> source, bool mipmapped, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+               std::shared_ptr<DataSource<ImageBuffer>> source, bool mipmapped,
+               std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 };
 }  // namespace tgfx

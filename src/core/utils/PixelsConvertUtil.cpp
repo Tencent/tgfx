@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PixelsConvertUtil.h"
-#include <unordered_map>
 #include <skcms.h>
+#include <unordered_map>
 
 namespace tgfx {
 
@@ -44,37 +44,37 @@ static void CopyRectMemory(const void* src, size_t srcRB, void* dst, size_t dstR
 }
 
 static const std::unordered_map<ColorType, gfx::skcms_PixelFormat> ColorMapper{
-      {ColorType::RGBA_8888, gfx::skcms_PixelFormat::skcms_PixelFormat_RGBA_8888},
-      {ColorType::BGRA_8888, gfx::skcms_PixelFormat::skcms_PixelFormat_BGRA_8888},
-      {ColorType::ALPHA_8, gfx::skcms_PixelFormat::skcms_PixelFormat_A_8},
-      {ColorType::RGB_565, gfx::skcms_PixelFormat::skcms_PixelFormat_BGR_565},
-      {ColorType::Gray_8, gfx::skcms_PixelFormat::skcms_PixelFormat_G_8},
-      {ColorType::RGBA_F16, gfx::skcms_PixelFormat::skcms_PixelFormat_RGBA_hhhh},
-      {ColorType::RGBA_1010102, gfx::skcms_PixelFormat::skcms_PixelFormat_RGBA_1010102},
-  };
+    {ColorType::RGBA_8888, gfx::skcms_PixelFormat::skcms_PixelFormat_RGBA_8888},
+    {ColorType::BGRA_8888, gfx::skcms_PixelFormat::skcms_PixelFormat_BGRA_8888},
+    {ColorType::ALPHA_8, gfx::skcms_PixelFormat::skcms_PixelFormat_A_8},
+    {ColorType::RGB_565, gfx::skcms_PixelFormat::skcms_PixelFormat_BGR_565},
+    {ColorType::Gray_8, gfx::skcms_PixelFormat::skcms_PixelFormat_G_8},
+    {ColorType::RGBA_F16, gfx::skcms_PixelFormat::skcms_PixelFormat_RGBA_hhhh},
+    {ColorType::RGBA_1010102, gfx::skcms_PixelFormat::skcms_PixelFormat_RGBA_1010102},
+};
 
 static const std::unordered_map<AlphaType, gfx::skcms_AlphaFormat> AlphaMapper{
-      {AlphaType::Unpremultiplied, gfx::skcms_AlphaFormat::skcms_AlphaFormat_Unpremul},
-      {AlphaType::Premultiplied, gfx::skcms_AlphaFormat::skcms_AlphaFormat_PremulAsEncoded},
-      {AlphaType::Opaque, gfx::skcms_AlphaFormat::skcms_AlphaFormat_Opaque},
-  };
+    {AlphaType::Unpremultiplied, gfx::skcms_AlphaFormat::skcms_AlphaFormat_Unpremul},
+    {AlphaType::Premultiplied, gfx::skcms_AlphaFormat::skcms_AlphaFormat_PremulAsEncoded},
+    {AlphaType::Opaque, gfx::skcms_AlphaFormat::skcms_AlphaFormat_Opaque},
+};
 
 void ConvertPixels(const ImageInfo& srcInfo, const void* srcPixels, const ImageInfo& dstInfo,
-                          void* dstPixels, bool isConvertColorSpace) {
+                   void* dstPixels, bool isConvertColorSpace) {
   bool canDirectCopy = false;
-  if(srcInfo.colorType() == dstInfo.colorType() && srcInfo.alphaType() == dstInfo.alphaType()) {
+  if (srcInfo.colorType() == dstInfo.colorType() && srcInfo.alphaType() == dstInfo.alphaType()) {
     canDirectCopy = true;
-    if(isConvertColorSpace) {
-      if(ColorSpace::Equals(srcInfo.colorSpace().get(), dstInfo.colorSpace().get())) {
+    if (isConvertColorSpace) {
+      if (ColorSpace::Equals(srcInfo.colorSpace().get(), dstInfo.colorSpace().get())) {
         canDirectCopy = true;
-      }else {
+      } else {
         canDirectCopy = false;
       }
     }
   }
-  if(canDirectCopy) {
+  if (canDirectCopy) {
     CopyRectMemory(srcPixels, srcInfo.rowBytes(), dstPixels, dstInfo.rowBytes(),
-                     dstInfo.minRowBytes(), static_cast<size_t>(dstInfo.height()));
+                   dstInfo.minRowBytes(), static_cast<size_t>(dstInfo.height()));
     return;
   }
 
@@ -86,12 +86,12 @@ void ConvertPixels(const ImageInfo& srcInfo, const void* srcPixels, const ImageI
   auto height = dstInfo.height();
   gfx::skcms_ICCProfile* srcProfile = nullptr;
   gfx::skcms_ICCProfile* dstProfile = nullptr;
-  if(isConvertColorSpace) {
-    if(srcInfo.colorSpace()) {
+  if (isConvertColorSpace) {
+    if (srcInfo.colorSpace()) {
       srcProfile = static_cast<gfx::skcms_ICCProfile*>(alloca(sizeof(gfx::skcms_ICCProfile)));
       srcInfo.colorSpace()->toProfile(reinterpret_cast<ICCProfile*>(srcProfile));
     }
-    if(dstInfo.colorSpace()) {
+    if (dstInfo.colorSpace()) {
       dstProfile = static_cast<gfx::skcms_ICCProfile*>(alloca(sizeof(gfx::skcms_ICCProfile)));
       dstInfo.colorSpace()->toProfile(reinterpret_cast<ICCProfile*>(dstProfile));
     }
