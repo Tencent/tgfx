@@ -25,6 +25,8 @@
 #include "gpu/opengl/GLBuffer.h"
 
 namespace tgfx {
+class GLGPU;
+
 /**
  * GLRenderPipeline is the OpenGL implementation of the GPURenderPipeline interface. It encapsulates
  * an OpenGL shader program along with its associated state, such as vertex attributes and blending
@@ -38,18 +40,18 @@ class GLRenderPipeline : public GPURenderPipeline {
   /**
    * Binds the shader program so that it is used in subsequent draw calls.
    */
-  void activate(GLInterface* interface);
+  void activate(GLGPU* gpu);
 
   /**
    * Sets the uniform data to be used in subsequent draw calls.
    */
-  void setUniformBytes(GLInterface* interface, const void* data, size_t size);
+  void setUniformBytes(GLGPU* gpu, const void* data, size_t size);
 
   /**
    * Binds the vertex buffer to be used in subsequent draw calls. The vertexOffset is the offset
    * into the buffer where the vertex data begins.
    */
-  void setVertexBuffer(GLInterface* interface, GPUBuffer* vertexBuffer, size_t vertexOffset);
+  void setVertexBuffer(GLGPU* gpu, GPUBuffer* vertexBuffer, size_t vertexOffset);
 
   void release(GPU* gpu) override;
 

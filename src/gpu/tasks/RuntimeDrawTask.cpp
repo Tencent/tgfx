@@ -93,6 +93,8 @@ void RuntimeDrawTask::execute(CommandEncoder* encoder) {
   }
   effect->onDraw(RuntimeProgramWrapper::Unwrap(program.get()), backendTextures,
                  renderTarget->getBackendRenderTarget(), offset);
+  // Reset GL state to prevent side effects from external GL calls.
+  context->gpu()->resetGLState();
   if (renderTarget->sampleCount() > 1) {
     RenderPassDescriptor descriptor(renderTarget->getRenderTexture(),
                                     renderTarget->getSampleTexture());

@@ -18,12 +18,15 @@
 
 #pragma once
 
+#include <climits>
 #include "gpu/GPU.h"
 #include "gpu/opengl/GLCommandQueue.h"
 #include "gpu/opengl/GLInterface.h"
 
 namespace tgfx {
 class GLTexture;
+
+enum class FrameBufferTarget { Draw, Read, Both };
 
 class GLGPU : public GPU {
  public:
@@ -63,11 +66,21 @@ class GLGPU : public GPU {
 
   std::shared_ptr<CommandEncoder> createCommandEncoder() override;
 
+  void resetGLState() override;
+
+  void bindTexture(GLTexture* texture, unsigned textureUnit = 0);
+
+  void bindFramebuffer(GLTexture* texture, FrameBufferTarget target = FrameBufferTarget::Both);
+
  protected:
   explicit GLGPU(std::shared_ptr<GLInterface> glInterface);
 
  private:
   std::shared_ptr<GLInterface> interface = nullptr;
   std::unique_ptr<GLCommandQueue> commandQueue = nullptr;
+  unsigned activeTextureUint = UINT_MAX;
+  std::vector<uint32_t> textureUnits = {};
+  unsigned readFramebuffer = UINT_MAX;
+  unsigned drawFramebuffer = UINT_MAX;
 };
 }  // namespace tgfx
