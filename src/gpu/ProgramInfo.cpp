@@ -172,7 +172,7 @@ std::vector<SamplerInfo> ProgramInfo::getSamplers() const {
   std::vector<SamplerInfo> samplers = {};
   for (size_t i = 0; i < geometryProcessor->numTextureSamplers(); i++) {
     SamplerInfo sampler = {geometryProcessor->textureAt(i), geometryProcessor->samplerStateAt(i)};
-    samplers.emplace_back(sampler);
+    samplers.push_back(sampler);
   }
   FragmentProcessor::Iter iter(this);
   const FragmentProcessor* fp = iter.next();
