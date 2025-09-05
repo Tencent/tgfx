@@ -27,8 +27,6 @@ UniformBuffer::UniformBuffer(std::vector<Uniform> uniforms, bool uboSupport)
     return;
   }
 
-  printf("UniformBuffer::UniformBuffer -> uboSupport: %s\n", _uboSupport ? "true" : "false");
-
   uniformBufferLayout = std::make_unique<UniformBufferLayout>(_uboSupport);
 
   for (const auto& uniform : _uniforms) {

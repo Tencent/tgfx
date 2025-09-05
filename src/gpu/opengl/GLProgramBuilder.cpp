@@ -190,7 +190,7 @@ std::unique_ptr<PipelineProgram> GLProgramBuilder::finalize() {
   const auto& vertex = vertexShaderBuilder()->shaderString();
   const auto& fragment = fragmentShaderBuilder()->shaderString();
 
-#if 1
+#if 0
   LOGI("vertex shader:\n%s\n\n", vertex.c_str());
   LOGI("fragment shader:\n%s\n\n", fragment.c_str());
 #endif
