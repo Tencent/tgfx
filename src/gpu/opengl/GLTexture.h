@@ -20,6 +20,7 @@
 
 #include "gpu/GPUTexture.h"
 #include "gpu/opengl/GLInterface.h"
+#include "gpu/opengl/GLSampler.h"
 
 namespace tgfx {
 class GLGPU;
@@ -61,6 +62,11 @@ class GLTexture : public GPUTexture {
    */
   bool checkFrameBuffer(GLGPU* gpu);
 
+  /**
+   * Binds the texture to the specified texture unit and applies the sampler parameters.
+   */
+  void bindTexture(GLInterface* interface, unsigned textureUnit, const GLSampler* sampler);
+
   GPUTextureType type() const override;
 
   BackendTexture getBackendTexture() const override;
@@ -77,5 +83,9 @@ class GLTexture : public GPUTexture {
 
  private:
   unsigned textureFrameBuffer = 0;
+  int lastWrapS = 0;
+  int lastWrapT = 0;
+  int lastMinFilter = 0;
+  int lastMagFilter = 0;
 };
 }  // namespace tgfx

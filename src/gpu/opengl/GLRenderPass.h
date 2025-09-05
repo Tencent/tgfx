@@ -38,7 +38,7 @@ class GLRenderPass : public RenderPass {
 
   void setUniformBytes(unsigned binding, const void* data, size_t size) override;
 
-  void setTexture(unsigned binding, GPUTexture* texture, const SamplerState& state) override;
+  void setTexture(unsigned binding, GPUTexture* texture, GPUSampler* sampler) override;
 
   void setVertexBuffer(GPUBuffer* buffer, size_t offset) override;
 
