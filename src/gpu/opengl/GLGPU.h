@@ -54,8 +54,12 @@ class GLGPU : public GPU {
   std::unique_ptr<GPUTexture> importExternalTexture(const BackendTexture& backendTexture,
                                                     uint32_t usage, bool adopted) override;
 
+  std::unique_ptr<GPUFence> importExternalFence(const BackendSemaphore& semaphore) override;
+
   std::unique_ptr<GPUTexture> importExternalTexture(
       const BackendRenderTarget& renderTarget) override;
+
+  std::unique_ptr<GPUSampler> createSampler(const GPUSamplerDescriptor& descriptor) override;
 
   std::shared_ptr<CommandEncoder> createCommandEncoder() override;
 

@@ -120,6 +120,19 @@ std::shared_ptr<Program> ProgramInfo::getProgram() const {
   return program;
 }
 
+static AddressMode ToAddressMode(TileMode tileMode) {
+  switch (tileMode) {
+    case TileMode::Clamp:
+      return AddressMode::ClampToEdge;
+    case TileMode::Repeat:
+      return AddressMode::Repeat;
+    case TileMode::Mirror:
+      return AddressMode::MirrorRepeat;
+    case TileMode::Decal:
+      return AddressMode::ClampToBorder;
+  }
+}
+
 void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, PipelineProgram* program) const {
   DEBUG_ASSERT(renderTarget != nullptr);
   auto* vertexUniformBuffer = program->vertexUniformBuffer.get();
@@ -158,8 +171,12 @@ void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, PipelineProgram
 
   const auto& samplers = getSamplers();
   unsigned textureIndex = 0;
-  for (const auto& [texture, state] : samplers) {
-    renderPass->setTexture(textureIndex++, texture, state);
+  auto gpu = renderTarget->getContext()->gpu();
+  for (auto& [texture, state] : samplers) {
+    GPUSamplerDescriptor descriptor(ToAddressMode(state.tileModeX), ToAddressMode(state.tileModeY),
+                                    state.filterMode, state.filterMode, state.mipmapMode);
+    auto sampler = gpu->createSampler(descriptor);
+    renderPass->setTexture(textureIndex++, texture, sampler.get());
   }
 }
 

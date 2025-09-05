@@ -19,10 +19,10 @@
 #pragma once
 
 #include "gpu/CommandBuffer.h"
+#include "gpu/GPUFence.h"
 #include "gpu/GPUTexture.h"
 #include "gpu/RenderPass.h"
 #include "gpu/RenderPassDescriptor.h"
-#include "gpu/Semaphore.h"
 
 namespace tgfx {
 /**
@@ -61,17 +61,17 @@ class CommandEncoder {
   virtual void generateMipmapsForTexture(GPUTexture* texture) = 0;
 
   /**
-   * Inserts a signal semaphore into the command encoder. This is used to notify other
+   * Inserts a signal GPUFence into the command encoder. This is used to notify other
    * synchronization points once the preceding GPU commands have finished executing. Returns nullptr
-   * if the semaphore cannot be created or inserted.
+   * if the GPUFence cannot be created or inserted.
    */
-  virtual BackendSemaphore insertSemaphore() = 0;
+  virtual std::unique_ptr<GPUFence> insertFence() = 0;
 
   /**
-   * Makes subsequent commands added to the command encoder to wait until the specified semaphore is
+   * Makes subsequent commands added to the command encoder to wait until the specified GPUFence is
    * signaled.
    */
-  virtual void waitSemaphore(const BackendSemaphore& semaphore) = 0;
+  virtual void waitForFence(GPUFence* fence) = 0;
 
   /**
    * Finalizes command encoding and returns a CommandBuffer with all recorded commands. You can then

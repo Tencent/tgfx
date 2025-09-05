@@ -16,28 +16,26 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "tgfx/gpu/FilterMode.h"
-#include "tgfx/gpu/MipmapMode.h"
+#include "GLFence.h"
+#include "gpu/opengl/GLGPU.h"
+#include "tgfx/gpu/opengl/GLFunctions.h"
 
 namespace tgfx {
-struct SamplingOptions {
-  SamplingOptions() = default;
-
-  explicit SamplingOptions(FilterMode filterMode, MipmapMode mipmapMode = MipmapMode::Linear)
-      : filterMode(filterMode), mipmapMode(mipmapMode) {
+BackendSemaphore GLFence::getBackendSemaphore() const {
+  if (_glSync == nullptr) {
+    return {};
   }
+  GLSyncInfo glSyncInfo = {};
+  glSyncInfo.sync = _glSync;
+  return {glSyncInfo};
+}
 
-  friend bool operator==(const SamplingOptions& a, const SamplingOptions& b) {
-    return a.filterMode == b.filterMode && a.mipmapMode == b.mipmapMode;
+void GLFence::release(GPU* gpu) {
+  if (_glSync != nullptr) {
+    auto gl = static_cast<const GLGPU*>(gpu)->functions();
+    gl->deleteSync(_glSync);
+    _glSync = nullptr;
   }
+}
 
-  friend bool operator!=(const SamplingOptions& a, const SamplingOptions& b) {
-    return !(a == b);
-  }
-
-  FilterMode filterMode = FilterMode::Linear;
-  MipmapMode mipmapMode = MipmapMode::Linear;
-};
 }  // namespace tgfx

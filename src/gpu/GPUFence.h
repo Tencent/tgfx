@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,26 +18,19 @@
 
 #pragma once
 
-#include "tgfx/gpu/FilterMode.h"
-#include "tgfx/gpu/MipmapMode.h"
+#include "gpu/GPUResource.h"
+#include "tgfx/gpu/Backend.h"
 
 namespace tgfx {
-struct SamplingOptions {
-  SamplingOptions() = default;
-
-  explicit SamplingOptions(FilterMode filterMode, MipmapMode mipmapMode = MipmapMode::Linear)
-      : filterMode(filterMode), mipmapMode(mipmapMode) {
-  }
-
-  friend bool operator==(const SamplingOptions& a, const SamplingOptions& b) {
-    return a.filterMode == b.filterMode && a.mipmapMode == b.mipmapMode;
-  }
-
-  friend bool operator!=(const SamplingOptions& a, const SamplingOptions& b) {
-    return !(a == b);
-  }
-
-  FilterMode filterMode = FilterMode::Linear;
-  MipmapMode mipmapMode = MipmapMode::Linear;
+/**
+ * GPUFence is a synchronization primitive to capture, track, and manage resource dependencies
+ * across command encoders.
+ */
+class GPUFence : public GPUResource {
+ public:
+  /**
+   * Returns the backend semaphore object.
+   */
+  virtual BackendSemaphore getBackendSemaphore() const = 0;
 };
 }  // namespace tgfx
