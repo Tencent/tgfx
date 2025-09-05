@@ -89,9 +89,9 @@ struct ICCProfile {
   uint32_t tag_count;
   Curve trc[3];
   Matrix3x3 toXYZD50;
-  A2B A2B;
-  B2A B2A;
-  CICP CICP;
+  A2B a2b;
+  B2A b2a;
+  CICP cicp;
   bool has_trc;
   bool has_toXYZD50;
   bool has_A2B;

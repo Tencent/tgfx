@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #include "tgfx/core/ColorSpaceXformSteps.h"
 #include <skcms.h>
+#include <cmath>
 #include <cstring>
 #include "tgfx/core/AlphaType.h"
 #include "tgfx/core/ColorSpace.h"
