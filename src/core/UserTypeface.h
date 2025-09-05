@@ -77,11 +77,8 @@ class UserTypeface : public Typeface {
   explicit UserTypeface(uint32_t builderID, const std::string& fontFamily,
                         const std::string& fontStyle, const FontMetrics& fontMetrics,
                         const Rect& fontBounds)
-      : _builderID(builderID),
-        _fontFamily(fontFamily),
-        _fontStyle(fontStyle),
-        _fontMetrics(fontMetrics),
-        fontBounds(fontBounds) {
+      : _builderID(builderID), _fontFamily(fontFamily), _fontStyle(fontStyle),
+        _fontMetrics(fontMetrics), fontBounds(fontBounds) {
   }
 
  private:

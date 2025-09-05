@@ -27,8 +27,7 @@ class OpsRenderTask : public RenderTask {
  public:
   OpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy,
                 PlacementArray<DrawOp>&& drawOps, std::optional<Color> clearColor)
-      : renderTargetProxy(std::move(renderTargetProxy)),
-        drawOps(std::move(drawOps)),
+      : renderTargetProxy(std::move(renderTargetProxy)), drawOps(std::move(drawOps)),
         clearColor(clearColor) {
   }
 

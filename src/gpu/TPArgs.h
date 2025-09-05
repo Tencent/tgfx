@@ -31,10 +31,7 @@ class TPArgs {
 
   TPArgs(Context* context, uint32_t renderFlags, bool mipmapped, float drawScale,
          BackingFit backingFit = BackingFit::Approx)
-      : context(context),
-        renderFlags(renderFlags),
-        mipmapped(mipmapped),
-        backingFit(backingFit),
+      : context(context), renderFlags(renderFlags), mipmapped(mipmapped), backingFit(backingFit),
         drawScale(drawScale) {
   }
 

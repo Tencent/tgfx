@@ -76,10 +76,7 @@ class ColorAttachment {
   ColorAttachment(GPUTexture* texture, LoadAction loadAction = LoadAction::DontCare,
                   StoreAction storeAction = StoreAction::Store,
                   Color clearValue = Color::Transparent(), GPUTexture* resolveTexture = nullptr)
-      : texture(texture),
-        loadAction(loadAction),
-        storeAction(storeAction),
-        clearValue(clearValue),
+      : texture(texture), loadAction(loadAction), storeAction(storeAction), clearValue(clearValue),
         resolveTexture(resolveTexture) {
   }
 
@@ -128,13 +125,9 @@ class DepthStencilAttachment {
                          StoreAction storeAction = StoreAction::DontCare,
                          float depthClearValue = 1.0f, bool depthReadOnly = false,
                          uint32_t stencilClearValue = 0, bool stencilReadOnly = false)
-      : texture(texture),
-        loadAction(loadAction),
-        storeAction(storeAction),
-        depthClearValue(depthClearValue),
-        depthReadOnly(depthReadOnly),
-        stencilClearValue(stencilClearValue),
-        stencilReadOnly(stencilReadOnly) {
+      : texture(texture), loadAction(loadAction), storeAction(storeAction),
+        depthClearValue(depthClearValue), depthReadOnly(depthReadOnly),
+        stencilClearValue(stencilClearValue), stencilReadOnly(stencilReadOnly) {
   }
 
   /**

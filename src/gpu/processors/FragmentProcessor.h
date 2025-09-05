@@ -210,14 +210,10 @@ class FragmentProcessor : public Processor {
              std::string outputColor, std::string inputColor, std::string inputSubset,
              const TransformedCoordVars* transformedCoords, const TextureSamplers* textureSamplers,
              std::function<std::string(std::string_view)> coordFunc = {})
-        : fragBuilder(fragBuilder),
-          uniformHandler(uniformHandler),
-          outputColor(std::move(outputColor)),
-          inputColor(std::move(inputColor)),
-          transformedCoords(transformedCoords),
-          textureSamplers(textureSamplers),
-          coordFunc(std::move(coordFunc)),
-          inputSubset(std::move(inputSubset)) {
+        : fragBuilder(fragBuilder), uniformHandler(uniformHandler),
+          outputColor(std::move(outputColor)), inputColor(std::move(inputColor)),
+          transformedCoords(transformedCoords), textureSamplers(textureSamplers),
+          coordFunc(std::move(coordFunc)), inputSubset(std::move(inputSubset)) {
     }
 
     /**

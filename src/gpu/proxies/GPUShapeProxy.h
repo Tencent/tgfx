@@ -26,8 +26,7 @@ class GPUShapeProxy {
  public:
   GPUShapeProxy(const Matrix& drawingMatrix, std::shared_ptr<VertexBufferProxy> triangles,
                 std::shared_ptr<TextureProxy> proxy)
-      : drawingMatrix(drawingMatrix),
-        triangles(std::move(triangles)),
+      : drawingMatrix(drawingMatrix), triangles(std::move(triangles)),
         textureView(std::move(proxy)) {
   }
 

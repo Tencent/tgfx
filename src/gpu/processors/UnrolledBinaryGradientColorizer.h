@@ -41,26 +41,12 @@ class UnrolledBinaryGradientColorizer : public FragmentProcessor {
 
   UnrolledBinaryGradientColorizer(int intervalCount, Color* scales, Color* biases,
                                   Rect thresholds1_7, Rect thresholds9_13)
-      : FragmentProcessor(ClassID()),
-        intervalCount(intervalCount),
-        scale0_1(scales[0]),
-        scale2_3(scales[1]),
-        scale4_5(scales[2]),
-        scale6_7(scales[3]),
-        scale8_9(scales[4]),
-        scale10_11(scales[5]),
-        scale12_13(scales[6]),
-        scale14_15(scales[7]),
-        bias0_1(biases[0]),
-        bias2_3(biases[1]),
-        bias4_5(biases[2]),
-        bias6_7(biases[3]),
-        bias8_9(biases[4]),
-        bias10_11(biases[5]),
-        bias12_13(biases[6]),
-        bias14_15(biases[7]),
-        thresholds1_7(thresholds1_7),
-        thresholds9_13(thresholds9_13) {
+      : FragmentProcessor(ClassID()), intervalCount(intervalCount), scale0_1(scales[0]),
+        scale2_3(scales[1]), scale4_5(scales[2]), scale6_7(scales[3]), scale8_9(scales[4]),
+        scale10_11(scales[5]), scale12_13(scales[6]), scale14_15(scales[7]), bias0_1(biases[0]),
+        bias2_3(biases[1]), bias4_5(biases[2]), bias6_7(biases[3]), bias8_9(biases[4]),
+        bias10_11(biases[5]), bias12_13(biases[6]), bias14_15(biases[7]),
+        thresholds1_7(thresholds1_7), thresholds9_13(thresholds9_13) {
   }
 
   int intervalCount;

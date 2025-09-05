@@ -36,12 +36,8 @@ class DualIntervalGradientColorizer : public FragmentProcessor {
 
   DualIntervalGradientColorizer(Color scale01, Color bias01, Color scale23, Color bias23,
                                 float threshold)
-      : FragmentProcessor(ClassID()),
-        scale01(scale01),
-        bias01(bias01),
-        scale23(scale23),
-        bias23(bias23),
-        threshold(threshold) {
+      : FragmentProcessor(ClassID()), scale01(scale01), bias01(bias01), scale23(scale23),
+        bias23(bias23), threshold(threshold) {
   }
 
   Color scale01;

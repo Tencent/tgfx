@@ -68,8 +68,7 @@ class TextureRenderTarget : public DefaultTextureView, public RenderTarget {
   TextureRenderTarget(std::unique_ptr<GPUTexture> texture,
                       std::unique_ptr<GPUTexture> renderTexture, ImageOrigin origin,
                       bool externallyOwned)
-      : DefaultTextureView(std::move(texture), origin),
-        renderTexture(std::move(renderTexture)),
+      : DefaultTextureView(std::move(texture), origin), renderTexture(std::move(renderTexture)),
         _externallyOwned(externallyOwned) {
   }
 
