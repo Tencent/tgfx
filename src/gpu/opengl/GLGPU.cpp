@@ -28,7 +28,7 @@
 namespace tgfx {
 GLGPU::GLGPU(std::shared_ptr<GLInterface> glInterface) : interface(std::move(glInterface)) {
   commandQueue = std::make_unique<GLCommandQueue>(this);
-  textureUnits.resize(static_cast<size_t>(interface->caps()->maxFragmentSamplers), 0);
+  textureUnits.resize(static_cast<size_t>(interface->caps()->maxFragmentSamplers), INVALID_VALUE);
 }
 
 std::unique_ptr<GPUBuffer> GLGPU::createBuffer(size_t size, uint32_t usage) {
@@ -219,10 +219,10 @@ std::shared_ptr<CommandEncoder> GLGPU::createCommandEncoder() {
 }
 
 void GLGPU::resetGLState() {
-  activeTextureUint = UINT_MAX;
-  memset(textureUnits.data(), 0, textureUnits.size() * sizeof(textureUnits[0]));
-  readFramebuffer = UINT_MAX;
-  drawFramebuffer = UINT_MAX;
+  activeTextureUint = INVALID_VALUE;
+  textureUnits.assign(textureUnits.size(), INVALID_VALUE);
+  readFramebuffer = INVALID_VALUE;
+  drawFramebuffer = INVALID_VALUE;
 }
 
 void GLGPU::bindTexture(GLTexture* texture, unsigned textureUnit) {

@@ -18,13 +18,15 @@
 
 #pragma once
 
-#include <climits>
+#include <limits>
 #include "gpu/GPU.h"
 #include "gpu/opengl/GLCommandQueue.h"
 #include "gpu/opengl/GLInterface.h"
 
 namespace tgfx {
 class GLTexture;
+
+static constexpr unsigned INVALID_VALUE = std::numeric_limits<unsigned>::max();
 
 enum class FrameBufferTarget { Draw, Read, Both };
 
@@ -78,9 +80,9 @@ class GLGPU : public GPU {
  private:
   std::shared_ptr<GLInterface> interface = nullptr;
   std::unique_ptr<GLCommandQueue> commandQueue = nullptr;
-  unsigned activeTextureUint = UINT_MAX;
+  unsigned activeTextureUint = INVALID_VALUE;
   std::vector<uint32_t> textureUnits = {};
-  unsigned readFramebuffer = UINT_MAX;
-  unsigned drawFramebuffer = UINT_MAX;
+  unsigned readFramebuffer = INVALID_VALUE;
+  unsigned drawFramebuffer = INVALID_VALUE;
 };
 }  // namespace tgfx
