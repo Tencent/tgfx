@@ -167,7 +167,7 @@ std::shared_ptr<Image> Surface::makeImageSnapshot() {
     textureProxy = renderTarget->makeTextureProxy();
     drawingManager->addRenderTargetCopyTask(renderTarget, textureProxy);
   }
-  cachedImage = TextureImage::Wrap(std::move(textureProxy));
+  cachedImage = TextureImage::Wrap(std::move(textureProxy), renderTarget->getColorSpace());
   return cachedImage;
 }
 

@@ -56,6 +56,9 @@ public:
     }
 
     void setData(UniformBuffer* uniformBuffer, const ColorSpaceXformSteps* colorSpaceXform) {
+      if (colorSpaceXform) {
+        fFlags = colorSpaceXform->fFlags;
+      }
       if(this->applySrcTF()) {
         float srcTF0[4] = {colorSpaceXform->fSrcTF.g, colorSpaceXform->fSrcTF.a, colorSpaceXform->fSrcTF.b, colorSpaceXform->fSrcTF.c};
         float srcTF1[4] = {colorSpaceXform->fSrcTF.d, colorSpaceXform->fSrcTF.e, colorSpaceXform->fSrcTF.f, 0.0f};
