@@ -18,20 +18,23 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
 #include "gpu/Uniform.h"
+#include "gpu/UniformBufferLayout.h"
 #include "tgfx/core/Matrix.h"
 
 namespace tgfx {
+static const std::string VertexUniformBlockName = "VertexUniformBlock";
+static const std::string FragmentUniformBlockName = "FragmentUniformBlock";
+
 /**
  * An object representing the collection of uniform variables in a GPU program.
  */
 class UniformBuffer {
  public:
-  ~UniformBuffer();
-
   /**
    * Copies value into the uniform buffer. The data must have the same size as the uniform specified
    * by name.
@@ -51,14 +54,14 @@ class UniformBuffer {
    * Returns a pointer to the start of the uniform buffer in memory.
    */
   const void* data() const {
-    return _buffer;
+    return buffer.data();
   }
 
   /**
    * Returns the size of the uniform buffer in bytes.
    */
   size_t size() const {
-    return offsets.back();
+    return buffer.size();
   }
 
   /**
@@ -68,14 +71,21 @@ class UniformBuffer {
     return _uniforms;
   }
 
- private:
-  uint8_t* _buffer = nullptr;
-  std::vector<Uniform> _uniforms = {};
-  std::unordered_map<std::string, size_t> uniformMap = {};
-  std::vector<size_t> offsets = {};
-  std::string nameSuffix = "";
+  /**
+   * Returns true if UBO is supported in the current context.
+   */
+  bool uboSupport() const {
+    return _uboSupport;
+  }
 
-  UniformBuffer(std::vector<Uniform> uniforms, std::unordered_map<std::string, size_t> uniformMap);
+ private:
+  std::vector<uint8_t> buffer = {};
+  std::vector<Uniform> _uniforms = {};
+  std::string nameSuffix = "";
+  std::unique_ptr<UniformBufferLayout> uniformBufferLayout = nullptr;
+  bool _uboSupport = false;
+
+  explicit UniformBuffer(std::vector<Uniform> uniforms, bool uboSupport = false);
 
   void onSetData(const std::string& name, const void* data, size_t size);
 

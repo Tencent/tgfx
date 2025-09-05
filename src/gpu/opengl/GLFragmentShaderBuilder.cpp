@@ -32,16 +32,17 @@ GLFragmentShaderBuilder::GLFragmentShaderBuilder(ProgramBuilder* program)
 }
 
 std::string GLFragmentShaderBuilder::dstColor() {
-  auto caps = GLCaps::Get(programBuilder->getContext());
+  const auto* caps = GLCaps::Get(programBuilder->getContext());
   if (caps->frameBufferFetchSupport) {
     addFeature(PrivateFeature::FramebufferFetch, caps->frameBufferFetchExtensionString);
-    return caps->frameBufferFetchColorName;
+    const bool isLegacyES = static_cast<GLProgramBuilder*>(programBuilder)->isLegacyES();
+    return isLegacyES ? caps->frameBufferFetchColorName : CustomColorOutputName();
   }
   return DstColorName;
 }
 
 std::string GLFragmentShaderBuilder::colorOutputName() {
-  return static_cast<GLProgramBuilder*>(programBuilder)->isDesktopGL() ? CustomColorOutputName()
-                                                                       : "gl_FragColor";
+  return static_cast<GLProgramBuilder*>(programBuilder)->isLegacyES() ? "gl_FragColor"
+                                                                      : CustomColorOutputName();
 }
 }  // namespace tgfx

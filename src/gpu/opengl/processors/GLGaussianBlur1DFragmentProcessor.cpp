@@ -75,7 +75,7 @@ void GLGaussianBlur1DFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("%s = sum / total;", args.outputColor.c_str());
 }
 
-void GLGaussianBlur1DFragmentProcessor::onSetData(UniformBuffer* uniformBuffer) const {
+void GLGaussianBlur1DFragmentProcessor::onSetData(UniformBuffer* /*vertexUniformBuffer*/, UniformBuffer* fragmentUniformBuffer) const {
   auto* processor = childProcessor(0);
   Point stepVectors[] = {{0, 0}, {stepLength, 0}};
   if (direction == GaussianBlurDirection::Vertical) {
@@ -87,7 +87,7 @@ void GLGaussianBlur1DFragmentProcessor::onSetData(UniformBuffer* uniformBuffer) 
   auto matrix = transform->getTotalMatrix();
   matrix.mapPoints(stepVectors, 2);
   Point step = stepVectors[1] - stepVectors[0];
-  uniformBuffer->setData("Sigma", sigma);
-  uniformBuffer->setData("Step", step);
+  fragmentUniformBuffer->setData("Sigma", sigma);
+  fragmentUniformBuffer->setData("Step", step);
 }
 }  // namespace tgfx

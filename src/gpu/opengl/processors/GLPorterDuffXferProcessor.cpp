@@ -76,7 +76,7 @@ void GLPorterDuffXferProcessor::emitCode(const EmitArgs& args) const {
   fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), outColor);
 }
 
-void GLPorterDuffXferProcessor::setData(UniformBuffer* uniformBuffer) const {
+void GLPorterDuffXferProcessor::setData(UniformBuffer* /*vertexUniformBuffer*/, UniformBuffer* fragmentUniformBuffer) const {
   if (dstTextureInfo.textureProxy == nullptr) {
     return;
   }
@@ -84,7 +84,7 @@ void GLPorterDuffXferProcessor::setData(UniformBuffer* uniformBuffer) const {
   if (dstTextureView == nullptr) {
     return;
   }
-  uniformBuffer->setData("DstTextureUpperLeft", dstTextureInfo.offset);
+  fragmentUniformBuffer->setData("DstTextureUpperLeft", dstTextureInfo.offset);
   int width;
   int height;
   if (dstTextureView->getTexture()->type() == GPUTextureType::Rectangle) {
@@ -95,6 +95,6 @@ void GLPorterDuffXferProcessor::setData(UniformBuffer* uniformBuffer) const {
     height = dstTextureView->height();
   }
   float scales[] = {1.f / static_cast<float>(width), 1.f / static_cast<float>(height)};
-  uniformBuffer->setData("DstTextureCoordScale", scales);
+  fragmentUniformBuffer->setData("DstTextureCoordScale", scales);
 }
 }  // namespace tgfx

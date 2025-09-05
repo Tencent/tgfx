@@ -59,8 +59,8 @@ void GLClampedGradientEffect::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("%s *= %s.a;", args.outputColor.c_str(), args.inputColor.c_str());
 }
 
-void GLClampedGradientEffect::onSetData(UniformBuffer* uniformBuffer) const {
-  uniformBuffer->setData("leftBorderColor", leftBorderColor);
-  uniformBuffer->setData("rightBorderColor", rightBorderColor);
+void GLClampedGradientEffect::onSetData(UniformBuffer* /*vertexUniformBuffer*/, UniformBuffer* fragmentUniformBuffer) const {
+  fragmentUniformBuffer->setData("leftBorderColor", leftBorderColor);
+  fragmentUniformBuffer->setData("rightBorderColor", rightBorderColor);
 }
 }  // namespace tgfx

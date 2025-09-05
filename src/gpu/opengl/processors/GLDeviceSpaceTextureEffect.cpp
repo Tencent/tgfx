@@ -52,7 +52,7 @@ void GLDeviceSpaceTextureEffect::emitCode(EmitArgs& args) const {
   }
 }
 
-void GLDeviceSpaceTextureEffect::onSetData(UniformBuffer* uniformBuffer) const {
+void GLDeviceSpaceTextureEffect::onSetData(UniformBuffer* /*vertexUniformBuffer*/, UniformBuffer* fragmentUniformBuffer) const {
   auto textureView = textureProxy->getTextureView();
   if (textureView == nullptr) {
     return;
@@ -60,6 +60,6 @@ void GLDeviceSpaceTextureEffect::onSetData(UniformBuffer* uniformBuffer) const {
   auto deviceCoordMatrix = uvMatrix;
   auto scale = textureView->getTextureCoord(1, 1);
   deviceCoordMatrix.postScale(scale.x, scale.y);
-  uniformBuffer->setData("DeviceCoordMatrix", deviceCoordMatrix);
+  fragmentUniformBuffer->setData("DeviceCoordMatrix", deviceCoordMatrix);
 }
 }  // namespace tgfx

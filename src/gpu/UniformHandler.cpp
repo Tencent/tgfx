@@ -66,36 +66,25 @@ ShaderVar UniformHandler::getSamplerVariable(SamplerHandle handle) const {
   return ShaderVar(uniform);
 }
 
-std::unique_ptr<UniformBuffer> UniformHandler::makeUniformBuffer() const {
-  std::vector<Uniform> uniforms = {};
-  std::unordered_map<std::string, size_t> uniformMap = {};
-  size_t index = 0;
-  // Merge uniforms with the same name across shader stages.
-  for (auto& uniform : vertexUniforms) {
-    if (uniformMap.count(uniform.name()) > 0) {
-      continue;
-    }
-    uniformMap[uniform.name()] = index++;
-    uniforms.emplace_back(uniform);
-  }
-  for (auto& uniform : fragmentUniforms) {
-    if (uniformMap.count(uniform.name()) > 0) {
-      continue;
-    }
-    uniformMap[uniform.name()] = index++;
-    uniforms.emplace_back(uniform);
-  }
+std::unique_ptr<UniformBuffer> UniformHandler::makeUniformBuffer(ShaderStage stage) const {
+  const auto* caps = programBuilder->getContext()->caps();
   return std::unique_ptr<UniformBuffer>(
-      new UniformBuffer(std::move(uniforms), std::move(uniformMap)));
+      new UniformBuffer(stage == ShaderStage::Vertex ? vertexUniforms : fragmentUniforms, caps->uboSupport));
 }
 
 std::string UniformHandler::getUniformDeclarations(ShaderStage stage) const {
   std::string ret;
   auto& uniforms = stage == ShaderStage::Vertex ? vertexUniforms : fragmentUniforms;
-  for (auto& uniform : uniforms) {
-    ret += programBuilder->getShaderVarDeclarations(ShaderVar(uniform), stage);
-    ret += ";\n";
+  const auto* caps = programBuilder->getContext()->caps();
+  if (caps->uboSupport) {
+    ret += programBuilder->getUniformBlockDeclaration(stage, uniforms);
+  } else {
+    for (auto& uniform : uniforms) {
+      ret += programBuilder->getShaderVarDeclarations(ShaderVar(uniform), stage);
+      ret += ";\n";
+    }
   }
+
   if (stage == ShaderStage::Fragment) {
     for (const auto& sampler : samplers) {
       ret += programBuilder->getShaderVarDeclarations(ShaderVar(sampler), stage);

@@ -36,6 +36,7 @@ class ShaderVar {
     FlatVarying,
     Uniform,
     Out,
+    InOut
   };
 
   ShaderVar() = default;

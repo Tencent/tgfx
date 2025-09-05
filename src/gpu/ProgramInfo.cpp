@@ -122,32 +122,44 @@ std::shared_ptr<Program> ProgramInfo::getProgram() const {
 
 void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, PipelineProgram* program) const {
   DEBUG_ASSERT(renderTarget != nullptr);
-  auto uniformBuffer = program->uniformBuffer.get();
-  DEBUG_ASSERT(uniformBuffer != nullptr);
+  auto* vertexUniformBuffer = program->vertexUniformBuffer.get();
+  auto* fragmentUniformBuffer = program->fragmentUniformBuffer.get();
+
+  DEBUG_ASSERT(vertexUniformBuffer != nullptr);
+  DEBUG_ASSERT(fragmentUniformBuffer != nullptr);
+
   auto array = GetRTAdjustArray(renderTarget);
-  uniformBuffer->setData(RTAdjustName, array);
-  uniformBuffer->nameSuffix = getMangledSuffix(geometryProcessor);
+  vertexUniformBuffer->setData(RTAdjustName, array);
+  vertexUniformBuffer->nameSuffix = getMangledSuffix(geometryProcessor);
+  fragmentUniformBuffer->nameSuffix = getMangledSuffix(geometryProcessor);
+
   FragmentProcessor::CoordTransformIter coordTransformIter(this);
-  geometryProcessor->setData(uniformBuffer, &coordTransformIter);
+  geometryProcessor->setData(vertexUniformBuffer, fragmentUniformBuffer, &coordTransformIter);
+
   for (auto& fragmentProcessor : fragmentProcessors) {
     FragmentProcessor::Iter iter(fragmentProcessor);
     const FragmentProcessor* fp = iter.next();
     while (fp) {
-      uniformBuffer->nameSuffix = getMangledSuffix(fp);
-      fp->setData(uniformBuffer);
+      vertexUniformBuffer->nameSuffix = getMangledSuffix(fp);
+      fragmentUniformBuffer->nameSuffix = getMangledSuffix(fp);
+      fp->setData(vertexUniformBuffer, fragmentUniformBuffer);
       fp = iter.next();
     }
   }
-  auto processor = getXferProcessor();
-  uniformBuffer->nameSuffix = getMangledSuffix(processor);
-  processor->setData(uniformBuffer);
-  uniformBuffer->nameSuffix = "";
-  renderPass->setUniformBytes(0, uniformBuffer->data(), uniformBuffer->size());
+  const auto* processor = getXferProcessor();
+  vertexUniformBuffer->nameSuffix = getMangledSuffix(processor);
+  fragmentUniformBuffer->nameSuffix = getMangledSuffix(processor);
+  processor->setData(vertexUniformBuffer, fragmentUniformBuffer);
+  vertexUniformBuffer->nameSuffix = "";
+  fragmentUniformBuffer->nameSuffix = "";
 
-  auto samplers = getSamplers();
+  renderPass->setUniformBytes(0, vertexUniformBuffer->data(), vertexUniformBuffer->size());
+  renderPass->setUniformBytes(1, fragmentUniformBuffer->data(), fragmentUniformBuffer->size());
+
+  const auto& samplers = getSamplers();
   unsigned textureIndex = 0;
-  for (auto& sampler : samplers) {
-    renderPass->setTexture(textureIndex++, sampler.texture, sampler.state);
+  for (const auto& [texture, state] : samplers) {
+    renderPass->setTexture(textureIndex++, texture, state);
   }
 }
 

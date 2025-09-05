@@ -129,11 +129,11 @@ void GLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("%s = vec4(edgeAlpha);", args.outputCoverage.c_str());
 }
 
-void GLEllipseGeometryProcessor::setData(UniformBuffer* uniformBuffer,
+void GLEllipseGeometryProcessor::setData(UniformBuffer* vertexUniformBuffer, UniformBuffer* fragmentUniformBuffer,
                                          FPCoordTransformIter* transformIter) const {
-  setTransformDataHelper(Matrix::I(), uniformBuffer, transformIter);
+  setTransformDataHelper(Matrix::I(), vertexUniformBuffer, transformIter);
   if (commonColor.has_value()) {
-    uniformBuffer->setData("Color", *commonColor);
+    fragmentUniformBuffer->setData("Color", *commonColor);
   }
 }
 }  // namespace tgfx

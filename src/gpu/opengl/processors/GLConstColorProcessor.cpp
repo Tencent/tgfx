@@ -45,7 +45,7 @@ void GLConstColorProcessor::emitCode(EmitArgs& args) const {
   }
 }
 
-void GLConstColorProcessor::onSetData(UniformBuffer* uniformBuffer) const {
-  uniformBuffer->setData("Color", color);
+void GLConstColorProcessor::onSetData(UniformBuffer* /*vertexUniformBuffer*/, UniformBuffer* fragmentUniformBuffer) const {
+  fragmentUniformBuffer->setData("Color", color);
 }
 }  // namespace tgfx

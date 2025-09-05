@@ -269,24 +269,24 @@ void SetUniformData(UniformBuffer* uniformBuffer, const std::string& name, int i
   }
 }
 
-void GLUnrolledBinaryGradientColorizer::onSetData(UniformBuffer* uniformBuffer) const {
-  SetUniformData(uniformBuffer, "scale0_1", intervalCount, 0, scale0_1);
-  SetUniformData(uniformBuffer, "scale2_3", intervalCount, 1, scale2_3);
-  SetUniformData(uniformBuffer, "scale4_5", intervalCount, 2, scale4_5);
-  SetUniformData(uniformBuffer, "scale6_7", intervalCount, 3, scale6_7);
-  SetUniformData(uniformBuffer, "scale8_9", intervalCount, 4, scale8_9);
-  SetUniformData(uniformBuffer, "scale10_11", intervalCount, 5, scale10_11);
-  SetUniformData(uniformBuffer, "scale12_13", intervalCount, 6, scale12_13);
-  SetUniformData(uniformBuffer, "scale14_15", intervalCount, 7, scale14_15);
-  SetUniformData(uniformBuffer, "bias0_1", intervalCount, 0, bias0_1);
-  SetUniformData(uniformBuffer, "bias2_3", intervalCount, 1, bias2_3);
-  SetUniformData(uniformBuffer, "bias4_5", intervalCount, 2, bias4_5);
-  SetUniformData(uniformBuffer, "bias6_7", intervalCount, 3, bias6_7);
-  SetUniformData(uniformBuffer, "bias8_9", intervalCount, 4, bias8_9);
-  SetUniformData(uniformBuffer, "bias10_11", intervalCount, 5, bias10_11);
-  SetUniformData(uniformBuffer, "bias12_13", intervalCount, 6, bias12_13);
-  SetUniformData(uniformBuffer, "bias14_15", intervalCount, 7, bias14_15);
-  uniformBuffer->setData("thresholds1_7", thresholds1_7);
-  uniformBuffer->setData("thresholds9_13", thresholds9_13);
+void GLUnrolledBinaryGradientColorizer::onSetData(UniformBuffer* /*vertexUniformBuffer*/, UniformBuffer* fragmentUniformBuffer) const {
+  SetUniformData(fragmentUniformBuffer, "scale0_1", intervalCount, 0, scale0_1);
+  SetUniformData(fragmentUniformBuffer, "scale2_3", intervalCount, 1, scale2_3);
+  SetUniformData(fragmentUniformBuffer, "scale4_5", intervalCount, 2, scale4_5);
+  SetUniformData(fragmentUniformBuffer, "scale6_7", intervalCount, 3, scale6_7);
+  SetUniformData(fragmentUniformBuffer, "scale8_9", intervalCount, 4, scale8_9);
+  SetUniformData(fragmentUniformBuffer, "scale10_11", intervalCount, 5, scale10_11);
+  SetUniformData(fragmentUniformBuffer, "scale12_13", intervalCount, 6, scale12_13);
+  SetUniformData(fragmentUniformBuffer, "scale14_15", intervalCount, 7, scale14_15);
+  SetUniformData(fragmentUniformBuffer, "bias0_1", intervalCount, 0, bias0_1);
+  SetUniformData(fragmentUniformBuffer, "bias2_3", intervalCount, 1, bias2_3);
+  SetUniformData(fragmentUniformBuffer, "bias4_5", intervalCount, 2, bias4_5);
+  SetUniformData(fragmentUniformBuffer, "bias6_7", intervalCount, 3, bias6_7);
+  SetUniformData(fragmentUniformBuffer, "bias8_9", intervalCount, 4, bias8_9);
+  SetUniformData(fragmentUniformBuffer, "bias10_11", intervalCount, 5, bias10_11);
+  SetUniformData(fragmentUniformBuffer, "bias12_13", intervalCount, 6, bias12_13);
+  SetUniformData(fragmentUniformBuffer, "bias14_15", intervalCount, 7, bias14_15);
+  fragmentUniformBuffer->setData("thresholds1_7", thresholds1_7);
+  fragmentUniformBuffer->setData("thresholds9_13", thresholds9_13);
 }
 }  // namespace tgfx

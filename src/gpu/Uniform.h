@@ -41,6 +41,10 @@ enum class UniformFormat {
   Texture2DRectSampler,    // Rectangle texture sampler.
 };
 
+#if DEBUG
+const char* ToUniformFormatName(UniformFormat format);
+#endif
+
 /**
  * Represents a uniform variable in a GPU program.
  */

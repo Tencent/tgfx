@@ -33,7 +33,7 @@ class GLTextureEffect : public TextureEffect {
  private:
   void emitDefaultTextureCode(EmitArgs& args) const;
   void emitYUVTextureCode(EmitArgs& args) const;
-  void onSetData(UniformBuffer* uniformBuffer) const override;
+  void onSetData(UniformBuffer* vertexUniformBuffer, UniformBuffer* fragmentUniformBuffer) const override;
   void appendClamp(FragmentShaderBuilder* fragBuilder, const std::string& vertexColor,
                    const std::string& finalCoordName, const std::string& subsetName,
                    const std::string& extraSubsetName) const;

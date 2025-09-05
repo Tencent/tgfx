@@ -67,9 +67,9 @@ void GLRenderPass::setPipeline(GPURenderPipeline* pipeline) {
   renderPipeline->activate(interface.get());
 }
 
-void GLRenderPass::setUniformBytes(unsigned, const void* data, size_t size) {
+void GLRenderPass::setUniformBytes(unsigned binding, const void* data, size_t size) {
   DEBUG_ASSERT(renderPipeline != nullptr);
-  renderPipeline->setUniformBytes(interface.get(), data, size);
+  renderPipeline->setUniformBytes(interface.get(), binding, data, size);
 }
 
 static int FilterToGLMagFilter(FilterMode filterMode) {

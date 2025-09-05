@@ -49,4 +49,41 @@ size_t Uniform::size() const {
   }
   return 0;
 }
+
+#if DEBUG
+const char* ToUniformFormatName(UniformFormat format) {
+  switch (format) {
+    case UniformFormat::Float:
+      return "Float";
+    case UniformFormat::Float2:
+      return "Float2";
+    case UniformFormat::Float3:
+      return "Float3";
+    case UniformFormat::Float4:
+      return "Float4";
+    case UniformFormat::Float2x2:
+      return "Float2x2";
+    case UniformFormat::Float3x3:
+      return "Float3x3";
+    case UniformFormat::Float4x4:
+      return "Float4x4";
+    case UniformFormat::Int:
+      return "Int";
+    case UniformFormat::Int2:
+      return "Int2";
+    case UniformFormat::Int3:
+      return "Int3";
+    case UniformFormat::Int4:
+      return "Int4";
+    case UniformFormat::Texture2DSampler:
+      return "Texture2DSampler";
+    case UniformFormat::TextureExternalSampler:
+      return "TextureExternalSampler";
+    case UniformFormat::Texture2DRectSampler:
+      return "Texture2DRectSampler";
+    default:
+      return "?";
+  }
+}
+#endif
 }  // namespace tgfx

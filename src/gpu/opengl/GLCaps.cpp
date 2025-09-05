@@ -85,6 +85,7 @@ GLInfo::GLInfo(GLGetString* getString, GLGetStringi* getStringi, GLGetIntegerv* 
     : getString(getString), getStringi(getStringi), getIntegerv(getIntegerv),
       getInternalformativ(getInternalformativ), getShaderPrecisionFormat(getShaderPrecisionFormat) {
   auto versionString = (const char*)getString(GL_VERSION);
+  LOGI("OpenGL Version: %s\n", versionString);
   auto glVersion = GetGLVersion(versionString);
   version = GL_VER(glVersion.majorVersion, glVersion.minorVersion);
   standard = GetGLStandard(versionString);
@@ -254,6 +255,8 @@ void GLCaps::initGLSupport(const GLInfo& info) {
   if (version < GL_VER(1, 3) && !info.hasExtension("GL_ARB_texture_border_clamp")) {
     clampToBorderSupport = false;
   }
+
+  uboSupport = version >= GL_VER(3, 1);
 }
 
 void GLCaps::initGLESSupport(const GLInfo& info) {
@@ -292,6 +295,8 @@ void GLCaps::initGLESSupport(const GLInfo& info) {
   npotTextureTileSupport = version >= GL_VER(3, 0) || info.hasExtension("GL_OES_texture_npot");
   mipmapSupport = npotTextureTileSupport || info.hasExtension("GL_IMG_texture_npot");
   usesPrecisionModifiers = true;
+
+  uboSupport = version >= GL_VER(3, 0);
 }
 
 void GLCaps::initWebGLSupport(const GLInfo& info) {
@@ -309,6 +314,9 @@ void GLCaps::initWebGLSupport(const GLInfo& info) {
   npotTextureTileSupport = version >= GL_VER(2, 0);
   mipmapSupport = npotTextureTileSupport;
   usesPrecisionModifiers = true;
+
+  // WebGL 1.0 doesn't support UBOs, but WebGL 2.0 does.
+  uboSupport = version >= GL_VER(2, 0);
 }
 
 void GLCaps::initFormatMap(const GLInfo& info) {
