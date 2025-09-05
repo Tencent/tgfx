@@ -585,8 +585,8 @@ std::vector<DrawTask> DisplayList::getFallbackDrawTasks(
     return tasks;
   };
   for (auto iterator = firstGreaterTileCache; iterator < sortedCaches.end(); iterator++) {
-    auto tasks = findFallbackTasks(iterator->scale, iterator->tileCache, currentZoomScale, tileRect,
-                                   _tileSize);
+    auto tasks =
+        findFallbackTasks(iterator->first, iterator->second, currentZoomScale, tileRect, _tileSize);
     if (!tasks.empty()) {
       return tasks;
     }
@@ -595,8 +595,8 @@ std::vector<DrawTask> DisplayList::getFallbackDrawTasks(
     return {};
   }
   for (auto iterator = firstGreaterTileCache - 1; iterator >= sortedCaches.begin(); iterator--) {
-    auto tasks = findFallbackTasks(iterator->scale, iterator->tileCache, currentZoomScale, tileRect,
-                                   _tileSize);
+    auto tasks =
+        findFallbackTasks(iterator->first, iterator->second, currentZoomScale, tileRect, _tileSize);
     if (!tasks.empty()) {
       return tasks;
     }
