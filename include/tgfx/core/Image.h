@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/ImageGenerator.h"
 #include "tgfx/core/ImageInfo.h"
@@ -204,6 +205,15 @@ class Image {
   }
 
   /**
+   * return colorspace of this image.
+   */
+  virtual std::shared_ptr<ColorSpace> colorSpace() const {
+    return ColorSpace::MakeSRGB();
+  }
+
+  virtual std::shared_ptr<Image> makeColorSpace(std::shared_ptr<ColorSpace> colorSpace) const;
+
+  /**
    * Returns an Image backed by a GPU texture associated with the given context. If a corresponding
    * texture cache exists in the context, it returns an Image that wraps that texture. Otherwise, it
    * creates one immediately. If the Image is already texture-backed and the context is compatible
@@ -311,7 +321,8 @@ class Image {
     RGBAAA,
     Texture,
     Subset,
-    Scaled
+    Scaled,
+    ColorSpace
   };
 
   virtual Type type() const = 0;
@@ -362,6 +373,7 @@ class Image {
   friend class RasterizedImage;
   friend class ScaledImage;
   friend class ImageShader;
+  friend class ColorSpaceImage;
   friend class Types;
 };
 }  // namespace tgfx

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/RecordingContext.h"
+#include "tgfx/core/ColorSpaceXformSteps.h"
 #include "utils/Log.h"
 #include "utils/RectToRectMatrix.h"
 

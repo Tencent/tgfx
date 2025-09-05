@@ -37,12 +37,16 @@ class NV12HardwareBuffer : public ImageBuffer {
     return false;
   }
 
+  std::shared_ptr<ColorSpace> colorSpace() const override {
+    return ColorSpace::MakeSRGB();
+  }
+
  protected:
   std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) const override;
 
  private:
   CVPixelBufferRef pixelBuffer = nullptr;
-  YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED;
+  YUVColorSpace _colorSpace = YUVColorSpace::BT601_LIMITED;
 
   NV12HardwareBuffer(CVPixelBufferRef pixelBuffer, YUVColorSpace colorSpace);
 };

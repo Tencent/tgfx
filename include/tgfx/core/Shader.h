@@ -41,7 +41,8 @@ class Shader {
   /**
    * Creates a shader that draws the specified color.
    */
-  static std::shared_ptr<Shader> MakeColorShader(Color color);
+  static std::shared_ptr<Shader> MakeColorShader(
+      Color color, const std::shared_ptr<ColorSpace>& colorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Creates a shader that draws the specified image.
@@ -68,9 +69,10 @@ class Shader {
    * If this is not empty, the values must begin with 0, end with 1.0, and intermediate values must
    * be strictly increasing.
    */
-  static std::shared_ptr<Shader> MakeLinearGradient(const Point& startPoint, const Point& endPoint,
-                                                    const std::vector<Color>& colors,
-                                                    const std::vector<float>& positions = {});
+  static std::shared_ptr<Shader> MakeLinearGradient(
+      const Point& startPoint, const Point& endPoint, const std::vector<Color>& colors,
+      const std::vector<float>& positions = {},
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Returns a shader that generates a radial gradient given the center and radius. The color
@@ -83,9 +85,10 @@ class Shader {
    * If this is not empty, the values must begin with 0, end with 1.0, and intermediate values must
    * be strictly increasing.
    */
-  static std::shared_ptr<Shader> MakeRadialGradient(const Point& center, float radius,
-                                                    const std::vector<Color>& colors,
-                                                    const std::vector<float>& positions = {});
+  static std::shared_ptr<Shader> MakeRadialGradient(
+      const Point& center, float radius, const std::vector<Color>& colors,
+      const std::vector<float>& positions = {},
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Returns a shader that generates a conic gradient given a center point and an angular range.
@@ -101,9 +104,10 @@ class Shader {
    * If this is not empty, the values must begin with 0, end with 1.0, and intermediate values must
    * be strictly increasing.
    */
-  static std::shared_ptr<Shader> MakeConicGradient(const Point& center, float startAngle,
-                                                   float endAngle, const std::vector<Color>& colors,
-                                                   const std::vector<float>& positions = {});
+  static std::shared_ptr<Shader> MakeConicGradient(
+      const Point& center, float startAngle, float endAngle, const std::vector<Color>& colors,
+      const std::vector<float>& positions = {},
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Returns a shader that generates a diamond gradient given the center and half-diagonal. The
@@ -116,9 +120,10 @@ class Shader {
    * If this is not empty, the values must begin with 0, end with 1.0, and intermediate values must
    * be strictly increasing.
    */
-  static std::shared_ptr<Shader> MakeDiamondGradient(const Point& center, float halfDiagonal,
-                                                     const std::vector<Color>& colors,
-                                                     const std::vector<float>& positions = {});
+  static std::shared_ptr<Shader> MakeDiamondGradient(
+      const Point& center, float halfDiagonal, const std::vector<Color>& colors,
+      const std::vector<float>& positions = {},
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
   virtual ~Shader() = default;
 
   /**
@@ -141,7 +146,8 @@ class Shader {
    * If the shader has a constant color, this method returns true and updates the color parameter.
    * Otherwise, it returns false and leaves the color parameter unchanged.
    */
-  virtual bool asColor(Color*) const {
+  virtual bool asColor(Color*, std::shared_ptr<ColorSpace>* colorSpace = nullptr) const {
+    (void)colorSpace;
     return false;
   }
 

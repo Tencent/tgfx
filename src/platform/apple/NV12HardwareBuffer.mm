@@ -50,7 +50,7 @@ std::shared_ptr<NV12HardwareBuffer> NV12HardwareBuffer::MakeFrom(CVPixelBufferRe
 }
 
 NV12HardwareBuffer::NV12HardwareBuffer(CVPixelBufferRef pixelBuffer, YUVColorSpace colorSpace)
-    : pixelBuffer(pixelBuffer), colorSpace(colorSpace) {
+    : pixelBuffer(pixelBuffer), _colorSpace(colorSpace) {
   CFRetain(pixelBuffer);
 }
 
@@ -69,6 +69,6 @@ int NV12HardwareBuffer::height() const {
 }
 
 std::shared_ptr<TextureView> NV12HardwareBuffer::onMakeTexture(Context* context, bool) const {
-  return TextureView::MakeFrom(context, pixelBuffer, colorSpace);
+  return TextureView::MakeFrom(context, pixelBuffer, _colorSpace);
 }
 }  // namespace tgfx

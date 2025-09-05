@@ -20,66 +20,10 @@
 #include <unordered_map>
 #include "core/PixelRef.h"
 #include "skcms.h"
+#include "tgfx/core/ColorSpace.h"
+#include "utils/PixelsConvertUtil.h"
 
 namespace tgfx {
-
-inline void* AddOffset(void* pixels, size_t offset) {
-  return reinterpret_cast<uint8_t*>(pixels) + offset;
-}
-
-inline const void* AddOffset(const void* pixels, size_t offset) {
-  return reinterpret_cast<const uint8_t*>(pixels) + offset;
-}
-
-static void CopyRectMemory(const void* src, size_t srcRB, void* dst, size_t dstRB,
-                           size_t trimRowBytes, size_t rowCount) {
-  if (trimRowBytes == dstRB && trimRowBytes == srcRB) {
-    memcpy(dst, src, trimRowBytes * rowCount);
-    return;
-  }
-  for (size_t i = 0; i < rowCount; i++) {
-    memcpy(dst, src, trimRowBytes);
-    dst = AddOffset(dst, dstRB);
-    src = AddOffset(src, srcRB);
-  }
-}
-
-static const std::unordered_map<ColorType, gfx::skcms_PixelFormat> ColorMapper{
-    {ColorType::RGBA_8888, gfx::skcms_PixelFormat::skcms_PixelFormat_RGBA_8888},
-    {ColorType::BGRA_8888, gfx::skcms_PixelFormat::skcms_PixelFormat_BGRA_8888},
-    {ColorType::ALPHA_8, gfx::skcms_PixelFormat::skcms_PixelFormat_A_8},
-    {ColorType::RGB_565, gfx::skcms_PixelFormat::skcms_PixelFormat_BGR_565},
-    {ColorType::Gray_8, gfx::skcms_PixelFormat::skcms_PixelFormat_G_8},
-    {ColorType::RGBA_F16, gfx::skcms_PixelFormat::skcms_PixelFormat_RGBA_hhhh},
-    {ColorType::RGBA_1010102, gfx::skcms_PixelFormat::skcms_PixelFormat_RGBA_1010102},
-};
-
-static const std::unordered_map<AlphaType, gfx::skcms_AlphaFormat> AlphaMapper{
-    {AlphaType::Unpremultiplied, gfx::skcms_AlphaFormat::skcms_AlphaFormat_Unpremul},
-    {AlphaType::Premultiplied, gfx::skcms_AlphaFormat::skcms_AlphaFormat_PremulAsEncoded},
-    {AlphaType::Opaque, gfx::skcms_AlphaFormat::skcms_AlphaFormat_Opaque},
-};
-
-static void ConvertPixels(const ImageInfo& srcInfo, const void* srcPixels, const ImageInfo& dstInfo,
-                          void* dstPixels) {
-  if (srcInfo.colorType() == dstInfo.colorType() && srcInfo.alphaType() == dstInfo.alphaType()) {
-    CopyRectMemory(srcPixels, srcInfo.rowBytes(), dstPixels, dstInfo.rowBytes(),
-                   dstInfo.minRowBytes(), static_cast<size_t>(dstInfo.height()));
-    return;
-  }
-  auto srcFormat = ColorMapper.at(srcInfo.colorType());
-  auto srcAlpha = AlphaMapper.at(srcInfo.alphaType());
-  auto dstFormat = ColorMapper.at(dstInfo.colorType());
-  auto dstAlpha = AlphaMapper.at(dstInfo.alphaType());
-  auto width = dstInfo.width();
-  auto height = dstInfo.height();
-  for (int i = 0; i < height; i++) {
-    gfx::skcms_Transform(srcPixels, srcFormat, srcAlpha, nullptr, dstPixels, dstFormat, dstAlpha,
-                         nullptr, static_cast<size_t>(width));
-    dstPixels = AddOffset(dstPixels, dstInfo.rowBytes());
-    srcPixels = AddOffset(srcPixels, srcInfo.rowBytes());
-  }
-}
 
 Pixmap::Pixmap(const ImageInfo& info, const void* pixels) : _info(info), _pixels(pixels) {
   if (_info.isEmpty() || _pixels == nullptr) {
@@ -187,7 +131,8 @@ Pixmap Pixmap::makeSubset(const Rect& subset) const {
   return {srcInfo, srcPixels};
 }
 
-bool Pixmap::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int srcY) const {
+bool Pixmap::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int srcY,
+                        bool isConvertColorSpace) const {
   if (_pixels == nullptr || dstPixels == nullptr) {
     return false;
   }
@@ -198,7 +143,7 @@ bool Pixmap::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int
   auto srcPixels = _info.computeOffset(_pixels, srcX, srcY);
   auto srcInfo = _info.makeWH(imageInfo.width(), imageInfo.height());
   dstPixels = imageInfo.computeOffset(dstPixels, -srcX, -srcY);
-  ConvertPixels(srcInfo, srcPixels, imageInfo, dstPixels);
+  ConvertPixels(srcInfo, srcPixels, imageInfo, dstPixels, isConvertColorSpace);
   return true;
 }
 
