@@ -60,7 +60,7 @@ void TGFXBaseView::onClickEvent() {
 
 bool TGFXBaseView::draw(int drawIndex, float zoom, float offsetX, float offsetY) {
   if (!appHost->isDirty()) {
-    return false;
+    return true;
   }
   appHost->resetDirty();
 
@@ -92,7 +92,6 @@ bool TGFXBaseView::draw(int drawIndex, float zoom, float offsetX, float offsetY)
   context->flushAndSubmit();
   window->present(context);
   device->unlock();
-
   return true;
 }
 

@@ -61,7 +61,6 @@ class LayerBuilder {
   void build(const AppHost* host);
   virtual std::shared_ptr<tgfx::Layer> buildLayerTree(const AppHost* host) = 0;
 
-
  protected:
   float padding = 30.f;
   std::shared_ptr<tgfx::Layer> _root = nullptr;

@@ -34,11 +34,10 @@ TGFX_TEST(Hello2DTest, Compare) {
   auto surface = Surface::Make(context, appHost.width(), appHost.height(), false, 4);
   auto canvas = surface->getCanvas();
   auto builderNames = hello2d::LayerBuilder::Names();
-  for (auto& name : builderNames) {
-    auto builder = hello2d::LayerBuilder::GetByName(name);
-    ASSERT_TRUE(builder != nullptr);
-    builder->build(&appHost);
-    builder->displayList.render(surface.get());
+  for (size_t i = 0; i < builderNames.size(); ++i) {
+    const auto& name = builderNames[i];
+    appHost.draw(canvas, static_cast<int>(i));
+
     auto key = "DrawersTest/" + name;
     auto result = Baseline::Compare(surface, key);
     if (!result) {

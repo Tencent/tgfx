@@ -71,12 +71,12 @@ bool AppHost::updateScreen(int width, int height, float density) {
 }
 
 bool AppHost::updateZoomAndOffset(float zoomScale, const tgfx::Point& contentOffset) {
+  markDirty();
   if (zoomScale == _zoomScale && contentOffset == _contentOffset) {
     return false;
   }
   _zoomScale = zoomScale;
   _contentOffset = contentOffset;
-  markDirty();
   return true;
 }
 
@@ -132,7 +132,7 @@ void AppHost::draw(tgfx::Canvas* canvas, int drawIndex) const {
     if (root) {
       displayList.root()->addChild(root);
       displayList.setRenderMode(tgfx::RenderMode::Tiled);
-       displayList.setAllowZoomBlur(true);
+      displayList.setAllowZoomBlur(true);
       displayList.setMaxTileCount(512);
     }
     lastDrawIndex = drawIndex;
@@ -146,7 +146,7 @@ void AppHost::draw(tgfx::Canvas* canvas, int drawIndex) const {
   displayList.setZoomScale(zoomScale());
   displayList.setContentOffset(contentOffset().x, contentOffset().y);
   currentBuilder->build(this);
- displayList.render(canvas->getSurface(), false);
+  displayList.render(canvas->getSurface(), false);
 }
 
 void AppHost::updateRootMatrix() const {

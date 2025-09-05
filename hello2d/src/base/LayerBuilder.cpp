@@ -85,7 +85,7 @@ void LayerBuilder::build(const AppHost* host) {
     return;
   }
   if (!_root) {
-        _root = buildLayerTree(host);
+    _root = buildLayerTree(host);
 
     // _root = buildLayerTree(host);
     // displayList.root()->addChild(_root);
