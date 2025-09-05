@@ -121,4 +121,57 @@ bool GLTexture::checkFrameBuffer(GLGPU* gpu) {
   return true;
 }
 
+static int GetGLMinFilter(int minFilter, bool mipmapped) {
+  if (!mipmapped) {
+    switch (minFilter) {
+      case GL_NEAREST_MIPMAP_NEAREST:
+      case GL_NEAREST_MIPMAP_LINEAR:
+        return GL_NEAREST;
+      case GL_LINEAR_MIPMAP_NEAREST:
+      case GL_LINEAR_MIPMAP_LINEAR:
+        return GL_LINEAR;
+      default:
+        break;
+    }
+  }
+  return minFilter;
+}
+
+static int GetGLWrap(int wrapMode, unsigned target) {
+  if ((target == GL_TEXTURE_RECTANGLE || target == GL_TEXTURE_EXTERNAL_OES) &&
+      (wrapMode == GL_REPEAT || wrapMode == GL_MIRRORED_REPEAT)) {
+    return GL_CLAMP_TO_EDGE;
+  }
+  return wrapMode;
+}
+
+void GLTexture::bindTexture(GLInterface* interface, unsigned textureUnit,
+                            const GLSampler* sampler) {
+  DEBUG_ASSERT(interface != nullptr);
+  DEBUG_ASSERT(descriptor.usage & GPUTextureUsage::TEXTURE_BINDING);
+  auto gl = interface->functions();
+  gl->activeTexture(static_cast<unsigned>(GL_TEXTURE0) + textureUnit);
+  gl->bindTexture(_target, _textureID);
+  auto wrapS = GetGLWrap(sampler->wrapS(), _target);
+  if (wrapS != lastWrapS) {
+    gl->texParameteri(_target, GL_TEXTURE_WRAP_S, wrapS);
+    lastWrapS = wrapS;
+  }
+  auto wrapT = GetGLWrap(sampler->wrapT(), _target);
+  if (wrapT != lastWrapT) {
+    gl->texParameteri(_target, GL_TEXTURE_WRAP_T, wrapT);
+    lastWrapT = wrapT;
+  }
+  auto minFilter = GetGLMinFilter(sampler->minFilter(), descriptor.mipLevelCount > 1);
+  if (minFilter != lastMinFilter) {
+    gl->texParameteri(_target, GL_TEXTURE_MIN_FILTER, minFilter);
+    lastMinFilter = minFilter;
+  }
+  auto magFilter = sampler->magFilter();
+  if (magFilter != lastMagFilter) {
+    gl->texParameteri(_target, GL_TEXTURE_MAG_FILTER, magFilter);
+    lastMagFilter = magFilter;
+  }
+}
+
 }  // namespace tgfx

@@ -120,6 +120,19 @@ std::shared_ptr<Program> ProgramInfo::getProgram() const {
   return program;
 }
 
+static AddressMode ToAddressMode(TileMode tileMode) {
+  switch (tileMode) {
+    case TileMode::Clamp:
+      return AddressMode::ClampToEdge;
+    case TileMode::Repeat:
+      return AddressMode::Repeat;
+    case TileMode::Mirror:
+      return AddressMode::MirrorRepeat;
+    case TileMode::Decal:
+      return AddressMode::ClampToBorder;
+  }
+}
+
 void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, PipelineProgram* program) const {
   DEBUG_ASSERT(renderTarget != nullptr);
   auto uniformBuffer = program->uniformBuffer.get();
@@ -146,8 +159,12 @@ void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, PipelineProgram
 
   auto samplers = getSamplers();
   unsigned textureIndex = 0;
-  for (auto& sampler : samplers) {
-    renderPass->setTexture(textureIndex++, sampler.texture, sampler.state);
+  auto gpu = renderTarget->getContext()->gpu();
+  for (auto& [texture, state] : samplers) {
+    GPUSamplerDescriptor descriptor(ToAddressMode(state.tileModeX), ToAddressMode(state.tileModeY),
+                                    state.filterMode, state.filterMode, state.mipmapMode);
+    auto sampler = gpu->createSampler(descriptor);
+    renderPass->setTexture(textureIndex++, texture, sampler.get());
   }
 }
 
@@ -161,15 +178,15 @@ std::vector<SamplerInfo> ProgramInfo::getSamplers() const {
   const FragmentProcessor* fp = iter.next();
   while (fp) {
     for (size_t i = 0; i < fp->numTextureSamplers(); ++i) {
-      SamplerInfo sampler = {fp->textureAt(i), fp->samplerStateAt(i)};
-      samplers.push_back(sampler);
+      SamplerInfo info = {fp->textureAt(i), fp->samplerStateAt(i)};
+      samplers.push_back(info);
     }
     fp = iter.next();
   }
   auto dstTextureView = xferProcessor != nullptr ? xferProcessor->dstTextureView() : nullptr;
   if (dstTextureView != nullptr) {
-    SamplerInfo sampler = {dstTextureView->getTexture(), {}};
-    samplers.push_back(sampler);
+    SamplerInfo info = {dstTextureView->getTexture(), {}};
+    samplers.push_back(info);
   }
   return samplers;
 }

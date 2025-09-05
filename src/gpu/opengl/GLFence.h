@@ -18,26 +18,26 @@
 
 #pragma once
 
-#include "tgfx/gpu/FilterMode.h"
-#include "tgfx/gpu/MipmapMode.h"
+#include "gpu/GPUFence.h"
 
 namespace tgfx {
-struct SamplingOptions {
-  SamplingOptions() = default;
-
-  explicit SamplingOptions(FilterMode filterMode, MipmapMode mipmapMode = MipmapMode::Linear)
-      : filterMode(filterMode), mipmapMode(mipmapMode) {
+/**
+ * GLSemaphore is a wrapper class for an OpenGL sync object.
+ */
+class GLFence : public GPUFence {
+ public:
+  explicit GLFence(void* glSync) : _glSync(glSync) {
   }
 
-  friend bool operator==(const SamplingOptions& a, const SamplingOptions& b) {
-    return a.filterMode == b.filterMode && a.mipmapMode == b.mipmapMode;
+  void* glSync() const {
+    return _glSync;
   }
 
-  friend bool operator!=(const SamplingOptions& a, const SamplingOptions& b) {
-    return !(a == b);
-  }
+  BackendSemaphore getBackendSemaphore() const override;
 
-  FilterMode filterMode = FilterMode::Linear;
-  MipmapMode mipmapMode = MipmapMode::Linear;
+  void release(GPU* gpu) override;
+
+ private:
+  void* _glSync = nullptr;
 };
 }  // namespace tgfx

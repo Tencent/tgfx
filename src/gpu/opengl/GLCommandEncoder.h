@@ -33,9 +33,9 @@ class GLCommandEncoder : public CommandEncoder {
 
   void generateMipmapsForTexture(GPUTexture* texture) override;
 
-  BackendSemaphore insertSemaphore() override;
+  std::unique_ptr<GPUFence> insertFence() override;
 
-  void waitSemaphore(const BackendSemaphore& semaphore) override;
+  void waitForFence(GPUFence* fence) override;
 
  protected:
   std::shared_ptr<RenderPass> onBeginRenderPass(const RenderPassDescriptor& descriptor) override;

@@ -21,8 +21,8 @@
 #include "core/utils/Log.h"
 #include "gpu/GPUBuffer.h"
 #include "gpu/GPURenderPipeline.h"
+#include "gpu/GPUSampler.h"
 #include "gpu/RenderPassDescriptor.h"
-#include "gpu/SamplerState.h"
 
 namespace tgfx {
 /**
@@ -71,7 +71,7 @@ class RenderPass {
    * Sets a texture and its sampler state to a specified binding index in the shader's texture
    * table.
    */
-  virtual void setTexture(unsigned binding, GPUTexture* texture, const SamplerState& state) = 0;
+  virtual void setTexture(unsigned binding, GPUTexture* texture, GPUSampler* sampler) = 0;
 
   /**
    * Sets or unsets the current vertex buffer with an optional offset.

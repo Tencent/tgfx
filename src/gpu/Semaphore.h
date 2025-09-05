@@ -19,28 +19,48 @@
 #pragma once
 
 #include <memory>
+#include "gpu/GPUFence.h"
 #include "gpu/Resource.h"
-#include "tgfx/gpu/Backend.h"
 
 namespace tgfx {
 /**
- * Wrapper class for a backend semaphore object.
+ * Wrapper class for a GPUFence object.
  */
 class Semaphore : public Resource {
  public:
   /**
-   * Wraps a backend semaphore object into a Semaphore instance.
+   * Wraps a backend semaphore object into a Semaphore instance and takes ownership of it.
    */
-  static std::shared_ptr<Semaphore> Wrap(Context* context,
-                                         const BackendSemaphore& backendSemaphore);
+  static std::shared_ptr<Semaphore> MakeAdopted(Context* context,
+                                                const BackendSemaphore& backendSemaphore);
 
   size_t memoryUsage() const override {
     return 0;
   }
 
   /**
+   * Returns the GPUFence object associated with this Semaphore instance.
+   */
+  GPUFence* getFence() {
+    return fence.get();
+  }
+
+  /**
    * Returns the backend semaphore object associated with this Semaphore instance.
    */
-  virtual BackendSemaphore getBackendSemaphore() const = 0;
+  BackendSemaphore getBackendSemaphore() const {
+    return fence->getBackendSemaphore();
+  }
+
+ protected:
+  void onReleaseGPU() override {
+    fence->release(context->gpu());
+  }
+
+ private:
+  std::unique_ptr<GPUFence> fence = nullptr;
+
+  explicit Semaphore(std::unique_ptr<GPUFence> fence) : fence(std::move(fence)) {
+  }
 };
 }  // namespace tgfx
