@@ -591,7 +591,7 @@ std::vector<DrawTask> DisplayList::getFallbackDrawTasks(
       return tasks;
     }
   }
-  if (findFallbackTasks == sortedCaches.begin()) {
+  if (firstZoomOutTiled == sortedCaches.begin()) {
     return {};
   }
   for (auto index = firstZoomOutTiled - 1; index >= sortedCaches.begin(); index--) {
