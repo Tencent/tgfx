@@ -25,10 +25,11 @@
 #include "gpu/opengl/GLRenderPipeline.h"
 
 namespace tgfx {
+class GLGPU;
 
 class GLRenderPass : public RenderPass {
  public:
-  GLRenderPass(std::shared_ptr<GLInterface> interface, RenderPassDescriptor descriptor);
+  GLRenderPass(GLGPU* gpu, RenderPassDescriptor descriptor);
 
   void begin();
 
@@ -52,7 +53,7 @@ class GLRenderPass : public RenderPass {
   void onEnd() override;
 
  private:
-  std::shared_ptr<GLInterface> interface = nullptr;
+  GLGPU* gpu = nullptr;
   GLRenderPipeline* renderPipeline = nullptr;
   IndexFormat indexFormat = IndexFormat::UInt16;
 };

@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "core/utils/UniqueID.h"
 #include "gpu/GPUBuffer.h"
 #include "gpu/opengl/GLInterface.h"
 
@@ -32,7 +33,7 @@ class GLBuffer : public GPUBuffer {
    * Creates a new GLBuffer with the specified size and usage flags.
    */
   GLBuffer(unsigned bufferID, size_t size, uint32_t usage)
-      : GPUBuffer(size, usage), _bufferID(bufferID) {
+      : GPUBuffer(size, usage), uniqueID(UniqueID::Next()), _bufferID(bufferID) {
   }
 
   /**
@@ -50,6 +51,7 @@ class GLBuffer : public GPUBuffer {
   void release(GPU* gpu) override;
 
  private:
+  uint32_t uniqueID = 0;
   unsigned _bufferID = 0;
 
   friend class GLGPU;

@@ -20,6 +20,7 @@
 #include "GLTexture.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "gpu/opengl/GLBuffer.h"
+#include "gpu/opengl/GLGPU.h"
 #include "gpu/opengl/GLUtil.h"
 #include "tgfx/core/Buffer.h"
 
@@ -34,7 +35,7 @@ bool GLCommandQueue::writeBuffer(GPUBuffer* buffer, size_t bufferOffset, const v
     LOGE("GLCommandQueue::writeBuffer() size exceeds buffer size!");
     return false;
   }
-  auto gl = interface->functions();
+  auto gl = gpu->functions();
   ClearGLError(gl);
   auto glBuffer = static_cast<const GLBuffer*>(buffer);
   auto target = glBuffer->target();
@@ -51,13 +52,13 @@ void GLCommandQueue::writeTexture(GPUTexture* texture, const Rect& rect, const v
       !(texture->usage() & GPUTextureUsage::TEXTURE_BINDING)) {
     return;
   }
-  auto gl = interface->functions();
-  auto caps = interface->caps();
+  auto gl = gpu->functions();
+  auto caps = static_cast<const GLCaps*>(gpu->caps());
   if (caps->flushBeforeWritePixels) {
     gl->flush();
   }
-  auto glTexture = static_cast<const GLTexture*>(texture);
-  gl->bindTexture(glTexture->target(), glTexture->textureID());
+  auto glTexture = static_cast<GLTexture*>(texture);
+  gpu->bindTexture(glTexture);
   const auto& textureFormat = caps->getTextureFormat(glTexture->format());
   auto bytesPerPixel = PixelFormatBytesPerPixel(glTexture->format());
   gl->pixelStorei(GL_UNPACK_ALIGNMENT, static_cast<int>(bytesPerPixel));
@@ -102,11 +103,10 @@ bool GLCommandQueue::readTexture(GPUTexture* texture, const Rect& rect, void* pi
     LOGE("GLCommandQueue::readTexture() rowBytes is too small!");
     return false;
   }
-  auto gl = interface->functions();
-  auto caps = interface->caps();
+  auto gl = gpu->functions();
+  auto caps = static_cast<const GLCaps*>(gpu->caps());
   ClearGLError(gl);
-  auto glTexture = static_cast<GLTexture*>(texture);
-  gl->bindFramebuffer(GL_FRAMEBUFFER, glTexture->frameBufferID());
+  gpu->bindFramebuffer(static_cast<GLTexture*>(texture));
   void* outPixels = nullptr;
   Buffer tempBuffer = {};
   auto restoreGLRowLength = false;
@@ -144,12 +144,14 @@ bool GLCommandQueue::readTexture(GPUTexture* texture, const Rect& rect, void* pi
 }
 
 void GLCommandQueue::submit(std::shared_ptr<CommandBuffer>) {
-  auto gl = interface->functions();
+  auto gl = gpu->functions();
   gl->flush();
+  // Reset GL state every frame to avoid interference from external GL calls.
+  gpu->resetGLState();
 }
 
 void GLCommandQueue::waitUntilCompleted() {
-  auto gl = interface->functions();
+  auto gl = gpu->functions();
   gl->finish();
 }
 
