@@ -557,11 +557,13 @@ std::vector<DrawTask> DisplayList::getFallbackDrawTasks(
   auto tileRect = Rect::MakeXYWH(tileX * _tileSize, tileY * _tileSize, _tileSize, _tileSize);
   auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
   DEBUG_ASSERT(currentZoomScale != 0.0f);
-  auto firstGreaterTileCache =
-      std::find_if(sortedCaches.begin(), sortedCaches.end(),
-                   [currentZoomScale](const std::pair<float, TileCache*>& item) {
-                     return item.first > currentZoomScale;
-                   });
+  size_t firstGreaterIndex = 0;
+  for (auto& item : sortedCaches) {
+    if (item.first >= currentZoomScale) {
+      break;
+    }
+    firstGreaterIndex++;
+  }
   auto findFallbackTasks = [](float scale, TileCache* tileCache, float currentZoomScale,
                               const Rect& tileRect, int tileSize) -> std::vector<DrawTask> {
     if (scale == currentZoomScale || tileCache->empty()) {
@@ -584,19 +586,17 @@ std::vector<DrawTask> DisplayList::getFallbackDrawTasks(
     }
     return tasks;
   };
-  for (auto iterator = firstGreaterTileCache; iterator < sortedCaches.end(); iterator++) {
-    auto tasks =
-        findFallbackTasks(iterator->first, iterator->second, currentZoomScale, tileRect, _tileSize);
+  auto tileCacheCount = sortedCaches.size();
+  for (size_t index = firstGreaterIndex; index < tileCacheCount; index++) {
+    auto& [scale, tileCache] = sortedCaches[index];
+    auto tasks = findFallbackTasks(scale, tileCache, currentZoomScale, tileRect, _tileSize);
     if (!tasks.empty()) {
       return tasks;
     }
   }
-  if (firstGreaterTileCache == sortedCaches.begin()) {
-    return {};
-  }
-  for (auto iterator = firstGreaterTileCache - 1; iterator >= sortedCaches.begin(); iterator--) {
-    auto tasks =
-        findFallbackTasks(iterator->first, iterator->second, currentZoomScale, tileRect, _tileSize);
+  for (auto index = static_cast<int>(firstGreaterIndex) - 1; index >= 0; index--) {
+    auto& [scale, tileCache] = sortedCaches[static_cast<size_t>(index)];
+    auto tasks = findFallbackTasks(scale, tileCache, currentZoomScale, tileRect, _tileSize);
     if (!tasks.empty()) {
       return tasks;
     }
