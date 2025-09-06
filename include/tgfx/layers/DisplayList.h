@@ -283,8 +283,11 @@ class DisplayList {
 
   std::vector<std::pair<float, TileCache*>> getSortedTileCaches() const;
 
+  std::vector<std::pair<float, TileCache*>> getFallbackTileCaches(
+      const std::vector<std::pair<float, TileCache*>>& sortedCaches) const;
+
   std::vector<DrawTask> getFallbackDrawTasks(
-      int tileX, int tileY, const std::vector<std::pair<float, TileCache*>>& sortedCaches) const;
+      int tileX, int tileY, const std::vector<std::pair<float, TileCache*>>& fallbackCaches) const;
 
   std::vector<std::shared_ptr<Tile>> getFreeTiles(
       const Surface* renderSurface, size_t tileCount,

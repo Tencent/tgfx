@@ -109,7 +109,7 @@ class TileCache {
 
   /**
    * Returns a list of reusable tiles. These tiles have no external references and are sorted by
-   * their distance to the viewport center, with the closest ones first.
+   * their distance to the viewport center, with the farthest ones first.
    */
   std::vector<std::shared_ptr<Tile>> getReusableTiles(float centerX, float centerY);
 
