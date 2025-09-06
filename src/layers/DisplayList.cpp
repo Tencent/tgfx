@@ -500,7 +500,8 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
   for (auto& grid : dirtyGrids) {
     auto& tile = freeTiles[tileIndex++];
     if (_allowZoomBlur) {
-      auto fallbackTasks = getFallbackDrawTasks(grid.first, grid.second, sortedCaches);
+      auto fallbackTileCaches = getFallbackTileCaches(sortedCaches);
+      auto fallbackTasks = getFallbackDrawTasks(grid.first, grid.second, fallbackTileCaches);
       if (!fallbackTasks.empty()) {
         if (maxRefinedCount <= 0) {
           emptyTiles.emplace_back(tile);
@@ -552,28 +553,34 @@ std::vector<std::pair<float, TileCache*>> DisplayList::getSortedTileCaches() con
   return sortedTileCaches;
 }
 
-std::vector<DrawTask> DisplayList::getFallbackDrawTasks(
-    int tileX, int tileY, const std::vector<std::pair<float, TileCache*>>& sortedCaches) const {
-  auto tileRect = Rect::MakeXYWH(tileX * _tileSize, tileY * _tileSize, _tileSize, _tileSize);
+std::vector<std::pair<float, TileCache*>> DisplayList::getFallbackTileCaches(
+    const std::vector<std::pair<float, TileCache*>>& sortedCaches) const {
   auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
   DEBUG_ASSERT(currentZoomScale != 0.0f);
   auto cacheCount = sortedCaches.size();
-  std::vector<size_t> orderIndices = {};
-  orderIndices.reserve(cacheCount);
+  std::vector<std::pair<float, TileCache*>> fallbackCaches = {};
+  fallbackCaches.reserve(cacheCount);
   size_t firstGreaterIndex = 0;
-  for (size_t index = 0; index < cacheCount; index++) {
-    if (sortedCaches[index].first < currentZoomScale) {
+  for (auto& item : sortedCaches) {
+    if (item.first < currentZoomScale) {
       firstGreaterIndex++;
     } else {
-      orderIndices.push_back(index);
+      fallbackCaches.push_back(item);
     }
   }
   for (size_t index = firstGreaterIndex; index > 0; index--) {
-    orderIndices.push_back(index - 1);
+    auto& item = sortedCaches[index - 1];
+    fallbackCaches.push_back(item);
   }
+  return fallbackCaches;
+}
 
-  for (auto& index : orderIndices) {
-    auto& [scale, tileCache] = sortedCaches[index];
+std::vector<DrawTask> DisplayList::getFallbackDrawTasks(
+    int tileX, int tileY, const std::vector<std::pair<float, TileCache*>>& fallbackCaches) const {
+  auto tileRect = Rect::MakeXYWH(tileX * _tileSize, tileY * _tileSize, _tileSize, _tileSize);
+  auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
+  DEBUG_ASSERT(currentZoomScale != 0.0f);
+  for (auto& [scale, tileCache] : fallbackCaches) {
     if (scale == currentZoomScale || tileCache->empty()) {
       continue;
     }
