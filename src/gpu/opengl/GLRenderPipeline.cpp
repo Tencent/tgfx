@@ -63,12 +63,12 @@ GLRenderPipeline::GLRenderPipeline(unsigned programID, std::unique_ptr<UniformLa
 void GLRenderPipeline::activate(GLGPU* gpu) {
   auto gl = gpu->functions();
   auto caps = static_cast<const GLCaps*>(gpu->caps());
-  gl->useProgram(programID);
+  gpu->useProgram(programID);
   if (caps->frameBufferFetchSupport && caps->frameBufferFetchRequiresEnablePerSample) {
     if (blendFormula == nullptr) {
-      gl->enable(GL_FETCH_PER_SAMPLE_ARM);
+      gpu->enableCapability(GL_FETCH_PER_SAMPLE_ARM, true);
     } else {
-      gl->disable(GL_FETCH_PER_SAMPLE_ARM);
+      gpu->enableCapability(GL_FETCH_PER_SAMPLE_ARM, false);
     }
   }
   if (blendFormula == nullptr || (blendFormula->srcCoeff() == BlendModeCoeff::One &&
@@ -76,19 +76,19 @@ void GLRenderPipeline::activate(GLGPU* gpu) {
                                   (blendFormula->equation() == BlendEquation::Add ||
                                    blendFormula->equation() == BlendEquation::Subtract))) {
     // There is no need to enable blending if the blend mode is src.
-    gl->disable(GL_BLEND);
+    gpu->enableCapability(GL_BLEND, false);
   } else {
-    gl->enable(GL_BLEND);
-    gl->blendFunc(XfermodeCoeff2Blend[static_cast<int>(blendFormula->srcCoeff())],
-                  XfermodeCoeff2Blend[static_cast<int>(blendFormula->dstCoeff())]);
-    gl->blendEquation(XfermodeEquation2Blend[static_cast<int>(blendFormula->equation())]);
+    gpu->enableCapability(GL_BLEND, true);
+    gpu->setBlendFunc(XfermodeCoeff2Blend[static_cast<int>(blendFormula->srcCoeff())],
+                      XfermodeCoeff2Blend[static_cast<int>(blendFormula->dstCoeff())]);
+    gpu->setBlendEquation(XfermodeEquation2Blend[static_cast<int>(blendFormula->equation())]);
   }
   if (caps->vertexArrayObjectSupport) {
     if (vertexArray == 0) {
       gl->genVertexArrays(1, &vertexArray);
     }
     if (vertexArray > 0) {
-      gl->bindVertexArray(vertexArray);
+      gpu->bindVertexArray(vertexArray);
     }
   }
 }

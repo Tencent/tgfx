@@ -219,10 +219,67 @@ std::shared_ptr<CommandEncoder> GLGPU::createCommandEncoder() {
 }
 
 void GLGPU::resetGLState() {
-  activeTextureUint = INVALID_VALUE;
+  capabilities = {};
+  scissorRect = {0, 0, 0, 0};
+  viewport = {0, 0, 0, 0};
   textureUnits.assign(textureUnits.size(), INVALID_VALUE);
+  clearColor = std::nullopt;
+  activeTextureUint = INVALID_VALUE;
   readFramebuffer = INVALID_VALUE;
   drawFramebuffer = INVALID_VALUE;
+  program = INVALID_VALUE;
+  vertexArray = INVALID_VALUE;
+  srcBlendFunc = INVALID_VALUE;
+  dstBlendFunc = INVALID_VALUE;
+  blendEquation = INVALID_VALUE;
+}
+
+void GLGPU::enableCapability(unsigned capability, bool enabled) {
+  auto result = capabilities.find(capability);
+  if (result != capabilities.end() && result->second == enabled) {
+    return;
+  }
+  auto gl = interface->functions();
+  if (enabled) {
+    gl->enable(capability);
+  } else {
+    gl->disable(capability);
+  }
+  capabilities[capability] = enabled;
+}
+
+void GLGPU::setScissorRect(int x, int y, int width, int height) {
+  if (scissorRect[0] == x && scissorRect[1] == y && scissorRect[2] == width &&
+      scissorRect[3] == height) {
+    return;
+  }
+  auto gl = interface->functions();
+  gl->scissor(x, y, width, height);
+  scissorRect[0] = x;
+  scissorRect[1] = y;
+  scissorRect[2] = width;
+  scissorRect[3] = height;
+}
+
+void GLGPU::setViewport(int x, int y, int width, int height) {
+  if (viewport[0] == x && viewport[1] == y && viewport[2] == width && viewport[3] == height) {
+    return;
+  }
+  auto gl = interface->functions();
+  gl->viewport(x, y, width, height);
+  viewport[0] = x;
+  viewport[1] = y;
+  viewport[2] = width;
+  viewport[3] = height;
+}
+
+void GLGPU::setClearColor(Color color) {
+  if (clearColor.has_value() && *clearColor == color) {
+    return;
+  }
+  auto gl = interface->functions();
+  gl->clearColor(color.red, color.green, color.blue, color.alpha);
+  clearColor = color;
 }
 
 void GLGPU::bindTexture(GLTexture* texture, unsigned textureUnit) {
@@ -272,6 +329,44 @@ void GLGPU::bindFramebuffer(GLTexture* texture, FrameBufferTarget target) {
   }
   auto gl = interface->functions();
   gl->bindFramebuffer(frameBufferTarget, texture->frameBufferID());
+}
+
+void GLGPU::useProgram(unsigned programID) {
+  if (program == programID) {
+    return;
+  }
+  auto gl = interface->functions();
+  gl->useProgram(programID);
+  program = programID;
+}
+
+void GLGPU::bindVertexArray(unsigned vao) {
+  DEBUG_ASSERT(interface->caps()->vertexArrayObjectSupport);
+  if (vertexArray == vao) {
+    return;
+  }
+  auto gl = interface->functions();
+  gl->bindVertexArray(vao);
+  vertexArray = vao;
+}
+
+void GLGPU::setBlendFunc(unsigned srcFactor, unsigned dstFactor) {
+  if (srcBlendFunc == srcFactor && dstBlendFunc == dstFactor) {
+    return;
+  }
+  auto gl = interface->functions();
+  gl->blendFunc(srcFactor, dstFactor);
+  srcBlendFunc = srcFactor;
+  dstBlendFunc = dstFactor;
+}
+
+void GLGPU::setBlendEquation(unsigned mode) {
+  if (blendEquation == mode) {
+    return;
+  }
+  auto gl = interface->functions();
+  gl->blendEquation(mode);
+  blendEquation = mode;
 }
 
 }  // namespace tgfx

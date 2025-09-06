@@ -18,7 +18,6 @@
 
 #include "GLRenderPass.h"
 #include "GLSampler.h"
-#include "GLUtil.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/opengl/GLGPU.h"
 #include "gpu/opengl/GLRenderPipeline.h"
@@ -37,24 +36,22 @@ void GLRenderPass::begin() {
   gpu->bindFramebuffer(renderTexture);
   auto gl = gpu->functions();
   // Set the viewport to cover the entire color attachment by default.
-  gl->viewport(0, 0, renderTexture->width(), renderTexture->height());
+  gpu->setViewport(0, 0, renderTexture->width(), renderTexture->height());
   // Disable scissor test by default.
-  gl->disable(GL_SCISSOR_TEST);
+  gpu->enableCapability(GL_SCISSOR_TEST, false);
   if (colorAttachment.loadAction == LoadAction::Clear) {
-    auto& color = colorAttachment.clearValue;
-    gl->clearColor(color.red, color.green, color.blue, color.alpha);
+    gpu->setClearColor(colorAttachment.clearValue);
     gl->clear(GL_COLOR_BUFFER_BIT);
   }
 }
 
 void GLRenderPass::setScissorRect(int x, int y, int width, int height) {
-  auto gl = gpu->functions();
   auto texture = descriptor.colorAttachments[0].texture;
   if (x == 0 && y == 0 && width == texture->width() && height == texture->height()) {
-    gl->disable(GL_SCISSOR_TEST);
+    gpu->enableCapability(GL_SCISSOR_TEST, false);
   } else {
-    gl->enable(GL_SCISSOR_TEST);
-    gl->scissor(x, y, width, height);
+    gpu->enableCapability(GL_SCISSOR_TEST, true);
+    gpu->setScissorRect(x, y, width, height);
   }
 }
 
@@ -110,7 +107,7 @@ void GLRenderPass::onEnd() {
     gpu->bindFramebuffer(renderTexture, FrameBufferTarget::Read);
     gpu->bindFramebuffer(sampleTexture, FrameBufferTarget::Draw);
     // MSAA resolve may be affected by the scissor test, so disable it here.
-    gl->disable(GL_SCISSOR_TEST);
+    gpu->enableCapability(GL_SCISSOR_TEST, false);
     if (caps->msFBOType == MSFBOType::ES_Apple) {
       gl->resolveMultisampleFramebuffer();
     } else {
@@ -118,9 +115,6 @@ void GLRenderPass::onEnd() {
                           sampleTexture->width(), sampleTexture->height(), GL_COLOR_BUFFER_BIT,
                           GL_NEAREST);
     }
-  }
-  if (caps->vertexArrayObjectSupport) {
-    gl->bindVertexArray(0);
   }
 }
 
