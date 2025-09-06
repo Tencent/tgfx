@@ -45,7 +45,7 @@ bool TileSortCompImpl(float centerX, float centerY, float tileSize, const std::s
   res = hn::Add(hn::Reverse2(df, res), res);
   float resVec[4] = {0.0f};
   hn::Store(res, df, resVec);
-  return resVec[0] < resVec[2];
+  return resVec[0] > resVec[2];
 }
 }  // namespace HWY_NAMESPACE
 }  // namespace tgfx
