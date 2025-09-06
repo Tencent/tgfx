@@ -136,6 +136,11 @@ using GLGetVertexAttribPointerv = void GL_FUNCTION_TYPE(unsigned index, unsigned
                                                         void** pointer);
 using GLGetAttribLocation = int GL_FUNCTION_TYPE(unsigned program, const char* name);
 using GLGetUniformLocation = int GL_FUNCTION_TYPE(unsigned program, const char* name);
+using GLGetUniformBlockIndex = unsigned GL_FUNCTION_TYPE(unsigned program,
+                                                         const char* uniformBlockName);
+using GLUniformBlockBinding = void GL_FUNCTION_TYPE(unsigned program, unsigned uniformBlockIndex,
+                                                    unsigned uniformBlockBinding);
+using GLBindBufferBase = void GL_FUNCTION_TYPE(unsigned target, unsigned index, unsigned buffer);
 using GLIsTexture = unsigned char GL_FUNCTION_TYPE(unsigned texture);
 using GLLineWidth = void GL_FUNCTION_TYPE(float width);
 using GLLinkProgram = void GL_FUNCTION_TYPE(unsigned program);
@@ -297,6 +302,9 @@ class GLFunctions {
   GLGetVertexAttribPointerv* getVertexAttribPointerv = nullptr;
   GLGetAttribLocation* getAttribLocation = nullptr;
   GLGetUniformLocation* getUniformLocation = nullptr;
+  GLGetUniformBlockIndex* getUniformBlockIndex = nullptr;
+  GLUniformBlockBinding* uniformBlockBinding = nullptr;
+  GLBindBufferBase* bindBufferBase = nullptr;
   GLIsTexture* isTexture = nullptr;
   GLLineWidth* lineWidth = nullptr;
   GLLinkProgram* linkProgram = nullptr;

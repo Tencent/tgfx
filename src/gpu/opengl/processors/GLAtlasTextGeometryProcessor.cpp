@@ -34,10 +34,10 @@ GLAtlasTextGeometryProcessor::GLAtlasTextGeometryProcessor(
 }
 
 void GLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
-  auto* vertBuilder = args.vertBuilder;
-  auto* fragBuilder = args.fragBuilder;
-  auto* varyingHandler = args.varyingHandler;
-  auto* uniformHandler = args.uniformHandler;
+  auto vertBuilder = args.vertBuilder;
+  auto fragBuilder = args.fragBuilder;
+  auto varyingHandler = args.varyingHandler;
+  auto uniformHandler = args.uniformHandler;
 
   varyingHandler->emitAttributes(*this);
 
@@ -87,13 +87,14 @@ void GLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
   args.vertBuilder->emitNormalizedPosition(position.name());
 }
 
-void GLAtlasTextGeometryProcessor::setData(UniformBuffer* uniformBuffer,
+void GLAtlasTextGeometryProcessor::setData(UniformBuffer* vertexUniformBuffer,
+                                           UniformBuffer* fragmentUniformBuffer,
                                            FPCoordTransformIter* transformIter) const {
   auto atlasSizeInv = textureProxy->getTextureView()->getTextureCoord(1.f, 1.f);
-  uniformBuffer->setData(atlasSizeUniformName, atlasSizeInv);
-  setTransformDataHelper(Matrix::I(), uniformBuffer, transformIter);
+  vertexUniformBuffer->setData(atlasSizeUniformName, atlasSizeInv);
+  setTransformDataHelper(Matrix::I(), vertexUniformBuffer, transformIter);
   if (commonColor.has_value()) {
-    uniformBuffer->setData("Color", *commonColor);
+    fragmentUniformBuffer->setData("Color", *commonColor);
   }
 }
 }  // namespace tgfx

@@ -57,7 +57,7 @@ bool ComparePDF(const std::shared_ptr<MemoryWriteStream>& stream, const std::str
 
 TGFX_TEST(PDFExportTest, Empty) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
 
   auto PDFStream = MemoryWriteStream::Make();
@@ -76,7 +76,7 @@ TGFX_TEST(PDFExportTest, Empty) {
 
 TGFX_TEST(PDFExportTest, EmptyMultiPage) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
 
   auto PDFStream = MemoryWriteStream::Make();
@@ -97,13 +97,13 @@ TGFX_TEST(PDFExportTest, EmptyMultiPage) {
 
 TGFX_TEST(PDFExportTest, DrawColor) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
 
   auto PDFStream = MemoryWriteStream::Make();
 
   auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
-  auto* canvas = document->beginPage(256.f, 256.f);
+  auto canvas = document->beginPage(256.f, 256.f);
   canvas->drawColor(Color::Red());
   document->endPage();
   document->close();
@@ -114,13 +114,13 @@ TGFX_TEST(PDFExportTest, DrawColor) {
 
 TGFX_TEST(PDFExportTest, DrawShape) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
 
   auto PDFStream = MemoryWriteStream::Make();
 
   auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
-  auto* canvas = document->beginPage(512.f, 512.f);
+  auto canvas = document->beginPage(512.f, 512.f);
   {
     Paint paint;
     paint.setStyle(PaintStyle::Fill);
@@ -146,13 +146,13 @@ TGFX_TEST(PDFExportTest, DrawShape) {
 
 TGFX_TEST(PDFExportTest, DrawShapeStroke) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
 
   auto PDFStream = MemoryWriteStream::Make();
 
   auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
-  auto* canvas = document->beginPage(512.f, 512.f);
+  auto canvas = document->beginPage(512.f, 512.f);
   {
     Paint paint;
     paint.setStyle(PaintStyle::Stroke);
@@ -179,13 +179,13 @@ TGFX_TEST(PDFExportTest, DrawShapeStroke) {
 
 TGFX_TEST(PDFExportTest, SimpleText) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
 
   auto PDFStream = MemoryWriteStream::Make();
 
   auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
-  auto* canvas = document->beginPage(1500.f, 400.f);
+  auto canvas = document->beginPage(1500.f, 400.f);
   canvas->translate(40.0, 20.0);
   {
     auto typeface =
@@ -211,13 +211,13 @@ TGFX_TEST(PDFExportTest, SimpleText) {
 
 TGFX_TEST(PDFExportTest, EmojiText) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
 
   auto PDFStream = MemoryWriteStream::Make();
 
   auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
-  auto* canvas = document->beginPage(1500.f, 500.f);
+  auto canvas = document->beginPage(1500.f, 500.f);
   canvas->translate(40.0, 20.0);
   {
     auto typeface =
@@ -236,13 +236,13 @@ TGFX_TEST(PDFExportTest, EmojiText) {
 
 TGFX_TEST(PDFExportTest, Image) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
 
   auto PDFStream = MemoryWriteStream::Make();
 
   auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
-  auto* canvas = document->beginPage(500.f, 500.f);
+  auto canvas = document->beginPage(500.f, 500.f);
   {
     canvas->translate(50.f, 50.f);
     auto image = Image::MakeFromFile(ProjectPath::Absolute("resources/assets/glyph1.png"));
@@ -260,13 +260,13 @@ TGFX_TEST(PDFExportTest, Image) {
 
 TGFX_TEST(PDFExportTest, Complex) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
 
   auto PDFStream = MemoryWriteStream::Make();
 
   auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
-  auto* canvas = document->beginPage(1000.f, 500.f);
+  auto canvas = document->beginPage(1000.f, 500.f);
   canvas->translate(40.0, 20.0);
 
   {

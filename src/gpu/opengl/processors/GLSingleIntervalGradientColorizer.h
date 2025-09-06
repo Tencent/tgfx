@@ -30,6 +30,7 @@ class GLSingleIntervalGradientColorizer : public SingleIntervalGradientColorizer
   void emitCode(EmitArgs& args) const override;
 
  private:
-  void onSetData(UniformBuffer*) const override;
+  void onSetData(UniformBuffer* vertexUniformBuffer,
+                 UniformBuffer* fragmentUniformBuffer) const override;
 };
 }  // namespace tgfx

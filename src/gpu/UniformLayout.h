@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,20 +16,22 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLLinearGradientLayout.h"
+#pragma once
+#include <string>
+#include <vector>
+#include "Uniform.h"
 
 namespace tgfx {
-PlacementPtr<LinearGradientLayout> LinearGradientLayout::Make(BlockBuffer* buffer, Matrix matrix) {
-  return buffer->make<GLLinearGradientLayout>(matrix);
-}
+class UniformLayout final {
+ public:
+  UniformLayout(std::vector<std::string> uniformBlockNames, std::vector<Uniform> vertexUniforms,
+                std::vector<Uniform> fragmentUniforms)
+      : uniformBlockNames(std::move(uniformBlockNames)), vertexUniforms(std::move(vertexUniforms)),
+        fragmentUniforms(std::move(fragmentUniforms)) {
+  }
 
-GLLinearGradientLayout::GLLinearGradientLayout(Matrix matrix) : LinearGradientLayout(matrix) {
-}
-
-void GLLinearGradientLayout::emitCode(EmitArgs& args) const {
-  auto fragBuilder = args.fragBuilder;
-  fragBuilder->codeAppendf("float t = %s.x + 1.0000000000000001e-05;",
-                           (*args.transformedCoords)[0].name().c_str());
-  fragBuilder->codeAppendf("%s = vec4(t, 1.0, 0.0, 0.0);", args.outputColor.c_str());
-}
+  std::vector<std::string> uniformBlockNames = {};
+  std::vector<Uniform> vertexUniforms = {};
+  std::vector<Uniform> fragmentUniforms = {};
+};
 }  // namespace tgfx

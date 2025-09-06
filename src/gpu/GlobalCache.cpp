@@ -133,7 +133,7 @@ class RectIndicesProvider : public DataSource<Data> {
     if (buffer.isEmpty()) {
       return nullptr;
     }
-    auto* data = reinterpret_cast<uint16_t*>(buffer.data());
+    auto data = reinterpret_cast<uint16_t*>(buffer.data());
     for (uint16_t i = 0; i < reps; ++i) {
       uint16_t baseIdx = i * patternSize;
       auto baseVert = static_cast<uint16_t>(i * vertCount);

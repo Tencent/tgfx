@@ -81,7 +81,7 @@ void ProgramBuilder::emitAndInstallFragProcessors(std::string* color, std::strin
     if (i == programInfo->numColorFragmentProcessors()) {
       inOut = &coverage;
     }
-    const auto* fp = programInfo->getFragmentProcessor(i);
+    const auto fp = programInfo->getFragmentProcessor(i);
     auto output = emitAndInstallFragProc(fp, transformedCoordVarsIdx, **inOut);
     FragmentProcessor::Iter iter(fp);
     while (const FragmentProcessor* tempFP = iter.next()) {
@@ -114,7 +114,7 @@ std::string ProgramBuilder::emitAndInstallFragProc(const FragmentProcessor* proc
   std::vector<SamplerHandle> texSamplers;
   FragmentProcessor::Iter fpIter(processor);
   int samplerIndex = 0;
-  while (const auto* subFP = fpIter.next()) {
+  while (const auto subFP = fpIter.next()) {
     for (size_t i = 0; i < subFP->numTextureSamplers(); ++i) {
       std::string name = "TextureSampler_";
       name += std::to_string(samplerIndex++);
@@ -165,7 +165,7 @@ void ProgramBuilder::emitFSOutputSwizzle() {
   if (swizzle == Swizzle::RGBA()) {
     return;
   }
-  auto* fragBuilder = fragmentShaderBuilder();
+  auto fragBuilder = fragmentShaderBuilder();
   const auto& output = fragBuilder->colorOutputName();
   fragBuilder->codeAppendf("%s = %s.%s;", output.c_str(), output.c_str(), swizzle.c_str());
 }

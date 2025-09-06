@@ -67,9 +67,9 @@ void GLRenderPass::setPipeline(GPURenderPipeline* pipeline) {
   renderPipeline->activate(gpu);
 }
 
-void GLRenderPass::setUniformBytes(unsigned, const void* data, size_t size) {
+void GLRenderPass::setUniformBytes(unsigned binding, const void* data, size_t size) {
   DEBUG_ASSERT(renderPipeline != nullptr);
-  renderPipeline->setUniformBytes(gpu, data, size);
+  renderPipeline->setUniformBytes(gpu, binding, data, size);
 }
 
 void GLRenderPass::setTexture(unsigned binding, GPUTexture* texture, GPUSampler* sampler) {

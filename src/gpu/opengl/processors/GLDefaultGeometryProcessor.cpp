@@ -34,10 +34,10 @@ GLDefaultGeometryProcessor::GLDefaultGeometryProcessor(Color color, int width, i
 }
 
 void GLDefaultGeometryProcessor::emitCode(EmitArgs& args) const {
-  auto* vertBuilder = args.vertBuilder;
-  auto* fragBuilder = args.fragBuilder;
-  auto* varyingHandler = args.varyingHandler;
-  auto* uniformHandler = args.uniformHandler;
+  auto vertBuilder = args.vertBuilder;
+  auto fragBuilder = args.fragBuilder;
+  auto varyingHandler = args.varyingHandler;
+  auto uniformHandler = args.uniformHandler;
 
   varyingHandler->emitAttributes(*this);
 
@@ -66,10 +66,11 @@ void GLDefaultGeometryProcessor::emitCode(EmitArgs& args) const {
   args.vertBuilder->emitNormalizedPosition(positionName);
 }
 
-void GLDefaultGeometryProcessor::setData(UniformBuffer* uniformBuffer,
+void GLDefaultGeometryProcessor::setData(UniformBuffer* vertexUniformBuffer,
+                                         UniformBuffer* fragmentUniformBuffer,
                                          FPCoordTransformIter* transformIter) const {
-  setTransformDataHelper(uvMatrix, uniformBuffer, transformIter);
-  uniformBuffer->setData("Color", color);
-  uniformBuffer->setData("Matrix", viewMatrix);
+  setTransformDataHelper(uvMatrix, vertexUniformBuffer, transformIter);
+  fragmentUniformBuffer->setData("Color", color);
+  vertexUniformBuffer->setData("Matrix", viewMatrix);
 }
 }  // namespace tgfx

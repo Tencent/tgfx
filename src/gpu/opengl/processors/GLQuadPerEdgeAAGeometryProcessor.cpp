@@ -34,10 +34,10 @@ GLQuadPerEdgeAAGeometryProcessor::GLQuadPerEdgeAAGeometryProcessor(int width, in
 }
 
 void GLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
-  auto* vertBuilder = args.vertBuilder;
-  auto* fragBuilder = args.fragBuilder;
-  auto* varyingHandler = args.varyingHandler;
-  auto* uniformHandler = args.uniformHandler;
+  auto vertBuilder = args.vertBuilder;
+  auto fragBuilder = args.fragBuilder;
+  auto varyingHandler = args.varyingHandler;
+  auto uniformHandler = args.uniformHandler;
 
   varyingHandler->emitAttributes(*this);
 
@@ -67,11 +67,12 @@ void GLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
   args.vertBuilder->emitNormalizedPosition(position.name());
 }
 
-void GLQuadPerEdgeAAGeometryProcessor::setData(UniformBuffer* uniformBuffer,
+void GLQuadPerEdgeAAGeometryProcessor::setData(UniformBuffer* vertexUniformBuffer,
+                                               UniformBuffer* fragmentUniformBuffer,
                                                FPCoordTransformIter* transformIter) const {
-  setTransformDataHelper(uvMatrix.value_or(Matrix::I()), uniformBuffer, transformIter);
+  setTransformDataHelper(uvMatrix.value_or(Matrix::I()), vertexUniformBuffer, transformIter);
   if (commonColor.has_value()) {
-    uniformBuffer->setData("Color", *commonColor);
+    fragmentUniformBuffer->setData("Color", *commonColor);
   }
 }
 

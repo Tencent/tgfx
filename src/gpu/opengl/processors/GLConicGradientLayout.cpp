@@ -29,8 +29,8 @@ GLConicGradientLayout::GLConicGradientLayout(Matrix matrix, float bias, float sc
 }
 
 void GLConicGradientLayout::emitCode(EmitArgs& args) const {
-  auto* fragBuilder = args.fragBuilder;
-  auto* uniformHandler = args.uniformHandler;
+  auto fragBuilder = args.fragBuilder;
+  auto uniformHandler = args.uniformHandler;
   auto biasName = uniformHandler->addUniform("Bias", UniformFormat::Float, ShaderStage::Fragment);
   auto scaleName = uniformHandler->addUniform("Scale", UniformFormat::Float, ShaderStage::Fragment);
   fragBuilder->codeAppendf("float angle = atan(-%s.y, -%s.x);",
@@ -41,8 +41,9 @@ void GLConicGradientLayout::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("%s = vec4(t, 1.0, 0.0, 0.0);", args.outputColor.c_str());
 }
 
-void GLConicGradientLayout::onSetData(UniformBuffer* uniformBuffer) const {
-  uniformBuffer->setData("Bias", bias);
-  uniformBuffer->setData("Scale", scale);
+void GLConicGradientLayout::onSetData(UniformBuffer* /*vertexUniformBuffer*/,
+                                      UniformBuffer* fragmentUniformBuffer) const {
+  fragmentUniformBuffer->setData("Bias", bias);
+  fragmentUniformBuffer->setData("Scale", scale);
 }
 }  // namespace tgfx

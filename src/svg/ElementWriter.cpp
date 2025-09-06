@@ -233,7 +233,7 @@ std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& im
   auto type = Types::Get(imageFilter.get());
   switch (type) {
     case Types::ImageFilterType::Blur: {
-      const auto* blurFilter = static_cast<const GaussianBlurImageFilter*>(imageFilter.get());
+      const auto blurFilter = static_cast<const GaussianBlurImageFilter*>(imageFilter.get());
       bound = blurFilter->filterBounds(bound);
       std::string filterID = resourceStore->addFilter();
       ElementWriter filterElement("filter", writer);
@@ -247,7 +247,7 @@ std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& im
       return filterID;
     }
     case Types::ImageFilterType::DropShadow: {
-      const auto* dropShadowFilter = static_cast<const DropShadowImageFilter*>(imageFilter.get());
+      const auto dropShadowFilter = static_cast<const DropShadowImageFilter*>(imageFilter.get());
       bound = dropShadowFilter->filterBounds(bound);
       std::string filterID = resourceStore->addFilter();
       ElementWriter filterElement("filter", writer);
@@ -261,7 +261,7 @@ std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& im
       return filterID;
     }
     case Types::ImageFilterType::InnerShadow: {
-      const auto* innerShadowFilter = static_cast<const InnerShadowImageFilter*>(imageFilter.get());
+      const auto innerShadowFilter = static_cast<const InnerShadowImageFilter*>(imageFilter.get());
       bound = innerShadowFilter->filterBounds(bound);
       std::string filterID = resourceStore->addFilter();
       ElementWriter filterElement("filter", writer);
@@ -275,7 +275,7 @@ std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& im
       return filterID;
     }
     case Types::ImageFilterType::Compose: {
-      const auto* composeFilter = static_cast<const ComposeImageFilter*>(imageFilter.get());
+      const auto composeFilter = static_cast<const ComposeImageFilter*>(imageFilter.get());
       std::string filterID;
       for (const auto& filterItem : composeFilter->filters) {
         auto id = addImageFilter(filterItem, bound);
@@ -309,7 +309,7 @@ void ElementWriter::addDropShadowImageFilter(const DropShadowImageFilter* filter
     float blurriness = 0.f;
     if (filter->blurFilter) {
       if (Types::Get(filter->blurFilter.get()) == Types::ImageFilterType::Blur) {
-        const auto* blurFilter =
+        const auto blurFilter =
             static_cast<const GaussianBlurImageFilter*>(filter->blurFilter.get());
         blurriness = std::max(blurFilter->blurrinessX, blurFilter->blurrinessY) / 2.f;
       }

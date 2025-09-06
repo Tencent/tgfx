@@ -20,46 +20,169 @@
 #include "core/utils/Log.h"
 
 namespace tgfx {
-UniformBuffer::UniformBuffer(std::vector<Uniform> uniforms,
-                             std::unordered_map<std::string, size_t> uniformMap)
-    : _uniforms(std::move(uniforms)), uniformMap(std::move(uniformMap)) {
-  DEBUG_ASSERT(uniforms.size() == uniformMap.size());
-  size_t offset = 0;
-  offsets.push_back(offset);
-  for (auto& uniform : _uniforms) {
-    offset += uniform.size();
-    offsets.push_back(offset);
-  }
-  if (offset > 0) {
-    _buffer = new (std::nothrow) uint8_t[offset];
-    if (_buffer == nullptr) {
-      offsets.resize(1);
-      LOGE("UniformBuffer::UniformBuffer() failed to allocate memory for uniform buffer!");
+UniformBuffer::UniformBuffer(std::vector<Uniform> uniforms, bool uboSupport)
+    : _uniforms(std::move(uniforms)), _uboSupport(uboSupport) {
+  for (const auto& uniform : _uniforms) {
+    size_t size = 0;
+    size_t align = 0;
+    if (_uboSupport) {
+      const auto& [entrySize, entryAlign] = EntryOf(uniform.format());
+      size = entrySize;
+      align = entryAlign;
+
+      const size_t offset = alignCursor(align);
+      fieldMap[uniform.name()] = {uniform.name(), uniform.format(), offset, size, align};
+      cursor = offset + size;
+    } else {
+      size = uniform.size();
+      align = 1;
+
+      const size_t offset = alignCursor(align);
+      fieldMap[uniform.name()] = {uniform.name(), uniform.format(), offset, size, align};
+      cursor = offset + size;
     }
   }
-}
 
-UniformBuffer::~UniformBuffer() {
-  delete[] _buffer;
+  if (const size_t size = alignCursor(_uboSupport ? 16 : 1); size > 0) {
+    buffer.resize(size);
+  }
 }
 
 void UniformBuffer::setData(const std::string& name, const Matrix& matrix) {
-  float values[6];
+  float values[6] = {};
   matrix.get6(values);
-  float data[] = {values[0], values[3], 0, values[1], values[4], 0, values[2], values[5], 1};
-  onSetData(name, data, sizeof(data));
+
+  if (_uboSupport) {
+    // clang-format off
+    const float data[] = {
+      values[0], values[3], 0, 0,
+      values[1], values[4], 0, 0,
+      values[2], values[5], 1, 0,
+    };
+    // clang-format on
+    onSetData(name, data, sizeof(data));
+  } else {
+    // clang-format off
+    const float data[] = {
+      values[0], values[3], 0,
+      values[1], values[4], 0,
+      values[2], values[5], 1
+    };
+    // clang-format on
+    onSetData(name, data, sizeof(data));
+  }
 }
 
 void UniformBuffer::onSetData(const std::string& name, const void* data, size_t size) {
-  auto key = name + nameSuffix;
-  auto result = uniformMap.find(key);
-  if (result == uniformMap.end()) {
+  const auto& key = name + nameSuffix;
+  auto field = findField(key);
+
+  if (field == nullptr) {
     LOGE("UniformBuffer::onSetData() uniform '%s' not found!", name.c_str());
     return;
   }
-  auto index = result->second;
-  DEBUG_ASSERT(_uniforms[index].size() == size);
-  memcpy(_buffer + offsets[index], data, size);
+  DEBUG_ASSERT(field->size == size);
+
+  memcpy(buffer.data() + field->offset, data, size);
 }
 
+const UniformBuffer::Field* UniformBuffer::findField(const std::string& key) const {
+  const auto& iter = fieldMap.find(key);
+  if (iter != fieldMap.end()) {
+    return &iter->second;
+  }
+  return nullptr;
+}
+
+size_t UniformBuffer::alignCursor(size_t alignment) const {
+  return (cursor + alignment - 1) / alignment * alignment;
+}
+
+UniformBuffer::Entry UniformBuffer::EntryOf(UniformFormat format) {
+  switch (format) {
+    case UniformFormat::Float:
+      return {4, 4};
+    case UniformFormat::Float2:
+      return {8, 8};
+    case UniformFormat::Float3:
+      return {12, 16};
+    case UniformFormat::Float4:
+      return {16, 16};
+    case UniformFormat::Float2x2:
+      return {32, 16};
+    case UniformFormat::Float3x3:
+      return {48, 16};
+    case UniformFormat::Float4x4:
+      return {64, 16};
+    case UniformFormat::Int:
+      return {4, 4};
+    case UniformFormat::Int2:
+      return {8, 8};
+    case UniformFormat::Int3:
+      return {12, 16};
+    case UniformFormat::Int4:
+      return {16, 16};
+    case UniformFormat::Texture2DSampler:
+    case UniformFormat::TextureExternalSampler:
+    case UniformFormat::Texture2DRectSampler:
+      return {4, 4};
+    default:
+      return {0, 0};
+  }
+}
+
+#if DEBUG
+const char* UniformBuffer::ToUniformFormatName(UniformFormat format) {
+  switch (format) {
+    case UniformFormat::Float:
+      return "Float";
+    case UniformFormat::Float2:
+      return "Float2";
+    case UniformFormat::Float3:
+      return "Float3";
+    case UniformFormat::Float4:
+      return "Float4";
+    case UniformFormat::Float2x2:
+      return "Float2x2";
+    case UniformFormat::Float3x3:
+      return "Float3x3";
+    case UniformFormat::Float4x4:
+      return "Float4x4";
+    case UniformFormat::Int:
+      return "Int";
+    case UniformFormat::Int2:
+      return "Int2";
+    case UniformFormat::Int3:
+      return "Int3";
+    case UniformFormat::Int4:
+      return "Int4";
+    case UniformFormat::Texture2DSampler:
+      return "Texture2DSampler";
+    case UniformFormat::TextureExternalSampler:
+      return "TextureExternalSampler";
+    case UniformFormat::Texture2DRectSampler:
+      return "Texture2DRectSampler";
+    default:
+      return "?";
+  }
+}
+
+void UniformBuffer::dump() const {
+  LOGI("\n-------------- UniformBufferLayout dump begin --------------");
+  std::vector<Field> sortedFields;
+  sortedFields.reserve(fieldMap.size());
+  for (const auto& [name, field] : fieldMap) {
+    sortedFields.push_back(field);
+  }
+  std::sort(sortedFields.begin(), sortedFields.end(),
+            [](const Field& a, const Field& b) { return a.offset < b.offset; });
+  for (size_t i = 0; i < sortedFields.size(); ++i) {
+    LOGI("%4zu: %-10s offset=%4zu, size=%4zu, align=%2zu, name=%s", i,
+         ToUniformFormatName(sortedFields[i].format), sortedFields[i].offset, sortedFields[i].size,
+         sortedFields[i].align, sortedFields[i].name.c_str());
+  }
+  LOGI("Total buffer size = %zu bytes", size());
+  LOGI("-------------- UniformBufferLayout dump end --------------\n");
+}
+#endif
 }  // namespace tgfx

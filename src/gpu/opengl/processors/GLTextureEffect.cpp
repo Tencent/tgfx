@@ -20,31 +20,41 @@
 #include <unordered_map>
 
 namespace tgfx {
-static const float ColorConversion601LimitRange[] = {
+static std::array<float, 12> AlignMat3(const float* mat3) {
+  // clang-format off
+  return {
+    mat3[0], mat3[1], mat3[2], 0.0f,
+    mat3[3], mat3[4], mat3[5], 0.0f,
+    mat3[6], mat3[7], mat3[8], 0.0f
+  };
+  // clang-format on
+}
+
+static constexpr float ColorConversion601LimitRange[] = {
     1.164384f, 1.164384f, 1.164384f, 0.0f, -0.391762f, 2.017232f, 1.596027f, -0.812968f, 0.0f,
 };
 
-static const float ColorConversion601FullRange[] = {
+static constexpr float ColorConversion601FullRange[] = {
     1.0f, 1.0f, 1.0f, 0.0f, -0.344136f, 1.772f, 1.402f, -0.714136f, 0.0f,
 };
 
-static const float ColorConversion709LimitRange[] = {
+static constexpr float ColorConversion709LimitRange[] = {
     1.164384f, 1.164384f, 1.164384f, 0.0f, -0.213249f, 2.112402f, 1.792741f, -0.532909f, 0.0f,
 };
 
-static const float ColorConversion709FullRange[] = {
+static constexpr float ColorConversion709FullRange[] = {
     1.0f, 1.0f, 1.0f, 0.0f, -0.187324f, 1.8556f, 1.5748f, -0.468124f, 0.0f,
 };
 
-static const float ColorConversion2020LimitRange[] = {
+static constexpr float ColorConversion2020LimitRange[] = {
     1.164384f, 1.164384f, 1.164384f, 0.0f, -0.187326f, 2.141772f, 1.678674f, -0.650424f, 0.0f,
 };
 
-static const float ColorConversion2020FullRange[] = {
+static constexpr float ColorConversion2020FullRange[] = {
     1.0f, 1.0f, 1.0f, 0.0f, -0.164553f, 1.8814f, 1.4746f, -0.571353f, 0.0f,
 };
 
-static const float ColorConversionJPEGFullRange[] = {
+static constexpr float ColorConversionJPEGFullRange[] = {
     1.0f, 1.0f, 1.0f, 0.0f, -0.344136f, 1.772000f, 1.402f, -0.714136f, 0.0f,
 };
 
@@ -90,8 +100,8 @@ void GLTextureEffect::emitCode(EmitArgs& args) const {
 }
 
 void GLTextureEffect::emitDefaultTextureCode(EmitArgs& args) const {
-  auto* fragBuilder = args.fragBuilder;
-  auto* uniformHandler = args.uniformHandler;
+  auto fragBuilder = args.fragBuilder;
+  auto uniformHandler = args.uniformHandler;
   auto& textureSampler = (*args.textureSamplers)[0];
   auto vertexColor = (*args.transformedCoords)[0].name();
   if (args.coordFunc) {
@@ -128,8 +138,8 @@ void GLTextureEffect::emitDefaultTextureCode(EmitArgs& args) const {
 }
 
 void GLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
-  auto* fragBuilder = args.fragBuilder;
-  auto* uniformHandler = args.uniformHandler;
+  auto fragBuilder = args.fragBuilder;
+  auto uniformHandler = args.uniformHandler;
   auto yuvTexture = getYUVTexture();
   auto& textureSamplers = *args.textureSamplers;
   auto vertexColor = (*args.transformedCoords)[0].name();
@@ -187,39 +197,75 @@ void GLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
   }
 }
 
-void GLTextureEffect::onSetData(UniformBuffer* uniformBuffer) const {
+void GLTextureEffect::onSetData(UniformBuffer* /*vertexUniformBuffer*/,
+                                UniformBuffer* fragmentUniformBuffer) const {
   auto textureView = getTextureView();
   if (textureView == nullptr) {
     return;
   }
   if (alphaStart != Point::Zero()) {
     auto alphaStartValue = textureView->getTextureCoord(alphaStart.x, alphaStart.y);
-    uniformBuffer->setData("AlphaStart", alphaStartValue);
+    fragmentUniformBuffer->setData("AlphaStart", alphaStartValue);
   }
   auto yuvTexture = getYUVTexture();
   if (yuvTexture) {
     std::string mat3ColorConversion = "Mat3ColorConversion";
     switch (yuvTexture->colorSpace()) {
-      case YUVColorSpace::BT601_LIMITED:
-        uniformBuffer->setData(mat3ColorConversion, ColorConversion601LimitRange);
-        break;
+      case YUVColorSpace::BT601_LIMITED: {
+        if (fragmentUniformBuffer->uboSupport()) {
+          fragmentUniformBuffer->setData(mat3ColorConversion,
+                                         AlignMat3(ColorConversion601LimitRange));
+        } else {
+          fragmentUniformBuffer->setData(mat3ColorConversion, ColorConversion601LimitRange);
+        }
+      } break;
       case YUVColorSpace::BT601_FULL:
-        uniformBuffer->setData(mat3ColorConversion, ColorConversion601FullRange);
+        if (fragmentUniformBuffer->uboSupport()) {
+          fragmentUniformBuffer->setData(mat3ColorConversion,
+                                         AlignMat3(ColorConversion601FullRange));
+        } else {
+          fragmentUniformBuffer->setData(mat3ColorConversion, ColorConversion601FullRange);
+        }
         break;
       case YUVColorSpace::BT709_LIMITED:
-        uniformBuffer->setData(mat3ColorConversion, ColorConversion709LimitRange);
+        if (fragmentUniformBuffer->uboSupport()) {
+          fragmentUniformBuffer->setData(mat3ColorConversion,
+                                         AlignMat3(ColorConversion709LimitRange));
+        } else {
+          fragmentUniformBuffer->setData(mat3ColorConversion, ColorConversion709LimitRange);
+        }
         break;
       case YUVColorSpace::BT709_FULL:
-        uniformBuffer->setData(mat3ColorConversion, ColorConversion709FullRange);
+        if (fragmentUniformBuffer->uboSupport()) {
+          fragmentUniformBuffer->setData(mat3ColorConversion,
+                                         AlignMat3(ColorConversion709FullRange));
+        } else {
+          fragmentUniformBuffer->setData(mat3ColorConversion, ColorConversion709FullRange);
+        }
         break;
       case YUVColorSpace::BT2020_LIMITED:
-        uniformBuffer->setData(mat3ColorConversion, ColorConversion2020LimitRange);
+        if (fragmentUniformBuffer->uboSupport()) {
+          fragmentUniformBuffer->setData(mat3ColorConversion,
+                                         AlignMat3(ColorConversion2020LimitRange));
+        } else {
+          fragmentUniformBuffer->setData(mat3ColorConversion, ColorConversion2020LimitRange);
+        }
         break;
       case YUVColorSpace::BT2020_FULL:
-        uniformBuffer->setData(mat3ColorConversion, ColorConversion2020FullRange);
+        if (fragmentUniformBuffer->uboSupport()) {
+          fragmentUniformBuffer->setData(mat3ColorConversion,
+                                         AlignMat3(ColorConversion2020FullRange));
+        } else {
+          fragmentUniformBuffer->setData(mat3ColorConversion, ColorConversion2020FullRange);
+        }
         break;
       case YUVColorSpace::JPEG_FULL:
-        uniformBuffer->setData(mat3ColorConversion, ColorConversionJPEGFullRange);
+        if (fragmentUniformBuffer->uboSupport()) {
+          fragmentUniformBuffer->setData(mat3ColorConversion,
+                                         AlignMat3(ColorConversionJPEGFullRange));
+        } else {
+          fragmentUniformBuffer->setData(mat3ColorConversion, ColorConversionJPEGFullRange);
+        }
         break;
       default:
         break;
@@ -253,7 +299,7 @@ void GLTextureEffect::onSetData(UniformBuffer* uniformBuffer) const {
       rect[2] = rb.x;
       rect[3] = rb.y;
     }
-    uniformBuffer->setData("Subset", rect);
+    fragmentUniformBuffer->setData("Subset", rect);
   }
 }
 

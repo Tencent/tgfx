@@ -127,7 +127,7 @@ std::string SVGPathParser::ToSVGString(const Path& path, PathEncoding encoding) 
   };
 
   auto pathIter = [&](PathVerb verb, const Point points[4], void* info) -> void {
-    auto* castedString = reinterpret_cast<std::string*>(info);
+    auto castedString = reinterpret_cast<std::string*>(info);
     switch (verb) {
       case PathVerb::Move:
         appendCommand(*castedString, 'M', points, 0, 1);

@@ -96,7 +96,7 @@ void ResourceCache::purgeResourcesByLRU(bool scratchResourceOnly,
                                         const std::function<bool(Resource*)>& satisfied) {
   auto item = purgeableResources.begin();
   while (item != purgeableResources.end()) {
-    auto* resource = *item;
+    auto resource = *item;
     if (satisfied(resource)) {
       break;
     }

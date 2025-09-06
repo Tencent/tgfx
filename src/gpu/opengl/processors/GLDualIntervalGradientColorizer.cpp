@@ -51,7 +51,7 @@ GLDualIntervalGradientColorizer::GLDualIntervalGradientColorizer(Color scale01, 
 }
 
 void GLDualIntervalGradientColorizer::emitCode(EmitArgs& args) const {
-  auto* fragBuilder = args.fragBuilder;
+  auto fragBuilder = args.fragBuilder;
   auto scale01Name =
       args.uniformHandler->addUniform("scale01", UniformFormat::Float4, ShaderStage::Fragment);
   auto bias01Name =
@@ -74,11 +74,12 @@ void GLDualIntervalGradientColorizer::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("%s = vec4(t * scale + bias);", args.outputColor.c_str());
 }
 
-void GLDualIntervalGradientColorizer::onSetData(UniformBuffer* uniformBuffer) const {
-  uniformBuffer->setData("scale01", scale01);
-  uniformBuffer->setData("bias01", bias01);
-  uniformBuffer->setData("scale23", scale23);
-  uniformBuffer->setData("bias23", bias23);
-  uniformBuffer->setData("threshold", threshold);
+void GLDualIntervalGradientColorizer::onSetData(UniformBuffer* /*vertexUniformBuffer*/,
+                                                UniformBuffer* fragmentUniformBuffer) const {
+  fragmentUniformBuffer->setData("scale01", scale01);
+  fragmentUniformBuffer->setData("bias01", bias01);
+  fragmentUniformBuffer->setData("scale23", scale23);
+  fragmentUniformBuffer->setData("bias23", bias23);
+  fragmentUniformBuffer->setData("threshold", threshold);
 }
 }  // namespace tgfx

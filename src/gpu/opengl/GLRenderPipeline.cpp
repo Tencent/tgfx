@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLRenderPipeline.h"
+#include "gpu/UniformBuffer.h"
 #include "gpu/opengl/GLGPU.h"
 
 namespace tgfx {
@@ -37,16 +38,19 @@ static const unsigned XfermodeEquation2Blend[] = {
     GL_FUNC_REVERSE_SUBTRACT,
 };
 
+static constexpr int VERTEX_UBO_BINDING_POINT = 0;
+static constexpr int FRAGMENT_UBO_BINDING_POINT = 1;
+
 struct AttribLayout {
   bool normalized = false;
   int count = 0;
   unsigned type = 0;
 };
 
-GLRenderPipeline::GLRenderPipeline(unsigned programID, std::vector<Uniform> uniforms,
+GLRenderPipeline::GLRenderPipeline(unsigned programID, std::unique_ptr<UniformLayout> uniformLayout,
                                    std::vector<Attribute> attribs,
                                    std::unique_ptr<BlendFormula> blendFormula)
-    : programID(programID), uniforms(std::move(uniforms)), attributes(std::move(attribs)),
+    : programID(programID), uniformLayout(std::move(uniformLayout)), attributes(std::move(attribs)),
       blendFormula(std::move(blendFormula)) {
   DEBUG_ASSERT(!attributes.empty());
   size_t offset = 0;
@@ -89,14 +93,71 @@ void GLRenderPipeline::activate(GLGPU* gpu) {
   }
 }
 
-void GLRenderPipeline::setUniformBytes(GLGPU* gpu, const void* data, size_t size) {
-  if (data == nullptr || size == 0) {
-    return;
-  }
-  if (uniforms.empty()) {
-    return;
-  }
+void GLRenderPipeline::setUniformBytesForUBO(GLGPU* gpu, unsigned binding, const void* data,
+                                             size_t size) {
   auto gl = gpu->functions();
+
+  unsigned ubo = 0;
+
+  if (binding == VERTEX_UBO_BINDING_POINT) {
+    if (vertexUBO == 0) {
+      gl->genBuffers(1, &vertexUBO);
+
+      unsigned vertexUniformBlockIndex =
+          gl->getUniformBlockIndex(programID, VertexUniformBlockName.c_str());
+      if (vertexUniformBlockIndex != GL_INVALID_INDEX) {
+        gl->uniformBlockBinding(programID, vertexUniformBlockIndex, VERTEX_UBO_BINDING_POINT);
+      }
+    }
+
+    ubo = vertexUBO;
+  } else if (binding == FRAGMENT_UBO_BINDING_POINT) {
+    if (fragmentUBO == 0) {
+      gl->genBuffers(1, &fragmentUBO);
+
+      unsigned fragmentUniformBlockIndex =
+          gl->getUniformBlockIndex(programID, FragmentUniformBlockName.c_str());
+      if (fragmentUniformBlockIndex != GL_INVALID_INDEX) {
+        gl->uniformBlockBinding(programID, fragmentUniformBlockIndex, FRAGMENT_UBO_BINDING_POINT);
+      }
+    }
+
+    ubo = fragmentUBO;
+  }
+
+  if (ubo <= 0) {
+    return;
+  }
+
+  gl->bindBuffer(GL_UNIFORM_BUFFER, ubo);
+  gl->bufferData(GL_UNIFORM_BUFFER, static_cast<int32_t>(size), data, GL_STATIC_DRAW);
+  gl->bindBuffer(GL_UNIFORM_BUFFER, 0);
+  gl->bindBufferBase(GL_UNIFORM_BUFFER, binding,
+                     binding == VERTEX_UBO_BINDING_POINT ? vertexUBO : fragmentUBO);
+}
+
+void GLRenderPipeline::setUniformBytes(GLGPU* gpu, unsigned binding, const void* data,
+                                       size_t size) {
+  if (data == nullptr || size == 0 || uniformLayout == nullptr) {
+    return;
+  }
+
+  const auto caps = gpu->caps();
+  if (caps->uboSupport && !uniformLayout->uniformBlockNames.empty()) {
+    setUniformBytesForUBO(gpu, binding, data, size);
+    return;
+  }
+
+  if (uniformLayout->vertexUniforms.empty() && uniformLayout->fragmentUniforms.empty()) {
+    return;
+  }
+
+  const auto& uniforms = binding == FRAGMENT_UBO_BINDING_POINT ? uniformLayout->fragmentUniforms
+                                                               : uniformLayout->vertexUniforms;
+
+  auto gl = gpu->functions();
+  auto& uniformLocations =
+      binding == FRAGMENT_UBO_BINDING_POINT ? fragmentUniformLocations : vertexUniformLocations;
   if (uniformLocations.empty()) {
     uniformLocations.reserve(uniforms.size());
     for (auto& uniform : uniforms) {
@@ -151,6 +212,7 @@ void GLRenderPipeline::setUniformBytes(GLGPU* gpu, const void* data, size_t size
       case UniformFormat::TextureExternalSampler:
       case UniformFormat::Texture2DRectSampler:
         gl->uniform1iv(location, 1, reinterpret_cast<int*>(buffer + offset));
+        break;
     }
     index++;
     offset += uniform.size();
@@ -230,6 +292,15 @@ void GLRenderPipeline::release(GPU* gpu) {
   }
   if (vertexArray > 0) {
     gl->deleteVertexArrays(1, &vertexArray);
+  }
+
+  if (vertexUBO > 0) {
+    gl->deleteBuffers(1, &vertexUBO);
+    vertexUBO = 0;
+  }
+  if (fragmentUBO > 0) {
+    gl->deleteBuffers(1, &fragmentUBO);
+    fragmentUBO = 0;
   }
 }
 }  // namespace tgfx

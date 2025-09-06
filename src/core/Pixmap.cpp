@@ -226,7 +226,7 @@ bool Pixmap::clear() {
   } else {
     auto rowCount = _info.height();
     auto trimRowBytes = static_cast<size_t>(_info.width()) * _info.bytesPerPixel();
-    auto* pixels = static_cast<char*>(_writablePixels);
+    auto pixels = static_cast<char*>(_writablePixels);
     for (int i = 0; i < rowCount; i++) {
       memset(pixels, 0, trimRowBytes);
       pixels += info().rowBytes();

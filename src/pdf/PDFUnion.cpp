@@ -30,7 +30,7 @@ namespace {
 // Given an arbitrary string, write it as a valid name (not including leading slash).
 void WriteNameEscaped(const std::shared_ptr<WriteStream>& stream, const char* name) {
   static const char kToEscape[] = "#/%()<>[]{}";
-  for (const auto* n = reinterpret_cast<const uint8_t*>(name); *n; ++n) {
+  for (auto n = reinterpret_cast<const uint8_t*>(name); *n; ++n) {
     uint8_t v = *n;
     if (v < '!' || v > '~' || strchr(kToEscape, v)) {
       char buffer[3] = {'#', HexadecimalDigits::upper[v >> 4], HexadecimalDigits::upper[v & 0xF]};
