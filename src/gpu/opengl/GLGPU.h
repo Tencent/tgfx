@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <array>
 #include <limits>
 #include <unordered_map>
 #include "gpu/GPU.h"
