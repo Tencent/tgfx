@@ -266,7 +266,7 @@ void DisplayList::render(Surface* surface, bool autoClear) {
 std::vector<Rect> DisplayList::renderDirect(Surface* surface, bool autoClear) const {
   auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
   drawRootLayer(surface, surfaceRect, getViewMatrix(), autoClear);
-  return {surfaceRect};
+  return {Rect::MakeEmpty()};
 }
 
 static std::vector<Rect> MapDirtyRegions(const std::vector<Rect>& dirtyRegions,
