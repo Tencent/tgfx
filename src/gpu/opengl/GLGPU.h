@@ -20,6 +20,7 @@
 
 #include <array>
 #include <limits>
+#include <optional>
 #include <unordered_map>
 #include "gpu/GPU.h"
 #include "gpu/opengl/GLCommandQueue.h"
