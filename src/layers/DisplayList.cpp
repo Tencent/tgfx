@@ -557,17 +557,25 @@ std::vector<DrawTask> DisplayList::getFallbackDrawTasks(
   auto tileRect = Rect::MakeXYWH(tileX * _tileSize, tileY * _tileSize, _tileSize, _tileSize);
   auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
   DEBUG_ASSERT(currentZoomScale != 0.0f);
+  auto cacheCount = sortedCaches.size();
+  std::vector<size_t> orderIndices = {};
+  orderIndices.reserve(cacheCount);
   size_t firstGreaterIndex = 0;
-  for (auto& item : sortedCaches) {
-    if (item.first >= currentZoomScale) {
-      break;
+  for (size_t index = 0; index < cacheCount; index++) {
+    if (sortedCaches[index].first < currentZoomScale) {
+      firstGreaterIndex++;
+    } else {
+      orderIndices.push_back(index);
     }
-    firstGreaterIndex++;
   }
-  auto findFallbackTasks = [](float scale, TileCache* tileCache, float currentZoomScale,
-                              const Rect& tileRect, int tileSize) -> std::vector<DrawTask> {
+  for (size_t index = firstGreaterIndex; index > 0; index--) {
+    orderIndices.push_back(index - 1);
+  }
+
+  for (auto& index : orderIndices) {
+    auto& [scale, tileCache] = sortedCaches[index];
     if (scale == currentZoomScale || tileCache->empty()) {
-      return {};
+      continue;
     }
     auto scaleRatio = scale / currentZoomScale;
     DEBUG_ASSERT(scaleRatio != 0.0f);
@@ -575,31 +583,16 @@ std::vector<DrawTask> DisplayList::getFallbackDrawTasks(
     zoomedRect.scale(scaleRatio, scaleRatio);
     auto tiles = tileCache->getTilesUnderRect(zoomedRect, true);
     if (tiles.empty()) {
-      return {};
+      continue;
     }
     std::vector<DrawTask> tasks = {};
-    for (const auto& tile : tiles) {
-      auto drawRect = tile->getTileRect(tileSize);
+    for (auto& tile : tiles) {
+      auto drawRect = tile->getTileRect(_tileSize);
       if (drawRect.intersect(zoomedRect)) {
-        tasks.emplace_back(tile, tileSize, drawRect, 1.0f / scaleRatio);
+        tasks.emplace_back(tile, _tileSize, drawRect, 1.0f / scaleRatio);
       }
     }
     return tasks;
-  };
-  auto tileCacheCount = sortedCaches.size();
-  for (size_t index = firstGreaterIndex; index < tileCacheCount; index++) {
-    auto& [scale, tileCache] = sortedCaches[index];
-    auto tasks = findFallbackTasks(scale, tileCache, currentZoomScale, tileRect, _tileSize);
-    if (!tasks.empty()) {
-      return tasks;
-    }
-  }
-  for (auto index = static_cast<int>(firstGreaterIndex) - 1; index >= 0; index--) {
-    auto& [scale, tileCache] = sortedCaches[static_cast<size_t>(index)];
-    auto tasks = findFallbackTasks(scale, tileCache, currentZoomScale, tileRect, _tileSize);
-    if (!tasks.empty()) {
-      return tasks;
-    }
   }
   return {};
 }
