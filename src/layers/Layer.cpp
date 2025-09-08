@@ -590,11 +590,13 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
       // localToGlobalMatrix to the background canvas matrix to ensure the coordinate space is
       // correct.
       actualMatrix.preConcat(localToGlobalMatrix);
+      backgroundCanvas->setMatrix(actualMatrix);
       if (auto image = getBackgroundImage(args, scale, nullptr)) {
-        backgroundCanvas->resetMatrix();
+        AutoCanvasRestore autoRestore(backgroundCanvas);
+        actualMatrix.preScale(1.0f / scale, 1.0f / scale);
+        backgroundCanvas->setMatrix(actualMatrix);
         backgroundCanvas->drawImage(image);
       }
-      backgroundCanvas->setMatrix(actualMatrix);
       args.backgroundContext = std::move(backgroundContext);
     }
   }
