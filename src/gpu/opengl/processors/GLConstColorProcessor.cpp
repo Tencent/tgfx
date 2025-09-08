@@ -29,7 +29,7 @@ GLConstColorProcessor::GLConstColorProcessor(Color color, InputMode mode)
 }
 
 void GLConstColorProcessor::emitCode(EmitArgs& args) const {
-  auto* fragBuilder = args.fragBuilder;
+  auto fragBuilder = args.fragBuilder;
   auto colorName =
       args.uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
   fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
@@ -45,7 +45,8 @@ void GLConstColorProcessor::emitCode(EmitArgs& args) const {
   }
 }
 
-void GLConstColorProcessor::onSetData(UniformBuffer* uniformBuffer) const {
-  uniformBuffer->setData("Color", color);
+void GLConstColorProcessor::onSetData(UniformBuffer* /*vertexUniformBuffer*/,
+                                      UniformBuffer* fragmentUniformBuffer) const {
+  fragmentUniformBuffer->setData("Color", color);
 }
 }  // namespace tgfx

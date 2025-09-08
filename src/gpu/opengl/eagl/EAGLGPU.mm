@@ -86,7 +86,7 @@ CVOpenGLESTextureCacheRef EAGLGPU::getTextureCache() {
         kCFAllocatorDefault, 1, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
     CFDictionarySetValue(attrs, kCVOpenGLESTextureCacheMaximumTextureAgeKey,
                          [NSNumber numberWithFloat:0]);
-    CVOpenGLESTextureCacheCreate(kCFAllocatorDefault, attrs, eaglContext, NULL, &textureCache);
+    CVOpenGLESTextureCacheCreate(kCFAllocatorDefault, attrs, _eaglContext, NULL, &textureCache);
     CFRelease(attrs);
   }
   return textureCache;

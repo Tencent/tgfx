@@ -18,6 +18,7 @@
 
 #include "RuntimeDrawTask.h"
 #include "gpu/GlobalCache.h"
+#include "gpu/PipelineProgram.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/Quad.h"
@@ -92,6 +93,8 @@ void RuntimeDrawTask::execute(CommandEncoder* encoder) {
   }
   effect->onDraw(RuntimeProgramWrapper::Unwrap(program.get()), backendTextures,
                  renderTarget->getBackendRenderTarget(), offset);
+  // Reset GL state to prevent side effects from external GL calls.
+  context->gpu()->resetGLState();
   if (renderTarget->sampleCount() > 1) {
     RenderPassDescriptor descriptor(renderTarget->getRenderTexture(),
                                     renderTarget->getSampleTexture());
@@ -139,12 +142,17 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
   auto geometryProcessor =
       DefaultGeometryProcessor::Make(context->drawingBuffer(), {}, renderTarget->width(),
                                      renderTarget->height(), AAType::None, {}, {});
-  std::vector<PlacementPtr<FragmentProcessor>> fragmentProcessors = {};
-  fragmentProcessors.emplace_back(std::move(colorProcessor));
-  ProgramInfo programInfo(renderTarget.get(), std::move(geometryProcessor),
+  std::vector fragmentProcessors = {colorProcessor.get()};
+  ProgramInfo programInfo(renderTarget.get(), geometryProcessor.get(),
                           std::move(fragmentProcessors), 1, nullptr, BlendMode::Src);
-  renderPass->bindProgramAndScissorClip(&programInfo, {});
-  renderPass->bindBuffers(nullptr, vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
+  auto program = std::static_pointer_cast<PipelineProgram>(programInfo.getProgram());
+  if (program == nullptr) {
+    LOGE("RuntimeDrawTask::GetFlatTextureView() Failed to get the program!");
+    return nullptr;
+  }
+  renderPass->setPipeline(program->getPipeline());
+  programInfo.setUniformsAndSamplers(renderPass.get(), program.get());
+  renderPass->setVertexBuffer(vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
   renderPass->draw(PrimitiveType::TriangleStrip, 0, 4);
   renderPass->end();
   return renderTarget->asTextureView();

@@ -55,7 +55,8 @@ class XferProcessor : public Processor {
 
   virtual void emitCode(const EmitArgs& args) const = 0;
 
-  virtual void setData(UniformBuffer* uniformBuffer) const = 0;
+  virtual void setData(UniformBuffer* vertexUniformBuffer,
+                       UniformBuffer* fragmentUniformBuffer) const = 0;
 
  protected:
   explicit XferProcessor(uint32_t classID) : Processor(classID) {

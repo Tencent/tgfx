@@ -35,7 +35,7 @@ class RuntimeProgramWrapper : public Program {
   std::unique_ptr<RuntimeProgram> runtimeProgram = nullptr;
 
   explicit RuntimeProgramWrapper(std::unique_ptr<RuntimeProgram> program)
-      : Program(nullptr), runtimeProgram(std::move(program)) {
+      : runtimeProgram(std::move(program)) {
   }
 };
 }  // namespace tgfx

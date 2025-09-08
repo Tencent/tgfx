@@ -97,7 +97,7 @@ std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string& fontFamily,
   CFMutableDictionaryRef cfAttributes = CFDictionaryCreateMutable(
       kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
   if (!fontFamily.empty()) {
-    const auto* cfFontName =
+    auto cfFontName =
         CFStringCreateWithCString(kCFAllocatorDefault, fontFamily.c_str(), kCFStringEncodingUTF8);
     if (cfFontName) {
       CFDictionaryAddValue(cfAttributes, kCTFontFamilyNameAttribute, cfFontName);
@@ -134,9 +134,9 @@ std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string& fontFamily,
   }
 
   std::shared_ptr<CGTypeface> typeface;
-  const auto* cfDesc = CTFontDescriptorCreateWithAttributes(cfAttributes);
+  auto cfDesc = CTFontDescriptorCreateWithAttributes(cfAttributes);
   if (cfDesc) {
-    const auto* ctFont = CTFontCreateWithFontDescriptor(cfDesc, 0, nullptr);
+    auto ctFont = CTFontCreateWithFontDescriptor(cfDesc, 0, nullptr);
     if (ctFont) {
       typeface = CGTypeface::Make(ctFont);
       CFRelease(ctFont);
@@ -298,7 +298,7 @@ std::shared_ptr<Data> CGTypeface::copyTableData(FontTableTag tag) const {
   if (cfData == nullptr) {
     return nullptr;
   }
-  const auto* bytePtr = CFDataGetBytePtr(cfData);
+  auto bytePtr = CFDataGetBytePtr(cfData);
   auto length = static_cast<size_t>(CFDataGetLength(cfData));
   return Data::MakeAdopted(
       bytePtr, length, [](const void*, void* context) { CFRelease((CFDataRef)context); },
@@ -359,12 +359,12 @@ static void GetGlyphMapByPlane(const uint8_t* bits, CTFontRef ctFont, std::vecto
 std::vector<Unichar> CGTypeface::getGlyphToUnicodeMap() const {
   auto glyphCount = CTFontGetGlyphCount(ctFont);
 
-  const auto* charSet = CTFontCopyCharacterSet(ctFont);
+  auto charSet = CTFontCopyCharacterSet(ctFont);
   if (!charSet) {
     return GetGlyphMapByChar(ctFont, glyphCount);
   }
 
-  const auto* bitmap = CFCharacterSetCreateBitmapRepresentation(nullptr, charSet);
+  auto bitmap = CFCharacterSetCreateBitmapRepresentation(nullptr, charSet);
   if (!bitmap) {
     return {};
   }
@@ -375,7 +375,7 @@ std::vector<Unichar> CGTypeface::getGlyphToUnicodeMap() const {
   }
 
   std::vector<Unichar> returnMap(static_cast<size_t>(glyphCount), 0);
-  const auto* bits = CFDataGetBytePtr(bitmap);
+  auto bits = CFDataGetBytePtr(bitmap);
   GetGlyphMapByPlane(bits, ctFont, returnMap, 0);
   /*
     A CFData object that specifies the bitmap representation of the Unicode
@@ -404,7 +404,7 @@ std::vector<Unichar> CGTypeface::getGlyphToUnicodeMap() const {
 #ifdef TGFX_USE_ADVANCED_TYPEFACE_PROPERTY
 AdvancedTypefaceInfo CGTypeface::getAdvancedInfo() const {
   AdvancedTypefaceInfo advancedProperty;
-  const auto* fontName = CTFontCopyPostScriptName(ctFont);
+  auto fontName = CTFontCopyPostScriptName(ctFont);
   if (fontName) {
     advancedProperty.postScriptName = CGTypeface::StringFromCFString(fontName);
   }

@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "gpu/GPURenderPipeline.h"
 #include "gpu/Resource.h"
 #include "gpu/UniformBuffer.h"
 #include "tgfx/core/BytesKey.h"
@@ -30,17 +31,6 @@ class Program : public Resource {
  public:
   size_t memoryUsage() const override {
     return 0;
-  }
-
-  UniformBuffer* uniformBuffer() const {
-    return _uniformBuffer.get();
-  }
-
- protected:
-  std::unique_ptr<UniformBuffer> _uniformBuffer = nullptr;
-
-  explicit Program(std::unique_ptr<UniformBuffer> uniformBuffer)
-      : _uniformBuffer(std::move(uniformBuffer)) {
   }
 
  private:

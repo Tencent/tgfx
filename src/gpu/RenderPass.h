@@ -18,9 +18,10 @@
 
 #pragma once
 
-#include <utility>
+#include "core/utils/Log.h"
 #include "gpu/GPUBuffer.h"
-#include "gpu/ProgramInfo.h"
+#include "gpu/GPURenderPipeline.h"
+#include "gpu/GPUSampler.h"
 #include "gpu/RenderPassDescriptor.h"
 
 namespace tgfx {
@@ -32,34 +33,85 @@ enum class PrimitiveType {
   TriangleStrip,
 };
 
+/**
+ * Index formats for indexed drawing.
+ */
+enum class IndexFormat {
+  UInt16,
+  UInt32,
+};
+
+/**
+ * RenderPass represents an interface for encoding a sequence of rendering commands into a command
+ * buffer. A RenderPass is begun by calling CommandEncoder::beginRenderPass() with a valid
+ * RenderPassDescriptor, and must be ended by calling end() before beginning a new render pass.
+ */
 class RenderPass {
  public:
   virtual ~RenderPass() = default;
 
-  void end();
-  void bindProgramAndScissorClip(const ProgramInfo* programInfo, const Rect& scissorRect);
-  void bindBuffers(GPUBuffer* indexBuffer, GPUBuffer* vertexBuffer, size_t vertexOffset = 0);
-  void draw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount);
-  void drawIndexed(PrimitiveType primitiveType, size_t baseIndex, size_t indexCount);
+  /**
+   * Sets the scissor rectangle used during the rasterization stage. After transformation into
+   * viewport coordinates any fragments that fall outside the scissor rectangle will be discarded.
+   */
+  virtual void setScissorRect(int x, int y, int width, int height) = 0;
+
+  /**
+   * Sets the render pipeline to be used for subsequent draw calls. The pipeline defines the shader
+   * programs and fixed-function state used during rendering.
+   */
+  virtual void setPipeline(GPURenderPipeline* pipeline) = 0;
+
+  /**
+   * Sets the uniform data to a specified binding index in the shader's UBO table.
+   */
+  virtual void setUniformBytes(unsigned binding, const void* data, size_t size) = 0;
+
+  /**
+   * Sets a texture and its sampler state to a specified binding index in the shader's texture table.
+   */
+  virtual void setTexture(unsigned binding, GPUTexture* texture, GPUSampler* sampler) = 0;
+
+  /**
+   * Sets or unsets the current vertex buffer with an optional offset.
+   */
+  virtual void setVertexBuffer(GPUBuffer* buffer, size_t offset = 0) = 0;
+
+  /**
+   * Sets the current index buffer with its format.
+   */
+  virtual void setIndexBuffer(GPUBuffer* buffer, IndexFormat format = IndexFormat::UInt16) = 0;
+
+  /**
+   * Draws primitives based on the vertex buffer provided by setVertexBuffer().
+   */
+  virtual void draw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount) = 0;
+
+  /**
+   * Draws indexed primitives based on the index buffer provided by setIndexBuffer() and the vertex
+   * buffer provided by setVertexBuffer().
+   */
+  virtual void drawIndexed(PrimitiveType primitiveType, size_t baseIndex, size_t indexCount) = 0;
+
+  /**
+   * Completes the current render pass. After calling this method, no further commands can be added
+   * to the render pass, and a new render pass can be started by calling
+   * CommandEncoder::beginRenderPass() again.
+   */
+  void end() {
+    onEnd();
+    isEnd = true;
+  }
 
  protected:
   RenderPassDescriptor descriptor = {};
-  std::shared_ptr<Program> program = nullptr;
 
   explicit RenderPass(RenderPassDescriptor descriptor) : descriptor(std::move(descriptor)) {
   }
 
-  virtual bool onBindProgramAndScissorClip(const ProgramInfo* programInfo,
-                                           const Rect& drawBounds) = 0;
-  virtual bool onBindBuffers(GPUBuffer* indexBuffer, GPUBuffer* vertexBuffer,
-                             size_t vertexOffset) = 0;
-  virtual void onDraw(PrimitiveType primitiveType, size_t offset, size_t count,
-                      bool drawIndexed) = 0;
   virtual void onEnd() = 0;
 
  private:
-  enum class DrawPipelineStatus { Ok = 0, NotConfigured, FailedToBind };
-  DrawPipelineStatus drawPipelineStatus = DrawPipelineStatus::NotConfigured;
   bool isEnd = false;
 
   friend class CommandEncoder;

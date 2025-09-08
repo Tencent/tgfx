@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,27 +18,32 @@
 
 #pragma once
 
-#include "gpu/Semaphore.h"
+#import <UIKit/UIKit.h>
+#include "gpu/opengl/GLGPU.h"
+#include "gpu/opengl/GLTexture.h"
 
 namespace tgfx {
-/**
- * Types for interacting with OpenGL semaphore object.
- */
-class GLSemaphore : public Semaphore {
+class EAGLLayerTexture : public GLTexture {
  public:
-  explicit GLSemaphore(void* glSync) : _glSync(glSync) {
+  static std::unique_ptr<EAGLLayerTexture> MakeFrom(GLGPU* gpu, CAEAGLLayer* layer);
+
+  unsigned frameBufferID() const override {
+    return _frameBufferID;
   }
 
-  void* glSync() const {
-    return _glSync;
+  unsigned colorBufferID() const {
+    return renderBufferID;
   }
-
-  BackendSemaphore getBackendSemaphore() const override;
 
  protected:
-  void onReleaseGPU() override;
+  void onRelease(GLGPU* gpu) override;
 
  private:
-  void* _glSync = nullptr;
+  unsigned _frameBufferID = 0;
+  unsigned renderBufferID = 0;
+
+  EAGLLayerTexture(const GPUTextureDescriptor& descriptor, unsigned frameBufferID)
+      : GLTexture(descriptor, GL_TEXTURE_2D, 0), _frameBufferID(frameBufferID) {
+  }
 };
 }  // namespace tgfx

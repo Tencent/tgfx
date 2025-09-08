@@ -105,7 +105,7 @@ void GLTiledTextureEffect::readColor(EmitArgs& args, const std::string& dimensio
   } else {
     normCoord = coord;
   }
-  auto* fragBuilder = args.fragBuilder;
+  auto fragBuilder = args.fragBuilder;
   fragBuilder->codeAppendf("vec4 %s = ", out);
   fragBuilder->appendTextureLookup((*args.textureSamplers)[0], normCoord);
   fragBuilder->codeAppend(";");
@@ -116,7 +116,7 @@ void GLTiledTextureEffect::subsetCoord(EmitArgs& args, TiledTextureEffect::Shade
                                        const char* subsetStartSwizzle,
                                        const char* subsetStopSwizzle, const char* extraCoord,
                                        const char* coordWeight) const {
-  auto* fragBuilder = args.fragBuilder;
+  auto fragBuilder = args.fragBuilder;
   switch (mode) {
     case TiledTextureEffect::ShaderMode::None:
     case TiledTextureEffect::ShaderMode::ClampToBorderNearest:
@@ -170,7 +170,7 @@ void GLTiledTextureEffect::subsetCoord(EmitArgs& args, TiledTextureEffect::Shade
 void GLTiledTextureEffect::clampCoord(EmitArgs& args, bool clamp, const std::string& clampName,
                                       const char* coordSwizzle, const char* clampStartSwizzle,
                                       const char* clampStopSwizzle) const {
-  auto* fragBuilder = args.fragBuilder;
+  auto fragBuilder = args.fragBuilder;
   if (clamp) {
     fragBuilder->codeAppendf("clampedCoord%s = clamp(subsetCoord%s, %s%s, %s%s);", coordSwizzle,
                              coordSwizzle, clampName.c_str(), clampStartSwizzle, clampName.c_str(),
@@ -195,7 +195,7 @@ GLTiledTextureEffect::UniformNames GLTiledTextureEffect::initUniform(EmitArgs& a
                                                                      const Sampling& sampling,
                                                                      const bool useClamp[2]) const {
   UniformNames names = {};
-  auto* uniformHandler = args.uniformHandler;
+  auto uniformHandler = args.uniformHandler;
   if (ShaderModeUsesSubset(sampling.shaderModeX) || ShaderModeUsesSubset(sampling.shaderModeY)) {
     names.subsetName =
         uniformHandler->addUniform("Subset", UniformFormat::Float4, ShaderStage::Fragment);
@@ -216,7 +216,7 @@ GLTiledTextureEffect::UniformNames GLTiledTextureEffect::initUniform(EmitArgs& a
 }
 
 void GLTiledTextureEffect::emitCode(EmitArgs& args) const {
-  auto* fragBuilder = args.fragBuilder;
+  auto fragBuilder = args.fragBuilder;
   auto textureView = getTextureView();
   if (textureView == nullptr) {
     // emit a transparent color as the output color.
@@ -415,7 +415,8 @@ void GLTiledTextureEffect::emitCode(EmitArgs& args) const {
   }
 }
 
-void GLTiledTextureEffect::onSetData(UniformBuffer* uniformBuffer) const {
+void GLTiledTextureEffect::onSetData(UniformBuffer* /*vertexUniformBuffer*/,
+                                     UniformBuffer* fragmentUniformBuffer) const {
   auto textureView = getTextureView();
   if (textureView == nullptr) {
     return;
@@ -426,7 +427,7 @@ void GLTiledTextureEffect::onSetData(UniformBuffer* uniformBuffer) const {
                              textureView->getTexture()->type() != GPUTextureType::Rectangle;
   if (hasDimensionUniform) {
     auto dimensions = textureView->getTextureCoord(1.f, 1.f);
-    uniformBuffer->setData("Dimension", dimensions);
+    fragmentUniformBuffer->setData("Dimension", dimensions);
   }
   auto pushRect = [&](Rect subset, const std::string& uni) {
     float rect[4] = {subset.left, subset.top, subset.right, subset.bottom};
@@ -447,7 +448,7 @@ void GLTiledTextureEffect::onSetData(UniformBuffer* uniformBuffer) const {
       rect[2] = rb.x;
       rect[3] = rb.y;
     }
-    uniformBuffer->setData(uni, rect);
+    fragmentUniformBuffer->setData(uni, rect);
   };
   if (ShaderModeUsesSubset(sampling.shaderModeX) || ShaderModeUsesSubset(sampling.shaderModeY)) {
     pushRect(sampling.shaderSubset, "Subset");

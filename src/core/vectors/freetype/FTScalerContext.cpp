@@ -262,7 +262,7 @@ void FTScalerContext::getFontMetricsInternal(FontMetrics* metrics) const {
   // use the os/2 table as a source of reasonable defaults.
   auto xHeight = 0.0f;
   auto capHeight = 0.0f;
-  auto* os2 = static_cast<TT_OS2*>(FT_Get_Sfnt_Table(face, FT_SFNT_OS2));
+  auto os2 = static_cast<TT_OS2*>(FT_Get_Sfnt_Table(face, FT_SFNT_OS2));
   if (os2) {
     xHeight = static_cast<float>(os2->sxHeight) / upem * textScale;
     if (os2->version != 0xFFFF && os2->version >= 2) {
@@ -332,7 +332,7 @@ void FTScalerContext::getFontMetricsInternal(FontMetrics* metrics) const {
     underlineThickness = 0;
     underlinePosition = 0;
 
-    auto* post = static_cast<TT_Postscript*>(FT_Get_Sfnt_Table(face, FT_SFNT_POST));
+    auto post = static_cast<TT_Postscript*>(FT_Get_Sfnt_Table(face, FT_SFNT_POST));
     if (post) {
       underlineThickness = static_cast<float>(post->underlineThickness) / upem;
       underlinePosition = -static_cast<float>(post->underlinePosition) / upem;

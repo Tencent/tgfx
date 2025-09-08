@@ -180,7 +180,7 @@ AdvancedTypefaceInfo::FontType PDFFont::FontType(const PDFStrike& /*pdfStrike*/,
 PDFFont* PDFStrike::getFontResource(GlyphID glyphID) {
   auto typeface = strikeSpec.typeface;
   auto textSize = strikeSpec.textSize;
-  const auto* fontMetrics = PDFFont::GetAdvancedInfo(typeface, textSize, document);
+  const auto fontMetrics = PDFFont::GetAdvancedInfo(typeface, textSize, document);
   DEBUG_ASSERT(fontMetrics);  // SkPDFDevice::internalDrawText ensures the typeface is good.
                               // GetMetrics only returns null to signify a bad typeface.
   const auto& metrics = *fontMetrics;
@@ -244,7 +244,7 @@ const std::vector<Unichar>& PDFFont::GetUnicodeMap(const Typeface& typeface,
 void PDFFont::emitSubsetType0(PDFDocumentImpl* document) const {
   auto typeface = strike().strikeSpec.typeface;
   auto textSize = strike().strikeSpec.textSize;
-  const auto* metricsPtr = PDFFont::GetAdvancedInfo(typeface, textSize, document);
+  const auto metricsPtr = PDFFont::GetAdvancedInfo(typeface, textSize, document);
   if (!metricsPtr) {
     return;
   }
@@ -421,7 +421,7 @@ PDFIndirectReference type3_descriptor(PDFDocumentImpl* doc,
   /** PDF32000_2008: FontWeight should be used for Type3 fonts in Tagged PDF documents. */
   descriptor.insertInt("FontWeight", 400);
 
-  if (const auto* metrics = PDFFont::GetAdvancedInfo(typeface, 1000.f, doc)) {
+  if (const auto metrics = PDFFont::GetAdvancedInfo(typeface, 1000.f, doc)) {
     // Type3 FontDescriptor does not require all the same fields.
     descriptor.insertName("FontName", metrics->postScriptName);
     // descriptor.insertInt("ItalicAngle", metrics->fItalicAngle);

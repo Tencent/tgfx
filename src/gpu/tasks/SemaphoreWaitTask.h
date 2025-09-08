@@ -29,7 +29,7 @@ class SemaphoreWaitTask : public RenderTask {
   }
 
   void execute(CommandEncoder* encoder) override {
-    encoder->waitSemaphore(semaphore->getBackendSemaphore());
+    encoder->waitForFence(semaphore->getFence());
   }
 
  private:

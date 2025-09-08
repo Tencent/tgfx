@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,36 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLSemaphore.h"
-#include "tgfx/gpu/opengl/GLFunctions.h"
+#include "Semaphore.h"
+#include "GPU.h"
 
 namespace tgfx {
-std::shared_ptr<Semaphore> Semaphore::Wrap(Context* context,
-                                           const BackendSemaphore& backendSemaphore) {
-  GLSyncInfo glSyncInfo = {};
-  if (context == nullptr || !context->caps()->semaphoreSupport ||
-      !backendSemaphore.getGLSync(&glSyncInfo)) {
+std::shared_ptr<Semaphore> Semaphore::MakeAdopted(Context* context,
+                                                  const BackendSemaphore& backendSemaphore) {
+  auto fence = context->gpu()->importExternalFence(backendSemaphore);
+  if (fence == nullptr) {
     return nullptr;
   }
-  auto semaphore = new GLSemaphore(glSyncInfo.sync);
-  return Resource::AddToCache(context, semaphore);
+  return Resource::AddToCache(context, new Semaphore(std::move(fence)));
 }
-
-BackendSemaphore GLSemaphore::getBackendSemaphore() const {
-  if (_glSync == nullptr) {
-    return {};
-  }
-  GLSyncInfo glSyncInfo = {};
-  glSyncInfo.sync = _glSync;
-  return {glSyncInfo};
-}
-
-void GLSemaphore::onReleaseGPU() {
-  if (_glSync != nullptr) {
-    auto gl = GLFunctions::Get(context);
-    gl->deleteSync(_glSync);
-    _glSync = nullptr;
-  }
-}
-
 }  // namespace tgfx

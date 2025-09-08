@@ -29,7 +29,7 @@ GLSingleIntervalGradientColorizer::GLSingleIntervalGradientColorizer(Color start
 }
 
 void GLSingleIntervalGradientColorizer::emitCode(EmitArgs& args) const {
-  auto* fragBuilder = args.fragBuilder;
+  auto fragBuilder = args.fragBuilder;
   auto startName =
       args.uniformHandler->addUniform("start", UniformFormat::Float4, ShaderStage::Fragment);
   auto endName =
@@ -39,8 +39,9 @@ void GLSingleIntervalGradientColorizer::emitCode(EmitArgs& args) const {
                            startName.c_str(), endName.c_str());
 }
 
-void GLSingleIntervalGradientColorizer::onSetData(UniformBuffer* uniformBuffer) const {
-  uniformBuffer->setData("start", start);
-  uniformBuffer->setData("end", end);
+void GLSingleIntervalGradientColorizer::onSetData(UniformBuffer* /*vertexUniformBuffer*/,
+                                                  UniformBuffer* fragmentUniformBuffer) const {
+  fragmentUniformBuffer->setData("start", start);
+  fragmentUniformBuffer->setData("end", end);
 }
 }  // namespace tgfx

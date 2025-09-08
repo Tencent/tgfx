@@ -131,7 +131,7 @@ int FTTypeface::unitsPerEmInternal() const {
   auto upem = face->units_per_EM;
   // At least some versions of FreeType set face->units_per_EM to 0 for bitmap only fonts.
   if (upem == 0) {
-    auto* ttHeader = static_cast<TT_Header*>(FT_Get_Sfnt_Table(face, FT_SFNT_HEAD));
+    auto ttHeader = static_cast<TT_Header*>(FT_Get_Sfnt_Table(face, FT_SFNT_HEAD));
     if (ttHeader) {
       upem = ttHeader->Units_Per_EM;
     }

@@ -29,13 +29,13 @@ GLColorMatrixFragmentProcessor::GLColorMatrixFragmentProcessor(const std::array<
 }
 
 void GLColorMatrixFragmentProcessor::emitCode(EmitArgs& args) const {
-  auto* uniformHandler = args.uniformHandler;
+  auto uniformHandler = args.uniformHandler;
   auto matrixUniformName =
       uniformHandler->addUniform("Matrix", UniformFormat::Float4x4, ShaderStage::Fragment);
   auto vectorUniformName =
       uniformHandler->addUniform("Vector", UniformFormat::Float4, ShaderStage::Fragment);
 
-  auto* fragBuilder = args.fragBuilder;
+  auto fragBuilder = args.fragBuilder;
   fragBuilder->codeAppendf("%s = vec4(%s.rgb / max(%s.a, 9.9999997473787516e-05), %s.a);",
                            args.outputColor.c_str(), args.inputColor.c_str(),
                            args.inputColor.c_str(), args.inputColor.c_str());
@@ -47,7 +47,8 @@ void GLColorMatrixFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("%s.rgb *= %s.a;", args.outputColor.c_str(), args.outputColor.c_str());
 }
 
-void GLColorMatrixFragmentProcessor::onSetData(UniformBuffer* uniformBuffer) const {
+void GLColorMatrixFragmentProcessor::onSetData(UniformBuffer* /*vertexUniformBuffer*/,
+                                               UniformBuffer* fragmentUniformBuffer) const {
   float m[] = {
       matrix[0], matrix[5], matrix[10], matrix[15], matrix[1], matrix[6], matrix[11], matrix[16],
       matrix[2], matrix[7], matrix[12], matrix[17], matrix[3], matrix[8], matrix[13], matrix[18],
@@ -58,7 +59,7 @@ void GLColorMatrixFragmentProcessor::onSetData(UniformBuffer* uniformBuffer) con
       matrix[14],
       matrix[19],
   };
-  uniformBuffer->setData("Matrix", m);
-  uniformBuffer->setData("Vector", vec);
+  fragmentUniformBuffer->setData("Matrix", m);
+  fragmentUniformBuffer->setData("Vector", vec);
 }
 }  // namespace tgfx

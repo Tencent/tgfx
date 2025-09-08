@@ -17,24 +17,30 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLProgramBuilder.h"
+#include <ostream>
+#include <string>
+#include "gpu/UniformBuffer.h"
+#include "gpu/UniformLayout.h"
 #include "gpu/opengl/GLUtil.h"
 
 namespace tgfx {
-static std::string TypeModifierString(bool isDesktopGL, ShaderVar::TypeModifier t,
+static std::string TypeModifierString(bool isLegacyES, ShaderVar::TypeModifier t,
                                       ShaderStage stage) {
   switch (t) {
     case ShaderVar::TypeModifier::None:
       return "";
     case ShaderVar::TypeModifier::Attribute:
-      return isDesktopGL ? "in" : "attribute";
+      return isLegacyES ? "attribute" : "in";
     case ShaderVar::TypeModifier::Varying:
-      return isDesktopGL ? (stage == ShaderStage::Vertex ? "out" : "in") : "varying";
+      return isLegacyES ? "varying" : (stage == ShaderStage::Vertex ? "out" : "in");
     case ShaderVar::TypeModifier::FlatVarying:
-      return isDesktopGL ? (stage == ShaderStage::Vertex ? "flat out" : "flat in") : "varying";
+      return isLegacyES ? "varying" : (stage == ShaderStage::Vertex ? "flat out" : "flat in");
     case ShaderVar::TypeModifier::Uniform:
       return "uniform";
     case ShaderVar::TypeModifier::Out:
       return "out";
+    case ShaderVar::TypeModifier::InOut:
+      return "inout";
   }
 }
 
@@ -120,18 +126,23 @@ GLProgramBuilder::GLProgramBuilder(Context* context, const ProgramInfo* programI
 }
 
 std::string GLProgramBuilder::versionDeclString() {
-  return isDesktopGL() ? "#version 150\n" : "#version 100\n";
+  if (const auto caps = GLCaps::Get(context); caps->standard == GLStandard::GL) {
+    // #version 140 - OpenGL 3.1
+    return "#version 140\n";
+  }
+
+  return isLegacyES() ? "#version 100\n" : "#version 300 es\n";
 }
 
 std::string GLProgramBuilder::textureFuncName() const {
-  return isDesktopGL() ? "texture" : "texture2D";
+  return isLegacyES() ? "texture2D" : "texture";
 }
 
 std::string GLProgramBuilder::getShaderVarDeclarations(const ShaderVar& var,
                                                        ShaderStage stage) const {
   std::string ret;
   if (var.modifier() != ShaderVar::TypeModifier::None) {
-    ret += TypeModifierString(isDesktopGL(), var.modifier(), stage);
+    ret += TypeModifierString(isLegacyES(), var.modifier(), stage);
     ret += " ";
   }
 
@@ -146,13 +157,40 @@ std::string GLProgramBuilder::getShaderVarDeclarations(const ShaderVar& var,
   return ret;
 }
 
-std::unique_ptr<GLProgram> GLProgramBuilder::finalize() {
-  if (isDesktopGL()) {
+std::string GLProgramBuilder::getUniformBlockDeclaration(
+    ShaderStage stage, const std::vector<Uniform>& uniforms) const {
+  if (uniforms.empty()) {
+    return "";
+  }
+
+  std::string result = "";
+  const std::string& uniformBlockName =
+      stage == ShaderStage::Vertex ? VertexUniformBlockName : FragmentUniformBlockName;
+  static const std::string INDENT_STR = "    ";  // 4 spaces
+  result += "layout(std140) uniform " + uniformBlockName + " {\n";
+  std::string precision = "";
+  for (const auto& uniform : uniforms) {
+    const auto& var = ShaderVar(uniform);
+    if (context->caps()->usesPrecisionModifiers) {
+      precision = SLTypePrecision(var.type());
+    } else {
+      precision = "";
+    }
+    result +=
+        INDENT_STR + precision + " " + SLTypeString(var.type()) + " " + uniform.name() + ";\n";
+  }
+  result += "};\n";
+  return result;
+}
+
+std::unique_ptr<PipelineProgram> GLProgramBuilder::finalize() {
+  if (!isLegacyES()) {
     fragmentShaderBuilder()->declareCustomOutputColor();
   }
   finalizeShaders();
-  auto vertex = vertexShaderBuilder()->shaderString();
-  auto fragment = fragmentShaderBuilder()->shaderString();
+  const auto& vertex = vertexShaderBuilder()->shaderString();
+  const auto& fragment = fragmentShaderBuilder()->shaderString();
+
   auto gl = GLFunctions::Get(context);
   auto programID = CreateGLProgram(gl, vertex, fragment);
   if (programID == 0) {
@@ -167,9 +205,26 @@ std::unique_ptr<GLProgram> GLProgramBuilder::finalize() {
     DEBUG_ASSERT(location != -1);
     gl->uniform1i(location, textureUint++);
   }
-  return std::make_unique<GLProgram>(programID, _uniformHandler.makeUniformBuffer(),
-                                     programInfo->getVertexAttributes(),
-                                     programInfo->getBlendFormula());
+  auto vertexUniformBuffer = _uniformHandler.makeUniformBuffer(ShaderStage::Vertex);
+  auto fragmentUniformBuffer = _uniformHandler.makeUniformBuffer(ShaderStage::Fragment);
+
+  std::unique_ptr<UniformLayout> uniformLayout = nullptr;
+  auto caps = GLCaps::Get(context);
+  std::vector<std::string> blockNames = {};
+  std::vector<Uniform> emptyUniforms = {};
+  if (caps->uboSupport) {
+    blockNames = {VertexUniformBlockName, FragmentUniformBlockName};
+  }
+  uniformLayout = std::make_unique<UniformLayout>(
+      std::move(blockNames), vertexUniformBuffer ? vertexUniformBuffer->uniforms() : emptyUniforms,
+      fragmentUniformBuffer ? fragmentUniformBuffer->uniforms() : emptyUniforms);
+
+  auto pipeline = std::make_unique<GLRenderPipeline>(programID, std::move(uniformLayout),
+                                                     programInfo->getVertexAttributes(),
+                                                     programInfo->getBlendFormula());
+
+  return std::make_unique<PipelineProgram>(std::move(pipeline), std::move(vertexUniformBuffer),
+                                           std::move(fragmentUniformBuffer));
 }
 
 bool GLProgramBuilder::checkSamplerCounts() {
@@ -181,8 +236,9 @@ bool GLProgramBuilder::checkSamplerCounts() {
   return true;
 }
 
-bool GLProgramBuilder::isDesktopGL() const {
-  auto caps = GLCaps::Get(context);
-  return caps->standard == GLStandard::GL;
+bool GLProgramBuilder::isLegacyES() const {
+  const auto caps = GLCaps::Get(context);
+  return (caps->standard == GLStandard::GLES && caps->version < GL_VER(3, 0)) ||
+         (caps->standard == GLStandard::WebGL && caps->version < GL_VER(2, 0));
 }
 }  // namespace tgfx
