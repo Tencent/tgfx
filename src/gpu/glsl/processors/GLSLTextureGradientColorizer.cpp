@@ -16,16 +16,26 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/processors/XfermodeFragmentProcessor.h"
+#include "GLSLTextureGradientColorizer.h"
 
 namespace tgfx {
-class GLXfermodeFragmentProcessor : public XfermodeFragmentProcessor {
- public:
-  GLXfermodeFragmentProcessor(PlacementPtr<FragmentProcessor> src,
-                              PlacementPtr<FragmentProcessor> dst, BlendMode mode);
+PlacementPtr<TextureGradientColorizer> TextureGradientColorizer::Make(
+    BlockBuffer* buffer, std::shared_ptr<TextureProxy> gradient) {
+  if (gradient == nullptr) {
+    return nullptr;
+  }
+  return buffer->make<GLSLTextureGradientColorizer>(std::move(gradient));
+}
 
-  void emitCode(EmitArgs& args) const override;
-};
+GLSLTextureGradientColorizer::GLSLTextureGradientColorizer(std::shared_ptr<TextureProxy> gradient)
+    : TextureGradientColorizer(std::move(gradient)) {
+}
+
+void GLSLTextureGradientColorizer::emitCode(EmitArgs& args) const {
+  auto fragBuilder = args.fragBuilder;
+  fragBuilder->codeAppendf("vec2 coord = vec2(%s.x, 0.5);", args.inputColor.c_str());
+  fragBuilder->codeAppendf("%s = ", args.outputColor.c_str());
+  fragBuilder->appendTextureLookup((*args.textureSamplers)[0], "coord");
+  fragBuilder->codeAppend(";");
+}
 }  // namespace tgfx

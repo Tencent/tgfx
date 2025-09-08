@@ -18,13 +18,25 @@
 
 #pragma once
 
-#include "gpu/processors/TextureGradientColorizer.h"
+#include <optional>
+#include "gpu/processors/TextureEffect.h"
 
 namespace tgfx {
-class GLTextureGradientColorizer : public TextureGradientColorizer {
+class GLSLTextureEffect : public TextureEffect {
  public:
-  explicit GLTextureGradientColorizer(std::shared_ptr<TextureProxy> gradient);
+  GLSLTextureEffect(std::shared_ptr<TextureProxy> proxy, const Point& alphaStart,
+                    const SamplingOptions& sampling, SrcRectConstraint constraint,
+                    const Matrix& uvMatrix, const std::optional<Rect>& subset);
 
   void emitCode(EmitArgs& args) const override;
+
+ private:
+  void emitDefaultTextureCode(EmitArgs& args) const;
+  void emitYUVTextureCode(EmitArgs& args) const;
+  void onSetData(UniformBuffer* vertexUniformBuffer,
+                 UniformBuffer* fragmentUniformBuffer) const override;
+  void appendClamp(FragmentShaderBuilder* fragBuilder, const std::string& vertexColor,
+                   const std::string& finalCoordName, const std::string& subsetName,
+                   const std::string& extraSubsetName) const;
 };
 }  // namespace tgfx

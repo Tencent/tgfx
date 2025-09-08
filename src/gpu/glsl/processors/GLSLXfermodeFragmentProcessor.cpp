@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLXfermodeFragmentProcessor.h"
+#include "GLSLXfermodeFragmentProcessor.h"
 #include "gpu/opengl/GLBlend.h"
 #include "gpu/processors/ConstColorProcessor.h"
 
@@ -35,17 +35,17 @@ PlacementPtr<FragmentProcessor> XfermodeFragmentProcessor::MakeFromTwoProcessors
     case BlendMode::Dst:
       return dst;
     default:
-      return buffer->make<GLXfermodeFragmentProcessor>(std::move(src), std::move(dst), mode);
+      return buffer->make<GLSLXfermodeFragmentProcessor>(std::move(src), std::move(dst), mode);
   }
 }
 
-GLXfermodeFragmentProcessor::GLXfermodeFragmentProcessor(PlacementPtr<FragmentProcessor> src,
-                                                         PlacementPtr<FragmentProcessor> dst,
-                                                         BlendMode mode)
+GLSLXfermodeFragmentProcessor::GLSLXfermodeFragmentProcessor(PlacementPtr<FragmentProcessor> src,
+                                                             PlacementPtr<FragmentProcessor> dst,
+                                                             BlendMode mode)
     : XfermodeFragmentProcessor(std::move(src), std::move(dst), mode) {
 }
 
-void GLXfermodeFragmentProcessor::emitCode(EmitArgs& args) const {
+void GLSLXfermodeFragmentProcessor::emitCode(EmitArgs& args) const {
   auto fragBuilder = args.fragBuilder;
   std::string coverage = "vec4(1.0)";
   if (child == XfermodeFragmentProcessor::Child::TwoChild) {

@@ -36,10 +36,10 @@ namespace tgfx {
  *  -               .z = boundary between (12,13) and (14,15) -> 13_14
  *  -               .w = unused
  */
-class GLUnrolledBinaryGradientColorizer : public UnrolledBinaryGradientColorizer {
+class GLSLUnrolledBinaryGradientColorizer : public UnrolledBinaryGradientColorizer {
  public:
-  GLUnrolledBinaryGradientColorizer(int intervalCount, Color* scales, Color* biases,
-                                    Rect thresholds1_7, Rect thresholds9_13);
+  GLSLUnrolledBinaryGradientColorizer(int intervalCount, Color* scales, Color* biases,
+                                      Rect thresholds1_7, Rect thresholds9_13);
 
   void emitCode(EmitArgs& args) const override;
 

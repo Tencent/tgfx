@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLUnrolledBinaryGradientColorizer.h"
+#include "GLSLUnrolledBinaryGradientColorizer.h"
 #include "core/utils/MathExtra.h"
 
 namespace tgfx {
@@ -100,16 +100,14 @@ PlacementPtr<UnrolledBinaryGradientColorizer> UnrolledBinaryGradientColorizer::M
     thresholds[i] = 0.0;
   }
 
-  return buffer->make<GLUnrolledBinaryGradientColorizer>(
+  return buffer->make<GLSLUnrolledBinaryGradientColorizer>(
       intervalCount, scales, biases,
       Rect::MakeLTRB(thresholds[0], thresholds[1], thresholds[2], thresholds[3]),
       Rect::MakeLTRB(thresholds[4], thresholds[5], thresholds[6], 0.0));
 }
 
-GLUnrolledBinaryGradientColorizer::GLUnrolledBinaryGradientColorizer(int intervalCount,
-                                                                     Color* scales, Color* biases,
-                                                                     Rect thresholds1_7,
-                                                                     Rect thresholds9_13)
+GLSLUnrolledBinaryGradientColorizer::GLSLUnrolledBinaryGradientColorizer(
+    int intervalCount, Color* scales, Color* biases, Rect thresholds1_7, Rect thresholds9_13)
     : UnrolledBinaryGradientColorizer(intervalCount, scales, biases, thresholds1_7,
                                       thresholds9_13) {
 }
@@ -217,7 +215,7 @@ void AppendCode2(FragmentShaderBuilder* fragBuilder, int intervalCount,
   }
 }
 
-void GLUnrolledBinaryGradientColorizer::emitCode(EmitArgs& args) const {
+void GLSLUnrolledBinaryGradientColorizer::emitCode(EmitArgs& args) const {
   auto fragBuilder = args.fragBuilder;
   auto uniformHandler = args.uniformHandler;
   UnrolledBinaryUniformName uniformNames = {};
@@ -269,8 +267,8 @@ void SetUniformData(UniformBuffer* uniformBuffer, const std::string& name, int i
   }
 }
 
-void GLUnrolledBinaryGradientColorizer::onSetData(UniformBuffer* /*vertexUniformBuffer*/,
-                                                  UniformBuffer* fragmentUniformBuffer) const {
+void GLSLUnrolledBinaryGradientColorizer::onSetData(UniformBuffer* /*vertexUniformBuffer*/,
+                                                    UniformBuffer* fragmentUniformBuffer) const {
   SetUniformData(fragmentUniformBuffer, "scale0_1", intervalCount, 0, scale0_1);
   SetUniformData(fragmentUniformBuffer, "scale2_3", intervalCount, 1, scale2_3);
   SetUniformData(fragmentUniformBuffer, "scale4_5", intervalCount, 2, scale4_5);

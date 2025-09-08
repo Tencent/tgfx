@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLTiledTextureEffect.h"
+#include "GLSLTiledTextureEffect.h"
 #include "gpu/SamplerState.h"
 #include "gpu/processors/TextureEffect.h"
 
@@ -34,7 +34,7 @@ PlacementPtr<FragmentProcessor> TiledTextureEffect::Make(std::shared_ptr<Texture
   SamplerState samplerState(args.tileModeX, args.tileModeY, args.sampling);
   auto isAlphaOnly = proxy->isAlphaOnly();
   auto drawingBuffer = proxy->getContext()->drawingBuffer();
-  PlacementPtr<FragmentProcessor> processor = drawingBuffer->make<GLTiledTextureEffect>(
+  PlacementPtr<FragmentProcessor> processor = drawingBuffer->make<GLSLTiledTextureEffect>(
       std::move(proxy), samplerState, args.constraint, matrix, args.sampleArea);
   if (forceAsMask && !isAlphaOnly) {
     processor = FragmentProcessor::MulInputByChildAlpha(drawingBuffer, std::move(processor));
@@ -42,14 +42,14 @@ PlacementPtr<FragmentProcessor> TiledTextureEffect::Make(std::shared_ptr<Texture
   return processor;
 }
 
-GLTiledTextureEffect::GLTiledTextureEffect(std::shared_ptr<TextureProxy> proxy,
-                                           const SamplerState& samplerState,
-                                           SrcRectConstraint constraint, const Matrix& uvMatrix,
-                                           const std::optional<Rect>& subset)
+GLSLTiledTextureEffect::GLSLTiledTextureEffect(std::shared_ptr<TextureProxy> proxy,
+                                               const SamplerState& samplerState,
+                                               SrcRectConstraint constraint, const Matrix& uvMatrix,
+                                               const std::optional<Rect>& subset)
     : TiledTextureEffect(std::move(proxy), samplerState, constraint, uvMatrix, subset) {
 }
 
-bool GLTiledTextureEffect::ShaderModeRequiresUnormCoord(TiledTextureEffect::ShaderMode mode) {
+bool GLSLTiledTextureEffect::ShaderModeRequiresUnormCoord(TiledTextureEffect::ShaderMode mode) {
   switch (mode) {
     case TiledTextureEffect::ShaderMode::None:
     case TiledTextureEffect::ShaderMode::Clamp:
@@ -65,7 +65,7 @@ bool GLTiledTextureEffect::ShaderModeRequiresUnormCoord(TiledTextureEffect::Shad
   }
 }
 
-bool GLTiledTextureEffect::ShaderModeUsesSubset(TiledTextureEffect::ShaderMode m) {
+bool GLSLTiledTextureEffect::ShaderModeUsesSubset(TiledTextureEffect::ShaderMode m) {
   switch (m) {
     case TiledTextureEffect::ShaderMode::None:
     case TiledTextureEffect::ShaderMode::Clamp:
@@ -81,7 +81,7 @@ bool GLTiledTextureEffect::ShaderModeUsesSubset(TiledTextureEffect::ShaderMode m
   }
 }
 
-bool GLTiledTextureEffect::ShaderModeUsesClamp(TiledTextureEffect::ShaderMode m) {
+bool GLSLTiledTextureEffect::ShaderModeUsesClamp(TiledTextureEffect::ShaderMode m) {
   switch (m) {
     case TiledTextureEffect::ShaderMode::None:
     case TiledTextureEffect::ShaderMode::ClampToBorderNearest:
@@ -97,8 +97,8 @@ bool GLTiledTextureEffect::ShaderModeUsesClamp(TiledTextureEffect::ShaderMode m)
   }
 }
 
-void GLTiledTextureEffect::readColor(EmitArgs& args, const std::string& dimensionsName,
-                                     const std::string& coord, const char* out) const {
+void GLSLTiledTextureEffect::readColor(EmitArgs& args, const std::string& dimensionsName,
+                                       const std::string& coord, const char* out) const {
   std::string normCoord;
   if (!dimensionsName.empty()) {
     normCoord = "(" + coord + ") * " + dimensionsName + "";
@@ -111,11 +111,11 @@ void GLTiledTextureEffect::readColor(EmitArgs& args, const std::string& dimensio
   fragBuilder->codeAppend(";");
 }
 
-void GLTiledTextureEffect::subsetCoord(EmitArgs& args, TiledTextureEffect::ShaderMode mode,
-                                       const std::string& subsetName, const char* coordSwizzle,
-                                       const char* subsetStartSwizzle,
-                                       const char* subsetStopSwizzle, const char* extraCoord,
-                                       const char* coordWeight) const {
+void GLSLTiledTextureEffect::subsetCoord(EmitArgs& args, TiledTextureEffect::ShaderMode mode,
+                                         const std::string& subsetName, const char* coordSwizzle,
+                                         const char* subsetStartSwizzle,
+                                         const char* subsetStopSwizzle, const char* extraCoord,
+                                         const char* coordWeight) const {
   auto fragBuilder = args.fragBuilder;
   switch (mode) {
     case TiledTextureEffect::ShaderMode::None:
@@ -167,9 +167,9 @@ void GLTiledTextureEffect::subsetCoord(EmitArgs& args, TiledTextureEffect::Shade
   }
 }
 
-void GLTiledTextureEffect::clampCoord(EmitArgs& args, bool clamp, const std::string& clampName,
-                                      const char* coordSwizzle, const char* clampStartSwizzle,
-                                      const char* clampStopSwizzle) const {
+void GLSLTiledTextureEffect::clampCoord(EmitArgs& args, bool clamp, const std::string& clampName,
+                                        const char* coordSwizzle, const char* clampStartSwizzle,
+                                        const char* clampStopSwizzle) const {
   auto fragBuilder = args.fragBuilder;
   if (clamp) {
     fragBuilder->codeAppendf("clampedCoord%s = clamp(subsetCoord%s, %s%s, %s%s);", coordSwizzle,
@@ -180,8 +180,8 @@ void GLTiledTextureEffect::clampCoord(EmitArgs& args, bool clamp, const std::str
   }
 }
 
-void GLTiledTextureEffect::clampCoord(EmitArgs& args, const bool useClamp[2],
-                                      const std::string& clampName) const {
+void GLSLTiledTextureEffect::clampCoord(EmitArgs& args, const bool useClamp[2],
+                                        const std::string& clampName) const {
   if (useClamp[0] == useClamp[1]) {
     clampCoord(args, useClamp[0], clampName, "", ".xy", ".zw");
   } else {
@@ -190,10 +190,9 @@ void GLTiledTextureEffect::clampCoord(EmitArgs& args, const bool useClamp[2],
   }
 }
 
-GLTiledTextureEffect::UniformNames GLTiledTextureEffect::initUniform(EmitArgs& args,
-                                                                     const TextureView* textureView,
-                                                                     const Sampling& sampling,
-                                                                     const bool useClamp[2]) const {
+GLSLTiledTextureEffect::UniformNames GLSLTiledTextureEffect::initUniform(
+    EmitArgs& args, const TextureView* textureView, const Sampling& sampling,
+    const bool useClamp[2]) const {
   UniformNames names = {};
   auto uniformHandler = args.uniformHandler;
   if (ShaderModeUsesSubset(sampling.shaderModeX) || ShaderModeUsesSubset(sampling.shaderModeY)) {
@@ -215,7 +214,7 @@ GLTiledTextureEffect::UniformNames GLTiledTextureEffect::initUniform(EmitArgs& a
   return names;
 }
 
-void GLTiledTextureEffect::emitCode(EmitArgs& args) const {
+void GLSLTiledTextureEffect::emitCode(EmitArgs& args) const {
   auto fragBuilder = args.fragBuilder;
   auto textureView = getTextureView();
   if (textureView == nullptr) {
@@ -415,8 +414,8 @@ void GLTiledTextureEffect::emitCode(EmitArgs& args) const {
   }
 }
 
-void GLTiledTextureEffect::onSetData(UniformBuffer* /*vertexUniformBuffer*/,
-                                     UniformBuffer* fragmentUniformBuffer) const {
+void GLSLTiledTextureEffect::onSetData(UniformBuffer* /*vertexUniformBuffer*/,
+                                       UniformBuffer* fragmentUniformBuffer) const {
   auto textureView = getTextureView();
   if (textureView == nullptr) {
     return;

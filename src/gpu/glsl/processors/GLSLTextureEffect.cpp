@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLTextureEffect.h"
+#include "GLSLTextureEffect.h"
 #include <unordered_map>
 
 namespace tgfx {
@@ -67,17 +67,17 @@ PlacementPtr<FragmentProcessor> TextureEffect::MakeRGBAAA(std::shared_ptr<Textur
   }
   auto matrix = uvMatrix ? *uvMatrix : Matrix::I();
   auto drawingBuffer = proxy->getContext()->drawingBuffer();
-  return drawingBuffer->make<GLTextureEffect>(std::move(proxy), alphaStart, args.sampling,
-                                              args.constraint, matrix, args.sampleArea);
+  return drawingBuffer->make<GLSLTextureEffect>(std::move(proxy), alphaStart, args.sampling,
+                                                args.constraint, matrix, args.sampleArea);
 }
 
-GLTextureEffect::GLTextureEffect(std::shared_ptr<TextureProxy> proxy, const Point& alphaStart,
-                                 const SamplingOptions& sampling, SrcRectConstraint constraint,
-                                 const Matrix& uvMatrix, const std::optional<Rect>& subset)
+GLSLTextureEffect::GLSLTextureEffect(std::shared_ptr<TextureProxy> proxy, const Point& alphaStart,
+                                     const SamplingOptions& sampling, SrcRectConstraint constraint,
+                                     const Matrix& uvMatrix, const std::optional<Rect>& subset)
     : TextureEffect(std::move(proxy), sampling, constraint, alphaStart, uvMatrix, subset) {
 }
 
-void GLTextureEffect::emitCode(EmitArgs& args) const {
+void GLSLTextureEffect::emitCode(EmitArgs& args) const {
   auto textureView = getTextureView();
   auto fragBuilder = args.fragBuilder;
   if (textureView == nullptr) {
@@ -99,7 +99,7 @@ void GLTextureEffect::emitCode(EmitArgs& args) const {
   }
 }
 
-void GLTextureEffect::emitDefaultTextureCode(EmitArgs& args) const {
+void GLSLTextureEffect::emitDefaultTextureCode(EmitArgs& args) const {
   auto fragBuilder = args.fragBuilder;
   auto uniformHandler = args.uniformHandler;
   auto& textureSampler = (*args.textureSamplers)[0];
@@ -137,7 +137,7 @@ void GLTextureEffect::emitDefaultTextureCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("%s = color;", args.outputColor.c_str());
 }
 
-void GLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
+void GLSLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
   auto fragBuilder = args.fragBuilder;
   auto uniformHandler = args.uniformHandler;
   auto yuvTexture = getYUVTexture();
@@ -197,8 +197,8 @@ void GLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
   }
 }
 
-void GLTextureEffect::onSetData(UniformBuffer* /*vertexUniformBuffer*/,
-                                UniformBuffer* fragmentUniformBuffer) const {
+void GLSLTextureEffect::onSetData(UniformBuffer* /*vertexUniformBuffer*/,
+                                  UniformBuffer* fragmentUniformBuffer) const {
   auto textureView = getTextureView();
   if (textureView == nullptr) {
     return;
@@ -303,10 +303,11 @@ void GLTextureEffect::onSetData(UniformBuffer* /*vertexUniformBuffer*/,
   }
 }
 
-void GLTextureEffect::appendClamp(FragmentShaderBuilder* fragBuilder,
-                                  const std::string& vertexColor, const std::string& finalCoordName,
-                                  const std::string& subsetName,
-                                  const std::string& extraSubsetName) const {
+void GLSLTextureEffect::appendClamp(FragmentShaderBuilder* fragBuilder,
+                                    const std::string& vertexColor,
+                                    const std::string& finalCoordName,
+                                    const std::string& subsetName,
+                                    const std::string& extraSubsetName) const {
   fragBuilder->codeAppendf("%s = %s;", finalCoordName.c_str(), vertexColor.c_str());
   if (!extraSubsetName.empty()) {
     fragBuilder->codeAppend("{");
