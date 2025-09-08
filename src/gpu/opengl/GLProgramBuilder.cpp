@@ -17,10 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLProgramBuilder.h"
-#include <ostream>
 #include <string>
 #include "gpu/UniformBuffer.h"
 #include "gpu/UniformLayout.h"
+#include "gpu/opengl/GLGPU.h"
 #include "gpu/opengl/GLUtil.h"
 
 namespace tgfx {
@@ -196,7 +196,8 @@ std::unique_ptr<PipelineProgram> GLProgramBuilder::finalize() {
   if (programID == 0) {
     return nullptr;
   }
-  gl->useProgram(programID);
+  auto gpu = static_cast<GLGPU*>(context->gpu());
+  gpu->useProgram(programID);
   auto& samplers = _uniformHandler.getSamplers();
   // Assign texture units to sampler uniforms up front, just once.
   int textureUint = 0;
