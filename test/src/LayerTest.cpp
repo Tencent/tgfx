@@ -2987,7 +2987,7 @@ TGFX_TEST(LayerTest, PartialDrawLayer) {
   canvas->clear();
   canvas->rotate(30, 45, 45);
   canvas->clipRect(Rect::MakeXYWH(0, 0, 90, 90));
-  canvas->scale(2.0, 1.0f);
+  canvas->scale(2.0f, 1.0f);
   rootLayer->draw(canvas);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PartialDrawLayer"));
   EXPECT_EQ(layerInvisible->rasterizedContent, nullptr);
