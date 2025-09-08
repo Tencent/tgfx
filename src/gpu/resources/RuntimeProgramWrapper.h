@@ -18,49 +18,24 @@
 
 #pragma once
 
-#include "gpu/RenderTarget.h"
-#include "gpu/Resource.h"
+#include "gpu/resources/Program.h"
+#include "tgfx/gpu/RuntimeProgram.h"
 
 namespace tgfx {
-class ExternalRenderTarget : public Resource, public RenderTarget {
+class RuntimeProgramWrapper : public Program {
  public:
-  Context* getContext() const override {
-    return context;
-  }
+  static std::shared_ptr<Program> Wrap(std::unique_ptr<RuntimeProgram> program);
 
-  ImageOrigin origin() const override {
-    return _origin;
-  }
-
-  bool externallyOwned() const override {
-    return true;
-  }
-
-  GPUTexture* getRenderTexture() const override {
-    return renderTexture.get();
-  }
-
-  GPUTexture* getSampleTexture() const override {
-    return renderTexture.get();
-  }
-
-  size_t memoryUsage() const override {
-    return 0;
-  }
+  static const RuntimeProgram* Unwrap(const Program* program);
 
  protected:
-  void onReleaseGPU() override {
-    renderTexture->release(context->gpu());
-  }
+  void onReleaseGPU() override;
 
  private:
-  std::unique_ptr<GPUTexture> renderTexture = nullptr;
-  ImageOrigin _origin = ImageOrigin::TopLeft;
+  std::unique_ptr<RuntimeProgram> runtimeProgram = nullptr;
 
-  ExternalRenderTarget(std::unique_ptr<GPUTexture> texture, ImageOrigin origin)
-      : renderTexture(std::move(texture)), _origin(origin) {
+  explicit RuntimeProgramWrapper(std::unique_ptr<RuntimeProgram> program)
+      : runtimeProgram(std::move(program)) {
   }
-
-  friend class RenderTarget;
 };
 }  // namespace tgfx

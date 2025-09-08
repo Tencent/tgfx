@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/ResourceKey.h"
+#include "ResourceKey.h"
 #include "core/utils/HashRange.h"
 #include "core/utils/Log.h"
 #include "gpu/UniqueDomain.h"

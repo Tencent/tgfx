@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/Resource.h"
+#include "Resource.h"
 
 namespace tgfx {
 void Resource::assignUniqueKey(const UniqueKey& newKey) {

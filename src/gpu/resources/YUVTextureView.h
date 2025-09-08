@@ -20,8 +20,8 @@
 
 #include <array>
 #include "gpu/GPUTexture.h"
-#include "gpu/TextureView.h"
 #include "gpu/YUVFormat.h"
+#include "gpu/resources/TextureView.h"
 #include "tgfx/core/YUVColorSpace.h"
 
 namespace tgfx {

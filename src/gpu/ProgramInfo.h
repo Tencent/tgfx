@@ -19,14 +19,14 @@
 #pragma once
 
 #include <unordered_map>
-#include "RenderTarget.h"
 #include "gpu/Blend.h"
-#include "gpu/PipelineProgram.h"
-#include "gpu/Program.h"
 #include "gpu/RenderPass.h"
 #include "gpu/processors/EmptyXferProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/GeometryProcessor.h"
+#include "gpu/resources/PipelineProgram.h"
+#include "gpu/resources/Program.h"
+#include "gpu/resources/RenderTarget.h"
 
 namespace tgfx {
 struct SamplerInfo {

@@ -19,7 +19,7 @@
 #pragma once
 
 #include "gpu/GPUTexture.h"
-#include "gpu/Resource.h"
+#include "gpu/resources/Resource.h"
 #include "tgfx/core/ImageBuffer.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/YUVColorSpace.h"

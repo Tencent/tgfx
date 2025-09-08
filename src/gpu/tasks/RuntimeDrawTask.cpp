@@ -18,15 +18,15 @@
 
 #include "RuntimeDrawTask.h"
 #include "gpu/GlobalCache.h"
-#include "gpu/PipelineProgram.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/Quad.h"
 #include "gpu/RectsVertexProvider.h"
 #include "gpu/RenderPass.h"
-#include "gpu/RuntimeProgramWrapper.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/processors/TextureEffect.h"
+#include "gpu/resources/PipelineProgram.h"
+#include "gpu/resources/RuntimeProgramWrapper.h"
 #include "inspect/InspectorMark.h"
 #include "tgfx/core/RenderFlags.h"
 

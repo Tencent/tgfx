@@ -20,9 +20,9 @@
 
 #include <list>
 #include <unordered_map>
-#include "gpu/Program.h"
 #include "gpu/proxies/IndexBufferProxy.h"
 #include "gpu/proxies/TextureProxy.h"
+#include "gpu/resources/Program.h"
 
 namespace tgfx {
 /**

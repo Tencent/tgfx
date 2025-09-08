@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "gpu/TextureView.h"
+#include "gpu/resources/TextureView.h"
 #include "tgfx/core/ImageBuffer.h"
 #include "tgfx/platform/HardwareBuffer.h"
 

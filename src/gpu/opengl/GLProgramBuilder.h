@@ -21,9 +21,9 @@
 #include "GLFragmentShaderBuilder.h"
 #include "GLRenderPipeline.h"
 #include "GLVertexShaderBuilder.h"
-#include "gpu/PipelineProgram.h"
 #include "gpu/ProgramBuilder.h"
 #include "gpu/UniformHandler.h"
+#include "gpu/resources/PipelineProgram.h"
 
 namespace tgfx {
 class GLProgramBuilder : public ProgramBuilder {

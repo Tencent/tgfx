@@ -19,7 +19,7 @@
 #pragma once
 
 #include "core/utils/LazyBounds.h"
-#include "gpu/ResourceKey.h"
+#include "gpu/resources/ResourceKey.h"
 #include "pathkit.h"
 
 namespace tgfx {
