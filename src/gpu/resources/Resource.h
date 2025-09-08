@@ -84,7 +84,7 @@ class Resource {
 
  protected:
   Context* context = nullptr;
-  std::shared_ptr<Resource> reference = nullptr;
+  std::weak_ptr<Resource> weakThis;
 
   /**
    * Overridden to free GPU resources in the backend API.
@@ -99,7 +99,7 @@ class Resource {
   std::chrono::steady_clock::time_point lastUsedTime = {};
 
   bool isPurgeable() const {
-    return reference.use_count() <= 1;
+    return weakThis.expired();
   }
 
   bool hasExternalReferences() const {

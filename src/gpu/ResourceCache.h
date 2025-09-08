@@ -22,6 +22,7 @@
 #include <functional>
 #include <list>
 #include <unordered_map>
+#include <concurrentqueue.h>
 #include "gpu/resources/ResourceKey.h"
 #include "tgfx/gpu/Context.h"
 
@@ -127,6 +128,8 @@ class ResourceCache {
   size_t _expirationFrames = 120;
   std::chrono::steady_clock::time_point currentFrameTime = {};
   std::deque<std::chrono::steady_clock::time_point> frameTimes = {};
+
+  moodycamel::ConcurrentQueue<Resource*> purgeableResourcesQueue;
   std::list<Resource*> nonpurgeableResources = {};
   std::list<Resource*> purgeableResources = {};
   ResourceKeyMap<std::vector<Resource*>> scratchKeyMap = {};

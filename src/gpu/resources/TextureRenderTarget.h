@@ -45,11 +45,11 @@ class TextureRenderTarget : public DefaultTextureView, public RenderTarget {
   }
 
   std::shared_ptr<TextureView> asTextureView() const override {
-    return std::static_pointer_cast<TextureView>(reference);
+    return std::static_pointer_cast<TextureView>(weakThis.lock());
   }
 
   std::shared_ptr<RenderTarget> asRenderTarget() const override {
-    return std::static_pointer_cast<TextureRenderTarget>(reference);
+    return std::static_pointer_cast<TextureRenderTarget>(weakThis.lock());
   }
 
   void onReleaseGPU() override;

@@ -112,10 +112,12 @@ void ResourceCache::purgeResourcesByLRU(bool scratchResourceOnly,
 
 void ResourceCache::processUnreferencedResources() {
   std::vector<Resource*> needToPurge = {};
-  for (auto& resource : nonpurgeableResources) {
-    if (resource->isPurgeable()) {
-      needToPurge.push_back(resource);
+  while (true) {
+    Resource* resource = nullptr;
+    if (!purgeableResourcesQueue.try_dequeue(resource)) {
+      break;
     }
+    needToPurge.push_back(resource);
   }
   if (needToPurge.empty()) {
     return;
@@ -238,10 +240,12 @@ std::shared_ptr<Resource> ResourceCache::addResource(Resource* resource,
     scratchKeyMap[resource->scratchKey].push_back(resource);
   }
   totalBytes += resource->memoryUsage();
-  auto result = std::shared_ptr<Resource>(resource);
-  // Add a strong reference to the resource itself, preventing it from being deleted by external
-  // references.
-  result->reference = result;
+  // allow the resource to be enqueued for purging when the last external reference is released,
+  // rather than being deleted immediately.
+  auto result = std::shared_ptr<Resource>(resource, [this](Resource* res) {
+    purgeableResourcesQueue.enqueue(res);
+  });
+  resource->weakThis = result;
   AddToList(nonpurgeableResources, resource);
   return result;
 }
@@ -252,7 +256,13 @@ std::shared_ptr<Resource> ResourceCache::refResource(Resource* resource) {
     purgeableBytes -= resource->memoryUsage();
     AddToList(nonpurgeableResources, resource);
   }
-  return resource->reference;
+  // allow the resource to be enqueued for purging when the last external reference is released,
+  // rather than being deleted immediately.
+  auto result = std::shared_ptr<Resource>(resource, [this](Resource* res) {
+    purgeableResourcesQueue.enqueue(res);
+  });
+  resource->weakThis = result;
+  return result;
 }
 
 void ResourceCache::removeResource(Resource* resource) {
