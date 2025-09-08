@@ -533,7 +533,7 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
     font = font.makeWithSize(font.getSize() * maxScale);
   }
   std::unique_ptr<Stroke> scaledStroke = nullptr;
-  if (stroke) {
+  if (!font.hasColor() && stroke) {
     scaledStroke = std::make_unique<Stroke>(*stroke);
     scaledStroke->width *= maxScale;
   }
