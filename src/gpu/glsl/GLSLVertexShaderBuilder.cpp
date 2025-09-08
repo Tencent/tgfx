@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/glsl/GLSLVertexShaderBuilder.h"
-#include "GLSLProgramBuilder.h"
+#include "GLSLVertexShaderBuilder.h"
+#include "gpu/glsl/GLSLProgramBuilder.h"
 
 namespace tgfx {
 GLSLVertexShaderBuilder::GLSLVertexShaderBuilder(ProgramBuilder* program)
