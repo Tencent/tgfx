@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,29 +16,20 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "Resource.h"
+#include "PendingPurgeResourceQueue.h"
+#include "gpu/resources/Resource.h"
 
 namespace tgfx {
-void Resource::assignUniqueKey(const UniqueKey& newKey) {
-  if (newKey.empty()) {
-    removeUniqueKey();
-    return;
-  }
-  if (newKey != uniqueKey) {
-    context->resourceCache()->changeUniqueKey(this, newKey);
+
+PendingPurgeResourceQueue::~PendingPurgeResourceQueue() {
+  Resource* resource = nullptr;
+  while (pendingQueue.try_dequeue(resource)) {
+    delete resource;
   }
 }
 
-void Resource::removeUniqueKey() {
-  if (!uniqueKey.empty()) {
-    context->resourceCache()->removeUniqueKey(this);
-  }
+void PendingPurgeResourceQueue::add(Resource* resource) {
+  pendingQueue.enqueue(resource);
 }
 
-void Resource::release(bool releaseGPU) {
-  if (releaseGPU) {
-    onReleaseGPU();
-  }
-  context = nullptr;
-}
 }  // namespace tgfx
