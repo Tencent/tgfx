@@ -100,20 +100,16 @@ static std::shared_ptr<ImageCodec> GetGlyphCodec(
   std::shared_ptr<ImageCodec> glyphCodec = nullptr;
   do {
     auto hasFauxBold = !font.hasColor() && font.isFauxBold();
-    auto hasStroke = !font.hasColor() && stroke != nullptr;
     auto bounds = scalerContext->getImageTransform(glyphID, hasFauxBold, stroke, nullptr);
     if (bounds.isEmpty()) {
       break;
-    }
-    if (hasStroke) {
-      ApplyStrokeToBounds(*stroke, &bounds);
     }
     glyphOffset->x = bounds.left;
     glyphOffset->y = bounds.top;
     auto width = static_cast<int>(ceilf(bounds.width()));
     auto height = static_cast<int>(ceilf(bounds.height()));
     glyphCodec = std::make_shared<GlyphRasterizer>(width, height, scalerContext, glyphID,
-                                                   hasFauxBold, hasStroke ? stroke : nullptr);
+                                                   hasFauxBold, stroke);
   } while (false);
 
   if (glyphCodec != nullptr) {
@@ -426,7 +422,7 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
   auto maskFormat = GetMaskFormat(font);
   auto typeface = font.getTypeface();
   std::unique_ptr<Stroke> scaledStroke = nullptr;
-  if (stroke != nullptr) {
+  if (!font.hasColor() && stroke != nullptr) {
     scaledStroke = std::make_unique<Stroke>(*stroke);
     scaledStroke->width *= maxScale;
   }
