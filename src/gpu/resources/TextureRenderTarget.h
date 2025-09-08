@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "gpu/DefaultTextureView.h"
-#include "gpu/RenderTarget.h"
+#include "gpu/resources/DefaultTextureView.h"
+#include "gpu/resources/RenderTarget.h"
 
 namespace tgfx {
 class TextureRenderTarget : public DefaultTextureView, public RenderTarget {

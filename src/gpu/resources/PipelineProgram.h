@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,25 +18,32 @@
 
 #pragma once
 
-#include "gpu/GPURenderPipeline.h"
-#include "gpu/Resource.h"
-#include "gpu/UniformBuffer.h"
-#include "tgfx/core/BytesKey.h"
+#include "gpu/resources/Program.h"
 
 namespace tgfx {
-/**
- * The base class for GPU programs.
- */
-class Program : public Resource {
+class PipelineProgram : public Program {
  public:
-  size_t memoryUsage() const override {
-    return 0;
+  explicit PipelineProgram(std::unique_ptr<GPURenderPipeline> pipeline,
+                           std::unique_ptr<UniformBuffer> vertexUniformBuffer,
+                           std::unique_ptr<UniformBuffer> fragmentUniformBuffer)
+      : pipeline(std::move(pipeline)), vertexUniformBuffer(std::move(vertexUniformBuffer)),
+        fragmentUniformBuffer(std::move(fragmentUniformBuffer)) {
+  }
+
+  GPURenderPipeline* getPipeline() const {
+    return pipeline.get();
+  }
+
+ protected:
+  void onReleaseGPU() override {
+    pipeline->release(context->gpu());
   }
 
  private:
-  BytesKey programKey = {};
-  std::list<Program*>::iterator cachedPosition;
+  std::unique_ptr<GPURenderPipeline> pipeline = nullptr;
+  std::unique_ptr<UniformBuffer> vertexUniformBuffer = nullptr;
+  std::unique_ptr<UniformBuffer> fragmentUniformBuffer = nullptr;
 
-  friend class GlobalCache;
+  friend class ProgramInfo;
 };
 }  // namespace tgfx

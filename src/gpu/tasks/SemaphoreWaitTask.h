@@ -19,7 +19,7 @@
 #pragma once
 
 #include "RenderTask.h"
-#include "gpu/Semaphore.h"
+#include "gpu/resources/Semaphore.h"
 
 namespace tgfx {
 class SemaphoreWaitTask : public RenderTask {

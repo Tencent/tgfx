@@ -20,9 +20,9 @@
 
 #include "gpu/SamplerState.h"
 #include "gpu/SamplingArgs.h"
-#include "gpu/YUVTextureView.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/proxies/TextureProxy.h"
+#include "gpu/resources/YUVTextureView.h"
 
 namespace tgfx {
 class TextureEffect : public FragmentProcessor {

@@ -18,44 +18,49 @@
 
 #pragma once
 
-#include "core/utils/Log.h"
+#include <memory>
+#include "gpu/GPUFence.h"
 #include "gpu/resources/Resource.h"
 
 namespace tgfx {
 /**
- * The base class for all proxy-derived objects. It defers the acquisition of resources until they
- * are actually required.
+ * Wrapper class for a GPUFence object.
  */
-class ResourceProxy {
+class Semaphore : public Resource {
  public:
-  virtual ~ResourceProxy() = default;
-
   /**
-   * Retrieves the context associated with this ResourceProxy.
+   * Wraps a backend semaphore object into a Semaphore instance and takes ownership of it.
    */
-  virtual Context* getContext() const {
-    return context;
+  static std::shared_ptr<Semaphore> MakeAdopted(Context* context,
+                                                const BackendSemaphore& backendSemaphore);
+
+  size_t memoryUsage() const override {
+    return 0;
   }
 
-  void assignUniqueKey(const UniqueKey& key) {
-    uniqueKey = key;
-    if (resource != nullptr) {
-      resource->assignUniqueKey(key);
-    }
+  /**
+   * Returns the GPUFence object associated with this Semaphore instance.
+   */
+  GPUFence* getFence() {
+    return fence.get();
+  }
+
+  /**
+   * Returns the backend semaphore object associated with this Semaphore instance.
+   */
+  BackendSemaphore getBackendSemaphore() const {
+    return fence->getBackendSemaphore();
   }
 
  protected:
-  Context* context = nullptr;
-  mutable std::shared_ptr<Resource> resource = nullptr;
-  UniqueKey uniqueKey;
-
-  explicit ResourceProxy(std::shared_ptr<Resource> resource) : resource(std::move(resource)) {
+  void onReleaseGPU() override {
+    fence->release(context->gpu());
   }
 
-  ResourceProxy() = default;
+ private:
+  std::unique_ptr<GPUFence> fence = nullptr;
 
-  friend class ResourceTask;
-  friend class ShapeBufferUploadTask;
-  friend class ProxyProvider;
+  explicit Semaphore(std::unique_ptr<GPUFence> fence) : fence(std::move(fence)) {
+  }
 };
 }  // namespace tgfx

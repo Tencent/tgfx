@@ -19,7 +19,7 @@
 #pragma once
 
 #include "ResourceProxy.h"
-#include "gpu/TextureView.h"
+#include "gpu/resources/TextureView.h"
 
 namespace tgfx {
 class RenderTargetProxy;

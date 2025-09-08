@@ -18,30 +18,30 @@
 
 #pragma once
 
-#include "GPU.h"
+#include "gpu/GPU.h"
 #include "gpu/GPUBuffer.h"
-#include "gpu/Resource.h"
+#include "gpu/resources/Resource.h"
 
 namespace tgfx {
 /**
- * VertexBuffer is a resource that encapsulates a GPUBuffer, which can be used for vertex data in
+ * IndexBuffer is a resource that encapsulates a GPUBuffer, which can be used for index data in
  * a RenderPass.
  */
-class VertexBuffer : public Resource {
+class IndexBuffer : public Resource {
  public:
   size_t memoryUsage() const override {
     return buffer->size();
   }
 
   /**
-   * Returns the size of the vertex buffer.
+   * Returns the size of the index buffer.
    */
   size_t size() const {
     return buffer->size();
   }
 
   /**
-   * Returns the GPUBuffer associated with this VertexBuffer.
+   * Returns the GPUBuffer associated with this IndexBuffer.
    */
   GPUBuffer* gpuBuffer() const {
     return buffer.get();
@@ -55,10 +55,9 @@ class VertexBuffer : public Resource {
  private:
   std::unique_ptr<GPUBuffer> buffer = nullptr;
 
-  explicit VertexBuffer(std::unique_ptr<GPUBuffer> buffer) : buffer(std::move(buffer)) {
+  explicit IndexBuffer(std::unique_ptr<GPUBuffer> buffer) : buffer(std::move(buffer)) {
   }
 
   friend class GPUBufferUploadTask;
-  friend class ShapeBufferUploadTask;
 };
 }  // namespace tgfx

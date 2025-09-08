@@ -18,7 +18,7 @@
 
 #include "ExternalOESBuffer.h"
 #include <mutex>
-#include "gpu/TextureView.h"
+#include "gpu/resources/TextureView.h"
 
 namespace tgfx {
 static std::mutex cacheLocker = {};

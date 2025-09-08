@@ -16,48 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
+#include "gpu/resources/Semaphore.h"
 #include "gpu/GPU.h"
-#include "gpu/GPUBuffer.h"
-#include "gpu/Resource.h"
 
 namespace tgfx {
-/**
- * IndexBuffer is a resource that encapsulates a GPUBuffer, which can be used for index data in
- * a RenderPass.
- */
-class IndexBuffer : public Resource {
- public:
-  size_t memoryUsage() const override {
-    return buffer->size();
+std::shared_ptr<Semaphore> Semaphore::MakeAdopted(Context* context,
+                                                  const BackendSemaphore& backendSemaphore) {
+  auto fence = context->gpu()->importExternalFence(backendSemaphore);
+  if (fence == nullptr) {
+    return nullptr;
   }
-
-  /**
-   * Returns the size of the index buffer.
-   */
-  size_t size() const {
-    return buffer->size();
-  }
-
-  /**
-   * Returns the GPUBuffer associated with this IndexBuffer.
-   */
-  GPUBuffer* gpuBuffer() const {
-    return buffer.get();
-  }
-
- protected:
-  void onReleaseGPU() override {
-    buffer->release(context->gpu());
-  }
-
- private:
-  std::unique_ptr<GPUBuffer> buffer = nullptr;
-
-  explicit IndexBuffer(std::unique_ptr<GPUBuffer> buffer) : buffer(std::move(buffer)) {
-  }
-
-  friend class GPUBufferUploadTask;
-};
+  return Resource::AddToCache(context, new Semaphore(std::move(fence)));
+}
 }  // namespace tgfx

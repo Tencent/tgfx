@@ -18,24 +18,47 @@
 
 #pragma once
 
-#include "gpu/Program.h"
-#include "tgfx/gpu/RuntimeProgram.h"
+#include "gpu/GPU.h"
+#include "gpu/GPUBuffer.h"
+#include "gpu/resources/Resource.h"
 
 namespace tgfx {
-class RuntimeProgramWrapper : public Program {
+/**
+ * VertexBuffer is a resource that encapsulates a GPUBuffer, which can be used for vertex data in
+ * a RenderPass.
+ */
+class VertexBuffer : public Resource {
  public:
-  static std::shared_ptr<Program> Wrap(std::unique_ptr<RuntimeProgram> program);
+  size_t memoryUsage() const override {
+    return buffer->size();
+  }
 
-  static const RuntimeProgram* Unwrap(const Program* program);
+  /**
+   * Returns the size of the vertex buffer.
+   */
+  size_t size() const {
+    return buffer->size();
+  }
+
+  /**
+   * Returns the GPUBuffer associated with this VertexBuffer.
+   */
+  GPUBuffer* gpuBuffer() const {
+    return buffer.get();
+  }
 
  protected:
-  void onReleaseGPU() override;
+  void onReleaseGPU() override {
+    buffer->release(context->gpu());
+  }
 
  private:
-  std::unique_ptr<RuntimeProgram> runtimeProgram = nullptr;
+  std::unique_ptr<GPUBuffer> buffer = nullptr;
 
-  explicit RuntimeProgramWrapper(std::unique_ptr<RuntimeProgram> program)
-      : runtimeProgram(std::move(program)) {
+  explicit VertexBuffer(std::unique_ptr<GPUBuffer> buffer) : buffer(std::move(buffer)) {
   }
+
+  friend class GPUBufferUploadTask;
+  friend class ShapeBufferUploadTask;
 };
 }  // namespace tgfx

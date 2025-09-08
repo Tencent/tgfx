@@ -33,7 +33,7 @@ endif ()
 
 if (NOT TGFX_USE_THREADS)
     set(TGFX_USE_INSPECTOR OFF)
-endif()
+endif ()
 
 if (APPLE OR (WEB AND NOT TGFX_USE_THREADS))
     option(TGFX_USE_FREETYPE "Use Freetype as the vector backend" OFF)
@@ -140,6 +140,7 @@ file(GLOB_RECURSE SRC_FILES
         src/gpu/ops/*.*
         src/gpu/processors/*.*
         src/gpu/proxies/*.*
+        src/gpu/resources/*.*
         src/gpu/tasks/*.*)
 list(APPEND TGFX_FILES ${SRC_FILES})
 file(GLOB PLATFORM_COMMON_FILES
@@ -170,9 +171,9 @@ if (TGFX_USE_INSPECTOR)
     list(APPEND TGFX_DEFINES TGFX_USE_INSPECTOR)
     list(APPEND TGFX_INCLUDES third_party/flatbuffers/include)
     list(APPEND TGFX_STATIC_VENDORS flatbuffers)
-endif()
+endif ()
 
-if(TGFX_BUILD_PDF)
+if (TGFX_BUILD_PDF)
     file(GLOB_RECURSE PDF_FILES
             src/pdf/*.*)
     list(APPEND TGFX_FILES ${PDF_FILES})
@@ -261,10 +262,10 @@ endif ()
 if (TGFX_BUILD_SVG OR TGFX_BUILD_PDF)
     # SVG and PDF exports require glyphs to be convertible back to Unicode.
     list(APPEND TGFX_DEFINES TGFX_USE_GLYPH_TO_UNICODE)
-    if(TGFX_BUILD_PDF)
+    if (TGFX_BUILD_PDF)
         list(APPEND TGFX_DEFINES TGFX_USE_ADVANCED_TYPEFACE_PROPERTY)
         set(TGFX_USE_ZLIB ON)
-    endif()
+    endif ()
 endif ()
 
 if (TGFX_USE_ZLIB)

@@ -18,49 +18,25 @@
 
 #pragma once
 
-#include <memory>
-#include "gpu/GPUFence.h"
-#include "gpu/Resource.h"
+#include "gpu/GPURenderPipeline.h"
+#include "gpu/UniformBuffer.h"
+#include "gpu/resources/Resource.h"
+#include "tgfx/core/BytesKey.h"
 
 namespace tgfx {
 /**
- * Wrapper class for a GPUFence object.
+ * The base class for GPU programs.
  */
-class Semaphore : public Resource {
+class Program : public Resource {
  public:
-  /**
-   * Wraps a backend semaphore object into a Semaphore instance and takes ownership of it.
-   */
-  static std::shared_ptr<Semaphore> MakeAdopted(Context* context,
-                                                const BackendSemaphore& backendSemaphore);
-
   size_t memoryUsage() const override {
     return 0;
   }
 
-  /**
-   * Returns the GPUFence object associated with this Semaphore instance.
-   */
-  GPUFence* getFence() {
-    return fence.get();
-  }
-
-  /**
-   * Returns the backend semaphore object associated with this Semaphore instance.
-   */
-  BackendSemaphore getBackendSemaphore() const {
-    return fence->getBackendSemaphore();
-  }
-
- protected:
-  void onReleaseGPU() override {
-    fence->release(context->gpu());
-  }
-
  private:
-  std::unique_ptr<GPUFence> fence = nullptr;
+  BytesKey programKey = {};
+  std::list<Program*>::iterator cachedPosition;
 
-  explicit Semaphore(std::unique_ptr<GPUFence> fence) : fence(std::move(fence)) {
-  }
+  friend class GlobalCache;
 };
 }  // namespace tgfx

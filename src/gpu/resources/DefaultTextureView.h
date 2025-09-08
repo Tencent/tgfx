@@ -16,16 +16,31 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "Semaphore.h"
-#include "GPU.h"
+#pragma once
+
+#include "gpu/resources/TextureView.h"
 
 namespace tgfx {
-std::shared_ptr<Semaphore> Semaphore::MakeAdopted(Context* context,
-                                                  const BackendSemaphore& backendSemaphore) {
-  auto fence = context->gpu()->importExternalFence(backendSemaphore);
-  if (fence == nullptr) {
-    return nullptr;
+/**
+ * DefaultTextureView is a simple TextureView implementation that stores pixel data using a single
+ * GPUTexture.
+ */
+class DefaultTextureView : public TextureView {
+ public:
+  explicit DefaultTextureView(std::unique_ptr<GPUTexture> texture,
+                              ImageOrigin origin = ImageOrigin::TopLeft);
+
+  size_t memoryUsage() const override;
+
+  GPUTexture* getTexture() const override {
+    return _texture.get();
   }
-  return Resource::AddToCache(context, new Semaphore(std::move(fence)));
-}
+
+ protected:
+  std::unique_ptr<GPUTexture> _texture = nullptr;
+
+  void onReleaseGPU() override {
+    _texture->release(context->gpu());
+  }
+};
 }  // namespace tgfx

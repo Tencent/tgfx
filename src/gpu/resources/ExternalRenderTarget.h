@@ -18,29 +18,49 @@
 
 #pragma once
 
-#include "gpu/TextureView.h"
+#include "gpu/resources/RenderTarget.h"
+#include "gpu/resources/Resource.h"
 
 namespace tgfx {
-/**
- * DefaultTextureView is a simple TextureView implementation that stores pixel data using a single
- * GPUTexture.
- */
-class DefaultTextureView : public TextureView {
+class ExternalRenderTarget : public Resource, public RenderTarget {
  public:
-  explicit DefaultTextureView(std::unique_ptr<GPUTexture> texture,
-                              ImageOrigin origin = ImageOrigin::TopLeft);
+  Context* getContext() const override {
+    return context;
+  }
 
-  size_t memoryUsage() const override;
+  ImageOrigin origin() const override {
+    return _origin;
+  }
 
-  GPUTexture* getTexture() const override {
-    return _texture.get();
+  bool externallyOwned() const override {
+    return true;
+  }
+
+  GPUTexture* getRenderTexture() const override {
+    return renderTexture.get();
+  }
+
+  GPUTexture* getSampleTexture() const override {
+    return renderTexture.get();
+  }
+
+  size_t memoryUsage() const override {
+    return 0;
   }
 
  protected:
-  std::unique_ptr<GPUTexture> _texture = nullptr;
-
   void onReleaseGPU() override {
-    _texture->release(context->gpu());
+    renderTexture->release(context->gpu());
   }
+
+ private:
+  std::unique_ptr<GPUTexture> renderTexture = nullptr;
+  ImageOrigin _origin = ImageOrigin::TopLeft;
+
+  ExternalRenderTarget(std::unique_ptr<GPUTexture> texture, ImageOrigin origin)
+      : renderTexture(std::move(texture)), _origin(origin) {
+  }
+
+  friend class RenderTarget;
 };
 }  // namespace tgfx
