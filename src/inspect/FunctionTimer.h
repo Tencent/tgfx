@@ -21,6 +21,33 @@
 #include "tgfx/core/Clock.h"
 
 namespace tgfx::inspect {
+
+static std::unordered_map<uint8_t, const char*> OpTaskName = {
+    {static_cast<uint8_t>(tgfx::inspect::OpTaskType::Unknown), "Unknown"},
+    {static_cast<uint8_t>(tgfx::inspect::OpTaskType::Flush), "Flush"},
+    {static_cast<uint8_t>(tgfx::inspect::OpTaskType::ResourceTask), "ResourceTask"},
+    {static_cast<uint8_t>(tgfx::inspect::OpTaskType::TextureUploadTask), "TextureUploadTask"},
+    {static_cast<uint8_t>(tgfx::inspect::OpTaskType::ShapeBufferUploadTask),
+     "ShapeBufferUploadTask"},
+    {static_cast<uint8_t>(tgfx::inspect::OpTaskType::GpuUploadTask), "GpuUploadTask"},
+    {static_cast<uint8_t>(tgfx::inspect::OpTaskType::TextureCreateTask), "TextureCreateTask"},
+    {static_cast<uint8_t>(tgfx::inspect::OpTaskType::RenderTargetCreateTask),
+     "RenderTargetCreateTask"},
+    {static_cast<uint8_t>(tgfx::inspect::OpTaskType::TextureFlattenTask), "TextureFlattenTask"},
+    {static_cast<uint8_t>(tgfx::inspect::OpTaskType::RenderTask), "RenderTask"},
+    {static_cast<uint8_t>(tgfx::inspect::OpTaskType::RenderTargetCopyTask), "RenderTargetCopyTask"},
+    {static_cast<uint8_t>(tgfx::inspect::OpTaskType::RuntimeDrawTask), "RuntimeDrawTask"},
+    {static_cast<uint8_t>(tgfx::inspect::OpTaskType::TextureResolveTask), "TextureResolveTask"},
+    {static_cast<uint8_t>(tgfx::inspect::OpTaskType::OpsRenderTask), "OpsRenderTask"},
+    {static_cast<uint8_t>(tgfx::inspect::OpTaskType::ClearOp), "ClearOp"},
+    {static_cast<uint8_t>(tgfx::inspect::OpTaskType::RectDrawOp), "RectDrawOp"},
+    {static_cast<uint8_t>(tgfx::inspect::OpTaskType::RRectDrawOp), "RRectDrawOp"},
+    {static_cast<uint8_t>(tgfx::inspect::OpTaskType::ShapeDrawOp), "ShapeDrawOp"},
+    {static_cast<uint8_t>(tgfx::inspect::OpTaskType::DstTextureCopyOp), "DstTextureCopyOp"},
+    {static_cast<uint8_t>(tgfx::inspect::OpTaskType::ResolveOp), "ResolveOp"},
+    {static_cast<uint8_t>(tgfx::inspect::OpTaskType::OpTaskTypeSize), "OpTaskTypeSize"},
+};
+
 class FunctionTimer {
  public:
   FunctionTimer(OpTaskType type, bool isActive) : active(isActive), type(type) {

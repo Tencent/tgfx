@@ -31,6 +31,18 @@ if (CMAKE_BUILD_TYPE MATCHES "Debug")
     option(TGFX_USE_INSPECTOR "Enable profiling support for the TGFX Inspector tool" ON)
 endif ()
 
+if (ANDROID OR OHOS)
+    option(TGFX_USE_INSPECTOR "Enable profiling support for the TGFX Inspector tool" OFF)
+endif ()
+
+if (TGFX_USE_INSPECTOR)
+    if (WEB)
+        option(TGFX_USE_WEBP_ENCODE "Enable embedded WEBP encoding support" ON)
+    else ()
+        option(TGFX_USE_JPEG_ENCODE "Enable embedded JPEG encoding support" ON)
+    endif ()
+endif ()
+
 if (NOT TGFX_USE_THREADS)
     set(TGFX_USE_INSPECTOR OFF)
 endif()

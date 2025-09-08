@@ -34,4 +34,9 @@ PlacementPtr<ProgramInfo> DrawOp::createProgramInfo(
       renderTarget, std::move(geometryProcessor), std::move(fragmentProcessors), numColorProcessors,
       std::move(xferProcessor), blendMode);
 }
+
+void DrawOp::captureInputTexture(RenderTarget* renderTaget) {
+  CAPUTRE_TEXTURE_BEFORE_RENDER(renderTaget->getContext(), colors);
+}
+
 }  // namespace tgfx

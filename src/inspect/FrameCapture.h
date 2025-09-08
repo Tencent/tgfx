@@ -95,7 +95,10 @@ class FrameCapture {
   static void SendOutputTextureID(const GPUTexture* texture);
 
   static void SendFragmentProcessor(
-      const std::vector<PlacementPtr<FragmentProcessor>>& programInfo);
+      const std::vector<PlacementPtr<FragmentProcessor>>& fragmentProcessors);
+
+  static void SendInputTextureBeforeRender(
+      Context* context, const std::vector<PlacementPtr<FragmentProcessor>>& fragmentProcessors);
 
   static void SendFrameCaptureTexture(std::shared_ptr<FrameCaptureTexture> frameCaptureTexture,
                                       bool differentEachFrame);

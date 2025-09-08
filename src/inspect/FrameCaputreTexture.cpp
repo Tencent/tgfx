@@ -18,6 +18,10 @@
 
 #include "FrameCaptureTexture.h"
 #include "core/utils/PixelFormatUtil.h"
+#include "gpu/GPU.h"
+#include "gpu/ProxyProvider.h"
+#include "gpu/RectsVertexProvider.h"
+#include "gpu/opengl/GLGPU.h"
 
 namespace tgfx::inspect {
 
@@ -28,23 +32,25 @@ std::shared_ptr<FrameCaptureTexture> FrameCaptureTexture::MakeFrom(GPUTexture* t
   const auto sz = static_cast<size_t>(height) * rowBytes;
   auto imageBuffer = std::make_shared<Buffer>(sz);
   imageBuffer->writeRange(0, sz, pixels);
-
   return std::make_shared<FrameCaptureTexture>(texture, width, height, rowBytes, format, true,
                                                std::move(imageBuffer));
 }
 
-std::shared_ptr<FrameCaptureTexture> FrameCaptureTexture::MakeFrom(
-    GPUTexture* texture, const CommandQueue* commandQueue) {
-
+std::shared_ptr<FrameCaptureTexture> FrameCaptureTexture::MakeFrom(GPUTexture* texture,
+                                                                   Context* context) {
   auto width = texture->width();
   auto height = texture->height();
-  auto colorType = PixelFormatToColorType(texture->format());
+  auto format = texture->format();
+  auto commandQueue = context->gpu()->queue();
+  auto colorType = PixelFormatToColorType(format);
   auto rowBytes = ImageInfo::GetBytesPerPixel(colorType) * static_cast<size_t>(width);
   auto buffer = std::make_shared<Buffer>(rowBytes * static_cast<size_t>(height));
-  commandQueue->readTexture(texture, Rect::MakeWH(width, height), buffer->bytes(), rowBytes);
-
-  return std::make_shared<FrameCaptureTexture>(texture, width, height, rowBytes, texture->format(),
-                                               true, buffer);
+  if (!commandQueue->readTexture(texture, Rect::MakeWH(width, height), buffer->bytes(),
+                                 rowBytes)) {
+    return nullptr;
+  }
+  return std::make_shared<FrameCaptureTexture>(texture, width, height, rowBytes,
+                                               texture->format(), true, buffer);
 }
 
 std::shared_ptr<FrameCaptureTexture> FrameCaptureTexture::MakeFrom(
@@ -55,10 +61,12 @@ std::shared_ptr<FrameCaptureTexture> FrameCaptureTexture::MakeFrom(
   auto format = renderTarget->format();
   auto imageInfo = ImageInfo::Make(width, height, PixelFormatToColorType(format));
   auto imageBuffer = std::make_shared<Buffer>(imageInfo.byteSize());
-  renderTarget->readPixels(imageInfo, imageBuffer->bytes());
+  if (!renderTarget->readPixels(imageInfo, imageBuffer->bytes())) {
+    LOGI("FrameCaptureTexture read renderTarget error");
+    return nullptr;
+  }
   return std::make_shared<FrameCaptureTexture>(renderTarget->getRenderTexture(), width, height,
                                                imageInfo.rowBytes(), format, false,
                                                std::move(imageBuffer));
 }
-
 }  // namespace tgfx::inspect

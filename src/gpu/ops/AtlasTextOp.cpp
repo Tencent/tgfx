@@ -95,6 +95,7 @@ void AtlasTextOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
   } else {
     renderPass->draw(PrimitiveType::TriangleStrip, 0, 4);
   }
+  CAPTURE_TEXTURE(textureProxy->getContext(), textureProxy->getTextureView());
   CAPUTRE_RENDER_TARGET(renderTarget);
 }
 

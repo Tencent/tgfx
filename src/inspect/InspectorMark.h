@@ -28,8 +28,12 @@
 #define RENDER_VISABLE_OBJECT(context) tgfx::inspect::LayerTree::Get().renderImageAndSend(context)
 #define SET_SLECTED_LAYER(layer) tgfx::inspect::LayerTree::Get().setSelectLayer(layer)
 
+#define MARE_CONCAT(x, y) MARE_CONCAT_INDIRECT(x, y)
+#define MARE_CONCAT_INDIRECT(x, y) x##y
+#define MARK_LINE __LINE__
 #define FRAME_MARK tgfx::inspect::FrameCapture::SendFrameMark(nullptr)
-#define FUNCTION_MARK(type, active) tgfx::inspect::FunctionTimer functionTimer(type, active)
+#define FUNCTION_MARK(type, active) \
+  tgfx::inspect::FunctionTimer MARE_CONCAT(functionTimer, MARK_LINE) = {type, active}
 #define OPERATE_MARK(type) FUNCTION_MARK(type, true)
 #define TASK_MARK(type) FUNCTION_MARK(type, true)
 #define ATTRIBUTE_NAME(name, value) tgfx::inspect::FrameCapture::SendAttributeData(name, value)
@@ -39,14 +43,12 @@
 
 #define ATTRIBUTE_ENUM(value, type) ATTRIBUTE_NAME_ENUM(#value, value, type)
 
-#define CAPUTRE_PIXELS_DATA(texturePtr, width, height, rowBytes, format, pixels)               \
-  auto frameCapture = inspect::FrameCaptureTexture::MakeFrom(texture, width, height, rowBytes, \
-                                                             pixelFormat, pixels);             \
-  tgfx::inspect::FrameCapture::SendFrameCaptureTexture(frameCapture, false);
-
-#define CAPUTRE_TEXTURE(commandQueue, texture)                                                  \
-  auto frameCapture = inspect::FrameCaptureTexture::MakeFrom(textureView->getTexture(), queue); \
-  tgfx::inspect::FrameCapture::SendFrameCaptureTexture(frameCapture, false);
+#define CAPTURE_TEXTURE(context, textureView)                                             \
+  if (inspect::FrameCapture::CurrentFrameShouldCaptrue()) {                               \
+    auto frameCapture =                                                                   \
+        inspect::FrameCaptureTexture::MakeFrom(textureView->getTexture(), context);       \
+    tgfx::inspect::FrameCapture::SendFrameCaptureTexture(std::move(frameCapture), false); \
+  }
 
 #define CAPUTRE_RENDER_TARGET(renderTarget)                                              \
   if (inspect::FrameCapture::CurrentFrameShouldCaptrue()) {                              \
@@ -57,6 +59,9 @@
 
 #define CAPUTRE_FRARGMENT_PROCESSORS(fragmentProcessors) \
   tgfx::inspect::FrameCapture::SendFragmentProcessor(fragmentProcessors)
+
+#define CAPUTRE_TEXTURE_BEFORE_RENDER(context, fragmentProcessors) \
+  tgfx::inspect::FrameCapture::SendInputTextureBeforeRender(context, fragmentProcessors)
 
 #define SEND_OUTPUT_TEXUTRE_ID(texturePtr) \
   tgfx::inspect::FrameCapture::SendOutputTextureID(texturePtr)
@@ -75,9 +80,9 @@
 #define ATTRIBUTE_NAME(name, value)
 #define ATTRIBUTE_NAME_ENUM(name, value, type)
 #define ATTRIBUTE_ENUM(value, type)
-#define CAPUTRE_PIXELS_DATA(texturePtr, width, height, rowBytes, format, pixels)
-#define CAPUTRE_TEXTURE(commandQueue, texturePtr)
-#define CAPUTRE_FRARGMENT_PROCESSORS(pipline)
+#define CAPTURE_TEXTURE(commandQueue, texturePtr)
+#define CAPUTRE_TEXTURE_BEFORE_RENDER(context, fragmentProcessors)
+#define CAPUTRE_FRARGMENT_PROCESSORS(renderTarget, fragmentProcessors)
 #define SEND_OUTPUT_TEXUTRE_ID(texturePtr)
 #define CAPUTRE_RENDER_TARGET(renderTarget)
 

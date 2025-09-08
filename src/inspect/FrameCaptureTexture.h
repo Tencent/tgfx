@@ -31,8 +31,7 @@ class FrameCaptureTexture {
                                                        size_t rowBytes, PixelFormat format,
                                                        const void* pixels);
 
-  static std::shared_ptr<FrameCaptureTexture> MakeFrom(GPUTexture* texture,
-                                                       const CommandQueue* commandQueue);
+  static std::shared_ptr<FrameCaptureTexture> MakeFrom(GPUTexture* texture, Context* context);
 
   static std::shared_ptr<FrameCaptureTexture> MakeFrom(const RenderTarget* renderTarget);
 

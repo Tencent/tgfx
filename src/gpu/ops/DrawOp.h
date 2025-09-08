@@ -54,6 +54,8 @@ class DrawOp {
     return !coverages.empty();
   }
 
+  virtual void captureInputTexture(RenderTarget* renderTaget);
+
   virtual void execute(RenderPass* renderPass, RenderTarget* renderTarget) = 0;
 
  protected:

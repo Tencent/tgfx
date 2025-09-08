@@ -24,11 +24,18 @@
 #include "Protocol.h"
 #include "Socket.h"
 #include "TCPPortProvider.h"
+#ifdef TGFX_USE_JPEG_ENCODE
 #include "core/codecs/jpeg/JpegCodec.h"
-#include "core/codecs/png/PngCodec.h"
+#elif TGFX_USE_WEBP_ENCODE
 #include "core/codecs/webp/WebpCodec.h"
+#elif TGFX_USE_PNG_ENCODE
+#include "core/codecs/png/PngCodec.h"
+#endif
+#include "FunctionTimer.h"
+#include "core/codecs/png/PngCodec.h"
 #include "core/utils/Log.h"
 #include "core/utils/PixelFormatUtil.h"
+#include "gpu/GPU.h"
 #include "gpu/RenderTarget.h"
 #include "lz4.h"
 #include "tgfx/core/Clock.h"
@@ -203,7 +210,9 @@ void FrameCapture::SendOutputTextureID(const GPUTexture* texture) {
 
 void FrameCapture::SendFrameCaptureTexture(std::shared_ptr<FrameCaptureTexture> frameCaptureTexture,
                                            bool differentEachFrame) {
-
+  if (frameCaptureTexture == nullptr) {
+    return;
+  }
   uint64_t currentFrame = 0;
   if (differentEachFrame) {
     currentFrame = GetInstance().frameCount.load(std::memory_order_relaxed) + 1;
@@ -218,12 +227,32 @@ void FrameCapture::SendFrameCaptureTexture(std::shared_ptr<FrameCaptureTexture> 
 
 void FrameCapture::SendFragmentProcessor(
     const std::vector<PlacementPtr<FragmentProcessor>>& fragmentProcessors) {
+  if (!CurrentFrameShouldCaptrue()) {
+    return;
+  }
   for (const auto& processor : fragmentProcessors) {
     FragmentProcessor::Iter fpIter(processor.get());
     while (const auto* subFP = fpIter.next()) {
       for (size_t j = 0; j < subFP->numTextureSamplers(); ++j) {
         auto texture = subFP->textureAt(j);
         SendInputTextureID(texture);
+      }
+    }
+  }
+}
+
+void FrameCapture::SendInputTextureBeforeRender(
+    Context* context, const std::vector<PlacementPtr<FragmentProcessor>>& fragmentProcessors) {
+  if (!CurrentFrameShouldCaptrue()) {
+    return;
+  }
+  for (const auto& processor : fragmentProcessors) {
+    FragmentProcessor::Iter fpIter(processor.get());
+    while (const auto* subFP = fpIter.next()) {
+      for (size_t j = 0; j < subFP->numTextureSamplers(); ++j) {
+        auto texture = subFP->textureAt(j);
+        auto frameCaptureTexture = FrameCaptureTexture::MakeFrom(texture, context);
+        SendFrameCaptureTexture(std::move(frameCaptureTexture), false);
       }
     }
   }
@@ -425,14 +454,14 @@ void FrameCapture::encodeWorker() {
       auto imageInfo = ImageInfo::Make(width, height, colorType, AlphaType::Premultiplied,
                                        frameCaputreTexture->rowBytes());
 #ifdef TGFX_USE_JPEG_ENCODE
-      auto encodedFormat = EncodedFormat::JPEG;
+      auto encodeFormat = EncodedFormat::JPEG;
 #elif TGFX_USE_WEBP_ENCODE
       auto encodeFormat = EncodedFormat::WEBP;
 #elif TGFX_USE_PNG_ENCODE
       auto encodeFormat = EncodedFormat::PNG;
 #endif
       auto jpgBuffer = ImageCodec::Encode(
-          Pixmap(imageInfo, frameCaputreTexture->imageBuffer()->bytes()), encodedFormat, 100);
+          Pixmap(imageInfo, frameCaputreTexture->imageBuffer()->bytes()), encodeFormat, 100);
       auto size = jpgBuffer->size();
       auto pxielsBuffer = static_cast<uint8_t*>(malloc(size));
       memcpy(pxielsBuffer, jpgBuffer->bytes(), size);
@@ -468,11 +497,10 @@ bool FrameCapture::needDataSize(size_t len) {
 
 void FrameCapture::appendDataUnsafe(const void* data, size_t len) {
   if (dataBuffer.size() < len + static_cast<size_t>(dataBufferOffset)) {
-    Buffer tempDataBuffer(dataBuffer.size());
-    memcpy(tempDataBuffer.bytes(), dataBuffer.bytes(), dataBuffer.size());
+    auto tempData = Data::MakeWithCopy(dataBuffer.data(), dataBuffer.size());
     dataBuffer.clear();
-    dataBuffer.alloc(len + static_cast<size_t>(dataBufferOffset));
-    memcpy(dataBuffer.bytes(), tempDataBuffer.bytes(), tempDataBuffer.size());
+    dataBuffer.alloc(len + static_cast<size_t>(dataBufferOffset - dataBufferStart));
+    memcpy(dataBuffer.bytes(), tempData->bytes(), tempData->size());
   }
   memcpy(dataBuffer.bytes() + dataBufferOffset, data, len);
   dataBufferOffset += static_cast<int>(len);
@@ -492,31 +520,43 @@ static bool IsEncodeImage(const uint8_t* data, size_t size) {
   auto offset =
       sizeof(FrameCaptureMessageHeader) + sizeof(StringTransferMessage) + sizeof(uint32_t);
   const auto pixelsData = Data::MakeWithoutCopy(data + offset, size);
-  return JpegCodec::IsJpeg(pixelsData) || WebpCodec::IsWebp(pixelsData) ||
-         PngCodec::IsPng(pixelsData);
+#ifdef TGFX_USE_JPEG_ENCODE
+  return JpegCodec::IsJpeg(pixelsData);
+#elif TGFX_USE_WEBP_ENCODE
+  return WebpCodec::IsWebp(pixelsData);
+#elif TGFX_USE_PNG_ENCODE
+  return PngCodec::IsPng(pixelsData);
+#endif
 }
 
 bool FrameCapture::sendData(const uint8_t* data, size_t len) {
   if (len == 0) {
     return true;
   }
+  auto headSize = sizeof(bool) + sizeof(size_t);
   auto maxOutputSize = LZ4CompressionHandler::GetMaxOutputSize(len);
   if (lz4Buf.size() < maxOutputSize) {
     lz4Buf.clear();
-    lz4Buf.alloc(maxOutputSize + sizeof(size_t));
+    lz4Buf.alloc(maxOutputSize + headSize);
     if (lz4Buf.isEmpty()) {
       LOGE("Inspector failed to send data!");
       return false;
     }
   }
   auto lz4Size = len;
-  if (IsEncodeImage(data, len)) {
-    memcpy(lz4Buf.bytes() + sizeof(size_t), data, len);
-  } else {
-    lz4Size = lz4Handler->encode(lz4Buf.bytes() + sizeof(size_t), maxOutputSize, data, len);
+  if (lz4Size == 11) {
+    LOGI("lz4size == 11");
   }
-  memcpy(lz4Buf.bytes(), &lz4Size, sizeof(size_t));
-  return sock->sendData(lz4Buf.bytes(), lz4Size + sizeof(size_t)) != -1;
+  bool isLz4Encode = false;
+  if (IsEncodeImage(data, len)) {
+    memcpy(lz4Buf.bytes() + headSize, data, len);
+  } else {
+    isLz4Encode = true;
+    lz4Size = lz4Handler->encode(lz4Buf.bytes() + headSize, maxOutputSize, data, len);
+  }
+  memcpy(lz4Buf.bytes(), &isLz4Encode, sizeof(bool));
+  memcpy(lz4Buf.bytes() + sizeof(bool), &lz4Size, sizeof(size_t));
+  return sock->sendData(lz4Buf.bytes(), lz4Size + sizeof(bool) + sizeof(size_t)) != -1;
 }
 
 bool FrameCapture::confirmProtocol() {
@@ -614,30 +654,19 @@ FrameCapture::DequeueStatus FrameCapture::dequeueSerial() {
     FrameCaptureMessageItem item = {};
     while (serialConcurrentQueue.try_dequeue(item)) {
       auto idx = item.hdr.idx;
-      switch (static_cast<FrameCaptureMessageType>(idx)) {
-        case FrameCaptureMessageType::TextureData: {
-          auto ptr = item.textureData.pixels;
-          auto csz = item.textureData.pixelsSize;
-          sendPixelsData(ptr, (const char*)ptr, csz, FrameCaptureMessageType::PixelsData);
-          free((void*)ptr);
-          break;
-        }
-        case FrameCaptureMessageType::OperateBegin: {
-          auto t = item.operateBegin.usTime;
-          auto dt = t - refThread;
-          refThread = t;
-          item.operateBegin.usTime = dt;
-          break;
-        }
-        case FrameCaptureMessageType::OperateEnd: {
-          auto t = item.operateEnd.usTime;
-          auto dt = t - refThread;
-          refThread = t;
-          item.operateEnd.usTime = dt;
-          break;
-        }
-        default:
-          break;
+      if (static_cast<FrameCaptureMessageType>(idx) == FrameCaptureMessageType::TextureData) {
+        auto ptr = item.textureData.pixels;
+        auto csz = item.textureData.pixelsSize;
+        LOGI("send Texture id: %d, size: %ld", item.textureData.textureId, csz);
+        sendPixelsData(ptr, (const char*)ptr, csz, FrameCaptureMessageType::PixelsData);
+        free((void*)ptr);
+      } else if (static_cast<FrameCaptureMessageType>(idx) ==
+                 FrameCaptureMessageType::OperateBegin) {
+        LOGI("Operate Begin %s, time %llu", OpTaskName[item.operateBegin.type],
+             item.operateBegin.usTime);
+      } else if (static_cast<FrameCaptureMessageType>(idx) == FrameCaptureMessageType::OperateEnd) {
+        LOGI("Operate End %s, time %llu", OpTaskName[item.operateBegin.type],
+             item.operateBegin.usTime);
       }
       if (!appendData(&item, FrameCaptureMessageDataSize[idx])) {
         return DequeueStatus::ConnectionLost;
