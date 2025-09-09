@@ -244,9 +244,8 @@ std::shared_ptr<Resource> ResourceCache::addResource(Resource* resource,
   totalBytes += resource->memoryUsage();
   // allow the resource to be enqueued for purging when the last external reference is released,
   // rather than being deleted immediately.
-  auto result = std::shared_ptr<Resource>(resource, [this](Resource* res) {
-    purgeableResourcesQueue.enqueue(res);
-  });
+  auto result = std::shared_ptr<Resource>(
+      resource, [this](Resource* res) { purgeableResourcesQueue.enqueue(res); });
   resource->weakThis = result;
   AddToList(nonpurgeableResources, resource);
   return result;
@@ -260,9 +259,8 @@ std::shared_ptr<Resource> ResourceCache::refResource(Resource* resource) {
   }
   // allow the resource to be enqueued for purging when the last external reference is released,
   // rather than being deleted immediately.
-  auto result = std::shared_ptr<Resource>(resource, [this](Resource* res) {
-    purgeableResourcesQueue.enqueue(res);
-  });
+  auto result = std::shared_ptr<Resource>(
+      resource, [this](Resource* res) { purgeableResourcesQueue.enqueue(res); });
   resource->weakThis = result;
   return result;
 }

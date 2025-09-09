@@ -18,11 +18,11 @@
 
 #pragma once
 
+#include <concurrentqueue.h>
 #include <deque>
 #include <functional>
 #include <list>
 #include <unordered_map>
-#include <concurrentqueue.h>
 #include "gpu/resources/ResourceKey.h"
 #include "tgfx/gpu/Context.h"
 
