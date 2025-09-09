@@ -96,7 +96,7 @@ bool GLCommandQueue::readTexture(GPUTexture* texture, const Rect& rect, void* pi
   auto gl = gpu->functions();
   auto caps = static_cast<const GLCaps*>(gpu->caps());
   ClearGLError(gl);
-  auto glReadTexture = GLReadTexture::MakeFrom(rect, static_cast<GLTexture*>(texture));
+  auto glReadTexture = GLReadTexture::MakeFrom(caps, rect, static_cast<GLTexture*>(texture));
   if (!glReadTexture->isSupportReadBack(gpu)) {
     return false;
   }

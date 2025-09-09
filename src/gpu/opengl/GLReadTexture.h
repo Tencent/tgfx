@@ -22,7 +22,7 @@
 namespace tgfx {
 class GLReadTexture {
  public:
-  static std::shared_ptr<GLReadTexture> MakeFrom(GLCaps* caps, const Rect& rect,
+  static std::shared_ptr<GLReadTexture> MakeFrom(const GLCaps* caps, const Rect& rect,
                                                  GLTexture* texture);
 
   virtual ~GLReadTexture() = default;

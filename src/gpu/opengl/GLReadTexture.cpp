@@ -78,7 +78,7 @@ bool NativeGLReadTexture::isSupportReadBack(GLGPU*) {
   return true;
 }
 
-std::shared_ptr<GLReadTexture> GLReadTexture::MakeFrom(GLCaps* caps, const Rect& rect,
+std::shared_ptr<GLReadTexture> GLReadTexture::MakeFrom(const GLCaps* caps, const Rect& rect,
                                                        GLTexture* texture) {
   auto width = static_cast<int>(rect.width());
   auto height = static_cast<int>(rect.height());
