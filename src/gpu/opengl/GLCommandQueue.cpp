@@ -92,7 +92,36 @@ bool GLCommandQueue::readTexture(GPUTexture* texture, const Rect& rect, void* pi
   if (texture == nullptr || rect.isEmpty() || pixels == nullptr) {
     return false;
   }
-  if (!(texture->usage() & GPUTextureUsage::RENDER_ATTACHMENT)) {
+  auto gl = gpu->functions();
+  auto caps = static_cast<const GLCaps*>(gpu->caps());
+  ClearGLError(gl);
+  bool deleteFrameBuffer = false;
+  unsigned frameBufferID = 0;
+  if (!(texture->usage() & GPUTextureUsage::RENDER_ATTACHMENT) &&
+      texture->usage() & GPUTextureUsage::TEXTURE_BINDING) {
+    deleteFrameBuffer = true;
+    GLTextureInfo textureInfo = {};
+    auto backendTexture = texture->getBackendTexture();
+    if (!backendTexture.getGLTextureInfo(&textureInfo)) {
+      return false;
+    }
+    GPUTextureDescriptor descriptor = {backendTexture.width(),
+                                       backendTexture.height(),
+                                       texture->format(),
+                                       false,
+                                       1,
+                                       texture->usage() | GPUTextureUsage::RENDER_ATTACHMENT};
+    std::unique_ptr<GLTexture> glTexture =
+        std::make_unique<GLTexture>(descriptor, textureInfo.target, textureInfo.id);
+    if (!glTexture->checkFrameBuffer(gpu)) {
+      texture->release(gpu);
+      return false;
+    }
+    gpu->bindFramebuffer(glTexture.get(), FrameBufferTarget::Read);
+    frameBufferID = glTexture->frameBufferID();
+  } else if (texture->usage() & GPUTextureUsage::RENDER_ATTACHMENT) {
+    gpu->bindFramebuffer(static_cast<GLTexture*>(texture), FrameBufferTarget::Read);
+  } else {
     LOGE("GLCommandQueue::readTexture() texture usage does not support readback!");
     return false;
   }
@@ -103,10 +132,6 @@ bool GLCommandQueue::readTexture(GPUTexture* texture, const Rect& rect, void* pi
     LOGE("GLCommandQueue::readTexture() rowBytes is too small!");
     return false;
   }
-  auto gl = gpu->functions();
-  auto caps = static_cast<const GLCaps*>(gpu->caps());
-  ClearGLError(gl);
-  gpu->bindFramebuffer(static_cast<GLTexture*>(texture));
   void* outPixels = nullptr;
   Buffer tempBuffer = {};
   auto restoreGLRowLength = false;
@@ -129,6 +154,9 @@ bool GLCommandQueue::readTexture(GPUTexture* texture, const Rect& rect, void* pi
   gl->readPixels(x, y, width, height, textureFormat.externalFormat, GL_UNSIGNED_BYTE, outPixels);
   if (restoreGLRowLength) {
     gl->pixelStorei(GL_PACK_ROW_LENGTH, 0);
+  }
+  if (deleteFrameBuffer) {
+    gl->deleteFramebuffers(1, &frameBufferID);
   }
   if (!tempBuffer.isEmpty()) {
     auto srcPixels = static_cast<const uint8_t*>(outPixels);
