@@ -41,22 +41,18 @@ void GLESReadTexture::readTexture(GLGPU* gpu, const Rect& rect, void* pixels) {
 }
 
 bool GLESReadTexture::isSupportReadBack(GLGPU* gpu) {
-  switch (texture->usage()) {
-    case GPUTextureUsage::RENDER_ATTACHMENT:
-    case GPUTextureUsage::RENDER_ATTACHMENT | GPUTextureUsage::TEXTURE_BINDING: {
-      gpu->bindFramebuffer(texture);
-      return true;
-    }
-    case GPUTextureUsage::TEXTURE_BINDING: {
-      if (!texture->checkFrameBuffer(gpu)) {
-        return false;
-      }
-      return true;
-    }
-    default:
-      LOGE("GLESReadTexture texture usage does not support readback!");
-      return false;
+  if (texture->usage() & GPUTextureUsage::RENDER_ATTACHMENT) {
+    gpu->bindFramebuffer(texture);
+    return true;
   }
+  if (texture->usage() & GPUTextureUsage::TEXTURE_BINDING) {
+    if (!texture->checkFrameBuffer(gpu)) {
+      return false;
+    }
+    return true;
+  }
+  LOGE("GLESReadTexture texture usage does not support readback!");
+  return false;
 }
 
 class NativeGLReadTexture : public GLReadTexture {
