@@ -2974,7 +2974,7 @@ TGFX_TEST(LayerTest, PartialDrawLayer) {
   path.addRect(Rect::MakeXYWH(0, 0, 100, 100));
   shapeLayer->setPath(path);
   shapeLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 255, 255, 50)));
-  shapeLayer->setLayerStyles({BackgroundBlurStyle::Make(1, 1)});
+  shapeLayer->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
   rootLayer->addChild(shapeLayer);
   auto layerInvisible = SolidLayer::Make();
   layerInvisible->setColor(Color::FromRGBA(0, 0, 0, 255));
@@ -2985,12 +2985,23 @@ TGFX_TEST(LayerTest, PartialDrawLayer) {
   rootLayer->addChild(layerInvisible);
   auto canvas = surface->getCanvas();
   canvas->clear();
+  canvas->save();
   canvas->rotate(30, 45, 45);
-  canvas->clipRect(Rect::MakeXYWH(0, 0, 90, 90));
+  canvas->clipRect(Rect::MakeXYWH(0, 0, 110, 110));
   canvas->scale(2.0f, 1.0f);
+  canvas->translate(20, 20);
   rootLayer->draw(canvas);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PartialDrawLayer"));
   EXPECT_EQ(layerInvisible->rasterizedContent, nullptr);
+  canvas->restore();
+
+  canvas->clear();
+  canvas->rotate(30, 45, 45);
+  canvas->clipRect(Rect::MakeXYWH(0, 0, 110, 110));
+  canvas->scale(2.0f, 1.0f);
+  canvas->translate(20, 20);
+  shapeLayer->draw(canvas);
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PartialDrawLayer_shapeLayer"));
 }
 
 TGFX_TEST(LayerTest, DropShadowDirtyRect) {
