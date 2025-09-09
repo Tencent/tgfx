@@ -42,12 +42,11 @@ static void ComputeAtlasKey(const Font& font, const std::shared_ptr<ScalerContex
                             uint32_t typefaceID, GlyphID glyphID, const Stroke* stroke,
                             BytesKey& key) {
   key.write(typefaceID);
+  key.write(std::roundf(scalerContext->getBackingSize()));
   if (font.hasColor()) {
-    key.write(std::roundf(scalerContext->getNativeSize()));
     key.write(glyphID);
     return;
   }
-  key.write(font.getSize());
   int packedID = glyphID;
   auto bold = static_cast<int>(font.isFauxBold());
   packedID |= (bold << (sizeof(glyphID) * 8));
@@ -97,30 +96,23 @@ static std::shared_ptr<ImageCodec> GetGlyphCodec(
   if (glyphID == 0) {
     return nullptr;
   }
-  std::shared_ptr<ImageCodec> glyphCodec = nullptr;
-  do {
-    auto hasFauxBold = !font.hasColor() && font.isFauxBold();
-    auto bounds = scalerContext->getImageTransform(glyphID, hasFauxBold, stroke, nullptr);
-    if (bounds.isEmpty()) {
-      break;
-    }
+
+  auto hasFauxBold = !font.hasColor() && font.isFauxBold();
+  auto bounds = scalerContext->getImageTransform(glyphID, hasFauxBold, stroke, nullptr);
+  if (!bounds.isEmpty()) {
     glyphOffset->x = bounds.left;
     glyphOffset->y = bounds.top;
     auto width = static_cast<int>(ceilf(bounds.width()));
     auto height = static_cast<int>(ceilf(bounds.height()));
-    glyphCodec = std::make_shared<GlyphRasterizer>(width, height, scalerContext, glyphID,
-                                                   hasFauxBold, stroke);
-  } while (false);
-
-  if (glyphCodec != nullptr) {
-    return glyphCodec;
+    return std::make_shared<GlyphRasterizer>(width, height, scalerContext, glyphID, hasFauxBold,
+                                             stroke);
   }
 
   auto shape = Shape::MakeFrom(font, glyphID);
   if (shape == nullptr) {
     return nullptr;
   }
-  auto bounds = shape->getBounds();
+  bounds = shape->getBounds();
   if (bounds.isEmpty()) {
     return nullptr;
   }
@@ -129,18 +121,17 @@ static std::shared_ptr<ImageCodec> GetGlyphCodec(
     shape = Shape::ApplyStroke(std::move(shape), stroke);
   }
   shape = Shape::ApplyMatrix(std::move(shape), Matrix::MakeTrans(-bounds.x(), -bounds.y()));
-  auto width = static_cast<int>(ceilf(bounds.width()));
-  auto height = static_cast<int>(ceilf(bounds.height()));
-  glyphCodec = PathRasterizer::MakeFrom(width, height, std::move(shape), true,
-#ifdef TGFX_USE_TEXT_GAMMA_CORRECTION
-                                        true
-#else
-                                        false
-#endif
-  );
   glyphOffset->x = bounds.left;
   glyphOffset->y = bounds.top;
-  return glyphCodec;
+  auto width = static_cast<int>(ceilf(bounds.width()));
+  auto height = static_cast<int>(ceilf(bounds.height()));
+  return PathRasterizer::MakeFrom(width, height, std::move(shape), true,
+#ifdef TGFX_USE_TEXT_GAMMA_CORRECTION
+                                  true
+#else
+                                  false
+#endif
+  );
 }
 
 static void ComputeGlyphFinalMatrix(const Rect& atlasLocation, const Matrix& stateMatrix,
@@ -151,9 +142,9 @@ static void ComputeGlyphFinalMatrix(const Rect& atlasLocation, const Matrix& sta
   glyphMatrix->preTranslate(-atlasLocation.x(), -atlasLocation.y());
 }
 
-static bool GlyphVisible(const Font& font, GlyphID glyphID, const Rect& clipBounds,
-                         const Stroke* stroke, float scale, const Point& glyphPosition,
-                         int* maxDimension) {
+static bool IsGlyphVisible(const Font& font, GlyphID glyphID, const Rect& clipBounds,
+                           const Stroke* stroke, float scale, const Point& glyphPosition,
+                           int* maxDimension) {
   auto bounds = font.getBounds(glyphID);
   if (bounds.isEmpty()) {
     return false;
@@ -172,7 +163,7 @@ static bool GlyphVisible(const Font& font, GlyphID glyphID, const Rect& clipBoun
 void GetGlyphMatrix(Matrix* glyphMatrix, const std::shared_ptr<ScalerContext>& scalerContext,
                     const Point& glyphOffset, bool fauxItalic) {
   glyphMatrix->setTranslate(glyphOffset.x, glyphOffset.y);
-  auto scale = scalerContext->getSize() / scalerContext->getNativeSize();
+  auto scale = scalerContext->getSize() / scalerContext->getBackingSize();
   glyphMatrix->postScale(scale, scale);
   if (fauxItalic) {
     glyphMatrix->postSkew(ITALIC_SKEW, 0);
@@ -437,8 +428,8 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
   for (auto& glyphID : sourceGlyphRun.glyphs) {
     auto glyphPosition = sourceGlyphRun.positions[index++];
     int maxDimension = 0;
-    if (!GlyphVisible(font, glyphID, localClipBounds, scaledStroke.get(), inverseScale,
-                      glyphPosition, &maxDimension)) {
+    if (!IsGlyphVisible(font, glyphID, localClipBounds, scaledStroke.get(), inverseScale,
+                        glyphPosition, &maxDimension)) {
       continue;
     }
 

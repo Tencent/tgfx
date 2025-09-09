@@ -25,7 +25,7 @@ namespace tgfx {
 class ImageUserScalerContext final : public UserScalerContext {
  public:
   ImageUserScalerContext(std::shared_ptr<Typeface> typeface, float size)
-      : UserScalerContext(std::move(typeface), 1.f), textScale(FloatNearlyZero(size) ? 1.f : size) {
+      : UserScalerContext(std::move(typeface), 1.f), textScale(size) {
   }
 
   Rect getBounds(GlyphID glyphID, bool, bool fauxItalic) const override {
@@ -74,7 +74,10 @@ class ImageUserScalerContext final : public UserScalerContext {
     return record->image->readPixels(dstInfo, dstPixels);
   }
 
-  float getNativeSize() const override {
+  float getBackingSize() const override {
+    if (FloatNearlyZero(textScale)) {
+      return 1.f;
+    }
     return 1.f / textScale;
   }
 
