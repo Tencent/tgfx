@@ -117,7 +117,9 @@ void ResourceCache::processUnreferencedResources() {
     if (!purgeableResourcesQueue.try_dequeue(resource)) {
       break;
     }
-    needToPurge.push_back(resource);
+    if (resource->isPurgeable()) {
+      needToPurge.push_back(resource);
+    }
   }
   if (needToPurge.empty()) {
     return;
