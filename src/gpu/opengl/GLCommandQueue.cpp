@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLCommandQueue.h"
+#include "GLReadTexture.h"
 #include "GLTexture.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "gpu/opengl/GLBuffer.h"
@@ -95,34 +96,8 @@ bool GLCommandQueue::readTexture(GPUTexture* texture, const Rect& rect, void* pi
   auto gl = gpu->functions();
   auto caps = static_cast<const GLCaps*>(gpu->caps());
   ClearGLError(gl);
-  bool deleteFrameBuffer = false;
-  unsigned frameBufferID = 0;
-  if (!(texture->usage() & GPUTextureUsage::RENDER_ATTACHMENT) &&
-      texture->usage() & GPUTextureUsage::TEXTURE_BINDING) {
-    deleteFrameBuffer = true;
-    GLTextureInfo textureInfo = {};
-    auto backendTexture = texture->getBackendTexture();
-    if (!backendTexture.getGLTextureInfo(&textureInfo)) {
-      return false;
-    }
-    GPUTextureDescriptor descriptor = {backendTexture.width(),
-                                       backendTexture.height(),
-                                       texture->format(),
-                                       false,
-                                       1,
-                                       texture->usage() | GPUTextureUsage::RENDER_ATTACHMENT};
-    std::unique_ptr<GLTexture> glTexture =
-        std::make_unique<GLTexture>(descriptor, textureInfo.target, textureInfo.id);
-    if (!glTexture->checkFrameBuffer(gpu)) {
-      texture->release(gpu);
-      return false;
-    }
-    gpu->bindFramebuffer(glTexture.get(), FrameBufferTarget::Read);
-    frameBufferID = glTexture->frameBufferID();
-  } else if (texture->usage() & GPUTextureUsage::RENDER_ATTACHMENT) {
-    gpu->bindFramebuffer(static_cast<GLTexture*>(texture), FrameBufferTarget::Read);
-  } else {
-    LOGE("GLCommandQueue::readTexture() texture usage does not support readback!");
+  auto glReadTexture = GLReadTexture::MakeFrom(rect, static_cast<GLTexture*>(texture));
+  if (!glReadTexture->isSupportReadBack(gpu)) {
     return false;
   }
   auto format = texture->format();
@@ -146,17 +121,9 @@ bool GLCommandQueue::readTexture(GPUTexture* texture, const Rect& rect, void* pi
     outPixels = tempBuffer.data();
   }
   gl->pixelStorei(GL_PACK_ALIGNMENT, static_cast<int>(bytesPerPixel));
-  auto x = static_cast<int>(rect.left);
-  auto y = static_cast<int>(rect.top);
-  auto width = static_cast<int>(rect.width());
-  auto height = static_cast<int>(rect.height());
-  auto textureFormat = caps->getTextureFormat(format);
-  gl->readPixels(x, y, width, height, textureFormat.externalFormat, GL_UNSIGNED_BYTE, outPixels);
+  glReadTexture->readTexture(gpu, rect, outPixels);
   if (restoreGLRowLength) {
     gl->pixelStorei(GL_PACK_ROW_LENGTH, 0);
-  }
-  if (deleteFrameBuffer) {
-    gl->deleteFramebuffers(1, &frameBufferID);
   }
   if (!tempBuffer.isEmpty()) {
     auto srcPixels = static_cast<const uint8_t*>(outPixels);

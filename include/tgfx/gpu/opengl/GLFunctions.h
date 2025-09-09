@@ -131,6 +131,8 @@ using GLGetShaderPrecisionFormat = void GL_FUNCTION_TYPE(unsigned shadertype,
                                                          int* precision);
 using GLGetString = const unsigned char* GL_FUNCTION_TYPE(unsigned name);
 using GLGetStringi = const unsigned char* GL_FUNCTION_TYPE(unsigned name, unsigned index);
+using GLGetTexImage = void GL_FUNCTION_TYPE(unsigned target, int level, unsigned format,
+                                            unsigned type, void* pixels);
 using GLGetVertexAttribiv = void GL_FUNCTION_TYPE(unsigned index, unsigned pname, int* params);
 using GLGetVertexAttribPointerv = void GL_FUNCTION_TYPE(unsigned index, unsigned pname,
                                                         void** pointer);
@@ -298,6 +300,7 @@ class GLFunctions {
   GLGetShaderPrecisionFormat* getShaderPrecisionFormat = nullptr;
   GLGetString* getString = nullptr;
   GLGetStringi* getStringi = nullptr;
+  GLGetTexImage* getTexImage = nullptr;
   GLGetVertexAttribiv* getVertexAttribiv = nullptr;
   GLGetVertexAttribPointerv* getVertexAttribPointerv = nullptr;
   GLGetAttribLocation* getAttribLocation = nullptr;

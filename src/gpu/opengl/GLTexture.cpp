@@ -91,8 +91,7 @@ void GLTexture::onRelease(GLGPU* gpu) {
 }
 
 bool GLTexture::checkFrameBuffer(GLGPU* gpu) {
-  if (!(descriptor.usage & GPUTextureUsage::RENDER_ATTACHMENT) || textureFrameBuffer > 0 ||
-      _textureID == 0) {
+  if (textureFrameBuffer > 0 || _textureID == 0) {
     return true;
   }
   DEBUG_ASSERT(gpu != nullptr);

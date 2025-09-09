@@ -186,6 +186,8 @@ std::shared_ptr<GLInterface> GLInterface::MakeNativeInterface(const GLProcGetter
       getter->getProcAddress("glGetShaderPrecisionFormat"));
   functions->getString = reinterpret_cast<GLGetString*>(getter->getProcAddress("glGetString"));
   functions->getStringi = reinterpret_cast<GLGetStringi*>(getter->getProcAddress("glGetStringi"));
+  functions->getTexImage =
+      reinterpret_cast<GLGetTexImage*>(getter->getProcAddress("glGetTexImage"));
   functions->getVertexAttribiv =
       reinterpret_cast<GLGetVertexAttribiv*>(getter->getProcAddress("glGetVertexAttribiv"));
   functions->getVertexAttribPointerv = reinterpret_cast<GLGetVertexAttribPointerv*>(
