@@ -19,7 +19,7 @@
 #include "ProgramInfo.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProgramBuilder.h"
-#include "gpu/RenderTarget.h"
+#include "gpu/resources/RenderTarget.h"
 
 namespace tgfx {
 ProgramInfo::ProgramInfo(RenderTarget* renderTarget, GeometryProcessor* geometryProcessor,

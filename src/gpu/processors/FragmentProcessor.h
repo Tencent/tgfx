@@ -23,11 +23,11 @@
 #include "gpu/FragmentShaderBuilder.h"
 #include "gpu/SamplerState.h"
 #include "gpu/SamplingArgs.h"
-#include "gpu/TextureView.h"
 #include "gpu/UniformBuffer.h"
 #include "gpu/UniformHandler.h"
 #include "gpu/processors/Processor.h"
 #include "gpu/proxies/TextureProxy.h"
+#include "gpu/resources/TextureView.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Image.h"
 

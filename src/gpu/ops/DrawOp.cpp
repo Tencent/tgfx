@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawOp.h"
-#include "gpu/PipelineProgram.h"
+#include "gpu/resources/PipelineProgram.h"
 #include "inspect/InspectorMark.h"
 
 namespace tgfx {

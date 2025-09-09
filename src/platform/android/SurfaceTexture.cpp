@@ -21,8 +21,8 @@
 #include "HandlerThread.h"
 #include "JNIUtil.h"
 #include "core/utils/Log.h"
-#include "gpu/DefaultTextureView.h"
 #include "gpu/opengl/GLTexture.h"
+#include "gpu/resources/DefaultTextureView.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
 
 namespace tgfx {

@@ -19,8 +19,8 @@
 #pragma once
 
 #include "core/utils/Log.h"
-#include "gpu/Resource.h"
 #include "gpu/proxies/ResourceProxy.h"
+#include "gpu/resources/Resource.h"
 
 namespace tgfx {
 /**

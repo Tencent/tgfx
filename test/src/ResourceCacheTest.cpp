@@ -21,7 +21,7 @@
 #include "core/utils/BlockBuffer.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/RectsVertexProvider.h"
-#include "gpu/Resource.h"
+#include "gpu/resources/Resource.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Task.h"
 #include "utils/TestUtils.h"
