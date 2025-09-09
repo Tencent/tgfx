@@ -19,9 +19,9 @@
 #include "GLTexture.h"
 
 namespace tgfx {
-class GLESReadTexture : public GLReadTexture {
+class EGLReadTexture : public GLReadTexture {
  public:
-  explicit GLESReadTexture(GLTexture* texture) : GLReadTexture(texture) {
+  explicit EGLReadTexture(GLTexture* texture) : GLReadTexture(texture) {
   }
 
   void readTexture(GLGPU* gpu, const Rect& rect, void* pixels) override;
@@ -29,7 +29,7 @@ class GLESReadTexture : public GLReadTexture {
   bool isSupportReadBack(GLGPU* gpu) override;
 };
 
-void GLESReadTexture::readTexture(GLGPU* gpu, const Rect& rect, void* pixels) {
+void EGLReadTexture::readTexture(GLGPU* gpu, const Rect& rect, void* pixels) {
   auto gl = gpu->functions();
   auto caps = static_cast<const GLCaps*>(gpu->caps());
   auto x = static_cast<int>(rect.left);
@@ -40,7 +40,7 @@ void GLESReadTexture::readTexture(GLGPU* gpu, const Rect& rect, void* pixels) {
   gl->readPixels(x, y, width, height, textureFormat.externalFormat, GL_UNSIGNED_BYTE, pixels);
 }
 
-bool GLESReadTexture::isSupportReadBack(GLGPU* gpu) {
+bool EGLReadTexture::isSupportReadBack(GLGPU* gpu) {
   if (texture->usage() & GPUTextureUsage::RENDER_ATTACHMENT) {
     gpu->bindFramebuffer(texture);
     return true;
@@ -51,7 +51,7 @@ bool GLESReadTexture::isSupportReadBack(GLGPU* gpu) {
     }
     return true;
   }
-  LOGE("GLESReadTexture texture usage does not support readback!");
+  LOGE("EGLReadTexture texture usage does not support readback!");
   return false;
 }
 
@@ -78,13 +78,15 @@ bool NativeGLReadTexture::isSupportReadBack(GLGPU*) {
   return true;
 }
 
-std::shared_ptr<GLReadTexture> GLReadTexture::MakeFrom(const Rect& rect, GLTexture* texture) {
+std::shared_ptr<GLReadTexture> GLReadTexture::MakeFrom(GLCaps* caps, const Rect& rect,
+                                                       GLTexture* texture) {
   auto width = static_cast<int>(rect.width());
   auto height = static_cast<int>(rect.height());
-  if (width == texture->width() && height == texture->height() && rect.left == 0 && rect.top == 0) {
+  if (caps->standard == GLStandard::GL && width == texture->width() &&
+      height == texture->height() && rect.left == 0 && rect.top == 0) {
     return std::make_shared<NativeGLReadTexture>(texture);
   }
-  return std::make_shared<GLESReadTexture>(texture);
+  return std::make_shared<EGLReadTexture>(texture);
 }
 
 }  // namespace tgfx
