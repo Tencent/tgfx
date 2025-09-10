@@ -50,7 +50,8 @@ static std::unique_ptr<GPUTexture> CreateTextureOfPlane(EAGLGPU* gpu, CVPixelBuf
                                      usage};
   auto hardwareTexture = std::unique_ptr<EAGLHardwareTexture>(
       new EAGLHardwareTexture(descriptor, pixelBuffer, texture, target, textureID));
-  if (hardwareTexture->usage() & GPUTextureUsage::RENDER_ATTACHMENT && !hardwareTexture->checkFrameBuffer(gpu)) {
+  if (hardwareTexture->usage() & GPUTextureUsage::RENDER_ATTACHMENT &&
+      !hardwareTexture->checkFrameBuffer(gpu)) {
     hardwareTexture->release(gpu);
     return nullptr;
   }
