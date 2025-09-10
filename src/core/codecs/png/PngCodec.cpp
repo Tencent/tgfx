@@ -189,7 +189,8 @@ std::shared_ptr<ColorSpace> ReadColorProfile(png_structp pngPtr, png_infop infoP
     // Note that Blink would again return nullptr in this case.
     fn = *gfx::skcms_sRGB_TransferFunction();
   }
-  return ColorSpace::MakeRGB(*reinterpret_cast<TransferFunction*>(&fn), *reinterpret_cast<Matrix3x3*>(&toXYZD50));
+  return ColorSpace::MakeRGB(*reinterpret_cast<TransferFunction*>(&fn),
+                             *reinterpret_cast<Matrix3x3*>(&toXYZD50));
 #else   // LIBPNG >= 1.6
   return ColorSpace::MakeSRGB();
 #endif  // LIBPNG >= 1.6

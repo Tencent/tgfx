@@ -26,16 +26,19 @@
 #include "gpu/TPArgs.h"
 
 namespace tgfx {
-std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageBuffer> buffer, const std::shared_ptr<ColorSpace>& colorSpace) {
+std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageBuffer> buffer,
+                                       const std::shared_ptr<ColorSpace>& colorSpace) {
   if (buffer == nullptr) {
     return nullptr;
   }
-  std::shared_ptr<Image> image = std::make_shared<BufferImage>(std::move(buffer), false, colorSpace);
+  std::shared_ptr<Image> image =
+      std::make_shared<BufferImage>(std::move(buffer), false, colorSpace);
   image->weakThis = image;
   return image->makeRasterized();
 }
 
-BufferImage::BufferImage(std::shared_ptr<ImageBuffer> buffer, bool mipmapped, std::shared_ptr<ColorSpace> colorSpace)
+BufferImage::BufferImage(std::shared_ptr<ImageBuffer> buffer, bool mipmapped,
+                         std::shared_ptr<ColorSpace> colorSpace)
     : PixelImage(mipmapped), imageBuffer(std::move(buffer)), _colorSpace(std::move(colorSpace)) {
 }
 

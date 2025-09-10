@@ -240,20 +240,18 @@ std::shared_ptr<ColorSpace> ColorSpace::MakeCICP(namedPrimaries::CicpId colorPri
 
 std::shared_ptr<ColorSpace> ColorSpace::MakeFromICC(const void* data, size_t size) {
   gfx::skcms_ICCProfile profile;
-  if(!gfx::skcms_Parse(data, size, &profile)) {
+  if (!gfx::skcms_Parse(data, size, &profile)) {
     return nullptr;
   }
   if (!profile.has_toXYZD50 || !profile.has_trc) {
     return nullptr;
   }
-  if (skcms_ApproximatelyEqualProfiles(&profile,
-                                       gfx::skcms_sRGB_profile())) {
+  if (skcms_ApproximatelyEqualProfiles(&profile, gfx::skcms_sRGB_profile())) {
     return ColorSpace::MakeSRGB();
   }
 
   gfx::skcms_Matrix3x3 inv;
-  if (!skcms_Matrix3x3_invert(&profile.toXYZD50,
-                              &inv)) {
+  if (!skcms_Matrix3x3_invert(&profile.toXYZD50, &inv)) {
     return nullptr;
   }
 
@@ -265,12 +263,14 @@ std::shared_ptr<ColorSpace> ColorSpace::MakeFromICC(const void* data, size_t siz
     if (gfx::skcms_TRCs_AreApproximateInverse(
             reinterpret_cast<const gfx::skcms_ICCProfile*>(&profile),
             gfx::skcms_sRGB_Inverse_TransferFunction())) {
-      return ColorSpace::MakeRGB(namedTransferFn::SRGB, *reinterpret_cast<Matrix3x3*>(&profile.toXYZD50));
-            }
+      return ColorSpace::MakeRGB(namedTransferFn::SRGB,
+                                 *reinterpret_cast<Matrix3x3*>(&profile.toXYZD50));
+    }
     return nullptr;
-      }
+  }
 
-  return ColorSpace::MakeRGB(*reinterpret_cast<TransferFunction*>(&profile.trc[0].parametric), *reinterpret_cast<Matrix3x3*>(&profile.toXYZD50));
+  return ColorSpace::MakeRGB(*reinterpret_cast<TransferFunction*>(&profile.trc[0].parametric),
+                             *reinterpret_cast<Matrix3x3*>(&profile.toXYZD50));
 }
 
 bool ColorSpace::gammaCloseToSRGB() const {

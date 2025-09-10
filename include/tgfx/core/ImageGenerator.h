@@ -87,8 +87,7 @@ class ImageGenerator {
   }
 
  protected:
-  ImageGenerator(int width, int height,
-                 std::shared_ptr<ColorSpace> colorSpace = nullptr)
+  ImageGenerator(int width, int height, std::shared_ptr<ColorSpace> colorSpace = nullptr)
       : _width(width), _height(height), _colorSpace(std::move(colorSpace)) {
   }
 

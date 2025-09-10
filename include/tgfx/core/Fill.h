@@ -38,7 +38,7 @@ class Fill {
    * Constructs a Fill with the specified color, blend mode, and antialiasing.
    */
   Fill(const Color& color, BlendMode blendMode, bool antiAlias = true)
-      : color(color), blendMode(blendMode), antiAlias(antiAlias){
+      : color(color), blendMode(blendMode), antiAlias(antiAlias) {
   }
 
   /**

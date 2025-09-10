@@ -18,10 +18,10 @@
 
 #include "tgfx/gpu/opengl/qt/QGLWindow.h"
 #include <QApplication>
+#include <QColorSpace>
 #include <QQuickWindow>
 #include <QThread>
 #include "gpu/opengl/GLTexture.h"
-#include <QColorSpace>
 
 namespace tgfx {
 class QGLDeviceCreator : public QObject {
@@ -179,14 +179,17 @@ std::shared_ptr<Surface> QGLWindow::onCreateSurface(Context* context) {
   }
   QSurfaceFormat windowFormat = nativeWindow->format();
   auto icc = windowFormat.colorSpace().iccProfile();
-  std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeFromICC(icc.data(), static_cast<size_t>(icc.size()));
+  std::shared_ptr<ColorSpace> colorSpace =
+      ColorSpace::MakeFromICC(icc.data(), static_cast<size_t>(icc.size()));
   if (!singleBufferMode) {
-    fontSurface = Surface::Make(context, width, height, ColorType::RGBA_8888, 1, false, 0, colorSpace);
+    fontSurface =
+        Surface::Make(context, width, height, ColorType::RGBA_8888, 1, false, 0, colorSpace);
     if (fontSurface == nullptr) {
       return nullptr;
     }
   }
-  auto backSurface = Surface::Make(context, width, height, ColorType::RGBA_8888, 1, false, 0, colorSpace);
+  auto backSurface =
+      Surface::Make(context, width, height, ColorType::RGBA_8888, 1, false, 0, colorSpace);
   if (backSurface == nullptr) {
     fontSurface = nullptr;
     return nullptr;

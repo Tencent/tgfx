@@ -18,8 +18,8 @@
 
 #include "tgfx/gpu/opengl/wgl/WGLWindow.h"
 #include <GL/GL.h>
-#include "core/utils/Log.h"
 #include <icm.h>
+#include "core/utils/Log.h"
 
 namespace tgfx {
 
@@ -46,21 +46,15 @@ static BOOL GetMonitorICCFromHWND(HWND hWnd, wchar_t* pProfilePath, DWORD* pSize
   return bResult;
 }
 
-static BOOL LoadICCProfileData(const wchar_t* pProfilePath, BYTE** ppProfileData, DWORD* pDataSize) {
+static BOOL LoadICCProfileData(const wchar_t* pProfilePath, BYTE** ppProfileData,
+                               DWORD* pDataSize) {
   if (pProfilePath == NULL || ppProfileData == NULL || pDataSize == NULL) {
     SetLastError(ERROR_INVALID_PARAMETER);
     return FALSE;
   }
 
-  HANDLE hFile = CreateFileW(
-      pProfilePath,
-      GENERIC_READ,
-      FILE_SHARE_READ,
-      NULL,
-      OPEN_EXISTING,
-      FILE_ATTRIBUTE_NORMAL,
-      NULL
-  );
+  HANDLE hFile = CreateFileW(pProfilePath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
+                             FILE_ATTRIBUTE_NORMAL, NULL);
 
   if (hFile == INVALID_HANDLE_VALUE) {
     return FALSE;

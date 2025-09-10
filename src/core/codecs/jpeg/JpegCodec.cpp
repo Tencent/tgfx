@@ -197,8 +197,8 @@ uint32_t JpegCodec::getScaledDimensions(int newWidth, int newHeight) const {
 
 bool JpegCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   if (auto scaleDimensions = getScaledDimensions(dstInfo.width(), dstInfo.height())) {
-    return readScaledPixels(dstInfo.colorType(), dstInfo.alphaType(), dstInfo.rowBytes(),
-                                   dstPixels, scaleDimensions);
+    return readScaledPixels(dstInfo.colorType(), dstInfo.alphaType(), dstInfo.rowBytes(), dstPixels,
+                            scaleDimensions);
   }
   return ImageCodec::readPixels(dstInfo, dstPixels);
 }

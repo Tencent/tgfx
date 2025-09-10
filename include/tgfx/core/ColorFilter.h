@@ -47,8 +47,7 @@ class ColorFilter {
    * Creates a new ColorFilter that applies blends between the constant color (src) and input color
    * (dst) based on the BlendMode.
    */
-  static std::shared_ptr<ColorFilter> Blend(
-      Color color, BlendMode mode);
+  static std::shared_ptr<ColorFilter> Blend(Color color, BlendMode mode);
 
   /**
    * Creates a new ColorFilter that transforms the color using the given 4x5 matrix. The matrix can

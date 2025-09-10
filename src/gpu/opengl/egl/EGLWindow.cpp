@@ -113,21 +113,22 @@ std::shared_ptr<Surface> EGLWindow::onCreateSurface(Context* context) {
   const char* extensions = eglQueryString(eglDevice->eglDisplay, EGL_EXTENSIONS);
   if (extensions && strstr(extensions, "EGL_KHR_gl_colorspace") != nullptr) {
     EGLint colorSpaceValue;
-    EGLBoolean success = eglQuerySurface(eglDevice->eglDisplay, eglDevice->eglSurface, EGL_GL_COLORSPACE_KHR, &colorSpaceValue);
+    EGLBoolean success = eglQuerySurface(eglDevice->eglDisplay, eglDevice->eglSurface,
+                                         EGL_GL_COLORSPACE_KHR, &colorSpaceValue);
     if (success == EGL_TRUE) {
-        switch (colorSpaceValue) {
-            case EGL_GL_COLORSPACE_SRGB_KHR:
-                colorSpace = ColorSpace::MakeSRGB();
-                break;
-            case EGL_GL_COLORSPACE_LINEAR_KHR:
-                colorSpace = ColorSpace::MakeSRGBLinear();
-                break;
-            case EGL_GL_COLORSPACE_DISPLAY_P3_EXT:
-                colorSpace = ColorSpace::MakeRGB(namedTransferFn::SRGB, namedGamut::DisplayP3);
-                break;
-            default:
-                break;
-        }
+      switch (colorSpaceValue) {
+        case EGL_GL_COLORSPACE_SRGB_KHR:
+          colorSpace = ColorSpace::MakeSRGB();
+          break;
+        case EGL_GL_COLORSPACE_LINEAR_KHR:
+          colorSpace = ColorSpace::MakeSRGBLinear();
+          break;
+        case EGL_GL_COLORSPACE_DISPLAY_P3_EXT:
+          colorSpace = ColorSpace::MakeRGB(namedTransferFn::SRGB, namedGamut::DisplayP3);
+          break;
+        default:
+          break;
+      }
     }
   }
   return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft, 1, colorSpace);

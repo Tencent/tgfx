@@ -3087,27 +3087,26 @@ TGFX_TEST(CanvasTest, ColorSpace) {
   canvas->drawPaint(paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawSRGBColorShaderToP3"));
   canvas->clear();
-  auto linearGradient =
-      Shader::MakeLinearGradient(Point::Make(0, 0), Point::Make(1024, 0),
-                                 {Color::Green(), Color::Red()}, {});
+  auto linearGradient = Shader::MakeLinearGradient(Point::Make(0, 0), Point::Make(1024, 0),
+                                                   {Color::Green(), Color::Red()}, {});
   paint.setShader(linearGradient);
   canvas->drawPaint(paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawSRGBLinearShaderToP3"));
   canvas->clear();
-  auto conicGradient = Shader::MakeConicGradient(
-      Point::Make(512, 512), 0, 360, {Color::Green(), Color::Red()}, {});
+  auto conicGradient =
+      Shader::MakeConicGradient(Point::Make(512, 512), 0, 360, {Color::Green(), Color::Red()}, {});
   paint.setShader(conicGradient);
   canvas->drawPaint(paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawSRGBConicShaderToP3"));
   canvas->clear();
-  auto diamondGradient = Shader::MakeDiamondGradient(
-      Point::Make(512, 512), 500, {Color::Green(), Color::Red()}, {});
+  auto diamondGradient =
+      Shader::MakeDiamondGradient(Point::Make(512, 512), 500, {Color::Green(), Color::Red()}, {});
   paint.setShader(diamondGradient);
   canvas->drawPaint(paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawSRGBDiamondShaderToP3"));
   canvas->clear();
-  auto radialGradient = Shader::MakeRadialGradient(
-      Point::Make(512, 512), 500, {Color::Green(), Color::Red()}, {});
+  auto radialGradient =
+      Shader::MakeRadialGradient(Point::Make(512, 512), 500, {Color::Green(), Color::Red()}, {});
   paint.setShader(radialGradient);
   canvas->drawPaint(paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawSRGBRadialShaderToP3"));
@@ -3123,8 +3122,7 @@ TGFX_TEST(CanvasTest, ColorSpace) {
   auto maskFilter = MaskFilter::MakeShader(std::move(maskShader));
   maskFilter = maskFilter->makeWithMatrix(Matrix::MakeTrans(462, 462));
   paint.setMaskFilter(maskFilter);
-  auto imageFilter =
-      ImageFilter::DropShadow(-10, -10, 10, 10, Color::Green());
+  auto imageFilter = ImageFilter::DropShadow(-10, -10, 10, 10, Color::Green());
   paint.setImageFilter(imageFilter);
   canvas->drawPaint(paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawSRGBDropShadowFilterToP3"));

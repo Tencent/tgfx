@@ -63,7 +63,7 @@ void ConvertPixels(const ImageInfo& srcInfo, const void* srcPixels, const ImageI
                    void* dstPixels) {
   if (srcInfo.colorType() == dstInfo.colorType() && srcInfo.alphaType() == dstInfo.alphaType()) {
     CopyRectMemory(srcPixels, srcInfo.rowBytes(), dstPixels, dstInfo.rowBytes(),
-               dstInfo.minRowBytes(), static_cast<size_t>(dstInfo.height()));
+                   dstInfo.minRowBytes(), static_cast<size_t>(dstInfo.height()));
     return;
   }
 

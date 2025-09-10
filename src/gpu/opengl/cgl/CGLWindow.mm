@@ -68,14 +68,14 @@ std::shared_ptr<Surface> CGLWindow::onCreateSurface(Context* context) {
   if (hostWindow) {
     NSScreen* hostScreen = hostWindow.screen;
     if (hostScreen) {
-        NSColorSpace* screenColorSpace = hostScreen.colorSpace;
-        NSData* iccData = [screenColorSpace ICCProfileData];
-        if (iccData) {
-            colorSpace = ColorSpace::MakeFromICC(iccData.bytes, iccData.length);
-        }
+      NSColorSpace* screenColorSpace = hostScreen.colorSpace;
+      NSData* iccData = [screenColorSpace ICCProfileData];
+      if (iccData) {
+        colorSpace = ColorSpace::MakeFromICC(iccData.bytes, iccData.length);
+      }
     }
   }
-    return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft, 0, colorSpace);
+  return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft, 0, colorSpace);
 }
 
 void CGLWindow::onPresent(Context*, int64_t) {

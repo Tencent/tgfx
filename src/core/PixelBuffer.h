@@ -35,8 +35,8 @@ class PixelBuffer : public ImageBuffer {
    * the tryHardware is true, a PixelBuffer backed by hardware is returned if it is available on the
    * current platform. Otherwise, a CPU-backed PixelBuffer is returned.
    */
-  static std::shared_ptr<PixelBuffer> Make(
-      int width, int height, bool alphaOnly = false, bool tryHardware = true);
+  static std::shared_ptr<PixelBuffer> Make(int width, int height, bool alphaOnly = false,
+                                           bool tryHardware = true);
 
   /**
    * Creates a PixelBuffer from the specified hardware buffer. Returns nullptr if the hardwareBuffer

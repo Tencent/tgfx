@@ -399,9 +399,9 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
     if (processor == nullptr) {
       return;
     }
-    processor = ColorSpaceXformEffect::Make(context->drawingBuffer(), std::move(processor), pendingImage->colorSpace().get()
-                                       , AlphaType::Premultiplied,
-                                       renderTarget->getColorSpace().get(), AlphaType::Premultiplied);
+    processor = ColorSpaceXformEffect::Make(
+        context->drawingBuffer(), std::move(processor), pendingImage->colorSpace().get(),
+        AlphaType::Premultiplied, renderTarget->getColorSpace().get(), AlphaType::Premultiplied);
     drawOp->addColorFP(std::move(processor));
   }
   addDrawOp(std::move(drawOp), pendingClip, pendingFill, localBounds, deviceBounds,

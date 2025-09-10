@@ -56,16 +56,18 @@ std::shared_ptr<Image> Image::MakeFromEncoded(std::shared_ptr<Data> encodedData)
   return MakeFrom(std::move(codec));
 }
 
-std::shared_ptr<Image> Image::MakeFrom(NativeImageRef nativeImage, const std::shared_ptr<ColorSpace>& colorSpace) {
+std::shared_ptr<Image> Image::MakeFrom(NativeImageRef nativeImage,
+                                       const std::shared_ptr<ColorSpace>& colorSpace) {
   auto codec = ImageCodec::MakeFrom(nativeImage);
   return MakeFrom(std::move(codec), std::move(colorSpace));
 }
 
-std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageGenerator> generator, const std::shared_ptr<ColorSpace>& colorSpace) {
+std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageGenerator> generator,
+                                       const std::shared_ptr<ColorSpace>& colorSpace) {
   if (generator == nullptr) {
     return nullptr;
   }
-  if(!generator->colorSpace()) {
+  if (!generator->colorSpace()) {
     generator->setColorSpace(std::move(colorSpace));
   }
   std::shared_ptr<Image> image = nullptr;
@@ -84,32 +86,38 @@ std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageGenerator> generator
   return image;
 }
 
-std::shared_ptr<Image> Image::MakeFrom(const ImageInfo& info, std::shared_ptr<Data> pixels, const std::shared_ptr<ColorSpace>& colorSpace) {
+std::shared_ptr<Image> Image::MakeFrom(const ImageInfo& info, std::shared_ptr<Data> pixels,
+                                       const std::shared_ptr<ColorSpace>& colorSpace) {
   auto codec = ImageCodec::MakeFrom(info, std::move(pixels));
   return MakeFrom(std::move(codec), colorSpace);
 }
 
-std::shared_ptr<Image> Image::MakeFrom(const Bitmap& bitmap, const std::shared_ptr<ColorSpace>& colorSpace) {
+std::shared_ptr<Image> Image::MakeFrom(const Bitmap& bitmap,
+                                       const std::shared_ptr<ColorSpace>& colorSpace) {
   return MakeFrom(bitmap.makeBuffer(), colorSpace);
 }
 
-std::shared_ptr<Image> Image::MakeFrom(HardwareBufferRef hardwareBuffer, YUVColorSpace colorSpace, const std::shared_ptr<ColorSpace>& gamutColorSpace) {
+std::shared_ptr<Image> Image::MakeFrom(HardwareBufferRef hardwareBuffer, YUVColorSpace colorSpace,
+                                       const std::shared_ptr<ColorSpace>& gamutColorSpace) {
   auto buffer = ImageBuffer::MakeFrom(hardwareBuffer, colorSpace);
   return MakeFrom(std::move(buffer), gamutColorSpace);
 }
 
-std::shared_ptr<Image> Image::MakeI420(std::shared_ptr<YUVData> yuvData, YUVColorSpace colorSpace, const std::shared_ptr<ColorSpace>& gamutColorSpace) {
+std::shared_ptr<Image> Image::MakeI420(std::shared_ptr<YUVData> yuvData, YUVColorSpace colorSpace,
+                                       const std::shared_ptr<ColorSpace>& gamutColorSpace) {
   auto buffer = ImageBuffer::MakeI420(std::move(yuvData), colorSpace);
   return MakeFrom(std::move(buffer), gamutColorSpace);
 }
 
-std::shared_ptr<Image> Image::MakeNV12(std::shared_ptr<YUVData> yuvData, YUVColorSpace colorSpace, const std::shared_ptr<ColorSpace>& gamutColorSpace) {
+std::shared_ptr<Image> Image::MakeNV12(std::shared_ptr<YUVData> yuvData, YUVColorSpace colorSpace,
+                                       const std::shared_ptr<ColorSpace>& gamutColorSpace) {
   auto buffer = ImageBuffer::MakeNV12(std::move(yuvData), colorSpace);
   return MakeFrom(std::move(buffer), gamutColorSpace);
 }
 
 std::shared_ptr<Image> Image::MakeFrom(Context* context, const BackendTexture& backendTexture,
-                                       ImageOrigin origin, const std::shared_ptr<ColorSpace>& colorSpace) {
+                                       ImageOrigin origin,
+                                       const std::shared_ptr<ColorSpace>& colorSpace) {
   if (context == nullptr) {
     return nullptr;
   }
@@ -118,7 +126,8 @@ std::shared_ptr<Image> Image::MakeFrom(Context* context, const BackendTexture& b
 }
 
 std::shared_ptr<Image> Image::MakeAdopted(Context* context, const BackendTexture& backendTexture,
-                                          ImageOrigin origin, const std::shared_ptr<ColorSpace>& colorSpace) {
+                                          ImageOrigin origin,
+                                          const std::shared_ptr<ColorSpace>& colorSpace) {
   if (context == nullptr) {
     return nullptr;
   }

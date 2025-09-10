@@ -23,8 +23,7 @@
 namespace tgfx {
 class ColorShader : public Shader {
  public:
-  explicit ColorShader(Color color)
-      : color(color) {
+  explicit ColorShader(Color color) : color(color) {
   }
 
   bool isOpaque() const override;

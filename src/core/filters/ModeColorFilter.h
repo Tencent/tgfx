@@ -24,8 +24,7 @@
 namespace tgfx {
 class ModeColorFilter : public ColorFilter {
  public:
-  ModeColorFilter(Color color, BlendMode mode)
-      : color(color), mode(mode) {
+  ModeColorFilter(Color color, BlendMode mode) : color(color), mode(mode) {
   }
 
   bool isAlphaUnchanged() const override;
