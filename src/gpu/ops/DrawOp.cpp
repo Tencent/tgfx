@@ -38,8 +38,8 @@ void DrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
   for (auto& coverage : coverages) {
     fragmentProcessors.emplace_back(coverage.get());
   }
-  ProgramInfo programInfo(renderTarget, geometryProcessor.get(), fragmentProcessors, colors.size(),
-                          xferProcessor.get(), blendMode);
+  ProgramInfo programInfo(renderTarget, geometryProcessor.get(), std::move(fragmentProcessors),
+                          colors.size(), xferProcessor.get(), blendMode);
   auto program = std::static_pointer_cast<PipelineProgram>(programInfo.getProgram());
   if (program == nullptr) {
     LOGE("DrawOp::execute() Failed to get the program!");
@@ -55,7 +55,7 @@ void DrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
                                static_cast<int>(scissorRect.height()));
   }
   onDraw(renderPass);
-  CAPUTRE_FRARGMENT_PROCESSORS(renderTarget->getContext(), fragmentProcessors);
+  CAPUTRE_FRARGMENT_PROCESSORS(renderTarget->getContext(), colors, coverages);
   CAPUTRE_RENDER_TARGET(renderTarget);
 }
 }  // namespace tgfx

@@ -226,7 +226,7 @@ void FrameCapture::SendOutputTextureID(uint64_t textureId) {
 }
 
 void FrameCapture::SendFrameCaptureTexture(
-std::shared_ptr<FrameCaptureTexture> frameCaptureTexture) {
+    std::shared_ptr<FrameCaptureTexture> frameCaptureTexture) {
   if (!IsConnected()) {
     return;
   }
@@ -236,12 +236,21 @@ std::shared_ptr<FrameCaptureTexture> frameCaptureTexture) {
   GetInstance().imageQueue.enqueue(std::move(frameCaptureTexture));
 }
 
-void FrameCapture::SendFragmentProcessor(Context* context,
-const std::vector<FragmentProcessor*>& processors) {
+void FrameCapture::SendFragmentProcessor(
+    Context* context, const std::vector<PlacementPtr<FragmentProcessor>>& colors,
+    const std::vector<PlacementPtr<FragmentProcessor>>& coverages) {
   if (!IsConnected() || !CurrentFrameShouldCaptrue()) {
     return;
   }
-  for (const auto& processor : processors) {
+  std::vector<FragmentProcessor*> fragmentProcessors = {};
+  fragmentProcessors.reserve(colors.size() + coverages.size());
+  for (auto& color : colors) {
+    fragmentProcessors.emplace_back(color.get());
+  }
+  for (auto& coverage : coverages) {
+    fragmentProcessors.emplace_back(coverage.get());
+  }
+  for (const auto& processor : fragmentProcessors) {
     FragmentProcessor::Iter fpIter(processor);
     while (const auto* subFP = fpIter.next()) {
       for (size_t j = 0; j < subFP->numTextureSamplers(); ++j) {

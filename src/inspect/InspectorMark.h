@@ -56,8 +56,8 @@
     tgfx::inspect::FrameCapture::SendOutputTextureID(textureId);                            \
   }
 
-#define CAPUTRE_FRARGMENT_PROCESSORS(context, processors) \
-  tgfx::inspect::FrameCapture::SendFragmentProcessor(context, processors);
+#define CAPUTRE_FRARGMENT_PROCESSORS(context, colors, coverages) \
+  tgfx::inspect::FrameCapture::SendFragmentProcessor(context, colors, coverages);
 
 #define CAPUTRE_TEXTURE_BEFORE_RENDER(context, fragmentProcessors) \
   tgfx::inspect::FrameCapture::SendInputTextureBeforeRender(context, fragmentProcessors)

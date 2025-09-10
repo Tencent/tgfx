@@ -97,7 +97,8 @@ class FrameCapture {
   static void SendOutputTextureID(uint64_t textureId);
 
   static void SendFragmentProcessor(Context* context,
-                                    const std::vector<FragmentProcessor*>& processors);
+                                    const std::vector<PlacementPtr<FragmentProcessor>>& colors,
+                                    const std::vector<PlacementPtr<FragmentProcessor>>& coverages);
 
   static void SendFrameCaptureTexture(std::shared_ptr<FrameCaptureTexture> frameCaptureTexture);
 
