@@ -22,7 +22,7 @@
         "DrawSRGBConicShaderToP3": "145be64b",
         "DrawSRGBDiamondShaderToP3": "145be64b",
         "DrawSRGBDropShadowFilterToP3": "145be64b",
-        "DrawSRGBImageShaderToP3": "145be64b",
+        "DrawImageShaderToP3": "62e4e8e2",
         "DrawSRGBLinearShaderToP3": "145be64b",
         "DrawSRGBRadialShaderToP3": "145be64b",
         "FillModifier": "fa2f12b1",

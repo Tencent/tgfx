@@ -24,17 +24,17 @@
 namespace tgfx {
 
 static BOOL GetMonitorICCFromHWND(HWND hWnd, wchar_t* pProfilePath, DWORD* pSize) {
-  HMONITOR hMonitor = MonitorFromWindow(hWnd, MONITOR_DEFAULTTONEAREST);
-  if (hMonitor == NULL) {
+  HDC hdc = GetDC(hWnd);
+  if (hdc == NULL) {
     return FALSE;
   }
 
   DWORD dwRequiredSize = 0;
-  BOOL bResult = GetICMProfileW(hMonitor, &dwRequiredSize, NULL);
+  BOOL bResult = GetICMProfileW(hdc, &dwRequiredSize, NULL);
   if (!bResult && GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
     // 再次调用，获取配置文件路径
     if (pProfilePath && *pSize >= dwRequiredSize) {
-      bResult = GetICMProfileW(hMonitor, pSize, pProfilePath);
+      bResult = GetICMProfileW(hdc, pSize, pProfilePath);
       return bResult;
     } else {
       // 缓冲区不足，可以通过pSize返回所需大小
@@ -53,55 +53,44 @@ static BOOL LoadICCProfileData(const wchar_t* pProfilePath, BYTE** ppProfileData
   }
 
   HANDLE hFile = CreateFileW(
-      pProfilePath,          // ICC 文件路径
-      GENERIC_READ,          // 只读访问
-      FILE_SHARE_READ,       // 共享读
-      NULL,                  // 默认安全属性
-      OPEN_EXISTING,         // 只打开已存在的文件
-      FILE_ATTRIBUTE_NORMAL, // 普通文件
-      NULL                   // 无模板文件
+      pProfilePath,
+      GENERIC_READ,
+      FILE_SHARE_READ,
+      NULL,
+      OPEN_EXISTING,
+      FILE_ATTRIBUTE_NORMAL,
+      NULL
   );
 
   if (hFile == INVALID_HANDLE_VALUE) {
-    // 文件打开失败
-    wprintf(L"无法打开 ICC 文件: %s, 错误: %lu\n", pProfilePath, GetLastError());
     return FALSE;
   }
 
-  // 获取文件大小
   DWORD dwFileSize = GetFileSize(hFile, NULL);
   if (dwFileSize == INVALID_FILE_SIZE) {
     CloseHandle(hFile);
-    wprintf(L"获取文件大小失败: %lu\n", GetLastError());
     return FALSE;
   }
 
-  // 分配内存来存储 ICC 数据
   BYTE* pData = (BYTE*)malloc(dwFileSize);
   if (pData == NULL) {
     CloseHandle(hFile);
-    wprintf(L"内存分配失败 (大小: %lu bytes)\n", dwFileSize);
     SetLastError(ERROR_OUTOFMEMORY);
     return FALSE;
   }
 
-  // 读取文件内容
   DWORD dwBytesRead = 0;
   BOOL bReadResult = ReadFile(hFile, pData, dwFileSize, &dwBytesRead, NULL);
-  CloseHandle(hFile); // 无论成功与否，都关闭文件句柄
+  CloseHandle(hFile);
 
   if (!bReadResult || dwBytesRead != dwFileSize) {
-    free(pData); // 读取失败，释放内存
-    wprintf(L"读取文件失败或字节数不匹配。错误: %lu, 已读: %lu, 期望: %lu\n",
-            GetLastError(), dwBytesRead, dwFileSize);
+    free(pData);
     return FALSE;
   }
 
-  // 成功，通过输出参数返回数据和大小
   *ppProfileData = pData;
   *pDataSize = dwFileSize;
 
-  wprintf(L"成功加载 ICC 配置文件: %s, 大小: %lu bytes\n", pProfilePath, dwFileSize);
   return TRUE;
 }
 
@@ -138,8 +127,8 @@ std::shared_ptr<Surface> WGLWindow::onCreateSurface(Context* context) {
   BackendRenderTarget renderTarget = {frameBuffer, size.width, size.height};
   std::shared_ptr<ColorSpace> colorSpace = nullptr;
   wchar_t profilePath[MAX_PATH];
-  DWORD size = MAX_PATH;
-  if (GetMonitorICCFromHWND(nativeWindow, profilePath, &size)) {
+  DWORD pathSize = MAX_PATH;
+  if (GetMonitorICCFromHWND(nativeWindow, profilePath, &pathSize)) {
     BYTE* pICCData = NULL;
     DWORD dwDataSize = 0;
     if (LoadICCProfileData(profilePath, &pICCData, &dwDataSize)) {

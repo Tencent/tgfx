@@ -3056,46 +3056,13 @@ TGFX_TEST(CanvasTest, ConvertColorSpace) {
   for (int i = 0; i < tfNum; i++) {
     for (int j = 0; j < gamutNum; j++) {
       auto midCS = ColorSpace::MakeRGB(tfs[i], gamuts[j]);
-      canvas->drawImage(image->makeColorSpace(midCS), static_cast<float>(i * width),
-                        static_cast<float>(j * height));
-    }
-  }
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ConvertColorSpace"));
-}
-
-TGFX_TEST(CanvasTest, ConvertColorSpace1) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 1024, 1024, false, 1, false, 0,
-                               ColorSpace::MakeSRGB()->makeColorSpin());
-  auto canvas = surface->getCanvas();
-  const TransferFunction tfs[] = {
-      namedTransferFn::SRGB,
-      namedTransferFn::_2Dot2,
-      namedTransferFn::Linear,
-      namedTransferFn::Rec2020,
-      namedTransferFn::PQ,
-      namedTransferFn::HLG,
-      {-3.0f, 2.0f, 2.0f, 1 / 0.17883277f, 0.28466892f, 0.55991073f, 3.0f}};
-
-  const Matrix3x3 gamuts[] = {namedGamut::SRGB, namedGamut::AdobeRGB, namedGamut::DisplayP3,
-                              namedGamut::Rec2020, namedGamut::XYZ};
-  auto image = MakeImage("resources/apitest/mandrill_128.png");
-  const int width = image->width();
-  const int height = image->height();
-  int tfNum = sizeof(tfs) / sizeof(TransferFunction);
-  int gamutNum = sizeof(gamuts) / sizeof(Matrix3x3);
-  for (int i = 0; i < tfNum; i++) {
-    for (int j = 0; j < gamutNum; j++) {
-      auto midCS = ColorSpace::MakeRGB(tfs[i], gamuts[j]);
       auto offscreen = Surface::Make(context, width, height, false, 1, false, 0, midCS);
       offscreen->getCanvas()->drawImage(image);
       canvas->drawImage(offscreen->makeImageSnapshot(), static_cast<float>(i * width),
                         static_cast<float>(j * height));
     }
   }
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ConvertColorSpace1"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ConvertColorSpace"));
 }
 
 TGFX_TEST(CanvasTest, ColorSpace) {
@@ -3105,49 +3072,47 @@ TGFX_TEST(CanvasTest, ColorSpace) {
   auto surface = Surface::Make(context, 1024, 1024, false, 1, false, 0,
                                ColorSpace::MakeRGB(namedTransferFn::_2Dot2, namedGamut::DisplayP3));
   auto canvas = surface->getCanvas();
-  canvas->drawColor(Color::Green(), BlendMode::SrcOver, ColorSpace::MakeSRGB());
+  canvas->drawColor(Color::Green(), BlendMode::SrcOver);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawSRGBColorToP3"));
   canvas->clear();
   Paint paint;
   auto image = MakeImage("resources/apitest/mandrill_128.png");
-  image = image->makeColorSpace(ColorSpace::MakeSRGB());
   auto imageShader = Shader::MakeImageShader(image, TileMode::Repeat, TileMode::Repeat);
   paint.setShader(imageShader);
   canvas->drawPaint(paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawSRGBImageShaderToP3"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawImageShaderToP3"));
   canvas->clear();
-  auto colorShader = Shader::MakeColorShader(Color::Green(), ColorSpace::MakeSRGB());
+  auto colorShader = Shader::MakeColorShader(Color::Green());
   paint.setShader(colorShader);
   canvas->drawPaint(paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawSRGBColorShaderToP3"));
   canvas->clear();
   auto linearGradient =
       Shader::MakeLinearGradient(Point::Make(0, 0), Point::Make(1024, 0),
-                                 {Color::Green(), Color::Red()}, {}, ColorSpace::MakeSRGB());
+                                 {Color::Green(), Color::Red()}, {});
   paint.setShader(linearGradient);
   canvas->drawPaint(paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawSRGBLinearShaderToP3"));
   canvas->clear();
   auto conicGradient = Shader::MakeConicGradient(
-      Point::Make(512, 512), 0, 360, {Color::Green(), Color::Red()}, {}, ColorSpace::MakeSRGB());
+      Point::Make(512, 512), 0, 360, {Color::Green(), Color::Red()}, {});
   paint.setShader(conicGradient);
   canvas->drawPaint(paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawSRGBConicShaderToP3"));
   canvas->clear();
   auto diamondGradient = Shader::MakeDiamondGradient(
-      Point::Make(512, 512), 500, {Color::Green(), Color::Red()}, {}, ColorSpace::MakeSRGB());
+      Point::Make(512, 512), 500, {Color::Green(), Color::Red()}, {});
   paint.setShader(diamondGradient);
   canvas->drawPaint(paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawSRGBDiamondShaderToP3"));
   canvas->clear();
   auto radialGradient = Shader::MakeRadialGradient(
-      Point::Make(512, 512), 500, {Color::Green(), Color::Red()}, {}, ColorSpace::MakeSRGB());
+      Point::Make(512, 512), 500, {Color::Green(), Color::Red()}, {});
   paint.setShader(radialGradient);
   canvas->drawPaint(paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawSRGBRadialShaderToP3"));
   canvas->clear();
-  auto blendFilter = ColorFilter::Blend(Color::FromRGBA(0, 0, 125, 125), BlendMode::SrcOver,
-                                        ColorSpace::MakeSRGB());
+  auto blendFilter = ColorFilter::Blend(Color::FromRGBA(0, 0, 125, 125), BlendMode::SrcOver);
   paint.setColorFilter(blendFilter);
   canvas->drawPaint(paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawSRGBBlendFilterToP3"));
@@ -3159,14 +3124,14 @@ TGFX_TEST(CanvasTest, ColorSpace) {
   maskFilter = maskFilter->makeWithMatrix(Matrix::MakeTrans(462, 462));
   paint.setMaskFilter(maskFilter);
   auto imageFilter =
-      ImageFilter::DropShadow(-10, -10, 10, 10, Color::Green(), ColorSpace::MakeSRGB());
+      ImageFilter::DropShadow(-10, -10, 10, 10, Color::Green());
   paint.setImageFilter(imageFilter);
   canvas->drawPaint(paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawSRGBDropShadowFilterToP3"));
   canvas->clear();
   Recorder record;
   auto recordCanvas = record.beginRecording();
-  recordCanvas->drawColor(Color::Green(), BlendMode::SrcOver, ColorSpace::MakeSRGB());
+  recordCanvas->drawColor(Color::Green(), BlendMode::SrcOver);
   auto picture = record.finishRecordingAsPicture();
   canvas->drawPicture(picture);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawRecordSRGBColorToP3UseDrawPicture"));
