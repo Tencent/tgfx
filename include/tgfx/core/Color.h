@@ -22,6 +22,8 @@
 #include <cinttypes>
 #include <limits>
 
+#include "ColorSpace.h"
+
 namespace tgfx {
 
 /**
@@ -60,8 +62,10 @@ struct Color {
   static const Color& Blue();
 
   /**
-   * Returns color value from 8-bit component values.
+   * Returns color value from 8-bit component values with colorSpace.
    */
+  static Color FromRGBAWithCS(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255, const std::shared_ptr<ColorSpace>& colorSpace = ColorSpace::MakeSRGB());
+
   static Color FromRGBA(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255);
 
   /**
@@ -145,7 +149,7 @@ struct Color {
   /**
    * Returns true if all channels are in [0, 1].
    **/
-  bool isValid() const;
+  bool isNotOverflow() const;
 
   /**
    * Returns true if Color is an opaque color.

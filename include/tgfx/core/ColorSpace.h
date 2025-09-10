@@ -27,76 +27,8 @@ struct Matrix3x3 {
   float vals[3][3];
 };
 
-struct Matrix3x4 {
-  float vals[3][4];
-};
-
 struct TransferFunction {
   float g, a, b, c, d, e, f;
-};
-
-union Curve {
-  struct A {
-    uint32_t alias_of_table_entries;
-    TransferFunction parametric;
-  } a;
-  struct B {
-    uint32_t table_entries;
-    const uint8_t* table_8;
-    const uint8_t* table_16;
-  } b;
-};
-
-typedef struct A2B {
-  Curve input_curves[4];
-  const uint8_t* grid_8;
-  const uint8_t* grid_16;
-  uint32_t input_channels;
-  uint8_t grid_points[4];
-  Curve matrix_curves[3];
-  Matrix3x4 matrix;
-  uint32_t matrix_channels;
-  uint32_t output_channels;
-  Curve output_curves[3];
-} A2B;
-
-struct B2A {
-  Curve input_curves[3];
-  uint32_t input_channels;
-  uint32_t matrix_channels;
-  Curve matrix_curves[3];
-  Matrix3x4 matrix;
-  Curve output_curves[4];
-  const uint8_t* grid_8;
-  const uint8_t* grid_16;
-  uint8_t grid_points[4];
-  uint32_t output_channels;
-};
-
-struct CICP {
-  uint8_t color_primaries;
-  uint8_t transfer_characteristics;
-  uint8_t matrix_coefficients;
-  uint8_t video_full_range_flag;
-};
-
-struct ICCProfile {
-  const uint8_t* buffer;
-
-  uint32_t size;
-  uint32_t data_color_space;
-  uint32_t pcs;
-  uint32_t tag_count;
-  Curve trc[3];
-  Matrix3x3 toXYZD50;
-  A2B a2b;
-  B2A b2a;
-  CICP cicp;
-  bool has_trc;
-  bool has_toXYZD50;
-  bool has_A2B;
-  bool has_B2A;
-  bool has_CICP;
 };
 
 /**
@@ -372,14 +304,9 @@ class ColorSpace : public std::enable_shared_from_this<ColorSpace> {
                                               namedTransferFn::CicpId transferCharacteristics);
 
   /**
-   *  Create an ColorSpace from a parsed (skcms) ICC profile.
-   */
-  static std::shared_ptr<ColorSpace> Make(const ICCProfile&);
-
-  /**
-   *  Convert this color space to an skcms ICC profile struct.
-   */
-  void toProfile(ICCProfile*) const;
+ *  Create an ColorSpace from a ICC data.
+ */
+  static std::shared_ptr<ColorSpace> MakeFromICC(const void* data, size_t size);
 
   /**
    *  Returns true if the color space gamma is near enough to be approximated as sRGB.
@@ -435,7 +362,7 @@ class ColorSpace : public std::enable_shared_from_this<ColorSpace> {
    *  Returns true if the color space is sRGB.
    *  Returns false otherwise.
    *
-   *  This allows a little bit of tolerance, given that we might see small numerical error
+*  This allows a little bit of tolerance, given that we might see small numerical error
    *  in some cases: converting ICC fixed point to float, converting white point to D50,
    *  rounding decisions on transfer function and matrix.
    *

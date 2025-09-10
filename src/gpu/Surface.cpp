@@ -53,6 +53,9 @@ std::shared_ptr<Surface> Surface::MakeFrom(Context* context,
   if (context == nullptr) {
     return nullptr;
   }
+  if(!colorSpace) {
+    colorSpace = ColorSpace::MakeSRGB();
+  }
   auto proxy = RenderTargetProxy::MakeFrom(context, renderTarget, origin, std::move(colorSpace));
   return MakeFrom(std::move(proxy), renderFlags);
 }

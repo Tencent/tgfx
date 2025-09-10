@@ -23,12 +23,10 @@ void Paint::setShader(std::shared_ptr<Shader> newShader) {
   fill.shader = std::move(newShader);
   if (fill.shader) {
     Color color = {};
-    std::shared_ptr<ColorSpace> colorSpace = nullptr;
-    if (fill.shader->asColor(&color, &colorSpace)) {
+    if (fill.shader->asColor(&color)) {
       color.alpha *= fill.color.alpha;
       fill.color = color;
       fill.shader = nullptr;
-      fill.colorSpace = colorSpace;
     }
   }
 }

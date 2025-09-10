@@ -37,10 +37,8 @@ class Fill {
   /**
    * Constructs a Fill with the specified color, blend mode, and antialiasing.
    */
-  Fill(const Color& color, BlendMode blendMode, bool antiAlias = true,
-       std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB())
-      : color(color), blendMode(blendMode), antiAlias(antiAlias),
-        colorSpace(std::move(colorSpace)) {
+  Fill(const Color& color, BlendMode blendMode, bool antiAlias = true)
+      : color(color), blendMode(blendMode), antiAlias(antiAlias){
   }
 
   /**
@@ -74,8 +72,6 @@ class Fill {
    * Optional color filter used to modify the color of the fill when drawing.
    */
   std::shared_ptr<ColorFilter> colorFilter = nullptr;
-
-  std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB();
 
   /**
    * Returns true if the Fill is guaranteed to produce only opaque colors.

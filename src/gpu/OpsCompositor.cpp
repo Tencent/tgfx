@@ -30,6 +30,7 @@
 #include "gpu/ops/ShapeDrawOp.h"
 #include "gpu/processors/AARectEffect.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
+#include "processors/ColorSpaceXformEffect.h"
 #include "processors/PorterDuffXferProcessor.h"
 
 namespace tgfx {
@@ -394,10 +395,13 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
     FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty()),
                    drawScale.value_or(1.0f)};
     auto processor =
-        FragmentProcessor::Make(std::move(pendingImage), args, pendingSampling, pendingConstraint);
+        FragmentProcessor::Make(pendingImage, args, pendingSampling, pendingConstraint);
     if (processor == nullptr) {
       return;
     }
+    processor = ColorSpaceXformEffect::Make(context->drawingBuffer(), std::move(processor), pendingImage->colorSpace().get()
+                                       , AlphaType::Premultiplied,
+                                       renderTarget->getColorSpace().get(), AlphaType::Premultiplied);
     drawOp->addColorFP(std::move(processor));
   }
   addDrawOp(std::move(drawOp), pendingClip, pendingFill, localBounds, deviceBounds,

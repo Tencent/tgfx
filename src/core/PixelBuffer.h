@@ -36,8 +36,7 @@ class PixelBuffer : public ImageBuffer {
    * current platform. Otherwise, a CPU-backed PixelBuffer is returned.
    */
   static std::shared_ptr<PixelBuffer> Make(
-      int width, int height, bool alphaOnly = false, bool tryHardware = true,
-      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+      int width, int height, bool alphaOnly = false, bool tryHardware = true);
 
   /**
    * Creates a PixelBuffer from the specified hardware buffer. Returns nullptr if the hardwareBuffer
@@ -55,10 +54,6 @@ class PixelBuffer : public ImageBuffer {
 
   bool isAlphaOnly() const override {
     return _info.isAlphaOnly();
-  }
-
-  std::shared_ptr<ColorSpace> colorSpace() const override {
-    return _info.colorSpace();
   }
 
   /**

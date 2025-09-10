@@ -42,8 +42,7 @@ class ImageInfo {
    * combination is supported. Returns an empty ImageInfo if validating fails.
    */
   static ImageInfo Make(int width, int height, ColorType colorType,
-                        AlphaType alphaType = AlphaType::Premultiplied, size_t rowBytes = 0,
-                        std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+                        AlphaType alphaType = AlphaType::Premultiplied, size_t rowBytes = 0);
 
   static size_t GetBytesPerPixel(ColorType colorType);
 
@@ -109,14 +108,6 @@ class ImageInfo {
     return _rowBytes;
   }
 
-  std::shared_ptr<ColorSpace> colorSpace() const {
-    return _colorSpace;
-  }
-
-  void setColorSpace(std::shared_ptr<ColorSpace> colorSpace) const {
-    _colorSpace = std::move(colorSpace);
-  }
-
   /**
    * Returns minimum bytes per row, computed from the width and colorType.
    */
@@ -166,10 +157,6 @@ class ImageInfo {
     return Make(_width, _height, newColorType, _alphaType, newRowBytes);
   }
 
-  ImageInfo makeColorSpace(std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB()) const {
-    return Make(_width, _height, _colorType, _alphaType, _rowBytes, std::move(colorSpace));
-  }
-
   /**
    * Returns readable pixel address at (x, y) of specified base pixel address.
    * Note: The x value will be clamped to the range of (0, width), and the y value will be clamped
@@ -199,10 +186,9 @@ class ImageInfo {
   }
 
  private:
-  ImageInfo(int width, int height, ColorType colorType, AlphaType alphaType, size_t rowBytes,
-            std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB())
+  ImageInfo(int width, int height, ColorType colorType, AlphaType alphaType, size_t rowBytes)
       : _width(width), _height(height), _colorType(colorType), _alphaType(alphaType),
-        _rowBytes(rowBytes), _colorSpace(std::move(colorSpace)) {
+        _rowBytes(rowBytes) {
   }
 
   int _width = 0;
@@ -210,6 +196,5 @@ class ImageInfo {
   ColorType _colorType = ColorType::Unknown;
   AlphaType _alphaType = AlphaType::Unknown;
   size_t _rowBytes = 0;
-  mutable std::shared_ptr<ColorSpace> _colorSpace = ColorSpace::MakeSRGB();
 };
 }  // namespace tgfx

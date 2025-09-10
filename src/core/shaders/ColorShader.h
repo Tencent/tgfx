@@ -23,13 +23,13 @@
 namespace tgfx {
 class ColorShader : public Shader {
  public:
-  explicit ColorShader(Color color, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB())
-      : color(color), colorSpace(std::move(colorSpace)) {
+  explicit ColorShader(Color color)
+      : color(color) {
   }
 
   bool isOpaque() const override;
 
-  bool asColor(Color* color, std::shared_ptr<ColorSpace>* colorSpace) const override;
+  bool asColor(Color* color) const override;
 
   std::shared_ptr<Shader> makeWithMatrix(const Matrix&) const override {
     return weakThis.lock();

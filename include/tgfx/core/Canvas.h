@@ -213,16 +213,16 @@ class Canvas {
   /**
    * Fills the current clip with the specified color, using BlendMode::Src. This replaces all pixels
    * within the clip with the specified color.
+   * @param color  the color in srgb gamut to clear, can overflow 0-1.
    */
-  void clear(const Color& color = Color::Transparent(),
-             const std::shared_ptr<ColorSpace>& colorSpace = ColorSpace::MakeSRGB());
+  void clear(const Color& color = Color::Transparent());
 
   /**
    * Fills the current clip with the specified color. The color is blended with the destination
    * pixels using the specified blend mode.
+   * @param color  the color in srgb gamut to clear, can overflow 0-1.
    */
-  void drawColor(const Color& color, BlendMode blendMode = BlendMode::SrcOver,
-                 const std::shared_ptr<ColorSpace>& colorSpace = ColorSpace::MakeSRGB());
+  void drawColor(const Color& color, BlendMode blendMode = BlendMode::SrcOver);
 
   /**
    * Fills the current clip with the specified paint. The paint's shader, color, blend mode, color
@@ -455,8 +455,7 @@ class Canvas {
    */
   void drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], const Rect tex[],
                  const Color colors[], size_t count, const SamplingOptions& sampling = {},
-                 const Paint* paint = nullptr,
-                 const std::shared_ptr<ColorSpace>& colorSpace = ColorSpace::MakeSRGB());
+                 const Paint* paint = nullptr);
 
  private:
   DrawContext* drawContext = nullptr;

@@ -183,13 +183,12 @@ void Canvas::resetStateStack() {
   std::stack<std::unique_ptr<CanvasState>>().swap(stateStack);
 }
 
-void Canvas::clear(const Color& color, const std::shared_ptr<ColorSpace>& colorSpace) {
-  drawColor(color, BlendMode::Src, colorSpace);
+void Canvas::clear(const Color& color) {
+  drawColor(color, BlendMode::Src);
 }
 
-void Canvas::drawColor(const Color& color, BlendMode blendMode,
-                       const std::shared_ptr<ColorSpace>& colorSpace) {
-  drawFill(*mcState, {color, blendMode, false, colorSpace});
+void Canvas::drawColor(const Color& color, BlendMode blendMode) {
+  drawFill(*mcState, {color, blendMode, false});
 }
 
 void Canvas::drawPaint(const Paint& paint) {
@@ -633,7 +632,7 @@ void Canvas::drawLayer(std::shared_ptr<Picture> picture, const MCState& state, c
 
 void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], const Rect tex[],
                        const Color colors[], size_t count, const SamplingOptions& sampling,
-                       const Paint* paint, const std::shared_ptr<ColorSpace>& colorSpace) {
+                       const Paint* paint) {
   // TODO: Support blend mode, atlas as source, colors as destination, colors can be nullptr.
   if (atlas == nullptr || count == 0) {
     return;
@@ -651,7 +650,6 @@ void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], cons
     auto glyphFill = fill;
     if (colors) {
       glyphFill.color = colors[i];
-      glyphFill.colorSpace = colorSpace;
     }
     auto dstRect = dstMatrix.mapRect(rect);
     drawImageRect(atlas, rect, dstRect, sampling, glyphFill);

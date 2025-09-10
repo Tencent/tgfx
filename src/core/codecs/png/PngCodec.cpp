@@ -130,8 +130,7 @@ static float PngInvertedFixedPointToFloat(png_fixed_point x) {
 #endif  // LIBPNG >= 1.6
 
 // If there is no color profile information, it will use sRGB.
-std::shared_ptr<ICCProfile> ReadColorProfile(png_structp pngPtr, png_infop infoPtr) {
-  std::shared_ptr<ICCProfile> result = nullptr;
+std::shared_ptr<ColorSpace> ReadColorProfile(png_structp pngPtr, png_infop infoPtr) {
 #if (PNG_LIBPNG_VER_MAJOR > 1) || (PNG_LIBPNG_VER_MAJOR == 1 && PNG_LIBPNG_VER_MINOR >= 6)
   // First check for an ICC profile
   png_bytep profile;
@@ -145,12 +144,7 @@ std::shared_ptr<ICCProfile> ReadColorProfile(png_structp pngPtr, png_infop infoP
   //   (2) "deflate" is the only mode of decompression that libpng supports.
   int compression;
   if (PNG_INFO_iCCP == png_get_iCCP(pngPtr, infoPtr, &name, &compression, &profile, &length)) {
-    result = std::make_shared<ICCProfile>();
-    if (!gfx::skcms_Parse(profile, length,
-                          reinterpret_cast<gfx::skcms_ICCProfile*>(result.get()))) {
-      result = nullptr;
-    }
-    return result;
+    return ColorSpace::MakeFromICC(profile, length);
   }
 
   // Second, check for sRGB.
@@ -159,7 +153,7 @@ std::shared_ptr<ICCProfile> ReadColorProfile(png_structp pngPtr, png_infop infoP
   // backup in case the decoder does not support full color management.
   if (png_get_valid(pngPtr, infoPtr, PNG_INFO_sRGB)) {
     // `sRGB` chunk.
-    return result;
+    return ColorSpace::MakeSRGB();
   }
 
   // Default to SRGB gamut.
@@ -195,15 +189,9 @@ std::shared_ptr<ICCProfile> ReadColorProfile(png_structp pngPtr, png_infop infoP
     // Note that Blink would again return nullptr in this case.
     fn = *gfx::skcms_sRGB_TransferFunction();
   }
-  result = std::make_shared<ICCProfile>();
-  auto innerICC = reinterpret_cast<gfx::skcms_ICCProfile*>(result.get());
-  skcms_Init(innerICC);
-  skcms_SetTransferFunction(innerICC, &fn);
-  skcms_SetXYZD50(innerICC, &toXYZD50);
-
-  return result;
+  return ColorSpace::MakeRGB(*reinterpret_cast<TransferFunction*>(&fn), *reinterpret_cast<Matrix3x3*>(&toXYZD50));
 #else   // LIBPNG >= 1.6
-  return result;
+  return ColorSpace::MakeSRGB();
 #endif  // LIBPNG >= 1.6
 }
 
@@ -216,8 +204,7 @@ std::shared_ptr<ImageCodec> PngCodec::MakeFromData(const std::string& filePath,
   png_uint_32 w = 0, h = 0;
   int colorType = -1;
   png_get_IHDR(readInfo->p, readInfo->pi, &w, &h, nullptr, &colorType, nullptr, nullptr, nullptr);
-  auto profile = ReadColorProfile(readInfo->p, readInfo->pi);
-  auto cs = profile ? ColorSpace::Make(*profile) : nullptr;
+  auto cs = ReadColorProfile(readInfo->p, readInfo->pi);
   if (!cs) {
     cs = ColorSpace::MakeSRGB();
   }

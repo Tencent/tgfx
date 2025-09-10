@@ -296,9 +296,7 @@ DecodeInfo WebpUtility::getDecodeInfo(const std::string& filePath) {
           needBreak = true;
           break;
         }
-        ICCProfile profile;
-        gfx::skcms_Parse(profiler, chunk_size, reinterpret_cast<gfx::skcms_ICCProfile*>(&profile));
-        decodeInfo.colorSpace = ColorSpace::Make(profile);
+        decodeInfo.colorSpace = ColorSpace::MakeFromICC(profiler, chunk_size);
         if (decodeInfo.colorSpace == nullptr) {
           decodeInfo.colorSpace = ColorSpace::MakeSRGB();
         }
@@ -361,14 +359,11 @@ DecodeInfo WebpUtility::getDecodeInfo(const void* fileBytes, size_t byteLength) 
   }
 
   std::shared_ptr<ColorSpace> colorSpace = nullptr;
-  ICCProfile profile;
   {
     WebPChunkIterator chunkIterator;
     if (WebPDemuxGetChunk(demux, "ICCP", 1, &chunkIterator)) {
       auto chunk = Data::MakeWithCopy(chunkIterator.chunk.bytes, chunkIterator.chunk.size);
-      gfx::skcms_Parse(chunk->data(), chunk->size(),
-                       reinterpret_cast<gfx::skcms_ICCProfile*>(&profile));
-      colorSpace = ColorSpace::Make(profile);
+      colorSpace = ColorSpace::MakeFromICC(chunk->data(), chunk->size());
     }
     if (colorSpace == nullptr) {
       colorSpace = ColorSpace::MakeSRGB();

@@ -23,14 +23,13 @@
 namespace tgfx {
 static constexpr int GradientWidth = 256;
 
-GradientGenerator::GradientGenerator(const Color* colors, const float* positions, int count,
-                                     std::shared_ptr<ColorSpace> colorSpace)
-    : ImageGenerator(GradientWidth, 1, std::move(colorSpace)), colors(colors, colors + count),
+GradientGenerator::GradientGenerator(const Color* colors, const float* positions, int count)
+    : ImageGenerator(GradientWidth, 1, ColorSpace::MakeSRGB()), colors(colors, colors + count),
       positions(positions, positions + count) {
 }
 
 std::shared_ptr<ImageBuffer> GradientGenerator::onMakeBuffer(bool) const {
-  auto pixelBuffer = PixelBuffer::Make(GradientWidth, 1, false, false, colorSpace());
+  auto pixelBuffer = PixelBuffer::Make(GradientWidth, 1, false, false);
   if (pixelBuffer == nullptr) {
     return nullptr;
   }

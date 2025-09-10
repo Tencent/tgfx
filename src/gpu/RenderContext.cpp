@@ -154,11 +154,11 @@ Rect RenderContext::getClipBounds(const Path& clip) {
   return bounds;
 }
 
-void RenderContext::convertFill(const Fill& fill, Fill& dstFill) {
+void RenderContext::convertFillColor(const Fill& fill, Fill& dstFill) {
   auto dstColorSpace = renderTarget->getColorSpace();
   dstFill = fill;
-  if (!ColorSpace::Equals(dstColorSpace.get(), dstFill.colorSpace.get())) {
-    ColorSpaceXformSteps steps(dstFill.colorSpace.get(), AlphaType::Unpremultiplied,
+  if (!ColorSpace::Equals(dstColorSpace.get(), ColorSpace::MakeSRGB().get())) {
+    ColorSpaceXformSteps steps(ColorSpace::MakeSRGB().get(), AlphaType::Unpremultiplied,
                                dstColorSpace.get(), AlphaType::Unpremultiplied);
     steps.apply(dstFill.color.array());
   }
@@ -166,15 +166,15 @@ void RenderContext::convertFill(const Fill& fill, Fill& dstFill) {
 
 void RenderContext::drawFill(const Fill& fill) {
   Fill dstFill;
-  convertFill(fill, dstFill);
-  if (auto compositor = getOpsCompositor(dstFill.isOpaque())) {
-    compositor->fillRect(renderTarget->bounds(), {}, dstFill);
+  convertFillColor(fill, dstFill);
+  if (auto compositor = getOpsCompositor(fill.isOpaque())) {
+    compositor->fillRect(renderTarget->bounds(), {}, fill);
   }
 }
 
 void RenderContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill) {
   Fill dstFill;
-  convertFill(fill, dstFill);
+  convertFillColor(fill, dstFill);
   if (auto compositor = getOpsCompositor()) {
     compositor->fillRect(rect, state, dstFill);
   }
@@ -183,7 +183,7 @@ void RenderContext::drawRect(const Rect& rect, const MCState& state, const Fill&
 void RenderContext::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
                               const Stroke* stroke) {
   Fill dstFill;
-  convertFill(fill, dstFill);
+  convertFillColor(fill, dstFill);
   if (auto compositor = getOpsCompositor()) {
     compositor->drawRRect(rRect, state, dstFill, stroke);
   }
@@ -191,7 +191,7 @@ void RenderContext::drawRRect(const RRect& rRect, const MCState& state, const Fi
 
 void RenderContext::drawPath(const Path& path, const MCState& state, const Fill& fill) {
   Fill dstFill;
-  convertFill(fill, dstFill);
+  convertFillColor(fill, dstFill);
   // Temporarily use drawShape for rendering, and perform merging in the compositor later.
   drawShape(Shape::MakeFrom(path), state, dstFill);
 }
@@ -209,8 +209,7 @@ static Rect ToLocalBounds(const Rect& bounds, const Matrix& viewMatrix) {
 void RenderContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
                               const MCState& state, const Fill& fill) {
   Fill dstFill;
-  convertFill(fill, dstFill);
-  image = image->makeColorSpace(renderTarget->getColorSpace());
+  convertFillColor(fill, dstFill);
   if (auto compositor = getOpsCompositor()) {
     compositor->fillImage(std::move(image), sampling, state, dstFill);
   }
@@ -219,7 +218,7 @@ void RenderContext::drawImage(std::shared_ptr<Image> image, const SamplingOption
 void RenderContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
                               const Fill& fill) {
   Fill dstFill;
-  convertFill(fill, dstFill);
+  convertFillColor(fill, dstFill);
   if (auto compositor = getOpsCompositor()) {
     compositor->fillShape(std::move(shape), state, dstFill);
   }
@@ -232,8 +231,7 @@ void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcR
   DEBUG_ASSERT(image != nullptr);
   DEBUG_ASSERT(image->isAlphaOnly() || fill.shader == nullptr);
   Fill dstFill;
-  convertFill(fill, dstFill);
-  image = image->makeColorSpace(renderTarget->getColorSpace());
+  convertFillColor(fill, dstFill);
   auto compositor = getOpsCompositor();
   if (compositor == nullptr) {
     return;
@@ -255,7 +253,7 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
                                      const MCState& state, const Fill& fill, const Stroke* stroke) {
   DEBUG_ASSERT(glyphRunList != nullptr);
   Fill dstFill;
-  convertFill(fill, dstFill);
+  convertFillColor(fill, dstFill);
   if (FloatNearlyZero(state.matrix.getMaxScale())) {
     return;
   }
@@ -314,7 +312,7 @@ void RenderContext::drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<
                               const MCState& state, const Fill& fill) {
   DEBUG_ASSERT(fill.shader == nullptr);
   Fill dstFill;
-  convertFill(fill, dstFill);
+  convertFillColor(fill, dstFill);
   Matrix viewMatrix = {};
   Rect bounds = {};
   if (picture->hasUnboundedFill()) {
@@ -392,7 +390,7 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
                                            const Rect& localClipBounds,
                                            GlyphRun* rejectedGlyphRun) {
   Fill dstFill;
-  convertFill(fill, dstFill);
+  convertFillColor(fill, dstFill);
   auto compositor = getOpsCompositor();
   if (compositor == nullptr) {
     return;
@@ -497,7 +495,7 @@ void RenderContext::drawGlyphsAsPath(std::shared_ptr<GlyphRunList> glyphRunList,
                                      const MCState& state, const Fill& fill, const Stroke* stroke,
                                      Rect& localClipBounds) {
   Fill dstFill;
-  convertFill(fill, dstFill);
+  convertFillColor(fill, dstFill);
   auto maxScale = state.matrix.getMaxScale();
   Path clipPath = {};
   if (dstFill.antiAlias) {
@@ -517,7 +515,7 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
                                                 const MCState& state, const Fill& fill,
                                                 const Stroke* stroke) {
   Fill dstFill;
-  convertFill(fill, dstFill);
+  convertFillColor(fill, dstFill);
   auto compositor = getOpsCompositor();
   if (compositor == nullptr) {
     return;

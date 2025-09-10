@@ -23,11 +23,8 @@
 #include "tgfx/core/Pixmap.h"
 
 namespace tgfx {
-Bitmap::Bitmap(int width, int height, bool alphaOnly, bool tryHardware,
-               std::shared_ptr<ColorSpace> colorSpace) {
+Bitmap::Bitmap(int width, int height, bool alphaOnly, bool tryHardware) {
   allocPixels(width, height, alphaOnly, tryHardware);
-  _info.setColorSpace(colorSpace);
-  pixelRef->info().setColorSpace(colorSpace);
 }
 
 Bitmap::Bitmap(const Bitmap& src) : _info(src._info), pixelRef(src.pixelRef) {
@@ -36,11 +33,10 @@ Bitmap::Bitmap(const Bitmap& src) : _info(src._info), pixelRef(src.pixelRef) {
 Bitmap::Bitmap(Bitmap&& src) : _info(src._info), pixelRef(std::move(src.pixelRef)) {
 }
 
-Bitmap::Bitmap(HardwareBufferRef hardwareBuffer, std::shared_ptr<ColorSpace> colorSpace) {
+Bitmap::Bitmap(HardwareBufferRef hardwareBuffer) {
   auto pixelBuffer = PixelBuffer::MakeFrom(hardwareBuffer);
   pixelRef = PixelRef::Wrap(pixelBuffer);
   if (pixelRef != nullptr) {
-    pixelRef->info().setColorSpace(std::move(colorSpace));
     _info = pixelRef->info();
   }
 }
@@ -86,13 +82,6 @@ const void* Bitmap::lockPixels() const {
 void Bitmap::unlockPixels() const {
   if (pixelRef != nullptr) {
     pixelRef->unlockPixels();
-  }
-}
-
-void Bitmap::setColorSpace(const std::shared_ptr<ColorSpace>& colorSpace) const {
-  _info.setColorSpace(colorSpace);
-  if (pixelRef) {
-    pixelRef->info().setColorSpace(colorSpace);
   }
 }
 

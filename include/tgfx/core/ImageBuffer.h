@@ -77,10 +77,6 @@ class ImageBuffer {
    */
   virtual int height() const = 0;
 
-  virtual std::shared_ptr<ColorSpace> colorSpace() const {
-    return ColorSpace::MakeSRGB();
-  }
-
   /**
    * Returns true if pixels represent transparency only. If true, each pixel is packed in 8 bits as
    * defined by ColorType::ALPHA_8.

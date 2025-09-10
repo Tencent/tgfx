@@ -24,29 +24,24 @@
 
 namespace tgfx {
 std::shared_ptr<ImageFilter> ImageFilter::DropShadow(float dx, float dy, float blurrinessX,
-                                                     float blurrinessY, const Color& color,
-                                                     std::shared_ptr<ColorSpace> colorSpace) {
+                                                     float blurrinessY, const Color& color) {
   if (color.alpha <= 0) {
     return nullptr;
   }
-  return std::make_shared<DropShadowImageFilter>(dx, dy, blurrinessX, blurrinessY, color, false,
-                                                 std::move(colorSpace));
+  return std::make_shared<DropShadowImageFilter>(dx, dy, blurrinessX, blurrinessY, color, false);
 }
 
 std::shared_ptr<ImageFilter> ImageFilter::DropShadowOnly(float dx, float dy, float blurrinessX,
-                                                         float blurrinessY, const Color& color,
-                                                         std::shared_ptr<ColorSpace> colorSpace) {
+                                                         float blurrinessY, const Color& color) {
   // If color is transparent, the image after applying the filter will be transparent.
   // So we should not return nullptr when color is transparent.
-  return std::make_shared<DropShadowImageFilter>(dx, dy, blurrinessX, blurrinessY, color, true,
-                                                 std::move(colorSpace));
+  return std::make_shared<DropShadowImageFilter>(dx, dy, blurrinessX, blurrinessY, color, true);
 }
 
 DropShadowImageFilter::DropShadowImageFilter(float dx, float dy, float blurrinessX,
-                                             float blurrinessY, const Color& color, bool shadowOnly,
-                                             std::shared_ptr<ColorSpace> colorSpace)
+                                             float blurrinessY, const Color& color, bool shadowOnly)
     : dx(dx), dy(dy), blurFilter(ImageFilter::Blur(blurrinessX, blurrinessY)), color(color),
-      shadowOnly(shadowOnly), colorSpace(std::move(colorSpace)) {
+      shadowOnly(shadowOnly) {
 }
 
 Rect DropShadowImageFilter::onFilterBounds(const Rect& srcRect) const {
@@ -94,7 +89,7 @@ PlacementPtr<FragmentProcessor> DropShadowImageFilter::getShadowFragmentProcesso
   }
   auto buffer = args.context->drawingBuffer();
   auto dstColor = color;
-  ColorSpaceXformSteps steps(colorSpace.get(), AlphaType::Unpremultiplied,
+  ColorSpaceXformSteps steps(ColorSpace::MakeSRGB().get(), AlphaType::Unpremultiplied,
                              source->colorSpace().get(), AlphaType::Premultiplied);
   steps.apply(dstColor.array());
   auto colorProcessor = ConstColorProcessor::Make(buffer, dstColor, InputMode::Ignore);

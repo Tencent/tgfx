@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/processors/FragmentProcessor.h"
+
+#include "ColorSpaceXformEffect.h"
 #include "ComposeFragmentProcessor.h"
 #include "core/utils/Log.h"
 #include "gpu/ProgramInfo.h"

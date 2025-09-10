@@ -957,7 +957,7 @@ void PopulateGraphicStateEntryFromPaint(
     // when we create our newGraphicsState (below)
     if (Types::Get(shader.get()) == Types::ShaderType::Color) {
       const auto* colorShader = static_cast<const ColorShader*>(shader.get());
-      if (colorShader->asColor(&color, nullptr)) {
+      if (colorShader->asColor(&color)) {
         color.alpha = 1;
         entry->color = color;
       }

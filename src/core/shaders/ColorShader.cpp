@@ -21,9 +21,8 @@
 #include "gpu/processors/ConstColorProcessor.h"
 
 namespace tgfx {
-std::shared_ptr<Shader> Shader::MakeColorShader(Color color,
-                                                const std::shared_ptr<ColorSpace>& colorSpace) {
-  auto shader = std::make_shared<ColorShader>(color, colorSpace);
+std::shared_ptr<Shader> Shader::MakeColorShader(Color color) {
+  auto shader = std::make_shared<ColorShader>(color);
   shader->weakThis = shader;
   return shader;
 }
@@ -32,11 +31,8 @@ bool ColorShader::isOpaque() const {
   return color.isOpaque();
 }
 
-bool ColorShader::asColor(Color* output, std::shared_ptr<ColorSpace>* colorSpace) const {
+bool ColorShader::asColor(Color* output) const {
   *output = color;
-  if (colorSpace) {
-    *colorSpace = this->colorSpace;
-  }
   return true;
 }
 
@@ -51,7 +47,10 @@ bool ColorShader::isEqual(const Shader* shader) const {
 
 PlacementPtr<FragmentProcessor> ColorShader::asFragmentProcessor(const FPArgs& args,
                                                                  const Matrix*) const {
-  return ConstColorProcessor::Make(args.context->drawingBuffer(), color.premultiply(),
+  auto dstColor = color;
+  ColorSpaceXformSteps steps{ColorSpace::MakeSRGB().get(), AlphaType::Unpremultiplied, args.dstColorSpace.get(), AlphaType::Premultiplied};
+  steps.apply(dstColor.array());
+  return ConstColorProcessor::Make(args.context->drawingBuffer(), dstColor,
                                    InputMode::ModulateA);
 }
 

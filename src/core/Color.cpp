@@ -18,6 +18,8 @@
 
 #include "tgfx/core/Color.h"
 #include "core/utils/Log.h"
+#include "tgfx/core/AlphaType.h"
+#include "tgfx/core/ColorSpaceXformSteps.h"
 
 namespace tgfx {
 const Color& Color::Transparent() {
@@ -50,6 +52,13 @@ const Color& Color::Blue() {
   return color;
 }
 
+Color Color::FromRGBAWithCS(uint8_t r, uint8_t g, uint8_t b, uint8_t a, const std::shared_ptr<ColorSpace>& colorSpace) {
+  float srcColor[4] = {static_cast<float>(r) / 255.0f, static_cast<float>(g) / 255.0f, static_cast<float>(b) / 255.0f, a == 255 ? 1.0f : static_cast<float>(a) / 255.0f};
+  ColorSpaceXformSteps steps{colorSpace.get(), AlphaType::Unpremultiplied, ColorSpace::MakeSRGB().get(), AlphaType::Unpremultiplied};
+  steps.apply(srcColor);
+  return {srcColor[0], srcColor[1], srcColor[2], srcColor[3]};
+}
+
 Color Color::FromRGBA(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
   auto alpha = a == 255 ? 1.0f : static_cast<float>(a) / 255.0f;
   return {static_cast<float>(r) / 255.0f, static_cast<float>(g) / 255.0f,
@@ -66,7 +75,7 @@ float& Color::operator[](int index) {
   return (&red)[index];
 }
 
-bool Color::isValid() const {
+bool Color::isNotOverflow() const {
   return red >= 0.0f && red <= 1.0f && green >= 0.0f && green <= 1.0f && blue >= 0.0f &&
          blue <= 1.0f && alpha >= 0.0f && alpha <= 1.0f;
 }

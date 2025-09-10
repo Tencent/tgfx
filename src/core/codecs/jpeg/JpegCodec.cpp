@@ -123,10 +123,7 @@ std::shared_ptr<ImageCodec> JpegCodec::MakeFromData(const std::string& filePath,
     orientation = get_exif_orientation(&cinfo);
     std::vector<uint8_t> iccProfileData;
     if (ExtractICCProfile(&cinfo, iccProfileData)) {
-      gfx::skcms_ICCProfile profile;
-      if (ParseICCProfile(iccProfileData, &profile)) {
-        cs = ColorSpace::Make(*reinterpret_cast<ICCProfile*>(&profile));
-      }
+      cs = ColorSpace::MakeFromICC(iccProfileData.data(), iccProfileData.size());
     }
     if (!cs) {
       cs = ColorSpace::MakeSRGB();
@@ -198,20 +195,12 @@ uint32_t JpegCodec::getScaledDimensions(int newWidth, int newHeight) const {
   return 0;
 }
 
-bool JpegCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels,
-                           bool isConvertColorSpace) const {
-  if (!isConvertColorSpace) {
-    dstInfo.setColorSpace(colorSpace());
-  }
+bool JpegCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   if (auto scaleDimensions = getScaledDimensions(dstInfo.width(), dstInfo.height())) {
-    bool result = readScaledPixels(dstInfo.colorType(), dstInfo.alphaType(), dstInfo.rowBytes(),
+    return readScaledPixels(dstInfo.colorType(), dstInfo.alphaType(), dstInfo.rowBytes(),
                                    dstPixels, scaleDimensions);
-    if (isConvertColorSpace) {
-      ConvertPixels(dstInfo.makeColorSpace(colorSpace()), dstPixels, dstInfo, dstPixels, true);
-    }
-    return result;
   }
-  return ImageCodec::readPixels(dstInfo, dstPixels, isConvertColorSpace);
+  return ImageCodec::readPixels(dstInfo, dstPixels);
 }
 
 bool JpegCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,

@@ -60,21 +60,10 @@ static const std::unordered_map<AlphaType, gfx::skcms_AlphaFormat> AlphaMapper{
 };
 
 void ConvertPixels(const ImageInfo& srcInfo, const void* srcPixels, const ImageInfo& dstInfo,
-                   void* dstPixels, bool isConvertColorSpace) {
-  bool canDirectCopy = false;
+                   void* dstPixels) {
   if (srcInfo.colorType() == dstInfo.colorType() && srcInfo.alphaType() == dstInfo.alphaType()) {
-    canDirectCopy = true;
-    if (isConvertColorSpace) {
-      if (ColorSpace::Equals(srcInfo.colorSpace().get(), dstInfo.colorSpace().get())) {
-        canDirectCopy = true;
-      } else {
-        canDirectCopy = false;
-      }
-    }
-  }
-  if (canDirectCopy) {
     CopyRectMemory(srcPixels, srcInfo.rowBytes(), dstPixels, dstInfo.rowBytes(),
-                   dstInfo.minRowBytes(), static_cast<size_t>(dstInfo.height()));
+               dstInfo.minRowBytes(), static_cast<size_t>(dstInfo.height()));
     return;
   }
 
@@ -84,21 +73,9 @@ void ConvertPixels(const ImageInfo& srcInfo, const void* srcPixels, const ImageI
   auto dstAlpha = AlphaMapper.at(dstInfo.alphaType());
   auto width = dstInfo.width();
   auto height = dstInfo.height();
-  gfx::skcms_ICCProfile* srcProfile = nullptr;
-  gfx::skcms_ICCProfile* dstProfile = nullptr;
-  if (isConvertColorSpace) {
-    if (srcInfo.colorSpace()) {
-      srcProfile = static_cast<gfx::skcms_ICCProfile*>(alloca(sizeof(gfx::skcms_ICCProfile)));
-      srcInfo.colorSpace()->toProfile(reinterpret_cast<ICCProfile*>(srcProfile));
-    }
-    if (dstInfo.colorSpace()) {
-      dstProfile = static_cast<gfx::skcms_ICCProfile*>(alloca(sizeof(gfx::skcms_ICCProfile)));
-      dstInfo.colorSpace()->toProfile(reinterpret_cast<ICCProfile*>(dstProfile));
-    }
-  }
   for (int i = 0; i < height; i++) {
-    gfx::skcms_Transform(srcPixels, srcFormat, srcAlpha, srcProfile, dstPixels, dstFormat, dstAlpha,
-                         dstProfile, static_cast<size_t>(width));
+    gfx::skcms_Transform(srcPixels, srcFormat, srcAlpha, nullptr, dstPixels, dstFormat, dstAlpha,
+                         nullptr, static_cast<size_t>(width));
     dstPixels = AddOffset(dstPixels, dstInfo.rowBytes());
     srcPixels = AddOffset(srcPixels, srcInfo.rowBytes());
   }

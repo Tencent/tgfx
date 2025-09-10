@@ -46,10 +46,6 @@ class RawPixelData : public ImageBuffer {
     return info.isAlphaOnly();
   }
 
-  std::shared_ptr<ColorSpace> colorSpace() const override {
-    return info.colorSpace();
-  }
-
  protected:
   std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) const override {
     switch (info.colorType()) {

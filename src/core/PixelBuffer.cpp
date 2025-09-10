@@ -91,8 +91,7 @@ class HardwarePixelBuffer : public PixelBuffer {
 };
 
 std::shared_ptr<PixelBuffer> PixelBuffer::Make(int width, int height, bool alphaOnly,
-                                               bool tryHardware,
-                                               std::shared_ptr<ColorSpace> colorSpace) {
+                                               bool tryHardware) {
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
@@ -106,7 +105,7 @@ std::shared_ptr<PixelBuffer> PixelBuffer::Make(int width, int height, bool alpha
   }
   auto colorType = alphaOnly ? ColorType::ALPHA_8 : ColorType::RGBA_8888;
   auto info =
-      ImageInfo::Make(width, height, colorType, AlphaType::Premultiplied, 0, std::move(colorSpace));
+      ImageInfo::Make(width, height, colorType, AlphaType::Premultiplied, 0);
   if (info.isEmpty()) {
     return nullptr;
   }

@@ -48,7 +48,7 @@ class ColorFilter {
    * (dst) based on the BlendMode.
    */
   static std::shared_ptr<ColorFilter> Blend(
-      Color color, BlendMode mode, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+      Color color, BlendMode mode);
 
   /**
    * Creates a new ColorFilter that transforms the color using the given 4x5 matrix. The matrix can

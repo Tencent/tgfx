@@ -49,8 +49,7 @@ class Bitmap {
    * backed PixelRef is allocated. Otherwise, a raster PixelRef is allocated. The isEmpty() method
    * of the Bitmap will return true if allocation fails.
    */
-  Bitmap(int width, int height, bool alphaOnly = false, bool tryHardware = true,
-         std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+  Bitmap(int width, int height, bool alphaOnly = false, bool tryHardware = true);
 
   /**
    * Copies settings from src to returned Bitmap. Shares pixels if src has pixels allocated, so both
@@ -68,8 +67,7 @@ class Bitmap {
    * buffer could be an AHardwareBuffer on the android platform or a CVPixelBufferRef on the apple
    * platform. The Bitmap takes a reference to the hardwareBuffer.
    */
-  explicit Bitmap(HardwareBufferRef hardwareBuffer,
-                  std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+  explicit Bitmap(HardwareBufferRef hardwareBuffer);
 
   /**
    * Copies settings from src to returned Bitmap. Shares pixels if src has pixels allocated, so both
