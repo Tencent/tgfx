@@ -108,6 +108,7 @@ bool Atlas::activateNewPage() {
       HardwareBufferAllocate(textureWidth, textureHeight, pixelFormat == PixelFormat::ALPHA_8);
   if (hardwareBuffer != nullptr) {
     proxy = proxyProvider->createTextureProxy(hardwareBuffer);
+    HardwareBufferRelease(hardwareBuffer);
   }
   if (proxy == nullptr) {
     proxy = proxyProvider->createTextureProxy(UniqueKey::Make(), textureWidth, textureHeight,
