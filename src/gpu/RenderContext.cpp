@@ -42,7 +42,7 @@ static void ComputeAtlasKey(const Font& font, const std::shared_ptr<ScalerContex
                             uint32_t typefaceID, GlyphID glyphID, const Stroke* stroke,
                             BytesKey& key) {
   key.write(typefaceID);
-  key.write(std::roundf(scalerContext->getBackingSize()));
+  key.write(scalerContext->getBackingSize());
   if (font.hasColor()) {
     key.write(glyphID);
     return;
@@ -111,7 +111,7 @@ static std::shared_ptr<ImageCodec> GetGlyphCodec(
   std::shared_ptr<Shape> shape = nullptr;
   if (!font.isFauxItalic()) {
     shape = Shape::MakeFrom(font, glyphID);
-  }else {
+  } else {
     auto noItalicFont = font;
     noItalicFont.setFauxItalic(false);
     shape = Shape::MakeFrom(std::move(noItalicFont), glyphID);
