@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RectPerspectiveRenderTask.h"
+#include "gpu/GlobalCache.h"
+#include "gpu/ProxyProvider.h"
 #include "gpu/RectsVertexProvider.h"
 #include "gpu/ops/RectDrawOp.h"
 #include "gpu/processors/QuadPerEdgeAA3DGeometryProcessor.h"
@@ -34,7 +36,7 @@ void RectPerspectiveRenderTask::execute(CommandEncoder* encoder) {
     LOGE("RectPerspectiveRenderTask::execute() Render target is null!");
     return;
   }
-  auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
+  const auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
   if (drawingBuffer == nullptr) {
     LOGE("RectPerspectiveRenderTask::execute() Drawing buffer is null!");
     return;
@@ -60,17 +62,32 @@ void RectPerspectiveRenderTask::execute(CommandEncoder* encoder) {
     renderPass->end();
     return;
   }
+
   renderPass->setPipeline(program->getPipeline());
   programInfo.setUniformsAndSamplers(renderPass.get(), program.get());
 
-  //TODO: richardjiechen complete logic
+  auto vertexProvider = RectsVertexProvider::MakeFrom(drawingBuffer, rect, aa);
+  const auto vertexBufferProxyView =
+      renderTarget->getContext()->proxyProvider()->createVertexBufferProxy(
+          std::move(vertexProvider));
+  const auto vertexBuffer = vertexBufferProxyView->getBuffer();
   std::shared_ptr<IndexBuffer> indexBuffer = nullptr;
-  std::shared_ptr<VertexBuffer> vertexBuffer = nullptr;
-
+  if (aa == AAType::Coverage) {
+    const auto indexBufferProxy =
+        renderTarget->getContext()->globalCache()->getRectIndexBuffer(true);
+    indexBuffer = indexBufferProxy->getBuffer();
+  }
   renderPass->setVertexBuffer(vertexBuffer->gpuBuffer(), 0);
   renderPass->setIndexBuffer(indexBuffer->gpuBuffer());
-  const auto numIndicesPerQuad = (aa == AAType::Coverage ? IndicesPerAAQuad : IndicesPerNonAAQuad);
-  renderPass->drawIndexed(PrimitiveType::Triangles, 0, numIndicesPerQuad);
+
+  if (indexBuffer != nullptr) {
+    const auto numIndicesPerQuad =
+        (aa == AAType::Coverage ? IndicesPerAAQuad : IndicesPerNonAAQuad);
+    renderPass->drawIndexed(PrimitiveType::Triangles, 0, numIndicesPerQuad);
+  } else {
+    renderPass->draw(PrimitiveType::TriangleStrip, 0, 4);
+  }
   renderPass->end();
 }
+
 }  // namespace tgfx
