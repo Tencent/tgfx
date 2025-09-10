@@ -23,7 +23,43 @@
 namespace tgfx {
 
 struct Vec3 {
-  float x, y, z;
+  constexpr Vec3() : x(0), y(0), z(0) {
+  }
+
+  constexpr Vec3(float x, float y, float z) : x(x), y(y), z(z) {
+  }
+
+  static float Dot(const Vec3& a, const Vec3& b) {
+    return a.x * b.x + a.y * b.y + a.z * b.z;
+  }
+
+  float dot(const Vec3& v) const {
+    return Dot(*this, v);
+  }
+
+  static Vec3 Cross(const Vec3& a, const Vec3& b) {
+    return {a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x};
+  }
+
+  Vec3 cross(const Vec3& v) const {
+    return Cross(*this, v);
+  }
+
+  static Vec3 Normalize(const Vec3& v) {
+    return v * (1.0f / v.length());
+  }
+
+  Vec3 normalize() const {
+    return Normalize(*this);
+  }
+
+  float length() const {
+    return sqrtf(Dot(*this, *this));
+  }
+
+  const float* ptr() const {
+    return &x;
+  }
 
   bool operator==(const Vec3& v) const {
     return x == v.x && y == v.y && z == v.z;
@@ -31,18 +67,6 @@ struct Vec3 {
 
   bool operator!=(const Vec3& v) const {
     return !(*this == v);
-  }
-
-  static float Dot(const Vec3& a, const Vec3& b) {
-    return a.x * b.x + a.y * b.y + a.z * b.z;
-  }
-
-  static Vec3 Cross(const Vec3& a, const Vec3& b) {
-    return {a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x};
-  }
-
-  static Vec3 Normalize(const Vec3& v) {
-    return v * (1.0f / v.length());
   }
 
   Vec3 operator-() const {
@@ -53,12 +77,24 @@ struct Vec3 {
     return {x + v.x, y + v.y, z + v.z};
   }
 
+  void operator+=(const Vec3& v) {
+    *this = *this + v;
+  }
+
   Vec3 operator-(const Vec3& v) const {
     return {x - v.x, y - v.y, z - v.z};
   }
 
+  void operator-=(const Vec3& v) {
+    *this = *this - v;
+  }
+
   Vec3 operator*(const Vec3& v) const {
     return {x * v.x, y * v.y, z * v.z};
+  }
+
+  void operator*=(const Vec3& v) {
+    *this = *this * v;
   }
 
   friend Vec3 operator*(const Vec3& v, float s) {
@@ -69,40 +105,41 @@ struct Vec3 {
     return v * s;
   }
 
-  void operator+=(Vec3 v) {
-    *this = *this + v;
-  }
-
-  void operator-=(Vec3 v) {
-    *this = *this - v;
-  }
-
-  void operator*=(Vec3 v) {
-    *this = *this * v;
-  }
-
   void operator*=(float s) {
     *this = *this * s;
   }
 
-  float lengthSquared() const {
-    return Dot(*this, *this);
+  float x, y, z;
+};
+
+struct Vec4 {
+  constexpr Vec4() : x(0), y(0), z(0), w(0) {
+  }
+
+  constexpr Vec4(float x, float y, float z, float w) : x(x), y(y), z(z), w(w) {
+  }
+
+  constexpr Vec4(const Vec3& v, float w) : x(v.x), y(v.y), z(v.z), w(w) {
+  }
+
+  static float Dot(const Vec4& a, const Vec4& b) {
+    return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
+  }
+
+  float dot(const Vec4& v) const {
+    return Dot(*this, v);
+  }
+
+  static Vec4 Normalize(const Vec4& v) {
+    return v * (1.0f / v.length());
+  }
+
+  Vec4 normalize() const {
+    return Normalize(*this);
   }
 
   float length() const {
     return sqrtf(Dot(*this, *this));
-  }
-
-  float dot(const Vec3& v) const {
-    return Dot(*this, v);
-  }
-
-  Vec3 cross(const Vec3& v) const {
-    return Cross(*this, v);
-  }
-
-  Vec3 normalize() const {
-    return Normalize(*this);
   }
 
   const float* ptr() const {
@@ -112,10 +149,6 @@ struct Vec3 {
   float* ptr() {
     return &x;
   }
-};
-
-struct Vec4 {
-  float x, y, z, w;
 
   bool operator==(const Vec4& v) const {
     return x == v.x && y == v.y && z == v.z && w == v.w;
@@ -123,14 +156,6 @@ struct Vec4 {
 
   bool operator!=(const Vec4& v) const {
     return !(*this == v);
-  }
-
-  static float Dot(const Vec4& a, const Vec4& b) {
-    return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
-  }
-
-  static Vec4 Normalize(const Vec4& v) {
-    return v * (1.0f / v.length());
   }
 
   Vec4 operator-() const {
@@ -141,12 +166,24 @@ struct Vec4 {
     return {x + v.x, y + v.y, z + v.z, w + v.w};
   }
 
+  void operator+=(const Vec4& v) {
+    *this = *this + v;
+  }
+
   Vec4 operator-(const Vec4& v) const {
     return {x - v.x, y - v.y, z - v.z, w - v.w};
   }
 
+  void operator-=(const Vec4& v) {
+    *this = *this - v;
+  }
+
   Vec4 operator*(const Vec4& v) const {
     return {x * v.x, y * v.y, z * v.z, w * v.w};
+  }
+
+  void operator*=(const Vec4& v) {
+    *this = *this * v;
   }
 
   friend Vec4 operator*(const Vec4& v, float s) {
@@ -157,28 +194,8 @@ struct Vec4 {
     return v * s;
   }
 
-  float lengthSquared() const {
-    return Dot(*this, *this);
-  }
-
-  float length() const {
-    return sqrtf(Dot(*this, *this));
-  }
-
-  float dot(const Vec4& v) const {
-    return Dot(*this, v);
-  }
-
-  Vec4 normalize() const {
-    return Normalize(*this);
-  }
-
-  const float* ptr() const {
-    return &x;
-  }
-
-  float* ptr() {
-    return &x;
+  void operator*=(float s) {
+    *this = *this * s;
   }
 
   float operator[](int i) const {
@@ -188,6 +205,8 @@ struct Vec4 {
   float& operator[](int i) {
     return this->ptr()[i];
   }
+
+  float x, y, z, w;
 };
 
 }  // namespace tgfx
