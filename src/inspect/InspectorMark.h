@@ -59,9 +59,6 @@
 #define CAPUTRE_FRARGMENT_PROCESSORS(context, colors, coverages) \
   tgfx::inspect::FrameCapture::SendFragmentProcessor(context, colors, coverages);
 
-#define CAPUTRE_TEXTURE_BEFORE_RENDER(context, fragmentProcessors) \
-  tgfx::inspect::FrameCapture::SendInputTextureBeforeRender(context, fragmentProcessors)
-
 #else
 
 #define SEND_LAYER_DATA(data) (void)data
@@ -76,10 +73,7 @@
 #define ATTRIBUTE_NAME(name, value)
 #define ATTRIBUTE_NAME_ENUM(name, value, type)
 #define ATTRIBUTE_ENUM(value, type)
-#define CAPTURE_TEXTURE(commandQueue, texturePtr)
-#define CAPUTRE_TEXTURE_BEFORE_RENDER(context, fragmentProcessors)
-#define CAPUTRE_FRARGMENT_PROCESSORS(renderTarget, fragmentProcessors)
-#define SEND_OUTPUT_TEXUTRE_ID(texturePtr)
 #define CAPUTRE_RENDER_TARGET(renderTarget)
+#define CAPUTRE_FRARGMENT_PROCESSORS(context, colors, coverages)
 
 #endif
