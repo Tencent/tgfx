@@ -20,7 +20,10 @@
 #include "core/Matrix3D.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/PlacementPtr.h"
+#include "gpu/DrawingManager.h"
+#include "gpu/TPArgs.h"
 #include "gpu/processors/TiledTextureEffect.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
 
@@ -52,11 +55,14 @@ Rect PerspectiveImageFilter::onFilterBounds(const Rect& srcRect) const {
 
 std::shared_ptr<TextureProxy> PerspectiveImageFilter::lockTextureProxy(
     std::shared_ptr<Image> source, const Rect& renderBounds, const TPArgs& args) const {
-  (void)source;
-  (void)renderBounds;
-  (void)args;
-  //TODO: RicharrdChen
-  return nullptr;
+  const auto renderTarget = RenderTargetProxy::MakeFallback(
+      args.context, static_cast<int>(renderBounds.width()), static_cast<int>(renderBounds.height()),
+      source->isAlphaOnly(), 1, args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
+  const auto sourceTextureProxy = source->lockTextureProxy(args);
+  const auto drawingManager = args.context->drawingManager();
+  drawingManager->addRectPerspectiveRenderTask(renderBounds, AAType::Coverage, renderTarget,
+                                               sourceTextureProxy);
+  return renderTarget->asTextureProxy();
 }
 
 PlacementPtr<FragmentProcessor> PerspectiveImageFilter::asFragmentProcessor(
