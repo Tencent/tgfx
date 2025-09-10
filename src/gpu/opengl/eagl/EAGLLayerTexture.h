@@ -18,24 +18,32 @@
 
 #pragma once
 
-#include "gpu/Program.h"
-#include "tgfx/gpu/RuntimeProgram.h"
+#import <UIKit/UIKit.h>
+#include "gpu/opengl/GLGPU.h"
+#include "gpu/opengl/GLTexture.h"
 
 namespace tgfx {
-class RuntimeProgramWrapper : public Program {
+class EAGLLayerTexture : public GLTexture {
  public:
-  static std::shared_ptr<Program> Wrap(std::unique_ptr<RuntimeProgram> program);
+  static std::unique_ptr<EAGLLayerTexture> MakeFrom(GLGPU* gpu, CAEAGLLayer* layer);
 
-  static const RuntimeProgram* Unwrap(const Program* program);
+  unsigned frameBufferID() const override {
+    return _frameBufferID;
+  }
+
+  unsigned colorBufferID() const {
+    return renderBufferID;
+  }
 
  protected:
-  void onReleaseGPU() override;
+  void onRelease(GLGPU* gpu) override;
 
  private:
-  std::unique_ptr<RuntimeProgram> runtimeProgram = nullptr;
+  unsigned _frameBufferID = 0;
+  unsigned renderBufferID = 0;
 
-  explicit RuntimeProgramWrapper(std::unique_ptr<RuntimeProgram> program)
-      : Program(nullptr), runtimeProgram(std::move(program)) {
+  EAGLLayerTexture(const GPUTextureDescriptor& descriptor, unsigned frameBufferID)
+      : GLTexture(descriptor, GL_TEXTURE_2D, 0), _frameBufferID(frameBufferID) {
   }
 };
 }  // namespace tgfx

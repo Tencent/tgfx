@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "gpu/ResourceKey.h"
+#include "gpu/resources/ResourceKey.h"
 #include "tgfx/core/Shape.h"
 
 namespace tgfx {

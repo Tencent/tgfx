@@ -2992,4 +2992,28 @@ TGFX_TEST(LayerTest, PartialDrawLayer) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PartialDrawLayer"));
   EXPECT_EQ(layerInvisible->rasterizedContent, nullptr);
 }
+
+TGFX_TEST(LayerTest, DropShadowDirtyRect) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  DisplayList displayList;
+  auto surface = Surface::Make(context, 200, 200);
+  auto rootLayer = Layer::Make();
+  displayList.root()->addChild(rootLayer);
+  auto shapeLayer = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeXYWH(0, 0, 100, 100));
+  shapeLayer->setPath(path);
+  shapeLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 0, 0, 255)));
+  shapeLayer->setLayerStyles({DropShadowStyle::Make(10, 10, 0, 0, Color::Black())});
+  rootLayer->addChild(shapeLayer);
+  shapeLayer->setMatrix(Matrix::MakeRotate(-120));
+  displayList.setContentOffset(50, 150);
+  displayList.render(surface.get());
+  shapeLayer->setMatrix(Matrix::MakeRotate(-121));
+  displayList.showDirtyRegions(true);
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DropShadowDirtyRect"));
+}
 }  // namespace tgfx

@@ -16,31 +16,32 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <memory>
-#include "gpu/Resource.h"
-#include "tgfx/gpu/Backend.h"
+#include "Resource.h"
 
 namespace tgfx {
-/**
- * Wrapper class for a backend semaphore object.
- */
-class Semaphore : public Resource {
- public:
-  /**
-   * Wraps a backend semaphore object into a Semaphore instance.
-   */
-  static std::shared_ptr<Semaphore> Wrap(Context* context,
-                                         const BackendSemaphore& backendSemaphore);
-
-  size_t memoryUsage() const override {
-    return 0;
+void Resource::assignUniqueKey(const UniqueKey& newKey) {
+  if (newKey.empty()) {
+    removeUniqueKey();
+    return;
   }
+  if (newKey != uniqueKey) {
+    context->resourceCache()->changeUniqueKey(this, newKey);
+  }
+}
 
-  /**
-   * Returns the backend semaphore object associated with this Semaphore instance.
-   */
-  virtual BackendSemaphore getBackendSemaphore() const = 0;
-};
+void Resource::removeUniqueKey() {
+  if (!uniqueKey.empty()) {
+    context->resourceCache()->removeUniqueKey(this);
+  }
+}
+
+void Resource::release(bool releaseGPU) {
+  if (releaseGPU) {
+    onReleaseGPU();
+  }
+  context = nullptr;
+  // Set the reference to nullptr, allowing the resource to be deleted immediately or later when the
+  // last external reference is released.
+  reference = nullptr;
+}
 }  // namespace tgfx

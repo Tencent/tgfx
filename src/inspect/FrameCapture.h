@@ -90,18 +90,14 @@ class FrameCapture {
 
   static void SendAttributeData(const char* name, float* val, int size);
 
-  static void SendInputTextureID(const GPUTexture* texture);
+  static void SendInputTextureID(uint64_t textureId);
 
-  static void SendOutputTextureID(const GPUTexture* texture);
+  static void SendOutputTextureID(uint64_t textureId);
 
-  static void SendFragmentProcessor(
-      const std::vector<PlacementPtr<FragmentProcessor>>& fragmentProcessors);
+  static void SendFragmentProcessor(Context* context,
+                                    const std::vector<FragmentProcessor*>& processors);
 
-  static void SendInputTextureBeforeRender(
-      Context* context, const std::vector<PlacementPtr<FragmentProcessor>>& fragmentProcessors);
-
-  static void SendFrameCaptureTexture(std::shared_ptr<FrameCaptureTexture> frameCaptureTexture,
-                                      bool differentEachFrame);
+  static void SendFrameCaptureTexture(std::shared_ptr<FrameCaptureTexture> frameCaptureTexture);
 
  protected:
   enum class DequeueStatus { DataDequeued, ConnectionLost, QueueEmpty };

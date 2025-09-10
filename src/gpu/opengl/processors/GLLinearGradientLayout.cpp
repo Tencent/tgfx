@@ -27,7 +27,7 @@ GLLinearGradientLayout::GLLinearGradientLayout(Matrix matrix) : LinearGradientLa
 }
 
 void GLLinearGradientLayout::emitCode(EmitArgs& args) const {
-  auto* fragBuilder = args.fragBuilder;
+  auto fragBuilder = args.fragBuilder;
   fragBuilder->codeAppendf("float t = %s.x + 1.0000000000000001e-05;",
                            (*args.transformedCoords)[0].name().c_str());
   fragBuilder->codeAppendf("%s = vec4(t, 1.0, 0.0, 0.0);", args.outputColor.c_str());

@@ -48,7 +48,14 @@ class RectDrawOp : public DrawOp {
   static PlacementPtr<RectDrawOp> Make(Context* context, PlacementPtr<RectsVertexProvider> provider,
                                        uint32_t renderFlags);
 
-  void execute(RenderPass* renderPass, RenderTarget* renderTarget) override;
+ protected:
+  PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
+
+  void onDraw(RenderPass* renderPass) override;
+
+  Type type() override {
+    return Type::RectDrawOp;
+  }
 
  private:
   size_t rectCount = 0;

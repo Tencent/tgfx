@@ -73,7 +73,7 @@ class TiledTextureEffect : public FragmentProcessor {
 
   const TextureView* getTextureView() const;
 
-  static ShaderMode GetShaderMode(SamplerState::WrapMode mode, FilterMode filter, MipmapMode mm);
+  static ShaderMode GetShaderMode(TileMode tileMode, FilterMode filter, MipmapMode mipmapMode);
 
   std::shared_ptr<TextureProxy> textureProxy;
   SamplerState samplerState;

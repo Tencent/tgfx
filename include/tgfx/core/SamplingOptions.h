@@ -18,34 +18,10 @@
 
 #pragma once
 
+#include "tgfx/gpu/FilterMode.h"
+#include "tgfx/gpu/MipmapMode.h"
+
 namespace tgfx {
-enum class FilterMode {
-  /**
-   * Single sample point (the nearest neighbor)
-   */
-  Nearest,
-
-  /**
-   * Interpolate between 2x2 sample points (bi-linear interpolation)
-   */
-  Linear,
-};
-
-enum class MipmapMode {
-  /**
-   * ignore mipmap levels, sample from the "base"
-   */
-  None,
-  /**
-   * Sample from the nearest level
-   */
-  Nearest,
-  /**
-   * Interpolate between the two nearest levels
-   */
-  Linear,
-};
-
 struct SamplingOptions {
   SamplingOptions() = default;
 

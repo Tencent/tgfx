@@ -33,8 +33,8 @@ GLDeviceSpaceTextureEffect::GLDeviceSpaceTextureEffect(std::shared_ptr<TexturePr
 }
 
 void GLDeviceSpaceTextureEffect::emitCode(EmitArgs& args) const {
-  auto* fragBuilder = args.fragBuilder;
-  auto* uniformHandler = args.uniformHandler;
+  auto fragBuilder = args.fragBuilder;
+  auto uniformHandler = args.uniformHandler;
   auto deviceCoordMatrixName = uniformHandler->addUniform(
       "DeviceCoordMatrix", UniformFormat::Float3x3, ShaderStage::Fragment);
   fragBuilder->codeAppendf("vec3 deviceCoord = %s * vec3(gl_FragCoord.xy, 1.0);",
@@ -52,7 +52,8 @@ void GLDeviceSpaceTextureEffect::emitCode(EmitArgs& args) const {
   }
 }
 
-void GLDeviceSpaceTextureEffect::onSetData(UniformBuffer* uniformBuffer) const {
+void GLDeviceSpaceTextureEffect::onSetData(UniformBuffer* /*vertexUniformBuffer*/,
+                                           UniformBuffer* fragmentUniformBuffer) const {
   auto textureView = textureProxy->getTextureView();
   if (textureView == nullptr) {
     return;
@@ -60,6 +61,6 @@ void GLDeviceSpaceTextureEffect::onSetData(UniformBuffer* uniformBuffer) const {
   auto deviceCoordMatrix = uvMatrix;
   auto scale = textureView->getTextureCoord(1, 1);
   deviceCoordMatrix.postScale(scale.x, scale.y);
-  uniformBuffer->setData("DeviceCoordMatrix", deviceCoordMatrix);
+  fragmentUniformBuffer->setData("DeviceCoordMatrix", deviceCoordMatrix);
 }
 }  // namespace tgfx

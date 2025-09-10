@@ -21,6 +21,7 @@
 #include <memory>
 #include "gpu/CommandEncoder.h"
 #include "gpu/CommandQueue.h"
+#include "gpu/GPUSampler.h"
 #include "gpu/YUVFormat.h"
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/Caps.h"
@@ -126,8 +127,23 @@ class GPU {
       const BackendRenderTarget& backendRenderTarget) = 0;
 
   /**
+   * Creates a GPUFence that wraps the specified backend semaphore. The returned GPUFence takes
+   * ownership of the backend semaphore and will destroy it when no longer needed. Returns nullptr
+   * if the backend semaphore is invalid or not supported by the GPU backend.
+   */
+  virtual std::unique_ptr<GPUFence> importExternalFence(const BackendSemaphore& semaphore) = 0;
+
+  /**
+   * Creates a GPUSampler with the specified descriptor.
+   */
+  virtual std::unique_ptr<GPUSampler> createSampler(const GPUSamplerDescriptor& descriptor) = 0;
+
+  /**
    * Creates a command encoder that can be used to encode commands to be issued to the GPU.
    */
   virtual std::shared_ptr<CommandEncoder> createCommandEncoder() = 0;
+
+  // TODO: Remove this method once all runtime effects have fully switched to using GPU commands.
+  virtual void resetGLState() = 0;
 };
 }  // namespace tgfx

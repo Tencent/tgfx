@@ -17,6 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+
+#include <unordered_map>
+
 namespace tgfx::inspect {
 
 static constexpr int LZ4HeaderSize = 12;
@@ -90,9 +93,17 @@ enum class OpTaskType : uint8_t {
   RectDrawOp,
   RRectDrawOp,
   ShapeDrawOp,
+  AtlasTextOp,
   DstTextureCopyOp,
   ResolveOp,
   OpTaskTypeSize,
+};
+
+static std::unordered_map<uint8_t, OpTaskType> DrawOpTypeToOpTaskType = {
+    {0, OpTaskType::RectDrawOp},
+    {1, OpTaskType::RRectDrawOp},
+    {2, OpTaskType::ShapeDrawOp},
+    {3, OpTaskType::AtlasTextOp},
 };
 
 enum class CustomEnumType : uint8_t {

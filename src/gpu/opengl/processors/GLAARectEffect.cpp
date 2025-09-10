@@ -27,8 +27,8 @@ GLAARectEffect::GLAARectEffect(const Rect& rect) : AARectEffect(rect) {
 }
 
 void GLAARectEffect::emitCode(EmitArgs& args) const {
-  auto* fragBuilder = args.fragBuilder;
-  auto* uniformHandler = args.uniformHandler;
+  auto fragBuilder = args.fragBuilder;
+  auto uniformHandler = args.uniformHandler;
 
   auto rectName = uniformHandler->addUniform("Rect", UniformFormat::Float4, ShaderStage::Fragment);
   fragBuilder->codeAppendf(
@@ -40,10 +40,11 @@ void GLAARectEffect::emitCode(EmitArgs& args) const {
                            args.inputColor.c_str());
 }
 
-void GLAARectEffect::onSetData(UniformBuffer* uniformBuffer) const {
+void GLAARectEffect::onSetData(UniformBuffer* /*vertexUniformBuffer*/,
+                               UniformBuffer* fragmentUniformBuffer) const {
   // The AA math in the shader evaluates to 0 at the uploaded coordinates, so outset by 0.5
   // to interpolate from 0 at a half pixel inset and 1 at a half pixel outset of rect.
   auto outRect = rect.makeOutset(0.5f, 0.5f);
-  uniformBuffer->setData("Rect", outRect);
+  fragmentUniformBuffer->setData("Rect", outRect);
 }
 }  // namespace tgfx

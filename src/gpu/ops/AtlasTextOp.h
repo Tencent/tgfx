@@ -35,9 +35,16 @@ class AtlasTextOp final : public DrawOp {
                                         std::shared_ptr<TextureProxy> textureProxy,
                                         const SamplingOptions& sampling);
 
-  void execute(RenderPass* renderPass, RenderTarget* renderTarget) override;
-
   bool hasCoverage() const override;
+
+ protected:
+  PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
+
+  void onDraw(RenderPass* renderPass) override;
+
+  Type type() override {
+    return Type::AtlasTextOp;
+  }
 
  private:
   size_t rectCount = 0;

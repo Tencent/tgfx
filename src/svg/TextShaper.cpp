@@ -40,7 +40,7 @@ class TextShaperPrimitive : public TextShaper {
     const char* textStart = text.data();
     const char* textStop = textStart + text.size();
     while (textStart < textStop) {
-      const auto* oldPosition = textStart;
+      const auto oldPosition = textStart;
       UTF::NextUTF8(&textStart, textStop);
       auto length = textStart - oldPosition;
       auto str = std::string(oldPosition, static_cast<size_t>(length));

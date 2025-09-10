@@ -19,7 +19,7 @@
 #pragma once
 
 #include "RenderTask.h"
-#include "gpu/Semaphore.h"
+#include "gpu/resources/Semaphore.h"
 
 namespace tgfx {
 class SemaphoreWaitTask : public RenderTask {
@@ -29,7 +29,7 @@ class SemaphoreWaitTask : public RenderTask {
   }
 
   void execute(CommandEncoder* encoder) override {
-    encoder->waitSemaphore(semaphore->getBackendSemaphore());
+    encoder->waitForFence(semaphore->getFence());
   }
 
  private:

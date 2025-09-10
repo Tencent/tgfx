@@ -19,7 +19,7 @@
 #include "tgfx/platform/ImageReader.h"
 #include "core/PixelRef.h"
 #include "core/utils/Log.h"
-#include "gpu/TextureView.h"
+#include "gpu/resources/TextureView.h"
 #include "platform/ImageStream.h"
 
 namespace tgfx {

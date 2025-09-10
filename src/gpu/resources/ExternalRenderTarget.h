@@ -18,46 +18,49 @@
 
 #pragma once
 
-#include "gpu/GPU.h"
-#include "gpu/GPUBuffer.h"
-#include "gpu/Resource.h"
+#include "gpu/resources/RenderTarget.h"
+#include "gpu/resources/Resource.h"
 
 namespace tgfx {
-/**
- * IndexBuffer is a resource that encapsulates a GPUBuffer, which can be used for index data in
- * a RenderPass.
- */
-class IndexBuffer : public Resource {
+class ExternalRenderTarget : public Resource, public RenderTarget {
  public:
+  Context* getContext() const override {
+    return context;
+  }
+
+  ImageOrigin origin() const override {
+    return _origin;
+  }
+
+  bool externallyOwned() const override {
+    return true;
+  }
+
+  GPUTexture* getRenderTexture() const override {
+    return renderTexture.get();
+  }
+
+  GPUTexture* getSampleTexture() const override {
+    return renderTexture.get();
+  }
+
   size_t memoryUsage() const override {
-    return buffer->size();
-  }
-
-  /**
-   * Returns the size of the index buffer.
-   */
-  size_t size() const {
-    return buffer->size();
-  }
-
-  /**
-   * Returns the GPUBuffer associated with this IndexBuffer.
-   */
-  GPUBuffer* gpuBuffer() const {
-    return buffer.get();
+    return 0;
   }
 
  protected:
   void onReleaseGPU() override {
-    buffer->release(context->gpu());
+    renderTexture->release(context->gpu());
   }
 
  private:
-  std::unique_ptr<GPUBuffer> buffer = nullptr;
+  std::unique_ptr<GPUTexture> renderTexture = nullptr;
+  ImageOrigin _origin = ImageOrigin::TopLeft;
 
-  explicit IndexBuffer(std::unique_ptr<GPUBuffer> buffer) : buffer(std::move(buffer)) {
+  ExternalRenderTarget(std::unique_ptr<GPUTexture> texture, ImageOrigin origin)
+      : renderTexture(std::move(texture)), _origin(origin) {
   }
 
-  friend class GPUBufferUploadTask;
+  friend class RenderTarget;
 };
 }  // namespace tgfx

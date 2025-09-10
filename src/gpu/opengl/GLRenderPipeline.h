@@ -18,48 +18,57 @@
 
 #pragma once
 
-#include <optional>
-#include "gpu/Program.h"
-#include "gpu/ProgramInfo.h"
+#include <memory>
+#include "gpu/Attribute.h"
+#include "gpu/Blend.h"
+#include "gpu/GPURenderPipeline.h"
+#include "gpu/UniformLayout.h"
 #include "gpu/opengl/GLBuffer.h"
 
 namespace tgfx {
-class GLProgram : public Program {
+class GLGPU;
+
+/**
+ * GLRenderPipeline is the OpenGL implementation of the GPURenderPipeline interface. It encapsulates
+ * an OpenGL shader program along with its associated state, such as vertex attributes and blending
+ * settings.
+ */
+class GLRenderPipeline : public GPURenderPipeline {
  public:
-  GLProgram(unsigned programID, std::unique_ptr<UniformBuffer> uniformBuffer,
-            std::vector<Attribute> attributes, std::unique_ptr<BlendFormula> blendFormula);
+  GLRenderPipeline(unsigned programID, std::unique_ptr<UniformLayout> uniformLayout,
+                   std::vector<Attribute> attribs, std::unique_ptr<BlendFormula> blendFormula);
 
   /**
-   * Binds the program so that it is used in subsequent draw calls.
+   * Binds the shader program so that it is used in subsequent draw calls.
    */
-  void activate();
+  void activate(GLGPU* gpu);
 
   /**
    * Sets the uniform data to be used in subsequent draw calls.
    */
-  void setUniformBytes(const void* data, size_t size);
+  void setUniformBytes(GLGPU* gpu, unsigned binding, const void* data, size_t size);
 
   /**
    * Binds the vertex buffer to be used in subsequent draw calls. The vertexOffset is the offset
    * into the buffer where the vertex data begins.
    */
-  void setVertexBuffer(GPUBuffer* vertexBuffer, size_t vertexOffset);
+  void setVertexBuffer(GLGPU* gpu, GPUBuffer* vertexBuffer, size_t vertexOffset);
 
-  /**
-   * Binds the index buffer to be used in subsequent draw calls.
-   */
-  void setIndexBuffer(GPUBuffer* indexBuffer);
-
- protected:
-  void onReleaseGPU() override;
+  void release(GPU* gpu) override;
 
  private:
   unsigned programID = 0;
   unsigned vertexArray = 0;
-  std::vector<Attribute> _attributes = {};
+  std::unique_ptr<UniformLayout> uniformLayout = nullptr;
+  std::vector<Attribute> attributes = {};
   std::vector<int> attributeLocations = {};
-  std::vector<int> uniformLocations = {};
+  std::vector<int> vertexUniformLocations = {};
+  std::vector<int> fragmentUniformLocations = {};
   int vertexStride = 0;
   std::unique_ptr<BlendFormula> blendFormula = nullptr;
+  unsigned int vertexUBO = 0;
+  unsigned int fragmentUBO = 0;
+
+  void setUniformBytesForUBO(GLGPU* gpu, unsigned binding, const void* data, size_t size);
 };
 }  // namespace tgfx

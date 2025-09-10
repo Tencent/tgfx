@@ -17,50 +17,21 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
-#include "gpu/RenderTarget.h"
-#include "gpu/Resource.h"
+#include <string>
+#include <vector>
+#include "Uniform.h"
 
 namespace tgfx {
-class ExternalRenderTarget : public Resource, public RenderTarget {
+class UniformLayout final {
  public:
-  Context* getContext() const override {
-    return context;
+  UniformLayout(std::vector<std::string> uniformBlockNames, std::vector<Uniform> vertexUniforms,
+                std::vector<Uniform> fragmentUniforms)
+      : uniformBlockNames(std::move(uniformBlockNames)), vertexUniforms(std::move(vertexUniforms)),
+        fragmentUniforms(std::move(fragmentUniforms)) {
   }
 
-  ImageOrigin origin() const override {
-    return _origin;
-  }
-
-  bool externallyOwned() const override {
-    return true;
-  }
-
-  GPUTexture* getRenderTexture() const override {
-    return renderTexture.get();
-  }
-
-  GPUTexture* getSampleTexture() const override {
-    return renderTexture.get();
-  }
-
-  size_t memoryUsage() const override {
-    return 0;
-  }
-
- protected:
-  void onReleaseGPU() override {
-    renderTexture->release(context->gpu());
-  }
-
- private:
-  std::unique_ptr<GPUTexture> renderTexture = nullptr;
-  ImageOrigin _origin = ImageOrigin::TopLeft;
-
-  ExternalRenderTarget(std::unique_ptr<GPUTexture> texture, ImageOrigin origin)
-      : renderTexture(std::move(texture)), _origin(origin) {
-  }
-
-  friend class RenderTarget;
+  std::vector<std::string> uniformBlockNames = {};
+  std::vector<Uniform> vertexUniforms = {};
+  std::vector<Uniform> fragmentUniforms = {};
 };
 }  // namespace tgfx

@@ -28,9 +28,16 @@ class ShapeDrawOp : public DrawOp {
   static PlacementPtr<ShapeDrawOp> Make(std::shared_ptr<GPUShapeProxy> shapeProxy, Color color,
                                         const Matrix& uvMatrix, AAType aaType);
 
-  void execute(RenderPass* renderPass, RenderTarget* renderTarget) override;
-
   bool hasCoverage() const override;
+
+ protected:
+  PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
+
+  void onDraw(RenderPass* renderPass) override;
+
+  Type type() override {
+    return Type::ShapeDrawOp;
+  }
 
  private:
   std::shared_ptr<GPUShapeProxy> shapeProxy = nullptr;

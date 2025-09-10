@@ -27,9 +27,6 @@ class DrawOp {
  public:
   virtual ~DrawOp() = default;
 
-  PlacementPtr<ProgramInfo> createProgramInfo(RenderTarget* renderTarget,
-                                              PlacementPtr<GeometryProcessor> geometryProcessor);
-
   void setScissorRect(const Rect& rect) {
     scissorRect = rect;
   }
@@ -54,9 +51,7 @@ class DrawOp {
     return !coverages.empty();
   }
 
-  virtual void captureInputTexture(RenderTarget* renderTaget);
-
-  virtual void execute(RenderPass* renderPass, RenderTarget* renderTarget) = 0;
+  void execute(RenderPass* renderPass, RenderTarget* renderTarget);
 
  protected:
   AAType aaType = AAType::None;
@@ -66,7 +61,15 @@ class DrawOp {
   PlacementPtr<XferProcessor> xferProcessor = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
 
+  enum class Type { RectDrawOp = 0, RRectDrawOp, ShapeDrawOp, AtlasTextOp };
+
   explicit DrawOp(AAType aaType) : aaType(aaType) {
   }
+
+  virtual PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) = 0;
+
+  virtual void onDraw(RenderPass* renderPass) = 0;
+
+  virtual Type type() = 0;
 };
 }  // namespace tgfx

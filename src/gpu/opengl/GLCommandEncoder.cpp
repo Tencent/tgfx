@@ -17,8 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLCommandEncoder.h"
+#include "gpu/opengl/GLFence.h"
+#include "gpu/opengl/GLGPU.h"
 #include "gpu/opengl/GLRenderPass.h"
-#include "gpu/opengl/GLSemaphore.h"
 #include "gpu/opengl/GLTexture.h"
 
 namespace tgfx {
@@ -49,7 +50,7 @@ std::shared_ptr<RenderPass> GLCommandEncoder::onBeginRenderPass(
         "texture and resolve texture cannot be the same!");
     return nullptr;
   }
-  auto renderPass = std::make_shared<GLRenderPass>(interface, descriptor);
+  auto renderPass = std::make_shared<GLRenderPass>(gpu, descriptor);
   renderPass->begin();
   return renderPass;
 }
@@ -63,18 +64,17 @@ void GLCommandEncoder::copyTextureToTexture(GPUTexture* srcTexture, const Rect& 
     LOGE("GLCommandEncoder::copyTextureToTexture() source texture is not copyable!");
     return;
   }
-  auto gl = interface->functions();
-  gl->bindFramebuffer(GL_FRAMEBUFFER, static_cast<GLTexture*>(srcTexture)->frameBufferID());
-  auto glTexture = static_cast<const GLTexture*>(dstTexture);
-  auto target = glTexture->target();
-  gl->bindTexture(target, glTexture->textureID());
+  auto gl = gpu->functions();
+  auto glTexture = static_cast<GLTexture*>(dstTexture);
+  gpu->bindTexture(glTexture);
+  gpu->bindFramebuffer(static_cast<GLTexture*>(srcTexture));
   auto offsetX = static_cast<int>(dstOffset.x);
   auto offsetY = static_cast<int>(dstOffset.y);
   auto x = static_cast<int>(srcRect.left);
   auto y = static_cast<int>(srcRect.top);
   auto width = static_cast<int>(srcRect.width());
   auto height = static_cast<int>(srcRect.height());
-  gl->copyTexSubImage2D(target, 0, offsetX, offsetY, x, y, width, height);
+  gl->copyTexSubImage2D(glTexture->target(), 0, offsetX, offsetY, x, y, width, height);
 }
 
 void GLCommandEncoder::generateMipmapsForTexture(GPUTexture* texture) {
@@ -82,33 +82,32 @@ void GLCommandEncoder::generateMipmapsForTexture(GPUTexture* texture) {
   if (glTexture->mipLevelCount() <= 1 || glTexture->target() != GL_TEXTURE_2D) {
     return;
   }
-  auto gl = interface->functions();
-  gl->bindTexture(glTexture->target(), glTexture->textureID());
+  gpu->bindTexture(glTexture);
+  auto gl = gpu->functions();
   gl->generateMipmap(glTexture->target());
 }
 
-BackendSemaphore GLCommandEncoder::insertSemaphore() {
-  if (!interface->caps()->semaphoreSupport) {
-    return {};
+std::unique_ptr<GPUFence> GLCommandEncoder::insertFence() {
+  if (!gpu->caps()->semaphoreSupport) {
+    return nullptr;
   }
-  auto gl = interface->functions();
-  GLSyncInfo glSync = {};
-  glSync.sync = gl->fenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-  if (glSync.sync) {
-    // If we inserted semaphores during the flush, we need to call glFlush.
-    gl->flush();
-    return {glSync};
+  auto gl = gpu->functions();
+  auto glSync = gl->fenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+  if (glSync == nullptr) {
+    return nullptr;
   }
-  return {};
+  // If we inserted semaphores during the flush, we need to call glFlush.
+  gl->flush();
+  return std::make_unique<GLFence>(glSync);
 }
 
-void GLCommandEncoder::waitSemaphore(const BackendSemaphore& semaphore) {
-  GLSyncInfo glSync = {};
-  if (!semaphore.getGLSync(&glSync)) {
+void GLCommandEncoder::waitForFence(GPUFence* fence) {
+  if (fence == nullptr) {
     return;
   }
-  auto gl = interface->functions();
-  gl->waitSync(glSync.sync, 0, GL_TIMEOUT_IGNORED);
+  auto gl = gpu->functions();
+  auto glSync = static_cast<GLFence*>(fence)->glSync();
+  gl->waitSync(glSync, 0, GL_TIMEOUT_IGNORED);
 }
 
 std::shared_ptr<CommandBuffer> GLCommandEncoder::onFinish() {

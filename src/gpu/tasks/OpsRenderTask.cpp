@@ -29,9 +29,6 @@ void OpsRenderTask::execute(CommandEncoder* encoder) {
     LOGE("OpsRenderTask::execute() Render target is null!");
     return;
   }
-  for (auto& op: drawOps) {
-    op->captureInputTexture(renderTarget.get());
-  }
   auto loadOp = clearColor.has_value() ? LoadAction::Clear : LoadAction::Load;
   auto resolveTexture =
       renderTarget->sampleCount() > 1 ? renderTarget->getSampleTexture() : nullptr;

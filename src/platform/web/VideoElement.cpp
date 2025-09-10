@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "platform/web/VideoElement.h"
-#include "gpu/DefaultTextureView.h"
 #include "gpu/opengl/GLTexture.h"
+#include "gpu/resources/DefaultTextureView.h"
 
 namespace tgfx {
 using namespace emscripten;

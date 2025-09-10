@@ -19,7 +19,7 @@
 #include "gpu/ResourceCache.h"
 #include <unordered_map>
 #include "core/utils/Log.h"
-#include "gpu/Resource.h"
+#include "gpu/resources/Resource.h"
 
 namespace tgfx {
 static constexpr size_t MAX_EXPIRATION_FRAMES = 1000000;  // About 4.5 hours at 60 FPS
@@ -96,7 +96,7 @@ void ResourceCache::purgeResourcesByLRU(bool scratchResourceOnly,
                                         const std::function<bool(Resource*)>& satisfied) {
   auto item = purgeableResources.begin();
   while (item != purgeableResources.end()) {
-    auto* resource = *item;
+    auto resource = *item;
     if (satisfied(resource)) {
       break;
     }

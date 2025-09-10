@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "WebImageBuffer.h"
-#include "gpu/TextureView.h"
 #include "gpu/opengl/GLTexture.h"
+#include "gpu/resources/TextureView.h"
 #include "tgfx/core/ImageCodec.h"
 
 using namespace emscripten;

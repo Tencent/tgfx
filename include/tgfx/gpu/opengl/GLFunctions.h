@@ -131,11 +131,18 @@ using GLGetShaderPrecisionFormat = void GL_FUNCTION_TYPE(unsigned shadertype,
                                                          int* precision);
 using GLGetString = const unsigned char* GL_FUNCTION_TYPE(unsigned name);
 using GLGetStringi = const unsigned char* GL_FUNCTION_TYPE(unsigned name, unsigned index);
+using GLGetTexImage = void GL_FUNCTION_TYPE(unsigned target, int level, unsigned format,
+                                            unsigned type, void* pixels);
 using GLGetVertexAttribiv = void GL_FUNCTION_TYPE(unsigned index, unsigned pname, int* params);
 using GLGetVertexAttribPointerv = void GL_FUNCTION_TYPE(unsigned index, unsigned pname,
                                                         void** pointer);
 using GLGetAttribLocation = int GL_FUNCTION_TYPE(unsigned program, const char* name);
 using GLGetUniformLocation = int GL_FUNCTION_TYPE(unsigned program, const char* name);
+using GLGetUniformBlockIndex = unsigned GL_FUNCTION_TYPE(unsigned program,
+                                                         const char* uniformBlockName);
+using GLUniformBlockBinding = void GL_FUNCTION_TYPE(unsigned program, unsigned uniformBlockIndex,
+                                                    unsigned uniformBlockBinding);
+using GLBindBufferBase = void GL_FUNCTION_TYPE(unsigned target, unsigned index, unsigned buffer);
 using GLIsTexture = unsigned char GL_FUNCTION_TYPE(unsigned texture);
 using GLLineWidth = void GL_FUNCTION_TYPE(float width);
 using GLLinkProgram = void GL_FUNCTION_TYPE(unsigned program);
@@ -293,10 +300,14 @@ class GLFunctions {
   GLGetShaderPrecisionFormat* getShaderPrecisionFormat = nullptr;
   GLGetString* getString = nullptr;
   GLGetStringi* getStringi = nullptr;
+  GLGetTexImage* getTexImage = nullptr;
   GLGetVertexAttribiv* getVertexAttribiv = nullptr;
   GLGetVertexAttribPointerv* getVertexAttribPointerv = nullptr;
   GLGetAttribLocation* getAttribLocation = nullptr;
   GLGetUniformLocation* getUniformLocation = nullptr;
+  GLGetUniformBlockIndex* getUniformBlockIndex = nullptr;
+  GLUniformBlockBinding* uniformBlockBinding = nullptr;
+  GLBindBufferBase* bindBufferBase = nullptr;
   GLIsTexture* isTexture = nullptr;
   GLLineWidth* lineWidth = nullptr;
   GLLinkProgram* linkProgram = nullptr;

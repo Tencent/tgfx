@@ -33,9 +33,9 @@ class FragmentShaderBuilder : public ShaderBuilder {
 
   virtual std::string dstColor() = 0;
 
-  void onBeforeChildProcEmitCode(const FragmentProcessor* child);
+  void onBeforeChildProcEmitCode(const FragmentProcessor* child) const;
 
-  void onAfterChildProcEmitCode();
+  void onAfterChildProcEmitCode() const;
 
   void declareCustomOutputColor();
 

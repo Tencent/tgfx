@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RenderTarget.h"
-#include "GPU.h"
 #include "core/utils/PixelFormatUtil.h"
+#include "gpu/GPU.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Pixmap.h"
 

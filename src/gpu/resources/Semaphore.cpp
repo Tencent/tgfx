@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,32 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/Resource.h"
+#include "gpu/resources/Semaphore.h"
+#include "gpu/GPU.h"
 
 namespace tgfx {
-void Resource::assignUniqueKey(const UniqueKey& newKey) {
-  if (newKey.empty()) {
-    removeUniqueKey();
-    return;
+std::shared_ptr<Semaphore> Semaphore::MakeAdopted(Context* context,
+                                                  const BackendSemaphore& backendSemaphore) {
+  auto fence = context->gpu()->importExternalFence(backendSemaphore);
+  if (fence == nullptr) {
+    return nullptr;
   }
-  if (newKey != uniqueKey) {
-    context->resourceCache()->changeUniqueKey(this, newKey);
-  }
-}
-
-void Resource::removeUniqueKey() {
-  if (!uniqueKey.empty()) {
-    context->resourceCache()->removeUniqueKey(this);
-  }
-}
-
-void Resource::release(bool releaseGPU) {
-  if (releaseGPU) {
-    onReleaseGPU();
-  }
-  context = nullptr;
-  // Set the reference to nullptr, allowing the resource to be deleted immediately or later when the
-  // last external reference is released.
-  reference = nullptr;
+  return Resource::AddToCache(context, new Semaphore(std::move(fence)));
 }
 }  // namespace tgfx

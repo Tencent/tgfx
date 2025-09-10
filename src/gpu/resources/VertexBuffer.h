@@ -18,29 +18,47 @@
 
 #pragma once
 
-#include "gpu/TextureView.h"
+#include "gpu/GPU.h"
+#include "gpu/GPUBuffer.h"
+#include "gpu/resources/Resource.h"
 
 namespace tgfx {
 /**
- * DefaultTextureView is a simple TextureView implementation that stores pixel data using a single
- * GPUTexture.
+ * VertexBuffer is a resource that encapsulates a GPUBuffer, which can be used for vertex data in
+ * a RenderPass.
  */
-class DefaultTextureView : public TextureView {
+class VertexBuffer : public Resource {
  public:
-  explicit DefaultTextureView(std::unique_ptr<GPUTexture> texture,
-                              ImageOrigin origin = ImageOrigin::TopLeft);
+  size_t memoryUsage() const override {
+    return buffer->size();
+  }
 
-  size_t memoryUsage() const override;
+  /**
+   * Returns the size of the vertex buffer.
+   */
+  size_t size() const {
+    return buffer->size();
+  }
 
-  GPUTexture* getTexture() const override {
-    return _texture.get();
+  /**
+   * Returns the GPUBuffer associated with this VertexBuffer.
+   */
+  GPUBuffer* gpuBuffer() const {
+    return buffer.get();
   }
 
  protected:
-  std::unique_ptr<GPUTexture> _texture = nullptr;
-
   void onReleaseGPU() override {
-    _texture->release(context->gpu());
+    buffer->release(context->gpu());
   }
+
+ private:
+  std::unique_ptr<GPUBuffer> buffer = nullptr;
+
+  explicit VertexBuffer(std::unique_ptr<GPUBuffer> buffer) : buffer(std::move(buffer)) {
+  }
+
+  friend class GPUBufferUploadTask;
+  friend class ShapeBufferUploadTask;
 };
 }  // namespace tgfx

@@ -21,6 +21,7 @@
 #include <map>
 #include <vector>
 #include "gpu/OpsCompositor.h"
+#include "gpu/resources/Semaphore.h"
 #include "gpu/tasks/OpsRenderTask.h"
 #include "gpu/tasks/RenderTask.h"
 #include "gpu/tasks/ResourceTask.h"

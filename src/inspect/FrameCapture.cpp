@@ -32,11 +32,8 @@
 #include "core/codecs/png/PngCodec.h"
 #endif
 #include "FunctionTimer.h"
-#include "core/codecs/png/PngCodec.h"
 #include "core/utils/Log.h"
 #include "core/utils/PixelFormatUtil.h"
-#include "gpu/GPU.h"
-#include "gpu/RenderTarget.h"
 #include "lz4.h"
 #include "tgfx/core/Clock.h"
 
@@ -186,73 +183,51 @@ void FrameCapture::SendAttributeData(const char* name, float* val, int size) {
   }
 }
 
-void FrameCapture::SendTextureID(uint64_t texturePtr, FrameCaptureMessageType type) {
-  if (!CurrentFrameShouldCaptrue()) {
+void FrameCapture::SendTextureID(uint64_t textureId, FrameCaptureMessageType type) {
+  if (!CurrentFrameShouldCaptrue() || textureId == 0) {
     return;
   }
-  auto textureId = GetInstance().getTextureId(texturePtr);
   FrameCaptureMessageItem item = {};
   item.hdr.type = type;
   item.textureSampler.textureId = textureId;
   QueueSerialFinish(item);
 }
 
-void FrameCapture::SendInputTextureID(const GPUTexture* texture) {
-  SendTextureID(reinterpret_cast<uint64_t>(texture), FrameCaptureMessageType::InputTexture);
+void FrameCapture::SendInputTextureID(uint64_t textureId) {
+  SendTextureID(textureId, FrameCaptureMessageType::InputTexture);
 }
 
-void FrameCapture::SendOutputTextureID(const GPUTexture* texture) {
-  if (!CurrentFrameShouldCaptrue()) {
-    return;
-  }
-  SendTextureID(reinterpret_cast<uint64_t>(texture), FrameCaptureMessageType::OutputTexture);
+void FrameCapture::SendOutputTextureID(uint64_t textureId) {
+  SendTextureID(textureId, FrameCaptureMessageType::OutputTexture);
 }
 
-void FrameCapture::SendFrameCaptureTexture(std::shared_ptr<FrameCaptureTexture> frameCaptureTexture,
-                                           bool differentEachFrame) {
+void FrameCapture::SendFrameCaptureTexture(
+    std::shared_ptr<FrameCaptureTexture> frameCaptureTexture) {
   if (frameCaptureTexture == nullptr) {
     return;
   }
-  uint64_t currentFrame = 0;
-  if (differentEachFrame) {
-    currentFrame = GetInstance().frameCount.load(std::memory_order_relaxed) + 1;
-  }
-  auto& textureIds = GetInstance().textureIds;
-  auto texture = reinterpret_cast<uint64_t>(frameCaptureTexture->texture());
-  auto textureId = NextTextureID();
-  textureIds[GetTextureHash(texture, currentFrame)] = textureId;
-  frameCaptureTexture->setTextureId(textureId);
   GetInstance().imageQueue.enqueue(std::move(frameCaptureTexture));
 }
 
-void FrameCapture::SendFragmentProcessor(
-    const std::vector<PlacementPtr<FragmentProcessor>>& fragmentProcessors) {
+void FrameCapture::SendFragmentProcessor(Context* context,
+                                         const std::vector<FragmentProcessor*>& processors) {
   if (!CurrentFrameShouldCaptrue()) {
     return;
   }
-  for (const auto& processor : fragmentProcessors) {
-    FragmentProcessor::Iter fpIter(processor.get());
-    while (const auto* subFP = fpIter.next()) {
-      for (size_t j = 0; j < subFP->numTextureSamplers(); ++j) {
-        auto texture = subFP->textureAt(j);
-        SendInputTextureID(texture);
-      }
-    }
-  }
-}
-
-void FrameCapture::SendInputTextureBeforeRender(
-    Context* context, const std::vector<PlacementPtr<FragmentProcessor>>& fragmentProcessors) {
-  if (!CurrentFrameShouldCaptrue()) {
-    return;
-  }
-  for (const auto& processor : fragmentProcessors) {
-    FragmentProcessor::Iter fpIter(processor.get());
+  for (const auto& processor : processors) {
+    FragmentProcessor::Iter fpIter(processor);
     while (const auto* subFP = fpIter.next()) {
       for (size_t j = 0; j < subFP->numTextureSamplers(); ++j) {
         auto texture = subFP->textureAt(j);
         auto frameCaptureTexture = FrameCaptureTexture::MakeFrom(texture, context);
-        SendFrameCaptureTexture(std::move(frameCaptureTexture), false);
+        uint64_t textureId = 0;
+        if (frameCaptureTexture) {
+          textureId = frameCaptureTexture->textureId();
+          SendFrameCaptureTexture(std::move(frameCaptureTexture));
+        } else {
+          textureId = FrameCaptureTexture::GetReadedTextureId(texture);
+        }
+        SendInputTextureID(textureId);
       }
     }
   }

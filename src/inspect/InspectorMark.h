@@ -21,6 +21,7 @@
 #include "FrameCapture.h"
 #include "FunctionTimer.h"
 #include "LayerTree.h"
+#include "Protocol.h"
 
 #define SEND_LAYER_DATA(data) tgfx::inspect::LayerTree::SocketAgent::Get().setData(data)
 #define LAYER_CALLBACK(func) tgfx::inspect::LayerTree::SocketAgent::Get().setCallBack(func)
@@ -34,7 +35,8 @@
 #define FRAME_MARK tgfx::inspect::FrameCapture::SendFrameMark(nullptr)
 #define FUNCTION_MARK(type, active) \
   tgfx::inspect::FunctionTimer MARE_CONCAT(functionTimer, MARK_LINE) = {type, active}
-#define OPERATE_MARK(type) FUNCTION_MARK(type, true)
+#define OPERATE_MARK(type) \
+  FUNCTION_MARK(tgfx::inspect::DrawOpTypeToOpTaskType[static_cast<uint8_t>(type)], true)
 #define TASK_MARK(type) FUNCTION_MARK(type, true)
 #define ATTRIBUTE_NAME(name, value) tgfx::inspect::FrameCapture::SendAttributeData(name, value)
 #define ATTRIBUTE_NAME_ENUM(name, value, type)                                      \
@@ -43,28 +45,22 @@
 
 #define ATTRIBUTE_ENUM(value, type) ATTRIBUTE_NAME_ENUM(#value, value, type)
 
-#define CAPTURE_TEXTURE(context, textureView)                                             \
-  if (inspect::FrameCapture::CurrentFrameShouldCaptrue()) {                               \
-    auto frameCapture =                                                                   \
-        inspect::FrameCaptureTexture::MakeFrom(textureView->getTexture(), context);       \
-    tgfx::inspect::FrameCapture::SendFrameCaptureTexture(std::move(frameCapture), false); \
+#define CAPUTRE_RENDER_TARGET(renderTarget)                                                 \
+  if (inspect::FrameCapture::CurrentFrameShouldCaptrue()) {                                 \
+    auto frameCaptureTexture = inspect::FrameCaptureTexture::MakeFrom(renderTarget);        \
+    uint64_t textureId = 0;                                                                 \
+    if (frameCaptureTexture != nullptr) {                                                   \
+      textureId = frameCaptureTexture->textureId();                                         \
+      tgfx::inspect::FrameCapture::SendFrameCaptureTexture(std::move(frameCaptureTexture)); \
+    }                                                                                       \
+    tgfx::inspect::FrameCapture::SendOutputTextureID(textureId);                            \
   }
 
-#define CAPUTRE_RENDER_TARGET(renderTarget)                                              \
-  if (inspect::FrameCapture::CurrentFrameShouldCaptrue()) {                              \
-    auto frameCapture = inspect::FrameCaptureTexture::MakeFrom(renderTarget);            \
-    tgfx::inspect::FrameCapture::SendFrameCaptureTexture(std::move(frameCapture), true); \
-    tgfx::inspect::FrameCapture::SendOutputTextureID(renderTarget->getRenderTexture());  \
-  }
-
-#define CAPUTRE_FRARGMENT_PROCESSORS(fragmentProcessors) \
-  tgfx::inspect::FrameCapture::SendFragmentProcessor(fragmentProcessors)
+#define CAPUTRE_FRARGMENT_PROCESSORS(context, processors) \
+  tgfx::inspect::FrameCapture::SendFragmentProcessor(context, processors);
 
 #define CAPUTRE_TEXTURE_BEFORE_RENDER(context, fragmentProcessors) \
   tgfx::inspect::FrameCapture::SendInputTextureBeforeRender(context, fragmentProcessors)
-
-#define SEND_OUTPUT_TEXUTRE_ID(texturePtr) \
-  tgfx::inspect::FrameCapture::SendOutputTextureID(texturePtr)
 
 #else
 

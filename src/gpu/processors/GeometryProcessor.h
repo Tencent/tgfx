@@ -86,7 +86,7 @@ class GeometryProcessor : public Processor {
 
   virtual void emitCode(EmitArgs&) const = 0;
 
-  virtual void setData(UniformBuffer* uniformBuffer,
+  virtual void setData(UniformBuffer* vertexUniformBuffer, UniformBuffer* fragmentUniformBuffer,
                        FPCoordTransformIter* coordTransformIter) const = 0;
 
   size_t numTextureSamplers() const {

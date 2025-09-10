@@ -19,7 +19,7 @@
 #pragma once
 #include "gpu/CommandQueue.h"
 #include "gpu/GPUTexture.h"
-#include "gpu/RenderTarget.h"
+#include "gpu/resources/RenderTarget.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/gpu/PixelFormat.h"
 
@@ -35,16 +35,11 @@ class FrameCaptureTexture {
 
   static std::shared_ptr<FrameCaptureTexture> MakeFrom(const RenderTarget* renderTarget);
 
+  static uint64_t GetReadedTextureId(GPUTexture* texture);
+
   explicit FrameCaptureTexture(const GPUTexture* texture, int width, int height, size_t rowBytes,
                                PixelFormat format, bool isInput,
-                               std::shared_ptr<Buffer> imageBuffer)
-      : _texture(texture), _width(width), _height(height), _rowBytes(rowBytes), _format(format),
-        _isInput(isInput), image(std::move(imageBuffer)) {
-  }
-
-  void setTextureId(uint64_t textureId) {
-    _textureId = textureId;
-  }
+                               std::shared_ptr<Buffer> imageBuffer);
 
   uint64_t textureId() const {
     return _textureId;

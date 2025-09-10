@@ -32,9 +32,9 @@ GLEllipseGeometryProcessor::GLEllipseGeometryProcessor(int width, int height, bo
 }
 
 void GLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
-  auto* vertBuilder = args.vertBuilder;
-  auto* varyingHandler = args.varyingHandler;
-  auto* uniformHandler = args.uniformHandler;
+  auto vertBuilder = args.vertBuilder;
+  auto varyingHandler = args.varyingHandler;
+  auto uniformHandler = args.uniformHandler;
 
   // emit attributes
   varyingHandler->emitAttributes(*this);
@@ -47,7 +47,7 @@ void GLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
   auto ellipseRadii = varyingHandler->addVarying("EllipseRadii", SLType::Float4);
   vertBuilder->codeAppendf("%s = %s;", ellipseRadii.vsOut().c_str(), inEllipseRadii.name().c_str());
 
-  auto* fragBuilder = args.fragBuilder;
+  auto fragBuilder = args.fragBuilder;
   // setup pass through color
   if (commonColor.has_value()) {
     auto colorName =
@@ -129,11 +129,12 @@ void GLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("%s = vec4(edgeAlpha);", args.outputCoverage.c_str());
 }
 
-void GLEllipseGeometryProcessor::setData(UniformBuffer* uniformBuffer,
+void GLEllipseGeometryProcessor::setData(UniformBuffer* vertexUniformBuffer,
+                                         UniformBuffer* fragmentUniformBuffer,
                                          FPCoordTransformIter* transformIter) const {
-  setTransformDataHelper(Matrix::I(), uniformBuffer, transformIter);
+  setTransformDataHelper(Matrix::I(), vertexUniformBuffer, transformIter);
   if (commonColor.has_value()) {
-    uniformBuffer->setData("Color", *commonColor);
+    fragmentUniformBuffer->setData("Color", *commonColor);
   }
 }
 }  // namespace tgfx

@@ -18,8 +18,8 @@
 
 #include "ShapeBufferUploadTask.h"
 #include "gpu/GPU.h"
-#include "gpu/TextureView.h"
-#include "gpu/VertexBuffer.h"
+#include "gpu/resources/TextureView.h"
+#include "gpu/resources/VertexBuffer.h"
 
 namespace tgfx {
 ShapeBufferUploadTask::ShapeBufferUploadTask(std::shared_ptr<ResourceProxy> trianglesProxy,
