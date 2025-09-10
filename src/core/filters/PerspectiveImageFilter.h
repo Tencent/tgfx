@@ -22,17 +22,9 @@
 
 namespace tgfx {
 
-struct PerspectiveInfo {
-  float xRotation = 0.0f;
-  float yRotation = 0.0f;
-  float zRotation = 0.0f;
-
-  float depth = 0.0f;
-};
-
-class PerspectiveImageFilter : public ImageFilter {
+class PerspectiveImageFilter final : public ImageFilter {
  public:
-  PerspectiveImageFilter(const PerspectiveInfo& info);
+  explicit PerspectiveImageFilter(const PerspectiveInfo& info);
 
  private:
   Type type() const override {

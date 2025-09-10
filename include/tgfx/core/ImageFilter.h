@@ -28,6 +28,7 @@
 namespace tgfx {
 class TextureProxy;
 enum class SrcRectConstraint;
+struct PerspectiveInfo;
 
 /**
  * ImageFilter is the base class for all image filters. If one is installed in the Paint, then all
@@ -118,6 +119,8 @@ class ImageFilter {
    */
   static std::shared_ptr<ImageFilter> Runtime(std::shared_ptr<RuntimeEffect> effect);
 
+  static std::shared_ptr<ImageFilter> Perspective(const PerspectiveInfo& perspective);
+
   virtual ~ImageFilter() = default;
 
   /**
@@ -173,5 +176,13 @@ class ImageFilter {
   friend class ComposeImageFilter;
   friend class FilterImage;
   friend class Types;
+};
+
+struct PerspectiveInfo {
+  float xRotation = 0.0f;
+  float yRotation = 0.0f;
+  float zRotation = 0.0f;
+
+  float depth = 0.0f;
 };
 }  // namespace tgfx

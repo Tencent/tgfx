@@ -28,6 +28,10 @@ namespace tgfx {
 #define NEAR_Z 1.0f
 #define FAR_Z 1000.0f
 
+std::shared_ptr<ImageFilter> ImageFilter::Perspective(const PerspectiveInfo& perspective) {
+  return std::make_shared<PerspectiveImageFilter>(perspective);
+}
+
 PerspectiveImageFilter::PerspectiveImageFilter(const PerspectiveInfo& info) : info(info) {
 }
 
