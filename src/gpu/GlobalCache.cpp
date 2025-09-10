@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GlobalCache.h"
+#include "core/GradientGenerator.h"
 #include "core/PixelBuffer.h"
-#include "gpu/GradientGenerator.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ops/RRectDrawOp.h"
 #include "gpu/ops/RectDrawOp.h"

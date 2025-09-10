@@ -124,6 +124,7 @@ bool CGLDevice::onLockContext() {
 }
 
 void CGLDevice::onUnlockContext() {
+  [NSOpenGLContext clearCurrentContext];
   CGLSetCurrentContext(oldContext);
   CGLReleaseContext(oldContext);
 }

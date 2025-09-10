@@ -149,6 +149,7 @@ file(GLOB_RECURSE SRC_FILES
         src/core/shaders/*.*
         src/core/shapes/*.*
         src/core/utils/*.*
+        src/gpu/glsl/*.*
         src/gpu/ops/*.*
         src/gpu/processors/*.*
         src/gpu/proxies/*.*

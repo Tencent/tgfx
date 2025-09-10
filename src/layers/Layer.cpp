@@ -582,19 +582,21 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
     backgroundRect.scale(scale, scale);
     auto backgroundMatrix = globalToLocalMatrix;
     backgroundMatrix.postScale(scale, scale);
-    if (auto backgroundContext = createBackgroundContext(
-            context, clippedBounds, globalToLocalMatrix, bounds == clippedBounds)) {
+    if (auto backgroundContext = createBackgroundContext(context, backgroundRect, backgroundMatrix,
+                                                         bounds == clippedBounds)) {
       auto backgroundCanvas = backgroundContext->getCanvas();
       auto actualMatrix = backgroundCanvas->getMatrix();
       // Since the background recorder starts from the current layer, we need to pre-concatenate
       // localToGlobalMatrix to the background canvas matrix to ensure the coordinate space is
       // correct.
       actualMatrix.preConcat(localToGlobalMatrix);
+      backgroundCanvas->setMatrix(actualMatrix);
       if (auto image = getBackgroundImage(args, scale, nullptr)) {
-        backgroundCanvas->resetMatrix();
+        AutoCanvasRestore autoRestore(backgroundCanvas);
+        actualMatrix.preScale(1.0f / scale, 1.0f / scale);
+        backgroundCanvas->setMatrix(actualMatrix);
         backgroundCanvas->drawImage(image);
       }
-      backgroundCanvas->setMatrix(actualMatrix);
       args.backgroundContext = std::move(backgroundContext);
     }
   }
@@ -972,7 +974,19 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
 
 bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
                          const Layer* stopChild) {
-  for (const auto& child : _children) {
+  int lastBackgroundLayerIndex = -1;
+  if (args.forceDrawBackground) {
+    lastBackgroundLayerIndex = static_cast<int>(_children.size()) - 1;
+  } else if (hasBackgroundStyle()) {
+    for (int i = static_cast<int>(_children.size()) - 1; i >= 0; --i) {
+      if (_children[static_cast<size_t>(i)]->hasBackgroundStyle()) {
+        lastBackgroundLayerIndex = i;
+        break;
+      }
+    }
+  }
+  for (size_t i = 0; i < _children.size(); ++i) {
+    auto& child = _children[i];
     if (child.get() == stopChild) {
       return false;
     }
@@ -982,9 +996,19 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
     if (!child->visible() || child->_alpha <= 0) {
       continue;
     }
+    auto childArgs = args;
+    if (static_cast<int>(i) < lastBackgroundLayerIndex) {
+      childArgs.forceDrawBackground = true;
+    } else {
+      childArgs.forceDrawBackground = false;
+      if (static_cast<int>(i) > lastBackgroundLayerIndex) {
+        childArgs.backgroundContext = nullptr;
+      }
+    }
 
     AutoCanvasRestore autoRestore(canvas);
-    auto backgroundCanvas = args.backgroundContext ? args.backgroundContext->getCanvas() : nullptr;
+    auto backgroundCanvas =
+        childArgs.backgroundContext ? childArgs.backgroundContext->getCanvas() : nullptr;
     canvas->concat(child->getMatrixWithScrollRect());
     if (child->_scrollRect) {
       canvas->clipRect(*child->_scrollRect);
@@ -996,7 +1020,7 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
         backgroundCanvas->clipRect(*child->_scrollRect);
       }
     }
-    child->drawLayer(args, canvas, child->_alpha * alpha,
+    child->drawLayer(childArgs, canvas, child->_alpha * alpha,
                      static_cast<BlendMode>(child->bitFields.blendMode));
     if (backgroundCanvas) {
       backgroundCanvas->restore();

@@ -25,7 +25,7 @@ namespace tgfx {
 class ImageUserScalerContext final : public UserScalerContext {
  public:
   ImageUserScalerContext(std::shared_ptr<Typeface> typeface, float size)
-      : UserScalerContext(std::move(typeface), size) {
+      : UserScalerContext(std::move(typeface), 1.f), textScale(size) {
   }
 
   Rect getBounds(GlyphID glyphID, bool, bool fauxItalic) const override {
@@ -36,7 +36,7 @@ class ImageUserScalerContext final : public UserScalerContext {
     auto bounds = Rect::MakeXYWH(record->offset.x, record->offset.y,
                                  static_cast<float>(record->image->width()),
                                  static_cast<float>(record->image->height()));
-    auto matrix = Matrix::MakeScale(textSize, textSize);
+    auto matrix = Matrix::MakeScale(textScale, textScale);
     if (fauxItalic) {
       matrix.postSkew(ITALIC_SKEW, 0.f);
     }
@@ -55,7 +55,7 @@ class ImageUserScalerContext final : public UserScalerContext {
     }
     if (matrix) {
       matrix->setTranslate(record->offset.x, record->offset.y);
-      matrix->postScale(textSize, textSize);
+      matrix->postScale(textScale, textScale);
     }
     return Rect::MakeXYWH(record->offset.x, record->offset.y,
                           static_cast<float>(record->image->width()),
@@ -74,10 +74,18 @@ class ImageUserScalerContext final : public UserScalerContext {
     return record->image->readPixels(dstInfo, dstPixels);
   }
 
+  float getBackingSize() const override {
+    if (FloatNearlyZero(textScale)) {
+      return 1.f;
+    }
+    return 1.f / textScale;
+  }
+
  private:
   ImageUserTypeface* imageTypeface() const {
     return static_cast<ImageUserTypeface*>(typeface.get());
   }
+  float textScale = 1.f;
 };
 
 //////////////

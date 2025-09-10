@@ -98,8 +98,7 @@ bool GLCommandQueue::readTexture(GPUTexture* texture, const Rect& rect, void* pi
   ClearGLError(gl);
   if (texture->usage() & GPUTextureUsage::RENDER_ATTACHMENT) {
     gpu->bindFramebuffer(glTexture);
-  }
-  else if (!glTexture->checkFrameBuffer(gpu)) {
+  } else if (!glTexture->checkFrameBuffer(gpu)) {
     return false;
   }
   auto format = texture->format();
@@ -128,7 +127,7 @@ bool GLCommandQueue::readTexture(GPUTexture* texture, const Rect& rect, void* pi
   auto width = static_cast<int>(rect.width());
   auto height = static_cast<int>(rect.height());
   auto textureFormat = caps->getTextureFormat(format);
-  gl->readPixels(x, y, width, height, textureFormat.externalFormat, GL_UNSIGNED_BYTE, pixels);
+  gl->readPixels(x, y, width, height, textureFormat.externalFormat, GL_UNSIGNED_BYTE, outPixels);
   if (restoreGLRowLength) {
     gl->pixelStorei(GL_PACK_ROW_LENGTH, 0);
   }
