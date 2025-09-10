@@ -127,7 +127,7 @@ class ImageFilter {
   Rect filterBounds(const Rect& rect) const;
 
  protected:
-  enum class Type { Blur, DropShadow, InnerShadow, Color, Compose, Runtime };
+  enum class Type { Blur, DropShadow, InnerShadow, Color, Compose, Runtime, Perspective };
 
   /**
    * Returns the type of this image filter.

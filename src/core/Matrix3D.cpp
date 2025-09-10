@@ -272,11 +272,11 @@ Vec4 Matrix3D::mapPoint(float x, float y, float z, float w) const {
   return result;
 }
 
-Rect Matrix3D::MapRect(const Matrix3D& m, const Rect& src) {
-  if (m.hasPerspective()) {
-    return MapRectPerspective(src, m.values);
+Rect Matrix3D::mapRect(const Rect& src) const {
+  if (hasPerspective()) {
+    return MapRectPerspective(src, values);
   } else {
-    return MapRectAffine(src, m.values);
+    return MapRectAffine(src, values);
   }
 }
 

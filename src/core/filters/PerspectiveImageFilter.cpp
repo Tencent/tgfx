@@ -16,18 +16,34 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "PserspectiveImageFilter.h"
+#include "PerspectiveImageFilter.h"
+#include "core/Matrix3D.h"
+#include "core/utils/MathExtra.h"
 #include "core/utils/PlacementPtr.h"
 #include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
 
+#define FOV_Y_DEGRESS 45.0f
+#define NEAR_Z 1.0f
+#define FAR_Z 1000.0f
+
 PerspectiveImageFilter::PerspectiveImageFilter(const PerspectiveInfo& info) : info(info) {
 }
 
 Rect PerspectiveImageFilter::onFilterBounds(const Rect& srcRect) const {
-  //TODO: RicharrdChen
-  return srcRect;
+  const auto perspectiveMatrix =
+      Matrix3D::Perspective(FOV_Y_DEGRESS, srcRect.width() / srcRect.height(), NEAR_Z, FAR_Z);
+  const Vec3 eyePosition = {0, 0, 1.0f / tanf(DegreesToRadians(FOV_Y_DEGRESS) / 2)};
+  constexpr Vec3 eyeTarget = {0, 0, 0};
+  constexpr Vec3 eyeUp = {0, 1, 0};
+  const auto viewMatrix = Matrix3D::LookAt(eyePosition, eyeTarget, eyeUp);
+  auto modelMatrix = Matrix3D::MakeRotate({1, 0, 0}, info.xRotation);
+  modelMatrix.postRotate({0, 1, 0}, info.yRotation);
+  modelMatrix.postRotate({0, 0, 1}, info.zRotation);
+  const auto transformMatrix = perspectiveMatrix * viewMatrix * modelMatrix;
+  const auto result = transformMatrix.mapRect(srcRect);
+  return result;
 }
 
 std::shared_ptr<TextureProxy> PerspectiveImageFilter::lockTextureProxy(

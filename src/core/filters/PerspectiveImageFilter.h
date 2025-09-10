@@ -23,8 +23,6 @@
 namespace tgfx {
 
 struct PerspectiveInfo {
-  Point anchor = {0.5f, 0.5f};
-
   float xRotation = 0.0f;
   float yRotation = 0.0f;
   float zRotation = 0.0f;

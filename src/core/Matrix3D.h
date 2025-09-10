@@ -88,7 +88,7 @@ class Matrix3D {
 
   Vec4 mapPoint(float x, float y, float z, float w) const;
 
-  static Rect MapRect(const Matrix3D& m, const Rect& src);
+  Rect mapRect(const Rect& src) const;
 
   static Matrix3D LookAt(const Vec3& eye, const Vec3& center, const Vec3& up);
 
