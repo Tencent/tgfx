@@ -60,6 +60,8 @@ class FrameCapture {
 
   static bool CurrentFrameShouldCaptrue();
 
+  static bool IsConnected();
+
   static uint64_t NextTextureID();
 
   static void QueueSerialFinish(const FrameCaptureMessageItem& item);

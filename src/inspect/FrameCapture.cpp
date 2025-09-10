@@ -112,6 +112,9 @@ void FrameCapture::SendAttributeData(const char* name, const std::optional<Color
 }
 
 void FrameCapture::SendFrameMark(const char* name) {
+  if (!IsConnected()) {
+    return;
+  }
   if (!name) {
     GetInstance().frameCount.fetch_add(1, std::memory_order_relaxed);
   }
@@ -128,6 +131,9 @@ void FrameCapture::SendFrameMark(const char* name) {
 }
 
 void FrameCapture::SendAttributeData(const char* name, int val) {
+  if (!IsConnected()) {
+    return;
+  }
   FrameCaptureMessageItem item = {};
   item.hdr.type = FrameCaptureMessageType::ValueDataInt;
   item.attributeDataInt.name = reinterpret_cast<uint64_t>(name);
@@ -136,6 +142,9 @@ void FrameCapture::SendAttributeData(const char* name, int val) {
 }
 
 void FrameCapture::SendAttributeData(const char* name, float val) {
+  if (!IsConnected()) {
+    return;
+  }
   FrameCaptureMessageItem item = {};
   item.hdr.type = FrameCaptureMessageType::ValueDataFloat;
   item.attributeDataFloat.name = reinterpret_cast<uint64_t>(name);
@@ -144,6 +153,9 @@ void FrameCapture::SendAttributeData(const char* name, float val) {
 }
 
 void FrameCapture::SendAttributeData(const char* name, bool val) {
+  if (!IsConnected()) {
+    return;
+  }
   FrameCaptureMessageItem item = {};
   item.hdr.type = FrameCaptureMessageType::ValueDataBool;
   item.attributeDataBool.name = reinterpret_cast<uint64_t>(name);
@@ -152,6 +164,9 @@ void FrameCapture::SendAttributeData(const char* name, bool val) {
 }
 
 void FrameCapture::SendAttributeData(const char* name, uint8_t val, uint8_t type) {
+  if (!IsConnected()) {
+    return;
+  }
   FrameCaptureMessageItem item = {};
   item.hdr.type = FrameCaptureMessageType::ValueDataEnum;
   item.attributeDataEnum.name = reinterpret_cast<uint64_t>(name);
@@ -160,6 +175,9 @@ void FrameCapture::SendAttributeData(const char* name, uint8_t val, uint8_t type
 }
 
 void FrameCapture::SendAttributeData(const char* name, uint32_t val, FrameCaptureMessageType type) {
+  if (!IsConnected()) {
+    return;
+  }
   FrameCaptureMessageItem item = {};
   item.hdr.type = type;
   item.attributeDataUint32.name = reinterpret_cast<uint64_t>(name);
@@ -168,6 +186,9 @@ void FrameCapture::SendAttributeData(const char* name, uint32_t val, FrameCaptur
 }
 
 void FrameCapture::SendAttributeData(const char* name, float* val, int size) {
+  if (!IsConnected()) {
+    return;
+  }
   if (size == 4) {
     FrameCaptureMessageItem item = {};
     item.hdr.type = FrameCaptureMessageType::ValueDataFloat4;
@@ -184,6 +205,9 @@ void FrameCapture::SendAttributeData(const char* name, float* val, int size) {
 }
 
 void FrameCapture::SendTextureID(uint64_t textureId, FrameCaptureMessageType type) {
+  if (!IsConnected()) {
+    return;
+  }
   if (!CurrentFrameShouldCaptrue() || textureId == 0) {
     return;
   }
@@ -202,7 +226,10 @@ void FrameCapture::SendOutputTextureID(uint64_t textureId) {
 }
 
 void FrameCapture::SendFrameCaptureTexture(
-    std::shared_ptr<FrameCaptureTexture> frameCaptureTexture) {
+std::shared_ptr<FrameCaptureTexture> frameCaptureTexture) {
+  if (!IsConnected()) {
+    return;
+  }
   if (frameCaptureTexture == nullptr) {
     return;
   }
@@ -210,8 +237,8 @@ void FrameCapture::SendFrameCaptureTexture(
 }
 
 void FrameCapture::SendFragmentProcessor(Context* context,
-                                         const std::vector<FragmentProcessor*>& processors) {
-  if (!CurrentFrameShouldCaptrue()) {
+const std::vector<FragmentProcessor*>& processors) {
+  if (!IsConnected() || !CurrentFrameShouldCaptrue()) {
     return;
   }
   for (const auto& processor : processors) {
@@ -243,6 +270,10 @@ bool FrameCapture::ShouldExit() {
 
 bool FrameCapture::CurrentFrameShouldCaptrue() {
   return GetInstance().currentFrameShouldCaptrue.load(std::memory_order_relaxed);
+}
+
+bool FrameCapture::IsConnected() {
+  return GetInstance().isConnect.load(std::memory_order_acquire);
 }
 
 uint64_t FrameCapture::GetTextureHash(uint64_t texturePtr, uint64_t currentFrame) {
@@ -304,7 +335,7 @@ void FrameCapture::sendPixelsData(uint64_t str, const char* pixels, size_t len,
   item.stringTransfer.ptr = str;
 
   auto dataLen = static_cast<uint32_t>(len);
-  needDataSize(FrameCaptureMessageDataSize[static_cast<int>(type)] + sizeof(uint32_t) + dataLen);
+  commitData();
   appendDataUnsafe(&item, FrameCaptureMessageDataSize[static_cast<int>(type)]);
   appendDataUnsafe(&dataLen, sizeof(uint32_t));
   appendDataUnsafe(pixels, dataLen);
@@ -519,11 +550,8 @@ bool FrameCapture::sendData(const uint8_t* data, size_t len) {
     }
   }
   auto lz4Size = len;
-  if (lz4Size == 11) {
-    LOGI("lz4size == 11");
-  }
   bool isLz4Encode = false;
-  if (IsEncodeImage(data, len)) {
+  if (IsEncodeImage(data, len) || len < MinLZ4EncodeSize) {
     memcpy(lz4Buf.bytes() + headSize, data, len);
   } else {
     isLz4Encode = true;
@@ -632,16 +660,8 @@ FrameCapture::DequeueStatus FrameCapture::dequeueSerial() {
       if (static_cast<FrameCaptureMessageType>(idx) == FrameCaptureMessageType::TextureData) {
         auto ptr = item.textureData.pixels;
         auto csz = item.textureData.pixelsSize;
-        LOGI("send Texture id: %d, size: %ld", item.textureData.textureId, csz);
         sendPixelsData(ptr, (const char*)ptr, csz, FrameCaptureMessageType::PixelsData);
         free((void*)ptr);
-      } else if (static_cast<FrameCaptureMessageType>(idx) ==
-                 FrameCaptureMessageType::OperateBegin) {
-        LOGI("Operate Begin %s, time %llu", OpTaskName[item.operateBegin.type],
-             item.operateBegin.usTime);
-      } else if (static_cast<FrameCaptureMessageType>(idx) == FrameCaptureMessageType::OperateEnd) {
-        LOGI("Operate End %s, time %llu", OpTaskName[item.operateBegin.type],
-             item.operateBegin.usTime);
       }
       if (!appendData(&item, FrameCaptureMessageDataSize[idx])) {
         return DequeueStatus::ConnectionLost;

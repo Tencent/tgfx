@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLCommandQueue.h"
-#include "GLReadTexture.h"
 #include "GLTexture.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "gpu/opengl/GLBuffer.h"
@@ -128,7 +127,7 @@ bool GLCommandQueue::readTexture(GPUTexture* texture, const Rect& rect, void* pi
   auto y = static_cast<int>(rect.top);
   auto width = static_cast<int>(rect.width());
   auto height = static_cast<int>(rect.height());
-  auto textureFormat = caps->getTextureFormat(texture->format());
+  auto textureFormat = caps->getTextureFormat(format);
   gl->readPixels(x, y, width, height, textureFormat.externalFormat, GL_UNSIGNED_BYTE, pixels);
   if (restoreGLRowLength) {
     gl->pixelStorei(GL_PACK_ROW_LENGTH, 0);
