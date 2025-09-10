@@ -196,8 +196,6 @@ std::shared_ptr<GLInterface> GLInterface::MakeNativeInterface(const GLProcGetter
       reinterpret_cast<GLGetUniformLocation*>(getter->getProcAddress("glGetUniformLocation"));
   functions->getUniformBlockIndex =
       reinterpret_cast<GLGetUniformBlockIndex*>(getter->getProcAddress("glGetUniformBlockIndex"));
-  functions->getTexImage =
-      reinterpret_cast<GLGetTexImage*>(getter->getProcAddress("glGetTexImage"));
   functions->uniformBlockBinding =
       reinterpret_cast<GLUniformBlockBinding*>(getter->getProcAddress("glUniformBlockBinding"));
   functions->bindBufferBase =

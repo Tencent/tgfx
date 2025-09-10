@@ -21,7 +21,6 @@
 #include "ProxyProvider.h"
 #include "core/AtlasCellDecodeTask.h"
 #include "core/AtlasManager.h"
-#include "core/utils/PixelFormatUtil.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/tasks/GenerateMipmapsTask.h"
