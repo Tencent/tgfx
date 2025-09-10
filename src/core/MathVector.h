@@ -22,6 +22,38 @@
 
 namespace tgfx {
 
+struct Vec2 {
+  constexpr Vec2() : x(0), y(0) {
+  }
+
+  constexpr Vec2(float x, float y) : x(x), y(y) {
+  }
+
+  static Vec2 Load(const float* ptr) {
+    Vec2 v;
+    memcpy(&v, ptr, sizeof(Vec2));
+    return v;
+  }
+
+  Vec2 operator+(const Vec2& v) const {
+    return {x + v.x, y + v.y};
+  }
+
+  friend Vec2 operator*(const Vec2& v, float s) {
+    return {v.x * s, v.y * s};
+  }
+
+  friend Vec2 operator*(float s, const Vec2& v) {
+    return v * s;
+  }
+
+  friend Vec2 operator/(const Vec2& v, float s) {
+    return {v.x / s, v.y / s};
+  }
+
+  float x, y;
+};
+
 struct Vec3 {
   constexpr Vec3() : x(0), y(0), z(0) {
   }
@@ -46,7 +78,7 @@ struct Vec3 {
   }
 
   static Vec3 Normalize(const Vec3& v) {
-    return v * (1.0f / v.length());
+    return v * (1.f / v.length());
   }
 
   Vec3 normalize() const {
@@ -116,10 +148,19 @@ struct Vec4 {
   constexpr Vec4() : x(0), y(0), z(0), w(0) {
   }
 
+  constexpr Vec4(float value) : x(value), y(value), z(value), w(value) {
+  }
+
   constexpr Vec4(float x, float y, float z, float w) : x(x), y(y), z(z), w(w) {
   }
 
   constexpr Vec4(const Vec3& v, float w) : x(v.x), y(v.y), z(v.z), w(w) {
+  }
+
+  static Vec4 Load(const float* ptr) {
+    Vec4 v;
+    memcpy(&v, ptr, sizeof(Vec4));
+    return v;
   }
 
   static float Dot(const Vec4& a, const Vec4& b) {
@@ -131,7 +172,7 @@ struct Vec4 {
   }
 
   static Vec4 Normalize(const Vec4& v) {
-    return v * (1.0f / v.length());
+    return v * (1.f / v.length());
   }
 
   Vec4 normalize() const {
@@ -198,6 +239,14 @@ struct Vec4 {
     *this = *this * s;
   }
 
+  Vec4 operator/(const Vec4& v) const {
+    return {x / v.x, y / v.y, z / v.z, w / v.w};
+  }
+
+  friend Vec4 operator/(const Vec4& v, float s) {
+    return {v.x / s, v.y / s, v.z / s, v.w / s};
+  }
+
   float operator[](int i) const {
     return this->ptr()[i];
   }
@@ -208,5 +257,21 @@ struct Vec4 {
 
   float x, y, z, w;
 };
+
+template <int... Ix>
+static inline Vec4 Shuffle(const Vec2& v) {
+  const float arr[2] = {v.x, v.y};
+  return {arr[Ix]...};
+}
+
+static inline Vec4 Min(const Vec4& a, const Vec4& b) {
+  return {a.x < b.x ? a.x : b.x, a.y < b.y ? a.y : b.y, a.z < b.z ? a.z : b.z,
+          a.w < b.w ? a.w : b.w};
+}
+
+static inline Vec4 Max(const Vec4& a, const Vec4& b) {
+  return {a.x > b.x ? a.x : b.x, a.y > b.y ? a.y : b.y, a.z > b.z ? a.z : b.z,
+          a.w > b.w ? a.w : b.w};
+}
 
 }  // namespace tgfx

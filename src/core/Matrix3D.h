@@ -18,6 +18,7 @@
 
 #include <cstring>
 #include "MathVector.h"
+#include "tgfx/core/Rect.h"
 
 namespace tgfx {
 
@@ -77,15 +78,17 @@ class Matrix3D {
 
   void postTranslate(float tx, float ty, float tz);
 
-  void preRotate(Vec3 axis, float degrees);
+  void preRotate(const Vec3& axis, float degrees);
 
-  void postRotate(Vec3 axis, float degrees);
+  void postRotate(const Vec3& axis, float degrees);
 
   bool invert(Matrix3D* inverse) const;
 
   Matrix3D transpose() const;
 
   Vec4 mapPoint(float x, float y, float z, float w) const;
+
+  static Rect MapRect(const Matrix3D& m, const Rect& src);
 
   static Matrix3D LookAt(const Vec3& eye, const Vec3& center, const Vec3& up);
 
@@ -132,6 +135,10 @@ class Matrix3D {
   void setRotateUnit(const Vec3& axis, float degrees);
 
   void setRotateUnitSinCos(const Vec3& axis, float sinV, float cosV);
+
+  bool hasPerspective() const {
+    return (values[3] != 0 || values[7] != 0 || values[11] != 0 || values[15] != 1);
+  }
 
   bool operator==(const Matrix3D& other) const;
 

@@ -40,23 +40,23 @@ static void TransposeArrays(const float src[16], float dst[16]) {
   dst[15] = src[15];
 }
 
-static bool Invert4x4Matrix(const float inMatrix[16], float outMatrix[16]) {
-  float a00 = inMatrix[0];
-  float a01 = inMatrix[1];
-  float a02 = inMatrix[2];
-  float a03 = inMatrix[3];
-  float a10 = inMatrix[4];
-  float a11 = inMatrix[5];
-  float a12 = inMatrix[6];
-  float a13 = inMatrix[7];
-  float a20 = inMatrix[8];
-  float a21 = inMatrix[9];
-  float a22 = inMatrix[10];
-  float a23 = inMatrix[11];
-  float a30 = inMatrix[12];
-  float a31 = inMatrix[13];
-  float a32 = inMatrix[14];
-  float a33 = inMatrix[15];
+static bool Invert4x4Matrix(const float inMat[16], float outMat[16]) {
+  const float a00 = inMat[0];
+  const float a01 = inMat[1];
+  const float a02 = inMat[2];
+  const float a03 = inMat[3];
+  const float a10 = inMat[4];
+  const float a11 = inMat[5];
+  const float a12 = inMat[6];
+  const float a13 = inMat[7];
+  const float a20 = inMat[8];
+  const float a21 = inMat[9];
+  const float a22 = inMat[10];
+  const float a23 = inMat[11];
+  const float a30 = inMat[12];
+  const float a31 = inMat[13];
+  const float a32 = inMat[14];
+  const float a33 = inMat[15];
 
   float b00 = a00 * a11 - a01 * a10;
   float b01 = a00 * a12 - a02 * a10;
@@ -71,51 +71,101 @@ static bool Invert4x4Matrix(const float inMatrix[16], float outMatrix[16]) {
   float b10 = a21 * a33 - a23 * a31;
   float b11 = a22 * a33 - a23 * a32;
 
-  float determinant = b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06;
-  if (outMatrix) {
-    if (FloatNearlyZero(determinant, FLOAT_NEARLY_ZERO * FLOAT_NEARLY_ZERO * FLOAT_NEARLY_ZERO)) {
-      return false;
-    }
-    float invdet = 1.0f / determinant;
-    b00 *= invdet;
-    b01 *= invdet;
-    b02 *= invdet;
-    b03 *= invdet;
-    b04 *= invdet;
-    b05 *= invdet;
-    b06 *= invdet;
-    b07 *= invdet;
-    b08 *= invdet;
-    b09 *= invdet;
-    b10 *= invdet;
-    b11 *= invdet;
-
-    outMatrix[0] = a11 * b11 - a12 * b10 + a13 * b09;
-    outMatrix[1] = a02 * b10 - a01 * b11 - a03 * b09;
-    outMatrix[2] = a31 * b05 - a32 * b04 + a33 * b03;
-    outMatrix[3] = a22 * b04 - a21 * b05 - a23 * b03;
-    outMatrix[4] = a12 * b08 - a10 * b11 - a13 * b07;
-    outMatrix[5] = a00 * b11 - a02 * b08 + a03 * b07;
-    outMatrix[6] = a32 * b02 - a30 * b05 - a33 * b01;
-    outMatrix[7] = a20 * b05 - a22 * b02 + a23 * b01;
-    outMatrix[8] = a10 * b10 - a11 * b08 + a13 * b06;
-    outMatrix[9] = a01 * b08 - a00 * b10 - a03 * b06;
-    outMatrix[10] = a30 * b04 - a31 * b02 + a33 * b00;
-    outMatrix[11] = a21 * b02 - a20 * b04 - a23 * b00;
-    outMatrix[12] = a11 * b07 - a10 * b09 - a12 * b06;
-    outMatrix[13] = a00 * b09 - a01 * b07 + a02 * b06;
-    outMatrix[14] = a31 * b01 - a30 * b03 - a32 * b00;
-    outMatrix[15] = a20 * b03 - a21 * b01 + a22 * b00;
-
-    if (!FloatsAreFinite(outMatrix, 16)) {
-      return false;
-    }
+  const float determinant = b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06;
+  if (FloatNearlyZero(determinant, FLOAT_NEARLY_ZERO * FLOAT_NEARLY_ZERO * FLOAT_NEARLY_ZERO)) {
+    return false;
   }
+  const float invdet = 1.f / determinant;
+  b00 *= invdet;
+  b01 *= invdet;
+  b02 *= invdet;
+  b03 *= invdet;
+  b04 *= invdet;
+  b05 *= invdet;
+  b06 *= invdet;
+  b07 *= invdet;
+  b08 *= invdet;
+  b09 *= invdet;
+  b10 *= invdet;
+  b11 *= invdet;
+
+  outMat[0] = a11 * b11 - a12 * b10 + a13 * b09;
+  outMat[1] = a02 * b10 - a01 * b11 - a03 * b09;
+  outMat[2] = a31 * b05 - a32 * b04 + a33 * b03;
+  outMat[3] = a22 * b04 - a21 * b05 - a23 * b03;
+  outMat[4] = a12 * b08 - a10 * b11 - a13 * b07;
+  outMat[5] = a00 * b11 - a02 * b08 + a03 * b07;
+  outMat[6] = a32 * b02 - a30 * b05 - a33 * b01;
+  outMat[7] = a20 * b05 - a22 * b02 + a23 * b01;
+  outMat[8] = a10 * b10 - a11 * b08 + a13 * b06;
+  outMat[9] = a01 * b08 - a00 * b10 - a03 * b06;
+  outMat[10] = a30 * b04 - a31 * b02 + a33 * b00;
+  outMat[11] = a21 * b02 - a20 * b04 - a23 * b00;
+  outMat[12] = a11 * b07 - a10 * b09 - a12 * b06;
+  outMat[13] = a00 * b09 - a01 * b07 + a02 * b06;
+  outMat[14] = a31 * b01 - a30 * b03 - a32 * b00;
+  outMat[15] = a20 * b03 - a21 * b01 + a22 * b00;
+
+  if (!FloatsAreFinite(outMat, 16)) {
+    return false;
+  }
+
   return true;
 }
 
+static Rect MapRectAffine(const Rect& srcRect, const float mat[16]) {
+  constexpr Vec4 flip{1.f, 1.f, -1.f, -1.f};
+
+  const auto c0 = Shuffle<0, 1, 0, 1>(Vec2::Load(mat)) * flip;
+  const auto c1 = Shuffle<0, 1, 0, 1>(Vec2::Load(mat + 4)) * flip;
+  const auto c3 = Shuffle<0, 1, 0, 1>(Vec2::Load(mat + 12));
+
+  const auto p0 = Min(c0 * srcRect.left + c1 * srcRect.top, c0 * srcRect.right + c1 * srcRect.top);
+  const auto p1 =
+      Min(c0 * srcRect.left + c1 * srcRect.bottom, c0 * srcRect.right + c1 * srcRect.bottom);
+  auto minMax = c3 + flip * Min(p0, p1);
+
+  return {minMax.x, minMax.y, minMax.z, minMax.w};
+}
+
+static Rect MapRectPerspective(const Rect& srcRect, const float mat[16]) {
+  const auto c0 = Vec4::Load(mat);
+  const auto c1 = Vec4::Load(mat + 4);
+  const auto c3 = Vec4::Load(mat + 12);
+
+  const auto tl = c0 * srcRect.left + c1 * srcRect.top + c3;
+  const auto tr = c0 * srcRect.right + c1 * srcRect.top + c3;
+  const auto bl = c0 * srcRect.left + c1 * srcRect.bottom + c3;
+  const auto br = c0 * srcRect.right + c1 * srcRect.bottom + c3;
+
+  constexpr Vec4 flip{1.f, 1.f, -1.f, -1.f};
+  auto project = [&flip](const Vec4& p0, const Vec4& p1, const Vec4& p2) {
+    const float w0 = p0[3];
+    if (constexpr float w0PlaneDistance = 1.f / (1 << 14); w0 >= w0PlaneDistance) {
+      return flip * Shuffle<0, 1, 0, 1>(Vec2(p0.x, p0.y)) / w0;
+    } else {
+      auto clip = [&](const Vec4& p) {
+        if (const float w = p[3]; w >= w0PlaneDistance) {
+          const float t = (w0PlaneDistance - w0) / (w - w0);
+          const auto c =
+              (t * Vec2::Load(p.ptr()) + (1.f - t) * Vec2::Load(p0.ptr())) / w0PlaneDistance;
+          return flip * Shuffle<0, 1, 0, 1>(c);
+        } else {
+          return Vec4(std::numeric_limits<float>::infinity());
+        }
+      };
+      return Min(clip(p1), clip(p2));
+    }
+  };
+
+  const auto p0 = Min(project(tl, tr, bl), project(tr, br, tl));
+  const auto p1 = Min(project(br, bl, tr), project(bl, tl, br));
+  auto minMax = flip * Min(p0, p1);
+  return {minMax.x, minMax.y, minMax.z, minMax.w};
+}
+
 const Matrix3D& Matrix3D::I() {
-  static const Matrix3D identity;
+  static constexpr Matrix3D identity;
   return identity;
 }
 
@@ -124,17 +174,17 @@ void Matrix3D::getRowMajor(float buffer[16]) const {
 }
 
 void Matrix3D::setConcat(const Matrix3D& a, const Matrix3D& b) {
-  auto c0 = a.getCol(0);
-  auto c1 = a.getCol(1);
-  auto c2 = a.getCol(2);
-  auto c3 = a.getCol(3);
+  const auto c0 = a.getCol(0);
+  const auto c1 = a.getCol(1);
+  const auto c2 = a.getCol(2);
+  const auto c3 = a.getCol(3);
 
   auto compute = [&](Vec4 v) { return c0 * v[0] + (c1 * v[1] + (c2 * v[2] + c3 * v[3])); };
 
-  auto m0 = compute(b.getCol(0));
-  auto m1 = compute(b.getCol(1));
-  auto m2 = compute(b.getCol(2));
-  auto m3 = compute(b.getCol(3));
+  const auto m0 = compute(b.getCol(0));
+  const auto m1 = compute(b.getCol(1));
+  const auto m2 = compute(b.getCol(2));
+  const auto m3 = compute(b.getCol(3));
 
   setCol(0, m0);
   setCol(1, m1);
@@ -155,9 +205,9 @@ void Matrix3D::preScale(float sx, float sy, float sz) {
     return;
   }
 
-  auto c0 = getCol(0);
-  auto c1 = getCol(1);
-  auto c2 = getCol(2);
+  const auto c0 = getCol(0);
+  const auto c1 = getCol(1);
+  const auto c2 = getCol(2);
 
   setCol(0, c0 * sx);
   setCol(1, c1 * sy);
@@ -168,15 +218,15 @@ void Matrix3D::postScale(float sx, float sy, float sz) {
   if (sx == 1 && sy == 1 && sz == 1) {
     return;
   }
-  auto m = MakeScale(sx, sy, sz);
+  const auto m = MakeScale(sx, sy, sz);
   this->postConcat(m);
 }
 
 void Matrix3D::preTranslate(float tx, float ty, float tz) {
-  auto c0 = getCol(0);
-  auto c1 = getCol(1);
-  auto c2 = getCol(2);
-  auto c3 = getCol(3);
+  const auto c0 = getCol(0);
+  const auto c1 = getCol(1);
+  const auto c2 = getCol(2);
+  const auto c3 = getCol(3);
 
   setCol(3, (c0 * tx + c1 * ty + c2 * tz + c3));
 }
@@ -187,13 +237,13 @@ void Matrix3D::postTranslate(float tx, float ty, float tz) {
   values[14] += tz;
 }
 
-void Matrix3D::preRotate(Vec3 axis, float degrees) {
-  auto m = MakeRotate(axis, degrees);
+void Matrix3D::preRotate(const Vec3& axis, float degrees) {
+  const auto m = MakeRotate(axis, degrees);
   preConcat(m);
 }
 
-void Matrix3D::postRotate(Vec3 axis, float degrees) {
-  auto m = MakeRotate(axis, degrees);
+void Matrix3D::postRotate(const Vec3& axis, float degrees) {
+  const auto m = MakeRotate(axis, degrees);
   postConcat(m);
 }
 
@@ -213,19 +263,27 @@ Matrix3D Matrix3D::transpose() const {
 }
 
 Vec4 Matrix3D::mapPoint(float x, float y, float z, float w) const {
-  auto c0 = getCol(0);
-  auto c1 = getCol(1);
-  auto c2 = getCol(2);
-  auto c3 = getCol(3);
+  const auto c0 = getCol(0);
+  const auto c1 = getCol(1);
+  const auto c2 = getCol(2);
+  const auto c3 = getCol(3);
 
-  Vec4 result = (c0 * x + c1 * y + c2 * z + c3 * w);
+  const Vec4 result = (c0 * x + c1 * y + c2 * z + c3 * w);
   return result;
 }
 
+Rect Matrix3D::MapRect(const Matrix3D& m, const Rect& src) {
+  if (m.hasPerspective()) {
+    return MapRectPerspective(src, m.values);
+  } else {
+    return MapRectAffine(src, m.values);
+  }
+}
+
 Matrix3D Matrix3D::LookAt(const Vec3& eye, const Vec3& center, const Vec3& up) {
-  Vec3 f = Vec3::Normalize(center - eye);
-  Vec3 u = Vec3::Normalize(up);
-  Vec3 s = Vec3::Normalize(f.cross(u));
+  const auto f = Vec3::Normalize(center - eye);
+  const auto u = Vec3::Normalize(up);
+  const auto s = Vec3::Normalize(f.cross(u));
 
   Matrix3D m;
   MakeCols(Vec4(s, 0), Vec4(s.cross(f), 0), Vec4(-f, 0), Vec4(eye, 1)).invert(&m);
@@ -234,13 +292,13 @@ Matrix3D Matrix3D::LookAt(const Vec3& eye, const Vec3& center, const Vec3& up) {
 
 Matrix3D Matrix3D::Perspective(float fovyDegress, float aspect, float nearZ, float farZ) {
   auto fovyRadians = DegreesToRadians(fovyDegress);
-  float cotan = 1.0f / tanf(fovyRadians / 2.0f);
+  float cotan = 1.f / tanf(fovyRadians / 2.f);
 
   Matrix3D m;
   m.setRowCol(0, 0, cotan / aspect);
   m.setRowCol(1, 1, cotan);
   m.setRowCol(2, 2, (farZ + nearZ) / (nearZ - farZ));
-  m.setRowCol(2, 3, (2.0f * farZ * nearZ) / (nearZ - farZ));
+  m.setRowCol(2, 3, (2.f * farZ * nearZ) / (nearZ - farZ));
   m.setRowCol(3, 2, -1);
   return m;
 }
@@ -269,14 +327,14 @@ void Matrix3D::setAll(float m00, float m01, float m02, float m03, float m10, flo
 void Matrix3D::setRotate(const Vec3& axis, float radians) {
   auto len = axis.length();
   if (len > 0 && (len * 0 == 0)) {
-    this->setRotateUnit(axis * (1.0f / len), radians);
+    this->setRotateUnit(axis * (1.f / len), radians);
   } else {
     this->setIdentity();
   }
 }
 
 void Matrix3D::setRotateUnit(const Vec3& axis, float degrees) {
-  auto radians = DegreesToRadians(degrees);
+  const auto radians = DegreesToRadians(degrees);
   this->setRotateUnitSinCos(axis, sin(radians), cos(radians));
 }
 
@@ -297,15 +355,15 @@ bool Matrix3D::operator==(const Matrix3D& other) const {
     return true;
   }
 
-  auto a0 = getCol(0);
-  auto a1 = getCol(1);
-  auto a2 = getCol(2);
-  auto a3 = getCol(3);
+  const auto a0 = getCol(0);
+  const auto a1 = getCol(1);
+  const auto a2 = getCol(2);
+  const auto a3 = getCol(3);
 
-  auto b0 = other.getCol(0);
-  auto b1 = other.getCol(1);
-  auto b2 = other.getCol(2);
-  auto b3 = other.getCol(3);
+  const auto b0 = other.getCol(0);
+  const auto b1 = other.getCol(1);
+  const auto b2 = other.getCol(2);
+  const auto b3 = other.getCol(3);
 
   return ((a0 == b0) && (a1 == b1) && (a2 == b2) && (a3 == b3));
 }
