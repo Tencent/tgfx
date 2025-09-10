@@ -70,6 +70,10 @@ class DrawingManager {
 
   void addSemaphoreWaitTask(std::shared_ptr<Semaphore> semaphore);
 
+  void addRectPerspectiveRenderTask(const Rect& rect, AAType aa,
+                                    std::shared_ptr<RenderTargetProxy> renderTarget,
+                                    std::shared_ptr<TextureProxy> fillTexture);
+
   /**
    * Flushes the drawing manager, executing all resource and render tasks. If signalSemaphore is not
    * null and uninitialized, a new semaphore will be created and assigned to signalSemaphore after
