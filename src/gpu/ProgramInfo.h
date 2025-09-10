@@ -19,7 +19,7 @@
 #pragma once
 
 #include <unordered_map>
-#include "gpu/Blend.h"
+#include "gpu/GPURenderPipeline.h"
 #include "gpu/RenderPass.h"
 #include "gpu/processors/EmptyXferProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
@@ -68,7 +68,7 @@ class ProgramInfo {
     return geometryProcessor->vertexAttributes();
   }
 
-  std::unique_ptr<BlendFormula> getBlendFormula() const;
+  PipelineColorAttachment getPipelineColorAttachment() const;
 
   /**
    * Returns the index of the processor in the ProgramInfo. Returns -1 if the processor is not in

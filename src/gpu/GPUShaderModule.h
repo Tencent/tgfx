@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,32 +18,33 @@
 
 #pragma once
 
-#include "gpu/BlendFormula.h"
-#include "gpu/processors/XferProcessor.h"
-#include "tgfx/core/BlendMode.h"
+#include <string>
+#include "gpu/GPUResource.h"
+#include "gpu/ShaderStage.h"
 
 namespace tgfx {
-class PorterDuffXferProcessor : public XferProcessor {
+/**
+ * GPUShaderModuleDescriptor describes the properties required to create a GPUShaderModule.
+ */
+class GPUShaderModuleDescriptor {
  public:
-  static PlacementPtr<PorterDuffXferProcessor> Make(BlockBuffer* buffer, BlendMode blend,
-                                                    DstTextureInfo dstTextureInfo);
+  /**
+   * The shader code to be compiled into a GPUShaderModule.
+   */
+  std::string code;
 
-  std::string name() const override {
-    return "PorterDuffXferProcessor";
-  }
+  /**
+   * Specifies the shader stage (e.g., vertex, fragment, compute). Only relevant for the OpenGL
+   * backend; ignored by other backends.
+   */
+  ShaderStage stage = ShaderStage::Vertex;
+};
 
-  const TextureView* dstTextureView() const override;
-
-  void computeProcessorKey(Context* context, BytesKey* bytesKey) const override;
-
- protected:
-  DEFINE_PROCESSOR_CLASS_ID
-
-  PorterDuffXferProcessor(BlendMode blend, DstTextureInfo dstTextureInfo)
-      : XferProcessor(ClassID()), blendMode(blend), dstTextureInfo(std::move(dstTextureInfo)) {
-  }
-
-  BlendMode blendMode = BlendMode::SrcOver;
-  DstTextureInfo dstTextureInfo = {};
+/**
+ * GPUShaderModule is an internal object that serves as a container for shader code，allowing it to
+ * be submitted to the GPU for execution within a pipeline.
+ */
+class GPUShaderModule : public GPUResource {
+ public:
 };
 }  // namespace tgfx

@@ -71,7 +71,7 @@ std::unique_ptr<UniformBuffer> UniformHandler::makeUniformBuffer(ShaderStage sta
     return nullptr;
   }
 
-  if (stage == ShaderStage::Fragment && fragmentUniforms.empty() && samplers.empty()) {
+  if (stage == ShaderStage::Fragment && fragmentUniforms.empty()) {
     return nullptr;
   }
 

@@ -18,11 +18,7 @@
   ./install_tools.sh
   depsync
 
-  if [[ $1 == "1" ]]; then
-    BUILD_DIR=build
-  else
-    BUILD_DIR=cmake-build-debug
-  fi
+  BUILD_DIR=build
 
   if [ ! -d "./${BUILD_DIR}" ]; then
     mkdir ${BUILD_DIR}
