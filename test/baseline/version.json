@@ -185,7 +185,7 @@
         "LayerVisible1": "4edccb64",
         "Layer_drawRRect": "66aef718",
         "Layer_hitTestPoint": "99c36f0c",
-        "Layer_hitTestPointNested": "6a23adfe",
+        "Layer_hitTestPointNested": "e89a8aa9",
         "MaskAlpha": "3dbeed5",
         "ModeColorFilter": "8bd149a4",
         "PartialBackgroundBlur": "ee2cc771",
@@ -217,7 +217,7 @@
         "imageMask": "8bd149a4",
         "innerShadow": "c26ff3d9",
         "shapeMask": "8bd149a4",
-        "textMask": "6a23adfe"
+        "textMask": "e89a8aa9"
     },
     "MaskTest": {
         "rasterize_emoji": "c0f39f8",
