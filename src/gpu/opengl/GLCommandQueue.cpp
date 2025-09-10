@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLCommandQueue.h"
-#include "GLReadTexture.h"
 #include "GLTexture.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "gpu/opengl/GLBuffer.h"
@@ -95,9 +94,18 @@ bool GLCommandQueue::readTexture(GPUTexture* texture, const Rect& rect, void* pi
   }
   auto gl = gpu->functions();
   auto caps = static_cast<const GLCaps*>(gpu->caps());
+  auto glTexture = static_cast<GLTexture*>(texture);
   ClearGLError(gl);
-  auto glReadTexture = GLReadTexture::MakeFrom(caps, rect, static_cast<GLTexture*>(texture));
-  if (!glReadTexture->isSupportReadBack(gpu)) {
+  if (texture->usage() & GPUTextureUsage::RENDER_ATTACHMENT) {
+    gpu->bindFramebuffer(glTexture);
+  }
+  else if (texture->usage() & GPUTextureUsage::TEXTURE_BINDING) {
+    if (!glTexture->checkFrameBuffer(gpu)) {
+      return false;
+    }
+  }
+  else {
+    LOGE("GLCommandQueue::readTexture() texture usage does not support readback!");
     return false;
   }
   auto format = texture->format();
@@ -121,7 +129,12 @@ bool GLCommandQueue::readTexture(GPUTexture* texture, const Rect& rect, void* pi
     outPixels = tempBuffer.data();
   }
   gl->pixelStorei(GL_PACK_ALIGNMENT, static_cast<int>(bytesPerPixel));
-  glReadTexture->readTexture(gpu, rect, outPixels);
+  auto x = static_cast<int>(rect.left);
+  auto y = static_cast<int>(rect.top);
+  auto width = static_cast<int>(rect.width());
+  auto height = static_cast<int>(rect.height());
+  auto textureFormat = caps->getTextureFormat(texture->format());
+  gl->readPixels(x, y, width, height, textureFormat.externalFormat, GL_UNSIGNED_BYTE, pixels);
   if (restoreGLRowLength) {
     gl->pixelStorei(GL_PACK_ROW_LENGTH, 0);
   }

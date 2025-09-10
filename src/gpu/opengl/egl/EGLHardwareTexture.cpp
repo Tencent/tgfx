@@ -101,7 +101,7 @@ std::unique_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(EGLGPU* gpu,
       new EGLHardwareTexture(descriptor, hardwareBuffer, eglImage, target, textureID));
   gpu->bindTexture(texture.get());
   eglext::glEGLImageTargetTexture2DOES(target, (GLeglImageOES)eglImage);
-  if (!texture->checkFrameBuffer(gpu)) {
+  if (texture->usage() & GPUTextureUsage::RENDER_ATTACHMENT && !texture->checkFrameBuffer(gpu)) {
     texture->release(gpu);
     return nullptr;
   }
