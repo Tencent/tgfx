@@ -98,8 +98,8 @@ bool GLCommandQueue::readTexture(GPUTexture* texture, const Rect& rect, void* pi
   ClearGLError(gl);
   if (texture->usage() & GPUTextureUsage::RENDER_ATTACHMENT) {
     gpu->bindFramebuffer(glTexture);
-  } else {
-    return glTexture->checkFrameBuffer(gpu);
+  } else if (!glTexture->checkFrameBuffer(gpu)) {
+    return false;
   }
   auto format = texture->format();
   auto bytesPerPixel = PixelFormatBytesPerPixel(format);
