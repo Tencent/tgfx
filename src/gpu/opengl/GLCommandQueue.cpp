@@ -98,7 +98,11 @@ bool GLCommandQueue::readTexture(GPUTexture* texture, const Rect& rect, void* pi
   ClearGLError(gl);
   if (texture->usage() & GPUTextureUsage::RENDER_ATTACHMENT) {
     gpu->bindFramebuffer(glTexture);
-  } else if (!glTexture->checkFrameBuffer(gpu)) {
+  } else if (texture->usage() & GPUTextureUsage::TEXTURE_BINDING &&
+             !glTexture->checkFrameBuffer(gpu)) {
+    return false;
+  } else {
+    LOGE("GLCommandQueue::readTexture() texture usage does not support readback!");
     return false;
   }
   auto format = texture->format();
