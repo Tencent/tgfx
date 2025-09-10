@@ -103,7 +103,7 @@ std::unique_ptr<GPUTexture> GLGPU::createTexture(const GPUTextureDescriptor& des
     texture->release(this);
     return nullptr;
   }
-  if (texture->usage() & GPUTextureUsage::RENDER_ATTACHMENT && !texture->checkFrameBuffer(this)) {
+  if (descriptor.usage & GPUTextureUsage::RENDER_ATTACHMENT && !texture->checkFrameBuffer(this)) {
     texture->release(this);
     return nullptr;
   }
@@ -139,7 +139,7 @@ std::unique_ptr<GPUTexture> GLGPU::importExternalTexture(const BackendTexture& b
   } else {
     texture = std::make_unique<GLExternalTexture>(descriptor, textureInfo.target, textureInfo.id);
   }
-  if (texture->usage() & GPUTextureUsage::RENDER_ATTACHMENT && !texture->checkFrameBuffer(this)) {
+  if (usage & GPUTextureUsage::RENDER_ATTACHMENT && !texture->checkFrameBuffer(this)) {
     texture->release(this);
     return nullptr;
   }
