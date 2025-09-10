@@ -108,7 +108,14 @@ static std::shared_ptr<ImageCodec> GetGlyphCodec(
                                              stroke);
   }
 
-  auto shape = Shape::MakeFrom(font, glyphID);
+  std::shared_ptr<Shape> shape = nullptr;
+  if (!font.isFauxItalic()) {
+    shape = Shape::MakeFrom(font, glyphID);
+  }else {
+    auto noItalicFont = font;
+    noItalicFont.setFauxItalic(false);
+    shape = Shape::MakeFrom(std::move(noItalicFont), glyphID);
+  }
   if (shape == nullptr) {
     return nullptr;
   }
