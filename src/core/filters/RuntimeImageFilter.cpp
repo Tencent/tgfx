@@ -67,7 +67,7 @@ std::shared_ptr<TextureProxy> RuntimeImageFilter::lockTextureProxy(std::shared_p
       return nullptr;
     }
     textureProxies.push_back(textureProxy);
-  } 
+  }
   auto offset = Point::Make(-renderBounds.x(), -renderBounds.y());
   auto drawingManager = args.context->drawingManager();
   drawingManager->addRuntimeDrawTask(renderTarget, std::move(textureProxies), effect, offset);
