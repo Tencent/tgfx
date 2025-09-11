@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Surface.h"
-#include <utility>
 #include "DrawingManager.h"
 #include "core/images/TextureImage.h"
 #include "core/utils/Log.h"

@@ -119,8 +119,6 @@ class Bitmap {
     return _info;
   }
 
-  void setColorSpace(const std::shared_ptr<ColorSpace>& colorSpace) const;
-
   /**
    * Returns the width of the pixels.
    */

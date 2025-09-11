@@ -32,12 +32,10 @@ static BOOL GetMonitorICCFromHWND(HWND hWnd, wchar_t* pProfilePath, DWORD* pSize
   DWORD dwRequiredSize = 0;
   BOOL bResult = GetICMProfileW(hdc, &dwRequiredSize, NULL);
   if (!bResult && GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
-    // 再次调用，获取配置文件路径
     if (pProfilePath && *pSize >= dwRequiredSize) {
       bResult = GetICMProfileW(hdc, pSize, pProfilePath);
       return bResult;
     } else {
-      // 缓冲区不足，可以通过pSize返回所需大小
       *pSize = dwRequiredSize;
       SetLastError(ERROR_INSUFFICIENT_BUFFER);
       return FALSE;

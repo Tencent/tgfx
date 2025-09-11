@@ -336,8 +336,7 @@ class Image {
     RGBAAA,
     Texture,
     Subset,
-    Scaled,
-    ColorSpace
+    Scaled
   };
 
   virtual Type type() const = 0;
@@ -388,7 +387,6 @@ class Image {
   friend class RasterizedImage;
   friend class ScaledImage;
   friend class ImageShader;
-  friend class ColorSpaceImage;
   friend class Types;
 };
 }  // namespace tgfx

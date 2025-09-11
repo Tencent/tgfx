@@ -24,8 +24,7 @@ namespace tgfx {
 class RawPixelCodec : public ImageCodec {
  public:
   RawPixelCodec(const ImageInfo& info, std::shared_ptr<Data> pixels)
-      : ImageCodec(info.width(), info.height(), Orientation::TopLeft), info(info),
-        pixels(std::move(pixels)) {
+      : ImageCodec(info.width(), info.height()), info(info), pixels(std::move(pixels)) {
   }
 
   bool isAlphaOnly() const override {

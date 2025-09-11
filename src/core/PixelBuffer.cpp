@@ -104,7 +104,7 @@ std::shared_ptr<PixelBuffer> PixelBuffer::Make(int width, int height, bool alpha
     }
   }
   auto colorType = alphaOnly ? ColorType::ALPHA_8 : ColorType::RGBA_8888;
-  auto info = ImageInfo::Make(width, height, colorType, AlphaType::Premultiplied, 0);
+  auto info = ImageInfo::Make(width, height, colorType);
   if (info.isEmpty()) {
     return nullptr;
   }

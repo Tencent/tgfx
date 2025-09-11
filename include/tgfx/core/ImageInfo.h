@@ -23,7 +23,6 @@
 #include <cstddef>
 #include <cstring>
 #include "tgfx/core/AlphaType.h"
-#include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/ColorType.h"
 
 namespace tgfx {

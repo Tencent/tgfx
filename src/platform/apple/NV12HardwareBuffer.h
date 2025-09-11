@@ -42,7 +42,7 @@ class NV12HardwareBuffer : public ImageBuffer {
 
  private:
   CVPixelBufferRef pixelBuffer = nullptr;
-  YUVColorSpace _colorSpace = YUVColorSpace::BT601_LIMITED;
+  YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED;
 
   NV12HardwareBuffer(CVPixelBufferRef pixelBuffer, YUVColorSpace colorSpace);
 };

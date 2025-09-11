@@ -35,7 +35,6 @@ class ColorShader : public Shader {
   }
 
   Color color;
-  std::shared_ptr<ColorSpace> colorSpace;
 
  protected:
   Type type() const override {

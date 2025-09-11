@@ -17,10 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/ImageCodec.h"
-#include <src/skcms_public.h>
 #include "BoxFilterDownsample.h"
 #include "core/PixelBuffer.h"
-#include "core/utils/PixelsConvertUtil.h"
 #include "core/utils/USE.h"
 #include "core/utils/WeakMap.h"
 #include "tgfx/core/Buffer.h"

@@ -31,7 +31,6 @@
 #include "core/shapes/TextShape.h"
 #include "core/utils/ApplyStrokeToBounds.h"
 #include "core/utils/MathExtra.h"
-#include "core/utils/Types.h"
 #include "gpu/DrawingManager.h"
 
 namespace tgfx {
