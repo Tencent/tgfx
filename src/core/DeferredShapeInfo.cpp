@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DeferredShapeInfo.h"
-#include <utility>
 #include "core/shapes/MatrixShape.h"
 #include "core/shapes/StrokeShape.h"
 #include "core/utils/ApplyStrokeToBounds.h"
@@ -34,31 +33,32 @@ std::shared_ptr<DeferredShapeInfo> DeferredShapeInfo::Make(std::shared_ptr<Shape
       new DeferredShapeInfo(std::move(shape), stroke, matrix));
 }
 
-DeferredShapeInfo::DeferredShapeInfo(std::shared_ptr<Shape> shape, const Stroke* inputStroke,
+DeferredShapeInfo::DeferredShapeInfo(std::shared_ptr<Shape> shape, const Stroke* stroke,
                                      Matrix matrix)
     : _matrix(matrix) {
   if (shape->type() == Shape::Type::Matrix) {
+    // Flatten nested MatrixShapes
     auto matrixShape = std::static_pointer_cast<MatrixShape>(shape);
     _matrix = matrix * matrixShape->matrix;
     _shape = matrixShape->shape;
   } else {
     _shape = std::move(shape);
   }
-  if (inputStroke) {
-    stroke = *inputStroke;
+  if (stroke) {
+    _stroke = *stroke;
   }
 }
 
-void DeferredShapeInfo::applyMatrix(const Matrix& m) {
-  _matrix = m * _matrix;
+void DeferredShapeInfo::applyMatrix(const Matrix& matrix) {
+  _matrix = matrix * _matrix;
 }
 
 Matrix DeferredShapeInfo::matrix() const {
   return _matrix;
 }
 
-void DeferredShapeInfo::setMatrix(const Matrix& m) {
-  _matrix = m;
+void DeferredShapeInfo::setMatrix(const Matrix& matrix) {
+  _matrix = matrix;
 }
 
 std::shared_ptr<const Shape> DeferredShapeInfo::shape() const {
@@ -67,8 +67,8 @@ std::shared_ptr<const Shape> DeferredShapeInfo::shape() const {
 
 Rect DeferredShapeInfo::getBounds() const {
   auto bounds = _shape->getBounds();
-  if (stroke.has_value()) {
-    ApplyStrokeToBounds(*stroke, &bounds, true);
+  if (_stroke.has_value()) {
+    ApplyStrokeToBounds(*_stroke, &bounds, true);
   }
   bounds = _matrix.mapRect(bounds);
   return bounds;
@@ -76,8 +76,8 @@ Rect DeferredShapeInfo::getBounds() const {
 
 UniqueKey DeferredShapeInfo::getUniqueKey() const {
   auto key = _shape->getUniqueKey();
-  if (stroke.has_value()) {
-    key = StrokeShape::MakeUniqueKey(key, *stroke);
+  if (_stroke.has_value()) {
+    key = StrokeShape::MakeUniqueKey(key, *_stroke);
   }
   key = MatrixShape::MakeUniqueKey(key, _matrix);
   return key;
@@ -85,20 +85,18 @@ UniqueKey DeferredShapeInfo::getUniqueKey() const {
 
 Path DeferredShapeInfo::getPath() const {
   auto finalPath = _shape->getPath();
-  if (!stroke.has_value()) {
+  if (!_stroke.has_value()) {
     finalPath.transform(_matrix);
     return finalPath;
   }
-  if (stroke->isHairline()) {
+  if (_stroke->isHairline()) {
     finalPath.transform(_matrix);
-    Stroke hairlineStroke = *stroke;
+    Stroke hairlineStroke = *_stroke;
     hairlineStroke.width = 1.f;
-    // hairlineStroke.applyToPath(&finalPath, _matrix.getMaxScale());
-    hairlineStroke.applyToPath(&finalPath);
+    hairlineStroke.applyToPath(&finalPath, _matrix.getMaxScale());
     return finalPath;
   }
-  // stroke->applyToPath(&finalPath, _matrix.getMaxScale());
-  stroke->applyToPath(&finalPath);
+  _stroke->applyToPath(&finalPath, _matrix.getMaxScale());
   finalPath.transform(_matrix);
   return finalPath;
 }

@@ -156,7 +156,7 @@ std::shared_ptr<GPUShapeProxy> ProxyProvider::createGPUShapeProxy(
   auto shape = deferredShape->shape();
   auto isInverseFillType = shape->isInverseFillType();
   auto matrix = deferredShape->matrix();
-  if (matrix.isIdentity() && !isInverseFillType) {
+  if (!matrix.isIdentity() && !isInverseFillType) {
     auto scales = matrix.getAxisScales();
     if (scales.x == scales.y) {
       DEBUG_ASSERT(scales.x != 0);

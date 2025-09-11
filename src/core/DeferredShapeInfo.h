@@ -27,6 +27,11 @@
 
 namespace tgfx {
 
+/**
+ * A class for deferred computation of a shape's Path, storing the associated matrix and stroke
+ * settings.
+ * The actual Path is constructed based on the current member variables when needed.
+ */
 class DeferredShapeInfo {
  public:
   static std::shared_ptr<DeferredShapeInfo> Make(std::shared_ptr<Shape> shape, const Stroke* stroke,
@@ -49,10 +54,10 @@ class DeferredShapeInfo {
   Path getPath() const;
 
  private:
-  DeferredShapeInfo(std::shared_ptr<Shape> shape, const Stroke* inputStroke, Matrix matrix);
+  DeferredShapeInfo(std::shared_ptr<Shape> shape, const Stroke* stroke, Matrix matrix);
 
   std::shared_ptr<Shape> _shape = nullptr;
-  std::optional<Stroke> stroke;
+  std::optional<Stroke> _stroke;
   Matrix _matrix = Matrix::I();
 };
 

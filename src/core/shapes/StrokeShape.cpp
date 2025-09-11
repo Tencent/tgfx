@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "StrokeShape.h"
-#include <memory>
 #include "core/shapes/MatrixShape.h"
 #include "core/utils/ApplyStrokeToBounds.h"
 #include "core/utils/Log.h"
@@ -88,9 +87,9 @@ UniqueKey StrokeShape::MakeUniqueKey(const UniqueKey& key, const Stroke& stroke)
   }
   // hairline stroke ignore cap, join and miterLimit,and width is always 0.f,so just use a fixed key.
   static const auto HairlineStrokeKey = []() -> UniqueKey {
-    auto HairlineStrokeShapeType = UniqueID::Next();
+    auto hairlineStrokeType = UniqueID::Next();
     BytesKey bytesKey(1);
-    bytesKey.write(HairlineStrokeShapeType);
+    bytesKey.write(hairlineStrokeType);
     return UniqueKey::Append(UniqueKey(), bytesKey.data(), bytesKey.size());
   }();
   return HairlineStrokeKey;

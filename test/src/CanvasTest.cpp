@@ -16,8 +16,6 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <algorithm>
-#include <iostream>
 #include "core/PathRef.h"
 #include "core/Records.h"
 #include "core/images/CodecImage.h"
