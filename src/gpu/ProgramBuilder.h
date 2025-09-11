@@ -43,10 +43,6 @@ class ProgramBuilder {
     return programInfo;
   }
 
-  virtual std::string versionDeclString() = 0;
-
-  virtual std::string textureFuncName() const = 0;
-
   virtual std::string getShaderVarDeclarations(const ShaderVar& var, ShaderStage stage) const = 0;
 
   virtual std::string getUniformBlockDeclaration(ShaderStage stage,

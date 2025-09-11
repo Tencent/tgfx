@@ -27,16 +27,10 @@
 namespace tgfx {
 class GLSLProgramBuilder : public ProgramBuilder {
  public:
-  std::string versionDeclString() override;
-
-  std::string textureFuncName() const override;
-
   std::string getShaderVarDeclarations(const ShaderVar& var, ShaderStage stage) const override;
 
   std::string getUniformBlockDeclaration(ShaderStage stage,
                                          const std::vector<Uniform>& uniforms) const override;
-
-  bool isLegacyES() const;
 
  private:
   GLSLProgramBuilder(Context* context, const ProgramInfo* programInfo);
