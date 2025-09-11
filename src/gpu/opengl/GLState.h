@@ -37,10 +37,7 @@ struct GLStencil {
   unsigned depthFailOp = INVALID_VALUE;
   unsigned passOp = INVALID_VALUE;
 
-  bool operator!=(const GLStencil& other) const {
-    return compare != other.compare || failOp != other.failOp || depthFailOp != other.depthFailOp ||
-           passOp == other.passOp;
-  }
+  bool operator!=(const GLStencil& other) const;
 };
 
 struct GLStencilState {

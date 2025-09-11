@@ -135,11 +135,11 @@ void GLRenderPass::onEnd() {
     auto renderTexture = static_cast<GLTexture*>(attachment.texture);
     auto sampleTexture = static_cast<GLTexture*>(attachment.resolveTexture);
     DEBUG_ASSERT(renderTexture != sampleTexture);
-    auto sate = gpu->state();
-    sate->bindFramebuffer(renderTexture, FrameBufferTarget::Read);
-    sate->bindFramebuffer(sampleTexture, FrameBufferTarget::Draw);
+    auto state = gpu->state();
+    state->bindFramebuffer(renderTexture, FrameBufferTarget::Read);
+    state->bindFramebuffer(sampleTexture, FrameBufferTarget::Draw);
     // MSAA resolve may be affected by the scissor test, so disable it here.
-    sate->setEnabled(GL_SCISSOR_TEST, false);
+    state->setEnabled(GL_SCISSOR_TEST, false);
     if (caps->msFBOType == MSFBOType::ES_Apple) {
       gl->resolveMultisampleFramebuffer();
     } else {

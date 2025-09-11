@@ -135,7 +135,7 @@ class DepthStencilAttachment {
   }
 
   /**
-   * Returns the texture associated with this attachment.
+   * The texture associated with this depth-stencil attachment.
    */
   GPUTexture* texture = nullptr;
 

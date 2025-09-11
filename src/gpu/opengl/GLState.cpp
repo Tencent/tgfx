@@ -21,6 +21,11 @@
 #include "gpu/opengl/GLTexture.h"
 
 namespace tgfx {
+bool GLStencil::operator!=(const GLStencil& other) const {
+  return compare != other.compare || failOp != other.failOp || depthFailOp != other.depthFailOp ||
+         passOp != other.passOp;
+}
+
 GLState::GLState(std::shared_ptr<GLInterface> glInterface) : interface(std::move(glInterface)) {
   auto shaderCaps = interface->caps()->shaderCaps();
   textureUnits.resize(static_cast<size_t>(shaderCaps->maxFragmentSamplers), INVALID_VALUE);
