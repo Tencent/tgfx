@@ -64,6 +64,10 @@ static unsigned ToGLBlendOperation(BlendOperation blendOperation) {
       return GL_FUNC_SUBTRACT;
     case BlendOperation::ReverseSubtract:
       return GL_FUNC_REVERSE_SUBTRACT;
+    case BlendOperation::Min:
+      return GL_MIN;
+    case BlendOperation::Max:
+      return GL_MAX;
   }
   return GL_FUNC_ADD;
 }

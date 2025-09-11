@@ -40,6 +40,18 @@ enum class BlendOperation {
    * Subtract a portion of the source values from a portion of the destination pixel values:
    * Cd*D - Cs*S.
    */
-  ReverseSubtract
+  ReverseSubtract,
+
+  /**
+   * Take the minimum of the source and destination pixel values:
+   * min(Cs*S, Cd*D).
+   */
+  Min,
+
+  /**
+   * Take the maximum of the source and destination pixel values:
+   * max(Cs*S, Cd*D).
+   */
+  Max
 };
 }  // namespace tgfx

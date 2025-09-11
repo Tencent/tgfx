@@ -518,7 +518,11 @@ void AppendCoeffBlend(FragmentShaderBuilder* fsBuilder, const std::string& srcCo
       fsBuilder->codeAppendf("%s = clamp(%s - %s, 0.0, 1.0);", outColor.c_str(), dstWithCoeff,
                              srcWithCoeff);
       break;
-    default:
+    case BlendOperation::Min:
+      fsBuilder->codeAppendf("%s = min(%s, %s);", outColor.c_str(), srcWithCoeff, dstWithCoeff);
+      break;
+    case BlendOperation::Max:
+      fsBuilder->codeAppendf("%s = max(%s, %s);", outColor.c_str(), srcWithCoeff, dstWithCoeff);
       break;
   }
 }
