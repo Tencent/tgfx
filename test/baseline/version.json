@@ -112,11 +112,13 @@
         "tile_mode_subset": "67961560"
     },
     "DrawersTest": {
-        "ConicGradient": "e89a8aa9",
-        "ImageWithMipmap": "e89a8aa9",
-        "ImageWithShadow": "e89a8aa9",
-        "RichText": "6095b909",
-        "SimpleLayerTree": "9060bdb6"
+        "ConicGradient": "69683f78",
+        "CustomLayerTreeDrawer": "9060bdb6",
+        "GridBackground": "2ae64df",
+        "ImageWithMipmap": "da590da",
+        "ImageWithShadow": "c26ff3d9",
+        "SimpleLayerTreeDrawer": "9060bdb6",
+        "SimpleText": "6095b909"
     },
     "DstTextureTest": {
         "EmptyLocalBounds": "be94e666",
@@ -183,7 +185,7 @@
         "LayerVisible1": "4edccb64",
         "Layer_drawRRect": "66aef718",
         "Layer_hitTestPoint": "99c36f0c",
-        "Layer_hitTestPointNested": "6a23adfe",
+        "Layer_hitTestPointNested": "e89a8aa9",
         "MaskAlpha": "3dbeed5",
         "ModeColorFilter": "8bd149a4",
         "PartialBackgroundBlur": "ee2cc771",
@@ -201,7 +203,7 @@
         "backgroundLayerBlur": "cebc420b",
         "draw_shape": "80a4bd69",
         "draw_solid": "b4a1231",
-        "draw_text": "d5f6e118",
+        "draw_text": "f3146f52",
         "dropShadow": "ee2cc771",
         "filterClip": "8bd149a4",
         "filterTest": "8bd149a4",
@@ -215,7 +217,7 @@
         "imageMask": "8bd149a4",
         "innerShadow": "c26ff3d9",
         "shapeMask": "8bd149a4",
-        "textMask": "6a23adfe"
+        "textMask": "e89a8aa9"
     },
     "MaskTest": {
         "rasterize_emoji": "c0f39f8",
@@ -334,7 +336,7 @@
     "TextAlignTest": {
         "FontFallbackTest": "9060bdb6",
         "SingleLineTextAlign": "6095b909",
-        "TextAlign": "6a23adfe",
+        "TextAlign": "e105ec7c",
         "TextAlignBlankLineTest": "6095b909",
         "TextAlignSimulateVerticalTextLayout": "9060bdb6",
         "TextAlignWidth0Height0": "6095b909",
@@ -342,7 +344,7 @@
         "TruncateTextLineTest": "9060bdb6"
     },
     "TypefaceTest": {
-        "CustomImageTypeface": "d5f6e118",
+        "CustomImageTypeface": "f3146f52",
         "CustomPathTypeface": "42ecc4c7"
     }
 }
