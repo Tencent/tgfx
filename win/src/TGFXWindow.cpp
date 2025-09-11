@@ -307,9 +307,8 @@ void TGFXWindow::draw() {
 
   int count = hello2d::LayerBuilder::Count();
   int index = (count > 0) ? (currentDrawerIndex % count) : 0;
-
-  appHost->draw(canvas, index);
-
+  bool isNeedBackground = true;
+  appHost->draw(canvas, index, isNeedBackground);
   canvas->restore();
   context->flushAndSubmit();
   tgfxWindow->present(context);
