@@ -285,6 +285,13 @@ class RenderPass {
   virtual void setIndexBuffer(GPUBuffer* buffer, IndexFormat format = IndexFormat::UInt16) = 0;
 
   /**
+   * Sets the stencil reference value using during stencil tests with the "replace" stencil
+   * operation (as set in the descriptor of the GPU::createRenderPipeline() method, in the
+   * properties defining the various stencil operations).
+   */
+  virtual void setStencilReference(uint32_t reference) = 0;
+
+  /**
    * Draws primitives based on the vertex buffer provided by setVertexBuffer().
    */
   virtual void draw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount) = 0;

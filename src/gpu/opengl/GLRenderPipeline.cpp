@@ -19,88 +19,40 @@
 #include "GLRenderPipeline.h"
 #include "gpu/UniformBuffer.h"
 #include "gpu/opengl/GLGPU.h"
+#include "gpu/opengl/GLUtil.h"
 
 namespace tgfx {
-
-static unsigned ToGLBlendFactor(BlendFactor blendFactor) {
-  switch (blendFactor) {
-    case BlendFactor::Zero:
-      return GL_ZERO;
-    case BlendFactor::One:
-      return GL_ONE;
-    case BlendFactor::Src:
-      return GL_SRC_COLOR;
-    case BlendFactor::OneMinusSrc:
-      return GL_ONE_MINUS_SRC_COLOR;
-    case BlendFactor::Dst:
-      return GL_DST_COLOR;
-    case BlendFactor::OneMinusDst:
-      return GL_ONE_MINUS_DST_COLOR;
-    case BlendFactor::SrcAlpha:
-      return GL_SRC_ALPHA;
-    case BlendFactor::OneMinusSrcAlpha:
-      return GL_ONE_MINUS_SRC_ALPHA;
-    case BlendFactor::DstAlpha:
-      return GL_DST_ALPHA;
-    case BlendFactor::OneMinusDstAlpha:
-      return GL_ONE_MINUS_DST_ALPHA;
-    case BlendFactor::Src1:
-      return GL_SRC1_COLOR;
-    case BlendFactor::OneMinusSrc1:
-      return GL_ONE_MINUS_SRC1_COLOR;
-    case BlendFactor::Src1Alpha:
-      return GL_SRC1_ALPHA;
-    case BlendFactor::OneMinusSrc1Alpha:
-      return GL_ONE_MINUS_SRC1_ALPHA;
-  }
-  return GL_ZERO;
-}
-
-static unsigned ToGLBlendOperation(BlendOperation blendOperation) {
-  switch (blendOperation) {
-    case BlendOperation::Add:
-      return GL_FUNC_ADD;
-    case BlendOperation::Subtract:
-      return GL_FUNC_SUBTRACT;
-    case BlendOperation::ReverseSubtract:
-      return GL_FUNC_REVERSE_SUBTRACT;
-    case BlendOperation::Min:
-      return GL_MIN;
-    case BlendOperation::Max:
-      return GL_MAX;
-  }
-  return GL_FUNC_ADD;
-}
-
 GLRenderPipeline::GLRenderPipeline(unsigned programID) : programID(programID) {
 }
 
-void GLRenderPipeline::activate(GLGPU* gpu) {
-  gpu->useProgram(programID);
+void GLRenderPipeline::activate(GLGPU* gpu, unsigned stencilReference) {
+  auto state = gpu->state();
+  state->useProgram(programID);
   auto shaderCaps = gpu->caps()->shaderCaps();
   if (shaderCaps->frameBufferFetchSupport && shaderCaps->frameBufferFetchRequiresEnablePerSample) {
-    if (colorAttachment.blendEnable) {
-      gpu->enableCapability(GL_FETCH_PER_SAMPLE_ARM, false);
+    if (blendState) {
+      state->setEnabled(GL_FETCH_PER_SAMPLE_ARM, false);
     } else {
-      gpu->enableCapability(GL_FETCH_PER_SAMPLE_ARM, true);
+      state->setEnabled(GL_FETCH_PER_SAMPLE_ARM, true);
     }
   }
-  if (colorAttachment.blendEnable) {
-    gpu->enableCapability(GL_BLEND, true);
-    auto srcColorFactor = ToGLBlendFactor(colorAttachment.srcColorBlendFactor);
-    auto dstColorFactor = ToGLBlendFactor(colorAttachment.dstColorBlendFactor);
-    auto srcAlphaFactor = ToGLBlendFactor(colorAttachment.srcAlphaBlendFactor);
-    auto dstAlphaFactor = ToGLBlendFactor(colorAttachment.dstAlphaBlendFactor);
-    gpu->setBlendFunc(srcColorFactor, dstColorFactor, srcAlphaFactor, dstAlphaFactor);
-    auto colorBlendOp = ToGLBlendOperation(colorAttachment.colorBlendOp);
-    auto alphaBlendOp = ToGLBlendOperation(colorAttachment.alphaBlendOp);
-    gpu->setBlendEquation(colorBlendOp, alphaBlendOp);
-  } else {
-    gpu->enableCapability(GL_BLEND, false);
+  state->setColorMask(colorWriteMask);
+
+  state->setEnabled(GL_STENCIL_TEST, stencilState != nullptr);
+  if (stencilState) {
+    stencilState->reference = stencilReference;
+    state->setStencilState(*stencilState);
   }
-  gpu->setColorMask(colorAttachment.colorWriteMask);
+  state->setEnabled(GL_DEPTH_TEST, depthState != nullptr);
+  if (depthState) {
+    state->setDepthState(*depthState);
+  }
+  state->setEnabled(GL_BLEND, blendState != nullptr);
+  if (blendState) {
+    state->setBlendState(*blendState);
+  }
   if (vertexArray > 0) {
-    gpu->bindVertexArray(vertexArray);
+    state->bindVertexArray(vertexArray);
   }
 }
 
@@ -177,7 +129,8 @@ void GLRenderPipeline::setTexture(GLGPU* gpu, unsigned binding, GLTexture* textu
     LOGE("GLRenderPipeline::setTexture: binding %d not found", binding);
     return;
   }
-  gpu->bindTexture(texture, result->second);
+  auto state = gpu->state();
+  state->bindTexture(texture, result->second);
   texture->updateSampler(gpu, sampler);
 }
 
@@ -194,6 +147,15 @@ void GLRenderPipeline::setVertexBuffer(GLGPU* gpu, GLBuffer* vertexBuffer, size_
                             reinterpret_cast<void*>(attribute.offset + vertexOffset));
     gl->enableVertexAttribArray(static_cast<unsigned>(attribute.location));
   }
+}
+
+void GLRenderPipeline::setStencilReference(GLGPU* gpu, unsigned reference) {
+  if (stencilState == nullptr) {
+    return;
+  }
+  stencilState->reference = reference;
+  auto state = gpu->state();
+  state->setStencilState(*stencilState);
 }
 
 void GLRenderPipeline::release(GPU* gpu) {
@@ -252,9 +214,58 @@ static GLAttribute MakeGLAttribute(VertexFormat format, int location, size_t off
   return {location, 0, 0, false, offset};
 }
 
+static std::unique_ptr<GLBlendState> MakeBlendState(const PipelineColorAttachment& attachment) {
+  if (!attachment.blendEnable) {
+    return nullptr;
+  }
+  auto blendState = std::make_unique<GLBlendState>();
+  blendState->srcColorFactor = ToGLBlendFactor(attachment.srcColorBlendFactor);
+  blendState->dstColorFactor = ToGLBlendFactor(attachment.dstColorBlendFactor);
+  blendState->srcAlphaFactor = ToGLBlendFactor(attachment.srcAlphaBlendFactor);
+  blendState->dstAlphaFactor = ToGLBlendFactor(attachment.dstAlphaBlendFactor);
+  blendState->colorOp = ToGLBlendOperation(attachment.colorBlendOp);
+  blendState->alphaOp = ToGLBlendOperation(attachment.alphaBlendOp);
+  return blendState;
+}
+
+static GLStencil MakeGLStencil(const StencilDescriptor& descriptor) {
+  GLStencil stencil = {};
+  stencil.compare = ToGLCompareFunction(descriptor.compare);
+  stencil.failOp = ToGLStencilOperation(descriptor.failOp);
+  stencil.depthFailOp = ToGLStencilOperation(descriptor.depthFailOp);
+  stencil.passOp = ToGLStencilOperation(descriptor.passOp);
+  return stencil;
+}
+
+static std::unique_ptr<GLStencilState> MakeStencilState(const DepthStencilDescriptor& descriptor) {
+  auto& stencilFront = descriptor.stencilFront;
+  auto& stencilBack = descriptor.stencilBack;
+  if (stencilFront.compare == CompareFunction::Always &&
+      stencilBack.compare == CompareFunction::Always) {
+    return nullptr;
+  }
+  auto stencilState = std::make_unique<GLStencilState>();
+  stencilState->front = MakeGLStencil(descriptor.stencilFront);
+  stencilState->back = MakeGLStencil(descriptor.stencilBack);
+  stencilState->readMask = descriptor.stencilReadMask;
+  stencilState->writeMask = descriptor.stencilWriteMask;
+  return stencilState;
+}
+
+static std::unique_ptr<GLDepthState> MakeDepthState(const DepthStencilDescriptor& descriptor) {
+  if (descriptor.depthCompare == CompareFunction::Always) {
+    return nullptr;
+  }
+  auto depthState = std::make_unique<GLDepthState>();
+  depthState->compare = ToGLCompareFunction(descriptor.depthCompare);
+  depthState->writeMask = descriptor.depthWriteEnabled;
+  return depthState;
+}
+
 bool GLRenderPipeline::setPipelineDescriptor(GLGPU* gpu,
                                              const GPURenderPipelineDescriptor& descriptor) {
-  gpu->useProgram(programID);
+  auto state = gpu->state();
+  state->useProgram(programID);
   auto gl = gpu->functions();
   auto caps = static_cast<const GLCaps*>(gpu->caps());
   if (caps->vertexArrayObjectSupport) {
@@ -279,7 +290,11 @@ bool GLRenderPipeline::setPipelineDescriptor(GLGPU* gpu,
   vertexStride = descriptor.vertex.vertexStride;
 
   DEBUG_ASSERT(descriptor.fragment.colorAttachments.size() == 1);
-  colorAttachment = descriptor.fragment.colorAttachments[0];
+  auto& attachment = descriptor.fragment.colorAttachments[0];
+  colorWriteMask = attachment.colorWriteMask;
+  stencilState = MakeStencilState(descriptor.depthStencil);
+  depthState = MakeDepthState(descriptor.depthStencil);
+  blendState = MakeBlendState(attachment);
 
   for (auto& entry : descriptor.layout.uniformBlocks) {
     GLUniformBlock block = {};
