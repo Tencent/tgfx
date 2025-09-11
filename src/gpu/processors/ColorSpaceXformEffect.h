@@ -49,7 +49,7 @@ class ColorSpaceXformEffect : public FragmentProcessor {
 
  private:
   DEFINE_PROCESSOR_CLASS_ID
-  void onSetData(UniformBuffer*) const override;
+  void onSetData(UniformBuffer*, UniformBuffer*) const override;
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
   std::shared_ptr<ColorSpaceXformSteps> colorSpaceXformSteps;
   mutable ColorSpaceXformHelper colorSpaceXformHelper;

@@ -59,7 +59,8 @@ ColorSpaceXformEffect::ColorSpaceXformEffect(PlacementPtr<FragmentProcessor> chi
   registerChildProcessor(std::move(child));
 }
 
-void ColorSpaceXformEffect::onSetData(UniformBuffer* uniformBuffer) const {
-  colorSpaceXformHelper.setData(uniformBuffer, colorSpaceXformSteps.get());
+void ColorSpaceXformEffect::onSetData(UniformBuffer* /*vertexUniformBuffer*/,
+                                      UniformBuffer* fragmentUniformBuffer) const {
+  colorSpaceXformHelper.setData(fragmentUniformBuffer, colorSpaceXformSteps.get());
 }
 }  // namespace tgfx

@@ -212,8 +212,8 @@ void RenderContext::convertFillColor(const Fill& fill, Fill& dstFill) {
 void RenderContext::drawFill(const Fill& fill) {
   Fill dstFill;
   convertFillColor(fill, dstFill);
-  if (auto compositor = getOpsCompositor(fill.isOpaque())) {
-    compositor->fillRect(renderTarget->bounds(), {}, fill);
+  if (auto compositor = getOpsCompositor(dstFill.isOpaque())) {
+    compositor->fillRect(renderTarget->bounds(), {}, dstFill);
   }
 }
 
