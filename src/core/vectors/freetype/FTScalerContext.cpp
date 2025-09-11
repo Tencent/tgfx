@@ -143,6 +143,7 @@ static FT_Int ChooseBitmapStrike(FT_Face face, FT_F26Dot6 scaleY) {
 
 FTScalerContext::FTScalerContext(std::shared_ptr<Typeface> typeFace, float size)
     : ScalerContext(std::move(typeFace), size), textScale(size) {
+  backingSize = textSize;
   loadGlyphFlags |= FT_LOAD_NO_BITMAP;
   // Always using FT_LOAD_IGNORE_GLOBAL_ADVANCE_WIDTH to get correct
   // advances, as fontconfig and cairo do.
@@ -219,6 +220,8 @@ FTScalerContext::FTScalerContext(std::shared_ptr<Typeface> typeFace, float size)
     // However, in FreeType 2.5.1 color bitmap-only fonts do not ignore this flag.
     // Force this flag off for bitmap-only fonts.
     loadGlyphFlags &= ~FT_LOAD_NO_BITMAP;
+
+    backingSize = FDot6ToFloat(face->available_sizes[strikeIndex].y_ppem);
   }
 }
 
@@ -697,12 +700,5 @@ bool FTScalerContext::loadOutlineGlyph(FT_Face face, GlyphID glyphID, bool fauxB
     ApplyEmbolden(face, face->glyph, glyphID, flags);
   }
   return true;
-}
-
-float FTScalerContext::getBackingSize() const {
-  if (!hasOutlines() && !FloatNearlyZero(extraScale.x)) {
-    return textSize / extraScale.x;
-  }
-  return textSize;
 }
 }  // namespace tgfx
