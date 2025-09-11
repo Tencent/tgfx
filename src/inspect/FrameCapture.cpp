@@ -348,7 +348,6 @@ void FrameCapture::sendPixelsData(uint64_t str, const char* pixels, size_t len,
   FrameCaptureMessageItem item = {};
   item.hdr.type = type;
   item.stringTransfer.ptr = str;
-
   auto dataLen = static_cast<uint32_t>(len);
   commitData();
   appendDataUnsafe(&item, FrameCaptureMessageDataSize[static_cast<int>(type)]);

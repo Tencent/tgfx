@@ -146,8 +146,6 @@ class FrameCapture {
 
   bool confirmProtocol();
 
-  uint64_t getTextureId(uint64_t texturePtr);
-
   DequeueStatus dequeueSerial();
 
  private:
