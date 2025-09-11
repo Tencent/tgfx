@@ -135,13 +135,13 @@ void ShaderBuilder::appendColorGamutXform(std::string* out, const char* srcColor
         function += "\tx = (x < D) ? (C * x) + F : pow(A * x + B, G) + E;\n";
         break;
       case gfx::skcms_TFType_PQish:
-        function += "\tx = pow(max(A + B * pow(x, C), 0) / (D + E * pow(x, C)), F);\n";
+        function += "\tx = pow(max(A + B * pow(x, C), 0.0f) / (D + E * pow(x, C)), F);\n";
         break;
       case gfx::skcms_TFType_HLGish:
-        function += "\tx = (x*A <= 1) ? pow(x*A, B) : exp((x-E)*C) + D; x *= (F+1);\n";
+        function += "\tx = (x * A <= 1.0f) ? pow(x * A, B) : exp(( x - E) * C) + D; x *= (F + 1.0f);\n";
         break;
       case gfx::skcms_TFType_HLGinvish:
-        function += "\tx /= (F+1); x = (x <= 1) ? A * pow(x, B) : C * log(x - D) + E;\n";
+        function += "\tx /= (F + 1.0f); x = (x <= 1.0f) ? A * pow(x, B) : C * log(x - D) + E;\n";
         break;
       default:
         DEBUG_ASSERT(false);
@@ -219,7 +219,7 @@ void ShaderBuilder::appendColorGamutXform(std::string* out, const char* srcColor
     if (colorXformHelper->applyUnpremul()) {
       function += "\tfloat alpha = color.a;\n";
       function +=
-          "\tcolor = alpha > 0.0 ? vec4(color.rgb / alpha, alpha) : vec4(0.0, 0.0, 0.0, 0.0);\n";
+          "\tcolor = alpha > 0.0f ? vec4(color.rgb / alpha, alpha) : vec4(0.0f, 0.0f, 0.0f, 0.0f);\n";
     }
     if (colorXformHelper->applySrcTF()) {
       snprintf(buffer, sizeof(buffer), "\tcolor.r = %s(color.r);\n", srcTFFunctionName.c_str());
