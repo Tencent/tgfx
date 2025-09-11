@@ -31,7 +31,6 @@
 #elif TGFX_USE_PNG_ENCODE
 #include "core/codecs/png/PngCodec.h"
 #endif
-#include "FunctionTimer.h"
 #include "core/utils/Log.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "lz4.h"
@@ -233,7 +232,7 @@ void FrameCapture::sendFrameCaptureTexture(
   if (frameCaptureTexture == nullptr) {
     return;
   }
-  GetInstance().imageQueue.enqueue(std::move(frameCaptureTexture));
+  imageQueue.enqueue(std::move(frameCaptureTexture));
 }
 
 void FrameCapture::captureRenderTarget(const RenderTarget* renderTarget) {
@@ -285,8 +284,8 @@ void FrameCapture::LaunchWorker(FrameCapture* inspector) {
   inspector->worker();
 }
 
-bool FrameCapture::ShouldExit() {
-  return GetInstance().shutdown.load(std::memory_order_relaxed);
+bool FrameCapture::shouldExit() {
+  return shutdown.load(std::memory_order_relaxed);
 }
 
 bool FrameCapture::currentFrameShouldCaptrue() {
@@ -371,7 +370,7 @@ void FrameCapture::worker() {
   }
 
   auto welcome = WelcomeMessage();
-  welcome.initBegin = GetInstance().initTime;
+  welcome.initBegin = initTime;
   welcome.initEnd = timeBegin.load(std::memory_order_relaxed);
 
   auto listen = ListenSocket{};
@@ -385,7 +384,7 @@ void FrameCapture::worker() {
   }
   if (!isListening) {
     while (true) {
-      if (ShouldExit()) {
+      if (shouldExit()) {
         shutdown.store(true, std::memory_order_relaxed);
         return;
       }
@@ -406,7 +405,7 @@ void FrameCapture::worker() {
   while (true) {
     welcome.refTime = refTimeThread;
     while (true) {
-      if (ShouldExit()) {
+      if (shouldExit()) {
         for (uint16_t i = 0; i < BroadcastCount; i++) {
           if (broadcast[i]) {
             broadcastMessage.activeTime = -1;
@@ -455,7 +454,7 @@ void FrameCapture::worker() {
     }
 
     handleConnect(welcome);
-    if (ShouldExit()) {
+    if (shouldExit()) {
       break;
     }
     isConnect.store(false, std::memory_order_release);
@@ -465,7 +464,7 @@ void FrameCapture::worker() {
 
 void FrameCapture::encodeWorker() {
   while (true) {
-    if (ShouldExit()) {
+    if (shouldExit()) {
       return;
     }
     std::shared_ptr<FrameCaptureTexture> frameCaputreTexture = nullptr;
@@ -614,7 +613,7 @@ void FrameCapture::handleConnect(const WelcomeMessage& welcome) {
     if (serialStatus == DequeueStatus::ConnectionLost) {
       break;
     } else if (serialStatus == DequeueStatus::QueueEmpty) {
-      if (ShouldExit()) {
+      if (shouldExit()) {
         break;
       }
       if (dataBufferOffset != dataBufferStart) {

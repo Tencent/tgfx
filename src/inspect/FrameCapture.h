@@ -114,7 +114,7 @@ class FrameCapture {
     inspector->encodeWorker();
   }
 
-  static bool ShouldExit();
+  bool shouldExit();
 
   void sendTextureID(uint64_t texturePtr, FrameCaptureMessageType type);
 
