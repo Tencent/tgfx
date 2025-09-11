@@ -87,10 +87,7 @@ bool Context::flush(BackendSemaphore* signalSemaphore) {
   return true;
 }
 
-bool Context::submit(bool syncCpu) {
-  if (commandBuffer == nullptr && !syncCpu) {
-    return false;
-  }
+void Context::submit(bool syncCpu) {
   auto queue = gpu()->queue();
   if (commandBuffer) {
     queue->submit(std::move(commandBuffer));
@@ -98,12 +95,14 @@ bool Context::submit(bool syncCpu) {
   if (syncCpu) {
     queue->waitUntilCompleted();
   }
-  return true;
 }
 
-void Context::flushAndSubmit(bool syncCpu) {
-  flush();
-  submit(syncCpu);
+bool Context::flushAndSubmit(bool syncCpu) {
+  auto result = flush();
+  if (result || syncCpu) {
+    submit(syncCpu);
+  }
+  return result;
 }
 
 size_t Context::memoryUsage() const {
