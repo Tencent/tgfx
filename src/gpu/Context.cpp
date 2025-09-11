@@ -88,11 +88,13 @@ bool Context::flush(BackendSemaphore* signalSemaphore) {
 }
 
 bool Context::submit(bool syncCpu) {
-  if (commandBuffer == nullptr) {
+  if (commandBuffer == nullptr && !syncCpu) {
     return false;
   }
   auto queue = gpu()->queue();
-  queue->submit(std::move(commandBuffer));
+  if (commandBuffer) {
+    queue->submit(std::move(commandBuffer));
+  }
   if (syncCpu) {
     queue->waitUntilCompleted();
   }
