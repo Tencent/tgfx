@@ -19,7 +19,6 @@
 #pragma once
 
 #include "gpu/RenderPass.h"
-#include "gpu/RenderPassDescriptor.h"
 #include "gpu/opengl/GLBuffer.h"
 #include "gpu/opengl/GLInterface.h"
 #include "gpu/opengl/GLRenderPipeline.h"
@@ -32,6 +31,8 @@ class GLRenderPass : public RenderPass {
   GLRenderPass(GLGPU* gpu, RenderPassDescriptor descriptor);
 
   void begin();
+
+  void setViewport(int x, int y, int width, int height) override;
 
   void setScissorRect(int x, int y, int width, int height) override;
 

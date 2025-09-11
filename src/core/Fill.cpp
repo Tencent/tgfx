@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Fill.h"
-#include "gpu/Blend.h"
+#include "gpu/BlendFormula.h"
 
 namespace tgfx {
 static OpacityType GetOpacityType(const Color& color, const Shader* shader) {

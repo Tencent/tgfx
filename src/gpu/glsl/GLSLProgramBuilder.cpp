@@ -16,12 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/glsl/GLSLProgramBuilder.h"
+#include "GLSLProgramBuilder.h"
 #include <string>
+#include "gpu/GPU.h"
 #include "gpu/UniformBuffer.h"
-#include "gpu/UniformLayout.h"
-#include "gpu/opengl/GLGPU.h"
-#include "gpu/opengl/GLUtil.h"
+#include "gpu/opengl/GLCaps.h"
 
 namespace tgfx {
 static std::string TypeModifierString(bool isLegacyES, ShaderVar::TypeModifier t,
@@ -188,42 +187,56 @@ std::unique_ptr<PipelineProgram> GLSLProgramBuilder::finalize() {
     fragmentShaderBuilder()->declareCustomOutputColor();
   }
   finalizeShaders();
-  const auto& vertex = vertexShaderBuilder()->shaderString();
-  const auto& fragment = fragmentShaderBuilder()->shaderString();
-
-  auto gl = GLFunctions::Get(context);
-  auto programID = CreateGLProgram(gl, vertex, fragment);
-  if (programID == 0) {
+  auto gpu = context->gpu();
+  GPUShaderModuleDescriptor vertexModule = {};
+  vertexModule.code = vertexShaderBuilder()->shaderString();
+  vertexModule.stage = ShaderStage::Vertex;
+  auto vertexShader = gpu->createShaderModule(vertexModule);
+  if (vertexShader == nullptr) {
     return nullptr;
   }
-  auto gpu = static_cast<GLGPU*>(context->gpu());
-  gpu->useProgram(programID);
-  auto& samplers = _uniformHandler.getSamplers();
-  // Assign texture units to sampler uniforms up front, just once.
-  int textureUint = 0;
-  for (auto& sampler : samplers) {
-    auto location = gl->getUniformLocation(programID, sampler.name().c_str());
-    DEBUG_ASSERT(location != -1);
-    gl->uniform1i(location, textureUint++);
+  GPUShaderModuleDescriptor fragmentModule = {};
+  fragmentModule.code = fragmentShaderBuilder()->shaderString();
+  fragmentModule.stage = ShaderStage::Fragment;
+  auto fragmentShader = gpu->createShaderModule(fragmentModule);
+  if (fragmentShader == nullptr) {
+    vertexShader->release(gpu);
+    return nullptr;
   }
+  GPURenderPipelineDescriptor descriptor = {};
+  descriptor.vertex = {programInfo->getVertexAttributes()};
+  descriptor.vertex.module = vertexShader.get();
+  descriptor.fragment.module = fragmentShader.get();
+  descriptor.fragment.colorAttachments.push_back(programInfo->getPipelineColorAttachment());
   auto vertexUniformBuffer = _uniformHandler.makeUniformBuffer(ShaderStage::Vertex);
   auto fragmentUniformBuffer = _uniformHandler.makeUniformBuffer(ShaderStage::Fragment);
-
-  std::unique_ptr<UniformLayout> uniformLayout = nullptr;
   auto caps = GLCaps::Get(context);
-  std::vector<std::string> blockNames = {};
-  std::vector<Uniform> emptyUniforms = {};
-  if (caps->uboSupport) {
-    blockNames = {VertexUniformBlockName, FragmentUniformBlockName};
+  if (vertexUniformBuffer) {
+    BindingEntry vertexBinding = {VertexUniformBlockName, VERTEX_UBO_BINDING_POINT};
+    if (!caps->uboSupport) {
+      vertexBinding.uniforms = vertexUniformBuffer->uniforms();
+      DEBUG_ASSERT(!vertexBinding.uniforms.empty());
+    }
+    descriptor.layout.uniformBlocks.push_back(vertexBinding);
   }
-  uniformLayout = std::make_unique<UniformLayout>(
-      std::move(blockNames), vertexUniformBuffer ? vertexUniformBuffer->uniforms() : emptyUniforms,
-      fragmentUniformBuffer ? fragmentUniformBuffer->uniforms() : emptyUniforms);
-
-  auto pipeline = std::make_unique<GLRenderPipeline>(programID, std::move(uniformLayout),
-                                                     programInfo->getVertexAttributes(),
-                                                     programInfo->getBlendFormula());
-
+  if (fragmentUniformBuffer) {
+    BindingEntry fragmentBinding = {FragmentUniformBlockName, FRAGMENT_UBO_BINDING_POINT};
+    if (!caps->uboSupport) {
+      fragmentBinding.uniforms = fragmentUniformBuffer->uniforms();
+      DEBUG_ASSERT(!fragmentBinding.uniforms.empty());
+    }
+    descriptor.layout.uniformBlocks.push_back(fragmentBinding);
+  }
+  int textureBinding = TEXTURE_BINDING_POINT_START;
+  for (const auto& sampler : _uniformHandler.getSamplers()) {
+    descriptor.layout.textureSamplers.emplace_back(sampler.name(), textureBinding++);
+  }
+  auto pipeline = gpu->createRenderPipeline(descriptor);
+  vertexShader->release(gpu);
+  fragmentShader->release(gpu);
+  if (pipeline == nullptr) {
+    return nullptr;
+  }
   return std::make_unique<PipelineProgram>(std::move(pipeline), std::move(vertexUniformBuffer),
                                            std::move(fragmentUniformBuffer));
 }

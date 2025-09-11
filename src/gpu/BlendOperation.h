@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,42 +18,40 @@
 
 #pragma once
 
-#include <utility>
-#include <vector>
-#include "SLType.h"
-#include "gpu/Attribute.h"
-#include "gpu/Uniform.h"
-
 namespace tgfx {
-class ShaderVar {
- public:
-  enum class TypeModifier { None, Attribute, Varying, FlatVarying, Uniform, Out, InOut };
+/**
+ * BlendOperation defines how each pixel's source fragment values are combined and weighted with the
+ * destination values.
+ */
+enum class BlendOperation {
+  /**
+   * Add portions of both source and destination pixel values:
+   * Cs*S + Cd*D.
+   */
+  Add,
 
-  ShaderVar() = default;
+  /**
+   * Subtract a portion of the destination pixel values from a portion of the source:
+   * Cs*S - Cd*D.
+   */
+  Subtract,
 
-  ShaderVar(std::string name, SLType type, TypeModifier typeModifier = TypeModifier::None)
-      : _name(std::move(name)), _type(type), _modifier(typeModifier) {
-  }
+  /**
+   * Subtract a portion of the source values from a portion of the destination pixel values:
+   * Cd*D - Cs*S.
+   */
+  ReverseSubtract,
 
-  explicit ShaderVar(const Attribute& attribute);
+  /**
+   * Take the minimum of the source and destination pixel values:
+   * min(Cs*S, Cd*D).
+   */
+  Min,
 
-  explicit ShaderVar(const Uniform& uniform);
-
-  const std::string& name() const {
-    return _name;
-  }
-
-  SLType type() const {
-    return _type;
-  }
-
-  TypeModifier modifier() const {
-    return _modifier;
-  }
-
- private:
-  std::string _name;
-  SLType _type = SLType::Void;
-  TypeModifier _modifier = TypeModifier::None;
+  /**
+   * Take the maximum of the source and destination pixel values:
+   * max(Cs*S, Cd*D).
+   */
+  Max
 };
 }  // namespace tgfx

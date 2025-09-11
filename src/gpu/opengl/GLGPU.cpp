@@ -22,7 +22,9 @@
 #include "gpu/opengl/GLExternalTexture.h"
 #include "gpu/opengl/GLFence.h"
 #include "gpu/opengl/GLMultisampleTexture.h"
+#include "gpu/opengl/GLRenderPipeline.h"
 #include "gpu/opengl/GLSampler.h"
+#include "gpu/opengl/GLShaderModule.h"
 #include "gpu/opengl/GLUtil.h"
 
 namespace tgfx {
@@ -214,6 +216,90 @@ std::unique_ptr<GPUSampler> GLGPU::createSampler(const GPUSamplerDescriptor& des
                                      ToGLWrap(descriptor.addressModeY), minFilter, magFilter);
 }
 
+std::unique_ptr<GPUShaderModule> GLGPU::createShaderModule(
+    const GPUShaderModuleDescriptor& descriptor) {
+  if (descriptor.code.empty()) {
+    LOGE("GLGPU::createShaderModule() shader code is empty!");
+    return nullptr;
+  }
+  unsigned shaderType = 0;
+  switch (descriptor.stage) {
+    case ShaderStage::Vertex:
+      shaderType = GL_VERTEX_SHADER;
+      break;
+    case ShaderStage::Fragment:
+      shaderType = GL_FRAGMENT_SHADER;
+      break;
+  }
+  auto gl = interface->functions();
+  auto shader = gl->createShader(shaderType);
+  auto& code = descriptor.code;
+  const char* files[] = {descriptor.code.c_str()};
+  gl->shaderSource(shader, 1, files, nullptr);
+  gl->compileShader(shader);
+#if defined(DEBUG) || !defined(TGFX_BUILD_FOR_WEB)
+  int success;
+  gl->getShaderiv(shader, GL_COMPILE_STATUS, &success);
+  if (!success) {
+    char infoLog[512];
+    gl->getShaderInfoLog(shader, 512, nullptr, infoLog);
+    LOGE("Could not compile shader:\n%s\ntype:%d info%s", code.c_str(), shaderType, infoLog);
+    gl->deleteShader(shader);
+    shader = 0;
+  }
+#endif
+  return std::make_unique<GLShaderModule>(shader);
+}
+
+std::unique_ptr<GPURenderPipeline> GLGPU::createRenderPipeline(
+    const GPURenderPipelineDescriptor& descriptor) {
+  auto vertexModule = static_cast<GLShaderModule*>(descriptor.vertex.module);
+  auto fragmentModule = static_cast<GLShaderModule*>(descriptor.fragment.module);
+  if (vertexModule == nullptr || vertexModule->shader() == 0 || vertexModule == nullptr ||
+      fragmentModule->shader() == 0) {
+    LOGE("GLGPU::createRenderPipeline() invalid shader module!");
+    return nullptr;
+  }
+  if (descriptor.vertex.attributes.empty()) {
+    LOGE("GLGPU::createRenderPipeline() invalid vertex attributes, no attributes set!");
+    return nullptr;
+  }
+  if (descriptor.vertex.vertexStride == 0) {
+    LOGE("GLGPU::createRenderPipeline() invalid vertex attributes, vertex stride is 0!");
+    return nullptr;
+  }
+  if (descriptor.fragment.colorAttachments.empty()) {
+    LOGE("GLGPU::createRenderPipeline() invalid color attachments, no color attachments!");
+    return nullptr;
+  }
+  if (descriptor.fragment.colorAttachments.size() > 1) {
+    LOGE(
+        "GLGPU::createRenderPipeline() Multiple color attachments are not yet supported in "
+        "OpenGL!");
+    return nullptr;
+  }
+  auto gl = interface->functions();
+  auto programID = gl->createProgram();
+  gl->attachShader(programID, vertexModule->shader());
+  gl->attachShader(programID, fragmentModule->shader());
+  gl->linkProgram(programID);
+  int success;
+  gl->getProgramiv(programID, GL_LINK_STATUS, &success);
+  if (!success) {
+    char infoLog[512];
+    gl->getProgramInfoLog(programID, 512, nullptr, infoLog);
+    gl->deleteProgram(programID);
+    programID = 0;
+    LOGE("GLGPU::createRenderPipeline() Could not link program: %s", infoLog);
+  }
+  auto pipeline = std::make_unique<GLRenderPipeline>(programID);
+  if (!pipeline->setPipelineDescriptor(this, descriptor)) {
+    pipeline->release(this);
+    return nullptr;
+  }
+  return pipeline;
+}
+
 std::shared_ptr<CommandEncoder> GLGPU::createCommandEncoder() {
   return std::make_shared<GLCommandEncoder>(this);
 }
@@ -229,9 +315,13 @@ void GLGPU::resetGLState() {
   drawFramebuffer = INVALID_VALUE;
   program = INVALID_VALUE;
   vertexArray = INVALID_VALUE;
-  srcBlendFunc = INVALID_VALUE;
-  dstBlendFunc = INVALID_VALUE;
-  blendEquation = INVALID_VALUE;
+  srcColorBlendFactor = INVALID_VALUE;
+  dstColorBlendFactor = INVALID_VALUE;
+  srcAlphaBlendFactor = INVALID_VALUE;
+  dstAlphaBlendFactor = INVALID_VALUE;
+  colorBlendOp = INVALID_VALUE;
+  alphaBlendOp = INVALID_VALUE;
+  colorWriteMask = 0xF;
 }
 
 void GLGPU::enableCapability(unsigned capability, bool enabled) {
@@ -349,23 +439,41 @@ void GLGPU::bindVertexArray(unsigned vao) {
   vertexArray = vao;
 }
 
-void GLGPU::setBlendFunc(unsigned srcFactor, unsigned dstFactor) {
-  if (srcBlendFunc == srcFactor && dstBlendFunc == dstFactor) {
+void GLGPU::setBlendFunc(unsigned srcColorFactor, unsigned dstColorFactor, unsigned srcAlphaFactor,
+                         unsigned dstAlphaFactor) {
+  if (srcColorFactor == srcColorBlendFactor && dstColorFactor == dstColorBlendFactor &&
+      srcAlphaFactor == srcAlphaBlendFactor && dstAlphaFactor == dstAlphaBlendFactor) {
     return;
   }
   auto gl = interface->functions();
-  gl->blendFunc(srcFactor, dstFactor);
-  srcBlendFunc = srcFactor;
-  dstBlendFunc = dstFactor;
+  gl->blendFuncSeparate(srcColorFactor, dstColorFactor, srcAlphaFactor, dstAlphaFactor);
+  srcColorBlendFactor = srcColorFactor;
+  dstColorBlendFactor = dstColorFactor;
+  srcAlphaBlendFactor = srcAlphaFactor;
+  dstAlphaBlendFactor = dstAlphaFactor;
 }
 
-void GLGPU::setBlendEquation(unsigned mode) {
-  if (blendEquation == mode) {
+void GLGPU::setBlendEquation(unsigned colorOp, unsigned alphaOp) {
+  if (colorOp == colorBlendOp && alphaOp == alphaBlendOp) {
     return;
   }
   auto gl = interface->functions();
-  gl->blendEquation(mode);
-  blendEquation = mode;
+  gl->blendEquationSeparate(colorOp, alphaOp);
+  colorBlendOp = colorOp;
+  alphaBlendOp = alphaOp;
+}
+
+void GLGPU::setColorMask(uint32_t colorMask) {
+  if (colorMask == colorWriteMask) {
+    return;
+  }
+  auto gl = interface->functions();
+  auto red = (colorMask & ColorWriteMask::RED) != 0;
+  auto green = (colorMask & ColorWriteMask::GREEN) != 0;
+  auto blue = (colorMask & ColorWriteMask::BLUE) != 0;
+  auto alpha = (colorMask & ColorWriteMask::ALPHA) != 0;
+  gl->colorMask(red, green, blue, alpha);
+  colorWriteMask = colorMask;
 }
 
 }  // namespace tgfx

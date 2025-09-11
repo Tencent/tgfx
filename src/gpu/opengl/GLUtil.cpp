@@ -89,53 +89,6 @@ GLVersion GetGLVersion(const char* versionString) {
   return {};
 }
 
-unsigned CreateGLProgram(const GLFunctions* gl, const std::string& vertex,
-                         const std::string& fragment) {
-  auto vertexShader = LoadGLShader(gl, GL_VERTEX_SHADER, vertex);
-  if (vertexShader == 0) {
-    return 0;
-  }
-  auto fragmentShader = LoadGLShader(gl, GL_FRAGMENT_SHADER, fragment);
-  if (fragmentShader == 0) {
-    return 0;
-  }
-  auto programHandle = gl->createProgram();
-  gl->attachShader(programHandle, vertexShader);
-  gl->attachShader(programHandle, fragmentShader);
-  gl->linkProgram(programHandle);
-  int success;
-  gl->getProgramiv(programHandle, GL_LINK_STATUS, &success);
-  if (!success) {
-    char infoLog[512];
-    gl->getProgramInfoLog(programHandle, 512, nullptr, infoLog);
-    gl->deleteProgram(programHandle);
-    programHandle = 0;
-    LOGE("CreateGLProgram failed:%s", infoLog);
-  }
-  gl->deleteShader(vertexShader);
-  gl->deleteShader(fragmentShader);
-  return programHandle;
-}
-
-unsigned LoadGLShader(const GLFunctions* gl, unsigned shaderType, const std::string& source) {
-  auto shader = gl->createShader(shaderType);
-  const char* files[] = {source.c_str()};
-  gl->shaderSource(shader, 1, files, nullptr);
-  gl->compileShader(shader);
-#if defined(DEBUG) || !defined(TGFX_BUILD_FOR_WEB)
-  int success;
-  gl->getShaderiv(shader, GL_COMPILE_STATUS, &success);
-  if (!success) {
-    char infoLog[512];
-    gl->getShaderInfoLog(shader, 512, nullptr, infoLog);
-    LOGE("Could not compile shader:\n%s\ntype:%d info%s", source.c_str(), shaderType, infoLog);
-    gl->deleteShader(shader);
-    shader = 0;
-  }
-#endif
-  return shader;
-}
-
 void ClearGLError(const GLFunctions* gl) {
 #ifdef TGFX_BUILD_FOR_WEB
   USE(gl);

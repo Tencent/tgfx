@@ -22,7 +22,6 @@
 #include "gpu/ProgramBuilder.h"
 #include "gpu/UniformHandler.h"
 #include "gpu/glsl/GLSLFragmentShaderBuilder.h"
-#include "gpu/opengl/GLRenderPipeline.h"
 #include "gpu/resources/PipelineProgram.h"
 
 namespace tgfx {
