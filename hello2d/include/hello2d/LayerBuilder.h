@@ -50,6 +50,7 @@ class LayerBuilder {
   explicit LayerBuilder(std::string name);
 
   virtual ~LayerBuilder() = default;
+  std::vector<std::shared_ptr<tgfx::Layer>> getLayersUnderPoint(float x, float y);
 
   std::string name() const {
     return _name;

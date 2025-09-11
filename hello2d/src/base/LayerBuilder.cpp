@@ -87,14 +87,8 @@ void LayerBuilder::build(const AppHost* host) {
   if (!_root) {
     _root = buildLayerTree(host);
   }
-  // auto bounds = _root->getBounds(nullptr, true);
-  // auto totalScale = std::min(static_cast<float>(host->width()) / (padding * 2 + bounds.width()),
-  //                            static_cast<float>(host->height()) / (padding * 2 + bounds.height()));
-
-  // auto rootMatrix = tgfx::Matrix::MakeScale(totalScale);
-  // rootMatrix.postTranslate((static_cast<float>(host->width()) - bounds.width() * totalScale) / 2,
-  //                          (static_cast<float>(host->height()) - bounds.height() * totalScale) / 2);
-  // _root->setMatrix(rootMatrix);
 }
-
+std::vector<std::shared_ptr<tgfx::Layer>> LayerBuilder::getLayersUnderPoint(float x, float y) {
+  return _root->getLayersUnderPoint(x,y);
+}
 }  // namespace hello2d

@@ -112,13 +112,11 @@
         "tile_mode_subset": "67961560"
     },
     "DrawersTest": {
-        "ConicGradient": "69683f78",
-        "CustomLayerTreeDrawer": "9060bdb6",
-        "GridBackground": "2ae64df",
-        "ImageWithMipmap": "da590da",
-        "ImageWithShadow": "c26ff3d9",
-        "SimpleLayerTreeDrawer": "9060bdb6",
-        "SimpleText": "6095b909"
+        "ConicGradient": "e89a8aa9",
+        "ImageWithMipmap": "e89a8aa9",
+        "ImageWithShadow": "e89a8aa9",
+        "RichText": "e89a8aa9",
+        "SimpleLayerTree": "e89a8aa9"
     },
     "DstTextureTest": {
         "EmptyLocalBounds": "be94e666",
