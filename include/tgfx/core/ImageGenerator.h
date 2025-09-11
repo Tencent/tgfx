@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "tgfx/core/ImageBuffer.h"
 #include "tgfx/core/ColorSpace.h"
+#include "tgfx/core/ImageBuffer.h"
 
 namespace tgfx {
 /**

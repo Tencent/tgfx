@@ -35,8 +35,7 @@ ColorImageFilter::ColorImageFilter(std::shared_ptr<tgfx::ColorFilter> filter)
 PlacementPtr<FragmentProcessor> ColorImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
     SrcRectConstraint constraint, const Matrix* uvMatrix) const {
-  auto imageProcessor =
-    FragmentProcessor::Make(source, args, sampling, constraint, uvMatrix);
+  auto imageProcessor = FragmentProcessor::Make(source, args, sampling, constraint, uvMatrix);
   if (imageProcessor == nullptr) {
     return nullptr;
   }
