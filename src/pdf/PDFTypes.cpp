@@ -207,7 +207,7 @@ void SerializeStream(PDFDictionary* origDict, Stream* stream, PDFSteamCompressio
   // Code assumes that the stream starts at the beginning.
   DEBUG_ASSERT(stream);
 
-  auto* inputPointer = stream;
+  auto inputPointer = stream;
   std::shared_ptr<Data> data = {};
   std::unique_ptr<Stream> streamPointer = {};
 

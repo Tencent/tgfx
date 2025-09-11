@@ -48,6 +48,10 @@ class FTScalerContext : public ScalerContext {
   bool readPixels(GlyphID glyphID, bool fauxBold, const Stroke* stroke, const ImageInfo& dstInfo,
                   void* dstPixels) const override;
 
+  float getBackingSize() const override {
+    return backingSize;
+  }
+
  private:
   int setupSize(bool fauxItalic) const;
 
@@ -72,5 +76,6 @@ class FTScalerContext : public ScalerContext {
   FT_Size ftSize = nullptr;
   FT_Int strikeIndex = -1;  // The bitmap strike for the face (or -1 if none).
   FT_Int32 loadGlyphFlags = 0;
+  float backingSize = 1.0f;
 };
 }  // namespace tgfx

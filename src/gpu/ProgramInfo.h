@@ -19,14 +19,14 @@
 #pragma once
 
 #include <unordered_map>
-#include "RenderTarget.h"
-#include "gpu/Blend.h"
-#include "gpu/PipelineProgram.h"
-#include "gpu/Program.h"
+#include "gpu/GPURenderPipeline.h"
 #include "gpu/RenderPass.h"
 #include "gpu/processors/EmptyXferProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/GeometryProcessor.h"
+#include "gpu/resources/PipelineProgram.h"
+#include "gpu/resources/Program.h"
+#include "gpu/resources/RenderTarget.h"
 
 namespace tgfx {
 struct SamplerInfo {
@@ -68,7 +68,7 @@ class ProgramInfo {
     return geometryProcessor->vertexAttributes();
   }
 
-  std::unique_ptr<BlendFormula> getBlendFormula() const;
+  PipelineColorAttachment getPipelineColorAttachment() const;
 
   /**
    * Returns the index of the processor in the ProgramInfo. Returns -1 if the processor is not in
@@ -98,5 +98,9 @@ class ProgramInfo {
   void updateProcessorIndices();
 
   std::vector<SamplerInfo> getSamplers() const;
+
+  void updateUniformBufferSuffix(UniformBuffer* vertexUniformBuffer,
+                                 UniformBuffer* fragmentUniformBuffer,
+                                 const Processor* processor) const;
 };
 }  // namespace tgfx

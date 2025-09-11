@@ -95,17 +95,13 @@ std::unique_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(EGLGPU* gpu,
     eglext::eglDestroyImageKHR(display, eglImage);
     return nullptr;
   }
-  glBindTexture(target, textureID);
-  glTexParameteri(target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  glTexParameteri(target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  eglext::glEGLImageTargetTexture2DOES(target, (GLeglImageOES)eglImage);
   auto size = HardwareBufferGetSize(hardwareBuffer);
   GPUTextureDescriptor descriptor = {size.width, size.height, formats.front(), false, 1, usage};
   auto texture = std::unique_ptr<EGLHardwareTexture>(
       new EGLHardwareTexture(descriptor, hardwareBuffer, eglImage, target, textureID));
-  if (!texture->checkFrameBuffer(gpu)) {
+  gpu->bindTexture(texture.get());
+  eglext::glEGLImageTargetTexture2DOES(target, (GLeglImageOES)eglImage);
+  if (usage & GPUTextureUsage::RENDER_ATTACHMENT && !texture->checkFrameBuffer(gpu)) {
     texture->release(gpu);
     return nullptr;
   }

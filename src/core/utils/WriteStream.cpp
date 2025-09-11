@@ -72,7 +72,7 @@ std::shared_ptr<WriteStream> WriteStream::MakeFromFile(const std::string& filePa
   if (filePath.empty()) {
     return nullptr;
   }
-  auto* file = fopen(filePath.c_str(), "wb");
+  auto file = fopen(filePath.c_str(), "wb");
   if (file == nullptr) {
     return nullptr;
   }
@@ -86,7 +86,7 @@ std::shared_ptr<MemoryWriteStream> MemoryWriteStream::Make() {
 }
 
 bool MemoryWriteStream::write(const void* data, size_t size) {
-  const auto* bytes = static_cast<const uint8_t*>(data);
+  const auto bytes = static_cast<const uint8_t*>(data);
   buffer.insert(buffer.end(), bytes, bytes + size);
   return true;
 }
@@ -139,7 +139,7 @@ bool MemoryWriteStream::read(void* data, size_t offset, size_t size) {
   if (offset + size > buffer.size()) {
     return false;
   }
-  const auto* bytes = buffer.data() + offset;
+  const auto bytes = buffer.data() + offset;
   memcpy(data, bytes, size);
   return true;
 }

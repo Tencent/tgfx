@@ -20,17 +20,16 @@
 #include "core/Records.h"
 #include "core/images/CodecImage.h"
 #include "core/images/RasterizedImage.h"
-#include "core/images/ScaledImage.h"
 #include "core/images/SubsetImage.h"
 #include "core/images/TransformImage.h"
 #include "core/shapes/AppendShape.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/RenderContext.h"
-#include "gpu/TextureView.h"
 #include "gpu/opengl/GLCaps.h"
 #include "gpu/ops/RRectDrawOp.h"
 #include "gpu/ops/RectDrawOp.h"
+#include "gpu/resources/TextureView.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Color.h"
@@ -127,7 +126,7 @@ TGFX_TEST(CanvasTest, DiscardContent) {
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
   surface->renderContext->flush();
-  auto* drawingManager = context->drawingManager();
+  auto drawingManager = context->drawingManager();
   ASSERT_TRUE(drawingManager->renderTasks.size() == 1);
   auto task = static_cast<OpsRenderTask*>(drawingManager->renderTasks.front().get());
   EXPECT_TRUE(task->drawOps.size() == 0);
@@ -185,7 +184,7 @@ TGFX_TEST(CanvasTest, merge_draw_call_rect) {
     }
   }
   surface->renderContext->flush();
-  auto* drawingManager = context->drawingManager();
+  auto drawingManager = context->drawingManager();
   EXPECT_TRUE(drawingManager->renderTasks.size() == 1);
   auto task = static_cast<OpsRenderTask*>(drawingManager->renderTasks.front().get());
   ASSERT_TRUE(task->drawOps.size() == 1);
@@ -225,7 +224,7 @@ TGFX_TEST(CanvasTest, merge_draw_call_rrect) {
     }
   }
   surface->renderContext->flush();
-  auto* drawingManager = context->drawingManager();
+  auto drawingManager = context->drawingManager();
   EXPECT_TRUE(drawingManager->renderTasks.size() == 1);
   auto task = static_cast<OpsRenderTask*>(drawingManager->renderTasks.front().get());
   ASSERT_TRUE(task->drawOps.size() == 1);
@@ -1757,13 +1756,13 @@ TGFX_TEST(CanvasTest, BlendFormula) {
 
 TGFX_TEST(CanvasTest, ShadowBoundIntersect) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 400, 400);
-  auto* canvas = surface->getCanvas();
+  auto canvas = surface->getCanvas();
 
   Recorder shadowRecorder = {};
-  auto* picCanvas = shadowRecorder.beginRecording();
+  auto picCanvas = shadowRecorder.beginRecording();
   Paint dropShadowPaint = {};
   dropShadowPaint.setImageFilter(ImageFilter::DropShadowOnly(0, -8.f, .5f, .5f, Color::Red()));
   picCanvas->saveLayer(&dropShadowPaint);
@@ -1781,12 +1780,12 @@ TGFX_TEST(CanvasTest, ShadowBoundIntersect) {
 
 TGFX_TEST(CanvasTest, MultiImageRect_SameView) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
   int surfaceWidth = 1563;
   int surfaceHeight = 1563;
   auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
-  auto* canvas = surface->getCanvas();
+  auto canvas = surface->getCanvas();
   canvas->clear();
   auto image = MakeImage("resources/assets/GenMesh.png");
   int meshNumH = 5;
@@ -1811,12 +1810,12 @@ TGFX_TEST(CanvasTest, MultiImageRect_SameView) {
 
 TGFX_TEST(CanvasTest, SingleImageRect) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
   int surfaceWidth = 1563;
   int surfaceHeight = 1563;
   auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
-  auto* canvas = surface->getCanvas();
+  auto canvas = surface->getCanvas();
   canvas->clear();
   auto image = MakeImage("resources/assets/HappyNewYear.png");
   float scale = 5.211f;
@@ -1840,12 +1839,12 @@ TGFX_TEST(CanvasTest, SingleImageRect) {
 
 TGFX_TEST(CanvasTest, MultiImageRect_SCALE_LINEAR) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
   int surfaceWidth = 1563;
   int surfaceHeight = 1563;
   auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
-  auto* canvas = surface->getCanvas();
+  auto canvas = surface->getCanvas();
   canvas->clear();
   auto image = MakeImage("resources/assets/HappyNewYear.png");
   auto mipmapImage = image->makeMipmapped(true);
@@ -1908,12 +1907,12 @@ TGFX_TEST(CanvasTest, MultiImageRect_SCALE_LINEAR) {
 
 TGFX_TEST(CanvasTest, MultiImageRect_NOSCALE_NEAREST) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
   int surfaceWidth = 1024;
   int surfaceHeight = 1024;
   auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
-  auto* canvas = surface->getCanvas();
+  auto canvas = surface->getCanvas();
   canvas->clear();
   auto image = MakeImage("resources/assets/HappyNewYear.png");
   auto mipmapImage = image->makeMipmapped(true);
@@ -1974,12 +1973,12 @@ TGFX_TEST(CanvasTest, MultiImageRect_NOSCALE_NEAREST) {
 
 TGFX_TEST(CanvasTest, CornerEffectCompare) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
   int surfaceWidth = 800;
   int surfaceHeight = 800;
   auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
-  auto* canvas = surface->getCanvas();
+  auto canvas = surface->getCanvas();
   Paint normalPaint;
   normalPaint.setStyle(PaintStyle::Stroke);
   normalPaint.setColor(Color::Red());
@@ -2049,10 +2048,10 @@ TGFX_TEST(CanvasTest, CornerEffectCompare) {
 
 TGFX_TEST(CanvasTest, CornerTest) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 1024, 1024);
-  auto* canvas = surface->getCanvas();
+  auto canvas = surface->getCanvas();
   canvas->clear();
   Path rectPath = {};
   rectPath.addRect(Rect::MakeXYWH(50, 50, 170, 100));

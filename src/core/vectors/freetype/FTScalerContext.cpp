@@ -143,6 +143,7 @@ static FT_Int ChooseBitmapStrike(FT_Face face, FT_F26Dot6 scaleY) {
 
 FTScalerContext::FTScalerContext(std::shared_ptr<Typeface> typeFace, float size)
     : ScalerContext(std::move(typeFace), size), textScale(size) {
+  backingSize = textSize;
   loadGlyphFlags |= FT_LOAD_NO_BITMAP;
   // Always using FT_LOAD_IGNORE_GLOBAL_ADVANCE_WIDTH to get correct
   // advances, as fontconfig and cairo do.
@@ -219,6 +220,8 @@ FTScalerContext::FTScalerContext(std::shared_ptr<Typeface> typeFace, float size)
     // However, in FreeType 2.5.1 color bitmap-only fonts do not ignore this flag.
     // Force this flag off for bitmap-only fonts.
     loadGlyphFlags &= ~FT_LOAD_NO_BITMAP;
+
+    backingSize = FDot6ToFloat(face->available_sizes[strikeIndex].y_ppem);
   }
 }
 
@@ -262,7 +265,7 @@ void FTScalerContext::getFontMetricsInternal(FontMetrics* metrics) const {
   // use the os/2 table as a source of reasonable defaults.
   auto xHeight = 0.0f;
   auto capHeight = 0.0f;
-  auto* os2 = static_cast<TT_OS2*>(FT_Get_Sfnt_Table(face, FT_SFNT_OS2));
+  auto os2 = static_cast<TT_OS2*>(FT_Get_Sfnt_Table(face, FT_SFNT_OS2));
   if (os2) {
     xHeight = static_cast<float>(os2->sxHeight) / upem * textScale;
     if (os2->version != 0xFFFF && os2->version >= 2) {
@@ -332,7 +335,7 @@ void FTScalerContext::getFontMetricsInternal(FontMetrics* metrics) const {
     underlineThickness = 0;
     underlinePosition = 0;
 
-    auto* post = static_cast<TT_Postscript*>(FT_Get_Sfnt_Table(face, FT_SFNT_POST));
+    auto post = static_cast<TT_Postscript*>(FT_Get_Sfnt_Table(face, FT_SFNT_POST));
     if (post) {
       underlineThickness = static_cast<float>(post->underlineThickness) / upem;
       underlinePosition = -static_cast<float>(post->underlinePosition) / upem;

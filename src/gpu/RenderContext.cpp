@@ -21,6 +21,7 @@
 #include "core/Atlas.h"
 #include "core/AtlasCell.h"
 #include "core/AtlasManager.h"
+#include "core/GlyphRasterizer.h"
 #include "core/PathRasterizer.h"
 #include "core/PathRef.h"
 #include "core/PathTriangulator.h"
@@ -38,31 +39,28 @@ static uint32_t GetTypefaceID(const Typeface* typeface, bool isCustom) {
   return isCustom ? static_cast<const UserTypeface*>(typeface)->builderID() : typeface->uniqueID();
 }
 
-static void ComputeAtlasKey(const Font& font, uint32_t typefaceID, GlyphID glyphID,
-                            const Stroke* stroke, std::shared_ptr<ImageCodec>& glyphCodec,
+static void ComputeAtlasKey(const Font& font, const std::shared_ptr<ScalerContext>& scalerContext,
+                            uint32_t typefaceID, GlyphID glyphID, const Stroke* stroke,
                             BytesKey& key) {
-  if (glyphCodec) {
-    key.write(typefaceID);
+  key.write(typefaceID);
+  key.write(scalerContext->getBackingSize());
+  if (font.hasColor()) {
     key.write(glyphID);
-    key.write(glyphCodec->width());
-    key.write(glyphCodec->height());
-  } else {
-    key.write(font.getSize());
-    key.write(typefaceID);
-    int packedID = glyphID;
-    auto bold = static_cast<int>(font.isFauxBold());
-    packedID |= (bold << (sizeof(glyphID) * 8));
-    key.write(packedID);
-    if (stroke != nullptr) {
-      key.write(stroke->width);
-      key.write(stroke->miterLimit);
-      int zipValue = 0;
-      auto cap = static_cast<int>(stroke->cap);
-      auto join = static_cast<int>(stroke->join);
-      zipValue |= (0b11 & cap);
-      zipValue |= (0b1100 & (join << 2));
-      key.write(zipValue);
-    }
+    return;
+  }
+  int packedID = glyphID;
+  auto bold = static_cast<int>(font.isFauxBold());
+  packedID |= (bold << (sizeof(glyphID) * 8));
+  key.write(packedID);
+  if (stroke != nullptr) {
+    key.write(stroke->width);
+    key.write(stroke->miterLimit);
+    int zipValue = 0;
+    auto cap = static_cast<int>(stroke->cap);
+    auto join = static_cast<int>(stroke->join);
+    zipValue |= (0b11 & cap);
+    zipValue |= (0b1100 & (join << 2));
+    key.write(zipValue);
   }
 }
 
@@ -93,17 +91,36 @@ static float FindMaxGlyphDimension(const Font& font, const std::vector<GlyphID>&
   return maxDimension;
 }
 
-static std::shared_ptr<ImageCodec> GetGlyphCodec(const Font& font, GlyphID glyphID,
-                                                 const Stroke* stroke, Matrix* matrix) {
-  auto glyphCodec = font.getImage(glyphID, stroke, matrix);
-  if (glyphCodec) {
-    return glyphCodec;
+static std::shared_ptr<ImageCodec> GetGlyphCodec(
+    const Font& font, const std::shared_ptr<ScalerContext>& scalerContext, GlyphID glyphID,
+    const Stroke* stroke, Point* glyphOffset) {
+  if (glyphID == 0) {
+    return nullptr;
   }
-  auto shape = Shape::MakeFrom(font, glyphID);
+
+  auto hasFauxBold = !font.hasColor() && font.isFauxBold();
+  auto bounds = scalerContext->getImageTransform(glyphID, hasFauxBold, stroke, nullptr);
+  if (!bounds.isEmpty()) {
+    glyphOffset->x = bounds.left;
+    glyphOffset->y = bounds.top;
+    auto width = static_cast<int>(ceilf(bounds.width()));
+    auto height = static_cast<int>(ceilf(bounds.height()));
+    return std::make_shared<GlyphRasterizer>(width, height, scalerContext, glyphID, hasFauxBold,
+                                             stroke);
+  }
+
+  std::shared_ptr<Shape> shape = nullptr;
+  if (!font.isFauxItalic()) {
+    shape = Shape::MakeFrom(font, glyphID);
+  } else {
+    auto noItalicFont = font;
+    noItalicFont.setFauxItalic(false);
+    shape = Shape::MakeFrom(std::move(noItalicFont), glyphID);
+  }
   if (shape == nullptr) {
     return nullptr;
   }
-  auto bounds = shape->getBounds();
+  bounds = shape->getBounds();
   if (bounds.isEmpty()) {
     return nullptr;
   }
@@ -112,25 +129,53 @@ static std::shared_ptr<ImageCodec> GetGlyphCodec(const Font& font, GlyphID glyph
     shape = Shape::ApplyStroke(std::move(shape), stroke);
   }
   shape = Shape::ApplyMatrix(std::move(shape), Matrix::MakeTrans(-bounds.x(), -bounds.y()));
+  glyphOffset->x = bounds.left;
+  glyphOffset->y = bounds.top;
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
-  glyphCodec = PathRasterizer::MakeFrom(width, height, std::move(shape), true,
+  return PathRasterizer::MakeFrom(width, height, std::move(shape), true,
 #ifdef TGFX_USE_TEXT_GAMMA_CORRECTION
-                                        true
+                                  true
 #else
-                                        false
+                                  false
 #endif
   );
-  matrix->setTranslate(bounds.x(), bounds.y());
-  return glyphCodec;
 }
 
-static void ComputeGlyphMatrix(const Rect& atlasLocation, const Matrix& stateMatrix, float scale,
-                               const Point& position, Matrix* glyphMatrix) {
+static void ComputeGlyphFinalMatrix(const Rect& atlasLocation, const Matrix& stateMatrix,
+                                    float scale, const Point& position, Matrix* glyphMatrix) {
   glyphMatrix->postScale(scale, scale);
   glyphMatrix->postTranslate(position.x, position.y);
   glyphMatrix->postConcat(stateMatrix);
   glyphMatrix->preTranslate(-atlasLocation.x(), -atlasLocation.y());
+}
+
+static bool IsGlyphVisible(const Font& font, GlyphID glyphID, const Rect& clipBounds,
+                           const Stroke* stroke, float scale, const Point& glyphPosition,
+                           int* maxDimension) {
+  auto bounds = font.getBounds(glyphID);
+  if (bounds.isEmpty()) {
+    return false;
+  }
+  if (stroke != nullptr) {
+    ApplyStrokeToBounds(*stroke, &bounds);
+  }
+  if (maxDimension != nullptr) {
+    *maxDimension = static_cast<int>(ceilf(std::max(bounds.width(), bounds.height())));
+  }
+  bounds.scale(scale, scale);
+  bounds.offset(glyphPosition.x, glyphPosition.y);
+  return Rect::Intersects(bounds, clipBounds);
+}
+
+void GetGlyphMatrix(Matrix* glyphMatrix, const std::shared_ptr<ScalerContext>& scalerContext,
+                    const Point& glyphOffset, bool fauxItalic) {
+  glyphMatrix->setTranslate(glyphOffset.x, glyphOffset.y);
+  auto scale = scalerContext->getSize() / scalerContext->getBackingSize();
+  glyphMatrix->postScale(scale, scale);
+  if (fauxItalic) {
+    glyphMatrix->postSkew(ITALIC_SKEW, 0);
+  }
 }
 
 RenderContext::RenderContext(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags,
@@ -395,81 +440,71 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
   if (compositor == nullptr) {
     return;
   }
+
   auto maxScale = state.matrix.getMaxScale();
-  auto hasScale = !FloatNearlyEqual(maxScale, 1.0f);
+  auto inverseScale = 1.f / maxScale;
   auto font = sourceGlyphRun.font;
-  if (hasScale) {
+  if (!FloatNearlyEqual(maxScale, 1.0f)) {
     font = font.makeWithSize(font.getSize() * maxScale);
   }
 
-  std::unique_ptr<Stroke> scaledStroke;
-  if (stroke) {
+  auto maskFormat = GetMaskFormat(font);
+  auto typeface = font.getTypeface();
+  std::unique_ptr<Stroke> scaledStroke = nullptr;
+  if (!font.hasColor() && stroke != nullptr) {
     scaledStroke = std::make_unique<Stroke>(*stroke);
     scaledStroke->width *= maxScale;
   }
   AtlasCell atlasCell;
-  size_t index = 0;
+  atlasCell.maskFormat = maskFormat;
   PlotUseUpdater plotUseUpdater;
   auto atlasManager = getContext()->atlasManager();
   auto drawingManager = getContext()->drawingManager();
   auto nextFlushToken = atlasManager->nextFlushToken();
+  size_t index = 0;
+
   for (auto& glyphID : sourceGlyphRun.glyphs) {
     auto glyphPosition = sourceGlyphRun.positions[index++];
-    auto bounds = font.getBounds(glyphID);
-    if (bounds.isEmpty()) {
+    int maxDimension = 0;
+    if (!IsGlyphVisible(font, glyphID, localClipBounds, scaledStroke.get(), inverseScale,
+                        glyphPosition, &maxDimension)) {
       continue;
     }
-    if (scaledStroke) {
-      ApplyStrokeToBounds(*scaledStroke, &bounds);
-    }
-    auto localBounds = bounds;
-    localBounds.scale(1.f / maxScale, 1.f / maxScale);
-    localBounds.offset(glyphPosition.x, glyphPosition.y);
-    if (!Rect::Intersects(localBounds, localClipBounds)) {
-      continue;
-    }
-    auto maxDimension = static_cast<int>(ceilf(std::max(bounds.width(), bounds.height())));
+
     if (maxDimension >= Atlas::MaxCellSize) {
       rejectedGlyphRun->glyphs.push_back(glyphID);
       rejectedGlyphRun->positions.push_back(glyphPosition);
       continue;
     }
 
-    auto glyphState = state;
-    std::shared_ptr<ImageCodec> glyphCodec = nullptr;
-    if (font.hasColor()) {
-      glyphCodec = font.getImage(glyphID, nullptr, &glyphState.matrix);
-    }
-    auto typeface = font.getTypeface();
-    BytesKey glyphKey;
-    ComputeAtlasKey(font, GetTypefaceID(typeface.get(), typeface->isCustom()), glyphID,
-                    scaledStroke.get(), glyphCodec, glyphKey);
-
-    auto maskFormat = GetMaskFormat(font);
     auto& textureProxies = atlasManager->getTextureProxies(maskFormat);
-
     AtlasCellLocator glyphLocator;
     auto& atlasLocator = glyphLocator.atlasLocator;
+    Point glyphOffset = {};
+    BytesKey glyphKey;
+    ComputeAtlasKey(font, font.scalerContext, GetTypefaceID(typeface.get(), typeface->isCustom()),
+                    glyphID, scaledStroke.get(), glyphKey);
     if (atlasManager->getCellLocator(maskFormat, glyphKey, glyphLocator)) {
-      if (glyphCodec == nullptr) {
-        glyphState.matrix = glyphLocator.matrix;
-      }
+      glyphOffset = glyphLocator.offset;
     } else {
+      auto glyphCodec =
+          GetGlyphCodec(font, font.scalerContext, glyphID, scaledStroke.get(), &glyphOffset);
       if (glyphCodec == nullptr) {
-        glyphCodec = GetGlyphCodec(font, glyphID, scaledStroke.get(), &glyphState.matrix);
-        if (glyphCodec == nullptr) {
-          rejectedGlyphRun->glyphs.push_back(glyphID);
-          rejectedGlyphRun->positions.push_back(glyphPosition);
-          continue;
-        }
+        rejectedGlyphRun->glyphs.push_back(glyphID);
+        rejectedGlyphRun->positions.push_back(glyphPosition);
+        continue;
       }
-      atlasCell.updateAll(std::move(glyphKey), maskFormat,
-                          static_cast<uint16_t>(glyphCodec->width()),
-                          static_cast<uint16_t>(glyphCodec->height()), glyphState.matrix);
+
+      atlasCell.key = std::move(glyphKey);
+      atlasCell.offset = glyphOffset;
+      atlasCell.width = static_cast<uint16_t>(glyphCodec->width());
+      atlasCell.height = static_cast<uint16_t>(glyphCodec->height());
+
       if (atlasManager->addCellToAtlas(atlasCell, nextFlushToken, atlasLocator)) {
         auto pageIndex = atlasLocator.pageIndex();
-        auto offset = Point::Make(atlasLocator.getLocation().left, atlasLocator.getLocation().top);
-        drawingManager->addAtlasCellCodecTask(textureProxies[pageIndex], offset,
+        auto atlasOffset =
+            Point::Make(atlasLocator.getLocation().left, atlasLocator.getLocation().top);
+        drawingManager->addAtlasCellCodecTask(textureProxies[pageIndex], atlasOffset,
                                               std::move(glyphCodec));
       } else {
         rejectedGlyphRun->glyphs.push_back(glyphID);
@@ -477,6 +512,7 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
         continue;
       }
     }
+
     atlasManager->setPlotUseToken(plotUseUpdater, atlasLocator.plotLocator(), maskFormat,
                                   nextFlushToken);
     auto textureProxy = textureProxies[atlasLocator.pageIndex()];
@@ -485,8 +521,11 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
       rejectedGlyphRun->positions.push_back(glyphPosition);
       continue;
     }
+
+    auto glyphState = state;
+    GetGlyphMatrix(&glyphState.matrix, font.scalerContext, glyphOffset, font.isFauxItalic());
     auto rect = atlasLocator.getLocation();
-    ComputeGlyphMatrix(rect, state.matrix, 1.f / maxScale, glyphPosition, &glyphState.matrix);
+    ComputeGlyphFinalMatrix(rect, state.matrix, inverseScale, glyphPosition, &glyphState.matrix);
     compositor->fillTextAtlas(std::move(textureProxy), rect, glyphState,
                               dstFill.makeWithMatrix(state.matrix));
   }
@@ -520,15 +559,14 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
   if (compositor == nullptr) {
     return;
   }
+
   auto maxScale = state.matrix.getMaxScale();
-  auto hasScale = !FloatNearlyEqual(maxScale, 1.0f);
   auto font = sourceGlyphRun.font;
-  if (hasScale) {
+  if (!FloatNearlyEqual(maxScale, 1.0f)) {
     font = font.makeWithSize(font.getSize() * maxScale);
   }
-
   std::unique_ptr<Stroke> scaledStroke = nullptr;
-  if (stroke) {
+  if (!font.hasColor() && stroke) {
     scaledStroke = std::make_unique<Stroke>(*stroke);
     scaledStroke->width *= maxScale;
   }
@@ -538,7 +576,6 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
   while (maxDimension > MaxAtlasDimension) {
     auto reductionFactor = MaxAtlasDimension / maxDimension;
     font = font.makeWithSize(font.getSize() * reductionFactor);
-
     if (scaledStroke) {
       scaledStroke->width *= reductionFactor;
     }
@@ -546,69 +583,60 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
     cellScale *= reductionFactor;
   }
 
+  auto maskFormat = GetMaskFormat(font);
+  auto typeface = font.getTypeface();
   AtlasCell atlasCell;
-  size_t index = 0;
+  atlasCell.maskFormat = maskFormat;
   PlotUseUpdater plotUseUpdater;
   auto atlasManager = getContext()->atlasManager();
   auto nextFlushToken = atlasManager->nextFlushToken();
   auto drawingManager = getContext()->drawingManager();
+  size_t index = 0;
+
   for (auto& glyphID : sourceGlyphRun.glyphs) {
     auto glyphPosition = sourceGlyphRun.positions[index++];
-    auto bounds = font.getBounds(glyphID);
-    if (bounds.isEmpty()) {
-      continue;
-    }
-    if (scaledStroke) {
-      ApplyStrokeToBounds(*scaledStroke, &bounds);
-    }
-
-    auto glyphState = state;
-    std::shared_ptr<ImageCodec> glyphCodec = nullptr;
-    if (font.hasColor()) {
-      glyphCodec = font.getImage(glyphID, nullptr, &glyphState.matrix);
-    }
-    auto typeface = font.getTypeface();
-    BytesKey glyphKey;
-    ComputeAtlasKey(font, GetTypefaceID(typeface.get(), typeface->isCustom()), glyphID,
-                    scaledStroke.get(), glyphCodec, glyphKey);
-    auto maskFormat = GetMaskFormat(font);
     auto& textureProxies = atlasManager->getTextureProxies(maskFormat);
-
     AtlasCellLocator glyphLocator;
     auto& atlasLocator = glyphLocator.atlasLocator;
+    Point glyphOffset = {};
+    BytesKey glyphKey;
+    ComputeAtlasKey(font, font.scalerContext, GetTypefaceID(typeface.get(), typeface->isCustom()),
+                    glyphID, scaledStroke.get(), glyphKey);
+
     if (atlasManager->getCellLocator(maskFormat, glyphKey, glyphLocator)) {
-      if (glyphCodec == nullptr) {
-        glyphState.matrix = glyphLocator.matrix;
-      }
+      glyphOffset = glyphLocator.offset;
     } else {
+      auto glyphCodec =
+          GetGlyphCodec(font, font.scalerContext, glyphID, scaledStroke.get(), &glyphOffset);
       if (glyphCodec == nullptr) {
-        glyphCodec = GetGlyphCodec(font, glyphID, scaledStroke.get(), &glyphState.matrix);
-        if (glyphCodec == nullptr) {
-          continue;
-        }
-      }
-      atlasCell.updateAll(std::move(glyphKey), maskFormat,
-                          static_cast<uint16_t>(glyphCodec->width()),
-                          static_cast<uint16_t>(glyphCodec->height()), glyphState.matrix);
-      if (!atlasManager->addCellToAtlas(atlasCell, nextFlushToken, atlasLocator)) {
         continue;
       }
 
+      atlasCell.key = std::move(glyphKey);
+      atlasCell.offset = glyphOffset;
+      atlasCell.width = static_cast<uint16_t>(glyphCodec->width());
+      atlasCell.height = static_cast<uint16_t>(glyphCodec->height());
+
+      if (!atlasManager->addCellToAtlas(atlasCell, nextFlushToken, atlasLocator)) {
+        continue;
+      }
       auto pageIndex = atlasLocator.pageIndex();
       auto offset = Point::Make(atlasLocator.getLocation().left, atlasLocator.getLocation().top);
       drawingManager->addAtlasCellCodecTask(textureProxies[pageIndex], offset,
                                             std::move(glyphCodec));
     }
-
     atlasManager->setPlotUseToken(plotUseUpdater, atlasLocator.plotLocator(), maskFormat,
                                   nextFlushToken);
     auto textureProxy = textureProxies[atlasLocator.pageIndex()];
     if (textureProxy == nullptr) {
       continue;
     }
+
+    auto glyphState = state;
+    GetGlyphMatrix(&glyphState.matrix, font.scalerContext, glyphOffset, font.isFauxItalic());
     auto rect = atlasLocator.getLocation();
-    ComputeGlyphMatrix(rect, state.matrix, 1.f / (maxScale * cellScale), glyphPosition,
-                       &glyphState.matrix);
+    ComputeGlyphFinalMatrix(rect, state.matrix, 1.f / (maxScale * cellScale), glyphPosition,
+                            &glyphState.matrix);
     compositor->fillTextAtlas(std::move(textureProxy), rect, glyphState,
                               dstFill.makeWithMatrix(state.matrix));
   }

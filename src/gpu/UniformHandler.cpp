@@ -66,36 +66,33 @@ ShaderVar UniformHandler::getSamplerVariable(SamplerHandle handle) const {
   return ShaderVar(uniform);
 }
 
-std::unique_ptr<UniformBuffer> UniformHandler::makeUniformBuffer() const {
-  std::vector<Uniform> uniforms = {};
-  std::unordered_map<std::string, size_t> uniformMap = {};
-  size_t index = 0;
-  // Merge uniforms with the same name across shader stages.
-  for (auto& uniform : vertexUniforms) {
-    if (uniformMap.count(uniform.name()) > 0) {
-      continue;
-    }
-    uniformMap[uniform.name()] = index++;
-    uniforms.emplace_back(uniform);
+std::unique_ptr<UniformBuffer> UniformHandler::makeUniformBuffer(ShaderStage stage) const {
+  if (stage == ShaderStage::Vertex && vertexUniforms.empty()) {
+    return nullptr;
   }
-  for (auto& uniform : fragmentUniforms) {
-    if (uniformMap.count(uniform.name()) > 0) {
-      continue;
-    }
-    uniformMap[uniform.name()] = index++;
-    uniforms.emplace_back(uniform);
+
+  if (stage == ShaderStage::Fragment && fragmentUniforms.empty()) {
+    return nullptr;
   }
-  return std::unique_ptr<UniformBuffer>(
-      new UniformBuffer(std::move(uniforms), std::move(uniformMap)));
+
+  auto shaderCaps = programBuilder->getContext()->caps()->shaderCaps();
+  return std::unique_ptr<UniformBuffer>(new UniformBuffer(
+      stage == ShaderStage::Vertex ? vertexUniforms : fragmentUniforms, shaderCaps->uboSupport));
 }
 
 std::string UniformHandler::getUniformDeclarations(ShaderStage stage) const {
   std::string ret;
   auto& uniforms = stage == ShaderStage::Vertex ? vertexUniforms : fragmentUniforms;
-  for (auto& uniform : uniforms) {
-    ret += programBuilder->getShaderVarDeclarations(ShaderVar(uniform), stage);
-    ret += ";\n";
+  auto shaderCaps = programBuilder->getContext()->caps()->shaderCaps();
+  if (shaderCaps->uboSupport) {
+    ret += programBuilder->getUniformBlockDeclaration(stage, uniforms);
+  } else {
+    for (auto& uniform : uniforms) {
+      ret += programBuilder->getShaderVarDeclarations(ShaderVar(uniform), stage);
+      ret += ";\n";
+    }
   }
+
   if (stage == ShaderStage::Fragment) {
     for (const auto& sampler : samplers) {
       ret += programBuilder->getShaderVarDeclarations(ShaderVar(sampler), stage);

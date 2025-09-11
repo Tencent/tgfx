@@ -19,7 +19,7 @@
 #pragma once
 
 #include "ResourceProxy.h"
-#include "gpu/IndexBuffer.h"
+#include "gpu/resources/IndexBuffer.h"
 
 namespace tgfx {
 /**

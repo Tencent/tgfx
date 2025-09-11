@@ -19,13 +19,13 @@
 #pragma once
 
 #include "gpu/CommandQueue.h"
-#include "gpu/opengl/GLInterface.h"
 
 namespace tgfx {
+class GLGPU;
+
 class GLCommandQueue : public CommandQueue {
  public:
-  explicit GLCommandQueue(std::shared_ptr<GLInterface> interface)
-      : interface(std::move(interface)) {
+  explicit GLCommandQueue(GLGPU* gpu) : gpu(gpu) {
   }
 
   bool writeBuffer(GPUBuffer* buffer, size_t bufferOffset, const void* data, size_t size) override;
@@ -41,6 +41,6 @@ class GLCommandQueue : public CommandQueue {
   void waitUntilCompleted() override;
 
  private:
-  std::shared_ptr<GLInterface> interface = nullptr;
+  GLGPU* gpu = nullptr;
 };
 }  // namespace tgfx

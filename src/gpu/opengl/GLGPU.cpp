@@ -22,12 +22,16 @@
 #include "gpu/opengl/GLExternalTexture.h"
 #include "gpu/opengl/GLFence.h"
 #include "gpu/opengl/GLMultisampleTexture.h"
+#include "gpu/opengl/GLRenderPipeline.h"
 #include "gpu/opengl/GLSampler.h"
+#include "gpu/opengl/GLShaderModule.h"
 #include "gpu/opengl/GLUtil.h"
 
 namespace tgfx {
 GLGPU::GLGPU(std::shared_ptr<GLInterface> glInterface) : interface(std::move(glInterface)) {
-  commandQueue = std::make_unique<GLCommandQueue>(interface);
+  commandQueue = std::make_unique<GLCommandQueue>(this);
+  auto shaderCaps = interface->caps()->shaderCaps();
+  textureUnits.resize(static_cast<size_t>(shaderCaps->maxFragmentSamplers), INVALID_VALUE);
 }
 
 std::unique_ptr<GPUBuffer> GLGPU::createBuffer(size_t size, uint32_t usage) {
@@ -84,7 +88,8 @@ std::unique_ptr<GPUTexture> GLGPU::createTexture(const GPUTextureDescriptor& des
   if (textureID == 0) {
     return nullptr;
   }
-  gl->bindTexture(target, textureID);
+  auto texture = std::make_unique<GLTexture>(descriptor, target, textureID);
+  bindTexture(texture.get());
   auto& textureFormat = interface->caps()->getTextureFormat(descriptor.format);
   bool success = true;
   // Texture memory must be allocated first on the web platform then can write pixels.
@@ -98,11 +103,10 @@ std::unique_ptr<GPUTexture> GLGPU::createTexture(const GPUTextureDescriptor& des
     success = CheckGLError(gl);
   }
   if (!success) {
-    gl->deleteTextures(1, &textureID);
+    texture->release(this);
     return nullptr;
   }
-  auto texture = std::make_unique<GLTexture>(descriptor, target, textureID);
-  if (!texture->checkFrameBuffer(this)) {
+  if (descriptor.usage & GPUTextureUsage::RENDER_ATTACHMENT && !texture->checkFrameBuffer(this)) {
     texture->release(this);
     return nullptr;
   }
@@ -138,7 +142,7 @@ std::unique_ptr<GPUTexture> GLGPU::importExternalTexture(const BackendTexture& b
   } else {
     texture = std::make_unique<GLExternalTexture>(descriptor, textureInfo.target, textureInfo.id);
   }
-  if (!texture->checkFrameBuffer(this)) {
+  if (usage & GPUTextureUsage::RENDER_ATTACHMENT && !texture->checkFrameBuffer(this)) {
     texture->release(this);
     return nullptr;
   }
@@ -213,7 +217,264 @@ std::unique_ptr<GPUSampler> GLGPU::createSampler(const GPUSamplerDescriptor& des
                                      ToGLWrap(descriptor.addressModeY), minFilter, magFilter);
 }
 
-std::shared_ptr<CommandEncoder> GLGPU::createCommandEncoder() {
-  return std::make_shared<GLCommandEncoder>(interface);
+std::unique_ptr<GPUShaderModule> GLGPU::createShaderModule(
+    const GPUShaderModuleDescriptor& descriptor) {
+  if (descriptor.code.empty()) {
+    LOGE("GLGPU::createShaderModule() shader code is empty!");
+    return nullptr;
+  }
+  unsigned shaderType = 0;
+  switch (descriptor.stage) {
+    case ShaderStage::Vertex:
+      shaderType = GL_VERTEX_SHADER;
+      break;
+    case ShaderStage::Fragment:
+      shaderType = GL_FRAGMENT_SHADER;
+      break;
+  }
+  auto gl = interface->functions();
+  auto shader = gl->createShader(shaderType);
+  auto& code = descriptor.code;
+  const char* files[] = {descriptor.code.c_str()};
+  gl->shaderSource(shader, 1, files, nullptr);
+  gl->compileShader(shader);
+#if defined(DEBUG) || !defined(TGFX_BUILD_FOR_WEB)
+  int success;
+  gl->getShaderiv(shader, GL_COMPILE_STATUS, &success);
+  if (!success) {
+    char infoLog[512];
+    gl->getShaderInfoLog(shader, 512, nullptr, infoLog);
+    LOGE("Could not compile shader:\n%s\ntype:%d info%s", code.c_str(), shaderType, infoLog);
+    gl->deleteShader(shader);
+    shader = 0;
+  }
+#endif
+  return std::make_unique<GLShaderModule>(shader);
 }
+
+std::unique_ptr<GPURenderPipeline> GLGPU::createRenderPipeline(
+    const GPURenderPipelineDescriptor& descriptor) {
+  auto vertexModule = static_cast<GLShaderModule*>(descriptor.vertex.module);
+  auto fragmentModule = static_cast<GLShaderModule*>(descriptor.fragment.module);
+  if (vertexModule == nullptr || vertexModule->shader() == 0 || vertexModule == nullptr ||
+      fragmentModule->shader() == 0) {
+    LOGE("GLGPU::createRenderPipeline() invalid shader module!");
+    return nullptr;
+  }
+  if (descriptor.vertex.attributes.empty()) {
+    LOGE("GLGPU::createRenderPipeline() invalid vertex attributes, no attributes set!");
+    return nullptr;
+  }
+  if (descriptor.vertex.vertexStride == 0) {
+    LOGE("GLGPU::createRenderPipeline() invalid vertex attributes, vertex stride is 0!");
+    return nullptr;
+  }
+  if (descriptor.fragment.colorAttachments.empty()) {
+    LOGE("GLGPU::createRenderPipeline() invalid color attachments, no color attachments!");
+    return nullptr;
+  }
+  if (descriptor.fragment.colorAttachments.size() > 1) {
+    LOGE(
+        "GLGPU::createRenderPipeline() Multiple color attachments are not yet supported in "
+        "OpenGL!");
+    return nullptr;
+  }
+  auto gl = interface->functions();
+  auto programID = gl->createProgram();
+  gl->attachShader(programID, vertexModule->shader());
+  gl->attachShader(programID, fragmentModule->shader());
+  gl->linkProgram(programID);
+  int success;
+  gl->getProgramiv(programID, GL_LINK_STATUS, &success);
+  if (!success) {
+    char infoLog[512];
+    gl->getProgramInfoLog(programID, 512, nullptr, infoLog);
+    gl->deleteProgram(programID);
+    programID = 0;
+    LOGE("GLGPU::createRenderPipeline() Could not link program: %s", infoLog);
+  }
+  auto pipeline = std::make_unique<GLRenderPipeline>(programID);
+  if (!pipeline->setPipelineDescriptor(this, descriptor)) {
+    pipeline->release(this);
+    return nullptr;
+  }
+  return pipeline;
+}
+
+std::shared_ptr<CommandEncoder> GLGPU::createCommandEncoder() {
+  return std::make_shared<GLCommandEncoder>(this);
+}
+
+void GLGPU::resetGLState() {
+  capabilities = {};
+  scissorRect = {0, 0, 0, 0};
+  viewport = {0, 0, 0, 0};
+  textureUnits.assign(textureUnits.size(), INVALID_VALUE);
+  clearColor = std::nullopt;
+  activeTextureUint = INVALID_VALUE;
+  readFramebuffer = INVALID_VALUE;
+  drawFramebuffer = INVALID_VALUE;
+  program = INVALID_VALUE;
+  vertexArray = INVALID_VALUE;
+  srcColorBlendFactor = INVALID_VALUE;
+  dstColorBlendFactor = INVALID_VALUE;
+  srcAlphaBlendFactor = INVALID_VALUE;
+  dstAlphaBlendFactor = INVALID_VALUE;
+  colorBlendOp = INVALID_VALUE;
+  alphaBlendOp = INVALID_VALUE;
+  colorWriteMask = 0xF;
+}
+
+void GLGPU::enableCapability(unsigned capability, bool enabled) {
+  auto result = capabilities.find(capability);
+  if (result != capabilities.end() && result->second == enabled) {
+    return;
+  }
+  auto gl = interface->functions();
+  if (enabled) {
+    gl->enable(capability);
+  } else {
+    gl->disable(capability);
+  }
+  capabilities[capability] = enabled;
+}
+
+void GLGPU::setScissorRect(int x, int y, int width, int height) {
+  if (scissorRect[0] == x && scissorRect[1] == y && scissorRect[2] == width &&
+      scissorRect[3] == height) {
+    return;
+  }
+  auto gl = interface->functions();
+  gl->scissor(x, y, width, height);
+  scissorRect[0] = x;
+  scissorRect[1] = y;
+  scissorRect[2] = width;
+  scissorRect[3] = height;
+}
+
+void GLGPU::setViewport(int x, int y, int width, int height) {
+  if (viewport[0] == x && viewport[1] == y && viewport[2] == width && viewport[3] == height) {
+    return;
+  }
+  auto gl = interface->functions();
+  gl->viewport(x, y, width, height);
+  viewport[0] = x;
+  viewport[1] = y;
+  viewport[2] = width;
+  viewport[3] = height;
+}
+
+void GLGPU::setClearColor(Color color) {
+  if (clearColor.has_value() && *clearColor == color) {
+    return;
+  }
+  auto gl = interface->functions();
+  gl->clearColor(color.red, color.green, color.blue, color.alpha);
+  clearColor = color;
+}
+
+void GLGPU::bindTexture(GLTexture* texture, unsigned textureUnit) {
+  DEBUG_ASSERT(texture != nullptr);
+  DEBUG_ASSERT(texture->usage() & GPUTextureUsage::TEXTURE_BINDING);
+  auto& uniqueID = textureUnits[textureUnit];
+  if (uniqueID == texture->uniqueID) {
+    return;
+  }
+
+  auto gl = interface->functions();
+  if (activeTextureUint != textureUnit) {
+    gl->activeTexture(static_cast<unsigned>(GL_TEXTURE0) + textureUnit);
+    activeTextureUint = textureUnit;
+  }
+  gl->bindTexture(texture->target(), texture->textureID());
+  uniqueID = texture->uniqueID;
+}
+
+void GLGPU::bindFramebuffer(GLTexture* texture, FrameBufferTarget target) {
+  DEBUG_ASSERT(texture != nullptr);
+  auto uniqueID = texture->uniqueID;
+  unsigned frameBufferTarget = GL_FRAMEBUFFER;
+  switch (target) {
+    case FrameBufferTarget::Read:
+      if (uniqueID == readFramebuffer) {
+        return;
+      }
+      frameBufferTarget = GL_READ_FRAMEBUFFER;
+      readFramebuffer = texture->uniqueID;
+      break;
+    case FrameBufferTarget::Draw:
+      if (uniqueID == drawFramebuffer) {
+        return;
+      }
+      frameBufferTarget = GL_DRAW_FRAMEBUFFER;
+      drawFramebuffer = texture->uniqueID;
+      break;
+    case FrameBufferTarget::Both:
+      if (uniqueID == drawFramebuffer && uniqueID == readFramebuffer) {
+        return;
+      }
+      frameBufferTarget = GL_FRAMEBUFFER;
+      readFramebuffer = drawFramebuffer = texture->uniqueID;
+      break;
+  }
+  auto gl = interface->functions();
+  gl->bindFramebuffer(frameBufferTarget, texture->frameBufferID());
+}
+
+void GLGPU::useProgram(unsigned programID) {
+  if (program == programID) {
+    return;
+  }
+  auto gl = interface->functions();
+  gl->useProgram(programID);
+  program = programID;
+}
+
+void GLGPU::bindVertexArray(unsigned vao) {
+  DEBUG_ASSERT(interface->caps()->vertexArrayObjectSupport);
+  if (vertexArray == vao) {
+    return;
+  }
+  auto gl = interface->functions();
+  gl->bindVertexArray(vao);
+  vertexArray = vao;
+}
+
+void GLGPU::setBlendFunc(unsigned srcColorFactor, unsigned dstColorFactor, unsigned srcAlphaFactor,
+                         unsigned dstAlphaFactor) {
+  if (srcColorFactor == srcColorBlendFactor && dstColorFactor == dstColorBlendFactor &&
+      srcAlphaFactor == srcAlphaBlendFactor && dstAlphaFactor == dstAlphaBlendFactor) {
+    return;
+  }
+  auto gl = interface->functions();
+  gl->blendFuncSeparate(srcColorFactor, dstColorFactor, srcAlphaFactor, dstAlphaFactor);
+  srcColorBlendFactor = srcColorFactor;
+  dstColorBlendFactor = dstColorFactor;
+  srcAlphaBlendFactor = srcAlphaFactor;
+  dstAlphaBlendFactor = dstAlphaFactor;
+}
+
+void GLGPU::setBlendEquation(unsigned colorOp, unsigned alphaOp) {
+  if (colorOp == colorBlendOp && alphaOp == alphaBlendOp) {
+    return;
+  }
+  auto gl = interface->functions();
+  gl->blendEquationSeparate(colorOp, alphaOp);
+  colorBlendOp = colorOp;
+  alphaBlendOp = alphaOp;
+}
+
+void GLGPU::setColorMask(uint32_t colorMask) {
+  if (colorMask == colorWriteMask) {
+    return;
+  }
+  auto gl = interface->functions();
+  auto red = (colorMask & ColorWriteMask::RED) != 0;
+  auto green = (colorMask & ColorWriteMask::GREEN) != 0;
+  auto blue = (colorMask & ColorWriteMask::BLUE) != 0;
+  auto alpha = (colorMask & ColorWriteMask::ALPHA) != 0;
+  gl->colorMask(red, green, blue, alpha);
+  colorWriteMask = colorMask;
+}
+
 }  // namespace tgfx

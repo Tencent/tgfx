@@ -47,5 +47,7 @@ class DrawArgs {
 
   // The background context to be used during the drawing process. Note: this could be nullptr.
   std::shared_ptr<BackgroundContext> backgroundContext = nullptr;
+  // Indicates whether to force drawing the background, even if there are no background styles.
+  bool forceDrawBackground = false;
 };
 }  // namespace tgfx

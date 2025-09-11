@@ -48,6 +48,8 @@ namespace tgfx {
 #define GL_BLEND_EQUATION_ALPHA 0x883D
 #define GL_FUNC_SUBTRACT 0x800A
 #define GL_FUNC_REVERSE_SUBTRACT 0x800B
+#define GL_MIN 0x8007
+#define GL_MAX 0x8008
 
 // KHR_blend_equation_advanced
 #define GL_SCREEN 0x9295
@@ -125,6 +127,9 @@ namespace tgfx {
 
 #define GL_CURRENT_VERTEX_ATTRIB 0x8626
 
+#define GL_UNIFORM_BUFFER 0x8A11
+#define GL_UNIFORM_BLOCK_BINDING 0x8A3F
+
 // CullFaceMode
 #define GL_FRONT 0x0404
 #define GL_BACK 0x0405
@@ -159,6 +164,7 @@ namespace tgfx {
 #define GL_INVALID_OPERATION 0x0502
 #define GL_OUT_OF_MEMORY 0x0505
 #define GL_CONTEXT_LOST 0x300E
+#define GL_INVALID_INDEX 0xFFFFFFFF
 
 // FrontFaceDirection
 #define GL_CW 0x0900

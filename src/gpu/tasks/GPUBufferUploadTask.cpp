@@ -18,8 +18,8 @@
 
 #include "GPUBufferUploadTask.h"
 #include "gpu/GPU.h"
-#include "gpu/IndexBuffer.h"
-#include "gpu/VertexBuffer.h"
+#include "gpu/resources/IndexBuffer.h"
+#include "gpu/resources/VertexBuffer.h"
 #include "inspect/InspectorMark.h"
 
 namespace tgfx {

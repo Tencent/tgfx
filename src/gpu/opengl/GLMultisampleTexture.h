@@ -31,7 +31,7 @@ class GLMultisampleTexture : public GLTexture {
   }
 
  protected:
-  void onRelease(GLGPU*) override;
+  void onRelease(GLGPU* gpu) override;
 
  private:
   unsigned _frameBufferID = 0;

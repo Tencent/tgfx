@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -25,13 +26,17 @@
 #include "tgfx/core/Matrix.h"
 
 namespace tgfx {
+static constexpr char VertexUniformBlockName[] = "VertexUniformBlock";
+static constexpr char FragmentUniformBlockName[] = "FragmentUniformBlock";
+static constexpr int VERTEX_UBO_BINDING_POINT = 0;
+static constexpr int FRAGMENT_UBO_BINDING_POINT = 1;
+static constexpr int TEXTURE_BINDING_POINT_START = 2;
+
 /**
  * An object representing the collection of uniform variables in a GPU program.
  */
 class UniformBuffer {
  public:
-  ~UniformBuffer();
-
   /**
    * Copies value into the uniform buffer. The data must have the same size as the uniform specified
    * by name.
@@ -51,14 +56,14 @@ class UniformBuffer {
    * Returns a pointer to the start of the uniform buffer in memory.
    */
   const void* data() const {
-    return _buffer;
+    return buffer.data();
   }
 
   /**
    * Returns the size of the uniform buffer in bytes.
    */
   size_t size() const {
-    return offsets.back();
+    return buffer.size();
   }
 
   /**
@@ -68,16 +73,52 @@ class UniformBuffer {
     return _uniforms;
   }
 
- private:
-  uint8_t* _buffer = nullptr;
-  std::vector<Uniform> _uniforms = {};
-  std::unordered_map<std::string, size_t> uniformMap = {};
-  std::vector<size_t> offsets = {};
-  std::string nameSuffix = "";
+  /**
+   * Returns true if UBO is supported in the current context.
+   */
+  bool uboSupport() const {
+    return _uboSupport;
+  }
 
-  UniformBuffer(std::vector<Uniform> uniforms, std::unordered_map<std::string, size_t> uniformMap);
+ private:
+  struct Field {
+    std::string name = "";
+    UniformFormat format = UniformFormat::Float;
+    size_t offset = 0;
+    size_t size = 0;
+    size_t align = 0;
+  };
+
+  struct Entry {
+    size_t size;
+    size_t align;
+  };
+
+  std::vector<uint8_t> buffer = {};
+  std::vector<Uniform> _uniforms = {};
+  std::string nameSuffix = "";
+  std::unordered_map<std::string, Field> fieldMap = {};
+  size_t cursor = 0;
+  bool _uboSupport = false;
+
+  explicit UniformBuffer(std::vector<Uniform> uniforms, bool uboSupport = false);
 
   void onSetData(const std::string& name, const void* data, size_t size);
+
+  const Field* findField(const std::string& key) const;
+
+  size_t alignCursor(size_t alignment) const;
+
+  static Entry EntryOf(UniformFormat format);
+
+  /**
+   * Dump UniformBuffer's memory layout information is printed to the console for debugging.
+   */
+#if DEBUG
+  static const char* ToUniformFormatName(UniformFormat format);
+
+  void dump() const;
+#endif
 
   friend class ProgramInfo;
   friend class UniformHandler;

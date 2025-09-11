@@ -19,18 +19,20 @@
 #pragma once
 
 #include "gpu/RenderPass.h"
-#include "gpu/RenderPassDescriptor.h"
 #include "gpu/opengl/GLBuffer.h"
 #include "gpu/opengl/GLInterface.h"
 #include "gpu/opengl/GLRenderPipeline.h"
 
 namespace tgfx {
+class GLGPU;
 
 class GLRenderPass : public RenderPass {
  public:
-  GLRenderPass(std::shared_ptr<GLInterface> interface, RenderPassDescriptor descriptor);
+  GLRenderPass(GLGPU* gpu, RenderPassDescriptor descriptor);
 
   void begin();
+
+  void setViewport(int x, int y, int width, int height) override;
 
   void setScissorRect(int x, int y, int width, int height) override;
 
@@ -52,7 +54,7 @@ class GLRenderPass : public RenderPass {
   void onEnd() override;
 
  private:
-  std::shared_ptr<GLInterface> interface = nullptr;
+  GLGPU* gpu = nullptr;
   GLRenderPipeline* renderPipeline = nullptr;
   IndexFormat indexFormat = IndexFormat::UInt16;
 };

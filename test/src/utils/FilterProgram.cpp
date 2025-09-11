@@ -17,12 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "FilterProgram.h"
+#include "utils/TestUtils.h"
 
 namespace tgfx {
 std::unique_ptr<FilterProgram> FilterProgram::Make(Context* context, const std::string& vertex,
                                                    const std::string& fragment) {
   auto gl = GLFunctions::Get(context);
-  auto program = CreateGLProgram(gl, vertex, fragment);
+  auto program = CreateGLProgram(context, vertex, fragment);
   if (program == 0) {
     return nullptr;
   }

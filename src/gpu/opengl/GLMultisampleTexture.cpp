@@ -83,7 +83,7 @@ std::unique_ptr<GLMultisampleTexture> GLMultisampleTexture::MakeFrom(
     texture->release(gpu);
     return nullptr;
   }
-  gl->bindFramebuffer(GL_FRAMEBUFFER, frameBufferID);
+  gpu->bindFramebuffer(texture.get());
   gl->framebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER,
                               texture->renderBufferID);
 #ifndef TGFX_BUILD_FOR_WEB
@@ -99,9 +99,8 @@ std::unique_ptr<GLMultisampleTexture> GLMultisampleTexture::MakeFrom(
 void GLMultisampleTexture::onRelease(GLGPU* gpu) {
   auto gl = gpu->functions();
   if (_frameBufferID > 0) {
-    gl->bindFramebuffer(GL_FRAMEBUFFER, _frameBufferID);
+    gpu->bindFramebuffer(this);
     gl->framebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, 0);
-    gl->bindFramebuffer(GL_FRAMEBUFFER, 0);
     gl->deleteFramebuffers(1, &_frameBufferID);
     _frameBufferID = 0;
   }

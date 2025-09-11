@@ -328,7 +328,7 @@ void Path::arcTo(float rx, float ry, float xAxisRotate, PathArcSize largeArc, bo
                         float_is_integer(rx) && float_is_integer(ry) &&
                         float_is_integer(endPoint.x) && float_is_integer(endPoint.y);
 
-  auto* path = &(writableRef()->path);
+  auto path = &(writableRef()->path);
   for (int i = 0; i < static_cast<int>(segments); ++i) {
     auto endTheta = startTheta + thetaWidth;
     auto sinEndTheta = SinSnapToZero(endTheta);

@@ -23,6 +23,8 @@
 namespace tgfx {
 class FragmentProcessor;
 
+static constexpr char CUSTOM_COLOR_OUTPUT_NAME[] = "tgfx_FragColor";
+
 class FragmentShaderBuilder : public ShaderBuilder {
  public:
   explicit FragmentShaderBuilder(ProgramBuilder* program);
@@ -33,18 +35,14 @@ class FragmentShaderBuilder : public ShaderBuilder {
 
   virtual std::string dstColor() = 0;
 
-  void onBeforeChildProcEmitCode(const FragmentProcessor* child);
+  void onBeforeChildProcEmitCode(const FragmentProcessor* child) const;
 
-  void onAfterChildProcEmitCode();
+  void onAfterChildProcEmitCode() const;
 
   void declareCustomOutputColor();
 
  protected:
   virtual std::string colorOutputName() = 0;
-
-  static std::string CustomColorOutputName() {
-    return "tgfx_FragColor";
-  }
 
   friend class ProgramBuilder;
 };

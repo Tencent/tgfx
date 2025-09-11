@@ -22,7 +22,7 @@
 #include <functional>
 #include <list>
 #include <unordered_map>
-#include "gpu/ResourceKey.h"
+#include "gpu/resources/ResourceKey.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {

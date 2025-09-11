@@ -17,9 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ProgramInfo.h"
+#include "gpu/BlendFormula.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProgramBuilder.h"
-#include "gpu/RenderTarget.h"
+#include "gpu/resources/RenderTarget.h"
 
 namespace tgfx {
 ProgramInfo::ProgramInfo(RenderTarget* renderTarget, GeometryProcessor* geometryProcessor,
@@ -58,13 +59,25 @@ const Swizzle& ProgramInfo::getOutputSwizzle() const {
   return context->caps()->getWriteSwizzle(renderTarget->format());
 }
 
-std::unique_ptr<BlendFormula> ProgramInfo::getBlendFormula() const {
-  if (xferProcessor != nullptr) {
-    return nullptr;
+PipelineColorAttachment ProgramInfo::getPipelineColorAttachment() const {
+  PipelineColorAttachment colorAttachment = {};
+  colorAttachment.format = renderTarget->format();
+  if (xferProcessor != nullptr || blendMode == BlendMode::Src) {
+    return colorAttachment;
   }
-  auto blendFormula = std::make_unique<BlendFormula>();
-  BlendModeAsCoeff(blendMode, numColorProcessors < fragmentProcessors.size(), blendFormula.get());
-  return blendFormula;
+  BlendFormula blendFormula = {};
+  if (!BlendModeAsCoeff(blendMode, numColorProcessors < fragmentProcessors.size(), &blendFormula)) {
+    return colorAttachment;
+  }
+  colorAttachment.blendEnable = true;
+  colorAttachment.srcColorBlendFactor = blendFormula.srcFactor();
+  colorAttachment.dstColorBlendFactor = blendFormula.dstFactor();
+  colorAttachment.colorBlendOp = blendFormula.operation();
+  colorAttachment.srcAlphaBlendFactor = blendFormula.srcFactor();
+  colorAttachment.dstAlphaBlendFactor = blendFormula.dstFactor();
+  colorAttachment.alphaBlendOp = blendFormula.operation();
+  colorAttachment.colorWriteMask = ColorWriteMask::All;
+  return colorAttachment;
 }
 
 static std::array<float, 4> GetRTAdjustArray(const RenderTarget* renderTarget) {
@@ -135,36 +148,49 @@ static AddressMode ToAddressMode(TileMode tileMode) {
 
 void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, PipelineProgram* program) const {
   DEBUG_ASSERT(renderTarget != nullptr);
-  auto uniformBuffer = program->uniformBuffer.get();
-  DEBUG_ASSERT(uniformBuffer != nullptr);
+  auto vertexUniformBuffer = program->vertexUniformBuffer.get();
+  auto fragmentUniformBuffer = program->fragmentUniformBuffer.get();
+
   auto array = GetRTAdjustArray(renderTarget);
-  uniformBuffer->setData(RTAdjustName, array);
-  uniformBuffer->nameSuffix = getMangledSuffix(geometryProcessor);
+  if (vertexUniformBuffer != nullptr) {
+    vertexUniformBuffer->setData(RTAdjustName, array);
+  }
+  updateUniformBufferSuffix(vertexUniformBuffer, fragmentUniformBuffer, geometryProcessor);
+
   FragmentProcessor::CoordTransformIter coordTransformIter(this);
-  geometryProcessor->setData(uniformBuffer, &coordTransformIter);
+  geometryProcessor->setData(vertexUniformBuffer, fragmentUniformBuffer, &coordTransformIter);
+
   for (auto& fragmentProcessor : fragmentProcessors) {
     FragmentProcessor::Iter iter(fragmentProcessor);
     const FragmentProcessor* fp = iter.next();
     while (fp) {
-      uniformBuffer->nameSuffix = getMangledSuffix(fp);
-      fp->setData(uniformBuffer);
+      updateUniformBufferSuffix(vertexUniformBuffer, fragmentUniformBuffer, fp);
+      fp->setData(vertexUniformBuffer, fragmentUniformBuffer);
       fp = iter.next();
     }
   }
-  auto processor = getXferProcessor();
-  uniformBuffer->nameSuffix = getMangledSuffix(processor);
-  processor->setData(uniformBuffer);
-  uniformBuffer->nameSuffix = "";
-  renderPass->setUniformBytes(0, uniformBuffer->data(), uniformBuffer->size());
+  const auto* processor = getXferProcessor();
+  updateUniformBufferSuffix(vertexUniformBuffer, fragmentUniformBuffer, processor);
+  processor->setData(vertexUniformBuffer, fragmentUniformBuffer);
+  updateUniformBufferSuffix(vertexUniformBuffer, fragmentUniformBuffer, nullptr);
+
+  if (vertexUniformBuffer != nullptr) {
+    renderPass->setUniformBytes(VERTEX_UBO_BINDING_POINT, vertexUniformBuffer->data(),
+                                vertexUniformBuffer->size());
+  }
+  if (fragmentUniformBuffer != nullptr) {
+    renderPass->setUniformBytes(FRAGMENT_UBO_BINDING_POINT, fragmentUniformBuffer->data(),
+                                fragmentUniformBuffer->size());
+  }
 
   auto samplers = getSamplers();
-  unsigned textureIndex = 0;
+  unsigned textureBinding = TEXTURE_BINDING_POINT_START;
   auto gpu = renderTarget->getContext()->gpu();
   for (auto& [texture, state] : samplers) {
     GPUSamplerDescriptor descriptor(ToAddressMode(state.tileModeX), ToAddressMode(state.tileModeY),
                                     state.filterMode, state.filterMode, state.mipmapMode);
     auto sampler = gpu->createSampler(descriptor);
-    renderPass->setTexture(textureIndex++, texture, sampler.get());
+    renderPass->setTexture(textureBinding++, texture, sampler.get());
   }
 }
 
@@ -178,16 +204,29 @@ std::vector<SamplerInfo> ProgramInfo::getSamplers() const {
   const FragmentProcessor* fp = iter.next();
   while (fp) {
     for (size_t i = 0; i < fp->numTextureSamplers(); ++i) {
-      SamplerInfo info = {fp->textureAt(i), fp->samplerStateAt(i)};
-      samplers.push_back(info);
+      SamplerInfo sampler = {fp->textureAt(i), fp->samplerStateAt(i)};
+      samplers.push_back(sampler);
     }
     fp = iter.next();
   }
   auto dstTextureView = xferProcessor != nullptr ? xferProcessor->dstTextureView() : nullptr;
   if (dstTextureView != nullptr) {
-    SamplerInfo info = {dstTextureView->getTexture(), {}};
-    samplers.push_back(info);
+    SamplerInfo sampler = {dstTextureView->getTexture(), {}};
+    samplers.push_back(sampler);
   }
   return samplers;
+}
+
+void ProgramInfo::updateUniformBufferSuffix(UniformBuffer* vertexUniformBuffer,
+                                            UniformBuffer* fragmentUniformBuffer,
+                                            const Processor* processor) const {
+  auto suffix = getMangledSuffix(processor);
+  if (vertexUniformBuffer != nullptr) {
+    vertexUniformBuffer->nameSuffix = suffix;
+  }
+
+  if (fragmentUniformBuffer != nullptr) {
+    fragmentUniformBuffer->nameSuffix = suffix;
+  }
 }
 }  // namespace tgfx

@@ -91,37 +91,37 @@ void SVGRoot::onSetAttribute(SVGAttribute attr, const SVGValue& v) {
   if (type != Type::kInner && type != Type::kRoot) return;
   switch (attr) {
     case SVGAttribute::X:
-      if (const auto* x = v.as<SVGLengthValue>()) {
+      if (const auto x = v.as<SVGLengthValue>()) {
         SVGLength xValue = *x;
         this->setX(xValue);
       }
       break;
     case SVGAttribute::Y:
-      if (const auto* y = v.as<SVGLengthValue>()) {
+      if (const auto y = v.as<SVGLengthValue>()) {
         SVGLength yValue = *y;
         this->setY(yValue);
       }
       break;
     case SVGAttribute::Width:
-      if (const auto* w = v.as<SVGLengthValue>()) {
+      if (const auto w = v.as<SVGLengthValue>()) {
         SVGLength wValue = *w;
         this->setWidth(wValue);
       }
       break;
     case SVGAttribute::Height:
-      if (const auto* h = v.as<SVGLengthValue>()) {
+      if (const auto h = v.as<SVGLengthValue>()) {
         SVGLength hValue = *h;
         this->setHeight(hValue);
       }
       break;
     case SVGAttribute::ViewBox:
-      if (const auto* vb = v.as<SVGViewBoxValue>()) {
+      if (const auto vb = v.as<SVGViewBoxValue>()) {
         SVGViewBoxType vbValue = *vb;
         this->setViewBox(vbValue);
       }
       break;
     case SVGAttribute::PreserveAspectRatio:
-      if (const auto* par = v.as<SVGPreserveAspectRatioValue>()) {
+      if (const auto par = v.as<SVGPreserveAspectRatioValue>()) {
         SVGPreserveAspectRatio parValue = *par;
         this->setPreserveAspectRatio(parValue);
       }

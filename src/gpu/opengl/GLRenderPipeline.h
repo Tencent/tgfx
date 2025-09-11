@@ -18,13 +18,34 @@
 
 #pragma once
 
-#include "gpu/Attribute.h"
-#include "gpu/Blend.h"
+#include <memory>
+#include <unordered_map>
 #include "gpu/GPURenderPipeline.h"
-#include "gpu/Uniform.h"
 #include "gpu/opengl/GLBuffer.h"
+#include "gpu/opengl/GLTexture.h"
 
 namespace tgfx {
+class GLGPU;
+
+struct GLAttribute {
+  int location = 0;
+  int count = 0;
+  unsigned type = 0;
+  bool normalized = false;
+  size_t offset = 0;
+};
+
+struct GLUniform {
+  UniformFormat format = UniformFormat::Float;
+  int location = -1;
+  size_t offset = 0;
+};
+
+struct GLUniformBlock {
+  unsigned ubo = 0;                      // OpenGL UBO handle, 0 if UBOs are not supported.
+  std::vector<GLUniform> uniforms = {};  // only used if UBOs are not supported.
+};
+
 /**
  * GLRenderPipeline is the OpenGL implementation of the GPURenderPipeline interface. It encapsulates
  * an OpenGL shader program along with its associated state, such as vertex attributes and blending
@@ -32,35 +53,42 @@ namespace tgfx {
  */
 class GLRenderPipeline : public GPURenderPipeline {
  public:
-  GLRenderPipeline(unsigned programID, std::vector<Uniform> uniforms,
-                   std::vector<Attribute> attribs, std::unique_ptr<BlendFormula> blendFormula);
+  explicit GLRenderPipeline(unsigned programID);
 
   /**
    * Binds the shader program so that it is used in subsequent draw calls.
    */
-  void activate(GLInterface* interface);
+  void activate(GLGPU* gpu);
 
   /**
-   * Sets the uniform data to be used in subsequent draw calls.
+   * Sets the uniform data to a specified binding index.
    */
-  void setUniformBytes(GLInterface* interface, const void* data, size_t size);
+  void setUniformBytes(GLGPU* gpu, unsigned binding, const void* data, size_t size);
+
+  /**
+   * Sets a texture and its sampler state to a specified binding index.
+   */
+  void setTexture(GLGPU* gpu, unsigned binding, GLTexture* texture, GLSampler* sampler);
 
   /**
    * Binds the vertex buffer to be used in subsequent draw calls. The vertexOffset is the offset
    * into the buffer where the vertex data begins.
    */
-  void setVertexBuffer(GLInterface* interface, GPUBuffer* vertexBuffer, size_t vertexOffset);
+  void setVertexBuffer(GLGPU* gpu, GLBuffer* vertexBuffer, size_t vertexOffset);
 
   void release(GPU* gpu) override;
 
  private:
   unsigned programID = 0;
   unsigned vertexArray = 0;
-  std::vector<Uniform> uniforms = {};
-  std::vector<Attribute> attributes = {};
-  std::vector<int> attributeLocations = {};
-  std::vector<int> uniformLocations = {};
-  int vertexStride = 0;
-  std::unique_ptr<BlendFormula> blendFormula = nullptr;
+  std::vector<GLAttribute> attributes = {};
+  size_t vertexStride = 0;
+  std::unordered_map<unsigned, GLUniformBlock> uniformBlocks = {};
+  std::unordered_map<unsigned, unsigned> textureUnits = {};
+  PipelineColorAttachment colorAttachment = {};
+
+  bool setPipelineDescriptor(GLGPU* gpu, const GPURenderPipelineDescriptor& descriptor);
+
+  friend class GLGPU;
 };
 }  // namespace tgfx
