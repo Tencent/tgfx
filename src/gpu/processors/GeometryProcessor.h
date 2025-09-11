@@ -22,6 +22,7 @@
 #include "gpu/Attribute.h"
 #include "gpu/FragmentShaderBuilder.h"
 #include "gpu/GPUTexture.h"
+#include "gpu/ShaderCaps.h"
 #include "gpu/ShaderVar.h"
 #include "gpu/UniformBuffer.h"
 #include "gpu/VaryingHandler.h"
@@ -65,7 +66,7 @@ class GeometryProcessor : public Processor {
 
   struct EmitArgs {
     EmitArgs(VertexShaderBuilder* vertBuilder, FragmentShaderBuilder* fragBuilder,
-             VaryingHandler* varyingHandler, UniformHandler* uniformHandler, const Caps* caps,
+             VaryingHandler* varyingHandler, UniformHandler* uniformHandler, const ShaderCaps* caps,
              std::string outputColor, std::string outputCoverage,
              FPCoordTransformHandler* transformHandler, std::string* outputSubset)
         : vertBuilder(vertBuilder), fragBuilder(fragBuilder), varyingHandler(varyingHandler),
@@ -77,7 +78,7 @@ class GeometryProcessor : public Processor {
     FragmentShaderBuilder* fragBuilder;
     VaryingHandler* varyingHandler;
     UniformHandler* uniformHandler;
-    const Caps* caps;
+    const ShaderCaps* caps;
     const std::string outputColor;
     const std::string outputCoverage;
     FPCoordTransformHandler* fpCoordTransformHandler;

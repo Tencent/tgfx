@@ -76,9 +76,9 @@ GLRenderPipeline::GLRenderPipeline(unsigned programID) : programID(programID) {
 }
 
 void GLRenderPipeline::activate(GLGPU* gpu) {
-  auto caps = static_cast<const GLCaps*>(gpu->caps());
   gpu->useProgram(programID);
-  if (caps->frameBufferFetchSupport && caps->frameBufferFetchRequiresEnablePerSample) {
+  auto shaderCaps = gpu->caps()->shaderCaps();
+  if (shaderCaps->frameBufferFetchSupport && shaderCaps->frameBufferFetchRequiresEnablePerSample) {
     if (colorAttachment.blendEnable) {
       gpu->enableCapability(GL_FETCH_PER_SAMPLE_ARM, false);
     } else {
@@ -284,7 +284,7 @@ bool GLRenderPipeline::setPipelineDescriptor(GLGPU* gpu,
   for (auto& entry : descriptor.layout.uniformBlocks) {
     GLUniformBlock block = {};
     if (entry.uniforms.empty()) {
-      DEBUG_ASSERT(gpu->caps()->uboSupport);
+      DEBUG_ASSERT(gpu->caps()->shaderCaps()->uboSupport);
       gl->genBuffers(1, &block.ubo);
       if (block.ubo == 0) {
         LOGE("GLRenderPipeline::createUniformBlocks: failed to create UBO!");

@@ -262,7 +262,7 @@ static bool IsPixelAligned(const Rect& rect) {
 }
 
 static bool RRectUseScale(Context* context) {
-  return !context->caps()->floatIs32Bits;
+  return !context->caps()->shaderCaps()->floatIs32Bits;
 }
 
 class PendingOpsAutoReset {
@@ -475,7 +475,7 @@ std::pair<bool, bool> OpsCompositor::needComputeBounds(const Fill& fill, bool ha
   bool needDeviceBounds = false;
   if (BlendModeNeedDstTexture(fill.blendMode, hasCoverage)) {
     auto caps = context->caps();
-    if (!caps->frameBufferFetchSupport &&
+    if (!caps->shaderCaps()->frameBufferFetchSupport &&
         (!caps->textureBarrierSupport || renderTarget->asTextureProxy() == nullptr ||
          renderTarget->sampleCount() > 1)) {
       needDeviceBounds = true;
@@ -592,7 +592,7 @@ std::pair<PlacementPtr<FragmentProcessor>, bool> OpsCompositor::getClipMaskFP(co
 
 DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds, AAType aaType) {
   auto caps = context->caps();
-  if (caps->frameBufferFetchSupport) {
+  if (caps->shaderCaps()->frameBufferFetchSupport) {
     return {};
   }
   Rect bounds = {};
@@ -682,7 +682,8 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const F
   op->setBlendMode(fill.blendMode);
   if (BlendModeNeedDstTexture(fill.blendMode, op->hasCoverage())) {
     auto dstTextureInfo = makeDstTextureInfo(deviceBounds.value_or(Rect::MakeEmpty()), aaType);
-    if (!context->caps()->frameBufferFetchSupport && dstTextureInfo.textureProxy == nullptr) {
+    auto shaderCaps = context->caps()->shaderCaps();
+    if (!shaderCaps->frameBufferFetchSupport && dstTextureInfo.textureProxy == nullptr) {
       return;
     }
     auto xferProcessor =

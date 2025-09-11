@@ -30,7 +30,8 @@
 namespace tgfx {
 GLGPU::GLGPU(std::shared_ptr<GLInterface> glInterface) : interface(std::move(glInterface)) {
   commandQueue = std::make_unique<GLCommandQueue>(this);
-  textureUnits.resize(static_cast<size_t>(interface->caps()->maxFragmentSamplers), INVALID_VALUE);
+  auto shaderCaps = interface->caps()->shaderCaps();
+  textureUnits.resize(static_cast<size_t>(shaderCaps->maxFragmentSamplers), INVALID_VALUE);
 }
 
 std::unique_ptr<GPUBuffer> GLGPU::createBuffer(size_t size, uint32_t usage) {
