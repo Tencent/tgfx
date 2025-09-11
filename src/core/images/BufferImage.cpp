@@ -63,7 +63,7 @@ std::shared_ptr<TextureProxy> BufferImage::lockTextureProxy(const TPArgs& args) 
 }
 
 std::shared_ptr<Image> BufferImage::onMakeMipmapped(bool mipmapped) const {
-  auto image = std::make_shared<BufferImage>(imageBuffer, mipmapped);
+  auto image = std::make_shared<BufferImage>(imageBuffer, mipmapped, colorSpace());
   image->weakThis = image;
   return image;
 }

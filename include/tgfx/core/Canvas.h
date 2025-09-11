@@ -448,7 +448,7 @@ class Canvas {
    * @param atlas The image containing the sprites.
    * @param matrix The matrix transformations for the sprites in the atlas.
    * @param tex The rectangle locations of the sprites in the atlas.
-   * @param colors An array of colors for each sprite; can be nullptr.
+   * @param colors An array of colors in srgb gamut for each sprite; can overflow 0-1 or nullptr.
    * @param count The number of sprites to draw.
    * @param sampling The sampling options used to sample the atlas image.
    * @param paint The paint used for blending, alpha, etc.

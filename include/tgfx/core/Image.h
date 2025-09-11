@@ -76,7 +76,8 @@ class Image {
 
   /**
    * Creates an Image from the image generator. An Image is returned if the generator is not
-   * nullptr. The image generator may wrap codec data or custom data.
+   * nullptr. The image generator may wrap codec data or custom data. The colorSpace will set if
+   * the generator's colorSpace is nullptr.
    */
   static std::shared_ptr<Image> MakeFrom(
       std::shared_ptr<ImageGenerator> generator,

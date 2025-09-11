@@ -53,7 +53,7 @@ std::shared_ptr<TextureProxy> DecodedImage::lockTextureProxy(const TPArgs& args)
 
 std::shared_ptr<Image> DecodedImage::onMakeMipmapped(bool mipmapped) const {
   auto image = std::shared_ptr<DecodedImage>(
-      new DecodedImage(_width, _height, _alphaOnly, source, mipmapped));
+      new DecodedImage(_width, _height, _alphaOnly, source, mipmapped, colorSpace()));
   image->weakThis = image;
   return image;
 }
