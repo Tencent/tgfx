@@ -281,18 +281,17 @@ Rect Matrix3D::mapRect(const Rect& src) const {
 }
 
 Matrix3D Matrix3D::LookAt(const Vec3& eye, const Vec3& center, const Vec3& up) {
-  const auto f = Vec3::Normalize(center - eye);
-  const auto u = Vec3::Normalize(up);
-  const auto s = Vec3::Normalize(f.cross(u));
-
-  Matrix3D m;
-  MakeCols(Vec4(s, 0), Vec4(s.cross(f), 0), Vec4(-f, 0), Vec4(eye, 1)).invert(&m);
+  const auto viewZ = Vec3::Normalize(eye - center);
+  const auto viewX = Vec3::Normalize(up.cross(viewZ));
+  const auto viewY = viewZ.cross(viewX);
+  const Matrix3D m(viewX.x, viewY.x, viewZ.x, 0.f, viewX.y, viewY.y, viewZ.y, 0.f, viewX.z, viewY.z,
+                   viewZ.z, 0.f, -viewX.dot(eye), -viewY.dot(eye), -viewZ.dot(eye), 1.f);
   return m;
 }
 
 Matrix3D Matrix3D::Perspective(float fovyDegress, float aspect, float nearZ, float farZ) {
-  auto fovyRadians = DegreesToRadians(fovyDegress);
-  float cotan = 1.f / tanf(fovyRadians / 2.f);
+  const auto fovyRadians = DegreesToRadians(fovyDegress);
+  const float cotan = 1.f / tanf(fovyRadians / 2.f);
 
   Matrix3D m;
   m.setRowCol(0, 0, cotan / aspect);
@@ -325,8 +324,7 @@ void Matrix3D::setAll(float m00, float m01, float m02, float m03, float m10, flo
 }
 
 void Matrix3D::setRotate(const Vec3& axis, float radians) {
-  auto len = axis.length();
-  if (len > 0 && (len * 0 == 0)) {
+  if (const auto len = axis.length(); len > 0 && (len * 0 == 0)) {
     this->setRotateUnit(axis * (1.f / len), radians);
   } else {
     this->setIdentity();
@@ -339,15 +337,15 @@ void Matrix3D::setRotateUnit(const Vec3& axis, float degrees) {
 }
 
 void Matrix3D::setRotateUnitSinCos(const Vec3& axis, float sinAngle, float cosAngle) {
-  float x = axis.x;
-  float y = axis.y;
-  float z = axis.z;
-  float c = cosAngle;
-  float s = sinAngle;
-  float t = 1 - c;
+  const float x = axis.x;
+  const float y = axis.y;
+  const float z = axis.z;
+  const float c = cosAngle;
+  const float s = sinAngle;
+  const float t = 1 - c;
 
-  setAll(t * x * x + c, t * x * y - s * z, t * x * z + s * y, 0, t * x * y + s * z, t * y * y + c,
-         t * y * z - s * x, 0, t * x * z - s * y, t * y * z + s * x, t * z * z + c, 0, 0, 0, 0, 1);
+  setAll(t * x * x + c, t * x * y + s * z, t * x * z - s * y, 0, t * x * y - s * z, t * y * y + c,
+         t * y * z + s * x, 0, t * x * z + s * y, t * y * z - s * x, t * z * z + c, 0, 0, 0, 0, 1);
 }
 
 bool Matrix3D::operator==(const Matrix3D& other) const {
