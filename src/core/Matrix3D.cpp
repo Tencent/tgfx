@@ -179,7 +179,7 @@ void Matrix3D::setConcat(const Matrix3D& a, const Matrix3D& b) {
   const auto c2 = a.getCol(2);
   const auto c3 = a.getCol(3);
 
-  auto compute = [&](Vec4 v) { return c0 * v[0] + (c1 * v[1] + (c2 * v[2] + c3 * v[3])); };
+  auto compute = [&](Vec4 v) { return c0 * v[0] + c1 * v[1] + c2 * v[2] + c3 * v[3]; };
 
   const auto m0 = compute(b.getCol(0));
   const auto m1 = compute(b.getCol(1));
@@ -293,12 +293,9 @@ Matrix3D Matrix3D::Perspective(float fovyDegress, float aspect, float nearZ, flo
   const auto fovyRadians = DegreesToRadians(fovyDegress);
   const float cotan = 1.f / tanf(fovyRadians / 2.f);
 
-  Matrix3D m;
-  m.setRowCol(0, 0, cotan / aspect);
-  m.setRowCol(1, 1, cotan);
-  m.setRowCol(2, 2, (farZ + nearZ) / (nearZ - farZ));
-  m.setRowCol(2, 3, (2.f * farZ * nearZ) / (nearZ - farZ));
-  m.setRowCol(3, 2, -1);
+  const Matrix3D m(cotan / aspect, 0.f, 0.f, 0.f, 0.f, cotan, 0.f, 0.f, 0.f, 0.f,
+                   (nearZ + farZ) / (nearZ - farZ), -1.f, 0.f, 0.f,
+                   (2.f * nearZ * farZ) / (nearZ - farZ), 0.f);
   return m;
 }
 

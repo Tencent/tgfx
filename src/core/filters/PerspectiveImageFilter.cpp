@@ -39,17 +39,25 @@ PerspectiveImageFilter::PerspectiveImageFilter(const PerspectiveInfo& info) : in
 }
 
 Rect PerspectiveImageFilter::onFilterBounds(const Rect& srcRect) const {
-  const auto perspectiveMatrix =
-      Matrix3D::Perspective(FOV_Y_DEGRESS, srcRect.width() / srcRect.height(), NEAR_Z, FAR_Z);
-  const Vec3 eyePosition = {0, 0, 1.0f / tanf(DegreesToRadians(FOV_Y_DEGRESS) / 2)};
-  constexpr Vec3 eyeTarget = {0, 0, 0};
-  constexpr Vec3 eyeUp = {0, 1, 0};
+  //TODO: RichardJieChen
+  DEBUG_ASSERT(srcRect.left == 0.f && srcRect.top == 0.f);
+  const auto perspectiveMatrix = Matrix3D::Perspective(FOV_Y_DEGRESS, 1.f, NEAR_Z, FAR_Z);
+  const Vec3 eyePosition = {0.f, 0.f, 1.f / tanf(DegreesToRadians(FOV_Y_DEGRESS * 0.5f))};
+  constexpr Vec3 eyeTarget = {0.f, 0.f, 0.f};
+  constexpr Vec3 eyeUp = {0.f, 1.f, 0.f};
   const auto viewMatrix = Matrix3D::LookAt(eyePosition, eyeTarget, eyeUp);
-  auto modelMatrix = Matrix3D::MakeRotate({1, 0, 0}, info.xRotation);
-  modelMatrix.postRotate({0, 1, 0}, info.yRotation);
-  modelMatrix.postRotate({0, 0, 1}, info.zRotation);
+  auto modelMatrix = Matrix3D::MakeRotate({1.f, 0.f, 0.f}, info.xRotation);
+  modelMatrix.postRotate({0.f, 1.f, 0.f}, info.yRotation);
+  modelMatrix.postRotate({0.f, 0.f, 1.f}, info.zRotation);
   const auto transformMatrix = perspectiveMatrix * viewMatrix * modelMatrix;
-  const auto result = transformMatrix.mapRect(srcRect);
+  constexpr auto tempRect = Rect::MakeXYWH(-1.f, -1.f, 2.f, 2.f);
+  const auto ndcResult = transformMatrix.mapRect(tempRect);
+  const auto normalizedResult =
+      Rect::MakeXYWH((ndcResult.left + 1.f) * 0.5f, (ndcResult.top + 1.f) * 0.5f,
+                     ndcResult.width() * 0.5f, ndcResult.height() * 0.5f);
+  const auto result = Rect::MakeXYWH(
+      normalizedResult.left * srcRect.width(), normalizedResult.top * srcRect.height(),
+      normalizedResult.width() * srcRect.width(), normalizedResult.height() * srcRect.height());
   return result;
 }
 
