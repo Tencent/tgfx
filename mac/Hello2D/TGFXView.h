@@ -32,8 +32,9 @@
 @property(nonatomic) CVDisplayLinkRef cvDisplayLink;
 @property(nonatomic, strong) CADisplayLink* caDisplayLink;
 
-- (void)draw;
+- (bool)draw;
 - (void)startDisplayLink;
 - (void)stopDisplayLink;
+- (void)markDirty;
 
 @end

@@ -22,7 +22,7 @@
 #include <QQuickWindow>
 #include <QSGImageNode>
 #include <QThread>
-#include "drawers/Drawer.h"
+#include "hello2d/LayerBuilder.h"
 
 namespace hello2d {
 TGFXView::TGFXView(QQuickItem* parent) : QQuickItem(parent) {
@@ -86,12 +86,14 @@ void TGFXView::onSceneGraphInvalidated() {
 }
 
 void TGFXView::createAppHost() {
-  appHost = std::make_unique<drawers::AppHost>();
+  appHost = std::make_unique<hello2d::AppHost>();
   auto rootPath = QApplication::applicationDirPath();
   rootPath = QFileInfo(rootPath + "/../../").absolutePath();
   auto imagePath = rootPath + "/resources/assets/bridge.jpg";
   auto image = tgfx::Image::MakeFromFile(std::string(imagePath.toLocal8Bit()));
   appHost->addImage("bridge", image);
+  imagePath = rootPath + "/resources/assets/tgfx.png";
+  appHost->addImage("TGFX", tgfx::Image::MakeFromFile(std::string(imagePath.toLocal8Bit())));
 #ifdef __APPLE__
   auto defaultTypeface = tgfx::Typeface::MakeFromName("PingFang SC", "");
   auto emojiTypeface = tgfx::Typeface::MakeFromName("Apple Color Emoji", "");
@@ -103,35 +105,40 @@ void TGFXView::createAppHost() {
   appHost->addTypeface("default", defaultTypeface);
   appHost->addTypeface("emoji", emojiTypeface);
 }
+void TGFXView::markDirty() {
+  appHost->markDirty();
+}
 
-void TGFXView::draw() {
+bool TGFXView::draw() {
+  if (!appHost->isDirty()) {
+    return false;
+  }
+  appHost->resetDirty();
   auto device = tgfxWindow->getDevice();
   if (device == nullptr) {
-    return;
+    return true;
   }
   auto context = device->lockContext();
   if (context == nullptr) {
-    return;
+    return true;
   }
   auto surface = tgfxWindow->getSurface(context);
   if (surface == nullptr) {
     device->unlock();
-    return;
+    return true;
   }
   appHost->updateZoomAndOffset(
       zoom, tgfx::Point(static_cast<float>(offset.x()), static_cast<float>(offset.y())));
   auto canvas = surface->getCanvas();
   canvas->clear();
-  canvas->save();
-  auto numDrawers = drawers::Drawer::Count() - 1;
-  auto index = (currentDrawerIndex % numDrawers) + 1;
-  auto drawer = drawers::Drawer::GetByName("GridBackground");
-  drawer->draw(canvas, appHost.get());
-  drawer = drawers::Drawer::GetByIndex(index);
-  drawer->draw(canvas, appHost.get());
-  canvas->restore();
+  auto numBuilders = hello2d::LayerBuilder::Count();
+  auto index = (currentDrawerIndex % numBuilders);
+  bool isNeedBackground = true;
+  appHost->draw(canvas, index, isNeedBackground);
   context->flushAndSubmit();
   tgfxWindow->present(context);
   device->unlock();
+
+  return true;
 }
 }  // namespace hello2d

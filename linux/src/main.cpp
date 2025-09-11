@@ -18,7 +18,7 @@
 
 #include <filesystem>
 #include <fstream>
-#include "drawers/Drawer.h"
+#include "hello2d/LayerBuilder.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/opengl/GLDevice.h"
 #include "tgfx/platform/Print.h"
@@ -40,9 +40,11 @@ static void SaveFile(std::shared_ptr<tgfx::Data> data, const std::string& output
 
 int main() {
   auto rootPath = GetRootPath();
-  drawers::AppHost appHost(720, 720, 2.0f);
+  hello2d::AppHost appHost(720, 720, 2.0f);
   auto image = tgfx::Image::MakeFromFile(rootPath + "resources/assets/bridge.jpg");
   appHost.addImage("bridge", std::move(image));
+  auto image2 = tgfx::Image::MakeFromFile(rootPath + "resources/assets/tgfx.png");
+  appHost.addImage("TGFX", std::move(image2));
   auto typeface = tgfx::Typeface::MakeFromPath(rootPath + "resources/font/NotoSansSC-Regular.otf");
   appHost.addTypeface("default", std::move(typeface));
   typeface = tgfx::Typeface::MakeFromPath(rootPath + "resources/font/NotoColorEmoji.ttf");
@@ -60,11 +62,14 @@ int main() {
   }
   auto surface = tgfx::Surface::Make(context, appHost.width(), appHost.height());
   auto canvas = surface->getCanvas();
-  auto drawerNames = drawers::Drawer::Names();
-  for (auto& name : drawerNames) {
-    auto drawer = drawers::Drawer::GetByName(name);
+  auto builderNames = hello2d::LayerBuilder::Names();
+  auto index = 0;
+
+  for (auto& name : builderNames) {
     canvas->clear();
-    drawer->draw(canvas, &appHost);
+    bool isNeedBackground = true;
+    appHost.draw(canvas, index, isNeedBackground);
+
     tgfx::Bitmap bitmap = {};
     bitmap.allocPixels(surface->width(), surface->height());
     auto pixels = bitmap.lockPixels();
@@ -80,6 +85,7 @@ int main() {
       return -1;
     }
     SaveFile(data, "out/" + name + ".png");
+    index++;
   }
   device->unlock();
   tgfx::PrintLog("All images have been saved to the 'out/' directory");

@@ -17,20 +17,21 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TGFXView.h"
+#include <iostream>
 
 namespace hello2d {
 
 TGFXView::TGFXView(const std::string& canvasID) : TGFXBaseView(canvasID) {
-  // To utilize a custom typeface, you can load it directly into the browser and access it using
-  // tgfx::Typeface::MakeFromName().
-  auto typeface = tgfx::Typeface::MakeFromName("Arial", "Regular");
+}
+
+void TGFXView::registerFonts() {
+  auto typeface = tgfx::Typeface::MakeFromName("default", "Regular");
   if (typeface) {
     appHost->addTypeface("default", std::move(typeface));
   }
-  typeface = tgfx::Typeface::MakeFromName("Noto Color Emoji", "Regular");
+  typeface = tgfx::Typeface::MakeFromName("emoji", "Regular");
   if (typeface) {
     appHost->addTypeface("emoji", std::move(typeface));
   }
 }
-
 }  // namespace hello2d

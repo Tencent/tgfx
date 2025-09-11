@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "SimpleLayerTree.h"
+#include "base/LayerBuilders.h"
 #include "tgfx/layers/Gradient.h"
 #include "tgfx/layers/ImageLayer.h"
 #include "tgfx/layers/ShapeLayer.h"
@@ -24,7 +24,7 @@
 #include "tgfx/layers/TextLayer.h"
 #include "tgfx/layers/filters/DropShadowFilter.h"
 
-namespace drawers {
+namespace hello2d {
 
 static std::shared_ptr<tgfx::Layer> CreateProgressBar() {
   auto progressBar = tgfx::Layer::Make();
@@ -127,4 +127,4 @@ std::shared_ptr<tgfx::Layer> SimpleLayerTree::buildLayerTree(const AppHost* host
   root->addChild(progressBar);
   return root;
 }
-}  // namespace drawers
+}  // namespace hello2d

@@ -16,28 +16,36 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "base/Drawers.h"
+#include "base/LayerBuilders.h"
+#include "tgfx/layers/Gradient.h"
+#include "tgfx/layers/ShapeLayer.h"
 
-namespace drawers {
-void ImageWithMipmap::onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) {
+namespace hello2d {
+std::shared_ptr<tgfx::Layer> ConicGradient::buildLayerTree(const AppHost* host) {
+  auto root = tgfx::Layer::Make();
+  auto shapeLayer = tgfx::ShapeLayer::Make();
+
   auto scale = host->density();
+  padding = 75.f * scale;
   auto width = host->width();
   auto height = host->height();
-  auto screenSize = std::min(width, height);
-  auto size = screenSize - static_cast<int>(150 * scale);
+  auto size = std::min(width, height) - static_cast<int>(padding * 2);
   size = std::max(size, 50);
-  auto image = host->getImage("bridge");
-  if (image == nullptr) {
-    return;
-  }
-  image = image->makeMipmapped(true);
-  auto imageScale = static_cast<float>(size) / static_cast<float>(image->width());
-  auto matrix = tgfx::Matrix::MakeScale(imageScale);
-  matrix.postTranslate(static_cast<float>(width - size) / 2, static_cast<float>(height - size) / 2);
-  matrix.postScale(host->zoomScale(), host->zoomScale());
-  matrix.postTranslate(host->contentOffset().x, host->contentOffset().y);
-  canvas->concat(matrix);
-  tgfx::SamplingOptions sampling(tgfx::FilterMode::Linear, tgfx::MipmapMode::Linear);
-  canvas->drawImage(image, sampling);
+  tgfx::Color cyan = {0.0f, 1.0f, 1.0f, 1.0f};
+  tgfx::Color magenta = {1.0f, 0.0f, 1.0f, 1.0f};
+  tgfx::Color yellow = {1.0f, 1.0f, 0.0f, 1.0f};
+
+  auto conicGradient = tgfx::Gradient::MakeConic(tgfx::Point::Make(size / 2, size / 2), 0, 360,
+                                                 {cyan, magenta, yellow, cyan}, {});
+  auto rect = tgfx::Rect::MakeXYWH(0, 0, size, size);
+
+  tgfx::Path path = {};
+  path.addRoundRect(rect, 20 * scale, 20 * scale);
+  shapeLayer->setPath(path);
+  shapeLayer->setFillStyle(conicGradient);
+
+  root->addChild(shapeLayer);
+  return root;
 }
-}  // namespace drawers
+
+}  // namespace hello2d
