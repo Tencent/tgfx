@@ -39,7 +39,7 @@ void GLSLQuadPerEdgeAA3DGeometryProcessor::emitCode(EmitArgs& args) const {
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(position));
 
   if (aa == AAType::Coverage) {
-    auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
+    const auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
     vertBuilder->codeAppendf("%s = %s;", coverageVar.vsOut().c_str(), coverage.name().c_str());
     fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(),
                              coverageVar.fsIn().c_str());

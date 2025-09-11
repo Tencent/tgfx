@@ -22,7 +22,7 @@ namespace tgfx {
 
 QuadPerEdgeAA3DGeometryProcessor::QuadPerEdgeAA3DGeometryProcessor(AAType aa)
     : GeometryProcessor(ClassID()), aa(aa) {
-  position = {"aPosition", VertexFormat::Float3};
+  position = {"aPosition", VertexFormat::Float2};
   if (aa == AAType::Coverage) {
     coverage = {"inCoverage", VertexFormat::Float};
   }

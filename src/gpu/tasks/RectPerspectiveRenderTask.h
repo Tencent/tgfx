@@ -19,7 +19,9 @@
 #pragma once
 
 #include "gpu/AAType.h"
+#include "gpu/proxies/IndexBufferProxy.h"
 #include "gpu/proxies/RenderTargetProxy.h"
+#include "gpu/proxies/VertexBufferProxyView.h"
 #include "gpu/tasks/RenderTask.h"
 
 namespace tgfx {
@@ -27,10 +29,7 @@ namespace tgfx {
 class RectPerspectiveRenderTask final : public RenderTask {
  public:
   RectPerspectiveRenderTask(std::shared_ptr<RenderTargetProxy> renderTarget, const Rect& rect,
-                            AAType aa, std::shared_ptr<TextureProxy> fillTexture)
-      : renderTarget(std::move(renderTarget)), rect(rect), aa(aa),
-        fillTexture(std::move(fillTexture)) {
-  }
+                            AAType aa, std::shared_ptr<TextureProxy> fillTexture);
 
   void execute(CommandEncoder* encoder) override;
 
@@ -49,6 +48,9 @@ class RectPerspectiveRenderTask final : public RenderTask {
   Rect rect;
   AAType aa = AAType::None;
   std::shared_ptr<TextureProxy> fillTexture = nullptr;
+
+  std::shared_ptr<VertexBufferProxyView> vertexBufferProxyView = nullptr;
+  std::shared_ptr<IndexBufferProxy> indexBufferProxy = nullptr;
 };
 
 }  // namespace tgfx

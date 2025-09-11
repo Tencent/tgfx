@@ -26,9 +26,29 @@
 
 namespace tgfx {
 
+RectPerspectiveRenderTask::RectPerspectiveRenderTask(
+    std::shared_ptr<RenderTargetProxy> renderTarget, const Rect& rect, AAType aa,
+    std::shared_ptr<TextureProxy> fillTexture)
+    : renderTarget(std::move(renderTarget)), rect(rect), aa(aa),
+      fillTexture(std::move(fillTexture)) {
+  const auto drawingBuffer = this->renderTarget->getContext()->drawingBuffer();
+  if (drawingBuffer == nullptr) {
+    LOGE("RectPerspectiveRenderTask::execute() Drawing buffer is null!");
+    return;
+  }
+
+  auto vertexProvider = RectsVertexProvider::MakeFrom(drawingBuffer, rect, aa);
+  vertexBufferProxyView =
+      this->renderTarget->getContext()->proxyProvider()->createVertexBufferProxy(
+          std::move(vertexProvider));
+  if (aa == AAType::Coverage) {
+    indexBufferProxy = this->renderTarget->getContext()->globalCache()->getRectIndexBuffer(true);
+  }
+}
+
 void RectPerspectiveRenderTask::execute(CommandEncoder* encoder) {
-  if (fillTexture == nullptr) {
-    LOGE("RectPerspectiveRenderTask::execute() Fill texture is null!");
+  if (vertexBufferProxyView == nullptr || fillTexture == nullptr) {
+    LOGE("RectPerspectiveRenderTask::execute() Vertext buffer proxy view or fill texture is null!");
     return;
   }
   const auto rt = renderTarget->getRenderTarget();
@@ -66,19 +86,10 @@ void RectPerspectiveRenderTask::execute(CommandEncoder* encoder) {
   renderPass->setPipeline(program->getPipeline());
   programInfo.setUniformsAndSamplers(renderPass.get(), program.get());
 
-  auto vertexProvider = RectsVertexProvider::MakeFrom(drawingBuffer, rect, aa);
-  const auto vertexBufferProxyView =
-      renderTarget->getContext()->proxyProvider()->createVertexBufferProxy(
-          std::move(vertexProvider));
   const auto vertexBuffer = vertexBufferProxyView->getBuffer();
-  std::shared_ptr<IndexBuffer> indexBuffer = nullptr;
-  if (aa == AAType::Coverage) {
-    const auto indexBufferProxy =
-        renderTarget->getContext()->globalCache()->getRectIndexBuffer(true);
-    indexBuffer = indexBufferProxy->getBuffer();
-  }
-  renderPass->setVertexBuffer(vertexBuffer->gpuBuffer(), 0);
-  renderPass->setIndexBuffer(indexBuffer->gpuBuffer());
+  const auto indexBuffer = indexBufferProxy->getBuffer();
+  renderPass->setVertexBuffer(vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
+  renderPass->setIndexBuffer(indexBuffer ? indexBuffer->gpuBuffer() : nullptr);
 
   if (indexBuffer != nullptr) {
     const auto numIndicesPerQuad =
