@@ -21,9 +21,9 @@
 #include "tgfx/core/Clock.h"
 
 namespace tgfx::inspect {
-class FunctionTimer {
+class FunctionStat {
  public:
-  FunctionTimer(OpTaskType type, bool isActive) : active(isActive), type(type) {
+  FunctionStat(OpTaskType type, bool isActive) : active(isActive), type(type) {
     if (!active || !FrameCapture::GetInstance().isConnected()) {
       return;
     }
@@ -34,7 +34,7 @@ class FunctionTimer {
     FrameCapture::GetInstance().queueSerialFinish(item);
   }
 
-  ~FunctionTimer() {
+  ~FunctionStat() {
     if (!active || !FrameCapture::GetInstance().isConnected()) {
       return;
     }
@@ -45,13 +45,13 @@ class FunctionTimer {
     FrameCapture::GetInstance().queueSerialFinish(item);
   }
 
-  FunctionTimer(const FunctionTimer&) = delete;
+  FunctionStat(const FunctionStat&) = delete;
 
-  FunctionTimer(FunctionTimer&&) = delete;
+  FunctionStat(FunctionStat&&) = delete;
 
-  FunctionTimer& operator=(const FunctionTimer&) = delete;
+  FunctionStat& operator=(const FunctionStat&) = delete;
 
-  FunctionTimer& operator=(FunctionTimer&&) = delete;
+  FunctionStat& operator=(FunctionStat&&) = delete;
 
  private:
   bool active = false;
