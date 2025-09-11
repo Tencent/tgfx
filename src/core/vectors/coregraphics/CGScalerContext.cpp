@@ -337,6 +337,10 @@ Rect CGScalerContext::getImageTransform(GlyphID glyphID, bool fauxBold, const St
   bounds.roundOut();
   if (matrix) {
     matrix->setTranslate(bounds.left, bounds.top);
+    if (backingFont != nullptr) {
+      auto scale = textSize / getBackingSize();
+      matrix->postScale(scale, scale);
+    }
   }
   return bounds;
 }
