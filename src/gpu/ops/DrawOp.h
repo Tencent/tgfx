@@ -25,6 +25,8 @@
 namespace tgfx {
 class DrawOp {
  public:
+  enum class Type { RectDrawOp, RRectDrawOp, ShapeDrawOp, AtlasTextOp };
+
   virtual ~DrawOp() = default;
 
   void setScissorRect(const Rect& rect) {
@@ -60,8 +62,6 @@ class DrawOp {
   std::vector<PlacementPtr<FragmentProcessor>> coverages = {};
   PlacementPtr<XferProcessor> xferProcessor = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
-
-  enum class Type { RectDrawOp = 0, RRectDrawOp, ShapeDrawOp, AtlasTextOp };
 
   explicit DrawOp(AAType aaType) : aaType(aaType) {
   }

@@ -29,9 +29,9 @@ std::shared_ptr<FrameCaptureTexture> FrameCaptureTexture::MakeFrom(GPUTexture* t
                                                                    int height, size_t rowBytes,
                                                                    PixelFormat format,
                                                                    const void* pixels) {
-  const auto sz = static_cast<size_t>(height) * rowBytes;
-  auto imageBuffer = std::make_shared<Buffer>(sz);
-  imageBuffer->writeRange(0, sz, pixels);
+  const auto size = static_cast<size_t>(height) * rowBytes;
+  auto imageBuffer = std::make_shared<Buffer>(size);
+  imageBuffer->writeRange(0, size, pixels);
   return std::make_shared<FrameCaptureTexture>(texture, width, height, rowBytes, format, true,
                                                std::move(imageBuffer));
 }

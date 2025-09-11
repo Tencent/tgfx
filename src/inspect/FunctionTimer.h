@@ -24,25 +24,25 @@ namespace tgfx::inspect {
 class FunctionTimer {
  public:
   FunctionTimer(OpTaskType type, bool isActive) : active(isActive), type(type) {
-    if (!active || !FrameCapture::IsConnected()) {
+    if (!active || !FrameCapture::GetInstance().isConnected()) {
       return;
     }
     auto item = FrameCaptureMessageItem();
     item.hdr.type = FrameCaptureMessageType::OperateBegin;
     item.operateBegin.usTime = Clock::Now();
     item.operateBegin.type = static_cast<uint8_t>(type);
-    FrameCapture::QueueSerialFinish(item);
+    FrameCapture::GetInstance().queueSerialFinish(item);
   }
 
   ~FunctionTimer() {
-    if (!active || !FrameCapture::IsConnected()) {
+    if (!active || !FrameCapture::GetInstance().isConnected()) {
       return;
     }
     auto item = FrameCaptureMessageItem();
     item.hdr.type = FrameCaptureMessageType::OperateEnd;
     item.operateEnd.usTime = Clock::Now();
     item.operateEnd.type = static_cast<uint8_t>(type);
-    FrameCapture::QueueSerialFinish(item);
+    FrameCapture::GetInstance().queueSerialFinish(item);
   }
 
   FunctionTimer(const FunctionTimer&) = delete;

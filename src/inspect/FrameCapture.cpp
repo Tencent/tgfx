@@ -66,16 +66,16 @@ uint64_t FrameCapture::NextTextureID() {
   return id;
 }
 
-void FrameCapture::QueueSerialFinish(const FrameCaptureMessageItem& item) {
-  GetInstance().serialConcurrentQueue.enqueue(item);
+void FrameCapture::queueSerialFinish(const FrameCaptureMessageItem& item) {
+  serialConcurrentQueue.enqueue(item);
 }
 
-void FrameCapture::SendAttributeData(const char* name, const Rect& rect) {
+void FrameCapture::sendAttributeData(const char* name, const Rect& rect) {
   float value[4] = {rect.left, rect.right, rect.top, rect.bottom};
-  SendAttributeData(name, value, 4);
+  sendAttributeData(name, value, 4);
 }
 
-void FrameCapture::SendAttributeData(const char* name, const Matrix& matrix) {
+void FrameCapture::sendAttributeData(const char* name, const Matrix& matrix) {
   float value[6] = {1, 0, 0, 0, 1, 0};
   value[0] = matrix.getScaleX();
   value[1] = matrix.getSkewX();
@@ -83,110 +83,110 @@ void FrameCapture::SendAttributeData(const char* name, const Matrix& matrix) {
   value[3] = matrix.getSkewY();
   value[4] = matrix.getScaleY();
   value[5] = matrix.getTranslateY();
-  SendAttributeData(name, value, 6);
+  sendAttributeData(name, value, 6);
 }
 
-void FrameCapture::SendAttributeData(const char* name, const std::optional<Matrix>& matrix) {
+void FrameCapture::sendAttributeData(const char* name, const std::optional<Matrix>& matrix) {
   auto value = Matrix::MakeAll(1, 0, 0, 0, 1, 0);
   if (matrix.has_value()) {
     value = matrix.value();
   }
-  SendAttributeData(name, value);
+  sendAttributeData(name, value);
 }
 
-void FrameCapture::SendAttributeData(const char* name, const Color& color) {
+void FrameCapture::sendAttributeData(const char* name, const Color& color) {
   auto r = static_cast<uint8_t>(color.red * 255.f);
   auto g = static_cast<uint8_t>(color.green * 255.f);
   auto b = static_cast<uint8_t>(color.blue * 255.f);
   auto a = static_cast<uint8_t>(color.alpha * 255.f);
   auto value = static_cast<uint32_t>(r | g << 8 | b << 16 | a << 24);
-  SendAttributeData(name, value, FrameCaptureMessageType::ValueDataColor);
+  sendAttributeData(name, value, FrameCaptureMessageType::ValueDataColor);
 }
 
-void FrameCapture::SendAttributeData(const char* name, const std::optional<Color>& color) {
+void FrameCapture::sendAttributeData(const char* name, const std::optional<Color>& color) {
   auto value = Color::FromRGBA(255, 255, 255, 255);
   if (color.has_value()) {
     value = color.value();
   }
-  SendAttributeData(name, value);
+  sendAttributeData(name, value);
 }
 
-void FrameCapture::SendFrameMark(const char* name) {
-  if (!IsConnected()) {
+void FrameCapture::sendFrameMark(const char* name) {
+  if (!isConnected()) {
     return;
   }
   if (!name) {
-    GetInstance().frameCount.fetch_add(1, std::memory_order_relaxed);
+    frameCount.fetch_add(1, std::memory_order_relaxed);
   }
-  GetInstance().currentFrameShouldCaptrue.store(false, std::memory_order_relaxed);
-  if (GetInstance().captureFrameCount > 0) {
-    GetInstance().captureFrameCount--;
-    GetInstance().currentFrameShouldCaptrue.store(true, std::memory_order_relaxed);
+  _currentFrameShouldCaptrue.store(false, std::memory_order_relaxed);
+  if (captureFrameCount > 0) {
+    captureFrameCount--;
+    _currentFrameShouldCaptrue.store(true, std::memory_order_relaxed);
   }
   FrameCaptureMessageItem item = {};
   item.hdr.type = FrameCaptureMessageType::FrameMarkMessage;
-  item.frameMark.captured = CurrentFrameShouldCaptrue();
+  item.frameMark.captured = currentFrameShouldCaptrue();
   item.frameMark.usTime = Clock::Now();
-  QueueSerialFinish(item);
+  queueSerialFinish(item);
 }
 
-void FrameCapture::SendAttributeData(const char* name, int val) {
-  if (!IsConnected()) {
+void FrameCapture::sendAttributeData(const char* name, int val) {
+  if (!isConnected()) {
     return;
   }
   FrameCaptureMessageItem item = {};
   item.hdr.type = FrameCaptureMessageType::ValueDataInt;
   item.attributeDataInt.name = reinterpret_cast<uint64_t>(name);
   item.attributeDataInt.value = val;
-  QueueSerialFinish(item);
+  queueSerialFinish(item);
 }
 
-void FrameCapture::SendAttributeData(const char* name, float val) {
-  if (!IsConnected()) {
+void FrameCapture::sendAttributeData(const char* name, float val) {
+  if (!isConnected()) {
     return;
   }
   FrameCaptureMessageItem item = {};
   item.hdr.type = FrameCaptureMessageType::ValueDataFloat;
   item.attributeDataFloat.name = reinterpret_cast<uint64_t>(name);
   item.attributeDataFloat.value = val;
-  QueueSerialFinish(item);
+  queueSerialFinish(item);
 }
 
-void FrameCapture::SendAttributeData(const char* name, bool val) {
-  if (!IsConnected()) {
+void FrameCapture::sendAttributeData(const char* name, bool val) {
+  if (!isConnected()) {
     return;
   }
   FrameCaptureMessageItem item = {};
   item.hdr.type = FrameCaptureMessageType::ValueDataBool;
   item.attributeDataBool.name = reinterpret_cast<uint64_t>(name);
   item.attributeDataBool.value = val;
-  QueueSerialFinish(item);
+  queueSerialFinish(item);
 }
 
-void FrameCapture::SendAttributeData(const char* name, uint8_t val, uint8_t type) {
-  if (!IsConnected()) {
+void FrameCapture::sendAttributeData(const char* name, uint8_t val, uint8_t type) {
+  if (!isConnected()) {
     return;
   }
   FrameCaptureMessageItem item = {};
   item.hdr.type = FrameCaptureMessageType::ValueDataEnum;
   item.attributeDataEnum.name = reinterpret_cast<uint64_t>(name);
   item.attributeDataEnum.value = static_cast<uint16_t>(type << 8 | val);
-  QueueSerialFinish(item);
+  queueSerialFinish(item);
 }
 
-void FrameCapture::SendAttributeData(const char* name, uint32_t val, FrameCaptureMessageType type) {
-  if (!IsConnected()) {
+void FrameCapture::sendAttributeData(const char* name, uint32_t val, FrameCaptureMessageType type) {
+  if (!isConnected()) {
     return;
   }
   FrameCaptureMessageItem item = {};
   item.hdr.type = type;
   item.attributeDataUint32.name = reinterpret_cast<uint64_t>(name);
   item.attributeDataUint32.value = val;
-  QueueSerialFinish(item);
+  queueSerialFinish(item);
 }
 
-void FrameCapture::SendAttributeData(const char* name, float* val, int size) {
-  if (!IsConnected()) {
+void FrameCapture::sendAttributeData(const char* name, float* val, int size) {
+  if (!isConnected()) {
     return;
   }
   if (size == 4) {
@@ -194,40 +194,40 @@ void FrameCapture::SendAttributeData(const char* name, float* val, int size) {
     item.hdr.type = FrameCaptureMessageType::ValueDataFloat4;
     item.attributeDataFloat4.name = reinterpret_cast<uint64_t>(name);
     memcpy(item.attributeDataFloat4.value, val, static_cast<size_t>(size) * sizeof(float));
-    QueueSerialFinish(item);
+    queueSerialFinish(item);
   } else if (size == 6) {
     FrameCaptureMessageItem item = {};
     item.hdr.type = FrameCaptureMessageType::ValueDataMat3;
     item.attributeDataMat4.name = reinterpret_cast<uint64_t>(name);
     memcpy(item.attributeDataMat4.value, val, static_cast<size_t>(size) * sizeof(float));
-    QueueSerialFinish(item);
+    queueSerialFinish(item);
   }
 }
 
-void FrameCapture::SendTextureID(uint64_t textureId, FrameCaptureMessageType type) {
-  if (!IsConnected()) {
+void FrameCapture::sendTextureID(uint64_t textureId, FrameCaptureMessageType type) {
+  if (!isConnected()) {
     return;
   }
-  if (!CurrentFrameShouldCaptrue() || textureId == 0) {
+  if (!currentFrameShouldCaptrue() || textureId == 0) {
     return;
   }
   FrameCaptureMessageItem item = {};
   item.hdr.type = type;
   item.textureSampler.textureId = textureId;
-  QueueSerialFinish(item);
+  queueSerialFinish(item);
 }
 
-void FrameCapture::SendInputTextureID(uint64_t textureId) {
-  SendTextureID(textureId, FrameCaptureMessageType::InputTexture);
+void FrameCapture::sendInputTextureID(uint64_t textureId) {
+  sendTextureID(textureId, FrameCaptureMessageType::InputTexture);
 }
 
-void FrameCapture::SendOutputTextureID(uint64_t textureId) {
-  SendTextureID(textureId, FrameCaptureMessageType::OutputTexture);
+void FrameCapture::sendOutputTextureID(uint64_t textureId) {
+  sendTextureID(textureId, FrameCaptureMessageType::OutputTexture);
 }
 
-void FrameCapture::SendFrameCaptureTexture(
+void FrameCapture::sendFrameCaptureTexture(
     std::shared_ptr<FrameCaptureTexture> frameCaptureTexture) {
-  if (!IsConnected()) {
+  if (!isConnected()) {
     return;
   }
   if (frameCaptureTexture == nullptr) {
@@ -236,10 +236,22 @@ void FrameCapture::SendFrameCaptureTexture(
   GetInstance().imageQueue.enqueue(std::move(frameCaptureTexture));
 }
 
-void FrameCapture::SendFragmentProcessor(
+void FrameCapture::captureRenderTarget(const RenderTarget* renderTarget) {
+  if (currentFrameShouldCaptrue()) {
+    auto frameCaptureTexture = FrameCaptureTexture::MakeFrom(renderTarget);
+    uint64_t textureId = 0;
+    if (frameCaptureTexture != nullptr) {
+      textureId = frameCaptureTexture->textureId();
+      sendFrameCaptureTexture(std::move(frameCaptureTexture));
+    }
+    sendOutputTextureID(textureId);
+  }
+}
+
+void FrameCapture::sendFragmentProcessor(
     Context* context, const std::vector<PlacementPtr<FragmentProcessor>>& colors,
     const std::vector<PlacementPtr<FragmentProcessor>>& coverages) {
-  if (!IsConnected() || !CurrentFrameShouldCaptrue()) {
+  if (!isConnected() || !currentFrameShouldCaptrue()) {
     return;
   }
   std::vector<FragmentProcessor*> fragmentProcessors = {};
@@ -259,11 +271,11 @@ void FrameCapture::SendFragmentProcessor(
         uint64_t textureId = 0;
         if (frameCaptureTexture) {
           textureId = frameCaptureTexture->textureId();
-          SendFrameCaptureTexture(std::move(frameCaptureTexture));
+          sendFrameCaptureTexture(std::move(frameCaptureTexture));
         } else {
           textureId = FrameCaptureTexture::GetReadedTextureId(texture);
         }
-        SendInputTextureID(textureId);
+        sendInputTextureID(textureId);
       }
     }
   }
@@ -277,17 +289,12 @@ bool FrameCapture::ShouldExit() {
   return GetInstance().shutdown.load(std::memory_order_relaxed);
 }
 
-bool FrameCapture::CurrentFrameShouldCaptrue() {
-  return GetInstance().currentFrameShouldCaptrue.load(std::memory_order_relaxed);
+bool FrameCapture::currentFrameShouldCaptrue() {
+  return _currentFrameShouldCaptrue.load(std::memory_order_relaxed);
 }
 
-bool FrameCapture::IsConnected() {
-  return GetInstance().isConnect.load(std::memory_order_acquire);
-}
-
-uint64_t FrameCapture::GetTextureHash(uint64_t texturePtr, uint64_t currentFrame) {
-  uint64_t combined = texturePtr ^ currentFrame;
-  return std::hash<uint64_t>{}(combined);
+bool FrameCapture::isConnected() {
+  return isConnect.load(std::memory_order_acquire);
 }
 
 void FrameCapture::spawnWorkerThreads() {
@@ -491,7 +498,7 @@ void FrameCapture::encodeWorker() {
       item.textureData.format = frameCaputreTexture->format();
       item.textureData.pixels = reinterpret_cast<uint64_t>(pxielsBuffer);
       item.textureData.pixelsSize = size;
-      QueueSerialFinish(item);
+      queueSerialFinish(item);
     }
   }
 }
@@ -545,7 +552,7 @@ static bool IsEncodeImage(const uint8_t* data, size_t size) {
 }
 
 bool FrameCapture::sendData(const uint8_t* data, size_t len) {
-  if (len == 0) {
+  if (len == 0 || data == nullptr) {
     return true;
   }
   auto headSize = sizeof(bool) + sizeof(size_t);
@@ -591,21 +598,6 @@ bool FrameCapture::confirmProtocol() {
     return false;
   }
   return true;
-}
-
-uint64_t FrameCapture::getTextureId(uint64_t texturePtr) {
-  uint64_t textureId = texturePtr;
-  auto texturePtrToTextureIdIter = textureIds.find(GetTextureHash(texturePtr));
-  if (texturePtrToTextureIdIter != textureIds.end()) {
-    textureId = texturePtrToTextureIdIter->second;
-  } else {
-    auto currentFrame = GetInstance().frameCount.load(std::memory_order_relaxed) + 1;
-    texturePtrToTextureIdIter = textureIds.find(GetTextureHash(texturePtr, currentFrame));
-    if (texturePtrToTextureIdIter != textureIds.end()) {
-      textureId = texturePtrToTextureIdIter->second;
-    }
-  }
-  return textureId;
 }
 
 void FrameCapture::handleConnect(const WelcomeMessage& welcome) {

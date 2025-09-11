@@ -58,49 +58,50 @@ class FrameCapture {
 
   ~FrameCapture();
 
-  static bool CurrentFrameShouldCaptrue();
+  bool currentFrameShouldCaptrue();
 
-  static bool IsConnected();
+  bool isConnected();
 
   static uint64_t NextTextureID();
 
-  static void QueueSerialFinish(const FrameCaptureMessageItem& item);
+  void queueSerialFinish(const FrameCaptureMessageItem& item);
 
-  static void SendAttributeData(const char* name, const Rect& rect);
+  void sendAttributeData(const char* name, const Rect& rect);
 
-  static void SendAttributeData(const char* name, const Matrix& matrix);
+  void sendAttributeData(const char* name, const Matrix& matrix);
 
-  static void SendAttributeData(const char* name, const std::optional<Matrix>& matrix);
+  void sendAttributeData(const char* name, const std::optional<Matrix>& matrix);
 
-  static void SendAttributeData(const char* name, const Color& color);
+  void sendAttributeData(const char* name, const Color& color);
 
-  static void SendAttributeData(const char* name, const std::optional<Color>& color);
+  void sendAttributeData(const char* name, const std::optional<Color>& color);
 
-  static void SendFrameMark(const char* name);
+  void sendFrameMark(const char* name);
 
-  static void SendAttributeData(const char* name, int val);
+  void sendAttributeData(const char* name, int val);
 
-  static void SendAttributeData(const char* name, float val);
+  void sendAttributeData(const char* name, float val);
 
-  static void SendAttributeData(const char* name, bool val);
+  void sendAttributeData(const char* name, bool val);
 
-  static void SendAttributeData(const char* name, uint8_t val, uint8_t type);
+  void sendAttributeData(const char* name, uint8_t val, uint8_t type);
 
-  static void SendAttributeData(
-      const char* name, uint32_t val,
-      FrameCaptureMessageType type = FrameCaptureMessageType::ValueDataUint32);
+  void sendAttributeData(const char* name, uint32_t val,
+                         FrameCaptureMessageType type = FrameCaptureMessageType::ValueDataUint32);
 
-  static void SendAttributeData(const char* name, float* val, int size);
+  void sendAttributeData(const char* name, float* val, int size);
 
-  static void SendInputTextureID(uint64_t textureId);
+  void sendInputTextureID(uint64_t textureId);
 
-  static void SendOutputTextureID(uint64_t textureId);
+  void sendOutputTextureID(uint64_t textureId);
 
-  static void SendFragmentProcessor(Context* context,
-                                    const std::vector<PlacementPtr<FragmentProcessor>>& colors,
-                                    const std::vector<PlacementPtr<FragmentProcessor>>& coverages);
+  void sendFragmentProcessor(Context* context,
+                             const std::vector<PlacementPtr<FragmentProcessor>>& colors,
+                             const std::vector<PlacementPtr<FragmentProcessor>>& coverages);
 
-  static void SendFrameCaptureTexture(std::shared_ptr<FrameCaptureTexture> frameCaptureTexture);
+  void sendFrameCaptureTexture(std::shared_ptr<FrameCaptureTexture> frameCaptureTexture);
+
+  void captureRenderTarget(const RenderTarget* renderTarget);
 
  protected:
   enum class DequeueStatus { DataDequeued, ConnectionLost, QueueEmpty };
@@ -115,9 +116,7 @@ class FrameCapture {
 
   static bool ShouldExit();
 
-  static void SendTextureID(uint64_t texturePtr, FrameCaptureMessageType type);
-
-  static uint64_t GetTextureHash(uint64_t texturePtr, uint64_t currentFrame = 0);
+  void sendTextureID(uint64_t texturePtr, FrameCaptureMessageType type);
 
   void worker();
 
@@ -173,7 +172,6 @@ class FrameCapture {
   int dataBufferOffset = 0;
   int dataBufferStart = 0;
   uint32_t captureFrameCount = 0;
-  std::atomic<bool> currentFrameShouldCaptrue = false;
-  std::unordered_map<uint64_t, uint64_t> textureIds = {};
+  std::atomic<bool> _currentFrameShouldCaptrue = false;
 };
 }  // namespace tgfx::inspect

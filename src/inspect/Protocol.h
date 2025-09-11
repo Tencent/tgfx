@@ -19,6 +19,7 @@
 #pragma once
 
 #include <unordered_map>
+#include "gpu/ops/DrawOp.h"
 
 namespace tgfx::inspect {
 
@@ -100,11 +101,11 @@ enum class OpTaskType : uint8_t {
   OpTaskTypeSize,
 };
 
-static std::unordered_map<uint8_t, OpTaskType> DrawOpTypeToOpTaskType = {
-    {0, OpTaskType::RectDrawOp},
-    {1, OpTaskType::RRectDrawOp},
-    {2, OpTaskType::ShapeDrawOp},
-    {3, OpTaskType::AtlasTextOp},
+static std::unordered_map<DrawOp::Type, OpTaskType> DrawOpTypeToOpTaskType = {
+    {DrawOp::Type::RectDrawOp, OpTaskType::RectDrawOp},
+    {DrawOp::Type::RRectDrawOp, OpTaskType::RRectDrawOp},
+    {DrawOp::Type::ShapeDrawOp, OpTaskType::ShapeDrawOp},
+    {DrawOp::Type::AtlasTextOp, OpTaskType::AtlasTextOp},
 };
 
 enum class CustomEnumType : uint8_t {
