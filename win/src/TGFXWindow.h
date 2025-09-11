@@ -35,13 +35,13 @@
 
 namespace hello2d {
 class TGFXWindow {
-public:
+ public:
   TGFXWindow();
   virtual ~TGFXWindow();
 
   bool open();
 
-private:
+ private:
   HWND windowHandle = nullptr;
   int currentDrawerIndex = 0;
   float zoomScale = 1.0f;
