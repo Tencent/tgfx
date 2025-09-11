@@ -94,6 +94,12 @@ Rect Font::getBounds(GlyphID glyphID) const {
   return scalerContext->getBounds(glyphID, fauxBold, fauxItalic);
 }
 
+float Font::getLineHeight() const {
+  const auto& fontMetrics = scalerContext->getFontMetrics();
+  return std::fabs(fontMetrics.ascent) + std::fabs(fontMetrics.descent) +
+         std::fabs(fontMetrics.leading);
+}
+
 float Font::getAdvance(GlyphID glyphID, bool verticalText) const {
   if (glyphID == 0) {
     return 0;

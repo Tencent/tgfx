@@ -270,9 +270,7 @@ float TextLayer::getLineHeight(const std::shared_ptr<GlyphLine>& glyphLine) cons
 
   // For a blank line with only newline characters, use the font's ascent, descent, and leading as the line height.
   if (glyphLine->getGlyphCount() == 0) {
-    const auto fontMetrics = _font.getMetrics();
-    return std::fabs(fontMetrics.ascent) + std::fabs(fontMetrics.descent) +
-           std::fabs(fontMetrics.leading);
+    return _font.getLineHeight();
   }
 
   float lineHeight = 0.0f;
@@ -289,9 +287,7 @@ float TextLayer::getLineHeight(const std::shared_ptr<GlyphLine>& glyphLine) cons
     if (fontHeightMap.find(typefaceID) == fontHeightMap.end()) {
       auto font = _font;
       font.setTypeface(typeface);
-      const auto& fontMetrics = font.getMetrics();
-      fontHeightMap[typefaceID] = std::fabs(fontMetrics.ascent) + std::fabs(fontMetrics.descent) +
-                                  std::fabs(fontMetrics.leading);
+      fontHeightMap[typefaceID] = font.getLineHeight();
     }
 
     lineHeight = std::max(lineHeight, fontHeightMap[typefaceID]);

@@ -128,6 +128,16 @@ class Font {
   Rect getBounds(GlyphID glyphID) const;
 
   /**
+   * Returns the line height of this font.
+   *
+   * The line height is the recommended distance between the baselines
+   * of consecutive lines of text. It is usually defined as:
+   * 
+   *   ascent + descent + leading
+   */
+  float getLineHeight() const;
+
+  /**
    * Returns the advance for specified glyph.
    * @param glyphID The id of specified glyph.
    * @param verticalText The intended drawing orientation of the glyph. Please note that it is not
