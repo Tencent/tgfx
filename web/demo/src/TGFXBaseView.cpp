@@ -60,7 +60,7 @@ void TGFXBaseView::onClickEvent() {
 
 bool TGFXBaseView::draw(int drawIndex, float zoom, float offsetX, float offsetY) {
   if (!appHost->isDirty()) {
-    return true;
+    return false;
   }
   appHost->resetDirty();
 

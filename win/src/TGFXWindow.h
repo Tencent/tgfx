@@ -28,26 +28,27 @@
 #include <functional>
 #include <memory>
 #include <string>
-#include "drawers/Drawer.h"
+#include "hello2d/AppHost.h"
+#include "hello2d/LayerBuilder.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/gpu/opengl/wgl/WGLWindow.h"
 
 namespace hello2d {
 class TGFXWindow {
- public:
+public:
   TGFXWindow();
   virtual ~TGFXWindow();
 
   bool open();
 
- private:
+private:
   HWND windowHandle = nullptr;
   int currentDrawerIndex = 0;
   float zoomScale = 1.0f;
   double lastZoomArgument = 0.0;
   tgfx::Point contentOffset = {0.0f, 0.0f};
   std::shared_ptr<tgfx::WGLWindow> tgfxWindow = nullptr;
-  std::shared_ptr<drawers::AppHost> appHost = nullptr;
+  std::shared_ptr<hello2d::AppHost> appHost = nullptr;
 
   static WNDCLASS RegisterWindowClass();
   static LRESULT CALLBACK WndProc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) noexcept;

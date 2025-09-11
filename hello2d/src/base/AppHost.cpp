@@ -117,7 +117,7 @@ void AppHost::draw(tgfx::Canvas* canvas, int drawIndex,bool isNeedBackground ) c
     return;
   }
   canvas->clear();
-
+  
   if(isNeedBackground){
     LayerBuilder::DrawBackground(canvas, this);
   }
