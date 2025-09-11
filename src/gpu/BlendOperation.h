@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,21 +16,42 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLSLVertexShaderBuilder.h"
-#include "gpu/glsl/GLSLProgramBuilder.h"
+#pragma once
 
 namespace tgfx {
-GLSLVertexShaderBuilder::GLSLVertexShaderBuilder(ProgramBuilder* program)
-    : VertexShaderBuilder(program) {
-  auto glProgram = static_cast<GLSLProgramBuilder*>(program);
-  auto shaderCaps = glProgram->getContext()->caps()->shaderCaps();
-  if (shaderCaps->usesPrecisionModifiers) {
-    setPrecisionQualifier("precision mediump float;");
-  }
-}
+/**
+ * BlendOperation defines how each pixel's source fragment values are combined and weighted with the
+ * destination values.
+ */
+enum class BlendOperation {
+  /**
+   * Add portions of both source and destination pixel values:
+   * Cs*S + Cd*D.
+   */
+  Add,
 
-void GLSLVertexShaderBuilder::emitNormalizedPosition(const std::string& devPos) {
-  codeAppendf("gl_Position = vec4(%s.xy * %s.xz + %s.yw, 0, 1);", devPos.c_str(),
-              RTAdjustName.c_str(), RTAdjustName.c_str());
-}
+  /**
+   * Subtract a portion of the destination pixel values from a portion of the source:
+   * Cs*S - Cd*D.
+   */
+  Subtract,
+
+  /**
+   * Subtract a portion of the source values from a portion of the destination pixel values:
+   * Cd*D - Cs*S.
+   */
+  ReverseSubtract,
+
+  /**
+   * Take the minimum of the source and destination pixel values:
+   * min(Cs*S, Cd*D).
+   */
+  Min,
+
+  /**
+   * Take the maximum of the source and destination pixel values:
+   * max(Cs*S, Cd*D).
+   */
+  Max
+};
 }  // namespace tgfx

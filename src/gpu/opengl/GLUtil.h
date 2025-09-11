@@ -38,11 +38,6 @@ unsigned PixelFormatToGLSizeFormat(PixelFormat pixelFormat);
 
 GLVersion GetGLVersion(const char* versionString);
 
-unsigned CreateGLProgram(const GLFunctions* gl, const std::string& vertex,
-                         const std::string& fragment);
-
-unsigned LoadGLShader(const GLFunctions* gl, unsigned shaderType, const std::string& source);
-
 void ClearGLError(const GLFunctions* gl);
 
 bool CheckGLErrorImpl(const GLFunctions* gl, std::string file, int line);

@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLXfermodeFragmentProcessor.h"
-#include "gpu/opengl/GLBlend.h"
+#include "gpu/glsl/GLSLBlend.h"
 #include "gpu/processors/ConstColorProcessor.h"
 
 namespace tgfx {

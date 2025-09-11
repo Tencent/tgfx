@@ -18,7 +18,6 @@
 
 #include "GLSLFragmentShaderBuilder.h"
 #include "gpu/glsl/GLSLProgramBuilder.h"
-#include "gpu/opengl/GLCaps.h"
 
 namespace tgfx {
 static constexpr char DstColorName[] = "_dstColor";
@@ -26,23 +25,26 @@ static constexpr char DstColorName[] = "_dstColor";
 GLSLFragmentShaderBuilder::GLSLFragmentShaderBuilder(ProgramBuilder* program)
     : FragmentShaderBuilder(program) {
   auto glProgram = static_cast<GLSLProgramBuilder*>(program);
-  if (glProgram->getContext()->caps()->usesPrecisionModifiers) {
+  auto shaderCaps = glProgram->getContext()->caps()->shaderCaps();
+  if (shaderCaps->usesPrecisionModifiers) {
     setPrecisionQualifier("precision mediump float;");
   }
 }
 
 std::string GLSLFragmentShaderBuilder::dstColor() {
-  const auto caps = GLCaps::Get(programBuilder->getContext());
-  if (caps->frameBufferFetchSupport) {
-    addFeature(PrivateFeature::FramebufferFetch, caps->frameBufferFetchExtensionString);
-    const bool isLegacyES = static_cast<GLSLProgramBuilder*>(programBuilder)->isLegacyES();
-    return isLegacyES ? caps->frameBufferFetchColorName : CustomColorOutputName();
+  auto shaderCaps = programBuilder->getContext()->caps()->shaderCaps();
+  if (shaderCaps->frameBufferFetchSupport) {
+    addFeature(PrivateFeature::FramebufferFetch, shaderCaps->frameBufferFetchExtensionString);
+    if (shaderCaps->frameBufferFetchNeedsCustomOutput) {
+      return CUSTOM_COLOR_OUTPUT_NAME;
+    }
+    return shaderCaps->frameBufferFetchColorName;
   }
   return DstColorName;
 }
 
 std::string GLSLFragmentShaderBuilder::colorOutputName() {
-  return static_cast<GLSLProgramBuilder*>(programBuilder)->isLegacyES() ? "gl_FragColor"
-                                                                        : CustomColorOutputName();
+  auto shaderCaps = programBuilder->getContext()->caps()->shaderCaps();
+  return shaderCaps->usesCustomColorOutputName ? CUSTOM_COLOR_OUTPUT_NAME : "gl_FragColor";
 }
 }  // namespace tgfx

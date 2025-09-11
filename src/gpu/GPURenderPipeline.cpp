@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,21 +16,15 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLSLVertexShaderBuilder.h"
-#include "gpu/glsl/GLSLProgramBuilder.h"
+#include "GPURenderPipeline.h"
 
 namespace tgfx {
-GLSLVertexShaderBuilder::GLSLVertexShaderBuilder(ProgramBuilder* program)
-    : VertexShaderBuilder(program) {
-  auto glProgram = static_cast<GLSLProgramBuilder*>(program);
-  auto shaderCaps = glProgram->getContext()->caps()->shaderCaps();
-  if (shaderCaps->usesPrecisionModifiers) {
-    setPrecisionQualifier("precision mediump float;");
+VertexDescriptor::VertexDescriptor(std::vector<Attribute> attribs, size_t stride)
+    : attributes(std::move(attribs)), vertexStride(stride) {
+  if (vertexStride == 0) {
+    for (auto& attribute : attributes) {
+      vertexStride += attribute.size();
+    }
   }
-}
-
-void GLSLVertexShaderBuilder::emitNormalizedPosition(const std::string& devPos) {
-  codeAppendf("gl_Position = vec4(%s.xy * %s.xz + %s.yw, 0, 1);", devPos.c_str(),
-              RTAdjustName.c_str(), RTAdjustName.c_str());
 }
 }  // namespace tgfx
