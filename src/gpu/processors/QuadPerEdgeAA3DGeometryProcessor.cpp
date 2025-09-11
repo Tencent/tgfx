@@ -20,8 +20,11 @@
 
 namespace tgfx {
 
-QuadPerEdgeAA3DGeometryProcessor::QuadPerEdgeAA3DGeometryProcessor(AAType aa)
-    : GeometryProcessor(ClassID()), aa(aa) {
+QuadPerEdgeAA3DGeometryProcessor::QuadPerEdgeAA3DGeometryProcessor(AAType aa,
+                                                                   const Matrix3D& transfromMatrix,
+                                                                   const Matrix& adjustMatrix)
+    : GeometryProcessor(ClassID()), aa(aa), transfromMatrix(transfromMatrix),
+      adjustMatrix(adjustMatrix) {
   position = {"aPosition", VertexFormat::Float2};
   if (aa == AAType::Coverage) {
     coverage = {"inCoverage", VertexFormat::Float};

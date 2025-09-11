@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "core/Matrix3D.h"
 #include "gpu/AAType.h"
 #include "gpu/proxies/IndexBufferProxy.h"
 #include "gpu/proxies/RenderTargetProxy.h"
@@ -29,7 +30,8 @@ namespace tgfx {
 class RectPerspectiveRenderTask final : public RenderTask {
  public:
   RectPerspectiveRenderTask(std::shared_ptr<RenderTargetProxy> renderTarget, const Rect& rect,
-                            AAType aa, std::shared_ptr<TextureProxy> fillTexture);
+                            AAType aa, std::shared_ptr<TextureProxy> fillTexture,
+                            const Matrix3D& transformMatrix);
 
   void execute(CommandEncoder* encoder) override;
 
@@ -48,6 +50,7 @@ class RectPerspectiveRenderTask final : public RenderTask {
   Rect rect;
   AAType aa = AAType::None;
   std::shared_ptr<TextureProxy> fillTexture = nullptr;
+  Matrix3D transformMatrix;
 
   std::shared_ptr<VertexBufferProxyView> vertexBufferProxyView = nullptr;
   std::shared_ptr<IndexBufferProxy> indexBufferProxy = nullptr;

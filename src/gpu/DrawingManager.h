@@ -20,6 +20,7 @@
 
 #include <map>
 #include <vector>
+#include "core/Matrix3D.h"
 #include "gpu/OpsCompositor.h"
 #include "gpu/resources/Semaphore.h"
 #include "gpu/tasks/OpsRenderTask.h"
@@ -72,7 +73,8 @@ class DrawingManager {
 
   void addRectPerspectiveRenderTask(const Rect& rect, AAType aa,
                                     std::shared_ptr<RenderTargetProxy> renderTarget,
-                                    std::shared_ptr<TextureProxy> fillTexture);
+                                    std::shared_ptr<TextureProxy> fillTexture,
+                                    const Matrix3D& transformMatrix);
 
   /**
    * Flushes the drawing manager, executing all resource and render tasks. If signalSemaphore is not

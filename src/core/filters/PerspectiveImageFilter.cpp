@@ -27,31 +27,32 @@
 
 namespace tgfx {
 
-#define FOV_Y_DEGRESS 45.0f
-#define NEAR_Z 1.0f
-#define FAR_Z 1000.0f
+#define FOV_Y_DEGRESS 45.f
+#define NORMAL_NEAR_Z 0.25f
+#define NORMAL_FAR_Z 1000.f
+
+static constexpr Vec3 eyeTarget = {0.f, 0.f, 0.f};
+static constexpr Vec3 eyeUp = {0.f, 1.f, 0.f};
 
 std::shared_ptr<ImageFilter> ImageFilter::Perspective(const PerspectiveInfo& perspective) {
   return std::make_shared<PerspectiveImageFilter>(perspective);
 }
 
 PerspectiveImageFilter::PerspectiveImageFilter(const PerspectiveInfo& info) : info(info) {
+  auto perspectiveMatrix = Matrix3D::Perspective(FOV_Y_DEGRESS, 1.f, NORMAL_NEAR_Z, NORMAL_FAR_Z);
+  const Vec3 eyePosition = {0.f, 0.f, 1.f / tanf(DegreesToRadians(FOV_Y_DEGRESS * 0.5f))};
+  const auto viewMatrix = Matrix3D::LookAt(eyePosition, eyeTarget, eyeUp);
+  modelMatrix = Matrix3D::MakeRotate({1.f, 0.f, 0.f}, info.xRotation);
+  modelMatrix.postRotate({0.f, 1.f, 0.f}, info.yRotation);
+  modelMatrix.postRotate({0.f, 0.f, 1.f}, info.zRotation);
+  normalTransformMatrix = perspectiveMatrix * viewMatrix * modelMatrix;
 }
 
 Rect PerspectiveImageFilter::onFilterBounds(const Rect& srcRect) const {
   //TODO: RichardJieChen
   DEBUG_ASSERT(srcRect.left == 0.f && srcRect.top == 0.f);
-  const auto perspectiveMatrix = Matrix3D::Perspective(FOV_Y_DEGRESS, 1.f, NEAR_Z, FAR_Z);
-  const Vec3 eyePosition = {0.f, 0.f, 1.f / tanf(DegreesToRadians(FOV_Y_DEGRESS * 0.5f))};
-  constexpr Vec3 eyeTarget = {0.f, 0.f, 0.f};
-  constexpr Vec3 eyeUp = {0.f, 1.f, 0.f};
-  const auto viewMatrix = Matrix3D::LookAt(eyePosition, eyeTarget, eyeUp);
-  auto modelMatrix = Matrix3D::MakeRotate({1.f, 0.f, 0.f}, info.xRotation);
-  modelMatrix.postRotate({0.f, 1.f, 0.f}, info.yRotation);
-  modelMatrix.postRotate({0.f, 0.f, 1.f}, info.zRotation);
-  const auto transformMatrix = perspectiveMatrix * viewMatrix * modelMatrix;
   constexpr auto tempRect = Rect::MakeXYWH(-1.f, -1.f, 2.f, 2.f);
-  const auto ndcResult = transformMatrix.mapRect(tempRect);
+  const auto ndcResult = normalTransformMatrix.mapRect(tempRect);
   const auto normalizedResult =
       Rect::MakeXYWH((ndcResult.left + 1.f) * 0.5f, (ndcResult.top + 1.f) * 0.5f,
                      ndcResult.width() * 0.5f, ndcResult.height() * 0.5f);
@@ -63,13 +64,28 @@ Rect PerspectiveImageFilter::onFilterBounds(const Rect& srcRect) const {
 
 std::shared_ptr<TextureProxy> PerspectiveImageFilter::lockTextureProxy(
     std::shared_ptr<Image> source, const Rect& renderBounds, const TPArgs& args) const {
+  const auto sourceW = static_cast<float>(source->width());
+  const auto sourceH = static_cast<float>(source->height());
+  const auto srcRect = Rect::MakeXYWH(-sourceW * 0.5f, -sourceH * 0.5f, sourceW, sourceH);
+
   const auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(renderBounds.width()), static_cast<int>(renderBounds.height()),
       source->isAlphaOnly(), 1, args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
+
   const auto sourceTextureProxy = source->lockTextureProxy(args);
+
+  const float eyePositionZ =
+      renderBounds.height() * 0.5f / tanf(DegreesToRadians(FOV_Y_DEGRESS * 0.5f));
+  const Vec3 eyePosition = {0.f, 0.f, eyePositionZ};
+  const auto viewMatrix = Matrix3D::LookAt(eyePosition, eyeTarget, eyeUp);
+  const float nearZ = std::min(NORMAL_NEAR_Z, eyePositionZ * 0.1f);
+  const float farZ = std::max(NORMAL_FAR_Z, eyePositionZ * 10.f);
+  const auto perspectiveMatrix = Matrix3D::Perspective(FOV_Y_DEGRESS, 1.f, nearZ, farZ);
+  const auto transformMatrix = perspectiveMatrix * viewMatrix * modelMatrix;
+
   const auto drawingManager = args.context->drawingManager();
-  drawingManager->addRectPerspectiveRenderTask(renderBounds, AAType::Coverage, renderTarget,
-                                               sourceTextureProxy);
+  drawingManager->addRectPerspectiveRenderTask(srcRect, AAType::Coverage, renderTarget,
+                                               sourceTextureProxy, transformMatrix);
   return renderTarget->asTextureProxy();
 }
 

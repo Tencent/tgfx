@@ -189,9 +189,10 @@ void DrawingManager::addSemaphoreWaitTask(std::shared_ptr<Semaphore> semaphore) 
 
 void DrawingManager::addRectPerspectiveRenderTask(const Rect& rect, AAType aa,
                                                   std::shared_ptr<RenderTargetProxy> renderTarget,
-                                                  std::shared_ptr<TextureProxy> fillTexture) {
-  auto task = drawingBuffer->make<RectPerspectiveRenderTask>(std::move(renderTarget), rect, aa,
-                                                             std::move(fillTexture));
+                                                  std::shared_ptr<TextureProxy> fillTexture,
+                                                  const Matrix3D& transformMatrix) {
+  auto task = drawingBuffer->make<RectPerspectiveRenderTask>(
+      std::move(renderTarget), rect, aa, std::move(fillTexture), transformMatrix);
   renderTasks.emplace_back(std::move(task));
 }
 

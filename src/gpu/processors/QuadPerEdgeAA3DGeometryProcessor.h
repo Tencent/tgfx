@@ -19,13 +19,16 @@
 #pragma once
 
 #include "GeometryProcessor.h"
+#include "core/Matrix3D.h"
 #include "gpu/AAType.h"
 
 namespace tgfx {
 
 class QuadPerEdgeAA3DGeometryProcessor : public GeometryProcessor {
  public:
-  static PlacementPtr<QuadPerEdgeAA3DGeometryProcessor> Make(BlockBuffer* buffer, AAType aa);
+  static PlacementPtr<QuadPerEdgeAA3DGeometryProcessor> Make(BlockBuffer* buffer, AAType aa,
+                                                             const Matrix3D& transformMatrix,
+                                                             const Matrix& adjustMatrix);
 
   std::string name() const override {
     return "QuadPerEdgeAA3DGeometryProcessor";
@@ -34,14 +37,20 @@ class QuadPerEdgeAA3DGeometryProcessor : public GeometryProcessor {
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  explicit QuadPerEdgeAA3DGeometryProcessor(AAType aa);
+  explicit QuadPerEdgeAA3DGeometryProcessor(AAType aa, const Matrix3D& transfromMatrix,
+                                            const Matrix& adjustMatrix);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
   Attribute position;
+
   Attribute coverage;
 
   AAType aa = AAType::None;
+
+  Matrix3D transfromMatrix;
+
+  Matrix adjustMatrix;
 };
 
 }  // namespace tgfx

@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "core/Matrix3D.h"
 #include "tgfx/core/ImageFilter.h"
 
 namespace tgfx {
@@ -44,6 +45,10 @@ class PerspectiveImageFilter final : public ImageFilter {
                                                       const Matrix* uvMatrix) const override;
 
   PerspectiveInfo info = {};
+
+  Matrix3D modelMatrix;
+
+  Matrix3D normalTransformMatrix;
 };
 
 }  // namespace tgfx

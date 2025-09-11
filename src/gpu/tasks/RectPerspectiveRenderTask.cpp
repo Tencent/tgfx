@@ -28,9 +28,9 @@ namespace tgfx {
 
 RectPerspectiveRenderTask::RectPerspectiveRenderTask(
     std::shared_ptr<RenderTargetProxy> renderTarget, const Rect& rect, AAType aa,
-    std::shared_ptr<TextureProxy> fillTexture)
+    std::shared_ptr<TextureProxy> fillTexture, const Matrix3D& transformMatrix)
     : renderTarget(std::move(renderTarget)), rect(rect), aa(aa),
-      fillTexture(std::move(fillTexture)) {
+      fillTexture(std::move(fillTexture)), transformMatrix(transformMatrix) {
   const auto drawingBuffer = this->renderTarget->getContext()->drawingBuffer();
   if (drawingBuffer == nullptr) {
     LOGE("RectPerspectiveRenderTask::execute() Drawing buffer is null!");
@@ -71,7 +71,8 @@ void RectPerspectiveRenderTask::execute(CommandEncoder* encoder) {
     return;
   }
 
-  const auto geometryProcessor = QuadPerEdgeAA3DGeometryProcessor::Make(drawingBuffer, aa);
+  const auto geometryProcessor =
+      QuadPerEdgeAA3DGeometryProcessor::Make(drawingBuffer, aa, transformMatrix, {});
   const SamplingArgs samplingArgs = {TileMode::Decal, TileMode::Decal, {}, SrcRectConstraint::Fast};
   const auto fragmentProcessor = TextureEffect::Make(fillTexture, samplingArgs);
   const ProgramInfo programInfo((rt.get()), geometryProcessor.get(), {fragmentProcessor.get()}, 1,
@@ -87,7 +88,7 @@ void RectPerspectiveRenderTask::execute(CommandEncoder* encoder) {
   programInfo.setUniformsAndSamplers(renderPass.get(), program.get());
 
   const auto vertexBuffer = vertexBufferProxyView->getBuffer();
-  const auto indexBuffer = indexBufferProxy->getBuffer();
+  const auto indexBuffer = indexBufferProxy ? indexBufferProxy->getBuffer() : nullptr;
   renderPass->setVertexBuffer(vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
   renderPass->setIndexBuffer(indexBuffer ? indexBuffer->gpuBuffer() : nullptr);
 
