@@ -20,9 +20,8 @@
 
   BUILD_DIR=build
 
-  if [ ! -d "./${BUILD_DIR}" ]; then
-    mkdir ${BUILD_DIR}
-  fi
+  rm -rf ${BUILD_DIR}
+  mkdir ${BUILD_DIR}
   cd ${BUILD_DIR}
 
   if [ -f "./CMakeCache.txt" ]; then
@@ -72,4 +71,5 @@
     cp -r test/out result
     exit 1
   fi
+  rm -rf ${BUILD_DIR}
 }
