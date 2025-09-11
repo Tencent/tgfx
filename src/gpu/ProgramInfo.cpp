@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ProgramInfo.h"
+#include "gpu/BlendFormula.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProgramBuilder.h"
 #include "gpu/resources/RenderTarget.h"
@@ -58,13 +59,25 @@ const Swizzle& ProgramInfo::getOutputSwizzle() const {
   return context->caps()->getWriteSwizzle(renderTarget->format());
 }
 
-std::unique_ptr<BlendFormula> ProgramInfo::getBlendFormula() const {
-  if (xferProcessor != nullptr) {
-    return nullptr;
+PipelineColorAttachment ProgramInfo::getPipelineColorAttachment() const {
+  PipelineColorAttachment colorAttachment = {};
+  colorAttachment.format = renderTarget->format();
+  if (xferProcessor != nullptr || blendMode == BlendMode::Src) {
+    return colorAttachment;
   }
-  auto blendFormula = std::make_unique<BlendFormula>();
-  BlendModeAsCoeff(blendMode, numColorProcessors < fragmentProcessors.size(), blendFormula.get());
-  return blendFormula;
+  BlendFormula blendFormula = {};
+  if (!BlendModeAsCoeff(blendMode, numColorProcessors < fragmentProcessors.size(), &blendFormula)) {
+    return colorAttachment;
+  }
+  colorAttachment.blendEnable = true;
+  colorAttachment.srcColorBlendFactor = blendFormula.srcFactor();
+  colorAttachment.dstColorBlendFactor = blendFormula.dstFactor();
+  colorAttachment.colorBlendOp = blendFormula.operation();
+  colorAttachment.srcAlphaBlendFactor = blendFormula.srcFactor();
+  colorAttachment.dstAlphaBlendFactor = blendFormula.dstFactor();
+  colorAttachment.alphaBlendOp = blendFormula.operation();
+  colorAttachment.colorWriteMask = ColorWriteMask::All;
+  return colorAttachment;
 }
 
 static std::array<float, 4> GetRTAdjustArray(const RenderTarget* renderTarget) {
@@ -162,21 +175,22 @@ void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, PipelineProgram
   updateUniformBufferSuffix(vertexUniformBuffer, fragmentUniformBuffer, nullptr);
 
   if (vertexUniformBuffer != nullptr) {
-    renderPass->setUniformBytes(0, vertexUniformBuffer->data(), vertexUniformBuffer->size());
+    renderPass->setUniformBytes(VERTEX_UBO_BINDING_POINT, vertexUniformBuffer->data(),
+                                vertexUniformBuffer->size());
   }
-
   if (fragmentUniformBuffer != nullptr) {
-    renderPass->setUniformBytes(1, fragmentUniformBuffer->data(), fragmentUniformBuffer->size());
+    renderPass->setUniformBytes(FRAGMENT_UBO_BINDING_POINT, fragmentUniformBuffer->data(),
+                                fragmentUniformBuffer->size());
   }
 
   auto samplers = getSamplers();
-  unsigned textureIndex = 0;
+  unsigned textureBinding = TEXTURE_BINDING_POINT_START;
   auto gpu = renderTarget->getContext()->gpu();
   for (auto& [texture, state] : samplers) {
     GPUSamplerDescriptor descriptor(ToAddressMode(state.tileModeX), ToAddressMode(state.tileModeY),
                                     state.filterMode, state.filterMode, state.mipmapMode);
     auto sampler = gpu->createSampler(descriptor);
-    renderPass->setTexture(textureIndex++, texture, sampler.get());
+    renderPass->setTexture(textureBinding++, texture, sampler.get());
   }
 }
 

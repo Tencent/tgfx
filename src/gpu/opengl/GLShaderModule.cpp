@@ -16,22 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-#include <string>
-#include <vector>
-#include "Uniform.h"
+#include "GLShaderModule.h"
+#include "core/utils/Log.h"
+#include "gpu/opengl/GLGPU.h"
 
 namespace tgfx {
-class UniformLayout final {
- public:
-  UniformLayout(std::vector<std::string> uniformBlockNames, std::vector<Uniform> vertexUniforms,
-                std::vector<Uniform> fragmentUniforms)
-      : uniformBlockNames(std::move(uniformBlockNames)), vertexUniforms(std::move(vertexUniforms)),
-        fragmentUniforms(std::move(fragmentUniforms)) {
+void GLShaderModule::release(GPU* gpu) {
+  DEBUG_ASSERT(gpu != nullptr);
+  if (_shader > 0) {
+    auto gl = static_cast<const GLGPU*>(gpu)->functions();
+    gl->deleteShader(_shader);
+    _shader = 0;
   }
+}
 
-  std::vector<std::string> uniformBlockNames = {};
-  std::vector<Uniform> vertexUniforms = {};
-  std::vector<Uniform> fragmentUniforms = {};
-};
 }  // namespace tgfx

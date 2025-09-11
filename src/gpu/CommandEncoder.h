@@ -22,7 +22,6 @@
 #include "gpu/GPUFence.h"
 #include "gpu/GPUTexture.h"
 #include "gpu/RenderPass.h"
-#include "gpu/RenderPassDescriptor.h"
 
 namespace tgfx {
 /**

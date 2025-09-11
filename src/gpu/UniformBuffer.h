@@ -26,8 +26,11 @@
 #include "tgfx/core/Matrix.h"
 
 namespace tgfx {
-static const std::string VertexUniformBlockName = "VertexUniformBlock";
-static const std::string FragmentUniformBlockName = "FragmentUniformBlock";
+static constexpr char VertexUniformBlockName[] = "VertexUniformBlock";
+static constexpr char FragmentUniformBlockName[] = "FragmentUniformBlock";
+static constexpr int VERTEX_UBO_BINDING_POINT = 0;
+static constexpr int FRAGMENT_UBO_BINDING_POINT = 1;
+static constexpr int TEXTURE_BINDING_POINT_START = 2;
 
 /**
  * An object representing the collection of uniform variables in a GPU program.

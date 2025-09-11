@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLPorterDuffXferProcessor.h"
-#include "gpu/opengl/GLBlend.h"
+#include "gpu/glsl/GLSLBlend.h"
 
 namespace tgfx {
 PlacementPtr<PorterDuffXferProcessor> PorterDuffXferProcessor::Make(BlockBuffer* buffer,
