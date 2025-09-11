@@ -184,7 +184,10 @@ void PDFExportContext::drawPath(const Path& path, const MCState& state, const Fi
 };
 
 void PDFExportContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
-                                 const Fill& fill) {
+                                 const Fill& fill, const Stroke* stroke) {
+  if (stroke) {
+    shape = Shape::ApplyStroke(std::move(shape), stroke);
+  }
   auto path = shape->getPath();
   this->onDrawPath(state, path, fill);
 }
@@ -537,7 +540,7 @@ void PDFExportContext::exportGlyphRunAsPath(const GlyphRun& glyphRun, const MCSt
   }
   auto shape = Shape::MakeFrom(path);
   shape = Shape::ApplyStroke(std::move(shape), stroke);
-  drawShape(shape, state, fill);
+  drawShape(shape, state, fill, nullptr);
 
   //TODO (YGaurora): maybe hasPerspective()
   Fill transparentFill = fill;

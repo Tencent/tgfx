@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,37 +18,42 @@
 
 #pragma once
 
-#include "gpu/resources/ResourceKey.h"
+#include <optional>
+#include "tgfx/core/Matrix.h"
+#include "tgfx/core/Path.h"
+#include "tgfx/core/Rect.h"
 #include "tgfx/core/Shape.h"
+#include "tgfx/core/Stroke.h"
 
 namespace tgfx {
-/**
- * Shape that applies a matrix transformation to another Shape.
- */
-class MatrixShape : public Shape {
+
+class DeferredShapeInfo {
  public:
-  MatrixShape(std::shared_ptr<Shape> shape, const Matrix& matrix)
-      : shape(std::move(shape)), matrix(matrix) {
-  }
+  static std::shared_ptr<DeferredShapeInfo> Make(std::shared_ptr<Shape> shape, const Stroke* stroke,
+                                                 Matrix matrix);
 
-  bool isInverseFillType() const override {
-    return shape->isInverseFillType();
-  }
+  ~DeferredShapeInfo() = default;
 
-  Rect getBounds() const override;
+  void applyMatrix(const Matrix& m);
 
-  Path getPath() const override;
+  Matrix matrix() const;
 
-  static UniqueKey MakeUniqueKey(const UniqueKey& key, const Matrix& matrix);
+  void setMatrix(const Matrix& m);
 
-  std::shared_ptr<Shape> shape = nullptr;
-  Matrix matrix = {};
+  std::shared_ptr<const Shape> shape() const;
 
- protected:
-  Type type() const override {
-    return Type::Matrix;
-  }
+  Rect getBounds() const;
 
-  UniqueKey getUniqueKey() const override;
+  UniqueKey getUniqueKey() const;
+
+  Path getPath() const;
+
+ private:
+  DeferredShapeInfo(std::shared_ptr<Shape> shape, const Stroke* inputStroke, Matrix matrix);
+
+  std::shared_ptr<Shape> _shape = nullptr;
+  std::optional<Stroke> stroke;
+  Matrix _matrix = Matrix::I();
 };
+
 }  // namespace tgfx

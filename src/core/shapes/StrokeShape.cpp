@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "StrokeShape.h"
+#include <memory>
 #include "core/shapes/MatrixShape.h"
 #include "core/utils/ApplyStrokeToBounds.h"
 #include "core/utils/Log.h"
@@ -32,7 +33,7 @@ std::shared_ptr<Shape> Shape::ApplyStroke(std::shared_ptr<Shape> shape, const St
     return shape;
   }
   if (stroke->width <= 0.0f) {
-    return nullptr;
+    return shape;
   }
   if (shape->type() != Type::Matrix) {
     return std::make_shared<StrokeShape>(std::move(shape), *stroke);
@@ -63,12 +64,12 @@ Path StrokeShape::getPath() const {
   return path;
 }
 
-UniqueKey StrokeShape::getUniqueKey() const {
+UniqueKey StrokeShape::MakeUniqueKey(const UniqueKey& key, const Stroke& stroke) {
   static const auto WidthStrokeShapeType = UniqueID::Next();
   static const auto CapJoinStrokeShapeType = UniqueID::Next();
   static const auto FullStrokeShapeType = UniqueID::Next();
   auto hasMiter = stroke.join == LineJoin::Miter && stroke.miterLimit != 4.0f;
-  auto hasCapJoin = (hasMiter || stroke.cap != LineCap::Butt || stroke.join != LineJoin::Miter);
+  auto hasCapJoin = hasMiter || stroke.cap != LineCap::Butt || stroke.join != LineJoin::Miter;
   size_t count = 2 + (hasCapJoin ? 1 : 0) + (hasMiter ? 1 : 0);
   auto type =
       hasCapJoin ? (hasMiter ? FullStrokeShapeType : CapJoinStrokeShapeType) : WidthStrokeShapeType;
@@ -81,6 +82,10 @@ UniqueKey StrokeShape::getUniqueKey() const {
   if (hasMiter) {
     bytesKey.write(stroke.miterLimit);
   }
-  return UniqueKey::Append(shape->getUniqueKey(), bytesKey.data(), bytesKey.size());
+  return UniqueKey::Append(key, bytesKey.data(), bytesKey.size());
+}
+
+UniqueKey StrokeShape::getUniqueKey() const {
+  return MakeUniqueKey(shape->getUniqueKey(), stroke);
 }
 }  // namespace tgfx

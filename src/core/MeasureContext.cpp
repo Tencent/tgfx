@@ -47,9 +47,12 @@ void MeasureContext::drawPath(const Path& path, const MCState& state, const Fill
   addLocalBounds(state, fill, localBounds, path.isInverseFillType());
 }
 
-void MeasureContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
-                               const Fill& fill) {
+void MeasureContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill,
+                               const Stroke* stroke) {
   DEBUG_ASSERT(shape != nullptr);
+  if (stroke) {
+    shape = Shape::ApplyStroke(std::move(shape), stroke);
+  }
   if (computeTightBounds) {
     addTightBounds(shape->getPath(), state, fill);
     return;

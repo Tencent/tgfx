@@ -146,5 +146,6 @@ class Shape {
   friend class ProxyProvider;
   friend class Canvas;
   friend class Types;
+  friend class DeferredShapeInfo;
 };
 }  // namespace tgfx

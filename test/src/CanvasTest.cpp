@@ -16,6 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <algorithm>
+#include <iostream>
 #include "core/PathRef.h"
 #include "core/Records.h"
 #include "core/images/CodecImage.h"
@@ -39,9 +41,11 @@
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/PathTypes.h"
+#include "tgfx/core/RRect.h"
 #include "tgfx/core/Recorder.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Shader.h"
+#include "tgfx/core/Stroke.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
 #include "tgfx/platform/ImageReader.h"
@@ -2985,4 +2989,33 @@ TGFX_TEST(CanvasTest, RRectBlendMode) {
   canvas->drawPath(path, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/RRectBlendMode"));
 }
+
+TGFX_TEST(CanvasTest, HairLine) {
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  ASSERT_TRUE(surface != nullptr);
+  auto* canvas = surface->getCanvas();
+
+  Paint paint;
+  paint.setAntiAlias(true);
+  paint.setColor(Color::FromRGBA(255, 0, 0, 255));
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStrokeWidth(0.0f);  // Hairline
+
+  auto path = Path();
+  path.addRoundRect(Rect::MakeXYWH(-12.5f, -12.5f, 25.f, 25.f), 5, 5);
+  canvas->translate(100, 100);
+  canvas->drawPath(path, paint);
+  canvas->scale(2.f, 2.f);
+  canvas->drawPath(path, paint);
+  canvas->scale(2.f, 2.f);
+  canvas->drawPath(path, paint);
+  canvas->scale(1.9f, 1.9f);
+  canvas->drawPath(path, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "AAADebug/HairLine"));
+}
+
 }  // namespace tgfx
