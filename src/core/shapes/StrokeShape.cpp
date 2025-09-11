@@ -22,6 +22,7 @@
 #include "core/utils/ApplyStrokeToBounds.h"
 #include "core/utils/Log.h"
 #include "core/utils/UniqueID.h"
+#include "gpu/resources/ResourceKey.h"
 
 namespace tgfx {
 
@@ -68,21 +69,31 @@ UniqueKey StrokeShape::MakeUniqueKey(const UniqueKey& key, const Stroke& stroke)
   static const auto WidthStrokeShapeType = UniqueID::Next();
   static const auto CapJoinStrokeShapeType = UniqueID::Next();
   static const auto FullStrokeShapeType = UniqueID::Next();
-  auto hasMiter = stroke.join == LineJoin::Miter && stroke.miterLimit != 4.0f;
-  auto hasCapJoin = hasMiter || stroke.cap != LineCap::Butt || stroke.join != LineJoin::Miter;
-  size_t count = 2 + (hasCapJoin ? 1 : 0) + (hasMiter ? 1 : 0);
-  auto type =
-      hasCapJoin ? (hasMiter ? FullStrokeShapeType : CapJoinStrokeShapeType) : WidthStrokeShapeType;
-  BytesKey bytesKey(count);
-  bytesKey.write(type);
-  bytesKey.write(stroke.width);
-  if (hasCapJoin) {
-    bytesKey.write(static_cast<uint32_t>(stroke.join) << 16 | static_cast<uint32_t>(stroke.cap));
+  if (stroke.width > 0.f) {
+    auto hasMiter = stroke.join == LineJoin::Miter && stroke.miterLimit != 4.0f;
+    auto hasCapJoin = hasMiter || stroke.cap != LineCap::Butt || stroke.join != LineJoin::Miter;
+    size_t count = 2 + (hasCapJoin ? 1 : 0) + (hasMiter ? 1 : 0);
+    auto type = hasCapJoin ? (hasMiter ? FullStrokeShapeType : CapJoinStrokeShapeType)
+                           : WidthStrokeShapeType;
+    BytesKey bytesKey(count);
+    bytesKey.write(type);
+    bytesKey.write(stroke.width);
+    if (hasCapJoin) {
+      bytesKey.write(static_cast<uint32_t>(stroke.join) << 16 | static_cast<uint32_t>(stroke.cap));
+    }
+    if (hasMiter) {
+      bytesKey.write(stroke.miterLimit);
+    }
+    return UniqueKey::Append(key, bytesKey.data(), bytesKey.size());
   }
-  if (hasMiter) {
-    bytesKey.write(stroke.miterLimit);
-  }
-  return UniqueKey::Append(key, bytesKey.data(), bytesKey.size());
+  // hairline stroke ignore cap, join and miterLimit,and width is always 0.f,so just use a fixed key.
+  static const auto HairlineStrokeKey = []() -> UniqueKey {
+    auto HairlineStrokeShapeType = UniqueID::Next();
+    BytesKey bytesKey(1);
+    bytesKey.write(HairlineStrokeShapeType);
+    return UniqueKey::Append(UniqueKey(), bytesKey.data(), bytesKey.size());
+  }();
+  return HairlineStrokeKey;
 }
 
 UniqueKey StrokeShape::getUniqueKey() const {

@@ -74,6 +74,9 @@ class Shape {
   /**
    * Applies the specified stroke to the given Shape. If the stroke is nullptr, the original Shape
    * is returned. Returns nullptr if the Shape is nullptr.
+   * Note: If the stroke width is less than or equal to zero (hairline), the stroke is not applied,
+   * and the original Shape is returned. Hairline strokes are a rendering concept and do not modify
+   * the Shape itself.
    */
   static std::shared_ptr<Shape> ApplyStroke(std::shared_ptr<Shape> shape, const Stroke* stroke);
 
