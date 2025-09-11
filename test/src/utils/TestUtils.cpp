@@ -20,6 +20,7 @@
 #include <dirent.h>
 #include <fstream>
 #include "ProjectPath.h"
+#include "core/utils/Log.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
@@ -31,6 +32,51 @@ static const std::string OUT_ROOT = ProjectPath::Absolute("test/baseline-out/");
 static const std::string OUT_ROOT = ProjectPath::Absolute("test/out/");
 #endif
 static const std::string WEBP_FILE_EXT = ".webp";
+
+unsigned LoadGLShader(const GLFunctions* gl, unsigned shaderType, const std::string& source) {
+  auto shader = gl->createShader(shaderType);
+  const char* files[] = {source.c_str()};
+  gl->shaderSource(shader, 1, files, nullptr);
+  gl->compileShader(shader);
+  int success;
+  gl->getShaderiv(shader, GL_COMPILE_STATUS, &success);
+  if (!success) {
+    char infoLog[512];
+    gl->getShaderInfoLog(shader, 512, nullptr, infoLog);
+    LOGE("Could not compile shader:\n%s\ntype:%d info%s", source.c_str(), shaderType, infoLog);
+    gl->deleteShader(shader);
+    shader = 0;
+  }
+  return shader;
+}
+
+unsigned CreateGLProgram(Context* context, const std::string& vertex, const std::string& fragment) {
+  auto gl = GLFunctions::Get(context);
+  auto vertexShader = LoadGLShader(gl, GL_VERTEX_SHADER, vertex);
+  if (vertexShader == 0) {
+    return 0;
+  }
+  auto fragmentShader = LoadGLShader(gl, GL_FRAGMENT_SHADER, fragment);
+  if (fragmentShader == 0) {
+    return 0;
+  }
+  auto programHandle = gl->createProgram();
+  gl->attachShader(programHandle, vertexShader);
+  gl->attachShader(programHandle, fragmentShader);
+  gl->linkProgram(programHandle);
+  int success;
+  gl->getProgramiv(programHandle, GL_LINK_STATUS, &success);
+  if (!success) {
+    char infoLog[512];
+    gl->getProgramInfoLog(programHandle, 512, nullptr, infoLog);
+    gl->deleteProgram(programHandle);
+    programHandle = 0;
+    LOGE("CreateGLProgram failed:%s", infoLog);
+  }
+  gl->deleteShader(vertexShader);
+  gl->deleteShader(fragmentShader);
+  return programHandle;
+}
 
 bool CreateGLTexture(Context* context, int width, int height, GLTextureInfo* texture) {
   texture->target = GL_TEXTURE_2D;

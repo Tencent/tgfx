@@ -16,25 +16,23 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/glsl/GLSLProgramBuilder.h"
+#include "GLSLProgramBuilder.h"
 #include <string>
+#include "gpu/GPU.h"
 #include "gpu/UniformBuffer.h"
-#include "gpu/UniformLayout.h"
-#include "gpu/opengl/GLGPU.h"
-#include "gpu/opengl/GLUtil.h"
 
 namespace tgfx {
-static std::string TypeModifierString(bool isLegacyES, ShaderVar::TypeModifier t,
+static std::string TypeModifierString(bool varyingIsInOut, ShaderVar::TypeModifier t,
                                       ShaderStage stage) {
   switch (t) {
     case ShaderVar::TypeModifier::None:
       return "";
     case ShaderVar::TypeModifier::Attribute:
-      return isLegacyES ? "attribute" : "in";
+      return varyingIsInOut ? "in" : "attribute";
     case ShaderVar::TypeModifier::Varying:
-      return isLegacyES ? "varying" : (stage == ShaderStage::Vertex ? "out" : "in");
+      return varyingIsInOut ? (stage == ShaderStage::Vertex ? "out" : "in") : "varying";
     case ShaderVar::TypeModifier::FlatVarying:
-      return isLegacyES ? "varying" : (stage == ShaderStage::Vertex ? "flat out" : "flat in");
+      return varyingIsInOut ? (stage == ShaderStage::Vertex ? "flat out" : "flat in") : "varying";
     case ShaderVar::TypeModifier::Uniform:
       return "uniform";
     case ShaderVar::TypeModifier::Out:
@@ -125,28 +123,16 @@ GLSLProgramBuilder::GLSLProgramBuilder(Context* context, const ProgramInfo* prog
       _vertexBuilder(this), _fragBuilder(this) {
 }
 
-std::string GLSLProgramBuilder::versionDeclString() {
-  if (const auto caps = GLCaps::Get(context); caps->standard == GLStandard::GL) {
-    // #version 140 - OpenGL 3.1
-    return "#version 140\n";
-  }
-
-  return isLegacyES() ? "#version 100\n" : "#version 300 es\n";
-}
-
-std::string GLSLProgramBuilder::textureFuncName() const {
-  return isLegacyES() ? "texture2D" : "texture";
-}
-
 std::string GLSLProgramBuilder::getShaderVarDeclarations(const ShaderVar& var,
                                                          ShaderStage stage) const {
   std::string ret;
   if (var.modifier() != ShaderVar::TypeModifier::None) {
-    ret += TypeModifierString(isLegacyES(), var.modifier(), stage);
+    auto varyingIsInOut = getContext()->caps()->shaderCaps()->varyingIsInOut;
+    ret += TypeModifierString(varyingIsInOut, var.modifier(), stage);
     ret += " ";
   }
-
-  if (context->caps()->usesPrecisionModifiers) {
+  auto shaderCaps = context->caps()->shaderCaps();
+  if (shaderCaps->usesPrecisionModifiers) {
     ret += SLTypePrecision(var.type());
     ret += " ";
   }
@@ -169,9 +155,10 @@ std::string GLSLProgramBuilder::getUniformBlockDeclaration(
   static const std::string INDENT_STR = "    ";  // 4 spaces
   result += "layout(std140) uniform " + uniformBlockName + " {\n";
   std::string precision = "";
+  auto shaderCaps = context->caps()->shaderCaps();
   for (const auto& uniform : uniforms) {
     const auto& var = ShaderVar(uniform);
-    if (context->caps()->usesPrecisionModifiers) {
+    if (shaderCaps->usesPrecisionModifiers) {
       precision = SLTypePrecision(var.type());
     } else {
       precision = "";
@@ -184,62 +171,70 @@ std::string GLSLProgramBuilder::getUniformBlockDeclaration(
 }
 
 std::unique_ptr<PipelineProgram> GLSLProgramBuilder::finalize() {
-  if (!isLegacyES()) {
+  auto shaderCaps = context->caps()->shaderCaps();
+  if (shaderCaps->usesCustomColorOutputName) {
     fragmentShaderBuilder()->declareCustomOutputColor();
   }
   finalizeShaders();
-  const auto& vertex = vertexShaderBuilder()->shaderString();
-  const auto& fragment = fragmentShaderBuilder()->shaderString();
-
-  auto gl = GLFunctions::Get(context);
-  auto programID = CreateGLProgram(gl, vertex, fragment);
-  if (programID == 0) {
+  auto gpu = context->gpu();
+  GPUShaderModuleDescriptor vertexModule = {};
+  vertexModule.code = vertexShaderBuilder()->shaderString();
+  vertexModule.stage = ShaderStage::Vertex;
+  auto vertexShader = gpu->createShaderModule(vertexModule);
+  if (vertexShader == nullptr) {
     return nullptr;
   }
-  auto gpu = static_cast<GLGPU*>(context->gpu());
-  gpu->useProgram(programID);
-  auto& samplers = _uniformHandler.getSamplers();
-  // Assign texture units to sampler uniforms up front, just once.
-  int textureUint = 0;
-  for (auto& sampler : samplers) {
-    auto location = gl->getUniformLocation(programID, sampler.name().c_str());
-    DEBUG_ASSERT(location != -1);
-    gl->uniform1i(location, textureUint++);
+  GPUShaderModuleDescriptor fragmentModule = {};
+  fragmentModule.code = fragmentShaderBuilder()->shaderString();
+  fragmentModule.stage = ShaderStage::Fragment;
+  auto fragmentShader = gpu->createShaderModule(fragmentModule);
+  if (fragmentShader == nullptr) {
+    vertexShader->release(gpu);
+    return nullptr;
   }
+  GPURenderPipelineDescriptor descriptor = {};
+  descriptor.vertex = {programInfo->getVertexAttributes()};
+  descriptor.vertex.module = vertexShader.get();
+  descriptor.fragment.module = fragmentShader.get();
+  descriptor.fragment.colorAttachments.push_back(programInfo->getPipelineColorAttachment());
   auto vertexUniformBuffer = _uniformHandler.makeUniformBuffer(ShaderStage::Vertex);
   auto fragmentUniformBuffer = _uniformHandler.makeUniformBuffer(ShaderStage::Fragment);
-
-  std::unique_ptr<UniformLayout> uniformLayout = nullptr;
-  auto caps = GLCaps::Get(context);
-  std::vector<std::string> blockNames = {};
-  std::vector<Uniform> emptyUniforms = {};
-  if (caps->uboSupport) {
-    blockNames = {VertexUniformBlockName, FragmentUniformBlockName};
+  if (vertexUniformBuffer) {
+    BindingEntry vertexBinding = {VertexUniformBlockName, VERTEX_UBO_BINDING_POINT};
+    if (!shaderCaps->uboSupport) {
+      vertexBinding.uniforms = vertexUniformBuffer->uniforms();
+      DEBUG_ASSERT(!vertexBinding.uniforms.empty());
+    }
+    descriptor.layout.uniformBlocks.push_back(vertexBinding);
   }
-  uniformLayout = std::make_unique<UniformLayout>(
-      std::move(blockNames), vertexUniformBuffer ? vertexUniformBuffer->uniforms() : emptyUniforms,
-      fragmentUniformBuffer ? fragmentUniformBuffer->uniforms() : emptyUniforms);
-
-  auto pipeline = std::make_unique<GLRenderPipeline>(programID, std::move(uniformLayout),
-                                                     programInfo->getVertexAttributes(),
-                                                     programInfo->getBlendFormula());
-
+  if (fragmentUniformBuffer) {
+    BindingEntry fragmentBinding = {FragmentUniformBlockName, FRAGMENT_UBO_BINDING_POINT};
+    if (!shaderCaps->uboSupport) {
+      fragmentBinding.uniforms = fragmentUniformBuffer->uniforms();
+      DEBUG_ASSERT(!fragmentBinding.uniforms.empty());
+    }
+    descriptor.layout.uniformBlocks.push_back(fragmentBinding);
+  }
+  int textureBinding = TEXTURE_BINDING_POINT_START;
+  for (const auto& sampler : _uniformHandler.getSamplers()) {
+    descriptor.layout.textureSamplers.emplace_back(sampler.name(), textureBinding++);
+  }
+  auto pipeline = gpu->createRenderPipeline(descriptor);
+  vertexShader->release(gpu);
+  fragmentShader->release(gpu);
+  if (pipeline == nullptr) {
+    return nullptr;
+  }
   return std::make_unique<PipelineProgram>(std::move(pipeline), std::move(vertexUniformBuffer),
                                            std::move(fragmentUniformBuffer));
 }
 
 bool GLSLProgramBuilder::checkSamplerCounts() {
-  auto caps = GLCaps::Get(context);
-  if (numFragmentSamplers > caps->maxFragmentSamplers) {
+  auto shaderCaps = context->caps()->shaderCaps();
+  if (numFragmentSamplers > shaderCaps->maxFragmentSamplers) {
     LOGE("Program would use too many fragment samplers.");
     return false;
   }
   return true;
-}
-
-bool GLSLProgramBuilder::isLegacyES() const {
-  const auto caps = GLCaps::Get(context);
-  return (caps->standard == GLStandard::GLES && caps->version < GL_VER(3, 0)) ||
-         (caps->standard == GLStandard::WebGL && caps->version < GL_VER(2, 0));
 }
 }  // namespace tgfx

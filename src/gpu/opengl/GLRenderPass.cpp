@@ -45,6 +45,10 @@ void GLRenderPass::begin() {
   }
 }
 
+void GLRenderPass::setViewport(int x, int y, int width, int height) {
+  gpu->setViewport(x, y, width, height);
+}
+
 void GLRenderPass::setScissorRect(int x, int y, int width, int height) {
   auto texture = descriptor.colorAttachments[0].texture;
   if (x == 0 && y == 0 && width == texture->width() && height == texture->height()) {
@@ -56,25 +60,33 @@ void GLRenderPass::setScissorRect(int x, int y, int width, int height) {
 }
 
 void GLRenderPass::setPipeline(GPURenderPipeline* pipeline) {
-  DEBUG_ASSERT(pipeline != nullptr);
   if (renderPipeline == pipeline) {
     return;
   }
   renderPipeline = static_cast<GLRenderPipeline*>(pipeline);
-  renderPipeline->activate(gpu);
+  if (renderPipeline != nullptr) {
+    renderPipeline->activate(gpu);
+  }
 }
 
 void GLRenderPass::setUniformBytes(unsigned binding, const void* data, size_t size) {
-  DEBUG_ASSERT(renderPipeline != nullptr);
+  if (renderPipeline == nullptr) {
+    LOGE("GLRenderPass::setUniformBytes: renderPipeline is null!");
+    return;
+  }
   renderPipeline->setUniformBytes(gpu, binding, data, size);
 }
 
 void GLRenderPass::setTexture(unsigned binding, GPUTexture* texture, GPUSampler* sampler) {
-  DEBUG_ASSERT(texture != nullptr);
-  auto glTexture = static_cast<GLTexture*>(texture);
-  auto glSampler = static_cast<GLSampler*>(sampler);
-  gpu->bindTexture(glTexture, binding);
-  glTexture->updateSampler(gpu, glSampler);
+  if (texture == nullptr) {
+    return;
+  }
+  if (renderPipeline == nullptr) {
+    LOGE("GLRenderPass::setTexture: renderPipeline is null!");
+    return;
+  }
+  renderPipeline->setTexture(gpu, binding, static_cast<GLTexture*>(texture),
+                             static_cast<GLSampler*>(sampler));
   auto renderTexture = descriptor.colorAttachments[0].texture;
   auto caps = static_cast<const GLCaps*>(gpu->caps());
   if (texture == renderTexture && caps->textureRedSupport) {
@@ -84,12 +96,18 @@ void GLRenderPass::setTexture(unsigned binding, GPUTexture* texture, GPUSampler*
 }
 
 void GLRenderPass::setVertexBuffer(GPUBuffer* buffer, size_t offset) {
-  DEBUG_ASSERT(renderPipeline != nullptr);
-  renderPipeline->setVertexBuffer(gpu, buffer, offset);
+  if (renderPipeline == nullptr) {
+    LOGE("GLRenderPass::setVertexBuffer: renderPipeline is null!");
+    return;
+  }
+  renderPipeline->setVertexBuffer(gpu, static_cast<GLBuffer*>(buffer), offset);
 }
 
 void GLRenderPass::setIndexBuffer(GPUBuffer* buffer, IndexFormat format) {
-  DEBUG_ASSERT(renderPipeline != nullptr);
+  if (renderPipeline == nullptr) {
+    LOGE("GLRenderPass::setIndexBuffer: renderPipeline is null!");
+    return;
+  }
   auto bufferID = buffer ? static_cast<GLBuffer*>(buffer)->bufferID() : 0;
   auto gl = gpu->functions();
   gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, bufferID);

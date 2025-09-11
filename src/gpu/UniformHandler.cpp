@@ -71,20 +71,20 @@ std::unique_ptr<UniformBuffer> UniformHandler::makeUniformBuffer(ShaderStage sta
     return nullptr;
   }
 
-  if (stage == ShaderStage::Fragment && fragmentUniforms.empty() && samplers.empty()) {
+  if (stage == ShaderStage::Fragment && fragmentUniforms.empty()) {
     return nullptr;
   }
 
-  auto caps = programBuilder->getContext()->caps();
+  auto shaderCaps = programBuilder->getContext()->caps()->shaderCaps();
   return std::unique_ptr<UniformBuffer>(new UniformBuffer(
-      stage == ShaderStage::Vertex ? vertexUniforms : fragmentUniforms, caps->uboSupport));
+      stage == ShaderStage::Vertex ? vertexUniforms : fragmentUniforms, shaderCaps->uboSupport));
 }
 
 std::string UniformHandler::getUniformDeclarations(ShaderStage stage) const {
   std::string ret;
   auto& uniforms = stage == ShaderStage::Vertex ? vertexUniforms : fragmentUniforms;
-  auto caps = programBuilder->getContext()->caps();
-  if (caps->uboSupport) {
+  auto shaderCaps = programBuilder->getContext()->caps()->shaderCaps();
+  if (shaderCaps->uboSupport) {
     ret += programBuilder->getUniformBlockDeclaration(stage, uniforms);
   } else {
     for (auto& uniform : uniforms) {

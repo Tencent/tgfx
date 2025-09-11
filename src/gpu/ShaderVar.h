@@ -25,8 +25,6 @@
 #include "gpu/Uniform.h"
 
 namespace tgfx {
-enum class ShaderStage { Vertex, Fragment };
-
 class ShaderVar {
  public:
   enum class TypeModifier { None, Attribute, Varying, FlatVarying, Uniform, Out, InOut };

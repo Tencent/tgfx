@@ -21,7 +21,9 @@
 #include <memory>
 #include "gpu/CommandEncoder.h"
 #include "gpu/CommandQueue.h"
+#include "gpu/GPURenderPipeline.h"
 #include "gpu/GPUSampler.h"
+#include "gpu/GPUShaderModule.h"
 #include "gpu/YUVFormat.h"
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/Caps.h"
@@ -137,6 +139,20 @@ class GPU {
    * Creates a GPUSampler with the specified descriptor.
    */
   virtual std::unique_ptr<GPUSampler> createSampler(const GPUSamplerDescriptor& descriptor) = 0;
+
+  /**
+   * Creates a GPUShaderModule from the provided shader code. The shader code must be valid and
+   * compatible with the GPU backend. Returns nullptr if the shader module creation fails.
+   */
+  virtual std::unique_ptr<GPUShaderModule> createShaderModule(
+      const GPUShaderModuleDescriptor& descriptor) = 0;
+
+  /**
+   * Creates a GPURenderPipeline that manages the vertex and fragment shader stages for use in a
+   * RenderPass. Returns nullptr if pipeline creation fails.
+   */
+  virtual std::unique_ptr<GPURenderPipeline> createRenderPipeline(
+      const GPURenderPipelineDescriptor& descriptor) = 0;
 
   /**
    * Creates a command encoder that can be used to encode commands to be issued to the GPU.

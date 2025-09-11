@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLBlend.h"
-#include "gpu/Blend.h"
+#include "GLSLBlend.h"
+#include "gpu/BlendFormula.h"
 
 namespace tgfx {
 static void HardLight(FragmentShaderBuilder* fsBuilder, const char* final, const char* src,
@@ -488,37 +488,41 @@ void AppendCoeffBlend(FragmentShaderBuilder* fsBuilder, const std::string& srcCo
   }
 
   auto dstWithCoeff = "dst";
-  if (formula.dstCoeff() == BlendModeCoeff::Zero) {
+  if (formula.dstFactor() == BlendFactor::Zero) {
     fsBuilder->codeAppendf("vec4 %s = vec4(0.0);", dstWithCoeff);
   } else {
     fsBuilder->codeAppendf("vec4 %s = %s", dstWithCoeff, dstColor.c_str());
-    kCoeffHandlers[static_cast<int>(formula.dstCoeff()) - 1](
+    kCoeffHandlers[static_cast<int>(formula.dstFactor()) - 1](
         fsBuilder, primaryOutputColor.c_str(), secondaryOutputColor.c_str(), dstColor.c_str());
   }
 
   auto srcWithCoeff = "src";
-  if (formula.srcCoeff() == BlendModeCoeff::Zero) {
+  if (formula.srcFactor() == BlendFactor::Zero) {
     fsBuilder->codeAppendf("vec4 %s = vec4(0.0);", srcWithCoeff);
   } else {
     fsBuilder->codeAppendf("vec4 %s = %s", srcWithCoeff, primaryOutputColor.c_str());
-    kCoeffHandlers[static_cast<int>(formula.srcCoeff()) - 1](
+    kCoeffHandlers[static_cast<int>(formula.srcFactor()) - 1](
         fsBuilder, primaryOutputColor.c_str(), secondaryOutputColor.c_str(), dstColor.c_str());
   }
 
-  switch (formula.equation()) {
-    case BlendEquation::Add:
+  switch (formula.operation()) {
+    case BlendOperation::Add:
       fsBuilder->codeAppendf("%s = clamp(%s + %s, 0.0, 1.0);", outColor.c_str(), srcWithCoeff,
                              dstWithCoeff);
       break;
-    case BlendEquation::Subtract:
+    case BlendOperation::Subtract:
       fsBuilder->codeAppendf("%s = clamp(%s - %s , 0.0, 1.0);", outColor.c_str(), srcWithCoeff,
                              dstWithCoeff);
       break;
-    case BlendEquation::ReverseSubtract:
+    case BlendOperation::ReverseSubtract:
       fsBuilder->codeAppendf("%s = clamp(%s - %s, 0.0, 1.0);", outColor.c_str(), dstWithCoeff,
                              srcWithCoeff);
       break;
-    default:
+    case BlendOperation::Min:
+      fsBuilder->codeAppendf("%s = min(%s, %s);", outColor.c_str(), srcWithCoeff, dstWithCoeff);
+      break;
+    case BlendOperation::Max:
+      fsBuilder->codeAppendf("%s = max(%s, %s);", outColor.c_str(), srcWithCoeff, dstWithCoeff);
       break;
   }
 }

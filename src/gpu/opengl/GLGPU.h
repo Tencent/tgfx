@@ -69,6 +69,12 @@ class GLGPU : public GPU {
 
   std::unique_ptr<GPUSampler> createSampler(const GPUSamplerDescriptor& descriptor) override;
 
+  std::unique_ptr<GPUShaderModule> createShaderModule(
+      const GPUShaderModuleDescriptor& descriptor) override;
+
+  std::unique_ptr<GPURenderPipeline> createRenderPipeline(
+      const GPURenderPipelineDescriptor& descriptor) override;
+
   std::shared_ptr<CommandEncoder> createCommandEncoder() override;
 
   void resetGLState() override;
@@ -89,9 +95,12 @@ class GLGPU : public GPU {
 
   void bindVertexArray(unsigned vertexArray);
 
-  void setBlendFunc(unsigned srcFactor, unsigned dstFactor);
+  void setBlendFunc(unsigned srcColorFactor, unsigned dstColorFactor, unsigned srcAlphaFactor,
+                    unsigned dstAlphaFactor);
 
-  void setBlendEquation(unsigned mode);
+  void setBlendEquation(unsigned colorOp, unsigned alphaOp);
+
+  void setColorMask(uint32_t colorMask);
 
  protected:
   explicit GLGPU(std::shared_ptr<GLInterface> glInterface);
@@ -109,8 +118,12 @@ class GLGPU : public GPU {
   unsigned drawFramebuffer = INVALID_VALUE;
   unsigned program = INVALID_VALUE;
   unsigned vertexArray = INVALID_VALUE;
-  unsigned srcBlendFunc = INVALID_VALUE;
-  unsigned dstBlendFunc = INVALID_VALUE;
-  unsigned blendEquation = INVALID_VALUE;
+  unsigned srcColorBlendFactor = INVALID_VALUE;
+  unsigned dstColorBlendFactor = INVALID_VALUE;
+  unsigned srcAlphaBlendFactor = INVALID_VALUE;
+  unsigned dstAlphaBlendFactor = INVALID_VALUE;
+  unsigned colorBlendOp = INVALID_VALUE;
+  unsigned alphaBlendOp = INVALID_VALUE;
+  uint32_t colorWriteMask = 0xF;
 };
 }  // namespace tgfx
