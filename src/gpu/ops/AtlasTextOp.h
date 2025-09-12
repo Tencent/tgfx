@@ -42,6 +42,10 @@ class AtlasTextOp final : public DrawOp {
 
   void onDraw(RenderPass* renderPass) override;
 
+  Type type() override {
+    return Type::AtlasTextOp;
+  }
+
  private:
   size_t rectCount = 0;
   std::optional<Color> commonColor = std::nullopt;

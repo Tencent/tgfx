@@ -31,6 +31,10 @@ if (CMAKE_BUILD_TYPE MATCHES "Debug")
     option(TGFX_USE_INSPECTOR "Enable profiling support for the TGFX Inspector tool" ON)
 endif ()
 
+if (TGFX_USE_INSPECTOR)
+    option(TGFX_USE_JPEG_ENCODE "Enable embedded JPEG encoding support" ON)
+endif ()
+
 if (NOT TGFX_USE_THREADS)
     set(TGFX_USE_INSPECTOR OFF)
 endif ()

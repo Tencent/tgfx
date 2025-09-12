@@ -51,7 +51,6 @@ RRectDrawOp::RRectDrawOp(RRectsVertexProvider* provider)
 }
 
 PlacementPtr<GeometryProcessor> RRectDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {
-  OPERATE_MARK(tgfx::inspect::OpTaskType::RRectDrawOp);
   ATTRIBUTE_NAME("rectCount", static_cast<uint32_t>(rectCount));
   ATTRIBUTE_NAME("useScale", useScale);
   ATTRIBUTE_NAME("hasStroke", hasStroke);

@@ -35,6 +35,10 @@ class ShapeDrawOp : public DrawOp {
 
   void onDraw(RenderPass* renderPass) override;
 
+  Type type() override {
+    return Type::ShapeDrawOp;
+  }
+
  private:
   std::shared_ptr<GPUShapeProxy> shapeProxy = nullptr;
   std::shared_ptr<VertexBufferProxyView> maskBufferProxy = {};

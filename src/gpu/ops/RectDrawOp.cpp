@@ -59,7 +59,6 @@ RectDrawOp::RectDrawOp(RectsVertexProvider* provider)
 }
 
 PlacementPtr<GeometryProcessor> RectDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {
-  OPERATE_MARK(tgfx::inspect::OpTaskType::RectDrawOp);
   ATTRIBUTE_NAME("rectCount", static_cast<int>(rectCount));
   ATTRIBUTE_NAME("commonColor", commonColor);
   ATTRIBUTE_NAME("uvMatrix", uvMatrix);

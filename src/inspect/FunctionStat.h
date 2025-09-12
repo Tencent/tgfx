@@ -21,37 +21,37 @@
 #include "tgfx/core/Clock.h"
 
 namespace tgfx::inspect {
-class FunctionTimer {
+class FunctionStat {
  public:
-  FunctionTimer(OpTaskType type, bool isActive) : active(isActive), type(type) {
-    if (!active) {
+  FunctionStat(OpTaskType type, bool isActive) : active(isActive), type(type) {
+    if (!active || !FrameCapture::GetInstance().isConnected()) {
       return;
     }
     auto item = FrameCaptureMessageItem();
     item.hdr.type = FrameCaptureMessageType::OperateBegin;
     item.operateBegin.usTime = Clock::Now();
     item.operateBegin.type = static_cast<uint8_t>(type);
-    FrameCapture::QueueSerialFinish(item);
+    FrameCapture::GetInstance().queueSerialFinish(item);
   }
 
-  ~FunctionTimer() {
-    if (!active) {
+  ~FunctionStat() {
+    if (!active || !FrameCapture::GetInstance().isConnected()) {
       return;
     }
     auto item = FrameCaptureMessageItem();
     item.hdr.type = FrameCaptureMessageType::OperateEnd;
     item.operateEnd.usTime = Clock::Now();
     item.operateEnd.type = static_cast<uint8_t>(type);
-    FrameCapture::QueueSerialFinish(item);
+    FrameCapture::GetInstance().queueSerialFinish(item);
   }
 
-  FunctionTimer(const FunctionTimer&) = delete;
+  FunctionStat(const FunctionStat&) = delete;
 
-  FunctionTimer(FunctionTimer&&) = delete;
+  FunctionStat(FunctionStat&&) = delete;
 
-  FunctionTimer& operator=(const FunctionTimer&) = delete;
+  FunctionStat& operator=(const FunctionStat&) = delete;
 
-  FunctionTimer& operator=(FunctionTimer&&) = delete;
+  FunctionStat& operator=(FunctionStat&&) = delete;
 
  private:
   bool active = false;

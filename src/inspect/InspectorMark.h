@@ -19,8 +19,9 @@
 #ifdef TGFX_USE_INSPECTOR
 
 #include "FrameCapture.h"
-#include "FunctionTimer.h"
+#include "FunctionStat.h"
 #include "LayerTree.h"
+#include "Protocol.h"
 
 #define SEND_LAYER_DATA(data) tgfx::inspect::LayerTree::SocketAgent::Get().setData(data)
 #define LAYER_CALLBACK(func) tgfx::inspect::LayerTree::SocketAgent::Get().setCallBack(func)
@@ -31,16 +32,24 @@
 #define MARE_CONCAT(x, y) MARE_CONCAT_INDIRECT(x, y)
 #define MARE_CONCAT_INDIRECT(x, y) x##y
 #define MARK_LINE __LINE__
-#define FRAME_MARK tgfx::inspect::FrameCapture::SendFrameMark(nullptr)
+#define FRAME_MARK tgfx::inspect::FrameCapture::GetInstance().sendFrameMark(nullptr)
 #define FUNCTION_MARK(type, active) \
-  tgfx::inspect::FunctionTimer MARE_CONCAT(functionTimer, MARK_LINE) = {type, active}
-#define OPERATE_MARK(type) FUNCTION_MARK(type, true)
+  tgfx::inspect::FunctionStat MARE_CONCAT(functionTimer, MARK_LINE) = {type, active}
+#define OPERATE_MARK(type) FUNCTION_MARK(tgfx::inspect::DrawOpTypeToOpTaskType[type], true)
 #define TASK_MARK(type) FUNCTION_MARK(type, true)
-#define ATTRIBUTE_NAME(name, value) tgfx::inspect::FrameCapture::SendAttributeData(name, value)
-#define ATTRIBUTE_NAME_ENUM(name, value, type)                                      \
-  tgfx::inspect::FrameCapture::SendAttributeData(name, static_cast<uint8_t>(value), \
-                                                 static_cast<uint8_t>(type))
+#define ATTRIBUTE_NAME(name, value) \
+  tgfx::inspect::FrameCapture::GetInstance().sendAttributeData(name, value)
+#define ATTRIBUTE_NAME_ENUM(name, value, type)                                                    \
+  tgfx::inspect::FrameCapture::GetInstance().sendAttributeData(name, static_cast<uint8_t>(value), \
+                                                               static_cast<uint8_t>(type))
+
 #define ATTRIBUTE_ENUM(value, type) ATTRIBUTE_NAME_ENUM(#value, value, type)
+
+#define CAPUTRE_RENDER_TARGET(renderTarget) \
+  tgfx::inspect::FrameCapture::GetInstance().captureRenderTarget(renderTarget)
+
+#define CAPUTRE_FRARGMENT_PROCESSORS(context, colors, coverages) \
+  tgfx::inspect::FrameCapture::GetInstance().sendFragmentProcessor(context, colors, coverages);
 
 #else
 
@@ -56,5 +65,7 @@
 #define ATTRIBUTE_NAME(name, value)
 #define ATTRIBUTE_NAME_ENUM(name, value, type)
 #define ATTRIBUTE_ENUM(value, type)
+#define CAPUTRE_RENDER_TARGET(renderTarget)
+#define CAPUTRE_FRARGMENT_PROCESSORS(context, colors, coverages)
 
 #endif

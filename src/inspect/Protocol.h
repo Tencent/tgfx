@@ -17,13 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+
+#include <unordered_map>
+#include "gpu/ops/DrawOp.h"
+
 namespace tgfx::inspect {
 
-static constexpr int Lz4CompressBound(int size) {
-  return size + (size / 255) + 16;
-}
+static constexpr int LZ4HeaderSize = 12;
+static constexpr int MinLZ4EncodeSize = 1024 * 4;
 static constexpr int TargetFrameSize = 256 * 1024;
-static constexpr int LZ4Size = Lz4CompressBound(TargetFrameSize);
 static constexpr int HandshakeShibbolethSize = 4;
 static constexpr char HandshakeShibboleth[HandshakeShibbolethSize] = {'T', 'G', 'F', 'X'};
 
@@ -65,6 +67,7 @@ enum class ServerQuery : uint8_t {
   String,
   ValueName,
   Disconnect,
+  CaptureFrame,
 };
 
 struct ServerQueryPacket {
@@ -92,9 +95,17 @@ enum class OpTaskType : uint8_t {
   RectDrawOp,
   RRectDrawOp,
   ShapeDrawOp,
+  AtlasTextOp,
   DstTextureCopyOp,
   ResolveOp,
   OpTaskTypeSize,
+};
+
+static std::unordered_map<DrawOp::Type, OpTaskType> DrawOpTypeToOpTaskType = {
+    {DrawOp::Type::RectDrawOp, OpTaskType::RectDrawOp},
+    {DrawOp::Type::RRectDrawOp, OpTaskType::RRectDrawOp},
+    {DrawOp::Type::ShapeDrawOp, OpTaskType::ShapeDrawOp},
+    {DrawOp::Type::AtlasTextOp, OpTaskType::AtlasTextOp},
 };
 
 enum class CustomEnumType : uint8_t {

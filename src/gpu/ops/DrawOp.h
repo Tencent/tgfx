@@ -25,6 +25,8 @@
 namespace tgfx {
 class DrawOp {
  public:
+  enum class Type { RectDrawOp, RRectDrawOp, ShapeDrawOp, AtlasTextOp };
+
   virtual ~DrawOp() = default;
 
   void setScissorRect(const Rect& rect) {
@@ -67,5 +69,7 @@ class DrawOp {
   virtual PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) = 0;
 
   virtual void onDraw(RenderPass* renderPass) = 0;
+
+  virtual Type type() = 0;
 };
 }  // namespace tgfx
