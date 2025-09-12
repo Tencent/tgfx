@@ -58,7 +58,8 @@ std::unique_ptr<EAGLLayerTexture> EAGLLayerTexture::MakeFrom(GLGPU* gpu, CAEAGLL
     LOGE("EAGLLayerTexture::MakeFrom() failed to allocate renderbuffer storage!");
     return nullptr;
   }
-  gpu->bindFramebuffer(texture.get());
+  auto state = gpu->state();
+  state->bindFramebuffer(texture.get());
   gl->framebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER,
                               texture->renderBufferID);
   auto frameBufferStatus = gl->checkFramebufferStatus(GL_FRAMEBUFFER);
@@ -73,7 +74,8 @@ std::unique_ptr<EAGLLayerTexture> EAGLLayerTexture::MakeFrom(GLGPU* gpu, CAEAGLL
 void EAGLLayerTexture::onRelease(GLGPU* gpu) {
   auto gl = gpu->functions();
   if (_frameBufferID > 0) {
-    gpu->bindFramebuffer(this);
+    auto state = gpu->state();
+    state->bindFramebuffer(this);
     gl->framebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, 0);
     gl->deleteFramebuffers(1, &_frameBufferID);
     _frameBufferID = 0;

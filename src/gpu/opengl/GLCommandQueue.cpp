@@ -58,7 +58,8 @@ void GLCommandQueue::writeTexture(GPUTexture* texture, const Rect& rect, const v
     gl->flush();
   }
   auto glTexture = static_cast<GLTexture*>(texture);
-  gpu->bindTexture(glTexture);
+  auto state = gpu->state();
+  state->bindTexture(glTexture);
   const auto& textureFormat = caps->getTextureFormat(glTexture->format());
   auto bytesPerPixel = PixelFormatBytesPerPixel(glTexture->format());
   gl->pixelStorei(GL_UNPACK_ALIGNMENT, static_cast<int>(bytesPerPixel));
@@ -97,7 +98,8 @@ bool GLCommandQueue::readTexture(GPUTexture* texture, const Rect& rect, void* pi
   auto glTexture = static_cast<GLTexture*>(texture);
   ClearGLError(gl);
   if (texture->usage() & GPUTextureUsage::RENDER_ATTACHMENT) {
-    gpu->bindFramebuffer(glTexture);
+    auto state = gpu->state();
+    state->bindFramebuffer(glTexture);
   } else if (!glTexture->checkFrameBuffer(gpu)) {
     return false;
   }
