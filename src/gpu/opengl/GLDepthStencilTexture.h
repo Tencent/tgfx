@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,44 +18,25 @@
 
 #pragma once
 
+#include "gpu/opengl/GLTexture.h"
+
 namespace tgfx {
-/**
- * Describes the possible pixel formats of a GPUTexture.
- */
-enum class PixelFormat {
-  /**
-   * uninitialized.
-   */
-  Unknown,
+class GLDepthStencilTexture : public GLTexture {
+ public:
+  static std::unique_ptr<GLDepthStencilTexture> MakeFrom(GLGPU* gpu,
+                                                         const GPUTextureDescriptor& descriptor);
+  unsigned renderBufferID() const {
+    return _renderBufferID;
+  }
 
-  /**
-   * Pixel with 8 bits for alpha. Each pixel is stored on 1 byte.
-   */
-  ALPHA_8,
+ protected:
+  void onRelease(GLGPU* gpu) override;
 
-  /**
-   * Pixel with 8 bits for grayscale. Each pixel is stored on 1 byte.
-   */
-  GRAY_8,
+ private:
+  unsigned _renderBufferID = 0;
 
-  /**
-   * Pixel with 8 bits for red, green. Each pixel is stored on 2 bytes.
-   */
-  RG_88,
-
-  /**
-   * Pixel with 8 bits for red, green, blue, alpha. Each pixel is stored on 4 bytes.
-   */
-  RGBA_8888,
-
-  /**
-   * Pixel with 8 bits for blue, green, red, alpha. Each pixel is stored on 4 bytes.
-   */
-  BGRA_8888,
-
-  /**
-   * Pixel with 24 bits for depth, 8 bits for stencil. Each pixel is stored on 4 bytes.
-   */
-  DEPTH24_STENCIL8
+  GLDepthStencilTexture(const GPUTextureDescriptor& descriptor, unsigned renderBufferID)
+      : GLTexture(descriptor, GL_TEXTURE_2D, 0), _renderBufferID(renderBufferID) {
+  }
 };
 }  // namespace tgfx
