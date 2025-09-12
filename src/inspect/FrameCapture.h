@@ -142,7 +142,8 @@ class FrameCapture {
 
   void sendString(uint64_t stringPtr, const char* str, size_t len, FrameCaptureMessageType type);
 
-  void sendPixelsData(uint64_t pixelsPtr, const char* pixels, size_t len, FrameCaptureMessageType type);
+  void sendPixelsData(uint64_t pixelsPtr, const char* pixels, size_t len,
+                      FrameCaptureMessageType type);
 
   bool confirmProtocol();
 
