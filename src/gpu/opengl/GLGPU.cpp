@@ -234,7 +234,7 @@ std::unique_ptr<GPUShaderModule> GLGPU::createShaderModule(
   auto gl = interface->functions();
   auto shader = gl->createShader(shaderType);
   auto& code = descriptor.code;
-  const char* files[] = {descriptor.code.c_str()};
+  const char* files[] = {code.c_str()};
   gl->shaderSource(shader, 1, files, nullptr);
   gl->compileShader(shader);
 #if defined(DEBUG) || !defined(TGFX_BUILD_FOR_WEB)
