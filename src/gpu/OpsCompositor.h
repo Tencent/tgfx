@@ -73,7 +73,8 @@ class OpsCompositor {
   /**
    * Fills the given shape with the given state and fill.
    */
-  void fillShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill);
+  void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill,
+                 const Stroke* stroke);
 
   /**
    * Fills the given rect with the given atlas textureProxy, state and fill.

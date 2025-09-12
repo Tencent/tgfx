@@ -52,8 +52,7 @@ Path MatrixShape::getPath() const {
   path.transform(matrix);
   return path;
 }
-
-UniqueKey MatrixShape::getUniqueKey() const {
+UniqueKey MatrixShape::MakeUniqueKey(const UniqueKey& key, const Matrix& matrix) {
   static const auto SingleScaleMatrixShapeType = UniqueID::Next();
   static const auto BothScalesShapeType = UniqueID::Next();
   static const auto RSXformShapeType = UniqueID::Next();
@@ -61,7 +60,7 @@ UniqueKey MatrixShape::getUniqueKey() const {
   auto hasBothScales = hasRSXform || matrix.getScaleX() != matrix.getScaleY();
   if (!hasBothScales && matrix.getScaleX() == 1.0f) {
     // The matrix has translation only.
-    return shape->getUniqueKey();
+    return key;
   }
   size_t count = 2 + (hasBothScales ? 1 : 0) + (hasRSXform ? 2 : 0);
   auto type = hasBothScales ? (hasRSXform ? RSXformShapeType : BothScalesShapeType)
@@ -76,7 +75,11 @@ UniqueKey MatrixShape::getUniqueKey() const {
     bytesKey.write(matrix.getSkewX());
     bytesKey.write(matrix.getSkewY());
   }
-  return UniqueKey::Append(shape->getUniqueKey(), bytesKey.data(), bytesKey.size());
+  return UniqueKey::Append(key, bytesKey.data(), bytesKey.size());
+}
+
+UniqueKey MatrixShape::getUniqueKey() const {
+  return MakeUniqueKey(shape->getUniqueKey(), matrix);
 }
 
 }  // namespace tgfx

@@ -39,6 +39,8 @@ class MatrixShape : public Shape {
 
   Path getPath() const override;
 
+  static UniqueKey MakeUniqueKey(const UniqueKey& key, const Matrix& matrix);
+
   std::shared_ptr<Shape> shape = nullptr;
   Matrix matrix = {};
 

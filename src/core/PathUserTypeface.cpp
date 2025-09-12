@@ -118,7 +118,9 @@ class PathUserScalerContext final : public UserScalerContext {
     auto matrix = Matrix::MakeScale(textSize);
     matrix.postTranslate(-bounds.x(), -bounds.y());
     auto shape = Shape::MakeFrom(pathProvider);
-    shape = Shape::ApplyStroke(std::move(shape), stroke);
+    if (stroke && !stroke->isHairline()) {
+      shape = Shape::ApplyStroke(std::move(shape), stroke);
+    }
     shape = Shape::ApplyMatrix(std::move(shape), matrix);
     auto rasterizer = PathRasterizer::MakeFrom(width, height, std::move(shape), true,
 #ifdef TGFX_USE_TEXT_GAMMA_CORRECTION

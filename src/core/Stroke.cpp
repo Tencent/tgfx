@@ -18,6 +18,7 @@
 
 #include "tgfx/core/Stroke.h"
 #include "core/PathRef.h"
+#include "core/utils/MathExtra.h"
 
 namespace tgfx {
 using namespace pk;
@@ -48,8 +49,7 @@ bool Stroke::applyToPath(Path* path, float resolutionScale) const {
   if (path == nullptr) {
     return false;
   }
-  if (width <= 0) {
-    path->reset();
+  if (isHairline()) {
     return true;
   }
   SkPaint paint = {};
@@ -62,4 +62,7 @@ bool Stroke::applyToPath(Path* path, float resolutionScale) const {
   return paint.getFillPath(skPath, &skPath, nullptr, resolutionScale);
 }
 
+bool Stroke::isHairline() const {
+  return FloatNearlyZero(width) || width < 0;
+}
 }  // namespace tgfx

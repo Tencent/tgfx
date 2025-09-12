@@ -40,6 +40,8 @@ class StrokeShape : public Shape {
 
   Path getPath() const override;
 
+  static UniqueKey MakeUniqueKey(const UniqueKey& key, const Stroke& stroke);
+
   std::shared_ptr<Shape> shape = nullptr;
   Stroke stroke = {};
 

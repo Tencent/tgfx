@@ -18,13 +18,8 @@
 
 #pragma once
 
-#include <cstddef>
-#include <cstdint>
-#include <memory>
-#include <utility>
 #include "core/DrawContext.h"
 #include "svg/SVGTextBuilder.h"
-#include "svg/SVGUtils.h"
 #include "svg/xml/XMLWriter.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Canvas.h"
@@ -32,7 +27,7 @@
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Rect.h"
-#include "tgfx/core/Size.h"
+#include "tgfx/core/Stroke.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/svg/SVGExporter.h"
 #include "tgfx/svg/SVGPathParser.h"
@@ -61,7 +56,8 @@ class SVGExportContext : public DrawContext {
 
   void drawPath(const Path& path, const MCState& state, const Fill& fill) override;
 
-  void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill) override;
+  void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill,
+                 const Stroke* stroke) override;
 
   void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
                  const MCState& state, const Fill& fill) override;
