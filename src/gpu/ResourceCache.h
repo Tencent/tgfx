@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <concurrentqueue.h>
 #include <deque>
 #include <functional>
 #include <list>
@@ -28,6 +27,7 @@
 
 namespace tgfx {
 class Resource;
+class PendingPurgeResourceQueue;
 
 /**
  * Manages the lifetime of all Resource instances.
@@ -129,7 +129,7 @@ class ResourceCache {
   std::chrono::steady_clock::time_point currentFrameTime = {};
   std::deque<std::chrono::steady_clock::time_point> frameTimes = {};
 
-  moodycamel::ConcurrentQueue<Resource*> purgeableResourcesQueue;
+  std::shared_ptr<PendingPurgeResourceQueue> unreferencedResourceQueue;
   std::list<Resource*> nonpurgeableResources = {};
   std::list<Resource*> purgeableResources = {};
   ResourceKeyMap<std::vector<Resource*>> scratchKeyMap = {};
@@ -138,10 +138,12 @@ class ResourceCache {
   static void AddToList(std::list<Resource*>& list, Resource* resource);
   static void RemoveFromList(std::list<Resource*>& list, Resource* resource);
   static bool InList(const std::list<Resource*>& list, Resource* resource);
+  static void NotifyReferenceReachedZero(Resource* resource);
 
   void releaseAll(bool releaseGPU);
   void purgeAsNeeded();
   void processUnreferencedResources();
+  std::shared_ptr<Resource> wrapResource(Resource* resource);
   std::shared_ptr<Resource> addResource(Resource* resource, const ScratchKey& scratchKey);
   std::shared_ptr<Resource> refResource(Resource* resource);
   void removeResource(Resource* resource);
