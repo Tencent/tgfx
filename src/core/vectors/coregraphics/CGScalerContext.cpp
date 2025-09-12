@@ -41,6 +41,7 @@ constexpr uint32_t TAG(char a, char b, char c, char d) noexcept {
 static uint16_t ReadU16BE(const uint8_t* p) {
   return static_cast<uint16_t>((p[0] << 8) | p[1]);
 }
+
 static uint32_t ReadU32BE(const uint8_t* p) {
   return (static_cast<uint32_t>(p[0]) << 24) | (static_cast<uint32_t>(p[1]) << 16) |
          (static_cast<uint32_t>(p[2]) << 8) | static_cast<uint32_t>(p[3]);
