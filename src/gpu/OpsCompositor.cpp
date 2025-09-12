@@ -55,6 +55,10 @@ static bool HasDifferentViewMatrix(const std::vector<PlacementPtr<RectRecord>>& 
 }
 
 static SamplingOptions GetAtlasSampling(const Matrix& matrix) {
+  if (!FloatNearlyEqual(std::abs(matrix.getScaleX()), 1.f) ||
+      !FloatNearlyEqual(std::abs(matrix.getScaleY()), 1.f)) {
+    return SamplingOptions{FilterMode::Linear, MipmapMode::None};
+  }
   // A matrix is considered rotated if it has any skew or if it swaps the x and y axes.
   auto hasRotated = !FloatNearlyZero(matrix.getSkewX()) || !FloatNearlyZero(matrix.getSkewY());
   auto filterMode = hasRotated ? FilterMode::Linear : FilterMode::Nearest;
