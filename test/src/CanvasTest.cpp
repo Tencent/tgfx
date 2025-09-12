@@ -3039,8 +3039,9 @@ TGFX_TEST(CanvasTest, HairLineShape) {
   auto shape = Shape::MakeFrom(path);
   Stroke stroke(0.0f);
   auto strokeShape = Shape::ApplyStroke(shape, &stroke);
-  // hairline is a rendering concept, the hairline stroke won't apply to the shape
-  EXPECT_EQ(shape, strokeShape);
+  // hairline is a rendering concept, the hairline stroke won't apply to the shape, so the
+  // strokeShape should be nullptr.
+  EXPECT_TRUE(strokeShape == nullptr);
 
   canvas->translate(100, 100);
   canvas->drawShape(shape, paint);
