@@ -111,7 +111,7 @@
         "tile_mode_rgbaaa": "8cb853c",
         "tile_mode_subset": "67961560"
     },
-   "DrawersTest": {
+    "DrawersTest": {
         "ConicGradient": "b88c0432",
         "ImageWithMipmap": "b88c0432",
         "ImageWithShadow": "b88c0432",
@@ -336,7 +336,7 @@
         "SingleLineTextAlign": "6095b909",
         "TextAlign": "497fa488",
         "TextAlignBlankLineTest": "6095b909",
-        "TextAlignSimulateVerticalTextLayout": "9060bdb6",
+        "TextAlignSimulateVerticalTextLayout": "9c456da3",
         "TextAlignWidth0Height0": "6095b909",
         "TextAlignWidth1Height10": "6095b909",
         "TruncateTextLineTest": "9060bdb6"
