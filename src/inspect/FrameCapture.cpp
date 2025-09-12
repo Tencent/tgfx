@@ -325,29 +325,29 @@ bool FrameCapture::handleServerQuery() {
   return true;
 }
 
-void FrameCapture::sendString(uint64_t str, const char* ptr, size_t len,
+void FrameCapture::sendString(uint64_t stringPtr, const char* str, size_t len,
                               FrameCaptureMessageType type) {
   FrameCaptureMessageItem item = {};
   item.hdr.type = type;
-  item.stringTransfer.ptr = str;
+  item.stringTransfer.ptr = stringPtr;
 
   auto dataLen = static_cast<uint16_t>(len);
   needDataSize(FrameCaptureMessageDataSize[static_cast<int>(type)] + sizeof(uint16_t) + dataLen);
   appendDataUnsafe(&item, FrameCaptureMessageDataSize[static_cast<int>(type)]);
   appendDataUnsafe(&dataLen, sizeof(uint16_t));
-  appendDataUnsafe(ptr, dataLen);
+  appendDataUnsafe(str, dataLen);
 }
 
-void FrameCapture::sendString(uint64_t str, const char* ptr, FrameCaptureMessageType type) {
-  sendString(str, ptr, strlen(ptr), type);
+void FrameCapture::sendString(uint64_t stringPtr, const char* str, FrameCaptureMessageType type) {
+  sendString(stringPtr, str, strlen(str), type);
 }
 
-void FrameCapture::sendPixelsData(uint64_t str, const char* pixels, size_t len,
+void FrameCapture::sendPixelsData(uint64_t pixelsPtr, const char* pixels, size_t len,
                                   FrameCaptureMessageType type) {
   ASSERT(type == FrameCaptureMessageType::PixelsData);
   FrameCaptureMessageItem item = {};
   item.hdr.type = type;
-  item.stringTransfer.ptr = str;
+  item.stringTransfer.ptr = pixelsPtr;
   auto dataLen = static_cast<uint32_t>(len);
   commitData();
   appendDataUnsafe(&item, FrameCaptureMessageDataSize[static_cast<int>(type)]);
@@ -658,8 +658,8 @@ FrameCapture::DequeueStatus FrameCapture::dequeueSerial() {
       auto idx = item.hdr.idx;
       if (static_cast<FrameCaptureMessageType>(idx) == FrameCaptureMessageType::TextureData) {
         auto ptr = item.textureData.pixels;
-        auto csz = item.textureData.pixelsSize;
-        sendPixelsData(ptr, (const char*)ptr, csz, FrameCaptureMessageType::PixelsData);
+        auto size = item.textureData.pixelsSize;
+        sendPixelsData(ptr, (const char*)ptr, size, FrameCaptureMessageType::PixelsData);
         free((void*)ptr);
       }
       if (!appendData(&item, FrameCaptureMessageDataSize[idx])) {
