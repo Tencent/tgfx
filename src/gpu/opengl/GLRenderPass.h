@@ -30,7 +30,7 @@ class GLRenderPass : public RenderPass {
  public:
   GLRenderPass(GLGPU* gpu, RenderPassDescriptor descriptor);
 
-  void begin();
+  bool begin();
 
   void setViewport(int x, int y, int width, int height) override;
 

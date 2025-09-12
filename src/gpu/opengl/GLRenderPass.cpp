@@ -19,6 +19,7 @@
 #include "GLRenderPass.h"
 #include "GLSampler.h"
 #include "gpu/DrawingManager.h"
+#include "gpu/opengl/GLDepthStencilTexture.h"
 #include "gpu/opengl/GLGPU.h"
 #include "gpu/opengl/GLRenderPipeline.h"
 #include "gpu/opengl/GLTexture.h"
@@ -28,7 +29,7 @@ GLRenderPass::GLRenderPass(GLGPU* gpu, RenderPassDescriptor descriptor)
     : RenderPass(std::move(descriptor)), gpu(gpu) {
 }
 
-void GLRenderPass::begin() {
+bool GLRenderPass::begin() {
   DEBUG_ASSERT(!descriptor.colorAttachments.empty());
   auto& colorAttachment = descriptor.colorAttachments[0];
   DEBUG_ASSERT(colorAttachment.texture != nullptr);
@@ -36,6 +37,25 @@ void GLRenderPass::begin() {
   auto state = gpu->state();
   state->bindFramebuffer(renderTexture);
   auto gl = gpu->functions();
+
+  auto& depthStencilAttachment = descriptor.depthStencilAttachment;
+  if (depthStencilAttachment.texture != nullptr) {
+    auto depthStencilTexture = static_cast<GLDepthStencilTexture*>(depthStencilAttachment.texture);
+    gl->bindRenderbuffer(GL_RENDERBUFFER, depthStencilTexture->renderBufferID());
+    gl->framebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER,
+                                depthStencilTexture->renderBufferID());
+#ifndef TGFX_BUILD_FOR_WEB
+    if (gl->checkFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+      LOGE("GLCommandEncoder::beginRenderPass() depthStencil attachment can not be attached!");
+      return false;
+    }
+#endif
+    if (depthStencilAttachment.loadAction == LoadAction::Clear) {
+      gl->clearDepthf(depthStencilAttachment.depthClearValue);
+      gl->clearStencil(static_cast<int>(depthStencilAttachment.stencilClearValue));
+      gl->clear(GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+    }
+  }
   // Set the viewport to cover the entire color attachment by default.
   state->setViewport(0, 0, renderTexture->width(), renderTexture->height());
   // Disable scissor test by default.
@@ -44,6 +64,7 @@ void GLRenderPass::begin() {
     state->setClearColor(colorAttachment.clearValue);
     gl->clear(GL_COLOR_BUFFER_BIT);
   }
+  return true;
 }
 
 void GLRenderPass::setViewport(int x, int y, int width, int height) {
@@ -68,7 +89,9 @@ void GLRenderPass::setPipeline(GPURenderPipeline* pipeline) {
   }
   renderPipeline = static_cast<GLRenderPipeline*>(pipeline);
   if (renderPipeline != nullptr) {
-    renderPipeline->activate(gpu, stencilReference);
+    auto& attachment = descriptor.depthStencilAttachment;
+    renderPipeline->activate(gpu, attachment.depthReadOnly, attachment.stencilReadOnly,
+                             stencilReference);
   }
 }
 

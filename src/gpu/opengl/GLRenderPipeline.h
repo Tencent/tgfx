@@ -59,7 +59,7 @@ class GLRenderPipeline : public GPURenderPipeline {
   /**
    * Binds the shader program so that it is used in subsequent draw calls.
    */
-  void activate(GLGPU* gpu, unsigned stencilReference);
+  void activate(GLGPU* gpu, bool depthReadOnly, bool stencilReadOnly, unsigned stencilReference);
 
   /**
    * Sets the uniform data to a specified binding index.
