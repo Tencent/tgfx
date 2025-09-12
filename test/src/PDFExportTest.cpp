@@ -19,6 +19,7 @@
 #include <hb-subset.h>
 #include <hb.h>
 #include "base/TGFXTest.h"
+#include "pdf/MD5.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/ImageFilter.h"
@@ -357,4 +358,13 @@ TGFX_TEST(PDFExportTest, Complex) {
 
   EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/Complex"));
 }
+
+TGFX_TEST(PDFExportTest, MD5Test) {
+  const char* testString = "The quick brown fox jumps over the lazy dog";
+  auto digest = MD5::Calculate(testString, strlen(testString));
+  const uint8_t expectedDigest[16] = {0x9e, 0x10, 0x7d, 0x9d, 0x37, 0x2b, 0xb6, 0x82,
+                                      0x6b, 0xd8, 0x1d, 0x35, 0x42, 0xa4, 0x19, 0xd6};
+  EXPECT_EQ(0, std::memcmp(digest.data(), expectedDigest, 16));
+}
+
 }  // namespace tgfx
