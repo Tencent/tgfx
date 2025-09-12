@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,29 +16,28 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "Resource.h"
+#pragma once
+
+#include <concurrentqueue.h>
+#include <list>
 
 namespace tgfx {
-void Resource::assignUniqueKey(const UniqueKey& newKey) {
-  if (newKey.empty()) {
-    removeUniqueKey();
-    return;
-  }
-  if (newKey != uniqueKey) {
-    context->resourceCache()->changeUniqueKey(this, newKey);
-  }
-}
+class Resource;
 
-void Resource::removeUniqueKey() {
-  if (!uniqueKey.empty()) {
-    context->resourceCache()->removeUniqueKey(this);
-  }
-}
+/**
+ * Manages resources whose references are released by `shared_ptr`.
+ */
+class PendingPurgeResourceQueue {
+ public:
+  PendingPurgeResourceQueue() = default;
 
-void Resource::release(bool releaseGPU) {
-  if (releaseGPU) {
-    onReleaseGPU();
-  }
-  context = nullptr;
-}
+  ~PendingPurgeResourceQueue();
+
+  /**
+   * Adds a resource whose references are released by `shared_ptr`.
+   */
+  void add(Resource* resource);
+
+  moodycamel::ConcurrentQueue<Resource*> pendingQueue;
+};
 }  // namespace tgfx
