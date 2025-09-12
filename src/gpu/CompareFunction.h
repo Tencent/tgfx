@@ -21,7 +21,7 @@
 namespace tgfx {
 /**
  * Options used to specify how a sample compare operation should be performed on a depth or stencil
- * buffer.
+ * texture.
  */
 enum class CompareFunction {
   /**

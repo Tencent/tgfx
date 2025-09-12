@@ -264,9 +264,10 @@ static std::unique_ptr<GLDepthState> MakeDepthState(const DepthStencilDescriptor
 
 bool GLRenderPipeline::setPipelineDescriptor(GLGPU* gpu,
                                              const GPURenderPipelineDescriptor& descriptor) {
+  auto gl = gpu->functions();
+  ClearGLError(gl);
   auto state = gpu->state();
   state->useProgram(programID);
-  auto gl = gpu->functions();
   auto caps = static_cast<const GLCaps*>(gpu->caps());
   if (caps->vertexArrayObjectSupport) {
     gl->genVertexArrays(1, &vertexArray);
@@ -335,6 +336,6 @@ bool GLRenderPipeline::setPipelineDescriptor(GLGPU* gpu,
     textureUint++;
   }
 
-  return true;
+  return CheckGLError(gl);
 }
 }  // namespace tgfx
