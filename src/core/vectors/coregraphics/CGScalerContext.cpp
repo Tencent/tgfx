@@ -129,7 +129,7 @@ static void CreateBackingFont(CTFontRef ctFont, float textSize, CTFontRef& backi
 
 CGScalerContext::CGScalerContext(std::shared_ptr<Typeface> tf, float size)
     : ScalerContext(std::move(tf), size) {
-  const CTFontRef font = std::static_pointer_cast<CGTypeface>(typeface)->ctFont;
+  CTFontRef font = std::static_pointer_cast<CGTypeface>(typeface)->ctFont;
   fauxBoldScale = FauxBoldScale(textSize);
   ctFont = CTFontCreateCopyWithAttributes(font, static_cast<CGFloat>(textSize), nullptr, nullptr);
   if (typeface->hasColor() || !typeface->hasOutlines()) {
