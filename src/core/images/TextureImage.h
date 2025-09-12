@@ -30,7 +30,9 @@ class TextureImage : public Image {
   /**
    * Creates an Image wraps the existing TextureProxy, returns nullptr if textureProxy is nullptr.
    */
-  static std::shared_ptr<Image> Wrap(std::shared_ptr<TextureProxy> textureProxy);
+  static std::shared_ptr<Image> Wrap(
+      std::shared_ptr<TextureProxy> textureProxy,
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   int width() const override {
     return textureProxy->width();
@@ -50,6 +52,10 @@ class TextureImage : public Image {
 
   bool isTextureBacked() const override {
     return true;
+  }
+
+  std::shared_ptr<ColorSpace> colorSpace() const override {
+    return _colorSpace;
   }
 
   BackendTexture getBackendTexture(Context* context, ImageOrigin* origin) const override;
@@ -79,7 +85,9 @@ class TextureImage : public Image {
  private:
   std::shared_ptr<TextureProxy> textureProxy = nullptr;
   uint32_t contextID = 0;
+  std::shared_ptr<ColorSpace> _colorSpace = ColorSpace::MakeSRGB();
 
-  TextureImage(std::shared_ptr<TextureProxy> textureProxy, uint32_t contextID);
+  TextureImage(std::shared_ptr<TextureProxy> textureProxy, uint32_t contextID,
+               std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 };
 }  // namespace tgfx

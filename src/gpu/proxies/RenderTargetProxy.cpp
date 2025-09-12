@@ -23,13 +23,14 @@
 
 namespace tgfx {
 std::shared_ptr<RenderTargetProxy> RenderTargetProxy::MakeFrom(
-    Context* context, const BackendRenderTarget& backendRenderTarget, ImageOrigin origin) {
+    Context* context, const BackendRenderTarget& backendRenderTarget, ImageOrigin origin,
+    std::shared_ptr<ColorSpace> colorSpace) {
   auto renderTarget = RenderTarget::MakeFrom(context, backendRenderTarget, origin);
   if (renderTarget == nullptr) {
     return nullptr;
   }
   return std::shared_ptr<ExternalRenderTargetProxy>(
-      new ExternalRenderTargetProxy(std::move(renderTarget)));
+      new ExternalRenderTargetProxy(std::move(renderTarget), std::move(colorSpace)));
 }
 
 std::shared_ptr<RenderTargetProxy> RenderTargetProxy::MakeFallback(Context* context, int width,

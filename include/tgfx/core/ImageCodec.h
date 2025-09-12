@@ -93,8 +93,9 @@ class ImageCodec : public ImageGenerator {
   virtual bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const;
 
  protected:
-  ImageCodec(int width, int height, Orientation orientation = Orientation::TopLeft)
-      : ImageGenerator(width, height), _orientation(orientation) {
+  ImageCodec(int width, int height, Orientation orientation = Orientation::TopLeft,
+             std::shared_ptr<ColorSpace> colorSpace = nullptr)
+      : ImageGenerator(width, height, std::move(colorSpace)), _orientation(orientation) {
   }
 
   std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;

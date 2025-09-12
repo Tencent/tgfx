@@ -37,7 +37,7 @@ class InnerShadowImageFilter : public ImageFilter {
     return Type::InnerShadow;
   }
 
-  PlacementPtr<FragmentProcessor> getShadowFragmentProcessor(std::shared_ptr<Image> source,
+  PlacementPtr<FragmentProcessor> getShadowFragmentProcessor(const std::shared_ptr<Image>& source,
                                                              const FPArgs& args,
                                                              const SamplingOptions& sampling,
                                                              SrcRectConstraint constraint,

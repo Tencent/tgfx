@@ -17,8 +17,16 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
+#include <emscripten.h>
 #include "core/utils/Log.h"
 #include "tgfx/gpu/opengl/GLDefines.h"
+
+EM_JS(int, getBrowserColorGamut, (), {
+  if (window.matchMedia("(color-gamut: rec2020)").matches) return 2;
+  else if (window.matchMedia("(color-gamut: p3)").matches)
+    return 1;
+  return 0;
+});
 
 namespace tgfx {
 std::shared_ptr<WebGLWindow> WebGLWindow::MakeFrom(const std::string& canvasID) {
@@ -48,6 +56,20 @@ std::shared_ptr<Surface> WebGLWindow::onCreateSurface(Context* context) {
   GLFrameBufferInfo glInfo = {};
   glInfo.id = 0;
   glInfo.format = GL_RGBA8;
-  return Surface::MakeFrom(context, {glInfo, width, height}, ImageOrigin::BottomLeft);
+  int gamut = getBrowserColorGamut();
+  std::shared_ptr<ColorSpace> colorSpace = nullptr;
+  switch (gamut) {
+    case 2:
+      colorSpace = ColorSpace::MakeRGB(namedTransferFn::Rec2020, namedGamut::Rec2020);
+      break;
+    case 1:
+      colorSpace = ColorSpace::MakeRGB(namedTransferFn::SRGB, namedGamut::DisplayP3);
+      break;
+    default:
+      colorSpace = ColorSpace::MakeSRGB();
+      break;
+  }
+  return Surface::MakeFrom(context, {glInfo, width, height}, ImageOrigin::BottomLeft, 1,
+                           colorSpace);
 }
 }  // namespace tgfx

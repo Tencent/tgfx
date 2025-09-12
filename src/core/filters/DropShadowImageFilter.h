@@ -39,7 +39,7 @@ class DropShadowImageFilter : public ImageFilter {
 
   Rect onFilterBounds(const Rect& srcRect) const override;
 
-  PlacementPtr<FragmentProcessor> getShadowFragmentProcessor(std::shared_ptr<Image> source,
+  PlacementPtr<FragmentProcessor> getShadowFragmentProcessor(const std::shared_ptr<Image>& source,
                                                              const FPArgs& args,
                                                              const SamplingOptions& sampling,
                                                              SrcRectConstraint constraint,

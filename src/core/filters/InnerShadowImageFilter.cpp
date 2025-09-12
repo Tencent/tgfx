@@ -46,7 +46,7 @@ InnerShadowImageFilter::InnerShadowImageFilter(float dx, float dy, float blurrin
 }
 
 PlacementPtr<FragmentProcessor> InnerShadowImageFilter::getShadowFragmentProcessor(
-    std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
+    const std::shared_ptr<Image>& source, const FPArgs& args, const SamplingOptions& sampling,
     SrcRectConstraint constraint, const Matrix* uvMatrix) const {
   auto shadowMatrix = Matrix::MakeTrans(-dx, -dy);
   if (uvMatrix) {
@@ -55,12 +55,11 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::getShadowFragmentProcess
 
   PlacementPtr<FragmentProcessor> invertShadowMask;
   if (blurFilter != nullptr) {
-    invertShadowMask = blurFilter->asFragmentProcessor(std::move(source), args, sampling,
-                                                       constraint, &shadowMatrix);
-  } else {
     invertShadowMask =
-        FragmentProcessor::Make(std::move(source), args, TileMode::Decal, TileMode::Decal, sampling,
-                                constraint, &shadowMatrix);
+        blurFilter->asFragmentProcessor(source, args, sampling, constraint, &shadowMatrix);
+  } else {
+    invertShadowMask = FragmentProcessor::Make(source, args, TileMode::Decal, TileMode::Decal,
+                                               sampling, constraint, &shadowMatrix);
   }
 
   auto buffer = args.context->drawingBuffer();
@@ -68,7 +67,11 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::getShadowFragmentProcess
     invertShadowMask =
         ConstColorProcessor::Make(buffer, Color::Transparent().premultiply(), InputMode::Ignore);
   }
-  auto colorProcessor = ConstColorProcessor::Make(buffer, color.premultiply(), InputMode::Ignore);
+  auto dstColor = color;
+  ColorSpaceXformSteps steps(ColorSpace::MakeSRGB().get(), AlphaType::Unpremultiplied,
+                             source->colorSpace().get(), AlphaType::Premultiplied);
+  steps.apply(dstColor.array());
+  auto colorProcessor = ConstColorProcessor::Make(buffer, dstColor, InputMode::Ignore);
 
   // get shadow mask and fill it with color
   auto colorShadowProcessor = XfermodeFragmentProcessor::MakeFromTwoProcessors(

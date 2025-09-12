@@ -30,6 +30,7 @@
 #include "gpu/ops/ShapeDrawOp.h"
 #include "gpu/processors/AARectEffect.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
+#include "processors/ColorSpaceXformEffect.h"
 #include "processors/PorterDuffXferProcessor.h"
 
 namespace tgfx {
@@ -394,10 +395,13 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
     FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty()),
                    drawScale.value_or(1.0f)};
     auto processor =
-        FragmentProcessor::Make(std::move(pendingImage), args, pendingSampling, pendingConstraint);
+        FragmentProcessor::Make(pendingImage, args, pendingSampling, pendingConstraint);
     if (processor == nullptr) {
       return;
     }
+    processor = ColorSpaceXformEffect::Make(
+        context->drawingBuffer(), std::move(processor), pendingImage->colorSpace().get(),
+        AlphaType::Premultiplied, renderTarget->getColorSpace().get(), AlphaType::Premultiplied);
     drawOp->addColorFP(std::move(processor));
   }
   addDrawOp(std::move(drawOp), pendingClip, pendingFill, localBounds, deviceBounds,
@@ -645,8 +649,9 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const F
   if (localBounds.has_value() && localBounds->isEmpty()) {
     return;
   }
-
-  FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty()), drawScale};
+  auto colorSpace = renderTarget->getColorSpace();
+  FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty()), drawScale,
+                 colorSpace};
   if (fill.shader) {
     if (auto processor = FragmentProcessor::Make(fill.shader, args)) {
       op->addColorFP(std::move(processor));
@@ -657,7 +662,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const F
     }
   }
   if (fill.colorFilter) {
-    if (auto processor = fill.colorFilter->asFragmentProcessor(context)) {
+    if (auto processor = fill.colorFilter->asFragmentProcessor(context, colorSpace)) {
       op->addColorFP(std::move(processor));
     }
   }
