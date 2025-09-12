@@ -26,6 +26,9 @@
 #ifdef None
 #undef None
 #endif
+#ifdef Always
+#undef Always
+#endif
 
 namespace tgfx {
 class EGLDevice : public GLDevice {
