@@ -59,11 +59,13 @@ void GLSLQuadPerEdgeAA3DGeometryProcessor::emitCode(EmitArgs& args) const {
   args.vertBuilder->codeAppendf("vec4 position_trans = %s * vec4(%s, 0.0, 1.0);",
                                 transformMatrixName.c_str(), position.name().c_str());
   args.vertBuilder->codeAppend("vec2 position_ndc = position_trans.xy / position_trans.w;");
+  const auto adjustMatrixName =
+      uniformHandler->addUniform("adjustMatrix", UniformFormat::Float3x3, ShaderStage::Vertex);
+  args.vertBuilder->codeAppendf("position_ndc = (%s * vec3(position_ndc, 1.0)).xy;",
+                                adjustMatrixName.c_str());
   // TODO: RichardJieChen
-  // const auto adjustMatrixName = uniformHandler->addUniform("adjustMatrix", UniformFormat::Float3x3, ShaderStage::Vertex);
-  // args.vertBuilder->codeAppendf("position_ndc = (%s * vec3(position_ndc, 1.0)).xy;", adjustMatrixName.c_str());
-  //
-  args.vertBuilder->emitNormalizedPosition(position.name());
+  // args.vertBuilder->emitNormalizedPosition(position.name());
+  args.vertBuilder->codeAppend("vec4 tem = tgfx_RTAdjust;");
   //
   args.vertBuilder->codeAppend("gl_Position = vec4(position_ndc.x, position_ndc.y, 0.0, 1.0);");
 }
@@ -74,8 +76,7 @@ void GLSLQuadPerEdgeAA3DGeometryProcessor::setData(UniformBuffer* vertexUniformB
   setTransformDataHelper(Matrix::I(), vertexUniformBuffer, transformIter);
   fragmentUniformBuffer->setData("Color", defaultColor);
   vertexUniformBuffer->setData("transformMatrix", transfromMatrix);
-  //TODO: RichardJieChen
-  // vertexUniformBuffer->setData("adjustMatrix", adjustMatrix);
+  vertexUniformBuffer->setData("adjustMatrix", adjustMatrix);
 }
 
 }  // namespace tgfx

@@ -320,9 +320,9 @@ void Matrix3D::setAll(float m00, float m01, float m02, float m03, float m10, flo
   values[15] = m33;
 }
 
-void Matrix3D::setRotate(const Vec3& axis, float radians) {
+void Matrix3D::setRotate(const Vec3& axis, float degrees) {
   if (const auto len = axis.length(); len > 0 && (len * 0 == 0)) {
-    this->setRotateUnit(axis * (1.f / len), radians);
+    this->setRotateUnit(axis * (1.f / len), degrees);
   } else {
     this->setIdentity();
   }
