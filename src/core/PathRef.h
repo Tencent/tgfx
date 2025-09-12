@@ -20,7 +20,11 @@
 
 #include "core/utils/LazyBounds.h"
 #include "gpu/resources/ResourceKey.h"
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wfloat-conversion"
+#pragma clang diagnostic ignored "-Wimplicit-int-conversion"
 #include "pathkit.h"
+#pragma clang diagnostic pop
 
 namespace tgfx {
 class Path;
