@@ -167,7 +167,7 @@ GLCaps::GLCaps(const GLInfo& info) {
   standard = info.standard;
   version = info.version;
   vendor = GetVendorFromString((const char*)info.getString(GL_VENDOR));
-  floatIs32Bits = IsMediumFloatFp32(info);
+  _shaderCaps.floatIs32Bits = IsMediumFloatFp32(info);
   switch (standard) {
     case GLStandard::GL:
       initGLSupport(info);
@@ -182,7 +182,7 @@ GLCaps::GLCaps(const GLInfo& info) {
       break;
   }
   info.getIntegerv(GL_MAX_TEXTURE_SIZE, &maxTextureSize);
-  info.getIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &maxFragmentSamplers);
+  info.getIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &_shaderCaps.maxFragmentSamplers);
   if (vendor == GLVendor::Qualcomm) {
     // https://skia-review.googlesource.com/c/skia/+/571418
     // On certain Adreno devices running WebGL, glTexSubImage2D() may not upload texels in time for
@@ -255,6 +255,17 @@ void GLCaps::initGLSupport(const GLInfo& info) {
   if (version < GL_VER(1, 3) && !info.hasExtension("GL_ARB_texture_border_clamp")) {
     clampToBorderSupport = false;
   }
+  _shaderCaps.versionDeclString = "#version 140";
+  _shaderCaps.usesCustomColorOutputName = true;
+  _shaderCaps.varyingIsInOut = true;
+  _shaderCaps.textureFuncName = "texture";
+  if (info.hasExtension("GL_EXT_shader_framebuffer_fetch")) {
+    _shaderCaps.frameBufferFetchNeedsCustomOutput = version >= GL_VER(3, 0);
+    _shaderCaps.frameBufferFetchSupport = true;
+    _shaderCaps.frameBufferFetchColorName = "gl_LastFragData[0]";
+    _shaderCaps.frameBufferFetchExtensionString = "GL_EXT_shader_framebuffer_fetch";
+    _shaderCaps.frameBufferFetchRequiresEnablePerSample = false;
+  }
 
   // TODO UBO currently does not do merge processing, and the performance is slightly worse than
   // the traditional Uniform variable, and it will be enabled after
@@ -272,24 +283,33 @@ void GLCaps::initGLESSupport(const GLInfo& info) {
   textureRedSupport = version >= GL_VER(3, 0) || info.hasExtension("GL_EXT_texture_rg");
   multisampleDisableSupport = info.hasExtension("GL_EXT_multisample_compatibility");
   textureBarrierSupport = info.hasExtension("GL_NV_texture_barrier");
+  _shaderCaps.versionDeclString = version >= GL_VER(3, 0) ? "#version 300 es" : "#version 100";
+  _shaderCaps.usesCustomColorOutputName = version >= GL_VER(3, 0);
+  _shaderCaps.varyingIsInOut = version >= GL_VER(3, 0);
+  _shaderCaps.textureFuncName = version >= GL_VER(3, 0) ? "texture" : "texture2D";
+  _shaderCaps.oesTextureExtension =
+      version >= GL_VER(3, 0) ? "GL_OES_EGL_image_external_essl3" : "GL_OES_EGL_image_external";
   if (info.hasExtension("GL_EXT_shader_framebuffer_fetch")) {
-    frameBufferFetchSupport = true;
-    frameBufferFetchColorName = "gl_LastFragData[0]";
-    frameBufferFetchExtensionString = "GL_EXT_shader_framebuffer_fetch";
-    frameBufferFetchRequiresEnablePerSample = false;
+    _shaderCaps.frameBufferFetchNeedsCustomOutput = version >= GL_VER(3, 0);
+    _shaderCaps.frameBufferFetchSupport = true;
+    _shaderCaps.frameBufferFetchColorName = "gl_LastFragData[0]";
+    _shaderCaps.frameBufferFetchExtensionString = "GL_EXT_shader_framebuffer_fetch";
+    _shaderCaps.frameBufferFetchRequiresEnablePerSample = false;
   } else if (info.hasExtension("GL_NV_shader_framebuffer_fetch")) {
     // Actually, we haven't seen an ES3.0 device with this extension yet, so we don't know.
-    frameBufferFetchSupport = true;
-    frameBufferFetchColorName = "gl_LastFragData[0]";
-    frameBufferFetchExtensionString = "GL_NV_shader_framebuffer_fetch";
-    frameBufferFetchRequiresEnablePerSample = false;
+    _shaderCaps.frameBufferFetchNeedsCustomOutput = false;
+    _shaderCaps.frameBufferFetchSupport = true;
+    _shaderCaps.frameBufferFetchColorName = "gl_LastFragData[0]";
+    _shaderCaps.frameBufferFetchExtensionString = "GL_NV_shader_framebuffer_fetch";
+    _shaderCaps.frameBufferFetchRequiresEnablePerSample = false;
   } else if (info.hasExtension("GL_ARM_shader_framebuffer_fetch")) {
-    frameBufferFetchSupport = true;
-    frameBufferFetchColorName = "gl_LastFragColorARM";
-    frameBufferFetchExtensionString = "GL_ARM_shader_framebuffer_fetch";
+    _shaderCaps.frameBufferFetchNeedsCustomOutput = false;
+    _shaderCaps.frameBufferFetchSupport = true;
+    _shaderCaps.frameBufferFetchColorName = "gl_LastFragColorARM";
+    _shaderCaps.frameBufferFetchExtensionString = "GL_ARM_shader_framebuffer_fetch";
     // The arm extension requires specifically enabling MSAA fetching per sample.
     // On some devices this may have a perf hit. Also multiple render targets are disabled
-    frameBufferFetchRequiresEnablePerSample = true;
+    _shaderCaps.frameBufferFetchRequiresEnablePerSample = true;
   }
   semaphoreSupport = version >= GL_VER(3, 0) || info.hasExtension("GL_APPLE_sync");
   if (version < GL_VER(3, 2) && !info.hasExtension("GL_EXT_texture_border_clamp") &&
@@ -299,7 +319,7 @@ void GLCaps::initGLESSupport(const GLInfo& info) {
   }
   npotTextureTileSupport = version >= GL_VER(3, 0) || info.hasExtension("GL_OES_texture_npot");
   mipmapSupport = npotTextureTileSupport || info.hasExtension("GL_IMG_texture_npot");
-  usesPrecisionModifiers = true;
+  _shaderCaps.usesPrecisionModifiers = true;
 
   // TODO UBO currently does not do merge processing, and the performance is slightly worse than
   // the traditional Uniform variable, and it will be enabled after
@@ -318,12 +338,16 @@ void GLCaps::initWebGLSupport(const GLInfo& info) {
   textureRedSupport = version >= GL_VER(2, 0);
   multisampleDisableSupport = false;
   textureBarrierSupport = false;
-  frameBufferFetchSupport = false;
   semaphoreSupport = version >= GL_VER(2, 0);
   clampToBorderSupport = false;
   npotTextureTileSupport = version >= GL_VER(2, 0);
   mipmapSupport = npotTextureTileSupport;
-  usesPrecisionModifiers = true;
+  _shaderCaps.usesCustomColorOutputName = version >= GL_VER(2, 0);
+  _shaderCaps.varyingIsInOut = version >= GL_VER(2, 0);
+  _shaderCaps.versionDeclString = version >= GL_VER(2, 0) ? "#version 300 es" : "#version 100";
+  _shaderCaps.textureFuncName = version >= GL_VER(2, 0) ? "texture" : "texture2D";
+  _shaderCaps.frameBufferFetchSupport = false;
+  _shaderCaps.usesPrecisionModifiers = true;
 
   // TODO UBO currently does not do merge processing, and the performance is slightly worse than
   // the traditional Uniform variable, and it will be enabled after

@@ -29,7 +29,7 @@ void FragmentShaderBuilder::declareCustomOutputColor() {
     typeModifier = ShaderVar::TypeModifier::InOut;
   }
 
-  outputs.emplace_back(CustomColorOutputName(), SLType::Float4, typeModifier);
+  outputs.emplace_back(CUSTOM_COLOR_OUTPUT_NAME, SLType::Float4, typeModifier);
 }
 
 void FragmentShaderBuilder::onBeforeChildProcEmitCode(const FragmentProcessor* child) const {

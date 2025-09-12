@@ -27,7 +27,10 @@
 #elif defined(__linux__) && !defined(__ANDROID__) && !defined(ANDROID)
 #include <openssl/md5.h>
 #else
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wimplicit-int-conversion"
 #include "algorithm/md5.hpp"
+#pragma clang diagnostic pop
 #endif
 
 namespace tgfx {

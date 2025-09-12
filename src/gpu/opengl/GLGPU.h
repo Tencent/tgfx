@@ -18,21 +18,11 @@
 
 #pragma once
 
-#include <array>
-#include <limits>
-#include <optional>
-#include <unordered_map>
 #include "gpu/GPU.h"
 #include "gpu/opengl/GLCommandQueue.h"
-#include "gpu/opengl/GLInterface.h"
+#include "gpu/opengl/GLState.h"
 
 namespace tgfx {
-class GLTexture;
-
-static constexpr unsigned INVALID_VALUE = std::numeric_limits<unsigned>::max();
-
-enum class FrameBufferTarget { Draw, Read, Both };
-
 class GLGPU : public GPU {
  public:
   Backend backend() const override {
@@ -47,8 +37,16 @@ class GLGPU : public GPU {
     return interface->functions();
   }
 
+  GLState* state() const {
+    return _state.get();
+  }
+
   CommandQueue* queue() const override {
     return commandQueue.get();
+  }
+
+  void resetGLState() override {
+    _state->reset();
   }
 
   std::unique_ptr<GPUBuffer> createBuffer(size_t size, uint32_t usage) override;
@@ -69,48 +67,20 @@ class GLGPU : public GPU {
 
   std::unique_ptr<GPUSampler> createSampler(const GPUSamplerDescriptor& descriptor) override;
 
+  std::unique_ptr<GPUShaderModule> createShaderModule(
+      const GPUShaderModuleDescriptor& descriptor) override;
+
+  std::unique_ptr<GPURenderPipeline> createRenderPipeline(
+      const GPURenderPipelineDescriptor& descriptor) override;
+
   std::shared_ptr<CommandEncoder> createCommandEncoder() override;
-
-  void resetGLState() override;
-
-  void enableCapability(unsigned capability, bool enabled);
-
-  void setScissorRect(int x, int y, int width, int height);
-
-  void setViewport(int x, int y, int width, int height);
-
-  void setClearColor(Color color);
-
-  void bindTexture(GLTexture* texture, unsigned textureUnit = 0);
-
-  void bindFramebuffer(GLTexture* texture, FrameBufferTarget target = FrameBufferTarget::Both);
-
-  void useProgram(unsigned programID);
-
-  void bindVertexArray(unsigned vertexArray);
-
-  void setBlendFunc(unsigned srcFactor, unsigned dstFactor);
-
-  void setBlendEquation(unsigned mode);
 
  protected:
   explicit GLGPU(std::shared_ptr<GLInterface> glInterface);
 
  private:
+  std::unique_ptr<GLState> _state = nullptr;
   std::shared_ptr<GLInterface> interface = nullptr;
   std::unique_ptr<GLCommandQueue> commandQueue = nullptr;
-  std::unordered_map<unsigned, bool> capabilities = {};
-  std::vector<uint32_t> textureUnits = {};
-  std::array<int, 4> scissorRect = {0, 0, 0, 0};
-  std::array<int, 4> viewport = {0, 0, 0, 0};
-  std::optional<Color> clearColor = std::nullopt;
-  unsigned activeTextureUint = INVALID_VALUE;
-  unsigned readFramebuffer = INVALID_VALUE;
-  unsigned drawFramebuffer = INVALID_VALUE;
-  unsigned program = INVALID_VALUE;
-  unsigned vertexArray = INVALID_VALUE;
-  unsigned srcBlendFunc = INVALID_VALUE;
-  unsigned dstBlendFunc = INVALID_VALUE;
-  unsigned blendEquation = INVALID_VALUE;
 };
 }  // namespace tgfx

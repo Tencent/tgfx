@@ -19,7 +19,6 @@
 #pragma once
 
 #include "gpu/RenderPass.h"
-#include "gpu/RenderPassDescriptor.h"
 #include "gpu/opengl/GLBuffer.h"
 #include "gpu/opengl/GLInterface.h"
 #include "gpu/opengl/GLRenderPipeline.h"
@@ -33,6 +32,8 @@ class GLRenderPass : public RenderPass {
 
   void begin();
 
+  void setViewport(int x, int y, int width, int height) override;
+
   void setScissorRect(int x, int y, int width, int height) override;
 
   void setPipeline(GPURenderPipeline* pipeline) override;
@@ -45,6 +46,8 @@ class GLRenderPass : public RenderPass {
 
   void setIndexBuffer(GPUBuffer* buffer, IndexFormat format) override;
 
+  void setStencilReference(uint32_t reference) override;
+
   void draw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount) override;
 
   void drawIndexed(PrimitiveType primitiveType, size_t baseIndex, size_t indexCount) override;
@@ -56,5 +59,6 @@ class GLRenderPass : public RenderPass {
   GLGPU* gpu = nullptr;
   GLRenderPipeline* renderPipeline = nullptr;
   IndexFormat indexFormat = IndexFormat::UInt16;
+  uint32_t stencilReference = 0;
 };
 }  // namespace tgfx

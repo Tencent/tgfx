@@ -23,6 +23,7 @@
 #include <vector>
 #include "core/utils/EnumHasher.h"
 #include "core/utils/Log.h"
+#include "gpu/ShaderCaps.h"
 #include "gpu/Swizzle.h"
 #include "tgfx/gpu/Caps.h"
 #include "tgfx/gpu/PixelFormat.h"
@@ -103,15 +104,15 @@ class GLCaps : public Caps {
   bool unpackRowLengthSupport = false;
   bool textureRedSupport = false;
   MSFBOType msFBOType = MSFBOType::None;
-  bool frameBufferFetchRequiresEnablePerSample = false;
-  std::string frameBufferFetchColorName;
-  std::string frameBufferFetchExtensionString;
-  int maxFragmentSamplers = 0;
   bool flushBeforeWritePixels = false;
 
   static const GLCaps* Get(Context* context);
 
   explicit GLCaps(const GLInfo& info);
+
+  const ShaderCaps* shaderCaps() const override {
+    return &_shaderCaps;
+  }
 
   const GLTextureFormat& getTextureFormat(PixelFormat pixelFormat) const;
 
@@ -124,6 +125,7 @@ class GLCaps : public Caps {
   int getSampleCount(int requestedCount, PixelFormat pixelFormat) const override;
 
  private:
+  ShaderCaps _shaderCaps = {};
   std::unordered_map<PixelFormat, ConfigInfo, EnumHasher> pixelFormatMap = {};
 
   void initFormatMap(const GLInfo& info);

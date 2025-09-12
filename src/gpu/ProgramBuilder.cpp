@@ -68,8 +68,9 @@ void ProgramBuilder::emitAndInstallGeoProc(std::string* outputColor, std::string
 
   GeometryProcessor::FPCoordTransformHandler transformHandler(programInfo, &transformedCoordVars);
   GeometryProcessor::EmitArgs args(vertexShaderBuilder(), fragmentShaderBuilder(), varyingHandler(),
-                                   uniformHandler(), getContext()->caps(), *outputColor,
-                                   *outputCoverage, &transformHandler, &subsetVarName);
+                                   uniformHandler(), getContext()->caps()->shaderCaps(),
+                                   *outputColor, *outputCoverage, &transformHandler,
+                                   &subsetVarName);
   geometryProcessor->emitCode(args);
   fragmentShaderBuilder()->codeAppend("}");
 }

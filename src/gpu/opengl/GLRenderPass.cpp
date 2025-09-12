@@ -33,48 +33,63 @@ void GLRenderPass::begin() {
   auto& colorAttachment = descriptor.colorAttachments[0];
   DEBUG_ASSERT(colorAttachment.texture != nullptr);
   auto renderTexture = static_cast<GLTexture*>(colorAttachment.texture);
-  gpu->bindFramebuffer(renderTexture);
+  auto state = gpu->state();
+  state->bindFramebuffer(renderTexture);
   auto gl = gpu->functions();
   // Set the viewport to cover the entire color attachment by default.
-  gpu->setViewport(0, 0, renderTexture->width(), renderTexture->height());
+  state->setViewport(0, 0, renderTexture->width(), renderTexture->height());
   // Disable scissor test by default.
-  gpu->enableCapability(GL_SCISSOR_TEST, false);
+  state->setEnabled(GL_SCISSOR_TEST, false);
   if (colorAttachment.loadAction == LoadAction::Clear) {
-    gpu->setClearColor(colorAttachment.clearValue);
+    state->setClearColor(colorAttachment.clearValue);
     gl->clear(GL_COLOR_BUFFER_BIT);
   }
 }
 
+void GLRenderPass::setViewport(int x, int y, int width, int height) {
+  auto state = gpu->state();
+  state->setViewport(x, y, width, height);
+}
+
 void GLRenderPass::setScissorRect(int x, int y, int width, int height) {
   auto texture = descriptor.colorAttachments[0].texture;
+  auto state = gpu->state();
   if (x == 0 && y == 0 && width == texture->width() && height == texture->height()) {
-    gpu->enableCapability(GL_SCISSOR_TEST, false);
+    state->setEnabled(GL_SCISSOR_TEST, false);
   } else {
-    gpu->enableCapability(GL_SCISSOR_TEST, true);
-    gpu->setScissorRect(x, y, width, height);
+    state->setEnabled(GL_SCISSOR_TEST, true);
+    state->setScissorRect(x, y, width, height);
   }
 }
 
 void GLRenderPass::setPipeline(GPURenderPipeline* pipeline) {
-  DEBUG_ASSERT(pipeline != nullptr);
   if (renderPipeline == pipeline) {
     return;
   }
   renderPipeline = static_cast<GLRenderPipeline*>(pipeline);
-  renderPipeline->activate(gpu);
+  if (renderPipeline != nullptr) {
+    renderPipeline->activate(gpu, stencilReference);
+  }
 }
 
 void GLRenderPass::setUniformBytes(unsigned binding, const void* data, size_t size) {
-  DEBUG_ASSERT(renderPipeline != nullptr);
+  if (renderPipeline == nullptr) {
+    LOGE("GLRenderPass::setUniformBytes: renderPipeline is null!");
+    return;
+  }
   renderPipeline->setUniformBytes(gpu, binding, data, size);
 }
 
 void GLRenderPass::setTexture(unsigned binding, GPUTexture* texture, GPUSampler* sampler) {
-  DEBUG_ASSERT(texture != nullptr);
-  auto glTexture = static_cast<GLTexture*>(texture);
-  auto glSampler = static_cast<GLSampler*>(sampler);
-  gpu->bindTexture(glTexture, binding);
-  glTexture->updateSampler(gpu, glSampler);
+  if (texture == nullptr) {
+    return;
+  }
+  if (renderPipeline == nullptr) {
+    LOGE("GLRenderPass::setTexture: renderPipeline is null!");
+    return;
+  }
+  renderPipeline->setTexture(gpu, binding, static_cast<GLTexture*>(texture),
+                             static_cast<GLSampler*>(sampler));
   auto renderTexture = descriptor.colorAttachments[0].texture;
   auto caps = static_cast<const GLCaps*>(gpu->caps());
   if (texture == renderTexture && caps->textureRedSupport) {
@@ -84,16 +99,32 @@ void GLRenderPass::setTexture(unsigned binding, GPUTexture* texture, GPUSampler*
 }
 
 void GLRenderPass::setVertexBuffer(GPUBuffer* buffer, size_t offset) {
-  DEBUG_ASSERT(renderPipeline != nullptr);
-  renderPipeline->setVertexBuffer(gpu, buffer, offset);
+  if (renderPipeline == nullptr) {
+    LOGE("GLRenderPass::setVertexBuffer: renderPipeline is null!");
+    return;
+  }
+  renderPipeline->setVertexBuffer(gpu, static_cast<GLBuffer*>(buffer), offset);
 }
 
 void GLRenderPass::setIndexBuffer(GPUBuffer* buffer, IndexFormat format) {
-  DEBUG_ASSERT(renderPipeline != nullptr);
+  if (renderPipeline == nullptr) {
+    LOGE("GLRenderPass::setIndexBuffer: renderPipeline is null!");
+    return;
+  }
   auto bufferID = buffer ? static_cast<GLBuffer*>(buffer)->bufferID() : 0;
   auto gl = gpu->functions();
   gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, bufferID);
   indexFormat = format;
+}
+
+void GLRenderPass::setStencilReference(uint32_t reference) {
+  if (reference == stencilReference) {
+    return;
+  }
+  if (renderPipeline != nullptr) {
+    renderPipeline->setStencilReference(gpu, reference);
+  }
+  stencilReference = reference;
 }
 
 void GLRenderPass::onEnd() {
@@ -104,10 +135,11 @@ void GLRenderPass::onEnd() {
     auto renderTexture = static_cast<GLTexture*>(attachment.texture);
     auto sampleTexture = static_cast<GLTexture*>(attachment.resolveTexture);
     DEBUG_ASSERT(renderTexture != sampleTexture);
-    gpu->bindFramebuffer(renderTexture, FrameBufferTarget::Read);
-    gpu->bindFramebuffer(sampleTexture, FrameBufferTarget::Draw);
+    auto state = gpu->state();
+    state->bindFramebuffer(renderTexture, FrameBufferTarget::Read);
+    state->bindFramebuffer(sampleTexture, FrameBufferTarget::Draw);
     // MSAA resolve may be affected by the scissor test, so disable it here.
-    gpu->enableCapability(GL_SCISSOR_TEST, false);
+    state->setEnabled(GL_SCISSOR_TEST, false);
     if (caps->msFBOType == MSFBOType::ES_Apple) {
       gl->resolveMultisampleFramebuffer();
     } else {

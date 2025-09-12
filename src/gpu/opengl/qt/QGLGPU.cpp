@@ -62,7 +62,7 @@ std::vector<std::unique_ptr<GPUTexture>> QGLGPU::importHardwareTextures(
   if (texture == nullptr) {
     return {};
   }
-  if (!texture->checkFrameBuffer(this)) {
+  if (usage & GPUTextureUsage::RENDER_ATTACHMENT && !texture->checkFrameBuffer(this)) {
     texture->release(this);
     return {};
   }

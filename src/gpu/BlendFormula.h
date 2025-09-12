@@ -20,75 +20,11 @@
 
 #include <cstdint>
 #include <cstring>
+#include "gpu/BlendFactor.h"
+#include "gpu/BlendOperation.h"
 #include "tgfx/core/BlendMode.h"
 
 namespace tgfx {
-enum class BlendModeCoeff {
-  /**
-   * 0
-   */
-  Zero,
-  /**
-   * 1
-   */
-  One,
-  /**
-   * src color
-   */
-  SC,
-  /**
-   * inverse src color (i.e. 1 - sc)
-   */
-  ISC,
-  /**
-   * dst color
-   */
-  DC,
-  /**
-   * inverse dst color (i.e. 1 - dc)
-   */
-  IDC,
-  /**
-   * src alpha
-   */
-  SA,
-  /**
-   * inverse src alpha (i.e. 1 - sa)
-   */
-  ISA,
-  /**
-   * dst alpha
-   */
-  DA,
-  /**
-   * inverse dst alpha (i.e. 1 - da)
-   */
-  IDA,
-  /**
-   * src color * src color
-   */
-  S2C,
-  /**
-   * inverse src1 color
-   */
-  IS2C,
-  /**
-   * src1 alpha
-   */
-  S2A,
-  /**
-   * inverse src1 alpha
-   */
-  IS2A
-};
-
-enum class BlendEquation {
-  // Basic blend equations.
-  Add,              //<! Cs*S + Cd*D
-  Subtract,         //<! Cs*S - Cd*D
-  ReverseSubtract,  //<! Cd*D - Cs*S
-};
-
 struct BlendFormula {
   /**
     * Values the shader can write to primary and secondary outputs. These are all modulated by
@@ -105,15 +41,15 @@ struct BlendFormula {
 
   BlendFormula() {
     // default to src-over blendmode
-    bitFields.equation = static_cast<uint8_t>(BlendEquation::Add);
-    bitFields.srcCoeff = static_cast<uint8_t>(BlendModeCoeff::One);
-    bitFields.dstCoeff = static_cast<uint8_t>(BlendModeCoeff::ISA);
+    bitFields.equation = static_cast<uint8_t>(BlendOperation::Add);
+    bitFields.srcCoeff = static_cast<uint8_t>(BlendFactor::One);
+    bitFields.dstCoeff = static_cast<uint8_t>(BlendFactor::OneMinusSrcAlpha);
     bitFields.primaryOutputType = static_cast<uint8_t>(OutputType::Modulate);
     bitFields.secondaryOutputType = static_cast<uint8_t>(OutputType::None);
   }
 
   constexpr BlendFormula(OutputType primaryOutputType, OutputType secondaryOutputType,
-                         BlendEquation eq, BlendModeCoeff src, BlendModeCoeff dst) {
+                         BlendOperation eq, BlendFactor src, BlendFactor dst) {
     bitFields.primaryOutputType = static_cast<uint8_t>(primaryOutputType);
     bitFields.secondaryOutputType = static_cast<uint8_t>(secondaryOutputType);
     bitFields.equation = static_cast<uint8_t>(eq);
@@ -133,16 +69,16 @@ struct BlendFormula {
     return static_cast<OutputType>(bitFields.secondaryOutputType);
   }
 
-  BlendEquation equation() const {
-    return static_cast<BlendEquation>(bitFields.equation);
+  BlendOperation operation() const {
+    return static_cast<BlendOperation>(bitFields.equation);
   }
 
-  BlendModeCoeff srcCoeff() const {
-    return static_cast<BlendModeCoeff>(bitFields.srcCoeff);
+  BlendFactor srcFactor() const {
+    return static_cast<BlendFactor>(bitFields.srcCoeff);
   }
 
-  BlendModeCoeff dstCoeff() const {
-    return static_cast<BlendModeCoeff>(bitFields.dstCoeff);
+  BlendFactor dstFactor() const {
+    return static_cast<BlendFactor>(bitFields.dstCoeff);
   }
 
  private:

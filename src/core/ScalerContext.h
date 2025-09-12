@@ -65,6 +65,10 @@ class ScalerContext {
   virtual bool readPixels(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
                           const ImageInfo& dstInfo, void* dstPixels) const = 0;
 
+  virtual float getBackingSize() const {
+    return textSize;
+  }
+
  protected:
   // Note: This could be nullptr.
   std::shared_ptr<Typeface> typeface = nullptr;

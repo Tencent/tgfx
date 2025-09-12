@@ -21,7 +21,6 @@
 #include "gpu/ProgramBuilder.h"
 
 namespace tgfx {
-static const std::string OES_TEXTURE_EXTENSION = "GL_OES_EGL_image_external";
 
 std::string UniformHandler::addUniform(const std::string& name, UniformFormat format,
                                        ShaderStage stage) {
@@ -42,8 +41,9 @@ SamplerHandle UniformHandler::addSampler(GPUTexture* texture, const std::string&
   UniformFormat format;
   switch (texture->type()) {
     case GPUTextureType::External:
-      programBuilder->fragmentShaderBuilder()->addFeature(PrivateFeature::OESTexture,
-                                                          OES_TEXTURE_EXTENSION);
+      programBuilder->fragmentShaderBuilder()->addFeature(
+          PrivateFeature::OESTexture,
+          programBuilder->getContext()->caps()->shaderCaps()->oesTextureExtension);
       format = UniformFormat::TextureExternalSampler;
       break;
     case GPUTextureType::Rectangle:
@@ -71,20 +71,20 @@ std::unique_ptr<UniformBuffer> UniformHandler::makeUniformBuffer(ShaderStage sta
     return nullptr;
   }
 
-  if (stage == ShaderStage::Fragment && fragmentUniforms.empty() && samplers.empty()) {
+  if (stage == ShaderStage::Fragment && fragmentUniforms.empty()) {
     return nullptr;
   }
 
-  auto caps = programBuilder->getContext()->caps();
+  auto shaderCaps = programBuilder->getContext()->caps()->shaderCaps();
   return std::unique_ptr<UniformBuffer>(new UniformBuffer(
-      stage == ShaderStage::Vertex ? vertexUniforms : fragmentUniforms, caps->uboSupport));
+      stage == ShaderStage::Vertex ? vertexUniforms : fragmentUniforms, shaderCaps->uboSupport));
 }
 
 std::string UniformHandler::getUniformDeclarations(ShaderStage stage) const {
   std::string ret;
   auto& uniforms = stage == ShaderStage::Vertex ? vertexUniforms : fragmentUniforms;
-  auto caps = programBuilder->getContext()->caps();
-  if (caps->uboSupport) {
+  auto shaderCaps = programBuilder->getContext()->caps()->shaderCaps();
+  if (shaderCaps->uboSupport) {
     ret += programBuilder->getUniformBlockDeclaration(stage, uniforms);
   } else {
     for (auto& uniform : uniforms) {

@@ -89,6 +89,6 @@ class GLTexture : public GPUTexture {
   int lastMinFilter = 0;
   int lastMagFilter = 0;
 
-  friend class GLGPU;
+  friend class GLState;
 };
 }  // namespace tgfx

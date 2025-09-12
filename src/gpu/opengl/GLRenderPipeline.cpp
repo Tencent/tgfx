@@ -19,269 +19,143 @@
 #include "GLRenderPipeline.h"
 #include "gpu/UniformBuffer.h"
 #include "gpu/opengl/GLGPU.h"
+#include "gpu/opengl/GLUtil.h"
 
 namespace tgfx {
-
-static const unsigned XfermodeCoeff2Blend[] = {
-    GL_ZERO,       GL_ONE,
-    GL_SRC_COLOR,  GL_ONE_MINUS_SRC_COLOR,
-    GL_DST_COLOR,  GL_ONE_MINUS_DST_COLOR,
-    GL_SRC_ALPHA,  GL_ONE_MINUS_SRC_ALPHA,
-    GL_DST_ALPHA,  GL_ONE_MINUS_DST_ALPHA,
-    GL_SRC1_COLOR, GL_ONE_MINUS_SRC1_COLOR,
-    GL_SRC1_ALPHA, GL_ONE_MINUS_SRC1_ALPHA,
-};
-
-static const unsigned XfermodeEquation2Blend[] = {
-    GL_FUNC_ADD,
-    GL_FUNC_SUBTRACT,
-    GL_FUNC_REVERSE_SUBTRACT,
-};
-
-static constexpr int VERTEX_UBO_BINDING_POINT = 0;
-static constexpr int FRAGMENT_UBO_BINDING_POINT = 1;
-
-struct AttribLayout {
-  bool normalized = false;
-  int count = 0;
-  unsigned type = 0;
-};
-
-GLRenderPipeline::GLRenderPipeline(unsigned programID, std::unique_ptr<UniformLayout> uniformLayout,
-                                   std::vector<Attribute> attribs,
-                                   std::unique_ptr<BlendFormula> blendFormula)
-    : programID(programID), uniformLayout(std::move(uniformLayout)), attributes(std::move(attribs)),
-      blendFormula(std::move(blendFormula)) {
-  DEBUG_ASSERT(!attributes.empty());
-  size_t offset = 0;
-  for (auto& attribute : attributes) {
-    offset += attribute.size();
-  }
-  vertexStride = static_cast<int>(offset);
+GLRenderPipeline::GLRenderPipeline(unsigned programID) : programID(programID) {
 }
 
-void GLRenderPipeline::activate(GLGPU* gpu) {
-  auto gl = gpu->functions();
-  auto caps = static_cast<const GLCaps*>(gpu->caps());
-  gpu->useProgram(programID);
-  if (caps->frameBufferFetchSupport && caps->frameBufferFetchRequiresEnablePerSample) {
-    if (blendFormula == nullptr) {
-      gpu->enableCapability(GL_FETCH_PER_SAMPLE_ARM, true);
+void GLRenderPipeline::activate(GLGPU* gpu, unsigned stencilReference) {
+  auto state = gpu->state();
+  state->useProgram(programID);
+  auto shaderCaps = gpu->caps()->shaderCaps();
+  if (shaderCaps->frameBufferFetchSupport && shaderCaps->frameBufferFetchRequiresEnablePerSample) {
+    if (blendState) {
+      state->setEnabled(GL_FETCH_PER_SAMPLE_ARM, false);
     } else {
-      gpu->enableCapability(GL_FETCH_PER_SAMPLE_ARM, false);
+      state->setEnabled(GL_FETCH_PER_SAMPLE_ARM, true);
     }
   }
-  if (blendFormula == nullptr || (blendFormula->srcCoeff() == BlendModeCoeff::One &&
-                                  blendFormula->dstCoeff() == BlendModeCoeff::Zero &&
-                                  (blendFormula->equation() == BlendEquation::Add ||
-                                   blendFormula->equation() == BlendEquation::Subtract))) {
-    // There is no need to enable blending if the blend mode is src.
-    gpu->enableCapability(GL_BLEND, false);
-  } else {
-    gpu->enableCapability(GL_BLEND, true);
-    gpu->setBlendFunc(XfermodeCoeff2Blend[static_cast<int>(blendFormula->srcCoeff())],
-                      XfermodeCoeff2Blend[static_cast<int>(blendFormula->dstCoeff())]);
-    gpu->setBlendEquation(XfermodeEquation2Blend[static_cast<int>(blendFormula->equation())]);
+  state->setColorMask(colorWriteMask);
+
+  state->setEnabled(GL_STENCIL_TEST, stencilState != nullptr);
+  if (stencilState) {
+    stencilState->reference = stencilReference;
+    state->setStencilState(*stencilState);
   }
-  if (caps->vertexArrayObjectSupport) {
-    if (vertexArray == 0) {
-      gl->genVertexArrays(1, &vertexArray);
-    }
-    if (vertexArray > 0) {
-      gpu->bindVertexArray(vertexArray);
-    }
+  state->setEnabled(GL_DEPTH_TEST, depthState != nullptr);
+  if (depthState) {
+    state->setDepthState(*depthState);
   }
-}
-
-void GLRenderPipeline::setUniformBytesForUBO(GLGPU* gpu, unsigned binding, const void* data,
-                                             size_t size) {
-  auto gl = gpu->functions();
-
-  unsigned ubo = 0;
-
-  if (binding == VERTEX_UBO_BINDING_POINT) {
-    if (vertexUBO == 0) {
-      gl->genBuffers(1, &vertexUBO);
-
-      unsigned vertexUniformBlockIndex =
-          gl->getUniformBlockIndex(programID, VertexUniformBlockName.c_str());
-      if (vertexUniformBlockIndex != GL_INVALID_INDEX) {
-        gl->uniformBlockBinding(programID, vertexUniformBlockIndex, VERTEX_UBO_BINDING_POINT);
-      }
-    }
-
-    ubo = vertexUBO;
-  } else if (binding == FRAGMENT_UBO_BINDING_POINT) {
-    if (fragmentUBO == 0) {
-      gl->genBuffers(1, &fragmentUBO);
-
-      unsigned fragmentUniformBlockIndex =
-          gl->getUniformBlockIndex(programID, FragmentUniformBlockName.c_str());
-      if (fragmentUniformBlockIndex != GL_INVALID_INDEX) {
-        gl->uniformBlockBinding(programID, fragmentUniformBlockIndex, FRAGMENT_UBO_BINDING_POINT);
-      }
-    }
-
-    ubo = fragmentUBO;
+  state->setEnabled(GL_BLEND, blendState != nullptr);
+  if (blendState) {
+    state->setBlendState(*blendState);
   }
-
-  if (ubo <= 0) {
-    return;
+  if (vertexArray > 0) {
+    state->bindVertexArray(vertexArray);
   }
-
-  gl->bindBuffer(GL_UNIFORM_BUFFER, ubo);
-  gl->bufferData(GL_UNIFORM_BUFFER, static_cast<int32_t>(size), data, GL_STATIC_DRAW);
-  gl->bindBuffer(GL_UNIFORM_BUFFER, 0);
-  gl->bindBufferBase(GL_UNIFORM_BUFFER, binding,
-                     binding == VERTEX_UBO_BINDING_POINT ? vertexUBO : fragmentUBO);
 }
 
 void GLRenderPipeline::setUniformBytes(GLGPU* gpu, unsigned binding, const void* data,
                                        size_t size) {
-  if (data == nullptr || size == 0 || uniformLayout == nullptr) {
+  if (data == nullptr || size == 0) {
     return;
   }
-
-  const auto caps = gpu->caps();
-  if (caps->uboSupport && !uniformLayout->uniformBlockNames.empty()) {
-    setUniformBytesForUBO(gpu, binding, data, size);
+  auto result = uniformBlocks.find(binding);
+  if (result == uniformBlocks.end()) {
+    LOGE("GLRenderPipeline::setUniformBytesForUBO: binding %d not found", binding);
     return;
   }
-
-  if (uniformLayout->vertexUniforms.empty() && uniformLayout->fragmentUniforms.empty()) {
-    return;
-  }
-
-  const auto& uniforms = binding == FRAGMENT_UBO_BINDING_POINT ? uniformLayout->fragmentUniforms
-                                                               : uniformLayout->vertexUniforms;
-
+  auto& block = result->second;
   auto gl = gpu->functions();
-  auto& uniformLocations =
-      binding == FRAGMENT_UBO_BINDING_POINT ? fragmentUniformLocations : vertexUniformLocations;
-  if (uniformLocations.empty()) {
-    uniformLocations.reserve(uniforms.size());
-    for (auto& uniform : uniforms) {
-      auto location = gl->getUniformLocation(programID, uniform.name().c_str());
-      uniformLocations.push_back(location);
-    }
+  if (block.ubo > 0) {
+    gl->bindBuffer(GL_UNIFORM_BUFFER, block.ubo);
+    gl->bufferData(GL_UNIFORM_BUFFER, static_cast<int32_t>(size), data, GL_STATIC_DRAW);
+    gl->bindBufferBase(GL_UNIFORM_BUFFER, binding, block.ubo);
+    return;
   }
-
-  size_t index = 0;
-  size_t offset = 0;
   auto buffer = reinterpret_cast<uint8_t*>(const_cast<void*>(data));
-  for (auto& uniform : uniforms) {
-    auto location = uniformLocations[index];
-    if (location < 0) {
-      continue;
-    }
-    switch (uniform.format()) {
+  for (auto& uniform : block.uniforms) {
+    auto uniformData = buffer + uniform.offset;
+    switch (uniform.format) {
       case UniformFormat::Float:
-        gl->uniform1fv(location, 1, reinterpret_cast<float*>(buffer + offset));
+        gl->uniform1fv(uniform.location, 1, reinterpret_cast<float*>(uniformData));
         break;
       case UniformFormat::Float2:
-        gl->uniform2fv(location, 1, reinterpret_cast<float*>(buffer + offset));
+        gl->uniform2fv(uniform.location, 1, reinterpret_cast<float*>(uniformData));
         break;
       case UniformFormat::Float3:
-        gl->uniform3fv(location, 1, reinterpret_cast<float*>(buffer + offset));
+        gl->uniform3fv(uniform.location, 1, reinterpret_cast<float*>(uniformData));
         break;
       case UniformFormat::Float4:
-        gl->uniform4fv(location, 1, reinterpret_cast<float*>(buffer + offset));
+        gl->uniform4fv(uniform.location, 1, reinterpret_cast<float*>(uniformData));
         break;
       case UniformFormat::Float2x2:
-        gl->uniformMatrix2fv(location, 1, GL_FALSE, reinterpret_cast<float*>(buffer + offset));
+        gl->uniformMatrix2fv(uniform.location, 1, GL_FALSE, reinterpret_cast<float*>(uniformData));
         break;
       case UniformFormat::Float3x3:
-        gl->uniformMatrix3fv(location, 1, GL_FALSE, reinterpret_cast<float*>(buffer + offset));
+        gl->uniformMatrix3fv(uniform.location, 1, GL_FALSE, reinterpret_cast<float*>(uniformData));
         break;
       case UniformFormat::Float4x4:
-        gl->uniformMatrix4fv(location, 1, GL_FALSE, reinterpret_cast<float*>(buffer + offset));
+        gl->uniformMatrix4fv(uniform.location, 1, GL_FALSE, reinterpret_cast<float*>(uniformData));
         break;
       case UniformFormat::Int:
-        gl->uniform1iv(location, 1, reinterpret_cast<int*>(buffer + offset));
+        gl->uniform1iv(uniform.location, 1, reinterpret_cast<int*>(uniformData));
         break;
       case UniformFormat::Int2:
-        gl->uniform2iv(location, 1, reinterpret_cast<int*>(buffer + offset));
+        gl->uniform2iv(uniform.location, 1, reinterpret_cast<int*>(uniformData));
         break;
       case UniformFormat::Int3:
-        gl->uniform3iv(location, 1, reinterpret_cast<int*>(buffer + offset));
+        gl->uniform3iv(uniform.location, 1, reinterpret_cast<int*>(uniformData));
         break;
       case UniformFormat::Int4:
-        gl->uniform4iv(location, 1, reinterpret_cast<int*>(buffer + offset));
+        gl->uniform4iv(uniform.location, 1, reinterpret_cast<int*>(uniformData));
         break;
       case UniformFormat::Texture2DSampler:
       case UniformFormat::TextureExternalSampler:
       case UniformFormat::Texture2DRectSampler:
-        gl->uniform1iv(location, 1, reinterpret_cast<int*>(buffer + offset));
+        gl->uniform1iv(uniform.location, 1, reinterpret_cast<int*>(uniformData));
         break;
     }
-    index++;
-    offset += uniform.size();
   }
 }
 
-static AttribLayout GetAttribLayout(VertexFormat format) {
-  switch (format) {
-    case VertexFormat::Float:
-      return {false, 1, GL_FLOAT};
-    case VertexFormat::Float2:
-      return {false, 2, GL_FLOAT};
-    case VertexFormat::Float3:
-      return {false, 3, GL_FLOAT};
-    case VertexFormat::Float4:
-      return {false, 4, GL_FLOAT};
-    case VertexFormat::Half:
-      return {false, 1, GL_HALF_FLOAT};
-    case VertexFormat::Half2:
-      return {false, 2, GL_HALF_FLOAT};
-    case VertexFormat::Half3:
-      return {false, 3, GL_HALF_FLOAT};
-    case VertexFormat::Half4:
-      return {false, 4, GL_HALF_FLOAT};
-    case VertexFormat::Int:
-      return {false, 1, GL_INT};
-    case VertexFormat::Int2:
-      return {false, 2, GL_INT};
-    case VertexFormat::Int3:
-      return {false, 3, GL_INT};
-    case VertexFormat::Int4:
-      return {false, 4, GL_INT};
-    case VertexFormat::UByteNormalized:
-      return {true, 1, GL_UNSIGNED_BYTE};
-    case VertexFormat::UByte2Normalized:
-      return {true, 2, GL_UNSIGNED_BYTE};
-    case VertexFormat::UByte3Normalized:
-      return {true, 3, GL_UNSIGNED_BYTE};
-    case VertexFormat::UByte4Normalized:
-      return {true, 4, GL_UNSIGNED_BYTE};
+void GLRenderPipeline::setTexture(GLGPU* gpu, unsigned binding, GLTexture* texture,
+                                  GLSampler* sampler) {
+  DEBUG_ASSERT(texture != nullptr);
+  DEBUG_ASSERT(sampler != nullptr);
+  auto result = textureUnits.find(binding);
+  if (result == textureUnits.end()) {
+    LOGE("GLRenderPipeline::setTexture: binding %d not found", binding);
+    return;
   }
-  return {false, 0, 0};
+  auto state = gpu->state();
+  state->bindTexture(texture, result->second);
+  texture->updateSampler(gpu, sampler);
 }
 
-void GLRenderPipeline::setVertexBuffer(GLGPU* gpu, GPUBuffer* vertexBuffer, size_t vertexOffset) {
+void GLRenderPipeline::setVertexBuffer(GLGPU* gpu, GLBuffer* vertexBuffer, size_t vertexOffset) {
   auto gl = gpu->functions();
   if (vertexBuffer == nullptr) {
     gl->bindBuffer(GL_ARRAY_BUFFER, 0);
     return;
   }
   gl->bindBuffer(GL_ARRAY_BUFFER, static_cast<GLBuffer*>(vertexBuffer)->bufferID());
-  if (attributeLocations.empty()) {
-    for (auto& attribute : attributes) {
-      auto location = gl->getAttribLocation(programID, attribute.name().c_str());
-      attributeLocations.push_back(location);
-    }
-  }
-  size_t index = 0;
-  size_t offset = vertexOffset;
   for (auto& attribute : attributes) {
-    auto location = attributeLocations[index++];
-    if (location >= 0) {
-      auto layout = GetAttribLayout(attribute.format());
-      gl->vertexAttribPointer(static_cast<unsigned>(location), layout.count, layout.type,
-                              layout.normalized, vertexStride, reinterpret_cast<void*>(offset));
-      gl->enableVertexAttribArray(static_cast<unsigned>(location));
-    }
-    offset += attribute.size();
+    gl->vertexAttribPointer(static_cast<unsigned>(attribute.location), attribute.count,
+                            attribute.type, attribute.normalized, static_cast<int>(vertexStride),
+                            reinterpret_cast<void*>(attribute.offset + vertexOffset));
+    gl->enableVertexAttribArray(static_cast<unsigned>(attribute.location));
   }
+}
+
+void GLRenderPipeline::setStencilReference(GLGPU* gpu, unsigned reference) {
+  if (stencilState == nullptr) {
+    return;
+  }
+  stencilState->reference = reference;
+  auto state = gpu->state();
+  state->setStencilState(*stencilState);
 }
 
 void GLRenderPipeline::release(GPU* gpu) {
@@ -293,14 +167,175 @@ void GLRenderPipeline::release(GPU* gpu) {
   if (vertexArray > 0) {
     gl->deleteVertexArrays(1, &vertexArray);
   }
+  for (auto& item : uniformBlocks) {
+    auto& uniformBlock = item.second;
+    if (uniformBlock.ubo > 0) {
+      gl->deleteBuffers(1, &uniformBlock.ubo);
+      uniformBlock.ubo = 0;
+    }
+  }
+}
 
-  if (vertexUBO > 0) {
-    gl->deleteBuffers(1, &vertexUBO);
-    vertexUBO = 0;
+static GLAttribute MakeGLAttribute(VertexFormat format, int location, size_t offset) {
+  switch (format) {
+    case VertexFormat::Float:
+      return {location, 1, GL_FLOAT, false, offset};
+    case VertexFormat::Float2:
+      return {location, 2, GL_FLOAT, false, offset};
+    case VertexFormat::Float3:
+      return {location, 3, GL_FLOAT, false, offset};
+    case VertexFormat::Float4:
+      return {location, 4, GL_FLOAT, false, offset};
+    case VertexFormat::Half:
+      return {location, 1, GL_HALF_FLOAT, false, offset};
+    case VertexFormat::Half2:
+      return {location, 2, GL_HALF_FLOAT, false, offset};
+    case VertexFormat::Half3:
+      return {location, 3, GL_HALF_FLOAT, false, offset};
+    case VertexFormat::Half4:
+      return {location, 4, GL_HALF_FLOAT, false, offset};
+    case VertexFormat::Int:
+      return {location, 1, GL_INT, false, offset};
+    case VertexFormat::Int2:
+      return {location, 2, GL_INT, false, offset};
+    case VertexFormat::Int3:
+      return {location, 3, GL_INT, false, offset};
+    case VertexFormat::Int4:
+      return {location, 4, GL_INT, false, offset};
+    case VertexFormat::UByteNormalized:
+      return {location, 1, GL_UNSIGNED_BYTE, true, offset};
+    case VertexFormat::UByte2Normalized:
+      return {location, 2, GL_UNSIGNED_BYTE, true, offset};
+    case VertexFormat::UByte3Normalized:
+      return {location, 3, GL_UNSIGNED_BYTE, true, offset};
+    case VertexFormat::UByte4Normalized:
+      return {location, 4, GL_UNSIGNED_BYTE, true, offset};
   }
-  if (fragmentUBO > 0) {
-    gl->deleteBuffers(1, &fragmentUBO);
-    fragmentUBO = 0;
+  return {location, 0, 0, false, offset};
+}
+
+static std::unique_ptr<GLBlendState> MakeBlendState(const PipelineColorAttachment& attachment) {
+  if (!attachment.blendEnable) {
+    return nullptr;
   }
+  auto blendState = std::make_unique<GLBlendState>();
+  blendState->srcColorFactor = ToGLBlendFactor(attachment.srcColorBlendFactor);
+  blendState->dstColorFactor = ToGLBlendFactor(attachment.dstColorBlendFactor);
+  blendState->srcAlphaFactor = ToGLBlendFactor(attachment.srcAlphaBlendFactor);
+  blendState->dstAlphaFactor = ToGLBlendFactor(attachment.dstAlphaBlendFactor);
+  blendState->colorOp = ToGLBlendOperation(attachment.colorBlendOp);
+  blendState->alphaOp = ToGLBlendOperation(attachment.alphaBlendOp);
+  return blendState;
+}
+
+static GLStencil MakeGLStencil(const StencilDescriptor& descriptor) {
+  GLStencil stencil = {};
+  stencil.compare = ToGLCompareFunction(descriptor.compare);
+  stencil.failOp = ToGLStencilOperation(descriptor.failOp);
+  stencil.depthFailOp = ToGLStencilOperation(descriptor.depthFailOp);
+  stencil.passOp = ToGLStencilOperation(descriptor.passOp);
+  return stencil;
+}
+
+static std::unique_ptr<GLStencilState> MakeStencilState(const DepthStencilDescriptor& descriptor) {
+  auto& stencilFront = descriptor.stencilFront;
+  auto& stencilBack = descriptor.stencilBack;
+  if (stencilFront.compare == CompareFunction::Always &&
+      stencilBack.compare == CompareFunction::Always) {
+    return nullptr;
+  }
+  auto stencilState = std::make_unique<GLStencilState>();
+  stencilState->front = MakeGLStencil(descriptor.stencilFront);
+  stencilState->back = MakeGLStencil(descriptor.stencilBack);
+  stencilState->readMask = descriptor.stencilReadMask;
+  stencilState->writeMask = descriptor.stencilWriteMask;
+  return stencilState;
+}
+
+static std::unique_ptr<GLDepthState> MakeDepthState(const DepthStencilDescriptor& descriptor) {
+  if (descriptor.depthCompare == CompareFunction::Always) {
+    return nullptr;
+  }
+  auto depthState = std::make_unique<GLDepthState>();
+  depthState->compare = ToGLCompareFunction(descriptor.depthCompare);
+  depthState->writeMask = descriptor.depthWriteEnabled;
+  return depthState;
+}
+
+bool GLRenderPipeline::setPipelineDescriptor(GLGPU* gpu,
+                                             const GPURenderPipelineDescriptor& descriptor) {
+  auto gl = gpu->functions();
+  ClearGLError(gl);
+  auto state = gpu->state();
+  state->useProgram(programID);
+  auto caps = static_cast<const GLCaps*>(gpu->caps());
+  if (caps->vertexArrayObjectSupport) {
+    gl->genVertexArrays(1, &vertexArray);
+    if (vertexArray == 0) {
+      LOGE("GLRenderPipeline::createVertexArrays: failed to create VAO!");
+      return false;
+    }
+  }
+
+  DEBUG_ASSERT(!descriptor.vertex.attributes.empty());
+  DEBUG_ASSERT(descriptor.vertex.vertexStride > 0);
+  size_t vertexOffset = 0;
+  attributes.reserve(descriptor.vertex.attributes.size());
+  for (const auto& attribute : descriptor.vertex.attributes) {
+    auto location = gl->getAttribLocation(programID, attribute.name().c_str());
+    if (location != -1) {
+      attributes.push_back(MakeGLAttribute(attribute.format(), location, vertexOffset));
+    }
+    vertexOffset += attribute.size();
+  }
+  vertexStride = descriptor.vertex.vertexStride;
+
+  DEBUG_ASSERT(descriptor.fragment.colorAttachments.size() == 1);
+  auto& attachment = descriptor.fragment.colorAttachments[0];
+  colorWriteMask = attachment.colorWriteMask;
+  stencilState = MakeStencilState(descriptor.depthStencil);
+  depthState = MakeDepthState(descriptor.depthStencil);
+  blendState = MakeBlendState(attachment);
+
+  for (auto& entry : descriptor.layout.uniformBlocks) {
+    GLUniformBlock block = {};
+    if (entry.uniforms.empty()) {
+      DEBUG_ASSERT(gpu->caps()->shaderCaps()->uboSupport);
+      gl->genBuffers(1, &block.ubo);
+      if (block.ubo == 0) {
+        LOGE("GLRenderPipeline::createUniformBlocks: failed to create UBO!");
+        return false;
+      }
+      auto index = gl->getUniformBlockIndex(programID, entry.name.c_str());
+      if (index != GL_INVALID_INDEX) {
+        gl->uniformBlockBinding(programID, index, entry.binding);
+      }
+    } else {
+      block.uniforms.reserve(entry.uniforms.size());
+      size_t uniformOffset = 0;
+      for (auto& uniform : entry.uniforms) {
+        auto location = gl->getUniformLocation(programID, uniform.name().c_str());
+        if (location != -1) {
+          block.uniforms.push_back({uniform.format(), location, uniformOffset});
+        }
+        uniformOffset += uniform.size();
+      }
+    }
+    uniformBlocks[entry.binding] = block;
+  }
+
+  // Assign texture units to sampler uniforms up front, just once.
+  unsigned textureUint = 0;
+  for (auto& entry : descriptor.layout.textureSamplers) {
+    auto location = gl->getUniformLocation(programID, entry.name.c_str());
+    if (location == -1) {
+      continue;
+    }
+    textureUnits[entry.binding] = textureUint;
+    gl->uniform1i(location, static_cast<int>(textureUint));
+    textureUint++;
+  }
+
+  return CheckGLError(gl);
 }
 }  // namespace tgfx
