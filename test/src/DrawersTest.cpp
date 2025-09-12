@@ -17,13 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/utils/Log.h"
-#include "drawers/Drawer.h"
+#include "hello2d/LayerBuilder.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
-TGFX_TEST(DrawersTest, Compare) {
-  drawers::AppHost appHost(720, 720, 2.0f);
+TGFX_TEST(Hello2DTest, Compare) {
+  hello2d::AppHost appHost(720, 720, 2.0f);
   appHost.addImage("bridge", MakeImage("resources/assets/bridge.jpg"));
+  appHost.addImage("TGFX", MakeImage("resources/assets/tgfx.png"));
   appHost.addTypeface("default", MakeTypeface("resources/font/NotoSansSC-Regular.otf"));
   appHost.addTypeface("emoji", MakeTypeface("resources/font/NotoColorEmoji.ttf"));
 
@@ -32,12 +33,12 @@ TGFX_TEST(DrawersTest, Compare) {
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, appHost.width(), appHost.height(), false, 4);
   auto canvas = surface->getCanvas();
-  auto drawerNames = drawers::Drawer::Names();
-  for (auto& name : drawerNames) {
-    auto drawer = drawers::Drawer::GetByName(name);
-    ASSERT_TRUE(drawer != nullptr);
-    canvas->clear();
-    drawer->draw(canvas, &appHost);
+  auto builderNames = hello2d::LayerBuilder::Names();
+  for (size_t i = 0; i < builderNames.size(); ++i) {
+    const auto& name = builderNames[i];
+    bool isNeedBackground = false;
+    appHost.draw(canvas, static_cast<int>(i), isNeedBackground);
+
     auto key = "DrawersTest/" + name;
     auto result = Baseline::Compare(surface, key);
     if (!result) {
@@ -45,5 +46,6 @@ TGFX_TEST(DrawersTest, Compare) {
       LOGI("Baseline::Compare failed for %s", key.c_str());
     }
   }
+  canvas->clear();
 }
 }  // namespace tgfx

@@ -50,5 +50,5 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../ ./tgfx)
 file(GLOB_RECURSE HELLO_2D_SOURCE_FILES src/*.*)
 add_executable(Hello2D ${HELLO_2D_SOURCE_FILES})
 target_include_directories(Hello2D PRIVATE ${HELLO_2D_INCLUDES} src)
-target_link_libraries(Hello2D tgfx-drawers tgfx ${HELLO_2D_LIBS})
+target_link_libraries(Hello2D tgfx-hello2d tgfx ${HELLO_2D_LIBS})
 
