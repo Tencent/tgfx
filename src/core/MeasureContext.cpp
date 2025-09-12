@@ -50,7 +50,7 @@ void MeasureContext::drawPath(const Path& path, const MCState& state, const Fill
 void MeasureContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill,
                                const Stroke* stroke) {
   DEBUG_ASSERT(shape != nullptr);
-  if (stroke) {
+  if (stroke && !stroke->isHairline()) {
     shape = Shape::ApplyStroke(std::move(shape), stroke);
   }
   if (computeTightBounds) {

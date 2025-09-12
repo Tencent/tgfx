@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ProxyProvider.h"
-#include "core/DeferredShapeInfo.h"
 #include "core/ShapeRasterizer.h"
 #include "core/shapes/MatrixShape.h"
 #include "core/utils/MathExtra.h"
@@ -147,7 +146,7 @@ static UniqueKey AppendClipBoundsKey(const UniqueKey& uniqueKey, const Rect& cli
 }
 
 std::shared_ptr<GPUShapeProxy> ProxyProvider::createGPUShapeProxy(
-    std::shared_ptr<DeferredShapeInfo> deferredShape, AAType aaType, const Rect& clipBounds,
+    std::shared_ptr<StyledShape> deferredShape, AAType aaType, const Rect& clipBounds,
     uint32_t renderFlags) {
   if (deferredShape == nullptr) {
     return nullptr;

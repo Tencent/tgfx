@@ -17,14 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "OpsCompositor.h"
-#include "core/Atlas.h"
-#include "core/DeferredShapeInfo.h"
 #include "core/PathRasterizer.h"
 #include "core/PathRef.h"
 #include "core/PathTriangulator.h"
+#include "core/StyledShape.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/RectToRectMatrix.h"
-#include "core/utils/Types.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ops/AtlasTextOp.h"
@@ -178,7 +176,7 @@ void OpsCompositor::drawShape(std::shared_ptr<Shape> shape, const MCState& state
     }
     drawScale = std::min(state.matrix.getMaxScale(), 1.0f);
   }
-  auto deferredShape = DeferredShapeInfo::Make(shape, stroke, state.matrix);
+  auto deferredShape = StyledShape::Make(shape, stroke, state.matrix);
   if (needDeviceBounds) {
     deviceBounds = shape->isInverseFillType() ? clipBounds : deferredShape->getBounds();
   }
@@ -539,7 +537,7 @@ std::shared_ptr<TextureProxy> OpsCompositor::getClipTexture(const Path& clip, AA
   if (PathTriangulator::ShouldTriangulatePath(clip)) {
     auto clipBounds = Rect::MakeWH(width, height);
     auto shape = Shape::MakeFrom(clip);
-    auto deferredShape = DeferredShapeInfo::Make(shape, nullptr, rasterizeMatrix);
+    auto deferredShape = StyledShape::Make(shape, nullptr, rasterizeMatrix);
     auto shapeProxy =
         proxyProvider()->createGPUShapeProxy(deferredShape, aaType, clipBounds, renderFlags);
     auto uvMatrix = Matrix::MakeTrans(bounds.left, bounds.top);

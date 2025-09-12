@@ -104,7 +104,7 @@ void HitTestContext::drawShape(std::shared_ptr<Shape> shape, const MCState& stat
     return;
   }
   if (shapeHitTest) {
-    if (stroke) {
+    if (stroke && !stroke->isHairline()) {
       shape = Shape::ApplyStroke(std::move(shape), stroke);
     }
     auto path = shape->getPath();

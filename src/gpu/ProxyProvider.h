@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "core/DeferredShapeInfo.h"
+#include "core/StyledShape.h"
 #include "core/utils/BlockBuffer.h"
 #include "core/utils/SlidingWindowTracker.h"
 #include "gpu/AAType.h"
@@ -69,7 +69,7 @@ class ProxyProvider {
    * Creates a GPUShapeProxy for the given Shape. The shape will be released after being uploaded to
    * the GPU.
    */
-  std::shared_ptr<GPUShapeProxy> createGPUShapeProxy(std::shared_ptr<DeferredShapeInfo> shape,
+  std::shared_ptr<GPUShapeProxy> createGPUShapeProxy(std::shared_ptr<StyledShape> shape,
                                                      AAType aaType, const Rect& clipBounds,
                                                      uint32_t renderFlags = 0);
 

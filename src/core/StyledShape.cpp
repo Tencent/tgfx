@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "DeferredShapeInfo.h"
+#include "StyledShape.h"
 #include "core/shapes/MatrixShape.h"
 #include "core/shapes/StrokeShape.h"
 #include "core/utils/ApplyStrokeToBounds.h"
@@ -24,17 +24,15 @@
 
 namespace tgfx {
 
-std::shared_ptr<DeferredShapeInfo> DeferredShapeInfo::Make(std::shared_ptr<Shape> shape,
-                                                           const Stroke* stroke, Matrix matrix) {
+std::shared_ptr<StyledShape> StyledShape::Make(std::shared_ptr<Shape> shape, const Stroke* stroke,
+                                               Matrix matrix) {
   if (shape == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<DeferredShapeInfo>(
-      new DeferredShapeInfo(std::move(shape), stroke, matrix));
+  return std::shared_ptr<StyledShape>(new StyledShape(std::move(shape), stroke, matrix));
 }
 
-DeferredShapeInfo::DeferredShapeInfo(std::shared_ptr<Shape> shape, const Stroke* stroke,
-                                     Matrix matrix)
+StyledShape::StyledShape(std::shared_ptr<Shape> shape, const Stroke* stroke, Matrix matrix)
     : _matrix(matrix) {
   if (shape->type() == Shape::Type::Matrix) {
     // Flatten nested MatrixShapes
@@ -49,23 +47,23 @@ DeferredShapeInfo::DeferredShapeInfo(std::shared_ptr<Shape> shape, const Stroke*
   }
 }
 
-void DeferredShapeInfo::applyMatrix(const Matrix& matrix) {
+void StyledShape::applyMatrix(const Matrix& matrix) {
   _matrix = matrix * _matrix;
 }
 
-Matrix DeferredShapeInfo::matrix() const {
+Matrix StyledShape::matrix() const {
   return _matrix;
 }
 
-void DeferredShapeInfo::setMatrix(const Matrix& matrix) {
+void StyledShape::setMatrix(const Matrix& matrix) {
   _matrix = matrix;
 }
 
-std::shared_ptr<const Shape> DeferredShapeInfo::shape() const {
+std::shared_ptr<const Shape> StyledShape::shape() const {
   return _shape;
 }
 
-Rect DeferredShapeInfo::getBounds() const {
+Rect StyledShape::getBounds() const {
   auto bounds = _shape->getBounds();
   if (_stroke.has_value()) {
     ApplyStrokeToBounds(*_stroke, &bounds, true);
@@ -74,7 +72,7 @@ Rect DeferredShapeInfo::getBounds() const {
   return bounds;
 }
 
-UniqueKey DeferredShapeInfo::getUniqueKey() const {
+UniqueKey StyledShape::getUniqueKey() const {
   auto key = _shape->getUniqueKey();
   if (_stroke.has_value()) {
     key = StrokeShape::MakeUniqueKey(key, *_stroke);
@@ -83,7 +81,7 @@ UniqueKey DeferredShapeInfo::getUniqueKey() const {
   return key;
 }
 
-Path DeferredShapeInfo::getPath() const {
+Path StyledShape::getPath() const {
   auto finalPath = _shape->getPath();
   if (!_stroke.has_value()) {
     finalPath.transform(_matrix);

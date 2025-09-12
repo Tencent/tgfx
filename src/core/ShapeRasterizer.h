@@ -19,7 +19,7 @@
 #pragma once
 
 #include "DataSource.h"
-#include "core/DeferredShapeInfo.h"
+#include "core/StyledShape.h"
 #include "gpu/AAType.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Shape.h"
@@ -42,7 +42,7 @@ class ShapeRasterizer : public DataSource<ShapeBuffer> {
   /**
    * Creates a ShapeRasterizer from a shape.
    */
-  ShapeRasterizer(int width, int height, std::shared_ptr<DeferredShapeInfo> shape, AAType aaType);
+  ShapeRasterizer(int width, int height, std::shared_ptr<StyledShape> shape, AAType aaType);
 
   /**
    * Returns true if the ShapeRasterizer supports asynchronous decoding. If so, the getData()
@@ -62,7 +62,7 @@ class ShapeRasterizer : public DataSource<ShapeBuffer> {
  private:
   int width = 0;
   int height = 0;
-  std::shared_ptr<DeferredShapeInfo> shape = nullptr;
+  std::shared_ptr<StyledShape> shape = nullptr;
   AAType aaType = AAType::None;
 
   std::shared_ptr<Data> makeTriangles(const Path& finalPath) const;

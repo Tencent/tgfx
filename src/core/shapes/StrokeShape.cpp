@@ -32,7 +32,10 @@ std::shared_ptr<Shape> Shape::ApplyStroke(std::shared_ptr<Shape> shape, const St
   if (stroke == nullptr) {
     return shape;
   }
-  if (stroke->width <= 0.0f) {
+  if (stroke->isHairline()) {
+    return nullptr;
+  }
+  if (stroke->width < 0) {
     return shape;
   }
   if (shape->type() != Type::Matrix) {

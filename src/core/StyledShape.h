@@ -32,12 +32,12 @@ namespace tgfx {
  * settings.
  * The actual Path is constructed based on the current member variables when needed.
  */
-class DeferredShapeInfo {
+class StyledShape {
  public:
-  static std::shared_ptr<DeferredShapeInfo> Make(std::shared_ptr<Shape> shape, const Stroke* stroke,
-                                                 Matrix matrix);
+  static std::shared_ptr<StyledShape> Make(std::shared_ptr<Shape> shape, const Stroke* stroke,
+                                           Matrix matrix);
 
-  ~DeferredShapeInfo() = default;
+  ~StyledShape() = default;
 
   void applyMatrix(const Matrix& m);
 
@@ -54,7 +54,7 @@ class DeferredShapeInfo {
   Path getPath() const;
 
  private:
-  DeferredShapeInfo(std::shared_ptr<Shape> shape, const Stroke* stroke, Matrix matrix);
+  StyledShape(std::shared_ptr<Shape> shape, const Stroke* stroke, Matrix matrix);
 
   std::shared_ptr<Shape> _shape = nullptr;
   std::optional<Stroke> _stroke;
