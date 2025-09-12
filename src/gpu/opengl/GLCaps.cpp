@@ -287,6 +287,8 @@ void GLCaps::initGLESSupport(const GLInfo& info) {
   _shaderCaps.usesCustomColorOutputName = version >= GL_VER(3, 0);
   _shaderCaps.varyingIsInOut = version >= GL_VER(3, 0);
   _shaderCaps.textureFuncName = version >= GL_VER(3, 0) ? "texture" : "texture2D";
+  _shaderCaps.oesTextureExtension =
+      version >= GL_VER(3, 0) ? "GL_OES_EGL_image_external_essl3" : "GL_OES_EGL_image_external";
   if (info.hasExtension("GL_EXT_shader_framebuffer_fetch")) {
     _shaderCaps.frameBufferFetchNeedsCustomOutput = version >= GL_VER(3, 0);
     _shaderCaps.frameBufferFetchSupport = true;
