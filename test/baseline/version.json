@@ -111,12 +111,14 @@
         "tile_mode_rgbaaa": "8cb853c",
         "tile_mode_subset": "67961560"
     },
-   "DrawersTest": {
-        "ConicGradient": "b88c0432",
-        "ImageWithMipmap": "b88c0432",
-        "ImageWithShadow": "b88c0432",
-        "RichText": "b88c0432",
-        "SimpleLayerTree": "b88c0432"
+    "DrawersTest": {
+        "ConicGradient": "69683f78",
+        "CustomLayerTreeDrawer": "9060bdb6",
+        "GridBackground": "2ae64df",
+        "ImageWithMipmap": "da590da",
+        "ImageWithShadow": "c26ff3d9",
+        "SimpleLayerTreeDrawer": "9060bdb6",
+        "SimpleText": "6095b909"
     },
     "DstTextureTest": {
         "EmptyLocalBounds": "be94e666",
@@ -334,7 +336,7 @@
     "TextAlignTest": {
         "FontFallbackTest": "9060bdb6",
         "SingleLineTextAlign": "6095b909",
-        "TextAlign": "497fa488",
+        "TextAlign": "e105ec7c",
         "TextAlignBlankLineTest": "6095b909",
         "TextAlignSimulateVerticalTextLayout": "9060bdb6",
         "TextAlignWidth0Height0": "6095b909",
@@ -342,7 +344,7 @@
         "TruncateTextLineTest": "9060bdb6"
     },
     "TypefaceTest": {
-        "CustomImageTypeface": "497fa488",
+        "CustomImageTypeface": "f3146f52",
         "CustomPathTypeface": "42ecc4c7"
     }
 }
