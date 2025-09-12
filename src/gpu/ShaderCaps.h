@@ -101,5 +101,11 @@ class ShaderCaps {
    * "texture2D" for GLSL ES 1.0 and "texture" for GLSL ES 3.0 and later.
    */
   std::string textureFuncName;
+
+  /**
+   * The extension string required to enable OES_EGL_image_external support. This is typically
+   * "GL_OES_EGL_image_external" for OpenGL ES2 and "GL_OES_EGL_image_external_essl3" for OpenGL ES3.
+   */
+  std::string oesTextureExtension;
 };
 }  // namespace tgfx

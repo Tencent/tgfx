@@ -65,9 +65,10 @@ void GLCommandEncoder::copyTextureToTexture(GPUTexture* srcTexture, const Rect& 
     return;
   }
   auto gl = gpu->functions();
+  auto state = gpu->state();
   auto glTexture = static_cast<GLTexture*>(dstTexture);
-  gpu->bindTexture(glTexture);
-  gpu->bindFramebuffer(static_cast<GLTexture*>(srcTexture));
+  state->bindTexture(glTexture);
+  state->bindFramebuffer(static_cast<GLTexture*>(srcTexture));
   auto offsetX = static_cast<int>(dstOffset.x);
   auto offsetY = static_cast<int>(dstOffset.y);
   auto x = static_cast<int>(srcRect.left);
@@ -82,7 +83,8 @@ void GLCommandEncoder::generateMipmapsForTexture(GPUTexture* texture) {
   if (glTexture->mipLevelCount() <= 1 || glTexture->target() != GL_TEXTURE_2D) {
     return;
   }
-  gpu->bindTexture(glTexture);
+  auto state = gpu->state();
+  state->bindTexture(glTexture);
   auto gl = gpu->functions();
   gl->generateMipmap(glTexture->target());
 }
