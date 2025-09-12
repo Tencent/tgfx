@@ -22,6 +22,7 @@
 #include <unordered_map>
 #include "gpu/GPURenderPipeline.h"
 #include "gpu/opengl/GLBuffer.h"
+#include "gpu/opengl/GLState.h"
 #include "gpu/opengl/GLTexture.h"
 
 namespace tgfx {
@@ -58,7 +59,7 @@ class GLRenderPipeline : public GPURenderPipeline {
   /**
    * Binds the shader program so that it is used in subsequent draw calls.
    */
-  void activate(GLGPU* gpu);
+  void activate(GLGPU* gpu, unsigned stencilReference);
 
   /**
    * Sets the uniform data to a specified binding index.
@@ -76,6 +77,11 @@ class GLRenderPipeline : public GPURenderPipeline {
    */
   void setVertexBuffer(GLGPU* gpu, GLBuffer* vertexBuffer, size_t vertexOffset);
 
+  /**
+   * Sets the stencil reference value for stencil testing.
+   */
+  void setStencilReference(GLGPU* gpu, unsigned reference);
+
   void release(GPU* gpu) override;
 
  private:
@@ -85,7 +91,10 @@ class GLRenderPipeline : public GPURenderPipeline {
   size_t vertexStride = 0;
   std::unordered_map<unsigned, GLUniformBlock> uniformBlocks = {};
   std::unordered_map<unsigned, unsigned> textureUnits = {};
-  PipelineColorAttachment colorAttachment = {};
+  uint32_t colorWriteMask = ColorWriteMask::All;
+  std::unique_ptr<GLStencilState> stencilState = nullptr;
+  std::unique_ptr<GLDepthState> depthState = nullptr;
+  std::unique_ptr<GLBlendState> blendState = nullptr;
 
   bool setPipelineDescriptor(GLGPU* gpu, const GPURenderPipelineDescriptor& descriptor);
 

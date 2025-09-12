@@ -135,7 +135,7 @@ class DepthStencilAttachment {
   }
 
   /**
-   * Returns the texture associated with this attachment.
+   * The texture associated with this depth-stencil attachment.
    */
   GPUTexture* texture = nullptr;
 
@@ -283,6 +283,13 @@ class RenderPass {
    * Sets the current index buffer with its format.
    */
   virtual void setIndexBuffer(GPUBuffer* buffer, IndexFormat format = IndexFormat::UInt16) = 0;
+
+  /**
+   * Sets the stencil reference value using during stencil tests with the "replace" stencil
+   * operation (as set in the descriptor of the GPU::createRenderPipeline() method, in the
+   * properties defining the various stencil operations).
+   */
+  virtual void setStencilReference(uint32_t reference) = 0;
 
   /**
    * Draws primitives based on the vertex buffer provided by setVertexBuffer().
