@@ -21,7 +21,7 @@
 #include "gpu/ProgramBuilder.h"
 
 namespace tgfx {
-static const std::string OES_TEXTURE_EXTENSION = "GL_OES_EGL_image_external_essl3";
+static const std::string OES_TEXTURE_EXTENSION = "GL_OES_EGL_image_external";
 
 std::string UniformHandler::addUniform(const std::string& name, UniformFormat format,
                                        ShaderStage stage) {

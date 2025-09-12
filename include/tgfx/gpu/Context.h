@@ -154,9 +154,7 @@ class Context {
   bool flush(BackendSemaphore* signalSemaphore = nullptr);
 
   /**
-   * Submit outstanding work to the gpu from all previously un-submitted flushes. The return
-   * value of the submit method will indicate whether the submission to the GPU was successful.
-   *
+   * Submit outstanding work to the gpu from all previously un-submitted flushes.
    * If the syncCpu flag is true, this function will return once the gpu has finished with all
    * submitted work.
    */
