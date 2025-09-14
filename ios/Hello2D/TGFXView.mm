@@ -18,11 +18,11 @@
 
 #import "TGFXView.h"
 #include <cmath>
-#include "drawers/Drawer.h"
+#include "hello2d/LayerBuilder.h"
 
 @implementation TGFXView {
   std::shared_ptr<tgfx::EAGLWindow> tgfxWindow;
-  std::unique_ptr<drawers::AppHost> appHost;
+  std::unique_ptr<hello2d::AppHost> appHost;
 }
 
 + (Class)layerClass {
@@ -57,10 +57,13 @@
   auto width = static_cast<int>(roundf(self.layer.bounds.size.width * self.layer.contentsScale));
   auto height = static_cast<int>(roundf(self.layer.bounds.size.height * self.layer.contentsScale));
   if (appHost == nullptr) {
-    appHost = std::make_unique<drawers::AppHost>();
+    appHost = std::make_unique<hello2d::AppHost>();
     NSString* imagePath = [[NSBundle mainBundle] pathForResource:@"bridge" ofType:@"jpg"];
     auto image = tgfx::Image::MakeFromFile(imagePath.UTF8String);
     appHost->addImage("bridge", image);
+    imagePath = [[NSBundle mainBundle] pathForResource:@"tgfx" ofType:@"png"];
+    image = tgfx::Image::MakeFromFile(imagePath.UTF8String);
+    appHost->addImage("TGFX", image);
     auto typeface = tgfx::Typeface::MakeFromName("PingFang SC", "");
     appHost->addTypeface("default", typeface);
     typeface = tgfx::Typeface::MakeFromName("Apple Color Emoji", "");
@@ -71,42 +74,51 @@
     tgfxWindow->invalidSize();
   }
 }
+- (void)markDirty {
+  appHost->markDirty();
+}
 
-- (void)draw:(int)index zoom:(float)zoom offset:(CGPoint)offset {
+- (BOOL)draw:(int)drawIndex zoom:(float)zoom offset:(CGPoint)offset {
+  if (!appHost->isDirty()) {
+    return false;
+  }
+  appHost->resetDirty();
   if (self.window == nil) {
-    return;
+    return true;
   }
   if (appHost->width() <= 0 || appHost->height() <= 0) {
-    return;
+    return true;
   }
   if (tgfxWindow == nullptr) {
     tgfxWindow = tgfx::EAGLWindow::MakeFrom((CAEAGLLayer*)[self layer]);
   }
   if (tgfxWindow == nullptr) {
-    return;
+    return true;
   }
   auto device = tgfxWindow->getDevice();
   auto context = device->lockContext();
   if (context == nullptr) {
-    return;
+    return true;
   }
   auto surface = tgfxWindow->getSurface(context);
   if (surface == nullptr) {
     device->unlock();
-    return;
+    return true;
   }
-  appHost->updateZoomAndOffset(zoom, tgfx::Point(offset.x, offset.y));
+
+  appHost->updateZoomAndOffset(
+      zoom, tgfx::Point(static_cast<float>(offset.x), static_cast<float>(offset.y)));
   auto canvas = surface->getCanvas();
   canvas->clear();
-  auto numDrawers = drawers::Drawer::Count() - 1;
-  index = (index % numDrawers) + 1;
-  auto drawer = drawers::Drawer::GetByName("GridBackground");
-  drawer->draw(canvas, appHost.get());
-  drawer = drawers::Drawer::GetByIndex(index);
-  drawer->draw(canvas, appHost.get());
+  auto numBuilders = hello2d::LayerBuilder::Count();
+  auto index = (drawIndex % numBuilders);
+  bool isNeedBackground = true;
+  appHost->draw(canvas, index, isNeedBackground);
   context->flushAndSubmit();
   tgfxWindow->present(context);
   device->unlock();
+
+  return true;
 }
 
 @end

@@ -1,8 +1,8 @@
 #include "napi/native_api.h"
 #include <ace/xcomponent/native_interface_xcomponent.h>
 #include "tgfx/gpu/opengl/egl/EGLWindow.h"
-#include "drawers/AppHost.h"
-#include "drawers/Drawer.h"
+#include "hello2d/AppHost.h"
+#include "hello2d/LayerBuilder.h"
 #include "DisplayLink.h"
 
 static float screenDensity = 1.0f;
@@ -10,11 +10,11 @@ static double drawIndex = 0;
 static double zoomScale = 1;
 static double contentOffsetX = 0;
 static double contentOffsetY = 0;
-static std::shared_ptr<drawers::AppHost> appHost = nullptr;
+static std::shared_ptr<hello2d::AppHost> appHost = nullptr;
 static std::shared_ptr<tgfx::Window> window = nullptr;
 static std::shared_ptr<DisplayLink> displayLink = nullptr;
 
-static std::shared_ptr<drawers::AppHost> CreateAppHost();
+static std::shared_ptr<hello2d::AppHost> CreateAppHost();
 
 static napi_value OnUpdateDensity(napi_env env, napi_callback_info info) {
   size_t argc = 1;
@@ -25,6 +25,7 @@ static napi_value OnUpdateDensity(napi_env env, napi_callback_info info) {
   screenDensity = static_cast<float>(value);
   return nullptr;
 }
+
 
 static napi_value AddImageFromEncoded(napi_env env, napi_callback_info info) {
   size_t argc = 2;
@@ -48,36 +49,41 @@ static napi_value AddImageFromEncoded(napi_env env, napi_callback_info info) {
   return nullptr;
 }
 
-static void Draw(int index, float zoom = 1.0f, float offsetX = 0.0f, float offsetY = 0.0f) {
-  if (window == nullptr || appHost == nullptr || appHost->width() <= 0 || appHost->height() <= 0) {
-    return;
+static bool Draw(int drawIndex, float zoom = 1.0f, float offsetX = 0.0f, float offsetY = 0.0f) {
+  if (!appHost || !appHost->isDirty()) {
+    return false;
+  }
+  appHost->resetDirty();
+
+  if (window == nullptr || appHost->width() <= 0 || appHost->height() <= 0) {
+    return true;
   }
   auto device = window->getDevice();
   auto context = device->lockContext();
   if (context == nullptr) {
     printf("Fail to lock context from the Device.\n");
-    return;
+    return true;
   }
   auto surface = window->getSurface(context);
   if (surface == nullptr) {
     device->unlock();
-    return;
+    return true;
   }
+
   appHost->updateZoomAndOffset(zoom, tgfx::Point(offsetX, offsetY));
   auto canvas = surface->getCanvas();
   canvas->clear();
-  canvas->save();
-  auto numDrawers = drawers::Drawer::Count() - 1;
-  index = (index % numDrawers) + 1;
-  auto drawer = drawers::Drawer::GetByName("GridBackground");
-  drawer->draw(canvas, appHost.get());
-  drawer = drawers::Drawer::GetByIndex(index);
-  drawer->draw(canvas, appHost.get());
-  canvas->restore();
+
+  auto index = (drawIndex % hello2d::LayerBuilder::Count());
+  bool isNeedBackground = true;
+  appHost->draw(canvas, index, isNeedBackground);
   context->flushAndSubmit();
   window->present(context);
   device->unlock();
+
+  return true;
 }
+
 
 static napi_value UpdateDrawParams(napi_env env, napi_callback_info info) {
   size_t argc = 4;
@@ -87,19 +93,33 @@ static napi_value UpdateDrawParams(napi_env env, napi_callback_info info) {
   napi_get_value_double(env, args[1], &zoomScale);
   napi_get_value_double(env, args[2], &contentOffsetX);
   napi_get_value_double(env, args[3], &contentOffsetY);
+
+  if (appHost) {
+      appHost->markDirty();
+  }
+
+  if (displayLink) {
+      displayLink->start();
+  }
   return nullptr;
 }
+
 
 static napi_value StartDrawLoop(napi_env, napi_callback_info) {
     if (displayLink == nullptr) {
         displayLink = std::make_shared<DisplayLink>([&]() {
-            Draw(static_cast<int>(drawIndex), static_cast<float>(zoomScale),
+            bool needsRedraw = Draw(static_cast<int>(drawIndex), static_cast<float>(zoomScale),
                  static_cast<float>(contentOffsetX), static_cast<float>(contentOffsetY));
+
+            if (!needsRedraw) {
+                displayLink->stop();
+            }
         });
     }
     displayLink->start();
     return nullptr;
 }
+
 
 static napi_value StopDrawLoop(napi_env, napi_callback_info) {
     if (displayLink != nullptr) {
@@ -108,8 +128,9 @@ static napi_value StopDrawLoop(napi_env, napi_callback_info) {
     return nullptr;
 }
 
-static std::shared_ptr<drawers::AppHost> CreateAppHost() {
-  auto appHost = std::make_shared<drawers::AppHost>();
+
+static std::shared_ptr<hello2d::AppHost> CreateAppHost() {
+  auto appHost = std::make_shared<hello2d::AppHost>();
   static const std::string FallbackFontFileNames[] = {"/system/fonts/HarmonyOS_Sans.ttf",
                                                       "/system/fonts/HarmonyOS_Sans_SC.ttf",
                                                       "/system/fonts/HarmonyOS_Sans_TC.ttf"};
@@ -127,6 +148,7 @@ static std::shared_ptr<drawers::AppHost> CreateAppHost() {
   return appHost;
 }
 
+
 static void UpdateSize(OH_NativeXComponent* component, void* nativeWindow) {
   uint64_t width;
   uint64_t height;
@@ -140,6 +162,10 @@ static void UpdateSize(OH_NativeXComponent* component, void* nativeWindow) {
   appHost->updateScreen(static_cast<int>(width), static_cast<int>(height), screenDensity);
   if (window != nullptr) {
     window->invalidSize();
+    appHost->markDirty();
+    if (displayLink) {
+        displayLink->start();
+    }
   }
 }
 
@@ -162,7 +188,12 @@ static void OnSurfaceCreatedCB(OH_NativeXComponent* component, void* nativeWindo
     printf("OnSurfaceCreatedCB() Invalid surface specified.\n");
     return;
   }
-  Draw(0);
+  if (appHost) {
+    appHost->markDirty();
+    if (displayLink) {
+        displayLink->start();
+    }
+  }
 }
 
 static void RegisterCallback(napi_env env, napi_value exports) {
