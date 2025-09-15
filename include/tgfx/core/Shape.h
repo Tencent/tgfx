@@ -72,11 +72,10 @@ class Shape {
   static std::shared_ptr<Shape> Merge(const std::vector<std::shared_ptr<Shape>>& shapes);
 
   /**
-   * Applies the specified stroke to the given Shape. If stroke is nullptr, the original Shape
-   * is returned. Returns nullptr if the Shape is nullptr.
-   * Note: If the stroke width is less than or equal to zero (hairline), the stroke is not applied,
-   * and nullptr is returned. Hairline strokes are a rendering concept and do not modify the Shape
-   * itself.
+   * Applies the specified stroke to the Shape. If the stroke is nullptr, the original Shape is
+   * returned. Returns nullptr if the Shape is nullptr or if the stroke width is zero or less. 
+   * Note: Hairline strokes (width ≤ 0) are only supported as a rendering feature when set on a
+   * Paint.
    */
   static std::shared_ptr<Shape> ApplyStroke(std::shared_ptr<Shape> shape, const Stroke* stroke);
 

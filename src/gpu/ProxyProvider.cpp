@@ -146,26 +146,26 @@ static UniqueKey AppendClipBoundsKey(const UniqueKey& uniqueKey, const Rect& cli
 }
 
 std::shared_ptr<GPUShapeProxy> ProxyProvider::createGPUShapeProxy(
-    std::shared_ptr<StyledShape> deferredShape, AAType aaType, const Rect& clipBounds,
+    std::shared_ptr<StyledShape> styledShape, AAType aaType, const Rect& clipBounds,
     uint32_t renderFlags) {
-  if (deferredShape == nullptr) {
+  if (styledShape == nullptr) {
     return nullptr;
   }
   Matrix drawingMatrix = {};
-  auto shape = deferredShape->shape();
+  auto shape = styledShape->shape();
   auto isInverseFillType = shape->isInverseFillType();
-  auto matrix = deferredShape->matrix();
+  auto matrix = styledShape->matrix();
   if (!matrix.isIdentity() && !isInverseFillType) {
     auto scales = matrix.getAxisScales();
     if (scales.x == scales.y) {
       DEBUG_ASSERT(scales.x != 0);
       drawingMatrix = matrix;
       drawingMatrix.preScale(1.0f / scales.x, 1.0f / scales.x);
-      deferredShape->setMatrix(Matrix::MakeScale(scales.x));
+      styledShape->setMatrix(Matrix::MakeScale(scales.x));
     }
   }
-  auto shapeBounds = deferredShape->getBounds();
-  auto uniqueKey = deferredShape->getUniqueKey();
+  auto shapeBounds = styledShape->getBounds();
+  auto uniqueKey = styledShape->getUniqueKey();
   if (isInverseFillType) {
     uniqueKey =
         AppendClipBoundsKey(uniqueKey, clipBounds.makeOffset(-shapeBounds.left, -shapeBounds.top));
@@ -194,9 +194,9 @@ std::shared_ptr<GPUShapeProxy> ProxyProvider::createGPUShapeProxy(
   }
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
-  deferredShape->applyMatrix(Matrix::MakeTrans(-bounds.x(), -bounds.y()));
+  styledShape->applyMatrix(Matrix::MakeTrans(-bounds.x(), -bounds.y()));
   auto rasterizer =
-      std::make_unique<ShapeRasterizer>(width, height, std::move(deferredShape), aaType);
+      std::make_unique<ShapeRasterizer>(width, height, std::move(styledShape), aaType);
   std::unique_ptr<DataSource<ShapeBuffer>> dataSource = nullptr;
 #ifdef TGFX_USE_THREADS
   if (!(renderFlags & RenderFlags::DisableAsyncTask) && rasterizer->asyncSupport()) {

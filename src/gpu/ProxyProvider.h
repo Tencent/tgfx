@@ -69,7 +69,7 @@ class ProxyProvider {
    * Creates a GPUShapeProxy for the given Shape. The shape will be released after being uploaded to
    * the GPU.
    */
-  std::shared_ptr<GPUShapeProxy> createGPUShapeProxy(std::shared_ptr<StyledShape> shape,
+  std::shared_ptr<GPUShapeProxy> createGPUShapeProxy(std::shared_ptr<StyledShape> styledShape,
                                                      AAType aaType, const Rect& clipBounds,
                                                      uint32_t renderFlags = 0);
 
