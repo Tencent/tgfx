@@ -79,10 +79,9 @@ std::shared_ptr<TextureProxy> PerspectiveImageFilter::lockTextureProxy(
   const auto viewMatrix = Matrix3D::LookAt(eyePosition, eyeTarget, eyeUp);
   const float nearZ = std::min(NORMAL_NEAR_Z, eyePositionZ * 0.1f);
   const float farZ = std::max(NORMAL_FAR_Z, eyePositionZ * 10.f);
-  const auto perspectiveMatrix = Matrix3D::Perspective(
-      FOV_Y_DEGRESS, renderBounds.width() / renderBounds.height(), nearZ, farZ);
+  const auto perspectiveMatrix =
+      Matrix3D::Perspective(FOV_Y_DEGRESS, sourceW / sourceH, nearZ, farZ);
   const auto transformMatrix = perspectiveMatrix * viewMatrix * modelMatrix;
-
   const auto drawingManager = args.context->drawingManager();
   drawingManager->addRectPerspectiveRenderTask(srcRect, AAType::Coverage, renderTarget,
                                                sourceTextureProxy, transformMatrix);

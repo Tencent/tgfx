@@ -25,7 +25,7 @@ namespace tgfx {
 class GLSLQuadPerEdgeAA3DGeometryProcessor final : public QuadPerEdgeAA3DGeometryProcessor {
  public:
   explicit GLSLQuadPerEdgeAA3DGeometryProcessor(AAType aa, const Matrix3D& transformMatrix,
-                                                const Matrix& adjustMatrix);
+                                                const Vec2& ndcScale, const Vec2& ndcOffset);
 
   void emitCode(EmitArgs& args) const override;
 

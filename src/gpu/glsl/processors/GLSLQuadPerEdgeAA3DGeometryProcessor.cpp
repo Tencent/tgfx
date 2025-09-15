@@ -20,14 +20,20 @@
 
 namespace tgfx {
 
+#define UNIFORM_TRANSFORM_MATRIX_NAME "transformMatrix"
+#define UNIFORM_TRANSFORM_NDC_SCALE_NAME "ndcScale"
+#define UNIFORM_TRANSFORM_NDC_OFFSET_NAME "ndcOffset"
+
 PlacementPtr<QuadPerEdgeAA3DGeometryProcessor> QuadPerEdgeAA3DGeometryProcessor::Make(
-    BlockBuffer* buffer, AAType aa, const Matrix3D& transfromMatrix, const Matrix& adjustMatrix) {
-  return buffer->make<GLSLQuadPerEdgeAA3DGeometryProcessor>(aa, transfromMatrix, adjustMatrix);
+    BlockBuffer* buffer, AAType aa, const Matrix3D& transfromMatrix, const Vec2& ndcScale,
+    const Vec2& ndcOffset) {
+  return buffer->make<GLSLQuadPerEdgeAA3DGeometryProcessor>(aa, transfromMatrix, ndcScale,
+                                                            ndcOffset);
 }
 
 GLSLQuadPerEdgeAA3DGeometryProcessor::GLSLQuadPerEdgeAA3DGeometryProcessor(
-    AAType aa, const Matrix3D& transformMatrix, const Matrix& adjustMatrix)
-    : QuadPerEdgeAA3DGeometryProcessor(aa, transformMatrix, adjustMatrix) {
+    AAType aa, const Matrix3D& transformMatrix, const Vec2& ndcScale, const Vec2& ndcOffset)
+    : QuadPerEdgeAA3DGeometryProcessor(aa, transformMatrix, ndcScale, ndcOffset) {
 }
 
 void GLSLQuadPerEdgeAA3DGeometryProcessor::emitCode(EmitArgs& args) const {
@@ -53,21 +59,22 @@ void GLSLQuadPerEdgeAA3DGeometryProcessor::emitCode(EmitArgs& args) const {
   const auto colorName =
       uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
   fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
-
-  const auto transformMatrixName =
-      uniformHandler->addUniform("transformMatrix", UniformFormat::Float4x4, ShaderStage::Vertex);
-  args.vertBuilder->codeAppendf("vec4 position_trans = %s * vec4(%s, 0.0, 1.0);",
+  const auto transformMatrixName = uniformHandler->addUniform(
+      UNIFORM_TRANSFORM_MATRIX_NAME, UniformFormat::Float4x4, ShaderStage::Vertex);
+  // args.vertBuilder->codeAppend("gl_Position = vec4(position_ndc.x, position_ndc.y, 0.0, 1.0);");
+  args.vertBuilder->codeAppendf("vec4 clipPoint = %s * vec4(%s, 0.0, 1.0);",
                                 transformMatrixName.c_str(), position.name().c_str());
-  args.vertBuilder->codeAppend("vec2 position_ndc = position_trans.xy / position_trans.w;");
-  const auto adjustMatrixName =
-      uniformHandler->addUniform("adjustMatrix", UniformFormat::Float3x3, ShaderStage::Vertex);
-  args.vertBuilder->codeAppendf("position_ndc = (%s * vec3(position_ndc, 1.0)).xy;",
-                                adjustMatrixName.c_str());
+  const auto ndcScaleName = uniformHandler->addUniform(UNIFORM_TRANSFORM_NDC_SCALE_NAME,
+                                                       UniformFormat::Float2, ShaderStage::Vertex);
+  args.vertBuilder->codeAppendf("vec4 clipScale = vec4(%s.xy, 1.0, 1.0);", ndcScaleName.c_str());
+  const auto ndcOffsetName = uniformHandler->addUniform(UNIFORM_TRANSFORM_NDC_OFFSET_NAME,
+                                                        UniformFormat::Float2, ShaderStage::Vertex);
+  args.vertBuilder->codeAppendf("vec4 clipOffset = vec4((%s * clipPoint.w).xy, 1.0, 1.0);",
+                                ndcOffsetName.c_str());
+  args.vertBuilder->codeAppend("gl_Position = clipPoint * clipScale + clipOffset;");
   // TODO: RichardJieChen
-  // args.vertBuilder->emitNormalizedPosition(position.name());
   args.vertBuilder->codeAppend("vec4 tem = tgfx_RTAdjust;");
   //
-  args.vertBuilder->codeAppend("gl_Position = vec4(position_ndc.x, position_ndc.y, 0.0, 1.0);");
 }
 
 void GLSLQuadPerEdgeAA3DGeometryProcessor::setData(UniformBuffer* vertexUniformBuffer,
@@ -76,7 +83,8 @@ void GLSLQuadPerEdgeAA3DGeometryProcessor::setData(UniformBuffer* vertexUniformB
   setTransformDataHelper(Matrix::I(), vertexUniformBuffer, transformIter);
   fragmentUniformBuffer->setData("Color", defaultColor);
   vertexUniformBuffer->setData("transformMatrix", transfromMatrix);
-  vertexUniformBuffer->setData("adjustMatrix", adjustMatrix);
+  vertexUniformBuffer->setData("ndcScale", ndcScale);
+  vertexUniformBuffer->setData("ndcOffset", ndcOffset);
 }
 
 }  // namespace tgfx

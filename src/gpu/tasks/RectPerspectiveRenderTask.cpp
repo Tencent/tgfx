@@ -71,18 +71,18 @@ void RectPerspectiveRenderTask::execute(CommandEncoder* encoder) {
     return;
   }
 
-  const auto ndcScaleX = static_cast<float>(rect.width()) / static_cast<float>(rt->width());
-  const auto ndcScaleY = static_cast<float>(rect.height()) / static_cast<float>(rt->height());
-  auto adjustMatrix = Matrix::MakeScale(ndcScaleX, ndcScaleY);
+  const Vec2 ndcScale(rect.width() / static_cast<float>(rt->width()),
+                      rect.height() / static_cast<float>(rt->height()));
   const auto ndcRect = transformMatrix.mapRect(rect);
   const auto ndcRectScaled =
-      Rect::MakeXYWH(ndcRect.left * ndcScaleX, ndcRect.top * ndcScaleY, ndcRect.width() * ndcScaleX,
-                     ndcRect.height() * ndcScaleY);
-  adjustMatrix.postTranslate(-1.f - ndcRectScaled.left, -1.f - ndcRectScaled.top);
-  const auto geometryProcessor =
-      QuadPerEdgeAA3DGeometryProcessor::Make(drawingBuffer, aa, transformMatrix, adjustMatrix);
+      Rect::MakeXYWH(ndcRect.left * ndcScale.x, ndcRect.top * ndcScale.y,
+                     ndcRect.width() * ndcScale.x, ndcRect.height() * ndcScale.y);
+  const Vec2 ndcOffset(-1.f - ndcRectScaled.left, -1.f - ndcRectScaled.top);
+  const auto geometryProcessor = QuadPerEdgeAA3DGeometryProcessor::Make(
+      drawingBuffer, aa, transformMatrix, ndcScale, ndcOffset);
   const SamplingArgs samplingArgs = {TileMode::Decal, TileMode::Decal, {}, SrcRectConstraint::Fast};
-  const auto fragmentProcessor = TextureEffect::Make(fillTexture, samplingArgs);
+  const auto uvMatrix = Matrix::MakeTrans(-rect.left, -rect.top);
+  const auto fragmentProcessor = TextureEffect::Make(fillTexture, samplingArgs, &uvMatrix);
   const ProgramInfo programInfo((rt.get()), geometryProcessor.get(), {fragmentProcessor.get()}, 1,
                                 nullptr, BlendMode::SrcOver);
   const auto program = std::static_pointer_cast<PipelineProgram>(programInfo.getProgram());

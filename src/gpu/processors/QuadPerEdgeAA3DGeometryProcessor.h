@@ -28,7 +28,8 @@ class QuadPerEdgeAA3DGeometryProcessor : public GeometryProcessor {
  public:
   static PlacementPtr<QuadPerEdgeAA3DGeometryProcessor> Make(BlockBuffer* buffer, AAType aa,
                                                              const Matrix3D& transformMatrix,
-                                                             const Matrix& adjustMatrix);
+                                                             const Vec2& ndcScale,
+                                                             const Vec2& ndcOffset);
 
   std::string name() const override {
     return "QuadPerEdgeAA3DGeometryProcessor";
@@ -38,7 +39,7 @@ class QuadPerEdgeAA3DGeometryProcessor : public GeometryProcessor {
   DEFINE_PROCESSOR_CLASS_ID
 
   explicit QuadPerEdgeAA3DGeometryProcessor(AAType aa, const Matrix3D& transfromMatrix,
-                                            const Matrix& adjustMatrix);
+                                            const Vec2& ndcScale, const Vec2& ndcOffset);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
@@ -50,7 +51,9 @@ class QuadPerEdgeAA3DGeometryProcessor : public GeometryProcessor {
 
   Matrix3D transfromMatrix;
 
-  Matrix adjustMatrix;
+  Vec2 ndcScale;
+
+  Vec2 ndcOffset;
 };
 
 }  // namespace tgfx
