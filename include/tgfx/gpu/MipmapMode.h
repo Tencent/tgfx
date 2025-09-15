@@ -24,7 +24,7 @@ namespace tgfx {
  */
 enum class MipmapMode {
   /**
-   * ignore mipmap levels, sample from the "base"
+   * Ignore mipmap levels, sample from the "base"
    */
   None,
   /**
