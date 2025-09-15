@@ -97,8 +97,8 @@ std::unique_ptr<GPUTexture> GLGPU::createTexture(const GPUTextureDescriptor& des
     auto currentWidth = std::max(1, descriptor.width / twoToTheMipLevel);
     auto currentHeight = std::max(1, descriptor.height / twoToTheMipLevel);
     gl->texImage2D(target, level, static_cast<int>(textureFormat.internalFormatTexImage),
-                   currentWidth, currentHeight, 0, textureFormat.externalFormat, GL_UNSIGNED_BYTE,
-                   nullptr);
+                   currentWidth, currentHeight, 0, textureFormat.externalFormat,
+                   textureFormat.externalType, nullptr);
     success = CheckGLError(gl);
   }
   if (!success) {

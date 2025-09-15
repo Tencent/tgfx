@@ -50,8 +50,18 @@ std::shared_ptr<RenderPass> GLCommandEncoder::onBeginRenderPass(
         "texture and resolve texture cannot be the same!");
     return nullptr;
   }
+  auto& depthStencilAttachment = descriptor.depthStencilAttachment;
+  if (depthStencilAttachment.texture &&
+      depthStencilAttachment.texture->format() != PixelFormat::DEPTH24_STENCIL8) {
+    LOGE(
+        "GLCommandEncoder::beginRenderPass() Invalid render pass descriptor, depthStencil "
+        "attachment texture format must be DEPTH24_STENCIL8!");
+    return nullptr;
+  }
   auto renderPass = std::make_shared<GLRenderPass>(gpu, descriptor);
-  renderPass->begin();
+  if (!renderPass->begin()) {
+    return nullptr;
+  }
   return renderPass;
 }
 
