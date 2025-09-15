@@ -62,7 +62,7 @@ void RectPerspectiveRenderTask::execute(CommandEncoder* encoder) {
     return;
   }
 
-  constexpr auto loadOp = LoadAction::Load;
+  constexpr auto loadOp = LoadAction::Clear;
   const RenderPassDescriptor descriptor(rt->getRenderTexture(), loadOp, StoreAction::Store,
                                         Color::Transparent(), nullptr);
   const auto renderPass = encoder->beginRenderPass(descriptor);
