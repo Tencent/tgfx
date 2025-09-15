@@ -34,16 +34,24 @@ std::shared_ptr<StyledShape> StyledShape::Make(std::shared_ptr<Shape> shape, con
 
 StyledShape::StyledShape(std::shared_ptr<Shape> shape, const Stroke* stroke, Matrix matrix)
     : _matrix(matrix) {
+  if (stroke) {
+    _stroke = *stroke;
+  }
   if (shape->type() == Shape::Type::Matrix) {
     // Flatten nested MatrixShapes
     auto matrixShape = std::static_pointer_cast<MatrixShape>(shape);
-    _matrix = matrix * matrixShape->matrix;
-    _shape = matrixShape->shape;
+    auto scales = matrixShape->matrix.getAxisScales();
+    if (scales.x != scales.y || scales.x > 1.f) {
+      _shape = std::move(shape);
+    } else {
+      _matrix = matrix * matrixShape->matrix;
+      _shape = matrixShape->shape;
+      if (_stroke.has_value() && !_stroke->isHairline()) {
+        _stroke->width /= scales.x;
+      }
+    }
   } else {
     _shape = std::move(shape);
-  }
-  if (stroke) {
-    _stroke = *stroke;
   }
 }
 

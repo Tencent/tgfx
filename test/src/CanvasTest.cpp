@@ -3056,4 +3056,27 @@ TGFX_TEST(CanvasTest, HairLineShape) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/HairLineShape"));
 }
 
+TGFX_TEST(CanvasTest, MatrixShapeStroke) {
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  ASSERT_TRUE(surface != nullptr);
+  auto* canvas = surface->getCanvas();
+
+  Paint paint;
+  paint.setAntiAlias(true);
+  paint.setColor(Color::FromRGBA(255, 0, 0, 255));
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStroke(Stroke(1.0f));
+
+  auto path = Path();
+  path.addRoundRect(Rect::MakeXYWH(0, 0, 8, 8), 2, 2);
+  auto shape = Shape::MakeFrom(path);
+  shape = Shape::ApplyMatrix(shape, Matrix::MakeScale(20, 20));
+  canvas->translate(20, 20);
+  canvas->drawShape(shape, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/MatrixShapeStroke"));
+}
 }  // namespace tgfx
