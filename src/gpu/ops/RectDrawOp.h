@@ -53,6 +53,10 @@ class RectDrawOp : public DrawOp {
 
   void onDraw(RenderPass* renderPass) override;
 
+  Type type() override {
+    return Type::RectDrawOp;
+  }
+
  private:
   size_t rectCount = 0;
   std::optional<Color> commonColor = std::nullopt;

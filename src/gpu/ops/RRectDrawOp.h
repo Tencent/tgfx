@@ -55,6 +55,10 @@ class RRectDrawOp : public DrawOp {
 
   void onDraw(RenderPass* renderPass) override;
 
+  Type type() override {
+    return Type::RRectDrawOp;
+  }
+
  private:
   size_t rectCount = 0;
   bool useScale = false;

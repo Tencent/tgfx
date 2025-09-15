@@ -60,7 +60,6 @@ AtlasTextOp::AtlasTextOp(RectsVertexProvider* provider, std::shared_ptr<TextureP
 }
 
 PlacementPtr<GeometryProcessor> AtlasTextOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {
-  OPERATE_MARK(tgfx::inspect::OpTaskType::RRectDrawOp);
   ATTRIBUTE_NAME("rectCount", static_cast<uint32_t>(rectCount));
   ATTRIBUTE_NAME("commonColor", commonColor);
   auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
