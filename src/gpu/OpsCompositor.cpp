@@ -54,15 +54,17 @@ static bool HasDifferentViewMatrix(const std::vector<PlacementPtr<RectRecord>>& 
   return false;
 }
 
-static SamplingOptions GetAtlasSampling(const Matrix& matrix) {
-  if (!FloatNearlyEqual(std::abs(matrix.getScaleX()), 1.f) ||
-      !FloatNearlyEqual(std::abs(matrix.getScaleY()), 1.f)) {
+static SamplingOptions GetAtlasSampling(const Rect& cellRect, const Matrix& matrix) {
+  // A matrix is considered rotated if it has any skew or if it swaps the x and y axes.
+  if (!FloatNearlyZero(matrix.getSkewX()) || !FloatNearlyZero(matrix.getSkewY())) {
     return SamplingOptions{FilterMode::Linear, MipmapMode::None};
   }
-  // A matrix is considered rotated if it has any skew or if it swaps the x and y axes.
-  auto hasRotated = !FloatNearlyZero(matrix.getSkewX()) || !FloatNearlyZero(matrix.getSkewY());
-  auto filterMode = hasRotated ? FilterMode::Linear : FilterMode::Nearest;
-  return SamplingOptions{filterMode, MipmapMode::None};
+  const auto mappedRect = matrix.mapRect(cellRect);
+  if (!FloatNearlyEqual(cellRect.height(), mappedRect.height()) ||
+      !FloatNearlyEqual(cellRect.width(), mappedRect.width())) {
+    return SamplingOptions{FilterMode::Linear, MipmapMode::None};
+  }
+  return SamplingOptions{FilterMode::Nearest, MipmapMode::None};
 }
 
 OpsCompositor::OpsCompositor(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags,
@@ -701,7 +703,7 @@ void OpsCompositor::fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, co
                                   const MCState& state, const Fill& fill) {
   DEBUG_ASSERT(textureProxy != nullptr);
   DEBUG_ASSERT(!rect.isEmpty());
-  auto sampling = GetAtlasSampling(state.matrix);
+  auto sampling = GetAtlasSampling(rect, state.matrix);
   if (!canAppend(PendingOpType::Atlas, state.clip, fill) || pendingAtlasTexture != textureProxy ||
       pendingSampling != sampling) {
     flushPendingOps(PendingOpType::Atlas, state.clip, fill);

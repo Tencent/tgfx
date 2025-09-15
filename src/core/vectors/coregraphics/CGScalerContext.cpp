@@ -77,20 +77,12 @@ static Strike* FindClosestStrike(std::vector<Strike>& strikes, uint16_t targetPp
   return (diffPrev <= diffCurr) ? &(*prev) : &(*it);
 }
 
-static void CreateBackingFont(CTFontRef ctFont, float textSize, CTFontRef& backingFont) {
+static CTFontRef CreateBackingFont(CTFontRef ctFont, float textSize) {
   const CFDataRef sbix =
       CTFontCopyTable(ctFont, TAG('s', 'b', 'i', 'x'), kCTFontTableOptionNoOptions);
   if (sbix == nullptr) {
-    return;
+    return nullptr;
   }
-
-  auto bytes = CFDataGetBytePtr(sbix);
-  const auto dataLength = static_cast<uint32_t>(CFDataGetLength(sbix));
-  if (dataLength < 8) {
-    CFRelease(sbix);
-    return;
-  }
-
   /** sbix table header
     struct sbixHeader {
       uint16_t version;
@@ -98,16 +90,23 @@ static void CreateBackingFont(CTFontRef ctFont, float textSize, CTFontRef& backi
       uint32_t numStrikes;
     };
   */
+  constexpr uint32_t SBIX_HEADER_SIZE = 8;
+  auto bytes = CFDataGetBytePtr(sbix);
+  const auto dataLength = static_cast<uint32_t>(CFDataGetLength(sbix));
+  if (dataLength < SBIX_HEADER_SIZE) {
+    CFRelease(sbix);
+    return nullptr;
+  }
+
   auto numStrikes = ReadU32BE(bytes + 4);
-  constexpr size_t offsetsStart = 8;
-  if (dataLength < offsetsStart + numStrikes * 4) {
-    numStrikes = (dataLength - 8) / 4;
+  if (dataLength < SBIX_HEADER_SIZE + numStrikes * 4) {
+    numStrikes = (dataLength - SBIX_HEADER_SIZE) / 4;
   }
 
   std::vector<Strike> strikes;
   strikes.reserve(numStrikes);
   for (uint32_t i = 0; i < numStrikes; ++i) {
-    auto strikeOffset = ReadU32BE(bytes + offsetsStart + i * 4);
+    const auto strikeOffset = ReadU32BE(bytes + SBIX_HEADER_SIZE + i * 4);
     if (strikeOffset + 4 > dataLength) {
       continue;
     }
@@ -121,11 +120,11 @@ static void CreateBackingFont(CTFontRef ctFont, float textSize, CTFontRef& backi
             [](const Strike& a, const Strike& b) { return a.ppem < b.ppem; });
   const auto strike = FindClosestStrike(strikes, static_cast<uint16_t>(textSize));
   if (strike == nullptr || FloatNearlyEqual(textSize, static_cast<float>(strike->ppem))) {
-    return;
+    return nullptr;
   }
 
-  backingFont =
-      CTFontCreateCopyWithAttributes(ctFont, static_cast<CGFloat>(strike->ppem), nullptr, nullptr);
+  return CTFontCreateCopyWithAttributes(ctFont, static_cast<CGFloat>(strike->ppem), nullptr,
+                                        nullptr);
 }
 
 CGScalerContext::CGScalerContext(std::shared_ptr<Typeface> tf, float size)
@@ -134,7 +133,7 @@ CGScalerContext::CGScalerContext(std::shared_ptr<Typeface> tf, float size)
   fauxBoldScale = FauxBoldScale(textSize);
   ctFont = CTFontCreateCopyWithAttributes(font, static_cast<CGFloat>(textSize), nullptr, nullptr);
   if (typeface->hasColor() || !typeface->hasOutlines()) {
-    CreateBackingFont(ctFont, textSize, backingFont);
+    backingFont = CreateBackingFont(ctFont, textSize);
   }
 }
 
