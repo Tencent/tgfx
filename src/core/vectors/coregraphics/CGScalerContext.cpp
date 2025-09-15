@@ -85,8 +85,8 @@ static void CreateBackingFont(CTFontRef ctFont, float textSize, CTFontRef& backi
   }
 
   auto bytes = CFDataGetBytePtr(sbix);
-  const auto len = static_cast<uint32_t>(CFDataGetLength(sbix));
-  if (len < 8) {
+  const auto dataLength = static_cast<uint32_t>(CFDataGetLength(sbix));
+  if (dataLength < 8) {
     CFRelease(sbix);
     return;
   }
@@ -100,15 +100,15 @@ static void CreateBackingFont(CTFontRef ctFont, float textSize, CTFontRef& backi
   */
   auto numStrikes = ReadU32BE(bytes + 4);
   constexpr size_t offsetsStart = 8;
-  if (len < offsetsStart + numStrikes * 4) {
-    numStrikes = (len - 8) / 4;
+  if (dataLength < offsetsStart + numStrikes * 4) {
+    numStrikes = (dataLength - 8) / 4;
   }
 
   std::vector<Strike> strikes;
   strikes.reserve(numStrikes);
   for (uint32_t i = 0; i < numStrikes; ++i) {
     auto strikeOffset = ReadU32BE(bytes + offsetsStart + i * 4);
-    if (strikeOffset + 4 > len) {
+    if (strikeOffset + 4 > dataLength) {
       continue;
     }
     auto ppem = ReadU16BE(bytes + strikeOffset + 0);
