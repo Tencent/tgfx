@@ -167,8 +167,8 @@ static bool IsGlyphVisible(const Font& font, GlyphID glyphID, const Rect& clipBo
   return Rect::Intersects(bounds, clipBounds);
 }
 
-void GetGlyphMatrix(Matrix* glyphMatrix, const std::shared_ptr<ScalerContext>& scalerContext,
-                    const Point& glyphOffset, bool fauxItalic) {
+static void GetGlyphMatrix(const std::shared_ptr<ScalerContext>& scalerContext,
+                           const Point& glyphOffset, bool fauxItalic, Matrix* glyphMatrix) {
   glyphMatrix->setTranslate(glyphOffset.x, glyphOffset.y);
   auto scale = scalerContext->getSize() / scalerContext->getBackingSize();
   glyphMatrix->postScale(scale, scale);
@@ -492,7 +492,7 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
     }
 
     auto glyphState = state;
-    GetGlyphMatrix(&glyphState.matrix, font.scalerContext, glyphOffset, font.isFauxItalic());
+    GetGlyphMatrix(font.scalerContext, glyphOffset, font.isFauxItalic(), &glyphState.matrix);
     auto rect = atlasLocator.getLocation();
     ComputeGlyphFinalMatrix(rect, state.matrix, inverseScale, glyphPosition, &glyphState.matrix);
     compositor->fillTextAtlas(std::move(textureProxy), rect, glyphState,
@@ -598,7 +598,7 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
     }
 
     auto glyphState = state;
-    GetGlyphMatrix(&glyphState.matrix, font.scalerContext, glyphOffset, font.isFauxItalic());
+    GetGlyphMatrix(font.scalerContext, glyphOffset, font.isFauxItalic(), &glyphState.matrix);
     auto rect = atlasLocator.getLocation();
     ComputeGlyphFinalMatrix(rect, state.matrix, 1.f / (maxScale * cellScale), glyphPosition,
                             &glyphState.matrix);
