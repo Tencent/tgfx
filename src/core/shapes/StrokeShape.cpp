@@ -35,9 +35,6 @@ std::shared_ptr<Shape> Shape::ApplyStroke(std::shared_ptr<Shape> shape, const St
   if (stroke->isHairline()) {
     return nullptr;
   }
-  if (stroke->width < 0) {
-    return shape;
-  }
   if (shape->type() != Type::Matrix) {
     return std::make_shared<StrokeShape>(std::move(shape), *stroke);
   }
@@ -71,7 +68,7 @@ UniqueKey StrokeShape::MakeUniqueKey(const UniqueKey& key, const Stroke& stroke)
   static const auto WidthStrokeShapeType = UniqueID::Next();
   static const auto CapJoinStrokeShapeType = UniqueID::Next();
   static const auto FullStrokeShapeType = UniqueID::Next();
-  if (stroke.width > 0.f) {
+  if (!stroke.isHairline()) {
     auto hasMiter = stroke.join == LineJoin::Miter && stroke.miterLimit != 4.0f;
     auto hasCapJoin = hasMiter || stroke.cap != LineCap::Butt || stroke.join != LineJoin::Miter;
     size_t count = 2 + (hasCapJoin ? 1 : 0) + (hasMiter ? 1 : 0);

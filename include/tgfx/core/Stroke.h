@@ -87,7 +87,7 @@ class Stroke {
   bool applyToPath(Path* path, float resolutionScale = 1.0f) const;
 
   /**
-   * Returns true if the stroke is a hairline (width == 0).
+   * Returns true if the stroke is a hairline (width <= 0).
    */
   bool isHairline() const;
 

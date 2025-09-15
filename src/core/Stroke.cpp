@@ -63,6 +63,6 @@ bool Stroke::applyToPath(Path* path, float resolutionScale) const {
 }
 
 bool Stroke::isHairline() const {
-  return FloatNearlyZero(width) || width < 0;
+  return width <= 0 || FloatNearlyZero(width);
 }
 }  // namespace tgfx
