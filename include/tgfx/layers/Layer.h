@@ -611,6 +611,9 @@ class Layer : public std::enable_shared_from_this<Layer> {
                                                              const Matrix& viewMatrix,
                                                              bool fullLayer = false) const;
 
+  static std::shared_ptr<Picture> RecorderContour(float contentScale,
+                                                const std::function<void(Canvas*)>& drawFunction);
+
   struct {
     bool dirtyContent : 1;        // layer's content needs updating
     bool dirtyContentBounds : 1;  // layer's content bounds needs updating

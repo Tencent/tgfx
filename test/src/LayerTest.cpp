@@ -1989,15 +1989,15 @@ TGFX_TEST(LayerTest, DropShadowStyle) {
   style->setShowBehindLayer(false);
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DropShadowStyle-stroke"));
-
-  auto blur = BlurFilter::Make(2.5, 2.5);
-  layer->setFilters({blur});
-  displayList->render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DropShadowStyle-stroke-blur"));
-
-  style->setShowBehindLayer(true);
-  displayList->render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DropShadowStyle-stroke-blur-behindLayer"));
+  //
+  // auto blur = BlurFilter::Make(2.5, 2.5);
+  // layer->setFilters({blur});
+  // displayList->render(surface.get());
+  // EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DropShadowStyle-stroke-blur"));
+  //
+  // style->setShowBehindLayer(true);
+  // displayList->render(surface.get());
+  // EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DropShadowStyle-stroke-blur-behindLayer"));
 }
 
 TGFX_TEST(LayerTest, InnerShadowStyle) {

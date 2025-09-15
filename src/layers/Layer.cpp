@@ -20,6 +20,7 @@
 #include <atomic>
 #include "contents/LayerContent.h"
 #include "contents/RasterizedContent.h"
+#include "core/ContourContext.h"
 #include "core/images/PictureImage.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
@@ -42,6 +43,18 @@ struct LayerStyleSource {
   std::shared_ptr<Image> contour = nullptr;
   Point contourOffset = {};
 };
+
+std::shared_ptr<Picture> Layer::RecorderContour(float contentScale,
+                                                const std::function<void(Canvas*)>& drawFunction) {
+  if (drawFunction == nullptr) {
+    return nullptr;
+  }
+  ContourContext contourContext;
+  auto contentCanvas = Canvas(&contourContext);
+  contentCanvas.scale(contentScale, contentScale);
+  drawFunction(&contentCanvas);
+  return contourContext.finishRecordingAsPicture();
+}
 
 static std::shared_ptr<Picture> RecordPicture(float contentScale,
                                               const std::function<void(Canvas*)>& drawFunction) {
@@ -848,9 +861,16 @@ std::shared_ptr<MaskFilter> Layer::getMaskFilter(const DrawArgs& args, float sca
   auto maskType = static_cast<LayerMaskType>(bitFields.maskType);
   maskArgs.drawMode = maskType != LayerMaskType::Contour ? DrawMode::Normal : DrawMode::Contour;
   maskArgs.backgroundContext = nullptr;
-  auto maskPicture = RecordPicture(scale, [&](Canvas* canvas) {
-    _mask->drawLayer(maskArgs, canvas, _mask->_alpha, BlendMode::SrcOver);
-  });
+  std::shared_ptr<Picture> maskPicture = nullptr;
+  if (maskType == LayerMaskType::Contour) {
+    maskPicture = RecorderContour(scale, [&](Canvas* canvas) {
+      _mask->drawLayer(maskArgs, canvas, _mask->_alpha, BlendMode::SrcOver);
+    });
+  } else {
+    maskPicture = RecordPicture(scale, [&](Canvas* canvas) {
+      _mask->drawLayer(maskArgs, canvas, _mask->_alpha, BlendMode::SrcOver);
+    });
+  }
   if (maskPicture == nullptr) {
     return nullptr;
   }
@@ -1077,8 +1097,8 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
     // Child effects are always excluded when drawing the layer contour.
     drawArgs.excludeEffects = true;
     drawArgs.drawMode = DrawMode::Contour;
-    auto contourPicture =
-        RecordPicture(contentScale, [&](Canvas* canvas) { drawContents(drawArgs, canvas, 1.0f); });
+    auto contourPicture = RecorderContour(
+        contentScale, [&](Canvas* canvas) { drawContents(drawArgs, canvas, 1.0f); });
     source->contour = ToImageWithOffset(std::move(contourPicture), &source->contourOffset);
   }
   return source;
