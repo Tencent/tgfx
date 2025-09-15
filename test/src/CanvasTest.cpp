@@ -1130,7 +1130,7 @@ static GLTextureInfo CreateRectangleTexture(Context* context, int width, int hei
   gl->bindTexture(glInfo.target, glInfo.id);
   const auto& textureFormat = GLCaps::Get(context)->getTextureFormat(PixelFormat::RGBA_8888);
   gl->texImage2D(glInfo.target, 0, static_cast<int>(textureFormat.internalFormatTexImage), width,
-                 heigh, 0, textureFormat.externalFormat, GL_UNSIGNED_BYTE, nullptr);
+                 heigh, 0, textureFormat.externalFormat, textureFormat.externalType, nullptr);
   return glInfo;
 }
 
