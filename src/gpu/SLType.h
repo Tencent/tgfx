@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <cstddef>
+
 namespace tgfx {
 /**
  * Types of shader-language-specific boxed variables we can create.
@@ -31,11 +33,14 @@ enum class SLType {
   Float2x2,
   Float3x3,
   Float4x4,
+  Half,
+  Half2,
+  Half3,
+  Half4,
   Int,
   Int2,
   Int3,
   Int4,
-  UByte4Color,
   Texture2DSampler,
   TextureExternalSampler,
   Texture2DRectSampler,

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -89,7 +89,7 @@ class Path {
    * PathVerb::Move points that do not alter the area drawn by the returned rect.
    * @param rect storage for bounds of Rect; may be nullptr.
    */
-  bool isRect(Rect* rect = nullptr) const;
+  bool isRect(Rect* rect = nullptr, bool* closed = nullptr, bool* reversed = nullptr) const;
 
   /**
    * Returns true if this path is equivalent to an oval or circle when filled. Otherwise, returns
@@ -277,6 +277,23 @@ class Path {
    *      5      4
    */
   void addRoundRect(const Rect& rect, float radiusX, float radiusY, bool reversed = false,
+                    unsigned startIndex = 0);
+
+  /**
+   * Adds a round rect to path. creating a new closed contour, each corner is 90 degrees of an
+   * ellipse with radii from the array. The round rect begins at startIndex point and continues
+   * clockwise if reversed is false, counterclockwise if reversed is true. The indices of all points
+   * are as follows:
+   *      0      1
+   *      *------*
+   *   7 *        * 2
+   *     |        |
+   *   6 *        * 3
+   *      *------*
+   *      5      4
+   * Radii order: top-left, top-right, bottom-right, bottom-left
+   */
+  void addRoundRect(const Rect& rect, const std::array<Point, 4>& radii, bool reversed = false,
                     unsigned startIndex = 0);
 
   /**

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -65,7 +65,7 @@ SVGAttributeParser::SVGAttributeParser(const char* str, size_t length)
 
 template <typename F>
 inline bool SVGAttributeParser::advanceWhile(F f) {
-  const auto* initial = currentPos;
+  const auto initial = currentPos;
   while (currentPos < endPos && f(*currentPos)) {
     currentPos++;
   }
@@ -481,7 +481,7 @@ bool SVGAttributeParser::parse(SVGIRI* iri) {
     iriType = SVGIRI::Type::Nonlocal;
   }
 
-  const auto* start = currentPos;
+  const auto start = currentPos;
   if (!this->advanceWhile([](char c) -> bool { return c != ')'; })) {
     return false;
   }
@@ -1004,7 +1004,7 @@ bool SVGAttributeParser::parse(SVGFontFamily* family) {
   } else {
     // The spec allows specifying a comma-separated list for explicit fallback order.
     // For now, we only use the first entry and rely on the font manager to handle fallback.
-    const auto* comma = strchr(currentPos, ',');
+    const auto comma = strchr(currentPos, ',');
     auto family_name = comma ? std::string(currentPos, static_cast<uint32_t>(comma - currentPos))
                              : std::string(currentPos);
     *family = SVGFontFamily(family_name);

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -20,7 +20,6 @@
 
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/core/PathProvider.h"
-#include "tgfx/core/RRect.h"
 #include "tgfx/core/TextBlob.h"
 
 namespace tgfx {
@@ -42,16 +41,22 @@ class Shape {
   static std::shared_ptr<Shape> MakeFrom(Path path);
 
   /**
-   * Creates a new Shape from the given text blob. The Shape uses a resolution scale of 1.0 to get
-   * the path from the text blob. Returns nullptr if the text blob is nullptr or contains a typeface
-   * that can't generate a path, such as bitmap typefaces.
+   * Creates a new Shape from the given text blob. The specified scale is applied to the text blob
+   * before extracting its paths. Returns nullptr if the text blob is nullptr or if none of the
+   * glyphs in the blob can generate a path, such as when using bitmap typefaces.
    */
-  static std::shared_ptr<Shape> MakeFrom(std::shared_ptr<TextBlob> textBlob);
+  static std::shared_ptr<Shape> MakeFrom(std::shared_ptr<TextBlob> textBlob, float scale = 1.0f);
 
   /**
    * Creates a new Shape from the given PathProvider. Returns nullptr if pathProvider is nullptr.
    */
   static std::shared_ptr<Shape> MakeFrom(std::shared_ptr<PathProvider> pathProvider);
+
+  /**
+   * Creates a new Shape from the Font and glyphID. Returns nullptr if the glyphID is 0
+   * or contains a typeface that can't generate a path, such as bitmap typefaces.
+   */
+  static std::shared_ptr<Shape> MakeFrom(Font font, GlyphID glyphID);
 
   /**
    * Merges two Shapes into a new Shape using the specified path operation. If either Shape is
@@ -67,8 +72,10 @@ class Shape {
   static std::shared_ptr<Shape> Merge(const std::vector<std::shared_ptr<Shape>>& shapes);
 
   /**
-   * Applies the specified stroke to the given Shape. If the stroke is nullptr, the original Shape
-   * is returned. Returns nullptr if the Shape is nullptr.
+   * Applies the specified stroke to the Shape. If the stroke is nullptr, the original Shape is
+   * returned. Returns nullptr if the Shape is nullptr or if the stroke width is zero or less. 
+   * Note: Hairline strokes (width ≤ 0) are only supported as a rendering feature when set on a
+   * Paint.
    */
   static std::shared_ptr<Shape> ApplyStroke(std::shared_ptr<Shape> shape, const Stroke* stroke);
 
@@ -94,41 +101,19 @@ class Shape {
   virtual ~Shape() = default;
 
   /**
-   * Returns true if the Shape is a Line and stores points in line. Otherwise, returns false and
-   * leaves line unchanged.
+   * Returns true if the Shape contains a simple path that can be directly retrieved using getPath()
+   * without extra computation.
    */
-  virtual bool isLine(Point line[2] = nullptr) const;
-
-  /**
-   * Returns true if the Shape is a Rect and stores the Rect in rect. Otherwise, returns false and
-   * leaves rect unchanged.
-   */
-  virtual bool isRect(Rect* rect = nullptr) const;
-
-  /**
-   * Returns true if the Shape is an oval or circle and stores the bounding Rect in bounds.
-   * Otherwise, returns false and leaves the bounds unchanged.
-   */
-  virtual bool isOval(Rect* bounds = nullptr) const;
-
-  /**
-   * Returns true if the Shape is a RRect and stores the RRect in rRect. Otherwise, returns false
-   * and leaves rRect unchanged. Please note that this method returns false if the path is
-   * representable as oval, circle, or Rect.
-   */
-  virtual bool isRRect(RRect* rRect = nullptr) const;
-
-  /**
-   * Returns true if the Shape is a simple path without any deferred operations. If it is, the
-   * backing Path is stored in the provided path parameter. Otherwise, it returns false and leaves
-   * the path parameter unchanged.
-   */
-  virtual bool isSimplePath(Path* path = nullptr) const;
+  virtual bool isSimplePath() const {
+    return false;
+  }
 
   /**
    * Returns true if the PathFillType of the computed path is InverseWinding or InverseEvenOdd.
    */
-  virtual bool isInverseFillType() const;
+  virtual bool isInverseFillType() const {
+    return false;
+  }
 
   /**
    * Returns the bounding box of the Shape. The bounds might be larger than the actual shape because
@@ -143,7 +128,7 @@ class Shape {
   virtual Path getPath() const = 0;
 
  protected:
-  enum class Type { Append, Effect, Glyph, Inverse, Matrix, Merge, Path, Stroke, Provider };
+  enum class Type { Append, Effect, Text, Inverse, Matrix, Merge, Path, Stroke, Provider, Glyph };
 
   /**
    * Returns the type of the Shape.
@@ -162,5 +147,7 @@ class Shape {
   friend class ShapeDrawOp;
   friend class ProxyProvider;
   friend class Canvas;
+  friend class Types;
+  friend class StyledShape;
 };
 }  // namespace tgfx

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -19,7 +19,8 @@
 #pragma once
 
 #include <vector>
-#include "ShaderVar.h"
+#include "gpu/ShaderStage.h"
+#include "gpu/ShaderVar.h"
 
 namespace tgfx {
 class ProgramBuilder;
@@ -30,12 +31,15 @@ class Varying {
   const std::string& vsOut() const {
     return _name;
   }
+
   const std::string& fsIn() const {
     return _name;
   }
+
   const std::string& name() const {
     return _name;
   }
+
   SLType type() const {
     return _type;
   }
@@ -43,6 +47,7 @@ class Varying {
  private:
   SLType _type = SLType::Void;
   std::string _name;
+  bool _isFlat = false;
 
   friend class VaryingHandler;
 };
@@ -54,7 +59,7 @@ class VaryingHandler {
 
   virtual ~VaryingHandler() = default;
 
-  Varying addVarying(const std::string& name, SLType type);
+  Varying addVarying(const std::string& name, SLType type, bool isFlat = false);
 
   void emitAttributes(const GeometryProcessor& processor);
 
@@ -64,12 +69,10 @@ class VaryingHandler {
    */
   void finalize();
 
-  void getVertexDecls(std::string* inputDecls, std::string* outputDecls) const;
-
-  void getFragDecls(std::string* inputDecls) const;
+  void getDeclarations(std::string* inputDecls, std::string* outputDecls, ShaderStage stage) const;
 
  private:
-  void appendDecls(const std::vector<ShaderVar>& vars, std::string* out, ShaderFlags flag) const;
+  void appendDecls(const std::vector<ShaderVar>& vars, std::string* out, ShaderStage stage) const;
 
   void addAttribute(const ShaderVar& var);
 

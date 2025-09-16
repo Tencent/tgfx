@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -25,7 +25,6 @@
 #include "tgfx/core/Picture.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/SamplingOptions.h"
-#include "tgfx/core/TileMode.h"
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/ImageOrigin.h"
 #include "tgfx/platform/HardwareBuffer.h"
@@ -36,6 +35,7 @@ template <typename T>
 class PlacementPtr;
 class FPArgs;
 class TPArgs;
+class SamplingArgs;
 class Context;
 class ImageFilter;
 class FragmentProcessor;
@@ -78,12 +78,10 @@ class Image {
   static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ImageGenerator> generator);
 
   /**
-   * Creates an Image from the ImageInfo and shares pixels from the immutable Data object. The
-   * returned Image takes a reference to the pixels. The caller must ensure the pixels are always
-   * the same for the lifetime of the returned Image. If the ImageInfo is unsuitable for direct
-   * texture uploading, the Image will internally create an ImageGenerator for pixel format
-   * conventing instead of an ImageBuffer. Returns nullptr if the ImageInfo is empty or the pixels
-   * are nullptr.
+   * Creates an Image using the provided ImageInfo and pixel data from an immutable Data object. The
+   * returned Image holds a reference to the pixel data. The caller must ensure the pixel data
+   * remains unchanged for the lifetime of the Image. Returns nullptr if the ImageInfo is empty or
+   * the pixel data is nullptr.
    */
   static std::shared_ptr<Image> MakeFrom(const ImageInfo& info, std::shared_ptr<Data> pixels);
 
@@ -106,11 +104,14 @@ class Image {
                                          YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED);
 
   /**
-   * Creates an Image from the given picture with the specified width, height, and matrix.
-   * The picture will be drawn onto the Image using the provided matrix. The returned Image holds a
-   * reference to the picture and replays the drawing commands until it is actually required.
-   * Note: This method may return a different type of Image other than PictureImage if the picture
-   * is simple enough.
+   * Creates an Image from the given picture with the specified width, height, and matrix. The
+   * picture will be drawn onto the Image using the provided matrix. The returned Image keeps a
+   * reference to the picture and replays its drawing commands only when needed. A PictureImage is
+   * not rasterized and does not cache its content, so it can render just the required portions of
+   * the picture to a temporary offscreen image. To cache the entire content at full size, use the
+   * makeRasterized() method on the PictureImage. Note: This method may return a different type of
+   * Image instead of PictureImage if the picture is simple enough to be treated directly as an
+   * Image.
    * @param picture A stream of drawing commands.
    * @param width The width of the Image.
    * @param height The height of the Image.
@@ -214,7 +215,7 @@ class Image {
 
   /**
    * Retrieves the backend texture of the Image. Returns an invalid BackendTexture if the Image is
-   * not backed by a Texture. If the origin is not nullptr, the origin of the backend texture is
+   * not backed by a texture. If the origin is not nullptr, the origin of the backend texture is
    * returned.
    */
   virtual BackendTexture getBackendTexture(Context* context, ImageOrigin* origin = nullptr) const;
@@ -248,24 +249,31 @@ class Image {
   std::shared_ptr<Image> makeOriented(Orientation orientation) const;
 
   /**
-   * Returns a rasterized Image scaled by the specified rasterizationScale. A rasterized Image can
-   * be cached as an independent GPU resource for repeated drawing. By default, an Image directly
-   * backed by an ImageBuffer, an ImageGenerator, or a GPU texture is rasterized. Other image aren’t
-   * rasterized unless implicitly created by this method. For example, if you create a subset Image
-   * from a rasterized Image, the subset Image doesn’t create its own GPU cache but uses the full
-   * resolution cache created by the original Image. If you want the subset Image to create its own
-   * GPU cache, call makeRasterized() on the subset Image. The returned Image always has the same
-   * mipmap state as the original Image.
-   * @param rasterizationScale The factor to scale the Image by when rasterizing. The default value
-   * is 1.0, indicating that the Image should be rasterized at its current size. If the value is
-   * greater than 1.0, it may result in blurring.
-   * @param sampling The sampling options to apply when rasterizing the Image if the
-   * rasterizationScale is not 1.0.
-   * @return If the Image is already rasterized and the rasterizationScale is 1.0, the original
-   * Image is returned. If the rasterizationScale is less than zero, nullptr is returned.
+   * Creates a new Image scaled to the specified width and height. The new Image keeps the
+   * original's mipmap and rasterization settings. If the original Image is rasterized, the scaled
+   * Image will also be rasterized and cached at its new size. If not, the scaled Image won't be
+   * cached and will only render the needed parts to a temporary offscreen image. To cache the
+   * entire scaled Image, use the makeRasterized() method on the returned Image.
+   * @param newWidth Target width of the scaled Image.
+   * @param newHeight Target height of the scaled Image.
+   * @param sampling Sampling options for scaling.
+   * @return The original Image if width and height are unchanged; nullptr if width or height is
+   * less than or equal to 0.
    */
-  virtual std::shared_ptr<Image> makeRasterized(float rasterizationScale = 1.0f,
-                                                const SamplingOptions& sampling = {}) const;
+  std::shared_ptr<Image> makeScaled(int newWidth, int newHeight,
+                                    const SamplingOptions& sampling = {}) const;
+
+  /**
+   * Returns a rasterized Image can be cached as an independent GPU resource for repeated drawing.
+   * By default, an Image directly backed by an ImageBuffer, an ImageGenerator, or a GPU texture is
+   * rasterized. Other image aren’t rasterized unless implicitly created by this method.
+   * For example, if you create a subset Image from a rasterized Image, the subset Image doesn’t
+   * create its own GPU cache but uses the full resolution cache created by the original Image.
+   * If you want the subset Image or scaled Image to create its own GPU cache, call makeRasterized()
+   * on the Image. The returned Image always has the same mipmap state as the original Image.
+   * @return If the Image is already rasterized the original Image is returned.
+   */
+  virtual std::shared_ptr<Image> makeRasterized() const;
 
   /**
    * Returns a filtered Image with the specified filter. The filter has the potential to alter the
@@ -297,13 +305,13 @@ class Image {
     Decoded,
     Filter,
     Generator,
-    Mipmap,
     Orient,
     Picture,
     Rasterized,
     RGBAAA,
     Texture,
-    Subset
+    Subset,
+    Scaled
   };
 
   virtual Type type() const = 0;
@@ -321,24 +329,30 @@ class Image {
   virtual std::shared_ptr<Image> onMakeWithFilter(std::shared_ptr<ImageFilter> filter,
                                                   Point* offset, const Rect* clipRect) const;
 
+  virtual std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
+                                              const SamplingOptions& sampling) const;
+
   /**
-   * Returns a texture proxy for the entire Image.
+   * Returns the scale factor for rasterized cache based on the given draw scale if the subclass's
+   * lockTextureProxy method supports direct downscaling; otherwise, returns 1.0f.
+   */
+  virtual float getRasterizedScale(float drawScale) const;
+
+  /**
+   * Returns a texture proxy for the entire Image. Note that the returned texture size may differ
+   * from the scaling factor in TPArgs, as subclasses can choose whether to apply exact scaling.
    * @param args The TPArgs used to create the texture proxy.
    */
-  virtual std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const;
+  virtual std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const = 0;
 
   /**
    * Returns a fragment processor for the entire Image.
    * @param args The FPArgs used to create the fragment processor.
-   * @param tileModeX The tile mode applied in the x direction.
-   * @param tileModeY The tile mode applied in the y direction.
-   * @param sampling The sampling options used when sampling the Image.
+   * @param samplingArgs The SamplingArgs used to sample the Image.
    * @param uvMatrix The matrix used to transform the uv coordinates.
    */
   virtual PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
-                                                              TileMode tileModeX,
-                                                              TileMode tileModeY,
-                                                              const SamplingOptions& sampling,
+                                                              const SamplingArgs& samplingArgs,
                                                               const Matrix* uvMatrix) const = 0;
 
   friend class FragmentProcessor;
@@ -346,7 +360,8 @@ class Image {
   friend class TransformImage;
   friend class RGBAAAImage;
   friend class RasterizedImage;
+  friend class ScaledImage;
   friend class ImageShader;
-  friend class Caster;
+  friend class Types;
 };
 }  // namespace tgfx

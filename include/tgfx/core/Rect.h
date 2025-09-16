@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -70,26 +70,26 @@ struct Rect {
   }
 
   /**
-   * Returns constructed Rect set to (x, y, x + w, y + h). Does not validate input; w or h may be
-   * negative.
-   */
+  * Returns a Rect constructed as (x, y, x + w, y + h). Input is not validated; w or h may be
+  * negative.
+  */
   static constexpr Rect MakeXYWH(int x, int y, int w, int h) {
     return {static_cast<float>(x), static_cast<float>(y), static_cast<float>(x + w),
             static_cast<float>(y + h)};
   }
 
   /**
-   * Returns constructed Rect set to (0, 0, size.width, size.height). Does not validate input;
-   * size.width or size.height may be negative.
-   */
+  * Returns a Rect constructed as (0, 0, size.width, size.height). Input is not validated;
+  * size.width or size.height may be negative.
+  */
   static constexpr Rect MakeSize(const ISize& size) {
     return Rect{0, 0, static_cast<float>(size.width), static_cast<float>(size.height)};
   }
 
   /**
-   * Returns constructed Rect set to (0, 0, size.width, size.height). Does not validate input;
-   * size.width or size.height may be negative.
-   */
+  * Returns a Rect constructed as (0, 0, size.width, size.height). Input is not validated;
+  * size.width or size.height may be negative.
+  */
   static constexpr Rect MakeSize(const Size& size) {
     return Rect{0, 0, size.width, size.height};
   }
@@ -155,24 +155,24 @@ struct Rect {
   }
 
   /**
-   * Returns top edge of Rect, if sorted. Call isEmpty() to see if Rect may be invalid, and sort()
-   * to reverse top and bottom if needed.
-   */
+  * Returns the top edge of the Rect if it is sorted.
+  * Use isEmpty() to check if the Rect may be invalid, and sort() to swap top and bottom if needed.
+  */
   float y() const {
     return top;
   }
 
   /**
-   * Returns span on the x-axis. This does not check if Rect is sorted, or if result fits in 32-bit
-   * float; result may be negative or infinity.
+   * Returns the width of the rectangle along the x-axis. This does not check if the Rect is sorted,
+   * and the result may be negative or infinite.
    */
   float width() const {
     return right - left;
   }
 
   /**
-   * Returns span on the y-axis. This does not check if Rect is sorted, or if result fits in 32-bit
-   * float; result may be negative or infinity.
+   * Returns the span along the y-axis. This does not check if the Rect is sorted, and the result
+   * may be negative or infinite.
    */
   float height() const {
     return bottom - top;
@@ -184,6 +184,13 @@ struct Rect {
    */
   Size size() const {
     return Size::Make(this->width(), this->height());
+  }
+
+  /**
+   * Returns the area of the rectangle. The result may be negative or infinity.
+   */
+  float area() const {
+    return (right - left) * (bottom - top);
   }
 
   /**
@@ -390,23 +397,6 @@ struct Rect {
    * Returns false if either a or b is empty, leaving Rect unchanged.
    */
   bool intersect(const Rect& a, const Rect& b);
-
-  /**
-   * Constructs Rect to intersect from (left, top, right, bottom). Does not sort construction.
-   * Returns true if Rect intersects construction.
-   * Returns false if either construction or Rect is empty, or do not intersect.
-   */
-  bool intersects(float l, float t, float r, float b) const {
-    return Intersects(left, top, right, bottom, l, t, r, b);
-  }
-
-  /**
-   * Returns true if Rect intersects r. Returns false if either r or Rect is empty, or do not
-   * intersect.
-   */
-  bool intersects(const Rect& r) const {
-    return Intersects(left, top, right, bottom, r.left, r.top, r.right, r.bottom);
-  }
 
   /**
    * Returns true if a intersects b. Returns false if either a or b is empty, or do not intersect.

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -22,38 +22,29 @@
 
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
-#include "gpu/Texture.h"
-#include "tgfx/platform/HardwareBuffer.h"
+#include "gpu/opengl/GLTexture.h"
+#include "gpu/opengl/egl/EGLGPU.h"
 
 namespace tgfx {
-class EGLHardwareTexture : public Texture {
+class EGLHardwareTexture : public GLTexture {
  public:
-  static std::shared_ptr<EGLHardwareTexture> MakeFrom(Context* context,
-                                                      HardwareBufferRef hardwareBuffer);
-
-  size_t memoryUsage() const override;
-
-  const TextureSampler* getSampler() const override {
-    return sampler.get();
-  }
+  static std::unique_ptr<EGLHardwareTexture> MakeFrom(EGLGPU* gpu, HardwareBufferRef hardwareBuffer,
+                                                      uint32_t usage);
+  ~EGLHardwareTexture() override;
 
   HardwareBufferRef getHardwareBuffer() const override {
     return hardwareBuffer;
   }
 
  protected:
-  void onReleaseGPU() override;
+  void onRelease(GLGPU* gpu) override;
 
  private:
-  std::unique_ptr<TextureSampler> sampler = {};
   HardwareBufferRef hardwareBuffer = nullptr;
   EGLImageKHR eglImage = EGL_NO_IMAGE_KHR;
 
-  static ScratchKey ComputeScratchKey(void* hardwareBuffer);
-
-  EGLHardwareTexture(HardwareBufferRef hardwareBuffer, EGLImageKHR eglImage, int width, int height);
-
-  ~EGLHardwareTexture() override;
+  EGLHardwareTexture(const GPUTextureDescriptor& descriptor, HardwareBufferRef hardwareBuffer,
+                     EGLImageKHR eglImage, unsigned target, unsigned textureID);
 };
 }  // namespace tgfx
 

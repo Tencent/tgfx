@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -40,7 +40,7 @@ class TextShaperPrimitive : public TextShaper {
     const char* textStart = text.data();
     const char* textStop = textStart + text.size();
     while (textStart < textStop) {
-      const auto* oldPosition = textStart;
+      const auto oldPosition = textStart;
       UTF::NextUTF8(&textStart, textStop);
       auto length = textStart - oldPosition;
       auto str = std::string(oldPosition, static_cast<size_t>(length));

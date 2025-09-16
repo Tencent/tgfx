@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -19,21 +19,22 @@
 #pragma once
 
 #include "gpu/SamplerState.h"
-#include "gpu/YUVTexture.h"
+#include "gpu/SamplingArgs.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/proxies/TextureProxy.h"
+#include "gpu/resources/YUVTextureView.h"
 
 namespace tgfx {
 class TextureEffect : public FragmentProcessor {
  public:
   static PlacementPtr<FragmentProcessor> Make(std::shared_ptr<TextureProxy> proxy,
-                                              const SamplingOptions& sampling = {},
+                                              const SamplingArgs& args = {},
                                               const Matrix* uvMatrix = nullptr,
                                               bool forceAsMask = false);
 
   static PlacementPtr<FragmentProcessor> MakeRGBAAA(std::shared_ptr<TextureProxy> proxy,
+                                                    const SamplingArgs& args,
                                                     const Point& alphaStart,
-                                                    const SamplingOptions& sampling = {},
                                                     const Matrix* uvMatrix = nullptr);
 
   std::string name() const override {
@@ -44,25 +45,30 @@ class TextureEffect : public FragmentProcessor {
   DEFINE_PROCESSOR_CLASS_ID
 
   TextureEffect(std::shared_ptr<TextureProxy> proxy, const SamplingOptions& sampling,
-                const Point& alphaStart, const Matrix& uvMatrix);
+                SrcRectConstraint constraint, const Point& alphaStart, const Matrix& uvMatrix,
+                const std::optional<Rect>& subset);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
   size_t onCountTextureSamplers() const override;
 
-  const TextureSampler* onTextureSampler(size_t index) const override;
+  GPUTexture* onTextureAt(size_t index) const override;
 
-  SamplerState onSamplerState(size_t) const override {
+  SamplerState onSamplerStateAt(size_t) const override {
     return samplerState;
   }
 
-  Texture* getTexture() const;
+  TextureView* getTextureView() const;
 
-  YUVTexture* getYUVTexture() const;
+  YUVTextureView* getYUVTexture() const;
+
+  bool needSubset() const;
 
   std::shared_ptr<TextureProxy> textureProxy;
   SamplerState samplerState;
+  SrcRectConstraint constraint = SrcRectConstraint::Fast;
   Point alphaStart = {};
   CoordTransform coordTransform;
+  std::optional<Rect> subset = std::nullopt;
 };
 }  // namespace tgfx

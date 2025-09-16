@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MatrixShader.h"
-#include "core/utils/Caster.h"
+#include "core/utils/Types.h"
 #include "gpu/processors/FragmentProcessor.h"
 
 namespace tgfx {
@@ -48,8 +48,12 @@ std::shared_ptr<Shader> MatrixShader::makeWithMatrix(const Matrix& viewMatrix) c
 }
 
 bool MatrixShader::isEqual(const Shader* shader) const {
-  auto other = Caster::AsMatrixShader(shader);
-  return other && matrix == other->matrix && Caster::Compare(source.get(), other->source.get());
+  auto type = Types::Get(shader);
+  if (type != Types::ShaderType::Matrix) {
+    return false;
+  }
+  auto other = static_cast<const MatrixShader*>(shader);
+  return matrix == other->matrix && source->isEqual(other->source.get());
 }
 
 PlacementPtr<FragmentProcessor> MatrixShader::asFragmentProcessor(const FPArgs& args,

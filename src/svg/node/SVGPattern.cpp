@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -130,7 +130,7 @@ const SVGPattern* SVGPattern::resolveHref(const SVGRenderContext& context,
 
 bool SVGPattern::onAsPaint(const SVGRenderContext& context, Paint* paint) const {
   PatternAttributes attrs;
-  const auto* contentNode = this->resolveHref(context, &attrs);
+  const auto contentNode = this->resolveHref(context, &attrs);
   auto lengthContext = context.lengthContext();
   lengthContext.setBoundingBoxUnits(PatternUnits);
   Rect tile = lengthContext.resolveRect(attrs.x.has_value() ? *attrs.x : SVGLength(0),
@@ -143,7 +143,7 @@ bool SVGPattern::onAsPaint(const SVGRenderContext& context, Paint* paint) const 
   }
 
   Recorder patternRecorder;
-  auto* canvas = patternRecorder.beginRecording();
+  auto canvas = patternRecorder.beginRecording();
   auto patternMatrix = attrs.patternTransform.value_or(Matrix::I());
   canvas->concat(patternMatrix);
   {

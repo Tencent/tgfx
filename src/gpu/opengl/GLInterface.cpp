@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -26,12 +26,9 @@
 
 namespace tgfx {
 static std::mutex interfaceLocker = {};
-static std::unordered_map<int, std::unique_ptr<const GLInterface>> glInterfaceMap = {};
+static std::unordered_map<int, std::shared_ptr<GLInterface>> glInterfaceMap = {};
 
 static int GetGLVersion(const GLProcGetter* getter) {
-  if (getter == nullptr) {
-    return -1;
-  }
   auto glGetString = reinterpret_cast<GLGetString*>(getter->getProcAddress("glGetString"));
   if (glGetString == nullptr) {
     return -1;
@@ -40,11 +37,7 @@ static int GetGLVersion(const GLProcGetter* getter) {
   return GetGLVersion(versionString).majorVersion;
 }
 
-const GLInterface* GLInterface::Get(const Context* context) {
-  return context ? static_cast<const GLContext*>(context)->glInterface : nullptr;
-}
-
-const GLInterface* GLInterface::GetNative() {
+std::shared_ptr<GLInterface> GLInterface::GetNative() {
   auto getter = GLProcGetter::Make();
   if (getter == nullptr) {
     return nullptr;
@@ -56,16 +49,14 @@ const GLInterface* GLInterface::GetNative() {
   std::lock_guard<std::mutex> autoLock(interfaceLocker);
   auto result = glInterfaceMap.find(version);
   if (result != glInterfaceMap.end()) {
-    return result->second.get();
+    return result->second;
   }
-  glInterfaceMap[version] = MakeNativeInterface(getter.get());
-  return glInterfaceMap[version].get();
+  auto interface = MakeNativeInterface(getter.get());
+  glInterfaceMap[version] = interface;
+  return interface;
 }
 
-std::unique_ptr<const GLInterface> GLInterface::MakeNativeInterface(const GLProcGetter* getter) {
-  if (getter == nullptr) {
-    return nullptr;
-  }
+std::shared_ptr<GLInterface> GLInterface::MakeNativeInterface(const GLProcGetter* getter) {
   auto getString = reinterpret_cast<GLGetString*>(getter->getProcAddress("glGetString"));
   if (getString == nullptr) {
     return nullptr;
@@ -80,9 +71,7 @@ std::unique_ptr<const GLInterface> GLInterface::MakeNativeInterface(const GLProc
   auto getInternalformativ =
       reinterpret_cast<GLGetInternalformativ*>(getter->getProcAddress("glGetInternalformativ"));
   GLInfo info(getString, getStringi, getIntegerv, getInternalformativ, getShaderPrecisionFormat);
-  auto interface = new GLInterface();
-  auto functions = std::make_shared<GLFunctions>();
-  interface->functions = functions;
+  auto functions = std::make_unique<GLFunctions>();
   functions->activeTexture =
       reinterpret_cast<GLActiveTexture*>(getter->getProcAddress("glActiveTexture"));
   functions->attachShader =
@@ -205,6 +194,12 @@ std::unique_ptr<const GLInterface> GLInterface::MakeNativeInterface(const GLProc
       reinterpret_cast<GLGetAttribLocation*>(getter->getProcAddress("glGetAttribLocation"));
   functions->getUniformLocation =
       reinterpret_cast<GLGetUniformLocation*>(getter->getProcAddress("glGetUniformLocation"));
+  functions->getUniformBlockIndex =
+      reinterpret_cast<GLGetUniformBlockIndex*>(getter->getProcAddress("glGetUniformBlockIndex"));
+  functions->uniformBlockBinding =
+      reinterpret_cast<GLUniformBlockBinding*>(getter->getProcAddress("glUniformBlockBinding"));
+  functions->bindBufferBase =
+      reinterpret_cast<GLBindBufferBase*>(getter->getProcAddress("glBindBufferBase"));
   functions->isTexture = reinterpret_cast<GLIsTexture*>(getter->getProcAddress("glIsTexture"));
   functions->lineWidth = reinterpret_cast<GLLineWidth*>(getter->getProcAddress("glLineWidth"));
   functions->linkProgram =
@@ -290,7 +285,7 @@ std::unique_ptr<const GLInterface> GLInterface::MakeNativeInterface(const GLProc
       GLAssembleWebGLInterface(getter, functions.get(), info);
       break;
   }
-  interface->caps = std::shared_ptr<const GLCaps>(new GLCaps(info));
-  return std::unique_ptr<const GLInterface>(interface);
+  auto caps = std::make_unique<GLCaps>(info);
+  return std::shared_ptr<GLInterface>(new GLInterface(std::move(caps), std::move(functions)));
 }
 }  // namespace tgfx

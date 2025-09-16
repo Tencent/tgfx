@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -22,16 +22,21 @@
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Matrix.h"
-#include "tgfx/layers/LayerContent.h"
+#include "tgfx/layers/LayerMaskType.h"
+#include "tgfx/layers/LayerRecorder.h"
 #include "tgfx/layers/LayerType.h"
 #include "tgfx/layers/filters/LayerFilter.h"
 #include "tgfx/layers/layerstyles/LayerStyle.h"
 
 namespace tgfx {
-
+class LayerContent;
+class RasterizedContent;
 class DisplayList;
 class DrawArgs;
+class RegionTransformer;
+class RootLayer;
 struct LayerStyleSource;
+class BackgroundContext;
 
 /**
  * The base class for all layers that can be placed on the display list. The layer class includes
@@ -40,7 +45,7 @@ struct LayerStyleSource;
  * single thread. Some properties only take effect if the layer has a parent, such as alpha,
  * blendMode, position, matrix, visible, scrollRect, and mask.
  */
-class Layer {
+class Layer : public std::enable_shared_from_this<Layer> {
  public:
   /**
    * Returns the default value for the allowsEdgeAntialiasing property for new Layer instances. The
@@ -174,11 +179,12 @@ class Layer {
   void setShouldRasterize(bool value);
 
   /**
-   * The scale at which to rasterize content, relative to the coordinate space of the layer. When
-   * the value in the shouldRasterize property is true, the layer uses this property to determine
-   * whether to scale the rasterized content (and by how much). The default value of this property
-   * is 1.0, which indicates that the layer should be rasterized at its current size. Larger values
-   * magnify the content and smaller values shrink it.
+   * The scale factor used to rasterize the content, relative to the layer’s coordinate space. When
+   * shouldRasterize is true, this property determines how much to scale the rasterized content.
+   * A value of 1.0 means the layer is rasterized at its current size. Values greater than 1.0
+   * enlarge the content, while values less than 1.0 shrink it. If set to an invalid value (less
+   * than or equal to 0), the layer is rasterized at its drawn size, which may cause the cache to be
+   * invalidated frequently if the drawn scale changes often. The default value is 0.0.
    */
   float rasterizationScale() const {
     return _rasterizationScale;
@@ -233,7 +239,7 @@ class Layer {
   /**
    * Sets the list of layer styles applied to the layer.
    */
-  void setLayerStyles(const std::vector<std::shared_ptr<LayerStyle>>& value);
+  void setLayerStyles(std::vector<std::shared_ptr<LayerStyle>> value);
 
   /**
    * Whether to exclude child effects in the layer style. If true, child layer
@@ -282,6 +288,20 @@ class Layer {
   void setMask(std::shared_ptr<Layer> value);
 
   /**
+   * Returns the mask type used by the layer. The mask type affects how the mask is applied to the
+   * layer content, such as whether it uses the alpha channel, luminance, or contour of the
+   * mask layer. The default value is LayerMaskType::Alpha.
+   */
+  LayerMaskType maskType() const {
+    return static_cast<LayerMaskType>(bitFields.maskType);
+  }
+
+  /**
+   * Sets the mask type used by the layer.
+   */
+  void setMaskType(LayerMaskType value);
+
+  /**
    * Returns the scroll rectangle bounds of the layer. The layer is cropped to the size defined by
    * the rectangle, and it scrolls within the rectangle when you change the x and y properties of
    * the scrollRect. The properties of the scrollRect Rectangle object use the layer's coordinate
@@ -308,15 +328,13 @@ class Layer {
    * Returns the root layer of the calling layer. A DisplayList has only one root layer. If a layer
    * is not added to a display list, its root property is set to nullptr.
    */
-  Layer* root() const {
-    return _root;
-  }
+  Layer* root() const;
 
   /**
    * Returns the parent layer that contains the calling layer.
    */
-  std::shared_ptr<Layer> parent() const {
-    return _parent ? _parent->weakThis.lock() : nullptr;
+  Layer* parent() const {
+    return _parent;
   }
 
   /**
@@ -423,10 +441,12 @@ class Layer {
    * targetCoordinateSpace layer. If the targetCoordinateSpace is nullptr, this method returns a
    * rectangle that defines the area of the layer relative to its own coordinates.
    * @param targetCoordinateSpace The layer that defines the coordinate system to use.
+   * @param computeTightBounds Determines whether to calculate the exact tight bounding box (true)
+   * or a general bounding box that may be larger but is faster to compute (false).
    * @return The rectangle that defines the area of the layer relative to the targetCoordinateSpace
    * layer's coordinate system.
    */
-  Rect getBounds(const Layer* targetCoordinateSpace = nullptr);
+  Rect getBounds(const Layer* targetCoordinateSpace = nullptr, bool computeTightBounds = false);
 
   /**
    * Converts the point from the root's (global) coordinates to the layer's (local) coordinates.
@@ -463,12 +483,12 @@ class Layer {
    * methods to convert points between these coordinate spaces.
    * @param x The x coordinate to test it against the calling layer.
    * @param y The y coordinate to test it against the calling layer.
-   * @param pixelHitTest Whether to check the actual pixels of the layer (true) or just the bounding
+   * @param shapeHitTest Whether to check the actual shape of the layer (true) or just the bounding
    * box (false). Note that Image layers are always checked against their bounding box. You can draw
    * image layers to a Surface and use the Surface::getColor() method to check the actual pixels.
    * @return true if the layer overlaps or intersects with the specified point, false otherwise.
    */
-  bool hitTestPoint(float x, float y, bool pixelHitTest = false);
+  bool hitTestPoint(float x, float y, bool shapeHitTest = false);
 
   /**
    * Draws the layer and all its children onto the given canvas. You can specify the alpha and blend
@@ -482,10 +502,33 @@ class Layer {
   void draw(Canvas* canvas, float alpha = 1.0f, BlendMode blendMode = BlendMode::SrcOver);
 
  protected:
-  std::weak_ptr<Layer> weakThis;
-
   Layer();
 
+  /**
+   * Marks the layer's contents as changed and in need of an update. This will trigger a call to
+   * onUpdateContent() to update the layer's contents.
+   */
+  void invalidateContent();
+
+  /**
+   * Called when the layer’s contents needs to be updated. Subclasses should override this method to
+   * update the layer’s contents, typically by drawing on a canvas obtained from the given
+   * LayerRecorder.
+   * @param recorder The LayerRecorder used to record the layer's contents.
+   */
+  virtual void onUpdateContent(LayerRecorder* recorder);
+
+  /**
+   * Attaches a property to this layer.
+   */
+  void attachProperty(LayerProperty* property);
+
+  /**
+   * Detaches a property from this layer.
+   */
+  void detachProperty(LayerProperty* property);
+
+ private:
   /**
    * Marks the layer as needing to be redrawn. Unlike invalidateContent(), this method only marks
    * the layer as dirty and does not update the layer content.
@@ -493,54 +536,15 @@ class Layer {
   void invalidateTransform();
 
   /**
-   * Marks the layer's content as changed and needing to be redrawn. The updateContent() method will
-   * be called to create the new layer content.
-   */
-  void invalidateContent();
-
-  /**
-   * Called when the layer's content needs to be updated. Subclasses should override this method to
-   * create the layer content used for measuring the bounding box and drawing the layer itself
-   * (children not included).
-   */
-  virtual std::unique_ptr<LayerContent> onUpdateContent();
-
-  /**
-   * Draws the layer content and its children on the given canvas. By default, this method draws the
-   * layer content first, followed by the children. Subclasses can override this method to change
-   * the drawing order or the way the layer content is drawn.
-   * @param content The layer content to draw. This can be nullptr.
-   * @param canvas The canvas to draw the layer content on.
-   * @param alpha The alpha transparency value used for drawing the layer content.
-   * @param forContour Whether to draw the layer content for the contour.
-   * @param drawChildren A callback function that draws the children of the layer. if the function
-   * return false, the content above children should not be drawn.
-   */
-  virtual void drawContents(LayerContent* content, Canvas* canvas, float alpha, bool forContour,
-                            const std::function<bool()>& drawChildren) const;
-
-  /**
-  * Attachs a property to this layer.
-  */
-  void attachProperty(LayerProperty* property) const;
-
-  /**
-   * Detaches a property from this layer.
-   */
-  void detachProperty(LayerProperty* property) const;
-
- private:
-  /**
    * Marks the layer's descendents as changed and needing to be redrawn.
    */
   void invalidateDescendents();
 
-  /**
-   * Marks the layer's background as changed and needing to be redrawn.
-   */
-  void invalidateBackground();
+  void invalidate();
 
-  void onAttachToRoot(Layer* owner);
+  Rect getBoundsInternal(const Matrix& coordinateMatrix, bool computeTightBounds);
+
+  void onAttachToRoot(RootLayer* rootLayer);
 
   void onDetachFromRoot();
 
@@ -554,11 +558,9 @@ class Layer {
 
   LayerContent* getContent();
 
-  Paint getLayerPaint(float alpha, BlendMode blendMode = BlendMode::SrcOver) const;
-
   std::shared_ptr<ImageFilter> getImageFilter(float contentScale);
 
-  LayerContent* getRasterizedCache(const DrawArgs& args);
+  RasterizedContent* getRasterizedCache(const DrawArgs& args, const Matrix& renderMatrix);
 
   std::shared_ptr<Image> getRasterizedImage(const DrawArgs& args, float contentScale,
                                             Matrix* drawingMatrix);
@@ -569,14 +571,22 @@ class Layer {
 
   void drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha);
 
-  bool drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, Layer* stopChild = nullptr);
+  void drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
+                    const LayerStyleSource* layerStyleSource = nullptr,
+                    const Layer* stopChild = nullptr);
 
-  void drawBackground(const DrawArgs& args, Canvas* canvas, float* contentAlpha = nullptr);
+  bool drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
+                    const Layer* stopChild = nullptr);
+
+  float drawBackgroundLayers(const DrawArgs& args, Canvas* canvas);
 
   std::unique_ptr<LayerStyleSource> getLayerStyleSource(const DrawArgs& args, const Matrix& matrix);
 
-  void drawLayerStyles(Canvas* canvas, float alpha, const LayerStyleSource* source,
-                       LayerStylePosition position);
+  std::shared_ptr<Image> getBackgroundImage(const DrawArgs& args, float contentScale,
+                                            Point* offset);
+
+  void drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
+                       const LayerStyleSource* source, LayerStylePosition position);
 
   bool getLayersUnderPointInternal(float x, float y, std::vector<std::shared_ptr<Layer>>* results);
 
@@ -586,37 +596,58 @@ class Layer {
 
   bool hasValidMask() const;
 
-  void invalidate();
+  void updateRenderBounds(std::shared_ptr<RegionTransformer> transformer = nullptr,
+                          bool forceDirty = false);
+
+  void checkBackgroundStyles(std::shared_ptr<RegionTransformer> transformer);
+
+  void updateBackgroundBounds(float contentScale);
+
+  void propagateBackgroundStyleOutset();
+
+  bool hasBackgroundStyle();
+
+  std::shared_ptr<BackgroundContext> createBackgroundContext(Context* context, const Rect& drawRect,
+                                                             const Matrix& viewMatrix,
+                                                             bool fullLayer = false) const;
 
   struct {
-    bool dirtyContent : 1;      // need to update content
-    bool dirtyDescendents : 1;  // need to redraw the layer's descendents
-    bool dirtyTransform : 1;    // need to redraw the layer
-    bool dirtyBackground : 1;   // need to redraw the layer's background, only mark while sibling is
-                                // changed.
+    bool dirtyContent : 1;        // layer's content needs updating
+    bool dirtyContentBounds : 1;  // layer's content bounds needs updating
+    bool dirtyDescendents : 1;    // a descendant layer needs redrawing
+    bool dirtyTransform : 1;      // the layer and its children need redrawing
     bool visible : 1;
     bool shouldRasterize : 1;
     bool allowsEdgeAntialiasing : 1;
     bool allowsGroupOpacity : 1;
     bool excludeChildEffectsInLayerStyle : 1;
     uint8_t blendMode : 5;
+    uint8_t maskType : 2;
   } bitFields = {};
   std::string _name;
   float _alpha = 1.0f;
   Matrix _matrix = {};
-  float _rasterizationScale = 1.0f;
-  std::vector<std::shared_ptr<LayerFilter>> _filters = {};
   std::shared_ptr<Layer> _mask = nullptr;
   Layer* maskOwner = nullptr;
   std::unique_ptr<Rect> _scrollRect = nullptr;
-  Layer* _root = nullptr;
+  RootLayer* _root = nullptr;
   Layer* _parent = nullptr;
-  std::unique_ptr<LayerContent> layerContent = nullptr;
-  std::unique_ptr<LayerContent> rasterizedContent = nullptr;
   std::vector<std::shared_ptr<Layer>> _children = {};
+  std::vector<std::shared_ptr<LayerFilter>> _filters = {};
   std::vector<std::shared_ptr<LayerStyle>> _layerStyles = {};
+  float _rasterizationScale = 0.0f;
+  std::unique_ptr<RasterizedContent> rasterizedContent;
+  std::shared_ptr<LayerContent> layerContent = nullptr;
+  Rect renderBounds = {};         // in global coordinates
+  Rect* contentBounds = nullptr;  //  in global coordinates
 
+  // if > 0, means the layer or any of its descendants has a background style
+  float maxBackgroundOutset = 0.f;
+  float minBackgroundOutset = std::numeric_limits<float>::max();
+
+  friend class RootLayer;
   friend class DisplayList;
   friend class LayerProperty;
+  friend class LayerSerialization;
 };
 }  // namespace tgfx

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -45,66 +45,60 @@ InnerShadowImageFilter::InnerShadowImageFilter(float dx, float dy, float blurrin
       shadowOnly(shadowOnly) {
 }
 
-PlacementPtr<FragmentProcessor> InnerShadowImageFilter::asFragmentProcessor(
+PlacementPtr<FragmentProcessor> InnerShadowImageFilter::getShadowFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-    const Matrix* uvMatrix) const {
-  if (color.alpha <= 0) {
-    // The filer will not be created if filter is not drop shadow only and alpha < 0.So if color is
-    // transparent, the image after applying the filter will be transparent.
-    return nullptr;
-  }
-
-  auto drawBounds = args.drawRect;
-  auto fpMatrix = Matrix::I();
-  if (uvMatrix != nullptr) {
-    drawBounds = uvMatrix->mapRect(drawBounds);
-    fpMatrix = *uvMatrix;
-  }
-  auto clipBounds = drawBounds;
-  clipBounds.offset(-dx, -dy);
-  clipBounds.join(drawBounds);
-
-  auto sourceRect = Rect::MakeXYWH(0, 0, source->width(), source->height());
-  if (blurFilter) {
-    // outset the bounds to include the blur radius
-    clipBounds = blurFilter->filterBounds(clipBounds);
-  }
-
-  clipBounds.intersect(sourceRect);
-  source = source->makeSubset(clipBounds);
-  source = source->makeRasterized();
-
-  // add the subset offset to the matrix
-  fpMatrix.postConcat(Matrix::MakeTrans(-clipBounds.left, -clipBounds.top));
-
+    SrcRectConstraint constraint, const Matrix* uvMatrix) const {
   auto shadowMatrix = Matrix::MakeTrans(-dx, -dy);
-  shadowMatrix.preConcat(fpMatrix);
+  if (uvMatrix) {
+    shadowMatrix.preConcat(*uvMatrix);
+  }
+
   PlacementPtr<FragmentProcessor> invertShadowMask;
   if (blurFilter != nullptr) {
-    invertShadowMask = blurFilter->asFragmentProcessor(source, args, sampling, &shadowMatrix);
+    invertShadowMask = blurFilter->asFragmentProcessor(std::move(source), args, sampling,
+                                                       constraint, &shadowMatrix);
   } else {
-    invertShadowMask = FragmentProcessor::Make(source, args, TileMode::Decal, TileMode::Decal,
-                                               sampling, &shadowMatrix);
+    invertShadowMask =
+        FragmentProcessor::Make(std::move(source), args, TileMode::Decal, TileMode::Decal, sampling,
+                                constraint, &shadowMatrix);
   }
+
   auto buffer = args.context->drawingBuffer();
+  if (invertShadowMask == nullptr) {
+    invertShadowMask =
+        ConstColorProcessor::Make(buffer, Color::Transparent().premultiply(), InputMode::Ignore);
+  }
   auto colorProcessor = ConstColorProcessor::Make(buffer, color.premultiply(), InputMode::Ignore);
 
   // get shadow mask and fill it with color
   auto colorShadowProcessor = XfermodeFragmentProcessor::MakeFromTwoProcessors(
       buffer, std::move(colorProcessor), std::move(invertShadowMask), BlendMode::SrcOut);
+  return colorShadowProcessor;
+}
 
-  auto imageProcessor = FragmentProcessor::Make(std::move(source), args, TileMode::Decal,
-                                                TileMode::Decal, sampling, &fpMatrix);
+PlacementPtr<FragmentProcessor> InnerShadowImageFilter::getSourceFragmentProcessor(
+    std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
+    SrcRectConstraint constraint, const Matrix* uvMatrix) const {
+  return FragmentProcessor::Make(std::move(source), args, TileMode::Decal, TileMode::Decal,
+                                 sampling, constraint, uvMatrix);
+}
 
-  if (shadowOnly) {
-    // mask the image with origin image
-    return XfermodeFragmentProcessor::MakeFromTwoProcessors(
-        buffer, std::move(colorShadowProcessor), std::move(imageProcessor), BlendMode::SrcIn);
-  } else {
-    // mask the image with origin image and draw the inner shadow mask on top
-    return XfermodeFragmentProcessor::MakeFromTwoProcessors(
-        buffer, std::move(colorShadowProcessor), std::move(imageProcessor), BlendMode::SrcATop);
+PlacementPtr<FragmentProcessor> InnerShadowImageFilter::asFragmentProcessor(
+    std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
+    SrcRectConstraint constraint, const Matrix* uvMatrix) const {
+  if (color.alpha <= 0 && shadowOnly) {
+    return nullptr;
   }
+  auto imageProcessor = getSourceFragmentProcessor(source, args, sampling, constraint, uvMatrix);
+  if (imageProcessor == nullptr) {
+    return nullptr;
+  }
+  auto buffer = args.context->drawingBuffer();
+  auto blendMode = shadowOnly ? BlendMode::SrcIn : BlendMode::SrcATop;
+
+  return XfermodeFragmentProcessor::MakeFromTwoProcessors(
+      buffer, getShadowFragmentProcessor(source, args, sampling, constraint, uvMatrix),
+      std::move(imageProcessor), blendMode);
 }
 
 }  // namespace tgfx

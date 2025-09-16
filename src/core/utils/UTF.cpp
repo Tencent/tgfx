@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -131,5 +131,21 @@ std::string UTF::ToUTF8(int32_t unichar) {
   }
   *--to = (char)(~(0xFF >> count) | unichar);
   return {utf8, count};
+}
+
+std::wstring UTF::ToUTF16(int32_t uni) {
+  if (static_cast<uint32_t>(uni) > 0x10FFFF) {
+    return L"";
+  }
+  size_t extra = (uni > 0xFFFF);
+  wchar_t utf16[2];
+  if (extra) {
+    utf16[0] = static_cast<wchar_t>((0xD800 - 64) + (uni >> 10));
+    utf16[1] = static_cast<wchar_t>(0xDC00 | (uni & 0x3FF));
+  } else {
+    utf16[0] = static_cast<wchar_t>(uni);
+  }
+
+  return {utf16, 1 + extra};
 }
 }  // namespace tgfx

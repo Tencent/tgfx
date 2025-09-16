@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,7 +18,7 @@
 
 #include "tgfx/gpu/opengl/egl/EGLDevice.h"
 #include "core/utils/Log.h"
-#include "gpu/opengl/egl/EGLProcGetter.h"
+#include "gpu/opengl/egl/EGLGPU.h"
 #include "tgfx/gpu/opengl/egl/EGLGlobals.h"
 
 namespace tgfx {
@@ -151,20 +151,18 @@ std::shared_ptr<EGLDevice> EGLDevice::Wrap(EGLDisplay eglDisplay, EGLSurface egl
       return nullptr;
     }
   }
-#if defined(__ANDROID__) || defined(ANDROID)
-  if (!externallyOwned) {
-    // Disable vsync on Android to make buffer swapping non-blocking, as the platform already has an
-    // animation frame callback with vsync.
-    eglSwapInterval(eglDisplay, 0);
+  std::shared_ptr<EGLDevice> device = nullptr;
+  auto interface = GLInterface::GetNative();
+  if (interface != nullptr) {
+    auto gpu = std::make_unique<EGLGPU>(std::move(interface), eglDisplay);
+    device = std::shared_ptr<EGLDevice>(new EGLDevice(std::move(gpu), eglContext));
+    device->externallyOwned = externallyOwned;
+    device->eglDisplay = eglDisplay;
+    device->eglSurface = eglSurface;
+    device->eglContext = eglContext;
+    device->shareContext = shareContext;
+    device->weakThis = device;
   }
-#endif
-  auto device = std::shared_ptr<EGLDevice>(new EGLDevice(eglContext));
-  device->externallyOwned = externallyOwned;
-  device->eglDisplay = eglDisplay;
-  device->eglSurface = eglSurface;
-  device->eglContext = eglContext;
-  device->shareContext = shareContext;
-  device->weakThis = device;
   if (oldEglContext != eglContext) {
     eglMakeCurrent(eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
     if (oldEglDisplay) {
@@ -174,7 +172,8 @@ std::shared_ptr<EGLDevice> EGLDevice::Wrap(EGLDisplay eglDisplay, EGLSurface egl
   return device;
 }
 
-EGLDevice::EGLDevice(void* nativeHandle) : GLDevice(nativeHandle) {
+EGLDevice::EGLDevice(std::unique_ptr<GPU> gpu, void* nativeHandle)
+    : GLDevice(std::move(gpu), nativeHandle) {
 }
 
 EGLDevice::~EGLDevice() {
@@ -192,7 +191,7 @@ bool EGLDevice::sharableWith(void* nativeContext) const {
   return nativeHandle == nativeContext || shareContext == nativeContext;
 }
 
-bool EGLDevice::onMakeCurrent() {
+bool EGLDevice::onLockContext() {
   oldEglContext = eglGetCurrentContext();
   oldEglDisplay = eglGetCurrentDisplay();
   oldEglReadSurface = eglGetCurrentSurface(EGL_READ);
@@ -208,20 +207,20 @@ bool EGLDevice::onMakeCurrent() {
     eglDestroySurface(eglDisplay, eglSurface);
     eglSurface = CreateFixedSizeSurfaceForAngle(nativeWindow, EGLGlobals::Get());
     if (eglSurface == nullptr) {
-      LOGE("EGLDevice::onMakeCurrent() CreateFixedSizeSurfaceForAngle error=%d", eglGetError());
+      LOGE("EGLDevice::onLockContext() CreateFixedSizeSurfaceForAngle error=%d", eglGetError());
       return false;
     }
   }
 #endif
   auto result = eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext);
   if (!result) {
-    LOGE("EGLDevice::onMakeCurrent() failure result = %d error= %d", result, eglGetError());
+    LOGE("EGLDevice::onLockContext() failure result = %d error= %d", result, eglGetError());
     return false;
   }
   return true;
 }
 
-void EGLDevice::onClearCurrent() {
+void EGLDevice::onUnlockContext() {
   if (oldEglContext == eglContext) {
     return;
   }

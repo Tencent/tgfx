@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,17 +18,18 @@
 
 #include "CGLHardwareTexture.h"
 #include "core/utils/UniqueID.h"
-#include "gpu/opengl/GLSampler.h"
 
 namespace tgfx {
-std::shared_ptr<CGLHardwareTexture> CGLHardwareTexture::MakeFrom(
-    Context* context, CVPixelBufferRef pixelBuffer, CVOpenGLTextureCacheRef textureCache) {
-  auto scratchKey = ComputeScratchKey(pixelBuffer);
-  auto glTexture = Resource::Find<CGLHardwareTexture>(context, scratchKey);
-  if (glTexture) {
-    return glTexture;
-  }
+std::unique_ptr<CGLHardwareTexture> CGLHardwareTexture::MakeFrom(
+    const Caps* caps, CVPixelBufferRef pixelBuffer, uint32_t usage,
+    CVOpenGLTextureCacheRef textureCache) {
   if (textureCache == nil) {
+    return nullptr;
+  }
+  auto format = CVPixelBufferGetPixelFormatType(pixelBuffer) == kCVPixelFormatType_OneComponent8
+                    ? PixelFormat::ALPHA_8
+                    : PixelFormat::RGBA_8888;
+  if (usage & GPUTextureUsage::RENDER_ATTACHMENT && !caps->isFormatRenderable(format)) {
     return nullptr;
   }
   CVOpenGLTextureRef texture = nil;
@@ -37,38 +38,29 @@ std::shared_ptr<CGLHardwareTexture> CGLHardwareTexture::MakeFrom(
   if (texture == nil) {
     return nullptr;
   }
-  auto glSampler = std::make_unique<GLSampler>();
-  glSampler->target = CVOpenGLTextureGetTarget(texture);
-  glSampler->id = CVOpenGLTextureGetName(texture);
-  glSampler->format =
-      CVPixelBufferGetPixelFormatType(pixelBuffer) == kCVPixelFormatType_OneComponent8
-          ? PixelFormat::ALPHA_8
-          : PixelFormat::RGBA_8888;
-  glTexture = Resource::AddToCache(context, new CGLHardwareTexture(pixelBuffer), scratchKey);
-  glTexture->sampler = std::move(glSampler);
-  glTexture->texture = texture;
-  glTexture->textureCache = textureCache;
-  CFRetain(textureCache);
-
-  return glTexture;
+  auto target = CVOpenGLTextureGetTarget(texture);
+  auto textureID = CVOpenGLTextureGetName(texture);
+  GPUTextureDescriptor descriptor = {static_cast<int>(CVPixelBufferGetWidth(pixelBuffer)),
+                                     static_cast<int>(CVPixelBufferGetHeight(pixelBuffer)),
+                                     format,
+                                     false,
+                                     1,
+                                     usage};
+  auto gpuTexture = std::unique_ptr<CGLHardwareTexture>(
+      new CGLHardwareTexture(descriptor, pixelBuffer, textureCache, target, textureID));
+  gpuTexture->texture = texture;
+  return gpuTexture;
 }
 
-ScratchKey CGLHardwareTexture::ComputeScratchKey(CVPixelBufferRef pixelBuffer) {
-  static const uint32_t CGLHardwareTextureType = UniqueID::Next();
-  BytesKey bytesKey(3);
-  bytesKey.write(CGLHardwareTextureType);
-  // The pointer can be used as the key directly because the cache holder retains the CVPixelBuffer.
-  // As long as the holder cache exists, the CVPixelBuffer pointer remains valid, avoiding conflicts
-  // with new objects. In other scenarios, it's best to avoid using pointers as keys.
-  bytesKey.write(pixelBuffer);
-  return bytesKey;
-}
-
-CGLHardwareTexture::CGLHardwareTexture(CVPixelBufferRef pixelBuffer)
-    : Texture(static_cast<int>(CVPixelBufferGetWidth(pixelBuffer)),
-              static_cast<int>(CVPixelBufferGetHeight(pixelBuffer)), ImageOrigin::TopLeft),
-      pixelBuffer(pixelBuffer) {
+CGLHardwareTexture::CGLHardwareTexture(const GPUTextureDescriptor& descriptor,
+                                       CVPixelBufferRef pixelBuffer,
+                                       CVOpenGLTextureCacheRef textureCache, unsigned target,
+                                       unsigned textureID)
+    : GLTexture(descriptor, target, textureID),
+      pixelBuffer(pixelBuffer),
+      textureCache(textureCache) {
   CFRetain(pixelBuffer);
+  CFRetain(textureCache);
 }
 
 CGLHardwareTexture::~CGLHardwareTexture() {
@@ -79,11 +71,7 @@ CGLHardwareTexture::~CGLHardwareTexture() {
   }
 }
 
-size_t CGLHardwareTexture::memoryUsage() const {
-  return CVPixelBufferGetDataSize(pixelBuffer);
-}
-
-void CGLHardwareTexture::onReleaseGPU() {
+void CGLHardwareTexture::onRelease(GLGPU*) {
   if (texture == nil) {
     return;
   }

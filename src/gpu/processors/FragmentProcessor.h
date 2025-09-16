@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -22,14 +22,17 @@
 #include "gpu/CoordTransform.h"
 #include "gpu/FragmentShaderBuilder.h"
 #include "gpu/SamplerState.h"
-#include "gpu/Texture.h"
+#include "gpu/SamplingArgs.h"
 #include "gpu/UniformBuffer.h"
 #include "gpu/UniformHandler.h"
 #include "gpu/processors/Processor.h"
 #include "gpu/proxies/TextureProxy.h"
+#include "gpu/resources/TextureView.h"
+#include "tgfx/core/Canvas.h"
+#include "tgfx/core/Image.h"
 
 namespace tgfx {
-class Pipeline;
+class ProgramInfo;
 class Image;
 class Shader;
 
@@ -37,13 +40,14 @@ class FPArgs {
  public:
   FPArgs() = default;
 
-  FPArgs(Context* context, uint32_t renderFlags, const Rect& drawRect)
-      : context(context), renderFlags(renderFlags), drawRect(drawRect) {
+  FPArgs(Context* context, uint32_t renderFlags, const Rect& drawRect, float drawScale = 1.0f)
+      : context(context), renderFlags(renderFlags), drawRect(drawRect), drawScale(drawScale) {
   }
 
   Context* context = nullptr;
   uint32_t renderFlags = 0;
   Rect drawRect = {};
+  float drawScale = 1.0f;
 };
 
 class FragmentProcessor : public Processor {
@@ -52,9 +56,9 @@ class FragmentProcessor : public Processor {
    * Creates a fragment processor that will draw the given image with the given options. The both
    * tileModeX and tileModeY are set to TileMode::Clamp.
    */
-  static PlacementPtr<FragmentProcessor> Make(std::shared_ptr<Image> image, const FPArgs& args,
-                                              const SamplingOptions& sampling,
-                                              const Matrix* uvMatrix = nullptr);
+  static PlacementPtr<FragmentProcessor> Make(
+      std::shared_ptr<Image> image, const FPArgs& args, const SamplingOptions& sampling,
+      SrcRectConstraint constraint = SrcRectConstraint::Fast, const Matrix* uvMatrix = nullptr);
 
   /**
    * Creates a fragment processor that will draw the given image with the given options.
@@ -62,6 +66,14 @@ class FragmentProcessor : public Processor {
   static PlacementPtr<FragmentProcessor> Make(std::shared_ptr<Image> image, const FPArgs& args,
                                               TileMode tileModeX, TileMode tileModeY,
                                               const SamplingOptions& sampling,
+                                              SrcRectConstraint constraint,
+                                              const Matrix* uvMatrix = nullptr);
+  /**
+   * Creates a fragment processor that will draw the given image with the given options.
+   * The samplingArgs contains additional information about how to sample the image.
+   */
+  static PlacementPtr<FragmentProcessor> Make(std::shared_ptr<Image> image, const FPArgs& args,
+                                              const SamplingArgs& samplingArgs,
                                               const Matrix* uvMatrix = nullptr);
 
   /**
@@ -103,12 +115,12 @@ class FragmentProcessor : public Processor {
     return onCountTextureSamplers();
   }
 
-  const TextureSampler* textureSampler(size_t i) const {
-    return onTextureSampler(i);
+  GPUTexture* textureAt(size_t i) const {
+    return onTextureAt(i);
   }
 
-  SamplerState samplerState(size_t i) const {
-    return onSamplerState(i);
+  SamplerState samplerStateAt(size_t i) const {
+    return onSamplerStateAt(i);
   }
 
   void computeProcessorKey(Context* context, BytesKey* bytesKey) const override;
@@ -134,8 +146,8 @@ class FragmentProcessor : public Processor {
   }
 
   /**
-   * Pre-order traversal of a FP hierarchy, or of the forest of FPs in a Pipeline. In the latter
-   * case the tree rooted at each FP in the Pipeline is visited successively.
+   * Pre-order traversal of a FP hierarchy, or of the forest of FPs in a ProgramInfo. In the latter
+   * case the tree rooted at each FP in the ProgramInfo is visited successively.
    */
   class Iter {
    public:
@@ -143,7 +155,7 @@ class FragmentProcessor : public Processor {
       fpStack.push_back(fp);
     }
 
-    explicit Iter(const Pipeline* pipeline);
+    explicit Iter(const ProgramInfo* programInfo);
 
     const FragmentProcessor* next();
 
@@ -152,11 +164,12 @@ class FragmentProcessor : public Processor {
   };
 
   /**
-   * Iterates over all the CoordTransforms owned by the forest of FragmentProcessors in a Pipeline.
+   * Iterates over all the CoordTransforms owned by the forest of FragmentProcessors in a
+   * ProgramInfo.
    */
   class CoordTransformIter {
    public:
-    explicit CoordTransformIter(const Pipeline* pipeline);
+    explicit CoordTransformIter(const ProgramInfo* programInfo);
 
     const CoordTransform* next();
 
@@ -194,13 +207,13 @@ class FragmentProcessor : public Processor {
 
   struct EmitArgs {
     EmitArgs(FragmentShaderBuilder* fragBuilder, UniformHandler* uniformHandler,
-             std::string outputColor, std::string inputColor,
+             std::string outputColor, std::string inputColor, std::string inputSubset,
              const TransformedCoordVars* transformedCoords, const TextureSamplers* textureSamplers,
              std::function<std::string(std::string_view)> coordFunc = {})
         : fragBuilder(fragBuilder), uniformHandler(uniformHandler),
           outputColor(std::move(outputColor)), inputColor(std::move(inputColor)),
           transformedCoords(transformedCoords), textureSamplers(textureSamplers),
-          coordFunc(std::move(coordFunc)) {
+          coordFunc(std::move(coordFunc)), inputSubset(std::move(inputSubset)) {
     }
 
     /**
@@ -222,11 +235,12 @@ class FragmentProcessor : public Processor {
      */
     const TransformedCoordVars* transformedCoords;
     /**
-     * Contains one entry for each TextureSampler of the Processor. These can be passed to the
+     * Contains one entry for each GPUTexture of the Processor. These can be passed to the
      * builder to emit texture reads in the generated code.
      */
     const TextureSamplers* textureSamplers;
     const std::function<std::string(std::string_view)> coordFunc;
+    const std::string inputSubset;
   };
 
   /**
@@ -235,7 +249,7 @@ class FragmentProcessor : public Processor {
    */
   virtual void emitCode(EmitArgs& args) const = 0;
 
-  void setData(UniformBuffer* uniformBuffer) const;
+  void setData(UniformBuffer* vertexUniformBuffer, UniformBuffer* fragmentUniformBuffer) const;
 
   /**
    * Emit the child with the default input color (solid white)
@@ -297,7 +311,7 @@ class FragmentProcessor : public Processor {
     coordTransforms.push_back(transform);
   }
 
-  virtual void onSetData(UniformBuffer*) const {
+  virtual void onSetData(UniformBuffer*, UniformBuffer*) const {
   }
 
  private:
@@ -308,11 +322,11 @@ class FragmentProcessor : public Processor {
     return 0;
   }
 
-  virtual const TextureSampler* onTextureSampler(size_t) const {
+  virtual GPUTexture* onTextureAt(size_t) const {
     return nullptr;
   }
 
-  virtual SamplerState onSamplerState(size_t) const {
+  virtual SamplerState onSamplerStateAt(size_t) const {
     return {};
   }
 

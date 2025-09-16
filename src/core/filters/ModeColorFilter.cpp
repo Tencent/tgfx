@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ModeColorFilter.h"
-#include "core/utils/Caster.h"
+#include "core/utils/Types.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
 
@@ -60,8 +60,12 @@ bool ModeColorFilter::asColorMode(Color* color, BlendMode* mode) const {
 }
 
 bool ModeColorFilter::isEqual(const ColorFilter* colorFilter) const {
-  auto other = Caster::AsModeColorFilter(colorFilter);
-  return other && color == other->color && mode == other->mode;
+  auto type = Types::Get(colorFilter);
+  if (type != Types::ColorFilterType::Blend) {
+    return false;
+  }
+  auto other = static_cast<const ModeColorFilter*>(colorFilter);
+  return color == other->color && mode == other->mode;
 }
 
 PlacementPtr<FragmentProcessor> ModeColorFilter::asFragmentProcessor(Context* context) const {

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -20,14 +20,11 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
-#include <tuple>
-#include "core/utils/Log.h"
 #include "svg/SVGAttributeParser.h"
 #include "svg/SVGRenderContext.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/TextBlob.h"
-#include "tgfx/core/UTF.h"
 #include "tgfx/svg/SVGTypes.h"
 
 namespace tgfx {
@@ -134,7 +131,7 @@ void SVGText::onRender(const SVGRenderContext& context) const {
       return;
     }
 
-    auto bound = textBlob->getBounds();
+    auto bound = textBlob->getTightBounds();
     float x =
         context.presentationContext()._inherited.TextAnchor->getAlignmentFactor() * bound.width();
     float y = 0;
@@ -146,10 +143,10 @@ void SVGText::onRender(const SVGRenderContext& context) const {
     auto strokePaint = paintContext.strokePaint();
 
     if (fillPaint.has_value()) {
-      context.canvas()->drawTextBlob(textBlob, x, y, fillPaint.value());
+      context.canvas()->drawTextBlob(textBlob, x, y, *fillPaint);
     }
     if (strokePaint.has_value()) {
-      context.canvas()->drawTextBlob(textBlob, x, y, strokePaint.value());
+      context.canvas()->drawTextBlob(textBlob, x, y, *strokePaint);
     }
   };
 

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -19,22 +19,37 @@
 #pragma once
 
 #include "DataSource.h"
-#include "core/Rasterizer.h"
-#include "core/ShapeBuffer.h"
+#include "core/StyledShape.h"
 #include "gpu/AAType.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Shape.h"
 
 namespace tgfx {
+struct ShapeBuffer {
+  ShapeBuffer(std::shared_ptr<Data> triangles, std::shared_ptr<ImageBuffer> imageBuffer)
+      : triangles(std::move(triangles)), imageBuffer(std::move(imageBuffer)) {
+  }
+
+  std::shared_ptr<Data> triangles = nullptr;
+  std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
+};
+
 /**
  * ShapeRasterizer converts a shape into its rasterized form.
  */
-class ShapeRasterizer : public Rasterizer, public DataSource<ShapeBuffer> {
+class ShapeRasterizer : public DataSource<ShapeBuffer> {
  public:
   /**
    * Creates a ShapeRasterizer from a shape.
    */
-  ShapeRasterizer(int width, int height, std::shared_ptr<Shape> shape, AAType aaType);
+  ShapeRasterizer(int width, int height, std::shared_ptr<StyledShape> shape, AAType aaType);
+
+  /**
+   * Returns true if the ShapeRasterizer supports asynchronous decoding. If so, the getData()
+   * method can be called from an arbitrary thread. Otherwise, the getData() method must be
+   * called from the main thread.
+   */
+  bool asyncSupport() const;
 
   /**
    * Rasterizes the shape into a ShapeBuffer. Unlike the makeBuffer() method, which always returns
@@ -44,15 +59,14 @@ class ShapeRasterizer : public Rasterizer, public DataSource<ShapeBuffer> {
    */
   std::shared_ptr<ShapeBuffer> getData() const override;
 
- protected:
-  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
-
  private:
-  std::shared_ptr<Shape> shape = nullptr;
+  int width = 0;
+  int height = 0;
+  std::shared_ptr<StyledShape> shape = nullptr;
   AAType aaType = AAType::None;
 
   std::shared_ptr<Data> makeTriangles(const Path& finalPath) const;
 
-  std::shared_ptr<ImageBuffer> makeImageBuffer(const Path& finalPath, bool tryHardware) const;
+  std::shared_ptr<ImageBuffer> makeImageBuffer(const Path& finalPath) const;
 };
 }  // namespace tgfx

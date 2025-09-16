@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "org.tgfx.hello2d"
-    ndkVersion = "19.2.5345600"
+    ndkVersion = "20.1.5948944"
     compileSdk = 34
 
     defaultConfig {
@@ -24,6 +24,15 @@ android {
                 abiFilters.add("armeabi-v7a")
                 abiFilters.add("arm64-v8a")
                 abiFilters.add("x86_64")
+            }
+        }
+
+        externalNativeBuild {
+            cmake {
+                val cmakeArgs: String? = project.findProperty("cmakeArgs") as String?
+                if (!cmakeArgs.isNullOrEmpty()) {
+                    arguments.addAll(cmakeArgs.split(" "))
+                }
             }
         }
     }

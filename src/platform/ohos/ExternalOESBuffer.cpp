@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,7 +18,7 @@
 
 #include "ExternalOESBuffer.h"
 #include <mutex>
-#include "gpu/Texture.h"
+#include "gpu/resources/TextureView.h"
 
 namespace tgfx {
 static std::mutex cacheLocker = {};
@@ -73,7 +73,7 @@ int ExternalOESBuffer::height() const {
   return config.height;
 }
 
-std::shared_ptr<Texture> ExternalOESBuffer::onMakeTexture(Context* context, bool) const {
-  return Texture::MakeFrom(context, hardwareBuffer, colorSpace);
+std::shared_ptr<TextureView> ExternalOESBuffer::onMakeTexture(Context* context, bool) const {
+  return TextureView::MakeFrom(context, hardwareBuffer, colorSpace);
 }
 }  // namespace tgfx

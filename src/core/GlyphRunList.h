@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "core/utils/LazyBounds.h"
 #include "tgfx/core/GlyphRun.h"
 #include "tgfx/core/Stroke.h"
 
@@ -51,14 +52,14 @@ class GlyphRunList {
    * Returns true if the GlyphRunList has color.
    */
   bool hasColor() const {
-    return _glyphRuns[0].glyphFace->hasColor();
+    return _glyphRuns[0].font.hasColor();
   }
 
   /**
    * Returns true if the GlyphRunList has outlines.
    */
   bool hasOutlines() const {
-    return _glyphRuns[0].glyphFace->hasOutlines();
+    return _glyphRuns[0].font.hasOutlines();
   }
 
   /**
@@ -69,22 +70,28 @@ class GlyphRunList {
   }
 
   /**
-   * Returns the bounding box of the glyphs in this run. The resolutionScale parameter is used to
-   * scale the glyphs before measuring. However, the resolutionScale is not applied to the returned
-   * bounds; it just affects the precision of the bounds.
+   * Computes glyph bounds using the font bounds and each glyph's position
    */
-  Rect getBounds(float resolutionScale = 1.0f) const;
+  Rect getBounds() const;
 
   /**
-   * Creates a Path for the glyphs in this run. Since text outlines can change with different
-   * scale factors, it's best to use the final drawing scale factor in the resolutionScale for
-   * accuracy. Note that the resolutionScale is not applied to the returned Path; it only affects
-   * the precision of the Path. Returns true if the path was successfully created. Otherwise,
+   * Returns the tight bounding box of the glyphs in this run. If a matrix is provided, the bounds
+   * will be transformed accordingly. Compared to getBounds, this method is more accurate but also
+   * more computationally expensive.
+   */
+  Rect getTightBounds(const Matrix* matrix = nullptr) const;
+
+  /**
+   * Creates a Path for the glyphs in this run. If a matrix is provided, the path will be transformed
+   * accordingly. Returns true if the path was successfully created. Otherwise,
    * returns false and leaves the path unchanged.
    */
-  bool getPath(Path* path, float resolutionScale = 1.0f) const;
+  bool getPath(Path* path, const Matrix* matrix = nullptr) const;
 
  private:
   std::vector<GlyphRun> _glyphRuns = {};
+  LazyBounds bounds = {};
+
+  Rect computeConservativeBounds() const;
 };
 }  // namespace tgfx

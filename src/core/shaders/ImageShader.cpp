@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ImageShader.h"
-#include "core/utils/Caster.h"
-#include "gpu/TextureSampler.h"
+#include "core/utils/Types.h"
+#include "gpu/GPUTexture.h"
 #include "gpu/ops/DrawOp.h"
 #include "gpu/processors/TiledTextureEffect.h"
 
@@ -36,13 +36,18 @@ std::shared_ptr<Shader> Shader::MakeImageShader(std::shared_ptr<Image> image, Ti
 }
 
 bool ImageShader::isEqual(const Shader* shader) const {
-  auto other = Caster::AsImageShader(shader);
-  return other && image == other->image && tileModeX == other->tileModeX &&
-         tileModeY == other->tileModeY && sampling == other->sampling;
+  auto type = Types::Get(shader);
+  if (type != Types::ShaderType::Image) {
+    return false;
+  }
+  auto other = static_cast<const ImageShader*>(shader);
+  return image == other->image && tileModeX == other->tileModeX && tileModeY == other->tileModeY &&
+         sampling == other->sampling;
 }
 
 PlacementPtr<FragmentProcessor> ImageShader::asFragmentProcessor(const FPArgs& args,
                                                                  const Matrix* uvMatrix) const {
-  return image->asFragmentProcessor(args, tileModeX, tileModeY, sampling, uvMatrix);
+  SamplingArgs samplingArgs = {tileModeX, tileModeY, sampling, SrcRectConstraint::Fast};
+  return image->asFragmentProcessor(args, samplingArgs, uvMatrix);
 }
 }  // namespace tgfx

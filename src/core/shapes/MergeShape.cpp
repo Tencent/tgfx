@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -37,27 +37,6 @@ std::shared_ptr<Shape> Shape::Merge(std::shared_ptr<Shape> first, std::shared_pt
   return std::make_shared<MergeShape>(std::move(first), std::move(second), pathOp);
 }
 
-bool MergeShape::isRect(Rect* rect) const {
-  if (pathOp != PathOp::Intersect) {
-    return false;
-  }
-  Rect firstRect = {};
-  if (!first->isRect(&firstRect)) {
-    return false;
-  }
-  Rect secondRect = {};
-  if (!second->isRect(&secondRect)) {
-    return false;
-  }
-  if (rect) {
-    if (!firstRect.intersect(secondRect)) {
-      return false;
-    }
-    *rect = firstRect;
-  }
-  return true;
-}
-
 bool MergeShape::isInverseFillType() const {
   switch (pathOp) {
     case PathOp::Difference:
@@ -81,7 +60,7 @@ Rect MergeShape::getBounds() const {
       return second->isInverseFillType() ? secondBounds : firstBounds;
     case PathOp::Intersect:
       if (first->isInverseFillType() == second->isInverseFillType()) {
-        return firstBounds.intersects(secondBounds) ? firstBounds : Rect::MakeEmpty();
+        return firstBounds.intersect(secondBounds) ? firstBounds : Rect::MakeEmpty();
       }
       return first->isInverseFillType() ? secondBounds : firstBounds;
     default:

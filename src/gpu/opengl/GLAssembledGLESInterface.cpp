@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -20,19 +20,6 @@
 #include "GLInterface.h"
 
 namespace tgfx {
-static void InitFramebufferTexture2DMultisample(const GLProcGetter* getter, GLFunctions* functions,
-                                                const GLInfo& info) {
-  if (info.hasExtension("GL_EXT_multisampled_render_to_texture")) {
-    functions->framebufferTexture2DMultisample =
-        reinterpret_cast<GLFramebufferTexture2DMultisample*>(
-            getter->getProcAddress("glFramebufferTexture2DMultisampleEXT"));
-  } else if (info.hasExtension("GL_IMG_multisampled_render_to_texture")) {
-    functions->framebufferTexture2DMultisample =
-        reinterpret_cast<GLFramebufferTexture2DMultisample*>(
-            getter->getProcAddress("glFramebufferTexture2DMultisampleIMG"));
-  }
-}
-
 static void InitRenderbufferStorageMultisample(const GLProcGetter* getter, GLFunctions* functions,
                                                const GLInfo& info) {
   if (info.version >= GL_VER(3, 0)) {
@@ -44,16 +31,6 @@ static void InitRenderbufferStorageMultisample(const GLProcGetter* getter, GLFun
   } else if (info.hasExtension("GL_ANGLE_framebuffer_multisample")) {
     functions->renderbufferStorageMultisample = reinterpret_cast<GLRenderbufferStorageMultisample*>(
         getter->getProcAddress("glRenderbufferStorageMultisampleANGLE"));
-  }
-  if (info.hasExtension("GL_EXT_multisampled_render_to_texture")) {
-    functions->renderbufferStorageMultisampleEXT =
-        reinterpret_cast<GLRenderbufferStorageMultisampleEXT*>(
-            getter->getProcAddress("glRenderbufferStorageMultisampleEXT"));
-  }
-  if (info.hasExtension("GL_IMG_multisampled_render_to_texture")) {
-    functions->renderbufferStorageMultisampleEXT =
-        reinterpret_cast<GLRenderbufferStorageMultisampleEXT*>(
-            getter->getProcAddress("glRenderbufferStorageMultisampleIMG"));
   }
   if (info.hasExtension("GL_APPLE_framebuffer_multisample")) {
     functions->renderbufferStorageMultisampleAPPLE =
@@ -103,7 +80,6 @@ void GLAssembleGLESInterface(const GLProcGetter* getter, GLFunctions* functions,
   }
   InitBlitFramebuffer(getter, functions, info);
   InitRenderbufferStorageMultisample(getter, functions, info);
-  InitFramebufferTexture2DMultisample(getter, functions, info);
   InitVertexArray(getter, functions, info);
 }
 }  // namespace tgfx

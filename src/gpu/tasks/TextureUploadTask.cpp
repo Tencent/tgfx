@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,16 +17,19 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureUploadTask.h"
-#include "gpu/Texture.h"
+#include "gpu/resources/TextureView.h"
+#include "inspect/InspectorMark.h"
 
 namespace tgfx {
-TextureUploadTask::TextureUploadTask(UniqueKey uniqueKey,
+TextureUploadTask::TextureUploadTask(std::shared_ptr<ResourceProxy> proxy,
                                      std::shared_ptr<DataSource<ImageBuffer>> source,
                                      bool mipmapped)
-    : ResourceTask(std::move(uniqueKey)), source(std::move(source)), mipmapped(mipmapped) {
+    : ResourceTask(std::move(proxy)), source(std::move(source)), mipmapped(mipmapped) {
 }
 
 std::shared_ptr<Resource> TextureUploadTask::onMakeResource(Context* context) {
+  TASK_MARK(tgfx::inspect::OpTaskType::TextureUploadTask);
+  ATTRIBUTE_NAME("mipmaped", mipmapped);
   if (source == nullptr) {
     return nullptr;
   }
@@ -35,13 +38,13 @@ std::shared_ptr<Resource> TextureUploadTask::onMakeResource(Context* context) {
     LOGE("TextureUploadTask::onMakeResource() Failed to decode the image!");
     return nullptr;
   }
-  auto texture = Texture::MakeFrom(context, imageBuffer, mipmapped);
-  if (texture == nullptr) {
-    LOGE("TextureUploadTask::onMakeResource() Failed to upload the texture!");
+  auto textureView = TextureView::MakeFrom(context, imageBuffer, mipmapped);
+  if (textureView == nullptr) {
+    LOGE("TextureUploadTask::onMakeResource() Failed to upload the texture view!");
   } else {
     // Free the image source immediately to reduce memory pressure.
     source = nullptr;
   }
-  return texture;
+  return textureView;
 }
 }  // namespace tgfx

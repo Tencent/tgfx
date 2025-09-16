@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,36 +17,48 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ShapeRasterizer.h"
+#include "core/PathRasterizer.h"
 #include "core/PathTriangulator.h"
-#include "tgfx/core/Mask.h"
 #include "utils/Log.h"
 
 namespace tgfx {
-ShapeRasterizer::ShapeRasterizer(int width, int height, std::shared_ptr<Shape> shape, AAType aaType)
-    : Rasterizer(width, height), shape(std::move(shape)), aaType(aaType) {
+ShapeRasterizer::ShapeRasterizer(int width, int height, std::shared_ptr<StyledShape> shape,
+                                 AAType aaType)
+    : width(width), height(height), shape(std::move(shape)), aaType(aaType) {
+}
+
+bool ShapeRasterizer::asyncSupport() const {
+#if defined(TGFX_BUILD_FOR_WEB) && !defined(TGFX_USE_FREETYPE)
+  return false;
+#else
+  return true;
+#endif
 }
 
 std::shared_ptr<ShapeBuffer> ShapeRasterizer::getData() const {
   auto finalPath = shape->getPath();
   if (finalPath.isEmpty() && finalPath.isInverseFillType()) {
     finalPath.reset();
-    finalPath.addRect(Rect::MakeWH(width(), height()));
+    finalPath.addRect(Rect::MakeWH(width, height));
   }
   if (PathTriangulator::ShouldTriangulatePath(finalPath)) {
-    return ShapeBuffer::MakeFrom(makeTriangles(finalPath));
+    auto triangles = makeTriangles(finalPath);
+    if (triangles == nullptr) {
+      return nullptr;
+    }
+    return std::make_shared<ShapeBuffer>(triangles, nullptr);
   }
-  return ShapeBuffer::MakeFrom(makeImageBuffer(finalPath, true));
-}
-
-std::shared_ptr<ImageBuffer> ShapeRasterizer::onMakeBuffer(bool tryHardware) const {
-  auto finalPath = shape->getPath();
-  return makeImageBuffer(finalPath, tryHardware);
+  auto imageBuffer = makeImageBuffer(finalPath);
+  if (imageBuffer == nullptr) {
+    return nullptr;
+  }
+  return std::make_shared<ShapeBuffer>(nullptr, imageBuffer);
 }
 
 std::shared_ptr<Data> ShapeRasterizer::makeTriangles(const Path& finalPath) const {
   std::vector<float> vertices = {};
   size_t count = 0;
-  auto bounds = Rect::MakeWH(width(), height());
+  auto bounds = Rect::MakeWH(width, height);
   if (aaType == AAType::Coverage) {
     count = PathTriangulator::ToAATriangles(finalPath, bounds, &vertices);
   } else {
@@ -61,15 +73,12 @@ std::shared_ptr<Data> ShapeRasterizer::makeTriangles(const Path& finalPath) cons
   return Data::MakeWithCopy(vertices.data(), vertices.size() * sizeof(float));
 }
 
-std::shared_ptr<ImageBuffer> ShapeRasterizer::makeImageBuffer(const Path& finalPath,
-                                                              bool tryHardware) const {
-  auto mask = Mask::Make(width(), height(), tryHardware);
-  if (!mask) {
-    LOGE("ShapeRasterizer::makeImageBuffer() Failed to create the mask!");
+std::shared_ptr<ImageBuffer> ShapeRasterizer::makeImageBuffer(const Path& finalPath) const {
+  auto pathRasterizer = PathRasterizer::MakeFrom(width, height, finalPath, aaType != AAType::None);
+  if (pathRasterizer == nullptr) {
+    LOGE("ShapeRasterizer::makeImageBuffer() Failed to create the PathRasterizer!");
     return nullptr;
   }
-  mask->setAntiAlias(aaType != AAType::None);
-  mask->fillPath(finalPath);
-  return mask->makeBuffer();
+  return pathRasterizer->makeBuffer();
 }
 }  // namespace tgfx

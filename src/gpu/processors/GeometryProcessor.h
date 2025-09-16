@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -19,11 +19,12 @@
 #pragma once
 
 #include <vector>
+#include "gpu/Attribute.h"
 #include "gpu/FragmentShaderBuilder.h"
+#include "gpu/GPUTexture.h"
+#include "gpu/ShaderCaps.h"
 #include "gpu/ShaderVar.h"
-#include "gpu/TextureSampler.h"
 #include "gpu/UniformBuffer.h"
-#include "gpu/UniformHandler.h"
 #include "gpu/VaryingHandler.h"
 #include "gpu/VertexShaderBuilder.h"
 #include "gpu/processors/FragmentProcessor.h"
@@ -35,42 +36,7 @@ class GeometryProcessor : public Processor {
   // Use only for easy-to-use aliases.
   using FPCoordTransformIter = FragmentProcessor::CoordTransformIter;
 
-  /**
-   * Describes a vertex attribute.
-   */
-  class Attribute {
-   public:
-    Attribute() = default;
-    Attribute(std::string name, SLType gpuType) : _name(std::move(name)), _gpuType(gpuType) {
-    }
-
-    bool isInitialized() const {
-      return !_name.empty();
-    }
-
-    const std::string& name() const {
-      return _name;
-    }
-    SLType gpuType() const {
-      return _gpuType;
-    }
-
-    size_t sizeAlign4() const;
-
-    ShaderVar asShaderVar() const {
-      return {_name, _gpuType, ShaderVar::TypeModifier::Attribute};
-    }
-
-    void computeKey(BytesKey* bytesKey) const {
-      bytesKey->write(isInitialized() ? static_cast<uint32_t>(_gpuType) : ~0u);
-    }
-
-   private:
-    std::string _name;
-    SLType _gpuType = SLType::Float;
-  };
-
-  const std::vector<const Attribute*>& vertexAttributes() const {
+  const std::vector<Attribute>& vertexAttributes() const {
     return attributes;
   }
 
@@ -78,8 +44,9 @@ class GeometryProcessor : public Processor {
 
   class FPCoordTransformHandler {
    public:
-    FPCoordTransformHandler(const Pipeline* pipeline, std::vector<ShaderVar>* transformedCoordVars)
-        : iter(pipeline), transformedCoordVars(transformedCoordVars) {
+    FPCoordTransformHandler(const ProgramInfo* programInfo,
+                            std::vector<ShaderVar>* transformedCoordVars)
+        : iter(programInfo), transformedCoordVars(transformedCoordVars) {
     }
 
     const CoordTransform* nextCoordTransform() {
@@ -99,27 +66,45 @@ class GeometryProcessor : public Processor {
 
   struct EmitArgs {
     EmitArgs(VertexShaderBuilder* vertBuilder, FragmentShaderBuilder* fragBuilder,
-             VaryingHandler* varyingHandler, UniformHandler* uniformHandler, const Caps* caps,
+             VaryingHandler* varyingHandler, UniformHandler* uniformHandler, const ShaderCaps* caps,
              std::string outputColor, std::string outputCoverage,
-             FPCoordTransformHandler* transformHandler)
+             FPCoordTransformHandler* transformHandler, std::string* outputSubset)
         : vertBuilder(vertBuilder), fragBuilder(fragBuilder), varyingHandler(varyingHandler),
           uniformHandler(uniformHandler), caps(caps), outputColor(std::move(outputColor)),
-          outputCoverage(std::move(outputCoverage)), fpCoordTransformHandler(transformHandler) {
+          outputCoverage(std::move(outputCoverage)), fpCoordTransformHandler(transformHandler),
+          outputSubset(outputSubset) {
     }
     VertexShaderBuilder* vertBuilder;
     FragmentShaderBuilder* fragBuilder;
     VaryingHandler* varyingHandler;
     UniformHandler* uniformHandler;
-    const Caps* caps;
+    const ShaderCaps* caps;
     const std::string outputColor;
     const std::string outputCoverage;
     FPCoordTransformHandler* fpCoordTransformHandler;
+    std::string* outputSubset = nullptr;
   };
 
   virtual void emitCode(EmitArgs&) const = 0;
 
-  virtual void setData(UniformBuffer* uniformBuffer,
+  virtual void setData(UniformBuffer* vertexUniformBuffer, UniformBuffer* fragmentUniformBuffer,
                        FPCoordTransformIter* coordTransformIter) const = 0;
+
+  size_t numTextureSamplers() const {
+    return textureSamplerCount;
+  }
+
+  GPUTexture* textureAt(size_t index) const {
+    return onTextureAt(index);
+  }
+
+  SamplerState samplerStateAt(size_t index) const {
+    return onSamplerStateAt(index);
+  }
+
+  void setTextureSamplerCount(size_t count) {
+    textureSamplerCount = count;
+  }
 
  protected:
   explicit GeometryProcessor(uint32_t classID) : Processor(classID) {
@@ -137,14 +122,30 @@ class GeometryProcessor : public Processor {
    * Emit transformed uv coords from the vertex shader as a uniform matrix and varying per
    * coord-transform. uvCoordsVar must be a 2-component vector.
    */
-  void emitTransforms(VertexShaderBuilder* vertexBuilder, VaryingHandler* varyingHandler,
-                      UniformHandler* uniformHandler, const ShaderVar& uvCoordsVar,
-                      FPCoordTransformHandler* transformHandler) const;
+  void emitTransforms(EmitArgs& args, VertexShaderBuilder* vertexBuilder,
+                      VaryingHandler* varyingHandler, UniformHandler* uniformHandler,
+                      const ShaderVar& uvCoordsVar) const;
 
  private:
   virtual void onComputeProcessorKey(BytesKey*) const {
   }
 
-  std::vector<const Attribute*> attributes = {};
+  virtual GPUTexture* onTextureAt(size_t) const {
+    return nullptr;
+  }
+
+  virtual SamplerState onSamplerStateAt(size_t) const {
+    return {};
+  }
+
+  virtual void onEmitTransform(EmitArgs&, VertexShaderBuilder*, VaryingHandler*, UniformHandler*,
+                               const std::string&, int) const {
+  }
+
+  virtual void onSetTransformData(UniformBuffer*, const CoordTransform*, int) const {
+  }
+
+  std::vector<Attribute> attributes = {};
+  size_t textureSamplerCount = 0;
 };
 }  // namespace tgfx

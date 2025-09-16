@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -24,8 +24,8 @@ DeviceSpaceTextureEffect::DeviceSpaceTextureEffect(std::shared_ptr<TextureProxy>
     : FragmentProcessor(ClassID()), textureProxy(std::move(textureProxy)), uvMatrix(uvMatrix) {
 }
 
-const TextureSampler* DeviceSpaceTextureEffect::onTextureSampler(size_t) const {
-  auto texture = textureProxy->getTexture();
-  return texture == nullptr ? nullptr : texture->getSampler();
+GPUTexture* DeviceSpaceTextureEffect::onTextureAt(size_t) const {
+  auto textureView = textureProxy->getTextureView();
+  return textureView == nullptr ? nullptr : textureView->getTexture();
 }
 }  // namespace tgfx

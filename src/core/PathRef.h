@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,8 +18,13 @@
 
 #pragma once
 
-#include "gpu/ResourceKey.h"
+#include "core/utils/LazyBounds.h"
+#include "gpu/resources/ResourceKey.h"
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wfloat-conversion"
+#pragma clang diagnostic ignored "-Wimplicit-int-conversion"
 #include "pathkit.h"
+#pragma clang diagnostic pop
 
 namespace tgfx {
 class Path;
@@ -38,16 +43,12 @@ class PathRef {
   explicit PathRef(const pk::SkPath& path) : path(path) {
   }
 
-  ~PathRef();
-
   Rect getBounds();
 
  private:
   LazyUniqueKey uniqueKey = {};
-  std::atomic<Rect*> bounds = {nullptr};
+  LazyBounds bounds = {};
   pk::SkPath path = {};
-
-  void resetBounds();
 
   friend bool operator==(const Path& a, const Path& b);
   friend bool operator!=(const Path& a, const Path& b);

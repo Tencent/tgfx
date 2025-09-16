@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,13 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "CornerPinEffect.h"
+#include <string>
 
 namespace tgfx {
-static const char CORNER_PIN_VERTEX_SHADER[] = R"(
-        #version 100
-        attribute vec2 aPosition;
-        attribute vec3 aTextureCoord;
-        varying vec3 vertexColor;
+static constexpr char CORNER_PIN_VERTEX_SHADER[] = R"(
+        in vec2 aPosition;
+        in vec3 aTextureCoord;
+        out vec3 vertexColor;
         void main() {
             vec3 position = vec3(aPosition, 1);
             gl_Position = vec4(position.xy, 0, 1);
@@ -31,15 +31,23 @@ static const char CORNER_PIN_VERTEX_SHADER[] = R"(
         }
     )";
 
-static const char CORNER_PIN_FRAGMENT_SHADER[] = R"(
-        #version 100
+static constexpr char CORNER_PIN_FRAGMENT_SHADER[] = R"(
         precision mediump float;
-        varying vec3 vertexColor;
+        in vec3 vertexColor;
         uniform sampler2D sTexture;
+        out vec4 tgfx_FragColor;
         void main() {
-            gl_FragColor = texture2D(sTexture, vertexColor.xy / vertexColor.z);
+            tgfx_FragColor = texture(sTexture, vertexColor.xy / vertexColor.z);
         }
     )";
+
+static std::string GetFinalShaderCode(const char* codeSnippet, bool isDesktop) {
+  if (isDesktop) {
+    return std::string("#version 140\n\n") + codeSnippet;
+  } else {
+    return std::string("#version 300 es\n\n") + codeSnippet;
+  }
+}
 
 std::shared_ptr<CornerPinEffect> CornerPinEffect::Make(const Point& upperLeft,
                                                        const Point& upperRight,
@@ -49,8 +57,7 @@ std::shared_ptr<CornerPinEffect> CornerPinEffect::Make(const Point& upperLeft,
 }
 
 CornerPinEffect::CornerPinEffect(const Point& upperLeft, const Point& upperRight,
-                                 const Point& lowerRight, const Point& lowerLeft)
-    : RuntimeEffect(Type()) {
+                                 const Point& lowerRight, const Point& lowerLeft) {
   cornerPoints[0] = lowerLeft;
   cornerPoints[1] = lowerRight;
   cornerPoints[2] = upperLeft;
@@ -71,51 +78,43 @@ Rect CornerPinEffect::filterBounds(const Rect&) const {
 }
 
 std::unique_ptr<RuntimeProgram> CornerPinEffect::onCreateProgram(Context* context) const {
+  auto gl = GLFunctions::Get(context);
   // Clear the previously generated GLError, causing the subsequent CheckGLError to return an
   // incorrect result.
-  ClearGLError(context);
+  ClearGLError(gl);
+  const auto caps = GLCaps::Get(context);
+  const auto isDesktop = caps->standard == GLStandard::GL;
   auto filterProgram =
-      FilterProgram::Make(context, CORNER_PIN_VERTEX_SHADER, CORNER_PIN_FRAGMENT_SHADER);
+      FilterProgram::Make(context, GetFinalShaderCode(CORNER_PIN_VERTEX_SHADER, isDesktop),
+                          GetFinalShaderCode(CORNER_PIN_FRAGMENT_SHADER, isDesktop));
   if (filterProgram == nullptr) {
     return nullptr;
   }
-  auto gl = GLFunctions::Get(context);
+
   auto program = filterProgram->program;
   auto uniforms = std::make_unique<CornerPinUniforms>();
   uniforms->positionHandle = gl->getAttribLocation(program, "aPosition");
   uniforms->textureCoordHandle = gl->getAttribLocation(program, "aTextureCoord");
   filterProgram->uniforms = std::move(uniforms);
-  if (!CheckGLError(context)) {
+  if (!CheckGLError(gl)) {
     return nullptr;
   }
   return filterProgram;
-}
-
-static void EnableMultisample(tgfx::Context* context, bool usesMSAA) {
-  if (usesMSAA && context->caps()->multisampleDisableSupport) {
-    auto gl = tgfx::GLFunctions::Get(context);
-    gl->enable(GL_MULTISAMPLE);
-  }
-}
-
-static void DisableMultisample(tgfx::Context* context, bool usesMSAA) {
-  if (usesMSAA && context->caps()->multisampleDisableSupport) {
-    auto gl = tgfx::GLFunctions::Get(context);
-    gl->disable(GL_MULTISAMPLE);
-  }
 }
 
 bool CornerPinEffect::onDraw(const RuntimeProgram* program,
                              const std::vector<BackendTexture>& inputTextures,
                              const BackendRenderTarget& target, const Point& offset) const {
   auto context = program->getContext();
+  auto gl = tgfx::GLFunctions::Get(context);
   // Clear the previously generated GLError
-  ClearGLError(context);
+  ClearGLError(gl);
   auto filterProgram = static_cast<const FilterProgram*>(program);
   auto uniforms = static_cast<const CornerPinUniforms*>(filterProgram->uniforms.get());
-  auto gl = tgfx::GLFunctions::Get(context);
   auto needsMSAA = sampleCount() > 1;
-  EnableMultisample(context, needsMSAA);
+  if (needsMSAA && context->caps()->multisampleDisableSupport) {
+    gl->enable(GL_MULTISAMPLE);
+  }
   gl->useProgram(filterProgram->program);
   gl->disable(GL_SCISSOR_TEST);
   gl->enable(GL_BLEND);
@@ -125,10 +124,14 @@ bool CornerPinEffect::onDraw(const RuntimeProgram* program,
   target.getGLFramebufferInfo(&frameBuffer);
   gl->bindFramebuffer(GL_FRAMEBUFFER, frameBuffer.id);
   gl->viewport(0, 0, target.width(), target.height());
-  GLTextureInfo sampler = {};
-  inputTextures[0].getGLTextureInfo(&sampler);
+  GLTextureInfo glInfo = {};
+  inputTextures[0].getGLTextureInfo(&glInfo);
   gl->activeTexture(GL_TEXTURE0);
-  gl->bindTexture(sampler.target, sampler.id);
+  gl->bindTexture(glInfo.target, glInfo.id);
+  gl->texParameteri(glInfo.target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  gl->texParameteri(glInfo.target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  gl->texParameteri(glInfo.target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  gl->texParameteri(glInfo.target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   auto vertices = computeVertices(inputTextures[0], target, offset);
   if (filterProgram->vertexArray > 0) {
     gl->bindVertexArray(filterProgram->vertexArray);
@@ -148,8 +151,10 @@ bool CornerPinEffect::onDraw(const RuntimeProgram* program,
   if (filterProgram->vertexArray > 0) {
     gl->bindVertexArray(0);
   }
-  DisableMultisample(context, needsMSAA);
-  return CheckGLError(context);
+  if (needsMSAA && context->caps()->multisampleDisableSupport) {
+    gl->disable(GL_MULTISAMPLE);
+  }
+  return CheckGLError(gl);
 }
 
 static Point ToGLVertexPoint(const Point& point, const BackendRenderTarget& target) {

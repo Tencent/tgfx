@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -87,7 +87,7 @@ std::shared_ptr<ImageFilter> InnerShadowFilter::onCreateImageFilter(float scale)
 InnerShadowFilter::InnerShadowFilter(float offsetX, float offsetY, float blurrinessX,
                                      float blurrinessY, const Color& color, bool innerShadowOnly)
     : _offsetX(offsetX), _offsetY(offsetY), _blurrinessX(blurrinessX), _blurrinessY(blurrinessY),
-      _color(std::move(color)), _innerShadowOnly(innerShadowOnly) {
+      _color(color), _innerShadowOnly(innerShadowOnly) {
 }
 
 }  // namespace tgfx

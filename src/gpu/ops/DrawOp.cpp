@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,21 +17,45 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawOp.h"
+#include "gpu/resources/PipelineProgram.h"
+#include "inspect/InspectorMark.h"
 
 namespace tgfx {
-PlacementPtr<Pipeline> DrawOp::createPipeline(RenderPass* renderPass,
-                                              PlacementPtr<GeometryProcessor> gp) {
-  auto numColorProcessors = colors.size();
-  auto fragmentProcessors = std::move(colors);
-  fragmentProcessors.reserve(numColorProcessors + coverages.size());
-  for (auto& coverage : coverages) {
-    fragmentProcessors.emplace_back(std::move(coverage));
+void DrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
+  OPERATE_MARK(type());
+  auto geometryProcessor = onMakeGeometryProcessor(renderTarget);
+  ATTRIBUTE_NAME("scissorRect", scissorRect);
+  ATTRIBUTE_NAME_ENUM("blenderMode", blendMode, tgfx::inspect::CustomEnumType::BlendMode);
+  ATTRIBUTE_NAME_ENUM("aaType", aaType, tgfx::inspect::CustomEnumType::AAType);
+  if (geometryProcessor == nullptr) {
+    return;
   }
-  auto format = renderPass->renderTarget()->format();
-  auto context = renderPass->getContext();
-  const auto& swizzle = context->caps()->getWriteSwizzle(format);
-  return context->drawingBuffer()->make<Pipeline>(std::move(gp), std::move(fragmentProcessors),
-                                                  numColorProcessors, std::move(xferProcessor),
-                                                  blendMode, &swizzle);
+  std::vector<FragmentProcessor*> fragmentProcessors = {};
+  fragmentProcessors.reserve(colors.size() + coverages.size());
+  for (auto& color : colors) {
+    fragmentProcessors.emplace_back(color.get());
+  }
+  for (auto& coverage : coverages) {
+    fragmentProcessors.emplace_back(coverage.get());
+  }
+  ProgramInfo programInfo(renderTarget, geometryProcessor.get(), std::move(fragmentProcessors),
+                          colors.size(), xferProcessor.get(), blendMode);
+  auto program = std::static_pointer_cast<PipelineProgram>(programInfo.getProgram());
+  if (program == nullptr) {
+    LOGE("DrawOp::execute() Failed to get the program!");
+    return;
+  }
+  renderPass->setPipeline(program->getPipeline());
+  programInfo.setUniformsAndSamplers(renderPass, program.get());
+  if (scissorRect.isEmpty()) {
+    renderPass->setScissorRect(0, 0, renderTarget->width(), renderTarget->height());
+  } else {
+    renderPass->setScissorRect(static_cast<int>(scissorRect.x()), static_cast<int>(scissorRect.y()),
+                               static_cast<int>(scissorRect.width()),
+                               static_cast<int>(scissorRect.height()));
+  }
+  onDraw(renderPass);
+  CAPUTRE_FRARGMENT_PROCESSORS(renderTarget->getContext(), colors, coverages);
+  CAPUTRE_RENDER_TARGET(renderTarget);
 }
 }  // namespace tgfx

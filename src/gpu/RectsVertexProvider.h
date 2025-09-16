@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -35,6 +35,10 @@ struct RectRecord {
   Color color;
 };
 
+enum class UVSubsetMode { None, SubsetOnly, RoundOutAndSubset };
+
+enum class UVCoordMode { Auto, Required, Disabled };
+
 /**
  * RectsVertexProvider is a VertexProvider that provides vertices for drawing rectangles.
  */
@@ -51,7 +55,9 @@ class RectsVertexProvider : public VertexProvider {
    */
   static PlacementPtr<RectsVertexProvider> MakeFrom(BlockBuffer* buffer,
                                                     std::vector<PlacementPtr<RectRecord>>&& rects,
-                                                    AAType aaType, bool needUVCoord);
+                                                    std::vector<PlacementPtr<Rect>>&& uvRects,
+                                                    AAType aaType, bool needUVCoord,
+                                                    UVSubsetMode subsetMode);
 
   /**
    * Returns the number of rects in the provider.
@@ -103,15 +109,25 @@ class RectsVertexProvider : public VertexProvider {
     return rects.front()->color;
   }
 
+  /**
+   * Returns true if the provider generates subset rects.
+   */
+  bool hasSubset() const {
+    return static_cast<UVSubsetMode>(bitFields.subsetMode) != UVSubsetMode::None;
+  }
+
  protected:
   PlacementArray<RectRecord> rects = {};
+  PlacementArray<Rect> uvRects = {};
   struct {
     uint8_t aaType : 2;
     bool hasUVCoord : 1;
     bool hasColor : 1;
+    uint8_t subsetMode : 2;
   } bitFields = {};
 
-  RectsVertexProvider(PlacementArray<RectRecord>&& rects, AAType aaType, bool hasUVCoord,
-                      bool hasColor);
+  RectsVertexProvider(PlacementArray<RectRecord>&& rects, PlacementArray<Rect>&& uvRects,
+                      AAType aaType, bool hasUVCoord, bool hasColor, UVSubsetMode subsetMode,
+                      std::shared_ptr<BlockBuffer> reference);
 };
 }  // namespace tgfx

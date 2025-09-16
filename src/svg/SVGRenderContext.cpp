@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -21,6 +21,7 @@
 #include <cmath>
 #include <memory>
 #include <optional>
+#include "core/utils/AddressOf.h"
 #include "core/utils/Log.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Color.h"
@@ -254,7 +255,7 @@ std::shared_ptr<ImageFilter> SVGRenderContext::applyFilter(const SVGFuncIRI& fil
     return nullptr;
   }
 
-  const auto* filterNode = reinterpret_cast<const SVGFilter*>(node.get());
+  auto filterNode = reinterpret_cast<const SVGFilter*>(node.get());
   return filterNode->buildFilterDAG(*this);
 }
 
@@ -289,7 +290,7 @@ std::shared_ptr<MaskFilter> SVGRenderContext::applyMask(const SVGFuncIRI& mask) 
 
   auto maskNode = std::static_pointer_cast<SVGMask>(node);
   Recorder maskRecorder;
-  auto* maskCanvas = maskRecorder.beginRecording();
+  auto maskCanvas = maskRecorder.beginRecording();
   {
     SVGRenderContext maskContext(*this, maskCanvas);
     maskNode->renderMask(maskContext);
@@ -340,7 +341,7 @@ std::optional<Paint> SVGRenderContext::commonPaint(const SVGPaint& svgPaint, flo
                                     presentContext, scope, {});
 
       const auto node = this->findNodeById(svgPaint.iri());
-      if (!node || !node->asPaint(localContext, &(paint.value()))) {
+      if (!node || !node->asPaint(localContext, AddressOf(paint))) {
         // Use the fallback color.
         paint->setColor(this->resolveSVGColor(svgPaint.color()));
       }

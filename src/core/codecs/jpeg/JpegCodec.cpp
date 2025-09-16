@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,6 +18,7 @@
 
 #include "core/codecs/jpeg/JpegCodec.h"
 #include <csetjmp>
+#include "core/utils/MathExtra.h"
 #include "core/utils/OrientationHelper.h"
 #include "skcms.h"
 #include "tgfx/core/Buffer.h"
@@ -156,19 +157,60 @@ bool ConvertCMYKPixels(void* dst, const gfx::skcms_ICCProfile cmykProfile,
   return true;
 }
 
+uint32_t JpegCodec::getScaledDimensions(int newWidth, int newHeight) const {
+  auto scaledX = static_cast<float>(newWidth) / static_cast<float>(width());
+  auto scaledY = static_cast<float>(newHeight) / static_cast<float>(height());
+  if (!FloatNearlyEqual(scaledX, scaledY)) {
+    return 0;
+  }
+  if (FloatNearlyEqual(scaledX, 1.f / 8.f)) {
+    return 1;
+  } else if (FloatNearlyEqual(scaledX, 2.f / 8.f)) {
+    return 2;
+  } else if (FloatNearlyEqual(scaledX, 3.f / 8.f)) {
+    return 3;
+  } else if (FloatNearlyEqual(scaledX, 4.f / 8.f)) {
+    return 4;
+  } else if (FloatNearlyEqual(scaledX, 5.f / 8.f)) {
+    return 5;
+  } else if (FloatNearlyEqual(scaledX, 6.f / 8.f)) {
+    return 6;
+  } else if (FloatNearlyEqual(scaledX, 7.f / 8.f)) {
+    return 7;
+  } else if (FloatNearlyEqual(scaledX, 1.f)) {
+    return 8;
+  }
+  return 0;
+}
+
 bool JpegCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
-  if (dstPixels == nullptr || dstInfo.isEmpty()) {
+  if (auto scaleDimensions = getScaledDimensions(dstInfo.width(), dstInfo.height())) {
+    return readScaledPixels(dstInfo.colorType(), dstInfo.alphaType(), dstInfo.rowBytes(), dstPixels,
+                            scaleDimensions);
+  }
+  return ImageCodec::readPixels(dstInfo, dstPixels);
+}
+
+bool JpegCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
+                             void* dstPixels) const {
+  return readScaledPixels(colorType, alphaType, dstRowBytes, dstPixels, 8);
+}
+
+bool JpegCodec::readScaledPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
+                                 void* dstPixels, uint32_t scaleNum) const {
+  if (dstPixels == nullptr) {
     return false;
   }
-  if (dstInfo.colorType() == ColorType::ALPHA_8) {
-    memset(dstPixels, 255, dstInfo.rowBytes() * static_cast<size_t>(height()));
+  if (colorType == ColorType::ALPHA_8) {
+    memset(dstPixels, 255, dstRowBytes * static_cast<size_t>(height()));
     return true;
   }
+  auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes);
   Bitmap bitmap = {};
   auto outPixels = dstPixels;
-  auto outRowBytes = dstInfo.rowBytes();
+  auto outRowBytes = dstRowBytes;
   J_COLOR_SPACE out_color_space;
-  switch (dstInfo.colorType()) {
+  switch (colorType) {
     case ColorType::RGBA_8888:
       out_color_space = JCS_EXT_RGBA;
       break;
@@ -182,7 +224,7 @@ bool JpegCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
       out_color_space = JCS_RGB565;
       break;
     default:
-      auto success = bitmap.allocPixels(dstInfo.width(), dstInfo.height(), false, false);
+      auto success = bitmap.allocPixels(width(), height(), false, false);
       if (!success) {
         return false;
       }
@@ -215,6 +257,8 @@ bool JpegCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
     if (jpeg_read_header(&cinfo, TRUE) != JPEG_HEADER_OK) {
       break;
     }
+    cinfo.scale_num = scaleNum;
+    cinfo.scale_denom = 8;
     cinfo.out_color_space = out_color_space;
     if (cinfo.jpeg_color_space == JCS_CMYK || cinfo.jpeg_color_space == JCS_YCCK) {
       cinfo.out_color_space = JCS_CMYK;
@@ -224,8 +268,7 @@ bool JpegCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
     }
     JSAMPROW pRow[1];
     int line = 0;
-    JDIMENSION h = static_cast<JDIMENSION>(height());
-    while (cinfo.output_scanline < h) {
+    while (cinfo.output_scanline < cinfo.output_height) {
       pRow[0] = (JSAMPROW)(static_cast<unsigned char*>(outPixels) +
                            outRowBytes * static_cast<size_t>(line));
       jpeg_read_scanlines(&cinfo, pRow, 1);

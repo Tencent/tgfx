@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -23,6 +23,8 @@
 
 namespace tgfx {
 class Context;
+class GPU;
+
 /**
  * The GPU interface for drawing graphics.
  */
@@ -56,13 +58,14 @@ class Device {
   Context* context = nullptr;
   std::weak_ptr<Device> weakThis;
 
-  Device();
+  explicit Device(std::unique_ptr<GPU> gpu);
   void releaseAll();
   virtual bool onLockContext();
   virtual void onUnlockContext();
 
  private:
   uint32_t _uniqueID = 0;
+  GPU* _gpu = nullptr;
   bool contextLocked = false;
 
   friend class ResourceCache;

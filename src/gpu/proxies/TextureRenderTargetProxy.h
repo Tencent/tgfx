@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,24 +18,65 @@
 
 #pragma once
 
+#include "DefaultTextureProxy.h"
 #include "RenderTargetProxy.h"
 
 namespace tgfx {
-class TextureRenderTargetProxy : public RenderTargetProxy {
+class TextureRenderTargetProxy : public DefaultTextureProxy,
+                                 public RenderTargetProxy,
+                                 public std::enable_shared_from_this<TextureRenderTargetProxy> {
  public:
-  std::shared_ptr<TextureProxy> getTextureProxy() const override {
-    return textureProxy;
+  Context* getContext() const override {
+    return context;
   }
 
- private:
-  std::shared_ptr<TextureProxy> textureProxy = nullptr;
-
-  TextureRenderTargetProxy(UniqueKey uniqueKey, std::shared_ptr<TextureProxy> textureProxy,
-                           PixelFormat format, int sampleCount)
-      : RenderTargetProxy(std::move(uniqueKey), textureProxy->width(), textureProxy->height(),
-                          format, sampleCount, textureProxy->origin()),
-        textureProxy(std::move(textureProxy)) {
+  int width() const override {
+    return _width;
   }
+
+  int height() const override {
+    return _height;
+  }
+
+  PixelFormat format() const override {
+    return _format;
+  }
+
+  int sampleCount() const override {
+    return _sampleCount;
+  }
+
+  ImageOrigin origin() const override {
+    return _origin;
+  }
+
+  bool externallyOwned() const override {
+    return _externallyOwned;
+  }
+
+  std::shared_ptr<TextureProxy> asTextureProxy() const override {
+    return std::const_pointer_cast<TextureRenderTargetProxy>(shared_from_this());
+  }
+
+  std::shared_ptr<RenderTargetProxy> asRenderTargetProxy() const override {
+    return std::const_pointer_cast<TextureRenderTargetProxy>(shared_from_this());
+  }
+
+  std::shared_ptr<TextureView> getTextureView() const override {
+    return DefaultTextureProxy::getTextureView();
+  }
+
+  std::shared_ptr<RenderTarget> getRenderTarget() const override;
+
+ protected:
+  int _sampleCount = 1;
+  bool _externallyOwned = false;
+
+  TextureRenderTargetProxy(int width, int height, PixelFormat format, int sampleCount,
+                           bool mipmapped = false, ImageOrigin origin = ImageOrigin::TopLeft,
+                           bool externallyOwned = false);
+
+  std::shared_ptr<TextureView> onMakeTexture(Context* context) const override;
 
   friend class ProxyProvider;
 };

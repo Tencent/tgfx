@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -33,16 +33,4 @@ Quad::Quad(const Rect& rect, const Matrix* matrix) {
     matrix->mapPoints(points, 4);
   }
 }
-
-std::shared_ptr<Data> Quad::toTriangleStrips() const {
-  Buffer buffer(8 * sizeof(float));
-  auto vertices = static_cast<float*>(buffer.data());
-  int index = 0;
-  for (size_t i = 4; i >= 1; --i) {
-    vertices[index++] = points[i - 1].x;
-    vertices[index++] = points[i - 1].y;
-  }
-  return buffer.release();
-}
-
 }  // namespace tgfx

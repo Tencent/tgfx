@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TGFXWindow.h"
+#include <cmath>
 #include <filesystem>
 #if WINVER >= 0x0603  // Windows 8.1
 #include <shellscalingapi.h>
@@ -24,6 +25,9 @@
 
 namespace hello2d {
 static constexpr LPCWSTR ClassName = L"TGFXWindow";
+static constexpr float MAX_ZOOM = 1000.0f;
+static constexpr float MIN_ZOOM = 0.001f;
+static constexpr float WHEEL_RATIO = 400.0f;
 
 TGFXWindow::TGFXWindow() {
   createAppHost();
@@ -46,8 +50,11 @@ bool TGFXWindow::open() {
   if (windowHandle == nullptr) {
     return false;
   }
+  RegisterTouchWindow(windowHandle, 0);
   SetWindowLongPtr(windowHandle, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
   centerAndShow();
+  ShowWindow(windowHandle, SW_SHOW);
+  UpdateWindow(windowHandle);
   return true;
 }
 
@@ -78,28 +85,81 @@ LRESULT CALLBACK TGFXWindow::WndProc(HWND window, UINT message, WPARAM wparam,
 }
 
 LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam) noexcept {
-  LRESULT result = 0;
   switch (message) {
+    case WM_ACTIVATE:
+      isDrawing = (LOWORD(wparam) != WA_INACTIVE);
+      break;
     case WM_DESTROY:
       destroy();
       PostQuitMessage(0);
       break;
     case WM_PAINT: {
-      PAINTSTRUCT ps;
-      BeginPaint(windowHandle, &ps);
-      draw();
-      EndPaint(windowHandle, &ps);
+      if (isDrawing) {
+        draw();
+      }
       break;
     }
-    case WM_LBUTTONDOWN:
-      lastDrawIndex++;
+    case WM_LBUTTONDOWN: {
+      currentDrawerIndex++;
+      zoomScale = 1.0f;
+      contentOffset = {0.0f, 0.0f};
       ::InvalidateRect(windowHandle, nullptr, TRUE);
       break;
-    default:
-      result = DefWindowProc(windowHandle, message, wparam, lparam);
+    }
+    case WM_MOUSEWHEEL: {
+      POINT mousePoint = {GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
+      ScreenToClient(hwnd, &mousePoint);
+      bool isCtrlPressed = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
+      bool isShiftPressed = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
+      if (isCtrlPressed) {
+        float zoomStep = std::exp(GET_WHEEL_DELTA_WPARAM(wparam) / WHEEL_RATIO);
+        float newZoom = std::clamp(zoomScale * zoomStep, MIN_ZOOM, MAX_ZOOM);
+        contentOffset.x = mousePoint.x - ((mousePoint.x - contentOffset.x) / zoomScale) * newZoom;
+        contentOffset.y = mousePoint.y - ((mousePoint.y - contentOffset.y) / zoomScale) * newZoom;
+        zoomScale = newZoom;
+      } else {
+        float wheelDelta = static_cast<float>(GET_WHEEL_DELTA_WPARAM(wparam));
+        if (isShiftPressed) {
+          contentOffset.x += wheelDelta;
+        } else {
+          contentOffset.y -= wheelDelta;
+        }
+      }
+      ::InvalidateRect(windowHandle, nullptr, TRUE);
       break;
+    }
+    case WM_GESTURE: {
+      GESTUREINFO gestureInfo{};
+      gestureInfo.cbSize = sizeof(GESTUREINFO);
+      if (GetGestureInfo(reinterpret_cast<HGESTUREINFO>(lparam), &gestureInfo)) {
+        if (gestureInfo.dwID == GID_ZOOM) {
+          double currentArgument = gestureInfo.ullArguments;
+          if (lastZoomArgument != 0.0) {
+            double zoomFactor = currentArgument / lastZoomArgument;
+            POINT mousePoint = {GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
+            ScreenToClient(hwnd, &mousePoint);
+            float newZoom =
+                std::clamp(zoomScale * static_cast<float>(zoomFactor), MIN_ZOOM, MAX_ZOOM);
+            contentOffset.x =
+                mousePoint.x - ((mousePoint.x - contentOffset.x) / zoomScale) * newZoom;
+            contentOffset.y =
+                mousePoint.y - ((mousePoint.y - contentOffset.y) / zoomScale) * newZoom;
+            zoomScale = newZoom;
+            ::InvalidateRect(windowHandle, nullptr, TRUE);
+          }
+          lastZoomArgument = currentArgument;
+        }
+        if (gestureInfo.dwFlags & GF_END) {
+          lastZoomArgument = 0.0;
+        }
+        CloseGestureInfoHandle(reinterpret_cast<HGESTUREINFO>(lparam));
+      }
+      break;
+    }
+    default:
+      return DefWindowProc(windowHandle, message, wparam, lparam);
   }
-  return result;
+  return 0;
 }
 
 void TGFXWindow::destroy() {
@@ -227,11 +287,12 @@ void TGFXWindow::draw() {
     device->unlock();
     return;
   }
+  appHost->updateZoomAndOffset(zoomScale, contentOffset);
   auto canvas = surface->getCanvas();
   canvas->clear();
   canvas->save();
   auto numDrawers = drawers::Drawer::Count() - 1;
-  auto index = (lastDrawIndex % numDrawers) + 1;
+  auto index = (currentDrawerIndex % numDrawers) + 1;
   auto drawer = drawers::Drawer::GetByName("GridBackground");
   drawer->draw(canvas, appHost.get());
   drawer = drawers::Drawer::GetByIndex(index);

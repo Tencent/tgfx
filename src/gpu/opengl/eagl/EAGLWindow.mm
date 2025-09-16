@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,6 +18,7 @@
 
 #include "tgfx/gpu/opengl/eagl/EAGLWindow.h"
 #include "core/utils/Log.h"
+#include "gpu/opengl/eagl/EAGLLayerTexture.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
 
 namespace tgfx {
@@ -43,58 +44,27 @@ EAGLWindow::EAGLWindow(std::shared_ptr<Device> device, CAEAGLLayer* layer)
 EAGLWindow::~EAGLWindow() {
   auto context = device->lockContext();
   if (context) {
-    auto gl = GLFunctions::Get(context);
-    if (frameBufferID > 0) {
-      gl->deleteFramebuffers(1, &frameBufferID);
-      frameBufferID = 0;
-    }
-    if (colorBuffer) {
-      gl->deleteRenderbuffers(1, &colorBuffer);
-      colorBuffer = 0;
-    }
+    layerTexture->release(context->gpu());
     device->unlock();
   }
 }
 
 std::shared_ptr<Surface> EAGLWindow::onCreateSurface(Context* context) {
-  auto gl = GLFunctions::Get(context);
-  if (frameBufferID > 0) {
-    gl->deleteFramebuffers(1, &frameBufferID);
-    frameBufferID = 0;
+  if (layerTexture != nullptr) {
+    layerTexture->release(context->gpu());
+    layerTexture = nullptr;
   }
-  if (colorBuffer) {
-    gl->deleteRenderbuffers(1, &colorBuffer);
-    colorBuffer = 0;
-  }
-  auto width = layer.bounds.size.width * layer.contentsScale;
-  auto height = layer.bounds.size.height * layer.contentsScale;
-  if (width <= 0 || height <= 0) {
+  layerTexture = EAGLLayerTexture::MakeFrom(static_cast<GLGPU*>(context->gpu()), layer);
+  if (layerTexture == nullptr) {
     return nullptr;
   }
-  gl->genFramebuffers(1, &frameBufferID);
-  gl->bindFramebuffer(GL_FRAMEBUFFER, frameBufferID);
-  gl->genRenderbuffers(1, &colorBuffer);
-  gl->bindRenderbuffer(GL_RENDERBUFFER, colorBuffer);
-  gl->framebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, colorBuffer);
-  auto eaglContext = static_cast<EAGLDevice*>(context->device())->eaglContext();
-  [eaglContext renderbufferStorage:GL_RENDERBUFFER fromDrawable:layer];
-  auto frameBufferStatus = gl->checkFramebufferStatus(GL_FRAMEBUFFER);
-  gl->bindFramebuffer(GL_FRAMEBUFFER, 0);
-  gl->bindRenderbuffer(GL_RENDERBUFFER, 0);
-  if (frameBufferStatus != GL_FRAMEBUFFER_COMPLETE) {
-    LOGE("EAGLWindow::onCreateSurface() Framebuffer is not complete!");
-    return nullptr;
-  }
-  GLFrameBufferInfo glInfo = {};
-  glInfo.id = frameBufferID;
-  glInfo.format = GL_RGBA8;
-  BackendRenderTarget renderTarget = {glInfo, static_cast<int>(width), static_cast<int>(height)};
+  BackendRenderTarget renderTarget = layerTexture->getBackendRenderTarget();
   return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
 }
 
 void EAGLWindow::onPresent(Context* context, int64_t) {
   auto gl = GLFunctions::Get(context);
-  gl->bindRenderbuffer(GL_RENDERBUFFER, colorBuffer);
+  gl->bindRenderbuffer(GL_RENDERBUFFER, layerTexture->colorBufferID());
   auto eaglContext = static_cast<EAGLDevice*>(context->device())->eaglContext();
   [eaglContext presentRenderbuffer:GL_RENDERBUFFER];
   gl->bindRenderbuffer(GL_RENDERBUFFER, 0);

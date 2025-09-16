@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -19,7 +19,7 @@
 #pragma once
 
 #include "tgfx/core/ImageInfo.h"
-#include "tgfx/gpu/PixelFormat.h"
+#include "tgfx/core/Size.h"
 
 #if defined(__ANDROID__) || defined(ANDROID)
 struct AHardwareBuffer;
@@ -84,16 +84,16 @@ void* HardwareBufferLock(HardwareBufferRef buffer);
 void HardwareBufferUnlock(HardwareBufferRef buffer);
 
 /**
+ * Returns the size of the hardware buffer in pixels as an ISize object. Returns an empty ISize if
+ * the buffer is nullptr or not recognized.
+ */
+ISize HardwareBufferGetSize(HardwareBufferRef buffer);
+
+/**
  * Returns an ImageInfo describing the width, height, color type, alpha type, and row bytes of the
  * given hardware buffer object. Returns an empty ImageInfo if the buffer is nullptr or not
  * recognized.
  */
 ImageInfo HardwareBufferGetInfo(HardwareBufferRef buffer);
-
-/**
- * Returns the pixel format of the texture generated from the given hardware buffer object. Returns
- * PixelFormat::Unknown if the buffer is nullptr or not recognized.
- */
-PixelFormat HardwareBufferGetPixelFormat(HardwareBufferRef buffer);
 
 }  // namespace tgfx

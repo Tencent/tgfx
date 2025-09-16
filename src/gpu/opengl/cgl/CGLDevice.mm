@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/opengl/cgl/CGLDevice.h"
+#include "gpu/opengl/cgl/CGLGPU.h"
 
 namespace tgfx {
 void* GLDevice::CurrentNativeHandle() {
@@ -76,9 +77,14 @@ std::shared_ptr<CGLDevice> CGLDevice::Wrap(CGLContextObj cglContext, bool extern
         return nullptr;
       }
     }
-    auto device = std::shared_ptr<CGLDevice>(new CGLDevice(cglContext));
-    device->externallyOwned = externallyOwned;
-    device->weakThis = device;
+    std::shared_ptr<CGLDevice> device = nullptr;
+    auto interface = GLInterface::GetNative();
+    if (interface != nullptr) {
+      auto gpu = std::make_unique<CGLGPU>(std::move(interface), cglContext);
+      device = std::shared_ptr<CGLDevice>(new CGLDevice(std::move(gpu), cglContext));
+      device->externallyOwned = externallyOwned;
+      device->weakThis = device;
+    }
     if (oldCGLContext != cglContext) {
       CGLSetCurrentContext(oldCGLContext);
     }
@@ -86,16 +92,13 @@ std::shared_ptr<CGLDevice> CGLDevice::Wrap(CGLContextObj cglContext, bool extern
   }
 }
 
-CGLDevice::CGLDevice(CGLContextObj cglContext) : GLDevice(cglContext) {
+CGLDevice::CGLDevice(std::unique_ptr<GPU> gpu, CGLContextObj cglContext)
+    : GLDevice(std::move(gpu), cglContext) {
   glContext = [[NSOpenGLContext alloc] initWithCGLContextObj:cglContext];
 }
 
 CGLDevice::~CGLDevice() {
   releaseAll();
-  if (textureCache != nil) {
-    CFRelease(textureCache);
-    textureCache = nil;
-  }
   [glContext release];
 }
 
@@ -111,16 +114,7 @@ CGLContextObj CGLDevice::cglContext() const {
   return glContext.CGLContextObj;
 }
 
-CVOpenGLTextureCacheRef CGLDevice::getTextureCache() {
-  if (!textureCache) {
-    auto pixelFormatObj = CGLGetPixelFormat(glContext.CGLContextObj);
-    CVOpenGLTextureCacheCreate(kCFAllocatorDefault, nil, glContext.CGLContextObj, pixelFormatObj,
-                               nil, &textureCache);
-  }
-  return textureCache;
-}
-
-bool CGLDevice::onMakeCurrent() {
+bool CGLDevice::onLockContext() {
   @autoreleasepool {
     oldContext = CGLGetCurrentContext();
     CGLRetainContext(oldContext);
@@ -129,7 +123,8 @@ bool CGLDevice::onMakeCurrent() {
   }
 }
 
-void CGLDevice::onClearCurrent() {
+void CGLDevice::onUnlockContext() {
+  [NSOpenGLContext clearCurrentContext];
   CGLSetCurrentContext(oldContext);
   CGLReleaseContext(oldContext);
 }

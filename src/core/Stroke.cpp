@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,6 +18,7 @@
 
 #include "tgfx/core/Stroke.h"
 #include "core/PathRef.h"
+#include "core/utils/MathExtra.h"
 
 namespace tgfx {
 using namespace pk;
@@ -48,8 +49,7 @@ bool Stroke::applyToPath(Path* path, float resolutionScale) const {
   if (path == nullptr) {
     return false;
   }
-  if (width <= 0) {
-    path->reset();
+  if (isHairline()) {
     return true;
   }
   SkPaint paint = {};
@@ -62,16 +62,7 @@ bool Stroke::applyToPath(Path* path, float resolutionScale) const {
   return paint.getFillPath(skPath, &skPath, nullptr, resolutionScale);
 }
 
-void Stroke::applyToBounds(Rect* bounds) const {
-  if (bounds == nullptr) {
-    return;
-  }
-  auto expand = width * 0.5f;
-  if (join == LineJoin::Miter) {
-    expand *= miterLimit;
-  }
-  expand = ceilf(expand);
-  bounds->outset(expand, expand);
+bool Stroke::isHairline() const {
+  return width <= 0 || FloatNearlyZero(width);
 }
-
 }  // namespace tgfx

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,16 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
-#include "ResourceImage.h"
+#include "PixelImage.h"
 
 namespace tgfx {
 /**
  * BufferImage wraps a fully decoded ImageBuffer that can generate textures on demand.
  */
-class BufferImage : public ResourceImage {
+class BufferImage : public PixelImage {
  public:
-  BufferImage(UniqueKey uniqueKey, std::shared_ptr<ImageBuffer> buffer);
+  BufferImage(std::shared_ptr<ImageBuffer> buffer, bool mipmapped);
 
   int width() const override {
     return imageBuffer->width();
@@ -40,15 +39,20 @@ class BufferImage : public ResourceImage {
     return imageBuffer->isAlphaOnly();
   }
 
+  std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
+
  protected:
   Type type() const override {
     return Type::Buffer;
   }
 
-  std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args,
-                                                   const UniqueKey& key) const override;
+  float getRasterizedScale(float drawScale) const override;
 
- private:
-  std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
+  std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
+
+  std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
+
+  std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
+                                      const SamplingOptions& sampling) const override;
 };
 }  // namespace tgfx

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -23,22 +23,22 @@ EllipseGeometryProcessor::EllipseGeometryProcessor(int width, int height, bool s
                                                    bool useScale, std::optional<Color> commonColor)
     : GeometryProcessor(ClassID()), width(width), height(height), stroke(stroke),
       useScale(useScale), commonColor(commonColor) {
-  inPosition = {"inPosition", SLType::Float2};
+  inPosition = {"inPosition", VertexFormat::Float2};
   if (!commonColor.has_value()) {
-    inColor = {"inColor", SLType::UByte4Color};
+    inColor = {"inColor", VertexFormat::UByte4Normalized};
   }
   if (useScale) {
-    inEllipseOffset = {"inEllipseOffset", SLType::Float3};
+    inEllipseOffset = {"inEllipseOffset", VertexFormat::Float3};
   } else {
-    inEllipseOffset = {"inEllipseOffset", SLType::Float2};
+    inEllipseOffset = {"inEllipseOffset", VertexFormat::Float2};
   }
-  inEllipseRadii = {"inEllipseRadii", SLType::Float4};
+  inEllipseRadii = {"inEllipseRadii", VertexFormat::Float4};
   this->setVertexAttributes(&inPosition, 4);
 }
 
 void EllipseGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
   uint32_t flags = stroke ? 1 : 0;
-  flags = commonColor.has_value() ? 2 : 0;
+  flags |= commonColor.has_value() ? 2 : 0;
   bytesKey->write(flags);
 }
 }  // namespace tgfx

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,30 +18,39 @@
 
 #pragma once
 
-#include "gpu/TextureSampler.h"
+#include "gpu/GPUSampler.h"
 #include "tgfx/gpu/opengl/GLDefines.h"
 
 namespace tgfx {
-/**
- * Defines the sampling parameters for an OpenGL texture uint.
- */
-class GLSampler : public TextureSampler {
+class GLSampler : public GPUSampler {
  public:
-  /**
-   * The OpenGL texture id of the sampler.
-   */
-  unsigned id = 0;
+  explicit GLSampler(int wrapS, int wrapT, int minFilter, int magFilter)
+      : _wrapS(wrapS), _wrapT(wrapT), _minFilter(minFilter), _magFilter(magFilter) {
+  }
 
-  /**
-   * The OpenGL texture target of the sampler.
-   */
-  unsigned target = GL_TEXTURE_2D;
+  int wrapS() const {
+    return _wrapS;
+  }
 
-  SamplerType type() const override;
+  int wrapT() const {
+    return _wrapT;
+  }
 
-  BackendTexture getBackendTexture(int width, int height) const override;
+  int minFilter() const {
+    return _minFilter;
+  }
 
- protected:
-  void computeKey(Context* context, BytesKey* bytesKey) const override;
+  int magFilter() const {
+    return _magFilter;
+  }
+
+  void release(GPU*) override {
+  }
+
+ private:
+  int _wrapS = 0;
+  int _wrapT = 0;
+  int _minFilter = 0;
+  int _magFilter = 0;
 };
 }  // namespace tgfx

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -43,7 +43,7 @@ class NativeImageBuffer : public ImageBuffer {
   }
 
  protected:
-  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipmapped) const override;
+  std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) const override;
 
  private:
   ImageInfo info = {};

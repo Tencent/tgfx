@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -20,6 +20,7 @@
 
 #include <mutex>
 #include "ft2build.h"
+#include "tgfx/core/Stream.h"
 #include FT_FREETYPE_H
 #include "FTFontData.h"
 #include "tgfx/core/Font.h"
@@ -50,7 +51,7 @@ class FTTypeface : public Typeface {
 
   GlyphID getGlyphID(Unichar unichar) const override;
 
-  std::shared_ptr<Data> getBytes() const override;
+  std::unique_ptr<Stream> openStream() const override;
 
   std::shared_ptr<Data> copyTableData(FontTableTag tag) const override;
 
@@ -59,15 +60,24 @@ class FTTypeface : public Typeface {
   std::vector<Unichar> getGlyphToUnicodeMap() const override;
 #endif
 
+#ifdef TGFX_USE_ADVANCED_TYPEFACE_PROPERTY
+  AdvancedTypefaceInfo getAdvancedInfo() const override;
+#endif
+
+  std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const override;
+
  private:
   uint32_t _uniqueID = 0;
   FTFontData data;
   FT_Face face = nullptr;
-  std::weak_ptr<FTTypeface> weakThis;
 
   FTTypeface(FTFontData data, FT_Face face);
 
   int unitsPerEmInternal() const;
+
+#ifdef TGFX_USE_ADVANCED_TYPEFACE_PROPERTY
+  bool isOpentypeFontDataStandardFormat() const;
+#endif
 
   friend class FTScalerContext;
 };

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -50,14 +50,20 @@ class BackendTexture {
   /**
    * Creates an OpenGL backend texture.
    */
-  BackendTexture(const GLTextureInfo& glInfo, int width, int height);
+  BackendTexture(const GLTextureInfo& glInfo, int width, int height)
+      : _backend(Backend::OPENGL), _width(width), _height(height), glInfo(glInfo) {
+  }
 
   /**
    * Creates a Metal backend texture.
    */
-  BackendTexture(const MtlTextureInfo& mtlInfo, int width, int height);
+  BackendTexture(const MtlTextureInfo& mtlInfo, int width, int height)
+      : _backend(Backend::METAL), _width(width), _height(height), mtlInfo(mtlInfo) {
+  }
 
-  BackendTexture(const BackendTexture& that);
+  BackendTexture(const BackendTexture& that) {
+    *this = that;
+  }
 
   BackendTexture& operator=(const BackendTexture& that);
 
@@ -126,14 +132,20 @@ class BackendRenderTarget {
   /**
    * Creates an OpenGL backend render target.
    */
-  BackendRenderTarget(const GLFrameBufferInfo& glInfo, int width, int height);
+  BackendRenderTarget(const GLFrameBufferInfo& glInfo, int width, int height)
+      : _backend(Backend::OPENGL), _width(width), _height(height), glInfo(glInfo) {
+  }
 
   /**
    * Creates an Metal backend render target.
    */
-  BackendRenderTarget(const MtlTextureInfo& mtlInfo, int width, int height);
+  BackendRenderTarget(const MtlTextureInfo& mtlInfo, int width, int height)
+      : _backend(Backend::METAL), _width(width), _height(height), mtlInfo(mtlInfo) {
+  }
 
-  BackendRenderTarget(const BackendRenderTarget& that);
+  BackendRenderTarget(const BackendRenderTarget& that) {
+    *this = that;
+  }
 
   BackendRenderTarget& operator=(const BackendRenderTarget&);
 
@@ -192,21 +204,35 @@ class BackendRenderTarget {
  */
 class BackendSemaphore {
  public:
-  BackendSemaphore();
-
-  bool isInitialized() const {
-    return _isInitialized;
+  /**
+   * Creates an uninitialized backend semaphore.
+   */
+  BackendSemaphore() : _backend(Backend::MOCK) {
   }
 
-  void initGL(void* sync);
+  /**
+   * Creates an OpenGL backend semaphore.
+   */
+  BackendSemaphore(const GLSyncInfo& syncInfo) : _backend(Backend::OPENGL), glSyncInfo(syncInfo) {
+  }
 
-  void* glSync() const;
+  BackendSemaphore(const BackendSemaphore& that) {
+    *this = that;
+  }
+
+  BackendSemaphore& operator=(const BackendSemaphore&);
+
+  /**
+   * Returns true if the backend semaphore has been initialized.
+   */
+  bool isInitialized() const;
+
+  bool getGLSync(GLSyncInfo* syncInfo) const;
 
  private:
   Backend _backend = Backend::MOCK;
   union {
-    void* _glSync;
+    GLSyncInfo glSyncInfo;
   };
-  bool _isInitialized;
 };
 }  // namespace tgfx

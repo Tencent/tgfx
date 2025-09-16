@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -19,9 +19,11 @@
 #include "TextShaper.h"
 #include <list>
 #include <map>
+#include <memory>
 #include <mutex>
 #include "core/utils/Log.h"
 #include "hb.h"
+#include "tgfx/core/Buffer.h"
 #include "utils/ProjectPath.h"
 
 namespace tgfx {
@@ -46,14 +48,19 @@ hb_blob_t* HBGetTable(hb_face_t*, hb_tag_t tag, void* userData) {
 
 std::shared_ptr<hb_face_t> CreateHBFace(const std::shared_ptr<Typeface>& typeface) {
   std::shared_ptr<hb_face_t> hbFace;
-  auto data = typeface->getBytes();
-  if (data && !data->empty()) {
-    auto wrapper = new PtrWrapper<Data>(data);
+  auto stream = typeface->openStream();
+  if (stream && stream->size() > 0) {
+    auto size = stream->size();
+    auto buffer = std::make_shared<Buffer>(size);
+    if (stream->read(buffer->data(), size) != size) {
+      return nullptr;
+    }
+    auto wrapper = new PtrWrapper<Buffer>(buffer);
     auto blob = std::shared_ptr<hb_blob_t>(
-        hb_blob_create(static_cast<const char*>(data->data()),
-                       static_cast<unsigned int>(data->size()), HB_MEMORY_MODE_READONLY,
+        hb_blob_create(static_cast<const char*>(buffer->data()),
+                       static_cast<unsigned int>(buffer->size()), HB_MEMORY_MODE_READONLY,
                        static_cast<void*>(wrapper),
-                       [](void* ctx) { delete reinterpret_cast<PtrWrapper<Data>*>(ctx); }),
+                       [](void* ctx) { delete reinterpret_cast<PtrWrapper<Buffer>*>(ctx); }),
         hb_blob_destroy);
     if (hb_blob_get_empty() == blob.get()) {
       return nullptr;
@@ -135,9 +142,9 @@ class HBLockedFontCache {
 };
 
 static HBLockedFontCache GetHBFontCache() {
-  static auto* HBFontCacheMutex = new std::mutex();
-  static auto* HBFontLRU = new std::list<uint32_t>();
-  static auto* HBFontCache = new std::map<uint32_t, std::shared_ptr<hb_font_t>>();
+  static auto HBFontCacheMutex = new std::mutex();
+  static auto HBFontLRU = new std::list<uint32_t>();
+  static auto HBFontCache = new std::map<uint32_t, std::shared_ptr<hb_font_t>>();
   return {HBFontLRU, HBFontCache, HBFontCacheMutex};
 }
 
@@ -171,7 +178,7 @@ static std::vector<std::tuple<uint32_t, uint32_t, uint32_t>> ShapeText(
   hb_buffer_guess_segment_properties(hbBuffer.get());
   hb_shape(hbFont.get(), hbBuffer.get(), nullptr, 0);
   unsigned count = 0;
-  auto* infos = hb_buffer_get_glyph_infos(hbBuffer.get(), &count);
+  auto infos = hb_buffer_get_glyph_infos(hbBuffer.get(), &count);
   std::vector<std::tuple<uint32_t, uint32_t, uint32_t>> result;
   for (unsigned i = 0; i < count; ++i) {
     auto length = (i + 1 == count ? text.length() : infos[i + 1].cluster) - infos[i].cluster;

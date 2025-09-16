@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -19,7 +19,7 @@
 #include "base/Drawers.h"
 
 namespace drawers {
-void ConicGradient::onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) {
+void ConicGradient::onDraw(tgfx::Canvas* canvas, const AppHost* host) {
   auto scale = host->density();
   auto width = host->width();
   auto height = host->height();
@@ -36,6 +36,8 @@ void ConicGradient::onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) {
   auto rect = tgfx::Rect::MakeXYWH((width - size) / 2, (height - size) / 2, size, size);
   tgfx::Path path = {};
   path.addRoundRect(rect, 20 * scale, 20 * scale);
+  canvas->translate(host->contentOffset().x, host->contentOffset().y);
+  canvas->scale(host->zoomScale(), host->zoomScale());
   canvas->drawPath(path, paint);
 }
 

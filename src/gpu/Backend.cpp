@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -19,18 +19,6 @@
 #include "tgfx/gpu/Backend.h"
 
 namespace tgfx {
-BackendTexture::BackendTexture(const GLTextureInfo& glInfo, int width, int height)
-    : _backend(Backend::OPENGL), _width(width), _height(height), glInfo(glInfo) {
-}
-
-BackendTexture::BackendTexture(const MtlTextureInfo& mtlInfo, int width, int height)
-    : _backend(Backend::METAL), _width(width), _height(height), mtlInfo(mtlInfo) {
-}
-
-BackendTexture::BackendTexture(const BackendTexture& that) {
-  *this = that;
-}
-
 BackendTexture& BackendTexture::operator=(const BackendTexture& that) {
   if (!that.isValid()) {
     _width = _height = 0;
@@ -66,18 +54,6 @@ bool BackendTexture::getMtlTextureInfo(MtlTextureInfo* mtlTextureInfo) const {
   }
   *mtlTextureInfo = mtlInfo;
   return true;
-}
-
-BackendRenderTarget::BackendRenderTarget(const GLFrameBufferInfo& glInfo, int width, int height)
-    : _backend(Backend::OPENGL), _width(width), _height(height), glInfo(glInfo) {
-}
-
-BackendRenderTarget::BackendRenderTarget(const MtlTextureInfo& mtlInfo, int width, int height)
-    : _backend(Backend::METAL), _width(width), _height(height), mtlInfo(mtlInfo) {
-}
-
-BackendRenderTarget::BackendRenderTarget(const BackendRenderTarget& that) {
-  *this = that;
 }
 
 BackendRenderTarget& BackendRenderTarget::operator=(const BackendRenderTarget& that) {
@@ -117,23 +93,33 @@ bool BackendRenderTarget::getMtlTextureInfo(MtlTextureInfo* mtlTextureInfo) cons
   return true;
 }
 
-BackendSemaphore::BackendSemaphore()
-    : _backend(Backend::MOCK), _glSync(nullptr), _isInitialized(false) {
+BackendSemaphore& BackendSemaphore::operator=(const BackendSemaphore& that) {
+  _backend = that._backend;
+  switch (that._backend) {
+    case Backend::OPENGL:
+      glSyncInfo = that.glSyncInfo;
+      break;
+    default:
+      break;
+  }
+  return *this;
 }
 
-void BackendSemaphore::initGL(void* sync) {
-  if (sync == nullptr) {
-    return;
+bool BackendSemaphore::isInitialized() const {
+  switch (_backend) {
+    case Backend::OPENGL:
+      return glSyncInfo.sync != nullptr;
+    default:
+      break;
   }
-  _backend = Backend::OPENGL;
-  _glSync = sync;
-  _isInitialized = true;
+  return false;
 }
 
-void* BackendSemaphore::glSync() const {
-  if (!_isInitialized || _backend != Backend::OPENGL) {
-    return nullptr;
+bool BackendSemaphore::getGLSync(GLSyncInfo* syncInfo) const {
+  if (_backend != Backend::OPENGL || glSyncInfo.sync == nullptr) {
+    return false;
   }
-  return _glSync;
+  *syncInfo = glSyncInfo;
+  return true;
 }
 }  // namespace tgfx

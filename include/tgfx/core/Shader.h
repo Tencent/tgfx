@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -174,8 +174,12 @@ class Shader {
 
   virtual PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                               const Matrix* uvMatrix) const = 0;
-
+  friend class OpsCompositor;
+  friend class ShaderMaskFilter;
+  friend class ColorFilterShader;
+  friend class BlendShader;
+  friend class MatrixShader;
   friend class FragmentProcessor;
-  friend class Caster;
+  friend class Types;
 };
 }  // namespace tgfx

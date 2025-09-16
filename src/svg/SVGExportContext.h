@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,13 +18,8 @@
 
 #pragma once
 
-#include <cstddef>
-#include <cstdint>
-#include <memory>
-#include <utility>
 #include "core/DrawContext.h"
 #include "svg/SVGTextBuilder.h"
-#include "svg/SVGUtils.h"
 #include "svg/xml/XMLWriter.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Canvas.h"
@@ -32,9 +27,10 @@
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Rect.h"
-#include "tgfx/core/Size.h"
+#include "tgfx/core/Stroke.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/svg/SVGExporter.h"
+#include "tgfx/svg/SVGPathParser.h"
 
 namespace tgfx {
 
@@ -51,20 +47,24 @@ class SVGExportContext : public DrawContext {
     canvas = inputCanvas;
   }
 
-  void drawFill(const MCState& state, const Fill& fill) override;
+  void drawFill(const Fill& fill) override;
 
   void drawRect(const Rect& rect, const MCState& state, const Fill& fill) override;
 
-  void drawRRect(const RRect& rRect, const MCState& state, const Fill& fill) override;
+  void drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
+                 const Stroke* stroke) override;
 
-  void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill) override;
+  void drawPath(const Path& path, const MCState& state, const Fill& fill) override;
+
+  void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill,
+                 const Stroke* stroke) override;
 
   void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
                  const MCState& state, const Fill& fill) override;
 
-  void drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
-                     const SamplingOptions& sampling, const MCState& state,
-                     const Fill& fill) override;
+  void drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
+                     const SamplingOptions& sampling, const MCState& state, const Fill& fill,
+                     SrcRectConstraint constraint) override;
 
   void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
                         const Fill& fill, const Stroke* stroke) override;
@@ -108,7 +108,7 @@ class SVGExportContext : public DrawContext {
 
   void applyClipPath(const Path& clipPath);
 
-  static PathEncoding PathEncodingType();
+  static SVGPathParser::PathEncoding PathEncodingType();
 
   uint32_t exportFlags = {};
   Context* context = nullptr;

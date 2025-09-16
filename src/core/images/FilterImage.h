@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -43,6 +43,8 @@ class FilterImage : public SubsetImage {
     return static_cast<int>(bounds.height());
   }
 
+  std::shared_ptr<ImageFilter> filter = nullptr;
+
  protected:
   Type type() const override {
     return Type::Filter;
@@ -58,16 +60,16 @@ class FilterImage : public SubsetImage {
   std::shared_ptr<Image> onMakeWithFilter(std::shared_ptr<ImageFilter> filter, Point* offset,
                                           const Rect* clipRect) const override;
 
+  std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
+                                      const SamplingOptions& sampling) const override;
+
   std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
 
-  PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args, TileMode tileModeX,
-                                                      TileMode tileModeY,
-                                                      const SamplingOptions& sampling,
+  PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
+                                                      const SamplingArgs& samplingArgs,
                                                       const Matrix* uvMatrix) const override;
 
  private:
-  std::shared_ptr<ImageFilter> filter = nullptr;
-
   static std::shared_ptr<Image> Wrap(std::shared_ptr<Image> source, const Rect& bounds,
                                      std::shared_ptr<ImageFilter> filter);
 };

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,22 +18,13 @@
 
 #pragma once
 
-#include "core/utils/Log.h"
-#include "gpu/RenderPass.h"
-#include "gpu/proxies/RenderTargetProxy.h"
+#include "gpu/CommandEncoder.h"
 
 namespace tgfx {
 class RenderTask {
  public:
   virtual ~RenderTask() = default;
 
-  virtual bool execute(RenderPass* renderPass) = 0;
-
- protected:
-  explicit RenderTask(std::shared_ptr<RenderTargetProxy> proxy)
-      : renderTargetProxy(std::move(proxy)) {
-  }
-
-  std::shared_ptr<RenderTargetProxy> renderTargetProxy = nullptr;
+  virtual void execute(CommandEncoder* encoder) = 0;
 };
 }  // namespace tgfx

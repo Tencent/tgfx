@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,48 +17,52 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ShapeBufferUploadTask.h"
-#include "gpu/GpuBuffer.h"
-#include "gpu/Texture.h"
+#include "gpu/GPU.h"
+#include "gpu/resources/TextureView.h"
+#include "gpu/resources/VertexBuffer.h"
 
 namespace tgfx {
-ShapeBufferUploadTask::ShapeBufferUploadTask(UniqueKey trianglesKey, UniqueKey textureKey,
+ShapeBufferUploadTask::ShapeBufferUploadTask(std::shared_ptr<ResourceProxy> trianglesProxy,
+                                             std::shared_ptr<ResourceProxy> textureProxy,
                                              std::unique_ptr<DataSource<ShapeBuffer>> source)
-    : ResourceTask(std::move(trianglesKey)), textureKey(std::move(textureKey)),
+    : ResourceTask(std::move(trianglesProxy)), textureProxy(std::move(textureProxy)),
       source(std::move(source)) {
 }
 
-bool ShapeBufferUploadTask::execute(Context* context) {
-  if (uniqueKey.strongCount() <= 0) {
-    // Skip the resource creation if there is no proxy is referencing it.
-    return false;
-  }
+std::shared_ptr<Resource> ShapeBufferUploadTask::onMakeResource(Context* context) {
   if (source == nullptr) {
-    return false;
+    return nullptr;
   }
   auto shapeBuffer = source->getData();
   if (shapeBuffer == nullptr) {
     // No need to log an error here; the shape might not be a filled path or could be invisible.
-    return false;
+    return nullptr;
   }
-  if (auto triangles = shapeBuffer->triangles()) {
-    auto gpuBuffer =
-        GpuBuffer::Make(context, BufferType::Vertex, triangles->data(), triangles->size());
+  std::shared_ptr<VertexBuffer> vertexBuffer = nullptr;
+  if (auto triangles = shapeBuffer->triangles) {
+    auto gpu = context->gpu();
+    auto gpuBuffer = gpu->createBuffer(triangles->size(), GPUBufferUsage::VERTEX);
     if (!gpuBuffer) {
-      LOGE("ShapeBufferUploadTask::execute() Failed to create the GpuBuffer!");
-      return false;
+      LOGE("ShapeBufferUploadTask::onMakeResource() Failed to create buffer!");
+      return nullptr;
     }
-    gpuBuffer->assignUniqueKey(uniqueKey);
+    if (!gpu->queue()->writeBuffer(gpuBuffer.get(), 0, triangles->data(), triangles->size())) {
+      gpuBuffer->release(gpu);
+      LOGE("ShapeBufferUploadTask::onMakeResource() Failed to write buffer!");
+      return nullptr;
+    }
+    vertexBuffer = Resource::AddToCache(context, new VertexBuffer(std::move(gpuBuffer)));
   } else {
-    auto imageBuffer = shapeBuffer->imageBuffer();
-    auto texture = Texture::MakeFrom(context, std::move(imageBuffer));
-    if (!texture) {
-      LOGE("ShapeBufferUploadTask::execute() Failed to create the texture!");
-      return false;
+    auto textureView = TextureView::MakeFrom(context, std::move(shapeBuffer->imageBuffer));
+    if (!textureView) {
+      LOGE("ShapeBufferUploadTask::execute() Failed to create the texture view!");
+      return nullptr;
     }
-    texture->assignUniqueKey(textureKey);
+    textureView->assignUniqueKey(textureProxy->uniqueKey);
+    textureProxy->resource = std::move(textureView);
   }
   // Free the data source immediately to reduce memory pressure.
   source = nullptr;
-  return true;
+  return vertexBuffer;
 }
 }  // namespace tgfx

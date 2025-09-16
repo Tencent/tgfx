@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,10 +18,12 @@
 
 #pragma once
 
-#include "core/ImageStream.h"
+#include "platform/ImageStream.h"
 #include "tgfx/platform/android/Global.h"
 
 namespace tgfx {
+class GPUTexture;
+
 /**
  * The SurfaceTexture class allows direct access to image data rendered into the Java Surface object
  * on the android platform. It is typically used with the ImageReader class.
@@ -41,22 +43,6 @@ class SurfaceTexture : public ImageStream {
 
   ~SurfaceTexture() override;
 
-  int width() const override {
-    return _width;
-  }
-
-  int height() const override {
-    return _height;
-  }
-
-  bool isAlphaOnly() const override {
-    return false;
-  }
-
-  bool isHardwareBacked() const override {
-    return false;
-  }
-
   /**
    * Returns the Surface object used as the input to the SurfaceTexture. The release() method of
    * the returned Surface will be called when the SurfaceTexture is released.
@@ -70,14 +56,12 @@ class SurfaceTexture : public ImageStream {
   void notifyFrameAvailable();
 
  protected:
-  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipmapped) override;
+  std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) override;
 
-  bool onUpdateTexture(std::shared_ptr<Texture> texture, const Rect& bounds) override;
+  bool onUpdateTexture(std::shared_ptr<TextureView> textureView) override;
 
  private:
   std::mutex locker = {};
-  int _width = 0;
-  int _height = 0;
   std::condition_variable condition = {};
   Global<jobject> surface;
   Global<jobject> surfaceTexture;
@@ -87,7 +71,9 @@ class SurfaceTexture : public ImageStream {
 
   SurfaceTexture(int width, int height, JNIEnv* env, jobject surfaceTexture);
 
-  std::shared_ptr<Texture> makeTexture(Context* context);
+  unsigned makeExternalOESTexture(Context* context);
+
+  ISize updateTexImage();
 
   friend class JNIInit;
 };

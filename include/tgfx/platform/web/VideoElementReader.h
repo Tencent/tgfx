@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -19,7 +19,7 @@
 #pragma once
 
 #include <emscripten/val.h>
-#include "tgfx/core/ImageReader.h"
+#include "tgfx/platform/ImageReader.h"
 
 namespace tgfx {
 /**
@@ -33,21 +33,6 @@ class VideoElementReader : public ImageReader {
    * Returns nullptr if the video is null or the buffer size is zero.
    */
   static std::shared_ptr<VideoElementReader> MakeFrom(emscripten::val video, int width, int height);
-
-  /**
-   * Acquires the next ImageBuffer from the VideoElementReader after a new image frame has been
-   * rendered into the associated HTMLVideoElement. Note that the previously returned image
-   * buffers will immediately expire after the newly created ImageBuffer is drawn.
-   */
-  std::shared_ptr<ImageBuffer> acquireNextBuffer() override;
-
-  /**
-   * Acquires the next ImageBuffer from the VideoElementReader after a new image frame is about to
-   * be rendered into the associated HTMLVideoElement. The returned ImageBuffer will call the
-   * promise.await() method before generating textures. Note that the previously returned image
-   * buffers will immediately expire after the newly created ImageBuffer is drawn.
-   */
-  std::shared_ptr<ImageBuffer> acquireNextBuffer(emscripten::val promise);
 
  private:
   explicit VideoElementReader(std::shared_ptr<ImageStream> stream);

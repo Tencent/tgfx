@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -26,8 +26,7 @@ namespace tgfx {
 class TiledTextureEffect : public FragmentProcessor {
  public:
   static PlacementPtr<FragmentProcessor> Make(std::shared_ptr<TextureProxy> textureProxy,
-                                              TileMode tileModeX, TileMode tileModeY,
-                                              const SamplingOptions& sampling = {},
+                                              const SamplingArgs& args,
                                               const Matrix* uvMatrix = nullptr,
                                               bool forceAsMask = false);
 
@@ -51,7 +50,7 @@ class TiledTextureEffect : public FragmentProcessor {
   };
 
   struct Sampling {
-    Sampling(const Texture* texture, SamplerState sampler, const Rect& subset);
+    Sampling(const TextureView* textureView, SamplerState sampler, const Rect& subset);
 
     SamplerState hwSampler;
     ShaderMode shaderModeX = ShaderMode::None;
@@ -61,22 +60,25 @@ class TiledTextureEffect : public FragmentProcessor {
   };
 
   TiledTextureEffect(std::shared_ptr<TextureProxy> proxy, const SamplerState& samplerState,
-                     const Matrix& uvMatrix);
+                     SrcRectConstraint constraint, const Matrix& uvMatrix,
+                     const std::optional<Rect>& subset);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
   size_t onCountTextureSamplers() const override;
 
-  const TextureSampler* onTextureSampler(size_t) const override;
+  GPUTexture* onTextureAt(size_t) const override;
 
-  SamplerState onSamplerState(size_t) const override;
+  SamplerState onSamplerStateAt(size_t) const override;
 
-  const Texture* getTexture() const;
+  const TextureView* getTextureView() const;
 
-  static ShaderMode GetShaderMode(SamplerState::WrapMode mode, FilterMode filter, MipmapMode mm);
+  static ShaderMode GetShaderMode(TileMode tileMode, FilterMode filter, MipmapMode mipmapMode);
 
   std::shared_ptr<TextureProxy> textureProxy;
   SamplerState samplerState;
   CoordTransform coordTransform;
+  Rect subset = Rect::MakeEmpty();
+  SrcRectConstraint constraint = SrcRectConstraint::Fast;
 };
 }  // namespace tgfx

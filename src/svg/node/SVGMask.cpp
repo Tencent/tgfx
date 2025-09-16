@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -21,7 +21,6 @@
 #include "svg/SVGRenderContext.h"
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/Paint.h"
-#include "tgfx/core/Recorder.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/svg/SVGTypes.h"
 
@@ -46,20 +45,10 @@ Rect SVGMask::bounds(const SVGRenderContext& context) const {
   SVGRenderContext resolveContext(context, lengthContext);
   if (Width.has_value() && Height.has_value()) {
     return resolveContext.resolveOBBRect(X.value_or(SVGLength(0, SVGLength::Unit::Number)),
-                                         Y.value_or(SVGLength(0, SVGLength::Unit::Number)),
-                                         Width.value(), Height.value(), MaskUnits);
+                                         Y.value_or(SVGLength(0, SVGLength::Unit::Number)), *Width,
+                                         *Height, MaskUnits);
   }
   return {};
-}
-
-/** See ITU-R Recommendation BT.709 at http://www.itu.int/rec/R-REC-BT.709/ .*/
-constexpr float LUM_COEFF_R = 0.2126f;
-constexpr float LUM_COEFF_G = 0.7152f;
-constexpr float LUM_COEFF_B = 0.0722f;
-
-constexpr std::array<float, 20> MakeLuminanceToAlpha() {
-  return std::array<float, 20>{0, 0, 0, 0, 0, 0,           0,           0,           0, 0,
-                               0, 0, 0, 0, 0, LUM_COEFF_R, LUM_COEFF_G, LUM_COEFF_B, 0, 0};
 }
 
 void SVGMask::renderMask(const SVGRenderContext& context) const {
@@ -72,7 +61,7 @@ void SVGMask::renderMask(const SVGRenderContext& context) const {
 
   int saveCount = context.canvas()->getSaveCount();
   if (MaskType.type() != SVGMaskType::Type::Alpha) {
-    auto luminanceFilter = ColorFilter::Matrix(MakeLuminanceToAlpha());
+    auto luminanceFilter = ColorFilter::Luma();
     Paint luminancePaint;
     luminancePaint.setColorFilter(luminanceFilter);
     context.canvas()->saveLayer(&luminancePaint);

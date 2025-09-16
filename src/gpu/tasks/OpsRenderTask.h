@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -25,13 +25,17 @@
 namespace tgfx {
 class OpsRenderTask : public RenderTask {
  public:
-  OpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy, PlacementArray<Op>&& ops)
-      : RenderTask(std::move(renderTargetProxy)), ops(std::move(ops)) {
+  OpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy,
+                PlacementArray<DrawOp>&& drawOps, std::optional<Color> clearColor)
+      : renderTargetProxy(std::move(renderTargetProxy)), drawOps(std::move(drawOps)),
+        clearColor(clearColor) {
   }
 
-  bool execute(RenderPass* renderPass) override;
+  void execute(CommandEncoder* encoder) override;
 
  private:
-  PlacementArray<Op> ops = {};
+  std::shared_ptr<RenderTargetProxy> renderTargetProxy = nullptr;
+  PlacementArray<DrawOp> drawOps = {};
+  std::optional<Color> clearColor = std::nullopt;
 };
 }  // namespace tgfx

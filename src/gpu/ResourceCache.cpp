@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,17 +18,118 @@
 
 #include "gpu/ResourceCache.h"
 #include <unordered_map>
-#include "gpu/Resource.h"
+#include "core/utils/Log.h"
+#include "gpu/resources/Resource.h"
 
 namespace tgfx {
-// Default maximum limit for the amount of GPU memory allocated to resources.
-static const size_t DefaultMaxBytes = 96 * (1 << 20);  // 96MB
+static constexpr size_t MAX_EXPIRATION_FRAMES = 1000000;  // About 4.5 hours at 60 FPS
+static constexpr size_t SCRATCH_EXPIRATION_FRAMES = 2;
 
-ResourceCache::ResourceCache(Context* context) : context(context), maxBytes(DefaultMaxBytes) {
+ResourceCache::ResourceCache(Context* context) : context(context) {
 }
 
 bool ResourceCache::empty() const {
   return nonpurgeableResources.empty() && purgeableResources.empty();
+}
+
+void ResourceCache::setCacheLimit(size_t bytesLimit) {
+  if (maxBytes == bytesLimit) {
+    return;
+  }
+  maxBytes = bytesLimit;
+  purgeAsNeeded();
+}
+
+void ResourceCache::setExpirationFrames(size_t frames) {
+  if (frames > MAX_EXPIRATION_FRAMES) {
+    frames = MAX_EXPIRATION_FRAMES;
+  }
+  if (_expirationFrames == frames) {
+    return;
+  }
+  _expirationFrames = frames;
+  while (frameTimes.size() > _expirationFrames + 1) {
+    frameTimes.pop_front();
+  }
+  purgeAsNeeded();
+}
+
+void ResourceCache::purgeNotUsedSince(std::chrono::steady_clock::time_point purgeTime) {
+  processUnreferencedResources();
+  purgeResourcesByLRU(false,
+                      [&](Resource* resource) { return resource->lastUsedTime > purgeTime; });
+}
+
+bool ResourceCache::purgeUntilMemoryTo(size_t bytesLimit) {
+  processUnreferencedResources();
+  purgeResourcesByLRU(false, [&](Resource*) { return totalBytes <= bytesLimit; });
+  return totalBytes <= bytesLimit;
+}
+
+void ResourceCache::advanceFrameAndPurge() {
+  currentFrameTime = std::chrono::steady_clock::now();
+  frameTimes.push_back(currentFrameTime);
+  if (frameTimes.size() > _expirationFrames + 1) {
+    frameTimes.pop_front();
+  }
+  purgeAsNeeded();
+}
+
+void ResourceCache::purgeAsNeeded() {
+  processUnreferencedResources();
+  if (frameTimes.size() > _expirationFrames) {
+    auto purgeTime = frameTimes[frameTimes.size() - _expirationFrames - 1];
+    purgeResourcesByLRU(false, [&](Resource* resource) {
+      return resource->lastUsedTime > purgeTime && totalBytes <= maxBytes;
+    });
+  } else {
+    purgeResourcesByLRU(false, [&](Resource*) { return totalBytes <= maxBytes; });
+  }
+  if (frameTimes.size() > SCRATCH_EXPIRATION_FRAMES) {
+    auto purgeTime = frameTimes[frameTimes.size() - SCRATCH_EXPIRATION_FRAMES - 1];
+    purgeResourcesByLRU(true,
+                        [&](Resource* resource) { return resource->lastUsedTime > purgeTime; });
+  }
+}
+
+void ResourceCache::purgeResourcesByLRU(bool scratchResourceOnly,
+                                        const std::function<bool(Resource*)>& satisfied) {
+  auto item = purgeableResources.begin();
+  while (item != purgeableResources.end()) {
+    auto resource = *item;
+    if (satisfied(resource)) {
+      break;
+    }
+    if (!scratchResourceOnly || !resource->hasExternalReferences()) {
+      item = purgeableResources.erase(item);
+      purgeableBytes -= resource->memoryUsage();
+      removeResource(resource);
+    } else {
+      item++;
+    }
+  }
+}
+
+void ResourceCache::processUnreferencedResources() {
+  std::vector<Resource*> needToPurge = {};
+  for (auto& resource : nonpurgeableResources) {
+    if (resource->isPurgeable()) {
+      needToPurge.push_back(resource);
+    }
+  }
+  if (needToPurge.empty()) {
+    return;
+  }
+  for (auto& resource : needToPurge) {
+    RemoveFromList(nonpurgeableResources, resource);
+    if (!resource->scratchKey.empty() || resource->hasExternalReferences()) {
+      AddToList(purgeableResources, resource);
+      purgeableBytes += resource->memoryUsage();
+      resource->lastUsedTime = currentFrameTime;
+    } else {
+      removeResource(resource);
+    }
+  }
 }
 
 void ResourceCache::releaseAll(bool releaseGPU) {
@@ -44,14 +145,6 @@ void ResourceCache::releaseAll(bool releaseGPU) {
   uniqueKeyMap.clear();
   purgeableBytes = 0;
   totalBytes = 0;
-}
-
-void ResourceCache::setCacheLimit(size_t bytesLimit) {
-  if (maxBytes == bytesLimit) {
-    return;
-  }
-  maxBytes = bytesLimit;
-  purgeUntilMemoryTo(maxBytes);
 }
 
 std::shared_ptr<Resource> ResourceCache::findScratchResource(const ScratchKey& scratchKey) {
@@ -178,65 +271,5 @@ void ResourceCache::removeResource(Resource* resource) {
   }
   totalBytes -= resource->memoryUsage();
   resource->release(true);
-}
-
-void ResourceCache::purgeNotUsedSince(std::chrono::steady_clock::time_point purgeTime,
-                                      bool scratchResourcesOnly) {
-  purgeResourcesByLRU(scratchResourcesOnly,
-                      [&](Resource* resource) { return resource->lastUsedTime >= purgeTime; });
-}
-
-bool ResourceCache::purgeUntilMemoryTo(size_t bytesLimit, bool scratchResourcesOnly) {
-  purgeResourcesByLRU(scratchResourcesOnly, [&](Resource*) { return totalBytes <= bytesLimit; });
-  return totalBytes <= bytesLimit;
-}
-
-bool ResourceCache::purgeToCacheLimit(std::chrono::steady_clock::time_point notUsedSinceTime) {
-  purgeResourcesByLRU(false, [&](Resource* resource) {
-    return resource->lastUsedTime >= notUsedSinceTime || totalBytes <= maxBytes;
-  });
-  return totalBytes <= maxBytes;
-}
-
-void ResourceCache::purgeResourcesByLRU(bool scratchResourceOnly,
-                                        const std::function<bool(Resource*)>& satisfied) {
-  processUnreferencedResources();
-  auto item = purgeableResources.begin();
-  while (item != purgeableResources.end()) {
-    auto* resource = *item;
-    if (satisfied(resource)) {
-      break;
-    }
-    if (!scratchResourceOnly || !resource->hasExternalReferences()) {
-      item = purgeableResources.erase(item);
-      purgeableBytes -= resource->memoryUsage();
-      removeResource(resource);
-    } else {
-      item++;
-    }
-  }
-}
-
-void ResourceCache::processUnreferencedResources() {
-  std::vector<Resource*> needToPurge = {};
-  for (auto& resource : nonpurgeableResources) {
-    if (resource->isPurgeable()) {
-      needToPurge.push_back(resource);
-    }
-  }
-  if (needToPurge.empty()) {
-    return;
-  }
-  auto currentTime = std::chrono::steady_clock::now();
-  for (auto& resource : needToPurge) {
-    RemoveFromList(nonpurgeableResources, resource);
-    if (!resource->scratchKey.empty() || resource->hasExternalReferences()) {
-      AddToList(purgeableResources, resource);
-      purgeableBytes += resource->memoryUsage();
-      resource->lastUsedTime = currentTime;
-    } else {
-      removeResource(resource);
-    }
-  }
 }
 }  // namespace tgfx

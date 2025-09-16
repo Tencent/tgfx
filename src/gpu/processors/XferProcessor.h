@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -29,7 +29,6 @@ namespace tgfx {
 struct DstTextureInfo {
   std::shared_ptr<TextureProxy> textureProxy = nullptr;
   Point offset = {};
-  bool requiresBarrier = false;
 };
 
 class XferProcessor : public Processor {
@@ -50,17 +49,14 @@ class XferProcessor : public Processor {
     const SamplerHandle dstTextureSamplerHandle;
   };
 
-  virtual const Texture* dstTexture() const {
+  virtual const TextureView* dstTextureView() const {
     return nullptr;
-  }
-
-  virtual bool requiresBarrier() const {
-    return false;
   }
 
   virtual void emitCode(const EmitArgs& args) const = 0;
 
-  virtual void setData(UniformBuffer* uniformBuffer) const = 0;
+  virtual void setData(UniformBuffer* vertexUniformBuffer,
+                       UniformBuffer* fragmentUniformBuffer) const = 0;
 
  protected:
   explicit XferProcessor(uint32_t classID) : Processor(classID) {

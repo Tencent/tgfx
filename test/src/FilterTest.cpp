@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -21,27 +21,22 @@
 #include "CornerPinEffect.h"
 #include "core/filters/ColorImageFilter.h"
 #include "core/filters/DropShadowImageFilter.h"
+#include "core/filters/GaussianBlurImageFilter.h"
 #include "core/filters/InnerShadowImageFilter.h"
 #include "core/shaders/GradientShader.h"
 #include "core/shaders/ImageShader.h"
-#include "core/vectors/freetype/FTMask.h"
-#include "gpu/opengl/GLUtil.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/GradientType.h"
 #include "tgfx/core/ImageFilter.h"
-#include "tgfx/core/Mask.h"
-#include "tgfx/core/PathEffect.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/Size.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/TileMode.h"
-#include "tgfx/gpu/RuntimeEffect.h"
-#include "tgfx/gpu/opengl/GLFunctions.h"
 #include "utils/TestUtils.h"
 #include "utils/common.h"
 
@@ -122,7 +117,8 @@ TGFX_TEST(FilterTest, ShaderMaskFilter) {
   auto image = MakeImage("resources/apitest/rotation.jpg");
   image = image->makeOriented(Orientation::LeftBottom);
   image = image->makeMipmapped(true);
-  image = image->makeRasterized(0.25f);
+  image = ScaleImage(image, 0.25f);
+  image = image->makeRasterized();
   ASSERT_TRUE(image != nullptr);
   auto surface = Surface::Make(context, image->width(), image->height());
   auto canvas = surface->getCanvas();
@@ -164,6 +160,7 @@ TGFX_TEST(FilterTest, Blur) {
   canvas->concat(Matrix::MakeTrans(imageWidth + padding, 0));
   canvas->save();
   canvas->concat(imageMatrix);
+  // The blur filter is applied to the scaled image after it is drawn on the canvas.
   paint.setImageFilter(ImageFilter::Blur(130, 130, TileMode::Decal));
   canvas->drawImage(image, &paint);
   canvas->restore();
@@ -221,15 +218,15 @@ TGFX_TEST(FilterTest, DropShadow) {
                                static_cast<int>(imageHeight * 2.f + padding * 3.f));
   auto canvas = surface->getCanvas();
   canvas->concat(Matrix::MakeTrans(padding, padding));
-  paint.setImageFilter(ImageFilter::Blur(15, 15));
+  paint.setImageFilter(ImageFilter::Blur(5, 5));
   canvas->drawImage(image, &paint);
 
   canvas->concat(Matrix::MakeTrans(imageWidth + padding, 0));
-  paint.setImageFilter(ImageFilter::DropShadowOnly(0, 0, 15, 15, Color::White()));
+  paint.setImageFilter(ImageFilter::DropShadowOnly(0, 0, 5, 5, Color::White()));
   canvas->drawImage(image, &paint);
 
   canvas->concat(Matrix::MakeTrans(-imageWidth - padding, imageWidth + padding));
-  paint.setImageFilter(ImageFilter::DropShadow(0, 0, 15, 15, Color::White()));
+  paint.setImageFilter(ImageFilter::DropShadow(0, 0, 5, 5, Color::White()));
   canvas->drawImage(image, &paint);
 
   canvas->concat(Matrix::MakeTrans(imageWidth + padding, 0));
@@ -253,7 +250,7 @@ TGFX_TEST(FilterTest, BlurLargePixel) {
   auto image = MakeImage("resources/apitest/rotation.jpg");
   ASSERT_TRUE(image != nullptr);
   Matrix imageMatrix = {};
-  image = image->makeRasterized(1.f);
+  image = image->makeRasterized();
   auto bounds = Rect::MakeWH(image->width(), image->height());
   imageMatrix.mapRect(&bounds);
   auto imageWidth = static_cast<float>(bounds.width());
@@ -278,7 +275,7 @@ TGFX_TEST(FilterTest, ImageFilterShader) {
   auto surface = Surface::Make(context, 720, 720);
   auto canvas = surface->getCanvas();
   image = image->makeMipmapped(true);
-  auto filter = ImageFilter::DropShadow(0, 0, 300, 300, Color::Black());
+  auto filter = ImageFilter::DropShadow(0, 0, 90, 90, Color::Black());
   image = image->makeWithFilter(std::move(filter));
   auto imageSize = 480.0f;
   auto imageScale = imageSize / static_cast<float>(image->width());
@@ -304,7 +301,7 @@ TGFX_TEST(FilterTest, ComposeImageFilter) {
   image = image->makeMipmapped(true);
   auto blueFilter = ImageFilter::DropShadow(100, 100, 0, 0, Color::Blue());
   auto greenFilter = ImageFilter::DropShadow(-100, -100, 0, 0, Color::Green());
-  auto blackFilter = ImageFilter::DropShadow(0, 0, 300, 300, Color::Black());
+  auto blackFilter = ImageFilter::DropShadow(0, 0, 100, 100, Color::Black());
   auto composeFilter = ImageFilter::Compose({blueFilter, greenFilter, blackFilter});
   auto filterImage = image->makeWithFilter(std::move(composeFilter));
   auto imageSize = 512.0f;
@@ -337,10 +334,18 @@ TGFX_TEST(FilterTest, RuntimeEffect) {
   auto surface = Surface::Make(context, 720, 720);
   auto canvas = surface->getCanvas();
   image = image->makeMipmapped(true);
-  image = image->makeRasterized(0.5f, SamplingOptions(FilterMode::Linear, MipmapMode::Linear));
-  auto effect = CornerPinEffect::Make({484, 54}, {764, 80}, {764, 504}, {482, 512});
-  auto filter = ImageFilter::Runtime(std::move(effect));
-  image = image->makeWithFilter(std::move(filter));
+  image = ScaleImage(image, 0.5f, SamplingOptions(FilterMode::Linear, MipmapMode::Linear));
+  image = image->makeRasterized();
+
+  auto effect1 = CornerPinEffect::Make(
+      {0, 0}, {static_cast<float>(image->width()), 0},
+      {static_cast<float>(image->width()), static_cast<float>(image->height())},
+      {0, static_cast<float>(image->height())});
+  auto effect2 = CornerPinEffect::Make({484, 54}, {764, 80}, {764, 504}, {482, 512});
+  auto filter1 = ImageFilter::Runtime(std::move(effect1));
+  auto filter2 = ImageFilter::Runtime(effect2);
+  auto composeFilter = ImageFilter::Compose(filter1, filter2);
+  image = image->makeWithFilter(std::move(composeFilter));
   canvas->drawImage(image, 200, 100);
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/RuntimeEffect"));
 }
@@ -399,8 +404,8 @@ TGFX_TEST(FilterTest, GetFilterProperties) {
     auto imageFilter = ImageFilter::Blur(20, 30);
     EXPECT_EQ(imageFilter->type(), ImageFilter::Type::Blur);
     Size blurSize = imageFilter->filterBounds({}).size();
-    EXPECT_EQ(blurSize.width, 18.f);
-    EXPECT_EQ(blurSize.height, 36.f);
+    EXPECT_EQ(blurSize.width, 80.f);
+    EXPECT_EQ(blurSize.height, 120.f);
   }
 
   {
@@ -408,8 +413,8 @@ TGFX_TEST(FilterTest, GetFilterProperties) {
     EXPECT_EQ(imageFilter->type(), ImageFilter::Type::DropShadow);
     auto dropShadowFilter = std::static_pointer_cast<const DropShadowImageFilter>(imageFilter);
     Size blurSize = dropShadowFilter->blurFilter->filterBounds({}).size();
-    EXPECT_EQ(blurSize.width, 18.f);
-    EXPECT_EQ(blurSize.height, 36.f);
+    EXPECT_EQ(blurSize.width, 80.f);
+    EXPECT_EQ(blurSize.height, 120.f);
     EXPECT_EQ(dropShadowFilter->dx, 15.f);
     EXPECT_EQ(dropShadowFilter->dy, 15.f);
     EXPECT_EQ(dropShadowFilter->color, Color::White());
@@ -421,8 +426,8 @@ TGFX_TEST(FilterTest, GetFilterProperties) {
     EXPECT_EQ(imageFilter->type(), ImageFilter::Type::DropShadow);
     auto dropShadowFilter = std::static_pointer_cast<const DropShadowImageFilter>(imageFilter);
     Size blurSize = dropShadowFilter->blurFilter->filterBounds({}).size();
-    EXPECT_EQ(blurSize.width, 18.f);
-    EXPECT_EQ(blurSize.height, 36.f);
+    EXPECT_EQ(blurSize.width, 80.f);
+    EXPECT_EQ(blurSize.height, 120.f);
     EXPECT_EQ(dropShadowFilter->dx, 15.f);
     EXPECT_EQ(dropShadowFilter->dy, 15.f);
     EXPECT_EQ(dropShadowFilter->color, Color::White());
@@ -434,8 +439,8 @@ TGFX_TEST(FilterTest, GetFilterProperties) {
     EXPECT_EQ(imageFilter->type(), ImageFilter::Type::InnerShadow);
     auto innerShadowFilter = std::static_pointer_cast<InnerShadowImageFilter>(imageFilter);
     Size blurSize = innerShadowFilter->blurFilter->filterBounds({}).size();
-    EXPECT_EQ(blurSize.width, 18.f);
-    EXPECT_EQ(blurSize.height, 36.f);
+    EXPECT_EQ(blurSize.width, 80.f);
+    EXPECT_EQ(blurSize.height, 120.f);
     EXPECT_EQ(innerShadowFilter->dx, 15.f);
     EXPECT_EQ(innerShadowFilter->dy, 15.f);
     EXPECT_EQ(innerShadowFilter->color, Color::White());
@@ -447,8 +452,8 @@ TGFX_TEST(FilterTest, GetFilterProperties) {
     EXPECT_EQ(imageFilter->type(), ImageFilter::Type::InnerShadow);
     auto innerShadowFilter = std::static_pointer_cast<InnerShadowImageFilter>(imageFilter);
     Size blurSize = innerShadowFilter->blurFilter->filterBounds({}).size();
-    EXPECT_EQ(blurSize.width, 18.f);
-    EXPECT_EQ(blurSize.height, 36.f);
+    EXPECT_EQ(blurSize.width, 80.f);
+    EXPECT_EQ(blurSize.height, 120.f);
     EXPECT_EQ(innerShadowFilter->dx, 15.f);
     EXPECT_EQ(innerShadowFilter->dy, 15.f);
     EXPECT_EQ(innerShadowFilter->color, Color::White());
@@ -682,5 +687,150 @@ TGFX_TEST(FilterTest, InnerShadowBadCase) {
   path.addOval(rect);
   canvas->drawPath(path, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/InnerShadowBadCase"));
+}
+
+TGFX_TEST(FilterTest, ClipInnerShadowImageFilter) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  int surfaceWidth = 100;
+  int surfaceHeight = 100;
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+  ASSERT_TRUE(surface != nullptr);
+
+  auto image = MakeImage("resources/apitest/image_as_mask.png");
+  ASSERT_TRUE(image != nullptr);
+  auto shadowFilter = ImageFilter::InnerShadow(0, -10.5, 2, 2, Color::FromRGBA(0, 0, 0, 128));
+  image = image->makeWithFilter(shadowFilter);
+  auto canvas = surface->getCanvas();
+  canvas->scale(0.8571f, 0.8571f);
+  {
+    AutoCanvasRestore restore(canvas);
+    canvas->clipRect(Rect::MakeWH(100.f, 30.f));
+    canvas->drawImage(image);
+  }
+  {
+    AutoCanvasRestore restore(canvas);
+    canvas->clipRect(Rect::MakeXYWH(0.f, 30.f, 100.f, 30.f));
+    canvas->drawImage(image);
+  }
+  {
+    AutoCanvasRestore restore(canvas);
+    canvas->clipRect(Rect::MakeXYWH(0, 60, 100, 30));
+    canvas->drawImage(image);
+  }
+  {
+    AutoCanvasRestore restore(canvas);
+    canvas->clipRect(Rect::MakeXYWH(0, 90, 100, 10));
+    canvas->drawImage(image);
+  }
+  context->flushAndSubmit();
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ClipInnerShadowImageFilter"));
+}
+
+TGFX_TEST(FilterTest, GaussianBlurImageFilter) {
+  const ContextScope scope;
+  Context* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  std::shared_ptr<Image> simpleImage = MakeImage("resources/apitest/image_as_mask.png");
+  ASSERT_TRUE(simpleImage != nullptr);
+  // The Gaussian blur operation expands image boundaries to reserve space for effect validation.
+  constexpr float simpleCanvasMargin = 25.0f;
+  const int simpleSurfaceWidth = simpleImage->width() + static_cast<int>(simpleCanvasMargin) * 2;
+  const int simpleSurfaceHeight = simpleImage->height() + static_cast<int>(simpleCanvasMargin) * 2;
+  auto simpleSurface = Surface::Make(context, simpleSurfaceWidth, simpleSurfaceHeight);
+  ASSERT_TRUE(simpleSurface != nullptr);
+  Canvas* simpleCanvas = simpleSurface->getCanvas();
+
+  // Simple two-dimensional image blur.
+  {
+    simpleCanvas->save();
+
+    simpleCanvas->clear();
+    auto gaussianBlurFilter =
+        std::make_shared<GaussianBlurImageFilter>(3.0f, 3.0f, TileMode::Decal);
+    auto image = simpleImage->makeWithFilter(gaussianBlurFilter);
+    const float drawLeft = static_cast<float>(simpleSurfaceWidth - image->width()) * 0.5f;
+    const float drawTop = static_cast<float>(simpleSurfaceHeight - image->height()) * 0.5f;
+    simpleCanvas->drawImage(image, drawLeft, drawTop);
+    context->flushAndSubmit();
+    EXPECT_TRUE(Baseline::Compare(simpleSurface, "FilterTest/GaussianBlurImageFilterSimple2D"));
+
+    simpleCanvas->restore();
+  }
+
+  // Complex one-dimensional image blur.
+  {
+    simpleCanvas->save();
+
+    simpleCanvas->clear();
+    constexpr float imageScale = 0.8f;
+    simpleCanvas->scale(imageScale, imageScale);
+    // Move the image center to the left-top corner of the canvas.
+    simpleCanvas->translate(static_cast<float>(simpleSurfaceWidth) * -0.5f / imageScale,
+                            static_cast<float>(simpleSurfaceHeight) * -0.5f / imageScale);
+    // Set a value exceeding the maximum blur factor.
+    auto gaussianBlurFilter =
+        std::make_shared<GaussianBlurImageFilter>(12.0f, 0.0f, TileMode::Decal);
+    auto image = simpleImage->makeWithFilter(gaussianBlurFilter);
+    const float drawLeft =
+        (static_cast<float>(simpleSurfaceWidth) - static_cast<float>(image->width()) * imageScale) *
+        0.5f / imageScale;
+    const float drawTop = (static_cast<float>(simpleSurfaceHeight) -
+                           static_cast<float>(image->height()) * imageScale) *
+                          0.5f / imageScale;
+    simpleCanvas->drawImage(image, drawLeft, drawTop);
+    context->flushAndSubmit();
+    EXPECT_TRUE(Baseline::Compare(simpleSurface, "FilterTest/GaussianBlurImageFilterComplex1D"));
+
+    simpleCanvas->restore();
+  }
+
+  std::shared_ptr<Image> opaqueImage = MakeImage("resources/apitest/imageReplacement.jpg");
+  ASSERT_TRUE(opaqueImage != nullptr);
+  // Simulate tile-based rendering to validate seamless pixel transitions between adjacent tiles.
+  {
+    constexpr float canvasMargin = 25.0f;
+    constexpr float imageScale = 1.2f;
+    const int surfaceWidth = static_cast<int>(
+        static_cast<float>(opaqueImage->width()) * imageScale + canvasMargin * 2.0f);
+    const int surfaceHeight = static_cast<int>(
+        static_cast<float>(opaqueImage->height()) * imageScale + canvasMargin * 2.0f);
+    auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+    ASSERT_TRUE(surface != nullptr);
+    Canvas* canvas = surface->getCanvas();
+    canvas->scale(imageScale, imageScale);
+    canvas->translate(canvasMargin / imageScale, canvasMargin / imageScale);
+    auto gaussianBlurFilter =
+        std::make_shared<GaussianBlurImageFilter>(5.0f, 5.0f, TileMode::Decal);
+
+    // Divide into 4 equal tiles.
+    const auto clipRect1 =
+        Rect::MakeWH(std::floor(static_cast<float>(opaqueImage->width()) * 0.5f),
+                     std::floor(static_cast<float>(opaqueImage->height()) * 0.5f));
+    auto image1 = opaqueImage->makeWithFilter(gaussianBlurFilter, nullptr, &clipRect1);
+    canvas->drawImage(image1, 0.0f, 0.0f);
+
+    const auto clipRect2 =
+        Rect(clipRect1.right, 0.0f, static_cast<float>(opaqueImage->width()), clipRect1.bottom);
+    auto image2 = opaqueImage->makeWithFilter(gaussianBlurFilter, nullptr, &clipRect2);
+    canvas->drawImage(image2, static_cast<float>(opaqueImage->width()) * 0.5f, 0.0f);
+
+    const auto clipRect3 =
+        Rect(0.0f, clipRect1.bottom, clipRect1.right, static_cast<float>(opaqueImage->height()));
+    auto image3 = opaqueImage->makeWithFilter(gaussianBlurFilter, nullptr, &clipRect3);
+    canvas->drawImage(image3, 0.0f, static_cast<float>(opaqueImage->height()) * 0.5f);
+
+    const auto clipRect4 =
+        Rect(clipRect2.left, clipRect2.bottom, clipRect2.right, clipRect3.bottom);
+    auto image4 = opaqueImage->makeWithFilter(gaussianBlurFilter, nullptr, &clipRect4);
+    canvas->drawImage(image4, static_cast<float>(opaqueImage->width()) * 0.5f,
+                      static_cast<float>(opaqueImage->height()) * 0.5f);
+
+    context->flushAndSubmit();
+    EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/GaussianBlurImageFilterComplex2D"));
+  }
 }
 }  // namespace tgfx

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,8 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
-#include <utility>
-#include "OpaqueThreshold.h"
+#include "layers/OpaqueThreshold.h"
 
 namespace tgfx {
 
@@ -75,7 +74,7 @@ void DropShadowStyle::setShowBehindLayer(bool showBehindLayer) {
     return;
   }
   _showBehindLayer = showBehindLayer;
-  invalidate();
+  invalidateTransform();
 }
 
 DropShadowStyle::DropShadowStyle(float offsetX, float offsetY, float blurrinessX, float blurrinessY,
@@ -110,8 +109,8 @@ void DropShadowStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Imag
   if (!_showBehindLayer) {
     extraSource = extraSource->makeWithFilter(opaqueFilter);
     auto shader = Shader::MakeImageShader(extraSource, TileMode::Decal, TileMode::Decal);
-    auto matrixShader = shader->makeWithMatrix(
-        Matrix::MakeTrans(extraSourceOffset.x - offset.x, extraSourceOffset.y - offset.y));
+    auto matrixShader =
+        shader->makeWithMatrix(Matrix::MakeTrans(extraSourceOffset.x, extraSourceOffset.y));
     paint.setMaskFilter(MaskFilter::MakeShader(matrixShader, true));
   }
   paint.setBlendMode(blendMode);
@@ -138,7 +137,7 @@ std::shared_ptr<ImageFilter> DropShadowStyle::getShadowFilter(float scale) {
 
 void DropShadowStyle::invalidateFilter() {
   shadowFilter = nullptr;
-  invalidate();
+  invalidateTransform();
 }
 
 }  // namespace tgfx

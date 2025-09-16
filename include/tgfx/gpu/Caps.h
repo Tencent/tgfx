@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -22,6 +22,7 @@
 
 namespace tgfx {
 class Swizzle;
+class ShaderCaps;
 
 /**
  * Caps describes the capabilities of the GPU.
@@ -30,15 +31,16 @@ class Caps {
  public:
   virtual ~Caps() = default;
 
+  virtual const ShaderCaps* shaderCaps() const = 0;
+
+  virtual const Swizzle& getReadSwizzle(PixelFormat pixelFormat) const = 0;
+
   virtual const Swizzle& getWriteSwizzle(PixelFormat pixelFormat) const = 0;
 
   virtual bool isFormatRenderable(PixelFormat pixelFormat) const = 0;
 
   virtual int getSampleCount(int requestedCount, PixelFormat pixelFormat) const = 0;
 
-  virtual int getMaxMipmapLevel(int width, int height) const = 0;
-
-  bool floatIs32Bits = true;
   int maxTextureSize = 0;
   bool semaphoreSupport = false;
   bool multisampleDisableSupport = false;
@@ -50,6 +52,5 @@ class Caps {
   bool npotTextureTileSupport = true;  // Vulkan and Metal always have support.
   bool mipmapSupport = true;
   bool textureBarrierSupport = false;
-  bool frameBufferFetchSupport = false;
 };
 }  // namespace tgfx

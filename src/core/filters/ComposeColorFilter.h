@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -28,6 +28,9 @@ class ComposeColorFilter : public ColorFilter {
 
   bool isAlphaUnchanged() const override;
 
+  std::shared_ptr<ColorFilter> inner = nullptr;
+  std::shared_ptr<ColorFilter> outer = nullptr;
+
  protected:
   Type type() const override {
     return Type::Compose;
@@ -36,9 +39,6 @@ class ComposeColorFilter : public ColorFilter {
   bool isEqual(const ColorFilter* colorFilter) const override;
 
  private:
-  std::shared_ptr<ColorFilter> inner = nullptr;
-  std::shared_ptr<ColorFilter> outer = nullptr;
-
   PlacementPtr<FragmentProcessor> asFragmentProcessor(Context* context) const override;
 };
 }  // namespace tgfx

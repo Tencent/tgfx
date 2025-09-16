@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,15 +17,16 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SVGExportContext.h"
-#include <cstdlib>
-#include <memory>
-#include <string>
 #include "ElementWriter.h"
 #include "SVGUtils.h"
-#include "core/CanvasState.h"
-#include "core/utils/Caster.h"
+#include "core/images/CodecImage.h"
+#include "core/images/FilterImage.h"
+#include "core/images/PictureImage.h"
+#include "core/images/SubsetImage.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/RectToRectMatrix.h"
+#include "core/utils/Types.h"
 #include "svg/SVGTextBuilder.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Fill.h"
@@ -35,6 +36,7 @@
 #include "tgfx/core/Path.h"
 #include "tgfx/core/PathTypes.h"
 #include "tgfx/core/Pixmap.h"
+#include "tgfx/core/Point.h"
 #include "tgfx/core/RRect.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Stroke.h"
@@ -42,6 +44,7 @@
 #include "tgfx/core/TileMode.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/svg/SVGExporter.h"
+#include "tgfx/svg/SVGPathParser.h"
 
 namespace tgfx {
 
@@ -70,15 +73,8 @@ SVGExportContext::SVGExportContext(Context* context, const Rect& viewBox,
   }
 }
 
-void SVGExportContext::drawFill(const MCState& state, const Fill& fill) {
-  auto newFill = fill;
-  if (newFill.shader) {
-    newFill.shader = newFill.shader->makeWithMatrix(state.matrix);
-  }
-  if (newFill.maskFilter) {
-    newFill.maskFilter = newFill.maskFilter->makeWithMatrix(state.matrix);
-  }
-  drawRect(viewBox, MCState{state.clip}, newFill);
+void SVGExportContext::drawFill(const Fill& fill) {
+  drawRect(viewBox, {}, fill);
 }
 
 void SVGExportContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill) {
@@ -108,7 +104,8 @@ void SVGExportContext::drawRect(const Rect& rect, const MCState& state, const Fi
   }
 }
 
-void SVGExportContext::drawRRect(const RRect& roundRect, const MCState& state, const Fill& fill) {
+void SVGExportContext::drawRRect(const RRect& roundRect, const MCState& state, const Fill& fill,
+                                 const Stroke*) {
   if (!state.clip.contains(roundRect.rect)) {
     applyClipPath(state.clip);
   }
@@ -130,12 +127,10 @@ void SVGExportContext::drawRRect(const RRect& roundRect, const MCState& state, c
   }
 }
 
-void SVGExportContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
-                                 const Fill& fill) {
-  if (!state.clip.contains(shape->getBounds())) {
+void SVGExportContext::drawPath(const Path& path, const MCState& state, const Fill& fill) {
+  if (!state.clip.contains(path.getBounds())) {
     applyClipPath(state.clip);
   }
-  auto path = shape->getPath();
   ElementWriter pathElement("path", context, this, writer.get(), resourceBucket.get(),
                             exportFlags & SVGExportFlags::DisableWarnings, state, fill);
   pathElement.addPathAttributes(path, tgfx::SVGExportContext::PathEncodingType());
@@ -144,31 +139,96 @@ void SVGExportContext::drawShape(std::shared_ptr<Shape> shape, const MCState& st
   }
 }
 
+void SVGExportContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
+                                 const Fill& fill, const Stroke* stroke) {
+  DEBUG_ASSERT(shape != nullptr);
+  if (stroke && !stroke->isHairline()) {
+    shape = Shape::ApplyStroke(std::move(shape), stroke);
+  }
+  drawPath(shape->getPath(), state, fill);
+}
+
 void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
                                  const MCState& state, const Fill& fill) {
   DEBUG_ASSERT(image != nullptr);
-  auto rect = Rect::MakeWH(image->width(), image->height());
-  return drawImageRect(std::move(image), rect, sampling, state, fill);
+  auto type = Types::Get(image.get());
+  if (type == Types::ImageType::Picture) {
+    const auto pictureImage = static_cast<const PictureImage*>(image.get());
+    auto newState = state;
+    if (pictureImage->matrix) {
+      newState.matrix.preConcat(*pictureImage->matrix);
+    }
+    drawPicture(pictureImage->picture, newState);
+  } else if (type == Types::ImageType::Filter) {
+    const auto filterImage = static_cast<const FilterImage*>(image.get());
+    auto filter = filterImage->filter;
+    auto bound = Rect::MakeWH(filterImage->source->width(), filterImage->source->height());
+    auto filtBound = filterImage->bounds;
+    auto outer = Point::Make((filtBound.width() - bound.width()) / 2,
+                             (filtBound.height() - bound.height()) / 2);
+    auto offset =
+        Point::Make((filtBound.centerX() - bound.centerX()), filtBound.centerY() - bound.centerY());
+    bound = state.matrix.mapRect(bound);
+
+    Resources resources;
+    if (filter) {
+      ElementWriter defs("defs", writer, resourceBucket.get());
+      resources = defs.addImageFilterResource(filter, bound);
+    }
+    {
+      auto groupElement = std::make_unique<ElementWriter>("g", writer, resourceBucket.get());
+      if (!outer.isZero()) {
+        groupElement->addAttribute(
+            "transform", ToSVGTransform(Matrix::MakeTrans(outer.x - offset.x, outer.y - offset.y)));
+      }
+      if (filter) {
+        groupElement->addAttribute("filter", resources.filter);
+      }
+      drawImage(filterImage->source, sampling, state, fill);
+    }
+  } else if (type == Types::ImageType::Subset) {
+    const auto subsetImage = static_cast<const SubsetImage*>(image.get());
+    auto bound = subsetImage->bounds.size();
+    auto offset = Point::Make(subsetImage->bounds.x(), subsetImage->bounds.y());
+
+    Path clipBound;
+    clipBound.addRect(Rect::MakeSize(bound));
+    applyClipPath(clipBound);
+    auto groupElement = std::make_unique<ElementWriter>("g", writer, resourceBucket.get());
+    if (!offset.isZero()) {
+      groupElement->addAttribute("transform",
+                                 ToSVGTransform(Matrix::MakeTrans(offset.x, offset.y)));
+    }
+    drawImage(subsetImage->source, sampling, state, fill);
+  } else {
+    Bitmap bitmap = ImageExportToBitmap(context, image);
+    if (!bitmap.isEmpty()) {
+      exportPixmap(Pixmap(bitmap), state, fill);
+    }
+  }
 }
 
-void SVGExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
-                                     const SamplingOptions&, const MCState& state,
-                                     const Fill& fill) {
+void SVGExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect,
+                                     const Rect& dstRect, const SamplingOptions&,
+                                     const MCState& state, const Fill& fill, SrcRectConstraint) {
   DEBUG_ASSERT(image != nullptr);
-  Bitmap bitmap = ImageExportToBitmap(context, image);
+  auto subsetImage = image->makeSubset(srcRect);
+  if (subsetImage == nullptr) {
+    return;
+  }
+  Bitmap bitmap = ImageExportToBitmap(context, subsetImage);
   if (!bitmap.isEmpty()) {
-    Rect srcRect = Rect::MakeWH(image->width(), image->height());
-    float scaleX = rect.width() / srcRect.width();
-    float scaleY = rect.height() / srcRect.height();
-    float transX = rect.left - srcRect.left * scaleX;
-    float transY = rect.top - srcRect.top * scaleY;
+    auto viewMatrix =
+        MakeRectToRectMatrix(Rect::MakeWH(srcRect.width(), srcRect.height()), dstRect);
 
     MCState newState;
     newState.matrix = state.matrix;
-    newState.matrix.postScale(scaleX, scaleY);
-    newState.matrix.postTranslate(transX, transY);
+    newState.matrix.preConcat(viewMatrix);
 
-    exportPixmap(Pixmap(bitmap), newState, fill);
+    auto fillMatrix = Matrix::I();
+    viewMatrix.invert(&fillMatrix);
+
+    exportPixmap(Pixmap(bitmap), newState, fill.makeWithMatrix(fillMatrix));
   }
 }
 
@@ -200,14 +260,17 @@ void SVGExportContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunLi
                                         const MCState& state, const Fill& fill,
                                         const Stroke* stroke) {
   DEBUG_ASSERT(glyphRunList != nullptr);
-  bool hasFont = glyphRunList->glyphRuns()[0].glyphFace->asFont(nullptr);
-
+  auto typeface = glyphRunList->glyphRuns()[0].font.getTypeface().get();
+  if (typeface == nullptr) {
+    return;
+  }
   // If the font needs to be converted to a path but lacks outlines (e.g., emoji font, web font),
   // it cannot be converted.
-  if (!state.clip.contains(glyphRunList->getBounds(state.matrix.getMaxScale()))) {
+  auto deviceBounds = state.matrix.mapRect(glyphRunList->getBounds());
+  if (!state.clip.contains(deviceBounds)) {
     applyClipPath(state.clip);
   }
-  if (hasFont) {
+  if (!typeface->isCustom()) {
     if (glyphRunList->hasOutlines() && !glyphRunList->hasColor() &&
         exportFlags & SVGExportFlags::ConvertTextToPaths) {
       exportGlyphsAsPath(glyphRunList, state, fill, stroke);
@@ -244,15 +307,12 @@ void SVGExportContext::exportGlyphsAsText(const std::shared_ptr<GlyphRunList>& g
     ElementWriter textElement("text", context, this, writer.get(), resourceBucket.get(),
                               exportFlags & SVGExportFlags::DisableWarnings, state, fill, stroke);
 
-    Font font;
-    if (glyphRun.glyphFace->asFont(&font)) {
-      textElement.addFontAttributes(font);
+    textElement.addFontAttributes(glyphRun.font);
 
-      auto unicharInfo = textBuilder.glyphToUnicharsInfo(glyphRun);
-      textElement.addAttribute("x", unicharInfo.posX);
-      textElement.addAttribute("y", unicharInfo.posY);
-      textElement.addText(unicharInfo.text);
-    }
+    auto unicharInfo = textBuilder.glyphToUnicharsInfo(glyphRun);
+    textElement.addAttribute("x", unicharInfo.posX);
+    textElement.addAttribute("y", unicharInfo.posY);
+    textElement.addText(unicharInfo.text);
   }
 }
 
@@ -260,16 +320,13 @@ void SVGExportContext::exportGlyphsAsImage(const std::shared_ptr<GlyphRunList>& 
                                            const MCState& state, const Fill& fill) {
   auto viewMatrix = state.matrix;
   auto scale = viewMatrix.getMaxScale();
-  if (scale <= 0) {
+  if (FloatNearlyZero(scale)) {
     return;
   }
   viewMatrix.preScale(1.0f / scale, 1.0f / scale);
   for (const auto& glyphRun : glyphRunList->glyphRuns()) {
-    auto glyphFace = glyphRun.glyphFace;
-    glyphFace = glyphFace->makeScaled(scale);
-    if (glyphFace == nullptr) {
-      continue;
-    }
+    auto font = glyphRun.font;
+    font = font.makeWithSize(scale * font.getSize());
     const auto& glyphIDs = glyphRun.glyphs;
     auto glyphCount = glyphIDs.size();
     const auto& positions = glyphRun.positions;
@@ -277,14 +334,16 @@ void SVGExportContext::exportGlyphsAsImage(const std::shared_ptr<GlyphRunList>& 
     for (size_t i = 0; i < glyphCount; ++i) {
       const auto& glyphID = glyphIDs[i];
       const auto& position = positions[i];
-      auto glyphImage = glyphFace->getImage(glyphID, &glyphState.matrix);
+      auto glyphCodec = font.getImage(glyphID, nullptr, &glyphState.matrix);
+      auto glyphImage = Image::MakeFrom(glyphCodec);
       if (glyphImage == nullptr) {
         continue;
       }
       glyphState.matrix.postTranslate(position.x * scale, position.y * scale);
       glyphState.matrix.postConcat(viewMatrix);
       auto rect = Rect::MakeWH(glyphImage->width(), glyphImage->height());
-      drawImageRect(std::move(glyphImage), rect, {}, glyphState, fill);
+      drawImageRect(std::move(glyphImage), rect, rect, {}, glyphState, fill,
+                    SrcRectConstraint::Fast);
     }
   }
 }
@@ -322,14 +381,16 @@ bool SVGExportContext::RequiresViewportReset(const Fill& fill) {
     return false;
   }
 
-  if (const auto* imageShader = Caster::AsImageShader(shader.get())) {
+  if (Types::Get(shader.get()) == Types::ShaderType::Image) {
+    auto imageShader = static_cast<const ImageShader*>(shader.get());
     return imageShader->tileModeX == TileMode::Repeat || imageShader->tileModeY == TileMode::Repeat;
   }
+
   return false;
 }
 
-PathEncoding SVGExportContext::PathEncodingType() {
-  return PathEncoding::Absolute;
+SVGPathParser::PathEncoding SVGExportContext::PathEncodingType() {
+  return SVGPathParser::PathEncoding::Absolute;
 }
 
 void SVGExportContext::applyClipPath(const Path& clipPath) {
@@ -383,11 +444,11 @@ void SVGExportContext::applyClipPath(const Path& clipPath) {
 Bitmap SVGExportContext::ImageExportToBitmap(Context* context,
                                              const std::shared_ptr<Image>& image) {
   auto surface = Surface::Make(context, image->width(), image->height());
-  auto* canvas = surface->getCanvas();
+  auto canvas = surface->getCanvas();
   canvas->drawImage(image);
 
   Bitmap bitmap(surface->width(), surface->height());
-  auto* pixels = bitmap.lockPixels();
+  auto pixels = bitmap.lockPixels();
   if (surface->readPixels(bitmap.info(), pixels)) {
     bitmap.unlockPixels();
     return bitmap;
@@ -397,11 +458,11 @@ Bitmap SVGExportContext::ImageExportToBitmap(Context* context,
 }
 
 std::shared_ptr<Data> SVGExportContext::ImageToEncodedData(const std::shared_ptr<Image>& image) {
-  const auto* codecImage = Caster::AsCodecImage(image.get());
-  if (!codecImage) {
+  if (Types::Get(image.get()) != Types::ImageType::Codec) {
     return nullptr;
   }
-  auto imageCodec = codecImage->codec();
+  const auto codecImage = static_cast<const CodecImage*>(image.get());
+  auto imageCodec = codecImage->getCodec();
   return imageCodec->getEncodedData();
 }
 

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -21,9 +21,11 @@
 #include <stack>
 #include "core/CanvasState.h"
 #include "core/GlyphRunList.h"
+#include "tgfx/core/Canvas.h"
 #include "tgfx/core/Fill.h"
 #include "tgfx/core/Picture.h"
 #include "tgfx/core/Shape.h"
+#include "tgfx/core/Stroke.h"
 
 namespace tgfx {
 class Surface;
@@ -38,7 +40,7 @@ class DrawContext {
   /**
    * Fills the entire clip area with the specified Fill.
    */
-  virtual void drawFill(const MCState& state, const Fill& fill) = 0;
+  virtual void drawFill(const Fill& fill) = 0;
 
   /**
    * Draws a rectangle with the specified MCState and Fill.
@@ -48,15 +50,22 @@ class DrawContext {
   /**
    * Draws a rounded rectangle with the specified MCState and Fill.
    */
-  virtual void drawRRect(const RRect& rRect, const MCState& state, const Fill& fill) = 0;
+  virtual void drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
+                         const Stroke* stroke) = 0;
+
+  /**
+   * Draws a path with the specified MCState and Fill.
+   */
+  virtual void drawPath(const Path& path, const MCState& state, const Fill& fill) = 0;
 
   /**
    * Draws a complex Shape with the specified MCState and Fill.
    */
-  virtual void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill) = 0;
+  virtual void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill,
+                         const Stroke* stroke) = 0;
 
   /**
-   * Draws an Image with the specified SamplingOptions, MCState, and Fill.
+   * Draws a image with the specified SamplingOptions, MCState, Fill.
    */
   virtual void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
                          const MCState& state, const Fill& fill) = 0;
@@ -64,9 +73,9 @@ class DrawContext {
   /**
    * Draws a rectangle filled with the specified Image, SamplingOptions, MCState, and Fill.
    */
-  virtual void drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
+  virtual void drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
                              const SamplingOptions& sampling, const MCState& state,
-                             const Fill& fill) = 0;
+                             const Fill& fill, SrcRectConstraint constraint) = 0;
 
   /**
    * Draws a GlyphRunList with the specified MCState, Fill, and optional Stroke.

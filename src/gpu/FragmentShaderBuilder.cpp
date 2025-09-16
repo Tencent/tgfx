@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -23,19 +23,20 @@ namespace tgfx {
 FragmentShaderBuilder::FragmentShaderBuilder(ProgramBuilder* program) : ShaderBuilder(program) {
 }
 
-void FragmentShaderBuilder::onFinalize() {
-  programBuilder->varyingHandler()->getFragDecls(&shaderStrings[Type::Inputs]);
-}
-
 void FragmentShaderBuilder::declareCustomOutputColor() {
-  outputs.emplace_back(CustomColorOutputName(), SLType::Float4, ShaderVar::TypeModifier::Out);
+  auto typeModifier = ShaderVar::TypeModifier::Out;
+  if (features & PrivateFeature::FramebufferFetch) {
+    typeModifier = ShaderVar::TypeModifier::InOut;
+  }
+
+  outputs.emplace_back(CUSTOM_COLOR_OUTPUT_NAME, SLType::Float4, typeModifier);
 }
 
-void FragmentShaderBuilder::onBeforeChildProcEmitCode(const FragmentProcessor* child) {
+void FragmentShaderBuilder::onBeforeChildProcEmitCode(const FragmentProcessor* child) const {
   programBuilder->currentProcessors.push_back(child);
 }
 
-void FragmentShaderBuilder::onAfterChildProcEmitCode() {
+void FragmentShaderBuilder::onAfterChildProcEmitCode() const {
   programBuilder->currentProcessors.pop_back();
 }
 }  // namespace tgfx

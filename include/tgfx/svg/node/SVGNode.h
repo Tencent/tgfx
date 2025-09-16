@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -98,7 +98,7 @@ enum class SVGTag {
     return presentationAttributes.attr_name;                                          \
   }                                                                                   \
   void set##attr_name(const SVGProperty<attr_type, attr_inherited>& v) {              \
-    auto* dest = &presentationAttributes.attr_name;                                   \
+    auto dest = &presentationAttributes.attr_name;                                    \
     if (!dest->isInheritable() || v.isValue()) {                                      \
       /* TODO: If dest is not inheritable, handle v == "inherit" */                   \
       *dest = v;                                                                      \
@@ -107,7 +107,7 @@ enum class SVGTag {
     }                                                                                 \
   }                                                                                   \
   void set##attr_name(SVGProperty<attr_type, attr_inherited>&& v) {                   \
-    auto* dest = &presentationAttributes.attr_name;                                   \
+    auto dest = &presentationAttributes.attr_name;                                    \
     if (!dest->isInheritable() || v.isValue()) {                                      \
       /* TODO: If dest is not inheritable, handle v == "inherit" */                   \
       *dest = std::move(v);                                                           \

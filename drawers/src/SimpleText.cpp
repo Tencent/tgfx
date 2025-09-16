@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -31,11 +31,13 @@ void SimpleText::onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) {
   tgfx::Font font(typeface, 40 * scale);
   font.setFauxBold(true);
   auto textBlob = tgfx::TextBlob::MakeFrom(text, font);
-  auto bounds = textBlob->getBounds();
+  auto bounds = textBlob->getTightBounds();
   auto textScale = screenWidth / bounds.width();
   tgfx::Point textStart = {(width - bounds.width()) / 2, height / 2 - bounds.bottom * 1.2f};
   tgfx::Matrix matrix = {};
   matrix.setScale(textScale, textScale, width / 2, height / 2);
+  canvas->translate(host->contentOffset().x, host->contentOffset().y);
+  canvas->scale(host->zoomScale(), host->zoomScale());
   auto oldMatrix = canvas->getMatrix();
   canvas->concat(matrix);
   tgfx::Paint paint = {};

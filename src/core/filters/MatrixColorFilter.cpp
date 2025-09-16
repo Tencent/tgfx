@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,11 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MatrixColorFilter.h"
-#include "core/utils/Caster.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/Types.h"
 #include "gpu/processors/ColorMatrixFragmentProcessor.h"
 
 namespace tgfx {
+
 std::shared_ptr<ColorFilter> ColorFilter::Matrix(const std::array<float, 20>& rowMajor) {
   return std::make_shared<MatrixColorFilter>(rowMajor);
 }
@@ -37,8 +38,12 @@ MatrixColorFilter::MatrixColorFilter(const std::array<float, 20>& matrix)
 }
 
 bool MatrixColorFilter::isEqual(const ColorFilter* colorFilter) const {
-  auto other = Caster::AsMatrixColorFilter(colorFilter);
-  return other && matrix == other->matrix;
+  auto type = Types::Get(colorFilter);
+  if (type != Types::ColorFilterType::Matrix) {
+    return false;
+  }
+  auto other = static_cast<const MatrixColorFilter*>(colorFilter);
+  return matrix == other->matrix;
 }
 
 PlacementPtr<FragmentProcessor> MatrixColorFilter::asFragmentProcessor(Context* context) const {

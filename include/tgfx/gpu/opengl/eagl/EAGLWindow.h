@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -22,6 +22,8 @@
 #include "tgfx/gpu/Window.h"
 
 namespace tgfx {
+class EAGLLayerTexture;
+
 class EAGLWindow : public Window {
  public:
   /**
@@ -37,9 +39,8 @@ class EAGLWindow : public Window {
   void onPresent(Context* context, int64_t presentationTime) override;
 
  private:
-  unsigned frameBufferID = 0;
-  GLuint colorBuffer = 0;
   CAEAGLLayer* layer = nil;
+  std::unique_ptr<EAGLLayerTexture> layerTexture;
 
   EAGLWindow(std::shared_ptr<Device> device, CAEAGLLayer* layer);
 };

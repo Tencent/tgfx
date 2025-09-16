@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -23,17 +23,16 @@
 #include "gpu/ProxyProvider.h"
 
 namespace tgfx {
-using Wrap = SamplerState::WrapMode;
-
-TiledTextureEffect::ShaderMode TiledTextureEffect::GetShaderMode(Wrap wrap, FilterMode filter,
-                                                                 MipmapMode mm) {
-  switch (wrap) {
-    case Wrap::MirrorRepeat:
+TiledTextureEffect::ShaderMode TiledTextureEffect::GetShaderMode(TileMode tileMode,
+                                                                 FilterMode filter,
+                                                                 MipmapMode mipmapMode) {
+  switch (tileMode) {
+    case TileMode::Mirror:
       return ShaderMode::MirrorRepeat;
-    case Wrap::Clamp:
+    case TileMode::Clamp:
       return ShaderMode::Clamp;
-    case Wrap::Repeat:
-      switch (mm) {
+    case TileMode::Repeat:
+      switch (mipmapMode) {
         case MipmapMode::None:
           switch (filter) {
             case FilterMode::Nearest:
@@ -50,7 +49,7 @@ TiledTextureEffect::ShaderMode TiledTextureEffect::GetShaderMode(Wrap wrap, Filt
               return ShaderMode::RepeatLinearMipmap;
           }
       }
-    case Wrap::ClampToBorder:
+    case TileMode::Decal:
       switch (filter) {
         case FilterMode::Nearest:
           return ShaderMode::ClampToBorderNearest;
@@ -60,7 +59,7 @@ TiledTextureEffect::ShaderMode TiledTextureEffect::GetShaderMode(Wrap wrap, Filt
   }
 }
 
-TiledTextureEffect::Sampling::Sampling(const Texture* texture, SamplerState sampler,
+TiledTextureEffect::Sampling::Sampling(const TextureView* textureView, SamplerState sampler,
                                        const Rect& subset) {
   struct Span {
     float a = 0.f;
@@ -78,40 +77,50 @@ TiledTextureEffect::Sampling::Sampling(const Texture* texture, SamplerState samp
     ShaderMode shaderMode = ShaderMode::None;
     Span shaderSubset;
     Span shaderClamp;
-    Wrap hwWrap = Wrap::Clamp;
+    TileMode hwMode = TileMode::Clamp;
   };
-  auto caps = texture->getContext()->caps();
-  auto canDoWrapInHW = [&](int size, Wrap wrap) {
-    if (wrap == Wrap::ClampToBorder && !caps->clampToBorderSupport) {
+  auto caps = textureView->getContext()->caps();
+  auto canDoWrapInHW = [&](int size, TileMode tileMode) {
+    if (tileMode == TileMode::Decal && !caps->clampToBorderSupport) {
       return false;
     }
-    if (wrap != Wrap::Clamp && !caps->npotTextureTileSupport && !IsPow2(size)) {
+    if (tileMode != TileMode::Clamp && !caps->npotTextureTileSupport && !IsPow2(size)) {
       return false;
     }
-    if (texture->getSampler()->type() != SamplerType::TwoD &&
-        !(wrap == Wrap::Clamp || wrap == Wrap::ClampToBorder)) {
+    if (textureView->getTexture()->type() != GPUTextureType::TwoD &&
+        !(tileMode == TileMode::Clamp || tileMode == TileMode::Decal)) {
       return false;
     }
     return true;
   };
-  auto resolve = [&](int size, Wrap wrap, Span subset) {
+  auto resolve = [&](int size, TileMode tileMode, Span subsetSpan, float linearFilterInset) {
     Result1D r;
-    bool canDoModeInHW = canDoWrapInHW(size, wrap);
-    if (canDoModeInHW && subset.a <= 0 && subset.b >= static_cast<float>(size)) {
-      r.hwWrap = wrap;
+    bool canDoModeInHW = canDoWrapInHW(size, tileMode);
+    if (canDoModeInHW && subsetSpan.a <= 0 && subsetSpan.b >= static_cast<float>(size)) {
+      r.hwMode = tileMode;
       return r;
     }
-    r.shaderSubset = subset;
-    r.shaderClamp = subset.makeInset(0.5f);
-    r.shaderMode = GetShaderMode(wrap, sampler.filterMode, sampler.mipmapMode);
+    r.shaderSubset = subsetSpan;
+    if (sampler.filterMode == FilterMode::Nearest) {
+      Span isubset{std::floor(subsetSpan.a), std::ceil(subsetSpan.b)};
+      // This inset prevents sampling neighboring texels that could occur when
+      // texture coords fall exactly at texel boundaries (depending on precision
+      // and GPU-specific snapping at the boundary).
+      r.shaderClamp = isubset.makeInset(0.5f);
+    } else {
+      r.shaderClamp = subsetSpan.makeInset(linearFilterInset);
+    }
+    auto mipmapMode = textureView->hasMipmaps() ? sampler.mipmapMode : MipmapMode::None;
+    r.shaderMode = GetShaderMode(tileMode, sampler.filterMode, mipmapMode);
+    DEBUG_ASSERT(r.shaderMode != ShaderMode::None);
     return r;
   };
 
   Span subsetX{subset.left, subset.right};
-  auto x = resolve(texture->width(), sampler.wrapModeX, subsetX);
+  auto x = resolve(textureView->width(), sampler.tileModeX, subsetX, 0.5f);
   Span subsetY{subset.top, subset.bottom};
-  auto y = resolve(texture->height(), sampler.wrapModeY, subsetY);
-  hwSampler = SamplerState(x.hwWrap, y.hwWrap, sampler.filterMode, sampler.mipmapMode);
+  auto y = resolve(textureView->height(), sampler.tileModeY, subsetY, 0.5f);
+  hwSampler = SamplerState(x.hwMode, y.hwMode, sampler.filterMode, sampler.mipmapMode);
   shaderModeX = x.shaderMode;
   shaderModeY = y.shaderMode;
   shaderSubset = {x.shaderSubset.a, y.shaderSubset.a, x.shaderSubset.b, y.shaderSubset.b};
@@ -119,54 +128,57 @@ TiledTextureEffect::Sampling::Sampling(const Texture* texture, SamplerState samp
 }
 
 TiledTextureEffect::TiledTextureEffect(std::shared_ptr<TextureProxy> proxy,
-                                       const SamplerState& samplerState, const Matrix& uvMatrix)
+                                       const SamplerState& samplerState,
+                                       SrcRectConstraint constraint, const Matrix& uvMatrix,
+                                       const std::optional<Rect>& subset)
     : FragmentProcessor(ClassID()), textureProxy(std::move(proxy)), samplerState(samplerState),
-      coordTransform(uvMatrix, textureProxy.get()) {
+      coordTransform(uvMatrix, textureProxy.get()),
+      subset(subset.value_or(Rect::MakeWH(textureProxy->width(), textureProxy->height()))),
+      constraint(constraint) {
   addCoordTransform(&coordTransform);
 }
 
 void TiledTextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
-  auto texture = getTexture();
-  if (texture == nullptr) {
+  auto textureView = getTextureView();
+  if (textureView == nullptr) {
     return;
   }
   // Sometimes textureProxy->isAlphaOnly() != texture->isAlphaOnly(), we use
   // textureProxy->isAlphaOnly() to determine the alpha-only flag.
   bytesKey->write(textureProxy->isAlphaOnly());
-  auto subset = Rect::MakeWH(texture->width(), texture->height());
-  Sampling sampling(texture, samplerState, subset);
+  Sampling sampling(textureView, samplerState, subset);
   auto flags = static_cast<uint32_t>(sampling.shaderModeX);
   flags |= static_cast<uint32_t>(sampling.shaderModeY) << 4;
+  flags |= constraint == SrcRectConstraint::Strict ? static_cast<uint32_t>(1) << 8 : 0;
   bytesKey->write(flags);
 }
 
 size_t TiledTextureEffect::onCountTextureSamplers() const {
-  auto texture = getTexture();
-  return texture ? 1 : 0;
+  auto textureView = getTextureView();
+  return textureView ? 1 : 0;
 }
 
-const TextureSampler* TiledTextureEffect::onTextureSampler(size_t) const {
-  auto texture = getTexture();
-  if (texture == nullptr) {
+GPUTexture* TiledTextureEffect::onTextureAt(size_t) const {
+  auto textureView = getTextureView();
+  if (textureView == nullptr) {
     return nullptr;
   }
-  return texture->getSampler();
+  return textureView->getTexture();
 }
 
-SamplerState TiledTextureEffect::onSamplerState(size_t) const {
-  auto texture = getTexture();
-  if (texture == nullptr) {
+SamplerState TiledTextureEffect::onSamplerStateAt(size_t) const {
+  auto textureView = getTextureView();
+  if (textureView == nullptr) {
     return {};
   }
-  auto subset = Rect::MakeWH(texture->width(), texture->height());
-  Sampling sampling(texture, samplerState, subset);
+  Sampling sampling(textureView, samplerState, subset);
   return sampling.hwSampler;
 }
 
-const Texture* TiledTextureEffect::getTexture() const {
-  auto texture = textureProxy->getTexture().get();
-  if (texture && !texture->isYUV()) {
-    return texture;
+const TextureView* TiledTextureEffect::getTextureView() const {
+  auto textureView = textureProxy->getTextureView().get();
+  if (textureView && !textureView->isYUV()) {
+    return textureView;
   }
   return nullptr;
 }

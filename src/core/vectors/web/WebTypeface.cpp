@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,8 +18,10 @@
 
 #include "WebTypeface.h"
 #include <vector>
+#include "WebScalerContext.h"
 #include "core/utils/UniqueID.h"
 #include "platform/web/WebImageBuffer.h"
+#include "tgfx/core/Stream.h"
 #include "tgfx/core/UTF.h"
 
 using namespace emscripten;
@@ -53,6 +55,7 @@ std::shared_ptr<WebTypeface> WebTypeface::Make(const std::string& name, const st
   }
   auto webTypeface = std::shared_ptr<WebTypeface>(new WebTypeface(name, style));
   webTypeface->scalerContextClass = scalerContextClass;
+  webTypeface->weakThis = webTypeface;
   return webTypeface;
 }
 
@@ -90,7 +93,7 @@ GlyphID WebTypeface::getGlyphID(Unichar unichar) const {
   return static_cast<GlyphID>(glyphs.size());
 }
 
-std::shared_ptr<Data> WebTypeface::getBytes() const {
+std::unique_ptr<Stream> WebTypeface::openStream() const {
   return nullptr;
 }
 
@@ -112,4 +115,26 @@ std::vector<Unichar> WebTypeface::getGlyphToUnicodeMap() const {
 }
 #endif
 
+#ifdef TGFX_USE_GLYPH_TO_UNICODE
+AdvancedTypefaceInfo getAdvancedProperty() const {
+  return AdvancedTypefaceProperty{.postScriptName = webFontFamily,
+                                  .type = AdvancedTypefaceProperty::FontType::Other,
+                                  .flags = static_cast<AdvancedTypefaceProperty::FontFlags>(
+                                      AdvancedTypefaceProperty::FontFlags::NotEmbeddable |
+                                      AdvancedTypefaceProperty::FontFlags::NotSubsettable),
+                                  .style = static_cast<AdvancedTypefaceProperty::StyleFlags>(0)};
+}
+#endif
+
+std::shared_ptr<ScalerContext> WebTypeface::onCreateScalerContext(float size) const {
+  auto scalerContextClass = emscripten::val::module_property("ScalerContext");
+  if (!scalerContextClass.as<bool>()) {
+    return nullptr;
+  }
+  auto scalerContext = scalerContextClass.new_(fontFamily(), fontStyle(), size);
+  if (!scalerContext.as<bool>()) {
+    return nullptr;
+  }
+  return std::make_shared<WebScalerContext>(weakThis.lock(), size, std::move(scalerContext));
+}
 }  // namespace tgfx

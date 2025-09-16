@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -19,7 +19,7 @@
 #pragma once
 
 #include "FragmentShaderBuilder.h"
-#include "Pipeline.h"
+#include "ProgramInfo.h"
 #include "UniformHandler.h"
 #include "VaryingHandler.h"
 #include "VertexShaderBuilder.h"
@@ -31,7 +31,7 @@ class ProgramBuilder {
   /**
    * Generates a shader program.
    */
-  static std::unique_ptr<Program> CreateProgram(Context* context, const Pipeline* pipeline);
+  static std::shared_ptr<Program> CreateProgram(Context* context, const ProgramInfo* programInfo);
 
   virtual ~ProgramBuilder() = default;
 
@@ -39,25 +39,14 @@ class ProgramBuilder {
     return context;
   }
 
-  const Pipeline* getPipeline() const {
-    return pipeline;
+  const ProgramInfo* getProgramInfo() const {
+    return programInfo;
   }
 
-  virtual std::string versionDeclString() = 0;
+  virtual std::string getShaderVarDeclarations(const ShaderVar& var, ShaderStage stage) const = 0;
 
-  virtual std::string textureFuncName() const = 0;
-
-  virtual std::string getShaderVarDeclarations(const ShaderVar& var, ShaderFlags flag) const = 0;
-
-  std::string getUniformDeclarations(ShaderFlags visibility) const;
-
-  const ShaderVar& samplerVariable(SamplerHandle handle) const {
-    return uniformHandler()->samplerVariable(handle);
-  }
-
-  Swizzle samplerSwizzle(SamplerHandle handle) const {
-    return uniformHandler()->samplerSwizzle(handle);
-  }
+  virtual std::string getUniformBlockDeclaration(ShaderStage stage,
+                                                 const std::vector<Uniform>& uniforms) const = 0;
 
   /**
    * Generates a name for a variable. The generated string will be mangled to be processor-specific.
@@ -76,10 +65,10 @@ class ProgramBuilder {
 
  protected:
   Context* context = nullptr;
-  const Pipeline* pipeline = nullptr;
+  const ProgramInfo* programInfo = nullptr;
   int numFragmentSamplers = 0;
 
-  ProgramBuilder(Context* context, const Pipeline* pipeline);
+  ProgramBuilder(Context* context, const ProgramInfo* programInfo);
 
   bool emitAndInstallProcessors();
 
@@ -90,6 +79,7 @@ class ProgramBuilder {
  private:
   std::vector<const Processor*> currentProcessors = {};
   std::vector<ShaderVar> transformedCoordVars = {};
+  std::string subsetVarName = {};
 
   /**
    * Generates a possibly mangled name for a stage variable and writes it to the fragment shader.
@@ -105,7 +95,7 @@ class ProgramBuilder {
 
   void emitAndInstallXferProc(const std::string& colorIn, const std::string& coverageIn);
 
-  SamplerHandle emitSampler(const TextureSampler* sampler, const std::string& name);
+  SamplerHandle emitSampler(GPUTexture* texture, const std::string& name);
 
   void emitFSOutputSwizzle();
 

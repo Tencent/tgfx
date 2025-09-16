@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <optional>
 #include "tgfx/core/Image.h"
 
 namespace tgfx {
@@ -43,6 +44,13 @@ class TransformImage : public Image {
   std::shared_ptr<Image> source = nullptr;
 
  protected:
+  std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
+
+  std::shared_ptr<TextureProxy> lockTextureProxySubset(
+      const TPArgs& args, const Rect& drawRect, const SamplingOptions& samplingOptions = {}) const;
+
+  virtual std::optional<Matrix> concatUVMatrix(const Matrix* uvMatrix) const = 0;
+
   std::shared_ptr<Image> onMakeDecoded(Context* context, bool tryHardware) const override;
 
   std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "gpu/ResourceKey.h"
+#include "gpu/resources/ResourceKey.h"
 #include "tgfx/core/Shape.h"
 
 namespace tgfx {
@@ -31,14 +31,6 @@ class MatrixShape : public Shape {
       : shape(std::move(shape)), matrix(matrix) {
   }
 
-  bool isLine(Point line[2] = nullptr) const override;
-
-  bool isRect(Rect* rect = nullptr) const override;
-
-  bool isOval(Rect* bounds = nullptr) const override;
-
-  bool isRRect(RRect* rRect = nullptr) const override;
-
   bool isInverseFillType() const override {
     return shape->isInverseFillType();
   }
@@ -46,6 +38,8 @@ class MatrixShape : public Shape {
   Rect getBounds() const override;
 
   Path getPath() const override;
+
+  static UniqueKey MakeUniqueKey(const UniqueKey& key, const Matrix& matrix);
 
   std::shared_ptr<Shape> shape = nullptr;
   Matrix matrix = {};

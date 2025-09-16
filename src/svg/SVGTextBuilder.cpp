@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -29,13 +29,10 @@
 namespace tgfx {
 
 SVGTextBuilder::UnicharsInfo SVGTextBuilder::glyphToUnicharsInfo(const GlyphRun& glyphRun) {
-
-  Font font;
-  if (!glyphRun.glyphFace->asFont(&font)) {
+  auto unicodeChars = converter.glyphsToUnichars(glyphRun.font, glyphRun.glyphs);
+  if (unicodeChars.empty()) {
     return {};
   }
-
-  auto unicodeChars = converter.glyphsToUnichars(font, glyphRun.glyphs);
 
   std::string _text;
   std::string posXString;

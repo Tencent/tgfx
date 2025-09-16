@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -20,24 +20,29 @@
 
 #include "GLCaps.h"
 #include "GLProcGetter.h"
-#include "tgfx/gpu/opengl/GLDefines.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
 
 namespace tgfx {
-class GLState;
-
 class GLInterface {
  public:
-  static const GLInterface* Get(const Context* context);
+  static std::shared_ptr<GLInterface> GetNative();
 
-  std::shared_ptr<const GLCaps> caps = nullptr;
-  std::shared_ptr<const GLFunctions> functions = nullptr;
+  const GLCaps* caps() const {
+    return _caps.get();
+  }
+
+  const GLFunctions* functions() const {
+    return _functions.get();
+  }
 
  private:
-  static const GLInterface* GetNative();
-  static std::unique_ptr<const GLInterface> MakeNativeInterface(const GLProcGetter* getter);
+  std::unique_ptr<GLCaps> _caps = nullptr;
+  std::unique_ptr<GLFunctions> _functions = nullptr;
 
-  friend class GLDevice;
-  friend class GLContext;
+  static std::shared_ptr<GLInterface> MakeNativeInterface(const GLProcGetter* getter);
+
+  GLInterface(std::unique_ptr<GLCaps> caps, std::unique_ptr<GLFunctions> functions)
+      : _caps(std::move(caps)), _functions(std::move(functions)) {
+  }
 };
 }  // namespace tgfx

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -72,7 +72,7 @@ std::shared_ptr<WriteStream> WriteStream::MakeFromFile(const std::string& filePa
   if (filePath.empty()) {
     return nullptr;
   }
-  auto* file = fopen(filePath.c_str(), "wb");
+  auto file = fopen(filePath.c_str(), "wb");
   if (file == nullptr) {
     return nullptr;
   }
@@ -86,8 +86,48 @@ std::shared_ptr<MemoryWriteStream> MemoryWriteStream::Make() {
 }
 
 bool MemoryWriteStream::write(const void* data, size_t size) {
-  const auto* bytes = static_cast<const uint8_t*>(data);
+  const auto bytes = static_cast<const uint8_t*>(data);
   buffer.insert(buffer.end(), bytes, bytes + size);
+  return true;
+}
+
+bool MemoryWriteStream::writeToAndReset(const std::shared_ptr<MemoryWriteStream>& destStream) {
+  if (!destStream) {
+    return false;
+  }
+  if (bytesWritten() == 0) {
+    return true;
+  }
+  if (destStream->bytesWritten() == 0) {
+    destStream->buffer.swap(buffer);
+    return true;
+  }
+  destStream->buffer.insert(destStream->buffer.end(), buffer.begin(), buffer.end());
+  reset();
+  return true;
+}
+
+void MemoryWriteStream::writeToStream(const std::shared_ptr<MemoryWriteStream>& destStream) {
+  if (!destStream) {
+    return;
+  }
+  destStream->buffer.insert(destStream->buffer.end(), buffer.begin(), buffer.end());
+}
+
+bool MemoryWriteStream::prependToAndReset(const std::shared_ptr<MemoryWriteStream>& destStream) {
+  if (!destStream) {
+    return false;
+  }
+  if (bytesWritten() == 0) {
+    return true;
+  }
+  if (destStream->bytesWritten() == 0) {
+    destStream->buffer.swap(buffer);
+    return true;
+  }
+  buffer.insert(buffer.end(), destStream->buffer.begin(), destStream->buffer.end());
+  destStream->buffer.swap(buffer);
+  reset();
   return true;
 }
 
@@ -99,7 +139,7 @@ bool MemoryWriteStream::read(void* data, size_t offset, size_t size) {
   if (offset + size > buffer.size()) {
     return false;
   }
-  const auto* bytes = buffer.data() + offset;
+  const auto bytes = buffer.data() + offset;
   memcpy(data, bytes, size);
   return true;
 }
@@ -110,6 +150,11 @@ std::shared_ptr<Data> MemoryWriteStream::readData() {
 
 std::string MemoryWriteStream::readString() {
   return std::string(buffer.begin(), buffer.end());
+}
+
+void MemoryWriteStream::reset() {
+  buffer.clear();
+  buffer.shrink_to_fit();
 }
 
 }  // namespace tgfx

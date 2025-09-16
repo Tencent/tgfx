@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,54 +18,25 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "gpu/Uniform.h"
 #include "tgfx/core/Matrix.h"
 
 namespace tgfx {
-/**
- * Reflected description of a uniform variable in the GPU program.
- */
-struct Uniform {
-  /**
-   * Possible types of a uniform variable.
-   */
-  enum class Type {
-    Float,
-    Float2,
-    Float3,
-    Float4,
-    Float2x2,
-    Float3x3,
-    Float4x4,
-    Int,
-    Int2,
-    Int3,
-    Int4,
-  };
-
-  std::string name;
-  Type type;
-
-  /**
-   * Returns the size of the uniform in bytes.
-   */
-  size_t size() const;
-};
+static constexpr char VertexUniformBlockName[] = "VertexUniformBlock";
+static constexpr char FragmentUniformBlockName[] = "FragmentUniformBlock";
+static constexpr int VERTEX_UBO_BINDING_POINT = 0;
+static constexpr int FRAGMENT_UBO_BINDING_POINT = 1;
+static constexpr int TEXTURE_BINDING_POINT_START = 2;
 
 /**
  * An object representing the collection of uniform variables in a GPU program.
  */
 class UniformBuffer {
  public:
-  /**
-   * Constructs a uniform buffer with the specified uniforms.
-   */
-  explicit UniformBuffer(std::vector<Uniform> uniforms);
-
-  virtual ~UniformBuffer() = default;
-
   /**
    * Copies value into the uniform buffer. The data must have the same size as the uniform specified
    * by name.
@@ -81,22 +52,75 @@ class UniformBuffer {
    */
   void setData(const std::string& name, const Matrix& matrix);
 
- protected:
-  std::vector<Uniform> uniforms = {};
-  std::vector<size_t> offsets = {};
+  /**
+   * Returns a pointer to the start of the uniform buffer in memory.
+   */
+  const void* data() const {
+    return buffer.data();
+  }
 
   /**
-   * Copies data into the uniform buffer. The data must have the same size as the uniform specified
-   * by name.
+   * Returns the size of the uniform buffer in bytes.
    */
-  virtual void onCopyData(size_t index, size_t offset, size_t size, const void* data) = 0;
+  size_t size() const {
+    return buffer.size();
+  }
+
+  /**
+   * Returns the list of uniforms in this buffer.
+   */
+  const std::vector<Uniform>& uniforms() const {
+    return _uniforms;
+  }
+
+  /**
+   * Returns true if UBO is supported in the current context.
+   */
+  bool uboSupport() const {
+    return _uboSupport;
+  }
 
  private:
+  struct Field {
+    std::string name = "";
+    UniformFormat format = UniformFormat::Float;
+    size_t offset = 0;
+    size_t size = 0;
+    size_t align = 0;
+  };
+
+  struct Entry {
+    size_t size;
+    size_t align;
+  };
+
+  std::vector<uint8_t> buffer = {};
+  std::vector<Uniform> _uniforms = {};
   std::string nameSuffix = "";
-  std::unordered_map<std::string, size_t> uniformMap = {};
+  std::unordered_map<std::string, Field> fieldMap = {};
+  size_t cursor = 0;
+  bool _uboSupport = false;
+
+  explicit UniformBuffer(std::vector<Uniform> uniforms, bool uboSupport = false);
 
   void onSetData(const std::string& name, const void* data, size_t size);
 
-  friend class Pipeline;
+  const Field* findField(const std::string& key) const;
+
+  size_t alignCursor(size_t alignment) const;
+
+  static Entry EntryOf(UniformFormat format);
+
+  /**
+   * Dump UniformBuffer's memory layout information is printed to the console for debugging.
+   */
+#if DEBUG
+  static const char* ToUniformFormatName(UniformFormat format);
+
+  void dump() const;
+#endif
+
+  friend class ProgramInfo;
+  friend class UniformHandler;
 };
 }  // namespace tgfx

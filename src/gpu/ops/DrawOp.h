@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,22 +18,19 @@
 
 #pragma once
 
-#include "Op.h"
 #include "gpu/AAType.h"
-#include "gpu/Pipeline.h"
+#include "gpu/ProgramInfo.h"
 #include "gpu/RenderPass.h"
 
 namespace tgfx {
-class DrawOp : public Op {
+class DrawOp {
  public:
-  PlacementPtr<Pipeline> createPipeline(RenderPass* renderPass, PlacementPtr<GeometryProcessor> gp);
+  enum class Type { RectDrawOp, RRectDrawOp, ShapeDrawOp, AtlasTextOp };
 
-  const Rect& scissorRect() const {
-    return _scissorRect;
-  }
+  virtual ~DrawOp() = default;
 
-  void setScissorRect(Rect scissorRect) {
-    _scissorRect = scissorRect;
+  void setScissorRect(const Rect& rect) {
+    scissorRect = rect;
   }
 
   void setBlendMode(BlendMode mode) {
@@ -52,17 +49,27 @@ class DrawOp : public Op {
     coverages.emplace_back(std::move(coverageProcessor));
   }
 
- protected:
-  AAType aaType = AAType::None;
-
-  explicit DrawOp(AAType aaType) : aaType(aaType) {
+  virtual bool hasCoverage() const {
+    return !coverages.empty();
   }
 
- private:
-  Rect _scissorRect = {};
+  void execute(RenderPass* renderPass, RenderTarget* renderTarget);
+
+ protected:
+  AAType aaType = AAType::None;
+  Rect scissorRect = {};
   std::vector<PlacementPtr<FragmentProcessor>> colors = {};
   std::vector<PlacementPtr<FragmentProcessor>> coverages = {};
   PlacementPtr<XferProcessor> xferProcessor = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
+
+  explicit DrawOp(AAType aaType) : aaType(aaType) {
+  }
+
+  virtual PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) = 0;
+
+  virtual void onDraw(RenderPass* renderPass) = 0;
+
+  virtual Type type() = 0;
 };
 }  // namespace tgfx

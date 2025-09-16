@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,29 +17,30 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RenderTargetCopyTask.h"
+#include "inspect/InspectorMark.h"
 
 namespace tgfx {
 RenderTargetCopyTask::RenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> source,
-                                           std::shared_ptr<TextureProxy> dest)
-    : RenderTask(std::move(source)), dest(std::move(dest)) {
+                                           std::shared_ptr<TextureProxy> dest, int srcX, int srcY)
+    : source(std::move(source)), dest(std::move(dest)), srcX(srcX), srcY(srcY) {
 }
 
-bool RenderTargetCopyTask::execute(RenderPass* renderPass) {
-  auto renderTarget = renderTargetProxy->getRenderTarget();
+void RenderTargetCopyTask::execute(CommandEncoder* encoder) {
+  TASK_MARK(tgfx::inspect::OpTaskType::RenderTargetCopyTask);
+  auto renderTarget = source->getRenderTarget();
   if (renderTarget == nullptr) {
     LOGE("RenderTargetCopyTask::execute() Failed to get the source render target!");
-    return false;
+    return;
   }
-  auto texture = dest->getTexture();
-  if (texture == nullptr) {
-    LOGE("RenderTargetCopyTask::execute() Failed to get the dest texture!");
-    return false;
+  auto textureView = dest->getTextureView();
+  if (textureView == nullptr) {
+    LOGE("RenderTargetCopyTask::execute() Failed to get the dest texture view!");
+    return;
   }
-  DEBUG_ASSERT(renderTarget->width() == texture->width() &&
-               renderTarget->height() == texture->height());
-  auto gpu = renderPass->getContext()->gpu();
-  gpu->copyRenderTargetToTexture(renderTarget.get(), texture.get(), 0, 0);
-  return true;
+  auto srcRect = Rect::MakeXYWH(srcX, srcY, textureView->width(), textureView->height());
+  encoder->copyTextureToTexture(renderTarget->getSampleTexture(), srcRect,
+                                textureView->getTexture(), Point::Zero());
+  encoder->generateMipmapsForTexture(textureView->getTexture());
 }
 
 }  // namespace tgfx

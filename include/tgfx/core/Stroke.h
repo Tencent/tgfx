@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -87,9 +87,9 @@ class Stroke {
   bool applyToPath(Path* path, float resolutionScale = 1.0f) const;
 
   /**
-   * Applies the stroke options to the given bounds.
+   * Returns true if the stroke is a hairline (width <= 0).
    */
-  void applyToBounds(Rect* bounds) const;
+  bool isHairline() const;
 
   /**
    * The thickness of the pen used to outline the paths or glyphs.

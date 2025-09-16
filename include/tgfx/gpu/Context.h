@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -25,21 +25,30 @@
 #include "tgfx/gpu/Device.h"
 
 namespace tgfx {
-class ProgramCache;
+class GlobalCache;
 class ResourceCache;
 class DrawingManager;
-class Gpu;
+class GPU;
 class ResourceProvider;
 class ProxyProvider;
 class BlockBuffer;
-class MaxValueTracker;
+class SlidingWindowTracker;
+class AtlasManager;
+class CommandBuffer;
 
 /**
- * Context is the main interface to the GPU. It is used to create and manage GPU resources, and to
- * issue drawing commands. Contexts are created by Devices.
+ * Context is responsible for creating and managing GPU resources, as well as issuing drawing
+ * commands. It is not thread-safe and should only be used from the single thread where it was
+ * locked from the Device. After unlocking the Context from the Device, do not use it further as
+ * this may result in undefined behavior.
  */
 class Context {
  public:
+  /**
+   * Creates a new Context with the specified device and GPU backend.
+   */
+  Context(Device* device, GPU* gpu);
+
   virtual ~Context();
 
   /**
@@ -50,40 +59,27 @@ class Context {
   }
 
   /**
+   * Returns the GPU backend type of this context.
+   */
+  Backend backend() const;
+
+  /**
+   * Returns the capability info of the backend GPU.
+   */
+  const Caps* caps() const;
+
+  /**
+   * Returns the GPU instance associated with this context.
+   */
+  GPU* gpu() const {
+    return _gpu;
+  }
+
+  /**
    * Returns the unique ID of the Context.
    */
   uint32_t uniqueID() const {
     return _device->uniqueID();
-  }
-
-  /**
-   * Returns the associated cache that manages the lifetime of all Program instances.
-   */
-  ProgramCache* programCache() const {
-    return _programCache;
-  }
-
-  /**
-   * Returns the associated cache that manages the lifetime of all Resource instances.
-   */
-  ResourceCache* resourceCache() const {
-    return _resourceCache;
-  }
-
-  DrawingManager* drawingManager() const {
-    return _drawingManager;
-  }
-
-  BlockBuffer* drawingBuffer() const {
-    return _drawingBuffer;
-  }
-
-  ResourceProvider* resourceProvider() const {
-    return _resourceProvider;
-  }
-
-  ProxyProvider* proxyProvider() const {
-    return _proxyProvider;
   }
 
   /**
@@ -97,33 +93,45 @@ class Context {
   size_t purgeableBytes() const;
 
   /**
-   * Returns current cache limits of max gpu memory byte size.
+   * Returns the size of the Context's gpu memory cache limit in bytes. The default value is 512MB.
    */
   size_t cacheLimit() const;
 
   /**
-   * Sets the cache limit of max gpu memory byte size.
+   * Sets the size of the Context's gpu memory cache limit in bytes. If the new limit is lower than
+   * the current limit, the cache will try to free resources to get under the new limit.
    */
   void setCacheLimit(size_t bytesLimit);
 
   /**
-   * Purges GPU resources that haven't been used since the passed point in time.
-   * @param purgeTime A time point previously returned by std::chrono::steady_clock::now().
-   * @param scratchResourcesOnly If true, the purgeable resources containing unique keys are spared.
-   * If false, then all purgeable resources will be deleted.
+   * Returns the number of frames (valid flushes) after which unused GPU resources are considered
+   * expired. A 'frame' is defined as a non-empty flush where actual rendering work is performed and
+   * commands are submitted to the GPU. If a GPU resource is not used for more than this number of
+   * frames, it will be automatically purged from the cache. The default value is 120 frames.
    */
-  void purgeResourcesNotUsedSince(std::chrono::steady_clock::time_point purgeTime,
-                                  bool scratchResourcesOnly = false);
+  size_t resourceExpirationFrames() const;
 
   /**
-   * Purge unreferenced resources from the cache until the provided bytesLimit has been reached, or
-   * we have purged all unreferenced resources. Returns true if the total resource bytes is not over
-   * the specified bytesLimit after purging.
-   * @param bytesLimit The desired number of bytes after puring.
-   * @param scratchResourcesOnly If true, the purgeable resources containing unique keys are spared.
-   * If false, then all purgeable resources will be deleted.
+   * Sets the number of frames (valid flushes) after which unused GPU resources are considered
+   * expired. If the new value is lower than the current value, the cache will try to free resources
+   * that haven't been used for more than the new number of frames.
    */
-  bool purgeResourcesUntilMemoryTo(size_t bytesLimit, bool scratchResourcesOnly = false);
+  void setResourceExpirationFrames(size_t frames);
+
+  /**
+   * Purges GPU resources that haven't been used since the passed point in time.
+   * @param purgeTime A time point returned by std::chrono::steady_clock::now() or
+   * std::chrono::steady_clock::now() - std::chrono::milliseconds(msNotUsed).
+   */
+  void purgeResourcesNotUsedSince(std::chrono::steady_clock::time_point purgeTime);
+
+  /**
+   * Purges GPU resources from the cache until the specified bytesLimit is reached, or until all
+   * purgeable resources have been removed. Returns true if the total resource usage does not exceed
+   * bytesLimit after purging.
+   * @param bytesLimit The target maximum number of bytes after purging.
+   */
+  bool purgeResourcesUntilMemoryTo(size_t bytesLimit);
 
   /**
    * Inserts a GPU semaphore that the current GPU-backed API must wait on before executing any more
@@ -135,73 +143,66 @@ class Context {
   bool wait(const BackendSemaphore& waitSemaphore);
 
   /**
-   * Apply all pending changes to the render target immediately. After issuing all commands, the
-   * semaphore will be signaled by the GPU. If the signalSemaphore is not null and uninitialized,
-   * a new semaphore is created and initializes BackendSemaphore. The caller must delete the
-   * semaphore returned in signalSemaphore. BackendSemaphore can be deleted as soon as this function
-   * returns. If the back-end API is OpenGL, only uninitialized backend semaphores are supported.
-   * If false is returned, the GPU back-end did not create or add a semaphore to signal on the GPU;
-   * the caller should not instruct the GPU to wait on the semaphore.
+   * Ensures that all pending drawing operations for this context are flushed to the underlying GPU
+   * API objects. A call to Context::submit is always required to ensure work is actually sent to
+   * the GPU. If signalSemaphore is not null, a new semaphore will be created and assigned to
+   * signalSemaphore. The caller is responsible for deleting the semaphore returned in
+   * signalSemaphore. Returns false if there are no pending drawing operations and nothing was
+   * flushed to the GPU. In that case, signalSemaphore will not be initialized, and the caller
+   * should not wait on it.
    */
   bool flush(BackendSemaphore* signalSemaphore = nullptr);
 
   /**
-   * Submit outstanding work to the gpu from all previously un-submitted flushes. The return
-   * value of the submit method will indicate whether the submission to the GPU was successful.
-   *
-   * If the call returns true, all previously passed in semaphores in flush calls will have been
-   * submitted to the GPU and they can safely be waited on. The caller should wait on those
-   * semaphores or perform some other global synchronization before deleting the semaphores.
-   *
-   * If it returns false, then those same semaphores will not have been submitted, and we will not
-   * try to submit them again. The caller is free to delete the semaphores at any time.
-   *
+   * Submit outstanding work to the gpu from all previously un-submitted flushes.
    * If the syncCpu flag is true, this function will return once the gpu has finished with all
    * submitted work.
    */
-  bool submit(bool syncCpu = false);
+  void submit(bool syncCpu = false);
 
   /**
    * Call to ensure all drawing to the context has been flushed and submitted to the underlying 3D
    * API. This is equivalent to calling Context::flush() followed by Context::submit(syncCpu).
+   *
+   * Returns false if there are no pending drawing operations and nothing was flushed to the GPU.
    */
-  void flushAndSubmit(bool syncCpu = false);
+  bool flushAndSubmit(bool syncCpu = false);
 
-  /**
-   * Returns the GPU backend of this context.
-   */
-  virtual Backend backend() const = 0;
-
-  /**
-   * Returns the capability info of this context.
-   */
-  virtual const Caps* caps() const = 0;
-
-  /**
-   * The Context normally assumes that no outsider is setting state within the underlying GPU API's
-   * context/device/whatever. This call informs the context that the state was modified and it
-   * should resend. Shouldn't be called frequently for good performance.
-   */
-  virtual void resetState() = 0;
-
-  Gpu* gpu() {
-    return _gpu;
+  GlobalCache* globalCache() const {
+    return _globalCache;
   }
 
- protected:
-  explicit Context(Device* device);
+  ResourceCache* resourceCache() const {
+    return _resourceCache;
+  }
 
-  Gpu* _gpu = nullptr;
+  DrawingManager* drawingManager() const {
+    return _drawingManager;
+  }
+
+  BlockBuffer* drawingBuffer() const {
+    return _drawingBuffer;
+  }
+
+  ProxyProvider* proxyProvider() const {
+    return _proxyProvider;
+  }
+
+  AtlasManager* atlasManager() const {
+    return _atlasManager;
+  }
 
  private:
   Device* _device = nullptr;
-  ProgramCache* _programCache = nullptr;
+  GPU* _gpu = nullptr;
+  GlobalCache* _globalCache = nullptr;
   ResourceCache* _resourceCache = nullptr;
   DrawingManager* _drawingManager = nullptr;
-  ResourceProvider* _resourceProvider = nullptr;
   ProxyProvider* _proxyProvider = nullptr;
   BlockBuffer* _drawingBuffer = nullptr;
-  MaxValueTracker* _maxValueTracker = nullptr;
+  SlidingWindowTracker* _maxValueTracker = nullptr;
+  AtlasManager* _atlasManager = nullptr;
+  std::shared_ptr<CommandBuffer> commandBuffer = nullptr;
 
   void releaseAll(bool releaseGPU);
 

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -142,8 +142,8 @@ std::shared_ptr<ImageFilter> SVGFilter::buildDropShadowFilter(
   auto dx = offsetFe->getDx() * scale.x * context.matrix().getScaleX();
   auto dy = offsetFe->getDy() * scale.y * context.matrix().getScaleY();
 
-  auto blurrinessX = blurFe->getstdDeviation().X * scale.x * 4 * context.matrix().getScaleX();
-  auto blurrinessY = blurFe->getstdDeviation().Y * scale.y * 4 * context.matrix().getScaleY();
+  auto blurrinessX = blurFe->getstdDeviation().X * scale.x * context.matrix().getScaleX();
+  auto blurrinessY = blurFe->getstdDeviation().Y * scale.y * context.matrix().getScaleY();
 
   auto colorMatrix = colorMatrixFe->getValues();
   Color color{colorMatrix[4], colorMatrix[9], colorMatrix[14], colorMatrix[18]};
@@ -188,8 +188,8 @@ std::shared_ptr<ImageFilter> SVGFilter::buildInnerShadowFilter(
     auto scale = context.transformForCurrentBoundBox(filterContext.primitiveUnits()).scale;
     auto dx = offsetFe->getDx() * scale.x * context.matrix().getScaleX();
     auto dy = offsetFe->getDy() * scale.y * context.matrix().getScaleY();
-    auto blurrinessX = blurFe->getstdDeviation().X * scale.x * 4 * context.matrix().getScaleX();
-    auto blurrinessY = blurFe->getstdDeviation().Y * scale.y * 4 * context.matrix().getScaleY();
+    auto blurrinessX = blurFe->getstdDeviation().X * scale.x * context.matrix().getScaleX();
+    auto blurrinessY = blurFe->getstdDeviation().Y * scale.y * context.matrix().getScaleY();
     auto colorMatrixFe = std::static_pointer_cast<SVGFeColorMatrix>(children[compositeIndex + 1]);
     auto colorMatrix = colorMatrixFe->getValues();
     Color color{colorMatrix[4], colorMatrix[9], colorMatrix[14], colorMatrix[18]};

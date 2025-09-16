@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,14 +18,13 @@
 
 #pragma once
 
-#include "gpu/ResourceKey.h"
-#include "tgfx/core/Shape.h"
+#include "core/shapes/UniqueKeyShape.h"
 
 namespace tgfx {
 /**
  * Shape that applies a PathEffect to another Shape.
  */
-class EffectShape : public Shape {
+class EffectShape : public UniqueKeyShape {
  public:
   EffectShape(std::shared_ptr<Shape> shape, std::shared_ptr<PathEffect> effect)
       : shape(std::move(shape)), effect(std::move(effect)) {
@@ -40,12 +39,7 @@ class EffectShape : public Shape {
     return Type::Effect;
   }
 
-  UniqueKey getUniqueKey() const override {
-    return uniqueKey.get();
-  }
-
  private:
-  LazyUniqueKey uniqueKey = {};
   std::shared_ptr<Shape> shape = nullptr;
   std::shared_ptr<PathEffect> effect = nullptr;
 };

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -19,6 +19,8 @@
 #pragma once
 
 #include "RenderTask.h"
+#include "gpu/proxies/RenderTargetProxy.h"
+#include "gpu/proxies/VertexBufferProxyView.h"
 #include "tgfx/gpu/RuntimeEffect.h"
 
 namespace tgfx {
@@ -28,11 +30,17 @@ class RuntimeDrawTask : public RenderTask {
                   std::vector<std::shared_ptr<TextureProxy>> inputs,
                   std::shared_ptr<RuntimeEffect> effect, const Point& offset);
 
-  bool execute(RenderPass* renderPass) override;
+  void execute(CommandEncoder* encoder) override;
 
  private:
-  std::vector<std::shared_ptr<TextureProxy>> inputs;
+  std::shared_ptr<RenderTargetProxy> renderTargetProxy = nullptr;
+  std::vector<std::shared_ptr<TextureProxy>> inputTextures = {};
+  std::vector<std::shared_ptr<VertexBufferProxyView>> inputVertexBuffers = {};
   std::shared_ptr<RuntimeEffect> effect = nullptr;
   Point offset = {};
+
+  static std::shared_ptr<TextureView> GetFlatTextureView(CommandEncoder* encoder,
+                                                         std::shared_ptr<TextureProxy> textureProxy,
+                                                         VertexBufferProxyView* vertexProxyView);
 };
 }  // namespace tgfx

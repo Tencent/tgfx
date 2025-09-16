@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -36,22 +36,19 @@ class CGLDevice : public GLDevice {
   CGLContextObj cglContext() const;
 
  protected:
-  bool onMakeCurrent() override;
-  void onClearCurrent() override;
+  bool onLockContext() override;
+  void onUnlockContext() override;
 
  private:
   NSOpenGLContext* glContext = nil;
   CGLContextObj oldContext = nil;
-  CVOpenGLTextureCacheRef textureCache = nil;
 
   static std::shared_ptr<CGLDevice> Wrap(CGLContextObj cglContext, bool externallyOwned);
 
-  explicit CGLDevice(CGLContextObj cglContext);
-
-  CVOpenGLTextureCacheRef getTextureCache();
+  CGLDevice(std::unique_ptr<GPU> gpu, CGLContextObj cglContext);
 
   friend class GLDevice;
   friend class CGLWindow;
-  friend class Texture;
+  friend class GPUTexture;
 };
 }  // namespace tgfx

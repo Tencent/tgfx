@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -35,30 +35,26 @@ class EAGLDevice : public GLDevice {
 
   EAGLContext* eaglContext() const;
 
-  CVOpenGLESTextureCacheRef getTextureCache();
-
-  void releaseTexture(CVOpenGLESTextureRef texture);
-
  protected:
-  bool onMakeCurrent() override;
-  void onClearCurrent() override;
+  bool onLockContext() override;
+  void onUnlockContext() override;
 
  private:
   EAGLContext* _eaglContext = nil;
   EAGLContext* oldContext = nil;
-  CVOpenGLESTextureCacheRef textureCache = nil;
   size_t cacheArrayIndex = 0;
 
   static std::shared_ptr<EAGLDevice> Wrap(EAGLContext* eaglContext, bool externallyOwned);
   static void NotifyReferenceReachedZero(EAGLDevice* device);
 
-  explicit EAGLDevice(EAGLContext* eaglContext);
+  EAGLDevice(std::unique_ptr<GPU> gpu, EAGLContext* eaglContext);
   bool makeCurrent(bool force = false);
   void clearCurrent();
   void finish();
 
   friend class GLDevice;
   friend class EAGLWindow;
+  friend class EAGLHardwareTexture;
 
   friend void ApplicationWillResignActive();
   friend void ApplicationDidBecomeActive();

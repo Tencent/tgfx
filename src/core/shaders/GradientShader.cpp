@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,9 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GradientShader.h"
-#include "core/utils/Caster.h"
 #include "core/utils/MathExtra.h"
-#include "gpu/ResourceProvider.h"
+#include "core/utils/Types.h"
+#include "gpu/GlobalCache.h"
+#include "gpu/ShaderCaps.h"
 #include "gpu/processors/ClampedGradientEffect.h"
 #include "gpu/processors/ConicGradientLayout.h"
 #include "gpu/processors/DiamondGradientLayout.h"
@@ -61,14 +62,15 @@ static PlacementPtr<FragmentProcessor> MakeColorizer(const Context* context, con
     return SingleIntervalGradientColorizer::Make(drawingBuffer, colors[offset], colors[offset + 1]);
   }
 
-  bool tryAnalyticColorizer = count <= UnrolledBinaryGradientColorizer::kMaxColorCount;
+  bool tryAnalyticColorizer = count <= UnrolledBinaryGradientColorizer::MaxColorCount;
 
   // The remaining analytic colorizes use scale*t+bias, and the scale/bias values can become
   // quite large when thresholds are close (but still outside the hard stop limit). If float isn't
   // 32-bit, output can be incorrect if the thresholds are too close together. However, the
   // analytic shaders are higher quality, so they can be used with lower precision hardware when
   // the thresholds are not ill-conditioned.
-  if (!context->caps()->floatIs32Bits && tryAnalyticColorizer) {
+  auto shaderCaps = context->caps()->shaderCaps();
+  if (!shaderCaps->floatIs32Bits && tryAnalyticColorizer) {
     // Could run into problems, check if thresholds are close together (with a limit of .01, so
     // that scales will be less than 100, which leaves 4 decimals of precision on 16-bit).
     for (int i = offset; i < count - 1; i++) {
@@ -102,12 +104,10 @@ static PlacementPtr<FragmentProcessor> MakeColorizer(const Context* context, con
       return unrolled;
     }
   }
-
   // Otherwise, fall back to a raster gradient sample by a texture, which can handle
   // arbitrary gradients (the only downside being sampling resolution).
-  return TextureGradientColorizer::Make(
-      drawingBuffer,
-      context->resourceProvider()->getGradient(colors + offset, positions + offset, count));
+  auto gradient = context->globalCache()->getGradient(colors + offset, positions + offset, count);
+  return TextureGradientColorizer::Make(drawingBuffer, std::move(gradient));
 }
 
 GradientShader::GradientShader(const std::vector<Color>& colors,

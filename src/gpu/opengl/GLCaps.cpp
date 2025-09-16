@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,6 +18,7 @@
 
 #include "GLCaps.h"
 #include "GLUtil.h"
+#include "tgfx/gpu/Context.h"
 
 namespace tgfx {
 static GLStandard GetGLStandard(const char* versionString) {
@@ -84,6 +85,7 @@ GLInfo::GLInfo(GLGetString* getString, GLGetStringi* getStringi, GLGetIntegerv* 
     : getString(getString), getStringi(getStringi), getIntegerv(getIntegerv),
       getInternalformativ(getInternalformativ), getShaderPrecisionFormat(getShaderPrecisionFormat) {
   auto versionString = (const char*)getString(GL_VERSION);
+  LOGI("OpenGL Version: %s\n", versionString);
   auto glVersion = GetGLVersion(versionString);
   version = GL_VER(glVersion.majorVersion, glVersion.minorVersion);
   standard = GetGLStandard(versionString);
@@ -165,7 +167,7 @@ GLCaps::GLCaps(const GLInfo& info) {
   standard = info.standard;
   version = info.version;
   vendor = GetVendorFromString((const char*)info.getString(GL_VENDOR));
-  floatIs32Bits = IsMediumFloatFp32(info);
+  _shaderCaps.floatIs32Bits = IsMediumFloatFp32(info);
   switch (standard) {
     case GLStandard::GL:
       initGLSupport(info);
@@ -180,12 +182,19 @@ GLCaps::GLCaps(const GLInfo& info) {
       break;
   }
   info.getIntegerv(GL_MAX_TEXTURE_SIZE, &maxTextureSize);
-  info.getIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &maxFragmentSamplers);
+  info.getIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &_shaderCaps.maxFragmentSamplers);
+  if (vendor == GLVendor::Qualcomm) {
+    // https://skia-review.googlesource.com/c/skia/+/571418
+    // On certain Adreno devices running WebGL, glTexSubImage2D() may not upload texels in time for
+    // sampling. Similar issues have also been observed with Android OpenGL ES. To work around this,
+    // call glFlush() before glTexSubImage2D().
+    flushBeforeWritePixels = true;
+  }
   initMSAASupport(info);
   initFormatMap(info);
 }
 
-const TextureFormat& GLCaps::getTextureFormat(PixelFormat pixelFormat) const {
+const GLTextureFormat& GLCaps::getTextureFormat(PixelFormat pixelFormat) const {
   return pixelFormatMap.at(pixelFormat).format;
 }
 
@@ -229,14 +238,6 @@ int GLCaps::getSampleCount(int requestedCount, PixelFormat pixelFormat) const {
   return 1;
 }
 
-int GLCaps::getMaxMipmapLevel(int width, int height) const {
-  if (!mipmapSupport) {
-    return 0;
-  }
-  int maxDimension = std::max(width, height);
-  return static_cast<int>(std::log2(maxDimension));
-}
-
 void GLCaps::initGLSupport(const GLInfo& info) {
   packRowLengthSupport = true;
   unpackRowLengthSupport = true;
@@ -254,6 +255,24 @@ void GLCaps::initGLSupport(const GLInfo& info) {
   if (version < GL_VER(1, 3) && !info.hasExtension("GL_ARB_texture_border_clamp")) {
     clampToBorderSupport = false;
   }
+  _shaderCaps.versionDeclString = "#version 140";
+  _shaderCaps.usesCustomColorOutputName = true;
+  _shaderCaps.varyingIsInOut = true;
+  _shaderCaps.textureFuncName = "texture";
+  if (info.hasExtension("GL_EXT_shader_framebuffer_fetch")) {
+    _shaderCaps.frameBufferFetchNeedsCustomOutput = version >= GL_VER(3, 0);
+    _shaderCaps.frameBufferFetchSupport = true;
+    _shaderCaps.frameBufferFetchColorName = "gl_LastFragData[0]";
+    _shaderCaps.frameBufferFetchExtensionString = "GL_EXT_shader_framebuffer_fetch";
+    _shaderCaps.frameBufferFetchRequiresEnablePerSample = false;
+  }
+
+  // TODO UBO currently does not do merge processing, and the performance is slightly worse than
+  // the traditional Uniform variable, and it will be enabled after
+  // the performance optimization is completed
+#if ENABLE_UBO
+  uboSupport = version >= GL_VER(3, 1);
+#endif
 }
 
 void GLCaps::initGLESSupport(const GLInfo& info) {
@@ -264,24 +283,33 @@ void GLCaps::initGLESSupport(const GLInfo& info) {
   textureRedSupport = version >= GL_VER(3, 0) || info.hasExtension("GL_EXT_texture_rg");
   multisampleDisableSupport = info.hasExtension("GL_EXT_multisample_compatibility");
   textureBarrierSupport = info.hasExtension("GL_NV_texture_barrier");
+  _shaderCaps.versionDeclString = version >= GL_VER(3, 0) ? "#version 300 es" : "#version 100";
+  _shaderCaps.usesCustomColorOutputName = version >= GL_VER(3, 0);
+  _shaderCaps.varyingIsInOut = version >= GL_VER(3, 0);
+  _shaderCaps.textureFuncName = version >= GL_VER(3, 0) ? "texture" : "texture2D";
+  _shaderCaps.oesTextureExtension =
+      version >= GL_VER(3, 0) ? "GL_OES_EGL_image_external_essl3" : "GL_OES_EGL_image_external";
   if (info.hasExtension("GL_EXT_shader_framebuffer_fetch")) {
-    frameBufferFetchSupport = true;
-    frameBufferFetchColorName = "gl_LastFragData[0]";
-    frameBufferFetchExtensionString = "GL_EXT_shader_framebuffer_fetch";
-    frameBufferFetchRequiresEnablePerSample = false;
+    _shaderCaps.frameBufferFetchNeedsCustomOutput = version >= GL_VER(3, 0);
+    _shaderCaps.frameBufferFetchSupport = true;
+    _shaderCaps.frameBufferFetchColorName = "gl_LastFragData[0]";
+    _shaderCaps.frameBufferFetchExtensionString = "GL_EXT_shader_framebuffer_fetch";
+    _shaderCaps.frameBufferFetchRequiresEnablePerSample = false;
   } else if (info.hasExtension("GL_NV_shader_framebuffer_fetch")) {
     // Actually, we haven't seen an ES3.0 device with this extension yet, so we don't know.
-    frameBufferFetchSupport = true;
-    frameBufferFetchColorName = "gl_LastFragData[0]";
-    frameBufferFetchExtensionString = "GL_NV_shader_framebuffer_fetch";
-    frameBufferFetchRequiresEnablePerSample = false;
+    _shaderCaps.frameBufferFetchNeedsCustomOutput = false;
+    _shaderCaps.frameBufferFetchSupport = true;
+    _shaderCaps.frameBufferFetchColorName = "gl_LastFragData[0]";
+    _shaderCaps.frameBufferFetchExtensionString = "GL_NV_shader_framebuffer_fetch";
+    _shaderCaps.frameBufferFetchRequiresEnablePerSample = false;
   } else if (info.hasExtension("GL_ARM_shader_framebuffer_fetch")) {
-    frameBufferFetchSupport = true;
-    frameBufferFetchColorName = "gl_LastFragColorARM";
-    frameBufferFetchExtensionString = "GL_ARM_shader_framebuffer_fetch";
+    _shaderCaps.frameBufferFetchNeedsCustomOutput = false;
+    _shaderCaps.frameBufferFetchSupport = true;
+    _shaderCaps.frameBufferFetchColorName = "gl_LastFragColorARM";
+    _shaderCaps.frameBufferFetchExtensionString = "GL_ARM_shader_framebuffer_fetch";
     // The arm extension requires specifically enabling MSAA fetching per sample.
     // On some devices this may have a perf hit. Also multiple render targets are disabled
-    frameBufferFetchRequiresEnablePerSample = true;
+    _shaderCaps.frameBufferFetchRequiresEnablePerSample = true;
   }
   semaphoreSupport = version >= GL_VER(3, 0) || info.hasExtension("GL_APPLE_sync");
   if (version < GL_VER(3, 2) && !info.hasExtension("GL_EXT_texture_border_clamp") &&
@@ -291,6 +319,14 @@ void GLCaps::initGLESSupport(const GLInfo& info) {
   }
   npotTextureTileSupport = version >= GL_VER(3, 0) || info.hasExtension("GL_OES_texture_npot");
   mipmapSupport = npotTextureTileSupport || info.hasExtension("GL_IMG_texture_npot");
+  _shaderCaps.usesPrecisionModifiers = true;
+
+  // TODO UBO currently does not do merge processing, and the performance is slightly worse than
+  // the traditional Uniform variable, and it will be enabled after
+  // the performance optimization is completed
+#if ENABLE_UBO
+  uboSupport = version >= GL_VER(3, 0);
+#endif
 }
 
 void GLCaps::initWebGLSupport(const GLInfo& info) {
@@ -302,45 +338,79 @@ void GLCaps::initWebGLSupport(const GLInfo& info) {
   textureRedSupport = version >= GL_VER(2, 0);
   multisampleDisableSupport = false;
   textureBarrierSupport = false;
-  frameBufferFetchSupport = false;
   semaphoreSupport = version >= GL_VER(2, 0);
   clampToBorderSupport = false;
   npotTextureTileSupport = version >= GL_VER(2, 0);
   mipmapSupport = npotTextureTileSupport;
+  _shaderCaps.usesCustomColorOutputName = version >= GL_VER(2, 0);
+  _shaderCaps.varyingIsInOut = version >= GL_VER(2, 0);
+  _shaderCaps.versionDeclString = version >= GL_VER(2, 0) ? "#version 300 es" : "#version 100";
+  _shaderCaps.textureFuncName = version >= GL_VER(2, 0) ? "texture" : "texture2D";
+  _shaderCaps.frameBufferFetchSupport = false;
+  _shaderCaps.usesPrecisionModifiers = true;
+
+  // TODO UBO currently does not do merge processing, and the performance is slightly worse than
+  // the traditional Uniform variable, and it will be enabled after
+  // the performance optimization is completed
+  // WebGL 1.0 doesn't support UBOs, but WebGL 2.0 does.
+#if ENABLE_UBO
+  uboSupport = version >= GL_VER(2, 0);
+#endif
 }
 
 void GLCaps::initFormatMap(const GLInfo& info) {
-  pixelFormatMap[PixelFormat::RGBA_8888].format.sizedFormat = GL_RGBA8;
-  pixelFormatMap[PixelFormat::RGBA_8888].format.externalFormat = GL_RGBA;
-  pixelFormatMap[PixelFormat::RGBA_8888].readSwizzle = Swizzle::RGBA();
-  pixelFormatMap[PixelFormat::BGRA_8888].format.sizedFormat = GL_RGBA8;
-  pixelFormatMap[PixelFormat::BGRA_8888].format.externalFormat = GL_BGRA;
-  pixelFormatMap[PixelFormat::BGRA_8888].readSwizzle = Swizzle::RGBA();
+  auto& RGBAFormat = pixelFormatMap[PixelFormat::RGBA_8888];
+  RGBAFormat.format.sizedFormat = GL_RGBA8;
+  RGBAFormat.format.externalFormat = GL_RGBA;
+  RGBAFormat.format.externalType = GL_UNSIGNED_BYTE;
+  RGBAFormat.readSwizzle = Swizzle::RGBA();
+  auto& BGRAFormat = pixelFormatMap[PixelFormat::BGRA_8888];
+  BGRAFormat.format.sizedFormat = GL_RGBA8;
+  BGRAFormat.format.externalFormat = GL_BGRA;
+  BGRAFormat.format.externalType = GL_UNSIGNED_BYTE;
+  BGRAFormat.readSwizzle = Swizzle::RGBA();
+  auto& DEPTHSTENCILFormat = pixelFormatMap[PixelFormat::DEPTH24_STENCIL8];
+  DEPTHSTENCILFormat.format.sizedFormat = GL_DEPTH24_STENCIL8;
+  DEPTHSTENCILFormat.format.externalFormat = GL_DEPTH_STENCIL;
+  DEPTHSTENCILFormat.format.externalType = GL_UNSIGNED_INT_24_8;
   if (textureRedSupport) {
-    pixelFormatMap[PixelFormat::ALPHA_8].format.sizedFormat = GL_R8;
-    pixelFormatMap[PixelFormat::ALPHA_8].format.externalFormat = GL_RED;
-    pixelFormatMap[PixelFormat::ALPHA_8].readSwizzle = Swizzle::RRRR();
+    auto& ALPHAFormat = pixelFormatMap[PixelFormat::ALPHA_8];
+    ALPHAFormat.format.sizedFormat = GL_R8;
+    ALPHAFormat.format.externalFormat = GL_RED;
+    ALPHAFormat.format.externalType = GL_UNSIGNED_BYTE;
+    ALPHAFormat.readSwizzle = Swizzle::RRRR();
     // Shader output swizzles will default to RGBA. When we've use GL_RED instead of GL_ALPHA to
     // implement PixelFormat::ALPHA_8 we need to swizzle the shader outputs so the alpha channel
     // gets written to the single component.
-    pixelFormatMap[PixelFormat::ALPHA_8].writeSwizzle = Swizzle::AAAA();
-    pixelFormatMap[PixelFormat::GRAY_8].format.sizedFormat = GL_R8;
-    pixelFormatMap[PixelFormat::GRAY_8].format.externalFormat = GL_RED;
-    pixelFormatMap[PixelFormat::GRAY_8].readSwizzle = Swizzle::RRRA();
-    pixelFormatMap[PixelFormat::RG_88].format.sizedFormat = GL_RG8;
-    pixelFormatMap[PixelFormat::RG_88].format.externalFormat = GL_RG;
-    pixelFormatMap[PixelFormat::RG_88].readSwizzle = Swizzle::RGRG();
+    ALPHAFormat.writeSwizzle = Swizzle::AAAA();
+    auto& GrayFormat = pixelFormatMap[PixelFormat::GRAY_8];
+    GrayFormat.format.sizedFormat = GL_R8;
+    GrayFormat.format.externalFormat = GL_RED;
+    GrayFormat.format.externalType = GL_UNSIGNED_BYTE;
+    GrayFormat.readSwizzle = Swizzle::RRRA();
+    auto& RGFormat = pixelFormatMap[PixelFormat::RG_88];
+    RGFormat.format.sizedFormat = GL_RG8;
+    RGFormat.format.externalFormat = GL_RG;
+    RGFormat.format.externalType = GL_UNSIGNED_BYTE;
+    RGFormat.readSwizzle = Swizzle::RGRG();
   } else {
-    pixelFormatMap[PixelFormat::ALPHA_8].format.sizedFormat = GL_ALPHA8;
-    pixelFormatMap[PixelFormat::ALPHA_8].format.externalFormat = GL_ALPHA;
-    pixelFormatMap[PixelFormat::ALPHA_8].readSwizzle = Swizzle::AAAA();
-    pixelFormatMap[PixelFormat::GRAY_8].format.sizedFormat = GL_LUMINANCE8;
-    pixelFormatMap[PixelFormat::GRAY_8].format.externalFormat = GL_LUMINANCE;
-    pixelFormatMap[PixelFormat::GRAY_8].readSwizzle = Swizzle::RGBA();
-    pixelFormatMap[PixelFormat::RG_88].format.sizedFormat = GL_LUMINANCE8_ALPHA8;
-    pixelFormatMap[PixelFormat::RG_88].format.externalFormat = GL_LUMINANCE_ALPHA;
-    pixelFormatMap[PixelFormat::RG_88].readSwizzle = Swizzle::RARA();
+    auto& ALPHAFormat = pixelFormatMap[PixelFormat::ALPHA_8];
+    ALPHAFormat.format.sizedFormat = GL_ALPHA8;
+    ALPHAFormat.format.externalFormat = GL_ALPHA;
+    ALPHAFormat.format.externalType = GL_UNSIGNED_BYTE;
+    ALPHAFormat.readSwizzle = Swizzle::AAAA();
+    auto& GrayFormat = pixelFormatMap[PixelFormat::GRAY_8];
+    GrayFormat.format.sizedFormat = GL_LUMINANCE8;
+    GrayFormat.format.externalFormat = GL_LUMINANCE;
+    GrayFormat.format.externalType = GL_UNSIGNED_BYTE;
+    GrayFormat.readSwizzle = Swizzle::RGBA();
+    auto& RGFormat = pixelFormatMap[PixelFormat::RG_88];
+    RGFormat.format.sizedFormat = GL_LUMINANCE8_ALPHA8;
+    RGFormat.format.externalFormat = GL_LUMINANCE_ALPHA;
+    RGFormat.format.externalType = GL_UNSIGNED_BYTE;
+    RGFormat.readSwizzle = Swizzle::RARA();
   }
+
   // ES 2.0 requires that the internal/external formats match.
   bool useSizedTexFormats =
       (standard == GLStandard::GL || (standard == GLStandard::GLES && version >= GL_VER(3, 0)) ||
@@ -392,9 +462,7 @@ void GLCaps::initColorSampleCount(const GLInfo& info) {
     } else {
       // Fake out the table using some semi-standard counts up to the max allowed sample count.
       int maxSampleCnt = 1;
-      if (MSFBOType::ES_IMG_MsToTexture == msFBOType) {
-        info.getIntegerv(GL_MAX_SAMPLES_IMG, &maxSampleCnt);
-      } else if (MSFBOType::None != msFBOType) {
+      if (MSFBOType::None != msFBOType) {
         info.getIntegerv(GL_MAX_SAMPLES, &maxSampleCnt);
       }
       // Chrome has a mock GL implementation that returns 0.
@@ -411,41 +479,24 @@ void GLCaps::initColorSampleCount(const GLInfo& info) {
   }
 }
 
-static MSFBOType GetMSFBOType_GLES(uint32_t version, const GLInfo& glInterface) {
-  // We prefer multisampled-render-to-texture extensions over ES3 MSAA because we've observed
-  // ES3 driver bugs on at least one device with a tiled GPU (N10).
-  if (glInterface.hasExtension("GL_EXT_multisampled_render_to_texture")) {
-    return MSFBOType::ES_EXT_MsToTexture;
-  }
-  if (glInterface.hasExtension("GL_IMG_multisampled_render_to_texture")) {
-    return MSFBOType::ES_IMG_MsToTexture;
-  }
-  if (version >= GL_VER(3, 0) || glInterface.hasExtension("GL_CHROMIUM_framebuffer_multisample") ||
-      glInterface.hasExtension("GL_ANGLE_framebuffer_multisample")) {
-    return MSFBOType::Standard;
-  }
-  if (glInterface.hasExtension("GL_APPLE_framebuffer_multisample")) {
-    return MSFBOType::ES_Apple;
-  }
-  return MSFBOType::None;
-}
-
 void GLCaps::initMSAASupport(const GLInfo& info) {
   if (standard == GLStandard::GL) {
     if (version >= GL_VER(3, 0) || info.hasExtension("GL_ARB_framebuffer_object") ||
         (info.hasExtension("GL_EXT_framebuffer_multisample") &&
          info.hasExtension("GL_EXT_framebuffer_blit"))) {
       msFBOType = MSFBOType::Standard;
-      blitRectsMustMatchForMSAASrc = false;
     }
   } else if (standard == GLStandard::GLES) {
-    msFBOType = GetMSFBOType_GLES(version, info);
-    blitRectsMustMatchForMSAASrc = true;
+    if (version >= GL_VER(3, 0) || info.hasExtension("GL_CHROMIUM_framebuffer_multisample") ||
+        info.hasExtension("GL_ANGLE_framebuffer_multisample")) {
+      msFBOType = MSFBOType::Standard;
+    } else if (info.hasExtension("GL_APPLE_framebuffer_multisample")) {
+      msFBOType = MSFBOType::ES_Apple;
+    }
   } else if (standard == GLStandard::WebGL) {
     // No support in WebGL 1, but there is for 2.0
     if (version >= GL_VER(2, 0)) {
       msFBOType = MSFBOType::Standard;
-      blitRectsMustMatchForMSAASrc = true;
     }
   }
 
@@ -453,13 +504,5 @@ void GLCaps::initMSAASupport(const GLInfo& info) {
   if (GLVendor::Intel == vendor) {
     msFBOType = MSFBOType::None;
   }
-}
-bool GLCaps::usesMSAARenderBuffers() const {
-  return MSFBOType::None != msFBOType && MSFBOType::ES_IMG_MsToTexture != msFBOType &&
-         MSFBOType::ES_EXT_MsToTexture != msFBOType;
-}
-
-bool GLCaps::usesImplicitMSAAResolve() const {
-  return MSFBOType::ES_IMG_MsToTexture == msFBOType || MSFBOType::ES_EXT_MsToTexture == msFBOType;
 }
 }  // namespace tgfx

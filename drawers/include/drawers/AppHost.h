@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -59,6 +59,22 @@ class AppHost {
   }
 
   /**
+   * Returns the current scale factor applied to the view. The default value is 1.0, which means no
+   * zooming is applied.
+   */
+  float zoomScale() const {
+    return _zoomScale;
+  }
+
+  /**
+   * Returns the current content offset of the view after applying the zoomScale. The default value
+   * is (0, 0).
+   */
+  const tgfx::Point& contentOffset() const {
+    return _contentOffset;
+  }
+
+  /**
    * Returns an image with the given name.
    */
   std::shared_ptr<tgfx::Image> getImage(const std::string& name) const;
@@ -76,6 +92,11 @@ class AppHost {
   bool updateScreen(int width, int height, float density);
 
   /**
+   * Updates the zoom scale and content offset.
+   */
+  bool updateZoomAndOffset(float zoomScale, const tgfx::Point& contentOffset);
+
+  /**
    * Add an image for the given resource name.
    */
   void addImage(const std::string& name, std::shared_ptr<tgfx::Image> image);
@@ -89,6 +110,8 @@ class AppHost {
   int _width = 1280;
   int _height = 720;
   float _density = 1.0f;
+  float _zoomScale = 1.0f;
+  tgfx::Point _contentOffset = {};
   std::unordered_map<std::string, std::shared_ptr<tgfx::Image>> images = {};
   std::unordered_map<std::string, std::shared_ptr<tgfx::Typeface>> typefaces = {};
 };

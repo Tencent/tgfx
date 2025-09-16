@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -52,72 +52,15 @@ Path MatrixShape::getPath() const {
   path.transform(matrix);
   return path;
 }
-
-bool MatrixShape::isLine(Point line[2]) const {
-  if (!shape->isLine(line)) {
-    return false;
-  }
-  if (line) {
-    matrix.mapPoints(line, 2);
-  }
-  return true;
-}
-
-bool MatrixShape::isRect(Rect* rect) const {
-  if (!matrix.rectStaysRect()) {
-    return false;
-  }
-  if (!shape->isRect(rect)) {
-    return false;
-  }
-  if (rect) {
-    matrix.mapRect(rect);
-  }
-  return true;
-}
-
-bool MatrixShape::isOval(Rect* bounds) const {
-  if (!matrix.rectStaysRect()) {
-    return false;
-  }
-  if (!shape->isOval(bounds)) {
-    return false;
-  }
-  if (bounds) {
-    matrix.mapRect(bounds);
-  }
-  return true;
-}
-
-bool MatrixShape::isRRect(RRect* rRect) const {
-  if (!matrix.rectStaysRect()) {
-    return false;
-  }
-  if (!shape->isRRect(rRect)) {
-    return false;
-  }
-  if (rRect) {
-    matrix.mapRect(&rRect->rect);
-    matrix.mapPoints(&rRect->radii, 1);
-    if (rRect->radii.x < 0.0f) {
-      rRect->radii.x = -rRect->radii.x;
-    }
-    if (rRect->radii.y < 0.0f) {
-      rRect->radii.y = -rRect->radii.y;
-    }
-  }
-  return true;
-}
-
-UniqueKey MatrixShape::getUniqueKey() const {
+UniqueKey MatrixShape::MakeUniqueKey(const UniqueKey& key, const Matrix& matrix) {
   static const auto SingleScaleMatrixShapeType = UniqueID::Next();
   static const auto BothScalesShapeType = UniqueID::Next();
   static const auto RSXformShapeType = UniqueID::Next();
-  auto hasRSXform = matrix.getSkewX() != 0 || matrix.getSkewY() != 0;
+  auto hasRSXform = !matrix.isScaleTranslate();
   auto hasBothScales = hasRSXform || matrix.getScaleX() != matrix.getScaleY();
   if (!hasBothScales && matrix.getScaleX() == 1.0f) {
     // The matrix has translation only.
-    return shape->getUniqueKey();
+    return key;
   }
   size_t count = 2 + (hasBothScales ? 1 : 0) + (hasRSXform ? 2 : 0);
   auto type = hasBothScales ? (hasRSXform ? RSXformShapeType : BothScalesShapeType)
@@ -132,7 +75,11 @@ UniqueKey MatrixShape::getUniqueKey() const {
     bytesKey.write(matrix.getSkewX());
     bytesKey.write(matrix.getSkewY());
   }
-  return UniqueKey::Append(shape->getUniqueKey(), bytesKey.data(), bytesKey.size());
+  return UniqueKey::Append(key, bytesKey.data(), bytesKey.size());
+}
+
+UniqueKey MatrixShape::getUniqueKey() const {
+  return MakeUniqueKey(shape->getUniqueKey(), matrix);
 }
 
 }  // namespace tgfx

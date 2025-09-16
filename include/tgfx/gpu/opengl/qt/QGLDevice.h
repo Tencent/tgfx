@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,9 +18,6 @@
 
 #pragma once
 
-#ifdef __APPLE__
-#include <CoreVideo/CoreVideo.h>
-#endif
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-copy"
 #include <QOffscreenSurface>
@@ -69,8 +66,8 @@ class QGLDevice : public GLDevice {
   void moveToThread(QThread* renderThread);
 
  protected:
-  bool onMakeCurrent() override;
-  void onClearCurrent() override;
+  bool onLockContext() override;
+  void onUnlockContext() override;
 
  private:
   QThread* ownerThread = nullptr;
@@ -82,15 +79,10 @@ class QGLDevice : public GLDevice {
   static std::shared_ptr<QGLDevice> Wrap(QOpenGLContext* context, QSurface* surface,
                                          bool externallyOwned);
 
-  explicit QGLDevice(void* nativeHandle);
-
-#ifdef __APPLE__
-  CVOpenGLTextureCacheRef textureCache = nil;
-  CVOpenGLTextureCacheRef getTextureCache();
-#endif
+  QGLDevice(std::unique_ptr<GPU> gpu, void* nativeHandle);
 
   friend class GLDevice;
   friend class QGLWindow;
-  friend class Texture;
+  friend class GPUTexture;
 };
 }  // namespace tgfx

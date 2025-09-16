@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -34,8 +34,7 @@ bool SVGTransformableNode::onPrepareToRender(SVGRenderContext* context) const {
   if (!transform.isIdentity()) {
     auto tempTransform = transform;
     if (auto unit = context->lengthContext().getBoundingBoxUnits();
-        unit.has_value() &&
-        unit.value().type() == SVGObjectBoundingBoxUnits::Type::ObjectBoundingBox) {
+        unit.has_value() && unit->type() == SVGObjectBoundingBoxUnits::Type::ObjectBoundingBox) {
       tempTransform.postScale(context->lengthContext().viewPort().width,
                               context->lengthContext().viewPort().height);
     }
@@ -50,7 +49,7 @@ bool SVGTransformableNode::onPrepareToRender(SVGRenderContext* context) const {
 void SVGTransformableNode::onSetAttribute(SVGAttribute attr, const SVGValue& v) {
   switch (attr) {
     case SVGAttribute::Transform:
-      if (const auto* matrix = v.as<SVGTransformValue>()) {
+      if (const auto matrix = v.as<SVGTransformValue>()) {
         this->setTransform(*matrix);
       }
       break;

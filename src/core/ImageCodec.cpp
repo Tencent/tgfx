@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,8 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/ImageCodec.h"
+#include "BoxFilterDownsample.h"
 #include "core/PixelBuffer.h"
 #include "core/utils/USE.h"
+#include "core/utils/WeakMap.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/Pixmap.h"
@@ -39,7 +41,20 @@
 #endif
 
 namespace tgfx {
+
+static size_t GetPaddingAlignment16(size_t size) {
+  auto remainder = size & 0xF;
+  return (16 - remainder) & 0xF;
+}
+
 std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(const std::string& filePath) {
+  static WeakMap<std::string, ImageCodec> imageCodecMap = {};
+  if (filePath.empty()) {
+    return nullptr;
+  }
+  if (auto cached = imageCodecMap.find(filePath)) {
+    return cached;
+  }
   std::shared_ptr<ImageCodec> codec = nullptr;
   auto stream = Stream::MakeFromFile(filePath);
   if (stream && stream->size() > 14) {
@@ -68,9 +83,11 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(const std::string& filePath) {
   if (codec == nullptr) {
     codec = MakeNativeCodec(filePath);
   }
-
   if (codec && !ImageInfo::IsValidSize(codec->width(), codec->height())) {
     codec = nullptr;
+  }
+  if (codec) {
+    imageCodecMap.insert(filePath, codec);
   }
   return codec;
 }
@@ -131,6 +148,56 @@ std::shared_ptr<Data> ImageCodec::Encode(const Pixmap& pixmap, EncodedFormat for
   }
 #endif
   return nullptr;
+}
+
+bool ImageCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
+  if (dstInfo.width() > width() || dstInfo.height() > height()) {
+    return false;
+  }
+  if (dstInfo.width() == width() && dstInfo.height() == height()) {
+    return onReadPixels(dstInfo.colorType(), dstInfo.alphaType(), dstInfo.rowBytes(), dstPixels);
+  }
+
+  Buffer buffer = {};
+  Buffer dstTempBuffer = {};
+  auto dstData = dstPixels;
+  auto dstImageInfo = dstInfo;
+  auto colorType = dstInfo.colorType();
+  auto srcRowBytes = dstInfo.bytesPerPixel() * static_cast<size_t>(width());
+  if (dstInfo.colorType() != ColorType::RGBA_8888 && dstInfo.colorType() != ColorType::BGRA_8888 &&
+      dstInfo.colorType() != ColorType::ALPHA_8 && dstInfo.colorType() != ColorType::Gray_8) {
+    colorType = ColorType::RGBA_8888;
+    srcRowBytes = ImageInfo::GetBytesPerPixel(colorType) * static_cast<size_t>(width());
+    dstImageInfo = dstInfo.makeColorType(colorType);
+    auto dstRowBytes = dstImageInfo.rowBytes();
+    if (dstRowBytes % 16) {
+      dstRowBytes = dstImageInfo.rowBytes() + GetPaddingAlignment16(dstImageInfo.rowBytes());
+      dstImageInfo = ImageInfo::Make(dstInfo.width(), dstInfo.height(), colorType,
+                                     dstInfo.alphaType(), dstRowBytes);
+    }
+    if (!dstTempBuffer.alloc(dstImageInfo.byteSize())) {
+      return false;
+    }
+    dstData = dstTempBuffer.bytes();
+  }
+  srcRowBytes = srcRowBytes + GetPaddingAlignment16(srcRowBytes);
+  if (!buffer.alloc(srcRowBytes * static_cast<size_t>(height()))) {
+    return false;
+  }
+  auto result = onReadPixels(colorType, dstInfo.alphaType(), srcRowBytes, buffer.data());
+  if (!result) {
+    return false;
+  }
+  auto isOneComponent = dstImageInfo.colorType() == ColorType::Gray_8 ||
+                        dstImageInfo.colorType() == ColorType::ALPHA_8;
+  auto inputLayout = PixelLayout{width(), height(), static_cast<int>(srcRowBytes)};
+  auto outputLayout = PixelLayout{dstImageInfo.width(), dstImageInfo.height(),
+                                  static_cast<int>(dstImageInfo.rowBytes())};
+  BoxFilterDownsample(buffer.data(), inputLayout, dstData, outputLayout, isOneComponent);
+  if (!dstTempBuffer.isEmpty()) {
+    Pixmap(dstImageInfo, dstData).readPixels(dstInfo, dstPixels);
+  }
+  return true;
 }
 
 std::shared_ptr<ImageBuffer> ImageCodec::onMakeBuffer(bool tryHardware) const {

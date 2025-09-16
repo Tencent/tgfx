@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,12 +18,12 @@
 
 #pragma once
 
-#include <array>
 #include <string>
-#include "gpu/opengl/GLContext.h"
-#include "gpu/opengl/GLSampler.h"
-#include "tgfx/core/Matrix.h"
-#include "tgfx/gpu/ImageOrigin.h"
+#include "gpu/BlendFactor.h"
+#include "gpu/BlendOperation.h"
+#include "gpu/CompareFunction.h"
+#include "gpu/StencilOperation.h"
+#include "gpu/opengl/GLInterface.h"
 
 namespace tgfx {
 struct GLVersion {
@@ -36,27 +36,31 @@ struct GLVersion {
   }
 };
 
+unsigned ToGLBlendFactor(BlendFactor blendFactor);
+
+unsigned ToGLBlendOperation(BlendOperation blendOperation);
+
+unsigned ToGLCompareFunction(CompareFunction compare);
+
+unsigned ToGLStencilOperation(StencilOperation stencilOp);
+
 PixelFormat GLSizeFormatToPixelFormat(unsigned sizeFormat);
 
 unsigned PixelFormatToGLSizeFormat(PixelFormat pixelFormat);
 
 GLVersion GetGLVersion(const char* versionString);
 
-unsigned CreateGLProgram(Context* context, const std::string& vertex, const std::string& fragment);
+void ClearGLError(const GLFunctions* gl);
 
-unsigned LoadGLShader(Context* context, unsigned shaderType, const std::string& source);
-
-void ClearGLError(Context* context);
-
-bool CheckGLErrorImpl(Context* context, std::string file, int line);
+bool CheckGLErrorImpl(const GLFunctions* gl, std::string file, int line);
 
 #ifdef DEBUG
 
-#define CheckGLError(context) CheckGLErrorImpl(context, __FILE__, __LINE__)
+#define CheckGLError(gl) CheckGLErrorImpl(gl, __FILE__, __LINE__)
 
 #else
 
-#define CheckGLError(context) CheckGLErrorImpl(context, "", 0)
+#define CheckGLError(gl) CheckGLErrorImpl(gl, "", 0)
 
 #endif
 }  // namespace tgfx

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -46,12 +46,47 @@ class RasterPixelBuffer : public PixelBuffer {
   void onUnlockPixels() const override {
   }
 
-  std::shared_ptr<Texture> onBindToHardwareTexture(Context*) const override {
+  std::shared_ptr<TextureView> onBindToHardwareTexture(Context*) const override {
     return nullptr;
   }
 
  private:
   uint8_t* _pixels = nullptr;
+};
+
+class HardwarePixelBuffer : public PixelBuffer {
+ public:
+  HardwarePixelBuffer(const ImageInfo& info, HardwareBufferRef hardwareBuffer)
+      : PixelBuffer(info), hardwareBuffer(HardwareBufferRetain(hardwareBuffer)) {
+  }
+
+  ~HardwarePixelBuffer() override {
+    HardwareBufferRelease(hardwareBuffer);
+  }
+
+  bool isHardwareBacked() const override {
+    return HardwareBufferCheck(hardwareBuffer);
+  }
+
+  HardwareBufferRef getHardwareBuffer() const override {
+    return isHardwareBacked() ? hardwareBuffer : nullptr;
+  }
+
+ protected:
+  void* onLockPixels() const override {
+    return HardwareBufferLock(hardwareBuffer);
+  }
+
+  void onUnlockPixels() const override {
+    HardwareBufferUnlock(hardwareBuffer);
+  }
+
+  std::shared_ptr<TextureView> onBindToHardwareTexture(Context* context) const override {
+    return TextureView::MakeFrom(context, hardwareBuffer);
+  }
+
+ private:
+  HardwareBufferRef hardwareBuffer;
 };
 
 std::shared_ptr<PixelBuffer> PixelBuffer::Make(int width, int height, bool alphaOnly,
@@ -101,7 +136,7 @@ void PixelBuffer::unlockPixels() {
   locker.unlock();
 }
 
-std::shared_ptr<Texture> PixelBuffer::onMakeTexture(Context* context, bool mipmapped) const {
+std::shared_ptr<TextureView> PixelBuffer::onMakeTexture(Context* context, bool mipmapped) const {
   std::lock_guard<std::mutex> autoLock(locker);
   if (!mipmapped && isHardwareBacked()) {
     return onBindToHardwareTexture(context);
@@ -111,9 +146,9 @@ std::shared_ptr<Texture> PixelBuffer::onMakeTexture(Context* context, bool mipma
     return nullptr;
   }
   auto format = ColorTypeToPixelFormat(_info.colorType());
-  auto texture =
-      Texture::MakeFormat(context, width(), height(), pixels, _info.rowBytes(), format, mipmapped);
+  auto textureView = TextureView::MakeFormat(context, width(), height(), pixels, _info.rowBytes(),
+                                             format, mipmapped);
   onUnlockPixels();
-  return texture;
+  return textureView;
 }
 }  // namespace tgfx

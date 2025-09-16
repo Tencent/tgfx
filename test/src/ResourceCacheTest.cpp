@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,9 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <vector>
+#include <array>
+#include <utility>
+#include "core/utils/BlockBuffer.h"
 #include "core/utils/UniqueID.h"
-#include "gpu/Resource.h"
+#include "gpu/RectsVertexProvider.h"
+#include "gpu/resources/Resource.h"
+#include "tgfx/core/Rect.h"
 #include "tgfx/core/Task.h"
 #include "utils/TestUtils.h"
 
@@ -50,7 +54,7 @@ TGFX_TEST(ResourceCacheTest, multiThreadRecycling) {
       auto context = device->lockContext();
       ASSERT_TRUE(context != nullptr);
       auto resource = TestResource::Make(context, i);
-      context->flush();
+      context->flushAndSubmit();
       context->resourceCache()->purgeUntilMemoryTo(0);
       device->unlock();
       tgfx::Task::Run([resource, device] {
@@ -59,5 +63,20 @@ TGFX_TEST(ResourceCacheTest, multiThreadRecycling) {
       });
     }
   });
+};
+
+#ifdef TGFX_USE_THREADS
+TGFX_TEST(ResourceCacheTest, blockBufferRefCount) {
+  BlockBuffer blockBuffer;
+  {
+    auto vertexProvider =
+        RectsVertexProvider::MakeFrom(&blockBuffer, Rect::MakeWH(100, 100), AAType::Coverage);
+    std::array<float, 16> vertices;
+    auto task = std::make_shared<VertexProviderTask>(std::move(vertexProvider), vertices.data());
+    Task::Run(task);
+  }
+  blockBuffer.clear();
 }
+#endif
+
 }  // namespace tgfx

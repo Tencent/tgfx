@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,129 +17,57 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RenderTargetProxy.h"
-#include "core/PixelBuffer.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/proxies/ExternalRenderTargetProxy.h"
 
 namespace tgfx {
 std::shared_ptr<RenderTargetProxy> RenderTargetProxy::MakeFrom(
     Context* context, const BackendRenderTarget& backendRenderTarget, ImageOrigin origin) {
-  if (context == nullptr) {
+  auto renderTarget = RenderTarget::MakeFrom(context, backendRenderTarget, origin);
+  if (renderTarget == nullptr) {
     return nullptr;
   }
-  return context->proxyProvider()->wrapBackendRenderTarget(backendRenderTarget, origin);
-}
-
-std::shared_ptr<RenderTargetProxy> RenderTargetProxy::MakeFrom(Context* context,
-                                                               const BackendTexture& backendTexture,
-                                                               int sampleCount, ImageOrigin origin,
-                                                               bool adopted) {
-  if (context == nullptr) {
-    return nullptr;
-  }
-  auto textureProxy = context->proxyProvider()->wrapBackendTexture(backendTexture, origin, adopted);
-  if (textureProxy == nullptr) {
-    return nullptr;
-  }
-  auto textureSampler = TextureSampler::MakeFrom(context, backendTexture);
-  return context->proxyProvider()->createRenderTargetProxy(std::move(textureProxy),
-                                                           textureSampler->format, sampleCount);
-}
-
-std::shared_ptr<RenderTargetProxy> RenderTargetProxy::MakeFrom(Context* context,
-                                                               HardwareBufferRef hardwareBuffer,
-                                                               int sampleCount) {
-  if (context == nullptr) {
-    return nullptr;
-  }
-  auto format = HardwareBufferGetPixelFormat(hardwareBuffer);
-  if (format == PixelFormat::Unknown) {
-    return nullptr;
-  }
-  auto pixelBuffer = PixelBuffer::MakeFrom(hardwareBuffer);
-  if (pixelBuffer == nullptr) {
-    return nullptr;
-  }
-  auto textureProxy =
-      context->proxyProvider()->createTextureProxy({}, std::move(pixelBuffer), false);
-  if (textureProxy == nullptr) {
-    return nullptr;
-  }
-  return context->proxyProvider()->createRenderTargetProxy(std::move(textureProxy), format,
-                                                           sampleCount);
-}
-
-std::shared_ptr<RenderTargetProxy> RenderTargetProxy::Make(Context* context, int width, int height,
-                                                           PixelFormat format, int sampleCount,
-                                                           bool mipmapped, ImageOrigin origin) {
-  if (context == nullptr) {
-    return nullptr;
-  }
-  if (!context->caps()->isFormatRenderable(format)) {
-    return nullptr;
-  }
-  return Create(context, width, height, format, sampleCount, mipmapped, origin);
+  return std::shared_ptr<ExternalRenderTargetProxy>(
+      new ExternalRenderTargetProxy(std::move(renderTarget)));
 }
 
 std::shared_ptr<RenderTargetProxy> RenderTargetProxy::MakeFallback(Context* context, int width,
-                                                                   int height, bool isAlphaOnly,
+                                                                   int height, bool alphaOnly,
                                                                    int sampleCount, bool mipmapped,
-                                                                   ImageOrigin origin) {
+                                                                   ImageOrigin origin,
+                                                                   BackingFit backingFit) {
   if (context == nullptr) {
     return nullptr;
   }
   auto alphaRenderable = context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
-  auto format = isAlphaOnly && alphaRenderable ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
-  return Create(context, width, height, format, sampleCount, mipmapped, origin);
-}
-
-std::shared_ptr<RenderTargetProxy> RenderTargetProxy::Create(Context* context, int width,
-                                                             int height, PixelFormat format,
-                                                             int sampleCount, bool mipmapped,
-                                                             ImageOrigin origin) {
-  auto proxyProvider = context->proxyProvider();
-  auto textureProxy =
-      proxyProvider->createTextureProxy({}, width, height, format, mipmapped, origin);
-  if (textureProxy == nullptr) {
-    return nullptr;
-  }
-  return proxyProvider->createRenderTargetProxy(std::move(textureProxy), format, sampleCount);
-}
-
-RenderTargetProxy::RenderTargetProxy(UniqueKey uniqueKey, int width, int height, PixelFormat format,
-                                     int sampleCount, ImageOrigin origin)
-    : ResourceProxy(std::move(uniqueKey)), _width(width), _height(height), _format(format),
-      _sampleCount(sampleCount), _origin(origin) {
-}
-
-bool RenderTargetProxy::isTextureBacked() const {
-  return getTextureProxy() != nullptr;
-}
-
-std::shared_ptr<Texture> RenderTargetProxy::getTexture() const {
-  auto textureProxy = getTextureProxy();
-  return textureProxy ? textureProxy->getTexture() : nullptr;
-}
-
-std::shared_ptr<RenderTarget> RenderTargetProxy::getRenderTarget() const {
-  return Resource::Find<RenderTarget>(context, handle.key());
+  auto format = alphaOnly && alphaRenderable ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
+  return context->proxyProvider()->createRenderTargetProxy({}, width, height, format, sampleCount,
+                                                           mipmapped, origin, backingFit);
 }
 
 std::shared_ptr<TextureProxy> RenderTargetProxy::makeTextureProxy(int width, int height) const {
-  auto context = getContext();
-  auto textureProxy = getTextureProxy();
+  auto textureProxy = asTextureProxy();
   auto hasMipmaps = textureProxy && textureProxy->hasMipmaps();
-  return context->proxyProvider()->createTextureProxy({}, width, height, format(), hasMipmaps,
-                                                      origin());
+  return getContext()->proxyProvider()->createTextureProxy({}, width, height, format(), hasMipmaps,
+                                                           origin());
 }
 
 std::shared_ptr<RenderTargetProxy> RenderTargetProxy::makeRenderTargetProxy(int width,
                                                                             int height) const {
-  auto textureProxy = makeTextureProxy(width, height);
-  if (textureProxy == nullptr) {
-    return nullptr;
-  }
-  return context->proxyProvider()->createRenderTargetProxy(std::move(textureProxy), format(),
-                                                           sampleCount());
+  return getContext()->proxyProvider()->createRenderTargetProxy({}, width, height, format(),
+                                                                sampleCount());
 }
+
+Matrix RenderTargetProxy::getOriginTransform() const {
+  if (origin() == ImageOrigin::TopLeft) {
+    return Matrix::I();
+  }
+  auto textureProxy = asTextureProxy();
+  auto offset = textureProxy ? textureProxy->backingStoreHeight() : height();
+  auto result = Matrix::MakeScale(1.0f, -1.0f);
+  result.postTranslate(0.0f, static_cast<float>(offset));
+  return result;
+}
+
 }  // namespace tgfx

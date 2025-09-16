@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -19,6 +19,7 @@
 #include "GaussianBlurImageFilter.h"
 #include <memory>
 #include <utility>
+#include "core/utils/MathExtra.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/TPArgs.h"
 #include "gpu/processors/GaussianBlur1DFragmentProcessor.h"
@@ -41,9 +42,13 @@ std::shared_ptr<ImageFilter> ImageFilter::Blur(float blurrinessX, float blurrine
   return std::make_shared<GaussianBlurImageFilter>(blurrinessX, blurrinessY, tileMode);
 }
 
+float GaussianBlurImageFilter::MaxSigma() {
+  return MAX_BLUR_SIGMA;
+}
+
 GaussianBlurImageFilter::GaussianBlurImageFilter(float blurrinessX, float blurrinessY,
                                                  TileMode tileMode)
-    : BlurImageFilter(blurrinessX, blurrinessY, tileMode) {
+    : blurrinessX(blurrinessX), blurrinessY(blurrinessY), tileMode(tileMode) {
 }
 
 static void Blur1D(PlacementPtr<FragmentProcessor> source,
@@ -56,107 +61,115 @@ static void Blur1D(PlacementPtr<FragmentProcessor> source,
   auto drawingManager = context->drawingManager();
   auto processor = GaussianBlur1DFragmentProcessor::Make(
       context->drawingBuffer(), std::move(source), sigma, direction, stepLength, MAX_BLUR_SIGMA);
-  drawingManager->fillRTWithFP(renderTarget, std::move(processor), renderFlags);
-}
-
-static std::shared_ptr<TextureProxy> ScaleTexture(const TPArgs& args,
-                                                  std::shared_ptr<TextureProxy> texture,
-                                                  int targetWidth, int targetHeight) {
-  auto renderTarget = RenderTargetProxy::MakeFallback(args.context, targetWidth, targetHeight,
-                                                      texture->isAlphaOnly(), 1, args.mipmapped);
-  if (!renderTarget) {
-    return nullptr;
-  }
-
-  auto uvMatrix =
-      Matrix::MakeScale(static_cast<float>(texture->width()) / static_cast<float>(targetWidth),
-                        static_cast<float>(texture->height()) / static_cast<float>(targetHeight));
-  auto finalProcessor = TextureEffect::Make(std::move(texture), {}, &uvMatrix);
-  auto drawingManager = args.context->drawingManager();
-  drawingManager->fillRTWithFP(renderTarget, std::move(finalProcessor), args.renderFlags);
-  return renderTarget->getTextureProxy();
+  drawingManager->fillRTWithFP(std::move(renderTarget), std::move(processor), renderFlags);
 }
 
 std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
     std::shared_ptr<Image> source, const Rect& clipBounds, const TPArgs& args) const {
-  const float maxSigma = std::max(blurrinessX, blurrinessY);
-  float scaleFactor = 1.0f;
-  bool blur2D = blurrinessX > 0 && blurrinessY > 0;
+  Rect srcSampleBounds = clipBounds;
+  // The pixels involved in the convolution operation may be outside the clipping area.
+  srcSampleBounds = filterBounds(srcSampleBounds);
+  srcSampleBounds.intersect(filterBounds(Rect::MakeWH(source->width(), source->height())));
+  // Expand outward to prevent loss of intermediate state data.
+  srcSampleBounds.roundOut();
 
-  Rect boundsWillSample = clipBounds;
-  if (blur2D) {
-    // if blur2D, we need to make sure the pixels are in the clip bounds while blur y.
-    // if blur1D, we use the origin image.
-    boundsWillSample = filterBounds(boundsWillSample);
-    boundsWillSample.intersect(filterBounds(Rect::MakeWH(source->width(), source->height())));
-    boundsWillSample.roundOut();
+  float dstDrawWidth = clipBounds.width();
+  float dstDrawHeight = clipBounds.height();
+  float drawScaleX = std::max(0.0f, args.drawScale);
+  float drawScaleY = drawScaleX;
+  if (!FloatNearlyEqual(drawScaleX, 1.0f)) {
+    dstDrawWidth *= drawScaleX;
+    dstDrawHeight *= drawScaleY;
   }
+  dstDrawWidth = std::ceil(dstDrawWidth);
+  dstDrawHeight = std::ceil(dstDrawHeight);
+  drawScaleX = dstDrawWidth / clipBounds.width();
+  drawScaleY = dstDrawHeight / clipBounds.height();
 
-  Rect scaledBounds = boundsWillSample;
-  if (maxSigma > MAX_BLUR_SIGMA) {
-    scaleFactor = MAX_BLUR_SIGMA / maxSigma;
-    Matrix matrix = Matrix::MakeScale(scaleFactor);
-    matrix.mapRect(&scaledBounds);
+  float sigmaX = blurrinessX;
+  float sigmaY = blurrinessY;
+  const bool isDrawScaleDown = (drawScaleX < 1.0f || drawScaleY < 1.0f);
+  if (isDrawScaleDown) {
+    // Reduce the size of the blur target to improve computation speed.
+    sigmaX *= drawScaleX;
+    sigmaY *= drawScaleY;
   }
-  scaledBounds.roundOut();
+  sigmaX = std::min(sigmaX, MAX_BLUR_SIGMA);
+  sigmaY = std::min(sigmaY, MAX_BLUR_SIGMA);
+  const bool blur2D = (sigmaX > 0.0f && sigmaY > 0.0f);
 
+  // BlurDstScale describes the scaling factor of the Gaussian blur render target size relative to the size of the
+  // source data clip bounds.
+  float blurDstScaleX = (blurrinessX > 0.0f ? sigmaX / blurrinessX : 1.0f);
+  float blurDstScaleY = (blurrinessY > 0.0f ? sigmaY / blurrinessY : 1.0f);
+  Rect scaledSrcSampleBounds = srcSampleBounds;
+  scaledSrcSampleBounds.scale(blurDstScaleX, blurDstScaleY);
+  scaledSrcSampleBounds.roundOut();
+  // The entire process involves texture upscaling, and linear filtering is used to avoid aliasing. This causes the
+  // edge pixels of the target texture to be computed by blending the surrounding pixels of the corresponding sampling
+  // points in the source texture. In a tiled rendering scenario, the edges of each tile need to blend with the edge
+  // pixels of adjacent tiles to ensure smooth transitions between them. Therefore, the data region contained in
+  // intermediate textures must be larger than the actual clipped data region.
+  const float blurDstWidth = scaledSrcSampleBounds.width();
+  const float blurDstHeight = scaledSrcSampleBounds.height();
+  blurDstScaleX = blurDstWidth / srcSampleBounds.width();
+  blurDstScaleY = blurDstHeight / srcSampleBounds.height();
+
+  PlacementPtr<FragmentProcessor> sourceFragment = getSourceFragmentProcessor(
+      source, args.context, args.renderFlags, srcSampleBounds, Point(blurDstScaleX, blurDstScaleY));
   const auto isAlphaOnly = source->isAlphaOnly();
+  const bool isBlurDstScaled = (!FloatNearlyEqual(blurDstWidth, dstDrawWidth) ||
+                                !FloatNearlyEqual(blurDstHeight, dstDrawHeight));
+  const bool defaultBlurTargetMipmapped = (args.mipmapped && !blur2D && !isBlurDstScaled);
   auto renderTarget = RenderTargetProxy::MakeFallback(
-      args.context, static_cast<int>(scaledBounds.width()), static_cast<int>(scaledBounds.height()),
-      isAlphaOnly, 1, args.mipmapped);
+      args.context, static_cast<int>(blurDstWidth), static_cast<int>(blurDstHeight), isAlphaOnly, 1,
+      defaultBlurTargetMipmapped, ImageOrigin::TopLeft,
+      blur2D || isBlurDstScaled ? BackingFit::Approx : args.backingFit);
   if (!renderTarget) {
     return nullptr;
   }
 
-  Matrix uvMatrix = Matrix::MakeTrans(boundsWillSample.left, boundsWillSample.top);
-  uvMatrix.preScale(boundsWillSample.width() / scaledBounds.width(),
-                    boundsWillSample.height() / scaledBounds.height());
-  FPArgs fpArgs(args.context, args.renderFlags,
-                Rect::MakeWH(scaledBounds.width(), scaledBounds.height()));
-
-  auto sourceProcessor = FragmentProcessor::Make(source, fpArgs, tileMode, tileMode, {}, &uvMatrix);
-
   if (blur2D) {
-    Blur1D(std::move(sourceProcessor), renderTarget, blurrinessX * scaleFactor,
-           GaussianBlurDirection::Horizontal, 1.0f, args.renderFlags);
+    Blur1D(std::move(sourceFragment), renderTarget, sigmaX, GaussianBlurDirection::Horizontal, 1.0f,
+           args.renderFlags);
 
-    // blur and scale the texture to the clip bounds.
-    uvMatrix = Matrix::MakeScale(scaledBounds.width() / boundsWillSample.width(),
-                                 scaledBounds.height() / boundsWillSample.height());
-    uvMatrix.preTranslate(clipBounds.left - boundsWillSample.left,
-                          clipBounds.top - boundsWillSample.top);
-
-    sourceProcessor = TiledTextureEffect::Make(renderTarget->getTextureProxy(), tileMode, tileMode,
-                                               {}, &uvMatrix);
-
+    SamplingArgs samplingArgs = {tileMode, tileMode, {}, SrcRectConstraint::Fast};
+    sourceFragment = TiledTextureEffect::Make(renderTarget->asTextureProxy(), samplingArgs);
+    const bool finalBlurTargetMipmapped = (args.mipmapped && !isBlurDstScaled);
     renderTarget = RenderTargetProxy::MakeFallback(
-        args.context, static_cast<int>(clipBounds.width()), static_cast<int>(clipBounds.height()),
-        isAlphaOnly, 1, args.mipmapped);
-
+        args.context, static_cast<int>(blurDstWidth), static_cast<int>(blurDstHeight), isAlphaOnly,
+        1, finalBlurTargetMipmapped, ImageOrigin::TopLeft,
+        isBlurDstScaled ? BackingFit::Approx : args.backingFit);
     if (!renderTarget) {
       return nullptr;
     }
-
-    Blur1D(std::move(sourceProcessor), renderTarget, blurrinessY * scaleFactor,
-           GaussianBlurDirection::Vertical, boundsWillSample.height() / scaledBounds.height(),
+    Blur1D(std::move(sourceFragment), renderTarget, sigmaY, GaussianBlurDirection::Vertical, 1.0f,
            args.renderFlags);
-    return renderTarget->getTextureProxy();
+  } else {
+    const auto blurDirection =
+        (sigmaX > sigmaY ? GaussianBlurDirection::Horizontal : GaussianBlurDirection::Vertical);
+    const float blurSigma = std::max(sigmaX, sigmaY);
+    Blur1D(std::move(sourceFragment), renderTarget, blurSigma, blurDirection, 1.0f,
+           args.renderFlags);
   }
 
-  if (blurrinessX > 0) {
-    Blur1D(std::move(sourceProcessor), renderTarget, blurrinessX * scaleFactor,
-           GaussianBlurDirection::Horizontal, 1.0f, args.renderFlags);
-  } else if (blurrinessY > 0) {
-    Blur1D(std::move(sourceProcessor), renderTarget, blurrinessY * scaleFactor,
-           GaussianBlurDirection::Vertical, 1.0f, args.renderFlags);
+  if (isBlurDstScaled) {
+    auto finalUVMatrix = Matrix::MakeScale(clipBounds.width() * blurDstScaleX / dstDrawWidth,
+                                           clipBounds.height() * blurDstScaleY / dstDrawHeight);
+    finalUVMatrix.postTranslate((clipBounds.left - srcSampleBounds.left) * blurDstScaleX,
+                                (clipBounds.top - srcSampleBounds.top) * blurDstScaleY);
+    auto finalProcessor = TextureEffect::Make(renderTarget->asTextureProxy(), {}, &finalUVMatrix);
+    renderTarget = RenderTargetProxy::MakeFallback(
+        args.context, static_cast<int>(dstDrawWidth), static_cast<int>(dstDrawHeight), isAlphaOnly,
+        1, args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
+    if (!renderTarget) {
+      return nullptr;
+    }
+    const auto drawingManager = args.context->drawingManager();
+    drawingManager->fillRTWithFP(renderTarget, std::move(finalProcessor), args.renderFlags);
   }
 
-  if (maxSigma <= MAX_BLUR_SIGMA) {
-    return renderTarget->getTextureProxy();
-  }
-
-  return ScaleTexture(args, renderTarget->getTextureProxy(), static_cast<int>(clipBounds.width()),
-                      static_cast<int>(clipBounds.height()));
+  return renderTarget->asTextureProxy();
 }
 
 Rect GaussianBlurImageFilter::onFilterBounds(const Rect& srcRect) const {
@@ -165,8 +178,40 @@ Rect GaussianBlurImageFilter::onFilterBounds(const Rect& srcRect) const {
 
 PlacementPtr<FragmentProcessor> GaussianBlurImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-    const Matrix* uvMatrix) const {
-  return makeFPFromTextureProxy(source, args, sampling, uvMatrix);
+    SrcRectConstraint constraint, const Matrix* uvMatrix) const {
+  return makeFPFromTextureProxy(source, args, sampling, constraint, uvMatrix);
+}
+
+PlacementPtr<FragmentProcessor> GaussianBlurImageFilter::getSourceFragmentProcessor(
+    std::shared_ptr<Image> source, Context* context, uint32_t renderFlags, const Rect& drawRect,
+    const Point& scales) const {
+  Matrix uvMatrix = Matrix::MakeScale(1 / scales.x, 1 / scales.y);
+  uvMatrix.postTranslate(drawRect.left, drawRect.top);
+  auto scaledDrawRect = drawRect;
+  scaledDrawRect.scale(scales.x, scales.y);
+  scaledDrawRect.round();
+  FPArgs args =
+      FPArgs(context, renderFlags, Rect::MakeWH(scaledDrawRect.width(), scaledDrawRect.height()),
+             std::max(scales.x, scales.y));
+
+  SamplingArgs samplingArgs = {};
+  samplingArgs.tileModeX = tileMode;
+  samplingArgs.tileModeY = tileMode;
+  auto fp = FragmentProcessor::Make(source, args, samplingArgs, &uvMatrix);
+  if (fp == nullptr) {
+    return nullptr;
+  }
+  if (fp->numCoordTransforms() == 1) {
+    return fp;
+  }
+  auto renderTarget = RenderTargetProxy::MakeFallback(
+      context, static_cast<int>(scaledDrawRect.width()), static_cast<int>(scaledDrawRect.height()),
+      source->isAlphaOnly(), 1);
+  if (renderTarget == nullptr) {
+    return nullptr;
+  }
+  context->drawingManager()->fillRTWithFP(renderTarget, std::move(fp), renderFlags);
+  return TiledTextureEffect::Make(renderTarget->asTextureProxy(), samplingArgs);
 }
 
 }  // namespace tgfx

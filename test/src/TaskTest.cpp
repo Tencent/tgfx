@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -25,9 +25,15 @@ namespace tgfx {
 TGFX_TEST(TaskTest, release) {
   Task::ReleaseThreads();
   auto group = TaskGroup::GetInstance();
-  EXPECT_EQ(group->threads->dequeue(), nullptr);
+  std::thread* thead = nullptr;
+  group->threads->try_dequeue(thead);
+  EXPECT_EQ(thead, nullptr);
   EXPECT_EQ(group->waitingThreads, 0);
   EXPECT_EQ(group->totalThreads, 0);
-  EXPECT_EQ(group->tasks->dequeue(), nullptr);
+  for (auto& queue : group->priorityQueues) {
+    std::shared_ptr<Task> task = nullptr;
+    queue->try_dequeue(task);
+    EXPECT_EQ(task, nullptr);
+  }
 }
 }  // namespace tgfx

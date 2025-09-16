@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,38 +18,31 @@
 
 #pragma once
 
-#import <UIKit/UIKit.h>
-#include "gpu/Texture.h"
-#include "gpu/TextureSampler.h"
+#include <CoreVideo/CoreVideo.h>
+#include "gpu/opengl/GLTexture.h"
+#include "gpu/opengl/eagl/EAGLGPU.h"
 
 namespace tgfx {
-class EAGLHardwareTexture : public Texture {
+class EAGLHardwareTexture : public GLTexture {
  public:
-  static std::shared_ptr<EAGLHardwareTexture> MakeFrom(Context* context,
-                                                       CVPixelBufferRef pixelBuffer);
+  static std::vector<std::unique_ptr<GPUTexture>> MakeFrom(EAGLGPU* gpu,
+                                                           CVPixelBufferRef pixelBuffer,
+                                                           uint32_t usage);
 
-  explicit EAGLHardwareTexture(CVPixelBufferRef pixelBuffer);
+  explicit EAGLHardwareTexture(const GPUTextureDescriptor& descriptor, CVPixelBufferRef pixelBuffer,
+                               CVOpenGLESTextureRef texture, unsigned target, unsigned textureID);
 
   ~EAGLHardwareTexture() override;
-
-  size_t memoryUsage() const override;
-
-  const TextureSampler* getSampler() const override {
-    return sampler.get();
-  }
 
   HardwareBufferRef getHardwareBuffer() const override {
     return pixelBuffer;
   }
 
  protected:
-  void onReleaseGPU() override;
+  void onRelease(GLGPU* gpu) override;
 
  private:
-  std::unique_ptr<TextureSampler> sampler = {};
   CVPixelBufferRef pixelBuffer = nullptr;
   CVOpenGLESTextureRef texture = nil;
-
-  static ScratchKey ComputeScratchKey(CVPixelBufferRef pixelBuffer);
 };
 }  // namespace tgfx

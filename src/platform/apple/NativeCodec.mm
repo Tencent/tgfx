@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -123,8 +123,9 @@ NativeCodec::~NativeCodec() {
   }
 }
 
-bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
-  if (dstInfo.isEmpty() || dstPixels == nullptr) {
+bool NativeCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
+                               void* dstPixels) const {
+  if (dstPixels == nullptr) {
     return false;
   }
   NSData* data = nil;
@@ -157,7 +158,7 @@ bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
     }
   }
   Buffer tempBuffer = {};
-  auto colorType = dstInfo.colorType();
+  auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes);
   auto info = dstInfo;
   auto pixels = dstPixels;
   if (colorType != ColorType::RGBA_8888 && colorType != ColorType::BGRA_8888 &&

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -31,6 +31,11 @@ class BackgroundBlurStyle : public LayerStyle {
  public:
   static std::shared_ptr<BackgroundBlurStyle> Make(float blurrinessX, float blurrinessY,
                                                    TileMode tileMode = TileMode::Mirror);
+
+  LayerStyleType Type() const override {
+    return LayerStyleType::BackgroundBlur;
+  }
+
   /**
    * The x blurriness of the background.
    */
@@ -75,6 +80,8 @@ class BackgroundBlurStyle : public LayerStyle {
     return srcRect;
   }
 
+  Rect filterBackground(const Rect& srcRect, float contentScale) override;
+
   LayerStyleExtraSourceType extraSourceType() const override {
     return _blurrinessX > 0 && _blurrinessY > 0 ? LayerStyleExtraSourceType::Background
                                                 : LayerStyleExtraSourceType::None;
@@ -89,12 +96,15 @@ class BackgroundBlurStyle : public LayerStyle {
                              float alpha, BlendMode blendMode) override;
 
  private:
-  explicit BackgroundBlurStyle(float blurrinessX, float blurrinessY, TileMode tileMode);
+  BackgroundBlurStyle(float blurrinessX, float blurrinessY, TileMode tileMode);
+
+  std::shared_ptr<ImageFilter> getBackgroundFilter(float contentScale);
 
   float _blurrinessX = 0;
   float _blurrinessY = 0;
-
   TileMode _tileMode = TileMode::Mirror;
+  std::shared_ptr<ImageFilter> backgroundFilter = nullptr;
+  float currentScale = 0.0f;
 };
 
 }  // namespace tgfx

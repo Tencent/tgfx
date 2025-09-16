@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -26,6 +26,9 @@
 #ifdef None
 #undef None
 #endif
+#ifdef Always
+#undef Always
+#endif
 
 namespace tgfx {
 class EGLDevice : public GLDevice {
@@ -41,15 +44,11 @@ class EGLDevice : public GLDevice {
 
   ~EGLDevice() override;
 
-  EGLDisplay getDisplay() const {
-    return eglDisplay;
-  }
-
   bool sharableWith(void* nativeHandle) const override;
 
  protected:
-  bool onMakeCurrent() override;
-  void onClearCurrent() override;
+  bool onLockContext() override;
+  void onUnlockContext() override;
 
  private:
   EGLDisplay eglDisplay = nullptr;
@@ -70,7 +69,7 @@ class EGLDevice : public GLDevice {
                                          EGLContext eglContext, EGLContext shareContext,
                                          bool externallyOwned);
 
-  explicit EGLDevice(void* nativeHandle);
+  EGLDevice(std::unique_ptr<GPU> gpu, void* nativeHandle);
 
   friend class GLDevice;
 

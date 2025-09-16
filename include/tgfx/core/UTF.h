@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -42,6 +42,11 @@ class UTF {
    * Given a unicode codepoint, return the UTF-8 string.
    */
   static std::string ToUTF8(int32_t unichar);
+
+  /**
+   * Given a unicode codepoint, return the UTF-16 string.
+   */
+  static std::wstring ToUTF16(int32_t unichar);
 };
 
 }  // namespace tgfx

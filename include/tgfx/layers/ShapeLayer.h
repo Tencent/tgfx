@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -300,10 +300,7 @@ class ShapeLayer : public Layer {
  protected:
   ShapeLayer();
 
-  std::unique_ptr<LayerContent> onUpdateContent() override;
-
-  void drawContents(LayerContent* content, Canvas* canvas, float alpha, bool forContour,
-                    const std::function<bool()>& drawChildren) const override;
+  void onUpdateContent(LayerRecorder* recorder) override;
 
  private:
   std::shared_ptr<Shape> _shape = nullptr;
@@ -320,7 +317,9 @@ class ShapeLayer : public Layer {
     uint8_t strokeAlign : 2;
   } shapeBitFields = {};
 
-  Paint getPaint(float alpha) const;
+  std::vector<Paint> createShapePaints(const std::vector<std::shared_ptr<ShapeStyle>>& styles,
+                                       bool isHairline = false) const;
+
   std::shared_ptr<Shape> createStrokeShape() const;
 };
 }  // namespace tgfx

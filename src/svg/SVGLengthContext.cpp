@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -54,7 +54,7 @@ float SVGLengthContext::resolve(const SVGLength& length, LengthType type) const 
   switch (length.unit()) {
     case SVGLength::Unit::Number: {
       if (unit.has_value()) {
-        if (unit.value().type() == SVGObjectBoundingBoxUnits::Type::ObjectBoundingBox) {
+        if (unit->type() == SVGObjectBoundingBoxUnits::Type::ObjectBoundingBox) {
           return length.value() * length_size_for_type(_viewPort, type);
         } else {
           return length.value();

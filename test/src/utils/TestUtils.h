@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -32,6 +32,8 @@
 
 namespace tgfx {
 
+unsigned CreateGLProgram(Context* context, const std::string& vertex, const std::string& fragment);
+
 bool CreateGLTexture(Context* context, int width, int height, GLTextureInfo* texture);
 
 std::shared_ptr<ImageCodec> MakeImageCodec(const std::string& path);
@@ -46,6 +48,8 @@ std::shared_ptr<Data> ReadFile(const std::string& path);
 
 void SaveFile(std::shared_ptr<Data> data, const std::string& key);
 
+void SaveWebpFile(std::shared_ptr<Data> data, const std::string& key);
+
 void SaveImage(std::shared_ptr<PixelBuffer> pixelBuffer, const std::string& key);
 
 void SaveImage(const Bitmap& bitmap, const std::string& key);
@@ -53,4 +57,10 @@ void SaveImage(const Bitmap& bitmap, const std::string& key);
 void SaveImage(const Pixmap& pixmap, const std::string& key);
 
 void RemoveImage(const std::string& key);
+
+void RemoveFile(const std::string& key);
+
+std::shared_ptr<Image> ScaleImage(const std::shared_ptr<Image>& image, float scale,
+                                  const SamplingOptions& options = {});
+
 }  // namespace tgfx

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,65 +18,42 @@
 
 #pragma once
 
-#include <string>
+#include <utility>
 #include <vector>
-#include "BitmaskOperators.h"
 #include "SLType.h"
+#include "gpu/Attribute.h"
+#include "gpu/Uniform.h"
 
 namespace tgfx {
-enum class ShaderFlags : unsigned {
-  None = 0,
-  Vertex = 1 << 0,
-  Fragment = 1 << 1,
-  TGFX_MARK_AS_BITMASK_ENUM(Fragment)
-};
-
 class ShaderVar {
  public:
-  enum class TypeModifier {
-    None,
-    Attribute,
-    Varying,
-    Uniform,
-    Out,
-  };
+  enum class TypeModifier { None, Attribute, Varying, FlatVarying, Uniform, Out, InOut };
 
   ShaderVar() = default;
 
-  ShaderVar(std::string name, SLType type) : _type(type), _name(std::move(name)) {
+  ShaderVar(std::string name, SLType type, TypeModifier typeModifier = TypeModifier::None)
+      : _name(std::move(name)), _type(type), _modifier(typeModifier) {
   }
 
-  ShaderVar(std::string name, SLType type, TypeModifier typeModifier)
-      : _type(type), _typeModifier(typeModifier), _name(std::move(name)) {
-  }
+  explicit ShaderVar(const Attribute& attribute);
 
-  void setName(const std::string& name) {
-    _name = name;
-  }
+  explicit ShaderVar(const Uniform& uniform);
 
   const std::string& name() const {
     return _name;
-  }
-
-  void setType(SLType type) {
-    _type = type;
   }
 
   SLType type() const {
     return _type;
   }
 
-  void setTypeModifier(TypeModifier type) {
-    _typeModifier = type;
-  }
-
-  TypeModifier typeModifier() const {
-    return _typeModifier;
+  TypeModifier modifier() const {
+    return _modifier;
   }
 
  private:
-  SLType _type = SLType::Void;
-  TypeModifier _typeModifier = TypeModifier::None;
   std::string _name;
+  SLType _type = SLType::Void;
+  TypeModifier _modifier = TypeModifier::None;
 };
 }  // namespace tgfx

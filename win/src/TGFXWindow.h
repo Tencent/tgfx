@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -24,10 +24,12 @@
 
 #include <Windows.h>
 #include <Windowsx.h>
+#include <Winuser.h>
 #include <functional>
 #include <memory>
 #include <string>
 #include "drawers/Drawer.h"
+#include "tgfx/core/Point.h"
 #include "tgfx/gpu/opengl/wgl/WGLWindow.h"
 
 namespace hello2d {
@@ -40,7 +42,10 @@ class TGFXWindow {
 
  private:
   HWND windowHandle = nullptr;
-  int lastDrawIndex = 0;
+  int currentDrawerIndex = 0;
+  float zoomScale = 1.0f;
+  double lastZoomArgument = 0.0;
+  tgfx::Point contentOffset = {0.0f, 0.0f};
   std::shared_ptr<tgfx::WGLWindow> tgfxWindow = nullptr;
   std::shared_ptr<drawers::AppHost> appHost = nullptr;
 
@@ -54,5 +59,7 @@ class TGFXWindow {
   float getPixelRatio();
   void createAppHost();
   void draw();
+
+  bool isDrawing = true;
 };
 }  // namespace hello2d

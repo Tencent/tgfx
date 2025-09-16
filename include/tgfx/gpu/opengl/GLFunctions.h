@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -102,11 +102,6 @@ using GLFramebufferRenderbuffer = void GL_FUNCTION_TYPE(unsigned target, unsigne
 using GLFramebufferTexture2D = void GL_FUNCTION_TYPE(unsigned target, unsigned attachment,
                                                      unsigned textarget, unsigned texture,
                                                      int level);
-using GLFramebufferTexture2DMultisample = void GL_FUNCTION_TYPE(unsigned target,
-                                                                unsigned attachment,
-                                                                unsigned textarget,
-                                                                unsigned texture, int level,
-                                                                int samples);
 using GLFrontFace = void GL_FUNCTION_TYPE(unsigned mode);
 using GLGenBuffers = void GL_FUNCTION_TYPE(int n, unsigned* buffers);
 using GLGenVertexArrays = void GL_FUNCTION_TYPE(int n, unsigned* vertexArrays);
@@ -141,6 +136,11 @@ using GLGetVertexAttribPointerv = void GL_FUNCTION_TYPE(unsigned index, unsigned
                                                         void** pointer);
 using GLGetAttribLocation = int GL_FUNCTION_TYPE(unsigned program, const char* name);
 using GLGetUniformLocation = int GL_FUNCTION_TYPE(unsigned program, const char* name);
+using GLGetUniformBlockIndex = unsigned GL_FUNCTION_TYPE(unsigned program,
+                                                         const char* uniformBlockName);
+using GLUniformBlockBinding = void GL_FUNCTION_TYPE(unsigned program, unsigned uniformBlockIndex,
+                                                    unsigned uniformBlockBinding);
+using GLBindBufferBase = void GL_FUNCTION_TYPE(unsigned target, unsigned index, unsigned buffer);
 using GLIsTexture = unsigned char GL_FUNCTION_TYPE(unsigned texture);
 using GLLineWidth = void GL_FUNCTION_TYPE(float width);
 using GLLinkProgram = void GL_FUNCTION_TYPE(unsigned program);
@@ -155,9 +155,6 @@ using GLRenderbufferStorageMultisample = void GL_FUNCTION_TYPE(unsigned target, 
 using GLRenderbufferStorageMultisampleAPPLE = void GL_FUNCTION_TYPE(unsigned target, int samples,
                                                                     unsigned internalformat,
                                                                     int width, int height);
-using GLRenderbufferStorageMultisampleEXT = void GL_FUNCTION_TYPE(unsigned target, int samples,
-                                                                  unsigned internalformat,
-                                                                  int width, int height);
 using GLResolveMultisampleFramebuffer = void GL_FUNCTION_TYPE();
 using GLBlitFramebuffer = void GL_FUNCTION_TYPE(int srcX0, int srcY0, int srcX1, int srcY1,
                                                 int dstX0, int dstY0, int dstX1, int dstY1,
@@ -280,7 +277,6 @@ class GLFunctions {
   GLFlush* flush = nullptr;
   GLFramebufferRenderbuffer* framebufferRenderbuffer = nullptr;
   GLFramebufferTexture2D* framebufferTexture2D = nullptr;
-  GLFramebufferTexture2DMultisample* framebufferTexture2DMultisample = nullptr;
   GLFrontFace* frontFace = nullptr;
   GLGenBuffers* genBuffers = nullptr;
   GLGenFramebuffers* genFramebuffers = nullptr;
@@ -306,6 +302,9 @@ class GLFunctions {
   GLGetVertexAttribPointerv* getVertexAttribPointerv = nullptr;
   GLGetAttribLocation* getAttribLocation = nullptr;
   GLGetUniformLocation* getUniformLocation = nullptr;
+  GLGetUniformBlockIndex* getUniformBlockIndex = nullptr;
+  GLUniformBlockBinding* uniformBlockBinding = nullptr;
+  GLBindBufferBase* bindBufferBase = nullptr;
   GLIsTexture* isTexture = nullptr;
   GLLineWidth* lineWidth = nullptr;
   GLLinkProgram* linkProgram = nullptr;
@@ -314,7 +313,6 @@ class GLFunctions {
   GLRenderbufferStorage* renderbufferStorage = nullptr;
   GLRenderbufferStorageMultisample* renderbufferStorageMultisample = nullptr;
   GLRenderbufferStorageMultisampleAPPLE* renderbufferStorageMultisampleAPPLE = nullptr;
-  GLRenderbufferStorageMultisampleEXT* renderbufferStorageMultisampleEXT = nullptr;
   GLResolveMultisampleFramebuffer* resolveMultisampleFramebuffer = nullptr;
   GLBlitFramebuffer* blitFramebuffer = nullptr;
   GLScissor* scissor = nullptr;

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -29,21 +29,21 @@ class PathShape : public Shape {
   explicit PathShape(Path path) : path(std::move(path)) {
   }
 
-  bool isLine(Point line[2] = nullptr) const override;
+  bool isSimplePath() const override {
+    return true;
+  }
 
-  bool isRect(Rect* rect = nullptr) const override;
+  bool isInverseFillType() const override {
+    return path.isInverseFillType();
+  }
 
-  bool isOval(Rect* bounds = nullptr) const override;
+  Rect getBounds() const override {
+    return path.getBounds();
+  }
 
-  bool isRRect(RRect* rRect = nullptr) const override;
-
-  bool isSimplePath(Path* path) const override;
-
-  bool isInverseFillType() const override;
-
-  Rect getBounds() const override;
-
-  Path getPath() const override;
+  Path getPath() const override {
+    return path;
+  }
 
   Path path = {};
 

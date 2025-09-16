@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,7 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SubsetImage.h"
+#include "core/images/ScaledImage.h"
 #include "core/utils/AddressOf.h"
+#include "core/utils/MathExtra.h"
 #include "gpu/TPArgs.h"
 #include "gpu/processors/TiledTextureEffect.h"
 
@@ -44,27 +46,60 @@ std::shared_ptr<Image> SubsetImage::onMakeSubset(const Rect& subset) const {
   return SubsetImage::MakeFrom(source, newBounds);
 }
 
+std::shared_ptr<Image> SubsetImage::onMakeScaled(int newWidth, int newHeight,
+                                                 const SamplingOptions& sampling) const {
+  float scaleX = static_cast<float>(newWidth) / static_cast<float>(width());
+  float scaleY = static_cast<float>(newHeight) / static_cast<float>(height());
+  auto sourceScaledWidth = scaleX * static_cast<float>(source->width());
+  auto sourceScaledHeight = scaleY * static_cast<float>(source->height());
+  if (!IsInteger(sourceScaledWidth) || !IsInteger(sourceScaledHeight)) {
+    return Image::onMakeScaled(newWidth, newHeight, sampling);
+  }
+  auto newSource = source->makeScaled(static_cast<int>(sourceScaledWidth),
+                                      static_cast<int>(sourceScaledHeight), sampling);
+  if (newSource == nullptr) {
+    return nullptr;
+  }
+  auto newBounds = Rect::MakeXYWH(bounds.x() * scaleX, bounds.y() * scaleY,
+                                  static_cast<float>(newWidth), static_cast<float>(newHeight));
+  return MakeFrom(std::move(newSource), newBounds);
+}
+
 PlacementPtr<FragmentProcessor> SubsetImage::asFragmentProcessor(const FPArgs& args,
-                                                                 TileMode tileModeX,
-                                                                 TileMode tileModeY,
-                                                                 const SamplingOptions& sampling,
+                                                                 const SamplingArgs& samplingArgs,
                                                                  const Matrix* uvMatrix) const {
   auto matrix = concatUVMatrix(uvMatrix);
   auto drawBounds = args.drawRect;
   if (matrix) {
     matrix->mapRect(&drawBounds);
   }
+  auto newSamplingArgs = samplingArgs;
   if (bounds.contains(drawBounds)) {
-    return FragmentProcessor::Make(source, args, tileModeX, tileModeY, sampling, AddressOf(matrix));
+    if (samplingArgs.constraint != SrcRectConstraint::Strict && !newSamplingArgs.sampleArea) {
+      // if samplingArgs has sampleArea, means the area is already subsetted
+      newSamplingArgs.sampleArea = getSubset(drawBounds);
+    }
+    return FragmentProcessor::Make(source, args, newSamplingArgs, AddressOf(matrix));
   }
-  auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
-  TPArgs tpArgs(args.context, args.renderFlags, mipmapped);
-  auto textureProxy = lockTextureProxy(tpArgs);
+  if (!drawBounds.intersect(bounds)) {
+    return nullptr;
+  }
+  drawBounds.offset(-bounds.x(), -bounds.y());
+  drawBounds.roundOut();
+  auto mipmapped = source->hasMipmaps() && samplingArgs.sampling.mipmapMode != MipmapMode::None;
+  TPArgs tpArgs(args.context, args.renderFlags, mipmapped, args.drawScale);
+  auto textureProxy = lockTextureProxySubset(tpArgs, drawBounds);
   if (textureProxy == nullptr) {
     return nullptr;
   }
-  return TiledTextureEffect::Make(textureProxy, tileModeX, tileModeY, sampling, uvMatrix,
-                                  source->isAlphaOnly());
+  newSamplingArgs.sampleArea = std::nullopt;
+  auto fpMatrix = Matrix::MakeTrans(-drawBounds.left, -drawBounds.top);
+  fpMatrix.preScale(static_cast<float>(textureProxy->width()) / drawBounds.width(),
+                    static_cast<float>(textureProxy->height()) / drawBounds.height());
+  if (uvMatrix) {
+    fpMatrix.preConcat(*uvMatrix);
+  }
+  return TiledTextureEffect::Make(textureProxy, newSamplingArgs, &fpMatrix, source->isAlphaOnly());
 }
 
 std::optional<Matrix> SubsetImage::concatUVMatrix(const Matrix* uvMatrix) const {
@@ -81,4 +116,14 @@ std::optional<Matrix> SubsetImage::concatUVMatrix(const Matrix* uvMatrix) const 
   }
   return matrix;
 }
+
+std::optional<Rect> SubsetImage::getSubset(const Rect& drawRect) const {
+  auto saftBounds = bounds;
+  saftBounds.inset(0.5f, 0.5f);
+  if (saftBounds.contains(drawRect)) {
+    return std::nullopt;
+  }
+  return {bounds};
+}
+
 }  // namespace tgfx

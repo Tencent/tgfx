@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,10 +18,14 @@
 
 #pragma once
 
+#define WIN32_LEAN_AND_MEAN  // Exclude rarely-used stuff from Windows headers
 #include <windows.h>
 #include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace tgfx {
+struct HPBUFFER__;
+typedef HPBUFFER__* HPBUFFER;
+
 class WGLDevice : public GLDevice {
  public:
   /**
@@ -29,13 +33,17 @@ class WGLDevice : public GLDevice {
    */
   static std::shared_ptr<WGLDevice> MakeFrom(HWND nativeWindow, HGLRC sharedContext);
 
+  ~WGLDevice() override;
+
   bool sharableWith(void* nativeConext) const override;
 
  protected:
-  bool onMakeCurrent() override;
-  void onClearCurrent() override;
+  bool onLockContext() override;
+  void onUnlockContext() override;
 
- protected:
+ private:
+  HWND nativeWindow = nullptr;
+  HPBUFFER pBuffer = nullptr;
   HDC deviceContext = nullptr;
   HGLRC glContext = nullptr;
   HGLRC sharedContext = nullptr;
@@ -43,10 +51,10 @@ class WGLDevice : public GLDevice {
   HDC oldDeviceContext = nullptr;
   HGLRC oldGLContext = nullptr;
 
-  explicit WGLDevice(HGLRC nativeHandle);
+  WGLDevice(std::unique_ptr<GPU> gpu, HGLRC nativeHandle);
 
-  static std::shared_ptr<WGLDevice> Wrap(HWND nativeWindow, HDC deviceContext, HGLRC glContext,
-                                         HGLRC sharedContext, bool externallyOwned);
+  static std::shared_ptr<WGLDevice> Wrap(HDC deviceContext, HGLRC glContext, HGLRC sharedContext,
+                                         HWND nativeWindow, HPBUFFER pBuffer, bool externallyOwned);
 
   friend class GLDevice;
   friend class WGLWindow;

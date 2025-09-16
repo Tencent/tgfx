@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,15 +18,15 @@
 
 #pragma once
 
-#include "ResourceImage.h"
+#include "PixelImage.h"
 
 namespace tgfx {
 /**
  * GeneratorImage wraps an ImageGenerator that can generate ImageBuffers on demand.
  */
-class GeneratorImage : public ResourceImage {
+class GeneratorImage : public PixelImage {
  public:
-  GeneratorImage(UniqueKey uniqueKey, std::shared_ptr<ImageGenerator> generator);
+  GeneratorImage(std::shared_ptr<ImageGenerator> generator, bool mipmapped);
 
   int width() const override {
     return generator->width();
@@ -51,8 +51,9 @@ class GeneratorImage : public ResourceImage {
 
   std::shared_ptr<Image> onMakeDecoded(Context* context, bool tryHardware) const override;
 
-  std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args,
-                                                   const UniqueKey& key) const override;
+  std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
+
+  std::shared_ptr<Image> onMakeMipmapped(bool mipmapped) const override;
 
   std::shared_ptr<ImageGenerator> generator = nullptr;
 };

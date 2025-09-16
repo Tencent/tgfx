@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -19,7 +19,7 @@
 #include "tgfx/gpu/opengl/eagl/EAGLDevice.h"
 #import <OpenGLES/ES2/gl.h>
 #import <OpenGLES/ES3/glext.h>
-#include "EAGLProcGetter.h"
+#include "gpu/opengl/eagl/EAGLGPU.h"
 
 namespace tgfx {
 static std::mutex deviceLocker = {};
@@ -105,10 +105,15 @@ std::shared_ptr<EAGLDevice> EAGLDevice::Wrap(EAGLContext* eaglContext, bool exte
       return nullptr;
     }
   }
-  auto device = std::shared_ptr<EAGLDevice>(new EAGLDevice(eaglContext),
-                                            EAGLDevice::NotifyReferenceReachedZero);
-  device->externallyOwned = externallyOwned;
-  device->weakThis = device;
+  std::shared_ptr<EAGLDevice> device = nullptr;
+  auto interface = GLInterface::GetNative();
+  if (interface != nullptr) {
+    auto gpu = std::make_unique<EAGLGPU>(std::move(interface), eaglContext);
+    device = std::shared_ptr<EAGLDevice>(new EAGLDevice(std::move(gpu), eaglContext),
+                                         EAGLDevice::NotifyReferenceReachedZero);
+    device->externallyOwned = externallyOwned;
+    device->weakThis = device;
+  }
   if (oldEAGLContext != eaglContext) {
     [EAGLContext setCurrentContext:oldEAGLContext];
   }
@@ -125,8 +130,8 @@ void EAGLDevice::NotifyReferenceReachedZero(EAGLDevice* device) {
   delayPurgeList.push_back(device);
 }
 
-EAGLDevice::EAGLDevice(EAGLContext* eaglContext)
-    : GLDevice(eaglContext), _eaglContext(eaglContext) {
+EAGLDevice::EAGLDevice(std::unique_ptr<GPU> gpu, EAGLContext* eaglContext)
+    : GLDevice(std::move(gpu), eaglContext), _eaglContext(eaglContext) {
   [_eaglContext retain];
   std::lock_guard<std::mutex> autoLock(deviceLocker);
   auto index = deviceList.size();
@@ -144,10 +149,6 @@ EAGLDevice::~EAGLDevice() {
     deviceList.pop_back();
   }
   releaseAll();
-  if (textureCache != nil) {
-    CFRelease(textureCache);
-    textureCache = nil;
-  }
   [_eaglContext release];
 }
 
@@ -163,31 +164,11 @@ EAGLContext* EAGLDevice::eaglContext() const {
   return _eaglContext;
 }
 
-CVOpenGLESTextureCacheRef EAGLDevice::getTextureCache() {
-  if (!textureCache) {
-    CFMutableDictionaryRef attrs = CFDictionaryCreateMutable(
-        kCFAllocatorDefault, 1, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
-    CFDictionarySetValue(attrs, kCVOpenGLESTextureCacheMaximumTextureAgeKey,
-                         [NSNumber numberWithFloat:0]);
-    CVOpenGLESTextureCacheCreate(kCFAllocatorDefault, attrs, _eaglContext, NULL, &textureCache);
-    CFRelease(attrs);
-  }
-  return textureCache;
-}
-
-void EAGLDevice::releaseTexture(CVOpenGLESTextureRef texture) {
-  if (texture == nil || textureCache == nil) {
-    return;
-  }
-  CFRelease(texture);
-  CVOpenGLESTextureCacheFlush(textureCache, 0);
-}
-
-bool EAGLDevice::onMakeCurrent() {
+bool EAGLDevice::onLockContext() {
   return makeCurrent();
 }
 
-void EAGLDevice::onClearCurrent() {
+void EAGLDevice::onUnlockContext() {
   clearCurrent();
 }
 

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -19,6 +19,7 @@
 #pragma once
 
 #include <CoreText/CoreText.h>
+#include "tgfx/core/Stream.h"
 #include "tgfx/core/Typeface.h"
 
 namespace tgfx {
@@ -56,14 +57,22 @@ class CGTypeface : public Typeface {
 
   GlyphID getGlyphID(Unichar unichar) const override;
 
-  std::shared_ptr<Data> getBytes() const override;
+  std::unique_ptr<Stream> openStream() const override;
 
   std::shared_ptr<Data> copyTableData(FontTableTag tag) const override;
+
+  static std::string StringFromCFString(CFStringRef src);
 
  protected:
 #ifdef TGFX_USE_GLYPH_TO_UNICODE
   std::vector<Unichar> getGlyphToUnicodeMap() const override;
 #endif
+
+#ifdef TGFX_USE_ADVANCED_TYPEFACE_PROPERTY
+  AdvancedTypefaceInfo getAdvancedInfo() const override;
+#endif
+
+  std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const override;
 
  private:
   CGTypeface(CTFontRef ctFont, std::shared_ptr<Data> data);
@@ -73,7 +82,6 @@ class CGTypeface : public Typeface {
   bool _hasColor = false;
   bool _hasOutlines = true;
   std::shared_ptr<Data> data;
-  std::weak_ptr<CGTypeface> weakThis;
 
   friend class CGScalerContext;
 };

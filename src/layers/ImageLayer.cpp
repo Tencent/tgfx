@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,13 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/ImageLayer.h"
-#include "layers/contents/ImageContent.h"
 
 namespace tgfx {
 std::shared_ptr<ImageLayer> ImageLayer::Make() {
-  auto layer = std::shared_ptr<ImageLayer>(new ImageLayer());
-  layer->weakThis = layer;
-  return layer;
+  return std::shared_ptr<ImageLayer>(new ImageLayer());
 }
 
 void ImageLayer::setSampling(const SamplingOptions& value) {
@@ -38,14 +35,12 @@ void ImageLayer::setImage(std::shared_ptr<Image> value) {
   if (_image == value) {
     return;
   }
-  _image = value;
+  _image = std::move(value);
   invalidateContent();
 }
 
-std::unique_ptr<LayerContent> ImageLayer::onUpdateContent() {
-  if (!_image) {
-    return nullptr;
-  }
-  return std::make_unique<ImageContent>(_image, _sampling);
+void ImageLayer::onUpdateContent(LayerRecorder* recorder) {
+  auto canvas = recorder->getCanvas();
+  canvas->drawImage(_image, _sampling);
 }
 }  // namespace tgfx

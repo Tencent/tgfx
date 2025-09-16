@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -34,8 +34,8 @@ class ProcessorGuard {
   ProgramBuilder* builder = nullptr;
 };
 
-ProgramBuilder::ProgramBuilder(Context* context, const Pipeline* pipeline)
-    : context(context), pipeline(pipeline) {
+ProgramBuilder::ProgramBuilder(Context* context, const ProgramInfo* programInfo)
+    : context(context), programInfo(programInfo) {
 }
 
 bool ProgramBuilder::emitAndInstallProcessors() {
@@ -52,24 +52,25 @@ bool ProgramBuilder::emitAndInstallProcessors() {
 void ProgramBuilder::emitAndInstallGeoProc(std::string* outputColor, std::string* outputCoverage) {
   // We don't want the RTAdjustName to be mangled, so we add it to the uniform handler before the
   // processor guard.
-  uniformHandler()->addUniform(ShaderFlags::Vertex, SLType::Float4, RTAdjustName);
-  auto geometryProcessor = pipeline->getGeometryProcessor();
+  uniformHandler()->addUniform(RTAdjustName, UniformFormat::Float4, ShaderStage::Vertex);
+  auto geometryProcessor = programInfo->getGeometryProcessor();
   // Set the current processor so that all variable names will be mangled correctly.
   ProcessorGuard processorGuard(this, geometryProcessor);
   nameExpression(outputColor, "outputColor");
   nameExpression(outputCoverage, "outputCoverage");
 
-  auto processorIndex = pipeline->getProcessorIndex(geometryProcessor);
+  auto processorIndex = programInfo->getProcessorIndex(geometryProcessor);
   // Enclose custom code in a block to avoid namespace conflicts
   fragmentShaderBuilder()->codeAppendf("{ // Processor%d : %s\n", processorIndex,
                                        geometryProcessor->name().c_str());
   vertexShaderBuilder()->codeAppendf("// Processor%d : %s\n", processorIndex,
                                      geometryProcessor->name().c_str());
 
-  GeometryProcessor::FPCoordTransformHandler transformHandler(pipeline, &transformedCoordVars);
+  GeometryProcessor::FPCoordTransformHandler transformHandler(programInfo, &transformedCoordVars);
   GeometryProcessor::EmitArgs args(vertexShaderBuilder(), fragmentShaderBuilder(), varyingHandler(),
-                                   uniformHandler(), getContext()->caps(), *outputColor,
-                                   *outputCoverage, &transformHandler);
+                                   uniformHandler(), getContext()->caps()->shaderCaps(),
+                                   *outputColor, *outputCoverage, &transformHandler,
+                                   &subsetVarName);
   geometryProcessor->emitCode(args);
   fragmentShaderBuilder()->codeAppend("}");
 }
@@ -77,11 +78,11 @@ void ProgramBuilder::emitAndInstallGeoProc(std::string* outputColor, std::string
 void ProgramBuilder::emitAndInstallFragProcessors(std::string* color, std::string* coverage) {
   size_t transformedCoordVarsIdx = 0;
   std::string** inOut = &color;
-  for (size_t i = 0; i < pipeline->numFragmentProcessors(); ++i) {
-    if (i == pipeline->numColorFragmentProcessors()) {
+  for (size_t i = 0; i < programInfo->numFragmentProcessors(); ++i) {
+    if (i == programInfo->numColorFragmentProcessors()) {
       inOut = &coverage;
     }
-    const auto* fp = pipeline->getFragmentProcessor(i);
+    const auto fp = programInfo->getFragmentProcessor(i);
     auto output = emitAndInstallFragProc(fp, transformedCoordVarsIdx, **inOut);
     FragmentProcessor::Iter iter(fp);
     while (const FragmentProcessor* tempFP = iter.next()) {
@@ -107,25 +108,26 @@ std::string ProgramBuilder::emitAndInstallFragProc(const FragmentProcessor* proc
   nameExpression(&output, "output");
 
   // Enclose custom code in a block to avoid namespace conflicts
-  fragmentShaderBuilder()->codeAppendf(
-      "{ // Processor%d : %s\n", pipeline->getProcessorIndex(processor), processor->name().c_str());
+  fragmentShaderBuilder()->codeAppendf("{ // Processor%d : %s\n",
+                                       programInfo->getProcessorIndex(processor),
+                                       processor->name().c_str());
 
   std::vector<SamplerHandle> texSamplers;
   FragmentProcessor::Iter fpIter(processor);
   int samplerIndex = 0;
-  while (const auto* subFP = fpIter.next()) {
+  while (const auto subFP = fpIter.next()) {
     for (size_t i = 0; i < subFP->numTextureSamplers(); ++i) {
       std::string name = "TextureSampler_";
       name += std::to_string(samplerIndex++);
-      const auto* sampler = subFP->textureSampler(i);
-      texSamplers.emplace_back(emitSampler(sampler, name));
+      auto texture = subFP->textureAt(i);
+      texSamplers.emplace_back(emitSampler(texture, name));
     }
   }
   FragmentProcessor::TransformedCoordVars coords(
       processor, GetPointer(transformedCoordVars, transformedCoordVarsIdx));
   FragmentProcessor::TextureSamplers textureSamplers(processor, GetPointer(texSamplers, 0));
   FragmentProcessor::EmitArgs args(fragmentShaderBuilder(), uniformHandler(), output, input,
-                                   &coords, &textureSamplers);
+                                   subsetVarName, &coords, &textureSamplers);
 
   processor->emitCode(args);
   fragmentShaderBuilder()->codeAppend("}");
@@ -134,15 +136,15 @@ std::string ProgramBuilder::emitAndInstallFragProc(const FragmentProcessor* proc
 
 void ProgramBuilder::emitAndInstallXferProc(const std::string& colorIn,
                                             const std::string& coverageIn) {
-  auto xferProcessor = pipeline->getXferProcessor();
+  auto xferProcessor = programInfo->getXferProcessor();
   ProcessorGuard processorGuard(this, xferProcessor);
   fragmentShaderBuilder()->codeAppendf("{ // Processor%d : %s\n",
-                                       pipeline->getProcessorIndex(xferProcessor),
+                                       programInfo->getProcessorIndex(xferProcessor),
                                        xferProcessor->name().c_str());
 
   SamplerHandle dstTextureSamplerHandle;
-  if (auto dstTexture = xferProcessor->dstTexture()) {
-    dstTextureSamplerHandle = emitSampler(dstTexture->getSampler(), "DstTextureSampler");
+  if (auto dstTextureView = xferProcessor->dstTextureView()) {
+    dstTextureSamplerHandle = emitSampler(dstTextureView->getTexture(), "DstTextureSampler");
   }
 
   std::string inputColor = !colorIn.empty() ? colorIn : "vec4(1.0)";
@@ -153,18 +155,18 @@ void ProgramBuilder::emitAndInstallXferProc(const std::string& colorIn,
   fragmentShaderBuilder()->codeAppend("}");
 }
 
-SamplerHandle ProgramBuilder::emitSampler(const TextureSampler* sampler, const std::string& name) {
+SamplerHandle ProgramBuilder::emitSampler(GPUTexture* texture, const std::string& name) {
   ++numFragmentSamplers;
-  return uniformHandler()->addSampler(sampler, name);
+  return uniformHandler()->addSampler(texture, name);
 }
 
 void ProgramBuilder::emitFSOutputSwizzle() {
   // Swizzle the fragment shader outputs if necessary.
-  const auto& swizzle = *pipeline->outputSwizzle();
+  auto& swizzle = programInfo->getOutputSwizzle();
   if (swizzle == Swizzle::RGBA()) {
     return;
   }
-  auto* fragBuilder = fragmentShaderBuilder();
+  auto fragBuilder = fragmentShaderBuilder();
   const auto& output = fragBuilder->colorOutputName();
   fragBuilder->codeAppendf("%s = %s.%s;", output.c_str(), output.c_str(), swizzle.c_str());
 }
@@ -174,7 +176,7 @@ std::string ProgramBuilder::nameVariable(const std::string& name) const {
   if (processor == nullptr) {
     return name;
   }
-  return name + pipeline->getMangledSuffix(processor);
+  return name + programInfo->getMangledSuffix(processor);
 }
 
 void ProgramBuilder::nameExpression(std::string* output, const std::string& baseName) {
@@ -191,13 +193,9 @@ void ProgramBuilder::nameExpression(std::string* output, const std::string& base
   *output = outName;
 }
 
-std::string ProgramBuilder::getUniformDeclarations(ShaderFlags visibility) const {
-  return uniformHandler()->getUniformDeclarations(visibility);
-}
-
 void ProgramBuilder::finalizeShaders() {
   varyingHandler()->finalize();
-  vertexShaderBuilder()->finalize(ShaderFlags::Vertex);
-  fragmentShaderBuilder()->finalize(ShaderFlags::Fragment);
+  vertexShaderBuilder()->finalize();
+  fragmentShaderBuilder()->finalize();
 }
 }  // namespace tgfx

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -91,37 +91,37 @@ void SVGRoot::onSetAttribute(SVGAttribute attr, const SVGValue& v) {
   if (type != Type::kInner && type != Type::kRoot) return;
   switch (attr) {
     case SVGAttribute::X:
-      if (const auto* x = v.as<SVGLengthValue>()) {
+      if (const auto x = v.as<SVGLengthValue>()) {
         SVGLength xValue = *x;
         this->setX(xValue);
       }
       break;
     case SVGAttribute::Y:
-      if (const auto* y = v.as<SVGLengthValue>()) {
+      if (const auto y = v.as<SVGLengthValue>()) {
         SVGLength yValue = *y;
         this->setY(yValue);
       }
       break;
     case SVGAttribute::Width:
-      if (const auto* w = v.as<SVGLengthValue>()) {
+      if (const auto w = v.as<SVGLengthValue>()) {
         SVGLength wValue = *w;
         this->setWidth(wValue);
       }
       break;
     case SVGAttribute::Height:
-      if (const auto* h = v.as<SVGLengthValue>()) {
+      if (const auto h = v.as<SVGLengthValue>()) {
         SVGLength hValue = *h;
         this->setHeight(hValue);
       }
       break;
     case SVGAttribute::ViewBox:
-      if (const auto* vb = v.as<SVGViewBoxValue>()) {
+      if (const auto vb = v.as<SVGViewBoxValue>()) {
         SVGViewBoxType vbValue = *vb;
         this->setViewBox(vbValue);
       }
       break;
     case SVGAttribute::PreserveAspectRatio:
-      if (const auto* par = v.as<SVGPreserveAspectRatioValue>()) {
+      if (const auto par = v.as<SVGPreserveAspectRatioValue>()) {
         SVGPreserveAspectRatio parValue = *par;
         this->setPreserveAspectRatio(parValue);
       }

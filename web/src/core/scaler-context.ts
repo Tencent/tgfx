@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,14 +18,36 @@
 
 import {measureText} from '../utils/measure-text';
 import {defaultFontNames, getFontFamilies} from '../utils/font-family';
-import {getCanvas2D} from '../utils/canvas';
-
-import type {Rect} from '../types';
+import {getCanvas2D, releaseCanvas2D} from '../utils/canvas';
+import {TGFXModule} from '../tgfx-module';
+import {ctor, Rect} from '../types';
 
 export class ScalerContext {
     public static canvas: HTMLCanvasElement | OffscreenCanvas;
     public static context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
     private static hasMeasureBoundsAPI: boolean | undefined = undefined;
+
+    public static getLineCap(cap: ctor): CanvasLineCap {
+        switch (cap) {
+            case TGFXModule.TGFXLineCap.Round:
+                return 'round';
+            case TGFXModule.TGFXLineCap.Square:
+                return 'square';
+            default:
+                return 'butt';
+        }
+    }
+
+    public static getLineJoin(join: ctor): CanvasLineJoin {
+        switch (join) {
+            case TGFXModule.TGFXLineJoin.Round:
+                return 'round';
+            case TGFXModule.TGFXLineJoin.Bevel:
+                return 'bevel';
+            default:
+                return 'miter';
+        }
+    }
 
     public static setCanvas(canvas: HTMLCanvasElement | OffscreenCanvas) {
         ScalerContext.canvas = canvas;
@@ -145,12 +167,33 @@ export class ScalerContext {
         return context.measureText(text).width;
     }
 
-    public generateImage(text: string, bounds: Rect) {
-        const canvas = getCanvas2D(bounds.right - bounds.left, bounds.bottom - bounds.top);
-        const context = canvas.getContext('2d') as CanvasRenderingContext2D;
-        context.font = this.fontString(false, false);
-        context.fillText(text, -bounds.left, -bounds.top);
-        return canvas;
+    public readPixels(
+        text: string,
+        bounds: Rect,
+        fauxBold: boolean,
+        stroke ?: { width: number; cap: ctor; join: ctor; miterLimit: number }
+    ) {
+        const width = bounds.right - bounds.left;
+        const height = bounds.bottom - bounds.top
+        const canvas = getCanvas2D(width, height);
+        const context = canvas.getContext('2d',{willReadFrequently: true}) as CanvasRenderingContext2D;
+        context.clearRect(0, 0, width, height);
+        context.font = this.fontString(fauxBold, false);
+        if (stroke){
+            context.lineJoin = ScalerContext.getLineJoin(stroke.join);
+            context.miterLimit = stroke.miterLimit;
+            context.lineCap = ScalerContext.getLineCap(stroke.cap);
+            context.lineWidth = stroke.width;
+            context.strokeText(text, -bounds.left, -bounds.top);
+        } else {
+            context.fillText(text, -bounds.left, -bounds.top);
+        }
+        const {data} = context.getImageData(0, 0, width, height);
+        releaseCanvas2D(canvas);
+        if (data.length === 0) {
+            return null;
+        }
+        return new Uint8Array(data);
     }
 
     protected loadCanvas() {

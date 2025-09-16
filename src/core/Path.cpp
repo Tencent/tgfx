@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,6 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Path.h"
+#include <include/core/SkPathTypes.h>
+#include <include/core/SkRect.h>
+#include <memory>
 #include "core/PathRef.h"
 #include "core/utils/MathExtra.h"
 
@@ -128,15 +131,21 @@ bool Path::isLine(Point line[2]) const {
   return pathRef->path.isLine(reinterpret_cast<SkPoint*>(line));
 }
 
-bool Path::isRect(Rect* rect) const {
-  if (!rect) {
-    return pathRef->path.isRect(nullptr);
-  }
-  SkRect skRect = {};
-  if (!pathRef->path.isRect(&skRect)) {
+bool Path::isRect(Rect* rect, bool* closed, bool* reversed) const {
+  std::unique_ptr<SkRect> rectPointer = rect ? std::make_unique<SkRect>() : nullptr;
+  std::unique_ptr<SkPathDirection> directionPointer =
+      reversed ? std::make_unique<SkPathDirection>() : nullptr;
+
+  if (!pathRef->path.isRect(rectPointer.get(), closed, directionPointer.get())) {
     return false;
   }
-  rect->setLTRB(skRect.fLeft, skRect.fTop, skRect.fRight, skRect.fBottom);
+
+  if (rectPointer) {
+    rect->setLTRB(rectPointer->fLeft, rectPointer->fTop, rectPointer->fRight, rectPointer->fBottom);
+  }
+  if (directionPointer) {
+    *reversed = *directionPointer != SkPathDirection::kCW;
+  }
   return true;
 }
 
@@ -319,7 +328,7 @@ void Path::arcTo(float rx, float ry, float xAxisRotate, PathArcSize largeArc, bo
                         float_is_integer(rx) && float_is_integer(ry) &&
                         float_is_integer(endPoint.x) && float_is_integer(endPoint.y);
 
-  auto* path = &(writableRef()->path);
+  auto path = &(writableRef()->path);
   for (int i = 0; i < static_cast<int>(segments); ++i) {
     auto endTheta = startTheta + thetaWidth;
     auto sinEndTheta = SinSnapToZero(endTheta);
@@ -459,6 +468,13 @@ void Path::addRoundRect(const Rect& rect, float radiusX, float radiusY, bool rev
                                ToSkDirection(reversed), startIndex);
 }
 
+void Path::addRoundRect(const Rect& rect, const std::array<Point, 4>& radii, bool reversed,
+                        unsigned startIndex) {
+  SkRRect skRRect;
+  skRRect.setRectRadii(ToSkRect(rect), reinterpret_cast<const SkPoint*>(radii.data()));
+  writableRef()->path.addRRect(skRRect, ToSkDirection(reversed), startIndex);
+}
+
 void Path::addRRect(const RRect& rRect, bool reversed, unsigned int startIndex) {
   auto skRRect = SkRRect::MakeRectXY(ToSkRect(rRect.rect), rRect.radii.x, rRect.radii.y);
   writableRef()->path.addRRect(skRRect, ToSkDirection(reversed), startIndex);
@@ -557,8 +573,9 @@ PathRef* Path::writableRef() {
   if (pathRef.use_count() != 1) {
     pathRef = std::make_shared<PathRef>(pathRef->path);
   } else {
+    // There only one reference to this PathRef, so we can safely reset the uniqueKey and bounds.
     pathRef->uniqueKey.reset();
-    pathRef->resetBounds();
+    pathRef->bounds.reset();
   }
   return pathRef.get();
 }

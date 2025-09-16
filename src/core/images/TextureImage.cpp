@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,6 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureImage.h"
+#include "ScaledImage.h"
+#include "gpu/TPArgs.h"
+#include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
 std::shared_ptr<Image> TextureImage::Wrap(std::shared_ptr<TextureProxy> textureProxy) {
@@ -31,23 +34,22 @@ std::shared_ptr<Image> TextureImage::Wrap(std::shared_ptr<TextureProxy> textureP
 }
 
 TextureImage::TextureImage(std::shared_ptr<TextureProxy> textureProxy, uint32_t contextID)
-    : ResourceImage(textureProxy->getUniqueKey()), textureProxy(std::move(textureProxy)),
-      contextID(contextID) {
+    : textureProxy(std::move(textureProxy)), contextID(contextID) {
 }
 
 BackendTexture TextureImage::getBackendTexture(Context* context, ImageOrigin* origin) const {
   if (context == nullptr || context->uniqueID() != contextID) {
     return {};
   }
-  context->flush();
-  auto texture = textureProxy->getTexture();
-  if (texture == nullptr) {
+  context->flushAndSubmit();
+  auto textureView = textureProxy->getTextureView();
+  if (textureView == nullptr) {
     return {};
   }
   if (origin != nullptr) {
     *origin = textureProxy->origin();
   }
-  return texture->getBackendTexture();
+  return textureView->getBackendTexture();
 }
 
 std::shared_ptr<Image> TextureImage::makeTextureImage(Context* context) const {
@@ -57,11 +59,29 @@ std::shared_ptr<Image> TextureImage::makeTextureImage(Context* context) const {
   return std::static_pointer_cast<Image>(weakThis.lock());
 }
 
-std::shared_ptr<TextureProxy> TextureImage::onLockTextureProxy(const TPArgs& args,
-                                                               const UniqueKey&) const {
+std::shared_ptr<Image> TextureImage::makeRasterized() const {
+  return weakThis.lock();
+}
+
+std::shared_ptr<Image> TextureImage::onMakeScaled(int newWidth, int newHeight,
+                                                  const SamplingOptions& sampling) const {
+  auto scaledImage = Image::onMakeScaled(newWidth, newHeight, sampling);
+  return scaledImage->makeTextureImage(textureProxy->getContext());
+}
+
+std::shared_ptr<TextureProxy> TextureImage::lockTextureProxy(const TPArgs& args) const {
   if (args.context == nullptr || args.context->uniqueID() != contextID) {
     return nullptr;
   }
   return textureProxy;
+}
+
+PlacementPtr<FragmentProcessor> TextureImage::asFragmentProcessor(const FPArgs& args,
+                                                                  const SamplingArgs& samplingArgs,
+                                                                  const Matrix* uvMatrix) const {
+  if (args.context == nullptr || args.context->uniqueID() != contextID) {
+    return nullptr;
+  }
+  return TiledTextureEffect::Make(textureProxy, samplingArgs, uvMatrix, isAlphaOnly());
 }
 }  // namespace tgfx

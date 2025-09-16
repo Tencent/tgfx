@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -19,39 +19,30 @@
 #pragma once
 
 #include <CoreVideo/CoreVideo.h>
-#include "gpu/Texture.h"
-#include "gpu/TextureSampler.h"
+#include "gpu/opengl/GLTexture.h"
 
 namespace tgfx {
-class CGLHardwareTexture : public Texture {
+class CGLHardwareTexture : public GLTexture {
  public:
-  static std::shared_ptr<CGLHardwareTexture> MakeFrom(Context* context,
-                                                      CVPixelBufferRef pixelBuffer,
+  static std::unique_ptr<CGLHardwareTexture> MakeFrom(const Caps* caps,
+                                                      CVPixelBufferRef pixelBuffer, uint32_t usage,
                                                       CVOpenGLTextureCacheRef textureCache);
 
-  explicit CGLHardwareTexture(CVPixelBufferRef pixelBuffer);
-
   ~CGLHardwareTexture() override;
-
-  size_t memoryUsage() const override;
-
-  const TextureSampler* getSampler() const override {
-    return sampler.get();
-  }
 
   HardwareBufferRef getHardwareBuffer() const override {
     return pixelBuffer;
   }
 
  protected:
-  void onReleaseGPU() override;
+  void onRelease(GLGPU* gpu) override;
 
  private:
-  std::unique_ptr<TextureSampler> sampler = {};
   CVPixelBufferRef pixelBuffer = nullptr;
   CVOpenGLTextureRef texture = nil;
   CVOpenGLTextureCacheRef textureCache = nil;
 
-  static ScratchKey ComputeScratchKey(CVPixelBufferRef pixelBuffer);
+  CGLHardwareTexture(const GPUTextureDescriptor& descriptor, CVPixelBufferRef pixelBuffer,
+                     CVOpenGLTextureCacheRef textureCache, unsigned target, unsigned textureID);
 };
 }  // namespace tgfx

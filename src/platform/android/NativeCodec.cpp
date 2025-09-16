@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -294,8 +294,9 @@ static jobject ConvertHardwareBitmap(JNIEnv* env, jobject bitmap) {
   return bitmap;
 }
 
-bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
-  if (dstInfo.isEmpty() || dstPixels == nullptr) {
+bool NativeCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
+                               void* dstPixels) const {
+  if (dstPixels == nullptr) {
     return false;
   }
   JNIEnvironment environment;
@@ -303,7 +304,7 @@ bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   if (env == nullptr) {
     return false;
   }
-  auto bitmap = decodeBitmap(env, dstInfo.colorType(), dstInfo.alphaType(), false);
+  auto bitmap = decodeBitmap(env, colorType, alphaType, false);
   auto info = AndroidBitmap::GetInfo(env, bitmap);
   if (info.isEmpty()) {
     LOGE("NativeCodec::readPixels() Failed to read the image info from a Bitmap!");
@@ -315,6 +316,7 @@ bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
     LOGE("NativeCodec::readPixels() Failed to lockPixels() of a Java Bitmap!");
     return false;
   }
+  auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes);
   auto result = Pixmap(info, pixels).readPixels(dstInfo, dstPixels);
   AndroidBitmap_unlockPixels(env, bitmap);
   return result;

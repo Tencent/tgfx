@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -20,24 +20,22 @@
 
 #include "ResourceTask.h"
 #include "core/DataSource.h"
-#include "core/ShapeBuffer.h"
+#include "core/ShapeRasterizer.h"
 
 namespace tgfx {
 class ShapeBufferUploadTask : public ResourceTask {
  public:
-  ShapeBufferUploadTask(UniqueKey trianglesKey, UniqueKey textureKey,
+  ShapeBufferUploadTask(std::shared_ptr<ResourceProxy> trianglesProxy,
+                        std::shared_ptr<ResourceProxy> textureProxy,
                         std::unique_ptr<DataSource<ShapeBuffer>> source);
 
-  bool execute(Context* context) override;
-
  protected:
-  std::shared_ptr<Resource> onMakeResource(Context*) override {
-    // The execute() method is already overridden, so this method should never be called.
-    return nullptr;
-  }
+  std::shared_ptr<Resource> onMakeResource(Context*) override;
 
  private:
-  UniqueKey textureKey = {};
+  std::shared_ptr<ResourceProxy> textureProxy = nullptr;
   std::unique_ptr<DataSource<ShapeBuffer>> source = nullptr;
+
+  friend class ProxyProvider;
 };
 }  // namespace tgfx

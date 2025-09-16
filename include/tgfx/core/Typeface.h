@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,11 +18,14 @@
 
 #pragma once
 
+#include <memory>
 #include <mutex>
 #include <unordered_map>
 #include <vector>
 #include "tgfx/core/Data.h"
 #include "tgfx/core/FontStyle.h"
+#include "tgfx/core/Rect.h"
+#include "tgfx/core/Stream.h"
 
 namespace tgfx {
 /**
@@ -38,6 +41,7 @@ typedef int32_t Unichar;
 typedef uint32_t FontTableTag;
 
 class ScalerContext;
+class AdvancedTypefaceInfo;
 
 /**
  * A set of character glyphs and layout information for drawing text.
@@ -131,12 +135,23 @@ class Typeface {
    */
   virtual GlyphID getGlyphID(Unichar unichar) const = 0;
 
-  virtual std::shared_ptr<Data> getBytes() const = 0;
+  /**
+   * Returns a Stream object containing the font data, or nullptr if unavailable.
+   * For local file fonts, this will return a stream object of the file
+   */
+  virtual std::unique_ptr<Stream> openStream() const = 0;
 
   /**
    * Returns an immutable copy of the requested font table, or nullptr if that table was not found.
    */
   virtual std::shared_ptr<Data> copyTableData(FontTableTag tag) const = 0;
+
+  /**
+   * Returns a rectangle that represents the union of the bounds of all the glyphs, but each one
+   * positioned at (0,0). This may be conservatively large, and will not take into account any
+   * hitting or other size-specific adjustments.
+   */
+  Rect getBounds() const;
 
  protected:
   /**
@@ -146,12 +161,39 @@ class Typeface {
    */
   virtual std::vector<Unichar> getGlyphToUnicodeMap() const;
 
+  virtual std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const = 0;
+
+  /**
+   * Returns advanced information about the typeface. This method is used by the PDF backend.
+   */
+  virtual AdvancedTypefaceInfo getAdvancedInfo() const;
+
   mutable std::mutex locker = {};
 
- private:
-  std::unordered_map<float, std::weak_ptr<ScalerContext>> scalerContexts = {};
+  std::weak_ptr<Typeface> weakThis;
 
+ private:
+  /**
+   *  Returns a ScalerContext for the given size.
+   */
+  std::shared_ptr<ScalerContext> getScalerContext(float size);
+
+  virtual bool isCustom() const;
+
+  virtual bool onComputeBounds(Rect* bounds) const;
+
+  std::unordered_map<float, std::weak_ptr<ScalerContext>> scalerContexts = {};
+  mutable Rect bounds = {};
+  mutable std::once_flag onceFlag = {};
+
+  friend class Font;
   friend class ScalerContext;
   friend class GlyphConverter;
+  friend class CGMask;
+  friend class WebMask;
+  friend class SVGExportContext;
+  friend class RenderContext;
+  friend class PDFExportContext;
+  friend class PDFFont;
 };
 }  // namespace tgfx

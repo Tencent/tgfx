@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -39,16 +39,16 @@ void SVGShape::onRender(const SVGRenderContext& context) const {
   auto strokePaint = paintContext.strokePaint();
 
   if (fillPaint.has_value()) {
-    onDrawFill(context.canvas(), context.lengthContext(), fillPaint.value(), fillType);
+    onDrawFill(context.canvas(), context.lengthContext(), *fillPaint, fillType);
   }
 
   if (strokePaint.has_value()) {
     auto strokePathEffect = context.strokePathEffect();
     if (strokePathEffect) {
-      onDrawStroke(context.canvas(), context.lengthContext(), strokePaint.value(), fillType,
+      onDrawStroke(context.canvas(), context.lengthContext(), *strokePaint, fillType,
                    strokePathEffect);
     } else {
-      onDrawFill(context.canvas(), context.lengthContext(), strokePaint.value(), fillType);
+      onDrawFill(context.canvas(), context.lengthContext(), *strokePaint, fillType);
     }
   }
 }

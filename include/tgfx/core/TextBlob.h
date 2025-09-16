@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -46,14 +46,6 @@ class TextBlob {
                                             size_t glyphCount, const Font& font);
 
   /**
-   * Creates a new TextBlob from the given glyphIDs, positions, and glyphFace. Returns nullptr if
-   * the glyphCount is 0 or glyphFace is nullptr.
-   */
-  static std::shared_ptr<TextBlob> MakeFrom(const GlyphID glyphIDs[], const Point positions[],
-                                            size_t glyphCount,
-                                            std::shared_ptr<GlyphFace> glyphFace);
-
-  /**
    * Creates a new TextBlob from a single glyph run. Returns nullptr if the glyph run is empty or
    * has mismatched glyph and position counts.
    */
@@ -68,23 +60,26 @@ class TextBlob {
   virtual ~TextBlob() = default;
 
   /**
-   * Returns the bounding box of the TextBlob. Since text outlines can change with different scale
-   * factors, it's best to use the final drawing scale factor in the resolutionScale for accurate
-   * bounds calculation. Note that the resolutionScale is not applied to the returned bounds; it
-   * only affects the precision of the bounds.
-   * @param resolutionScale The intended resolution for the TextBlob. The default value is 1.0.
-   * @return The bounding box of the TextBlob.
+   * Returns a conservative bounding box for the TextBlob that is guaranteed to contain all glyphs.
+   * It may be larger than the actual bounds, but it is faster to compute.
    */
-  Rect getBounds(float resolutionScale = 1.0f) const;
+  Rect getBounds() const;
+
+  /**
+   * Returns the tight bounding box of the TextBlob when drawn with the given Matrix. Because text
+   * outlines can vary with different scale factors, it's best to use the final drawing matrix for
+   * accurate bounds. This method is more accurate than getBounds, but also more computationally
+   * expensive.
+   */
+  Rect getTightBounds(const Matrix* matrix = nullptr) const;
 
   /**
    * Creates a Path for the glyphs in the text blob. Since text outlines can change with different
-   * scale factors, it's best to use the final drawing scale factor in the resolutionScale for
-   * accuracy. Note that the resolutionScale is not applied to the returned Path; it only affects
-   * the precision of the Path. Returns true if the path was successfully created. Otherwise,
-   * returns false and leaves the path unchanged.
+   * scale factors, it's best to use the final drawing matrix to compute an accurate Path.
+   * Returns true if the path was created successfully; otherwise, returns false and leaves the
+   * path unchanged.
    */
-  bool getPath(Path* path, float resolutionScale = 1.0f) const;
+  bool getPath(Path* path, const Matrix* matrix = nullptr) const;
 
  private:
   std::vector<std::shared_ptr<GlyphRunList>> glyphRunLists = {};

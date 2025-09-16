@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -17,14 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/SolidLayer.h"
-#include "layers/contents/ShapeContent.h"
-#include "layers/contents/SolidContent.h"
 
 namespace tgfx {
 std::shared_ptr<SolidLayer> SolidLayer::Make() {
-  auto layer = std::shared_ptr<SolidLayer>(new SolidLayer());
-  layer->weakThis = layer;
-  return layer;
+  return std::shared_ptr<SolidLayer>(new SolidLayer());
 }
 
 void SolidLayer::setWidth(float width) {
@@ -73,14 +69,16 @@ void SolidLayer::setColor(const Color& color) {
   invalidateContent();
 }
 
-std::unique_ptr<LayerContent> SolidLayer::onUpdateContent() {
+void SolidLayer::onUpdateContent(LayerRecorder* recorder) {
   if (_width == 0 || _height == 0) {
-    return nullptr;
+    return;
   }
   RRect rRect = {};
   rRect.setRectXY(Rect::MakeLTRB(0, 0, _width, _height), _radiusX, _radiusY);
-  auto content = std::make_unique<SolidContent>(rRect, _color);
-  return content;
+  Paint paint = {};
+  paint.setColor(_color);
+  auto canvas = recorder->getCanvas();
+  canvas->drawRRect(rRect, paint);
 }
 
 }  // namespace tgfx

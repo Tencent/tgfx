@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -27,6 +27,7 @@
 
 namespace tgfx {
 class TextureProxy;
+enum class SrcRectConstraint;
 
 /**
  * ImageFilter is the base class for all image filters. If one is installed in the Paint, then all
@@ -142,11 +143,11 @@ class ImageFilter {
   /**
    * Returns a texture proxy that applies this filter to the source image.
    * @param source The source image.
-   * @param clipBounds The clip bounds of the filtered image, relative to the source image.
+   * @param renderBounds Render bounds of the filtered image, relative to the source image.
    * @param args The arguments for creating the texture proxy.
    */
   virtual std::shared_ptr<TextureProxy> lockTextureProxy(std::shared_ptr<Image> source,
-                                                         const Rect& clipBounds,
+                                                         const Rect& renderBounds,
                                                          const TPArgs& args) const;
 
   /**
@@ -156,6 +157,7 @@ class ImageFilter {
   virtual PlacementPtr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
                                                               const FPArgs& args,
                                                               const SamplingOptions& sampling,
+                                                              SrcRectConstraint constraint,
                                                               const Matrix* uvMatrix) const = 0;
 
   bool applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* clipBounds = nullptr) const;
@@ -163,12 +165,13 @@ class ImageFilter {
   PlacementPtr<FragmentProcessor> makeFPFromTextureProxy(std::shared_ptr<Image> source,
                                                          const FPArgs& args,
                                                          const SamplingOptions& sampling,
+                                                         SrcRectConstraint constraint,
                                                          const Matrix* uvMatrix) const;
 
   friend class DropShadowImageFilter;
   friend class InnerShadowImageFilter;
   friend class ComposeImageFilter;
   friend class FilterImage;
-  friend class Caster;
+  friend class Types;
 };
 }  // namespace tgfx

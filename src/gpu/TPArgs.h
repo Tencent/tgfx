@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,7 +18,8 @@
 
 #pragma once
 
-#include "gpu/proxies/TextureProxy.h"
+#include "gpu/BackingFit.h"
+#include "tgfx/core/SamplingOptions.h"
 
 namespace tgfx {
 /**
@@ -28,8 +29,10 @@ class TPArgs {
  public:
   TPArgs() = default;
 
-  TPArgs(Context* context, uint32_t renderFlags, bool mipmapped)
-      : context(context), renderFlags(renderFlags), mipmapped(mipmapped) {
+  TPArgs(Context* context, uint32_t renderFlags, bool mipmapped, float drawScale,
+         BackingFit backingFit = BackingFit::Approx)
+      : context(context), renderFlags(renderFlags), mipmapped(mipmapped), backingFit(backingFit),
+        drawScale(drawScale) {
   }
 
   /**
@@ -47,5 +50,15 @@ class TPArgs {
    * image already has preset mipmaps.
    */
   bool mipmapped = false;
+
+  /**
+   * Specifies whether the texture size should be approximated based on the width and height.
+   */
+  BackingFit backingFit = BackingFit::Approx;
+
+  /**
+   * Recommended scales for creating the TextureProxy.
+   */
+  float drawScale = 1.0f;
 };
 }  // namespace tgfx
