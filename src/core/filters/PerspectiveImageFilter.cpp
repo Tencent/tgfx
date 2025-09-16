@@ -51,7 +51,6 @@ PerspectiveImageFilter::PerspectiveImageFilter(const PerspectiveInfo& info) : in
 }
 
 Rect PerspectiveImageFilter::onFilterBounds(const Rect& srcRect) const {
-  DEBUG_ASSERT(srcRect.left == 0.f && srcRect.top == 0.f);
   auto normalModelMatrix = rotateModelMatrix;
   normalModelMatrix.postTranslate(0.f, 0.f, info.depth * 2.f / srcRect.height());
   const auto normalTransformMatrix = normalPVMatrix * normalModelMatrix;
@@ -61,7 +60,7 @@ Rect PerspectiveImageFilter::onFilterBounds(const Rect& srcRect) const {
       Rect::MakeXYWH((ndcResult.left + 1.f) * 0.5f, (ndcResult.top + 1.f) * 0.5f,
                      ndcResult.width() * 0.5f, ndcResult.height() * 0.5f);
   const auto result = Rect::MakeXYWH(
-      normalizedResult.left * srcRect.width(), normalizedResult.top * srcRect.height(),
+      normalizedResult.left * srcRect.width() + srcRect.left, normalizedResult.top * srcRect.height() + srcRect.top,
       normalizedResult.width() * srcRect.width(), normalizedResult.height() * srcRect.height());
   return result;
 }
