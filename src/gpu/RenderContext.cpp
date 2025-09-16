@@ -180,11 +180,9 @@ static void GetGlyphMatrix(const std::shared_ptr<ScalerContext>& scalerContext,
 static SamplingOptions GetSamplingOptions(const std::shared_ptr<ScalerContext>& scalerContext,
                                           bool fauxItalic, const Matrix& stateMatrix) {
   if (fauxItalic || !FloatNearlyEqual(scalerContext->getBackingSize(), scalerContext->getSize())) {
-    return SamplingOptions{FilterMode::Nearest, MipmapMode::None};
+    return SamplingOptions{FilterMode::Linear, MipmapMode::None};
   }
-  const auto hasRotated =
-      !FloatNearlyZero(stateMatrix.getSkewX()) || !FloatNearlyZero(stateMatrix.getSkewY());
-  const auto filterMode = hasRotated ? FilterMode::Linear : FilterMode::Nearest;
+  const auto filterMode = stateMatrix.isScaleTranslate() ? FilterMode::Nearest : FilterMode::Linear;
   return SamplingOptions{filterMode, MipmapMode::None};
 }
 
