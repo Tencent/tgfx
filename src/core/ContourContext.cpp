@@ -22,6 +22,10 @@
 #include "utils/RectToRectMatrix.h"
 
 namespace tgfx {
+ContourContext::ContourContext() {
+  contourBounds.reserve(3);
+}
+
 void ContourContext::drawFill(const Fill& fill) {
   drawRect(Rect::MakeLTRB(-FLT_MAX, -FLT_MAX, FLT_MAX, FLT_MAX), {}, fill);
 }
@@ -82,7 +86,7 @@ void ContourContext::drawImageRect(std::shared_ptr<Image> image, const Rect& src
     return;
   }
   auto bounds = state.matrix.mapRect(dstRect);
-  if (containContentBounds(bounds)) {
+  if (containContourBound(bounds)) {
     return;
   }
   recordingContext.drawImageRect(image, srcRect, dstRect, sampling, state, fill, constraint);
@@ -96,7 +100,7 @@ void ContourContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList
     ApplyStrokeToBounds(*stroke, &bounds);
   }
   bounds = state.matrix.mapRect(bounds);
-  if (containContentBounds(bounds)) {
+  if (containContourBound(bounds)) {
     return;
   }
   recordingContext.drawGlyphRunList(glyphRunList, state, fill, stroke);
@@ -112,14 +116,59 @@ void ContourContext::drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr
   picture->playback(this, state);
 }
 
-bool ContourContext::containContentBounds(const Rect& bounds) {
-  auto 
-  for (const auto& contour : contourBounds) {
-    if (contour.contains(bounds)) {
-      return true;
+bool ContourContext::containContourBound(const Rect& bounds) {
+  return std::any_of(contourBounds.begin(), contourBounds.end(),
+                     [&](const Rect& rect) { return rect.contains(bounds); });
+}
+
+Rect GetMaxOverlapRect(const Rect& rect1, const Rect& rect2) {
+  auto intersect = rect1;
+  if (intersect.intersect(rect2)) {
+    float left = std::min(rect1.left, rect2.left);
+    float top = std::min(rect1.top, rect2.top);
+    float right = std::max(rect1.right, rect2.right);
+    float bottom = std::max(rect1.bottom, rect2.bottom);
+    auto overlap1 = Rect::MakeLTRB(intersect.left, top, intersect.right, bottom);
+    auto overlap2 = Rect::MakeLTRB(left, intersect.top, right, intersect.bottom);
+    return overlap1.area() > overlap2.area() ? overlap1 : overlap2;
+  }
+  return Rect::MakeEmpty();
+}
+
+void ContourContext::appendContourBound(const Rect& bounds) {
+  if (contourBounds.size() < 3) {
+    contourBounds.emplace_back(bounds);
+    if (contourBounds.size() == 3) {
+      std::sort(contourBounds.begin(), contourBounds.end(),
+                [](const Rect& a, const Rect& b) { return a.area() > b.area(); });
+    }
+    return;
+  }
+  size_t bestIdx = 0;
+  float maxOverlapArea = 0;
+  Rect bestOverlap = Rect::MakeEmpty();
+  for (size_t i = 0; i < contourBounds.size(); ++i) {
+    const auto& r = contourBounds[i];
+    auto overlap = GetMaxOverlapRect(r, bounds);
+    float overlapArea = overlap.area();
+    if (overlapArea < bounds.area()) {
+      continue;
+    }
+    if (overlapArea > maxOverlapArea) {
+      maxOverlapArea = overlapArea;
+      bestIdx = i;
+      bestOverlap = overlap;
     }
   }
-  return false;
+  if (maxOverlapArea > 0) {
+    contourBounds[bestIdx] = bestOverlap;
+  } else {
+    if (bounds.area() > contourBounds.back().area()) {
+      contourBounds.back() = bounds;
+    }
+  }
+  std::sort(contourBounds.begin(), contourBounds.end(),
+            [](const Rect& a, const Rect& b) { return a.area() > b.area(); });
 }
 
 std::shared_ptr<Picture> ContourContext::finishRecordingAsPicture() {
@@ -146,15 +195,36 @@ bool ContourContext::canAppend(std::shared_ptr<Shape> shape, const MCState& stat
 void ContourContext::flushPendingShape(std::shared_ptr<Shape> shape, const MCState& state,
                                        const Fill& fill, const Stroke* stroke) {
   if (pendingShape) {
-    Rect bounds = state.matrix.mapRect(pendingShape->getBounds());
-    if (!containContentBounds(bounds)) {
+    Rect outset = Rect::MakeEmpty();
+    for (auto pendingStroke : pendingStrokes) {
+      auto rect = Rect::MakeEmpty();
+      ApplyStrokeToBounds(*pendingStroke, &rect);
+      if (rect.right > outset.right) {
+        outset = rect;
+      }
+    }
+    Rect localBounds = pendingShape->getBounds();
+    localBounds.outset(outset.right, outset.top);
+    auto globalBounds = state.matrix.mapRect(localBounds);
+
+    if (!containContourBound(globalBounds)) {
       for (size_t i = 0; i < pendingFills.size(); i++) {
         auto& pendingFill = pendingFills[i];
         const Stroke* pendingStroke = pendingStrokes.size() > i ? pendingStrokes[i] : nullptr;
         drawShapeInternal(pendingShape, pendingState, pendingFill, pendingStroke);
       }
-      if ((fill.shader == nullptr || !fill.shader->isAImage()) && !fill.maskFilter) {
-        contourBounds.push_back(bounds);
+      if (pendingState.matrix.isScaleTranslate() && pendingShape->isSimplePath() &&
+          (fill.shader == nullptr || !fill.shader->isAImage()) && !fill.maskFilter) {
+        RRect rRect = {};
+        if (pendingShape->getPath().isRect()) {
+          appendContourBound(globalBounds);
+        } else if (pendingShape->getPath().isRRect(&rRect)) {
+          localBounds.inset(rRect.radii.x, rRect.radii.y);
+          if (localBounds.isSorted()) {
+            globalBounds = state.matrix.mapRect(localBounds);
+            appendContourBound(globalBounds);
+          }
+        }
       }
     }
   }

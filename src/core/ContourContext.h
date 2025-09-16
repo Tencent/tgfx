@@ -23,6 +23,8 @@
 namespace tgfx {
 class ContourContext : public DrawContext {
  public:
+  ContourContext();
+
   ~ContourContext() override = default;
 
   void drawFill(const Fill& fill) override;
@@ -54,7 +56,9 @@ class ContourContext : public DrawContext {
   std::shared_ptr<Picture> finishRecordingAsPicture();
 
  private:
-  bool containContentBounds(const Rect& bounds);
+  bool containContourBound(const Rect& bounds);
+
+  void appendContourBound(const Rect& bounds);
 
   bool canAppend(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill);
 
