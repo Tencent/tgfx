@@ -166,7 +166,7 @@
         "InnerShadowBadCase": "cebc420b",
         "ModeColorFilter": "81d4e16e",
         "OpacityShadowTest": "ee2cc771",
-        "RuntimeEffect": "aac25365",
+        "RuntimeEffect": "5796ca30",
         "blur": "81d4e16e",
         "blur-large-pixel": "81d4e16e",
         "dropShadow": "ee2cc771",
@@ -245,7 +245,7 @@
         "imageMask": "fdbd281d",
         "innerShadow": "c26ff3d9",
         "shapeMask": "fdbd281d",
-        "textMask": "983a559b"
+        "textMask": "5796ca30"
     },
     "MaskTest": {
         "rasterize_emoji": "c0f39f8",
