@@ -40,17 +40,21 @@ std::shared_ptr<ImageFilter> ImageFilter::Perspective(const PerspectiveInfo& per
 }
 
 PerspectiveImageFilter::PerspectiveImageFilter(const PerspectiveInfo& info) : info(info) {
-  auto perspectiveMatrix = Matrix3D::Perspective(FOV_Y_DEGRESS, 1.f, NORMAL_NEAR_Z, NORMAL_FAR_Z);
+  const auto perspectiveMatrix =
+      Matrix3D::Perspective(FOV_Y_DEGRESS, 1.f, NORMAL_NEAR_Z, NORMAL_FAR_Z);
   const Vec3 eyePosition = {0.f, 0.f, 1.f / tanf(DegreesToRadians(FOV_Y_DEGRESS * 0.5f))};
   const auto viewMatrix = Matrix3D::LookAt(eyePosition, eyeTarget, eyeUp);
-  modelMatrix = Matrix3D::MakeRotate({1.f, 0.f, 0.f}, info.xRotation);
-  modelMatrix.postRotate({0.f, 1.f, 0.f}, info.yRotation);
-  modelMatrix.postRotate({0.f, 0.f, 1.f}, info.zRotation);
-  normalTransformMatrix = perspectiveMatrix * viewMatrix * modelMatrix;
+  normalPVMatrix = perspectiveMatrix * viewMatrix;
+  rotateModelMatrix = Matrix3D::MakeRotate({1.f, 0.f, 0.f}, info.xRotation);
+  rotateModelMatrix.postRotate({0.f, 1.f, 0.f}, info.yRotation);
+  rotateModelMatrix.postRotate({0.f, 0.f, 1.f}, info.zRotation);
 }
 
 Rect PerspectiveImageFilter::onFilterBounds(const Rect& srcRect) const {
   DEBUG_ASSERT(srcRect.left == 0.f && srcRect.top == 0.f);
+  auto normalModelMatrix = rotateModelMatrix;
+  normalModelMatrix.postTranslate(0.f, 0.f, info.depth * 2.f / srcRect.height());
+  const auto normalTransformMatrix = normalPVMatrix * normalModelMatrix;
   constexpr auto tempRect = Rect::MakeXYWH(-1.f, -1.f, 2.f, 2.f);
   const auto ndcResult = normalTransformMatrix.mapRect(tempRect);
   const auto normalizedResult =
@@ -80,6 +84,8 @@ std::shared_ptr<TextureProxy> PerspectiveImageFilter::lockTextureProxy(
   const float farZ = std::max(NORMAL_FAR_Z, eyePositionZ * 10.f);
   const auto perspectiveMatrix =
       Matrix3D::Perspective(FOV_Y_DEGRESS, sourceW / sourceH, nearZ, farZ);
+  auto modelMatrix = rotateModelMatrix;
+  modelMatrix.postTranslate(0.f, 0.f, info.depth);
   const auto transformMatrix = perspectiveMatrix * viewMatrix * modelMatrix;
 
   // Convert the projected NDC coordinates to the pixel coordinate system of RT and align NDC Rect

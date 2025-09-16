@@ -46,9 +46,9 @@ class PerspectiveImageFilter final : public ImageFilter {
 
   PerspectiveInfo info = {};
 
-  Matrix3D modelMatrix;
+  Matrix3D normalPVMatrix;
 
-  Matrix3D normalTransformMatrix;
+  Matrix3D rotateModelMatrix;
 };
 
 }  // namespace tgfx
