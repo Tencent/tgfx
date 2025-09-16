@@ -48,7 +48,7 @@ class RenderTargetProxy {
                                                          bool alphaOnly, int sampleCount = 1,
                                                          bool mipmapped = false,
                                                          ImageOrigin origin = ImageOrigin::TopLeft,
-                                                         BackingFit backingFit = BackingFit::Exact);
+                                                         BackingFit backingFit = BackingFit::Exact, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   virtual ~RenderTargetProxy() = default;
 

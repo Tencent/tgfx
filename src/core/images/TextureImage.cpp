@@ -18,8 +18,10 @@
 
 #include "TextureImage.h"
 #include "ScaledImage.h"
+#include "gpu/DrawingManager.h"
 #include "gpu/TPArgs.h"
 #include "gpu/processors/TiledTextureEffect.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
 std::shared_ptr<Image> TextureImage::Wrap(std::shared_ptr<TextureProxy> textureProxy,

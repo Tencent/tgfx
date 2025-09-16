@@ -47,14 +47,13 @@ bool ImageShader::isEqual(const Shader* shader) const {
 }
 
 PlacementPtr<FragmentProcessor> ImageShader::asFragmentProcessor(const FPArgs& args,
-                                                                 const Matrix* uvMatrix) const {
+                                                                 const Matrix* uvMatrix, std::shared_ptr<ColorSpace> colorSpace) const {
   SamplingArgs samplingArgs = {tileModeX, tileModeY, sampling, SrcRectConstraint::Fast};
-  auto dstColorSpace = args.dstColorSpace;
   auto fp = image->asFragmentProcessor(args, samplingArgs, uvMatrix);
   if (fp) {
     return ColorSpaceXformEffect::Make(args.context->drawingBuffer(), std::move(fp),
                                        image->colorSpace().get(), AlphaType::Premultiplied,
-                                       args.dstColorSpace.get(), AlphaType::Premultiplied);
+                                       colorSpace.get(), AlphaType::Premultiplied);
   }
   return fp;
 }

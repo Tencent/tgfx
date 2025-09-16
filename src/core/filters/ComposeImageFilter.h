@@ -38,7 +38,7 @@ class ComposeImageFilter : public ImageFilter {
                                                       const FPArgs& args,
                                                       const SamplingOptions& sampling,
                                                       SrcRectConstraint constraint,
-                                                      const Matrix* uvMatrix) const override;
+                                                      const Matrix* uvMatrix, std::shared_ptr<ColorSpace> dstColorSpace) const override;
 
   friend class ImageFilter;
 };

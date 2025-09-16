@@ -650,10 +650,9 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const F
     return;
   }
   auto colorSpace = renderTarget->getColorSpace();
-  FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty()), drawScale,
-                 colorSpace};
+  FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty()), drawScale};
   if (fill.shader) {
-    if (auto processor = FragmentProcessor::Make(fill.shader, args)) {
+    if (auto processor = FragmentProcessor::Make(fill.shader, args, nullptr, colorSpace)) {
       op->addColorFP(std::move(processor));
     } else {
       // The shader is the main source of color, so if it fails to create a processor, we can't

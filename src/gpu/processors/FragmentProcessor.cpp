@@ -16,6 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <utility>
+
 #include "gpu/processors/FragmentProcessor.h"
 #include "ColorSpaceXformEffect.h"
 #include "ComposeFragmentProcessor.h"
@@ -54,9 +56,9 @@ PlacementPtr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Image> i
 
 PlacementPtr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Shader> shader,
                                                         const FPArgs& args,
-                                                        const Matrix* uvMatrix) {
+                                                        const Matrix* uvMatrix, std::shared_ptr<ColorSpace> colorSpace) {
   DEBUG_ASSERT(shader != nullptr);
-  return shader->asFragmentProcessor(args, uvMatrix);
+  return shader->asFragmentProcessor(args, uvMatrix, std::move(colorSpace));
 }
 
 PlacementPtr<FragmentProcessor> FragmentProcessor::MulChildByInputAlpha(

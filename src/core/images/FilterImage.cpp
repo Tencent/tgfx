@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "FilterImage.h"
+
+#include <utility>
 #include "core/images/ScaledImage.h"
 #include "core/images/SubsetImage.h"
 #include "core/utils/AddressOf.h"
@@ -25,7 +27,7 @@
 namespace tgfx {
 std::shared_ptr<Image> FilterImage::MakeFrom(std::shared_ptr<Image> source,
                                              std::shared_ptr<ImageFilter> filter, Point* offset,
-                                             const Rect* clipRect) {
+                                             const Rect* clipRect, std::shared_ptr<ColorSpace> colorSpace) {
   if (source == nullptr) {
     return nullptr;
   }
@@ -47,40 +49,40 @@ std::shared_ptr<Image> FilterImage::MakeFrom(std::shared_ptr<Image> source,
     offset->x = bounds.left;
     offset->y = bounds.top;
   }
-  return Wrap(std::move(source), bounds, std::move(filter));
+  return Wrap(std::move(source), bounds, std::move(filter), std::move(colorSpace));
 }
 
 std::shared_ptr<Image> FilterImage::Wrap(std::shared_ptr<Image> source, const Rect& bounds,
-                                         std::shared_ptr<ImageFilter> filter) {
+                                         std::shared_ptr<ImageFilter> filter, std::shared_ptr<ColorSpace> colorSpace) {
   auto image =
-      std::shared_ptr<FilterImage>(new FilterImage(std::move(source), bounds, std::move(filter)));
+      std::shared_ptr<FilterImage>(new FilterImage(std::move(source), bounds, std::move(filter), std::move(colorSpace)));
   image->weakThis = image;
   return image;
 }
 
 FilterImage::FilterImage(std::shared_ptr<Image> source, const Rect& bounds,
-                         std::shared_ptr<ImageFilter> filter)
-    : SubsetImage(std::move(source), bounds), filter(std::move(filter)) {
+                         std::shared_ptr<ImageFilter> filter, std::shared_ptr<ColorSpace> colorSpace)
+    : SubsetImage(std::move(source), bounds), filter(std::move(filter)), _colorSpace(std::move(colorSpace)) {
 }
 
 std::shared_ptr<Image> FilterImage::onCloneWith(std::shared_ptr<Image> newSource) const {
-  return FilterImage::Wrap(std::move(newSource), bounds, filter);
+  return FilterImage::Wrap(std::move(newSource), bounds, filter, _colorSpace);
 }
 
 std::shared_ptr<Image> FilterImage::onMakeSubset(const Rect& subset) const {
   auto newBounds = subset;
   newBounds.offset(bounds.x(), bounds.y());
-  return FilterImage::Wrap(source, newBounds, filter);
+  return FilterImage::Wrap(source, newBounds, filter, _colorSpace);
 }
 
 std::shared_ptr<Image> FilterImage::onMakeWithFilter(std::shared_ptr<ImageFilter> imageFilter,
-                                                     Point* offset, const Rect* clipRect) const {
+                                                     Point* offset, const Rect* clipRect, std::shared_ptr<ColorSpace> colorSpace) const {
   if (imageFilter == nullptr) {
     return nullptr;
   }
   auto inputBounds = Rect::MakeWH(source->width(), source->height());
   if (filter->filterBounds(inputBounds) != bounds) {
-    return FilterImage::MakeFrom(weakThis.lock(), std::move(imageFilter), offset, clipRect);
+    return FilterImage::MakeFrom(weakThis.lock(), std::move(imageFilter), offset, clipRect, colorSpace);
   }
   auto filterBounds = imageFilter->filterBounds(Rect::MakeWH(width(), height()));
   if (filterBounds.isEmpty()) {
@@ -100,11 +102,11 @@ std::shared_ptr<Image> FilterImage::onMakeWithFilter(std::shared_ptr<ImageFilter
     offset->y = filterBounds.top;
   }
   if (hasClip) {
-    return FilterImage::Wrap(weakThis.lock(), filterBounds, std::move(imageFilter));
+    return FilterImage::Wrap(weakThis.lock(), filterBounds, std::move(imageFilter), _colorSpace);
   }
   filterBounds.offset(bounds.x(), bounds.y());
   auto composeFilter = ImageFilter::Compose(filter, std::move(imageFilter));
-  return FilterImage::Wrap(source, filterBounds, std::move(composeFilter));
+  return FilterImage::Wrap(source, filterBounds, std::move(composeFilter), _colorSpace);
 }
 
 std::shared_ptr<Image> FilterImage::onMakeScaled(int newWidth, int newHeight,
@@ -115,7 +117,7 @@ std::shared_ptr<Image> FilterImage::onMakeScaled(int newWidth, int newHeight,
 std::shared_ptr<TextureProxy> FilterImage::lockTextureProxy(const TPArgs& args) const {
   auto inputBounds = Rect::MakeWH(source->width(), source->height());
   auto filterBounds = filter->filterBounds(inputBounds);
-  return filter->lockTextureProxy(source, filterBounds, args);
+  return filter->lockTextureProxy(source, filterBounds, args, _colorSpace);
 }
 
 PlacementPtr<FragmentProcessor> FilterImage::asFragmentProcessor(const FPArgs& args,
@@ -138,11 +140,11 @@ PlacementPtr<FragmentProcessor> FilterImage::asFragmentProcessor(const FPArgs& a
   auto sampling = samplingArgs.sampling;
   if (dstBounds.contains(drawBounds)) {
     return filter->asFragmentProcessor(source, args, sampling, samplingArgs.constraint,
-                                       AddressOf(fpMatrix));
+                                       AddressOf(fpMatrix), _colorSpace);
   }
   auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
   TPArgs tpArgs(args.context, args.renderFlags, mipmapped, args.drawScale);
-  auto textureProxy = filter->lockTextureProxy(source, dstBounds, tpArgs);
+  auto textureProxy = filter->lockTextureProxy(source, dstBounds, tpArgs, _colorSpace);
   if (textureProxy == nullptr) {
     return nullptr;
   }

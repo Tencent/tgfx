@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RenderTargetProxy.h"
+
+#include <utility>
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/proxies/ExternalRenderTargetProxy.h"
@@ -37,14 +39,14 @@ std::shared_ptr<RenderTargetProxy> RenderTargetProxy::MakeFallback(Context* cont
                                                                    int height, bool alphaOnly,
                                                                    int sampleCount, bool mipmapped,
                                                                    ImageOrigin origin,
-                                                                   BackingFit backingFit) {
+                                                                   BackingFit backingFit, std::shared_ptr<ColorSpace> colorSpace) {
   if (context == nullptr) {
     return nullptr;
   }
   auto alphaRenderable = context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
   auto format = alphaOnly && alphaRenderable ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
   return context->proxyProvider()->createRenderTargetProxy({}, width, height, format, sampleCount,
-                                                           mipmapped, origin, backingFit);
+                                                           mipmapped, origin, backingFit, 0, std::move(colorSpace));
 }
 
 std::shared_ptr<TextureProxy> RenderTargetProxy::makeTextureProxy(int width, int height) const {

@@ -37,12 +37,12 @@ class RuntimeImageFilter : public ImageFilter {
 
   std::shared_ptr<TextureProxy> lockTextureProxy(std::shared_ptr<Image> source,
                                                  const Rect& renderBounds,
-                                                 const TPArgs& args) const override;
+                                                 const TPArgs& args, std::shared_ptr<ColorSpace> dstColorSpace) const override;
 
   PlacementPtr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
                                                       const FPArgs& args,
                                                       const SamplingOptions& sampling,
                                                       SrcRectConstraint constraint,
-                                                      const Matrix* uvMatrix) const override;
+                                                      const Matrix* uvMatrix, std::shared_ptr<ColorSpace> dstColorSpace) const override;
 };
 }  // namespace tgfx

@@ -130,7 +130,7 @@ class Image {
    * parameters.
    */
   static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Picture> picture, int width, int height,
-                                         const Matrix* matrix = nullptr);
+                                         const Matrix* matrix = nullptr, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Creates an Image in the I420 format with the specified YUVData and the YUVColorSpace. Returns
@@ -308,7 +308,7 @@ class Image {
    */
   std::shared_ptr<Image> makeWithFilter(std::shared_ptr<ImageFilter> filter,
                                         Point* offset = nullptr,
-                                        const Rect* clipRect = nullptr) const;
+                                        const Rect* clipRect = nullptr, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB()) const;
 
   /**
    * Returns an Image with the RGBAAA layout that takes half of the original Image as its RGB
@@ -352,7 +352,7 @@ class Image {
   virtual std::shared_ptr<Image> onMakeOriented(Orientation orientation) const;
 
   virtual std::shared_ptr<Image> onMakeWithFilter(std::shared_ptr<ImageFilter> filter,
-                                                  Point* offset, const Rect* clipRect) const;
+                                                  Point* offset, const Rect* clipRect, std::shared_ptr<ColorSpace> colorSpace) const;
 
   virtual std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
                                               const SamplingOptions& sampling) const;

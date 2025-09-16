@@ -18,6 +18,7 @@
 
 #include "InnerShadowImageFilter.h"
 #include "core/images/TextureImage.h"
+#include "gpu/processors/ColorSpaceXformEffect.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
@@ -47,29 +48,29 @@ InnerShadowImageFilter::InnerShadowImageFilter(float dx, float dy, float blurrin
 
 PlacementPtr<FragmentProcessor> InnerShadowImageFilter::getShadowFragmentProcessor(
     const std::shared_ptr<Image>& source, const FPArgs& args, const SamplingOptions& sampling,
-    SrcRectConstraint constraint, const Matrix* uvMatrix) const {
+    SrcRectConstraint constraint, const Matrix* uvMatrix, std::shared_ptr<ColorSpace> dstColorSpace) const {
   auto shadowMatrix = Matrix::MakeTrans(-dx, -dy);
   if (uvMatrix) {
     shadowMatrix.preConcat(*uvMatrix);
   }
-
+  auto buffer = args.context->drawingBuffer();
   PlacementPtr<FragmentProcessor> invertShadowMask;
   if (blurFilter != nullptr) {
     invertShadowMask =
-        blurFilter->asFragmentProcessor(source, args, sampling, constraint, &shadowMatrix);
+        blurFilter->asFragmentProcessor(source, args, sampling, constraint, &shadowMatrix, dstColorSpace);
   } else {
-    invertShadowMask = FragmentProcessor::Make(source, args, TileMode::Decal, TileMode::Decal,
+    auto imgFP = FragmentProcessor::Make(source, args, TileMode::Decal, TileMode::Decal,
                                                sampling, constraint, &shadowMatrix);
+    invertShadowMask = ColorSpaceXformEffect::Make(buffer, std::move(imgFP), source->colorSpace().get(), AlphaType::Premultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
   }
 
-  auto buffer = args.context->drawingBuffer();
   if (invertShadowMask == nullptr) {
     invertShadowMask =
         ConstColorProcessor::Make(buffer, Color::Transparent().premultiply(), InputMode::Ignore);
   }
   auto dstColor = color;
   ColorSpaceXformSteps steps(ColorSpace::MakeSRGB().get(), AlphaType::Unpremultiplied,
-                             source->colorSpace().get(), AlphaType::Premultiplied);
+                             dstColorSpace.get(), AlphaType::Premultiplied);
   steps.apply(dstColor.array());
   auto colorProcessor = ConstColorProcessor::Make(buffer, dstColor, InputMode::Ignore);
 
@@ -81,18 +82,19 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::getShadowFragmentProcess
 
 PlacementPtr<FragmentProcessor> InnerShadowImageFilter::getSourceFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-    SrcRectConstraint constraint, const Matrix* uvMatrix) const {
-  return FragmentProcessor::Make(std::move(source), args, TileMode::Decal, TileMode::Decal,
+    SrcRectConstraint constraint, const Matrix* uvMatrix, std::shared_ptr<ColorSpace> dstColorspace) const {
+  auto imgFP =  FragmentProcessor::Make(source, args, TileMode::Decal, TileMode::Decal,
                                  sampling, constraint, uvMatrix);
+  return ColorSpaceXformEffect::Make(args.context->drawingBuffer(), std::move(imgFP), source->colorSpace().get(), AlphaType::Premultiplied, dstColorspace.get(), AlphaType::Premultiplied);
 }
 
 PlacementPtr<FragmentProcessor> InnerShadowImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-    SrcRectConstraint constraint, const Matrix* uvMatrix) const {
+    SrcRectConstraint constraint, const Matrix* uvMatrix, std::shared_ptr<ColorSpace> dstColorSpace) const {
   if (color.alpha <= 0 && shadowOnly) {
     return nullptr;
   }
-  auto imageProcessor = getSourceFragmentProcessor(source, args, sampling, constraint, uvMatrix);
+  auto imageProcessor = getSourceFragmentProcessor(source, args, sampling, constraint, uvMatrix, dstColorSpace);
   if (imageProcessor == nullptr) {
     return nullptr;
   }
@@ -100,7 +102,7 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::asFragmentProcessor(
   auto blendMode = shadowOnly ? BlendMode::SrcIn : BlendMode::SrcATop;
 
   return XfermodeFragmentProcessor::MakeFromTwoProcessors(
-      buffer, getShadowFragmentProcessor(source, args, sampling, constraint, uvMatrix),
+      buffer, getShadowFragmentProcessor(source, args, sampling, constraint, uvMatrix, dstColorSpace),
       std::move(imageProcessor), blendMode);
 }
 

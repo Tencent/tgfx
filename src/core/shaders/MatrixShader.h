@@ -51,7 +51,7 @@ class MatrixShader final : public Shader {
   bool isEqual(const Shader* shader) const override;
 
   PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
-                                                      const Matrix* uvMatrix) const override;
+                                                      const Matrix* uvMatrix, std::shared_ptr<ColorSpace> colorSpace) const override;
 
   MatrixShader(std::shared_ptr<Shader> source, const Matrix& matrix);
 };

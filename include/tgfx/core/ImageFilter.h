@@ -148,7 +148,7 @@ class ImageFilter {
    */
   virtual std::shared_ptr<TextureProxy> lockTextureProxy(std::shared_ptr<Image> source,
                                                          const Rect& renderBounds,
-                                                         const TPArgs& args) const;
+                                                         const TPArgs& args, std::shared_ptr<ColorSpace> dstColorSpace) const;
 
   /**
    * Returns a FragmentProcessor that applies this filter to the source image. The returned
@@ -158,7 +158,7 @@ class ImageFilter {
                                                               const FPArgs& args,
                                                               const SamplingOptions& sampling,
                                                               SrcRectConstraint constraint,
-                                                              const Matrix* uvMatrix) const = 0;
+                                                              const Matrix* uvMatrix, std::shared_ptr<ColorSpace> dstColorSpace) const = 0;
 
   bool applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* clipBounds = nullptr) const;
 
@@ -166,7 +166,7 @@ class ImageFilter {
                                                          const FPArgs& args,
                                                          const SamplingOptions& sampling,
                                                          SrcRectConstraint constraint,
-                                                         const Matrix* uvMatrix) const;
+                                                         const Matrix* uvMatrix, std::shared_ptr<ColorSpace> dstColorSpace) const;
 
   friend class DropShadowImageFilter;
   friend class InnerShadowImageFilter;

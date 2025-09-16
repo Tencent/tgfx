@@ -57,7 +57,7 @@ bool MatrixShader::isEqual(const Shader* shader) const {
 }
 
 PlacementPtr<FragmentProcessor> MatrixShader::asFragmentProcessor(const FPArgs& args,
-                                                                  const Matrix* uvMatrix) const {
+                                                                  const Matrix* uvMatrix, std::shared_ptr<ColorSpace> colorSpace) const {
   Matrix totalMatrix = {};
   if (!matrix.invert(&totalMatrix)) {
     return nullptr;
@@ -65,6 +65,6 @@ PlacementPtr<FragmentProcessor> MatrixShader::asFragmentProcessor(const FPArgs& 
   if (uvMatrix) {
     totalMatrix.preConcat(*uvMatrix);
   }
-  return FragmentProcessor::Make(source, args, &totalMatrix);
+  return FragmentProcessor::Make(source, args, &totalMatrix, colorSpace);
 }
 }  // namespace tgfx
