@@ -20,12 +20,12 @@
 
 #include <map>
 #include <vector>
-#include "core/Matrix3D.h"
 #include "gpu/OpsCompositor.h"
 #include "gpu/resources/Semaphore.h"
 #include "gpu/tasks/OpsRenderTask.h"
 #include "gpu/tasks/RenderTask.h"
 #include "gpu/tasks/ResourceTask.h"
+#include "tasks/RectPerspectiveRenderTask.h"
 
 namespace tgfx {
 struct AtlasCellData {
@@ -71,10 +71,10 @@ class DrawingManager {
 
   void addSemaphoreWaitTask(std::shared_ptr<Semaphore> semaphore);
 
-  void addRectPerspectiveRenderTask(const Rect& rect, AAType aa,
+  void addRectPerspectiveRenderTask(const Rect& rect,
                                     std::shared_ptr<RenderTargetProxy> renderTarget,
                                     std::shared_ptr<TextureProxy> fillTexture,
-                                    const Matrix3D& transformMatrix);
+                                    const PerspectiveRenderArgs& args);
 
   /**
    * Flushes the drawing manager, executing all resource and render tasks. If signalSemaphore is not

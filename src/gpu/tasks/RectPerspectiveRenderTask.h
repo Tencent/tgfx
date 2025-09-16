@@ -27,32 +27,35 @@
 
 namespace tgfx {
 
+struct PerspectiveRenderArgs {
+  AAType aa = AAType::None;
+
+  Matrix3D transformMatrix;
+
+  Vec2 ndcScale;
+
+  Vec2 ndcOffset;
+};
+
 class RectPerspectiveRenderTask final : public RenderTask {
  public:
-  RectPerspectiveRenderTask(std::shared_ptr<RenderTargetProxy> renderTarget, const Rect& rect,
-                            AAType aa, std::shared_ptr<TextureProxy> fillTexture,
-                            const Matrix3D& transformMatrix);
+  RectPerspectiveRenderTask(const Rect& rect, std::shared_ptr<RenderTargetProxy> renderTarget,
+                            std::shared_ptr<TextureProxy> fillTexture,
+                            const PerspectiveRenderArgs& args);
 
   void execute(CommandEncoder* encoder) override;
 
  private:
-  /**
-   * The maximum number of vertices per non-AA quad.
-   */
-  static constexpr uint16_t IndicesPerNonAAQuad = 6;
-
-  /**
-   * The maximum number of vertices per AA quad.
-   */
-  static constexpr uint16_t IndicesPerAAQuad = 30;
+  Rect rect;
 
   std::shared_ptr<RenderTargetProxy> renderTarget = nullptr;
-  Rect rect;
-  AAType aa = AAType::None;
+
   std::shared_ptr<TextureProxy> fillTexture = nullptr;
-  Matrix3D transformMatrix;
+
+  PerspectiveRenderArgs args;
 
   std::shared_ptr<VertexBufferProxyView> vertexBufferProxyView = nullptr;
+
   std::shared_ptr<IndexBufferProxy> indexBufferProxy = nullptr;
 };
 

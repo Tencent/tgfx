@@ -26,22 +26,27 @@
 
 namespace tgfx {
 
+// The maximum number of vertices per non-AA quad.
+#define INDICES_PER_NON_AA_QUAD 6UL
+// The maximum number of vertices per AA quad.
+#define INDICES_PER_AA_QUAD 30UL
+
 RectPerspectiveRenderTask::RectPerspectiveRenderTask(
-    std::shared_ptr<RenderTargetProxy> renderTarget, const Rect& rect, AAType aa,
-    std::shared_ptr<TextureProxy> fillTexture, const Matrix3D& transformMatrix)
-    : renderTarget(std::move(renderTarget)), rect(rect), aa(aa),
-      fillTexture(std::move(fillTexture)), transformMatrix(transformMatrix) {
+    const Rect& rect, std::shared_ptr<RenderTargetProxy> renderTarget,
+    std::shared_ptr<TextureProxy> fillTexture, const PerspectiveRenderArgs& args)
+    : rect(rect), renderTarget(std::move(renderTarget)), fillTexture(std::move(fillTexture)),
+      args(args) {
   const auto drawingBuffer = this->renderTarget->getContext()->drawingBuffer();
   if (drawingBuffer == nullptr) {
     LOGE("RectPerspectiveRenderTask::execute() Drawing buffer is null!");
     return;
   }
 
-  auto vertexProvider = RectsVertexProvider::MakeFrom(drawingBuffer, rect, aa);
+  auto vertexProvider = RectsVertexProvider::MakeFrom(drawingBuffer, rect, args.aa);
   vertexBufferProxyView =
       this->renderTarget->getContext()->proxyProvider()->createVertexBufferProxy(
           std::move(vertexProvider));
-  if (aa == AAType::Coverage) {
+  if (args.aa == AAType::Coverage) {
     indexBufferProxy = this->renderTarget->getContext()->globalCache()->getRectIndexBuffer(true);
   }
 }
@@ -71,15 +76,21 @@ void RectPerspectiveRenderTask::execute(CommandEncoder* encoder) {
     return;
   }
 
-  const Vec2 ndcScale(rect.width() / static_cast<float>(rt->width()),
-                      rect.height() / static_cast<float>(rt->height()));
-  const auto ndcRect = transformMatrix.mapRect(rect);
-  const auto ndcRectScaled =
-      Rect::MakeXYWH(ndcRect.left * ndcScale.x, ndcRect.top * ndcScale.y,
-                     ndcRect.width() * ndcScale.x, ndcRect.height() * ndcScale.y);
-  const Vec2 ndcOffset(-1.f - ndcRectScaled.left, -1.f - ndcRectScaled.top);
+  // NDC_Point is the projected vertex coordinate in the NDC space, and NDC_Point_shifted is the
+  // adjusted NDC coordinate. Scale1 and offset1 are transformation parameters passed externally,
+  // while scale2 and offset2 map the NDC coordinates from the valid space to the actual space.
+  //
+  // NDC_Point_shifted = ((NDC_Point * scale1) + offset1) * scale2 + offset2
+  const Vec2 scale2(static_cast<float>(renderTarget->width()) / static_cast<float>(rt->width()),
+                    static_cast<float>(renderTarget->height()) / static_cast<float>(rt->height()));
+  Vec2 ndcScale = args.ndcScale * scale2;
+  Vec2 ndcOffset = args.ndcOffset * scale2 + scale2 - Vec2(1.f, 1.f);
+  if (renderTarget->origin() == ImageOrigin::BottomLeft) {
+    ndcScale.y = -ndcScale.y;
+    ndcOffset.y = -ndcOffset.y;
+  }
   const auto geometryProcessor = QuadPerEdgeAA3DGeometryProcessor::Make(
-      drawingBuffer, aa, transformMatrix, ndcScale, ndcOffset);
+      drawingBuffer, args.aa, args.transformMatrix, ndcScale, ndcOffset);
   const SamplingArgs samplingArgs = {TileMode::Decal, TileMode::Decal, {}, SrcRectConstraint::Fast};
   const auto uvMatrix = Matrix::MakeTrans(-rect.left, -rect.top);
   const auto fragmentProcessor = TextureEffect::Make(fillTexture, samplingArgs, &uvMatrix);
@@ -102,7 +113,7 @@ void RectPerspectiveRenderTask::execute(CommandEncoder* encoder) {
 
   if (indexBuffer != nullptr) {
     const auto numIndicesPerQuad =
-        (aa == AAType::Coverage ? IndicesPerAAQuad : IndicesPerNonAAQuad);
+        (args.aa == AAType::Coverage ? INDICES_PER_AA_QUAD : INDICES_PER_NON_AA_QUAD);
     renderPass->drawIndexed(PrimitiveType::Triangles, 0, numIndicesPerQuad);
   } else {
     renderPass->draw(PrimitiveType::TriangleStrip, 0, 4);

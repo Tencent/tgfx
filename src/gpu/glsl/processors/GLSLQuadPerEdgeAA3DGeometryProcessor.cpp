@@ -61,7 +61,6 @@ void GLSLQuadPerEdgeAA3DGeometryProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
   const auto transformMatrixName = uniformHandler->addUniform(
       UNIFORM_TRANSFORM_MATRIX_NAME, UniformFormat::Float4x4, ShaderStage::Vertex);
-  // args.vertBuilder->codeAppend("gl_Position = vec4(position_ndc.x, position_ndc.y, 0.0, 1.0);");
   args.vertBuilder->codeAppendf("vec4 clipPoint = %s * vec4(%s, 0.0, 1.0);",
                                 transformMatrixName.c_str(), position.name().c_str());
   const auto ndcScaleName = uniformHandler->addUniform(UNIFORM_TRANSFORM_NDC_SCALE_NAME,
@@ -72,9 +71,6 @@ void GLSLQuadPerEdgeAA3DGeometryProcessor::emitCode(EmitArgs& args) const {
   args.vertBuilder->codeAppendf("vec4 clipOffset = vec4((%s * clipPoint.w).xy, 1.0, 1.0);",
                                 ndcOffsetName.c_str());
   args.vertBuilder->codeAppend("gl_Position = clipPoint * clipScale + clipOffset;");
-  // TODO: RichardJieChen
-  args.vertBuilder->codeAppend("vec4 tem = tgfx_RTAdjust;");
-  //
 }
 
 void GLSLQuadPerEdgeAA3DGeometryProcessor::setData(UniformBuffer* vertexUniformBuffer,

@@ -24,6 +24,7 @@
 #include "gpu/TPArgs.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
+#include "gpu/tasks/RectPerspectiveRenderTask.h"
 
 namespace tgfx {
 
@@ -49,7 +50,6 @@ PerspectiveImageFilter::PerspectiveImageFilter(const PerspectiveInfo& info) : in
 }
 
 Rect PerspectiveImageFilter::onFilterBounds(const Rect& srcRect) const {
-  //TODO: RichardJieChen
   DEBUG_ASSERT(srcRect.left == 0.f && srcRect.top == 0.f);
   constexpr auto tempRect = Rect::MakeXYWH(-1.f, -1.f, 2.f, 2.f);
   const auto ndcResult = normalTransformMatrix.mapRect(tempRect);
@@ -71,7 +71,6 @@ std::shared_ptr<TextureProxy> PerspectiveImageFilter::lockTextureProxy(
   const auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(renderBounds.width()), static_cast<int>(renderBounds.height()),
       source->isAlphaOnly(), 1, args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
-
   const auto sourceTextureProxy = source->lockTextureProxy(args);
 
   const float eyePositionZ = sourceH * 0.5f / tanf(DegreesToRadians(FOV_Y_DEGRESS * 0.5f));
@@ -82,9 +81,21 @@ std::shared_ptr<TextureProxy> PerspectiveImageFilter::lockTextureProxy(
   const auto perspectiveMatrix =
       Matrix3D::Perspective(FOV_Y_DEGRESS, sourceW / sourceH, nearZ, farZ);
   const auto transformMatrix = perspectiveMatrix * viewMatrix * modelMatrix;
+
+  // Convert the projected NDC coordinates to the pixel coordinate system of RT and align NDC Rect
+  // to the top-left corner of RT.
+  const Vec2 ndcScale(sourceW / renderBounds.width(), sourceH / renderBounds.height());
+  const auto ndcRect = transformMatrix.mapRect(srcRect);
+  const auto ndcRectScaled =
+      Rect::MakeXYWH(ndcRect.left * ndcScale.x, ndcRect.top * ndcScale.y,
+                     ndcRect.width() * ndcScale.x, ndcRect.height() * ndcScale.y);
+  const Vec2 ndcOffset(-1.f - ndcRectScaled.left, -1.f - ndcRectScaled.top);
+  const PerspectiveRenderArgs perspectiveArgs{AAType::Coverage, transformMatrix, ndcScale,
+                                              ndcOffset};
+
   const auto drawingManager = args.context->drawingManager();
-  drawingManager->addRectPerspectiveRenderTask(srcRect, AAType::Coverage, renderTarget,
-                                               sourceTextureProxy, transformMatrix);
+  drawingManager->addRectPerspectiveRenderTask(srcRect, renderTarget, sourceTextureProxy,
+                                               perspectiveArgs);
   return renderTarget->asTextureProxy();
 }
 
