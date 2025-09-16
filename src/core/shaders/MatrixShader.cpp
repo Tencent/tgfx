@@ -56,8 +56,8 @@ bool MatrixShader::isEqual(const Shader* shader) const {
   return matrix == other->matrix && source->isEqual(other->source.get());
 }
 
-PlacementPtr<FragmentProcessor> MatrixShader::asFragmentProcessor(const FPArgs& args,
-                                                                  const Matrix* uvMatrix, std::shared_ptr<ColorSpace> colorSpace) const {
+PlacementPtr<FragmentProcessor> MatrixShader::asFragmentProcessor(
+    const FPArgs& args, const Matrix* uvMatrix, std::shared_ptr<ColorSpace> colorSpace) const {
   Matrix totalMatrix = {};
   if (!matrix.invert(&totalMatrix)) {
     return nullptr;

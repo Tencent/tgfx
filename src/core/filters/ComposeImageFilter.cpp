@@ -72,12 +72,14 @@ Rect ComposeImageFilter::onFilterBounds(const Rect& srcRect) const {
 
 PlacementPtr<FragmentProcessor> ComposeImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-    SrcRectConstraint constraint, const Matrix* uvMatrix, std::shared_ptr<ColorSpace> dstColorSpace) const {
+    SrcRectConstraint constraint, const Matrix* uvMatrix,
+    std::shared_ptr<ColorSpace> dstColorSpace) const {
   auto lastSource = source;
   Point lastOffset = {};
   for (auto& filter : filters) {
     Point offset = {};
-    lastSource = FilterImage::MakeFrom(std::move(lastSource), filter, &offset, nullptr, dstColorSpace);
+    lastSource =
+        FilterImage::MakeFrom(std::move(lastSource), filter, &offset, nullptr, dstColorSpace);
     if (!lastSource) {
       return nullptr;
     }

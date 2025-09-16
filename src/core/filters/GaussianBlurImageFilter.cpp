@@ -66,7 +66,8 @@ static void Blur1D(PlacementPtr<FragmentProcessor> source,
 }
 
 std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
-    std::shared_ptr<Image> source, const Rect& clipBounds, const TPArgs& args, std::shared_ptr<ColorSpace> dstColorSpace) const {
+    std::shared_ptr<Image> source, const Rect& clipBounds, const TPArgs& args,
+    std::shared_ptr<ColorSpace> dstColorSpace) const {
   auto srcColorSpace = source->colorSpace();
   Rect srcSampleBounds = clipBounds;
   // The pixels involved in the convolution operation may be outside the clipping area.
@@ -171,11 +172,12 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
     drawingManager->fillRTWithFP(renderTarget, std::move(finalProcessor), args.renderFlags);
   }
   auto fp = TextureEffect::Make(renderTarget->asTextureProxy());
-  auto effect = ColorSpaceXformEffect::Make(args.context->drawingBuffer(), std::move(fp), srcColorSpace.get(), AlphaType::Premultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
+  auto effect = ColorSpaceXformEffect::Make(args.context->drawingBuffer(), std::move(fp),
+                                            srcColorSpace.get(), AlphaType::Premultiplied,
+                                            dstColorSpace.get(), AlphaType::Premultiplied);
   renderTarget = RenderTargetProxy::MakeFallback(
-        args.context, renderTarget->width(), renderTarget->height(), isAlphaOnly,
-        1, args.mipmapped, ImageOrigin::TopLeft,
-        args.backingFit);
+      args.context, renderTarget->width(), renderTarget->height(), isAlphaOnly, 1, args.mipmapped,
+      ImageOrigin::TopLeft, args.backingFit);
   const auto drawingManager = args.context->drawingManager();
   drawingManager->fillRTWithFP(renderTarget, std::move(effect), args.renderFlags);
   return renderTarget->asTextureProxy();
@@ -187,7 +189,8 @@ Rect GaussianBlurImageFilter::onFilterBounds(const Rect& srcRect) const {
 
 PlacementPtr<FragmentProcessor> GaussianBlurImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-    SrcRectConstraint constraint, const Matrix* uvMatrix, std::shared_ptr<ColorSpace> dstColorSpace) const {
+    SrcRectConstraint constraint, const Matrix* uvMatrix,
+    std::shared_ptr<ColorSpace> dstColorSpace) const {
   return makeFPFromTextureProxy(source, args, sampling, constraint, uvMatrix, dstColorSpace);
 }
 

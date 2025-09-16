@@ -226,13 +226,16 @@ std::shared_ptr<Image> Image::onMakeOriented(Orientation orientation) const {
 }
 
 std::shared_ptr<Image> Image::makeWithFilter(std::shared_ptr<ImageFilter> filter, Point* offset,
-                                             const Rect* clipRect, std::shared_ptr<ColorSpace> colorSpace) const {
+                                             const Rect* clipRect,
+                                             std::shared_ptr<ColorSpace> colorSpace) const {
   return onMakeWithFilter(std::move(filter), offset, clipRect, std::move(colorSpace));
 }
 
 std::shared_ptr<Image> Image::onMakeWithFilter(std::shared_ptr<ImageFilter> filter, Point* offset,
-                                               const Rect* clipRect, std::shared_ptr<ColorSpace> colorSpace) const {
-  return FilterImage::MakeFrom(weakThis.lock(), std::move(filter), offset, clipRect, std::move(colorSpace));
+                                               const Rect* clipRect,
+                                               std::shared_ptr<ColorSpace> colorSpace) const {
+  return FilterImage::MakeFrom(weakThis.lock(), std::move(filter), offset, clipRect,
+                               std::move(colorSpace));
 }
 
 std::shared_ptr<Image> Image::onMakeScaled(int newWidth, int newHeight,

@@ -129,8 +129,9 @@ class Image {
    * @return An Image that matches the content when the picture is drawn with the specified
    * parameters.
    */
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Picture> picture, int width, int height,
-                                         const Matrix* matrix = nullptr, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+  static std::shared_ptr<Image> MakeFrom(
+      std::shared_ptr<Picture> picture, int width, int height, const Matrix* matrix = nullptr,
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Creates an Image in the I420 format with the specified YUVData and the YUVColorSpace. Returns
@@ -306,9 +307,9 @@ class Image {
    * accordingly. The offset will store the translation information to be applied when drawing the
    * filtered Image. If the filter is nullptr or fails to apply, nullptr is returned.
    */
-  std::shared_ptr<Image> makeWithFilter(std::shared_ptr<ImageFilter> filter,
-                                        Point* offset = nullptr,
-                                        const Rect* clipRect = nullptr, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB()) const;
+  std::shared_ptr<Image> makeWithFilter(
+      std::shared_ptr<ImageFilter> filter, Point* offset = nullptr, const Rect* clipRect = nullptr,
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB()) const;
 
   /**
    * Returns an Image with the RGBAAA layout that takes half of the original Image as its RGB
@@ -352,7 +353,8 @@ class Image {
   virtual std::shared_ptr<Image> onMakeOriented(Orientation orientation) const;
 
   virtual std::shared_ptr<Image> onMakeWithFilter(std::shared_ptr<ImageFilter> filter,
-                                                  Point* offset, const Rect* clipRect, std::shared_ptr<ColorSpace> colorSpace) const;
+                                                  Point* offset, const Rect* clipRect,
+                                                  std::shared_ptr<ColorSpace> colorSpace) const;
 
   virtual std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
                                               const SamplingOptions& sampling) const;

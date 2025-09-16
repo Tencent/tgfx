@@ -46,8 +46,8 @@ bool ImageShader::isEqual(const Shader* shader) const {
          sampling == other->sampling;
 }
 
-PlacementPtr<FragmentProcessor> ImageShader::asFragmentProcessor(const FPArgs& args,
-                                                                 const Matrix* uvMatrix, std::shared_ptr<ColorSpace> colorSpace) const {
+PlacementPtr<FragmentProcessor> ImageShader::asFragmentProcessor(
+    const FPArgs& args, const Matrix* uvMatrix, std::shared_ptr<ColorSpace> colorSpace) const {
   SamplingArgs samplingArgs = {tileModeX, tileModeY, sampling, SrcRectConstraint::Fast};
   auto fp = image->asFragmentProcessor(args, samplingArgs, uvMatrix);
   if (fp) {

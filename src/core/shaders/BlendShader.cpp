@@ -57,8 +57,8 @@ bool BlendShader::isEqual(const Shader* shader) const {
   return mode == other->mode && dst->isEqual(other->dst.get()) && src->isEqual(other->src.get());
 }
 
-PlacementPtr<FragmentProcessor> BlendShader::asFragmentProcessor(const FPArgs& args,
-                                                                 const Matrix* uvMatrix, std::shared_ptr<ColorSpace> colorSpace) const {
+PlacementPtr<FragmentProcessor> BlendShader::asFragmentProcessor(
+    const FPArgs& args, const Matrix* uvMatrix, std::shared_ptr<ColorSpace> colorSpace) const {
   auto fpA = FragmentProcessor::Make(dst, args, uvMatrix, colorSpace);
   if (fpA == nullptr) {
     return nullptr;

@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "FilterImage.h"
-
 #include <utility>
 #include "core/images/ScaledImage.h"
 #include "core/images/SubsetImage.h"
@@ -27,7 +26,8 @@
 namespace tgfx {
 std::shared_ptr<Image> FilterImage::MakeFrom(std::shared_ptr<Image> source,
                                              std::shared_ptr<ImageFilter> filter, Point* offset,
-                                             const Rect* clipRect, std::shared_ptr<ColorSpace> colorSpace) {
+                                             const Rect* clipRect,
+                                             std::shared_ptr<ColorSpace> colorSpace) {
   if (source == nullptr) {
     return nullptr;
   }
@@ -53,16 +53,19 @@ std::shared_ptr<Image> FilterImage::MakeFrom(std::shared_ptr<Image> source,
 }
 
 std::shared_ptr<Image> FilterImage::Wrap(std::shared_ptr<Image> source, const Rect& bounds,
-                                         std::shared_ptr<ImageFilter> filter, std::shared_ptr<ColorSpace> colorSpace) {
-  auto image =
-      std::shared_ptr<FilterImage>(new FilterImage(std::move(source), bounds, std::move(filter), std::move(colorSpace)));
+                                         std::shared_ptr<ImageFilter> filter,
+                                         std::shared_ptr<ColorSpace> colorSpace) {
+  auto image = std::shared_ptr<FilterImage>(
+      new FilterImage(std::move(source), bounds, std::move(filter), std::move(colorSpace)));
   image->weakThis = image;
   return image;
 }
 
 FilterImage::FilterImage(std::shared_ptr<Image> source, const Rect& bounds,
-                         std::shared_ptr<ImageFilter> filter, std::shared_ptr<ColorSpace> colorSpace)
-    : SubsetImage(std::move(source), bounds), filter(std::move(filter)), _colorSpace(std::move(colorSpace)) {
+                         std::shared_ptr<ImageFilter> filter,
+                         std::shared_ptr<ColorSpace> colorSpace)
+    : SubsetImage(std::move(source), bounds), filter(std::move(filter)),
+      _colorSpace(std::move(colorSpace)) {
 }
 
 std::shared_ptr<Image> FilterImage::onCloneWith(std::shared_ptr<Image> newSource) const {
@@ -76,13 +79,15 @@ std::shared_ptr<Image> FilterImage::onMakeSubset(const Rect& subset) const {
 }
 
 std::shared_ptr<Image> FilterImage::onMakeWithFilter(std::shared_ptr<ImageFilter> imageFilter,
-                                                     Point* offset, const Rect* clipRect, std::shared_ptr<ColorSpace> colorSpace) const {
+                                                     Point* offset, const Rect* clipRect,
+                                                     std::shared_ptr<ColorSpace> colorSpace) const {
   if (imageFilter == nullptr) {
     return nullptr;
   }
   auto inputBounds = Rect::MakeWH(source->width(), source->height());
   if (filter->filterBounds(inputBounds) != bounds) {
-    return FilterImage::MakeFrom(weakThis.lock(), std::move(imageFilter), offset, clipRect, colorSpace);
+    return FilterImage::MakeFrom(weakThis.lock(), std::move(imageFilter), offset, clipRect,
+                                 colorSpace);
   }
   auto filterBounds = imageFilter->filterBounds(Rect::MakeWH(width(), height()));
   if (filterBounds.isEmpty()) {
