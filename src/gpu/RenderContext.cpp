@@ -177,6 +177,17 @@ static void GetGlyphMatrix(const std::shared_ptr<ScalerContext>& scalerContext,
   }
 }
 
+static SamplingOptions GetSamplingOptions(const std::shared_ptr<ScalerContext>& scalerContext,
+                                          bool fauxItalic, const Matrix& stateMatrix) {
+  if (fauxItalic || !FloatNearlyEqual(scalerContext->getBackingSize(), scalerContext->getSize())) {
+    return SamplingOptions{FilterMode::Nearest, MipmapMode::None};
+  }
+  const auto hasRotated =
+      !FloatNearlyZero(stateMatrix.getSkewX()) || !FloatNearlyZero(stateMatrix.getSkewY());
+  const auto filterMode = hasRotated ? FilterMode::Linear : FilterMode::Nearest;
+  return SamplingOptions{filterMode, MipmapMode::None};
+}
+
 RenderContext::RenderContext(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags,
                              bool clearAll, Surface* surface)
     : renderTarget(std::move(proxy)), renderFlags(renderFlags), surface(surface) {
@@ -495,7 +506,8 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
     GetGlyphMatrix(font.scalerContext, glyphOffset, font.isFauxItalic(), &glyphState.matrix);
     auto rect = atlasLocator.getLocation();
     ComputeGlyphFinalMatrix(rect, state.matrix, inverseScale, glyphPosition, &glyphState.matrix);
-    compositor->fillTextAtlas(std::move(textureProxy), rect, glyphState,
+    auto sampling = GetSamplingOptions(font.scalerContext, font.isFauxItalic(), state.matrix);
+    compositor->fillTextAtlas(std::move(textureProxy), rect, sampling, glyphState,
                               fill.makeWithMatrix(state.matrix));
   }
 }
@@ -604,7 +616,8 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
     auto rect = atlasLocator.getLocation();
     ComputeGlyphFinalMatrix(rect, state.matrix, 1.f / (maxScale * cellScale), glyphPosition,
                             &glyphState.matrix);
-    compositor->fillTextAtlas(std::move(textureProxy), rect, glyphState,
+    compositor->fillTextAtlas(std::move(textureProxy), rect,
+                              SamplingOptions(FilterMode::Linear, MipmapMode::None), glyphState,
                               fill.makeWithMatrix(state.matrix));
   }
 }

@@ -77,10 +77,10 @@ class OpsCompositor {
                  const Stroke* stroke);
 
   /**
-   * Fills the given rect with the given atlas textureProxy, state and fill.
+   * Fills the given rect with the given atlas textureProxy, sampling options, state and fill.
    */
   void fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, const Rect& rect,
-                     const MCState& state, const Fill& fill);
+                     const SamplingOptions& sampling, const MCState& state, const Fill& fill);
 
   /**
    * Discard all pending operations.
