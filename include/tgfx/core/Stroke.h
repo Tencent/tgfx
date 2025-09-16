@@ -87,6 +87,11 @@ class Stroke {
   bool applyToPath(Path* path, float resolutionScale = 1.0f) const;
 
   /**
+   * Returns true if the stroke is a hairline (width <= 0).
+   */
+  bool isHairline() const;
+
+  /**
    * The thickness of the pen used to outline the paths or glyphs.
    */
   float width = 1.0f;

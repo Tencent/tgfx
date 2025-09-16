@@ -30,6 +30,7 @@
 #include "gpu/ops/RRectDrawOp.h"
 #include "gpu/ops/RectDrawOp.h"
 #include "gpu/resources/TextureView.h"
+#include "gtest/gtest.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Color.h"
@@ -39,9 +40,12 @@
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/PathTypes.h"
+#include "tgfx/core/RRect.h"
 #include "tgfx/core/Recorder.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Shader.h"
+#include "tgfx/core/Shape.h"
+#include "tgfx/core/Stroke.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
 #include "tgfx/platform/ImageReader.h"
@@ -1126,7 +1130,7 @@ static GLTextureInfo CreateRectangleTexture(Context* context, int width, int hei
   gl->bindTexture(glInfo.target, glInfo.id);
   const auto& textureFormat = GLCaps::Get(context)->getTextureFormat(PixelFormat::RGBA_8888);
   gl->texImage2D(glInfo.target, 0, static_cast<int>(textureFormat.internalFormatTexImage), width,
-                 heigh, 0, textureFormat.externalFormat, GL_UNSIGNED_BYTE, nullptr);
+                 heigh, 0, textureFormat.externalFormat, textureFormat.externalType, nullptr);
   return glInfo;
 }
 
@@ -2985,6 +2989,97 @@ TGFX_TEST(CanvasTest, RRectBlendMode) {
   canvas->drawPath(path, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/RRectBlendMode"));
 }
+
+TGFX_TEST(CanvasTest, HairLinePath) {
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  ASSERT_TRUE(surface != nullptr);
+  auto* canvas = surface->getCanvas();
+
+  Paint paint;
+  paint.setAntiAlias(true);
+  paint.setColor(Color::FromRGBA(255, 0, 0, 255));
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStroke(Stroke(0.0f));
+
+  EXPECT_TRUE(paint.getStroke()->isHairline());
+
+  auto path = Path();
+  path.addRoundRect(Rect::MakeXYWH(-12.5f, -12.5f, 25.f, 25.f), 5, 5);
+  canvas->translate(100, 100);
+  canvas->drawPath(path, paint);
+  canvas->scale(2.f, 2.f);
+  canvas->drawPath(path, paint);
+  canvas->scale(2.f, 2.f);
+  canvas->drawPath(path, paint);
+  canvas->scale(1.9f, 1.9f);
+  canvas->drawPath(path, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/HairLinePath"));
+}
+
+TGFX_TEST(CanvasTest, HairLineShape) {
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  ASSERT_TRUE(surface != nullptr);
+  auto* canvas = surface->getCanvas();
+
+  Paint paint;
+  paint.setAntiAlias(true);
+  paint.setColor(Color::FromRGBA(255, 0, 0, 255));
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStroke(Stroke(0.0f));
+
+  auto path = Path();
+  path.addRoundRect(Rect::MakeXYWH(-12.5f, -12.5f, 25.f, 25.f), 5, 5);
+  auto shape = Shape::MakeFrom(path);
+  Stroke stroke(0.0f);
+  auto strokeShape = Shape::ApplyStroke(shape, &stroke);
+  // hairline is a rendering concept, the hairline stroke won't apply to the shape, so the
+  // strokeShape should be nullptr.
+  EXPECT_TRUE(strokeShape == nullptr);
+
+  canvas->translate(100, 100);
+  canvas->drawShape(shape, paint);
+  canvas->scale(2.f, 2.f);
+  canvas->drawShape(shape, paint);
+
+  canvas->scale(3.f, 3.f);
+  Stroke thickStroke(5.f);
+  auto thickStrokeShape = Shape::ApplyStroke(shape, &thickStroke);
+  canvas->drawShape(thickStrokeShape, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/HairLineShape"));
+}
+
+TGFX_TEST(CanvasTest, MatrixShapeStroke) {
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  ASSERT_TRUE(surface != nullptr);
+  auto* canvas = surface->getCanvas();
+
+  Paint paint;
+  paint.setAntiAlias(true);
+  paint.setColor(Color::FromRGBA(255, 0, 0, 255));
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStroke(Stroke(1.0f));
+
+  auto path = Path();
+  path.addRoundRect(Rect::MakeXYWH(0, 0, 8, 8), 2, 2);
+  auto shape = Shape::MakeFrom(path);
+  shape = Shape::ApplyMatrix(shape, Matrix::MakeScale(20, 20));
+  canvas->translate(20, 20);
+  canvas->drawShape(shape, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/MatrixShapeStroke"));
+}
+
 
 TGFX_TEST(CanvasTest, SurfaceColorSpace) {
   TransferFunction tf = namedTransferFn::_2Dot2;

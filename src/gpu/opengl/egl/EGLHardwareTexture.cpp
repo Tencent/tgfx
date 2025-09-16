@@ -99,7 +99,8 @@ std::unique_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(EGLGPU* gpu,
   GPUTextureDescriptor descriptor = {size.width, size.height, formats.front(), false, 1, usage};
   auto texture = std::unique_ptr<EGLHardwareTexture>(
       new EGLHardwareTexture(descriptor, hardwareBuffer, eglImage, target, textureID));
-  gpu->bindTexture(texture.get());
+  auto state = gpu->state();
+  state->bindTexture(texture.get());
   eglext::glEGLImageTargetTexture2DOES(target, (GLeglImageOES)eglImage);
   if (usage & GPUTextureUsage::RENDER_ATTACHMENT && !texture->checkFrameBuffer(gpu)) {
     texture->release(gpu);

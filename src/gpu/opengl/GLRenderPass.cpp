@@ -19,6 +19,7 @@
 #include "GLRenderPass.h"
 #include "GLSampler.h"
 #include "gpu/DrawingManager.h"
+#include "gpu/opengl/GLDepthStencilTexture.h"
 #include "gpu/opengl/GLGPU.h"
 #include "gpu/opengl/GLRenderPipeline.h"
 #include "gpu/opengl/GLTexture.h"
@@ -28,34 +29,57 @@ GLRenderPass::GLRenderPass(GLGPU* gpu, RenderPassDescriptor descriptor)
     : RenderPass(std::move(descriptor)), gpu(gpu) {
 }
 
-void GLRenderPass::begin() {
+bool GLRenderPass::begin() {
   DEBUG_ASSERT(!descriptor.colorAttachments.empty());
   auto& colorAttachment = descriptor.colorAttachments[0];
   DEBUG_ASSERT(colorAttachment.texture != nullptr);
   auto renderTexture = static_cast<GLTexture*>(colorAttachment.texture);
-  gpu->bindFramebuffer(renderTexture);
+  auto state = gpu->state();
+  state->bindFramebuffer(renderTexture);
   auto gl = gpu->functions();
+
+  auto& depthStencilAttachment = descriptor.depthStencilAttachment;
+  if (depthStencilAttachment.texture != nullptr) {
+    auto depthStencilTexture = static_cast<GLDepthStencilTexture*>(depthStencilAttachment.texture);
+    gl->bindRenderbuffer(GL_RENDERBUFFER, depthStencilTexture->renderBufferID());
+    gl->framebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER,
+                                depthStencilTexture->renderBufferID());
+#ifndef TGFX_BUILD_FOR_WEB
+    if (gl->checkFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+      LOGE("GLCommandEncoder::beginRenderPass() depthStencil attachment can not be attached!");
+      return false;
+    }
+#endif
+    if (depthStencilAttachment.loadAction == LoadAction::Clear) {
+      gl->clearDepthf(depthStencilAttachment.depthClearValue);
+      gl->clearStencil(static_cast<int>(depthStencilAttachment.stencilClearValue));
+      gl->clear(GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+    }
+  }
   // Set the viewport to cover the entire color attachment by default.
-  gpu->setViewport(0, 0, renderTexture->width(), renderTexture->height());
+  state->setViewport(0, 0, renderTexture->width(), renderTexture->height());
   // Disable scissor test by default.
-  gpu->enableCapability(GL_SCISSOR_TEST, false);
+  state->setEnabled(GL_SCISSOR_TEST, false);
   if (colorAttachment.loadAction == LoadAction::Clear) {
-    gpu->setClearColor(colorAttachment.clearValue);
+    state->setClearColor(colorAttachment.clearValue);
     gl->clear(GL_COLOR_BUFFER_BIT);
   }
+  return true;
 }
 
 void GLRenderPass::setViewport(int x, int y, int width, int height) {
-  gpu->setViewport(x, y, width, height);
+  auto state = gpu->state();
+  state->setViewport(x, y, width, height);
 }
 
 void GLRenderPass::setScissorRect(int x, int y, int width, int height) {
   auto texture = descriptor.colorAttachments[0].texture;
+  auto state = gpu->state();
   if (x == 0 && y == 0 && width == texture->width() && height == texture->height()) {
-    gpu->enableCapability(GL_SCISSOR_TEST, false);
+    state->setEnabled(GL_SCISSOR_TEST, false);
   } else {
-    gpu->enableCapability(GL_SCISSOR_TEST, true);
-    gpu->setScissorRect(x, y, width, height);
+    state->setEnabled(GL_SCISSOR_TEST, true);
+    state->setScissorRect(x, y, width, height);
   }
 }
 
@@ -65,7 +89,9 @@ void GLRenderPass::setPipeline(GPURenderPipeline* pipeline) {
   }
   renderPipeline = static_cast<GLRenderPipeline*>(pipeline);
   if (renderPipeline != nullptr) {
-    renderPipeline->activate(gpu);
+    auto& attachment = descriptor.depthStencilAttachment;
+    renderPipeline->activate(gpu, attachment.depthReadOnly, attachment.stencilReadOnly,
+                             stencilReference);
   }
 }
 
@@ -114,6 +140,16 @@ void GLRenderPass::setIndexBuffer(GPUBuffer* buffer, IndexFormat format) {
   indexFormat = format;
 }
 
+void GLRenderPass::setStencilReference(uint32_t reference) {
+  if (reference == stencilReference) {
+    return;
+  }
+  if (renderPipeline != nullptr) {
+    renderPipeline->setStencilReference(gpu, reference);
+  }
+  stencilReference = reference;
+}
+
 void GLRenderPass::onEnd() {
   auto gl = gpu->functions();
   auto caps = static_cast<const GLCaps*>(gpu->caps());
@@ -122,10 +158,11 @@ void GLRenderPass::onEnd() {
     auto renderTexture = static_cast<GLTexture*>(attachment.texture);
     auto sampleTexture = static_cast<GLTexture*>(attachment.resolveTexture);
     DEBUG_ASSERT(renderTexture != sampleTexture);
-    gpu->bindFramebuffer(renderTexture, FrameBufferTarget::Read);
-    gpu->bindFramebuffer(sampleTexture, FrameBufferTarget::Draw);
+    auto state = gpu->state();
+    state->bindFramebuffer(renderTexture, FrameBufferTarget::Read);
+    state->bindFramebuffer(sampleTexture, FrameBufferTarget::Draw);
     // MSAA resolve may be affected by the scissor test, so disable it here.
-    gpu->enableCapability(GL_SCISSOR_TEST, false);
+    state->setEnabled(GL_SCISSOR_TEST, false);
     if (caps->msFBOType == MSFBOType::ES_Apple) {
       gl->resolveMultisampleFramebuffer();
     } else {

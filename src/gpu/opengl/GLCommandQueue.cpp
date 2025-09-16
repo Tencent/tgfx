@@ -58,7 +58,8 @@ void GLCommandQueue::writeTexture(GPUTexture* texture, const Rect& rect, const v
     gl->flush();
   }
   auto glTexture = static_cast<GLTexture*>(texture);
-  gpu->bindTexture(glTexture);
+  auto state = gpu->state();
+  state->bindTexture(glTexture);
   const auto& textureFormat = caps->getTextureFormat(glTexture->format());
   auto bytesPerPixel = PixelFormatBytesPerPixel(glTexture->format());
   gl->pixelStorei(GL_UNPACK_ALIGNMENT, static_cast<int>(bytesPerPixel));
@@ -70,17 +71,17 @@ void GLCommandQueue::writeTexture(GPUTexture* texture, const Rect& rect, const v
     // the number of pixels, not bytes
     gl->pixelStorei(GL_UNPACK_ROW_LENGTH, static_cast<int>(rowBytes / bytesPerPixel));
     gl->texSubImage2D(glTexture->target(), 0, x, y, width, height, textureFormat.externalFormat,
-                      GL_UNSIGNED_BYTE, pixels);
+                      textureFormat.externalType, pixels);
     gl->pixelStorei(GL_UNPACK_ROW_LENGTH, 0);
   } else {
     if (static_cast<size_t>(width) * bytesPerPixel == rowBytes) {
       gl->texSubImage2D(glTexture->target(), 0, x, y, width, height, textureFormat.externalFormat,
-                        GL_UNSIGNED_BYTE, pixels);
+                        textureFormat.externalType, pixels);
     } else {
       auto data = reinterpret_cast<const uint8_t*>(pixels);
       for (int row = 0; row < height; ++row) {
         gl->texSubImage2D(glTexture->target(), 0, x, y + row, width, 1,
-                          textureFormat.externalFormat, GL_UNSIGNED_BYTE,
+                          textureFormat.externalFormat, textureFormat.externalType,
                           data + (static_cast<size_t>(row) * rowBytes));
       }
     }
@@ -92,12 +93,16 @@ bool GLCommandQueue::readTexture(GPUTexture* texture, const Rect& rect, void* pi
   if (texture == nullptr || rect.isEmpty() || pixels == nullptr) {
     return false;
   }
-  auto gl = gpu->functions();
   auto caps = static_cast<const GLCaps*>(gpu->caps());
+  if (!caps->isFormatRenderable(texture->format())) {
+    return false;
+  }
+  auto gl = gpu->functions();
   auto glTexture = static_cast<GLTexture*>(texture);
   ClearGLError(gl);
   if (texture->usage() & GPUTextureUsage::RENDER_ATTACHMENT) {
-    gpu->bindFramebuffer(glTexture);
+    auto state = gpu->state();
+    state->bindFramebuffer(glTexture);
   } else if (!glTexture->checkFrameBuffer(gpu)) {
     return false;
   }
@@ -127,7 +132,8 @@ bool GLCommandQueue::readTexture(GPUTexture* texture, const Rect& rect, void* pi
   auto width = static_cast<int>(rect.width());
   auto height = static_cast<int>(rect.height());
   auto textureFormat = caps->getTextureFormat(format);
-  gl->readPixels(x, y, width, height, textureFormat.externalFormat, GL_UNSIGNED_BYTE, outPixels);
+  gl->readPixels(x, y, width, height, textureFormat.externalFormat, textureFormat.externalType,
+                 outPixels);
   if (restoreGLRowLength) {
     gl->pixelStorei(GL_PACK_ROW_LENGTH, 0);
   }

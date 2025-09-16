@@ -73,8 +73,9 @@ void GLTexture::release(GPU* gpu) {
   DEBUG_ASSERT(gpu != nullptr);
   auto glGPU = static_cast<GLGPU*>(gpu);
   if (textureFrameBuffer > 0) {
+    auto state = glGPU->state();
+    state->bindFramebuffer(this);
     auto gl = glGPU->functions();
-    glGPU->bindFramebuffer(this);
     gl->framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, _target, 0, 0);
     gl->deleteFramebuffers(1, &textureFrameBuffer);
     textureFrameBuffer = 0;
@@ -106,7 +107,8 @@ bool GLTexture::checkFrameBuffer(GLGPU* gpu) {
     LOGE("GLTexture::makeFrameBuffer() failed to generate framebuffer!");
     return false;
   }
-  gpu->bindFramebuffer(this);
+  auto state = gpu->state();
+  state->bindFramebuffer(this);
   gl->framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, _target, _textureID, 0);
 #ifndef TGFX_BUILD_FOR_WEB
   if (gl->checkFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
