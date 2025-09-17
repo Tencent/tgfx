@@ -51,6 +51,15 @@
 #define CAPUTRE_FRARGMENT_PROCESSORS(context, colors, coverages) \
   tgfx::inspect::FrameCapture::GetInstance().sendFragmentProcessor(context, colors, coverages);
 
+#define PROGRAM_KEY(programKey) \
+  tgfx::inspect::FrameCapture::GetInstance().sendProgramKey(programKey)
+
+#define CAPUTRE_PROGRAM_INFO(programKey, context, programInfo) \
+  tgfx::inspect::FrameCapture::GetInstance().captureProgramInfo(programKey, context, programInfo);
+
+#define UNIFORM_VALUE(name, data, size) \
+  tgfx::inspect::FrameCapture::GetInstance().sendUniformValue(name, data, size)
+
 #else
 
 #define SEND_LAYER_DATA(data) (void)data

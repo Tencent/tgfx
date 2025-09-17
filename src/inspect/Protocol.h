@@ -132,4 +132,9 @@ enum class LayerTreeMessage : uint8_t {
   LayerSubAttribute,
   ImageData
 };
+
+enum class VertexProviderType {
+  RectsVertexProvider,
+  RRectsVertexProvider
+};
 }  // namespace tgfx::inspect

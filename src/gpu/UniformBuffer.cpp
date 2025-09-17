@@ -18,6 +18,7 @@
 
 #include "UniformBuffer.h"
 #include "core/utils/Log.h"
+#include "inspect/InspectorMark.h"
 
 namespace tgfx {
 UniformBuffer::UniformBuffer(std::vector<Uniform> uniforms, bool uboSupport)
@@ -82,7 +83,7 @@ void UniformBuffer::onSetData(const std::string& name, const void* data, size_t 
     return;
   }
   DEBUG_ASSERT(field->size == size);
-
+  UNIFORM_VALUE(key, data, size);
   memcpy(buffer.data() + field->offset, data, size);
 }
 

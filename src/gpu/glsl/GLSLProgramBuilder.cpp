@@ -20,6 +20,7 @@
 #include <string>
 #include "gpu/GPU.h"
 #include "gpu/UniformBuffer.h"
+#include "inspect/InspectorMark.h"
 
 namespace tgfx {
 static std::string TypeModifierString(bool varyingIsInOut, ShaderVar::TypeModifier t,

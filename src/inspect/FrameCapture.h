@@ -20,6 +20,7 @@
 #include <chrono>
 #include <mutex>
 #include <optional>
+#include <set>
 #include <thread>
 #include <vector>
 #include "FrameCaptureMessage.h"
@@ -31,6 +32,8 @@
 #include "gpu/CommandQueue.h"
 #include "gpu/GPUTexture.h"
 #include "gpu/ProgramInfo.h"
+#include "gpu/RRectsVertexProvider.h"
+#include "gpu/RectsVertexProvider.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Clock.h"
@@ -101,6 +104,17 @@ class FrameCapture {
 
   void sendFrameCaptureTexture(std::shared_ptr<FrameCaptureTexture> frameCaptureTexture);
 
+  void sendProgramKey(const BytesKey& programKey);
+
+  void sendUniformValue(const std::string& name, const void* data, size_t size);
+
+  void sendMeshData(DrawOp* drawOp, PlacementPtr<tgfx::RectsVertexProvider> provider);
+
+  void sendMeshData(Context* context, PlacementPtr<tgfx::RRectsVertexProvider> provider);
+
+  void captureProgramInfo(const BytesKey& programKey, Context* context,
+                          const ProgramInfo* programInfo);
+
   void captureRenderTarget(const RenderTarget* renderTarget);
 
  protected:
@@ -138,14 +152,22 @@ class FrameCapture {
 
   bool sendData(const uint8_t* data, size_t len);
 
-  void sendString(uint64_t stringPtr, const char* str, FrameCaptureMessageType type);
+  void sendString(uint64_t str, const char* ptr, FrameCaptureMessageType type);
 
-  void sendString(uint64_t stringPtr, const char* str, size_t len, FrameCaptureMessageType type);
+  void sendString(uint64_t str, const char* ptr, size_t len, FrameCaptureMessageType type);
 
-  void sendPixelsData(uint64_t pixelsPtr, const char* pixels, size_t len,
-                      FrameCaptureMessageType type);
+  void sendStringWithExtraData(uint64_t str, const char* ptr, size_t len,
+                               std::shared_ptr<Data> extraData, FrameCaptureMessageType type);
+
+  void sendPixelsData(uint64_t str, const char* pixels, size_t len, FrameCaptureMessageType type);
+
+  void sendShaderText(const GPUShaderModuleDescriptor& shaderDescriptor);
+
+  void sendUniformInfo(const std::vector<Uniform>& uniforms);
 
   bool confirmProtocol();
+
+  FrameCaptureMessageItem copyDataToDirectlySendDataMessage(const void* src, size_t size);
 
   DequeueStatus dequeueSerial();
 
@@ -172,5 +194,6 @@ class FrameCapture {
   int dataBufferStart = 0;
   uint32_t captureFrameCount = 0;
   std::atomic<bool> _currentFrameShouldCaptrue = false;
+  std::set<BytesKey> programKeys = {};
 };
 }  // namespace tgfx::inspect
