@@ -19,6 +19,7 @@
 #pragma once
 
 #include <optional>
+#include "tgfx/core/Fill.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Rect.h"
@@ -53,8 +54,12 @@ class StyledShape {
 
   Path getPath() const;
 
+  void convertToHairlineIfNecessary(Fill& fill);
+
  private:
   StyledShape(std::shared_ptr<Shape> shape, const Stroke* stroke, Matrix matrix);
+
+  bool treatStrokeAsHairline(float* width = nullptr) const;
 
   std::shared_ptr<Shape> _shape = nullptr;
   std::optional<Stroke> _stroke;

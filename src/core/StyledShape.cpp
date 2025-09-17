@@ -20,6 +20,8 @@
 #include "core/shapes/MatrixShape.h"
 #include "core/shapes/StrokeShape.h"
 #include "core/utils/ApplyStrokeToBounds.h"
+#include "tgfx/core/Fill.h"
+#include "tgfx/core/Point.h"
 #include "tgfx/core/Stroke.h"
 
 namespace tgfx {
@@ -97,6 +99,33 @@ Path StyledShape::getPath() const {
   _stroke->applyToPath(&finalPath, _matrix.getMaxScale());
   finalPath.transform(_matrix);
   return finalPath;
+}
+
+bool StyledShape::treatStrokeAsHairline(float* width) const {
+  if (!_stroke.has_value() || _stroke->isHairline()) {
+    return false;
+  }
+  Point points[2];
+  Point mappedPoints[2];
+  points[0].set(_stroke->width, 0);
+  points[1].set(0, _stroke->width);
+  _matrix.mapPoints(mappedPoints, points, 2);
+  auto width1 = mappedPoints[0].length();
+  auto width2 = mappedPoints[1].length();
+  auto maxWidth = std::max(width1, width2);
+  if (width) {
+    *width = maxWidth;
+  }
+  return maxWidth <= 1.f;
+}
+
+void StyledShape::convertToHairlineIfNecessary(Fill& fill) {
+  float strokeWidth = 0.f;
+  if (!treatStrokeAsHairline(&strokeWidth)) {
+    return;
+  }
+  fill.color.alpha *= strokeWidth / 1.f;
+  _stroke->width = 0.f;
 }
 
 }  // namespace tgfx

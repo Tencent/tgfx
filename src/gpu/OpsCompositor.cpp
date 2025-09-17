@@ -23,6 +23,7 @@
 #include "core/StyledShape.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/RectToRectMatrix.h"
+#include "gpu/AAType.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ops/AtlasTextOp.h"
@@ -30,6 +31,7 @@
 #include "gpu/processors/AARectEffect.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "processors/PorterDuffXferProcessor.h"
+#include "tgfx/core/Fill.h"
 
 namespace tgfx {
 /**
@@ -181,11 +183,15 @@ void OpsCompositor::drawShape(std::shared_ptr<Shape> shape, const MCState& state
     deviceBounds = shape->isInverseFillType() ? clipBounds : styledShape->getBounds();
   }
   auto aaType = getAAType(fill);
+  Fill finalFill = fill;
+  if (aaType == AAType::Coverage) {
+    styledShape->convertToHairlineIfNecessary(finalFill);
+  }
   auto shapeProxy =
       proxyProvider()->createGPUShapeProxy(styledShape, aaType, clipBounds, renderFlags);
   auto drawOp =
-      ShapeDrawOp::Make(std::move(shapeProxy), fill.color.premultiply(), uvMatrix, aaType);
-  addDrawOp(std::move(drawOp), clip, fill, localBounds, deviceBounds, drawScale);
+      ShapeDrawOp::Make(std::move(shapeProxy), finalFill.color.premultiply(), uvMatrix, aaType);
+  addDrawOp(std::move(drawOp), clip, finalFill, localBounds, deviceBounds, drawScale);
 }
 
 void OpsCompositor::discardAll() {

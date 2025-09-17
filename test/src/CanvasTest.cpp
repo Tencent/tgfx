@@ -3056,4 +3056,26 @@ TGFX_TEST(CanvasTest, HairLineShape) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/HairLineShape"));
 }
 
+TGFX_TEST(CanvasTest, ExtremelyThinStrokePath) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 400);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::Black());
+
+  auto path = SVGPathParser::FromSVGString(
+      "M1690.5,699.5C1690.5,1113.7136,1164.2136,1449.5,750,1449.5C335.78641,1449.5,0,1113.7136,0,"
+      "699.5C0,285.28641,335.78641,0,750,0C1164.2136,0,1690.5,285.28641,1690."
+      "5,699.5Z");
+  Paint paint;
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStrokeWidth(1.f);
+  paint.setColor(Color::FromRGBA(255, 255, 0, 255));
+
+  canvas->scale(0.2f, 0.2f);
+  canvas->drawPath(*path, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ExtremelyThinStrokePath"));
+}
 }  // namespace tgfx
