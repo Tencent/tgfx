@@ -229,7 +229,7 @@ void ContourContext::flushPendingShape(std::shared_ptr<Shape> shape, const MCSta
     Rect localBounds = pendingShape->getBounds();
     localBounds.outset(outset.right, outset.top);
     auto globalBounds = GetGlobalBounds(pendingState, localBounds);
-    if (!containContourBound(globalBounds) || shape->isInverseFillType()) {
+    if (!containContourBound(globalBounds) || pendingShape->isInverseFillType()) {
       for (size_t i = 0; i < pendingFills.size(); i++) {
         auto& pendingFill = pendingFills[i];
         const Stroke* pendingStroke = pendingStrokes.size() > i ? pendingStrokes[i] : nullptr;
