@@ -96,14 +96,17 @@ void HitTestContext::drawPath(const Path& path, const MCState& state, const Fill
   }
 }
 
-void HitTestContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
-                               const Fill& fill) {
+void HitTestContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill,
+                               const Stroke* stroke) {
   DEBUG_ASSERT(shape != nullptr);
   Point local = {};
   if (!GetLocalPoint(state.matrix, deviceX, deviceY, &local)) {
     return;
   }
   if (shapeHitTest) {
+    if (stroke && !stroke->isHairline()) {
+      shape = Shape::ApplyStroke(std::move(shape), stroke);
+    }
     auto path = shape->getPath();
     if (!path.contains(local.x, local.y)) {
       return;

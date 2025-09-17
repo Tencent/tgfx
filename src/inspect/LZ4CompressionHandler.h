@@ -17,23 +17,20 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include <memory>
 
-namespace tgfx {
-/**
- * MipmapMode defines how mipmap levels are selected during texture sampling.
- */
-enum class MipmapMode {
-  /**
-   * Ignore mipmap levels, sample from the "base"
-   */
-  None,
-  /**
-   * Sample from the nearest level
-   */
-  Nearest,
-  /**
-   * Interpolate between the two nearest levels
-   */
-  Linear,
+namespace tgfx::inspect {
+class LZ4CompressionHandler {
+ public:
+  static std::unique_ptr<LZ4CompressionHandler> Make();
+
+  static size_t GetMaxOutputSize(size_t inputSize);
+
+  virtual ~LZ4CompressionHandler() = default;
+
+  virtual size_t encode(uint8_t* dstBuffer, size_t dstSize, const uint8_t* srcBuffer,
+                        size_t srcSize) const = 0;
+
+  virtual void reset() = 0;
 };
-}  // namespace tgfx
+}  // namespace tgfx::inspect

@@ -47,15 +47,22 @@ void MeasureContext::drawPath(const Path& path, const MCState& state, const Fill
   addLocalBounds(state, fill, localBounds, path.isInverseFillType());
 }
 
-void MeasureContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
-                               const Fill& fill) {
+void MeasureContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill,
+                               const Stroke* stroke) {
   DEBUG_ASSERT(shape != nullptr);
   if (computeTightBounds) {
-    addTightBounds(shape->getPath(), state, fill);
+    auto path = shape->getPath();
+    if (stroke && !stroke->isHairline()) {
+      stroke->applyToPath(&path);
+    }
+    addTightBounds(path, state, fill);
     return;
   }
-  auto localBounds = shape->getBounds();
-  addLocalBounds(state, fill, localBounds, shape->isInverseFillType());
+  auto bound = shape->getBounds();
+  if (stroke && !stroke->isHairline()) {
+    ApplyStrokeToBounds(*stroke, &bound, true);
+  }
+  addLocalBounds(state, fill, bound, shape->isInverseFillType());
 }
 
 void MeasureContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions&,

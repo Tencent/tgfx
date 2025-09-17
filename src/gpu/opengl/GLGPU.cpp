@@ -19,6 +19,7 @@
 #include "GLGPU.h"
 #include "gpu/opengl/GLBuffer.h"
 #include "gpu/opengl/GLCommandEncoder.h"
+#include "gpu/opengl/GLDepthStencilTexture.h"
 #include "gpu/opengl/GLExternalTexture.h"
 #include "gpu/opengl/GLFence.h"
 #include "gpu/opengl/GLMultisampleTexture.h"
@@ -67,6 +68,9 @@ std::unique_ptr<GPUTexture> GLGPU::createTexture(const GPUTextureDescriptor& des
   }
   if (descriptor.sampleCount > 1) {
     return GLMultisampleTexture::MakeFrom(this, descriptor);
+  }
+  if (descriptor.format == PixelFormat::DEPTH24_STENCIL8) {
+    return GLDepthStencilTexture::MakeFrom(this, descriptor);
   }
   if (descriptor.usage & GPUTextureUsage::RENDER_ATTACHMENT &&
       !caps()->isFormatRenderable(descriptor.format)) {

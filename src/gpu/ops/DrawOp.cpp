@@ -22,6 +22,7 @@
 
 namespace tgfx {
 void DrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
+  OPERATE_MARK(type());
   auto geometryProcessor = onMakeGeometryProcessor(renderTarget);
   ATTRIBUTE_NAME("scissorRect", scissorRect);
   ATTRIBUTE_NAME_ENUM("blenderMode", blendMode, tgfx::inspect::CustomEnumType::BlendMode);
@@ -54,5 +55,7 @@ void DrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
                                static_cast<int>(scissorRect.height()));
   }
   onDraw(renderPass);
+  CAPUTRE_FRARGMENT_PROCESSORS(renderTarget->getContext(), colors, coverages);
+  CAPUTRE_RENDER_TARGET(renderTarget);
 }
 }  // namespace tgfx
