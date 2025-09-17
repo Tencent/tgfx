@@ -22,7 +22,11 @@
 
 namespace tgfx {
 
+enum class LayerProjectType { Standard, CSS };
+
 struct LayerPerspectiveInfo {
+  LayerProjectType projectType = LayerProjectType::Standard;
+
   float xRotation = 0.0f;
   float yRotation = 0.0f;
   float zRotation = 0.0f;
@@ -31,7 +35,7 @@ struct LayerPerspectiveInfo {
 
   bool operator==(const LayerPerspectiveInfo& other) const {
     return xRotation == other.xRotation && yRotation == other.yRotation &&
-           zRotation == other.zRotation && depth == other.depth;
+           zRotation == other.zRotation && depth == other.depth && projectType == other.projectType;
   }
 };
 

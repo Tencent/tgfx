@@ -42,7 +42,7 @@ std::shared_ptr<ImageFilter> ImageFilter::Perspective(const PerspectiveInfo& per
 }
 
 PerspectiveImageFilter::PerspectiveImageFilter(const PerspectiveInfo& info) : info(info) {
-  normalProjectMatrix = MakeProjectMatrix(ProjectType::CSS, Rect::MakeXYWH(-1.f, -1.f, 2.f, 2.f));
+  normalProjectMatrix = MakeProjectMatrix(info.projectType, Rect::MakeXYWH(-1.f, -1.f, 2.f, 2.f));
   rotateModelMatrix = Matrix3D::MakeRotate({1.f, 0.f, 0.f}, info.xRotation);
   rotateModelMatrix.postRotate({0.f, 1.f, 0.f}, info.yRotation);
   rotateModelMatrix.postRotate({0.f, 0.f, 1.f}, info.zRotation);
@@ -79,7 +79,7 @@ std::shared_ptr<TextureProxy> PerspectiveImageFilter::lockTextureProxy(
   // Rect(0, 0, sourceW, sourceH) describing the entire original image to establish the perspective
   // projection model. This ensures that the projection of the rectangle covers the front surface of
   // the clipping frustum when no model transformation is applied.
-  const auto projectMatrix = MakeProjectMatrix(ProjectType::CSS, srcRect);
+  const auto projectMatrix = MakeProjectMatrix(info.projectType, srcRect);
   auto modelMatrix = rotateModelMatrix;
   modelMatrix.postTranslate(0.f, 0.f, info.depth);
   const auto transformMatrix = projectMatrix * modelMatrix;

@@ -28,8 +28,6 @@ class PerspectiveImageFilter final : public ImageFilter {
   explicit PerspectiveImageFilter(const PerspectiveInfo& info);
 
  private:
-  enum class ProjectType { Standard, CSS };
-
   Type type() const override {
     return Type::Perspective;
   }

@@ -73,7 +73,19 @@ PerspectiveFilter::PerspectiveFilter(const LayerPerspectiveInfo& info) : _info(i
 }
 
 std::shared_ptr<ImageFilter> PerspectiveFilter::onCreateImageFilter(float) {
-  return ImageFilter::Perspective({_info.xRotation, _info.yRotation, _info.zRotation, _info.depth});
+  auto projectType = ProjectType::Standard;
+  switch (_info.projectType) {
+    case LayerProjectType::Standard:
+      projectType = ProjectType::Standard;
+      break;
+    case LayerProjectType::CSS:
+      projectType = ProjectType::CSS;
+      break;
+    default:
+      break;
+  }
+  return ImageFilter::Perspective(
+      {projectType, _info.xRotation, _info.yRotation, _info.zRotation, _info.depth});
 }
 
 }  // namespace tgfx
