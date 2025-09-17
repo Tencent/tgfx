@@ -68,7 +68,7 @@ void GLSLQuadPerEdgeAA3DGeometryProcessor::emitCode(EmitArgs& args) const {
   args.vertBuilder->codeAppendf("vec4 clipScale = vec4(%s.xy, 1.0, 1.0);", ndcScaleName.c_str());
   const auto ndcOffsetName = uniformHandler->addUniform(UNIFORM_TRANSFORM_NDC_OFFSET_NAME,
                                                         UniformFormat::Float2, ShaderStage::Vertex);
-  args.vertBuilder->codeAppendf("vec4 clipOffset = vec4((%s * clipPoint.w).xy, 1.0, 1.0);",
+  args.vertBuilder->codeAppendf("vec4 clipOffset = vec4((%s * clipPoint.w).xy, 0.0, 0.0);",
                                 ndcOffsetName.c_str());
   args.vertBuilder->codeAppend("gl_Position = clipPoint * clipScale + clipOffset;");
 }

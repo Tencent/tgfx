@@ -35,14 +35,14 @@ static constexpr Vec3 StandardEyeCenter = {0.f, 0.f, 0.f};
 static constexpr Vec3 StandardEyeUp = {0.f, 1.f, 0.f};
 
 static constexpr float CSSEyeZ = 1200.f;
+static constexpr float CSSFarZ = -500.f;
 
 std::shared_ptr<ImageFilter> ImageFilter::Perspective(const PerspectiveInfo& perspective) {
   return std::make_shared<PerspectiveImageFilter>(perspective);
 }
 
 PerspectiveImageFilter::PerspectiveImageFilter(const PerspectiveInfo& info) : info(info) {
-  normalProjectMatrix =
-      MakeProjectMatrix(ProjectType::Standard, Rect::MakeXYWH(-1.f, -1.f, 2.f, 2.f));
+  normalProjectMatrix = MakeProjectMatrix(ProjectType::CSS, Rect::MakeXYWH(-1.f, -1.f, 2.f, 2.f));
   rotateModelMatrix = Matrix3D::MakeRotate({1.f, 0.f, 0.f}, info.xRotation);
   rotateModelMatrix.postRotate({0.f, 1.f, 0.f}, info.yRotation);
   rotateModelMatrix.postRotate({0.f, 0.f, 1.f}, info.zRotation);
@@ -79,7 +79,7 @@ std::shared_ptr<TextureProxy> PerspectiveImageFilter::lockTextureProxy(
   // Rect(0, 0, sourceW, sourceH) describing the entire original image to establish the perspective
   // projection model. This ensures that the projection of the rectangle covers the front surface of
   // the clipping frustum when no model transformation is applied.
-  const auto projectMatrix = MakeProjectMatrix(ProjectType::Standard, srcRect);
+  const auto projectMatrix = MakeProjectMatrix(ProjectType::CSS, srcRect);
   auto modelMatrix = rotateModelMatrix;
   modelMatrix.postTranslate(0.f, 0.f, info.depth);
   const auto transformMatrix = projectMatrix * modelMatrix;
@@ -136,7 +136,9 @@ Matrix3D PerspectiveImageFilter::MakeProjectMatrix(ProjectType projectType, cons
       return perspectiveMatrix * viewMatrix;
     }
     case ProjectType::CSS: {
-      return Matrix3D::ProjectionCSS(CSSEyeZ);
+      const float top = rect.bottom;
+      const float bottom = rect.top;
+      return Matrix3D::ProjectionCSS(CSSEyeZ, rect.left, rect.right, top, bottom, CSSFarZ);
     }
     default:
       DEBUG_ASSERT(false);

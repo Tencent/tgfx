@@ -66,6 +66,10 @@ class Matrix3D {
 
   void getRowMajor(float buffer[16]) const;
 
+  float getRowCol(int r, int c) const {
+    return values[c * 4 + r];
+  }
+
   void setRowCol(int r, int c, float value) {
     values[c * 4 + r] = value;
   }
@@ -100,7 +104,8 @@ class Matrix3D {
 
   static Matrix3D Perspective(float fovyDegress, float aspect, float nearZ, float farZ);
 
-  static Matrix3D ProjectionCSS(float eyeDistance);
+  static Matrix3D ProjectionCSS(float eyeDistance, float left, float right, float top, float bottom,
+                                float farZ);
 
  private:
   constexpr Matrix3D(float m00, float m01, float m02, float m03, float m10, float m11, float m12,
