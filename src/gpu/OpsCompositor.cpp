@@ -23,7 +23,6 @@
 #include "core/StyledShape.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/RectToRectMatrix.h"
-#include "gpu/AAType.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ops/AtlasTextOp.h"
@@ -31,7 +30,6 @@
 #include "gpu/processors/AARectEffect.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "processors/PorterDuffXferProcessor.h"
-#include "tgfx/core/Fill.h"
 
 namespace tgfx {
 /**

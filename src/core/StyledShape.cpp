@@ -20,8 +20,6 @@
 #include "core/shapes/MatrixShape.h"
 #include "core/shapes/StrokeShape.h"
 #include "core/utils/ApplyStrokeToBounds.h"
-#include "tgfx/core/Fill.h"
-#include "tgfx/core/Point.h"
 #include "tgfx/core/Stroke.h"
 
 namespace tgfx {
