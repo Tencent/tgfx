@@ -58,7 +58,7 @@ class ContourContext : public DrawContext {
  private:
   bool containContourBound(const Rect& bounds);
 
-  void appendContourBound(const Rect& bounds);
+  void mergeContourBound(const Rect& bounds);
 
   bool canAppend(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill);
 

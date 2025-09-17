@@ -44,22 +44,17 @@ struct LayerStyleSource {
   Point contourOffset = {};
 };
 
-std::shared_ptr<Picture> Layer::RecorderContour(float contentScale,
-                                                const std::function<void(Canvas*)>& drawFunction) {
-  if (drawFunction == nullptr) {
-    return nullptr;
-  }
-  ContourContext contourContext;
-  auto contentCanvas = Canvas(&contourContext);
-  contentCanvas.scale(contentScale, contentScale);
-  drawFunction(&contentCanvas);
-  return contourContext.finishRecordingAsPicture();
-}
-
-static std::shared_ptr<Picture> RecordPicture(float contentScale,
+std::shared_ptr<Picture> Layer::RecordPicture(DrawMode mode, float contentScale,
                                               const std::function<void(Canvas*)>& drawFunction) {
   if (drawFunction == nullptr) {
     return nullptr;
+  }
+  if (mode == DrawMode::Contour) {
+    ContourContext contourContext;
+    auto contentCanvas = Canvas(&contourContext);
+    contentCanvas.scale(contentScale, contentScale);
+    drawFunction(&contentCanvas);
+    return contourContext.finishRecordingAsPicture();
   }
   Recorder recorder = {};
   auto contentCanvas = recorder.beginRecording();
@@ -782,8 +777,8 @@ std::shared_ptr<Image> Layer::getRasterizedImage(const DrawArgs& args, float con
   auto drawArgs = args;
   drawArgs.renderRect = nullptr;
   drawArgs.backgroundContext = nullptr;
-  auto picture =
-      RecordPicture(contentScale, [&](Canvas* canvas) { drawDirectly(drawArgs, canvas, 1.0f); });
+  auto picture = RecordPicture(drawArgs.drawMode, contentScale,
+                               [&](Canvas* canvas) { drawDirectly(drawArgs, canvas, 1.0f); });
   if (!picture) {
     return nullptr;
   }
@@ -862,15 +857,9 @@ std::shared_ptr<MaskFilter> Layer::getMaskFilter(const DrawArgs& args, float sca
   maskArgs.drawMode = maskType != LayerMaskType::Contour ? DrawMode::Normal : DrawMode::Contour;
   maskArgs.backgroundContext = nullptr;
   std::shared_ptr<Picture> maskPicture = nullptr;
-  if (maskType == LayerMaskType::Contour) {
-    maskPicture = RecorderContour(scale, [&](Canvas* canvas) {
-      _mask->drawLayer(maskArgs, canvas, _mask->_alpha, BlendMode::SrcOver);
-    });
-  } else {
-    maskPicture = RecordPicture(scale, [&](Canvas* canvas) {
-      _mask->drawLayer(maskArgs, canvas, _mask->_alpha, BlendMode::SrcOver);
-    });
-  }
+  maskPicture = RecordPicture(maskArgs.drawMode, scale, [&](Canvas* canvas) {
+    _mask->drawLayer(maskArgs, canvas, _mask->_alpha, BlendMode::SrcOver);
+  });
   if (maskPicture == nullptr) {
     return nullptr;
   }
@@ -920,7 +909,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
                                   : nullptr;
   auto offscreenArgs = args;
   offscreenArgs.backgroundContext = subBackgroundContext;
-  auto picture = RecordPicture(contentScale,
+  auto picture = RecordPicture(offscreenArgs.drawMode, contentScale,
                                [&](Canvas* canvas) { drawDirectly(offscreenArgs, canvas, 1.0f); });
   if (picture == nullptr) {
     return;
@@ -1077,8 +1066,9 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   DrawArgs drawArgs = args;
   drawArgs.backgroundContext = nullptr;
   drawArgs.excludeEffects = bitFields.excludeChildEffectsInLayerStyle;
-  auto contentPicture =
-      RecordPicture(contentScale, [&](Canvas* canvas) { drawContents(drawArgs, canvas, 1.0f); });
+  auto contentPicture = RecordPicture(drawArgs.drawMode, contentScale, [&](Canvas* canvas) {
+    drawContents(drawArgs, canvas, 1.0f);
+  });
   Point contentOffset = {};
   auto content = ToImageWithOffset(std::move(contentPicture), &contentOffset);
   if (content == nullptr) {
@@ -1097,8 +1087,9 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
     // Child effects are always excluded when drawing the layer contour.
     drawArgs.excludeEffects = true;
     drawArgs.drawMode = DrawMode::Contour;
-    auto contourPicture = RecorderContour(
-        contentScale, [&](Canvas* canvas) { drawContents(drawArgs, canvas, 1.0f); });
+    auto contourPicture = RecordPicture(DrawMode::Contour, contentScale, [&](Canvas* canvas) {
+      drawContents(drawArgs, canvas, 1.0f);
+    });
     source->contour = ToImageWithOffset(std::move(contourPicture), &source->contourOffset);
   }
   return source;

@@ -110,15 +110,28 @@ void ContourContext::drawPicture(std::shared_ptr<Picture> picture, const MCState
   picture->playback(this, state);
 }
 
-void ContourContext::drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<ImageFilter>,
-                               const MCState& state, const Fill&) {
-  // skip image filter for contour
-  picture->playback(this, state);
+void ContourContext::drawLayer(std::shared_ptr<Picture> picture,
+                               std::shared_ptr<ImageFilter> filter, const MCState& state,
+                               const Fill& fill) {
+  if (!filter) {
+    drawPicture(picture, state);
+    return;
+  }
+  if (!picture->hasUnboundedFill()) {
+    auto bounds = picture->getBounds();
+    bounds = filter->filterBounds(bounds);
+    bounds = state.matrix.mapRect(bounds);
+    if (containContourBound(bounds)) {
+      return;
+    }
+  }
+  flushPendingShape();
+  recordingContext.drawLayer(picture, filter, state, fill);
 }
 
 bool ContourContext::containContourBound(const Rect& bounds) {
-  return std::any_of(contourBounds.begin(), contourBounds.end(),
-                     [&](const Rect& rect) { return rect.contains(bounds); });
+  return bounds.isEmpty() || std::any_of(contourBounds.begin(), contourBounds.end(),
+                                         [&](const Rect& rect) { return rect.contains(bounds); });
 }
 
 Rect GetMaxOverlapRect(const Rect& rect1, const Rect& rect2) {
@@ -135,7 +148,7 @@ Rect GetMaxOverlapRect(const Rect& rect1, const Rect& rect2) {
   return Rect::MakeEmpty();
 }
 
-void ContourContext::appendContourBound(const Rect& bounds) {
+void ContourContext::mergeContourBound(const Rect& bounds) {
   if (contourBounds.size() < 3) {
     contourBounds.emplace_back(bounds);
     if (contourBounds.size() == 3) {
@@ -192,6 +205,16 @@ bool ContourContext::canAppend(std::shared_ptr<Shape> shape, const MCState& stat
   return pendingShape == shape;
 }
 
+Rect GetGlobalBounds(const MCState& state, const Rect& localBounds) {
+  auto globalBounds = state.matrix.mapRect(localBounds);
+  if (!state.clip.isInverseFillType()) {
+    if (!globalBounds.intersect(state.clip.getBounds())) {
+      return Rect::MakeEmpty();
+    }
+  }
+  return globalBounds;
+}
+
 void ContourContext::flushPendingShape(std::shared_ptr<Shape> shape, const MCState& state,
                                        const Fill& fill, const Stroke* stroke) {
   if (pendingShape) {
@@ -205,24 +228,24 @@ void ContourContext::flushPendingShape(std::shared_ptr<Shape> shape, const MCSta
     }
     Rect localBounds = pendingShape->getBounds();
     localBounds.outset(outset.right, outset.top);
-    auto globalBounds = state.matrix.mapRect(localBounds);
-
-    if (!containContourBound(globalBounds)) {
+    auto globalBounds = GetGlobalBounds(pendingState, localBounds);
+    if (!containContourBound(globalBounds) || shape->isInverseFillType()) {
       for (size_t i = 0; i < pendingFills.size(); i++) {
         auto& pendingFill = pendingFills[i];
         const Stroke* pendingStroke = pendingStrokes.size() > i ? pendingStrokes[i] : nullptr;
         drawShapeInternal(pendingShape, pendingState, pendingFill, pendingStroke);
       }
       if (pendingState.matrix.isScaleTranslate() && pendingShape->isSimplePath() &&
+          !pendingShape->isInverseFillType() &&
           (fill.shader == nullptr || !fill.shader->isAImage()) && !fill.maskFilter) {
         RRect rRect = {};
         if (pendingShape->getPath().isRect()) {
-          appendContourBound(globalBounds);
+          mergeContourBound(globalBounds);
         } else if (pendingShape->getPath().isRRect(&rRect)) {
           localBounds.inset(rRect.radii.x, rRect.radii.y);
           if (localBounds.isSorted()) {
-            globalBounds = state.matrix.mapRect(localBounds);
-            appendContourBound(globalBounds);
+            globalBounds = GetGlobalBounds(pendingState, localBounds);
+            mergeContourBound(globalBounds);
           }
         }
       }
