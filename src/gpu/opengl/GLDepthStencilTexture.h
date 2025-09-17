@@ -18,22 +18,25 @@
 
 #pragma once
 
+#include "gpu/opengl/GLTexture.h"
+
 namespace tgfx {
-/**
- * MipmapMode defines how mipmap levels are selected during texture sampling.
- */
-enum class MipmapMode {
-  /**
-   * Ignore mipmap levels, sample from the "base"
-   */
-  None,
-  /**
-   * Sample from the nearest level
-   */
-  Nearest,
-  /**
-   * Interpolate between the two nearest levels
-   */
-  Linear,
+class GLDepthStencilTexture : public GLTexture {
+ public:
+  static std::unique_ptr<GLDepthStencilTexture> MakeFrom(GLGPU* gpu,
+                                                         const GPUTextureDescriptor& descriptor);
+  unsigned renderBufferID() const {
+    return _renderBufferID;
+  }
+
+ protected:
+  void onRelease(GLGPU* gpu) override;
+
+ private:
+  unsigned _renderBufferID = 0;
+
+  GLDepthStencilTexture(const GPUTextureDescriptor& descriptor, unsigned renderBufferID)
+      : GLTexture(descriptor, GL_TEXTURE_2D, 0), _renderBufferID(renderBufferID) {
+  }
 };
 }  // namespace tgfx

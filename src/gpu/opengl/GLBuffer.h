@@ -54,6 +54,6 @@ class GLBuffer : public GPUBuffer {
   uint32_t uniqueID = 0;
   unsigned _bufferID = 0;
 
-  friend class GLGPU;
+  friend class GLState;
 };
 }  // namespace tgfx

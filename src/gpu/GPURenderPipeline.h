@@ -23,43 +23,15 @@
 #include "gpu/Attribute.h"
 #include "gpu/BlendFactor.h"
 #include "gpu/BlendOperation.h"
+#include "gpu/ColorWriteMask.h"
+#include "gpu/CompareFunction.h"
 #include "gpu/GPUResource.h"
 #include "gpu/GPUShaderModule.h"
+#include "gpu/StencilOperation.h"
 #include "gpu/Uniform.h"
 #include "tgfx/gpu/PixelFormat.h"
 
 namespace tgfx {
-/**
- * Values used to specify a mask to permit or restrict writing to color channels of a color value.
- */
-class ColorWriteMask {
- public:
-  /**
-   * The red color channel is enabled.
-   */
-  static constexpr uint32_t RED = 0x1;
-
-  /**
-   * The green color channel is enabled.
-   */
-  static constexpr uint32_t GREEN = 0x2;
-
-  /**
-   * The blue color channel is enabled.
-   */
-  static constexpr uint32_t BLUE = 0x4;
-
-  /**
-   * The alpha color channel is enabled.
-   */
-  static constexpr uint32_t ALPHA = 0x8;
-
-  /**
-   * All color channels are enabled.
-   */
-  static constexpr uint32_t All = 0xF;
-};
-
 /**
 * PipelineColorAttachment specifies the color format and blending settings for an individual color
 * attachment within a rendering pipeline.
@@ -185,11 +157,6 @@ class VertexDescriptor {
 class BindingEntry {
  public:
   /**
-   * Creates an empty BindingEntry.
-   */
-  BindingEntry() = default;
-
-  /**
    * Creates a BindingEntry with the specified name and binding point.
    */
   BindingEntry(std::string name, unsigned binding) : name(std::move(name)), binding(binding) {
@@ -219,18 +186,6 @@ class BindingEntry {
 class BindingLayout {
  public:
   /**
-   * Creates an empty BindingLayout.
-   */
-  BindingLayout() = default;
-
-  /**
-   * Creates a BindingLayout with the specified uniform blocks and texture samplers.
-   */
-  BindingLayout(std::vector<BindingEntry> uniformBlocks, std::vector<BindingEntry> textureSamplers)
-      : uniformBlocks(std::move(uniformBlocks)), textureSamplers(std::move(textureSamplers)) {
-  }
-
-  /**
    * Specifies the binding points for uniform blocks used in the shader program.
    */
   std::vector<BindingEntry> uniformBlocks = {};
@@ -239,6 +194,70 @@ class BindingLayout {
    * Specifies the binding points for texture samplers used in the shader program.
    */
   std::vector<BindingEntry> textureSamplers = {};
+};
+
+/**
+ * An object that defines the front-facing or back-facing stencil operations of a depth and stencil
+ * state object.
+ */
+class StencilDescriptor {
+ public:
+  /**
+   * The function used to compare the existing stencil value in the buffer with the reference value.
+   */
+  CompareFunction compare = CompareFunction::Always;
+
+  /**
+   * The operation to perform on the stencil buffer when the depth comparison test fails.
+   */
+  StencilOperation depthFailOp = StencilOperation::Keep;
+
+  /**
+   * The operation to perform on the stencil buffer when the stencil comparison test fails.
+   */
+  StencilOperation failOp = StencilOperation::Keep;
+
+  /**
+   * The operation to perform on the stencil buffer when both the depth and stencil comparison tests
+   * pass.
+   */
+  StencilOperation passOp = StencilOperation::Keep;
+};
+
+/**
+ * DepthStencilDescriptor describes the depth and stencil state for a render pipeline.
+ */
+class DepthStencilDescriptor {
+ public:
+  /**
+   * A comparison function used to test fragment depths against depthStencilAttachment depth values.
+   */
+  CompareFunction depthCompare = CompareFunction::Always;
+
+  /**
+   * A Boolean value that indicates whether depth values can be written to the depth attachment.
+   */
+  bool depthWriteEnabled = false;
+
+  /**
+   * An object that defines the front-facing stencil operations.
+   */
+  StencilDescriptor stencilBack = {};
+
+  /**
+   * An object that defines the back-facing stencil operations.
+   */
+  StencilDescriptor stencilFront = {};
+
+  /**
+    * A bitmask that determines from which bits that stencil comparison tests can read.
+   */
+  uint32_t stencilReadMask = 0xFFFFFFFF;
+
+  /**
+   * A bitmask that determines to which bits that stencil operations can write.
+   */
+  uint32_t stencilWriteMask = 0xFFFFFFFF;
 };
 
 /**
@@ -262,6 +281,11 @@ class GPURenderPipelineDescriptor {
    * shader code.
    */
   BindingLayout layout = {};
+
+  /**
+   * An object that describes the depth and stencil state for the render pipeline.
+   */
+  DepthStencilDescriptor depthStencil = {};
 };
 
 /**

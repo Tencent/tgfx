@@ -35,7 +35,7 @@ static std::unique_ptr<GPUTexture> CreateTextureOfPlane(EAGLGPU* gpu, CVPixelBuf
       kCFAllocatorDefault, textureCache, pixelBuffer, NULL,             /* texture attributes */
       GL_TEXTURE_2D, static_cast<GLint>(format.internalFormatTexImage), /* opengl format */
       width, height, format.externalFormat,                             /* native iOS format */
-      GL_UNSIGNED_BYTE, planeIndex, &texture);
+      format.externalType, planeIndex, &texture);
   if (result != kCVReturnSuccess && texture != nil) {
     CFRelease(texture);
     return nullptr;

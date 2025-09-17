@@ -20,20 +20,48 @@
 
 namespace tgfx {
 /**
- * MipmapMode defines how mipmap levels are selected during texture sampling.
+ * Options used to specify how a sample compare operation should be performed on a depth or stencil
+ * texture.
  */
-enum class MipmapMode {
+enum class CompareFunction {
   /**
-   * Ignore mipmap levels, sample from the "base"
+   * A new value never passes the comparison test.
    */
-  None,
+  Never,
+
   /**
-   * Sample from the nearest level
+   * A new value passes the comparison test if it is less than the existing value.
    */
-  Nearest,
+  Less,
+
   /**
-   * Interpolate between the two nearest levels
+   * A new value passes the comparison test if it is equal to the existing value.
    */
-  Linear,
+  Equal,
+
+  /**
+   * A new value passes the comparison test if it is less than or equal to the existing value.
+   */
+  LessEqual,
+
+  /**
+   * A new value passes the comparison test if it is greater than the existing value.
+   */
+  Greater,
+
+  /**
+   * A new value passes the comparison test if it is not equal to the existing value.
+   */
+  NotEqual,
+
+  /**
+   * A new value passes the comparison test if it is greater than or equal to the existing value.
+   */
+  GreaterEqual,
+
+  /**
+   * A new value always passes the comparison test.
+   */
+  Always
 };
 }  // namespace tgfx

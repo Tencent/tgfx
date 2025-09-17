@@ -287,6 +287,8 @@ void GLCaps::initGLESSupport(const GLInfo& info) {
   _shaderCaps.usesCustomColorOutputName = version >= GL_VER(3, 0);
   _shaderCaps.varyingIsInOut = version >= GL_VER(3, 0);
   _shaderCaps.textureFuncName = version >= GL_VER(3, 0) ? "texture" : "texture2D";
+  _shaderCaps.oesTextureExtension =
+      version >= GL_VER(3, 0) ? "GL_OES_EGL_image_external_essl3" : "GL_OES_EGL_image_external";
   if (info.hasExtension("GL_EXT_shader_framebuffer_fetch")) {
     _shaderCaps.frameBufferFetchNeedsCustomOutput = version >= GL_VER(3, 0);
     _shaderCaps.frameBufferFetchSupport = true;
@@ -357,37 +359,58 @@ void GLCaps::initWebGLSupport(const GLInfo& info) {
 }
 
 void GLCaps::initFormatMap(const GLInfo& info) {
-  pixelFormatMap[PixelFormat::RGBA_8888].format.sizedFormat = GL_RGBA8;
-  pixelFormatMap[PixelFormat::RGBA_8888].format.externalFormat = GL_RGBA;
-  pixelFormatMap[PixelFormat::RGBA_8888].readSwizzle = Swizzle::RGBA();
-  pixelFormatMap[PixelFormat::BGRA_8888].format.sizedFormat = GL_RGBA8;
-  pixelFormatMap[PixelFormat::BGRA_8888].format.externalFormat = GL_BGRA;
-  pixelFormatMap[PixelFormat::BGRA_8888].readSwizzle = Swizzle::RGBA();
+  auto& RGBAFormat = pixelFormatMap[PixelFormat::RGBA_8888];
+  RGBAFormat.format.sizedFormat = GL_RGBA8;
+  RGBAFormat.format.externalFormat = GL_RGBA;
+  RGBAFormat.format.externalType = GL_UNSIGNED_BYTE;
+  RGBAFormat.readSwizzle = Swizzle::RGBA();
+  auto& BGRAFormat = pixelFormatMap[PixelFormat::BGRA_8888];
+  BGRAFormat.format.sizedFormat = GL_RGBA8;
+  BGRAFormat.format.externalFormat = GL_BGRA;
+  BGRAFormat.format.externalType = GL_UNSIGNED_BYTE;
+  BGRAFormat.readSwizzle = Swizzle::RGBA();
+  auto& DEPTHSTENCILFormat = pixelFormatMap[PixelFormat::DEPTH24_STENCIL8];
+  DEPTHSTENCILFormat.format.sizedFormat = GL_DEPTH24_STENCIL8;
+  DEPTHSTENCILFormat.format.externalFormat = GL_DEPTH_STENCIL;
+  DEPTHSTENCILFormat.format.externalType = GL_UNSIGNED_INT_24_8;
   if (textureRedSupport) {
-    pixelFormatMap[PixelFormat::ALPHA_8].format.sizedFormat = GL_R8;
-    pixelFormatMap[PixelFormat::ALPHA_8].format.externalFormat = GL_RED;
-    pixelFormatMap[PixelFormat::ALPHA_8].readSwizzle = Swizzle::RRRR();
+    auto& ALPHAFormat = pixelFormatMap[PixelFormat::ALPHA_8];
+    ALPHAFormat.format.sizedFormat = GL_R8;
+    ALPHAFormat.format.externalFormat = GL_RED;
+    ALPHAFormat.format.externalType = GL_UNSIGNED_BYTE;
+    ALPHAFormat.readSwizzle = Swizzle::RRRR();
     // Shader output swizzles will default to RGBA. When we've use GL_RED instead of GL_ALPHA to
     // implement PixelFormat::ALPHA_8 we need to swizzle the shader outputs so the alpha channel
     // gets written to the single component.
-    pixelFormatMap[PixelFormat::ALPHA_8].writeSwizzle = Swizzle::AAAA();
-    pixelFormatMap[PixelFormat::GRAY_8].format.sizedFormat = GL_R8;
-    pixelFormatMap[PixelFormat::GRAY_8].format.externalFormat = GL_RED;
-    pixelFormatMap[PixelFormat::GRAY_8].readSwizzle = Swizzle::RRRA();
-    pixelFormatMap[PixelFormat::RG_88].format.sizedFormat = GL_RG8;
-    pixelFormatMap[PixelFormat::RG_88].format.externalFormat = GL_RG;
-    pixelFormatMap[PixelFormat::RG_88].readSwizzle = Swizzle::RGRG();
+    ALPHAFormat.writeSwizzle = Swizzle::AAAA();
+    auto& GrayFormat = pixelFormatMap[PixelFormat::GRAY_8];
+    GrayFormat.format.sizedFormat = GL_R8;
+    GrayFormat.format.externalFormat = GL_RED;
+    GrayFormat.format.externalType = GL_UNSIGNED_BYTE;
+    GrayFormat.readSwizzle = Swizzle::RRRA();
+    auto& RGFormat = pixelFormatMap[PixelFormat::RG_88];
+    RGFormat.format.sizedFormat = GL_RG8;
+    RGFormat.format.externalFormat = GL_RG;
+    RGFormat.format.externalType = GL_UNSIGNED_BYTE;
+    RGFormat.readSwizzle = Swizzle::RGRG();
   } else {
-    pixelFormatMap[PixelFormat::ALPHA_8].format.sizedFormat = GL_ALPHA8;
-    pixelFormatMap[PixelFormat::ALPHA_8].format.externalFormat = GL_ALPHA;
-    pixelFormatMap[PixelFormat::ALPHA_8].readSwizzle = Swizzle::AAAA();
-    pixelFormatMap[PixelFormat::GRAY_8].format.sizedFormat = GL_LUMINANCE8;
-    pixelFormatMap[PixelFormat::GRAY_8].format.externalFormat = GL_LUMINANCE;
-    pixelFormatMap[PixelFormat::GRAY_8].readSwizzle = Swizzle::RGBA();
-    pixelFormatMap[PixelFormat::RG_88].format.sizedFormat = GL_LUMINANCE8_ALPHA8;
-    pixelFormatMap[PixelFormat::RG_88].format.externalFormat = GL_LUMINANCE_ALPHA;
-    pixelFormatMap[PixelFormat::RG_88].readSwizzle = Swizzle::RARA();
+    auto& ALPHAFormat = pixelFormatMap[PixelFormat::ALPHA_8];
+    ALPHAFormat.format.sizedFormat = GL_ALPHA8;
+    ALPHAFormat.format.externalFormat = GL_ALPHA;
+    ALPHAFormat.format.externalType = GL_UNSIGNED_BYTE;
+    ALPHAFormat.readSwizzle = Swizzle::AAAA();
+    auto& GrayFormat = pixelFormatMap[PixelFormat::GRAY_8];
+    GrayFormat.format.sizedFormat = GL_LUMINANCE8;
+    GrayFormat.format.externalFormat = GL_LUMINANCE;
+    GrayFormat.format.externalType = GL_UNSIGNED_BYTE;
+    GrayFormat.readSwizzle = Swizzle::RGBA();
+    auto& RGFormat = pixelFormatMap[PixelFormat::RG_88];
+    RGFormat.format.sizedFormat = GL_LUMINANCE8_ALPHA8;
+    RGFormat.format.externalFormat = GL_LUMINANCE_ALPHA;
+    RGFormat.format.externalType = GL_UNSIGNED_BYTE;
+    RGFormat.readSwizzle = Swizzle::RARA();
   }
+
   // ES 2.0 requires that the internal/external formats match.
   bool useSizedTexFormats =
       (standard == GLStandard::GL || (standard == GLStandard::GLES && version >= GL_VER(3, 0)) ||

@@ -20,20 +20,33 @@
 
 namespace tgfx {
 /**
- * MipmapMode defines how mipmap levels are selected during texture sampling.
+ * Values used to specify a mask to permit or restrict writing to color channels of a color value.
  */
-enum class MipmapMode {
+class ColorWriteMask {
+ public:
   /**
-   * Ignore mipmap levels, sample from the "base"
+   * The red color channel is enabled.
    */
-  None,
+  static constexpr uint32_t RED = 0x1;
+
   /**
-   * Sample from the nearest level
+   * The green color channel is enabled.
    */
-  Nearest,
+  static constexpr uint32_t GREEN = 0x2;
+
   /**
-   * Interpolate between the two nearest levels
+   * The blue color channel is enabled.
    */
-  Linear,
+  static constexpr uint32_t BLUE = 0x4;
+
+  /**
+   * The alpha color channel is enabled.
+   */
+  static constexpr uint32_t ALPHA = 0x8;
+
+  /**
+   * All color channels are enabled.
+   */
+  static constexpr uint32_t All = 0xF;
 };
 }  // namespace tgfx

@@ -34,8 +34,8 @@
 #define MARK_LINE __LINE__
 #define FRAME_MARK tgfx::inspect::FrameCapture::GetInstance().sendFrameMark(nullptr)
 #define FUNCTION_MARK(type, active) \
-  tgfx::inspect::FunctionStat MARE_CONCAT(functionTimer, MARK_LINE) = {type, active}
-#define OPERATE_MARK(type) FUNCTION_MARK(tgfx::inspect::DrawOpTypeToOpTaskType[type], true)
+  tgfx::inspect::FunctionTimer MARE_CONCAT(functionTimer, MARK_LINE) = {type, active}
+#define OPERATE_MARK(type) FUNCTION_MARK(type, true)
 #define TASK_MARK(type) FUNCTION_MARK(type, true)
 #define ATTRIBUTE_NAME(name, value) \
   tgfx::inspect::FrameCapture::GetInstance().sendAttributeData(name, value)

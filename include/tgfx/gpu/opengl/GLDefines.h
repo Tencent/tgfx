@@ -326,6 +326,7 @@ namespace tgfx {
 #define GL_HALF_FLOAT 0x140B
 #define GL_FIXED 0x140C
 #define GL_HALF_FLOAT_OES 0x8D61
+#define GL_UNSIGNED_INT_24_8 0x84FA
 
 // Lighting
 #define GL_LIGHTING 0x0B50
@@ -580,6 +581,7 @@ namespace tgfx {
 
 // TextureUsage
 #define GL_FRAMEBUFFER_ATTACHMENT 0x93A3
+#define GL_DEPTH_STENCIL_ATTACHMENT 0x821A
 
 // TextureParameterName
 #define GL_TEXTURE_MAG_FILTER 0x2800

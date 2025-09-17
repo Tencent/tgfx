@@ -50,8 +50,18 @@ std::shared_ptr<RenderPass> GLCommandEncoder::onBeginRenderPass(
         "texture and resolve texture cannot be the same!");
     return nullptr;
   }
+  auto& depthStencilAttachment = descriptor.depthStencilAttachment;
+  if (depthStencilAttachment.texture &&
+      depthStencilAttachment.texture->format() != PixelFormat::DEPTH24_STENCIL8) {
+    LOGE(
+        "GLCommandEncoder::beginRenderPass() Invalid render pass descriptor, depthStencil "
+        "attachment texture format must be DEPTH24_STENCIL8!");
+    return nullptr;
+  }
   auto renderPass = std::make_shared<GLRenderPass>(gpu, descriptor);
-  renderPass->begin();
+  if (!renderPass->begin()) {
+    return nullptr;
+  }
   return renderPass;
 }
 
@@ -65,9 +75,10 @@ void GLCommandEncoder::copyTextureToTexture(GPUTexture* srcTexture, const Rect& 
     return;
   }
   auto gl = gpu->functions();
+  auto state = gpu->state();
   auto glTexture = static_cast<GLTexture*>(dstTexture);
-  gpu->bindTexture(glTexture);
-  gpu->bindFramebuffer(static_cast<GLTexture*>(srcTexture));
+  state->bindTexture(glTexture);
+  state->bindFramebuffer(static_cast<GLTexture*>(srcTexture));
   auto offsetX = static_cast<int>(dstOffset.x);
   auto offsetY = static_cast<int>(dstOffset.y);
   auto x = static_cast<int>(srcRect.left);
@@ -82,7 +93,8 @@ void GLCommandEncoder::generateMipmapsForTexture(GPUTexture* texture) {
   if (glTexture->mipLevelCount() <= 1 || glTexture->target() != GL_TEXTURE_2D) {
     return;
   }
-  gpu->bindTexture(glTexture);
+  auto state = gpu->state();
+  state->bindTexture(glTexture);
   auto gl = gpu->functions();
   gl->generateMipmap(glTexture->target());
 }
