@@ -45,9 +45,11 @@ class CGScalerContext : public ScalerContext {
 
   bool readPixels(GlyphID glyphID, bool fauxBold, const Stroke* stroke, const ImageInfo& dstInfo,
                   void* dstPixels) const override;
+  float getBackingSize() const override;
 
  private:
   float fauxBoldScale = 1.0f;
   CTFontRef ctFont = nullptr;
+  CTFontRef backingFont = nullptr;
 };
 }  // namespace tgfx

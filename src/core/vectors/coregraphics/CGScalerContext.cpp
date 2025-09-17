@@ -20,6 +20,7 @@
 #include "core/ScalerContext.h"
 #include "core/utils/FauxBoldScale.h"
 #include "core/utils/Log.h"
+#include "core/utils/MathExtra.h"
 #include "platform/apple/BitmapContextUtil.h"
 #include "tgfx/core/PathEffect.h"
 
@@ -32,16 +33,116 @@ static CGAffineTransform GetTransform(bool fauxItalic) {
   return fauxItalic ? italicTransform : identityTransform;
 }
 
+constexpr uint32_t TAG(char a, char b, char c, char d) noexcept {
+  return (static_cast<uint32_t>(a) << 24) | (static_cast<uint32_t>(b) << 16) |
+         (static_cast<uint32_t>(c) << 8) | static_cast<uint32_t>(d);
+}
+
+static uint16_t ReadU16BE(const uint8_t* p) {
+  return static_cast<uint16_t>((p[0] << 8) | p[1]);
+}
+
+static uint32_t ReadU32BE(const uint8_t* p) {
+  return (static_cast<uint32_t>(p[0]) << 24) | (static_cast<uint32_t>(p[1]) << 16) |
+         (static_cast<uint32_t>(p[2]) << 8) | static_cast<uint32_t>(p[3]);
+}
+
+struct Strike {
+  uint16_t ppem;
+  uint16_t resolution;
+  Strike(uint16_t ppem, uint16_t resolution) : ppem(ppem), resolution(resolution) {
+  }
+};
+
+static Strike* FindClosestStrike(std::vector<Strike>& strikes, uint16_t targetPpem) {
+  if (strikes.empty()) {
+    return nullptr;
+  }
+  const auto it =
+      std::lower_bound(strikes.begin(), strikes.end(), targetPpem,
+                       [](const Strike& s, const auto target) { return s.ppem < target; });
+
+  if (it == strikes.begin()) {
+    return &strikes.front();
+  }
+
+  if (it == strikes.end()) {
+    return &strikes.back();
+  }
+
+  const auto prev = it - 1;
+  const auto diffPrev = targetPpem - prev->ppem;
+  const auto diffCurr = it->ppem - targetPpem;
+
+  return (diffPrev <= diffCurr) ? &(*prev) : &(*it);
+}
+
+static CTFontRef CreateBackingFont(CTFontRef ctFont, float textSize) {
+  const CFDataRef sbix =
+      CTFontCopyTable(ctFont, TAG('s', 'b', 'i', 'x'), kCTFontTableOptionNoOptions);
+  if (sbix == nullptr) {
+    return nullptr;
+  }
+  /** sbix table header
+    struct sbixHeader {
+      uint16_t version;
+      uint16_t flags;
+      uint32_t numStrikes;
+    };
+  */
+  constexpr uint32_t SBIX_HEADER_SIZE = 8;
+  auto bytes = CFDataGetBytePtr(sbix);
+  const auto dataLength = static_cast<uint32_t>(CFDataGetLength(sbix));
+  if (dataLength < SBIX_HEADER_SIZE) {
+    CFRelease(sbix);
+    return nullptr;
+  }
+
+  auto numStrikes = ReadU32BE(bytes + 4);
+  if (dataLength < SBIX_HEADER_SIZE + numStrikes * 4) {
+    numStrikes = (dataLength - SBIX_HEADER_SIZE) / 4;
+  }
+
+  std::vector<Strike> strikes;
+  strikes.reserve(numStrikes);
+  for (uint32_t i = 0; i < numStrikes; ++i) {
+    const auto strikeOffset = ReadU32BE(bytes + SBIX_HEADER_SIZE + i * 4);
+    if (strikeOffset + 4 > dataLength) {
+      continue;
+    }
+    auto ppem = ReadU16BE(bytes + strikeOffset + 0);
+    auto resolution = ReadU16BE(bytes + strikeOffset + 2);
+    strikes.emplace_back(ppem, resolution);
+  }
+  CFRelease(sbix);
+
+  std::sort(strikes.begin(), strikes.end(),
+            [](const Strike& a, const Strike& b) { return a.ppem < b.ppem; });
+  const auto strike = FindClosestStrike(strikes, static_cast<uint16_t>(textSize));
+  if (strike == nullptr || FloatNearlyEqual(textSize, static_cast<float>(strike->ppem))) {
+    return nullptr;
+  }
+
+  return CTFontCreateCopyWithAttributes(ctFont, static_cast<CGFloat>(strike->ppem), nullptr,
+                                        nullptr);
+}
+
 CGScalerContext::CGScalerContext(std::shared_ptr<Typeface> tf, float size)
     : ScalerContext(std::move(tf), size) {
   CTFontRef font = std::static_pointer_cast<CGTypeface>(typeface)->ctFont;
   fauxBoldScale = FauxBoldScale(textSize);
   ctFont = CTFontCreateCopyWithAttributes(font, static_cast<CGFloat>(textSize), nullptr, nullptr);
+  if (typeface->hasColor() || !typeface->hasOutlines()) {
+    backingFont = CreateBackingFont(ctFont, textSize);
+  }
 }
 
 CGScalerContext::~CGScalerContext() {
   if (ctFont) {
     CFRelease(ctFont);
+  }
+  if (backingFont) {
+    CFRelease(backingFont);
   }
 }
 
@@ -222,8 +323,9 @@ Rect CGScalerContext::getImageTransform(GlyphID glyphID, bool fauxBold, const St
     return {};
   }
 
+  const auto font = backingFont ? backingFont : ctFont;
   CGRect cgBounds;
-  CTFontGetBoundingRectsForGlyphs(ctFont, kCTFontOrientationHorizontal, &glyphID, &cgBounds, 1);
+  CTFontGetBoundingRectsForGlyphs(font, kCTFontOrientationHorizontal, &glyphID, &cgBounds, 1);
   if (CGRectIsEmpty(cgBounds)) {
     return {};
   }
@@ -235,6 +337,10 @@ Rect CGScalerContext::getImageTransform(GlyphID glyphID, bool fauxBold, const St
   bounds.roundOut();
   if (matrix) {
     matrix->setTranslate(bounds.left, bounds.top);
+    if (backingFont != nullptr) {
+      auto scale = textSize / getBackingSize();
+      matrix->postScale(scale, scale);
+    }
   }
   return bounds;
 }
@@ -254,14 +360,22 @@ bool CGScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke* s
   if (cgContext == nullptr) {
     return false;
   }
-  CGContextClearRect(cgContext, CGRectMake(0, 0, bounds.width(), bounds.height()));
+  const auto font = backingFont ? backingFont : ctFont;
+  CGContextClearRect(cgContext, CGRectMake(0, 0, width, height));
   CGContextSetBlendMode(cgContext, kCGBlendModeCopy);
   CGContextSetTextDrawingMode(cgContext, kCGTextFill);
   CGContextSetShouldAntialias(cgContext, true);
   CGContextSetShouldSmoothFonts(cgContext, true);
   auto point = CGPointMake(-bounds.left, bounds.bottom);
-  CTFontDrawGlyphs(ctFont, &glyphID, &point, 1, cgContext);
+  CTFontDrawGlyphs(font, &glyphID, &point, 1, cgContext);
   CGContextRelease(cgContext);
   return true;
+}
+
+float CGScalerContext::getBackingSize() const {
+  if (backingFont == nullptr) {
+    return textSize;
+  }
+  return static_cast<float>(CTFontGetSize(backingFont));
 }
 }  // namespace tgfx
