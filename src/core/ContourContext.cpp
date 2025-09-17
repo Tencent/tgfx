@@ -296,6 +296,7 @@ void ContourContext::drawShapeInternal(std::shared_ptr<Shape> shape, const MCSta
   RRect rRect = {};
   if (path.isRRect(&rRect)) {
     recordingContext.drawRRect(rRect, state, fill, stroke);
+    return;
   }
   recordingContext.drawPath(path, state, fill);
 }
