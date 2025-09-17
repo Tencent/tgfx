@@ -28,23 +28,21 @@
 
 namespace tgfx {
 
-#define FOV_Y_DEGRESS 45.f
-#define NORMAL_NEAR_Z 0.25f
-#define NORMAL_FAR_Z 1000.f
+static constexpr float StandardFovYDegress = 45.f;
+static constexpr float StandardMaxNearZ = 0.25f;
+static constexpr float StandardMinFarZ = 1000.f;
+static constexpr Vec3 StandardEyeCenter = {0.f, 0.f, 0.f};
+static constexpr Vec3 StandardEyeUp = {0.f, 1.f, 0.f};
 
-static constexpr Vec3 eyeTarget = {0.f, 0.f, 0.f};
-static constexpr Vec3 eyeUp = {0.f, 1.f, 0.f};
+static constexpr float CSSEyeZ = 1200.f;
 
 std::shared_ptr<ImageFilter> ImageFilter::Perspective(const PerspectiveInfo& perspective) {
   return std::make_shared<PerspectiveImageFilter>(perspective);
 }
 
 PerspectiveImageFilter::PerspectiveImageFilter(const PerspectiveInfo& info) : info(info) {
-  const auto perspectiveMatrix =
-      Matrix3D::Perspective(FOV_Y_DEGRESS, 1.f, NORMAL_NEAR_Z, NORMAL_FAR_Z);
-  const Vec3 eyePosition = {0.f, 0.f, 1.f / tanf(DegreesToRadians(FOV_Y_DEGRESS * 0.5f))};
-  const auto viewMatrix = Matrix3D::LookAt(eyePosition, eyeTarget, eyeUp);
-  normalPVMatrix = perspectiveMatrix * viewMatrix;
+  normalProjectMatrix =
+      MakeProjectMatrix(ProjectType::Standard, Rect::MakeXYWH(-1.f, -1.f, 2.f, 2.f));
   rotateModelMatrix = Matrix3D::MakeRotate({1.f, 0.f, 0.f}, info.xRotation);
   rotateModelMatrix.postRotate({0.f, 1.f, 0.f}, info.yRotation);
   rotateModelMatrix.postRotate({0.f, 0.f, 1.f}, info.zRotation);
@@ -53,7 +51,7 @@ PerspectiveImageFilter::PerspectiveImageFilter(const PerspectiveInfo& info) : in
 Rect PerspectiveImageFilter::onFilterBounds(const Rect& srcRect) const {
   auto normalModelMatrix = rotateModelMatrix;
   normalModelMatrix.postTranslate(0.f, 0.f, info.depth * 2.f / srcRect.height());
-  const auto normalTransformMatrix = normalPVMatrix * normalModelMatrix;
+  const auto normalTransformMatrix = normalProjectMatrix * normalModelMatrix;
   constexpr auto tempRect = Rect::MakeXYWH(-1.f, -1.f, 2.f, 2.f);
   const auto ndcResult = normalTransformMatrix.mapRect(tempRect);
   const auto normalizedResult =
@@ -81,16 +79,10 @@ std::shared_ptr<TextureProxy> PerspectiveImageFilter::lockTextureProxy(
   // Rect(0, 0, sourceW, sourceH) describing the entire original image to establish the perspective
   // projection model. This ensures that the projection of the rectangle covers the front surface of
   // the clipping frustum when no model transformation is applied.
-  const float eyePositionZ = sourceH * 0.5f / tanf(DegreesToRadians(FOV_Y_DEGRESS * 0.5f));
-  const Vec3 eyePosition = {0.f, 0.f, eyePositionZ};
-  const auto viewMatrix = Matrix3D::LookAt(eyePosition, eyeTarget, eyeUp);
-  const float nearZ = std::min(NORMAL_NEAR_Z, eyePositionZ * 0.1f);
-  const float farZ = std::max(NORMAL_FAR_Z, eyePositionZ * 10.f);
-  const auto perspectiveMatrix =
-      Matrix3D::Perspective(FOV_Y_DEGRESS, sourceW / sourceH, nearZ, farZ);
+  const auto projectMatrix = MakeProjectMatrix(ProjectType::Standard, srcRect);
   auto modelMatrix = rotateModelMatrix;
   modelMatrix.postTranslate(0.f, 0.f, info.depth);
-  const auto transformMatrix = perspectiveMatrix * viewMatrix * modelMatrix;
+  const auto transformMatrix = projectMatrix * modelMatrix;
 
   // ProjectRect is the result of the projection transformation of the rectangle
   // Rect(0, 0, sourceW, sourceH) on the canvas, and RenderBounds describes a region within it.
@@ -128,6 +120,28 @@ PlacementPtr<FragmentProcessor> PerspectiveImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
     SrcRectConstraint constraint, const Matrix* uvMatrix) const {
   return makeFPFromTextureProxy(source, args, sampling, constraint, uvMatrix);
+}
+
+Matrix3D PerspectiveImageFilter::MakeProjectMatrix(ProjectType projectType, const Rect& rect) {
+  switch (projectType) {
+    case ProjectType::Standard: {
+      const float eyePositionZ =
+          rect.height() * 0.5f / tanf(DegreesToRadians(StandardFovYDegress * 0.5f));
+      const Vec3 eyePosition = {0.f, 0.f, eyePositionZ};
+      const auto viewMatrix = Matrix3D::LookAt(eyePosition, StandardEyeCenter, StandardEyeUp);
+      const float nearZ = std::min(StandardMaxNearZ, eyePositionZ * 0.1f);
+      const float farZ = std::max(StandardMinFarZ, eyePositionZ * 10.f);
+      const auto perspectiveMatrix =
+          Matrix3D::Perspective(StandardFovYDegress, rect.width() / rect.height(), nearZ, farZ);
+      return perspectiveMatrix * viewMatrix;
+    }
+    case ProjectType::CSS: {
+      return Matrix3D::ProjectionCSS(CSSEyeZ);
+    }
+    default:
+      DEBUG_ASSERT(false);
+      return Matrix3D::I();
+  }
 }
 
 }  // namespace tgfx

@@ -66,6 +66,10 @@ class Matrix3D {
 
   void getRowMajor(float buffer[16]) const;
 
+  void setRowCol(int r, int c, float value) {
+    values[c * 4 + r] = value;
+  }
+
   void setConcat(const Matrix3D& a, const Matrix3D& b);
 
   void preConcat(const Matrix3D& m);
@@ -96,6 +100,8 @@ class Matrix3D {
 
   static Matrix3D Perspective(float fovyDegress, float aspect, float nearZ, float farZ);
 
+  static Matrix3D ProjectionCSS(float eyeDistance);
+
  private:
   constexpr Matrix3D(float m00, float m01, float m02, float m03, float m10, float m11, float m12,
                      float m13, float m20, float m21, float m22, float m23, float m30, float m31,
@@ -122,10 +128,6 @@ class Matrix3D {
 
   void setCol(int i, const Vec4& v) {
     memcpy(&values[i * 4], v.ptr(), sizeof(v));
-  }
-
-  void setRowCol(int r, int c, float value) {
-    values[c * 4 + r] = value;
   }
 
   void setIdentity() {

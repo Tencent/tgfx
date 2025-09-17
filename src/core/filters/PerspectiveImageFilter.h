@@ -28,6 +28,8 @@ class PerspectiveImageFilter final : public ImageFilter {
   explicit PerspectiveImageFilter(const PerspectiveInfo& info);
 
  private:
+  enum class ProjectType { Standard, CSS };
+
   Type type() const override {
     return Type::Perspective;
   }
@@ -44,9 +46,11 @@ class PerspectiveImageFilter final : public ImageFilter {
                                                       SrcRectConstraint constraint,
                                                       const Matrix* uvMatrix) const override;
 
+  static Matrix3D MakeProjectMatrix(ProjectType projectType, const Rect& rect);
+
   PerspectiveInfo info = {};
 
-  Matrix3D normalPVMatrix;
+  Matrix3D normalProjectMatrix;
 
   Matrix3D rotateModelMatrix;
 };

@@ -299,6 +299,12 @@ Matrix3D Matrix3D::Perspective(float fovyDegress, float aspect, float nearZ, flo
   return m;
 }
 
+Matrix3D Matrix3D::ProjectionCSS(float eyeDistance) {
+  auto m = Matrix3D::I();
+  m.setRowCol(3, 2, -1.f / eyeDistance);
+  return m;
+}
+
 void Matrix3D::setAll(float m00, float m01, float m02, float m03, float m10, float m11, float m12,
                       float m13, float m20, float m21, float m22, float m23, float m30, float m31,
                       float m32, float m33) {
