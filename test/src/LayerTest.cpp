@@ -18,10 +18,10 @@
 
 #include <math.h>
 #include <vector>
-#include "core/ContourContext.h"
 #include "core/filters/GaussianBlurImageFilter.h"
 #include "core/shaders/GradientShader.h"
 #include "gpu/proxies/RenderTargetProxy.h"
+#include "layers/ContourContext.h"
 #include "layers/DrawArgs.h"
 #include "layers/RootLayer.h"
 #include "layers/contents/RasterizedContent.h"

@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include "DrawContext.h"
-#include "RecordingContext.h"
+#include "core/DrawContext.h"
+#include "core/RecordingContext.h"
 
 namespace tgfx {
 class ContourContext : public DrawContext {

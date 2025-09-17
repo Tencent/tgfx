@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ContourContext.h"
+#include "core/utils/ApplyStrokeToBounds.h"
+#include "core/utils/RectToRectMatrix.h"
 #include "layers/OpaqueThreshold.h"
-#include "utils/ApplyStrokeToBounds.h"
-#include "utils/RectToRectMatrix.h"
 
 namespace tgfx {
 ContourContext::ContourContext() {

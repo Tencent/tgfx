@@ -20,10 +20,10 @@
 #include <atomic>
 #include "contents/LayerContent.h"
 #include "contents/RasterizedContent.h"
-#include "core/ContourContext.h"
 #include "core/images/PictureImage.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
+#include "layers/ContourContext.h"
 #include "layers/DrawArgs.h"
 #include "layers/OpaqueThreshold.h"
 #include "layers/RegionTransformer.h"
