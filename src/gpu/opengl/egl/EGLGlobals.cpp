@@ -19,7 +19,6 @@
 #include "tgfx/gpu/opengl/egl/EGLGlobals.h"
 #include <EGL/eglext.h>
 #include <atomic>
-#include "core/utils/Log.h"
 #if defined(_WIN32)
 #include "EGLDisplayWrapper.h"
 #endif
@@ -38,7 +37,6 @@ EGLGlobals InitializeEGL() {
 #else
   globals.display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
   eglInitialize(globals.display, &majorVersion, &minorVersion);
-  LOGE("EGLVERSION: %d.%d", majorVersion, minorVersion);
   const char* extensions = eglQueryString(globals.display, EGL_EXTENSIONS);
   if (extensions && strstr(extensions, "EGL_EXT_gl_colorspace_display_p3_passthrough")) {
      globals.windowSurfaceAttributes = {EGL_GL_COLORSPACE_KHR, EGL_GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT, EGL_NONE};
