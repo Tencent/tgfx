@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Picture.h"
-#include "ContourContext.h"
 #include "core/HitTestContext.h"
 #include "core/MeasureContext.h"
 #include "core/Records.h"
