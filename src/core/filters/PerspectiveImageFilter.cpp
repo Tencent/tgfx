@@ -59,9 +59,10 @@ Rect PerspectiveImageFilter::onFilterBounds(const Rect& srcRect) const {
   const auto normalizedResult =
       Rect::MakeXYWH((ndcResult.left + 1.f) * 0.5f, (ndcResult.top + 1.f) * 0.5f,
                      ndcResult.width() * 0.5f, ndcResult.height() * 0.5f);
-  const auto result = Rect::MakeXYWH(
-      normalizedResult.left * srcRect.width() + srcRect.left, normalizedResult.top * srcRect.height() + srcRect.top,
-      normalizedResult.width() * srcRect.width(), normalizedResult.height() * srcRect.height());
+  const auto result = Rect::MakeXYWH(normalizedResult.left * srcRect.width() + srcRect.left,
+                                     normalizedResult.top * srcRect.height() + srcRect.top,
+                                     normalizedResult.width() * srcRect.width(),
+                                     normalizedResult.height() * srcRect.height());
   return result;
 }
 
@@ -76,6 +77,10 @@ std::shared_ptr<TextureProxy> PerspectiveImageFilter::lockTextureProxy(
       source->isAlphaOnly(), 1, args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
   const auto sourceTextureProxy = source->lockTextureProxy(args);
 
+  // To ensure the correct visual effect of perspective projection, use the rectangle
+  // Rect(0, 0, sourceW, sourceH) describing the entire original image to establish the perspective
+  // projection model. This ensures that the projection of the rectangle covers the front surface of
+  // the clipping frustum when no model transformation is applied.
   const float eyePositionZ = sourceH * 0.5f / tanf(DegreesToRadians(FOV_Y_DEGRESS * 0.5f));
   const Vec3 eyePosition = {0.f, 0.f, eyePositionZ};
   const auto viewMatrix = Matrix3D::LookAt(eyePosition, eyeTarget, eyeUp);
@@ -87,18 +92,33 @@ std::shared_ptr<TextureProxy> PerspectiveImageFilter::lockTextureProxy(
   modelMatrix.postTranslate(0.f, 0.f, info.depth);
   const auto transformMatrix = perspectiveMatrix * viewMatrix * modelMatrix;
 
-  // Convert the projected NDC coordinates to the pixel coordinate system of RT and align NDC Rect
-  // to the top-left corner of RT.
+  // ProjectRect is the result of the projection transformation of the rectangle
+  // Rect(0, 0, sourceW, sourceH) on the canvas, and RenderBounds describes a region within it.
+  // Since the perspective transformation model for calculating NDC is based on the dimensions of
+  // the source, and the size of the render target RT is set via RenderBounds, the NDC coordinates
+  // are scaled and translated so that RT only displays the required content.
   const Vec2 ndcScale(sourceW / renderBounds.width(), sourceH / renderBounds.height());
   const auto ndcRect = transformMatrix.mapRect(srcRect);
   const auto ndcRectScaled =
       Rect::MakeXYWH(ndcRect.left * ndcScale.x, ndcRect.top * ndcScale.y,
                      ndcRect.width() * ndcScale.x, ndcRect.height() * ndcScale.y);
-  const Vec2 ndcOffset(-1.f - ndcRectScaled.left, -1.f - ndcRectScaled.top);
-  const PerspectiveRenderArgs perspectiveArgs{AAType::Coverage, transformMatrix, ndcScale,
-                                              ndcOffset};
+  const auto normalizedRect =
+      Rect::MakeXYWH((ndcRect.left + 1.f) * 0.5f, (ndcRect.top + 1.f) * 0.5f,
+                     ndcRect.width() * 0.5f, ndcRect.height() * 0.5f);
+  // Align the top-left origin of the drawing area renderBounds with the NDC coordinate origin
+  // (-1.f, -1.f) of the clipping rectangle.
+  const auto projectRect =
+      Rect::MakeXYWH(normalizedRect.left * sourceW, normalizedRect.top * sourceH,
+                     normalizedRect.width() * sourceW, normalizedRect.height() * sourceH);
+  const Vec2 renderBoundsLTNDC(
+      (renderBounds.left - projectRect.left) * ndcRectScaled.width() / projectRect.width(),
+      (renderBounds.top - projectRect.top) * ndcRectScaled.height() / projectRect.height());
+  const Vec2 ndcOffset(-1.f - ndcRectScaled.left - renderBoundsLTNDC.x,
+                       -1.f - ndcRectScaled.top - renderBoundsLTNDC.y);
 
   const auto drawingManager = args.context->drawingManager();
+  const PerspectiveRenderArgs perspectiveArgs{AAType::Coverage, transformMatrix, ndcScale,
+                                              ndcOffset};
   drawingManager->addRectPerspectiveRenderTask(srcRect, renderTarget, sourceTextureProxy,
                                                perspectiveArgs);
   return renderTarget->asTextureProxy();
