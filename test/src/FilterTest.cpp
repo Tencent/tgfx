@@ -833,4 +833,69 @@ TGFX_TEST(FilterTest, GaussianBlurImageFilter) {
     EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/GaussianBlurImageFilterComplex2D"));
   }
 }
+
+TGFX_TEST(FilterTest, PerspectiveImageFilter) {
+  const ContextScope scope;
+  Context* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  ASSERT_TRUE(surface != nullptr);
+  Canvas* canvas = surface->getCanvas();
+
+  auto image = MakeImage("resources/apitest/imageReplacement.jpg");
+  auto perspectiveInfo = PerspectiveInfo();
+  perspectiveInfo.yRotation = 45.0f;
+  const auto perspectiveFilter = ImageFilter::Perspective(perspectiveInfo);
+
+  {
+    // Test basic drawing
+    canvas->save();
+    canvas->clear();
+
+    Paint paint = {};
+    paint.setImageFilter(perspectiveFilter);
+    canvas->setMatrix(tgfx::Matrix::MakeRotate(45, 100, 100));
+    canvas->drawImage(image, 45.f, 45.f, &paint);
+
+    context->flushAndSubmit();
+    EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/PerspectiveImageFilterStandard"));
+    canvas->restore();
+  }
+
+  {
+    // Test image clipping drawing
+    canvas->save();
+    canvas->clear();
+
+    auto filteredImage = image->makeWithFilter(perspectiveFilter);
+    auto filteredBounds = perspectiveFilter->filterBounds(
+        Rect::MakeWH(static_cast<float>(image->width()), static_cast<float>(image->height())));
+
+    const auto clipRectLT =
+        Rect::MakeXYWH(filteredBounds.left, filteredBounds.top, filteredBounds.width() * 0.5f,
+                       filteredBounds.height() * 0.5f);
+    const auto imageLT = image->makeWithFilter(perspectiveFilter, nullptr, &clipRectLT);
+    canvas->drawImage(imageLT, 0.f, 0.f);
+
+    const auto clipRectRT = Rect::MakeXYWH(clipRectLT.right, filteredBounds.top,
+                                           filteredBounds.width() * 0.5f, clipRectLT.height());
+    const auto imageRT = image->makeWithFilter(perspectiveFilter, nullptr, &clipRectRT);
+    canvas->drawImage(imageRT, static_cast<float>(imageLT->width()), 0.f);
+
+    const auto clipRectLB = Rect::MakeXYWH(filteredBounds.left, clipRectLT.bottom,
+                                           clipRectLT.width(), filteredBounds.height() * 0.5f);
+    const auto imageLB = image->makeWithFilter(perspectiveFilter, nullptr, &clipRectLB);
+    canvas->drawImage(imageLB, 0.f, static_cast<float>(imageLT->height()));
+
+    const auto clipRectRB =
+        Rect::MakeXYWH(clipRectRT.left, clipRectRT.bottom, clipRectRT.width(), clipRectLB.height());
+    const auto imageRB = image->makeWithFilter(perspectiveFilter, nullptr, &clipRectRB);
+    canvas->drawImage(imageRB, static_cast<float>(imageLT->width()),
+                      static_cast<float>(imageLT->height()));
+
+    context->flushAndSubmit();
+    EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/PerspectiveImageFilterClip"));
+    canvas->restore();
+  }
+}
 }  // namespace tgfx
