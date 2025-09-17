@@ -41,25 +41,21 @@ void ContourContext::drawRRect(const RRect& rRect, const MCState& state, const F
   Path path = {};
   path.addRRect(rRect);
   auto shape = Shape::MakeFrom(path);
-  if (canAppend(shape, state, fill) && pendingStrokes.empty() == (stroke == nullptr)) {
-    appendFill(fill, stroke);
-    return;
-  }
-  flushPendingShape(shape, state, fill, stroke);
+  drawShape(shape, state, fill, stroke);
 }
 
 void ContourContext::drawPath(const Path& path, const MCState& state, const Fill& fill) {
   auto shape = Shape::MakeFrom(path);
-  drawShape(shape, state, fill);
+  drawShape(shape, state, fill, nullptr);
 }
 
-void ContourContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
-                               const Fill& fill) {
-  if (canAppend(shape, state, fill)) {
-    appendFill(fill);
+void ContourContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill,
+                               const Stroke* stroke) {
+  if (canAppend(shape, state, fill, stroke)) {
+    appendFill(fill, stroke);
     return;
   }
-  flushPendingShape(shape, state, fill);
+  flushPendingShape(shape, state, fill, stroke);
 }
 
 void ContourContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
@@ -189,12 +185,15 @@ std::shared_ptr<Picture> ContourContext::finishRecordingAsPicture() {
   return recordingContext.finishRecordingAsPicture();
 }
 
-bool ContourContext::canAppend(std::shared_ptr<Shape> shape, const MCState& state,
-                               const Fill& fill) {
+bool ContourContext::canAppend(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill,
+                               const Stroke* stroke) {
   if (state.clip != pendingState.clip || state.matrix != pendingState.matrix) {
     return false;
   }
   if (pendingFills.empty() || fill.maskFilter != pendingFills.back().maskFilter) {
+    return false;
+  }
+  if (pendingStrokes.empty() != (stroke == nullptr)) {
     return false;
   }
   if (pendingShape->isSimplePath() && shape->isSimplePath()) {
@@ -279,10 +278,19 @@ void ContourContext::appendFill(const Fill& fill, const Stroke* stroke) {
 void ContourContext::drawShapeInternal(std::shared_ptr<Shape> shape, const MCState& state,
                                        const Fill& fill, const Stroke* stroke) {
   if (!shape->isSimplePath()) {
-    recordingContext.drawShape(std::move(shape), state, fill);
+    recordingContext.drawShape(std::move(shape), state, fill, stroke);
     return;
   }
   auto path = shape->getPath();
+  RRect rRect = {};
+  if (path.isRRect(&rRect)) {
+    recordingContext.drawRRect(rRect, state, fill, stroke);
+    return;
+  }
+  if (stroke) {
+    recordingContext.drawShape(std::move(shape), state, fill, stroke);
+    return;
+  }
   Rect rect = {};
   if (path.isRect(&rect)) {
     if (rect.left == -FLT_MAX && rect.top == -FLT_MAX && rect.right == FLT_MAX &&
@@ -291,11 +299,6 @@ void ContourContext::drawShapeInternal(std::shared_ptr<Shape> shape, const MCSta
     } else {
       recordingContext.drawRect(rect, state, fill);
     }
-    return;
-  }
-  RRect rRect = {};
-  if (path.isRRect(&rRect)) {
-    recordingContext.drawRRect(rRect, state, fill, stroke);
     return;
   }
   recordingContext.drawPath(path, state, fill);
