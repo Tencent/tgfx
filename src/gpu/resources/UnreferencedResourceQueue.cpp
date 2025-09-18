@@ -15,22 +15,16 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-
-#pragma once
-
-#include <concurrentqueue.h>
+#include "UnreferencedResourceQueue.h"
+#include "gpu/resources/Resource.h"
 
 namespace tgfx {
-class Resource;
 
-/**
- * Manages resources whose references are released by `shared_ptr`.
- */
-class UnreferencedResourceQueue {
- public:
-  /** Destructor that cleans up all unreferenced resources. */
-  ~UnreferencedResourceQueue();
+UnreferencedResourceQueue::~UnreferencedResourceQueue() {
+  Resource* resource = nullptr;
+  while (queue.try_dequeue(resource)) {
+    delete resource;
+  }
+}
 
-  moodycamel::ConcurrentQueue<Resource*> queue;
-};
 }  // namespace tgfx
