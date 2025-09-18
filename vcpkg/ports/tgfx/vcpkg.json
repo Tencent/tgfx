@@ -84,13 +84,13 @@
       "description": "Enable building with the ANGLE library"
     },
     "enable-opengl": {
-      "description": "Use OpenGL as the GPU backend"
+      "description": "Enable OpenGL as the GPU backend"
     },
     "enable-threads": {
       "description": "Enable support for multithreaded rendering"
     },
     "enable-freetype": {
-      "description": "Use Freetype as the vector backend"
+      "description": "Enable Freetype as the vector backend"
     },
     "enable-inspector": {
       "description": "Enable profiling support for the TGFX Inspector tool"
