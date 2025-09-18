@@ -375,80 +375,30 @@ Finally, connect your OpenHarmony device or start the simulator, then build and 
 target in DevEco. You're all set!
 
 
-## vcpkg Integration
+## Vcpkg Integration
 
-TGFX provides official vcpkg port files for easy integration into projects using vcpkg dependency management.
+TGFX provides official vcpkg port files for easy integration into projects using vcpkg dependency management. Due to maintenance costs, we haven't merged into the official vcpkg repository yet, but this may be considered in the future. Currently, you can use TGFX through manual vcpkg port configuration.
 
-### Getting Started with vcpkg
+### Quick Start
 
-First, ensure you have vcpkg installed. Please refer to the [official vcpkg installation guide](https://vcpkg.io/en/getting-started.html).
+1. Visit the [TGFX releases page](https://github.com/Tencent/tgfx/releases) and download the vcpkg port files for your target version
+2. Copy the `tgfx/` directory to your vcpkg installation's `ports/` directory  
+3. Run `vcpkg install tgfx` to install
 
-### Updating TGFX Version
+### Using Specific Commit
 
-#### Method 1: Download from Releases (Recommended)
+If you need a specific commit version of TGFX, you can use the provided script in [`vcpkg`](vcpkg/) directory to generate the port configuration:
 
-1. Visit the [TGFX releases page](https://github.com/Tencent/tgfx/releases)
-2. Download the vcpkg port files for your target version
-3. Copy the `tgfx/` directory to your vcpkg installation's `ports/` directory
-
-#### Method 2: Using the Update Script
-
-Use the provided script in [`vcpkg`](vcpkg/) directory to automatically update the portfile:
-
-Find the commit hash for your target version in TGFX repository.
-Then run the update script with the commit hash:
 ```bash
-node update_tgfx <commit-hash>
+node update_vcpkg <commit-hash>
 ```
 
-Example: Update to a specific commit:
+Example:
 ```bash
-node update_tgfx 6095b909b1109d4910991a034405f4ae30d6786f
+node update_vcpkg 6095b909b1109d4910991a034405f4ae30d6786f
 ```
 
 The script will automatically download the source code, calculate the SHA512 hash, and update the `vcpkg/ports/tgfx/portfile.cmake` file.
-
-### Using TGFX vcpkg Port
-
-**Manifest Mode (Recommended):**
-
-Create a `vcpkg.json` file in your project:
-
-```json
-{
-  "name": "your-project",
-  "version": "1.0.0",
-  "dependencies": [
-    {
-      "name": "tgfx",
-      "features": ["enable-svg", "enable-opengl", "enable-threads"]
-    }
-  ]
-}
-```
-
-Then install dependencies:
-
-```bash
-vcpkg install --triplet=x64-osx
-```
-
-**Classic Mode:**
-
-```bash
-# Basic installation
-vcpkg install tgfx
-
-# Install with specific features
-vcpkg install tgfx[enable-svg,enable-freetype] --triplet=x64-osx
-
-# WebAssembly build
-vcpkg install tgfx[enable-threads] --triplet=wasm32-emscripten
-```
-
-### Available Features
-
-Refer to [`vcpkg/ports/tgfx/vcpkg.json`](vcpkg/ports/tgfx/vcpkg.json) for the complete feature list and platform-specific defaults.
 
 ## Build Library
 

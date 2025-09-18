@@ -6,8 +6,8 @@ const crypto = require('crypto');
 const https = require('https');
 
 function printUsage() {
-    console.log('Usage: node update_tgfx <commit-hash>');
-    console.log('Example: node update_tgfx 6095b909b1109d4910991a034405f4ae30d6786f');
+    console.log('Usage: node update_vcpkg <commit-hash>');
+    console.log('Example: node update_vcpkg 6095b909b1109d4910991a034405f4ae30d6786f');
 }
 
 function validateCommitHash(commitHash) {

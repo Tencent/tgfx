@@ -28,92 +28,92 @@
   ],
   "default-features": [
     {
-      "name": "enable-opengl"
+      "name": "opengl"
     },
     {
-      "name": "enable-threads",
+      "name": "threads",
       "platform": "!wasm32"
     },
     {
-      "name": "enable-freetype",
+      "name": "freetype",
       "platform": "!(osx | ios | wasm32)"
     },
     {
-      "name": "enable-webp-decode",
+      "name": "webp-decode",
       "platform": "!(android | ohos)"
     },
     {
-      "name": "enable-png-decode",
+      "name": "png-decode",
       "platform": "!(android | ohos) & !(ios | wasm32)"
     },
     {
-      "name": "enable-png-encode",
+      "name": "png-encode",
       "platform": "!(android | ohos) & !(ios | wasm32)"
     },
     {
-      "name": "enable-jpeg-decode",
+      "name": "jpeg-decode",
       "platform": "!(android | ohos) & !(ios | wasm32)"
     },
     {
-      "name": "enable-jpeg-encode",
+      "name": "jpeg-encode",
       "platform": "!(android | ohos) & !(ios | wasm32)"
     },
     {
-      "name": "enable-webp-encode",
+      "name": "webp-encode",
       "platform": "!(android | ohos) & !(ios | wasm32)"
     }
   ],
   "features": {
-    "enable-svg": {
+    "svg": {
       "description": "Enable building the SVG module"
     },
-    "enable-pdf": {
+    "pdf": {
       "description": "Enable building the PDF module"
     },
-    "enable-framework": {
+    "framework": {
       "description": "Enable building framework",
       "supports": "osx | ios"
     },
-    "enable-qt": {
+    "qt": {
       "description": "Enable building with the Qt framework"
     },
-    "enable-swiftshader": {
+    "swiftshader": {
       "description": "Enable building with the SwiftShader library"
     },
-    "enable-angle": {
+    "angle": {
       "description": "Enable building with the ANGLE library"
     },
-    "enable-opengl": {
+    "opengl": {
       "description": "Enable OpenGL as the GPU backend"
     },
-    "enable-threads": {
+    "threads": {
       "description": "Enable support for multithreaded rendering"
     },
-    "enable-freetype": {
+    "freetype": {
       "description": "Enable Freetype as the vector backend"
     },
-    "enable-inspector": {
+    "inspector": {
       "description": "Enable profiling support for the TGFX Inspector tool"
     },
-    "enable-png-decode": {
+    "png-decode": {
       "description": "Enable embedded PNG decoding support"
     },
-    "enable-png-encode": {
+    "png-encode": {
       "description": "Enable embedded PNG encoding support"
     },
-    "enable-jpeg-decode": {
+    "jpeg-decode": {
       "description": "Enable embedded JPEG decoding support"
     },
-    "enable-jpeg-encode": {
+    "jpeg-encode": {
       "description": "Enable embedded JPEG encoding support"
     },
-    "enable-webp-decode": {
+    "webp-decode": {
       "description": "Enable embedded WEBP decoding support"
     },
-    "enable-webp-encode": {
+    "webp-encode": {
       "description": "Enable embedded WEBP encoding support"
     },
-    "enable-text-gamma-correction": {
+    "text-gamma-correction": {
       "description": "Enable gamma correction when rendering text"
     }
   },
