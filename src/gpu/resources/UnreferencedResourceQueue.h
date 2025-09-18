@@ -19,6 +19,7 @@
 #pragma once
 
 #include <concurrentqueue.h>
+#include "gpu/resources/Resource.h"
 
 namespace tgfx {
 class Resource;
@@ -26,19 +27,19 @@ class Resource;
 /**
  * Manages resources whose references are released by `shared_ptr`.
  */
-class PendingPurgeResourceQueue {
+class UnreferencedResourceQueue {
  public:
   /** Default constructor. */
-  PendingPurgeResourceQueue() = default;
+  UnreferencedResourceQueue() = default;
 
-  /** Destructor that cleans up all pending resources. */
-  ~PendingPurgeResourceQueue();
+  /** Destructor that cleans up all unreferenced resources. */
+  ~UnreferencedResourceQueue() {
+    Resource* resource = nullptr;
+    while (queue.try_dequeue(resource)) {
+      delete resource;
+    }
+  }
 
-  /**
-   * Adds a resource whose references are released by `shared_ptr`.
-   */
-  void add(Resource* resource);
-
-  moodycamel::ConcurrentQueue<Resource*> pendingQueue;
+  moodycamel::ConcurrentQueue<Resource*> queue;
 };
 }  // namespace tgfx

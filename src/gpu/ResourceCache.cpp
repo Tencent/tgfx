@@ -19,7 +19,7 @@
 #include "gpu/ResourceCache.h"
 #include <unordered_map>
 #include "core/utils/Log.h"
-#include "gpu/resources/PendingPurgeResourceQueue.h"
+#include "gpu/resources/UnreferencedResourceQueue.h"
 #include "gpu/resources/Resource.h"
 
 namespace tgfx {
@@ -27,7 +27,7 @@ static constexpr size_t MAX_EXPIRATION_FRAMES = 1000000;  // About 4.5 hours at 
 static constexpr size_t SCRATCH_EXPIRATION_FRAMES = 2;
 
 ResourceCache::ResourceCache(Context* context) : context(context) {
-  unreferencedResourceQueue = std::make_shared<PendingPurgeResourceQueue>();
+  unreferencedResourceQueue = std::make_shared<UnreferencedResourceQueue>();
 }
 
 bool ResourceCache::empty() const {
@@ -114,7 +114,7 @@ void ResourceCache::purgeResourcesByLRU(bool scratchResourceOnly,
 
 void ResourceCache::processUnreferencedResources() {
   Resource* resource = nullptr;
-  while (unreferencedResourceQueue->pendingQueue.try_dequeue(resource)) {
+  while (unreferencedResourceQueue->queue.try_dequeue(resource)) {
     DEBUG_ASSERT(resource->isPurgeable());
     RemoveFromList(nonpurgeableResources, resource);
     if (!resource->scratchKey.empty() || resource->hasExternalReferences()) {
@@ -209,10 +209,9 @@ bool ResourceCache::InList(const std::list<Resource*>& list, tgfx::Resource* res
 }
 
 void ResourceCache::NotifyReferenceReachedZero(Resource* resource) {
-  if (resource->pendingPurgeQueue) {
-    resource->pendingPurgeQueue->add(resource);
-    resource->pendingPurgeQueue = nullptr;
-  }
+  DEBUG_ASSERT(resource->unreferencedQueue);
+  resource->unreferencedQueue->queue.enqueue(resource);
+  resource->unreferencedQueue = nullptr;
 }
 
 void ResourceCache::changeUniqueKey(Resource* resource, const UniqueKey& uniqueKey) {
@@ -235,7 +234,7 @@ void ResourceCache::removeUniqueKey(Resource* resource) {
 std::shared_ptr<Resource> ResourceCache::wrapResource(Resource* resource) {
   auto result = std::shared_ptr<Resource>(resource, ResourceCache::NotifyReferenceReachedZero);
   result->weakThis = result;
-  result->pendingPurgeQueue = unreferencedResourceQueue;
+  result->unreferencedQueue = unreferencedResourceQueue;
   return result;
 }
 

@@ -84,7 +84,7 @@ class Resource {
 
  protected:
   Context* context = nullptr;
-  std::shared_ptr<PendingPurgeResourceQueue> pendingPurgeQueue;
+  std::shared_ptr<UnreferencedResourceQueue> unreferencedQueue;
   std::weak_ptr<Resource> weakThis;
 
   /**
