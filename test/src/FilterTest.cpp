@@ -841,60 +841,79 @@ TGFX_TEST(FilterTest, PerspectiveImageFilter) {
   auto surface = Surface::Make(context, 200, 200);
   ASSERT_TRUE(surface != nullptr);
   Canvas* canvas = surface->getCanvas();
-
   auto image = MakeImage("resources/apitest/imageReplacement.jpg");
-  auto perspectiveInfo = PerspectiveInfo();
-  perspectiveInfo.yRotation = 45.0f;
-  const auto perspectiveFilter = ImageFilter::Perspective(perspectiveInfo);
 
+  auto cssPerspectiveInfo = PerspectiveInfo();
+  cssPerspectiveInfo.yRotation = 45.0f;
+  cssPerspectiveInfo.projectType = PerspectiveType::CSS;
+  const auto cssPerspectiveFilter = ImageFilter::Perspective(cssPerspectiveInfo);
   {
-    // Test basic drawing
+    // Test basic drawing with css perspective type.
     canvas->save();
     canvas->clear();
 
     Paint paint = {};
-    paint.setImageFilter(perspectiveFilter);
+    paint.setImageFilter(cssPerspectiveFilter);
+    canvas->drawImage(image, 45.f, 45.f, &paint);
+
+    context->flushAndSubmit();
+    EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/PerspectiveImageFilterCSSBasic"));
+    canvas->restore();
+  }
+
+  auto standardPerspectiveInfo = PerspectiveInfo();
+  standardPerspectiveInfo.yRotation = 45.0f;
+  standardPerspectiveInfo.projectType = PerspectiveType::Standard;
+  const auto standardPerspectiveFilter = ImageFilter::Perspective(standardPerspectiveInfo);
+
+  {
+    // Test basic drawing with standard perspective type.
+    canvas->save();
+    canvas->clear();
+
+    Paint paint = {};
+    paint.setImageFilter(standardPerspectiveFilter);
     canvas->setMatrix(tgfx::Matrix::MakeRotate(45, 100, 100));
     canvas->drawImage(image, 45.f, 45.f, &paint);
 
     context->flushAndSubmit();
-    EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/PerspectiveImageFilterStandard"));
+    EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/PerspectiveImageFilterStandardBasic"));
     canvas->restore();
   }
 
   {
-    // Test image clipping drawing
+    // Test image clipping drawing with standard perspective type.
     canvas->save();
     canvas->clear();
 
-    auto filteredImage = image->makeWithFilter(perspectiveFilter);
-    auto filteredBounds = perspectiveFilter->filterBounds(
+    auto filteredImage = image->makeWithFilter(standardPerspectiveFilter);
+    auto filteredBounds = standardPerspectiveFilter->filterBounds(
         Rect::MakeWH(static_cast<float>(image->width()), static_cast<float>(image->height())));
 
     const auto clipRectLT =
         Rect::MakeXYWH(filteredBounds.left, filteredBounds.top, filteredBounds.width() * 0.5f,
                        filteredBounds.height() * 0.5f);
-    const auto imageLT = image->makeWithFilter(perspectiveFilter, nullptr, &clipRectLT);
+    const auto imageLT = image->makeWithFilter(standardPerspectiveFilter, nullptr, &clipRectLT);
     canvas->drawImage(imageLT, 0.f, 0.f);
 
     const auto clipRectRT = Rect::MakeXYWH(clipRectLT.right, filteredBounds.top,
                                            filteredBounds.width() * 0.5f, clipRectLT.height());
-    const auto imageRT = image->makeWithFilter(perspectiveFilter, nullptr, &clipRectRT);
+    const auto imageRT = image->makeWithFilter(standardPerspectiveFilter, nullptr, &clipRectRT);
     canvas->drawImage(imageRT, static_cast<float>(imageLT->width()), 0.f);
 
     const auto clipRectLB = Rect::MakeXYWH(filteredBounds.left, clipRectLT.bottom,
                                            clipRectLT.width(), filteredBounds.height() * 0.5f);
-    const auto imageLB = image->makeWithFilter(perspectiveFilter, nullptr, &clipRectLB);
+    const auto imageLB = image->makeWithFilter(standardPerspectiveFilter, nullptr, &clipRectLB);
     canvas->drawImage(imageLB, 0.f, static_cast<float>(imageLT->height()));
 
     const auto clipRectRB =
         Rect::MakeXYWH(clipRectRT.left, clipRectRT.bottom, clipRectRT.width(), clipRectLB.height());
-    const auto imageRB = image->makeWithFilter(perspectiveFilter, nullptr, &clipRectRB);
+    const auto imageRB = image->makeWithFilter(standardPerspectiveFilter, nullptr, &clipRectRB);
     canvas->drawImage(imageRB, static_cast<float>(imageLT->width()),
                       static_cast<float>(imageLT->height()));
 
     context->flushAndSubmit();
-    EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/PerspectiveImageFilterClip"));
+    EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/PerspectiveImageFilterStandardClip"));
     canvas->restore();
   }
 }

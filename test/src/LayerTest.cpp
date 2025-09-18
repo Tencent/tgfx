@@ -663,6 +663,7 @@ TGFX_TEST(LayerTest, FilterTest) {
   auto filter2 = DropShadowFilter::Make(-40, -40, 0, 0, Color::Green());
   auto filter3 = BlurFilter::Make(10, 10);
   LayerPerspectiveInfo info;
+  info.projectType = LayerPerspectiveType::Standard;
   info.xRotation = 45;
   auto filter4 = PerspectiveFilter::Make(info);
   auto image = MakeImage("resources/apitest/rotation.jpg");
@@ -680,7 +681,7 @@ TGFX_TEST(LayerTest, FilterTest) {
   displayList->root()->addChild(layer);
   displayList->render(surface.get());
   auto bounds = displayList->root()->getBounds();
-  EXPECT_EQ(Rect::MakeLTRB(130.f, 130.f, 1722.f, 2226.f), bounds);
+  EXPECT_EQ(Rect::MakeLTRB(-200.f, 604.f, 2052.f, 2226.f), bounds);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/filterTest"));
 }
 
