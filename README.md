@@ -375,6 +375,101 @@ Finally, connect your OpenHarmony device or start the simulator, then build and 
 target in DevEco. You're all set!
 
 
+## vcpkg Integration
+
+TGFX provides official vcpkg port files for easy integration into projects using vcpkg dependency management.
+
+### Getting Started with vcpkg
+
+First, ensure you have vcpkg installed. Please refer to the [official vcpkg installation guide](https://vcpkg.io/en/getting-started.html).
+
+### Using TGFX vcpkg Port
+
+#### Method 1: Download from Releases (Recommended)
+
+1. Visit the [TGFX releases page](https://github.com/Tencent/tgfx/releases)
+2. Download the vcpkg port files for your target version
+3. Copy the `tgfx/` directory to your vcpkg installation's `ports/` directory
+
+#### Method 2: Use Overlay Ports
+
+Copy the `vcpkg/tgfx/` directory from this repository to your project and use overlay ports:
+
+```bash
+vcpkg install tgfx --overlay-ports=./vcpkg
+```
+
+#### Method 3: Build from Specific Commit
+
+To use a specific commit, update the `REF` and `SHA512` values in `vcpkg/tgfx/portfile.cmake`:
+
+```cmake
+vcpkg_from_github(
+    OUT_SOURCE_PATH SOURCE_PATH
+    REPO Tencent/tgfx
+    REF <your-commit-hash>
+    SHA512 <calculated-sha512-hash>
+)
+```
+
+### Installation Examples
+
+**Manifest Mode (Recommended):**
+
+Create a `vcpkg.json` file in your project:
+
+```json
+{
+  "name": "your-project",
+  "version": "1.0.0",
+  "dependencies": [
+    {
+      "name": "tgfx",
+      "features": ["enable-svg", "enable-opengl", "enable-threads"]
+    }
+  ]
+}
+```
+
+Then install dependencies:
+
+```bash
+vcpkg install --triplet=x64-osx
+```
+
+**Classic Mode:**
+
+```bash
+# Basic installation
+vcpkg install tgfx
+
+# Install with specific features
+vcpkg install tgfx[enable-svg,enable-freetype] --triplet=x64-osx
+
+# WebAssembly build
+vcpkg install tgfx[enable-threads] --triplet=wasm32-emscripten
+```
+
+### Available Features
+
+The vcpkg port supports various features to customize your TGFX build:
+
+- `enable-svg`: Enable SVG module support
+- `enable-opengl`: Use OpenGL as GPU backend (default)
+- `enable-threads`: Enable multithreaded rendering (default on non-WebAssembly)
+- `enable-freetype`: Use FreeType as vector backend
+- `enable-faster-blur`: Enable faster blur algorithm (default)
+- `enable-png-decode/encode`: PNG image format support
+- `enable-jpeg-decode/encode`: JPEG image format support
+- `enable-webp-decode/encode`: WebP image format support
+- And more...
+
+Refer to `vcpkg/tgfx/vcpkg.json` for the complete feature list and platform-specific defaults.
+
+### Integration Approach
+
+The vcpkg port uses a hybrid approach: vcpkg handles source code fetching while dependencies are managed by [depsync](https://github.com/domchen/depsync) and built using [vendor_tools](https://github.com/libpag/vendor_tools). This provides better control over TGFX's specialized build requirements.
+
 ## Build Library
 
 Aside from directly integrating the source code of tgfx into your project, you also have the option
