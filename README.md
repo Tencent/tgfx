@@ -383,7 +383,7 @@ TGFX provides official vcpkg port files for easy integration into projects using
 
 First, ensure you have vcpkg installed. Please refer to the [official vcpkg installation guide](https://vcpkg.io/en/getting-started.html).
 
-### Using TGFX vcpkg Port
+### Updating TGFX Version
 
 #### Method 1: Download from Releases (Recommended)
 
@@ -391,28 +391,24 @@ First, ensure you have vcpkg installed. Please refer to the [official vcpkg inst
 2. Download the vcpkg port files for your target version
 3. Copy the `tgfx/` directory to your vcpkg installation's `ports/` directory
 
-#### Method 2: Use Overlay Ports
+#### Method 2: Using the Update Script
 
-Copy the `vcpkg/tgfx/` directory from this repository to your project and use overlay ports:
+Use the provided script in [`vcpkg`](vcpkg/) directory to automatically update the portfile:
 
+Find the commit hash for your target version in TGFX repository.
+Then run the update script with the commit hash:
 ```bash
-vcpkg install tgfx --overlay-ports=./vcpkg
+node update_tgfx <commit-hash>
 ```
 
-#### Method 3: Build from Specific Commit
-
-To use a specific commit, update the `REF` and `SHA512` values in `vcpkg/tgfx/portfile.cmake`:
-
-```cmake
-vcpkg_from_github(
-    OUT_SOURCE_PATH SOURCE_PATH
-    REPO Tencent/tgfx
-    REF <your-commit-hash>
-    SHA512 <calculated-sha512-hash>
-)
+Example: Update to a specific commit:
+```bash
+node update_tgfx 6095b909b1109d4910991a034405f4ae30d6786f
 ```
 
-### Installation Examples
+The script will automatically download the source code, calculate the SHA512 hash, and update the `vcpkg/ports/tgfx/portfile.cmake` file.
+
+### Using TGFX vcpkg Port
 
 **Manifest Mode (Recommended):**
 
@@ -452,23 +448,7 @@ vcpkg install tgfx[enable-threads] --triplet=wasm32-emscripten
 
 ### Available Features
 
-The vcpkg port supports various features to customize your TGFX build:
-
-- `enable-svg`: Enable SVG module support
-- `enable-opengl`: Use OpenGL as GPU backend (default)
-- `enable-threads`: Enable multithreaded rendering (default on non-WebAssembly)
-- `enable-freetype`: Use FreeType as vector backend
-- `enable-faster-blur`: Enable faster blur algorithm (default)
-- `enable-png-decode/encode`: PNG image format support
-- `enable-jpeg-decode/encode`: JPEG image format support
-- `enable-webp-decode/encode`: WebP image format support
-- And more...
-
-Refer to `vcpkg/tgfx/vcpkg.json` for the complete feature list and platform-specific defaults.
-
-### Integration Approach
-
-The vcpkg port uses a hybrid approach: vcpkg handles source code fetching while dependencies are managed by [depsync](https://github.com/domchen/depsync) and built using [vendor_tools](https://github.com/libpag/vendor_tools). This provides better control over TGFX's specialized build requirements.
+Refer to [`vcpkg/ports/tgfx/vcpkg.json`](vcpkg/ports/tgfx/vcpkg.json) for the complete feature list and platform-specific defaults.
 
 ## Build Library
 

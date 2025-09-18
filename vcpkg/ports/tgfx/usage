@@ -1,0 +1,4 @@
+The package tgfx can be used via CMake:
+
+    find_package(tgfx CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE tgfx::tgfx)
