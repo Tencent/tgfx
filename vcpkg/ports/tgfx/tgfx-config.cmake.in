@@ -1,0 +1,83 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+include(CMakePackageConfigHelpers)
+
+set(TGFX_SYSTEM_LIBS)
+set(TGFX_COMPILE_OPTIONS)
+set(TGFX_COMPILE_DEFINITIONS)
+
+if (APPLE)
+    find_library(APPLICATION_SERVICES_FRAMEWORK ApplicationServices REQUIRED)
+    find_library(QUARTZ_CORE QuartzCore REQUIRED)
+    find_library(COCOA Cocoa REQUIRED)
+    find_library(FOUNDATION Foundation REQUIRED)
+    find_library(OPENGL_FRAMEWORK OpenGL REQUIRED)
+    find_library(ICONV_LIBRARIES NAMES iconv libiconv libiconv-2 c)
+    find_library(CORE_MEDIA CoreMedia)
+    
+    list(APPEND TGFX_SYSTEM_LIBS 
+        ${APPLICATION_SERVICES_FRAMEWORK}
+        ${QUARTZ_CORE}
+        ${COCOA}
+        ${FOUNDATION}
+        ${OPENGL_FRAMEWORK}
+        ${ICONV_LIBRARIES}
+        ${CORE_MEDIA}
+    )
+    
+    list(APPEND TGFX_COMPILE_DEFINITIONS GL_SILENCE_DEPRECATION) 
+elseif (CMAKE_HOST_SYSTEM_NAME MATCHES "Linux")
+    find_package(Threads REQUIRED)
+    list(APPEND TGFX_SYSTEM_LIBS ${CMAKE_THREAD_LIBS_INIT})
+    
+    list(APPEND TGFX_SYSTEM_LIBS dl)
+
+    list(APPEND TGFX_COMPILE_OPTIONS -fPIC -pthread)
+    
+    list(APPEND TGFX_SYSTEM_LIBS GLESv2 EGL)
+endif()
+
+get_filename_component(_IMPORT_PREFIX "${CMAKE_CURRENT_LIST_FILE}" PATH)
+get_filename_component(_IMPORT_PREFIX "${_IMPORT_PREFIX}" PATH)
+get_filename_component(_IMPORT_PREFIX "${_IMPORT_PREFIX}" PATH)
+
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(TGFX_LIBRARY_PATH "${_IMPORT_PREFIX}/debug/lib")
+else()
+    set(TGFX_LIBRARY_PATH "${_IMPORT_PREFIX}/lib")
+endif()
+
+find_library(TGFX_LIBRARY 
+    NAMES tgfx.a tgfx.lib tgfx
+    PATHS ${TGFX_LIBRARY_PATH}
+    NO_DEFAULT_PATH
+    REQUIRED
+)
+
+if(NOT TARGET tgfx::tgfx)
+    add_library(tgfx::tgfx STATIC IMPORTED)
+    set_target_properties(tgfx::tgfx PROPERTIES
+        IMPORTED_LOCATION "${TGFX_LIBRARY}"
+        INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/include"
+        INTERFACE_LINK_LIBRARIES "${TGFX_SYSTEM_LIBS}"
+    )
+    
+    if(TGFX_COMPILE_OPTIONS)
+        set_target_properties(tgfx::tgfx PROPERTIES
+            INTERFACE_COMPILE_OPTIONS "${TGFX_COMPILE_OPTIONS}"
+        )
+    endif()
+    
+    if(TGFX_COMPILE_DEFINITIONS)
+        set_target_properties(tgfx::tgfx PROPERTIES
+            INTERFACE_COMPILE_DEFINITIONS "${TGFX_COMPILE_DEFINITIONS}"
+        )
+    endif()
+endif()
+
+set(TGFX_FOUND TRUE)
+set(TGFX_INCLUDE_DIRS "${_IMPORT_PREFIX}/include")
+set(TGFX_LIBRARIES tgfx::tgfx)
+
+check_required_components(tgfx)
