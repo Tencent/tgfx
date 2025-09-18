@@ -27,6 +27,7 @@
 
 namespace tgfx {
 class Resource;
+class UnreferencedResourceQueue;
 
 /**
  * Manages the lifetime of all Resource instances.
@@ -127,6 +128,7 @@ class ResourceCache {
   size_t _expirationFrames = 120;
   std::chrono::steady_clock::time_point currentFrameTime = {};
   std::deque<std::chrono::steady_clock::time_point> frameTimes = {};
+  std::shared_ptr<UnreferencedResourceQueue> unreferencedResourceQueue;
   std::list<Resource*> nonpurgeableResources = {};
   std::list<Resource*> purgeableResources = {};
   ResourceKeyMap<std::vector<Resource*>> scratchKeyMap = {};
@@ -135,10 +137,12 @@ class ResourceCache {
   static void AddToList(std::list<Resource*>& list, Resource* resource);
   static void RemoveFromList(std::list<Resource*>& list, Resource* resource);
   static bool InList(const std::list<Resource*>& list, Resource* resource);
+  static void NotifyReferenceReachedZero(Resource* resource);
 
   void releaseAll(bool releaseGPU);
   void purgeAsNeeded();
   void processUnreferencedResources();
+  std::shared_ptr<Resource> wrapResource(Resource* resource);
   std::shared_ptr<Resource> addResource(Resource* resource, const ScratchKey& scratchKey);
   std::shared_ptr<Resource> refResource(Resource* resource);
   void removeResource(Resource* resource);
