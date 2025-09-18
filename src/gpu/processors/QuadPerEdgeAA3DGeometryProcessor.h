@@ -44,7 +44,7 @@ class QuadPerEdgeAA3DGeometryProcessor : public GeometryProcessor {
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  explicit QuadPerEdgeAA3DGeometryProcessor(AAType aa, const Matrix3D& transfromMatrix,
+  explicit QuadPerEdgeAA3DGeometryProcessor(AAType aa, const Matrix3D& transformMatrix,
                                             const Vec2& ndcScale, const Vec2& ndcOffset);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;

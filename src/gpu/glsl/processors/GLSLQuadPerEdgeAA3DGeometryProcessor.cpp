@@ -25,9 +25,9 @@ namespace tgfx {
 #define UNIFORM_NDC_OFFSET_NAME "ndcOffset"
 
 PlacementPtr<QuadPerEdgeAA3DGeometryProcessor> QuadPerEdgeAA3DGeometryProcessor::Make(
-    BlockBuffer* buffer, AAType aa, const Matrix3D& transfromMatrix, const Vec2& ndcScale,
+    BlockBuffer* buffer, AAType aa, const Matrix3D& transformMatrix, const Vec2& ndcScale,
     const Vec2& ndcOffset) {
-  return buffer->make<GLSLQuadPerEdgeAA3DGeometryProcessor>(aa, transfromMatrix, ndcScale,
+  return buffer->make<GLSLQuadPerEdgeAA3DGeometryProcessor>(aa, transformMatrix, ndcScale,
                                                             ndcOffset);
 }
 

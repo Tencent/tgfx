@@ -21,10 +21,10 @@
 namespace tgfx {
 
 QuadPerEdgeAA3DGeometryProcessor::QuadPerEdgeAA3DGeometryProcessor(AAType aa,
-                                                                   const Matrix3D& transfromMatrix,
+                                                                   const Matrix3D& transformMatrix,
                                                                    const Vec2& ndcScale,
                                                                    const Vec2& ndcOffset)
-    : GeometryProcessor(ClassID()), aa(aa), transfromMatrix(transfromMatrix), ndcScale(ndcScale),
+    : GeometryProcessor(ClassID()), aa(aa), transfromMatrix(transformMatrix), ndcScale(ndcScale),
       ndcOffset(ndcOffset) {
   position = {"aPosition", VertexFormat::Float2};
   if (aa == AAType::Coverage) {
@@ -35,8 +35,6 @@ QuadPerEdgeAA3DGeometryProcessor::QuadPerEdgeAA3DGeometryProcessor(AAType aa,
 
 void QuadPerEdgeAA3DGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
   uint32_t flags = (aa == AAType::Coverage ? 1 : 0);
-  // Distinguish from DefaultGeometryProcessor
-  flags |= (static_cast<uint32_t>(1) << 31);
   bytesKey->write(flags);
 }
 
