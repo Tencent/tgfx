@@ -15,25 +15,16 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-
-#pragma once
+#include "UnreferencedResourceQueue.h"
+#include "gpu/resources/Resource.h"
 
 namespace tgfx {
-/**
- * MipmapMode defines how mipmap levels are selected during texture sampling.
- */
-enum class MipmapMode {
-  /**
-   * Ignore mipmap levels, sample from the "base"
-   */
-  None,
-  /**
-   * Sample from the nearest level
-   */
-  Nearest,
-  /**
-   * Interpolate between the two nearest levels
-   */
-  Linear,
-};
+
+UnreferencedResourceQueue::~UnreferencedResourceQueue() {
+  Resource* resource = nullptr;
+  while (queue.try_dequeue(resource)) {
+    delete resource;
+  }
+}
+
 }  // namespace tgfx

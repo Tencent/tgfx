@@ -40,8 +40,5 @@ void Resource::release(bool releaseGPU) {
     onReleaseGPU();
   }
   context = nullptr;
-  // Set the reference to nullptr, allowing the resource to be deleted immediately or later when the
-  // last external reference is released.
-  reference = nullptr;
 }
 }  // namespace tgfx

@@ -40,6 +40,7 @@ struct GLTextureFormat {
   unsigned internalFormatTexImage = 0;
   unsigned internalFormatRenderBuffer = 0;
   unsigned externalFormat = 0;
+  unsigned externalType = 0;
 };
 
 struct ConfigInfo {

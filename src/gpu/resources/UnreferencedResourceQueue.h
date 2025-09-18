@@ -18,22 +18,19 @@
 
 #pragma once
 
+#include <concurrentqueue.h>
+
 namespace tgfx {
+class Resource;
+
 /**
- * MipmapMode defines how mipmap levels are selected during texture sampling.
+ * Manages resources whose references are released by `shared_ptr`.
  */
-enum class MipmapMode {
-  /**
-   * Ignore mipmap levels, sample from the "base"
-   */
-  None,
-  /**
-   * Sample from the nearest level
-   */
-  Nearest,
-  /**
-   * Interpolate between the two nearest levels
-   */
-  Linear,
+class UnreferencedResourceQueue {
+ public:
+  /** Destructor that cleans up all unreferenced resources. */
+  ~UnreferencedResourceQueue();
+
+  moodycamel::ConcurrentQueue<Resource*> queue;
 };
 }  // namespace tgfx

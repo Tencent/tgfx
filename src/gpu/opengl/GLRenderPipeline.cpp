@@ -25,7 +25,8 @@ namespace tgfx {
 GLRenderPipeline::GLRenderPipeline(unsigned programID) : programID(programID) {
 }
 
-void GLRenderPipeline::activate(GLGPU* gpu, unsigned stencilReference) {
+void GLRenderPipeline::activate(GLGPU* gpu, bool depthReadOnly, bool stencilReadOnly,
+                                unsigned stencilReference) {
   auto state = gpu->state();
   state->useProgram(programID);
   auto shaderCaps = gpu->caps()->shaderCaps();
@@ -40,12 +41,20 @@ void GLRenderPipeline::activate(GLGPU* gpu, unsigned stencilReference) {
 
   state->setEnabled(GL_STENCIL_TEST, stencilState != nullptr);
   if (stencilState) {
-    stencilState->reference = stencilReference;
-    state->setStencilState(*stencilState);
+    auto stencil = *stencilState;
+    stencil.reference = stencilReference;
+    if (stencilReadOnly) {
+      stencil.writeMask = 0;
+    }
+    state->setStencilState(stencil);
   }
   state->setEnabled(GL_DEPTH_TEST, depthState != nullptr);
   if (depthState) {
-    state->setDepthState(*depthState);
+    auto depth = *depthState;
+    if (depthReadOnly) {
+      depth.writeMask = 0;
+    }
+    state->setDepthState(depth);
   }
   state->setEnabled(GL_BLEND, blendState != nullptr);
   if (blendState) {

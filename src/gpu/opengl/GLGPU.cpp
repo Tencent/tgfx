@@ -19,6 +19,7 @@
 #include "GLGPU.h"
 #include "gpu/opengl/GLBuffer.h"
 #include "gpu/opengl/GLCommandEncoder.h"
+#include "gpu/opengl/GLDepthStencilTexture.h"
 #include "gpu/opengl/GLExternalTexture.h"
 #include "gpu/opengl/GLFence.h"
 #include "gpu/opengl/GLMultisampleTexture.h"
@@ -68,6 +69,9 @@ std::unique_ptr<GPUTexture> GLGPU::createTexture(const GPUTextureDescriptor& des
   if (descriptor.sampleCount > 1) {
     return GLMultisampleTexture::MakeFrom(this, descriptor);
   }
+  if (descriptor.format == PixelFormat::DEPTH24_STENCIL8) {
+    return GLDepthStencilTexture::MakeFrom(this, descriptor);
+  }
   if (descriptor.usage & GPUTextureUsage::RENDER_ATTACHMENT &&
       !caps()->isFormatRenderable(descriptor.format)) {
     LOGE("GLGPU::createTexture() format is not renderable, but usage includes RENDER_ATTACHMENT!");
@@ -97,8 +101,8 @@ std::unique_ptr<GPUTexture> GLGPU::createTexture(const GPUTextureDescriptor& des
     auto currentWidth = std::max(1, descriptor.width / twoToTheMipLevel);
     auto currentHeight = std::max(1, descriptor.height / twoToTheMipLevel);
     gl->texImage2D(target, level, static_cast<int>(textureFormat.internalFormatTexImage),
-                   currentWidth, currentHeight, 0, textureFormat.externalFormat, GL_UNSIGNED_BYTE,
-                   nullptr);
+                   currentWidth, currentHeight, 0, textureFormat.externalFormat,
+                   textureFormat.externalType, nullptr);
     success = CheckGLError(gl);
   }
   if (!success) {

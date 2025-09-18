@@ -51,7 +51,6 @@ ShapeDrawOp::ShapeDrawOp(std::shared_ptr<GPUShapeProxy> proxy, Color color, cons
 }
 
 PlacementPtr<GeometryProcessor> ShapeDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {
-  OPERATE_MARK(tgfx::inspect::OpTaskType::ShapeDrawOp);
   ATTRIBUTE_NAME("color", color);
   ATTRIBUTE_NAME("uvMatrix", uvMatrix);
   if (shapeProxy == nullptr) {

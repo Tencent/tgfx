@@ -145,27 +145,27 @@ static UniqueKey AppendClipBoundsKey(const UniqueKey& uniqueKey, const Rect& cli
   return UniqueKey::Append(uniqueKey, bytesKey.data(), bytesKey.size());
 }
 
-std::shared_ptr<GPUShapeProxy> ProxyProvider::createGPUShapeProxy(std::shared_ptr<Shape> shape,
-                                                                  AAType aaType,
-                                                                  const Rect& clipBounds,
-                                                                  uint32_t renderFlags) {
-  if (shape == nullptr) {
+std::shared_ptr<GPUShapeProxy> ProxyProvider::createGPUShapeProxy(
+    std::shared_ptr<StyledShape> styledShape, AAType aaType, const Rect& clipBounds,
+    uint32_t renderFlags) {
+  if (styledShape == nullptr) {
     return nullptr;
   }
   Matrix drawingMatrix = {};
+  auto shape = styledShape->shape();
   auto isInverseFillType = shape->isInverseFillType();
-  if (shape->type() == Shape::Type::Matrix && !isInverseFillType) {
-    auto matrixShape = std::static_pointer_cast<MatrixShape>(shape);
-    auto scales = matrixShape->matrix.getAxisScales();
+  auto matrix = styledShape->matrix();
+  if (!matrix.isIdentity() && !isInverseFillType) {
+    auto scales = matrix.getAxisScales();
     if (scales.x == scales.y) {
       DEBUG_ASSERT(scales.x != 0);
-      drawingMatrix = matrixShape->matrix;
+      drawingMatrix = matrix;
       drawingMatrix.preScale(1.0f / scales.x, 1.0f / scales.x);
-      shape = Shape::ApplyMatrix(matrixShape->shape, Matrix::MakeScale(scales.x));
+      styledShape->setMatrix(Matrix::MakeScale(scales.x));
     }
   }
-  auto shapeBounds = shape->getBounds();
-  auto uniqueKey = shape->getUniqueKey();
+  auto shapeBounds = styledShape->getBounds();
+  auto uniqueKey = styledShape->getUniqueKey();
   if (isInverseFillType) {
     uniqueKey =
         AppendClipBoundsKey(uniqueKey, clipBounds.makeOffset(-shapeBounds.left, -shapeBounds.top));
@@ -194,8 +194,9 @@ std::shared_ptr<GPUShapeProxy> ProxyProvider::createGPUShapeProxy(std::shared_pt
   }
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
-  shape = Shape::ApplyMatrix(std::move(shape), Matrix::MakeTrans(-bounds.x(), -bounds.y()));
-  auto rasterizer = std::make_unique<ShapeRasterizer>(width, height, std::move(shape), aaType);
+  styledShape->applyMatrix(Matrix::MakeTrans(-bounds.x(), -bounds.y()));
+  auto rasterizer =
+      std::make_unique<ShapeRasterizer>(width, height, std::move(styledShape), aaType);
   std::unique_ptr<DataSource<ShapeBuffer>> dataSource = nullptr;
 #ifdef TGFX_USE_THREADS
   if (!(renderFlags & RenderFlags::DisableAsyncTask) && rasterizer->asyncSupport()) {
