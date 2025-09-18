@@ -108,14 +108,16 @@ Path StyledShape::getPath() const {
 }
 
 void StyledShape::convertToHairlineIfNecessary(Fill& fill) {
-  float strokeWidth = 0.f;
   if (!_stroke.has_value()) {
     return;
   }
-  if (!TreatStrokeAsHairline(*_stroke, _matrix, &strokeWidth)) {
+  float mappedStrokeWidth = 0.f;
+  if (!TreatStrokeAsHairline(*_stroke, _matrix, &mappedStrokeWidth)) {
     return;
   }
-  fill.color.alpha *= strokeWidth / 1.f;
+  // Adjust the alpha based on the mapped stroke width to simulate the semi-transparent effect of
+  // very thin stroke.
+  fill.color.alpha *= mappedStrokeWidth / 1.f;
   _stroke->width = 0.f;
 }
 

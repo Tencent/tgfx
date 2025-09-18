@@ -3067,4 +3067,31 @@ TGFX_TEST(LayerTest, HairlineLayer) {
   displayList.render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/HairlineLayer"));
 }
+
+TGFX_TEST(LayerTest, ExtremelyThinStrokeLayer) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  auto canvas = surface->getCanvas();
+  canvas->clear();
+
+  Path path2 = {};
+  path2.addRect(-200, -200, 200, 200);
+  auto shapeLayer = ShapeLayer::Make();
+  auto shape = Shape::MakeFrom(path2);
+  shape = Shape::ApplyEffect(shape, PathEffect::MakeCorner(50));
+  shapeLayer->setShape(shape);
+  shapeLayer->setLineWidth(1.0f);
+  auto strokeStyle = SolidColor::Make(Color::Red());
+  shapeLayer->setStrokeStyle(strokeStyle);
+  auto matrix = Matrix::MakeTrans(100, 100);
+  matrix.preScale(0.4f, 0.4f);
+  shapeLayer->setMatrix(matrix);
+
+  DisplayList displayList;
+  displayList.root()->addChild(shapeLayer);
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ExtremelyThinStrokeLayer"));
+}
 }  // namespace tgfx

@@ -17,12 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/ShapeLayer.h"
-#include <memory>
-#include <vector>
 #include "core/utils/StrokeUtils.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/PathEffect.h"
-#include "tgfx/core/Shape.h"
 
 namespace tgfx {
 std::shared_ptr<ShapeLayer> ShapeLayer::Make() {
@@ -305,7 +302,7 @@ void ShapeLayer::onUpdateContent(LayerRecorder* recorder) {
 }
 
 std::vector<Paint> ShapeLayer::createShapePaints(
-    const std::vector<std::shared_ptr<ShapeStyle>>& styles, bool isStrokeStylePaint) const {
+    const std::vector<std::shared_ptr<ShapeStyle>>& styles, bool isHairline) const {
   std::vector<Paint> paintList = {};
   paintList.reserve(styles.size());
   for (auto& style : styles) {
@@ -313,8 +310,9 @@ std::vector<Paint> ShapeLayer::createShapePaints(
     paint.setAlpha(style->alpha());
     paint.setBlendMode(style->blendMode());
     paint.setShader(style->getShader());
-    if (isStrokeStylePaint) {
+    if (isHairline) {
       paint.setStyle(PaintStyle::Stroke);
+      // maybe is treat as hairline, set stroke width to original stroke width
       paint.setStrokeWidth(stroke.width);
     }
     if (!paint.getFill().nothingToDraw()) {
@@ -324,7 +322,7 @@ std::vector<Paint> ShapeLayer::createShapePaints(
   return paintList;
 }
 
-std::shared_ptr<Shape> ShapeLayer::createStrokeShape(bool isHairlineRender) const {
+std::shared_ptr<Shape> ShapeLayer::createStrokeShape(bool isHairline) const {
   auto strokeShape = _shape;
   if ((_strokeStart != 0 || _strokeEnd != 1)) {
     auto pathEffect = PathEffect::MakeTrim(_strokeStart, _strokeEnd);
@@ -340,7 +338,7 @@ std::shared_ptr<Shape> ShapeLayer::createStrokeShape(bool isHairlineRender) cons
 
     strokeShape = Shape::ApplyEffect(std::move(strokeShape), std::move(dash));
   }
-  if (isHairlineRender) {
+  if (isHairline) {
     // hairline stroke ignore strokeAlign and don't apply to the shape
     return strokeShape;
   }
