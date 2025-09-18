@@ -312,7 +312,7 @@ std::vector<Paint> ShapeLayer::createShapePaints(
     paint.setShader(style->getShader());
     if (isHairline) {
       paint.setStyle(PaintStyle::Stroke);
-      // maybe is treat as hairline, set stroke width to original stroke width
+      // may be is treat as hairline, set stroke width to original stroke width
       paint.setStrokeWidth(stroke.width);
     }
     if (!paint.getFill().nothingToDraw()) {
