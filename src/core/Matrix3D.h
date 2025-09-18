@@ -24,86 +24,239 @@
 
 namespace tgfx {
 
+/**
+ * Matrix3D holds a 4x4 matrix for transforming coordinates in 3D space. This allows mapping points
+ * and vectors with translation, scaling, skewing, rotation, and perspective. These types of
+ * transformations are collectively known as projective transformations. Projective transformations
+ * preserve the straightness of lines but do not preserve parallelism, so parallel lines may not
+ * remain parallel after transformation.
+ * The elements of Matrix3D are in column-major order.
+ * Matrix3D does not have a default constructor, so it must be explicitly initialized.
+ */
 class Matrix3D {
  public:
+  /**
+   * Creates a Matrix3D set to the identity matrix.
+   */
   constexpr Matrix3D() : Matrix3D(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1) {
   }
 
+  /**
+   * Creates a Matrix3D from a 16-element array in row-major order.
+   */
   static Matrix3D MakeRowMajor(const float r[16]) {
     return {r[0], r[4], r[8],  r[12], r[1], r[5], r[9],  r[13],
             r[2], r[6], r[10], r[14], r[3], r[7], r[11], r[15]};
   }
 
+  /**
+   * Creates a Matrix3D from a 16-element array in column-major order.
+   */
   static Matrix3D MakeColMajor(const float c[16]) {
     return {c[0], c[1], c[2],  c[3],  c[4],  c[5],  c[6],  c[7],
             c[8], c[9], c[10], c[11], c[12], c[13], c[14], c[15]};
   }
 
+  /**
+   * Creates a Matrix3D from four Vec4 columns.
+   */
   static Matrix3D MakeCols(const Vec4& c0, const Vec4& c1, const Vec4& c2, const Vec4& c3) {
     return {c0.x, c0.y, c0.z, c0.w, c1.x, c1.y, c1.z, c1.w,
             c2.x, c2.y, c2.z, c2.w, c3.x, c3.y, c3.z, c3.w};
   }
 
+  /**
+   * Returns a reference to a constant identity Matrix3D. The returned Matrix3D is set to:
+   *
+   *       | 1 0 0 0 |
+   *       | 0 1 0 0 |
+   *       | 0 0 1 0 |
+   *       | 0 0 0 1 |
+   */
   static const Matrix3D& I();
 
+  /**
+   * Creates a Matrix3D that scales by (sx, sy, sz). The returned matrix is:
+   *
+   *       | sx  0  0  0 |
+   *       |  0 sy  0  0 |
+   *       |  0  0 sz  0 |
+   *       |  0  0  0  1 |
+   */
   static Matrix3D MakeScale(float sx, float sy, float sz) {
     return {sx, 0, 0, 0, 0, sy, 0, 0, 0, 0, sz, 0, 0, 0, 0, 1};
   }
 
+  /**
+   * Creates a Matrix3D that translates by (tx, ty, tz). The returned matrix is:
+   *
+   *      | 1 0 0 tx |
+   *      | 0 1 0 ty |
+   *      | 0 0 1 tz |
+   *      | 0 0 0 1  |
+   */
   static Matrix3D MakeTranslate(float tx, float ty, float tz) {
     return {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, tx, ty, tz, 1};
   }
 
+  /**
+   * Creates a Matrix3D that rotates by (degrees) around (axis). The returned matrix is:
+   *
+   *   | t*x*x + c   t*x*y + s*z   t*x*z - s*y   0 |
+   *   | t*x*y - s*z t*y*y + c     t*y*z + s*x   0 |
+   *   | t*x*z + s*y t*y*z - s*x   t*z*z + c     0 |
+   *   |     0           0             0         1 |
+   *
+   * where:
+   *   x, y, z = normalized components of axis
+   *   c = cos(degrees)
+   *   s = sin(degrees)
+   *   t = 1 - c
+   * @param axis The axis to rotate around.
+   * @param degrees The angle of rotation in degrees.
+   */
   static Matrix3D MakeRotate(const Vec3& axis, float degrees) {
     Matrix3D m;
     m.setRotate(axis, degrees);
     return m;
   }
 
+  /**
+   * Copies the matrix values into a 16-element array in column-major order.
+   */
   void getColMajor(float buffer[16]) const {
     memcpy(buffer, values, sizeof(values));
   }
 
+  /**
+   * Copies the matrix values into a 16-element array in row-major order.
+   */
   void getRowMajor(float buffer[16]) const;
 
+  /**
+   * Returns the matrix value at the given row and column.
+   * @param r  Row index, valid range 0..3.
+   * @param c  Column index, valid range 0..3.
+   */
   float getRowCol(int r, int c) const {
     return values[c * 4 + r];
   }
 
+  /**
+   * Sets the matrix value at the given row and column.
+   * @param r  Row index, valid range 0..3.
+   * @param c  Column index, valid range 0..3.
+   */
   void setRowCol(int r, int c, float value) {
     values[c * 4 + r] = value;
   }
 
+  /**
+   * Concatenates two matrices and stores the result in this matrix. M' = a * b.
+   */
   void setConcat(const Matrix3D& a, const Matrix3D& b);
 
+  /**
+   * Concatenates the given matrix with this matrix, and stores the result in this matrix. M' = m * M.
+   */
   void preConcat(const Matrix3D& m);
 
+  /**
+   * Concatenates this matrix with the given matrix, and stores the result in this matrix. M' = M * m.
+   */
   void postConcat(const Matrix3D& m);
 
+  /**
+   * Pre-concatenates a scale to this matrix. M' = S * M.
+   */
   void preScale(float sx, float sy, float sz);
 
+  /**
+   * Post-concatenates a scale to this matrix. M' = M * S.
+   */
   void postScale(float sx, float sy, float sz);
 
+  /**
+   * Pre-concatenates a translation to this matrix. M' = T * M.
+   */
   void preTranslate(float tx, float ty, float tz);
 
+  /**
+   * Post-concatenates a translation to this matrix. M' = M * T.
+   */
   void postTranslate(float tx, float ty, float tz);
 
+  /**
+   * Pre-concatenates a rotation to this matrix. M' = R * M.
+   */
   void preRotate(const Vec3& axis, float degrees);
 
+  /**
+   * Post-concatenates a rotation to this matrix. M' = M * R.
+   */
   void postRotate(const Vec3& axis, float degrees);
 
+  /**
+   * Calculates the inverse of the current matrix and stores the result in the Matrix3D object
+   * pointed to by inverse.
+   * @param inverse Pointer to the Matrix3D object used to store the inverse matrix. Must not be
+   * nullptr. If the current matrix is not invertible, inverse will not be modified.
+   * @return Returns true if the inverse matrix exists, otherwise returns false.
+   */
   bool invert(Matrix3D* inverse) const;
 
+  /**
+   * Returns the transpose of the current matrix.
+   */
   Matrix3D transpose() const;
 
+  /**
+   * Maps a 4D point (x, y, z, w) using this matrix.
+   * If the current matrix contains a perspective transformation, the returned Vec4 is not
+   * perspective-divided, i.e., the w component of the result may not be 1.
+   */
   Vec4 mapPoint(float x, float y, float z, float w) const;
 
+  /**
+   * Maps a rectangle using this matrix.
+   * If the matrix contains a perspective transformation, each corner of the rectangle is mapped as a
+   * 4D point (x, y, 0, 1), and the resulting rectangle is computed from the projected points
+   * (after perspective division).
+   */
   Rect mapRect(const Rect& src) const;
 
+  /**
+   * Creates a view matrix for a camera. This is commonly used to transform world coordinates to
+   * camera (view) coordinates in 3D graphics.
+   * @param eye The position of the camera.
+   * @param center The point the camera is looking at.
+   * @param up The up direction for the camera.
+   */
   static Matrix3D LookAt(const Vec3& eye, const Vec3& center, const Vec3& up);
 
+  /**
+   * Creates a standard perspective projection matrix. This matrix maps 3D coordinates into
+   * normalized device coordinates for perspective rendering.
+   * @param fovyDegress Field of view angle in degrees (vertical).
+   * @param aspect Aspect ratio (width / height).
+   * @param nearZ Distance to the near clipping plane.
+   * @param farZ Distance to the far clipping plane.
+   */
   static Matrix3D Perspective(float fovyDegress, float aspect, float nearZ, float farZ);
 
+  /**
+   * Creates a projection matrix compatible with CSS 3D transforms. This matrix maps 3D coordinates
+   * into normalized device coordinates for perspective rendering. This is useful for web rendering
+   * scenarios that require CSS-like perspective projection.
+   * For more details on the definition of CSS perspective projection, please refer to the official
+   * documentation: CSS Transforms Module Level 2, Perspective.
+   * @param eyeDistance Distance from the eye to the projection plane (z = 0).
+   * @param left Left bound of the view volume.
+   * @param right Right bound of the view volume.
+   * @param top Top bound of the view volume.
+   * @param bottom Bottom bound of the view volume.
+   * @param farZ Distance to the far clipping plane.
+   */
   static Matrix3D ProjectionCSS(float eyeDistance, float left, float right, float top, float bottom,
                                 float farZ);
 
