@@ -28,13 +28,20 @@
 
 namespace tgfx {
 
+// The field of view (in degrees) for the standard perspective projection model.
 static constexpr float StandardFovYDegress = 45.f;
+// The maximum position of the near plane on the Z axis for the standard perspective projection model.
 static constexpr float StandardMaxNearZ = 0.25f;
+// The minimum position of the far plane on the Z axis for the standard perspective projection model.
 static constexpr float StandardMinFarZ = 1000.f;
+// The target position of the camera for the standard perspective projection model, in pixels.
 static constexpr Vec3 StandardEyeCenter = {0.f, 0.f, 0.f};
+// The up direction unit vector for the camera in the standard perspective projection model.
 static constexpr Vec3 StandardEyeUp = {0.f, 1.f, 0.f};
 
+// The camera position for the CSS perspective projection model.
 static constexpr float CSSEyeZ = 1200.f;
+// The position of the far plane on the Z axis for the CSS perspective projection model.
 static constexpr float CSSFarZ = -500.f;
 
 std::shared_ptr<ImageFilter> ImageFilter::Perspective(const PerspectiveInfo& perspective) {
@@ -43,13 +50,13 @@ std::shared_ptr<ImageFilter> ImageFilter::Perspective(const PerspectiveInfo& per
 
 PerspectiveImageFilter::PerspectiveImageFilter(const PerspectiveInfo& info) : info(info) {
   normalProjectMatrix = MakeProjectMatrix(info.projectType, Rect::MakeXYWH(-1.f, -1.f, 2.f, 2.f));
-  rotateModelMatrix = Matrix3D::MakeRotate({1.f, 0.f, 0.f}, info.xRotation);
-  rotateModelMatrix.postRotate({0.f, 1.f, 0.f}, info.yRotation);
-  rotateModelMatrix.postRotate({0.f, 0.f, 1.f}, info.zRotation);
+  modelRotateMatrix = Matrix3D::MakeRotate({1.f, 0.f, 0.f}, info.xRotation);
+  modelRotateMatrix.postRotate({0.f, 1.f, 0.f}, info.yRotation);
+  modelRotateMatrix.postRotate({0.f, 0.f, 1.f}, info.zRotation);
 }
 
 Rect PerspectiveImageFilter::onFilterBounds(const Rect& srcRect) const {
-  auto normalModelMatrix = rotateModelMatrix;
+  auto normalModelMatrix = modelRotateMatrix;
   normalModelMatrix.postTranslate(0.f, 0.f, info.depth * 2.f / srcRect.height());
   const auto normalTransformMatrix = normalProjectMatrix * normalModelMatrix;
   constexpr auto tempRect = Rect::MakeXYWH(-1.f, -1.f, 2.f, 2.f);
@@ -80,7 +87,7 @@ std::shared_ptr<TextureProxy> PerspectiveImageFilter::lockTextureProxy(
   // projection model. This ensures that the projection of the rectangle covers the front surface of
   // the clipping frustum when no model transformation is applied.
   const auto projectMatrix = MakeProjectMatrix(info.projectType, srcRect);
-  auto modelMatrix = rotateModelMatrix;
+  auto modelMatrix = modelRotateMatrix;
   modelMatrix.postTranslate(0.f, 0.f, info.depth);
   const auto transformMatrix = projectMatrix * modelMatrix;
 
@@ -129,6 +136,10 @@ Matrix3D PerspectiveImageFilter::MakeProjectMatrix(PerspectiveType projectType, 
           rect.height() * 0.5f / tanf(DegreesToRadians(StandardFovYDegress * 0.5f));
       const Vec3 eyePosition = {0.f, 0.f, eyePositionZ};
       const auto viewMatrix = Matrix3D::LookAt(eyePosition, StandardEyeCenter, StandardEyeUp);
+      // Ensure nearZ is not too far away or farZ is not too close to avoid precision issues. For
+      // example, if the z value of the near plane is less than 0, the projected model will be
+      // outside the clipping range, or if the far plane is too close, the projected model may
+      // exceed the clipping range with a slight rotation.
       const float nearZ = std::min(StandardMaxNearZ, eyePositionZ * 0.1f);
       const float farZ = std::max(StandardMinFarZ, eyePositionZ * 10.f);
       const auto perspectiveMatrix =
@@ -136,6 +147,8 @@ Matrix3D PerspectiveImageFilter::MakeProjectMatrix(PerspectiveType projectType, 
       return perspectiveMatrix * viewMatrix;
     }
     case PerspectiveType::CSS: {
+      // The Y axis of the model coordinate system points downward, while the Y axis of the CSS
+      // projection model points upward, so top and bottom need to be swapped.
       const float top = rect.bottom;
       const float bottom = rect.top;
       return Matrix3D::ProjectionCSS(CSSEyeZ, rect.left, rect.right, top, bottom, CSSFarZ);

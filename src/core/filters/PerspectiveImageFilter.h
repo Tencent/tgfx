@@ -23,8 +23,15 @@
 
 namespace tgfx {
 
+/**
+ * PerspectiveImageFilter is an image filter that applies a perspective transformation to the input
+ * image.
+ */
 class PerspectiveImageFilter final : public ImageFilter {
  public:
+  /**
+   * Creates a PerspectiveImageFilter with the specified PerspectiveInfo.
+   */
   explicit PerspectiveImageFilter(const PerspectiveInfo& info);
 
  private:
@@ -48,9 +55,12 @@ class PerspectiveImageFilter final : public ImageFilter {
 
   PerspectiveInfo info = {};
 
+  /**
+   * The projection matrix for the unit rectangle LTRB(-1, -1, 1, 1).
+   */
   Matrix3D normalProjectMatrix;
 
-  Matrix3D rotateModelMatrix;
+  Matrix3D modelRotateMatrix;
 };
 
 }  // namespace tgfx
