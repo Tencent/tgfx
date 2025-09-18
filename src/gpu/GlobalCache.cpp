@@ -17,11 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GlobalCache.h"
+#include "AlignUtils.h"
 #include "core/GradientGenerator.h"
 #include "core/PixelBuffer.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ops/RRectDrawOp.h"
 #include "gpu/ops/RectDrawOp.h"
+#include "opengl/GLBuffer.h"
 #include "tgfx/core/Buffer.h"
 
 namespace tgfx {
@@ -29,6 +31,7 @@ static constexpr size_t MAX_PROGRAM_COUNT = 128;
 static constexpr size_t MaxNumCachedGradientBitmaps = 32;
 static constexpr uint16_t VerticesPerNonAAQuad = 4;
 static constexpr uint16_t VerticesPerAAQuad = 8;
+static constexpr size_t MaxUniformGPUBufferMemory = 128 * 1024;
 
 GlobalCache::GlobalCache(Context* context) : context(context) {
 }
@@ -43,6 +46,91 @@ std::shared_ptr<Program> GlobalCache::findProgram(const BytesKey& programKey) {
     return program;
   }
   return nullptr;
+}
+
+std::shared_ptr<GPUBuffer> GlobalCache::findOrCreateUniformGPUBuffer(size_t bufferSize, size_t* lastBufferOffset) {
+  static const auto maxUBOSize = static_cast<size_t>(context->gpu()->caps()->shaderCaps()->maxUBOSize);
+  static const auto uboOffsetAlignment = static_cast<size_t>(context->gpu()->caps()->shaderCaps()->uboOffsetAlignment);
+
+  if (maxUBOSize == 0) {
+    LOGE("[GlobalCache::findOrCreateUniformGPUBuffer] maxUBOSize is 0");
+    return nullptr;
+  }
+
+  auto alignedBufferSize = AlignTo(bufferSize, uboOffsetAlignment);
+
+  if (bufferSize == 0 || alignedBufferSize > maxUBOSize) {
+    LOGE("[GlobalCache::findOrCreateUniformGPUBuffer] invalid request buffer size: %zu, max UBO size: %zu, %s:%d", bufferSize, maxUBOSize, __FILE__, __LINE__);
+    return nullptr;
+  }
+
+  auto& tripleBuffer = tripleUniformBuffers[tripleUniformBufferIndex];
+  static uint64_t counter = 0;
+  counter++;
+  tripleUniformBufferIndex = counter % UNIFORM_BUFFER_COUNT;
+  if (counter == UNIFORM_BUFFER_COUNT) {
+    counter = 0;
+  }
+
+  if (tripleBuffer.gupBuffers.empty()) {
+    auto buffer = context->gpu()->createBuffer(maxUBOSize, GPUBufferUsage::UNIFORM);
+    if (buffer == nullptr) {
+      LOGE("[GlobalCache::findOrCreateUniformGPUBuffer] failed to create initial uniform buffer, request buffer size: %zu, %s:%d", bufferSize, __FILE__, __LINE__);
+      return nullptr;
+    }
+    tripleBuffer.gupBuffers.emplace_back(std::move(buffer));
+    tripleBuffer.bufferIndex = 0;
+    tripleBuffer.cursor = 0;
+  }
+
+  // Check if triple buffer has enough space
+  if (tripleBuffer.bufferIndex < tripleBuffer.gupBuffers.size() &&
+      tripleBuffer.cursor + alignedBufferSize <= tripleBuffer.gupBuffers[tripleBuffer.bufferIndex]->size()) {
+    *lastBufferOffset = tripleBuffer.cursor;
+    tripleBuffer.cursor += alignedBufferSize;
+    return tripleBuffer.gupBuffers[tripleBuffer.bufferIndex];
+  }
+
+  // Need to move to next buffer or create a new one
+  tripleBuffer.bufferIndex++;
+  tripleBuffer.cursor = 0;
+
+  if (tripleBuffer.bufferIndex >= tripleBuffer.gupBuffers.size()) {
+    // Need to create a new buffer
+    auto buffer = context->gpu()->createBuffer(maxUBOSize, GPUBufferUsage::UNIFORM);
+    if (buffer == nullptr) {
+      LOGE("[GlobalCache::findOrCreateUniformGPUBuffer] failed to create uniform buffer, request buffer size: %zu, %s:%d", bufferSize, __FILE__, __LINE__);
+      return nullptr;
+    }
+    tripleBuffer.gupBuffers.emplace_back(std::move(buffer));
+  }
+
+  *lastBufferOffset = tripleBuffer.cursor;
+  tripleBuffer.cursor += alignedBufferSize;
+
+  return tripleBuffer.gupBuffers[tripleBuffer.bufferIndex];
+}
+
+void GlobalCache::resetUniformGPUBuffer() {
+  static const auto maxUBOSize = static_cast<size_t>(context->gpu()->caps()->shaderCaps()->maxUBOSize);
+  if (maxUBOSize == 0) {
+    return;
+  }
+
+  auto& currentBuffer = tripleUniformBuffers[tripleUniformBufferIndex];
+
+  size_t maxBufferCount = MaxUniformGPUBufferMemory / maxUBOSize;
+  bool needsResize = maxBufferCount > 0 && currentBuffer.gupBuffers.size() > maxBufferCount;
+
+  if (needsResize) {
+    for (size_t i = maxBufferCount; i < currentBuffer.gupBuffers.size(); i++) {
+      currentBuffer.gupBuffers[i]->release(context->gpu());
+    }
+    currentBuffer.gupBuffers.resize(maxBufferCount);
+  }
+
+  currentBuffer.bufferIndex = 0;
+  currentBuffer.cursor = 0;
 }
 
 void GlobalCache::addProgram(const BytesKey& programKey, std::shared_ptr<Program> program) {

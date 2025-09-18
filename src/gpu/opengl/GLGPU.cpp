@@ -43,6 +43,8 @@ std::unique_ptr<GPUBuffer> GLGPU::createBuffer(size_t size, uint32_t usage) {
     target = GL_ARRAY_BUFFER;
   } else if (usage & GPUBufferUsage::INDEX) {
     target = GL_ELEMENT_ARRAY_BUFFER;
+  } else if (usage & GPUBufferUsage::UNIFORM) {
+    target = GL_UNIFORM_BUFFER;
   } else {
     LOGE("GLGPU::createBuffer() invalid buffer usage!");
     return nullptr;

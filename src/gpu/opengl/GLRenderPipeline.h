@@ -42,11 +42,6 @@ struct GLUniform {
   size_t offset = 0;
 };
 
-struct GLUniformBlock {
-  unsigned ubo = 0;                      // OpenGL UBO handle, 0 if UBOs are not supported.
-  std::vector<GLUniform> uniforms = {};  // only used if UBOs are not supported.
-};
-
 /**
  * GLRenderPipeline is the OpenGL implementation of the GPURenderPipeline interface. It encapsulates
  * an OpenGL shader program along with its associated state, such as vertex attributes and blending
@@ -67,6 +62,11 @@ class GLRenderPipeline : public GPURenderPipeline {
   void setUniformBytes(GLGPU* gpu, unsigned binding, const void* data, size_t size);
 
   /**
+   * Sets a uniform buffer to a specified binding index.
+   */
+  void setUniformBuffer(GLGPU* gpu, unsigned binding, GPUBuffer* buffer, size_t offset, size_t size);
+
+  /**
    * Sets a texture and its sampler state to a specified binding index.
    */
   void setTexture(GLGPU* gpu, unsigned binding, GLTexture* texture, GLSampler* sampler);
@@ -84,17 +84,20 @@ class GLRenderPipeline : public GPURenderPipeline {
 
   void release(GPU* gpu) override;
 
- private:
+private:
   unsigned programID = 0;
   unsigned vertexArray = 0;
   std::vector<GLAttribute> attributes = {};
   size_t vertexStride = 0;
-  std::unordered_map<unsigned, GLUniformBlock> uniformBlocks = {};
+  // only used if UBOs are not supported.
+  std::unordered_map<unsigned, std::vector<GLUniform>> uniformBlocks = {};
   std::unordered_map<unsigned, unsigned> textureUnits = {};
   uint32_t colorWriteMask = ColorWriteMask::All;
   std::unique_ptr<GLStencilState> stencilState = nullptr;
   std::unique_ptr<GLDepthState> depthState = nullptr;
   std::unique_ptr<GLBlendState> blendState = nullptr;
+  unsigned vertexUniformBlockIndex = GL_INVALID_INDEX;
+  unsigned fragmentUniformBlockIndex = GL_INVALID_INDEX;
 
   bool setPipelineDescriptor(GLGPU* gpu, const GPURenderPipelineDescriptor& descriptor);
 

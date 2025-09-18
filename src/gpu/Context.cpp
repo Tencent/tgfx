@@ -102,6 +102,10 @@ bool Context::flushAndSubmit(bool syncCpu) {
   if (result || syncCpu) {
     submit(syncCpu);
   }
+
+  if (gpu()->caps()->shaderCaps()->uboSupport) {
+    globalCache()->resetUniformGPUBuffer();
+  }
   return result;
 }
 

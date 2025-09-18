@@ -28,8 +28,61 @@ unsigned GLBuffer::target() const {
   if (_usage & GPUBufferUsage::INDEX) {
     return GL_ELEMENT_ARRAY_BUFFER;
   }
+  if (_usage & GPUBufferUsage::UNIFORM) {
+    return GL_UNIFORM_BUFFER;
+  }
   LOGE("GLBuffer::target() invalid buffer usage!");
   return 0;
+}
+
+void* GLBuffer::getMappedRange(GPU* gpu, size_t offset, size_t size) {
+  if (_mapStata == GPUBufferMapStata::MAPPED) {
+    return _mappedRange;
+  }
+
+  if (gpu == nullptr) {
+    return nullptr;
+  }
+
+  if (offset + size > _size) {
+    LOGE("GLBuffer::getMappedRange() out of range!");
+    return nullptr;
+  }
+
+  auto uboOffsetAlignment = static_cast<size_t>(gpu->caps()->shaderCaps()->uboOffsetAlignment);
+  if (uboOffsetAlignment <= 0 || offset % uboOffsetAlignment != 0) {
+    LOGE("GLBuffer::getMappedRange() invalid offset:%zu, offset must be aligned to %zu bytes", offset, uboOffsetAlignment);
+    return nullptr;
+  }
+
+  auto gl = static_cast<GLGPU*>(gpu)->functions();
+  gl->bindBuffer(GL_UNIFORM_BUFFER, _bufferID);
+  _mappedRange = gl->mapBufferRange(GL_UNIFORM_BUFFER,
+                                 static_cast<int32_t>(offset),
+                                 static_cast<int32_t>(size),
+                                 GL_MAP_WRITE_BIT |
+                                 GL_MAP_INVALIDATE_RANGE_BIT |
+                                 GL_MAP_UNSYNCHRONIZED_BIT);
+  if (_mappedRange != nullptr) {
+    _mapStata = GPUBufferMapStata::MAPPED;
+  }
+  return _mappedRange;
+}
+
+void GLBuffer::unmap(GPU* gpu) {
+  if (_mapStata == GPUBufferMapStata::UNMAPPED) {
+    return;
+  }
+
+  if (gpu == nullptr) {
+    return;
+  }
+
+  auto gl = static_cast<GLGPU*>(gpu)->functions();
+  gl->unmapBuffer(GL_UNIFORM_BUFFER);
+  gl->bindBuffer(GL_UNIFORM_BUFFER, 0);
+  _mapStata = GPUBufferMapStata::UNMAPPED;
+  _mappedRange = nullptr;
 }
 
 void GLBuffer::release(GPU* gpu) {

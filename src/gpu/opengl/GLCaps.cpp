@@ -267,12 +267,15 @@ void GLCaps::initGLSupport(const GLInfo& info) {
     _shaderCaps.frameBufferFetchRequiresEnablePerSample = false;
   }
 
-  // TODO UBO currently does not do merge processing, and the performance is slightly worse than
-  // the traditional Uniform variable, and it will be enabled after
-  // the performance optimization is completed
-#if ENABLE_UBO
-  uboSupport = version >= GL_VER(3, 1);
-#endif
+  _shaderCaps.uboSupport = version >= GL_VER(3, 1);
+  if (_shaderCaps.uboSupport) {
+    info.getIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &_shaderCaps.maxUBOSize);
+    _shaderCaps.maxUBOSize = std::min(_shaderCaps.maxUBOSize, 64 * 1024);
+    LOGI("maxUBOSize : %d\n", _shaderCaps.maxUBOSize);
+
+    info.getIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &_shaderCaps.uboOffsetAlignment);
+    LOGI("uboOffsetAlignment : %d\n", _shaderCaps.uboOffsetAlignment);
+  }
 }
 
 void GLCaps::initGLESSupport(const GLInfo& info) {
@@ -321,12 +324,12 @@ void GLCaps::initGLESSupport(const GLInfo& info) {
   mipmapSupport = npotTextureTileSupport || info.hasExtension("GL_IMG_texture_npot");
   _shaderCaps.usesPrecisionModifiers = true;
 
-  // TODO UBO currently does not do merge processing, and the performance is slightly worse than
-  // the traditional Uniform variable, and it will be enabled after
-  // the performance optimization is completed
-#if ENABLE_UBO
-  uboSupport = version >= GL_VER(3, 0);
-#endif
+  _shaderCaps.uboSupport = version >= GL_VER(3, 0);
+  if (_shaderCaps.uboSupport) {
+    info.getIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &_shaderCaps.maxUBOSize);
+    _shaderCaps.maxUBOSize = std::min(_shaderCaps.maxUBOSize, 64 * 1024);
+    LOGI("max uniform block size : %d\n", _shaderCaps.maxUBOSize);
+  }
 }
 
 void GLCaps::initWebGLSupport(const GLInfo& info) {
@@ -349,13 +352,12 @@ void GLCaps::initWebGLSupport(const GLInfo& info) {
   _shaderCaps.frameBufferFetchSupport = false;
   _shaderCaps.usesPrecisionModifiers = true;
 
-  // TODO UBO currently does not do merge processing, and the performance is slightly worse than
-  // the traditional Uniform variable, and it will be enabled after
-  // the performance optimization is completed
-  // WebGL 1.0 doesn't support UBOs, but WebGL 2.0 does.
-#if ENABLE_UBO
-  uboSupport = version >= GL_VER(2, 0);
-#endif
+  _shaderCaps.uboSupport = version >= GL_VER(2, 0);
+  if (_shaderCaps.uboSupport) {
+    info.getIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &_shaderCaps.maxUBOSize);
+    _shaderCaps.maxUBOSize = std::min(_shaderCaps.maxUBOSize, 64 * 1024);
+    LOGI("max uniform block size : %d\n", _shaderCaps.maxUBOSize);
+  }
 }
 
 void GLCaps::initFormatMap(const GLInfo& info) {

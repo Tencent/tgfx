@@ -188,7 +188,7 @@ class BindingLayout {
   /**
    * Specifies the binding points for uniform blocks used in the shader program.
    */
-  std::vector<BindingEntry> uniformBlocks = {};
+  std::vector<BindingEntry> uniformBindingPoints = {};
 
   /**
    * Specifies the binding points for texture samplers used in the shader program.

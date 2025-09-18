@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <array>
 #include <list>
 #include <unordered_map>
 #include "gpu/proxies/IndexBufferProxy.h"
@@ -37,6 +38,23 @@ class GlobalCache {
    * will be kept alive for the lifetime of the GlobalCache.
    */
   std::shared_ptr<Program> findProgram(const BytesKey& programKey);
+
+  /**
+   * Find or creates a uniform GPUBuffer with specified size. If a suitable buffer already exists,
+   * it will be reused. If no suitable buffer exists, a new buffer will be created.
+   * The buffer will be kept alive for the lifetime of the GlobalCache.
+   * Returns last buffer offset within the returned buffer via lastBufferOffset parameter.
+   * Returns nullptr if the requested buffer size exceeds the maximum allowed uniform buffer size.
+   */
+  std::shared_ptr<GPUBuffer> findOrCreateUniformGPUBuffer(size_t bufferSize, size_t* lastBufferOffset);
+
+  /**
+   * After calling Context::flushAndSubmit(), the cached buffer can be reused once the GPU has
+   * finished processing commands for the current frame.
+   * Typically, this is done at the start of each frame to allow buffer reuse.
+   * This approach minimizes buffer creation and destruction, improving performance.
+   */
+  void resetUniformGPUBuffer();
 
   /**
    * Adds a program to the cache with the specified key. If a program with the same key already
@@ -84,6 +102,12 @@ class GlobalCache {
     std::list<GradientTexture*>::iterator cachedPosition = {};
   };
 
+  struct TripleUniformBuffer {
+    std::vector<std::shared_ptr<GPUBuffer>> gupBuffers = {};
+    size_t bufferIndex = 0;
+    size_t cursor = 0;
+  };
+
   Context* context = nullptr;
   std::list<Program*> programLRU = {};
   BytesKeyMap<std::shared_ptr<Program>> programMap = {};
@@ -94,6 +118,10 @@ class GlobalCache {
   std::shared_ptr<IndexBufferProxy> rRectFillIndexBuffer = nullptr;
   std::shared_ptr<IndexBufferProxy> rRectStrokeIndexBuffer = nullptr;
   ResourceKeyMap<std::shared_ptr<Resource>> staticResources = {};
+  // Triple buffering for uniform buffer management
+  static constexpr uint32_t UNIFORM_BUFFER_COUNT = 3;
+  std::array<TripleUniformBuffer, UNIFORM_BUFFER_COUNT> tripleUniformBuffers = {};
+  uint32_t tripleUniformBufferIndex = 0;
 
   void releaseAll();
 
