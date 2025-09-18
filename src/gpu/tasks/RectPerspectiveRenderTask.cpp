@@ -27,9 +27,9 @@
 namespace tgfx {
 
 // The maximum number of vertices per non-AA quad.
-#define INDICES_PER_NON_AA_QUAD 6UL
+static constexpr uint32_t IndicesPerNonAAQuad = 6;
 // The maximum number of vertices per AA quad.
-#define INDICES_PER_AA_QUAD 30UL
+static constexpr uint32_t IndicesPerAAQuad = 30;
 
 RectPerspectiveRenderTask::RectPerspectiveRenderTask(
     const Rect& rect, std::shared_ptr<RenderTargetProxy> renderTarget,
@@ -76,8 +76,12 @@ void RectPerspectiveRenderTask::execute(CommandEncoder* encoder) {
     return;
   }
 
-  // NDC_Point is the projected vertex coordinate in the NDC space, and NDC_Point_shifted is the
-  // adjusted NDC coordinate. Scale1 and offset1 are transformation parameters passed externally,
+  // The actual size of the rendered texture is larger than the valid size, while the current
+  // NDC coordinates were calculated based on the valid size, so they need to be adjusted
+  // accordingly.
+  //
+  // NDC_Point is the projected vertex coordinate in NDC space, and NDC_Point_shifted is the
+  // adjusted NDC coordinate. scale1 and offset1 are transformation parameters passed externally,
   // while scale2 and offset2 map the NDC coordinates from the valid space to the actual space.
   //
   // NDC_Point_shifted = ((NDC_Point * scale1) + offset1) * scale2 + offset2
@@ -113,7 +117,7 @@ void RectPerspectiveRenderTask::execute(CommandEncoder* encoder) {
 
   if (indexBuffer != nullptr) {
     const auto numIndicesPerQuad =
-        (args.aa == AAType::Coverage ? INDICES_PER_AA_QUAD : INDICES_PER_NON_AA_QUAD);
+        (args.aa == AAType::Coverage ? IndicesPerAAQuad : IndicesPerNonAAQuad);
     renderPass->drawIndexed(PrimitiveType::Triangles, 0, numIndicesPerQuad);
   } else {
     renderPass->draw(PrimitiveType::TriangleStrip, 0, 4);

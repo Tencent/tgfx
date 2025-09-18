@@ -24,8 +24,14 @@
 
 namespace tgfx {
 
+/**
+ * A geometry processor for rendering 3D transformed quads with optional per-edge anti-aliasing.
+ */
 class QuadPerEdgeAA3DGeometryProcessor : public GeometryProcessor {
  public:
+  /**
+   * Creates a QuadPerEdgeAA3DGeometryProcessor instance with the specified parameters.
+   */
   static PlacementPtr<QuadPerEdgeAA3DGeometryProcessor> Make(BlockBuffer* buffer, AAType aa,
                                                              const Matrix3D& transformMatrix,
                                                              const Vec2& ndcScale,
@@ -49,10 +55,18 @@ class QuadPerEdgeAA3DGeometryProcessor : public GeometryProcessor {
 
   AAType aa = AAType::None;
 
+  /**
+   * The transformation matrix from local space to clip space.
+   */
   Matrix3D transfromMatrix;
 
+  /**
+   * The scaling and translation parameters in NDC space. After the projected model's vertex
+   * coordinates are transformed to NDC, ndcScale is applied for scaling, followed by ndcOffset for
+   * translation. These two properties allow any rectangular region of the projected model to be
+   * mapped to any position within the target texture.
+   */
   Vec2 ndcScale;
-
   Vec2 ndcOffset;
 };
 

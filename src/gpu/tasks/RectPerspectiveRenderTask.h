@@ -27,18 +27,38 @@
 
 namespace tgfx {
 
+/**
+ * PerspectiveRenderArgs defines arguments for perspective rendering.
+ */
 struct PerspectiveRenderArgs {
+  /**
+   * Anti-aliasing type.
+   */
   AAType aa = AAType::None;
 
+  /**
+   * The transformation matrix from local space to clip space.
+   */
   Matrix3D transformMatrix;
 
+  /**
+   * The scaling and translation parameters in NDC space. After the projected model's vertex
+   * coordinates are transformed to NDC, ndcScale is applied for scaling, followed by ndcOffset for
+   * translation. These two properties allow any rectangular region of the projected model to be
+   * mapped to any position within the target texture.
+   */
   Vec2 ndcScale;
-
   Vec2 ndcOffset;
 };
 
+/**
+ * RectPerspectiveRenderTask is a render task that renders a rectangle with perspective transformation.
+ */
 class RectPerspectiveRenderTask final : public RenderTask {
  public:
+  /**
+   * Creates a RectPerspectiveRenderTask with rect, render target, fill texture and render args.
+   */
   RectPerspectiveRenderTask(const Rect& rect, std::shared_ptr<RenderTargetProxy> renderTarget,
                             std::shared_ptr<TextureProxy> fillTexture,
                             const PerspectiveRenderArgs& args);

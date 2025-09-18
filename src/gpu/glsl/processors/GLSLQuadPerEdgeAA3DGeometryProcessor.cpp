@@ -21,8 +21,8 @@
 namespace tgfx {
 
 #define UNIFORM_TRANSFORM_MATRIX_NAME "transformMatrix"
-#define UNIFORM_TRANSFORM_NDC_SCALE_NAME "ndcScale"
-#define UNIFORM_TRANSFORM_NDC_OFFSET_NAME "ndcOffset"
+#define UNIFORM_NDC_SCALE_NAME "ndcScale"
+#define UNIFORM_NDC_OFFSET_NAME "ndcOffset"
 
 PlacementPtr<QuadPerEdgeAA3DGeometryProcessor> QuadPerEdgeAA3DGeometryProcessor::Make(
     BlockBuffer* buffer, AAType aa, const Matrix3D& transfromMatrix, const Vec2& ndcScale,
@@ -54,8 +54,7 @@ void GLSLQuadPerEdgeAA3DGeometryProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputCoverage.c_str());
   }
 
-  // According to the default fragment processor color rendering logic, the color needs to be
-  // obtained from a uniform variable.
+  // The default fragment processor color rendering logic requires a color uniform.
   const auto colorName =
       uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
   fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
@@ -63,10 +62,10 @@ void GLSLQuadPerEdgeAA3DGeometryProcessor::emitCode(EmitArgs& args) const {
       UNIFORM_TRANSFORM_MATRIX_NAME, UniformFormat::Float4x4, ShaderStage::Vertex);
   args.vertBuilder->codeAppendf("vec4 clipPoint = %s * vec4(%s, 0.0, 1.0);",
                                 transformMatrixName.c_str(), position.name().c_str());
-  const auto ndcScaleName = uniformHandler->addUniform(UNIFORM_TRANSFORM_NDC_SCALE_NAME,
+  const auto ndcScaleName = uniformHandler->addUniform(UNIFORM_NDC_SCALE_NAME,
                                                        UniformFormat::Float2, ShaderStage::Vertex);
   args.vertBuilder->codeAppendf("vec4 clipScale = vec4(%s.xy, 1.0, 1.0);", ndcScaleName.c_str());
-  const auto ndcOffsetName = uniformHandler->addUniform(UNIFORM_TRANSFORM_NDC_OFFSET_NAME,
+  const auto ndcOffsetName = uniformHandler->addUniform(UNIFORM_NDC_OFFSET_NAME,
                                                         UniformFormat::Float2, ShaderStage::Vertex);
   args.vertBuilder->codeAppendf("vec4 clipOffset = vec4((%s * clipPoint.w).xy, 0.0, 0.0);",
                                 ndcOffsetName.c_str());

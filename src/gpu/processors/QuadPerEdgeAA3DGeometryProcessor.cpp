@@ -36,7 +36,7 @@ QuadPerEdgeAA3DGeometryProcessor::QuadPerEdgeAA3DGeometryProcessor(AAType aa,
 void QuadPerEdgeAA3DGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
   uint32_t flags = (aa == AAType::Coverage ? 1 : 0);
   // Distinguish from DefaultGeometryProcessor
-  flags |= static_cast<uint32_t>(1) << 31;
+  flags |= (static_cast<uint32_t>(1) << 31);
   bytesKey->write(flags);
 }
 

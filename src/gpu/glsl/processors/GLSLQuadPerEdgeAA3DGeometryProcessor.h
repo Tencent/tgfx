@@ -22,8 +22,14 @@
 
 namespace tgfx {
 
+/**
+ * The implementation of QuadPerEdgeAA3DGeometryProcessor using GLSL.
+ */
 class GLSLQuadPerEdgeAA3DGeometryProcessor final : public QuadPerEdgeAA3DGeometryProcessor {
  public:
+  /**
+   * Creates a GLSLQuadPerEdgeAA3DGeometryProcessor instance with the specified parameters.
+   */
   explicit GLSLQuadPerEdgeAA3DGeometryProcessor(AAType aa, const Matrix3D& transformMatrix,
                                                 const Vec2& ndcScale, const Vec2& ndcOffset);
 
