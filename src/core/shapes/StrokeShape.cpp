@@ -18,8 +18,8 @@
 
 #include "StrokeShape.h"
 #include "core/shapes/MatrixShape.h"
-#include "core/utils/ApplyStrokeToBounds.h"
 #include "core/utils/Log.h"
+#include "core/utils/StrokeUtils.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/resources/ResourceKey.h"
 

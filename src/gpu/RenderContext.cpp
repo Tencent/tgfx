@@ -29,8 +29,8 @@
 #include "core/UserTypeface.h"
 #include "core/images/SubsetImage.h"
 #include "core/shapes/TextShape.h"
-#include "core/utils/ApplyStrokeToBounds.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/StrokeUtils.h"
 #include "gpu/DrawingManager.h"
 
 namespace tgfx {

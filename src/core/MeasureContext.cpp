@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MeasureContext.h"
-#include "core/utils/ApplyStrokeToBounds.h"
 #include "core/utils/Log.h"
+#include "core/utils/StrokeUtils.h"
 #include "utils/MathExtra.h"
 
 namespace tgfx {

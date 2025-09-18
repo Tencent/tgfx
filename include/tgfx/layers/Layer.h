@@ -528,6 +528,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
    */
   void detachProperty(LayerProperty* property);
 
+  Matrix getGlobalMatrix() const;
+
  private:
   /**
    * Marks the layer as needing to be redrawn. Unlike invalidateContent(), this method only marks
@@ -551,8 +553,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
   int doGetChildIndex(const Layer* child) const;
 
   bool doContains(const Layer* child) const;
-
-  Matrix getGlobalMatrix() const;
 
   Matrix getMatrixWithScrollRect() const;
 

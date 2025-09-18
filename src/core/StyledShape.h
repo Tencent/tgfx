@@ -59,8 +59,6 @@ class StyledShape {
  private:
   StyledShape(std::shared_ptr<Shape> shape, const Stroke* stroke, Matrix matrix);
 
-  bool treatStrokeAsHairline(float* width = nullptr) const;
-
   std::shared_ptr<Shape> _shape = nullptr;
   std::optional<Stroke> _stroke;
   Matrix _matrix = Matrix::I();

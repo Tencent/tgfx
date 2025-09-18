@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "HitTestContext.h"
-#include "core/utils/ApplyStrokeToBounds.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/StrokeUtils.h"
 #include "utils/Log.h"
 
 namespace tgfx {

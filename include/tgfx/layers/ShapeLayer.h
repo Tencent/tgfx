@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "tgfx/core/Matrix.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/ShapeStyle.h"
@@ -318,8 +319,8 @@ class ShapeLayer : public Layer {
   } shapeBitFields = {};
 
   std::vector<Paint> createShapePaints(const std::vector<std::shared_ptr<ShapeStyle>>& styles,
-                                       bool isHairline = false) const;
+                                       bool isStrokeStylePaint = false) const;
 
-  std::shared_ptr<Shape> createStrokeShape() const;
+  std::shared_ptr<Shape> createStrokeShape(bool isHairlineRender) const;
 };
 }  // namespace tgfx
