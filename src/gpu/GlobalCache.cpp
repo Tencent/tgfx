@@ -48,9 +48,12 @@ std::shared_ptr<Program> GlobalCache::findProgram(const BytesKey& programKey) {
   return nullptr;
 }
 
-std::shared_ptr<GPUBuffer> GlobalCache::findOrCreateUniformGPUBuffer(size_t bufferSize, size_t* lastBufferOffset) {
-  static const auto maxUBOSize = static_cast<size_t>(context->gpu()->caps()->shaderCaps()->maxUBOSize);
-  static const auto uboOffsetAlignment = static_cast<size_t>(context->gpu()->caps()->shaderCaps()->uboOffsetAlignment);
+std::shared_ptr<GPUBuffer> GlobalCache::findOrCreateUniformGPUBuffer(size_t bufferSize,
+                                                                     size_t* lastBufferOffset) {
+  static const auto maxUBOSize =
+      static_cast<size_t>(context->gpu()->caps()->shaderCaps()->maxUBOSize);
+  static const auto uboOffsetAlignment =
+      static_cast<size_t>(context->gpu()->caps()->shaderCaps()->uboOffsetAlignment);
 
   if (maxUBOSize == 0) {
     LOGE("[GlobalCache::findOrCreateUniformGPUBuffer] maxUBOSize is 0");
@@ -60,7 +63,10 @@ std::shared_ptr<GPUBuffer> GlobalCache::findOrCreateUniformGPUBuffer(size_t buff
   auto alignedBufferSize = AlignTo(bufferSize, uboOffsetAlignment);
 
   if (bufferSize == 0 || alignedBufferSize > maxUBOSize) {
-    LOGE("[GlobalCache::findOrCreateUniformGPUBuffer] invalid request buffer size: %zu, max UBO size: %zu, %s:%d", bufferSize, maxUBOSize, __FILE__, __LINE__);
+    LOGE(
+        "[GlobalCache::findOrCreateUniformGPUBuffer] invalid request buffer size: %zu, max UBO "
+        "size: %zu, %s:%d",
+        bufferSize, maxUBOSize, __FILE__, __LINE__);
     return nullptr;
   }
 
@@ -75,7 +81,10 @@ std::shared_ptr<GPUBuffer> GlobalCache::findOrCreateUniformGPUBuffer(size_t buff
   if (tripleBuffer.gupBuffers.empty()) {
     auto buffer = context->gpu()->createBuffer(maxUBOSize, GPUBufferUsage::UNIFORM);
     if (buffer == nullptr) {
-      LOGE("[GlobalCache::findOrCreateUniformGPUBuffer] failed to create initial uniform buffer, request buffer size: %zu, %s:%d", bufferSize, __FILE__, __LINE__);
+      LOGE(
+          "[GlobalCache::findOrCreateUniformGPUBuffer] failed to create initial uniform buffer, "
+          "request buffer size: %zu, %s:%d",
+          bufferSize, __FILE__, __LINE__);
       return nullptr;
     }
     tripleBuffer.gupBuffers.emplace_back(std::move(buffer));
@@ -85,7 +94,8 @@ std::shared_ptr<GPUBuffer> GlobalCache::findOrCreateUniformGPUBuffer(size_t buff
 
   // Check if triple buffer has enough space
   if (tripleBuffer.bufferIndex < tripleBuffer.gupBuffers.size() &&
-      tripleBuffer.cursor + alignedBufferSize <= tripleBuffer.gupBuffers[tripleBuffer.bufferIndex]->size()) {
+      tripleBuffer.cursor + alignedBufferSize <=
+          tripleBuffer.gupBuffers[tripleBuffer.bufferIndex]->size()) {
     *lastBufferOffset = tripleBuffer.cursor;
     tripleBuffer.cursor += alignedBufferSize;
     return tripleBuffer.gupBuffers[tripleBuffer.bufferIndex];
@@ -99,7 +109,10 @@ std::shared_ptr<GPUBuffer> GlobalCache::findOrCreateUniformGPUBuffer(size_t buff
     // Need to create a new buffer
     auto buffer = context->gpu()->createBuffer(maxUBOSize, GPUBufferUsage::UNIFORM);
     if (buffer == nullptr) {
-      LOGE("[GlobalCache::findOrCreateUniformGPUBuffer] failed to create uniform buffer, request buffer size: %zu, %s:%d", bufferSize, __FILE__, __LINE__);
+      LOGE(
+          "[GlobalCache::findOrCreateUniformGPUBuffer] failed to create uniform buffer, request "
+          "buffer size: %zu, %s:%d",
+          bufferSize, __FILE__, __LINE__);
       return nullptr;
     }
     tripleBuffer.gupBuffers.emplace_back(std::move(buffer));
@@ -112,7 +125,8 @@ std::shared_ptr<GPUBuffer> GlobalCache::findOrCreateUniformGPUBuffer(size_t buff
 }
 
 void GlobalCache::resetUniformGPUBuffer() {
-  static const auto maxUBOSize = static_cast<size_t>(context->gpu()->caps()->shaderCaps()->maxUBOSize);
+  static const auto maxUBOSize =
+      static_cast<size_t>(context->gpu()->caps()->shaderCaps()->maxUBOSize);
   if (maxUBOSize == 0) {
     return;
   }

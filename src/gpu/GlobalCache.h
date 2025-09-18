@@ -46,7 +46,8 @@ class GlobalCache {
    * Returns last buffer offset within the returned buffer via lastBufferOffset parameter.
    * Returns nullptr if the requested buffer size exceeds the maximum allowed uniform buffer size.
    */
-  std::shared_ptr<GPUBuffer> findOrCreateUniformGPUBuffer(size_t bufferSize, size_t* lastBufferOffset);
+  std::shared_ptr<GPUBuffer> findOrCreateUniformGPUBuffer(size_t bufferSize,
+                                                          size_t* lastBufferOffset);
 
   /**
    * After calling Context::flushAndSubmit(), the cached buffer can be reused once the GPU has

@@ -64,7 +64,8 @@ class GLRenderPipeline : public GPURenderPipeline {
   /**
    * Sets a uniform buffer to a specified binding index.
    */
-  void setUniformBuffer(GLGPU* gpu, unsigned binding, GPUBuffer* buffer, size_t offset, size_t size);
+  void setUniformBuffer(GLGPU* gpu, unsigned binding, GPUBuffer* buffer, size_t offset,
+                        size_t size);
 
   /**
    * Sets a texture and its sampler state to a specified binding index.
@@ -84,7 +85,7 @@ class GLRenderPipeline : public GPURenderPipeline {
 
   void release(GPU* gpu) override;
 
-private:
+ private:
   unsigned programID = 0;
   unsigned vertexArray = 0;
   std::vector<GLAttribute> attributes = {};

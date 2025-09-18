@@ -272,7 +272,8 @@ class RenderPass {
   /**
    * Sets a GPUBuffer as a uniform buffer to a specified binding index in the shader's UBO table.
    */
-  virtual void setUniformBuffer(unsigned binding, GPUBuffer* buffer, size_t offset, size_t size) = 0;
+  virtual void setUniformBuffer(unsigned binding, GPUBuffer* buffer, size_t offset,
+                                size_t size) = 0;
 
   /**
    * Sets a texture and its sampler state to a specified binding index in the shader's texture table.

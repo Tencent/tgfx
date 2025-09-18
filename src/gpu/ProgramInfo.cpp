@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ProgramInfo.h"
-
 #include "AlignUtils.h"
 #include "gpu/BlendFormula.h"
 #include "gpu/GlobalCache.h"
@@ -137,13 +136,16 @@ std::shared_ptr<Program> ProgramInfo::getProgram() const {
     auto pipelineProgram = std::static_pointer_cast<PipelineProgram>(program);
     size_t uniformGPUBufferSize = 0;
     if (pipelineProgram->vertexUniformBuffer != nullptr) {
-      uniformGPUBufferSize += AlignTo(pipelineProgram->vertexUniformBuffer->size(), static_cast<size_t>(context->caps()->shaderCaps()->uboOffsetAlignment));
+      uniformGPUBufferSize +=
+          AlignTo(pipelineProgram->vertexUniformBuffer->size(),
+                  static_cast<size_t>(context->caps()->shaderCaps()->uboOffsetAlignment));
     }
     if (pipelineProgram->fragmentUniformBuffer != nullptr) {
       uniformGPUBufferSize += pipelineProgram->fragmentUniformBuffer->size();
     }
     if (uniformGPUBufferSize > 0) {
-      pipelineProgram->uniformGPUBuffer = context->globalCache()->findOrCreateUniformGPUBuffer(uniformGPUBufferSize, &pipelineProgram->uniformGPUBufferBaseOffset);
+      pipelineProgram->uniformGPUBuffer = context->globalCache()->findOrCreateUniformGPUBuffer(
+          uniformGPUBufferSize, &pipelineProgram->uniformGPUBufferBaseOffset);
     }
   }
 
@@ -195,24 +197,33 @@ void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, PipelineProgram
   if (gpu->caps()->shaderCaps()->uboSupport) {
     size_t fragmentUniformOffset = 0;
     if (vertexUniformBuffer != nullptr) {
-      auto buffer = program->uniformGPUBuffer->getMappedRange(gpu, program->uniformGPUBufferBaseOffset, vertexUniformBuffer->size());
+      auto buffer = program->uniformGPUBuffer->getMappedRange(
+          gpu, program->uniformGPUBufferBaseOffset, vertexUniformBuffer->size());
       if (buffer != nullptr) {
         memcpy(buffer, vertexUniformBuffer->data(), vertexUniformBuffer->size());
       }
       program->uniformGPUBuffer->unmap(gpu);
 
-      renderPass->setUniformBuffer(VERTEX_UBO_BINDING_POINT, program->uniformGPUBuffer.get(), program->uniformGPUBufferBaseOffset, vertexUniformBuffer->size());
-      fragmentUniformOffset = AlignTo(vertexUniformBuffer->size(), static_cast<size_t>(gpu->caps()->shaderCaps()->uboOffsetAlignment));
+      renderPass->setUniformBuffer(VERTEX_UBO_BINDING_POINT, program->uniformGPUBuffer.get(),
+                                   program->uniformGPUBufferBaseOffset,
+                                   vertexUniformBuffer->size());
+      fragmentUniformOffset =
+          AlignTo(vertexUniformBuffer->size(),
+                  static_cast<size_t>(gpu->caps()->shaderCaps()->uboOffsetAlignment));
     }
 
     if (fragmentUniformBuffer != nullptr) {
-      auto buffer = program->uniformGPUBuffer->getMappedRange(gpu, program->uniformGPUBufferBaseOffset + fragmentUniformOffset, fragmentUniformBuffer->size());
+      auto buffer = program->uniformGPUBuffer->getMappedRange(
+          gpu, program->uniformGPUBufferBaseOffset + fragmentUniformOffset,
+          fragmentUniformBuffer->size());
       if (buffer != nullptr) {
         memcpy(buffer, fragmentUniformBuffer->data(), fragmentUniformBuffer->size());
       }
       program->uniformGPUBuffer->unmap(gpu);
 
-      renderPass->setUniformBuffer(FRAGMENT_UBO_BINDING_POINT, program->uniformGPUBuffer.get(), program->uniformGPUBufferBaseOffset + fragmentUniformOffset, fragmentUniformBuffer->size());
+      renderPass->setUniformBuffer(FRAGMENT_UBO_BINDING_POINT, program->uniformGPUBuffer.get(),
+                                   program->uniformGPUBufferBaseOffset + fragmentUniformOffset,
+                                   fragmentUniformBuffer->size());
     }
   } else {
     if (vertexUniformBuffer != nullptr) {

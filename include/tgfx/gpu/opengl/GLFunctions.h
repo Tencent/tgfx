@@ -141,9 +141,10 @@ using GLGetUniformBlockIndex = unsigned GL_FUNCTION_TYPE(unsigned program,
 using GLUniformBlockBinding = void GL_FUNCTION_TYPE(unsigned program, unsigned uniformBlockIndex,
                                                     unsigned uniformBlockBinding);
 using GLBindBufferBase = void GL_FUNCTION_TYPE(unsigned target, unsigned index, unsigned buffer);
-using GLBindBufferRange = void GL_FUNCTION_TYPE(unsigned target, unsigned index, unsigned buffer, GLintptr offset, GLsizeiptr size);
+using GLBindBufferRange = void GL_FUNCTION_TYPE(unsigned target, unsigned index, unsigned buffer,
+                                                GLintptr offset, GLsizeiptr size);
 using GLMapBufferRange = void* GL_FUNCTION_TYPE(unsigned target, GLintptr offset, GLsizeiptr length,
-                                                     unsigned access);
+                                                unsigned access);
 using GLUnmapBuffer = unsigned char GL_FUNCTION_TYPE(unsigned target);
 using GLIsTexture = unsigned char GL_FUNCTION_TYPE(unsigned texture);
 using GLLineWidth = void GL_FUNCTION_TYPE(float width);

@@ -103,7 +103,8 @@ void GLRenderPass::setUniformBytes(unsigned binding, const void* data, size_t si
   renderPipeline->setUniformBytes(gpu, binding, data, size);
 }
 
-void GLRenderPass::setUniformBuffer(unsigned binding, GPUBuffer* buffer, size_t offset, size_t size) {
+void GLRenderPass::setUniformBuffer(unsigned binding, GPUBuffer* buffer, size_t offset,
+                                    size_t size) {
   if (renderPipeline == nullptr) {
     LOGE("GLRenderPass::setUniformBuffer: renderPipeline is nullptr!");
     return;

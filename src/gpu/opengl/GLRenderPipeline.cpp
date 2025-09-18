@@ -123,7 +123,8 @@ void GLRenderPipeline::setUniformBytes(GLGPU* gpu, unsigned binding, const void*
   }
 }
 
-void GLRenderPipeline::setUniformBuffer(GLGPU* gpu, unsigned binding, GPUBuffer* buffer, size_t offset, size_t size) {
+void GLRenderPipeline::setUniformBuffer(GLGPU* gpu, unsigned binding, GPUBuffer* buffer,
+                                        size_t offset, size_t size) {
   if (gpu == nullptr || buffer == nullptr || size == 0) {
     return;
   }
@@ -133,18 +134,21 @@ void GLRenderPipeline::setUniformBuffer(GLGPU* gpu, unsigned binding, GPUBuffer*
     return;
   }
 
-  auto& uniformBlockIndex = binding == VERTEX_UBO_BINDING_POINT ? vertexUniformBlockIndex : fragmentUniformBlockIndex;
+  auto& uniformBlockIndex =
+      binding == VERTEX_UBO_BINDING_POINT ? vertexUniformBlockIndex : fragmentUniformBlockIndex;
 
   auto gl = gpu->functions();
   if (uniformBlockIndex == GL_INVALID_INDEX) {
-    auto blockName = binding == VERTEX_UBO_BINDING_POINT ? VertexUniformBlockName : FragmentUniformBlockName;
+    auto blockName =
+        binding == VERTEX_UBO_BINDING_POINT ? VertexUniformBlockName : FragmentUniformBlockName;
     uniformBlockIndex = gl->getUniformBlockIndex(programID, blockName);
   }
   if (uniformBlockIndex != GL_INVALID_INDEX) {
     gl->uniformBlockBinding(programID, uniformBlockIndex, binding);
   }
 
-  gl->bindBufferRange(GL_UNIFORM_BUFFER, binding, ubo, static_cast<int32_t>(offset), static_cast<int32_t>(size));
+  gl->bindBufferRange(GL_UNIFORM_BUFFER, binding, ubo, static_cast<int32_t>(offset),
+                      static_cast<int32_t>(size));
 }
 
 void GLRenderPipeline::setTexture(GLGPU* gpu, unsigned binding, GLTexture* texture,

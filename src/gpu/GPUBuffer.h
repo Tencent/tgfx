@@ -47,10 +47,7 @@ class GPUBufferUsage {
 /**
  * Represents the mapped state of the uniform GPUBuffer.
  */
-enum class GPUBufferMapStata : uint8_t {
-  UNMAPPED = 0,
-  MAPPED = 1
-};
+enum class GPUBufferMapStata : uint8_t { UNMAPPED = 0, MAPPED = 1 };
 
 /**
  * GPUBuffer represents a block of GPU memory used to store raw data for GPU operations.

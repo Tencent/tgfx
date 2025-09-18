@@ -51,18 +51,16 @@ void* GLBuffer::getMappedRange(GPU* gpu, size_t offset, size_t size) {
 
   auto uboOffsetAlignment = static_cast<size_t>(gpu->caps()->shaderCaps()->uboOffsetAlignment);
   if (uboOffsetAlignment <= 0 || offset % uboOffsetAlignment != 0) {
-    LOGE("GLBuffer::getMappedRange() invalid offset:%zu, offset must be aligned to %zu bytes", offset, uboOffsetAlignment);
+    LOGE("GLBuffer::getMappedRange() invalid offset:%zu, offset must be aligned to %zu bytes",
+         offset, uboOffsetAlignment);
     return nullptr;
   }
 
   auto gl = static_cast<GLGPU*>(gpu)->functions();
   gl->bindBuffer(GL_UNIFORM_BUFFER, _bufferID);
-  _mappedRange = gl->mapBufferRange(GL_UNIFORM_BUFFER,
-                                 static_cast<int32_t>(offset),
-                                 static_cast<int32_t>(size),
-                                 GL_MAP_WRITE_BIT |
-                                 GL_MAP_INVALIDATE_RANGE_BIT |
-                                 GL_MAP_UNSYNCHRONIZED_BIT);
+  _mappedRange = gl->mapBufferRange(
+      GL_UNIFORM_BUFFER, static_cast<int32_t>(offset), static_cast<int32_t>(size),
+      GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
   if (_mappedRange != nullptr) {
     _mapStata = GPUBufferMapStata::MAPPED;
   }
