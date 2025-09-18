@@ -328,7 +328,10 @@ void GLCaps::initGLESSupport(const GLInfo& info) {
   if (_shaderCaps.uboSupport) {
     info.getIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &_shaderCaps.maxUBOSize);
     _shaderCaps.maxUBOSize = std::min(_shaderCaps.maxUBOSize, 64 * 1024);
-    LOGI("max uniform block size : %d\n", _shaderCaps.maxUBOSize);
+    LOGI("maxUBOSize : %d\n", _shaderCaps.maxUBOSize);
+
+    info.getIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &_shaderCaps.uboOffsetAlignment);
+    LOGI("uboOffsetAlignment : %d\n", _shaderCaps.uboOffsetAlignment);
   }
 }
 
@@ -356,7 +359,10 @@ void GLCaps::initWebGLSupport(const GLInfo& info) {
   if (_shaderCaps.uboSupport) {
     info.getIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &_shaderCaps.maxUBOSize);
     _shaderCaps.maxUBOSize = std::min(_shaderCaps.maxUBOSize, 64 * 1024);
-    LOGI("max uniform block size : %d\n", _shaderCaps.maxUBOSize);
+    LOGI("maxUBOSize : %d\n", _shaderCaps.maxUBOSize);
+
+    info.getIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &_shaderCaps.uboOffsetAlignment);
+    LOGI("uboOffsetAlignment : %d\n", _shaderCaps.uboOffsetAlignment);
   }
 }
 
