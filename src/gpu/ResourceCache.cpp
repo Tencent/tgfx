@@ -19,8 +19,8 @@
 #include "gpu/ResourceCache.h"
 #include <unordered_map>
 #include "core/utils/Log.h"
-#include "gpu/resources/UnreferencedResourceQueue.h"
 #include "gpu/resources/Resource.h"
+#include "gpu/resources/UnreferencedResourceQueue.h"
 
 namespace tgfx {
 static constexpr size_t MAX_EXPIRATION_FRAMES = 1000000;  // About 4.5 hours at 60 FPS
