@@ -73,13 +73,13 @@ PerspectiveFilter::PerspectiveFilter(const LayerPerspectiveInfo& info) : _info(i
 }
 
 std::shared_ptr<ImageFilter> PerspectiveFilter::onCreateImageFilter(float) {
-  auto projectType = ProjectType::Standard;
+  auto projectType = PerspectiveType::Standard;
   switch (_info.projectType) {
-    case LayerProjectType::Standard:
-      projectType = ProjectType::Standard;
+    case LayerPerspectiveType::Standard:
+      projectType = PerspectiveType::Standard;
       break;
-    case LayerProjectType::CSS:
-      projectType = ProjectType::CSS;
+    case LayerPerspectiveType::CSS:
+      projectType = PerspectiveType::CSS;
       break;
     default:
       break;

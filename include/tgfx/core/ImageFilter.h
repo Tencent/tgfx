@@ -178,10 +178,10 @@ class ImageFilter {
   friend class Types;
 };
 
-enum class ProjectType { Standard, CSS };
+enum class PerspectiveType { Standard, CSS };
 
 struct PerspectiveInfo {
-  ProjectType projectType = ProjectType::Standard;
+  PerspectiveType projectType = PerspectiveType::Standard;
 
   float xRotation = 0.0f;
   float yRotation = 0.0f;

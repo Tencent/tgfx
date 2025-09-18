@@ -122,9 +122,9 @@ PlacementPtr<FragmentProcessor> PerspectiveImageFilter::asFragmentProcessor(
   return makeFPFromTextureProxy(source, args, sampling, constraint, uvMatrix);
 }
 
-Matrix3D PerspectiveImageFilter::MakeProjectMatrix(ProjectType projectType, const Rect& rect) {
+Matrix3D PerspectiveImageFilter::MakeProjectMatrix(PerspectiveType projectType, const Rect& rect) {
   switch (projectType) {
-    case ProjectType::Standard: {
+    case PerspectiveType::Standard: {
       const float eyePositionZ =
           rect.height() * 0.5f / tanf(DegreesToRadians(StandardFovYDegress * 0.5f));
       const Vec3 eyePosition = {0.f, 0.f, eyePositionZ};
@@ -135,7 +135,7 @@ Matrix3D PerspectiveImageFilter::MakeProjectMatrix(ProjectType projectType, cons
           Matrix3D::Perspective(StandardFovYDegress, rect.width() / rect.height(), nearZ, farZ);
       return perspectiveMatrix * viewMatrix;
     }
-    case ProjectType::CSS: {
+    case PerspectiveType::CSS: {
       const float top = rect.bottom;
       const float bottom = rect.top;
       return Matrix3D::ProjectionCSS(CSSEyeZ, rect.left, rect.right, top, bottom, CSSFarZ);

@@ -44,7 +44,7 @@ class PerspectiveImageFilter final : public ImageFilter {
                                                       SrcRectConstraint constraint,
                                                       const Matrix* uvMatrix) const override;
 
-  static Matrix3D MakeProjectMatrix(ProjectType projectType, const Rect& rect);
+  static Matrix3D MakeProjectMatrix(PerspectiveType projectType, const Rect& rect);
 
   PerspectiveInfo info = {};
 

@@ -22,10 +22,10 @@
 
 namespace tgfx {
 
-enum class LayerProjectType { Standard, CSS };
+enum class LayerPerspectiveType { Standard, CSS };
 
 struct LayerPerspectiveInfo {
-  LayerProjectType projectType = LayerProjectType::Standard;
+  LayerPerspectiveType projectType = LayerPerspectiveType::Standard;
 
   float xRotation = 0.0f;
   float yRotation = 0.0f;
