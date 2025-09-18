@@ -20,12 +20,14 @@
 #include <unordered_map>
 #include "core/utils/Log.h"
 #include "gpu/resources/Resource.h"
+#include "gpu/resources/UnreferencedResourceQueue.h"
 
 namespace tgfx {
 static constexpr size_t MAX_EXPIRATION_FRAMES = 1000000;  // About 4.5 hours at 60 FPS
 static constexpr size_t SCRATCH_EXPIRATION_FRAMES = 2;
 
 ResourceCache::ResourceCache(Context* context) : context(context) {
+  unreferencedResourceQueue = std::make_shared<UnreferencedResourceQueue>();
 }
 
 bool ResourceCache::empty() const {
@@ -111,16 +113,9 @@ void ResourceCache::purgeResourcesByLRU(bool scratchResourceOnly,
 }
 
 void ResourceCache::processUnreferencedResources() {
-  std::vector<Resource*> needToPurge = {};
-  for (auto& resource : nonpurgeableResources) {
-    if (resource->isPurgeable()) {
-      needToPurge.push_back(resource);
-    }
-  }
-  if (needToPurge.empty()) {
-    return;
-  }
-  for (auto& resource : needToPurge) {
+  Resource* resource = nullptr;
+  while (unreferencedResourceQueue->queue.try_dequeue(resource)) {
+    DEBUG_ASSERT(resource->isPurgeable());
     RemoveFromList(nonpurgeableResources, resource);
     if (!resource->scratchKey.empty() || resource->hasExternalReferences()) {
       AddToList(purgeableResources, resource);
@@ -213,6 +208,12 @@ bool ResourceCache::InList(const std::list<Resource*>& list, tgfx::Resource* res
   return resource->cachedList == &list;
 }
 
+void ResourceCache::NotifyReferenceReachedZero(Resource* resource) {
+  DEBUG_ASSERT(resource->unreferencedQueue);
+  resource->unreferencedQueue->queue.enqueue(resource);
+  resource->unreferencedQueue = nullptr;
+}
+
 void ResourceCache::changeUniqueKey(Resource* resource, const UniqueKey& uniqueKey) {
   auto result = uniqueKeyMap.find(uniqueKey);
   if (result != uniqueKeyMap.end()) {
@@ -230,6 +231,13 @@ void ResourceCache::removeUniqueKey(Resource* resource) {
   resource->uniqueKey = {};
 }
 
+std::shared_ptr<Resource> ResourceCache::wrapResource(Resource* resource) {
+  auto result = std::shared_ptr<Resource>(resource, ResourceCache::NotifyReferenceReachedZero);
+  result->weakThis = result;
+  result->unreferencedQueue = unreferencedResourceQueue;
+  return result;
+}
+
 std::shared_ptr<Resource> ResourceCache::addResource(Resource* resource,
                                                      const ScratchKey& scratchKey) {
   resource->context = context;
@@ -238,21 +246,18 @@ std::shared_ptr<Resource> ResourceCache::addResource(Resource* resource,
     scratchKeyMap[resource->scratchKey].push_back(resource);
   }
   totalBytes += resource->memoryUsage();
-  auto result = std::shared_ptr<Resource>(resource);
-  // Add a strong reference to the resource itself, preventing it from being deleted by external
-  // references.
-  result->reference = result;
   AddToList(nonpurgeableResources, resource);
-  return result;
+  return wrapResource(resource);
 }
 
 std::shared_ptr<Resource> ResourceCache::refResource(Resource* resource) {
+  processUnreferencedResources();
   if (InList(purgeableResources, resource)) {
     RemoveFromList(purgeableResources, resource);
     purgeableBytes -= resource->memoryUsage();
     AddToList(nonpurgeableResources, resource);
   }
-  return resource->reference;
+  return wrapResource(resource);
 }
 
 void ResourceCache::removeResource(Resource* resource) {
