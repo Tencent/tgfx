@@ -58,7 +58,7 @@ class QuadPerEdgeAA3DGeometryProcessor : public GeometryProcessor {
   /**
    * The transformation matrix from local space to clip space.
    */
-  Matrix3D transfromMatrix;
+  Matrix3D transformMatrix;
 
   /**
    * The scaling and translation parameters in NDC space. After the projected model's vertex

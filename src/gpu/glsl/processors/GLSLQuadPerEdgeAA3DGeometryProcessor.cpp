@@ -77,7 +77,7 @@ void GLSLQuadPerEdgeAA3DGeometryProcessor::setData(UniformBuffer* vertexUniformB
                                                    FPCoordTransformIter* transformIter) const {
   setTransformDataHelper(Matrix::I(), vertexUniformBuffer, transformIter);
   fragmentUniformBuffer->setData("Color", defaultColor);
-  vertexUniformBuffer->setData("transformMatrix", transfromMatrix);
+  vertexUniformBuffer->setData("transformMatrix", transformMatrix);
   vertexUniformBuffer->setData("ndcScale", ndcScale);
   vertexUniformBuffer->setData("ndcOffset", ndcOffset);
 }

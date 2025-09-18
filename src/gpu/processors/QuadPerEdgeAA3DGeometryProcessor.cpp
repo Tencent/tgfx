@@ -24,7 +24,7 @@ QuadPerEdgeAA3DGeometryProcessor::QuadPerEdgeAA3DGeometryProcessor(AAType aa,
                                                                    const Matrix3D& transformMatrix,
                                                                    const Vec2& ndcScale,
                                                                    const Vec2& ndcOffset)
-    : GeometryProcessor(ClassID()), aa(aa), transfromMatrix(transformMatrix), ndcScale(ndcScale),
+    : GeometryProcessor(ClassID()), aa(aa), transformMatrix(transformMatrix), ndcScale(ndcScale),
       ndcOffset(ndcOffset) {
   position = {"aPosition", VertexFormat::Float2};
   if (aa == AAType::Coverage) {

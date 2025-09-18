@@ -53,7 +53,7 @@ RectPerspectiveRenderTask::RectPerspectiveRenderTask(
 
 void RectPerspectiveRenderTask::execute(CommandEncoder* encoder) {
   if (vertexBufferProxyView == nullptr || fillTexture == nullptr) {
-    LOGE("RectPerspectiveRenderTask::execute() Vertext buffer proxy view or fill texture is null!");
+    LOGE("RectPerspectiveRenderTask::execute() Vertex buffer proxy view or fill texture is null!");
     return;
   }
   const auto rt = renderTarget->getRenderTarget();
