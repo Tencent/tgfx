@@ -22,40 +22,52 @@
 #include "layers/OpaqueThreshold.h"
 
 namespace tgfx {
+
+class PendingContourAutoReset {
+ public:
+  PendingContourAutoReset(ContourContext* context, const ContourContext::Contour& contour,
+                          MCState state, Fill fill, const Stroke* stroke)
+      : context(context), contour(contour), state(std::move(state)), fill(std::move(fill)),
+        stroke(stroke) {
+  }
+
+  ~PendingContourAutoReset() {
+    context->resetPendingContour(contour, state, fill, stroke);
+  }
+
+ private:
+  ContourContext* context = nullptr;
+  ContourContext::Contour contour;
+  MCState state;
+  Fill fill;
+  const Stroke* stroke = nullptr;
+};
+
 ContourContext::ContourContext() {
   contourBounds.reserve(3);
 }
 
 void ContourContext::drawFill(const Fill& fill) {
-  drawRect(Rect::MakeLTRB(-FLT_MAX, -FLT_MAX, FLT_MAX, FLT_MAX), {}, fill);
+  static Contour FillContour = Contour(Contour::Type::Fill);
+  drawContour(FillContour, {}, fill);
 }
 
 void ContourContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill) {
-  Path path = {};
-  path.addRect(rect);
-  drawPath(path, state, fill);
+  drawContour(Contour(rect), state, fill);
 }
 
 void ContourContext::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
                                const Stroke* stroke) {
-  Path path = {};
-  path.addRRect(rRect);
-  auto shape = Shape::MakeFrom(path);
-  drawShape(shape, state, fill, stroke);
+  drawContour(Contour(rRect), state, fill, stroke);
 }
 
 void ContourContext::drawPath(const Path& path, const MCState& state, const Fill& fill) {
-  auto shape = Shape::MakeFrom(path);
-  drawShape(shape, state, fill, nullptr);
+  drawContour(Contour(path), state, fill);
 }
 
 void ContourContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill,
                                const Stroke* stroke) {
-  if (canAppend(shape, state, fill, stroke)) {
-    appendFill(fill, stroke);
-    return;
-  }
-  flushPendingShape(shape, state, fill, stroke);
+  drawContour(Contour(std::move(shape)), state, fill, stroke);
 }
 
 void ContourContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
@@ -121,8 +133,17 @@ void ContourContext::drawLayer(std::shared_ptr<Picture> picture,
       return;
     }
   }
-  flushPendingShape();
+  flushPendingContour();
   recordingContext.drawLayer(picture, filter, state, fill);
+}
+
+void ContourContext::drawContour(const Contour& contour, const MCState& state, const Fill& fill,
+                                 const Stroke* stroke) {
+  if (canAppend(contour, state, fill, stroke)) {
+    appendFill(fill, stroke);
+    return;
+  }
+  flushPendingContour(contour, state, fill, stroke);
 }
 
 bool ContourContext::containContourBound(const Rect& bounds) {
@@ -181,11 +202,11 @@ void ContourContext::mergeContourBound(const Rect& bounds) {
 }
 
 std::shared_ptr<Picture> ContourContext::finishRecordingAsPicture() {
-  flushPendingShape();
+  flushPendingContour();
   return recordingContext.finishRecordingAsPicture();
 }
 
-bool ContourContext::canAppend(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill,
+bool ContourContext::canAppend(const Contour& contour, const MCState& state, const Fill& fill,
                                const Stroke* stroke) {
   if (state.clip != pendingState.clip || state.matrix != pendingState.matrix) {
     return false;
@@ -196,12 +217,7 @@ bool ContourContext::canAppend(std::shared_ptr<Shape> shape, const MCState& stat
   if (pendingStrokes.empty() != (stroke == nullptr)) {
     return false;
   }
-  if (pendingShape->isSimplePath() && shape->isSimplePath()) {
-    auto pendingPath = pendingShape->getPath();
-    auto currentPath = shape->getPath();
-    return pendingPath == currentPath;
-  }
-  return pendingShape == shape;
+  return contour == pendingContour;
 }
 
 Rect GetGlobalBounds(const MCState& state, const Rect& localBounds) {
@@ -214,46 +230,47 @@ Rect GetGlobalBounds(const MCState& state, const Rect& localBounds) {
   return globalBounds;
 }
 
-void ContourContext::flushPendingShape(std::shared_ptr<Shape> shape, const MCState& state,
-                                       const Fill& fill, const Stroke* stroke) {
-  if (pendingShape) {
-    Rect outset = Rect::MakeEmpty();
-    for (auto pendingStroke : pendingStrokes) {
-      auto rect = Rect::MakeEmpty();
-      ApplyStrokeToBounds(*pendingStroke, &rect);
-      if (rect.right > outset.right) {
-        outset = rect;
-      }
+void ContourContext::flushPendingContour(const Contour& contour, const MCState& state,
+                                         const Fill& fill, const Stroke* stroke) {
+  PendingContourAutoReset autoReset(this, contour, state, fill, stroke);
+  if (pendingContour.type == Contour::Type::None) {
+    return;
+  }
+  Rect outset = Rect::MakeEmpty();
+  for (auto pendingStroke : pendingStrokes) {
+    auto rect = Rect::MakeEmpty();
+    ApplyStrokeToBounds(*pendingStroke, &rect);
+    if (rect.right > outset.right) {
+      outset = rect;
     }
-    Rect localBounds = pendingShape->getBounds();
-    localBounds.outset(outset.right, outset.top);
-    auto globalBounds = GetGlobalBounds(pendingState, localBounds);
-    if (!containContourBound(globalBounds) || pendingShape->isInverseFillType()) {
-      for (size_t i = 0; i < pendingFills.size(); i++) {
-        auto& pendingFill = pendingFills[i];
-        const Stroke* pendingStroke = pendingStrokes.size() > i ? pendingStrokes[i] : nullptr;
-        drawShapeInternal(pendingShape, pendingState, pendingFill, pendingStroke);
-      }
-      if (pendingState.matrix.isScaleTranslate() && pendingShape->isSimplePath() &&
-          !pendingShape->isInverseFillType() &&
-          (fill.shader == nullptr || !fill.shader->isAImage()) && !fill.maskFilter) {
-        RRect rRect = {};
-        if (pendingShape->getPath().isRect()) {
-          mergeContourBound(globalBounds);
-        } else if (pendingShape->getPath().isRRect(&rRect)) {
-          localBounds.inset(rRect.radii.x, rRect.radii.y);
-          if (localBounds.isSorted()) {
-            globalBounds = GetGlobalBounds(pendingState, localBounds);
-            mergeContourBound(globalBounds);
-          }
-        }
+  }
+  Rect localBounds = pendingContour.getBounds();
+  localBounds.outset(outset.right, outset.top);
+  auto globalBounds = GetGlobalBounds(pendingState, localBounds);
+  bool fillIsFull = false;
+  if (containContourBound(globalBounds) && !pendingContour.isInverseFillType()) {
+    return;
+  }
+  for (size_t i = 0; i < pendingFills.size(); i++) {
+    auto& pendingFill = pendingFills[i];
+    const Stroke* pendingStroke = pendingStrokes.size() > i ? pendingStrokes[i] : nullptr;
+    fillIsFull =
+        fillIsFull || ((pendingFill.shader == nullptr || !pendingFill.shader->isAImage()) &&
+                       !pendingFill.maskFilter);
+    pendingContour.draw(recordingContext, pendingState, pendingFill, pendingStroke);
+  }
+  if (fillIsFull && pendingState.matrix.rectStaysRect() &&
+      pendingContour.type < Contour::Type::Path && !pendingContour.isInverseFillType()) {
+    if (pendingContour.type == Contour::Type::Rect) {
+      mergeContourBound(globalBounds);
+    } else if (pendingContour.type == Contour::Type::RRect) {
+      localBounds.inset(pendingContour.rRect.radii.x, pendingContour.rRect.radii.y);
+      if (localBounds.isSorted()) {
+        globalBounds = GetGlobalBounds(pendingState, localBounds);
+        mergeContourBound(globalBounds);
       }
     }
   }
-  pendingShape = std::move(shape);
-  pendingState = state;
-  pendingFills = {fill};
-  pendingStrokes = stroke == nullptr ? std::vector<const Stroke*>() : std::vector{stroke};
 }
 
 void ContourContext::appendFill(const Fill& fill, const Stroke* stroke) {
@@ -275,33 +292,129 @@ void ContourContext::appendFill(const Fill& fill, const Stroke* stroke) {
   }
 }
 
-void ContourContext::drawShapeInternal(std::shared_ptr<Shape> shape, const MCState& state,
-                                       const Fill& fill, const Stroke* stroke) {
-  if (!shape->isSimplePath()) {
-    recordingContext.drawShape(std::move(shape), state, fill, stroke);
-    return;
-  }
-  auto path = shape->getPath();
-  RRect rRect = {};
-  if (path.isRRect(&rRect)) {
-    recordingContext.drawRRect(rRect, state, fill, stroke);
-    return;
-  }
+void ContourContext::resetPendingContour(const Contour& contour, const MCState& state,
+                                         const Fill& fill, const Stroke* stroke) {
+  pendingContour = contour;
+  pendingState = state;
+  pendingFills = {fill};
   if (stroke) {
-    recordingContext.drawShape(std::move(shape), state, fill, stroke);
-    return;
+    pendingStrokes = {stroke};
+  } else {
+    pendingStrokes.clear();
   }
-  Rect rect = {};
-  if (path.isRect(&rect)) {
-    if (rect.left == -FLT_MAX && rect.top == -FLT_MAX && rect.right == FLT_MAX &&
-        rect.bottom == FLT_MAX) {
-      recordingContext.drawFill(fill);
-    } else {
-      recordingContext.drawRect(rect, state, fill);
+}
+
+bool ContourContext::Contour::isInverseFillType() const {
+  if (type < Type::Path) {
+    return false;
+  }
+  if (type == Type::Path) {
+    return path.isInverseFillType();
+  }
+  return shape->isInverseFillType();
+}
+
+Rect ContourContext::Contour::getBounds() const {
+  switch (type) {
+    case Type::Fill: {
+      return Rect::MakeLTRB(-FLT_MAX, -FLT_MAX, FLT_MAX, FLT_MAX);
     }
-    return;
+    case Type::Rect: {
+      return rect;
+    }
+    case Type::RRect: {
+      return rRect.rect;
+    }
+    case Type::Path: {
+      return path.getBounds();
+    }
+    case Type::Shape: {
+      return shape->getBounds();
+    }
+    default:
+      break;
   }
-  recordingContext.drawPath(path, state, fill);
+  return Rect::MakeEmpty();
+}
+
+void ContourContext::Contour::draw(RecordingContext& context, const MCState& state,
+                                   const Fill& fill, const Stroke* stroke) const {
+  switch (type) {
+    case Type::Fill: {
+      context.drawFill(fill);
+      break;
+    }
+    case Type::Rect: {
+      context.drawRect(rect, state, fill);
+      break;
+    }
+    case Type::RRect: {
+      context.drawRRect(rRect, state, fill, stroke);
+      break;
+    }
+    case Type::Path: {
+      context.drawPath(path, state, fill);
+      break;
+    }
+    case Type::Shape: {
+      context.drawShape(shape, state, fill, stroke);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+bool ContourContext::Contour::operator==(const Contour& other) const {
+  if (type != other.type) {
+    return false;
+  }
+  switch (type) {
+    case Type::Rect:
+      return rect == other.rect;
+    case Type::RRect:
+      return rRect.rect == other.rRect.rect && rRect.radii == other.rRect.radii;
+    case Type::Path:
+      return path == other.path;
+    case Type::Shape:
+      return shape == other.shape;
+    default:
+      break;
+  }
+  return true;
+}
+
+ContourContext::Contour& ContourContext::Contour::operator=(const Contour& other) {
+  if (this == &other) return *this;
+  switch (type) {
+    case Type::Path:
+      path.~Path();
+      break;
+    case Type::Shape:
+      shape.~shared_ptr<Shape>();
+      break;
+    default:
+      break;
+  }
+  type = other.type;
+  switch (type) {
+    case Type::Rect:
+      new (&rect) Rect(other.rect);
+      break;
+    case Type::RRect:
+      new (&rRect) RRect(other.rRect);
+      break;
+    case Type::Path:
+      new (&path) Path(other.path);
+      break;
+    case Type::Shape:
+      new (&shape) std::shared_ptr<Shape>(other.shape);
+      break;
+    case Type::Fill:
+    case Type::None:
+      break;
+  }
+  return *this;
 }
 
 }  // namespace tgfx

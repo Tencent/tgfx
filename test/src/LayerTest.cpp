@@ -3068,6 +3068,10 @@ TGFX_TEST(LayerTest, ContourTest) {
   rRectLayerOutBase->setPath(rRectPath2);
   rRectLayerOutBase->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 0, 255, 128)));
   baseLayer->addChild(rRectLayerOutBase);
+  auto rRectLayerOutBase2 = ShapeLayer::Make();
+  rRectLayerOutBase2->setPath(rRectPath2);
+  rRectLayerOutBase2->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 0, 255, 128)));
+  baseLayer->addChild(rRectLayerOutBase2);
 
   auto layerInBase = ShapeLayer::Make();
   Path pathInBase;

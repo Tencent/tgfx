@@ -57,27 +57,80 @@ class ContourContext : public DrawContext {
   std::shared_ptr<Picture> finishRecordingAsPicture();
 
  private:
+  struct Contour {
+    enum class Type { None, Fill, Rect, RRect, Path, Shape };
+
+    Contour() : shape(nullptr) {
+    }
+    explicit Contour(Type t) : shape(nullptr), type(t) {
+      DEBUG_ASSERT(t == Type::None || t == Type::Fill);
+    }
+    explicit Contour(const Rect& r) : rect(r), type(Type::Rect) {
+    }
+    explicit Contour(const RRect& rr) : rRect(rr), type(Type::RRect) {
+    }
+    explicit Contour(const Path& p) : path(p), type(Type::Path) {
+    }
+    explicit Contour(std::shared_ptr<Shape> s) : shape(std::move(s)), type(Type::Shape) {
+    }
+
+    Contour(const Contour& other) {
+      *this = other;
+    }
+
+    ~Contour() {
+      if (type == Type::Path) {
+        path.~Path();
+      } else if (type == Type::Shape) {
+        shape.~shared_ptr<Shape>();
+      }
+    }
+
+    union {
+      Rect rect;
+      RRect rRect;
+      Path path;
+      std::shared_ptr<Shape> shape;
+    };
+
+    Type type = Type::None;
+    bool isInverseFillType() const;
+    Rect getBounds() const;
+    void draw(RecordingContext& context, const MCState& state, const Fill& fill,
+              const Stroke* stroke) const;
+    bool operator==(const Contour& other) const;
+    bool operator!=(const Contour& other) const {
+      return !(*this == other);
+    }
+    Contour& operator=(const Contour& other);
+  };
+
+  void drawContour(const Contour& contour, const MCState& state, const Fill& fill,
+                   const Stroke* stroke = nullptr);
+
   bool containContourBound(const Rect& bounds);
 
   void mergeContourBound(const Rect& bounds);
 
-  bool canAppend(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill,
+  bool canAppend(const Contour& contour, const MCState& state, const Fill& fill,
                  const Stroke* stroke = nullptr);
 
   void appendFill(const Fill& fill, const Stroke* stroke = nullptr);
 
-  void flushPendingShape(std::shared_ptr<Shape> shape = nullptr, const MCState& state = {},
-                         const Fill& fill = {}, const Stroke* stroke = nullptr);
+  void flushPendingContour(const Contour& contour = {}, const MCState& state = {},
+                           const Fill& fill = {}, const Stroke* stroke = nullptr);
 
-  void drawShapeInternal(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill,
-                         const Stroke* stroke);
+  void resetPendingContour(const Contour& contour, const MCState& state, const Fill& fill,
+                           const Stroke* stroke);
+  Contour pendingContour = {};
 
-  std::shared_ptr<Shape> pendingShape = nullptr;
   MCState pendingState = {};
   std::vector<Fill> pendingFills = {};
   std::vector<const Stroke*> pendingStrokes = {};
 
   std::vector<Rect> contourBounds = {};
   RecordingContext recordingContext = {};
+
+  friend class PendingContourAutoReset;
 };
 }  // namespace tgfx
