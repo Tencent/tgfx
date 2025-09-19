@@ -1,0 +1,137 @@
+#!/usr/bin/env node
+
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
+const https = require('https');
+
+function printUsage() {
+    console.log('Usage: node update_vcpkg <commit-hash>');
+    console.log('Example: node update_vcpkg 6095b909b1109d4910991a034405f4ae30d6786f');
+}
+
+function validateCommitHash(commitHash) {
+    const commitRegex = /^[a-f0-9]{40}$/i;
+    return commitRegex.test(commitHash);
+}
+
+function downloadFile(url) {
+    return new Promise((resolve, reject) => {
+        console.log(`Downloading: ${url}`);
+        
+        https.get(url, (response) => {
+            if (response.statusCode === 302 || response.statusCode === 301) {
+                return downloadFile(response.headers.location).then(resolve).catch(reject);
+            }
+            
+            if (response.statusCode !== 200) {
+                reject(new Error(`Download failed, HTTP status: ${response.statusCode}`));
+                return;
+            }
+            
+            const chunks = [];
+            let totalLength = 0;
+            
+            response.on('data', (chunk) => {
+                chunks.push(chunk);
+                totalLength += chunk.length;
+                
+                if (totalLength % (1024 * 1024) === 0) {
+                    process.stdout.write(`\rDownloaded: ${(totalLength / 1024 / 1024).toFixed(1)} MB`);
+                }
+            });
+            
+            response.on('end', () => {
+                console.log(`\nDownload complete, size: ${(totalLength / 1024 / 1024).toFixed(2)} MB`);
+                const buffer = Buffer.concat(chunks);
+                resolve(buffer);
+            });
+            
+            response.on('error', reject);
+        }).on('error', reject);
+    });
+}
+
+function calculateSHA512(buffer) {
+    console.log('Calculating SHA512 hash...');
+    const hash = crypto.createHash('sha512');
+    hash.update(buffer);
+    const sha512 = hash.digest('hex');
+    console.log(`SHA512: ${sha512}`);
+    return sha512;
+}
+
+function updatePortfile(commitHash, sha512) {
+    const portfilePath = path.join(__dirname, 'ports', 'tgfx', 'portfile.cmake');
+    
+    if (!fs.existsSync(portfilePath)) {
+        throw new Error(`Portfile not found: ${portfilePath}`);
+    }
+    
+    console.log(`Updating ${portfilePath}...`);
+    
+    let content = fs.readFileSync(portfilePath, 'utf8');
+    
+    const refRegex = /(\s+REF\s+)[a-f0-9]{40}/i;
+    const refMatch = content.match(refRegex);
+    if (!refMatch) {
+        throw new Error('REF line not found in portfile.cmake');
+    }
+    content = content.replace(refRegex, `${refMatch[1]}${commitHash}`);
+    
+    const sha512Regex = /(\s+SHA512\s+)[a-f0-9]{128}/i;
+    const sha512Match = content.match(sha512Regex);
+    if (!sha512Match) {
+        throw new Error('SHA512 line not found in portfile.cmake');
+    }
+    content = content.replace(sha512Regex, `${sha512Match[1]}${sha512}`);
+    
+    fs.writeFileSync(portfilePath, content, 'utf8');
+    
+    console.log('portfile.cmake updated successfully!');
+    console.log(`   REF: ${commitHash}`);
+    console.log(`   SHA512: ${sha512}`);
+}
+
+async function main() {
+    const args = process.argv.slice(2);
+    
+    if (args.length !== 1) {
+        printUsage();
+        process.exit(1);
+    }
+    
+    const commitHash = args[0];
+    
+    if (!validateCommitHash(commitHash)) {
+        console.error('Error: Invalid commit hash format');
+        console.error('   Commit hash should be 40 hexadecimal characters');
+        console.error(`   Provided: ${commitHash}`);
+        process.exit(1);
+    }
+    
+    try {
+        const archiveUrl = `https://github.com/Tencent/tgfx/archive/${commitHash}.tar.gz`;
+        const buffer = await downloadFile(archiveUrl);
+        const sha512 = calculateSHA512(buffer);
+        updatePortfile(commitHash, sha512);
+        
+    } catch (error) {
+        console.error('Error:', error.message);
+        process.exit(1);
+    }
+}
+
+process.on('uncaughtException', (error) => {
+    console.error('Uncaught exception:', error.message);
+    process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled promise rejection:', reason);
+    process.exit(1);
+});
+
+if (require.main === module) {
+    main();
+}
