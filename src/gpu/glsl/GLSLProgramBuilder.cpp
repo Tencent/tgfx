@@ -192,6 +192,7 @@ std::unique_ptr<PipelineProgram> GLSLProgramBuilder::finalize() {
     vertexShader->release(gpu);
     return nullptr;
   }
+
   GPURenderPipelineDescriptor descriptor = {};
   descriptor.vertex = {programInfo->getVertexAttributes()};
   descriptor.vertex.module = vertexShader.get();
@@ -205,7 +206,7 @@ std::unique_ptr<PipelineProgram> GLSLProgramBuilder::finalize() {
       vertexBinding.uniforms = vertexUniformBuffer->uniforms();
       DEBUG_ASSERT(!vertexBinding.uniforms.empty());
     }
-    descriptor.layout.uniformBlocks.push_back(vertexBinding);
+    descriptor.layout.uniformBindingPoints.push_back(vertexBinding);
   }
   if (fragmentUniformBuffer) {
     BindingEntry fragmentBinding = {FragmentUniformBlockName, FRAGMENT_UBO_BINDING_POINT};
@@ -213,7 +214,7 @@ std::unique_ptr<PipelineProgram> GLSLProgramBuilder::finalize() {
       fragmentBinding.uniforms = fragmentUniformBuffer->uniforms();
       DEBUG_ASSERT(!fragmentBinding.uniforms.empty());
     }
-    descriptor.layout.uniformBlocks.push_back(fragmentBinding);
+    descriptor.layout.uniformBindingPoints.push_back(fragmentBinding);
   }
   int textureBinding = TEXTURE_BINDING_POINT_START;
   for (const auto& sampler : _uniformHandler.getSamplers()) {
