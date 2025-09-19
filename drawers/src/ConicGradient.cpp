@@ -17,28 +17,16 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "base/Drawers.h"
+#include "tgfx/core/ColorSpace.h"
 
 namespace drawers {
 void ConicGradient::onDraw(tgfx::Canvas* canvas, const AppHost* host) {
-  auto scale = host->density();
-  auto width = host->width();
-  auto height = host->height();
-  tgfx::Color cyan = {0.0f, 1.0f, 1.0f, 1.0f};
-  tgfx::Color magenta = {1.0f, 0.0f, 1.0f, 1.0f};
-  tgfx::Color yellow = {1.0f, 1.0f, 0.0f, 1.0f};
-  auto shader = tgfx::Shader::MakeConicGradient(tgfx::Point::Make(width / 2, height / 2), 0, 360,
-                                                {cyan, magenta, yellow, cyan}, {});
-  tgfx::Paint paint = {};
-  paint.setShader(shader);
-  auto screenSize = std::min(width, height);
-  auto size = screenSize - static_cast<int>(150 * scale);
-  size = std::max(size, 50);
-  auto rect = tgfx::Rect::MakeXYWH((width - size) / 2, (height - size) / 2, size, size);
-  tgfx::Path path = {};
-  path.addRoundRect(rect, 20 * scale, 20 * scale);
-  canvas->translate(host->contentOffset().x, host->contentOffset().y);
-  canvas->scale(host->zoomScale(), host->zoomScale());
-  canvas->drawPath(path, paint);
+    (void)host;
+    tgfx::Color green = tgfx::Color::FromRGBAWithCS(0, 255, 0, 255,
+                                                    tgfx::ColorSpace::MakeRGB(
+                                                            tgfx::namedTransferFn::SRGB,
+                                                            tgfx::namedGamut::DisplayP3));
+    canvas->drawColor(green);
 }
 
 }  // namespace drawers

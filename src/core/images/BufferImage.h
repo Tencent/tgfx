@@ -25,7 +25,8 @@ namespace tgfx {
  */
 class BufferImage : public PixelImage {
  public:
-  BufferImage(std::shared_ptr<ImageBuffer> buffer, bool mipmapped);
+  BufferImage(std::shared_ptr<ImageBuffer> buffer, bool mipmapped,
+              std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   int width() const override {
     return imageBuffer->width();
@@ -39,7 +40,12 @@ class BufferImage : public PixelImage {
     return imageBuffer->isAlphaOnly();
   }
 
+  std::shared_ptr<ColorSpace> colorSpace() const override {
+    return _colorSpace;
+  }
+
   std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
+  std::shared_ptr<ColorSpace> _colorSpace = ColorSpace::MakeSRGB();
 
  protected:
   Type type() const override {

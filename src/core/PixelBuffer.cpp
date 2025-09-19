@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/PixelBuffer.h"
+#include <utility>
 #include "core/utils/PixelFormatUtil.h"
 #include "tgfx/gpu/Device.h"
 

@@ -31,9 +31,10 @@ class FilterImage : public SubsetImage {
   /**
    * Creates a new FilterImage from the given source image, filter, and clipRect.
    */
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source,
-                                         std::shared_ptr<ImageFilter> filter,
-                                         Point* offset = nullptr, const Rect* clipRect = nullptr);
+  static std::shared_ptr<Image> MakeFrom(
+      std::shared_ptr<Image> source, std::shared_ptr<ImageFilter> filter, Point* offset = nullptr,
+      const Rect* clipRect = nullptr,
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeRGB(namedTransferFn::SRGB, namedGamut::DisplayP3));
 
   int width() const override {
     return static_cast<int>(bounds.width());
@@ -43,7 +44,12 @@ class FilterImage : public SubsetImage {
     return static_cast<int>(bounds.height());
   }
 
+  std::shared_ptr<ColorSpace> colorSpace() const override {
+    return _colorSpace;
+  }
+
   std::shared_ptr<ImageFilter> filter = nullptr;
+  std::shared_ptr<ColorSpace> _colorSpace = nullptr;
 
  protected:
   Type type() const override {
@@ -51,14 +57,15 @@ class FilterImage : public SubsetImage {
   }
 
   FilterImage(std::shared_ptr<Image> source, const Rect& bounds,
-              std::shared_ptr<ImageFilter> filter);
+              std::shared_ptr<ImageFilter> filter, std::shared_ptr<ColorSpace> colorSpace);
 
   std::shared_ptr<Image> onCloneWith(std::shared_ptr<Image> newSource) const override;
 
   std::shared_ptr<Image> onMakeSubset(const Rect& subset) const override;
 
   std::shared_ptr<Image> onMakeWithFilter(std::shared_ptr<ImageFilter> filter, Point* offset,
-                                          const Rect* clipRect) const override;
+                                          const Rect* clipRect,
+                                          std::shared_ptr<ColorSpace> colorSpace) const override;
 
   std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
                                       const SamplingOptions& sampling) const override;
@@ -71,6 +78,7 @@ class FilterImage : public SubsetImage {
 
  private:
   static std::shared_ptr<Image> Wrap(std::shared_ptr<Image> source, const Rect& bounds,
-                                     std::shared_ptr<ImageFilter> filter);
+                                     std::shared_ptr<ImageFilter> filter,
+                                     std::shared_ptr<ColorSpace> colorSpace);
 };
 }  // namespace tgfx

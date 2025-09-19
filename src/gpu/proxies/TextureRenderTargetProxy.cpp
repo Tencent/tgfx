@@ -21,9 +21,10 @@
 namespace tgfx {
 TextureRenderTargetProxy::TextureRenderTargetProxy(int width, int height, PixelFormat format,
                                                    int sampleCount, bool mipmapped,
-                                                   ImageOrigin origin, bool externallyOwned)
+                                                   ImageOrigin origin, bool externallyOwned,
+                                                   std::shared_ptr<ColorSpace> colorSpace)
     : DefaultTextureProxy(width, height, format, mipmapped, origin), _sampleCount(sampleCount),
-      _externallyOwned(externallyOwned) {
+      _externallyOwned(externallyOwned), _colorSpace(std::move(colorSpace)) {
 }
 
 std::shared_ptr<RenderTarget> TextureRenderTargetProxy::getRenderTarget() const {

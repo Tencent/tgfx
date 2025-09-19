@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ColorImageFilter.h"
+#include "gpu/processors/ColorSpaceXformEffect.h"
 #include "gpu/processors/ComposeFragmentProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "tgfx/core/ColorFilter.h"
@@ -34,15 +35,18 @@ ColorImageFilter::ColorImageFilter(std::shared_ptr<tgfx::ColorFilter> filter)
 
 PlacementPtr<FragmentProcessor> ColorImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-    SrcRectConstraint constraint, const Matrix* uvMatrix) const {
-  auto imageProcessor =
-      FragmentProcessor::Make(std::move(source), args, sampling, constraint, uvMatrix);
+    SrcRectConstraint constraint, const Matrix* uvMatrix,
+    std::shared_ptr<ColorSpace> dstColorSpace) const {
+  auto imageProcessor = FragmentProcessor::Make(source, args, sampling, constraint, uvMatrix);
   if (imageProcessor == nullptr) {
     return nullptr;
   }
   auto drawingBuffer = args.context->drawingBuffer();
-  auto processor = ComposeFragmentProcessor::Make(drawingBuffer, std::move(imageProcessor),
-                                                  filter->asFragmentProcessor(args.context));
+  auto effect = ColorSpaceXformEffect::Make(drawingBuffer, std::move(imageProcessor),
+                                            source->colorSpace().get(), AlphaType::Premultiplied,
+                                            dstColorSpace.get(), AlphaType::Premultiplied);
+  auto processor = ComposeFragmentProcessor::Make(
+      drawingBuffer, std::move(effect), filter->asFragmentProcessor(args.context, dstColorSpace));
   return FragmentProcessor::MulChildByInputAlpha(drawingBuffer, std::move(processor));
 }
 }  // namespace tgfx

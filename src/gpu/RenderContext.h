@@ -83,6 +83,7 @@ class RenderContext : public DrawContext {
   std::shared_ptr<OpsCompositor> opsCompositor = nullptr;
 
   Rect getClipBounds(const Path& clip);
+  void convertFillColor(const Fill& fill, Fill& dstFill);
   OpsCompositor* getOpsCompositor(bool discardContent = false);
   void replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRenderTarget,
                            std::shared_ptr<Image> oldContent);

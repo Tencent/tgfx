@@ -59,7 +59,7 @@ std::shared_ptr<Surface> EAGLWindow::onCreateSurface(Context* context) {
     return nullptr;
   }
   BackendRenderTarget renderTarget = layerTexture->getBackendRenderTarget();
-  return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
+  return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft, 1, ColorSpace::MakeSRGB());
 }
 
 void EAGLWindow::onPresent(Context* context, int64_t) {

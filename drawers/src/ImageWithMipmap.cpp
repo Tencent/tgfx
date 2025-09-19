@@ -20,24 +20,8 @@
 
 namespace drawers {
 void ImageWithMipmap::onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) {
-  auto scale = host->density();
-  auto width = host->width();
-  auto height = host->height();
-  auto screenSize = std::min(width, height);
-  auto size = screenSize - static_cast<int>(150 * scale);
-  size = std::max(size, 50);
-  auto image = host->getImage("bridge");
-  if (image == nullptr) {
-    return;
-  }
-  image = image->makeMipmapped(true);
-  auto imageScale = static_cast<float>(size) / static_cast<float>(image->width());
-  auto matrix = tgfx::Matrix::MakeScale(imageScale);
-  matrix.postTranslate(static_cast<float>(width - size) / 2, static_cast<float>(height - size) / 2);
-  matrix.postScale(host->zoomScale(), host->zoomScale());
-  matrix.postTranslate(host->contentOffset().x, host->contentOffset().y);
-  canvas->concat(matrix);
-  tgfx::SamplingOptions sampling(tgfx::FilterMode::Linear, tgfx::MipmapMode::Linear);
-  canvas->drawImage(image, sampling);
+  (void)host;
+  tgfx::Color green = tgfx::Color::FromRGBA(0, 255, 0, 255);
+  canvas->drawColor(green);
 }
 }  // namespace drawers

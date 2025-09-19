@@ -39,8 +39,8 @@ bool ColorFilterShader::isEqual(const Shader* otherShader) const {
 }
 
 PlacementPtr<FragmentProcessor> ColorFilterShader::asFragmentProcessor(
-    const FPArgs& args, const Matrix* uvMatrix) const {
-  auto fp1 = FragmentProcessor::Make(shader, args, uvMatrix);
+    const FPArgs& args, const Matrix* uvMatrix, std::shared_ptr<ColorSpace> colorSpace) const {
+  auto fp1 = FragmentProcessor::Make(shader, args, uvMatrix, colorSpace);
   if (fp1 == nullptr) {
     return nullptr;
   }
