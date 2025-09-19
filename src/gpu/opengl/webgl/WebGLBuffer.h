@@ -23,8 +23,8 @@ namespace tgfx {
 class WebGLBuffer : public GLBuffer {
  public:
   /**
-      * Creates a new WebGLBuffer with the specified size and usage flags.
-      */
+   * Creates a new WebGLBuffer with the specified size and usage flags.
+   */
   WebGLBuffer(unsigned bufferID, size_t size, uint32_t usage);
 
   ~WebGLBuffer() override;
