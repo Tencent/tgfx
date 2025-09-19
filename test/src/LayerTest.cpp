@@ -21,6 +21,8 @@
 #include "core/filters/GaussianBlurImageFilter.h"
 #include "core/shaders/GradientShader.h"
 #include "gpu/proxies/RenderTargetProxy.h"
+#include "layers/ContourContext.h"
+#include "layers/DrawArgs.h"
 #include "layers/RootLayer.h"
 #include "layers/contents/RasterizedContent.h"
 #include "tgfx/core/PathEffect.h"
@@ -3027,6 +3029,81 @@ TGFX_TEST(LayerTest, DropShadowDirtyRect) {
   displayList.showDirtyRegions(true);
   displayList.render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DropShadowDirtyRect"));
+}
+
+TGFX_TEST(LayerTest, ContourTest) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 300);
+  auto baseLayer = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeXYWH(50, 50, 100, 100));
+  baseLayer->setPath(path);
+  baseLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 0, 0, 255)));
+
+  auto layerOutOfBase = ShapeLayer::Make();
+  Path pathOutOfBase;
+  pathOutOfBase.addRect(Rect::MakeXYWH(80, 50, 100, 80));
+  layerOutOfBase->setPath(pathOutOfBase);
+  layerOutOfBase->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 255, 0, 128)));
+  baseLayer->addChild(layerOutOfBase);
+
+  auto layerOutOfBase2 = ShapeLayer::Make();
+  layerOutOfBase2->setPath(pathOutOfBase);
+  layerOutOfBase2->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 255, 255, 128)));
+  layerOutOfBase2->setMatrix(Matrix::MakeRotate(30, 80, 90));
+  baseLayer->addChild(layerOutOfBase2);
+
+  auto rRectLayerInBase = ShapeLayer::Make();
+  Path rRectPath;
+  rRectPath.addRRect(RRect{Rect::MakeXYWH(60, 60, 40, 40), Point::Make(20, 20)});
+  rRectLayerInBase->setPath(rRectPath);
+  rRectLayerInBase->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 255, 0, 128)));
+  baseLayer->addChild(rRectLayerInBase);
+
+  auto rRectLayerOutBase = ShapeLayer::Make();
+  Path rRectPath2;
+  rRectPath2.addRRect(RRect{Rect::MakeXYWH(60, 60, 100, 100), Point::Make(20, 20)});
+  rRectLayerOutBase->setPath(rRectPath2);
+  rRectLayerOutBase->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 0, 255, 128)));
+  baseLayer->addChild(rRectLayerOutBase);
+  auto rRectLayerOutBase2 = ShapeLayer::Make();
+  rRectLayerOutBase2->setPath(rRectPath2);
+  rRectLayerOutBase2->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 0, 255, 128)));
+  baseLayer->addChild(rRectLayerOutBase2);
+
+  auto layerInBase = ShapeLayer::Make();
+  Path pathInBase;
+  pathInBase.addRect(Rect::MakeXYWH(80, 80, 30, 30));
+  layerInBase->setPath(pathInBase);
+  layerInBase->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 0, 255, 128)));
+  layerInBase->setMatrix(Matrix::MakeRotate(30, 60, 60));
+  baseLayer->addChild(layerInBase);
+
+  auto pathOutBase = ShapeLayer::Make();
+  Path pathOutBasePath;
+  pathOutBasePath.moveTo(200, 200);
+  pathOutBasePath.cubicTo(250, 70, 250, 150, 200, 150);
+  pathOutBase->setPath(pathOutBasePath);
+  pathOutBase->setLineWidth(2);
+  pathOutBase->setStrokeStyle(SolidColor::Make(Color::FromRGBA(0, 0, 0, 255)));
+  baseLayer->addChild(pathOutBase);
+
+  ContourContext contourContext;
+  Canvas contourCanvas = Canvas(&contourContext);
+  DrawArgs drawArgs = DrawArgs(nullptr);
+  drawArgs.drawMode = DrawMode::Contour;
+  baseLayer->drawLayer(drawArgs, &contourCanvas, 1.0, BlendMode::SrcOver);
+  auto picture = contourContext.finishRecordingAsPicture();
+
+  EXPECT_TRUE(picture != nullptr);
+  EXPECT_TRUE(picture->drawCount == 6);
+  EXPECT_TRUE(contourContext.contourBounds.size() == 3);
+  auto canvas = surface->getCanvas();
+  canvas->clear();
+  canvas->drawPicture(picture);
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ContourTest"));
 }
 
 TGFX_TEST(LayerTest, HairlineLayer) {

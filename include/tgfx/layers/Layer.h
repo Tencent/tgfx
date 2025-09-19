@@ -37,6 +37,7 @@ class RegionTransformer;
 class RootLayer;
 struct LayerStyleSource;
 class BackgroundContext;
+enum class DrawMode;
 
 /**
  * The base class for all layers that can be placed on the display list. The layer class includes
@@ -610,6 +611,9 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::shared_ptr<BackgroundContext> createBackgroundContext(Context* context, const Rect& drawRect,
                                                              const Matrix& viewMatrix,
                                                              bool fullLayer = false) const;
+
+  static std::shared_ptr<Picture> RecordPicture(DrawMode mode, float contentScale,
+                                                const std::function<void(Canvas*)>& drawFunction);
 
   struct {
     bool dirtyContent : 1;        // layer's content needs updating
