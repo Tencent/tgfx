@@ -21,25 +21,26 @@
 
 namespace tgfx {
 class WebGLBuffer : public GLBuffer {
-  public:
-    /**
+ public:
+  /**
       * Creates a new WebGLBuffer with the specified size and usage flags.
       */
-    WebGLBuffer(unsigned bufferID, size_t size, uint32_t usage);
+  WebGLBuffer(unsigned bufferID, size_t size, uint32_t usage);
 
-    ~WebGLBuffer() override;
+  ~WebGLBuffer() override;
 
-    void* getMappedRange(GPU* gpu, size_t offset, size_t size) override;
+  void* getMappedRange(GPU* gpu, size_t offset, size_t size) override;
 
-    void unmap(GPU* gpu) override;
+  void unmap(GPU* gpu) override;
 
-    void release(GPU* gpu) override;
-  private:
-    uint32_t uniqueID = 0;
-    unsigned _bufferID = 0;
-    size_t _mappedOffset = 0;
-    size_t _mappedSize = 0;
+  void release(GPU* gpu) override;
 
-    void releaseInternal();
+ private:
+  uint32_t uniqueID = 0;
+  unsigned _bufferID = 0;
+  size_t _mappedOffset = 0;
+  size_t _mappedSize = 0;
+
+  void releaseInternal();
 };
-} // namespace tgfx
+}  // namespace tgfx

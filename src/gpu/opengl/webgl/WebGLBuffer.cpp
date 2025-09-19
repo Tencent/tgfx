@@ -17,12 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "WebGLBuffer.h"
-
 #include "gpu/GPU.h"
 #include "gpu/opengl/GLGPU.h"
 
 tgfx::WebGLBuffer::WebGLBuffer(unsigned bufferID, size_t size, uint32_t usage)
-  : GLBuffer(bufferID, size, usage), uniqueID(UniqueID::Next()), _bufferID(bufferID) {
+    : GLBuffer(bufferID, size, usage), uniqueID(UniqueID::Next()), _bufferID(bufferID) {
 }
 
 tgfx::WebGLBuffer::~WebGLBuffer() {
@@ -79,10 +78,8 @@ void tgfx::WebGLBuffer::unmap(GPU* gpu) {
   auto bufferTarget = target();
   auto gl = static_cast<GLGPU*>(gpu)->functions();
 
-  gl->bufferSubData(bufferTarget,
-                    static_cast<int32_t>(_mappedOffset),
-                    static_cast<int32_t>(_mappedSize),
-                    _mappedRange);
+  gl->bufferSubData(bufferTarget, static_cast<int32_t>(_mappedOffset),
+                    static_cast<int32_t>(_mappedSize), _mappedRange);
   gl->bindBuffer(bufferTarget, 0);
 
   releaseInternal();
