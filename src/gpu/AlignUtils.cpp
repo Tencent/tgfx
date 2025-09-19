@@ -20,7 +20,7 @@
 
 namespace tgfx {
 size_t AlignTo(size_t value, size_t alignment) {
-  if (alignment <= 0) {
+  if (alignment == 0) {
     return value;
   }
   return (value + alignment - 1) / alignment * alignment;

@@ -36,7 +36,7 @@ unsigned GLBuffer::target() const {
 }
 
 void* GLBuffer::getMappedRange(GPU* gpu, size_t offset, size_t size) {
-  if (_mapStata == GPUBufferMapStata::MAPPED) {
+  if (_mapState == GPUBufferMapState::MAPPED) {
     return _mappedRange;
   }
 
@@ -69,13 +69,13 @@ void* GLBuffer::getMappedRange(GPU* gpu, size_t offset, size_t size) {
       bufferTarget, static_cast<int32_t>(offset), static_cast<int32_t>(size),
       GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
   if (_mappedRange != nullptr) {
-    _mapStata = GPUBufferMapStata::MAPPED;
+    _mapState = GPUBufferMapState::MAPPED;
   }
   return _mappedRange;
 }
 
 void GLBuffer::unmap(GPU* gpu) {
-  if (_mapStata == GPUBufferMapStata::UNMAPPED) {
+  if (_mapState == GPUBufferMapState::UNMAPPED) {
     return;
   }
 
@@ -87,7 +87,7 @@ void GLBuffer::unmap(GPU* gpu) {
   auto gl = static_cast<GLGPU*>(gpu)->functions();
   gl->unmapBuffer(bufferTarget);
   gl->bindBuffer(bufferTarget, 0);
-  _mapStata = GPUBufferMapStata::UNMAPPED;
+  _mapState = GPUBufferMapState::UNMAPPED;
   _mappedRange = nullptr;
 }
 

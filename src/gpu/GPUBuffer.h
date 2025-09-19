@@ -47,7 +47,7 @@ class GPUBufferUsage {
 /**
  * Represents the mapped state of the uniform GPUBuffer.
  */
-enum class GPUBufferMapStata : uint8_t { UNMAPPED = 0, MAPPED = 1 };
+enum class GPUBufferMapState : uint8_t { UNMAPPED = 0, MAPPED = 1 };
 
 /**
  * GPUBuffer represents a block of GPU memory used to store raw data for GPU operations.
@@ -75,8 +75,8 @@ class GPUBuffer : public GPUResource {
    * Returns the current mapped state of the buffer, indicating whether it is currently mapped for
    * CPU access or not.
    */
-  GPUBufferMapStata mapStata() const {
-    return _mapStata;
+  GPUBufferMapState mapStata() const {
+    return _mapState;
   }
 
   /**
@@ -94,7 +94,7 @@ class GPUBuffer : public GPUResource {
   size_t _size = 0;
   uint32_t _usage = 0;
   void* _mappedRange = nullptr;
-  GPUBufferMapStata _mapStata = GPUBufferMapStata::UNMAPPED;
+  GPUBufferMapState _mapState = GPUBufferMapState::UNMAPPED;
 
   GPUBuffer(size_t size, uint32_t usage) : _size(size), _usage(usage) {
   }

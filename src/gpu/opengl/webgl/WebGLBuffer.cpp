@@ -30,7 +30,7 @@ WebGLBuffer::~WebGLBuffer() {
 }
 
 void* WebGLBuffer::getMappedRange(GPU* gpu, size_t offset, size_t size) {
-  if (_mapStata == GPUBufferMapStata::MAPPED) {
+  if (_mapState == GPUBufferMapStata::MAPPED) {
     return _mappedRange;
   }
 
@@ -60,7 +60,7 @@ void* WebGLBuffer::getMappedRange(GPU* gpu, size_t offset, size_t size) {
   auto gl = static_cast<GLGPU*>(gpu)->functions();
   gl->bindBuffer(bufferTarget, _bufferID);
   _mappedRange = malloc(size);
-  _mapStata = GPUBufferMapStata::MAPPED;
+  _mapState = GPUBufferMapStata::MAPPED;
   _mappedOffset = offset;
   _mappedSize = size;
 
@@ -68,7 +68,7 @@ void* WebGLBuffer::getMappedRange(GPU* gpu, size_t offset, size_t size) {
 }
 
 void WebGLBuffer::unmap(GPU* gpu) {
-  if (_mapStata == GPUBufferMapStata::UNMAPPED || _mappedRange == nullptr) {
+  if (_mapState == GPUBufferMapStata::UNMAPPED || _mappedRange == nullptr) {
     return;
   }
 
@@ -97,6 +97,6 @@ void WebGLBuffer::releaseInternal() {
     free(_mappedRange);
   }
   _mappedRange = nullptr;
-  _mapStata = GPUBufferMapStata::UNMAPPED;
+  _mapState = GPUBufferMapStata::UNMAPPED;
 }
 }  // namespace tgfx

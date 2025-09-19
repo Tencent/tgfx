@@ -104,7 +104,7 @@ class GlobalCache {
   };
 
   struct TripleUniformBuffer {
-    std::vector<std::shared_ptr<GPUBuffer>> gupBuffers = {};
+    std::vector<std::shared_ptr<GPUBuffer>> gpuBuffers = {};
     size_t bufferIndex = 0;
     size_t cursor = 0;
   };

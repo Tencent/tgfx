@@ -78,7 +78,7 @@ std::shared_ptr<GPUBuffer> GlobalCache::findOrCreateUniformGPUBuffer(size_t buff
     counter = 0;
   }
 
-  if (tripleBuffer.gupBuffers.empty()) {
+  if (tripleBuffer.gpuBuffers.empty()) {
     auto buffer = context->gpu()->createBuffer(maxUBOSize, GPUBufferUsage::UNIFORM);
     if (buffer == nullptr) {
       LOGE(
@@ -87,25 +87,25 @@ std::shared_ptr<GPUBuffer> GlobalCache::findOrCreateUniformGPUBuffer(size_t buff
           bufferSize, __FILE__, __LINE__);
       return nullptr;
     }
-    tripleBuffer.gupBuffers.emplace_back(std::move(buffer));
+    tripleBuffer.gpuBuffers.emplace_back(std::move(buffer));
     tripleBuffer.bufferIndex = 0;
     tripleBuffer.cursor = 0;
   }
 
   // Check if triple buffer has enough space
-  if (tripleBuffer.bufferIndex < tripleBuffer.gupBuffers.size() &&
+  if (tripleBuffer.bufferIndex < tripleBuffer.gpuBuffers.size() &&
       tripleBuffer.cursor + alignedBufferSize <=
-          tripleBuffer.gupBuffers[tripleBuffer.bufferIndex]->size()) {
+          tripleBuffer.gpuBuffers[tripleBuffer.bufferIndex]->size()) {
     *lastBufferOffset = tripleBuffer.cursor;
     tripleBuffer.cursor += alignedBufferSize;
-    return tripleBuffer.gupBuffers[tripleBuffer.bufferIndex];
+    return tripleBuffer.gpuBuffers[tripleBuffer.bufferIndex];
   }
 
   // Need to move to next buffer or create a new one
   tripleBuffer.bufferIndex++;
   tripleBuffer.cursor = 0;
 
-  if (tripleBuffer.bufferIndex >= tripleBuffer.gupBuffers.size()) {
+  if (tripleBuffer.bufferIndex >= tripleBuffer.gpuBuffers.size()) {
     // Need to create a new buffer
     auto buffer = context->gpu()->createBuffer(maxUBOSize, GPUBufferUsage::UNIFORM);
     if (buffer == nullptr) {
@@ -115,13 +115,13 @@ std::shared_ptr<GPUBuffer> GlobalCache::findOrCreateUniformGPUBuffer(size_t buff
           bufferSize, __FILE__, __LINE__);
       return nullptr;
     }
-    tripleBuffer.gupBuffers.emplace_back(std::move(buffer));
+    tripleBuffer.gpuBuffers.emplace_back(std::move(buffer));
   }
 
   *lastBufferOffset = tripleBuffer.cursor;
   tripleBuffer.cursor += alignedBufferSize;
 
-  return tripleBuffer.gupBuffers[tripleBuffer.bufferIndex];
+  return tripleBuffer.gpuBuffers[tripleBuffer.bufferIndex];
 }
 
 void GlobalCache::resetUniformGPUBuffer() {
@@ -134,13 +134,13 @@ void GlobalCache::resetUniformGPUBuffer() {
   auto& currentBuffer = tripleUniformBuffers[tripleUniformBufferIndex];
 
   size_t maxBufferCount = MaxUniformGPUBufferMemory / maxUBOSize;
-  bool needsResize = maxBufferCount > 0 && currentBuffer.gupBuffers.size() > maxBufferCount;
+  bool needsResize = maxBufferCount > 0 && currentBuffer.gpuBuffers.size() > maxBufferCount;
 
   if (needsResize) {
-    for (size_t i = maxBufferCount; i < currentBuffer.gupBuffers.size(); i++) {
-      currentBuffer.gupBuffers[i]->release(context->gpu());
+    for (size_t i = maxBufferCount; i < currentBuffer.gpuBuffers.size(); i++) {
+      currentBuffer.gpuBuffers[i]->release(context->gpu());
     }
-    currentBuffer.gupBuffers.resize(maxBufferCount);
+    currentBuffer.gpuBuffers.resize(maxBufferCount);
   }
 
   currentBuffer.bufferIndex = 0;
