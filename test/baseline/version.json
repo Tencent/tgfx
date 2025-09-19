@@ -1,7 +1,4 @@
 {
-    "AAADebug": {
-        "ZoomUpStroke": "6b1e8839"
-    },
     "CanvasTest": {
         "AdaptiveDashEffect": "330279d",
         "BlendFormula": "218540e0",
@@ -16,8 +13,6 @@
         "DiscardContent": "4c590832",
         "DrawPathProvider": "0e538a2",
         "FillModifier": "fa2f12b1",
-        "HairLinePath": "b5a8f503",
-        "HairLineShape": "6b1e8839",
         "MatrixShapeStroke": "b6ad55b0",
         "MultiImageRect_NOSCALE_NEAREST_LINEAR": "4edccb64",
         "MultiImageRect_NOSCALE_NEAREST_NEAREST": "4edccb64",
@@ -165,7 +160,7 @@
         "ChildMask": "ee2cc771",
         "DirtyRegionTest1": "e1604824",
         "DirtyRegionTest10": "31250c62",
-        "DirtyRegionTest11": "772f574e",
+        "DirtyRegionTest11": "5be7fc78",
         "DirtyRegionTest2": "e1604824",
         "DirtyRegionTest3": "e1604824",
         "DirtyRegionTest4": "e1604824",
@@ -181,7 +176,6 @@
         "DropShadowStyle-stroke-blur": "f58595d0",
         "DropShadowStyle-stroke-blur-behindLayer": "f58595d0",
         "DropShadowStyle2": "80c523ee",
-        "HairlineLayer": "b5a8f503",
         "HasContentChanged_Offset": "bedeb932",
         "HasContentChanged_Org": "bedeb932",
         "HasContentChanged_Zoom": "bedeb932",
@@ -333,6 +327,14 @@
         "text": "9060bdb6",
         "textEmoji": "983a559b",
         "textFont": "6095b909"
+    },
+    "StrokeTest": {
+        "DrawPathByHairlinePaint": "5be7fc78",
+        "DrawShapeByHairlinePaint": "5be7fc78",
+        "ExtremelyThinStrokeLayer": "5be7fc78",
+        "ExtremelyThinStrokePath": "5be7fc78",
+        "HairlineLayer": "5be7fc78",
+        "ZoomUpTinyStrokeShape": "5be7fc78"
     },
     "SurfaceTest": {
         "ImageSnapshot1": "d010fb8",

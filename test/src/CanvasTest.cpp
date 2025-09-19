@@ -2990,67 +2990,6 @@ TGFX_TEST(CanvasTest, RRectBlendMode) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/RRectBlendMode"));
 }
 
-TGFX_TEST(CanvasTest, HairLinePath) {
-  ContextScope scope;
-  auto* context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 200, 200);
-  ASSERT_TRUE(surface != nullptr);
-  auto* canvas = surface->getCanvas();
-
-  Paint paint;
-  paint.setAntiAlias(true);
-  paint.setColor(Color::FromRGBA(255, 0, 0, 255));
-  paint.setStyle(PaintStyle::Stroke);
-  paint.setStroke(Stroke(0.0f));
-
-  EXPECT_TRUE(paint.getStroke()->isHairline());
-
-  auto path = Path();
-  path.addRoundRect(Rect::MakeXYWH(-12.5f, -12.5f, 25.f, 25.f), 5, 5);
-  canvas->translate(100, 100);
-  canvas->drawPath(path, paint);
-  canvas->scale(2.f, 2.f);
-  canvas->drawPath(path, paint);
-  canvas->scale(2.f, 2.f);
-  canvas->drawPath(path, paint);
-  canvas->scale(1.9f, 1.9f);
-  canvas->drawPath(path, paint);
-
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/HairLinePath"));
-}
-
-TGFX_TEST(CanvasTest, HairLineShape) {
-  ContextScope scope;
-  auto* context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 200, 200);
-  ASSERT_TRUE(surface != nullptr);
-  auto* canvas = surface->getCanvas();
-
-  Paint paint;
-  paint.setAntiAlias(true);
-  paint.setColor(Color::FromRGBA(255, 0, 0, 255));
-  paint.setStyle(PaintStyle::Stroke);
-  paint.setStroke(Stroke(0.0f));
-
-  auto path = Path();
-  path.addRoundRect(Rect::MakeXYWH(-12.5f, -12.5f, 25.f, 25.f), 5, 5);
-  auto shape = Shape::MakeFrom(path);
-
-  canvas->translate(100, 100);
-  canvas->drawShape(shape, paint);
-  canvas->scale(2.f, 2.f);
-  canvas->drawShape(shape, paint);
-
-  canvas->scale(3.f, 3.f);
-  Stroke thickStroke(5.f);
-  auto thickStrokeShape = Shape::ApplyStroke(shape, &thickStroke);
-  canvas->drawShape(thickStrokeShape, paint);
-
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/HairLineShape"));
-}
-
 TGFX_TEST(CanvasTest, MatrixShapeStroke) {
   ContextScope scope;
   auto* context = scope.getContext();
@@ -3073,42 +3012,5 @@ TGFX_TEST(CanvasTest, MatrixShapeStroke) {
   canvas->drawShape(shape, paint);
 
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/MatrixShapeStroke"));
-}
-
-TGFX_TEST(CanvasTest, ZoomUpStrokeShape) {
-  ContextScope scope;
-  auto* context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 400, 200);
-  ASSERT_TRUE(surface != nullptr);
-  auto* canvas = surface->getCanvas();
-
-  canvas->clear(Color::Black());
-  Paint paint;
-  paint.setColor(Color::FromRGBA(255, 255, 0));
-  {
-    Path path;
-    path.addRoundRect(Rect::MakeXYWH(-2, -2, 4, 4), 2, 2);
-    auto shape = Shape::MakeFrom(path);
-    auto stroke = Stroke(1.f);
-    shape = Shape::ApplyStroke(shape, &stroke);
-    shape = Shape::ApplyMatrix(shape, Matrix::MakeScale(20, 20));
-
-    canvas->translate(100, 100);
-    canvas->drawShape(shape, paint);
-  }
-  {
-    Path path;
-    path.addRoundRect(Rect::MakeXYWH(-2, -2, 4, 4), 2, 2);
-    auto shape = Shape::MakeFrom(path);
-    shape = Shape::ApplyMatrix(shape, Matrix::MakeScale(20, 20));
-    auto stroke = Stroke(20.f);
-    shape = Shape::ApplyStroke(shape, &stroke);
-
-    canvas->translate(200, 0);
-    canvas->drawShape(shape, paint);
-  }
-
-  EXPECT_TRUE(Baseline::Compare(surface, "AAADebug/ZoomUpStroke"));
 }
 }  // namespace tgfx

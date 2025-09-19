@@ -63,7 +63,7 @@ Path MatrixShape::getPath(const Matrix& scaleMatrix) const {
     // Handle hairline stroke
     auto strokeShape = std::static_pointer_cast<StrokeShape>(shape);
     if (strokeShape->stroke.isHairline() ||
-        TreatStrokeAsHairline(strokeShape->stroke, scaleMatrix)) {
+        TreatStrokeAsHairline(strokeShape->stroke, totalMatrix)) {
       isHairline = true;
       originStrokeShape = strokeShape;
     }
@@ -76,7 +76,7 @@ Path MatrixShape::getPath(const Matrix& scaleMatrix) const {
         if (strokeShape->shape == mergeShape->second) {
           auto stroke = strokeShape->stroke;
           stroke.width /= 2.f;
-          if (strokeShape->stroke.isHairline() || TreatStrokeAsHairline(stroke, scaleMatrix)) {
+          if (strokeShape->stroke.isHairline() || TreatStrokeAsHairline(stroke, totalMatrix)) {
             isHairline = true;
             originStrokeShape = strokeShape;
           }

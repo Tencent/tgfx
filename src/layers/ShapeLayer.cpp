@@ -275,7 +275,7 @@ void ShapeLayer::onUpdateContent(LayerRecorder* recorder) {
     return;
   }
   auto fillPaints = createShapePaints(_fillStyles);
-  auto strokePaints = createShapePaints(_strokeStyles, stroke.isHairline());
+  auto strokePaints = createShapePaints(_strokeStyles);
   auto strokeShape = strokePaints.empty() ? nullptr : createStrokeShape();
   auto canvas = recorder->getCanvas(LayerContentType::Default);
   for (auto& paint : fillPaints) {
@@ -296,7 +296,7 @@ void ShapeLayer::onUpdateContent(LayerRecorder* recorder) {
 }
 
 std::vector<Paint> ShapeLayer::createShapePaints(
-    const std::vector<std::shared_ptr<ShapeStyle>>& styles, bool isHairline) const {
+    const std::vector<std::shared_ptr<ShapeStyle>>& styles) const {
   std::vector<Paint> paintList = {};
   paintList.reserve(styles.size());
   for (auto& style : styles) {
@@ -304,10 +304,6 @@ std::vector<Paint> ShapeLayer::createShapePaints(
     paint.setAlpha(style->alpha());
     paint.setBlendMode(style->blendMode());
     paint.setShader(style->getShader());
-    if (isHairline) {
-      paint.setStyle(PaintStyle::Stroke);
-      paint.setStrokeWidth(0.f);
-    }
     if (!paint.getFill().nothingToDraw()) {
       paintList.push_back(paint);
     }
@@ -330,10 +326,6 @@ std::shared_ptr<Shape> ShapeLayer::createStrokeShape() const {
                                      shapeBitFields.lineDashAdaptive);
 
     strokeShape = Shape::ApplyEffect(std::move(strokeShape), std::move(dash));
-  }
-  if (stroke.isHairline()) {
-    // hairline stroke ignore strokeAlign and don't apply to the shape
-    return strokeShape;
   }
   auto strokeAlign = static_cast<StrokeAlign>(shapeBitFields.strokeAlign);
   if (strokeAlign != StrokeAlign::Center) {
