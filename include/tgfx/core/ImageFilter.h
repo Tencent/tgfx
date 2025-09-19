@@ -28,6 +28,7 @@
 namespace tgfx {
 class TextureProxy;
 enum class SrcRectConstraint;
+struct PerspectiveInfo;
 
 /**
  * ImageFilter is the base class for all image filters. If one is installed in the Paint, then all
@@ -118,6 +119,12 @@ class ImageFilter {
    */
   static std::shared_ptr<ImageFilter> Runtime(std::shared_ptr<RuntimeEffect> effect);
 
+  /**
+   * Creates a filter that applies a perspective transformation to the input image.
+   * @param perspective  The perspective transformation parameters.
+   */
+  static std::shared_ptr<ImageFilter> Perspective(const PerspectiveInfo& perspective);
+
   virtual ~ImageFilter() = default;
 
   /**
@@ -127,7 +134,7 @@ class ImageFilter {
   Rect filterBounds(const Rect& rect) const;
 
  protected:
-  enum class Type { Blur, DropShadow, InnerShadow, Color, Compose, Runtime };
+  enum class Type { Blur, DropShadow, InnerShadow, Color, Compose, Runtime, Perspective };
 
   /**
    * Returns the type of this image filter.
@@ -173,5 +180,46 @@ class ImageFilter {
   friend class ComposeImageFilter;
   friend class FilterImage;
   friend class Types;
+};
+
+/**
+ * PerspectiveType specifies the mode of perspective projection.
+ *
+ * Standard:
+ * Represents the conventional perspective projection used in computer graphics.
+ * In this mode, the projection model is established by defining the camera position, orientation,
+ * field of view, and near/far planes. Points inside the view frustum are projected onto the near
+ * plane.
+ *
+ * CSS:
+ * Represents the perspective projection model inspired by CSS3 3D transforms.
+ * In this mode, the projection plane is fixed at z=0, the camera orientation is fixed, and the
+ * projection model is established by specifying the camera distance.
+ * For more details on the definition of CSS perspective projection, please refer to the official
+ * documentation: CSS Transforms Module Level 2, Perspective.
+ */
+enum class PerspectiveType { Standard, CSS };
+
+/**
+ * PerspectiveInfo specifies the parameters for perspective projection.
+ */
+struct PerspectiveInfo {
+  /**
+   * The type of projection. The default is Standard.
+   */
+  PerspectiveType projectType = PerspectiveType::Standard;
+
+  /**
+   * Rotation angles (in degrees) around the X, Y, and Z axes, applied in order.
+   */
+  float xRotation = 0.0f;
+  float yRotation = 0.0f;
+  float zRotation = 0.0f;
+
+  /**
+   * The depth of the projected object, in pixels. A larger depth means the object is closer to the
+   * viewer and appears larger; a smaller value means it is farther and appears smaller.
+   */
+  float depth = 0.0f;
 };
 }  // namespace tgfx

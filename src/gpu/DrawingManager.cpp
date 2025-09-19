@@ -28,7 +28,7 @@
 #include "gpu/tasks/RuntimeDrawTask.h"
 #include "gpu/tasks/SemaphoreWaitTask.h"
 #include "inspect/InspectorMark.h"
-#include "tgfx/core/RenderFlags.h"
+#include "tasks/RectPerspectiveRenderTask.h"
 
 namespace tgfx {
 static ColorType GetAtlasColorType(bool isAlphaOnly) {
@@ -184,6 +184,16 @@ void DrawingManager::addSemaphoreWaitTask(std::shared_ptr<Semaphore> semaphore) 
     return;
   }
   auto task = drawingBuffer->make<SemaphoreWaitTask>(std::move(semaphore));
+  renderTasks.emplace_back(std::move(task));
+}
+
+void DrawingManager::addRectPerspectiveRenderTask(const Rect& rect,
+                                                  std::shared_ptr<RenderTargetProxy> renderTarget,
+                                                  std::shared_ptr<TextureProxy> fillTexture,
+                                                  const PerspectiveRenderArgs& args) {
+  auto task = drawingBuffer->make<RectPerspectiveRenderTask>(rect, std::move(renderTarget),
+                                                             std::move(fillTexture), args);
+
   renderTasks.emplace_back(std::move(task));
 }
 

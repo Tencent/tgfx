@@ -25,6 +25,7 @@
 #include "gpu/tasks/OpsRenderTask.h"
 #include "gpu/tasks/RenderTask.h"
 #include "gpu/tasks/ResourceTask.h"
+#include "tasks/RectPerspectiveRenderTask.h"
 
 namespace tgfx {
 struct AtlasCellData {
@@ -69,6 +70,11 @@ class DrawingManager {
                              const Point& atlasOffset, std::shared_ptr<ImageCodec> codec);
 
   void addSemaphoreWaitTask(std::shared_ptr<Semaphore> semaphore);
+
+  void addRectPerspectiveRenderTask(const Rect& rect,
+                                    std::shared_ptr<RenderTargetProxy> renderTarget,
+                                    std::shared_ptr<TextureProxy> fillTexture,
+                                    const PerspectiveRenderArgs& args);
 
   /**
    * Flushes the drawing manager, executing all resource and render tasks. If signalSemaphore is not
