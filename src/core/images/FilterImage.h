@@ -34,7 +34,7 @@ class FilterImage : public SubsetImage {
   static std::shared_ptr<Image> MakeFrom(
       std::shared_ptr<Image> source, std::shared_ptr<ImageFilter> filter, Point* offset = nullptr,
       const Rect* clipRect = nullptr,
-      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeRGB(namedTransferFn::SRGB, namedGamut::DisplayP3));
 
   int width() const override {
     return static_cast<int>(bounds.width());

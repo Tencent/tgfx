@@ -107,11 +107,11 @@ std::shared_ptr<Image> FilterImage::onMakeWithFilter(std::shared_ptr<ImageFilter
     offset->y = filterBounds.top;
   }
   if (hasClip) {
-    return FilterImage::Wrap(weakThis.lock(), filterBounds, std::move(imageFilter), _colorSpace);
+    return FilterImage::Wrap(weakThis.lock(), filterBounds, std::move(imageFilter), colorSpace);
   }
   filterBounds.offset(bounds.x(), bounds.y());
   auto composeFilter = ImageFilter::Compose(filter, std::move(imageFilter));
-  return FilterImage::Wrap(source, filterBounds, std::move(composeFilter), _colorSpace);
+  return FilterImage::Wrap(source, filterBounds, std::move(composeFilter), colorSpace);
 }
 
 std::shared_ptr<Image> FilterImage::onMakeScaled(int newWidth, int newHeight,

@@ -59,28 +59,7 @@ std::shared_ptr<Surface> EAGLWindow::onCreateSurface(Context* context) {
     return nullptr;
   }
   BackendRenderTarget renderTarget = layerTexture->getBackendRenderTarget();
-  std::shared_ptr<ColorSpace> colorSpace = nullptr;
-  id delegate = layer.delegate;
-  UIView* hostView = nil;
-  if ([delegate isKindOfClass:[UIView class]]) {
-    hostView = (UIView*)delegate;
-  }
-  if (hostView) {
-    UIWindow* hostWindow = hostView.window;
-    if (hostWindow) {
-      UIScreen* hostScreen = hostWindow.screen;  // iOS
-      if (hostScreen) {
-        if (hostScreen.traitCollection.displayGamut == UIDisplayGamutP3) {
-          NSLog(@"The main screen supports P3 wide color gamut.");
-          colorSpace = ColorSpace::MakeRGB(namedTransferFn::SRGB, namedGamut::DisplayP3);
-        } else {
-          NSLog(@"The main screen uses sRGB color space.");
-          colorSpace = ColorSpace::MakeSRGB();
-        }
-      }
-    }
-  }
-  return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft, 1, colorSpace);
+  return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft, 1, ColorSpace::MakeSRGB());
 }
 
 void EAGLWindow::onPresent(Context* context, int64_t) {

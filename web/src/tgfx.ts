@@ -102,6 +102,18 @@ export const uploadToTexture = (
     }
 };
 
+export const isDisplayP3Supported = (
+    GL: EmscriptenGL
+) => {
+    const gl = GL.currentContext?.GLctx as WebGLRenderingContext;
+    if ('drawingBufferColorSpace' in gl) {
+        gl.drawingBufferColorSpace = "display-p3";
+        return true;
+    } else {
+        return false;
+    }
+};
+
 export const isAndroidMiniprogram = () => {
     if (typeof wx !== 'undefined' && wx.getSystemInfoSync) {
         return wx.getSystemInfoSync().platform === 'android';

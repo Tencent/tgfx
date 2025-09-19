@@ -63,19 +63,7 @@ std::shared_ptr<Surface> CGLWindow::onCreateSurface(Context* context) {
   frameBuffer.format = GL_RGBA8;
   BackendRenderTarget renderTarget(frameBuffer, static_cast<int>(size.width),
                                    static_cast<int>(size.height));
-  std::shared_ptr<ColorSpace> colorSpace = nullptr;
-  NSWindow* hostWindow = view.window;
-  if (hostWindow) {
-    NSScreen* hostScreen = hostWindow.screen;
-    if (hostScreen) {
-      NSColorSpace* screenColorSpace = hostScreen.colorSpace;
-      NSData* iccData = [screenColorSpace ICCProfileData];
-      if (iccData) {
-        colorSpace = ColorSpace::MakeFromICC(iccData.bytes, iccData.length);
-      }
-    }
-  }
-  return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft, 0, colorSpace);
+  return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft, 0, ColorSpace::MakeSRGB());
 }
 
 void CGLWindow::onPresent(Context*, int64_t) {
