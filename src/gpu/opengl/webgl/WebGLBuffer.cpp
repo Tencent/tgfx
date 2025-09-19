@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,26 +16,20 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLBuffer.h"
-#include "GLGPU.h"
-#include "GLUtil.h"
+#include "WebGLBuffer.h"
 
-namespace tgfx {
-unsigned GLBuffer::target() const {
-  if (_usage & GPUBufferUsage::VERTEX) {
-    return GL_ARRAY_BUFFER;
-  }
-  if (_usage & GPUBufferUsage::INDEX) {
-    return GL_ELEMENT_ARRAY_BUFFER;
-  }
-  if (_usage & GPUBufferUsage::UNIFORM) {
-    return GL_UNIFORM_BUFFER;
-  }
-  LOGE("GLBuffer::target() invalid buffer usage!");
-  return 0;
+#include "gpu/GPU.h"
+#include "gpu/opengl/GLGPU.h"
+
+tgfx::WebGLBuffer::WebGLBuffer(unsigned bufferID, size_t size, uint32_t usage)
+  : GLBuffer(bufferID, size, usage), uniqueID(UniqueID::Next()), _bufferID(bufferID) {
 }
 
-void* GLBuffer::getMappedRange(GPU* gpu, size_t offset, size_t size) {
+tgfx::WebGLBuffer::~WebGLBuffer() {
+  releaseInternal();
+}
+
+void* tgfx::WebGLBuffer::getMappedRange(GPU* gpu, size_t offset, size_t size) {
   if (_mapStata == GPUBufferMapStata::MAPPED) {
     return _mappedRange;
   }
@@ -45,7 +39,7 @@ void* GLBuffer::getMappedRange(GPU* gpu, size_t offset, size_t size) {
   }
 
   if (offset + size > _size) {
-    LOGE("GLBuffer::getMappedRange() out of range!");
+    LOGE("WebGLBuffer::getMappedRange() out of range!");
     return nullptr;
   }
 
@@ -53,29 +47,28 @@ void* GLBuffer::getMappedRange(GPU* gpu, size_t offset, size_t size) {
   if (bufferTarget == GL_UNIFORM_BUFFER) {
     auto uboOffsetAlignment = static_cast<size_t>(gpu->caps()->shaderCaps()->uboOffsetAlignment);
     if (uboOffsetAlignment <= 0 || offset % uboOffsetAlignment != 0) {
-      LOGE("GLBuffer::getMappedRange() invalid UBO offset:%zu, must be aligned to %zu bytes",
+      LOGE("WebGLBuffer::getMappedRange() invalid UBO offset:%zu, must be aligned to %zu bytes",
            offset, uboOffsetAlignment);
       return nullptr;
     }
   } else if (bufferTarget == GL_ELEMENT_ARRAY_BUFFER) {
     if (offset % 4 != 0) {
-      LOGE("GLBuffer::getMappedRange() EBO offset:%zu not 4-byte aligned", offset);
+      LOGE("WebGLBuffer::getMappedRange() EBO offset:%zu not 4-byte aligned", offset);
     }
   }
 
   auto gl = static_cast<GLGPU*>(gpu)->functions();
   gl->bindBuffer(bufferTarget, _bufferID);
-  _mappedRange = gl->mapBufferRange(
-      bufferTarget, static_cast<int32_t>(offset), static_cast<int32_t>(size),
-      GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
-  if (_mappedRange != nullptr) {
-    _mapStata = GPUBufferMapStata::MAPPED;
-  }
+  _mappedRange = malloc(size);
+  _mapStata = GPUBufferMapStata::MAPPED;
+  _mappedOffset = offset;
+  _mappedSize = size;
+
   return _mappedRange;
 }
 
-void GLBuffer::unmap(GPU* gpu) {
-  if (_mapStata == GPUBufferMapStata::UNMAPPED) {
+void tgfx::WebGLBuffer::unmap(GPU* gpu) {
+  if (_mapStata == GPUBufferMapStata::UNMAPPED || _mappedRange == nullptr) {
     return;
   }
 
@@ -85,18 +78,26 @@ void GLBuffer::unmap(GPU* gpu) {
 
   auto bufferTarget = target();
   auto gl = static_cast<GLGPU*>(gpu)->functions();
-  gl->unmapBuffer(bufferTarget);
+
+  gl->bufferSubData(bufferTarget,
+                    static_cast<int32_t>(_mappedOffset),
+                    static_cast<int32_t>(_mappedSize),
+                    _mappedRange);
   gl->bindBuffer(bufferTarget, 0);
-  _mapStata = GPUBufferMapStata::UNMAPPED;
-  _mappedRange = nullptr;
+
+  releaseInternal();
 }
 
-void GLBuffer::release(GPU* gpu) {
-  DEBUG_ASSERT(gpu != nullptr);
-  if (_bufferID > 0) {
-    auto gl = static_cast<const GLGPU*>(gpu)->functions();
-    gl->deleteBuffers(1, &_bufferID);
-    _bufferID = 0;
-  }
+void tgfx::WebGLBuffer::release(GPU* gpu) {
+  GLBuffer::release(gpu);
+
+  releaseInternal();
 }
-}  // namespace tgfx
+
+void tgfx::WebGLBuffer::releaseInternal() {
+  if (_mappedRange != nullptr) {
+    free(_mappedRange);
+  }
+  _mappedRange = nullptr;
+  _mapStata = GPUBufferMapStata::UNMAPPED;
+}

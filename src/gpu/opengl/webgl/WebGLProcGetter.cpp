@@ -106,8 +106,6 @@ void* WebGLProcGetter::getProcAddress(const char* name) const {
   N(glUniformBlockBinding)
   N(glBindBufferBase)
   N(glBindBufferRange)
-  N(glMapBufferRange)
-  N(glUnmapBuffer)
   N(glIsTexture)
   N(glLineWidth)
   N(glLinkProgram)

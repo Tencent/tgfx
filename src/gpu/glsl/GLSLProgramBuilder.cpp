@@ -193,8 +193,8 @@ std::unique_ptr<PipelineProgram> GLSLProgramBuilder::finalize() {
     return nullptr;
   }
 
-  // printf("vertex shader code :\n%s\n\n", vertexModule.code.c_str());
-  // printf("fragment shader code :\n%s\n", fragmentModule.code.c_str());
+  LOGI("vertex shader code :\n%s\n", vertexModule.code.c_str());
+  LOGI("fragment shader code :\n%s\n", fragmentModule.code.c_str());
 
   GPURenderPipelineDescriptor descriptor = {};
   descriptor.vertex = {programInfo->getVertexAttributes()};
