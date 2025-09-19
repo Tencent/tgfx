@@ -99,4 +99,4 @@ void WebGLBuffer::releaseInternal() {
   _mappedRange = nullptr;
   _mapStata = GPUBufferMapStata::UNMAPPED;
 }
-} // namespace tgfx
+}  // namespace tgfx
