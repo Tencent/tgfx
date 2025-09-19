@@ -61,8 +61,7 @@ class DrawContext {
   /**
    * Draws a complex Shape with the specified MCState and Fill.
    */
-  virtual void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill,
-                         const Stroke* stroke) = 0;
+  virtual void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill) = 0;
 
   /**
    * Draws a image with the specified SamplingOptions, MCState, Fill.

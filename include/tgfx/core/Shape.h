@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "tgfx/core/Matrix.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/core/PathProvider.h"
 #include "tgfx/core/TextBlob.h"
@@ -125,7 +126,7 @@ class Shape {
    * Returns the Shape's computed path.  Note: The path is recalculated each time this method is
    * called, as it is not cached.
    */
-  virtual Path getPath() const = 0;
+  virtual Path getPath(const Matrix& scaleMatrix = Matrix::I()) const = 0;
 
  protected:
   enum class Type { Append, Effect, Text, Inverse, Matrix, Merge, Path, Stroke, Provider, Glyph };

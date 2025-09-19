@@ -29,8 +29,8 @@
 #include "core/UserTypeface.h"
 #include "core/images/SubsetImage.h"
 #include "core/shapes/TextShape.h"
-#include "core/utils/ApplyStrokeToBounds.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/StrokeUtils.h"
 #include "gpu/DrawingManager.h"
 
 namespace tgfx {
@@ -123,7 +123,7 @@ static std::shared_ptr<ImageCodec> GetGlyphCodec(
   if (bounds.isEmpty()) {
     return nullptr;
   }
-  if (stroke && !stroke->isHairline()) {
+  if (stroke) {
     ApplyStrokeToBounds(*stroke, &bounds);
     shape = Shape::ApplyStroke(std::move(shape), stroke);
   }
@@ -228,7 +228,7 @@ void RenderContext::drawRRect(const RRect& rRect, const MCState& state, const Fi
 
 void RenderContext::drawPath(const Path& path, const MCState& state, const Fill& fill) {
   // Temporarily use drawShape for rendering, and perform merging in the compositor later.
-  drawShape(Shape::MakeFrom(path), state, fill, nullptr);
+  drawShape(Shape::MakeFrom(path), state, fill);
 }
 
 static Rect ToLocalBounds(const Rect& bounds, const Matrix& viewMatrix) {
@@ -248,10 +248,10 @@ void RenderContext::drawImage(std::shared_ptr<Image> image, const SamplingOption
   }
 }
 
-void RenderContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill,
-                              const Stroke* stroke) {
+void RenderContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
+                              const Fill& fill) {
   if (auto compositor = getOpsCompositor()) {
-    compositor->drawShape(std::move(shape), state, fill, stroke);
+    compositor->drawShape(std::move(shape), state, fill);
   }
 }
 
@@ -520,12 +520,11 @@ void RenderContext::drawGlyphsAsPath(std::shared_ptr<GlyphRunList> glyphRunList,
   clipPath.addRect(localClipBounds);
   std::shared_ptr<Shape> shape = std::make_shared<TextShape>(std::move(glyphRunList), maxScale);
   shape = Shape::ApplyMatrix(std::move(shape), Matrix::MakeScale(1.0f / maxScale, 1.0f / maxScale));
-  if (stroke && !stroke->isHairline()) {
-    shape = Shape::ApplyStroke(std::move(shape), stroke);
-  }
+  shape = Shape::ApplyStroke(std::move(shape), stroke);
+
   shape = Shape::Merge(std::move(shape), Shape::MakeFrom(std::move(clipPath)), PathOp::Intersect);
   if (auto compositor = getOpsCompositor()) {
-    compositor->drawShape(std::move(shape), state, fill, nullptr);
+    compositor->drawShape(std::move(shape), state, fill);
   }
 }
 

@@ -184,11 +184,8 @@ void PDFExportContext::drawPath(const Path& path, const MCState& state, const Fi
 };
 
 void PDFExportContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
-                                 const Fill& fill, const Stroke* stroke) {
-  if (stroke && !stroke->isHairline()) {
-    shape = Shape::ApplyStroke(std::move(shape), stroke);
-  }
-  auto path = shape->getPath();
+                                 const Fill& fill) {
+  auto path = shape->getPath(state.matrix);
   this->onDrawPath(state, path, fill);
 }
 
@@ -542,7 +539,7 @@ void PDFExportContext::exportGlyphRunAsPath(const GlyphRun& glyphRun, const MCSt
   if (stroke && !stroke->isHairline()) {
     shape = Shape::ApplyStroke(std::move(shape), stroke);
   }
-  drawShape(shape, state, fill, nullptr);
+  drawShape(shape, state, fill);
 
   //TODO (YGaurora): maybe hasPerspective()
   Fill transparentFill = fill;

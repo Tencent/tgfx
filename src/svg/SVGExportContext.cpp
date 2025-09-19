@@ -140,12 +140,9 @@ void SVGExportContext::drawPath(const Path& path, const MCState& state, const Fi
 }
 
 void SVGExportContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
-                                 const Fill& fill, const Stroke* stroke) {
+                                 const Fill& fill) {
   DEBUG_ASSERT(shape != nullptr);
-  if (stroke && !stroke->isHairline()) {
-    shape = Shape::ApplyStroke(std::move(shape), stroke);
-  }
-  drawPath(shape->getPath(), state, fill);
+  drawPath(shape->getPath(state.matrix), state, fill);
 }
 
 void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,

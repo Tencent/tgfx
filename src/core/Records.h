@@ -254,7 +254,7 @@ class DrawShape : public Record {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawShape(shape, playback->state(), playback->fill(), playback->stroke());
+    context->drawShape(shape, playback->state(), playback->fill());
   }
 
   std::shared_ptr<Shape> shape;

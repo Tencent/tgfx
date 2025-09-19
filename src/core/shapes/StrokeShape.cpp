@@ -18,10 +18,11 @@
 
 #include "StrokeShape.h"
 #include "core/shapes/MatrixShape.h"
-#include "core/utils/ApplyStrokeToBounds.h"
 #include "core/utils/Log.h"
+#include "core/utils/StrokeUtils.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/resources/ResourceKey.h"
+#include "tgfx/core/Matrix.h"
 
 namespace tgfx {
 
@@ -31,9 +32,6 @@ std::shared_ptr<Shape> Shape::ApplyStroke(std::shared_ptr<Shape> shape, const St
   }
   if (stroke == nullptr) {
     return shape;
-  }
-  if (stroke->isHairline()) {
-    return nullptr;
   }
   if (shape->type() != Type::Matrix) {
     return std::make_shared<StrokeShape>(std::move(shape), *stroke);
@@ -58,9 +56,9 @@ Rect StrokeShape::getBounds() const {
   return bounds;
 }
 
-Path StrokeShape::getPath() const {
-  auto path = shape->getPath();
-  stroke.applyToPath(&path);
+Path StrokeShape::getPath(const Matrix& scaleMatrix) const {
+  auto path = shape->getPath(scaleMatrix);
+  stroke.applyToPath(&path, scaleMatrix.getMaxScale());
   return path;
 }
 

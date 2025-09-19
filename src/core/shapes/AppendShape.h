@@ -33,7 +33,7 @@ class AppendShape : public UniqueKeyShape {
 
   Rect getBounds() const override;
 
-  Path getPath() const override;
+  Path getPath(const Matrix& scaleMatrix) const override;
 
  protected:
   Type type() const override {

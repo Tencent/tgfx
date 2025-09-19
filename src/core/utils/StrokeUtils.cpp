@@ -1,6 +1,5 @@
+#include "StrokeUtils.h"
 #include <cmath>
-#include "ApplyStrokeToBounds.h"
-#include "core/utils/MathExtra.h"
 
 namespace tgfx {
 
@@ -16,4 +15,11 @@ void ApplyStrokeToBounds(const Stroke& stroke, Rect* bounds, bool applyMiterLimi
   bounds->outset(expand, expand);
 }
 
+bool TreatStrokeAsHairline(const Stroke& stroke, const Matrix& matrix) {
+  if (stroke.isHairline()) {
+    return false;
+  }
+  auto maxWidth = stroke.width * matrix.getMaxScale();
+  return maxWidth < 1.f;
+}
 }  // namespace tgfx

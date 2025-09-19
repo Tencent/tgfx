@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "tgfx/core/Matrix.h"
 #include "tgfx/core/Shape.h"
 
 namespace tgfx {
@@ -41,7 +42,7 @@ class PathShape : public Shape {
     return path.getBounds();
   }
 
-  Path getPath() const override {
+  Path getPath(const Matrix& /*scaleMatrix*/) const override {
     return path;
   }
 

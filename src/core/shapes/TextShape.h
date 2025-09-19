@@ -20,6 +20,7 @@
 
 #include "core/GlyphRunList.h"
 #include "core/shapes/UniqueKeyShape.h"
+#include "tgfx/core/Matrix.h"
 
 namespace tgfx {
 /**
@@ -33,7 +34,7 @@ class TextShape : public UniqueKeyShape {
 
   Rect getBounds() const override;
 
-  Path getPath() const override;
+  Path getPath(const Matrix& scaleMatrix) const override;
 
  protected:
   Type type() const override {

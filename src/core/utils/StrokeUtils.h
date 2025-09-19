@@ -26,4 +26,11 @@ namespace tgfx {
  * Applies the stroke options to the given bounds.
  */
 void ApplyStrokeToBounds(const Stroke& stroke, Rect* bounds, bool applyMiterLimit = false);
+
+/**
+ * If the stroke is not a hairline but is very thin after transformation, it can also be treated
+ * as a hairline to avoid precision issues.
+ */
+bool TreatStrokeAsHairline(const Stroke& stroke, const Matrix& matrix);
+
 }  // namespace tgfx

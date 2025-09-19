@@ -116,9 +116,9 @@ void RecordingContext::drawPath(const Path& path, const MCState& state, const Fi
 }
 
 void RecordingContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
-                                 const Fill& fill, const Stroke* stroke) {
+                                 const Fill& fill) {
   DEBUG_ASSERT(shape != nullptr);
-  recordAll(state, fill, stroke);
+  recordAll(state, fill);
   auto record = blockBuffer.make<DrawShape>(std::move(shape));
   records.emplace_back(std::move(record));
   drawCount++;

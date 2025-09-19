@@ -3067,4 +3067,5 @@ TGFX_TEST(LayerTest, HairlineLayer) {
   displayList.render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/HairlineLayer"));
 }
+
 }  // namespace tgfx

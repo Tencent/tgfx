@@ -1,4 +1,7 @@
 {
+    "AAADebug": {
+        "ZoomUpStroke": "6b1e8839"
+    },
     "CanvasTest": {
         "AdaptiveDashEffect": "330279d",
         "BlendFormula": "218540e0",
@@ -14,7 +17,7 @@
         "DrawPathProvider": "0e538a2",
         "FillModifier": "fa2f12b1",
         "HairLinePath": "b5a8f503",
-        "HairLineShape": "b5a8f503",
+        "HairLineShape": "6b1e8839",
         "MatrixShapeStroke": "b6ad55b0",
         "MultiImageRect_NOSCALE_NEAREST_LINEAR": "4edccb64",
         "MultiImageRect_NOSCALE_NEAREST_NEAREST": "4edccb64",
@@ -320,7 +323,7 @@
         "complex4": "b5a8f503",
         "complex5": "b5a8f503",
         "complex6": "c21fb7d7",
-        "complex7": "c26ff3d9",
+        "complex7": "6b1e8839",
         "jpg_image": "b1db872",
         "mask": "da364e8",
         "path": "a6ff60e1",

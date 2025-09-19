@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "HitTestContext.h"
-#include "core/utils/ApplyStrokeToBounds.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/StrokeUtils.h"
 #include "utils/Log.h"
 
 namespace tgfx {
@@ -96,18 +96,15 @@ void HitTestContext::drawPath(const Path& path, const MCState& state, const Fill
   }
 }
 
-void HitTestContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill,
-                               const Stroke* stroke) {
+void HitTestContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
+                               const Fill& fill) {
   DEBUG_ASSERT(shape != nullptr);
   Point local = {};
   if (!GetLocalPoint(state.matrix, deviceX, deviceY, &local)) {
     return;
   }
   if (shapeHitTest) {
-    if (stroke && !stroke->isHairline()) {
-      shape = Shape::ApplyStroke(std::move(shape), stroke);
-    }
-    auto path = shape->getPath();
+    auto path = shape->getPath(state.matrix);
     if (!path.contains(local.x, local.y)) {
       return;
     }

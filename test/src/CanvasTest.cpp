@@ -3037,11 +3037,6 @@ TGFX_TEST(CanvasTest, HairLineShape) {
   auto path = Path();
   path.addRoundRect(Rect::MakeXYWH(-12.5f, -12.5f, 25.f, 25.f), 5, 5);
   auto shape = Shape::MakeFrom(path);
-  Stroke stroke(0.0f);
-  auto strokeShape = Shape::ApplyStroke(shape, &stroke);
-  // hairline is a rendering concept, the hairline stroke won't apply to the shape, so the
-  // strokeShape should be nullptr.
-  EXPECT_TRUE(strokeShape == nullptr);
 
   canvas->translate(100, 100);
   canvas->drawShape(shape, paint);
@@ -3078,5 +3073,42 @@ TGFX_TEST(CanvasTest, MatrixShapeStroke) {
   canvas->drawShape(shape, paint);
 
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/MatrixShapeStroke"));
+}
+
+TGFX_TEST(CanvasTest, ZoomUpStrokeShape) {
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 200);
+  ASSERT_TRUE(surface != nullptr);
+  auto* canvas = surface->getCanvas();
+
+  canvas->clear(Color::Black());
+  Paint paint;
+  paint.setColor(Color::FromRGBA(255, 255, 0));
+  {
+    Path path;
+    path.addRoundRect(Rect::MakeXYWH(-2, -2, 4, 4), 2, 2);
+    auto shape = Shape::MakeFrom(path);
+    auto stroke = Stroke(1.f);
+    shape = Shape::ApplyStroke(shape, &stroke);
+    shape = Shape::ApplyMatrix(shape, Matrix::MakeScale(20, 20));
+
+    canvas->translate(100, 100);
+    canvas->drawShape(shape, paint);
+  }
+  {
+    Path path;
+    path.addRoundRect(Rect::MakeXYWH(-2, -2, 4, 4), 2, 2);
+    auto shape = Shape::MakeFrom(path);
+    shape = Shape::ApplyMatrix(shape, Matrix::MakeScale(20, 20));
+    auto stroke = Stroke(20.f);
+    shape = Shape::ApplyStroke(shape, &stroke);
+
+    canvas->translate(200, 0);
+    canvas->drawShape(shape, paint);
+  }
+
+  EXPECT_TRUE(Baseline::Compare(surface, "AAADebug/ZoomUpStroke"));
 }
 }  // namespace tgfx
