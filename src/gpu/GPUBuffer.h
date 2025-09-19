@@ -75,7 +75,7 @@ class GPUBuffer : public GPUResource {
    * Returns the current mapped state of the buffer, indicating whether it is currently mapped for
    * CPU access or not.
    */
-  GPUBufferMapState mapStata() const {
+  GPUBufferMapState mapState() const {
     return _mapState;
   }
 
