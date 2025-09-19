@@ -20,15 +20,16 @@
 #include "gpu/GPU.h"
 #include "gpu/opengl/GLGPU.h"
 
-tgfx::WebGLBuffer::WebGLBuffer(unsigned bufferID, size_t size, uint32_t usage)
+namespace tgfx {
+WebGLBuffer::WebGLBuffer(unsigned bufferID, size_t size, uint32_t usage)
     : GLBuffer(bufferID, size, usage), uniqueID(UniqueID::Next()), _bufferID(bufferID) {
 }
 
-tgfx::WebGLBuffer::~WebGLBuffer() {
+WebGLBuffer::~WebGLBuffer() {
   releaseInternal();
 }
 
-void* tgfx::WebGLBuffer::getMappedRange(GPU* gpu, size_t offset, size_t size) {
+void* WebGLBuffer::getMappedRange(GPU* gpu, size_t offset, size_t size) {
   if (_mapStata == GPUBufferMapStata::MAPPED) {
     return _mappedRange;
   }
@@ -66,7 +67,7 @@ void* tgfx::WebGLBuffer::getMappedRange(GPU* gpu, size_t offset, size_t size) {
   return _mappedRange;
 }
 
-void tgfx::WebGLBuffer::unmap(GPU* gpu) {
+void WebGLBuffer::unmap(GPU* gpu) {
   if (_mapStata == GPUBufferMapStata::UNMAPPED || _mappedRange == nullptr) {
     return;
   }
@@ -85,16 +86,17 @@ void tgfx::WebGLBuffer::unmap(GPU* gpu) {
   releaseInternal();
 }
 
-void tgfx::WebGLBuffer::release(GPU* gpu) {
+void WebGLBuffer::release(GPU* gpu) {
   GLBuffer::release(gpu);
 
   releaseInternal();
 }
 
-void tgfx::WebGLBuffer::releaseInternal() {
+void WebGLBuffer::releaseInternal() {
   if (_mappedRange != nullptr) {
     free(_mappedRange);
   }
   _mappedRange = nullptr;
   _mapStata = GPUBufferMapStata::UNMAPPED;
 }
+} // namespace tgfx
