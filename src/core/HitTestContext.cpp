@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "HitTestContext.h"
+#include <algorithm>
 #include "core/utils/MathExtra.h"
 #include "core/utils/ShapeUtils.h"
 #include "core/utils/StrokeUtils.h"
@@ -106,9 +107,12 @@ void HitTestContext::drawShape(std::shared_ptr<Shape> shape, const MCState& stat
     return;
   }
   if (shapeHitTest) {
-    auto path = ShapeUtils::GetShapeRenderingPath(shape, state.matrix);
+    // For performance and memory reasons, hit testing doesn't require high-precision paths.
+    // Only apply scaling when the shape is reduced in size. Optimize further if issues arise.
+    auto path = shape->getPath();
     if (stroke) {
-      stroke->applyToPath(&path, state.matrix.getMaxScale());
+      auto scale = state.matrix.getMaxScale();
+      stroke->applyToPath(&path, std::min(scale, 1.0f));
     }
     if (!path.contains(local.x, local.y)) {
       return;

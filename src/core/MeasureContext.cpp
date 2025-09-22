@@ -52,8 +52,14 @@ void MeasureContext::drawShape(std::shared_ptr<Shape> shape, const MCState& stat
                                const Stroke* stroke) {
   DEBUG_ASSERT(shape != nullptr);
   if (computeTightBounds) {
-    shape = Shape::ApplyStroke(shape, stroke);
-    addTightBounds(shape->getPath(), state, fill);
+    // For performance and memory reasons, measure doesn't require high-precision paths.
+    // Only apply scaling when the shape is reduced in size. Optimize further if issues arise.
+    auto path = shape->getPath();
+    if (stroke) {
+      auto scale = state.matrix.getMaxScale();
+      stroke->applyToPath(&path, std::min(scale, 1.0f));
+    }
+    addTightBounds(path, state, fill);
     return;
   }
   auto localBounds = shape->getBounds();
