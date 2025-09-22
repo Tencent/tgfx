@@ -228,7 +228,7 @@ void RenderContext::drawRRect(const RRect& rRect, const MCState& state, const Fi
 
 void RenderContext::drawPath(const Path& path, const MCState& state, const Fill& fill) {
   // Temporarily use drawShape for rendering, and perform merging in the compositor later.
-  drawShape(Shape::MakeFrom(path), state, fill);
+  drawShape(Shape::MakeFrom(path), state, fill, nullptr);
 }
 
 static Rect ToLocalBounds(const Rect& bounds, const Matrix& viewMatrix) {
@@ -248,9 +248,10 @@ void RenderContext::drawImage(std::shared_ptr<Image> image, const SamplingOption
   }
 }
 
-void RenderContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
-                              const Fill& fill) {
+void RenderContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill,
+                              const Stroke* stroke) {
   if (auto compositor = getOpsCompositor()) {
+    shape = Shape::ApplyStroke(std::move(shape), stroke);
     compositor->drawShape(std::move(shape), state, fill);
   }
 }

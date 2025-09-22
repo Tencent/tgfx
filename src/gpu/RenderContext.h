@@ -22,6 +22,7 @@
 #include "core/DrawContext.h"
 #include "gpu/OpsCompositor.h"
 #include "gpu/proxies/RenderTargetProxy.h"
+#include "tgfx/core/Stroke.h"
 
 namespace tgfx {
 class RenderContext : public DrawContext {
@@ -42,7 +43,8 @@ class RenderContext : public DrawContext {
 
   void drawPath(const Path& path, const MCState& state, const Fill& fill) override;
 
-  void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill) override;
+  void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill,
+                 const Stroke* stroke) override;
 
   void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
                  const MCState& state, const Fill& fill) override;

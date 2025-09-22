@@ -19,6 +19,7 @@
 #include "MeasureContext.h"
 #include "core/utils/Log.h"
 #include "core/utils/StrokeUtils.h"
+#include "tgfx/core/Shape.h"
 #include "utils/MathExtra.h"
 
 namespace tgfx {
@@ -47,14 +48,18 @@ void MeasureContext::drawPath(const Path& path, const MCState& state, const Fill
   addLocalBounds(state, fill, localBounds, path.isInverseFillType());
 }
 
-void MeasureContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
-                               const Fill& fill) {
+void MeasureContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill,
+                               const Stroke* stroke) {
   DEBUG_ASSERT(shape != nullptr);
   if (computeTightBounds) {
+    shape = Shape::ApplyStroke(shape, stroke);
     addTightBounds(shape->getPath(), state, fill);
     return;
   }
   auto localBounds = shape->getBounds();
+  if (stroke) {
+    ApplyStrokeToBounds(*stroke, &localBounds);
+  }
   addLocalBounds(state, fill, localBounds, shape->isInverseFillType());
 }
 

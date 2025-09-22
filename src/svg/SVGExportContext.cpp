@@ -39,6 +39,7 @@
 #include "tgfx/core/Point.h"
 #include "tgfx/core/RRect.h"
 #include "tgfx/core/Rect.h"
+#include "tgfx/core/Shape.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/TileMode.h"
@@ -140,8 +141,9 @@ void SVGExportContext::drawPath(const Path& path, const MCState& state, const Fi
 }
 
 void SVGExportContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
-                                 const Fill& fill) {
+                                 const Fill& fill, const Stroke* stroke) {
   DEBUG_ASSERT(shape != nullptr);
+  shape = Shape::ApplyStroke(shape, stroke);
   drawPath(shape->getPath(state.matrix), state, fill);
 }
 

@@ -19,6 +19,7 @@
 #include "HitTestContext.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/StrokeUtils.h"
+#include "tgfx/core/Stroke.h"
 #include "utils/Log.h"
 
 namespace tgfx {
@@ -96,8 +97,8 @@ void HitTestContext::drawPath(const Path& path, const MCState& state, const Fill
   }
 }
 
-void HitTestContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
-                               const Fill& fill) {
+void HitTestContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill,
+                               const Stroke* stroke) {
   DEBUG_ASSERT(shape != nullptr);
   Point local = {};
   if (!GetLocalPoint(state.matrix, deviceX, deviceY, &local)) {
@@ -105,11 +106,17 @@ void HitTestContext::drawShape(std::shared_ptr<Shape> shape, const MCState& stat
   }
   if (shapeHitTest) {
     auto path = shape->getPath(state.matrix);
+    if (stroke) {
+      stroke->applyToPath(&path, state.matrix.getMaxScale());
+    }
     if (!path.contains(local.x, local.y)) {
       return;
     }
   } else {
     auto bounds = shape->getBounds();
+    if (stroke) {
+      ApplyStrokeToBounds(*stroke, &bounds);
+    }
     if (!bounds.contains(local.x, local.y)) {
       return;
     }
