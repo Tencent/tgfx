@@ -60,7 +60,7 @@ Path MatrixShape::getPath(const Matrix& scaleMatrix) const {
   bool isHairline = false;
   std::shared_ptr<StrokeShape> originStrokeShape = nullptr;
   if (shape->type() == Type::Stroke) {
-    // Handle hairline stroke
+    // Handle strokes are hairline
     auto strokeShape = std::static_pointer_cast<StrokeShape>(shape);
     if (strokeShape->stroke.isHairline() ||
         TreatStrokeAsHairline(strokeShape->stroke, totalMatrix)) {
@@ -68,18 +68,17 @@ Path MatrixShape::getPath(const Matrix& scaleMatrix) const {
       originStrokeShape = strokeShape;
     }
   } else if (shape->type() == Type::Merge) {
-    // Handle cases where inner or outer strokes are hairline
+    // Handle cases where inner or outer strokes are hairline in shape layers
     auto mergeShape = std::static_pointer_cast<MergeShape>(shape);
-    if (mergeShape->pathOp == PathOp::Intersect || mergeShape->pathOp == PathOp::Difference) {
-      if (mergeShape->first->type() == Type::Stroke) {
-        auto strokeShape = std::static_pointer_cast<StrokeShape>(mergeShape->first);
-        if (strokeShape->shape == mergeShape->second) {
-          auto stroke = strokeShape->stroke;
-          stroke.width /= 2.f;
-          if (strokeShape->stroke.isHairline() || TreatStrokeAsHairline(stroke, totalMatrix)) {
-            isHairline = true;
-            originStrokeShape = strokeShape;
-          }
+    if (mergeShape->first->type() == Type::Stroke &&
+        (mergeShape->pathOp == PathOp::Intersect || mergeShape->pathOp == PathOp::Difference)) {
+      auto strokeShape = std::static_pointer_cast<StrokeShape>(mergeShape->first);
+      if (strokeShape->shape == mergeShape->second) {
+        auto stroke = strokeShape->stroke;
+        stroke.width /= 2.f;
+        if (strokeShape->stroke.isHairline() || TreatStrokeAsHairline(stroke, totalMatrix)) {
+          isHairline = true;
+          originStrokeShape = strokeShape;
         }
       }
     }
@@ -92,7 +91,7 @@ Path MatrixShape::getPath(const Matrix& scaleMatrix) const {
     hairlineStroke.applyToPath(&hairlinePath, totalMatrix.getMaxScale());
     return hairlinePath;
   }
-  auto path = shape->getPath(scaleMatrix * matrix);
+  auto path = shape->getPath(totalMatrix);
   path.transform(matrix);
   return path;
 }

@@ -75,8 +75,6 @@ class Shape {
   /**
    * Applies the specified stroke to the Shape. If the stroke is nullptr, the original Shape is
    * returned. Returns nullptr if the Shape is nullptr or if the stroke width is zero or less. 
-   * Note: Hairline strokes (width ≤ 0) are only supported as a rendering feature when set on a
-   * Paint.
    */
   static std::shared_ptr<Shape> ApplyStroke(std::shared_ptr<Shape> shape, const Stroke* stroke);
 
@@ -123,8 +121,10 @@ class Shape {
   virtual Rect getBounds() const = 0;
 
   /**
-   * Returns the Shape's computed path.  Note: The path is recalculated each time this method is
-   * called, as it is not cached.
+   * Returns the path using the given scale matrix of the current transformation matrix (CTM).
+   * Note: 
+   * The path is recalculated every time this method is called and is not cached.
+   * The scale matrix is optional and is provided to optimize computation and rendering quality.
    */
   virtual Path getPath(const Matrix& scaleMatrix = Matrix::I()) const = 0;
 
