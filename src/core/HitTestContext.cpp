@@ -18,6 +18,7 @@
 
 #include "HitTestContext.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/ShapeUtils.h"
 #include "core/utils/StrokeUtils.h"
 #include "tgfx/core/Stroke.h"
 #include "utils/Log.h"
@@ -105,7 +106,7 @@ void HitTestContext::drawShape(std::shared_ptr<Shape> shape, const MCState& stat
     return;
   }
   if (shapeHitTest) {
-    auto path = shape->getPath(state.matrix);
+    auto path = ShapeUtils::GetShapeRenderingPath(shape, state.matrix);
     if (stroke) {
       stroke->applyToPath(&path, state.matrix.getMaxScale());
     }

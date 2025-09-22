@@ -36,8 +36,8 @@ Rect EffectShape::getBounds() const {
   return effect->filterBounds(bounds);
 }
 
-Path EffectShape::getPath(const Matrix& scaleMatrix) const {
-  auto path = shape->getPath(scaleMatrix);
+Path EffectShape::onGetPath(const Matrix& scaleMatrix) const {
+  auto path = shape->onGetPath(scaleMatrix);
   effect->filterPath(&path);
   return path;
 }

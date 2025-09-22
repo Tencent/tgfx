@@ -34,12 +34,12 @@ class TextShape : public UniqueKeyShape {
 
   Rect getBounds() const override;
 
-  Path getPath(const Matrix& scaleMatrix) const override;
-
  protected:
   Type type() const override {
     return Type::Text;
   }
+
+  Path onGetPath(const Matrix& scaleMatrix) const override;
 
  private:
   std::shared_ptr<GlyphRunList> glyphRunList = nullptr;

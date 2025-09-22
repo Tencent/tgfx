@@ -39,8 +39,6 @@ class StrokeShape : public Shape {
 
   Rect getBounds() const override;
 
-  Path getPath(const Matrix& scaleMatrix) const override;
-
   static UniqueKey MakeUniqueKey(const UniqueKey& key, const Stroke& stroke);
 
   std::shared_ptr<Shape> shape = nullptr;
@@ -52,6 +50,8 @@ class StrokeShape : public Shape {
   }
 
   UniqueKey getUniqueKey() const override;
+
+  Path onGetPath(const Matrix& scaleMatrix) const override;
 
   friend class Shape;
 };

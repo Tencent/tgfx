@@ -30,12 +30,12 @@ class GlyphShape : public UniqueKeyShape {
 
   Rect getBounds() const override;
 
-  Path getPath(const Matrix& scaleMatrix) const override;
-
  protected:
   Type type() const override {
     return Type::Glyph;
   }
+
+  Path onGetPath(const Matrix& scaleMatrix) const override;
 
  private:
   Font font;

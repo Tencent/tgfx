@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,30 +18,18 @@
 
 #pragma once
 
-#include "core/shapes/UniqueKeyShape.h"
-#include "tgfx/core/Matrix.h"
-
+#include <memory>
+#include "tgfx/core/Path.h"
+#include "tgfx/core/Shape.h"
 namespace tgfx {
-/**
- * Shape that applies a PathEffect to another Shape.
- */
-class EffectShape : public UniqueKeyShape {
+
+class ShapeUtils {
  public:
-  EffectShape(std::shared_ptr<Shape> shape, std::shared_ptr<PathEffect> effect)
-      : shape(std::move(shape)), effect(std::move(effect)) {
-  }
-
-  Rect getBounds() const override;
-
- protected:
-  Type type() const override {
-    return Type::Effect;
-  }
-
-  Path onGetPath(const Matrix& scaleMatrix) const override;
-
- private:
-  std::shared_ptr<Shape> shape = nullptr;
-  std::shared_ptr<PathEffect> effect = nullptr;
+  /**
+   * Returns the Shape adjusted by the current transformation matrix (CTM).
+   * This is used during rendering to determine whether to simplify the Path or apply hairline
+   * stroking based on CTM scaling.
+   */
+  static Path GetShapeRenderingPath(std::shared_ptr<Shape> shape, const Matrix& matrix);
 };
 }  // namespace tgfx

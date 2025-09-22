@@ -35,8 +35,6 @@ class MergeShape : public UniqueKeyShape {
 
   Rect getBounds() const override;
 
-  Path getPath(const Matrix& scaleMatrix) const override;
-
   std::shared_ptr<Shape> first = nullptr;
   std::shared_ptr<Shape> second = nullptr;
   PathOp pathOp = PathOp::Append;
@@ -45,5 +43,7 @@ class MergeShape : public UniqueKeyShape {
   Type type() const override {
     return Type::Merge;
   }
+
+  Path onGetPath(const Matrix& scaleMatrix) const override;
 };
 }  // namespace tgfx

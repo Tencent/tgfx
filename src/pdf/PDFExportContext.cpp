@@ -33,6 +33,7 @@
 #include "core/shaders/MatrixShader.h"
 #include "core/utils/Log.h"
 #include "core/utils/PlacementPtr.h"
+#include "core/utils/ShapeUtils.h"
 #include "core/utils/Types.h"
 #include "pdf/PDFBitmap.h"
 #include "pdf/PDFDocumentImpl.h"
@@ -186,7 +187,7 @@ void PDFExportContext::drawPath(const Path& path, const MCState& state, const Fi
 void PDFExportContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
                                  const Fill& fill, const Stroke* stroke) {
   shape = Shape::ApplyStroke(std::move(shape), stroke);
-  auto path = shape->getPath(state.matrix);
+  auto path = ShapeUtils::GetShapeRenderingPath(shape, state.matrix);
   this->onDrawPath(state, path, fill);
 }
 

@@ -121,12 +121,11 @@ class Shape {
   virtual Rect getBounds() const = 0;
 
   /**
-   * Returns the path using the given scale matrix of the current transformation matrix (CTM).
-   * Note: 
-   * The path is recalculated every time this method is called and is not cached.
-   * The scale matrix is optional and is provided to optimize computation and rendering quality.
+   * Returns the path of the Shape.
    */
-  virtual Path getPath(const Matrix& scaleMatrix = Matrix::I()) const = 0;
+  Path getPath() const {
+    return onGetPath(Matrix::I());
+  }
 
  protected:
   enum class Type { Append, Effect, Text, Inverse, Matrix, Merge, Path, Stroke, Provider, Glyph };
@@ -142,13 +141,26 @@ class Shape {
    */
   virtual UniqueKey getUniqueKey() const = 0;
 
+  /**
+   * Called by getPath() to compute the actual path of the Shape. The scaleMatrix parameter
+   * provides any transformation matrix applied within the Shape.
+   * During rendering, complex Shapes may be simplified based on the current scale matrix to improve
+   * performance. Extremely thin strokes may also be converted to hairline strokes for better
+   * rendering quality.
+   */
+  virtual Path onGetPath(const Matrix& scaleMatrix) const = 0;
+
   friend class AppendShape;
   friend class StrokeShape;
   friend class MatrixShape;
+  friend class InverseShape;
+  friend class MergeShape;
+  friend class EffectShape;
   friend class ShapeDrawOp;
   friend class ProxyProvider;
   friend class Canvas;
   friend class Types;
   friend class StyledShape;
+  friend class ShapeUtils;
 };
 }  // namespace tgfx

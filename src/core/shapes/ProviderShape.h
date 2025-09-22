@@ -31,12 +31,12 @@ class ProviderShape : public UniqueKeyShape {
 
   Rect getBounds() const override;
 
-  Path getPath(const Matrix& matrix) const override;
-
  protected:
   Type type() const override {
     return Type::Provider;
   }
+
+  Path onGetPath(const Matrix& matrix) const override;
 
  private:
   std::shared_ptr<PathProvider> provider = nullptr;

@@ -45,7 +45,7 @@ Rect TextShape::getBounds() const {
   return bounds;
 }
 
-Path TextShape::getPath(const Matrix& /*scaleMatrix*/) const {
+Path TextShape::onGetPath(const Matrix& /*scaleMatrix*/) const {
   Path path = {};
   auto matrix = Matrix::MakeScale(scale, scale);
   if (!glyphRunList->getPath(&path, &matrix)) {

@@ -26,6 +26,7 @@
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/RectToRectMatrix.h"
+#include "core/utils/ShapeUtils.h"
 #include "core/utils/Types.h"
 #include "svg/SVGTextBuilder.h"
 #include "tgfx/core/Bitmap.h"
@@ -144,7 +145,8 @@ void SVGExportContext::drawShape(std::shared_ptr<Shape> shape, const MCState& st
                                  const Fill& fill, const Stroke* stroke) {
   DEBUG_ASSERT(shape != nullptr);
   shape = Shape::ApplyStroke(shape, stroke);
-  drawPath(shape->getPath(state.matrix), state, fill);
+  auto path = ShapeUtils::GetShapeRenderingPath(shape, state.matrix);
+  drawPath(path, state, fill);
 }
 
 void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,

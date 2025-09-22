@@ -42,10 +42,6 @@ class PathShape : public Shape {
     return path.getBounds();
   }
 
-  Path getPath(const Matrix& /*scaleMatrix*/) const override {
-    return path;
-  }
-
   Path path = {};
 
  protected:
@@ -54,5 +50,9 @@ class PathShape : public Shape {
   }
 
   UniqueKey getUniqueKey() const override;
+
+  Path onGetPath(const Matrix& /*scaleMatrix*/) const override {
+    return path;
+  }
 };
 }  // namespace tgfx

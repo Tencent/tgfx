@@ -35,12 +35,12 @@ class InverseShape : public UniqueKeyShape {
     return shape->getBounds();
   }
 
-  Path getPath(const Matrix& scaleMatrix) const override;
-
  protected:
   Type type() const override {
     return Type::Inverse;
   }
+
+  Path onGetPath(const Matrix& scaleMatrix) const override;
 
  private:
   std::shared_ptr<Shape> shape = nullptr;

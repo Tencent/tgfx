@@ -54,7 +54,7 @@ Rect MatrixShape::getBounds() const {
   return bounds;
 }
 
-Path MatrixShape::getPath(const Matrix& scaleMatrix) const {
+Path MatrixShape::onGetPath(const Matrix& scaleMatrix) const {
   auto totalMatrix = scaleMatrix * matrix;
 
   bool isHairline = false;
@@ -86,12 +86,12 @@ Path MatrixShape::getPath(const Matrix& scaleMatrix) const {
   if (isHairline) {
     auto hairlineStroke = originStrokeShape->stroke;
     hairlineStroke.width = 1.f;
-    auto hairlinePath = originStrokeShape->shape->getPath(totalMatrix);
+    auto hairlinePath = originStrokeShape->shape->onGetPath(totalMatrix);
     hairlinePath.transform(matrix);
     hairlineStroke.applyToPath(&hairlinePath, totalMatrix.getMaxScale());
     return hairlinePath;
   }
-  auto path = shape->getPath(totalMatrix);
+  auto path = shape->onGetPath(totalMatrix);
   path.transform(matrix);
   return path;
 }

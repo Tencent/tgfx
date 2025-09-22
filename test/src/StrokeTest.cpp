@@ -1,4 +1,6 @@
 #include "gtest/gtest.h"
+#include "tgfx/core/Shape.h"
+#include "tgfx/core/Stroke.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/SolidColor.h"
@@ -196,5 +198,30 @@ TGFX_TEST(StrokeTest, ExtremelyThinStrokeLayer) {
   displayList.root()->addChild(shapeLayer);
   displayList.render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/ExtremelyThinStrokeLayer"));
+}
+
+TGFX_TEST(StrokeTest, HairlineUniqueKey) {
+  Stroke hairlineStroke1(0.f);
+  hairlineStroke1.cap = LineCap::Round;
+  hairlineStroke1.join = LineJoin::Miter;
+
+  Stroke hairlineStroke2(0.f);
+  hairlineStroke2.cap = LineCap::Butt;
+  hairlineStroke2.join = LineJoin::Round;
+
+  auto path = Path();
+  path.addRoundRect(Rect::MakeXYWH(-12.5f, -12.5f, 25.f, 25.f), 5, 5);
+
+  auto shape = Shape::MakeFrom(path);
+  auto strokeShape1 = Shape::ApplyStroke(shape, &hairlineStroke1);
+  auto strokeShape2 = Shape::ApplyStroke(shape, &hairlineStroke2);
+  EXPECT_EQ(strokeShape1->getUniqueKey(), strokeShape2->getUniqueKey());
+
+  hairlineStroke1.width = 1.f;
+  hairlineStroke2.width = 1.f;
+
+  auto normalStrokeShape1 = Shape::ApplyStroke(shape, &hairlineStroke1);
+  auto normalStrokeShape2 = Shape::ApplyStroke(shape, &hairlineStroke2);
+  EXPECT_NE(normalStrokeShape1->getUniqueKey(), normalStrokeShape2->getUniqueKey());
 }
 }  // namespace tgfx

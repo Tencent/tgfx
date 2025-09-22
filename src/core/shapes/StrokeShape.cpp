@@ -56,8 +56,8 @@ Rect StrokeShape::getBounds() const {
   return bounds;
 }
 
-Path StrokeShape::getPath(const Matrix& scaleMatrix) const {
-  auto path = shape->getPath(scaleMatrix);
+Path StrokeShape::onGetPath(const Matrix& scaleMatrix) const {
+  auto path = shape->onGetPath(scaleMatrix);
   stroke.applyToPath(&path, scaleMatrix.getMaxScale());
   return path;
 }
@@ -84,13 +84,13 @@ UniqueKey StrokeShape::MakeUniqueKey(const UniqueKey& key, const Stroke& stroke)
     return UniqueKey::Append(key, bytesKey.data(), bytesKey.size());
   }
   // hairline stroke ignore cap, join and miterLimit,and width is always 0.f,so just use a fixed key.
-  static const auto HairlineStrokeKey = []() -> UniqueKey {
+  static const auto HairlineStrokeKey = []() -> BytesKey {
     auto hairlineStrokeType = UniqueID::Next();
     BytesKey bytesKey(1);
     bytesKey.write(hairlineStrokeType);
-    return UniqueKey::Append(UniqueKey(), bytesKey.data(), bytesKey.size());
+    return bytesKey;
   }();
-  return HairlineStrokeKey;
+  return UniqueKey::Append(key, HairlineStrokeKey.data(), HairlineStrokeKey.size());
 }
 
 UniqueKey StrokeShape::getUniqueKey() const {
