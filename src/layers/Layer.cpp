@@ -599,11 +599,12 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
       // correct.
       actualMatrix.preConcat(localToGlobalMatrix);
       backgroundCanvas->setMatrix(actualMatrix);
-      if (auto image = getBackgroundImage(args, scale, nullptr)) {
+      Point offset = {};
+      if (auto image = getBackgroundImage(args, scale, &offset)) {
         AutoCanvasRestore autoRestore(backgroundCanvas);
         actualMatrix.preScale(1.0f / scale, 1.0f / scale);
         backgroundCanvas->setMatrix(actualMatrix);
-        backgroundCanvas->drawImage(image);
+        backgroundCanvas->drawImage(image, offset.x, offset.y);
       }
       args.backgroundContext = std::move(backgroundContext);
     }
@@ -1066,7 +1067,10 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   DrawArgs drawArgs = args;
   drawArgs.backgroundContext = nullptr;
   drawArgs.excludeEffects = bitFields.excludeChildEffectsInLayerStyle;
-  auto contentPicture = RecordPicture(drawArgs.drawMode, contentScale, [&](Canvas* canvas) {
+  // Use Mode::Contour to record the contour of the content, to prevent the subsequent use of
+  // AlphaThresholdFilter from turning semi-transparent pixels into opaque pixels, which would cause
+  // severe aliasing.
+  auto contentPicture = RecordPicture(DrawMode::Contour, contentScale, [&](Canvas* canvas) {
     drawContents(drawArgs, canvas, 1.0f);
   });
   Point contentOffset = {};

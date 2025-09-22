@@ -1963,6 +1963,7 @@ TGFX_TEST(LayerTest, DropShadowStyle) {
   layer->setPath(path);
   auto fillStyle = SolidColor::Make(Color::FromRGBA(100, 0, 0, 128));
   layer->setFillStyle(fillStyle);
+  layer->setLineWidth(2.0f);
   layer->setBlendMode(BlendMode::Lighten);
 
   auto shadowLayer = Layer::Make();
@@ -3143,5 +3144,32 @@ TGFX_TEST(LayerTest, HairlineLayer) {
   displayList.root()->addChild(shapeLayer2);
   displayList.render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/HairlineLayer"));
+}
+
+TGFX_TEST(LayerTest, NotRectBackgroundBlur) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  auto canvas = surface->getCanvas();
+  canvas->clear();
+  auto backgroundLayer = ShapeLayer::Make();
+  Path backgroundPath;
+  backgroundPath.addRect(Rect::MakeXYWH(0, 0, 200, 200));
+  backgroundLayer->setPath(backgroundPath);
+  backgroundLayer->addFillStyle(
+      Gradient::MakeRadial({100, 100}, 100, {Color::Red(), Color::Blue()}));
+  DisplayList displayList;
+  displayList.root()->addChild(backgroundLayer);
+  auto layer = ShapeLayer::Make();
+  Path path;
+  path.addOval(Rect::MakeXYWH(50, 50, 100, 100));
+  layer->setPath(path);
+  layer->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 0, 0, 10)));
+  layer->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
+  displayList.root()->addChild(layer);
+  // displayList.render(surface.get());
+  layer->draw(canvas);
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/NotRectBackgroundBlur"));
 }
 }  // namespace tgfx
