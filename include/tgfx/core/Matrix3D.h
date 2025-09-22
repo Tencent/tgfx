@@ -66,7 +66,7 @@ class Matrix3D {
   }
 
   /**
-   * Returns a reference to a constant identity Matrix3D. The returned Matrix3D is set to:
+   * Returns a reference to a constant identity Matrix3D. The returned Matrix3D is:
    *
    *       | 1 0 0 0 |
    *       | 0 1 0 0 |
@@ -100,7 +100,8 @@ class Matrix3D {
   }
 
   /**
-   * Creates a Matrix3D that rotates by (degrees) around (axis). The returned matrix is:
+   * Creates a Matrix3D that rotates by the given angle (in degrees) around the specified axis.
+   * The returned matrix is:
    *
    *   | t*x*x + c   t*x*y + s*z   t*x*z - s*y   0 |
    *   | t*x*y - s*z t*y*y + c     t*y*z + s*x   0 |
@@ -112,7 +113,7 @@ class Matrix3D {
    *   c = cos(degrees)
    *   s = sin(degrees)
    *   t = 1 - c
-   * @param axis The axis to rotate around.
+   * @param axis The axis to rotate about.
    * @param degrees The angle of rotation in degrees.
    */
   static Matrix3D MakeRotate(const Vec3& axis, float degrees) {
@@ -201,7 +202,7 @@ class Matrix3D {
    * pointed to by inverse.
    * @param inverse Pointer to the Matrix3D object used to store the inverse matrix. Must not be
    * nullptr. If the current matrix is not invertible, inverse will not be modified.
-   * @return Returns true if the inverse matrix exists, otherwise returns false.
+   * @return Returns true if the inverse matrix exists; otherwise, returns false.
    */
   bool invert(Matrix3D* inverse) const;
 
@@ -213,7 +214,7 @@ class Matrix3D {
   /**
    * Maps a 4D point (x, y, z, w) using this matrix.
    * If the current matrix contains a perspective transformation, the returned Vec4 is not
-   * perspective-divided, i.e., the w component of the result may not be 1.
+   * perspective-divided; i.e., the w component of the result may not be 1.
    */
   Vec4 mapPoint(float x, float y, float z, float w) const;
 
@@ -236,19 +237,24 @@ class Matrix3D {
 
   /**
    * Creates a standard perspective projection matrix. This matrix maps 3D coordinates into
-   * normalized device coordinates for perspective rendering.
-   * @param fovyDegress Field of view angle in degrees (vertical).
+   * clip coordinates for perspective rendering.
+   * The standard projection model is established by defining the camera position, orientation,
+   * field of view, and near/far planes. Points inside the view frustum are projected onto the near
+   * plane.
+   * @param fovyDegrees Field of view angle in degrees (vertical).
    * @param aspect Aspect ratio (width / height).
    * @param nearZ Distance to the near clipping plane.
    * @param farZ Distance to the far clipping plane.
    */
-  static Matrix3D Perspective(float fovyDegress, float aspect, float nearZ, float farZ);
+  static Matrix3D Perspective(float fovyDegrees, float aspect, float nearZ, float farZ);
 
   /**
    * Creates a projection matrix compatible with CSS 3D transforms. This matrix maps 3D coordinates
-   * into normalized device coordinates for perspective rendering. This is useful for web rendering
-   * scenarios that require CSS-like perspective projection.
-   * For more details on the definition of CSS perspective projection, please refer to the official
+   * into clip coordinates for perspective rendering. This is useful for web rendering scenarios
+   * that require CSS-like perspective projection.
+   * The CSS projection model is established by specifying the camera distance and a projection
+   * plane fixed at z=0, with the camera orientation fixed. For more details on the definition of
+   * CSS perspective projection, please refer to the official
    * documentation: CSS Transforms Module Level 2, Perspective.
    * @param eyeDistance Distance from the eye to the projection plane (z = 0).
    * @param left Left bound of the view volume.

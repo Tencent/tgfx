@@ -1,0 +1,100 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making tgfx available.
+//
+//  Copyright (C) 2025 Tencent. All rights reserved.
+//
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+//  in compliance with the License. You may obtain a copy of the License at
+//
+//      https://opensource.org/licenses/BSD-3-Clause
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#include "Transform3DImageFilter.h"
+#include "core/utils/PlacementPtr.h"
+#include "gpu/DrawingManager.h"
+#include "gpu/TPArgs.h"
+#include "gpu/processors/TiledTextureEffect.h"
+#include "gpu/proxies/RenderTargetProxy.h"
+#include "gpu/tasks/Transform3DRenderTask.h"
+#include "tgfx/core/Matrix3D.h"
+
+namespace tgfx {
+
+std::shared_ptr<ImageFilter> ImageFilter::Transform3D(const Matrix3D& matrix,
+                                                      const Size& viewSize) {
+  return std::make_shared<Transform3DImageFilter>(matrix, viewSize);
+}
+
+Transform3DImageFilter::Transform3DImageFilter(const Matrix3D& matrix, const Size& viewSize)
+    : matrix(matrix), viewSize(viewSize) {
+}
+
+Rect Transform3DImageFilter::onFilterBounds(const Rect& srcRect) const {
+  const auto srcModelRect = Rect::MakeXYWH(-srcRect.width() * 0.5f, -srcRect.height() * 0.5f,
+                                           srcRect.width(), srcRect.height());
+  const auto ndcRect = matrix.mapRect(srcModelRect);
+  const auto result = Rect::MakeXYWH(ndcRect.left * viewSize.width * 0.5f - srcModelRect.left,
+                                     ndcRect.top * viewSize.height * 0.5f - srcModelRect.top,
+                                     ndcRect.width() * viewSize.width * 0.5f,
+                                     ndcRect.height() * viewSize.height * 0.5f);
+  return result;
+}
+
+std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
+    std::shared_ptr<Image> source, const Rect& renderBounds, const TPArgs& args) const {
+  const auto renderTarget = RenderTargetProxy::MakeFallback(
+      args.context, static_cast<int>(renderBounds.width()), static_cast<int>(renderBounds.height()),
+      source->isAlphaOnly(), 1, args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
+  const auto sourceTextureProxy = source->lockTextureProxy(args);
+
+  const auto srcW = static_cast<float>(source->width());
+  const auto srcH = static_cast<float>(source->height());
+  const auto srcModelRect = Rect::MakeXYWH(-srcW * 0.5f, -srcH * 0.5f, srcW, srcH);
+  const auto srcNDCRect = matrix.mapRect(srcModelRect);
+  // SrcProjectRect is the result of projecting srcRect onto the canvas. RenderBounds describes a
+  // subregion that needs to be drawn within it.
+  const auto srcProjectRect = Rect::MakeXYWH(
+      srcNDCRect.left * viewSize.width * 0.5f - srcModelRect.left,
+      srcNDCRect.top * viewSize.height * 0.5f - srcModelRect.top,
+      srcNDCRect.width() * viewSize.width * 0.5f, srcNDCRect.height() * viewSize.height * 0.5f);
+  // ndcScale and ndcOffset are used to scale and translate the NDC coordinates to ensure that only
+  // the content within RenderBounds is drawn to the render target. This clips regions beyond the
+  // clip space.
+  // NdcScale first maps the NDC coordinates from the view size defined by this->matrix's projection
+  // to the size of srcProjectRect after source projection, then scales up so that the required
+  // drawing area exactly fills the -1 to 1 clip region. The scale formula is:
+  // ((viewsize / srcProjectRect) * (srcProjectRect / renderBounds))
+  const Vec2 ndcScale(viewSize.width / renderBounds.width(),
+                      viewSize.height / renderBounds.height());
+  // ndcOffset translates the NDC coordinates so that the local area to be drawn aligns exactly with
+  // the (-1, -1) point.
+  const auto ndcRectScaled =
+      Rect::MakeXYWH(srcNDCRect.left * ndcScale.x, srcNDCRect.top * ndcScale.y,
+                     srcNDCRect.width() * ndcScale.x, srcNDCRect.height() * ndcScale.y);
+  const Vec2 renderBoundsLTNDC(
+      (renderBounds.left - srcProjectRect.left) * ndcRectScaled.width() / srcProjectRect.width(),
+      (renderBounds.top - srcProjectRect.top) * ndcRectScaled.height() / srcProjectRect.height());
+  const Vec2 ndcOffset(-1.f - ndcRectScaled.left - renderBoundsLTNDC.x,
+                       -1.f - ndcRectScaled.top - renderBoundsLTNDC.y);
+
+  const auto drawingManager = args.context->drawingManager();
+  const PerspectiveRenderArgs perspectiveArgs{AAType::Coverage, matrix, ndcScale, ndcOffset};
+  drawingManager->addRectPerspectiveRenderTask(srcModelRect, renderTarget, sourceTextureProxy,
+                                               perspectiveArgs);
+  return renderTarget->asTextureProxy();
+}
+
+PlacementPtr<FragmentProcessor> Transform3DImageFilter::asFragmentProcessor(
+    std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
+    SrcRectConstraint constraint, const Matrix* uvMatrix) const {
+  return makeFPFromTextureProxy(source, args, sampling, constraint, uvMatrix);
+}
+
+}  // namespace tgfx

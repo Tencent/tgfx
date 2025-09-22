@@ -16,13 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "RectPerspectiveRenderTask.h"
+#include "Transform3DRenderTask.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/RectsVertexProvider.h"
 #include "gpu/ops/RectDrawOp.h"
-#include "gpu/processors/QuadPerEdgeAA3DGeometryProcessor.h"
 #include "gpu/processors/TextureEffect.h"
+#include "gpu/processors/Transform3DGeometryProcessor.h"
 
 namespace tgfx {
 
@@ -31,9 +31,10 @@ static constexpr uint32_t IndicesPerNonAAQuad = 6;
 // The maximum number of vertices per AA quad.
 static constexpr uint32_t IndicesPerAAQuad = 30;
 
-RectPerspectiveRenderTask::RectPerspectiveRenderTask(
-    const Rect& rect, std::shared_ptr<RenderTargetProxy> renderTarget,
-    std::shared_ptr<TextureProxy> fillTexture, const PerspectiveRenderArgs& args)
+Transform3DRenderTask::Transform3DRenderTask(const Rect& rect,
+                                             std::shared_ptr<RenderTargetProxy> renderTarget,
+                                             std::shared_ptr<TextureProxy> fillTexture,
+                                             const PerspectiveRenderArgs& args)
     : rect(rect), renderTarget(std::move(renderTarget)), fillTexture(std::move(fillTexture)),
       args(args) {
   const auto drawingBuffer = this->renderTarget->getContext()->drawingBuffer();
@@ -51,7 +52,7 @@ RectPerspectiveRenderTask::RectPerspectiveRenderTask(
   }
 }
 
-void RectPerspectiveRenderTask::execute(CommandEncoder* encoder) {
+void Transform3DRenderTask::execute(CommandEncoder* encoder) {
   if (vertexBufferProxyView == nullptr || fillTexture == nullptr) {
     LOGE("RectPerspectiveRenderTask::execute() Vertex buffer proxy view or fill texture is null!");
     return;
@@ -93,13 +94,13 @@ void RectPerspectiveRenderTask::execute(CommandEncoder* encoder) {
     ndcScale.y = -ndcScale.y;
     ndcOffset.y = -ndcOffset.y;
   }
-  const auto geometryProcessor = QuadPerEdgeAA3DGeometryProcessor::Make(
+  const auto geometryProcessor = Transform3DGeometryProcessor::Make(
       drawingBuffer, args.aa, args.transformMatrix, ndcScale, ndcOffset);
   const SamplingArgs samplingArgs = {TileMode::Decal, TileMode::Decal, {}, SrcRectConstraint::Fast};
   const auto uvMatrix = Matrix::MakeTrans(-rect.left, -rect.top);
   const auto fragmentProcessor = TextureEffect::Make(fillTexture, samplingArgs, &uvMatrix);
   const ProgramInfo programInfo((rt.get()), geometryProcessor.get(), {fragmentProcessor.get()}, 1,
-                                nullptr, BlendMode::SrcOver);
+                                nullptr, BlendMode::Src);
   const auto program = std::static_pointer_cast<PipelineProgram>(programInfo.getProgram());
   if (program == nullptr) {
     LOGE("RectPerspectiveRenderTask::execute() Failed to get the program!");

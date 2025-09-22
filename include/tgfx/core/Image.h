@@ -363,6 +363,6 @@ class Image {
   friend class ScaledImage;
   friend class ImageShader;
   friend class Types;
-  friend class PerspectiveImageFilter;
+  friend class Transform3DImageFilter;
 };
 }  // namespace tgfx

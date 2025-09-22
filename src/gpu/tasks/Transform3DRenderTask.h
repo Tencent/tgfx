@@ -18,12 +18,12 @@
 
 #pragma once
 
-#include "core/Matrix3D.h"
 #include "gpu/AAType.h"
 #include "gpu/proxies/IndexBufferProxy.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/VertexBufferProxyView.h"
 #include "gpu/tasks/RenderTask.h"
+#include "tgfx/core/Matrix3D.h"
 
 namespace tgfx {
 
@@ -52,16 +52,16 @@ struct PerspectiveRenderArgs {
 };
 
 /**
- * RectPerspectiveRenderTask is a render task that renders a rectangle with perspective transformation.
+ * Transform3DRenderTask is a render task that renders a rectangle with perspective transformation.
  */
-class RectPerspectiveRenderTask final : public RenderTask {
+class Transform3DRenderTask final : public RenderTask {
  public:
   /**
-   * Creates a RectPerspectiveRenderTask with rect, render target, fill texture and render args.
+   * Creates a Transform3DRenderTask with rect, render target, fill texture and render args.
    */
-  RectPerspectiveRenderTask(const Rect& rect, std::shared_ptr<RenderTargetProxy> renderTarget,
-                            std::shared_ptr<TextureProxy> fillTexture,
-                            const PerspectiveRenderArgs& args);
+  Transform3DRenderTask(const Rect& rect, std::shared_ptr<RenderTargetProxy> renderTarget,
+                        std::shared_ptr<TextureProxy> fillTexture,
+                        const PerspectiveRenderArgs& args);
 
   void execute(CommandEncoder* encoder) override;
 

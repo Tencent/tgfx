@@ -18,21 +18,21 @@
 
 #pragma once
 
-#include "core/Matrix3D.h"
 #include "tgfx/core/ImageFilter.h"
+#include "tgfx/core/Matrix3D.h"
 
 namespace tgfx {
 
 /**
- * PerspectiveImageFilter is an image filter that applies a perspective transformation to the input
+ * Transform3DImageFilter is an image filter that applies a perspective transformation to the input
  * image.
  */
-class PerspectiveImageFilter final : public ImageFilter {
+class Transform3DImageFilter final : public ImageFilter {
  public:
   /**
-   * Creates a PerspectiveImageFilter with the specified PerspectiveInfo.
+   * Creates a Transform3DImageFilter with the specified PerspectiveInfo.
    */
-  explicit PerspectiveImageFilter(const PerspectiveInfo& info);
+  explicit Transform3DImageFilter(const Matrix3D& matrix, const Size& viewSize);
 
  private:
   Type type() const override {
@@ -51,16 +51,15 @@ class PerspectiveImageFilter final : public ImageFilter {
                                                       SrcRectConstraint constraint,
                                                       const Matrix* uvMatrix) const override;
 
-  static Matrix3D MakeProjectMatrix(PerspectiveType projectType, const Rect& rect);
-
-  PerspectiveInfo info = {};
+  /**
+   * 3D transformation matrix used to convert model coordinates to clip space.
+   */
+  Matrix3D matrix = Matrix3D::I();
 
   /**
-   * The projection matrix for the unit rectangle LTRB(-1, -1, 1, 1).
+   * Window view size, used to map NDC coordinates to window coordinates.
    */
-  Matrix3D normalProjectMatrix;
-
-  Matrix3D modelRotateMatrix;
+  Size viewSize = {0, 0};
 };
 
 }  // namespace tgfx

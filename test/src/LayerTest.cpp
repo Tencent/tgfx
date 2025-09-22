@@ -38,7 +38,6 @@
 #include "tgfx/layers/filters/ColorMatrixFilter.h"
 #include "tgfx/layers/filters/DropShadowFilter.h"
 #include "tgfx/layers/filters/InnerShadowFilter.h"
-#include "tgfx/layers/filters/PerspectiveFilter.h"
 #include "tgfx/layers/layerstyles/BackgroundBlurStyle.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
 #include "tgfx/layers/layerstyles/InnerShadowStyle.h"
@@ -663,10 +662,6 @@ TGFX_TEST(LayerTest, FilterTest) {
   auto filter = DropShadowFilter::Make(-80, -80, 0, 0, Color::Black());
   auto filter2 = DropShadowFilter::Make(-40, -40, 0, 0, Color::Green());
   auto filter3 = BlurFilter::Make(10, 10);
-  LayerPerspectiveInfo info;
-  info.projectType = LayerPerspectiveType::Standard;
-  info.xRotation = 45;
-  auto filter4 = PerspectiveFilter::Make(info);
   auto image = MakeImage("resources/apitest/rotation.jpg");
   ContextScope scope;
   auto context = scope.getContext();
@@ -678,11 +673,11 @@ TGFX_TEST(LayerTest, FilterTest) {
   auto matrix = Matrix::MakeScale(0.5f);
   matrix.postTranslate(200, 200);
   layer->setMatrix(matrix);
-  layer->setFilters({filter3, filter, filter2, filter4});
+  layer->setFilters({filter3, filter, filter2});
   displayList->root()->addChild(layer);
   displayList->render(surface.get());
   auto bounds = displayList->root()->getBounds();
-  EXPECT_EQ(Rect::MakeLTRB(-200.f, 604.f, 2052.f, 2226.f), bounds);
+  EXPECT_EQ(Rect::MakeLTRB(130.f, 130.f, 1722.f, 2226.f), bounds);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/filterTest"));
 }
 

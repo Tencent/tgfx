@@ -25,7 +25,7 @@
 #include "gpu/tasks/OpsRenderTask.h"
 #include "gpu/tasks/RenderTask.h"
 #include "gpu/tasks/ResourceTask.h"
-#include "tasks/RectPerspectiveRenderTask.h"
+#include "tasks/Transform3DRenderTask.h"
 
 namespace tgfx {
 struct AtlasCellData {

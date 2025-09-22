@@ -28,7 +28,7 @@
 #include "gpu/tasks/RuntimeDrawTask.h"
 #include "gpu/tasks/SemaphoreWaitTask.h"
 #include "inspect/InspectorMark.h"
-#include "tasks/RectPerspectiveRenderTask.h"
+#include "tasks/Transform3DRenderTask.h"
 
 namespace tgfx {
 static ColorType GetAtlasColorType(bool isAlphaOnly) {
@@ -191,8 +191,8 @@ void DrawingManager::addRectPerspectiveRenderTask(const Rect& rect,
                                                   std::shared_ptr<RenderTargetProxy> renderTarget,
                                                   std::shared_ptr<TextureProxy> fillTexture,
                                                   const PerspectiveRenderArgs& args) {
-  auto task = drawingBuffer->make<RectPerspectiveRenderTask>(rect, std::move(renderTarget),
-                                                             std::move(fillTexture), args);
+  auto task = drawingBuffer->make<Transform3DRenderTask>(rect, std::move(renderTarget),
+                                                         std::move(fillTexture), args);
 
   renderTasks.emplace_back(std::move(task));
 }

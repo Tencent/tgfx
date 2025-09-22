@@ -25,6 +25,7 @@
 #include "core/filters/InnerShadowImageFilter.h"
 #include "core/shaders/GradientShader.h"
 #include "core/shaders/ImageShader.h"
+#include "core/utils/MathExtra.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Color.h"
@@ -842,15 +843,24 @@ TGFX_TEST(FilterTest, PerspectiveImageFilter) {
   ASSERT_TRUE(surface != nullptr);
   Canvas* canvas = surface->getCanvas();
   auto image = MakeImage("resources/apitest/imageReplacement.jpg");
+  Size imageSize(static_cast<float>(image->width()), static_cast<float>(image->height()));
 
-  auto cssPerspectiveInfo = PerspectiveInfo();
-  cssPerspectiveInfo.yRotation = 45.0f;
-  cssPerspectiveInfo.projectType = PerspectiveType::CSS;
-  const auto cssPerspectiveFilter = ImageFilter::Perspective(cssPerspectiveInfo);
+  // Test basic drawing with css perspective type.
   {
-    // Test basic drawing with css perspective type.
     canvas->save();
     canvas->clear();
+
+    // The camera position for the CSS perspective projection model.
+    static constexpr float CSSEyeZ = 1200.f;
+    // The position of the far plane on the Z axis for the CSS perspective projection model.
+    static constexpr float CSSFarZ = -500.f;
+    auto cssProjectionMatrix =
+        Matrix3D::ProjectionCSS(CSSEyeZ, -imageSize.width * 0.5f, imageSize.width * 0.5f,
+                                imageSize.height * 0.5f, -imageSize.height * 0.5f, CSSFarZ);
+    auto modelMatrix = Matrix3D::MakeRotate({0.f, 1.f, 0.f}, 45.f);
+    modelMatrix.postTranslate(0.f, 0.f, 1.f / 100.f);
+    auto transform = cssProjectionMatrix * modelMatrix;
+    const auto cssPerspectiveFilter = ImageFilter::Transform3D(transform, imageSize);
 
     Paint paint = {};
     paint.setImageFilter(cssPerspectiveFilter);
@@ -861,13 +871,36 @@ TGFX_TEST(FilterTest, PerspectiveImageFilter) {
     canvas->restore();
   }
 
-  auto standardPerspectiveInfo = PerspectiveInfo();
-  standardPerspectiveInfo.yRotation = 45.0f;
-  standardPerspectiveInfo.projectType = PerspectiveType::Standard;
-  const auto standardPerspectiveFilter = ImageFilter::Perspective(standardPerspectiveInfo);
+  // The field of view (in degrees) for the standard perspective projection model.
+  static constexpr float StandardFovYDegress = 45.f;
+  // The maximum position of the near plane on the Z axis for the standard perspective projection model.
+  static constexpr float StandardMaxNearZ = 0.25f;
+  // The minimum position of the far plane on the Z axis for the standard perspective projection model.
+  static constexpr float StandardMinFarZ = 1000.f;
+  // The target position of the camera for the standard perspective projection model, in pixels.
+  static constexpr Vec3 StandardEyeCenter = {0.f, 0.f, 0.f};
+  // The up direction unit vector for the camera in the standard perspective projection model.
+  static constexpr Vec3 StandardEyeUp = {0.f, 1.f, 0.f};
+  const float eyePositionZ = 0.5f * static_cast<float>(image->height()) /
+                             tanf(DegreesToRadians(StandardFovYDegress * 0.5f));
+  const Vec3 eyePosition = {0.f, 0.f, eyePositionZ};
+  const auto viewMatrix = Matrix3D::LookAt(eyePosition, StandardEyeCenter, StandardEyeUp);
+  // Ensure nearZ is not too far away or farZ is not too close to avoid precision issues. For
+  // example, if the z value of the near plane is less than 0, the projected model will be
+  // outside the clipping range, or if the far plane is too close, the projected model may
+  // exceed the clipping range with a slight rotation.
+  const float nearZ = std::min(StandardMaxNearZ, eyePositionZ * 0.1f);
+  const float farZ = std::max(StandardMinFarZ, eyePositionZ * 10.f);
+  const auto perspectiveMatrix = Matrix3D::Perspective(
+      StandardFovYDegress, static_cast<float>(image->width()) / static_cast<float>(image->height()),
+      nearZ, farZ);
+  auto modelMatrix = Matrix3D::MakeRotate({0.f, 1.f, 0.f}, 45.f);
+  modelMatrix.postTranslate(0.f, 0.f, -10.f);
+  auto standardTransform = perspectiveMatrix * viewMatrix * modelMatrix;
+  const auto standardPerspectiveFilter = ImageFilter::Transform3D(standardTransform, imageSize);
 
+  // Test basic drawing with standard perspective type.
   {
-    // Test basic drawing with standard perspective type.
     canvas->save();
     canvas->clear();
 
@@ -881,8 +914,8 @@ TGFX_TEST(FilterTest, PerspectiveImageFilter) {
     canvas->restore();
   }
 
+  // Test image clipping drawing with standard perspective type.
   {
-    // Test image clipping drawing with standard perspective type.
     canvas->save();
     canvas->clear();
 

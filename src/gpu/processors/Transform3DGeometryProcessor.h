@@ -19,23 +19,23 @@
 #pragma once
 
 #include "GeometryProcessor.h"
-#include "core/Matrix3D.h"
 #include "gpu/AAType.h"
+#include "tgfx/core/Matrix3D.h"
 
 namespace tgfx {
 
 /**
  * A geometry processor for rendering 3D transformed quads with optional per-edge anti-aliasing.
  */
-class QuadPerEdgeAA3DGeometryProcessor : public GeometryProcessor {
+class Transform3DGeometryProcessor : public GeometryProcessor {
  public:
   /**
-   * Creates a QuadPerEdgeAA3DGeometryProcessor instance with the specified parameters.
+   * Creates a Transform3DGeometryProcessor instance with the specified parameters.
    */
-  static PlacementPtr<QuadPerEdgeAA3DGeometryProcessor> Make(BlockBuffer* buffer, AAType aa,
-                                                             const Matrix3D& transformMatrix,
-                                                             const Vec2& ndcScale,
-                                                             const Vec2& ndcOffset);
+  static PlacementPtr<Transform3DGeometryProcessor> Make(BlockBuffer* buffer, AAType aa,
+                                                         const Matrix3D& transformMatrix,
+                                                         const Vec2& ndcScale,
+                                                         const Vec2& ndcOffset);
 
   std::string name() const override {
     return "QuadPerEdgeAA3DGeometryProcessor";
@@ -44,8 +44,8 @@ class QuadPerEdgeAA3DGeometryProcessor : public GeometryProcessor {
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  explicit QuadPerEdgeAA3DGeometryProcessor(AAType aa, const Matrix3D& transformMatrix,
-                                            const Vec2& ndcScale, const Vec2& ndcOffset);
+  explicit Transform3DGeometryProcessor(AAType aa, const Matrix3D& transformMatrix,
+                                        const Vec2& ndcScale, const Vec2& ndcOffset);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
