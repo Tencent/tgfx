@@ -19,6 +19,7 @@
 #include "StrokeShape.h"
 #include "core/shapes/MatrixShape.h"
 #include "core/utils/Log.h"
+#include "core/utils/MathExtra.h"
 #include "core/utils/StrokeUtils.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/resources/ResourceKey.h"
@@ -57,6 +58,9 @@ Rect StrokeShape::getBounds() const {
 }
 
 Path StrokeShape::onGetPath(float resolutionScale) const {
+  if (FloatNearlyZero(resolutionScale)) {
+    return {};
+  }
   auto path = shape->onGetPath(resolutionScale);
   if (TreatStrokeAsHairline(stroke, Matrix::MakeScale(resolutionScale, resolutionScale))) {
     Stroke hairlineStroke = stroke;

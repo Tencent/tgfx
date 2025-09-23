@@ -34,6 +34,9 @@ GlyphShape::GlyphShape(Font font, GlyphID glyphID) : font(std::move(font)), glyp
 }
 
 Path GlyphShape::onGetPath(float resolutionScale) const {
+  if (FloatNearlyZero(resolutionScale)) {
+    return {};
+  }
   Path path = {};
   if (FloatNearlyEqual(resolutionScale, 1.0f)) {
     if (!font.getPath(glyphID, &path)) {

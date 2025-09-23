@@ -19,6 +19,7 @@
 #include "TextShape.h"
 #include "core/GlyphRunList.h"
 #include "core/utils/Log.h"
+#include "core/utils/MathExtra.h"
 #include "tgfx/core/Matrix.h"
 
 namespace tgfx {
@@ -46,6 +47,9 @@ Rect TextShape::getBounds() const {
 }
 
 Path TextShape::onGetPath(float resolutionScale) const {
+  if (FloatNearlyZero(resolutionScale)) {
+    return {};
+  }
   Path path = {};
   auto matrix = Matrix::MakeScale(resolutionScale, resolutionScale);
   if (!glyphRunList->getPath(&path, &matrix)) {
