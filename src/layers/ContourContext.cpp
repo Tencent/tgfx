@@ -121,13 +121,18 @@ void ContourContext::drawPicture(std::shared_ptr<Picture> picture, const MCState
 void ContourContext::drawLayer(std::shared_ptr<Picture> picture,
                                std::shared_ptr<ImageFilter> filter, const MCState& state,
                                const Fill& fill) {
-  if (!filter) {
+  if (fill.nothingToDraw()) {
+    return;
+  }
+  if (!filter && !fill.maskFilter) {
     drawPicture(picture, state);
     return;
   }
   if (!picture->hasUnboundedFill()) {
     auto bounds = picture->getBounds();
-    bounds = filter->filterBounds(bounds);
+    if (filter) {
+      bounds = filter->filterBounds(bounds);
+    }
     bounds = state.matrix.mapRect(bounds);
     if (containContourBound(bounds)) {
       return;
@@ -273,20 +278,25 @@ void ContourContext::flushPendingContour(const Contour& contour, const MCState& 
   }
 }
 
-void ContourContext::appendFill(const Fill& fill, const Stroke* stroke) {
-  auto& pendingShader = pendingFills.back().shader;
-  if (pendingShader == nullptr || !pendingShader->isAImage()) {
-    return;
-  }
-  if (fill.shader != nullptr && fill.shader->isAImage()) {
+Fill GetContourFill(const Fill& fill) {
+  Color color;
+  if (fill.shader && !fill.shader->asColor(&color)) {
     auto contourFill = fill;
     contourFill.colorFilter = ColorFilter::AlphaThreshold(OPAQUE_THRESHOLD);
-    pendingFills.emplace_back(fill);
-  } else {
-    auto contourFill = Fill(Color::White(), BlendMode::Src, fill.antiAlias);
-    contourFill.maskFilter = fill.maskFilter;
-    pendingFills.emplace_back(contourFill);
+    return contourFill;
   }
+  // Src + coverage AA may cause edge artifacts, use SrcOver instead.
+  auto contourFill = Fill(Color::White(), BlendMode::SrcOver, fill.antiAlias);
+  contourFill.maskFilter = fill.maskFilter;
+  return contourFill;
+}
+
+void ContourContext::appendFill(const Fill& fill, const Stroke* stroke) {
+  auto& pendingShader = pendingFills.back().shader;
+  if (pendingShader == nullptr) {
+    return;
+  }
+  pendingFills.emplace_back(GetContourFill(fill));
   if (stroke) {
     pendingStrokes.emplace_back(stroke);
   }
@@ -296,7 +306,7 @@ void ContourContext::resetPendingContour(const Contour& contour, const MCState& 
                                          const Fill& fill, const Stroke* stroke) {
   pendingContour = contour;
   pendingState = state;
-  pendingFills = {fill};
+  pendingFills = {GetContourFill(fill)};
   if (stroke) {
     pendingStrokes = {stroke};
   } else {
