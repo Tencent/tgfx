@@ -121,7 +121,8 @@ class Shape {
   virtual Rect getBounds() const = 0;
 
   /**
-   * Returns the path of the Shape.
+   * Returns the Shape's computed path. Note: The path is recalculated each time this method is
+   * called, as it is not cached.
    */
   Path getPath() const {
     return onGetPath(Matrix::I());

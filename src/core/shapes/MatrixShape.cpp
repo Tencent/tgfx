@@ -56,41 +56,6 @@ Rect MatrixShape::getBounds() const {
 
 Path MatrixShape::onGetPath(const Matrix& scaleMatrix) const {
   auto totalMatrix = scaleMatrix * matrix;
-
-  bool isHairline = false;
-  std::shared_ptr<StrokeShape> originStrokeShape = nullptr;
-  if (shape->type() == Type::Stroke) {
-    // Handle strokes are hairline
-    auto strokeShape = std::static_pointer_cast<StrokeShape>(shape);
-    if (strokeShape->stroke.isHairline() ||
-        TreatStrokeAsHairline(strokeShape->stroke, totalMatrix)) {
-      isHairline = true;
-      originStrokeShape = strokeShape;
-    }
-  } else if (shape->type() == Type::Merge) {
-    // Handle cases where inner or outer strokes are hairline in shape layers
-    auto mergeShape = std::static_pointer_cast<MergeShape>(shape);
-    if (mergeShape->first->type() == Type::Stroke &&
-        (mergeShape->pathOp == PathOp::Intersect || mergeShape->pathOp == PathOp::Difference)) {
-      auto strokeShape = std::static_pointer_cast<StrokeShape>(mergeShape->first);
-      if (strokeShape->shape == mergeShape->second) {
-        auto stroke = strokeShape->stroke;
-        stroke.width /= 2.f;
-        if (strokeShape->stroke.isHairline() || TreatStrokeAsHairline(stroke, totalMatrix)) {
-          isHairline = true;
-          originStrokeShape = strokeShape;
-        }
-      }
-    }
-  }
-  if (isHairline) {
-    auto hairlineStroke = originStrokeShape->stroke;
-    hairlineStroke.width = 1.f;
-    auto hairlinePath = originStrokeShape->shape->onGetPath(totalMatrix);
-    hairlinePath.transform(matrix);
-    hairlineStroke.applyToPath(&hairlinePath, totalMatrix.getMaxScale());
-    return hairlinePath;
-  }
   auto path = shape->onGetPath(totalMatrix);
   path.transform(matrix);
   return path;

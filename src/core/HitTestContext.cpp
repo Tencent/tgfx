@@ -107,12 +107,10 @@ void HitTestContext::drawShape(std::shared_ptr<Shape> shape, const MCState& stat
     return;
   }
   if (shapeHitTest) {
-    // For performance and memory reasons, hit testing doesn't require high-precision paths.
-    // Only apply scaling when the shape is reduced in size. Optimize further if issues arise.
+    // Measure doesn't require high-precision paths, so ignore resolution scale here.
     auto path = shape->getPath();
     if (stroke) {
-      auto scale = state.matrix.getMaxScale();
-      stroke->applyToPath(&path, std::min(scale, 1.0f));
+      stroke->applyToPath(&path);
     }
     if (!path.contains(local.x, local.y)) {
       return;

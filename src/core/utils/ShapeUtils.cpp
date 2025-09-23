@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ShapeUtils.h"
+#include "tgfx/core/Matrix.h"
 
 namespace tgfx {
 
@@ -24,7 +25,8 @@ Path ShapeUtils::GetShapeRenderingPath(std::shared_ptr<Shape> shape, const Matri
   if (shape == nullptr) {
     return {};
   }
-  return shape->onGetPath(matrix);
+  auto scale = matrix.getMaxScale();
+  return shape->onGetPath(Matrix::MakeScale(scale, scale));
 }
 
 }  // namespace tgfx
