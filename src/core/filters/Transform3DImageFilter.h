@@ -36,7 +36,7 @@ class Transform3DImageFilter final : public ImageFilter {
 
  private:
   Type type() const override {
-    return Type::Perspective;
+    return Type::Transform3D;
   }
 
   Rect onFilterBounds(const Rect& srcRect) const override;

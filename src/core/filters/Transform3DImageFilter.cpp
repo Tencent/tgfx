@@ -37,13 +37,21 @@ Transform3DImageFilter::Transform3DImageFilter(const Matrix3D& matrix, const Siz
 }
 
 Rect Transform3DImageFilter::onFilterBounds(const Rect& srcRect) const {
+  // Align the camera center with the center of the source rect.
+  //
+  // The standard rectangle XYWH(-viewSize.width * 0.5, -viewSize.height * 0.5, viewSize.width,
+  // viewSize.height). After applying the matrix, the projected rectangle in the NDC coordinate
+  // system is XYWH[-1, 1, 2, 2]. For convenience, the top-left vertex of the standard rectangle is
+  // set to (0,0). Combined with srcRect, a model rectangle is constructed. The minimum axis-aligned
+  // bounding rectangle of srcRect after projection is calculated based on the size after applying
+  // the matrix and its relative position to the standard rectangle.
   const auto srcModelRect = Rect::MakeXYWH(-srcRect.width() * 0.5f, -srcRect.height() * 0.5f,
                                            srcRect.width(), srcRect.height());
   const auto ndcRect = matrix.mapRect(srcModelRect);
-  const auto result = Rect::MakeXYWH(ndcRect.left * viewSize.width * 0.5f - srcModelRect.left,
-                                     ndcRect.top * viewSize.height * 0.5f - srcModelRect.top,
-                                     ndcRect.width() * viewSize.width * 0.5f,
-                                     ndcRect.height() * viewSize.height * 0.5f);
+  const auto result = Rect::MakeXYWH(
+      ndcRect.left * viewSize.width * 0.5f - srcModelRect.left + srcRect.left,
+      ndcRect.top * viewSize.height * 0.5f - srcModelRect.top + srcRect.top,
+      ndcRect.width() * viewSize.width * 0.5f, ndcRect.height() * viewSize.height * 0.5f);
   return result;
 }
 
@@ -56,6 +64,7 @@ std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
 
   const auto srcW = static_cast<float>(source->width());
   const auto srcH = static_cast<float>(source->height());
+  // Align the camera center with the initial position center of the source model.
   const auto srcModelRect = Rect::MakeXYWH(-srcW * 0.5f, -srcH * 0.5f, srcW, srcH);
   const auto srcNDCRect = matrix.mapRect(srcModelRect);
   // SrcProjectRect is the result of projecting srcRect onto the canvas. RenderBounds describes a
