@@ -35,20 +35,20 @@ HWY_BEFORE_NAMESPACE();
 namespace tgfx {
 namespace HWY_NAMESPACE {
 namespace hn = hwy::HWY_NAMESPACE;
-bool TileSortCompImpl(float centerX, float centerY, float tileSize, const std::shared_ptr<Tile>& a,
-                      const std::shared_ptr<Tile>& b) {
+bool TileSortCompImpl(const Point& center, float tileSize, const TileCoord& a, const TileCoord& b,
+                      bool ascending) {
   const hn::Full128<int32_t> di;
   const hn::Full128<float> df;
-  auto res = hn::Add(
-      hn::ConvertTo(df, hn::Dup128VecFromValues(di, a->tileX, a->tileY, b->tileX, b->tileY)),
-      hn::Set(df, 0.5f));
+  auto res =
+      hn::Add(hn::ConvertTo(df, hn::Dup128VecFromValues(di, a.first, a.second, b.first, b.second)),
+              hn::Set(df, 0.5f));
   res = hn::MulSub(res, hn::Set(df, tileSize),
-                   hn::Dup128VecFromValues(df, centerX, centerY, centerX, centerY));
+                   hn::Dup128VecFromValues(df, center.x, center.y, center.x, center.y));
   res = hn::Mul(res, res);
   res = hn::Add(hn::Reverse2(df, res), res);
   float resVec[4] = {0.0f};
   hn::Store(res, df, resVec);
-  return resVec[0] > resVec[2];
+  return ascending ? resVec[0] < resVec[2] : resVec[0] > resVec[2];
 }
 }  // namespace HWY_NAMESPACE
 }  // namespace tgfx
@@ -68,9 +68,19 @@ std::vector<std::shared_ptr<Tile>> TileCache::getReusableTiles(float centerX, fl
   std::sort(tiles.begin(), tiles.end(),
             [centerX, centerY, tileSize = static_cast<float>(tileSize)](
                 const std::shared_ptr<Tile>& a, const std::shared_ptr<Tile>& b) {
-              return HWY_DYNAMIC_DISPATCH(TileSortCompImpl)(centerX, centerY, tileSize, a, b);
+              return HWY_DYNAMIC_DISPATCH(TileSortCompImpl)(
+                  {centerX, centerY}, tileSize, {a->tileX, a->tileY}, {b->tileX, b->tileY}, false);
             });
   return tiles;
+}
+
+void TileCache::SortTilesByDistance(std::vector<TileCoord>& tiles, const Point& center,
+                                    int tileSize) {
+  std::sort(
+      tiles.begin(), tiles.end(),
+      [&center, tileSize = static_cast<float>(tileSize)](const TileCoord& a, const TileCoord& b) {
+        return HWY_DYNAMIC_DISPATCH(TileSortCompImpl)(center, tileSize, a, b, true);
+      });
 }
 }  // namespace tgfx
 #endif

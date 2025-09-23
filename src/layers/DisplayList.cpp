@@ -123,21 +123,11 @@ static std::vector<std::pair<int, int>> GenerateGridTiles(int startX, int endX, 
   return tiles;
 }
 
-static std::vector<std::pair<int, int>> GetSortedTiles(int startX, int endX, int startY, int endY,
-                                                       int tileSize, const Point& mousePosition) {
+static std::vector<TileCoord> GetSortedTiles(int startX, int endX, int startY, int endY,
+                                             int tileSize, const Point& mousePosition) {
 
   auto tiles = GenerateGridTiles(startX, endX, startY, endY);
-  const auto halfSize = static_cast<float>(tileSize) * 0.5f;
-  const float mouseX = mousePosition.x;
-  const float mouseY = mousePosition.y;
-  std::sort(tiles.begin(), tiles.end(),
-            [&](const std::pair<int, int>& a, const std::pair<int, int>& b) {
-              const auto dx1 = static_cast<float>(a.first * tileSize) + halfSize - mouseX;
-              const auto dy1 = static_cast<float>(a.second * tileSize) + halfSize - mouseY;
-              const auto dx2 = static_cast<float>(b.first * tileSize) + halfSize - mouseX;
-              const auto dy2 = static_cast<float>(b.second * tileSize) + halfSize - mouseY;
-              return dx1 * dx1 + dy1 * dy1 < dx2 * dx2 + dy2 * dy2;
-            });
+  TileCache::SortTilesByDistance(tiles, mousePosition, tileSize);
   return tiles;
 }
 
@@ -472,9 +462,13 @@ void DisplayList::invalidateCurrentTileCache(const TileCache* tileCache,
 
 std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
                                                       std::vector<DrawTask>* tileTasks) {
+  if (std::isnan(mousePosition.x) && std::isnan(mousePosition.y)) {
+    mousePosition = Point::Make(surface->width() / 2, surface->height() / 2);
+    mousePosition -= _contentOffset;
+  }
   auto maxRefinedCount = _maxTilesRefinedPerFrame;
-  updateMousePosition(surface);
   if (lastContentOffset != _contentOffset || lastZoomScaleInt != _zoomScaleInt) {
+    updateMousePosition();
     lastContentOffset = _contentOffset;
     lastZoomScaleInt = _zoomScaleInt;
     // To ensure smooth user interactions, we skip refinement when the offset or zoom scale is
@@ -497,7 +491,7 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
   int endX = static_cast<int>(ceilf(renderRect.right / static_cast<float>(_tileSize)));
   int endY = static_cast<int>(ceilf(renderRect.bottom / static_cast<float>(_tileSize)));
   std::vector<DrawTask> screenTasks = {};
-  std::vector<std::pair<int, int>> dirtyGrids = {};
+  std::vector<TileCoord> dirtyGrids = {};
   auto tileCount = static_cast<size_t>(endX - startX) * static_cast<size_t>(endY - startY);
   screenTasks.reserve(tileCount);
   dirtyGrids.reserve(tileCount);
@@ -908,16 +902,7 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
 }
 
-void DisplayList::updateMousePosition(const Surface* surface) {
-  if (lastContentOffset == _contentOffset && lastZoomScaleInt == _zoomScaleInt) {
-    if (!mousePosition.isZero()) {
-      return;
-    }
-    mousePosition = Point::Make(surface->width() / 2, surface->height() / 2);
-    mousePosition -= _contentOffset;
-    return;
-  }
-
+void DisplayList::updateMousePosition() {
   if (lastZoomScaleInt == _zoomScaleInt) {
     mousePosition += (lastContentOffset - _contentOffset);
     return;
@@ -925,7 +910,8 @@ void DisplayList::updateMousePosition(const Surface* surface) {
 
   const auto scale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision) /
                      ToZoomScaleFloat(lastZoomScaleInt, _zoomScalePrecision);
-  const auto invScaleFactor = 1.f / (1.f - scale);
+  DEBUG_ASSERT(scale != 1.0f);
+  const auto invScaleFactor = 1.0f / (1.0f - scale);
   mousePosition = (_contentOffset - lastContentOffset * scale) * invScaleFactor;
   mousePosition -= _contentOffset;
 }

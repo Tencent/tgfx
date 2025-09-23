@@ -22,6 +22,7 @@
 #include "tgfx/core/Rect.h"
 
 namespace tgfx {
+using TileCoord = std::pair<int, int>;
 /**
  * Tile represents a single tile in the tile cache.
  */
@@ -112,6 +113,11 @@ class TileCache {
    * their distance to the viewport center, with the farthest ones first.
    */
   std::vector<std::shared_ptr<Tile>> getReusableTiles(float centerX, float centerY);
+
+  /**
+   * Sorts tiles by their distance from the center point, nearest first.
+   */
+  static void SortTilesByDistance(std::vector<TileCoord>& tiles, const Point& center, int tileSize);
 
  private:
   int tileSize = 256;
