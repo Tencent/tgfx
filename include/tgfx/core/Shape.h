@@ -42,11 +42,10 @@ class Shape {
   static std::shared_ptr<Shape> MakeFrom(Path path);
 
   /**
-   * Creates a new Shape from the given text blob. The specified scale is applied to the text blob
-   * before extracting its paths. Returns nullptr if the text blob is nullptr or if none of the
-   * glyphs in the blob can generate a path, such as when using bitmap typefaces.
+   * Creates a new Shape from the given text blob. Returns nullptr if the text blob is nullptr or 
+   * if none of the glyphs in the blob can generate a path, such as when using bitmap typefaces.
    */
-  static std::shared_ptr<Shape> MakeFrom(std::shared_ptr<TextBlob> textBlob, float scale = 1.0f);
+  static std::shared_ptr<Shape> MakeFrom(std::shared_ptr<TextBlob> textBlob);
 
   /**
    * Creates a new Shape from the given PathProvider. Returns nullptr if pathProvider is nullptr.
@@ -125,7 +124,7 @@ class Shape {
    * called, as it is not cached.
    */
   Path getPath() const {
-    return onGetPath(Matrix::I());
+    return onGetPath(1.f);
   }
 
  protected:
@@ -143,13 +142,13 @@ class Shape {
   virtual UniqueKey getUniqueKey() const = 0;
 
   /**
-   * Called by getPath() to compute the actual path of the Shape. The scaleMatrix parameter
-   * provides any transformation matrix applied within the Shape.
-   * During rendering, complex Shapes may be simplified based on the current scale matrix to improve
-   * performance. Extremely thin strokes may also be converted to hairline strokes for better
-   * rendering quality.
+   * Called by getPath() to compute the actual path of the Shape. The resolution scale parameter
+   * provides any scale applied within the Shape.
+   * During rendering, complex Shapes may be simplified based on the current resolution scale to 
+   * improve performance. Extremely thin strokes may also be converted to hairline strokes for 
+   * better rendering quality.
    */
-  virtual Path onGetPath(const Matrix& scaleMatrix) const = 0;
+  virtual Path onGetPath(float resolutionScale) const = 0;
 
   friend class AppendShape;
   friend class StrokeShape;

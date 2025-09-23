@@ -56,16 +56,17 @@ Rect StrokeShape::getBounds() const {
   return bounds;
 }
 
-Path StrokeShape::onGetPath(const Matrix& scaleMatrix) const {
-  auto path = shape->onGetPath(scaleMatrix);
-  if (stroke.isHairline() || TreatStrokeAsHairline(stroke, scaleMatrix)) {
+Path StrokeShape::onGetPath(float resolutionScale) const {
+  auto path = shape->onGetPath(resolutionScale);
+  if (stroke.isHairline() ||
+      TreatStrokeAsHairline(stroke, Matrix::MakeScale(resolutionScale, resolutionScale))) {
     Stroke hairlineStroke = stroke;
     // When zoomed in by a matrix shape, reduce the stroke width ahead of time
-    hairlineStroke.width = 1.f / scaleMatrix.getMaxScale();
-    hairlineStroke.applyToPath(&path, scaleMatrix.getMaxScale());
+    hairlineStroke.width = 1.f / resolutionScale;
+    hairlineStroke.applyToPath(&path, resolutionScale);
     return path;
   }
-  stroke.applyToPath(&path, scaleMatrix.getMaxScale());
+  stroke.applyToPath(&path, resolutionScale);
   return path;
 }
 

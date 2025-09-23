@@ -48,7 +48,7 @@ class MatrixShape : public Shape {
     return Type::Matrix;
   }
 
-  Path onGetPath(const Matrix& scaleMatrix) const override;
+  Path onGetPath(float resolutionScale) const override;
 
   UniqueKey getUniqueKey() const override;
 };

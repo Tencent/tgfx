@@ -30,7 +30,7 @@ Rect ProviderShape::getBounds() const {
   return provider->getBounds();
 }
 
-Path ProviderShape::onGetPath(const Matrix& /*matrix*/) const {
+Path ProviderShape::onGetPath(float /*resolutionScale*/) const {
   return provider->getPath();
 }
 }  // namespace tgfx

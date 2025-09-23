@@ -26,10 +26,10 @@ namespace tgfx {
 class ShapeUtils {
  public:
   /**
-   * Returns the Shape adjusted by the current transformation matrix (CTM).
-   * This is used during rendering to determine whether to simplify the Path or apply hairline
-   * stroking based on CTM scaling.
+   * Returns the Shape adjusted for the current resolution scale.
+   * Used during rendering to decide whether to simplify the Path or apply hairline stroking,
+   * depending on the resolution scale.
    */
-  static Path GetShapeRenderingPath(std::shared_ptr<Shape> shape, const Matrix& matrix);
+  static Path GetShapeRenderingPath(std::shared_ptr<Shape> shape, float resolutionScale);
 };
 }  // namespace tgfx

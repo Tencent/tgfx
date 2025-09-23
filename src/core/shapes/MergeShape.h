@@ -44,6 +44,6 @@ class MergeShape : public UniqueKeyShape {
     return Type::Merge;
   }
 
-  Path onGetPath(const Matrix& scaleMatrix) const override;
+  Path onGetPath(float resolutionScale) const override;
 };
 }  // namespace tgfx

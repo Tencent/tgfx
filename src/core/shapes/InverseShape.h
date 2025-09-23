@@ -40,7 +40,7 @@ class InverseShape : public UniqueKeyShape {
     return Type::Inverse;
   }
 
-  Path onGetPath(const Matrix& scaleMatrix) const override;
+  Path onGetPath(float resolutionScale) const override;
 
  private:
   std::shared_ptr<Shape> shape = nullptr;

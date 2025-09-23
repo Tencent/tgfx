@@ -51,8 +51,8 @@ std::shared_ptr<Shape> Shape::ApplyInverse(std::shared_ptr<Shape> shape) {
   return std::make_shared<InverseShape>(std::move(shape));
 }
 
-Path InverseShape::onGetPath(const Matrix& scaleMatrix) const {
-  auto path = shape->onGetPath(scaleMatrix);
+Path InverseShape::onGetPath(float resolutionScale) const {
+  auto path = shape->onGetPath(resolutionScale);
   path.toggleInverseFillType();
   return path;
 }

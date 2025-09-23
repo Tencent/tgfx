@@ -38,7 +38,7 @@ class EffectShape : public UniqueKeyShape {
     return Type::Effect;
   }
 
-  Path onGetPath(const Matrix& scaleMatrix) const override;
+  Path onGetPath(float resolutionScale) const override;
 
  private:
   std::shared_ptr<Shape> shape = nullptr;

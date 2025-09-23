@@ -513,14 +513,12 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
 void RenderContext::drawGlyphsAsPath(std::shared_ptr<GlyphRunList> glyphRunList,
                                      const MCState& state, const Fill& fill, const Stroke* stroke,
                                      Rect& localClipBounds) {
-  auto maxScale = state.matrix.getMaxScale();
   Path clipPath = {};
   if (fill.antiAlias) {
     localClipBounds.outset(1.0f, 1.0f);
   }
   clipPath.addRect(localClipBounds);
-  std::shared_ptr<Shape> shape = std::make_shared<TextShape>(std::move(glyphRunList), maxScale);
-  shape = Shape::ApplyMatrix(std::move(shape), Matrix::MakeScale(1.0f / maxScale, 1.0f / maxScale));
+  std::shared_ptr<Shape> shape = std::make_shared<TextShape>(std::move(glyphRunList));
   shape = Shape::ApplyStroke(std::move(shape), stroke);
 
   shape = Shape::Merge(std::move(shape), Shape::MakeFrom(std::move(clipPath)), PathOp::Intersect);

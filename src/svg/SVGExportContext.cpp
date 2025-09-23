@@ -145,7 +145,7 @@ void SVGExportContext::drawShape(std::shared_ptr<Shape> shape, const MCState& st
                                  const Fill& fill, const Stroke* stroke) {
   DEBUG_ASSERT(shape != nullptr);
   shape = Shape::ApplyStroke(shape, stroke);
-  auto path = ShapeUtils::GetShapeRenderingPath(shape, state.matrix);
+  auto path = ShapeUtils::GetShapeRenderingPath(shape, state.matrix.getMaxScale());
   drawPath(path, state, fill);
 }
 

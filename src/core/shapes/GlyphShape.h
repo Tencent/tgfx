@@ -35,7 +35,7 @@ class GlyphShape : public UniqueKeyShape {
     return Type::Glyph;
   }
 
-  Path onGetPath(const Matrix& scaleMatrix) const override;
+  Path onGetPath(float resolutionScale) const override;
 
  private:
   Font font;

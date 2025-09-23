@@ -36,7 +36,7 @@ class ProviderShape : public UniqueKeyShape {
     return Type::Provider;
   }
 
-  Path onGetPath(const Matrix& matrix) const override;
+  Path onGetPath(float resolutionScale) const override;
 
  private:
   std::shared_ptr<PathProvider> provider = nullptr;

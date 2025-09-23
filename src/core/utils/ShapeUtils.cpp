@@ -17,16 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ShapeUtils.h"
-#include "tgfx/core/Matrix.h"
 
 namespace tgfx {
 
-Path ShapeUtils::GetShapeRenderingPath(std::shared_ptr<Shape> shape, const Matrix& matrix) {
+Path ShapeUtils::GetShapeRenderingPath(std::shared_ptr<Shape> shape, float resolutionScale) {
   if (shape == nullptr) {
     return {};
   }
-  auto scale = matrix.getMaxScale();
-  return shape->onGetPath(Matrix::MakeScale(scale, scale));
+  return shape->onGetPath(resolutionScale);
 }
 
 }  // namespace tgfx

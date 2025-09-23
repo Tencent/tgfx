@@ -32,7 +32,7 @@ std::shared_ptr<Shape> Shape::MakeFrom(Font font, GlyphID glyphID) {
 GlyphShape::GlyphShape(Font font, GlyphID glyphID) : font(std::move(font)), glyphID(glyphID) {
 }
 
-Path GlyphShape::onGetPath(const Matrix& /*scaleMatrix*/) const {
+Path GlyphShape::onGetPath(float /*resolutionScale*/) const {
   Path path = {};
   if (!font.getPath(glyphID, &path)) {
     return {};

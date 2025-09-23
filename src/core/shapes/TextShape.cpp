@@ -19,9 +19,10 @@
 #include "TextShape.h"
 #include "core/GlyphRunList.h"
 #include "core/utils/Log.h"
+#include "tgfx/core/Matrix.h"
 
 namespace tgfx {
-std::shared_ptr<Shape> Shape::MakeFrom(std::shared_ptr<TextBlob> textBlob, float scale) {
+std::shared_ptr<Shape> Shape::MakeFrom(std::shared_ptr<TextBlob> textBlob) {
   auto glyphRunLists = GlyphRunList::Unwrap(textBlob.get());
   if (glyphRunLists == nullptr) {
     return nullptr;
@@ -36,22 +37,29 @@ std::shared_ptr<Shape> Shape::MakeFrom(std::shared_ptr<TextBlob> textBlob, float
   if (glyphRunList == nullptr) {
     return nullptr;
   }
-  return std::make_shared<TextShape>(std::move(glyphRunList), scale);
+  return std::make_shared<TextShape>(std::move(glyphRunList));
 }
 
 Rect TextShape::getBounds() const {
   auto bounds = glyphRunList->getBounds();
-  bounds.scale(scale, scale);
   return bounds;
 }
 
-Path TextShape::onGetPath(const Matrix& /*scaleMatrix*/) const {
+Path TextShape::onGetPath(float resolutionScale) const {
   Path path = {};
-  auto matrix = Matrix::MakeScale(scale, scale);
+  auto matrix = Matrix::MakeScale(resolutionScale, resolutionScale);
   if (!glyphRunList->getPath(&path, &matrix)) {
     LOGE("TextShape::getPath() Failed to get path from GlyphRunList!");
     return {};
   }
+  // Matrix inverseMatrix = {};
+  // if (matrix.invert(&inverseMatrix)) {
+  //   path.transform(inverseMatrix);
+  //   return path;
+  // }
+  auto inverseMatrix = Matrix::MakeScale(1.f / resolutionScale, 1.f / resolutionScale);
+  path.transform(inverseMatrix);
+
   return path;
 }
 }  // namespace tgfx

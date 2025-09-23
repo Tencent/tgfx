@@ -51,7 +51,7 @@ class PathShape : public Shape {
 
   UniqueKey getUniqueKey() const override;
 
-  Path onGetPath(const Matrix& /*scaleMatrix*/) const override {
+  Path onGetPath(float /*resolutionScale*/) const override {
     return path;
   }
 };

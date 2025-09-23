@@ -187,7 +187,7 @@ void PDFExportContext::drawPath(const Path& path, const MCState& state, const Fi
 void PDFExportContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
                                  const Fill& fill, const Stroke* stroke) {
   shape = Shape::ApplyStroke(std::move(shape), stroke);
-  auto path = ShapeUtils::GetShapeRenderingPath(shape, state.matrix);
+  auto path = ShapeUtils::GetShapeRenderingPath(shape, state.matrix.getMaxScale());
   this->onDrawPath(state, path, fill);
 }
 

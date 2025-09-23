@@ -38,7 +38,7 @@ class AppendShape : public UniqueKeyShape {
     return Type::Append;
   }
 
-  Path onGetPath(const Matrix& scaleMatrix) const override;
+  Path onGetPath(float resolutionScale) const override;
 
  private:
   std::vector<std::shared_ptr<Shape>> shapes = {};

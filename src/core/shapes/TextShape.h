@@ -28,8 +28,8 @@ namespace tgfx {
  */
 class TextShape : public UniqueKeyShape {
  public:
-  explicit TextShape(std::shared_ptr<GlyphRunList> glyphRunList, float scale)
-      : glyphRunList(std::move(glyphRunList)), scale(scale) {
+  explicit TextShape(std::shared_ptr<GlyphRunList> glyphRunList)
+      : glyphRunList(std::move(glyphRunList)) {
   }
 
   Rect getBounds() const override;
@@ -39,10 +39,9 @@ class TextShape : public UniqueKeyShape {
     return Type::Text;
   }
 
-  Path onGetPath(const Matrix& scaleMatrix) const override;
+  Path onGetPath(float resolutionScale) const override;
 
  private:
   std::shared_ptr<GlyphRunList> glyphRunList = nullptr;
-  float scale = 1.0f;
 };
 }  // namespace tgfx

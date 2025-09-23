@@ -54,9 +54,9 @@ Rect MatrixShape::getBounds() const {
   return bounds;
 }
 
-Path MatrixShape::onGetPath(const Matrix& scaleMatrix) const {
-  auto totalMatrix = scaleMatrix * matrix;
-  auto path = shape->onGetPath(totalMatrix);
+Path MatrixShape::onGetPath(float resolutionScale) const {
+  resolutionScale = resolutionScale * matrix.getMaxScale();
+  auto path = shape->onGetPath(resolutionScale);
   path.transform(matrix);
   return path;
 }
