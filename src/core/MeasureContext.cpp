@@ -62,7 +62,7 @@ void MeasureContext::drawShape(std::shared_ptr<Shape> shape, const MCState& stat
   }
   auto localBounds = shape->getBounds();
   if (stroke) {
-    ApplyStrokeToBounds(*stroke, &localBounds);
+    ApplyStrokeToBounds(*stroke, &localBounds, true);
   }
   addLocalBounds(state, fill, localBounds, shape->isInverseFillType());
 }
