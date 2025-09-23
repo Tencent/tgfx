@@ -307,9 +307,7 @@ std::vector<Paint> ShapeLayer::createShapePaints(
       paint.setStyle(PaintStyle::Stroke);
       paint.setStrokeWidth(0.f);
     }
-    if (!paint.getFill().nothingToDraw()) {
-      paintList.push_back(paint);
-    }
+    paintList.push_back(paint);
   }
   return paintList;
 }

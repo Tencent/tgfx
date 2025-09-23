@@ -31,10 +31,8 @@ static bool GetLocalPoint(const Matrix& matrix, float deviceX, float deviceY, Po
   return true;
 }
 
-void HitTestContext::drawFill(const Fill& fill) {
-  if (!fill.nothingToDraw()) {
-    hit = true;
-  }
+void HitTestContext::drawFill(const Fill&) {
+  hit = true;
 }
 
 void HitTestContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill) {
@@ -226,9 +224,8 @@ void HitTestContext::drawPicture(std::shared_ptr<Picture> picture, const MCState
   }
 }
 
-bool HitTestContext::checkClipAndFill(const Path& clip, const Fill& fill,
-                                      const Point& local) const {
-  if (fill.nothingToDraw() || (!clip.isInverseFillType() && clip.isEmpty())) {
+bool HitTestContext::checkClipAndFill(const Path& clip, const Fill&, const Point& local) const {
+  if (!clip.isInverseFillType() && clip.isEmpty()) {
     return false;
   }
   if (shapeHitTest || clip.isInverseFillType()) {
