@@ -3168,7 +3168,6 @@ TGFX_TEST(LayerTest, NotRectBackgroundBlur) {
   layer->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 0, 0, 10)));
   layer->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
   displayList.root()->addChild(layer);
-  // displayList.render(surface.get());
   layer->draw(canvas);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/NotRectBackgroundBlur"));
 }
