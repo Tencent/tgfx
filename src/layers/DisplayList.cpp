@@ -20,6 +20,7 @@
 #include "core/utils/DecomposeRects.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/TileSortCompareFunc.h"
 #include "inspect/InspectorMark.h"
 #include "layers/DrawArgs.h"
 #include "layers/RootLayer.h"
@@ -123,11 +124,15 @@ static std::vector<std::pair<int, int>> GenerateGridTiles(int startX, int endX, 
   return tiles;
 }
 
-static std::vector<TileCoord> GetSortedTiles(int startX, int endX, int startY, int endY,
-                                             int tileSize, const Point& mousePosition) {
+static std::vector<std::pair<int, int>> GetSortedTiles(int startX, int endX, int startY, int endY,
+                                                       int tileSize, const Point& mousePosition) {
 
   auto tiles = GenerateGridTiles(startX, endX, startY, endY);
-  TileCache::SortTilesByDistance(tiles, mousePosition, tileSize);
+  std::sort(tiles.begin(), tiles.end(),
+            [&mousePosition, tileSize = static_cast<float>(tileSize)](
+                const std::pair<int, int>& a, const std::pair<int, int>& b) {
+              return TileSortCompareFunc(mousePosition, tileSize, a, b);
+            });
   return tiles;
 }
 
@@ -462,10 +467,6 @@ void DisplayList::invalidateCurrentTileCache(const TileCache* tileCache,
 
 std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
                                                       std::vector<DrawTask>* tileTasks) {
-  if (std::isnan(mousePosition.x) && std::isnan(mousePosition.y)) {
-    mousePosition = Point::Make(surface->width() / 2, surface->height() / 2);
-    mousePosition -= _contentOffset;
-  }
   auto maxRefinedCount = _maxTilesRefinedPerFrame;
   if (lastContentOffset != _contentOffset || lastZoomScaleInt != _zoomScaleInt) {
     updateMousePosition();
@@ -491,7 +492,7 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
   int endX = static_cast<int>(ceilf(renderRect.right / static_cast<float>(_tileSize)));
   int endY = static_cast<int>(ceilf(renderRect.bottom / static_cast<float>(_tileSize)));
   std::vector<DrawTask> screenTasks = {};
-  std::vector<TileCoord> dirtyGrids = {};
+  std::vector<std::pair<int, int>> dirtyGrids = {};
   auto tileCount = static_cast<size_t>(endX - startX) * static_cast<size_t>(endY - startY);
   screenTasks.reserve(tileCount);
   dirtyGrids.reserve(tileCount);

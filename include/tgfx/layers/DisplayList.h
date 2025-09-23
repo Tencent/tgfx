@@ -257,7 +257,7 @@ class DisplayList {
   bool hasZoomBlurTiles = false;
   int64_t lastZoomScaleInt = 1000;
   Point lastContentOffset = {};
-  Point mousePosition = {NAN, NAN};
+  Point mousePosition = {};
   int totalTileCount = 0;
   std::vector<std::shared_ptr<Surface>> surfaceCaches = {};
   std::unordered_map<int64_t, TileCache*> tileCaches = {};
