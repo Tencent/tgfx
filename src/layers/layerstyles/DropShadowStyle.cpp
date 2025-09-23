@@ -90,7 +90,7 @@ Rect DropShadowStyle::filterBounds(const Rect& srcRect, float contentScale) {
   return filter->filterBounds(srcRect);
 }
 
-void DropShadowStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Image> contentContour,
+void DropShadowStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Image> contour,
                                             float contentScale, std::shared_ptr<Image> extraSource,
                                             const Point& extraSourceOffset, float alpha,
                                             BlendMode blendMode) {
@@ -99,7 +99,7 @@ void DropShadowStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Imag
   if (!filter) {
     return;
   }
-  auto shadowImage = contentContour->makeWithFilter(filter, &offset);
+  auto shadowImage = contour->makeWithFilter(filter, &offset);
   Paint paint = {};
   if (!_showBehindLayer) {
     auto shader = Shader::MakeImageShader(extraSource, TileMode::Decal, TileMode::Decal);
@@ -112,9 +112,9 @@ void DropShadowStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Imag
   canvas->drawImage(shadowImage, offset.x, offset.y, &paint);
 }
 
-void DropShadowStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> contentContour,
-                             float contentScale, float alpha, BlendMode blendMode) {
-  onDrawWithExtraSource(canvas, contentContour, contentScale, nullptr, {}, alpha, blendMode);
+void DropShadowStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> contour, float contentScale,
+                             float alpha, BlendMode blendMode) {
+  onDrawWithExtraSource(canvas, contour, contentScale, nullptr, {}, alpha, blendMode);
 }
 
 std::shared_ptr<ImageFilter> DropShadowStyle::getShadowFilter(float scale) {

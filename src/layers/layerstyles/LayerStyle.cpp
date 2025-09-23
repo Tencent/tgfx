@@ -32,10 +32,10 @@ Rect LayerStyle::filterBackground(const Rect& srcRect, float) {
   return srcRect;
 }
 
-void LayerStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Image> contentContour,
+void LayerStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Image> contour,
                                        float contentScale, std::shared_ptr<Image>, const Point&,
                                        float alpha, BlendMode blendMode) {
-  onDraw(canvas, std::move(contentContour), contentScale, alpha, blendMode);
+  onDraw(canvas, std::move(contour), contentScale, alpha, blendMode);
 }
 
 }  // namespace tgfx
