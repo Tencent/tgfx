@@ -285,7 +285,8 @@ Fill GetContourFill(const Fill& fill) {
     contourFill.colorFilter = ColorFilter::AlphaThreshold(OPAQUE_THRESHOLD);
     return contourFill;
   }
-  auto contourFill = Fill(Color::White(), BlendMode::Src, fill.antiAlias);
+  // Src + antiAlias may cause edge artifacts, use SrcOver instead.
+  auto contourFill = Fill(Color::White(), BlendMode::SrcOver, fill.antiAlias);
   contourFill.maskFilter = fill.maskFilter;
   return contourFill;
 }
