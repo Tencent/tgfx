@@ -17,25 +17,20 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
-#include "gpu/AAType.h"
+#include "DrawOp.h"
+#include "core/utils/PlacementPtr.h"
+#include "gpu/RectsVertexProvider.h"
 #include "gpu/proxies/IndexBufferProxy.h"
-#include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/VertexBufferProxyView.h"
-#include "gpu/tasks/RenderTask.h"
 #include "tgfx/core/Matrix3D.h"
+#include "tgfx/gpu/Context.h"
 
 namespace tgfx {
 
 /**
  * PerspectiveRenderArgs defines arguments for perspective rendering.
  */
-struct PerspectiveRenderArgs {
-  /**
-   * Anti-aliasing type.
-   */
-  AAType aa = AAType::None;
-
+struct Rect3DDrawArgs {
   /**
    * The transformation matrix from local space to clip space.
    */
@@ -49,34 +44,45 @@ struct PerspectiveRenderArgs {
    */
   Vec2 ndcScale;
   Vec2 ndcOffset;
+
+  /**
+   * Reference viewport size, used to convert NDC coordinates to window coordinates. The external
+   * transformMatrix, ndcScale, and ndcOffset are all defined based on this viewport size.
+   */
+  Size viewportSize;
 };
 
-/**
- * Transform3DRenderTask is a render task that renders a rectangle with perspective transformation.
- */
-class Transform3DRenderTask final : public RenderTask {
+class Rect3DDrawOp : public DrawOp {
  public:
   /**
-   * Creates a Transform3DRenderTask with rect, render target, fill texture and render args.
-   */
-  Transform3DRenderTask(const Rect& rect, std::shared_ptr<RenderTargetProxy> renderTarget,
-                        std::shared_ptr<TextureProxy> fillTexture,
-                        const PerspectiveRenderArgs& args);
-
-  void execute(CommandEncoder* encoder) override;
+ * Create a new RectDrawOp for the specified vertex provider.
+ */
+  static PlacementPtr<Rect3DDrawOp> Make(Context* context,
+                                         PlacementPtr<RectsVertexProvider> provider,
+                                         uint32_t renderFlags, const Rect3DDrawArgs& drawArgs);
 
  private:
-  Rect rect;
+  Rect3DDrawOp(RectsVertexProvider* provider, const Rect3DDrawArgs& drawArgs);
 
-  std::shared_ptr<RenderTargetProxy> renderTarget = nullptr;
+  PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
 
-  std::shared_ptr<TextureProxy> fillTexture = nullptr;
+  void onDraw(RenderPass* renderPass) override;
 
-  PerspectiveRenderArgs args;
+  Type type() override {
+    return Type::Rect3DDrawOp;
+  }
 
-  std::shared_ptr<VertexBufferProxyView> vertexBufferProxyView = nullptr;
+  Rect3DDrawArgs drawArgs;
+
+  size_t rectCount = 0;
+  std::optional<Color> commonColor = std::nullopt;
+  std::optional<Matrix> uvMatrix = std::nullopt;
+  bool hasSubset = false;
 
   std::shared_ptr<IndexBufferProxy> indexBufferProxy = nullptr;
+  std::shared_ptr<VertexBufferProxyView> vertexBufferProxyView = nullptr;
+
+  friend class BlockBuffer;
 };
 
 }  // namespace tgfx

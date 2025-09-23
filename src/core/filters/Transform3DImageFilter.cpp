@@ -20,9 +20,9 @@
 #include "core/utils/PlacementPtr.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/TPArgs.h"
-#include "gpu/processors/TiledTextureEffect.h"
+#include "gpu/ops/Rect3DDrawOp.h"
+#include "gpu/processors/TextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
-#include "gpu/tasks/Transform3DRenderTask.h"
 #include "tgfx/core/Matrix3D.h"
 
 namespace tgfx {
@@ -52,7 +52,7 @@ std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
   const auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(renderBounds.width()), static_cast<int>(renderBounds.height()),
       source->isAlphaOnly(), 1, args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
-  const auto sourceTextureProxy = source->lockTextureProxy(args);
+  auto sourceTextureProxy = source->lockTextureProxy(args);
 
   const auto srcW = static_cast<float>(source->width());
   const auto srcH = static_cast<float>(source->height());
@@ -85,9 +85,25 @@ std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
                        -1.f - ndcRectScaled.top - renderBoundsLTNDC.y);
 
   const auto drawingManager = args.context->drawingManager();
-  const PerspectiveRenderArgs perspectiveArgs{AAType::Coverage, matrix, ndcScale, ndcOffset};
-  drawingManager->addRectPerspectiveRenderTask(srcModelRect, renderTarget, sourceTextureProxy,
-                                               perspectiveArgs);
+  const auto drawingBuffer = args.context->drawingBuffer();
+  auto vertexProvider =
+      RectsVertexProvider::MakeFrom(drawingBuffer, srcModelRect, AAType::Coverage);
+  const Size viewportSise(static_cast<float>(renderTarget->width()),
+                          static_cast<float>(renderTarget->height()));
+  const Rect3DDrawArgs drawArgs{matrix, ndcScale, ndcOffset, viewportSise};
+  auto drawOp =
+      Rect3DDrawOp::Make(args.context, std::move(vertexProvider), args.renderFlags, drawArgs);
+  const SamplingArgs samplingArgs = {TileMode::Decal, TileMode::Decal, {}, SrcRectConstraint::Fast};
+  // Ensure the vertex texture sampling coordinates are in the range [0, 1]
+  const auto uvMatrix = Matrix::MakeTrans(-srcModelRect.left, -srcModelRect.top);
+  auto fragmentProcessor =
+      TextureEffect::Make(std::move(sourceTextureProxy), samplingArgs, &uvMatrix);
+  drawOp->addColorFP(std::move(fragmentProcessor));
+  std::vector<PlacementPtr<DrawOp>> drawOps;
+  drawOps.emplace_back(std::move(drawOp));
+  auto drawOpArray = drawingBuffer->makeArray(std::move(drawOps));
+  drawingManager->addOpsRenderTask(renderTarget, std::move(drawOpArray), std::nullopt);
+
   return renderTarget->asTextureProxy();
 }
 

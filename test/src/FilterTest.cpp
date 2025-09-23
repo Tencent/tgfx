@@ -835,7 +835,7 @@ TGFX_TEST(FilterTest, GaussianBlurImageFilter) {
   }
 }
 
-TGFX_TEST(FilterTest, PerspectiveImageFilter) {
+TGFX_TEST(FilterTest, Transform3DImageFilter) {
   const ContextScope scope;
   Context* context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -860,14 +860,14 @@ TGFX_TEST(FilterTest, PerspectiveImageFilter) {
     auto modelMatrix = Matrix3D::MakeRotate({0.f, 1.f, 0.f}, 45.f);
     modelMatrix.postTranslate(0.f, 0.f, 1.f / 100.f);
     auto transform = cssProjectionMatrix * modelMatrix;
-    const auto cssPerspectiveFilter = ImageFilter::Transform3D(transform, imageSize);
+    const auto cssTransform3DFilter = ImageFilter::Transform3D(transform, imageSize);
 
     Paint paint = {};
-    paint.setImageFilter(cssPerspectiveFilter);
+    paint.setImageFilter(cssTransform3DFilter);
     canvas->drawImage(image, 45.f, 45.f, &paint);
 
     context->flushAndSubmit();
-    EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/PerspectiveImageFilterCSSBasic"));
+    EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/Transform3DImageFilterCSSBasic"));
     canvas->restore();
   }
 
@@ -897,7 +897,7 @@ TGFX_TEST(FilterTest, PerspectiveImageFilter) {
   auto modelMatrix = Matrix3D::MakeRotate({0.f, 1.f, 0.f}, 45.f);
   modelMatrix.postTranslate(0.f, 0.f, -10.f);
   auto standardTransform = perspectiveMatrix * viewMatrix * modelMatrix;
-  const auto standardPerspectiveFilter = ImageFilter::Transform3D(standardTransform, imageSize);
+  const auto standardTransform3DFilter = ImageFilter::Transform3D(standardTransform, imageSize);
 
   // Test basic drawing with standard perspective type.
   {
@@ -905,12 +905,12 @@ TGFX_TEST(FilterTest, PerspectiveImageFilter) {
     canvas->clear();
 
     Paint paint = {};
-    paint.setImageFilter(standardPerspectiveFilter);
+    paint.setImageFilter(standardTransform3DFilter);
     canvas->setMatrix(tgfx::Matrix::MakeRotate(45, 100, 100));
     canvas->drawImage(image, 45.f, 45.f, &paint);
 
     context->flushAndSubmit();
-    EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/PerspectiveImageFilterStandardBasic"));
+    EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/Transorm3DImageFilterStandardBasic"));
     canvas->restore();
   }
 
@@ -919,34 +919,34 @@ TGFX_TEST(FilterTest, PerspectiveImageFilter) {
     canvas->save();
     canvas->clear();
 
-    auto filteredImage = image->makeWithFilter(standardPerspectiveFilter);
-    auto filteredBounds = standardPerspectiveFilter->filterBounds(
+    auto filteredImage = image->makeWithFilter(standardTransform3DFilter);
+    auto filteredBounds = standardTransform3DFilter->filterBounds(
         Rect::MakeWH(static_cast<float>(image->width()), static_cast<float>(image->height())));
 
     const auto clipRectLT =
         Rect::MakeXYWH(filteredBounds.left, filteredBounds.top, filteredBounds.width() * 0.5f,
                        filteredBounds.height() * 0.5f);
-    const auto imageLT = image->makeWithFilter(standardPerspectiveFilter, nullptr, &clipRectLT);
+    const auto imageLT = image->makeWithFilter(standardTransform3DFilter, nullptr, &clipRectLT);
     canvas->drawImage(imageLT, 0.f, 0.f);
 
     const auto clipRectRT = Rect::MakeXYWH(clipRectLT.right, filteredBounds.top,
                                            filteredBounds.width() * 0.5f, clipRectLT.height());
-    const auto imageRT = image->makeWithFilter(standardPerspectiveFilter, nullptr, &clipRectRT);
+    const auto imageRT = image->makeWithFilter(standardTransform3DFilter, nullptr, &clipRectRT);
     canvas->drawImage(imageRT, static_cast<float>(imageLT->width()), 0.f);
 
     const auto clipRectLB = Rect::MakeXYWH(filteredBounds.left, clipRectLT.bottom,
                                            clipRectLT.width(), filteredBounds.height() * 0.5f);
-    const auto imageLB = image->makeWithFilter(standardPerspectiveFilter, nullptr, &clipRectLB);
+    const auto imageLB = image->makeWithFilter(standardTransform3DFilter, nullptr, &clipRectLB);
     canvas->drawImage(imageLB, 0.f, static_cast<float>(imageLT->height()));
 
     const auto clipRectRB =
         Rect::MakeXYWH(clipRectRT.left, clipRectRT.bottom, clipRectRT.width(), clipRectLB.height());
-    const auto imageRB = image->makeWithFilter(standardPerspectiveFilter, nullptr, &clipRectRB);
+    const auto imageRB = image->makeWithFilter(standardTransform3DFilter, nullptr, &clipRectRB);
     canvas->drawImage(imageRB, static_cast<float>(imageLT->width()),
                       static_cast<float>(imageLT->height()));
 
     context->flushAndSubmit();
-    EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/PerspectiveImageFilterStandardClip"));
+    EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/Transform3DImageFilterStandardClip"));
     canvas->restore();
   }
 }

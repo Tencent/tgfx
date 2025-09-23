@@ -25,7 +25,7 @@
 namespace tgfx {
 class DrawOp {
  public:
-  enum class Type { RectDrawOp, RRectDrawOp, ShapeDrawOp, AtlasTextOp };
+  enum class Type { RectDrawOp, RRectDrawOp, ShapeDrawOp, AtlasTextOp, Rect3DDrawOp };
 
   virtual ~DrawOp() = default;
 
