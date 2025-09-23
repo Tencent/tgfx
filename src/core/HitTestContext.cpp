@@ -17,8 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "HitTestContext.h"
-#include "core/utils/ApplyStrokeToBounds.h"
+#include <algorithm>
 #include "core/utils/MathExtra.h"
+#include "core/utils/ShapeUtils.h"
+#include "core/utils/StrokeUtils.h"
+#include "tgfx/core/Stroke.h"
 #include "utils/Log.h"
 
 namespace tgfx {
@@ -104,15 +107,19 @@ void HitTestContext::drawShape(std::shared_ptr<Shape> shape, const MCState& stat
     return;
   }
   if (shapeHitTest) {
-    if (stroke && !stroke->isHairline()) {
-      shape = Shape::ApplyStroke(std::move(shape), stroke);
-    }
+    // Measure doesn't require high-precision paths, so ignore resolution scale here.
     auto path = shape->getPath();
+    if (stroke) {
+      stroke->applyToPath(&path);
+    }
     if (!path.contains(local.x, local.y)) {
       return;
     }
   } else {
     auto bounds = shape->getBounds();
+    if (stroke) {
+      ApplyStrokeToBounds(*stroke, &bounds);
+    }
     if (!bounds.contains(local.x, local.y)) {
       return;
     }

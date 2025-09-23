@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,32 +16,15 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "core/shapes/UniqueKeyShape.h"
-#include "tgfx/core/Matrix.h"
+#include "ShapeUtils.h"
 
 namespace tgfx {
-/**
- * Shape that applies a PathEffect to another Shape.
- */
-class EffectShape : public UniqueKeyShape {
- public:
-  EffectShape(std::shared_ptr<Shape> shape, std::shared_ptr<PathEffect> effect)
-      : shape(std::move(shape)), effect(std::move(effect)) {
+
+Path ShapeUtils::GetShapeRenderingPath(std::shared_ptr<Shape> shape, float resolutionScale) {
+  if (shape == nullptr) {
+    return {};
   }
+  return shape->onGetPath(resolutionScale);
+}
 
-  Rect getBounds() const override;
-
- protected:
-  Type type() const override {
-    return Type::Effect;
-  }
-
-  Path onGetPath(float resolutionScale) const override;
-
- private:
-  std::shared_ptr<Shape> shape = nullptr;
-  std::shared_ptr<PathEffect> effect = nullptr;
-};
 }  // namespace tgfx

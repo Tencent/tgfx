@@ -26,6 +26,7 @@
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/RectToRectMatrix.h"
+#include "core/utils/ShapeUtils.h"
 #include "core/utils/Types.h"
 #include "svg/SVGTextBuilder.h"
 #include "tgfx/core/Bitmap.h"
@@ -39,6 +40,7 @@
 #include "tgfx/core/Point.h"
 #include "tgfx/core/RRect.h"
 #include "tgfx/core/Rect.h"
+#include "tgfx/core/Shape.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/TileMode.h"
@@ -142,10 +144,9 @@ void SVGExportContext::drawPath(const Path& path, const MCState& state, const Fi
 void SVGExportContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
                                  const Fill& fill, const Stroke* stroke) {
   DEBUG_ASSERT(shape != nullptr);
-  if (stroke && !stroke->isHairline()) {
-    shape = Shape::ApplyStroke(std::move(shape), stroke);
-  }
-  drawPath(shape->getPath(), state, fill);
+  shape = Shape::ApplyStroke(shape, stroke);
+  auto path = ShapeUtils::GetShapeRenderingPath(shape, state.matrix.getMaxScale());
+  drawPath(path, state, fill);
 }
 
 void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,

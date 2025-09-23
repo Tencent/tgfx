@@ -17,8 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MeasureContext.h"
-#include "core/utils/ApplyStrokeToBounds.h"
 #include "core/utils/Log.h"
+#include "core/utils/StrokeUtils.h"
+#include "tgfx/core/Shape.h"
 #include "utils/MathExtra.h"
 
 namespace tgfx {
@@ -52,17 +53,18 @@ void MeasureContext::drawShape(std::shared_ptr<Shape> shape, const MCState& stat
   DEBUG_ASSERT(shape != nullptr);
   if (computeTightBounds) {
     auto path = shape->getPath();
-    if (stroke && !stroke->isHairline()) {
+    if (stroke) {
+      // Measure doesn't require high-precision paths, so ignore resolution scale here.
       stroke->applyToPath(&path);
     }
     addTightBounds(path, state, fill);
     return;
   }
-  auto bound = shape->getBounds();
-  if (stroke && !stroke->isHairline()) {
-    ApplyStrokeToBounds(*stroke, &bound, true);
+  auto localBounds = shape->getBounds();
+  if (stroke) {
+    ApplyStrokeToBounds(*stroke, &localBounds, true);
   }
-  addLocalBounds(state, fill, bound, shape->isInverseFillType());
+  addLocalBounds(state, fill, localBounds, shape->isInverseFillType());
 }
 
 void MeasureContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions&,
