@@ -1229,7 +1229,7 @@ TGFX_TEST(LayerTest, HasContentChanged) {
 
 /**
  * The schematic diagram is as follows:
- * https://www.geogebra.org/graphing/et36u73x
+ * https://www.geogebra.org/graphing/uxs8drhd
  * https://codesign-1252678369.cos.ap-guangzhou.myqcloud.com/getLayersUnderPoint.png
  */
 TGFX_TEST(LayerTest, getLayersUnderPoint) {
@@ -1302,6 +1302,35 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
   printf("shaperLayer2Bounds: (%f, %f, %f, %f)\n", shaperLayer2Bounds.left, shaperLayer2Bounds.top,
          shaperLayer2Bounds.right, shaperLayer2Bounds.bottom);
 
+  auto shapeLayerInvisibleFill = ShapeLayer::Make();
+  auto rectPath1 = tgfx::Path();
+  rectPath1.addRect({100, 300, 200, 375});
+  shapeLayerInvisibleFill->setPath(rectPath1);
+  shapeLayerInvisibleFill->setName("shapeLayerInvisibleFill");
+  auto fillStyle0 = SolidColor::Make(Color::FromRGBA(130, 182, 41, 0));
+  shapeLayerInvisibleFill->setFillStyle(fillStyle0);
+  rootLayer->addChild(shapeLayerInvisibleFill);
+  auto shapeLayerInvisibleFillBounds = shapeLayerInvisibleFill->getBounds(nullptr, true);
+  shapeLayerInvisibleFill->getGlobalMatrix().mapRect(&shapeLayerInvisibleFillBounds);
+  printf("shapeLayerInvisibleFillBounds: (%f, %f, %f, %f)\n", shapeLayerInvisibleFillBounds.left,
+         shapeLayerInvisibleFillBounds.top, shapeLayerInvisibleFillBounds.right,
+         shapeLayerInvisibleFillBounds.bottom);
+
+  auto shapeLayerInvisibleStroke = ShapeLayer::Make();
+  auto rectPath2 = tgfx::Path();
+  rectPath2.addRect({150, 320, 250, 395});
+  shapeLayerInvisibleStroke->setPath(rectPath2);
+  shapeLayerInvisibleStroke->setName("shapeLayerInvisibleStroke");
+  shapeLayerInvisibleStroke->addStrokeStyle(
+      tgfx::SolidColor::Make(tgfx::Color::FromRGBA(130, 182, 41, 0)));
+  rootLayer->addChild(shapeLayerInvisibleStroke);
+
+  auto shapeLayerInvisibleStrokeBounds = shapeLayerInvisibleStroke->getBounds(nullptr, true);
+  shapeLayerInvisibleStroke->getGlobalMatrix().mapRect(&shapeLayerInvisibleStrokeBounds);
+  printf("shapeLayerInvisibleStrokeBounds: (%f, %f, %f, %f)\n",
+         shapeLayerInvisibleStrokeBounds.left, shapeLayerInvisibleStrokeBounds.top,
+         shapeLayerInvisibleStrokeBounds.right, shapeLayerInvisibleStrokeBounds.bottom);
+
   auto rootLayerBounds = rootLayer->getBounds(nullptr, true);
   printf("rootLayerBounds: (%f, %f, %f, %f)\n", rootLayerBounds.left, rootLayerBounds.top,
          rootLayerBounds.right, rootLayerBounds.bottom);
@@ -1316,6 +1345,8 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
   canvas->drawRect(shaperLayerBounds, paint);
   canvas->drawRect(textLayerBounds, paint);
   canvas->drawRect(shaperLayer2Bounds, paint);
+  canvas->drawRect(shapeLayerInvisibleFillBounds, paint);
+  canvas->drawRect(shapeLayerInvisibleStrokeBounds, paint);
   paint.setColor(Color::Red());
   canvas->drawRect(rootLayerBounds, paint);
 
@@ -1463,6 +1494,19 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
   printf("\n");
   EXPECT_EQ(static_cast<int>(layers.size()), 3);
   EXPECT_EQ(layerNameJoin, "shaper_layer2|text_layer|root_layer|");
+
+  // P12(180, 360) is in the shaper_layer2, root_layer
+  layerNameJoin = "";
+  layers = rootLayer->getLayersUnderPoint(180.0f, 360.0f);
+  canvas->drawCircle(180.0f, 360.0f, 5.0f, paint);
+  printf("layers.size(): %zu\n", layers.size());
+  for (auto layer : layers) {
+    printf("layer: %s\n", layer->name().c_str());
+    layerNameJoin += layer->name() + "|";
+  }
+  printf("\n");
+  EXPECT_EQ(static_cast<int>(layers.size()), 3);
+  EXPECT_EQ(layerNameJoin, "shapeLayerInvisibleStroke|shapeLayerInvisibleFill|root_layer|");
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/getLayersUnderPoint"));
 }
 

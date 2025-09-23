@@ -434,6 +434,7 @@ Rect Layer::getBoundsInternal(const Matrix& coordinateMatrix, bool computeTightB
     }
   }
   for (const auto& child : _children) {
+    // Alpha does not need to be checked; alpha == 0 is still valid.
     if (!child->visible() || child->maskOwner) {
       continue;
     }
@@ -494,7 +495,8 @@ bool Layer::hitTestPoint(float x, float y, bool shapeHitTest) {
   }
 
   for (const auto& childLayer : _children) {
-    if (!childLayer->visible() || childLayer->_alpha <= 0.f || childLayer->maskOwner) {
+    // Alpha does not need to be checked; alpha == 0 is still valid.
+    if (!childLayer->visible() || childLayer->maskOwner) {
       continue;
     }
 
