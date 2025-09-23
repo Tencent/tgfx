@@ -105,7 +105,7 @@ class LayerStyle : public LayerProperty {
    * Applies the layer style to the scaled image of the layer content and draws it on the canvas.
    * @param canvas The canvas to draw the layer style on.
    * @param contour The scaled contour (shape) of the content, which may not match the RGBA data of
-   * the content and only represents the shape information. Note: contour and layer  contour are not
+   * the content and only represents the shape information. Note: contour and layer contour are not
    * necessarily the same.
    * @param contentScale The scale factor of the layer content relative to its original size.
    * Some layer styles have size-related parameters that must be adjusted with this scale factor.
@@ -128,7 +128,7 @@ class LayerStyle : public LayerProperty {
    * draws it on the canvas.
    * @param canvas The canvas to draw the layer style on.
    * @param contour The scaled contour (shape) of the content, which may not match the RGBA data of
-   * the content and only represents the shape information. Note: contour and layer  contour are not
+   * the content and only represents the shape information. Note: contour and layer contour are not
    * necessarily the same.
    * @param contentScale The scale factor of the layer content relative to its original size.
    * Some layer styles have size-related parameters that must be adjusted with this scale factor.
@@ -149,7 +149,7 @@ class LayerStyle : public LayerProperty {
    * Applies the layer style to the scaled image of the layer content and draws it on the canvas.
    * @param canvas The canvas to draw the layer style on.
    * @param contour The scaled contour (shape) of the content, which may not match the RGBA data of
-   * the content and only represents the shape information. Note: contour and layer  contour are not
+   * the content and only represents the shape information. Note: contour and layer contour are not
    * necessarily the same.
    * @param contentScale The scale factor of the layer content relative to its original size.
    * Some layer styles have size-related parameters that must be adjusted with this scale factor.
@@ -166,7 +166,7 @@ class LayerStyle : public LayerProperty {
    * The default implementation calls onDraw with the layer content only.
    * @param canvas The canvas to draw the layer style on.
    * @param contour The scaled contour (shape) of the content, which may not match the RGBA data of
-   * the content and only represents the shape information. Note: contour and layer  contour are not
+   * the content and only represents the shape information. Note: contour and layer contour are not
    * necessarily the same.
    * @param contentScale The scale factor of the layer content relative to its original size.
    * Some layer styles have size-related parameters that must be adjusted with this scale factor.
