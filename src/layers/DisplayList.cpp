@@ -20,6 +20,7 @@
 #include "core/utils/DecomposeRects.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/TileSortCompareFunc.h"
 #include "inspect/InspectorMark.h"
 #include "layers/DrawArgs.h"
 #include "layers/RootLayer.h"
@@ -110,6 +111,29 @@ static int64_t ChangeZoomScalePrecision(int64_t zoomScaleInt, int oldPrecision, 
   return static_cast<int64_t>(
       std::roundf(static_cast<float>(zoomScaleInt) * static_cast<float>(newPrecision) /
                   static_cast<float>(oldPrecision)));
+}
+
+static std::vector<std::pair<int, int>> GenerateGridTiles(int startX, int endX, int startY,
+                                                          int endY) {
+  std::vector<std::pair<int, int>> tiles;
+  for (auto tileY = startY; tileY < endY; ++tileY) {
+    for (auto tileX = startX; tileX < endX; ++tileX) {
+      tiles.emplace_back(tileX, tileY);
+    }
+  }
+  return tiles;
+}
+
+static std::vector<std::pair<int, int>> GetSortedTiles(int startX, int endX, int startY, int endY,
+                                                       int tileSize, const Point& mousePosition) {
+
+  auto tiles = GenerateGridTiles(startX, endX, startY, endY);
+  std::sort(tiles.begin(), tiles.end(),
+            [&mousePosition, tileSize = static_cast<float>(tileSize)](
+                const std::pair<int, int>& a, const std::pair<int, int>& b) {
+              return TileSortCompareFunc(mousePosition, tileSize, a, b);
+            });
+  return tiles;
 }
 
 DisplayList::DisplayList() : _root(RootLayer::Make()) {
@@ -445,6 +469,7 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
                                                       std::vector<DrawTask>* tileTasks) {
   auto maxRefinedCount = _maxTilesRefinedPerFrame;
   if (lastContentOffset != _contentOffset || lastZoomScaleInt != _zoomScaleInt) {
+    updateMousePosition();
     lastContentOffset = _contentOffset;
     lastZoomScaleInt = _zoomScaleInt;
     // To ensure smooth user interactions, we skip refinement when the offset or zoom scale is
@@ -473,25 +498,24 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
   dirtyGrids.reserve(tileCount);
   auto sortedCaches = getSortedTileCaches();
   auto fallbackTileCaches = getFallbackTileCaches(sortedCaches);
-  for (int tileY = startY; tileY < endY; ++tileY) {
-    for (int tileX = startX; tileX < endX; ++tileX) {
-      auto tile = currentTileCache->getTile(tileX, tileY);
-      if (tile != nullptr) {
-        screenTasks.emplace_back(tile, _tileSize);
-      } else {
-        if (_allowZoomBlur) {
-          auto fallbackTasks = getFallbackDrawTasks(tileX, tileY, fallbackTileCaches);
-          if (!fallbackTasks.empty()) {
-            if (maxRefinedCount <= 0) {
-              screenTasks.insert(screenTasks.end(), fallbackTasks.begin(), fallbackTasks.end());
-              hasZoomBlurTiles = true;
-              continue;
-            }
-            maxRefinedCount--;
+  auto sortedTiles = GetSortedTiles(startX, endX, startY, endY, _tileSize, mousePosition);
+  for (const auto& [tileX, tileY] : sortedTiles) {
+    auto tile = currentTileCache->getTile(tileX, tileY);
+    if (tile != nullptr) {
+      screenTasks.emplace_back(tile, _tileSize);
+    } else {
+      if (_allowZoomBlur) {
+        auto fallbackTasks = getFallbackDrawTasks(tileX, tileY, fallbackTileCaches);
+        if (!fallbackTasks.empty()) {
+          if (maxRefinedCount <= 0) {
+            screenTasks.insert(screenTasks.end(), fallbackTasks.begin(), fallbackTasks.end());
+            hasZoomBlurTiles = true;
+            continue;
           }
+          maxRefinedCount--;
         }
-        dirtyGrids.emplace_back(tileX, tileY);
       }
+      dirtyGrids.emplace_back(tileX, tileY);
     }
   }
   std::vector<std::shared_ptr<Tile>> freeTiles = {};
@@ -499,6 +523,7 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
   if (screenTasks.empty()) {
     freeTiles = createContinuousTiles(surface, endX - startX, endY - startY);
     continuous = !freeTiles.empty();
+    dirtyGrids = GenerateGridTiles(startX, endX, startY, endY);
   }
   if (freeTiles.empty()) {
     freeTiles = getFreeTiles(surface, dirtyGrids.size(), sortedCaches);
@@ -878,4 +903,17 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
 }
 
+void DisplayList::updateMousePosition() {
+  if (lastZoomScaleInt == _zoomScaleInt) {
+    mousePosition += (lastContentOffset - _contentOffset);
+    return;
+  }
+
+  const auto scale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision) /
+                     ToZoomScaleFloat(lastZoomScaleInt, _zoomScalePrecision);
+  DEBUG_ASSERT(scale != 1.0f);
+  const auto invScaleFactor = 1.0f / (1.0f - scale);
+  mousePosition = (_contentOffset - lastContentOffset * scale) * invScaleFactor;
+  mousePosition -= _contentOffset;
+}
 }  // namespace tgfx

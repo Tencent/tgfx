@@ -19,6 +19,7 @@
 #pragma once
 
 #include "gpu/resources/ResourceKey.h"
+#include "tgfx/core/Matrix.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/core/Stroke.h"
 
@@ -38,8 +39,6 @@ class StrokeShape : public Shape {
 
   Rect getBounds() const override;
 
-  Path getPath() const override;
-
   static UniqueKey MakeUniqueKey(const UniqueKey& key, const Stroke& stroke);
 
   std::shared_ptr<Shape> shape = nullptr;
@@ -51,6 +50,8 @@ class StrokeShape : public Shape {
   }
 
   UniqueKey getUniqueKey() const override;
+
+  Path onGetPath(float resolutionScale) const override;
 
   friend class Shape;
 };

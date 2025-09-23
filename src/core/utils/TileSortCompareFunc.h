@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,30 +18,21 @@
 
 #pragma once
 
-#include "core/shapes/UniqueKeyShape.h"
-#include "tgfx/core/Matrix.h"
+#include "tgfx/core/Point.h"
 
 namespace tgfx {
+enum class SortOrder { Ascending, Descending };
+
 /**
- * Shape that applies a PathEffect to another Shape.
+ * Compares two tiles based on their distance to a center point.
+ * @param center The center point to measure distance from.
+ * @param tileSize The size of each tile.
+ * @param a The coordinates of the first tile (tileX, tileY).
+ * @param b The coordinates of the second tile (tileX, tileY).
+ * @param order The sort order, either ascending or descending.
+ * @return True if tile 'a' is closer to the center than tile 'b' (for ascending order),
+ *         or farther from the center than tile 'b' (for descending order).
  */
-class EffectShape : public UniqueKeyShape {
- public:
-  EffectShape(std::shared_ptr<Shape> shape, std::shared_ptr<PathEffect> effect)
-      : shape(std::move(shape)), effect(std::move(effect)) {
-  }
-
-  Rect getBounds() const override;
-
- protected:
-  Type type() const override {
-    return Type::Effect;
-  }
-
-  Path onGetPath(float resolutionScale) const override;
-
- private:
-  std::shared_ptr<Shape> shape = nullptr;
-  std::shared_ptr<PathEffect> effect = nullptr;
-};
+bool TileSortCompareFunc(const Point& center, float tileSize, const std::pair<int, int>& a,
+                         const std::pair<int, int>& b, SortOrder order = SortOrder::Ascending);
 }  // namespace tgfx
