@@ -1,3 +1,4 @@
+#include "core/utils/StrokeUtils.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/core/Stroke.h"
@@ -23,7 +24,7 @@ TGFX_TEST(StrokeTest, DrawPathByHairlinePaint) {
   paint.setStyle(PaintStyle::Stroke);
   paint.setStroke(Stroke(0.0f));
 
-  EXPECT_TRUE(paint.getStroke()->isHairline());
+  EXPECT_TRUE(IsHairlineStroke(*paint.getStroke()));
 
   auto path = Path();
   path.addRoundRect(Rect::MakeXYWH(-12.5f, -12.5f, 25.f, 25.f), 5, 5);

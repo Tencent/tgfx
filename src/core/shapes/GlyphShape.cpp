@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GlyphShape.h"
+#include "core/utils/MathExtra.h"
 
 namespace tgfx {
 std::shared_ptr<Shape> Shape::MakeFrom(Font font, GlyphID glyphID) {
@@ -32,10 +33,19 @@ std::shared_ptr<Shape> Shape::MakeFrom(Font font, GlyphID glyphID) {
 GlyphShape::GlyphShape(Font font, GlyphID glyphID) : font(std::move(font)), glyphID(glyphID) {
 }
 
-Path GlyphShape::onGetPath(float /*resolutionScale*/) const {
+Path GlyphShape::onGetPath(float resolutionScale) const {
   Path path = {};
-  if (!font.getPath(glyphID, &path)) {
-    return {};
+  if (FloatNearlyEqual(resolutionScale, 1.0f)) {
+    if (!font.getPath(glyphID, &path)) {
+      return {};
+    }
+  } else {
+    auto scaledFont = font.makeWithSize(font.getSize() * resolutionScale);
+    if (!scaledFont.getPath(glyphID, &path)) {
+      return {};
+    }
+    auto inverseMatrix = Matrix::MakeScale(1.f / resolutionScale, 1.f / resolutionScale);
+    path.transform(inverseMatrix);
   }
   return path;
 }

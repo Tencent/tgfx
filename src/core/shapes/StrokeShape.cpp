@@ -58,8 +58,7 @@ Rect StrokeShape::getBounds() const {
 
 Path StrokeShape::onGetPath(float resolutionScale) const {
   auto path = shape->onGetPath(resolutionScale);
-  if (stroke.isHairline() ||
-      TreatStrokeAsHairline(stroke, Matrix::MakeScale(resolutionScale, resolutionScale))) {
+  if (TreatStrokeAsHairline(stroke, Matrix::MakeScale(resolutionScale, resolutionScale))) {
     Stroke hairlineStroke = stroke;
     // When zoomed in by a matrix shape, reduce the stroke width ahead of time
     hairlineStroke.width = 1.f / resolutionScale;
@@ -74,7 +73,7 @@ UniqueKey StrokeShape::MakeUniqueKey(const UniqueKey& key, const Stroke& stroke)
   static const auto WidthStrokeShapeType = UniqueID::Next();
   static const auto CapJoinStrokeShapeType = UniqueID::Next();
   static const auto FullStrokeShapeType = UniqueID::Next();
-  if (!stroke.isHairline()) {
+  if (!IsHairlineStroke(stroke)) {
     auto hasMiter = stroke.join == LineJoin::Miter && stroke.miterLimit != 4.0f;
     auto hasCapJoin = hasMiter || stroke.cap != LineCap::Butt || stroke.join != LineJoin::Miter;
     size_t count = 2 + (hasCapJoin ? 1 : 0) + (hasMiter ? 1 : 0);

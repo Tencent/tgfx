@@ -52,14 +52,8 @@ Path TextShape::onGetPath(float resolutionScale) const {
     LOGE("TextShape::getPath() Failed to get path from GlyphRunList!");
     return {};
   }
-  // Matrix inverseMatrix = {};
-  // if (matrix.invert(&inverseMatrix)) {
-  //   path.transform(inverseMatrix);
-  //   return path;
-  // }
   auto inverseMatrix = Matrix::MakeScale(1.f / resolutionScale, 1.f / resolutionScale);
   path.transform(inverseMatrix);
-
   return path;
 }
 }  // namespace tgfx
