@@ -304,9 +304,7 @@ std::vector<Paint> ShapeLayer::createShapePaints(
     paint.setAlpha(style->alpha());
     paint.setBlendMode(style->blendMode());
     paint.setShader(style->getShader());
-    if (!paint.getFill().nothingToDraw()) {
-      paintList.push_back(paint);
-    }
+    paintList.push_back(paint);
   }
   return paintList;
 }

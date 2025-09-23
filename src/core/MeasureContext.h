@@ -63,11 +63,9 @@ class MeasureContext : public DrawContext {
   bool computeTightBounds = false;
   Rect bounds = {};
 
-  void addTightBounds(const Path& path, const MCState& state, const Fill& fill);
+  void addTightBounds(const Path& path, const MCState& state);
 
-  void addLocalBounds(const MCState& state, const Fill& fill, const Rect& localBounds,
-                      bool unbounded = false);
-  void addDeviceBounds(const Path& clip, const Fill& fill, const Rect& deviceBounds,
-                       bool unbounded = false);
+  void addLocalBounds(const MCState& state, const Rect& localBounds, bool unbounded = false);
+  void addDeviceBounds(const Path& clip, const Rect& deviceBounds, bool unbounded = false);
 };
 }  // namespace tgfx
