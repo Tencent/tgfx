@@ -32,7 +32,7 @@ class Transform3DImageFilter final : public ImageFilter {
   /**
    * Creates a Transform3DImageFilter with the specified PerspectiveInfo.
    */
-  explicit Transform3DImageFilter(const Matrix3D& matrix, const Size& viewSize);
+  explicit Transform3DImageFilter(const Matrix3D& matrix, const Size& viewportSize);
 
  private:
   Type type() const override {
@@ -57,9 +57,9 @@ class Transform3DImageFilter final : public ImageFilter {
   Matrix3D matrix = Matrix3D::I();
 
   /**
-   * Window view size, used to map NDC coordinates to window coordinates.
+   * View port size, used to map NDC coordinates to window coordinates.
    */
-  Size viewSize = {0, 0};
+  Size viewportSize = {0, 0};
 };
 
 }  // namespace tgfx
