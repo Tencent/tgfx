@@ -285,7 +285,6 @@ TGFX_TEST(LayerTest, Layer_getTotalMatrix) {
 /**
  * The derivation process is shown in the following figure:
  * https://www.geogebra.org/graphing/vtcatfdf
- * https://codesign-1252678369.cos.ap-guangzhou.myqcloud.com/%E5%9D%90%E6%A0%87%E8%BD%AC%E6%8D%A2_%E5%85%A8%E5%B1%80%E5%88%B0%E5%B1%80%E9%83%A8.png
  */
 TGFX_TEST(LayerTest, Layer_globalToLocal) {
   auto layerA1 = Layer::Make();
@@ -317,7 +316,6 @@ TGFX_TEST(LayerTest, Layer_globalToLocal) {
 }
 /**
  * The derivation process is shown in the following figure:
- * https://codesign-1252678369.cos.ap-guangzhou.myqcloud.com/%E5%9D%90%E6%A0%87%E8%BD%AC%E6%8D%A2.png
  * https://www.geogebra.org/graphing/kvrqtdqk
  */
 TGFX_TEST(LayerTest, Layer_localToGlobal) {
@@ -1230,7 +1228,6 @@ TGFX_TEST(LayerTest, HasContentChanged) {
 /**
  * The schematic diagram is as follows:
  * https://www.geogebra.org/graphing/uxs8drhd
- * https://codesign-1252678369.cos.ap-guangzhou.myqcloud.com/getLayersUnderPoint.png
  */
 TGFX_TEST(LayerTest, getLayersUnderPoint) {
   ContextScope scope;
@@ -1513,8 +1510,6 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
 /**
  * The schematic diagram is as follows(Visit geogebra online vector map to view pixel details):
  * https://www.geogebra.org/classic/krbzbz6m
- * https://codesign-1252678369.cos.ap-guangzhou.myqcloud.com/hitTestPoint.png
- * https://codesign-1252678369.cos.ap-guangzhou.myqcloud.com/Layer_hitTestPoint.png
  */
 TGFX_TEST(LayerTest, hitTestPoint) {
   ContextScope scope;
@@ -1729,7 +1724,6 @@ TGFX_TEST(LayerTest, drawRRect) {
 /**
  * The schematic diagram is as follows:
  * https://www.geogebra.org/classic/nxwbmmrp
- * https://codesign-1252678369.cos.ap-guangzhou.myqcloud.com/hitTestPointNested.png
  */
 TGFX_TEST(LayerTest, hitTestPointNested) {
   ContextScope scope;
