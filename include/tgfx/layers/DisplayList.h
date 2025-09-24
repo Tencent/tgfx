@@ -257,6 +257,7 @@ class DisplayList {
   bool hasZoomBlurTiles = false;
   int64_t lastZoomScaleInt = 1000;
   Point lastContentOffset = {};
+  Point mousePosition = {};
   int totalTileCount = 0;
   std::vector<std::shared_ptr<Surface>> surfaceCaches = {};
   std::unordered_map<int64_t, TileCache*> tileCaches = {};
@@ -314,5 +315,6 @@ class DisplayList {
 
   void drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
                      bool autoClear) const;
+  void updateMousePosition();
 };
 }  // namespace tgfx

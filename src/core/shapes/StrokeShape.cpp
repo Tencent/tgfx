@@ -18,10 +18,12 @@
 
 #include "StrokeShape.h"
 #include "core/shapes/MatrixShape.h"
-#include "core/utils/ApplyStrokeToBounds.h"
 #include "core/utils/Log.h"
+#include "core/utils/MathExtra.h"
+#include "core/utils/StrokeUtils.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/resources/ResourceKey.h"
+#include "tgfx/core/Matrix.h"
 
 namespace tgfx {
 
@@ -31,9 +33,6 @@ std::shared_ptr<Shape> Shape::ApplyStroke(std::shared_ptr<Shape> shape, const St
   }
   if (stroke == nullptr) {
     return shape;
-  }
-  if (stroke->isHairline()) {
-    return nullptr;
   }
   if (shape->type() != Type::Matrix) {
     return std::make_shared<StrokeShape>(std::move(shape), *stroke);
@@ -58,9 +57,19 @@ Rect StrokeShape::getBounds() const {
   return bounds;
 }
 
-Path StrokeShape::getPath() const {
-  auto path = shape->getPath();
-  stroke.applyToPath(&path);
+Path StrokeShape::onGetPath(float resolutionScale) const {
+  if (FloatNearlyZero(resolutionScale)) {
+    return {};
+  }
+  auto path = shape->onGetPath(resolutionScale);
+  if (TreatStrokeAsHairline(stroke, Matrix::MakeScale(resolutionScale, resolutionScale))) {
+    Stroke hairlineStroke = stroke;
+    // When zoomed in by a matrix shape, reduce the stroke width ahead of time
+    hairlineStroke.width = 1.f / resolutionScale;
+    hairlineStroke.applyToPath(&path, resolutionScale);
+    return path;
+  }
+  stroke.applyToPath(&path, resolutionScale);
   return path;
 }
 
@@ -68,7 +77,7 @@ UniqueKey StrokeShape::MakeUniqueKey(const UniqueKey& key, const Stroke& stroke)
   static const auto WidthStrokeShapeType = UniqueID::Next();
   static const auto CapJoinStrokeShapeType = UniqueID::Next();
   static const auto FullStrokeShapeType = UniqueID::Next();
-  if (!stroke.isHairline()) {
+  if (!IsHairlineStroke(stroke)) {
     auto hasMiter = stroke.join == LineJoin::Miter && stroke.miterLimit != 4.0f;
     auto hasCapJoin = hasMiter || stroke.cap != LineCap::Butt || stroke.join != LineJoin::Miter;
     size_t count = 2 + (hasCapJoin ? 1 : 0) + (hasMiter ? 1 : 0);
@@ -86,13 +95,13 @@ UniqueKey StrokeShape::MakeUniqueKey(const UniqueKey& key, const Stroke& stroke)
     return UniqueKey::Append(key, bytesKey.data(), bytesKey.size());
   }
   // hairline stroke ignore cap, join and miterLimit,and width is always 0.f,so just use a fixed key.
-  static const auto HairlineStrokeKey = []() -> UniqueKey {
+  static const auto HairlineStrokeKey = []() -> BytesKey {
     auto hairlineStrokeType = UniqueID::Next();
     BytesKey bytesKey(1);
     bytesKey.write(hairlineStrokeType);
-    return UniqueKey::Append(UniqueKey(), bytesKey.data(), bytesKey.size());
+    return bytesKey;
   }();
-  return HairlineStrokeKey;
+  return UniqueKey::Append(key, HairlineStrokeKey.data(), HairlineStrokeKey.size());
 }
 
 UniqueKey StrokeShape::getUniqueKey() const {

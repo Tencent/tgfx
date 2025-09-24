@@ -17,7 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MatrixShape.h"
+#include "core/shapes/MergeShape.h"
+#include "core/shapes/StrokeShape.h"
+#include "core/utils/StrokeUtils.h"
+#include "core/utils/Types.h"
 #include "core/utils/UniqueID.h"
+#include "tgfx/core/Matrix.h"
+#include "tgfx/core/Shape.h"
+#include "tgfx/core/Stroke.h"
 
 namespace tgfx {
 std::shared_ptr<Shape> Shape::ApplyMatrix(std::shared_ptr<Shape> shape, const Matrix& matrix) {
@@ -47,11 +54,13 @@ Rect MatrixShape::getBounds() const {
   return bounds;
 }
 
-Path MatrixShape::getPath() const {
-  auto path = shape->getPath();
+Path MatrixShape::onGetPath(float resolutionScale) const {
+  resolutionScale = resolutionScale * matrix.getMaxScale();
+  auto path = shape->onGetPath(resolutionScale);
   path.transform(matrix);
   return path;
 }
+
 UniqueKey MatrixShape::MakeUniqueKey(const UniqueKey& key, const Matrix& matrix) {
   static const auto SingleScaleMatrixShapeType = UniqueID::Next();
   static const auto BothScalesShapeType = UniqueID::Next();

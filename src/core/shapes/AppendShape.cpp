@@ -68,12 +68,12 @@ Rect AppendShape::getBounds() const {
   return bounds;
 }
 
-Path AppendShape::getPath() const {
+Path AppendShape::onGetPath(float resolutionScale) const {
   auto firstShape = shapes.front();
   // the first path determines the fill type
-  auto path = firstShape->getPath();
+  auto path = firstShape->onGetPath(resolutionScale);
   for (size_t i = 1; i < shapes.size(); ++i) {
-    path.addPath(shapes[i]->getPath());
+    path.addPath(shapes[i]->onGetPath(resolutionScale));
   }
   return path;
 }

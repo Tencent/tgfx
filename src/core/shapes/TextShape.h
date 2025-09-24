@@ -20,6 +20,7 @@
 
 #include "core/GlyphRunList.h"
 #include "core/shapes/UniqueKeyShape.h"
+#include "tgfx/core/Matrix.h"
 
 namespace tgfx {
 /**
@@ -27,21 +28,20 @@ namespace tgfx {
  */
 class TextShape : public UniqueKeyShape {
  public:
-  explicit TextShape(std::shared_ptr<GlyphRunList> glyphRunList, float scale)
-      : glyphRunList(std::move(glyphRunList)), scale(scale) {
+  explicit TextShape(std::shared_ptr<GlyphRunList> glyphRunList)
+      : glyphRunList(std::move(glyphRunList)) {
   }
 
   Rect getBounds() const override;
-
-  Path getPath() const override;
 
  protected:
   Type type() const override {
     return Type::Text;
   }
 
+  Path onGetPath(float resolutionScale) const override;
+
  private:
   std::shared_ptr<GlyphRunList> glyphRunList = nullptr;
-  float scale = 1.0f;
 };
 }  // namespace tgfx

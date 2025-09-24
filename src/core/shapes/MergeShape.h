@@ -19,6 +19,7 @@
 #pragma once
 
 #include "core/shapes/UniqueKeyShape.h"
+#include "tgfx/core/Matrix.h"
 
 namespace tgfx {
 /**
@@ -34,16 +35,15 @@ class MergeShape : public UniqueKeyShape {
 
   Rect getBounds() const override;
 
-  Path getPath() const override;
+  std::shared_ptr<Shape> first = nullptr;
+  std::shared_ptr<Shape> second = nullptr;
+  PathOp pathOp = PathOp::Append;
 
  protected:
   Type type() const override {
     return Type::Merge;
   }
 
- private:
-  std::shared_ptr<Shape> first = nullptr;
-  std::shared_ptr<Shape> second = nullptr;
-  PathOp pathOp = PathOp::Append;
+  Path onGetPath(float resolutionScale) const override;
 };
 }  // namespace tgfx

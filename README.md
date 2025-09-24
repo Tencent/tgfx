@@ -375,6 +375,31 @@ Finally, connect your OpenHarmony device or start the simulator, then build and 
 target in DevEco. You're all set!
 
 
+## Vcpkg Integration
+
+TGFX provides official vcpkg port files for easy integration into projects using vcpkg dependency management. Due to maintenance costs, we haven't merged into the official vcpkg repository yet, but this may be considered in the future. Currently, you can use TGFX through manual vcpkg port configuration.
+
+### Quick Start
+
+1. Visit the [TGFX releases page](https://github.com/Tencent/tgfx/releases) and download the vcpkg port files for your target version
+2. Copy the `tgfx/` directory to your vcpkg installation's `ports/` directory  
+3. Run `vcpkg install tgfx` to install
+
+### Using Specific Commit
+
+If you need a specific commit version of TGFX, you can use the provided script in [`vcpkg`](vcpkg/) directory to generate the port configuration:
+
+```bash
+node update_vcpkg <commit-hash>
+```
+
+Example:
+```bash
+node update_vcpkg 6095b909b1109d4910991a034405f4ae30d6786f
+```
+
+The script will automatically download the source code, calculate the SHA512 hash, and update the `vcpkg/ports/tgfx/portfile.cmake` file.
+
 ## Build Library
 
 Aside from directly integrating the source code of tgfx into your project, you also have the option
