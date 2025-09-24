@@ -20,6 +20,7 @@
 #include <vector>
 #include "core/filters/GaussianBlurImageFilter.h"
 #include "core/shaders/GradientShader.h"
+#include "core/utils/MathExtra.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "layers/RootLayer.h"
 #include "layers/contents/RasterizedContent.h"
@@ -3081,7 +3082,14 @@ TGFX_TEST(LayerTest, Transform3DLayer) {
   auto layerA = ImageLayer::Make();
   auto image = MakeImage("resources/apitest/imageReplacement.jpg");
   layerA->setImage(image);
-  layerA->setMatrix(Matrix::MakeTrans(30.f, 35.f));
+  const Size imagesize(static_cast<float>(image->width()), static_cast<float>(image->height()));
+  auto layerAMatrix = Matrix::MakeTrans(-imagesize.width * 0.5f, -imagesize.height * 0.5f);
+  layerAMatrix.postScale(1.5f, 1.5f);
+  const float skewXDegrees = 10.f;
+  const float skewYDegrees = 10.f;
+  layerAMatrix.postSkew(tanf(DegreesToRadians(skewXDegrees)), tanf(DegreesToRadians(skewYDegrees)));
+  layerAMatrix.postTranslate(imagesize.width * 0.5f + 30.f, imagesize.height * 0.5f + 35.f);
+  layerA->setMatrix(layerAMatrix);
   auto layerB = SolidLayer::Make();
   layerB->setWidth(300.f);
   layerB->setHeight(180.f);
@@ -3110,12 +3118,12 @@ TGFX_TEST(LayerTest, Transform3DLayer) {
       Matrix3D::ProjectionCSS(1200.f, -layerABounds.width() * 0.5f, layerABounds.width() * 0.5f,
                               layerABounds.height() * 0.5f, -layerABounds.height() * 0.5f, farZ);
   auto modelMatrix = Matrix3D::MakeRotate({0.f, 1.f, 0.f}, 45.f);
-  modelMatrix.postTranslate(0.f, 0.f, 1.f / 100.f);
+  modelMatrix.postTranslate(0.f, 0.f, -1000.f);
   auto transformMatrix = projectionMatrix * modelMatrix;
   layerAWrapper->setMatrix3D(transformMatrix);
 
   displayList->render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Transform3DLayer"));
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/aaTransform3DLayer"));
 }
 
 }  // namespace tgfx
