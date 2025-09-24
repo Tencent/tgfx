@@ -17,8 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "HitTestContext.h"
-#include "core/utils/ApplyStrokeToBounds.h"
+#include <algorithm>
 #include "core/utils/MathExtra.h"
+#include "core/utils/ShapeUtils.h"
+#include "core/utils/StrokeUtils.h"
+#include "tgfx/core/Stroke.h"
 #include "utils/Log.h"
 
 namespace tgfx {
@@ -31,23 +34,21 @@ static bool GetLocalPoint(const Matrix& matrix, float deviceX, float deviceY, Po
   return true;
 }
 
-void HitTestContext::drawFill(const Fill& fill) {
-  if (!fill.nothingToDraw()) {
-    hit = true;
-  }
+void HitTestContext::drawFill(const Fill&) {
+  hit = true;
 }
 
-void HitTestContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill) {
+void HitTestContext::drawRect(const Rect& rect, const MCState& state, const Fill&) {
   Point local = {};
   if (!GetLocalPoint(state.matrix, deviceX, deviceY, &local)) {
     return;
   }
-  if (rect.contains(local.x, local.y) && checkClipAndFill(state.clip, fill, local)) {
+  if (rect.contains(local.x, local.y) && checkClip(state.clip, local)) {
     hit = true;
   }
 }
 
-void HitTestContext::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
+void HitTestContext::drawRRect(const RRect& rRect, const MCState& state, const Fill&,
                                const Stroke* stroke) {
   Point local = {};
   if (!GetLocalPoint(state.matrix, deviceX, deviceY, &local)) {
@@ -71,12 +72,12 @@ void HitTestContext::drawRRect(const RRect& rRect, const MCState& state, const F
       return;
     }
   }
-  if (checkClipAndFill(state.clip, fill, local)) {
+  if (checkClip(state.clip, local)) {
     hit = true;
   }
 }
 
-void HitTestContext::drawPath(const Path& path, const MCState& state, const Fill& fill) {
+void HitTestContext::drawPath(const Path& path, const MCState& state, const Fill&) {
   Point local = {};
   if (!GetLocalPoint(state.matrix, deviceX, deviceY, &local)) {
     return;
@@ -91,12 +92,12 @@ void HitTestContext::drawPath(const Path& path, const MCState& state, const Fill
       return;
     }
   }
-  if (checkClipAndFill(state.clip, fill, local)) {
+  if (checkClip(state.clip, local)) {
     hit = true;
   }
 }
 
-void HitTestContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill,
+void HitTestContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill&,
                                const Stroke* stroke) {
   DEBUG_ASSERT(shape != nullptr);
   Point local = {};
@@ -104,53 +105,56 @@ void HitTestContext::drawShape(std::shared_ptr<Shape> shape, const MCState& stat
     return;
   }
   if (shapeHitTest) {
-    if (stroke && !stroke->isHairline()) {
-      shape = Shape::ApplyStroke(std::move(shape), stroke);
-    }
+    // Measure doesn't require high-precision paths, so ignore resolution scale here.
     auto path = shape->getPath();
+    if (stroke) {
+      stroke->applyToPath(&path);
+    }
     if (!path.contains(local.x, local.y)) {
       return;
     }
   } else {
     auto bounds = shape->getBounds();
+    if (stroke) {
+      ApplyStrokeToBounds(*stroke, &bounds);
+    }
     if (!bounds.contains(local.x, local.y)) {
       return;
     }
   }
-  if (checkClipAndFill(state.clip, fill, local)) {
+  if (checkClip(state.clip, local)) {
     hit = true;
   }
 }
 
 void HitTestContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions&,
-                               const MCState& state, const Fill& fill) {
+                               const MCState& state, const Fill&) {
   // Images are always checked against their bounding box.
   Point local = {};
   if (!GetLocalPoint(state.matrix, deviceX, deviceY, &local)) {
     return;
   }
   auto imageBounds = Rect::MakeWH(image->width(), image->height());
-  if (imageBounds.contains(local.x, local.y) && checkClipAndFill(state.clip, fill, local)) {
+  if (imageBounds.contains(local.x, local.y) && checkClip(state.clip, local)) {
     hit = true;
   }
 }
 
 void HitTestContext::drawImageRect(std::shared_ptr<Image>, const Rect&, const Rect& dstRect,
-                                   const SamplingOptions&, const MCState& state, const Fill& fill,
+                                   const SamplingOptions&, const MCState& state, const Fill&,
                                    SrcRectConstraint) {
   // Images are always checked against their bounding box.
   Point local = {};
   if (!GetLocalPoint(state.matrix, deviceX, deviceY, &local)) {
     return;
   }
-  if (dstRect.contains(local.x, local.y) && checkClipAndFill(state.clip, fill, local)) {
+  if (dstRect.contains(local.x, local.y) && checkClip(state.clip, local)) {
     hit = true;
   }
 }
 
 void HitTestContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
-                                      const MCState& state, const Fill& fill,
-                                      const Stroke* stroke) {
+                                      const MCState& state, const Fill&, const Stroke* stroke) {
   DEBUG_ASSERT(glyphRunList != nullptr);
   auto maxScale = state.matrix.getMaxScale();
   if (FloatNearlyZero(maxScale)) {
@@ -182,14 +186,14 @@ void HitTestContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList
   if (!GetLocalPoint(state.matrix, deviceX, deviceY, &local)) {
     return;
   }
-  if (checkClipAndFill(state.clip, fill, local)) {
+  if (checkClip(state.clip, local)) {
     hit = true;
   }
 }
 
 void HitTestContext::drawLayer(std::shared_ptr<Picture> picture,
                                std::shared_ptr<ImageFilter> imageFilter, const MCState& state,
-                               const Fill& fill) {
+                               const Fill&) {
   DEBUG_ASSERT(picture != nullptr);
   Point local = {};
   if (!GetLocalPoint(state.matrix, deviceX, deviceY, &local)) {
@@ -206,7 +210,7 @@ void HitTestContext::drawLayer(std::shared_ptr<Picture> picture,
       return;
     }
   }
-  if (checkClipAndFill(state.clip, fill, local)) {
+  if (checkClip(state.clip, local)) {
     hit = true;
   }
 }
@@ -221,14 +225,13 @@ void HitTestContext::drawPicture(std::shared_ptr<Picture> picture, const MCState
   if (!picture->hitTestPoint(local.x, local.y, shapeHitTest)) {
     return;
   }
-  if (checkClipAndFill(state.clip, {}, local)) {
+  if (checkClip(state.clip, local)) {
     hit = true;
   }
 }
 
-bool HitTestContext::checkClipAndFill(const Path& clip, const Fill& fill,
-                                      const Point& local) const {
-  if (fill.nothingToDraw() || (!clip.isInverseFillType() && clip.isEmpty())) {
+bool HitTestContext::checkClip(const Path& clip, const Point& local) const {
+  if (!clip.isInverseFillType() && clip.isEmpty()) {
     return false;
   }
   if (shapeHitTest || clip.isInverseFillType()) {

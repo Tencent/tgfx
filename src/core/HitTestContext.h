@@ -65,6 +65,6 @@ class HitTestContext : public DrawContext {
   bool shapeHitTest = false;
   bool hit = false;
 
-  bool checkClipAndFill(const Path& clip, const Fill& fill, const Point& local) const;
+  bool checkClip(const Path& clip, const Point& local) const;
 };
 }  // namespace tgfx

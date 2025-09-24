@@ -18,47 +18,18 @@
 
 #pragma once
 
-#include <optional>
-#include "tgfx/core/Matrix.h"
+#include <memory>
 #include "tgfx/core/Path.h"
-#include "tgfx/core/Rect.h"
 #include "tgfx/core/Shape.h"
-#include "tgfx/core/Stroke.h"
-
 namespace tgfx {
 
-/**
- * A class for deferred computation of a shape's Path, storing the associated matrix and stroke
- * settings.
- * The actual Path is constructed based on the current member variables when needed.
- */
-class StyledShape {
+class ShapeUtils {
  public:
-  static std::shared_ptr<StyledShape> Make(std::shared_ptr<Shape> shape, const Stroke* stroke,
-                                           Matrix matrix);
-
-  ~StyledShape() = default;
-
-  void applyMatrix(const Matrix& m);
-
-  Matrix matrix() const;
-
-  void setMatrix(const Matrix& m);
-
-  std::shared_ptr<const Shape> shape() const;
-
-  Rect getBounds() const;
-
-  UniqueKey getUniqueKey() const;
-
-  Path getPath() const;
-
- private:
-  StyledShape(std::shared_ptr<Shape> shape, const Stroke* stroke, Matrix matrix);
-
-  std::shared_ptr<Shape> _shape = nullptr;
-  std::optional<Stroke> _stroke;
-  Matrix _matrix = Matrix::I();
+  /**
+   * Returns the Shape adjusted for the current resolution scale.
+   * Used during rendering to decide whether to simplify the Path or apply hairline stroking,
+   * depending on the resolution scale.
+   */
+  static Path GetShapeRenderingPath(std::shared_ptr<Shape> shape, float resolutionScale);
 };
-
 }  // namespace tgfx

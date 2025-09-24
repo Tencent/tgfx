@@ -19,6 +19,7 @@
 #pragma once
 
 #include "core/shapes/UniqueKeyShape.h"
+#include "tgfx/core/Matrix.h"
 
 namespace tgfx {
 /**
@@ -32,12 +33,12 @@ class EffectShape : public UniqueKeyShape {
 
   Rect getBounds() const override;
 
-  Path getPath() const override;
-
  protected:
   Type type() const override {
     return Type::Effect;
   }
+
+  Path onGetPath(float resolutionScale) const override;
 
  private:
   std::shared_ptr<Shape> shape = nullptr;
