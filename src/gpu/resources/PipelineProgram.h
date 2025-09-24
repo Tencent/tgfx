@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "gpu/GPUBuffer.h"
 #include "gpu/resources/Program.h"
 
 namespace tgfx {
@@ -43,6 +44,8 @@ class PipelineProgram : public Program {
   std::unique_ptr<GPURenderPipeline> pipeline = nullptr;
   std::unique_ptr<UniformBuffer> vertexUniformBuffer = nullptr;
   std::unique_ptr<UniformBuffer> fragmentUniformBuffer = nullptr;
+  std::shared_ptr<GPUBuffer> uniformGPUBuffer = nullptr;
+  size_t uniformGPUBufferBaseOffset = 0;
 
   friend class ProgramInfo;
 };

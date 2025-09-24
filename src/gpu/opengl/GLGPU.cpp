@@ -18,6 +18,9 @@
 
 #include "GLGPU.h"
 #include "gpu/opengl/GLBuffer.h"
+#if defined(__EMSCRIPTEN__)
+#include "gpu/opengl/webgl/WebGLBuffer.h"
+#endif
 #include "gpu/opengl/GLCommandEncoder.h"
 #include "gpu/opengl/GLDepthStencilTexture.h"
 #include "gpu/opengl/GLExternalTexture.h"
@@ -43,6 +46,8 @@ std::unique_ptr<GPUBuffer> GLGPU::createBuffer(size_t size, uint32_t usage) {
     target = GL_ARRAY_BUFFER;
   } else if (usage & GPUBufferUsage::INDEX) {
     target = GL_ELEMENT_ARRAY_BUFFER;
+  } else if (usage & GPUBufferUsage::UNIFORM) {
+    target = GL_UNIFORM_BUFFER;
   } else {
     LOGE("GLGPU::createBuffer() invalid buffer usage!");
     return nullptr;
@@ -56,7 +61,11 @@ std::unique_ptr<GPUBuffer> GLGPU::createBuffer(size_t size, uint32_t usage) {
   gl->bindBuffer(target, bufferID);
   gl->bufferData(target, static_cast<GLsizeiptr>(size), nullptr, GL_STATIC_DRAW);
   gl->bindBuffer(target, 0);
+#if defined(__EMSCRIPTEN__)
+  return std::unique_ptr<GPUBuffer>(new WebGLBuffer(bufferID, size, usage));
+#else
   return std::make_unique<GLBuffer>(bufferID, size, usage);
+#endif
 }
 
 std::unique_ptr<GPUTexture> GLGPU::createTexture(const GPUTextureDescriptor& descriptor) {

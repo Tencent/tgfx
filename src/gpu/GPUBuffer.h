@@ -37,7 +37,17 @@ class GPUBufferUsage {
    * The buffer can be used as a vertex buffer.
    */
   static constexpr uint32_t VERTEX = 0x20;
+
+  /**
+   * The buffer can be used as a uniform buffer.
+   */
+  static constexpr uint32_t UNIFORM = 0x40;
 };
+
+/**
+ * Represents the mapped state of the uniform GPUBuffer.
+ */
+enum class GPUBufferMapState : uint8_t { UNMAPPED = 0, MAPPED = 1 };
 
 /**
  * GPUBuffer represents a block of GPU memory used to store raw data for GPU operations.
@@ -61,9 +71,30 @@ class GPUBuffer : public GPUResource {
     return _usage;
   }
 
+  /**
+   * Returns the current mapped state of the buffer, indicating whether it is currently mapped for
+   * CPU access or not.
+   */
+  GPUBufferMapState mapState() const {
+    return _mapState;
+  }
+
+  /**
+   * Maps the specified range of the GPUBuffer.
+   * Returns a pointer containing the mapped contents of the GPUBuffer in the specified range.
+   */
+  virtual void* getMappedRange(GPU* gpu, size_t offset, size_t size) = 0;
+
+  /**
+   * Unmaps the mapped range of the GPUBuffer, making its contents available for use by the GPU again.
+   */
+  virtual void unmap(GPU* gpu) = 0;
+
  protected:
   size_t _size = 0;
   uint32_t _usage = 0;
+  void* _mappedRange = nullptr;
+  GPUBufferMapState _mapState = GPUBufferMapState::UNMAPPED;
 
   GPUBuffer(size_t size, uint32_t usage) : _size(size), _usage(usage) {
   }

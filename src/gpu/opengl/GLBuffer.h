@@ -48,6 +48,24 @@ class GLBuffer : public GPUBuffer {
     return _bufferID;
   }
 
+  /**
+   * Returns a pointer to the mapped range of the uniform buffer for CPU access.
+   * If the uniform buffer is already mapped, it returns the existing mapped pointer.
+   * Otherwise, it maps the buffer range and returns the pointer.
+   * The offset and size must be within the buffer's size and properly aligned.
+   * @param gpu The GPU instance used for mapping.
+   * @param offset The offset within the buffer to start mapping.
+   * @param size The size of the range to map.
+   * @return A pointer to the mapped range, or nullptr if mapping fails.
+   */
+  void* getMappedRange(GPU* gpu, size_t offset, size_t size) override;
+
+  /**
+   * Unmaps the uniform buffer, making it inaccessible for CPU access.
+   * If the buffer is not currently mapped, this function does nothing.
+   */
+  void unmap(GPU* gpu) override;
+
   void release(GPU* gpu) override;
 
  private:
