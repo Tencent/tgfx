@@ -130,10 +130,12 @@ void ResourceCache::processUnreferencedResources() {
 void ResourceCache::releaseAll(bool releaseGPU) {
   for (auto& resource : nonpurgeableResources) {
     resource->release(releaseGPU);
+    // Note that we don't delete the resource here, because it may still be referenced externally.
   }
   nonpurgeableResources.clear();
   for (auto& resource : purgeableResources) {
     resource->release(releaseGPU);
+    delete resource;
   }
   purgeableResources.clear();
   scratchKeyMap.clear();
@@ -276,5 +278,6 @@ void ResourceCache::removeResource(Resource* resource) {
   }
   totalBytes -= resource->memoryUsage();
   resource->release(true);
+  delete resource;
 }
 }  // namespace tgfx
