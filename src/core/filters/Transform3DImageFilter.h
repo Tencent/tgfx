@@ -34,6 +34,19 @@ class Transform3DImageFilter final : public ImageFilter {
    */
   explicit Transform3DImageFilter(const Matrix3D& matrix, const Size& viewportSize);
 
+  /**
+   * Sets the anchor point for the layer's 3D transformation, as well as the center point observed
+   * by the camera in the projection model. Valid value range is [0, 1], values outside this range
+   * will be clamped.
+   * Point (0, 0) represents the top-left corner of the layer, point (1, 1) represents the
+   * bottom-right corner of the layer. Default value is (0.5, 0.5), which is the center point of the
+   * layer.
+   * Affine transformations such as rotation implied in the matrix3D are performed based on this
+   * anchor point. The X and Y coordinates of the camera's position in 3D space during layer
+   * projection are also determined by this origin point.
+   */
+  void setOrigin(const Point& origin);
+
  private:
   Type type() const override {
     return Type::Transform3D;
@@ -54,12 +67,14 @@ class Transform3DImageFilter final : public ImageFilter {
   /**
    * 3D transformation matrix used to convert model coordinates to clip space.
    */
-  Matrix3D matrix = Matrix3D::I();
+  Matrix3D _matrix = Matrix3D::I();
+
+  Point _origin = {0.5, 0.5};
 
   /**
    * View port size, used to map NDC coordinates to window coordinates.
    */
-  Size viewportSize = {0, 0};
+  Size _viewportSize = {0, 0};
 };
 
 }  // namespace tgfx

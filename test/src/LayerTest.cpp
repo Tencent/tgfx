@@ -3083,12 +3083,15 @@ TGFX_TEST(LayerTest, Transform3DLayer) {
   auto image = MakeImage("resources/apitest/imageReplacement.jpg");
   layerA->setImage(image);
   const Size imagesize(static_cast<float>(image->width()), static_cast<float>(image->height()));
-  auto layerAMatrix = Matrix::MakeTrans(-imagesize.width * 0.5f, -imagesize.height * 0.5f);
-  layerAMatrix.postScale(1.5f, 1.5f);
-  const float skewXDegrees = 10.f;
-  const float skewYDegrees = 10.f;
+  constexpr Point layerATransformOrigin(0.f, 0.f);
+  auto layerAMatrix = Matrix::MakeTrans(-imagesize.width * layerATransformOrigin.x,
+                                        -imagesize.height * layerATransformOrigin.y);
+  layerAMatrix.postScale(1.f, 1.f);
+  constexpr float skewXDegrees = 10.f;
+  constexpr float skewYDegrees = 10.f;
   layerAMatrix.postSkew(tanf(DegreesToRadians(skewXDegrees)), tanf(DegreesToRadians(skewYDegrees)));
-  layerAMatrix.postTranslate(imagesize.width * 0.5f + 30.f, imagesize.height * 0.5f + 35.f);
+  layerAMatrix.postTranslate(imagesize.width * layerATransformOrigin.x + 30.f,
+                             imagesize.height * layerATransformOrigin.x + 35.f);
   layerA->setMatrix(layerAMatrix);
   auto layerB = SolidLayer::Make();
   layerB->setWidth(300.f);
@@ -3121,9 +3124,10 @@ TGFX_TEST(LayerTest, Transform3DLayer) {
   modelMatrix.postTranslate(0.f, 0.f, -1000.f);
   auto transformMatrix = projectionMatrix * modelMatrix;
   layerAWrapper->setMatrix3D(transformMatrix);
+  layerAWrapper->setOrigin(layerATransformOrigin);
 
   displayList->render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/aaTransform3DLayer"));
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Transform3DLayer"));
 }
 
 }  // namespace tgfx

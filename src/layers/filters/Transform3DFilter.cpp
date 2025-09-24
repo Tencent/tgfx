@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Transform3DFilter.h"
+#include "core/filters/Transform3DImageFilter.h"
 
 namespace tgfx {
 
@@ -33,6 +34,14 @@ void Transform3DFilter::setMatrix(const Matrix3D& matrix) {
   invalidateFilter();
 }
 
+void Transform3DFilter::setOrigin(const Point& origin) {
+  if (_origin == origin) {
+    return;
+  }
+  _origin = origin;
+  invalidateFilter();
+}
+
 void Transform3DFilter::setViewportSize(const Size& size) {
   if (_viewportSize == size) {
     return;
@@ -46,7 +55,9 @@ Transform3DFilter::Transform3DFilter(const Matrix3D& matrix, const Size& viewpor
 }
 
 std::shared_ptr<ImageFilter> Transform3DFilter::onCreateImageFilter(float) {
-  return ImageFilter::Transform3D(_matrix, _viewportSize);
+  auto filter = std::make_shared<Transform3DImageFilter>(_matrix, _viewportSize);
+  filter->setOrigin(_origin);
+  return filter;
 }
 
 }  // namespace tgfx
