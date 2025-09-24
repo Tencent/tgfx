@@ -808,24 +808,22 @@ TGFX_TEST(FilterTest, GaussianBlurImageFilter) {
         std::make_shared<GaussianBlurImageFilter>(5.0f, 5.0f, TileMode::Decal);
 
     // Divide into 4 equal tiles.
-    const auto clipRect1 =
-        Rect::MakeWH(std::floor(static_cast<float>(opaqueImage->width()) * 0.5f),
-                     std::floor(static_cast<float>(opaqueImage->height()) * 0.5f));
+    auto clipRect1 = Rect::MakeWH(std::floor(static_cast<float>(opaqueImage->width()) * 0.5f),
+                                  std::floor(static_cast<float>(opaqueImage->height()) * 0.5f));
     auto image1 = opaqueImage->makeWithFilter(gaussianBlurFilter, nullptr, &clipRect1);
     canvas->drawImage(image1, 0.0f, 0.0f);
 
-    const auto clipRect2 =
+    auto clipRect2 =
         Rect(clipRect1.right, 0.0f, static_cast<float>(opaqueImage->width()), clipRect1.bottom);
     auto image2 = opaqueImage->makeWithFilter(gaussianBlurFilter, nullptr, &clipRect2);
     canvas->drawImage(image2, static_cast<float>(opaqueImage->width()) * 0.5f, 0.0f);
 
-    const auto clipRect3 =
+    auto clipRect3 =
         Rect(0.0f, clipRect1.bottom, clipRect1.right, static_cast<float>(opaqueImage->height()));
     auto image3 = opaqueImage->makeWithFilter(gaussianBlurFilter, nullptr, &clipRect3);
     canvas->drawImage(image3, 0.0f, static_cast<float>(opaqueImage->height()) * 0.5f);
 
-    const auto clipRect4 =
-        Rect(clipRect2.left, clipRect2.bottom, clipRect2.right, clipRect3.bottom);
+    auto clipRect4 = Rect(clipRect2.left, clipRect2.bottom, clipRect2.right, clipRect3.bottom);
     auto image4 = opaqueImage->makeWithFilter(gaussianBlurFilter, nullptr, &clipRect4);
     canvas->drawImage(image4, static_cast<float>(opaqueImage->width()) * 0.5f,
                       static_cast<float>(opaqueImage->height()) * 0.5f);
@@ -860,7 +858,7 @@ TGFX_TEST(FilterTest, Transform3DImageFilter) {
     auto modelMatrix = Matrix3D::MakeRotate({0.f, 1.f, 0.f}, 45.f);
     modelMatrix.postTranslate(0.f, 0.f, 1.f / 100.f);
     auto transform = cssProjectionMatrix * modelMatrix;
-    const auto cssTransform3DFilter = ImageFilter::Transform3D(transform, imageSize);
+    auto cssTransform3DFilter = ImageFilter::Transform3D(transform, imageSize);
 
     Paint paint = {};
     paint.setImageFilter(cssTransform3DFilter);
@@ -884,20 +882,20 @@ TGFX_TEST(FilterTest, Transform3DImageFilter) {
   const float eyePositionZ = 0.5f * static_cast<float>(image->height()) /
                              tanf(DegreesToRadians(StandardFovYDegress * 0.5f));
   const Vec3 eyePosition = {0.f, 0.f, eyePositionZ};
-  const auto viewMatrix = Matrix3D::LookAt(eyePosition, StandardEyeCenter, StandardEyeUp);
+  auto viewMatrix = Matrix3D::LookAt(eyePosition, StandardEyeCenter, StandardEyeUp);
   // Ensure nearZ is not too far away or farZ is not too close to avoid precision issues. For
   // example, if the z value of the near plane is less than 0, the projected model will be
   // outside the clipping range, or if the far plane is too close, the projected model may
   // exceed the clipping range with a slight rotation.
   const float nearZ = std::min(StandardMaxNearZ, eyePositionZ * 0.1f);
   const float farZ = std::max(StandardMinFarZ, eyePositionZ * 10.f);
-  const auto perspectiveMatrix = Matrix3D::Perspective(
+  auto perspectiveMatrix = Matrix3D::Perspective(
       StandardFovYDegress, static_cast<float>(image->width()) / static_cast<float>(image->height()),
       nearZ, farZ);
   auto modelMatrix = Matrix3D::MakeRotate({0.f, 1.f, 0.f}, 45.f);
   modelMatrix.postTranslate(0.f, 0.f, -10.f);
   auto standardTransform = perspectiveMatrix * viewMatrix * modelMatrix;
-  const auto standardTransform3DFilter = ImageFilter::Transform3D(standardTransform, imageSize);
+  auto standardTransform3DFilter = ImageFilter::Transform3D(standardTransform, imageSize);
 
   // Test basic drawing with standard perspective type.
   {
@@ -923,25 +921,24 @@ TGFX_TEST(FilterTest, Transform3DImageFilter) {
     auto filteredBounds = standardTransform3DFilter->filterBounds(
         Rect::MakeWH(static_cast<float>(image->width()), static_cast<float>(image->height())));
 
-    const auto clipRectLT =
-        Rect::MakeXYWH(filteredBounds.left, filteredBounds.top, filteredBounds.width() * 0.5f,
-                       filteredBounds.height() * 0.5f);
-    const auto imageLT = image->makeWithFilter(standardTransform3DFilter, nullptr, &clipRectLT);
+    auto clipRectLT = Rect::MakeXYWH(filteredBounds.left, filteredBounds.top,
+                                     filteredBounds.width() * 0.5f, filteredBounds.height() * 0.5f);
+    auto imageLT = image->makeWithFilter(standardTransform3DFilter, nullptr, &clipRectLT);
     canvas->drawImage(imageLT, 0.f, 0.f);
 
-    const auto clipRectRT = Rect::MakeXYWH(clipRectLT.right, filteredBounds.top,
-                                           filteredBounds.width() * 0.5f, clipRectLT.height());
-    const auto imageRT = image->makeWithFilter(standardTransform3DFilter, nullptr, &clipRectRT);
+    auto clipRectRT = Rect::MakeXYWH(clipRectLT.right, filteredBounds.top,
+                                     filteredBounds.width() * 0.5f, clipRectLT.height());
+    auto imageRT = image->makeWithFilter(standardTransform3DFilter, nullptr, &clipRectRT);
     canvas->drawImage(imageRT, static_cast<float>(imageLT->width()), 0.f);
 
-    const auto clipRectLB = Rect::MakeXYWH(filteredBounds.left, clipRectLT.bottom,
-                                           clipRectLT.width(), filteredBounds.height() * 0.5f);
-    const auto imageLB = image->makeWithFilter(standardTransform3DFilter, nullptr, &clipRectLB);
+    auto clipRectLB = Rect::MakeXYWH(filteredBounds.left, clipRectLT.bottom, clipRectLT.width(),
+                                     filteredBounds.height() * 0.5f);
+    auto imageLB = image->makeWithFilter(standardTransform3DFilter, nullptr, &clipRectLB);
     canvas->drawImage(imageLB, 0.f, static_cast<float>(imageLT->height()));
 
-    const auto clipRectRB =
+    auto clipRectRB =
         Rect::MakeXYWH(clipRectRT.left, clipRectRT.bottom, clipRectRT.width(), clipRectLB.height());
-    const auto imageRB = image->makeWithFilter(standardTransform3DFilter, nullptr, &clipRectRB);
+    auto imageRB = image->makeWithFilter(standardTransform3DFilter, nullptr, &clipRectRB);
     canvas->drawImage(imageRB, static_cast<float>(imageLT->width()),
                       static_cast<float>(imageLT->height()));
 

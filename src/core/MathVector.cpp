@@ -16,30 +16,15 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/processors/Transform3DGeometryProcessor.h"
+#include "tgfx/core/MathVector.h"
+#include "core/utils/MathExtra.h"
+#include "utils/Log.h"
 
 namespace tgfx {
 
-/**
- * The implementation of QuadPerEdgeAA3DGeometryProcessor using GLSL.
- */
-class GLSLQuadPerEdgeAA3DGeometryProcessor final : public Transform3DGeometryProcessor {
- public:
-  /**
-   * Creates a GLSLQuadPerEdgeAA3DGeometryProcessor instance with the specified parameters.
-   */
-  explicit GLSLQuadPerEdgeAA3DGeometryProcessor(AAType aa, const Matrix3D& matrix,
-                                                const Vec2& ndcScale, const Vec2& ndcOffset);
-
-  void emitCode(EmitArgs& args) const override;
-
-  void setData(UniformBuffer* vertexUniformBuffer, UniformBuffer* fragmentUniformBuffer,
-               FPCoordTransformIter* transformIter) const override;
-
- private:
-  Color defaultColor = Color::White();
-};
+Vec2 operator/(const Vec2& v, float s) {
+  DEBUG_ASSERT(!FloatNearlyZero(s));
+  return {v.x / s, v.y / s};
+}
 
 }  // namespace tgfx

@@ -64,7 +64,7 @@ Rect3DDrawOp::Rect3DDrawOp(RectsVertexProvider* provider, const Rect3DDrawArgs& 
 }
 
 PlacementPtr<GeometryProcessor> Rect3DDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {
-  const auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
+  auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
   // The actual size of the rendered texture is larger than the valid size, while the current
   // NDC coordinates were calculated based on the valid size, so they need to be adjusted
   // accordingly.

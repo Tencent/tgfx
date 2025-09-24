@@ -36,33 +36,21 @@ namespace tgfx {
 class Matrix3D {
  public:
   /**
-   * Creates a Matrix3D set to the identity matrix.
+   * Creates a Matrix3D set to the identity matrix. The created Matrix3D is:
+   *
+   *       | 1 0 0 0 |
+   *       | 0 1 0 0 |
+   *       | 0 0 1 0 |
+   *       | 0 0 0 1 |
    */
   constexpr Matrix3D() : Matrix3D(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1) {
   }
 
   /**
-   * Creates a Matrix3D from a 16-element array in row-major order.
+   * Copies the matrix values into a 16-element array in column-major order.
    */
-  static Matrix3D MakeRowMajor(const float r[16]) {
-    return {r[0], r[4], r[8],  r[12], r[1], r[5], r[9],  r[13],
-            r[2], r[6], r[10], r[14], r[3], r[7], r[11], r[15]};
-  }
-
-  /**
-   * Creates a Matrix3D from a 16-element array in column-major order.
-   */
-  static Matrix3D MakeColMajor(const float c[16]) {
-    return {c[0], c[1], c[2],  c[3],  c[4],  c[5],  c[6],  c[7],
-            c[8], c[9], c[10], c[11], c[12], c[13], c[14], c[15]};
-  }
-
-  /**
-   * Creates a Matrix3D from four Vec4 columns.
-   */
-  static Matrix3D MakeCols(const Vec4& c0, const Vec4& c1, const Vec4& c2, const Vec4& c3) {
-    return {c0.x, c0.y, c0.z, c0.w, c1.x, c1.y, c1.z, c1.w,
-            c2.x, c2.y, c2.z, c2.w, c3.x, c3.y, c3.z, c3.w};
+  void getColMajor(float buffer[16]) const {
+    memcpy(buffer, values, sizeof(values));
   }
 
   /**
@@ -74,30 +62,6 @@ class Matrix3D {
    *       | 0 0 0 1 |
    */
   static const Matrix3D& I();
-
-  /**
-   * Creates a Matrix3D that scales by (sx, sy, sz). The returned matrix is:
-   *
-   *       | sx  0  0  0 |
-   *       |  0 sy  0  0 |
-   *       |  0  0 sz  0 |
-   *       |  0  0  0  1 |
-   */
-  static Matrix3D MakeScale(float sx, float sy, float sz) {
-    return {sx, 0, 0, 0, 0, sy, 0, 0, 0, 0, sz, 0, 0, 0, 0, 1};
-  }
-
-  /**
-   * Creates a Matrix3D that translates by (tx, ty, tz). The returned matrix is:
-   *
-   *      | 1 0 0 tx |
-   *      | 0 1 0 ty |
-   *      | 0 0 1 tz |
-   *      | 0 0 0 1  |
-   */
-  static Matrix3D MakeTranslate(float tx, float ty, float tz) {
-    return {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, tx, ty, tz, 1};
-  }
 
   /**
    * Creates a Matrix3D that rotates by the given angle (in degrees) around the specified axis.
@@ -123,10 +87,94 @@ class Matrix3D {
   }
 
   /**
-   * Copies the matrix values into a 16-element array in column-major order.
+   * Creates a Matrix3D that translates by (tx, ty, tz). The returned matrix is:
+   *
+   *      | 1 0 0 tx |
+   *      | 0 1 0 ty |
+   *      | 0 0 1 tz |
+   *      | 0 0 0 1  |
    */
-  void getColMajor(float buffer[16]) const {
-    memcpy(buffer, values, sizeof(values));
+  static Matrix3D MakeTranslate(float tx, float ty, float tz) {
+    return {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, tx, ty, tz, 1};
+  }
+
+  /**
+   * Creates a view matrix for a camera. This is commonly used to transform world coordinates to
+   * camera (view) coordinates in 3D graphics.
+   * @param eye The position of the camera.
+   * @param center The point the camera is looking at.
+   * @param up The up direction for the camera.
+   */
+  static Matrix3D LookAt(const Vec3& eye, const Vec3& center, const Vec3& up);
+
+  /**
+   * Creates a standard perspective projection matrix. This matrix maps 3D coordinates into
+   * clip coordinates for perspective rendering.
+   * The standard projection model is established by defining the camera position, orientation,
+   * field of view, and near/far planes. Points inside the view frustum are projected onto the near
+   * plane.
+   * @param fovyDegrees Field of view angle in degrees (vertical).
+   * @param aspect Aspect ratio (width / height).
+   * @param nearZ Distance to the near clipping plane.
+   * @param farZ Distance to the far clipping plane.
+   */
+  static Matrix3D Perspective(float fovyDegrees, float aspect, float nearZ, float farZ);
+
+  /**
+   * Creates a projection matrix compatible with CSS 3D transforms. This matrix maps 3D coordinates
+   * into clip coordinates for perspective rendering. This is useful for web rendering scenarios
+   * that require CSS-like perspective projection.
+   * The CSS projection model is established by specifying the camera distance and a projection
+   * plane fixed at z=0, with the camera orientation fixed. For more details on the definition of
+   * CSS perspective projection, please refer to the official
+   * documentation: CSS Transforms Module Level 2, Perspective.
+   * @param eyeDistance Distance from the eye to the projection plane (z = 0).
+   * @param left Left bound of the view volume.
+   * @param right Right bound of the view volume.
+   * @param top Top bound of the view volume.
+   * @param bottom Bottom bound of the view volume.
+   * @param farZ Distance to the far clipping plane.
+   */
+  static Matrix3D ProjectionCSS(float eyeDistance, float left, float right, float top, float bottom,
+                                float farZ);
+
+  /**
+   * Maps a rectangle using this matrix.
+   * If the matrix contains a perspective transformation, each corner of the rectangle is mapped as a
+   * 4D point (x, y, 0, 1), and the resulting rectangle is computed from the projected points
+   * (after perspective division).
+   */
+  Rect mapRect(const Rect& src) const;
+
+  bool operator==(const Matrix3D& other) const;
+
+  bool operator!=(const Matrix3D& other) const {
+    return !(other == *this);
+  }
+
+  friend Matrix3D operator*(const Matrix3D& a, const Matrix3D& b) {
+    Matrix3D result;
+    result.setConcat(a, b);
+    return result;
+  }
+
+ private:
+  constexpr Matrix3D(float m00, float m01, float m02, float m03, float m10, float m11, float m12,
+                     float m13, float m20, float m21, float m22, float m23, float m30, float m31,
+                     float m32, float m33)
+      : values{m00, m01, m02, m03, m10, m11, m12, m13, m20, m21, m22, m23, m30, m31, m32, m33} {
+  }
+
+  /**
+   * Creates a Matrix3D that scales by (sx, sy, sz). The returned matrix is:
+   *
+   *       | sx  0  0  0 |
+   *       |  0 sy  0  0 |
+   *       |  0  0 sz  0 |
+   *       |  0  0  0  1 |
+   */
+  static Matrix3D MakeScale(float sx, float sy, float sz) {
+    return {sx, 0, 0, 0, 0, sy, 0, 0, 0, 0, sz, 0, 0, 0, 0, 1};
   }
 
   /**
@@ -218,67 +266,6 @@ class Matrix3D {
    */
   Vec4 mapPoint(float x, float y, float z, float w) const;
 
-  /**
-   * Maps a rectangle using this matrix.
-   * If the matrix contains a perspective transformation, each corner of the rectangle is mapped as a
-   * 4D point (x, y, 0, 1), and the resulting rectangle is computed from the projected points
-   * (after perspective division).
-   */
-  Rect mapRect(const Rect& src) const;
-
-  /**
-   * Creates a view matrix for a camera. This is commonly used to transform world coordinates to
-   * camera (view) coordinates in 3D graphics.
-   * @param eye The position of the camera.
-   * @param center The point the camera is looking at.
-   * @param up The up direction for the camera.
-   */
-  static Matrix3D LookAt(const Vec3& eye, const Vec3& center, const Vec3& up);
-
-  /**
-   * Creates a standard perspective projection matrix. This matrix maps 3D coordinates into
-   * clip coordinates for perspective rendering.
-   * The standard projection model is established by defining the camera position, orientation,
-   * field of view, and near/far planes. Points inside the view frustum are projected onto the near
-   * plane.
-   * @param fovyDegrees Field of view angle in degrees (vertical).
-   * @param aspect Aspect ratio (width / height).
-   * @param nearZ Distance to the near clipping plane.
-   * @param farZ Distance to the far clipping plane.
-   */
-  static Matrix3D Perspective(float fovyDegrees, float aspect, float nearZ, float farZ);
-
-  /**
-   * Creates a projection matrix compatible with CSS 3D transforms. This matrix maps 3D coordinates
-   * into clip coordinates for perspective rendering. This is useful for web rendering scenarios
-   * that require CSS-like perspective projection.
-   * The CSS projection model is established by specifying the camera distance and a projection
-   * plane fixed at z=0, with the camera orientation fixed. For more details on the definition of
-   * CSS perspective projection, please refer to the official
-   * documentation: CSS Transforms Module Level 2, Perspective.
-   * @param eyeDistance Distance from the eye to the projection plane (z = 0).
-   * @param left Left bound of the view volume.
-   * @param right Right bound of the view volume.
-   * @param top Top bound of the view volume.
-   * @param bottom Bottom bound of the view volume.
-   * @param farZ Distance to the far clipping plane.
-   */
-  static Matrix3D ProjectionCSS(float eyeDistance, float left, float right, float top, float bottom,
-                                float farZ);
-
-  bool operator==(const Matrix3D& other) const;
-
-  bool operator!=(const Matrix3D& other) const {
-    return !(other == *this);
-  }
-
- private:
-  constexpr Matrix3D(float m00, float m01, float m02, float m03, float m10, float m11, float m12,
-                     float m13, float m20, float m21, float m22, float m23, float m30, float m31,
-                     float m32, float m33)
-      : values{m00, m01, m02, m03, m10, m11, m12, m13, m20, m21, m22, m23, m30, m31, m32, m33} {
-  }
-
   Vec4 getCol(int i) const {
     Vec4 v;
     memcpy(&v, values + i * 4, sizeof(Vec4));
@@ -314,17 +301,11 @@ class Matrix3D {
     return (values[3] != 0 || values[7] != 0 || values[11] != 0 || values[15] != 1);
   }
 
-  friend Matrix3D operator*(const Matrix3D& a, const Matrix3D& b) {
-    Matrix3D result;
-    result.setConcat(a, b);
-    return result;
-  }
-
   Vec4 operator*(const Vec4& v) const {
     return this->mapPoint(v.x, v.y, v.z, v.w);
   }
 
-  float values[16];
+  float values[16] = {.0f};
 };
 
 }  // namespace tgfx

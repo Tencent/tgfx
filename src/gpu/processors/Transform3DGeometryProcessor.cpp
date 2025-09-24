@@ -20,11 +20,10 @@
 
 namespace tgfx {
 
-Transform3DGeometryProcessor::Transform3DGeometryProcessor(AAType aa,
-                                                           const Matrix3D& transformMatrix,
+Transform3DGeometryProcessor::Transform3DGeometryProcessor(AAType aa, const Matrix3D& transform,
                                                            const Vec2& ndcScale,
                                                            const Vec2& ndcOffset)
-    : GeometryProcessor(ClassID()), aa(aa), transformMatrix(transformMatrix), ndcScale(ndcScale),
+    : GeometryProcessor(ClassID()), aa(aa), matrix(transform), ndcScale(ndcScale),
       ndcOffset(ndcOffset) {
   position = {"aPosition", VertexFormat::Float2};
   if (aa == AAType::Coverage) {

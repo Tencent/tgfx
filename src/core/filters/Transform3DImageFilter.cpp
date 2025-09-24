@@ -45,10 +45,10 @@ Rect Transform3DImageFilter::onFilterBounds(const Rect& srcRect) const {
   // set to (0,0). Combined with srcRect, a model rectangle is constructed. The minimum axis-aligned
   // bounding rectangle of srcRect after projection is calculated based on the size after applying
   // the matrix and its relative position to the standard rectangle.
-  const auto srcModelRect = Rect::MakeXYWH(-srcRect.width() * 0.5f, -srcRect.height() * 0.5f,
-                                           srcRect.width(), srcRect.height());
-  const auto ndcRect = matrix.mapRect(srcModelRect);
-  const auto result = Rect::MakeXYWH(
+  auto srcModelRect = Rect::MakeXYWH(-srcRect.width() * 0.5f, -srcRect.height() * 0.5f,
+                                     srcRect.width(), srcRect.height());
+  auto ndcRect = matrix.mapRect(srcModelRect);
+  auto result = Rect::MakeXYWH(
       ndcRect.left * viewSize.width * 0.5f - srcModelRect.left + srcRect.left,
       ndcRect.top * viewSize.height * 0.5f - srcModelRect.top + srcRect.top,
       ndcRect.width() * viewSize.width * 0.5f, ndcRect.height() * viewSize.height * 0.5f);
@@ -57,22 +57,22 @@ Rect Transform3DImageFilter::onFilterBounds(const Rect& srcRect) const {
 
 std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
     std::shared_ptr<Image> source, const Rect& renderBounds, const TPArgs& args) const {
-  const auto renderTarget = RenderTargetProxy::MakeFallback(
+  auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(renderBounds.width()), static_cast<int>(renderBounds.height()),
       source->isAlphaOnly(), 1, args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
   auto sourceTextureProxy = source->lockTextureProxy(args);
 
-  const auto srcW = static_cast<float>(source->width());
-  const auto srcH = static_cast<float>(source->height());
+  auto srcW = static_cast<float>(source->width());
+  auto srcH = static_cast<float>(source->height());
   // Align the camera center with the initial position center of the source model.
-  const auto srcModelRect = Rect::MakeXYWH(-srcW * 0.5f, -srcH * 0.5f, srcW, srcH);
-  const auto srcNDCRect = matrix.mapRect(srcModelRect);
+  auto srcModelRect = Rect::MakeXYWH(-srcW * 0.5f, -srcH * 0.5f, srcW, srcH);
+  auto srcNDCRect = matrix.mapRect(srcModelRect);
   // SrcProjectRect is the result of projecting srcRect onto the canvas. RenderBounds describes a
   // subregion that needs to be drawn within it.
-  const auto srcProjectRect = Rect::MakeXYWH(
-      srcNDCRect.left * viewSize.width * 0.5f - srcModelRect.left,
-      srcNDCRect.top * viewSize.height * 0.5f - srcModelRect.top,
-      srcNDCRect.width() * viewSize.width * 0.5f, srcNDCRect.height() * viewSize.height * 0.5f);
+  auto srcProjectRect = Rect::MakeXYWH(srcNDCRect.left * viewSize.width * 0.5f - srcModelRect.left,
+                                       srcNDCRect.top * viewSize.height * 0.5f - srcModelRect.top,
+                                       srcNDCRect.width() * viewSize.width * 0.5f,
+                                       srcNDCRect.height() * viewSize.height * 0.5f);
   // ndcScale and ndcOffset are used to scale and translate the NDC coordinates to ensure that only
   // the content within RenderBounds is drawn to the render target. This clips regions beyond the
   // clip space.
@@ -84,7 +84,7 @@ std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
                       viewSize.height / renderBounds.height());
   // ndcOffset translates the NDC coordinates so that the local area to be drawn aligns exactly with
   // the (-1, -1) point.
-  const auto ndcRectScaled =
+  auto ndcRectScaled =
       Rect::MakeXYWH(srcNDCRect.left * ndcScale.x, srcNDCRect.top * ndcScale.y,
                      srcNDCRect.width() * ndcScale.x, srcNDCRect.height() * ndcScale.y);
   const Vec2 renderBoundsLTNDC(
@@ -93,8 +93,8 @@ std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
   const Vec2 ndcOffset(-1.f - ndcRectScaled.left - renderBoundsLTNDC.x,
                        -1.f - ndcRectScaled.top - renderBoundsLTNDC.y);
 
-  const auto drawingManager = args.context->drawingManager();
-  const auto drawingBuffer = args.context->drawingBuffer();
+  auto drawingManager = args.context->drawingManager();
+  auto drawingBuffer = args.context->drawingBuffer();
   auto vertexProvider =
       RectsVertexProvider::MakeFrom(drawingBuffer, srcModelRect, AAType::Coverage);
   const Size viewportSise(static_cast<float>(renderTarget->width()),
@@ -104,7 +104,7 @@ std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
       Rect3DDrawOp::Make(args.context, std::move(vertexProvider), args.renderFlags, drawArgs);
   const SamplingArgs samplingArgs = {TileMode::Decal, TileMode::Decal, {}, SrcRectConstraint::Fast};
   // Ensure the vertex texture sampling coordinates are in the range [0, 1]
-  const auto uvMatrix = Matrix::MakeTrans(-srcModelRect.left, -srcModelRect.top);
+  auto uvMatrix = Matrix::MakeTrans(-srcModelRect.left, -srcModelRect.top);
   auto fragmentProcessor =
       TextureEffect::Make(std::move(sourceTextureProxy), samplingArgs, &uvMatrix);
   drawOp->addColorFP(std::move(fragmentProcessor));
