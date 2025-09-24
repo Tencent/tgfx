@@ -33,7 +33,7 @@ class Transform3DGeometryProcessor : public GeometryProcessor {
    * Creates a Transform3DGeometryProcessor instance with the specified parameters.
    */
   static PlacementPtr<Transform3DGeometryProcessor> Make(BlockBuffer* buffer, AAType aa,
-                                                         const Matrix3D& transformMatrix,
+                                                         const Matrix3D& matrix,
                                                          const Vec2& ndcScale,
                                                          const Vec2& ndcOffset);
 
@@ -44,21 +44,21 @@ class Transform3DGeometryProcessor : public GeometryProcessor {
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  explicit Transform3DGeometryProcessor(AAType aa, const Matrix3D& transformMatrix,
-                                        const Vec2& ndcScale, const Vec2& ndcOffset);
+  explicit Transform3DGeometryProcessor(AAType aa, const Matrix3D& transform, const Vec2& ndcScale,
+                                        const Vec2& ndcOffset);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
-  Attribute position;
+  Attribute position = {};
 
-  Attribute coverage;
+  Attribute coverage = {};
 
   AAType aa = AAType::None;
 
   /**
    * The transformation matrix from local space to clip space.
    */
-  Matrix3D transformMatrix;
+  Matrix3D matrix = Matrix3D::I();
 
   /**
    * The scaling and translation parameters in NDC space. After the projected model's vertex
@@ -66,8 +66,8 @@ class Transform3DGeometryProcessor : public GeometryProcessor {
    * translation. These two properties allow any rectangular region of the projected model to be
    * mapped to any position within the target texture.
    */
-  Vec2 ndcScale;
-  Vec2 ndcOffset;
+  Vec2 ndcScale = Vec2(0.f, 0.f);
+  Vec2 ndcOffset = Vec2(0.f, 0.f);
 };
 
 }  // namespace tgfx

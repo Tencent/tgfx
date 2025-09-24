@@ -19,6 +19,7 @@
 #pragma once
 
 #include <cmath>
+#include <cstring>
 
 namespace tgfx {
 
@@ -92,9 +93,7 @@ struct Vec2 {
   /**
    * Returns the quotient of this vector and a scalar, computed as (v.x / s, v.y / s).
    */
-  friend Vec2 operator/(const Vec2& v, float s) {
-    return {v.x / s, v.y / s};
-  }
+  friend Vec2 operator/(const Vec2& v, float s);
 
   /**
    * The x component value.

@@ -40,7 +40,7 @@ static void TransposeArrays(const float src[16], float dst[16]) {
   dst[15] = src[15];
 }
 
-static bool Invert4x4Matrix(const float inMat[16], float outMat[16]) {
+static bool InvertMatrix3D(const float inMat[16], float outMat[16]) {
   const float a00 = inMat[0];
   const float a01 = inMat[1];
   const float a02 = inMat[2];
@@ -116,27 +116,26 @@ static bool Invert4x4Matrix(const float inMat[16], float outMat[16]) {
 static Rect MapRectAffine(const Rect& srcRect, const float mat[16]) {
   constexpr Vec4 flip{1.f, 1.f, -1.f, -1.f};
 
-  const auto c0 = Shuffle<0, 1, 0, 1>(Vec2::Load(mat)) * flip;
-  const auto c1 = Shuffle<0, 1, 0, 1>(Vec2::Load(mat + 4)) * flip;
-  const auto c3 = Shuffle<0, 1, 0, 1>(Vec2::Load(mat + 12));
+  auto c0 = Shuffle<0, 1, 0, 1>(Vec2::Load(mat)) * flip;
+  auto c1 = Shuffle<0, 1, 0, 1>(Vec2::Load(mat + 4)) * flip;
+  auto c3 = Shuffle<0, 1, 0, 1>(Vec2::Load(mat + 12));
 
-  const auto p0 = Min(c0 * srcRect.left + c1 * srcRect.top, c0 * srcRect.right + c1 * srcRect.top);
-  const auto p1 =
-      Min(c0 * srcRect.left + c1 * srcRect.bottom, c0 * srcRect.right + c1 * srcRect.bottom);
+  auto p0 = Min(c0 * srcRect.left + c1 * srcRect.top, c0 * srcRect.right + c1 * srcRect.top);
+  auto p1 = Min(c0 * srcRect.left + c1 * srcRect.bottom, c0 * srcRect.right + c1 * srcRect.bottom);
   auto minMax = c3 + flip * Min(p0, p1);
 
   return {minMax.x, minMax.y, minMax.z, minMax.w};
 }
 
 static Rect MapRectPerspective(const Rect& srcRect, const float mat[16]) {
-  const auto c0 = Vec4::Load(mat);
-  const auto c1 = Vec4::Load(mat + 4);
-  const auto c3 = Vec4::Load(mat + 12);
+  auto c0 = Vec4::Load(mat);
+  auto c1 = Vec4::Load(mat + 4);
+  auto c3 = Vec4::Load(mat + 12);
 
-  const auto tl = c0 * srcRect.left + c1 * srcRect.top + c3;
-  const auto tr = c0 * srcRect.right + c1 * srcRect.top + c3;
-  const auto bl = c0 * srcRect.left + c1 * srcRect.bottom + c3;
-  const auto br = c0 * srcRect.right + c1 * srcRect.bottom + c3;
+  auto tl = c0 * srcRect.left + c1 * srcRect.top + c3;
+  auto tr = c0 * srcRect.right + c1 * srcRect.top + c3;
+  auto bl = c0 * srcRect.left + c1 * srcRect.bottom + c3;
+  auto br = c0 * srcRect.right + c1 * srcRect.bottom + c3;
 
   constexpr Vec4 flip{1.f, 1.f, -1.f, -1.f};
   auto project = [&flip](const Vec4& p0, const Vec4& p1, const Vec4& p2) {
@@ -147,8 +146,7 @@ static Rect MapRectPerspective(const Rect& srcRect, const float mat[16]) {
       auto clip = [&](const Vec4& p) {
         if (const float w = p[3]; w >= w0PlaneDistance) {
           const float t = (w0PlaneDistance - w0) / (w - w0);
-          const auto c =
-              (t * Vec2::Load(p.ptr()) + (1.f - t) * Vec2::Load(p0.ptr())) / w0PlaneDistance;
+          auto c = (t * Vec2::Load(p.ptr()) + (1.f - t) * Vec2::Load(p0.ptr())) / w0PlaneDistance;
           return flip * Shuffle<0, 1, 0, 1>(c);
         } else {
           return Vec4(std::numeric_limits<float>::infinity());
@@ -158,8 +156,8 @@ static Rect MapRectPerspective(const Rect& srcRect, const float mat[16]) {
     }
   };
 
-  const auto p0 = Min(project(tl, tr, bl), project(tr, br, tl));
-  const auto p1 = Min(project(br, bl, tr), project(bl, tl, br));
+  auto p0 = Min(project(tl, tr, bl), project(tr, br, tl));
+  auto p1 = Min(project(br, bl, tr), project(bl, tl, br));
   auto minMax = flip * Min(p0, p1);
   return {minMax.x, minMax.y, minMax.z, minMax.w};
 }
@@ -169,128 +167,17 @@ const Matrix3D& Matrix3D::I() {
   return identity;
 }
 
-void Matrix3D::getRowMajor(float buffer[16]) const {
-  TransposeArrays(values, buffer);
-}
-
-void Matrix3D::setConcat(const Matrix3D& a, const Matrix3D& b) {
-  const auto c0 = a.getCol(0);
-  const auto c1 = a.getCol(1);
-  const auto c2 = a.getCol(2);
-  const auto c3 = a.getCol(3);
-
-  auto compute = [&](Vec4 v) { return c0 * v[0] + c1 * v[1] + c2 * v[2] + c3 * v[3]; };
-
-  const auto m0 = compute(b.getCol(0));
-  const auto m1 = compute(b.getCol(1));
-  const auto m2 = compute(b.getCol(2));
-  const auto m3 = compute(b.getCol(3));
-
-  setCol(0, m0);
-  setCol(1, m1);
-  setCol(2, m2);
-  setCol(3, m3);
-}
-
-void Matrix3D::preConcat(const Matrix3D& m) {
-  setConcat(*this, m);
-}
-
-void Matrix3D::postConcat(const Matrix3D& m) {
-  setConcat(m, *this);
-}
-
-void Matrix3D::preScale(float sx, float sy, float sz) {
-  if (sx == 1 && sy == 1 && sz == 1) {
-    return;
-  }
-
-  const auto c0 = getCol(0);
-  const auto c1 = getCol(1);
-  const auto c2 = getCol(2);
-
-  setCol(0, c0 * sx);
-  setCol(1, c1 * sy);
-  setCol(2, c2 * sz);
-}
-
-void Matrix3D::postScale(float sx, float sy, float sz) {
-  if (sx == 1 && sy == 1 && sz == 1) {
-    return;
-  }
-  const auto m = MakeScale(sx, sy, sz);
-  this->postConcat(m);
-}
-
-void Matrix3D::preTranslate(float tx, float ty, float tz) {
-  const auto c0 = getCol(0);
-  const auto c1 = getCol(1);
-  const auto c2 = getCol(2);
-  const auto c3 = getCol(3);
-
-  setCol(3, (c0 * tx + c1 * ty + c2 * tz + c3));
-}
-
-void Matrix3D::postTranslate(float tx, float ty, float tz) {
-  values[12] += tx;
-  values[13] += ty;
-  values[14] += tz;
-}
-
-void Matrix3D::preRotate(const Vec3& axis, float degrees) {
-  const auto m = MakeRotate(axis, degrees);
-  preConcat(m);
-}
-
-void Matrix3D::postRotate(const Vec3& axis, float degrees) {
-  const auto m = MakeRotate(axis, degrees);
-  postConcat(m);
-}
-
-bool Matrix3D::invert(Matrix3D* inverse) const {
-  float result[16];
-  if (!Invert4x4Matrix(values, result)) {
-    return false;
-  }
-  memcpy(inverse->values, result, sizeof(result));
-  return true;
-}
-
-Matrix3D Matrix3D::transpose() const {
-  Matrix3D m;
-  TransposeArrays(values, m.values);
-  return m;
-}
-
-Vec4 Matrix3D::mapPoint(float x, float y, float z, float w) const {
-  const auto c0 = getCol(0);
-  const auto c1 = getCol(1);
-  const auto c2 = getCol(2);
-  const auto c3 = getCol(3);
-
-  const Vec4 result = (c0 * x + c1 * y + c2 * z + c3 * w);
-  return result;
-}
-
-Rect Matrix3D::mapRect(const Rect& src) const {
-  if (hasPerspective()) {
-    return MapRectPerspective(src, values);
-  } else {
-    return MapRectAffine(src, values);
-  }
-}
-
 Matrix3D Matrix3D::LookAt(const Vec3& eye, const Vec3& center, const Vec3& up) {
-  const auto viewZ = Vec3::Normalize(eye - center);
-  const auto viewX = Vec3::Normalize(up.cross(viewZ));
-  const auto viewY = viewZ.cross(viewX);
+  auto viewZ = Vec3::Normalize(eye - center);
+  auto viewX = Vec3::Normalize(up.cross(viewZ));
+  auto viewY = viewZ.cross(viewX);
   const Matrix3D m(viewX.x, viewY.x, viewZ.x, 0.f, viewX.y, viewY.y, viewZ.y, 0.f, viewX.z, viewY.z,
                    viewZ.z, 0.f, -viewX.dot(eye), -viewY.dot(eye), -viewZ.dot(eye), 1.f);
   return m;
 }
 
 Matrix3D Matrix3D::Perspective(float fovyDegress, float aspect, float nearZ, float farZ) {
-  const auto fovyRadians = DegreesToRadians(fovyDegress);
+  auto fovyRadians = DegreesToRadians(fovyDegress);
   const float cotan = 1.f / tanf(fovyRadians / 2.f);
 
   const Matrix3D m(cotan / aspect, 0.f, 0.f, 0.f, 0.f, cotan, 0.f, 0.f, 0.f, 0.f,
@@ -312,6 +199,117 @@ Matrix3D Matrix3D::ProjectionCSS(float eyeDistance, float left, float right, flo
   m.setRowCol(1, 3, -(top + bottom) / (top - bottom));
   m.setRowCol(2, 3, -1.f + farZ / eyeDistance - m.getRowCol(2, 2) * eyeDistance);
   return m;
+}
+
+Rect Matrix3D::mapRect(const Rect& src) const {
+  if (hasPerspective()) {
+    return MapRectPerspective(src, values);
+  } else {
+    return MapRectAffine(src, values);
+  }
+}
+
+void Matrix3D::getRowMajor(float buffer[16]) const {
+  TransposeArrays(values, buffer);
+}
+
+void Matrix3D::setConcat(const Matrix3D& a, const Matrix3D& b) {
+  auto c0 = a.getCol(0);
+  auto c1 = a.getCol(1);
+  auto c2 = a.getCol(2);
+  auto c3 = a.getCol(3);
+
+  auto compute = [&](Vec4 v) { return c0 * v[0] + c1 * v[1] + c2 * v[2] + c3 * v[3]; };
+
+  auto m0 = compute(b.getCol(0));
+  auto m1 = compute(b.getCol(1));
+  auto m2 = compute(b.getCol(2));
+  auto m3 = compute(b.getCol(3));
+
+  setCol(0, m0);
+  setCol(1, m1);
+  setCol(2, m2);
+  setCol(3, m3);
+}
+
+void Matrix3D::preConcat(const Matrix3D& m) {
+  setConcat(*this, m);
+}
+
+void Matrix3D::postConcat(const Matrix3D& m) {
+  setConcat(m, *this);
+}
+
+void Matrix3D::preScale(float sx, float sy, float sz) {
+  if (sx == 1 && sy == 1 && sz == 1) {
+    return;
+  }
+
+  auto c0 = getCol(0);
+  auto c1 = getCol(1);
+  auto c2 = getCol(2);
+
+  setCol(0, c0 * sx);
+  setCol(1, c1 * sy);
+  setCol(2, c2 * sz);
+}
+
+void Matrix3D::postScale(float sx, float sy, float sz) {
+  if (sx == 1 && sy == 1 && sz == 1) {
+    return;
+  }
+  auto m = MakeScale(sx, sy, sz);
+  this->postConcat(m);
+}
+
+void Matrix3D::preTranslate(float tx, float ty, float tz) {
+  auto c0 = getCol(0);
+  auto c1 = getCol(1);
+  auto c2 = getCol(2);
+  auto c3 = getCol(3);
+
+  setCol(3, (c0 * tx + c1 * ty + c2 * tz + c3));
+}
+
+void Matrix3D::postTranslate(float tx, float ty, float tz) {
+  values[12] += tx;
+  values[13] += ty;
+  values[14] += tz;
+}
+
+void Matrix3D::preRotate(const Vec3& axis, float degrees) {
+  auto m = MakeRotate(axis, degrees);
+  preConcat(m);
+}
+
+void Matrix3D::postRotate(const Vec3& axis, float degrees) {
+  auto m = MakeRotate(axis, degrees);
+  postConcat(m);
+}
+
+bool Matrix3D::invert(Matrix3D* inverse) const {
+  float result[16];
+  if (!InvertMatrix3D(values, result)) {
+    return false;
+  }
+  memcpy(inverse->values, result, sizeof(result));
+  return true;
+}
+
+Matrix3D Matrix3D::transpose() const {
+  Matrix3D m;
+  TransposeArrays(values, m.values);
+  return m;
+}
+
+Vec4 Matrix3D::mapPoint(float x, float y, float z, float w) const {
+  auto c0 = getCol(0);
+  auto c1 = getCol(1);
+  auto c2 = getCol(2);
+  auto c3 = getCol(3);
+
+  const Vec4 result = (c0 * x + c1 * y + c2 * z + c3 * w);
+  return result;
 }
 
 void Matrix3D::setAll(float m00, float m01, float m02, float m03, float m10, float m11, float m12,
@@ -336,7 +334,7 @@ void Matrix3D::setAll(float m00, float m01, float m02, float m03, float m10, flo
 }
 
 void Matrix3D::setRotate(const Vec3& axis, float degrees) {
-  if (const auto len = axis.length(); len > 0 && (len * 0 == 0)) {
+  if (auto len = axis.length(); len > 0 && (len * 0 == 0)) {
     this->setRotateUnit(axis * (1.f / len), degrees);
   } else {
     this->setIdentity();
@@ -344,7 +342,7 @@ void Matrix3D::setRotate(const Vec3& axis, float degrees) {
 }
 
 void Matrix3D::setRotateUnit(const Vec3& axis, float degrees) {
-  const auto radians = DegreesToRadians(degrees);
+  auto radians = DegreesToRadians(degrees);
   this->setRotateUnitSinCos(axis, sin(radians), cos(radians));
 }
 
@@ -365,15 +363,15 @@ bool Matrix3D::operator==(const Matrix3D& other) const {
     return true;
   }
 
-  const auto a0 = getCol(0);
-  const auto a1 = getCol(1);
-  const auto a2 = getCol(2);
-  const auto a3 = getCol(3);
+  auto a0 = getCol(0);
+  auto a1 = getCol(1);
+  auto a2 = getCol(2);
+  auto a3 = getCol(3);
 
-  const auto b0 = other.getCol(0);
-  const auto b1 = other.getCol(1);
-  const auto b2 = other.getCol(2);
-  const auto b3 = other.getCol(3);
+  auto b0 = other.getCol(0);
+  auto b1 = other.getCol(1);
+  auto b2 = other.getCol(2);
+  auto b3 = other.getCol(3);
 
   return ((a0 == b0) && (a1 == b1) && (a2 == b2) && (a3 == b3));
 }

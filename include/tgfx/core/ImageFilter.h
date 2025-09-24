@@ -123,9 +123,9 @@ class ImageFilter {
   /**
    * Creates a filter that applies a perspective transformation to the input image.
    * @param matrix 3D transformation matrix used to convert model coordinates to clip space.
-   * @param viewSize Window view size, used to map NDC coordinates to window coordinates.
+   * @param viewportSize View port size, used to map NDC coordinates to window(screen) coordinates.
    */
-  static std::shared_ptr<ImageFilter> Transform3D(const Matrix3D& matrix, const Size& viewSize);
+  static std::shared_ptr<ImageFilter> Transform3D(const Matrix3D& matrix, const Size& viewportSize);
 
   virtual ~ImageFilter() = default;
 
