@@ -266,6 +266,12 @@ class Matrix3D {
   static Matrix3D ProjectionCSS(float eyeDistance, float left, float right, float top, float bottom,
                                 float farZ);
 
+  bool operator==(const Matrix3D& other) const;
+
+  bool operator!=(const Matrix3D& other) const {
+    return !(other == *this);
+  }
+
  private:
   constexpr Matrix3D(float m00, float m01, float m02, float m03, float m10, float m11, float m12,
                      float m13, float m20, float m21, float m22, float m23, float m30, float m31,
@@ -306,12 +312,6 @@ class Matrix3D {
 
   bool hasPerspective() const {
     return (values[3] != 0 || values[7] != 0 || values[11] != 0 || values[15] != 1);
-  }
-
-  bool operator==(const Matrix3D& other) const;
-
-  bool operator!=(const Matrix3D& other) const {
-    return !(other == *this);
   }
 
   friend Matrix3D operator*(const Matrix3D& a, const Matrix3D& b) {

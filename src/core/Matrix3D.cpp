@@ -314,6 +314,24 @@ Matrix3D Matrix3D::ProjectionCSS(float eyeDistance, float left, float right, flo
   return m;
 }
 
+bool Matrix3D::operator==(const Matrix3D& other) const {
+  if (this == &other) {
+    return true;
+  }
+
+  const auto a0 = getCol(0);
+  const auto a1 = getCol(1);
+  const auto a2 = getCol(2);
+  const auto a3 = getCol(3);
+
+  const auto b0 = other.getCol(0);
+  const auto b1 = other.getCol(1);
+  const auto b2 = other.getCol(2);
+  const auto b3 = other.getCol(3);
+
+  return ((a0 == b0) && (a1 == b1) && (a2 == b2) && (a3 == b3));
+}
+
 void Matrix3D::setAll(float m00, float m01, float m02, float m03, float m10, float m11, float m12,
                       float m13, float m20, float m21, float m22, float m23, float m30, float m31,
                       float m32, float m33) {
@@ -358,24 +376,6 @@ void Matrix3D::setRotateUnitSinCos(const Vec3& axis, float sinAngle, float cosAn
 
   setAll(t * x * x + c, t * x * y + s * z, t * x * z - s * y, 0, t * x * y - s * z, t * y * y + c,
          t * y * z + s * x, 0, t * x * z + s * y, t * y * z - s * x, t * z * z + c, 0, 0, 0, 0, 1);
-}
-
-bool Matrix3D::operator==(const Matrix3D& other) const {
-  if (this == &other) {
-    return true;
-  }
-
-  const auto a0 = getCol(0);
-  const auto a1 = getCol(1);
-  const auto a2 = getCol(2);
-  const auto a3 = getCol(3);
-
-  const auto b0 = other.getCol(0);
-  const auto b1 = other.getCol(1);
-  const auto b2 = other.getCol(2);
-  const auto b3 = other.getCol(3);
-
-  return ((a0 == b0) && (a1 == b1) && (a2 == b2) && (a3 == b3));
 }
 
 }  // namespace tgfx

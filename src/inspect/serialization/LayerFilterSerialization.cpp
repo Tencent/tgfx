@@ -23,6 +23,7 @@
 #include <tgfx/layers/filters/DropShadowFilter.h>
 #include <tgfx/layers/filters/InnerShadowFilter.h>
 #include "core/utils/Log.h"
+#include "layers/filters/Transform3DFilter.h"
 #include "tgfx/layers/filters/LayerFilter.h"
 
 namespace tgfx {
@@ -101,6 +102,19 @@ static void SerializeInnerShadowFilterImpl(flexbuffers::Builder& fbb,
   SerializeUtils::SetFlexBufferMap(fbb, "innerShadowOnly", innerShadowFilter->innerShadowOnly());
 }
 
+static void SerializeTransform3DFilterImpl(flexbuffers::Builder& fbb,
+                                           const LayerFilter* layerFilter,
+                                           SerializeUtils::ComplexObjSerMap* map) {
+  SerializeBasicLayerFilterImpl(fbb, layerFilter);
+  const Transform3DFilter* transform3DFilter = static_cast<const Transform3DFilter*>(layerFilter);
+  auto matrixID = SerializeUtils::GetObjID();
+  SerializeUtils::SetFlexBufferMap(fbb, "matrix", "", false, true, matrixID);
+  SerializeUtils::FillComplexObjSerMap(transform3DFilter->matrix(), matrixID, map);
+  auto viewportSizeID = SerializeUtils::GetObjID();
+  SerializeUtils::SetFlexBufferMap(fbb, "viewportSize", "", false, true, viewportSizeID);
+  SerializeUtils::FillComplexObjSerMap(transform3DFilter->viewportSize(), viewportSizeID, map);
+}
+
 std::shared_ptr<Data> LayerFilterSerialization::Serialize(const LayerFilter* layerFilter,
                                                           SerializeUtils::ComplexObjSerMap* map) {
   DEBUG_ASSERT(layerFilter != nullptr)
@@ -128,6 +142,9 @@ std::shared_ptr<Data> LayerFilterSerialization::Serialize(const LayerFilter* lay
       break;
     case Types::LayerFilterType::InnerShadowFilter:
       SerializeInnerShadowFilterImpl(fbb, layerFilter, map);
+      break;
+    case Types::LayerFilterType::Transform3DFilter:
+      SerializeTransform3DFilterImpl(fbb, layerFilter, map);
       break;
   }
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);

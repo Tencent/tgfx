@@ -33,6 +33,7 @@
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/SolidLayer.h"
 #include "tgfx/layers/TextLayer.h"
+#include "tgfx/layers/Transform3DLayer.h"
 #include "tgfx/layers/filters/BlendFilter.h"
 #include "tgfx/layers/filters/BlurFilter.h"
 #include "tgfx/layers/filters/ColorMatrixFilter.h"
@@ -3067,4 +3068,54 @@ TGFX_TEST(LayerTest, HairlineLayer) {
   displayList.render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/HairlineLayer"));
 }
+
+TGFX_TEST(LayerTest, Transform3DLayer) {
+  const ContextScope scope;
+  const auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  const auto surface = Surface::Make(context, 300, 180);
+  const auto canvas = surface->getCanvas();
+  canvas->clear();
+
+  // Build the initial layer tree.
+  const auto layerA = ImageLayer::Make();
+  const auto image = MakeImage("resources/apitest/imageReplacement.jpg");
+  layerA->setImage(image);
+  layerA->setMatrix(Matrix::MakeTrans(30.f, 35.f));
+  const auto layerB = SolidLayer::Make();
+  layerB->setWidth(300.f);
+  layerB->setHeight(180.f);
+  layerB->setColor(Color::FromRGBA(156, 101, 79, 128));
+  layerB->addChild(layerA);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->root()->addChild(layerB);
+
+  // Replace LayerA with a Transform3DLayer to enable 3D effects and update the layer structure.
+  auto layerAWrapper = Transform3DLayer::Make();
+  const auto layerAParent = layerA->parent();
+  layerA->removeFromParent();
+  for (auto& child : layerA->children()) {
+    child->removeFromParent();
+    layerAWrapper->addChild(child);
+  }
+  layerAParent->addChild(layerAWrapper);
+  layerAWrapper->setContent(layerA);
+  layerAWrapper->setMatrix(layerA->matrix());
+  // Set the 3D transformation matrix on the wrapper layer.
+  const auto layerABounds = layerA->getBounds();
+  // Choose an appropriate far plane to avoid clipping during rotation.
+  const auto maxLength = std::max(layerABounds.width(), layerABounds.height()) * 10.f;
+  const auto farZ = std::min(-maxLength, -500.f);
+  const auto projectionMatrix =
+      Matrix3D::ProjectionCSS(1200.f, -layerABounds.width() * 0.5f, layerABounds.width() * 0.5f,
+                              layerABounds.height() * 0.5f, -layerABounds.height() * 0.5f, farZ);
+  auto modelMatrix = Matrix3D::MakeRotate({0.f, 1.f, 0.f}, 45.f);
+  modelMatrix.postTranslate(0.f, 0.f, 1.f / 100.f);
+  const auto transformMatrix = projectionMatrix * modelMatrix;
+  layerAWrapper->setMatrix3D(transformMatrix);
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Transform3DLayer"));
+}
+
 }  // namespace tgfx

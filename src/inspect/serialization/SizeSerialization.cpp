@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,33 +16,25 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "SizeSerialization.h"
 
-namespace tgfx {
-/**
- * Defines the types of a layer.
- */
-enum class LayerType {
-  /**
-   * The type for a generic layer. May be used as a container for other child layers.
-   */
-  Layer,
-  /**
-   * A layer displaying an image.
-   */
-  Image,
-  /**
-   * A layer displaying a shape.
-   */
-  Shape,
-  /**
-   * A layer displaying a simple text.
-   */
-  Text,
-  /**
-   * A layer that fills its bounds with a solid color.
-   */
-  Solid,
-  Transform3D
-};
-}  // namespace tgfx
+namespace tgfx::SizeSerialization {
+
+static void SerializeSizeImpl(flexbuffers::Builder& fbb, const Size* size) {
+  SerializeUtils::SetFlexBufferMap(fbb, "width", size->width);
+  SerializeUtils::SetFlexBufferMap(fbb, "height", size->height);
+}
+
+std::shared_ptr<Data> Serialize(const Size* size) {
+  DEBUG_ASSERT(size != nullptr)
+  flexbuffers::Builder fbb;
+  size_t startMap;
+  size_t contentMap;
+  SerializeUtils::SerializeBegin(fbb, tgfx::inspect::LayerTreeMessage::LayerSubAttribute, startMap,
+                                 contentMap);
+  SerializeSizeImpl(fbb, size);
+  SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
+  return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
+}
+
+}  // namespace tgfx::SizeSerialization
