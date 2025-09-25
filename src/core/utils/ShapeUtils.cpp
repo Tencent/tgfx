@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ShapeUtils.h"
-#include <memory>
 #include "core/shapes/MatrixShape.h"
 #include "core/shapes/StrokeShape.h"
 #include "core/utils/StrokeUtils.h"
