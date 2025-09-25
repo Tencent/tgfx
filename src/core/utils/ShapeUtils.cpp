@@ -17,6 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ShapeUtils.h"
+#include <memory>
+#include "core/shapes/MatrixShape.h"
+#include "core/shapes/StrokeShape.h"
+#include "core/utils/StrokeUtils.h"
+#include "tgfx/core/Shape.h"
 
 namespace tgfx {
 
@@ -25,6 +30,25 @@ Path ShapeUtils::GetShapeRenderingPath(std::shared_ptr<Shape> shape, float resol
     return {};
   }
   return shape->onGetPath(resolutionScale);
+}
+
+float ShapeUtils::CalculateAlphaReduceFactorIfHairline(std::shared_ptr<Shape> shape) {
+  if (shape->type() != Shape::Type::Matrix) {
+    return 1.f;
+  }
+
+  auto matrixShape = std::static_pointer_cast<MatrixShape>(shape);
+  if (matrixShape->shape->type() == Shape::Type::Stroke) {
+    auto strokeShape = std::static_pointer_cast<StrokeShape>(matrixShape->shape);
+    if (IsHairlineStroke(strokeShape->stroke)) {
+      return 1.f;
+    }
+    auto width = strokeShape->stroke.width * matrixShape->matrix.getMaxScale();
+    if (width < 1.f) {
+      return width;
+    }
+  }
+  return 1.f;
 }
 
 }  // namespace tgfx
