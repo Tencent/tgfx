@@ -211,10 +211,10 @@ void Matrix3D::setConcat(const Matrix3D& a, const Matrix3D& b) {
   auto m2 = compute(b.getCol(2));
   auto m3 = compute(b.getCol(3));
 
-  setCol(0, m0);
-  setCol(1, m1);
-  setCol(2, m2);
-  setCol(3, m3);
+  setColumn(0, m0);
+  setColumn(1, m1);
+  setColumn(2, m2);
+  setColumn(3, m3);
 }
 
 void Matrix3D::preConcat(const Matrix3D& m) {
@@ -234,9 +234,9 @@ void Matrix3D::preScale(float sx, float sy, float sz) {
   auto c1 = getCol(1);
   auto c2 = getCol(2);
 
-  setCol(0, c0 * sx);
-  setCol(1, c1 * sy);
-  setCol(2, c2 * sz);
+  setColumn(0, c0 * sx);
+  setColumn(1, c1 * sy);
+  setColumn(2, c2 * sz);
 }
 
 void Matrix3D::postScale(float sx, float sy, float sz) {
@@ -253,7 +253,7 @@ void Matrix3D::preTranslate(float tx, float ty, float tz) {
   auto c2 = getCol(2);
   auto c3 = getCol(3);
 
-  setCol(3, (c0 * tx + c1 * ty + c2 * tz + c3));
+  setColumn(3, (c0 * tx + c1 * ty + c2 * tz + c3));
 }
 
 void Matrix3D::postTranslate(float tx, float ty, float tz) {

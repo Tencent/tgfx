@@ -259,7 +259,7 @@ class Matrix3D {
     values[i + 12] = v.w;
   }
 
-  void setCol(int i, const Vec4& v) {
+  void setColumn(int i, const Vec4& v) {
     memcpy(&values[i * 4], v.ptr(), sizeof(v));
   }
 

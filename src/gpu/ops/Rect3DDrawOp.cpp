@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Rect3DDrawOp.h"
+#include "core/utils/MathExtra.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/processors/Transform3DGeometryProcessor.h"
@@ -74,8 +75,12 @@ PlacementPtr<GeometryProcessor> Rect3DDrawOp::onMakeGeometryProcessor(RenderTarg
   // while scale2 and offset2 map the NDC coordinates from the valid space to the actual space.
   //
   // NDC_Point_shifted = ((NDC_Point * scale1) + offset1) * scale2 + offset2
-  const Vec2 scale2(drawArgs.viewportSize.width / static_cast<float>(renderTarget->width()),
-                    drawArgs.viewportSize.height / static_cast<float>(renderTarget->height()));
+  auto renderTargetW = static_cast<float>(renderTarget->width());
+  DEBUG_ASSERT(!FloatNearlyZero(renderTargetW));
+  auto renderTargetH = static_cast<float>(renderTarget->height());
+  DEBUG_ASSERT(!FloatNearlyZero(renderTargetH));
+  const Vec2 scale2(drawArgs.viewportSize.width / renderTargetW,
+                    drawArgs.viewportSize.height / renderTargetH);
   Vec2 ndcScale = drawArgs.ndcScale * scale2;
   Vec2 ndcOffset = drawArgs.ndcOffset * scale2 + scale2 - Vec2(1.f, 1.f);
   if (renderTarget->origin() == ImageOrigin::BottomLeft) {
