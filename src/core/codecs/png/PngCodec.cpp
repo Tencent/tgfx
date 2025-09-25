@@ -323,9 +323,10 @@ static void png_reader_write_data(png_structp png_ptr, png_bytep data, png_size_
   writer->length += length;
 }
 
-std::shared_ptr<Data> PngCodec::Encode(const Pixmap& pixmap, int) {
+std::shared_ptr<Data> PngCodec::Encode(const Pixmap& pixmap, int, std::shared_ptr<ColorSpace> colorSpace) {
   auto srcPixels = static_cast<png_bytep>(const_cast<void*>((pixmap.pixels())));
   auto srcRowBytes = static_cast<int>(pixmap.rowBytes());
+  auto iccData = colorSpace->toICCProfile();
   uint8_t* alphaPixels = nullptr;
   Buffer tempBuffer;
   if (pixmap.colorType() == ColorType::ALPHA_8) {
@@ -371,6 +372,7 @@ std::shared_ptr<Data> PngCodec::Encode(const Pixmap& pixmap, int) {
     png_set_IHDR(png_ptr, info_ptr, static_cast<png_uint_32>(pixmap.width()),
                  static_cast<png_uint_32>(pixmap.height()), 8, colorType, PNG_INTERLACE_NONE,
                  PNG_COMPRESSION_TYPE_BASE, PNG_FILTER_TYPE_BASE);
+    png_set_iCCP(png_ptr, info_ptr, "TGFX", 0, iccData->bytes(), static_cast<uint32_t>(iccData->size()));
     png_set_sBIT(png_ptr, info_ptr, &sigBit);
     png_set_write_fn(png_ptr, &pngWriter, png_reader_write_data, nullptr);
     png_write_info(png_ptr, info_ptr);

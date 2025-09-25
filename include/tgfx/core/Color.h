@@ -63,11 +63,7 @@ struct Color {
   /**
    * Returns color value from 8-bit component values with colorSpace.
    */
-  static Color FromRGBAWithCS(
-      uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255,
-      const std::shared_ptr<ColorSpace>& colorSpace = ColorSpace::MakeSRGB());
-
-  static Color FromRGBA(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255);
+  static Color FromRGBA(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Constructs an opaque white Color.

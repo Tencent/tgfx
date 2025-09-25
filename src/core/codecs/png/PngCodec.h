@@ -21,7 +21,6 @@
 #include "tgfx/core/ImageCodec.h"
 
 namespace tgfx {
-class ColorSpace;
 class PngCodec : public ImageCodec {
  public:
   static std::shared_ptr<ImageCodec> MakeFrom(const std::string& filePath);
@@ -31,7 +30,7 @@ class PngCodec : public ImageCodec {
   bool isAlphaOnly() const override;
 
 #ifdef TGFX_USE_PNG_ENCODE
-  static std::shared_ptr<Data> Encode(const Pixmap& pixmap, int quality);
+  static std::shared_ptr<Data> Encode(const Pixmap& pixmap, int quality, std::shared_ptr<ColorSpace> colorSpace);
 #endif
 
  protected:

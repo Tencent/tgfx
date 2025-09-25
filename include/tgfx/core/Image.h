@@ -72,7 +72,7 @@ class Image {
    */
   static std::shared_ptr<Image> MakeFrom(
       NativeImageRef nativeImage,
-      const std::shared_ptr<ColorSpace>& colorSpace = ColorSpace::MakeSRGB());
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Creates an Image from the image generator. An Image is returned if the generator is not
@@ -81,7 +81,7 @@ class Image {
    */
   static std::shared_ptr<Image> MakeFrom(
       std::shared_ptr<ImageGenerator> generator,
-      const std::shared_ptr<ColorSpace>& colorSpace = ColorSpace::MakeSRGB());
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Creates an Image using the provided ImageInfo and pixel data from an immutable Data object. The
@@ -91,7 +91,7 @@ class Image {
    */
   static std::shared_ptr<Image> MakeFrom(
       const ImageInfo& info, std::shared_ptr<Data> pixels,
-      const std::shared_ptr<ColorSpace>& colorSpace = ColorSpace::MakeSRGB());
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Creates an Image from the Bitmap, sharing bitmap pixels. The Bitmap will allocate new internal
@@ -99,7 +99,7 @@ class Image {
    * writing to the Bitmap. Therefore, the content of the returned Image will always be the same.
    */
   static std::shared_ptr<Image> MakeFrom(
-      const Bitmap& bitmap, const std::shared_ptr<ColorSpace>& colorSpace = ColorSpace::MakeSRGB());
+      const Bitmap& bitmap, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Creates an Image from the platform-specific hardware buffer. For example, the hardware buffer
@@ -111,7 +111,7 @@ class Image {
    */
   static std::shared_ptr<Image> MakeFrom(
       HardwareBufferRef hardwareBuffer, YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED,
-      const std::shared_ptr<ColorSpace>& gamutColorSpace = ColorSpace::MakeSRGB());
+      std::shared_ptr<ColorSpace> gamutColorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Creates an Image from the given picture with the specified width, height, and matrix. The
@@ -131,7 +131,7 @@ class Image {
    */
   static std::shared_ptr<Image> MakeFrom(
       std::shared_ptr<Picture> picture, int width, int height, const Matrix* matrix = nullptr,
-      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeRGB(namedTransferFn::SRGB, namedGamut::DisplayP3));
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeRGB(SRGBTF, DisplayP3Mat));
 
   /**
    * Creates an Image in the I420 format with the specified YUVData and the YUVColorSpace. Returns
@@ -139,7 +139,7 @@ class Image {
    */
   static std::shared_ptr<Image> MakeI420(
       std::shared_ptr<YUVData> yuvData, YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED,
-      const std::shared_ptr<ColorSpace>& gamutColorSpace = ColorSpace::MakeSRGB());
+      std::shared_ptr<ColorSpace> gamutColorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Creates an Image in the NV12 format with the specified YUVData and the YUVColorSpace. Returns
@@ -147,7 +147,7 @@ class Image {
    */
   static std::shared_ptr<Image> MakeNV12(
       std::shared_ptr<YUVData> yuvData, YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED,
-      const std::shared_ptr<ColorSpace>& gamutColorSpace = ColorSpace::MakeSRGB());
+      std::shared_ptr<ColorSpace> gamutColorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Creates an Image from the ImageBuffer, An Image is returned if the imageBuffer is not nullptr
@@ -155,7 +155,7 @@ class Image {
    */
   static std::shared_ptr<Image> MakeFrom(
       std::shared_ptr<ImageBuffer> imageBuffer,
-      const std::shared_ptr<ColorSpace>& colorSpace = ColorSpace::MakeSRGB());
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Creates an Image from the backendTexture associated with the context. The caller must ensure
@@ -166,7 +166,7 @@ class Image {
   static std::shared_ptr<Image> MakeFrom(
       Context* context, const BackendTexture& backendTexture,
       ImageOrigin origin = ImageOrigin::TopLeft,
-      const std::shared_ptr<ColorSpace>& colorSpace = ColorSpace::MakeSRGB());
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Creates an Image from the backendTexture associated with the context, taking ownership of the
@@ -178,7 +178,7 @@ class Image {
   static std::shared_ptr<Image> MakeAdopted(
       Context* context, const BackendTexture& backendTexture,
       ImageOrigin origin = ImageOrigin::TopLeft,
-      const std::shared_ptr<ColorSpace>& colorSpace = ColorSpace::MakeSRGB());
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   virtual ~Image() = default;
 
@@ -309,7 +309,7 @@ class Image {
    */
   std::shared_ptr<Image> makeWithFilter(
       std::shared_ptr<ImageFilter> filter, Point* offset = nullptr, const Rect* clipRect = nullptr,
-      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeRGB(namedTransferFn::SRGB, namedGamut::DisplayP3)) const;
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeRGB(SRGBTF, DisplayP3Mat)) const;
 
   /**
    * Returns an Image with the RGBAAA layout that takes half of the original Image as its RGB

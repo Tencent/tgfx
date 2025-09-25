@@ -20,7 +20,7 @@
 
 namespace tgfx {
 EllipseGeometryProcessor::EllipseGeometryProcessor(int width, int height, bool stroke,
-                                                   bool useScale, std::optional<Color> commonColor)
+                                                   bool useScale, std::optional<Color> commonColor, std::shared_ptr<ColorSpace> dstColorSpace)
     : GeometryProcessor(ClassID()), width(width), height(height), stroke(stroke),
       useScale(useScale), commonColor(commonColor) {
   inPosition = {"inPosition", VertexFormat::Float2};
@@ -34,11 +34,16 @@ EllipseGeometryProcessor::EllipseGeometryProcessor(int width, int height, bool s
   }
   inEllipseRadii = {"inEllipseRadii", VertexFormat::Float4};
   this->setVertexAttributes(&inPosition, 4);
+  steps = std::make_shared<ColorSpaceXformSteps>(ColorSpace::MakeSRGB().get(), AlphaType::Premultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
 }
 
 void EllipseGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
   uint32_t flags = stroke ? 1 : 0;
   flags |= commonColor.has_value() ? 2 : 0;
   bytesKey->write(flags);
+  if(!commonColor.has_value()) {
+    uint32_t key = ColorSpaceXformSteps::xformKey(steps.get());
+    bytesKey->write(key);
+  }
 }
 }  // namespace tgfx

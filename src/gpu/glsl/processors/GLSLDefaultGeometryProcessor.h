@@ -25,11 +25,13 @@ namespace tgfx {
 class GLSLDefaultGeometryProcessor : public DefaultGeometryProcessor {
  public:
   GLSLDefaultGeometryProcessor(Color color, int width, int height, AAType aa,
-                               const Matrix& viewMatrix, const Matrix& uvMatrix);
+                               const Matrix& viewMatrix, const Matrix& uvMatrix, std::shared_ptr<ColorSpace> dstColorSpace);
 
   void emitCode(EmitArgs& args) const override;
 
   void setData(UniformBuffer* vertexUniformBuffer, UniformBuffer* fragmentUniformBuffer,
                FPCoordTransformIter* transformIter) const override;
+private:
+  std::shared_ptr<ColorSpace> colorSpace = nullptr;
 };
 }  // namespace tgfx

@@ -21,15 +21,15 @@
 namespace tgfx {
 PlacementPtr<QuadPerEdgeAAGeometryProcessor> QuadPerEdgeAAGeometryProcessor::Make(
     BlockBuffer* buffer, int width, int height, AAType aa, std::optional<Color> commonColor,
-    std::optional<Matrix> uvMatrix, bool hasSubset) {
+    std::optional<Matrix> uvMatrix, bool hasSubset, std::shared_ptr<ColorSpace> dstColorSpace) {
   return buffer->make<GLSLQuadPerEdgeAAGeometryProcessor>(width, height, aa, commonColor, uvMatrix,
-                                                          hasSubset);
+                                                          hasSubset, std::move(dstColorSpace));
 }
 
 GLSLQuadPerEdgeAAGeometryProcessor::GLSLQuadPerEdgeAAGeometryProcessor(
     int width, int height, AAType aa, std::optional<Color> commonColor,
-    std::optional<Matrix> uvMatrix, bool hasSubset)
-    : QuadPerEdgeAAGeometryProcessor(width, height, aa, commonColor, uvMatrix, hasSubset) {
+    std::optional<Matrix> uvMatrix, bool hasSubset, std::shared_ptr<ColorSpace> dstColorSpace)
+    : QuadPerEdgeAAGeometryProcessor(width, height, aa, commonColor, uvMatrix, hasSubset, std::move(dstColorSpace)), helper() {
 }
 
 void GLSLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
@@ -58,7 +58,10 @@ void GLSLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
   } else {
     auto colorVar = varyingHandler->addVarying("Color", SLType::Float4);
-    vertBuilder->codeAppendf("%s = %s;", colorVar.vsOut().c_str(), color.name().c_str());
+    helper.emitCode(args.uniformHandler, steps.get(), ShaderStage::Vertex);
+    std::string xformedColor;
+    vertBuilder->appendColorGamutXform(&xformedColor, color.name().c_str(), &helper);
+    vertBuilder->codeAppendf("%s = %s;", colorVar.vsOut().c_str(), xformedColor.c_str());
     fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorVar.fsIn().c_str());
   }
 
@@ -71,7 +74,11 @@ void GLSLQuadPerEdgeAAGeometryProcessor::setData(UniformBuffer* vertexUniformBuf
                                                  FPCoordTransformIter* transformIter) const {
   setTransformDataHelper(uvMatrix.value_or(Matrix::I()), vertexUniformBuffer, transformIter);
   if (commonColor.has_value()) {
-    fragmentUniformBuffer->setData("Color", *commonColor);
+    Color dstCommonColor = commonColor.value();
+    steps->apply(dstCommonColor.array());
+    fragmentUniformBuffer->setData("Color", dstCommonColor);
+  }else {
+    helper.setData(vertexUniformBuffer, steps.get());
   }
 }
 

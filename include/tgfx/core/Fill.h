@@ -42,8 +42,8 @@ class Fill {
   }
 
   /**
-   * The input color, unpremultiplied, as four floating point values，in SRGB gamut. The default value is opaque
-   * white. Can overflow 0-1.
+   * The input color, which is unpremultiplied and in the sRGB gamut, may exceed the 0-1 range. The
+   * default value is opaque white.
    */
   Color color = {};
 

@@ -50,7 +50,7 @@ ShapeDrawOp::ShapeDrawOp(std::shared_ptr<GPUShapeProxy> proxy, Color color, cons
   }
 }
 
-PlacementPtr<GeometryProcessor> ShapeDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {
+PlacementPtr<GeometryProcessor> ShapeDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget, std::shared_ptr<ColorSpace> dstColorSpace) {
   ATTRIBUTE_NAME("color", color);
   ATTRIBUTE_NAME("uvMatrix", uvMatrix);
   if (shapeProxy == nullptr) {
@@ -83,7 +83,7 @@ PlacementPtr<GeometryProcessor> ShapeDrawOp::onMakeGeometryProcessor(RenderTarge
   }
   auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
   return DefaultGeometryProcessor::Make(drawingBuffer, color, renderTarget->width(),
-                                        renderTarget->height(), aa, viewMatrix, realUVMatrix);
+                                        renderTarget->height(), aa, viewMatrix, realUVMatrix, std::move(dstColorSpace));
 }
 
 void ShapeDrawOp::onDraw(RenderPass* renderPass) {

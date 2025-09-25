@@ -45,7 +45,8 @@
         "targets": [
           "webp",
           "webpdemux",
-          "sharpyuv"
+          "sharpyuv",
+          "libwebpmux"
         ]
       }
     },
@@ -54,7 +55,8 @@
       "cmake": {
         "targets": [
           "webp",
-          "webpdemux"
+          "webpdemux",
+          "libwebpmux"
         ],
         "arguments": [
           "-DWEBP_BUILD_WEBP_JS=ON"

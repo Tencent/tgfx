@@ -21,7 +21,7 @@
 namespace tgfx {
 AtlasTextGeometryProcessor::AtlasTextGeometryProcessor(std::shared_ptr<TextureProxy> textureProxy,
                                                        AAType aa, std::optional<Color> commonColor,
-                                                       const SamplingOptions& sampling)
+                                                       const SamplingOptions& sampling, std::shared_ptr<ColorSpace> dstColorSpace)
     : GeometryProcessor(ClassID()), textureProxy(std::move(textureProxy)), commonColor(commonColor),
       samplerState(sampling) {
   position = {"aPosition", VertexFormat::Float2};
@@ -35,11 +35,16 @@ AtlasTextGeometryProcessor::AtlasTextGeometryProcessor(std::shared_ptr<TexturePr
   setVertexAttributes(&position, 4);
   textures.emplace_back(this->textureProxy->getTextureView()->getTexture());
   setTextureSamplerCount(textures.size());
+  steps = std::make_shared<ColorSpaceXformSteps>(ColorSpace::MakeSRGB().get(), AlphaType::Premultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
 }
 void AtlasTextGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
   uint32_t flags = aa == AAType::Coverage ? 1 : 0;
   flags |= commonColor.has_value() ? 2 : 0;
   flags |= textureProxy->isAlphaOnly() ? 4 : 0;
   bytesKey->write(flags);
+  if(!commonColor.has_value()) {
+    uint32_t key = ColorSpaceXformSteps::xformKey(steps.get());
+    bytesKey->write(key);
+  }
 }
 }  // namespace tgfx

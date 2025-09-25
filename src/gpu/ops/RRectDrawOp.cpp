@@ -50,14 +50,14 @@ RRectDrawOp::RRectDrawOp(RRectsVertexProvider* provider)
   hasStroke = provider->hasStroke();
 }
 
-PlacementPtr<GeometryProcessor> RRectDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {
+PlacementPtr<GeometryProcessor> RRectDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget, std::shared_ptr<ColorSpace> dstColorSpace) {
   ATTRIBUTE_NAME("rectCount", static_cast<uint32_t>(rectCount));
   ATTRIBUTE_NAME("useScale", useScale);
   ATTRIBUTE_NAME("hasStroke", hasStroke);
   ATTRIBUTE_NAME("commonColor", commonColor);
   auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
   return EllipseGeometryProcessor::Make(drawingBuffer, renderTarget->width(),
-                                        renderTarget->height(), hasStroke, useScale, commonColor);
+                                        renderTarget->height(), hasStroke, useScale, commonColor, std::move(dstColorSpace));
 }
 
 void RRectDrawOp::onDraw(RenderPass* renderPass) {

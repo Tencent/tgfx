@@ -53,7 +53,7 @@ class DrawOp {
     return !coverages.empty();
   }
 
-  void execute(RenderPass* renderPass, RenderTarget* renderTarget);
+  void execute(RenderPass* renderPass, RenderTarget* renderTarget, std::shared_ptr<ColorSpace> dstColorSpace);
 
  protected:
   AAType aaType = AAType::None;
@@ -66,7 +66,7 @@ class DrawOp {
   explicit DrawOp(AAType aaType) : aaType(aaType) {
   }
 
-  virtual PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) = 0;
+  virtual PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget, std::shared_ptr<ColorSpace> dstColorSpace) = 0;
 
   virtual void onDraw(RenderPass* renderPass) = 0;
 

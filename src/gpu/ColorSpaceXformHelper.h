@@ -93,19 +93,19 @@ class ColorSpaceXformHelper {
   }
 
   bool applyUnpremul() const {
-    return fFlags.unpremul;
+    return fFlags.unPremul;
   }
   bool applySrcTF() const {
     return fFlags.linearize;
   }
   bool applySrcOOTF() const {
-    return fFlags.src_ootf;
+    return fFlags.srcOOTF;
   }
   bool applyGamutXform() const {
-    return fFlags.gamut_transform;
+    return fFlags.gamutTransform;
   }
   bool applyDstOOTF() const {
-    return fFlags.dst_ootf;
+    return fFlags.dstOOTF;
   }
   bool applyDstTF() const {
     return fFlags.encode;

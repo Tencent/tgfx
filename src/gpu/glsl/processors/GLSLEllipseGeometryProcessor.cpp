@@ -21,14 +21,14 @@
 namespace tgfx {
 PlacementPtr<EllipseGeometryProcessor> EllipseGeometryProcessor::Make(
     BlockBuffer* buffer, int width, int height, bool stroke, bool useScale,
-    std::optional<Color> commonColor) {
-  return buffer->make<GLSLEllipseGeometryProcessor>(width, height, stroke, useScale, commonColor);
+    std::optional<Color> commonColor, std::shared_ptr<ColorSpace> dstColorSpace) {
+  return buffer->make<GLSLEllipseGeometryProcessor>(width, height, stroke, useScale, commonColor, std::move(dstColorSpace));
 }
 
 GLSLEllipseGeometryProcessor::GLSLEllipseGeometryProcessor(int width, int height, bool stroke,
                                                            bool useScale,
-                                                           std::optional<Color> commonColor)
-    : EllipseGeometryProcessor(width, height, stroke, useScale, commonColor) {
+                                                           std::optional<Color> commonColor, std::shared_ptr<ColorSpace> dstColorSpace)
+    : EllipseGeometryProcessor(width, height, stroke, useScale, commonColor, std::move(dstColorSpace)) {
 }
 
 void GLSLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
@@ -55,7 +55,10 @@ void GLSLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
   } else {
     auto color = varyingHandler->addVarying("Color", SLType::Float4);
-    vertBuilder->codeAppendf("%s = %s;", color.vsOut().c_str(), inColor.name().c_str());
+    helper.emitCode(args.uniformHandler, steps.get(), ShaderStage::Vertex);
+    std::string xformedColor;
+    vertBuilder->appendColorGamutXform(&xformedColor, inColor.name().c_str(), &helper);
+    vertBuilder->codeAppendf("%s = %s;", color.vsOut().c_str(), xformedColor.c_str());
     fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), color.fsIn().c_str());
   }
 
@@ -134,7 +137,11 @@ void GLSLEllipseGeometryProcessor::setData(UniformBuffer* vertexUniformBuffer,
                                            FPCoordTransformIter* transformIter) const {
   setTransformDataHelper(Matrix::I(), vertexUniformBuffer, transformIter);
   if (commonColor.has_value()) {
-    fragmentUniformBuffer->setData("Color", *commonColor);
+    Color dstCommonColor = commonColor.value();
+    steps->apply(dstCommonColor.array());
+    fragmentUniformBuffer->setData("Color", dstCommonColor);
+  }else {
+    helper.setData(vertexUniformBuffer, steps.get());
   }
 }
 }  // namespace tgfx

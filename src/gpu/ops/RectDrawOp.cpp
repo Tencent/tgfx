@@ -58,14 +58,14 @@ RectDrawOp::RectDrawOp(RectsVertexProvider* provider)
   hasSubset = provider->hasSubset();
 }
 
-PlacementPtr<GeometryProcessor> RectDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {
+PlacementPtr<GeometryProcessor> RectDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget, std::shared_ptr<ColorSpace> dstColorSpace) {
   ATTRIBUTE_NAME("rectCount", static_cast<int>(rectCount));
   ATTRIBUTE_NAME("commonColor", commonColor);
   ATTRIBUTE_NAME("uvMatrix", uvMatrix);
   auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
   return QuadPerEdgeAAGeometryProcessor::Make(drawingBuffer, renderTarget->width(),
                                               renderTarget->height(), aaType, commonColor, uvMatrix,
-                                              hasSubset);
+                                              hasSubset, dstColorSpace);
 }
 
 void RectDrawOp::onDraw(RenderPass* renderPass) {

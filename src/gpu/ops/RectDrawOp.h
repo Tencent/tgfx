@@ -49,7 +49,7 @@ class RectDrawOp : public DrawOp {
                                        uint32_t renderFlags);
 
  protected:
-  PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
+  PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget, std::shared_ptr<ColorSpace> dstColorSpace) override;
 
   void onDraw(RenderPass* renderPass) override;
 

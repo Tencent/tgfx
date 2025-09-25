@@ -177,6 +177,8 @@ class Surface {
    */
   bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0, int srcY = 0);
 
+  std::shared_ptr<ColorSpace> colorSpace() const;
+
  private:
   uint32_t _uniqueID = 0;
   RenderContext* renderContext = nullptr;

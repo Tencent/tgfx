@@ -26,7 +26,7 @@ class GLSLQuadPerEdgeAAGeometryProcessor : public QuadPerEdgeAAGeometryProcessor
  public:
   GLSLQuadPerEdgeAAGeometryProcessor(int width, int height, AAType aa,
                                      std::optional<Color> commonColor,
-                                     std::optional<Matrix> uvMatrix, bool hasSubset);
+                                     std::optional<Matrix> uvMatrix, bool hasSubset, std::shared_ptr<ColorSpace> dstColorSpace);
 
   void emitCode(EmitArgs& args) const override;
 
@@ -42,5 +42,6 @@ class GLSLQuadPerEdgeAAGeometryProcessor : public QuadPerEdgeAAGeometryProcessor
 
  private:
   std::optional<std::string> subsetVaryingName = std::nullopt;
+  mutable ColorSpaceXformHelper helper;
 };
 }  // namespace tgfx

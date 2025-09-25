@@ -319,9 +319,10 @@ std::shared_ptr<Data> JpegCodec::getEncodedData() const {
 }
 
 #ifdef TGFX_USE_JPEG_ENCODE
-std::shared_ptr<Data> JpegCodec::Encode(const Pixmap& pixmap, int quality) {
+std::shared_ptr<Data> JpegCodec::Encode(const Pixmap& pixmap, int quality, std::shared_ptr<ColorSpace> colorSpace) {
   auto srcPixels = static_cast<uint8_t*>(const_cast<void*>(pixmap.pixels()));
   int srcRowBytes = static_cast<int>(pixmap.rowBytes());
+  auto iccData = colorSpace->toICCProfile();
   jpeg_compress_struct cinfo = {};
   jpeg_error_mgr jerr = {};
   JSAMPROW row_pointer[1];
@@ -363,6 +364,7 @@ std::shared_ptr<Data> JpegCodec::Encode(const Pixmap& pixmap, int quality) {
   cinfo.optimize_coding = TRUE;
   jpeg_set_quality(&cinfo, quality, TRUE);
   jpeg_start_compress(&cinfo, TRUE);
+  jpeg_write_icc_profile(&cinfo, iccData->bytes(), static_cast<uint32_t>(iccData->size()));
   while (cinfo.next_scanline < cinfo.image_height) {
     row_pointer[0] = &(srcPixels)[cinfo.next_scanline * static_cast<JDIMENSION>(srcRowBytes)];
     (void)jpeg_write_scanlines(&cinfo, row_pointer, 1);

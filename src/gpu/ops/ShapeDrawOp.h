@@ -31,7 +31,7 @@ class ShapeDrawOp : public DrawOp {
   bool hasCoverage() const override;
 
  protected:
-  PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
+  PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget, std::shared_ptr<ColorSpace> dstColorSpace) override;
 
   void onDraw(RenderPass* renderPass) override;
 

@@ -212,6 +212,10 @@ bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, in
   return renderTarget->readPixels(dstInfo, dstPixels, srcX, srcY);
 }
 
+std::shared_ptr<ColorSpace> Surface::colorSpace() const {
+  return renderContext->colorSpace();
+}
+
 bool Surface::aboutToDraw(bool discardContent) {
   if (cachedImage == nullptr) {
     return true;

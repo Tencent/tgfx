@@ -116,7 +116,7 @@ std::shared_ptr<Surface> EGLWindow::onCreateSurface(Context* context) {
     EGLBoolean success = eglQuerySurface(eglDevice->eglDisplay, eglDevice->eglSurface,
                                          EGL_GL_COLORSPACE_KHR, &colorSpaceValue);
     if (success == EGL_TRUE && colorSpaceValue == EGL_GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT) {
-      colorSpace = ColorSpace::MakeRGB(namedTransferFn::SRGB, namedGamut::DisplayP3);
+      colorSpace = ColorSpace::MakeRGB(SRGBTF, DisplayP3Mat);
     }
   }
   return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft, 1, colorSpace);

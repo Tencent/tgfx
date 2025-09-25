@@ -21,9 +21,9 @@
 #include "inspect/InspectorMark.h"
 
 namespace tgfx {
-void DrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
+void DrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget, std::shared_ptr<ColorSpace> dstColorSpace) {
   OPERATE_MARK(type());
-  auto geometryProcessor = onMakeGeometryProcessor(renderTarget);
+  auto geometryProcessor = onMakeGeometryProcessor(renderTarget, std::move(dstColorSpace));
   ATTRIBUTE_NAME("scissorRect", scissorRect);
   ATTRIBUTE_NAME_ENUM("blenderMode", blendMode, tgfx::inspect::CustomEnumType::BlendMode);
   ATTRIBUTE_NAME_ENUM("aaType", aaType, tgfx::inspect::CustomEnumType::AAType);

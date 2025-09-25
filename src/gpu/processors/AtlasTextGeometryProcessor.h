@@ -28,7 +28,7 @@ class AtlasTextGeometryProcessor : public GeometryProcessor {
   static PlacementPtr<AtlasTextGeometryProcessor> Make(BlockBuffer* buffer,
                                                        std::shared_ptr<TextureProxy> textureProxy,
                                                        AAType aa, std::optional<Color> commonColor,
-                                                       const SamplingOptions& sampling);
+                                                       const SamplingOptions& sampling, std::shared_ptr<ColorSpace> dstColorSpace);
   std::string name() const override {
     return "AtlasTextGeometryProcessor";
   }
@@ -37,7 +37,7 @@ class AtlasTextGeometryProcessor : public GeometryProcessor {
   DEFINE_PROCESSOR_CLASS_ID
 
   AtlasTextGeometryProcessor(std::shared_ptr<TextureProxy> textureProxy, AAType aa,
-                             std::optional<Color> commonColor, const SamplingOptions& sampling);
+                             std::optional<Color> commonColor, const SamplingOptions& sampling, std::shared_ptr<ColorSpace> dstColorSpace);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
@@ -56,5 +56,6 @@ class AtlasTextGeometryProcessor : public GeometryProcessor {
   std::optional<Color> commonColor = std::nullopt;
   std::vector<GPUTexture*> textures;
   SamplerState samplerState = {};
+  std::shared_ptr<ColorSpaceXformSteps> steps = nullptr;
 };
 }  // namespace tgfx

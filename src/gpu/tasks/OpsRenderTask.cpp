@@ -25,6 +25,7 @@ namespace tgfx {
 void OpsRenderTask::execute(CommandEncoder* encoder) {
   TASK_MARK(tgfx::inspect::OpTaskType::OpsRenderTask);
   auto renderTarget = renderTargetProxy->getRenderTarget();
+  auto dstColorSpace = renderTargetProxy->getColorSpace();
   if (renderTarget == nullptr) {
     LOGE("OpsRenderTask::execute() Render target is null!");
     return;
@@ -40,7 +41,7 @@ void OpsRenderTask::execute(CommandEncoder* encoder) {
     return;
   }
   for (auto& op : drawOps) {
-    op->execute(renderPass.get(), renderTarget.get());
+    op->execute(renderPass.get(), renderTarget.get(), dstColorSpace);
     // Release the Op immediately after execution to maximize GPU resource reuse.
     op = nullptr;
   }

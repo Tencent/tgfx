@@ -27,7 +27,7 @@ class DefaultGeometryProcessor : public GeometryProcessor {
   static PlacementPtr<DefaultGeometryProcessor> Make(BlockBuffer* buffer, Color color, int width,
                                                      int height, AAType aa,
                                                      const Matrix& viewMatrix,
-                                                     const Matrix& uvMatrix);
+                                                     const Matrix& uvMatrix, std::shared_ptr<ColorSpace> dstColorSpace);
 
   std::string name() const override {
     return "DefaultGeometryProcessor";
