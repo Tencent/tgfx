@@ -97,8 +97,8 @@ std::shared_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(EGLGPU* gpu,
   }
   auto size = HardwareBufferGetSize(hardwareBuffer);
   GPUTextureDescriptor descriptor = {size.width, size.height, formats.front(), false, 1, usage};
-  auto texture = gpu->makeResoource<EGLHardwareTexture>(descriptor, hardwareBuffer, eglImage,
-                                                        target, textureID);
+  auto texture = gpu->makeResource<EGLHardwareTexture>(descriptor, hardwareBuffer, eglImage, target,
+                                                       textureID);
   auto state = gpu->state();
   state->bindTexture(texture.get());
   eglext::glEGLImageTargetTexture2DOES(target, (GLeglImageOES)eglImage);
