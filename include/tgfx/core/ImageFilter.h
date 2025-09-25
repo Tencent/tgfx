@@ -29,7 +29,6 @@
 namespace tgfx {
 class TextureProxy;
 enum class SrcRectConstraint;
-struct PerspectiveInfo;
 
 /**
  * ImageFilter is the base class for all image filters. If one is installed in the Paint, then all
