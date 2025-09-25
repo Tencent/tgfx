@@ -213,7 +213,8 @@ std::shared_ptr<TextureView> SurfaceTexture::onMakeTexture(Context* context, boo
                                      1,
                                      GPUTextureUsage::TEXTURE_BINDING};
   auto gpu = static_cast<GLGPU*>(context->gpu());
-  auto texture = gpu->makeResource<GLTexture>(descriptor, GL_TEXTURE_EXTERNAL_OES, textureID);
+  auto texture = gpu->makeResource<GLTexture>(
+      descriptor, static_cast<unsigned>(GL_TEXTURE_EXTERNAL_OES), textureID);
   return Resource::AddToCache(context, new DefaultTextureView(std::move(texture)));
 }
 
