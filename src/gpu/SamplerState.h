@@ -27,22 +27,31 @@ class SamplerState {
   SamplerState() = default;
 
   explicit SamplerState(const SamplingOptions& sampling)
-      : filterMode(sampling.filterMode), mipmapMode(sampling.mipmapMode) {
+      : minFilterMode(sampling.minFilterMode), magFilterMode(sampling.magFilterMode),
+        mipmapMode(sampling.mipmapMode) {
   }
 
   SamplerState(TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling)
-      : tileModeX(tileModeX), tileModeY(tileModeY), filterMode(sampling.filterMode),
-        mipmapMode(sampling.mipmapMode) {
+      : tileModeX(tileModeX), tileModeY(tileModeY), minFilterMode(sampling.minFilterMode),
+        magFilterMode(sampling.magFilterMode), mipmapMode(sampling.mipmapMode) {
   }
 
   SamplerState(TileMode tileModeX, TileMode tileModeY, FilterMode filterMode = FilterMode::Linear,
                MipmapMode mipmapMode = MipmapMode::None)
-      : tileModeX(tileModeX), tileModeY(tileModeY), filterMode(filterMode), mipmapMode(mipmapMode) {
+      : tileModeX(tileModeX), tileModeY(tileModeY), minFilterMode(filterMode),
+        magFilterMode(filterMode), mipmapMode(mipmapMode) {
+  }
+
+  SamplerState(TileMode tileModeX, TileMode tileModeY, FilterMode minFilterMode,
+               FilterMode magFilterMode, MipmapMode mipmapMode = MipmapMode::None)
+      : tileModeX(tileModeX), tileModeY(tileModeY), minFilterMode(minFilterMode),
+        magFilterMode(magFilterMode), mipmapMode(mipmapMode) {
   }
 
   TileMode tileModeX = TileMode::Clamp;
   TileMode tileModeY = TileMode::Clamp;
-  FilterMode filterMode = FilterMode::Linear;
+  FilterMode minFilterMode = FilterMode::Linear;
+  FilterMode magFilterMode = FilterMode::Linear;
   MipmapMode mipmapMode = MipmapMode::None;
 };
 }  // namespace tgfx

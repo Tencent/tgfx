@@ -273,8 +273,11 @@ void GLSLTextureEffect::onSetData(UniformBuffer* /*vertexUniformBuffer*/,
   }
   if (needSubset()) {
     auto subsetRect = subset.value_or(Rect::MakeWH(textureProxy->width(), textureProxy->height()));
-    if (samplerState.filterMode == FilterMode::Nearest) {
-      subsetRect.roundOut();
+    if (samplerState.magFilterMode == samplerState.minFilterMode &&
+        samplerState.magFilterMode == FilterMode::Nearest) {
+      // If both mag and min filter mode are nearest, we need to inset by 0.5 to avoid sampling
+      // outside the subset.
+      subsetRect = subsetRect.makeInset(0.5f, 0.5f);
     }
     auto type = textureView->getTexture()->type();
     // https://cs.android.com/android/platform/superproject/+/master:frameworks/native/libs/nativedisplay/surfacetexture/SurfaceTexture.cpp;l=275;drc=master;bpv=0;bpt=1

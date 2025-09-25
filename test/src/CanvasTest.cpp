@@ -1800,7 +1800,8 @@ TGFX_TEST(CanvasTest, MultiImageRect_SameView) {
   Paint paint;
   paint.setAntiAlias(false);
   SamplingOptions options;
-  options.filterMode = FilterMode::Linear;
+  options.magFilterMode = FilterMode::Linear;
+  options.minFilterMode = FilterMode::Linear;
   for (int i = 0; i < meshNumH; i++) {
     for (int j = 0; j < meshNumV; j++) {
       Rect srcRect = Rect::MakeXYWH(i * meshWidth, j * meshHeight, meshWidth, meshHeight);
@@ -1826,14 +1827,16 @@ TGFX_TEST(CanvasTest, SingleImageRect) {
   Rect srcRect = Rect::MakeXYWH(256, 256, 256, 256);
   Rect dstRect = Rect::MakeXYWH(0.0f, 0.0f, srcRect.width() * scale, srcRect.height() * scale);
   SamplingOptions options;
-  options.filterMode = FilterMode::Linear;
+  options.magFilterMode = FilterMode::Linear;
+  options.minFilterMode = FilterMode::Linear;
   Paint paint;
   paint.setAntiAlias(false);
   canvas->drawImageRect(image, srcRect, dstRect, options, &paint, SrcRectConstraint::Strict);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/SingleImageRect1"));
   canvas->clear();
   auto mipmapImage = image->makeMipmapped(true);
-  options.filterMode = FilterMode::Linear;
+  options.magFilterMode = FilterMode::Linear;
+  options.minFilterMode = FilterMode::Linear;
   options.mipmapMode = MipmapMode::Nearest;
   scale = 0.3f;
   dstRect = Rect::MakeXYWH(0.0f, 0.0f, srcRect.width() * scale, srcRect.height() * scale);
@@ -1860,7 +1863,8 @@ TGFX_TEST(CanvasTest, MultiImageRect_SCALE_LINEAR) {
   float meshWidth = image->width() / meshNumH;
   float meshHeight = image->height() / meshNumV;
   SamplingOptions options;
-  options.filterMode = FilterMode::Linear;
+  options.magFilterMode = FilterMode::Linear;
+  options.minFilterMode = FilterMode::Linear;
   options.mipmapMode = MipmapMode::None;
   Point offsets[meshNumV][meshNumH] = {
       {{meshWidth, meshHeight}, {meshWidth, 0.0f}, {0.0f, meshHeight * 2}, {meshWidth * 3, 0.0f}},
@@ -1927,7 +1931,8 @@ TGFX_TEST(CanvasTest, MultiImageRect_NOSCALE_NEAREST) {
   float meshWidth = image->width() / meshNumH;
   float meshHeight = image->height() / meshNumV;
   SamplingOptions options;
-  options.filterMode = FilterMode::Nearest;
+  options.magFilterMode = FilterMode::Nearest;
+  options.minFilterMode = FilterMode::Nearest;
   options.mipmapMode = MipmapMode::None;
   Point offsets[meshNumV][meshNumH] = {
       {{meshWidth, meshHeight}, {meshWidth, 0.0f}, {0.0f, meshHeight * 2}, {meshWidth * 3, 0.0f}},
