@@ -206,10 +206,6 @@ void ResourceCache::RemoveFromList(std::list<Resource*>& list, Resource* resourc
   resource->cachedList = nullptr;
 }
 
-bool ResourceCache::InList(const std::list<Resource*>& list, tgfx::Resource* resource) {
-  return resource->cachedList == &list;
-}
-
 void ResourceCache::NotifyReferenceReachedZero(Resource* resource) {
   DEBUG_ASSERT(resource->unreferencedQueue);
   resource->unreferencedQueue->queue.enqueue(resource);
@@ -253,12 +249,14 @@ std::shared_ptr<Resource> ResourceCache::addResource(Resource* resource,
 }
 
 std::shared_ptr<Resource> ResourceCache::refResource(Resource* resource) {
-  processUnreferencedResources();
-  if (InList(purgeableResources, resource)) {
-    RemoveFromList(purgeableResources, resource);
-    purgeableBytes -= resource->memoryUsage();
-    AddToList(nonpurgeableResources, resource);
+  if (auto reference = resource->weakThis.lock()) {
+    return reference;
   }
+  processUnreferencedResources();
+  DEBUG_ASSERT(resource->cachedList == &purgeableResources);
+  RemoveFromList(purgeableResources, resource);
+  purgeableBytes -= resource->memoryUsage();
+  AddToList(nonpurgeableResources, resource);
   return wrapResource(resource);
 }
 
