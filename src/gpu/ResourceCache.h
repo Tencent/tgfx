@@ -136,7 +136,6 @@ class ResourceCache {
 
   static void AddToList(std::list<Resource*>& list, Resource* resource);
   static void RemoveFromList(std::list<Resource*>& list, Resource* resource);
-  static bool InList(const std::list<Resource*>& list, Resource* resource);
   static void NotifyReferenceReachedZero(Resource* resource);
 
   void releaseAll(bool releaseGPU);
