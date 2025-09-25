@@ -33,12 +33,12 @@ class AppendShape : public UniqueKeyShape {
 
   Rect getBounds() const override;
 
-  Path getPath() const override;
-
  protected:
   Type type() const override {
     return Type::Append;
   }
+
+  Path onGetPath(float resolutionScale) const override;
 
  private:
   std::vector<std::shared_ptr<Shape>> shapes = {};

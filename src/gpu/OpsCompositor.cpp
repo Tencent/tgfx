@@ -20,7 +20,6 @@
 #include "core/PathRasterizer.h"
 #include "core/PathRef.h"
 #include "core/PathTriangulator.h"
-#include "core/StyledShape.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/RectToRectMatrix.h"
 #include "gpu/DrawingManager.h"
@@ -147,8 +146,8 @@ static Rect ClipLocalBounds(const Rect& localBounds, const Matrix& viewMatrix,
   return result;
 }
 
-void OpsCompositor::drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill,
-                              const Stroke* stroke) {
+void OpsCompositor::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
+                              const Fill& fill) {
   DEBUG_ASSERT(shape != nullptr);
   flushPendingOps();
   Matrix uvMatrix = {};
@@ -170,13 +169,12 @@ void OpsCompositor::drawShape(std::shared_ptr<Shape> shape, const MCState& state
     }
     drawScale = std::min(state.matrix.getMaxScale(), 1.0f);
   }
-  auto styledShape = StyledShape::Make(shape, stroke, state.matrix);
+  shape = Shape::ApplyMatrix(std::move(shape), state.matrix);
   if (needDeviceBounds) {
-    deviceBounds = shape->isInverseFillType() ? clipBounds : styledShape->getBounds();
+    deviceBounds = shape->isInverseFillType() ? clipBounds : shape->getBounds();
   }
   auto aaType = getAAType(fill);
-  auto shapeProxy =
-      proxyProvider()->createGPUShapeProxy(styledShape, aaType, clipBounds, renderFlags);
+  auto shapeProxy = proxyProvider()->createGPUShapeProxy(shape, aaType, clipBounds, renderFlags);
   auto drawOp =
       ShapeDrawOp::Make(std::move(shapeProxy), fill.color.premultiply(), uvMatrix, aaType);
   addDrawOp(std::move(drawOp), clip, fill, localBounds, deviceBounds, drawScale);
@@ -537,9 +535,8 @@ std::shared_ptr<TextureProxy> OpsCompositor::getClipTexture(const Path& clip, AA
   if (PathTriangulator::ShouldTriangulatePath(clip)) {
     auto clipBounds = Rect::MakeWH(width, height);
     auto shape = Shape::MakeFrom(clip);
-    auto styledShape = StyledShape::Make(shape, nullptr, rasterizeMatrix);
-    auto shapeProxy =
-        proxyProvider()->createGPUShapeProxy(styledShape, aaType, clipBounds, renderFlags);
+    shape = Shape::ApplyMatrix(std::move(shape), rasterizeMatrix);
+    auto shapeProxy = proxyProvider()->createGPUShapeProxy(shape, aaType, clipBounds, renderFlags);
     auto uvMatrix = Matrix::MakeTrans(bounds.left, bounds.top);
     auto drawOp = ShapeDrawOp::Make(std::move(shapeProxy), {}, uvMatrix, aaType);
     auto clipRenderTarget = RenderTargetProxy::MakeFallback(

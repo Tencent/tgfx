@@ -19,8 +19,8 @@
 #include "WebScalerContext.h"
 #include "ReadPixelsFromCanvasImage.h"
 #include "WebTypeface.h"
-#include "core/utils/ApplyStrokeToBounds.h"
 #include "core/utils/Log.h"
+#include "core/utils/StrokeUtils.h"
 #include "platform/web/WebImageBuffer.h"
 
 using namespace emscripten;

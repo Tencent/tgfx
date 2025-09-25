@@ -144,11 +144,6 @@ struct Color {
   float& operator[](int index);
 
   /**
-   * Returns true if all channels are in [0, 1].
-   **/
-  bool isNotOverflow() const;
-
-  /**
    * Returns true if Color is an opaque color.
    */
   bool isOpaque() const;

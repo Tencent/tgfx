@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
-#include "layers/OpaqueThreshold.h"
 
 namespace tgfx {
 
@@ -91,23 +90,18 @@ Rect DropShadowStyle::filterBounds(const Rect& srcRect, float contentScale) {
   return filter->filterBounds(srcRect);
 }
 
-void DropShadowStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Image> content,
+void DropShadowStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Image> contour,
                                             float contentScale, std::shared_ptr<Image> extraSource,
                                             const Point& extraSourceOffset, float alpha,
                                             BlendMode blendMode) {
-  // create opaque image
-  auto opaqueFilter = ImageFilter::ColorFilter(ColorFilter::AlphaThreshold(OPAQUE_THRESHOLD));
-  auto opaqueImage = content->makeWithFilter(opaqueFilter);
-
   Point offset = {};
   auto filter = getShadowFilter(contentScale);
   if (!filter) {
     return;
   }
-  auto shadowImage = opaqueImage->makeWithFilter(filter, &offset);
+  auto shadowImage = contour->makeWithFilter(filter, &offset);
   Paint paint = {};
   if (!_showBehindLayer) {
-    extraSource = extraSource->makeWithFilter(opaqueFilter);
     auto shader = Shader::MakeImageShader(extraSource, TileMode::Decal, TileMode::Decal);
     auto matrixShader =
         shader->makeWithMatrix(Matrix::MakeTrans(extraSourceOffset.x, extraSourceOffset.y));
@@ -118,9 +112,9 @@ void DropShadowStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Imag
   canvas->drawImage(shadowImage, offset.x, offset.y, &paint);
 }
 
-void DropShadowStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
+void DropShadowStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> contour, float contentScale,
                              float alpha, BlendMode blendMode) {
-  onDrawWithExtraSource(canvas, content, contentScale, nullptr, {}, alpha, blendMode);
+  onDrawWithExtraSource(canvas, contour, contentScale, nullptr, {}, alpha, blendMode);
 }
 
 std::shared_ptr<ImageFilter> DropShadowStyle::getShadowFilter(float scale) {

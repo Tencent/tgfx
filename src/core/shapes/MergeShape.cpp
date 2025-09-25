@@ -69,9 +69,9 @@ Rect MergeShape::getBounds() const {
   }
 }
 
-Path MergeShape::getPath() const {
-  auto path = first->getPath();
-  auto secondPath = second->getPath();
+Path MergeShape::onGetPath(float resolutionScale) const {
+  auto path = first->onGetPath(resolutionScale);
+  auto secondPath = second->onGetPath(resolutionScale);
   path.addPath(secondPath, pathOp);
   return path;
 }
