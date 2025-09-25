@@ -69,21 +69,20 @@ BackendRenderTarget GLTexture::getBackendRenderTarget() const {
   return {glInfo, width(), height()};
 }
 
-void GLTexture::release(GPU* gpu) {
+void GLTexture::onRelease(GLGPU* gpu) {
   DEBUG_ASSERT(gpu != nullptr);
-  auto glGPU = static_cast<GLGPU*>(gpu);
   if (textureFrameBuffer > 0) {
-    auto state = glGPU->state();
+    auto state = gpu->state();
     state->bindFramebuffer(this);
-    auto gl = glGPU->functions();
+    auto gl = gpu->functions();
     gl->framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, _target, 0, 0);
     gl->deleteFramebuffers(1, &textureFrameBuffer);
     textureFrameBuffer = 0;
   }
-  onRelease(glGPU);
+  onReleaseTexture(gpu);
 }
 
-void GLTexture::onRelease(GLGPU* gpu) {
+void GLTexture::onReleaseTexture(GLGPU* gpu) {
   if (_textureID > 0) {
     auto gl = gpu->functions();
     gl->deleteTextures(1, &_textureID);

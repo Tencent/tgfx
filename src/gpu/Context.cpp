@@ -43,15 +43,12 @@ Context::Context(Device* device, GPU* gpu) : _device(device), _gpu(gpu) {
 }
 
 Context::~Context() {
-  // The Device owner must call releaseAll() before deleting this Context, otherwise, GPU resources
-  // may leak.
-  DEBUG_ASSERT(_resourceCache->empty());
-  delete _globalCache;
-  delete _resourceCache;
-  delete _drawingManager;
-  delete _proxyProvider;
-  delete _drawingBuffer;
   delete _atlasManager;
+  delete _drawingManager;
+  delete _globalCache;
+  delete _proxyProvider;
+  delete _resourceCache;
+  delete _drawingBuffer;
   delete _maxValueTracker;
 }
 
@@ -64,11 +61,11 @@ const Caps* Context::caps() const {
 }
 
 bool Context::wait(const BackendSemaphore& waitSemaphore) {
-  auto semaphore = Semaphore::MakeAdopted(this, waitSemaphore);
-  if (semaphore == nullptr) {
+  auto fence = gpu()->importExternalFence(waitSemaphore);
+  if (fence == nullptr) {
     return false;
   }
-  _drawingManager->addSemaphoreWaitTask(std::move(semaphore));
+  _drawingManager->addGPUFenceWaitTask(std::move(fence));
   return true;
 }
 
@@ -135,12 +132,5 @@ void Context::purgeResourcesNotUsedSince(std::chrono::steady_clock::time_point p
 
 bool Context::purgeResourcesUntilMemoryTo(size_t bytesLimit) {
   return _resourceCache->purgeUntilMemoryTo(bytesLimit);
-}
-
-void Context::releaseAll(bool releaseGPU) {
-  _drawingManager->releaseAll();
-  _atlasManager->releaseAll();
-  _globalCache->releaseAll();
-  _resourceCache->releaseAll(releaseGPU);
 }
 }  // namespace tgfx

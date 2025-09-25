@@ -96,11 +96,6 @@ void AtlasManager::postFlush() {
   }
 }
 
-void AtlasManager::releaseAll() {
-  for (auto& atlas : atlases) {
-    atlas = nullptr;
-  }
-}
 AtlasToken AtlasManager::nextFlushToken() const {
   return atlasTokenTracker.nextToken();
 }

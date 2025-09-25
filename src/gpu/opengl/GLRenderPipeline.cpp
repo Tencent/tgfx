@@ -167,9 +167,9 @@ void GLRenderPipeline::setStencilReference(GLGPU* gpu, unsigned reference) {
   state->setStencilState(*stencilState);
 }
 
-void GLRenderPipeline::release(GPU* gpu) {
+void GLRenderPipeline::onRelease(GLGPU* gpu) {
   DEBUG_ASSERT(gpu != nullptr);
-  auto gl = static_cast<GLGPU*>(gpu)->functions();
+  auto gl = gpu->functions();
   if (programID > 0) {
     gl->deleteProgram(programID);
   }

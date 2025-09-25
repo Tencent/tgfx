@@ -19,7 +19,6 @@
 #pragma once
 
 #include <string>
-#include "gpu/GPUResource.h"
 #include "gpu/ShaderStage.h"
 
 namespace tgfx {
@@ -44,7 +43,8 @@ class GPUShaderModuleDescriptor {
  * GPUShaderModule is an internal object that serves as a container for shader code，allowing it to
  * be submitted to the GPU for execution within a pipeline.
  */
-class GPUShaderModule : public GPUResource {
+class GPUShaderModule {
  public:
+  virtual ~GPUShaderModule() = default;
 };
 }  // namespace tgfx

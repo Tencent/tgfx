@@ -46,7 +46,6 @@ std::unique_ptr<EAGLLayerTexture> EAGLLayerTexture::MakeFrom(GLGPU* gpu, CAEAGLL
   auto texture = std::unique_ptr<EAGLLayerTexture>(new EAGLLayerTexture(descriptor, frameBufferID));
   gl->genRenderbuffers(1, &texture->renderBufferID);
   if (texture->renderBufferID == 0) {
-    texture->release(gpu);
     LOGE("EAGLLayerTexture::MakeFrom() failed to generate renderbuffer!");
     return nullptr;
   }
@@ -54,7 +53,6 @@ std::unique_ptr<EAGLLayerTexture> EAGLLayerTexture::MakeFrom(GLGPU* gpu, CAEAGLL
   auto eaglContext = static_cast<EAGLGPU*>(gpu)->eaglContext();
   [eaglContext renderbufferStorage:GL_RENDERBUFFER fromDrawable:layer];
   if (!CheckGLError(gl)) {
-    texture->release(gpu);
     LOGE("EAGLLayerTexture::MakeFrom() failed to allocate renderbuffer storage!");
     return nullptr;
   }
@@ -64,14 +62,13 @@ std::unique_ptr<EAGLLayerTexture> EAGLLayerTexture::MakeFrom(GLGPU* gpu, CAEAGLL
                               texture->renderBufferID);
   auto frameBufferStatus = gl->checkFramebufferStatus(GL_FRAMEBUFFER);
   if (frameBufferStatus != GL_FRAMEBUFFER_COMPLETE) {
-    texture->release(gpu);
     LOGE("EAGLLayerTexture::MakeFrom() framebuffer is not complete!");
     return nullptr;
   }
   return texture;
 }
 
-void EAGLLayerTexture::onRelease(GLGPU* gpu) {
+void EAGLLayerTexture::onReleaseTexture(GLGPU* gpu) {
   auto gl = gpu->functions();
   if (_frameBufferID > 0) {
     auto state = gpu->state();

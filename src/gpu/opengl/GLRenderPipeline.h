@@ -22,12 +22,11 @@
 #include <unordered_map>
 #include "gpu/GPURenderPipeline.h"
 #include "gpu/opengl/GLBuffer.h"
+#include "gpu/opengl/GLResource.h"
 #include "gpu/opengl/GLState.h"
 #include "gpu/opengl/GLTexture.h"
 
 namespace tgfx {
-class GLGPU;
-
 struct GLAttribute {
   int location = 0;
   int count = 0;
@@ -52,7 +51,7 @@ struct GLUniformBlock {
  * an OpenGL shader program along with its associated state, such as vertex attributes and blending
  * settings.
  */
-class GLRenderPipeline : public GPURenderPipeline {
+class GLRenderPipeline : public GPURenderPipeline, public GLResource {
  public:
   explicit GLRenderPipeline(unsigned programID);
 
@@ -82,7 +81,8 @@ class GLRenderPipeline : public GPURenderPipeline {
    */
   void setStencilReference(GLGPU* gpu, unsigned reference);
 
-  void release(GPU* gpu) override;
+ protected:
+  void onRelease(GLGPU* gpu) override;
 
  private:
   unsigned programID = 0;

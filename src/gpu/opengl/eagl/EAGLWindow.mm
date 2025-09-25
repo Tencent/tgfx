@@ -41,17 +41,8 @@ EAGLWindow::EAGLWindow(std::shared_ptr<Device> device, CAEAGLLayer* layer)
   // do not retain layer here, otherwise it can cause circular reference.
 }
 
-EAGLWindow::~EAGLWindow() {
-  auto context = device->lockContext();
-  if (context) {
-    layerTexture->release(context->gpu());
-    device->unlock();
-  }
-}
-
 std::shared_ptr<Surface> EAGLWindow::onCreateSurface(Context* context) {
   if (layerTexture != nullptr) {
-    layerTexture->release(context->gpu());
     layerTexture = nullptr;
   }
   layerTexture = EAGLLayerTexture::MakeFrom(static_cast<GLGPU*>(context->gpu()), layer);

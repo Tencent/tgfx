@@ -16,23 +16,33 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "RenderTask.h"
-#include "gpu/resources/Semaphore.h"
+#include "ReturnQueue.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
-class SemaphoreWaitTask : public RenderTask {
- public:
-  explicit SemaphoreWaitTask(std::shared_ptr<Semaphore> semaphore)
-      : semaphore(std::move(semaphore)) {
-  }
+std::shared_ptr<ReturnQueue> ReturnQueue::Make() {
+  auto queue = std::shared_ptr<ReturnQueue>(new ReturnQueue());
+  queue->weakThis = queue;
+  return queue;
+}
 
-  void execute(CommandEncoder* encoder) override {
-    encoder->waitForFence(semaphore->getFence());
-  }
+void ReturnQueue::NotifyReferenceReachedZero(ReturnNode* node) {
+  DEBUG_ASSERT(node->unreferencedQueue != nullptr);
+  node->unreferencedQueue->queue.enqueue(node);
+  node->unreferencedQueue = nullptr;
+}
 
- private:
-  std::shared_ptr<Semaphore> semaphore = nullptr;
-};
+ReturnQueue::~ReturnQueue() {
+  ReturnNode* node = nullptr;
+  while (queue.try_dequeue(node)) {
+    delete node;
+  }
+}
+
+std::shared_ptr<ReturnNode> ReturnQueue::makeShared(ReturnNode* node) {
+  auto reference = std::shared_ptr<ReturnNode>(node, NotifyReferenceReachedZero);
+  reference->unreferencedQueue = weakThis.lock();
+  return reference;
+}
+
 }  // namespace tgfx

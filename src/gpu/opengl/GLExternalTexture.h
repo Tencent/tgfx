@@ -32,7 +32,7 @@ class GLExternalTexture : public GLTexture {
     return _textureID > 0 ? GLTexture::frameBufferID() : _frameBufferID;
   }
 
-  void onRelease(GLGPU*) override {
+  void onReleaseTexture(GLGPU*) override {
     // External textures are not owned by TGFX, so we do not release them.
   }
 

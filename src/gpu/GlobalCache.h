@@ -94,9 +94,5 @@ class GlobalCache {
   std::shared_ptr<IndexBufferProxy> rRectFillIndexBuffer = nullptr;
   std::shared_ptr<IndexBufferProxy> rRectStrokeIndexBuffer = nullptr;
   ResourceKeyMap<std::shared_ptr<Resource>> staticResources = {};
-
-  void releaseAll();
-
-  friend class Context;
 };
 }  // namespace tgfx
