@@ -51,7 +51,7 @@ class Matrix3D {
    * @param r  Row index, valid range 0..3.
    * @param c  Column index, valid range 0..3.
    */
-  float getRowCol(int r, int c) const {
+  float getRowColumn(int r, int c) const {
     return values[c * 4 + r];
   }
 
@@ -60,7 +60,7 @@ class Matrix3D {
    * @param r  Row index, valid range 0..3.
    * @param c  Column index, valid range 0..3.
    */
-  void setRowCol(int r, int c, float value) {
+  void setRowColumn(int r, int c, float value) {
     values[c * 4 + r] = value;
   }
 
