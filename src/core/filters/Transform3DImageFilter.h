@@ -30,9 +30,12 @@ namespace tgfx {
 class Transform3DImageFilter final : public ImageFilter {
  public:
   /**
-   * Creates a Transform3DImageFilter with the specified transformation matrix and viewportSize.
+   * Creates a Transform3DImageFilter with the specified transformation matrix.
+   * The transformation matrix transforms 3D model coordinates to destination coordinates for x and
+   * y before perspective division. The z value is mapped to the [-1, 1] range before perspective
+   * division; content outside this z range will be clipped.
    */
-  explicit Transform3DImageFilter(const Matrix3D& matrix, const Size& viewportSize);
+  explicit Transform3DImageFilter(const Matrix3D& matrix);
 
  private:
   Type type() const override {
@@ -55,11 +58,6 @@ class Transform3DImageFilter final : public ImageFilter {
    * 3D transformation matrix used to convert model coordinates to clip space.
    */
   Matrix3D matrix = Matrix3D::I();
-
-  /**
-   * Window view size, used to map NDC coordinates to window coordinates.
-   */
-  Size viewportSize = {0, 0};
 };
 
 }  // namespace tgfx

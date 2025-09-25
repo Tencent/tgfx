@@ -47,6 +47,24 @@ class Matrix3D {
   }
 
   /**
+   * Returns the matrix value at the given row and column.
+   * @param r  Row index, valid range 0..3.
+   * @param c  Column index, valid range 0..3.
+   */
+  float getRowCol(int r, int c) const {
+    return values[c * 4 + r];
+  }
+
+  /**
+   * Sets the matrix value at the given row and column.
+   * @param r  Row index, valid range 0..3.
+   * @param c  Column index, valid range 0..3.
+   */
+  void setRowCol(int r, int c, float value) {
+    values[c * 4 + r] = value;
+  }
+
+  /**
    * Returns a reference to a constant identity Matrix3D. The returned Matrix3D is:
    *
    *       | 1 0 0 0 |
@@ -55,6 +73,18 @@ class Matrix3D {
    *       | 0 0 0 1 |
    */
   static const Matrix3D& I();
+
+  /**
+   * Creates a Matrix3D that scales by (sx, sy, sz). The returned matrix is:
+   *
+   *       | sx  0  0  0 |
+   *       |  0 sy  0  0 |
+   *       |  0  0 sz  0 |
+   *       |  0  0  0  1 |
+   */
+  static Matrix3D MakeScale(float sx, float sy, float sz) {
+    return {sx, 0, 0, 0, 0, sy, 0, 0, 0, 0, sz, 0, 0, 0, 0, 1};
+  }
 
   /**
    * Creates a Matrix3D that rotates by the given angle (in degrees) around the specified axis.
@@ -114,24 +144,6 @@ class Matrix3D {
   static Matrix3D Perspective(float fovyDegrees, float aspect, float nearZ, float farZ);
 
   /**
-   * Creates a projection matrix compatible with CSS 3D transforms. This matrix maps 3D coordinates
-   * into clip coordinates for perspective rendering. This is useful for web rendering scenarios
-   * that require CSS-like perspective projection.
-   * The CSS projection model is established by specifying the camera distance and a projection
-   * plane fixed at z=0, with the camera orientation fixed. For more details on the definition of
-   * CSS perspective projection, please refer to the official
-   * documentation: CSS Transforms Module Level 2, Perspective.
-   * @param eyeDistance Distance from the eye to the projection plane (z = 0).
-   * @param left Left bound of the view volume.
-   * @param right Right bound of the view volume.
-   * @param top Top bound of the view volume.
-   * @param bottom Bottom bound of the view volume.
-   * @param farZ Distance to the far clipping plane.
-   */
-  static Matrix3D ProjectionCSS(float eyeDistance, float left, float right, float top, float bottom,
-                                float farZ);
-
-  /**
    * Maps a rectangle using this matrix.
    * If the matrix contains a perspective transformation, each corner of the rectangle is mapped as a
    * 4D point (x, y, 0, 1), and the resulting rectangle is computed from the projected points
@@ -153,18 +165,6 @@ class Matrix3D {
   }
 
   /**
-   * Creates a Matrix3D that scales by (sx, sy, sz). The returned matrix is:
-   *
-   *       | sx  0  0  0 |
-   *       |  0 sy  0  0 |
-   *       |  0  0 sz  0 |
-   *       |  0  0  0  1 |
-   */
-  static Matrix3D MakeScale(float sx, float sy, float sz) {
-    return {sx, 0, 0, 0, 0, sy, 0, 0, 0, 0, sz, 0, 0, 0, 0, 1};
-  }
-
-  /**
    * Copies the matrix values into a 16-element array in column-major order.
    */
   void getColMajor(float buffer[16]) const {
@@ -175,24 +175,6 @@ class Matrix3D {
    * Copies the matrix values into a 16-element array in row-major order.
    */
   void getRowMajor(float buffer[16]) const;
-
-  /**
-   * Returns the matrix value at the given row and column.
-   * @param r  Row index, valid range 0..3.
-   * @param c  Column index, valid range 0..3.
-   */
-  float getRowCol(int r, int c) const {
-    return values[c * 4 + r];
-  }
-
-  /**
-   * Sets the matrix value at the given row and column.
-   * @param r  Row index, valid range 0..3.
-   * @param c  Column index, valid range 0..3.
-   */
-  void setRowCol(int r, int c, float value) {
-    values[c * 4 + r] = value;
-  }
 
   /**
    * Concatenates two matrices and stores the result in this matrix. M' = a * b.
