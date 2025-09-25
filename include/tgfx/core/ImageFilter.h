@@ -29,7 +29,6 @@
 namespace tgfx {
 class TextureProxy;
 enum class SrcRectConstraint;
-struct PerspectiveInfo;
 
 /**
  * ImageFilter is the base class for all image filters. If one is installed in the Paint, then all
@@ -122,10 +121,11 @@ class ImageFilter {
 
   /**
    * Creates a filter that applies a perspective transformation to the input image.
-   * @param matrix 3D transformation matrix used to convert model coordinates to clip space.
-   * @param viewportSize View port size, used to map NDC coordinates to window(screen) coordinates.
+   * @param matrix 3D transformation matrix used to 3D model coordinates to destination coordinates
+   * for x and y before perspective division. The z value is mapped to the [-1, 1] range before
+   * perspective division; content outside this z range will be clipped.
    */
-  static std::shared_ptr<ImageFilter> Transform3D(const Matrix3D& matrix, const Size& viewportSize);
+  static std::shared_ptr<ImageFilter> Transform3D(const Matrix3D& matrix);
 
   virtual ~ImageFilter() = default;
 

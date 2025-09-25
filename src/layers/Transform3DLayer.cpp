@@ -49,9 +49,7 @@ void Transform3DLayer::onUpdateContent(LayerRecorder* recorder) {
   _content->onUpdateContent(recorder);
   auto filters = _content->filters();
   if (_matrix3D != Matrix3D::I()) {
-    auto contentBounds = _content->getBounds();
-    auto contentSize = Size(contentBounds.width(), contentBounds.height());
-    auto transform3DFilter = Transform3DFilter::Make(_matrix3D, contentSize);
+    auto transform3DFilter = Transform3DFilter::Make(_matrix3D);
     filters.push_back(std::move(transform3DFilter));
   }
   setFilters(std::move(filters));

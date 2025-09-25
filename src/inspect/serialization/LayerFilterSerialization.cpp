@@ -110,9 +110,6 @@ static void SerializeTransform3DFilterImpl(flexbuffers::Builder& fbb,
   auto matrixID = SerializeUtils::GetObjID();
   SerializeUtils::SetFlexBufferMap(fbb, "matrix", "", false, true, matrixID);
   SerializeUtils::FillComplexObjSerMap(transform3DFilter->matrix(), matrixID, map);
-  auto viewportSizeID = SerializeUtils::GetObjID();
-  SerializeUtils::SetFlexBufferMap(fbb, "viewportSize", "", false, true, viewportSizeID);
-  SerializeUtils::FillComplexObjSerMap(transform3DFilter->viewportSize(), viewportSizeID, map);
 }
 
 std::shared_ptr<Data> LayerFilterSerialization::Serialize(const LayerFilter* layerFilter,

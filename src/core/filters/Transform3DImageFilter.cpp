@@ -27,31 +27,23 @@
 
 namespace tgfx {
 
-std::shared_ptr<ImageFilter> ImageFilter::Transform3D(const Matrix3D& matrix,
-                                                      const Size& viewportSize) {
-  return std::make_shared<Transform3DImageFilter>(matrix, viewportSize);
+std::shared_ptr<ImageFilter> ImageFilter::Transform3D(const Matrix3D& matrix) {
+  return std::make_shared<Transform3DImageFilter>(matrix);
 }
 
-Transform3DImageFilter::Transform3DImageFilter(const Matrix3D& matrix, const Size& viewportSize)
-    : matrix(matrix), viewportSize(viewportSize) {
+Transform3DImageFilter::Transform3DImageFilter(const Matrix3D& matrix) : matrix(matrix) {
 }
 
 Rect Transform3DImageFilter::onFilterBounds(const Rect& srcRect) const {
   // Align the camera center with the center of the source rect.
-  //
-  // The standard rectangle XYWH(-viewSize.width * 0.5, -viewSize.height * 0.5, viewSize.width,
-  // viewSize.height). After applying the matrix, the projected rectangle in the NDC coordinate
-  // system is XYWH[-1, 1, 2, 2]. For convenience, the top-left vertex of the standard rectangle is
-  // set to (0,0). Combined with srcRect, a model rectangle is constructed. The minimum axis-aligned
-  // bounding rectangle of srcRect after projection is calculated based on the size after applying
-  // the matrix and its relative position to the standard rectangle.
   auto srcModelRect = Rect::MakeXYWH(-srcRect.width() * 0.5f, -srcRect.height() * 0.5f,
                                      srcRect.width(), srcRect.height());
-  auto ndcRect = matrix.mapRect(srcModelRect);
-  auto result = Rect::MakeXYWH(
-      ndcRect.left * viewportSize.width * 0.5f - srcModelRect.left + srcRect.left,
-      ndcRect.top * viewportSize.height * 0.5f - srcModelRect.top + srcRect.top,
-      ndcRect.width() * viewportSize.width * 0.5f, ndcRect.height() * viewportSize.height * 0.5f);
+  auto dstModelRect = matrix.mapRect(srcModelRect);
+  // The minimum axis-aligned bounding rectangle of srcRect after projection is calculated based on
+  // its relative position to the standard rectangle.
+  auto result = Rect::MakeXYWH(dstModelRect.left - srcModelRect.left + srcRect.left,
+                               dstModelRect.top - srcModelRect.top + srcRect.top,
+                               dstModelRect.width(), dstModelRect.height());
   return result;
 }
 
@@ -66,41 +58,35 @@ std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
   auto srcH = static_cast<float>(source->height());
   // Align the camera center with the initial position center of the source model.
   auto srcModelRect = Rect::MakeXYWH(-srcW * 0.5f, -srcH * 0.5f, srcW, srcH);
-  auto srcNDCRect = matrix.mapRect(srcModelRect);
+  auto dstModelRect = matrix.mapRect(srcModelRect);
   // SrcProjectRect is the result of projecting srcRect onto the canvas. RenderBounds describes a
   // subregion that needs to be drawn within it.
   auto srcProjectRect =
-      Rect::MakeXYWH(srcNDCRect.left * viewportSize.width * 0.5f - srcModelRect.left,
-                     srcNDCRect.top * viewportSize.height * 0.5f - srcModelRect.top,
-                     srcNDCRect.width() * viewportSize.width * 0.5f,
-                     srcNDCRect.height() * viewportSize.height * 0.5f);
+      Rect::MakeXYWH(dstModelRect.left - srcModelRect.left, dstModelRect.top - srcModelRect.top,
+                     dstModelRect.width(), dstModelRect.height());
   // ndcScale and ndcOffset are used to scale and translate the NDC coordinates to ensure that only
   // the content within RenderBounds is drawn to the render target. This clips regions beyond the
   // clip space.
-  // NdcScale first maps the NDC coordinates from the view size defined by this->matrix's projection
-  // to the size of srcProjectRect after source projection, then scales up so that the required
-  // drawing area exactly fills the -1 to 1 clip region. The scale formula is:
-  // ((viewsize / srcProjectRect) * (srcProjectRect / renderBounds))
-  const Vec2 ndcScale(viewportSize.width / renderBounds.width(),
-                      viewportSize.height / renderBounds.height());
+  // NdcScale first maps the projected coordinates to the NDC region [-1, 1], then scales them so
+  // that the required drawing area exactly fills the [-1, 1] clip region. The scaling formula is:
+  // ((2 / srcProjectRect) * (srcProjectRect / renderBounds))
+  const Vec2 ndcScale(2.0f / renderBounds.width(), 2.0f / renderBounds.height());
   // ndcOffset translates the NDC coordinates so that the local area to be drawn aligns exactly with
   // the (-1, -1) point.
   auto ndcRectScaled =
-      Rect::MakeXYWH(srcNDCRect.left * ndcScale.x, srcNDCRect.top * ndcScale.y,
-                     srcNDCRect.width() * ndcScale.x, srcNDCRect.height() * ndcScale.y);
-  const Vec2 renderBoundsLTNDC(
-      (renderBounds.left - srcProjectRect.left) * ndcRectScaled.width() / srcProjectRect.width(),
-      (renderBounds.top - srcProjectRect.top) * ndcRectScaled.height() / srcProjectRect.height());
-  const Vec2 ndcOffset(-1.f - ndcRectScaled.left - renderBoundsLTNDC.x,
-                       -1.f - ndcRectScaled.top - renderBoundsLTNDC.y);
+      Rect::MakeXYWH(dstModelRect.left * ndcScale.x, dstModelRect.top * ndcScale.y,
+                     dstModelRect.width() * ndcScale.x, dstModelRect.height() * ndcScale.y);
+  const Vec2 renderBoundsLTNDCScaled((renderBounds.left - srcProjectRect.left) * ndcScale.x,
+                                     (renderBounds.top - srcProjectRect.top) * ndcScale.y);
+  const Vec2 ndcOffset(-1.f - ndcRectScaled.left - renderBoundsLTNDCScaled.x,
+                       -1.f - ndcRectScaled.top - renderBoundsLTNDCScaled.y);
 
   auto drawingManager = args.context->drawingManager();
   auto drawingBuffer = args.context->drawingBuffer();
-  auto vertexProvider =
-      RectsVertexProvider::MakeFrom(drawingBuffer, srcModelRect, AAType::Coverage);
-  const Size viewportSise(static_cast<float>(renderTarget->width()),
+  auto vertexProvider = RectsVertexProvider::MakeFrom(drawingBuffer, srcModelRect, AAType::None);
+  const Size viewportSize(static_cast<float>(renderTarget->width()),
                           static_cast<float>(renderTarget->height()));
-  const Rect3DDrawArgs drawArgs{matrix, ndcScale, ndcOffset, viewportSise};
+  const Rect3DDrawArgs drawArgs{matrix, ndcScale, ndcOffset, viewportSize};
   auto drawOp =
       Rect3DDrawOp::Make(args.context, std::move(vertexProvider), args.renderFlags, drawArgs);
   const SamplingArgs samplingArgs = {TileMode::Decal, TileMode::Decal, {}, SrcRectConstraint::Fast};

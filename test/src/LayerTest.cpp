@@ -3205,16 +3205,22 @@ TGFX_TEST(LayerTest, Transform3DLayer) {
   layerAWrapper->setContent(layerA);
   layerAWrapper->setMatrix(layerA->matrix());
   // Set the 3D transformation matrix on the wrapper layer.
+  auto perspectiveMatrix = Matrix3D::I();
+  constexpr float eyeDistance = 1200.f;
+  constexpr float shift = 10.f;
+  const float nearZ = eyeDistance - shift;
   auto layerABounds = layerA->getBounds();
   // Choose an appropriate far plane to avoid clipping during rotation.
   auto maxLength = std::max(layerABounds.width(), layerABounds.height()) * 10.f;
   auto farZ = std::min(-maxLength, -500.f);
-  auto projectionMatrix =
-      Matrix3D::ProjectionCSS(1200.f, -layerABounds.width() * 0.5f, layerABounds.width() * 0.5f,
-                              layerABounds.height() * 0.5f, -layerABounds.height() * 0.5f, farZ);
+  const float m22 = (2 - (farZ + nearZ) / eyeDistance) / (farZ - nearZ);
+  perspectiveMatrix.setRowCol(2, 2, m22);
+  const float m23 = -1.f + nearZ / eyeDistance - perspectiveMatrix.getRowCol(2, 2) * nearZ;
+  perspectiveMatrix.setRowCol(2, 3, m23);
+  perspectiveMatrix.setRowCol(3, 2, -1.f / eyeDistance);
   auto modelMatrix = Matrix3D::MakeRotate({0.f, 1.f, 0.f}, 45.f);
   modelMatrix.postTranslate(0.f, 0.f, 1.f / 100.f);
-  auto transformMatrix = projectionMatrix * modelMatrix;
+  auto transformMatrix = perspectiveMatrix * modelMatrix;
   layerAWrapper->setMatrix3D(transformMatrix);
 
   displayList->render(surface.get());

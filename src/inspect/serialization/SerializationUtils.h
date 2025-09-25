@@ -100,8 +100,6 @@ void FillComplexObjSerMap(const Color& color, uint64_t objID, ComplexObjSerMap* 
 
 void FillComplexObjSerMap(const Matrix3D& matrix, uint64_t objID, ComplexObjSerMap* map);
 
-void FillComplexObjSerMap(const Size& size, uint64_t objID, ComplexObjSerMap* map);
-
 void FillComplexObjSerMap(const std::shared_ptr<LayerFilter>& layerFilter, uint64_t objID,
                           ComplexObjSerMap* map);
 
