@@ -174,14 +174,11 @@ void OpsCompositor::drawShape(std::shared_ptr<Shape> shape, const MCState& state
     deviceBounds = shape->isInverseFillType() ? clipBounds : shape->getBounds();
   }
   auto aaType = getAAType(fill);
-  auto shapeFill = fill;
-  if (aaType == AAType::Coverage) {
-    shapeFill.color.alpha *= ShapeUtils::CalculateAlphaReduceFactorIfHairline(shape);
-  }
+  auto color = fill.color;
+  color.alpha *= ShapeUtils::CalculateAlphaReduceFactorIfHairline(shape);
   auto shapeProxy = proxyProvider()->createGPUShapeProxy(shape, aaType, clipBounds, renderFlags);
-  auto drawOp =
-      ShapeDrawOp::Make(std::move(shapeProxy), shapeFill.color.premultiply(), uvMatrix, aaType);
-  addDrawOp(std::move(drawOp), clip, shapeFill, localBounds, deviceBounds, drawScale);
+  auto drawOp = ShapeDrawOp::Make(std::move(shapeProxy), color.premultiply(), uvMatrix, aaType);
+  addDrawOp(std::move(drawOp), clip, fill, localBounds, deviceBounds, drawScale);
 }
 
 void OpsCompositor::discardAll() {
