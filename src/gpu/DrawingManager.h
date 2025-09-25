@@ -21,7 +21,6 @@
 #include <map>
 #include <vector>
 #include "gpu/OpsCompositor.h"
-#include "gpu/resources/Semaphore.h"
 #include "gpu/tasks/OpsRenderTask.h"
 #include "gpu/tasks/RenderTask.h"
 #include "gpu/tasks/ResourceTask.h"
@@ -68,7 +67,7 @@ class DrawingManager {
   void addAtlasCellCodecTask(const std::shared_ptr<TextureProxy>& textureProxy,
                              const Point& atlasOffset, std::shared_ptr<ImageCodec> codec);
 
-  void addSemaphoreWaitTask(std::shared_ptr<Semaphore> semaphore);
+  void addGPUFenceWaitTask(std::shared_ptr<GPUFence> fence);
 
   /**
    * Flushes the drawing manager, executing all resource and render tasks. If signalSemaphore is not
@@ -77,11 +76,6 @@ class DrawingManager {
    * signalSemaphore will not be created.
    */
   std::shared_ptr<CommandBuffer> flush(BackendSemaphore* signalSemaphore);
-
-  /**
-   * Releases all tasks associated with the drawing manager.
-   */
-  void releaseAll();
 
  private:
   Context* context = nullptr;

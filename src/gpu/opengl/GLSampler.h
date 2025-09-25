@@ -44,9 +44,6 @@ class GLSampler : public GPUSampler {
     return _magFilter;
   }
 
-  void release(GPU*) override {
-  }
-
  private:
   int _wrapS = 0;
   int _wrapT = 0;

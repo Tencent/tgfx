@@ -46,8 +46,7 @@ std::shared_ptr<Resource> ShapeBufferUploadTask::onMakeResource(Context* context
       LOGE("ShapeBufferUploadTask::onMakeResource() Failed to create buffer!");
       return nullptr;
     }
-    if (!gpu->queue()->writeBuffer(gpuBuffer.get(), 0, triangles->data(), triangles->size())) {
-      gpuBuffer->release(gpu);
+    if (!gpu->queue()->writeBuffer(gpuBuffer, 0, triangles->data(), triangles->size())) {
       LOGE("ShapeBufferUploadTask::onMakeResource() Failed to write buffer!");
       return nullptr;
     }

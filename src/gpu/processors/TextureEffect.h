@@ -52,7 +52,7 @@ class TextureEffect : public FragmentProcessor {
 
   size_t onCountTextureSamplers() const override;
 
-  GPUTexture* onTextureAt(size_t index) const override;
+  std::shared_ptr<GPUTexture> onTextureAt(size_t index) const override;
 
   SamplerState onSamplerStateAt(size_t) const override {
     return samplerState;

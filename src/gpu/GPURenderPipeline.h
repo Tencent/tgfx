@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 #include <vector>
 #include "gpu/Attribute.h"
@@ -25,7 +26,6 @@
 #include "gpu/BlendOperation.h"
 #include "gpu/ColorWriteMask.h"
 #include "gpu/CompareFunction.h"
-#include "gpu/GPUResource.h"
 #include "gpu/GPUShaderModule.h"
 #include "gpu/StencilOperation.h"
 #include "gpu/Uniform.h"
@@ -97,7 +97,7 @@ class FragmentDescriptor {
   /**
    * A GPUShaderModule object containing the fragment shader code.
    */
-  GPUShaderModule* module = nullptr;
+  std::shared_ptr<GPUShaderModule> module = nullptr;
 
   /**
    * The name of the entry point function in the shader code.
@@ -131,7 +131,7 @@ class VertexDescriptor {
   /**
    * A GPUShaderModule object containing the vertex shader code.
    */
-  GPUShaderModule* module = nullptr;
+  std::shared_ptr<GPUShaderModule> module = nullptr;
 
   /**
    * The name of the entry point function in the shader code.
@@ -292,7 +292,8 @@ class GPURenderPipelineDescriptor {
  * GPURenderPipeline represents a graphics pipeline configuration for a render pass, which the pass
  * applies to the draw commands you encode.
  */
-class GPURenderPipeline : public GPUResource {
+class GPURenderPipeline {
  public:
+  virtual ~GPURenderPipeline() = default;
 };
 }  // namespace tgfx

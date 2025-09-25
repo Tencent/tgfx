@@ -21,7 +21,7 @@
 #include "tgfx/gpu/opengl/eagl/EAGLDevice.h"
 
 namespace tgfx {
-static std::unique_ptr<GPUTexture> CreateTextureOfPlane(EAGLGPU* gpu, CVPixelBufferRef pixelBuffer,
+static std::shared_ptr<GPUTexture> CreateTextureOfPlane(EAGLGPU* gpu, CVPixelBufferRef pixelBuffer,
                                                         size_t planeIndex, PixelFormat pixelFormat,
                                                         uint32_t usage,
                                                         CVOpenGLESTextureCacheRef textureCache) {
@@ -48,17 +48,16 @@ static std::unique_ptr<GPUTexture> CreateTextureOfPlane(EAGLGPU* gpu, CVPixelBuf
                                      false,
                                      1,
                                      usage};
-  auto hardwareTexture = std::unique_ptr<EAGLHardwareTexture>(
-      new EAGLHardwareTexture(descriptor, pixelBuffer, texture, target, textureID));
+  auto hardwareTexture =
+      gpu->makeResource<EAGLHardwareTexture>(descriptor, pixelBuffer, texture, target, textureID);
   if (hardwareTexture->usage() & GPUTextureUsage::RENDER_ATTACHMENT &&
       !hardwareTexture->checkFrameBuffer(gpu)) {
-    hardwareTexture->release(gpu);
     return nullptr;
   }
   return hardwareTexture;
 }
 
-std::vector<std::unique_ptr<GPUTexture>> EAGLHardwareTexture::MakeFrom(EAGLGPU* gpu,
+std::vector<std::shared_ptr<GPUTexture>> EAGLHardwareTexture::MakeFrom(EAGLGPU* gpu,
                                                                        CVPixelBufferRef pixelBuffer,
                                                                        uint32_t usage) {
   auto textureCache = gpu->getTextureCache();
@@ -74,13 +73,10 @@ std::vector<std::unique_ptr<GPUTexture>> EAGLHardwareTexture::MakeFrom(EAGLGPU* 
       (yuvFormat != YUVFormat::Unknown || !gpu->caps()->isFormatRenderable(formats.front()))) {
     return {};
   }
-  std::vector<std::unique_ptr<GPUTexture>> textures = {};
+  std::vector<std::shared_ptr<GPUTexture>> textures = {};
   for (size_t i = 0; i < formats.size(); ++i) {
     auto texture = CreateTextureOfPlane(gpu, pixelBuffer, i, formats[i], usage, textureCache);
     if (texture == nullptr) {
-      for (auto& plane : textures) {
-        plane->release(gpu);
-      }
       return {};
     }
     textures.push_back(std::move(texture));
@@ -102,7 +98,7 @@ EAGLHardwareTexture::~EAGLHardwareTexture() {
   }
 }
 
-void EAGLHardwareTexture::onRelease(GLGPU* gpu) {
+void EAGLHardwareTexture::onReleaseTexture(GLGPU* gpu) {
   if (texture == nil) {
     return;
   }

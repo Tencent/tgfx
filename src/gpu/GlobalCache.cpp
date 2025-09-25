@@ -60,17 +60,6 @@ void GlobalCache::addProgram(const BytesKey& programKey, std::shared_ptr<Program
   }
 }
 
-void GlobalCache::releaseAll() {
-  programLRU.clear();
-  programMap.clear();
-  gradientLRU.clear();
-  gradientTextures.clear();
-  aaQuadIndexBuffer = nullptr;
-  nonAAQuadIndexBuffer = nullptr;
-  rRectFillIndexBuffer = nullptr;
-  rRectStrokeIndexBuffer = nullptr;
-}
-
 std::shared_ptr<TextureProxy> GlobalCache::getGradient(const Color* colors, const float* positions,
                                                        int count) {
   BytesKey bytesKey = {};

@@ -23,10 +23,10 @@
 #include "core/AtlasManager.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
+#include "gpu/tasks/GPUFenceWaitTask.h"
 #include "gpu/tasks/GenerateMipmapsTask.h"
 #include "gpu/tasks/RenderTargetCopyTask.h"
 #include "gpu/tasks/RuntimeDrawTask.h"
-#include "gpu/tasks/SemaphoreWaitTask.h"
 #include "inspect/InspectorMark.h"
 #include "tgfx/core/RenderFlags.h"
 
@@ -179,11 +179,11 @@ void DrawingManager::addAtlasCellCodecTask(const std::shared_ptr<TextureProxy>& 
   atlasCellCodecTasks.emplace_back(std::move(task));
 }
 
-void DrawingManager::addSemaphoreWaitTask(std::shared_ptr<Semaphore> semaphore) {
-  if (semaphore == nullptr) {
+void DrawingManager::addGPUFenceWaitTask(std::shared_ptr<GPUFence> fence) {
+  if (fence == nullptr) {
     return;
   }
-  auto task = drawingBuffer->make<SemaphoreWaitTask>(std::move(semaphore));
+  auto task = drawingBuffer->make<SemaphoreWaitTask>(std::move(fence));
   renderTasks.emplace_back(std::move(task));
 }
 
@@ -231,13 +231,6 @@ std::shared_ptr<CommandBuffer> DrawingManager::flush(BackendSemaphore* signalSem
     }
   }
   return commandEncoder->finish();
-}
-
-void DrawingManager::releaseAll() {
-  compositors.clear();
-  resourceTasks.clear();
-  renderTasks.clear();
-  resetAtlasCache();
 }
 
 void DrawingManager::resetAtlasCache() {

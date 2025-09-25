@@ -18,17 +18,16 @@
 
 #pragma once
 
+#include "core/utils/ReturnQueue.h"
 #include "gpu/ResourceCache.h"
 #include "gpu/resources/ResourceKey.h"
 
 namespace tgfx {
 /**
- * The base class for GPU resource. Overrides the onReleaseGPU() method to free all GPU resources.
- * No backend API calls should be made during destructuring since there may be no GPU context that
- * is current on the calling thread. Note: Resource is not thread safe, do not access any properties
+ * The base class for GPU resource. Note: Resource is not thread safe, do not access any properties
  * of a Resource unless its associated device is locked.
  */
-class Resource {
+class Resource : public ReturnNode {
  public:
   /**
    * A convenient method to add a resource to the cache.
@@ -54,8 +53,6 @@ class Resource {
   static std::shared_ptr<T> Find(Context* context, const ScratchKey& scratchKey) {
     return std::static_pointer_cast<T>(context->resourceCache()->findScratchResource(scratchKey));
   }
-
-  virtual ~Resource() = default;
 
   /**
    * Retrieves the context associated with this Resource.
@@ -84,13 +81,7 @@ class Resource {
 
  protected:
   Context* context = nullptr;
-  std::shared_ptr<UnreferencedResourceQueue> unreferencedQueue;
   std::weak_ptr<Resource> weakThis;
-
-  /**
-   * Overridden to free GPU resources in the backend API.
-   */
-  virtual void onReleaseGPU() = 0;
 
  private:
   ScratchKey scratchKey = {};
@@ -106,8 +97,6 @@ class Resource {
   bool hasExternalReferences() const {
     return uniqueKey.useCount() > 1;
   }
-
-  void release(bool releaseGPU);
 
   friend class ResourceCache;
 };

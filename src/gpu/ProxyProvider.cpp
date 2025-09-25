@@ -425,14 +425,12 @@ std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
 }
 
 void ProxyProvider::purgeExpiredProxies() {
-  std::vector<const ResourceKey*> keys = {};
-  for (auto& pair : proxyMap) {
-    if (pair.second.expired()) {
-      keys.push_back(&pair.first);
+  for (auto item = proxyMap.begin(); item != proxyMap.end();) {
+    if (item->second.expired()) {
+      item = proxyMap.erase(item);
+    } else {
+      ++item;
     }
-  }
-  for (auto& key : keys) {
-    proxyMap.erase(*key);
   }
 }
 

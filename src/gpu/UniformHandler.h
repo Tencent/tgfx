@@ -51,7 +51,7 @@ class UniformHandler {
   /**
    * Adds a sampler to the current program.
    */
-  SamplerHandle addSampler(GPUTexture* texture, const std::string& name);
+  SamplerHandle addSampler(std::shared_ptr<GPUTexture> texture, const std::string& name);
 
   /**
    * Returns the sampler variable for the given sampler handle.
