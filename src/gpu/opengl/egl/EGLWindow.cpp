@@ -30,7 +30,7 @@
 #include "core/utils/USE.h"
 
 #ifndef EGL_GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT
-    #define  EGL_GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT -1
+#define EGL_GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT -1
 #endif
 
 namespace tgfx {
