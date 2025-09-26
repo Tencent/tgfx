@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLRenderPipeline.h"
-
 #include "FakeUniformBuffer.h"
 #include "gpu/UniformData.h"
 #include "gpu/opengl/GLGPU.h"

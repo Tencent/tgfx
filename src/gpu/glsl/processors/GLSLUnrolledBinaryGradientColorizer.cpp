@@ -260,8 +260,8 @@ void GLSLUnrolledBinaryGradientColorizer::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("%s = vec4(t * scale + bias);", args.outputColor.c_str());
 }
 
-void SetUniformData(UniformData* uniformData, const std::string& name, int intervalCount,
-                    int limit, const Color& value) {
+void SetUniformData(UniformData* uniformData, const std::string& name, int intervalCount, int limit,
+                    const Color& value) {
   if (intervalCount > limit) {
     uniformData->setData(name, value);
   }

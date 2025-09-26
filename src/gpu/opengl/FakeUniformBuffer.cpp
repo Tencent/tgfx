@@ -17,14 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "FakeUniformBuffer.h"
-
 #include "core/utils/Log.h"
 #include "core/utils/UniqueID.h"
 
 namespace tgfx {
 
 FakeUniformBuffer::FakeUniformBuffer(size_t size)
-  : GPUBuffer(size, GPUBufferUsage::UNIFORM), uniqueID(UniqueID::Next()) {
+    : GPUBuffer(size, GPUBufferUsage::UNIFORM), uniqueID(UniqueID::Next()) {
   _data = malloc(size);
 }
 
@@ -61,4 +60,4 @@ void FakeUniformBuffer::releaseInternal() {
   mappedRange = nullptr;
   isMapped = false;
 }
-} // namespace tgfx
+}  // namespace tgfx

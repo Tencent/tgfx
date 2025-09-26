@@ -213,25 +213,24 @@ void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, PipelineProgram
   if (gpu->caps()->shaderCaps()->uboSupport) {
     size_t fragmentUniformOffset = 0;
     if (vertexUniformData != nullptr) {
-      auto buffer = program->uniformBuffer->map(
-          gpu, program->uniformBufferBaseOffset, vertexUniformData->size());
+      auto buffer = program->uniformBuffer->map(gpu, program->uniformBufferBaseOffset,
+                                                vertexUniformData->size());
       if (buffer != nullptr) {
         memcpy(buffer, vertexUniformData->data(), vertexUniformData->size());
       }
       program->uniformBuffer->unmap(gpu);
 
       renderPass->setUniformBuffer(VERTEX_UBO_BINDING_POINT, program->uniformBuffer.get(),
-                                   program->uniformBufferBaseOffset,
-                                   vertexUniformData->size());
+                                   program->uniformBufferBaseOffset, vertexUniformData->size());
       fragmentUniformOffset =
           AlignTo(vertexUniformData->size(),
                   static_cast<size_t>(gpu->caps()->shaderCaps()->uboOffsetAlignment));
     }
 
     if (fragmentUniformData != nullptr) {
-      auto buffer = program->uniformBuffer->map(
-          gpu, program->uniformBufferBaseOffset + fragmentUniformOffset,
-          fragmentUniformData->size());
+      auto buffer =
+          program->uniformBuffer->map(gpu, program->uniformBufferBaseOffset + fragmentUniformOffset,
+                                      fragmentUniformData->size());
       if (buffer != nullptr) {
         memcpy(buffer, fragmentUniformData->data(), fragmentUniformData->size());
       }
@@ -244,22 +243,21 @@ void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, PipelineProgram
   } else {
     size_t fragmentUniformOffset = 0;
     if (vertexUniformData != nullptr) {
-      auto buffer = program->uniformBuffer->map(
-          gpu, program->uniformBufferBaseOffset, vertexUniformData->size());
+      auto buffer = program->uniformBuffer->map(gpu, program->uniformBufferBaseOffset,
+                                                vertexUniformData->size());
       if (buffer != nullptr) {
         memcpy(buffer, vertexUniformData->data(), vertexUniformData->size());
       }
       program->uniformBuffer->unmap(gpu);
 
       renderPass->setUniformBuffer(VERTEX_UBO_BINDING_POINT, program->uniformBuffer.get(),
-                                   program->uniformBufferBaseOffset,
-                                   vertexUniformData->size());
+                                   program->uniformBufferBaseOffset, vertexUniformData->size());
       fragmentUniformOffset = vertexUniformData->size();
     }
     if (fragmentUniformData != nullptr) {
-      auto buffer = program->uniformBuffer->map(
-          gpu, program->uniformBufferBaseOffset + fragmentUniformOffset,
-          fragmentUniformData->size());
+      auto buffer =
+          program->uniformBuffer->map(gpu, program->uniformBufferBaseOffset + fragmentUniformOffset,
+                                      fragmentUniformData->size());
       if (buffer != nullptr) {
         memcpy(buffer, fragmentUniformData->data(), fragmentUniformData->size());
       }
@@ -304,8 +302,8 @@ std::vector<SamplerInfo> ProgramInfo::getSamplers() const {
 }
 
 void ProgramInfo::updateUniformDataSuffix(UniformData* vertexUniformData,
-                                            UniformData* fragmentUniformData,
-                                            const Processor* processor) const {
+                                          UniformData* fragmentUniformData,
+                                          const Processor* processor) const {
   auto suffix = getMangledSuffix(processor);
   if (vertexUniformData != nullptr) {
     vertexUniformData->nameSuffix = suffix;

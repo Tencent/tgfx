@@ -49,9 +49,15 @@ std::shared_ptr<Program> GlobalCache::findProgram(const BytesKey& programKey) {
 }
 
 std::shared_ptr<GPUBuffer> GlobalCache::findOrCreateUniformBuffer(size_t bufferSize,
-                                                                     size_t* lastBufferOffset, bool useFakeUniformBuffer) {
-  auto maxUBOSize = useFakeUniformBuffer ? MAX_FAKE_UNIFORM_BUFFER_SIZE : static_cast<size_t>(context->gpu()->caps()->shaderCaps()->maxUBOSize);
-  auto uboOffsetAlignment = useFakeUniformBuffer ? 1 : static_cast<size_t>(context->gpu()->caps()->shaderCaps()->uboOffsetAlignment);
+                                                                  size_t* lastBufferOffset,
+                                                                  bool useFakeUniformBuffer) {
+  auto maxUBOSize = useFakeUniformBuffer
+                        ? MAX_FAKE_UNIFORM_BUFFER_SIZE
+                        : static_cast<size_t>(context->gpu()->caps()->shaderCaps()->maxUBOSize);
+  auto uboOffsetAlignment =
+      useFakeUniformBuffer
+          ? 1
+          : static_cast<size_t>(context->gpu()->caps()->shaderCaps()->uboOffsetAlignment);
 
   if (maxUBOSize == 0) {
     LOGE("[GlobalCache::findOrCreateUniformBuffer] maxUBOSize is 0");
@@ -83,7 +89,9 @@ std::shared_ptr<GPUBuffer> GlobalCache::findOrCreateUniformBuffer(size_t bufferS
   };
 
   if (tripleBuffer.gpuBuffers.empty()) {
-    auto buffer = useFakeUniformBuffer ? std::make_shared<FakeUniformBuffer>(maxUBOSize) : context->gpu()->createBuffer(maxUBOSize, GPUBufferUsage::UNIFORM);
+    auto buffer = useFakeUniformBuffer
+                      ? std::make_shared<FakeUniformBuffer>(maxUBOSize)
+                      : context->gpu()->createBuffer(maxUBOSize, GPUBufferUsage::UNIFORM);
     if (buffer == nullptr) {
       LOGE(
           "[GlobalCache::findOrCreateUniformBuffer] failed to create initial uniform buffer, "
@@ -112,7 +120,9 @@ std::shared_ptr<GPUBuffer> GlobalCache::findOrCreateUniformBuffer(size_t bufferS
 
   if (tripleBuffer.bufferIndex >= tripleBuffer.gpuBuffers.size()) {
     // Need to create a new buffer
-    auto buffer = useFakeUniformBuffer ? std::make_shared<FakeUniformBuffer>(maxUBOSize) : context->gpu()->createBuffer(maxUBOSize, GPUBufferUsage::UNIFORM);
+    auto buffer = useFakeUniformBuffer
+                      ? std::make_shared<FakeUniformBuffer>(maxUBOSize)
+                      : context->gpu()->createBuffer(maxUBOSize, GPUBufferUsage::UNIFORM);
     if (buffer == nullptr) {
       LOGE(
           "[GlobalCache::findOrCreateUniformBuffer] failed to create uniform buffer, request "
@@ -137,7 +147,9 @@ void GlobalCache::resetUniformBuffer(bool useFakeUniformBuffer) {
     counter = 0;
   }
 
-  auto maxUBOSize = useFakeUniformBuffer ? MAX_FAKE_UNIFORM_BUFFER_SIZE : static_cast<size_t>(context->gpu()->caps()->shaderCaps()->maxUBOSize);
+  auto maxUBOSize = useFakeUniformBuffer
+                        ? MAX_FAKE_UNIFORM_BUFFER_SIZE
+                        : static_cast<size_t>(context->gpu()->caps()->shaderCaps()->maxUBOSize);
   if (maxUBOSize == 0) {
     return;
   }

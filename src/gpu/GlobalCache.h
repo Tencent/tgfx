@@ -21,10 +21,10 @@
 #include <array>
 #include <list>
 #include <unordered_map>
+#include "core/utils/SlidingWindowTracker.h"
 #include "gpu/proxies/IndexBufferProxy.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/resources/Program.h"
-#include "core/utils/SlidingWindowTracker.h"
 
 namespace tgfx {
 /**
@@ -47,9 +47,8 @@ class GlobalCache {
    * Returns last buffer offset within the returned buffer via lastBufferOffset parameter.
    * Returns nullptr if the requested buffer size exceeds the maximum allowed uniform buffer size.
    */
-  std::shared_ptr<GPUBuffer> findOrCreateUniformBuffer(size_t bufferSize,
-                                                          size_t* lastBufferOffset,
-                                                          bool useFakeUniformBuffer = false);
+  std::shared_ptr<GPUBuffer> findOrCreateUniformBuffer(size_t bufferSize, size_t* lastBufferOffset,
+                                                       bool useFakeUniformBuffer = false);
 
   /**
    * After calling Context::flush(), the cached buffer can be reused once the GPU has

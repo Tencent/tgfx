@@ -22,9 +22,8 @@
 namespace tgfx {
 static constexpr size_t MAX_FAKE_UNIFORM_BUFFER_SIZE = 64 * 1024;
 
-class FakeUniformBuffer : public GPUBuffer
-{
-public:
+class FakeUniformBuffer : public GPUBuffer {
+ public:
   explicit FakeUniformBuffer(size_t size);
 
   ~FakeUniformBuffer() override;
@@ -37,7 +36,7 @@ public:
     return _data;
   }
 
-private:
+ private:
   uint32_t uniqueID = 0;
   size_t _mappedOffset = 0;
   size_t _mappedSize = 0;
@@ -45,4 +44,4 @@ private:
 
   void releaseInternal();
 };
-} // namespace tgfx
+}  // namespace tgfx

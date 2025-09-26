@@ -21,7 +21,7 @@
 
 namespace tgfx {
 class WebGLBuffer : public GLBuffer {
-public:
+ public:
   /**
    * Creates a new WebGLBuffer with the specified size and usage flags.
    */
@@ -35,7 +35,7 @@ public:
 
   void onRelease(GLGPU* gpu) override;
 
-private:
+ private:
   uint32_t uniqueID = 0;
   unsigned _bufferID = 0;
   size_t _mappedOffset = 0;
