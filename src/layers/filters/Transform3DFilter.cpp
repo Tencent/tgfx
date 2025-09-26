@@ -33,21 +33,11 @@ void Transform3DFilter::setMatrix(const Matrix3D& matrix) {
   invalidateFilter();
 }
 
-void Transform3DFilter::setOrigin(const Point& origin) {
-  if (_origin == origin) {
-    return;
-  }
-  _origin = origin;
-  invalidateFilter();
-}
-
 Transform3DFilter::Transform3DFilter(const Matrix3D& matrix) : _matrix(matrix) {
 }
 
 std::shared_ptr<ImageFilter> Transform3DFilter::onCreateImageFilter(float) {
-  auto filter = std::make_shared<Transform3DImageFilter>(_matrix);
-  filter->setOrigin(_origin);
-  return filter;
+  return std::make_shared<Transform3DImageFilter>(_matrix);
 }
 
 }  // namespace tgfx

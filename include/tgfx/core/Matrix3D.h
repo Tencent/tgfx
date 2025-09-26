@@ -19,6 +19,7 @@
 #pragma once
 
 #include <cstring>
+#include "Matrix.h"
 #include "Vec.h"
 #include "tgfx/core/Rect.h"
 
@@ -44,6 +45,19 @@ class Matrix3D {
    *       | 0 0 0 1 |
    */
   constexpr Matrix3D() : Matrix3D(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1) {
+  }
+
+  /**
+   * Creates a Matrix3D with the given matrix. The created Matrix3D is:
+   *
+   *       | m.scaleX  m.skewX   0  m.transX |
+   *       | m.skewY   m.scaleY  0  m.transY |
+   *       | 0         0         1  0        |
+   *       | 0         0         0  1        |
+   */
+  explicit Matrix3D(const Matrix& m)
+      : Matrix3D(m.get(0), m.get(3), 0, 0, m.get(1), m.get(4), 0, 0, 0, 0, 1, 0, m.get(2), m.get(5),
+                 0, 1) {
   }
 
   /**

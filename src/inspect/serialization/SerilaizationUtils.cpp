@@ -27,7 +27,6 @@
 #include "RecordedContentSerialization.h"
 #include "RectSerialization.h"
 #include "SerializationUtils.h"
-#include "SizeSerialization.h"
 #include "core/images/FilterImage.h"
 #include "tgfx/core/Surface.h"
 

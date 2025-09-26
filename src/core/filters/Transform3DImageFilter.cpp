@@ -35,13 +35,9 @@ std::shared_ptr<ImageFilter> ImageFilter::Transform3D(const Matrix3D& matrix) {
 Transform3DImageFilter::Transform3DImageFilter(const Matrix3D& matrix) : _matrix(matrix) {
 }
 
-void Transform3DImageFilter::setOrigin(const Point& origin) {
-  _origin = Point(std::max(std::min(origin.x, 1.0f), 0.f), std::max(std::min(origin.y, 1.0f), 0.f));
-}
-
 Rect Transform3DImageFilter::onFilterBounds(const Rect& srcRect) const {
   // Align the camera center with the center of the source rect.
-  auto srcModelRect = Rect::MakeXYWH(-srcRect.width() * _origin.x, -srcRect.height() * _origin.y,
+  auto srcModelRect = Rect::MakeXYWH(-srcRect.width() * 0.5f, -srcRect.height() * 0.5f,
                                      srcRect.width(), srcRect.height());
   auto dstModelRect = _matrix.mapRect(srcModelRect);
   // The minimum axis-aligned bounding rectangle of srcRect after projection is calculated based on
@@ -74,7 +70,7 @@ std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
   auto srcW = static_cast<float>(source->width());
   auto srcH = static_cast<float>(source->height());
   // Align the camera center with the initial position center of the source model.
-  auto srcModelRect = Rect::MakeXYWH(-srcW * _origin.x, -srcH * _origin.y, srcW, srcH);
+  auto srcModelRect = Rect::MakeXYWH(-srcW * 0.5f, -srcH * 0.5f, srcW, srcH);
   auto dstModelRect = _matrix.mapRect(srcModelRect);
   // SrcProjectRect is the result of projecting srcRect onto the canvas. RenderBounds describes a
   // subregion that needs to be drawn within it.

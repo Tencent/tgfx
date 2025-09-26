@@ -3177,7 +3177,7 @@ TGFX_TEST(LayerTest, Transform3DLayer) {
   const ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 300, 180);
+  auto surface = Surface::Make(context, 300, 300);
   auto canvas = surface->getCanvas();
   canvas->clear();
 
@@ -3186,19 +3186,23 @@ TGFX_TEST(LayerTest, Transform3DLayer) {
   auto image = MakeImage("resources/apitest/imageReplacement.jpg");
   layerA->setImage(image);
   const Size imagesize(static_cast<float>(image->width()), static_cast<float>(image->height()));
+  constexpr Point layerOrgigin(30.f, 35.f);
   constexpr Point layerATransformOrigin(0.f, 0.f);
   auto layerAMatrix = Matrix::MakeTrans(-imagesize.width * layerATransformOrigin.x,
                                         -imagesize.height * layerATransformOrigin.y);
-  layerAMatrix.postScale(1.f, 1.f);
+  // 倾斜和缩放的顺序不影响结果
+  layerAMatrix.postScale(1.2f, 1.2f);
   constexpr float skewXDegrees = 10.f;
   constexpr float skewYDegrees = 10.f;
   layerAMatrix.postSkew(tanf(DegreesToRadians(skewXDegrees)), tanf(DegreesToRadians(skewYDegrees)));
-  layerAMatrix.postTranslate(imagesize.width * layerATransformOrigin.x + 30.f,
-                             imagesize.height * layerATransformOrigin.x + 35.f);
+  // 然后旋转和平移操作要依次按序应用
+  layerAMatrix.postRotate(-45.f);
+  layerAMatrix.postTranslate(imagesize.width * layerATransformOrigin.x + layerOrgigin.x,
+                             imagesize.height * layerATransformOrigin.y + layerOrgigin.y);
   layerA->setMatrix(layerAMatrix);
   auto layerB = SolidLayer::Make();
   layerB->setWidth(300.f);
-  layerB->setHeight(180.f);
+  layerB->setHeight(300.f);
   layerB->setColor(Color::FromRGBA(156, 101, 79, 128));
   layerB->addChild(layerA);
   auto displayList = std::make_unique<DisplayList>();
@@ -3208,13 +3212,16 @@ TGFX_TEST(LayerTest, Transform3DLayer) {
   auto layerAWrapper = Transform3DLayer::Make();
   auto layerAParent = layerA->parent();
   layerA->removeFromParent();
+  layerA->setMatrix(Matrix::I());
   for (auto& child : layerA->children()) {
     child->removeFromParent();
     layerAWrapper->addChild(child);
   }
   layerAParent->addChild(layerAWrapper);
   layerAWrapper->setContent(layerA);
-  layerAWrapper->setMatrix(layerA->matrix());
+  auto translateMatrix =
+      Matrix::MakeTrans(layerAMatrix.getTranslateX(), layerAMatrix.getTranslateY());
+  layerAWrapper->setMatrix(translateMatrix);
   // Set the 3D transformation matrix on the wrapper layer.
   auto perspectiveMatrix = Matrix3D::I();
   constexpr float eyeDistance = 1200.f;
@@ -3229,11 +3236,22 @@ TGFX_TEST(LayerTest, Transform3DLayer) {
   const float m23 = -1.f + nearZ / eyeDistance - perspectiveMatrix.getRowColumn(2, 2) * nearZ;
   perspectiveMatrix.setRowColumn(2, 3, m23);
   perspectiveMatrix.setRowColumn(3, 2, -1.f / eyeDistance);
-  auto modelMatrix = Matrix3D::MakeRotate({0.f, 1.f, 0.f}, 45.f);
+  auto nonTranslateMatrix = Matrix::MakeAll(layerAMatrix.getScaleX(), layerAMatrix.getSkewX(), 0,
+                                            layerAMatrix.getSkewY(), layerAMatrix.getScaleY(), 0);
+  // 绕模型坐标系的ZXY轴依次旋转，绕着模型坐标系的最新变换需要放到矩阵乘法等式的最右边
+  auto modelMatrix = Matrix3D(nonTranslateMatrix);
+  modelMatrix.preRotate({1.f, 0.f, 0.f}, 45.f);
+  modelMatrix.preRotate({0.f, 1.f, 0.f}, 45.f);
   modelMatrix.postTranslate(0.f, 0.f, -1000.f);
-  auto transformMatrix = perspectiveMatrix * modelMatrix;
+  auto offsetToAnchorMatrix =
+      Matrix3D::MakeTranslate((0.5f - layerATransformOrigin.x) * imagesize.width,
+                              (0.5f - layerATransformOrigin.y) * imagesize.height, 0.f);
+  auto invOffsetToAnchorMatrix =
+      Matrix3D::MakeTranslate((layerATransformOrigin.x - 0.5f) * imagesize.width,
+                              (layerATransformOrigin.y - 0.5f) * imagesize.height, 0.f);
+  auto transformMatrix =
+      invOffsetToAnchorMatrix * perspectiveMatrix * modelMatrix * offsetToAnchorMatrix;
   layerAWrapper->setMatrix3D(transformMatrix);
-  layerAWrapper->setOrigin(layerATransformOrigin);
 
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Transform3DLayer"));

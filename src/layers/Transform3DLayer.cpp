@@ -41,14 +41,6 @@ void Transform3DLayer::setMatrix3D(const Matrix3D& matrix3D) {
   invalidateContent();
 }
 
-void Transform3DLayer::setOrigin(const Point& origin) {
-  if (_origin == origin) {
-    return;
-  }
-  _origin = origin;
-  invalidateContent();
-}
-
 void Transform3DLayer::onUpdateContent(LayerRecorder* recorder) {
   if (!_content) {
     return;
@@ -57,9 +49,7 @@ void Transform3DLayer::onUpdateContent(LayerRecorder* recorder) {
   _content->onUpdateContent(recorder);
   auto filters = _content->filters();
   if (_matrix3D != Matrix3D::I()) {
-    auto transform3DFilter = Transform3DFilter::Make(_matrix3D);
-    transform3DFilter->setOrigin(_origin);
-    filters.push_back(std::move(transform3DFilter));
+    filters.push_back(Transform3DFilter::Make(_matrix3D));
   }
   setFilters(std::move(filters));
 }
