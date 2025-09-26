@@ -25,6 +25,7 @@
 #include "gpu/proxies/IndexBufferProxy.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/resources/Program.h"
+#include "tgfx/core/Color.h"
 
 namespace tgfx {
 /**

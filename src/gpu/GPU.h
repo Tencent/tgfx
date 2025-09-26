@@ -30,12 +30,6 @@
 #include "tgfx/platform/HardwareBuffer.h"
 
 namespace tgfx {
-// Forward declarations to avoid circular dependencies
-class GPUBuffer;
-class GPUTexture;
-class GPUTextureDescriptor;
-class GPUFence;
-
 /**
  * This is the main interface for accessing GPU functionality. In Metal, Vulkan, and WebGPU, its
  * equivalents are MTLDevice, VkDevice, and GPUDevice. For OpenGL, it simply refers to GL functions.

@@ -18,6 +18,9 @@
 
 #include "CommandEncoder.h"
 
+#include "RenderPass.h"
+#include "core/utils/Log.h"
+
 namespace tgfx {
 std::shared_ptr<RenderPass> CommandEncoder::beginRenderPass(
     const RenderPassDescriptor& descriptor) {

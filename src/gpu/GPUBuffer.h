@@ -22,6 +22,7 @@
 #include <cstdint>
 
 namespace tgfx {
+
 class GPU;
 
 /**
