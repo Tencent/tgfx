@@ -36,22 +36,48 @@ static constexpr int TEXTURE_BINDING_POINT_START = 2;
  * An object representing the collection of uniform data in CPU side.
  */
 class UniformData {
- public:
+public:
   /**
+   *
    * Copies value into the uniform data. The data must have the same size as the uniform specified
    * by name.
    */
   template <typename T>
   std::enable_if_t<std::is_trivially_copyable_v<T> && !std::is_pointer_v<T> &&
-                 !std::is_same_v<std::decay_t<T>, Matrix>, void> setData(
-      const std::string& name, const T& value) const {
+                   !std::is_same_v<std::decay_t<T>, Matrix>, void>
+  setData(const std::string& name, const T& value) const {
     onSetData(name, &value, sizeof(value));
   }
 
   /**
    * Convenience method for copying a Matrix to a 3x3 matrix in column-major order.
    */
-  void setData(const std::string& name, const Matrix& matrix) const;
+  template <typename T>
+  std::enable_if_t<std::is_same_v<std::decay_t<T>, Matrix>, void>
+  setData(const std::string& name, const T& matrix) const {
+    float values[6] = {};
+    matrix.get6(values);
+
+    if (_uboSupport) {
+      // clang-format off
+      const float data[] = {
+        values[0], values[3], 0, 0,
+        values[1], values[4], 0, 0,
+        values[2], values[5], 1, 0,
+      };
+      // clang-format on
+      onSetData(name, data, sizeof(data));
+    } else {
+      // clang-format off
+      const float data[] = {
+        values[0], values[3], 0,
+        values[1], values[4], 0,
+        values[2], values[5], 1
+      };
+      // clang-format on
+      onSetData(name, data, sizeof(data));
+    }
+  }
 
   /**
    * Sets an external memory buffer for writing uniform data.
@@ -59,7 +85,7 @@ class UniformData {
    * On platforms without UBO support, the buffer points to CPU memory.
    * bufferBaseOffset specifies the starting offset in bytes within the buffer.
    */
-  void setBuffer(void *buffer, size_t bufferBaseOffset);
+  void setBuffer(void* buffer, size_t bufferBaseOffset);
 
   /**
    * Returns the size of the uniform data in bytes.
@@ -82,7 +108,7 @@ class UniformData {
     return _uboSupport;
   }
 
- private:
+private:
   struct Field {
     std::string name = "";
     UniformFormat format = UniformFormat::Float;
@@ -126,4 +152,4 @@ class UniformData {
   friend class ProgramInfo;
   friend class UniformHandler;
 };
-}  // namespace tgfx
+} // namespace tgfx

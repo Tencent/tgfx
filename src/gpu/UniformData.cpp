@@ -46,31 +46,6 @@ UniformData::UniformData(std::vector<Uniform> uniforms, bool uboSupport)
   bufferSize = alignCursor(_uboSupport ? 16 : 1);
 }
 
-void UniformData::setData(const std::string& name, const Matrix& matrix) const {
-  float values[6] = {};
-  matrix.get6(values);
-
-  if (_uboSupport) {
-    // clang-format off
-    const float data[] = {
-      values[0], values[3], 0, 0,
-      values[1], values[4], 0, 0,
-      values[2], values[5], 1, 0,
-    };
-    // clang-format on
-    onSetData(name, data, sizeof(data));
-  } else {
-    // clang-format off
-    const float data[] = {
-      values[0], values[3], 0,
-      values[1], values[4], 0,
-      values[2], values[5], 1
-    };
-    // clang-format on
-    onSetData(name, data, sizeof(data));
-  }
-}
-
 void UniformData::setBuffer(void *buffer, size_t bufferBaseOffset) {
   _buffer = static_cast<uint8_t*>(buffer) + bufferBaseOffset;
 }
