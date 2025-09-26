@@ -32,7 +32,6 @@ static constexpr size_t MAX_PROGRAM_COUNT = 128;
 static constexpr size_t MAX_NUM_CACHED_GRADIENT_BITMAPS = 32;
 static constexpr uint16_t VERTICES_PER_NON_AA_QUAD = 4;
 static constexpr uint16_t VERTICES_PER_AA_QUAD = 8;
-static constexpr size_t MAX_UNIFORM_BUFFER_MEMORY = 128 * 1024;
 
 GlobalCache::GlobalCache(Context* context) : context(context) {
 }
@@ -69,12 +68,19 @@ std::shared_ptr<GPUBuffer> GlobalCache::findOrCreateUniformBuffer(size_t bufferS
     return nullptr;
   }
 
-  auto& tripleBuffer = tripleUniformBuffers[tripleUniformBufferIndex];
-  counter++;
-  tripleUniformBufferIndex = counter % UNIFORM_BUFFER_COUNT;
-  if (counter == UNIFORM_BUFFER_COUNT) {
-    counter = 0;
+  if (maxUniformBufferTracker == nullptr) {
+    maxUniformBufferTracker = std::make_shared<SlidingWindowTracker>(10);
   }
+
+  auto& tripleBuffer = tripleUniformBuffers[tripleUniformBufferIndex];
+
+  auto getAverageUniformBufferSize = [this]() {
+    size_t totalUniformBufferSize = 0;
+    for (const auto& tripleUniformBuffer : tripleUniformBuffers) {
+      totalUniformBufferSize += tripleUniformBuffer.gpuBuffers.size();
+    }
+    return (totalUniformBufferSize + UNIFORM_BUFFER_COUNT - 1) / UNIFORM_BUFFER_COUNT;
+  };
 
   if (tripleBuffer.gpuBuffers.empty()) {
     auto buffer = useFakeUniformBuffer ? std::make_shared<FakeUniformBuffer>(maxUBOSize) : context->gpu()->createBuffer(maxUBOSize, GPUBufferUsage::UNIFORM);
@@ -88,6 +94,7 @@ std::shared_ptr<GPUBuffer> GlobalCache::findOrCreateUniformBuffer(size_t bufferS
     tripleBuffer.gpuBuffers.emplace_back(std::move(buffer));
     tripleBuffer.bufferIndex = 0;
     tripleBuffer.cursor = 0;
+    maxUniformBufferTracker->addValue(getAverageUniformBufferSize());
   }
 
   // Check if triple buffer has enough space
@@ -114,6 +121,7 @@ std::shared_ptr<GPUBuffer> GlobalCache::findOrCreateUniformBuffer(size_t bufferS
       return nullptr;
     }
     tripleBuffer.gpuBuffers.emplace_back(std::move(buffer));
+    maxUniformBufferTracker->addValue(getAverageUniformBufferSize());
   }
 
   *lastBufferOffset = tripleBuffer.cursor;
@@ -123,6 +131,12 @@ std::shared_ptr<GPUBuffer> GlobalCache::findOrCreateUniformBuffer(size_t bufferS
 }
 
 void GlobalCache::resetUniformBuffer(bool useFakeUniformBuffer) {
+  counter++;
+  tripleUniformBufferIndex = counter % UNIFORM_BUFFER_COUNT;
+  if (counter == UNIFORM_BUFFER_COUNT) {
+    counter = 0;
+  }
+
   auto maxUBOSize = useFakeUniformBuffer ? MAX_FAKE_UNIFORM_BUFFER_SIZE : static_cast<size_t>(context->gpu()->caps()->shaderCaps()->maxUBOSize);
   if (maxUBOSize == 0) {
     return;
@@ -130,11 +144,9 @@ void GlobalCache::resetUniformBuffer(bool useFakeUniformBuffer) {
 
   auto& currentBuffer = tripleUniformBuffers[tripleUniformBufferIndex];
 
-  size_t maxBufferCount = MAX_UNIFORM_BUFFER_MEMORY / maxUBOSize;
-  bool needsResize = maxBufferCount > 0 && currentBuffer.gpuBuffers.size() > maxBufferCount;
-
-  if (needsResize) {
-    currentBuffer.gpuBuffers.resize(maxBufferCount);
+  size_t maxReuseSize = maxUniformBufferTracker->getMaxValue();
+  if (maxReuseSize > 0 && currentBuffer.gpuBuffers.size() > maxReuseSize) {
+    currentBuffer.gpuBuffers.resize(maxReuseSize);
   }
 
   currentBuffer.bufferIndex = 0;

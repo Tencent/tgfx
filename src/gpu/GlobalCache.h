@@ -24,6 +24,7 @@
 #include "gpu/proxies/IndexBufferProxy.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/resources/Program.h"
+#include "core/utils/SlidingWindowTracker.h"
 
 namespace tgfx {
 /**
@@ -125,5 +126,6 @@ class GlobalCache {
   std::array<TripleUniformBuffer, UNIFORM_BUFFER_COUNT> tripleUniformBuffers = {};
   uint32_t tripleUniformBufferIndex = 0;
   uint64_t counter = 0;
+  std::shared_ptr<SlidingWindowTracker> maxUniformBufferTracker = nullptr;
 };
 }  // namespace tgfx
