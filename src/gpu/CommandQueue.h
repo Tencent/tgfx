@@ -41,7 +41,7 @@ class CommandQueue {
    * @param size The size of the data in bytes.
    * @return true if the write operation was successful, false otherwise.
    */
-  virtual bool writeBuffer(GPUBuffer* buffer, size_t bufferOffset, const void* data,
+  virtual bool writeBuffer(std::shared_ptr<GPUBuffer> buffer, size_t bufferOffset, const void* data,
                            size_t size) = 0;
 
   /**
@@ -51,8 +51,8 @@ class CommandQueue {
    * generateMipmapsForTexture() method after writing the pixels, as mipmaps will not be generated
    * automatically.
    */
-  virtual void writeTexture(GPUTexture* texture, const Rect& rect, const void* pixels,
-                            size_t rowBytes) = 0;
+  virtual void writeTexture(std::shared_ptr<GPUTexture> texture, const Rect& rect,
+                            const void* pixels, size_t rowBytes) = 0;
 
   /**
    * Copies pixel data from the GPUTexture within the specified rectangle into the provided memory
@@ -60,7 +60,7 @@ class CommandQueue {
    * must be entirely within the frame buffer's dimensions. Returns true if the read operation
    * succeeds, false otherwise.
    */
-  virtual bool readTexture(GPUTexture* texture, const Rect& rect, void* pixels,
+  virtual bool readTexture(std::shared_ptr<GPUTexture> texture, const Rect& rect, void* pixels,
                            size_t rowBytes) const = 0;
 
   /**

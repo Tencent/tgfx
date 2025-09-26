@@ -40,10 +40,6 @@ class TestResource : public Resource {
   size_t memoryUsage() const override {
     return 1;
   }
-
- protected:
-  void onReleaseGPU() override {
-  }
 };
 
 TGFX_TEST(ResourceCacheTest, multiThreadRecycling) {

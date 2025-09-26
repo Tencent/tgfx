@@ -19,12 +19,13 @@
 #pragma once
 
 #include "gpu/GPUFence.h"
+#include "gpu/opengl/GLResource.h"
 
 namespace tgfx {
 /**
  * GLSemaphore is a wrapper class for an OpenGL sync object.
  */
-class GLFence : public GPUFence {
+class GLFence : public GPUFence, public GLResource {
  public:
   explicit GLFence(void* glSync) : _glSync(glSync) {
   }
@@ -35,7 +36,8 @@ class GLFence : public GPUFence {
 
   BackendSemaphore getBackendSemaphore() const override;
 
-  void release(GPU* gpu) override;
+ protected:
+  void onRelease(GLGPU* gpu) override;
 
  private:
   void* _glSync = nullptr;

@@ -16,35 +16,33 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <string>
-#include "gpu/GPUResource.h"
-#include "gpu/ShaderStage.h"
+#include "ReturnQueue.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
-/**
- * GPUShaderModuleDescriptor describes the properties required to create a GPUShaderModule.
- */
-class GPUShaderModuleDescriptor {
- public:
-  /**
-   * The shader code to be compiled into a GPUShaderModule.
-   */
-  std::string code;
+std::shared_ptr<ReturnQueue> ReturnQueue::Make() {
+  auto queue = std::shared_ptr<ReturnQueue>(new ReturnQueue());
+  queue->weakThis = queue;
+  return queue;
+}
 
-  /**
-   * Specifies the shader stage (e.g., vertex, fragment, compute). Only relevant for the OpenGL
-   * backend; ignored by other backends.
-   */
-  ShaderStage stage = ShaderStage::Vertex;
-};
+void ReturnQueue::NotifyReferenceReachedZero(ReturnNode* node) {
+  DEBUG_ASSERT(node->unreferencedQueue != nullptr);
+  node->unreferencedQueue->queue.enqueue(node);
+  node->unreferencedQueue = nullptr;
+}
 
-/**
- * GPUShaderModule is an internal object that serves as a container for shader code，allowing it to
- * be submitted to the GPU for execution within a pipeline.
- */
-class GPUShaderModule : public GPUResource {
- public:
-};
+ReturnQueue::~ReturnQueue() {
+  ReturnNode* node = nullptr;
+  while (queue.try_dequeue(node)) {
+    delete node;
+  }
+}
+
+std::shared_ptr<ReturnNode> ReturnQueue::makeShared(ReturnNode* node) {
+  auto reference = std::shared_ptr<ReturnNode>(node, NotifyReferenceReachedZero);
+  reference->unreferencedQueue = weakThis.lock();
+  return reference;
+}
+
 }  // namespace tgfx

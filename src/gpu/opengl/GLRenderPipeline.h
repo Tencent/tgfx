@@ -20,14 +20,13 @@
 
 #include <memory>
 #include <unordered_map>
-#include "gpu/GPURenderPipeline.h"
+#include "gpu/RenderPipeline.h"
 #include "gpu/opengl/GLBuffer.h"
+#include "gpu/opengl/GLResource.h"
 #include "gpu/opengl/GLState.h"
 #include "gpu/opengl/GLTexture.h"
 
 namespace tgfx {
-class GLGPU;
-
 struct GLAttribute {
   int location = 0;
   int count = 0;
@@ -48,11 +47,11 @@ struct GLUniformBlock {
 };
 
 /**
- * GLRenderPipeline is the OpenGL implementation of the GPURenderPipeline interface. It encapsulates
+ * GLRenderPipeline is the OpenGL implementation of the RenderPipeline interface. It encapsulates
  * an OpenGL shader program along with its associated state, such as vertex attributes and blending
  * settings.
  */
-class GLRenderPipeline : public GPURenderPipeline {
+class GLRenderPipeline : public RenderPipeline, public GLResource {
  public:
   explicit GLRenderPipeline(unsigned programID);
 
@@ -82,7 +81,8 @@ class GLRenderPipeline : public GPURenderPipeline {
    */
   void setStencilReference(GLGPU* gpu, unsigned reference);
 
-  void release(GPU* gpu) override;
+ protected:
+  void onRelease(GLGPU* gpu) override;
 
  private:
   unsigned programID = 0;
@@ -96,7 +96,7 @@ class GLRenderPipeline : public GPURenderPipeline {
   std::unique_ptr<GLDepthState> depthState = nullptr;
   std::unique_ptr<GLBlendState> blendState = nullptr;
 
-  bool setPipelineDescriptor(GLGPU* gpu, const GPURenderPipelineDescriptor& descriptor);
+  bool setPipelineDescriptor(GLGPU* gpu, const RenderPipelineDescriptor& descriptor);
 
   friend class GLGPU;
 };

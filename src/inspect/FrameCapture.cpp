@@ -272,7 +272,7 @@ void FrameCapture::sendFragmentProcessor(
           textureId = frameCaptureTexture->textureId();
           sendFrameCaptureTexture(std::move(frameCaptureTexture));
         } else {
-          textureId = FrameCaptureTexture::GetReadedTextureId(texture);
+          textureId = FrameCaptureTexture::GetReadTextureId(texture);
         }
         sendInputTextureID(textureId);
       }

@@ -34,11 +34,4 @@ void Resource::removeUniqueKey() {
     context->resourceCache()->removeUniqueKey(this);
   }
 }
-
-void Resource::release(bool releaseGPU) {
-  if (releaseGPU) {
-    onReleaseGPU();
-  }
-  context = nullptr;
-}
 }  // namespace tgfx

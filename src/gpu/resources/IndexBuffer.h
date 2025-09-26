@@ -43,19 +43,14 @@ class IndexBuffer : public Resource {
   /**
    * Returns the GPUBuffer associated with this IndexBuffer.
    */
-  GPUBuffer* gpuBuffer() const {
-    return buffer.get();
-  }
-
- protected:
-  void onReleaseGPU() override {
-    buffer->release(context->gpu());
+  std::shared_ptr<GPUBuffer> gpuBuffer() const {
+    return buffer;
   }
 
  private:
-  std::unique_ptr<GPUBuffer> buffer = nullptr;
+  std::shared_ptr<GPUBuffer> buffer = nullptr;
 
-  explicit IndexBuffer(std::unique_ptr<GPUBuffer> buffer) : buffer(std::move(buffer)) {
+  explicit IndexBuffer(std::shared_ptr<GPUBuffer> buffer) : buffer(std::move(buffer)) {
   }
 
   friend class GPUBufferUploadTask;

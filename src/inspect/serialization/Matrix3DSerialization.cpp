@@ -22,7 +22,7 @@ namespace tgfx::Matrix3DSerialization {
 
 static void SerializeMatrix3DImpl(flexbuffers::Builder& fbb, const Matrix3D* matrix) {
   float buffer[16] = {0.0f};
-  matrix->getColMajor(buffer);
+  matrix->getColumnMajor(buffer);
   std::string key = "";
   for (int i = 0; i < 6; i++) {
     key = "[" + std::to_string(i) + "]";

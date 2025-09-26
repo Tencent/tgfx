@@ -15,16 +15,16 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#include "UnreferencedResourceQueue.h"
-#include "gpu/resources/Resource.h"
+
+#include "RenderPipeline.h"
 
 namespace tgfx {
-
-UnreferencedResourceQueue::~UnreferencedResourceQueue() {
-  Resource* resource = nullptr;
-  while (queue.try_dequeue(resource)) {
-    delete resource;
+VertexDescriptor::VertexDescriptor(std::vector<Attribute> attribs, size_t stride)
+    : attributes(std::move(attribs)), vertexStride(stride) {
+  if (vertexStride == 0) {
+    for (auto& attribute : attributes) {
+      vertexStride += attribute.size();
+    }
   }
 }
-
 }  // namespace tgfx

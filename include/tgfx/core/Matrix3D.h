@@ -49,7 +49,7 @@ class Matrix3D {
   /**
    * Copies the matrix values into a 16-element array in column-major order.
    */
-  void getColMajor(float buffer[16]) const {
+  void getColumnMajor(float buffer[16]) const {
     memcpy(buffer, values, sizeof(values));
   }
 

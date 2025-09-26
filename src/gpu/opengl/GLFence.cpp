@@ -30,9 +30,9 @@ BackendSemaphore GLFence::getBackendSemaphore() const {
   return {glSyncInfo};
 }
 
-void GLFence::release(GPU* gpu) {
+void GLFence::onRelease(GLGPU* gpu) {
   if (_glSync != nullptr) {
-    auto gl = static_cast<const GLGPU*>(gpu)->functions();
+    auto gl = gpu->functions();
     gl->deleteSync(_glSync);
     _glSync = nullptr;
   }

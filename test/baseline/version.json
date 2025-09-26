@@ -165,7 +165,7 @@
         "ContourTest": "5ccc0507",
         "DirtyRegionTest1": "e1604824",
         "DirtyRegionTest10": "31250c62",
-        "DirtyRegionTest11": "5be7fc78",
+        "DirtyRegionTest11": "4bd4e0ad",
         "DirtyRegionTest2": "e1604824",
         "DirtyRegionTest3": "e1604824",
         "DirtyRegionTest4": "e1604824",
@@ -324,7 +324,7 @@
         "complex4": "a3179b14",
         "complex5": "a3179b14",
         "complex6": "a3179b14",
-        "complex7": "a3179b14",
+        "complex7": "4bd4e0ad",
         "jpg_image": "b1db872",
         "mask": "da364e8",
         "path": "a6ff60e1",
@@ -338,8 +338,8 @@
     "StrokeTest": {
         "DrawPathByHairlinePaint": "5be7fc78",
         "DrawShapeByHairlinePaint": "5be7fc78",
-        "ExtremelyThinStrokeLayer": "5be7fc78",
-        "ExtremelyThinStrokePath": "5be7fc78",
+        "ExtremelyThinStrokeLayer": "4bd4e0ad",
+        "ExtremelyThinStrokePath": "4bd4e0ad",
         "HairlineLayer": "5be7fc78",
         "ZoomUpTinyStrokeShape": "5be7fc78"
     },

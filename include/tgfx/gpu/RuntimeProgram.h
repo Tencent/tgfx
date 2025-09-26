@@ -50,6 +50,6 @@ class RuntimeProgram {
  private:
   Context* context = nullptr;
 
-  friend class RuntimeProgramWrapper;
+  friend class GLRuntimeProgram;
 };
 }  // namespace tgfx

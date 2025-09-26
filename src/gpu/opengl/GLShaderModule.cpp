@@ -21,10 +21,10 @@
 #include "gpu/opengl/GLGPU.h"
 
 namespace tgfx {
-void GLShaderModule::release(GPU* gpu) {
+void GLShaderModule::onRelease(GLGPU* gpu) {
   DEBUG_ASSERT(gpu != nullptr);
   if (_shader > 0) {
-    auto gl = static_cast<const GLGPU*>(gpu)->functions();
+    auto gl = gpu->functions();
     gl->deleteShader(_shader);
     _shader = 0;
   }

@@ -33,14 +33,15 @@ bool GLRenderPass::begin() {
   DEBUG_ASSERT(!descriptor.colorAttachments.empty());
   auto& colorAttachment = descriptor.colorAttachments[0];
   DEBUG_ASSERT(colorAttachment.texture != nullptr);
-  auto renderTexture = static_cast<GLTexture*>(colorAttachment.texture);
+  auto renderTexture = static_cast<GLTexture*>(colorAttachment.texture.get());
   auto state = gpu->state();
   state->bindFramebuffer(renderTexture);
   auto gl = gpu->functions();
 
   auto& depthStencilAttachment = descriptor.depthStencilAttachment;
   if (depthStencilAttachment.texture != nullptr) {
-    auto depthStencilTexture = static_cast<GLDepthStencilTexture*>(depthStencilAttachment.texture);
+    auto depthStencilTexture =
+        static_cast<GLDepthStencilTexture*>(depthStencilAttachment.texture.get());
     gl->bindRenderbuffer(GL_RENDERBUFFER, depthStencilTexture->renderBufferID());
     gl->framebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER,
                                 depthStencilTexture->renderBufferID());
@@ -83,11 +84,11 @@ void GLRenderPass::setScissorRect(int x, int y, int width, int height) {
   }
 }
 
-void GLRenderPass::setPipeline(GPURenderPipeline* pipeline) {
+void GLRenderPass::setPipeline(std::shared_ptr<RenderPipeline> pipeline) {
   if (renderPipeline == pipeline) {
     return;
   }
-  renderPipeline = static_cast<GLRenderPipeline*>(pipeline);
+  renderPipeline = std::static_pointer_cast<GLRenderPipeline>(pipeline);
   if (renderPipeline != nullptr) {
     auto& attachment = descriptor.depthStencilAttachment;
     renderPipeline->activate(gpu, attachment.depthReadOnly, attachment.stencilReadOnly,
@@ -103,7 +104,8 @@ void GLRenderPass::setUniformBytes(unsigned binding, const void* data, size_t si
   renderPipeline->setUniformBytes(gpu, binding, data, size);
 }
 
-void GLRenderPass::setTexture(unsigned binding, GPUTexture* texture, GPUSampler* sampler) {
+void GLRenderPass::setTexture(unsigned binding, std::shared_ptr<GPUTexture> texture,
+                              std::shared_ptr<GPUSampler> sampler) {
   if (texture == nullptr) {
     return;
   }
@@ -111,8 +113,8 @@ void GLRenderPass::setTexture(unsigned binding, GPUTexture* texture, GPUSampler*
     LOGE("GLRenderPass::setTexture: renderPipeline is null!");
     return;
   }
-  renderPipeline->setTexture(gpu, binding, static_cast<GLTexture*>(texture),
-                             static_cast<GLSampler*>(sampler));
+  renderPipeline->setTexture(gpu, binding, static_cast<GLTexture*>(texture.get()),
+                             static_cast<GLSampler*>(sampler.get()));
   auto renderTexture = descriptor.colorAttachments[0].texture;
   auto caps = static_cast<const GLCaps*>(gpu->caps());
   if (texture == renderTexture && caps->textureRedSupport) {
@@ -121,20 +123,20 @@ void GLRenderPass::setTexture(unsigned binding, GPUTexture* texture, GPUSampler*
   }
 }
 
-void GLRenderPass::setVertexBuffer(GPUBuffer* buffer, size_t offset) {
+void GLRenderPass::setVertexBuffer(std::shared_ptr<GPUBuffer> buffer, size_t offset) {
   if (renderPipeline == nullptr) {
     LOGE("GLRenderPass::setVertexBuffer: renderPipeline is null!");
     return;
   }
-  renderPipeline->setVertexBuffer(gpu, static_cast<GLBuffer*>(buffer), offset);
+  renderPipeline->setVertexBuffer(gpu, static_cast<GLBuffer*>(buffer.get()), offset);
 }
 
-void GLRenderPass::setIndexBuffer(GPUBuffer* buffer, IndexFormat format) {
+void GLRenderPass::setIndexBuffer(std::shared_ptr<GPUBuffer> buffer, IndexFormat format) {
   if (renderPipeline == nullptr) {
     LOGE("GLRenderPass::setIndexBuffer: renderPipeline is null!");
     return;
   }
-  auto bufferID = buffer ? static_cast<GLBuffer*>(buffer)->bufferID() : 0;
+  auto bufferID = buffer ? static_cast<GLBuffer*>(buffer.get())->bufferID() : 0;
   auto gl = gpu->functions();
   gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, bufferID);
   indexFormat = format;
@@ -155,8 +157,8 @@ void GLRenderPass::onEnd() {
   auto caps = static_cast<const GLCaps*>(gpu->caps());
   auto& attachment = descriptor.colorAttachments[0];
   if (attachment.resolveTexture) {
-    auto renderTexture = static_cast<GLTexture*>(attachment.texture);
-    auto sampleTexture = static_cast<GLTexture*>(attachment.resolveTexture);
+    auto renderTexture = static_cast<GLTexture*>(attachment.texture.get());
+    auto sampleTexture = static_cast<GLTexture*>(attachment.resolveTexture.get());
     DEBUG_ASSERT(renderTexture != sampleTexture);
     auto state = gpu->state();
     state->bindFramebuffer(renderTexture, FrameBufferTarget::Read);

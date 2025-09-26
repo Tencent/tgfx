@@ -18,21 +18,33 @@
 
 #pragma once
 
-#include "RenderTask.h"
-#include "gpu/resources/Semaphore.h"
+#include <string>
+#include "gpu/ShaderStage.h"
 
 namespace tgfx {
-class SemaphoreWaitTask : public RenderTask {
+/**
+ * ShaderModuleDescriptor describes the properties required to create a ShaderModule.
+ */
+class ShaderModuleDescriptor {
  public:
-  explicit SemaphoreWaitTask(std::shared_ptr<Semaphore> semaphore)
-      : semaphore(std::move(semaphore)) {
-  }
+  /**
+   * The shader code to be compiled into a ShaderModule.
+   */
+  std::string code;
 
-  void execute(CommandEncoder* encoder) override {
-    encoder->waitForFence(semaphore->getFence());
-  }
+  /**
+   * Specifies the shader stage (e.g., vertex, fragment, compute). Only relevant for the OpenGL
+   * backend; ignored by other backends.
+   */
+  ShaderStage stage = ShaderStage::Vertex;
+};
 
- private:
-  std::shared_ptr<Semaphore> semaphore = nullptr;
+/**
+ * ShaderModule is an internal object that serves as a container for shader code，allowing it to
+ * be submitted to the GPU for execution within a pipeline.
+ */
+class ShaderModule {
+ public:
+  virtual ~ShaderModule() = default;
 };
 }  // namespace tgfx

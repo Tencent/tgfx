@@ -21,7 +21,7 @@
 #include "gpu/opengl/GLUtil.h"
 
 namespace tgfx {
-std::unique_ptr<GLDepthStencilTexture> GLDepthStencilTexture::MakeFrom(
+std::shared_ptr<GLDepthStencilTexture> GLDepthStencilTexture::MakeFrom(
     GLGPU* gpu, const GPUTextureDescriptor& descriptor) {
   DEBUG_ASSERT(gpu != nullptr);
   DEBUG_ASSERT(descriptor.format == PixelFormat::DEPTH24_STENCIL8);
@@ -53,11 +53,10 @@ std::unique_ptr<GLDepthStencilTexture> GLDepthStencilTexture::MakeFrom(
     gl->deleteRenderbuffers(1, &renderBufferID);
     return nullptr;
   }
-  return std::unique_ptr<GLDepthStencilTexture>(
-      new GLDepthStencilTexture(descriptor, renderBufferID));
+  return gpu->makeResource<GLDepthStencilTexture>(descriptor, renderBufferID);
 }
 
-void GLDepthStencilTexture::onRelease(GLGPU* gpu) {
+void GLDepthStencilTexture::onReleaseTexture(GLGPU* gpu) {
   if (_renderBufferID > 0) {
     auto gl = gpu->functions();
     gl->deleteRenderbuffers(1, &_renderBufferID);

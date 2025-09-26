@@ -18,24 +18,20 @@
 
 #pragma once
 
+#include "RenderTask.h"
+#include "gpu/GPUFence.h"
+
 namespace tgfx {
-class GPU;
-
-/**
- * GPUResource is the base class for GPU resources that need manual release of their underlying
- * allocations. It is intended for resources like buffers and textures that are not automatically
- * managed by the GPU. This class decouples resource release from object destruction, allowing you
- * to skip releasing resources in scenarios such as when the GPU device is lost or destroyed.
- * Otherwise, it may lead to undefined behavior.
- */
-class GPUResource {
+class SemaphoreWaitTask : public RenderTask {
  public:
-  virtual ~GPUResource() = default;
+  explicit SemaphoreWaitTask(std::shared_ptr<GPUFence> fence) : fence(std::move(fence)) {
+  }
 
-  /**
-   * Releases the underlying GPU resources. After calling this method, the GPUResource must not be
-   * used, as doing so may lead to undefined behavior.
-   */
-  virtual void release(GPU* gpu) = 0;
+  void execute(CommandEncoder* encoder) override {
+    encoder->waitForFence(fence);
+  }
+
+ private:
+  std::shared_ptr<GPUFence> fence = nullptr;
 };
 }  // namespace tgfx
