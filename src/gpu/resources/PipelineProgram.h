@@ -24,19 +24,19 @@
 namespace tgfx {
 class PipelineProgram : public Program {
  public:
-  explicit PipelineProgram(std::shared_ptr<GPURenderPipeline> pipeline,
+  explicit PipelineProgram(std::shared_ptr<RenderPipeline> pipeline,
                            std::unique_ptr<UniformData> vertexUniformData,
                            std::unique_ptr<UniformData> fragmentUniformData)
       : pipeline(std::move(pipeline)), vertexUniformData(std::move(vertexUniformData)),
         fragmentUniformData(std::move(fragmentUniformData)) {
   }
 
-  std::shared_ptr<GPURenderPipeline> getPipeline() const {
+  std::shared_ptr<RenderPipeline> getPipeline() const {
     return pipeline;
   }
 
  private:
-  std::shared_ptr<GPURenderPipeline> pipeline = nullptr;
+  std::shared_ptr<RenderPipeline> pipeline = nullptr;
   std::unique_ptr<UniformData> vertexUniformData = nullptr;
   std::unique_ptr<UniformData> fragmentUniformData = nullptr;
   std::shared_ptr<GPUBuffer> uniformBuffer = nullptr;
