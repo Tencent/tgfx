@@ -28,7 +28,7 @@ class GLSLAtlasTextGeometryProcessor : public AtlasTextGeometryProcessor {
                                  std::optional<Color> commonColor, const SamplingOptions& sampling);
   void emitCode(EmitArgs&) const override;
 
-  void setData(UniformBuffer* vertexUniformBuffer, UniformBuffer* fragmentUniformBuffer,
+  void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData,
                FPCoordTransformIter* coordTransformIter) const override;
 
   SamplerState onSamplerStateAt(size_t) const override {

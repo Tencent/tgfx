@@ -40,7 +40,7 @@ void GeometryProcessor::setVertexAttributes(const Attribute* attrs, int attrCoun
   }
 }
 
-void GeometryProcessor::setTransformDataHelper(const Matrix& uvMatrix, UniformBuffer* uniformBuffer,
+void GeometryProcessor::setTransformDataHelper(const Matrix& uvMatrix, UniformData* uniformData,
                                                FPCoordTransformIter* transformIter) const {
   int i = 0;
   while (const CoordTransform* coordTransform = transformIter->next()) {
@@ -48,8 +48,8 @@ void GeometryProcessor::setTransformDataHelper(const Matrix& uvMatrix, UniformBu
     combined.setConcat(coordTransform->getTotalMatrix(), uvMatrix);
     std::string uniformName = TRANSFORM_UNIFORM_PREFIX;
     uniformName += std::to_string(i);
-    uniformBuffer->setData(uniformName, combined);
-    onSetTransformData(uniformBuffer, coordTransform, i);
+    uniformData->setData(uniformName, combined);
+    onSetTransformData(uniformData, coordTransform, i);
     ++i;
   }
 }

@@ -67,7 +67,7 @@ ShaderVar UniformHandler::getSamplerVariable(SamplerHandle handle) const {
   return ShaderVar(uniform);
 }
 
-std::unique_ptr<UniformBuffer> UniformHandler::makeUniformBuffer(ShaderStage stage) const {
+std::unique_ptr<UniformData> UniformHandler::makeUniformData(ShaderStage stage) const {
   if (stage == ShaderStage::Vertex && vertexUniforms.empty()) {
     return nullptr;
   }
@@ -77,7 +77,7 @@ std::unique_ptr<UniformBuffer> UniformHandler::makeUniformBuffer(ShaderStage sta
   }
 
   auto shaderCaps = programBuilder->getContext()->caps()->shaderCaps();
-  return std::unique_ptr<UniformBuffer>(new UniformBuffer(
+  return std::unique_ptr<UniformData>(new UniformData(
       stage == ShaderStage::Vertex ? vertexUniforms : fragmentUniforms, shaderCaps->uboSupport));
 }
 

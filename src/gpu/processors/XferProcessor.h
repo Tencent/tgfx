@@ -20,7 +20,7 @@
 
 #include <memory>
 #include "gpu/FragmentShaderBuilder.h"
-#include "gpu/UniformBuffer.h"
+#include "gpu/UniformData.h"
 #include "gpu/UniformHandler.h"
 #include "gpu/processors/Processor.h"
 #include "gpu/proxies/TextureProxy.h"
@@ -55,8 +55,7 @@ class XferProcessor : public Processor {
 
   virtual void emitCode(const EmitArgs& args) const = 0;
 
-  virtual void setData(UniformBuffer* vertexUniformBuffer,
-                       UniformBuffer* fragmentUniformBuffer) const = 0;
+  virtual void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const = 0;
 
  protected:
   explicit XferProcessor(uint32_t classID) : Processor(classID) {

@@ -18,8 +18,6 @@
 
 #pragma once
 
-#include "gpu/RenderPipeline.h"
-#include "gpu/UniformBuffer.h"
 #include "gpu/resources/Resource.h"
 #include "tgfx/core/BytesKey.h"
 

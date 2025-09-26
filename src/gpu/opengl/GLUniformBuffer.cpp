@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,22 +16,34 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/processors/GaussianBlur1DFragmentProcessor.h"
+#include "GLUniformBuffer.h"
+#include "core/utils/UniqueID.h"
 
 namespace tgfx {
 
-class GLSLGaussianBlur1DFragmentProcessor : public GaussianBlur1DFragmentProcessor {
- public:
-  GLSLGaussianBlur1DFragmentProcessor(PlacementPtr<FragmentProcessor> processor, float sigma,
-                                      GaussianBlurDirection direction, float stepLength,
-                                      int maxSigma);
+GLUniformBuffer::GLUniformBuffer(size_t size)
+    : GLBuffer(nullptr, 0, size, GPUBufferUsage::UNIFORM), uniqueID(UniqueID::Next()) {
+}
 
-  void emitCode(EmitArgs& args) const override;
+GLUniformBuffer::~GLUniformBuffer() {
+  releaseInternal();
+}
 
- private:
-  void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
-};
+void* GLUniformBuffer::map() {
+  if (mappedAddress == nullptr) {
+    mappedAddress = malloc(_size);
+  }
+  return mappedAddress;
+}
 
+void GLUniformBuffer::unmap() {
+  // Do nothing here.
+}
+
+void GLUniformBuffer::releaseInternal() {
+  if (mappedAddress != nullptr) {
+    free(mappedAddress);
+    mappedAddress = nullptr;
+  }
+}
 }  // namespace tgfx

@@ -200,6 +200,12 @@ std::shared_ptr<GLInterface> GLInterface::MakeNativeInterface(const GLProcGetter
       reinterpret_cast<GLUniformBlockBinding*>(getter->getProcAddress("glUniformBlockBinding"));
   functions->bindBufferBase =
       reinterpret_cast<GLBindBufferBase*>(getter->getProcAddress("glBindBufferBase"));
+  functions->bindBufferRange =
+      reinterpret_cast<GLBindBufferRange*>(getter->getProcAddress("glBindBufferRange"));
+  functions->mapBufferRange =
+      reinterpret_cast<GLMapBufferRange*>(getter->getProcAddress("glMapBufferRange"));
+  functions->unmapBuffer =
+      reinterpret_cast<GLUnmapBuffer*>(getter->getProcAddress("glUnmapBuffer"));
   functions->isTexture = reinterpret_cast<GLIsTexture*>(getter->getProcAddress("glIsTexture"));
   functions->lineWidth = reinterpret_cast<GLLineWidth*>(getter->getProcAddress("glLineWidth"));
   functions->linkProgram =

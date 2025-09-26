@@ -21,9 +21,12 @@
 #include "gpu/CommandBuffer.h"
 #include "gpu/GPUFence.h"
 #include "gpu/GPUTexture.h"
-#include "gpu/RenderPass.h"
 
 namespace tgfx {
+
+class RenderPass;
+class RenderPassDescriptor;
+
 /**
  * CommandEncoder represents an interface for collecting a sequence of GPU commands to be issued to
  * the GPU.

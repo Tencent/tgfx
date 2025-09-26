@@ -32,7 +32,6 @@ class GLSLClampedGradientEffect : public ClampedGradientEffect {
   void emitCode(EmitArgs& args) const override;
 
  private:
-  void onSetData(UniformBuffer* vertexUniformBuffer,
-                 UniformBuffer* fragmentUniformBuffer) const override;
+  void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
 };
 }  // namespace tgfx

@@ -414,8 +414,8 @@ void GLSLTiledTextureEffect::emitCode(EmitArgs& args) const {
   }
 }
 
-void GLSLTiledTextureEffect::onSetData(UniformBuffer* /*vertexUniformBuffer*/,
-                                       UniformBuffer* fragmentUniformBuffer) const {
+void GLSLTiledTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
+                                       UniformData* fragmentUniformData) const {
   auto textureView = getTextureView();
   if (textureView == nullptr) {
     return;
@@ -426,7 +426,7 @@ void GLSLTiledTextureEffect::onSetData(UniformBuffer* /*vertexUniformBuffer*/,
                              textureView->getTexture()->type() != GPUTextureType::Rectangle;
   if (hasDimensionUniform) {
     auto dimensions = textureView->getTextureCoord(1.f, 1.f);
-    fragmentUniformBuffer->setData("Dimension", dimensions);
+    fragmentUniformData->setData("Dimension", dimensions);
   }
   auto pushRect = [&](Rect subset, const std::string& uni) {
     float rect[4] = {subset.left, subset.top, subset.right, subset.bottom};
@@ -447,7 +447,7 @@ void GLSLTiledTextureEffect::onSetData(UniformBuffer* /*vertexUniformBuffer*/,
       rect[2] = rb.x;
       rect[3] = rb.y;
     }
-    fragmentUniformBuffer->setData(uni, rect);
+    fragmentUniformData->setData(uni, rect);
   };
   if (ShaderModeUsesSubset(sampling.shaderModeX) || ShaderModeUsesSubset(sampling.shaderModeY)) {
     pushRect(sampling.shaderSubset, "Subset");

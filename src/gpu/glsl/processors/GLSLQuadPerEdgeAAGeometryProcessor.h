@@ -30,10 +30,10 @@ class GLSLQuadPerEdgeAAGeometryProcessor : public QuadPerEdgeAAGeometryProcessor
 
   void emitCode(EmitArgs& args) const override;
 
-  void setData(UniformBuffer* vertexUniformBuffer, UniformBuffer* fragmentUniformBuffer,
+  void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData,
                FPCoordTransformIter* transformIter) const override;
 
-  void onSetTransformData(UniformBuffer* uniformBuffer, const CoordTransform* coordTransform,
+  void onSetTransformData(UniformData* uniformData, const CoordTransform* coordTransform,
                           int index) const override;
 
   void onEmitTransform(EmitArgs& args, VertexShaderBuilder* vertexBuilder,

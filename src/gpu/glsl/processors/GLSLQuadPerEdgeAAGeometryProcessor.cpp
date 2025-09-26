@@ -66,21 +66,21 @@ void GLSLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
   args.vertBuilder->emitNormalizedPosition(position.name());
 }
 
-void GLSLQuadPerEdgeAAGeometryProcessor::setData(UniformBuffer* vertexUniformBuffer,
-                                                 UniformBuffer* fragmentUniformBuffer,
+void GLSLQuadPerEdgeAAGeometryProcessor::setData(UniformData* vertexUniformData,
+                                                 UniformData* fragmentUniformData,
                                                  FPCoordTransformIter* transformIter) const {
-  setTransformDataHelper(uvMatrix.value_or(Matrix::I()), vertexUniformBuffer, transformIter);
+  setTransformDataHelper(uvMatrix.value_or(Matrix::I()), vertexUniformData, transformIter);
   if (commonColor.has_value()) {
-    fragmentUniformBuffer->setData("Color", *commonColor);
+    fragmentUniformData->setData("Color", *commonColor);
   }
 }
 
-void GLSLQuadPerEdgeAAGeometryProcessor::onSetTransformData(UniformBuffer* uniformBuffer,
+void GLSLQuadPerEdgeAAGeometryProcessor::onSetTransformData(UniformData* uniformData,
                                                             const CoordTransform* coordTransform,
                                                             int index) const {
   if (index == 0 && !subset.empty() && uvCoord.empty()) {
     // Subset only applies to the first image in ProgramInfo.
-    uniformBuffer->setData("texSubsetMatrix", coordTransform->getTotalMatrix());
+    uniformData->setData("texSubsetMatrix", coordTransform->getTotalMatrix());
   }
 }
 

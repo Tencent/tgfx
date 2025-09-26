@@ -130,6 +130,26 @@ std::shared_ptr<Program> ProgramInfo::getProgram() const {
     }
     context->globalCache()->addProgram(programKey, program);
   }
+
+  auto pipelineProgram = std::static_pointer_cast<PipelineProgram>(program);
+  if (pipelineProgram != nullptr) {
+    if (pipelineProgram->vertexUniformData != nullptr &&
+        pipelineProgram->vertexUniformData->size() > 0) {
+      pipelineProgram->vertexUniformBuffer = context->globalCache()->findOrCreateUniformBuffer(
+          pipelineProgram->vertexUniformData->size(), &pipelineProgram->vertexUniformBufferOffset);
+      pipelineProgram->vertexUniformData->setBuffer(pipelineProgram->vertexUniformBuffer->map(),
+                                                    pipelineProgram->vertexUniformBufferOffset);
+    }
+    if (pipelineProgram->fragmentUniformData != nullptr &&
+        pipelineProgram->fragmentUniformData->size() > 0) {
+      pipelineProgram->fragmentUniformBuffer = context->globalCache()->findOrCreateUniformBuffer(
+          pipelineProgram->fragmentUniformData->size(),
+          &pipelineProgram->fragmentUniformBufferOffset);
+      pipelineProgram->fragmentUniformData->setBuffer(pipelineProgram->fragmentUniformBuffer->map(),
+                                                      pipelineProgram->fragmentUniformBufferOffset);
+    }
+  }
+
   return program;
 }
 
@@ -148,44 +168,49 @@ static AddressMode ToAddressMode(TileMode tileMode) {
 
 void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, PipelineProgram* program) const {
   DEBUG_ASSERT(renderTarget != nullptr);
-  auto vertexUniformBuffer = program->vertexUniformBuffer.get();
-  auto fragmentUniformBuffer = program->fragmentUniformBuffer.get();
+  auto vertexUniformData = program->vertexUniformData.get();
+  auto fragmentUniformData = program->fragmentUniformData.get();
 
   auto array = GetRTAdjustArray(renderTarget);
-  if (vertexUniformBuffer != nullptr) {
-    vertexUniformBuffer->setData(RTAdjustName, array);
+  if (vertexUniformData != nullptr) {
+    vertexUniformData->setData(RTAdjustName, array);
   }
-  updateUniformBufferSuffix(vertexUniformBuffer, fragmentUniformBuffer, geometryProcessor);
+  updateUniformDataSuffix(vertexUniformData, fragmentUniformData, geometryProcessor);
 
   FragmentProcessor::CoordTransformIter coordTransformIter(this);
-  geometryProcessor->setData(vertexUniformBuffer, fragmentUniformBuffer, &coordTransformIter);
+  geometryProcessor->setData(vertexUniformData, fragmentUniformData, &coordTransformIter);
 
   for (auto& fragmentProcessor : fragmentProcessors) {
     FragmentProcessor::Iter iter(fragmentProcessor);
     const FragmentProcessor* fp = iter.next();
     while (fp) {
-      updateUniformBufferSuffix(vertexUniformBuffer, fragmentUniformBuffer, fp);
-      fp->setData(vertexUniformBuffer, fragmentUniformBuffer);
+      updateUniformDataSuffix(vertexUniformData, fragmentUniformData, fp);
+      fp->setData(vertexUniformData, fragmentUniformData);
       fp = iter.next();
     }
   }
   const auto* processor = getXferProcessor();
-  updateUniformBufferSuffix(vertexUniformBuffer, fragmentUniformBuffer, processor);
-  processor->setData(vertexUniformBuffer, fragmentUniformBuffer);
-  updateUniformBufferSuffix(vertexUniformBuffer, fragmentUniformBuffer, nullptr);
+  updateUniformDataSuffix(vertexUniformData, fragmentUniformData, processor);
+  processor->setData(vertexUniformData, fragmentUniformData);
+  updateUniformDataSuffix(vertexUniformData, fragmentUniformData, nullptr);
 
-  if (vertexUniformBuffer != nullptr) {
-    renderPass->setUniformBytes(VERTEX_UBO_BINDING_POINT, vertexUniformBuffer->data(),
-                                vertexUniformBuffer->size());
-  }
-  if (fragmentUniformBuffer != nullptr) {
-    renderPass->setUniformBytes(FRAGMENT_UBO_BINDING_POINT, fragmentUniformBuffer->data(),
-                                fragmentUniformBuffer->size());
+  if (vertexUniformData != nullptr && program->vertexUniformBuffer != nullptr) {
+    program->vertexUniformBuffer->unmap();
+
+    renderPass->setUniformBuffer(VERTEX_UBO_BINDING_POINT, program->vertexUniformBuffer,
+                                 program->vertexUniformBufferOffset, vertexUniformData->size());
   }
 
+  if (fragmentUniformData != nullptr && program->fragmentUniformBuffer != nullptr) {
+    program->fragmentUniformBuffer->unmap();
+
+    renderPass->setUniformBuffer(FRAGMENT_UBO_BINDING_POINT, program->fragmentUniformBuffer,
+                                 program->fragmentUniformBufferOffset, fragmentUniformData->size());
+  }
+
+  auto gpu = renderTarget->getContext()->gpu();
   auto samplers = getSamplers();
   unsigned textureBinding = TEXTURE_BINDING_POINT_START;
-  auto gpu = renderTarget->getContext()->gpu();
   for (auto& [texture, state] : samplers) {
     GPUSamplerDescriptor descriptor(ToAddressMode(state.tileModeX), ToAddressMode(state.tileModeY),
                                     state.filterMode, state.filterMode, state.mipmapMode);
@@ -217,16 +242,16 @@ std::vector<SamplerInfo> ProgramInfo::getSamplers() const {
   return samplers;
 }
 
-void ProgramInfo::updateUniformBufferSuffix(UniformBuffer* vertexUniformBuffer,
-                                            UniformBuffer* fragmentUniformBuffer,
-                                            const Processor* processor) const {
+void ProgramInfo::updateUniformDataSuffix(UniformData* vertexUniformData,
+                                          UniformData* fragmentUniformData,
+                                          const Processor* processor) const {
   auto suffix = getMangledSuffix(processor);
-  if (vertexUniformBuffer != nullptr) {
-    vertexUniformBuffer->nameSuffix = suffix;
+  if (vertexUniformData != nullptr) {
+    vertexUniformData->nameSuffix = suffix;
   }
 
-  if (fragmentUniformBuffer != nullptr) {
-    fragmentUniformBuffer->nameSuffix = suffix;
+  if (fragmentUniformData != nullptr) {
+    fragmentUniformData->nameSuffix = suffix;
   }
 }
 }  // namespace tgfx
