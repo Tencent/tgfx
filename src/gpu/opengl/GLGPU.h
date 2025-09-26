@@ -71,11 +71,11 @@ class GLGPU : public GPU {
 
   std::shared_ptr<GPUSampler> createSampler(const GPUSamplerDescriptor& descriptor) override;
 
-  std::shared_ptr<GPUShaderModule> createShaderModule(
-      const GPUShaderModuleDescriptor& descriptor) override;
+  std::shared_ptr<ShaderModule> createShaderModule(
+      const ShaderModuleDescriptor& descriptor) override;
 
-  std::shared_ptr<GPURenderPipeline> createRenderPipeline(
-      const GPURenderPipelineDescriptor& descriptor) override;
+  std::shared_ptr<RenderPipeline> createRenderPipeline(
+      const RenderPipelineDescriptor& descriptor) override;
 
   std::shared_ptr<CommandEncoder> createCommandEncoder() override;
 

@@ -20,9 +20,9 @@
 
 #include "core/utils/Log.h"
 #include "gpu/GPUBuffer.h"
-#include "gpu/GPURenderPipeline.h"
 #include "gpu/GPUSampler.h"
 #include "gpu/GPUTexture.h"
+#include "gpu/RenderPipeline.h"
 #include "tgfx/core/Color.h"
 
 namespace tgfx {
@@ -266,7 +266,7 @@ class RenderPass {
    * Sets the render pipeline to be used for subsequent draw calls. The pipeline defines the shader
    * programs and fixed-function state used during rendering.
    */
-  virtual void setPipeline(std::shared_ptr<GPURenderPipeline> pipeline) = 0;
+  virtual void setPipeline(std::shared_ptr<RenderPipeline> pipeline) = 0;
 
   /**
    * Sets a GPUBuffer as a uniform buffer to a specified binding index in the shader's UBO table.

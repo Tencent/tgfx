@@ -21,9 +21,9 @@
 #include <memory>
 #include "gpu/CommandEncoder.h"
 #include "gpu/CommandQueue.h"
-#include "gpu/GPURenderPipeline.h"
 #include "gpu/GPUSampler.h"
-#include "gpu/GPUShaderModule.h"
+#include "gpu/RenderPipeline.h"
+#include "gpu/ShaderModule.h"
 #include "gpu/YUVFormat.h"
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/Caps.h"
@@ -147,18 +147,18 @@ class GPU {
   virtual std::shared_ptr<GPUSampler> createSampler(const GPUSamplerDescriptor& descriptor) = 0;
 
   /**
-   * Creates a GPUShaderModule from the provided shader code. The shader code must be valid and
+   * Creates a ShaderModule from the provided shader code. The shader code must be valid and
    * compatible with the GPU backend. Returns nullptr if the shader module creation fails.
    */
-  virtual std::shared_ptr<GPUShaderModule> createShaderModule(
-      const GPUShaderModuleDescriptor& descriptor) = 0;
+  virtual std::shared_ptr<ShaderModule> createShaderModule(
+      const ShaderModuleDescriptor& descriptor) = 0;
 
   /**
-   * Creates a GPURenderPipeline that manages the vertex and fragment shader stages for use in a
+   * Creates a RenderPipeline that manages the vertex and fragment shader stages for use in a
    * RenderPass. Returns nullptr if pipeline creation fails.
    */
-  virtual std::shared_ptr<GPURenderPipeline> createRenderPipeline(
-      const GPURenderPipelineDescriptor& descriptor) = 0;
+  virtual std::shared_ptr<RenderPipeline> createRenderPipeline(
+      const RenderPipelineDescriptor& descriptor) = 0;
 
   /**
    * Creates a command encoder that can be used to encode commands to be issued to the GPU.

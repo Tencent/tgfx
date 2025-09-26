@@ -20,7 +20,7 @@
 
 #include <memory>
 #include <unordered_map>
-#include "gpu/GPURenderPipeline.h"
+#include "gpu/RenderPipeline.h"
 #include "gpu/opengl/GLBuffer.h"
 #include "gpu/opengl/GLResource.h"
 #include "gpu/opengl/GLState.h"
@@ -42,11 +42,11 @@ struct GLUniform {
 };
 
 /**
- * GLRenderPipeline is the OpenGL implementation of the GPURenderPipeline interface. It encapsulates
+ * GLRenderPipeline is the OpenGL implementation of the RenderPipeline interface. It encapsulates
  * an OpenGL shader program along with its associated state, such as vertex attributes and blending
  * settings.
  */
-class GLRenderPipeline : public GPURenderPipeline, public GLResource {
+class GLRenderPipeline : public RenderPipeline, public GLResource {
  public:
   explicit GLRenderPipeline(unsigned programID);
 
@@ -93,7 +93,7 @@ class GLRenderPipeline : public GPURenderPipeline, public GLResource {
   std::unique_ptr<GLDepthState> depthState = nullptr;
   std::unique_ptr<GLBlendState> blendState = nullptr;
 
-  bool setPipelineDescriptor(GLGPU* gpu, const GPURenderPipelineDescriptor& descriptor);
+  bool setPipelineDescriptor(GLGPU* gpu, const RenderPipelineDescriptor& descriptor);
 
   friend class GLGPU;
 };

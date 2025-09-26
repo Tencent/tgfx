@@ -84,7 +84,7 @@ void GLRenderPass::setScissorRect(int x, int y, int width, int height) {
   }
 }
 
-void GLRenderPass::setPipeline(std::shared_ptr<GPURenderPipeline> pipeline) {
+void GLRenderPass::setPipeline(std::shared_ptr<RenderPipeline> pipeline) {
   if (renderPipeline == pipeline) {
     return;
   }

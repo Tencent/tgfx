@@ -16,25 +16,15 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/ShaderModule.h"
-#include "gpu/opengl/GLResource.h"
+#include "tgfx/core/Vec.h"
+#include "core/utils/MathExtra.h"
+#include "utils/Log.h"
 
 namespace tgfx {
-class GLShaderModule : public ShaderModule, public GLResource {
- public:
-  explicit GLShaderModule(unsigned shader) : _shader(shader) {
-  }
 
-  unsigned shader() const {
-    return _shader;
-  }
+Vec2 operator/(const Vec2& v, float s) {
+  DEBUG_ASSERT(!FloatNearlyZero(s));
+  return {v.x / s, v.y / s};
+}
 
- protected:
-  void onRelease(GLGPU* gpu) override;
-
- private:
-  unsigned _shader = 0;
-};
 }  // namespace tgfx

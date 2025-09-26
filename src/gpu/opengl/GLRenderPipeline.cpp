@@ -280,7 +280,7 @@ static std::unique_ptr<GLDepthState> MakeDepthState(const DepthStencilDescriptor
 }
 
 bool GLRenderPipeline::setPipelineDescriptor(GLGPU* gpu,
-                                             const GPURenderPipelineDescriptor& descriptor) {
+                                             const RenderPipelineDescriptor& descriptor) {
   auto gl = gpu->functions();
   ClearGLError(gl);
   auto state = gpu->state();

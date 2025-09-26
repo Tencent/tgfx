@@ -18,33 +18,28 @@
 
 #pragma once
 
-#include <string>
-#include "gpu/ShaderStage.h"
+#include "gpu/processors/Transform3DGeometryProcessor.h"
 
 namespace tgfx {
-/**
- * GPUShaderModuleDescriptor describes the properties required to create a GPUShaderModule.
- */
-class GPUShaderModuleDescriptor {
- public:
-  /**
-   * The shader code to be compiled into a GPUShaderModule.
-   */
-  std::string code;
-
-  /**
-   * Specifies the shader stage (e.g., vertex, fragment, compute). Only relevant for the OpenGL
-   * backend; ignored by other backends.
-   */
-  ShaderStage stage = ShaderStage::Vertex;
-};
 
 /**
- * GPUShaderModule is an internal object that serves as a container for shader code，allowing it to
- * be submitted to the GPU for execution within a pipeline.
+ * The implementation of QuadPerEdgeAA3DGeometryProcessor using GLSL.
  */
-class GPUShaderModule {
+class GLSLQuadPerEdgeAA3DGeometryProcessor final : public Transform3DGeometryProcessor {
  public:
-  virtual ~GPUShaderModule() = default;
+  /**
+   * Creates a GLSLQuadPerEdgeAA3DGeometryProcessor instance with the specified parameters.
+   */
+  explicit GLSLQuadPerEdgeAA3DGeometryProcessor(AAType aa, const Matrix3D& matrix,
+                                                const Vec2& ndcScale, const Vec2& ndcOffset);
+
+  void emitCode(EmitArgs& args) const override;
+
+  void setData(UniformBuffer* vertexUniformBuffer, UniformBuffer* fragmentUniformBuffer,
+               FPCoordTransformIter* transformIter) const override;
+
+ private:
+  Color defaultColor = Color::White();
 };
+
 }  // namespace tgfx

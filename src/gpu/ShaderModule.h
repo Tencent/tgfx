@@ -18,23 +18,33 @@
 
 #pragma once
 
-#include "gpu/ShaderModule.h"
-#include "gpu/opengl/GLResource.h"
+#include <string>
+#include "gpu/ShaderStage.h"
 
 namespace tgfx {
-class GLShaderModule : public ShaderModule, public GLResource {
+/**
+ * ShaderModuleDescriptor describes the properties required to create a ShaderModule.
+ */
+class ShaderModuleDescriptor {
  public:
-  explicit GLShaderModule(unsigned shader) : _shader(shader) {
-  }
+  /**
+   * The shader code to be compiled into a ShaderModule.
+   */
+  std::string code;
 
-  unsigned shader() const {
-    return _shader;
-  }
+  /**
+   * Specifies the shader stage (e.g., vertex, fragment, compute). Only relevant for the OpenGL
+   * backend; ignored by other backends.
+   */
+  ShaderStage stage = ShaderStage::Vertex;
+};
 
- protected:
-  void onRelease(GLGPU* gpu) override;
-
- private:
-  unsigned _shader = 0;
+/**
+ * ShaderModule is an internal object that serves as a container for shader code，allowing it to
+ * be submitted to the GPU for execution within a pipeline.
+ */
+class ShaderModule {
+ public:
+  virtual ~ShaderModule() = default;
 };
 }  // namespace tgfx

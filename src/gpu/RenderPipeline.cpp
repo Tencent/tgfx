@@ -16,25 +16,15 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/ShaderModule.h"
-#include "gpu/opengl/GLResource.h"
+#include "RenderPipeline.h"
 
 namespace tgfx {
-class GLShaderModule : public ShaderModule, public GLResource {
- public:
-  explicit GLShaderModule(unsigned shader) : _shader(shader) {
+VertexDescriptor::VertexDescriptor(std::vector<Attribute> attribs, size_t stride)
+    : attributes(std::move(attribs)), vertexStride(stride) {
+  if (vertexStride == 0) {
+    for (auto& attribute : attributes) {
+      vertexStride += attribute.size();
+    }
   }
-
-  unsigned shader() const {
-    return _shader;
-  }
-
- protected:
-  void onRelease(GLGPU* gpu) override;
-
- private:
-  unsigned _shader = 0;
-};
+}
 }  // namespace tgfx

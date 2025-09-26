@@ -234,8 +234,7 @@ std::shared_ptr<GPUSampler> GLGPU::createSampler(const GPUSamplerDescriptor& des
                                      ToGLWrap(descriptor.addressModeY), minFilter, magFilter);
 }
 
-std::shared_ptr<GPUShaderModule> GLGPU::createShaderModule(
-    const GPUShaderModuleDescriptor& descriptor) {
+std::shared_ptr<ShaderModule> GLGPU::createShaderModule(const ShaderModuleDescriptor& descriptor) {
   if (descriptor.code.empty()) {
     LOGE("GLGPU::createShaderModule() shader code is empty!");
     return nullptr;
@@ -269,8 +268,8 @@ std::shared_ptr<GPUShaderModule> GLGPU::createShaderModule(
   return makeResource<GLShaderModule>(shader);
 }
 
-std::shared_ptr<GPURenderPipeline> GLGPU::createRenderPipeline(
-    const GPURenderPipelineDescriptor& descriptor) {
+std::shared_ptr<RenderPipeline> GLGPU::createRenderPipeline(
+    const RenderPipelineDescriptor& descriptor) {
   auto vertexModule = static_cast<GLShaderModule*>(descriptor.vertex.module.get());
   auto fragmentModule = static_cast<GLShaderModule*>(descriptor.fragment.module.get());
   if (vertexModule == nullptr || vertexModule->shader() == 0 || vertexModule == nullptr ||
