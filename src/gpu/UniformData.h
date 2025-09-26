@@ -33,12 +33,12 @@ static constexpr int FRAGMENT_UBO_BINDING_POINT = 1;
 static constexpr int TEXTURE_BINDING_POINT_START = 2;
 
 /**
- * An object representing the collection of uniform variables in a GPU program.
+ * An object representing the collection of uniform data in CPU side.
  */
-class UniformBuffer {
+class UniformData {
  public:
   /**
-   * Copies value into the uniform buffer. The data must have the same size as the uniform specified
+   * Copies value into the uniform data. The data must have the same size as the uniform specified
    * by name.
    */
   template <typename T>
@@ -53,21 +53,21 @@ class UniformBuffer {
   void setData(const std::string& name, const Matrix& matrix);
 
   /**
-   * Returns a pointer to the start of the uniform buffer in memory.
+   * Returns a pointer to the start of the uniform data in memory.
    */
   const void* data() const {
     return buffer.data();
   }
 
   /**
-   * Returns the size of the uniform buffer in bytes.
+   * Returns the size of the uniform data in bytes.
    */
   size_t size() const {
     return buffer.size();
   }
 
   /**
-   * Returns the list of uniforms in this buffer.
+   * Returns the list of uniforms in this data.
    */
   const std::vector<Uniform>& uniforms() const {
     return _uniforms;
@@ -101,7 +101,7 @@ class UniformBuffer {
   size_t cursor = 0;
   bool _uboSupport = false;
 
-  explicit UniformBuffer(std::vector<Uniform> uniforms, bool uboSupport = false);
+  explicit UniformData(std::vector<Uniform> uniforms, bool uboSupport = false);
 
   void onSetData(const std::string& name, const void* data, size_t size);
 
@@ -112,7 +112,7 @@ class UniformBuffer {
   static Entry EntryOf(UniformFormat format);
 
   /**
-   * Dump UniformBuffer's memory layout information is printed to the console for debugging.
+   * Dump UniformData's memory layout information is printed to the console for debugging.
    */
 #if DEBUG
   static const char* ToUniformFormatName(UniformFormat format);

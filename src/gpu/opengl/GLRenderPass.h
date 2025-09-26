@@ -40,6 +40,8 @@ class GLRenderPass : public RenderPass {
 
   void setUniformBytes(unsigned binding, const void* data, size_t size) override;
 
+  void setUniformBuffer(unsigned binding, GPUBuffer* buffer, size_t offset, size_t size) override;
+
   void setTexture(unsigned binding, std::shared_ptr<GPUTexture> texture,
                   std::shared_ptr<GPUSampler> sampler) override;
 

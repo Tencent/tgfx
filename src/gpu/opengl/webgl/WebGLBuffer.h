@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -15,21 +15,32 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-
 #pragma once
 
-#include <optional>
-#include "gpu/processors/DefaultGeometryProcessor.h"
+#include "gpu/opengl/GLBuffer.h"
 
 namespace tgfx {
-class GLSLDefaultGeometryProcessor : public DefaultGeometryProcessor {
- public:
-  GLSLDefaultGeometryProcessor(Color color, int width, int height, AAType aa,
-                               const Matrix& viewMatrix, const Matrix& uvMatrix);
+class WebGLBuffer : public GLBuffer {
+public:
+  /**
+   * Creates a new WebGLBuffer with the specified size and usage flags.
+   */
+  WebGLBuffer(unsigned bufferID, size_t size, uint32_t usage);
 
-  void emitCode(EmitArgs& args) const override;
+  ~WebGLBuffer() override;
 
-  void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData,
-               FPCoordTransformIter* transformIter) const override;
+  void* map(GPU* gpu, size_t offset, size_t size) override;
+
+  void unmap(GPU* gpu) override;
+
+  void onRelease(GLGPU* gpu) override;
+
+private:
+  uint32_t uniqueID = 0;
+  unsigned _bufferID = 0;
+  size_t _mappedOffset = 0;
+  size_t _mappedSize = 0;
+
+  void releaseInternal();
 };
 }  // namespace tgfx

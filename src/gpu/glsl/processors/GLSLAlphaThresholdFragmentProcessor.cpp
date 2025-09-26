@@ -38,9 +38,9 @@ void GLSLAlphaThresholdFragmentProcessor::emitCode(EmitArgs& args) const {
                            args.outputColor.c_str());
 }
 
-void GLSLAlphaThresholdFragmentProcessor::onSetData(UniformBuffer* /*vertexUniformBuffer*/,
-                                                    UniformBuffer* fragmentUniformBuffer) const {
-  fragmentUniformBuffer->setData("Threshold", threshold);
+void GLSLAlphaThresholdFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
+                                                    UniformData* fragmentUniformData) const {
+  fragmentUniformData->setData("Threshold", threshold);
 }
 
 }  // namespace tgfx

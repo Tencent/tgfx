@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLRenderPipeline.h"
-#include "gpu/UniformBuffer.h"
+#include "gpu/UniformData.h"
 #include "gpu/opengl/GLGPU.h"
 #include "gpu/opengl/GLUtil.h"
 
@@ -75,16 +75,10 @@ void GLRenderPipeline::setUniformBytes(GLGPU* gpu, unsigned binding, const void*
     LOGE("GLRenderPipeline::setUniformBytesForUBO: binding %d not found", binding);
     return;
   }
-  auto& block = result->second;
+  auto& uniforms = result->second;
   auto gl = gpu->functions();
-  if (block.ubo > 0) {
-    gl->bindBuffer(GL_UNIFORM_BUFFER, block.ubo);
-    gl->bufferData(GL_UNIFORM_BUFFER, static_cast<int32_t>(size), data, GL_STATIC_DRAW);
-    gl->bindBufferBase(GL_UNIFORM_BUFFER, binding, block.ubo);
-    return;
-  }
   auto buffer = reinterpret_cast<uint8_t*>(const_cast<void*>(data));
-  for (auto& uniform : block.uniforms) {
+  for (auto& uniform : uniforms) {
     auto uniformData = buffer + uniform.offset;
     switch (uniform.format) {
       case UniformFormat::Float:
@@ -127,6 +121,22 @@ void GLRenderPipeline::setUniformBytes(GLGPU* gpu, unsigned binding, const void*
         break;
     }
   }
+}
+
+void GLRenderPipeline::setUniformBuffer(GLGPU* gpu, unsigned binding, GPUBuffer* buffer,
+                                        size_t offset, size_t size) {
+  if (gpu == nullptr || buffer == nullptr || size == 0) {
+    return;
+  }
+
+  unsigned ubo = static_cast<GLBuffer*>(buffer)->bufferID();
+  if (ubo <= 0) {
+    return;
+  }
+
+  auto gl = gpu->functions();
+  gl->bindBufferRange(GL_UNIFORM_BUFFER, binding, ubo, static_cast<int32_t>(offset),
+                      static_cast<int32_t>(size));
 }
 
 void GLRenderPipeline::setTexture(GLGPU* gpu, unsigned binding, GLTexture* texture,
@@ -175,13 +185,6 @@ void GLRenderPipeline::onRelease(GLGPU* gpu) {
   }
   if (vertexArray > 0) {
     gl->deleteVertexArrays(1, &vertexArray);
-  }
-  for (auto& item : uniformBlocks) {
-    auto& uniformBlock = item.second;
-    if (uniformBlock.ubo > 0) {
-      gl->deleteBuffers(1, &uniformBlock.ubo);
-      uniformBlock.ubo = 0;
-    }
   }
 }
 
@@ -307,30 +310,26 @@ bool GLRenderPipeline::setPipelineDescriptor(GLGPU* gpu,
   blendState = MakeBlendState(attachment);
 
   for (auto& entry : descriptor.layout.uniformBlocks) {
-    GLUniformBlock block = {};
-    if (entry.uniforms.empty()) {
-      DEBUG_ASSERT(gpu->caps()->shaderCaps()->uboSupport);
-      gl->genBuffers(1, &block.ubo);
-      if (block.ubo == 0) {
-        LOGE("GLRenderPipeline::createUniformBlocks: failed to create UBO!");
-        return false;
-      }
-      auto index = gl->getUniformBlockIndex(programID, entry.name.c_str());
-      if (index != GL_INVALID_INDEX) {
-        gl->uniformBlockBinding(programID, index, entry.binding);
+    if (gpu->caps()->shaderCaps()->uboSupport) {
+      auto uniformBlockIndex = gl->getUniformBlockIndex(programID, entry.name.c_str());
+      if (uniformBlockIndex != GL_INVALID_INDEX) {
+        gl->uniformBlockBinding(programID, uniformBlockIndex, entry.binding);
       }
     } else {
-      block.uniforms.reserve(entry.uniforms.size());
-      size_t uniformOffset = 0;
-      for (auto& uniform : entry.uniforms) {
-        auto location = gl->getUniformLocation(programID, uniform.name().c_str());
-        if (location != -1) {
-          block.uniforms.push_back({uniform.format(), location, uniformOffset});
+      std::vector<GLUniform> uniforms = {};
+      if (!entry.uniforms.empty()) {
+        uniforms.reserve(entry.uniforms.size());
+        size_t uniformOffset = 0;
+        for (auto& uniform : entry.uniforms) {
+          auto location = gl->getUniformLocation(programID, uniform.name().c_str());
+          if (location != -1) {
+            uniforms.push_back({uniform.format(), location, uniformOffset});
+          }
+          uniformOffset += uniform.size();
         }
-        uniformOffset += uniform.size();
       }
+      uniformBlocks[entry.binding] = uniforms;
     }
-    uniformBlocks[entry.binding] = block;
   }
 
   // Assign texture units to sampler uniforms up front, just once.

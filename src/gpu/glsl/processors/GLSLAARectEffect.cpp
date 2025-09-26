@@ -40,11 +40,11 @@ void GLSLAARectEffect::emitCode(EmitArgs& args) const {
                            args.inputColor.c_str());
 }
 
-void GLSLAARectEffect::onSetData(UniformBuffer* /*vertexUniformBuffer*/,
-                                 UniformBuffer* fragmentUniformBuffer) const {
+void GLSLAARectEffect::onSetData(UniformData* /*vertexUniformData*/,
+                                 UniformData* fragmentUniformData) const {
   // The AA math in the shader evaluates to 0 at the uploaded coordinates, so outset by 0.5
   // to interpolate from 0 at a half pixel inset and 1 at a half pixel outset of rect.
   auto outRect = rect.makeOutset(0.5f, 0.5f);
-  fragmentUniformBuffer->setData("Rect", outRect);
+  fragmentUniformData->setData("Rect", outRect);
 }
 }  // namespace tgfx

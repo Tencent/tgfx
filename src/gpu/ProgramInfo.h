@@ -99,8 +99,8 @@ class ProgramInfo {
 
   std::vector<SamplerInfo> getSamplers() const;
 
-  void updateUniformBufferSuffix(UniformBuffer* vertexUniformBuffer,
-                                 UniformBuffer* fragmentUniformBuffer,
+  void updateUniformDataSuffix(UniformData* vertexUniformData,
+                                 UniformData* fragmentUniformData,
                                  const Processor* processor) const;
 };
 }  // namespace tgfx

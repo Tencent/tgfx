@@ -74,12 +74,12 @@ void GLSLDualIntervalGradientColorizer::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("%s = vec4(t * scale + bias);", args.outputColor.c_str());
 }
 
-void GLSLDualIntervalGradientColorizer::onSetData(UniformBuffer* /*vertexUniformBuffer*/,
-                                                  UniformBuffer* fragmentUniformBuffer) const {
-  fragmentUniformBuffer->setData("scale01", scale01);
-  fragmentUniformBuffer->setData("bias01", bias01);
-  fragmentUniformBuffer->setData("scale23", scale23);
-  fragmentUniformBuffer->setData("bias23", bias23);
-  fragmentUniformBuffer->setData("threshold", threshold);
+void GLSLDualIntervalGradientColorizer::onSetData(UniformData* /*vertexUniformData*/,
+                                                  UniformData* fragmentUniformData) const {
+  fragmentUniformData->setData("scale01", scale01);
+  fragmentUniformData->setData("bias01", bias01);
+  fragmentUniformData->setData("scale23", scale23);
+  fragmentUniformData->setData("bias23", bias23);
+  fragmentUniformData->setData("threshold", threshold);
 }
 }  // namespace tgfx

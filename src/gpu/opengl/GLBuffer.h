@@ -49,6 +49,10 @@ class GLBuffer : public GPUBuffer, public GLResource {
     return _bufferID;
   }
 
+  void* map(GPU* gpu, size_t offset, size_t size) override;
+
+  void unmap(GPU* gpu) override;
+
  protected:
   void onRelease(GLGPU* gpu) override;
 

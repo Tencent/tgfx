@@ -86,14 +86,14 @@ void GLSLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
   args.vertBuilder->emitNormalizedPosition(position.name());
 }
 
-void GLSLAtlasTextGeometryProcessor::setData(UniformBuffer* vertexUniformBuffer,
-                                             UniformBuffer* fragmentUniformBuffer,
+void GLSLAtlasTextGeometryProcessor::setData(UniformData* vertexUniformData,
+                                             UniformData* fragmentUniformData,
                                              FPCoordTransformIter* transformIter) const {
   auto atlasSizeInv = textureProxy->getTextureView()->getTextureCoord(1.f, 1.f);
-  vertexUniformBuffer->setData(atlasSizeUniformName, atlasSizeInv);
-  setTransformDataHelper(Matrix::I(), vertexUniformBuffer, transformIter);
+  vertexUniformData->setData(atlasSizeUniformName, atlasSizeInv);
+  setTransformDataHelper(Matrix::I(), vertexUniformData, transformIter);
   if (commonColor.has_value()) {
-    fragmentUniformBuffer->setData("Color", *commonColor);
+    fragmentUniformData->setData("Color", *commonColor);
   }
 }
 }  // namespace tgfx

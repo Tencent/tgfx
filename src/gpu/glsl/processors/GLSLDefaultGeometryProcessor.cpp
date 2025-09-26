@@ -66,11 +66,11 @@ void GLSLDefaultGeometryProcessor::emitCode(EmitArgs& args) const {
   args.vertBuilder->emitNormalizedPosition(positionName);
 }
 
-void GLSLDefaultGeometryProcessor::setData(UniformBuffer* vertexUniformBuffer,
-                                           UniformBuffer* fragmentUniformBuffer,
+void GLSLDefaultGeometryProcessor::setData(UniformData* vertexUniformData,
+                                           UniformData* fragmentUniformData,
                                            FPCoordTransformIter* transformIter) const {
-  setTransformDataHelper(uvMatrix, vertexUniformBuffer, transformIter);
-  fragmentUniformBuffer->setData("Color", color);
-  vertexUniformBuffer->setData("Matrix", viewMatrix);
+  setTransformDataHelper(uvMatrix, vertexUniformData, transformIter);
+  fragmentUniformData->setData("Color", color);
+  vertexUniformData->setData("Matrix", viewMatrix);
 }
 }  // namespace tgfx

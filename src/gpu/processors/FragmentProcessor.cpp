@@ -137,9 +137,9 @@ const CoordTransform* FragmentProcessor::CoordTransformIter::next() {
   return currFP->coordTransform(currentIndex++);
 }
 
-void FragmentProcessor::setData(UniformBuffer* vertexUniformBuffer,
-                                UniformBuffer* fragmentUniformBuffer) const {
-  onSetData(vertexUniformBuffer, fragmentUniformBuffer);
+void FragmentProcessor::setData(UniformData* vertexUniformData,
+                                UniformData* fragmentUniformData) const {
+  onSetData(vertexUniformData, fragmentUniformData);
 }
 
 void FragmentProcessor::emitChild(size_t childIndex, const std::string& inputColor,

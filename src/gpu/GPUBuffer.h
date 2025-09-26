@@ -18,10 +18,11 @@
 
 #pragma once
 
-#include <cstddef>
 #include <cstdint>
 
 namespace tgfx {
+class GPU;
+
 /**
  * GPUBufferUsage defines the usage flags for GPU buffers.
  */
@@ -36,6 +37,11 @@ class GPUBufferUsage {
    * The buffer can be used as a vertex buffer.
    */
   static constexpr uint32_t VERTEX = 0x20;
+
+  /**
+   * The buffer can be used as a uniform buffer.
+   */
+  static constexpr uint32_t UNIFORM = 0x40;
 };
 
 /**
@@ -62,9 +68,24 @@ class GPUBuffer {
     return _usage;
   }
 
+  /**
+   * Mapping a GPUBuffer allows the CPU to read from or write to the buffer's memory directly.
+   * The offset and size must be within the bounds of the buffer's size and properly aligned.
+   * If the mapping fails, it returns nullptr.
+   */
+  virtual void* map(GPU* gpu, size_t offset, size_t size) = 0;
+
+  /**
+   * Unmaps the GPUBuffer, making its contents available for use by the GPU again.
+   * If the buffer is not currently mapped, this function does nothing.
+   */
+  virtual void unmap(GPU* gpu) = 0;
+
  protected:
   size_t _size = 0;
   uint32_t _usage = 0;
+  void* mappedRange = nullptr;
+  bool isMapped = false;
 
   GPUBuffer(size_t size, uint32_t usage) : _size(size), _usage(usage) {
   }

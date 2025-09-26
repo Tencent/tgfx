@@ -18,16 +18,17 @@
 
 #pragma once
 
+#include "gpu/GPUBuffer.h"
 #include "gpu/resources/Program.h"
 
 namespace tgfx {
 class PipelineProgram : public Program {
  public:
   explicit PipelineProgram(std::shared_ptr<GPURenderPipeline> pipeline,
-                           std::unique_ptr<UniformBuffer> vertexUniformBuffer,
-                           std::unique_ptr<UniformBuffer> fragmentUniformBuffer)
-      : pipeline(std::move(pipeline)), vertexUniformBuffer(std::move(vertexUniformBuffer)),
-        fragmentUniformBuffer(std::move(fragmentUniformBuffer)) {
+                           std::unique_ptr<UniformData> vertexUniformData,
+                           std::unique_ptr<UniformData> fragmentUniformData)
+      : pipeline(std::move(pipeline)), vertexUniformData(std::move(vertexUniformData)),
+        fragmentUniformData(std::move(fragmentUniformData)) {
   }
 
   std::shared_ptr<GPURenderPipeline> getPipeline() const {
@@ -36,8 +37,10 @@ class PipelineProgram : public Program {
 
  private:
   std::shared_ptr<GPURenderPipeline> pipeline = nullptr;
-  std::unique_ptr<UniformBuffer> vertexUniformBuffer = nullptr;
-  std::unique_ptr<UniformBuffer> fragmentUniformBuffer = nullptr;
+  std::unique_ptr<UniformData> vertexUniformData = nullptr;
+  std::unique_ptr<UniformData> fragmentUniformData = nullptr;
+  std::shared_ptr<GPUBuffer> uniformBuffer = nullptr;
+  size_t uniformBufferBaseOffset = 0;
 
   friend class ProgramInfo;
 };
