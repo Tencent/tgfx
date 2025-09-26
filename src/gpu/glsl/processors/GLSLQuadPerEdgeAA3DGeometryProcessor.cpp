@@ -20,9 +20,9 @@
 
 namespace tgfx {
 
-static constexpr const char* UniformTransformMatrixName = "transformMatrix";
-static constexpr const char* UniformNdcScaleName = "ndcScale";
-static constexpr const char* UniformNdcOffsetName = "ndcOffset";
+static constexpr char UniformTransformMatrixName[] = "transformMatrix";
+static constexpr char UniformNdcScaleName[] = "ndcScale";
+static constexpr char UniformNdcOffsetName[] = "ndcOffset";
 
 PlacementPtr<Transform3DGeometryProcessor> Transform3DGeometryProcessor::Make(
     BlockBuffer* buffer, AAType aa, const Matrix3D& matrix, const Vec2& ndcScale,

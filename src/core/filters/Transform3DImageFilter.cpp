@@ -52,11 +52,10 @@ std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
     std::shared_ptr<Image> source, const Rect& renderBounds, const TPArgs& args) const {
   float dstDrawWidth = renderBounds.width();
   float dstDrawHeight = renderBounds.height();
-  const float tmpDrawScale = std::max(0.f, args.drawScale);
-  DEBUG_ASSERT(!FloatNearlyZero(tmpDrawScale));
-  if (!FloatNearlyEqual(tmpDrawScale, 1.f)) {
-    dstDrawWidth = dstDrawWidth * tmpDrawScale;
-    dstDrawHeight = dstDrawHeight * tmpDrawScale;
+  DEBUG_ASSERT(args.drawScale > 0.f);
+  if (!FloatNearlyEqual(args.drawScale, 1.f)) {
+    dstDrawWidth = dstDrawWidth * args.drawScale;
+    dstDrawHeight = dstDrawHeight * args.drawScale;
   }
   dstDrawWidth = std::ceil(dstDrawWidth);
   dstDrawHeight = std::ceil(dstDrawHeight);
