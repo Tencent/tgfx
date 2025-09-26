@@ -34,10 +34,6 @@ class GLCommandEncoder : public CommandEncoder {
 
   void generateMipmapsForTexture(std::shared_ptr<GPUTexture> texture) override;
 
-  std::shared_ptr<GPUFence> insertFence() override;
-
-  void waitForFence(std::shared_ptr<GPUFence> fence) override;
-
  protected:
   std::shared_ptr<RenderPass> onBeginRenderPass(const RenderPassDescriptor& descriptor) override;
 
