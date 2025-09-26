@@ -21,6 +21,7 @@
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Matrix.h"
+#include "tgfx/core/Matrix3D.h"
 #include "tgfx/core/TileMode.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/RuntimeEffect.h"
@@ -118,6 +119,14 @@ class ImageFilter {
    */
   static std::shared_ptr<ImageFilter> Runtime(std::shared_ptr<RuntimeEffect> effect);
 
+  /**
+   * Creates a filter that applies a perspective transformation to the input image.
+   * @param matrix 3D transformation matrix used to 3D model coordinates to destination coordinates
+   * for x and y before perspective division. The z value is mapped to the [-1, 1] range before
+   * perspective division; content outside this z range will be clipped.
+   */
+  static std::shared_ptr<ImageFilter> Transform3D(const Matrix3D& matrix);
+
   virtual ~ImageFilter() = default;
 
   /**
@@ -127,7 +136,7 @@ class ImageFilter {
   Rect filterBounds(const Rect& rect) const;
 
  protected:
-  enum class Type { Blur, DropShadow, InnerShadow, Color, Compose, Runtime };
+  enum class Type { Blur, DropShadow, InnerShadow, Color, Compose, Runtime, Transform3D };
 
   /**
    * Returns the type of this image filter.
@@ -174,4 +183,5 @@ class ImageFilter {
   friend class FilterImage;
   friend class Types;
 };
+
 }  // namespace tgfx
