@@ -23,7 +23,7 @@
 namespace tgfx {
 bool GLFence::isSignaled() const {
   if (_glSync == nullptr) {
-    return true;
+    return false;
   }
   auto gl = interface->functions();
   auto result = gl->clientWaitSync(_glSync, 0, 0);
