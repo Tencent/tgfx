@@ -43,7 +43,7 @@ void* GLBuffer::map() {
   auto bufferTarget = target();
   auto gl = _interface->functions();
   gl->bindBuffer(bufferTarget, _bufferID);
-  mappedAddress = gl->mapBufferRange(bufferTarget, 0, static_cast<int64_t>(_size),
+  mappedAddress = gl->mapBufferRange(bufferTarget, 0, static_cast<int32_t>(_size),
                                      GL_MAP_WRITE_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
   if (mappedAddress != nullptr) {
     isMapped = true;
