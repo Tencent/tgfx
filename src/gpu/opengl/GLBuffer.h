@@ -59,8 +59,6 @@ class GLBuffer : public GPUBuffer, public GLResource {
 
   void onRelease(GLGPU* gpu) override;
 
-
-
   friend class GLState;
 };
 }  // namespace tgfx

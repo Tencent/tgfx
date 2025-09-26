@@ -47,8 +47,8 @@ void* WebGLBuffer::map(GPU* gpu, size_t offset, size_t size) {
   if (bufferTarget == GL_UNIFORM_BUFFER) {
     auto uboOffsetAlignment = static_cast<size_t>(gpu->caps()->shaderCaps()->uboOffsetAlignment);
     if (uboOffsetAlignment <= 0 || offset % uboOffsetAlignment != 0) {
-      LOGE("WebGLBuffer::map() invalid UBO offset:%zu, must be aligned to %zu bytes",
-           offset, uboOffsetAlignment);
+      LOGE("WebGLBuffer::map() invalid UBO offset:%zu, must be aligned to %zu bytes", offset,
+           uboOffsetAlignment);
       return nullptr;
     }
   } else if (bufferTarget == GL_ELEMENT_ARRAY_BUFFER) {
