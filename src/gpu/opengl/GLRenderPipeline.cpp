@@ -66,7 +66,7 @@ void GLRenderPipeline::activate(GLGPU* gpu, bool depthReadOnly, bool stencilRead
   }
 }
 
-void GLRenderPipeline::setUniformBuffer(GLGPU* gpu, unsigned binding, GPUBuffer* buffer,
+void GLRenderPipeline::setUniformBuffer(GLGPU* gpu, unsigned binding, const std::shared_ptr<GPUBuffer>& buffer,
                                         size_t offset, size_t size) {
   if (gpu == nullptr || buffer == nullptr || size == 0) {
     return;
@@ -74,7 +74,7 @@ void GLRenderPipeline::setUniformBuffer(GLGPU* gpu, unsigned binding, GPUBuffer*
 
   auto gl = gpu->functions();
   if (gpu->caps()->shaderCaps()->uboSupport) {
-    unsigned ubo = static_cast<GLBuffer*>(buffer)->bufferID();
+    unsigned ubo = std::static_pointer_cast<GLBuffer>(buffer)->bufferID();
     if (ubo == 0) {
       LOGE("GLRenderPipeline::setUniformBuffer error, uniform buffer id is 0");
       return;
@@ -89,7 +89,7 @@ void GLRenderPipeline::setUniformBuffer(GLGPU* gpu, unsigned binding, GPUBuffer*
       return;
     }
 
-    auto fakeUniformBuffer = static_cast<FakeUniformBuffer*>(buffer);
+    auto fakeUniformBuffer = std::static_pointer_cast<FakeUniformBuffer>(buffer);
     DEBUG_ASSERT(fakeUniformBuffer != nullptr);
     auto data = reinterpret_cast<uint8_t*>(const_cast<void*>(fakeUniformBuffer->data())) + offset;
 

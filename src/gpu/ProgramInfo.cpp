@@ -220,7 +220,7 @@ void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, PipelineProgram
       }
       program->uniformBuffer->unmap(gpu);
 
-      renderPass->setUniformBuffer(VERTEX_UBO_BINDING_POINT, program->uniformBuffer.get(),
+      renderPass->setUniformBuffer(VERTEX_UBO_BINDING_POINT, program->uniformBuffer,
                                    program->uniformBufferBaseOffset, vertexUniformData->size());
       fragmentUniformOffset =
           AlignTo(vertexUniformData->size(),
@@ -236,7 +236,7 @@ void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, PipelineProgram
       }
       program->uniformBuffer->unmap(gpu);
 
-      renderPass->setUniformBuffer(FRAGMENT_UBO_BINDING_POINT, program->uniformBuffer.get(),
+      renderPass->setUniformBuffer(FRAGMENT_UBO_BINDING_POINT, program->uniformBuffer,
                                    program->uniformBufferBaseOffset + fragmentUniformOffset,
                                    fragmentUniformData->size());
     }
@@ -250,7 +250,7 @@ void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, PipelineProgram
       }
       program->uniformBuffer->unmap(gpu);
 
-      renderPass->setUniformBuffer(VERTEX_UBO_BINDING_POINT, program->uniformBuffer.get(),
+      renderPass->setUniformBuffer(VERTEX_UBO_BINDING_POINT, program->uniformBuffer,
                                    program->uniformBufferBaseOffset, vertexUniformData->size());
       fragmentUniformOffset = vertexUniformData->size();
     }
@@ -262,7 +262,7 @@ void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, PipelineProgram
         memcpy(buffer, fragmentUniformData->data(), fragmentUniformData->size());
       }
       program->uniformBuffer->unmap(gpu);
-      renderPass->setUniformBuffer(FRAGMENT_UBO_BINDING_POINT, program->uniformBuffer.get(),
+      renderPass->setUniformBuffer(FRAGMENT_UBO_BINDING_POINT, program->uniformBuffer,
                                    program->uniformBufferBaseOffset + fragmentUniformOffset,
                                    fragmentUniformData->size());
     }

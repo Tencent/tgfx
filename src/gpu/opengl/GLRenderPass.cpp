@@ -96,7 +96,7 @@ void GLRenderPass::setPipeline(std::shared_ptr<RenderPipeline> pipeline) {
   }
 }
 
-void GLRenderPass::setUniformBuffer(unsigned binding, GPUBuffer* buffer, size_t offset,
+void GLRenderPass::setUniformBuffer(unsigned binding, const std::shared_ptr<GPUBuffer> &buffer, size_t offset,
                                     size_t size) {
   if (renderPipeline == nullptr) {
     LOGE("GLRenderPass::setUniformBuffer: renderPipeline is nullptr!");
