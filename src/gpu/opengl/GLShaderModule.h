@@ -18,11 +18,11 @@
 
 #pragma once
 
-#include "gpu/GPUShaderModule.h"
+#include "gpu/ShaderModule.h"
 #include "gpu/opengl/GLResource.h"
 
 namespace tgfx {
-class GLShaderModule : public GPUShaderModule, public GLResource {
+class GLShaderModule : public ShaderModule, public GLResource {
  public:
   explicit GLShaderModule(unsigned shader) : _shader(shader) {
   }

@@ -173,21 +173,21 @@ std::shared_ptr<PipelineProgram> GLSLProgramBuilder::finalize() {
   }
   finalizeShaders();
   auto gpu = context->gpu();
-  GPUShaderModuleDescriptor vertexModule = {};
+  ShaderModuleDescriptor vertexModule = {};
   vertexModule.code = vertexShaderBuilder()->shaderString();
   vertexModule.stage = ShaderStage::Vertex;
   auto vertexShader = gpu->createShaderModule(vertexModule);
   if (vertexShader == nullptr) {
     return nullptr;
   }
-  GPUShaderModuleDescriptor fragmentModule = {};
+  ShaderModuleDescriptor fragmentModule = {};
   fragmentModule.code = fragmentShaderBuilder()->shaderString();
   fragmentModule.stage = ShaderStage::Fragment;
   auto fragmentShader = gpu->createShaderModule(fragmentModule);
   if (fragmentShader == nullptr) {
     return nullptr;
   }
-  GPURenderPipelineDescriptor descriptor = {};
+  RenderPipelineDescriptor descriptor = {};
   descriptor.vertex = {programInfo->getVertexAttributes()};
   descriptor.vertex.module = vertexShader;
   descriptor.fragment.module = fragmentShader;

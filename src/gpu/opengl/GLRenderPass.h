@@ -36,7 +36,7 @@ class GLRenderPass : public RenderPass {
 
   void setScissorRect(int x, int y, int width, int height) override;
 
-  void setPipeline(std::shared_ptr<GPURenderPipeline> pipeline) override;
+  void setPipeline(std::shared_ptr<RenderPipeline> pipeline) override;
 
   void setUniformBytes(unsigned binding, const void* data, size_t size) override;
 
