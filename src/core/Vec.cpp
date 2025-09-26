@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/core/MathVector.h"
+#include "tgfx/core/Vec.h"
 #include "core/utils/MathExtra.h"
 #include "utils/Log.h"
 

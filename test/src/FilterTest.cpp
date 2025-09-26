@@ -854,10 +854,10 @@ TGFX_TEST(FilterTest, Transform3DImageFilter) {
     constexpr float shift = 10.f;
     const float nearZ = eyeDistance - shift;
     const float m22 = (2 - (farZ + nearZ) / eyeDistance) / (farZ - nearZ);
-    cssPerspectiveMatrix.setRowCol(2, 2, m22);
-    const float m23 = -1.f + nearZ / eyeDistance - cssPerspectiveMatrix.getRowCol(2, 2) * nearZ;
-    cssPerspectiveMatrix.setRowCol(2, 3, m23);
-    cssPerspectiveMatrix.setRowCol(3, 2, -1.f / eyeDistance);
+    cssPerspectiveMatrix.setRowColumn(2, 2, m22);
+    const float m23 = -1.f + nearZ / eyeDistance - cssPerspectiveMatrix.getRowColumn(2, 2) * nearZ;
+    cssPerspectiveMatrix.setRowColumn(2, 3, m23);
+    cssPerspectiveMatrix.setRowColumn(3, 2, -1.f / eyeDistance);
 
     auto modelMatrix = Matrix3D::MakeRotate({0.f, 1.f, 0.f}, 45.f);
     modelMatrix.postTranslate(0.f, 0.f, -100.f);
@@ -903,6 +903,20 @@ TGFX_TEST(FilterTest, Transform3DImageFilter) {
   auto standardTransform = standardvViewportMatrix * perspectiveMatrix * viewMatrix * modelMatrix *
                            invStandardViewportMatrix;
   auto standardTransform3DFilter = ImageFilter::Transform3D(standardTransform);
+
+  // Test scale drawing with standard perspective type.
+  {
+    canvas->save();
+    canvas->clear();
+
+    auto filteredImage = image->makeWithFilter(standardTransform3DFilter);
+    canvas->setMatrix(Matrix::MakeScale(0.5f, 0.5f));
+    canvas->drawImage(filteredImage, 45.f, 45.f, {});
+
+    context->flushAndSubmit();
+    EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/Transorm3DImageFilterStandardScale"));
+    canvas->restore();
+  }
 
   // Test basic drawing with standard perspective type.
   {
