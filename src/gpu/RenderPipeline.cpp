@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GPURenderPipeline.h"
+#include "RenderPipeline.h"
 
 namespace tgfx {
 VertexDescriptor::VertexDescriptor(std::vector<Attribute> attribs, size_t stride)

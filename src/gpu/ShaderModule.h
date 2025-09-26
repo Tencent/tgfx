@@ -23,12 +23,12 @@
 
 namespace tgfx {
 /**
- * GPUShaderModuleDescriptor describes the properties required to create a GPUShaderModule.
+ * ShaderModuleDescriptor describes the properties required to create a ShaderModule.
  */
-class GPUShaderModuleDescriptor {
+class ShaderModuleDescriptor {
  public:
   /**
-   * The shader code to be compiled into a GPUShaderModule.
+   * The shader code to be compiled into a ShaderModule.
    */
   std::string code;
 
@@ -40,11 +40,11 @@ class GPUShaderModuleDescriptor {
 };
 
 /**
- * GPUShaderModule is an internal object that serves as a container for shader code，allowing it to
+ * ShaderModule is an internal object that serves as a container for shader code，allowing it to
  * be submitted to the GPU for execution within a pipeline.
  */
-class GPUShaderModule {
+class ShaderModule {
  public:
-  virtual ~GPUShaderModule() = default;
+  virtual ~ShaderModule() = default;
 };
 }  // namespace tgfx
