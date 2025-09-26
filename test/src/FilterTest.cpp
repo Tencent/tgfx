@@ -904,6 +904,20 @@ TGFX_TEST(FilterTest, Transform3DImageFilter) {
                            invStandardViewportMatrix;
   auto standardTransform3DFilter = ImageFilter::Transform3D(standardTransform);
 
+  // Test scale drawing with standard perspective type.
+  {
+    canvas->save();
+    canvas->clear();
+
+    auto filteredImage = image->makeWithFilter(standardTransform3DFilter);
+    canvas->setMatrix(Matrix::MakeScale(0.5f, 0.5f));
+    canvas->drawImage(filteredImage, 45.f, 45.f, {});
+
+    context->flushAndSubmit();
+    EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/Transorm3DImageFilterStandardScale"));
+    canvas->restore();
+  }
+
   // Test basic drawing with standard perspective type.
   {
     canvas->save();

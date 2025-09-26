@@ -20,9 +20,9 @@
 
 namespace tgfx {
 
-#define UNIFORM_TRANSFORM_MATRIX_NAME "transformMatrix"
-#define UNIFORM_NDC_SCALE_NAME "ndcScale"
-#define UNIFORM_NDC_OFFSET_NAME "ndcOffset"
+static constexpr const char* UniformTransformMatrixName = "transformMatrix";
+static constexpr const char* UniformNdcScaleName = "ndcScale";
+static constexpr const char* UniformNdcOffsetName = "ndcOffset";
 
 PlacementPtr<Transform3DGeometryProcessor> Transform3DGeometryProcessor::Make(
     BlockBuffer* buffer, AAType aa, const Matrix3D& matrix, const Vec2& ndcScale,
@@ -60,14 +60,14 @@ void GLSLQuadPerEdgeAA3DGeometryProcessor::emitCode(EmitArgs& args) const {
       uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
   fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
   auto transformMatrixName = uniformHandler->addUniform(
-      UNIFORM_TRANSFORM_MATRIX_NAME, UniformFormat::Float4x4, ShaderStage::Vertex);
+      UniformTransformMatrixName, UniformFormat::Float4x4, ShaderStage::Vertex);
   args.vertBuilder->codeAppendf("vec4 clipPoint = %s * vec4(%s, 0.0, 1.0);",
                                 transformMatrixName.c_str(), position.name().c_str());
-  auto ndcScaleName = uniformHandler->addUniform(UNIFORM_NDC_SCALE_NAME, UniformFormat::Float2,
-                                                 ShaderStage::Vertex);
+  auto ndcScaleName =
+      uniformHandler->addUniform(UniformNdcScaleName, UniformFormat::Float2, ShaderStage::Vertex);
   args.vertBuilder->codeAppendf("vec4 clipScale = vec4(%s.xy, 1.0, 1.0);", ndcScaleName.c_str());
-  auto ndcOffsetName = uniformHandler->addUniform(UNIFORM_NDC_OFFSET_NAME, UniformFormat::Float2,
-                                                  ShaderStage::Vertex);
+  auto ndcOffsetName =
+      uniformHandler->addUniform(UniformNdcOffsetName, UniformFormat::Float2, ShaderStage::Vertex);
   args.vertBuilder->codeAppendf("vec4 clipOffset = vec4((%s * clipPoint.w).xy, 0.0, 0.0);",
                                 ndcOffsetName.c_str());
   args.vertBuilder->codeAppend("gl_Position = clipPoint * clipScale + clipOffset;");

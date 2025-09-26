@@ -19,7 +19,7 @@
 #pragma once
 
 #include <cstring>
-#include "MathVector.h"
+#include "Vec.h"
 #include "tgfx/core/Rect.h"
 
 namespace tgfx {
