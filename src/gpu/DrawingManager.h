@@ -67,15 +67,11 @@ class DrawingManager {
   void addAtlasCellCodecTask(const std::shared_ptr<TextureProxy>& textureProxy,
                              const Point& atlasOffset, std::shared_ptr<ImageCodec> codec);
 
-  void addGPUFenceWaitTask(std::shared_ptr<GPUFence> fence);
-
   /**
-   * Flushes the drawing manager, executing all resource and render tasks. If signalSemaphore is not
-   * null and uninitialized, a new semaphore will be created and assigned to signalSemaphore after
-   * the flush is complete. Returns nullptr if there are no tasks to execute, in which case the
-   * signalSemaphore will not be created.
+   * Flushes all recorded tasks and returns a CommandBuffer containing the GPU commands. If no tasks
+   * were recorded, returns nullptr.
    */
-  std::shared_ptr<CommandBuffer> flush(BackendSemaphore* signalSemaphore);
+  std::shared_ptr<CommandBuffer> flush();
 
  private:
   Context* context = nullptr;

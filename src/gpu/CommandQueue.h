@@ -21,6 +21,7 @@
 #include <memory>
 #include "gpu/CommandBuffer.h"
 #include "gpu/GPUBuffer.h"
+#include "gpu/GPUFence.h"
 #include "gpu/GPUTexture.h"
 
 namespace tgfx {
@@ -69,8 +70,21 @@ class CommandQueue {
   virtual void submit(std::shared_ptr<CommandBuffer> commandBuffer) = 0;
 
   /**
-   * Blocks the current thread until all previously submitted commands in this queue have
-   * completed execution on the GPU.
+   * Inserts a GPU fence into the command queue. The fence can be used to synchronize CPU and GPU
+   * operations, allowing you to check or wait for the completion of previously submitted GPU
+   * commands. Returns a shared pointer to the GPUFence, or nullptr if fence insertion failed.
+   */
+  virtual std::shared_ptr<GPUFence> insertFence() = 0;
+
+  /**
+   * Inserts a GPU wait operation into the command queue, making the GPU wait until the specified
+   * fence is signaled before executing subsequent commands.
+   */
+  virtual void waitForFence(std::shared_ptr<GPUFence> fence) = 0;
+
+  /**
+   * Blocks the current thread until all previously submitted commands in this queue have completed
+   * execution on the GPU.
    */
   virtual void waitUntilCompleted() = 0;
 };

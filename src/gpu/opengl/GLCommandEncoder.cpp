@@ -101,29 +101,6 @@ void GLCommandEncoder::generateMipmapsForTexture(std::shared_ptr<GPUTexture> tex
   gl->generateMipmap(glTexture->target());
 }
 
-std::shared_ptr<GPUFence> GLCommandEncoder::insertFence() {
-  if (!gpu->caps()->semaphoreSupport) {
-    return nullptr;
-  }
-  auto gl = gpu->functions();
-  auto glSync = gl->fenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-  if (glSync == nullptr) {
-    return nullptr;
-  }
-  // If we inserted semaphores during the flush, we need to call glFlush.
-  gl->flush();
-  return gpu->makeResource<GLFence>(glSync);
-}
-
-void GLCommandEncoder::waitForFence(std::shared_ptr<GPUFence> fence) {
-  if (fence == nullptr) {
-    return;
-  }
-  auto gl = gpu->functions();
-  auto glSync = std::static_pointer_cast<GLFence>(fence)->glSync();
-  gl->waitSync(glSync, 0, GL_TIMEOUT_IGNORED);
-}
-
 std::shared_ptr<CommandBuffer> GLCommandEncoder::onFinish() {
   // In OpenGL, we don't have a specific command buffer to return, so we just return an empty one.
   return std::make_shared<CommandBuffer>();
