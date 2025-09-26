@@ -58,6 +58,11 @@ std::shared_ptr<GPUBuffer> GLGPU::createBuffer(size_t size, uint32_t usage) {
     LOGE("GLGPU::createBuffer() invalid buffer usage!");
     return nullptr;
   }
+
+  if (!interface->caps()->shaderCaps()->uboSupport && (usage & GPUBufferUsage::UNIFORM)) {
+    return std::make_shared<GLUniformBuffer>(size);
+  }
+
   auto gl = interface->functions();
   unsigned bufferID = 0;
   gl->genBuffers(1, &bufferID);
@@ -67,9 +72,6 @@ std::shared_ptr<GPUBuffer> GLGPU::createBuffer(size_t size, uint32_t usage) {
   gl->bindBuffer(target, bufferID);
   gl->bufferData(target, static_cast<GLsizeiptr>(size), nullptr, GL_STATIC_DRAW);
   gl->bindBuffer(target, 0);
-  if (!interface->caps()->shaderCaps()->uboSupport && (usage & GPUBufferUsage::UNIFORM)) {
-    return std::make_shared<GLUniformBuffer>(size);
-  }
   return makeResource<GLBuffer>(interface, bufferID, size, usage);
 }
 

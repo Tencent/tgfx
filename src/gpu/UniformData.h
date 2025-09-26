@@ -42,28 +42,30 @@ class UniformData {
    * by name.
    */
   template <typename T>
-  std::enable_if_t<std::is_trivially_copyable_v<T> && !std::is_pointer_v<T>, void> setData(
-      const std::string& name, const T& value) {
+  std::enable_if_t<std::is_trivially_copyable_v<T> && !std::is_pointer_v<T> &&
+                 !std::is_same_v<std::decay_t<T>, Matrix>, void> setData(
+      const std::string& name, const T& value) const {
     onSetData(name, &value, sizeof(value));
   }
 
   /**
    * Convenience method for copying a Matrix to a 3x3 matrix in column-major order.
    */
-  void setData(const std::string& name, const Matrix& matrix);
+  void setData(const std::string& name, const Matrix& matrix) const;
 
   /**
-   * Returns a pointer to the start of the uniform data in memory.
+   * Sets an external memory buffer for writing uniform data.
+   * On platforms with UBO support, the buffer points to memory mapped from a GPU UBO object.
+   * On platforms without UBO support, the buffer points to CPU memory.
+   * bufferBaseOffset specifies the starting offset in bytes within the buffer.
    */
-  const void* data() const {
-    return buffer.data();
-  }
+  void setBuffer(void *buffer, size_t bufferBaseOffset);
 
   /**
    * Returns the size of the uniform data in bytes.
    */
   size_t size() const {
-    return buffer.size();
+    return bufferSize;
   }
 
   /**
@@ -94,7 +96,8 @@ class UniformData {
     size_t align;
   };
 
-  std::vector<uint8_t> buffer = {};
+  uint8_t* _buffer = nullptr;
+  size_t bufferSize = 0;
   std::vector<Uniform> _uniforms = {};
   std::string nameSuffix = "";
   std::unordered_map<std::string, Field> fieldMap = {};
@@ -103,7 +106,7 @@ class UniformData {
 
   explicit UniformData(std::vector<Uniform> uniforms, bool uboSupport = false);
 
-  void onSetData(const std::string& name, const void* data, size_t size);
+  void onSetData(const std::string& name, const void* data, size_t size) const;
 
   const Field* findField(const std::string& key) const;
 

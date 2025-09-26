@@ -351,6 +351,9 @@ void GLCaps::initWebGLSupport(const GLInfo& info) {
   _shaderCaps.frameBufferFetchSupport = false;
   _shaderCaps.usesPrecisionModifiers = true;
 
+  // WebGL does not support glMapBufferRange, and updating UBOs with glBufferSubData is inefficient.
+  // Therefore, UBO support is disabled by default and will be enabled after performance optimizations.
+#if 0
   _shaderCaps.uboSupport = version >= GL_VER(2, 0);
   if (_shaderCaps.uboSupport) {
     info.getIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &_shaderCaps.maxUBOSize);
@@ -358,6 +361,7 @@ void GLCaps::initWebGLSupport(const GLInfo& info) {
 
     info.getIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &_shaderCaps.uboOffsetAlignment);
   }
+#endif
 }
 
 void GLCaps::initFormatMap(const GLInfo& info) {

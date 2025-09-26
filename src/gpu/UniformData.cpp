@@ -43,12 +43,10 @@ UniformData::UniformData(std::vector<Uniform> uniforms, bool uboSupport)
     }
   }
 
-  if (const size_t size = alignCursor(_uboSupport ? 16 : 1); size > 0) {
-    buffer.resize(size);
-  }
+  bufferSize = alignCursor(_uboSupport ? 16 : 1);
 }
 
-void UniformData::setData(const std::string& name, const Matrix& matrix) {
+void UniformData::setData(const std::string& name, const Matrix& matrix) const {
   float values[6] = {};
   matrix.get6(values);
 
@@ -73,7 +71,11 @@ void UniformData::setData(const std::string& name, const Matrix& matrix) {
   }
 }
 
-void UniformData::onSetData(const std::string& name, const void* data, size_t size) {
+void UniformData::setBuffer(void *buffer, size_t bufferBaseOffset) {
+  _buffer = static_cast<uint8_t*>(buffer) + bufferBaseOffset;
+}
+
+void UniformData::onSetData(const std::string& name, const void* data, size_t size) const {
   const auto& key = name + nameSuffix;
   auto field = findField(key);
 
@@ -83,7 +85,7 @@ void UniformData::onSetData(const std::string& name, const void* data, size_t si
   }
   DEBUG_ASSERT(field->size == size);
 
-  memcpy(buffer.data() + field->offset, data, size);
+  memcpy(_buffer + field->offset, data, size);
 }
 
 const UniformData::Field* UniformData::findField(const std::string& key) const {

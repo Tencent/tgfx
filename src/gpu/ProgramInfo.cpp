@@ -135,9 +135,11 @@ std::shared_ptr<Program> ProgramInfo::getProgram() const {
   if (pipelineProgram != nullptr) {
     if (pipelineProgram->vertexUniformData != nullptr && pipelineProgram->vertexUniformData->size() > 0) {
       pipelineProgram->vertexUniformBuffer = context->globalCache()->findOrCreateUniformBuffer(pipelineProgram->vertexUniformData->size(), &pipelineProgram->vertexUniformBufferOffset);
+      pipelineProgram->vertexUniformData->setBuffer(pipelineProgram->vertexUniformBuffer->map(), pipelineProgram->vertexUniformBufferOffset);
     }
     if (pipelineProgram->fragmentUniformData != nullptr && pipelineProgram->fragmentUniformData->size() > 0) {
       pipelineProgram->fragmentUniformBuffer = context->globalCache()->findOrCreateUniformBuffer(pipelineProgram->fragmentUniformData->size(), &pipelineProgram->fragmentUniformBufferOffset);
+      pipelineProgram->fragmentUniformData->setBuffer(pipelineProgram->fragmentUniformBuffer->map(), pipelineProgram->fragmentUniformBufferOffset);
     }
   }
 
@@ -185,22 +187,14 @@ void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, PipelineProgram
   processor->setData(vertexUniformData, fragmentUniformData);
   updateUniformDataSuffix(vertexUniformData, fragmentUniformData, nullptr);
 
-  if (vertexUniformData != nullptr) {
-    auto buffer = static_cast<uint8_t*>(program->vertexUniformBuffer->map());
-    if (buffer != nullptr) {
-      memcpy(buffer + program->vertexUniformBufferOffset, vertexUniformData->data(), vertexUniformData->size());
-    }
+  if (vertexUniformData != nullptr && program->vertexUniformBuffer != nullptr) {
     program->vertexUniformBuffer->unmap();
 
     renderPass->setUniformBuffer(VERTEX_UBO_BINDING_POINT, program->vertexUniformBuffer,
                                  program->vertexUniformBufferOffset, vertexUniformData->size());
   }
 
-  if (fragmentUniformData != nullptr) {
-    auto buffer = static_cast<uint8_t*>(program->fragmentUniformBuffer->map());
-    if (buffer != nullptr) {
-      memcpy(buffer + program->fragmentUniformBufferOffset, fragmentUniformData->data(), fragmentUniformData->size());
-    }
+  if (fragmentUniformData != nullptr && program->fragmentUniformBuffer != nullptr) {
     program->fragmentUniformBuffer->unmap();
 
     renderPass->setUniformBuffer(FRAGMENT_UBO_BINDING_POINT, program->fragmentUniformBuffer,

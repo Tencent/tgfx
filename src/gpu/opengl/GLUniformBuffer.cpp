@@ -30,12 +30,14 @@ GLUniformBuffer::~GLUniformBuffer() {
 }
 
 void* GLUniformBuffer::map() {
-  mappedAddress = malloc(_size);
+  if (mappedAddress == nullptr) {
+    mappedAddress = malloc(_size);
+  }
   return mappedAddress;
 }
 
 void GLUniformBuffer::unmap() {
-
+  // Do nothing here.
 }
 
 void GLUniformBuffer::releaseInternal() {
