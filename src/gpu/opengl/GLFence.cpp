@@ -21,12 +21,30 @@
 #include "tgfx/gpu/opengl/GLFunctions.h"
 
 namespace tgfx {
-BackendSemaphore GLFence::getBackendSemaphore() const {
+bool GLFence::isSignaled() const {
+  if (_glSync == nullptr) {
+    return true;
+  }
+  auto gl = interface->functions();
+  auto result = gl->clientWaitSync(_glSync, 0, 0);
+  return result == GL_ALREADY_SIGNALED || result == GL_CONDITION_SATISFIED;
+}
+
+void GLFence::waitOnCPU() {
+  if (_glSync == nullptr) {
+    return;
+  }
+  auto gl = interface->functions();
+  gl->clientWaitSync(_glSync, 0, GL_TIMEOUT_IGNORED);
+}
+
+BackendSemaphore GLFence::stealBackendSemaphore() {
   if (_glSync == nullptr) {
     return {};
   }
   GLSyncInfo glSyncInfo = {};
   glSyncInfo.sync = _glSync;
+  _glSync = nullptr;
   return {glSyncInfo};
 }
 

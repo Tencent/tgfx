@@ -39,6 +39,10 @@ class GLCommandQueue : public CommandQueue {
 
   void submit(std::shared_ptr<CommandBuffer>) override;
 
+  std::shared_ptr<GPUFence> insertFence() override;
+
+  void waitForFence(std::shared_ptr<GPUFence> fence) override;
+
   void waitUntilCompleted() override;
 
  private:

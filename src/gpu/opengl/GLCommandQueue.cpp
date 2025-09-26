@@ -20,6 +20,7 @@
 #include "GLTexture.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "gpu/opengl/GLBuffer.h"
+#include "gpu/opengl/GLFence.h"
 #include "gpu/opengl/GLGPU.h"
 #include "gpu/opengl/GLUtil.h"
 #include "tgfx/core/Buffer.h"
@@ -156,6 +157,29 @@ void GLCommandQueue::submit(std::shared_ptr<CommandBuffer>) {
   gl->flush();
   // Reset GL state every frame to avoid interference from external GL calls.
   gpu->resetGLState();
+}
+
+std::shared_ptr<GPUFence> GLCommandQueue::insertFence() {
+  if (!gpu->caps()->semaphoreSupport) {
+    return nullptr;
+  }
+  auto gl = gpu->functions();
+  auto glSync = gl->fenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+  if (glSync == nullptr) {
+    return nullptr;
+  }
+  // If we inserted semaphores during the flush, we need to call glFlush.
+  gl->flush();
+  return gpu->makeResource<GLFence>(gpu->interface, glSync);
+}
+
+void GLCommandQueue::waitForFence(std::shared_ptr<GPUFence> fence) {
+  if (fence == nullptr) {
+    return;
+  }
+  auto gl = gpu->functions();
+  auto glSync = std::static_pointer_cast<GLFence>(fence)->glSync();
+  gl->waitSync(glSync, 0, GL_TIMEOUT_IGNORED);
 }
 
 void GLCommandQueue::waitUntilCompleted() {

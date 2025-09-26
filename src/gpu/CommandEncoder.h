@@ -61,19 +61,6 @@ class CommandEncoder {
   virtual void generateMipmapsForTexture(std::shared_ptr<GPUTexture> texture) = 0;
 
   /**
-   * Inserts a signal GPUFence into the command encoder. This is used to notify other
-   * synchronization points once the preceding GPU commands have finished executing. Returns nullptr
-   * if the GPUFence cannot be created or inserted.
-   */
-  virtual std::shared_ptr<GPUFence> insertFence() = 0;
-
-  /**
-   * Makes subsequent commands added to the command encoder to wait until the specified GPUFence is
-   * signaled.
-   */
-  virtual void waitForFence(std::shared_ptr<GPUFence> fence) = 0;
-
-  /**
    * Finalizes command encoding and returns a CommandBuffer with all recorded commands. You can then
    * submit the CommandBuffer to the GPU for execution using GPU::submit(). Returns nullptr if no
    * commands were recorded or if encoding failed, for example, if an active render pass was not

@@ -65,16 +65,22 @@ bool Context::wait(const BackendSemaphore& waitSemaphore) {
   if (fence == nullptr) {
     return false;
   }
-  _drawingManager->addGPUFenceWaitTask(std::move(fence));
+  gpu()->queue()->waitForFence(std::move(fence));
   return true;
 }
 
 bool Context::flush(BackendSemaphore* signalSemaphore) {
   _resourceCache->processUnreferencedResources();
   _atlasManager->preFlush();
-  commandBuffer = _drawingManager->flush(signalSemaphore);
+  commandBuffer = _drawingManager->flush();
   if (commandBuffer == nullptr) {
     return false;
+  }
+  if (signalSemaphore != nullptr) {
+    auto fence = gpu()->queue()->insertFence();
+    if (fence != nullptr) {
+      *signalSemaphore = fence->stealBackendSemaphore();
+    }
   }
   _atlasManager->postFlush();
   _proxyProvider->purgeExpiredProxies();

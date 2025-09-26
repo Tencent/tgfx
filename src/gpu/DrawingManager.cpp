@@ -23,7 +23,6 @@
 #include "core/AtlasManager.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
-#include "gpu/tasks/GPUFenceWaitTask.h"
 #include "gpu/tasks/GenerateMipmapsTask.h"
 #include "gpu/tasks/RenderTargetCopyTask.h"
 #include "gpu/tasks/RuntimeDrawTask.h"
@@ -178,15 +177,7 @@ void DrawingManager::addAtlasCellCodecTask(const std::shared_ptr<TextureProxy>& 
   atlasCellCodecTasks.emplace_back(std::move(task));
 }
 
-void DrawingManager::addGPUFenceWaitTask(std::shared_ptr<GPUFence> fence) {
-  if (fence == nullptr) {
-    return;
-  }
-  auto task = drawingBuffer->make<SemaphoreWaitTask>(std::move(fence));
-  renderTasks.emplace_back(std::move(task));
-}
-
-std::shared_ptr<CommandBuffer> DrawingManager::flush(BackendSemaphore* signalSemaphore) {
+std::shared_ptr<CommandBuffer> DrawingManager::flush() {
   TASK_MARK(tgfx::inspect::OpTaskType::Flush);
   while (!compositors.empty()) {
     auto compositor = compositors.back();
@@ -222,13 +213,6 @@ std::shared_ptr<CommandBuffer> DrawingManager::flush(BackendSemaphore* signalSem
     }
   }
   renderTasks.clear();
-
-  if (signalSemaphore != nullptr) {
-    auto fence = commandEncoder->insertFence();
-    if (fence != nullptr) {
-      *signalSemaphore = fence->getBackendSemaphore();
-    }
-  }
   return commandEncoder->finish();
 }
 
