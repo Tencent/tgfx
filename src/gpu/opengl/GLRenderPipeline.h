@@ -56,11 +56,6 @@ class GLRenderPipeline : public GPURenderPipeline, public GLResource {
   void activate(GLGPU* gpu, bool depthReadOnly, bool stencilReadOnly, unsigned stencilReference);
 
   /**
-   * Sets the uniform data to a specified binding index.
-   */
-  void setUniformBytes(GLGPU* gpu, unsigned binding, const void* data, size_t size);
-
-  /**
    * Sets a uniform buffer to a specified binding index.
    */
   void setUniformBuffer(GLGPU* gpu, unsigned binding, GPUBuffer* buffer, size_t offset,

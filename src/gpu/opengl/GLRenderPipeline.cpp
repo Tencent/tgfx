@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLRenderPipeline.h"
+
+#include "FakeUniformBuffer.h"
 #include "gpu/UniformData.h"
 #include "gpu/opengl/GLGPU.h"
 #include "gpu/opengl/GLUtil.h"
@@ -65,78 +67,81 @@ void GLRenderPipeline::activate(GLGPU* gpu, bool depthReadOnly, bool stencilRead
   }
 }
 
-void GLRenderPipeline::setUniformBytes(GLGPU* gpu, unsigned binding, const void* data,
-                                       size_t size) {
-  if (data == nullptr || size == 0) {
-    return;
-  }
-  auto result = uniformBlocks.find(binding);
-  if (result == uniformBlocks.end()) {
-    LOGE("GLRenderPipeline::setUniformBytesForUBO: binding %d not found", binding);
-    return;
-  }
-  auto& uniforms = result->second;
-  auto gl = gpu->functions();
-  auto buffer = reinterpret_cast<uint8_t*>(const_cast<void*>(data));
-  for (auto& uniform : uniforms) {
-    auto uniformData = buffer + uniform.offset;
-    switch (uniform.format) {
-      case UniformFormat::Float:
-        gl->uniform1fv(uniform.location, 1, reinterpret_cast<float*>(uniformData));
-        break;
-      case UniformFormat::Float2:
-        gl->uniform2fv(uniform.location, 1, reinterpret_cast<float*>(uniformData));
-        break;
-      case UniformFormat::Float3:
-        gl->uniform3fv(uniform.location, 1, reinterpret_cast<float*>(uniformData));
-        break;
-      case UniformFormat::Float4:
-        gl->uniform4fv(uniform.location, 1, reinterpret_cast<float*>(uniformData));
-        break;
-      case UniformFormat::Float2x2:
-        gl->uniformMatrix2fv(uniform.location, 1, GL_FALSE, reinterpret_cast<float*>(uniformData));
-        break;
-      case UniformFormat::Float3x3:
-        gl->uniformMatrix3fv(uniform.location, 1, GL_FALSE, reinterpret_cast<float*>(uniformData));
-        break;
-      case UniformFormat::Float4x4:
-        gl->uniformMatrix4fv(uniform.location, 1, GL_FALSE, reinterpret_cast<float*>(uniformData));
-        break;
-      case UniformFormat::Int:
-        gl->uniform1iv(uniform.location, 1, reinterpret_cast<int*>(uniformData));
-        break;
-      case UniformFormat::Int2:
-        gl->uniform2iv(uniform.location, 1, reinterpret_cast<int*>(uniformData));
-        break;
-      case UniformFormat::Int3:
-        gl->uniform3iv(uniform.location, 1, reinterpret_cast<int*>(uniformData));
-        break;
-      case UniformFormat::Int4:
-        gl->uniform4iv(uniform.location, 1, reinterpret_cast<int*>(uniformData));
-        break;
-      case UniformFormat::Texture2DSampler:
-      case UniformFormat::TextureExternalSampler:
-      case UniformFormat::Texture2DRectSampler:
-        gl->uniform1iv(uniform.location, 1, reinterpret_cast<int*>(uniformData));
-        break;
-    }
-  }
-}
-
 void GLRenderPipeline::setUniformBuffer(GLGPU* gpu, unsigned binding, GPUBuffer* buffer,
                                         size_t offset, size_t size) {
   if (gpu == nullptr || buffer == nullptr || size == 0) {
     return;
   }
 
-  unsigned ubo = static_cast<GLBuffer*>(buffer)->bufferID();
-  if (ubo <= 0) {
-    return;
-  }
-
   auto gl = gpu->functions();
-  gl->bindBufferRange(GL_UNIFORM_BUFFER, binding, ubo, static_cast<int32_t>(offset),
-                      static_cast<int32_t>(size));
+  if (gpu->caps()->shaderCaps()->uboSupport) {
+    unsigned ubo = static_cast<GLBuffer*>(buffer)->bufferID();
+    if (ubo == 0) {
+      LOGE("GLRenderPipeline::setUniformBuffer error, uniform buffer id is 0");
+      return;
+    }
+
+    gl->bindBufferRange(GL_UNIFORM_BUFFER, binding, ubo, static_cast<int32_t>(offset),
+                        static_cast<int32_t>(size));
+  } else {
+    auto result = uniformBlocks.find(binding);
+    if (result == uniformBlocks.end()) {
+      LOGE("GLRenderPipeline::setUniformBuffer: binding %d not found", binding);
+      return;
+    }
+
+    auto fakeUniformBuffer = static_cast<FakeUniformBuffer*>(buffer);
+    DEBUG_ASSERT(fakeUniformBuffer != nullptr);
+    auto data = reinterpret_cast<uint8_t*>(const_cast<void*>(fakeUniformBuffer->data())) + offset;
+
+    auto& uniforms = result->second;
+    for (auto& uniform : uniforms) {
+      auto uniformData = data + uniform.offset;
+      switch (uniform.format) {
+        case UniformFormat::Float:
+          gl->uniform1fv(uniform.location, 1, reinterpret_cast<float*>(uniformData));
+          break;
+        case UniformFormat::Float2:
+          gl->uniform2fv(uniform.location, 1, reinterpret_cast<float*>(uniformData));
+          break;
+        case UniformFormat::Float3:
+          gl->uniform3fv(uniform.location, 1, reinterpret_cast<float*>(uniformData));
+          break;
+        case UniformFormat::Float4:
+          gl->uniform4fv(uniform.location, 1, reinterpret_cast<float*>(uniformData));
+          break;
+        case UniformFormat::Float2x2:
+          gl->uniformMatrix2fv(uniform.location, 1, GL_FALSE,
+                               reinterpret_cast<float*>(uniformData));
+          break;
+        case UniformFormat::Float3x3:
+          gl->uniformMatrix3fv(uniform.location, 1, GL_FALSE,
+                               reinterpret_cast<float*>(uniformData));
+          break;
+        case UniformFormat::Float4x4:
+          gl->uniformMatrix4fv(uniform.location, 1, GL_FALSE,
+                               reinterpret_cast<float*>(uniformData));
+          break;
+        case UniformFormat::Int:
+          gl->uniform1iv(uniform.location, 1, reinterpret_cast<int*>(uniformData));
+          break;
+        case UniformFormat::Int2:
+          gl->uniform2iv(uniform.location, 1, reinterpret_cast<int*>(uniformData));
+          break;
+        case UniformFormat::Int3:
+          gl->uniform3iv(uniform.location, 1, reinterpret_cast<int*>(uniformData));
+          break;
+        case UniformFormat::Int4:
+          gl->uniform4iv(uniform.location, 1, reinterpret_cast<int*>(uniformData));
+          break;
+        case UniformFormat::Texture2DSampler:
+        case UniformFormat::TextureExternalSampler:
+        case UniformFormat::Texture2DRectSampler:
+          gl->uniform1iv(uniform.location, 1, reinterpret_cast<int*>(uniformData));
+          break;
+      }
+    }
+  }
 }
 
 void GLRenderPipeline::setTexture(GLGPU* gpu, unsigned binding, GLTexture* texture,

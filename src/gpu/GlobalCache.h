@@ -47,7 +47,8 @@ class GlobalCache {
    * Returns nullptr if the requested buffer size exceeds the maximum allowed uniform buffer size.
    */
   std::shared_ptr<GPUBuffer> findOrCreateUniformBuffer(size_t bufferSize,
-                                                          size_t* lastBufferOffset);
+                                                          size_t* lastBufferOffset,
+                                                          bool useFakeUniformBuffer = false);
 
   /**
    * After calling Context::flush(), the cached buffer can be reused once the GPU has
@@ -55,7 +56,7 @@ class GlobalCache {
    * Typically, this is done at the start of each frame to allow buffer reuse.
    * This approach minimizes buffer creation and destruction, improving performance.
    */
-  void resetUniformBuffer();
+  void resetUniformBuffer(bool useFakeUniformBuffer = false);
 
   /**
    * Adds a program to the cache with the specified key. If a program with the same key already

@@ -22,6 +22,7 @@
 #include "gpu/GlobalCache.h"
 #include "gpu/ProgramBuilder.h"
 #include "gpu/resources/RenderTarget.h"
+#include "opengl/FakeUniformBuffer.h"
 
 namespace tgfx {
 ProgramInfo::ProgramInfo(RenderTarget* renderTarget, GeometryProcessor* geometryProcessor,
@@ -132,20 +133,35 @@ std::shared_ptr<Program> ProgramInfo::getProgram() const {
     context->globalCache()->addProgram(programKey, program);
   }
 
-  if (context->caps()->shaderCaps()->uboSupport) {
-    auto pipelineProgram = std::static_pointer_cast<PipelineProgram>(program);
-    size_t uniformBufferSize = 0;
-    if (pipelineProgram->vertexUniformData != nullptr) {
-      uniformBufferSize +=
-          AlignTo(pipelineProgram->vertexUniformData->size(),
-                  static_cast<size_t>(context->caps()->shaderCaps()->uboOffsetAlignment));
-    }
-    if (pipelineProgram->fragmentUniformData != nullptr) {
-      uniformBufferSize += pipelineProgram->fragmentUniformData->size();
-    }
-    if (uniformBufferSize > 0) {
-      pipelineProgram->uniformBuffer = context->globalCache()->findOrCreateUniformBuffer(
-          uniformBufferSize, &pipelineProgram->uniformBufferBaseOffset);
+  auto pipelineProgram = std::static_pointer_cast<PipelineProgram>(program);
+  if (pipelineProgram != nullptr) {
+    if (context->caps()->shaderCaps()->uboSupport) {
+      size_t uniformBufferSize = 0;
+      if (pipelineProgram->vertexUniformData != nullptr) {
+        uniformBufferSize +=
+            AlignTo(pipelineProgram->vertexUniformData->size(),
+                    static_cast<size_t>(context->caps()->shaderCaps()->uboOffsetAlignment));
+      }
+      if (pipelineProgram->fragmentUniformData != nullptr) {
+        uniformBufferSize += pipelineProgram->fragmentUniformData->size();
+      }
+      if (uniformBufferSize > 0) {
+        pipelineProgram->uniformBuffer = context->globalCache()->findOrCreateUniformBuffer(
+            uniformBufferSize, &pipelineProgram->uniformBufferBaseOffset, false);
+      }
+    } else {
+      size_t uniformBufferSize = 0;
+      if (pipelineProgram->vertexUniformData != nullptr) {
+        uniformBufferSize += pipelineProgram->vertexUniformData->size();
+      }
+      if (pipelineProgram->fragmentUniformData != nullptr) {
+        uniformBufferSize += pipelineProgram->fragmentUniformData->size();
+      }
+      if (uniformBufferSize > 0) {
+        pipelineProgram->uniformBuffer = context->globalCache()->findOrCreateUniformBuffer(
+            uniformBufferSize, &pipelineProgram->uniformBufferBaseOffset, true);
+      }
+      pipelineProgram->uniformBufferBaseOffset = 0;
     }
   }
 
@@ -226,13 +242,31 @@ void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, PipelineProgram
                                    fragmentUniformData->size());
     }
   } else {
+    size_t fragmentUniformOffset = 0;
     if (vertexUniformData != nullptr) {
-      renderPass->setUniformBytes(VERTEX_UBO_BINDING_POINT, vertexUniformData->data(),
-                                  vertexUniformData->size());
+      auto buffer = program->uniformBuffer->map(
+          gpu, program->uniformBufferBaseOffset, vertexUniformData->size());
+      if (buffer != nullptr) {
+        memcpy(buffer, vertexUniformData->data(), vertexUniformData->size());
+      }
+      program->uniformBuffer->unmap(gpu);
+
+      renderPass->setUniformBuffer(VERTEX_UBO_BINDING_POINT, program->uniformBuffer.get(),
+                                   program->uniformBufferBaseOffset,
+                                   vertexUniformData->size());
+      fragmentUniformOffset = vertexUniformData->size();
     }
     if (fragmentUniformData != nullptr) {
-      renderPass->setUniformBytes(FRAGMENT_UBO_BINDING_POINT, fragmentUniformData->data(),
-                                  fragmentUniformData->size());
+      auto buffer = program->uniformBuffer->map(
+          gpu, program->uniformBufferBaseOffset + fragmentUniformOffset,
+          fragmentUniformData->size());
+      if (buffer != nullptr) {
+        memcpy(buffer, fragmentUniformData->data(), fragmentUniformData->size());
+      }
+      program->uniformBuffer->unmap(gpu);
+      renderPass->setUniformBuffer(FRAGMENT_UBO_BINDING_POINT, program->uniformBuffer.get(),
+                                   program->uniformBufferBaseOffset + fragmentUniformOffset,
+                                   fragmentUniformData->size());
     }
   }
 
