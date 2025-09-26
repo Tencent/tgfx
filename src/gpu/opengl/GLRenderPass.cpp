@@ -103,7 +103,8 @@ void GLRenderPass::setUniformBuffer(unsigned binding, std::shared_ptr<GPUBuffer>
     return;
   }
 
-  renderPipeline->setUniformBuffer(gpu, binding, static_cast<GLBuffer*>(buffer.get()), offset, size);
+  renderPipeline->setUniformBuffer(gpu, binding, static_cast<GLBuffer*>(buffer.get()), offset,
+                                   size);
 }
 
 void GLRenderPass::setTexture(unsigned binding, std::shared_ptr<GPUTexture> texture,

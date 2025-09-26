@@ -46,7 +46,7 @@ UniformData::UniformData(std::vector<Uniform> uniforms, bool uboSupport)
   bufferSize = alignCursor(_uboSupport ? 16 : 1);
 }
 
-void UniformData::setBuffer(void *buffer, size_t bufferBaseOffset) {
+void UniformData::setBuffer(void* buffer, size_t bufferBaseOffset) {
   _buffer = static_cast<uint8_t*>(buffer) + bufferBaseOffset;
 }
 

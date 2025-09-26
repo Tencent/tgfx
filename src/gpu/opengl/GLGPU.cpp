@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLGPU.h"
-
 #include "GLUniformBuffer.h"
 #include "gpu/opengl/GLBuffer.h"
 #include "gpu/opengl/GLCommandEncoder.h"

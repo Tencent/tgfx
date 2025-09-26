@@ -133,13 +133,20 @@ std::shared_ptr<Program> ProgramInfo::getProgram() const {
 
   auto pipelineProgram = std::static_pointer_cast<PipelineProgram>(program);
   if (pipelineProgram != nullptr) {
-    if (pipelineProgram->vertexUniformData != nullptr && pipelineProgram->vertexUniformData->size() > 0) {
-      pipelineProgram->vertexUniformBuffer = context->globalCache()->findOrCreateUniformBuffer(pipelineProgram->vertexUniformData->size(), &pipelineProgram->vertexUniformBufferOffset);
-      pipelineProgram->vertexUniformData->setBuffer(pipelineProgram->vertexUniformBuffer->map(), pipelineProgram->vertexUniformBufferOffset);
+    if (pipelineProgram->vertexUniformData != nullptr &&
+        pipelineProgram->vertexUniformData->size() > 0) {
+      pipelineProgram->vertexUniformBuffer = context->globalCache()->findOrCreateUniformBuffer(
+          pipelineProgram->vertexUniformData->size(), &pipelineProgram->vertexUniformBufferOffset);
+      pipelineProgram->vertexUniformData->setBuffer(pipelineProgram->vertexUniformBuffer->map(),
+                                                    pipelineProgram->vertexUniformBufferOffset);
     }
-    if (pipelineProgram->fragmentUniformData != nullptr && pipelineProgram->fragmentUniformData->size() > 0) {
-      pipelineProgram->fragmentUniformBuffer = context->globalCache()->findOrCreateUniformBuffer(pipelineProgram->fragmentUniformData->size(), &pipelineProgram->fragmentUniformBufferOffset);
-      pipelineProgram->fragmentUniformData->setBuffer(pipelineProgram->fragmentUniformBuffer->map(), pipelineProgram->fragmentUniformBufferOffset);
+    if (pipelineProgram->fragmentUniformData != nullptr &&
+        pipelineProgram->fragmentUniformData->size() > 0) {
+      pipelineProgram->fragmentUniformBuffer = context->globalCache()->findOrCreateUniformBuffer(
+          pipelineProgram->fragmentUniformData->size(),
+          &pipelineProgram->fragmentUniformBufferOffset);
+      pipelineProgram->fragmentUniformData->setBuffer(pipelineProgram->fragmentUniformBuffer->map(),
+                                                      pipelineProgram->fragmentUniformBufferOffset);
     }
   }
 
@@ -198,8 +205,7 @@ void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, PipelineProgram
     program->fragmentUniformBuffer->unmap();
 
     renderPass->setUniformBuffer(FRAGMENT_UBO_BINDING_POINT, program->fragmentUniformBuffer,
-                                 program->fragmentUniformBufferOffset,
-                                 fragmentUniformData->size());
+                                 program->fragmentUniformBufferOffset, fragmentUniformData->size());
   }
 
   auto gpu = renderTarget->getContext()->gpu();

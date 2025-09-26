@@ -66,9 +66,8 @@ void GLRenderPipeline::activate(GLGPU* gpu, bool depthReadOnly, bool stencilRead
   }
 }
 
-void GLRenderPipeline::setUniformBuffer(GLGPU* gpu, unsigned binding,
-                                        GLBuffer* buffer, size_t offset,
-                                        size_t size) {
+void GLRenderPipeline::setUniformBuffer(GLGPU* gpu, unsigned binding, GLBuffer* buffer,
+                                        size_t offset, size_t size) {
   if (gpu == nullptr || buffer == nullptr || size == 0) {
     return;
   }

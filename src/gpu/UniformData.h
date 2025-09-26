@@ -36,7 +36,7 @@ static constexpr int TEXTURE_BINDING_POINT_START = 2;
  * An object representing the collection of uniform data in CPU side.
  */
 class UniformData {
-public:
+ public:
   /**
    *
    * Copies value into the uniform data. The data must have the same size as the uniform specified
@@ -44,7 +44,8 @@ public:
    */
   template <typename T>
   std::enable_if_t<std::is_trivially_copyable_v<T> && !std::is_pointer_v<T> &&
-                   !std::is_same_v<std::decay_t<T>, Matrix>, void>
+                       !std::is_same_v<std::decay_t<T>, Matrix>,
+                   void>
   setData(const std::string& name, const T& value) const {
     onSetData(name, &value, sizeof(value));
   }
@@ -53,8 +54,8 @@ public:
    * Convenience method for copying a Matrix to a 3x3 matrix in column-major order.
    */
   template <typename T>
-  std::enable_if_t<std::is_same_v<std::decay_t<T>, Matrix>, void>
-  setData(const std::string& name, const T& matrix) const {
+  std::enable_if_t<std::is_same_v<std::decay_t<T>, Matrix>, void> setData(const std::string& name,
+                                                                          const T& matrix) const {
     float values[6] = {};
     matrix.get6(values);
 
@@ -108,7 +109,7 @@ public:
     return _uboSupport;
   }
 
-private:
+ private:
   struct Field {
     std::string name = "";
     UniformFormat format = UniformFormat::Float;
@@ -152,4 +153,4 @@ private:
   friend class ProgramInfo;
   friend class UniformHandler;
 };
-} // namespace tgfx
+}  // namespace tgfx
