@@ -18,21 +18,28 @@
 
 #pragma once
 
-#include "RenderTask.h"
-#include "gpu/resources/Semaphore.h"
+#include "gpu/processors/Transform3DGeometryProcessor.h"
 
 namespace tgfx {
-class SemaphoreWaitTask : public RenderTask {
- public:
-  explicit SemaphoreWaitTask(std::shared_ptr<Semaphore> semaphore)
-      : semaphore(std::move(semaphore)) {
-  }
 
-  void execute(CommandEncoder* encoder) override {
-    encoder->waitForFence(semaphore->getFence());
-  }
+/**
+ * The implementation of QuadPerEdgeAA3DGeometryProcessor using GLSL.
+ */
+class GLSLQuadPerEdgeAA3DGeometryProcessor final : public Transform3DGeometryProcessor {
+ public:
+  /**
+   * Creates a GLSLQuadPerEdgeAA3DGeometryProcessor instance with the specified parameters.
+   */
+  explicit GLSLQuadPerEdgeAA3DGeometryProcessor(AAType aa, const Matrix3D& matrix,
+                                                const Vec2& ndcScale, const Vec2& ndcOffset);
+
+  void emitCode(EmitArgs& args) const override;
+
+  void setData(UniformBuffer* vertexUniformBuffer, UniformBuffer* fragmentUniformBuffer,
+               FPCoordTransformIter* transformIter) const override;
 
  private:
-  std::shared_ptr<Semaphore> semaphore = nullptr;
+  Color defaultColor = Color::White();
 };
+
 }  // namespace tgfx

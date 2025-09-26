@@ -25,8 +25,8 @@
 #include "tgfx/core/Buffer.h"
 
 namespace tgfx {
-bool GLCommandQueue::writeBuffer(GPUBuffer* buffer, size_t bufferOffset, const void* data,
-                                 size_t size) {
+bool GLCommandQueue::writeBuffer(std::shared_ptr<GPUBuffer> buffer, size_t bufferOffset,
+                                 const void* data, size_t size) {
   if (data == nullptr || size == 0) {
     LOGE("GLCommandQueue::writeBuffer() data is null or size is zero!");
     return false;
@@ -37,7 +37,7 @@ bool GLCommandQueue::writeBuffer(GPUBuffer* buffer, size_t bufferOffset, const v
   }
   auto gl = gpu->functions();
   ClearGLError(gl);
-  auto glBuffer = static_cast<const GLBuffer*>(buffer);
+  auto glBuffer = std::static_pointer_cast<GLBuffer>(buffer);
   auto target = glBuffer->target();
   gl->bindBuffer(target, glBuffer->bufferID());
   gl->bufferSubData(target, static_cast<GLintptr>(bufferOffset), static_cast<GLsizeiptr>(size),
@@ -46,8 +46,8 @@ bool GLCommandQueue::writeBuffer(GPUBuffer* buffer, size_t bufferOffset, const v
   return CheckGLError(gl);
 }
 
-void GLCommandQueue::writeTexture(GPUTexture* texture, const Rect& rect, const void* pixels,
-                                  size_t rowBytes) {
+void GLCommandQueue::writeTexture(std::shared_ptr<GPUTexture> texture, const Rect& rect,
+                                  const void* pixels, size_t rowBytes) {
   if (texture == nullptr || rect.isEmpty() ||
       !(texture->usage() & GPUTextureUsage::TEXTURE_BINDING)) {
     return;
@@ -57,7 +57,7 @@ void GLCommandQueue::writeTexture(GPUTexture* texture, const Rect& rect, const v
   if (caps->flushBeforeWritePixels) {
     gl->flush();
   }
-  auto glTexture = static_cast<GLTexture*>(texture);
+  auto glTexture = static_cast<GLTexture*>(texture.get());
   auto state = gpu->state();
   state->bindTexture(glTexture);
   const auto& textureFormat = caps->getTextureFormat(glTexture->format());
@@ -88,8 +88,8 @@ void GLCommandQueue::writeTexture(GPUTexture* texture, const Rect& rect, const v
   }
 }
 
-bool GLCommandQueue::readTexture(GPUTexture* texture, const Rect& rect, void* pixels,
-                                 size_t rowBytes) const {
+bool GLCommandQueue::readTexture(std::shared_ptr<GPUTexture> texture, const Rect& rect,
+                                 void* pixels, size_t rowBytes) const {
   if (texture == nullptr || rect.isEmpty() || pixels == nullptr) {
     return false;
   }
@@ -98,7 +98,7 @@ bool GLCommandQueue::readTexture(GPUTexture* texture, const Rect& rect, void* pi
     return false;
   }
   auto gl = gpu->functions();
-  auto glTexture = static_cast<GLTexture*>(texture);
+  auto glTexture = static_cast<GLTexture*>(texture.get());
   ClearGLError(gl);
   if (texture->usage() & GPUTextureUsage::RENDER_ATTACHMENT) {
     auto state = gpu->state();
@@ -151,6 +151,7 @@ bool GLCommandQueue::readTexture(GPUTexture* texture, const Rect& rect, void* pi
 }
 
 void GLCommandQueue::submit(std::shared_ptr<CommandBuffer>) {
+  gpu->processUnreferencedResources();
   auto gl = gpu->functions();
   gl->flush();
   // Reset GL state every frame to avoid interference from external GL calls.

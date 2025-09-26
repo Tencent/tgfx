@@ -16,16 +16,15 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/resources/Semaphore.h"
-#include "gpu/GPU.h"
+#include "RenderPipeline.h"
 
 namespace tgfx {
-std::shared_ptr<Semaphore> Semaphore::MakeAdopted(Context* context,
-                                                  const BackendSemaphore& backendSemaphore) {
-  auto fence = context->gpu()->importExternalFence(backendSemaphore);
-  if (fence == nullptr) {
-    return nullptr;
+VertexDescriptor::VertexDescriptor(std::vector<Attribute> attribs, size_t stride)
+    : attributes(std::move(attribs)), vertexStride(stride) {
+  if (vertexStride == 0) {
+    for (auto& attribute : attributes) {
+      vertexStride += attribute.size();
+    }
   }
-  return Resource::AddToCache(context, new Semaphore(std::move(fence)));
 }
 }  // namespace tgfx

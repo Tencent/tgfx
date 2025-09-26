@@ -19,8 +19,8 @@
 #pragma once
 
 #include <unordered_map>
-#include "gpu/GPURenderPipeline.h"
 #include "gpu/RenderPass.h"
+#include "gpu/RenderPipeline.h"
 #include "gpu/processors/EmptyXferProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/GeometryProcessor.h"
@@ -30,7 +30,7 @@
 
 namespace tgfx {
 struct SamplerInfo {
-  GPUTexture* texture;
+  std::shared_ptr<GPUTexture> texture;
   SamplerState state;
 };
 

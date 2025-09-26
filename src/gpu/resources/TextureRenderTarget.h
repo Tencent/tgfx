@@ -36,12 +36,12 @@ class TextureRenderTarget : public DefaultTextureView, public RenderTarget {
     return _externallyOwned;
   }
 
-  GPUTexture* getRenderTexture() const override {
-    return renderTexture ? renderTexture.get() : _texture.get();
+  std::shared_ptr<GPUTexture> getRenderTexture() const override {
+    return renderTexture ? renderTexture : _texture;
   }
 
-  GPUTexture* getSampleTexture() const override {
-    return _texture.get();
+  std::shared_ptr<GPUTexture> getSampleTexture() const override {
+    return _texture;
   }
 
   std::shared_ptr<TextureView> asTextureView() const override {
@@ -52,21 +52,19 @@ class TextureRenderTarget : public DefaultTextureView, public RenderTarget {
     return std::static_pointer_cast<TextureRenderTarget>(weakThis.lock());
   }
 
-  void onReleaseGPU() override;
-
  private:
-  std::unique_ptr<GPUTexture> renderTexture = nullptr;
+  std::shared_ptr<GPUTexture> renderTexture = nullptr;
   bool _externallyOwned = false;
 
   static std::shared_ptr<RenderTarget> MakeFrom(Context* context,
-                                                std::unique_ptr<GPUTexture> texture,
+                                                std::shared_ptr<GPUTexture> texture,
                                                 int sampleCount,
                                                 ImageOrigin origin = ImageOrigin::TopLeft,
                                                 bool externallyOwned = false,
                                                 const ScratchKey& scratchKey = {});
 
-  TextureRenderTarget(std::unique_ptr<GPUTexture> texture,
-                      std::unique_ptr<GPUTexture> renderTexture, ImageOrigin origin,
+  TextureRenderTarget(std::shared_ptr<GPUTexture> texture,
+                      std::shared_ptr<GPUTexture> renderTexture, ImageOrigin origin,
                       bool externallyOwned)
       : DefaultTextureView(std::move(texture), origin), renderTexture(std::move(renderTexture)),
         _externallyOwned(externallyOwned) {

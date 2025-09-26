@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -15,16 +15,26 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#include "UnreferencedResourceQueue.h"
-#include "gpu/resources/Resource.h"
+
+#include "Transform3DGeometryProcessor.h"
 
 namespace tgfx {
 
-UnreferencedResourceQueue::~UnreferencedResourceQueue() {
-  Resource* resource = nullptr;
-  while (queue.try_dequeue(resource)) {
-    delete resource;
+Transform3DGeometryProcessor::Transform3DGeometryProcessor(AAType aa, const Matrix3D& transform,
+                                                           const Vec2& ndcScale,
+                                                           const Vec2& ndcOffset)
+    : GeometryProcessor(ClassID()), aa(aa), matrix(transform), ndcScale(ndcScale),
+      ndcOffset(ndcOffset) {
+  position = {"aPosition", VertexFormat::Float2};
+  if (aa == AAType::Coverage) {
+    coverage = {"inCoverage", VertexFormat::Float};
   }
+  setVertexAttributes(&position, 2);
+}
+
+void Transform3DGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
+  uint32_t flags = (aa == AAType::Coverage ? 1 : 0);
+  bytesKey->write(flags);
 }
 
 }  // namespace tgfx

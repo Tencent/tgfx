@@ -16,15 +16,35 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GPURenderPipeline.h"
+#pragma once
+
+#include <string>
+#include "gpu/ShaderStage.h"
 
 namespace tgfx {
-VertexDescriptor::VertexDescriptor(std::vector<Attribute> attribs, size_t stride)
-    : attributes(std::move(attribs)), vertexStride(stride) {
-  if (vertexStride == 0) {
-    for (auto& attribute : attributes) {
-      vertexStride += attribute.size();
-    }
-  }
-}
+/**
+ * ShaderModuleDescriptor describes the properties required to create a ShaderModule.
+ */
+class ShaderModuleDescriptor {
+ public:
+  /**
+   * The shader code to be compiled into a ShaderModule.
+   */
+  std::string code;
+
+  /**
+   * Specifies the shader stage (e.g., vertex, fragment, compute). Only relevant for the OpenGL
+   * backend; ignored by other backends.
+   */
+  ShaderStage stage = ShaderStage::Vertex;
+};
+
+/**
+ * ShaderModule is an internal object that serves as a container for shader code，allowing it to
+ * be submitted to the GPU for execution within a pipeline.
+ */
+class ShaderModule {
+ public:
+  virtual ~ShaderModule() = default;
+};
 }  // namespace tgfx

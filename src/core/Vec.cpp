@@ -16,35 +16,15 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <string>
-#include "gpu/GPUResource.h"
-#include "gpu/ShaderStage.h"
+#include "tgfx/core/Vec.h"
+#include "core/utils/MathExtra.h"
+#include "utils/Log.h"
 
 namespace tgfx {
-/**
- * GPUShaderModuleDescriptor describes the properties required to create a GPUShaderModule.
- */
-class GPUShaderModuleDescriptor {
- public:
-  /**
-   * The shader code to be compiled into a GPUShaderModule.
-   */
-  std::string code;
 
-  /**
-   * Specifies the shader stage (e.g., vertex, fragment, compute). Only relevant for the OpenGL
-   * backend; ignored by other backends.
-   */
-  ShaderStage stage = ShaderStage::Vertex;
-};
+Vec2 operator/(const Vec2& v, float s) {
+  DEBUG_ASSERT(!FloatNearlyZero(s));
+  return {v.x / s, v.y / s};
+}
 
-/**
- * GPUShaderModule is an internal object that serves as a container for shader code，allowing it to
- * be submitted to the GPU for execution within a pipeline.
- */
-class GPUShaderModule : public GPUResource {
- public:
-};
 }  // namespace tgfx

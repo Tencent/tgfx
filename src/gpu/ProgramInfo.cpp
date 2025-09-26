@@ -190,7 +190,7 @@ void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, PipelineProgram
     GPUSamplerDescriptor descriptor(ToAddressMode(state.tileModeX), ToAddressMode(state.tileModeY),
                                     state.filterMode, state.filterMode, state.mipmapMode);
     auto sampler = gpu->createSampler(descriptor);
-    renderPass->setTexture(textureBinding++, texture, sampler.get());
+    renderPass->setTexture(textureBinding++, texture, sampler);
   }
 }
 

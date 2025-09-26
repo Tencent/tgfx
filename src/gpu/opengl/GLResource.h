@@ -18,19 +18,28 @@
 
 #pragma once
 
-#include <concurrentqueue.h>
+#include <list>
+#include "core/utils/ReturnQueue.h"
 
 namespace tgfx {
-class Resource;
+class GLGPU;
 
 /**
- * Manages resources whose references are released by `shared_ptr`.
+ * GLResource is the base class for OpenGL resources. Subclasses must implement the onRelease()
+ * method to free all underlying GPU resources. No OpenGL API calls should be made during
+ * destructuring since there may be no OpenGL context that is current on the calling thread.
  */
-class UnreferencedResourceQueue {
- public:
-  /** Destructor that cleans up all unreferenced resources. */
-  ~UnreferencedResourceQueue();
+class GLResource : public ReturnNode {
+ protected:
+  /**
+   * Overridden to free the underlying OpenGL resources. After calling this method, the GLResource
+   * must not be used, as doing so may lead to undefined behavior.
+   */
+  virtual void onRelease(GLGPU* gpu) = 0;
 
-  moodycamel::ConcurrentQueue<Resource*> queue;
+ private:
+  std::list<GLResource*>::iterator cachedPosition;
+
+  friend class GLGPU;
 };
 }  // namespace tgfx

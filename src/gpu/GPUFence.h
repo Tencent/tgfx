@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "gpu/GPUResource.h"
 #include "tgfx/gpu/Backend.h"
 
 namespace tgfx {
@@ -26,8 +25,10 @@ namespace tgfx {
  * GPUFence is a synchronization primitive to capture, track, and manage resource dependencies
  * across command encoders.
  */
-class GPUFence : public GPUResource {
+class GPUFence {
  public:
+  virtual ~GPUFence() = default;
+
   /**
    * Returns the backend semaphore object.
    */

@@ -36,15 +36,16 @@ class GLRenderPass : public RenderPass {
 
   void setScissorRect(int x, int y, int width, int height) override;
 
-  void setPipeline(GPURenderPipeline* pipeline) override;
+  void setPipeline(std::shared_ptr<RenderPipeline> pipeline) override;
 
   void setUniformBytes(unsigned binding, const void* data, size_t size) override;
 
-  void setTexture(unsigned binding, GPUTexture* texture, GPUSampler* sampler) override;
+  void setTexture(unsigned binding, std::shared_ptr<GPUTexture> texture,
+                  std::shared_ptr<GPUSampler> sampler) override;
 
-  void setVertexBuffer(GPUBuffer* buffer, size_t offset) override;
+  void setVertexBuffer(std::shared_ptr<GPUBuffer> buffer, size_t offset) override;
 
-  void setIndexBuffer(GPUBuffer* buffer, IndexFormat format) override;
+  void setIndexBuffer(std::shared_ptr<GPUBuffer> buffer, IndexFormat format) override;
 
   void setStencilReference(uint32_t reference) override;
 
@@ -57,7 +58,7 @@ class GLRenderPass : public RenderPass {
 
  private:
   GLGPU* gpu = nullptr;
-  GLRenderPipeline* renderPipeline = nullptr;
+  std::shared_ptr<GLRenderPipeline> renderPipeline = nullptr;
   IndexFormat indexFormat = IndexFormat::UInt16;
   uint32_t stencilReference = 0;
 };

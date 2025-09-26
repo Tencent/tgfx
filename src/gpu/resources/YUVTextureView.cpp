@@ -23,9 +23,9 @@
 namespace tgfx {
 static constexpr int YUV_SIZE_FACTORS[] = {0, 1, 1};
 
-static std::vector<std::unique_ptr<GPUTexture>> MakeTexturePlanes(GPU* gpu, const YUVData* yuvData,
+static std::vector<std::shared_ptr<GPUTexture>> MakeTexturePlanes(GPU* gpu, const YUVData* yuvData,
                                                                   const PixelFormat* formats) {
-  std::vector<std::unique_ptr<GPUTexture>> texturePlanes = {};
+  std::vector<std::shared_ptr<GPUTexture>> texturePlanes = {};
   auto count = static_cast<int>(yuvData->planeCount());
   for (int index = 0; index < count; index++) {
     auto w = yuvData->width() >> YUV_SIZE_FACTORS[index];
@@ -33,9 +33,6 @@ static std::vector<std::unique_ptr<GPUTexture>> MakeTexturePlanes(GPU* gpu, cons
     GPUTextureDescriptor descriptor = {w, h, formats[index]};
     auto texture = gpu->createTexture(descriptor);
     if (texture == nullptr) {
-      for (auto& plane : texturePlanes) {
-        plane->release(gpu);
-      }
       return {};
     }
     texturePlanes.push_back(std::move(texture));
@@ -44,7 +41,7 @@ static std::vector<std::unique_ptr<GPUTexture>> MakeTexturePlanes(GPU* gpu, cons
 }
 
 static void SubmitYUVTexture(GPU* gpu, const YUVData* yuvData,
-                             std::unique_ptr<GPUTexture> textures[]) {
+                             std::shared_ptr<GPUTexture> textures[]) {
   auto count = yuvData->planeCount();
   for (size_t index = 0; index < count; index++) {
     auto& texture = textures[index];
@@ -52,7 +49,7 @@ static void SubmitYUVTexture(GPU* gpu, const YUVData* yuvData,
     auto h = yuvData->height() >> YUV_SIZE_FACTORS[index];
     auto pixels = yuvData->getBaseAddressAt(index);
     auto rowBytes = yuvData->getRowBytesAt(index);
-    gpu->queue()->writeTexture(texture.get(), Rect::MakeWH(w, h), pixels, rowBytes);
+    gpu->queue()->writeTexture(texture, Rect::MakeWH(w, h), pixels, rowBytes);
     // YUV textures do not support mipmaps, so we don't need to regenerate mipmaps.
   }
 }
@@ -94,7 +91,7 @@ std::shared_ptr<TextureView> TextureView::MakeNV12(Context* context, const YUVDa
   return texture;
 }
 
-YUVTextureView::YUVTextureView(std::vector<std::unique_ptr<GPUTexture>> yuvTextures,
+YUVTextureView::YUVTextureView(std::vector<std::shared_ptr<GPUTexture>> yuvTextures,
                                YUVFormat yuvFormat, YUVColorSpace colorSpace)
     : _yuvFormat(yuvFormat), _colorSpace(colorSpace) {
   DEBUG_ASSERT(_yuvFormat != YUVFormat::Unknown);
@@ -116,9 +113,9 @@ size_t YUVTextureView::textureCount() const {
   }
 }
 
-GPUTexture* YUVTextureView::getTextureAt(size_t index) const {
+std::shared_ptr<GPUTexture> YUVTextureView::getTextureAt(size_t index) const {
   DEBUG_ASSERT(index < textureCount());
-  return textures[index].get();
+  return textures[index];
 }
 
 size_t YUVTextureView::memoryUsage() const {
@@ -130,12 +127,5 @@ size_t YUVTextureView::memoryUsage() const {
 
 Point YUVTextureView::getTextureCoord(float x, float y) const {
   return {x / static_cast<float>(width()), y / static_cast<float>(height())};
-}
-
-void YUVTextureView::onReleaseGPU() {
-  auto count = textureCount();
-  for (size_t i = 0; i < count; ++i) {
-    textures[i]->release(context->gpu());
-  }
 }
 }  // namespace tgfx

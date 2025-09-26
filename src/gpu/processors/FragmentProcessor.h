@@ -116,7 +116,7 @@ class FragmentProcessor : public Processor {
     return onCountTextureSamplers();
   }
 
-  GPUTexture* textureAt(size_t i) const {
+  std::shared_ptr<GPUTexture> textureAt(size_t i) const {
     return onTextureAt(i);
   }
 
@@ -323,7 +323,7 @@ class FragmentProcessor : public Processor {
     return 0;
   }
 
-  virtual GPUTexture* onTextureAt(size_t) const {
+  virtual std::shared_ptr<GPUTexture> onTextureAt(size_t) const {
     return nullptr;
   }
 

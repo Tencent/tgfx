@@ -46,7 +46,7 @@ class TextureView : public Resource {
   /**
    * Computes a BytesKey for the texture that can be used to identify it in a cache.
    */
-  static void ComputeTextureKey(const GPUTexture* texture, BytesKey* bytesKey);
+  static void ComputeTextureKey(std::shared_ptr<GPUTexture> texture, BytesKey* bytesKey);
 
   /**
    * Creates a new texture view from the specified pixel data with each pixel stored as 32-bit RGBA
@@ -203,7 +203,7 @@ class TextureView : public Resource {
   /**
    * Returns the associated GPUTexture object.
    */
-  virtual GPUTexture* getTexture() const = 0;
+  virtual std::shared_ptr<GPUTexture> getTexture() const = 0;
 
   /**
    * Returns the texture coordinates in backend units corresponding to specified position in pixels.

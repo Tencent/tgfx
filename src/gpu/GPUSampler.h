@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "gpu/GPUResource.h"
 #include "tgfx/gpu/FilterMode.h"
 #include "tgfx/gpu/MipmapMode.h"
 
@@ -102,7 +101,8 @@ class GPUSamplerDescriptor {
  * outside the range [0, 1] are handled (wrap mode), and how the texture is filtered when it is
  * minified or magnified (filter mode).
  */
-class GPUSampler : public GPUResource {
+class GPUSampler {
  public:
+  virtual ~GPUSampler() = default;
 };
 }  // namespace tgfx
