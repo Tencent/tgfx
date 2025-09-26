@@ -30,7 +30,8 @@ class PngCodec : public ImageCodec {
   bool isAlphaOnly() const override;
 
 #ifdef TGFX_USE_PNG_ENCODE
-  static std::shared_ptr<Data> Encode(const Pixmap& pixmap, int quality);
+  static std::shared_ptr<Data> Encode(const Pixmap& pixmap, int quality,
+                                      std::shared_ptr<ColorSpace> colorSpace);
 #endif
 
  protected:
@@ -44,8 +45,9 @@ class PngCodec : public ImageCodec {
                                                   std::shared_ptr<Data> byteData);
 
   PngCodec(int width, int height, Orientation orientation, bool isAlphaOnly, std::string filePath,
-           std::shared_ptr<Data> fileData)
-      : ImageCodec(width, height, orientation), _isAlphaOnly(isAlphaOnly),
+           std::shared_ptr<Data> fileData,
+           std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB())
+      : ImageCodec(width, height, orientation, colorSpace), _isAlphaOnly(isAlphaOnly),
         fileData(std::move(fileData)), filePath(std::move(filePath)) {
   }
 

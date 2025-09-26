@@ -19,10 +19,9 @@
 #include "QuadPerEdgeAAGeometryProcessor.h"
 
 namespace tgfx {
-QuadPerEdgeAAGeometryProcessor::QuadPerEdgeAAGeometryProcessor(int width, int height, AAType aa,
-                                                               std::optional<Color> commonColor,
-                                                               std::optional<Matrix> uvMatrix,
-                                                               bool hasSubset)
+QuadPerEdgeAAGeometryProcessor::QuadPerEdgeAAGeometryProcessor(
+    int width, int height, AAType aa, std::optional<Color> commonColor,
+    std::optional<Matrix> uvMatrix, bool hasSubset, std::shared_ptr<ColorSpace> dstColorSpace)
     : GeometryProcessor(ClassID()), width(width), height(height), aa(aa), commonColor(commonColor),
       uvMatrix(uvMatrix), hasSubset(hasSubset) {
   position = {"aPosition", VertexFormat::Float2};
@@ -39,6 +38,9 @@ QuadPerEdgeAAGeometryProcessor::QuadPerEdgeAAGeometryProcessor(int width, int he
     subset = {"texSubset", VertexFormat::Float4};
   }
   setVertexAttributes(&position, 5);
+  steps =
+      std::make_shared<ColorSpaceXformSteps>(ColorSpace::MakeSRGB().get(), AlphaType::Premultiplied,
+                                             dstColorSpace.get(), AlphaType::Premultiplied);
 }
 
 void QuadPerEdgeAAGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
@@ -49,5 +51,9 @@ void QuadPerEdgeAAGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) c
   bool hasSubsetMatrix = hasSubset && uvMatrix.has_value();
   flags |= hasSubsetMatrix ? 16 : 0;
   bytesKey->write(flags);
+  if (!commonColor.has_value()) {
+    uint32_t key = ColorSpaceXformSteps::xformKey(steps.get());
+    bytesKey->write(key);
+  }
 }
 }  // namespace tgfx

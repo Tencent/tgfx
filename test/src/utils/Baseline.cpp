@@ -105,13 +105,14 @@ static void SetJSONValue(nlohmann::json& target, const std::string& key, const s
   (*json)[jsonKey] = value;
 }
 
-bool Baseline::Compare(std::shared_ptr<PixelBuffer> pixelBuffer, const std::string& key) {
+bool Baseline::Compare(std::shared_ptr<PixelBuffer> pixelBuffer, const std::string& key,
+                       std::shared_ptr<ColorSpace> colorSpace) {
   if (pixelBuffer == nullptr) {
     return false;
   }
   auto pixels = pixelBuffer->lockPixels();
   Pixmap pixmap(pixelBuffer->info(), pixels);
-  auto result = Baseline::Compare(pixmap, key);
+  auto result = Baseline::Compare(pixmap, key, std::move(colorSpace));
   pixelBuffer->unlockPixels();
   return result;
 }
@@ -126,15 +127,16 @@ bool Baseline::Compare(const std::shared_ptr<Surface> surface, const std::string
   if (!result) {
     return false;
   }
-  return Baseline::Compare(pixmap, key);
+  return Baseline::Compare(pixmap, key, surface->colorSpace());
 }
 
-bool Baseline::Compare(const Bitmap& bitmap, const std::string& key) {
+bool Baseline::Compare(const Bitmap& bitmap, const std::string& key,
+                       std::shared_ptr<ColorSpace> colorSpace) {
   if (bitmap.isEmpty()) {
     return false;
   }
   Pixmap pixmap(bitmap);
-  return Baseline::Compare(pixmap, key);
+  return Baseline::Compare(pixmap, key, std::move(colorSpace));
 }
 
 static bool CompareVersionAndMd5(const std::string& md5, const std::string& key,
@@ -161,7 +163,8 @@ static bool CompareVersionAndMd5(const std::string& md5, const std::string& key,
   return true;
 }
 
-bool Baseline::Compare(const Pixmap& pixmap, const std::string& key) {
+bool Baseline::Compare(const Pixmap& pixmap, const std::string& key,
+                       std::shared_ptr<ColorSpace> colorSpace) {
   if (pixmap.isEmpty()) {
     return false;
   }
@@ -178,13 +181,13 @@ bool Baseline::Compare(const Pixmap& pixmap, const std::string& key) {
     md5 = DumpMD5(newPixmap.pixels(), newPixmap.byteSize());
   }
 #ifdef GENERATE_BASELINE_IMAGES
-  SaveImage(pixmap, key + "_base");
+  SaveImage(pixmap, key + "_base", colorSpace);
 #endif
-  return CompareVersionAndMd5(md5, key, [key, pixmap](bool result) {
+  return CompareVersionAndMd5(md5, key, [key, pixmap, colorSpace](bool result) {
     if (result) {
       RemoveImage(key);
     } else {
-      SaveImage(pixmap, key);
+      SaveImage(pixmap, key, colorSpace);
     }
   });
 }

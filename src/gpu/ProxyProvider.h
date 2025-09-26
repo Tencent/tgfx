@@ -123,14 +123,16 @@ class ProxyProvider {
    */
   std::shared_ptr<RenderTargetProxy> createRenderTargetProxy(
       const BackendTexture& backendTexture, int sampleCount = 1,
-      ImageOrigin origin = ImageOrigin::TopLeft, bool adopted = false);
+      ImageOrigin origin = ImageOrigin::TopLeft, bool adopted = false,
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Creates a RenderTargetProxy for the specified HardwareBuffer and sample count. Returns nullptr
    * if the hardware buffer is not renderable.
    */
-  std::shared_ptr<RenderTargetProxy> createRenderTargetProxy(HardwareBufferRef hardwareBuffer,
-                                                             int sampleCount = 1);
+  std::shared_ptr<RenderTargetProxy> createRenderTargetProxy(
+      HardwareBufferRef hardwareBuffer, int sampleCount = 1,
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Creates a RenderTargetProxy with specified width, height, format, sample count, mipmap state
@@ -139,7 +141,8 @@ class ProxyProvider {
   std::shared_ptr<RenderTargetProxy> createRenderTargetProxy(
       const UniqueKey& uniqueKey, int width, int height, PixelFormat format, int sampleCount = 1,
       bool mipmapped = false, ImageOrigin origin = ImageOrigin::TopLeft,
-      BackingFit backingFit = BackingFit::Exact, uint32_t renderFlags = 0);
+      BackingFit backingFit = BackingFit::Exact, uint32_t renderFlags = 0,
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   /*
    * Purges all unreferenced proxies.

@@ -25,7 +25,8 @@ std::shared_ptr<ColorFilter> ColorFilter::Luma() {
   return std::make_shared<LumaColorFilter>();
 }
 
-PlacementPtr<FragmentProcessor> LumaColorFilter::asFragmentProcessor(Context* context) const {
+PlacementPtr<FragmentProcessor> LumaColorFilter::asFragmentProcessor(
+    Context* context, std::shared_ptr<ColorSpace>) const {
   return LumaFragmentProcessor::Make(context->drawingBuffer());
 }
 

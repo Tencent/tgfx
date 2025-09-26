@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "base/Drawers.h"
+#include "tgfx/core/ColorSpace.h"
 
 namespace drawers {
 void ConicGradient::onDraw(tgfx::Canvas* canvas, const AppHost* host) {
