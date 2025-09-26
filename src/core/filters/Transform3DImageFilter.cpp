@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Transform3DImageFilter.h"
+#include "core/utils/MathExtra.h"
 #include "core/utils/PlacementPtr.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/TPArgs.h"
@@ -27,13 +28,11 @@
 
 namespace tgfx {
 
-std::shared_ptr<ImageFilter> ImageFilter::Transform3D(const Matrix3D& matrix,
-                                                      const Size& viewportSize) {
-  return std::make_shared<Transform3DImageFilter>(matrix, viewportSize);
+std::shared_ptr<ImageFilter> ImageFilter::Transform3D(const Matrix3D& matrix) {
+  return std::make_shared<Transform3DImageFilter>(matrix);
 }
 
-Transform3DImageFilter::Transform3DImageFilter(const Matrix3D& matrix, const Size& viewportSize)
-    : _matrix(matrix), _viewportSize(viewportSize) {
+Transform3DImageFilter::Transform3DImageFilter(const Matrix3D& matrix) : _matrix(matrix) {
 }
 
 void Transform3DImageFilter::setOrigin(const Point& origin) {
@@ -42,27 +41,33 @@ void Transform3DImageFilter::setOrigin(const Point& origin) {
 
 Rect Transform3DImageFilter::onFilterBounds(const Rect& srcRect) const {
   // Align the camera center with the center of the source rect.
-  //
-  // The standard rectangle XYWH(-viewSize.width * 0.5, -viewSize.height * 0.5, viewSize.width,
-  // viewSize.height). After applying the matrix, the projected rectangle in the NDC coordinate
-  // system is XYWH[-1, 1, 2, 2]. For convenience, the top-left vertex of the standard rectangle is
-  // set to (0,0). Combined with srcRect, a model rectangle is constructed. The minimum axis-aligned
-  // bounding rectangle of srcRect after projection is calculated based on the size after applying
-  // the matrix and its relative position to the standard rectangle.
   auto srcModelRect = Rect::MakeXYWH(-srcRect.width() * _origin.x, -srcRect.height() * _origin.y,
                                      srcRect.width(), srcRect.height());
-  auto ndcRect = _matrix.mapRect(srcModelRect);
-  auto result = Rect::MakeXYWH(
-      ndcRect.left * _viewportSize.width * 0.5f - srcModelRect.left + srcRect.left,
-      ndcRect.top * _viewportSize.height * 0.5f - srcModelRect.top + srcRect.top,
-      ndcRect.width() * _viewportSize.width * 0.5f, ndcRect.height() * _viewportSize.height * 0.5f);
+  auto dstModelRect = _matrix.mapRect(srcModelRect);
+  // The minimum axis-aligned bounding rectangle of srcRect after projection is calculated based on
+  // its relative position to the standard rectangle.
+  auto result = Rect::MakeXYWH(dstModelRect.left - srcModelRect.left + srcRect.left,
+                               dstModelRect.top - srcModelRect.top + srcRect.top,
+                               dstModelRect.width(), dstModelRect.height());
   return result;
 }
 
 std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
     std::shared_ptr<Image> source, const Rect& renderBounds, const TPArgs& args) const {
+  float dstDrawWidth = renderBounds.width();
+  float dstDrawHeight = renderBounds.height();
+  DEBUG_ASSERT(args.drawScale > 0.f);
+  if (!FloatNearlyEqual(args.drawScale, 1.f)) {
+    dstDrawWidth = dstDrawWidth * args.drawScale;
+    dstDrawHeight = dstDrawHeight * args.drawScale;
+  }
+  dstDrawWidth = std::ceil(dstDrawWidth);
+  dstDrawHeight = std::ceil(dstDrawHeight);
+  const float drawScaleX = dstDrawWidth / renderBounds.width();
+  const float drawScaleY = dstDrawHeight / renderBounds.height();
+
   auto renderTarget = RenderTargetProxy::MakeFallback(
-      args.context, static_cast<int>(renderBounds.width()), static_cast<int>(renderBounds.height()),
+      args.context, static_cast<int>(dstDrawWidth), static_cast<int>(dstDrawHeight),
       source->isAlphaOnly(), 1, args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
   auto sourceTextureProxy = source->lockTextureProxy(args);
 
@@ -70,46 +75,45 @@ std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
   auto srcH = static_cast<float>(source->height());
   // Align the camera center with the initial position center of the source model.
   auto srcModelRect = Rect::MakeXYWH(-srcW * _origin.x, -srcH * _origin.y, srcW, srcH);
-  auto srcNDCRect = _matrix.mapRect(srcModelRect);
+  auto dstModelRect = _matrix.mapRect(srcModelRect);
   // SrcProjectRect is the result of projecting srcRect onto the canvas. RenderBounds describes a
   // subregion that needs to be drawn within it.
   auto srcProjectRect =
-      Rect::MakeXYWH(srcNDCRect.left * _viewportSize.width * 0.5f - srcModelRect.left,
-                     srcNDCRect.top * _viewportSize.height * 0.5f - srcModelRect.top,
-                     srcNDCRect.width() * _viewportSize.width * 0.5f,
-                     srcNDCRect.height() * _viewportSize.height * 0.5f);
+      Rect::MakeXYWH(dstModelRect.left - srcModelRect.left, dstModelRect.top - srcModelRect.top,
+                     dstModelRect.width(), dstModelRect.height());
   // ndcScale and ndcOffset are used to scale and translate the NDC coordinates to ensure that only
   // the content within RenderBounds is drawn to the render target. This clips regions beyond the
   // clip space.
-  // NdcScale first maps the NDC coordinates from the view size defined by this->matrix's projection
-  // to the size of srcProjectRect after source projection, then scales up so that the required
-  // drawing area exactly fills the -1 to 1 clip region. The scale formula is:
-  // ((viewsize / srcProjectRect) * (srcProjectRect / renderBounds))
-  const Vec2 ndcScale(_viewportSize.width / renderBounds.width(),
-                      _viewportSize.height / renderBounds.height());
+  // NdcScale first maps the projected coordinates to the NDC region [-1, 1], then scales them so
+  // that the required drawing area exactly fills the [-1, 1] clip region. The scaling formula is:
+  // ((2 / srcProjectRect) * (srcProjectRect / renderBounds))
+  // Scaling the original image with drawScale does not affect the calculation result of ndcScale.
+  const Vec2 ndcScale(2.0f / renderBounds.width(), 2.0f / renderBounds.height());
   // ndcOffset translates the NDC coordinates so that the local area to be drawn aligns exactly with
   // the (-1, -1) point.
   auto ndcRectScaled =
-      Rect::MakeXYWH(srcNDCRect.left * ndcScale.x, srcNDCRect.top * ndcScale.y,
-                     srcNDCRect.width() * ndcScale.x, srcNDCRect.height() * ndcScale.y);
-  const Vec2 renderBoundsLTNDC(
-      (renderBounds.left - srcProjectRect.left) * ndcRectScaled.width() / srcProjectRect.width(),
-      (renderBounds.top - srcProjectRect.top) * ndcRectScaled.height() / srcProjectRect.height());
-  const Vec2 ndcOffset(-1.f - ndcRectScaled.left - renderBoundsLTNDC.x,
-                       -1.f - ndcRectScaled.top - renderBoundsLTNDC.y);
+      Rect::MakeXYWH(dstModelRect.left * ndcScale.x, dstModelRect.top * ndcScale.y,
+                     dstModelRect.width() * ndcScale.x, dstModelRect.height() * ndcScale.y);
+  const Vec2 renderBoundsLTNDCScaled((renderBounds.left - srcProjectRect.left) * ndcScale.x,
+                                     (renderBounds.top - srcProjectRect.top) * ndcScale.y);
+  const Vec2 ndcOffset(-1.f - ndcRectScaled.left - renderBoundsLTNDCScaled.x,
+                       -1.f - ndcRectScaled.top - renderBoundsLTNDCScaled.y);
 
   auto drawingManager = args.context->drawingManager();
   auto drawingBuffer = args.context->drawingBuffer();
   auto vertexProvider =
       RectsVertexProvider::MakeFrom(drawingBuffer, srcModelRect, AAType::Coverage);
-  const Size viewportSise(static_cast<float>(renderTarget->width()),
+  const Size viewportSize(static_cast<float>(renderTarget->width()),
                           static_cast<float>(renderTarget->height()));
-  const Rect3DDrawArgs drawArgs{_matrix, ndcScale, ndcOffset, viewportSise};
+  const Rect3DDrawArgs drawArgs{_matrix, ndcScale, ndcOffset, viewportSize};
   auto drawOp =
       Rect3DDrawOp::Make(args.context, std::move(vertexProvider), args.renderFlags, drawArgs);
   const SamplingArgs samplingArgs = {TileMode::Decal, TileMode::Decal, {}, SrcRectConstraint::Fast};
   // Ensure the vertex texture sampling coordinates are in the range [0, 1]
   auto uvMatrix = Matrix::MakeTrans(-srcModelRect.left, -srcModelRect.top);
+  // The Size obtained from Source is the original size, while the texture size generated by Source
+  // is the size after applying DrawScale. Texture sampling requires corresponding scaling.
+  uvMatrix.postScale(drawScaleX, drawScaleY);
   auto fragmentProcessor =
       TextureEffect::Make(std::move(sourceTextureProxy), samplingArgs, &uvMatrix);
   drawOp->addColorFP(std::move(fragmentProcessor));

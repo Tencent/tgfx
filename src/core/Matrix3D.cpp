@@ -186,21 +186,6 @@ Matrix3D Matrix3D::Perspective(float fovyDegress, float aspect, float nearZ, flo
   return m;
 }
 
-Matrix3D Matrix3D::ProjectionCSS(float eyeDistance, float left, float right, float top,
-                                 float bottom, float farZ) {
-  auto m = Matrix3D::I();
-  m.setRowCol(0, 0, 2.f / (right - left));
-  m.setRowCol(1, 1, 2.f / (top - bottom));
-  m.setRowCol(0, 2, (right + left) / ((right - left) * eyeDistance));
-  m.setRowCol(1, 2, (top + bottom) / ((top - bottom) * eyeDistance));
-  m.setRowCol(2, 2, (2 - (farZ + eyeDistance) / eyeDistance) / (farZ - eyeDistance));
-  m.setRowCol(3, 2, -1.f / eyeDistance);
-  m.setRowCol(0, 3, -(right + left) / (right - left));
-  m.setRowCol(1, 3, -(top + bottom) / (top - bottom));
-  m.setRowCol(2, 3, -1.f + farZ / eyeDistance - m.getRowCol(2, 2) * eyeDistance);
-  return m;
-}
-
 Rect Matrix3D::mapRect(const Rect& src) const {
   if (hasPerspective()) {
     return MapRectPerspective(src, values);
@@ -244,10 +229,10 @@ void Matrix3D::setConcat(const Matrix3D& a, const Matrix3D& b) {
   auto m2 = compute(b.getCol(2));
   auto m3 = compute(b.getCol(3));
 
-  setCol(0, m0);
-  setCol(1, m1);
-  setCol(2, m2);
-  setCol(3, m3);
+  setColumn(0, m0);
+  setColumn(1, m1);
+  setColumn(2, m2);
+  setColumn(3, m3);
 }
 
 void Matrix3D::preConcat(const Matrix3D& m) {
@@ -267,9 +252,9 @@ void Matrix3D::preScale(float sx, float sy, float sz) {
   auto c1 = getCol(1);
   auto c2 = getCol(2);
 
-  setCol(0, c0 * sx);
-  setCol(1, c1 * sy);
-  setCol(2, c2 * sz);
+  setColumn(0, c0 * sx);
+  setColumn(1, c1 * sy);
+  setColumn(2, c2 * sz);
 }
 
 void Matrix3D::postScale(float sx, float sy, float sz) {
@@ -286,7 +271,7 @@ void Matrix3D::preTranslate(float tx, float ty, float tz) {
   auto c2 = getCol(2);
   auto c3 = getCol(3);
 
-  setCol(3, (c0 * tx + c1 * ty + c2 * tz + c3));
+  setColumn(3, (c0 * tx + c1 * ty + c2 * tz + c3));
 }
 
 void Matrix3D::postTranslate(float tx, float ty, float tz) {

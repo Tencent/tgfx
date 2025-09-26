@@ -30,9 +30,12 @@ namespace tgfx {
 class Transform3DImageFilter final : public ImageFilter {
  public:
   /**
-   * Creates a Transform3DImageFilter with the specified PerspectiveInfo.
+   * Creates a Transform3DImageFilter with the specified transformation matrix.
+   * The transformation matrix transforms 3D model coordinates to destination coordinates for x and
+   * y before perspective division. The z value is mapped to the [-1, 1] range before perspective
+   * division; content outside this z range will be clipped.
    */
-  explicit Transform3DImageFilter(const Matrix3D& matrix, const Size& viewportSize);
+  explicit Transform3DImageFilter(const Matrix3D& matrix);
 
   /**
    * Sets the anchor point for the layer's 3D transformation, as well as the center point observed
@@ -70,11 +73,6 @@ class Transform3DImageFilter final : public ImageFilter {
   Matrix3D _matrix = Matrix3D::I();
 
   Point _origin = {0.5, 0.5};
-
-  /**
-   * View port size, used to map NDC coordinates to window coordinates.
-   */
-  Size _viewportSize = {0, 0};
 };
 
 }  // namespace tgfx

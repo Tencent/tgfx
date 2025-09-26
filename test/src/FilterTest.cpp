@@ -848,18 +848,21 @@ TGFX_TEST(FilterTest, Transform3DImageFilter) {
     canvas->save();
     canvas->clear();
 
-    // The camera position for the CSS perspective projection model.
-    static constexpr float CSSEyeZ = 1200.f;
-    // The position of the far plane on the Z axis for the CSS perspective projection model.
-    static constexpr float CSSFarZ = -500.f;
-    auto cssProjectionMatrix =
-        Matrix3D::ProjectionCSS(CSSEyeZ, -imageSize.width * 0.5f, imageSize.width * 0.5f,
-                                imageSize.height * 0.5f, -imageSize.height * 0.5f, CSSFarZ);
-    auto modelMatrix = Matrix3D::MakeRotate({0.f, 1.f, 0.f}, 45.f);
-    modelMatrix.postTranslate(0.f, 0.f, 1.f / 100.f);
-    auto transform = cssProjectionMatrix * modelMatrix;
-    auto cssTransform3DFilter = ImageFilter::Transform3D(transform, imageSize);
+    auto cssPerspectiveMatrix = Matrix3D::I();
+    constexpr float eyeDistance = 1200.f;
+    constexpr float farZ = -1000.f;
+    constexpr float shift = 10.f;
+    const float nearZ = eyeDistance - shift;
+    const float m22 = (2 - (farZ + nearZ) / eyeDistance) / (farZ - nearZ);
+    cssPerspectiveMatrix.setRowColumn(2, 2, m22);
+    const float m23 = -1.f + nearZ / eyeDistance - cssPerspectiveMatrix.getRowColumn(2, 2) * nearZ;
+    cssPerspectiveMatrix.setRowColumn(2, 3, m23);
+    cssPerspectiveMatrix.setRowColumn(3, 2, -1.f / eyeDistance);
 
+    auto modelMatrix = Matrix3D::MakeRotate({0.f, 1.f, 0.f}, 45.f);
+    modelMatrix.postTranslate(0.f, 0.f, -100.f);
+    auto transform = cssPerspectiveMatrix * modelMatrix;
+    auto cssTransform3DFilter = ImageFilter::Transform3D(transform);
     Paint paint = {};
     paint.setImageFilter(cssTransform3DFilter);
     canvas->drawImage(image, 45.f, 45.f, &paint);
@@ -869,33 +872,51 @@ TGFX_TEST(FilterTest, Transform3DImageFilter) {
     canvas->restore();
   }
 
+  const float halfImageW = imageSize.width * 0.5f;
+  const float halfImageH = imageSize.height * 0.5f;
+  auto standardvViewportMatrix = Matrix3D::MakeScale(halfImageW, halfImageH, 1.f);
+  auto invStandardViewportMatrix = Matrix3D::MakeScale(1.f / halfImageW, 1.f / halfImageH, 1.f);
   // The field of view (in degrees) for the standard perspective projection model.
-  static constexpr float StandardFovYDegress = 45.f;
+  constexpr float standardFovYDegress = 45.f;
   // The maximum position of the near plane on the Z axis for the standard perspective projection model.
-  static constexpr float StandardMaxNearZ = 0.25f;
+  constexpr float standardMaxNearZ = 0.25f;
   // The minimum position of the far plane on the Z axis for the standard perspective projection model.
-  static constexpr float StandardMinFarZ = 1000.f;
+  constexpr float standardMinFarZ = 1000.f;
   // The target position of the camera for the standard perspective projection model, in pixels.
-  static constexpr Vec3 StandardEyeCenter = {0.f, 0.f, 0.f};
+  constexpr Vec3 standardEyeCenter = {0.f, 0.f, 0.f};
   // The up direction unit vector for the camera in the standard perspective projection model.
   static constexpr Vec3 StandardEyeUp = {0.f, 1.f, 0.f};
-  const float eyePositionZ = 0.5f * static_cast<float>(image->height()) /
-                             tanf(DegreesToRadians(StandardFovYDegress * 0.5f));
+  const float eyePositionZ = 1.f / tanf(DegreesToRadians(standardFovYDegress * 0.5f));
   const Vec3 eyePosition = {0.f, 0.f, eyePositionZ};
-  auto viewMatrix = Matrix3D::LookAt(eyePosition, StandardEyeCenter, StandardEyeUp);
+  auto viewMatrix = Matrix3D::LookAt(eyePosition, standardEyeCenter, StandardEyeUp);
   // Ensure nearZ is not too far away or farZ is not too close to avoid precision issues. For
   // example, if the z value of the near plane is less than 0, the projected model will be
   // outside the clipping range, or if the far plane is too close, the projected model may
   // exceed the clipping range with a slight rotation.
-  const float nearZ = std::min(StandardMaxNearZ, eyePositionZ * 0.1f);
-  const float farZ = std::max(StandardMinFarZ, eyePositionZ * 10.f);
+  const float nearZ = std::min(standardMaxNearZ, eyePositionZ * 0.1f);
+  const float farZ = std::max(standardMinFarZ, eyePositionZ * 10.f);
   auto perspectiveMatrix = Matrix3D::Perspective(
-      StandardFovYDegress, static_cast<float>(image->width()) / static_cast<float>(image->height()),
+      standardFovYDegress, static_cast<float>(image->width()) / static_cast<float>(image->height()),
       nearZ, farZ);
   auto modelMatrix = Matrix3D::MakeRotate({0.f, 1.f, 0.f}, 45.f);
-  modelMatrix.postTranslate(0.f, 0.f, -10.f);
-  auto standardTransform = perspectiveMatrix * viewMatrix * modelMatrix;
-  auto standardTransform3DFilter = ImageFilter::Transform3D(standardTransform, imageSize);
+  modelMatrix.postTranslate(0.f, 0.f, -10.f / imageSize.width);
+  auto standardTransform = standardvViewportMatrix * perspectiveMatrix * viewMatrix * modelMatrix *
+                           invStandardViewportMatrix;
+  auto standardTransform3DFilter = ImageFilter::Transform3D(standardTransform);
+
+  // Test scale drawing with standard perspective type.
+  {
+    canvas->save();
+    canvas->clear();
+
+    auto filteredImage = image->makeWithFilter(standardTransform3DFilter);
+    canvas->setMatrix(Matrix::MakeScale(0.5f, 0.5f));
+    canvas->drawImage(filteredImage, 45.f, 45.f, {});
+
+    context->flushAndSubmit();
+    EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/Transorm3DImageFilterStandardScale"));
+    canvas->restore();
+  }
 
   // Test basic drawing with standard perspective type.
   {

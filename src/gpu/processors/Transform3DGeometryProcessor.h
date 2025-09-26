@@ -38,7 +38,7 @@ class Transform3DGeometryProcessor : public GeometryProcessor {
                                                          const Vec2& ndcOffset);
 
   std::string name() const override {
-    return "QuadPerEdgeAA3DGeometryProcessor";
+    return "Transform3DGeometryProcessor";
   }
 
  protected:

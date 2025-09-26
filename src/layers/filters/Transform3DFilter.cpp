@@ -21,9 +21,8 @@
 
 namespace tgfx {
 
-std::shared_ptr<Transform3DFilter> Transform3DFilter::Make(const Matrix3D& matrix,
-                                                           const Size& viewportSize) {
-  return std::shared_ptr<Transform3DFilter>(new Transform3DFilter(matrix, viewportSize));
+std::shared_ptr<Transform3DFilter> Transform3DFilter::Make(const Matrix3D& matrix) {
+  return std::shared_ptr<Transform3DFilter>(new Transform3DFilter(matrix));
 }
 
 void Transform3DFilter::setMatrix(const Matrix3D& matrix) {
@@ -42,20 +41,11 @@ void Transform3DFilter::setOrigin(const Point& origin) {
   invalidateFilter();
 }
 
-void Transform3DFilter::setViewportSize(const Size& size) {
-  if (_viewportSize == size) {
-    return;
-  }
-  _viewportSize = size;
-  invalidateFilter();
-}
-
-Transform3DFilter::Transform3DFilter(const Matrix3D& matrix, const Size& viewportSize)
-    : _matrix(matrix), _viewportSize(viewportSize) {
+Transform3DFilter::Transform3DFilter(const Matrix3D& matrix) : _matrix(matrix) {
 }
 
 std::shared_ptr<ImageFilter> Transform3DFilter::onCreateImageFilter(float) {
-  auto filter = std::make_shared<Transform3DImageFilter>(_matrix, _viewportSize);
+  auto filter = std::make_shared<Transform3DImageFilter>(_matrix);
   filter->setOrigin(_origin);
   return filter;
 }

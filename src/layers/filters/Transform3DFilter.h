@@ -28,9 +28,12 @@ namespace tgfx {
 class Transform3DFilter final : public LayerFilter {
  public:
   /**
-   * Creates a Transform3DFilter with the specified LayerPerspectiveInfo.
+   * Creates a Transform3DFilter with the specified transformation matrix.
+   * The transformation matrix transforms 3D model coordinates to destination coordinates for x and
+   * y before perspective division. The z value is mapped to the [-1, 1] range before perspective
+   * division; content outside this z range will be clipped.
    */
-  static std::shared_ptr<Transform3DFilter> Make(const Matrix3D& matrix, const Size& viewportSize);
+  static std::shared_ptr<Transform3DFilter> Make(const Matrix3D& matrix);
 
   /**
    * Returns the 3D transformation matrix. This matrix maps the layer's bounding rectangle model
@@ -56,17 +59,8 @@ class Transform3DFilter final : public LayerFilter {
    */
   void setOrigin(const Point& origin);
 
-  /**
-   * View port size, used to map NDC coordinates to window coordinates.
-   */
-  Size viewportSize() const {
-    return _viewportSize;
-  }
-
-  void setViewportSize(const Size& size);
-
  private:
-  explicit Transform3DFilter(const Matrix3D& matrix, const Size& viewportSize);
+  explicit Transform3DFilter(const Matrix3D& matrix);
 
   Type type() const override {
     return Type::Transform3DFilter;
@@ -77,8 +71,6 @@ class Transform3DFilter final : public LayerFilter {
   Matrix3D _matrix = Matrix3D::I();
 
   Point _origin = {0.5, 0.5};
-
-  Size _viewportSize = {0, 0};
 };
 
 }  // namespace tgfx

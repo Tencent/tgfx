@@ -381,10 +381,6 @@ void SerializeUtils::FillComplexObjSerMap(const Matrix3D& matrix, uint64_t objID
   (*map)[objID] = [matrix]() { return Matrix3DSerialization::Serialize(&matrix); };
 }
 
-void SerializeUtils::FillComplexObjSerMap(const Size& size, uint64_t objID, ComplexObjSerMap* map) {
-  (*map)[objID] = [size]() { return SizeSerialization::Serialize(&size); };
-}
-
 void SerializeUtils::SetFlexBufferMap(flexbuffers::Builder& fbb, const char* key, const char* value,
                                       bool isAddress, bool isExpandable,
                                       std::optional<uint64_t> objID, bool isRenderableObj) {
