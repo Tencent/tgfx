@@ -64,7 +64,7 @@ class Rect3DDrawOp : public DrawOp {
  private:
   Rect3DDrawOp(RectsVertexProvider* provider, const Rect3DDrawArgs& drawArgs);
 
-  PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
+  PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget, std::shared_ptr<ColorSpace> dstColorSpace) override;
 
   void onDraw(RenderPass* renderPass) override;
 

@@ -49,7 +49,7 @@ Rect Transform3DImageFilter::onFilterBounds(const Rect& srcRect) const {
 }
 
 std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
-    std::shared_ptr<Image> source, const Rect& renderBounds, const TPArgs& args) const {
+    std::shared_ptr<Image> source, const Rect& renderBounds, const TPArgs& args, std::shared_ptr<ColorSpace>) const {
   float dstDrawWidth = renderBounds.width();
   float dstDrawHeight = renderBounds.height();
   DEBUG_ASSERT(args.drawScale > 0.f);
@@ -123,8 +123,8 @@ std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
 
 PlacementPtr<FragmentProcessor> Transform3DImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-    SrcRectConstraint constraint, const Matrix* uvMatrix) const {
-  return makeFPFromTextureProxy(source, args, sampling, constraint, uvMatrix);
+    SrcRectConstraint constraint, const Matrix* uvMatrix, std::shared_ptr<ColorSpace> dstColorSpace) const {
+  return makeFPFromTextureProxy(source, args, sampling, constraint, uvMatrix, std::move(dstColorSpace));
 }
 
 }  // namespace tgfx
