@@ -33,8 +33,8 @@ class GLBuffer : public GPUBuffer, public GLResource {
   /**
    * Creates a new GLBuffer with the specified size and usage flags.
    */
-  GLBuffer(unsigned bufferID, size_t size, uint32_t usage)
-      : GPUBuffer(size, usage), uniqueID(UniqueID::Next()), _bufferID(bufferID) {
+  GLBuffer(std::shared_ptr<GLInterface> interface, unsigned bufferID, size_t size, uint32_t usage)
+      : GPUBuffer(size, usage), _interface(std::move(interface)), uniqueID(UniqueID::Next()), _bufferID(bufferID) {
   }
 
   /**
@@ -49,13 +49,16 @@ class GLBuffer : public GPUBuffer, public GLResource {
     return _bufferID;
   }
 
-  void* map(GPU* gpu, size_t offset, size_t size) override;
+  void* map() override;
 
-  void unmap(GPU* gpu) override;
+  void unmap() override;
 
  protected:
+  std::shared_ptr<GLInterface> _interface = nullptr;
   uint32_t uniqueID = 0;
   unsigned _bufferID = 0;
+  void* mappedAddress = nullptr;
+  bool isMapped = false;
 
   void onRelease(GLGPU* gpu) override;
 

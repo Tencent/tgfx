@@ -15,29 +15,29 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
+
 #pragma once
 
-#include "gpu/opengl/GLBuffer.h"
+#include "GLBuffer.h"
 
 namespace tgfx {
-class WebGLBuffer : public GLBuffer {
+class GLUniformBuffer : public GLBuffer {
  public:
-  /**
-   * Creates a new WebGLBuffer with the specified size and usage flags.
-   */
-  WebGLBuffer(unsigned bufferID, size_t size, uint32_t usage);
+  explicit GLUniformBuffer(size_t size);
 
-  ~WebGLBuffer() override;
+  ~GLUniformBuffer() override;
 
-  void* map(GPU* gpu, size_t offset, size_t size) override;
+  void* map() override;
 
-  void unmap(GPU* gpu) override;
+  void unmap() override;
 
-  void onRelease(GLGPU* gpu) override;
+  const void* data() const {
+    return mappedAddress;
+  }
 
  private:
-  size_t _mappedOffset = 0;
-  size_t _mappedSize = 0;
+  uint32_t uniqueID = 0;
+  void* mappedAddress = nullptr;
 
   void releaseInternal();
 };

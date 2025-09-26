@@ -48,8 +48,7 @@ class GlobalCache {
    * Returns last buffer offset within the returned buffer via lastBufferOffset parameter.
    * Returns nullptr if the requested buffer size exceeds the maximum allowed uniform buffer size.
    */
-  std::shared_ptr<GPUBuffer> findOrCreateUniformBuffer(size_t bufferSize, size_t* lastBufferOffset,
-                                                       bool useFakeUniformBuffer = false);
+  std::shared_ptr<GPUBuffer> findOrCreateUniformBuffer(size_t bufferSize, size_t* lastBufferOffset);
 
   /**
    * After calling Context::flush(), the cached buffer can be reused once the GPU has
@@ -57,7 +56,7 @@ class GlobalCache {
    * Typically, this is done at the start of each frame to allow buffer reuse.
    * This approach minimizes buffer creation and destruction, improving performance.
    */
-  void resetUniformBuffer(bool useFakeUniformBuffer = false);
+  void resetUniformBuffer();
 
   /**
    * Adds a program to the cache with the specified key. If a program with the same key already
@@ -105,7 +104,7 @@ class GlobalCache {
     std::list<GradientTexture*>::iterator cachedPosition = {};
   };
 
-  struct TripleUniformBuffer {
+  struct UniformBufferPacket {
     std::vector<std::shared_ptr<GPUBuffer>> gpuBuffers = {};
     size_t bufferIndex = 0;
     size_t cursor = 0;
@@ -123,7 +122,7 @@ class GlobalCache {
   ResourceKeyMap<std::shared_ptr<Resource>> staticResources = {};
   // Triple buffering for uniform buffer management
   static constexpr uint32_t UNIFORM_BUFFER_COUNT = 3;
-  std::array<TripleUniformBuffer, UNIFORM_BUFFER_COUNT> tripleUniformBuffers = {};
+  std::array<UniformBufferPacket, UNIFORM_BUFFER_COUNT> tripleUniformBuffer = {};
   uint32_t tripleUniformBufferIndex = 0;
   uint64_t counter = 0;
   std::shared_ptr<SlidingWindowTracker> maxUniformBufferTracker = nullptr;

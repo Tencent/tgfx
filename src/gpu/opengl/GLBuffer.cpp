@@ -35,60 +35,34 @@ unsigned GLBuffer::target() const {
   return 0;
 }
 
-void* GLBuffer::map(GPU* gpu, size_t offset, size_t size) {
+void* GLBuffer::map() {
   if (isMapped) {
-    return mappedRange;
-  }
-
-  if (gpu == nullptr) {
-    return nullptr;
-  }
-
-  if (offset + size > _size) {
-    LOGE("GLBuffer::map() out of range!");
-    return nullptr;
+    return mappedAddress;
   }
 
   auto bufferTarget = target();
-  if (bufferTarget == GL_UNIFORM_BUFFER) {
-    auto uboOffsetAlignment = static_cast<size_t>(gpu->caps()->shaderCaps()->uboOffsetAlignment);
-    if (uboOffsetAlignment <= 0 || offset % uboOffsetAlignment != 0) {
-      LOGE("GLBuffer::map() invalid UBO offset:%zu, must be aligned to %zu bytes", offset,
-           uboOffsetAlignment);
-      return nullptr;
-    }
-  } else if (bufferTarget == GL_ELEMENT_ARRAY_BUFFER) {
-    if (offset % 4 != 0) {
-      LOGE("GLBuffer::map() EBO offset:%zu not 4-byte aligned", offset);
-    }
-  }
-
-  auto gl = static_cast<GLGPU*>(gpu)->functions();
+  auto gl = _interface->functions();
   gl->bindBuffer(bufferTarget, _bufferID);
-  mappedRange = gl->mapBufferRange(
-      bufferTarget, static_cast<int32_t>(offset), static_cast<int32_t>(size),
-      GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
-  if (mappedRange != nullptr) {
+  mappedAddress = gl->mapBufferRange(
+      bufferTarget, 0, static_cast<int64_t>(_size),
+      GL_MAP_WRITE_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
+  if (mappedAddress != nullptr) {
     isMapped = true;
   }
-  return mappedRange;
+  return mappedAddress;
 }
 
-void GLBuffer::unmap(GPU* gpu) {
+void GLBuffer::unmap() {
   if (!isMapped) {
     return;
   }
 
-  if (gpu == nullptr) {
-    return;
-  }
-
   auto bufferTarget = target();
-  auto gl = static_cast<GLGPU*>(gpu)->functions();
+  auto gl = _interface->functions();
+  gl->bindBuffer(bufferTarget, _bufferID);
   gl->unmapBuffer(bufferTarget);
-  gl->bindBuffer(bufferTarget, 0);
   isMapped = false;
-  mappedRange = nullptr;
+  mappedAddress = nullptr;
 }
 
 void GLBuffer::onRelease(GLGPU* gpu) {

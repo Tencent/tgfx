@@ -72,22 +72,19 @@ class GPUBuffer {
 
   /**
    * Mapping a GPUBuffer allows the CPU to read from or write to the buffer's memory directly.
-   * The offset and size must be within the bounds of the buffer's size and properly aligned.
    * If the mapping fails, it returns nullptr.
    */
-  virtual void* map(GPU* gpu, size_t offset, size_t size) = 0;
+  virtual void* map() = 0;
 
   /**
    * Unmaps the GPUBuffer, making its contents available for use by the GPU again.
    * If the buffer is not currently mapped, this function does nothing.
    */
-  virtual void unmap(GPU* gpu) = 0;
+  virtual void unmap() = 0;
 
  protected:
   size_t _size = 0;
   uint32_t _usage = 0;
-  void* mappedRange = nullptr;
-  bool isMapped = false;
 
   GPUBuffer(size_t size, uint32_t usage) : _size(size), _usage(usage) {
   }

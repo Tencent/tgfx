@@ -39,8 +39,10 @@ class PipelineProgram : public Program {
   std::shared_ptr<RenderPipeline> pipeline = nullptr;
   std::unique_ptr<UniformData> vertexUniformData = nullptr;
   std::unique_ptr<UniformData> fragmentUniformData = nullptr;
-  std::shared_ptr<GPUBuffer> uniformBuffer = nullptr;
-  size_t uniformBufferBaseOffset = 0;
+  std::shared_ptr<GPUBuffer> vertexUniformBuffer = nullptr;
+  std::shared_ptr<GPUBuffer> fragmentUniformBuffer = nullptr;
+  size_t vertexUniformBufferOffset = 0;
+  size_t fragmentUniformBufferOffset = 0;
 
   friend class ProgramInfo;
 };

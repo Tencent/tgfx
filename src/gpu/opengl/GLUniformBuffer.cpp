@@ -16,48 +16,32 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "FakeUniformBuffer.h"
-#include "core/utils/Log.h"
+#include "GLUniformBuffer.h"
 #include "core/utils/UniqueID.h"
 
 namespace tgfx {
 
-FakeUniformBuffer::FakeUniformBuffer(size_t size)
-    : GPUBuffer(size, GPUBufferUsage::UNIFORM), uniqueID(UniqueID::Next()) {
-  _data = malloc(size);
+GLUniformBuffer::GLUniformBuffer(size_t size)
+    : GLBuffer(nullptr, 0, size, GPUBufferUsage::UNIFORM), uniqueID(UniqueID::Next()) {
 }
 
-FakeUniformBuffer::~FakeUniformBuffer() {
+GLUniformBuffer::~GLUniformBuffer() {
   releaseInternal();
 }
 
-void* FakeUniformBuffer::map(GPU*, size_t offset, size_t size) {
-  if (offset + size > _size) {
-    LOGE("FakeUniformBuffer::map() out of range!");
-    return nullptr;
-  }
-
-  isMapped = true;
-  _mappedOffset = offset;
-  _mappedSize = size;
-  mappedRange = static_cast<uint8_t*>(_data) + offset;
-
-  return mappedRange;
+void* GLUniformBuffer::map() {
+  mappedAddress = malloc(_size);
+  return mappedAddress;
 }
 
-void FakeUniformBuffer::unmap(GPU*) {
-  if (!isMapped) {
-    return;
-  }
-  isMapped = false;
-  mappedRange = nullptr;
+void GLUniformBuffer::unmap() {
+
 }
 
-void FakeUniformBuffer::releaseInternal() {
-  if (_data != nullptr) {
-    free(_data);
+void GLUniformBuffer::releaseInternal() {
+  if (mappedAddress != nullptr) {
+    free(mappedAddress);
+    mappedAddress = nullptr;
   }
-  mappedRange = nullptr;
-  isMapped = false;
 }
 }  // namespace tgfx
