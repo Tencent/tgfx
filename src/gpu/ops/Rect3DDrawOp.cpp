@@ -64,7 +64,8 @@ Rect3DDrawOp::Rect3DDrawOp(RectsVertexProvider* provider, const Rect3DDrawArgs& 
   hasSubset = provider->hasSubset();
 }
 
-PlacementPtr<GeometryProcessor> Rect3DDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget, std::shared_ptr<ColorSpace>) {
+PlacementPtr<GeometryProcessor> Rect3DDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget,
+                                                                      std::shared_ptr<ColorSpace>) {
   auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
   // The actual size of the rendered texture is larger than the valid size, while the current
   // NDC coordinates were calculated based on the valid size, so they need to be adjusted
