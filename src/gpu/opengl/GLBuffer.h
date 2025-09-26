@@ -54,11 +54,12 @@ class GLBuffer : public GPUBuffer, public GLResource {
   void unmap(GPU* gpu) override;
 
  protected:
-  void onRelease(GLGPU* gpu) override;
-
- private:
   uint32_t uniqueID = 0;
   unsigned _bufferID = 0;
+
+  void onRelease(GLGPU* gpu) override;
+
+
 
   friend class GLState;
 };

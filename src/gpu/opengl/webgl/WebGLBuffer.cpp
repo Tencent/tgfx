@@ -22,7 +22,7 @@
 
 namespace tgfx {
 WebGLBuffer::WebGLBuffer(unsigned bufferID, size_t size, uint32_t usage)
-    : GLBuffer(bufferID, size, usage), uniqueID(UniqueID::Next()), _bufferID(bufferID) {
+    : GLBuffer(bufferID, size, usage) {
 }
 
 WebGLBuffer::~WebGLBuffer() {
@@ -39,7 +39,7 @@ void* WebGLBuffer::map(GPU* gpu, size_t offset, size_t size) {
   }
 
   if (offset + size > _size) {
-    LOGE("WebGLBuffer::getMappedRange() out of range!");
+    LOGE("WebGLBuffer::map() out of range!");
     return nullptr;
   }
 
@@ -47,13 +47,13 @@ void* WebGLBuffer::map(GPU* gpu, size_t offset, size_t size) {
   if (bufferTarget == GL_UNIFORM_BUFFER) {
     auto uboOffsetAlignment = static_cast<size_t>(gpu->caps()->shaderCaps()->uboOffsetAlignment);
     if (uboOffsetAlignment <= 0 || offset % uboOffsetAlignment != 0) {
-      LOGE("WebGLBuffer::getMappedRange() invalid UBO offset:%zu, must be aligned to %zu bytes",
+      LOGE("WebGLBuffer::map() invalid UBO offset:%zu, must be aligned to %zu bytes",
            offset, uboOffsetAlignment);
       return nullptr;
     }
   } else if (bufferTarget == GL_ELEMENT_ARRAY_BUFFER) {
     if (offset % 4 != 0) {
-      LOGE("WebGLBuffer::getMappedRange() EBO offset:%zu not 4-byte aligned", offset);
+      LOGE("WebGLBuffer::map() EBO offset:%zu not 4-byte aligned", offset);
     }
   }
 

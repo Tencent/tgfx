@@ -45,7 +45,7 @@ void* GLBuffer::map(GPU* gpu, size_t offset, size_t size) {
   }
 
   if (offset + size > _size) {
-    LOGE("GLBuffer::getMappedRange() out of range!");
+    LOGE("GLBuffer::map() out of range!");
     return nullptr;
   }
 
@@ -53,13 +53,13 @@ void* GLBuffer::map(GPU* gpu, size_t offset, size_t size) {
   if (bufferTarget == GL_UNIFORM_BUFFER) {
     auto uboOffsetAlignment = static_cast<size_t>(gpu->caps()->shaderCaps()->uboOffsetAlignment);
     if (uboOffsetAlignment <= 0 || offset % uboOffsetAlignment != 0) {
-      LOGE("GLBuffer::getMappedRange() invalid UBO offset:%zu, must be aligned to %zu bytes",
+      LOGE("GLBuffer::map() invalid UBO offset:%zu, must be aligned to %zu bytes",
            offset, uboOffsetAlignment);
       return nullptr;
     }
   } else if (bufferTarget == GL_ELEMENT_ARRAY_BUFFER) {
     if (offset % 4 != 0) {
-      LOGE("GLBuffer::getMappedRange() EBO offset:%zu not 4-byte aligned", offset);
+      LOGE("GLBuffer::map() EBO offset:%zu not 4-byte aligned", offset);
     }
   }
 

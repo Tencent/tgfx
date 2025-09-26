@@ -36,8 +36,6 @@ class WebGLBuffer : public GLBuffer {
   void onRelease(GLGPU* gpu) override;
 
  private:
-  uint32_t uniqueID = 0;
-  unsigned _bufferID = 0;
   size_t _mappedOffset = 0;
   size_t _mappedSize = 0;
 

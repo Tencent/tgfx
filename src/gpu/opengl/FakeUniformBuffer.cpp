@@ -33,7 +33,7 @@ FakeUniformBuffer::~FakeUniformBuffer() {
 
 void* FakeUniformBuffer::map(GPU*, size_t offset, size_t size) {
   if (offset + size > _size) {
-    LOGE("FakeUniformBuffer::getMappedRange() out of range!");
+    LOGE("FakeUniformBuffer::map() out of range!");
     return nullptr;
   }
 
