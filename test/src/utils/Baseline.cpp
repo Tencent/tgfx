@@ -105,7 +105,8 @@ static void SetJSONValue(nlohmann::json& target, const std::string& key, const s
   (*json)[jsonKey] = value;
 }
 
-bool Baseline::Compare(std::shared_ptr<PixelBuffer> pixelBuffer, const std::string& key, std::shared_ptr<ColorSpace> colorSpace) {
+bool Baseline::Compare(std::shared_ptr<PixelBuffer> pixelBuffer, const std::string& key,
+                       std::shared_ptr<ColorSpace> colorSpace) {
   if (pixelBuffer == nullptr) {
     return false;
   }
@@ -129,7 +130,8 @@ bool Baseline::Compare(const std::shared_ptr<Surface> surface, const std::string
   return Baseline::Compare(pixmap, key, surface->colorSpace());
 }
 
-bool Baseline::Compare(const Bitmap& bitmap, const std::string& key, std::shared_ptr<ColorSpace> colorSpace) {
+bool Baseline::Compare(const Bitmap& bitmap, const std::string& key,
+                       std::shared_ptr<ColorSpace> colorSpace) {
   if (bitmap.isEmpty()) {
     return false;
   }
@@ -161,7 +163,8 @@ static bool CompareVersionAndMd5(const std::string& md5, const std::string& key,
   return true;
 }
 
-bool Baseline::Compare(const Pixmap& pixmap, const std::string& key, std::shared_ptr<ColorSpace> colorSpace) {
+bool Baseline::Compare(const Pixmap& pixmap, const std::string& key,
+                       std::shared_ptr<ColorSpace> colorSpace) {
   if (pixmap.isEmpty()) {
     return false;
   }

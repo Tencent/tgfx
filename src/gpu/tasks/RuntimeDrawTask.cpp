@@ -139,9 +139,9 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
     LOGE("RuntimeDrawTask::getFlatTexture() Failed to create the color processor!");
     return nullptr;
   }
-  auto geometryProcessor =
-      DefaultGeometryProcessor::Make(context->drawingBuffer(), {}, renderTarget->width(),
-                                     renderTarget->height(), AAType::None, {}, {}, renderTargetProxy->getColorSpace());
+  auto geometryProcessor = DefaultGeometryProcessor::Make(
+      context->drawingBuffer(), {}, renderTarget->width(), renderTarget->height(), AAType::None, {},
+      {}, renderTargetProxy->getColorSpace());
   std::vector fragmentProcessors = {colorProcessor.get()};
   ProgramInfo programInfo(renderTarget.get(), geometryProcessor.get(),
                           std::move(fragmentProcessors), 1, nullptr, BlendMode::Src);

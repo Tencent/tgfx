@@ -35,7 +35,8 @@ class NativeCodec : public ImageCodec {
   std::shared_ptr<Data> imageBytes = nullptr;
   CGImageRef nativeImage = nullptr;
 
-    NativeCodec(int width, int height, Orientation origin, std::shared_ptr<ColorSpace> colorSpace) : ImageCodec(width, height, origin, std::move(colorSpace)) {
+  NativeCodec(int width, int height, Orientation origin, std::shared_ptr<ColorSpace> colorSpace)
+      : ImageCodec(width, height, origin, std::move(colorSpace)) {
   }
 
   friend class ImageCodec;

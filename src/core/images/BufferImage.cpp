@@ -27,7 +27,7 @@
 
 namespace tgfx {
 std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageBuffer> buffer,
-                                        std::shared_ptr<ColorSpace> colorSpace) {
+                                       std::shared_ptr<ColorSpace> colorSpace) {
   if (buffer == nullptr) {
     return nullptr;
   }

@@ -40,7 +40,8 @@ class NativeCodec : public ImageCodec {
 
   OH_ImageSourceNative* CreateImageSource() const;
 
-  NativeCodec(int width, int height, Orientation orientation, std::shared_ptr<ColorSpace> colorSpace)
+  NativeCodec(int width, int height, Orientation orientation,
+              std::shared_ptr<ColorSpace> colorSpace)
       : ImageCodec(width, height, orientation, std::move(colorSpace)) {
   }
 

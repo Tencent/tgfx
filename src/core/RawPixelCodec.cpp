@@ -21,7 +21,8 @@
 
 namespace tgfx {
 std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(const ImageInfo& info,
-                                                 std::shared_ptr<Data> pixels, std::shared_ptr<ColorSpace> colorSpace) {
+                                                 std::shared_ptr<Data> pixels,
+                                                 std::shared_ptr<ColorSpace> colorSpace) {
   if (info.isEmpty() || pixels == nullptr || info.byteSize() > pixels->size()) {
     return nullptr;
   }

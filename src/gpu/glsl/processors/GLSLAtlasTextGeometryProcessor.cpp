@@ -21,7 +21,8 @@
 namespace tgfx {
 PlacementPtr<AtlasTextGeometryProcessor> AtlasTextGeometryProcessor::Make(
     BlockBuffer* buffer, std::shared_ptr<TextureProxy> textureProxy, AAType aa,
-    std::optional<Color> commonColor, const SamplingOptions& sampling, std::shared_ptr<ColorSpace> dstColorSpace) {
+    std::optional<Color> commonColor, const SamplingOptions& sampling,
+    std::shared_ptr<ColorSpace> dstColorSpace) {
   return buffer->make<GLSLAtlasTextGeometryProcessor>(std::move(textureProxy), aa, commonColor,
                                                       sampling, std::move(dstColorSpace));
 }
@@ -29,7 +30,8 @@ PlacementPtr<AtlasTextGeometryProcessor> AtlasTextGeometryProcessor::Make(
 GLSLAtlasTextGeometryProcessor::GLSLAtlasTextGeometryProcessor(
     std::shared_ptr<TextureProxy> textureProxy, AAType aa, std::optional<Color> commonColor,
     const SamplingOptions& sampling, std::shared_ptr<ColorSpace> dstColorSpace)
-    : AtlasTextGeometryProcessor(std::move(textureProxy), aa, commonColor, sampling, std::move(dstColorSpace)) {
+    : AtlasTextGeometryProcessor(std::move(textureProxy), aa, commonColor, sampling,
+                                 std::move(dstColorSpace)) {
 }
 
 void GLSLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
@@ -99,7 +101,7 @@ void GLSLAtlasTextGeometryProcessor::setData(UniformBuffer* vertexUniformBuffer,
     Color dstCommonColor = commonColor.value();
     steps->apply(dstCommonColor.array());
     fragmentUniformBuffer->setData("Color", dstCommonColor);
-  }else {
+  } else {
     helper.setData(vertexUniformBuffer, steps.get());
   }
 }

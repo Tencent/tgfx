@@ -27,9 +27,9 @@
 
 namespace tgfx {
 
-#define CHECK_PIXELS(info, pixels, key, colorSpace)                           \
-  {                                                                           \
-    Pixmap bm(info, pixels);                                                  \
+#define CHECK_PIXELS(info, pixels, key, colorSpace)                                       \
+  {                                                                                       \
+    Pixmap bm(info, pixels);                                                              \
     EXPECT_TRUE(Baseline::Compare(bm, "ReadPixelsTest/" + std::string(key), colorSpace)); \
   }
 
@@ -365,7 +365,7 @@ TGFX_TEST(ReadPixelsTest, WebpCodec) {
   CHECK_PIXELS(A8Info, pixels, "WebpCodec_Decode_Alpha8", colorSpace);
   bytes = ImageCodec::Encode(Pixmap(A8Info, pixels), EncodedFormat::WEBP, 100);
   codec = ImageCodec::MakeFrom(bytes);
-  colorSpace= codec->colorSpace();
+  colorSpace = codec->colorSpace();
   buffer.clear();
   EXPECT_TRUE(codec->readPixels(A8Info, pixels));
   CHECK_PIXELS(A8Info, pixels, "WebpCodec_Encode_Alpha8", colorSpace);

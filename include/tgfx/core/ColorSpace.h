@@ -57,48 +57,48 @@ struct ColorSpacePrimaries {
 
 // Rec. ITU-R BT.709-6, value 1.
 static constexpr ColorSpacePrimaries Rec709Primaries = {0.64f, 0.33f, 0.3f,    0.6f,
-                                               0.15f, 0.06f, 0.3127f, 0.329f};
+                                                        0.15f, 0.06f, 0.3127f, 0.329f};
 
 // Rec. ITU-R BT.470-6 System M (historical), value 4.
 static constexpr ColorSpacePrimaries Rec470SystemMPrimaries = {0.67f, 0.33f, 0.21f, 0.71f,
-                                                      0.14f, 0.08f, 0.31f, 0.316f};
+                                                               0.14f, 0.08f, 0.31f, 0.316f};
 
 // Rec. ITU-R BT.470-6 System B, G (historical), value 5.
 static constexpr ColorSpacePrimaries Rec470SystemBGPrimaries = {0.64f, 0.33f, 0.29f,   0.60f,
-                                                       0.15f, 0.06f, 0.3127f, 0.3290f};
+                                                                0.15f, 0.06f, 0.3127f, 0.3290f};
 
 // Rec. ITU-R BT.601-7 525, value 6.
 static constexpr ColorSpacePrimaries Rec601Primaries = {0.630f, 0.340f, 0.310f,  0.595f,
-                                               0.155f, 0.070f, 0.3127f, 0.3290f};
+                                                        0.155f, 0.070f, 0.3127f, 0.3290f};
 
 // SMPTE ST 240, value 7 (functionally the same as value 6).
 static constexpr ColorSpacePrimaries SMPTE_ST_240Primaries = Rec601Primaries;
 
 // Generic film (colour filters using Illuminant C), value 8.
 static constexpr ColorSpacePrimaries GenericFilmPrimaries = {0.681f, 0.319f, 0.243f, 0.692f,
-                                                    0.145f, 0.049f, 0.310f, 0.316f};
+                                                             0.145f, 0.049f, 0.310f, 0.316f};
 
 // Rec. ITU-R BT.2020-2, value 9.
 static constexpr ColorSpacePrimaries Rec2020Primaries{0.708f, 0.292f, 0.170f,  0.797f,
-                                             0.131f, 0.046f, 0.3127f, 0.3290f};
+                                                      0.131f, 0.046f, 0.3127f, 0.3290f};
 
 // SMPTE ST 428-1, value 10.
 static constexpr ColorSpacePrimaries SMPTE_ST_428_1Primaries = {1.f, 0.f, 0.f,       1.f,
-                                                       0.f, 0.f, 1.f / 3.f, 1.f / 3.f};
+                                                                0.f, 0.f, 1.f / 3.f, 1.f / 3.f};
 
 // SMPTE RP 431-2, value 11.
 static constexpr ColorSpacePrimaries SMPTE_RP_431_2Primaries = {0.680f, 0.320f, 0.265f, 0.690f,
-                                                       0.150f, 0.060f, 0.314f, 0.351f};
+                                                                0.150f, 0.060f, 0.314f, 0.351f};
 
 // SMPTE EG 432-1, value 12.
 static constexpr ColorSpacePrimaries SMPTE_EG_432_1Primaries = {0.680f, 0.320f, 0.265f,  0.690f,
-                                                       0.150f, 0.060f, 0.3127f, 0.3290f};
+                                                                0.150f, 0.060f, 0.3127f, 0.3290f};
 
 // No corresponding industry specification identified, value 22.
 // This is sometimes referred to as EBU 3213-E, but that document doesn't
 // specify these values.
-static constexpr ColorSpacePrimaries ITU_T_H273_Value22Primaries = {0.630f, 0.340f, 0.295f,  0.605f,
-                                                           0.155f, 0.077f, 0.3127f, 0.3290f};
+static constexpr ColorSpacePrimaries ITU_T_H273_Value22Primaries = {
+    0.630f, 0.340f, 0.295f, 0.605f, 0.155f, 0.077f, 0.3127f, 0.3290f};
 
 // Mapping between names of color primaries and the number of the corresponding
 // row in ITU-T H.273, table 2.  As above, the constants are named based on the
@@ -124,7 +124,7 @@ enum class CicpPrimariesId : uint8_t {
 
 // https://www.w3.org/TR/css-color-4/#predefined-prophoto-rgb
 static constexpr ColorSpacePrimaries ProPhotoRGBPrimaries = {0.7347f, 0.2653f, 0.1596f,  0.8404f,
-                                                    0.0366f, 0.0001f, 0.34567f, 0.35850f};
+                                                             0.0366f, 0.0001f, 0.34567f, 0.35850f};
 
 static constexpr TransferFunction SRGBTF = {
     2.4f, (float)(1 / 1.055), (float)(0.055 / 1.055), (float)(1 / 12.92), 0.04045f, 0.0f, 0.0f};
@@ -132,7 +132,7 @@ static constexpr TransferFunction SRGBTF = {
 static constexpr TransferFunction twoDotTwoTF = {2.2f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
 
 static constexpr TransferFunction Rec2020TF = {2.22222f,   0.909672f, 0.0903276f, 0.222222f,
-                                             0.0812429f, 0,         0};
+                                               0.0812429f, 0,         0};
 
 ////////////////////////////////////////////////////////////////////////////////
 // Color primaries defined by ITU-T H.273, table 3. Names are given by the first
@@ -172,7 +172,8 @@ static constexpr TransferFunction Rec2020_10bitTF = Rec709TF;
 static constexpr TransferFunction Rec2020_12bitTF = Rec709TF;
 
 // SMPTE ST 428-1, value 17.
-static constexpr TransferFunction SMPTE_ST_428_1TF = {2.6f, 1.034080527699f, 0.f, 0.f, 0.f, 0.f, 0.f};
+static constexpr TransferFunction SMPTE_ST_428_1TF = {2.6f, 1.034080527699f, 0.f, 0.f, 0.f, 0.f,
+                                                      0.f};
 
 // Mapping between transfer function names and the number of the corresponding
 // row in ITU-T H.273, table 3.  As above, the constants are named based on the

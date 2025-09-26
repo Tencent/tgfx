@@ -28,7 +28,8 @@ class JpegCodec : public ImageCodec {
   static bool IsJpeg(const std::shared_ptr<Data>& data);
 
 #ifdef TGFX_USE_JPEG_ENCODE
-  static std::shared_ptr<Data> Encode(const Pixmap& pixmap, int quality, std::shared_ptr<ColorSpace> colorSpace);
+  static std::shared_ptr<Data> Encode(const Pixmap& pixmap, int quality,
+                                      std::shared_ptr<ColorSpace> colorSpace);
 #endif
 
   uint32_t getScaledDimensions(int newWidth, int newHeight) const;

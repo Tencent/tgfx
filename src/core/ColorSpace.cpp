@@ -19,30 +19,26 @@
 #include "tgfx/core/ColorSpace.h"
 #include <skcms.h>
 #include <cmath>
+#include <sstream>
+#include <vector>
 #include "tgfx/core/Checksum.h"
 #include "utils/Log.h"
-#include <vector>
-#include <sstream>
 
 namespace tgfx {
 
 #if !defined(TGFX_CPU_BENDIAN) && !defined(TGFX_CPU_LENDIAN)
-  #if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
-      #define TGFX_CPU_BENDIAN
-  #elif defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
-      #define TGFX_CPU_LENDIAN
-  #elif defined(__sparc) || defined(__sparc__) || \
-    defined(_POWER) || defined(__powerpc__) || \
-    defined(__ppc__) || defined(__hppa) || \
-    defined(__PPC__) || defined(__PPC64__) || \
-    defined(_MIPSEB) || defined(__ARMEB__) || \
-    defined(__s390__) || \
-    (defined(__sh__) && defined(__BIG_ENDIAN__)) || \
-    (defined(__ia64) && defined(__BIG_ENDIAN__))
-      #define TGFX_CPU_BENDIAN
-  #else
-      #define TGFX_CPU_LENDIAN
-  #endif
+#if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+#define TGFX_CPU_BENDIAN
+#elif defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
+#define TGFX_CPU_LENDIAN
+#elif defined(__sparc) || defined(__sparc__) || defined(_POWER) || defined(__powerpc__) || \
+    defined(__ppc__) || defined(__hppa) || defined(__PPC__) || defined(__PPC64__) ||       \
+    defined(_MIPSEB) || defined(__ARMEB__) || defined(__s390__) ||                         \
+    (defined(__sh__) && defined(__BIG_ENDIAN__)) || (defined(__ia64) && defined(__BIG_ENDIAN__))
+#define TGFX_CPU_BENDIAN
+#else
+#define TGFX_CPU_LENDIAN
+#endif
 #endif
 
 static uint16_t EndianSwap16(uint16_t value) {
@@ -50,18 +46,16 @@ static uint16_t EndianSwap16(uint16_t value) {
 }
 
 static uint32_t EndianSwap32(uint32_t value) {
-  return ((value & 0xFF) << 24) |
-         ((value & 0xFF00) << 8) |
-         ((value & 0xFF0000) >> 8) |
-          (value >> 24);
+  return ((value & 0xFF) << 24) | ((value & 0xFF00) << 8) | ((value & 0xFF0000) >> 8) |
+         (value >> 24);
 }
 
 #ifdef TGFX_CPU_LENDIAN
-  #define Endian_SwapBE16(n)    EndianSwap16(n)
-  #define Endian_SwapBE32(n)    EndianSwap32(n)
+#define Endian_SwapBE16(n) EndianSwap16(n)
+#define Endian_SwapBE32(n) EndianSwap32(n)
 #else
-  #define Endian_SwapBE16(n)    static_cast<uint16_t>(n)
-  #define Endian_SwapBE32(n)    static_cast<uint32_t>(n)
+#define Endian_SwapBE16(n) static_cast<uint16_t>(n)
+#define Endian_SwapBE32(n) static_cast<uint32_t>(n)
 #endif
 
 static bool GetCicp(CicpPrimariesId primaries, ColorSpacePrimaries& colorSpacePrimaries) {
@@ -172,12 +166,9 @@ static bool TransferFnAlmostEqual(float a, float b) {
 }
 
 static bool IsAlmostSRGB(const TransferFunction& coeffs) {
-  return TransferFnAlmostEqual(SRGBTF.a, coeffs.a) &&
-         TransferFnAlmostEqual(SRGBTF.b, coeffs.b) &&
-         TransferFnAlmostEqual(SRGBTF.c, coeffs.c) &&
-         TransferFnAlmostEqual(SRGBTF.d, coeffs.d) &&
-         TransferFnAlmostEqual(SRGBTF.e, coeffs.e) &&
-         TransferFnAlmostEqual(SRGBTF.f, coeffs.f) &&
+  return TransferFnAlmostEqual(SRGBTF.a, coeffs.a) && TransferFnAlmostEqual(SRGBTF.b, coeffs.b) &&
+         TransferFnAlmostEqual(SRGBTF.c, coeffs.c) && TransferFnAlmostEqual(SRGBTF.d, coeffs.d) &&
+         TransferFnAlmostEqual(SRGBTF.e, coeffs.e) && TransferFnAlmostEqual(SRGBTF.f, coeffs.f) &&
          TransferFnAlmostEqual(SRGBTF.g, coeffs.g);
 }
 
@@ -214,14 +205,10 @@ static bool NearlyEqual(float x, float y) {
 }
 
 static bool NearlyEqual(const gfx::skcms_TransferFunction& u,
-                  const gfx::skcms_TransferFunction& v) {
-  return NearlyEqual(u.g, v.g)
-      && NearlyEqual(u.a, v.a)
-      && NearlyEqual(u.b, v.b)
-      && NearlyEqual(u.c, v.c)
-      && NearlyEqual(u.d, v.d)
-      && NearlyEqual(u.e, v.e)
-      && NearlyEqual(u.f, v.f);
+                        const gfx::skcms_TransferFunction& v) {
+  return NearlyEqual(u.g, v.g) && NearlyEqual(u.a, v.a) && NearlyEqual(u.b, v.b) &&
+         NearlyEqual(u.c, v.c) && NearlyEqual(u.d, v.d) && NearlyEqual(u.e, v.e) &&
+         NearlyEqual(u.f, v.f);
 }
 
 static bool NearlyEqual(const gfx::skcms_Matrix3x3& u, const gfx::skcms_Matrix3x3& v) {
@@ -240,7 +227,7 @@ constexpr uint32_t CICPTrfn2Dot2 = 4;
 constexpr uint32_t CICPTrfnLinear = 8;
 
 static uint32_t GetCICPTrfn(const gfx::skcms_TransferFunction& fn) {
-  if(gfx::skcms_TransferFunction_getType(&fn) == gfx::skcms_TFType_sRGBish) {
+  if (gfx::skcms_TransferFunction_getType(&fn) == gfx::skcms_TFType_sRGBish) {
     if (NearlyEqual(fn, *reinterpret_cast<const gfx::skcms_TransferFunction*>(&SRGBTF))) {
       return CICPTrfnSRGB;
     }
@@ -272,7 +259,7 @@ static uint32_t GetCicpPrimaries(const gfx::skcms_Matrix3x3& toXYZD50) {
 }
 
 static std::string GetDescString(const gfx::skcms_TransferFunction& fn,
-                            const gfx::skcms_Matrix3x3& toXYZD50, uint64_t hash) {
+                                 const gfx::skcms_Matrix3x3& toXYZD50, uint64_t hash) {
   const uint32_t cicpTrfn = GetCICPTrfn(fn);
   const uint32_t cicpPrimaries = GetCicpPrimaries(toXYZD50);
 
@@ -287,31 +274,31 @@ static std::string GetDescString(const gfx::skcms_TransferFunction& fn,
     switch (cicpPrimaries) {
       case CICPPrimariesSRGB:
         result += "sRGB";
-      break;
+        break;
       case CICPPrimariesP3:
         result += "Display P3";
-      break;
+        break;
       case CICPPrimariesRec2020:
         result += "Rec2020";
-      break;
+        break;
       default:
         result += "Unknown";
-      break;
+        break;
     }
     result += " Gamut with ";
     switch (cicpTrfn) {
       case CICPTrfnSRGB:
         result += "sRGB";
-      break;
+        break;
       case CICPTrfnLinear:
         result += "Linear";
-      break;
+        break;
       case CICPTrfn2Dot2:
         result += "2.2";
-      break;
+        break;
       default:
         result += "Unknown";
-      break;
+        break;
     }
     result += " Transfer";
     return result;
@@ -333,10 +320,10 @@ static constexpr size_t ICCHeaderSize = 132;
 // Contains a signature (4), offset (4), and size (4).
 static constexpr size_t ICCTagTableEntrySize = 12;
 
-static constexpr uint32_t DisplayProfile    = SetFourByteTag('m', 'n', 't', 'r');
-static constexpr uint32_t RGBColorSpace     = SetFourByteTag('R', 'G', 'B', ' ');
-static constexpr uint32_t XYZPCSSpace       = SetFourByteTag('X', 'Y', 'Z', ' ');
-static constexpr uint32_t ACSPSignature     = SetFourByteTag('a', 'c', 's', 'p');
+static constexpr uint32_t DisplayProfile = SetFourByteTag('m', 'n', 't', 'r');
+static constexpr uint32_t RGBColorSpace = SetFourByteTag('R', 'G', 'B', ' ');
+static constexpr uint32_t XYZPCSSpace = SetFourByteTag('X', 'Y', 'Z', ' ');
+static constexpr uint32_t ACSPSignature = SetFourByteTag('a', 'c', 's', 'p');
 
 static constexpr uint32_t TagRXYZ = SetFourByteTag('r', 'X', 'Y', 'Z');
 static constexpr uint32_t TagGXYZ = SetFourByteTag('g', 'X', 'Y', 'Z');
@@ -348,16 +335,16 @@ static constexpr uint32_t TagBTRC = SetFourByteTag('b', 'T', 'R', 'C');
 static constexpr uint32_t TagCPRT = SetFourByteTag('c', 'p', 'r', 't');
 static constexpr uint32_t TagDESC = SetFourByteTag('d', 'e', 's', 'c');
 
-static constexpr uint32_t TagCurveType     = SetFourByteTag('c', 'u', 'r', 'v');
+static constexpr uint32_t TagCurveType = SetFourByteTag('c', 'u', 'r', 'v');
 static constexpr uint32_t TagParaCurveType = SetFourByteTag('p', 'a', 'r', 'a');
-static constexpr uint32_t TagTextType      = SetFourByteTag('m', 'l', 'u', 'c');
+static constexpr uint32_t TagTextType = SetFourByteTag('m', 'l', 'u', 'c');
 
 enum ParaCurveType {
   ExponentialParaCurveType = 0,
-  GABParaCurveType         = 1,
-  GABCParaCurveType        = 2,
-  GABDEParaCurveType       = 3,
-  GABCDEFParaCurveType     = 4,
+  GABParaCurveType = 1,
+  GABCParaCurveType = 2,
+  GABDEParaCurveType = 3,
+  GABCDEFParaCurveType = 4,
 };
 
 // The D50 illuminant.
@@ -400,10 +387,10 @@ struct ICCHeader {
   // Date and time (ignored)
   uint16_t creation_date_year = Endian_SwapBE16(2025);
   uint16_t creation_date_month = Endian_SwapBE16(9);  // 1-12
-  uint16_t creation_date_day =  Endian_SwapBE16(23);  // 1-31
-  uint16_t creation_date_hours = 0;  // 0-23
-  uint16_t creation_date_minutes = 0;  // 0-59
-  uint16_t creation_date_seconds = 0;  // 0-59
+  uint16_t creation_date_day = Endian_SwapBE16(23);   // 1-31
+  uint16_t creation_date_hours = 0;                   // 0-23
+  uint16_t creation_date_minutes = 0;                 // 0-59
+  uint16_t creation_date_seconds = 0;                 // 0-59
 
   // Profile signature
   uint32_t signature = Endian_SwapBE32(ACSPSignature);
@@ -446,12 +433,12 @@ struct ICCHeader {
 
 static std::shared_ptr<Data> WriteXYZTag(float x, float y, float z) {
   uint32_t data[] = {
-    Endian_SwapBE32(XYZPCSSpace),
-    0,
-    Endian_SwapBE32(static_cast<uint32_t>(FloatRoundToFixed(x))),
-    Endian_SwapBE32(static_cast<uint32_t>(FloatRoundToFixed(y))),
-    Endian_SwapBE32(static_cast<uint32_t>(FloatRoundToFixed(z))),
-};
+      Endian_SwapBE32(XYZPCSSpace),
+      0,
+      Endian_SwapBE32(static_cast<uint32_t>(FloatRoundToFixed(x))),
+      Endian_SwapBE32(static_cast<uint32_t>(FloatRoundToFixed(y))),
+      Endian_SwapBE32(static_cast<uint32_t>(FloatRoundToFixed(z))),
+  };
   return Data::MakeWithCopy(data, sizeof(data));
 }
 
@@ -469,23 +456,22 @@ static void StreamWriteU32BE(std::ostringstream* s, uint32_t value) {
 static std::shared_ptr<Data> WriteTrcTag(const gfx::skcms_Curve& trc) {
   std::ostringstream s{std::ios::binary};
   if (trc.table_entries) {
-    StreamWriteU32BE(&s, TagCurveType);     // Type
-    StreamWriteU32BE(&s, 0);                // Reserved
+    StreamWriteU32BE(&s, TagCurveType);       // Type
+    StreamWriteU32BE(&s, 0);                  // Reserved
     StreamWriteU32BE(&s, trc.table_entries);  // Value count
     for (uint32_t i = 0; i < trc.table_entries; ++i) {
       uint16_t value = reinterpret_cast<const uint16_t*>(trc.table_16)[i];
       s.write((char*)&value, sizeof(value));
     }
   } else {
-    StreamWriteU32BE(&s, TagParaCurveType);       // Type
-    StreamWriteU32BE(&s, 0);                      // Reserved
+    StreamWriteU32BE(&s, TagParaCurveType);  // Type
+    StreamWriteU32BE(&s, 0);                 // Reserved
     const auto& fn = trc.parametric;
     DEBUG_ASSERT(skcms_TransferFunction_isSRGBish(&fn));
-    if (fn.a == 1.f && fn.b == 0.f && fn.c == 0.f && fn.d == 0.f && fn.e == 0.f &&
-        fn.f == 0.f) {
-        StreamWriteU16BE(&s, ExponentialParaCurveType);
-        StreamWriteU16BE(&s, 0);
-        StreamWriteU32BE(&s, static_cast<uint32_t>(FloatRoundToFixed(fn.g)));
+    if (fn.a == 1.f && fn.b == 0.f && fn.c == 0.f && fn.d == 0.f && fn.e == 0.f && fn.f == 0.f) {
+      StreamWriteU16BE(&s, ExponentialParaCurveType);
+      StreamWriteU16BE(&s, 0);
+      StreamWriteU32BE(&s, static_cast<uint32_t>(FloatRoundToFixed(fn.g)));
     } else {
       StreamWriteU16BE(&s, GABCDEFParaCurveType);
       StreamWriteU16BE(&s, 0);
@@ -508,14 +494,14 @@ static std::shared_ptr<Data> WriteTrcTag(const gfx::skcms_Curve& trc) {
 std::shared_ptr<Data> WriteTextTag(const char* text) {
   uint32_t text_length = static_cast<uint32_t>(strlen(text));
   uint32_t header[] = {
-    Endian_SwapBE32(TagTextType),                         // Type signature
-    0,                                                        // Reserved
-    Endian_SwapBE32(1),                                     // Number of records
-    Endian_SwapBE32(12),                                    // Record size (must be 12)
-    Endian_SwapBE32(SetFourByteTag('e', 'n', 'U', 'S')),  // English USA
-    Endian_SwapBE32(2 * text_length),                       // Length of string in bytes
-    Endian_SwapBE32(28),                                    // Offset of string
-};
+      Endian_SwapBE32(TagTextType),                         // Type signature
+      0,                                                    // Reserved
+      Endian_SwapBE32(1),                                   // Number of records
+      Endian_SwapBE32(12),                                  // Record size (must be 12)
+      Endian_SwapBE32(SetFourByteTag('e', 'n', 'U', 'S')),  // English USA
+      Endian_SwapBE32(2 * text_length),                     // Length of string in bytes
+      Endian_SwapBE32(28),                                  // Offset of string
+  };
   std::ostringstream s{std::ios::binary};
   s.write((char*)header, sizeof(header));
   for (size_t i = 0; i < text_length; i++) {
@@ -531,7 +517,8 @@ std::shared_ptr<Data> WriteTextTag(const char* text) {
   return Data::MakeWithCopy(stingData.data(), stingData.size());
 }
 
-static std::shared_ptr<Data> WriteICCProfile(const gfx::skcms_ICCProfile* profile, const char* desc) {
+static std::shared_ptr<Data> WriteICCProfile(const gfx::skcms_ICCProfile* profile,
+                                             const char* desc) {
   ICCHeader header;
   std::vector<std::pair<uint32_t, std::shared_ptr<Data>>> tags;
 
@@ -567,7 +554,7 @@ static std::shared_ptr<Data> WriteICCProfile(const gfx::skcms_ICCProfile* profil
   // Compute copyright tag
   tags.emplace_back(TagCPRT, WriteTextTag("Tencent Inc. 2025"));
 
-  if(desc && *desc != '\0') {
+  if (desc && *desc != '\0') {
     // Compute profile description tag
     tags.emplace(tags.begin(), TagDESC, WriteTextTag(desc));
   }
@@ -601,9 +588,9 @@ static std::shared_ptr<Data> WriteICCProfile(const gfx::skcms_ICCProfile* profil
       lastTagSize = tag.second->size();
     }
     uint32_t tagTableEntry[3] = {
-      Endian_SwapBE32(tag.first),
-      Endian_SwapBE32(static_cast<uint32_t>(lastTagOffset)),
-      Endian_SwapBE32(static_cast<uint32_t>(lastTagSize)),
+        Endian_SwapBE32(tag.first),
+        Endian_SwapBE32(static_cast<uint32_t>(lastTagOffset)),
+        Endian_SwapBE32(static_cast<uint32_t>(lastTagSize)),
     };
     memcpy(tempPtr, tagTableEntry, sizeof(tagTableEntry));
     tempPtr += sizeof(tagTableEntry);
@@ -611,8 +598,7 @@ static std::shared_ptr<Data> WriteICCProfile(const gfx::skcms_ICCProfile* profil
 
   // Write the tags.
   for (const auto& tag : tags) {
-    if (tag.second->empty())
-      continue;
+    if (tag.second->empty()) continue;
     memcpy(tempPtr, tag.second->data(), tag.second->size());
     tempPtr += tag.second->size();
   }
@@ -664,7 +650,7 @@ std::shared_ptr<ColorSpace> ColorSpace::MakeRGB(const TransferFunction& transfer
 }
 
 std::shared_ptr<ColorSpace> ColorSpace::MakeCICP(CicpPrimariesId colorPrimaries,
-                                                 CicpTFId  transferCharacteristics) {
+                                                 CicpTFId transferCharacteristics) {
   TransferFunction trfn;
   if (!GetCicp(transferCharacteristics, trfn)) {
     return nullptr;
@@ -708,8 +694,7 @@ std::shared_ptr<ColorSpace> ColorSpace::MakeFromICC(const void* data, size_t siz
     if (gfx::skcms_TRCs_AreApproximateInverse(
             reinterpret_cast<const gfx::skcms_ICCProfile*>(&profile),
             gfx::skcms_sRGB_Inverse_TransferFunction())) {
-      return ColorSpace::MakeRGB(SRGBTF,
-                                 *reinterpret_cast<Matrix3x3*>(&profile.toXYZD50));
+      return ColorSpace::MakeRGB(SRGBTF, *reinterpret_cast<Matrix3x3*>(&profile.toXYZD50));
     }
     return nullptr;
   }

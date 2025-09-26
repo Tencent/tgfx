@@ -166,13 +166,15 @@ static PlacementPtr<FragmentProcessor> MakeGradient(const Context* context,
     return nullptr;
   }
 
-  for (auto& color : shader.originalColors) {
-    steps.apply(const_cast<float*>(color.array()));
+  auto dstColors = shader.originalColors;
+
+  for (auto& color : dstColors) {
+    steps.apply(color.array());
   }
   // All gradients are colorized the same way, regardless of layout
   PlacementPtr<FragmentProcessor> colorizer =
-      MakeColorizer(context, shader.originalColors.data(), shader.originalPositions.data(),
-                    static_cast<int>(shader.originalColors.size()));
+      MakeColorizer(context, dstColors.data(), shader.originalPositions.data(),
+                    static_cast<int>(dstColors.size()));
   if (colorizer == nullptr) {
     return nullptr;
   }
@@ -181,8 +183,8 @@ static PlacementPtr<FragmentProcessor> MakeGradient(const Context* context,
   // need to do anything to achieve that: i.e., all the colors have a = 1, in which case
   // premultiply is a no op.
   return ClampedGradientEffect::Make(context->drawingBuffer(), std::move(colorizer),
-                                     std::move(layout), shader.originalColors[0],
-                                     shader.originalColors[shader.originalColors.size() - 1]);
+                                     std::move(layout), dstColors[0],
+                                     dstColors[dstColors.size() - 1]);
 }
 
 static Matrix PointsToUnitMatrix(const Point& startPoint, const Point& endPoint) {

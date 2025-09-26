@@ -19,18 +19,18 @@
 #include "GLSLDefaultGeometryProcessor.h"
 
 namespace tgfx {
-PlacementPtr<DefaultGeometryProcessor> DefaultGeometryProcessor::Make(BlockBuffer* buffer,
-                                                                      Color color, int width,
-                                                                      int height, AAType aa,
-                                                                      const Matrix& viewMatrix,
-                                                                      const Matrix& uvMatrix, std::shared_ptr<ColorSpace> dstColorSpace) {
-  return buffer->make<GLSLDefaultGeometryProcessor>(color, width, height, aa, viewMatrix, uvMatrix, std::move(dstColorSpace));
+PlacementPtr<DefaultGeometryProcessor> DefaultGeometryProcessor::Make(
+    BlockBuffer* buffer, Color color, int width, int height, AAType aa, const Matrix& viewMatrix,
+    const Matrix& uvMatrix, std::shared_ptr<ColorSpace> dstColorSpace) {
+  return buffer->make<GLSLDefaultGeometryProcessor>(color, width, height, aa, viewMatrix, uvMatrix,
+                                                    std::move(dstColorSpace));
 }
 
-GLSLDefaultGeometryProcessor::GLSLDefaultGeometryProcessor(Color color, int width, int height,
-                                                           AAType aa, const Matrix& viewMatrix,
-                                                           const Matrix& uvMatrix, std::shared_ptr<ColorSpace> dstColorSpace)
-    : DefaultGeometryProcessor(color, width, height, aa, viewMatrix, uvMatrix), colorSpace(std::move(dstColorSpace)) {
+GLSLDefaultGeometryProcessor::GLSLDefaultGeometryProcessor(
+    Color color, int width, int height, AAType aa, const Matrix& viewMatrix, const Matrix& uvMatrix,
+    std::shared_ptr<ColorSpace> dstColorSpace)
+    : DefaultGeometryProcessor(color, width, height, aa, viewMatrix, uvMatrix),
+      colorSpace(std::move(dstColorSpace)) {
 }
 
 void GLSLDefaultGeometryProcessor::emitCode(EmitArgs& args) const {
@@ -71,7 +71,8 @@ void GLSLDefaultGeometryProcessor::setData(UniformBuffer* vertexUniformBuffer,
                                            FPCoordTransformIter* transformIter) const {
   setTransformDataHelper(uvMatrix, vertexUniformBuffer, transformIter);
   Color dstColor = color;
-  ColorSpaceXformSteps steps{ColorSpace::MakeSRGB().get(), AlphaType::Premultiplied, colorSpace.get(), AlphaType::Premultiplied};
+  ColorSpaceXformSteps steps{ColorSpace::MakeSRGB().get(), AlphaType::Premultiplied,
+                             colorSpace.get(), AlphaType::Premultiplied};
   steps.apply(dstColor.array());
   fragmentUniformBuffer->setData("Color", dstColor);
   vertexUniformBuffer->setData("Matrix", viewMatrix);

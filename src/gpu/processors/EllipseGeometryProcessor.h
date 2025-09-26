@@ -34,7 +34,8 @@ class EllipseGeometryProcessor : public GeometryProcessor {
  public:
   static PlacementPtr<EllipseGeometryProcessor> Make(BlockBuffer* buffer, int width, int height,
                                                      bool stroke, bool useScale,
-                                                     std::optional<Color> commonColor, std::shared_ptr<ColorSpace> dstColorSpace);
+                                                     std::optional<Color> commonColor,
+                                                     std::shared_ptr<ColorSpace> dstColorSpace);
 
   std::string name() const override {
     return "EllipseGeometryProcessor";
@@ -44,7 +45,8 @@ class EllipseGeometryProcessor : public GeometryProcessor {
   DEFINE_PROCESSOR_CLASS_ID
 
   EllipseGeometryProcessor(int width, int height, bool stroke, bool useScale,
-                           std::optional<Color> commonColor, std::shared_ptr<ColorSpace> dstColorSpace);
+                           std::optional<Color> commonColor,
+                           std::shared_ptr<ColorSpace> dstColorSpace);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 

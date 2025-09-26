@@ -440,7 +440,8 @@ bool OpsCompositor::drawAsClear(const Rect& rect, const MCState& state, const Fi
   auto caps = context->caps();
   auto& writeSwizzle = caps->getWriteSwizzle(format);
   Color dstColor = fill.color;
-  ColorSpaceXformSteps steps{ColorSpace::MakeSRGB().get(), AlphaType::Unpremultiplied, renderTarget->getColorSpace().get(), AlphaType::Premultiplied};
+  ColorSpaceXformSteps steps{ColorSpace::MakeSRGB().get(), AlphaType::Unpremultiplied,
+                             renderTarget->getColorSpace().get(), AlphaType::Premultiplied};
   steps.apply(dstColor.array());
   clearColor = writeSwizzle.applyTo(dstColor);
   return true;

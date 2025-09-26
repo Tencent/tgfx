@@ -59,7 +59,8 @@ AtlasTextOp::AtlasTextOp(RectsVertexProvider* provider, std::shared_ptr<TextureP
   }
 }
 
-PlacementPtr<GeometryProcessor> AtlasTextOp::onMakeGeometryProcessor(RenderTarget* renderTarget, std::shared_ptr<ColorSpace> dstColorSpace) {
+PlacementPtr<GeometryProcessor> AtlasTextOp::onMakeGeometryProcessor(
+    RenderTarget* renderTarget, std::shared_ptr<ColorSpace> dstColorSpace) {
   ATTRIBUTE_NAME("rectCount", static_cast<uint32_t>(rectCount));
   ATTRIBUTE_NAME("commonColor", commonColor);
   auto drawingBuffer = renderTarget->getContext()->drawingBuffer();

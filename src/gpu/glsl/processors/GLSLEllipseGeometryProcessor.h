@@ -24,13 +24,15 @@ namespace tgfx {
 class GLSLEllipseGeometryProcessor : public EllipseGeometryProcessor {
  public:
   GLSLEllipseGeometryProcessor(int width, int height, bool stroke, bool useScale,
-                               std::optional<Color> commonColor, std::shared_ptr<ColorSpace> dstColorSpace);
+                               std::optional<Color> commonColor,
+                               std::shared_ptr<ColorSpace> dstColorSpace);
 
   void emitCode(EmitArgs& args) const override;
 
   void setData(UniformBuffer* vertexUniformBuffer, UniformBuffer* fragmentUniformBuffer,
                FPCoordTransformIter* transformIter) const override;
-private:
+
+ private:
   mutable ColorSpaceXformHelper helper;
 };
 }  // namespace tgfx

@@ -29,7 +29,9 @@ PlacementPtr<QuadPerEdgeAAGeometryProcessor> QuadPerEdgeAAGeometryProcessor::Mak
 GLSLQuadPerEdgeAAGeometryProcessor::GLSLQuadPerEdgeAAGeometryProcessor(
     int width, int height, AAType aa, std::optional<Color> commonColor,
     std::optional<Matrix> uvMatrix, bool hasSubset, std::shared_ptr<ColorSpace> dstColorSpace)
-    : QuadPerEdgeAAGeometryProcessor(width, height, aa, commonColor, uvMatrix, hasSubset, std::move(dstColorSpace)), helper() {
+    : QuadPerEdgeAAGeometryProcessor(width, height, aa, commonColor, uvMatrix, hasSubset,
+                                     std::move(dstColorSpace)),
+      helper() {
 }
 
 void GLSLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
@@ -77,7 +79,7 @@ void GLSLQuadPerEdgeAAGeometryProcessor::setData(UniformBuffer* vertexUniformBuf
     Color dstCommonColor = commonColor.value();
     steps->apply(dstCommonColor.array());
     fragmentUniformBuffer->setData("Color", dstCommonColor);
-  }else {
+  } else {
     helper.setData(vertexUniformBuffer, steps.get());
   }
 }

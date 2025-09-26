@@ -25,7 +25,8 @@ namespace tgfx {
 class GLSLAtlasTextGeometryProcessor : public AtlasTextGeometryProcessor {
  public:
   GLSLAtlasTextGeometryProcessor(std::shared_ptr<TextureProxy> textureProxy, AAType aa,
-                                 std::optional<Color> commonColor, const SamplingOptions& sampling, std::shared_ptr<ColorSpace> dstColorSpace);
+                                 std::optional<Color> commonColor, const SamplingOptions& sampling,
+                                 std::shared_ptr<ColorSpace> dstColorSpace);
   void emitCode(EmitArgs&) const override;
 
   void setData(UniformBuffer* vertexUniformBuffer, UniformBuffer* fragmentUniformBuffer,

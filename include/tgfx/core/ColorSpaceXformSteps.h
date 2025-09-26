@@ -37,8 +37,8 @@ struct ColorSpaceXformSteps {
     bool premul = false;
 
     constexpr uint32_t mask() const {
-      return (unPremul ? 1 : 0) | (linearize ? 2 : 0) | (gamutTransform ? 4 : 0) | (encode ? 8 : 0)
-              | (premul ? 16 : 0) |(srcOOTF ? 32 : 0) | (dstOOTF ? 64 : 0);
+      return (unPremul ? 1 : 0) | (linearize ? 2 : 0) | (gamutTransform ? 4 : 0) |
+             (encode ? 8 : 0) | (premul ? 16 : 0) | (srcOOTF ? 32 : 0) | (dstOOTF ? 64 : 0);
     }
   };
 

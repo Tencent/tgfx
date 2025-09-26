@@ -33,7 +33,8 @@ class WebpCodec : public ImageCodec {
   static bool IsWebp(const std::shared_ptr<Data>& data);
 
 #ifdef TGFX_USE_WEBP_ENCODE
-  static std::shared_ptr<Data> Encode(const Pixmap& pixmap, int quality, std::shared_ptr<ColorSpace> colorSpace);
+  static std::shared_ptr<Data> Encode(const Pixmap& pixmap, int quality,
+                                      std::shared_ptr<ColorSpace> colorSpace);
 #endif
 
  protected:

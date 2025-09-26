@@ -120,9 +120,10 @@ void NativeCodec::JNIInit(JNIEnv* env) {
   BitmapClass = env->FindClass("android/graphics/Bitmap");
   Bitmap_copy = env->GetMethodID(BitmapClass.get(), "copy",
                                  "(Landroid/graphics/Bitmap$Config;Z)Landroid/graphics/Bitmap;");
-  Bitmap_getColorSpace = env->GetMethodID(BitmapClass.get(), "getColorSpace", "()Landroid/graphics/ColorSpace;");
-  if(Bitmap_getColorSpace == nullptr){
-      env->ExceptionClear();
+  Bitmap_getColorSpace =
+      env->GetMethodID(BitmapClass.get(), "getColorSpace", "()Landroid/graphics/ColorSpace;");
+  if (Bitmap_getColorSpace == nullptr) {
+    env->ExceptionClear();
   }
   Bitmap_getConfig =
       env->GetMethodID(BitmapClass.get(), "getConfig", "()Landroid/graphics/Bitmap$Config;");
@@ -151,8 +152,8 @@ std::shared_ptr<NativeCodec> NativeCodec::Make(JNIEnv* env, jobject sizeObject, 
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
-  return std::shared_ptr<NativeCodec>(
-      new NativeCodec(width, height, static_cast<Orientation>(orientation), ColorSpace::MakeSRGB()));
+  return std::shared_ptr<NativeCodec>(new NativeCodec(
+      width, height, static_cast<Orientation>(orientation), ColorSpace::MakeSRGB()));
 }
 
 static Orientation GetOrientation(JNIEnv* env, jobject exifInterface) {
@@ -200,7 +201,8 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string& fileP
         env->NewObject(ExifInterfaceClass.get(), ExifInterface_Constructor_Path, imagePath);
   }
   auto origin = GetOrientation(env, exifInterface);
-  auto codec = std::shared_ptr<NativeCodec>(new NativeCodec(width, height, origin, ColorSpace::MakeSRGB()));
+  auto codec =
+      std::shared_ptr<NativeCodec>(new NativeCodec(width, height, origin, ColorSpace::MakeSRGB()));
   codec->imagePath = filePath;
   return codec;
 }
@@ -244,7 +246,8 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data> im
         env->NewObject(ExifInterfaceClass.get(), ExifInterface_Constructor_Stream, inputStream);
   }
   auto origin = GetOrientation(env, exifInterface);
-  auto codec = std::shared_ptr<NativeCodec>(new NativeCodec(width, height, origin, ColorSpace::MakeSRGB()));
+  auto codec =
+      std::shared_ptr<NativeCodec>(new NativeCodec(width, height, origin, ColorSpace::MakeSRGB()));
   codec->imageBytes = imageBytes;
   return codec;
 }
@@ -264,14 +267,15 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(NativeImageRef nativeImage) {
     return nullptr;
   }
   std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB();
-  if(Bitmap_getColorSpace){
-      jobject colorSpaceObj = env->CallObjectMethod(nativeImage, Bitmap_getColorSpace);
-      auto displayP3Obj = env->GetStaticObjectField(ColorSpaceNamedClass.get(), ColorSpaceNamed_DisplayP3);
-      auto displayP3 =
-              env->CallStaticObjectMethod(ColorSpaceClass.get(), ColorSpace_get, displayP3Obj);
-      if(env->IsSameObject(colorSpaceObj, displayP3)){
-          colorSpace = ColorSpace::MakeRGB(SRGBTF, DisplayP3Mat);
-      }
+  if (Bitmap_getColorSpace) {
+    jobject colorSpaceObj = env->CallObjectMethod(nativeImage, Bitmap_getColorSpace);
+    auto displayP3Obj =
+        env->GetStaticObjectField(ColorSpaceNamedClass.get(), ColorSpaceNamed_DisplayP3);
+    auto displayP3 =
+        env->CallStaticObjectMethod(ColorSpaceClass.get(), ColorSpace_get, displayP3Obj);
+    if (env->IsSameObject(colorSpaceObj, displayP3)) {
+      colorSpace = ColorSpace::MakeRGB(SRGBTF, DisplayP3Mat);
+    }
   }
   auto image = std::shared_ptr<NativeCodec>(
       new NativeCodec(info.width(), info.height(), Orientation::TopLeft, colorSpace));

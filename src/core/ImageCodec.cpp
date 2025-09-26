@@ -121,7 +121,8 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(std::shared_ptr<Data> imageByte
   return codec;
 }
 
-std::shared_ptr<Data> ImageCodec::Encode(const Pixmap& pixmap, EncodedFormat format, int quality, std::shared_ptr<ColorSpace> colorSpace) {
+std::shared_ptr<Data> ImageCodec::Encode(const Pixmap& pixmap, EncodedFormat format, int quality,
+                                         std::shared_ptr<ColorSpace> colorSpace) {
   if (pixmap.isEmpty()) {
     return nullptr;
   }

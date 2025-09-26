@@ -22,13 +22,15 @@ namespace tgfx {
 PlacementPtr<EllipseGeometryProcessor> EllipseGeometryProcessor::Make(
     BlockBuffer* buffer, int width, int height, bool stroke, bool useScale,
     std::optional<Color> commonColor, std::shared_ptr<ColorSpace> dstColorSpace) {
-  return buffer->make<GLSLEllipseGeometryProcessor>(width, height, stroke, useScale, commonColor, std::move(dstColorSpace));
+  return buffer->make<GLSLEllipseGeometryProcessor>(width, height, stroke, useScale, commonColor,
+                                                    std::move(dstColorSpace));
 }
 
-GLSLEllipseGeometryProcessor::GLSLEllipseGeometryProcessor(int width, int height, bool stroke,
-                                                           bool useScale,
-                                                           std::optional<Color> commonColor, std::shared_ptr<ColorSpace> dstColorSpace)
-    : EllipseGeometryProcessor(width, height, stroke, useScale, commonColor, std::move(dstColorSpace)) {
+GLSLEllipseGeometryProcessor::GLSLEllipseGeometryProcessor(
+    int width, int height, bool stroke, bool useScale, std::optional<Color> commonColor,
+    std::shared_ptr<ColorSpace> dstColorSpace)
+    : EllipseGeometryProcessor(width, height, stroke, useScale, commonColor,
+                               std::move(dstColorSpace)) {
 }
 
 void GLSLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
@@ -140,7 +142,7 @@ void GLSLEllipseGeometryProcessor::setData(UniformBuffer* vertexUniformBuffer,
     Color dstCommonColor = commonColor.value();
     steps->apply(dstCommonColor.array());
     fragmentUniformBuffer->setData("Color", dstCommonColor);
-  }else {
+  } else {
     helper.setData(vertexUniformBuffer, steps.get());
   }
 }

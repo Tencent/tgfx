@@ -30,7 +30,8 @@ class PngCodec : public ImageCodec {
   bool isAlphaOnly() const override;
 
 #ifdef TGFX_USE_PNG_ENCODE
-  static std::shared_ptr<Data> Encode(const Pixmap& pixmap, int quality, std::shared_ptr<ColorSpace> colorSpace);
+  static std::shared_ptr<Data> Encode(const Pixmap& pixmap, int quality,
+                                      std::shared_ptr<ColorSpace> colorSpace);
 #endif
 
  protected:

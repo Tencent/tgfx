@@ -147,7 +147,8 @@ void SaveImage(const Bitmap& bitmap, const std::string& key) {
   SaveImage(Pixmap(bitmap), key);
 }
 
-void SaveImage(const Pixmap& pixmap, const std::string& key, std::shared_ptr<ColorSpace> colorSpace) {
+void SaveImage(const Pixmap& pixmap, const std::string& key,
+               std::shared_ptr<ColorSpace> colorSpace) {
   auto data = ImageCodec::Encode(pixmap, EncodedFormat::WEBP, 100, std::move(colorSpace));
   if (data == nullptr) {
     return;

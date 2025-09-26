@@ -26,14 +26,12 @@
 namespace tgfx {
 
 // Rec. ITU-R BT.2100-2 perceptual quantization (PQ) system, value 16.
-static constexpr TransferFunction PQTF = {-2.0f,         -107 / 128.0f,  1.0f,          32 / 2523.0f,
-                                        2413 / 128.0f, -2392 / 128.0f, 8192 / 1305.0f};
+static constexpr TransferFunction PQTF = {
+    -2.0f, -107 / 128.0f, 1.0f, 32 / 2523.0f, 2413 / 128.0f, -2392 / 128.0f, 8192 / 1305.0f};
 
 // Rec. ITU-R BT.2100-2 hybrid log-gamma (HLG) system, value 18.
 static constexpr TransferFunction HLGTF = {-3.0f,       2.0f,        2.0f, 1 / 0.17883277f,
-                                         0.28466892f, 0.55991073f, 0.0f};
-
-
+                                           0.28466892f, 0.55991073f, 0.0f};
 
 // Compute the Y vector for the HLG OOTF in the primaries of a specified color space. The value
 // is specified in Rec2020 primaries in ITU-R BT.2100.

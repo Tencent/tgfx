@@ -604,7 +604,8 @@ void Canvas::drawLayer(std::shared_ptr<Picture> picture, const MCState& state, c
     Point offset = {};
     if (auto image = picture->asImage(&offset)) {
       Point filterOffset = {};
-      image = image->makeWithFilter(std::move(imageFilter), &filterOffset, nullptr, image->colorSpace());
+      image = image->makeWithFilter(std::move(imageFilter), &filterOffset, nullptr,
+                                    image->colorSpace());
       if (image == nullptr) {
         LOGE("Canvas::drawLayer() Failed to apply filter to image!");
         return;
