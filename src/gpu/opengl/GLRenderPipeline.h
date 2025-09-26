@@ -58,8 +58,8 @@ class GLRenderPipeline : public RenderPipeline, public GLResource {
   /**
    * Sets a uniform buffer to a specified binding index.
    */
-  void setUniformBuffer(GLGPU* gpu, unsigned binding, const std::shared_ptr<GPUBuffer>& buffer, size_t offset,
-                        size_t size);
+  void setUniformBuffer(GLGPU* gpu, unsigned binding, const std::shared_ptr<GPUBuffer>& buffer,
+                        size_t offset, size_t size);
 
   /**
    * Sets a texture and its sampler state to a specified binding index.
