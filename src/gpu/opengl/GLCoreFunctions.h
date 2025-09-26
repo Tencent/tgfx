@@ -99,6 +99,7 @@
   M(glGetUniformBlockIndex)                \
   M(glUniformBlockBinding)                 \
   M(glBindBufferBase)                      \
+  M(glBindBufferRange)                     \
   M(glIsTexture)                           \
   M(glLineWidth)                           \
   M(glLinkProgram)                         \
