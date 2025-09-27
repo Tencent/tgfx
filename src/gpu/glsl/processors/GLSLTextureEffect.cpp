@@ -273,7 +273,8 @@ void GLSLTextureEffect::onSetData(UniformBuffer* /*vertexUniformBuffer*/,
   }
   if (needSubset()) {
     auto subsetRect = subset.value_or(Rect::MakeWH(textureProxy->width(), textureProxy->height()));
-    if (samplerState.filterMode == FilterMode::Nearest) {
+    if (samplerState.magFilterMode == samplerState.minFilterMode &&
+        samplerState.magFilterMode == FilterMode::Nearest) {
       subsetRect.roundOut();
     }
     auto type = textureView->getTexture()->type();

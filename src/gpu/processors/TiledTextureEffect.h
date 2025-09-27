@@ -42,11 +42,14 @@ class TiledTextureEffect : public FragmentProcessor {
     Clamp,                // Shader based clamp, no filter specialization
     RepeatNearestNone,    // Simple repeat for nearest sampling, no mipmapping.
     RepeatLinearNone,     // Filter the subset boundary for kRepeat mode, no mip mapping
+    RepeatNone,           // Repeat for nearest or linear filter, no mipmapping.
     RepeatLinearMipmap,   // Logic for linear filtering and LOD selection with kRepeat mode.
     RepeatNearestMipmap,  // Logic for nearest filtering and LOD selection with kRepeat mode.
+    RepeatMipmap,         // Repeat for nearest or linear filter, with mipmapping.
     MirrorRepeat,         // Mirror repeat (doesn't depend on filter))
     ClampToBorderNearest,
-    ClampToBorderLinear
+    ClampToBorderLinear,
+    ClampToBorder  // Clamp to border with linear filtering or nearest filtering
   };
 
   struct Sampling {
@@ -73,7 +76,8 @@ class TiledTextureEffect : public FragmentProcessor {
 
   const TextureView* getTextureView() const;
 
-  static ShaderMode GetShaderMode(TileMode tileMode, FilterMode filter, MipmapMode mipmapMode);
+  static ShaderMode GetShaderMode(TileMode tileMode, FilterMode minFilter, FilterMode magFilter,
+                                  MipmapMode mipmapMode);
 
   std::shared_ptr<TextureProxy> textureProxy;
   SamplerState samplerState;

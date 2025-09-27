@@ -26,18 +26,25 @@ struct SamplingOptions {
   SamplingOptions() = default;
 
   explicit SamplingOptions(FilterMode filterMode, MipmapMode mipmapMode = MipmapMode::Linear)
-      : filterMode(filterMode), mipmapMode(mipmapMode) {
+      : minFilterMode(filterMode), magFilterMode(filterMode), mipmapMode(mipmapMode) {
+  }
+
+  SamplingOptions(FilterMode minFilterMode, FilterMode magFilterMode,
+                  MipmapMode mipmapMode = MipmapMode::Linear)
+      : minFilterMode(minFilterMode), magFilterMode(magFilterMode), mipmapMode(mipmapMode) {
   }
 
   friend bool operator==(const SamplingOptions& a, const SamplingOptions& b) {
-    return a.filterMode == b.filterMode && a.mipmapMode == b.mipmapMode;
+    return a.magFilterMode == b.magFilterMode && a.minFilterMode == b.minFilterMode &&
+           a.mipmapMode == b.mipmapMode;
   }
 
   friend bool operator!=(const SamplingOptions& a, const SamplingOptions& b) {
     return !(a == b);
   }
 
-  FilterMode filterMode = FilterMode::Linear;
+  FilterMode minFilterMode = FilterMode::Linear;
+  FilterMode magFilterMode = FilterMode::Linear;
   MipmapMode mipmapMode = MipmapMode::Linear;
 };
 }  // namespace tgfx
