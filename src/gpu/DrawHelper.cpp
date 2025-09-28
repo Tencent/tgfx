@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawHelper.h"
-
 #include "GlobalCache.h"
 
 namespace tgfx {
@@ -34,8 +33,8 @@ AddressMode ToAddressMode(TileMode tileMode) {
   }
 }
 
-std::pair<std::shared_ptr<GPUBuffer>, size_t> SetupUniformBuffer(
-    const Context* context, UniformData* uniformData) {
+std::pair<std::shared_ptr<GPUBuffer>, size_t> SetupUniformBuffer(const Context* context,
+                                                                 UniformData* uniformData) {
   if (uniformData == nullptr || uniformData->size() == 0) {
     return {nullptr, 0};
   }
@@ -48,8 +47,8 @@ std::pair<std::shared_ptr<GPUBuffer>, size_t> SetupUniformBuffer(
   return {buffer, offset};
 }
 
-void SetUniformBuffer(RenderPass* renderPass, std::shared_ptr<GPUBuffer> buffer,
-                              size_t offset, size_t size, unsigned bindingPoint) {
+void SetUniformBuffer(RenderPass* renderPass, std::shared_ptr<GPUBuffer> buffer, size_t offset,
+                      size_t size, unsigned bindingPoint) {
   if (buffer != nullptr) {
     buffer->unmap();
     renderPass->setUniformBuffer(bindingPoint, std::move(buffer), offset, size);
@@ -70,4 +69,4 @@ void SetupTextures(RenderPass* renderPass, GPU* gpu, const ProgramInfo& programI
     renderPass->setTexture(textureBinding++, texture, sampler);
   }
 }
-} // namespace tgfx
+}  // namespace tgfx

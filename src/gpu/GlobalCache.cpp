@@ -57,9 +57,10 @@ std::shared_ptr<Program> GlobalCache::findProgram(const BytesKey& programKey) {
 std::shared_ptr<GPUBuffer> GlobalCache::findOrCreateUniformBuffer(size_t bufferSize,
                                                                   size_t* lastBufferOffset) {
   auto uboSupport = context->gpu()->caps()->shaderCaps()->uboSupport;
-  auto maxUBOSize = uboSupport
-                        ? std::max(static_cast<size_t>(context->gpu()->caps()->shaderCaps()->maxUBOSize), MAX_UNIFORM_BUFFER_SIZE)
-                        : MAX_UNIFORM_BUFFER_SIZE;
+  auto maxUBOSize =
+      uboSupport ? std::max(static_cast<size_t>(context->gpu()->caps()->shaderCaps()->maxUBOSize),
+                            MAX_UNIFORM_BUFFER_SIZE)
+                 : MAX_UNIFORM_BUFFER_SIZE;
   auto uboOffsetAlignment =
       static_cast<size_t>(context->gpu()->caps()->shaderCaps()->uboOffsetAlignment);
 

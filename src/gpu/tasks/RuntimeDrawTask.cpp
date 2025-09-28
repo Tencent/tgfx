@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RuntimeDrawTask.h"
-
 #include "gpu/DrawHelper.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProgramInfo.h"
@@ -164,11 +163,12 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
 
   if (vertexUniformData != nullptr) {
     SetUniformBuffer(renderPass.get(), std::move(vertexBufferInfo.first), vertexBufferInfo.second,
-                      vertexUniformData->size(), VERTEX_UBO_BINDING_POINT);
+                     vertexUniformData->size(), VERTEX_UBO_BINDING_POINT);
   }
   if (fragmentUniformData != nullptr) {
-    SetUniformBuffer(renderPass.get(), std::move(fragmentBufferInfo.first), fragmentBufferInfo.second,
-                      fragmentUniformData->size(), FRAGMENT_UBO_BINDING_POINT);
+    SetUniformBuffer(renderPass.get(), std::move(fragmentBufferInfo.first),
+                     fragmentBufferInfo.second, fragmentUniformData->size(),
+                     FRAGMENT_UBO_BINDING_POINT);
   }
   SetupTextures(renderPass.get(), renderTarget->getContext()->gpu(), programInfo);
 

@@ -23,8 +23,8 @@
 namespace tgfx {
 GLBuffer::GLBuffer(std::shared_ptr<GLInterface> interface, unsigned bufferID, size_t size,
                    uint32_t usage)
-  : GPUBuffer(size, usage), _interface(std::move(interface)), uniqueID(UniqueID::Next()),
-    _bufferID(bufferID) {
+    : GPUBuffer(size, usage), _interface(std::move(interface)), uniqueID(UniqueID::Next()),
+      _bufferID(bufferID) {
   if ((usage & GPUBufferUsage::UNIFORM) && !_interface->caps()->shaderCaps()->uboSupport) {
     isLegacyUniform = true;
     if (size > 0) {

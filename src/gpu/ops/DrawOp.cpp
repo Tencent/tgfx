@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawOp.h"
-
 #include "gpu/DrawHelper.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/resources/PipelineProgram.h"
@@ -60,11 +59,11 @@ void DrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
 
   if (vertexUniformData != nullptr) {
     SetUniformBuffer(renderPass, std::move(vertexBufferInfo.first), vertexBufferInfo.second,
-                      vertexUniformData->size(), VERTEX_UBO_BINDING_POINT);
+                     vertexUniformData->size(), VERTEX_UBO_BINDING_POINT);
   }
   if (fragmentUniformData != nullptr) {
     SetUniformBuffer(renderPass, std::move(fragmentBufferInfo.first), fragmentBufferInfo.second,
-                      fragmentUniformData->size(), FRAGMENT_UBO_BINDING_POINT);
+                     fragmentUniformData->size(), FRAGMENT_UBO_BINDING_POINT);
   }
 
   SetupTextures(renderPass, renderTarget->getContext()->gpu(), programInfo);

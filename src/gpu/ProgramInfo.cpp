@@ -133,7 +133,8 @@ std::shared_ptr<Program> ProgramInfo::getProgram() const {
   return program;
 }
 
-void ProgramInfo::getUniformData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const {
+void ProgramInfo::getUniformData(UniformData* vertexUniformData,
+                                 UniformData* fragmentUniformData) const {
   DEBUG_ASSERT(renderTarget != nullptr);
 
   auto array = GetRTAdjustArray(renderTarget);

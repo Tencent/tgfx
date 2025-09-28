@@ -82,8 +82,7 @@ class ProgramInfo {
 
   std::vector<SamplerInfo> getSamplers() const;
 
-  void getUniformData(UniformData* vertexUniformData,
-                      UniformData* fragmentUniformData) const;
+  void getUniformData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const;
 
  private:
   RenderTarget* renderTarget = nullptr;
