@@ -87,5 +87,12 @@
 #define ATTRIBUTE_ENUM(value, type)
 #define CAPUTRE_RENDER_TARGET(renderTarget)
 #define CAPUTRE_FRARGMENT_PROCESSORS(context, colors, coverages)
+#define PROGRAM_KEY(programKey)
+#define CAPUTRE_PROGRAM_INFO(programKey, context, programInfo)
+#define UNIFORM_VALUE(name, data, size
+#define DRAW_OP(drawOp)
+#define CAPUTRE_RECT_MESH(drawOp, provider)
+#define CAPUTRE_RRECT_MESH(drawOp, provider)
+#define CAPUTRE_SHAPE_MESH(drawOp, styledShape, aaType, clipBounds)
 
 #endif
