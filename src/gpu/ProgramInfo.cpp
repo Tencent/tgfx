@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ProgramInfo.h"
+
+#include "AlignTo.h"
 #include "gpu/BlendFormula.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProgramBuilder.h"
@@ -133,6 +135,67 @@ std::shared_ptr<Program> ProgramInfo::getProgram() const {
   return program;
 }
 
+std::shared_ptr<GPUBuffer> ProgramInfo::getUniformBuffer(const PipelineProgram* program, size_t* vertexOffset, size_t* fragmentOffset) const {
+  DEBUG_ASSERT(renderTarget != nullptr);
+
+  auto globalCache = renderTarget->getContext()->globalCache();
+  auto uboOffsetAlignment =
+      static_cast<size_t>(renderTarget->getContext()->gpu()->caps()->shaderCaps()->uboOffsetAlignment);
+  size_t vertexUniformBufferSize = 0;
+  auto vertexUniformData = program->getUniformData(ShaderStage::Vertex);
+  if (vertexUniformData != nullptr) {
+    vertexUniformBufferSize += vertexUniformData->size();
+    vertexUniformBufferSize = AlignTo(vertexUniformBufferSize, uboOffsetAlignment);
+  }
+
+  size_t fragmentUniformBufferSize = 0;
+  auto fragmentUniformData = program->getUniformData(ShaderStage::Fragment);
+  if (fragmentUniformData != nullptr) {
+    fragmentUniformBufferSize += fragmentUniformData->size();
+  }
+
+  size_t totalUniformBufferSize = vertexUniformBufferSize + fragmentUniformBufferSize;
+  std::shared_ptr<GPUBuffer> uniformBuffer = nullptr;
+  if (totalUniformBufferSize > 0) {
+    size_t lastUniformBufferOffset = 0;
+    uniformBuffer = globalCache->findOrCreateUniformBuffer(totalUniformBufferSize, &lastUniformBufferOffset);
+    if (uniformBuffer != nullptr) {
+      auto buffer = static_cast<uint8_t*>(uniformBuffer->map());
+      if (vertexUniformData != nullptr) {
+        vertexUniformData->setBuffer(buffer + lastUniformBufferOffset);
+        *vertexOffset = lastUniformBufferOffset;
+      }
+      if (fragmentUniformData != nullptr) {
+        fragmentUniformData->setBuffer(buffer + lastUniformBufferOffset + vertexUniformBufferSize);
+        *fragmentOffset = lastUniformBufferOffset + vertexUniformBufferSize;
+      }
+    }
+  }
+
+  return uniformBuffer;
+}
+
+void ProgramInfo::bindUniformBufferAndUnloadToGPU(const PipelineProgram* program, std::shared_ptr<GPUBuffer> uniformBuffer, RenderPass* renderPass, size_t vertexOffset, size_t fragmentOffset) const {
+  if (uniformBuffer == nullptr) {
+    return;
+  }
+
+  uniformBuffer->unmap();
+  auto vertexUniformData = program->getUniformData(ShaderStage::Vertex);
+  auto fragmentUniformData = program->getUniformData(ShaderStage::Fragment);
+  if (vertexUniformData != nullptr) {
+    renderPass->setUniformBuffer(VERTEX_UBO_BINDING_POINT, uniformBuffer,
+                               vertexOffset, vertexUniformData->size());
+    vertexUniformData->setBuffer(nullptr);
+  }
+
+  if (fragmentUniformData != nullptr) {
+    renderPass->setUniformBuffer(FRAGMENT_UBO_BINDING_POINT, std::move(uniformBuffer),
+                               fragmentOffset, fragmentUniformData->size());
+    fragmentUniformData->setBuffer(nullptr);
+  }
+}
+
 static AddressMode ToAddressMode(TileMode tileMode) {
   switch (tileMode) {
     case TileMode::Clamp:
@@ -148,6 +211,10 @@ static AddressMode ToAddressMode(TileMode tileMode) {
 
 void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, PipelineProgram* program) const {
   DEBUG_ASSERT(renderTarget != nullptr);
+  size_t vertexOffset = 0;
+  size_t fragmentOffset = 0;
+  auto uniformBuffer = getUniformBuffer(program, &vertexOffset, &fragmentOffset);
+
   auto vertexUniformData = program->getUniformData(ShaderStage::Vertex);
   auto fragmentUniformData = program->getUniformData(ShaderStage::Fragment);
 
@@ -173,6 +240,8 @@ void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, PipelineProgram
   updateUniformDataSuffix(vertexUniformData, fragmentUniformData, processor);
   processor->setData(vertexUniformData, fragmentUniformData);
   updateUniformDataSuffix(vertexUniformData, fragmentUniformData, nullptr);
+
+  bindUniformBufferAndUnloadToGPU(program, std::move(uniformBuffer), renderPass, vertexOffset, fragmentOffset);
 
   auto samplers = getSamplers();
   unsigned textureBinding = TEXTURE_BINDING_POINT_START;

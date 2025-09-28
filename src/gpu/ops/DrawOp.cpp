@@ -50,53 +50,7 @@ void DrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
   }
   renderPass->setPipeline(program->getPipeline());
 
-  auto globalCache = renderTarget->getContext()->globalCache();
-
-  auto uboOffsetAlignment =
-      static_cast<size_t>(renderTarget->getContext()->gpu()->caps()->shaderCaps()->uboOffsetAlignment);
-  size_t vertexUniformBufferSize = 0;
-  auto vertexUniformData = program->getUniformData(ShaderStage::Vertex);
-  if (vertexUniformData != nullptr) {
-    vertexUniformBufferSize += vertexUniformData->size();
-    vertexUniformBufferSize = AlignTo(vertexUniformBufferSize, uboOffsetAlignment);
-  }
-
-  size_t fragmentUniformBufferSize = 0;
-  auto fragmentUniformData = program->getUniformData(ShaderStage::Fragment);
-  if (fragmentUniformData != nullptr) {
-    fragmentUniformBufferSize += fragmentUniformData->size();
-  }
-
-  size_t totalUniformBufferSize = vertexUniformBufferSize + fragmentUniformBufferSize;
-  if (totalUniformBufferSize > 0) {
-    size_t lastUniformBufferOffset = 0;
-    auto uniformBuffer = globalCache->findOrCreateUniformBuffer(totalUniformBufferSize, &lastUniformBufferOffset);
-    if (uniformBuffer != nullptr) {
-      auto buffer = static_cast<uint8_t*>(uniformBuffer->map());
-      if (vertexUniformData != nullptr) {
-        vertexUniformData->setBuffer(buffer + lastUniformBufferOffset);
-      }
-      if (fragmentUniformData != nullptr) {
-        fragmentUniformData->setBuffer(buffer + lastUniformBufferOffset + vertexUniformBufferSize);
-      }
-
-      programInfo.setUniformsAndSamplers(renderPass, program.get());
-
-      uniformBuffer->unmap();
-
-      if (vertexUniformData != nullptr) {
-        renderPass->setUniformBuffer(VERTEX_UBO_BINDING_POINT, uniformBuffer,
-                                   lastUniformBufferOffset, vertexUniformData->size());
-        vertexUniformData->setBuffer(nullptr);
-      }
-
-      if (fragmentUniformData != nullptr) {
-        renderPass->setUniformBuffer(FRAGMENT_UBO_BINDING_POINT, uniformBuffer,
-                                   lastUniformBufferOffset + vertexUniformBufferSize, fragmentUniformData->size());
-        fragmentUniformData->setBuffer(nullptr);
-      }
-    }
-  }
+  programInfo.setUniformsAndSamplers(renderPass, program.get());
 
   if (scissorRect.isEmpty()) {
     renderPass->setScissorRect(0, 0, renderTarget->width(), renderTarget->height());
