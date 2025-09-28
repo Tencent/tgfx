@@ -68,6 +68,10 @@ void* GLBuffer::map() {
 }
 
 void GLBuffer::unmap() {
+  if (dataAddress != nullptr) {
+    return;
+  }
+
   auto gl = _interface->functions();
   if (gl->mapBufferRange != nullptr) {
     auto bufferTarget = target();
