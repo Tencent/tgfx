@@ -60,10 +60,12 @@ void DrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
   if (vertexUniformData != nullptr) {
     SetUniformBuffer(renderPass, std::move(vertexBufferInfo.first), vertexBufferInfo.second,
                      vertexUniformData->size(), VERTEX_UBO_BINDING_POINT);
+    vertexUniformData->setBuffer(nullptr);
   }
   if (fragmentUniformData != nullptr) {
     SetUniformBuffer(renderPass, std::move(fragmentBufferInfo.first), fragmentBufferInfo.second,
                      fragmentUniformData->size(), FRAGMENT_UBO_BINDING_POINT);
+    fragmentUniformData->setBuffer(nullptr);
   }
 
   SetupTextures(renderPass, renderTarget->getContext()->gpu(), programInfo);
