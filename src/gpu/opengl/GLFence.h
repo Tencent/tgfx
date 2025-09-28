@@ -19,6 +19,7 @@
 #pragma once
 
 #include "gpu/GPUFence.h"
+#include "gpu/opengl/GLInterface.h"
 #include "gpu/opengl/GLResource.h"
 
 namespace tgfx {
@@ -27,19 +28,25 @@ namespace tgfx {
  */
 class GLFence : public GPUFence, public GLResource {
  public:
-  explicit GLFence(void* glSync) : _glSync(glSync) {
+  GLFence(std::shared_ptr<GLInterface> interface, void* glSync)
+      : interface(std::move(interface)), _glSync(glSync) {
   }
 
   void* glSync() const {
     return _glSync;
   }
 
-  BackendSemaphore getBackendSemaphore() const override;
+  bool isSignaled() const override;
+
+  void waitOnCPU() override;
+
+  BackendSemaphore stealBackendSemaphore() override;
 
  protected:
   void onRelease(GLGPU* gpu) override;
 
  private:
+  std::shared_ptr<GLInterface> interface = nullptr;
   void* _glSync = nullptr;
 };
 }  // namespace tgfx

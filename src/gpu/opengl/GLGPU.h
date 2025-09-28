@@ -101,5 +101,7 @@ class GLGPU : public GPU {
   std::shared_ptr<ReturnQueue> returnQueue = ReturnQueue::Make();
 
   std::shared_ptr<GLResource> addResource(GLResource* resource);
+
+  friend class GLCommandQueue;
 };
 }  // namespace tgfx
