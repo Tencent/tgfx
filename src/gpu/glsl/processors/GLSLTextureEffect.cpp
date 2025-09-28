@@ -197,74 +197,72 @@ void GLSLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
   }
 }
 
-void GLSLTextureEffect::onSetData(UniformBuffer* /*vertexUniformBuffer*/,
-                                  UniformBuffer* fragmentUniformBuffer) const {
+void GLSLTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
+                                  UniformData* fragmentUniformData) const {
   auto textureView = getTextureView();
   if (textureView == nullptr) {
     return;
   }
   if (alphaStart != Point::Zero()) {
     auto alphaStartValue = textureView->getTextureCoord(alphaStart.x, alphaStart.y);
-    fragmentUniformBuffer->setData("AlphaStart", alphaStartValue);
+    fragmentUniformData->setData("AlphaStart", alphaStartValue);
   }
   auto yuvTexture = getYUVTexture();
   if (yuvTexture) {
     std::string mat3ColorConversion = "Mat3ColorConversion";
     switch (yuvTexture->colorSpace()) {
       case YUVColorSpace::BT601_LIMITED: {
-        if (fragmentUniformBuffer->uboSupport()) {
-          fragmentUniformBuffer->setData(mat3ColorConversion,
-                                         AlignMat3(ColorConversion601LimitRange));
+        if (fragmentUniformData->uboSupport()) {
+          fragmentUniformData->setData(mat3ColorConversion,
+                                       AlignMat3(ColorConversion601LimitRange));
         } else {
-          fragmentUniformBuffer->setData(mat3ColorConversion, ColorConversion601LimitRange);
+          fragmentUniformData->setData(mat3ColorConversion, ColorConversion601LimitRange);
         }
       } break;
       case YUVColorSpace::BT601_FULL:
-        if (fragmentUniformBuffer->uboSupport()) {
-          fragmentUniformBuffer->setData(mat3ColorConversion,
-                                         AlignMat3(ColorConversion601FullRange));
+        if (fragmentUniformData->uboSupport()) {
+          fragmentUniformData->setData(mat3ColorConversion, AlignMat3(ColorConversion601FullRange));
         } else {
-          fragmentUniformBuffer->setData(mat3ColorConversion, ColorConversion601FullRange);
+          fragmentUniformData->setData(mat3ColorConversion, ColorConversion601FullRange);
         }
         break;
       case YUVColorSpace::BT709_LIMITED:
-        if (fragmentUniformBuffer->uboSupport()) {
-          fragmentUniformBuffer->setData(mat3ColorConversion,
-                                         AlignMat3(ColorConversion709LimitRange));
+        if (fragmentUniformData->uboSupport()) {
+          fragmentUniformData->setData(mat3ColorConversion,
+                                       AlignMat3(ColorConversion709LimitRange));
         } else {
-          fragmentUniformBuffer->setData(mat3ColorConversion, ColorConversion709LimitRange);
+          fragmentUniformData->setData(mat3ColorConversion, ColorConversion709LimitRange);
         }
         break;
       case YUVColorSpace::BT709_FULL:
-        if (fragmentUniformBuffer->uboSupport()) {
-          fragmentUniformBuffer->setData(mat3ColorConversion,
-                                         AlignMat3(ColorConversion709FullRange));
+        if (fragmentUniformData->uboSupport()) {
+          fragmentUniformData->setData(mat3ColorConversion, AlignMat3(ColorConversion709FullRange));
         } else {
-          fragmentUniformBuffer->setData(mat3ColorConversion, ColorConversion709FullRange);
+          fragmentUniformData->setData(mat3ColorConversion, ColorConversion709FullRange);
         }
         break;
       case YUVColorSpace::BT2020_LIMITED:
-        if (fragmentUniformBuffer->uboSupport()) {
-          fragmentUniformBuffer->setData(mat3ColorConversion,
-                                         AlignMat3(ColorConversion2020LimitRange));
+        if (fragmentUniformData->uboSupport()) {
+          fragmentUniformData->setData(mat3ColorConversion,
+                                       AlignMat3(ColorConversion2020LimitRange));
         } else {
-          fragmentUniformBuffer->setData(mat3ColorConversion, ColorConversion2020LimitRange);
+          fragmentUniformData->setData(mat3ColorConversion, ColorConversion2020LimitRange);
         }
         break;
       case YUVColorSpace::BT2020_FULL:
-        if (fragmentUniformBuffer->uboSupport()) {
-          fragmentUniformBuffer->setData(mat3ColorConversion,
-                                         AlignMat3(ColorConversion2020FullRange));
+        if (fragmentUniformData->uboSupport()) {
+          fragmentUniformData->setData(mat3ColorConversion,
+                                       AlignMat3(ColorConversion2020FullRange));
         } else {
-          fragmentUniformBuffer->setData(mat3ColorConversion, ColorConversion2020FullRange);
+          fragmentUniformData->setData(mat3ColorConversion, ColorConversion2020FullRange);
         }
         break;
       case YUVColorSpace::JPEG_FULL:
-        if (fragmentUniformBuffer->uboSupport()) {
-          fragmentUniformBuffer->setData(mat3ColorConversion,
-                                         AlignMat3(ColorConversionJPEGFullRange));
+        if (fragmentUniformData->uboSupport()) {
+          fragmentUniformData->setData(mat3ColorConversion,
+                                       AlignMat3(ColorConversionJPEGFullRange));
         } else {
-          fragmentUniformBuffer->setData(mat3ColorConversion, ColorConversionJPEGFullRange);
+          fragmentUniformData->setData(mat3ColorConversion, ColorConversionJPEGFullRange);
         }
         break;
       default:
@@ -299,7 +297,7 @@ void GLSLTextureEffect::onSetData(UniformBuffer* /*vertexUniformBuffer*/,
       rect[2] = rb.x;
       rect[3] = rb.y;
     }
-    fragmentUniformBuffer->setData("Subset", rect);
+    fragmentUniformData->setData("Subset", rect);
   }
 }
 

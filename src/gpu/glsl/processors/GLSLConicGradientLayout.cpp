@@ -41,9 +41,9 @@ void GLSLConicGradientLayout::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("%s = vec4(t, 1.0, 0.0, 0.0);", args.outputColor.c_str());
 }
 
-void GLSLConicGradientLayout::onSetData(UniformBuffer* /*vertexUniformBuffer*/,
-                                        UniformBuffer* fragmentUniformBuffer) const {
-  fragmentUniformBuffer->setData("Bias", bias);
-  fragmentUniformBuffer->setData("Scale", scale);
+void GLSLConicGradientLayout::onSetData(UniformData* /*vertexUniformData*/,
+                                        UniformData* fragmentUniformData) const {
+  fragmentUniformData->setData("Bias", bias);
+  fragmentUniformData->setData("Scale", scale);
 }
 }  // namespace tgfx

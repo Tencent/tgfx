@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawOp.h"
+#include "gpu/AlignTo.h"
+#include "gpu/GlobalCache.h"
 #include "gpu/resources/PipelineProgram.h"
 #include "inspect/InspectorMark.h"
 
@@ -46,7 +48,9 @@ void DrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
     return;
   }
   renderPass->setPipeline(program->getPipeline());
+
   programInfo.setUniformsAndSamplers(renderPass, program.get());
+
   if (scissorRect.isEmpty()) {
     renderPass->setScissorRect(0, 0, renderTarget->width(), renderTarget->height());
   } else {

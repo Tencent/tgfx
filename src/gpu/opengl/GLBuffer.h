@@ -33,9 +33,9 @@ class GLBuffer : public GPUBuffer, public GLResource {
   /**
    * Creates a new GLBuffer with the specified size and usage flags.
    */
-  GLBuffer(unsigned bufferID, size_t size, uint32_t usage)
-      : GPUBuffer(size, usage), uniqueID(UniqueID::Next()), _bufferID(bufferID) {
-  }
+  GLBuffer(std::shared_ptr<GLInterface> interface, unsigned bufferID, size_t size, uint32_t usage);
+
+  ~GLBuffer() override;
 
   /**
    * Returns the OpenGL target for this buffer based on its usage flags.
@@ -49,12 +49,17 @@ class GLBuffer : public GPUBuffer, public GLResource {
     return _bufferID;
   }
 
- protected:
-  void onRelease(GLGPU* gpu) override;
+  void* map() override;
 
- private:
+  void unmap() override;
+
+ protected:
+  std::shared_ptr<GLInterface> _interface = nullptr;
   uint32_t uniqueID = 0;
   unsigned _bufferID = 0;
+  void* dataAddress = nullptr;
+
+  void onRelease(GLGPU* gpu) override;
 
   friend class GLState;
 };
