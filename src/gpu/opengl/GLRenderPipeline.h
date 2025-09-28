@@ -95,6 +95,7 @@ class GLRenderPipeline : public RenderPipeline, public GLResource {
   std::unique_ptr<GLStencilState> stencilState = nullptr;
   std::unique_ptr<GLDepthState> depthState = nullptr;
   std::unique_ptr<GLBlendState> blendState = nullptr;
+  std::unique_ptr<GLCullFaceState> cullFaceState = {};
 
   bool setPipelineDescriptor(GLGPU* gpu, const RenderPipelineDescriptor& descriptor);
 

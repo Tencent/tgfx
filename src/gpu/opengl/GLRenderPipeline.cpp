@@ -63,6 +63,10 @@ void GLRenderPipeline::activate(GLGPU* gpu, bool depthReadOnly, bool stencilRead
   if (vertexArray > 0) {
     state->bindVertexArray(vertexArray);
   }
+  state->setEnabled(GL_CULL_FACE, cullFaceState != nullptr);
+  if (cullFaceState) {
+    state->setCullFaceState(*cullFaceState);
+  }
 }
 
 void GLRenderPipeline::setUniformBytes(GLGPU* gpu, unsigned binding, const void* data,
@@ -237,6 +241,16 @@ static std::unique_ptr<GLBlendState> MakeBlendState(const PipelineColorAttachmen
   return blendState;
 }
 
+static std::unique_ptr<GLCullFaceState> MakeCullFaceState(const CullFaceDescriptor& descriptor) {
+  if (!descriptor.enabled) {
+    return nullptr;
+  }
+  auto cullFaceState = std::make_unique<GLCullFaceState>();
+  cullFaceState->frontFace = ToGLFrontFaceDirection(descriptor.frontDirection);
+  cullFaceState->cullFace = ToGLCullFaceMode(descriptor.mode);
+  return cullFaceState;
+}
+
 static GLStencil MakeGLStencil(const StencilDescriptor& descriptor) {
   GLStencil stencil = {};
   stencil.compare = ToGLCompareFunction(descriptor.compare);
@@ -305,6 +319,7 @@ bool GLRenderPipeline::setPipelineDescriptor(GLGPU* gpu,
   stencilState = MakeStencilState(descriptor.depthStencil);
   depthState = MakeDepthState(descriptor.depthStencil);
   blendState = MakeBlendState(attachment);
+  cullFaceState = MakeCullFaceState(descriptor.cullFace);
 
   for (auto& entry : descriptor.layout.uniformBlocks) {
     GLUniformBlock block = {};

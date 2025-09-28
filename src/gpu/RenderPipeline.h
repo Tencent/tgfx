@@ -261,6 +261,37 @@ class DepthStencilDescriptor {
 };
 
 /**
+ * CullFaceDescriptor defines the face culling configuration for a render pipeline.
+ */
+class CullFaceDescriptor {
+ public:
+  /**
+   * The winding order that determines which polygons are considered front-facing.
+   */
+  enum class FrontDirection { CW, CCW };
+
+  /**
+   * The culling mode: specifies whether to cull front faces, back faces, or both.
+   */
+  enum class Mode { Front, Back, FrontAndBack };
+
+  /**
+   * Enables or disables face culling.
+   */
+  bool enabled = false;
+
+  /**
+   * The winding order used to identify front-facing polygons.
+   */
+  FrontDirection frontDirection = FrontDirection::CCW;
+
+  /**
+   * The culling mode: determines which faces (front, back, or both) are culled.
+   */
+  Mode mode = Mode::Back;
+};
+
+/**
  * Options you provide to a GPU device to create a render pipeline state.
  */
 class RenderPipelineDescriptor {
@@ -286,6 +317,11 @@ class RenderPipelineDescriptor {
    * An object that describes the depth and stencil state for the render pipeline.
    */
   DepthStencilDescriptor depthStencil = {};
+
+  /**
+   * An object that describes the face culling configuration for the render pipeline.
+   */
+  CullFaceDescriptor cullFace = {};
 };
 
 /**

@@ -41,6 +41,14 @@ void Transform3DLayer::setMatrix3D(const Matrix3D& matrix3D) {
   invalidateContent();
 }
 
+void Transform3DLayer::setHideBackFace(bool hideBackFace) {
+  if (_hideBackFace == hideBackFace) {
+    return;
+  }
+  _hideBackFace = hideBackFace;
+  invalidateContent();
+}
+
 void Transform3DLayer::onUpdateContent(LayerRecorder* recorder) {
   if (!_content) {
     return;
@@ -49,7 +57,9 @@ void Transform3DLayer::onUpdateContent(LayerRecorder* recorder) {
   _content->onUpdateContent(recorder);
   auto filters = _content->filters();
   if (_matrix3D != Matrix3D::I()) {
-    filters.push_back(Transform3DFilter::Make(_matrix3D));
+    auto filter = Transform3DFilter::Make(_matrix3D);
+    filter->setHideBackFace(_hideBackFace);
+    filters.push_back(std::move(filter));
   }
   setFilters(std::move(filters));
 }

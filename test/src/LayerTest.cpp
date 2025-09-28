@@ -3252,7 +3252,7 @@ TGFX_TEST(LayerTest, Transform3DLayer) {
   auto transformMatrix = originTranslateMatrix * invOffsetToAnchorMatrix * perspectiveMatrix *
                          modelMatrix * offsetToAnchorMatrix;
   layerAWrapper->setMatrix3D(transformMatrix);
-
+  layerAWrapper->setHideBackFace(true);
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Transform3DLayer"));
 }

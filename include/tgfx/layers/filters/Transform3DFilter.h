@@ -46,6 +46,22 @@ class Transform3DFilter final : public LayerFilter {
 
   void setMatrix(const Matrix3D& matrix);
 
+  /**
+   * Returns whether to hide the back face of the content after the 3D transformation. The default
+   * value is false, which means both the front and back faces are drawn.
+   * When the layer is first created, the front face is oriented toward the user by default. After
+   * applying certain 3D transformations, such as rotating 180 degrees around the X axis, the back
+   * face of the layer may face the user.
+   */
+  bool hideBackFace() const {
+    return _hideBackFace;
+  }
+
+  /**
+   * Sets whether to hide the back face of the content after the 3D transformation.
+   */
+  void setHideBackFace(bool hideBackFace);
+
  private:
   explicit Transform3DFilter(const Matrix3D& matrix);
 
@@ -56,6 +72,8 @@ class Transform3DFilter final : public LayerFilter {
   std::shared_ptr<ImageFilter> onCreateImageFilter(float scale) override;
 
   Matrix3D _matrix = Matrix3D::I();
+
+  bool _hideBackFace = false;
 };
 
 }  // namespace tgfx

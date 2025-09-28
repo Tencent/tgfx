@@ -37,6 +37,17 @@ class Transform3DImageFilter final : public ImageFilter {
    */
   explicit Transform3DImageFilter(const Matrix3D& matrix);
 
+  /**
+   * Sets whether to hide the back face of the content after the 3D transformation. The default
+   * value is false, which means both the front and back faces are drawn.
+   * When the layer is first created, the front face is oriented toward the user by default. After
+   * applying certain 3D transformations, such as rotating 180 degrees around the X axis, the back
+   * face of the layer may face the user.
+   */
+  void setHideBackFace(bool hideBackFace) {
+    _hideBackFace = hideBackFace;
+  }
+
  private:
   Type type() const override {
     return Type::Transform3D;
@@ -58,6 +69,8 @@ class Transform3DImageFilter final : public ImageFilter {
    * 3D transformation matrix used to convert model coordinates to clip space.
    */
   Matrix3D _matrix = Matrix3D::I();
+
+  bool _hideBackFace = false;
 };
 
 }  // namespace tgfx

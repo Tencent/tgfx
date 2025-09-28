@@ -60,6 +60,22 @@ class Transform3DLayer final : public Layer {
    */
   void setMatrix3D(const Matrix3D& matrix3D);
 
+  /**
+   * Returns whether to hide the back face of the content after the 3D transformation. The default
+   * value is false, which means both the front and back faces are drawn.
+   * When the layer is first created, the front face is oriented toward the user by default. After
+   * applying certain 3D transformations, such as rotating 180 degrees around the X axis, the back
+   * face of the layer may face the user.
+   */
+  bool hideBackFace() const {
+    return _hideBackFace;
+  }
+
+  /**
+   * Sets whether to hide the back face of the content after the 3D transformation.
+   */
+  void setHideBackFace(bool hideBackFace);
+
  private:
   Transform3DLayer() = default;
 
@@ -68,6 +84,8 @@ class Transform3DLayer final : public Layer {
   std::shared_ptr<Layer> _content = nullptr;
 
   Matrix3D _matrix3D = Matrix3D::I();
+
+  bool _hideBackFace = false;
 };
 
 }  // namespace tgfx

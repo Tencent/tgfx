@@ -16,38 +16,19 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/layers/filters/Transform3DFilter.h"
-#include "core/filters/Transform3DImageFilter.h"
+#pragma once
 
 namespace tgfx {
 
-std::shared_ptr<Transform3DFilter> Transform3DFilter::Make(const Matrix3D& matrix) {
-  return std::shared_ptr<Transform3DFilter>(new Transform3DFilter(matrix));
-}
-
-void Transform3DFilter::setMatrix(const Matrix3D& matrix) {
-  if (_matrix == matrix) {
-    return;
-  }
-  _matrix = matrix;
-  invalidateFilter();
-}
-
-void Transform3DFilter::setHideBackFace(bool hideBackFace) {
-  if (_hideBackFace == hideBackFace) {
-    return;
-  }
-  _hideBackFace = hideBackFace;
-  invalidateFilter();
-}
-
-Transform3DFilter::Transform3DFilter(const Matrix3D& matrix) : _matrix(matrix) {
-}
-
-std::shared_ptr<ImageFilter> Transform3DFilter::onCreateImageFilter(float) {
-  auto filter = std::make_shared<Transform3DImageFilter>(_matrix);
-  filter->setHideBackFace(_hideBackFace);
-  return filter;
-}
+enum class CullFaceType {
+  // Do not cull any faces
+  None,
+  // Cull front faces, i.e., faces facing the plane
+  Front,
+  // Cull back faces, i.e., faces facing away from the plane
+  Back,
+  // Cull both front and back faces
+  FrontAndBack
+};
 
 }  // namespace tgfx

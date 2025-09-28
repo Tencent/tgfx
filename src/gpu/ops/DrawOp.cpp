@@ -40,6 +40,7 @@ void DrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
   }
   ProgramInfo programInfo(renderTarget, geometryProcessor.get(), std::move(fragmentProcessors),
                           colors.size(), xferProcessor.get(), blendMode);
+  programInfo.setCullFaceType(cullFaceType);
   auto program = std::static_pointer_cast<PipelineProgram>(programInfo.getProgram());
   if (program == nullptr) {
     LOGE("DrawOp::execute() Failed to get the program!");
