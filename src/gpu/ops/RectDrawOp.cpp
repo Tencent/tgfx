@@ -32,6 +32,7 @@ PlacementPtr<RectDrawOp> RectDrawOp::Make(Context* context,
     return nullptr;
   }
   auto drawOp = context->drawingBuffer()->make<RectDrawOp>(provider.get());
+  CAPUTRE_RECT_MESH(drawOp.get(), provider.get());
   if (provider->aaType() == AAType::Coverage || provider->rectCount() > 1) {
     drawOp->indexBufferProxy =
         context->globalCache()->getRectIndexBuffer(provider->aaType() == AAType::Coverage);

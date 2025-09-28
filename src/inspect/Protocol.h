@@ -133,8 +133,23 @@ enum class LayerTreeMessage : uint8_t {
   ImageData
 };
 
-enum class VertexProviderType {
-  RectsVertexProvider,
-  RRectsVertexProvider
+enum class VertexProviderType { RectsVertexProvider, RRectsVertexProvider };
+
+struct MeshInfo {
+  size_t rectCount = 0;
+  uint64_t drawOpPtr = 0;
+};
+
+struct RectMeshInfo : MeshInfo {
+  uint8_t aaType = 2;
+  bool hasUVCoord = false;
+  bool hasColor = false;
+  bool hasSubset = false;
+};
+
+struct RRectMeshInfo : MeshInfo {
+  bool hasColor = false;
+  bool useScale = false;
+  bool hasStroke = false;
 };
 }  // namespace tgfx::inspect

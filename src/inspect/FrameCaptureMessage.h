@@ -24,6 +24,7 @@ namespace tgfx::inspect {
 enum class FrameCaptureMessageType : uint8_t {
   OperateBegin,
   OperateEnd,
+  OperatePtr,
   FrameMarkMessage,
   ValueDataUint32,
   ValueDataFloat4,
@@ -141,14 +142,18 @@ struct UniformInfoMessage : DirectlySendDataMessage {
   uint8_t format;
 };
 
-struct UniformValueMessage: DirectlySendDataMessage {
+struct UniformValueMessage : DirectlySendDataMessage {
   uint64_t valuePtr;
   size_t valueSize;
 };
 
-struct MeshMessage: DirectlySendDataMessage {
+struct DrawOpPtrMessage {
   uint64_t drawOpPtr;
-  uint8_t meshType;
+};
+
+struct MeshMessage : DirectlySendDataMessage {
+  uint64_t extraDataPtr;
+  size_t extraDataSize;
 };
 
 struct FrameCaptureMessageItem {
@@ -171,6 +176,7 @@ struct FrameCaptureMessageItem {
     ShaderTextMessage shaderTextMessage;
     UniformInfoMessage uniformInfoMessage;
     UniformValueMessage uniformValueMessage;
+    DrawOpPtrMessage drawOpPtrMessage;
     MeshMessage meshMessage;
   };
 };
@@ -179,6 +185,7 @@ struct FrameCaptureMessageItem {
 static constexpr size_t FrameCaptureMessageDataSize[] = {
     sizeof(FrameCaptureMessageHeader) + sizeof(OperateBeginMessage),
     sizeof(FrameCaptureMessageHeader) + sizeof(OperateEndMessage),
+    sizeof(FrameCaptureMessageHeader) + sizeof(DrawOpPtrMessage),
     sizeof(FrameCaptureMessageHeader) + sizeof(FrameMarkMessage),
     sizeof(FrameCaptureMessageHeader) + sizeof(AttributeDataUInt32Message),
     sizeof(FrameCaptureMessageHeader) + sizeof(AttributeDataFloat4Message),
