@@ -35,14 +35,20 @@ class PipelineProgram : public Program {
     return pipeline;
   }
 
+  UniformData* getUniformData(ShaderStage stage) const {
+    if (stage == ShaderStage::Vertex) {
+      return vertexUniformData.get();
+    }
+    if (stage == ShaderStage::Fragment) {
+      return fragmentUniformData.get();
+    }
+    return nullptr;
+  }
+
  private:
   std::shared_ptr<RenderPipeline> pipeline = nullptr;
   std::unique_ptr<UniformData> vertexUniformData = nullptr;
   std::unique_ptr<UniformData> fragmentUniformData = nullptr;
-  std::shared_ptr<GPUBuffer> vertexUniformBuffer = nullptr;
-  std::shared_ptr<GPUBuffer> fragmentUniformBuffer = nullptr;
-  size_t vertexUniformBufferOffset = 0;
-  size_t fragmentUniformBufferOffset = 0;
 
   friend class ProgramInfo;
 };

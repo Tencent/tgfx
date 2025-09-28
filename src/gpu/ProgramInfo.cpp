@@ -130,44 +130,11 @@ std::shared_ptr<Program> ProgramInfo::getProgram() const {
     }
     context->globalCache()->addProgram(programKey, program);
   }
-
-  auto pipelineProgram = std::static_pointer_cast<PipelineProgram>(program);
-  if (pipelineProgram != nullptr) {
-    if (pipelineProgram->vertexUniformData != nullptr &&
-        pipelineProgram->vertexUniformData->size() > 0) {
-      pipelineProgram->vertexUniformBuffer = context->globalCache()->findOrCreateUniformBuffer(
-          pipelineProgram->vertexUniformData->size(), &pipelineProgram->vertexUniformBufferOffset);
-      pipelineProgram->vertexUniformData->setBuffer(static_cast<uint8_t*>(pipelineProgram->vertexUniformBuffer->map()) + pipelineProgram->vertexUniformBufferOffset);
-    }
-    if (pipelineProgram->fragmentUniformData != nullptr &&
-        pipelineProgram->fragmentUniformData->size() > 0) {
-      pipelineProgram->fragmentUniformBuffer = context->globalCache()->findOrCreateUniformBuffer(
-          pipelineProgram->fragmentUniformData->size(),
-          &pipelineProgram->fragmentUniformBufferOffset);
-      pipelineProgram->fragmentUniformData->setBuffer(static_cast<uint8_t*>(pipelineProgram->fragmentUniformBuffer->map()) + pipelineProgram->fragmentUniformBufferOffset);
-    }
-  }
-
   return program;
 }
 
-static AddressMode ToAddressMode(TileMode tileMode) {
-  switch (tileMode) {
-    case TileMode::Clamp:
-      return AddressMode::ClampToEdge;
-    case TileMode::Repeat:
-      return AddressMode::Repeat;
-    case TileMode::Mirror:
-      return AddressMode::MirrorRepeat;
-    case TileMode::Decal:
-      return AddressMode::ClampToBorder;
-  }
-}
-
-void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, PipelineProgram* program) const {
+void ProgramInfo::getUniformData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const {
   DEBUG_ASSERT(renderTarget != nullptr);
-  auto vertexUniformData = program->vertexUniformData.get();
-  auto fragmentUniformData = program->fragmentUniformData.get();
 
   auto array = GetRTAdjustArray(renderTarget);
   if (vertexUniformData != nullptr) {
@@ -191,30 +158,6 @@ void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, PipelineProgram
   updateUniformDataSuffix(vertexUniformData, fragmentUniformData, processor);
   processor->setData(vertexUniformData, fragmentUniformData);
   updateUniformDataSuffix(vertexUniformData, fragmentUniformData, nullptr);
-
-  if (vertexUniformData != nullptr && program->vertexUniformBuffer != nullptr) {
-    program->vertexUniformBuffer->unmap();
-
-    renderPass->setUniformBuffer(VERTEX_UBO_BINDING_POINT, program->vertexUniformBuffer,
-                                 program->vertexUniformBufferOffset, vertexUniformData->size());
-  }
-
-  if (fragmentUniformData != nullptr && program->fragmentUniformBuffer != nullptr) {
-    program->fragmentUniformBuffer->unmap();
-
-    renderPass->setUniformBuffer(FRAGMENT_UBO_BINDING_POINT, program->fragmentUniformBuffer,
-                                 program->fragmentUniformBufferOffset, fragmentUniformData->size());
-  }
-
-  auto gpu = renderTarget->getContext()->gpu();
-  auto samplers = getSamplers();
-  unsigned textureBinding = TEXTURE_BINDING_POINT_START;
-  for (auto& [texture, state] : samplers) {
-    GPUSamplerDescriptor descriptor(ToAddressMode(state.tileModeX), ToAddressMode(state.tileModeY),
-                                    state.filterMode, state.filterMode, state.mipmapMode);
-    auto sampler = gpu->createSampler(descriptor);
-    renderPass->setTexture(textureBinding++, texture, sampler);
-  }
 }
 
 std::vector<SamplerInfo> ProgramInfo::getSamplers() const {

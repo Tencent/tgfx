@@ -80,10 +80,10 @@ class ProgramInfo {
 
   std::shared_ptr<Program> getProgram() const;
 
-  /**
-   * Sets the uniform data and texture samplers on the render pass for the given program.
-   */
-  void setUniformsAndSamplers(RenderPass* renderPass, PipelineProgram* program) const;
+  std::vector<SamplerInfo> getSamplers() const;
+
+  void getUniformData(UniformData* vertexUniformData,
+                      UniformData* fragmentUniformData) const;
 
  private:
   RenderTarget* renderTarget = nullptr;
@@ -96,8 +96,6 @@ class ProgramInfo {
   BlendMode blendMode = BlendMode::SrcOver;
 
   void updateProcessorIndices();
-
-  std::vector<SamplerInfo> getSamplers() const;
 
   void updateUniformDataSuffix(UniformData* vertexUniformData, UniformData* fragmentUniformData,
                                const Processor* processor) const;
