@@ -21,9 +21,10 @@
 namespace tgfx {
 HardwareRenderTargetProxy::HardwareRenderTargetProxy(HardwareBufferRef hardwareBuffer, int width,
                                                      int height, PixelFormat format,
-                                                     int sampleCount)
+                                                     int sampleCount,
+                                                     std::shared_ptr<ColorSpace> colorSpace)
     : TextureRenderTargetProxy(width, height, format, sampleCount, false, ImageOrigin::TopLeft,
-                               true),
+                               true, std::move(colorSpace)),
       hardwareBuffer(hardwareBuffer) {
   HardwareBufferRetain(hardwareBuffer);
 }

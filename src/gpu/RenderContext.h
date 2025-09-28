@@ -66,6 +66,10 @@ class RenderContext : public DrawContext {
    */
   bool flush();
 
+  std::shared_ptr<ColorSpace> colorSpace() const {
+    return renderTarget->getColorSpace();
+  }
+
  private:
   void drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const MCState& state,
                               const Fill& fill, const Stroke* stroke, const Rect& localClipBounds,

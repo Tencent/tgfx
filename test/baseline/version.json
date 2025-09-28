@@ -309,8 +309,8 @@
         "read_RGB_565_scaled_codec": "29745c73"
     },
     "SVGExportTest": {
-        "DrawImageRect": "9a80633b",
-        "ImageMask": "9a80633b",
+        "DrawImageRect": "bad79889",
+        "ImageMask": "bad79889",
         "InvertPictureImageMask": "9a80633b",
         "LayerDropShadow": "a8b299ea",
         "PictureImageMask": "9a80633b"

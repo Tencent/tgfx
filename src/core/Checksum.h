@@ -18,27 +18,18 @@
 
 #pragma once
 
-#include "TextureRenderTargetProxy.h"
+#include <cstddef>
+#include <cstdint>
 
 namespace tgfx {
-class HardwareRenderTargetProxy : public TextureRenderTargetProxy {
- public:
-  ~HardwareRenderTargetProxy() override;
-
-  HardwareBufferRef getHardwareBuffer() const override {
-    return hardwareBuffer;
-  }
-
- protected:
-  std::shared_ptr<TextureView> onMakeTexture(Context* context) const override;
-
- private:
-  HardwareBufferRef hardwareBuffer = nullptr;
-
-  HardwareRenderTargetProxy(HardwareBufferRef hardwareBuffer, int width, int height,
-                            PixelFormat format, int sampleCount,
-                            std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
-
-  friend class ProxyProvider;
-};
+namespace checksum {
+/**
+ * This is a fast, high-quality 32-bit hash. We make no guarantees about this remaining stable
+ * over time, or being consistent across devices.
+ *
+ * For now, this is a 64-bit wyhash, truncated to 32-bits.
+ * See: https://github.com/wangyi-fudan/wyhash
+ */
+uint32_t Hash32(const void* data, size_t bytes, uint32_t seed = 0);
+}  // namespace checksum
 }  // namespace tgfx
