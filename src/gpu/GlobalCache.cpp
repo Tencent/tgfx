@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GlobalCache.h"
+
+#include "AlignTo.h"
 #include "core/GradientGenerator.h"
 #include "core/PixelBuffer.h"
 #include "gpu/ProxyProvider.h"
@@ -31,13 +33,6 @@ static constexpr size_t MAX_NUM_CACHED_GRADIENT_BITMAPS = 32;
 static constexpr uint16_t VERTICES_PER_NON_AA_QUAD = 4;
 static constexpr uint16_t VERTICES_PER_AA_QUAD = 8;
 static constexpr size_t MAX_UNIFORM_BUFFER_SIZE = 64 * 1024;
-
-static size_t AlignTo(size_t value, size_t alignment) {
-  if (alignment == 0) {
-    return value;
-  }
-  return (value + alignment - 1) / alignment * alignment;
-}
 
 GlobalCache::GlobalCache(Context* context) : context(context) {
 }

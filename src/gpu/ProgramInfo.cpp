@@ -146,11 +146,7 @@ static AddressMode ToAddressMode(TileMode tileMode) {
   }
 }
 
-void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, PipelineProgram* program,
-                                         std::shared_ptr<GPUBuffer> vertexUniformBuffer,
-                                         size_t vertexUniformBufferOffset,
-                                         std::shared_ptr<GPUBuffer> fragmentUniformBuffer,
-                                         size_t fragmentUniformBufferOffset) const {
+void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, PipelineProgram* program) const {
   DEBUG_ASSERT(renderTarget != nullptr);
   auto vertexUniformData = program->getUniformData(ShaderStage::Vertex);
   auto fragmentUniformData = program->getUniformData(ShaderStage::Fragment);
@@ -177,15 +173,6 @@ void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, PipelineProgram
   updateUniformDataSuffix(vertexUniformData, fragmentUniformData, processor);
   processor->setData(vertexUniformData, fragmentUniformData);
   updateUniformDataSuffix(vertexUniformData, fragmentUniformData, nullptr);
-
-  if (vertexUniformData != nullptr) {
-    renderPass->setUniformBuffer(VERTEX_UBO_BINDING_POINT, std::move(vertexUniformBuffer),
-                                 vertexUniformBufferOffset, vertexUniformData->size());
-  }
-  if (fragmentUniformData != nullptr) {
-    renderPass->setUniformBuffer(FRAGMENT_UBO_BINDING_POINT, std::move(fragmentUniformBuffer),
-                                 fragmentUniformBufferOffset, fragmentUniformData->size());
-  }
 
   auto samplers = getSamplers();
   unsigned textureBinding = TEXTURE_BINDING_POINT_START;

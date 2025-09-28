@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RuntimeDrawTask.h"
+
+#include "gpu/AlignTo.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ProxyProvider.h"
@@ -153,38 +155,52 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
 
   renderPass->setPipeline(program->getPipeline());
 
-  auto globalCache = context->globalCache();
+  auto globalCache = renderTarget->getContext()->globalCache();
+
+  auto uboOffsetAlignment =
+      static_cast<size_t>(renderTarget->getContext()->gpu()->caps()->shaderCaps()->uboOffsetAlignment);
+  size_t vertexUniformBufferSize = 0;
   auto vertexUniformData = program->getUniformData(ShaderStage::Vertex);
-  std::shared_ptr<GPUBuffer> vertexUniformBuffer = nullptr;
-  size_t vertexUniformDataOffset = 0;
   if (vertexUniformData != nullptr) {
-    vertexUniformBuffer =
-        globalCache->findOrCreateUniformBuffer(vertexUniformData->size(), &vertexUniformDataOffset);
-    if (vertexUniformBuffer != nullptr) {
-      vertexUniformData->setBuffer(static_cast<uint8_t*>(vertexUniformBuffer->map()) +
-                                   vertexUniformDataOffset);
-    }
+    vertexUniformBufferSize += vertexUniformData->size();
+    vertexUniformBufferSize = AlignTo(vertexUniformBufferSize, uboOffsetAlignment);
   }
 
+  size_t fragmentUniformBufferSize = 0;
   auto fragmentUniformData = program->getUniformData(ShaderStage::Fragment);
-  std::shared_ptr<GPUBuffer> fragmentUniformBuffer = nullptr;
-  size_t fragmentUniformDataOffset = 0;
   if (fragmentUniformData != nullptr) {
-    fragmentUniformBuffer = globalCache->findOrCreateUniformBuffer(fragmentUniformData->size(),
-                                                                   &fragmentUniformDataOffset);
-    if (fragmentUniformBuffer != nullptr) {
-      fragmentUniformData->setBuffer(static_cast<uint8_t*>(fragmentUniformBuffer->map()) +
-                                     fragmentUniformDataOffset);
+    fragmentUniformBufferSize += fragmentUniformData->size();
+  }
+
+  size_t totalUniformBufferSize = vertexUniformBufferSize + fragmentUniformBufferSize;
+  if (totalUniformBufferSize > 0) {
+    size_t lastUniformBufferOffset = 0;
+    auto uniformBuffer = globalCache->findOrCreateUniformBuffer(totalUniformBufferSize, &lastUniformBufferOffset);
+    if (uniformBuffer != nullptr) {
+      auto buffer = static_cast<uint8_t*>(uniformBuffer->map());
+      if (vertexUniformData != nullptr) {
+        vertexUniformData->setBuffer(buffer);
+      }
+      if (fragmentUniformData != nullptr) {
+        fragmentUniformData->setBuffer(buffer + vertexUniformBufferSize);
+      }
+
+      programInfo.setUniformsAndSamplers(renderPass.get(), program.get());
+
+      uniformBuffer->unmap();
+
+      if (vertexUniformData != nullptr) {
+        renderPass->setUniformBuffer(VERTEX_UBO_BINDING_POINT, uniformBuffer,
+                                   lastUniformBufferOffset, vertexUniformData->size());
+        vertexUniformData->setBuffer(nullptr);
+      }
+
+      if (fragmentUniformData != nullptr) {
+        renderPass->setUniformBuffer(FRAGMENT_UBO_BINDING_POINT, std::move(uniformBuffer),
+                                   lastUniformBufferOffset + vertexUniformBufferSize, fragmentUniformData->size());
+        fragmentUniformData->setBuffer(nullptr);
+      }
     }
-  }
-  programInfo.setUniformsAndSamplers(renderPass.get(), program.get(),
-                                     std::move(vertexUniformBuffer), vertexUniformDataOffset,
-                                     std::move(fragmentUniformBuffer), fragmentUniformDataOffset);
-  if (vertexUniformData != nullptr) {
-    vertexUniformData->setBuffer(nullptr);
-  }
-  if (fragmentUniformData != nullptr) {
-    fragmentUniformData->setBuffer(nullptr);
   }
   renderPass->setVertexBuffer(vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
   renderPass->draw(PrimitiveType::TriangleStrip, 0, 4);

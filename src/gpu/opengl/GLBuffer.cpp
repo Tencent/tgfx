@@ -26,18 +26,14 @@ GLBuffer::GLBuffer(std::shared_ptr<GLInterface> interface, unsigned bufferID, si
     : GPUBuffer(size, usage), _interface(std::move(interface)), uniqueID(UniqueID::Next()),
       _bufferID(bufferID) {
   if ((usage & GPUBufferUsage::UNIFORM) && !_interface->caps()->shaderCaps()->uboSupport) {
-    isLegacyUniform = true;
-    if (size > 0) {
-      mappedAddress = malloc(size);
-    }
+    dataAddress = malloc(_size);
   }
 }
 
 GLBuffer::~GLBuffer() {
-  if (isLegacyUniform && mappedAddress != nullptr) {
-    free(mappedAddress);
-    isMapped = false;
-    mappedAddress = nullptr;
+  if (dataAddress != nullptr) {
+    free(dataAddress);
+    dataAddress = nullptr;
   }
 }
 
@@ -56,36 +52,22 @@ unsigned GLBuffer::target() const {
 }
 
 void* GLBuffer::map() {
-  if (isMapped) {
-    return mappedAddress;
+  if (dataAddress != nullptr) {
+    return dataAddress;
   }
 
-  if (!isLegacyUniform) {
-    auto bufferTarget = target();
-    auto gl = _interface->functions();
-    gl->bindBuffer(bufferTarget, _bufferID);
-    mappedAddress = gl->mapBufferRange(bufferTarget, 0, static_cast<int32_t>(_size),
-                                       GL_MAP_WRITE_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
-  }
-
-  if (mappedAddress != nullptr) {
-    isMapped = true;
-  }
-  return mappedAddress;
+  auto gl = _interface->functions();
+  auto bufferTarget = target();
+  gl->bindBuffer(bufferTarget, _bufferID);
+  return gl->mapBufferRange(bufferTarget, 0, static_cast<int32_t>(_size),
+                            GL_MAP_WRITE_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
 }
 
 void GLBuffer::unmap() {
-  if (!isMapped) {
-    return;
-  }
-
-  if (!isLegacyUniform) {
-    auto bufferTarget = target();
-    auto gl = _interface->functions();
-    gl->bindBuffer(bufferTarget, _bufferID);
-    gl->unmapBuffer(bufferTarget);
-  }
-  isMapped = false;
+  auto gl = _interface->functions();
+  auto bufferTarget = target();
+  gl->bindBuffer(bufferTarget, _bufferID);
+  gl->unmapBuffer(bufferTarget);
 }
 
 void GLBuffer::onRelease(GLGPU* gpu) {

@@ -83,11 +83,7 @@ class ProgramInfo {
   /**
    * Sets the uniform data and texture samplers on the render pass for the given program.
    */
-  void setUniformsAndSamplers(RenderPass* renderPass, PipelineProgram* program,
-                              std::shared_ptr<GPUBuffer> vertexUniformBuffer,
-                              size_t vertexUniformBufferOffset,
-                              std::shared_ptr<GPUBuffer> fragmentUniformBuffer,
-                              size_t fragmentUniformBufferOffset) const;
+  void setUniformsAndSamplers(RenderPass* renderPass, PipelineProgram* program) const;
 
  private:
   RenderTarget* renderTarget = nullptr;

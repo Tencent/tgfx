@@ -57,13 +57,9 @@ class GLBuffer : public GPUBuffer, public GLResource {
   std::shared_ptr<GLInterface> _interface = nullptr;
   uint32_t uniqueID = 0;
   unsigned _bufferID = 0;
-  void* mappedAddress = nullptr;
-  bool isMapped = false;
+  void* dataAddress = nullptr;
 
   void onRelease(GLGPU* gpu) override;
-
- private:
-  bool isLegacyUniform = false;
 
   friend class GLState;
 };
