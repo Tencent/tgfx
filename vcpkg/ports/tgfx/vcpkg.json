@@ -1,6 +1,6 @@
 {
   "name": "tgfx",
-  "version-string": "v2.1.0",
+  "version-string": "v2.1.1",
   "description": "A lightweight 2D graphics library for rendering texts, geometries, and images with high-performance APIs that work across various platforms.",
   "homepage": "https://github.com/Tencent/tgfx",
   "license": "BSD-3-Clause",
