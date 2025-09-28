@@ -72,7 +72,7 @@ std::vector<PixelFormat> EAGLGPU::getHardwareTextureFormats(HardwareBufferRef ha
   return formats;
 }
 
-std::vector<std::unique_ptr<GPUTexture>> EAGLGPU::importHardwareTextures(
+std::vector<std::shared_ptr<GPUTexture>> EAGLGPU::importHardwareTextures(
     HardwareBufferRef hardwareBuffer, uint32_t usage) {
   if (!HardwareBufferCheck(hardwareBuffer)) {
     return {};

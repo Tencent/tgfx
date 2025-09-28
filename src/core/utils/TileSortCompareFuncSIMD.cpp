@@ -16,12 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "TileCache.h"
+#include "TileSortCompareFunc.h"
+
 // First undef to prevent error when re-included.
 #undef HWY_TARGET_INCLUDE
 // For dynamic dispatch, specify the name of the current file (unfortunately
 // __FILE__ is not reliable) so that foreach_target.h can re-include it.
-#define HWY_TARGET_INCLUDE "layers/TileCacheSIMD.cpp"
+#define HWY_TARGET_INCLUDE "core/utils/TileSortCompareFuncSIMD.cpp"
 // Generates code for each enabled target by re-including this source file.
 #include "hwy/foreach_target.h"  // IWYU pragma: keep
 
@@ -35,20 +36,20 @@ HWY_BEFORE_NAMESPACE();
 namespace tgfx {
 namespace HWY_NAMESPACE {
 namespace hn = hwy::HWY_NAMESPACE;
-bool TileSortCompImpl(float centerX, float centerY, float tileSize, const std::shared_ptr<Tile>& a,
-                      const std::shared_ptr<Tile>& b) {
+bool TileSortCompareFuncImpl(const Point& center, float tileSize, const std::pair<int, int>& a,
+                             const std::pair<int, int>& b, SortOrder order) {
   const hn::Full128<int32_t> di;
   const hn::Full128<float> df;
-  auto res = hn::Add(
-      hn::ConvertTo(df, hn::Dup128VecFromValues(di, a->tileX, a->tileY, b->tileX, b->tileY)),
-      hn::Set(df, 0.5f));
+  auto res =
+      hn::Add(hn::ConvertTo(df, hn::Dup128VecFromValues(di, a.first, a.second, b.first, b.second)),
+              hn::Set(df, 0.5f));
   res = hn::MulSub(res, hn::Set(df, tileSize),
-                   hn::Dup128VecFromValues(df, centerX, centerY, centerX, centerY));
+                   hn::Dup128VecFromValues(df, center.x, center.y, center.x, center.y));
   res = hn::Mul(res, res);
   res = hn::Add(hn::Reverse2(df, res), res);
   float resVec[4] = {0.0f};
   hn::Store(res, df, resVec);
-  return resVec[0] > resVec[2];
+  return (order == SortOrder::Ascending) ? resVec[0] < resVec[2] : resVec[0] > resVec[2];
 }
 }  // namespace HWY_NAMESPACE
 }  // namespace tgfx
@@ -56,21 +57,11 @@ HWY_AFTER_NAMESPACE();
 
 #if HWY_ONCE
 namespace tgfx {
-HWY_EXPORT(TileSortCompImpl);
+HWY_EXPORT(TileSortCompareFuncImpl);
 
-std::vector<std::shared_ptr<Tile>> TileCache::getReusableTiles(float centerX, float centerY) {
-  std::vector<std::shared_ptr<Tile>> tiles = {};
-  for (auto& item : tileMap) {
-    if (item.second.use_count() == 1) {
-      tiles.push_back(item.second);
-    }
-  }
-  std::sort(tiles.begin(), tiles.end(),
-            [centerX, centerY, tileSize = static_cast<float>(tileSize)](
-                const std::shared_ptr<Tile>& a, const std::shared_ptr<Tile>& b) {
-              return HWY_DYNAMIC_DISPATCH(TileSortCompImpl)(centerX, centerY, tileSize, a, b);
-            });
-  return tiles;
+bool TileSortCompareFunc(const Point& center, float tileSize, const std::pair<int, int>& a,
+                         const std::pair<int, int>& b, SortOrder order) {
+  return HWY_DYNAMIC_DISPATCH(TileSortCompareFuncImpl)(center, tileSize, a, b, order);
 }
 }  // namespace tgfx
 #endif

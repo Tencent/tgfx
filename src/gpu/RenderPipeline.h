@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 #include <vector>
 #include "gpu/Attribute.h"
@@ -25,8 +26,7 @@
 #include "gpu/BlendOperation.h"
 #include "gpu/ColorWriteMask.h"
 #include "gpu/CompareFunction.h"
-#include "gpu/GPUResource.h"
-#include "gpu/GPUShaderModule.h"
+#include "gpu/ShaderModule.h"
 #include "gpu/StencilOperation.h"
 #include "gpu/Uniform.h"
 #include "tgfx/gpu/PixelFormat.h"
@@ -95,9 +95,9 @@ class PipelineColorAttachment {
 class FragmentDescriptor {
  public:
   /**
-   * A GPUShaderModule object containing the fragment shader code.
+   * A ShaderModule object containing the fragment shader code.
    */
-  GPUShaderModule* module = nullptr;
+  std::shared_ptr<ShaderModule> module = nullptr;
 
   /**
    * The name of the entry point function in the shader code.
@@ -129,9 +129,9 @@ class VertexDescriptor {
   VertexDescriptor(std::vector<Attribute> attributes, size_t vertexStride = 0);
 
   /**
-   * A GPUShaderModule object containing the vertex shader code.
+   * A ShaderModule object containing the vertex shader code.
    */
-  GPUShaderModule* module = nullptr;
+  std::shared_ptr<ShaderModule> module = nullptr;
 
   /**
    * The name of the entry point function in the shader code.
@@ -263,7 +263,7 @@ class DepthStencilDescriptor {
 /**
  * Options you provide to a GPU device to create a render pipeline state.
  */
-class GPURenderPipelineDescriptor {
+class RenderPipelineDescriptor {
  public:
   /**
    * The vertex shader entry point and its input buffer layouts.
@@ -289,10 +289,11 @@ class GPURenderPipelineDescriptor {
 };
 
 /**
- * GPURenderPipeline represents a graphics pipeline configuration for a render pass, which the pass
+ * RenderPipeline represents a graphics pipeline configuration for a render pass, which the pass
  * applies to the draw commands you encode.
  */
-class GPURenderPipeline : public GPUResource {
+class RenderPipeline {
  public:
+  virtual ~RenderPipeline() = default;
 };
 }  // namespace tgfx

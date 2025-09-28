@@ -32,6 +32,7 @@
 #include "gpu/tasks/TextureUploadTask.h"
 #include "proxies/HardwareTextureProxy.h"
 #include "tgfx/core/RenderFlags.h"
+#include "tgfx/core/Shape.h"
 
 namespace tgfx {
 ProxyProvider::ProxyProvider(Context* context)
@@ -145,27 +146,27 @@ static UniqueKey AppendClipBoundsKey(const UniqueKey& uniqueKey, const Rect& cli
   return UniqueKey::Append(uniqueKey, bytesKey.data(), bytesKey.size());
 }
 
-std::shared_ptr<GPUShapeProxy> ProxyProvider::createGPUShapeProxy(
-    std::shared_ptr<StyledShape> styledShape, AAType aaType, const Rect& clipBounds,
-    uint32_t renderFlags) {
-  if (styledShape == nullptr) {
+std::shared_ptr<GPUShapeProxy> ProxyProvider::createGPUShapeProxy(std::shared_ptr<Shape> shape,
+                                                                  AAType aaType,
+                                                                  const Rect& clipBounds,
+                                                                  uint32_t renderFlags) {
+  if (shape == nullptr) {
     return nullptr;
   }
   Matrix drawingMatrix = {};
-  auto shape = styledShape->shape();
   auto isInverseFillType = shape->isInverseFillType();
-  auto matrix = styledShape->matrix();
-  if (!matrix.isIdentity() && !isInverseFillType) {
-    auto scales = matrix.getAxisScales();
+  if (shape->type() == Shape::Type::Matrix && !isInverseFillType) {
+    auto matrixShape = std::static_pointer_cast<MatrixShape>(shape);
+    auto scales = matrixShape->matrix.getAxisScales();
     if (scales.x == scales.y) {
       DEBUG_ASSERT(scales.x != 0);
-      drawingMatrix = matrix;
+      drawingMatrix = matrixShape->matrix;
       drawingMatrix.preScale(1.0f / scales.x, 1.0f / scales.x);
-      styledShape->setMatrix(Matrix::MakeScale(scales.x));
+      shape = Shape::ApplyMatrix(matrixShape->shape, Matrix::MakeScale(scales.x));
     }
   }
-  auto shapeBounds = styledShape->getBounds();
-  auto uniqueKey = styledShape->getUniqueKey();
+  auto shapeBounds = shape->getBounds();
+  auto uniqueKey = shape->getUniqueKey();
   if (isInverseFillType) {
     uniqueKey =
         AppendClipBoundsKey(uniqueKey, clipBounds.makeOffset(-shapeBounds.left, -shapeBounds.top));
@@ -194,9 +195,8 @@ std::shared_ptr<GPUShapeProxy> ProxyProvider::createGPUShapeProxy(
   }
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
-  styledShape->applyMatrix(Matrix::MakeTrans(-bounds.x(), -bounds.y()));
-  auto rasterizer =
-      std::make_unique<ShapeRasterizer>(width, height, std::move(styledShape), aaType);
+  shape = Shape::ApplyMatrix(shape, Matrix::MakeTrans(-bounds.x(), -bounds.y()));
+  auto rasterizer = std::make_unique<ShapeRasterizer>(width, height, std::move(shape), aaType);
   std::unique_ptr<DataSource<ShapeBuffer>> dataSource = nullptr;
 #ifdef TGFX_USE_THREADS
   if (!(renderFlags & RenderFlags::DisableAsyncTask) && rasterizer->asyncSupport()) {
@@ -425,14 +425,12 @@ std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
 }
 
 void ProxyProvider::purgeExpiredProxies() {
-  std::vector<const ResourceKey*> keys = {};
-  for (auto& pair : proxyMap) {
-    if (pair.second.expired()) {
-      keys.push_back(&pair.first);
+  for (auto item = proxyMap.begin(); item != proxyMap.end();) {
+    if (item->second.expired()) {
+      item = proxyMap.erase(item);
+    } else {
+      ++item;
     }
-  }
-  for (auto& key : keys) {
-    proxyMap.erase(*key);
   }
 }
 

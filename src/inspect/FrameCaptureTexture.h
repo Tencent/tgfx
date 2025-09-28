@@ -27,25 +27,28 @@ namespace tgfx::inspect {
 
 class FrameCaptureTexture {
  public:
-  static std::shared_ptr<FrameCaptureTexture> MakeFrom(GPUTexture* texture, int width, int height,
-                                                       size_t rowBytes, PixelFormat format,
-                                                       const void* pixels);
+  static std::shared_ptr<FrameCaptureTexture> MakeFrom(std::shared_ptr<GPUTexture> texture,
+                                                       int width, int height, size_t rowBytes,
+                                                       PixelFormat format, const void* pixels);
 
-  static std::shared_ptr<FrameCaptureTexture> MakeFrom(GPUTexture* texture, Context* context);
+  static std::shared_ptr<FrameCaptureTexture> MakeFrom(std::shared_ptr<GPUTexture> texture,
+                                                       Context* context);
 
   static std::shared_ptr<FrameCaptureTexture> MakeFrom(const RenderTarget* renderTarget);
 
-  static uint64_t GetReadedTextureId(GPUTexture* texture);
+  static uint64_t GetReadTextureId(std::shared_ptr<GPUTexture> texture);
 
-  explicit FrameCaptureTexture(const GPUTexture* texture, int width, int height, size_t rowBytes,
-                               PixelFormat format, bool isInput,
+  static void ClearReadedTexture();
+
+  explicit FrameCaptureTexture(const std::shared_ptr<GPUTexture> texture, int width, int height,
+                               size_t rowBytes, PixelFormat format, bool isInput,
                                std::shared_ptr<Buffer> imageBuffer);
 
   uint64_t textureId() const {
     return _textureId;
   }
 
-  const GPUTexture* texture() const {
+  std::shared_ptr<GPUTexture> texture() const {
     return _texture;
   }
 
@@ -75,7 +78,7 @@ class FrameCaptureTexture {
 
  private:
   uint64_t _textureId = 0;
-  const GPUTexture* _texture = nullptr;
+  std::shared_ptr<GPUTexture> _texture = nullptr;
   int _width = 0;
   int _height = 0;
   size_t _rowBytes = 0;

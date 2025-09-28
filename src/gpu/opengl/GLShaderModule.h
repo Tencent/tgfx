@@ -18,10 +18,11 @@
 
 #pragma once
 
-#include "gpu/GPUShaderModule.h"
+#include "gpu/ShaderModule.h"
+#include "gpu/opengl/GLResource.h"
 
 namespace tgfx {
-class GLShaderModule : public GPUShaderModule {
+class GLShaderModule : public ShaderModule, public GLResource {
  public:
   explicit GLShaderModule(unsigned shader) : _shader(shader) {
   }
@@ -30,7 +31,8 @@ class GLShaderModule : public GPUShaderModule {
     return _shader;
   }
 
-  void release(GPU* gpu) override;
+ protected:
+  void onRelease(GLGPU* gpu) override;
 
  private:
   unsigned _shader = 0;

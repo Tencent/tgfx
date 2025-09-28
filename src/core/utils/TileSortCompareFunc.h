@@ -18,21 +18,21 @@
 
 #pragma once
 
-#include "RenderTask.h"
-#include "gpu/resources/Semaphore.h"
+#include "tgfx/core/Point.h"
 
 namespace tgfx {
-class SemaphoreWaitTask : public RenderTask {
- public:
-  explicit SemaphoreWaitTask(std::shared_ptr<Semaphore> semaphore)
-      : semaphore(std::move(semaphore)) {
-  }
+enum class SortOrder { Ascending, Descending };
 
-  void execute(CommandEncoder* encoder) override {
-    encoder->waitForFence(semaphore->getFence());
-  }
-
- private:
-  std::shared_ptr<Semaphore> semaphore = nullptr;
-};
+/**
+ * Compares two tiles based on their distance to a center point.
+ * @param center The center point to measure distance from.
+ * @param tileSize The size of each tile.
+ * @param a The coordinates of the first tile (tileX, tileY).
+ * @param b The coordinates of the second tile (tileX, tileY).
+ * @param order The sort order, either ascending or descending.
+ * @return True if tile 'a' is closer to the center than tile 'b' (for ascending order),
+ *         or farther from the center than tile 'b' (for descending order).
+ */
+bool TileSortCompareFunc(const Point& center, float tileSize, const std::pair<int, int>& a,
+                         const std::pair<int, int>& b, SortOrder order = SortOrder::Ascending);
 }  // namespace tgfx

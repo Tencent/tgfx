@@ -23,14 +23,14 @@
 namespace tgfx {
 class GLDepthStencilTexture : public GLTexture {
  public:
-  static std::unique_ptr<GLDepthStencilTexture> MakeFrom(GLGPU* gpu,
+  static std::shared_ptr<GLDepthStencilTexture> MakeFrom(GLGPU* gpu,
                                                          const GPUTextureDescriptor& descriptor);
   unsigned renderBufferID() const {
     return _renderBufferID;
   }
 
  protected:
-  void onRelease(GLGPU* gpu) override;
+  void onReleaseTexture(GLGPU* gpu) override;
 
  private:
   unsigned _renderBufferID = 0;
@@ -38,5 +38,7 @@ class GLDepthStencilTexture : public GLTexture {
   GLDepthStencilTexture(const GPUTextureDescriptor& descriptor, unsigned renderBufferID)
       : GLTexture(descriptor, GL_TEXTURE_2D, 0), _renderBufferID(renderBufferID) {
   }
+
+  friend class GLGPU;
 };
 }  // namespace tgfx

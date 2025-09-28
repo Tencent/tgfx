@@ -112,11 +112,7 @@ std::shared_ptr<Program> ProgramBuilder::CreateProgram(Context* context,
   if (!builder.emitAndInstallProcessors()) {
     return nullptr;
   }
-  auto program = builder.finalize();
-  if (program == nullptr) {
-    return nullptr;
-  }
-  return Resource::AddToCache(context, program.release());
+  return builder.finalize();
 }
 
 GLSLProgramBuilder::GLSLProgramBuilder(Context* context, const ProgramInfo* programInfo)
@@ -171,32 +167,31 @@ std::string GLSLProgramBuilder::getUniformBlockDeclaration(
   return result;
 }
 
-std::unique_ptr<PipelineProgram> GLSLProgramBuilder::finalize() {
+std::shared_ptr<PipelineProgram> GLSLProgramBuilder::finalize() {
   auto shaderCaps = context->caps()->shaderCaps();
   if (shaderCaps->usesCustomColorOutputName) {
     fragmentShaderBuilder()->declareCustomOutputColor();
   }
   finalizeShaders();
   auto gpu = context->gpu();
-  GPUShaderModuleDescriptor vertexModule = {};
+  ShaderModuleDescriptor vertexModule = {};
   vertexModule.code = vertexShaderBuilder()->shaderString();
   vertexModule.stage = ShaderStage::Vertex;
   auto vertexShader = gpu->createShaderModule(vertexModule);
   if (vertexShader == nullptr) {
     return nullptr;
   }
-  GPUShaderModuleDescriptor fragmentModule = {};
+  ShaderModuleDescriptor fragmentModule = {};
   fragmentModule.code = fragmentShaderBuilder()->shaderString();
   fragmentModule.stage = ShaderStage::Fragment;
   auto fragmentShader = gpu->createShaderModule(fragmentModule);
   if (fragmentShader == nullptr) {
-    vertexShader->release(gpu);
     return nullptr;
   }
-  GPURenderPipelineDescriptor descriptor = {};
+  RenderPipelineDescriptor descriptor = {};
   descriptor.vertex = {programInfo->getVertexAttributes()};
-  descriptor.vertex.module = vertexShader.get();
-  descriptor.fragment.module = fragmentShader.get();
+  descriptor.vertex.module = vertexShader;
+  descriptor.fragment.module = fragmentShader;
   descriptor.fragment.colorAttachments.push_back(programInfo->getPipelineColorAttachment());
   auto vertexUniformBuffer = _uniformHandler.makeUniformBuffer(ShaderStage::Vertex);
   auto fragmentUniformBuffer = _uniformHandler.makeUniformBuffer(ShaderStage::Fragment);
@@ -221,12 +216,10 @@ std::unique_ptr<PipelineProgram> GLSLProgramBuilder::finalize() {
     descriptor.layout.textureSamplers.emplace_back(sampler.name(), textureBinding++);
   }
   auto pipeline = gpu->createRenderPipeline(descriptor);
-  vertexShader->release(gpu);
-  fragmentShader->release(gpu);
   if (pipeline == nullptr) {
     return nullptr;
   }
-  return std::make_unique<PipelineProgram>(std::move(pipeline), std::move(vertexUniformBuffer),
+  return std::make_shared<PipelineProgram>(std::move(pipeline), std::move(vertexUniformBuffer),
                                            std::move(fragmentUniformBuffer));
 }
 

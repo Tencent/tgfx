@@ -32,8 +32,6 @@ class EAGLWindow : public Window {
   static std::shared_ptr<EAGLWindow> MakeFrom(CAEAGLLayer* layer,
                                               std::shared_ptr<GLDevice> device = nullptr);
 
-  ~EAGLWindow() override;
-
  protected:
   std::shared_ptr<Surface> onCreateSurface(Context* context) override;
   void onPresent(Context* context, int64_t presentationTime) override;

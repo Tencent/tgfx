@@ -40,7 +40,6 @@
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Rect.h"
-#include "core/StyledShape.h"
 
 #if defined _WIN32
 #include <intrin.h>
@@ -115,7 +114,7 @@ class FrameCapture {
 
   void sendRRectMeshData(DrawOp* drawOp, RRectsVertexProvider* provider);
 
-  void sendShapeMeshData(DrawOp* drawOp, std::shared_ptr<StyledShape> styledShape, AAType aaType, const Rect& clipBounds);
+  void sendShapeMeshData(DrawOp* drawOp, std::shared_ptr<Shape> styledShape, AAType aaType, const Rect& clipBounds);
 
   void sendMeshData(VertexProvider* provider, uint64_t extraDataPtr, size_t extraDataSize);
 
@@ -174,7 +173,7 @@ class FrameCapture {
   void sendLongStringWithExtraData(uint64_t str, const char* ptr, size_t len,
                                    std::shared_ptr<Data> extraData, FrameCaptureMessageType type);
 
-  void sendShaderText(const GPUShaderModuleDescriptor& shaderDescriptor);
+  void sendShaderText(const ShaderModuleDescriptor& shaderDescriptor);
 
   void sendUniformInfo(const std::vector<Uniform>& uniforms);
 

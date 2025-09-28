@@ -26,9 +26,7 @@
 #include "gpu/tasks/GenerateMipmapsTask.h"
 #include "gpu/tasks/RenderTargetCopyTask.h"
 #include "gpu/tasks/RuntimeDrawTask.h"
-#include "gpu/tasks/SemaphoreWaitTask.h"
 #include "inspect/InspectorMark.h"
-#include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
 static ColorType GetAtlasColorType(bool isAlphaOnly) {
@@ -179,15 +177,7 @@ void DrawingManager::addAtlasCellCodecTask(const std::shared_ptr<TextureProxy>& 
   atlasCellCodecTasks.emplace_back(std::move(task));
 }
 
-void DrawingManager::addSemaphoreWaitTask(std::shared_ptr<Semaphore> semaphore) {
-  if (semaphore == nullptr) {
-    return;
-  }
-  auto task = drawingBuffer->make<SemaphoreWaitTask>(std::move(semaphore));
-  renderTasks.emplace_back(std::move(task));
-}
-
-std::shared_ptr<CommandBuffer> DrawingManager::flush(BackendSemaphore* signalSemaphore) {
+std::shared_ptr<CommandBuffer> DrawingManager::flush() {
   TASK_MARK(tgfx::inspect::OpTaskType::Flush);
   while (!compositors.empty()) {
     auto compositor = compositors.back();
@@ -223,21 +213,7 @@ std::shared_ptr<CommandBuffer> DrawingManager::flush(BackendSemaphore* signalSem
     }
   }
   renderTasks.clear();
-
-  if (signalSemaphore != nullptr) {
-    auto fence = commandEncoder->insertFence();
-    if (fence != nullptr) {
-      *signalSemaphore = fence->getBackendSemaphore();
-    }
-  }
   return commandEncoder->finish();
-}
-
-void DrawingManager::releaseAll() {
-  compositors.clear();
-  resourceTasks.clear();
-  renderTasks.clear();
-  resetAtlasCache();
 }
 
 void DrawingManager::resetAtlasCache() {

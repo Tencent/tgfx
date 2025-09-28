@@ -167,9 +167,9 @@ void GLRenderPipeline::setStencilReference(GLGPU* gpu, unsigned reference) {
   state->setStencilState(*stencilState);
 }
 
-void GLRenderPipeline::release(GPU* gpu) {
+void GLRenderPipeline::onRelease(GLGPU* gpu) {
   DEBUG_ASSERT(gpu != nullptr);
-  auto gl = static_cast<GLGPU*>(gpu)->functions();
+  auto gl = gpu->functions();
   if (programID > 0) {
     gl->deleteProgram(programID);
   }
@@ -272,7 +272,7 @@ static std::unique_ptr<GLDepthState> MakeDepthState(const DepthStencilDescriptor
 }
 
 bool GLRenderPipeline::setPipelineDescriptor(GLGPU* gpu,
-                                             const GPURenderPipelineDescriptor& descriptor) {
+                                             const RenderPipelineDescriptor& descriptor) {
   auto gl = gpu->functions();
   ClearGLError(gl);
   auto state = gpu->state();

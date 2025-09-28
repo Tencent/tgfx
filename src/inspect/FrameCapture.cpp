@@ -312,40 +312,27 @@ void FrameCapture::sendRRectMeshData(DrawOp* drawOp, RRectsVertexProvider* provi
   sendMeshData(provider, reinterpret_cast<uint64_t>(data), extraDataSize);
 }
 
-void FrameCapture::sendShapeMeshData(DrawOp* drawOp, std::shared_ptr<StyledShape> styledShape,
+void FrameCapture::sendShapeMeshData(DrawOp* drawOp, std::shared_ptr<Shape> shape,
                                      AAType aaType, const Rect& clipBounds) {
-  if (!currentFrameShouldCaptrue() || styledShape == nullptr) {
+  if (!currentFrameShouldCaptrue() || shape == nullptr) {
     return;
   }
-  auto path = styledShape->getPath();
+  auto path = shape->getPath();
   if (!PathTriangulator::ShouldTriangulatePath(path)) {
     return;
   }
-  Matrix drawingMatrix = {};
-  auto shape = styledShape->shape();
   auto isInverseFillType = shape->isInverseFillType();
-  auto matrix = styledShape->matrix();
-  if (!matrix.isIdentity() && !isInverseFillType) {
-    auto scales = matrix.getAxisScales();
-    if (scales.x == scales.y) {
-      DEBUG_ASSERT(scales.x != 0);
-      drawingMatrix = matrix;
-      drawingMatrix.preScale(1.0f / scales.x, 1.0f / scales.x);
-      styledShape->setMatrix(Matrix::MakeScale(scales.x));
-    }
-  }
-  auto shapeBounds = styledShape->getBounds();
+  auto shapeBounds = shape->getBounds();
   if (aaType != AAType::None) {
     // Add a 1-pixel outset to preserve antialiasing results.
     shapeBounds.outset(1.0f, 1.0f);
   }
   auto bounds = isInverseFillType ? clipBounds : shapeBounds;
-  drawingMatrix.preTranslate(bounds.x(), bounds.y());
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
-  // styledShape->applyMatrix(Matrix::MakeTrans(-bounds.x(), -bounds.y()));
+  // shape->applyMatrix(Matrix::MakeTrans(-bounds.x(), -bounds.y()));
   auto rasterizer =
-      std::make_unique<ShapeRasterizer>(width, height, std::move(styledShape), aaType);
+      std::make_unique<ShapeRasterizer>(width, height, std::move(shape), aaType);
   auto shapeBuffer = rasterizer->getData();
   RectMeshInfo rectMeshData = {};
   auto meshType = static_cast<uint8_t>(VertexProviderType::RectsVertexProvider);
@@ -412,12 +399,12 @@ void FrameCapture::captureProgramInfo(const BytesKey& programKey, Context* conte
     builder.fragmentShaderBuilder()->declareCustomOutputColor();
   }
   builder.finalizeShaders();
-  GPUShaderModuleDescriptor vertexModule = {};
+  ShaderModuleDescriptor vertexModule = {};
   vertexModule.code = builder.vertexShaderBuilder()->shaderString();
   vertexModule.stage = ShaderStage::Vertex;
   sendShaderText(vertexModule);
 
-  GPUShaderModuleDescriptor fragmentModule = {};
+  ShaderModuleDescriptor fragmentModule = {};
   fragmentModule.code = builder.fragmentShaderBuilder()->shaderString();
   fragmentModule.stage = ShaderStage::Fragment;
   sendShaderText(fragmentModule);
@@ -428,7 +415,7 @@ void FrameCapture::captureProgramInfo(const BytesKey& programKey, Context* conte
   sendUniformInfo(fragmentUniformBuffer->uniforms());
 }
 
-void FrameCapture::sendShaderText(const GPUShaderModuleDescriptor& shaderDescriptor) {
+void FrameCapture::sendShaderText(const ShaderModuleDescriptor& shaderDescriptor) {
   if (!isConnected()) {
     return;
   }
@@ -489,7 +476,7 @@ void FrameCapture::sendFragmentProcessor(
           textureId = frameCaptureTexture->textureId();
           sendFrameCaptureTexture(std::move(frameCaptureTexture));
         } else {
-          textureId = FrameCaptureTexture::GetReadedTextureId(texture);
+          textureId = FrameCaptureTexture::GetReadTextureId(texture);
         }
         sendInputTextureID(textureId);
       }
@@ -502,6 +489,7 @@ void FrameCapture::LaunchWorker(FrameCapture* inspector) {
 }
 
 void FrameCapture::clear() {
+  FrameCaptureTexture::ClearReadedTexture();
   dataBufferOffset = 0;
   dataBufferStart = 0;
   captureFrameCount = 0;
@@ -985,7 +973,6 @@ FrameCapture::DequeueStatus FrameCapture::dequeueSerial() {
                                  item.meshMessage.extraDataSize);
           sendLongStringWithExtraData(data, reinterpret_cast<const char*>(data), size,
                                       std::move(extraData), FrameCaptureMessageType::MeshData);
-          LOGI("send Shape mesh size = %ld", size);
           delete[] reinterpret_cast<const uint8_t*>(data);
           delete[] reinterpret_cast<const uint8_t*>(item.meshMessage.extraDataPtr);
           continue;

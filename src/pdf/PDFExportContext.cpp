@@ -33,6 +33,7 @@
 #include "core/shaders/MatrixShader.h"
 #include "core/utils/Log.h"
 #include "core/utils/PlacementPtr.h"
+#include "core/utils/ShapeUtils.h"
 #include "core/utils/Types.h"
 #include "pdf/PDFBitmap.h"
 #include "pdf/PDFDocumentImpl.h"
@@ -185,10 +186,8 @@ void PDFExportContext::drawPath(const Path& path, const MCState& state, const Fi
 
 void PDFExportContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
                                  const Fill& fill, const Stroke* stroke) {
-  if (stroke && !stroke->isHairline()) {
-    shape = Shape::ApplyStroke(std::move(shape), stroke);
-  }
-  auto path = shape->getPath();
+  shape = Shape::ApplyStroke(std::move(shape), stroke);
+  auto path = ShapeUtils::GetShapeRenderingPath(shape, state.matrix.getMaxScale());
   this->onDrawPath(state, path, fill);
 }
 
@@ -539,10 +538,7 @@ void PDFExportContext::exportGlyphRunAsPath(const GlyphRun& glyphRun, const MCSt
     return;
   }
   auto shape = Shape::MakeFrom(path);
-  if (stroke && !stroke->isHairline()) {
-    shape = Shape::ApplyStroke(std::move(shape), stroke);
-  }
-  drawShape(shape, state, fill, nullptr);
+  drawShape(shape, state, fill, stroke);
 
   //TODO (YGaurora): maybe hasPerspective()
   Fill transparentFill = fill;

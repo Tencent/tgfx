@@ -107,32 +107,24 @@ std::shared_ptr<RenderTarget> RenderTarget::Make(Context* context, int width, in
 }
 
 std::shared_ptr<RenderTarget> TextureRenderTarget::MakeFrom(Context* context,
-                                                            std::unique_ptr<GPUTexture> texture,
+                                                            std::shared_ptr<GPUTexture> texture,
                                                             int sampleCount, ImageOrigin origin,
                                                             bool externallyOwned,
                                                             const ScratchKey& scratchKey) {
   DEBUG_ASSERT(context != nullptr);
   DEBUG_ASSERT(texture != nullptr);
-  std::unique_ptr<GPUTexture> renderTexture = nullptr;
+  std::shared_ptr<GPUTexture> renderTexture = nullptr;
   if (sampleCount > 1) {
     GPUTextureDescriptor descriptor = {texture->width(),  texture->height(),
                                        texture->format(), false,
                                        sampleCount,       GPUTextureUsage::RENDER_ATTACHMENT};
     renderTexture = context->gpu()->createTexture(descriptor);
     if (renderTexture == nullptr) {
-      texture->release(context->gpu());
       return nullptr;
     }
   }
   auto renderTarget = new TextureRenderTarget(std::move(texture), std::move(renderTexture), origin,
                                               externallyOwned);
   return Resource::AddToCache(context, renderTarget, scratchKey);
-}
-
-void TextureRenderTarget::onReleaseGPU() {
-  DefaultTextureView::onReleaseGPU();
-  if (renderTexture != nullptr) {
-    renderTexture->release(context->gpu());
-  }
 }
 }  // namespace tgfx

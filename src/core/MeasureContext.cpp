@@ -17,85 +17,86 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MeasureContext.h"
-#include "core/utils/ApplyStrokeToBounds.h"
 #include "core/utils/Log.h"
+#include "core/utils/StrokeUtils.h"
+#include "tgfx/core/Shape.h"
 #include "utils/MathExtra.h"
 
 namespace tgfx {
 void MeasureContext::drawFill(const Fill&) {
 }
 
-void MeasureContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill) {
-  addLocalBounds(state, fill, rect);
+void MeasureContext::drawRect(const Rect& rect, const MCState& state, const Fill&) {
+  addLocalBounds(state, rect);
 }
 
-void MeasureContext::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
+void MeasureContext::drawRRect(const RRect& rRect, const MCState& state, const Fill&,
                                const Stroke* stroke) {
   auto rect = rRect.rect;
   if (stroke) {
     ApplyStrokeToBounds(*stroke, &rect);
   }
-  addLocalBounds(state, fill, rect, false);
+  addLocalBounds(state, rect, false);
 }
 
-void MeasureContext::drawPath(const Path& path, const MCState& state, const Fill& fill) {
+void MeasureContext::drawPath(const Path& path, const MCState& state, const Fill&) {
   if (computeTightBounds) {
-    addTightBounds(path, state, fill);
+    addTightBounds(path, state);
     return;
   }
   auto localBounds = path.getBounds();
-  addLocalBounds(state, fill, localBounds, path.isInverseFillType());
+  addLocalBounds(state, localBounds, path.isInverseFillType());
 }
 
-void MeasureContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill,
+void MeasureContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill&,
                                const Stroke* stroke) {
   DEBUG_ASSERT(shape != nullptr);
   if (computeTightBounds) {
     auto path = shape->getPath();
-    if (stroke && !stroke->isHairline()) {
+    if (stroke) {
+      // Measure doesn't require high-precision paths, so ignore resolution scale here.
       stroke->applyToPath(&path);
     }
-    addTightBounds(path, state, fill);
+    addTightBounds(path, state);
     return;
   }
-  auto bound = shape->getBounds();
-  if (stroke && !stroke->isHairline()) {
-    ApplyStrokeToBounds(*stroke, &bound, true);
+  auto localBounds = shape->getBounds();
+  if (stroke) {
+    ApplyStrokeToBounds(*stroke, &localBounds, true);
   }
-  addLocalBounds(state, fill, bound, shape->isInverseFillType());
+  addLocalBounds(state, localBounds, shape->isInverseFillType());
 }
 
 void MeasureContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions&,
-                               const MCState& state, const Fill& fill) {
-  addLocalBounds(state, fill, Rect::MakeWH(image->width(), image->height()));
+                               const MCState& state, const Fill&) {
+  addLocalBounds(state, Rect::MakeWH(image->width(), image->height()));
 }
 
 void MeasureContext::drawImageRect(std::shared_ptr<Image>, const Rect&, const Rect& dstRect,
-                                   const SamplingOptions&, const MCState& state, const Fill& fill,
+                                   const SamplingOptions&, const MCState& state, const Fill&,
                                    SrcRectConstraint) {
-  addLocalBounds(state, fill, dstRect);
+  addLocalBounds(state, dstRect);
 }
 
 void MeasureContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
-                                      const MCState& state, const Fill& fill,
-                                      const Stroke* stroke) {
+                                      const MCState& state, const Fill&, const Stroke* stroke) {
   DEBUG_ASSERT(glyphRunList != nullptr);
   auto localBounds =
       computeTightBounds ? glyphRunList->getTightBounds() : glyphRunList->getBounds();
   if (stroke) {
     ApplyStrokeToBounds(*stroke, &localBounds);
   }
-  addLocalBounds(state, fill, localBounds);
+  addLocalBounds(state, localBounds);
 }
 
 void MeasureContext::drawLayer(std::shared_ptr<Picture> picture,
                                std::shared_ptr<ImageFilter> imageFilter, const MCState& state,
-                               const Fill& fill) {
+                               const Fill&) {
   DEBUG_ASSERT(picture != nullptr);
   if (imageFilter) {
     auto localBounds = computeTightBounds ? picture->getTightBounds(nullptr) : picture->getBounds();
     localBounds = imageFilter->filterBounds(localBounds);
-    addLocalBounds(state, fill, localBounds);
+    addLocalBounds(state, localBounds);
   } else {
     Rect deviceBounds = {};
     if (computeTightBounds) {
@@ -104,7 +105,7 @@ void MeasureContext::drawLayer(std::shared_ptr<Picture> picture,
       deviceBounds = picture->getBounds();
       state.matrix.mapRect(&deviceBounds);
     }
-    addDeviceBounds(state.clip, fill, deviceBounds, picture->hasUnboundedFill());
+    addDeviceBounds(state.clip, deviceBounds, picture->hasUnboundedFill());
   }
 }
 
@@ -113,24 +114,19 @@ void MeasureContext::drawPicture(std::shared_ptr<Picture> picture, const MCState
   picture->playback(this, state);
 }
 
-void MeasureContext::addTightBounds(const Path& path, const MCState& state, const Fill& fill) {
+void MeasureContext::addTightBounds(const Path& path, const MCState& state) {
   auto tempPath = path;
   tempPath.transform(state.matrix);
   auto deviceBounds = tempPath.getBounds();
-  addDeviceBounds(state.clip, fill, deviceBounds, path.isInverseFillType());
+  addDeviceBounds(state.clip, deviceBounds, path.isInverseFillType());
 }
 
-void MeasureContext::addLocalBounds(const MCState& state, const Fill& fill, const Rect& localBounds,
-                                    bool unbounded) {
+void MeasureContext::addLocalBounds(const MCState& state, const Rect& localBounds, bool unbounded) {
   auto deviceBounds = state.matrix.mapRect(localBounds);
-  addDeviceBounds(state.clip, fill, deviceBounds, unbounded);
+  addDeviceBounds(state.clip, deviceBounds, unbounded);
 }
 
-void MeasureContext::addDeviceBounds(const Path& clip, const Fill& fill, const Rect& deviceBounds,
-                                     bool unbounded) {
-  if (fill.nothingToDraw()) {
-    return;
-  }
+void MeasureContext::addDeviceBounds(const Path& clip, const Rect& deviceBounds, bool unbounded) {
   if (clip.isInverseFillType()) {
     bounds.join(deviceBounds);
     return;

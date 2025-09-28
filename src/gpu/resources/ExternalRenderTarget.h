@@ -36,28 +36,23 @@ class ExternalRenderTarget : public Resource, public RenderTarget {
     return true;
   }
 
-  GPUTexture* getRenderTexture() const override {
-    return renderTexture.get();
+  std::shared_ptr<GPUTexture> getRenderTexture() const override {
+    return renderTexture;
   }
 
-  GPUTexture* getSampleTexture() const override {
-    return renderTexture.get();
+  std::shared_ptr<GPUTexture> getSampleTexture() const override {
+    return renderTexture;
   }
 
   size_t memoryUsage() const override {
     return 0;
   }
 
- protected:
-  void onReleaseGPU() override {
-    renderTexture->release(context->gpu());
-  }
-
  private:
-  std::unique_ptr<GPUTexture> renderTexture = nullptr;
+  std::shared_ptr<GPUTexture> renderTexture = nullptr;
   ImageOrigin _origin = ImageOrigin::TopLeft;
 
-  ExternalRenderTarget(std::unique_ptr<GPUTexture> texture, ImageOrigin origin)
+  ExternalRenderTarget(std::shared_ptr<GPUTexture> texture, ImageOrigin origin)
       : renderTexture(std::move(texture)), _origin(origin) {
   }
 

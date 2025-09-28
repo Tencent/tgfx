@@ -21,13 +21,14 @@
 #include "core/utils/UniqueID.h"
 #include "gpu/GPUBuffer.h"
 #include "gpu/opengl/GLInterface.h"
+#include "gpu/opengl/GLResource.h"
 
 namespace tgfx {
 /**
  * GLBuffer is a GPUBuffer implementation for OpenGL. It encapsulates an OpenGL buffer object and
  * provides methods to access its properties and release its resources.
  */
-class GLBuffer : public GPUBuffer {
+class GLBuffer : public GPUBuffer, public GLResource {
  public:
   /**
    * Creates a new GLBuffer with the specified size and usage flags.
@@ -48,7 +49,8 @@ class GLBuffer : public GPUBuffer {
     return _bufferID;
   }
 
-  void release(GPU* gpu) override;
+ protected:
+  void onRelease(GLGPU* gpu) override;
 
  private:
   uint32_t uniqueID = 0;

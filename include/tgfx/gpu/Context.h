@@ -49,7 +49,7 @@ class Context {
    */
   Context(Device* device, GPU* gpu);
 
-  virtual ~Context();
+  ~Context();
 
   /**
    * Returns the associated device.
@@ -203,11 +203,6 @@ class Context {
   SlidingWindowTracker* _maxValueTracker = nullptr;
   AtlasManager* _atlasManager = nullptr;
   std::shared_ptr<CommandBuffer> commandBuffer = nullptr;
-
-  void releaseAll(bool releaseGPU);
-
-  friend class Device;
-  friend class Resource;
 };
 
 }  // namespace tgfx

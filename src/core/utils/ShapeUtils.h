@@ -18,33 +18,20 @@
 
 #pragma once
 
-#include <string>
-#include "gpu/GPUResource.h"
-#include "gpu/ShaderStage.h"
-
+#include <memory>
+#include "tgfx/core/Path.h"
+#include "tgfx/core/Shape.h"
 namespace tgfx {
-/**
- * GPUShaderModuleDescriptor describes the properties required to create a GPUShaderModule.
- */
-class GPUShaderModuleDescriptor {
+
+class ShapeUtils {
  public:
   /**
-   * The shader code to be compiled into a GPUShaderModule.
+   * Returns the Shape adjusted for the current resolution scale.
+   * Used during rendering to decide whether to simplify the Path or apply hairline stroking,
+   * depending on the resolution scale.
    */
-  std::string code;
+  static Path GetShapeRenderingPath(std::shared_ptr<Shape> shape, float resolutionScale);
 
-  /**
-   * Specifies the shader stage (e.g., vertex, fragment, compute). Only relevant for the OpenGL
-   * backend; ignored by other backends.
-   */
-  ShaderStage stage = ShaderStage::Vertex;
-};
-
-/**
- * GPUShaderModule is an internal object that serves as a container for shader code，allowing it to
- * be submitted to the GPU for execution within a pipeline.
- */
-class GPUShaderModule : public GPUResource {
- public:
+  static float CalculateAlphaReduceFactorIfHairline(std::shared_ptr<Shape> shape);
 };
 }  // namespace tgfx

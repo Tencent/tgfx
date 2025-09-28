@@ -34,7 +34,14 @@ GLGPU::GLGPU(std::shared_ptr<GLInterface> glInterface)
   commandQueue = std::make_unique<GLCommandQueue>(this);
 }
 
-std::unique_ptr<GPUBuffer> GLGPU::createBuffer(size_t size, uint32_t usage) {
+GLGPU::~GLGPU() {
+  // The Device owner must call releaseAll() before deleting this GLGPU, otherwise, GPU resources
+  // may leak.
+  DEBUG_ASSERT(returnQueue == nullptr);
+  DEBUG_ASSERT(resources.empty());
+}
+
+std::shared_ptr<GPUBuffer> GLGPU::createBuffer(size_t size, uint32_t usage) {
   if (size == 0) {
     return nullptr;
   }
@@ -56,10 +63,10 @@ std::unique_ptr<GPUBuffer> GLGPU::createBuffer(size_t size, uint32_t usage) {
   gl->bindBuffer(target, bufferID);
   gl->bufferData(target, static_cast<GLsizeiptr>(size), nullptr, GL_STATIC_DRAW);
   gl->bindBuffer(target, 0);
-  return std::make_unique<GLBuffer>(bufferID, size, usage);
+  return makeResource<GLBuffer>(bufferID, size, usage);
 }
 
-std::unique_ptr<GPUTexture> GLGPU::createTexture(const GPUTextureDescriptor& descriptor) {
+std::shared_ptr<GPUTexture> GLGPU::createTexture(const GPUTextureDescriptor& descriptor) {
   if (descriptor.width <= 0 || descriptor.height <= 0 ||
       descriptor.format == PixelFormat::Unknown || descriptor.mipLevelCount < 1 ||
       descriptor.sampleCount < 1 || descriptor.usage == 0) {
@@ -91,7 +98,7 @@ std::unique_ptr<GPUTexture> GLGPU::createTexture(const GPUTextureDescriptor& des
   if (textureID == 0) {
     return nullptr;
   }
-  auto texture = std::make_unique<GLTexture>(descriptor, target, textureID);
+  auto texture = makeResource<GLTexture>(descriptor, target, textureID);
   _state->bindTexture(texture.get());
   auto& textureFormat = interface->caps()->getTextureFormat(descriptor.format);
   bool success = true;
@@ -106,11 +113,9 @@ std::unique_ptr<GPUTexture> GLGPU::createTexture(const GPUTextureDescriptor& des
     success = CheckGLError(gl);
   }
   if (!success) {
-    texture->release(this);
     return nullptr;
   }
   if (descriptor.usage & GPUTextureUsage::RENDER_ATTACHMENT && !texture->checkFrameBuffer(this)) {
-    texture->release(this);
     return nullptr;
   }
   return texture;
@@ -124,7 +129,7 @@ PixelFormat GLGPU::getExternalTextureFormat(const BackendTexture& backendTexture
   return GLSizeFormatToPixelFormat(textureInfo.format);
 }
 
-std::unique_ptr<GPUTexture> GLGPU::importExternalTexture(const BackendTexture& backendTexture,
+std::shared_ptr<GPUTexture> GLGPU::importExternalTexture(const BackendTexture& backendTexture,
                                                          uint32_t usage, bool adopted) {
   GLTextureInfo textureInfo = {};
   if (!backendTexture.getGLTextureInfo(&textureInfo)) {
@@ -139,14 +144,13 @@ std::unique_ptr<GPUTexture> GLGPU::importExternalTexture(const BackendTexture& b
   }
   GPUTextureDescriptor descriptor = {
       backendTexture.width(), backendTexture.height(), format, false, 1, usage};
-  std::unique_ptr<GLTexture> texture = nullptr;
+  std::shared_ptr<GLTexture> texture = nullptr;
   if (adopted) {
-    texture = std::make_unique<GLTexture>(descriptor, textureInfo.target, textureInfo.id);
+    texture = makeResource<GLTexture>(descriptor, textureInfo.target, textureInfo.id);
   } else {
-    texture = std::make_unique<GLExternalTexture>(descriptor, textureInfo.target, textureInfo.id);
+    texture = makeResource<GLExternalTexture>(descriptor, textureInfo.target, textureInfo.id);
   }
   if (usage & GPUTextureUsage::RENDER_ATTACHMENT && !texture->checkFrameBuffer(this)) {
-    texture->release(this);
     return nullptr;
   }
   return texture;
@@ -160,7 +164,7 @@ PixelFormat GLGPU::getExternalTextureFormat(const BackendRenderTarget& renderTar
   return GLSizeFormatToPixelFormat(frameBufferInfo.format);
 }
 
-std::unique_ptr<GPUTexture> GLGPU::importExternalTexture(const BackendRenderTarget& renderTarget) {
+std::shared_ptr<GPUTexture> GLGPU::importExternalTexture(const BackendRenderTarget& renderTarget) {
   GLFrameBufferInfo frameBufferInfo = {};
   if (!renderTarget.getGLFramebufferInfo(&frameBufferInfo)) {
     return nullptr;
@@ -175,15 +179,16 @@ std::unique_ptr<GPUTexture> GLGPU::importExternalTexture(const BackendRenderTarg
                                      false,
                                      1,
                                      GPUTextureUsage::RENDER_ATTACHMENT};
-  return std::make_unique<GLExternalTexture>(descriptor, GL_TEXTURE_2D, 0, frameBufferInfo.id);
+  return makeResource<GLExternalTexture>(descriptor, static_cast<unsigned>(GL_TEXTURE_2D), 0u,
+                                         frameBufferInfo.id);
 }
 
-std::unique_ptr<GPUFence> GLGPU::importExternalFence(const BackendSemaphore& semaphore) {
+std::shared_ptr<GPUFence> GLGPU::importExternalFence(const BackendSemaphore& semaphore) {
   GLSyncInfo glSyncInfo = {};
   if (!caps()->semaphoreSupport || !semaphore.getGLSync(&glSyncInfo)) {
     return nullptr;
   }
-  return std::make_unique<GLFence>(glSyncInfo.sync);
+  return makeResource<GLFence>(interface, glSyncInfo.sync);
 }
 
 static int ToGLWrap(AddressMode wrapMode) {
@@ -200,7 +205,7 @@ static int ToGLWrap(AddressMode wrapMode) {
   return GL_REPEAT;
 }
 
-std::unique_ptr<GPUSampler> GLGPU::createSampler(const GPUSamplerDescriptor& descriptor) {
+std::shared_ptr<GPUSampler> GLGPU::createSampler(const GPUSamplerDescriptor& descriptor) {
   int minFilter = GL_LINEAR;
   switch (descriptor.mipmapMode) {
     case MipmapMode::None:
@@ -216,12 +221,11 @@ std::unique_ptr<GPUSampler> GLGPU::createSampler(const GPUSamplerDescriptor& des
       break;
   }
   int magFilter = descriptor.magFilter == FilterMode::Nearest ? GL_NEAREST : GL_LINEAR;
-  return std::make_unique<GLSampler>(ToGLWrap(descriptor.addressModeX),
+  return std::make_shared<GLSampler>(ToGLWrap(descriptor.addressModeX),
                                      ToGLWrap(descriptor.addressModeY), minFilter, magFilter);
 }
 
-std::unique_ptr<GPUShaderModule> GLGPU::createShaderModule(
-    const GPUShaderModuleDescriptor& descriptor) {
+std::shared_ptr<ShaderModule> GLGPU::createShaderModule(const ShaderModuleDescriptor& descriptor) {
   if (descriptor.code.empty()) {
     LOGE("GLGPU::createShaderModule() shader code is empty!");
     return nullptr;
@@ -252,13 +256,13 @@ std::unique_ptr<GPUShaderModule> GLGPU::createShaderModule(
     shader = 0;
   }
 #endif
-  return std::make_unique<GLShaderModule>(shader);
+  return makeResource<GLShaderModule>(shader);
 }
 
-std::unique_ptr<GPURenderPipeline> GLGPU::createRenderPipeline(
-    const GPURenderPipelineDescriptor& descriptor) {
-  auto vertexModule = static_cast<GLShaderModule*>(descriptor.vertex.module);
-  auto fragmentModule = static_cast<GLShaderModule*>(descriptor.fragment.module);
+std::shared_ptr<RenderPipeline> GLGPU::createRenderPipeline(
+    const RenderPipelineDescriptor& descriptor) {
+  auto vertexModule = static_cast<GLShaderModule*>(descriptor.vertex.module.get());
+  auto fragmentModule = static_cast<GLShaderModule*>(descriptor.fragment.module.get());
   if (vertexModule == nullptr || vertexModule->shader() == 0 || vertexModule == nullptr ||
       fragmentModule->shader() == 0) {
     LOGE("GLGPU::createRenderPipeline() invalid shader module!");
@@ -296,15 +300,43 @@ std::unique_ptr<GPURenderPipeline> GLGPU::createRenderPipeline(
     programID = 0;
     LOGE("GLGPU::createRenderPipeline() Could not link program: %s", infoLog);
   }
-  auto pipeline = std::make_unique<GLRenderPipeline>(programID);
+  auto pipeline = makeResource<GLRenderPipeline>(programID);
   if (!pipeline->setPipelineDescriptor(this, descriptor)) {
-    pipeline->release(this);
     return nullptr;
   }
   return pipeline;
 }
 
 std::shared_ptr<CommandEncoder> GLGPU::createCommandEncoder() {
+  processUnreferencedResources();
   return std::make_shared<GLCommandEncoder>(this);
 }
+
+void GLGPU::processUnreferencedResources() {
+  DEBUG_ASSERT(returnQueue != nullptr);
+  while (auto resource = static_cast<GLResource*>(returnQueue->dequeue())) {
+    resources.erase(resource->cachedPosition);
+    resource->onRelease(this);
+    delete resource;
+  }
+}
+
+void GLGPU::releaseAll(bool releaseGPU) {
+  if (releaseGPU) {
+    for (auto& resource : resources) {
+      resource->onRelease(this);
+    }
+  }
+  resources.clear();
+  returnQueue = nullptr;
+}
+
+std::shared_ptr<GLResource> GLGPU::addResource(GLResource* resource) {
+  DEBUG_ASSERT(resource != nullptr);
+  processUnreferencedResources();
+  resources.push_back(resource);
+  resource->cachedPosition = --resources.end();
+  return std::static_pointer_cast<GLResource>(returnQueue->makeShared(resource));
+}
+
 }  // namespace tgfx

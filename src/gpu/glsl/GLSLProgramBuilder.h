@@ -38,7 +38,7 @@ class GLSLProgramBuilder : public ProgramBuilder {
  private:
   GLSLProgramBuilder(Context* context, const ProgramInfo* programInfo);
 
-  std::unique_ptr<PipelineProgram> finalize();
+  std::shared_ptr<PipelineProgram> finalize();
 
   UniformHandler* uniformHandler() override {
     return &_uniformHandler;

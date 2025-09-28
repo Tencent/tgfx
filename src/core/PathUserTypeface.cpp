@@ -19,8 +19,8 @@
 #include "PathUserTypeface.h"
 #include "UserScalerContext.h"
 #include "core/PathRasterizer.h"
-#include "core/utils/ApplyStrokeToBounds.h"
 #include "core/utils/FauxBoldScale.h"
+#include "core/utils/StrokeUtils.h"
 #include "tgfx/core/Shape.h"
 
 namespace tgfx {
@@ -118,9 +118,7 @@ class PathUserScalerContext final : public UserScalerContext {
     auto matrix = Matrix::MakeScale(textSize);
     matrix.postTranslate(-bounds.x(), -bounds.y());
     auto shape = Shape::MakeFrom(pathProvider);
-    if (stroke && !stroke->isHairline()) {
-      shape = Shape::ApplyStroke(std::move(shape), stroke);
-    }
+    shape = Shape::ApplyStroke(std::move(shape), stroke);
     shape = Shape::ApplyMatrix(std::move(shape), matrix);
     auto rasterizer = PathRasterizer::MakeFrom(width, height, std::move(shape), true,
 #ifdef TGFX_USE_TEXT_GAMMA_CORRECTION

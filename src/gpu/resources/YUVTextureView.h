@@ -44,8 +44,8 @@ class YUVTextureView : public TextureView {
     return _colorSpace;
   }
 
-  GPUTexture* getTexture() const override {
-    return textures.front().get();
+  std::shared_ptr<GPUTexture> getTexture() const override {
+    return textures.front();
   }
 
   /**
@@ -56,7 +56,7 @@ class YUVTextureView : public TextureView {
   /**
    * Returns the GPUTexture at the specified index.
    */
-  GPUTexture* getTextureAt(size_t index) const;
+  std::shared_ptr<GPUTexture> getTextureAt(size_t index) const;
 
   bool isAlphaOnly() const override {
     return false;
@@ -79,13 +79,11 @@ class YUVTextureView : public TextureView {
   }
 
  protected:
-  YUVTextureView(std::vector<std::unique_ptr<GPUTexture>> yuvTextures, YUVFormat yuvFormat,
+  YUVTextureView(std::vector<std::shared_ptr<GPUTexture>> yuvTextures, YUVFormat yuvFormat,
                  YUVColorSpace colorSpace);
 
-  void onReleaseGPU() override;
-
  private:
-  std::array<std::unique_ptr<GPUTexture>, 3> textures = {};
+  std::array<std::shared_ptr<GPUTexture>, 3> textures = {};
   YUVFormat _yuvFormat = YUVFormat::Unknown;
   YUVColorSpace _colorSpace = YUVColorSpace::BT601_LIMITED;
 

@@ -22,6 +22,7 @@
 #include <functional>
 #include <list>
 #include <unordered_map>
+#include "core/utils/ReturnQueue.h"
 #include "gpu/resources/ResourceKey.h"
 #include "tgfx/gpu/Context.h"
 
@@ -34,6 +35,8 @@ class Resource;
 class ResourceCache {
  public:
   explicit ResourceCache(Context* context);
+
+  ~ResourceCache();
 
   /**
    * Returns true if there is no cache at all.
@@ -117,6 +120,13 @@ class ResourceCache {
    */
   bool hasUniqueResource(const UniqueKey& uniqueKey);
 
+  /**
+   * Removes all GPU resources from the cache, regardless of whether they are purgeable or not.
+   * Resources that are currently in use will be removed from the cache but not deleted until they
+   * are no longer referenced.
+   */
+  void releaseAll();
+
  private:
   Context* context = nullptr;
   size_t maxBytes = 512 * (1 << 20);  // 512MB
@@ -127,6 +137,7 @@ class ResourceCache {
   size_t _expirationFrames = 120;
   std::chrono::steady_clock::time_point currentFrameTime = {};
   std::deque<std::chrono::steady_clock::time_point> frameTimes = {};
+  std::shared_ptr<ReturnQueue> returnQueue = ReturnQueue::Make();
   std::list<Resource*> nonpurgeableResources = {};
   std::list<Resource*> purgeableResources = {};
   ResourceKeyMap<std::vector<Resource*>> scratchKeyMap = {};
@@ -134,9 +145,7 @@ class ResourceCache {
 
   static void AddToList(std::list<Resource*>& list, Resource* resource);
   static void RemoveFromList(std::list<Resource*>& list, Resource* resource);
-  static bool InList(const std::list<Resource*>& list, Resource* resource);
 
-  void releaseAll(bool releaseGPU);
   void purgeAsNeeded();
   void processUnreferencedResources();
   std::shared_ptr<Resource> addResource(Resource* resource, const ScratchKey& scratchKey);

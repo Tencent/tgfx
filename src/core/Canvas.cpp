@@ -421,9 +421,7 @@ void Canvas::drawShape(std::shared_ptr<Shape> shape, const Paint& paint) {
     }
     return;
   }
-  if (shape != nullptr) {
-    drawContext->drawShape(std::move(shape), state, fill, stroke);
-  }
+  drawContext->drawShape(std::move(shape), state, fill, stroke);
 }
 
 void Canvas::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,

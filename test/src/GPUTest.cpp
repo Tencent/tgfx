@@ -38,8 +38,8 @@ TGFX_TEST(GPUTest, DepthRenderPassTest) {
       GPUTextureUsage::RENDER_ATTACHMENT | GPUTextureUsage::TEXTURE_BINDING);
   auto renderTexture = context->gpu()->createTexture(renderTextureDesc);
   ASSERT_TRUE(renderTexture != nullptr);
-  RenderPassDescriptor renderPassDescriptor(renderTexture.get());
-  renderPassDescriptor.depthStencilAttachment.texture = depthTexture.get();
+  RenderPassDescriptor renderPassDescriptor(renderTexture);
+  renderPassDescriptor.depthStencilAttachment.texture = depthTexture;
   auto commandEncoder = context->gpu()->createCommandEncoder();
   ASSERT_TRUE(commandEncoder != nullptr);
   auto renderPass = commandEncoder->beginRenderPass(renderPassDescriptor);

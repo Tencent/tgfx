@@ -41,7 +41,7 @@ static bool RenderbufferStorageMSAA(GLGPU* gpu, int sampleCount, PixelFormat pix
   return CheckGLError(gl);
 }
 
-std::unique_ptr<GLMultisampleTexture> GLMultisampleTexture::MakeFrom(
+std::shared_ptr<GLMultisampleTexture> GLMultisampleTexture::MakeFrom(
     GLGPU* gpu, const GPUTextureDescriptor& descriptor) {
   DEBUG_ASSERT(gpu != nullptr);
   DEBUG_ASSERT(descriptor.sampleCount > 1);
@@ -69,18 +69,15 @@ std::unique_ptr<GLMultisampleTexture> GLMultisampleTexture::MakeFrom(
     LOGE("GLMultisampleTexture::MakeFrom() failed to generate framebuffer!");
     return nullptr;
   }
-  auto texture =
-      std::unique_ptr<GLMultisampleTexture>(new GLMultisampleTexture(descriptor, frameBufferID));
+  auto texture = gpu->makeResource<GLMultisampleTexture>(descriptor, frameBufferID);
   gl->genRenderbuffers(1, &texture->renderBufferID);
   if (texture->renderBufferID == 0) {
-    texture->release(gpu);
     LOGE("GLMultisampleTexture::MakeFrom() failed to generate renderbuffer!");
     return nullptr;
   }
   gl->bindRenderbuffer(GL_RENDERBUFFER, texture->renderBufferID);
   if (!RenderbufferStorageMSAA(gpu, descriptor.sampleCount, descriptor.format, descriptor.width,
                                descriptor.height)) {
-    texture->release(gpu);
     return nullptr;
   }
   auto state = gpu->state();
@@ -90,14 +87,13 @@ std::unique_ptr<GLMultisampleTexture> GLMultisampleTexture::MakeFrom(
 #ifndef TGFX_BUILD_FOR_WEB
   if (gl->checkFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
     LOGE("GLMultisampleTexture::MakeFrom() framebuffer is not complete!");
-    texture->release(gpu);
     return nullptr;
   }
 #endif
   return texture;
 }
 
-void GLMultisampleTexture::onRelease(GLGPU* gpu) {
+void GLMultisampleTexture::onReleaseTexture(GLGPU* gpu) {
   auto gl = gpu->functions();
   if (_frameBufferID > 0) {
     auto state = gpu->state();

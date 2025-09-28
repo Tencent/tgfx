@@ -18,6 +18,7 @@
 
 #include "tgfx/gpu/opengl/GLDevice.h"
 #include <thread>
+#include "gpu/ResourceCache.h"
 #include "gpu/opengl/GLGPU.h"
 
 namespace tgfx {
@@ -66,7 +67,24 @@ GLDevice::GLDevice(std::unique_ptr<GPU> gpu, void* nativeHandle)
 }
 
 GLDevice::~GLDevice() {
+  // Subclasses must call releaseAll() before GLDevice is destroyed to clean up all GPU resources in
+  // the context. Otherwise, GPU resources may leak due to OpenGL context loss.
+  DEBUG_ASSERT(context == nullptr);
   std::lock_guard<std::mutex> autoLock(deviceMapLocker);
   deviceMap.erase(nativeHandle);
+}
+
+void GLDevice::releaseAll() {
+  std::lock_guard<std::mutex> autoLock(locker);
+  if (context == nullptr) {
+    return;
+  }
+  auto releaseGPU = onLockContext();
+  static_cast<GLGPU*>(_gpu)->releaseAll(releaseGPU);
+  if (releaseGPU) {
+    onUnlockContext();
+  }
+  delete context;
+  context = nullptr;
 }
 }  // namespace tgfx

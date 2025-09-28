@@ -21,7 +21,6 @@
 #include <map>
 #include <vector>
 #include "gpu/OpsCompositor.h"
-#include "gpu/resources/Semaphore.h"
 #include "gpu/tasks/OpsRenderTask.h"
 #include "gpu/tasks/RenderTask.h"
 #include "gpu/tasks/ResourceTask.h"
@@ -68,20 +67,11 @@ class DrawingManager {
   void addAtlasCellCodecTask(const std::shared_ptr<TextureProxy>& textureProxy,
                              const Point& atlasOffset, std::shared_ptr<ImageCodec> codec);
 
-  void addSemaphoreWaitTask(std::shared_ptr<Semaphore> semaphore);
-
   /**
-   * Flushes the drawing manager, executing all resource and render tasks. If signalSemaphore is not
-   * null and uninitialized, a new semaphore will be created and assigned to signalSemaphore after
-   * the flush is complete. Returns nullptr if there are no tasks to execute, in which case the
-   * signalSemaphore will not be created.
+   * Flushes all recorded tasks and returns a CommandBuffer containing the GPU commands. If no tasks
+   * were recorded, returns nullptr.
    */
-  std::shared_ptr<CommandBuffer> flush(BackendSemaphore* signalSemaphore);
-
-  /**
-   * Releases all tasks associated with the drawing manager.
-   */
-  void releaseAll();
+  std::shared_ptr<CommandBuffer> flush();
 
  private:
   Context* context = nullptr;

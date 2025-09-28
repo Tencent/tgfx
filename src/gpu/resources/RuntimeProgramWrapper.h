@@ -22,19 +22,18 @@
 #include "tgfx/gpu/RuntimeProgram.h"
 
 namespace tgfx {
+class GLRuntimeProgram;
+
 class RuntimeProgramWrapper : public Program {
  public:
   static std::shared_ptr<Program> Wrap(std::unique_ptr<RuntimeProgram> program);
 
   static const RuntimeProgram* Unwrap(const Program* program);
 
- protected:
-  void onReleaseGPU() override;
-
  private:
-  std::unique_ptr<RuntimeProgram> runtimeProgram = nullptr;
+  std::shared_ptr<GLRuntimeProgram> runtimeProgram = nullptr;
 
-  explicit RuntimeProgramWrapper(std::unique_ptr<RuntimeProgram> program)
+  explicit RuntimeProgramWrapper(std::shared_ptr<GLRuntimeProgram> program)
       : runtimeProgram(std::move(program)) {
   }
 };

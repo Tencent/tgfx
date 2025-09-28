@@ -59,6 +59,10 @@ class RRectDrawOp : public DrawOp {
     return Type::RRectDrawOp;
   }
 
+  bool hasCoverage() const override {
+    return true;
+  }
+
  private:
   size_t rectCount = 0;
   bool useScale = false;

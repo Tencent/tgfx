@@ -23,22 +23,22 @@
 #include "gpu/GPU.h"
 
 namespace tgfx::inspect {
-static std::unordered_map<uint64_t, uint64_t> readedInputTexture = {};
+static std::unordered_map<uint64_t, uint64_t> ReadedInputTexture = {};
 
-std::shared_ptr<FrameCaptureTexture> FrameCaptureTexture::MakeFrom(GPUTexture* texture, int width,
-                                                                   int height, size_t rowBytes,
-                                                                   PixelFormat format,
-                                                                   const void* pixels) {
+std::shared_ptr<FrameCaptureTexture> FrameCaptureTexture::MakeFrom(
+    std::shared_ptr<GPUTexture> texture, int width, int height, size_t rowBytes, PixelFormat format,
+    const void* pixels) {
   const auto size = static_cast<size_t>(height) * rowBytes;
   auto imageBuffer = std::make_shared<Buffer>(size);
   imageBuffer->writeRange(0, size, pixels);
-  return std::make_shared<FrameCaptureTexture>(texture, width, height, rowBytes, format, true,
-                                               std::move(imageBuffer));
+  return std::make_shared<FrameCaptureTexture>(std::move(texture), width, height, rowBytes, format,
+                                               true, std::move(imageBuffer));
 }
 
-std::shared_ptr<FrameCaptureTexture> FrameCaptureTexture::MakeFrom(GPUTexture* texture,
-                                                                   Context* context) {
-  if (readedInputTexture.find(reinterpret_cast<uint64_t>(texture)) != readedInputTexture.end()) {
+std::shared_ptr<FrameCaptureTexture> FrameCaptureTexture::MakeFrom(
+    std::shared_ptr<GPUTexture> texture, Context* context) {
+  auto textureKey = reinterpret_cast<uint64_t>(texture.get());
+  if (ReadedInputTexture.find(textureKey) != ReadedInputTexture.end()) {
     return nullptr;
   }
   auto width = texture->width();
@@ -53,7 +53,7 @@ std::shared_ptr<FrameCaptureTexture> FrameCaptureTexture::MakeFrom(GPUTexture* t
   }
   auto frameCaptureTexture = std::make_shared<FrameCaptureTexture>(texture, width, height, rowBytes,
                                                                    texture->format(), true, buffer);
-  readedInputTexture[reinterpret_cast<uint64_t>(texture)] = frameCaptureTexture->textureId();
+  ReadedInputTexture[textureKey] = frameCaptureTexture->textureId();
   return frameCaptureTexture;
 }
 
@@ -73,16 +73,21 @@ std::shared_ptr<FrameCaptureTexture> FrameCaptureTexture::MakeFrom(
                                                std::move(imageBuffer));
 }
 
-uint64_t FrameCaptureTexture::GetReadedTextureId(GPUTexture* texture) {
-  if (readedInputTexture.find(reinterpret_cast<uint64_t>(texture)) == readedInputTexture.end()) {
+uint64_t FrameCaptureTexture::GetReadTextureId(std::shared_ptr<GPUTexture> texture) {
+  auto result = ReadedInputTexture.find(reinterpret_cast<uint64_t>(texture.get()));
+  if (result == ReadedInputTexture.end()) {
     return 0;
   }
-  return readedInputTexture[reinterpret_cast<uint64_t>(texture)];
+  return result->second;
 }
 
-FrameCaptureTexture::FrameCaptureTexture(const GPUTexture* texture, int width, int height,
-                                         size_t rowBytes, PixelFormat format, bool isInput,
-                                         std::shared_ptr<Buffer> imageBuffer)
+void FrameCaptureTexture::ClearReadedTexture() {
+  ReadedInputTexture.clear();
+}
+
+FrameCaptureTexture::FrameCaptureTexture(const std::shared_ptr<GPUTexture> texture, int width,
+                                         int height, size_t rowBytes, PixelFormat format,
+                                         bool isInput, std::shared_ptr<Buffer> imageBuffer)
     : _textureId(FrameCapture::NextTextureID()), _texture(texture), _width(width), _height(height),
       _rowBytes(rowBytes), _format(format), _isInput(isInput), image(std::move(imageBuffer)) {
 }

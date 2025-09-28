@@ -36,7 +36,7 @@ class EAGLLayerTexture : public GLTexture {
   }
 
  protected:
-  void onRelease(GLGPU* gpu) override;
+  void onReleaseTexture(GLGPU* gpu) override;
 
  private:
   unsigned _frameBufferID = 0;

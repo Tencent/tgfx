@@ -18,22 +18,42 @@
 
 #include "RuntimeProgramWrapper.h"
 #include "core/utils/Log.h"
+#include "gpu/opengl/GLGPU.h"
+#include "gpu/opengl/GLResource.h"
 
 namespace tgfx {
+//TODO: Remove this class once all runtime effects have fully switched to using GPU commands.
+class GLRuntimeProgram : public GLResource {
+ public:
+  explicit GLRuntimeProgram(std::unique_ptr<RuntimeProgram> program)
+      : runtimeProgram(std::move(program)) {
+  }
+
+  RuntimeProgram* program() const {
+    return runtimeProgram.get();
+  }
+
+ protected:
+  void onRelease(GLGPU*) override {
+    runtimeProgram->onReleaseGPU();
+    runtimeProgram->context = nullptr;
+  }
+
+ private:
+  std::unique_ptr<RuntimeProgram> runtimeProgram = nullptr;
+};
+
 std::shared_ptr<Program> RuntimeProgramWrapper::Wrap(std::unique_ptr<RuntimeProgram> program) {
   if (program == nullptr) {
     return nullptr;
   }
   auto context = program->getContext();
-  return Resource::AddToCache(context, new RuntimeProgramWrapper(std::move(program)));
+  auto glProgram =
+      static_cast<GLGPU*>(context->gpu())->makeResource<GLRuntimeProgram>(std::move(program));
+  return std::shared_ptr<RuntimeProgramWrapper>(new RuntimeProgramWrapper(std::move(glProgram)));
 }
 
 const RuntimeProgram* RuntimeProgramWrapper::Unwrap(const Program* program) {
-  return static_cast<const RuntimeProgramWrapper*>(program)->runtimeProgram.get();
-}
-
-void RuntimeProgramWrapper::onReleaseGPU() {
-  runtimeProgram->onReleaseGPU();
-  runtimeProgram->context = nullptr;
+  return static_cast<const RuntimeProgramWrapper*>(program)->runtimeProgram->program();
 }
 }  // namespace tgfx

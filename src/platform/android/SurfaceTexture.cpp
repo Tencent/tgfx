@@ -21,6 +21,7 @@
 #include "HandlerThread.h"
 #include "JNIUtil.h"
 #include "core/utils/Log.h"
+#include "gpu/opengl/GLGPU.h"
 #include "gpu/opengl/GLTexture.h"
 #include "gpu/resources/DefaultTextureView.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
@@ -211,7 +212,9 @@ std::shared_ptr<TextureView> SurfaceTexture::onMakeTexture(Context* context, boo
                                      false,
                                      1,
                                      GPUTextureUsage::TEXTURE_BINDING};
-  auto texture = std::make_unique<GLTexture>(descriptor, GL_TEXTURE_EXTERNAL_OES, textureID);
+  auto gpu = static_cast<GLGPU*>(context->gpu());
+  auto texture = gpu->makeResource<GLTexture>(
+      descriptor, static_cast<unsigned>(GL_TEXTURE_EXTERNAL_OES), textureID);
   return Resource::AddToCache(context, new DefaultTextureView(std::move(texture)));
 }
 

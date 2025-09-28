@@ -56,22 +56,12 @@ std::vector<PixelFormat> CGLGPU::getHardwareTextureFormats(HardwareBufferRef har
   return formats;
 }
 
-std::vector<std::unique_ptr<GPUTexture>> CGLGPU::importHardwareTextures(
+std::vector<std::shared_ptr<GPUTexture>> CGLGPU::importHardwareTextures(
     HardwareBufferRef hardwareBuffer, uint32_t usage) {
   if (!HardwareBufferCheck(hardwareBuffer)) {
     return {};
   }
-  auto texture = CGLHardwareTexture::MakeFrom(caps(), hardwareBuffer, usage, getTextureCache());
-  if (texture == nullptr) {
-    return {};
-  }
-  if (usage & GPUTextureUsage::RENDER_ATTACHMENT && !texture->checkFrameBuffer(this)) {
-    texture->release(this);
-    return {};
-  }
-  std::vector<std::unique_ptr<GPUTexture>> textures = {};
-  textures.push_back(std::move(texture));
-  return textures;
+  return CGLHardwareTexture::MakeFrom(this, hardwareBuffer, usage, getTextureCache());
 }
 
 CVOpenGLTextureCacheRef CGLGPU::getTextureCache() {

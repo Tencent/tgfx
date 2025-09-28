@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "tgfx/core/Matrix.h"
 #include "tgfx/core/Shape.h"
 
 namespace tgfx {
@@ -41,10 +42,6 @@ class PathShape : public Shape {
     return path.getBounds();
   }
 
-  Path getPath() const override {
-    return path;
-  }
-
   Path path = {};
 
  protected:
@@ -53,5 +50,9 @@ class PathShape : public Shape {
   }
 
   UniqueKey getUniqueKey() const override;
+
+  Path onGetPath(float /*resolutionScale*/) const override {
+    return path;
+  }
 };
 }  // namespace tgfx

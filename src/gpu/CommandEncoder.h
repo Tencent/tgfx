@@ -49,28 +49,16 @@ class CommandEncoder {
    * @param dstTexture The destination texture to copy to.
    * @param dstOffset The offset in the destination texture where the copied region will be placed.
    */
-  virtual void copyTextureToTexture(GPUTexture* srcTexture, const Rect& srcRect,
-                                    GPUTexture* dstTexture, const Point& dstOffset) = 0;
+  virtual void copyTextureToTexture(std::shared_ptr<GPUTexture> srcTexture, const Rect& srcRect,
+                                    std::shared_ptr<GPUTexture> dstTexture,
+                                    const Point& dstOffset) = 0;
 
   /**
    * Encodes a command that generates mipmaps for the specified GPUTexture from the base level to
    * the highest level. This method only has an effect if the texture was created with mipmap
    * enabled.
    */
-  virtual void generateMipmapsForTexture(GPUTexture* texture) = 0;
-
-  /**
-   * Inserts a signal GPUFence into the command encoder. This is used to notify other
-   * synchronization points once the preceding GPU commands have finished executing. Returns nullptr
-   * if the GPUFence cannot be created or inserted.
-   */
-  virtual std::unique_ptr<GPUFence> insertFence() = 0;
-
-  /**
-   * Makes subsequent commands added to the command encoder to wait until the specified GPUFence is
-   * signaled.
-   */
-  virtual void waitForFence(GPUFence* fence) = 0;
+  virtual void generateMipmapsForTexture(std::shared_ptr<GPUTexture> texture) = 0;
 
   /**
    * Finalizes command encoding and returns a CommandBuffer with all recorded commands. You can then

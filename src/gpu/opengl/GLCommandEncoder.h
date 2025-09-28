@@ -28,14 +28,11 @@ class GLCommandEncoder : public CommandEncoder {
   explicit GLCommandEncoder(GLGPU* gpu) : gpu(gpu) {
   }
 
-  void copyTextureToTexture(GPUTexture* srcTexture, const Rect& srcRect, GPUTexture* dstTexture,
+  void copyTextureToTexture(std::shared_ptr<GPUTexture> srcTexture, const Rect& srcRect,
+                            std::shared_ptr<GPUTexture> dstTexture,
                             const Point& dstOffset) override;
 
-  void generateMipmapsForTexture(GPUTexture* texture) override;
-
-  std::unique_ptr<GPUFence> insertFence() override;
-
-  void waitForFence(GPUFence* fence) override;
+  void generateMipmapsForTexture(std::shared_ptr<GPUTexture> texture) override;
 
  protected:
   std::shared_ptr<RenderPass> onBeginRenderPass(const RenderPassDescriptor& descriptor) override;

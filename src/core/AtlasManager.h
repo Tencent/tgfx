@@ -39,8 +39,6 @@ class AtlasManager : public AtlasGenerationCounter {
 
   void postFlush();
 
-  void releaseAll();
-
   AtlasToken nextFlushToken() const;
 
  private:

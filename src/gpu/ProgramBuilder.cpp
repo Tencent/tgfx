@@ -155,7 +155,8 @@ void ProgramBuilder::emitAndInstallXferProc(const std::string& colorIn,
   fragmentShaderBuilder()->codeAppend("}");
 }
 
-SamplerHandle ProgramBuilder::emitSampler(GPUTexture* texture, const std::string& name) {
+SamplerHandle ProgramBuilder::emitSampler(std::shared_ptr<GPUTexture> texture,
+                                          const std::string& name) {
   ++numFragmentSamplers;
   return uniformHandler()->addSampler(texture, name);
 }

@@ -98,7 +98,7 @@ class ProgramBuilder {
 
   void emitAndInstallXferProc(const std::string& colorIn, const std::string& coverageIn);
 
-  SamplerHandle emitSampler(GPUTexture* texture, const std::string& name);
+  SamplerHandle emitSampler(std::shared_ptr<GPUTexture> texture, const std::string& name);
 
   void emitFSOutputSwizzle();
 

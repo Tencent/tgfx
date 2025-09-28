@@ -40,7 +40,7 @@ bool TextureView::CheckSizeAndFormat(Context* context, int width, int height, Pi
   return width <= maxTextureSize && height <= maxTextureSize;
 }
 
-void TextureView::ComputeTextureKey(const GPUTexture* texture, BytesKey* bytesKey) {
+void TextureView::ComputeTextureKey(const std::shared_ptr<GPUTexture> texture, BytesKey* bytesKey) {
   DEBUG_ASSERT(texture != nullptr);
   bytesKey->write(static_cast<uint32_t>(texture->format()) << 16 |
                   static_cast<uint32_t>(texture->type()));

@@ -36,7 +36,8 @@ std::string UniformHandler::addUniform(const std::string& name, UniformFormat fo
   return uniformName;
 }
 
-SamplerHandle UniformHandler::addSampler(GPUTexture* texture, const std::string& name) {
+SamplerHandle UniformHandler::addSampler(std::shared_ptr<GPUTexture> texture,
+                                         const std::string& name) {
   // The same texture can be added multiple times, each with a different name.
   UniformFormat format;
   switch (texture->type()) {

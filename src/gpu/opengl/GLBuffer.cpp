@@ -32,10 +32,10 @@ unsigned GLBuffer::target() const {
   return 0;
 }
 
-void GLBuffer::release(GPU* gpu) {
+void GLBuffer::onRelease(GLGPU* gpu) {
   DEBUG_ASSERT(gpu != nullptr);
   if (_bufferID > 0) {
-    auto gl = static_cast<const GLGPU*>(gpu)->functions();
+    auto gl = gpu->functions();
     gl->deleteBuffers(1, &_bufferID);
     _bufferID = 0;
   }

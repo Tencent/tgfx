@@ -19,7 +19,6 @@
 #pragma once
 
 #include <cstdint>
-#include "gpu/GPUResource.h"
 #include "gpu/GPUTexture.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/PixelFormat.h"
@@ -101,8 +100,10 @@ class GPUTextureDescriptor {
 /**
  * GPUTexture represents a texture in the GPU backend for rendering operations.
  */
-class GPUTexture : public GPUResource {
+class GPUTexture {
  public:
+  virtual ~GPUTexture() = default;
+
   /**
    * Returns the width of the texture in pixels.
    */

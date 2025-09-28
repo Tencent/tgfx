@@ -22,8 +22,7 @@
 #include "utils/Log.h"
 
 namespace tgfx {
-ShapeRasterizer::ShapeRasterizer(int width, int height, std::shared_ptr<StyledShape> shape,
-                                 AAType aaType)
+ShapeRasterizer::ShapeRasterizer(int width, int height, std::shared_ptr<Shape> shape, AAType aaType)
     : width(width), height(height), shape(std::move(shape)), aaType(aaType) {
 }
 

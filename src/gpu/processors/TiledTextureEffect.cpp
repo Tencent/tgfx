@@ -158,7 +158,7 @@ size_t TiledTextureEffect::onCountTextureSamplers() const {
   return textureView ? 1 : 0;
 }
 
-GPUTexture* TiledTextureEffect::onTextureAt(size_t) const {
+std::shared_ptr<GPUTexture> TiledTextureEffect::onTextureAt(size_t) const {
   auto textureView = getTextureView();
   if (textureView == nullptr) {
     return nullptr;

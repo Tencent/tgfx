@@ -19,6 +19,7 @@
 #pragma once
 
 #include "core/shapes/UniqueKeyShape.h"
+#include "tgfx/core/Matrix.h"
 
 namespace tgfx {
 class InverseShape : public UniqueKeyShape {
@@ -34,12 +35,12 @@ class InverseShape : public UniqueKeyShape {
     return shape->getBounds();
   }
 
-  Path getPath() const override;
-
  protected:
   Type type() const override {
     return Type::Inverse;
   }
+
+  Path onGetPath(float resolutionScale) const override;
 
  private:
   std::shared_ptr<Shape> shape = nullptr;

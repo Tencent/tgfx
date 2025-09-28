@@ -16,16 +16,30 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/resources/Semaphore.h"
-#include "gpu/GPU.h"
+#pragma once
+
+#include "gpu/processors/Transform3DGeometryProcessor.h"
 
 namespace tgfx {
-std::shared_ptr<Semaphore> Semaphore::MakeAdopted(Context* context,
-                                                  const BackendSemaphore& backendSemaphore) {
-  auto fence = context->gpu()->importExternalFence(backendSemaphore);
-  if (fence == nullptr) {
-    return nullptr;
-  }
-  return Resource::AddToCache(context, new Semaphore(std::move(fence)));
-}
+
+/**
+ * The implementation of QuadPerEdgeAA3DGeometryProcessor using GLSL.
+ */
+class GLSLQuadPerEdgeAA3DGeometryProcessor final : public Transform3DGeometryProcessor {
+ public:
+  /**
+   * Creates a GLSLQuadPerEdgeAA3DGeometryProcessor instance with the specified parameters.
+   */
+  explicit GLSLQuadPerEdgeAA3DGeometryProcessor(AAType aa, const Matrix3D& matrix,
+                                                const Vec2& ndcScale, const Vec2& ndcOffset);
+
+  void emitCode(EmitArgs& args) const override;
+
+  void setData(UniformBuffer* vertexUniformBuffer, UniformBuffer* fragmentUniformBuffer,
+               FPCoordTransformIter* transformIter) const override;
+
+ private:
+  Color defaultColor = Color::White();
+};
+
 }  // namespace tgfx

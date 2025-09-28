@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "gpu/GPURenderPipeline.h"
+#include "gpu/RenderPipeline.h"
 #include "gpu/UniformBuffer.h"
 #include "gpu/resources/Resource.h"
 #include "tgfx/core/BytesKey.h"
@@ -27,11 +27,9 @@ namespace tgfx {
 /**
  * The base class for GPU programs.
  */
-class Program : public Resource {
+class Program {
  public:
-  size_t memoryUsage() const override {
-    return 0;
-  }
+  virtual ~Program() = default;
 
  private:
   BytesKey programKey = {};

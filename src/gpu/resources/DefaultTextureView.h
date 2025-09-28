@@ -27,20 +27,16 @@ namespace tgfx {
  */
 class DefaultTextureView : public TextureView {
  public:
-  explicit DefaultTextureView(std::unique_ptr<GPUTexture> texture,
+  explicit DefaultTextureView(std::shared_ptr<GPUTexture> texture,
                               ImageOrigin origin = ImageOrigin::TopLeft);
 
   size_t memoryUsage() const override;
 
-  GPUTexture* getTexture() const override {
-    return _texture.get();
+  std::shared_ptr<GPUTexture> getTexture() const override {
+    return _texture;
   }
 
  protected:
-  std::unique_ptr<GPUTexture> _texture = nullptr;
-
-  void onReleaseGPU() override {
-    _texture->release(context->gpu());
-  }
+  std::shared_ptr<GPUTexture> _texture = nullptr;
 };
 }  // namespace tgfx

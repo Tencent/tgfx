@@ -18,24 +18,23 @@
 
 #pragma once
 
+#include "tgfx/core/Rect.h"
+#include "tgfx/core/Stroke.h"
+
 namespace tgfx {
-class GPU;
+/**
+ * Applies the stroke options to the given bounds.
+ */
+void ApplyStrokeToBounds(const Stroke& stroke, Rect* bounds, bool applyMiterLimit = false);
 
 /**
- * GPUResource is the base class for GPU resources that need manual release of their underlying
- * allocations. It is intended for resources like buffers and textures that are not automatically
- * managed by the GPU. This class decouples resource release from object destruction, allowing you
- * to skip releasing resources in scenarios such as when the GPU device is lost or destroyed.
- * Otherwise, it may lead to undefined behavior.
+ * Returns true if the stroke is a hairline (width <= 0).
  */
-class GPUResource {
- public:
-  virtual ~GPUResource() = default;
+bool IsHairlineStroke(const Stroke& stroke);
+/**
+ * If the stroke width is zero or becomes extremely thin after transformation,
+ * it can be treated as a hairline to prevent precision issues.
+ */
+bool TreatStrokeAsHairline(const Stroke& stroke, const Matrix& matrix);
 
-  /**
-   * Releases the underlying GPU resources. After calling this method, the GPUResource must not be
-   * used, as doing so may lead to undefined behavior.
-   */
-  virtual void release(GPU* gpu) = 0;
-};
 }  // namespace tgfx
