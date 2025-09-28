@@ -79,10 +79,12 @@ void GLBuffer::unmap() {
     return;
   }
 
-  auto bufferTarget = target();
-  auto gl = _interface->functions();
-  gl->bindBuffer(bufferTarget, _bufferID);
-  gl->unmapBuffer(bufferTarget);
+  if (!isLegacyUniform) {
+    auto bufferTarget = target();
+    auto gl = _interface->functions();
+    gl->bindBuffer(bufferTarget, _bufferID);
+    gl->unmapBuffer(bufferTarget);
+  }
   isMapped = false;
 }
 
