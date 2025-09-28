@@ -102,7 +102,10 @@ RRectsVertexProvider::RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, 
 }
 
 size_t RRectsVertexProvider::vertexCount() const {
-  auto floatCount = rects.size() * 4 * 36;
+  auto floatCount = rects.size() * 4 * 32;
+  if (bitFields.hasColor) {
+    floatCount += rects.size() * 4 * 4;
+  }
   if (bitFields.useScale) {
     floatCount += rects.size() * 4 * 4;
   }
