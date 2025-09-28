@@ -31,7 +31,7 @@ static constexpr size_t MAX_PROGRAM_COUNT = 128;
 static constexpr size_t MAX_NUM_CACHED_GRADIENT_BITMAPS = 32;
 static constexpr uint16_t VERTICES_PER_NON_AA_QUAD = 4;
 static constexpr uint16_t VERTICES_PER_AA_QUAD = 8;
-static constexpr size_t MAX_FAKE_UNIFORM_BUFFER_SIZE = 64 * 1024;
+static constexpr size_t MAX_UNIFORM_BUFFER_SIZE = 64 * 1024;
 
 GlobalCache::GlobalCache(Context* context) : context(context) {
 }
@@ -52,8 +52,8 @@ std::shared_ptr<GPUBuffer> GlobalCache::findOrCreateUniformBuffer(size_t bufferS
                                                                   size_t* lastBufferOffset) {
   auto uboSupport = context->gpu()->caps()->shaderCaps()->uboSupport;
   auto maxUBOSize = uboSupport
-                        ? static_cast<size_t>(context->gpu()->caps()->shaderCaps()->maxUBOSize)
-                        : MAX_FAKE_UNIFORM_BUFFER_SIZE;
+                        ? std::max(static_cast<size_t>(context->gpu()->caps()->shaderCaps()->maxUBOSize), MAX_UNIFORM_BUFFER_SIZE)
+                        : MAX_UNIFORM_BUFFER_SIZE;
   auto uboOffsetAlignment =
       static_cast<size_t>(context->gpu()->caps()->shaderCaps()->uboOffsetAlignment);
 
@@ -139,11 +139,6 @@ void GlobalCache::resetUniformBuffer() {
   tripleUniformBufferIndex = counter % UNIFORM_BUFFER_COUNT;
   if (counter == UNIFORM_BUFFER_COUNT) {
     counter = 0;
-  }
-
-  auto maxUBOSize = static_cast<size_t>(context->gpu()->caps()->shaderCaps()->maxUBOSize);
-  if (maxUBOSize == 0) {
-    return;
   }
 
   auto& currentBuffer = tripleUniformBuffer[tripleUniformBufferIndex];

@@ -84,9 +84,8 @@ class UniformData {
    * Sets an external memory buffer for writing uniform data.
    * On platforms with UBO support, the buffer points to memory mapped from a GPU UBO object.
    * On platforms without UBO support, the buffer points to CPU memory.
-   * bufferBaseOffset specifies the starting offset in bytes within the buffer.
    */
-  void setBuffer(void* buffer, size_t bufferBaseOffset);
+  void setBuffer(void* buffer);
 
   /**
    * Returns the size of the uniform data in bytes.

@@ -270,8 +270,6 @@ void GLCaps::initGLSupport(const GLInfo& info) {
   _shaderCaps.uboSupport = version >= GL_VER(3, 1);
   if (_shaderCaps.uboSupport) {
     info.getIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &_shaderCaps.maxUBOSize);
-    _shaderCaps.maxUBOSize = std::min(_shaderCaps.maxUBOSize, 64 * 1024);
-
     info.getIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &_shaderCaps.uboOffsetAlignment);
   }
 }
@@ -325,8 +323,6 @@ void GLCaps::initGLESSupport(const GLInfo& info) {
   _shaderCaps.uboSupport = version >= GL_VER(3, 0);
   if (_shaderCaps.uboSupport) {
     info.getIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &_shaderCaps.maxUBOSize);
-    _shaderCaps.maxUBOSize = std::min(_shaderCaps.maxUBOSize, 64 * 1024);
-
     info.getIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &_shaderCaps.uboOffsetAlignment);
   }
 }
@@ -357,8 +353,6 @@ void GLCaps::initWebGLSupport(const GLInfo& info) {
   _shaderCaps.uboSupport = version >= GL_VER(2, 0);
   if (_shaderCaps.uboSupport) {
     info.getIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &_shaderCaps.maxUBOSize);
-    _shaderCaps.maxUBOSize = std::min(_shaderCaps.maxUBOSize, 64 * 1024);
-
     info.getIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &_shaderCaps.uboOffsetAlignment);
   }
 #endif

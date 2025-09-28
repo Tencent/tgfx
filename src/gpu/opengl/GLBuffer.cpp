@@ -21,6 +21,26 @@
 #include "GLUtil.h"
 
 namespace tgfx {
+GLBuffer::GLBuffer(std::shared_ptr<GLInterface> interface, unsigned bufferID, size_t size,
+                   uint32_t usage)
+  : GPUBuffer(size, usage), _interface(std::move(interface)), uniqueID(UniqueID::Next()),
+    _bufferID(bufferID) {
+  if ((usage & GPUBufferUsage::UNIFORM) && !_interface->caps()->shaderCaps()->uboSupport) {
+    isLegacyUniform = true;
+    if (size > 0) {
+      mappedAddress = malloc(size);
+    }
+  }
+}
+
+GLBuffer::~GLBuffer() {
+  if (isLegacyUniform && mappedAddress != nullptr) {
+    free(mappedAddress);
+    isMapped = false;
+    mappedAddress = nullptr;
+  }
+}
+
 unsigned GLBuffer::target() const {
   if (_usage & GPUBufferUsage::VERTEX) {
     return GL_ARRAY_BUFFER;
@@ -40,11 +60,14 @@ void* GLBuffer::map() {
     return mappedAddress;
   }
 
-  auto bufferTarget = target();
-  auto gl = _interface->functions();
-  gl->bindBuffer(bufferTarget, _bufferID);
-  mappedAddress = gl->mapBufferRange(bufferTarget, 0, static_cast<int32_t>(_size),
-                                     GL_MAP_WRITE_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
+  if (!isLegacyUniform) {
+    auto bufferTarget = target();
+    auto gl = _interface->functions();
+    gl->bindBuffer(bufferTarget, _bufferID);
+    mappedAddress = gl->mapBufferRange(bufferTarget, 0, static_cast<int32_t>(_size),
+                                       GL_MAP_WRITE_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
+  }
+
   if (mappedAddress != nullptr) {
     isMapped = true;
   }
@@ -61,7 +84,6 @@ void GLBuffer::unmap() {
   gl->bindBuffer(bufferTarget, _bufferID);
   gl->unmapBuffer(bufferTarget);
   isMapped = false;
-  mappedAddress = nullptr;
 }
 
 void GLBuffer::onRelease(GLGPU* gpu) {

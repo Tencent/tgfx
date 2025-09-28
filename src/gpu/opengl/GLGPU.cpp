@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLGPU.h"
-#include "GLUniformBuffer.h"
 #include "gpu/opengl/GLBuffer.h"
 #include "gpu/opengl/GLCommandEncoder.h"
 #include "gpu/opengl/GLDepthStencilTexture.h"
@@ -59,7 +58,7 @@ std::shared_ptr<GPUBuffer> GLGPU::createBuffer(size_t size, uint32_t usage) {
   }
 
   if (!interface->caps()->shaderCaps()->uboSupport && (usage & GPUBufferUsage::UNIFORM)) {
-    return std::make_shared<GLUniformBuffer>(size);
+    return makeResource<GLBuffer>(interface, 0u, size, usage);
   }
 
   auto gl = interface->functions();

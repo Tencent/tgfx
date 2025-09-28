@@ -137,16 +137,14 @@ std::shared_ptr<Program> ProgramInfo::getProgram() const {
         pipelineProgram->vertexUniformData->size() > 0) {
       pipelineProgram->vertexUniformBuffer = context->globalCache()->findOrCreateUniformBuffer(
           pipelineProgram->vertexUniformData->size(), &pipelineProgram->vertexUniformBufferOffset);
-      pipelineProgram->vertexUniformData->setBuffer(pipelineProgram->vertexUniformBuffer->map(),
-                                                    pipelineProgram->vertexUniformBufferOffset);
+      pipelineProgram->vertexUniformData->setBuffer(static_cast<uint8_t*>(pipelineProgram->vertexUniformBuffer->map()) + pipelineProgram->vertexUniformBufferOffset);
     }
     if (pipelineProgram->fragmentUniformData != nullptr &&
         pipelineProgram->fragmentUniformData->size() > 0) {
       pipelineProgram->fragmentUniformBuffer = context->globalCache()->findOrCreateUniformBuffer(
           pipelineProgram->fragmentUniformData->size(),
           &pipelineProgram->fragmentUniformBufferOffset);
-      pipelineProgram->fragmentUniformData->setBuffer(pipelineProgram->fragmentUniformBuffer->map(),
-                                                      pipelineProgram->fragmentUniformBufferOffset);
+      pipelineProgram->fragmentUniformData->setBuffer(static_cast<uint8_t*>(pipelineProgram->fragmentUniformBuffer->map()) + pipelineProgram->fragmentUniformBufferOffset);
     }
   }
 
