@@ -21,4 +21,4 @@
 
 namespace tgfx {
 size_t AlignTo(size_t value, size_t alignment);
-} // namespace tgfx
+}  // namespace tgfx

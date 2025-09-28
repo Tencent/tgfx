@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawOp.h"
-
 #include "gpu/AlignTo.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/resources/PipelineProgram.h"
