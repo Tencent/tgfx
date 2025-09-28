@@ -160,7 +160,6 @@ class Shape {
   friend class ProxyProvider;
   friend class Canvas;
   friend class Types;
-  friend class StyledShape;
   friend class ShapeUtils;
 };
 }  // namespace tgfx
