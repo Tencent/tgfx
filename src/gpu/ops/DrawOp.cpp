@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawOp.h"
-#include "gpu/DrawHelper.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/resources/PipelineProgram.h"
 #include "inspect/InspectorMark.h"
@@ -49,26 +48,42 @@ void DrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
   }
   renderPass->setPipeline(program->getPipeline());
 
-  auto context = renderTarget->getContext();
-  auto vertexUniformData = program->getUniformData(ShaderStage::Vertex);
-  auto fragmentUniformData = program->getUniformData(ShaderStage::Fragment);
-  auto vertexBufferInfo = SetupUniformBuffer(context, vertexUniformData);
-  auto fragmentBufferInfo = SetupUniformBuffer(context, fragmentUniformData);
+  auto globalCache = renderTarget->getContext()->globalCache();
 
-  programInfo.getUniformData(vertexUniformData, fragmentUniformData);
+  auto vertexUniformData = program->getUniformData(ShaderStage::Vertex);
+  std::shared_ptr<GPUBuffer> vertexUniformBuffer = nullptr;
+  size_t vertexUniformDataOffset = 0;
+  if (vertexUniformData != nullptr) {
+    vertexUniformBuffer =
+        globalCache->findOrCreateUniformBuffer(vertexUniformData->size(), &vertexUniformDataOffset);
+    if (vertexUniformBuffer != nullptr) {
+      vertexUniformData->setBuffer(static_cast<uint8_t*>(vertexUniformBuffer->map()) +
+                                   vertexUniformDataOffset);
+    }
+  }
+
+  auto fragmentUniformData = program->getUniformData(ShaderStage::Fragment);
+  std::shared_ptr<GPUBuffer> fragmentUniformBuffer = nullptr;
+  size_t fragmentUniformDataOffset = 0;
+  if (fragmentUniformData != nullptr) {
+    fragmentUniformBuffer = globalCache->findOrCreateUniformBuffer(fragmentUniformData->size(),
+                                                                   &fragmentUniformDataOffset);
+    if (fragmentUniformBuffer != nullptr) {
+      fragmentUniformData->setBuffer(static_cast<uint8_t*>(fragmentUniformBuffer->map()) +
+                                     fragmentUniformDataOffset);
+    }
+  }
+
+  programInfo.setUniformsAndSamplers(renderPass, program.get(), std::move(vertexUniformBuffer),
+                                     vertexUniformDataOffset, std::move(fragmentUniformBuffer),
+                                     fragmentUniformDataOffset);
 
   if (vertexUniformData != nullptr) {
-    SetUniformBuffer(renderPass, std::move(vertexBufferInfo.first), vertexBufferInfo.second,
-                     vertexUniformData->size(), VERTEX_UBO_BINDING_POINT);
     vertexUniformData->setBuffer(nullptr);
   }
   if (fragmentUniformData != nullptr) {
-    SetUniformBuffer(renderPass, std::move(fragmentBufferInfo.first), fragmentBufferInfo.second,
-                     fragmentUniformData->size(), FRAGMENT_UBO_BINDING_POINT);
     fragmentUniformData->setBuffer(nullptr);
   }
-
-  SetupTextures(renderPass, renderTarget->getContext()->gpu(), programInfo);
 
   if (scissorRect.isEmpty()) {
     renderPass->setScissorRect(0, 0, renderTarget->width(), renderTarget->height());

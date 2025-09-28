@@ -133,9 +133,27 @@ std::shared_ptr<Program> ProgramInfo::getProgram() const {
   return program;
 }
 
-void ProgramInfo::getUniformData(UniformData* vertexUniformData,
-                                 UniformData* fragmentUniformData) const {
+static AddressMode ToAddressMode(TileMode tileMode) {
+  switch (tileMode) {
+    case TileMode::Clamp:
+      return AddressMode::ClampToEdge;
+    case TileMode::Repeat:
+      return AddressMode::Repeat;
+    case TileMode::Mirror:
+      return AddressMode::MirrorRepeat;
+    case TileMode::Decal:
+      return AddressMode::ClampToBorder;
+  }
+}
+
+void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, PipelineProgram* program,
+                                         std::shared_ptr<GPUBuffer> vertexUniformBuffer,
+                                         size_t vertexUniformBufferOffset,
+                                         std::shared_ptr<GPUBuffer> fragmentUniformBuffer,
+                                         size_t fragmentUniformBufferOffset) const {
   DEBUG_ASSERT(renderTarget != nullptr);
+  auto vertexUniformData = program->getUniformData(ShaderStage::Vertex);
+  auto fragmentUniformData = program->getUniformData(ShaderStage::Fragment);
 
   auto array = GetRTAdjustArray(renderTarget);
   if (vertexUniformData != nullptr) {
@@ -159,6 +177,25 @@ void ProgramInfo::getUniformData(UniformData* vertexUniformData,
   updateUniformDataSuffix(vertexUniformData, fragmentUniformData, processor);
   processor->setData(vertexUniformData, fragmentUniformData);
   updateUniformDataSuffix(vertexUniformData, fragmentUniformData, nullptr);
+
+  if (vertexUniformData != nullptr) {
+    renderPass->setUniformBuffer(VERTEX_UBO_BINDING_POINT, std::move(vertexUniformBuffer),
+                                 vertexUniformBufferOffset, vertexUniformData->size());
+  }
+  if (fragmentUniformData != nullptr) {
+    renderPass->setUniformBuffer(FRAGMENT_UBO_BINDING_POINT, std::move(fragmentUniformBuffer),
+                                 fragmentUniformBufferOffset, fragmentUniformData->size());
+  }
+
+  auto samplers = getSamplers();
+  unsigned textureBinding = TEXTURE_BINDING_POINT_START;
+  auto gpu = renderTarget->getContext()->gpu();
+  for (auto& [texture, state] : samplers) {
+    GPUSamplerDescriptor descriptor(ToAddressMode(state.tileModeX), ToAddressMode(state.tileModeY),
+                                    state.filterMode, state.filterMode, state.mipmapMode);
+    auto sampler = gpu->createSampler(descriptor);
+    renderPass->setTexture(textureBinding++, texture, sampler);
+  }
 }
 
 std::vector<SamplerInfo> ProgramInfo::getSamplers() const {

@@ -49,7 +49,5 @@ class PipelineProgram : public Program {
   std::shared_ptr<RenderPipeline> pipeline = nullptr;
   std::unique_ptr<UniformData> vertexUniformData = nullptr;
   std::unique_ptr<UniformData> fragmentUniformData = nullptr;
-
-  friend class ProgramInfo;
 };
 }  // namespace tgfx
