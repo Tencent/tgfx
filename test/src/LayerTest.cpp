@@ -3219,9 +3219,7 @@ TGFX_TEST(LayerTest, Transform3DLayer) {
   }
   layerAParent->addChild(layerAWrapper);
   layerAWrapper->setContent(layerA);
-  auto translateMatrix =
-      Matrix::MakeTrans(layerAMatrix.getTranslateX(), layerAMatrix.getTranslateY());
-  layerAWrapper->setMatrix(translateMatrix);
+  layerAWrapper->setMatrix(Matrix::I());
   // Set the 3D transformation matrix on the wrapper layer.
   auto perspectiveMatrix = Matrix3D::I();
   constexpr float eyeDistance = 1200.f;
@@ -3249,8 +3247,10 @@ TGFX_TEST(LayerTest, Transform3DLayer) {
   auto invOffsetToAnchorMatrix =
       Matrix3D::MakeTranslate((layerATransformOrigin.x - 0.5f) * imagesize.width,
                               (layerATransformOrigin.y - 0.5f) * imagesize.height, 0.f);
-  auto transformMatrix =
-      invOffsetToAnchorMatrix * perspectiveMatrix * modelMatrix * offsetToAnchorMatrix;
+  auto originTranslateMatrix =
+      Matrix3D::MakeTranslate(layerAMatrix.getTranslateX(), layerAMatrix.getTranslateY(), 0.f);
+  auto transformMatrix = originTranslateMatrix * invOffsetToAnchorMatrix * perspectiveMatrix *
+                         modelMatrix * offsetToAnchorMatrix;
   layerAWrapper->setMatrix3D(transformMatrix);
 
   displayList->render(surface.get());
