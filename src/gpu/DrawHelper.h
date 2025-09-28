@@ -16,13 +16,21 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "AlignTo.h"
+#pragma once
+#include <memory>
+#include <utility>
+
+#include "GPUBuffer.h"
+#include "RenderPass.h"
+#include "UniformData.h"
+#include "tgfx/gpu/Context.h"
+#include "ProgramInfo.h"
 
 namespace tgfx {
-size_t AlignTo(size_t value, size_t alignment) {
-  if (alignment == 0) {
-    return value;
-  }
-  return (value + alignment - 1) / alignment * alignment;
-}
-}  // namespace tgfx
+AddressMode ToAddressMode(TileMode tileMode);
+std::pair<std::shared_ptr<GPUBuffer>, size_t> SetupUniformBuffer(
+  const Context* context, UniformData* uniformData);
+void SetUniformBuffer(RenderPass* renderPass, std::shared_ptr<GPUBuffer> buffer,
+                            size_t offset, size_t size, unsigned bindingPoint);
+void SetupTextures(RenderPass* renderPass, GPU* gpu, const ProgramInfo& programInfo);
+} // namespace tgfx

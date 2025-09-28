@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RuntimeDrawTask.h"
+
+#include "gpu/DrawHelper.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ProxyProvider.h"
@@ -150,8 +152,26 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
     LOGE("RuntimeDrawTask::GetFlatTextureView() Failed to get the program!");
     return nullptr;
   }
+
   renderPass->setPipeline(program->getPipeline());
-  programInfo.setUniformsAndSamplers(renderPass.get(), program.get());
+
+  auto vertexUniformData = program->getUniformData(ShaderStage::Vertex);
+  auto fragmentUniformData = program->getUniformData(ShaderStage::Fragment);
+  auto vertexBufferInfo = SetupUniformBuffer(context, vertexUniformData);
+  auto fragmentBufferInfo = SetupUniformBuffer(context, fragmentUniformData);
+
+  programInfo.getUniformData(vertexUniformData, fragmentUniformData);
+
+  if (vertexUniformData != nullptr) {
+    SetUniformBuffer(renderPass.get(), std::move(vertexBufferInfo.first), vertexBufferInfo.second,
+                      vertexUniformData->size(), VERTEX_UBO_BINDING_POINT);
+  }
+  if (fragmentUniformData != nullptr) {
+    SetUniformBuffer(renderPass.get(), std::move(fragmentBufferInfo.first), fragmentBufferInfo.second,
+                      fragmentUniformData->size(), FRAGMENT_UBO_BINDING_POINT);
+  }
+  SetupTextures(renderPass.get(), renderTarget->getContext()->gpu(), programInfo);
+
   renderPass->setVertexBuffer(vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
   renderPass->draw(PrimitiveType::TriangleStrip, 0, 4);
   renderPass->end();

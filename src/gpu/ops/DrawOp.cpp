@@ -18,24 +18,12 @@
 
 #include "DrawOp.h"
 
+#include "gpu/DrawHelper.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/resources/PipelineProgram.h"
 #include "inspect/InspectorMark.h"
 
 namespace tgfx {
-static AddressMode ToAddressMode(TileMode tileMode) {
-  switch (tileMode) {
-    case TileMode::Clamp:
-      return AddressMode::ClampToEdge;
-    case TileMode::Repeat:
-      return AddressMode::Repeat;
-    case TileMode::Mirror:
-      return AddressMode::MirrorRepeat;
-    case TileMode::Decal:
-      return AddressMode::ClampToBorder;
-  }
-}
-
 void DrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
   OPERATE_MARK(type());
   auto geometryProcessor = onMakeGeometryProcessor(renderTarget);
@@ -65,45 +53,21 @@ void DrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
   auto context = renderTarget->getContext();
   auto vertexUniformData = program->getUniformData(ShaderStage::Vertex);
   auto fragmentUniformData = program->getUniformData(ShaderStage::Fragment);
-  std::shared_ptr<GPUBuffer> vertexUniformBuffer = nullptr;
-  std::shared_ptr<GPUBuffer> fragmentUniformBuffer = nullptr;
-  size_t vertexUniformBufferOffset = 0;
-  size_t fragmentUniformBufferOffset = 0;
-  if (vertexUniformData != nullptr && vertexUniformData->size() > 0) {
-    vertexUniformBuffer = context->globalCache()->findOrCreateUniformBuffer(vertexUniformData->size(), &vertexUniformBufferOffset);
-    if (vertexUniformBuffer != nullptr) {
-      vertexUniformData->setBuffer(static_cast<uint8_t*>(vertexUniformBuffer->map()) + vertexUniformBufferOffset);
-    }
-  }
-  if (fragmentUniformData != nullptr && fragmentUniformData->size() > 0) {
-    fragmentUniformBuffer = context->globalCache()->findOrCreateUniformBuffer(fragmentUniformData->size(), &fragmentUniformBufferOffset);
-    if (fragmentUniformBuffer != nullptr) {
-      fragmentUniformData->setBuffer(static_cast<uint8_t*>(fragmentUniformBuffer->map()) + fragmentUniformBufferOffset);
-    }
-  }
+  auto vertexBufferInfo = SetupUniformBuffer(context, vertexUniformData);
+  auto fragmentBufferInfo = SetupUniformBuffer(context, fragmentUniformData);
+
   programInfo.getUniformData(vertexUniformData, fragmentUniformData);
 
-  if (vertexUniformData != nullptr && vertexUniformBuffer != nullptr) {
-    vertexUniformBuffer->unmap();
-
-    renderPass->setUniformBuffer(VERTEX_UBO_BINDING_POINT, vertexUniformBuffer, vertexUniformBufferOffset, vertexUniformData->size());
+  if (vertexUniformData != nullptr) {
+    SetUniformBuffer(renderPass, std::move(vertexBufferInfo.first), vertexBufferInfo.second,
+                      vertexUniformData->size(), VERTEX_UBO_BINDING_POINT);
+  }
+  if (fragmentUniformData != nullptr) {
+    SetUniformBuffer(renderPass, std::move(fragmentBufferInfo.first), fragmentBufferInfo.second,
+                      fragmentUniformData->size(), FRAGMENT_UBO_BINDING_POINT);
   }
 
-  if (fragmentUniformData != nullptr && fragmentUniformBuffer != nullptr) {
-    fragmentUniformBuffer->unmap();
-
-    renderPass->setUniformBuffer(FRAGMENT_UBO_BINDING_POINT, fragmentUniformBuffer, fragmentUniformBufferOffset, fragmentUniformData->size());
-  }
-
-  auto gpu = renderTarget->getContext()->gpu();
-  auto samplers = programInfo.getSamplers();
-  unsigned textureBinding = TEXTURE_BINDING_POINT_START;
-  for (auto& [texture, state] : samplers) {
-    GPUSamplerDescriptor descriptor(ToAddressMode(state.tileModeX), ToAddressMode(state.tileModeY),
-                                    state.filterMode, state.filterMode, state.mipmapMode);
-    auto sampler = gpu->createSampler(descriptor);
-    renderPass->setTexture(textureBinding++, texture, sampler);
-  }
+  SetupTextures(renderPass, renderTarget->getContext()->gpu(), programInfo);
 
   if (scissorRect.isEmpty()) {
     renderPass->setScissorRect(0, 0, renderTarget->width(), renderTarget->height());
