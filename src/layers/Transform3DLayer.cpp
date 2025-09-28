@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/Transform3DLayer.h"
-#include "filters/Transform3DFilter.h"
+#include "tgfx/layers/filters/Transform3DFilter.h"
 
 namespace tgfx {
 

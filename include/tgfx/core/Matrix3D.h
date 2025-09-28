@@ -143,6 +143,20 @@ class Matrix3D {
   }
 
   /**
+   * Pre-concatenates a rotation to this matrix. M' = R * M.
+   */
+  void preRotate(const Vec3& axis, float degrees);
+
+  /**
+   * Calculates the inverse of the current matrix and stores the result in the Matrix3D object
+   * pointed to by inverse.
+   * @param inverse Pointer to the Matrix3D object used to store the inverse matrix. Must not be
+   * nullptr. If the current matrix is not invertible, inverse will not be modified.
+   * @return Returns true if the inverse matrix exists; otherwise, returns false.
+   */
+  bool invert(Matrix3D* inverse) const;
+
+  /**
    * Creates a view matrix for a camera. This is commonly used to transform world coordinates to
    * camera (view) coordinates in 3D graphics.
    * @param eye The position of the camera.
@@ -232,23 +246,9 @@ class Matrix3D {
   void postTranslate(float tx, float ty, float tz);
 
   /**
-   * Pre-concatenates a rotation to this matrix. M' = R * M.
-   */
-  void preRotate(const Vec3& axis, float degrees);
-
-  /**
    * Post-concatenates a rotation to this matrix. M' = M * R.
    */
   void postRotate(const Vec3& axis, float degrees);
-
-  /**
-   * Calculates the inverse of the current matrix and stores the result in the Matrix3D object
-   * pointed to by inverse.
-   * @param inverse Pointer to the Matrix3D object used to store the inverse matrix. Must not be
-   * nullptr. If the current matrix is not invertible, inverse will not be modified.
-   * @return Returns true if the inverse matrix exists; otherwise, returns false.
-   */
-  bool invert(Matrix3D* inverse) const;
 
   /**
    * Returns the transpose of the current matrix.

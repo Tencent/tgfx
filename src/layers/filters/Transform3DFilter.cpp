@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "Transform3DFilter.h"
+#include "tgfx/layers/filters/Transform3DFilter.h"
 #include "core/filters/Transform3DImageFilter.h"
 
 namespace tgfx {

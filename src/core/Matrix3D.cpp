@@ -167,6 +167,20 @@ const Matrix3D& Matrix3D::I() {
   return identity;
 }
 
+void Matrix3D::preRotate(const Vec3& axis, float degrees) {
+  auto m = MakeRotate(axis, degrees);
+  preConcat(m);
+}
+
+bool Matrix3D::invert(Matrix3D* inverse) const {
+  float result[16];
+  if (!InvertMatrix3D(values, result)) {
+    return false;
+  }
+  memcpy(inverse->values, result, sizeof(result));
+  return true;
+}
+
 Matrix3D Matrix3D::LookAt(const Vec3& eye, const Vec3& center, const Vec3& up) {
   auto viewZ = Vec3::Normalize(eye - center);
   auto viewX = Vec3::Normalize(up.cross(viewZ));
@@ -280,23 +294,9 @@ void Matrix3D::postTranslate(float tx, float ty, float tz) {
   values[14] += tz;
 }
 
-void Matrix3D::preRotate(const Vec3& axis, float degrees) {
-  auto m = MakeRotate(axis, degrees);
-  preConcat(m);
-}
-
 void Matrix3D::postRotate(const Vec3& axis, float degrees) {
   auto m = MakeRotate(axis, degrees);
   postConcat(m);
-}
-
-bool Matrix3D::invert(Matrix3D* inverse) const {
-  float result[16];
-  if (!InvertMatrix3D(values, result)) {
-    return false;
-  }
-  memcpy(inverse->values, result, sizeof(result));
-  return true;
 }
 
 Matrix3D Matrix3D::transpose() const {
