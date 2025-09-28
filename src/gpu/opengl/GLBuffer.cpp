@@ -57,17 +57,23 @@ void* GLBuffer::map() {
   }
 
   auto gl = _interface->functions();
-  auto bufferTarget = target();
-  gl->bindBuffer(bufferTarget, _bufferID);
-  return gl->mapBufferRange(bufferTarget, 0, static_cast<int32_t>(_size),
-                            GL_MAP_WRITE_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
+  if (gl->mapBufferRange != nullptr) {
+    auto bufferTarget = target();
+    gl->bindBuffer(bufferTarget, _bufferID);
+    return gl->mapBufferRange(bufferTarget, 0, static_cast<int32_t>(_size),
+                              GL_MAP_WRITE_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
+  }
+
+  return nullptr;
 }
 
 void GLBuffer::unmap() {
   auto gl = _interface->functions();
-  auto bufferTarget = target();
-  gl->bindBuffer(bufferTarget, _bufferID);
-  gl->unmapBuffer(bufferTarget);
+  if (gl->mapBufferRange != nullptr) {
+    auto bufferTarget = target();
+    gl->bindBuffer(bufferTarget, _bufferID);
+    gl->unmapBuffer(bufferTarget);
+  }
 }
 
 void GLBuffer::onRelease(GLGPU* gpu) {
