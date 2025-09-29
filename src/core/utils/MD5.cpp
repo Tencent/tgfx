@@ -17,9 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/utils/MD5.h"
-#if defined(TGFX_USE_FALLBACK_MD5)
-#define FALLBACK_MD5
-#else
+#ifndef TGFX_USE_FALLBACK_MD5
 #if defined(__APPLE__)
 #include <CommonCrypto/CommonDigest.h>
 #elif defined(_WIN32)
@@ -34,7 +32,7 @@
 
 namespace tgfx {
 
-#ifdef FALLBACK_MD5
+#ifdef TGFX_USE_FALLBACK_MD5
 namespace {
 inline uint32_t F(uint32_t x, uint32_t y, uint32_t z) {
   return (x & y) | (~x & z);
@@ -168,7 +166,7 @@ MD5::Digest MD5::Calculate(const void* bytes, size_t size) {
   if (bytes == nullptr || size == 0) {
     return digest;
   }
-#if defined(TGFX_USE_FALLBACK_MD5)
+#ifdef TGFX_USE_FALLBACK_MD5
   MD5Impl impl;
   impl.update(static_cast<const uint8_t*>(bytes), size);
   digest = impl.finalize();
