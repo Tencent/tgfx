@@ -21,12 +21,12 @@
 #include <fstream>
 #include <unordered_set>
 #include "base/TGFXTest.h"
+#include "core/utils/MD5.h"
 #include "nlohmann/json.hpp"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Surface.h"
 #include "utils/ProjectPath.h"
 #include "utils/TestUtils.h"
-#include "core/utils/MD5.h"
 
 namespace tgfx {
 static const std::string BASELINE_ROOT = ProjectPath::Absolute("test/baseline/");
