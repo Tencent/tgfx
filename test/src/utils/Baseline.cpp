@@ -18,19 +18,15 @@
 
 #include "Baseline.h"
 #include <CommonCrypto/CommonCrypto.h>
-#include <chrono>
 #include <fstream>
-#include <iostream>
 #include <unordered_set>
 #include "base/TGFXTest.h"
-#include "core/utils/USE.h"
 #include "nlohmann/json.hpp"
 #include "tgfx/core/Data.h"
-#include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Surface.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
 #include "utils/ProjectPath.h"
 #include "utils/TestUtils.h"
+#include "core/utils/MD5.h"
 
 namespace tgfx {
 static const std::string BASELINE_ROOT = ProjectPath::Absolute("test/baseline/");
@@ -55,11 +51,7 @@ static std::mutex jsonLocker = {};
 static std::string currentVersion;
 
 std::string DumpMD5(const void* bytes, size_t size) {
-  unsigned char digest[CC_MD5_DIGEST_LENGTH] = {0};
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-  CC_MD5(bytes, static_cast<CC_LONG>(size), digest);
-#pragma clang diagnostic pop
+  auto digest = MD5::Calculate(bytes, size);
   char buffer[33];
   char* position = buffer;
   for (unsigned char i : digest) {

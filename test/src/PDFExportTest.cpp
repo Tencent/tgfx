@@ -19,7 +19,7 @@
 #include <hb-subset.h>
 #include <hb.h>
 #include "base/TGFXTest.h"
-#include "pdf/MD5.h"
+#include "core/utils/MD5.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/ImageFilter.h"

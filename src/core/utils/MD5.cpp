@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "pdf/MD5.h"
+#include "core/utils/MD5.h"
 #if defined(__APPLE__)
 #include <CommonCrypto/CommonDigest.h>
 #elif defined(_WIN32)
