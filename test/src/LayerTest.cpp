@@ -3184,8 +3184,8 @@ TGFX_TEST(LayerTest, DiffFilterModeImagePattern) {
   Path path;
   path.addRect(Rect::MakeWH(image->width(), image->height()));
   shapeLayer->setPath(path);
-  auto pattern = ImagePattern::Make(image, TileMode::Decal, TileMode::Decal, FilterMode::Linear,
-                                    FilterMode::Nearest);
+  auto pattern = ImagePattern::Make(image, TileMode::Decal, TileMode::Decal,
+                                    SamplingOptions(FilterMode::Linear, FilterMode::Nearest));
   DisplayList displayList;
   displayList.root()->addChild(shapeLayer);
   shapeLayer->setFillStyle(pattern);
