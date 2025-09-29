@@ -24,9 +24,9 @@ class DefaultLZ4CompressionHandler : public LZ4CompressionHandler {
  public:
   size_t encode(uint8_t* dstBuffer, size_t dstSize, const uint8_t* srcBuffer,
                 size_t srcSize) const override {
-    return static_cast<size_t>(LZ4_compress_default(reinterpret_cast<const char*>(srcBuffer),
-                                reinterpret_cast<char*>(dstBuffer), static_cast<int>(srcSize),
-                                static_cast<int>(dstSize)));
+    return static_cast<size_t>(LZ4_compress_default(
+        reinterpret_cast<const char*>(srcBuffer), reinterpret_cast<char*>(dstBuffer),
+        static_cast<int>(srcSize), static_cast<int>(dstSize)));
   }
 };
 
