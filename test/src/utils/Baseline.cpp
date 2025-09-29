@@ -22,6 +22,7 @@
 #include <unordered_set>
 #include "base/TGFXTest.h"
 #include "core/utils/MD5.h"
+#include "core/utils/USE.h"
 #include "nlohmann/json.hpp"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Surface.h"
