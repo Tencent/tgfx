@@ -57,13 +57,10 @@ bool GLSLTiledTextureEffect::ShaderModeRequiresUnormCoord(TiledTextureEffect::Sh
     case TiledTextureEffect::ShaderMode::MirrorRepeat:
       return false;
     case TiledTextureEffect::ShaderMode::RepeatLinearNone:
-    case TiledTextureEffect::ShaderMode::RepeatNone:
     case TiledTextureEffect::ShaderMode::RepeatNearestMipmap:
     case TiledTextureEffect::ShaderMode::RepeatLinearMipmap:
-    case TiledTextureEffect::ShaderMode::RepeatMipmap:
     case TiledTextureEffect::ShaderMode::ClampToBorderNearest:
     case TiledTextureEffect::ShaderMode::ClampToBorderLinear:
-    case TiledTextureEffect::ShaderMode::ClampToBorder:
       return true;
   }
 }
@@ -76,13 +73,10 @@ bool GLSLTiledTextureEffect::ShaderModeUsesSubset(TiledTextureEffect::ShaderMode
       return false;
     case TiledTextureEffect::ShaderMode::RepeatNearestNone:
     case TiledTextureEffect::ShaderMode::RepeatLinearNone:
-    case TiledTextureEffect::ShaderMode::RepeatNone:
     case TiledTextureEffect::ShaderMode::RepeatNearestMipmap:
     case TiledTextureEffect::ShaderMode::RepeatLinearMipmap:
-    case TiledTextureEffect::ShaderMode::RepeatMipmap:
     case TiledTextureEffect::ShaderMode::MirrorRepeat:
     case TiledTextureEffect::ShaderMode::ClampToBorderNearest:
-    case TiledTextureEffect::ShaderMode::ClampToBorder:
       return true;
   }
 }
@@ -95,13 +89,10 @@ bool GLSLTiledTextureEffect::ShaderModeUsesClamp(TiledTextureEffect::ShaderMode 
     case TiledTextureEffect::ShaderMode::Clamp:
     case TiledTextureEffect::ShaderMode::RepeatNearestNone:
     case TiledTextureEffect::ShaderMode::RepeatLinearNone:
-    case TiledTextureEffect::ShaderMode::RepeatNone:
     case TiledTextureEffect::ShaderMode::RepeatNearestMipmap:
     case TiledTextureEffect::ShaderMode::RepeatLinearMipmap:
-    case TiledTextureEffect::ShaderMode::RepeatMipmap:
     case TiledTextureEffect::ShaderMode::MirrorRepeat:
     case TiledTextureEffect::ShaderMode::ClampToBorderLinear:
-    case TiledTextureEffect::ShaderMode::ClampToBorder:
       return true;
   }
 }
@@ -130,13 +121,11 @@ void GLSLTiledTextureEffect::subsetCoord(EmitArgs& args, TiledTextureEffect::Sha
     case TiledTextureEffect::ShaderMode::None:
     case TiledTextureEffect::ShaderMode::ClampToBorderNearest:
     case TiledTextureEffect::ShaderMode::ClampToBorderLinear:
-    case TiledTextureEffect::ShaderMode::ClampToBorder:
     case TiledTextureEffect::ShaderMode::Clamp:
       fragBuilder->codeAppendf("subsetCoord.%s = inCoord.%s;", coordSwizzle, coordSwizzle);
       break;
     case TiledTextureEffect::ShaderMode::RepeatNearestNone:
     case TiledTextureEffect::ShaderMode::RepeatLinearNone:
-    case TiledTextureEffect::ShaderMode::RepeatNone:
       fragBuilder->codeAppendf("subsetCoord.%s = mod(inCoord.%s - %s.%s, %s.%s - %s.%s) + %s.%s;",
                                coordSwizzle, coordSwizzle, subsetName.c_str(), subsetStartSwizzle,
                                subsetName.c_str(), subsetStopSwizzle, subsetName.c_str(),
@@ -144,7 +133,6 @@ void GLSLTiledTextureEffect::subsetCoord(EmitArgs& args, TiledTextureEffect::Sha
       break;
     case TiledTextureEffect::ShaderMode::RepeatNearestMipmap:
     case TiledTextureEffect::ShaderMode::RepeatLinearMipmap:
-    case TiledTextureEffect::ShaderMode::RepeatMipmap:
       fragBuilder->codeAppend("{");
       fragBuilder->codeAppendf("float w = %s.%s - %s.%s;", subsetName.c_str(), subsetStopSwizzle,
                                subsetName.c_str(), subsetStartSwizzle);

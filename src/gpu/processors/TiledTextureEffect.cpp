@@ -24,10 +24,8 @@
 
 namespace tgfx {
 TiledTextureEffect::ShaderMode TiledTextureEffect::GetShaderMode(TileMode tileMode,
-                                                                 FilterMode minFilter,
-                                                                 FilterMode magFilter,
+                                                                 FilterMode filter,
                                                                  MipmapMode mipmapMode) {
-  bool sameFilter = (minFilter == magFilter);
   switch (tileMode) {
     case TileMode::Mirror:
       return ShaderMode::MirrorRepeat;
@@ -36,10 +34,7 @@ TiledTextureEffect::ShaderMode TiledTextureEffect::GetShaderMode(TileMode tileMo
     case TileMode::Repeat:
       switch (mipmapMode) {
         case MipmapMode::None:
-          if (!sameFilter) {
-            return ShaderMode::RepeatNone;
-          }
-          switch (magFilter) {
+          switch (filter) {
             case FilterMode::Nearest:
               return ShaderMode::RepeatNearestNone;
             case FilterMode::Linear:
@@ -47,10 +42,7 @@ TiledTextureEffect::ShaderMode TiledTextureEffect::GetShaderMode(TileMode tileMo
           }
         case MipmapMode::Nearest:
         case MipmapMode::Linear:
-          if (!sameFilter) {
-            return ShaderMode::RepeatMipmap;
-          }
-          switch (magFilter) {
+          switch (filter) {
             case FilterMode::Nearest:
               return ShaderMode::RepeatNearestMipmap;
             case FilterMode::Linear:
@@ -58,10 +50,7 @@ TiledTextureEffect::ShaderMode TiledTextureEffect::GetShaderMode(TileMode tileMo
           }
       }
     case TileMode::Decal:
-      if (!sameFilter) {
-        return ShaderMode::ClampToBorder;
-      }
-      switch (magFilter) {
+      switch (filter) {
         case FilterMode::Nearest:
           return ShaderMode::ClampToBorderNearest;
         case FilterMode::Linear:
@@ -112,8 +101,8 @@ TiledTextureEffect::Sampling::Sampling(const TextureView* textureView, SamplerSt
       return r;
     }
     r.shaderSubset = subsetSpan;
-    if (sampler.minFilterMode == sampler.magFilterMode &&
-        sampler.magFilterMode == FilterMode::Nearest) {
+    if (sampler.magFilterMode == FilterMode::Nearest &&
+        sampler.minFilterMode == FilterMode::Nearest) {
       Span isubset{std::floor(subsetSpan.a), std::ceil(subsetSpan.b)};
       // This inset prevents sampling neighboring texels that could occur when
       // texture coords fall exactly at texel boundaries (depending on precision
@@ -123,8 +112,11 @@ TiledTextureEffect::Sampling::Sampling(const TextureView* textureView, SamplerSt
       r.shaderClamp = subsetSpan.makeInset(linearFilterInset);
     }
     auto mipmapMode = textureView->hasMipmaps() ? sampler.mipmapMode : MipmapMode::None;
-    r.shaderMode =
-        GetShaderMode(tileMode, sampler.minFilterMode, sampler.magFilterMode, mipmapMode);
+    auto filterMode =
+        sampler.minFilterMode == FilterMode::Nearest || sampler.magFilterMode == FilterMode::Nearest
+            ? FilterMode::Nearest
+            : FilterMode::Linear;
+    r.shaderMode = GetShaderMode(tileMode, filterMode, mipmapMode);
     DEBUG_ASSERT(r.shaderMode != ShaderMode::None);
     return r;
   };
