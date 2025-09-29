@@ -274,7 +274,7 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(NativeImageRef nativeImage) {
     auto displayP3 =
         env->CallStaticObjectMethod(ColorSpaceClass.get(), ColorSpace_get, displayP3Obj);
     if (env->IsSameObject(colorSpaceObj, displayP3)) {
-      colorSpace = ColorSpace::MakeRGB(SRGBTF, DisplayP3Mat);
+      colorSpace = ColorSpace::MakeRGB(NamedTransferFn::SRGB, NamedGamut::DisplayP3);
     }
   }
   auto image = std::shared_ptr<NativeCodec>(
