@@ -54,7 +54,7 @@ std::string DumpMD5(const void* bytes, size_t size) {
   auto digest = MD5::Calculate(bytes, size);
   char buffer[33];
   char* position = buffer;
-  for (unsigned char i : digest) {
+  for (auto& i : digest) {
     snprintf(position, 3, "%02x", i);
     position += 2;
   }
