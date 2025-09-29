@@ -23,6 +23,7 @@
 #include <unordered_map>
 #include <vector>
 #include "gpu/Uniform.h"
+#include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/Matrix.h"
 
 namespace tgfx {
@@ -44,7 +45,7 @@ class UniformData {
    */
   template <typename T>
   std::enable_if_t<std::is_trivially_copyable_v<T> && !std::is_pointer_v<T> &&
-                       !std::is_same_v<std::decay_t<T>, Matrix>,
+                       !std::is_same_v<std::decay_t<T>, Matrix> && !std::is_same_v<std::decay_t<T>, ColorMatrix33>,
                    void>
   setData(const std::string& name, const T& value) const {
     onSetData(name, &value, sizeof(value));
@@ -74,6 +75,29 @@ class UniformData {
         values[0], values[3], 0,
         values[1], values[4], 0,
         values[2], values[5], 1
+      };
+      // clang-format on
+      onSetData(name, data, sizeof(data));
+    }
+  }
+
+  template<typename T>
+  std::enable_if_t<std::is_same_v<std::decay_t<T>, ColorMatrix33>, void> setData(const std::string& name, const T& matrix) const {
+    if (_uboSupport) {
+      // clang-format off
+      const float data[] = {
+        matrix.values[0][0], matrix.values[1][0], matrix.values[2][0], 0,
+        matrix.values[0][1], matrix.values[1][1], matrix.values[2][1], 0,
+        matrix.values[0][2], matrix.values[1][2], matrix.values[2][2], 0,
+      };
+      // clang-format on
+      onSetData(name, data, sizeof(data));
+    } else {
+      // clang-format off
+      const float data[] = {
+        matrix.values[0][0], matrix.values[1][0], matrix.values[2][0],
+        matrix.values[0][1], matrix.values[1][1], matrix.values[2][1],
+        matrix.values[0][2], matrix.values[1][2], matrix.values[2][2],
       };
       // clang-format on
       onSetData(name, data, sizeof(data));

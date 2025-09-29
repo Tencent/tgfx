@@ -18,7 +18,6 @@
 
 #pragma once
 #include <skcms.h>
-#include "UniformBuffer.h"
 #include "UniformHandler.h"
 #include "gpu/ShaderVar.h"
 #include "tgfx/core/ColorSpaceXformSteps.h"
@@ -31,12 +30,12 @@ class ColorSpaceXformHelper {
   void emitCode(UniformHandler* uniformHandler, const ColorSpaceXformSteps* colorSpaceXform,
                 ShaderStage shaderStage = ShaderStage::Fragment) {
     if (colorSpaceXform) {
-      fFlags = colorSpaceXform->fFlags;
+      fFlags = colorSpaceXform->flags;
       if (this->applySrcTF()) {
         srcTFVar0 = uniformHandler->addUniform("SrcTF0", UniformFormat::Float4, shaderStage);
         srcTFVar1 = uniformHandler->addUniform("SrcTF1", UniformFormat::Float4, shaderStage);
         _srcTFType = gfx::skcms_TransferFunction_getType(
-            reinterpret_cast<const gfx::skcms_TransferFunction*>(&colorSpaceXform->fSrcTF));
+            reinterpret_cast<const gfx::skcms_TransferFunction*>(&colorSpaceXform->srcTF));
       }
       if (this->applySrcOOTF()) {
         srcOOTFVar = uniformHandler->addUniform("SrcOOTF", UniformFormat::Float4, shaderStage);
@@ -52,39 +51,39 @@ class ColorSpaceXformHelper {
         dstTFVar0 = uniformHandler->addUniform("DstTF0", UniformFormat::Float4, shaderStage);
         dstTFVar1 = uniformHandler->addUniform("DstTF1", UniformFormat::Float4, shaderStage);
         _dstTFType = gfx::skcms_TransferFunction_getType(
-            reinterpret_cast<const gfx::skcms_TransferFunction*>(&colorSpaceXform->fDstTFInv));
+            reinterpret_cast<const gfx::skcms_TransferFunction*>(&colorSpaceXform->dstTFInv));
       }
     }
   }
 
-  void setData(UniformBuffer* uniformBuffer, const ColorSpaceXformSteps* colorSpaceXform) {
+  void setData(UniformData* uniformData, const ColorSpaceXformSteps* colorSpaceXform) {
     if (colorSpaceXform) {
-      fFlags = colorSpaceXform->fFlags;
+      fFlags = colorSpaceXform->flags;
     }
     if (this->applySrcTF()) {
-      float srcTF0[4] = {colorSpaceXform->fSrcTF.g, colorSpaceXform->fSrcTF.a,
-                         colorSpaceXform->fSrcTF.b, colorSpaceXform->fSrcTF.c};
-      float srcTF1[4] = {colorSpaceXform->fSrcTF.d, colorSpaceXform->fSrcTF.e,
-                         colorSpaceXform->fSrcTF.f, 0.0f};
-      uniformBuffer->setData("SrcTF0", srcTF0);
-      uniformBuffer->setData("SrcTF1", srcTF1);
+      float srcTF0[4] = {colorSpaceXform->srcTF.g, colorSpaceXform->srcTF.a,
+                         colorSpaceXform->srcTF.b, colorSpaceXform->srcTF.c};
+      float srcTF1[4] = {colorSpaceXform->srcTF.d, colorSpaceXform->srcTF.e,
+                         colorSpaceXform->srcTF.f, 0.0f};
+      uniformData->setData("SrcTF0", srcTF0);
+      uniformData->setData("SrcTF1", srcTF1);
     }
     if (this->applySrcOOTF()) {
-      uniformBuffer->setData("SrcOOTF", colorSpaceXform->fSrcOotf);
+      uniformData->setData("SrcOOTF", colorSpaceXform->srcOotf);
     }
     if (this->applyGamutXform()) {
-      uniformBuffer->setData("ColorXform", colorSpaceXform->fSrcToDstMatrix);
+      uniformData->setData("ColorXform", colorSpaceXform->srcToDstMatrix);
     }
     if (this->applyDstOOTF()) {
-      uniformBuffer->setData("DstOOTF", colorSpaceXform->fDstOotf);
+      uniformData->setData("DstOOTF", colorSpaceXform->dstOotf);
     }
     if (this->applyDstTF()) {
-      float dstTF0[4] = {colorSpaceXform->fDstTFInv.g, colorSpaceXform->fDstTFInv.a,
-                         colorSpaceXform->fDstTFInv.b, colorSpaceXform->fDstTFInv.c};
-      float dstTF1[4] = {colorSpaceXform->fDstTFInv.d, colorSpaceXform->fDstTFInv.e,
-                         colorSpaceXform->fDstTFInv.f, 0.0f};
-      uniformBuffer->setData("DstTF0", dstTF0);
-      uniformBuffer->setData("DstTF1", dstTF1);
+      float dstTF0[4] = {colorSpaceXform->dstTFInv.g, colorSpaceXform->dstTFInv.a,
+                         colorSpaceXform->dstTFInv.b, colorSpaceXform->dstTFInv.c};
+      float dstTF1[4] = {colorSpaceXform->dstTFInv.d, colorSpaceXform->dstTFInv.e,
+                         colorSpaceXform->dstTFInv.f, 0.0f};
+      uniformData->setData("DstTF0", dstTF0);
+      uniformData->setData("DstTF1", dstTF1);
     }
   }
 

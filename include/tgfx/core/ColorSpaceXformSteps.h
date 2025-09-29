@@ -56,14 +56,14 @@ struct ColorSpaceXformSteps {
 
   static uint32_t xformKey(const ColorSpaceXformSteps* xform);
 
-  Flags fFlags;
+  Flags flags;
 
-  TransferFunction fSrcTF,   // Apply for linearize.
-      fDstTFInv;             // Apply for encode.
-  float fSrcToDstMatrix[9];  // Apply this 3x3 *column*-major matrix for gamut_transform.
-  float fSrcOotf[4];         // Apply ootf with these r,g,b coefficients and gamma before
+  TransferFunction srcTF,   // Apply for linearize.
+      dstTFInv;             // Apply for encode.
+  ColorMatrix33 srcToDstMatrix;  // Apply this 3x3 matrix for gamut_transform.
+  float srcOotf[4];         // Apply ootf with these r,g,b coefficients and gamma before
   // gamut_transform.
-  float fDstOotf[4];  // Apply ootf with these r,g,b coefficients and gamma after
+  float dstOotf[4];  // Apply ootf with these r,g,b coefficients and gamma after
   // gamut_transform.
 };
 
