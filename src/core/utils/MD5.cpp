@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/utils/MD5.h"
+#ifndef TGFX_USE_FALLBACK_MD5
 #if defined(__APPLE__)
 #include <CommonCrypto/CommonDigest.h>
 #elif defined(_WIN32)
@@ -26,13 +27,12 @@
 // clang-format on
 #elif defined(__linux__) && !defined(__ANDROID__) && !defined(ANDROID) && !defined(__OHOS__)
 #include <openssl/md5.h>
-#else
-#define FALLBACK_MD5
+#endif
 #endif
 
 namespace tgfx {
 
-#ifdef FALLBACK_MD5
+#ifdef TGFX_USE_FALLBACK_MD5
 namespace {
 inline uint32_t F(uint32_t x, uint32_t y, uint32_t z) {
   return (x & y) | (~x & z);
@@ -166,6 +166,11 @@ MD5::Digest MD5::Calculate(const void* bytes, size_t size) {
   if (bytes == nullptr || size == 0) {
     return digest;
   }
+#ifdef TGFX_USE_FALLBACK_MD5
+  MD5Impl impl;
+  impl.update(static_cast<const uint8_t*>(bytes), size);
+  digest = impl.finalize();
+#else
 #if defined(__APPLE__)
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
@@ -186,10 +191,7 @@ MD5::Digest MD5::Calculate(const void* bytes, size_t size) {
   }
 #elif defined(__linux__) && !defined(__ANDROID__) && !defined(ANDROID) && !defined(__OHOS__)
   ::MD5(static_cast<const unsigned char*>(bytes), size, digest.data());
-#else
-  MD5Impl impl;
-  impl.update(static_cast<const uint8_t*>(bytes), size);
-  digest = impl.finalize();
+#endif
 #endif
   return digest;
 }
