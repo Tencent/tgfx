@@ -35,7 +35,8 @@
 #define FRAME_MARK tgfx::inspect::FrameCapture::GetInstance().sendFrameMark(nullptr)
 #define FUNCTION_MARK(type, active) \
   tgfx::inspect::FunctionStat MARE_CONCAT(functionTimer, MARK_LINE) = {type, active}
-#define OPERATE_MARK(type) FUNCTION_MARK(tgfx::inspect::DrawOpTypeToOpTaskType[type], true)
+#define OPERATE_MARK(type) \
+  FUNCTION_MARK(tgfx::inspect::DrawOpTypeToOpTaskType[static_cast<uint8_t>(type)], true)
 #define TASK_MARK(type) FUNCTION_MARK(type, true)
 #define ATTRIBUTE_NAME(name, value) \
   tgfx::inspect::FrameCapture::GetInstance().sendAttributeData(name, value)
@@ -68,8 +69,9 @@
 #define CAPUTRE_RRECT_MESH(drawOp, provider) \
   tgfx::inspect::FrameCapture::GetInstance().sendRRectMeshData(drawOp, provider)
 
-#define CAPUTRE_SHAPE_MESH(drawOp, styledShape, aaType, clipBounds) \
-  tgfx::inspect::FrameCapture::GetInstance().sendShapeMeshData(drawOp, styledShape, aaType, clipBounds)
+#define CAPUTRE_SHAPE_MESH(drawOp, styledShape, aaType, clipBounds)                         \
+  tgfx::inspect::FrameCapture::GetInstance().sendShapeMeshData(drawOp, styledShape, aaType, \
+                                                               clipBounds)
 
 #else
 

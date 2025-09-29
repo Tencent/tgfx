@@ -34,6 +34,7 @@
 #include "gpu/ProgramInfo.h"
 #include "gpu/RRectsVertexProvider.h"
 #include "gpu/RectsVertexProvider.h"
+#include "gpu/ops/DrawOp.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Clock.h"
@@ -114,7 +115,8 @@ class FrameCapture {
 
   void sendRRectMeshData(DrawOp* drawOp, RRectsVertexProvider* provider);
 
-  void sendShapeMeshData(DrawOp* drawOp, std::shared_ptr<Shape> styledShape, AAType aaType, const Rect& clipBounds);
+  void sendShapeMeshData(DrawOp* drawOp, std::shared_ptr<Shape> styledShape, AAType aaType,
+                         const Rect& clipBounds);
 
   void sendMeshData(VertexProvider* provider, uint64_t extraDataPtr, size_t extraDataSize);
 

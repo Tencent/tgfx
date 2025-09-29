@@ -63,6 +63,7 @@ PlacementPtr<GeometryProcessor> RectDrawOp::onMakeGeometryProcessor(RenderTarget
   ATTRIBUTE_NAME("rectCount", static_cast<int>(rectCount));
   ATTRIBUTE_NAME("commonColor", commonColor);
   ATTRIBUTE_NAME("uvMatrix", uvMatrix);
+  ATTRIBUTE_NAME("hasSubset", hasSubset);
   auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
   return QuadPerEdgeAAGeometryProcessor::Make(drawingBuffer, renderTarget->width(),
                                               renderTarget->height(), aaType, commonColor, uvMatrix,

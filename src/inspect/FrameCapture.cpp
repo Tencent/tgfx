@@ -312,8 +312,8 @@ void FrameCapture::sendRRectMeshData(DrawOp* drawOp, RRectsVertexProvider* provi
   sendMeshData(provider, reinterpret_cast<uint64_t>(data), extraDataSize);
 }
 
-void FrameCapture::sendShapeMeshData(DrawOp* drawOp, std::shared_ptr<Shape> shape,
-                                     AAType aaType, const Rect& clipBounds) {
+void FrameCapture::sendShapeMeshData(DrawOp* drawOp, std::shared_ptr<Shape> shape, AAType aaType,
+                                     const Rect& clipBounds) {
   if (!currentFrameShouldCaptrue() || shape == nullptr) {
     return;
   }
@@ -331,8 +331,7 @@ void FrameCapture::sendShapeMeshData(DrawOp* drawOp, std::shared_ptr<Shape> shap
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
   // shape->applyMatrix(Matrix::MakeTrans(-bounds.x(), -bounds.y()));
-  auto rasterizer =
-      std::make_unique<ShapeRasterizer>(width, height, std::move(shape), aaType);
+  auto rasterizer = std::make_unique<ShapeRasterizer>(width, height, std::move(shape), aaType);
   auto shapeBuffer = rasterizer->getData();
   RectMeshInfo rectMeshData = {};
   auto meshType = static_cast<uint8_t>(VertexProviderType::RectsVertexProvider);
@@ -361,7 +360,6 @@ void FrameCapture::sendShapeMeshData(DrawOp* drawOp, std::shared_ptr<Shape> shap
   item.meshMessage.extraDataSize = extraDataSize;
   queueSerialFinish(item);
 }
-
 
 void FrameCapture::sendMeshData(VertexProvider* provider, uint64_t extraDataPtr,
                                 size_t extraDataSize) {

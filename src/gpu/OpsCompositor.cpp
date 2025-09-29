@@ -147,7 +147,8 @@ static Rect ClipLocalBounds(const Rect& localBounds, const Matrix& viewMatrix,
   return result;
 }
 
-void OpsCompositor::drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill) {
+void OpsCompositor::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
+                              const Fill& fill) {
   DEBUG_ASSERT(shape != nullptr);
   flushPendingOps();
   Matrix uvMatrix = {};
