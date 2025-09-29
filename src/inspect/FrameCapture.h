@@ -17,8 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <chrono>
-#include <mutex>
 #include <optional>
 #include <set>
 #include <thread>
@@ -29,15 +27,12 @@
 #include "Protocol.h"
 #include "Socket.h"
 #include "concurrentqueue.h"
-#include "gpu/CommandQueue.h"
-#include "gpu/GPUTexture.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/RRectsVertexProvider.h"
 #include "gpu/RectsVertexProvider.h"
 #include "gpu/ops/DrawOp.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "tgfx/core/Buffer.h"
-#include "tgfx/core/Clock.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Rect.h"

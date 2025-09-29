@@ -330,7 +330,6 @@ void FrameCapture::sendShapeMeshData(DrawOp* drawOp, std::shared_ptr<Shape> shap
   auto bounds = isInverseFillType ? clipBounds : shapeBounds;
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
-  // shape->applyMatrix(Matrix::MakeTrans(-bounds.x(), -bounds.y()));
   auto rasterizer = std::make_unique<ShapeRasterizer>(width, height, std::move(shape), aaType);
   auto shapeBuffer = rasterizer->getData();
   RectMeshInfo rectMeshData = {};
