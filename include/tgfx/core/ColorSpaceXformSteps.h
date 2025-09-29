@@ -58,10 +58,10 @@ struct ColorSpaceXformSteps {
 
   Flags flags;
 
-  TransferFunction srcTF,   // Apply for linearize.
-      dstTFInv;             // Apply for encode.
+  TransferFunction srcTF,        // Apply for linearize.
+      dstTFInv;                  // Apply for encode.
   ColorMatrix33 srcToDstMatrix;  // Apply this 3x3 matrix for gamut_transform.
-  float srcOotf[4];         // Apply ootf with these r,g,b coefficients and gamma before
+  float srcOotf[4];              // Apply ootf with these r,g,b coefficients and gamma before
   // gamut_transform.
   float dstOotf[4];  // Apply ootf with these r,g,b coefficients and gamma after
   // gamut_transform.

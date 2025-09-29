@@ -188,8 +188,7 @@ ColorSpaceXformSteps::ColorSpaceXformSteps(const ColorSpace* src, AlphaType srcA
   }
 
   // Skip unpremul...premul if there are no non-linear operations between.
-  if (this->flags.unPremul && !this->flags.linearize && !this->flags.encode &&
-      this->flags.premul) {
+  if (this->flags.unPremul && !this->flags.linearize && !this->flags.encode && this->flags.premul) {
     this->flags.unPremul = false;
     this->flags.premul = false;
   }
@@ -222,7 +221,8 @@ void ColorSpaceXformSteps::apply(float rgba[4]) const {
   if (this->flags.gamutTransform) {
     float temp[3] = {rgba[0], rgba[1], rgba[2]};
     for (int i = 0; i < 3; ++i) {
-      rgba[i] = srcToDstMatrix.values[i % 3][i / 3] * temp[0] + srcToDstMatrix.values[(3 + i) % 3][(3 + i) / 3] * temp[1] +
+      rgba[i] = srcToDstMatrix.values[i % 3][i / 3] * temp[0] +
+                srcToDstMatrix.values[(3 + i) % 3][(3 + i) / 3] * temp[1] +
                 srcToDstMatrix.values[(6 + i) % 3][(6 + i) / 3] * temp[2];
     }
   }
