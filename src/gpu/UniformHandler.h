@@ -23,7 +23,7 @@
 #include "gpu/ShaderStage.h"
 #include "gpu/ShaderVar.h"
 #include "gpu/Swizzle.h"
-#include "gpu/UniformBuffer.h"
+#include "gpu/UniformData.h"
 
 namespace tgfx {
 class ProgramBuilder;
@@ -65,7 +65,7 @@ class UniformHandler {
     return samplerSwizzles[samplerHandle.toIndex()];
   }
 
-  std::unique_ptr<UniformBuffer> makeUniformBuffer(ShaderStage stage) const;
+  std::unique_ptr<UniformData> makeUniformData(ShaderStage stage) const;
 
   /**
    * Returns the declarations of all uniforms that are visible in the given shader visibility.

@@ -33,41 +33,69 @@ static constexpr int FRAGMENT_UBO_BINDING_POINT = 1;
 static constexpr int TEXTURE_BINDING_POINT_START = 2;
 
 /**
- * An object representing the collection of uniform variables in a GPU program.
+ * An object representing the collection of uniform data in CPU side.
  */
-class UniformBuffer {
+class UniformData {
  public:
   /**
-   * Copies value into the uniform buffer. The data must have the same size as the uniform specified
+   *
+   * Copies value into the uniform data. The data must have the same size as the uniform specified
    * by name.
    */
   template <typename T>
-  std::enable_if_t<std::is_trivially_copyable_v<T> && !std::is_pointer_v<T>, void> setData(
-      const std::string& name, const T& value) {
+  std::enable_if_t<std::is_trivially_copyable_v<T> && !std::is_pointer_v<T> &&
+                       !std::is_same_v<std::decay_t<T>, Matrix>,
+                   void>
+  setData(const std::string& name, const T& value) const {
     onSetData(name, &value, sizeof(value));
   }
 
   /**
    * Convenience method for copying a Matrix to a 3x3 matrix in column-major order.
    */
-  void setData(const std::string& name, const Matrix& matrix);
+  template <typename T>
+  std::enable_if_t<std::is_same_v<std::decay_t<T>, Matrix>, void> setData(const std::string& name,
+                                                                          const T& matrix) const {
+    float values[6] = {};
+    matrix.get6(values);
 
-  /**
-   * Returns a pointer to the start of the uniform buffer in memory.
-   */
-  const void* data() const {
-    return buffer.data();
+    if (_uboSupport) {
+      // clang-format off
+      const float data[] = {
+        values[0], values[3], 0, 0,
+        values[1], values[4], 0, 0,
+        values[2], values[5], 1, 0,
+      };
+      // clang-format on
+      onSetData(name, data, sizeof(data));
+    } else {
+      // clang-format off
+      const float data[] = {
+        values[0], values[3], 0,
+        values[1], values[4], 0,
+        values[2], values[5], 1
+      };
+      // clang-format on
+      onSetData(name, data, sizeof(data));
+    }
   }
 
   /**
-   * Returns the size of the uniform buffer in bytes.
+   * Sets an external memory buffer for writing uniform data.
+   * On platforms with UBO support, the buffer points to memory mapped from a GPU UBO object.
+   * On platforms without UBO support, the buffer points to CPU memory.
+   */
+  void setBuffer(void* buffer);
+
+  /**
+   * Returns the size of the uniform data in bytes.
    */
   size_t size() const {
-    return buffer.size();
+    return bufferSize;
   }
 
   /**
-   * Returns the list of uniforms in this buffer.
+   * Returns the list of uniforms in this data.
    */
   const std::vector<Uniform>& uniforms() const {
     return _uniforms;
@@ -94,16 +122,17 @@ class UniformBuffer {
     size_t align;
   };
 
-  std::vector<uint8_t> buffer = {};
+  uint8_t* _buffer = nullptr;
+  size_t bufferSize = 0;
   std::vector<Uniform> _uniforms = {};
   std::string nameSuffix = "";
   std::unordered_map<std::string, Field> fieldMap = {};
   size_t cursor = 0;
   bool _uboSupport = false;
 
-  explicit UniformBuffer(std::vector<Uniform> uniforms, bool uboSupport = false);
+  explicit UniformData(std::vector<Uniform> uniforms, bool uboSupport = false);
 
-  void onSetData(const std::string& name, const void* data, size_t size);
+  void onSetData(const std::string& name, const void* data, size_t size) const;
 
   const Field* findField(const std::string& key) const;
 
@@ -112,7 +141,7 @@ class UniformBuffer {
   static Entry EntryOf(UniformFormat format);
 
   /**
-   * Dump UniformBuffer's memory layout information is printed to the console for debugging.
+   * Dump UniformData's memory layout information is printed to the console for debugging.
    */
 #if DEBUG
   static const char* ToUniformFormatName(UniformFormat format);

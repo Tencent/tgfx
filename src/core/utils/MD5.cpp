@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "pdf/MD5.h"
+#include "core/utils/MD5.h"
 #if defined(__APPLE__)
 #include <CommonCrypto/CommonDigest.h>
 #elif defined(_WIN32)
@@ -24,7 +24,7 @@
 #include <windows.h>
 #include <wincrypt.h>
 // clang-format on
-#elif defined(__linux__) && !defined(__ANDROID__) && !defined(ANDROID)
+#elif defined(__linux__) && !defined(__ANDROID__) && !defined(ANDROID) && !defined(__OHOS__)
 #include <openssl/md5.h>
 #else
 #define FALLBACK_MD5
@@ -184,7 +184,7 @@ MD5::Digest MD5::Calculate(const void* bytes, size_t size) {
     }
     CryptReleaseContext(hProv, 0);
   }
-#elif defined(__linux__) && !defined(__ANDROID__) && !defined(ANDROID)
+#elif defined(__linux__) && !defined(__ANDROID__) && !defined(ANDROID) && !defined(__OHOS__)
   ::MD5(static_cast<const unsigned char*>(bytes), size, digest.data());
 #else
   MD5Impl impl;

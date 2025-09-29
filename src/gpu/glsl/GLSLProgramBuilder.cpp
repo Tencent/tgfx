@@ -19,8 +19,7 @@
 #include "GLSLProgramBuilder.h"
 #include <string>
 #include "gpu/GPU.h"
-#include "gpu/UniformBuffer.h"
-#include "inspect/InspectorMark.h"
+#include "gpu/UniformData.h"
 
 namespace tgfx {
 static std::string TypeModifierString(bool varyingIsInOut, ShaderVar::TypeModifier t,
@@ -193,20 +192,20 @@ std::shared_ptr<PipelineProgram> GLSLProgramBuilder::finalize() {
   descriptor.vertex.module = vertexShader;
   descriptor.fragment.module = fragmentShader;
   descriptor.fragment.colorAttachments.push_back(programInfo->getPipelineColorAttachment());
-  auto vertexUniformBuffer = _uniformHandler.makeUniformBuffer(ShaderStage::Vertex);
-  auto fragmentUniformBuffer = _uniformHandler.makeUniformBuffer(ShaderStage::Fragment);
-  if (vertexUniformBuffer) {
+  auto vertexUniformData = _uniformHandler.makeUniformData(ShaderStage::Vertex);
+  auto fragmentUniformData = _uniformHandler.makeUniformData(ShaderStage::Fragment);
+  if (vertexUniformData) {
     BindingEntry vertexBinding = {VertexUniformBlockName, VERTEX_UBO_BINDING_POINT};
     if (!shaderCaps->uboSupport) {
-      vertexBinding.uniforms = vertexUniformBuffer->uniforms();
+      vertexBinding.uniforms = vertexUniformData->uniforms();
       DEBUG_ASSERT(!vertexBinding.uniforms.empty());
     }
     descriptor.layout.uniformBlocks.push_back(vertexBinding);
   }
-  if (fragmentUniformBuffer) {
+  if (fragmentUniformData) {
     BindingEntry fragmentBinding = {FragmentUniformBlockName, FRAGMENT_UBO_BINDING_POINT};
     if (!shaderCaps->uboSupport) {
-      fragmentBinding.uniforms = fragmentUniformBuffer->uniforms();
+      fragmentBinding.uniforms = fragmentUniformData->uniforms();
       DEBUG_ASSERT(!fragmentBinding.uniforms.empty());
     }
     descriptor.layout.uniformBlocks.push_back(fragmentBinding);
@@ -219,8 +218,8 @@ std::shared_ptr<PipelineProgram> GLSLProgramBuilder::finalize() {
   if (pipeline == nullptr) {
     return nullptr;
   }
-  return std::make_shared<PipelineProgram>(std::move(pipeline), std::move(vertexUniformBuffer),
-                                           std::move(fragmentUniformBuffer));
+  return std::make_shared<PipelineProgram>(std::move(pipeline), std::move(vertexUniformData),
+                                           std::move(fragmentUniformData));
 }
 
 bool GLSLProgramBuilder::checkSamplerCounts() {

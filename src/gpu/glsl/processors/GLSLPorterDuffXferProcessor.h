@@ -27,7 +27,6 @@ class GLSLPorterDuffXferProcessor : public PorterDuffXferProcessor {
 
   void emitCode(const EmitArgs& args) const override;
 
-  void setData(UniformBuffer* vertexUniformBuffer,
-               UniformBuffer* fragmentUniformBuffer) const override;
+  void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
 };
 }  // namespace tgfx

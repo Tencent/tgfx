@@ -406,8 +406,8 @@ void FrameCapture::captureProgramInfo(const BytesKey& programKey, Context* conte
   fragmentModule.stage = ShaderStage::Fragment;
   sendShaderText(fragmentModule);
 
-  auto vertexUniformBuffer = builder.uniformHandler()->makeUniformBuffer(ShaderStage::Vertex);
-  auto fragmentUniformBuffer = builder.uniformHandler()->makeUniformBuffer(ShaderStage::Fragment);
+  auto vertexUniformBuffer = builder.uniformHandler()->makeUniformData(ShaderStage::Vertex);
+  auto fragmentUniformBuffer = builder.uniformHandler()->makeUniformData(ShaderStage::Fragment);
   sendUniformInfo(vertexUniformBuffer->uniforms());
   sendUniformInfo(fragmentUniformBuffer->uniforms());
 }

@@ -9,7 +9,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 cmake_policy(SET CMP0063 NEW)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
-set(TGFX_VERSION "2.1.0")
+set(TGFX_VERSION "2.1.1")
 
 # Options for building tgfx
 option(TGFX_BUILD_SVG "Enable building the SVG module" OFF)
