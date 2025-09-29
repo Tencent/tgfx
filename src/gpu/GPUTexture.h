@@ -18,8 +18,6 @@
 
 #pragma once
 
-#include <cstdint>
-#include "gpu/GPUTexture.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/PixelFormat.h"
 #include "tgfx/platform/HardwareBuffer.h"

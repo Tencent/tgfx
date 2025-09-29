@@ -35,6 +35,8 @@ static void* egl_get_gl_proc(void*, const char name[]) {
   GL_CORE_FUNCTIONS_EACH(M)
   M(eglGetCurrentDisplay)
   M(eglQueryString)
+  M(glMapBufferRange)
+  M(glUnmapBuffer)
 
 #undef M
   auto fun = eglGetProcAddress(name);

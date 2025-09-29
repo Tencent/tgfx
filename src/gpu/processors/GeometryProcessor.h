@@ -24,7 +24,7 @@
 #include "gpu/GPUTexture.h"
 #include "gpu/ShaderCaps.h"
 #include "gpu/ShaderVar.h"
-#include "gpu/UniformBuffer.h"
+#include "gpu/UniformData.h"
 #include "gpu/VaryingHandler.h"
 #include "gpu/VertexShaderBuilder.h"
 #include "gpu/processors/FragmentProcessor.h"
@@ -87,7 +87,7 @@ class GeometryProcessor : public Processor {
 
   virtual void emitCode(EmitArgs&) const = 0;
 
-  virtual void setData(UniformBuffer* vertexUniformBuffer, UniformBuffer* fragmentUniformBuffer,
+  virtual void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData,
                        FPCoordTransformIter* coordTransformIter) const = 0;
 
   size_t numTextureSamplers() const {
@@ -115,7 +115,7 @@ class GeometryProcessor : public Processor {
   /**
    * A helper to upload coord transform matrices in setData().
    */
-  void setTransformDataHelper(const Matrix& uvMatrix, UniformBuffer* uniformBuffer,
+  void setTransformDataHelper(const Matrix& uvMatrix, UniformData* uniformData,
                               FPCoordTransformIter* transformIter) const;
 
   /**
@@ -142,7 +142,7 @@ class GeometryProcessor : public Processor {
                                const std::string&, int) const {
   }
 
-  virtual void onSetTransformData(UniformBuffer*, const CoordTransform*, int) const {
+  virtual void onSetTransformData(UniformData*, const CoordTransform*, int) const {
   }
 
   std::vector<Attribute> attributes = {};

@@ -43,7 +43,7 @@ jobs:
       - name: Build iOS
         run: |
           cd ios
-          node gen_ios -DTGFX_BUILD_SVG=ON -DTGFX_BUILD_PDF=ON
+          node gen_ios -DTGFX_BUILD_LAYERS=ON -DTGFX_BUILD_SVG=ON -DTGFX_BUILD_PDF=ON
           xcodebuild -workspace Hello2D.xcworkspace -scheme Hello2D -configuration Release -sdk iphoneos -arch arm64 CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO
 
       - name: Save Third-Party Cache
@@ -94,7 +94,7 @@ jobs:
       - name: Build Android
         run: |
           cd android
-          ./gradlew assembleRelease -Parm64-only --no-daemon -PcmakeArgs="-DTGFX_BUILD_SVG=ON -DTGFX_BUILD_PDF=ON"
+          ./gradlew assembleRelease -Parm64-only --no-daemon -PcmakeArgs="-DTGFX_BUILD_LAYERS=ON -DTGFX_BUILD_SVG=ON -DTGFX_BUILD_PDF=ON"
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -219,7 +219,7 @@ jobs:
 
       - name: Build Windows
         run: |
-          node build_tgfx -s ./win Hello2D -DTGFX_BUILD_SVG=ON -DTGFX_BUILD_PDF=ON -o ./out/release/win -a x64 -d
+          node build_tgfx -s ./win Hello2D -DTGFX_BUILD_LAYERS=ON -DTGFX_BUILD_SVG=ON -DTGFX_BUILD_PDF=ON -o ./out/release/win -a x64 -d
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -268,7 +268,7 @@ jobs:
 
       - name: Build Linux
         run: |
-          node build_tgfx -s ./linux Hello2D -DTGFX_BUILD_SVG=ON -DTGFX_BUILD_PDF=ON -o ./out/release/linux -a x64 -d
+          node build_tgfx -s ./linux Hello2D -DTGFX_BUILD_LAYERS=ON -DTGFX_BUILD_SVG=ON -DTGFX_BUILD_PDF=ON -o ./out/release/linux -a x64 -d
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -324,7 +324,7 @@ jobs:
 
       - name: Build QT
         run: |
-          node build_tgfx -s ./qt Hello2D -DCMAKE_PREFIX_PATH="${{env.QT_ROOT_DIR}}/lib/cmake" -DTGFX_BUILD_SVG=ON -DTGFX_BUILD_PDF=ON -o ./out/release/qt -a x64
+          node build_tgfx -s ./qt Hello2D -DCMAKE_PREFIX_PATH="${{env.QT_ROOT_DIR}}/lib/cmake" -DTGFX_BUILD_LAYERS=ON -DTGFX_BUILD_SVG=ON -DTGFX_BUILD_PDF=ON -o ./out/release/qt -a x64
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}

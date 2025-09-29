@@ -39,9 +39,9 @@ void GLSLSingleIntervalGradientColorizer::emitCode(EmitArgs& args) const {
                            startName.c_str(), endName.c_str());
 }
 
-void GLSLSingleIntervalGradientColorizer::onSetData(UniformBuffer* /*vertexUniformBuffer*/,
-                                                    UniformBuffer* fragmentUniformBuffer) const {
-  fragmentUniformBuffer->setData("start", start);
-  fragmentUniformBuffer->setData("end", end);
+void GLSLSingleIntervalGradientColorizer::onSetData(UniformData* /*vertexUniformData*/,
+                                                    UniformData* fragmentUniformData) const {
+  fragmentUniformData->setData("start", start);
+  fragmentUniformData->setData("end", end);
 }
 }  // namespace tgfx

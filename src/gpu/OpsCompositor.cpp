@@ -356,7 +356,8 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
     case PendingOpType::Image: {
       auto subsetMode = UVSubsetMode::None;
       if (pendingConstraint == SrcRectConstraint::Strict && pendingImage) {
-        subsetMode = pendingSampling.filterMode == FilterMode::Linear
+        subsetMode = pendingSampling.magFilterMode == FilterMode::Linear ||
+                             pendingSampling.minFilterMode == FilterMode::Linear
                          ? UVSubsetMode::SubsetOnly
                          : UVSubsetMode::RoundOutAndSubset;
       }

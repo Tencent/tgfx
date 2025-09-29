@@ -163,6 +163,8 @@
         "BottomLeftSurface": "67961560",
         "ChildMask": "ee2cc771",
         "ContourTest": "5ccc0507",
+        "DiffFilterModeImagePattern -- zoomIn": "ac049958",
+        "DiffFilterModeImagePattern -- zoomOut": "ac049958",
         "DirtyRegionTest1": "e1604824",
         "DirtyRegionTest10": "31250c62",
         "DirtyRegionTest11": "4bd4e0ad",

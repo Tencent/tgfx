@@ -18,27 +18,36 @@
 
 #pragma once
 
+#include "gpu/GPUBuffer.h"
 #include "gpu/resources/Program.h"
 
 namespace tgfx {
 class PipelineProgram : public Program {
  public:
   explicit PipelineProgram(std::shared_ptr<RenderPipeline> pipeline,
-                           std::unique_ptr<UniformBuffer> vertexUniformBuffer,
-                           std::unique_ptr<UniformBuffer> fragmentUniformBuffer)
-      : pipeline(std::move(pipeline)), vertexUniformBuffer(std::move(vertexUniformBuffer)),
-        fragmentUniformBuffer(std::move(fragmentUniformBuffer)) {
+                           std::unique_ptr<UniformData> vertexUniformData,
+                           std::unique_ptr<UniformData> fragmentUniformData)
+      : pipeline(std::move(pipeline)), vertexUniformData(std::move(vertexUniformData)),
+        fragmentUniformData(std::move(fragmentUniformData)) {
   }
 
   std::shared_ptr<RenderPipeline> getPipeline() const {
     return pipeline;
   }
 
+  UniformData* getUniformData(ShaderStage stage) const {
+    if (stage == ShaderStage::Vertex) {
+      return vertexUniformData.get();
+    }
+    if (stage == ShaderStage::Fragment) {
+      return fragmentUniformData.get();
+    }
+    return nullptr;
+  }
+
  private:
   std::shared_ptr<RenderPipeline> pipeline = nullptr;
-  std::unique_ptr<UniformBuffer> vertexUniformBuffer = nullptr;
-  std::unique_ptr<UniformBuffer> fragmentUniformBuffer = nullptr;
-
-  friend class ProgramInfo;
+  std::unique_ptr<UniformData> vertexUniformData = nullptr;
+  std::unique_ptr<UniformData> fragmentUniformData = nullptr;
 };
 }  // namespace tgfx
