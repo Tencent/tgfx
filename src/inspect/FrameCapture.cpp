@@ -861,7 +861,6 @@ void FrameCapture::handleConnect(const WelcomeMessage& welcome) {
   auto handshake = HandshakeStatus::HandshakeWelcome;
   sock->sendData(&handshake, sizeof(handshake));
 
-  lz4Handler->reset();
   sock->sendData(&welcome, sizeof(welcome));
 
   auto keepAlive = 0;

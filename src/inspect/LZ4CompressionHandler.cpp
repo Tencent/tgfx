@@ -22,30 +22,12 @@
 namespace tgfx::inspect {
 class DefaultLZ4CompressionHandler : public LZ4CompressionHandler {
  public:
-  DefaultLZ4CompressionHandler() : lz4EncodeStream(LZ4_createStream()) {
-  }
-
-  ~DefaultLZ4CompressionHandler() override {
-    if (lz4EncodeStream) {
-      LZ4_freeStream(lz4EncodeStream);
-      lz4EncodeStream = nullptr;
-    }
-  }
-
   size_t encode(uint8_t* dstBuffer, size_t dstSize, const uint8_t* srcBuffer,
                 size_t srcSize) const override {
-    return static_cast<size_t>(
-        LZ4_compress_fast_continue(lz4EncodeStream, reinterpret_cast<const char*>(srcBuffer),
-                                   reinterpret_cast<char*>(dstBuffer), static_cast<int>(srcSize),
-                                   static_cast<int>(dstSize), 1));
+    return static_cast<size_t>(LZ4_compress_default(reinterpret_cast<const char*>(srcBuffer),
+                                reinterpret_cast<char*>(dstBuffer), static_cast<int>(srcSize),
+                                static_cast<int>(dstSize)));
   }
-
-  void reset() override {
-    LZ4_resetStream(lz4EncodeStream);
-  }
-
- private:
-  LZ4_stream_t* lz4EncodeStream = nullptr;
 };
 
 std::unique_ptr<LZ4CompressionHandler> LZ4CompressionHandler::Make() {
