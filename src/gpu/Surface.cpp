@@ -26,68 +26,50 @@
 
 namespace tgfx {
 std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, bool alphaOnly,
-                                       int sampleCount, bool mipmapped, uint32_t renderFlags,
-                                       std::shared_ptr<ColorSpace> colorSpace) {
+                                       int sampleCount, bool mipmapped, uint32_t renderFlags) {
   return Make(context, width, height, alphaOnly ? ColorType::ALPHA_8 : ColorType::RGBA_8888,
-              sampleCount, mipmapped, renderFlags, std::move(colorSpace));
+              sampleCount, mipmapped, renderFlags);
 }
 
 std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, ColorType colorType,
-                                       int sampleCount, bool mipmapped, uint32_t renderFlags,
-                                       std::shared_ptr<ColorSpace> colorSpace) {
+                                       int sampleCount, bool mipmapped, uint32_t renderFlags) {
   if (context == nullptr) {
     return nullptr;
-  }
-  if (!colorSpace) {
-    colorSpace = ColorSpace::MakeSRGB();
   }
   auto pixelFormat = ColorTypeToPixelFormat(colorType);
   auto proxy = context->proxyProvider()->createRenderTargetProxy(
       {}, width, height, pixelFormat, sampleCount, mipmapped, ImageOrigin::TopLeft,
-      BackingFit::Exact, 0, std::move(colorSpace));
+      BackingFit::Exact, 0);
   return MakeFrom(std::move(proxy), renderFlags, true);
 }
 
 std::shared_ptr<Surface> Surface::MakeFrom(Context* context,
                                            const BackendRenderTarget& renderTarget,
-                                           ImageOrigin origin, uint32_t renderFlags,
-                                           std::shared_ptr<ColorSpace> colorSpace) {
+                                           ImageOrigin origin, uint32_t renderFlags) {
   if (context == nullptr) {
     return nullptr;
   }
-  if (!colorSpace) {
-    colorSpace = ColorSpace::MakeSRGB();
-  }
-  auto proxy = RenderTargetProxy::MakeFrom(context, renderTarget, origin, std::move(colorSpace));
+  auto proxy = RenderTargetProxy::MakeFrom(context, renderTarget, origin);
   return MakeFrom(std::move(proxy), renderFlags);
 }
 
 std::shared_ptr<Surface> Surface::MakeFrom(Context* context, const BackendTexture& backendTexture,
                                            ImageOrigin origin, int sampleCount,
-                                           uint32_t renderFlags,
-                                           std::shared_ptr<ColorSpace> colorSpace) {
+                                           uint32_t renderFlags) {
   if (context == nullptr) {
     return nullptr;
   }
-  if (!colorSpace) {
-    colorSpace = ColorSpace::MakeSRGB();
-  }
-  auto proxy = context->proxyProvider()->createRenderTargetProxy(
-      backendTexture, sampleCount, origin, false, std::move(colorSpace));
+  auto proxy =
+      context->proxyProvider()->createRenderTargetProxy(backendTexture, sampleCount, origin, false);
   return MakeFrom(std::move(proxy), renderFlags);
 }
 
 std::shared_ptr<Surface> Surface::MakeFrom(Context* context, HardwareBufferRef hardwareBuffer,
-                                           int sampleCount, uint32_t renderFlags,
-                                           std::shared_ptr<ColorSpace> colorSpace) {
+                                           int sampleCount, uint32_t renderFlags) {
   if (context == nullptr) {
     return nullptr;
   }
-  if (!colorSpace) {
-    colorSpace = ColorSpace::MakeSRGB();
-  }
-  auto proxy = context->proxyProvider()->createRenderTargetProxy(hardwareBuffer, sampleCount,
-                                                                 std::move(colorSpace));
+  auto proxy = context->proxyProvider()->createRenderTargetProxy(hardwareBuffer, sampleCount);
   return MakeFrom(std::move(proxy), renderFlags);
 }
 
@@ -184,7 +166,7 @@ std::shared_ptr<Image> Surface::makeImageSnapshot() {
     textureProxy = renderTarget->makeTextureProxy();
     drawingManager->addRenderTargetCopyTask(renderTarget, textureProxy);
   }
-  cachedImage = TextureImage::Wrap(std::move(textureProxy));
+  cachedImage = TextureImage::Wrap(std::move(textureProxy), renderTarget->colorSpace());
   return cachedImage;
 }
 

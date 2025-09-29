@@ -123,42 +123,52 @@ static float PngFixedPointToFloat(png_fixed_point x) {
 }
 
 static float PngInvertedFixedPointToFloat(png_fixed_point x) {
-  // This is necessary because the gAMA chunk actually stores 1/gamma.
+  /**
+   * This is necessary because the gAMA chunk actually stores 1/gamma.
+   */
   return 1.0f / PngFixedPointToFloat(x);
 }
 
 #endif  // LIBPNG >= 1.6
 
-// If there is no color profile information, it will use sRGB.
+/**
+ * If there is no color profile information, it will use sRGB.
+ */
 static std::shared_ptr<ColorSpace> ReadColorProfile(png_structp pngPtr, png_infop infoPtr) {
 #if (PNG_LIBPNG_VER_MAJOR > 1) || (PNG_LIBPNG_VER_MAJOR == 1 && PNG_LIBPNG_VER_MINOR >= 6)
-  // First check for an ICC profile
+  /**
+   * First check for an ICC profile
+   */
   png_bytep profile;
   png_uint_32 length;
-  // The below variables are unused, however, we need to pass them in anyway or
-  // png_get_iCCP() will return nothing.
-  // Could knowing the |name| of the profile ever be interesting?  Maybe for debugging?
+  /**
+   * The below variables are unused, however, we need to pass them in anyway or png_get_iCCP() will
+   * return nothing.
+   */
   png_charp name;
-  // The |compression| is uninteresting since:
-  //   (1) libpng has already decompressed the profile for us.
-  //   (2) "deflate" is the only mode of decompression that libpng supports.
+  /**
+   * The |compression| is uninteresting since:
+   *  (1) libpng has already decompressed the profile for us.
+   *  (2) "deflate" is the only mode of decompression that libpng supports.
+   */
   int compression;
   if (PNG_INFO_iCCP == png_get_iCCP(pngPtr, infoPtr, &name, &compression, &profile, &length)) {
     return ColorSpace::MakeFromICC(profile, length);
   }
 
-  // Second, check for sRGB.
-  // Note that Blink does this first. This code checks ICC first, with the thinking that
-  // an image has both truly wants the potentially more specific ICC chunk, with sRGB as a
-  // backup in case the decoder does not support full color management.
+  /**
+   * Second, check for sRGB. Note that Blink does this first. This code checks ICC first, with the
+   * thinking that an image has both truly wants the potentially more specific ICC chunk, with sRGB
+   * as a backup in case the decoder does not support full color management.
+   */
   if (png_get_valid(pngPtr, infoPtr, PNG_INFO_sRGB)) {
-    // `sRGB` chunk.
     return ColorSpace::MakeSRGB();
   }
 
-  // Default to SRGB gamut.
+  /**
+   * Default to SRGB gamut.
+   */
   gfx::skcms_Matrix3x3 toXYZD50 = gfx::skcms_sRGB_profile()->toXYZD50;
-  // Next, check for chromaticities.
   png_fixed_point chrm[8];
   png_fixed_point gamma;
   if (png_get_cHRM_fixed(pngPtr, infoPtr, &chrm[0], &chrm[1], &chrm[2], &chrm[3], &chrm[4],
@@ -184,14 +194,15 @@ static std::shared_ptr<ColorSpace> ReadColorProfile(png_structp pngPtr, png_info
     fn.b = fn.c = fn.d = fn.e = fn.f = 0.0f;
     fn.g = PngInvertedFixedPointToFloat(gamma);
   } else {
-    // Default to sRGB gamma if the image has color space information,
-    // but does not specify gamma.
-    // Note that Blink would again return nullptr in this case.
+    /**
+     * Default to sRGB gamma if the image has color space information, but does not specify gamma.
+     * Note that Blink would again return nullptr in this case.
+     */
     fn = *gfx::skcms_sRGB_TransferFunction();
   }
   return ColorSpace::MakeRGB(*reinterpret_cast<TransferFunction*>(&fn),
-                             *reinterpret_cast<Matrix3x3*>(&toXYZD50));
-#else   // LIBPNG >= 1.6
+                             *reinterpret_cast<ColorMatrix33*>(&toXYZD50));
+#else   // LIBPNG < 1.6
   return ColorSpace::MakeSRGB();
 #endif  // LIBPNG >= 1.6
 }

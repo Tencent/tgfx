@@ -31,7 +31,7 @@ std::shared_ptr<ScaledImageGenerator> ScaledImageGenerator::MakeFrom(
 
 ScaledImageGenerator::ScaledImageGenerator(int width, int height,
                                            const std::shared_ptr<ImageCodec>& codec)
-    : ImageGenerator(width, height), source(codec) {
+    : ImageGenerator(width, height, codec->colorSpace()), source(codec) {
 }
 
 std::shared_ptr<ImageBuffer> ScaledImageGenerator::onMakeBuffer(bool tryHardware) const {

@@ -72,6 +72,7 @@ PlacementPtr<FragmentProcessor> DropShadowImageFilter::getShadowFragmentProcesso
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
     SrcRectConstraint constraint, const Matrix* uvMatrix) const {
   auto shadowMatrix = Matrix::MakeTrans(-dx, -dy);
+  auto sourceColorSpace = source->colorSpace();
   if (uvMatrix) {
     shadowMatrix.preConcat(*uvMatrix);
   }
@@ -88,7 +89,11 @@ PlacementPtr<FragmentProcessor> DropShadowImageFilter::getShadowFragmentProcesso
     return nullptr;
   }
   auto buffer = args.context->drawingBuffer();
-  auto colorProcessor = ConstColorProcessor::Make(buffer, color.premultiply(), InputMode::Ignore);
+  auto dstColor = color;
+  ColorSpaceXformSteps steps(ColorSpace::MakeSRGB().get(), AlphaType::Unpremultiplied,
+                             sourceColorSpace.get(), AlphaType::Premultiplied);
+  steps.apply(dstColor.array());
+  auto colorProcessor = ConstColorProcessor::Make(buffer, dstColor, InputMode::Ignore);
   return XfermodeFragmentProcessor::MakeFromTwoProcessors(
       buffer, std::move(colorProcessor), std::move(shadowProcessor), BlendMode::SrcIn);
 }

@@ -81,46 +81,52 @@ std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageGenerator> generator
   return image;
 }
 
-std::shared_ptr<Image> Image::MakeFrom(const ImageInfo& info, std::shared_ptr<Data> pixels) {
-  auto codec = ImageCodec::MakeFrom(info, std::move(pixels));
+std::shared_ptr<Image> Image::MakeFrom(const ImageInfo& info, std::shared_ptr<Data> pixels,
+                                       std::shared_ptr<ColorSpace> colorSpace) {
+  auto codec = ImageCodec::MakeFrom(info, std::move(pixels), std::move(colorSpace));
   return MakeFrom(std::move(codec));
 }
 
-std::shared_ptr<Image> Image::MakeFrom(const Bitmap& bitmap) {
-  return MakeFrom(bitmap.makeBuffer());
+std::shared_ptr<Image> Image::MakeFrom(const Bitmap& bitmap,
+                                       std::shared_ptr<ColorSpace> colorSpace) {
+  return MakeFrom(bitmap.makeBuffer(), std::move(colorSpace));
 }
 
-std::shared_ptr<Image> Image::MakeFrom(HardwareBufferRef hardwareBuffer, YUVColorSpace colorSpace) {
+std::shared_ptr<Image> Image::MakeFrom(HardwareBufferRef hardwareBuffer, YUVColorSpace colorSpace,
+                                       std::shared_ptr<ColorSpace> gamutColorSpace) {
   auto buffer = ImageBuffer::MakeFrom(hardwareBuffer, colorSpace);
-  return MakeFrom(std::move(buffer));
+  return MakeFrom(std::move(buffer), std::move(gamutColorSpace));
 }
 
-std::shared_ptr<Image> Image::MakeI420(std::shared_ptr<YUVData> yuvData, YUVColorSpace colorSpace) {
+std::shared_ptr<Image> Image::MakeI420(std::shared_ptr<YUVData> yuvData, YUVColorSpace colorSpace,
+                                       std::shared_ptr<ColorSpace> gamutColorSpace) {
   auto buffer = ImageBuffer::MakeI420(std::move(yuvData), colorSpace);
-  return MakeFrom(std::move(buffer));
+  return MakeFrom(std::move(buffer), std::move(gamutColorSpace));
 }
 
-std::shared_ptr<Image> Image::MakeNV12(std::shared_ptr<YUVData> yuvData, YUVColorSpace colorSpace) {
+std::shared_ptr<Image> Image::MakeNV12(std::shared_ptr<YUVData> yuvData, YUVColorSpace colorSpace,
+                                       std::shared_ptr<ColorSpace> gamutColorSpace) {
   auto buffer = ImageBuffer::MakeNV12(std::move(yuvData), colorSpace);
-  return MakeFrom(std::move(buffer));
+  return MakeFrom(std::move(buffer), std::move(gamutColorSpace));
 }
 
 std::shared_ptr<Image> Image::MakeFrom(Context* context, const BackendTexture& backendTexture,
-                                       ImageOrigin origin) {
+                                       ImageOrigin origin, std::shared_ptr<ColorSpace> colorSpace) {
   if (context == nullptr) {
     return nullptr;
   }
   auto textureProxy = context->proxyProvider()->wrapExternalTexture(backendTexture, origin, false);
-  return TextureImage::Wrap(std::move(textureProxy));
+  return TextureImage::Wrap(std::move(textureProxy), std::move(colorSpace));
 }
 
 std::shared_ptr<Image> Image::MakeAdopted(Context* context, const BackendTexture& backendTexture,
-                                          ImageOrigin origin) {
+                                          ImageOrigin origin,
+                                          std::shared_ptr<ColorSpace> colorSpace) {
   if (context == nullptr) {
     return nullptr;
   }
   auto textureProxy = context->proxyProvider()->wrapExternalTexture(backendTexture, origin, true);
-  return TextureImage::Wrap(std::move(textureProxy));
+  return TextureImage::Wrap(std::move(textureProxy), std::move(colorSpace));
 }
 
 std::shared_ptr<Image> Image::makeTextureImage(Context* context) const {
@@ -132,7 +138,7 @@ std::shared_ptr<Image> Image::makeTextureImage(Context* context) const {
   if (textureProxy == nullptr) {
     return nullptr;
   }
-  return TextureImage::Wrap(std::move(textureProxy));
+  return TextureImage::Wrap(std::move(textureProxy), colorSpace());
 }
 
 BackendTexture Image::getBackendTexture(Context*, ImageOrigin*) const {

@@ -59,17 +59,11 @@ class ExternalRenderTargetProxy : public RenderTargetProxy {
     return renderTarget;
   }
 
-  std::shared_ptr<ColorSpace> getColorSpace() const override {
-    return colorSpace;
-  }
-
  private:
   std::shared_ptr<RenderTarget> renderTarget = nullptr;
-  std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB();
 
-  explicit ExternalRenderTargetProxy(std::shared_ptr<RenderTarget> renderTarget,
-                                     std::shared_ptr<ColorSpace> colorSpace)
-      : renderTarget(std::move(renderTarget)), colorSpace(std::move(colorSpace)) {
+  explicit ExternalRenderTargetProxy(std::shared_ptr<RenderTarget> renderTarget)
+      : renderTarget(std::move(renderTarget)) {
   }
 
   friend class RenderTargetProxy;

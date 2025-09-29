@@ -21,9 +21,9 @@
 namespace tgfx {
 ExternalTextureRenderTargetProxy::ExternalTextureRenderTargetProxy(
     const BackendTexture& backendTexture, PixelFormat format, int sampleCount, ImageOrigin origin,
-    bool adopted, std::shared_ptr<ColorSpace> colorSpace)
+    bool adopted)
     : TextureRenderTargetProxy(backendTexture.width(), backendTexture.height(), format, sampleCount,
-                               false, origin, !adopted, std::move(colorSpace)),
+                               false, origin, !adopted),
       backendTexture(backendTexture) {
 }
 

@@ -26,17 +26,20 @@
 #include "gpu/TPArgs.h"
 
 namespace tgfx {
-std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageBuffer> buffer) {
+std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageBuffer> buffer,
+                                       std::shared_ptr<ColorSpace> colorSpace) {
   if (buffer == nullptr) {
     return nullptr;
   }
-  std::shared_ptr<Image> image = std::make_shared<BufferImage>(std::move(buffer), false);
+  std::shared_ptr<Image> image =
+      std::make_shared<BufferImage>(std::move(buffer), false, std::move(colorSpace));
   image->weakThis = image;
   return image->makeRasterized();
 }
 
-BufferImage::BufferImage(std::shared_ptr<ImageBuffer> buffer, bool mipmapped)
-    : PixelImage(mipmapped), imageBuffer(std::move(buffer)) {
+BufferImage::BufferImage(std::shared_ptr<ImageBuffer> buffer, bool mipmapped,
+                         std::shared_ptr<ColorSpace> colorSpace)
+    : PixelImage(mipmapped), imageBuffer(std::move(buffer)), _colorSpace(std::move(colorSpace)) {
 }
 
 float BufferImage::getRasterizedScale(float drawScale) const {
@@ -60,7 +63,7 @@ std::shared_ptr<TextureProxy> BufferImage::lockTextureProxy(const TPArgs& args) 
 }
 
 std::shared_ptr<Image> BufferImage::onMakeMipmapped(bool mipmapped) const {
-  auto image = std::make_shared<BufferImage>(imageBuffer, mipmapped);
+  auto image = std::make_shared<BufferImage>(imageBuffer, mipmapped, colorSpace());
   image->weakThis = image;
   return image;
 }

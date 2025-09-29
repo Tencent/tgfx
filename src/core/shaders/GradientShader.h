@@ -76,8 +76,9 @@ class LinearGradientShader : public GradientShader {
   GradientType asGradient(GradientInfo*) const override;
 
  protected:
-  PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
-                                                      const Matrix* uvMatrix) const override;
+  PlacementPtr<FragmentProcessor> asFragmentProcessor(
+      const FPArgs& args, const Matrix* uvMatrix,
+      std::shared_ptr<ColorSpace> colorSpace) const override;
 };
 
 class RadialGradientShader : public GradientShader {
@@ -88,8 +89,9 @@ class RadialGradientShader : public GradientShader {
   GradientType asGradient(GradientInfo*) const override;
 
  protected:
-  PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
-                                                      const Matrix* uvMatrix) const override;
+  PlacementPtr<FragmentProcessor> asFragmentProcessor(
+      const FPArgs& args, const Matrix* uvMatrix,
+      std::shared_ptr<ColorSpace> colorSpace) const override;
 };
 
 class ConicGradientShader : public GradientShader {
@@ -100,8 +102,9 @@ class ConicGradientShader : public GradientShader {
   GradientType asGradient(GradientInfo*) const override;
 
  protected:
-  PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
-                                                      const Matrix* uvMatrix) const override;
+  PlacementPtr<FragmentProcessor> asFragmentProcessor(
+      const FPArgs& args, const Matrix* uvMatrix,
+      std::shared_ptr<ColorSpace> colorSpace) const override;
 
  private:
   float bias;
@@ -116,7 +119,8 @@ class DiamondGradientShader : public GradientShader {
   GradientType asGradient(GradientInfo* info) const override;
 
  protected:
-  PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
-                                                      const Matrix* uvMatrix) const override;
+  PlacementPtr<FragmentProcessor> asFragmentProcessor(
+      const FPArgs& args, const Matrix* uvMatrix,
+      std::shared_ptr<ColorSpace> colorSpace) const override;
 };
 }  // namespace tgfx

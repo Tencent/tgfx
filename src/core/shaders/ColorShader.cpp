@@ -45,10 +45,13 @@ bool ColorShader::isEqual(const Shader* shader) const {
   return color == other->color;
 }
 
-PlacementPtr<FragmentProcessor> ColorShader::asFragmentProcessor(const FPArgs& args,
-                                                                 const Matrix*) const {
-  return ConstColorProcessor::Make(args.context->drawingBuffer(), color.premultiply(),
-                                   InputMode::ModulateA);
+PlacementPtr<FragmentProcessor> ColorShader::asFragmentProcessor(
+    const FPArgs& args, const Matrix*, std::shared_ptr<ColorSpace> colorSpace) const {
+  auto dstColor = color;
+  ColorSpaceXformSteps steps{ColorSpace::MakeSRGB().get(), AlphaType::Unpremultiplied,
+                             colorSpace.get(), AlphaType::Premultiplied};
+  steps.apply(dstColor.array());
+  return ConstColorProcessor::Make(args.context->drawingBuffer(), dstColor, InputMode::ModulateA);
 }
 
 }  // namespace tgfx

@@ -58,41 +58,41 @@ static uint32_t EndianSwap32(uint32_t value) {
 #define Endian_SwapBE32(n) static_cast<uint32_t>(n)
 #endif
 
-static bool GetCicp(CicpPrimariesId primaries, ColorSpacePrimaries& colorSpacePrimaries) {
+static bool GetCicp(NamedPrimaries::CICPID primaries, ColorSpacePrimaries& colorSpacePrimaries) {
   // Rec. ITU-T H.273, Table 2.
   switch (primaries) {
-    case CicpPrimariesId::Rec709:
-      colorSpacePrimaries = Rec709Primaries;
+    case NamedPrimaries::CICPID::Rec709:
+      colorSpacePrimaries = NamedPrimaries::Rec709;
       return true;
-    case CicpPrimariesId::Rec470SystemM:
-      colorSpacePrimaries = Rec470SystemMPrimaries;
+    case NamedPrimaries::CICPID::Rec470SystemM:
+      colorSpacePrimaries = NamedPrimaries::Rec470SystemM;
       return true;
-    case CicpPrimariesId::Rec470SystemBG:
-      colorSpacePrimaries = Rec470SystemBGPrimaries;
+    case NamedPrimaries::CICPID::Rec470SystemBG:
+      colorSpacePrimaries = NamedPrimaries::Rec470SystemBG;
       return true;
-    case CicpPrimariesId::Rec601:
-      colorSpacePrimaries = Rec601Primaries;
+    case NamedPrimaries::CICPID::Rec601:
+      colorSpacePrimaries = NamedPrimaries::Rec601;
       return true;
-    case CicpPrimariesId::SMPTE_ST_240:
-      colorSpacePrimaries = SMPTE_ST_240Primaries;
+    case NamedPrimaries::CICPID::SMPTE_ST_240:
+      colorSpacePrimaries = NamedPrimaries::SMPTE_ST_240;
       return true;
-    case CicpPrimariesId::GenericFilm:
-      colorSpacePrimaries = GenericFilmPrimaries;
+    case NamedPrimaries::CICPID::GenericFilm:
+      colorSpacePrimaries = NamedPrimaries::GenericFilm;
       return true;
-    case CicpPrimariesId::Rec2020:
-      colorSpacePrimaries = Rec2020Primaries;
+    case NamedPrimaries::CICPID::Rec2020:
+      colorSpacePrimaries = NamedPrimaries::Rec2020;
       return true;
-    case CicpPrimariesId::SMPTE_ST_428_1:
-      colorSpacePrimaries = SMPTE_ST_428_1Primaries;
+    case NamedPrimaries::CICPID::SMPTE_ST_428_1:
+      colorSpacePrimaries = NamedPrimaries::SMPTE_ST_428_1;
       return true;
-    case CicpPrimariesId::SMPTE_RP_431_2:
-      colorSpacePrimaries = SMPTE_RP_431_2Primaries;
+    case NamedPrimaries::CICPID::SMPTE_RP_431_2:
+      colorSpacePrimaries = NamedPrimaries::SMPTE_RP_431_2;
       return true;
-    case CicpPrimariesId::SMPTE_EG_432_1:
-      colorSpacePrimaries = SMPTE_EG_432_1Primaries;
+    case NamedPrimaries::CICPID::SMPTE_EG_432_1:
+      colorSpacePrimaries = NamedPrimaries::SMPTE_EG_432_1;
       return true;
-    case CicpPrimariesId::ITU_T_H273_Value22:
-      colorSpacePrimaries = ITU_T_H273_Value22Primaries;
+    case NamedPrimaries::CICPID::ITU_T_H273_Value22:
+      colorSpacePrimaries = NamedPrimaries::ITU_T_H273_Value22;
       return true;
     default:
       // Reserved or unimplemented.
@@ -101,41 +101,41 @@ static bool GetCicp(CicpPrimariesId primaries, ColorSpacePrimaries& colorSpacePr
   return false;
 }
 
-static bool GetCicp(CicpTFId transferCharacteristics, TransferFunction& trfn) {
+static bool GetCicp(NamedTransferFn::CICPID transferCharacteristics, TransferFunction& trfn) {
   // Rec. ITU-T H.273, Table 3.
   switch (transferCharacteristics) {
-    case CicpTFId::Rec709:
-      trfn = Rec709TF;
+    case NamedTransferFn::CICPID::Rec709:
+      trfn = NamedTransferFn::Rec709;
       return true;
-    case CicpTFId::Rec470SystemM:
-      trfn = Rec470SystemMTF;
+    case NamedTransferFn::CICPID::Rec470SystemM:
+      trfn = NamedTransferFn::Rec470SystemM;
       return true;
-    case CicpTFId::Rec470SystemBG:
-      trfn = Rec470SystemBGTF;
+    case NamedTransferFn::CICPID::Rec470SystemBG:
+      trfn = NamedTransferFn::Rec470SystemBG;
       return true;
-    case CicpTFId::Rec601:
-      trfn = Rec601TF;
+    case NamedTransferFn::CICPID::Rec601:
+      trfn = NamedTransferFn::Rec601;
       return true;
-    case CicpTFId::SMPTE_ST_240:
-      trfn = SMPTE_ST_240TF;
+    case NamedTransferFn::CICPID::SMPTE_ST_240:
+      trfn = NamedTransferFn::SMPTE_ST_240;
       return true;
-    case CicpTFId::Linear:
-      trfn = LinearTF;
+    case NamedTransferFn::CICPID::Linear:
+      trfn = NamedTransferFn::Linear;
       return true;
-    case CicpTFId::IEC61966_2_4:
-      trfn = IEC61966_2_4TF;
+    case NamedTransferFn::CICPID::IEC61966_2_4:
+      trfn = NamedTransferFn::IEC61966_2_4;
       return true;
-    case CicpTFId::IEC61966_2_1:
-      trfn = IEC61966_2_1TF;
+    case NamedTransferFn::CICPID::IEC61966_2_1:
+      trfn = NamedTransferFn::IEC61966_2_1;
       return true;
-    case CicpTFId::Rec2020_10bit:
-      trfn = Rec2020_10bitTF;
+    case NamedTransferFn::CICPID::Rec2020_10bit:
+      trfn = NamedTransferFn::Rec2020_10bit;
       return true;
-    case CicpTFId::Rec2020_12bit:
-      trfn = Rec2020_12bitTF;
+    case NamedTransferFn::CICPID::Rec2020_12bit:
+      trfn = NamedTransferFn::Rec2020_12bit;
       return true;
-    case CicpTFId::SMPTE_ST_428_1:
-      trfn = SMPTE_ST_428_1TF;
+    case NamedTransferFn::CICPID::SMPTE_ST_428_1:
+      trfn = NamedTransferFn::SMPTE_ST_428_1;
       return true;
     default:
       // Reserved or unimplemented.
@@ -148,7 +148,7 @@ static bool ColorSpaceAlmostEqual(float a, float b) {
   return fabsf(a - b) < 0.01f;
 }
 
-static bool XYZAlmostEqual(const Matrix3x3& mA, const Matrix3x3& mB) {
+static bool XYZAlmostEqual(const ColorMatrix33& mA, const ColorMatrix33& mB) {
   for (int r = 0; r < 3; ++r) {
     for (int c = 0; c < 3; ++c) {
       if (!ColorSpaceAlmostEqual(mA.values[r][c], mB.values[r][c])) {
@@ -166,10 +166,13 @@ static bool TransferFnAlmostEqual(float a, float b) {
 }
 
 static bool IsAlmostSRGB(const TransferFunction& coeffs) {
-  return TransferFnAlmostEqual(SRGBTF.a, coeffs.a) && TransferFnAlmostEqual(SRGBTF.b, coeffs.b) &&
-         TransferFnAlmostEqual(SRGBTF.c, coeffs.c) && TransferFnAlmostEqual(SRGBTF.d, coeffs.d) &&
-         TransferFnAlmostEqual(SRGBTF.e, coeffs.e) && TransferFnAlmostEqual(SRGBTF.f, coeffs.f) &&
-         TransferFnAlmostEqual(SRGBTF.g, coeffs.g);
+  return TransferFnAlmostEqual(NamedTransferFn::SRGB.a, coeffs.a) &&
+         TransferFnAlmostEqual(NamedTransferFn::SRGB.b, coeffs.b) &&
+         TransferFnAlmostEqual(NamedTransferFn::SRGB.c, coeffs.c) &&
+         TransferFnAlmostEqual(NamedTransferFn::SRGB.d, coeffs.d) &&
+         TransferFnAlmostEqual(NamedTransferFn::SRGB.e, coeffs.e) &&
+         TransferFnAlmostEqual(NamedTransferFn::SRGB.f, coeffs.f) &&
+         TransferFnAlmostEqual(NamedTransferFn::SRGB.g, coeffs.g);
 }
 
 static bool IsAlmost2dot2(const TransferFunction& coeffs) {
@@ -228,13 +231,16 @@ constexpr uint32_t CICPTrfnLinear = 8;
 
 static uint32_t GetCICPTrfn(const gfx::skcms_TransferFunction& fn) {
   if (gfx::skcms_TransferFunction_getType(&fn) == gfx::skcms_TFType_sRGBish) {
-    if (NearlyEqual(fn, *reinterpret_cast<const gfx::skcms_TransferFunction*>(&SRGBTF))) {
+    if (NearlyEqual(
+            fn, *reinterpret_cast<const gfx::skcms_TransferFunction*>(&NamedTransferFn::SRGB))) {
       return CICPTrfnSRGB;
     }
-    if (NearlyEqual(fn, *reinterpret_cast<const gfx::skcms_TransferFunction*>(&twoDotTwoTF))) {
+    if (NearlyEqual(fn, *reinterpret_cast<const gfx::skcms_TransferFunction*>(
+                            &NamedTransferFn::TwoDotTwo))) {
       return CICPTrfn2Dot2;
     }
-    if (NearlyEqual(fn, *reinterpret_cast<const gfx::skcms_TransferFunction*>(&LinearTF))) {
+    if (NearlyEqual(
+            fn, *reinterpret_cast<const gfx::skcms_TransferFunction*>(&NamedTransferFn::Linear))) {
       return CICPTrfnLinear;
     }
   }
@@ -246,13 +252,14 @@ constexpr uint32_t CICPPrimariesP3 = 12;
 constexpr uint32_t CICPPrimariesRec2020 = 9;
 
 static uint32_t GetCicpPrimaries(const gfx::skcms_Matrix3x3& toXYZD50) {
-  if (NearlyEqual(toXYZD50, *reinterpret_cast<const gfx::skcms_Matrix3x3*>(&SRGBMat))) {
+  if (NearlyEqual(toXYZD50, *reinterpret_cast<const gfx::skcms_Matrix3x3*>(&NamedGamut::SRGB))) {
     return CICPPrimariesSRGB;
   }
-  if (NearlyEqual(toXYZD50, *reinterpret_cast<const gfx::skcms_Matrix3x3*>(&DisplayP3Mat))) {
+  if (NearlyEqual(toXYZD50,
+                  *reinterpret_cast<const gfx::skcms_Matrix3x3*>(&NamedGamut::DisplayP3))) {
     return CICPPrimariesP3;
   }
-  if (NearlyEqual(toXYZD50, *reinterpret_cast<const gfx::skcms_Matrix3x3*>(&Rec2020Mat))) {
+  if (NearlyEqual(toXYZD50, *reinterpret_cast<const gfx::skcms_Matrix3x3*>(&NamedGamut::Rec2020))) {
     return CICPPrimariesRec2020;
   }
   return 0;
@@ -606,25 +613,25 @@ static std::shared_ptr<Data> WriteICCProfile(const gfx::skcms_ICCProfile* profil
   return Data::MakeAdopted(ptr, profileSize, Data::FreeProc);
 }
 
-bool ColorSpacePrimaries::toXYZD50(Matrix3x3* toXYZD50) const {
+bool ColorSpacePrimaries::toXYZD50(ColorMatrix33* toXYZD50) const {
   return gfx::skcms_PrimariesToXYZD50(rx, ry, gx, gy, bx, by, wx, wy,
                                       reinterpret_cast<gfx::skcms_Matrix3x3*>(toXYZD50));
 }
 
 std::shared_ptr<ColorSpace> ColorSpace::MakeSRGB() {
   static std::shared_ptr<ColorSpace> cs =
-      std::shared_ptr<ColorSpace>(new ColorSpace(SRGBTF, SRGBMat));
+      std::shared_ptr<ColorSpace>(new ColorSpace(NamedTransferFn::SRGB, NamedGamut::SRGB));
   return cs;
 }
 
 std::shared_ptr<ColorSpace> ColorSpace::MakeSRGBLinear() {
   static std::shared_ptr<ColorSpace> cs =
-      std::shared_ptr<ColorSpace>(new ColorSpace(LinearTF, SRGBMat));
+      std::shared_ptr<ColorSpace>(new ColorSpace(NamedTransferFn::Linear, NamedGamut::SRGB));
   return cs;
 }
 
 std::shared_ptr<ColorSpace> ColorSpace::MakeRGB(const TransferFunction& transferFn,
-                                                const Matrix3x3& toXYZ) {
+                                                const ColorMatrix33& toXYZ) {
   if (gfx::skcms_TransferFunction_getType(reinterpret_cast<const gfx::skcms_TransferFunction*>(
           &transferFn)) == gfx::skcms_TFType_Invalid) {
     return nullptr;
@@ -633,24 +640,24 @@ std::shared_ptr<ColorSpace> ColorSpace::MakeRGB(const TransferFunction& transfer
   const TransferFunction* tf = &transferFn;
 
   if (IsAlmostSRGB(transferFn)) {
-    if (XYZAlmostEqual(toXYZ, SRGBMat)) {
+    if (XYZAlmostEqual(toXYZ, NamedGamut::SRGB)) {
       return ColorSpace::MakeSRGB();
     }
-    tf = &SRGBTF;
+    tf = &NamedTransferFn::SRGB;
   } else if (IsAlmost2dot2(transferFn)) {
-    tf = &twoDotTwoTF;
+    tf = &NamedTransferFn::TwoDotTwo;
   } else if (IsAlmostLinear(transferFn)) {
-    if (XYZAlmostEqual(toXYZ, SRGBMat)) {
+    if (XYZAlmostEqual(toXYZ, NamedGamut::SRGB)) {
       return ColorSpace::MakeSRGBLinear();
     }
-    tf = &LinearTF;
+    tf = &NamedTransferFn::Linear;
   }
 
   return std::shared_ptr<ColorSpace>(new ColorSpace(*tf, toXYZ));
 }
 
-std::shared_ptr<ColorSpace> ColorSpace::MakeCICP(CicpPrimariesId colorPrimaries,
-                                                 CicpTFId transferCharacteristics) {
+std::shared_ptr<ColorSpace> ColorSpace::MakeCICP(NamedPrimaries::CICPID colorPrimaries,
+                                                 NamedTransferFn::CICPID transferCharacteristics) {
   TransferFunction trfn;
   if (!GetCicp(transferCharacteristics, trfn)) {
     return nullptr;
@@ -661,7 +668,7 @@ std::shared_ptr<ColorSpace> ColorSpace::MakeCICP(CicpPrimariesId colorPrimaries,
     return nullptr;
   }
 
-  Matrix3x3 primariesMatrix;
+  ColorMatrix33 primariesMatrix;
   if (!primaries.toXYZD50(&primariesMatrix)) {
     return nullptr;
   }
@@ -694,23 +701,24 @@ std::shared_ptr<ColorSpace> ColorSpace::MakeFromICC(const void* data, size_t siz
     if (gfx::skcms_TRCs_AreApproximateInverse(
             reinterpret_cast<const gfx::skcms_ICCProfile*>(&profile),
             gfx::skcms_sRGB_Inverse_TransferFunction())) {
-      return ColorSpace::MakeRGB(SRGBTF, *reinterpret_cast<Matrix3x3*>(&profile.toXYZD50));
+      return ColorSpace::MakeRGB(NamedTransferFn::SRGB,
+                                 *reinterpret_cast<ColorMatrix33*>(&profile.toXYZD50));
     }
     return nullptr;
   }
 
   return ColorSpace::MakeRGB(*reinterpret_cast<TransferFunction*>(&profile.trc[0].parametric),
-                             *reinterpret_cast<Matrix3x3*>(&profile.toXYZD50));
+                             *reinterpret_cast<ColorMatrix33*>(&profile.toXYZD50));
 }
 
 bool ColorSpace::gammaCloseToSRGB() const {
   // Nearly-equal transfer functions were snapped at construction time, so just do an exact test
-  return memcmp(&_transferFn, &SRGBTF, 7 * sizeof(float)) == 0;
+  return memcmp(&_transferFn, &NamedTransferFn::SRGB, 7 * sizeof(float)) == 0;
 }
 
 bool ColorSpace::gammaIsLinear() const {
   // Nearly-equal transfer functions were snapped at construction time, so just do an exact test
-  return memcmp(&_transferFn, &LinearTF, 7 * sizeof(float)) == 0;
+  return memcmp(&_transferFn, &NamedTransferFn::Linear, 7 * sizeof(float)) == 0;
 }
 
 bool ColorSpace::isNumericalTransferFn(TransferFunction* fn) const {
@@ -719,7 +727,7 @@ bool ColorSpace::isNumericalTransferFn(TransferFunction* fn) const {
          gfx::skcms_TFType_sRGBish;
 }
 
-bool ColorSpace::toXYZD50(Matrix3x3* toXYZD50) const {
+bool ColorSpace::toXYZD50(ColorMatrix33* toXYZD50) const {
   *toXYZD50 = _toXYZD50;
   return true;
 }
@@ -728,14 +736,14 @@ std::shared_ptr<ColorSpace> ColorSpace::makeLinearGamma() const {
   if (this->gammaIsLinear()) {
     return const_cast<ColorSpace*>(this)->shared_from_this();
   }
-  return ColorSpace::MakeRGB(LinearTF, _toXYZD50);
+  return ColorSpace::MakeRGB(NamedTransferFn::Linear, _toXYZD50);
 }
 
 std::shared_ptr<ColorSpace> ColorSpace::makeSRGBGamma() const {
   if (this->gammaCloseToSRGB()) {
     return const_cast<ColorSpace*>(this)->shared_from_this();
   }
-  return ColorSpace::MakeRGB(SRGBTF, _toXYZD50);
+  return ColorSpace::MakeRGB(NamedTransferFn::SRGB, _toXYZD50);
 }
 
 std::shared_ptr<ColorSpace> ColorSpace::makeColorSpin() const {
@@ -743,49 +751,11 @@ std::shared_ptr<ColorSpace> ColorSpace::makeColorSpin() const {
   gfx::skcms_Matrix3x3 spun =
       gfx::skcms_Matrix3x3_concat(reinterpret_cast<const gfx::skcms_Matrix3x3*>(&_toXYZD50), &spin);
   return std::shared_ptr<ColorSpace>(
-      new ColorSpace(_transferFn, *reinterpret_cast<Matrix3x3*>(&spun)));
+      new ColorSpace(_transferFn, *reinterpret_cast<ColorMatrix33*>(&spun)));
 }
 
 bool ColorSpace::isSRGB() const {
   return this == MakeSRGB().get();
-}
-
-std::shared_ptr<Data> ColorSpace::serialize() const {
-  size_t length = this->writeToMemory(nullptr);
-  void* memory = malloc(length);
-  this->writeToMemory(memory);
-  return Data::MakeAdopted(memory, length, Data::FreeProc);
-}
-
-enum Version {
-  k0_Version,  // Initial (deprecated) version, no longer supported
-  k1_Version,  // Simple header (version tag) + 16 floats
-
-  kCurrent_Version = k1_Version,
-};
-
-struct ColorSpaceHeader {
-  uint8_t fVersion = kCurrent_Version;
-
-  // Other fields were only used by k0_Version. Could be re-purposed in future versions.
-  uint8_t fReserved0 = 0;
-  uint8_t fReserved1 = 0;
-  uint8_t fReserved2 = 0;
-};
-
-size_t ColorSpace::writeToMemory(void* memory) const {
-  auto temp = static_cast<uint8_t*>(memory);
-  if (temp) {
-    *((ColorSpaceHeader*)temp) = ColorSpaceHeader();
-    temp += sizeof(ColorSpaceHeader);
-
-    memcpy(temp, &_transferFn, 7 * sizeof(float));
-    temp += 7 * sizeof(float);
-
-    memcpy(temp, &_toXYZD50, 9 * sizeof(float));
-  }
-
-  return sizeof(ColorSpaceHeader) + 16 * sizeof(float);
 }
 
 std::shared_ptr<Data> ColorSpace::toICCProfile() const {
@@ -817,31 +787,6 @@ std::shared_ptr<Data> ColorSpace::toICCProfile() const {
   return WriteICCProfile(&profile, description.c_str());
 }
 
-std::shared_ptr<ColorSpace> ColorSpace::Deserialize(const void* data, size_t length) {
-  if (length < sizeof(ColorSpaceHeader)) {
-    return nullptr;
-  }
-  auto temp = static_cast<const uint8_t*>(data);
-  ColorSpaceHeader header = *((const ColorSpaceHeader*)temp);
-  temp += sizeof(ColorSpaceHeader);
-  length -= sizeof(ColorSpaceHeader);
-  if (header.fVersion != k1_Version) {
-    return nullptr;
-  }
-
-  if (length < 16 * sizeof(float)) {
-    return nullptr;
-  }
-
-  TransferFunction transferFn;
-  memcpy(&transferFn, temp, 7 * sizeof(float));
-  temp += 7 * sizeof(float);
-
-  Matrix3x3 toXYZ;
-  memcpy(&toXYZ, temp, 9 * sizeof(float));
-  return ColorSpace::MakeRGB(transferFn, toXYZ);
-}
-
 bool ColorSpace::Equals(const ColorSpace* x, const ColorSpace* y) {
   if (x == y) {
     return true;
@@ -864,15 +809,15 @@ void ColorSpace::invTransferFn(TransferFunction* fn) const {
   *fn = _invTransferFn;
 }
 
-void ColorSpace::gamutTransformTo(const ColorSpace* dst, Matrix3x3* srcToDst) const {
+void ColorSpace::gamutTransformTo(const ColorSpace* dst, ColorMatrix33* srcToDst) const {
   dst->computeLazyDstFields();
   auto result =
       gfx::skcms_Matrix3x3_concat(reinterpret_cast<const gfx::skcms_Matrix3x3*>(&dst->_fromXYZD50),
                                   reinterpret_cast<const gfx::skcms_Matrix3x3*>(&_toXYZD50));
-  *srcToDst = *reinterpret_cast<Matrix3x3*>(&result);
+  *srcToDst = *reinterpret_cast<ColorMatrix33*>(&result);
 }
 
-ColorSpace::ColorSpace(const TransferFunction& transferFn, const Matrix3x3& toXYZ)
+ColorSpace::ColorSpace(const TransferFunction& transferFn, const ColorMatrix33& toXYZ)
     : _transferFn(transferFn), _toXYZD50(toXYZ) {
   _transferFnHash = checksum::Hash32(&_transferFn, 7 * sizeof(float));
   _toXYZD50Hash = checksum::Hash32(&_toXYZD50, 9 * sizeof(float));

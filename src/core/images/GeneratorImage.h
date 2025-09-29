@@ -44,6 +44,10 @@ class GeneratorImage : public PixelImage {
     return false;
   }
 
+  std::shared_ptr<ColorSpace> colorSpace() const override {
+    return generator->colorSpace();
+  }
+
  protected:
   Type type() const override {
     return Type::Generator;
