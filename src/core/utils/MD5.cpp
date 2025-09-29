@@ -24,7 +24,7 @@
 #include <windows.h>
 #include <wincrypt.h>
 // clang-format on
-#elif defined(__linux__) && !defined(__ANDROID__) && !defined(ANDROID)
+#elif defined(__linux__) && !defined(__ANDROID__) && !defined(ANDROID) && !defined(__OHOS__)
 #include <openssl/md5.h>
 #else
 #define FALLBACK_MD5
