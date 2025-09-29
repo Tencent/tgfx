@@ -41,21 +41,6 @@ class ImagePattern : public ShapeStyle {
                                             TileMode tileModeY = TileMode::Clamp,
                                             const SamplingOptions& sampling = {});
 
-  /**
-    * Creates a new ImagePattern with the given image, tile modes, and sampling options.
-    * @param image The image to use for the pattern.
-    * @param tileModeX The tile mode for the x direction.
-    * @param tileModeY The tile mode for the y direction.
-    * @param minFilterMode The filter mode to use when zooming out.
-    * @param magFilterMode The filter mode to use when zooming in.
-    * @param mipmapMode The mipmap mode to use.
-    * @return A new ImagePattern, nullptr if the image is nullptr.
-    */
-  static std::shared_ptr<ImagePattern> Make(std::shared_ptr<Image> image, TileMode tileModeX,
-                                            TileMode tileModeY, FilterMode minFilterMode,
-                                            FilterMode magFilterMode,
-                                            MipmapMode mipmapMode = MipmapMode::Linear);
-
   std::shared_ptr<Image> image() const {
     return _image;
   }
@@ -68,16 +53,8 @@ class ImagePattern : public ShapeStyle {
     return _tileModeY;
   }
 
-  FilterMode minFilterMode() const {
-    return _minFilterMode;
-  }
-
-  FilterMode magFilterMode() const {
-    return _magFilterMode;
-  }
-
-  MipmapMode mipmapMode() const {
-    return _mipmapMode;
+  SamplingOptions samplingOptions() const {
+    return _sampling;
   }
 
  protected:
@@ -91,11 +68,9 @@ class ImagePattern : public ShapeStyle {
   std::shared_ptr<Image> _image = nullptr;
   TileMode _tileModeX = TileMode::Clamp;
   TileMode _tileModeY = TileMode::Clamp;
-  FilterMode _minFilterMode = FilterMode::Linear;
-  FilterMode _magFilterMode = FilterMode::Linear;
-  MipmapMode _mipmapMode = MipmapMode::Linear;
+  SamplingOptions _sampling = {};
 
   ImagePattern(std::shared_ptr<Image> image, TileMode tileModeX, TileMode tileModeY,
-               FilterMode minFilterMode, FilterMode magFilterMode, MipmapMode mipmapMode);
+               const SamplingOptions& sampling);
 };
 }  // namespace tgfx

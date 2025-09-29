@@ -22,30 +22,20 @@ namespace tgfx {
 std::shared_ptr<ImagePattern> ImagePattern::Make(std::shared_ptr<Image> image, TileMode tileModeX,
                                                  TileMode tileModeY,
                                                  const SamplingOptions& sampling) {
-  return Make(std::move(image), tileModeX, tileModeY, sampling.minFilterMode,
-              sampling.magFilterMode, sampling.mipmapMode);
-}
-
-std::shared_ptr<ImagePattern> ImagePattern::Make(std::shared_ptr<Image> image, TileMode tileModeX,
-                                                 TileMode tileModeY, FilterMode minFilterMode,
-                                                 FilterMode magFilterMode, MipmapMode mipmapMode) {
   if (image == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<ImagePattern>(new ImagePattern(std::move(image), tileModeX, tileModeY,
-                                                        minFilterMode, magFilterMode, mipmapMode));
+  return std::shared_ptr<ImagePattern>(
+      new ImagePattern(std::move(image), tileModeX, tileModeY, sampling));
 }
 
 ImagePattern::ImagePattern(std::shared_ptr<Image> image, TileMode tileModeX, TileMode tileModeY,
-                           FilterMode minFilterMode, FilterMode magFilterMode,
-                           MipmapMode mipmapMode)
-    : _image(std::move(image)), _tileModeX(tileModeX), _tileModeY(tileModeY),
-      _minFilterMode(minFilterMode), _magFilterMode(magFilterMode), _mipmapMode(mipmapMode) {
+                           const SamplingOptions& sampling)
+    : _image(std::move(image)), _tileModeX(tileModeX), _tileModeY(tileModeY), _sampling(sampling) {
 }
 
 std::shared_ptr<Shader> ImagePattern::onGetShader() const {
-  return Shader::MakeImageShader(_image, _tileModeX, _tileModeY,
-                                 SamplingOptions(_minFilterMode, _magFilterMode, _mipmapMode));
+  return Shader::MakeImageShader(_image, _tileModeX, _tileModeY, _sampling);
 }
 
 }  // namespace tgfx
