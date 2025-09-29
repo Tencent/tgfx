@@ -185,7 +185,7 @@ MD5::Digest MD5::Calculate(const void* bytes, size_t size) {
     }
     CryptReleaseContext(hProv, 0);
   }
-#elif defined(TGFX_USE_FALLBACK_MD5) && defined(__linux__) && !defined(__ANDROID__) && \
+#elif defined(!TGFX_USE_FALLBACK_MD5) && defined(__linux__) && !defined(__ANDROID__) && \
     !defined(ANDROID) && !defined(__OHOS__)
   ::MD5(static_cast<const unsigned char*>(bytes), size, digest.data());
 #else
