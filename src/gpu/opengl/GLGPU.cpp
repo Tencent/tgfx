@@ -195,7 +195,7 @@ std::shared_ptr<GPUFence> GLGPU::importExternalFence(const BackendSemaphore& sem
   if (!caps()->semaphoreSupport || !semaphore.getGLSync(&glSyncInfo)) {
     return nullptr;
   }
-  return makeResource<GLFence>(interface, glSyncInfo.sync);
+  return makeResource<GLFence>(glSyncInfo.sync);
 }
 
 static int ToGLWrap(AddressMode wrapMode) {

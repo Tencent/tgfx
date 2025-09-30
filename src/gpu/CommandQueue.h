@@ -70,9 +70,9 @@ class CommandQueue {
   virtual void submit(std::shared_ptr<CommandBuffer> commandBuffer) = 0;
 
   /**
-   * Inserts a GPU fence into the command queue. The fence can be used to synchronize CPU and GPU
-   * operations, allowing you to check or wait for the completion of previously submitted GPU
-   * commands. Returns a shared pointer to the GPUFence, or nullptr if fence insertion failed.
+   * Inserts a GPU fence into the command queue. This allows other synchronization points to be
+   * notified when all previous GPU commands have finished executing. Returns nullptr if the
+   * GPUFence cannot be inserted due to lack of support (for example, on WebGPU).
    */
   virtual std::shared_ptr<GPUFence> insertFence() = 0;
 
