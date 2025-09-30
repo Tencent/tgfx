@@ -38,6 +38,8 @@ class FrameCaptureTexture {
 
   static uint64_t GetReadTextureId(std::shared_ptr<GPUTexture> texture);
 
+  static void ClearReadedTexture();
+
   explicit FrameCaptureTexture(const std::shared_ptr<GPUTexture> texture, int width, int height,
                                size_t rowBytes, PixelFormat format, bool isInput,
                                std::shared_ptr<Buffer> imageBuffer);

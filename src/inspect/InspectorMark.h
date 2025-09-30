@@ -35,7 +35,8 @@
 #define FRAME_MARK tgfx::inspect::FrameCapture::GetInstance().sendFrameMark(nullptr)
 #define FUNCTION_MARK(type, active) \
   tgfx::inspect::FunctionStat MARE_CONCAT(functionTimer, MARK_LINE) = {type, active}
-#define OPERATE_MARK(type) FUNCTION_MARK(tgfx::inspect::DrawOpTypeToOpTaskType[type], true)
+#define OPERATE_MARK(type) \
+  FUNCTION_MARK(tgfx::inspect::DrawOpTypeToOpTaskType[static_cast<uint8_t>(type)], true)
 #define TASK_MARK(type) FUNCTION_MARK(type, true)
 #define ATTRIBUTE_NAME(name, value) \
   tgfx::inspect::FrameCapture::GetInstance().sendAttributeData(name, value)
@@ -50,6 +51,27 @@
 
 #define CAPUTRE_FRARGMENT_PROCESSORS(context, colors, coverages) \
   tgfx::inspect::FrameCapture::GetInstance().sendFragmentProcessor(context, colors, coverages);
+
+#define PROGRAM_KEY(programKey) \
+  tgfx::inspect::FrameCapture::GetInstance().sendProgramKey(programKey)
+
+#define CAPUTRE_PROGRAM_INFO(programKey, context, programInfo) \
+  tgfx::inspect::FrameCapture::GetInstance().captureProgramInfo(programKey, context, programInfo);
+
+#define UNIFORM_VALUE(name, data, size) \
+  tgfx::inspect::FrameCapture::GetInstance().sendUniformValue(name, data, size)
+
+#define DRAW_OP(drawOp) tgfx::inspect::FrameCapture::GetInstance().sendOpPtr(drawOp)
+
+#define CAPUTRE_RECT_MESH(drawOp, provider) \
+  tgfx::inspect::FrameCapture::GetInstance().sendRectMeshData(drawOp, provider)
+
+#define CAPUTRE_RRECT_MESH(drawOp, provider) \
+  tgfx::inspect::FrameCapture::GetInstance().sendRRectMeshData(drawOp, provider)
+
+#define CAPUTRE_SHAPE_MESH(drawOp, styledShape, aaType, clipBounds)                         \
+  tgfx::inspect::FrameCapture::GetInstance().sendShapeMeshData(drawOp, styledShape, aaType, \
+                                                               clipBounds)
 
 #else
 
@@ -67,5 +89,12 @@
 #define ATTRIBUTE_ENUM(value, type)
 #define CAPUTRE_RENDER_TARGET(renderTarget)
 #define CAPUTRE_FRARGMENT_PROCESSORS(context, colors, coverages)
+#define PROGRAM_KEY(programKey)
+#define CAPUTRE_PROGRAM_INFO(programKey, context, programInfo)
+#define UNIFORM_VALUE(name, data, size)
+#define DRAW_OP(drawOp)
+#define CAPUTRE_RECT_MESH(drawOp, provider)
+#define CAPUTRE_RRECT_MESH(drawOp, provider)
+#define CAPUTRE_SHAPE_MESH(drawOp, styledShape, aaType, clipBounds)
 
 #endif

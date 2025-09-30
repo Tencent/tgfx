@@ -30,7 +30,5 @@ class LZ4CompressionHandler {
 
   virtual size_t encode(uint8_t* dstBuffer, size_t dstSize, const uint8_t* srcBuffer,
                         size_t srcSize) const = 0;
-
-  virtual void reset() = 0;
 };
 }  // namespace tgfx::inspect
