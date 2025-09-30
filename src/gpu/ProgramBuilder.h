@@ -24,9 +24,6 @@
 #include "VaryingHandler.h"
 #include "VertexShaderBuilder.h"
 #include "gpu/processors/GeometryProcessor.h"
-#ifdef TGFX_USE_INSPECTOR
-#include "inspect/FrameCapture.h"
-#endif
 
 namespace tgfx {
 class ProgramBuilder {
@@ -104,8 +101,5 @@ class ProgramBuilder {
 
   friend class FragmentShaderBuilder;
   friend class ProcessorGuard;
-#ifdef TGFX_USE_INSPECTOR
-  friend class FrameCapture;
-#endif
 };
 }  // namespace tgfx

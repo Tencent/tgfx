@@ -69,6 +69,8 @@ class GLSLProgramBuilder : public ProgramBuilder {
   size_t vertexStride = 0;
 
   friend class ProgramBuilder;
+#ifdef TGFX_USE_INSPECTOR
   friend class inspect::FrameCapture;
+#endif
 };
 }  // namespace tgfx
