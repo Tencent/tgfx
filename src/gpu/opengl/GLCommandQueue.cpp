@@ -170,7 +170,7 @@ std::shared_ptr<GPUFence> GLCommandQueue::insertFence() {
   }
   // If we inserted semaphores during the flush, we need to call glFlush.
   gl->flush();
-  return gpu->makeResource<GLFence>(gpu->interface, glSync);
+  return gpu->makeResource<GLFence>(glSync);
 }
 
 void GLCommandQueue::waitForFence(std::shared_ptr<GPUFence> fence) {
