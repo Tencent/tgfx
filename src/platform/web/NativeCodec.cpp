@@ -73,11 +73,13 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(NativeImageRef nativeImage) {
 }
 
 NativeCodec::NativeCodec(int width, int height, std::shared_ptr<Data> imageBytes)
-    : ImageCodec(width, height), imageBytes(std::move(imageBytes)) {
+    : ImageCodec(width, height, Orientation::TopLeft, ColorSpace::MakeSRGB()),
+      imageBytes(std::move(imageBytes)) {
 }
 
 NativeCodec::NativeCodec(int width, int height, emscripten::val nativeImage)
-    : ImageCodec(width, height), nativeImage(std::move(nativeImage)) {
+    : ImageCodec(width, height, Orientation::TopLeft, ColorSpace::MakeSRGB()),
+      nativeImage(std::move(nativeImage)) {
 }
 
 bool NativeCodec::asyncSupport() const {

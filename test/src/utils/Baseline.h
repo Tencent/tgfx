@@ -25,13 +25,16 @@
 namespace tgfx {
 class Baseline {
  public:
-  static bool Compare(std::shared_ptr<PixelBuffer> pixelBuffer, const std::string& key);
+  static bool Compare(std::shared_ptr<PixelBuffer> pixelBuffer, const std::string& key,
+                      std::shared_ptr<ColorSpace> colorSpace);
 
   static bool Compare(std::shared_ptr<Surface> surface, const std::string& key);
 
-  static bool Compare(const Bitmap& bitmap, const std::string& key);
+  static bool Compare(const Bitmap& bitmap, const std::string& key,
+                      std::shared_ptr<ColorSpace> colorSpace);
 
-  static bool Compare(const Pixmap& pixmap, const std::string& key);
+  static bool Compare(const Pixmap& pixmap, const std::string& key,
+                      std::shared_ptr<ColorSpace> colorSpace);
 
   static bool Compare(std::shared_ptr<Data> data, const std::string& key);
 

@@ -21,6 +21,7 @@
 #include "TextureProxy.h"
 #include "gpu/BackingFit.h"
 #include "gpu/resources/RenderTarget.h"
+#include "tgfx/core/ColorSpace.h"
 
 namespace tgfx {
 /**
@@ -112,6 +113,10 @@ class RenderTargetProxy {
    * Returns the RenderTarget of the proxy. Returns nullptr if the proxy is not instantiated yet.
    */
   virtual std::shared_ptr<RenderTarget> getRenderTarget() const = 0;
+
+  virtual std::shared_ptr<ColorSpace> colorSpace() const {
+    return ColorSpace::MakeSRGB();
+  }
 
   /**
    * Creates a compatible TextureProxy instance matches the properties of the RenderTargetProxy.

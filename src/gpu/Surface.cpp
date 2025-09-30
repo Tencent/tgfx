@@ -37,8 +37,9 @@ std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, 
     return nullptr;
   }
   auto pixelFormat = ColorTypeToPixelFormat(colorType);
-  auto proxy = context->proxyProvider()->createRenderTargetProxy({}, width, height, pixelFormat,
-                                                                 sampleCount, mipmapped);
+  auto proxy = context->proxyProvider()->createRenderTargetProxy(
+      {}, width, height, pixelFormat, sampleCount, mipmapped, ImageOrigin::TopLeft,
+      BackingFit::Exact, 0);
   return MakeFrom(std::move(proxy), renderFlags, true);
 }
 
@@ -59,7 +60,7 @@ std::shared_ptr<Surface> Surface::MakeFrom(Context* context, const BackendTextur
     return nullptr;
   }
   auto proxy =
-      context->proxyProvider()->createRenderTargetProxy(backendTexture, sampleCount, origin);
+      context->proxyProvider()->createRenderTargetProxy(backendTexture, sampleCount, origin, false);
   return MakeFrom(std::move(proxy), renderFlags);
 }
 
@@ -165,7 +166,7 @@ std::shared_ptr<Image> Surface::makeImageSnapshot() {
     textureProxy = renderTarget->makeTextureProxy();
     drawingManager->addRenderTargetCopyTask(renderTarget, textureProxy);
   }
-  cachedImage = TextureImage::Wrap(std::move(textureProxy));
+  cachedImage = TextureImage::Wrap(std::move(textureProxy), renderTarget->colorSpace());
   return cachedImage;
 }
 
@@ -200,6 +201,10 @@ bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, in
     return false;
   }
   return renderTarget->readPixels(dstInfo, dstPixels, srcX, srcY);
+}
+
+std::shared_ptr<ColorSpace> Surface::colorSpace() const {
+  return renderContext->colorSpace();
 }
 
 bool Surface::aboutToDraw(bool discardContent) {

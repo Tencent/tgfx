@@ -172,8 +172,8 @@ class Shader {
 
   std::weak_ptr<Shader> weakThis;
 
-  virtual PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
-                                                              const Matrix* uvMatrix) const = 0;
+  virtual PlacementPtr<FragmentProcessor> asFragmentProcessor(
+      const FPArgs& args, const Matrix* uvMatrix, std::shared_ptr<ColorSpace> colorSpace) const = 0;
   friend class OpsCompositor;
   friend class ShaderMaskFilter;
   friend class ColorFilterShader;

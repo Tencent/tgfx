@@ -45,6 +45,10 @@ class FilterImage : public SubsetImage {
 
   std::shared_ptr<ImageFilter> filter = nullptr;
 
+  std::shared_ptr<ColorSpace> colorSpace() const override {
+    return source->colorSpace();
+  }
+
  protected:
   Type type() const override {
     return Type::Filter;

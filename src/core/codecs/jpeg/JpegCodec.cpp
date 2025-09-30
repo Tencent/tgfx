@@ -78,39 +78,7 @@ std::shared_ptr<ImageCodec> JpegCodec::MakeFrom(std::shared_ptr<Data> imageBytes
   return MakeFromData("", std::move(imageBytes));
 }
 
-std::shared_ptr<ImageCodec> JpegCodec::MakeFromData(const std::string& filePath,
-                                                    std::shared_ptr<Data> byteData) {
-  FILE* infile = nullptr;
-  if (byteData == nullptr && (infile = fopen(filePath.c_str(), "rb")) == nullptr) {
-    return nullptr;
-  }
-  jpeg_decompress_struct cinfo = {};
-  my_error_mgr jerr = {};
-  cinfo.err = jpeg_std_error(&jerr.pub);
-  Orientation orientation = Orientation::TopLeft;
-  do {
-    if (setjmp(jerr.setjmp_buffer)) break;
-    jpeg_create_decompress(&cinfo);
-    if (infile) {
-      jpeg_stdio_src(&cinfo, infile);
-    } else {
-      jpeg_mem_src(&cinfo, byteData->bytes(), byteData->size());
-    }
-    jpeg_save_markers(&cinfo, kExifMarker, 0xFFFF);
-    if (jpeg_read_header(&cinfo, TRUE) != JPEG_HEADER_OK) break;
-    orientation = get_exif_orientation(&cinfo);
-  } while (false);
-  jpeg_destroy_decompress(&cinfo);
-  if (infile) fclose(infile);
-  if (cinfo.image_width == 0 || cinfo.image_height == 0) {
-    return nullptr;
-  }
-  return std::shared_ptr<ImageCodec>(new JpegCodec(static_cast<int>(cinfo.image_width),
-                                                   static_cast<int>(cinfo.image_height),
-                                                   orientation, filePath, std::move(byteData)));
-}
-
-bool ExtractICCProfile(jpeg_decompress_struct* cinfo, std::vector<uint8_t>& iccProfileData) {
+static bool ExtractICCProfile(jpeg_decompress_struct* cinfo, std::vector<uint8_t>& iccProfileData) {
   jpeg_saved_marker_ptr marker = cinfo->marker_list;
   while (marker) {
     if (marker->marker == JPEG_APP0 + 2 && marker->data_length > 14 &&
@@ -123,8 +91,50 @@ bool ExtractICCProfile(jpeg_decompress_struct* cinfo, std::vector<uint8_t>& iccP
   return !iccProfileData.empty();
 }
 
-bool ParseICCProfile(const std::vector<uint8_t>& iccProfileData, gfx::skcms_ICCProfile* profile) {
+static bool ParseICCProfile(const std::vector<uint8_t>& iccProfileData,
+                            gfx::skcms_ICCProfile* profile) {
   return skcms_Parse(iccProfileData.data(), iccProfileData.size(), profile);
+}
+
+std::shared_ptr<ImageCodec> JpegCodec::MakeFromData(const std::string& filePath,
+                                                    std::shared_ptr<Data> byteData) {
+  FILE* infile = nullptr;
+  if (byteData == nullptr && (infile = fopen(filePath.c_str(), "rb")) == nullptr) {
+    return nullptr;
+  }
+  jpeg_decompress_struct cinfo = {};
+  my_error_mgr jerr = {};
+  cinfo.err = jpeg_std_error(&jerr.pub);
+  Orientation orientation = Orientation::TopLeft;
+  std::shared_ptr<ColorSpace> cs = nullptr;
+  do {
+    if (setjmp(jerr.setjmp_buffer)) break;
+    jpeg_create_decompress(&cinfo);
+    if (infile) {
+      jpeg_stdio_src(&cinfo, infile);
+    } else {
+      jpeg_mem_src(&cinfo, byteData->bytes(), byteData->size());
+    }
+    jpeg_save_markers(&cinfo, kExifMarker, 0xFFFF);
+    jpeg_save_markers(&cinfo, JPEG_APP0 + 2, 0xFFFF);
+    if (jpeg_read_header(&cinfo, TRUE) != JPEG_HEADER_OK) break;
+    orientation = get_exif_orientation(&cinfo);
+    std::vector<uint8_t> iccProfileData;
+    if (ExtractICCProfile(&cinfo, iccProfileData)) {
+      cs = ColorSpace::MakeFromICC(iccProfileData.data(), iccProfileData.size());
+    }
+    if (!cs) {
+      cs = ColorSpace::MakeSRGB();
+    }
+  } while (false);
+  jpeg_destroy_decompress(&cinfo);
+  if (infile) fclose(infile);
+  if (cinfo.image_width == 0 || cinfo.image_height == 0) {
+    return nullptr;
+  }
+  return std::shared_ptr<ImageCodec>(new JpegCodec(static_cast<int>(cinfo.image_width),
+                                                   static_cast<int>(cinfo.image_height),
+                                                   orientation, filePath, std::move(byteData), cs));
 }
 
 bool ConvertCMYKPixels(void* dst, const gfx::skcms_ICCProfile cmykProfile,
@@ -310,7 +320,8 @@ std::shared_ptr<Data> JpegCodec::getEncodedData() const {
 }
 
 #ifdef TGFX_USE_JPEG_ENCODE
-std::shared_ptr<Data> JpegCodec::Encode(const Pixmap& pixmap, int quality) {
+std::shared_ptr<Data> JpegCodec::Encode(const Pixmap& pixmap, int quality,
+                                        std::shared_ptr<ColorSpace> colorSpace) {
   auto srcPixels = static_cast<uint8_t*>(const_cast<void*>(pixmap.pixels()));
   int srcRowBytes = static_cast<int>(pixmap.rowBytes());
   jpeg_compress_struct cinfo = {};
@@ -354,6 +365,10 @@ std::shared_ptr<Data> JpegCodec::Encode(const Pixmap& pixmap, int quality) {
   cinfo.optimize_coding = TRUE;
   jpeg_set_quality(&cinfo, quality, TRUE);
   jpeg_start_compress(&cinfo, TRUE);
+  if (colorSpace) {
+    auto iccData = colorSpace->toICCProfile();
+    jpeg_write_icc_profile(&cinfo, iccData->bytes(), static_cast<uint32_t>(iccData->size()));
+  }
   while (cinfo.next_scanline < cinfo.image_height) {
     row_pointer[0] = &(srcPixels)[cinfo.next_scanline * static_cast<JDIMENSION>(srcRowBytes)];
     (void)jpeg_write_scanlines(&cinfo, row_pointer, 1);

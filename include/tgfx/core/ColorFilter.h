@@ -20,6 +20,7 @@
 
 #include <array>
 #include <memory>
+#include "ColorSpace.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Color.h"
 
@@ -113,7 +114,9 @@ class ColorFilter {
   virtual bool isEqual(const ColorFilter* colorFilter) const = 0;
 
  private:
-  virtual PlacementPtr<FragmentProcessor> asFragmentProcessor(Context* context) const = 0;
+  virtual PlacementPtr<FragmentProcessor> asFragmentProcessor(
+      Context* context,
+      std::shared_ptr<ColorSpace> dstColorSpace = ColorSpace::MakeSRGB()) const = 0;
 
   friend class OpsCompositor;
   friend class ColorFilterShader;
