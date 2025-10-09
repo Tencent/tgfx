@@ -225,4 +225,25 @@ TGFX_TEST(StrokeTest, HairlineUniqueKey) {
   auto normalStrokeShape2 = Shape::ApplyStroke(shape, &hairlineStroke2);
   EXPECT_NE(normalStrokeShape1->getUniqueKey(), normalStrokeShape2->getUniqueKey());
 }
+
+TGFX_TEST(StrokeTest, LineRenderAsHairline) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  auto canvas = surface->getCanvas();
+  canvas->clear();
+
+  tgfx::Paint paint1;
+  paint1.setColor(tgfx::Color::White());
+  paint1.setStyle(tgfx::PaintStyle::Stroke);
+  paint1.setStrokeWidth(0.0f);
+
+  canvas->drawLine(50, 20, 150, 20, paint1);   // horizontal line
+  canvas->drawLine(50, 40, 150, 140, paint1);  // 45 degree line
+  canvas->drawLine(50, 60, 50, 160, paint1);   // vertical line
+
+  EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/LineRenderAsHairline"));
+}
+
 }  // namespace tgfx
