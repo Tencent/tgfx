@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "SimpleLayerTree.h"
+#include "base/LayerBuilders.h"
 #include "tgfx/layers/Gradient.h"
 #include "tgfx/layers/ImageLayer.h"
 #include "tgfx/layers/ShapeLayer.h"
@@ -24,7 +24,7 @@
 #include "tgfx/layers/TextLayer.h"
 #include "tgfx/layers/filters/DropShadowFilter.h"
 
-namespace drawers {
+namespace hello2d {
 
 static std::shared_ptr<tgfx::Layer> CreateProgressBar() {
   auto progressBar = tgfx::Layer::Make();
@@ -58,13 +58,16 @@ static std::shared_ptr<tgfx::Layer> CreateProgressBar() {
   return progressBar;
 }
 
-static std::shared_ptr<tgfx::Layer> CreateBackground() {
+static std::vector<std::shared_ptr<tgfx::Layer>> CreateBackground() {
+  std::vector<std::shared_ptr<tgfx::Layer>> layers;
+
   auto background = tgfx::ShapeLayer::Make();
   tgfx::Rect displayRect = tgfx::Rect::MakeWH(375, 812);
   auto backPath = tgfx::Path();
   backPath.addRoundRect(displayRect, 40, 40);
   background->setFillStyle(tgfx::SolidColor::Make(tgfx::Color::FromRGBA(72, 154, 209)));
   background->setPath(backPath);
+  layers.push_back(background);
 
   auto backgroundGradient = tgfx::ShapeLayer::Make();
   auto gradient = tgfx::Gradient::MakeLinear(
@@ -76,8 +79,9 @@ static std::shared_ptr<tgfx::Layer> CreateBackground() {
   backgroundGradient->setFillStyle(gradient);
   backgroundGradient->setPath(gradientPath);
   backgroundGradient->setAlpha(0.2f);
-  background->addChild(backgroundGradient);
-  return background;
+  layers.push_back(backgroundGradient);
+
+  return layers;
 }
 
 static std::shared_ptr<tgfx::Layer> CreateImageLayer(const AppHost* host) {
@@ -109,7 +113,9 @@ static std::shared_ptr<tgfx::Layer> CreateImageLayer(const AppHost* host) {
 std::shared_ptr<tgfx::Layer> SimpleLayerTree::buildLayerTree(const AppHost* host) {
   auto root = tgfx::Layer::Make();
   // background
-  root->addChild(CreateBackground());
+  for (auto layer:CreateBackground()) {
+    root->addChild(layer);
+  }
 
   // image
   root->addChild(CreateImageLayer(host));
@@ -120,6 +126,7 @@ std::shared_ptr<tgfx::Layer> SimpleLayerTree::buildLayerTree(const AppHost* host
   textLayer->setMatrix(tgfx::Matrix::MakeTrans(48, 550));
   tgfx::Font font(host->getTypeface("default"), 18);
   textLayer->setFont(font);
+  textLayer->setTextColor(tgfx::Color::Black());
   root->addChild(textLayer);
 
   // progress shape
@@ -127,4 +134,4 @@ std::shared_ptr<tgfx::Layer> SimpleLayerTree::buildLayerTree(const AppHost* host
   root->addChild(progressBar);
   return root;
 }
-}  // namespace drawers
+}  // namespace hello2d

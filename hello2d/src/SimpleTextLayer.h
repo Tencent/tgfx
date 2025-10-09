@@ -20,28 +20,56 @@
 
 #include "tgfx/layers/Layer.h"
 
-namespace drawers {
-class CustomLayer : public tgfx::Layer {
+namespace hello2d {
+struct TextLine {
+  float left = 0.f;
+  float right = 0.f;
+  float linePosition = 0.f;
+};
+
+class Element {
+  friend class SimpleTextLayer;
+
  public:
-  static std::shared_ptr<CustomLayer> Make();
-  void setText(const std::string& text) {
-    _text = text;
+  enum Type { Text, Image };
+
+  std::string text = {};
+  tgfx::Font font = {};
+  std::vector<tgfx::Paint> paints = {};
+
+  std::shared_ptr<tgfx::Image> image = nullptr;
+  float width = 0.f;
+  float height = 0.f;
+
+  std::vector<std::pair<size_t, size_t>> underlineIndex = {};
+  std::vector<std::pair<size_t, size_t>> deletelineIndex = {};
+  Type type = Text;
+
+ private:
+  tgfx::Rect imageRect = {};
+  std::shared_ptr<tgfx::TextBlob> textBlob = nullptr;
+  std::vector<TextLine> underline = {};
+  std::vector<TextLine> deleteline = {};
+};
+
+class SimpleTextLayer : public tgfx::Layer {
+ public:
+  static std::shared_ptr<SimpleTextLayer> Make();
+
+  void setElements(const std::vector<Element>& value) {
+    richTexts = value;
     invalidateContent();
   }
 
-  void setFont(const tgfx::Font& font) {
-    _font = font;
-    invalidateContent();
-  }
+  void invalidateLayout();
 
  protected:
-  CustomLayer() = default;
+  SimpleTextLayer() = default;
 
   void onUpdateContent(tgfx::LayerRecorder* recorder) override;
 
  private:
-  std::string _text;
-  tgfx::Font _font;
+  std::vector<Element> richTexts = {};
 };
 
-}  // namespace drawers
+}  // namespace hello2d

@@ -19,7 +19,8 @@
 #pragma once
 
 #include <emscripten/bind.h>
-#include "drawers/Drawer.h"
+#include "hello2d/AppHost.h"
+#include "hello2d/LayerBuilder.h"
 #include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
 
 namespace hello2d {
@@ -28,14 +29,17 @@ class TGFXBaseView {
  public:
   TGFXBaseView(const std::string& canvasID);
 
-  void setImage(const std::string& name, tgfx::NativeImageRef nativeImage);
+  void setImagePath(const std::string& name, tgfx::NativeImageRef nativeImage);
 
   void updateSize(float devicePixelRatio);
 
   bool draw(int drawIndex, float zoom, float offsetX, float offsetY);
 
+  void onWheelEvent();
+  void onClickEvent();
+
  protected:
-  std::shared_ptr<drawers::AppHost> appHost;
+  std::shared_ptr<hello2d::AppHost> appHost;
 
  private:
   std::string canvasID = "";

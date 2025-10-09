@@ -18,49 +18,55 @@
 
 #pragma once
 
-#include "drawers/AppHost.h"
+#include "hello2d/AppHost.h"
 #include "tgfx/core/Canvas.h"
+#include "tgfx/layers/DisplayList.h"
 
-namespace drawers {
-class Drawer {
+namespace hello2d {
+class LayerBuilder {
  public:
   /**
-   * Returns the number of drawers.
+   * Returns the number of layer builders.
    */
   static int Count();
 
   /**
-   * Returns the names of all drawers.
+   * Returns the names of all layer builders.
    */
   static const std::vector<std::string>& Names();
 
   /**
-   * Returns the drawer with the given index.
+   * Returns the layer builder with the given index.
    */
-  static Drawer* GetByIndex(int index);
+  static LayerBuilder* GetByIndex(int index);
 
   /**
-   * Returns the drawer with the given name.
+   * Returns the layer builder with the given name.
    */
-  static Drawer* GetByName(const std::string& name);
+  static LayerBuilder* GetByName(const std::string& name);
 
-  explicit Drawer(std::string name);
+  static void DrawBackground(tgfx::Canvas* canvas, const AppHost* host);
 
-  virtual ~Drawer() = default;
+  explicit LayerBuilder(std::string name);
+
+  virtual ~LayerBuilder() = default;
+  std::vector<std::shared_ptr<tgfx::Layer>> getLayersUnderPoint(float x, float y);
 
   std::string name() const {
     return _name;
   }
 
   /**
-   * Draws the contents to the given canvas.
+   * Build the contents.
    */
-  void draw(tgfx::Canvas* canvas, const AppHost* host);
+  void build(const AppHost* host);
+  virtual std::shared_ptr<tgfx::Layer> buildLayerTree(const AppHost* host) = 0;
 
  protected:
-  virtual void onDraw(tgfx::Canvas* canvas, const AppHost* host) = 0;
+  float padding = 30.f;
+  std::shared_ptr<tgfx::Layer> _root = nullptr;
 
  private:
   std::string _name;
 };
-}  // namespace drawers
+}  // namespace hello2d

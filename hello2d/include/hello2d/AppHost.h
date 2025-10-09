@@ -22,8 +22,9 @@
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Typeface.h"
+#include "tgfx/layers/DisplayList.h"
 
-namespace drawers {
+namespace hello2d {
 /**
  * AppHost provides information about the current app context.
  */
@@ -106,6 +107,28 @@ class AppHost {
    */
   void addTypeface(const std::string& name, std::shared_ptr<tgfx::Typeface> typeface);
 
+  //  Check and set dirty flags (can be called on const objects)
+  bool isDirty() const;
+  void markDirty() const;
+  void resetDirty() const;
+  /**
+   * Draws the content of the corresponding LayerBuilder based on the index.
+   */
+  void draw(tgfx::Canvas* canvas, int drawIndex,bool isNeedBackground) const;
+  /**
+   * Calculates and sets the transformation matrix for the current root layer
+   * (displayList.root()->firstChild()), centering it in the window, scaling it proportionally, and
+   * leaving a 30px padding on all sides.
+   */
+  void updateRootMatrix() const;
+
+  /**
+   * Returns all layers hit at the specified logical coordinates (sorted by depth then by level).
+   */
+  std::vector<std::shared_ptr<tgfx::Layer>> getLayersUnderPoint(float x, float y) const;
+
+  mutable tgfx::DisplayList displayList = {};
+
  private:
   int _width = 1280;
   int _height = 720;
@@ -114,5 +137,9 @@ class AppHost {
   tgfx::Point _contentOffset = {};
   std::unordered_map<std::string, std::shared_ptr<tgfx::Image>> images = {};
   std::unordered_map<std::string, std::shared_ptr<tgfx::Typeface>> typefaces = {};
+  mutable bool _dirty = true;
+
+  mutable int lastDrawIndex = -1;
+  mutable std::shared_ptr<tgfx::Layer> root = nullptr;
 };
-}  // namespace drawers
+}  // namespace hello2d
