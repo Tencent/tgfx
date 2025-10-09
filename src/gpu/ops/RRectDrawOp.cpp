@@ -32,6 +32,7 @@ PlacementPtr<RRectDrawOp> RRectDrawOp::Make(Context* context,
     return nullptr;
   }
   auto drawOp = context->drawingBuffer()->make<RRectDrawOp>(provider.get());
+  CAPUTRE_RRECT_MESH(drawOp.get(), provider.get());
   drawOp->indexBufferProxy = context->globalCache()->getRRectIndexBuffer(provider->hasStroke());
   if (provider->rectCount() <= 1) {
     // If we only have one rect, it is not worth the async task overhead.

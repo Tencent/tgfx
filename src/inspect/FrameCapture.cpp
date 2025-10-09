@@ -31,12 +31,19 @@
 #elif TGFX_USE_PNG_ENCODE
 #include "core/codecs/png/PngCodec.h"
 #endif
+#include "core/PathTriangulator.h"
+#include "core/ShapeRasterizer.h"
 #include "core/utils/Log.h"
 #include "core/utils/PixelFormatUtil.h"
+#include "gpu/glsl/GLSLProgramBuilder.h"
+#include "gpu/ops/RectDrawOp.h"
 #include "lz4.h"
 #include "tgfx/core/Clock.h"
+#include "tgfx/core/DataView.h"
 
 namespace tgfx::inspect {
+class RectIndicesProvider;
+
 FrameCapture::FrameCapture()
     : epoch(Clock::Now()), initTime(Clock::Now()), dataBuffer(TargetFrameSize * 3),
       lz4Handler(LZ4CompressionHandler::Make()), broadcast(BroadcastCount) {
@@ -235,16 +242,210 @@ void FrameCapture::sendFrameCaptureTexture(
   imageQueue.enqueue(std::move(frameCaptureTexture));
 }
 
-void FrameCapture::captureRenderTarget(const RenderTarget* renderTarget) {
-  if (currentFrameShouldCaptrue()) {
-    auto frameCaptureTexture = FrameCaptureTexture::MakeFrom(renderTarget);
-    uint64_t textureId = 0;
-    if (frameCaptureTexture != nullptr) {
-      textureId = frameCaptureTexture->textureId();
-      sendFrameCaptureTexture(std::move(frameCaptureTexture));
-    }
-    sendOutputTextureID(textureId);
+void FrameCapture::sendProgramKey(const BytesKey& programKey) {
+  auto size = programKey.size() * sizeof(uint32_t);
+  if (size == 0) {
+    return;
   }
+  auto item = copyDataToDirectlySendDataMessage(programKey.data(), size);
+  item.hdr.type = FrameCaptureMessageType::ProgramKey;
+  queueSerialFinish(item);
+}
+
+void FrameCapture::sendUniformValue(const std::string& name, const void* data, size_t size) {
+  if (!currentFrameShouldCaptrue()) {
+    return;
+  }
+  auto item = copyDataToDirectlySendDataMessage(name.c_str(), name.size());
+  item.hdr.type = FrameCaptureMessageType::UniformValue;
+  auto value = new (std::nothrow) uint8_t[size];
+  memcpy(value, data, size);
+  item.uniformValueMessage.valuePtr = reinterpret_cast<uint64_t>(value);
+  item.uniformValueMessage.valueSize = size;
+  queueSerialFinish(item);
+}
+
+void FrameCapture::sendOpPtr(DrawOp* drawOp) {
+  if (!currentFrameShouldCaptrue()) {
+    return;
+  }
+  FrameCaptureMessageItem item = {};
+  item.hdr.type = FrameCaptureMessageType::OperatePtr;
+  item.drawOpPtrMessage.drawOpPtr = reinterpret_cast<uint64_t>(drawOp);
+  queueSerialFinish(item);
+}
+
+void FrameCapture::sendRectMeshData(DrawOp* drawOp, RectsVertexProvider* provider) {
+  RectMeshInfo rectMeshData = {};
+  auto meshType = static_cast<uint8_t>(VertexProviderType::RectsVertexProvider);
+  rectMeshData.drawOpPtr = reinterpret_cast<uint64_t>(drawOp);
+  rectMeshData.rectCount = provider->rectCount();
+  rectMeshData.aaType = static_cast<uint8_t>(provider->aaType());
+  rectMeshData.hasUVCoord = provider->hasUVCoord();
+  rectMeshData.hasColor = provider->hasColor();
+  rectMeshData.hasSubset = provider->hasSubset();
+  auto extraDataSize = sizeof(RectMeshInfo) + sizeof(uint8_t);
+  auto data = new (std::nothrow) uint8_t[extraDataSize];
+  if (data == nullptr) {
+    return;
+  }
+  memcpy(data, &meshType, sizeof(uint8_t));
+  memcpy(data + sizeof(uint8_t), &rectMeshData, sizeof(RectMeshInfo));
+  sendMeshData(provider, reinterpret_cast<uint64_t>(data), extraDataSize);
+}
+
+void FrameCapture::sendRRectMeshData(DrawOp* drawOp, RRectsVertexProvider* provider) {
+  RRectMeshInfo rrectMeshData = {};
+  auto meshType = static_cast<uint8_t>(VertexProviderType::RRectsVertexProvider);
+  rrectMeshData.drawOpPtr = reinterpret_cast<uint64_t>(drawOp);
+  rrectMeshData.rectCount = provider->rectCount();
+  rrectMeshData.hasColor = provider->hasColor();
+  rrectMeshData.useScale = provider->useScale();
+  rrectMeshData.hasStroke = provider->hasStroke();
+  auto extraDataSize = sizeof(RRectMeshInfo) + sizeof(uint8_t);
+  auto data = new (std::nothrow) uint8_t[extraDataSize];
+  if (data == nullptr) {
+    return;
+  }
+  memcpy(data, &meshType, sizeof(meshType));
+  memcpy(data + sizeof(uint8_t), &rrectMeshData, sizeof(RRectMeshInfo));
+  sendMeshData(provider, reinterpret_cast<uint64_t>(data), extraDataSize);
+}
+
+void FrameCapture::sendShapeMeshData(DrawOp* drawOp, std::shared_ptr<Shape> shape, AAType aaType,
+                                     const Rect& clipBounds) {
+  if (!currentFrameShouldCaptrue() || shape == nullptr) {
+    return;
+  }
+  auto path = shape->getPath();
+  if (!PathTriangulator::ShouldTriangulatePath(path)) {
+    return;
+  }
+  auto isInverseFillType = shape->isInverseFillType();
+  auto shapeBounds = shape->getBounds();
+  if (aaType != AAType::None) {
+    // Add a 1-pixel outset to preserve antialiasing results.
+    shapeBounds.outset(1.0f, 1.0f);
+  }
+  auto bounds = isInverseFillType ? clipBounds : shapeBounds;
+  auto width = static_cast<int>(ceilf(bounds.width()));
+  auto height = static_cast<int>(ceilf(bounds.height()));
+  auto rasterizer = std::make_unique<ShapeRasterizer>(width, height, std::move(shape), aaType);
+  auto shapeBuffer = rasterizer->getData();
+  RectMeshInfo rectMeshData = {};
+  auto meshType = static_cast<uint8_t>(VertexProviderType::RectsVertexProvider);
+  rectMeshData.drawOpPtr = reinterpret_cast<uint64_t>(drawOp);
+  rectMeshData.rectCount = 0;
+  rectMeshData.aaType = static_cast<uint8_t>(aaType);
+  rectMeshData.hasUVCoord = false;
+  rectMeshData.hasColor = false;
+  rectMeshData.hasSubset = false;
+  auto extraDataSize = sizeof(RectMeshInfo) + sizeof(uint8_t);
+  auto extraData = new (std::nothrow) uint8_t[extraDataSize];
+  if (extraData == nullptr) {
+    return;
+  }
+  memcpy(extraData, &meshType, sizeof(uint8_t));
+  memcpy(extraData + sizeof(uint8_t), &rectMeshData, sizeof(RectMeshInfo));
+
+  auto bytesSize = shapeBuffer->triangles->size();
+  auto vertices = new (std::nothrow) uint8_t[bytesSize];
+  memcpy(const_cast<void*>(shapeBuffer->triangles->data()), vertices, bytesSize);
+  FrameCaptureMessageItem item = {};
+  item.hdr.type = FrameCaptureMessageType::Mesh;
+  item.meshMessage.dataPtr = reinterpret_cast<uint64_t>(vertices);
+  item.meshMessage.size = bytesSize;
+  item.meshMessage.extraDataPtr = reinterpret_cast<uint64_t>(extraData);
+  item.meshMessage.extraDataSize = extraDataSize;
+  queueSerialFinish(item);
+}
+
+void FrameCapture::sendMeshData(VertexProvider* provider, uint64_t extraDataPtr,
+                                size_t extraDataSize) {
+  if (!currentFrameShouldCaptrue()) {
+    return;
+  }
+  auto bytesSize = provider->vertexCount() * sizeof(float);
+  FrameCaptureMessageItem item = {};
+  auto vertices = new (std::nothrow) uint8_t[bytesSize];
+  provider->getVertices((float*)vertices);
+  item.hdr.type = FrameCaptureMessageType::Mesh;
+  item.meshMessage.dataPtr = reinterpret_cast<uint64_t>(vertices);
+  item.meshMessage.size = bytesSize;
+  item.meshMessage.extraDataPtr = extraDataPtr;
+  item.meshMessage.extraDataSize = extraDataSize;
+  queueSerialFinish(item);
+}
+
+void FrameCapture::captureProgramInfo(const BytesKey& programKey, Context* context,
+                                      const ProgramInfo* programInfo) {
+  if (!currentFrameShouldCaptrue()) {
+    return;
+  }
+  sendProgramKey(programKey);
+  if (programKeys.find(programKey) != programKeys.end()) {
+    return;
+  }
+  programKeys.emplace(programKey);
+  GLSLProgramBuilder builder(context, programInfo);
+  if (!builder.emitAndInstallProcessors()) {
+    return;
+  }
+  auto shaderCaps = context->caps()->shaderCaps();
+  if (shaderCaps->usesCustomColorOutputName) {
+    builder.fragmentShaderBuilder()->declareCustomOutputColor();
+  }
+  builder.finalizeShaders();
+  ShaderModuleDescriptor vertexModule = {};
+  vertexModule.code = builder.vertexShaderBuilder()->shaderString();
+  vertexModule.stage = ShaderStage::Vertex;
+  sendShaderText(vertexModule);
+
+  ShaderModuleDescriptor fragmentModule = {};
+  fragmentModule.code = builder.fragmentShaderBuilder()->shaderString();
+  fragmentModule.stage = ShaderStage::Fragment;
+  sendShaderText(fragmentModule);
+
+  auto vertexUniformBuffer = builder.uniformHandler()->makeUniformData(ShaderStage::Vertex);
+  auto fragmentUniformBuffer = builder.uniformHandler()->makeUniformData(ShaderStage::Fragment);
+  sendUniformInfo(vertexUniformBuffer->uniforms());
+  sendUniformInfo(fragmentUniformBuffer->uniforms());
+}
+
+void FrameCapture::sendShaderText(const ShaderModuleDescriptor& shaderDescriptor) {
+  if (!isConnected()) {
+    return;
+  }
+  auto size = shaderDescriptor.code.size();
+  if (size == 0) {
+    return;
+  }
+  auto item = copyDataToDirectlySendDataMessage(shaderDescriptor.code.c_str(), size);
+  item.hdr.type = FrameCaptureMessageType::ShaderText;
+  item.shaderTextMessage.type = static_cast<uint8_t>(shaderDescriptor.stage);
+  queueSerialFinish(item);
+}
+
+void FrameCapture::sendUniformInfo(const std::vector<Uniform>& uniforms) {
+  for (const auto& uniform : uniforms) {
+    auto item = copyDataToDirectlySendDataMessage(uniform.name().c_str(), uniform.name().size());
+    item.hdr.type = FrameCaptureMessageType::UniformInfo;
+    item.uniformInfoMessage.format = static_cast<uint8_t>(uniform.format());
+    queueSerialFinish(item);
+  }
+}
+
+void FrameCapture::captureRenderTarget(const RenderTarget* renderTarget) {
+  if (!currentFrameShouldCaptrue()) {
+    return;
+  }
+  auto frameCaptureTexture = FrameCaptureTexture::MakeFrom(renderTarget);
+  uint64_t textureId = 0;
+  if (frameCaptureTexture != nullptr) {
+    textureId = frameCaptureTexture->textureId();
+    sendFrameCaptureTexture(std::move(frameCaptureTexture));
+  }
+  sendOutputTextureID(textureId);
 }
 
 void FrameCapture::sendFragmentProcessor(
@@ -282,6 +483,15 @@ void FrameCapture::sendFragmentProcessor(
 
 void FrameCapture::LaunchWorker(FrameCapture* inspector) {
   inspector->worker();
+}
+
+void FrameCapture::clear() {
+  FrameCaptureTexture::ClearReadedTexture();
+  dataBufferOffset = 0;
+  dataBufferStart = 0;
+  captureFrameCount = 0;
+  programKeys.clear();
+  _currentFrameShouldCaptrue.store(false, std::memory_order_relaxed);
 }
 
 bool FrameCapture::shouldExit() {
@@ -340,6 +550,42 @@ void FrameCapture::sendString(uint64_t stringPtr, const char* str, size_t len,
 
 void FrameCapture::sendString(uint64_t stringPtr, const char* str, FrameCaptureMessageType type) {
   sendString(stringPtr, str, strlen(str), type);
+}
+
+void FrameCapture::sendStringWithExtraData(uint64_t str, const char* ptr, size_t len,
+                                           std::shared_ptr<Data> extraData,
+                                           FrameCaptureMessageType type) {
+  FrameCaptureMessageItem item = {};
+  item.hdr.type = type;
+  item.stringTransfer.ptr = str;
+
+  auto dataLen = static_cast<uint16_t>(len);
+  auto extraDataLen = static_cast<uint16_t>(extraData->size());
+  needDataSize(FrameCaptureMessageDataSize[static_cast<int>(type)] + sizeof(uint16_t) + dataLen +
+               sizeof(extraDataLen) + extraData->size());
+  appendDataUnsafe(&item, FrameCaptureMessageDataSize[static_cast<int>(type)]);
+  appendDataUnsafe(&dataLen, sizeof(uint16_t));
+  appendDataUnsafe(ptr, dataLen);
+  appendDataUnsafe(&extraDataLen, sizeof(uint16_t));
+  appendDataUnsafe(extraData->bytes(), extraDataLen);
+}
+
+void FrameCapture::sendLongStringWithExtraData(uint64_t str, const char* ptr, size_t len,
+                                               std::shared_ptr<Data> extraData,
+                                               FrameCaptureMessageType type) {
+  FrameCaptureMessageItem item = {};
+  item.hdr.type = type;
+  item.stringTransfer.ptr = str;
+
+  auto dataLen = static_cast<uint32_t>(len);
+  auto extraDataLen = static_cast<uint32_t>(extraData->size());
+  needDataSize(FrameCaptureMessageDataSize[static_cast<int>(type)] + sizeof(uint32_t) + dataLen +
+               sizeof(extraDataLen) + extraData->size());
+  appendDataUnsafe(&item, FrameCaptureMessageDataSize[static_cast<int>(type)]);
+  appendDataUnsafe(&dataLen, sizeof(uint32_t));
+  appendDataUnsafe(ptr, dataLen);
+  appendDataUnsafe(&extraDataLen, sizeof(uint32_t));
+  appendDataUnsafe(extraData->bytes(), extraDataLen);
 }
 
 void FrameCapture::sendPixelsData(uint64_t pixelsPtr, const char* pixels, size_t len,
@@ -403,6 +649,7 @@ void FrameCapture::worker() {
   long long lastBroadcast = 0;
   while (true) {
     welcome.refTime = refTimeThread;
+    clear();
     while (true) {
       if (shouldExit()) {
         for (uint16_t i = 0; i < BroadcastCount; i++) {
@@ -598,12 +845,21 @@ bool FrameCapture::confirmProtocol() {
   return true;
 }
 
+FrameCaptureMessageItem FrameCapture::copyDataToDirectlySendDataMessage(const void* src,
+                                                                        size_t size) {
+  FrameCaptureMessageItem item = {};
+  auto data = new (std::nothrow) uint8_t[size];
+  memcpy(data, src, size);
+  item.directlySendDataMessage.size = size;
+  item.directlySendDataMessage.dataPtr = reinterpret_cast<uint64_t>(data);
+  return item;
+}
+
 void FrameCapture::handleConnect(const WelcomeMessage& welcome) {
   isConnect.store(true, std::memory_order_release);
   auto handshake = HandshakeStatus::HandshakeWelcome;
   sock->sendData(&handshake, sizeof(handshake));
 
-  lz4Handler->reset();
   sock->sendData(&welcome, sizeof(welcome));
 
   auto keepAlive = 0;
@@ -654,13 +910,71 @@ FrameCapture::DequeueStatus FrameCapture::dequeueSerial() {
   if (queueSize > 0) {
     auto refThread = refTimeThread;
     FrameCaptureMessageItem item = {};
-    while (serialConcurrentQueue.try_dequeue(item)) {
+    for (; serialConcurrentQueue.try_dequeue(item);) {
       auto idx = item.hdr.idx;
-      if (static_cast<FrameCaptureMessageType>(idx) == FrameCaptureMessageType::TextureData) {
-        auto ptr = item.textureData.pixels;
-        auto size = item.textureData.pixelsSize;
-        sendPixelsData(ptr, (const char*)ptr, size, FrameCaptureMessageType::PixelsData);
-        free((void*)ptr);
+      switch (static_cast<FrameCaptureMessageType>(idx)) {
+        case FrameCaptureMessageType::TextureData: {
+          auto ptr = item.textureData.pixels;
+          auto size = item.textureData.pixelsSize;
+          sendPixelsData(ptr, reinterpret_cast<const char*>(ptr), size,
+                         FrameCaptureMessageType::PixelsData);
+          free((void*)ptr);
+          break;
+        }
+        case FrameCaptureMessageType::ProgramKey: {
+          auto data = item.directlySendDataMessage.dataPtr;
+          auto size = item.directlySendDataMessage.size;
+          sendString(data, reinterpret_cast<const char*>(data), size,
+                     FrameCaptureMessageType::ProgramKeyData);
+          delete[] reinterpret_cast<const uint8_t*>(data);
+          continue;
+        }
+        case FrameCaptureMessageType::ShaderText: {
+          auto data = item.directlySendDataMessage.dataPtr;
+          auto size = item.directlySendDataMessage.size;
+          auto type = FrameCaptureMessageType::VertexShaderTextData;
+          if (item.shaderTextMessage.type == static_cast<uint8_t>(ShaderStage::Fragment)) {
+            type = FrameCaptureMessageType::FragmentShaderTextData;
+          }
+          sendString(data, reinterpret_cast<const char*>(data), size, type);
+          delete[] reinterpret_cast<const uint8_t*>(data);
+          continue;
+        }
+        case FrameCaptureMessageType::UniformInfo: {
+          auto data = item.directlySendDataMessage.dataPtr;
+          auto size = item.directlySendDataMessage.size;
+          auto formatData = Data::MakeWithCopy(&item.uniformInfoMessage.format, sizeof(uint8_t));
+          sendStringWithExtraData(data, reinterpret_cast<const char*>(data), size,
+                                  std::move(formatData), FrameCaptureMessageType::UniformInfoData);
+          delete[] reinterpret_cast<const uint8_t*>(data);
+          continue;
+        }
+        case FrameCaptureMessageType::UniformValue: {
+          auto data = item.directlySendDataMessage.dataPtr;
+          auto size = item.directlySendDataMessage.size;
+          auto valueData =
+              Data::MakeWithCopy(reinterpret_cast<uint8_t*>(item.uniformValueMessage.valuePtr),
+                                 item.uniformValueMessage.valueSize);
+          sendStringWithExtraData(data, reinterpret_cast<const char*>(data), size,
+                                  std::move(valueData), FrameCaptureMessageType::UniformValueData);
+          delete[] reinterpret_cast<const uint8_t*>(data);
+          delete[] reinterpret_cast<const uint8_t*>(item.uniformValueMessage.valuePtr);
+          continue;
+        }
+        case FrameCaptureMessageType::Mesh: {
+          auto data = item.directlySendDataMessage.dataPtr;
+          auto size = item.directlySendDataMessage.size;
+          auto extraData =
+              Data::MakeWithCopy(reinterpret_cast<uint8_t*>(item.meshMessage.extraDataPtr),
+                                 item.meshMessage.extraDataSize);
+          sendLongStringWithExtraData(data, reinterpret_cast<const char*>(data), size,
+                                      std::move(extraData), FrameCaptureMessageType::MeshData);
+          delete[] reinterpret_cast<const uint8_t*>(data);
+          delete[] reinterpret_cast<const uint8_t*>(item.meshMessage.extraDataPtr);
+          continue;
+        }
+        default:
+          break;
       }
       if (!appendData(&item, FrameCaptureMessageDataSize[idx])) {
         return DequeueStatus::ConnectionLost;

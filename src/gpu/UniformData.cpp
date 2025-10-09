@@ -18,6 +18,7 @@
 
 #include "UniformData.h"
 #include "core/utils/Log.h"
+#include "inspect/InspectorMark.h"
 
 namespace tgfx {
 UniformData::UniformData(std::vector<Uniform> uniforms, bool uboSupport)
@@ -62,6 +63,7 @@ void UniformData::onSetData(const std::string& name, const void* data, size_t si
   }
   DEBUG_ASSERT(field->size == size);
 
+  UNIFORM_VALUE(key, data, size);
   memcpy(_buffer + field->offset, data, size);
 }
 

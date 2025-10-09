@@ -25,6 +25,7 @@
 namespace tgfx {
 void DrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
   OPERATE_MARK(type());
+  DRAW_OP(this);
   auto geometryProcessor = onMakeGeometryProcessor(renderTarget);
   ATTRIBUTE_NAME("scissorRect", scissorRect);
   ATTRIBUTE_NAME_ENUM("blenderMode", blendMode, tgfx::inspect::CustomEnumType::BlendMode);

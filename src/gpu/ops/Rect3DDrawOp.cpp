@@ -21,6 +21,7 @@
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/processors/Transform3DGeometryProcessor.h"
+#include "inspect/InspectorMark.h"
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
@@ -38,6 +39,7 @@ PlacementPtr<Rect3DDrawOp> Rect3DDrawOp::Make(Context* context,
     return nullptr;
   }
   auto drawOp = context->drawingBuffer()->make<Rect3DDrawOp>(provider.get(), drawArgs);
+  CAPUTRE_RECT_MESH(drawOp.get(), provider.get());
   if (provider->aaType() == AAType::Coverage || provider->rectCount() > 1) {
     drawOp->indexBufferProxy =
         context->globalCache()->getRectIndexBuffer(provider->aaType() == AAType::Coverage);
@@ -65,6 +67,10 @@ Rect3DDrawOp::Rect3DDrawOp(RectsVertexProvider* provider, const Rect3DDrawArgs& 
 }
 
 PlacementPtr<GeometryProcessor> Rect3DDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {
+  ATTRIBUTE_NAME("rectCount", static_cast<int>(rectCount));
+  ATTRIBUTE_NAME("commonColor", commonColor);
+  ATTRIBUTE_NAME("uvMatrix", uvMatrix);
+  ATTRIBUTE_NAME("hasSubset", hasSubset);
   auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
   // The actual size of the rendered texture is larger than the valid size, while the current
   // NDC coordinates were calculated based on the valid size, so they need to be adjusted

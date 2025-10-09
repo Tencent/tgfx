@@ -22,24 +22,12 @@
 
 namespace tgfx {
 /**
- * GPUFence is a synchronization primitive used for both CPU-GPU and GPU-GPU operations. It has two
- * states: signaled and unsignaled. A fence becomes signaled when a queue submission finishes. Once
- * signaled, the fence remains in that state and cannot be reset; create a new fence for further
- * synchronization.
+ * GPUFence is a synchronization primitive for GPU-to-GPU operations. Once a fence is signaled, it
+ * remains in that state and cannot be reset; to synchronize again, create a new fence.
  */
 class GPUFence {
  public:
   virtual ~GPUFence() = default;
-
-  /**
-   * Returns true if the fence is signaled; otherwise, returns false. This check does not block.
-   */
-  virtual bool isSignaled() const = 0;
-
-  /**
-   * Waits on the CPU until the fence is signaled.
-   */
-  virtual void waitOnCPU() = 0;
 
   /**
    * Returns the backend semaphore object and transfers ownership to the caller, who must manage its

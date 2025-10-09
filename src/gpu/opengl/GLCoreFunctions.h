@@ -40,7 +40,6 @@
   M(glClearColor)                          \
   M(glClearDepthf)                         \
   M(glClearStencil)                        \
-  M(glClientWaitSync)                      \
   M(glColorMask)                           \
   M(glCompileShader)                       \
   M(glCompressedTexImage2D)                \

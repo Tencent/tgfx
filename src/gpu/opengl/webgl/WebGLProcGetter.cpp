@@ -23,12 +23,6 @@
 #include "gpu/opengl/GLCoreFunctions.h"
 
 namespace tgfx {
-static void emscripten_glClientWaitSync(GLsync sync, GLbitfield flags, GLuint64 timeout) {
-  auto timeoutLo = static_cast<uint32_t>(timeout);
-  uint32_t timeoutHi = timeout >> 32;
-  emscripten_glClientWaitSync(sync, flags, timeoutLo, timeoutHi);
-}
-
 static void emscripten_glWaitSync(GLsync sync, GLbitfield flags, GLuint64 timeout) {
   auto timeoutLo = static_cast<uint32_t>(timeout);
   uint32_t timeoutHi = timeout >> 32;

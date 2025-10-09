@@ -22,6 +22,7 @@
 #include "gpu/GlobalCache.h"
 #include "gpu/ProgramBuilder.h"
 #include "gpu/resources/RenderTarget.h"
+#include "inspect/InspectorMark.h"
 
 namespace tgfx {
 ProgramInfo::ProgramInfo(RenderTarget* renderTarget, GeometryProcessor* geometryProcessor,
@@ -122,6 +123,7 @@ std::shared_ptr<Program> ProgramInfo::getProgram() const {
   }
   programKey.write(static_cast<uint32_t>(blendMode));
   programKey.write(static_cast<uint32_t>(getOutputSwizzle().asKey()));
+  CAPUTRE_PROGRAM_INFO(programKey, context, this);
   auto program = context->globalCache()->findProgram(programKey);
   if (program == nullptr) {
     program = ProgramBuilder::CreateProgram(context, this);
