@@ -27,7 +27,6 @@ namespace tgfx {
  */
 struct ColorMatrix33 {
   float values[3][3];
-  ColorMatrix33 operator*(float scalar) const;
 };
 
 struct TransferFunction {
@@ -128,11 +127,18 @@ static constexpr ColorSpacePrimaries ITU_T_H273_Value22 = {0.630f, 0.340f, 0.295
                                                            0.155f, 0.077f, 0.3127f, 0.3290f};
 
 /**
+ * https://www.w3.org/TR/css-color-4/#predefined-prophoto-rgb
+ */
+static constexpr ColorSpacePrimaries ProPhotoRGB = {0.7347f, 0.2653f, 0.1596f,  0.8404f,
+                                                    0.0366f, 0.0001f, 0.34567f, 0.35850f};
+}  // namespace NamedPrimaries
+
+/**
  * Mapping between names of color primaries and the number of the corresponding row in ITU-T H.273,
  * table 2.  As above, the constants are named based on the first specification referenced in the
  * value's row.
  */
-enum class CICPID {
+enum class ColorSpacePrimariesID {
   // Value 0 is reserved.
   Rec709 = 1,
   // Value 2 is unspecified.
@@ -151,14 +157,7 @@ enum class CICPID {
   // Values 23-255 are reserved.
 };
 
-/**
- * https://www.w3.org/TR/css-color-4/#predefined-prophoto-rgb
- */
-static constexpr ColorSpacePrimaries ProPhotoRGB = {0.7347f, 0.2653f, 0.1596f,  0.8404f,
-                                                    0.0366f, 0.0001f, 0.34567f, 0.35850f};
-}  // namespace NamedPrimaries
-
-namespace NamedTransferFn {
+namespace NamedTransferFunction {
 
 static constexpr TransferFunction SRGB = {
     2.4f, (float)(1 / 1.055), (float)(0.055 / 1.055), (float)(1 / 12.92), 0.04045f, 0.0f, 0.0f};
@@ -231,11 +230,23 @@ static constexpr TransferFunction Rec2020_12bit = Rec709;
 static constexpr TransferFunction SMPTE_ST_428_1 = {2.6f, 1.034080527699f, 0.f, 0.f, 0.f, 0.f, 0.f};
 
 /**
+ * https://w3.org/TR/css-color-4/#valdef-color-prophoto-rgb
+ * "The transfer curve is a gamma function with a value of 1/1.8".
+ */
+static constexpr TransferFunction ProPhotoRGB = {1.8f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+
+/**
+ * https://www.w3.org/TR/css-color-4/#predefined-a98-rgb
+ */
+static constexpr TransferFunction A98RGB = TwoDotTwo;
+}  // namespace NamedTransferFunction
+
+/**
  * Mapping between transfer function names and the number of the corresponding row in ITU-T H.273,
  * table 3.  As above, the constants are named based on the first specification referenced in the
  * value's row.
  */
-enum class CICPID {
+enum class TransferFunctionID {
   // Value 0 is reserved.
   Rec709 = 1,
   // Value 2 is unspecified.
@@ -258,18 +269,6 @@ enum class CICPID {
   // Value 18 is not supported by `SkColorSpace::MakeCICP`.
   // Values 19-255 are reserved.
 };
-
-/**
- * https://w3.org/TR/css-color-4/#valdef-color-prophoto-rgb
- * "The transfer curve is a gamma function with a value of 1/1.8".
- */
-static constexpr TransferFunction ProPhotoRGB = {1.8f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
-
-/**
- * https://www.w3.org/TR/css-color-4/#predefined-a98-rgb
- */
-static constexpr TransferFunction A98RGB = TwoDotTwo;
-}  // namespace NamedTransferFn
 
 namespace NamedGamut {
 
@@ -357,8 +356,8 @@ class ColorSpace : public std::enable_shared_from_this<ColorSpace> {
    * take a `video_full_range_flag` - the caller is expected to verify that it is `1` (indicating a
    * full range image).
    */
-  static std::shared_ptr<ColorSpace> MakeCICP(NamedPrimaries::CICPID colorPrimaries,
-                                              NamedTransferFn::CICPID transferCharacteristics);
+  static std::shared_ptr<ColorSpace> MakeCICP(ColorSpacePrimariesID colorPrimaries,
+                                              TransferFunctionID transferCharacteristics);
 
   /**
    * Create an ColorSpace from a ICC data.

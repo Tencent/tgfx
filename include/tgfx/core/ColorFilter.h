@@ -115,8 +115,7 @@ class ColorFilter {
 
  private:
   virtual PlacementPtr<FragmentProcessor> asFragmentProcessor(
-      Context* context,
-      std::shared_ptr<ColorSpace> dstColorSpace = ColorSpace::MakeSRGB()) const = 0;
+      Context* context, std::shared_ptr<ColorSpace> dstColorSpace = nullptr) const = 0;
 
   friend class OpsCompositor;
   friend class ColorFilterShader;

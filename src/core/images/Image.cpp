@@ -43,14 +43,14 @@ static std::shared_ptr<ColorSpace> MakeColorSpaceFromYUVColorSpace(YUVColorSpace
     case YUVColorSpace::BT601_LIMITED:
     case YUVColorSpace::JPEG_FULL:
       NamedPrimaries::Rec601.toXYZD50(&matrix);
-      return ColorSpace::MakeRGB(NamedTransferFn::Rec601, matrix);
+      return ColorSpace::MakeRGB(NamedTransferFunction::Rec601, matrix);
     case YUVColorSpace::BT709_FULL:
     case YUVColorSpace::BT709_LIMITED:
       NamedPrimaries::Rec709.toXYZD50(&matrix);
-      return ColorSpace::MakeRGB(NamedTransferFn::Rec709, matrix);
+      return ColorSpace::MakeRGB(NamedTransferFunction::Rec709, matrix);
     case YUVColorSpace::BT2020_FULL:
     case YUVColorSpace::BT2020_LIMITED:
-      return ColorSpace::MakeRGB(NamedTransferFn::Rec2020, NamedGamut::Rec2020);
+      return ColorSpace::MakeRGB(NamedTransferFunction::Rec2020, NamedGamut::Rec2020);
   }
 }
 

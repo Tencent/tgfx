@@ -115,7 +115,7 @@ class RenderTargetProxy {
   virtual std::shared_ptr<RenderTarget> getRenderTarget() const = 0;
 
   virtual std::shared_ptr<ColorSpace> colorSpace() const {
-    return ColorSpace::MakeSRGB();
+    return _colorSpace;
   }
 
   /**
@@ -150,5 +150,8 @@ class RenderTargetProxy {
    * Y-axis for ImageOrigin::BottomLeft.
    */
   Matrix getOriginTransform() const;
+
+ private:
+  std::shared_ptr<ColorSpace> _colorSpace = ColorSpace::MakeSRGB();
 };
 }  // namespace tgfx

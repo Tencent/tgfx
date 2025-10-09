@@ -25,6 +25,16 @@
 
 namespace tgfx {
 
+static ColorMatrix33 operator*(const ColorMatrix33& matrix, float scalar) {
+  ColorMatrix33 result{};
+  for (int i = 0; i < 3; ++i) {
+    for (int j = 0; j < 3; ++j) {
+      result.values[i][j] = matrix.values[i][j] * scalar;
+    }
+  }
+  return result;
+}
+
 // Rec. ITU-R BT.2100-2 perceptual quantization (PQ) system, value 16.
 static constexpr TransferFunction PQTF = {
     -2.0f, -107 / 128.0f, 1.0f, 32 / 2523.0f, 2413 / 128.0f, -2392 / 128.0f, 8192 / 1305.0f};
@@ -37,7 +47,8 @@ static constexpr TransferFunction HLGTF = {-3.0f,       2.0f,        2.0f, 1 / 0
 // is specified in Rec2020 primaries in ITU-R BT.2100.
 static void SetOOTFY(const ColorSpace* cs, float* Y) {
   ColorMatrix33 m;
-  cs->gamutTransformTo(ColorSpace::MakeRGB(NamedTransferFn::Linear, NamedGamut::Rec2020).get(), &m);
+  cs->gamutTransformTo(
+      ColorSpace::MakeRGB(NamedTransferFunction::Linear, NamedGamut::Rec2020).get(), &m);
   constexpr float yRec2020[3] = {0.262700f, 0.678000f, 0.059300f};
   for (int i = 0; i < 3; ++i) {
     Y[i] = 0.f;
@@ -102,7 +113,8 @@ ColorSpaceXformSteps::ColorSpaceXformSteps(const ColorSpace* src, AlphaType srcA
       }
       break;
     default:
-      this->flags.linearize = memcmp(&srcTrfn, &NamedTransferFn::Linear, sizeof(srcTrfn)) != 0;
+      this->flags.linearize =
+          memcmp(&srcTrfn, &NamedTransferFunction::Linear, sizeof(srcTrfn)) != 0;
       if (this->flags.linearize) {
         src->transferFn(&this->srcTF);
       }
@@ -136,7 +148,7 @@ ColorSpaceXformSteps::ColorSpaceXformSteps(const ColorSpace* src, AlphaType srcA
       }
       break;
     default:
-      this->flags.encode = memcmp(&dstTrfn, &NamedTransferFn::Linear, sizeof(dstTrfn)) != 0;
+      this->flags.encode = memcmp(&dstTrfn, &NamedTransferFunction::Linear, sizeof(dstTrfn)) != 0;
       if (this->flags.encode) {
         dst->invTransferFn(&this->dstTFInv);
       }

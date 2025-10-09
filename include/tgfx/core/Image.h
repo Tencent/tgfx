@@ -214,8 +214,8 @@ class Image {
   }
 
   /**
- * return colorspace of this image.
- */
+   * return colorspace of this image.
+   */
   virtual std::shared_ptr<ColorSpace> colorSpace() const {
     return ColorSpace::MakeSRGB();
   }
