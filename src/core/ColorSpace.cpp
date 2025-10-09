@@ -613,6 +613,16 @@ static std::shared_ptr<Data> WriteICCProfile(const gfx::skcms_ICCProfile* profil
   return Data::MakeAdopted(ptr, profileSize, Data::FreeProc);
 }
 
+ColorMatrix33 ColorMatrix33::operator*(float scalar) const {
+  ColorMatrix33 result{};
+  for (int i = 0; i < 3; ++i) {
+    for (int j = 0; j < 3; ++j) {
+      result.values[i][j] = values[i][j] * scalar;
+    }
+  }
+  return result;
+}
+
 bool ColorSpacePrimaries::toXYZD50(ColorMatrix33* toXYZD50) const {
   return gfx::skcms_PrimariesToXYZD50(rx, ry, gx, gy, bx, by, wx, wy,
                                       reinterpret_cast<gfx::skcms_Matrix3x3*>(toXYZD50));

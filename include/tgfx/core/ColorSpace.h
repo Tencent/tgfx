@@ -27,16 +27,7 @@ namespace tgfx {
  */
 struct ColorMatrix33 {
   float values[3][3];
-
-  ColorMatrix33 operator*(float scalar) const {
-    ColorMatrix33 result{};
-    for (int i = 0; i < 3; ++i) {
-      for (int j = 0; j < 3; ++j) {
-        result.values[i][j] = values[i][j] * scalar;
-      }
-    }
-    return result;
-  }
+  ColorMatrix33 operator*(float scalar) const;
 };
 
 struct TransferFunction {

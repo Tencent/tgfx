@@ -35,6 +35,25 @@
 #include "tgfx/core/Pixmap.h"
 
 namespace tgfx {
+
+static std::shared_ptr<ColorSpace> MakeColorSpaceFromYUVColorSpace(YUVColorSpace yuvColorSpace) {
+  ColorMatrix33 matrix{};
+  switch (yuvColorSpace) {
+    case YUVColorSpace::BT601_FULL:
+    case YUVColorSpace::BT601_LIMITED:
+    case YUVColorSpace::JPEG_FULL:
+      NamedPrimaries::Rec601.toXYZD50(&matrix);
+      return ColorSpace::MakeRGB(NamedTransferFn::Rec601, matrix);
+    case YUVColorSpace::BT709_FULL:
+    case YUVColorSpace::BT709_LIMITED:
+      NamedPrimaries::Rec709.toXYZD50(&matrix);
+      return ColorSpace::MakeRGB(NamedTransferFn::Rec709, matrix);
+    case YUVColorSpace::BT2020_FULL:
+    case YUVColorSpace::BT2020_LIMITED:
+      return ColorSpace::MakeRGB(NamedTransferFn::Rec2020, NamedGamut::Rec2020);
+  }
+}
+
 std::shared_ptr<Image> Image::MakeFromFile(const std::string& filePath) {
   static WeakMap<std::string, Image> imageMap = {};
   if (filePath.empty()) {
@@ -92,22 +111,19 @@ std::shared_ptr<Image> Image::MakeFrom(const Bitmap& bitmap,
   return MakeFrom(bitmap.makeBuffer(), std::move(colorSpace));
 }
 
-std::shared_ptr<Image> Image::MakeFrom(HardwareBufferRef hardwareBuffer, YUVColorSpace colorSpace,
-                                       std::shared_ptr<ColorSpace> gamutColorSpace) {
+std::shared_ptr<Image> Image::MakeFrom(HardwareBufferRef hardwareBuffer, YUVColorSpace colorSpace) {
   auto buffer = ImageBuffer::MakeFrom(hardwareBuffer, colorSpace);
-  return MakeFrom(std::move(buffer), std::move(gamutColorSpace));
+  return MakeFrom(std::move(buffer), MakeColorSpaceFromYUVColorSpace(colorSpace));
 }
 
-std::shared_ptr<Image> Image::MakeI420(std::shared_ptr<YUVData> yuvData, YUVColorSpace colorSpace,
-                                       std::shared_ptr<ColorSpace> gamutColorSpace) {
+std::shared_ptr<Image> Image::MakeI420(std::shared_ptr<YUVData> yuvData, YUVColorSpace colorSpace) {
   auto buffer = ImageBuffer::MakeI420(std::move(yuvData), colorSpace);
-  return MakeFrom(std::move(buffer), std::move(gamutColorSpace));
+  return MakeFrom(std::move(buffer), MakeColorSpaceFromYUVColorSpace(colorSpace));
 }
 
-std::shared_ptr<Image> Image::MakeNV12(std::shared_ptr<YUVData> yuvData, YUVColorSpace colorSpace,
-                                       std::shared_ptr<ColorSpace> gamutColorSpace) {
+std::shared_ptr<Image> Image::MakeNV12(std::shared_ptr<YUVData> yuvData, YUVColorSpace colorSpace) {
   auto buffer = ImageBuffer::MakeNV12(std::move(yuvData), colorSpace);
-  return MakeFrom(std::move(buffer), std::move(gamutColorSpace));
+  return MakeFrom(std::move(buffer), MakeColorSpaceFromYUVColorSpace(colorSpace));
 }
 
 std::shared_ptr<Image> Image::MakeFrom(Context* context, const BackendTexture& backendTexture,
