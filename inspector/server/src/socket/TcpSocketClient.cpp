@@ -81,4 +81,4 @@ void TcpSocketClient::onSocketErrorOccurred(QAbstractSocket::SocketError error) 
   Q_UNUSED(error);
   qDebug() << "error: " << m_TcpSocket->errorString();
 }
-}
+}  // namespace inspector

@@ -53,7 +53,7 @@ class InspectorView : public QObject {
   Q_SLOT void onCloseView(QQuickCloseEvent*);
   Q_SIGNAL void closeView(QObject* view);
   Q_SIGNAL void failedOpenInspectorView(QString errorMsg);
-    Q_SIGNAL void viewHide();
+  Q_SIGNAL void viewHide();
 
  private:
   int width;

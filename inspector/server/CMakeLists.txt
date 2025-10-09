@@ -8,6 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 cmake_policy(SET CMP0063 NEW)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 set(INSPECTOR_COMMON_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../common)
+set(ZSTD_DIR third_party/zstd)
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
@@ -87,6 +88,18 @@ endif ()
 
 list(APPEND TGFX_INSPECTOR_SRC src src/tags src/socket/*.* src/layerInspector/*.*)
 file(GLOB TGFX_INSPECTOR_FILES src/*.* src/tags/*.* src/socket/*.* src/layerInspector/*.*)
+
+#list(APPEND TGFX_INSPECTOR_INCLUDE
+#        ${ZSTD_DIR}/zstd_ddict.h
+#        ${ZSTD_DIR}/zstd.h
+#        ${ZSTD_DIR}/zstd_decompress_block.h
+#        ${ZSTD_DIR}/zstd_decompress_internal.h)
+
+file(GLOB INSPECTOR_DECOMPRESS_FILES
+        ${ZSTD_DIR}/huf_decompress.c
+        ${ZSTD_DIR}/zstd_ddict.c
+        ${ZSTD_DIR}/zstd_decompress.c
+        ${ZSTD_DIR}/zstd_decompress_block.c)
 
 list(APPEND TGFX_INSPECTOR_COMMON_SRC ${INSPECTOR_COMMON_DIR})
 file(GLOB TGFX_INSPECTOR_COMMON_FILES ${INSPECTOR_COMMON_DIR}/*.*)

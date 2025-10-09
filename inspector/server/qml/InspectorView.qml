@@ -330,6 +330,7 @@ ApplicationWindow {
 
                 Component.onCompleted: {
                     addDockWidget(attributeDock, KDDW.KDDockWidgets.Location_OnRight, null, Qt.size(1500, 0));
+                    attributeDock.addDockWidgetAsTab(textureDock);
                     addDockWidget(taskDock, KDDW.KDDockWidgets.Location_OnLeft, attributeDock, Qt.size(420, 0));
                 }
             }

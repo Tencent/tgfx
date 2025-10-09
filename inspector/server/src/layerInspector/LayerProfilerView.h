@@ -22,12 +22,12 @@
 #include <QDialog>
 #include <QQmlApplicationEngine>
 #include "LayerAttributeModel.h"
+#include "LayerInspectorProtocol.h"
 #include "LayerTreeModel.h"
 #include "MemoryImageProvider.h"
 #include "flatbuffers/flexbuffers.h"
 #include "socket/TcpSocketClient.h"
 #include "socket/WebSocketServer.h"
-#include "LayerInspectorProtocol.h"
 
 namespace inspector {
 class LayerProfilerView : public QObject {
@@ -51,14 +51,14 @@ class LayerProfilerView : public QObject {
   Q_INVOKABLE void showLayerTree();
   Q_INVOKABLE void showLayerAttributeTree();
   void cleanView();
-  signals:
-      void viewHide();
+ signals:
+  void viewHide();
 
-protected:
+ protected:
   void LayerProlfilerQMLImpl();
   void ProcessMessage(const QByteArray& message);
 
-private:
+ private:
   QByteArray feedBackData(LayerInspectorMsgType type, uint64_t value);
 
   void sendSelectedAddress(uint64_t address);
@@ -69,7 +69,7 @@ private:
 
   void processImageFlush(uint64_t imageID);
 
-private:
+ private:
   WebSocketServer* m_WebSocketServer;
   TcpSocketClient* m_TcpSocketClient;
   std::unique_ptr<QQmlApplicationEngine> m_LayerTreeEngine;
@@ -79,4 +79,4 @@ private:
   KDDockWidgets::QtQuick::DockWidget* layerTree;
   KDDockWidgets::QtQuick::DockWidget* layerAttributeTree;
 };
-}
+}  // namespace inspector

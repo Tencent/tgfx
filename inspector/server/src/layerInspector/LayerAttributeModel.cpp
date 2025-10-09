@@ -222,4 +222,4 @@ void LayerAttributeModel::ProcessLayerAttribute(const flexbuffers::Map& contentM
     }
   }
 }
-}
+}  // namespace inspector

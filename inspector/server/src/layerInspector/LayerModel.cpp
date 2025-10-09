@@ -72,4 +72,4 @@ QVariant LayerModel::headerData(int section, Qt::Orientation orientation, int ro
   return orientation == Qt::Horizontal && role == Qt::DisplayRole ? rootItem->data(section)
                                                                   : QVariant{};
 }
-}
+}  // namespace inspector

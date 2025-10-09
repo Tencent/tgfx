@@ -7,7 +7,6 @@
         <file>qml/TitleBar.qml</file>
         <file>qml/TaskTreeView.qml</file>
         <file>qml/TextureView.qml</file>
-        <file>qml/TextureDrawer.qml</file>
         <file>qml/FramesView.qml</file>
         <file>qml/MyGroup.qml</file>
         <file>qml/AttributeView.qml</file>

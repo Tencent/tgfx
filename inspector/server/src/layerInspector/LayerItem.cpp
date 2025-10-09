@@ -58,4 +58,4 @@ int LayerItem::row() const {
 LayerItem* LayerItem::parentItem() {
   return m_parentItem;
 }
-}
+}  // namespace inspector

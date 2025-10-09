@@ -25,12 +25,15 @@
 
 namespace tgfx {
 
-std::shared_ptr<Data> RecordedContentSerialization::Serialize(const RecordedContent* content, SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap) {
+std::shared_ptr<Data> RecordedContentSerialization::Serialize(
+    const RecordedContent* content, SerializeUtils::ComplexObjSerMap* map,
+    SerializeUtils::RenderableObjSerMap* rosMap) {
   DEBUG_ASSERT(content != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;
-  SerializeUtils::SerializeBegin(fbb, inspector::LayerInspectorMsgType::LayerSubAttribute, startMap, contentMap);
+  SerializeUtils::SerializeBegin(fbb, inspector::LayerInspectorMsgType::LayerSubAttribute, startMap,
+                                 contentMap);
   auto type = Types::Get(content);
   SerializeUtils::SetFlexBufferMap(fbb, "type", SerializeUtils::RecordedContentTypeToString(type));
   switch (type) {
@@ -48,38 +51,49 @@ std::shared_ptr<Data> RecordedContentSerialization::Serialize(const RecordedCont
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
 
-void RecordedContentSerialization::SerializeDefaultContentImpl(flexbuffers::Builder& fbb, const RecordedContent* content, SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap) {
+void RecordedContentSerialization::SerializeDefaultContentImpl(
+    flexbuffers::Builder& fbb, const RecordedContent* content,
+    SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap) {
   auto defaultContent = static_cast<const DefaultContent*>(content);
   auto picture = defaultContent->content;
   auto pictureID = SerializeUtils::GetObjID();
-  SerializeUtils::SetFlexBufferMap(fbb, "content", reinterpret_cast<uint64_t>(picture.get()), true, picture != nullptr, pictureID, true);
+  SerializeUtils::SetFlexBufferMap(fbb, "content", reinterpret_cast<uint64_t>(picture.get()), true,
+                                   picture != nullptr, pictureID, true);
   SerializeUtils::FillRenderableObjSerMap(picture, pictureID, rosMap);
   SerializeUtils::FillComplexObjSerMap(picture, pictureID, map);
 }
 
-void RecordedContentSerialization::SerializeForegroundContentImpl(flexbuffers::Builder& fbb, const RecordedContent* content, SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap) {
+void RecordedContentSerialization::SerializeForegroundContentImpl(
+    flexbuffers::Builder& fbb, const RecordedContent* content,
+    SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap) {
   auto foregroundContent = static_cast<const ForegroundContent*>(content);
   auto foreground = foregroundContent->foreground;
   auto background = foregroundContent->background;
   auto foregroundID = SerializeUtils::GetObjID();
   auto backgroundID = SerializeUtils::GetObjID();
-  SerializeUtils::SetFlexBufferMap(fbb, "foreground", reinterpret_cast<uint64_t>(foreground.get()), true, foreground != nullptr, foregroundID, true);
+  SerializeUtils::SetFlexBufferMap(fbb, "foreground", reinterpret_cast<uint64_t>(foreground.get()),
+                                   true, foreground != nullptr, foregroundID, true);
   SerializeUtils::FillRenderableObjSerMap(foreground, foregroundID, rosMap);
   SerializeUtils::FillComplexObjSerMap(foreground, foregroundID, map);
-  SerializeUtils::SetFlexBufferMap(fbb, "background", reinterpret_cast<uint64_t>(background.get()), true, background != nullptr, backgroundID, true);
+  SerializeUtils::SetFlexBufferMap(fbb, "background", reinterpret_cast<uint64_t>(background.get()),
+                                   true, background != nullptr, backgroundID, true);
   SerializeUtils::FillRenderableObjSerMap(background, backgroundID, rosMap);
   SerializeUtils::FillComplexObjSerMap(background, backgroundID, map);
 }
 
-void RecordedContentSerialization::SerializeContourContentImpl(flexbuffers::Builder& fbb, const RecordedContent* content, SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap) {
+void RecordedContentSerialization::SerializeContourContentImpl(
+    flexbuffers::Builder& fbb, const RecordedContent* content,
+    SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap) {
   auto contourContent = static_cast<const ContourContent*>(content);
   auto contour = contourContent->contour;
   auto contourID = SerializeUtils::GetObjID();
-  SerializeUtils::SetFlexBufferMap(fbb, "contour", reinterpret_cast<uint64_t>(contour.get()), true, contour != nullptr, contourID, true);
+  SerializeUtils::SetFlexBufferMap(fbb, "contour", reinterpret_cast<uint64_t>(contour.get()), true,
+                                   contour != nullptr, contourID, true);
   SerializeUtils::FillRenderableObjSerMap(contour, contourID, rosMap);
   SerializeUtils::FillComplexObjSerMap(contour, contourID, map);
   auto contentID = SerializeUtils::GetObjID();
-  SerializeUtils::SetFlexBufferMap(fbb, "recordedContent", "", false, (bool)contourContent->content, contentID);
+  SerializeUtils::SetFlexBufferMap(fbb, "recordedContent", "", false, (bool)contourContent->content,
+                                   contentID);
   SerializeUtils::FillComplexObjSermap(contourContent->content, contentID, map, rosMap);
 }
 }  // namespace tgfx

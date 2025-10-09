@@ -111,7 +111,7 @@ int TaskTreeModel::columnCount(const QModelIndex& parent) const {
 
 bool TaskTreeModel::filterOpTasks(
     const OpTaskData* opTask, const std::unordered_map<uint32_t, std::vector<uint32_t>>& opChilds) {
-  const auto& dataContext = worker->GetDataContext();
+  const auto& dataContext = worker->getDataContext();
   auto& opTaskName = OpTaskName[opTask->type];
   auto& opTasks = dataContext.opTasks;
   if (matchesFilter(opTaskName)) {
@@ -156,7 +156,7 @@ void TaskTreeModel::refreshData() {
   beginResetModel();
 
   auto selectFrame = viewData->selectFrame;
-  const auto& frameData = worker->GetFrameData()->frames;
+  const auto& frameData = worker->getFrameData()->frames;
   if (selectFrame > frameData.size() || selectFrame < 2) {
     endResetModel();
     return;
@@ -166,10 +166,10 @@ void TaskTreeModel::refreshData() {
   if (selectFrame == frameData.size()) {
     nextFrame = 0;
   }
-  const auto& dataContext = worker->GetDataContext();
-  auto selectFrameTime = worker->GetFrameTime(dataContext.frameData, selectFrame);
+  const auto& dataContext = worker->getDataContext();
+  auto selectFrameTime = worker->getFrameTime(dataContext.frameData, selectFrame);
   auto& opTasks = dataContext.opTasks;
-  auto opChilds = dataContext.opChilds;
+  auto& opChilds = dataContext.opChilds;
   std::unordered_map<uint32_t, std::vector<uint32_t>> selectChilds;
   std::vector<std::shared_ptr<OpTaskData>> selectFrameOpTasks;
   for (const auto& iter : opTasks) {
@@ -178,8 +178,9 @@ void TaskTreeModel::refreshData() {
     }
     if (iter->start > selectFrameData.start) {
       selectFrameOpTasks.push_back(iter);
-      if (opChilds.find(iter->id) != opChilds.end()) {
-        auto& tmp = opChilds[iter->id];
+      auto opIter = opChilds.find(iter->id);
+      if (opIter != opChilds.end()) {
+        auto& tmp = opIter->second;
         selectChilds[iter->id] = tmp;
       }
     }

@@ -23,8 +23,9 @@
 #include "AttributeModel.h"
 #include "FramesDrawer.h"
 #include "TaskTreeModel.h"
+#include "TextureDrawer.h"
+#include "TextureListDrawer.h"
 #include "kddockwidgets/qtquick/views/Group.h"
-
 namespace inspector {
 
 class CustomViewFactory : public KDDockWidgets::QtQuick::ViewFactory {
@@ -72,6 +73,8 @@ void InspectorView::initView() {
   qmlRegisterType<FramesDrawer>("FramesDrawer", 1, 0, "FramesDrawer");
   qmlRegisterType<TaskTreeModel>("TaskTreeModel", 1, 0, "TaskTreeModel");
   qmlRegisterType<AttributeModel>("AttributeModel", 1, 0, "AttributeModel");
+  qmlRegisterType<TextureDrawer>("TextureDrawer", 1, 0, "TextureDrawer");
+  qmlRegisterType<TextureListDrawer>("TextureListDrawer", 1, 0, "TextureListDrawer");
   qmlRegisterUncreatableType<KDDockWidgets::QtQuick::Group>(
       "com.kdab.dockwidgets", 2, 0, "GroupView", QStringLiteral("Internal usage only"));
   taskTreeModel = std::make_unique<TaskTreeModel>(&worker, &viewData, this);
@@ -137,12 +140,12 @@ bool InspectorView::saveFile() {
   if (saveFilePath.empty()) {
     return false;
   }
-  return worker.Save(saveFilePath);
+  return worker.saveFile(saveFilePath);
 }
 
 bool InspectorView::saveFileAs(const QUrl& filePath) {
   saveFilePath = filePath.path().toStdString();
-  return worker.Save(saveFilePath);
+  return worker.saveFile(saveFilePath);
 }
 
 void InspectorView::onCloseView(QQuickCloseEvent*) {
@@ -169,7 +172,7 @@ bool InspectorView::getHasSaveFilePath() const {
 }
 
 void InspectorView::nextFrame() {
-  if (viewData.selectFrame + 1 > worker.GetFrameCount() - 1) {
+  if (viewData.selectFrame + 1 > worker.getFrameCount() - 1) {
     return;
   }
   viewData.selectFrame++;

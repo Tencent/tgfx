@@ -50,13 +50,13 @@ class MemoryImageProvider : public QQuickImageProvider {
   bool isImageExisted(uint64_t id);
   // Implement the requestImage method
   QImage requestImage(const QString& id, QSize* size, const QSize& requestedSize) override;
-  signals:
-   void imageFlush(uint64_t imgID);
+ signals:
+  void imageFlush(uint64_t imgID);
 
-private:
+ private:
   std::unordered_map<uint64_t, ImageData> imageMap;
   uint64_t currentImageID;
   QReadWriteLock rwLock;
   QImage* defaultImage;
 };
-}
+}  // namespace inspector

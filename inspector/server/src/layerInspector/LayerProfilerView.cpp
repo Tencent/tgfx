@@ -323,4 +323,4 @@ void LayerProfilerView::processImageFlush(uint64_t imageID) {
   }
 }
 
-}
+}  // namespace inspector

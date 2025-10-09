@@ -17,10 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include <chrono>
 #include <iostream>
 #include <mutex>
 #include <thread>
-#include <chrono>
 #include "FastVector.h"
 #include "Protocol.h"
 #include "Queue.h"
@@ -28,11 +28,11 @@
 #include "Utils.h"
 
 #if defined _WIN32
-#  include <intrin.h>
+#include <intrin.h>
 #endif
 #ifdef __APPLE__
-#  include <TargetConditionals.h>
-#  include <mach/mach_time.h>
+#include <TargetConditionals.h>
+#include <mach/mach_time.h>
 #endif
 
 namespace inspector {

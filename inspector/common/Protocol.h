@@ -26,6 +26,7 @@ constexpr unsigned Lz4CompressBound(unsigned isize) {
 }
 using lz4sz_t = int;
 
+const int MaxTargetSize = 1024 * 1024 * 100;
 enum { TargetFrameSize = 256 * 1024 };
 enum { LZ4Size = Lz4CompressBound(TargetFrameSize) };
 enum { HandshakeShibbolethSize = 4 };
@@ -64,7 +65,6 @@ struct WelcomeMessage {
 enum ServerQuery : uint8_t {
   ServerQueryTerminate,
   ServerQueryString,
-  ServerQueryFrameName,
   ServerQueryValueName,
   ServerQueryDisconnect,
 };

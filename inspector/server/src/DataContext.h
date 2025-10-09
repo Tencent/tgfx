@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include <mutex>
 #include "InspectorEvent.h"
 #include "StreamContext.h"
-#include <mutex>
 
 namespace inspector {
 class DataContext : public StreamContext {
@@ -29,6 +29,8 @@ class DataContext : public StreamContext {
   std::vector<std::shared_ptr<OpTaskData>> opTasks;
   std::vector<std::shared_ptr<OpTaskData>> opTaskStack;
   std::unordered_map<uint64_t, std::string> nameMap;
+  std::unordered_map<uint64_t, std::shared_ptr<tgfx::Data>> pixelsData;
+  std::unordered_map<uint64_t, std::shared_ptr<tgfx::Pixmap>> pixelmap;
   std::unordered_map<uint32_t, std::vector<uint32_t>> opChilds;
   std::unordered_map<uint32_t, std::shared_ptr<PropertyData>> properties;
   std::unordered_map<uint32_t, std::shared_ptr<TextureData>> textures;

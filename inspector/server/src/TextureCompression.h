@@ -16,11 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #pragma once
-#include "DecodeStream.h"
-#include "InspectorEvent.h"
-#include "TagHeader.h"
-namespace inspector {
-void ReadFrameTag(DecodeStream* stream);
 
-TagType WriteFrameTag(EncodeStream* stream, const FrameData* frames);
-}  // namespace inspector
+namespace inspector {
+class TextureCompression {
+
+};
+}

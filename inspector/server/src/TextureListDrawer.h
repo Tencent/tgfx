@@ -17,67 +17,67 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include <QStringList>
+#include <QVector>
+#include <memory>
 #include "AppHost.h"
 #include "ViewData.h"
 #include "Worker.h"
 #include "tgfx/gpu/opengl/qt/QGLWindow.h"
 
 namespace inspector {
-#define FRAME_VIEW_HEIGHT 50
-
-constexpr int64_t MaxFrameTime = 50 * 1000 * 1000;
-
-class TimelineView;
-class FramesDrawer : public QQuickItem {
+class TextureListDrawer : public QQuickItem {
   Q_OBJECT
+  Q_PROPERTY(int imageLabel WRITE setImageLabel)
   Q_PROPERTY(Worker* worker READ getWorker WRITE setWorker)
   Q_PROPERTY(ViewData* viewData READ getViewData WRITE setViewData)
  public:
-  explicit FramesDrawer(QQuickItem* parent = nullptr);
-  ~FramesDrawer() override = default;
+  explicit TextureListDrawer(QQuickItem* parent = nullptr);
+  ~TextureListDrawer() override = default;
 
-  void wheelEvent(QWheelEvent* event) override;
-  void mouseMoveEvent(QMouseEvent* event) override;
-  void mousePressEvent(QMouseEvent* event) override;
-  void mouseReleaseEvent(QMouseEvent* event) override;
-
-  Worker* getWorker() const {
+ Worker* getWorker() const {
     return worker;
-  }
-  void setWorker(Worker* worker) {
-    this->worker = worker;
-    frames = worker->getFrameData();
-  }
+ }
+ void setWorker(Worker* worker) {
+     this->worker = worker;
+ }
 
-  ViewData* getViewData() const {
-    return viewData;
-  }
-  void setViewData(ViewData* viewData) {
-    this->viewData = viewData;
-  }
+ ViewData* getViewData() const {
+   return viewData;
+ }
+ void setViewData(ViewData* viewData) {
+   this->viewData = viewData;
+ }
 
-  Q_SIGNAL void selectFrame();
+ void setImageLabel(int label) {
+   _label = label;
+ }
+
+  Q_SIGNAL void selectedImage(std::shared_ptr<tgfx::Image> image);
+
+  void updateImageData();
 
  protected:
-  void draw();
-  void drawFrames(tgfx::Canvas* canvas);
-  void drawBackground(tgfx::Canvas* canvas);
-  void drawSelectFrame(tgfx::Canvas* canvas, int onScreen, int frameWidth);
-  void drawSelect(tgfx::Canvas* canvas, std::pair<uint32_t, uint32_t>& range, int onScreen,
-                  int frameWidth, uint32_t color);
-  QSGNode* updatePaintNode(QSGNode* node, UpdatePaintNodeData*) override;
+  QSGNode* updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) override;
+  void mousePressEvent(QMouseEvent* event) override;
+  void wheelEvent(QWheelEvent* event) override;
+  void geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) override;
 
  private:
+  void updateLayout();
+  void draw();
+  int itemAtPosition(float y) const;
+
+private:
   Worker* worker = nullptr;
-  const FrameData* frames = nullptr;
   ViewData* viewData = nullptr;
-  uint64_t frameTarget = 0;
+  int _label = 0;
+  std::vector<tgfx::Rect> squareRects;
+  std::vector<std::shared_ptr<tgfx::Image>> images;
+  bool layoutDirty = true;
+  float scrollOffset = 0.f;
+
   std::shared_ptr<tgfx::QGLWindow> tgfxWindow = nullptr;
   std::shared_ptr<AppHost> appHost = nullptr;
-
-  float viewOffset = 0.0f;
-  float placeWidth = 50.f;
-
-  QPoint lastRightDragPos = {0, 0};
 };
 }  // namespace inspector

@@ -94,4 +94,4 @@ void LayerTreeModel::setupModelData(const flexbuffers::Map& contentMap, LayerIte
     setupModelData(childMap, parent->child(parent->childCount() - 1));
   }
 }
-}
+}  // namespace inspector

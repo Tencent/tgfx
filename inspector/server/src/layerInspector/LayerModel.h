@@ -38,7 +38,7 @@ class LayerModel : public QAbstractItemModel {
   Qt::ItemFlags flags(const QModelIndex& index) const override;
   QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
 
-protected:
+ protected:
   std::shared_ptr<LayerItem> rootItem;
 };
-}
+}  // namespace inspector

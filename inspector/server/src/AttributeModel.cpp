@@ -40,7 +40,7 @@ bool AttributeModel::getIsTask() const {
   if (selectOpTask == -1) {
     return true;
   }
-  const auto& dataContext = worker->GetDataContext();
+  const auto& dataContext = worker->getDataContext();
   const auto& opTasks = dataContext.opTasks;
   if (static_cast<uint32_t>(selectOpTask) > opTasks.size()) {
     return true;
@@ -80,7 +80,7 @@ void AttributeModel::refreshData() {
     Q_EMIT itemsChanged();
     return;
   }
-  const auto& dataContext = worker->GetDataContext();
+  const auto& dataContext = worker->getDataContext();
   const auto& properties = dataContext.properties;
   const auto& nameMap = dataContext.nameMap;
   const auto& propertyIter = properties.find(static_cast<uint32_t>(selectOpTask));

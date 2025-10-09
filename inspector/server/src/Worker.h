@@ -26,7 +26,6 @@
 #include "Protocol.h"
 #include "Queue.h"
 #include "Socket.h"
-#include "StringDiscovery.h"
 
 namespace inspector {
 class Worker : public QObject {
@@ -36,60 +35,66 @@ class Worker : public QObject {
     int size;
   };
 
+  struct TexturePixels {
+    std::shared_ptr<tgfx::Data> pixels;
+  };
+
+  explicit Worker(const std::string& filePath);
   Worker(const char* addr, uint16_t port);
-  Worker(std::string& filePath);
-  ~Worker();
+  ~Worker() override;
 
-  bool Open(const std::string& filePath);
-  bool Save(const std::string& filePath);
+  bool openFile(const std::string& filePath);
+  bool saveFile(const std::string& filePath);
 
-  int64_t GetFrameTime(const FrameData& fd, size_t idx) const;
-  int64_t GetLastTime() const;
-  int64_t GetFrameStart(uint32_t index) const;
-  int64_t GetFrameDrawCall(uint32_t index) const;
-  int64_t GetFrameTriangles(uint32_t index) const;
-  size_t GetFrameCount() const;
+  int64_t getFrameTime(const FrameData& fd, size_t idx) const;
+  int64_t getLastTime() const;
+  int64_t getFrameStart(uint32_t index) const;
+  int64_t getFrameDrawCall(uint32_t index) const;
+  int64_t getFrameTriangles(uint32_t index) const;
+  size_t getFrameCount() const;
   bool hasExpection() const;
   std::vector<std::string>& getErrorMessage();
 
-  FrameData* GetFrameData();
-  const DataContext& GetDataContext() const;
+  FrameData* getFrameData();
+  const DataContext& getDataContext() const;
 
  private:
-  DecodeStream ReadBodyBytes(DecodeStream* stream);
+  DecodeStream readBodyBytes(DecodeStream* stream);
 
-  void Shutdown();
-  void Exec();
-  void Network();
+  void shutdown();
+  void exec();
+  void netWork();
 
-  void NewOpTask(std::shared_ptr<OpTaskData> opTask);
-  void Query(ServerQuery type, uint64_t data, uint32_t extra = 0);
-  void QueryTerminate();
-  bool DispatchProcess(const QueueItem& ev, const char*& ptr);
-  bool Process(const QueueItem& ev);
-  void ProcessOperateBegin(const QueueOperateBegin& ev);
-  void ProcessOperateEnd(const QueueOperateEnd& ev);
-  void ProcessAttributeImpl(DataHead& head, std::shared_ptr<tgfx::Data> data);
-  void ProcessFloatValue(const QueueAttributeDataFloat& ev);
-  void ProcessFloat4Value(const QueueAttributeDataFloat4& ev);
-  void ProcessIntValue(const QueueAttributeDataInt& ev);
-  void ProcessBoolValue(const QueueAttributeDataBool& ev);
-  void ProcessMat4Value(const QueueAttributeDataMat4& ev);
-  void ProcessEnumValue(const QueueAttributeDataEnum& ev);
-  void ProcessUint32Value(const QueueAttributeDataUInt32& ev);
-  void ProcessColorValue(const QueueAttributeDataUInt32& ev);
-  void ProcessFrameMark(const QueueFrameMark& ev);
+  void newOpTask(const std::shared_ptr<OpTaskData>& opTask);
+  void query(ServerQuery type, uint64_t data, uint32_t extra = 0);
+  void queryTerminate();
+  bool dispatchProcess(const QueueItem& ev, const char*& ptr);
+  bool process(const QueueItem& ev);
+  void processOperateBegin(const QueueOperateBegin& ev);
+  void processOperateEnd(const QueueOperateEnd& ev);
+  void processAttributeImpl(DataHead& head, std::shared_ptr<tgfx::Data> data);
+  void processFloatValue(const QueueAttributeDataFloat& ev);
+  void processFloat4Value(const QueueAttributeDataFloat4& ev);
+  void processIntValue(const QueueAttributeDataInt& ev);
+  void processBoolValue(const QueueAttributeDataBool& ev);
+  void processMat4Value(const QueueAttributeDataMat4& ev);
+  void processEnumValue(const QueueAttributeDataEnum& ev);
+  void processUint32Value(const QueueAttributeDataUInt32& ev);
+  void processColorValue(const QueueAttributeDataUInt32& ev);
+  void processFrameMark(const QueueFrameMark& ev);
+  void processTextureData(const QueueTextureData& ev);
+  void processTextureSampler(const QueueTextureSampler& ev);
 
-  void HandleValueName(uint64_t name, const char* str, size_t sz);
+  void addPixelsData(const char* data, size_t sz);
 
-  int64_t TscTime(int64_t tsc) {
-    return int64_t(tsc - dataContext.baseTime);
+  void handleValueName(uint64_t name, const char* str, size_t sz);
+  void handleTexturePixels(uint64_t samplerPtr, const void* data, size_t sz);
+
+  int64_t tscTime(int64_t tsc) const {
+    return tsc - dataContext.baseTime;
   }
-  int64_t TscTime(uint64_t tsc) {
-    return int64_t(int64_t(tsc) - dataContext.baseTime);
-  }
-  int64_t TscPeriod(uint64_t tsc) {
-    return int64_t(tsc);
+  int64_t tscTime(uint64_t tsc) const {
+    return static_cast<int64_t>(tsc) - dataContext.baseTime;
   }
 
  private:
@@ -129,6 +134,10 @@ class Worker : public QObject {
   size_t serverQuerySpaceBase = 0;
 
   int64_t refTime = 0;
+
+  size_t pixelsDataSize = 0;
+  char* pixelsDataBuffer = nullptr;
+  std::vector<TexturePixels> penddingPixels;
 };
 
 }  // namespace inspector

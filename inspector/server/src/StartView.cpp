@@ -132,19 +132,14 @@ void StartView::connectToClient(QObject* object) {
   auto client = dynamic_cast<ClientData*>(object);
   if (client) {
     if (inspectorView) {
-      connect(inspectorView, &InspectorView::destroyed, this,
-              [&, client]() {
-                inspectorView = new InspectorView(client, 1920, this);
-                connect(inspectorView, &InspectorView::viewHide, [this]() {
-                  showStartView();
-                });
-              });
+      connect(inspectorView, &InspectorView::destroyed, this, [&, client]() {
+        inspectorView = new InspectorView(client, 1920, this);
+        connect(inspectorView, &InspectorView::viewHide, [this]() { showStartView(); });
+      });
       inspectorView->deleteLater();
     } else {
       inspectorView = new InspectorView(client, 1920, this);
-      connect(inspectorView, &InspectorView::viewHide, [this]() {
-        showStartView();
-      });
+      connect(inspectorView, &InspectorView::viewHide, [this]() { showStartView(); });
     }
   }
 }
@@ -156,17 +151,13 @@ void StartView::connectToClientByLayerInspector(QObject* object) {
       connect(layerProfilerView, &LayerProfilerView::destroyed, this, [&, client] {
         layerProfilerView =
             new LayerProfilerView(QString::fromStdString(client->address), client->port);
-        connect(layerProfilerView, &LayerProfilerView::viewHide, [this]() {
-          showStartView();
-        });
+        connect(layerProfilerView, &LayerProfilerView::viewHide, [this]() { showStartView(); });
       });
       layerProfilerView->deleteLater();
     } else {
       layerProfilerView =
           new LayerProfilerView(QString::fromStdString(client->address), client->port);
-      connect(layerProfilerView, &LayerProfilerView::viewHide, [this]() {
-          showStartView();
-      });
+      connect(layerProfilerView, &LayerProfilerView::viewHide, [this]() { showStartView(); });
     }
   }
 }

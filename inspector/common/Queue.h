@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -31,9 +31,12 @@ enum class QueueType : uint8_t {
   ValueDataFloat,
   ValueDataBool,
   ValueDataEnum,
+  TextureSampler,
+  TextureData,
   KeepAlive,
   StringData,
-  ValueName
+  ValueName,
+  PixelsData,
 };
 
 #pragma pack(push, 1)
@@ -46,7 +49,7 @@ struct QueueHeader {
 };
 
 struct QueueOperaterBase {
-  int64_t time;
+  int64_t nsTime;
 };
 
 struct QueueOperateBegin : QueueOperaterBase {
@@ -58,7 +61,7 @@ struct QueueOperateEnd : QueueOperaterBase {
 };
 
 struct QueueFrameMark {
-  int64_t time;
+  int64_t nsTime;
 };
 
 struct QueueAttributeData {
@@ -97,6 +100,18 @@ struct QueueStringTransfer {
   uint64_t ptr;
 };
 
+struct QueueTextureSampler {
+  uint64_t samplerPtr;
+};
+
+struct QueueTextureData: QueueTextureSampler {
+  uint8_t format;
+  int width;
+  int height;
+  size_t rowBytes;
+  uint64_t pixels;
+};
+
 struct QueueItem {
   QueueHeader hdr;
   union {
@@ -111,12 +126,12 @@ struct QueueItem {
     QueueAttributeDataFloat attributeDataFloat;
     QueueAttributeDataBool attributeDataBool;
     QueueAttributeDataEnum attributeDataEnum;
+    QueueTextureSampler textureSampler;
+    QueueTextureData textureData;
   };
 };
 
 #pragma pack(pop)
-
-enum { QueueItemSize = sizeof(QueueItem) };
 static constexpr size_t QueueDataSize[] = {
     sizeof(QueueHeader) + sizeof(QueueOperateBegin),
     sizeof(QueueHeader) + sizeof(QueueOperateEnd),
@@ -129,7 +144,10 @@ static constexpr size_t QueueDataSize[] = {
     sizeof(QueueHeader) + sizeof(QueueAttributeDataFloat),
     sizeof(QueueHeader) + sizeof(QueueAttributeDataBool),
     sizeof(QueueHeader) + sizeof(QueueAttributeDataEnum),
+    sizeof(QueueHeader) + sizeof(QueueTextureSampler),
+    sizeof(QueueHeader) + sizeof(QueueTextureData),
     sizeof(QueueHeader),
+    sizeof(QueueHeader) + sizeof(QueueStringTransfer),
     sizeof(QueueHeader) + sizeof(QueueStringTransfer),
     sizeof(QueueHeader) + sizeof(QueueStringTransfer),
 };

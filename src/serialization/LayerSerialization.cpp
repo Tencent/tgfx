@@ -17,12 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #ifdef TGFX_USE_INSPECTOR
 
+#include "LayerSerialization.h"
 #include <tgfx/layers/ImageLayer.h>
 #include <tgfx/layers/ShapeLayer.h>
 #include <tgfx/layers/SolidLayer.h>
 #include <tgfx/layers/TextLayer.h>
 #include "LayerFilterSerialization.h"
-#include "LayerSerialization.h"
 #include "core/utils/Log.h"
 #include "tgfx/layers/Layer.h"
 
@@ -131,7 +131,8 @@ void LayerSerialization::SerializeBasicLayerImpl(flexbuffers::Builder& fbb, cons
   auto parent = layer->parent();
   SerializeUtils::SetFlexBufferMap(fbb, "parent", reinterpret_cast<uint64_t>(parent), true,
                                    parent != nullptr, parentID);
-  SerializeUtils::FillComplexObjSerMap(parent ? parent->shared_from_this() : nullptr, parentID, map, rosMap);
+  SerializeUtils::FillComplexObjSerMap(parent ? parent->shared_from_this() : nullptr, parentID, map,
+                                       rosMap);
 
   auto childrenID = SerializeUtils::GetObjID();
   auto children = layer->children();
@@ -164,7 +165,8 @@ void LayerSerialization::SerializeBasicLayerImpl(flexbuffers::Builder& fbb, cons
   SerializeUtils::FillComplexObjSerMap(renderBounds, renderBoundsID, map);
 
   auto recordedContentID = SerializeUtils::GetObjID();
-  SerializeUtils::SetFlexBufferMap(fbb, "recordedContent", "", false, (bool)layer->recordedContent, recordedContentID);
+  SerializeUtils::SetFlexBufferMap(fbb, "recordedContent", "", false, (bool)layer->recordedContent,
+                                   recordedContentID);
   SerializeUtils::FillComplexObjSermap(layer->recordedContent, recordedContentID, map, rosMap);
 }
 
