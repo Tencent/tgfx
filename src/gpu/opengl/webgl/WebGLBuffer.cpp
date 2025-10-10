@@ -35,18 +35,19 @@ void* WebGLBuffer::map(size_t offset, size_t size) {
 
   DEBUG_ASSERT(offset + size <= _size);
 
-  if (dataAddress != nullptr) {
+  bufferData = malloc(_size);
+  if (bufferData != nullptr) {
     subDataOffset = offset;
     subDataSize = size;
 
-    return static_cast<uint8_t*>(dataAddress) + offset;
+    return static_cast<uint8_t*>(bufferData) + offset;
   }
 
   return nullptr;
 }
 
 void WebGLBuffer::unmap() {
-  if (dataAddress == nullptr) {
+  if (bufferData == nullptr) {
     return;
   }
 
@@ -56,6 +57,9 @@ void WebGLBuffer::unmap() {
   gl->bindBuffer(bufferTarget, _bufferID);
   gl->bufferSubData(bufferTarget, static_cast<GLintptr>(subDataOffset),
                     static_cast<GLsizeiptr>(subDataSize),
-                    static_cast<uint8_t*>(dataAddress) + subDataOffset);
+                    static_cast<uint8_t*>(bufferData) + subDataOffset);
+
+  free(bufferData);
+  bufferData = nullptr;
 }
 }  // namespace tgfx
