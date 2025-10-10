@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLBuffer.h"
+#include <limits>
 #include "GLGPU.h"
 #include "GLUtil.h"
-#include <limits>
 
 namespace tgfx {
 GLBuffer::GLBuffer(std::shared_ptr<GLInterface> interface, unsigned bufferID, size_t size,

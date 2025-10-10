@@ -17,10 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "WebGLBuffer.h"
-
-#include <utility>
 #include <limits>
-
+#include <utility>
 #include "gpu/GPU.h"
 #include "gpu/opengl/GLGPU.h"
 
