@@ -65,8 +65,8 @@ void WebGLBuffer::unmap() {
   auto gl = _interface->functions();
 
   gl->bindBuffer(bufferTarget, _bufferID);
-  gl->bufferSubData(bufferTarget, static_cast<int32_t>(subDataOffset),
-                    static_cast<int32_t>(subDataSize),
+  gl->bufferSubData(bufferTarget, static_cast<GLintptr>(subDataOffset),
+                    static_cast<GLsizeiptr>(subDataSize),
                     static_cast<uint8_t*>(dataAddress) + subDataOffset);
 }
 
