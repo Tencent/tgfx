@@ -104,7 +104,7 @@ struct QueueTextureSampler {
   uint64_t samplerPtr;
 };
 
-struct QueueTextureData: QueueTextureSampler {
+struct QueueTextureData : QueueTextureSampler {
   uint8_t format;
   int width;
   int height;

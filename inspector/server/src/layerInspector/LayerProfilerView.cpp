@@ -244,6 +244,7 @@ void LayerProfilerView::ProcessMessage(const QByteArray& message) {
       auto currentAddress = m_LayerAttributeModel->GetCurrentAddress();
       if (!m_LayerTreeModel->selectLayer(currentAddress)) {
         m_LayerAttributeModel->clearAttribute();
+        m_LayerTreeModel->selectDefaultLayer();
       }
       break;
     }

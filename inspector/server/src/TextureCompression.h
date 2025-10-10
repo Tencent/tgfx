@@ -18,7 +18,5 @@
 #pragma once
 
 namespace inspector {
-class TextureCompression {
-
-};
-}
+class TextureCompression {};
+}  // namespace inspector

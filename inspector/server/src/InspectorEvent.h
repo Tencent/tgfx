@@ -17,11 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include <tgfx/core/Pixmap.h>
 #include <cstdint>
 #include <unordered_map>
 #include <vector>
-#include <tgfx/core/Pixmap.h>
-
 #include "Protocol.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/gpu/PixelFormat.h"

@@ -163,12 +163,11 @@ void TextureListDrawer::updateImageData() {
   const auto& textureData = textureIter->second;
   if (_label == 0) {
     const auto& inputTextures = textureData->inputTexture;
-    for (const auto& input: inputTextures) {
+    for (const auto& input : inputTextures) {
       auto data = tgfx::Data::MakeWithCopy(input->pixels(), input->byteSize());
       images.push_back(tgfx::Image::MakeFrom(input->info(), data));
     }
-  }
-  else {
+  } else {
     const auto& outputTexture = textureData->outputTextures;
     if (outputTexture) {
       auto data = tgfx::Data::MakeWithCopy(outputTexture->pixels(), outputTexture->byteSize());

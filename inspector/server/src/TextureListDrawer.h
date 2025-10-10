@@ -35,23 +35,23 @@ class TextureListDrawer : public QQuickItem {
   explicit TextureListDrawer(QQuickItem* parent = nullptr);
   ~TextureListDrawer() override = default;
 
- Worker* getWorker() const {
+  Worker* getWorker() const {
     return worker;
- }
- void setWorker(Worker* worker) {
-     this->worker = worker;
- }
+  }
+  void setWorker(Worker* worker) {
+    this->worker = worker;
+  }
 
- ViewData* getViewData() const {
-   return viewData;
- }
- void setViewData(ViewData* viewData) {
-   this->viewData = viewData;
- }
+  ViewData* getViewData() const {
+    return viewData;
+  }
+  void setViewData(ViewData* viewData) {
+    this->viewData = viewData;
+  }
 
- void setImageLabel(int label) {
-   _label = label;
- }
+  void setImageLabel(int label) {
+    _label = label;
+  }
 
   Q_SIGNAL void selectedImage(std::shared_ptr<tgfx::Image> image);
 
@@ -68,7 +68,7 @@ class TextureListDrawer : public QQuickItem {
   void draw();
   int itemAtPosition(float y) const;
 
-private:
+ private:
   Worker* worker = nullptr;
   ViewData* viewData = nullptr;
   int _label = 0;

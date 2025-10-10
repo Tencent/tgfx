@@ -352,9 +352,8 @@ void Worker::netWork() {
     auto sz = 0;
     if (lz4sz <= TargetFrameSize) {
       sz = LZ4_decompress_safe_continue((LZ4_streamDecode_t*)lz4Stream, lz4buf.get(), buf, lz4sz,
-                                             TargetFrameSize);
-    }
-    else {
+                                        TargetFrameSize);
+    } else {
       sz = lz4sz;
       // MemWrite(buf, lz4buf.get(), static_cast<size_t>(lz4sz));
     }
@@ -418,8 +417,7 @@ bool Worker::dispatchProcess(const QueueItem& ev, const char*& ptr) {
       memcpy(&sz, ptr, sizeof(sz));
       ptr += sizeof(sz);
 
-    }
-    else {
+    } else {
       uint16_t sz;
       memcpy(&sz, ptr, sizeof(sz));
       ptr += sizeof(sz);
@@ -622,12 +620,12 @@ void Worker::processTextureData(const QueueTextureData& ev) {
   if (texture == textures.end()) {
     textureData = std::make_shared<TextureData>();
     textures[opTask->id] = textureData;
-  }
-  else {
+  } else {
     textureData = texture->second;
   }
   auto input = textureData->inputTexture;
-  auto imageInfo = tgfx::ImageInfo::Make(ev.width, ev.height, PixelFormatToColorType(static_cast<tgfx::PixelFormat>(ev.format)));
+  auto imageInfo = tgfx::ImageInfo::Make(
+      ev.width, ev.height, PixelFormatToColorType(static_cast<tgfx::PixelFormat>(ev.format)));
   auto& pixelsData = dataContext.pixelsData;
   auto pixelsIter = pixelsData.find(ev.samplerPtr);
   if (pixelsIter == pixelsData.end()) {
@@ -640,7 +638,7 @@ void Worker::processTextureData(const QueueTextureData& ev) {
   input.push_back(pixmap);
 }
 
-void Worker::processTextureSampler(const QueueTextureSampler& ev){
+void Worker::processTextureSampler(const QueueTextureSampler& ev) {
   auto& stack = dataContext.opTaskStack;
   if (stack.empty()) {
     return;
@@ -652,8 +650,7 @@ void Worker::processTextureSampler(const QueueTextureSampler& ev){
   if (texture == textures.end()) {
     textureData = std::make_shared<TextureData>();
     textures[opTask->id] = textureData;
-  }
-  else {
+  } else {
     textureData = texture->second;
   }
   auto& pixelmap = dataContext.pixelmap;
@@ -666,7 +663,7 @@ void Worker::processTextureSampler(const QueueTextureSampler& ev){
   input.push_back(pixmap);
 }
 
-void Worker::addPixelsData(const char *data, size_t sz) {
+void Worker::addPixelsData(const char* data, size_t sz) {
   ASSERT(sz % 8 == 0);
   if (pixelsDataSize < sz) {
     pixelsDataSize = sz;
@@ -677,9 +674,7 @@ void Worker::addPixelsData(const char *data, size_t sz) {
   auto src = (uint8_t*)data;
   auto dst = (uint8_t*)pixelsDataBuffer;
   memcpy(dst, src, sz);
-
 }
-
 
 void Worker::handleValueName(uint64_t name, const char* str, size_t sz) {
   auto& nameMap = dataContext.nameMap;

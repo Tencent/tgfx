@@ -31,6 +31,7 @@ class LayerTreeModel : public LayerModel {
   ~LayerTreeModel() override = default;
   void setLayerTreeData(const flexbuffers::Map& contentMap);
   bool selectLayer(uint64_t address);
+  void selectDefaultLayer();
   QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override;
   void flushLayerTree();
   Q_INVOKABLE void MouseSelectedIndex(QModelIndex index);

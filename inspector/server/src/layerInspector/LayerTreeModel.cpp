@@ -40,6 +40,14 @@ bool LayerTreeModel::selectLayer(uint64_t address) {
   return false;
 }
 
+void LayerTreeModel::selectDefaultLayer() {
+  auto item = rootItem->child(0);
+  int row = item->row();
+  QModelIndex index = createIndex(row, 0, item);
+  emit selectIndex(index);
+  MouseSelectedIndex(index);
+}
+
 QVariant LayerTreeModel::data(const QModelIndex& index, int role) const {
   if (!index.isValid() || role != Qt::DisplayRole) return {};
 
