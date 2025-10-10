@@ -18,13 +18,10 @@
 
 #pragma once
 
-#include "core/utils/UniqueID.h"
-#include "gpu/GPUBuffer.h"
-#include "gpu/opengl/GLInterface.h"
-#include "gpu/opengl/GLResource.h"
+#include "gpu/opengl/GLBuffer.h"
 
 namespace tgfx {
-class WebGLBuffer : public GPUBuffer, public GLResource {
+class WebGLBuffer : public GLBuffer {
  public:
   /**
    * Creates a new WebGLBuffer with the specified size and usage flags.
@@ -32,25 +29,11 @@ class WebGLBuffer : public GPUBuffer, public GLResource {
   WebGLBuffer(std::shared_ptr<GLInterface> interface, unsigned bufferID, size_t size,
               uint32_t usage);
 
-  ~WebGLBuffer() override;
-
-  unsigned target() const;
-
-  unsigned bufferID() const {
-    return _bufferID;
-  }
-
   void* map(size_t offset, size_t size) override;
 
   void unmap() override;
 
-  void onRelease(GLGPU* gpu) override;
-
  private:
-  std::shared_ptr<GLInterface> _interface = nullptr;
-  uint32_t uniqueID = 0;
-  unsigned _bufferID = 0;
-  void* dataAddress = nullptr;
   size_t subDataOffset = 0;
   size_t subDataSize = 0;
 };

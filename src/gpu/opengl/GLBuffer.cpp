@@ -19,15 +19,22 @@
 #include "GLBuffer.h"
 #include "GLGPU.h"
 #include "GLUtil.h"
+#include <limits>
 
 namespace tgfx {
 GLBuffer::GLBuffer(std::shared_ptr<GLInterface> interface, unsigned bufferID, size_t size,
                    uint32_t usage)
     : GPUBuffer(size, usage), _interface(std::move(interface)), uniqueID(UniqueID::Next()),
       _bufferID(bufferID) {
+#if defined(__EMSCRIPTEN__)
+  if (usage & GPUBufferUsage::UNIFORM) {
+    dataAddress = malloc(_size);
+  }
+#else
   if ((usage & GPUBufferUsage::UNIFORM) && !_interface->caps()->shaderCaps()->uboSupport) {
     dataAddress = malloc(_size);
   }
+#endif
 }
 
 GLBuffer::~GLBuffer() {
@@ -52,6 +59,12 @@ unsigned GLBuffer::target() const {
 }
 
 void* GLBuffer::map(size_t offset, size_t size) {
+  if (size == std::numeric_limits<size_t>::max()) {
+    size = _size - offset;
+  }
+
+  DEBUG_ASSERT(offset + size <= _size);
+
   if (dataAddress != nullptr) {
     return static_cast<uint8_t*>(dataAddress) + offset;
   }

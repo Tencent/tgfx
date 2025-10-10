@@ -17,10 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLGPU.h"
+#include "gpu/opengl/GLBuffer.h"
 #if defined(__EMSCRIPTEN__)
 #include "webgl/WebGLBuffer.h"
-#else
-#include "gpu/opengl/GLBuffer.h"
 #endif
 #include "gpu/opengl/GLCommandEncoder.h"
 #include "gpu/opengl/GLDepthStencilTexture.h"

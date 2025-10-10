@@ -17,39 +17,26 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "WebGLBuffer.h"
+
+#include <utility>
+#include <limits>
+
 #include "gpu/GPU.h"
 #include "gpu/opengl/GLGPU.h"
 
 namespace tgfx {
 WebGLBuffer::WebGLBuffer(std::shared_ptr<GLInterface> interface, unsigned bufferID, size_t size,
                          uint32_t usage)
-    : GPUBuffer(size, usage), _interface(std::move(interface)), uniqueID(UniqueID::Next()),
-      _bufferID(bufferID) {
-  dataAddress = malloc(_size);
-}
-
-WebGLBuffer::~WebGLBuffer() {
-  if (dataAddress != nullptr) {
-    free(dataAddress);
-    dataAddress = nullptr;
-  }
-}
-
-unsigned WebGLBuffer::target() const {
-  if (_usage & GPUBufferUsage::VERTEX) {
-    return GL_ARRAY_BUFFER;
-  }
-  if (_usage & GPUBufferUsage::INDEX) {
-    return GL_ELEMENT_ARRAY_BUFFER;
-  }
-  if (_usage & GPUBufferUsage::UNIFORM) {
-    return GL_UNIFORM_BUFFER;
-  }
-  LOGE("WebGLBuffer::target() invalid buffer usage!");
-  return 0;
+    : GLBuffer(std::move(interface), bufferID, size, usage) {
 }
 
 void* WebGLBuffer::map(size_t offset, size_t size) {
+  if (size == std::numeric_limits<size_t>::max()) {
+    size = _size - offset;
+  }
+
+  DEBUG_ASSERT(offset + size <= _size);
+
   if (dataAddress != nullptr) {
     subDataOffset = offset;
     subDataSize = size;
@@ -61,6 +48,10 @@ void* WebGLBuffer::map(size_t offset, size_t size) {
 }
 
 void WebGLBuffer::unmap() {
+  if (dataAddress == nullptr) {
+    return;
+  }
+
   auto bufferTarget = target();
   auto gl = _interface->functions();
 
@@ -68,14 +59,5 @@ void WebGLBuffer::unmap() {
   gl->bufferSubData(bufferTarget, static_cast<GLintptr>(subDataOffset),
                     static_cast<GLsizeiptr>(subDataSize),
                     static_cast<uint8_t*>(dataAddress) + subDataOffset);
-}
-
-void WebGLBuffer::onRelease(GLGPU* gpu) {
-  DEBUG_ASSERT(gpu != nullptr);
-  if (_bufferID > 0) {
-    auto gl = gpu->functions();
-    gl->deleteBuffers(1, &_bufferID);
-    _bufferID = 0;
-  }
 }
 }  // namespace tgfx
