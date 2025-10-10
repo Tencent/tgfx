@@ -335,12 +335,13 @@
         "textFont": "492105ac"
     },
     "StrokeTest": {
-        "DrawPathByHairlinePaint": "492105ac",
-        "DrawShapeByHairlinePaint": "492105ac",
-        "ExtremelyThinStrokeLayer": "492105ac",
-        "ExtremelyThinStrokePath": "492105ac",
-        "HairlineLayer": "492105ac",
-        "ZoomUpTinyStrokeShape": "492105ac"
+        "DrawPathByHairlinePaint": "5be7fc78",
+        "DrawShapeByHairlinePaint": "5be7fc78",
+        "ExtremelyThinStrokeLayer": "4bd4e0ad",
+        "ExtremelyThinStrokePath": "4bd4e0ad",
+        "HairlineLayer": "5be7fc78",
+        "LineRenderAsHairline": "492105ac",
+        "ZoomUpTinyStrokeShape": "5be7fc78"
     },
     "SurfaceTest": {
         "ImageSnapshot1": "492105ac",
