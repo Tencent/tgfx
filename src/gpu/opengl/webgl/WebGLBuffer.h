@@ -25,12 +25,12 @@
 
 namespace tgfx {
 class WebGLBuffer : public GPUBuffer, public GLResource {
-public:
+ public:
   /**
    * Creates a new WebGLBuffer with the specified size and usage flags.
    */
   WebGLBuffer(std::shared_ptr<GLInterface> interface, unsigned bufferID, size_t size,
-                   uint32_t usage);
+              uint32_t usage);
 
   ~WebGLBuffer() override;
 
@@ -46,7 +46,7 @@ public:
 
   void onRelease(GLGPU* gpu) override;
 
-private:
+ private:
   std::shared_ptr<GLInterface> _interface = nullptr;
   uint32_t uniqueID = 0;
   unsigned _bufferID = 0;

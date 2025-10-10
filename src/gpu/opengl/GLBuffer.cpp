@@ -60,7 +60,8 @@ void* GLBuffer::map(size_t offset, size_t size) {
   if (gl->mapBufferRange != nullptr) {
     auto bufferTarget = target();
     gl->bindBuffer(bufferTarget, _bufferID);
-    return gl->mapBufferRange(bufferTarget, static_cast<int32_t>(offset), static_cast<int32_t>(size),
+    return gl->mapBufferRange(bufferTarget, static_cast<int32_t>(offset),
+                              static_cast<int32_t>(size),
                               GL_MAP_WRITE_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
   }
 

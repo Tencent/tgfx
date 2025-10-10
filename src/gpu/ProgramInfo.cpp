@@ -164,7 +164,8 @@ std::shared_ptr<GPUBuffer> ProgramInfo::getUniformBuffer(const PipelineProgram* 
     uniformBuffer =
         globalCache->findOrCreateUniformBuffer(totalUniformBufferSize, &lastUniformBufferOffset);
     if (uniformBuffer != nullptr) {
-      auto buffer = static_cast<uint8_t*>(uniformBuffer->map(lastUniformBufferOffset, totalUniformBufferSize));
+      auto buffer = static_cast<uint8_t*>(
+          uniformBuffer->map(lastUniformBufferOffset, totalUniformBufferSize));
       if (vertexUniformData != nullptr) {
         vertexUniformData->setBuffer(buffer);
         *vertexOffset = lastUniformBufferOffset;

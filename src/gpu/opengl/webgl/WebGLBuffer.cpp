@@ -23,8 +23,8 @@
 namespace tgfx {
 WebGLBuffer::WebGLBuffer(std::shared_ptr<GLInterface> interface, unsigned bufferID, size_t size,
                          uint32_t usage)
-  : GPUBuffer(size, usage), _interface(std::move(interface)), uniqueID(UniqueID::Next()),
-    _bufferID(bufferID) {
+    : GPUBuffer(size, usage), _interface(std::move(interface)), uniqueID(UniqueID::Next()),
+      _bufferID(bufferID) {
   dataAddress = malloc(_size);
 }
 
@@ -66,7 +66,8 @@ void WebGLBuffer::unmap() {
 
   gl->bindBuffer(bufferTarget, _bufferID);
   gl->bufferSubData(bufferTarget, static_cast<int32_t>(subDataOffset),
-                    static_cast<int32_t>(subDataSize), static_cast<uint8_t*>(dataAddress) + subDataOffset);
+                    static_cast<int32_t>(subDataSize),
+                    static_cast<uint8_t*>(dataAddress) + subDataOffset);
 }
 
 void WebGLBuffer::onRelease(GLGPU* gpu) {
