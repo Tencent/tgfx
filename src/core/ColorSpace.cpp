@@ -26,18 +26,18 @@
 
 namespace tgfx {
 
-#if !defined(TGFX_CPU_BENDIAN) && !defined(TGFX_CPU_LENDIAN)
+#if !defined(TGFX_CPU_BIG_ENDIAN) && !defined(TGFX_CPU_LITTLE_ENDIAN)
 #if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
-#define TGFX_CPU_BENDIAN
+#define TGFX_CPU_BIG_ENDIAN
 #elif defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
-#define TGFX_CPU_LENDIAN
+#define TGFX_CPU_LITTLE_ENDIAN
 #elif defined(__sparc) || defined(__sparc__) || defined(_POWER) || defined(__powerpc__) || \
     defined(__ppc__) || defined(__hppa) || defined(__PPC__) || defined(__PPC64__) ||       \
     defined(_MIPSEB) || defined(__ARMEB__) || defined(__s390__) ||                         \
     (defined(__sh__) && defined(__BIG_ENDIAN__)) || (defined(__ia64) && defined(__BIG_ENDIAN__))
-#define TGFX_CPU_BENDIAN
+#define TGFX_CPU_BIG_ENDIAN
 #else
-#define TGFX_CPU_LENDIAN
+#define TGFX_CPU_LITTLE_ENDIAN
 #endif
 #endif
 
@@ -50,49 +50,50 @@ static uint32_t EndianSwap32(uint32_t value) {
          (value >> 24);
 }
 
-#ifdef TGFX_CPU_LENDIAN
-#define Endian_SwapBE16(n) EndianSwap16(n)
-#define Endian_SwapBE32(n) EndianSwap32(n)
+#ifdef TGFX_CPU_LITTLE_ENDIAN
+#define SWAP_UINT16_TO_BIG_ENDIAN(n) EndianSwap16(n)
+#define SWAP_UINT32_TO_BIG_ENDIAN(n) EndianSwap32(n)
 #else
-#define Endian_SwapBE16(n) static_cast<uint16_t>(n)
-#define Endian_SwapBE32(n) static_cast<uint32_t>(n)
+#define SWAP_UINT16_TO_BIG_ENDIAN(n) static_cast<uint16_t>(n)
+#define SWAP_UINT32_TO_BIG_ENDIAN(n) static_cast<uint32_t>(n)
 #endif
 
-static bool GetCicp(ColorSpacePrimariesID primaries, ColorSpacePrimaries& colorSpacePrimaries) {
+static bool GetPrimariesByID(ColorSpacePrimariesID primaries,
+                             ColorSpacePrimaries* colorSpacePrimaries) {
   // Rec. ITU-T H.273, Table 2.
   switch (primaries) {
     case ColorSpacePrimariesID::Rec709:
-      colorSpacePrimaries = NamedPrimaries::Rec709;
+      *colorSpacePrimaries = NamedPrimaries::Rec709;
       return true;
     case ColorSpacePrimariesID::Rec470SystemM:
-      colorSpacePrimaries = NamedPrimaries::Rec470SystemM;
+      *colorSpacePrimaries = NamedPrimaries::Rec470SystemM;
       return true;
     case ColorSpacePrimariesID::Rec470SystemBG:
-      colorSpacePrimaries = NamedPrimaries::Rec470SystemBG;
+      *colorSpacePrimaries = NamedPrimaries::Rec470SystemBG;
       return true;
     case ColorSpacePrimariesID::Rec601:
-      colorSpacePrimaries = NamedPrimaries::Rec601;
+      *colorSpacePrimaries = NamedPrimaries::Rec601;
       return true;
     case ColorSpacePrimariesID::SMPTE_ST_240:
-      colorSpacePrimaries = NamedPrimaries::SMPTE_ST_240;
+      *colorSpacePrimaries = NamedPrimaries::SMPTE_ST_240;
       return true;
     case ColorSpacePrimariesID::GenericFilm:
-      colorSpacePrimaries = NamedPrimaries::GenericFilm;
+      *colorSpacePrimaries = NamedPrimaries::GenericFilm;
       return true;
     case ColorSpacePrimariesID::Rec2020:
-      colorSpacePrimaries = NamedPrimaries::Rec2020;
+      *colorSpacePrimaries = NamedPrimaries::Rec2020;
       return true;
     case ColorSpacePrimariesID::SMPTE_ST_428_1:
-      colorSpacePrimaries = NamedPrimaries::SMPTE_ST_428_1;
+      *colorSpacePrimaries = NamedPrimaries::SMPTE_ST_428_1;
       return true;
     case ColorSpacePrimariesID::SMPTE_RP_431_2:
-      colorSpacePrimaries = NamedPrimaries::SMPTE_RP_431_2;
+      *colorSpacePrimaries = NamedPrimaries::SMPTE_RP_431_2;
       return true;
     case ColorSpacePrimariesID::SMPTE_EG_432_1:
-      colorSpacePrimaries = NamedPrimaries::SMPTE_EG_432_1;
+      *colorSpacePrimaries = NamedPrimaries::SMPTE_EG_432_1;
       return true;
     case ColorSpacePrimariesID::ITU_T_H273_Value22:
-      colorSpacePrimaries = NamedPrimaries::ITU_T_H273_Value22;
+      *colorSpacePrimaries = NamedPrimaries::ITU_T_H273_Value22;
       return true;
     default:
       // Reserved or unimplemented.
@@ -101,41 +102,42 @@ static bool GetCicp(ColorSpacePrimariesID primaries, ColorSpacePrimaries& colorS
   return false;
 }
 
-static bool GetCicp(TransferFunctionID transferCharacteristics, TransferFunction& trfn) {
+static bool GetTransferFunctionByID(TransferFunctionID transferCharacteristics,
+                                    TransferFunction* transferFunction) {
   // Rec. ITU-T H.273, Table 3.
   switch (transferCharacteristics) {
     case TransferFunctionID::Rec709:
-      trfn = NamedTransferFunction::Rec709;
+      *transferFunction = NamedTransferFunction::Rec709;
       return true;
     case TransferFunctionID::Rec470SystemM:
-      trfn = NamedTransferFunction::Rec470SystemM;
+      *transferFunction = NamedTransferFunction::Rec470SystemM;
       return true;
     case TransferFunctionID::Rec470SystemBG:
-      trfn = NamedTransferFunction::Rec470SystemBG;
+      *transferFunction = NamedTransferFunction::Rec470SystemBG;
       return true;
     case TransferFunctionID::Rec601:
-      trfn = NamedTransferFunction::Rec601;
+      *transferFunction = NamedTransferFunction::Rec601;
       return true;
     case TransferFunctionID::SMPTE_ST_240:
-      trfn = NamedTransferFunction::SMPTE_ST_240;
+      *transferFunction = NamedTransferFunction::SMPTE_ST_240;
       return true;
     case TransferFunctionID::Linear:
-      trfn = NamedTransferFunction::Linear;
+      *transferFunction = NamedTransferFunction::Linear;
       return true;
     case TransferFunctionID::IEC61966_2_4:
-      trfn = NamedTransferFunction::IEC61966_2_4;
+      *transferFunction = NamedTransferFunction::IEC61966_2_4;
       return true;
     case TransferFunctionID::IEC61966_2_1:
-      trfn = NamedTransferFunction::IEC61966_2_1;
+      *transferFunction = NamedTransferFunction::IEC61966_2_1;
       return true;
     case TransferFunctionID::Rec2020_10bit:
-      trfn = NamedTransferFunction::Rec2020_10bit;
+      *transferFunction = NamedTransferFunction::Rec2020_10bit;
       return true;
     case TransferFunctionID::Rec2020_12bit:
-      trfn = NamedTransferFunction::Rec2020_12bit;
+      *transferFunction = NamedTransferFunction::Rec2020_12bit;
       return true;
     case TransferFunctionID::SMPTE_ST_428_1:
-      trfn = NamedTransferFunction::SMPTE_ST_428_1;
+      *transferFunction = NamedTransferFunction::SMPTE_ST_428_1;
       return true;
     default:
       // Reserved or unimplemented.
@@ -159,8 +161,10 @@ static bool XYZAlmostEqual(const ColorMatrix33& mA, const ColorMatrix33& mB) {
   return true;
 }
 
-// Let's use a stricter version for transfer functions.  Worst case, these are encoded
-// in ICC format, which offers 16-bits of fractional precision.
+/**
+ * Let's use a stricter version for transfer functions.  Worst case, these are encoded in ICC
+ * format, which offers 16-bits of fractional precision.
+ */
 static bool TransferFnAlmostEqual(float a, float b) {
   return fabsf(a - b) < 0.001f;
 }
@@ -196,13 +200,15 @@ static bool IsAlmostLinear(const TransferFunction& coeffs) {
 }
 
 static bool NearlyEqual(float x, float y) {
-  // A note on why I chose this tolerance:  TransferFnAlmostEqual() uses a tolerance of 0.001f,
-  // which doesn't seem to be enough to distinguish between similar transfer functions, for example:
-  // gamma2.2 and sRGB.
-  //
-  // If the tolerance is 0.0f, then this we can't distinguish between two different encodings of
-  // what is clearly the same colorspace. Some experimentation with example files lead to this
-  // number:
+  /**
+   * A note on why I chose this tolerance:  TransferFnAlmostEqual() uses a tolerance of 0.001f,
+   * which doesn't seem to be enough to distinguish between similar transfer functions, for example:
+   * gamma2.2 and sRGB.
+   *
+   * If the tolerance is 0.0f, then this we can't distinguish between two different encodings of
+   * what is clearly the same colorspace. Some experimentation with example files lead to this
+   * number:
+   */
   static constexpr float Tolerance = 1.0f / (1 << 11);
   return ::fabsf(x - y) <= Tolerance;
 }
@@ -225,23 +231,23 @@ static bool NearlyEqual(const gfx::skcms_Matrix3x3& u, const gfx::skcms_Matrix3x
   return true;
 }
 
-constexpr uint32_t CICPTrfnSRGB = 1;
-constexpr uint32_t CICPTrfn2Dot2 = 4;
-constexpr uint32_t CICPTrfnLinear = 8;
+constexpr uint32_t CICPTranferFunctionSRGB = 1;
+constexpr uint32_t CICPTranferFunction2Dot2 = 4;
+constexpr uint32_t CICPTranferFunctionLinear = 8;
 
-static uint32_t GetCICPTrfn(const gfx::skcms_TransferFunction& fn) {
-  if (gfx::skcms_TransferFunction_getType(&fn) == gfx::skcms_TFType_sRGBish) {
-    if (NearlyEqual(fn, *reinterpret_cast<const gfx::skcms_TransferFunction*>(
-                            &NamedTransferFunction::SRGB))) {
-      return CICPTrfnSRGB;
+static uint32_t GetCICPTranferFunction(const gfx::skcms_TransferFunction& function) {
+  if (gfx::skcms_TransferFunction_getType(&function) == gfx::skcms_TFType_sRGBish) {
+    if (NearlyEqual(function, *reinterpret_cast<const gfx::skcms_TransferFunction*>(
+                                  &NamedTransferFunction::SRGB))) {
+      return CICPTranferFunctionSRGB;
     }
-    if (NearlyEqual(fn, *reinterpret_cast<const gfx::skcms_TransferFunction*>(
-                            &NamedTransferFunction::TwoDotTwo))) {
-      return CICPTrfn2Dot2;
+    if (NearlyEqual(function, *reinterpret_cast<const gfx::skcms_TransferFunction*>(
+                                  &NamedTransferFunction::TwoDotTwo))) {
+      return CICPTranferFunction2Dot2;
     }
-    if (NearlyEqual(fn, *reinterpret_cast<const gfx::skcms_TransferFunction*>(
-                            &NamedTransferFunction::Linear))) {
-      return CICPTrfnLinear;
+    if (NearlyEqual(function, *reinterpret_cast<const gfx::skcms_TransferFunction*>(
+                                  &NamedTransferFunction::Linear))) {
+      return CICPTranferFunctionLinear;
     }
   }
   return 0;
@@ -251,7 +257,7 @@ constexpr uint32_t CICPPrimariesSRGB = 1;
 constexpr uint32_t CICPPrimariesP3 = 12;
 constexpr uint32_t CICPPrimariesRec2020 = 9;
 
-static uint32_t GetCicpPrimaries(const gfx::skcms_Matrix3x3& toXYZD50) {
+static uint32_t GetCICPPrimaries(const gfx::skcms_Matrix3x3& toXYZD50) {
   if (NearlyEqual(toXYZD50, *reinterpret_cast<const gfx::skcms_Matrix3x3*>(&NamedGamut::SRGB))) {
     return CICPPrimariesSRGB;
   }
@@ -265,13 +271,13 @@ static uint32_t GetCicpPrimaries(const gfx::skcms_Matrix3x3& toXYZD50) {
   return 0;
 }
 
-static std::string GetDescString(const gfx::skcms_TransferFunction& fn,
+static std::string GetDescString(const gfx::skcms_TransferFunction& function,
                                  const gfx::skcms_Matrix3x3& toXYZD50, uint64_t hash) {
-  const uint32_t cicpTrfn = GetCICPTrfn(fn);
-  const uint32_t cicpPrimaries = GetCicpPrimaries(toXYZD50);
+  const uint32_t cicpTrfn = GetCICPTranferFunction(function);
+  const uint32_t cicpPrimaries = GetCICPPrimaries(toXYZD50);
 
   // Use a unique string for sRGB.
-  if (cicpTrfn == CICPTrfnSRGB && cicpPrimaries == CICPPrimariesSRGB) {
+  if (cicpTrfn == CICPTranferFunctionSRGB && cicpPrimaries == CICPPrimariesSRGB) {
     return "sRGB";
   }
 
@@ -294,13 +300,13 @@ static std::string GetDescString(const gfx::skcms_TransferFunction& fn,
     }
     result += " Gamut with ";
     switch (cicpTrfn) {
-      case CICPTrfnSRGB:
+      case CICPTranferFunctionSRGB:
         result += "sRGB";
         break;
-      case CICPTrfnLinear:
+      case CICPTranferFunctionLinear:
         result += "Linear";
         break;
-      case CICPTrfn2Dot2:
+      case CICPTranferFunction2Dot2:
         result += "2.2";
         break;
       default:
@@ -319,12 +325,15 @@ static constexpr uint32_t SetFourByteTag(char a, char b, char c, char d) {
   return (((uint32_t)a << 24) | ((uint32_t)b << 16) | ((uint32_t)c << 8) | (uint32_t)d);
 }
 
-// This is equal to the header size according to the ICC specification (128)
-// plus the size of the tag count (4).  We include the tag count since we
-// always require it to be present anyway.
+/**
+ * This is equal to the header size according to the ICC specification (128) plus the size of the
+ * tag count (4).  We include the tag count since we always require it to be present anyway.
+ */
 static constexpr size_t ICCHeaderSize = 132;
 
-// Contains a signature (4), offset (4), and size (4).
+/**
+ * Contains a signature (4), offset (4), and size (4).
+ */
 static constexpr size_t ICCTagTableEntrySize = 12;
 
 static constexpr uint32_t DisplayProfile = SetFourByteTag('m', 'n', 't', 'r');
@@ -354,7 +363,9 @@ enum ParaCurveType {
   GABCDEFParaCurveType = 4,
 };
 
-// The D50 illuminant.
+/**
+ * The D50 illuminant.
+ */
 static constexpr float kD50_x = 0.9642f;
 static constexpr float kD50_y = 1.0000f;
 static constexpr float kD50_z = 0.8249f;
@@ -380,27 +391,27 @@ struct ICCHeader {
   uint32_t cmm_type = 0;
 
   // Version 4.3 or 4.4 if CICP is included.
-  uint32_t version = Endian_SwapBE32(0x04300000);
+  uint32_t version = SWAP_UINT32_TO_BIG_ENDIAN(0x04300000);
 
   // Display device profile
-  uint32_t profile_class = Endian_SwapBE32(DisplayProfile);
+  uint32_t profile_class = SWAP_UINT32_TO_BIG_ENDIAN(DisplayProfile);
 
   // RGB input color space;
-  uint32_t data_color_space = Endian_SwapBE32(RGBColorSpace);
+  uint32_t data_color_space = SWAP_UINT32_TO_BIG_ENDIAN(RGBColorSpace);
 
   // Profile connection space.
-  uint32_t pcs = Endian_SwapBE32(XYZPCSSpace);
+  uint32_t pcs = SWAP_UINT32_TO_BIG_ENDIAN(XYZPCSSpace);
 
   // Date and time (ignored)
-  uint16_t creation_date_year = Endian_SwapBE16(2025);
-  uint16_t creation_date_month = Endian_SwapBE16(9);  // 1-12
-  uint16_t creation_date_day = Endian_SwapBE16(23);   // 1-31
-  uint16_t creation_date_hours = 0;                   // 0-23
-  uint16_t creation_date_minutes = 0;                 // 0-59
-  uint16_t creation_date_seconds = 0;                 // 0-59
+  uint16_t creation_date_year = SWAP_UINT16_TO_BIG_ENDIAN(2025);
+  uint16_t creation_date_month = SWAP_UINT16_TO_BIG_ENDIAN(9);  // 1-12
+  uint16_t creation_date_day = SWAP_UINT16_TO_BIG_ENDIAN(23);   // 1-31
+  uint16_t creation_date_hours = 0;                             // 0-23
+  uint16_t creation_date_minutes = 0;                           // 0-59
+  uint16_t creation_date_seconds = 0;                           // 0-59
 
   // Profile signature
-  uint32_t signature = Endian_SwapBE32(ACSPSignature);
+  uint32_t signature = SWAP_UINT32_TO_BIG_ENDIAN(ACSPSignature);
 
   // Platform target (ignored)
   uint32_t platform = 0;
@@ -418,12 +429,15 @@ struct ICCHeader {
   uint8_t device_attributes[8] = {0};
 
   // Relative colorimetric rendering intent
-  uint32_t rendering_intent = Endian_SwapBE32(1);
+  uint32_t rendering_intent = SWAP_UINT32_TO_BIG_ENDIAN(1);
 
   // D50 standard illuminant (X, Y, Z)
-  uint32_t illuminant_X = Endian_SwapBE32(static_cast<uint32_t>(FloatRoundToFixed(kD50_x)));
-  uint32_t illuminant_Y = Endian_SwapBE32(static_cast<uint32_t>(FloatRoundToFixed(kD50_y)));
-  uint32_t illuminant_Z = Endian_SwapBE32(static_cast<uint32_t>(FloatRoundToFixed(kD50_z)));
+  uint32_t illuminant_X =
+      SWAP_UINT32_TO_BIG_ENDIAN(static_cast<uint32_t>(FloatRoundToFixed(kD50_x)));
+  uint32_t illuminant_Y =
+      SWAP_UINT32_TO_BIG_ENDIAN(static_cast<uint32_t>(FloatRoundToFixed(kD50_y)));
+  uint32_t illuminant_Z =
+      SWAP_UINT32_TO_BIG_ENDIAN(static_cast<uint32_t>(FloatRoundToFixed(kD50_z)));
 
   // Profile creator (ignored)
   uint32_t creator = 0;
@@ -440,17 +454,17 @@ struct ICCHeader {
 
 static std::shared_ptr<Data> WriteXYZTag(float x, float y, float z) {
   uint32_t data[] = {
-      Endian_SwapBE32(XYZPCSSpace),
+      SWAP_UINT32_TO_BIG_ENDIAN(XYZPCSSpace),
       0,
-      Endian_SwapBE32(static_cast<uint32_t>(FloatRoundToFixed(x))),
-      Endian_SwapBE32(static_cast<uint32_t>(FloatRoundToFixed(y))),
-      Endian_SwapBE32(static_cast<uint32_t>(FloatRoundToFixed(z))),
+      SWAP_UINT32_TO_BIG_ENDIAN(static_cast<uint32_t>(FloatRoundToFixed(x))),
+      SWAP_UINT32_TO_BIG_ENDIAN(static_cast<uint32_t>(FloatRoundToFixed(y))),
+      SWAP_UINT32_TO_BIG_ENDIAN(static_cast<uint32_t>(FloatRoundToFixed(z))),
   };
   return Data::MakeWithCopy(data, sizeof(data));
 }
 
 static void StreamWriteU16BE(std::ostringstream* s, uint16_t value) {
-  value = Endian_SwapBE16(value);
+  value = SWAP_UINT16_TO_BIG_ENDIAN(value);
   s->write((char*)&value, sizeof(value));
 }
 
@@ -501,13 +515,13 @@ static std::shared_ptr<Data> WriteTrcTag(const gfx::skcms_Curve& trc) {
 std::shared_ptr<Data> WriteTextTag(const char* text) {
   uint32_t text_length = static_cast<uint32_t>(strlen(text));
   uint32_t header[] = {
-      Endian_SwapBE32(TagTextType),                         // Type signature
-      0,                                                    // Reserved
-      Endian_SwapBE32(1),                                   // Number of records
-      Endian_SwapBE32(12),                                  // Record size (must be 12)
-      Endian_SwapBE32(SetFourByteTag('e', 'n', 'U', 'S')),  // English USA
-      Endian_SwapBE32(2 * text_length),                     // Length of string in bytes
-      Endian_SwapBE32(28),                                  // Offset of string
+      SWAP_UINT32_TO_BIG_ENDIAN(TagTextType),                         // Type signature
+      0,                                                              // Reserved
+      SWAP_UINT32_TO_BIG_ENDIAN(1),                                   // Number of records
+      SWAP_UINT32_TO_BIG_ENDIAN(12),                                  // Record size (must be 12)
+      SWAP_UINT32_TO_BIG_ENDIAN(SetFourByteTag('e', 'n', 'U', 'S')),  // English USA
+      SWAP_UINT32_TO_BIG_ENDIAN(2 * text_length),                     // Length of string in bytes
+      SWAP_UINT32_TO_BIG_ENDIAN(28),                                  // Offset of string
   };
   std::ostringstream s{std::ios::binary};
   s.write((char*)header, sizeof(header));
@@ -575,10 +589,10 @@ static std::shared_ptr<Data> WriteICCProfile(const gfx::skcms_ICCProfile* profil
   size_t profileSize = ICCHeaderSize + tagTableSize + tagDataSize;
 
   // Write the header.
-  header.data_color_space = Endian_SwapBE32(profile->data_color_space);
-  header.pcs = Endian_SwapBE32(profile->pcs);
-  header.size = Endian_SwapBE32(static_cast<uint32_t>(profileSize));
-  header.tag_count = Endian_SwapBE32(static_cast<uint32_t>(tags.size()));
+  header.data_color_space = SWAP_UINT32_TO_BIG_ENDIAN(profile->data_color_space);
+  header.pcs = SWAP_UINT32_TO_BIG_ENDIAN(profile->pcs);
+  header.size = SWAP_UINT32_TO_BIG_ENDIAN(static_cast<uint32_t>(profileSize));
+  header.tag_count = SWAP_UINT32_TO_BIG_ENDIAN(static_cast<uint32_t>(tags.size()));
   auto ptr = (uint8_t*)malloc(profileSize);
   auto tempPtr = ptr;
   memcpy(tempPtr, &header, sizeof(header));
@@ -595,9 +609,9 @@ static std::shared_ptr<Data> WriteICCProfile(const gfx::skcms_ICCProfile* profil
       lastTagSize = tag.second->size();
     }
     uint32_t tagTableEntry[3] = {
-        Endian_SwapBE32(tag.first),
-        Endian_SwapBE32(static_cast<uint32_t>(lastTagOffset)),
-        Endian_SwapBE32(static_cast<uint32_t>(lastTagSize)),
+        SWAP_UINT32_TO_BIG_ENDIAN(tag.first),
+        SWAP_UINT32_TO_BIG_ENDIAN(static_cast<uint32_t>(lastTagOffset)),
+        SWAP_UINT32_TO_BIG_ENDIAN(static_cast<uint32_t>(lastTagSize)),
     };
     memcpy(tempPtr, tagTableEntry, sizeof(tagTableEntry));
     tempPtr += sizeof(tagTableEntry);
@@ -630,23 +644,23 @@ std::shared_ptr<ColorSpace> ColorSpace::MakeSRGBLinear() {
   return cs;
 }
 
-std::shared_ptr<ColorSpace> ColorSpace::MakeRGB(const TransferFunction& transferFn,
+std::shared_ptr<ColorSpace> ColorSpace::MakeRGB(const TransferFunction& transferFunction,
                                                 const ColorMatrix33& toXYZ) {
   if (gfx::skcms_TransferFunction_getType(reinterpret_cast<const gfx::skcms_TransferFunction*>(
-          &transferFn)) == gfx::skcms_TFType_Invalid) {
+          &transferFunction)) == gfx::skcms_TFType_Invalid) {
     return nullptr;
   }
 
-  const TransferFunction* tf = &transferFn;
+  const TransferFunction* tf = &transferFunction;
 
-  if (IsAlmostSRGB(transferFn)) {
+  if (IsAlmostSRGB(transferFunction)) {
     if (XYZAlmostEqual(toXYZ, NamedGamut::SRGB)) {
       return ColorSpace::MakeSRGB();
     }
     tf = &NamedTransferFunction::SRGB;
-  } else if (IsAlmost2dot2(transferFn)) {
+  } else if (IsAlmost2dot2(transferFunction)) {
     tf = &NamedTransferFunction::TwoDotTwo;
-  } else if (IsAlmostLinear(transferFn)) {
+  } else if (IsAlmostLinear(transferFunction)) {
     if (XYZAlmostEqual(toXYZ, NamedGamut::SRGB)) {
       return ColorSpace::MakeSRGBLinear();
     }
@@ -659,12 +673,12 @@ std::shared_ptr<ColorSpace> ColorSpace::MakeRGB(const TransferFunction& transfer
 std::shared_ptr<ColorSpace> ColorSpace::MakeCICP(ColorSpacePrimariesID colorPrimaries,
                                                  TransferFunctionID transferCharacteristics) {
   TransferFunction trfn;
-  if (!GetCicp(transferCharacteristics, trfn)) {
+  if (!GetTransferFunctionByID(transferCharacteristics, &trfn)) {
     return nullptr;
   }
 
   ColorSpacePrimaries primaries;
-  if (!GetCicp(colorPrimaries, primaries)) {
+  if (!GetPrimariesByID(colorPrimaries, &primaries)) {
     return nullptr;
   }
 
@@ -713,18 +727,18 @@ std::shared_ptr<ColorSpace> ColorSpace::MakeFromICC(const void* data, size_t siz
 
 bool ColorSpace::gammaCloseToSRGB() const {
   // Nearly-equal transfer functions were snapped at construction time, so just do an exact test
-  return memcmp(&_transferFn, &NamedTransferFunction::SRGB, 7 * sizeof(float)) == 0;
+  return memcmp(&_transferFunction, &NamedTransferFunction::SRGB, 7 * sizeof(float)) == 0;
 }
 
 bool ColorSpace::gammaIsLinear() const {
   // Nearly-equal transfer functions were snapped at construction time, so just do an exact test
-  return memcmp(&_transferFn, &NamedTransferFunction::Linear, 7 * sizeof(float)) == 0;
+  return memcmp(&_transferFunction, &NamedTransferFunction::Linear, 7 * sizeof(float)) == 0;
 }
 
-bool ColorSpace::isNumericalTransferFn(TransferFunction* fn) const {
-  this->transferFn(fn);
-  return gfx::skcms_TransferFunction_getType(reinterpret_cast<gfx::skcms_TransferFunction*>(fn)) ==
-         gfx::skcms_TFType_sRGBish;
+bool ColorSpace::isNumericalTransferFunction(TransferFunction* function) const {
+  this->transferFunction(function);
+  return gfx::skcms_TransferFunction_getType(
+             reinterpret_cast<gfx::skcms_TransferFunction*>(function)) == gfx::skcms_TFType_sRGBish;
 }
 
 bool ColorSpace::toXYZD50(ColorMatrix33* toXYZD50) const {
@@ -751,7 +765,7 @@ std::shared_ptr<ColorSpace> ColorSpace::makeColorSpin() const {
   gfx::skcms_Matrix3x3 spun =
       gfx::skcms_Matrix3x3_concat(reinterpret_cast<const gfx::skcms_Matrix3x3*>(&_toXYZD50), &spin);
   return std::shared_ptr<ColorSpace>(
-      new ColorSpace(_transferFn, *reinterpret_cast<ColorMatrix33*>(&spun)));
+      new ColorSpace(_transferFunction, *reinterpret_cast<ColorMatrix33*>(&spun)));
 }
 
 bool ColorSpace::isSRGB() const {
@@ -774,7 +788,7 @@ std::shared_ptr<Data> ColorSpace::toICCProfile() const {
     profile.toXYZD50 = *skcmsToXYZD50;
   }
 
-  auto skcmsTF = reinterpret_cast<const gfx::skcms_TransferFunction*>(&_transferFn);
+  auto skcmsTF = reinterpret_cast<const gfx::skcms_TransferFunction*>(&_transferFunction);
   // Populate the analytic TRC for sRGB-like curves.
   if (gfx::skcms_TransferFunction_isSRGBish(skcmsTF)) {
     profile.has_trc = true;
@@ -787,26 +801,26 @@ std::shared_ptr<Data> ColorSpace::toICCProfile() const {
   return WriteICCProfile(&profile, description.c_str());
 }
 
-bool ColorSpace::Equals(const ColorSpace* x, const ColorSpace* y) {
-  if (x == y) {
+bool ColorSpace::Equals(const ColorSpace* colorSpaceA, const ColorSpace* colorSpaceB) {
+  if (colorSpaceA == colorSpaceB) {
     return true;
   }
-  if (!x || !y) {
+  if (!colorSpaceA || !colorSpaceB) {
     return false;
   }
-  if (x->hash() == y->hash()) {
+  if (colorSpaceA->hash() == colorSpaceB->hash()) {
     return true;
   }
   return false;
 }
 
-void ColorSpace::transferFn(TransferFunction* fn) const {
-  *fn = _transferFn;
+void ColorSpace::transferFunction(TransferFunction* function) const {
+  *function = _transferFunction;
 }
 
-void ColorSpace::invTransferFn(TransferFunction* fn) const {
+void ColorSpace::invTransferFunction(TransferFunction* function) const {
   computeLazyDstFields();
-  *fn = _invTransferFn;
+  *function = _invTransferFunction;
 }
 
 void ColorSpace::gamutTransformTo(const ColorSpace* dst, ColorMatrix33* srcToDst) const {
@@ -817,9 +831,9 @@ void ColorSpace::gamutTransformTo(const ColorSpace* dst, ColorMatrix33* srcToDst
   *srcToDst = *reinterpret_cast<ColorMatrix33*>(&result);
 }
 
-ColorSpace::ColorSpace(const TransferFunction& transferFn, const ColorMatrix33& toXYZ)
-    : _transferFn(transferFn), _toXYZD50(toXYZ) {
-  _transferFnHash = checksum::Hash32(&_transferFn, 7 * sizeof(float));
+ColorSpace::ColorSpace(const TransferFunction& transferFunction, const ColorMatrix33& toXYZ)
+    : _transferFunction(transferFunction), _toXYZD50(toXYZ) {
+  _transferFunctionHash = checksum::Hash32(&_transferFunction, 7 * sizeof(float));
   _toXYZD50Hash = checksum::Hash32(&_toXYZD50, 9 * sizeof(float));
 }
 
@@ -835,9 +849,9 @@ void ColorSpace::computeLazyDstFields() const {
 
     // Invert transfer function, defaulting to sRGB if we can't.
     if (!gfx::skcms_TransferFunction_invert(
-            reinterpret_cast<const gfx::skcms_TransferFunction*>(&_transferFn),
-            reinterpret_cast<gfx::skcms_TransferFunction*>(&_invTransferFn))) {
-      _invTransferFn =
+            reinterpret_cast<const gfx::skcms_TransferFunction*>(&_transferFunction),
+            reinterpret_cast<gfx::skcms_TransferFunction*>(&_invTransferFunction))) {
+      _invTransferFunction =
           *reinterpret_cast<const TransferFunction*>(gfx::skcms_sRGB_Inverse_TransferFunction());
     }
 

@@ -15,7 +15,7 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#include "tgfx/core/ColorSpaceXformSteps.h"
+#include "ColorSpaceXformSteps.h"
 #include <skcms.h>
 #include <cmath>
 #include <cstring>
@@ -79,9 +79,9 @@ ColorSpaceXformSteps::ColorSpaceXformSteps(const ColorSpace* src, AlphaType srcA
   }
 
   TransferFunction srcTrfn;
-  src->transferFn(&srcTrfn);
+  src->transferFunction(&srcTrfn);
   TransferFunction dstTrfn;
-  dst->transferFn(&dstTrfn);
+  dst->transferFunction(&dstTrfn);
 
   // The scale factor is the amount that values in linear space will be scaled to accommodate
   // peak luminance and HDR reference white luminance.
@@ -94,7 +94,7 @@ ColorSpaceXformSteps::ColorSpaceXformSteps(const ColorSpace* src, AlphaType srcA
       // reference white luminance (a).
       scaleFactor *= 10000.f / srcTrfn.a;
       // Use the default PQish transfer function.
-      this->srcTF = PQTF;
+      this->srcTransferFunction = PQTF;
       this->flags.linearize = true;
       break;
     case gfx::skcms_TFType_HLG:
@@ -103,20 +103,20 @@ ColorSpaceXformSteps::ColorSpaceXformSteps(const ColorSpace* src, AlphaType srcA
       scaleFactor *= srcTrfn.b / srcTrfn.a;
       this->flags.linearize = true;
       // Use the HLGish transfer function scaled by 1/12.
-      this->srcTF = HLGTF;
-      this->srcTF.f = 1 / 12.f - 1.f;
+      this->srcTransferFunction = HLGTF;
+      this->srcTransferFunction.f = 1 / 12.f - 1.f;
       // If the system gamma is not 1.0, then compute the parameters for the OOTF.
       if (srcTrfn.c != 1.f) {
         this->flags.srcOOTF = true;
-        this->srcOotf[3] = srcTrfn.c - 1.f;
-        SetOOTFY(src, this->srcOotf);
+        this->srcOOTF[3] = srcTrfn.c - 1.f;
+        SetOOTFY(src, this->srcOOTF);
       }
       break;
     default:
       this->flags.linearize =
           memcmp(&srcTrfn, &NamedTransferFunction::Linear, sizeof(srcTrfn)) != 0;
       if (this->flags.linearize) {
-        src->transferFn(&this->srcTF);
+        src->transferFunction(&this->srcTransferFunction);
       }
       break;
   }
@@ -127,30 +127,30 @@ ColorSpaceXformSteps::ColorSpaceXformSteps(const ColorSpace* src, AlphaType srcA
       // This is the inverse of the treatment of source PQ.
       scaleFactor /= 10000.f / dstTrfn.a;
       this->flags.encode = true;
-      this->dstTFInv = PQTF;
+      this->dstTransferFunctionInverse = PQTF;
       gfx::skcms_TransferFunction_invert(
-          reinterpret_cast<gfx::skcms_TransferFunction*>(&this->dstTFInv),
-          reinterpret_cast<gfx::skcms_TransferFunction*>(&this->dstTFInv));
+          reinterpret_cast<gfx::skcms_TransferFunction*>(&this->dstTransferFunctionInverse),
+          reinterpret_cast<gfx::skcms_TransferFunction*>(&this->dstTransferFunctionInverse));
       break;
     case gfx::skcms_TFType_HLG:
       // This is the inverse of the treatment of source HLG.
       scaleFactor /= dstTrfn.b / dstTrfn.a;
       this->flags.encode = true;
-      this->dstTFInv = HLGTF;
-      this->dstTFInv.f = 1 / 12.f - 1.f;
+      this->dstTransferFunctionInverse = HLGTF;
+      this->dstTransferFunctionInverse.f = 1 / 12.f - 1.f;
       gfx::skcms_TransferFunction_invert(
-          reinterpret_cast<gfx::skcms_TransferFunction*>(&this->dstTFInv),
-          reinterpret_cast<gfx::skcms_TransferFunction*>(&this->dstTFInv));
+          reinterpret_cast<gfx::skcms_TransferFunction*>(&this->dstTransferFunctionInverse),
+          reinterpret_cast<gfx::skcms_TransferFunction*>(&this->dstTransferFunctionInverse));
       if (dstTrfn.c != 1.f) {
         this->flags.dstOOTF = true;
-        this->dstOotf[3] = 1 / dstTrfn.c - 1.f;
-        SetOOTFY(dst, this->dstOotf);
+        this->dstOOTF[3] = 1 / dstTrfn.c - 1.f;
+        SetOOTFY(dst, this->dstOOTF);
       }
       break;
     default:
       this->flags.encode = memcmp(&dstTrfn, &NamedTransferFunction::Linear, sizeof(dstTrfn)) != 0;
       if (this->flags.encode) {
-        dst->invTransferFn(&this->dstTFInv);
+        dst->invTransferFunction(&this->dstTransferFunctionInverse);
       }
       break;
   }
@@ -176,9 +176,9 @@ ColorSpaceXformSteps::ColorSpaceXformSteps(const ColorSpace* src, AlphaType srcA
   if (this->flags.srcOOTF && !this->flags.gamutTransform && this->flags.dstOOTF) {
     // If there is no gamut transform, then the r,g,b coefficients for the
     // OOTFs must be the same.
-    DEBUG_ASSERT(0 == memcmp(&this->srcOotf, &this->dstOotf, 3 * sizeof(float)));
+    DEBUG_ASSERT(0 == memcmp(&this->srcOOTF, &this->dstOOTF, 3 * sizeof(float)));
     // If the gammas cancel out, then remove the steps.
-    if ((this->srcOotf[3] + 1.f) * (this->dstOotf[3] + 1.f) == 1.f) {
+    if ((this->srcOOTF[3] + 1.f) * (this->dstOOTF[3] + 1.f) == 1.f) {
       this->flags.srcOOTF = false;
       this->flags.dstOOTF = false;
     }
@@ -187,12 +187,12 @@ ColorSpaceXformSteps::ColorSpaceXformSteps(const ColorSpace* src, AlphaType srcA
   // If we linearize then immediately reencode with the same transfer function, skip both.
   if (this->flags.linearize && !this->flags.srcOOTF && !this->flags.gamutTransform &&
       !this->flags.dstOOTF && this->flags.encode &&
-      src->transferFnHash() == dst->transferFnHash()) {
+      src->transferFunctionHash() == dst->transferFunctionHash()) {
 #ifdef DEBUG
     TransferFunction dstTF;
-    dst->transferFn(&dstTF);
+    dst->transferFunction(&dstTF);
     for (int i = 0; i < 7; i++) {
-      DEBUG_ASSERT((&srcTF.g)[i] == (&dstTF.g)[i] && "Hash collision");
+      DEBUG_ASSERT((&srcTransferFunction.g)[i] == (&dstTF.g)[i] && "Hash collision");
     }
 #endif
     this->flags.linearize = false;
@@ -217,15 +217,15 @@ void ColorSpaceXformSteps::apply(float rgba[4]) const {
   }
   if (this->flags.linearize) {
     rgba[0] = gfx::skcms_TransferFunction_eval(
-        reinterpret_cast<const gfx::skcms_TransferFunction*>(&srcTF), rgba[0]);
+        reinterpret_cast<const gfx::skcms_TransferFunction*>(&srcTransferFunction), rgba[0]);
     rgba[1] = gfx::skcms_TransferFunction_eval(
-        reinterpret_cast<const gfx::skcms_TransferFunction*>(&srcTF), rgba[1]);
+        reinterpret_cast<const gfx::skcms_TransferFunction*>(&srcTransferFunction), rgba[1]);
     rgba[2] = gfx::skcms_TransferFunction_eval(
-        reinterpret_cast<const gfx::skcms_TransferFunction*>(&srcTF), rgba[2]);
+        reinterpret_cast<const gfx::skcms_TransferFunction*>(&srcTransferFunction), rgba[2]);
   }
   if (this->flags.srcOOTF) {
-    const float Y = srcOotf[0] * rgba[0] + srcOotf[1] * rgba[1] + srcOotf[2] * rgba[2];
-    const float Y_to_gamma_minus_1 = std::pow(Y, srcOotf[3]);
+    const float Y = srcOOTF[0] * rgba[0] + srcOOTF[1] * rgba[1] + srcOOTF[2] * rgba[2];
+    const float Y_to_gamma_minus_1 = std::pow(Y, srcOOTF[3]);
     rgba[0] *= Y_to_gamma_minus_1;
     rgba[1] *= Y_to_gamma_minus_1;
     rgba[2] *= Y_to_gamma_minus_1;
@@ -239,19 +239,19 @@ void ColorSpaceXformSteps::apply(float rgba[4]) const {
     }
   }
   if (this->flags.dstOOTF) {
-    const float Y = dstOotf[0] * rgba[0] + dstOotf[1] * rgba[1] + dstOotf[2] * rgba[2];
-    const float Y_to_gamma_minus_1 = std::pow(Y, dstOotf[3]);
+    const float Y = dstOOTF[0] * rgba[0] + dstOOTF[1] * rgba[1] + dstOOTF[2] * rgba[2];
+    const float Y_to_gamma_minus_1 = std::pow(Y, dstOOTF[3]);
     rgba[0] *= Y_to_gamma_minus_1;
     rgba[1] *= Y_to_gamma_minus_1;
     rgba[2] *= Y_to_gamma_minus_1;
   }
   if (this->flags.encode) {
     rgba[0] = gfx::skcms_TransferFunction_eval(
-        reinterpret_cast<const gfx::skcms_TransferFunction*>(&dstTFInv), rgba[0]);
+        reinterpret_cast<const gfx::skcms_TransferFunction*>(&dstTransferFunctionInverse), rgba[0]);
     rgba[1] = gfx::skcms_TransferFunction_eval(
-        reinterpret_cast<const gfx::skcms_TransferFunction*>(&dstTFInv), rgba[1]);
+        reinterpret_cast<const gfx::skcms_TransferFunction*>(&dstTransferFunctionInverse), rgba[1]);
     rgba[2] = gfx::skcms_TransferFunction_eval(
-        reinterpret_cast<const gfx::skcms_TransferFunction*>(&dstTFInv), rgba[2]);
+        reinterpret_cast<const gfx::skcms_TransferFunction*>(&dstTransferFunctionInverse), rgba[2]);
   }
   if (this->flags.premul) {
     rgba[0] *= rgba[3];
@@ -260,7 +260,7 @@ void ColorSpaceXformSteps::apply(float rgba[4]) const {
   }
 }
 
-uint32_t ColorSpaceXformSteps::xformKey(const ColorSpaceXformSteps* xform) {
+uint32_t ColorSpaceXformSteps::XFormKey(const ColorSpaceXformSteps* xform) {
   // Code generation depends on which steps we apply,
   // and the kinds of transfer functions (if we're applying those).
   if (!xform) {
@@ -270,13 +270,13 @@ uint32_t ColorSpaceXformSteps::xformKey(const ColorSpaceXformSteps* xform) {
   if (xform->flags.linearize) {
     key |= static_cast<uint32_t>(
         gfx::skcms_TransferFunction_getType(
-            reinterpret_cast<const gfx::skcms_TransferFunction*>(&xform->srcTF))
+            reinterpret_cast<const gfx::skcms_TransferFunction*>(&xform->srcTransferFunction))
         << 8);
   }
   if (xform->flags.encode) {
     key |= static_cast<uint32_t>(
-        gfx::skcms_TransferFunction_getType(
-            reinterpret_cast<const gfx::skcms_TransferFunction*>(&xform->dstTFInv))
+        gfx::skcms_TransferFunction_getType(reinterpret_cast<const gfx::skcms_TransferFunction*>(
+            &xform->dstTransferFunctionInverse))
         << 16);
   }
   return key;

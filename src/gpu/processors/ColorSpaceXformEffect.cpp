@@ -48,7 +48,7 @@ void ColorSpaceXformEffect::emitCode(EmitArgs& args) const {
 }
 
 void ColorSpaceXformEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
-  uint32_t key = ColorSpaceXformSteps::xformKey(colorSpaceXformSteps.get());
+  uint32_t key = ColorSpaceXformSteps::XFormKey(colorSpaceXformSteps.get());
   bytesKey->write(key);
 }
 

@@ -18,8 +18,8 @@
 
 #pragma once
 #include "FragmentProcessor.h"
+#include "core/ColorSpaceXformSteps.h"
 #include "gpu/ColorSpaceXformHelper.h"
-#include "tgfx/core/ColorSpaceXformSteps.h"
 
 namespace tgfx {
 

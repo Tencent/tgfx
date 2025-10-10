@@ -278,11 +278,11 @@ static constexpr float UINT16ToFloat(uint16_t x) {
 
 static constexpr ColorMatrix33 SRGB = {{
     /**
-   * ICC fixed-point (16.16) representation, taken from skcms. Please keep them exactly in sync.
-   * 0.436065674f, 0.385147095f, 0.143066406f,
-   * 0.222488403f, 0.716873169f, 0.060607910f,
-   * 0.013916016f, 0.097076416f, 0.714096069f,
-   */
+     * ICC fixed-point (16.16) representation, taken from skcms. Please keep them exactly in sync.
+     * 0.436065674f, 0.385147095f, 0.143066406f,
+     * 0.222488403f, 0.716873169f, 0.060607910f,
+     * 0.013916016f, 0.097076416f, 0.714096069f,
+     */
     {UINT16ToFloat(0x6FA2), UINT16ToFloat(0x6299), UINT16ToFloat(0x24A0)},
     {UINT16ToFloat(0x38F5), UINT16ToFloat(0xB785), UINT16ToFloat(0x0F84)},
     {UINT16ToFloat(0x0390), UINT16ToFloat(0x18DA), UINT16ToFloat(0xB6CF)},
@@ -290,11 +290,11 @@ static constexpr ColorMatrix33 SRGB = {{
 
 static constexpr ColorMatrix33 AdobeRGB = {{
     /**
-   * CC fixed-point (16.16) repesentation of:
-   * 0.60974, 0.20528, 0.14919,
-   * 0.31111, 0.62567, 0.06322,
-   * 0.01947, 0.06087, 0.74457,
-   */
+     * CC fixed-point (16.16) repesentation of:
+     * 0.60974, 0.20528, 0.14919,
+     * 0.31111, 0.62567, 0.06322,
+     * 0.01947, 0.06087, 0.74457,
+     */
     {UINT16ToFloat(0x9c18), UINT16ToFloat(0x348d), UINT16ToFloat(0x2631)},
     {UINT16ToFloat(0x4fa5), UINT16ToFloat(0xa02c), UINT16ToFloat(0x102f)},
     {UINT16ToFloat(0x04fc), UINT16ToFloat(0x0f95), UINT16ToFloat(0xbe9c)},
@@ -335,7 +335,7 @@ class ColorSpace : public std::enable_shared_from_this<ColorSpace> {
   /**
    * Create an ColorSpace from a transfer function and a row-major 3x3 transformation to XYZ.
    */
-  static std::shared_ptr<ColorSpace> MakeRGB(const TransferFunction& transferFn,
+  static std::shared_ptr<ColorSpace> MakeRGB(const TransferFunction& transferFunction,
                                              const ColorMatrix33& toXYZ);
 
   /**
@@ -375,11 +375,11 @@ class ColorSpace : public std::enable_shared_from_this<ColorSpace> {
   bool gammaIsLinear() const;
 
   /**
-   * Sets |fn| to the transfer function from this color space. Returns true if the transfer function
-   * can be represented as coefficients to the standard ICC 7-parameter equation. Returns false
-   * otherwise (eg, PQ, HLG).
+   * Sets |function| to the transfer function from this color space. Returns true if the transfer
+   * function can be represented as coefficients to the standard ICC 7-parameter equation. Returns
+   * false otherwise (eg, PQ, HLG).
    */
-  bool isNumericalTransferFn(TransferFunction* fn) const;
+  bool isNumericalTransferFunction(TransferFunction* function) const;
 
   /**
    * Returns true and sets |toXYZD50|.
@@ -436,31 +436,31 @@ class ColorSpace : public std::enable_shared_from_this<ColorSpace> {
    * If both are null, we return true. If one is null and the other is not, we return false.
    * If both are non-null, we do a deeper compare.
    */
-  static bool Equals(const ColorSpace*, const ColorSpace*);
+  static bool Equals(const ColorSpace* colorSpaceA, const ColorSpace* colorSpaceB);
 
-  void transferFn(TransferFunction* fn) const;
-  void invTransferFn(TransferFunction* fn) const;
+  void transferFunction(TransferFunction* function) const;
+  void invTransferFunction(TransferFunction* function) const;
   void gamutTransformTo(const ColorSpace* dst, ColorMatrix33* srcToDst) const;
 
-  uint32_t transferFnHash() const {
-    return _transferFnHash;
+  uint32_t transferFunctionHash() const {
+    return _transferFunctionHash;
   }
   uint64_t hash() const {
-    return (uint64_t)_transferFnHash << 32 | _toXYZD50Hash;
+    return (uint64_t)_transferFunctionHash << 32 | _toXYZD50Hash;
   }
 
  private:
-  ColorSpace(const TransferFunction& transferFn, const ColorMatrix33& toXYZ);
+  ColorSpace(const TransferFunction& transferFunction, const ColorMatrix33& toXYZ);
 
   void computeLazyDstFields() const;
 
-  uint32_t _transferFnHash;
+  uint32_t _transferFunctionHash;
   uint32_t _toXYZD50Hash;
 
-  TransferFunction _transferFn;
+  TransferFunction _transferFunction;
   ColorMatrix33 _toXYZD50;
 
-  mutable TransferFunction _invTransferFn;
+  mutable TransferFunction _invTransferFunction;
   mutable ColorMatrix33 _fromXYZD50;
   mutable bool isLazyDstFieldsResolved = false;
 };
