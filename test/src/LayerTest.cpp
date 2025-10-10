@@ -3173,6 +3173,32 @@ TGFX_TEST(LayerTest, NotRectBackgroundBlur) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/NotRectBackgroundBlur"));
 }
 
+TGFX_TEST(LayerTest, DiffFilterModeImagePattern) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  auto canvas = surface->getCanvas();
+  canvas->clear();
+  auto image = MakeImage("resources/apitest/image_as_mask.png");
+  EXPECT_TRUE(image != nullptr);
+  auto shapeLayer = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeWH(image->width(), image->height()));
+  shapeLayer->setPath(path);
+  auto pattern = ImagePattern::Make(image, TileMode::Decal, TileMode::Decal,
+                                    SamplingOptions(FilterMode::Linear, FilterMode::Nearest));
+  DisplayList displayList;
+  displayList.root()->addChild(shapeLayer);
+  shapeLayer->setFillStyle(pattern);
+  displayList.setZoomScale(0.3f);
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DiffFilterModeImagePattern -- zoomOut"));
+  displayList.setZoomScale(1.5f);
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DiffFilterModeImagePattern -- zoomIn"));
+}
+
 TGFX_TEST(LayerTest, Transform3DLayer) {
   const ContextScope scope;
   auto context = scope.getContext();

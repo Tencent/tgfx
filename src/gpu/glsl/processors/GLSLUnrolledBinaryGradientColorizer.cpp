@@ -260,32 +260,32 @@ void GLSLUnrolledBinaryGradientColorizer::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("%s = vec4(t * scale + bias);", args.outputColor.c_str());
 }
 
-void SetUniformData(UniformBuffer* uniformBuffer, const std::string& name, int intervalCount,
-                    int limit, const Color& value) {
+void SetUniformData(UniformData* uniformData, const std::string& name, int intervalCount, int limit,
+                    const Color& value) {
   if (intervalCount > limit) {
-    uniformBuffer->setData(name, value);
+    uniformData->setData(name, value);
   }
 }
 
-void GLSLUnrolledBinaryGradientColorizer::onSetData(UniformBuffer* /*vertexUniformBuffer*/,
-                                                    UniformBuffer* fragmentUniformBuffer) const {
-  SetUniformData(fragmentUniformBuffer, "scale0_1", intervalCount, 0, scale0_1);
-  SetUniformData(fragmentUniformBuffer, "scale2_3", intervalCount, 1, scale2_3);
-  SetUniformData(fragmentUniformBuffer, "scale4_5", intervalCount, 2, scale4_5);
-  SetUniformData(fragmentUniformBuffer, "scale6_7", intervalCount, 3, scale6_7);
-  SetUniformData(fragmentUniformBuffer, "scale8_9", intervalCount, 4, scale8_9);
-  SetUniformData(fragmentUniformBuffer, "scale10_11", intervalCount, 5, scale10_11);
-  SetUniformData(fragmentUniformBuffer, "scale12_13", intervalCount, 6, scale12_13);
-  SetUniformData(fragmentUniformBuffer, "scale14_15", intervalCount, 7, scale14_15);
-  SetUniformData(fragmentUniformBuffer, "bias0_1", intervalCount, 0, bias0_1);
-  SetUniformData(fragmentUniformBuffer, "bias2_3", intervalCount, 1, bias2_3);
-  SetUniformData(fragmentUniformBuffer, "bias4_5", intervalCount, 2, bias4_5);
-  SetUniformData(fragmentUniformBuffer, "bias6_7", intervalCount, 3, bias6_7);
-  SetUniformData(fragmentUniformBuffer, "bias8_9", intervalCount, 4, bias8_9);
-  SetUniformData(fragmentUniformBuffer, "bias10_11", intervalCount, 5, bias10_11);
-  SetUniformData(fragmentUniformBuffer, "bias12_13", intervalCount, 6, bias12_13);
-  SetUniformData(fragmentUniformBuffer, "bias14_15", intervalCount, 7, bias14_15);
-  fragmentUniformBuffer->setData("thresholds1_7", thresholds1_7);
-  fragmentUniformBuffer->setData("thresholds9_13", thresholds9_13);
+void GLSLUnrolledBinaryGradientColorizer::onSetData(UniformData* /*vertexUniformData*/,
+                                                    UniformData* fragmentUniformData) const {
+  SetUniformData(fragmentUniformData, "scale0_1", intervalCount, 0, scale0_1);
+  SetUniformData(fragmentUniformData, "scale2_3", intervalCount, 1, scale2_3);
+  SetUniformData(fragmentUniformData, "scale4_5", intervalCount, 2, scale4_5);
+  SetUniformData(fragmentUniformData, "scale6_7", intervalCount, 3, scale6_7);
+  SetUniformData(fragmentUniformData, "scale8_9", intervalCount, 4, scale8_9);
+  SetUniformData(fragmentUniformData, "scale10_11", intervalCount, 5, scale10_11);
+  SetUniformData(fragmentUniformData, "scale12_13", intervalCount, 6, scale12_13);
+  SetUniformData(fragmentUniformData, "scale14_15", intervalCount, 7, scale14_15);
+  SetUniformData(fragmentUniformData, "bias0_1", intervalCount, 0, bias0_1);
+  SetUniformData(fragmentUniformData, "bias2_3", intervalCount, 1, bias2_3);
+  SetUniformData(fragmentUniformData, "bias4_5", intervalCount, 2, bias4_5);
+  SetUniformData(fragmentUniformData, "bias6_7", intervalCount, 3, bias6_7);
+  SetUniformData(fragmentUniformData, "bias8_9", intervalCount, 4, bias8_9);
+  SetUniformData(fragmentUniformData, "bias10_11", intervalCount, 5, bias10_11);
+  SetUniformData(fragmentUniformData, "bias12_13", intervalCount, 6, bias12_13);
+  SetUniformData(fragmentUniformData, "bias14_15", intervalCount, 7, bias14_15);
+  fragmentUniformData->setData("thresholds1_7", thresholds1_7);
+  fragmentUniformData->setData("thresholds9_13", thresholds9_13);
 }
 }  // namespace tgfx

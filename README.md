@@ -387,7 +387,7 @@ TGFX provides official vcpkg port files for easy integration into projects using
 
 ### Using Specific Commit
 
-If you need a specific commit version of TGFX, you can use the provided script in [`vcpkg`](vcpkg/) directory to generate the port configuration:
+If you need a specific commit version of TGFX, you can use the provided script in the root directory to generate the port configuration:
 
 ```bash
 node update_vcpkg <commit-hash>

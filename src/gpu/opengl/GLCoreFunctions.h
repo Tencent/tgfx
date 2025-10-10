@@ -40,7 +40,6 @@
   M(glClearColor)                          \
   M(glClearDepthf)                         \
   M(glClearStencil)                        \
-  M(glClientWaitSync)                      \
   M(glColorMask)                           \
   M(glCompileShader)                       \
   M(glCompressedTexImage2D)                \
@@ -99,6 +98,7 @@
   M(glGetUniformBlockIndex)                \
   M(glUniformBlockBinding)                 \
   M(glBindBufferBase)                      \
+  M(glBindBufferRange)                     \
   M(glIsTexture)                           \
   M(glLineWidth)                           \
   M(glLinkProgram)                         \

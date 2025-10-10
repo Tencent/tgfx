@@ -19,6 +19,7 @@
 #include <memory>
 #include <vector>
 #include "gpu/GPU.h"
+#include "gpu/RenderPass.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {

@@ -16,11 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "UniformBuffer.h"
+#include "UniformData.h"
 #include "core/utils/Log.h"
+#include "inspect/InspectorMark.h"
 
 namespace tgfx {
-UniformBuffer::UniformBuffer(std::vector<Uniform> uniforms, bool uboSupport)
+UniformData::UniformData(std::vector<Uniform> uniforms, bool uboSupport)
     : _uniforms(std::move(uniforms)), _uboSupport(uboSupport) {
   for (const auto& uniform : _uniforms) {
     size_t size = 0;
@@ -43,50 +44,30 @@ UniformBuffer::UniformBuffer(std::vector<Uniform> uniforms, bool uboSupport)
     }
   }
 
-  if (const size_t size = alignCursor(_uboSupport ? 16 : 1); size > 0) {
-    buffer.resize(size);
-  }
+  bufferSize = alignCursor(_uboSupport ? 16 : 1);
 }
 
-void UniformBuffer::setData(const std::string& name, const Matrix& matrix) {
-  float values[6] = {};
-  matrix.get6(values);
-
-  if (_uboSupport) {
-    // clang-format off
-    const float data[] = {
-      values[0], values[3], 0, 0,
-      values[1], values[4], 0, 0,
-      values[2], values[5], 1, 0,
-    };
-    // clang-format on
-    onSetData(name, data, sizeof(data));
-  } else {
-    // clang-format off
-    const float data[] = {
-      values[0], values[3], 0,
-      values[1], values[4], 0,
-      values[2], values[5], 1
-    };
-    // clang-format on
-    onSetData(name, data, sizeof(data));
-  }
+void UniformData::setBuffer(void* buffer) {
+  _buffer = static_cast<uint8_t*>(buffer);
 }
 
-void UniformBuffer::onSetData(const std::string& name, const void* data, size_t size) {
+void UniformData::onSetData(const std::string& name, const void* data, size_t size) const {
+  DEBUG_ASSERT(_buffer != nullptr);
+
   const auto& key = name + nameSuffix;
   auto field = findField(key);
 
   if (field == nullptr) {
-    LOGE("UniformBuffer::onSetData() uniform '%s' not found!", name.c_str());
+    LOGE("UniformData::onSetData() uniform '%s' not found!", name.c_str());
     return;
   }
   DEBUG_ASSERT(field->size == size);
 
-  memcpy(buffer.data() + field->offset, data, size);
+  UNIFORM_VALUE(key, data, size);
+  memcpy(_buffer + field->offset, data, size);
 }
 
-const UniformBuffer::Field* UniformBuffer::findField(const std::string& key) const {
+const UniformData::Field* UniformData::findField(const std::string& key) const {
   const auto& iter = fieldMap.find(key);
   if (iter != fieldMap.end()) {
     return &iter->second;
@@ -94,11 +75,11 @@ const UniformBuffer::Field* UniformBuffer::findField(const std::string& key) con
   return nullptr;
 }
 
-size_t UniformBuffer::alignCursor(size_t alignment) const {
+size_t UniformData::alignCursor(size_t alignment) const {
   return (cursor + alignment - 1) / alignment * alignment;
 }
 
-UniformBuffer::Entry UniformBuffer::EntryOf(UniformFormat format) {
+UniformData::Entry UniformData::EntryOf(UniformFormat format) {
   switch (format) {
     case UniformFormat::Float:
       return {4, 4};
@@ -132,7 +113,7 @@ UniformBuffer::Entry UniformBuffer::EntryOf(UniformFormat format) {
 }
 
 #if DEBUG
-const char* UniformBuffer::ToUniformFormatName(UniformFormat format) {
+const char* UniformData::ToUniformFormatName(UniformFormat format) {
   switch (format) {
     case UniformFormat::Float:
       return "Float";
@@ -167,8 +148,8 @@ const char* UniformBuffer::ToUniformFormatName(UniformFormat format) {
   }
 }
 
-void UniformBuffer::dump() const {
-  LOGI("\n-------------- UniformBufferLayout dump begin --------------");
+void UniformData::dump() const {
+  LOGI("\n-------------- UniformData Layout dump begin --------------");
   std::vector<Field> sortedFields;
   sortedFields.reserve(fieldMap.size());
   for (const auto& [name, field] : fieldMap) {
@@ -182,7 +163,7 @@ void UniformBuffer::dump() const {
          sortedFields[i].align, sortedFields[i].name.c_str());
   }
   LOGI("Total buffer size = %zu bytes", size());
-  LOGI("-------------- UniformBufferLayout dump end --------------\n");
+  LOGI("-------------- UniformData Layout dump end --------------\n");
 }
 #endif
 }  // namespace tgfx

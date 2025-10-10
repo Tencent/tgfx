@@ -81,6 +81,14 @@ class ProgramInfo {
 
   std::shared_ptr<Program> getProgram() const;
 
+  std::shared_ptr<GPUBuffer> getUniformBuffer(const PipelineProgram* program, size_t* vertexOffset,
+                                              size_t* fragmentOffset) const;
+
+  void bindUniformBufferAndUnloadToGPU(const PipelineProgram* program,
+                                       std::shared_ptr<GPUBuffer> uniformBuffer,
+                                       RenderPass* renderPass, size_t vertexOffset,
+                                       size_t fragmentOffset) const;
+
   /**
    * Sets the uniform data and texture samplers on the render pass for the given program.
    */
@@ -115,8 +123,7 @@ class ProgramInfo {
 
   std::vector<SamplerInfo> getSamplers() const;
 
-  void updateUniformBufferSuffix(UniformBuffer* vertexUniformBuffer,
-                                 UniformBuffer* fragmentUniformBuffer,
-                                 const Processor* processor) const;
+  void updateUniformDataSuffix(UniformData* vertexUniformData, UniformData* fragmentUniformData,
+                               const Processor* processor) const;
 };
 }  // namespace tgfx

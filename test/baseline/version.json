@@ -163,6 +163,8 @@
         "BottomLeftSurface": "67961560",
         "ChildMask": "ee2cc771",
         "ContourTest": "5ccc0507",
+        "DiffFilterModeImagePattern -- zoomIn": "ac049958",
+        "DiffFilterModeImagePattern -- zoomOut": "ac049958",
         "DirtyRegionTest1": "e1604824",
         "DirtyRegionTest10": "31250c62",
         "DirtyRegionTest11": "4bd4e0ad",
@@ -341,6 +343,7 @@
         "ExtremelyThinStrokeLayer": "4bd4e0ad",
         "ExtremelyThinStrokePath": "4bd4e0ad",
         "HairlineLayer": "5be7fc78",
+        "LineRenderAsHairline": "492105ac",
         "ZoomUpTinyStrokeShape": "5be7fc78"
     },
     "SurfaceTest": {

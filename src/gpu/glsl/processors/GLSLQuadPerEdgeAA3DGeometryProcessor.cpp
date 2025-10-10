@@ -73,14 +73,14 @@ void GLSLQuadPerEdgeAA3DGeometryProcessor::emitCode(EmitArgs& args) const {
   args.vertBuilder->codeAppend("gl_Position = clipPoint * clipScale + clipOffset;");
 }
 
-void GLSLQuadPerEdgeAA3DGeometryProcessor::setData(UniformBuffer* vertexUniformBuffer,
-                                                   UniformBuffer* fragmentUniformBuffer,
+void GLSLQuadPerEdgeAA3DGeometryProcessor::setData(UniformData* vertexUniformData,
+                                                   UniformData* fragmentUniformData,
                                                    FPCoordTransformIter* transformIter) const {
-  setTransformDataHelper(Matrix::I(), vertexUniformBuffer, transformIter);
-  fragmentUniformBuffer->setData("Color", defaultColor);
-  vertexUniformBuffer->setData("transformMatrix", matrix);
-  vertexUniformBuffer->setData("ndcScale", ndcScale);
-  vertexUniformBuffer->setData("ndcOffset", ndcOffset);
+  setTransformDataHelper(Matrix::I(), vertexUniformData, transformIter);
+  fragmentUniformData->setData("Color", defaultColor);
+  vertexUniformData->setData("transformMatrix", matrix);
+  vertexUniformData->setData("ndcScale", ndcScale);
+  vertexUniformData->setData("ndcOffset", ndcOffset);
 }
 
 }  // namespace tgfx

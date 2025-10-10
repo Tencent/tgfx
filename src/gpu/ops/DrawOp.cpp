@@ -17,12 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawOp.h"
+#include "gpu/AlignTo.h"
+#include "gpu/GlobalCache.h"
 #include "gpu/resources/PipelineProgram.h"
 #include "inspect/InspectorMark.h"
 
 namespace tgfx {
 void DrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
   OPERATE_MARK(type());
+  DRAW_OP(this);
   auto geometryProcessor = onMakeGeometryProcessor(renderTarget);
   ATTRIBUTE_NAME("scissorRect", scissorRect);
   ATTRIBUTE_NAME_ENUM("blenderMode", blendMode, tgfx::inspect::CustomEnumType::BlendMode);
@@ -47,7 +50,9 @@ void DrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
     return;
   }
   renderPass->setPipeline(program->getPipeline());
+
   programInfo.setUniformsAndSamplers(renderPass, program.get());
+
   if (scissorRect.isEmpty()) {
     renderPass->setScissorRect(0, 0, renderTarget->width(), renderTarget->height());
   } else {

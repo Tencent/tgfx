@@ -29,6 +29,7 @@
 #include "gpu/ops/ShapeDrawOp.h"
 #include "gpu/processors/AARectEffect.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
+#include "inspect/InspectorMark.h"
 #include "processors/PorterDuffXferProcessor.h"
 
 namespace tgfx {
@@ -178,6 +179,7 @@ void OpsCompositor::drawShape(std::shared_ptr<Shape> shape, const MCState& state
   color.alpha *= ShapeUtils::CalculateAlphaReduceFactorIfHairline(shape);
   auto shapeProxy = proxyProvider()->createGPUShapeProxy(shape, aaType, clipBounds, renderFlags);
   auto drawOp = ShapeDrawOp::Make(std::move(shapeProxy), color.premultiply(), uvMatrix, aaType);
+  CAPUTRE_SHAPE_MESH(drawOp.get(), shape, aaType, clipBounds);
   addDrawOp(std::move(drawOp), clip, fill, localBounds, deviceBounds, drawScale);
 }
 
@@ -355,7 +357,8 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
     case PendingOpType::Image: {
       auto subsetMode = UVSubsetMode::None;
       if (pendingConstraint == SrcRectConstraint::Strict && pendingImage) {
-        subsetMode = pendingSampling.filterMode == FilterMode::Linear
+        subsetMode = pendingSampling.magFilterMode == FilterMode::Linear ||
+                             pendingSampling.minFilterMode == FilterMode::Linear
                          ? UVSubsetMode::SubsetOnly
                          : UVSubsetMode::RoundOutAndSubset;
       }
@@ -534,6 +537,7 @@ std::shared_ptr<TextureProxy> OpsCompositor::getClipTexture(const Path& clip, AA
     auto shapeProxy = proxyProvider()->createGPUShapeProxy(shape, aaType, clipBounds, renderFlags);
     auto uvMatrix = Matrix::MakeTrans(bounds.left, bounds.top);
     auto drawOp = ShapeDrawOp::Make(std::move(shapeProxy), {}, uvMatrix, aaType);
+    CAPUTRE_SHAPE_MESH(drawOp.get(), shape, aaType, clipBounds);
     auto clipRenderTarget = RenderTargetProxy::MakeFallback(
         context, width, height, true, 1, false, ImageOrigin::TopLeft, BackingFit::Approx);
     if (clipRenderTarget == nullptr) {
