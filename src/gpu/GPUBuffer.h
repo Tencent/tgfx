@@ -23,6 +23,7 @@
 #include <limits>
 
 namespace tgfx {
+static constexpr size_t GPU_BUFFER_WHOLE_SIZE = std::numeric_limits<size_t>::max();
 
 class GPU;
 
@@ -75,7 +76,7 @@ class GPUBuffer {
    * Mapping a whole GPUBuffer allows the CPU to read from or write to the buffer's memory directly.
    */
   void* map() {
-    return map(0, std::numeric_limits<size_t>::max());
+    return map(0, GPU_BUFFER_WHOLE_SIZE);
   }
 
   /**

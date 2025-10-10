@@ -29,16 +29,29 @@ WebGLBuffer::WebGLBuffer(std::shared_ptr<GLInterface> interface, unsigned buffer
 }
 
 void* WebGLBuffer::map(size_t offset, size_t size) {
-  if (size == std::numeric_limits<size_t>::max()) {
+  if (size == 0) {
+    LOGE("WebGLBuffer::map() size cannot be 0!");
+    return nullptr;
+  }
+
+  if (size == GPU_BUFFER_WHOLE_SIZE) {
     size = _size - offset;
   }
 
-  DEBUG_ASSERT(offset + size <= _size);
+  if (offset + size > _size) {
+    LOGE("WebGLBuffer::map() range out of bounds!");
+    return nullptr;
+  }
+
+  if (isMapped) {
+    return bufferData;
+  }
 
   bufferData = malloc(size);
   if (bufferData != nullptr) {
     subDataOffset = offset;
     subDataSize = size;
+    isMapped = true;
 
     return bufferData;
   }
@@ -47,7 +60,7 @@ void* WebGLBuffer::map(size_t offset, size_t size) {
 }
 
 void WebGLBuffer::unmap() {
-  if (bufferData == nullptr) {
+  if (!isMapped) {
     return;
   }
 
@@ -60,5 +73,6 @@ void WebGLBuffer::unmap() {
 
   free(bufferData);
   bufferData = nullptr;
+  isMapped = false;
 }
 }  // namespace tgfx

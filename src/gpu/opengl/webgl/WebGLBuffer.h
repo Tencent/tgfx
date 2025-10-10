@@ -37,5 +37,6 @@ class WebGLBuffer : public GLBuffer {
   size_t subDataOffset = 0;
   size_t subDataSize = 0;
   void* bufferData = nullptr;
+  bool isMapped = false;
 };
 }  // namespace tgfx

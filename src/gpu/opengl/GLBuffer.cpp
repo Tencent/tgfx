@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLBuffer.h"
-#include <limits>
 #include "GLGPU.h"
 #include "GLUtil.h"
 
@@ -53,11 +52,19 @@ unsigned GLBuffer::target() const {
 }
 
 void* GLBuffer::map(size_t offset, size_t size) {
-  if (size == std::numeric_limits<size_t>::max()) {
+  if (size == 0) {
+    LOGE("GLBuffer::map() size cannot be 0!");
+    return nullptr;
+  }
+
+  if (size == GPU_BUFFER_WHOLE_SIZE) {
     size = _size - offset;
   }
 
-  DEBUG_ASSERT(offset + size <= _size);
+  if (offset + size > _size) {
+    LOGE("GLBuffer::map() range out of bounds!");
+    return nullptr;
+  }
 
   if (dataAddress != nullptr) {
     return static_cast<uint8_t*>(dataAddress) + offset;
