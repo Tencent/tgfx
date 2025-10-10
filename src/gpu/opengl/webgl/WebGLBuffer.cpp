@@ -35,12 +35,12 @@ void* WebGLBuffer::map(size_t offset, size_t size) {
 
   DEBUG_ASSERT(offset + size <= _size);
 
-  bufferData = malloc(_size);
+  bufferData = malloc(size);
   if (bufferData != nullptr) {
     subDataOffset = offset;
     subDataSize = size;
 
-    return static_cast<uint8_t*>(bufferData) + offset;
+    return bufferData;
   }
 
   return nullptr;
@@ -57,7 +57,7 @@ void WebGLBuffer::unmap() {
   gl->bindBuffer(bufferTarget, _bufferID);
   gl->bufferSubData(bufferTarget, static_cast<GLintptr>(subDataOffset),
                     static_cast<GLsizeiptr>(subDataSize),
-                    static_cast<uint8_t*>(bufferData) + subDataOffset);
+                    bufferData);
 
   free(bufferData);
   bufferData = nullptr;
