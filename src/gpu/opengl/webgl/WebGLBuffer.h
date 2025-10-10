@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -24,27 +24,18 @@
 #include "gpu/opengl/GLResource.h"
 
 namespace tgfx {
-/**
- * GLBuffer is a GPUBuffer implementation for OpenGL. It encapsulates an OpenGL buffer object and
- * provides methods to access its properties and release its resources.
- */
-class GLBuffer : public GPUBuffer, public GLResource {
- public:
+class WebGLBuffer : public GPUBuffer, public GLResource {
+public:
   /**
-   * Creates a new GLBuffer with the specified size and usage flags.
+   * Creates a new WebGLBuffer with the specified size and usage flags.
    */
-  GLBuffer(std::shared_ptr<GLInterface> interface, unsigned bufferID, size_t size, uint32_t usage);
+  WebGLBuffer(std::shared_ptr<GLInterface> interface, unsigned bufferID, size_t size,
+                   uint32_t usage);
 
-  ~GLBuffer() override;
+  ~WebGLBuffer() override;
 
-  /**
-   * Returns the OpenGL target for this buffer based on its usage flags.
-   */
   unsigned target() const;
 
-  /**
-   * Returns the OpenGL buffer ID associated with this buffer.
-   */
   unsigned bufferID() const {
     return _bufferID;
   }
@@ -53,14 +44,14 @@ class GLBuffer : public GPUBuffer, public GLResource {
 
   void unmap() override;
 
- protected:
+  void onRelease(GLGPU* gpu) override;
+
+private:
   std::shared_ptr<GLInterface> _interface = nullptr;
   uint32_t uniqueID = 0;
   unsigned _bufferID = 0;
   void* dataAddress = nullptr;
-
-  void onRelease(GLGPU* gpu) override;
-
-  friend class GLState;
+  size_t subDataOffset = 0;
+  size_t subDataSize = 0;
 };
 }  // namespace tgfx

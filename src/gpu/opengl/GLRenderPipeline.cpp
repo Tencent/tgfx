@@ -89,7 +89,7 @@ void GLRenderPipeline::setUniformBuffer(GLGPU* gpu, unsigned binding, GLBuffer* 
     gl->bindBufferRange(GL_UNIFORM_BUFFER, binding, ubo, static_cast<int32_t>(offset),
                         static_cast<int32_t>(size));
   } else {
-    auto data = static_cast<uint8_t*>(buffer->map()) + offset;
+    auto data = static_cast<uint8_t*>(buffer->map(offset, size));
     for (auto& uniform : uniforms) {
       auto uniformData = data + uniform.offset;
       switch (uniform.format) {

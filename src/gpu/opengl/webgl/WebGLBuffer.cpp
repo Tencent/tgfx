@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,28 +16,26 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLBuffer.h"
-#include "GLGPU.h"
-#include "GLUtil.h"
+#include "WebGLBuffer.h"
+#include "gpu/GPU.h"
+#include "gpu/opengl/GLGPU.h"
 
 namespace tgfx {
-GLBuffer::GLBuffer(std::shared_ptr<GLInterface> interface, unsigned bufferID, size_t size,
-                   uint32_t usage)
-    : GPUBuffer(size, usage), _interface(std::move(interface)), uniqueID(UniqueID::Next()),
-      _bufferID(bufferID) {
-  if ((usage & GPUBufferUsage::UNIFORM) && !_interface->caps()->shaderCaps()->uboSupport) {
-    dataAddress = malloc(_size);
-  }
+WebGLBuffer::WebGLBuffer(std::shared_ptr<GLInterface> interface, unsigned bufferID, size_t size,
+                         uint32_t usage)
+  : GPUBuffer(size, usage), _interface(std::move(interface)), uniqueID(UniqueID::Next()),
+    _bufferID(bufferID) {
+  dataAddress = malloc(_size);
 }
 
-GLBuffer::~GLBuffer() {
+WebGLBuffer::~WebGLBuffer() {
   if (dataAddress != nullptr) {
     free(dataAddress);
     dataAddress = nullptr;
   }
 }
 
-unsigned GLBuffer::target() const {
+unsigned WebGLBuffer::target() const {
   if (_usage & GPUBufferUsage::VERTEX) {
     return GL_ARRAY_BUFFER;
   }
@@ -47,40 +45,31 @@ unsigned GLBuffer::target() const {
   if (_usage & GPUBufferUsage::UNIFORM) {
     return GL_UNIFORM_BUFFER;
   }
-  LOGE("GLBuffer::target() invalid buffer usage!");
+  LOGE("WebGLBuffer::target() invalid buffer usage!");
   return 0;
 }
 
-void* GLBuffer::map(size_t offset, size_t size) {
+void* WebGLBuffer::map(size_t offset, size_t size) {
   if (dataAddress != nullptr) {
-    return static_cast<uint8_t*>(dataAddress) + offset;
-  }
+    subDataOffset = offset;
+    subDataSize = size;
 
-  auto gl = _interface->functions();
-  if (gl->mapBufferRange != nullptr) {
-    auto bufferTarget = target();
-    gl->bindBuffer(bufferTarget, _bufferID);
-    return gl->mapBufferRange(bufferTarget, static_cast<int32_t>(offset), static_cast<int32_t>(size),
-                              GL_MAP_WRITE_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
+    return static_cast<uint8_t*>(dataAddress) + offset;
   }
 
   return nullptr;
 }
 
-void GLBuffer::unmap() {
-  if (dataAddress != nullptr) {
-    return;
-  }
-
+void WebGLBuffer::unmap() {
+  auto bufferTarget = target();
   auto gl = _interface->functions();
-  if (gl->mapBufferRange != nullptr) {
-    auto bufferTarget = target();
-    gl->bindBuffer(bufferTarget, _bufferID);
-    gl->unmapBuffer(bufferTarget);
-  }
+
+  gl->bindBuffer(bufferTarget, _bufferID);
+  gl->bufferSubData(bufferTarget, static_cast<int32_t>(subDataOffset),
+                    static_cast<int32_t>(subDataSize), static_cast<uint8_t*>(dataAddress) + subDataOffset);
 }
 
-void GLBuffer::onRelease(GLGPU* gpu) {
+void WebGLBuffer::onRelease(GLGPU* gpu) {
   DEBUG_ASSERT(gpu != nullptr);
   if (_bufferID > 0) {
     auto gl = gpu->functions();
