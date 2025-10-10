@@ -81,6 +81,13 @@ class Transform3DLayer final : public Layer {
 
   void onUpdateContent(LayerRecorder* recorder) override;
 
+  void onUpdateContentBounds(Rect& bounds, float contentScale) const override;
+
+  bool needDrawOffScreen(const DrawArgs& args, float alpha, BlendMode blendMode) const override;
+
+  void onMakeImageFilters(std::vector<std::shared_ptr<ImageFilter>>& filters,
+                          float contentScale) const override;
+
   std::shared_ptr<Layer> _content = nullptr;
 
   Matrix3D _matrix3D = Matrix3D::I();

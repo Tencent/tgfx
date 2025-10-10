@@ -18,6 +18,8 @@
 
 #include "tgfx/layers/filters/Transform3DFilter.h"
 #include "core/filters/Transform3DImageFilter.h"
+#include "core/utils/Log.h"
+#include "core/utils/MathExtra.h"
 
 namespace tgfx {
 
@@ -44,8 +46,22 @@ void Transform3DFilter::setHideBackFace(bool hideBackFace) {
 Transform3DFilter::Transform3DFilter(const Matrix3D& matrix) : _matrix(matrix) {
 }
 
-std::shared_ptr<ImageFilter> Transform3DFilter::onCreateImageFilter(float) {
-  auto filter = std::make_shared<Transform3DImageFilter>(_matrix);
+std::shared_ptr<ImageFilter> Transform3DFilter::onCreateImageFilter(float scale) {
+  // The order of model scaling and projection affects the final result. Here, the expected behavior
+  // is to project first and then scale. Multiple matrices are modified as follows.
+  // For example, if a model is scaled by 2x and then rotated 90 degrees around the X axis, the
+  // expected rendering result is that the projection of the scaled model is also enlarged by 2x
+  // compared to the unscaled model. However, if the projection is applied to the already scaled
+  // model, not only will its length be doubled, but it will also be closer to the observer,
+  // resulting in a projection scale much greater than 2.
+  auto adjustedMatrix = _matrix;
+  if (!FloatNearlyEqual(scale, 1.0f)) {
+    DEBUG_ASSERT(!FloatNearlyZero(scale));
+    auto invScaleMatrix = Matrix3D::MakeScale(1.0f / scale, 1.0f / scale, 1.0f);
+    auto scaleMatrix = Matrix3D::MakeScale(scale, scale, 1.0f);
+    adjustedMatrix = scaleMatrix * _matrix * invScaleMatrix;
+  }
+  auto filter = std::make_shared<Transform3DImageFilter>(adjustedMatrix);
   filter->setHideBackFace(_hideBackFace);
   return filter;
 }

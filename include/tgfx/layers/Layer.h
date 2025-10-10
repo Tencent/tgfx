@@ -615,6 +615,22 @@ class Layer : public std::enable_shared_from_this<Layer> {
   static std::shared_ptr<Picture> RecordPicture(DrawMode mode, float contentScale,
                                                 const std::function<void(Canvas*)>& drawFunction);
 
+  /**
+   * Updates the bounds of the layer's own content, excluding child layer content.
+   */
+  virtual void onUpdateContentBounds(Rect& bounds, float contentScale) const;
+
+  /**
+   * Returns whether this layer needs offscreen rendering.
+   */
+  virtual bool needDrawOffScreen(const DrawArgs& args, float alpha, BlendMode blendMode) const;
+
+  /**
+   * Updates the list of filters applied to the image content.
+   */
+  virtual void onMakeImageFilters(std::vector<std::shared_ptr<ImageFilter>>& filters,
+                                  float contentScale) const;
+
   struct {
     bool dirtyContent : 1;        // layer's content needs updating
     bool dirtyContentBounds : 1;  // layer's content bounds needs updating

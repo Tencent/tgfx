@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/Transform3DLayer.h"
+#include "RegionTransformer.h"
 #include "tgfx/layers/filters/Transform3DFilter.h"
 
 namespace tgfx {
@@ -55,13 +56,39 @@ void Transform3DLayer::onUpdateContent(LayerRecorder* recorder) {
   }
 
   _content->onUpdateContent(recorder);
-  auto filters = _content->filters();
-  if (_matrix3D != Matrix3D::I()) {
-    auto filter = Transform3DFilter::Make(_matrix3D);
-    filter->setHideBackFace(_hideBackFace);
-    filters.push_back(std::move(filter));
+}
+
+void Transform3DLayer::onUpdateContentBounds(Rect& bounds, float contentScale) const {
+  if (_matrix3D == Matrix3D::I()) {
+    return;
   }
-  setFilters(std::move(filters));
+
+  auto filter = Transform3DFilter::Make(_matrix3D);
+  auto transformer = RegionTransformer::MakeFromFilters({std::move(filter)}, contentScale, nullptr);
+  transformer->transform(&bounds);
+}
+
+bool Transform3DLayer::needDrawOffScreen(const DrawArgs& args, float alpha,
+                                         BlendMode blendMode) const {
+  if (_matrix3D == Matrix3D::I()) {
+    return Layer::needDrawOffScreen(args, alpha, blendMode);
+  }
+
+  // Currently, 3D layers only support applying 3D transformation effects uniformly to the content
+  // of this node and all its child elements, so offscreen rendering is required.
+  return true;
+}
+
+void Transform3DLayer::onMakeImageFilters(std::vector<std::shared_ptr<ImageFilter>>& filters,
+                                          float contentScale) const {
+  if (_matrix3D == Matrix3D::I()) {
+    return;
+  }
+
+  auto filter = Transform3DFilter::Make(_matrix3D);
+  filter->setHideBackFace(_hideBackFace);
+  auto imageFilter = filter->getImageFilter(contentScale);
+  filters.push_back(std::move(imageFilter));
 }
 
 }  // namespace tgfx
