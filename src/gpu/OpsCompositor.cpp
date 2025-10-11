@@ -64,6 +64,9 @@ OpsCompositor::OpsCompositor(std::shared_ptr<RenderTargetProxy> proxy, uint32_t 
 void OpsCompositor::fillImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
                               const MCState& state, const Fill& fill) {
   DEBUG_ASSERT(image != nullptr);
+  printf("\nCJ3DRender Matrix: [Row1] %.6f %.6f %.6f [Row2] %.6f %.6f %.6f  ImageWH: %d %d\n",
+         state.matrix[0], state.matrix[1], state.matrix[2], state.matrix[3],
+         state.matrix[4], state.matrix[5], image->width(), image->height());
   auto imageRect = Rect::MakeWH(image->width(), image->height());
   if (!canAppend(PendingOpType::Image, state.clip, fill) || pendingImage != image ||
       pendingSampling != sampling || pendingConstraint != SrcRectConstraint::Fast) {
