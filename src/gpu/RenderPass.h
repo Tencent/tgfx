@@ -283,28 +283,15 @@ class RenderPass {
                           std::shared_ptr<GPUSampler> sampler) = 0;
 
   /**
-   * Sets or unsets the current vertex buffer, using an offset of 0 by default.
-   */
-  void setVertexBuffer(std::shared_ptr<GPUBuffer> buffer) {
-    setVertexBuffer(std::move(buffer), 0);
-  }
-
-  /**
    * Sets or unsets the current vertex buffer with an optional offset.
    */
-  virtual void setVertexBuffer(std::shared_ptr<GPUBuffer> buffer, size_t offset) = 0;
-
-  /**
-   * Sets the current index buffer, using IndexFormat::UInt16 as the default format.
-   */
-  void setIndexBuffer(std::shared_ptr<GPUBuffer> buffer) {
-    setIndexBuffer(std::move(buffer), IndexFormat::UInt16);
-  }
+  virtual void setVertexBuffer(std::shared_ptr<GPUBuffer> buffer, size_t offset = 0) = 0;
 
   /**
    * Sets the current index buffer with its format.
    */
-  virtual void setIndexBuffer(std::shared_ptr<GPUBuffer> buffer, IndexFormat format) = 0;
+  virtual void setIndexBuffer(std::shared_ptr<GPUBuffer> buffer,
+                              IndexFormat format = IndexFormat::UInt16) = 0;
 
   /**
    * Sets the stencil reference value using during stencil tests with the "replace" stencil
