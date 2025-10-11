@@ -77,12 +77,13 @@ class ColorAttachment {
    * Constructs a ColorAttachment with the specified texture, load action, store action, clear value,
    * and resolve texture.
    */
-  ColorAttachment(std::shared_ptr<GPUTexture> texture, LoadAction loadAction = LoadAction::DontCare,
-                  StoreAction storeAction = StoreAction::Store,
-                  Color clearValue = Color::Transparent(),
-                  std::shared_ptr<GPUTexture> resolveTexture = nullptr)
-      : texture(texture), loadAction(loadAction), storeAction(storeAction), clearValue(clearValue),
-        resolveTexture(resolveTexture) {
+  explicit ColorAttachment(std::shared_ptr<GPUTexture> texture,
+                           LoadAction loadAction = LoadAction::DontCare,
+                           StoreAction storeAction = StoreAction::Store,
+                           Color clearValue = Color::Transparent(),
+                           std::shared_ptr<GPUTexture> resolveTexture = nullptr)
+      : texture(std::move(texture)), loadAction(loadAction), storeAction(storeAction),
+        clearValue(clearValue), resolveTexture(std::move(resolveTexture)) {
   }
 
   /**
@@ -126,12 +127,12 @@ class DepthStencilAttachment {
    * Constructs a DepthStencilAttachment with the specified texture, load action, store action,
    * depth clear value, depth read-only flag, stencil clear value, and stencil read-only flag.
    */
-  DepthStencilAttachment(std::shared_ptr<GPUTexture> texture,
-                         LoadAction loadAction = LoadAction::Clear,
-                         StoreAction storeAction = StoreAction::DontCare,
-                         float depthClearValue = 1.0f, bool depthReadOnly = false,
-                         uint32_t stencilClearValue = 0, bool stencilReadOnly = false)
-      : texture(texture), loadAction(loadAction), storeAction(storeAction),
+  explicit DepthStencilAttachment(std::shared_ptr<GPUTexture> texture,
+                                  LoadAction loadAction = LoadAction::Clear,
+                                  StoreAction storeAction = StoreAction::DontCare,
+                                  float depthClearValue = 1.0f, bool depthReadOnly = false,
+                                  uint32_t stencilClearValue = 0, bool stencilReadOnly = false)
+      : texture(std::move(texture)), loadAction(loadAction), storeAction(storeAction),
         depthClearValue(depthClearValue), depthReadOnly(depthReadOnly),
         stencilClearValue(stencilClearValue), stencilReadOnly(stencilReadOnly) {
   }
@@ -192,12 +193,13 @@ class RenderPassDescriptor {
    * @param resolveTexture The texture to resolve the color attachment into. This is used for
    * multisampled textures. If this is nullptr, the color attachment will not be resolved.
    */
-  RenderPassDescriptor(std::shared_ptr<GPUTexture> texture,
-                       LoadAction loadAction = LoadAction::DontCare,
-                       StoreAction storeAction = StoreAction::Store,
-                       Color clearValue = Color::Transparent(),
-                       std::shared_ptr<GPUTexture> resolveTexture = nullptr) {
-    colorAttachments.emplace_back(texture, loadAction, storeAction, clearValue, resolveTexture);
+  explicit RenderPassDescriptor(std::shared_ptr<GPUTexture> texture,
+                                LoadAction loadAction = LoadAction::DontCare,
+                                StoreAction storeAction = StoreAction::Store,
+                                Color clearValue = Color::Transparent(),
+                                std::shared_ptr<GPUTexture> resolveTexture = nullptr) {
+    colorAttachments.emplace_back(std::move(texture), loadAction, storeAction, clearValue,
+                                  std::move(resolveTexture));
   }
 
   /**
@@ -208,8 +210,8 @@ class RenderPassDescriptor {
    */
   RenderPassDescriptor(std::shared_ptr<GPUTexture> texture,
                        std::shared_ptr<GPUTexture> resolveTexture) {
-    colorAttachments.emplace_back(texture, LoadAction::Load, StoreAction::Store,
-                                  Color::Transparent(), resolveTexture);
+    colorAttachments.emplace_back(std::move(texture), LoadAction::Load, StoreAction::Store,
+                                  Color::Transparent(), std::move(resolveTexture));
   }
 
   /**
@@ -281,15 +283,28 @@ class RenderPass {
                           std::shared_ptr<GPUSampler> sampler) = 0;
 
   /**
+   * Sets or unsets the current vertex buffer, using an offset of 0 by default.
+   */
+  void setVertexBuffer(std::shared_ptr<GPUBuffer> buffer) {
+    setVertexBuffer(std::move(buffer), 0);
+  }
+
+  /**
    * Sets or unsets the current vertex buffer with an optional offset.
    */
-  virtual void setVertexBuffer(std::shared_ptr<GPUBuffer> buffer, size_t offset = 0) = 0;
+  virtual void setVertexBuffer(std::shared_ptr<GPUBuffer> buffer, size_t offset) = 0;
+
+  /**
+   * Sets the current index buffer, using IndexFormat::UInt16 as the default format.
+   */
+  void setIndexBuffer(std::shared_ptr<GPUBuffer> buffer) {
+    setIndexBuffer(std::move(buffer), IndexFormat::UInt16);
+  }变量
 
   /**
    * Sets the current index buffer with its format.
    */
-  virtual void setIndexBuffer(std::shared_ptr<GPUBuffer> buffer,
-                              IndexFormat format = IndexFormat::UInt16) = 0;
+  virtual void setIndexBuffer(std::shared_ptr<GPUBuffer> buffer, IndexFormat format) = 0;
 
   /**
    * Sets the stencil reference value using during stencil tests with the "replace" stencil

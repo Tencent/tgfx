@@ -29,9 +29,9 @@ ProgramInfo::ProgramInfo(RenderTarget* renderTarget, GeometryProcessor* geometry
                          std::vector<FragmentProcessor*> fragmentProcessors,
                          size_t numColorProcessors, XferProcessor* xferProcessor,
                          BlendMode blendMode)
-    : renderTarget(renderTarget), geometryProcessor(std::move(geometryProcessor)),
+    : renderTarget(renderTarget), geometryProcessor(geometryProcessor),
       fragmentProcessors(std::move(fragmentProcessors)), numColorProcessors(numColorProcessors),
-      xferProcessor(std::move(xferProcessor)), blendMode(blendMode) {
+      xferProcessor(xferProcessor), blendMode(blendMode) {
   updateProcessorIndices();
 }
 
