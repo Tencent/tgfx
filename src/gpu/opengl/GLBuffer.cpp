@@ -51,16 +51,31 @@ unsigned GLBuffer::target() const {
   return 0;
 }
 
-void* GLBuffer::map() {
+void* GLBuffer::map(size_t offset, size_t size) {
+  if (size == 0) {
+    LOGE("GLBuffer::map() size cannot be 0!");
+    return nullptr;
+  }
+
+  if (size == GPU_BUFFER_WHOLE_SIZE) {
+    size = _size - offset;
+  }
+
+  if (offset + size > _size) {
+    LOGE("GLBuffer::map() range out of bounds!");
+    return nullptr;
+  }
+
   if (dataAddress != nullptr) {
-    return dataAddress;
+    return static_cast<uint8_t*>(dataAddress) + offset;
   }
 
   auto gl = _interface->functions();
   if (gl->mapBufferRange != nullptr) {
     auto bufferTarget = target();
     gl->bindBuffer(bufferTarget, _bufferID);
-    return gl->mapBufferRange(bufferTarget, 0, static_cast<int32_t>(_size),
+    return gl->mapBufferRange(bufferTarget, static_cast<GLintptr>(offset),
+                              static_cast<GLsizeiptr>(size),
                               GL_MAP_WRITE_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
   }
 

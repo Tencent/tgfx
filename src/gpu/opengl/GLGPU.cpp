@@ -18,6 +18,9 @@
 
 #include "GLGPU.h"
 #include "gpu/opengl/GLBuffer.h"
+#if defined(__EMSCRIPTEN__)
+#include "gpu/opengl/webgl/WebGLBuffer.h"
+#endif
 #include "gpu/opengl/GLCommandEncoder.h"
 #include "gpu/opengl/GLDepthStencilTexture.h"
 #include "gpu/opengl/GLExternalTexture.h"
@@ -70,7 +73,11 @@ std::shared_ptr<GPUBuffer> GLGPU::createBuffer(size_t size, uint32_t usage) {
   gl->bindBuffer(target, bufferID);
   gl->bufferData(target, static_cast<GLsizeiptr>(size), nullptr, GL_STATIC_DRAW);
   gl->bindBuffer(target, 0);
+#if defined(__EMSCRIPTEN__)
+  return makeResource<WebGLBuffer>(interface, bufferID, size, usage);
+#else
   return makeResource<GLBuffer>(interface, bufferID, size, usage);
+#endif
 }
 
 std::shared_ptr<GPUTexture> GLGPU::createTexture(const GPUTextureDescriptor& descriptor) {

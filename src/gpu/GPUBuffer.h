@@ -20,8 +20,10 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 
 namespace tgfx {
+static constexpr size_t GPU_BUFFER_WHOLE_SIZE = std::numeric_limits<size_t>::max();
 
 class GPU;
 
@@ -71,10 +73,20 @@ class GPUBuffer {
   }
 
   /**
-   * Mapping a GPUBuffer allows the CPU to read from or write to the buffer's memory directly.
-   * If the mapping fails, it returns nullptr.
+   * Mapping a whole GPUBuffer allows the CPU to read from or write to the buffer's memory directly.
    */
-  virtual void* map() = 0;
+  void* map() {
+    return map(0, GPU_BUFFER_WHOLE_SIZE);
+  }
+
+  /**
+   * Mapping a range of the GPUBuffer allows the CPU to directly read from or write to the buffer's
+   * memory. If the mapping fails, it returns nullptr.
+   * @param offset The offset in bytes from the start of the buffer where the mapping should begin.
+   * @param size The size in bytes of the memory region to map.
+   * @return A pointer to the mapped memory region, or nullptr if the mapping fails.
+   */
+  virtual void* map(size_t offset, size_t size) = 0;
 
   /**
    * Unmaps the GPUBuffer, making its contents available for use by the GPU again.
