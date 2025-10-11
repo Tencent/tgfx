@@ -29,6 +29,8 @@ class WebGLBuffer : public GLBuffer {
   WebGLBuffer(std::shared_ptr<GLInterface> interface, unsigned bufferID, size_t size,
               uint32_t usage);
 
+  ~WebGLBuffer() override;
+
   void* map(size_t offset, size_t size) override;
 
   void unmap() override;
@@ -37,6 +39,5 @@ class WebGLBuffer : public GLBuffer {
   size_t subDataOffset = 0;
   size_t subDataSize = 0;
   void* bufferData = nullptr;
-  bool isMapped = false;
 };
 }  // namespace tgfx

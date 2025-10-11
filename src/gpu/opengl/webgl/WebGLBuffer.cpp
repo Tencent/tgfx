@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "WebGLBuffer.h"
-#include <limits>
 #include <utility>
 #include "gpu/GPU.h"
 #include "gpu/opengl/GLGPU.h"
@@ -28,7 +27,21 @@ WebGLBuffer::WebGLBuffer(std::shared_ptr<GLInterface> interface, unsigned buffer
     : GLBuffer(std::move(interface), bufferID, size, usage) {
 }
 
+WebGLBuffer::~WebGLBuffer() {
+  if (bufferData != nullptr) {
+    free(bufferData);
+    bufferData = nullptr;
+  }
+}
+
 void* WebGLBuffer::map(size_t offset, size_t size) {
+  if (bufferData != nullptr) {
+    LOGE(
+        "WebGLBuffer::map() cannot be called repeatedly, you must call unmap() before mapping "
+        "again.");
+    return nullptr;
+  }
+
   if (size == 0) {
     LOGE("WebGLBuffer::map() size cannot be 0!");
     return nullptr;
@@ -43,15 +56,10 @@ void* WebGLBuffer::map(size_t offset, size_t size) {
     return nullptr;
   }
 
-  if (isMapped) {
-    return bufferData;
-  }
-
   bufferData = malloc(size);
   if (bufferData != nullptr) {
     subDataOffset = offset;
     subDataSize = size;
-    isMapped = true;
 
     return bufferData;
   }
@@ -60,7 +68,7 @@ void* WebGLBuffer::map(size_t offset, size_t size) {
 }
 
 void WebGLBuffer::unmap() {
-  if (!isMapped) {
+  if (bufferData == nullptr) {
     return;
   }
 
@@ -73,6 +81,5 @@ void WebGLBuffer::unmap() {
 
   free(bufferData);
   bufferData = nullptr;
-  isMapped = false;
 }
 }  // namespace tgfx
