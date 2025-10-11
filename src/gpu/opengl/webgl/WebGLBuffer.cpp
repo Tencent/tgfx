@@ -72,11 +72,11 @@ void WebGLBuffer::unmap() {
     return;
   }
 
-  auto bufferTarget = target();
+  auto target = GetTarget(_usage);
+  DEBUG_ASSERT(target != 0);
   auto gl = _interface->functions();
-
-  gl->bindBuffer(bufferTarget, _bufferID);
-  gl->bufferSubData(bufferTarget, static_cast<GLintptr>(subDataOffset),
+  gl->bindBuffer(target, _bufferID);
+  gl->bufferSubData(target, static_cast<GLintptr>(subDataOffset),
                     static_cast<GLsizeiptr>(subDataSize), bufferData);
 
   free(bufferData);
