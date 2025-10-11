@@ -299,7 +299,7 @@ class RenderPass {
    */
   void setIndexBuffer(std::shared_ptr<GPUBuffer> buffer) {
     setIndexBuffer(std::move(buffer), IndexFormat::UInt16);
-  }变量
+  }
 
   /**
    * Sets the current index buffer with its format.
