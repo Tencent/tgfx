@@ -86,27 +86,17 @@ class GPUBuffer {
   virtual bool isReady() const = 0;
 
   /**
-   * Maps the whole GPUBuffer, allowing the CPU to directly access its memory for reading or writing.
-   * For readback buffers, this method may block until the data transfer is complete, if the backend
-   * supports blocking. After you are done, call unmap() to release the mapping and let the GPU
-   * access the buffer again. Returns nullptr if mapping fails, or if the readback buffer is not
-   * ready and blocking is not supported.
-   */
-  void* map() {
-    return map(0, GPU_BUFFER_WHOLE_SIZE);
-  }
-
-  /**
-   * Mapping a range of the GPUBuffer, allowing the CPU to directly access a specific portion of its
+   * Maps a range of the GPUBuffer, allowing the CPU to directly access a specific portion of its
    * memory for reading or writing. For readback buffers, this method may block until the data
-   * transfer is complete, if the backend supports blocking. After you are done, call unmap() to
-   * release the mapping and let the GPU access the buffer again.
-   * @param offset The offset in bytes from the start of the buffer where the mapping should begin.
-   * @param size The size in bytes of the memory region to map.
+   * transfer from the GPU to the CPU is complete, if the backend supports blocking. After
+   * finishing, call unmap() to release the mapping and allow the GPU to access the buffer again.
+   * @param offset The byte offset from the start of the buffer where mapping begins.
+   * @param size The number of bytes to map. If set to GPU_BUFFER_WHOLE_SIZE, the mapping will cover
+   * the buffer from the offset to the end.
    * @return A pointer to the mapped memory region, or nullptr if mapping fails, or if the readback
-   * buffer is not ready and blocking is unsupported.
+   * buffer is not ready and blocking is not supported.
    */
-  virtual void* map(size_t offset, size_t size) = 0;
+  virtual void* map(size_t offset = 0, size_t size = GPU_BUFFER_WHOLE_SIZE) = 0;
 
   /**
    * Unmaps the GPUBuffer, making its contents available for use by the GPU again.
