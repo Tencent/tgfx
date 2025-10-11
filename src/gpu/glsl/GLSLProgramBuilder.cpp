@@ -241,6 +241,7 @@ std::shared_ptr<PipelineProgram> GLSLProgramBuilder::finalize() {
     descriptor.layout.textureSamplers.emplace_back(sampler.name(), textureBinding++);
   }
   descriptor.cullFace = MakeCullFaceDescriptor(programInfo->getCullFaceType());
+  printf("\nCJ3DRender GLSLProgramBuilder::finalize CullFaceEnabled %d FronType %d CullType %d", static_cast<int>(descriptor.cullFace.enabled), (int)descriptor.cullFace.frontDirection, (int)descriptor.cullFace.mode);
   auto pipeline = gpu->createRenderPipeline(descriptor);
   if (pipeline == nullptr) {
     return nullptr;

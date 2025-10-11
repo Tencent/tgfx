@@ -114,6 +114,7 @@ std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
       TextureEffect::Make(std::move(sourceTextureProxy), samplingArgs, &uvMatrix);
   drawOp->addColorFP(std::move(fragmentProcessor));
   if (_hideBackFace) {
+    printf("\nCJ3DRender Transform3DImageFilter::lockTextureProxy Cull Back face.");
     drawOp->setCullFaceType(CullFaceType::Back);
   }
   std::vector<PlacementPtr<DrawOp>> drawOps;

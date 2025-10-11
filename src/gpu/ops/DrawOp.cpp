@@ -43,6 +43,7 @@ void DrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
   }
   ProgramInfo programInfo(renderTarget, geometryProcessor.get(), std::move(fragmentProcessors),
                           colors.size(), xferProcessor.get(), blendMode);
+  printf("\nCJ3DRender DrawOp::execute CullFaceType %d", (int)cullFaceType);
   programInfo.setCullFaceType(cullFaceType);
   auto program = std::static_pointer_cast<PipelineProgram>(programInfo.getProgram());
   if (program == nullptr) {

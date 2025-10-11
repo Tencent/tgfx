@@ -65,6 +65,7 @@ void GLRenderPipeline::activate(GLGPU* gpu, bool depthReadOnly, bool stencilRead
   }
   state->setEnabled(GL_CULL_FACE, cullFaceState != nullptr);
   if (cullFaceState) {
+    printf("\nCJ3DRender GLRenderPipeline::activate CullFaceFronFace %d CullFace %d", cullFaceState->frontFace, cullFaceState->cullFace);
     state->setCullFaceState(*cullFaceState);
   }
 }
@@ -323,6 +324,11 @@ bool GLRenderPipeline::setPipelineDescriptor(GLGPU* gpu,
   depthState = MakeDepthState(descriptor.depthStencil);
   blendState = MakeBlendState(attachment);
   cullFaceState = MakeCullFaceState(descriptor.cullFace);
+  if (cullFaceState) {
+    printf("\nCJ3DRender GLRenderPipeline::setPipelineDescriptor CullFaceFronFace %d CullFace %d", cullFaceState->frontFace, cullFaceState->cullFace);
+  } else {
+    printf("\nCJ3DRender GLRenderPipeline::setPipelineDescriptor CullFaceDisable");
+  }
 
   for (auto& entry : descriptor.layout.uniformBlocks) {
     if (entry.uniforms.empty()) {
