@@ -60,10 +60,6 @@ std::shared_ptr<GPUBuffer> GLGPU::createBuffer(size_t size, uint32_t usage) {
     return nullptr;
   }
 
-  if (!interface->caps()->shaderCaps()->uboSupport && (usage & GPUBufferUsage::UNIFORM)) {
-    return makeResource<GLBuffer>(interface, 0u, size, usage);
-  }
-
   auto gl = interface->functions();
   unsigned bufferID = 0;
   gl->genBuffers(1, &bufferID);

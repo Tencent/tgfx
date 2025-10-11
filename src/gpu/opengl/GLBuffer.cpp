@@ -25,16 +25,6 @@ GLBuffer::GLBuffer(std::shared_ptr<GLInterface> interface, unsigned bufferID, si
                    uint32_t usage)
     : GPUBuffer(size, usage), _interface(std::move(interface)), uniqueID(UniqueID::Next()),
       _bufferID(bufferID) {
-  if ((usage & GPUBufferUsage::UNIFORM) && !_interface->caps()->shaderCaps()->uboSupport) {
-    dataAddress = malloc(_size);
-  }
-}
-
-GLBuffer::~GLBuffer() {
-  if (dataAddress != nullptr) {
-    free(dataAddress);
-    dataAddress = nullptr;
-  }
 }
 
 unsigned GLBuffer::target() const {
@@ -66,10 +56,6 @@ void* GLBuffer::map(size_t offset, size_t size) {
     return nullptr;
   }
 
-  if (dataAddress != nullptr) {
-    return static_cast<uint8_t*>(dataAddress) + offset;
-  }
-
   auto gl = _interface->functions();
   if (gl->mapBufferRange != nullptr) {
     auto bufferTarget = target();
@@ -83,10 +69,6 @@ void* GLBuffer::map(size_t offset, size_t size) {
 }
 
 void GLBuffer::unmap() {
-  if (dataAddress != nullptr) {
-    return;
-  }
-
   auto gl = _interface->functions();
   if (gl->mapBufferRange != nullptr) {
     auto bufferTarget = target();

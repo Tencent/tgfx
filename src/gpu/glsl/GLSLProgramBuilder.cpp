@@ -22,23 +22,24 @@
 #include "gpu/UniformData.h"
 
 namespace tgfx {
-static std::string TypeModifierString(bool varyingIsInOut, ShaderVar::TypeModifier t,
-                                      ShaderStage stage) {
+static std::string TypeModifierString(ShaderVar::TypeModifier t, ShaderStage stage) {
   switch (t) {
     case ShaderVar::TypeModifier::None:
       return "";
     case ShaderVar::TypeModifier::Attribute:
-      return varyingIsInOut ? "in" : "attribute";
+      return "in";
     case ShaderVar::TypeModifier::Varying:
-      return varyingIsInOut ? (stage == ShaderStage::Vertex ? "out" : "in") : "varying";
+      return stage == ShaderStage::Vertex ? "out" : "in";
     case ShaderVar::TypeModifier::FlatVarying:
-      return varyingIsInOut ? (stage == ShaderStage::Vertex ? "flat out" : "flat in") : "varying";
+      return stage == ShaderStage::Vertex ? "flat out" : "flat in";
     case ShaderVar::TypeModifier::Uniform:
       return "uniform";
     case ShaderVar::TypeModifier::Out:
       return "out";
     case ShaderVar::TypeModifier::InOut:
       return "inout";
+    default:
+      return "";
   }
 }
 
@@ -123,8 +124,7 @@ std::string GLSLProgramBuilder::getShaderVarDeclarations(const ShaderVar& var,
                                                          ShaderStage stage) const {
   std::string ret;
   if (var.modifier() != ShaderVar::TypeModifier::None) {
-    auto varyingIsInOut = getContext()->caps()->shaderCaps()->varyingIsInOut;
-    ret += TypeModifierString(varyingIsInOut, var.modifier(), stage);
+    ret += TypeModifierString(var.modifier(), stage);
     ret += " ";
   }
   auto shaderCaps = context->caps()->shaderCaps();
@@ -187,6 +187,10 @@ std::shared_ptr<PipelineProgram> GLSLProgramBuilder::finalize() {
   if (fragmentShader == nullptr) {
     return nullptr;
   }
+
+  LOGI("vertex shader code :\n%s\n", vertexModule.code.c_str());
+  LOGI("fragment shader code :\n%s\n\n", fragmentModule.code.c_str());
+
   RenderPipelineDescriptor descriptor = {};
   descriptor.vertex = {programInfo->getVertexAttributes()};
   descriptor.vertex.module = vertexShader;
@@ -196,18 +200,10 @@ std::shared_ptr<PipelineProgram> GLSLProgramBuilder::finalize() {
   auto fragmentUniformData = _uniformHandler.makeUniformData(ShaderStage::Fragment);
   if (vertexUniformData) {
     BindingEntry vertexBinding = {VertexUniformBlockName, VERTEX_UBO_BINDING_POINT};
-    if (!shaderCaps->uboSupport) {
-      vertexBinding.uniforms = vertexUniformData->uniforms();
-      DEBUG_ASSERT(!vertexBinding.uniforms.empty());
-    }
     descriptor.layout.uniformBlocks.push_back(vertexBinding);
   }
   if (fragmentUniformData) {
     BindingEntry fragmentBinding = {FragmentUniformBlockName, FRAGMENT_UBO_BINDING_POINT};
-    if (!shaderCaps->uboSupport) {
-      fragmentBinding.uniforms = fragmentUniformData->uniforms();
-      DEBUG_ASSERT(!fragmentBinding.uniforms.empty());
-    }
     descriptor.layout.uniformBlocks.push_back(fragmentBinding);
   }
   int textureBinding = TEXTURE_BINDING_POINT_START;

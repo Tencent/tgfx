@@ -71,72 +71,15 @@ void GLRenderPipeline::setUniformBuffer(GLGPU* gpu, unsigned binding, GLBuffer* 
     return;
   }
 
-  auto result = uniformBlocks.find(binding);
-  if (result == uniformBlocks.end()) {
-    LOGE("GLRenderPipeline::setUniformBuffer: binding %d not found", binding);
+  auto gl = gpu->functions();
+  unsigned ubo = buffer->bufferID();
+  if (ubo == 0) {
+    LOGE("GLRenderPipeline::setUniformBuffer error, uniform buffer id is 0");
     return;
   }
 
-  auto gl = gpu->functions();
-  auto& uniforms = result->second;
-  if (uniforms.empty()) {
-    unsigned ubo = buffer->bufferID();
-    if (ubo == 0) {
-      LOGE("GLRenderPipeline::setUniformBuffer error, uniform buffer id is 0");
-      return;
-    }
-
-    gl->bindBufferRange(GL_UNIFORM_BUFFER, binding, ubo, static_cast<int32_t>(offset),
-                        static_cast<int32_t>(size));
-  } else {
-    auto data = static_cast<uint8_t*>(buffer->map(offset, size));
-    for (auto& uniform : uniforms) {
-      auto uniformData = data + uniform.offset;
-      switch (uniform.format) {
-        case UniformFormat::Float:
-          gl->uniform1fv(uniform.location, 1, reinterpret_cast<float*>(uniformData));
-          break;
-        case UniformFormat::Float2:
-          gl->uniform2fv(uniform.location, 1, reinterpret_cast<float*>(uniformData));
-          break;
-        case UniformFormat::Float3:
-          gl->uniform3fv(uniform.location, 1, reinterpret_cast<float*>(uniformData));
-          break;
-        case UniformFormat::Float4:
-          gl->uniform4fv(uniform.location, 1, reinterpret_cast<float*>(uniformData));
-          break;
-        case UniformFormat::Float2x2:
-          gl->uniformMatrix2fv(uniform.location, 1, GL_FALSE,
-                               reinterpret_cast<float*>(uniformData));
-          break;
-        case UniformFormat::Float3x3:
-          gl->uniformMatrix3fv(uniform.location, 1, GL_FALSE,
-                               reinterpret_cast<float*>(uniformData));
-          break;
-        case UniformFormat::Float4x4:
-          gl->uniformMatrix4fv(uniform.location, 1, GL_FALSE,
-                               reinterpret_cast<float*>(uniformData));
-          break;
-        case UniformFormat::Int:
-          gl->uniform1iv(uniform.location, 1, reinterpret_cast<int*>(uniformData));
-          break;
-        case UniformFormat::Int2:
-          gl->uniform2iv(uniform.location, 1, reinterpret_cast<int*>(uniformData));
-          break;
-        case UniformFormat::Int3:
-          gl->uniform3iv(uniform.location, 1, reinterpret_cast<int*>(uniformData));
-          break;
-        case UniformFormat::Int4:
-          gl->uniform4iv(uniform.location, 1, reinterpret_cast<int*>(uniformData));
-          break;
-        case UniformFormat::Texture2DSampler:
-        case UniformFormat::TextureExternalSampler:
-        case UniformFormat::Texture2DRectSampler:
-          gl->uniform1iv(uniform.location, 1, reinterpret_cast<int*>(uniformData));
-          break;
-      }
-    }
-  }
+  gl->bindBufferRange(GL_UNIFORM_BUFFER, binding, ubo, static_cast<int32_t>(offset),
+                      static_cast<int32_t>(size));
 }
 
 void GLRenderPipeline::setTexture(GLGPU* gpu, unsigned binding, GLTexture* texture,
@@ -310,24 +253,9 @@ bool GLRenderPipeline::setPipelineDescriptor(GLGPU* gpu,
   blendState = MakeBlendState(attachment);
 
   for (auto& entry : descriptor.layout.uniformBlocks) {
-    if (entry.uniforms.empty()) {
-      auto uniformBlockIndex = gl->getUniformBlockIndex(programID, entry.name.c_str());
-      if (uniformBlockIndex != GL_INVALID_INDEX) {
-        gl->uniformBlockBinding(programID, uniformBlockIndex, entry.binding);
-      }
-      uniformBlocks[entry.binding] = {};
-    } else {
-      std::vector<GLUniform> uniforms = {};
-      uniforms.reserve(entry.uniforms.size());
-      size_t uniformOffset = 0;
-      for (auto& uniform : entry.uniforms) {
-        auto location = gl->getUniformLocation(programID, uniform.name().c_str());
-        if (location != -1) {
-          uniforms.push_back({uniform.format(), location, uniformOffset});
-        }
-        uniformOffset += uniform.size();
-      }
-      uniformBlocks[entry.binding] = uniforms;
+    auto uniformBlockIndex = gl->getUniformBlockIndex(programID, entry.name.c_str());
+    if (uniformBlockIndex != GL_INVALID_INDEX) {
+      gl->uniformBlockBinding(programID, uniformBlockIndex, entry.binding);
     }
   }
 

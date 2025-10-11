@@ -35,7 +35,7 @@ class GLBuffer : public GPUBuffer, public GLResource {
    */
   GLBuffer(std::shared_ptr<GLInterface> interface, unsigned bufferID, size_t size, uint32_t usage);
 
-  ~GLBuffer() override;
+  ~GLBuffer() override = default;
 
   /**
    * Returns the OpenGL target for this buffer based on its usage flags.
@@ -57,7 +57,6 @@ class GLBuffer : public GPUBuffer, public GLResource {
   std::shared_ptr<GLInterface> _interface = nullptr;
   uint32_t uniqueID = 0;
   unsigned _bufferID = 0;
-  void* dataAddress = nullptr;
 
   void onRelease(GLGPU* gpu) override;
 
