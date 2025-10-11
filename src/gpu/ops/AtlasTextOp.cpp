@@ -69,7 +69,7 @@ PlacementPtr<GeometryProcessor> AtlasTextOp::onMakeGeometryProcessor(RenderTarge
 }
 
 void AtlasTextOp::onDraw(RenderPass* renderPass) {
-  std::shared_ptr<IndexBuffer> indexBuffer = nullptr;
+  std::shared_ptr<BufferResource> indexBuffer = nullptr;
   if (indexBufferProxy) {
     indexBuffer = indexBufferProxy->getBuffer();
     if (indexBuffer == nullptr) {

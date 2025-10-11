@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,42 +18,25 @@
 
 #pragma once
 
-#include "gpu/GPU.h"
-#include "gpu/GPUBuffer.h"
-#include "gpu/resources/Resource.h"
+#include "ResourceProxy.h"
+#include "gpu/resources/BufferResource.h"
 
 namespace tgfx {
 /**
- * VertexBuffer is a resource that encapsulates a GPUBuffer, which can be used for vertex data in
- * a RenderPass.
+ * GPUBufferProxy is a proxy for GPUBuffer resources.
  */
-class VertexBuffer : public Resource {
+class GPUBufferProxy : public ResourceProxy {
  public:
-  size_t memoryUsage() const override {
-    return buffer->size();
-  }
-
   /**
-   * Returns the size of the vertex buffer.
+   * Returns the associated BufferResource instance.
    */
-  size_t size() const {
-    return buffer->size();
-  }
-
-  /**
-   * Returns the GPUBuffer associated with this VertexBuffer.
-   */
-  std::shared_ptr<GPUBuffer> gpuBuffer() const {
-    return buffer;
+  std::shared_ptr<BufferResource> getBuffer() const {
+    return std::static_pointer_cast<BufferResource>(resource);
   }
 
  private:
-  std::shared_ptr<GPUBuffer> buffer = nullptr;
+  GPUBufferProxy() = default;
 
-  explicit VertexBuffer(std::shared_ptr<GPUBuffer> buffer) : buffer(std::move(buffer)) {
-  }
-
-  friend class GPUBufferUploadTask;
-  friend class ShapeBufferUploadTask;
+  friend class ProxyProvider;
 };
 }  // namespace tgfx
