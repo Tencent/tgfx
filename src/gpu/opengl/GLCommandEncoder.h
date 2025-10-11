@@ -32,6 +32,10 @@ class GLCommandEncoder : public CommandEncoder {
                             std::shared_ptr<GPUTexture> dstTexture,
                             const Point& dstOffset) override;
 
+  void copyTextureToBuffer(std::shared_ptr<GPUTexture> srcTexture, const Rect& srcRect,
+                           std::shared_ptr<GPUBuffer> dstBuffer, size_t dstOffset,
+                           size_t dstRowBytes) override;
+
   void generateMipmapsForTexture(std::shared_ptr<GPUTexture> texture) override;
 
  protected:
