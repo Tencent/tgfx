@@ -364,6 +364,8 @@ void RenderContext::drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<
       return;
     }
     viewMatrix.preTranslate(-offset.x, -offset.y);
+    printf("\nCJ3DRender RenderContext::drawLayer Offset: %.6f %.6f  ImageWH: %d %d\n",
+       offset.x, offset.y, image->width(), image->height());
   }
   Matrix invertMatrix = {};
   if (!viewMatrix.invert(&invertMatrix)) {
