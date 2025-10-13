@@ -93,8 +93,6 @@ bool TGFXBaseView::draw(int drawIndex, float zoom, float offsetX, float offsetY)
   window->present(context);
   device->unlock();
   return true;
-  
-
 }
 
 }  // namespace hello2d

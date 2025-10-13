@@ -55,7 +55,7 @@ std::shared_ptr<tgfx::Typeface> AppHost::getTypeface(const std::string& name) co
 }
 
 bool AppHost::updateScreen(int width, int height, float density) {
-    markDirty();
+  markDirty();
   if (width <= 0 || height <= 0) {
     return false;
   }
@@ -109,13 +109,13 @@ void AppHost::addTypeface(const std::string& name, std::shared_ptr<tgfx::Typefac
   }
   typefaces[name] = std::move(typeface);
 }
-void AppHost::draw(tgfx::Canvas* canvas, int drawIndex,bool isNeedBackground ) const {
+void AppHost::draw(tgfx::Canvas* canvas, int drawIndex, bool isNeedBackground) const {
   if (drawIndex < 0 || drawIndex >= static_cast<int>(SampleBuilder::Count())) {
     return;
   }
   canvas->clear();
-  
-  if(isNeedBackground){
+
+  if (isNeedBackground) {
     SampleBuilder::DrawBackground(canvas, this);
   }
 
@@ -151,7 +151,7 @@ void AppHost::updateRootMatrix() const {
   if (!root) {
     return;
   }
-  auto bounds = root->getBounds(nullptr, true); 
+  auto bounds = root->getBounds(nullptr, true);
   if (bounds.isEmpty()) {
     return;
   }
@@ -164,15 +164,14 @@ void AppHost::updateRootMatrix() const {
     return;
   }
 
-  const float totalScale =
-      std::min(width / (padding * 2.0f + bounds.width()), height / (padding * 2.0f + bounds.height()));
+  const float totalScale = std::min(width / (padding * 2.0f + bounds.width()),
+                                    height / (padding * 2.0f + bounds.height()));
 
   tgfx::Matrix rootMatrix = tgfx::Matrix::MakeScale(totalScale);
   rootMatrix.postTranslate((width - bounds.width() * totalScale) * 0.5f,
                            (height - bounds.height() * totalScale) * 0.5f);
 
   root->setMatrix(rootMatrix);
-
 }
 
 std::vector<std::shared_ptr<tgfx::Layer>> AppHost::getLayersUnderPoint(float x, float y) const {

@@ -119,7 +119,7 @@ class MainActivity : ComponentActivity() {
 
 
     private fun requestDraw() {
-        if (animator?.isRunning) {
+        if (animator != null && animator!!.isRunning) {
             return
         }
 

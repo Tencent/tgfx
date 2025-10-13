@@ -89,6 +89,6 @@ void SampleBuilder::build(const AppHost* host) {
   }
 }
 std::vector<std::shared_ptr<tgfx::Layer>> SampleBuilder::getLayersUnderPoint(float x, float y) {
-  return _root->getLayersUnderPoint(x,y);
+  return _root->getLayersUnderPoint(x, y);
 }
 }  // namespace hello2d

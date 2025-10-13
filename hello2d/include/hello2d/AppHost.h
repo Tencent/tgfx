@@ -113,7 +113,7 @@ class AppHost {
   /**
    * Draws the content of the corresponding SampleBuilder based on the index.
    */
-  void draw(tgfx::Canvas* canvas, int drawIndex,bool isNeedBackground) const;
+  void draw(tgfx::Canvas* canvas, int drawIndex, bool isNeedBackground) const;
   /**
    * Calculates and sets the transformation matrix for the current root layer
    * (displayList.root()->firstChild()), centering it in the window, scaling it proportionally, and

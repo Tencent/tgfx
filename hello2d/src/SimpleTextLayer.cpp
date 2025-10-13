@@ -64,7 +64,7 @@ std::vector<std::pair<size_t, size_t>> findFirstOccurrence(const std::string& A,
   if (B.empty() || A.empty() || B.size() > A.size()) {
     return {};
   }
-  
+
   std::vector<std::pair<size_t, size_t>> result = {};
 
   size_t foundPos = A.find(B);
@@ -120,9 +120,9 @@ void SimpleTextLayer::invalidateLayout() {
   for (auto& richText : richTexts) {
     if (richText.type == Element::Type::Text) {
       auto font = richText.font;
-      std::string fontKey = std::to_string(reinterpret_cast<uintptr_t>(font.getTypeface().get())) + 
-                           "_" + std::to_string(font.getSize());
-      
+      std::string fontKey = std::to_string(reinterpret_cast<uintptr_t>(font.getTypeface().get())) +
+                            "_" + std::to_string(font.getSize());
+
       tgfx::FontMetrics fontMetrics;
       auto it = fontMetricsCache.find(fontKey);
       if (it != fontMetricsCache.end()) {
@@ -131,8 +131,8 @@ void SimpleTextLayer::invalidateLayout() {
         fontMetrics = font.getMetrics();
         fontMetricsCache[fontKey] = std::make_pair(font, fontMetrics);
       }
-      float textHeight =
-          std::fabs(fontMetrics.ascent) + std::fabs(fontMetrics.descent) + std::fabs(fontMetrics.leading);
+      float textHeight = std::fabs(fontMetrics.ascent) + std::fabs(fontMetrics.descent) +
+                         std::fabs(fontMetrics.leading);
       float textBaseline = (textHeight + fontMetrics.xHeight) / 2.f;
       float textUnderline = textBaseline + fontMetrics.descent;
       lineHeight = std::max(lineHeight, textHeight);
@@ -175,8 +175,8 @@ void SimpleTextLayer::invalidateLayout() {
       const char* textStart = richText.text.data();
       const char* textStop = textStart + richText.text.size();
       auto font = richText.font;
-      std::string fontKey = std::to_string(reinterpret_cast<uintptr_t>(font.getTypeface().get())) + 
-                           "_" + std::to_string(font.getSize());
+      std::string fontKey = std::to_string(reinterpret_cast<uintptr_t>(font.getTypeface().get())) +
+                            "_" + std::to_string(font.getSize());
       auto& metrics = fontMetricsCache[fontKey].second;
       auto emptyGlyphID = font.getGlyphID(" ");
       auto emptyAdvance = font.getAdvance(emptyGlyphID);
