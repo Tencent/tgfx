@@ -19,12 +19,13 @@
 #pragma once
 
 #include <cstdint>
-#include "SamplerHandle.h"
-#include "ShaderVar.h"
+#include "gpu/SamplerHandle.h"
+#include "gpu/ShaderStage.h"
+#include "gpu/ShaderVar.h"
 
 namespace tgfx {
 class ProgramBuilder;
-class Pipeline;
+class ProgramInfo;
 
 /**
  * Features that should only be enabled internally by the builders.
@@ -39,7 +40,7 @@ class ShaderBuilder {
  public:
   explicit ShaderBuilder(ProgramBuilder* builder);
 
-  const Pipeline* getPipeline() const;
+  const ProgramInfo* getProgramInfo() const;
 
   virtual ~ShaderBuilder() = default;
 

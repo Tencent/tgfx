@@ -60,7 +60,7 @@ static bool InitEGLEXTProc() {
          eglext::eglCreateImageKHR && eglext::eglDestroyImageKHR;
 }
 
-std::unique_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(EGLGPU* gpu,
+std::shared_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(EGLGPU* gpu,
                                                                  HardwareBufferRef hardwareBuffer,
                                                                  uint32_t usage) {
   static const bool initialized = InitEGLEXTProc();
@@ -95,18 +95,14 @@ std::unique_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(EGLGPU* gpu,
     eglext::eglDestroyImageKHR(display, eglImage);
     return nullptr;
   }
-  glBindTexture(target, textureID);
-  glTexParameteri(target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  glTexParameteri(target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  eglext::glEGLImageTargetTexture2DOES(target, (GLeglImageOES)eglImage);
   auto size = HardwareBufferGetSize(hardwareBuffer);
   GPUTextureDescriptor descriptor = {size.width, size.height, formats.front(), false, 1, usage};
-  auto texture = std::unique_ptr<EGLHardwareTexture>(
-      new EGLHardwareTexture(descriptor, hardwareBuffer, eglImage, target, textureID));
-  if (!texture->checkFrameBuffer(gpu)) {
-    texture->release(gpu);
+  auto texture = gpu->makeResource<EGLHardwareTexture>(descriptor, hardwareBuffer, eglImage, target,
+                                                       textureID);
+  auto state = gpu->state();
+  state->bindTexture(texture.get());
+  eglext::glEGLImageTargetTexture2DOES(target, (GLeglImageOES)eglImage);
+  if (usage & GPUTextureUsage::RENDER_ATTACHMENT && !texture->checkFrameBuffer(gpu)) {
     return nullptr;
   }
   return texture;
@@ -123,7 +119,7 @@ EGLHardwareTexture::~EGLHardwareTexture() {
   HardwareBufferRelease(hardwareBuffer);
 }
 
-void EGLHardwareTexture::onRelease(GLGPU* gpu) {
+void EGLHardwareTexture::onReleaseTexture(GLGPU* gpu) {
   auto display = static_cast<EGLGPU*>(gpu)->getDisplay();
   eglext::eglDestroyImageKHR(display, eglImage);
   GLTexture::onRelease(gpu);

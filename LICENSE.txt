@@ -6,7 +6,7 @@ tgfx is licensed under the BSD 3-Clause License except for the third-party compo
 
 
 Terms of the BSD 3-Clause License:
---------------------------------------------------------------------
+-------------------------------------------------------------------
 Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
 
 1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
@@ -156,7 +156,6 @@ Legal Terms
   Our home page can be found at
     https://www.freetype.org
 --- end of FTL.TXT ---
-
 
 For the license of other third party components, please refer to the following URL:
 https://skia.googlesource.com/third_party/freetype2.git/+/refs/heads/master/LICENSE.TXT
@@ -316,9 +315,8 @@ Copyright (c) 2011 Google Inc. All rights reserved.
 3. skcms
 Copyright 2018 Google Inc.
 
-4. tracy
-Copyright (c) 2017-2024, Bartosz Taudul <wolf@nereid.pl>
-All rights reserved.
+4. highway
+Copyright (c) The Highway Project Authors. All rights reserved.
 
 
 Terms of the BSD 3-Clause License:
@@ -774,6 +772,15 @@ For the license of other third party components, please refer to the following U
 https://swiftshader.googlesource.com/SwiftShader/+/refs/heads/master/LICENSE.txt
 
 
+Open Source Software Licensed under the Apache License Version 2.0 License:
+--------------------------------------------------------------------
+1. flatbuffers
+Copyright (c) flatbuffers original author and authors
+
+A copy of the Apache License Version 2.0 License is included in this file.
+
+
+
 Open Source Software Licensed under the BSD 3-Clause License and Other Licenses of the Third-Party Components therein:
 --------------------------------------------------------------------
 1. angle
@@ -785,3 +792,36 @@ A copy of the BSD 3-Clause is included in this file.
 
 For the license of other third party components, please refer to the following URL:
 https://github.com/google/angle/tree/main/third_party
+
+
+Open Source Software Licensed under the BSD 2-Clause License and Other Licenses of the Third-Party Components therein:
+--------------------------------------------------------------------
+1. concurrentqueue
+Copyright (c) 2013-2016, Cameron Desrochers. All rights reserved.
+
+
+Terms of the BSD 2-Clause License:
+--------------------------------------------------------------------
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+
+* Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+
+* Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+For the license of other third party components, please refer to the following URL:
+https://github.com/cameron314/concurrentqueue/tree/master/benchmarks
+
+
+
+Open Source Software Licensed under the BSD 2-Clause License and Other Licenses of the Third-Party Components therein:
+--------------------------------------------------------------------
+1. lz4
+Copyright (c) 2011-2020, Yann Collet
+All rights reserved.
+
+A copy of the BSD 2-Clause License is included in this file.
+
+For the license of other third party components, please refer to the following URL:
+https://github.com/lz4/lz4/tree/dev/lib

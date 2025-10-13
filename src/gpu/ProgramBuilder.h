@@ -19,7 +19,7 @@
 #pragma once
 
 #include "FragmentShaderBuilder.h"
-#include "Pipeline.h"
+#include "ProgramInfo.h"
 #include "UniformHandler.h"
 #include "VaryingHandler.h"
 #include "VertexShaderBuilder.h"
@@ -31,7 +31,7 @@ class ProgramBuilder {
   /**
    * Generates a shader program.
    */
-  static std::unique_ptr<Program> CreateProgram(Context* context, const Pipeline* pipeline);
+  static std::shared_ptr<Program> CreateProgram(Context* context, const ProgramInfo* programInfo);
 
   virtual ~ProgramBuilder() = default;
 
@@ -39,15 +39,14 @@ class ProgramBuilder {
     return context;
   }
 
-  const Pipeline* getPipeline() const {
-    return pipeline;
+  const ProgramInfo* getProgramInfo() const {
+    return programInfo;
   }
 
-  virtual std::string versionDeclString() = 0;
-
-  virtual std::string textureFuncName() const = 0;
-
   virtual std::string getShaderVarDeclarations(const ShaderVar& var, ShaderStage stage) const = 0;
+
+  virtual std::string getUniformBlockDeclaration(ShaderStage stage,
+                                                 const std::vector<Uniform>& uniforms) const = 0;
 
   /**
    * Generates a name for a variable. The generated string will be mangled to be processor-specific.
@@ -66,10 +65,10 @@ class ProgramBuilder {
 
  protected:
   Context* context = nullptr;
-  const Pipeline* pipeline = nullptr;
+  const ProgramInfo* programInfo = nullptr;
   int numFragmentSamplers = 0;
 
-  ProgramBuilder(Context* context, const Pipeline* pipeline);
+  ProgramBuilder(Context* context, const ProgramInfo* programInfo);
 
   bool emitAndInstallProcessors();
 
@@ -96,7 +95,7 @@ class ProgramBuilder {
 
   void emitAndInstallXferProc(const std::string& colorIn, const std::string& coverageIn);
 
-  SamplerHandle emitSampler(GPUTexture* texture, const std::string& name);
+  SamplerHandle emitSampler(std::shared_ptr<GPUTexture> texture, const std::string& name);
 
   void emitFSOutputSwizzle();
 

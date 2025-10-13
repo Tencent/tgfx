@@ -172,7 +172,7 @@ std::shared_ptr<Data> Base64Decode(const std::string& encodedString) {
     outLength--;
   }
 
-  auto* out = static_cast<unsigned char*>(malloc(outLength));
+  auto out = static_cast<unsigned char*>(malloc(outLength));
   auto outData = Data::MakeAdopted(out, outLength, Data::FreeProc);
 
   for (size_t i = 0, j = 0; i < inLength;) {
@@ -284,7 +284,7 @@ std::shared_ptr<Data> AsDataUri(const std::shared_ptr<Data>& encodedData) {
   size_t prefixLength = strlen(prefix);
   size_t base64Size = ((encodedData->size() + 2) / 3) * 4 + 1;  // +1 for char* terminator
   auto bufferSize = prefixLength + base64Size;
-  auto* dest = static_cast<char*>(malloc(bufferSize));
+  auto dest = static_cast<char*>(malloc(bufferSize));
   memcpy(dest, prefix, prefixLength);
   Base64Encode(encodedData->bytes(), encodedData->size(), dest + prefixLength);
   dest[bufferSize - 1] = '\0';

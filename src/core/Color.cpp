@@ -66,11 +66,6 @@ float& Color::operator[](int index) {
   return (&red)[index];
 }
 
-bool Color::isValid() const {
-  return red >= 0.0f && red <= 1.0f && green >= 0.0f && green <= 1.0f && blue >= 0.0f &&
-         blue <= 1.0f && alpha >= 0.0f && alpha <= 1.0f;
-}
-
 bool Color::isOpaque() const {
   DEBUG_ASSERT(alpha <= 1.0f && alpha >= 0.0f);
   return alpha == 1.0f;

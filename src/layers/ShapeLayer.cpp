@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/ShapeLayer.h"
+#include "tgfx/core/Matrix.h"
+#include "tgfx/core/Paint.h"
 #include "tgfx/core/PathEffect.h"
 
 namespace tgfx {
@@ -273,7 +275,7 @@ void ShapeLayer::onUpdateContent(LayerRecorder* recorder) {
     return;
   }
   auto fillPaints = createShapePaints(_fillStyles);
-  auto strokePaints = stroke.width > 0 ? createShapePaints(_strokeStyles) : std::vector<Paint>();
+  auto strokePaints = createShapePaints(_strokeStyles);
   auto strokeShape = strokePaints.empty() ? nullptr : createStrokeShape();
   auto canvas = recorder->getCanvas(LayerContentType::Default);
   for (auto& paint : fillPaints) {
@@ -302,9 +304,7 @@ std::vector<Paint> ShapeLayer::createShapePaints(
     paint.setAlpha(style->alpha());
     paint.setBlendMode(style->blendMode());
     paint.setShader(style->getShader());
-    if (!paint.getFill().nothingToDraw()) {
-      paintList.push_back(paint);
-    }
+    paintList.push_back(paint);
   }
   return paintList;
 }

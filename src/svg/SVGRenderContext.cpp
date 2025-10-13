@@ -290,7 +290,7 @@ std::shared_ptr<MaskFilter> SVGRenderContext::applyMask(const SVGFuncIRI& mask) 
 
   auto maskNode = std::static_pointer_cast<SVGMask>(node);
   Recorder maskRecorder;
-  auto* maskCanvas = maskRecorder.beginRecording();
+  auto maskCanvas = maskRecorder.beginRecording();
   {
     SVGRenderContext maskContext(*this, maskCanvas);
     maskNode->renderMask(maskContext);

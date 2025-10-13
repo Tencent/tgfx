@@ -43,7 +43,7 @@ jobs:
       - name: Build iOS
         run: |
           cd ios
-          node gen_ios -DTGFX_BUILD_SVG=ON -DTGFX_BUILD_PDF=ON
+          node gen_ios -DTGFX_BUILD_LAYERS=ON -DTGFX_BUILD_SVG=ON -DTGFX_BUILD_PDF=ON
           xcodebuild -workspace Hello2D.xcworkspace -scheme Hello2D -configuration Release -sdk iphoneos -arch arm64 CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO
 
       - name: Save Third-Party Cache
@@ -94,7 +94,7 @@ jobs:
       - name: Build Android
         run: |
           cd android
-          ./gradlew assembleRelease -Parm64-only --no-daemon -PcmakeArgs="-DTGFX_BUILD_SVG=ON -DTGFX_BUILD_PDF=ON"
+          ./gradlew assembleRelease -Parm64-only --no-daemon -PcmakeArgs="-DTGFX_BUILD_LAYERS=ON -DTGFX_BUILD_SVG=ON -DTGFX_BUILD_PDF=ON"
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -219,7 +219,7 @@ jobs:
 
       - name: Build Windows
         run: |
-          node build_tgfx -s ./win Hello2D -DTGFX_BUILD_SVG=ON -DTGFX_BUILD_PDF=ON -o ./out/release/win -a x64 -d
+          node build_tgfx -s ./win Hello2D -DTGFX_BUILD_LAYERS=ON -DTGFX_BUILD_SVG=ON -DTGFX_BUILD_PDF=ON -o ./out/release/win -a x64 -d
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -268,7 +268,7 @@ jobs:
 
       - name: Build Linux
         run: |
-          node build_tgfx -s ./linux Hello2D -DTGFX_BUILD_SVG=ON -DTGFX_BUILD_PDF=ON -o ./out/release/linux -a x64 -d
+          node build_tgfx -s ./linux Hello2D -DTGFX_BUILD_LAYERS=ON -DTGFX_BUILD_SVG=ON -DTGFX_BUILD_PDF=ON -o ./out/release/linux -a x64 -d
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -324,7 +324,7 @@ jobs:
 
       - name: Build QT
         run: |
-          node build_tgfx -s ./qt Hello2D -DCMAKE_PREFIX_PATH="${{env.QT_ROOT_DIR}}/lib/cmake" -DTGFX_BUILD_SVG=ON -DTGFX_BUILD_PDF=ON -o ./out/release/qt -a x64
+          node build_tgfx -s ./qt Hello2D -DCMAKE_PREFIX_PATH="${{env.QT_ROOT_DIR}}/lib/cmake" -DTGFX_BUILD_LAYERS=ON -DTGFX_BUILD_SVG=ON -DTGFX_BUILD_PDF=ON -o ./out/release/qt -a x64
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -343,7 +343,7 @@ jobs:
 
 
   ohos:
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
@@ -355,13 +355,13 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: /opt/ohos-cmd-tools
-          key: ohos-cli-5.0.9.310-mac-arm64
+          key: ohos-cli-5.0.9.310-linux-x64
           restore-keys: ohos-cli-
 
       - name: Install CLI Tools
         if: steps.cli-tools-cache.outputs.cache-hit != 'true'
         run: |
-          TOOLS_URL="https://github.com/libpag/ohos-sdk/releases/download/5.0.9/commandline-tools-mac-arm64-5.0.9.310.zip"
+          TOOLS_URL="https://github.com/libpag/ohos-sdk/releases/download/5.0.9/commandline-tools-linux-x64-5.0.9.310.zip"
           curl -L -o /tmp/cmdtools.zip "$TOOLS_URL"
           unzip -q /tmp/cmdtools.zip -d /tmp
           sudo mv /tmp/command-line-tools /opt/ohos-cmd-tools
@@ -371,7 +371,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: /opt/ohos-cmd-tools
-          key: ohos-cli-5.0.9.310-mac-arm64
+          key: ohos-cli-5.0.9.310-linux-x64
 
       - name: Configure Environment
         run: |
@@ -392,6 +392,16 @@ jobs:
         run: |
           npm install -g pnpm@8.13.1
           echo "$(npm prefix -g)/bin" >> $GITHUB_PATH
+
+      - name: Cache hvigor & ohpm
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.hvigor
+            ~/.ohpm
+          key: hvigor-${{ runner.os }}-${{ hashFiles('**/oh-package.json5', '**/hvigorfile.ts') }}
+          restore-keys: |
+            hvigor-${{ runner.os }}-
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -423,11 +433,11 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: third_party
-          key: third-party-openharmony-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+          key: third-party-linux-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
 
       - name: Job Failed
         if: ${{ failure() }}
         uses: actions/upload-artifact@v4
         with:
-          name: openharmony_build
+          name: ohos_build
           path: ohos/out

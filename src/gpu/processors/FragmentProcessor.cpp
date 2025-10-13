@@ -19,7 +19,7 @@
 #include "gpu/processors/FragmentProcessor.h"
 #include "ComposeFragmentProcessor.h"
 #include "core/utils/Log.h"
-#include "gpu/Pipeline.h"
+#include "gpu/ProgramInfo.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Shader.h"
@@ -100,9 +100,9 @@ size_t FragmentProcessor::registerChildProcessor(PlacementPtr<FragmentProcessor>
   return index;
 }
 
-FragmentProcessor::Iter::Iter(const Pipeline* pipeline) {
-  for (auto i = pipeline->numFragmentProcessors(); i >= 1; --i) {
-    fpStack.push_back(pipeline->getFragmentProcessor(i - 1));
+FragmentProcessor::Iter::Iter(const ProgramInfo* programInfo) {
+  for (auto i = programInfo->numFragmentProcessors(); i >= 1; --i) {
+    fpStack.push_back(programInfo->getFragmentProcessor(i - 1));
   }
 }
 
@@ -118,8 +118,8 @@ const FragmentProcessor* FragmentProcessor::Iter::next() {
   return back;
 }
 
-FragmentProcessor::CoordTransformIter::CoordTransformIter(const Pipeline* pipeline)
-    : fpIter(pipeline) {
+FragmentProcessor::CoordTransformIter::CoordTransformIter(const ProgramInfo* programInfo)
+    : fpIter(programInfo) {
   currFP = fpIter.next();
 }
 
@@ -137,16 +137,17 @@ const CoordTransform* FragmentProcessor::CoordTransformIter::next() {
   return currFP->coordTransform(currentIndex++);
 }
 
-void FragmentProcessor::setData(UniformBuffer* uniformBuffer) const {
-  onSetData(uniformBuffer);
+void FragmentProcessor::setData(UniformData* vertexUniformData,
+                                UniformData* fragmentUniformData) const {
+  onSetData(vertexUniformData, fragmentUniformData);
 }
 
 void FragmentProcessor::emitChild(size_t childIndex, const std::string& inputColor,
                                   std::string* outputColor, EmitArgs& args,
                                   std::function<std::string(std::string_view)> coordFunc) const {
-  auto* fragBuilder = args.fragBuilder;
-  auto pipeline = fragBuilder->getPipeline();
-  outputColor->append(pipeline->getMangledSuffix(this));
+  auto fragBuilder = args.fragBuilder;
+  auto programInfo = fragBuilder->getProgramInfo();
+  outputColor->append(programInfo->getMangledSuffix(this));
   fragBuilder->codeAppendf("vec4 %s;", outputColor->c_str());
   internalEmitChild(childIndex, inputColor, *outputColor, args, std::move(coordFunc));
 }
@@ -159,10 +160,10 @@ void FragmentProcessor::emitChild(size_t childIndex, const std::string& inputCol
 void FragmentProcessor::internalEmitChild(
     size_t childIndex, const std::string& inputColor, const std::string& outputColor,
     EmitArgs& args, std::function<std::string(std::string_view)> coordFunc) const {
-  auto* fragBuilder = args.fragBuilder;
-  const auto* childProc = childProcessor(childIndex);
+  auto fragBuilder = args.fragBuilder;
+  const auto childProc = childProcessor(childIndex);
   fragBuilder->onBeforeChildProcEmitCode(childProc);  // call first so mangleString is updated
-  auto pipeline = fragBuilder->getPipeline();
+  auto programInfo = fragBuilder->getProgramInfo();
   // Prepare a mangled input color variable if the default is not used,
   // inputName remains the empty string if no variable is needed.
   std::string inputName;
@@ -171,13 +172,13 @@ void FragmentProcessor::internalEmitChild(
     // since this is called after onBeforeChildProcEmitCode(), it will be
     // unique to the child processor (exactly what we want for its input).
     inputName += "_childInput";
-    inputName += pipeline->getMangledSuffix(childProc);
+    inputName += programInfo->getMangledSuffix(childProc);
     fragBuilder->codeAppendf("vec4 %s = %s;", inputName.c_str(), inputColor.c_str());
   }
 
   // emit the code for the child in its own scope
   fragBuilder->codeAppend("{\n");
-  fragBuilder->codeAppendf("// Processor%d : %s\n", pipeline->getProcessorIndex(childProc),
+  fragBuilder->codeAppendf("// Processor%d : %s\n", programInfo->getProcessorIndex(childProc),
                            childProc->name().c_str());
   TransformedCoordVars coordVars = args.transformedCoords->childInputs(childIndex);
   TextureSamplers textureSamplers = args.textureSamplers->childInputs(childIndex);

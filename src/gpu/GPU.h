@@ -21,6 +21,9 @@
 #include <memory>
 #include "gpu/CommandEncoder.h"
 #include "gpu/CommandQueue.h"
+#include "gpu/GPUSampler.h"
+#include "gpu/RenderPipeline.h"
+#include "gpu/ShaderModule.h"
 #include "gpu/YUVFormat.h"
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/Caps.h"
@@ -58,14 +61,14 @@ class GPU {
    * @return A unique pointer to the created GPUBuffer. The caller is responsible for managing the
    * lifetime of the buffer. If the creation fails, it returns nullptr.
    */
-  virtual std::unique_ptr<GPUBuffer> createBuffer(size_t size, uint32_t usage) = 0;
+  virtual std::shared_ptr<GPUBuffer> createBuffer(size_t size, uint32_t usage) = 0;
 
   /**
    * Creates a new GPUTexture with the given descriptor. The descriptor specifies the texture's
    * properties, such as width, height, format, mip levels, sample count and usage flags. Returns
    * nullptr if the texture cannot be created.
    */
-  virtual std::unique_ptr<GPUTexture> createTexture(const GPUTextureDescriptor& descriptor) = 0;
+  virtual std::shared_ptr<GPUTexture> createTexture(const GPUTextureDescriptor& descriptor) = 0;
 
   /**
    * Returns the pixel formats for textures created from a platform-specific hardware buffer, such
@@ -87,7 +90,7 @@ class GPU {
    * @param usage A bitmask of GPUTextureUsage flags specifying how the textures will be used.
    * @return An empty vector if the hardwareBuffer is invalid or not supported by the GPU backend.
    */
-  virtual std::vector<std::unique_ptr<GPUTexture>> importHardwareTextures(
+  virtual std::vector<std::shared_ptr<GPUTexture>> importHardwareTextures(
       HardwareBufferRef hardwareBuffer, uint32_t usage) = 0;
 
   /**
@@ -113,7 +116,7 @@ class GPU {
   * @return A unique pointer to the created GPUTexture. Returns nullptr if the backend texture is
   * invalid or not supported by the GPU backend.
   */
-  virtual std::unique_ptr<GPUTexture> importExternalTexture(const BackendTexture& backendTexture,
+  virtual std::shared_ptr<GPUTexture> importExternalTexture(const BackendTexture& backendTexture,
                                                             uint32_t usage,
                                                             bool adopted = false) = 0;
 
@@ -122,12 +125,41 @@ class GPU {
    * backend render target is valid for the lifetime of the returned GPUTexture. Returns nullptr
    * if the backend render target is invalid.
    */
-  virtual std::unique_ptr<GPUTexture> importExternalTexture(
+  virtual std::shared_ptr<GPUTexture> importExternalTexture(
       const BackendRenderTarget& backendRenderTarget) = 0;
+
+  /**
+   * Creates a GPUFence that wraps the specified backend semaphore. The returned GPUFence takes
+   * ownership of the backend semaphore and will destroy it when no longer needed. Returns nullptr
+   * if the backend semaphore is invalid or not supported by the GPU backend.
+   */
+  virtual std::shared_ptr<GPUFence> importExternalFence(const BackendSemaphore& semaphore) = 0;
+
+  /**
+   * Creates a GPUSampler with the specified descriptor.
+   */
+  virtual std::shared_ptr<GPUSampler> createSampler(const GPUSamplerDescriptor& descriptor) = 0;
+
+  /**
+   * Creates a ShaderModule from the provided shader code. The shader code must be valid and
+   * compatible with the GPU backend. Returns nullptr if the shader module creation fails.
+   */
+  virtual std::shared_ptr<ShaderModule> createShaderModule(
+      const ShaderModuleDescriptor& descriptor) = 0;
+
+  /**
+   * Creates a RenderPipeline that manages the vertex and fragment shader stages for use in a
+   * RenderPass. Returns nullptr if pipeline creation fails.
+   */
+  virtual std::shared_ptr<RenderPipeline> createRenderPipeline(
+      const RenderPipelineDescriptor& descriptor) = 0;
 
   /**
    * Creates a command encoder that can be used to encode commands to be issued to the GPU.
    */
   virtual std::shared_ptr<CommandEncoder> createCommandEncoder() = 0;
+
+  // TODO: Remove this method once all runtime effects have fully switched to using GPU commands.
+  virtual void resetGLState() = 0;
 };
 }  // namespace tgfx

@@ -67,13 +67,13 @@ class TiledTextureEffect : public FragmentProcessor {
 
   size_t onCountTextureSamplers() const override;
 
-  GPUTexture* onTextureAt(size_t) const override;
+  std::shared_ptr<GPUTexture> onTextureAt(size_t) const override;
 
   SamplerState onSamplerStateAt(size_t) const override;
 
   const TextureView* getTextureView() const;
 
-  static ShaderMode GetShaderMode(SamplerState::WrapMode mode, FilterMode filter, MipmapMode mm);
+  static ShaderMode GetShaderMode(TileMode tileMode, FilterMode filter, MipmapMode mipmapMode);
 
   std::shared_ptr<TextureProxy> textureProxy;
   SamplerState samplerState;

@@ -23,11 +23,11 @@
 #include "gpu/AAType.h"
 #include "gpu/BackingFit.h"
 #include "gpu/VertexProvider.h"
+#include "gpu/proxies/GPUBufferProxy.h"
 #include "gpu/proxies/GPUShapeProxy.h"
-#include "gpu/proxies/IndexBufferProxy.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
-#include "gpu/proxies/VertexBufferProxyView.h"
+#include "gpu/proxies/VertexBufferView.h"
 #include "tgfx/core/ImageGenerator.h"
 #include "tgfx/core/Shape.h"
 
@@ -51,18 +51,18 @@ class ProxyProvider {
   std::shared_ptr<TextureProxy> findOrWrapTextureProxy(const UniqueKey& uniqueKey);
 
   /**
-   * Creates a IndexBufferProxy for the given data source. The source will be released after being
+   * Creates a GPUBufferProxy for the given data source. The source will be released after being
    * uploaded to the GPU.
    */
-  std::shared_ptr<IndexBufferProxy> createIndexBufferProxy(std::unique_ptr<DataSource<Data>> source,
-                                                           uint32_t renderFlags = 0);
+  std::shared_ptr<GPUBufferProxy> createIndexBufferProxy(std::unique_ptr<DataSource<Data>> source,
+                                                         uint32_t renderFlags = 0);
 
   /**
-   * Creates a VertexBufferProxyView from the given VertexProvider. The provider will be released
+   * Creates a VertexBufferView from the given VertexProvider. The provider will be released
    * after being uploaded to the GPU.
    */
-  std::shared_ptr<VertexBufferProxyView> createVertexBufferProxy(
-      PlacementPtr<VertexProvider> provider, uint32_t renderFlags = 0);
+  std::shared_ptr<VertexBufferView> createVertexBufferProxy(PlacementPtr<VertexProvider> provider,
+                                                            uint32_t renderFlags = 0);
 
   /**
    * Creates a GPUShapeProxy for the given Shape. The shape will be released after being uploaded to
@@ -102,6 +102,12 @@ class ProxyProvider {
                                                    ImageOrigin origin = ImageOrigin::TopLeft,
                                                    BackingFit backingFit = BackingFit::Exact,
                                                    uint32_t renderFlags = 0);
+
+  /**
+   * Creates a TextureProxy for the specified HardwareBuffer. Returns nullptr if
+   * the hardware buffer is not supported on the current platform.
+   */
+  std::shared_ptr<TextureProxy> createTextureProxy(HardwareBufferRef hardwareBuffer);
 
   /**
    * Creates a texture proxy for the provided BackendTexture. If adopted is true, the backend
@@ -159,12 +165,12 @@ class ProxyProvider {
   Context* context = nullptr;
   ResourceKeyMap<std::weak_ptr<ResourceProxy>> proxyMap = {};
   bool sharedVertexBufferFlushed = false;
-  std::shared_ptr<VertexBufferProxy> sharedVertexBuffer = nullptr;
+  std::shared_ptr<GPUBufferProxy> sharedVertexBuffer = nullptr;
   std::vector<std::shared_ptr<Task>> sharedVertexBufferTasks = {};
   BlockBuffer vertexBlockBuffer = {};
   SlidingWindowTracker maxValueTracker = {10};
 
-  std::shared_ptr<VertexBufferProxy> findOrWrapVertexBufferProxy(const UniqueKey& uniqueKey);
+  std::shared_ptr<GPUBufferProxy> findOrWrapGPUBufferProxy(const UniqueKey& uniqueKey);
 
   void addResourceProxy(std::shared_ptr<ResourceProxy> proxy, const UniqueKey& uniqueKey = {});
 

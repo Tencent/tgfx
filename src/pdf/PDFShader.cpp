@@ -46,11 +46,11 @@ void Draw(Canvas* canvas, std::shared_ptr<Image> image, Color paintColor) {
 
 Bitmap ImageExportToBitmap(Context* context, const std::shared_ptr<Image>& image) {
   auto surface = Surface::Make(context, image->width(), image->height());
-  auto* canvas = surface->getCanvas();
+  auto canvas = surface->getCanvas();
   canvas->drawImage(image);
 
   Bitmap bitmap(surface->width(), surface->height());
-  auto* pixels = bitmap.lockPixels();
+  auto pixels = bitmap.lockPixels();
   if (surface->readPixels(bitmap.info(), pixels)) {
     bitmap.unlockPixels();
     return bitmap;
@@ -89,8 +89,8 @@ void FillColorFromBitmap(Canvas* canvas, float left, float top, float right, flo
 
 Color AdjustColor(const std::shared_ptr<Shader>& shader, Color paintColor) {
   if (Types::Get(shader.get()) == Types::ShaderType::Image) {
-    const auto* imageShader = static_cast<const ImageShader*>(shader.get());
-    const auto* img = imageShader->image.get();
+    const auto imageShader = static_cast<const ImageShader*>(shader.get());
+    const auto img = imageShader->image.get();
     if (img && img->isAlphaOnly()) {
       return paintColor;
     }
@@ -110,7 +110,7 @@ Matrix ScaleTranslate(float sx, float sy, float tx, float ty) {
 
 Bitmap ExtractSubset(Bitmap src, Rect subset) {
   Bitmap destination(static_cast<int>(subset.width()), static_cast<int>(subset.height()));
-  const auto* srcPixels = src.lockPixels();
+  const auto srcPixels = src.lockPixels();
   destination.writePixels(src.info(), srcPixels, static_cast<int>(subset.left),
                           static_cast<int>(subset.top));
   src.unlockPixels();
@@ -124,7 +124,7 @@ PDFIndirectReference PDFShader::Make(PDFDocumentImpl* doc, const std::shared_ptr
   DEBUG_ASSERT(shader);
   DEBUG_ASSERT(doc);
   if (Types::Get(shader.get()) == Types::ShaderType::Gradient) {
-    const auto* gradientShader = static_cast<const GradientShader*>(shader.get());
+    const auto gradientShader = static_cast<const GradientShader*>(shader.get());
     return PDFGradientShader::Make(doc, gradientShader, canvasTransform, surfaceBBox);
   }
   if (surfaceBBox.isEmpty()) {
@@ -136,7 +136,7 @@ PDFIndirectReference PDFShader::Make(PDFDocumentImpl* doc, const std::shared_ptr
   TileMode imageTileModes[2];
 
   if (Types::Get(shader.get()) == Types::ShaderType::Image) {
-    const auto* imageShader = static_cast<const ImageShader*>(shader.get());
+    const auto imageShader = static_cast<const ImageShader*>(shader.get());
     auto shaderImage = imageShader->image;
     // TODO (YGaurora): Cache image shaders and remove duplicates
     PDFIndirectReference pdfShader =

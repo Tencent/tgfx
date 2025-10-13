@@ -98,7 +98,7 @@ enum class SVGTag {
     return presentationAttributes.attr_name;                                          \
   }                                                                                   \
   void set##attr_name(const SVGProperty<attr_type, attr_inherited>& v) {              \
-    auto* dest = &presentationAttributes.attr_name;                                   \
+    auto dest = &presentationAttributes.attr_name;                                    \
     if (!dest->isInheritable() || v.isValue()) {                                      \
       /* TODO: If dest is not inheritable, handle v == "inherit" */                   \
       *dest = v;                                                                      \
@@ -107,7 +107,7 @@ enum class SVGTag {
     }                                                                                 \
   }                                                                                   \
   void set##attr_name(SVGProperty<attr_type, attr_inherited>&& v) {                   \
-    auto* dest = &presentationAttributes.attr_name;                                   \
+    auto dest = &presentationAttributes.attr_name;                                    \
     if (!dest->isInheritable() || v.isValue()) {                                      \
       /* TODO: If dest is not inheritable, handle v == "inherit" */                   \
       *dest = std::move(v);                                                           \

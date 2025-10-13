@@ -49,7 +49,7 @@ class Context {
    */
   Context(Device* device, GPU* gpu);
 
-  virtual ~Context();
+  ~Context();
 
   /**
    * Returns the associated device.
@@ -154,26 +154,19 @@ class Context {
   bool flush(BackendSemaphore* signalSemaphore = nullptr);
 
   /**
-   * Submit outstanding work to the gpu from all previously un-submitted flushes. The return
-   * value of the submit method will indicate whether the submission to the GPU was successful.
-   *
-   * If the call returns true, all previously passed in semaphores in flush calls will have been
-   * submitted to the GPU and they can safely be waited on. The caller should wait on those
-   * semaphores or perform some other global synchronization before deleting the semaphores.
-   *
-   * If it returns false, then those same semaphores will not have been submitted, and we will not
-   * try to submit them again. The caller is free to delete the semaphores at any time.
-   *
+   * Submit outstanding work to the gpu from all previously un-submitted flushes.
    * If the syncCpu flag is true, this function will return once the gpu has finished with all
    * submitted work.
    */
-  bool submit(bool syncCpu = false);
+  void submit(bool syncCpu = false);
 
   /**
    * Call to ensure all drawing to the context has been flushed and submitted to the underlying 3D
    * API. This is equivalent to calling Context::flush() followed by Context::submit(syncCpu).
+   *
+   * Returns false if there are no pending drawing operations and nothing was flushed to the GPU.
    */
-  void flushAndSubmit(bool syncCpu = false);
+  bool flushAndSubmit(bool syncCpu = false);
 
   GlobalCache* globalCache() const {
     return _globalCache;
@@ -210,11 +203,6 @@ class Context {
   SlidingWindowTracker* _maxValueTracker = nullptr;
   AtlasManager* _atlasManager = nullptr;
   std::shared_ptr<CommandBuffer> commandBuffer = nullptr;
-
-  void releaseAll(bool releaseGPU);
-
-  friend class Device;
-  friend class Resource;
 };
 
 }  // namespace tgfx

@@ -18,8 +18,6 @@
 
 #pragma once
 
-#include "gpu/GPUResource.h"
-#include "gpu/GPUTextureDescriptor.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/PixelFormat.h"
 #include "tgfx/platform/HardwareBuffer.h"
@@ -33,10 +31,77 @@ namespace tgfx {
 enum class GPUTextureType { None, TwoD, Rectangle, External };
 
 /**
+ * GPUTextureUsage defines the usage flags for GPU textures.
+ * These flags indicate how the texture can be used in rendering operations.
+ */
+class GPUTextureUsage {
+ public:
+  /**
+   * The texture can be bound for use as a sampled texture in a shader.
+   */
+  static constexpr uint32_t TEXTURE_BINDING = 0x04;
+
+  /**
+   * The texture can be used as a color or depth/stencil attachment in a render pass.
+   */
+  static constexpr uint32_t RENDER_ATTACHMENT = 0x10;
+};
+
+/**
+ * GPUTextureDescriptor is used to describe the properties of a GPUTexture.
+ */
+class GPUTextureDescriptor {
+ public:
+  /**
+   * Default constructor initializes the texture descriptor with default values.
+   */
+  GPUTextureDescriptor() = default;
+
+  /**
+   * Constructs a GPUTextureDescriptor with the specified properties.
+   */
+  GPUTextureDescriptor(int width, int height, PixelFormat format, bool mipmapped = false,
+                       int sampleCount = 1, uint32_t usage = GPUTextureUsage::TEXTURE_BINDING);
+
+  /**
+   * The width of the texture in pixels.
+   */
+  int width = 0;
+
+  /**
+   * The height of the texture in pixels.
+   */
+  int height = 0;
+
+  /**
+   * The pixel format of the texture.
+   */
+  PixelFormat format = PixelFormat::RGBA_8888;
+
+  /**
+   * The number of mipmap levels in the texture. A value of 1 indicates no mipmaps.
+   */
+  int mipLevelCount = 1;
+
+  /**
+   * The number of samples per pixel in the texture. A value of 1 indicates no multisampling.
+   */
+  int sampleCount = 1;
+
+  /**
+   * The bitwise flags that indicate the usage options for the texture. The value is the sum of the
+   * decimal values for each flag. See GPUTextureUsage for more details.
+   */
+  uint32_t usage = GPUTextureUsage::TEXTURE_BINDING;
+};
+
+/**
  * GPUTexture represents a texture in the GPU backend for rendering operations.
  */
-class GPUTexture : public GPUResource {
+class GPUTexture {
  public:
+  virtual ~GPUTexture() = default;
+
   /**
    * Returns the width of the texture in pixels.
    */

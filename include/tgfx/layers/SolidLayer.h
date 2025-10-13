@@ -47,7 +47,7 @@ class SolidLayer : public Layer {
   /**
    * Sets the width of the solid layer.
    */
-  void setWidth(float widht);
+  void setWidth(float width);
 
   /**
    * Returns the height of the solid layer. The default value is 0.

@@ -33,6 +33,7 @@
 #include "core/shaders/MatrixShader.h"
 #include "core/utils/Log.h"
 #include "core/utils/PlacementPtr.h"
+#include "core/utils/ShapeUtils.h"
 #include "core/utils/Types.h"
 #include "pdf/PDFBitmap.h"
 #include "pdf/PDFDocumentImpl.h"
@@ -184,8 +185,9 @@ void PDFExportContext::drawPath(const Path& path, const MCState& state, const Fi
 };
 
 void PDFExportContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
-                                 const Fill& fill) {
-  auto path = shape->getPath();
+                                 const Fill& fill, const Stroke* stroke) {
+  shape = Shape::ApplyStroke(std::move(shape), stroke);
+  auto path = ShapeUtils::GetShapeRenderingPath(shape, state.matrix.getMaxScale());
   this->onDrawPath(state, path, fill);
 }
 
@@ -421,7 +423,7 @@ void PDFExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const MCSt
   auto typeface = pdfStrike->strikeSpec.typeface;
   auto textSize = pdfStrike->strikeSpec.textSize;
 
-  const auto* advancedInfo = PDFFont::GetAdvancedInfo(typeface, textSize, document);
+  const auto advancedInfo = PDFFont::GetAdvancedInfo(typeface, textSize, document);
   if (!advancedInfo) {
     return;
   }
@@ -536,8 +538,7 @@ void PDFExportContext::exportGlyphRunAsPath(const GlyphRun& glyphRun, const MCSt
     return;
   }
   auto shape = Shape::MakeFrom(path);
-  shape = Shape::ApplyStroke(std::move(shape), stroke);
-  drawShape(shape, state, fill);
+  drawShape(shape, state, fill, stroke);
 
   //TODO (YGaurora): maybe hasPerspective()
   Fill transparentFill = fill;
@@ -579,7 +580,7 @@ void PDFExportContext::drawDropShadowBeforeLayer(const std::shared_ptr<Picture>&
                                                  const DropShadowImageFilter* dropShadowFilter,
                                                  const MCState& state, const Fill& fill) {
   DEBUG_ASSERT(Types::Get(dropShadowFilter->blurFilter.get()) == Types::ImageFilterType::Blur);
-  const auto* blurFilter =
+  const auto blurFilter =
       static_cast<const GaussianBlurImageFilter*>(dropShadowFilter->blurFilter.get());
   auto copyFilter = ImageFilter::DropShadowOnly(0.f, 0.f, blurFilter->blurrinessX,
                                                 blurFilter->blurrinessY, dropShadowFilter->color);
@@ -591,7 +592,7 @@ void PDFExportContext::drawDropShadowBeforeLayer(const std::shared_ptr<Picture>&
   auto surface = Surface::Make(document->context(), static_cast<int>(blurBounds.width()),
                                static_cast<int>(blurBounds.height()));
   DEBUG_ASSERT(surface);
-  auto* canvas = surface->getCanvas();
+  auto canvas = surface->getCanvas();
 
   Paint picturePaint = {};
   picturePaint.setImageFilter(copyFilter);
@@ -623,11 +624,11 @@ void PDFExportContext::drawInnerShadowAfterLayer(const Record* record,
   auto surface = Surface::Make(document->context(), static_cast<int>(pictureBounds.width()),
                                static_cast<int>(pictureBounds.height()));
   DEBUG_ASSERT(surface);
-  auto* canvas = surface->getCanvas();
+  auto canvas = surface->getCanvas();
   canvas->translate(-pictureBounds.x(), -pictureBounds.y());
 
   DEBUG_ASSERT(Types::Get(innerShadowFilter->blurFilter.get()) == Types::ImageFilterType::Blur);
-  const auto* blurFilter =
+  const auto blurFilter =
       static_cast<const GaussianBlurImageFilter*>(innerShadowFilter->blurFilter.get());
   auto copyFilter = ImageFilter::InnerShadowOnly(innerShadowFilter->dx, innerShadowFilter->dy,
                                                  blurFilter->blurrinessX, blurFilter->blurrinessY,
@@ -638,7 +639,7 @@ void PDFExportContext::drawInnerShadowAfterLayer(const Record* record,
 
   canvas->saveLayer(&picturePaint);
   {
-    auto* surfaceContext = canvas->drawContext;
+    auto surfaceContext = canvas->drawContext;
     auto matrix = Matrix::MakeTrans(-pictureBounds.x(), -pictureBounds.y());
     PlaybackContext tempPlaybackContext = {};
     tempPlaybackContext.setMatrix(matrix);
@@ -697,7 +698,7 @@ void PDFExportContext::drawLayer(std::shared_ptr<Picture> picture,
 
   if (imageFilter) {
     if (Types::Get(imageFilter.get()) == Types::ImageFilterType::DropShadow) {
-      const auto* dropShadowFilter = static_cast<const DropShadowImageFilter*>(imageFilter.get());
+      const auto dropShadowFilter = static_cast<const DropShadowImageFilter*>(imageFilter.get());
       drawDropShadowBeforeLayer(picture, dropShadowFilter, state, fill);
       if (!dropShadowFilter->shadowOnly) {
         picture->playback(this, state);
@@ -705,7 +706,7 @@ void PDFExportContext::drawLayer(std::shared_ptr<Picture> picture,
       return;
     }
     if (Types::Get(imageFilter.get()) == Types::ImageFilterType::InnerShadow) {
-      const auto* innerShadowFilter = static_cast<const InnerShadowImageFilter*>(imageFilter.get());
+      const auto innerShadowFilter = static_cast<const InnerShadowImageFilter*>(imageFilter.get());
       PlaybackContext playbackContext = {};
       for (const auto& record : picture->records) {
         record->playback(this, &playbackContext);
@@ -956,7 +957,7 @@ void PopulateGraphicStateEntryFromPaint(
     // note: we always present the alpha as 1 for the shader, knowing that it will be accounted for
     // when we create our newGraphicsState (below)
     if (Types::Get(shader.get()) == Types::ShaderType::Color) {
-      const auto* colorShader = static_cast<const ColorShader*>(shader.get());
+      const auto colorShader = static_cast<const ColorShader*>(shader.get());
       if (colorShader->asColor(&color)) {
         color.alpha = 1;
         entry->color = color;
@@ -1219,14 +1220,14 @@ std::tuple<std::shared_ptr<Picture>, Matrix> MaskFilterToPicture(
   auto shader = shaderMaskFilter->getShader();
   while (true) {
     if (Types::Get(shader.get()) == Types::ShaderType::Matrix) {
-      const auto* matrixShader = static_cast<const MatrixShader*>(shader.get());
+      const auto matrixShader = static_cast<const MatrixShader*>(shader.get());
       matrix.postConcat(matrixShader->matrix);
       shader = matrixShader->source;
     } else if (Types::Get(shader.get()) == Types::ShaderType::Image) {
-      const auto* imageShader = static_cast<const ImageShader*>(shader.get());
+      const auto imageShader = static_cast<const ImageShader*>(shader.get());
       auto image = imageShader->image;
       if (Types::Get(image.get()) == Types::ImageType::Picture) {
-        const auto* pictureImage = static_cast<const PictureImage*>(imageShader->image.get());
+        const auto pictureImage = static_cast<const PictureImage*>(imageShader->image.get());
         return {pictureImage->picture, matrix};
       }
       return {nullptr, Matrix::I()};
@@ -1251,7 +1252,7 @@ void PDFExportContext::drawPathWithFilter(const MCState& state, const Path& orig
   if (Types::Get(originPaint.maskFilter.get()) != Types::MaskFilterType::Shader) {
     return;
   }
-  const auto* shaderMaskFilter = static_cast<const ShaderMaskFilter*>(originPaint.maskFilter.get());
+  const auto shaderMaskFilter = static_cast<const ShaderMaskFilter*>(originPaint.maskFilter.get());
   auto [picture, pictureMatrix] = MaskFilterToPicture(shaderMaskFilter);
 
   auto maskContext = makeCongruentDevice();

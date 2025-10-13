@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "gpu/Blend.h"
+#include "gpu/BlendFormula.h"
 #include "gpu/processors/XferProcessor.h"
 #include "tgfx/core/BlendMode.h"
 

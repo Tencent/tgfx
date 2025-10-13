@@ -72,7 +72,7 @@ std::vector<PixelFormat> EAGLGPU::getHardwareTextureFormats(HardwareBufferRef ha
   return formats;
 }
 
-std::vector<std::unique_ptr<GPUTexture>> EAGLGPU::importHardwareTextures(
+std::vector<std::shared_ptr<GPUTexture>> EAGLGPU::importHardwareTextures(
     HardwareBufferRef hardwareBuffer, uint32_t usage) {
   if (!HardwareBufferCheck(hardwareBuffer)) {
     return {};
@@ -86,7 +86,7 @@ CVOpenGLESTextureCacheRef EAGLGPU::getTextureCache() {
         kCFAllocatorDefault, 1, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
     CFDictionarySetValue(attrs, kCVOpenGLESTextureCacheMaximumTextureAgeKey,
                          [NSNumber numberWithFloat:0]);
-    CVOpenGLESTextureCacheCreate(kCFAllocatorDefault, attrs, eaglContext, NULL, &textureCache);
+    CVOpenGLESTextureCacheCreate(kCFAllocatorDefault, attrs, _eaglContext, NULL, &textureCache);
     CFRelease(attrs);
   }
   return textureCache;

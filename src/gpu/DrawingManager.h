@@ -47,9 +47,11 @@ class DrawingManager {
                     PlacementPtr<FragmentProcessor> processor, uint32_t renderFlags);
 
   std::shared_ptr<OpsCompositor> addOpsCompositor(std::shared_ptr<RenderTargetProxy> renderTarget,
-                                                  uint32_t renderFlags);
+                                                  uint32_t renderFlags,
+                                                  std::optional<Color> clearColor = std::nullopt);
 
-  void addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTarget, PlacementArray<Op> ops);
+  void addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTarget,
+                        PlacementArray<DrawOp> drawOps, std::optional<Color> clearColor);
 
   void addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> renderTarget,
                           std::vector<std::shared_ptr<TextureProxy>> inputs,
@@ -65,20 +67,11 @@ class DrawingManager {
   void addAtlasCellCodecTask(const std::shared_ptr<TextureProxy>& textureProxy,
                              const Point& atlasOffset, std::shared_ptr<ImageCodec> codec);
 
-  void addSemaphoreWaitTask(std::shared_ptr<Semaphore> semaphore);
-
   /**
-   * Flushes the drawing manager, executing all resource and render tasks. If signalSemaphore is not
-   * null and uninitialized, a new semaphore will be created and assigned to signalSemaphore after
-   * the flush is complete. Returns nullptr if there are no tasks to execute, in which case the
-   * signalSemaphore will not be created.
+   * Flushes all recorded tasks and returns a CommandBuffer containing the GPU commands. If no tasks
+   * were recorded, returns nullptr.
    */
-  std::shared_ptr<CommandBuffer> flush(BackendSemaphore* signalSemaphore);
-
-  /**
-   * Releases all tasks associated with the drawing manager.
-   */
-  void releaseAll();
+  std::shared_ptr<CommandBuffer> flush();
 
  private:
   Context* context = nullptr;
@@ -88,10 +81,11 @@ class DrawingManager {
   std::list<std::shared_ptr<OpsCompositor>> compositors = {};
   std::vector<std::shared_ptr<Task>> atlasCellCodecTasks = {};
   std::map<std::shared_ptr<TextureProxy>, std::vector<AtlasCellData>> atlasCellDatas = {};
+  std::map<const TextureProxy*, std::pair<HardwareBufferRef, void*>> atlasHardwareBuffers = {};
 
   void uploadAtlasToGPU();
 
-  void clearAtlasCellCodecTasks();
+  void resetAtlasCache();
 
   friend class OpsCompositor;
 };

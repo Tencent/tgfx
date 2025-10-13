@@ -19,6 +19,7 @@
 #pragma once
 
 #include "core/shapes/UniqueKeyShape.h"
+#include "tgfx/core/Matrix.h"
 #include "tgfx/core/PathProvider.h"
 
 namespace tgfx {
@@ -30,12 +31,12 @@ class ProviderShape : public UniqueKeyShape {
 
   Rect getBounds() const override;
 
-  Path getPath() const override;
-
  protected:
   Type type() const override {
     return Type::Provider;
   }
+
+  Path onGetPath(float resolutionScale) const override;
 
  private:
   std::shared_ptr<PathProvider> provider = nullptr;

@@ -17,28 +17,43 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <filesystem>
-#include <iostream>
-#include <sstream>
 #include <string>
 #include "base/TGFXTest.h"
-#include "core/images/TransformImage.h"
-#include "gpu/opengl/GLCaps.h"
-#include "gpu/opengl/GLUtil.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Color.h"
+#include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Recorder.h"
 #include "tgfx/core/Rect.h"
-#include "tgfx/core/Size.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/WriteStream.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
+#include "tgfx/layers/DisplayList.h"
+#include "tgfx/layers/ShapeLayer.h"
+#include "tgfx/layers/SolidColor.h"
+#include "tgfx/layers/layerstyles/DropShadowStyle.h"
+#include "tgfx/layers/layerstyles/InnerShadowStyle.h"
 #include "tgfx/svg/SVGExporter.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
+
+namespace {
+bool CompareSVG(const std::shared_ptr<MemoryWriteStream>& stream, const std::string& key) {
+  auto data = stream->readData();
+#ifdef GENERATE_BASELINE_IMAGES
+  SaveFile(data, key + "_base.svg");
+#endif
+  auto result = Baseline::Compare(data, key);
+  if (result) {
+    RemoveFile(key + ".svg");
+  } else {
+    SaveFile(data, key + ".svg");
+  }
+  return result;
+}
+}  // namespace
 
 TGFX_TEST(SVGExportTest, PureColor) {
   std::string compareString =
@@ -47,7 +62,7 @@ TGFX_TEST(SVGExportTest, PureColor) {
       "fill=\"#00F\" x=\"50\" y=\"50\" width=\"100\" height=\"100\"/></svg>";
 
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
   tgfx::Paint paint;
@@ -56,7 +71,7 @@ TGFX_TEST(SVGExportTest, PureColor) {
   auto SVGStream = MemoryWriteStream::Make();
   auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
                                     SVGExportFlags::DisablePrettyXML);
-  auto* canvas = exporter->getCanvas();
+  auto canvas = exporter->getCanvas();
 
   canvas->drawRect(Rect::MakeXYWH(50, 50, 100, 100), paint);
 
@@ -76,7 +91,7 @@ TGFX_TEST(SVGExportTest, PureColorFile) {
   std::filesystem::create_directories(filePath.parent_path());
 
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
   tgfx::Paint paint;
@@ -85,7 +100,7 @@ TGFX_TEST(SVGExportTest, PureColorFile) {
   auto SVGStream = WriteStream::MakeFromFile(path);
   auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
                                     SVGExportFlags::DisablePrettyXML);
-  auto* canvas = exporter->getCanvas();
+  auto canvas = exporter->getCanvas();
 
   canvas->drawRect(Rect::MakeXYWH(50, 50, 100, 100), paint);
 
@@ -108,7 +123,7 @@ TGFX_TEST(SVGExportTest, OpacityColor) {
       "fill=\"#00F\" fill-opacity=\"0.5\" cx=\"100\" cy=\"100\" r=\"100\"/></svg>";
 
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
   Paint paint;
@@ -118,7 +133,7 @@ TGFX_TEST(SVGExportTest, OpacityColor) {
   auto SVGStream = MemoryWriteStream::Make();
   auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
                                     SVGExportFlags::DisablePrettyXML);
-  auto* canvas = exporter->getCanvas();
+  auto canvas = exporter->getCanvas();
 
   canvas->drawCircle(100, 100, 100, paint);
 
@@ -134,7 +149,7 @@ TGFX_TEST(SVGExportTest, OpacityColorFile) {
       "fill=\"#00F\" fill-opacity=\"0.5\" cx=\"100\" cy=\"100\" r=\"100\"/></svg>";
 
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
   auto path = ProjectPath::Absolute("test/out/FileWrite.txt");
@@ -148,7 +163,7 @@ TGFX_TEST(SVGExportTest, OpacityColorFile) {
   auto SVGStream = WriteStream::MakeFromFile(path);
   auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
                                     SVGExportFlags::DisablePrettyXML);
-  auto* canvas = exporter->getCanvas();
+  auto canvas = exporter->getCanvas();
 
   canvas->drawCircle(100, 100, 100, paint);
 
@@ -174,7 +189,7 @@ TGFX_TEST(SVGExportTest, LinearGradient) {
       "cx=\"100\" cy=\"100\" r=\"100\"/></svg>";
 
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
   tgfx::Paint paint;
@@ -186,7 +201,7 @@ TGFX_TEST(SVGExportTest, LinearGradient) {
   auto SVGStream = MemoryWriteStream::Make();
   auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
                                     SVGExportFlags::DisablePrettyXML);
-  auto* canvas = exporter->getCanvas();
+  auto canvas = exporter->getCanvas();
 
   canvas->drawCircle(100, 100, 100, paint);
 
@@ -205,7 +220,7 @@ TGFX_TEST(SVGExportTest, RadialGradient) {
       "fill=\"url(#gradient_0)\" x=\"50\" y=\"50\" width=\"100\" height=\"100\"/></svg>";
 
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
   tgfx::Paint paint;
@@ -217,7 +232,7 @@ TGFX_TEST(SVGExportTest, RadialGradient) {
   auto SVGStream = MemoryWriteStream::Make();
   auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
                                     SVGExportFlags::DisablePrettyXML);
-  auto* canvas = exporter->getCanvas();
+  auto canvas = exporter->getCanvas();
 
   canvas->drawRect(Rect::MakeXYWH(50, 50, 100, 100), paint);
 
@@ -237,7 +252,7 @@ TGFX_TEST(SVGExportTest, UnsupportedGradient) {
       "fill=\"url(#gradient_0)\" x=\"50\" y=\"50\" width=\"100\" height=\"100\"/></svg>";
 
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
   tgfx::Paint paint;
@@ -250,7 +265,7 @@ TGFX_TEST(SVGExportTest, UnsupportedGradient) {
   auto SVGStream = MemoryWriteStream::Make();
   auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
                                     SVGExportFlags::DisablePrettyXML);
-  auto* canvas = exporter->getCanvas();
+  auto canvas = exporter->getCanvas();
 
   canvas->drawRect(Rect::MakeXYWH(50, 50, 100, 100), paint);
 
@@ -267,7 +282,7 @@ TGFX_TEST(SVGExportTest, BlendMode) {
       "style=\"mix-blend-mode:difference\" x=\"50\" y=\"50\" width=\"100\" height=\"100\"/></svg>";
 
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
   Paint paintBackground;
@@ -280,7 +295,7 @@ TGFX_TEST(SVGExportTest, BlendMode) {
   auto SVGStream = MemoryWriteStream::Make();
   auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
                                     SVGExportFlags::DisablePrettyXML);
-  auto* canvas = exporter->getCanvas();
+  auto canvas = exporter->getCanvas();
 
   canvas->drawRect(tgfx::Rect::MakeXYWH(0, 0, 100, 100), paintBackground);
   canvas->drawRect(tgfx::Rect::MakeXYWH(50, 50, 100, 100), paint);
@@ -298,7 +313,7 @@ TGFX_TEST(SVGExportTest, StrokeWidth) {
       "147.5L147.5 147.5L147.5 52.5L52.5 52.5Z\"/></svg>";
 
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
   Paint paint;
@@ -309,7 +324,7 @@ TGFX_TEST(SVGExportTest, StrokeWidth) {
   auto SVGStream = MemoryWriteStream::Make();
   auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
                                     SVGExportFlags::DisablePrettyXML);
-  auto* canvas = exporter->getCanvas();
+  auto canvas = exporter->getCanvas();
 
   canvas->drawRect(tgfx::Rect::MakeXYWH(50, 50, 100, 100), paint);
 
@@ -326,7 +341,7 @@ TGFX_TEST(SVGExportTest, SimpleTextAsText) {
       "SC\" x=\"0, 43, 70, 86, 102, 132, 145, 178, 215, 246, \" y=\"0, \">Hello TGFX</text></svg>";
 
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
   auto typeface =
@@ -338,7 +353,7 @@ TGFX_TEST(SVGExportTest, SimpleTextAsText) {
   auto SVGStream = MemoryWriteStream::Make();
   auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(400, 200),
                                     SVGExportFlags::DisablePrettyXML);
-  auto* canvas = exporter->getCanvas();
+  auto canvas = exporter->getCanvas();
 
   canvas->drawSimpleText("Hello TGFX", 0, 80, font, paint);
 
@@ -359,7 +374,7 @@ TGFX_TEST(SVGExportTest, SimpleTextAsPath) {
       "-32.9844Z\"/></svg>";
 
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
   auto typeface =
@@ -372,7 +387,7 @@ TGFX_TEST(SVGExportTest, SimpleTextAsPath) {
   auto exporter =
       SVGExporter::Make(SVGStream, context, Rect::MakeWH(400, 200),
                         SVGExportFlags::ConvertTextToPaths | SVGExportFlags::DisablePrettyXML);
-  auto* canvas = exporter->getCanvas();
+  auto canvas = exporter->getCanvas();
 
   canvas->drawSimpleText("Hi", 0, 80, font, paint);
 
@@ -390,7 +405,7 @@ TGFX_TEST(SVGExportTest, EmojiText) {
       "\">🤡👻🐠🤩😃🤪</text></svg>";
 
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
   auto typeface =
@@ -402,7 +417,7 @@ TGFX_TEST(SVGExportTest, EmojiText) {
   auto SVGStream = MemoryWriteStream::Make();
   auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(400, 200),
                                     SVGExportFlags::DisablePrettyXML);
-  auto* canvas = exporter->getCanvas();
+  auto canvas = exporter->getCanvas();
 
   canvas->drawSimpleText("🤡👻🐠🤩😃🤪", 0, 80, font, paint);
 
@@ -420,7 +435,7 @@ TGFX_TEST(SVGExportTest, EmojiTextFile) {
       "\">🤡👻🐠🤩😃🤪</text></svg>";
 
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
   auto path = ProjectPath::Absolute("test/out/FileWrite.txt");
@@ -436,7 +451,7 @@ TGFX_TEST(SVGExportTest, EmojiTextFile) {
   auto SVGStream = WriteStream::MakeFromFile(path);
   auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(400, 200),
                                     SVGExportFlags::DisablePrettyXML);
-  auto* canvas = exporter->getCanvas();
+  auto canvas = exporter->getCanvas();
 
   canvas->drawSimpleText("🤡👻🐠🤩😃🤪", 0, 80, font, paint);
 
@@ -464,13 +479,13 @@ TGFX_TEST(SVGExportTest, ClipState) {
       "height=\"100\"/></svg>";
 
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
   auto SVGStream = MemoryWriteStream::Make();
   auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(300, 300),
                                     SVGExportFlags::DisablePrettyXML);
-  auto* canvas = exporter->getCanvas();
+  auto canvas = exporter->getCanvas();
 
   {
     Paint paint;
@@ -502,12 +517,12 @@ TGFX_TEST(SVGExportTest, ClipState) {
 TGFX_TEST(SVGExportTest, GradientMask) {
 
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
   auto SVGStream = MemoryWriteStream::Make();
   auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(300, 300));
-  auto* canvas = exporter->getCanvas();
+  auto canvas = exporter->getCanvas();
 
   {
     Paint paint;
@@ -536,12 +551,12 @@ TGFX_TEST(SVGExportTest, GradientMask) {
 
 TGFX_TEST(SVGExportTest, ImageMask) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
   auto SVGStream = MemoryWriteStream::Make();
   auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(300, 300));
-  auto* canvas = exporter->getCanvas();
+  auto canvas = exporter->getCanvas();
 
   {
     Paint paint;
@@ -559,28 +574,21 @@ TGFX_TEST(SVGExportTest, ImageMask) {
   }
 
   exporter->close();
-  auto SVGString = SVGStream->readString();
-
-  auto path = ProjectPath::Absolute("resources/apitest/mask_image.svg");
-  auto readStream = Stream::MakeFromFile(path);
-  EXPECT_TRUE(readStream != nullptr);
-  Buffer buffer(readStream->size());
-  readStream->read(buffer.data(), buffer.size());
-  EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), SVGString);
+  CompareSVG(SVGStream, "SVGExportTest/ImageMask");
 }
 
 TGFX_TEST(SVGExportTest, PictureImageMask) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
   auto SVGStream = MemoryWriteStream::Make();
   auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(300, 300));
-  auto* canvas = exporter->getCanvas();
+  auto canvas = exporter->getCanvas();
 
   {
     Recorder recorder;
-    auto* pictureCanvas = recorder.beginRecording();
+    auto pictureCanvas = recorder.beginRecording();
     {
       tgfx::Paint paint;
       pictureCanvas->drawCircle(50, 50, 50, paint);
@@ -605,28 +613,21 @@ TGFX_TEST(SVGExportTest, PictureImageMask) {
   }
 
   exporter->close();
-  auto SVGString = SVGStream->readString();
-
-  auto path = ProjectPath::Absolute("resources/apitest/mask_picture_image.svg");
-  auto readStream = Stream::MakeFromFile(path);
-  EXPECT_TRUE(readStream != nullptr);
-  Buffer buffer(readStream->size());
-  readStream->read(buffer.data(), buffer.size());
-  EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), SVGString);
+  CompareSVG(SVGStream, "SVGExportTest/PictureImageMask");
 }
 
 TGFX_TEST(SVGExportTest, InvertPictureImageMask) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
   auto SVGStream = MemoryWriteStream::Make();
   auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(300, 300));
-  auto* canvas = exporter->getCanvas();
+  auto canvas = exporter->getCanvas();
 
   {
     Recorder recorder;
-    auto* pictureCanvas = recorder.beginRecording();
+    auto pictureCanvas = recorder.beginRecording();
     {
       tgfx::Paint paint;
       pictureCanvas->drawCircle(50, 50, 50, paint);
@@ -651,19 +652,12 @@ TGFX_TEST(SVGExportTest, InvertPictureImageMask) {
   }
 
   exporter->close();
-  auto SVGString = SVGStream->readString();
-
-  auto path = ProjectPath::Absolute("resources/apitest/mask_invert_picture_image.svg");
-  auto readStream = Stream::MakeFromFile(path);
-  EXPECT_TRUE(readStream != nullptr);
-  Buffer buffer(readStream->size());
-  readStream->read(buffer.data(), buffer.size());
-  EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), SVGString);
+  CompareSVG(SVGStream, "SVGExportTest/InvertPictureImageMask");
 }
 
 TGFX_TEST(SVGExportTest, DrawImageRect) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
   auto SVGStream = MemoryWriteStream::Make();
@@ -671,7 +665,7 @@ TGFX_TEST(SVGExportTest, DrawImageRect) {
   int width = 400;
   int height = 400;
   auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(width, height));
-  auto* canvas = exporter->getCanvas();
+  auto canvas = exporter->getCanvas();
 
   auto image = MakeImage("resources/apitest/imageReplacement.png");
   ASSERT_TRUE(image != nullptr);
@@ -689,12 +683,44 @@ TGFX_TEST(SVGExportTest, DrawImageRect) {
   canvas->drawImageRect(image, srcRect, dstRect, SamplingOptions(FilterMode::Linear));
 
   exporter->close();
-  auto SVGString = SVGStream->readString();
-  auto path = ProjectPath::Absolute("resources/apitest/SVG/drawImageRect.svg");
-  auto readStream = Stream::MakeFromFile(path);
-  EXPECT_TRUE(readStream != nullptr);
-  Buffer buffer(readStream->size());
-  readStream->read(buffer.data(), buffer.size());
-  EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), SVGString);
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/DrawImageRect"));
+}
+
+TGFX_TEST(SVGExportTest, LayerShadow) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(400, 400));
+  auto canvas = exporter->getCanvas();
+
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto rootLayer = Layer::Make();
+  rootLayer->setMatrix(Matrix::MakeTrans(30, 30));
+
+  auto dropShadowLayer = ShapeLayer::Make();
+  auto dropShadowStyle = DropShadowStyle::Make(10, 10, 10, 10, Color::White(), false);
+  Path rect;
+  rect.addRect(Rect::MakeWH(50, 50));
+  dropShadowLayer->setPath(rect);
+  dropShadowLayer->setFillStyle(SolidColor::Make(Color::Red()));
+  dropShadowLayer->setLayerStyles({dropShadowStyle});
+  rootLayer->addChild(dropShadowLayer);
+
+  auto innerShadowLayer = ShapeLayer::Make();
+  auto innerShadowStyle = InnerShadowStyle::Make(10, 10, 10, 10, Color::White());
+  innerShadowLayer->setMatrix(Matrix::MakeTrans(200, 0));
+  innerShadowLayer->setPath(rect);
+  innerShadowLayer->setFillStyle(SolidColor::Make(Color::Red()));
+  innerShadowLayer->setLayerStyles({innerShadowStyle});
+  rootLayer->addChild(innerShadowLayer);
+
+  displayList->root()->addChild(rootLayer);
+  displayList->root()->draw(canvas);
+
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/LayerDropShadow"));
 }
 }  // namespace tgfx

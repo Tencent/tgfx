@@ -21,6 +21,7 @@
 #include "gpu/ProxyProvider.h"
 #include "gpu/Quad.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
+#include "inspect/InspectorMark.h"
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
@@ -31,6 +32,7 @@ PlacementPtr<RectDrawOp> RectDrawOp::Make(Context* context,
     return nullptr;
   }
   auto drawOp = context->drawingBuffer()->make<RectDrawOp>(provider.get());
+  CAPUTRE_RECT_MESH(drawOp.get(), provider.get());
   if (provider->aaType() == AAType::Coverage || provider->rectCount() > 1) {
     drawOp->indexBufferProxy =
         context->globalCache()->getRectIndexBuffer(provider->aaType() == AAType::Coverage);
@@ -57,8 +59,19 @@ RectDrawOp::RectDrawOp(RectsVertexProvider* provider)
   hasSubset = provider->hasSubset();
 }
 
-void RectDrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
-  std::shared_ptr<IndexBuffer> indexBuffer = nullptr;
+PlacementPtr<GeometryProcessor> RectDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {
+  ATTRIBUTE_NAME("rectCount", static_cast<int>(rectCount));
+  ATTRIBUTE_NAME("commonColor", commonColor);
+  ATTRIBUTE_NAME("uvMatrix", uvMatrix);
+  ATTRIBUTE_NAME("hasSubset", hasSubset);
+  auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
+  return QuadPerEdgeAAGeometryProcessor::Make(drawingBuffer, renderTarget->width(),
+                                              renderTarget->height(), aaType, commonColor, uvMatrix,
+                                              hasSubset);
+}
+
+void RectDrawOp::onDraw(RenderPass* renderPass) {
+  std::shared_ptr<BufferResource> indexBuffer = nullptr;
   if (indexBufferProxy) {
     indexBuffer = indexBufferProxy->getBuffer();
     if (indexBuffer == nullptr) {
@@ -69,14 +82,8 @@ void RectDrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
   if (vertexBuffer == nullptr) {
     return;
   }
-  auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
-  auto gp = QuadPerEdgeAAGeometryProcessor::Make(drawingBuffer, renderTarget->width(),
-                                                 renderTarget->height(), aaType, commonColor,
-                                                 uvMatrix, hasSubset);
-  auto pipeline = createPipeline(renderTarget, std::move(gp));
-  renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
-  renderPass->bindBuffers(indexBuffer ? indexBuffer->gpuBuffer() : nullptr,
-                          vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
+  renderPass->setVertexBuffer(vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
+  renderPass->setIndexBuffer(indexBuffer ? indexBuffer->gpuBuffer() : nullptr);
   if (indexBuffer != nullptr) {
     auto numIndicesPerQuad = aaType == AAType::Coverage ? IndicesPerAAQuad : IndicesPerNonAAQuad;
     renderPass->drawIndexed(PrimitiveType::Triangles, 0, rectCount * numIndicesPerQuad);

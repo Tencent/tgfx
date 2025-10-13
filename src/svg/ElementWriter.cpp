@@ -17,14 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ElementWriter.h"
-#include <memory>
-#include <string>
-#include <unordered_set>
 #include "SVGExportContext.h"
 #include "SVGUtils.h"
-#include "core/CanvasState.h"
 #include "core/codecs/jpeg/JpegCodec.h"
 #include "core/codecs/png/PngCodec.h"
+#include "core/filters/ComposeImageFilter.h"
 #include "core/filters/GaussianBlurImageFilter.h"
 #include "core/filters/ShaderMaskFilter.h"
 #include "core/shaders/MatrixShader.h"
@@ -37,7 +34,6 @@
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Shader.h"
-#include "tgfx/core/Size.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/svg/SVGPathParser.h"
@@ -226,54 +222,73 @@ void ElementWriter::addPathAttributes(const Path& path, SVGPathParser::PathEncod
 
 Resources ElementWriter::addImageFilterResource(const std::shared_ptr<ImageFilter>& imageFilter,
                                                 Rect bound) {
-  std::string filterID = resourceStore->addFilter();
-  {
-    ElementWriter filterElement("filter", writer);
-    filterElement.addAttribute("id", filterID);
-    auto type = Types::Get(imageFilter.get());
-    switch (type) {
-      case Types::ImageFilterType::Blur: {
-        auto blurFilter = static_cast<const GaussianBlurImageFilter*>(imageFilter.get());
-        bound = blurFilter->filterBounds(bound);
-        filterElement.addAttribute("x", bound.x());
-        filterElement.addAttribute("y", bound.y());
-        filterElement.addAttribute("width", bound.width());
-        filterElement.addAttribute("height", bound.height());
-        filterElement.addAttribute("filterUnits", "userSpaceOnUse");
-        addBlurImageFilter(blurFilter);
-        break;
-      }
-      case Types::ImageFilterType::DropShadow: {
-        auto dropShadowFilter = static_cast<const DropShadowImageFilter*>(imageFilter.get());
-        bound = dropShadowFilter->filterBounds(bound);
-        filterElement.addAttribute("x", bound.x());
-        filterElement.addAttribute("y", bound.y());
-        filterElement.addAttribute("width", bound.width());
-        filterElement.addAttribute("height", bound.height());
-        filterElement.addAttribute("filterUnits", "userSpaceOnUse");
-        addDropShadowImageFilter(dropShadowFilter);
-        break;
-      }
-      case Types::ImageFilterType::InnerShadow: {
-        auto innerShadowFilter = static_cast<const InnerShadowImageFilter*>(imageFilter.get());
-        bound = innerShadowFilter->filterBounds(bound);
-        filterElement.addAttribute("x", bound.x());
-        filterElement.addAttribute("y", bound.y());
-        filterElement.addAttribute("width", bound.width() + innerShadowFilter->dx);
-        filterElement.addAttribute("height", bound.height() + innerShadowFilter->dy);
-        filterElement.addAttribute("filterUnits", "userSpaceOnUse");
-        addInnerShadowImageFilter(innerShadowFilter);
-        break;
-      }
-      default:
-        // TODO (YGaurora): The compose filter can be expanded into multiple filters for export. This
-        // can be implemented.
-        reportUnsupportedElement("Unsupported image filter");
-    }
-  }
+  auto filterID = addImageFilter(imageFilter, bound);
   Resources resources;
   resources.filter = "url(#" + filterID + ")";
   return resources;
+}
+
+std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& imageFilter,
+                                          Rect bound) {
+  auto type = Types::Get(imageFilter.get());
+  switch (type) {
+    case Types::ImageFilterType::Blur: {
+      const auto blurFilter = static_cast<const GaussianBlurImageFilter*>(imageFilter.get());
+      bound = blurFilter->filterBounds(bound);
+      std::string filterID = resourceStore->addFilter();
+      ElementWriter filterElement("filter", writer);
+      filterElement.addAttribute("id", filterID);
+      filterElement.addAttribute("x", bound.x());
+      filterElement.addAttribute("y", bound.y());
+      filterElement.addAttribute("width", bound.width());
+      filterElement.addAttribute("height", bound.height());
+      filterElement.addAttribute("filterUnits", "userSpaceOnUse");
+      addBlurImageFilter(blurFilter);
+      return filterID;
+    }
+    case Types::ImageFilterType::DropShadow: {
+      const auto dropShadowFilter = static_cast<const DropShadowImageFilter*>(imageFilter.get());
+      bound = dropShadowFilter->filterBounds(bound);
+      std::string filterID = resourceStore->addFilter();
+      ElementWriter filterElement("filter", writer);
+      filterElement.addAttribute("id", filterID);
+      filterElement.addAttribute("x", bound.x());
+      filterElement.addAttribute("y", bound.y());
+      filterElement.addAttribute("width", bound.width());
+      filterElement.addAttribute("height", bound.height());
+      filterElement.addAttribute("filterUnits", "userSpaceOnUse");
+      addDropShadowImageFilter(dropShadowFilter);
+      return filterID;
+    }
+    case Types::ImageFilterType::InnerShadow: {
+      const auto innerShadowFilter = static_cast<const InnerShadowImageFilter*>(imageFilter.get());
+      bound = innerShadowFilter->filterBounds(bound);
+      std::string filterID = resourceStore->addFilter();
+      ElementWriter filterElement("filter", writer);
+      filterElement.addAttribute("id", filterID);
+      filterElement.addAttribute("x", bound.x());
+      filterElement.addAttribute("y", bound.y());
+      filterElement.addAttribute("width", bound.width() + innerShadowFilter->dx);
+      filterElement.addAttribute("height", bound.height() + innerShadowFilter->dy);
+      filterElement.addAttribute("filterUnits", "userSpaceOnUse");
+      addInnerShadowImageFilter(innerShadowFilter);
+      return filterID;
+    }
+    case Types::ImageFilterType::Compose: {
+      const auto composeFilter = static_cast<const ComposeImageFilter*>(imageFilter.get());
+      std::string filterID;
+      for (const auto& filterItem : composeFilter->filters) {
+        auto id = addImageFilter(filterItem, bound);
+        if (!id.empty()) {
+          filterID = id;
+        }
+      }
+      return filterID;
+    }
+    default:
+      reportUnsupportedElement("Unsupported image filter");
+      return "";
+  }
 }
 
 void ElementWriter::addBlurImageFilter(const GaussianBlurImageFilter* filter) {
@@ -284,9 +299,6 @@ void ElementWriter::addBlurImageFilter(const GaussianBlurImageFilter* filter) {
 }
 
 void ElementWriter::addDropShadowImageFilter(const DropShadowImageFilter* filter) {
-  if (!filter->blurFilter) {
-    return;
-  }
   {
     ElementWriter offsetElement("feOffset", writer);
     offsetElement.addAttribute("dx", filter->dx);
@@ -294,12 +306,16 @@ void ElementWriter::addDropShadowImageFilter(const DropShadowImageFilter* filter
   }
   {
     ElementWriter blurElement("feGaussianBlur", writer);
-    if (Types::Get(filter->blurFilter.get()) == Types::ImageFilterType::Blur) {
-      auto blurFilter = static_cast<const GaussianBlurImageFilter*>(filter->blurFilter.get());
-      blurElement.addAttribute("stdDeviation",
-                               std::max(blurFilter->blurrinessX, blurFilter->blurrinessY) / 2.f);
-      blurElement.addAttribute("result", "blur");
+    float blurriness = 0.f;
+    if (filter->blurFilter) {
+      if (Types::Get(filter->blurFilter.get()) == Types::ImageFilterType::Blur) {
+        const auto blurFilter =
+            static_cast<const GaussianBlurImageFilter*>(filter->blurFilter.get());
+        blurriness = std::max(blurFilter->blurrinessX, blurFilter->blurrinessY) / 2.f;
+      }
     }
+    blurElement.addAttribute("stdDeviation", blurriness);
+    blurElement.addAttribute("result", "blur");
   }
   {
     ElementWriter colorMatrixElement("feColorMatrix", writer);

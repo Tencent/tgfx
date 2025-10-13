@@ -19,6 +19,7 @@
 #include "CodecImage.h"
 #include "RasterizedImage.h"
 #include "core/ScaledImageGenerator.h"
+#include "core/utils/NextCacheScaleLevel.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/TPArgs.h"
 
@@ -32,7 +33,7 @@ std::shared_ptr<ImageCodec> CodecImage::getCodec() const {
 }
 
 float CodecImage::getRasterizedScale(float drawScale) const {
-  return NextPowerOfTwoScale(drawScale);
+  return NextCacheScaleLevel(drawScale);
 }
 
 std::shared_ptr<Image> CodecImage::onMakeScaled(int newWidth, int newHeight,

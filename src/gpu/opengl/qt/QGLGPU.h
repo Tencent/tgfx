@@ -21,6 +21,13 @@
 #ifdef __APPLE__
 #include <CoreVideo/CoreVideo.h>
 #endif
+
+#if defined(_WIN32) && (QT_VERSION_MAJOR < 6)
+// For Qt5 on Windows, combaseapi.h is included, in which interface is defined as struct FAR.
+#ifdef interface
+#undef interface
+#endif
+#endif
 #include "gpu/opengl/GLGPU.h"
 
 namespace tgfx {
@@ -36,7 +43,7 @@ class QGLGPU : public GLGPU {
   std::vector<PixelFormat> getHardwareTextureFormats(HardwareBufferRef hardwareBuffer,
                                                      YUVFormat* yuvFormat) const override;
 
-  std::vector<std::unique_ptr<GPUTexture>> importHardwareTextures(HardwareBufferRef hardwareBuffer,
+  std::vector<std::shared_ptr<GPUTexture>> importHardwareTextures(HardwareBufferRef hardwareBuffer,
                                                                   uint32_t usage) override;
 
  private:

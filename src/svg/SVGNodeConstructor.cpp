@@ -468,7 +468,7 @@ void SVGNodeConstructor::SetClassStyleAttributes(SVGNode& root, const CSSMapper&
       }
     }
     if (node->hasChildren()) {
-      auto* container = static_cast<SVGContainer*>(node);
+      auto container = static_cast<SVGContainer*>(node);
       for (const auto& child : container->getChildren()) {
         setter(setter, child.get());
       }

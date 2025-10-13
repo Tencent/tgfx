@@ -48,6 +48,12 @@ class RegionTransformer {
       const std::vector<std::shared_ptr<LayerStyle>>& styles, float contentScale,
       std::shared_ptr<RegionTransformer> outer = nullptr);
 
+  /**
+   * Creates a RegionTransformer that applies the given matrix transformation to the given rectangle.
+   */
+  static std::shared_ptr<RegionTransformer> MakeFromMatrix(
+      const Matrix& matrix, std::shared_ptr<RegionTransformer> outer = nullptr);
+
   explicit RegionTransformer(std::shared_ptr<RegionTransformer> outer);
 
   virtual ~RegionTransformer() = default;
@@ -57,12 +63,20 @@ class RegionTransformer {
    */
   void transform(Rect* bounds) const;
 
+  float getMaxScale() const;
+
  protected:
   virtual void onTransform(Rect* bounds) const = 0;
 
   virtual bool isClip() const {
     return false;
   }
+
+  virtual bool isMatrix() const {
+    return false;
+  }
+
+  void getTotalMatrix(Matrix* matrix) const;
 
  private:
   std::shared_ptr<RegionTransformer> outer = nullptr;

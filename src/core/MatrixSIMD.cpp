@@ -25,8 +25,11 @@
 // Generates code for each enabled target by re-including this source file.
 #include "hwy/foreach_target.h"  // IWYU pragma: keep
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wgnu-zero-variadic-macro-arguments"
 // Must come after foreach_target.h to avoid redefinition errors.
 #include "hwy/highway.h"
+#pragma clang diagnostic pop
 
 HWY_BEFORE_NAMESPACE();
 namespace tgfx {
@@ -34,8 +37,8 @@ namespace HWY_NAMESPACE {
 namespace hn = hwy::HWY_NAMESPACE;
 void TransPointsHWYImpl(const Matrix& m, Point* dst, const Point* src, int count) {
   if (count > 0) {
-    auto* fdst = reinterpret_cast<float*>(&dst[0]);
-    const auto* fsrc = reinterpret_cast<const float*>(&src[0]);
+    auto fdst = reinterpret_cast<float*>(&dst[0]);
+    const auto fsrc = reinterpret_cast<const float*>(&src[0]);
     float tx = m.getTranslateX();
     float ty = m.getTranslateY();
     const HWY_FULL(float) d;
@@ -57,8 +60,8 @@ void TransPointsHWYImpl(const Matrix& m, Point* dst, const Point* src, int count
 
 void ScalePointsHWYImpl(const Matrix& m, Point* dst, const Point* src, int count) {
   if (count > 0) {
-    auto* fdst = reinterpret_cast<float*>(&dst[0]);
-    const auto* fsrc = reinterpret_cast<const float*>(&src[0]);
+    auto fdst = reinterpret_cast<float*>(&dst[0]);
+    const auto fsrc = reinterpret_cast<const float*>(&src[0]);
     float tx = m.getTranslateX();
     float ty = m.getTranslateY();
     float sx = m.getScaleX();
@@ -85,8 +88,8 @@ void ScalePointsHWYImpl(const Matrix& m, Point* dst, const Point* src, int count
 
 void AffinePointsHWYImpl(const Matrix& m, Point* dst, const Point* src, int count) {
   if (count > 0) {
-    auto* fdst = reinterpret_cast<float*>(&dst[0]);
-    const auto* fsrc = reinterpret_cast<const float*>(&src[0]);
+    auto fdst = reinterpret_cast<float*>(&dst[0]);
+    const auto fsrc = reinterpret_cast<const float*>(&src[0]);
     float tx = m.getTranslateX();
     float ty = m.getTranslateY();
     float sx = m.getScaleX();

@@ -22,6 +22,7 @@
 #include "core/DrawContext.h"
 #include "core/Records.h"
 #include "core/utils/BlockBuffer.h"
+#include "tgfx/core/Stroke.h"
 
 namespace tgfx {
 class RecordingContext : public DrawContext {
@@ -50,7 +51,8 @@ class RecordingContext : public DrawContext {
 
   void drawPath(const Path& path, const MCState& state, const Fill& fill) override;
 
-  void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill) override;
+  void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill,
+                 const Stroke* stroke) override;
 
   void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
                  const MCState& state, const Fill& fill) override;

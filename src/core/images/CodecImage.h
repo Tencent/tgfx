@@ -21,7 +21,7 @@
 #include <memory>
 #include "core/images/BufferImage.h"
 #include "core/images/GeneratorImage.h"
-#include "core/utils/NextPowerOfTwoScale.h"
+#include "core/utils/NextCacheScaleLevel.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/ImageCodec.h"
 

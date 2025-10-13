@@ -22,6 +22,8 @@
 #include "tgfx/gpu/Window.h"
 
 namespace tgfx {
+class EAGLLayerTexture;
+
 class EAGLWindow : public Window {
  public:
   /**
@@ -30,16 +32,13 @@ class EAGLWindow : public Window {
   static std::shared_ptr<EAGLWindow> MakeFrom(CAEAGLLayer* layer,
                                               std::shared_ptr<GLDevice> device = nullptr);
 
-  ~EAGLWindow() override;
-
  protected:
   std::shared_ptr<Surface> onCreateSurface(Context* context) override;
   void onPresent(Context* context, int64_t presentationTime) override;
 
  private:
-  unsigned frameBufferID = 0;
-  GLuint colorBuffer = 0;
   CAEAGLLayer* layer = nil;
+  std::unique_ptr<EAGLLayerTexture> layerTexture;
 
   EAGLWindow(std::shared_ptr<Device> device, CAEAGLLayer* layer);
 };

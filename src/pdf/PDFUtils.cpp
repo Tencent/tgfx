@@ -36,7 +36,7 @@ namespace {
 size_t PrintPermilAsDecimal(int x, char* result, int places) {
   result[0] = '.';
   for (int i = places; i > 0; --i) {
-    result[i] = '0' + x % 10;
+    result[i] = static_cast<char>('0' + x % 10);
     x /= 10;
   }
   size_t j = 0;

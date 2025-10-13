@@ -19,6 +19,7 @@
 #pragma once
 
 #include "core/DrawContext.h"
+#include "tgfx/core/Stroke.h"
 
 namespace tgfx {
 class MeasureContext : public DrawContext {
@@ -40,7 +41,8 @@ class MeasureContext : public DrawContext {
 
   void drawPath(const Path& path, const MCState& state, const Fill& fill) override;
 
-  void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill) override;
+  void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill,
+                 const Stroke* stroke) override;
 
   void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
                  const MCState& state, const Fill& fill) override;
@@ -61,11 +63,9 @@ class MeasureContext : public DrawContext {
   bool computeTightBounds = false;
   Rect bounds = {};
 
-  void addTightBounds(const Path& path, const MCState& state, const Fill& fill);
+  void addTightBounds(const Path& path, const MCState& state);
 
-  void addLocalBounds(const MCState& state, const Fill& fill, const Rect& localBounds,
-                      bool unbounded = false);
-  void addDeviceBounds(const Path& clip, const Fill& fill, const Rect& deviceBounds,
-                       bool unbounded = false);
+  void addLocalBounds(const MCState& state, const Rect& localBounds, bool unbounded = false);
+  void addDeviceBounds(const Path& clip, const Rect& deviceBounds, bool unbounded = false);
 };
 }  // namespace tgfx

@@ -25,6 +25,7 @@
 #include "tgfx/core/Fill.h"
 #include "tgfx/core/Picture.h"
 #include "tgfx/core/Shape.h"
+#include "tgfx/core/Stroke.h"
 
 namespace tgfx {
 class Surface;
@@ -60,7 +61,8 @@ class DrawContext {
   /**
    * Draws a complex Shape with the specified MCState and Fill.
    */
-  virtual void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill) = 0;
+  virtual void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill,
+                         const Stroke* stroke) = 0;
 
   /**
    * Draws a image with the specified SamplingOptions, MCState, Fill.

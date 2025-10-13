@@ -20,11 +20,12 @@
 #include "GLCaps.h"
 #include "GLGPU.h"
 #include "core/utils/PixelFormatUtil.h"
+#include "core/utils/UniqueID.h"
 #include "gpu/opengl/GLUtil.h"
 
 namespace tgfx {
 GLTexture::GLTexture(const GPUTextureDescriptor& descriptor, unsigned target, unsigned textureID)
-    : GPUTexture(descriptor), _target(target), _textureID(textureID) {
+    : GPUTexture(descriptor), _target(target), _textureID(textureID), uniqueID(UniqueID::Next()) {
 }
 
 GPUTextureType GLTexture::type() const {
@@ -68,21 +69,20 @@ BackendRenderTarget GLTexture::getBackendRenderTarget() const {
   return {glInfo, width(), height()};
 }
 
-void GLTexture::release(GPU* gpu) {
+void GLTexture::onRelease(GLGPU* gpu) {
   DEBUG_ASSERT(gpu != nullptr);
-  auto glGPU = static_cast<GLGPU*>(gpu);
   if (textureFrameBuffer > 0) {
-    auto gl = glGPU->functions();
-    gl->bindFramebuffer(GL_FRAMEBUFFER, textureFrameBuffer);
+    auto state = gpu->state();
+    state->bindFramebuffer(this);
+    auto gl = gpu->functions();
     gl->framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, _target, 0, 0);
-    gl->bindFramebuffer(GL_FRAMEBUFFER, 0);
     gl->deleteFramebuffers(1, &textureFrameBuffer);
     textureFrameBuffer = 0;
   }
-  onRelease(glGPU);
+  onReleaseTexture(gpu);
 }
 
-void GLTexture::onRelease(GLGPU* gpu) {
+void GLTexture::onReleaseTexture(GLGPU* gpu) {
   if (_textureID > 0) {
     auto gl = gpu->functions();
     gl->deleteTextures(1, &_textureID);
@@ -91,8 +91,7 @@ void GLTexture::onRelease(GLGPU* gpu) {
 }
 
 bool GLTexture::checkFrameBuffer(GLGPU* gpu) {
-  if (!(descriptor.usage & GPUTextureUsage::RENDER_ATTACHMENT) || textureFrameBuffer > 0 ||
-      _textureID == 0) {
+  if (textureFrameBuffer > 0 || _textureID == 0) {
     return true;
   }
   DEBUG_ASSERT(gpu != nullptr);
@@ -102,23 +101,73 @@ bool GLTexture::checkFrameBuffer(GLGPU* gpu) {
     return false;
   }
   auto gl = gpu->functions();
-  unsigned frameBufferID = 0;
-  gl->genFramebuffers(1, &frameBufferID);
-  if (frameBufferID == 0) {
+  gl->genFramebuffers(1, &textureFrameBuffer);
+  if (textureFrameBuffer == 0) {
     LOGE("GLTexture::makeFrameBuffer() failed to generate framebuffer!");
     return false;
   }
-  gl->bindFramebuffer(GL_FRAMEBUFFER, frameBufferID);
+  auto state = gpu->state();
+  state->bindFramebuffer(this);
   gl->framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, _target, _textureID, 0);
 #ifndef TGFX_BUILD_FOR_WEB
   if (gl->checkFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-    gl->deleteFramebuffers(1, &frameBufferID);
+    gl->deleteFramebuffers(1, &textureFrameBuffer);
+    textureFrameBuffer = 0;
     LOGE("GLTexture::makeFrameBuffer() framebuffer is not complete!");
     return false;
   }
 #endif
-  textureFrameBuffer = frameBufferID;
   return true;
+}
+
+static int GetGLMinFilter(int minFilter, bool mipmapped) {
+  if (!mipmapped) {
+    switch (minFilter) {
+      case GL_NEAREST_MIPMAP_NEAREST:
+      case GL_NEAREST_MIPMAP_LINEAR:
+        return GL_NEAREST;
+      case GL_LINEAR_MIPMAP_NEAREST:
+      case GL_LINEAR_MIPMAP_LINEAR:
+        return GL_LINEAR;
+      default:
+        break;
+    }
+  }
+  return minFilter;
+}
+
+static int GetGLWrap(int wrapMode, unsigned target) {
+  if ((target == GL_TEXTURE_RECTANGLE || target == GL_TEXTURE_EXTERNAL_OES) &&
+      (wrapMode == GL_REPEAT || wrapMode == GL_MIRRORED_REPEAT)) {
+    return GL_CLAMP_TO_EDGE;
+  }
+  return wrapMode;
+}
+
+void GLTexture::updateSampler(GLGPU* gpu, const GLSampler* sampler) {
+  DEBUG_ASSERT(gpu != nullptr);
+  DEBUG_ASSERT(descriptor.usage & GPUTextureUsage::TEXTURE_BINDING);
+  auto gl = gpu->functions();
+  auto wrapS = GetGLWrap(sampler->wrapS(), _target);
+  if (wrapS != lastWrapS) {
+    gl->texParameteri(_target, GL_TEXTURE_WRAP_S, wrapS);
+    lastWrapS = wrapS;
+  }
+  auto wrapT = GetGLWrap(sampler->wrapT(), _target);
+  if (wrapT != lastWrapT) {
+    gl->texParameteri(_target, GL_TEXTURE_WRAP_T, wrapT);
+    lastWrapT = wrapT;
+  }
+  auto minFilter = GetGLMinFilter(sampler->minFilter(), descriptor.mipLevelCount > 1);
+  if (minFilter != lastMinFilter) {
+    gl->texParameteri(_target, GL_TEXTURE_MIN_FILTER, minFilter);
+    lastMinFilter = minFilter;
+  }
+  auto magFilter = sampler->magFilter();
+  if (magFilter != lastMagFilter) {
+    gl->texParameteri(_target, GL_TEXTURE_MAG_FILTER, magFilter);
+    lastMagFilter = magFilter;
+  }
 }
 
 }  // namespace tgfx

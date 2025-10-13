@@ -123,7 +123,8 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
   const bool defaultBlurTargetMipmapped = (args.mipmapped && !blur2D && !isBlurDstScaled);
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(blurDstWidth), static_cast<int>(blurDstHeight), isAlphaOnly, 1,
-      defaultBlurTargetMipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
+      defaultBlurTargetMipmapped, ImageOrigin::TopLeft,
+      blur2D || isBlurDstScaled ? BackingFit::Approx : args.backingFit);
   if (!renderTarget) {
     return nullptr;
   }
@@ -137,7 +138,8 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
     const bool finalBlurTargetMipmapped = (args.mipmapped && !isBlurDstScaled);
     renderTarget = RenderTargetProxy::MakeFallback(
         args.context, static_cast<int>(blurDstWidth), static_cast<int>(blurDstHeight), isAlphaOnly,
-        1, finalBlurTargetMipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
+        1, finalBlurTargetMipmapped, ImageOrigin::TopLeft,
+        isBlurDstScaled ? BackingFit::Approx : args.backingFit);
     if (!renderTarget) {
       return nullptr;
     }
@@ -159,7 +161,7 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
     auto finalProcessor = TextureEffect::Make(renderTarget->asTextureProxy(), {}, &finalUVMatrix);
     renderTarget = RenderTargetProxy::MakeFallback(
         args.context, static_cast<int>(dstDrawWidth), static_cast<int>(dstDrawHeight), isAlphaOnly,
-        1, args.mipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
+        1, args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
     if (!renderTarget) {
       return nullptr;
     }

@@ -18,15 +18,16 @@
 
 #include "RuntimeDrawTask.h"
 #include "gpu/GlobalCache.h"
-#include "gpu/Pipeline.h"
+#include "gpu/ProgramInfo.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/Quad.h"
 #include "gpu/RectsVertexProvider.h"
 #include "gpu/RenderPass.h"
-#include "gpu/RuntimeProgramCreator.h"
-#include "gpu/RuntimeProgramWrapper.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/processors/TextureEffect.h"
+#include "gpu/resources/PipelineProgram.h"
+#include "gpu/resources/RuntimeProgramWrapper.h"
+#include "inspect/InspectorMark.h"
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
@@ -52,6 +53,7 @@ RuntimeDrawTask::RuntimeDrawTask(std::shared_ptr<RenderTargetProxy> target,
 }
 
 void RuntimeDrawTask::execute(CommandEncoder* encoder) {
+  TASK_MARK(tgfx::inspect::OpTaskType::RuntimeDrawTask);
   std::vector<std::shared_ptr<TextureView>> textures = {};
   textures.reserve(inputTextures.size());
   for (size_t i = 0; i < inputTextures.size(); i++) {
@@ -71,11 +73,18 @@ void RuntimeDrawTask::execute(CommandEncoder* encoder) {
     return;
   }
   auto context = renderTarget->getContext();
-  RuntimeProgramCreator programCreator(effect);
-  auto program = context->globalCache()->getProgram(&programCreator);
+  static auto RuntimeProgramType = UniqueID::Next();
+  BytesKey programKey = {};
+  programKey.write(RuntimeProgramType);
+  programKey.write(effect->programID());
+  auto program = context->globalCache()->findProgram(programKey);
   if (program == nullptr) {
-    LOGE("RuntimeDrawTask::execute() Failed to create the runtime program!");
-    return;
+    program = RuntimeProgramWrapper::Wrap(effect->onCreateProgram(context));
+    if (program == nullptr) {
+      LOGE("RuntimeDrawTask::execute() Failed to create the runtime program!");
+      return;
+    }
+    context->globalCache()->addProgram(programKey, program);
   }
   std::vector<BackendTexture> backendTextures = {};
   backendTextures.reserve(textures.size());
@@ -84,8 +93,12 @@ void RuntimeDrawTask::execute(CommandEncoder* encoder) {
   }
   effect->onDraw(RuntimeProgramWrapper::Unwrap(program.get()), backendTextures,
                  renderTarget->getBackendRenderTarget(), offset);
+  // Reset GL state to prevent side effects from external GL calls.
+  context->gpu()->resetGLState();
   if (renderTarget->sampleCount() > 1) {
-    auto renderPass = encoder->beginRenderPass(renderTarget, true);
+    RenderPassDescriptor descriptor(renderTarget->getRenderTexture(),
+                                    renderTarget->getSampleTexture());
+    auto renderPass = encoder->beginRenderPass(descriptor);
     DEBUG_ASSERT(renderPass != nullptr);
     renderPass->end();
   }
@@ -93,7 +106,7 @@ void RuntimeDrawTask::execute(CommandEncoder* encoder) {
 
 std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
     CommandEncoder* encoder, std::shared_ptr<TextureProxy> textureProxy,
-    VertexBufferProxyView* vertexBufferProxyView) {
+    VertexBufferView* vertexBufferProxyView) {
   auto textureView = textureProxy->getTextureView();
   if (textureView == nullptr) {
     return nullptr;
@@ -115,7 +128,8 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
     return nullptr;
   }
   auto renderTarget = renderTargetProxy->getRenderTarget();
-  auto renderPass = encoder->beginRenderPass(renderTarget, false);
+  RenderPassDescriptor descriptor(renderTarget->getRenderTexture());
+  auto renderPass = encoder->beginRenderPass(descriptor);
   if (renderPass == nullptr) {
     LOGE("RuntimeDrawTask::getFlatTexture() Failed to initialize the render pass!");
     return nullptr;
@@ -128,15 +142,17 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
   auto geometryProcessor =
       DefaultGeometryProcessor::Make(context->drawingBuffer(), {}, renderTarget->width(),
                                      renderTarget->height(), AAType::None, {}, {});
-  auto format = renderTarget->format();
-  auto caps = renderTarget->getContext()->caps();
-  const auto& swizzle = caps->getWriteSwizzle(format);
-  std::vector<PlacementPtr<FragmentProcessor>> fragmentProcessors = {};
-  fragmentProcessors.emplace_back(std::move(colorProcessor));
-  Pipeline pipeline(std::move(geometryProcessor), std::move(fragmentProcessors), 1, nullptr,
-                    BlendMode::Src, &swizzle);
-  renderPass->bindProgramAndScissorClip(&pipeline, {});
-  renderPass->bindBuffers(nullptr, vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
+  std::vector fragmentProcessors = {colorProcessor.get()};
+  ProgramInfo programInfo(renderTarget.get(), geometryProcessor.get(),
+                          std::move(fragmentProcessors), 1, nullptr, BlendMode::Src);
+  auto program = std::static_pointer_cast<PipelineProgram>(programInfo.getProgram());
+  if (program == nullptr) {
+    LOGE("RuntimeDrawTask::GetFlatTextureView() Failed to get the program!");
+    return nullptr;
+  }
+  renderPass->setPipeline(program->getPipeline());
+  programInfo.setUniformsAndSamplers(renderPass.get(), program.get());
+  renderPass->setVertexBuffer(vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
   renderPass->draw(PrimitiveType::TriangleStrip, 0, 4);
   renderPass->end();
   return renderTarget->asTextureView();

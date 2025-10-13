@@ -18,7 +18,7 @@
 
 #include "NV12HardwareBuffer.h"
 #include "core/utils/USE.h"
-#include "gpu/TextureView.h"
+#include "gpu/resources/TextureView.h"
 
 namespace tgfx {
 static std::mutex cacheLocker = {};

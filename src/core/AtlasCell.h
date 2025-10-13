@@ -23,41 +23,16 @@
 #include "tgfx/core/Matrix.h"
 
 namespace tgfx {
-class AtlasCell {
- public:
-  const BytesKey& key() const {
-    return _key;
-  }
-
-  MaskFormat maskFormat() const {
-    return _maskFormat;
-  }
-
-  uint16_t width() const {
-    return _width;
-  }
-
-  uint16_t height() const {
-    return _height;
-  }
-
-  const Matrix& matrix() const {
-    return _matrix;
-  }
-
- private:
-  BytesKey _key;
-  Matrix _matrix = {};
-  MaskFormat _maskFormat = MaskFormat::A8;
-  uint16_t _width = 0;
-  uint16_t _height = 0;
-
-  friend class AtlasSource;
-  friend class RenderContext;
+struct AtlasCell {
+  BytesKey key = {};
+  Point offset = {};
+  MaskFormat maskFormat = MaskFormat::A8;
+  uint16_t width = 0;
+  uint16_t height = 0;
 };
 
 struct AtlasCellLocator {
-  Matrix matrix = {};  // The cell's transformation matrix
+  Point offset = {};  // The cell's offset for render
   AtlasLocator atlasLocator;
 };
 }  //namespace tgfx

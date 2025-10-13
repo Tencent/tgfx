@@ -18,8 +18,8 @@
 
 #include "ShapeBufferUploadTask.h"
 #include "gpu/GPU.h"
-#include "gpu/TextureView.h"
-#include "gpu/VertexBuffer.h"
+#include "gpu/resources/BufferResource.h"
+#include "gpu/resources/TextureView.h"
 
 namespace tgfx {
 ShapeBufferUploadTask::ShapeBufferUploadTask(std::shared_ptr<ResourceProxy> trianglesProxy,
@@ -38,7 +38,7 @@ std::shared_ptr<Resource> ShapeBufferUploadTask::onMakeResource(Context* context
     // No need to log an error here; the shape might not be a filled path or could be invisible.
     return nullptr;
   }
-  std::shared_ptr<VertexBuffer> vertexBuffer = nullptr;
+  std::shared_ptr<BufferResource> vertexBuffer = nullptr;
   if (auto triangles = shapeBuffer->triangles) {
     auto gpu = context->gpu();
     auto gpuBuffer = gpu->createBuffer(triangles->size(), GPUBufferUsage::VERTEX);
@@ -46,12 +46,8 @@ std::shared_ptr<Resource> ShapeBufferUploadTask::onMakeResource(Context* context
       LOGE("ShapeBufferUploadTask::onMakeResource() Failed to create buffer!");
       return nullptr;
     }
-    if (!gpu->queue()->writeBuffer(gpuBuffer.get(), 0, triangles->data(), triangles->size())) {
-      gpuBuffer->release(gpu);
-      LOGE("ShapeBufferUploadTask::onMakeResource() Failed to write buffer!");
-      return nullptr;
-    }
-    vertexBuffer = Resource::AddToCache(context, new VertexBuffer(std::move(gpuBuffer)));
+    gpu->queue()->writeBuffer(gpuBuffer, 0, triangles->data(), triangles->size());
+    vertexBuffer = Resource::AddToCache(context, new BufferResource(std::move(gpuBuffer)));
   } else {
     auto textureView = TextureView::MakeFrom(context, std::move(shapeBuffer->imageBuffer));
     if (!textureView) {

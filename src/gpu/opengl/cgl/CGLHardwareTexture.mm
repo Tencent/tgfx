@@ -18,25 +18,26 @@
 
 #include "CGLHardwareTexture.h"
 #include "core/utils/UniqueID.h"
+#include "gpu/opengl/GLGPU.h"
 
 namespace tgfx {
-std::unique_ptr<CGLHardwareTexture> CGLHardwareTexture::MakeFrom(
-    const Caps* caps, CVPixelBufferRef pixelBuffer, uint32_t usage,
+std::vector<std::shared_ptr<GPUTexture>> CGLHardwareTexture::MakeFrom(
+    GLGPU* gpu, CVPixelBufferRef pixelBuffer, uint32_t usage,
     CVOpenGLTextureCacheRef textureCache) {
   if (textureCache == nil) {
-    return nullptr;
+    return {};
   }
   auto format = CVPixelBufferGetPixelFormatType(pixelBuffer) == kCVPixelFormatType_OneComponent8
                     ? PixelFormat::ALPHA_8
                     : PixelFormat::RGBA_8888;
-  if (usage & GPUTextureUsage::RENDER_ATTACHMENT && !caps->isFormatRenderable(format)) {
-    return nullptr;
+  if (usage & GPUTextureUsage::RENDER_ATTACHMENT && !gpu->caps()->isFormatRenderable(format)) {
+    return {};
   }
   CVOpenGLTextureRef texture = nil;
   CVOpenGLTextureCacheCreateTextureFromImage(kCFAllocatorDefault, textureCache, pixelBuffer,
                                              nullptr, &texture);
   if (texture == nil) {
-    return nullptr;
+    return {};
   }
   auto target = CVOpenGLTextureGetTarget(texture);
   auto textureID = CVOpenGLTextureGetName(texture);
@@ -46,10 +47,15 @@ std::unique_ptr<CGLHardwareTexture> CGLHardwareTexture::MakeFrom(
                                      false,
                                      1,
                                      usage};
-  auto gpuTexture = std::unique_ptr<CGLHardwareTexture>(
-      new CGLHardwareTexture(descriptor, pixelBuffer, textureCache, target, textureID));
-  gpuTexture->texture = texture;
-  return gpuTexture;
+  auto glTexture = gpu->makeResource<CGLHardwareTexture>(descriptor, pixelBuffer, textureCache,
+                                                         target, textureID);
+  glTexture->texture = texture;
+  if (usage & GPUTextureUsage::RENDER_ATTACHMENT && !glTexture->checkFrameBuffer(gpu)) {
+    return {};
+  }
+  std::vector<std::shared_ptr<GPUTexture>> textures = {};
+  textures.push_back(std::move(glTexture));
+  return textures;
 }
 
 CGLHardwareTexture::CGLHardwareTexture(const GPUTextureDescriptor& descriptor,
@@ -71,7 +77,7 @@ CGLHardwareTexture::~CGLHardwareTexture() {
   }
 }
 
-void CGLHardwareTexture::onRelease(GLGPU*) {
+void CGLHardwareTexture::onReleaseTexture(GLGPU*) {
   if (texture == nil) {
     return;
   }

@@ -88,7 +88,7 @@ static CGImageRef CreateCGImage(const Path& path, void* pixels, const ImageInfo&
   CGContextTranslateCTM(cgContext, -left, -top);
   DrawPath(path, cgContext, info, antiAlias);
   CGContextFlush(cgContext);
-  auto* p = static_cast<uint8_t*>(pixels);
+  auto p = static_cast<uint8_t*>(pixels);
   auto stride = info.rowBytes();
   for (int y = 0; y < info.height(); ++y) {
     for (int x = 0; x < info.width(); ++x) {

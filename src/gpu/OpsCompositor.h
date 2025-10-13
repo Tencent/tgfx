@@ -44,7 +44,8 @@ class OpsCompositor {
   /**
    * Creates an OpsCompositor with the given render target proxy, render flags and render queue.
    */
-  OpsCompositor(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags);
+  OpsCompositor(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags,
+                std::optional<Color> clearColor = std::nullopt);
 
   /**
    * Fills the given image with the given sampling options, state and fill.
@@ -72,14 +73,13 @@ class OpsCompositor {
   /**
    * Fills the given shape with the given state and fill.
    */
-  void fillShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill);
+  void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill);
 
   /**
-   * Fills the given rect with the given fill, using the provided texture proxy and sampling
-   * options.
+   * Fills the given rect with the given atlas textureProxy, sampling options, state and fill.
    */
   void fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, const Rect& rect,
-                     const MCState& state, const Fill& fill);
+                     const SamplingOptions& sampling, const MCState& state, const Fill& fill);
 
   /**
    * Discard all pending operations.
@@ -118,7 +118,8 @@ class OpsCompositor {
   std::vector<PlacementPtr<Rect>> pendingUVRects = {};
   std::vector<PlacementPtr<RRectRecord>> pendingRRects = {};
   std::vector<PlacementPtr<Stroke>> pendingStrokes = {};
-  std::vector<PlacementPtr<Op>> ops = {};
+  std::optional<Color> clearColor = std::nullopt;
+  std::vector<PlacementPtr<DrawOp>> drawOps = {};
 
   static bool CompareFill(const Fill& a, const Fill& b);
 
