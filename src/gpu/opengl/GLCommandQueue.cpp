@@ -26,25 +26,23 @@
 #include "tgfx/core/Buffer.h"
 
 namespace tgfx {
-bool GLCommandQueue::writeBuffer(std::shared_ptr<GPUBuffer> buffer, size_t bufferOffset,
+void GLCommandQueue::writeBuffer(std::shared_ptr<GPUBuffer> buffer, size_t bufferOffset,
                                  const void* data, size_t size) {
   if (data == nullptr || size == 0) {
     LOGE("GLCommandQueue::writeBuffer() data is null or size is zero!");
-    return false;
+    return;
   }
   if (bufferOffset + size > buffer->size()) {
     LOGE("GLCommandQueue::writeBuffer() size exceeds buffer size!");
-    return false;
+    return;
   }
   auto gl = gpu->functions();
-  ClearGLError(gl);
   auto glBuffer = std::static_pointer_cast<GLBuffer>(buffer);
   auto target = GLBuffer::GetTarget(glBuffer->usage());
   DEBUG_ASSERT(target != 0);
   gl->bindBuffer(target, glBuffer->bufferID());
   gl->bufferSubData(target, static_cast<GLintptr>(bufferOffset), static_cast<GLsizeiptr>(size),
                     data);
-  return CheckGLError(gl);
 }
 
 void GLCommandQueue::writeTexture(std::shared_ptr<GPUTexture> texture, const Rect& rect,

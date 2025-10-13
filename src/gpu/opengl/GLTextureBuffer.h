@@ -18,34 +18,33 @@
 
 #pragma once
 
-#include "gpu/CommandQueue.h"
+#include "gpu/opengl/GLBuffer.h"
+#include "gpu/opengl/GLState.h"
+#include "gpu/opengl/GLTexture.h"
 
 namespace tgfx {
-class GLGPU;
-
-class GLCommandQueue : public CommandQueue {
+/**
+ * GLTextureBuffer is a readback buffer implementation that uses a texture as an intermediate buffer
+ * to read pixels from the GPU when PBO is not supported.
+ */
+class GLTextureBuffer : public GLBuffer {
  public:
-  explicit GLCommandQueue(GLGPU* gpu) : gpu(gpu) {
-  }
+  GLTextureBuffer(std::shared_ptr<GLInterface> interface, std::shared_ptr<GLState> state,
+                  size_t size);
 
-  void writeBuffer(std::shared_ptr<GPUBuffer> buffer, size_t bufferOffset, const void* data,
-                   size_t size) override;
+  void* map(size_t offset, size_t size) override;
 
-  void writeTexture(std::shared_ptr<GPUTexture> texture, const Rect& rect, const void* pixels,
-                    size_t rowBytes) override;
+  void unmap() override;
 
-  bool readTexture(std::shared_ptr<GPUTexture> texture, const Rect& rect, void* pixels,
-                   size_t rowBytes) const override;
-
-  void submit(std::shared_ptr<CommandBuffer>) override;
-
-  std::shared_ptr<GPUFence> insertFence() override;
-
-  void waitForFence(std::shared_ptr<GPUFence> fence) override;
-
-  void waitUntilCompleted() override;
+  std::shared_ptr<GPUTexture> acquireTexture(GPU* gpu, std::shared_ptr<GPUTexture> srcTexture,
+                                             const Rect& srcRect, size_t dstOffset,
+                                             size_t dstRowBytes);
 
  private:
-  GLGPU* gpu = nullptr;
+  std::shared_ptr<GLState> state = nullptr;
+  std::shared_ptr<GPUTexture> texture = nullptr;
+  size_t readOffset = 0;
+  size_t readRowBytes = 0;
+  void* bufferData = nullptr;
 };
 }  // namespace tgfx

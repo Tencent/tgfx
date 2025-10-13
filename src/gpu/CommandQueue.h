@@ -40,9 +40,8 @@ class CommandQueue {
    * @param bufferOffset The offset in the buffer where the data should be written.
    * @param data Pointer to the data to write.
    * @param size The size of the data in bytes.
-   * @return true if the write operation was successful, false otherwise.
    */
-  virtual bool writeBuffer(std::shared_ptr<GPUBuffer> buffer, size_t bufferOffset, const void* data,
+  virtual void writeBuffer(std::shared_ptr<GPUBuffer> buffer, size_t bufferOffset, const void* data,
                            size_t size) = 0;
 
   /**

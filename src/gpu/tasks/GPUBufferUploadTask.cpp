@@ -46,10 +46,7 @@ std::shared_ptr<Resource> GPUBufferUploadTask::onMakeResource(Context* context) 
     LOGE("GPUBufferUploadTask::onMakeResource() Failed to create buffer!");
     return nullptr;
   }
-  if (!gpu->queue()->writeBuffer(gpuBuffer, 0, data->data(), data->size())) {
-    LOGE("GPUBufferUploadTask::onMakeResource() Failed to write buffer!");
-    return nullptr;
-  }
+  gpu->queue()->writeBuffer(gpuBuffer, 0, data->data(), data->size());
   // Free the data source immediately to reduce memory pressure.
   source = nullptr;
   return Resource::AddToCache(context, new BufferResource(std::move(gpuBuffer)));
