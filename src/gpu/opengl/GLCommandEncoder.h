@@ -28,11 +28,11 @@ class GLCommandEncoder : public CommandEncoder {
   explicit GLCommandEncoder(GLGPU* gpu) : gpu(gpu) {
   }
 
-  bool copyTextureToTexture(std::shared_ptr<GPUTexture> srcTexture, const Rect& srcRect,
+  void copyTextureToTexture(std::shared_ptr<GPUTexture> srcTexture, const Rect& srcRect,
                             std::shared_ptr<GPUTexture> dstTexture,
                             const Point& dstOffset) override;
 
-  bool copyTextureToBuffer(std::shared_ptr<GPUTexture> srcTexture, const Rect& srcRect,
+  void copyTextureToBuffer(std::shared_ptr<GPUTexture> srcTexture, const Rect& srcRect,
                            std::shared_ptr<GPUBuffer> dstBuffer, size_t dstOffset,
                            size_t dstRowBytes) override;
 
