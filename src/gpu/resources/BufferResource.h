@@ -24,24 +24,23 @@
 
 namespace tgfx {
 /**
- * VertexBuffer is a resource that encapsulates a GPUBuffer, which can be used for vertex data in
- * a RenderPass.
+ * BufferResource is a resource that encapsulates a GPUBuffer.
  */
-class VertexBuffer : public Resource {
+class BufferResource : public Resource {
  public:
   size_t memoryUsage() const override {
     return buffer->size();
   }
 
   /**
-   * Returns the size of the vertex buffer.
+   * Returns the size of the BufferResource in bytes.
    */
   size_t size() const {
     return buffer->size();
   }
 
   /**
-   * Returns the GPUBuffer associated with this VertexBuffer.
+   * Returns the GPUBuffer associated with this BufferResource.
    */
   std::shared_ptr<GPUBuffer> gpuBuffer() const {
     return buffer;
@@ -50,7 +49,7 @@ class VertexBuffer : public Resource {
  private:
   std::shared_ptr<GPUBuffer> buffer = nullptr;
 
-  explicit VertexBuffer(std::shared_ptr<GPUBuffer> buffer) : buffer(std::move(buffer)) {
+  explicit BufferResource(std::shared_ptr<GPUBuffer> buffer) : buffer(std::move(buffer)) {
   }
 
   friend class GPUBufferUploadTask;

@@ -67,7 +67,12 @@ void GLRenderPipeline::activate(GLGPU* gpu, bool depthReadOnly, bool stencilRead
 
 void GLRenderPipeline::setUniformBuffer(GLGPU* gpu, unsigned binding, GLBuffer* buffer,
                                         size_t offset, size_t size) {
-  if (gpu == nullptr || buffer == nullptr || size == 0) {
+  DEBUG_ASSERT(gpu != nullptr);
+  if (buffer == nullptr || size == 0) {
+    return;
+  }
+  if (!(buffer->usage() & GPUBufferUsage::UNIFORM)) {
+    LOGE("GLRenderPipeline::setUniformBuffer error, buffer usage is not UNIFORM!");
     return;
   }
 
@@ -85,11 +90,10 @@ void GLRenderPipeline::setUniformBuffer(GLGPU* gpu, unsigned binding, GLBuffer* 
       LOGE("GLRenderPipeline::setUniformBuffer error, uniform buffer id is 0");
       return;
     }
-
     gl->bindBufferRange(GL_UNIFORM_BUFFER, binding, ubo, static_cast<int32_t>(offset),
                         static_cast<int32_t>(size));
   } else {
-    auto data = static_cast<uint8_t*>(buffer->map()) + offset;
+    auto data = static_cast<uint8_t*>(buffer->map(offset, size));
     for (auto& uniform : uniforms) {
       auto uniformData = data + uniform.offset;
       switch (uniform.format) {
@@ -159,7 +163,11 @@ void GLRenderPipeline::setVertexBuffer(GLGPU* gpu, GLBuffer* vertexBuffer, size_
     gl->bindBuffer(GL_ARRAY_BUFFER, 0);
     return;
   }
-  gl->bindBuffer(GL_ARRAY_BUFFER, static_cast<GLBuffer*>(vertexBuffer)->bufferID());
+  if (!(vertexBuffer->usage() & GPUBufferUsage::VERTEX)) {
+    LOGE("GLRenderPipeline::setVertexBuffer error, buffer usage is not VERTEX!");
+    return;
+  }
+  gl->bindBuffer(GL_ARRAY_BUFFER, vertexBuffer->bufferID());
   for (auto& attribute : attributes) {
     gl->vertexAttribPointer(static_cast<unsigned>(attribute.location), attribute.count,
                             attribute.type, attribute.normalized, static_cast<int>(vertexStride),

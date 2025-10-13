@@ -18,23 +18,23 @@
 
 #pragma once
 
-#include "gpu/proxies/VertexBufferProxy.h"
+#include "gpu/proxies/GPUBufferProxy.h"
 
 namespace tgfx {
 /**
- * VertexBufferProxyView is a view of a VertexBufferProxy that allows access to a specific range of
+ * VertexBufferView is a view of a GPUBufferProxy that allows access to a specific range of
  * the vertex buffer.
  */
-class VertexBufferProxyView {
+class VertexBufferView {
  public:
-  VertexBufferProxyView(std::shared_ptr<VertexBufferProxy> proxy, size_t _offset, size_t _size)
+  VertexBufferView(std::shared_ptr<GPUBufferProxy> proxy, size_t _offset, size_t _size)
       : proxy(std::move(proxy)), _offset(_offset), _size(_size) {
   }
 
   /**
-   * Returns the VertexBuffer associated with this VertexBufferProxyView.
+   * Returns the BufferResource associated with this VertexBufferView.
    */
-  std::shared_ptr<VertexBuffer> getBuffer() const {
+  std::shared_ptr<BufferResource> getBuffer() const {
     return proxy ? proxy->getBuffer() : nullptr;
   }
 
@@ -53,7 +53,7 @@ class VertexBufferProxyView {
   }
 
  private:
-  std::shared_ptr<VertexBufferProxy> proxy = nullptr;
+  std::shared_ptr<GPUBufferProxy> proxy = nullptr;
   size_t _offset = 0;
   size_t _size = 0;
 };

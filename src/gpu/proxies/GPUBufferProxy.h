@@ -19,23 +19,23 @@
 #pragma once
 
 #include "ResourceProxy.h"
-#include "gpu/resources/IndexBuffer.h"
+#include "gpu/resources/BufferResource.h"
 
 namespace tgfx {
 /**
- * IndexBufferProxy is a proxy for IndexBuffer resources.
+ * GPUBufferProxy is a proxy for GPUBuffer resources.
  */
-class IndexBufferProxy : public ResourceProxy {
+class GPUBufferProxy : public ResourceProxy {
  public:
   /**
-   * Returns the associated IndexBuffer instance.
+   * Returns the associated BufferResource instance.
    */
-  std::shared_ptr<IndexBuffer> getBuffer() const {
-    return std::static_pointer_cast<IndexBuffer>(resource);
+  std::shared_ptr<BufferResource> getBuffer() const {
+    return std::static_pointer_cast<BufferResource>(resource);
   }
 
  private:
-  IndexBufferProxy() = default;
+  GPUBufferProxy() = default;
 
   friend class ProxyProvider;
 };

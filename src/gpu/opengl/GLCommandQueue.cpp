@@ -39,11 +39,11 @@ bool GLCommandQueue::writeBuffer(std::shared_ptr<GPUBuffer> buffer, size_t buffe
   auto gl = gpu->functions();
   ClearGLError(gl);
   auto glBuffer = std::static_pointer_cast<GLBuffer>(buffer);
-  auto target = glBuffer->target();
+  auto target = GLBuffer::GetTarget(glBuffer->usage());
+  DEBUG_ASSERT(target != 0);
   gl->bindBuffer(target, glBuffer->bufferID());
   gl->bufferSubData(target, static_cast<GLintptr>(bufferOffset), static_cast<GLsizeiptr>(size),
                     data);
-  gl->bindBuffer(target, 0);
   return CheckGLError(gl);
 }
 
@@ -128,6 +128,8 @@ bool GLCommandQueue::readTexture(std::shared_ptr<GPUTexture> texture, const Rect
     outPixels = tempBuffer.data();
   }
   gl->pixelStorei(GL_PACK_ALIGNMENT, static_cast<int>(bytesPerPixel));
+  // Clear the pbo binding to avoid interference.
+  gl->bindBuffer(GL_PIXEL_PACK_BUFFER, 0);
   auto x = static_cast<int>(rect.left);
   auto y = static_cast<int>(rect.top);
   auto width = static_cast<int>(rect.width());
@@ -168,8 +170,6 @@ std::shared_ptr<GPUFence> GLCommandQueue::insertFence() {
   if (glSync == nullptr) {
     return nullptr;
   }
-  // If we inserted semaphores during the flush, we need to call glFlush.
-  gl->flush();
   return gpu->makeResource<GLFence>(glSync);
 }
 
