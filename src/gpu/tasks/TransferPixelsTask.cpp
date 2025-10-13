@@ -27,12 +27,12 @@ TransferPixelsTask::TransferPixelsTask(std::shared_ptr<RenderTargetProxy> source
 void TransferPixelsTask::execute(CommandEncoder* encoder) {
   auto renderTarget = source->getRenderTarget();
   if (renderTarget == nullptr) {
-    LOGE("ReadPixelsTask::execute() Failed to get the source render target!");
+    LOGE("TransferPixelsTask::execute() Failed to get the source render target!");
     return;
   }
   auto readbackBuffer = dest->getBuffer();
   if (readbackBuffer == nullptr) {
-    LOGE("ReadPixelsTask::execute() Failed to get the dest readback buffer!");
+    LOGE("TransferPixelsTask::execute() Failed to get the dest readback buffer!");
     return;
   }
   encoder->copyTextureToBuffer(renderTarget->getSampleTexture(), srcRect,
