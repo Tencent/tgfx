@@ -58,6 +58,12 @@ class ProxyProvider {
                                                          uint32_t renderFlags = 0);
 
   /**
+   * Creates a readback GPUBufferProxy of the given size. The buffer can be used to read data back
+   * from the GPU.
+   */
+  std::shared_ptr<GPUBufferProxy> createReadbackBufferProxy(size_t size);
+
+  /**
    * Creates a VertexBufferView from the given VertexProvider. The provider will be released
    * after being uploaded to the GPU.
    */

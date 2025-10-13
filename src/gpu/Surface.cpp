@@ -19,6 +19,7 @@
 #include "tgfx/core/Surface.h"
 #include "DrawingManager.h"
 #include "core/images/TextureImage.h"
+#include "core/utils/CopyPixels.h"
 #include "core/utils/Log.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "gpu/ProxyProvider.h"
@@ -182,11 +183,12 @@ bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, in
   if (dstInfo.isEmpty() || dstPixels == nullptr) {
     return false;
   }
-  auto renderTargetProxy = renderContext->renderTarget;
-  auto textureView = renderTargetProxy->getTextureView();
+  auto context = getContext();
+  auto renderTarget = renderContext->renderTarget;
+  auto textureView = renderTarget->getTextureView();
   auto hardwareBuffer = textureView ? textureView->getTexture()->getHardwareBuffer() : nullptr;
-  renderTargetProxy->getContext()->flushAndSubmit(hardwareBuffer != nullptr);
   if (hardwareBuffer != nullptr) {
+    context->flushAndSubmit(true);
     auto pixels = HardwareBufferLock(hardwareBuffer);
     if (pixels != nullptr) {
       auto info = HardwareBufferGetInfo(hardwareBuffer);
@@ -195,11 +197,37 @@ bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, in
       return success;
     }
   }
-  auto renderTarget = renderTargetProxy->getRenderTarget();
-  if (renderTarget == nullptr) {
+  auto outInfo = dstInfo.makeIntersect(-srcX, -srcY, renderTarget->width(), renderTarget->height());
+  if (outInfo.isEmpty()) {
     return false;
   }
-  return renderTarget->readPixels(dstInfo, dstPixels, srcX, srcY);
+  dstPixels = dstInfo.computeOffset(dstPixels, -srcX, -srcY);
+  auto colorType = PixelFormatToColorType(renderTarget->format());
+  auto flipY = renderTarget->origin() == ImageOrigin::BottomLeft;
+  auto srcInfo =
+      ImageInfo::Make(outInfo.width(), outInfo.height(), colorType, AlphaType::Premultiplied);
+  auto readX = std::max(0, srcX);
+  auto readY = std::max(0, srcY);
+  if (flipY) {
+    readY = renderTarget->height() - readY - outInfo.height();
+  }
+  auto rect = Rect::MakeXYWH(readX, readY, outInfo.width(), outInfo.height());
+  auto readbackBufferProxy = renderContext->copyPixels(rect);
+  if (readbackBufferProxy == nullptr) {
+    return false;
+  }
+  context->flushAndSubmit();
+  auto readbackBuffer = readbackBufferProxy->getBuffer();
+  if (readbackBuffer == nullptr) {
+    return false;
+  }
+  auto srcPixels = readbackBuffer->gpuBuffer()->map();
+  if (srcPixels == nullptr) {
+    return false;
+  }
+  CopyPixels(srcInfo, srcPixels, outInfo, dstPixels, flipY);
+  readbackBuffer->gpuBuffer()->unmap();
+  return true;
 }
 
 bool Surface::aboutToDraw(bool discardContent) {
