@@ -110,11 +110,6 @@ bool GLCommandEncoder::copyTextureToBuffer(std::shared_ptr<GPUTexture> srcTextur
     LOGE("GLCommandEncoder::copyTextureToBuffer() destination buffer is invalid!");
     return false;
   }
-  auto requiredSize = dstOffset + static_cast<size_t>(srcRect.height()) * dstRowBytes;
-  if (dstBuffer->size() < requiredSize) {
-    LOGE("GLCommandEncoder::copyTextureToBuffer() destination buffer is too small!");
-    return false;
-  }
   auto caps = static_cast<const GLCaps*>(gpu->caps());
   if (!caps->isFormatRenderable(srcTexture->format())) {
     LOGE("GLCommandEncoder::copyTextureToBuffer() source texture format is not copyable!");
@@ -123,14 +118,21 @@ bool GLCommandEncoder::copyTextureToBuffer(std::shared_ptr<GPUTexture> srcTextur
   auto format = srcTexture->format();
   auto bytesPerPixel = PixelFormatBytesPerPixel(format);
   auto minRowBytes = static_cast<size_t>(srcRect.width()) * bytesPerPixel;
-  if (dstRowBytes < minRowBytes) {
+  if (dstRowBytes == 0) {
+    dstRowBytes = minRowBytes;
+  } else if (dstRowBytes < minRowBytes) {
     LOGE("GLCommandEncoder::copyTextureToBuffer() dstRowBytes is too small!");
     return false;
-  }
-  if (dstRowBytes != minRowBytes && !caps->packRowLengthSupport) {
+  } else if (dstRowBytes > minRowBytes && !caps->packRowLengthSupport) {
     LOGE("GLCommandEncoder::copyTextureToBuffer() custom dstRowBytes is not supported!");
     return false;
   }
+  auto requiredSize = dstOffset + static_cast<size_t>(srcRect.height()) * dstRowBytes;
+  if (dstBuffer->size() < requiredSize) {
+    LOGE("GLCommandEncoder::copyTextureToBuffer() destination buffer is too small!");
+    return false;
+  }
+
   if (!caps->pboSupport) {
     auto textureBuffer = static_cast<GLTextureBuffer*>(dstBuffer.get());
     auto dstTexture =
