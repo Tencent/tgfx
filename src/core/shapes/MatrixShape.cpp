@@ -17,7 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MatrixShape.h"
+#include "core/shapes/MergeShape.h"
+#include "core/shapes/StrokeShape.h"
+#include "core/utils/StrokeUtils.h"
+#include "core/utils/Types.h"
 #include "core/utils/UniqueID.h"
+#include "tgfx/core/Matrix.h"
+#include "tgfx/core/Shape.h"
+#include "tgfx/core/Stroke.h"
 
 namespace tgfx {
 std::shared_ptr<Shape> Shape::ApplyMatrix(std::shared_ptr<Shape> shape, const Matrix& matrix) {
@@ -47,13 +54,14 @@ Rect MatrixShape::getBounds() const {
   return bounds;
 }
 
-Path MatrixShape::getPath() const {
-  auto path = shape->getPath();
+Path MatrixShape::onGetPath(float resolutionScale) const {
+  resolutionScale = resolutionScale * matrix.getMaxScale();
+  auto path = shape->onGetPath(resolutionScale);
   path.transform(matrix);
   return path;
 }
 
-UniqueKey MatrixShape::getUniqueKey() const {
+UniqueKey MatrixShape::MakeUniqueKey(const UniqueKey& key, const Matrix& matrix) {
   static const auto SingleScaleMatrixShapeType = UniqueID::Next();
   static const auto BothScalesShapeType = UniqueID::Next();
   static const auto RSXformShapeType = UniqueID::Next();
@@ -61,7 +69,7 @@ UniqueKey MatrixShape::getUniqueKey() const {
   auto hasBothScales = hasRSXform || matrix.getScaleX() != matrix.getScaleY();
   if (!hasBothScales && matrix.getScaleX() == 1.0f) {
     // The matrix has translation only.
-    return shape->getUniqueKey();
+    return key;
   }
   size_t count = 2 + (hasBothScales ? 1 : 0) + (hasRSXform ? 2 : 0);
   auto type = hasBothScales ? (hasRSXform ? RSXformShapeType : BothScalesShapeType)
@@ -76,7 +84,11 @@ UniqueKey MatrixShape::getUniqueKey() const {
     bytesKey.write(matrix.getSkewX());
     bytesKey.write(matrix.getSkewY());
   }
-  return UniqueKey::Append(shape->getUniqueKey(), bytesKey.data(), bytesKey.size());
+  return UniqueKey::Append(key, bytesKey.data(), bytesKey.size());
+}
+
+UniqueKey MatrixShape::getUniqueKey() const {
+  return MakeUniqueKey(shape->getUniqueKey(), matrix);
 }
 
 }  // namespace tgfx

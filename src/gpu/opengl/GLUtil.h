@@ -19,6 +19,10 @@
 #pragma once
 
 #include <string>
+#include "gpu/BlendFactor.h"
+#include "gpu/BlendOperation.h"
+#include "gpu/CompareFunction.h"
+#include "gpu/StencilOperation.h"
 #include "gpu/opengl/GLInterface.h"
 
 namespace tgfx {
@@ -32,16 +36,19 @@ struct GLVersion {
   }
 };
 
+unsigned ToGLBlendFactor(BlendFactor blendFactor);
+
+unsigned ToGLBlendOperation(BlendOperation blendOperation);
+
+unsigned ToGLCompareFunction(CompareFunction compare);
+
+unsigned ToGLStencilOperation(StencilOperation stencilOp);
+
 PixelFormat GLSizeFormatToPixelFormat(unsigned sizeFormat);
 
 unsigned PixelFormatToGLSizeFormat(PixelFormat pixelFormat);
 
 GLVersion GetGLVersion(const char* versionString);
-
-unsigned CreateGLProgram(const GLFunctions* gl, const std::string& vertex,
-                         const std::string& fragment);
-
-unsigned LoadGLShader(const GLFunctions* gl, unsigned shaderType, const std::string& source);
 
 void ClearGLError(const GLFunctions* gl);
 

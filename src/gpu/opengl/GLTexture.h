@@ -20,6 +20,8 @@
 
 #include "gpu/GPUTexture.h"
 #include "gpu/opengl/GLInterface.h"
+#include "gpu/opengl/GLResource.h"
+#include "gpu/opengl/GLSampler.h"
 
 namespace tgfx {
 class GLGPU;
@@ -28,7 +30,7 @@ class GLGPU;
  * GLTexture is a GPUTexture that wraps an OpenGL texture, providing access to its OpenGL texture ID
  * and target.
  */
-class GLTexture : public GPUTexture {
+class GLTexture : public GPUTexture, public GLResource {
  public:
   /**
    * Creates a GLTexture with the specified descriptor, OpenGL target, and texture ID.
@@ -61,21 +63,33 @@ class GLTexture : public GPUTexture {
    */
   bool checkFrameBuffer(GLGPU* gpu);
 
+  /**
+   * Binds the texture to the specified texture unit and applies the sampler parameters.
+   */
+  void updateSampler(GLGPU* gpu, const GLSampler* sampler);
+
   GPUTextureType type() const override;
 
   BackendTexture getBackendTexture() const override;
 
   BackendRenderTarget getBackendRenderTarget() const override;
 
-  void release(GPU* gpu) final;
-
  protected:
   unsigned _target = GL_TEXTURE_2D;
   unsigned _textureID = 0;
 
-  virtual void onRelease(GLGPU* gpu);
+  void onRelease(GLGPU* gpu) final;
+
+  virtual void onReleaseTexture(GLGPU* gpu);
 
  private:
+  uint32_t uniqueID = 0;
   unsigned textureFrameBuffer = 0;
+  int lastWrapS = 0;
+  int lastWrapT = 0;
+  int lastMinFilter = 0;
+  int lastMagFilter = 0;
+
+  friend class GLState;
 };
 }  // namespace tgfx

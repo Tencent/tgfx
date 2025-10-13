@@ -17,19 +17,19 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "OpsCompositor.h"
-#include "core/Atlas.h"
 #include "core/PathRasterizer.h"
 #include "core/PathRef.h"
 #include "core/PathTriangulator.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/RectToRectMatrix.h"
-#include "core/utils/Types.h"
+#include "core/utils/ShapeUtils.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ops/AtlasTextOp.h"
 #include "gpu/ops/ShapeDrawOp.h"
 #include "gpu/processors/AARectEffect.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
+#include "inspect/InspectorMark.h"
 #include "processors/PorterDuffXferProcessor.h"
 
 namespace tgfx {
@@ -52,13 +52,6 @@ static bool HasDifferentViewMatrix(const std::vector<PlacementPtr<RectRecord>>& 
     }
   }
   return false;
-}
-
-static SamplingOptions GetAtlasSampling(const Matrix& matrix) {
-  // A matrix is considered rotated if it has any skew or if it swaps the x and y axes.
-  auto hasRotated = !FloatNearlyZero(matrix.getSkewX()) || !FloatNearlyZero(matrix.getSkewY());
-  auto filterMode = hasRotated ? FilterMode::Linear : FilterMode::Nearest;
-  return SamplingOptions{filterMode, MipmapMode::None};
 }
 
 OpsCompositor::OpsCompositor(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags,
@@ -154,7 +147,7 @@ static Rect ClipLocalBounds(const Rect& localBounds, const Matrix& viewMatrix,
   return result;
 }
 
-void OpsCompositor::fillShape(std::shared_ptr<Shape> shape, const MCState& state,
+void OpsCompositor::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
                               const Fill& fill) {
   DEBUG_ASSERT(shape != nullptr);
   flushPendingOps();
@@ -182,9 +175,11 @@ void OpsCompositor::fillShape(std::shared_ptr<Shape> shape, const MCState& state
     deviceBounds = shape->isInverseFillType() ? clipBounds : shape->getBounds();
   }
   auto aaType = getAAType(fill);
+  auto color = fill.color;
+  color.alpha *= ShapeUtils::CalculateAlphaReduceFactorIfHairline(shape);
   auto shapeProxy = proxyProvider()->createGPUShapeProxy(shape, aaType, clipBounds, renderFlags);
-  auto drawOp =
-      ShapeDrawOp::Make(std::move(shapeProxy), fill.color.premultiply(), uvMatrix, aaType);
+  auto drawOp = ShapeDrawOp::Make(std::move(shapeProxy), color.premultiply(), uvMatrix, aaType);
+  CAPUTRE_SHAPE_MESH(drawOp.get(), shape, aaType, clipBounds);
   addDrawOp(std::move(drawOp), clip, fill, localBounds, deviceBounds, drawScale);
 }
 
@@ -262,7 +257,7 @@ static bool IsPixelAligned(const Rect& rect) {
 }
 
 static bool RRectUseScale(Context* context) {
-  return !context->caps()->floatIs32Bits;
+  return !context->caps()->shaderCaps()->floatIs32Bits;
 }
 
 class PendingOpsAutoReset {
@@ -362,7 +357,8 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
     case PendingOpType::Image: {
       auto subsetMode = UVSubsetMode::None;
       if (pendingConstraint == SrcRectConstraint::Strict && pendingImage) {
-        subsetMode = pendingSampling.filterMode == FilterMode::Linear
+        subsetMode = pendingSampling.magFilterMode == FilterMode::Linear ||
+                             pendingSampling.minFilterMode == FilterMode::Linear
                          ? UVSubsetMode::SubsetOnly
                          : UVSubsetMode::RoundOutAndSubset;
       }
@@ -475,7 +471,7 @@ std::pair<bool, bool> OpsCompositor::needComputeBounds(const Fill& fill, bool ha
   bool needDeviceBounds = false;
   if (BlendModeNeedDstTexture(fill.blendMode, hasCoverage)) {
     auto caps = context->caps();
-    if (!caps->frameBufferFetchSupport &&
+    if (!caps->shaderCaps()->frameBufferFetchSupport &&
         (!caps->textureBarrierSupport || renderTarget->asTextureProxy() == nullptr ||
          renderTarget->sampleCount() > 1)) {
       needDeviceBounds = true;
@@ -541,6 +537,7 @@ std::shared_ptr<TextureProxy> OpsCompositor::getClipTexture(const Path& clip, AA
     auto shapeProxy = proxyProvider()->createGPUShapeProxy(shape, aaType, clipBounds, renderFlags);
     auto uvMatrix = Matrix::MakeTrans(bounds.left, bounds.top);
     auto drawOp = ShapeDrawOp::Make(std::move(shapeProxy), {}, uvMatrix, aaType);
+    CAPUTRE_SHAPE_MESH(drawOp.get(), shape, aaType, clipBounds);
     auto clipRenderTarget = RenderTargetProxy::MakeFallback(
         context, width, height, true, 1, false, ImageOrigin::TopLeft, BackingFit::Approx);
     if (clipRenderTarget == nullptr) {
@@ -592,7 +589,7 @@ std::pair<PlacementPtr<FragmentProcessor>, bool> OpsCompositor::getClipMaskFP(co
 
 DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds, AAType aaType) {
   auto caps = context->caps();
-  if (caps->frameBufferFetchSupport) {
+  if (caps->shaderCaps()->frameBufferFetchSupport) {
     return {};
   }
   Rect bounds = {};
@@ -682,7 +679,8 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const F
   op->setBlendMode(fill.blendMode);
   if (BlendModeNeedDstTexture(fill.blendMode, op->hasCoverage())) {
     auto dstTextureInfo = makeDstTextureInfo(deviceBounds.value_or(Rect::MakeEmpty()), aaType);
-    if (!context->caps()->frameBufferFetchSupport && dstTextureInfo.textureProxy == nullptr) {
+    auto shaderCaps = context->caps()->shaderCaps();
+    if (!shaderCaps->frameBufferFetchSupport && dstTextureInfo.textureProxy == nullptr) {
       return;
     }
     auto xferProcessor =
@@ -693,10 +691,10 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const F
 }
 
 void OpsCompositor::fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, const Rect& rect,
-                                  const MCState& state, const Fill& fill) {
+                                  const SamplingOptions& sampling, const MCState& state,
+                                  const Fill& fill) {
   DEBUG_ASSERT(textureProxy != nullptr);
   DEBUG_ASSERT(!rect.isEmpty());
-  auto sampling = GetAtlasSampling(state.matrix);
   if (!canAppend(PendingOpType::Atlas, state.clip, fill) || pendingAtlasTexture != textureProxy ||
       pendingSampling != sampling) {
     flushPendingOps(PendingOpType::Atlas, state.clip, fill);

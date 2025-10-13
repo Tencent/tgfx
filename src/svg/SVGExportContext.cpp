@@ -26,6 +26,7 @@
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/RectToRectMatrix.h"
+#include "core/utils/ShapeUtils.h"
 #include "core/utils/Types.h"
 #include "svg/SVGTextBuilder.h"
 #include "tgfx/core/Bitmap.h"
@@ -39,6 +40,7 @@
 #include "tgfx/core/Point.h"
 #include "tgfx/core/RRect.h"
 #include "tgfx/core/Rect.h"
+#include "tgfx/core/Shape.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/TileMode.h"
@@ -140,9 +142,11 @@ void SVGExportContext::drawPath(const Path& path, const MCState& state, const Fi
 }
 
 void SVGExportContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
-                                 const Fill& fill) {
+                                 const Fill& fill, const Stroke* stroke) {
   DEBUG_ASSERT(shape != nullptr);
-  drawPath(shape->getPath(), state, fill);
+  shape = Shape::ApplyStroke(shape, stroke);
+  auto path = ShapeUtils::GetShapeRenderingPath(shape, state.matrix.getMaxScale());
+  drawPath(path, state, fill);
 }
 
 void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
@@ -150,14 +154,14 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
   DEBUG_ASSERT(image != nullptr);
   auto type = Types::Get(image.get());
   if (type == Types::ImageType::Picture) {
-    const auto* pictureImage = static_cast<const PictureImage*>(image.get());
+    const auto pictureImage = static_cast<const PictureImage*>(image.get());
     auto newState = state;
     if (pictureImage->matrix) {
       newState.matrix.preConcat(*pictureImage->matrix);
     }
     drawPicture(pictureImage->picture, newState);
   } else if (type == Types::ImageType::Filter) {
-    const auto* filterImage = static_cast<const FilterImage*>(image.get());
+    const auto filterImage = static_cast<const FilterImage*>(image.get());
     auto filter = filterImage->filter;
     auto bound = Rect::MakeWH(filterImage->source->width(), filterImage->source->height());
     auto filtBound = filterImage->bounds;
@@ -184,7 +188,7 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
       drawImage(filterImage->source, sampling, state, fill);
     }
   } else if (type == Types::ImageType::Subset) {
-    const auto* subsetImage = static_cast<const SubsetImage*>(image.get());
+    const auto subsetImage = static_cast<const SubsetImage*>(image.get());
     auto bound = subsetImage->bounds.size();
     auto offset = Point::Make(subsetImage->bounds.x(), subsetImage->bounds.y());
 
@@ -441,11 +445,11 @@ void SVGExportContext::applyClipPath(const Path& clipPath) {
 Bitmap SVGExportContext::ImageExportToBitmap(Context* context,
                                              const std::shared_ptr<Image>& image) {
   auto surface = Surface::Make(context, image->width(), image->height());
-  auto* canvas = surface->getCanvas();
+  auto canvas = surface->getCanvas();
   canvas->drawImage(image);
 
   Bitmap bitmap(surface->width(), surface->height());
-  auto* pixels = bitmap.lockPixels();
+  auto pixels = bitmap.lockPixels();
   if (surface->readPixels(bitmap.info(), pixels)) {
     bitmap.unlockPixels();
     return bitmap;
@@ -458,7 +462,7 @@ std::shared_ptr<Data> SVGExportContext::ImageToEncodedData(const std::shared_ptr
   if (Types::Get(image.get()) != Types::ImageType::Codec) {
     return nullptr;
   }
-  const auto* codecImage = static_cast<const CodecImage*>(image.get());
+  const auto codecImage = static_cast<const CodecImage*>(image.get());
   auto imageCodec = codecImage->getCodec();
   return imageCodec->getEncodedData();
 }

@@ -19,23 +19,24 @@
 #pragma once
 
 #include "gpu/CommandEncoder.h"
-#include "gpu/opengl/GLInterface.h"
 
 namespace tgfx {
+class GLGPU;
+
 class GLCommandEncoder : public CommandEncoder {
  public:
-  explicit GLCommandEncoder(std::shared_ptr<GLInterface> interface)
-      : interface(std::move(interface)) {
+  explicit GLCommandEncoder(GLGPU* gpu) : gpu(gpu) {
   }
 
-  void copyTextureToTexture(GPUTexture* srcTexture, const Rect& srcRect, GPUTexture* dstTexture,
+  void copyTextureToTexture(std::shared_ptr<GPUTexture> srcTexture, const Rect& srcRect,
+                            std::shared_ptr<GPUTexture> dstTexture,
                             const Point& dstOffset) override;
 
-  void generateMipmapsForTexture(GPUTexture* texture) override;
+  void copyTextureToBuffer(std::shared_ptr<GPUTexture> srcTexture, const Rect& srcRect,
+                           std::shared_ptr<GPUBuffer> dstBuffer, size_t dstOffset,
+                           size_t dstRowBytes) override;
 
-  BackendSemaphore insertSemaphore() override;
-
-  void waitSemaphore(const BackendSemaphore& semaphore) override;
+  void generateMipmapsForTexture(std::shared_ptr<GPUTexture> texture) override;
 
  protected:
   std::shared_ptr<RenderPass> onBeginRenderPass(const RenderPassDescriptor& descriptor) override;
@@ -43,6 +44,6 @@ class GLCommandEncoder : public CommandEncoder {
   std::shared_ptr<CommandBuffer> onFinish() override;
 
  private:
-  std::shared_ptr<GLInterface> interface = nullptr;
+  GLGPU* gpu = nullptr;
 };
 }  // namespace tgfx

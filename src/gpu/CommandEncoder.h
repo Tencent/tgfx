@@ -19,12 +19,14 @@
 #pragma once
 
 #include "gpu/CommandBuffer.h"
+#include "gpu/GPUBuffer.h"
 #include "gpu/GPUTexture.h"
-#include "gpu/RenderPass.h"
-#include "gpu/RenderPassDescriptor.h"
-#include "gpu/Semaphore.h"
 
 namespace tgfx {
+
+class RenderPass;
+class RenderPassDescriptor;
+
 /**
  * CommandEncoder represents an interface for collecting a sequence of GPU commands to be issued to
  * the GPU.
@@ -42,36 +44,42 @@ class CommandEncoder {
   std::shared_ptr<RenderPass> beginRenderPass(const RenderPassDescriptor& descriptor);
 
   /**
-   * Copies a region from the source GPUTexture to a region of the destination GPUTexture. If
-   * the texture has mipmaps, you should call the generateMipmapsForTexture() method after copying,
-   * as mipmaps will not be generated automatically.
+   * Encodes a command to copy a region from the source GPUTexture to a region of the destination
+   * GPUTexture. If the texture has mipmaps, you should call the generateMipmapsForTexture() method
+   * after copying, as mipmaps will not be generated automatically.
    * @param srcTexture The source frame buffer to copy from.
    * @param srcRect The rectangle region of the source texture to copy from.
    * @param dstTexture The destination texture to copy to.
    * @param dstOffset The offset in the destination texture where the copied region will be placed.
    */
-  virtual void copyTextureToTexture(GPUTexture* srcTexture, const Rect& srcRect,
-                                    GPUTexture* dstTexture, const Point& dstOffset) = 0;
+  virtual void copyTextureToTexture(std::shared_ptr<GPUTexture> srcTexture, const Rect& srcRect,
+                                    std::shared_ptr<GPUTexture> dstTexture,
+                                    const Point& dstOffset) = 0;
+
+  /**
+   * Encodes a command to copy a region from a source GPUTexture to a GPUBuffer for CPU access. The
+   * actual data transfer from the GPU to the CPU occurs asynchronously after the command is
+   * submitted. You can use the GPUBuffer's isReady() method to check if the data is available.
+   * @param srcTexture The source texture to copy from.
+   * @param srcRect The rectangle region within the source texture to copy. This region must be
+   * fully contained within the texture's dimensions.
+   * @param dstBuffer The destination buffer. It must be large enough to hold the data for the
+   * specified rectangle.
+   * @param dstOffset The offset in the destination buffer where the copied data will be placed.
+   * @param dstRowBytes The number of bytes per row in the destination buffer. If zero, it defaults
+   * to the width of the rectangle multiplied by the number of bytes per pixel for the texture's
+   * format.
+   */
+  virtual void copyTextureToBuffer(std::shared_ptr<GPUTexture> srcTexture, const Rect& srcRect,
+                                   std::shared_ptr<GPUBuffer> dstBuffer, size_t dstOffset = 0,
+                                   size_t dstRowBytes = 0) = 0;
 
   /**
    * Encodes a command that generates mipmaps for the specified GPUTexture from the base level to
    * the highest level. This method only has an effect if the texture was created with mipmap
    * enabled.
    */
-  virtual void generateMipmapsForTexture(GPUTexture* texture) = 0;
-
-  /**
-   * Inserts a signal semaphore into the command encoder. This is used to notify other
-   * synchronization points once the preceding GPU commands have finished executing. Returns nullptr
-   * if the semaphore cannot be created or inserted.
-   */
-  virtual BackendSemaphore insertSemaphore() = 0;
-
-  /**
-   * Makes subsequent commands added to the command encoder to wait until the specified semaphore is
-   * signaled.
-   */
-  virtual void waitSemaphore(const BackendSemaphore& semaphore) = 0;
+  virtual void generateMipmapsForTexture(std::shared_ptr<GPUTexture> texture) = 0;
 
   /**
    * Finalizes command encoding and returns a CommandBuffer with all recorded commands. You can then

@@ -22,6 +22,7 @@
 
 namespace tgfx {
 class Swizzle;
+class ShaderCaps;
 
 /**
  * Caps describes the capabilities of the GPU.
@@ -29,6 +30,8 @@ class Swizzle;
 class Caps {
  public:
   virtual ~Caps() = default;
+
+  virtual const ShaderCaps* shaderCaps() const = 0;
 
   virtual const Swizzle& getReadSwizzle(PixelFormat pixelFormat) const = 0;
 
@@ -38,7 +41,6 @@ class Caps {
 
   virtual int getSampleCount(int requestedCount, PixelFormat pixelFormat) const = 0;
 
-  bool floatIs32Bits = true;
   int maxTextureSize = 0;
   bool semaphoreSupport = false;
   bool multisampleDisableSupport = false;
@@ -50,7 +52,5 @@ class Caps {
   bool npotTextureTileSupport = true;  // Vulkan and Metal always have support.
   bool mipmapSupport = true;
   bool textureBarrierSupport = false;
-  bool frameBufferFetchSupport = false;
-  bool usesPrecisionModifiers = false;
 };
 }  // namespace tgfx

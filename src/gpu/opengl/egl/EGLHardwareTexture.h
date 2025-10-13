@@ -28,7 +28,7 @@
 namespace tgfx {
 class EGLHardwareTexture : public GLTexture {
  public:
-  static std::unique_ptr<EGLHardwareTexture> MakeFrom(EGLGPU* gpu, HardwareBufferRef hardwareBuffer,
+  static std::shared_ptr<EGLHardwareTexture> MakeFrom(EGLGPU* gpu, HardwareBufferRef hardwareBuffer,
                                                       uint32_t usage);
   ~EGLHardwareTexture() override;
 
@@ -37,7 +37,7 @@ class EGLHardwareTexture : public GLTexture {
   }
 
  protected:
-  void onRelease(GLGPU* gpu) override;
+  void onReleaseTexture(GLGPU* gpu) override;
 
  private:
   HardwareBufferRef hardwareBuffer = nullptr;
@@ -45,6 +45,7 @@ class EGLHardwareTexture : public GLTexture {
 
   EGLHardwareTexture(const GPUTextureDescriptor& descriptor, HardwareBufferRef hardwareBuffer,
                      EGLImageKHR eglImage, unsigned target, unsigned textureID);
+  friend class GLGPU;
 };
 }  // namespace tgfx
 

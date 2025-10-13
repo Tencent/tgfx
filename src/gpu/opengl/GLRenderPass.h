@@ -19,29 +19,48 @@
 #pragma once
 
 #include "gpu/RenderPass.h"
-#include "gpu/RenderPassDescriptor.h"
 #include "gpu/opengl/GLBuffer.h"
 #include "gpu/opengl/GLInterface.h"
+#include "gpu/opengl/GLRenderPipeline.h"
 
 namespace tgfx {
+class GLGPU;
 
 class GLRenderPass : public RenderPass {
  public:
-  GLRenderPass(std::shared_ptr<GLInterface> interface, RenderPassDescriptor descriptor);
+  GLRenderPass(GLGPU* gpu, RenderPassDescriptor descriptor);
 
-  void begin();
+  bool begin();
+
+  void setViewport(int x, int y, int width, int height) override;
+
+  void setScissorRect(int x, int y, int width, int height) override;
+
+  void setPipeline(std::shared_ptr<RenderPipeline> pipeline) override;
+
+  void setUniformBuffer(unsigned binding, std::shared_ptr<GPUBuffer> buffer, size_t offset,
+                        size_t size) override;
+
+  void setTexture(unsigned binding, std::shared_ptr<GPUTexture> texture,
+                  std::shared_ptr<GPUSampler> sampler) override;
+
+  void setVertexBuffer(std::shared_ptr<GPUBuffer> buffer, size_t offset) override;
+
+  void setIndexBuffer(std::shared_ptr<GPUBuffer> buffer, IndexFormat format) override;
+
+  void setStencilReference(uint32_t reference) override;
+
+  void draw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount) override;
+
+  void drawIndexed(PrimitiveType primitiveType, size_t baseIndex, size_t indexCount) override;
 
  protected:
-  bool onBindProgramAndScissorClip(const ProgramInfo* programInfo,
-                                   const Rect& scissorRect) override;
-  bool onBindBuffers(GPUBuffer* indexBuffer, GPUBuffer* vertexBuffer, size_t vertexOffset) override;
-  void onDraw(PrimitiveType primitiveType, size_t baseVertex, size_t count,
-              bool drawIndexed) override;
   void onEnd() override;
 
  private:
-  std::shared_ptr<GLInterface> interface = nullptr;
-
-  void bindTexture(int unitIndex, GPUTexture* texture, SamplerState samplerState = {});
+  GLGPU* gpu = nullptr;
+  std::shared_ptr<GLRenderPipeline> renderPipeline = nullptr;
+  IndexFormat indexFormat = IndexFormat::UInt16;
+  uint32_t stencilReference = 0;
 };
 }  // namespace tgfx

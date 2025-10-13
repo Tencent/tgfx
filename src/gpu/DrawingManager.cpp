@@ -26,13 +26,11 @@
 #include "gpu/tasks/GenerateMipmapsTask.h"
 #include "gpu/tasks/RenderTargetCopyTask.h"
 #include "gpu/tasks/RuntimeDrawTask.h"
-#include "gpu/tasks/SemaphoreWaitTask.h"
 #include "inspect/InspectorMark.h"
-#include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
-static ColorType GetAtlasColorType(bool isAplhaOnly) {
-  if (isAplhaOnly) {
+static ColorType GetAtlasColorType(bool isAlphaOnly) {
+  if (isAlphaOnly) {
     return ColorType::ALPHA_8;
   }
 #ifdef __APPLE__
@@ -40,6 +38,15 @@ static ColorType GetAtlasColorType(bool isAplhaOnly) {
 #else
   return ColorType::RGBA_8888;
 #endif
+}
+
+static ImageInfo GetAtlasImageInfo(int width, int height, bool isAlphaOnly) {
+  auto colorType = GetAtlasColorType(isAlphaOnly);
+  auto rowBytes = static_cast<size_t>(width * (isAlphaOnly ? 1 : 4));
+  // Align to 4 bytes
+  constexpr size_t ALIGNMENT = 4;
+  rowBytes = (rowBytes + ALIGNMENT - 1) & ~(ALIGNMENT - 1);
+  return ImageInfo::Make(width, height, colorType, AlphaType::Premultiplied, rowBytes);
 }
 
 DrawingManager::DrawingManager(Context* context)
@@ -154,8 +161,7 @@ void DrawingManager::addAtlasCellCodecTask(const std::shared_ptr<TextureProxy>& 
     auto offsetY = static_cast<int>(atlasOffset.y) - padding;
     dstPixels = hardwareInfo.computeOffset(pixels, offsetX, offsetY);
   } else {
-    auto colorType = GetAtlasColorType(codec->isAlphaOnly());
-    dstInfo = ImageInfo::Make(dstWidth, dstHeight, colorType);
+    dstInfo = GetAtlasImageInfo(dstWidth, dstHeight, codec->isAlphaOnly());
     auto length = dstInfo.byteSize();
     dstPixels = drawingBuffer->allocate(length);
     if (dstPixels == nullptr) {
@@ -171,15 +177,7 @@ void DrawingManager::addAtlasCellCodecTask(const std::shared_ptr<TextureProxy>& 
   atlasCellCodecTasks.emplace_back(std::move(task));
 }
 
-void DrawingManager::addSemaphoreWaitTask(std::shared_ptr<Semaphore> semaphore) {
-  if (semaphore == nullptr) {
-    return;
-  }
-  auto task = drawingBuffer->make<SemaphoreWaitTask>(std::move(semaphore));
-  renderTasks.emplace_back(std::move(task));
-}
-
-std::shared_ptr<CommandBuffer> DrawingManager::flush(BackendSemaphore* signalSemaphore) {
+std::shared_ptr<CommandBuffer> DrawingManager::flush() {
   TASK_MARK(tgfx::inspect::OpTaskType::Flush);
   while (!compositors.empty()) {
     auto compositor = compositors.back();
@@ -215,18 +213,7 @@ std::shared_ptr<CommandBuffer> DrawingManager::flush(BackendSemaphore* signalSem
     }
   }
   renderTasks.clear();
-
-  if (signalSemaphore != nullptr) {
-    *signalSemaphore = commandEncoder->insertSemaphore();
-  }
   return commandEncoder->finish();
-}
-
-void DrawingManager::releaseAll() {
-  compositors.clear();
-  resourceTasks.clear();
-  renderTasks.clear();
-  resetAtlasCache();
 }
 
 void DrawingManager::resetAtlasCache() {

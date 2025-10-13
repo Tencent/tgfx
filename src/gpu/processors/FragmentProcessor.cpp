@@ -137,14 +137,15 @@ const CoordTransform* FragmentProcessor::CoordTransformIter::next() {
   return currFP->coordTransform(currentIndex++);
 }
 
-void FragmentProcessor::setData(UniformBuffer* uniformBuffer) const {
-  onSetData(uniformBuffer);
+void FragmentProcessor::setData(UniformData* vertexUniformData,
+                                UniformData* fragmentUniformData) const {
+  onSetData(vertexUniformData, fragmentUniformData);
 }
 
 void FragmentProcessor::emitChild(size_t childIndex, const std::string& inputColor,
                                   std::string* outputColor, EmitArgs& args,
                                   std::function<std::string(std::string_view)> coordFunc) const {
-  auto* fragBuilder = args.fragBuilder;
+  auto fragBuilder = args.fragBuilder;
   auto programInfo = fragBuilder->getProgramInfo();
   outputColor->append(programInfo->getMangledSuffix(this));
   fragBuilder->codeAppendf("vec4 %s;", outputColor->c_str());
@@ -159,8 +160,8 @@ void FragmentProcessor::emitChild(size_t childIndex, const std::string& inputCol
 void FragmentProcessor::internalEmitChild(
     size_t childIndex, const std::string& inputColor, const std::string& outputColor,
     EmitArgs& args, std::function<std::string(std::string_view)> coordFunc) const {
-  auto* fragBuilder = args.fragBuilder;
-  const auto* childProc = childProcessor(childIndex);
+  auto fragBuilder = args.fragBuilder;
+  const auto childProc = childProcessor(childIndex);
   fragBuilder->onBeforeChildProcEmitCode(childProc);  // call first so mangleString is updated
   auto programInfo = fragBuilder->getProgramInfo();
   // Prepare a mangled input color variable if the default is not used,

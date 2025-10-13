@@ -19,8 +19,9 @@
 #pragma once
 
 #include <cstdint>
-#include "SamplerHandle.h"
-#include "ShaderVar.h"
+#include "gpu/SamplerHandle.h"
+#include "gpu/ShaderStage.h"
+#include "gpu/ShaderVar.h"
 
 namespace tgfx {
 class ProgramBuilder;

@@ -51,6 +51,11 @@ enum class PixelFormat {
   /**
    * Pixel with 8 bits for blue, green, red, alpha. Each pixel is stored on 4 bytes.
    */
-  BGRA_8888
+  BGRA_8888,
+
+  /**
+   * Pixel with 24 bits for depth, 8 bits for stencil. Each pixel is stored on 4 bytes.
+   */
+  DEPTH24_STENCIL8
 };
 }  // namespace tgfx

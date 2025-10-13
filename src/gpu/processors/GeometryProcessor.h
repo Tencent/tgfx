@@ -22,8 +22,9 @@
 #include "gpu/Attribute.h"
 #include "gpu/FragmentShaderBuilder.h"
 #include "gpu/GPUTexture.h"
+#include "gpu/ShaderCaps.h"
 #include "gpu/ShaderVar.h"
-#include "gpu/UniformBuffer.h"
+#include "gpu/UniformData.h"
 #include "gpu/VaryingHandler.h"
 #include "gpu/VertexShaderBuilder.h"
 #include "gpu/processors/FragmentProcessor.h"
@@ -65,7 +66,7 @@ class GeometryProcessor : public Processor {
 
   struct EmitArgs {
     EmitArgs(VertexShaderBuilder* vertBuilder, FragmentShaderBuilder* fragBuilder,
-             VaryingHandler* varyingHandler, UniformHandler* uniformHandler, const Caps* caps,
+             VaryingHandler* varyingHandler, UniformHandler* uniformHandler, const ShaderCaps* caps,
              std::string outputColor, std::string outputCoverage,
              FPCoordTransformHandler* transformHandler, std::string* outputSubset)
         : vertBuilder(vertBuilder), fragBuilder(fragBuilder), varyingHandler(varyingHandler),
@@ -77,7 +78,7 @@ class GeometryProcessor : public Processor {
     FragmentShaderBuilder* fragBuilder;
     VaryingHandler* varyingHandler;
     UniformHandler* uniformHandler;
-    const Caps* caps;
+    const ShaderCaps* caps;
     const std::string outputColor;
     const std::string outputCoverage;
     FPCoordTransformHandler* fpCoordTransformHandler;
@@ -86,14 +87,14 @@ class GeometryProcessor : public Processor {
 
   virtual void emitCode(EmitArgs&) const = 0;
 
-  virtual void setData(UniformBuffer* uniformBuffer,
+  virtual void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData,
                        FPCoordTransformIter* coordTransformIter) const = 0;
 
   size_t numTextureSamplers() const {
     return textureSamplerCount;
   }
 
-  GPUTexture* textureAt(size_t index) const {
+  std::shared_ptr<GPUTexture> textureAt(size_t index) const {
     return onTextureAt(index);
   }
 
@@ -114,7 +115,7 @@ class GeometryProcessor : public Processor {
   /**
    * A helper to upload coord transform matrices in setData().
    */
-  void setTransformDataHelper(const Matrix& uvMatrix, UniformBuffer* uniformBuffer,
+  void setTransformDataHelper(const Matrix& uvMatrix, UniformData* uniformData,
                               FPCoordTransformIter* transformIter) const;
 
   /**
@@ -129,7 +130,7 @@ class GeometryProcessor : public Processor {
   virtual void onComputeProcessorKey(BytesKey*) const {
   }
 
-  virtual GPUTexture* onTextureAt(size_t) const {
+  virtual std::shared_ptr<GPUTexture> onTextureAt(size_t) const {
     return nullptr;
   }
 
@@ -141,7 +142,7 @@ class GeometryProcessor : public Processor {
                                const std::string&, int) const {
   }
 
-  virtual void onSetTransformData(UniformBuffer*, const CoordTransform*, int) const {
+  virtual void onSetTransformData(UniformData*, const CoordTransform*, int) const {
   }
 
   std::vector<Attribute> attributes = {};

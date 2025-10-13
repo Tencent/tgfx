@@ -21,9 +21,12 @@
 #include "core/filters/GaussianBlurImageFilter.h"
 #include "core/shaders/GradientShader.h"
 #include "gpu/proxies/RenderTargetProxy.h"
+#include "layers/ContourContext.h"
+#include "layers/DrawArgs.h"
 #include "layers/RootLayer.h"
 #include "layers/contents/RasterizedContent.h"
 #include "tgfx/core/PathEffect.h"
+#include "tgfx/core/Shape.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Gradient.h"
 #include "tgfx/layers/ImageLayer.h"
@@ -282,7 +285,6 @@ TGFX_TEST(LayerTest, Layer_getTotalMatrix) {
 /**
  * The derivation process is shown in the following figure:
  * https://www.geogebra.org/graphing/vtcatfdf
- * https://codesign-1252678369.cos.ap-guangzhou.myqcloud.com/%E5%9D%90%E6%A0%87%E8%BD%AC%E6%8D%A2_%E5%85%A8%E5%B1%80%E5%88%B0%E5%B1%80%E9%83%A8.png
  */
 TGFX_TEST(LayerTest, Layer_globalToLocal) {
   auto layerA1 = Layer::Make();
@@ -314,7 +316,6 @@ TGFX_TEST(LayerTest, Layer_globalToLocal) {
 }
 /**
  * The derivation process is shown in the following figure:
- * https://codesign-1252678369.cos.ap-guangzhou.myqcloud.com/%E5%9D%90%E6%A0%87%E8%BD%AC%E6%8D%A2.png
  * https://www.geogebra.org/graphing/kvrqtdqk
  */
 TGFX_TEST(LayerTest, Layer_localToGlobal) {
@@ -1226,8 +1227,7 @@ TGFX_TEST(LayerTest, HasContentChanged) {
 
 /**
  * The schematic diagram is as follows:
- * https://www.geogebra.org/graphing/et36u73x
- * https://codesign-1252678369.cos.ap-guangzhou.myqcloud.com/getLayersUnderPoint.png
+ * https://www.geogebra.org/graphing/uxs8drhd
  */
 TGFX_TEST(LayerTest, getLayersUnderPoint) {
   ContextScope scope;
@@ -1299,6 +1299,35 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
   printf("shaperLayer2Bounds: (%f, %f, %f, %f)\n", shaperLayer2Bounds.left, shaperLayer2Bounds.top,
          shaperLayer2Bounds.right, shaperLayer2Bounds.bottom);
 
+  auto shapeLayerInvisibleFill = ShapeLayer::Make();
+  auto rectPath1 = tgfx::Path();
+  rectPath1.addRect({100, 300, 200, 375});
+  shapeLayerInvisibleFill->setPath(rectPath1);
+  shapeLayerInvisibleFill->setName("shapeLayerInvisibleFill");
+  auto fillStyle0 = SolidColor::Make(Color::FromRGBA(130, 182, 41, 0));
+  shapeLayerInvisibleFill->setFillStyle(fillStyle0);
+  rootLayer->addChild(shapeLayerInvisibleFill);
+  auto shapeLayerInvisibleFillBounds = shapeLayerInvisibleFill->getBounds(nullptr, true);
+  shapeLayerInvisibleFill->getGlobalMatrix().mapRect(&shapeLayerInvisibleFillBounds);
+  printf("shapeLayerInvisibleFillBounds: (%f, %f, %f, %f)\n", shapeLayerInvisibleFillBounds.left,
+         shapeLayerInvisibleFillBounds.top, shapeLayerInvisibleFillBounds.right,
+         shapeLayerInvisibleFillBounds.bottom);
+
+  auto shapeLayerInvisibleStroke = ShapeLayer::Make();
+  auto rectPath2 = tgfx::Path();
+  rectPath2.addRect({150, 320, 250, 395});
+  shapeLayerInvisibleStroke->setPath(rectPath2);
+  shapeLayerInvisibleStroke->setName("shapeLayerInvisibleStroke");
+  shapeLayerInvisibleStroke->addStrokeStyle(
+      tgfx::SolidColor::Make(tgfx::Color::FromRGBA(130, 182, 41, 0)));
+  rootLayer->addChild(shapeLayerInvisibleStroke);
+
+  auto shapeLayerInvisibleStrokeBounds = shapeLayerInvisibleStroke->getBounds(nullptr, true);
+  shapeLayerInvisibleStroke->getGlobalMatrix().mapRect(&shapeLayerInvisibleStrokeBounds);
+  printf("shapeLayerInvisibleStrokeBounds: (%f, %f, %f, %f)\n",
+         shapeLayerInvisibleStrokeBounds.left, shapeLayerInvisibleStrokeBounds.top,
+         shapeLayerInvisibleStrokeBounds.right, shapeLayerInvisibleStrokeBounds.bottom);
+
   auto rootLayerBounds = rootLayer->getBounds(nullptr, true);
   printf("rootLayerBounds: (%f, %f, %f, %f)\n", rootLayerBounds.left, rootLayerBounds.top,
          rootLayerBounds.right, rootLayerBounds.bottom);
@@ -1313,6 +1342,8 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
   canvas->drawRect(shaperLayerBounds, paint);
   canvas->drawRect(textLayerBounds, paint);
   canvas->drawRect(shaperLayer2Bounds, paint);
+  canvas->drawRect(shapeLayerInvisibleFillBounds, paint);
+  canvas->drawRect(shapeLayerInvisibleStrokeBounds, paint);
   paint.setColor(Color::Red());
   canvas->drawRect(rootLayerBounds, paint);
 
@@ -1460,14 +1491,25 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
   printf("\n");
   EXPECT_EQ(static_cast<int>(layers.size()), 3);
   EXPECT_EQ(layerNameJoin, "shaper_layer2|text_layer|root_layer|");
+
+  // P12(180, 360) is in the shaper_layer2, root_layer
+  layerNameJoin = "";
+  layers = rootLayer->getLayersUnderPoint(180.0f, 360.0f);
+  canvas->drawCircle(180.0f, 360.0f, 5.0f, paint);
+  printf("layers.size(): %zu\n", layers.size());
+  for (auto layer : layers) {
+    printf("layer: %s\n", layer->name().c_str());
+    layerNameJoin += layer->name() + "|";
+  }
+  printf("\n");
+  EXPECT_EQ(static_cast<int>(layers.size()), 3);
+  EXPECT_EQ(layerNameJoin, "shapeLayerInvisibleStroke|shapeLayerInvisibleFill|root_layer|");
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/getLayersUnderPoint"));
 }
 
 /**
  * The schematic diagram is as follows(Visit geogebra online vector map to view pixel details):
  * https://www.geogebra.org/classic/krbzbz6m
- * https://codesign-1252678369.cos.ap-guangzhou.myqcloud.com/hitTestPoint.png
- * https://codesign-1252678369.cos.ap-guangzhou.myqcloud.com/Layer_hitTestPoint.png
  */
 TGFX_TEST(LayerTest, hitTestPoint) {
   ContextScope scope;
@@ -1682,7 +1724,6 @@ TGFX_TEST(LayerTest, drawRRect) {
 /**
  * The schematic diagram is as follows:
  * https://www.geogebra.org/classic/nxwbmmrp
- * https://codesign-1252678369.cos.ap-guangzhou.myqcloud.com/hitTestPointNested.png
  */
 TGFX_TEST(LayerTest, hitTestPointNested) {
   ContextScope scope;
@@ -1960,6 +2001,7 @@ TGFX_TEST(LayerTest, DropShadowStyle) {
   layer->setPath(path);
   auto fillStyle = SolidColor::Make(Color::FromRGBA(100, 0, 0, 128));
   layer->setFillStyle(fillStyle);
+  layer->setLineWidth(2.0f);
   layer->setBlendMode(BlendMode::Lighten);
 
   auto shadowLayer = Layer::Make();
@@ -2974,7 +3016,7 @@ TGFX_TEST(LayerTest, PartialDrawLayer) {
   path.addRect(Rect::MakeXYWH(0, 0, 100, 100));
   shapeLayer->setPath(path);
   shapeLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 255, 255, 50)));
-  shapeLayer->setLayerStyles({BackgroundBlurStyle::Make(1, 1)});
+  shapeLayer->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
   rootLayer->addChild(shapeLayer);
   auto layerInvisible = SolidLayer::Make();
   layerInvisible->setColor(Color::FromRGBA(0, 0, 0, 255));
@@ -2985,11 +3027,173 @@ TGFX_TEST(LayerTest, PartialDrawLayer) {
   rootLayer->addChild(layerInvisible);
   auto canvas = surface->getCanvas();
   canvas->clear();
+  canvas->save();
   canvas->rotate(30, 45, 45);
-  canvas->clipRect(Rect::MakeXYWH(0, 0, 90, 90));
-  canvas->scale(2.0, 1.0f);
+  canvas->clipRect(Rect::MakeXYWH(0, 0, 110, 110));
+  canvas->scale(2.0f, 1.0f);
+  canvas->translate(20, 20);
   rootLayer->draw(canvas);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PartialDrawLayer"));
   EXPECT_EQ(layerInvisible->rasterizedContent, nullptr);
+  canvas->restore();
+
+  canvas->clear();
+  canvas->rotate(30, 45, 45);
+  canvas->clipRect(Rect::MakeXYWH(0, 0, 110, 110));
+  canvas->scale(2.0f, 1.0f);
+  canvas->translate(20, 20);
+  shapeLayer->draw(canvas);
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PartialDrawLayer_shapeLayer"));
+}
+
+TGFX_TEST(LayerTest, DropShadowDirtyRect) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  DisplayList displayList;
+  auto surface = Surface::Make(context, 200, 200);
+  auto rootLayer = Layer::Make();
+  displayList.root()->addChild(rootLayer);
+  auto shapeLayer = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeXYWH(0, 0, 100, 100));
+  shapeLayer->setPath(path);
+  shapeLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 0, 0, 255)));
+  shapeLayer->setLayerStyles({DropShadowStyle::Make(10, 10, 0, 0, Color::Black())});
+  rootLayer->addChild(shapeLayer);
+  shapeLayer->setMatrix(Matrix::MakeRotate(-120));
+  displayList.setContentOffset(50, 150);
+  displayList.render(surface.get());
+  shapeLayer->setMatrix(Matrix::MakeRotate(-121));
+  displayList.showDirtyRegions(true);
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DropShadowDirtyRect"));
+}
+
+TGFX_TEST(LayerTest, ContourTest) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 300);
+  auto baseLayer = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeXYWH(50, 50, 100, 100));
+  baseLayer->setPath(path);
+  baseLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 0, 0, 255)));
+
+  auto layerOutOfBase = ShapeLayer::Make();
+  Path pathOutOfBase;
+  pathOutOfBase.addRect(Rect::MakeXYWH(80, 50, 100, 80));
+  layerOutOfBase->setPath(pathOutOfBase);
+  layerOutOfBase->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 255, 0, 128)));
+  baseLayer->addChild(layerOutOfBase);
+
+  auto layerOutOfBase2 = ShapeLayer::Make();
+  layerOutOfBase2->setPath(pathOutOfBase);
+  layerOutOfBase2->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 255, 255, 128)));
+  layerOutOfBase2->setMatrix(Matrix::MakeRotate(30, 80, 90));
+  baseLayer->addChild(layerOutOfBase2);
+
+  auto rRectLayerInBase = ShapeLayer::Make();
+  Path rRectPath;
+  rRectPath.addRRect(RRect{Rect::MakeXYWH(60, 60, 40, 40), Point::Make(20, 20)});
+  rRectLayerInBase->setPath(rRectPath);
+  rRectLayerInBase->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 255, 0, 128)));
+  baseLayer->addChild(rRectLayerInBase);
+
+  auto rRectLayerOutBase = ShapeLayer::Make();
+  Path rRectPath2;
+  rRectPath2.addRRect(RRect{Rect::MakeXYWH(60, 60, 100, 100), Point::Make(20, 20)});
+  rRectLayerOutBase->setPath(rRectPath2);
+  rRectLayerOutBase->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 0, 255, 128)));
+  baseLayer->addChild(rRectLayerOutBase);
+  auto rRectLayerOutBase2 = ShapeLayer::Make();
+  rRectLayerOutBase2->setPath(rRectPath2);
+  rRectLayerOutBase2->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 0, 255, 128)));
+  baseLayer->addChild(rRectLayerOutBase2);
+
+  auto layerInBase = ShapeLayer::Make();
+  Path pathInBase;
+  pathInBase.addRect(Rect::MakeXYWH(80, 80, 30, 30));
+  layerInBase->setPath(pathInBase);
+  layerInBase->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 0, 255, 128)));
+  layerInBase->setMatrix(Matrix::MakeRotate(30, 60, 60));
+  baseLayer->addChild(layerInBase);
+
+  auto pathOutBase = ShapeLayer::Make();
+  Path pathOutBasePath;
+  pathOutBasePath.moveTo(200, 200);
+  pathOutBasePath.cubicTo(250, 70, 250, 150, 200, 150);
+  pathOutBase->setPath(pathOutBasePath);
+  pathOutBase->setLineWidth(2);
+  pathOutBase->setStrokeStyle(SolidColor::Make(Color::FromRGBA(0, 0, 0, 255)));
+  baseLayer->addChild(pathOutBase);
+
+  ContourContext contourContext;
+  Canvas contourCanvas = Canvas(&contourContext);
+  DrawArgs drawArgs = DrawArgs(nullptr);
+  drawArgs.drawMode = DrawMode::Contour;
+  baseLayer->drawLayer(drawArgs, &contourCanvas, 1.0, BlendMode::SrcOver);
+  auto picture = contourContext.finishRecordingAsPicture();
+
+  EXPECT_TRUE(picture != nullptr);
+  EXPECT_TRUE(picture->drawCount == 6);
+  EXPECT_TRUE(contourContext.contourBounds.size() == 3);
+  auto canvas = surface->getCanvas();
+  canvas->clear();
+  canvas->drawPicture(picture);
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ContourTest"));
+}
+
+TGFX_TEST(LayerTest, NotRectBackgroundBlur) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  auto canvas = surface->getCanvas();
+  canvas->clear();
+  auto backgroundLayer = ShapeLayer::Make();
+  Path backgroundPath;
+  backgroundPath.addRect(Rect::MakeXYWH(0, 0, 200, 200));
+  backgroundLayer->setPath(backgroundPath);
+  backgroundLayer->addFillStyle(
+      Gradient::MakeRadial({100, 100}, 100, {Color::Red(), Color::Blue()}));
+  DisplayList displayList;
+  displayList.root()->addChild(backgroundLayer);
+  auto layer = ShapeLayer::Make();
+  Path path;
+  path.addOval(Rect::MakeXYWH(50, 50, 100, 100));
+  layer->setPath(path);
+  layer->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 0, 0, 10)));
+  layer->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
+  displayList.root()->addChild(layer);
+  layer->draw(canvas);
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/NotRectBackgroundBlur"));
+}
+
+TGFX_TEST(LayerTest, DiffFilterModeImagePattern) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  auto canvas = surface->getCanvas();
+  canvas->clear();
+  auto image = MakeImage("resources/apitest/image_as_mask.png");
+  EXPECT_TRUE(image != nullptr);
+  auto shapeLayer = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeWH(image->width(), image->height()));
+  shapeLayer->setPath(path);
+  auto pattern = ImagePattern::Make(image, TileMode::Decal, TileMode::Decal,
+                                    SamplingOptions(FilterMode::Linear, FilterMode::Nearest));
+  DisplayList displayList;
+  displayList.root()->addChild(shapeLayer);
+  shapeLayer->setFillStyle(pattern);
+  displayList.setZoomScale(0.3f);
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DiffFilterModeImagePattern -- zoomOut"));
+  displayList.setZoomScale(1.5f);
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DiffFilterModeImagePattern -- zoomIn"));
 }
 }  // namespace tgfx

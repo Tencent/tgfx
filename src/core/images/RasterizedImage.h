@@ -19,7 +19,7 @@
 #pragma once
 
 #include "core/images/PixelImage.h"
-#include "gpu/ResourceKey.h"
+#include "gpu/resources/ResourceKey.h"
 
 namespace tgfx {
 /**

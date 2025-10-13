@@ -20,6 +20,7 @@
 #include "core/utils/MathExtra.h"
 #include "core/utils/Types.h"
 #include "gpu/GlobalCache.h"
+#include "gpu/ShaderCaps.h"
 #include "gpu/processors/ClampedGradientEffect.h"
 #include "gpu/processors/ConicGradientLayout.h"
 #include "gpu/processors/DiamondGradientLayout.h"
@@ -68,7 +69,8 @@ static PlacementPtr<FragmentProcessor> MakeColorizer(const Context* context, con
   // 32-bit, output can be incorrect if the thresholds are too close together. However, the
   // analytic shaders are higher quality, so they can be used with lower precision hardware when
   // the thresholds are not ill-conditioned.
-  if (!context->caps()->floatIs32Bits && tryAnalyticColorizer) {
+  auto shaderCaps = context->caps()->shaderCaps();
+  if (!shaderCaps->floatIs32Bits && tryAnalyticColorizer) {
     // Could run into problems, check if thresholds are close together (with a limit of .01, so
     // that scales will be less than 100, which leaves 4 decimals of precision on 16-bit).
     for (int i = offset; i < count - 1; i++) {

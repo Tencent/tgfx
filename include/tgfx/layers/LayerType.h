@@ -36,10 +36,6 @@ enum class LayerType {
    */
   Shape,
   /**
-   * A layer displaying a color gradient.
-   */
-  Gradient,
-  /**
    * A layer displaying a simple text.
    */
   Text,

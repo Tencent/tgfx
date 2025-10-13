@@ -7,7 +7,7 @@
     "common": [
       {
         "url": "${PAG_GROUP}/vendor_tools.git",
-        "commit": "c1c78c1217f0b67d2142a736140472f62e280fd1",
+        "commit": "c4c45c2914d15cf48bbdbd9698c79066a3f9f33f",
         "dir": "third_party/vendor_tools"
       },
       {
@@ -79,11 +79,6 @@
         "url": "https://github.com/google/highway.git",
         "commit": "a523516d35e22a4ba8e2e70a319062cb87352de6",
         "dir": "third_party/highway"
-      },
-      {
-        "url": "https://github.com/kerukuro/digestpp.git",
-        "commit": "9a1afa1459fa71ab544775f1b1c0a6298978d9fd",
-        "dir": "third_party/digestpp"
       },
       {
         "url": "https://github.com/lz4/lz4.git",

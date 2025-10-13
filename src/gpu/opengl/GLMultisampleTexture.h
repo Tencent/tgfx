@@ -23,7 +23,7 @@
 namespace tgfx {
 class GLMultisampleTexture : public GLTexture {
  public:
-  static std::unique_ptr<GLMultisampleTexture> MakeFrom(GLGPU* gpu,
+  static std::shared_ptr<GLMultisampleTexture> MakeFrom(GLGPU* gpu,
                                                         const GPUTextureDescriptor& descriptor);
 
   unsigned frameBufferID() const override {
@@ -31,7 +31,7 @@ class GLMultisampleTexture : public GLTexture {
   }
 
  protected:
-  void onRelease(GLGPU*) override;
+  void onReleaseTexture(GLGPU* gpu) override;
 
  private:
   unsigned _frameBufferID = 0;
@@ -40,5 +40,7 @@ class GLMultisampleTexture : public GLTexture {
   GLMultisampleTexture(const GPUTextureDescriptor& descriptor, unsigned frameBufferID)
       : GLTexture(descriptor, GL_TEXTURE_2D, 0), _frameBufferID(frameBufferID) {
   }
+
+  friend class GLGPU;
 };
 }  // namespace tgfx

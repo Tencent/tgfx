@@ -43,15 +43,12 @@ Context::Context(Device* device, GPU* gpu) : _device(device), _gpu(gpu) {
 }
 
 Context::~Context() {
-  // The Device owner must call releaseAll() before deleting this Context, otherwise, GPU resources
-  // may leak.
-  DEBUG_ASSERT(_resourceCache->empty());
-  delete _globalCache;
-  delete _resourceCache;
-  delete _drawingManager;
-  delete _proxyProvider;
-  delete _drawingBuffer;
   delete _atlasManager;
+  delete _drawingManager;
+  delete _globalCache;
+  delete _proxyProvider;
+  delete _resourceCache;
+  delete _drawingBuffer;
   delete _maxValueTracker;
 }
 
@@ -64,44 +61,56 @@ const Caps* Context::caps() const {
 }
 
 bool Context::wait(const BackendSemaphore& waitSemaphore) {
-  auto semaphore = Semaphore::Wrap(this, waitSemaphore);
-  if (semaphore == nullptr) {
+  auto fence = gpu()->importExternalFence(waitSemaphore);
+  if (fence == nullptr) {
     return false;
   }
-  _drawingManager->addSemaphoreWaitTask(std::move(semaphore));
+  gpu()->queue()->waitForFence(std::move(fence));
   return true;
 }
 
 bool Context::flush(BackendSemaphore* signalSemaphore) {
   _resourceCache->processUnreferencedResources();
   _atlasManager->preFlush();
-  commandBuffer = _drawingManager->flush(signalSemaphore);
+  commandBuffer = _drawingManager->flush();
   if (commandBuffer == nullptr) {
     return false;
+  }
+  if (signalSemaphore != nullptr) {
+    auto fence = gpu()->queue()->insertFence();
+    if (fence != nullptr) {
+      *signalSemaphore = fence->stealBackendSemaphore();
+    }
   }
   _atlasManager->postFlush();
   _proxyProvider->purgeExpiredProxies();
   _resourceCache->advanceFrameAndPurge();
   _maxValueTracker->addValue(_drawingBuffer->size());
   _drawingBuffer->clear(_maxValueTracker->getMaxValue());
+
+  if (gpu()->caps()->shaderCaps()->uboSupport) {
+    globalCache()->resetUniformBuffer();
+  }
+
   return true;
 }
 
-bool Context::submit(bool syncCpu) {
-  if (commandBuffer == nullptr) {
-    return false;
-  }
+void Context::submit(bool syncCpu) {
   auto queue = gpu()->queue();
-  queue->submit(std::move(commandBuffer));
+  if (commandBuffer) {
+    queue->submit(std::move(commandBuffer));
+  }
   if (syncCpu) {
     queue->waitUntilCompleted();
   }
-  return true;
 }
 
-void Context::flushAndSubmit(bool syncCpu) {
-  flush();
-  submit(syncCpu);
+bool Context::flushAndSubmit(bool syncCpu) {
+  auto result = flush();
+  if (result || syncCpu) {
+    submit(syncCpu);
+  }
+  return result;
 }
 
 size_t Context::memoryUsage() const {
@@ -134,12 +143,5 @@ void Context::purgeResourcesNotUsedSince(std::chrono::steady_clock::time_point p
 
 bool Context::purgeResourcesUntilMemoryTo(size_t bytesLimit) {
   return _resourceCache->purgeUntilMemoryTo(bytesLimit);
-}
-
-void Context::releaseAll(bool releaseGPU) {
-  _drawingManager->releaseAll();
-  _atlasManager->releaseAll();
-  _globalCache->releaseAll();
-  _resourceCache->releaseAll(releaseGPU);
 }
 }  // namespace tgfx

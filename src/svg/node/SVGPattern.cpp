@@ -130,7 +130,7 @@ const SVGPattern* SVGPattern::resolveHref(const SVGRenderContext& context,
 
 bool SVGPattern::onAsPaint(const SVGRenderContext& context, Paint* paint) const {
   PatternAttributes attrs;
-  const auto* contentNode = this->resolveHref(context, &attrs);
+  const auto contentNode = this->resolveHref(context, &attrs);
   auto lengthContext = context.lengthContext();
   lengthContext.setBoundingBoxUnits(PatternUnits);
   Rect tile = lengthContext.resolveRect(attrs.x.has_value() ? *attrs.x : SVGLength(0),
@@ -143,7 +143,7 @@ bool SVGPattern::onAsPaint(const SVGRenderContext& context, Paint* paint) const 
   }
 
   Recorder patternRecorder;
-  auto* canvas = patternRecorder.beginRecording();
+  auto canvas = patternRecorder.beginRecording();
   auto patternMatrix = attrs.patternTransform.value_or(Matrix::I());
   canvas->concat(patternMatrix);
   {

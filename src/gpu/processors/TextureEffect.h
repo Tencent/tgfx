@@ -20,9 +20,9 @@
 
 #include "gpu/SamplerState.h"
 #include "gpu/SamplingArgs.h"
-#include "gpu/YUVTextureView.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/proxies/TextureProxy.h"
+#include "gpu/resources/YUVTextureView.h"
 
 namespace tgfx {
 class TextureEffect : public FragmentProcessor {
@@ -52,7 +52,7 @@ class TextureEffect : public FragmentProcessor {
 
   size_t onCountTextureSamplers() const override;
 
-  GPUTexture* onTextureAt(size_t index) const override;
+  std::shared_ptr<GPUTexture> onTextureAt(size_t index) const override;
 
   SamplerState onSamplerStateAt(size_t) const override {
     return samplerState;

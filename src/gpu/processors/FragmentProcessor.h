@@ -23,11 +23,11 @@
 #include "gpu/FragmentShaderBuilder.h"
 #include "gpu/SamplerState.h"
 #include "gpu/SamplingArgs.h"
-#include "gpu/TextureView.h"
-#include "gpu/UniformBuffer.h"
+#include "gpu/UniformData.h"
 #include "gpu/UniformHandler.h"
 #include "gpu/processors/Processor.h"
 #include "gpu/proxies/TextureProxy.h"
+#include "gpu/resources/TextureView.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Image.h"
 
@@ -115,7 +115,7 @@ class FragmentProcessor : public Processor {
     return onCountTextureSamplers();
   }
 
-  GPUTexture* textureAt(size_t i) const {
+  std::shared_ptr<GPUTexture> textureAt(size_t i) const {
     return onTextureAt(i);
   }
 
@@ -249,7 +249,7 @@ class FragmentProcessor : public Processor {
    */
   virtual void emitCode(EmitArgs& args) const = 0;
 
-  void setData(UniformBuffer* uniformBuffer) const;
+  void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const;
 
   /**
    * Emit the child with the default input color (solid white)
@@ -311,7 +311,7 @@ class FragmentProcessor : public Processor {
     coordTransforms.push_back(transform);
   }
 
-  virtual void onSetData(UniformBuffer*) const {
+  virtual void onSetData(UniformData*, UniformData*) const {
   }
 
  private:
@@ -322,7 +322,7 @@ class FragmentProcessor : public Processor {
     return 0;
   }
 
-  virtual GPUTexture* onTextureAt(size_t) const {
+  virtual std::shared_ptr<GPUTexture> onTextureAt(size_t) const {
     return nullptr;
   }
 

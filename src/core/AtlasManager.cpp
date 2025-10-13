@@ -62,7 +62,7 @@ Atlas* AtlasManager::getAtlas(MaskFormat maskFormat) const {
 
 bool AtlasManager::addCellToAtlas(const AtlasCell& cell, AtlasToken nextFlushToken,
                                   AtlasLocator& atlasLocator) const {
-  return getAtlas(cell.maskFormat())->addToAtlas(cell, nextFlushToken, atlasLocator);
+  return getAtlas(cell.maskFormat)->addToAtlas(cell, nextFlushToken, atlasLocator);
 }
 
 bool AtlasManager::getCellLocator(MaskFormat maskFormat, const BytesKey& key,
@@ -96,11 +96,6 @@ void AtlasManager::postFlush() {
   }
 }
 
-void AtlasManager::releaseAll() {
-  for (auto& atlas : atlases) {
-    atlas = nullptr;
-  }
-}
 AtlasToken AtlasManager::nextFlushToken() const {
   return atlasTokenTracker.nextToken();
 }

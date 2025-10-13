@@ -18,7 +18,6 @@
 
 #include "RRectDrawOp.h"
 #include "core/DataSource.h"
-#include "gpu/GPUBuffer.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/processors/EllipseGeometryProcessor.h"
@@ -33,6 +32,7 @@ PlacementPtr<RRectDrawOp> RRectDrawOp::Make(Context* context,
     return nullptr;
   }
   auto drawOp = context->drawingBuffer()->make<RRectDrawOp>(provider.get());
+  CAPUTRE_RRECT_MESH(drawOp.get(), provider.get());
   drawOp->indexBufferProxy = context->globalCache()->getRRectIndexBuffer(provider->hasStroke());
   if (provider->rectCount() <= 1) {
     // If we only have one rect, it is not worth the async task overhead.
@@ -51,14 +51,17 @@ RRectDrawOp::RRectDrawOp(RRectsVertexProvider* provider)
   hasStroke = provider->hasStroke();
 }
 
-void RRectDrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
-  OPERATE_MARK(tgfx::inspect::OpTaskType::RRectDrawOp);
+PlacementPtr<GeometryProcessor> RRectDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {
   ATTRIBUTE_NAME("rectCount", static_cast<uint32_t>(rectCount));
   ATTRIBUTE_NAME("useScale", useScale);
   ATTRIBUTE_NAME("hasStroke", hasStroke);
   ATTRIBUTE_NAME("commonColor", commonColor);
-  ATTRIBUTE_NAME_ENUM("blenderMode", blendMode, tgfx::inspect::CustomEnumType::BlendMode);
-  ATTRIBUTE_NAME_ENUM("aaType", aaType, tgfx::inspect::CustomEnumType::AAType);
+  auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
+  return EllipseGeometryProcessor::Make(drawingBuffer, renderTarget->width(),
+                                        renderTarget->height(), hasStroke, useScale, commonColor);
+}
+
+void RRectDrawOp::onDraw(RenderPass* renderPass) {
   if (indexBufferProxy == nullptr || vertexBufferProxyView == nullptr) {
     return;
   }
@@ -70,14 +73,8 @@ void RRectDrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
   if (vertexBuffer == nullptr) {
     return;
   }
-  auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
-  auto gp =
-      EllipseGeometryProcessor::Make(drawingBuffer, renderTarget->width(), renderTarget->height(),
-                                     hasStroke, useScale, commonColor);
-  auto programInfo = createProgramInfo(renderTarget, std::move(gp));
-  renderPass->bindProgramAndScissorClip(programInfo.get(), scissorRect);
-  renderPass->bindBuffers(indexBuffer->gpuBuffer(), vertexBuffer->gpuBuffer(),
-                          vertexBufferProxyView->offset());
+  renderPass->setVertexBuffer(vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
+  renderPass->setIndexBuffer(indexBuffer->gpuBuffer());
   auto numIndicesPerRRect = hasStroke ? IndicesPerStrokeRRect : IndicesPerFillRRect;
   renderPass->drawIndexed(PrimitiveType::Triangles, 0, rectCount * numIndicesPerRRect);
 }

@@ -19,6 +19,7 @@
 #pragma once
 
 #include "core/DrawContext.h"
+#include "tgfx/core/Stroke.h"
 
 namespace tgfx {
 class HitTestContext : public DrawContext {
@@ -40,7 +41,8 @@ class HitTestContext : public DrawContext {
 
   void drawPath(const Path& path, const MCState& state, const Fill& fill) override;
 
-  void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill) override;
+  void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill,
+                 const Stroke* stroke) override;
 
   void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
                  const MCState& state, const Fill& fill) override;
@@ -63,6 +65,6 @@ class HitTestContext : public DrawContext {
   bool shapeHitTest = false;
   bool hit = false;
 
-  bool checkClipAndFill(const Path& clip, const Fill& fill, const Point& local) const;
+  bool checkClip(const Path& clip, const Point& local) const;
 };
 }  // namespace tgfx

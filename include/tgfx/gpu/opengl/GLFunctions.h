@@ -136,6 +136,16 @@ using GLGetVertexAttribPointerv = void GL_FUNCTION_TYPE(unsigned index, unsigned
                                                         void** pointer);
 using GLGetAttribLocation = int GL_FUNCTION_TYPE(unsigned program, const char* name);
 using GLGetUniformLocation = int GL_FUNCTION_TYPE(unsigned program, const char* name);
+using GLGetUniformBlockIndex = unsigned GL_FUNCTION_TYPE(unsigned program,
+                                                         const char* uniformBlockName);
+using GLUniformBlockBinding = void GL_FUNCTION_TYPE(unsigned program, unsigned uniformBlockIndex,
+                                                    unsigned uniformBlockBinding);
+using GLBindBufferBase = void GL_FUNCTION_TYPE(unsigned target, unsigned index, unsigned buffer);
+using GLBindBufferRange = void GL_FUNCTION_TYPE(unsigned target, unsigned index, unsigned buffer,
+                                                GLintptr offset, GLsizeiptr size);
+using GLMapBufferRange = void* GL_FUNCTION_TYPE(unsigned target, GLintptr offset, GLsizeiptr length,
+                                                unsigned access);
+using GLUnmapBuffer = unsigned char GL_FUNCTION_TYPE(unsigned target);
 using GLIsTexture = unsigned char GL_FUNCTION_TYPE(unsigned texture);
 using GLLineWidth = void GL_FUNCTION_TYPE(float width);
 using GLLinkProgram = void GL_FUNCTION_TYPE(unsigned program);
@@ -208,6 +218,7 @@ using GLVertexAttribPointer = void GL_FUNCTION_TYPE(unsigned indx, int size, uns
                                                     unsigned char normalized, int stride,
                                                     const void* ptr);
 using GLViewport = void GL_FUNCTION_TYPE(int x, int y, int width, int height);
+using GLClientWaitSync = unsigned GL_FUNCTION_TYPE(void* sync, unsigned flags, uint64_t timeout);
 using GLWaitSync = void GL_FUNCTION_TYPE(void* sync, unsigned flags, uint64_t timeout);
 
 class Context;
@@ -297,6 +308,12 @@ class GLFunctions {
   GLGetVertexAttribPointerv* getVertexAttribPointerv = nullptr;
   GLGetAttribLocation* getAttribLocation = nullptr;
   GLGetUniformLocation* getUniformLocation = nullptr;
+  GLGetUniformBlockIndex* getUniformBlockIndex = nullptr;
+  GLUniformBlockBinding* uniformBlockBinding = nullptr;
+  GLBindBufferBase* bindBufferBase = nullptr;
+  GLBindBufferRange* bindBufferRange = nullptr;
+  GLMapBufferRange* mapBufferRange = nullptr;
+  GLUnmapBuffer* unmapBuffer = nullptr;
   GLIsTexture* isTexture = nullptr;
   GLLineWidth* lineWidth = nullptr;
   GLLinkProgram* linkProgram = nullptr;
@@ -348,6 +365,7 @@ class GLFunctions {
   GLVertexAttrib4fv* vertexAttrib4fv = nullptr;
   GLVertexAttribPointer* vertexAttribPointer = nullptr;
   GLViewport* viewport = nullptr;
+  GLClientWaitSync* clientWaitSync = nullptr;
   GLWaitSync* waitSync = nullptr;
 };
 

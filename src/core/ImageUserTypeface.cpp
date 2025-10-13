@@ -74,6 +74,10 @@ class ImageUserScalerContext final : public UserScalerContext {
     return record->image->readPixels(dstInfo, dstPixels);
   }
 
+  float getBackingSize() const override {
+    return 1.f;
+  }
+
  private:
   ImageUserTypeface* imageTypeface() const {
     return static_cast<ImageUserTypeface*>(typeface.get());

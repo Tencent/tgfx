@@ -19,8 +19,11 @@
 #pragma once
 
 #include <core/utils/Types.h>
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wsign-conversion"
 #define FLATBUFFERS_LOCALE_INDEPENDENT 0
 #include <flatbuffers/flexbuffers.h>
+#pragma clang diagnostic pop
 #include <string>
 #include "inspect/Protocol.h"
 #include "tgfx/gpu/Context.h"

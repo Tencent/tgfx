@@ -25,10 +25,9 @@
 namespace tgfx {
 class DrawOp {
  public:
-  virtual ~DrawOp() = default;
+  enum class Type { RectDrawOp, RRectDrawOp, ShapeDrawOp, AtlasTextOp, Rect3DDrawOp };
 
-  PlacementPtr<ProgramInfo> createProgramInfo(RenderTarget* renderTarget,
-                                              PlacementPtr<GeometryProcessor> geometryProcessor);
+  virtual ~DrawOp() = default;
 
   void setScissorRect(const Rect& rect) {
     scissorRect = rect;
@@ -54,7 +53,7 @@ class DrawOp {
     return !coverages.empty();
   }
 
-  virtual void execute(RenderPass* renderPass, RenderTarget* renderTarget) = 0;
+  void execute(RenderPass* renderPass, RenderTarget* renderTarget);
 
  protected:
   AAType aaType = AAType::None;
@@ -66,5 +65,11 @@ class DrawOp {
 
   explicit DrawOp(AAType aaType) : aaType(aaType) {
   }
+
+  virtual PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) = 0;
+
+  virtual void onDraw(RenderPass* renderPass) = 0;
+
+  virtual Type type() = 0;
 };
 }  // namespace tgfx

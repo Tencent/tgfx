@@ -32,6 +32,8 @@
 
 namespace tgfx {
 
+unsigned CreateGLProgram(Context* context, const std::string& vertex, const std::string& fragment);
+
 bool CreateGLTexture(Context* context, int width, int height, GLTextureInfo* texture);
 
 std::shared_ptr<ImageCodec> MakeImageCodec(const std::string& path);

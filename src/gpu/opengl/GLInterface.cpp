@@ -194,6 +194,18 @@ std::shared_ptr<GLInterface> GLInterface::MakeNativeInterface(const GLProcGetter
       reinterpret_cast<GLGetAttribLocation*>(getter->getProcAddress("glGetAttribLocation"));
   functions->getUniformLocation =
       reinterpret_cast<GLGetUniformLocation*>(getter->getProcAddress("glGetUniformLocation"));
+  functions->getUniformBlockIndex =
+      reinterpret_cast<GLGetUniformBlockIndex*>(getter->getProcAddress("glGetUniformBlockIndex"));
+  functions->uniformBlockBinding =
+      reinterpret_cast<GLUniformBlockBinding*>(getter->getProcAddress("glUniformBlockBinding"));
+  functions->bindBufferBase =
+      reinterpret_cast<GLBindBufferBase*>(getter->getProcAddress("glBindBufferBase"));
+  functions->bindBufferRange =
+      reinterpret_cast<GLBindBufferRange*>(getter->getProcAddress("glBindBufferRange"));
+  functions->mapBufferRange =
+      reinterpret_cast<GLMapBufferRange*>(getter->getProcAddress("glMapBufferRange"));
+  functions->unmapBuffer =
+      reinterpret_cast<GLUnmapBuffer*>(getter->getProcAddress("glUnmapBuffer"));
   functions->isTexture = reinterpret_cast<GLIsTexture*>(getter->getProcAddress("glIsTexture"));
   functions->lineWidth = reinterpret_cast<GLLineWidth*>(getter->getProcAddress("glLineWidth"));
   functions->linkProgram =
@@ -264,6 +276,8 @@ std::shared_ptr<GLInterface> GLInterface::MakeNativeInterface(const GLProcGetter
   functions->vertexAttribPointer =
       reinterpret_cast<GLVertexAttribPointer*>(getter->getProcAddress("glVertexAttribPointer"));
   functions->viewport = reinterpret_cast<GLViewport*>(getter->getProcAddress("glViewport"));
+  functions->clientWaitSync =
+      reinterpret_cast<GLClientWaitSync*>(getter->getProcAddress("glClientWaitSync"));
   functions->waitSync = reinterpret_cast<GLWaitSync*>(getter->getProcAddress("glWaitSync"));
 
   switch (info.standard) {

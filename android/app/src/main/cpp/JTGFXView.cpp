@@ -130,7 +130,7 @@ JNIEXPORT jlong JNICALL Java_org_tgfx_hello2d_TGFXView_00024Companion_setupFromS
 JNIEXPORT void JNICALL Java_org_tgfx_hello2d_TGFXView_nativeDraw(JNIEnv* env, jobject thiz,
                                                                  jint drawIndex, jfloat zoom,
                                                                  jfloat offsetX, jfloat offsetY) {
-  auto* view = GetJTGFXView(env, thiz);
+  auto view = GetJTGFXView(env, thiz);
   if (view == nullptr) {
     return;
   }
@@ -138,7 +138,7 @@ JNIEXPORT void JNICALL Java_org_tgfx_hello2d_TGFXView_nativeDraw(JNIEnv* env, jo
 }
 
 JNIEXPORT void JNICALL Java_org_tgfx_hello2d_TGFXView_updateSize(JNIEnv* env, jobject thiz) {
-  auto* view = GetJTGFXView(env, thiz);
+  auto view = GetJTGFXView(env, thiz);
   if (view == nullptr) {
     return;
   }

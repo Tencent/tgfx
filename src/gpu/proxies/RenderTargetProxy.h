@@ -20,7 +20,7 @@
 
 #include "TextureProxy.h"
 #include "gpu/BackingFit.h"
-#include "gpu/RenderTarget.h"
+#include "gpu/resources/RenderTarget.h"
 
 namespace tgfx {
 /**

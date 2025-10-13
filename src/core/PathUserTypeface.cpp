@@ -19,8 +19,8 @@
 #include "PathUserTypeface.h"
 #include "UserScalerContext.h"
 #include "core/PathRasterizer.h"
-#include "core/utils/ApplyStrokeToBounds.h"
 #include "core/utils/FauxBoldScale.h"
+#include "core/utils/StrokeUtils.h"
 #include "tgfx/core/Shape.h"
 
 namespace tgfx {

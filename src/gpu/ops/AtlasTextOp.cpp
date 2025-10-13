@@ -37,6 +37,7 @@ PlacementPtr<AtlasTextOp> AtlasTextOp::Make(Context* context,
   }
   auto atlasTextOp = context->drawingBuffer()->make<AtlasTextOp>(provider.get(),
                                                                  std::move(textureProxy), sampling);
+  CAPUTRE_RECT_MESH(atlasTextOp.get(), provider.get());
   if (provider->aaType() == AAType::Coverage || provider->rectCount() > 1) {
     atlasTextOp->indexBufferProxy =
         context->globalCache()->getRectIndexBuffer(provider->aaType() == AAType::Coverage);
@@ -59,13 +60,16 @@ AtlasTextOp::AtlasTextOp(RectsVertexProvider* provider, std::shared_ptr<TextureP
   }
 }
 
-void AtlasTextOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
-  OPERATE_MARK(tgfx::inspect::OpTaskType::RRectDrawOp);
+PlacementPtr<GeometryProcessor> AtlasTextOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {
   ATTRIBUTE_NAME("rectCount", static_cast<uint32_t>(rectCount));
   ATTRIBUTE_NAME("commonColor", commonColor);
-  ATTRIBUTE_NAME_ENUM("blenderMode", blendMode, tgfx::inspect::CustomEnumType::BlendMode);
-  ATTRIBUTE_NAME_ENUM("aaType", aaType, tgfx::inspect::CustomEnumType::AAType);
-  std::shared_ptr<IndexBuffer> indexBuffer = nullptr;
+  auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
+  return AtlasTextGeometryProcessor::Make(drawingBuffer, textureProxy, aaType, commonColor,
+                                          sampling);
+}
+
+void AtlasTextOp::onDraw(RenderPass* renderPass) {
+  std::shared_ptr<BufferResource> indexBuffer = nullptr;
   if (indexBufferProxy) {
     indexBuffer = indexBufferProxy->getBuffer();
     if (indexBuffer == nullptr) {
@@ -76,14 +80,8 @@ void AtlasTextOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
   if (vertexBuffer == nullptr) {
     return;
   }
-
-  auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
-  auto atlasGeometryProcessor =
-      AtlasTextGeometryProcessor::Make(drawingBuffer, textureProxy, aaType, commonColor, sampling);
-  auto programInfo = createProgramInfo(renderTarget, std::move(atlasGeometryProcessor));
-  renderPass->bindProgramAndScissorClip(programInfo.get(), scissorRect);
-  renderPass->bindBuffers(indexBuffer ? indexBuffer->gpuBuffer() : nullptr,
-                          vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
+  renderPass->setVertexBuffer(vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
+  renderPass->setIndexBuffer(indexBuffer ? indexBuffer->gpuBuffer() : nullptr);
   if (indexBuffer != nullptr) {
     uint16_t numIndicesPerQuad;
     if (aaType == AAType::Coverage) {

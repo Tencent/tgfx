@@ -296,7 +296,7 @@ Canvas* PDFDocumentImpl::beginPage(float pageWidth, float pageHeight, const Rect
   if (state == State::InPage) {
     endPage();
   }
-  auto* canvas = onBeginPage(pageWidth, pageHeight);
+  auto canvas = onBeginPage(pageWidth, pageHeight);
   state = State::InPage;
   if (canvas && contentRect) {
     Rect rect = *contentRect;
@@ -450,7 +450,7 @@ void PDFDocumentImpl::onClose() {
 
   auto docCatalogRef = this->emit(*docCatalog);
 
-  for (const auto* f : get_fonts(*this)) {
+  for (const auto f : get_fonts(*this)) {
     f->emitSubset(this);
   }
   serialize_footer(offsetMap, _stream, infoDictionary, docCatalogRef, documentUUID);

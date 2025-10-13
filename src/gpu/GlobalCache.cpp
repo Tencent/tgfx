@@ -17,18 +17,21 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GlobalCache.h"
+#include "AlignTo.h"
+#include "core/GradientGenerator.h"
 #include "core/PixelBuffer.h"
-#include "gpu/GradientGenerator.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ops/RRectDrawOp.h"
 #include "gpu/ops/RectDrawOp.h"
+#include "opengl/GLBuffer.h"
 #include "tgfx/core/Buffer.h"
 
 namespace tgfx {
 static constexpr size_t MAX_PROGRAM_COUNT = 128;
-static constexpr size_t MaxNumCachedGradientBitmaps = 32;
-static constexpr uint16_t VerticesPerNonAAQuad = 4;
-static constexpr uint16_t VerticesPerAAQuad = 8;
+static constexpr size_t MAX_NUM_CACHED_GRADIENT_BITMAPS = 32;
+static constexpr uint16_t VERTICES_PER_NON_AA_QUAD = 4;
+static constexpr uint16_t VERTICES_PER_AA_QUAD = 8;
+static constexpr size_t MAX_UNIFORM_BUFFER_SIZE = 64 * 1024;
 
 GlobalCache::GlobalCache(Context* context) : context(context) {
 }
@@ -45,6 +48,111 @@ std::shared_ptr<Program> GlobalCache::findProgram(const BytesKey& programKey) {
   return nullptr;
 }
 
+std::shared_ptr<GPUBuffer> GlobalCache::findOrCreateUniformBuffer(size_t bufferSize,
+                                                                  size_t* lastBufferOffset) {
+  auto uboSupport = context->gpu()->caps()->shaderCaps()->uboSupport;
+  auto maxUBOSize =
+      uboSupport ? std::max(static_cast<size_t>(context->gpu()->caps()->shaderCaps()->maxUBOSize),
+                            MAX_UNIFORM_BUFFER_SIZE)
+                 : MAX_UNIFORM_BUFFER_SIZE;
+  auto uboOffsetAlignment =
+      static_cast<size_t>(context->gpu()->caps()->shaderCaps()->uboOffsetAlignment);
+
+  if (uboSupport && maxUBOSize == 0) {
+    LOGE("[GlobalCache::findOrCreateUniformBuffer] maxUBOSize is 0");
+    return nullptr;
+  }
+
+  auto alignedBufferSize = AlignTo(bufferSize, uboOffsetAlignment);
+
+  if (bufferSize == 0 || alignedBufferSize > maxUBOSize) {
+    LOGE(
+        "[GlobalCache::findOrCreateUniformBuffer] invalid request buffer size: %zu, max UBO "
+        "size: %zu, %s:%d",
+        bufferSize, maxUBOSize, __FILE__, __LINE__);
+    return nullptr;
+  }
+
+  if (maxUniformBufferTracker == nullptr) {
+    maxUniformBufferTracker = std::make_shared<SlidingWindowTracker>(10);
+  }
+
+  auto& uniformBufferPacket = tripleUniformBuffer[tripleUniformBufferIndex];
+
+  auto getAverageUniformBufferSize = [this]() {
+    size_t totalUniformBufferSize = 0;
+    for (const auto& packet : tripleUniformBuffer) {
+      totalUniformBufferSize += packet.gpuBuffers.size();
+    }
+    return (totalUniformBufferSize + UNIFORM_BUFFER_COUNT - 1) / UNIFORM_BUFFER_COUNT;
+  };
+
+  if (uniformBufferPacket.gpuBuffers.empty()) {
+    auto buffer = context->gpu()->createBuffer(maxUBOSize, GPUBufferUsage::UNIFORM);
+    if (buffer == nullptr) {
+      LOGE(
+          "[GlobalCache::findOrCreateUniformBuffer] failed to create initial uniform buffer, "
+          "request buffer size: %zu, %s:%d",
+          bufferSize, __FILE__, __LINE__);
+      return nullptr;
+    }
+    uniformBufferPacket.gpuBuffers.emplace_back(std::move(buffer));
+    uniformBufferPacket.bufferIndex = 0;
+    uniformBufferPacket.cursor = 0;
+    maxUniformBufferTracker->addValue(getAverageUniformBufferSize());
+  }
+
+  // Check if triple buffer has enough space
+  if (uniformBufferPacket.bufferIndex < uniformBufferPacket.gpuBuffers.size() &&
+      uniformBufferPacket.cursor + alignedBufferSize <=
+          uniformBufferPacket.gpuBuffers[uniformBufferPacket.bufferIndex]->size()) {
+    *lastBufferOffset = uniformBufferPacket.cursor;
+    uniformBufferPacket.cursor += alignedBufferSize;
+    return uniformBufferPacket.gpuBuffers[uniformBufferPacket.bufferIndex];
+  }
+
+  // Need to move to next buffer or create a new one
+  uniformBufferPacket.bufferIndex++;
+  uniformBufferPacket.cursor = 0;
+
+  if (uniformBufferPacket.bufferIndex >= uniformBufferPacket.gpuBuffers.size()) {
+    // Need to create a new buffer
+    auto buffer = context->gpu()->createBuffer(maxUBOSize, GPUBufferUsage::UNIFORM);
+    if (buffer == nullptr) {
+      LOGE(
+          "[GlobalCache::findOrCreateUniformBuffer] failed to create uniform buffer, request "
+          "buffer size: %zu, %s:%d",
+          bufferSize, __FILE__, __LINE__);
+      return nullptr;
+    }
+    uniformBufferPacket.gpuBuffers.emplace_back(std::move(buffer));
+    maxUniformBufferTracker->addValue(getAverageUniformBufferSize());
+  }
+
+  *lastBufferOffset = uniformBufferPacket.cursor;
+  uniformBufferPacket.cursor += alignedBufferSize;
+
+  return uniformBufferPacket.gpuBuffers[uniformBufferPacket.bufferIndex];
+}
+
+void GlobalCache::resetUniformBuffer() {
+  counter++;
+  tripleUniformBufferIndex = counter % UNIFORM_BUFFER_COUNT;
+  if (counter == UNIFORM_BUFFER_COUNT) {
+    counter = 0;
+  }
+
+  auto& currentBuffer = tripleUniformBuffer[tripleUniformBufferIndex];
+
+  size_t maxReuseSize = maxUniformBufferTracker->getMaxValue();
+  if (maxReuseSize > 0 && currentBuffer.gpuBuffers.size() > maxReuseSize) {
+    currentBuffer.gpuBuffers.resize(maxReuseSize);
+  }
+
+  currentBuffer.bufferIndex = 0;
+  currentBuffer.cursor = 0;
+}
+
 void GlobalCache::addProgram(const BytesKey& programKey, std::shared_ptr<Program> program) {
   if (program == nullptr) {
     return;
@@ -58,17 +166,6 @@ void GlobalCache::addProgram(const BytesKey& programKey, std::shared_ptr<Program
     programLRU.pop_back();
     programMap.erase(oldProgram->programKey);
   }
-}
-
-void GlobalCache::releaseAll() {
-  programLRU.clear();
-  programMap.clear();
-  gradientLRU.clear();
-  gradientTextures.clear();
-  aaQuadIndexBuffer = nullptr;
-  nonAAQuadIndexBuffer = nullptr;
-  rRectFillIndexBuffer = nullptr;
-  rRectStrokeIndexBuffer = nullptr;
 }
 
 std::shared_ptr<TextureProxy> GlobalCache::getGradient(const Color* colors, const float* positions,
@@ -98,7 +195,7 @@ std::shared_ptr<TextureProxy> GlobalCache::getGradient(const Color* colors, cons
   gradientLRU.push_front(gradientTexture.get());
   gradientTexture->cachedPosition = gradientLRU.begin();
   gradientTextures[bytesKey] = std::move(gradientTexture);
-  while (gradientLRU.size() > MaxNumCachedGradientBitmaps) {
+  while (gradientLRU.size() > MAX_NUM_CACHED_GRADIENT_BITMAPS) {
     auto texture = gradientLRU.back();
     gradientLRU.pop_back();
     gradientTextures.erase(texture->gradientKey);
@@ -133,7 +230,7 @@ class RectIndicesProvider : public DataSource<Data> {
     if (buffer.isEmpty()) {
       return nullptr;
     }
-    auto* data = reinterpret_cast<uint16_t*>(buffer.data());
+    auto data = reinterpret_cast<uint16_t*>(buffer.data());
     for (uint16_t i = 0; i < reps; ++i) {
       uint16_t baseIdx = i * patternSize;
       auto baseVert = static_cast<uint16_t>(i * vertCount);
@@ -151,12 +248,12 @@ class RectIndicesProvider : public DataSource<Data> {
   uint16_t vertCount = 0;
 };
 
-std::shared_ptr<IndexBufferProxy> GlobalCache::getRectIndexBuffer(bool antialias) {
+std::shared_ptr<GPUBufferProxy> GlobalCache::getRectIndexBuffer(bool antialias) {
   if (antialias) {
     if (aaQuadIndexBuffer == nullptr) {
       auto provider =
           std::make_unique<RectIndicesProvider>(AAQuadIndexPattern, RectDrawOp::IndicesPerAAQuad,
-                                                RectDrawOp::MaxNumRects, VerticesPerAAQuad);
+                                                RectDrawOp::MaxNumRects, VERTICES_PER_AA_QUAD);
       aaQuadIndexBuffer = context->proxyProvider()->createIndexBufferProxy(std::move(provider));
     }
     return aaQuadIndexBuffer;
@@ -164,7 +261,7 @@ std::shared_ptr<IndexBufferProxy> GlobalCache::getRectIndexBuffer(bool antialias
   if (nonAAQuadIndexBuffer == nullptr) {
     auto provider = std::make_unique<RectIndicesProvider>(
         NonAAQuadIndexPattern, RectDrawOp::IndicesPerNonAAQuad, RectDrawOp::MaxNumRects,
-        VerticesPerNonAAQuad);
+        VERTICES_PER_NON_AA_QUAD);
     nonAAQuadIndexBuffer = context->proxyProvider()->createIndexBufferProxy(std::move(provider));
   }
   return nonAAQuadIndexBuffer;
@@ -227,7 +324,7 @@ class RRectIndicesProvider : public DataSource<Data> {
   bool stroke = false;
 };
 
-std::shared_ptr<IndexBufferProxy> GlobalCache::getRRectIndexBuffer(bool stroke) {
+std::shared_ptr<GPUBufferProxy> GlobalCache::getRRectIndexBuffer(bool stroke) {
   auto& indexBuffer = stroke ? rRectStrokeIndexBuffer : rRectFillIndexBuffer;
   if (indexBuffer == nullptr) {
     auto provider = std::make_unique<RRectIndicesProvider>(RRectDrawOp::MaxNumRRects, stroke);

@@ -19,16 +19,18 @@
 #pragma once
 
 #include <unordered_map>
-#include "RenderTarget.h"
-#include "gpu/Blend.h"
-#include "gpu/Program.h"
+#include "gpu/RenderPass.h"
+#include "gpu/RenderPipeline.h"
 #include "gpu/processors/EmptyXferProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/GeometryProcessor.h"
+#include "gpu/resources/PipelineProgram.h"
+#include "gpu/resources/Program.h"
+#include "gpu/resources/RenderTarget.h"
 
 namespace tgfx {
 struct SamplerInfo {
-  GPUTexture* texture;
+  std::shared_ptr<GPUTexture> texture;
   SamplerState state;
 };
 
@@ -38,10 +40,9 @@ struct SamplerInfo {
  */
 class ProgramInfo {
  public:
-  ProgramInfo(RenderTarget* renderTarget, PlacementPtr<GeometryProcessor> geometryProcessor,
-              std::vector<PlacementPtr<FragmentProcessor>> fragmentProcessors,
-              size_t numColorProcessors, PlacementPtr<XferProcessor> xferProcessor,
-              BlendMode blendMode);
+  ProgramInfo(RenderTarget* renderTarget, GeometryProcessor* geometryProcessor,
+              std::vector<FragmentProcessor*> fragmentProcessors, size_t numColorProcessors,
+              XferProcessor* xferProcessor, BlendMode blendMode);
 
   size_t numColorFragmentProcessors() const {
     return numColorProcessors;
@@ -52,11 +53,11 @@ class ProgramInfo {
   }
 
   const GeometryProcessor* getGeometryProcessor() const {
-    return geometryProcessor.get();
+    return geometryProcessor;
   }
 
   const FragmentProcessor* getFragmentProcessor(size_t idx) const {
-    return fragmentProcessors[idx].get();
+    return fragmentProcessors[idx];
   }
 
   const XferProcessor* getXferProcessor() const;
@@ -67,11 +68,7 @@ class ProgramInfo {
     return geometryProcessor->vertexAttributes();
   }
 
-  std::unique_ptr<BlendFormula> getBlendFormula() const;
-
-  void getUniforms(UniformBuffer* uniformBuffer) const;
-
-  std::vector<SamplerInfo> getSamplers() const;
+  PipelineColorAttachment getPipelineColorAttachment() const;
 
   /**
    * Returns the index of the processor in the ProgramInfo. Returns -1 if the processor is not in
@@ -83,16 +80,34 @@ class ProgramInfo {
 
   std::shared_ptr<Program> getProgram() const;
 
+  std::shared_ptr<GPUBuffer> getUniformBuffer(const PipelineProgram* program, size_t* vertexOffset,
+                                              size_t* fragmentOffset) const;
+
+  void bindUniformBufferAndUnloadToGPU(const PipelineProgram* program,
+                                       std::shared_ptr<GPUBuffer> uniformBuffer,
+                                       RenderPass* renderPass, size_t vertexOffset,
+                                       size_t fragmentOffset) const;
+
+  /**
+   * Sets the uniform data and texture samplers on the render pass for the given program.
+   */
+  void setUniformsAndSamplers(RenderPass* renderPass, PipelineProgram* program) const;
+
  private:
   RenderTarget* renderTarget = nullptr;
-  PlacementPtr<GeometryProcessor> geometryProcessor = nullptr;
-  std::vector<PlacementPtr<FragmentProcessor>> fragmentProcessors = {};
+  GeometryProcessor* geometryProcessor = nullptr;
+  std::vector<FragmentProcessor*> fragmentProcessors = {};
   std::unordered_map<const Processor*, int> processorIndices = {};
   // This value is also the index in fragmentProcessors where coverage processors begin.
   size_t numColorProcessors = 0;
-  PlacementPtr<XferProcessor> xferProcessor = nullptr;
+  XferProcessor* xferProcessor = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
 
   void updateProcessorIndices();
+
+  std::vector<SamplerInfo> getSamplers() const;
+
+  void updateUniformDataSuffix(UniformData* vertexUniformData, UniformData* fragmentUniformData,
+                               const Processor* processor) const;
 };
 }  // namespace tgfx

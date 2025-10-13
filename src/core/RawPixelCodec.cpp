@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RawPixelCodec.h"
-#include "gpu/TextureView.h"
+#include "gpu/resources/TextureView.h"
 
 namespace tgfx {
 std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(const ImageInfo& info,

@@ -21,6 +21,7 @@
 #include <memory>
 #include "gpu/CommandBuffer.h"
 #include "gpu/GPUBuffer.h"
+#include "gpu/GPUFence.h"
 #include "gpu/GPUTexture.h"
 
 namespace tgfx {
@@ -39,9 +40,8 @@ class CommandQueue {
    * @param bufferOffset The offset in the buffer where the data should be written.
    * @param data Pointer to the data to write.
    * @param size The size of the data in bytes.
-   * @return true if the write operation was successful, false otherwise.
    */
-  virtual bool writeBuffer(GPUBuffer* buffer, size_t bufferOffset, const void* data,
+  virtual void writeBuffer(std::shared_ptr<GPUBuffer> buffer, size_t bufferOffset, const void* data,
                            size_t size) = 0;
 
   /**
@@ -51,8 +51,8 @@ class CommandQueue {
    * generateMipmapsForTexture() method after writing the pixels, as mipmaps will not be generated
    * automatically.
    */
-  virtual void writeTexture(GPUTexture* texture, const Rect& rect, const void* pixels,
-                            size_t rowBytes) = 0;
+  virtual void writeTexture(std::shared_ptr<GPUTexture> texture, const Rect& rect,
+                            const void* pixels, size_t rowBytes) = 0;
 
   /**
    * Copies pixel data from the GPUTexture within the specified rectangle into the provided memory
@@ -60,7 +60,7 @@ class CommandQueue {
    * must be entirely within the frame buffer's dimensions. Returns true if the read operation
    * succeeds, false otherwise.
    */
-  virtual bool readTexture(GPUTexture* texture, const Rect& rect, void* pixels,
+  virtual bool readTexture(std::shared_ptr<GPUTexture> texture, const Rect& rect, void* pixels,
                            size_t rowBytes) const = 0;
 
   /**
@@ -69,8 +69,21 @@ class CommandQueue {
   virtual void submit(std::shared_ptr<CommandBuffer> commandBuffer) = 0;
 
   /**
-   * Blocks the current thread until all previously submitted commands in this queue have
-   * completed execution on the GPU.
+   * Inserts a GPU fence into the command queue. This allows other synchronization points to be
+   * notified when all previous GPU commands have finished executing. Returns nullptr if the
+   * GPUFence cannot be inserted due to lack of support (for example, on WebGPU).
+   */
+  virtual std::shared_ptr<GPUFence> insertFence() = 0;
+
+  /**
+   * Inserts a GPU wait operation into the command queue, making the GPU wait until the specified
+   * fence is signaled before executing subsequent commands.
+   */
+  virtual void waitForFence(std::shared_ptr<GPUFence> fence) = 0;
+
+  /**
+   * Blocks the current thread until all previously submitted commands in this queue have completed
+   * execution on the GPU.
    */
   virtual void waitUntilCompleted() = 0;
 };
