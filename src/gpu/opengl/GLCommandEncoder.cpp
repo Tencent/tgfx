@@ -110,6 +110,11 @@ bool GLCommandEncoder::copyTextureToBuffer(std::shared_ptr<GPUTexture> srcTextur
     LOGE("GLCommandEncoder::copyTextureToBuffer() destination buffer is invalid!");
     return false;
   }
+  auto requiredSize = dstOffset + static_cast<size_t>(srcRect.height()) * dstRowBytes;
+  if (dstBuffer->size() < requiredSize) {
+    LOGE("GLCommandEncoder::copyTextureToBuffer() destination buffer is too small!");
+    return false;
+  }
   auto caps = static_cast<const GLCaps*>(gpu->caps());
   if (!caps->isFormatRenderable(srcTexture->format())) {
     LOGE("GLCommandEncoder::copyTextureToBuffer() source texture format is not copyable!");
