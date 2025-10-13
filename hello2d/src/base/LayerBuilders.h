@@ -18,13 +18,13 @@
 
 #pragma once
 
-#include "hello2d/LayerBuilder.h"
+#include "hello2d/SampleBuilder.h"
 
 namespace hello2d {
 #define DEFINE_LAYER_BUILDER(BuilderName)                                      \
-  class BuilderName : public hello2d::LayerBuilder {                           \
+  class BuilderName : public hello2d::SampleBuilder {                          \
    public:                                                                     \
-    BuilderName() : hello2d::LayerBuilder(#BuilderName) {                      \
+    BuilderName() : hello2d::SampleBuilder(#BuilderName) {                     \
     }                                                                          \
                                                                                \
     std::shared_ptr<tgfx::Layer> buildLayerTree(const AppHost* host) override; \

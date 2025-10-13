@@ -19,7 +19,7 @@
 #import "TGFXView.h"
 #import <QuartzCore/CADisplayLink.h>
 #include <cmath>
-#include "hello2d/LayerBuilder.h"
+#include "hello2d/SampleBuilder.h"
 #include "tgfx/core/Point.h"
 
 static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, const CVTimeStamp*,
@@ -171,10 +171,9 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
                                            static_cast<float>(self.contentOffset.y)));
   auto canvas = surface->getCanvas();
   canvas->clear();
-  auto numBuilders = hello2d::LayerBuilder::Count();
+  auto numBuilders = hello2d::SampleBuilder::Count();
   auto index = (self.drawIndex % numBuilders);
-  bool isNeedBackground = true;
-  appHost->draw(canvas, index, isNeedBackground);
+  appHost->draw(canvas, index, true);
   context->flushAndSubmit();
   tgfxWindow->present(context);
   device->unlock();

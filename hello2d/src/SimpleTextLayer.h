@@ -28,12 +28,10 @@ struct TextLine {
 };
 
 class Element {
-  friend class SimpleTextLayer;
-
  public:
-  enum Type { Text, Image };
+  enum class Type { Text, Image };
 
-  std::string text = {};
+  std::string text = "";
   tgfx::Font font = {};
   std::vector<tgfx::Paint> paints = {};
 
@@ -43,21 +41,23 @@ class Element {
 
   std::vector<std::pair<size_t, size_t>> underlineIndex = {};
   std::vector<std::pair<size_t, size_t>> deletelineIndex = {};
-  Type type = Text;
+  Type type = Type::Text;
 
  private:
   tgfx::Rect imageRect = {};
   std::shared_ptr<tgfx::TextBlob> textBlob = nullptr;
   std::vector<TextLine> underline = {};
   std::vector<TextLine> deleteline = {};
+
+  friend class SimpleTextLayer;
 };
 
 class SimpleTextLayer : public tgfx::Layer {
  public:
   static std::shared_ptr<SimpleTextLayer> Make();
 
-  void setElements(const std::vector<Element>& value) {
-    richTexts = value;
+  void setElements(std::vector<Element> value) {
+    richTexts = std::move(value);
     invalidateContent();
   }
 

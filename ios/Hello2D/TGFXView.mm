@@ -18,7 +18,7 @@
 
 #import "TGFXView.h"
 #include <cmath>
-#include "hello2d/LayerBuilder.h"
+#include "hello2d/SampleBuilder.h"
 
 @implementation TGFXView {
   std::shared_ptr<tgfx::EAGLWindow> tgfxWindow;
@@ -84,36 +84,35 @@
   }
   appHost->resetDirty();
   if (self.window == nil) {
-    return true;
+    return false;
   }
   if (appHost->width() <= 0 || appHost->height() <= 0) {
-    return true;
+    return false;
   }
   if (tgfxWindow == nullptr) {
     tgfxWindow = tgfx::EAGLWindow::MakeFrom((CAEAGLLayer*)[self layer]);
   }
   if (tgfxWindow == nullptr) {
-    return true;
+    return false;
   }
   auto device = tgfxWindow->getDevice();
   auto context = device->lockContext();
   if (context == nullptr) {
-    return true;
+    return false;
   }
   auto surface = tgfxWindow->getSurface(context);
   if (surface == nullptr) {
     device->unlock();
-    return true;
+    return false;
   }
 
   appHost->updateZoomAndOffset(
       zoom, tgfx::Point(static_cast<float>(offset.x), static_cast<float>(offset.y)));
   auto canvas = surface->getCanvas();
   canvas->clear();
-  auto numBuilders = hello2d::LayerBuilder::Count();
+  auto numBuilders = hello2d::SampleBuilder::Count();
   auto index = (drawIndex % numBuilders);
-  bool isNeedBackground = true;
-  appHost->draw(canvas, index, isNeedBackground);
+  appHost->draw(canvas, index, true);
   context->flushAndSubmit();
   tgfxWindow->present(context);
   device->unlock();

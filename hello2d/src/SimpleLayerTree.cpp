@@ -60,6 +60,7 @@ static std::shared_ptr<tgfx::Layer> CreateProgressBar() {
 
 static std::vector<std::shared_ptr<tgfx::Layer>> CreateBackground() {
   std::vector<std::shared_ptr<tgfx::Layer>> layers;
+  layers.reserve(4);  // 给个初始容量
 
   auto background = tgfx::ShapeLayer::Make();
   tgfx::Rect displayRect = tgfx::Rect::MakeWH(375, 812);
@@ -113,7 +114,7 @@ static std::shared_ptr<tgfx::Layer> CreateImageLayer(const AppHost* host) {
 std::shared_ptr<tgfx::Layer> SimpleLayerTree::buildLayerTree(const AppHost* host) {
   auto root = tgfx::Layer::Make();
   // background
-  for (auto layer:CreateBackground()) {
+  for (auto& layer : CreateBackground()) {
     root->addChild(layer);
   }
 

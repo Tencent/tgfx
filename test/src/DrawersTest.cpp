@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/utils/Log.h"
-#include "hello2d/LayerBuilder.h"
+#include "hello2d/SampleBuilder.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
@@ -33,7 +33,7 @@ TGFX_TEST(Hello2DTest, Compare) {
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, appHost.width(), appHost.height(), false, 4);
   auto canvas = surface->getCanvas();
-  auto builderNames = hello2d::LayerBuilder::Names();
+  auto builderNames = hello2d::SampleBuilder::Names();
   for (size_t i = 0; i < builderNames.size(); ++i) {
     const auto& name = builderNames[i];
     bool isNeedBackground = false;

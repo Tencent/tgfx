@@ -20,6 +20,7 @@
 #include <tgfx/layers/Gradient.h>
 #include <tgfx/layers/ShapeLayer.h>
 #include <tgfx/layers/SolidColor.h>
+#include <map>
 #include "base/LayerBuilders.h"
 #include "hello2d/AppHost.h"
 #include "tgfx/core/UTF.h"
@@ -29,7 +30,9 @@ static auto strokeOffset = 0.f;
 
 // Merge continuous lines at the same height
 static void mergeLines(std::vector<TextLine>& lines) {
-  if (lines.empty()) return;
+  if (lines.empty()) {
+    return;
+  }
 
   std::sort(lines.begin(), lines.end(), [](const TextLine& a, const TextLine& b) {
     if (a.linePosition != b.linePosition) {
@@ -58,10 +61,11 @@ static void mergeLines(std::vector<TextLine>& lines) {
 // Set the positions of the first occurrence of B in string A to true, for quickly setting underlineIndex and deletelineIndex
 std::vector<std::pair<size_t, size_t>> findFirstOccurrence(const std::string& A,
                                                            const std::string& B) {
-  std::vector<std::pair<size_t, size_t>> result;
   if (B.empty() || A.empty() || B.size() > A.size()) {
-    return result;
+    return {};
   }
+  
+  std::vector<std::pair<size_t, size_t>> result = {};
 
   size_t foundPos = A.find(B);
   if (foundPos != std::string::npos) {
@@ -86,7 +90,7 @@ void SimpleTextLayer::onUpdateContent(tgfx::LayerRecorder* recorder) {
       canvas->drawLine(left, linePosition, right, linePosition, linePaint);
     }
 
-    if (richText.type == Element::Text) {
+    if (richText.type == Element::Type::Text) {
       for (const auto& paint : richText.paints) {
         canvas->drawTextBlob(richText.textBlob, 0, 0, paint);
       }
@@ -106,18 +110,31 @@ void SimpleTextLayer::invalidateLayout() {
   auto baselineHeight = 0.f;   // Current line's max baseline height
   auto underlineHeight = 0.f;  // Current line's max underline height
 
-  std::vector<float> baselines;   // Baseline positions for each line
-  std::vector<float> underlines;  // Underline positions for each line
+  std::vector<float> baselines = {};   // Baseline positions for each line
+  std::vector<float> underlines = {};  // Underline positions for each line
+
+  // Cache font metrics to avoid repeated expensive calls
+  std::map<std::string, std::pair<tgfx::Font, tgfx::FontMetrics>> fontMetricsCache = {};
 
   // Baselines and underlines height are determined by the tallest richText, so calculates theses in first pass
   for (auto& richText : richTexts) {
-    if (richText.type == Element::Text) {
+    if (richText.type == Element::Type::Text) {
       auto font = richText.font;
-      auto metrics = font.getMetrics();
+      std::string fontKey = std::to_string(reinterpret_cast<uintptr_t>(font.getTypeface().get())) + 
+                           "_" + std::to_string(font.getSize());
+      
+      tgfx::FontMetrics fontMetrics;
+      auto it = fontMetricsCache.find(fontKey);
+      if (it != fontMetricsCache.end()) {
+        fontMetrics = it->second.second;
+      } else {
+        fontMetrics = font.getMetrics();
+        fontMetricsCache[fontKey] = std::make_pair(font, fontMetrics);
+      }
       float textHeight =
-          std::fabs(metrics.ascent) + std::fabs(metrics.descent) + std::fabs(metrics.leading);
-      float textBaseline = (textHeight + metrics.xHeight) / 2.f;
-      float textUnderline = textBaseline + metrics.descent;
+          std::fabs(fontMetrics.ascent) + std::fabs(fontMetrics.descent) + std::fabs(fontMetrics.leading);
+      float textBaseline = (textHeight + fontMetrics.xHeight) / 2.f;
+      float textUnderline = textBaseline + fontMetrics.descent;
       lineHeight = std::max(lineHeight, textHeight);
       baselineHeight = std::max(baselineHeight, textBaseline);
       underlineHeight = std::max(underlineHeight, textUnderline + strokeOffset);
@@ -137,7 +154,7 @@ void SimpleTextLayer::invalidateLayout() {
           }
         }
       }
-    } else if (richText.type == Element::Image) {
+    } else if (richText.type == Element::Type::Image) {
       lineHeight = lineHeight == 0.f
                        ? richText.height * 1.2f
                        : std::max(lineHeight, lineHeight - baselineHeight + richText.height);
@@ -151,14 +168,16 @@ void SimpleTextLayer::invalidateLayout() {
   auto xOffset = 0.f;
   size_t lineIndex = 0;
   for (auto& richText : richTexts) {
-    if (richText.type == Element::Text) {
+    if (richText.type == Element::Type::Text) {
       std::vector<tgfx::GlyphID> glyphs = {};
       std::vector<tgfx::Point> positions = {};
       size_t index = 0;
       const char* textStart = richText.text.data();
       const char* textStop = textStart + richText.text.size();
       auto font = richText.font;
-      auto metrics = font.getMetrics();
+      std::string fontKey = std::to_string(reinterpret_cast<uintptr_t>(font.getTypeface().get())) + 
+                           "_" + std::to_string(font.getSize());
+      auto& metrics = fontMetricsCache[fontKey].second;
       auto emptyGlyphID = font.getGlyphID(" ");
       auto emptyAdvance = font.getAdvance(emptyGlyphID);
       while (textStart < textStop) {
@@ -202,7 +221,7 @@ void SimpleTextLayer::invalidateLayout() {
       }
       tgfx::GlyphRun glyphRun(font, std::move(glyphs), std::move(positions));
       richText.textBlob = tgfx::TextBlob::MakeFrom(std::move(glyphRun));
-    } else if (richText.type == Element::Image) {
+    } else if (richText.type == Element::Type::Image) {
       richText.imageRect = tgfx::Rect::MakeXYWH(xOffset, baselines[lineIndex] - richText.height,
                                                 richText.width, richText.height);
       if (!richText.underlineIndex.empty()) {
@@ -266,11 +285,13 @@ std::shared_ptr<tgfx::Layer> RichText::buildLayerTree(const AppHost* host) {
 
   std::vector<Element> elements(5);
   //Image
-  elements[0].type = Element::Image;
+  elements[0].type = Element::Type::Image;
   auto image = host->getImage("TGFX");
   image = image->makeMipmapped(true);
   elements[0].image = image;
-  auto textHeight = ceil(fonts[0].getSize() * 0.8f);
+  // 参考TextLayer::getLineHeight的计算方法
+  auto metrics = fonts[0].getMetrics();
+  auto textHeight = ceil(metrics.capHeight + metrics.descent);
   elements[0].height = textHeight;
   elements[0].width =
       static_cast<float>(image->width()) * textHeight / static_cast<float>(image->height());
@@ -295,7 +316,7 @@ std::shared_ptr<tgfx::Layer> RichText::buildLayerTree(const AppHost* host) {
   elements[4].paints = {{}};
 
   auto textLayer = SimpleTextLayer::Make();
-  textLayer->setElements(elements);
+  textLayer->setElements(std::move(elements));
   textLayer->invalidateLayout();
   auto bounds = textLayer->getBounds();
   auto textScale = screenWidth / bounds.width();

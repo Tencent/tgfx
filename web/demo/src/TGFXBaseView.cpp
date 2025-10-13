@@ -18,7 +18,7 @@
 
 #include "TGFXBaseView.h"
 #include <cmath>
-#include "hello2d/LayerBuilder.h"
+#include "hello2d/SampleBuilder.h"
 #include "tgfx/core/Point.h"
 
 using namespace emscripten;
@@ -86,14 +86,15 @@ bool TGFXBaseView::draw(int drawIndex, float zoom, float offsetX, float offsetY)
   appHost->updateZoomAndOffset(zoom, tgfx::Point(offsetX, offsetY));
   auto canvas = surface->getCanvas();
   canvas->clear();
-  auto numhello2d = hello2d::LayerBuilder::Count();
+  auto numhello2d = hello2d::SampleBuilder::Count();
   auto index = (drawIndex % numhello2d);
-  bool isNeedBackground = true;
-  appHost->draw(canvas, index, isNeedBackground);
+  appHost->draw(canvas, index, true);
   context->flushAndSubmit();
   window->present(context);
   device->unlock();
   return true;
+  
+
 }
 
 }  // namespace hello2d

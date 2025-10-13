@@ -79,7 +79,7 @@ open class TGFXView : TextureView, TextureView.SurfaceTextureListener {
         surface = Surface(surfaceTexture)
         val imageBytesArray = arrayOf(imageBytesBridge, imageBytesTGFX)
         nativePtr = setupFromSurface(
-            surface!!,
+            surface,
             imageBytesArray,
             fontBytes,
             metrics.density
@@ -107,9 +107,8 @@ open class TGFXView : TextureView, TextureView.SurfaceTextureListener {
 
 
     fun release() {
-        surface?.let {
-            it.release()
-            surface = null
+        if (::surface.isInitialized) {
+            surface.release()
         }
         nativeRelease()
     }
@@ -132,7 +131,7 @@ open class TGFXView : TextureView, TextureView.SurfaceTextureListener {
     ): Boolean
 
 
-    private var surface: Surface? = null
+    private lateinit var surface: Surface
 
     private var nativePtr: Long = 0
 

@@ -16,52 +16,53 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "hello2d/LayerBuilder.h"
+#include "hello2d/SampleBuilder.h"
 #include <unordered_map>
 #include "GridBackground.h"
 #include "base/LayerBuilders.h"
 #include "tgfx/platform/Print.h"
 
 namespace hello2d {
-static std::vector<LayerBuilder*> layerBuilders = {
+static std::vector<SampleBuilder*> sampleBuilders = {
     new ConicGradient(), new ImageWithMipmap(), new ImageWithShadow(),
     new RichText(),      new SimpleLayerTree(),
 };
 
-static std::vector<std::string> GetLayerBuilderNames() {
+static std::vector<std::string> GetSampleBuilderNames() {
   std::vector<std::string> names;
-  for (const auto& builder : layerBuilders) {
+  names.reserve(sampleBuilders.size());
+  for (const auto& builder : sampleBuilders) {
     names.push_back(builder->name());
   }
   return names;
 }
 
-static std::unordered_map<std::string, LayerBuilder*> GetLayerBuilderMap() {
-  std::unordered_map<std::string, LayerBuilder*> map;
-  for (const auto& builder : layerBuilders) {
+static std::unordered_map<std::string, SampleBuilder*> GetSampleBuilderMap() {
+  std::unordered_map<std::string, SampleBuilder*> map;
+  map.reserve(sampleBuilders.size());
+  for (const auto& builder : sampleBuilders) {
     map[builder->name()] = builder;
   }
   return map;
 }
 
-int LayerBuilder::Count() {
-  return static_cast<int>(layerBuilders.size());
+int SampleBuilder::Count() {
+  return static_cast<int>(sampleBuilders.size());
 }
 
-const std::vector<std::string>& LayerBuilder::Names() {
-  static auto names = GetLayerBuilderNames();
-  return names;
+std::vector<std::string> SampleBuilder::Names() {
+  return GetSampleBuilderNames();
 }
 
-LayerBuilder* LayerBuilder::GetByIndex(int index) {
+SampleBuilder* SampleBuilder::GetByIndex(int index) {
   if (index < 0 || index >= Count()) {
     return nullptr;
   }
-  return layerBuilders[static_cast<size_t>(index)];
+  return sampleBuilders[static_cast<size_t>(index)];
 }
 
-LayerBuilder* LayerBuilder::GetByName(const std::string& name) {
-  static auto builderMap = GetLayerBuilderMap();
+SampleBuilder* SampleBuilder::GetByName(const std::string& name) {
+  auto builderMap = GetSampleBuilderMap();
   auto it = builderMap.find(name);
   if (it == builderMap.end()) {
     return nullptr;
@@ -69,26 +70,25 @@ LayerBuilder* LayerBuilder::GetByName(const std::string& name) {
   return it->second;
 }
 
-void LayerBuilder::DrawBackground(tgfx::Canvas* canvas, const AppHost* host) {
-  auto layer = GridBackgroundLayer::Make();
+void SampleBuilder::DrawBackground(tgfx::Canvas* canvas, const AppHost* host) {
+  static auto layer = GridBackgroundLayer::Make();
   layer->setSize(static_cast<float>(host->width()), static_cast<float>(host->height()),
                  host->density());
   layer->draw(canvas);
 }
 
-LayerBuilder::LayerBuilder(std::string name) : _name(std::move(name)) {
+SampleBuilder::SampleBuilder(std::string name) : _name(std::move(name)) {
 }
 
-void LayerBuilder::build(const AppHost* host) {
+void SampleBuilder::build(const AppHost* host) {
   if (host == nullptr) {
-    tgfx::PrintError("LayerBuilder::build() appHost is nullptr!");
     return;
   }
   if (!_root) {
     _root = buildLayerTree(host);
   }
 }
-std::vector<std::shared_ptr<tgfx::Layer>> LayerBuilder::getLayersUnderPoint(float x, float y) {
+std::vector<std::shared_ptr<tgfx::Layer>> SampleBuilder::getLayersUnderPoint(float x, float y) {
   return _root->getLayersUnderPoint(x,y);
 }
 }  // namespace hello2d

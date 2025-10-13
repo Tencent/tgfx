@@ -18,7 +18,7 @@ include_directories(${NATIVERENDER_ROOT_PATH}
                     ${NATIVERENDER_ROOT_PATH}/include)
 
 find_library(NATIVE_VSYNC_LIB native_vsync)
-set(TGFX_BUILD_DRAWERS ON)
+set(TGFX_BUILD_HELLO2D ON)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../../../../ ./tgfx)
 

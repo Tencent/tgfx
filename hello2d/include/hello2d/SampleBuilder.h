@@ -23,33 +23,33 @@
 #include "tgfx/layers/DisplayList.h"
 
 namespace hello2d {
-class LayerBuilder {
+class SampleBuilder {
  public:
   /**
-   * Returns the number of layer builders.
+   * Returns the number of sample builders.
    */
   static int Count();
 
   /**
-   * Returns the names of all layer builders.
+   * Returns the names of all sample builders.
    */
-  static const std::vector<std::string>& Names();
+  static std::vector<std::string> Names();
 
   /**
-   * Returns the layer builder with the given index.
+   * Returns the sample builder with the given index.
    */
-  static LayerBuilder* GetByIndex(int index);
+  static SampleBuilder* GetByIndex(int index);
 
   /**
-   * Returns the layer builder with the given name.
+   * Returns the sample builder with the given name.
    */
-  static LayerBuilder* GetByName(const std::string& name);
+  static SampleBuilder* GetByName(const std::string& name);
 
   static void DrawBackground(tgfx::Canvas* canvas, const AppHost* host);
 
-  explicit LayerBuilder(std::string name);
+  explicit SampleBuilder(std::string name);
 
-  virtual ~LayerBuilder() = default;
+  virtual ~SampleBuilder() = default;
   std::vector<std::shared_ptr<tgfx::Layer>> getLayersUnderPoint(float x, float y);
 
   std::string name() const {
@@ -67,6 +67,6 @@ class LayerBuilder {
   std::shared_ptr<tgfx::Layer> _root = nullptr;
 
  private:
-  std::string _name;
+  std::string _name = "";
 };
 }  // namespace hello2d

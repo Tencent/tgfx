@@ -20,7 +20,7 @@
 
 #include <emscripten/bind.h>
 #include "hello2d/AppHost.h"
-#include "hello2d/LayerBuilder.h"
+#include "hello2d/SampleBuilder.h"
 #include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
 
 namespace hello2d {

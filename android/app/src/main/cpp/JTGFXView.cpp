@@ -17,11 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "JTGFXView.h"
-#include "hello2d/LayerBuilder.h"
+#include "hello2d/SampleBuilder.h"
 
 namespace hello2d {
 static jfieldID TGFXView_nativePtr;
-bool isFristDraw = true;
 
 void JTGFXView::updateSize() {
   auto width = ANativeWindow_getWidth(nativeWindow);
@@ -32,42 +31,36 @@ void JTGFXView::updateSize() {
   }
 }
 
-void JTGFXView::localMarkDirty() {
+void JTGFXView::markDirty() {
   appHost->markDirty();
 }
 
 bool JTGFXView::draw(int drawIndex, float zoom, float offsetX, float offsetY) {
-  if (isFristDraw) {
-    isFristDraw = false;
-    appHost->markDirty();
-  }
   if (!appHost->isDirty()) {
-    printf("draw() isDirty() == false.\n");
     return false;
   }
   appHost->resetDirty();
 
   if (appHost->width() <= 0 || appHost->height() <= 0) {
-    return true;
+    return false;
   }
   auto device = window->getDevice();
   auto context = device->lockContext();
   if (context == nullptr) {
-    return true;
+    return false;
   }
   auto surface = window->getSurface(context);
   if (surface == nullptr) {
     device->unlock();
-    return true;
+    return false;
   }
 
   appHost->updateZoomAndOffset(zoom, tgfx::Point(offsetX, offsetY));
   auto canvas = surface->getCanvas();
   canvas->clear();
-  auto numDrawers = hello2d::LayerBuilder::Count();
+  auto numDrawers = hello2d::SampleBuilder::Count();
   auto index = (drawIndex % numDrawers);
-  bool isNeedBackground = true;
-  appHost->draw(canvas, index, isNeedBackground);
+  appHost->draw(canvas, index, true);
   context->flushAndSubmit();
   window->present(context);
   device->unlock();
@@ -113,26 +106,24 @@ JNIEXPORT void JNICALL Java_org_tgfx_hello2d_TGFXView_00024Companion_nativeInit(
 }
 
 JNIEXPORT jlong JNICALL Java_org_tgfx_hello2d_TGFXView_00024Companion_setupFromSurface(
-    JNIEnv* env, jobject, jobject surface, jobjectArray imageBytesArrays, jbyteArray fontBytes,
+    JNIEnv* env, jobject, jobject surface, jobjectArray imageBytesArray, jbyteArray fontBytes,
     jfloat density) {
   if (surface == nullptr) {
-    printf("SetupFromSurface() Invalid surface specified.\n");
     return 0;
   }
 
   auto nativeWindow = ANativeWindow_fromSurface(env, surface);
   auto window = tgfx::EGLWindow::MakeFrom(nativeWindow);
   if (window == nullptr) {
-    printf("SetupFromSurface() Invalid surface specified.\n");
     return 0;
   }
 
   auto appHost = CreateAppHost(nativeWindow, density);
 
-  jsize numArrays = env->GetArrayLength(imageBytesArrays);
+  jsize numArrays = env->GetArrayLength(imageBytesArray);
   for (jsize i = 0; i < numArrays; i++) {
     jbyteArray imageBytes =
-        static_cast<jbyteArray>(env->GetObjectArrayElement(imageBytesArrays, i));
+        static_cast<jbyteArray>(env->GetObjectArrayElement(imageBytesArray, i));
     auto bytes = env->GetByteArrayElements(imageBytes, nullptr);
     auto size = static_cast<size_t>(env->GetArrayLength(imageBytes));
     auto data = tgfx::Data::MakeWithCopy(bytes, size);
@@ -164,7 +155,7 @@ JNIEXPORT void JNICALL Java_org_tgfx_hello2d_TGFXView_nativeDraw(JNIEnv* env, jo
   if (view == nullptr) {
     return;
   }
-  view->localMarkDirty();
+  view->markDirty();
   view->draw(drawIndex, zoom, offsetX, offsetY);
 }
 

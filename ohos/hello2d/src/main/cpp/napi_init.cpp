@@ -2,7 +2,7 @@
 #include <ace/xcomponent/native_interface_xcomponent.h>
 #include "tgfx/gpu/opengl/egl/EGLWindow.h"
 #include "hello2d/AppHost.h"
-#include "hello2d/LayerBuilder.h"
+#include "hello2d/SampleBuilder.h"
 #include "DisplayLink.h"
 
 static float screenDensity = 1.0f;
@@ -56,27 +56,25 @@ static bool Draw(int drawIndex, float zoom = 1.0f, float offsetX = 0.0f, float o
   appHost->resetDirty();
 
   if (window == nullptr || appHost->width() <= 0 || appHost->height() <= 0) {
-    return true;
+    return false;
   }
   auto device = window->getDevice();
   auto context = device->lockContext();
   if (context == nullptr) {
-    printf("Fail to lock context from the Device.\n");
-    return true;
+    return false;
   }
   auto surface = window->getSurface(context);
   if (surface == nullptr) {
     device->unlock();
-    return true;
+    return false;
   }
 
   appHost->updateZoomAndOffset(zoom, tgfx::Point(offsetX, offsetY));
   auto canvas = surface->getCanvas();
   canvas->clear();
 
-  auto index = (drawIndex % hello2d::LayerBuilder::Count());
-  bool isNeedBackground = true;
-  appHost->draw(canvas, index, isNeedBackground);
+  auto index = (drawIndex % hello2d::SampleBuilder::Count());
+  appHost->draw(canvas, index, true);
   context->flushAndSubmit();
   window->present(context);
   device->unlock();
@@ -185,7 +183,7 @@ static void OnSurfaceCreatedCB(OH_NativeXComponent* component, void* nativeWindo
   UpdateSize(component, nativeWindow);
   window = tgfx::EGLWindow::MakeFrom(reinterpret_cast<EGLNativeWindowType>(nativeWindow));
   if (window == nullptr) {
-    printf("OnSurfaceCreatedCB() Invalid surface specified.\n");
+
     return;
   }
   if (appHost) {

@@ -22,7 +22,7 @@
 #include <jni.h>
 #include <string>
 #include "hello2d/AppHost.h"
-#include "hello2d/LayerBuilder.h"
+#include "hello2d/SampleBuilder.h"
 #include "tgfx/gpu/Window.h"
 #include "tgfx/gpu/opengl/egl/EGLWindow.h"
 
@@ -40,7 +40,7 @@ class JTGFXView {
   }
 
   void updateSize();
-  void localMarkDirty();
+  void markDirty();
   bool draw(int index, float zoom, float x, float y);
 
  private:

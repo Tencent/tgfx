@@ -90,7 +90,7 @@ elseif (WIN32)
 endif ()
 
 set(TGFX_USE_QT ON)
-set(TGFX_BUILD_DRAWERS ON)
+set(TGFX_BUILD_HELLO2D ON)
 
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../ ./tgfx)

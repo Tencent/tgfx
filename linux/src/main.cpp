@@ -18,7 +18,7 @@
 
 #include <filesystem>
 #include <fstream>
-#include "hello2d/LayerBuilder.h"
+#include "hello2d/SampleBuilder.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/opengl/GLDevice.h"
 #include "tgfx/platform/Print.h"
@@ -62,13 +62,12 @@ int main() {
   }
   auto surface = tgfx::Surface::Make(context, appHost.width(), appHost.height());
   auto canvas = surface->getCanvas();
-  auto builderNames = hello2d::LayerBuilder::Names();
+  auto builderNames = hello2d::SampleBuilder::Names();
   auto index = 0;
 
   for (auto& name : builderNames) {
     canvas->clear();
-    bool isNeedBackground = true;
-    appHost.draw(canvas, index, isNeedBackground);
+    appHost.draw(canvas, index, true);
 
     tgfx::Bitmap bitmap = {};
     bitmap.allocPixels(surface->width(), surface->height());

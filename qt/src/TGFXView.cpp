@@ -22,7 +22,7 @@
 #include <QQuickWindow>
 #include <QSGImageNode>
 #include <QThread>
-#include "hello2d/LayerBuilder.h"
+#include "hello2d/SampleBuilder.h"
 
 namespace hello2d {
 TGFXView::TGFXView(QQuickItem* parent) : QQuickItem(parent) {
@@ -131,10 +131,9 @@ bool TGFXView::draw() {
       zoom, tgfx::Point(static_cast<float>(offset.x()), static_cast<float>(offset.y())));
   auto canvas = surface->getCanvas();
   canvas->clear();
-  auto numBuilders = hello2d::LayerBuilder::Count();
+  auto numBuilders = hello2d::SampleBuilder::Count();
   auto index = (currentDrawerIndex % numBuilders);
-  bool isNeedBackground = true;
-  appHost->draw(canvas, index, isNeedBackground);
+  appHost->draw(canvas, index, true);
   context->flushAndSubmit();
   tgfxWindow->present(context);
   device->unlock();

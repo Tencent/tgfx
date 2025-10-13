@@ -107,12 +107,11 @@ class AppHost {
    */
   void addTypeface(const std::string& name, std::shared_ptr<tgfx::Typeface> typeface);
 
-  //  Check and set dirty flags (can be called on const objects)
   bool isDirty() const;
   void markDirty() const;
   void resetDirty() const;
   /**
-   * Draws the content of the corresponding LayerBuilder based on the index.
+   * Draws the content of the corresponding SampleBuilder based on the index.
    */
   void draw(tgfx::Canvas* canvas, int drawIndex,bool isNeedBackground) const;
   /**

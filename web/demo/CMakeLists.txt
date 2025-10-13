@@ -10,7 +10,7 @@ if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release")
 endif ()
 
-set(TGFX_BUILD_DRAWERS ON)
+set(TGFX_BUILD_HELLO2D ON)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../ ./tgfx)
 

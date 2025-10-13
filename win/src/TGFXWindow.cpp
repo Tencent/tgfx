@@ -25,7 +25,7 @@
 #include <shellscalingapi.h>
 #endif
 #include "hello2d/AppHost.h"
-#include "hello2d/LayerBuilder.h"
+#include "hello2d/SampleBuilder.h"
 
 namespace hello2d {
 static constexpr LPCWSTR ClassName = L"TGFXWindow";
@@ -103,8 +103,8 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
       }
       break;
     }
-    case WM_LBUTTONDOWN: {
-      int count = hello2d::LayerBuilder::Count();
+    case WM_LBUTTONUP: {
+      int count = hello2d::SampleBuilder::Count();
       if (count > 0) {
         currentDrawerIndex = (currentDrawerIndex + 1) % count;
         appHost->markDirty();
@@ -305,10 +305,9 @@ void TGFXWindow::draw() {
   canvas->clear();
   canvas->save();
 
-  int count = hello2d::LayerBuilder::Count();
+  int count = hello2d::SampleBuilder::Count();
   int index = (count > 0) ? (currentDrawerIndex % count) : 0;
-  bool isNeedBackground = true;
-  appHost->draw(canvas, index, isNeedBackground);
+  appHost->draw(canvas, index, true);
   canvas->restore();
   context->flushAndSubmit();
   tgfxWindow->present(context);

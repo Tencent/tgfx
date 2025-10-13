@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "hello2d/AppHost.h"
-#include "hello2d/LayerBuilder.h"
+#include "hello2d/SampleBuilder.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/platform/Print.h"
 
@@ -25,12 +25,15 @@ namespace hello2d {
 AppHost::AppHost(int width, int height, float density)
     : _width(width), _height(height), _density(density) {
 }
+
 bool AppHost::isDirty() const {
   return _dirty;
 }
+
 void AppHost::markDirty() const {
   _dirty = true;
 }
+
 void AppHost::resetDirty() const {
   _dirty = false;
 }
@@ -54,11 +57,9 @@ std::shared_ptr<tgfx::Typeface> AppHost::getTypeface(const std::string& name) co
 bool AppHost::updateScreen(int width, int height, float density) {
     markDirty();
   if (width <= 0 || height <= 0) {
-    tgfx::PrintError("AppHost::updateScreen() width or height is invalid!");
     return false;
   }
   if (density < 1.0) {
-    tgfx::PrintError("AppHost::updateScreen() density is invalid!");
     return false;
   }
   if (width == _width && height == _height && density == _density) {
@@ -84,15 +85,12 @@ bool AppHost::updateZoomAndOffset(float zoomScale, const tgfx::Point& contentOff
 
 void AppHost::addImage(const std::string& name, std::shared_ptr<tgfx::Image> image) {
   if (name.empty()) {
-    tgfx::PrintError("AppHost::addImage() name is empty!");
     return;
   }
   if (image == nullptr) {
-    tgfx::PrintError("AppHost::addImage() image is nullptr!");
     return;
   }
   if (images.count(name) > 0) {
-    tgfx::PrintError("AppHost::addImage() image with name %s already exists!", name.c_str());
     return;
   }
   images[name] = std::move(image);
@@ -101,32 +99,28 @@ void AppHost::addImage(const std::string& name, std::shared_ptr<tgfx::Image> ima
 void AppHost::addTypeface(const std::string& name, std::shared_ptr<tgfx::Typeface> typeface) {
   markDirty();
   if (name.empty()) {
-    tgfx::PrintError("AppHost::addTypeface() name is empty!");
     return;
   }
   if (typeface == nullptr) {
-    tgfx::PrintError("AppHost::addTypeface() typeface is nullptr!");
     return;
   }
   if (typefaces.count(name) > 0) {
-    tgfx::PrintError("AppHost::addTypeface() typeface with name %s already exists!", name.c_str());
     return;
   }
   typefaces[name] = std::move(typeface);
 }
 void AppHost::draw(tgfx::Canvas* canvas, int drawIndex,bool isNeedBackground ) const {
-  if (drawIndex < 0 || drawIndex >= static_cast<int>(LayerBuilder::Count())) {
+  if (drawIndex < 0 || drawIndex >= static_cast<int>(SampleBuilder::Count())) {
     return;
   }
   canvas->clear();
   
   if(isNeedBackground){
-    LayerBuilder::DrawBackground(canvas, this);
+    SampleBuilder::DrawBackground(canvas, this);
   }
 
-  auto currentBuilder = LayerBuilder::GetByIndex(drawIndex);
+  auto currentBuilder = SampleBuilder::GetByIndex(drawIndex);
   if (!currentBuilder) {
-    tgfx::PrintError("AppHost::draw() The builder for index %d is null!", drawIndex);
     return;
   }
 
@@ -137,14 +131,14 @@ void AppHost::draw(tgfx::Canvas* canvas, int drawIndex,bool isNeedBackground ) c
 
     if (root) {
       displayList.root()->addChild(root);
-      // displayList.setRenderMode(tgfx::RenderMode::Tiled);
-      // displayList.setAllowZoomBlur(true);
+      displayList.setRenderMode(tgfx::RenderMode::Tiled);
+      displayList.setAllowZoomBlur(true);
       displayList.setMaxTileCount(512);
     }
     lastDrawIndex = drawIndex;
     updateRootMatrix();
   }
-  auto builder = LayerBuilder::GetByIndex(drawIndex % LayerBuilder::Count());
+  auto builder = SampleBuilder::GetByIndex(drawIndex % SampleBuilder::Count());
   if (builder == nullptr) {
     return;
   }
@@ -162,15 +156,20 @@ void AppHost::updateRootMatrix() const {
     return;
   }
   constexpr float padding = 30.0f;
-  float w = static_cast<float>(width());
-  float h = static_cast<float>(height());
+  float width = static_cast<float>(this->width());
+  float height = static_cast<float>(this->height());
+
+  // 防止除以0问题
+  if (bounds.width() <= 0 || bounds.height() <= 0) {
+    return;
+  }
 
   const float totalScale =
-      std::min(w / (padding * 2.0f + bounds.width()), h / (padding * 2.0f + bounds.height()));
+      std::min(width / (padding * 2.0f + bounds.width()), height / (padding * 2.0f + bounds.height()));
 
   tgfx::Matrix rootMatrix = tgfx::Matrix::MakeScale(totalScale);
-  rootMatrix.postTranslate((w - bounds.width() * totalScale) * 0.5f,
-                           (h - bounds.height() * totalScale) * 0.5f);
+  rootMatrix.postTranslate((width - bounds.width() * totalScale) * 0.5f,
+                           (height - bounds.height() * totalScale) * 0.5f);
 
   root->setMatrix(rootMatrix);
 
