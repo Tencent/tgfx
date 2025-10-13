@@ -34,9 +34,6 @@ class GLCommandQueue : public CommandQueue {
   void writeTexture(std::shared_ptr<GPUTexture> texture, const Rect& rect, const void* pixels,
                     size_t rowBytes) override;
 
-  bool readTexture(std::shared_ptr<GPUTexture> texture, const Rect& rect, void* pixels,
-                   size_t rowBytes) const override;
-
   void submit(std::shared_ptr<CommandBuffer>) override;
 
   std::shared_ptr<GPUFence> insertFence() override;

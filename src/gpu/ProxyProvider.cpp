@@ -28,6 +28,7 @@
 #include "gpu/proxies/HardwareRenderTargetProxy.h"
 #include "gpu/proxies/TextureRenderTargetProxy.h"
 #include "gpu/tasks/GPUBufferUploadTask.h"
+#include "gpu/tasks/ReadbackBufferCreateTask.h"
 #include "gpu/tasks/ShapeBufferUploadTask.h"
 #include "gpu/tasks/TextureUploadTask.h"
 #include "proxies/HardwareTextureProxy.h"
@@ -55,6 +56,17 @@ std::shared_ptr<GPUBufferProxy> ProxyProvider::createIndexBufferProxy(
   addResourceProxy(proxy);
   auto task = context->drawingBuffer()->make<GPUBufferUploadTask>(proxy, BufferType::Index,
                                                                   std::move(source));
+  context->drawingManager()->addResourceTask(std::move(task));
+  return proxy;
+}
+
+std::shared_ptr<GPUBufferProxy> ProxyProvider::createReadbackBufferProxy(size_t size) {
+  if (size == 0) {
+    return nullptr;
+  }
+  auto proxy = std::shared_ptr<GPUBufferProxy>(new GPUBufferProxy());
+  addResourceProxy(proxy);
+  auto task = context->drawingBuffer()->make<ReadbackBufferCreateTask>(proxy, size);
   context->drawingManager()->addResourceTask(std::move(task));
   return proxy;
 }

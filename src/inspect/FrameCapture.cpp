@@ -728,7 +728,7 @@ void FrameCapture::encodeWorker() {
       auto encodeFormat = EncodedFormat::PNG;
 #endif
       auto jpgBuffer = ImageCodec::Encode(
-          Pixmap(imageInfo, frameCaputreTexture->imageBuffer()->bytes()), encodeFormat, 100);
+          Pixmap(imageInfo, frameCaputreTexture->imagePixels()->data()), encodeFormat, 100);
       auto size = jpgBuffer->size();
       auto pxielsBuffer = static_cast<uint8_t*>(malloc(size));
       memcpy(pxielsBuffer, jpgBuffer->bytes(), size);

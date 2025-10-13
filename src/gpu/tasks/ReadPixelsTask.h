@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,22 +18,21 @@
 
 #pragma once
 
-#include "ResourceTask.h"
-#include "core/DataSource.h"
-#include "core/ShapeRasterizer.h"
+#include "RenderTask.h"
+#include "gpu/proxies/GPUBufferProxy.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
-class ShapeBufferUploadTask : public ResourceTask {
+class ReadPixelsTask : public RenderTask {
  public:
-  ShapeBufferUploadTask(std::shared_ptr<ResourceProxy> trianglesProxy,
-                        std::shared_ptr<ResourceProxy> textureProxy,
-                        std::unique_ptr<DataSource<ShapeBuffer>> source);
+  ReadPixelsTask(std::shared_ptr<RenderTargetProxy> source, const Rect& srcRect,
+                 std::shared_ptr<GPUBufferProxy> dest);
 
- protected:
-  std::shared_ptr<Resource> onMakeResource(Context*) override;
+  void execute(CommandEncoder* encoder) override;
 
  private:
-  std::shared_ptr<ResourceProxy> textureProxy = nullptr;
-  std::unique_ptr<DataSource<ShapeBuffer>> source = nullptr;
+  std::shared_ptr<RenderTargetProxy> source = nullptr;
+  Rect srcRect = {};
+  std::shared_ptr<GPUBufferProxy> dest = nullptr;
 };
 }  // namespace tgfx

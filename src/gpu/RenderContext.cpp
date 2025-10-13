@@ -30,6 +30,7 @@
 #include "core/images/SubsetImage.h"
 #include "core/shapes/TextShape.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/PixelFormatUtil.h"
 #include "core/utils/StrokeUtils.h"
 #include "gpu/DrawingManager.h"
 
@@ -381,6 +382,22 @@ bool RenderContext::flush() {
     return !closed;
   }
   return false;
+}
+
+std::shared_ptr<GPUBufferProxy> RenderContext::copyPixels(const Rect& rect) {
+  DEBUG_ASSERT(!rect.isEmpty());
+  DEBUG_ASSERT(Rect::MakeWH(renderTarget->width(), renderTarget->height()).contains(rect));
+  flush();
+  auto colorType = PixelFormatToColorType(renderTarget->format());
+  auto rowBytes = static_cast<size_t>(rect.width()) * ImageInfo::GetBytesPerPixel(colorType);
+  auto byteSize = rowBytes * static_cast<size_t>(rect.height());
+  auto context = getContext();
+  auto readbackBuffer = context->proxyProvider()->createReadbackBufferProxy(byteSize);
+  if (readbackBuffer == nullptr) {
+    return nullptr;
+  }
+  context->drawingManager()->addReadPixelsTask(renderTarget, rect, readbackBuffer);
+  return readbackBuffer;
 }
 
 OpsCompositor* RenderContext::getOpsCompositor(bool discardContent) {

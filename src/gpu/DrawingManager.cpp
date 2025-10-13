@@ -27,6 +27,7 @@
 #include "gpu/tasks/RenderTargetCopyTask.h"
 #include "gpu/tasks/RuntimeDrawTask.h"
 #include "inspect/InspectorMark.h"
+#include "tasks/ReadPixelsTask.h"
 
 namespace tgfx {
 static ColorType GetAtlasColorType(bool isAlphaOnly) {
@@ -124,6 +125,15 @@ void DrawingManager::addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> 
   }
   auto task =
       drawingBuffer->make<RenderTargetCopyTask>(std::move(source), std::move(dest), srcX, srcY);
+  renderTasks.emplace_back(std::move(task));
+}
+
+void DrawingManager::addReadPixelsTask(std::shared_ptr<RenderTargetProxy> source,
+                                       const Rect& srcRect, std::shared_ptr<GPUBufferProxy> dest) {
+  if (source == nullptr || dest == nullptr || srcRect.isEmpty()) {
+    return;
+  }
+  auto task = drawingBuffer->make<ReadPixelsTask>(std::move(source), srcRect, std::move(dest));
   renderTasks.emplace_back(std::move(task));
 }
 

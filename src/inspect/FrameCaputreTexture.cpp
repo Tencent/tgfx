@@ -19,20 +19,53 @@
 #include <set>
 #include "FrameCapture.h"
 #include "FrameCaptureTexture.h"
+#include "core/utils/CopyPixels.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "gpu/GPU.h"
 
 namespace tgfx::inspect {
 static std::unordered_map<uint64_t, uint64_t> ReadedInputTexture = {};
 
+static std::shared_ptr<Data> ReadTexture(GPU* gpu, std::shared_ptr<GPUTexture> texture,
+                                         bool flipY = false) {
+  DEBUG_ASSERT(texture != nullptr);
+  auto width = texture->width();
+  auto height = texture->height();
+  auto format = texture->format();
+  auto srcInfo = ImageInfo::Make(width, height, PixelFormatToColorType(format));
+  auto readbackBuffer = gpu->createBuffer(srcInfo.byteSize(), GPUBufferUsage::READBACK);
+  if (readbackBuffer == nullptr) {
+    return nullptr;
+  }
+  auto encoder = gpu->createCommandEncoder();
+  DEBUG_ASSERT(encoder != nullptr);
+  auto rect = Rect::MakeXYWH(0, 0, width, height);
+  encoder->copyTextureToBuffer(texture, rect, readbackBuffer);
+  auto commandBuffer = encoder->finish();
+  if (commandBuffer == nullptr) {
+    return nullptr;
+  }
+  gpu->queue()->submit(commandBuffer);
+  Buffer buffer(srcInfo.byteSize());
+  if (buffer.isEmpty()) {
+    return nullptr;
+  }
+  auto srcPixels = readbackBuffer->map();
+  if (srcPixels == nullptr) {
+    return nullptr;
+  }
+  CopyPixels(srcInfo, srcPixels, srcInfo, buffer.bytes(), flipY);
+  readbackBuffer->unmap();
+  return buffer.release();
+}
+
 std::shared_ptr<FrameCaptureTexture> FrameCaptureTexture::MakeFrom(
     std::shared_ptr<GPUTexture> texture, int width, int height, size_t rowBytes, PixelFormat format,
     const void* pixels) {
   const auto size = static_cast<size_t>(height) * rowBytes;
-  auto imageBuffer = std::make_shared<Buffer>(size);
-  imageBuffer->writeRange(0, size, pixels);
+  auto data = Data::MakeWithCopy(pixels, size);
   return std::make_shared<FrameCaptureTexture>(std::move(texture), width, height, rowBytes, format,
-                                               true, std::move(imageBuffer));
+                                               true, std::move(data));
 }
 
 std::shared_ptr<FrameCaptureTexture> FrameCaptureTexture::MakeFrom(
@@ -41,18 +74,17 @@ std::shared_ptr<FrameCaptureTexture> FrameCaptureTexture::MakeFrom(
   if (ReadedInputTexture.find(textureKey) != ReadedInputTexture.end()) {
     return nullptr;
   }
+  auto pixels = ReadTexture(context->gpu(), texture);
+  if (pixels == nullptr) {
+    return nullptr;
+  }
   auto width = texture->width();
   auto height = texture->height();
   auto format = texture->format();
-  auto commandQueue = context->gpu()->queue();
   auto colorType = PixelFormatToColorType(format);
   auto rowBytes = ImageInfo::GetBytesPerPixel(colorType) * static_cast<size_t>(width);
-  auto buffer = std::make_shared<Buffer>(rowBytes * static_cast<size_t>(height));
-  if (!commandQueue->readTexture(texture, Rect::MakeWH(width, height), buffer->bytes(), rowBytes)) {
-    return nullptr;
-  }
-  auto frameCaptureTexture = std::make_shared<FrameCaptureTexture>(texture, width, height, rowBytes,
-                                                                   texture->format(), true, buffer);
+  auto frameCaptureTexture = std::make_shared<FrameCaptureTexture>(
+      texture, width, height, rowBytes, texture->format(), true, std::move(pixels));
   ReadedInputTexture[textureKey] = frameCaptureTexture->textureId();
   return frameCaptureTexture;
 }
@@ -62,15 +94,13 @@ std::shared_ptr<FrameCaptureTexture> FrameCaptureTexture::MakeFrom(
   auto width = renderTarget->width();
   auto height = renderTarget->height();
   auto format = renderTarget->format();
-  auto imageInfo = ImageInfo::Make(width, height, PixelFormatToColorType(format));
-  auto imageBuffer = std::make_shared<Buffer>(imageInfo.byteSize());
-  if (!renderTarget->readPixels(imageInfo, imageBuffer->bytes())) {
-    LOGI("FrameCaptureTexture read renderTarget error");
-    return nullptr;
-  }
+  auto rowBytes =
+      static_cast<size_t>(width) * ImageInfo::GetBytesPerPixel(PixelFormatToColorType(format));
+  auto gpu = renderTarget->getContext()->gpu();
+  auto flipY = renderTarget->origin() == ImageOrigin::BottomLeft;
+  auto pixels = ReadTexture(gpu, renderTarget->getSampleTexture(), flipY);
   return std::make_shared<FrameCaptureTexture>(renderTarget->getRenderTexture(), width, height,
-                                               imageInfo.rowBytes(), format, false,
-                                               std::move(imageBuffer));
+                                               rowBytes, format, false, std::move(pixels));
 }
 
 uint64_t FrameCaptureTexture::GetReadTextureId(std::shared_ptr<GPUTexture> texture) {
@@ -85,10 +115,10 @@ void FrameCaptureTexture::ClearReadedTexture() {
   ReadedInputTexture.clear();
 }
 
-FrameCaptureTexture::FrameCaptureTexture(const std::shared_ptr<GPUTexture> texture, int width,
-                                         int height, size_t rowBytes, PixelFormat format,
-                                         bool isInput, std::shared_ptr<Buffer> imageBuffer)
+FrameCaptureTexture::FrameCaptureTexture(std::shared_ptr<GPUTexture> texture, int width, int height,
+                                         size_t rowBytes, PixelFormat format, bool isInput,
+                                         std::shared_ptr<Data> pixels)
     : _textureId(FrameCapture::NextTextureID()), _texture(texture), _width(width), _height(height),
-      _rowBytes(rowBytes), _format(format), _isInput(isInput), image(std::move(imageBuffer)) {
+      _rowBytes(rowBytes), _format(format), _isInput(isInput), pixels(std::move(pixels)) {
 }
 }  // namespace tgfx::inspect
