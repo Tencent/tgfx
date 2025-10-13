@@ -18,32 +18,30 @@
 
 #pragma once
 
-#include "gpu/CommandEncoder.h"
+#include "gpu/opengl/GLBuffer.h"
+#include "gpu/opengl/GLState.h"
+#include "gpu/opengl/GLTexture.h"
 
 namespace tgfx {
-class GLGPU;
-
-class GLCommandEncoder : public CommandEncoder {
+/**
+ * GLTextureBuffer is a readback buffer implementation that uses a texture as an intermediate buffer
+ * to read pixels from the GPU when PBO is not supported.
+ */
+class GLTextureBuffer : public GLBuffer {
  public:
-  explicit GLCommandEncoder(GLGPU* gpu) : gpu(gpu) {
-  }
+  GLTextureBuffer(std::shared_ptr<GLInterface> interface, std::shared_ptr<GLState> state,
+                  size_t size);
 
-  bool copyTextureToTexture(std::shared_ptr<GPUTexture> srcTexture, const Rect& srcRect,
-                            std::shared_ptr<GPUTexture> dstTexture,
-                            const Point& dstOffset) override;
+  void* map(size_t offset, size_t size) override;
 
-  bool copyTextureToBuffer(std::shared_ptr<GPUTexture> srcTexture, const Rect& srcRect,
-                           std::shared_ptr<GPUBuffer> dstBuffer, size_t dstOffset,
-                           size_t dstRowBytes) override;
-
-  void generateMipmapsForTexture(std::shared_ptr<GPUTexture> texture) override;
-
- protected:
-  std::shared_ptr<RenderPass> onBeginRenderPass(const RenderPassDescriptor& descriptor) override;
-
-  std::shared_ptr<CommandBuffer> onFinish() override;
+  void unmap() override;
 
  private:
-  GLGPU* gpu = nullptr;
+  std::shared_ptr<GLState> state = nullptr;
+  std::shared_ptr<GPUTexture> texture = nullptr;
+  size_t rowBytes = 0;
+  void* bufferData = nullptr;
+
+  friend class GLCommandEncoder;
 };
 }  // namespace tgfx

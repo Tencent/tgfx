@@ -104,6 +104,7 @@ class GLCaps : public Caps {
   bool packRowLengthSupport = false;
   bool unpackRowLengthSupport = false;
   bool textureRedSupport = false;
+  bool pboSupport = false;
   MSFBOType msFBOType = MSFBOType::None;
   bool flushBeforeWritePixels = false;
 

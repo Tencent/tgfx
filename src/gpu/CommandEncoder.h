@@ -51,8 +51,9 @@ class CommandEncoder {
    * @param srcRect The rectangle region of the source texture to copy from.
    * @param dstTexture The destination texture to copy to.
    * @param dstOffset The offset in the destination texture where the copied region will be placed.
+   * @return true if the copy command was successfully encoded, false otherwise.
    */
-  virtual void copyTextureToTexture(std::shared_ptr<GPUTexture> srcTexture, const Rect& srcRect,
+  virtual bool copyTextureToTexture(std::shared_ptr<GPUTexture> srcTexture, const Rect& srcRect,
                                     std::shared_ptr<GPUTexture> dstTexture,
                                     const Point& dstOffset) = 0;
 
@@ -69,8 +70,9 @@ class CommandEncoder {
    * @param dstRowBytes The number of bytes per row in the destination buffer. If zero, it defaults
    * to the width of the rectangle multiplied by the number of bytes per pixel for the texture's
    * format.
+   * @return true if the copy command was successfully encoded, false otherwise.
    */
-  virtual void copyTextureToBuffer(std::shared_ptr<GPUTexture> srcTexture, const Rect& srcRect,
+  virtual bool copyTextureToBuffer(std::shared_ptr<GPUTexture> srcTexture, const Rect& srcRect,
                                    std::shared_ptr<GPUBuffer> dstBuffer, size_t dstOffset = 0,
                                    size_t dstRowBytes = 0) = 0;
 
