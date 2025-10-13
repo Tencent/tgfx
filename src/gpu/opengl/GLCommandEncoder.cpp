@@ -128,20 +128,16 @@ bool GLCommandEncoder::copyTextureToBuffer(std::shared_ptr<GPUTexture> srcTextur
   }
   if (!caps->pboSupport) {
     auto textureBuffer = static_cast<GLTextureBuffer*>(dstBuffer.get());
-    GPUTextureDescriptor descriptor(
-        static_cast<int>(srcRect.width()), static_cast<int>(srcRect.height()), srcTexture->format(),
-        false, 1, GPUTextureUsage::TEXTURE_BINDING | GPUTextureUsage::RENDER_ATTACHMENT);
-    auto dstTexture = gpu->createTexture(descriptor);
+    auto dstTexture =
+        textureBuffer->acquireTexture(gpu, srcTexture, srcRect, dstOffset, dstRowBytes);
     if (dstTexture == nullptr) {
-      LOGE("GLCommandEncoder::copyTextureToBuffer() failed to create the dst texture!");
+      LOGE("GLCommandEncoder::copyTextureToBuffer() failed to acquire intermediate texture!");
       return false;
     }
     if (!copyTextureToTexture(srcTexture, srcRect, dstTexture, Point::Zero())) {
       LOGE("GLCommandEncoder::copyTextureToBuffer() failed to copy texture!");
       return false;
     }
-    textureBuffer->texture = std::move(dstTexture);
-    textureBuffer->rowBytes = dstRowBytes;
     textureBuffer->insertReadbackFence();
     return true;
   }

@@ -18,6 +18,7 @@
 
 #include "GLTextureBuffer.h"
 #include "core/utils/PixelFormatUtil.h"
+#include "gpu/GPU.h"
 #include "gpu/opengl/GLUtil.h"
 
 namespace tgfx {
@@ -59,16 +60,17 @@ void* GLTextureBuffer::map(size_t offset, size_t size) {
   auto format = texture->format();
   auto bytesPerPixel = PixelFormatBytesPerPixel(format);
   auto minRowBytes = static_cast<size_t>(texture->width()) * bytesPerPixel;
-  if (rowBytes != minRowBytes) {
-    gl->pixelStorei(GL_PACK_ROW_LENGTH, static_cast<int>(rowBytes / bytesPerPixel));
+  if (readRowBytes != minRowBytes) {
+    gl->pixelStorei(GL_PACK_ROW_LENGTH, static_cast<int>(readRowBytes / bytesPerPixel));
   }
   gl->pixelStorei(GL_PACK_ALIGNMENT, static_cast<int>(bytesPerPixel));
   // Clear the pbo binding to avoid interference.
   gl->bindBuffer(GL_PIXEL_PACK_BUFFER, 0);
   auto textureFormat = _interface->caps()->getTextureFormat(format);
+  auto outPixels = static_cast<uint8_t*>(bufferData) + readOffset;
   gl->readPixels(0, 0, texture->width(), texture->height(), textureFormat.externalFormat,
-                 textureFormat.externalType, bufferData);
-  if (rowBytes != minRowBytes) {
+                 textureFormat.externalType, outPixels);
+  if (readRowBytes != minRowBytes) {
     gl->pixelStorei(GL_PACK_ROW_LENGTH, 0);
   }
   if (!CheckGLError(gl)) {
@@ -86,4 +88,21 @@ void GLTextureBuffer::unmap() {
   free(bufferData);
   bufferData = nullptr;
 }
+
+std::shared_ptr<GPUTexture> GLTextureBuffer::acquireTexture(GPU* gpu,
+                                                            std::shared_ptr<GPUTexture> srcTexture,
+                                                            const Rect& srcRect, size_t dstOffset,
+                                                            size_t dstRowBytes) {
+  if (texture == nullptr || texture->width() != srcTexture->width() ||
+      texture->height() != srcTexture->height() || texture->format() != srcTexture->format()) {
+    GPUTextureDescriptor descriptor(
+        static_cast<int>(srcRect.width()), static_cast<int>(srcRect.height()), srcTexture->format(),
+        false, 1, GPUTextureUsage::TEXTURE_BINDING | GPUTextureUsage::RENDER_ATTACHMENT);
+    texture = gpu->createTexture(descriptor);
+  }
+  readOffset = dstOffset;
+  readRowBytes = dstRowBytes;
+  return texture;
+}
+
 }  // namespace tgfx

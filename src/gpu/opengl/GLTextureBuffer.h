@@ -36,12 +36,15 @@ class GLTextureBuffer : public GLBuffer {
 
   void unmap() override;
 
+  std::shared_ptr<GPUTexture> acquireTexture(GPU* gpu, std::shared_ptr<GPUTexture> srcTexture,
+                                             const Rect& srcRect, size_t dstOffset,
+                                             size_t dstRowBytes);
+
  private:
   std::shared_ptr<GLState> state = nullptr;
   std::shared_ptr<GPUTexture> texture = nullptr;
-  size_t rowBytes = 0;
+  size_t readOffset = 0;
+  size_t readRowBytes = 0;
   void* bufferData = nullptr;
-
-  friend class GLCommandEncoder;
 };
 }  // namespace tgfx
