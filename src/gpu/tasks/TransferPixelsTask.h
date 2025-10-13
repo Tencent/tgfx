@@ -23,10 +23,10 @@
 #include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
-class ReadPixelsTask : public RenderTask {
+class TransferPixelsTask : public RenderTask {
  public:
-  ReadPixelsTask(std::shared_ptr<RenderTargetProxy> source, const Rect& srcRect,
-                 std::shared_ptr<GPUBufferProxy> dest);
+  TransferPixelsTask(std::shared_ptr<RenderTargetProxy> source, const Rect& srcRect,
+                     std::shared_ptr<GPUBufferProxy> dest);
 
   void execute(CommandEncoder* encoder) override;
 

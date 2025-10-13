@@ -396,7 +396,7 @@ std::shared_ptr<GPUBufferProxy> RenderContext::copyPixels(const Rect& rect) {
   if (readbackBuffer == nullptr) {
     return nullptr;
   }
-  context->drawingManager()->addReadPixelsTask(renderTarget, rect, readbackBuffer);
+  context->drawingManager()->addTransferPixelsTask(renderTarget, rect, readbackBuffer);
   return readbackBuffer;
 }
 

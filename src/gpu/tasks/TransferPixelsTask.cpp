@@ -16,15 +16,15 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ReadPixelsTask.h"
+#include "TransferPixelsTask.h"
 
 namespace tgfx {
-ReadPixelsTask::ReadPixelsTask(std::shared_ptr<RenderTargetProxy> source, const Rect& srcRect,
-                               std::shared_ptr<GPUBufferProxy> dest)
+TransferPixelsTask::TransferPixelsTask(std::shared_ptr<RenderTargetProxy> source,
+                                       const Rect& srcRect, std::shared_ptr<GPUBufferProxy> dest)
     : source(std::move(source)), srcRect(srcRect), dest(std::move(dest)) {
 }
 
-void ReadPixelsTask::execute(CommandEncoder* encoder) {
+void TransferPixelsTask::execute(CommandEncoder* encoder) {
   auto renderTarget = source->getRenderTarget();
   if (renderTarget == nullptr) {
     LOGE("ReadPixelsTask::execute() Failed to get the source render target!");
