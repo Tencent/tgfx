@@ -47,7 +47,7 @@ std::shared_ptr<Resource> ShapeBufferUploadTask::onMakeResource(Context* context
       return nullptr;
     }
     gpu->queue()->writeBuffer(gpuBuffer, 0, triangles->data(), triangles->size());
-    vertexBuffer = BufferResource::Wrap(context, std::move(gpuBuffer));
+    vertexBuffer = Resource::AddToCache(context, new BufferResource(std::move(gpuBuffer)));
   } else {
     auto textureView = TextureView::MakeFrom(context, std::move(shapeBuffer->imageBuffer));
     if (!textureView) {
