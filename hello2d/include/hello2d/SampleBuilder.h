@@ -38,9 +38,9 @@ class Sample {
    * Build the contents.
    */
   void build(const hello2d::AppHost* host);
-  
+
   std::vector<std::shared_ptr<tgfx::Layer>> getLayersUnderPoint(float x, float y);
-  
+
   virtual std::shared_ptr<tgfx::Layer> buildLayerTree(const hello2d::AppHost* host) = 0;
 
  protected:

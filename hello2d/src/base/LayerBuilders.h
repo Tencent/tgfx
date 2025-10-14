@@ -21,12 +21,12 @@
 #include "hello2d/SampleBuilder.h"
 
 namespace hello2d {
-#define DEFINE_SAMPLE(SampleName)                                              \
-  class SampleName : public hello2d::Sample {                                  \
-   public:                                                                     \
-    SampleName() : hello2d::Sample(#SampleName) {                              \
-    }                                                                          \
-                                                                               \
+#define DEFINE_SAMPLE(SampleName)                                                       \
+  class SampleName : public hello2d::Sample {                                           \
+   public:                                                                              \
+    SampleName() : hello2d::Sample(#SampleName) {                                       \
+    }                                                                                   \
+                                                                                        \
     std::shared_ptr<tgfx::Layer> buildLayerTree(const hello2d::AppHost* host) override; \
   }
 
