@@ -72,6 +72,7 @@ class SurfaceReadback {
   ImageInfo _info = {};
   std::shared_ptr<GPUBufferProxy> proxy = nullptr;
   void* flipYPixels = nullptr;
+  bool locked = false;
 
   SurfaceReadback(const ImageInfo& info, std::shared_ptr<GPUBufferProxy> proxy)
       : _info(info), proxy(std::move(proxy)) {

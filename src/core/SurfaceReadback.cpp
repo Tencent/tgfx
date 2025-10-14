@@ -23,6 +23,7 @@
 
 namespace tgfx {
 SurfaceReadback::~SurfaceReadback() {
+  DEBUG_ASSERT(!locked);
   if (flipYPixels != nullptr) {
     free(flipYPixels);
   }
@@ -45,7 +46,7 @@ const void* SurfaceReadback::lockPixels(Context* context, bool flipY) {
     LOGE("SurfaceReadback::lockPixels() Context mismatch!");
     return nullptr;
   }
-  if (flipYPixels != nullptr) {
+  if (locked) {
     LOGE("SurfaceReadback::lockPixels() you must call unlockPixels() before locking again!");
     return nullptr;
   }
@@ -60,16 +61,17 @@ const void* SurfaceReadback::lockPixels(Context* context, bool flipY) {
     }
   }
   auto pixels = readbackBuffer->gpuBuffer()->map();
-  if (!flipY) {
-    return pixels;
+  if (flipY) {
+    flipYPixels = malloc(_info.byteSize());
+    if (flipYPixels == nullptr) {
+      readbackBuffer->gpuBuffer()->unmap();
+      return nullptr;
+    }
+    CopyPixels(_info, pixels, _info, flipYPixels, true);
+    pixels = flipYPixels;
   }
-  flipYPixels = malloc(_info.byteSize());
-  if (flipYPixels == nullptr) {
-    readbackBuffer->gpuBuffer()->unmap();
-    return nullptr;
-  }
-  CopyPixels(_info, pixels, _info, flipYPixels, true);
-  return flipYPixels;
+  locked = true;
+  return pixels;
 }
 
 void SurfaceReadback::unlockPixels(Context* context) {
@@ -77,15 +79,16 @@ void SurfaceReadback::unlockPixels(Context* context) {
     LOGE("SurfaceReadback::unlockPixels() Context mismatch!");
     return;
   }
+  if (!locked) {
+    return;
+  }
+  locked = false;
   if (flipYPixels != nullptr) {
     free(flipYPixels);
     flipYPixels = nullptr;
   }
   auto readbackBuffer = proxy->getBuffer();
-  if (readbackBuffer == nullptr) {
-    LOGE("SurfaceReadback::unlockPixels() Readback buffer is null!");
-    return;
-  }
+  DEBUG_ASSERT(readbackBuffer != nullptr);
   readbackBuffer->gpuBuffer()->unmap();
 }
 }  // namespace tgfx
