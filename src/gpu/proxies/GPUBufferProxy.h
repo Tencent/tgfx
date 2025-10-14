@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,32 +18,25 @@
 
 #pragma once
 
-#include "gpu/CommandEncoder.h"
+#include "ResourceProxy.h"
+#include "gpu/resources/BufferResource.h"
 
 namespace tgfx {
-class GLGPU;
-
-class GLCommandEncoder : public CommandEncoder {
+/**
+ * GPUBufferProxy is a proxy for GPUBuffer resources.
+ */
+class GPUBufferProxy : public ResourceProxy {
  public:
-  explicit GLCommandEncoder(GLGPU* gpu) : gpu(gpu) {
+  /**
+   * Returns the associated BufferResource instance.
+   */
+  std::shared_ptr<BufferResource> getBuffer() const {
+    return std::static_pointer_cast<BufferResource>(resource);
   }
 
-  void copyTextureToTexture(std::shared_ptr<GPUTexture> srcTexture, const Rect& srcRect,
-                            std::shared_ptr<GPUTexture> dstTexture,
-                            const Point& dstOffset) override;
-
-  void copyTextureToBuffer(std::shared_ptr<GPUTexture> srcTexture, const Rect& srcRect,
-                           std::shared_ptr<GPUBuffer> dstBuffer, size_t dstOffset,
-                           size_t dstRowBytes) override;
-
-  void generateMipmapsForTexture(std::shared_ptr<GPUTexture> texture) override;
-
- protected:
-  std::shared_ptr<RenderPass> onBeginRenderPass(const RenderPassDescriptor& descriptor) override;
-
-  std::shared_ptr<CommandBuffer> onFinish() override;
-
  private:
-  GLGPU* gpu = nullptr;
+  GPUBufferProxy() = default;
+
+  friend class ProxyProvider;
 };
 }  // namespace tgfx

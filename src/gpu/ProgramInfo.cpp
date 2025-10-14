@@ -29,9 +29,9 @@ ProgramInfo::ProgramInfo(RenderTarget* renderTarget, GeometryProcessor* geometry
                          std::vector<FragmentProcessor*> fragmentProcessors,
                          size_t numColorProcessors, XferProcessor* xferProcessor,
                          BlendMode blendMode)
-    : renderTarget(renderTarget), geometryProcessor(std::move(geometryProcessor)),
+    : renderTarget(renderTarget), geometryProcessor(geometryProcessor),
       fragmentProcessors(std::move(fragmentProcessors)), numColorProcessors(numColorProcessors),
-      xferProcessor(std::move(xferProcessor)), blendMode(blendMode) {
+      xferProcessor(xferProcessor), blendMode(blendMode) {
   updateProcessorIndices();
 }
 
@@ -165,13 +165,14 @@ std::shared_ptr<GPUBuffer> ProgramInfo::getUniformBuffer(const PipelineProgram* 
     uniformBuffer =
         globalCache->findOrCreateUniformBuffer(totalUniformBufferSize, &lastUniformBufferOffset);
     if (uniformBuffer != nullptr) {
-      auto buffer = static_cast<uint8_t*>(uniformBuffer->map());
+      auto buffer = static_cast<uint8_t*>(
+          uniformBuffer->map(lastUniformBufferOffset, totalUniformBufferSize));
       if (vertexUniformData != nullptr) {
-        vertexUniformData->setBuffer(buffer + lastUniformBufferOffset);
+        vertexUniformData->setBuffer(buffer);
         *vertexOffset = lastUniformBufferOffset;
       }
       if (fragmentUniformData != nullptr) {
-        fragmentUniformData->setBuffer(buffer + lastUniformBufferOffset + vertexUniformBufferSize);
+        fragmentUniformData->setBuffer(buffer + vertexUniformBufferSize);
         *fragmentOffset = lastUniformBufferOffset + vertexUniformBufferSize;
       }
     }
@@ -188,9 +189,11 @@ void ProgramInfo::bindUniformBufferAndUnloadToGPU(const PipelineProgram* program
     return;
   }
 
-  uniformBuffer->unmap();
   auto vertexUniformData = program->getUniformData(ShaderStage::Vertex);
   auto fragmentUniformData = program->getUniformData(ShaderStage::Fragment);
+
+  uniformBuffer->unmap();
+
   if (vertexUniformData != nullptr) {
     renderPass->setUniformBuffer(VERTEX_UBO_BINDING_POINT, uniformBuffer, vertexOffset,
                                  vertexUniformData->size());

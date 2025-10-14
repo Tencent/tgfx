@@ -18,32 +18,18 @@
 
 #pragma once
 
-#include "gpu/CommandEncoder.h"
+#include "ResourceTask.h"
+#include "gpu/proxies/GPUBufferProxy.h"
 
 namespace tgfx {
-class GLGPU;
-
-class GLCommandEncoder : public CommandEncoder {
+class ReadbackBufferCreateTask : public ResourceTask {
  public:
-  explicit GLCommandEncoder(GLGPU* gpu) : gpu(gpu) {
-  }
-
-  void copyTextureToTexture(std::shared_ptr<GPUTexture> srcTexture, const Rect& srcRect,
-                            std::shared_ptr<GPUTexture> dstTexture,
-                            const Point& dstOffset) override;
-
-  void copyTextureToBuffer(std::shared_ptr<GPUTexture> srcTexture, const Rect& srcRect,
-                           std::shared_ptr<GPUBuffer> dstBuffer, size_t dstOffset,
-                           size_t dstRowBytes) override;
-
-  void generateMipmapsForTexture(std::shared_ptr<GPUTexture> texture) override;
+  ReadbackBufferCreateTask(std::shared_ptr<GPUBufferProxy> proxy, size_t size);
 
  protected:
-  std::shared_ptr<RenderPass> onBeginRenderPass(const RenderPassDescriptor& descriptor) override;
-
-  std::shared_ptr<CommandBuffer> onFinish() override;
+  std::shared_ptr<Resource> onMakeResource(Context*) override;
 
  private:
-  GLGPU* gpu = nullptr;
+  size_t size = 0;
 };
 }  // namespace tgfx

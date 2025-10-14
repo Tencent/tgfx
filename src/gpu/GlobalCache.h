@@ -22,7 +22,7 @@
 #include <list>
 #include <unordered_map>
 #include "core/utils/SlidingWindowTracker.h"
-#include "gpu/proxies/IndexBufferProxy.h"
+#include "gpu/proxies/GPUBufferProxy.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/resources/Program.h"
 #include "tgfx/core/Color.h"
@@ -72,13 +72,13 @@ class GlobalCache {
   /**
    * Returns a GPU buffer that contains indices for rendering a quad with or without antialiasing.
    */
-  std::shared_ptr<IndexBufferProxy> getRectIndexBuffer(bool antialias);
+  std::shared_ptr<GPUBufferProxy> getRectIndexBuffer(bool antialias);
 
   /**
    * Returns a GPU buffer containing indices for rendering a rounded rectangle, either for filling
    * or stroking.
    */
-  std::shared_ptr<IndexBufferProxy> getRRectIndexBuffer(bool stroke);
+  std::shared_ptr<GPUBufferProxy> getRRectIndexBuffer(bool stroke);
 
   /**
    * Finds a static resource in the cache by its unique key. Returns nullptr if no resource is found.
@@ -115,10 +115,10 @@ class GlobalCache {
   BytesKeyMap<std::shared_ptr<Program>> programMap = {};
   std::list<GradientTexture*> gradientLRU = {};
   BytesKeyMap<std::unique_ptr<GradientTexture>> gradientTextures = {};
-  std::shared_ptr<IndexBufferProxy> aaQuadIndexBuffer = nullptr;
-  std::shared_ptr<IndexBufferProxy> nonAAQuadIndexBuffer = nullptr;
-  std::shared_ptr<IndexBufferProxy> rRectFillIndexBuffer = nullptr;
-  std::shared_ptr<IndexBufferProxy> rRectStrokeIndexBuffer = nullptr;
+  std::shared_ptr<GPUBufferProxy> aaQuadIndexBuffer = nullptr;
+  std::shared_ptr<GPUBufferProxy> nonAAQuadIndexBuffer = nullptr;
+  std::shared_ptr<GPUBufferProxy> rRectFillIndexBuffer = nullptr;
+  std::shared_ptr<GPUBufferProxy> rRectStrokeIndexBuffer = nullptr;
   ResourceKeyMap<std::shared_ptr<Resource>> staticResources = {};
   // Triple buffering for uniform buffer management
   static constexpr uint32_t UNIFORM_BUFFER_COUNT = 3;

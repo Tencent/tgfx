@@ -40,9 +40,8 @@ class CommandQueue {
    * @param bufferOffset The offset in the buffer where the data should be written.
    * @param data Pointer to the data to write.
    * @param size The size of the data in bytes.
-   * @return true if the write operation was successful, false otherwise.
    */
-  virtual bool writeBuffer(std::shared_ptr<GPUBuffer> buffer, size_t bufferOffset, const void* data,
+  virtual void writeBuffer(std::shared_ptr<GPUBuffer> buffer, size_t bufferOffset, const void* data,
                            size_t size) = 0;
 
   /**
@@ -54,15 +53,6 @@ class CommandQueue {
    */
   virtual void writeTexture(std::shared_ptr<GPUTexture> texture, const Rect& rect,
                             const void* pixels, size_t rowBytes) = 0;
-
-  /**
-   * Copies pixel data from the GPUTexture within the specified rectangle into the provided memory
-   * buffer. The buffer must be large enough to hold all the data for the rectangle. The rectangle
-   * must be entirely within the frame buffer's dimensions. Returns true if the read operation
-   * succeeds, false otherwise.
-   */
-  virtual bool readTexture(std::shared_ptr<GPUTexture> texture, const Rect& rect, void* pixels,
-                           size_t rowBytes) const = 0;
 
   /**
    * Schedules the execution of the specified command buffer on the GPU.

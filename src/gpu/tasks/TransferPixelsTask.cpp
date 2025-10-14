@@ -16,34 +16,26 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/CommandEncoder.h"
+#include "TransferPixelsTask.h"
 
 namespace tgfx {
-class GLGPU;
+TransferPixelsTask::TransferPixelsTask(std::shared_ptr<RenderTargetProxy> source,
+                                       const Rect& srcRect, std::shared_ptr<GPUBufferProxy> dest)
+    : source(std::move(source)), srcRect(srcRect), dest(std::move(dest)) {
+}
 
-class GLCommandEncoder : public CommandEncoder {
- public:
-  explicit GLCommandEncoder(GLGPU* gpu) : gpu(gpu) {
+void TransferPixelsTask::execute(CommandEncoder* encoder) {
+  auto renderTarget = source->getRenderTarget();
+  if (renderTarget == nullptr) {
+    LOGE("TransferPixelsTask::execute() Failed to get the source render target!");
+    return;
   }
-
-  void copyTextureToTexture(std::shared_ptr<GPUTexture> srcTexture, const Rect& srcRect,
-                            std::shared_ptr<GPUTexture> dstTexture,
-                            const Point& dstOffset) override;
-
-  void copyTextureToBuffer(std::shared_ptr<GPUTexture> srcTexture, const Rect& srcRect,
-                           std::shared_ptr<GPUBuffer> dstBuffer, size_t dstOffset,
-                           size_t dstRowBytes) override;
-
-  void generateMipmapsForTexture(std::shared_ptr<GPUTexture> texture) override;
-
- protected:
-  std::shared_ptr<RenderPass> onBeginRenderPass(const RenderPassDescriptor& descriptor) override;
-
-  std::shared_ptr<CommandBuffer> onFinish() override;
-
- private:
-  GLGPU* gpu = nullptr;
-};
+  auto readbackBuffer = dest->getBuffer();
+  if (readbackBuffer == nullptr) {
+    LOGE("TransferPixelsTask::execute() Failed to get the dest readback buffer!");
+    return;
+  }
+  encoder->copyTextureToBuffer(renderTarget->getSampleTexture(), srcRect,
+                               readbackBuffer->gpuBuffer());
+}
 }  // namespace tgfx

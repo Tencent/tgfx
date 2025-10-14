@@ -18,6 +18,10 @@
 
 #include "GLGPU.h"
 #include "gpu/opengl/GLBuffer.h"
+#include "gpu/opengl/GLTextureBuffer.h"
+#if defined(__EMSCRIPTEN__)
+#include "gpu/opengl/webgl/WebGLBuffer.h"
+#endif
 #include "gpu/opengl/GLCommandEncoder.h"
 #include "gpu/opengl/GLDepthStencilTexture.h"
 #include "gpu/opengl/GLExternalTexture.h"
@@ -30,7 +34,7 @@
 
 namespace tgfx {
 GLGPU::GLGPU(std::shared_ptr<GLInterface> glInterface)
-    : _state(std::make_unique<GLState>(glInterface)), interface(std::move(glInterface)) {
+    : _state(std::make_shared<GLState>(glInterface)), interface(std::move(glInterface)) {
   commandQueue = std::make_unique<GLCommandQueue>(this);
 }
 
@@ -45,19 +49,22 @@ std::shared_ptr<GPUBuffer> GLGPU::createBuffer(size_t size, uint32_t usage) {
   if (size == 0) {
     return nullptr;
   }
-  unsigned target = 0;
-  if (usage & GPUBufferUsage::VERTEX) {
-    target = GL_ARRAY_BUFFER;
-  } else if (usage & GPUBufferUsage::INDEX) {
-    target = GL_ELEMENT_ARRAY_BUFFER;
-  } else if (usage & GPUBufferUsage::UNIFORM) {
-    target = GL_UNIFORM_BUFFER;
-  } else {
+  unsigned target = GLBuffer::GetTarget(usage);
+  if (target == 0) {
     LOGE("GLGPU::createBuffer() invalid buffer usage!");
     return nullptr;
   }
-
-  if (!interface->caps()->shaderCaps()->uboSupport && (usage & GPUBufferUsage::UNIFORM)) {
+  auto caps = interface->caps();
+  if (!caps->pboSupport && usage & GPUBufferUsage::READBACK) {
+    if (usage != GPUBufferUsage::READBACK) {
+      LOGE(
+          "GLGPU::createBuffer() READBACK usage can't be combined with other usages when PBO is "
+          "not supported!");
+      return nullptr;
+    }
+    return makeResource<GLTextureBuffer>(interface, _state, size);
+  }
+  if (!interface->caps()->shaderCaps()->uboSupport && usage & GPUBufferUsage::UNIFORM) {
     return makeResource<GLBuffer>(interface, 0u, size, usage);
   }
 
@@ -68,9 +75,13 @@ std::shared_ptr<GPUBuffer> GLGPU::createBuffer(size_t size, uint32_t usage) {
     return nullptr;
   }
   gl->bindBuffer(target, bufferID);
-  gl->bufferData(target, static_cast<GLsizeiptr>(size), nullptr, GL_STATIC_DRAW);
-  gl->bindBuffer(target, 0);
+  unsigned glUsage = usage & GPUBufferUsage::READBACK ? GL_STREAM_READ : GL_STATIC_DRAW;
+  gl->bufferData(target, static_cast<GLsizeiptr>(size), nullptr, glUsage);
+#if defined(__EMSCRIPTEN__)
+  return makeResource<WebGLBuffer>(interface, bufferID, size, usage);
+#else
   return makeResource<GLBuffer>(interface, bufferID, size, usage);
+#endif
 }
 
 std::shared_ptr<GPUTexture> GLGPU::createTexture(const GPUTextureDescriptor& descriptor) {
