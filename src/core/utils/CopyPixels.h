@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,22 +18,13 @@
 
 #pragma once
 
-#include "ResourceTask.h"
-#include "core/DataSource.h"
-#include "core/ShapeRasterizer.h"
+#include "tgfx/core/ImageInfo.h"
 
 namespace tgfx {
-class ShapeBufferUploadTask : public ResourceTask {
- public:
-  ShapeBufferUploadTask(std::shared_ptr<ResourceProxy> trianglesProxy,
-                        std::shared_ptr<ResourceProxy> textureProxy,
-                        std::unique_ptr<DataSource<ShapeBuffer>> source);
-
- protected:
-  std::shared_ptr<Resource> onMakeResource(Context*) override;
-
- private:
-  std::shared_ptr<ResourceProxy> textureProxy = nullptr;
-  std::unique_ptr<DataSource<ShapeBuffer>> source = nullptr;
-};
+/**
+ * Copy pixel data from source to destination with optional vertical flipping. The source and
+ * destination ImageInfo must have the same dimensions.
+ */
+void CopyPixels(const ImageInfo& srcInfo, const void* srcPixels, const ImageInfo& dstInfo,
+                void* dstPixels, bool flipY = false);
 }  // namespace tgfx

@@ -18,6 +18,7 @@
 
 #include "GLGPU.h"
 #include "gpu/opengl/GLBuffer.h"
+#include "gpu/opengl/GLTextureBuffer.h"
 #if defined(__EMSCRIPTEN__)
 #include "gpu/opengl/webgl/WebGLBuffer.h"
 #endif
@@ -33,7 +34,7 @@
 
 namespace tgfx {
 GLGPU::GLGPU(std::shared_ptr<GLInterface> glInterface)
-    : _state(std::make_unique<GLState>(glInterface)), interface(std::move(glInterface)) {
+    : _state(std::make_shared<GLState>(glInterface)), interface(std::move(glInterface)) {
   commandQueue = std::make_unique<GLCommandQueue>(this);
 }
 
@@ -52,6 +53,19 @@ std::shared_ptr<GPUBuffer> GLGPU::createBuffer(size_t size, uint32_t usage) {
   if (target == 0) {
     LOGE("GLGPU::createBuffer() invalid buffer usage!");
     return nullptr;
+  }
+  auto caps = interface->caps();
+  if (!caps->pboSupport && usage & GPUBufferUsage::READBACK) {
+    if (usage != GPUBufferUsage::READBACK) {
+      LOGE(
+          "GLGPU::createBuffer() READBACK usage can't be combined with other usages when PBO is "
+          "not supported!");
+      return nullptr;
+    }
+    return makeResource<GLTextureBuffer>(interface, _state, size);
+  }
+  if (!interface->caps()->shaderCaps()->uboSupport && usage & GPUBufferUsage::UNIFORM) {
+    return makeResource<GLBuffer>(interface, 0u, size, usage);
   }
 
   auto gl = interface->functions();

@@ -254,6 +254,8 @@ void GLCaps::initGLSupport(const GLInfo& info) {
                              info.hasExtension("GL_ARB_vertex_array_object") ||
                              info.hasExtension("GL_APPLE_vertex_array_object");
   textureRedSupport = version >= GL_VER(3, 0) || info.hasExtension("GL_ARB_texture_rg");
+  pboSupport = version >= GL_VER(2, 1) || info.hasExtension("GL_ARB_pixel_buffer_object") ||
+               info.hasExtension("GL_EXT_pixel_buffer_object");
   multisampleDisableSupport = true;
   if (vendor != GLVendor::Intel) {
     textureBarrierSupport = version >= GL_VER(4, 5) ||
@@ -285,6 +287,7 @@ void GLCaps::initGLESSupport(const GLInfo& info) {
   vertexArrayObjectSupport =
       version >= GL_VER(3, 0) || info.hasExtension("GL_OES_vertex_array_object");
   textureRedSupport = version >= GL_VER(3, 0) || info.hasExtension("GL_EXT_texture_rg");
+  pboSupport = version >= GL_VER(3, 0);
   multisampleDisableSupport = info.hasExtension("GL_EXT_multisample_compatibility");
   textureBarrierSupport = info.hasExtension("GL_NV_texture_barrier");
   _shaderCaps.versionDeclString = version >= GL_VER(3, 0) ? "#version 300 es" : "#version 100";
@@ -335,6 +338,7 @@ void GLCaps::initWebGLSupport(const GLInfo& info) {
                              info.hasExtension("GL_OES_vertex_array_object") ||
                              info.hasExtension("OES_vertex_array_object");
   textureRedSupport = version >= GL_VER(2, 0);
+  pboSupport = false;
   multisampleDisableSupport = false;
   textureBarrierSupport = false;
   semaphoreSupport = version >= GL_VER(2, 0);
