@@ -284,33 +284,27 @@ std::shared_ptr<tgfx::Layer> RichText::buildLayerTree(const AppHost* host) {
   paints[1].setShader(shader);
 
   std::vector<Element> elements(5);
-  //Image
   elements[0].type = Element::Type::Image;
   auto image = host->getImage("TGFX");
   image = image->makeMipmapped(true);
   elements[0].image = image;
-  // 参考TextLayer::getLineHeight的计算方法
   auto metrics = fonts[0].getMetrics();
   auto textHeight = ceil(metrics.capHeight + metrics.descent);
   elements[0].height = textHeight;
   elements[0].width =
       static_cast<float>(image->width()) * textHeight / static_cast<float>(image->height());
-  //HelloTGFX!
   elements[1].text = texts[0];
   elements[1].font = fonts[0];
   elements[1].paints = {paints[0], paints[1]};
-  //TGFX
   elements[2].text = texts[1];
   elements[2].font = fonts[1];
   elements[2].paints = {paints[0], paints[1]};
   elements[2].underlineIndex = findFirstOccurrence(texts[1], "TGFX");
-  //.....
   elements[3].text = texts[2];
   elements[3].font = fonts[2];
   elements[3].paints = {paints[0], paints[1]};
   elements[3].underlineIndex = findFirstOccurrence(texts[2], "(Tencent Graphics)");
   elements[3].deletelineIndex = findFirstOccurrence(texts[2], "video");
-  //emoji
   elements[4].text = texts[3];
   elements[4].font = fonts[3];
   elements[4].paints = {{}};

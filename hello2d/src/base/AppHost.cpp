@@ -159,7 +159,6 @@ void AppHost::updateRootMatrix() const {
   float width = static_cast<float>(this->width());
   float height = static_cast<float>(this->height());
 
-  // 防止除以0问题
   if (bounds.width() <= 0 || bounds.height() <= 0) {
     return;
   }

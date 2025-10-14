@@ -60,7 +60,7 @@ static std::shared_ptr<tgfx::Layer> CreateProgressBar() {
 
 static std::vector<std::shared_ptr<tgfx::Layer>> CreateBackground() {
   std::vector<std::shared_ptr<tgfx::Layer>> layers;
-  layers.reserve(4);  // 给个初始容量
+  layers.reserve(4);
 
   auto background = tgfx::ShapeLayer::Make();
   tgfx::Rect displayRect = tgfx::Rect::MakeWH(375, 812);
