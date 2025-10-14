@@ -1260,10 +1260,8 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     if (transformer) {
       contentScale = transformer->getMaxScale();
     }
-    transformer =
-        RegionTransformer::MakeFromFilters(_filters, contentScale, std::move(transformer));
-    transformer =
-        RegionTransformer::MakeFromStyles(_layerStyles, contentScale, std::move(transformer));
+    transformer = RegionTransformer::MakeFromFilters(_filters, 1.0f, std::move(transformer));
+    transformer = RegionTransformer::MakeFromStyles(_layerStyles, 1.0f, std::move(transformer));
   }
   auto content = getContent();
   if (bitFields.dirtyContentBounds || (forceDirty && content)) {
