@@ -23,6 +23,7 @@
 #include "gpu/VertexProvider.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Matrix.h"
+#include "tgfx/core/Stroke.h"
 
 namespace tgfx {
 struct RectRecord {
@@ -57,7 +58,8 @@ class RectsVertexProvider : public VertexProvider {
                                                     std::vector<PlacementPtr<RectRecord>>&& rects,
                                                     std::vector<PlacementPtr<Rect>>&& uvRects,
                                                     AAType aaType, bool needUVCoord,
-                                                    UVSubsetMode subsetMode);
+                                                    UVSubsetMode subsetMode,
+                                                    std::vector<PlacementPtr<Stroke>>&& strokes);
 
   /**
    * Returns the number of rects in the provider.
@@ -85,6 +87,17 @@ class RectsVertexProvider : public VertexProvider {
    */
   bool hasColor() const {
     return bitFields.hasColor;
+  }
+
+  /**
+   * Returns true if the provider generates stroke.
+   */
+  bool hasStroke() const {
+    return bitFields.hasStroke;
+  }
+
+  LineJoin lineJoin() const {
+    return static_cast<LineJoin>(bitFields.lineJoin);
   }
 
   /**
@@ -123,7 +136,9 @@ class RectsVertexProvider : public VertexProvider {
     uint8_t aaType : 2;
     bool hasUVCoord : 1;
     bool hasColor : 1;
+    bool hasStroke : 1;
     uint8_t subsetMode : 2;
+    uint8_t lineJoin : 2;
   } bitFields = {};
 
   RectsVertexProvider(PlacementArray<RectRecord>&& rects, PlacementArray<Rect>&& uvRects,

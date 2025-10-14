@@ -32,9 +32,17 @@ PlacementPtr<RectDrawOp> RectDrawOp::Make(Context* context,
     return nullptr;
   }
   auto drawOp = context->drawingBuffer()->make<RectDrawOp>(provider.get());
-  if (provider->aaType() == AAType::Coverage || provider->rectCount() > 1) {
-    drawOp->indexBufferProxy =
-        context->globalCache()->getRectIndexBuffer(provider->aaType() == AAType::Coverage);
+  if (provider->aaType() == AAType::Coverage || provider->rectCount() > 1 ||
+      provider->hasStroke()) {
+    if (provider->hasStroke()) {
+      drawOp->indexBufferProxy = context->globalCache()->getStrokeRectIndexBuffer(
+          provider->aaType() == AAType::Coverage, provider->lineJoin());
+    } else {
+      drawOp->indexBufferProxy =
+          context->globalCache()->getRectIndexBuffer(provider->aaType() == AAType::Coverage);
+    }
+  } else if (provider->rectCount() > 1) {
+    drawOp->indexBufferProxy = context->globalCache()->getRectIndexBuffer(false);
   }
   if (provider->rectCount() <= 1) {
     // If we only have one rect, it is not worth the async task overhead.
@@ -56,6 +64,8 @@ RectDrawOp::RectDrawOp(RectsVertexProvider* provider)
     commonColor = provider->firstColor();
   }
   hasSubset = provider->hasSubset();
+  hasStroke = provider->hasStroke();
+  strokeLineJoin = provider->lineJoin();
 }
 
 PlacementPtr<GeometryProcessor> RectDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {
@@ -66,6 +76,21 @@ PlacementPtr<GeometryProcessor> RectDrawOp::onMakeGeometryProcessor(RenderTarget
   return QuadPerEdgeAAGeometryProcessor::Make(drawingBuffer, renderTarget->width(),
                                               renderTarget->height(), aaType, commonColor, uvMatrix,
                                               hasSubset);
+}
+
+static uint16_t GetNumIndicesPerQuad(AAType aaType, bool hasStroke, LineJoin lineJoin) {
+  if (!hasStroke) {
+    return aaType == AAType::Coverage ? RectDrawOp::IndicesPerAAQuad
+                                      : RectDrawOp::IndicesPerNonAAQuad;
+  }
+
+  if (aaType == AAType::Coverage) {
+    return lineJoin == LineJoin::Miter ? RectDrawOp::IndicesPerAAMiterStrokeRect
+                                       : RectDrawOp::IndicesPerAABevelStrokeRect;
+  }
+
+  return lineJoin == LineJoin::Miter ? RectDrawOp::IndicesPerNonAAMiterStrokeRect
+                                     : RectDrawOp::IndicesPerNonAABevelStrokeRect;
 }
 
 void RectDrawOp::onDraw(RenderPass* renderPass) {
@@ -83,7 +108,7 @@ void RectDrawOp::onDraw(RenderPass* renderPass) {
   renderPass->setVertexBuffer(vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
   renderPass->setIndexBuffer(indexBuffer ? indexBuffer->gpuBuffer() : nullptr);
   if (indexBuffer != nullptr) {
-    auto numIndicesPerQuad = aaType == AAType::Coverage ? IndicesPerAAQuad : IndicesPerNonAAQuad;
+    auto numIndicesPerQuad = GetNumIndicesPerQuad(aaType, hasStroke, strokeLineJoin);
     renderPass->drawIndexed(PrimitiveType::Triangles, 0, rectCount * numIndicesPerQuad);
   } else {
     renderPass->draw(PrimitiveType::TriangleStrip, 0, 4);

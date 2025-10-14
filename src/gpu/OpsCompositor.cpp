@@ -101,13 +101,20 @@ void OpsCompositor::fillImageRect(std::shared_ptr<Image> image, const Rect& srcR
   }
 }
 
-void OpsCompositor::fillRect(const Rect& rect, const MCState& state, const Fill& fill) {
+void OpsCompositor::fillRect(const Rect& rect, const MCState& state, const Fill& fill,
+                             const Stroke* stroke) {
   DEBUG_ASSERT(!rect.isEmpty());
-  if (!canAppend(PendingOpType::Rect, state.clip, fill)) {
-    flushPendingOps(PendingOpType::Rect, state.clip, fill);
+  auto opType = stroke ? PendingOpType::StrokeRect : PendingOpType::Rect;
+  if (!canAppend(opType, state.clip, fill) ||
+      (stroke && (pendingStrokes.empty() || pendingStrokes.front()->join != stroke->join))) {
+    flushPendingOps(opType, state.clip, fill);
   }
   auto record = drawingBuffer()->make<RectRecord>(rect, state.matrix, fill.color.premultiply());
   pendingRects.emplace_back(std::move(record));
+  if (stroke) {
+    auto strokeRecord = drawingBuffer()->make<Stroke>(*stroke);
+    pendingStrokes.emplace_back(std::move(strokeRecord));
+  }
 }
 
 void OpsCompositor::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
@@ -238,6 +245,8 @@ bool OpsCompositor::canAppend(PendingOpType type, const Path& clip, const Fill& 
       return pendingRects.size() < RectDrawOp::MaxNumRects;
     case PendingOpType::RRect:
       return pendingRRects.size() < RRectDrawOp::MaxNumRRects;
+    case PendingOpType::StrokeRect:
+      return pendingRects.size() < RectDrawOp::MaxNumStrokeRects;
     default:
       break;
   }
@@ -352,6 +361,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
         }
       }
     // fallthrough
+    case PendingOpType::StrokeRect:
     case PendingOpType::Image: {
       auto subsetMode = UVSubsetMode::None;
       if (pendingConstraint == SrcRectConstraint::Strict && pendingImage) {
@@ -363,9 +373,9 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
           needLocalBounds && (hasRectToRectDraw || HasDifferentViewMatrix(pendingRects));
       auto uvRects =
           hasRectToRectDraw ? std::move(pendingUVRects) : std::vector<PlacementPtr<Rect>>();
-      auto provider =
-          RectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingRects),
-                                        std::move(uvRects), aaType, needUVCoord, subsetMode);
+      auto provider = RectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingRects),
+                                                    std::move(uvRects), aaType, needUVCoord,
+                                                    subsetMode, std::move(pendingStrokes));
       drawOp = RectDrawOp::Make(context, std::move(provider), renderFlags);
     } break;
     case PendingOpType::RRect: {
@@ -376,7 +386,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
     } break;
     case PendingOpType::Atlas: {
       auto provider = RectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingRects), {},
-                                                    AAType::None, true, UVSubsetMode::None);
+                                                    AAType::None, true, UVSubsetMode::None, {});
       drawOp = AtlasTextOp::Make(context, std::move(provider), renderFlags,
                                  std::move(pendingAtlasTexture), pendingSampling);
     } break;

@@ -205,8 +205,30 @@ void Canvas::drawLine(float x0, float y0, float x1, float y1, const Paint& paint
   drawPath(path, realPaint);
 }
 
+static bool UseDrawPath(const Stroke* stroke, const Rect& rect, const Matrix& viewMatrix) {
+  if (!stroke) {
+    return false;
+  }
+  if (!viewMatrix.rectStaysRect()) {
+    return true;
+  }
+
+  if (stroke->join == LineJoin::Round) {
+    return true;
+  }
+
+  float scaledStroke = std::fabs(stroke->width * (viewMatrix.getScaleX() + viewMatrix.getSkewY()));
+  // strokewidth is greater than  the smallest side
+  if (scaledStroke > std::min(rect.width(), rect.height())) {
+    return true;
+  }
+
+  return false;
+}
+
 void Canvas::drawRect(const Rect& rect, const Paint& paint) {
-  if (paint.getStroke()) {
+  auto stroke = paint.getStroke();
+  if (UseDrawPath(stroke, rect, mcState->matrix)) {
     Path path = {};
     path.addRect(rect);
     drawPath(path, paint);
@@ -216,7 +238,7 @@ void Canvas::drawRect(const Rect& rect, const Paint& paint) {
     return;
   }
   SaveLayerForImageFilter(paint.getImageFilter());
-  drawContext->drawRect(rect, *mcState, paint.getFill());
+  drawContext->drawRect(rect, *mcState, paint.getFill(), stroke);
 }
 
 void Canvas::drawOval(const Rect& oval, const Paint& paint) {
@@ -359,13 +381,13 @@ void Canvas::drawPath(const Path& path, const MCState& state, const Fill& fill,
       return;
     }
     if (StrokeLineIsRect(*stroke, line, &rect)) {
-      drawContext->drawRect(rect, state, fill);
+      drawContext->drawRect(rect, state, fill, stroke);
       return;
     }
   }
   if (stroke == nullptr) {
     if (path.isRect(&rect)) {
-      drawContext->drawRect(rect, state, fill);
+      drawContext->drawRect(rect, state, fill, stroke);
       return;
     }
     RRect rRect = {};

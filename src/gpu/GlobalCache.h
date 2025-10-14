@@ -26,6 +26,7 @@
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/resources/Program.h"
 #include "tgfx/core/Color.h"
+#include "tgfx/core/Stroke.h"
 
 namespace tgfx {
 /**
@@ -75,6 +76,12 @@ class GlobalCache {
   std::shared_ptr<IndexBufferProxy> getRectIndexBuffer(bool antialias);
 
   /**
+   * Returns a GPU buffer containing indices for rendering a stroked rectangle with the specified
+   * line join style.
+   */
+  std::shared_ptr<IndexBufferProxy> getStrokeRectIndexBuffer(bool antialias, LineJoin join);
+
+  /**
    * Returns a GPU buffer containing indices for rendering a rounded rectangle, either for filling
    * or stroking.
    */
@@ -110,6 +117,9 @@ class GlobalCache {
     size_t cursor = 0;
   };
 
+  std::shared_ptr<IndexBufferProxy> getMiterStrokeIndexBuffer(bool antialias);
+  std::shared_ptr<IndexBufferProxy> getBevelStrokeIndexBuffer(bool antialias);
+
   Context* context = nullptr;
   std::list<Program*> programLRU = {};
   BytesKeyMap<std::shared_ptr<Program>> programMap = {};
@@ -119,6 +129,10 @@ class GlobalCache {
   std::shared_ptr<IndexBufferProxy> nonAAQuadIndexBuffer = nullptr;
   std::shared_ptr<IndexBufferProxy> rRectFillIndexBuffer = nullptr;
   std::shared_ptr<IndexBufferProxy> rRectStrokeIndexBuffer = nullptr;
+  std::shared_ptr<IndexBufferProxy> aaRectMiterStrokeIndexBuffer = nullptr;
+  std::shared_ptr<IndexBufferProxy> aaRectBevelStrokeIndexBuffer = nullptr;
+  std::shared_ptr<IndexBufferProxy> nonAARectMiterStrokeIndexBuffer = nullptr;
+  std::shared_ptr<IndexBufferProxy> nonAARectBevelStrokeIndexBuffer = nullptr;
   ResourceKeyMap<std::shared_ptr<Resource>> staticResources = {};
   // Triple buffering for uniform buffer management
   static constexpr uint32_t UNIFORM_BUFFER_COUNT = 3;
