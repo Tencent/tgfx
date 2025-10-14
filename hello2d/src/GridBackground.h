@@ -24,12 +24,7 @@ namespace hello2d {
 class GridBackgroundLayer : public tgfx::Layer {
  public:
   static std::shared_ptr<GridBackgroundLayer> Make();
-  void setSize(float width, float height, float density) {
-    _width = width;
-    _height = height;
-    _density = density;
-    invalidateContent();
-  }
+  void setSize(int width, int height, float density);
 
  protected:
   GridBackgroundLayer() = default;
@@ -37,8 +32,8 @@ class GridBackgroundLayer : public tgfx::Layer {
   void onUpdateContent(tgfx::LayerRecorder* recorder) override;
 
  private:
-  float _width = 0.f;
-  float _height = 0.f;
+  int _width = 0;
+  int _height = 0;
   float _density = 1.f;
 };
 

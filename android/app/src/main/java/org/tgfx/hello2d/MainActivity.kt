@@ -22,7 +22,7 @@ class MainActivity : ComponentActivity() {
 
     private var contentOffset = PointF(0f, 0f)
 
-    private var animator: ValueAnimator? = null
+    private lateinit var animator: ValueAnimator
 
     private lateinit var scaleGestureDetector: ScaleGestureDetector
 
@@ -43,8 +43,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onPause() {
         super.onPause()
-        animator?.cancel()
-        animator = null
+        if (::animator.isInitialized) {
+            animator.cancel()
+        }
     }
 
 
@@ -55,8 +56,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        animator?.cancel()
-        animator = null
+        if (::animator.isInitialized) {
+            animator.cancel()
+        }
     }
 
 
@@ -119,7 +121,7 @@ class MainActivity : ComponentActivity() {
 
 
     private fun requestDraw() {
-        if (animator != null && animator!!.isRunning) {
+        if (::animator.isInitialized && animator.isRunning) {
             return
         }
 
@@ -128,8 +130,7 @@ class MainActivity : ComponentActivity() {
             addUpdateListener {
                 val needsRedraw = tgfxView.draw(drawIndex, zoomScale, contentOffset)
                 if (!needsRedraw) {
-                    animator?.cancel()
-                    animator = null
+                    cancel()
                 }
             }
             start()

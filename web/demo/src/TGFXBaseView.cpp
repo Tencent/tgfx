@@ -86,8 +86,8 @@ bool TGFXBaseView::draw(int drawIndex, float zoom, float offsetX, float offsetY)
   appHost->updateZoomAndOffset(zoom, tgfx::Point(offsetX, offsetY));
   auto canvas = surface->getCanvas();
   canvas->clear();
-  auto numhello2d = hello2d::SampleBuilder::Count();
-  auto index = (drawIndex % numhello2d);
+  auto sampleCount = hello2d::SampleManager::Count();
+  auto index = (drawIndex % sampleCount);
   appHost->draw(canvas, index, true);
   context->flushAndSubmit();
   window->present(context);

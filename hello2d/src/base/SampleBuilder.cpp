@@ -23,64 +23,34 @@
 #include "tgfx/platform/Print.h"
 
 namespace hello2d {
-static std::vector<SampleBuilder*> sampleBuilders = {
+static std::vector<Sample*> samples = {
     new ConicGradient(), new ImageWithMipmap(), new ImageWithShadow(),
     new RichText(),      new SimpleLayerTree(),
 };
 
-static std::vector<std::string> GetSampleBuilderNames() {
+static std::vector<std::string> GetSampleNames() {
   std::vector<std::string> names;
-  names.reserve(sampleBuilders.size());
-  for (const auto& builder : sampleBuilders) {
-    names.push_back(builder->name());
+  names.reserve(samples.size());
+  for (const auto& sample : samples) {
+    names.push_back(sample->name());
   }
   return names;
 }
 
-static std::unordered_map<std::string, SampleBuilder*> GetSampleBuilderMap() {
-  std::unordered_map<std::string, SampleBuilder*> map;
-  map.reserve(sampleBuilders.size());
-  for (const auto& builder : sampleBuilders) {
-    map[builder->name()] = builder;
+static std::unordered_map<std::string, Sample*> GetSampleMap() {
+  std::unordered_map<std::string, Sample*> map;
+  map.reserve(samples.size());
+  for (const auto& sample : samples) {
+    map[sample->name()] = sample;
   }
   return map;
 }
 
-int SampleBuilder::Count() {
-  return static_cast<int>(sampleBuilders.size());
+// Sample class implementation
+Sample::Sample(std::string name) : _name(std::move(name)) {
 }
 
-std::vector<std::string> SampleBuilder::Names() {
-  return GetSampleBuilderNames();
-}
-
-SampleBuilder* SampleBuilder::GetByIndex(int index) {
-  if (index < 0 || index >= Count()) {
-    return nullptr;
-  }
-  return sampleBuilders[static_cast<size_t>(index)];
-}
-
-SampleBuilder* SampleBuilder::GetByName(const std::string& name) {
-  auto builderMap = GetSampleBuilderMap();
-  auto it = builderMap.find(name);
-  if (it == builderMap.end()) {
-    return nullptr;
-  }
-  return it->second;
-}
-
-void SampleBuilder::DrawBackground(tgfx::Canvas* canvas, const AppHost* host) {
-  static auto layer = GridBackgroundLayer::Make();
-  layer->setSize(static_cast<float>(host->width()), static_cast<float>(host->height()),
-                 host->density());
-  layer->draw(canvas);
-}
-
-SampleBuilder::SampleBuilder(std::string name) : _name(std::move(name)) {
-}
-
-void SampleBuilder::build(const AppHost* host) {
+void Sample::build(const AppHost* host) {
   if (host == nullptr) {
     return;
   }
@@ -88,7 +58,39 @@ void SampleBuilder::build(const AppHost* host) {
     _root = buildLayerTree(host);
   }
 }
-std::vector<std::shared_ptr<tgfx::Layer>> SampleBuilder::getLayersUnderPoint(float x, float y) {
+
+std::vector<std::shared_ptr<tgfx::Layer>> Sample::getLayersUnderPoint(float x, float y) {
   return _root->getLayersUnderPoint(x, y);
+}
+
+// SampleManager class implementation
+int SampleManager::Count() {
+  return static_cast<int>(samples.size());
+}
+
+std::vector<std::string> SampleManager::Names() {
+  return GetSampleNames();
+}
+
+Sample* SampleManager::GetByIndex(int index) {
+  if (index < 0 || index >= Count()) {
+    return nullptr;
+  }
+  return samples[static_cast<size_t>(index)];
+}
+
+Sample* SampleManager::GetByName(const std::string& name) {
+  auto sampleMap = GetSampleMap();
+  auto it = sampleMap.find(name);
+  if (it == sampleMap.end()) {
+    return nullptr;
+  }
+  return it->second;
+}
+
+void SampleManager::DrawBackground(tgfx::Canvas* canvas, const AppHost* host) {
+  static auto layer = GridBackgroundLayer::Make();
+  layer->setSize(host->width(), host->height(), host->density());
+  layer->draw(canvas);
 }
 }  // namespace hello2d

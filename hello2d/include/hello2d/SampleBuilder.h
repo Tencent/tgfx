@@ -23,34 +23,12 @@
 #include "tgfx/layers/DisplayList.h"
 
 namespace hello2d {
-class SampleBuilder {
+
+// Base class for individual samples
+class Sample {
  public:
-  /**
-   * Returns the number of sample builders.
-   */
-  static int Count();
-
-  /**
-   * Returns the names of all sample builders.
-   */
-  static std::vector<std::string> Names();
-
-  /**
-   * Returns the sample builder with the given index.
-   */
-  static SampleBuilder* GetByIndex(int index);
-
-  /**
-   * Returns the sample builder with the given name.
-   */
-  static SampleBuilder* GetByName(const std::string& name);
-
-  static void DrawBackground(tgfx::Canvas* canvas, const AppHost* host);
-
-  explicit SampleBuilder(std::string name);
-
-  virtual ~SampleBuilder() = default;
-  std::vector<std::shared_ptr<tgfx::Layer>> getLayersUnderPoint(float x, float y);
+  explicit Sample(std::string name);
+  virtual ~Sample() = default;
 
   std::string name() const {
     return _name;
@@ -59,8 +37,11 @@ class SampleBuilder {
   /**
    * Build the contents.
    */
-  void build(const AppHost* host);
-  virtual std::shared_ptr<tgfx::Layer> buildLayerTree(const AppHost* host) = 0;
+  void build(const hello2d::AppHost* host);
+  
+  std::vector<std::shared_ptr<tgfx::Layer>> getLayersUnderPoint(float x, float y);
+  
+  virtual std::shared_ptr<tgfx::Layer> buildLayerTree(const hello2d::AppHost* host) = 0;
 
  protected:
   float padding = 30.f;
@@ -69,4 +50,34 @@ class SampleBuilder {
  private:
   std::string _name = "";
 };
+
+// Manager class for handling multiple samples
+class SampleManager {
+ public:
+  /**
+   * Returns the number of samples.
+   */
+  static int Count();
+
+  /**
+   * Returns the names of all samples.
+   */
+  static std::vector<std::string> Names();
+
+  /**
+   * Returns the sample with the given index.
+   */
+  static Sample* GetByIndex(int index);
+
+  /**
+   * Returns the sample with the given name.
+   */
+  static Sample* GetByName(const std::string& name);
+
+  static void DrawBackground(tgfx::Canvas* canvas, const hello2d::AppHost* host);
+};
+
+// For backward compatibility, alias SampleBuilder to Sample
+using SampleBuilder = Sample;
+
 }  // namespace hello2d

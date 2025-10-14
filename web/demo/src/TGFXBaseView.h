@@ -39,7 +39,7 @@ class TGFXBaseView {
   void onClickEvent();
 
  protected:
-  std::shared_ptr<hello2d::AppHost> appHost;
+  std::shared_ptr<hello2d::AppHost> appHost = nullptr;
 
  private:
   std::string canvasID = "";

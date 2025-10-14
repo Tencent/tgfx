@@ -179,54 +179,54 @@ Color Surface::getColor(int x, int y) {
   return Color::FromRGBA(color[0], color[1], color[2], color[3]);
 }
 
-bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int srcY) {
-  if (dstInfo.isEmpty() || dstPixels == nullptr) {
-    return false;
+std::shared_ptr<SurfaceReadback> Surface::asyncReadPixels(const Rect& rect) {
+  if (rect.isEmpty()) {
+    return nullptr;
   }
-  auto context = getContext();
+  auto surfaceRect = Rect::MakeWH(width(), height());
+  if (!surfaceRect.contains(rect)) {
+    return nullptr;
+  }
   auto renderTarget = renderContext->renderTarget;
-  auto textureView = renderTarget->getTextureView();
-  auto hardwareBuffer = textureView ? textureView->getTexture()->getHardwareBuffer() : nullptr;
-  if (hardwareBuffer != nullptr) {
-    context->flushAndSubmit(true);
-    auto pixels = HardwareBufferLock(hardwareBuffer);
-    if (pixels != nullptr) {
-      auto info = HardwareBufferGetInfo(hardwareBuffer);
-      auto success = Pixmap(info, pixels).readPixels(dstInfo, dstPixels, srcX, srcY);
-      HardwareBufferUnlock(hardwareBuffer);
-      return success;
-    }
+  auto srcRect = renderTarget->getOriginTransform().mapRect(rect);
+  auto colorType = PixelFormatToColorType(renderTarget->format());
+  auto info = ImageInfo::Make(static_cast<int>(srcRect.width()), static_cast<int>(srcRect.height()),
+                              colorType, AlphaType::Premultiplied);
+  auto context = renderTarget->getContext();
+  auto readbackBuffer = context->proxyProvider()->createReadbackBufferProxy(info.byteSize());
+  if (readbackBuffer == nullptr) {
+    return nullptr;
   }
+  renderContext->flush();
+  context->drawingManager()->addTransferPixelsTask(renderTarget, srcRect, readbackBuffer);
+  return std::shared_ptr<SurfaceReadback>(new SurfaceReadback(info, std::move(readbackBuffer)));
+}
+
+bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int srcY) {
+  auto renderTarget = renderContext->renderTarget;
   auto outInfo = dstInfo.makeIntersect(-srcX, -srcY, renderTarget->width(), renderTarget->height());
-  if (outInfo.isEmpty()) {
+  if (outInfo.isEmpty() || dstPixels == nullptr) {
     return false;
   }
   dstPixels = dstInfo.computeOffset(dstPixels, -srcX, -srcY);
   auto colorType = PixelFormatToColorType(renderTarget->format());
-  auto flipY = renderTarget->origin() == ImageOrigin::BottomLeft;
   auto srcInfo =
       ImageInfo::Make(outInfo.width(), outInfo.height(), colorType, AlphaType::Premultiplied);
   auto readX = std::max(0, srcX);
   auto readY = std::max(0, srcY);
-  if (flipY) {
-    readY = renderTarget->height() - readY - outInfo.height();
-  }
   auto rect = Rect::MakeXYWH(readX, readY, outInfo.width(), outInfo.height());
-  auto readbackBufferProxy = renderContext->copyPixels(rect);
-  if (readbackBufferProxy == nullptr) {
+  auto readback = asyncReadPixels(rect);
+  if (readback == nullptr) {
     return false;
   }
-  context->flushAndSubmit();
-  auto readbackBuffer = readbackBufferProxy->getBuffer();
-  if (readbackBuffer == nullptr) {
-    return false;
-  }
-  auto srcPixels = readbackBuffer->gpuBuffer()->map();
+  auto context = renderTarget->getContext();
+  auto srcPixels = readback->lockPixels(context);
   if (srcPixels == nullptr) {
     return false;
   }
+  auto flipY = renderTarget->origin() == ImageOrigin::BottomLeft;
   CopyPixels(srcInfo, srcPixels, outInfo, dstPixels, flipY);
-  readbackBuffer->gpuBuffer()->unmap();
+  readback->unlockPixels(context);
   return true;
 }
 

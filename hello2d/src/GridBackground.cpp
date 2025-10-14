@@ -19,18 +19,27 @@
 #include "GridBackground.h"
 
 namespace hello2d {
+
 std::shared_ptr<GridBackgroundLayer> GridBackgroundLayer::Make() {
   return std::shared_ptr<GridBackgroundLayer>(new GridBackgroundLayer());
 }
+
+void GridBackgroundLayer::setSize(int width, int height, float density) {
+  _width = width;
+  _height = height;
+  _density = density;
+  invalidateContent();
+}
+
 void GridBackgroundLayer::onUpdateContent(tgfx::LayerRecorder* recorder) {
   auto canvas = recorder->getCanvas();
   canvas->clear(tgfx::Color::White());
   tgfx::Paint paint = {};
   paint.setColor(tgfx::Color{0.8f, 0.8f, 0.8f, 1.f});
   int tileSize = 8 * static_cast<int>(_density);
-  for (int y = 0; y < static_cast<int>(_height); y += tileSize) {
+  for (int y = 0; y < _height; y += tileSize) {
     bool draw = (y / tileSize) % 2 == 1;
-    for (int x = 0; x < static_cast<int>(_width); x += tileSize) {
+    for (int x = 0; x < _width; x += tileSize) {
       if (draw) {
         auto rect =
             tgfx::Rect::MakeXYWH(static_cast<float>(x), static_cast<float>(y),
@@ -41,4 +50,5 @@ void GridBackgroundLayer::onUpdateContent(tgfx::LayerRecorder* recorder) {
     }
   }
 }
+
 }  // namespace hello2d

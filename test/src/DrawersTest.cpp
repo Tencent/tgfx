@@ -33,7 +33,7 @@ TGFX_TEST(Hello2DTest, Compare) {
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, appHost.width(), appHost.height(), false, 4);
   auto canvas = surface->getCanvas();
-  auto builderNames = hello2d::SampleBuilder::Names();
+  auto builderNames = hello2d::SampleManager::Names();
   for (size_t i = 0; i < builderNames.size(); ++i) {
     const auto& name = builderNames[i];
     bool isNeedBackground = false;

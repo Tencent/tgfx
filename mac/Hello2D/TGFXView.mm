@@ -144,26 +144,26 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   }
   appHost->resetDirty();
   if (self.window == nil) {
-    return true;
+    return false;
   }
   if (appHost->width() <= 0 || appHost->height() <= 0) {
-    return true;
+    return false;
   }
   if (tgfxWindow == nullptr) {
     tgfxWindow = tgfx::CGLWindow::MakeFrom(self);
   }
   if (tgfxWindow == nullptr) {
-    return true;
+    return false;
   }
   auto device = tgfxWindow->getDevice();
   auto context = device->lockContext();
   if (context == nullptr) {
-    return true;
+    return false;
   }
   auto surface = tgfxWindow->getSurface(context);
   if (surface == nullptr) {
     device->unlock();
-    return true;
+    return false;
   }
 
   appHost->updateZoomAndOffset(self.zoomScale,
@@ -171,7 +171,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
                                            static_cast<float>(self.contentOffset.y)));
   auto canvas = surface->getCanvas();
   canvas->clear();
-  auto numBuilders = hello2d::SampleBuilder::Count();
+  auto numBuilders = hello2d::SampleManager::Count();
   auto index = (self.drawIndex % numBuilders);
   appHost->draw(canvas, index, true);
   context->flushAndSubmit();

@@ -110,7 +110,7 @@ class AppHost {
   bool isDirty() const;
   void markDirty() const;
   void resetDirty() const;
-  void SetTileMode() const;
+  void setTileMode() const;
   /**
    * Draws the content of the corresponding SampleBuilder based on the index.
    */

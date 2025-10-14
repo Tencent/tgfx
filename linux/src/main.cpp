@@ -62,7 +62,7 @@ int main() {
   }
   auto surface = tgfx::Surface::Make(context, appHost.width(), appHost.height());
   auto canvas = surface->getCanvas();
-  auto builderNames = hello2d::SampleBuilder::Names();
+  auto builderNames = hello2d::SampleManager::Names();
   auto index = 0;
 
   for (auto& name : builderNames) {

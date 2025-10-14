@@ -46,6 +46,6 @@ class JTGFXView {
  private:
   ANativeWindow* nativeWindow = nullptr;
   std::shared_ptr<tgfx::Window> window;
-  std::shared_ptr<hello2d::AppHost> appHost;
+  std::shared_ptr<hello2d::AppHost> appHost = nullptr;
 };
 }  // namespace hello2d

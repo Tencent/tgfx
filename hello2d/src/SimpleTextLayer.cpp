@@ -28,7 +28,6 @@
 namespace hello2d {
 static auto strokeOffset = 0.f;
 
-// Merge continuous lines at the same height
 static void mergeLines(std::vector<TextLine>& lines) {
   if (lines.empty()) {
     return;
@@ -105,18 +104,16 @@ void SimpleTextLayer::onUpdateContent(tgfx::LayerRecorder* recorder) {
 }
 
 void SimpleTextLayer::invalidateLayout() {
-  auto lineTop = 0.f;          // Total height of all previous lines
-  auto lineHeight = 0.f;       // Current line's max height
-  auto baselineHeight = 0.f;   // Current line's max baseline height
-  auto underlineHeight = 0.f;  // Current line's max underline height
+  auto lineTop = 0.f;
+  auto lineHeight = 0.f;
+  auto baselineHeight = 0.f;
+  auto underlineHeight = 0.f;
 
-  std::vector<float> baselines = {};   // Baseline positions for each line
-  std::vector<float> underlines = {};  // Underline positions for each line
+  std::vector<float> baselines = {};
+  std::vector<float> underlines = {};
 
-  // Cache font metrics to avoid repeated expensive calls
   std::map<std::string, std::pair<tgfx::Font, tgfx::FontMetrics>> fontMetricsCache = {};
 
-  // Baselines and underlines height are determined by the tallest richText, so calculates theses in first pass
   for (auto& richText : richTexts) {
     if (richText.type == Element::Type::Text) {
       auto font = richText.font;
@@ -255,6 +252,7 @@ std::shared_ptr<tgfx::Layer> RichText::buildLayerTree(const AppHost* host) {
                                     "🤡👻🐠🤩😃🤪🙈🙊🐒🐙‍"};
 
   std::vector<tgfx::Font> fonts;
+  fonts.reserve(4);
   auto typeface = host->getTypeface("default");
   tgfx::Font font(typeface, 60);
   font.setFauxBold(true);

@@ -38,7 +38,7 @@ void AppHost::resetDirty() const {
   _dirty = false;
 }
 
-void AppHost::SetTileMode() const {
+void AppHost::setTileMode() const {
   _isTileMode = false;
 }
 
@@ -114,16 +114,16 @@ void AppHost::addTypeface(const std::string& name, std::shared_ptr<tgfx::Typefac
   typefaces[name] = std::move(typeface);
 }
 void AppHost::draw(tgfx::Canvas* canvas, int drawIndex, bool isNeedBackground) const {
-  if (drawIndex < 0 || drawIndex >= static_cast<int>(SampleBuilder::Count())) {
+  if (drawIndex < 0 || drawIndex >= static_cast<int>(SampleManager::Count())) {
     return;
   }
   canvas->clear();
 
   if (isNeedBackground) {
-    SampleBuilder::DrawBackground(canvas, this);
+    SampleManager::DrawBackground(canvas, this);
   }
 
-  auto currentBuilder = SampleBuilder::GetByIndex(drawIndex);
+  auto currentBuilder = SampleManager::GetByIndex(drawIndex);
   if (!currentBuilder) {
     return;
   }
@@ -144,7 +144,7 @@ void AppHost::draw(tgfx::Canvas* canvas, int drawIndex, bool isNeedBackground) c
     lastDrawIndex = drawIndex;
     updateRootMatrix();
   }
-  auto builder = SampleBuilder::GetByIndex(drawIndex % SampleBuilder::Count());
+  auto builder = SampleManager::GetByIndex(drawIndex % SampleManager::Count());
   if (builder == nullptr) {
     return;
   }

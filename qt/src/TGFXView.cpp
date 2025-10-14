@@ -80,8 +80,6 @@ QSGNode* TGFXView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
 
 void TGFXView::onSceneGraphInvalidated() {
   disconnect(window(), SIGNAL(sceneGraphInvalidated()), this, SLOT(onSceneGraphInvalidated()));
-  // Release the tgfxWindow on the QSG render thread or call tgfxWindow->moveToThread() to move
-  // it. Otherwise, destroying the tgfxWindow in the main thread will cause an error.
   tgfxWindow = nullptr;
 }
 
@@ -116,22 +114,22 @@ bool TGFXView::draw() {
   appHost->resetDirty();
   auto device = tgfxWindow->getDevice();
   if (device == nullptr) {
-    return true;
+    return false;
   }
   auto context = device->lockContext();
   if (context == nullptr) {
-    return true;
+    return false;
   }
   auto surface = tgfxWindow->getSurface(context);
   if (surface == nullptr) {
     device->unlock();
-    return true;
+    return false;
   }
   appHost->updateZoomAndOffset(
       zoom, tgfx::Point(static_cast<float>(offset.x()), static_cast<float>(offset.y())));
   auto canvas = surface->getCanvas();
   canvas->clear();
-  auto numBuilders = hello2d::SampleBuilder::Count();
+  auto numBuilders = hello2d::SampleManager::Count();
   auto index = (currentDrawerIndex % numBuilders);
   appHost->draw(canvas, index, true);
   context->flushAndSubmit();
