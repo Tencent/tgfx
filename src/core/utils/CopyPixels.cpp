@@ -32,15 +32,20 @@ inline const void* AddOffset(const void* pixels, size_t offset) {
 }
 
 static void CopyRectMemory(const void* src, size_t srcRB, void* dst, size_t dstRB,
-                           size_t trimRowBytes, size_t rowCount) {
-  if (trimRowBytes == dstRB && trimRowBytes == srcRB) {
+                           size_t trimRowBytes, size_t rowCount, bool flipY) {
+  if (!flipY && trimRowBytes == dstRB && trimRowBytes == srcRB) {
     memcpy(dst, src, trimRowBytes * rowCount);
     return;
+  }
+  auto srcRowOffset = static_cast<int64_t>(srcRB);
+  if (flipY) {
+    src = AddOffset(src, (rowCount - 1) * srcRB);
+    srcRowOffset = -srcRowOffset;
   }
   for (size_t i = 0; i < rowCount; i++) {
     memcpy(dst, src, trimRowBytes);
     dst = AddOffset(dst, dstRB);
-    src = AddOffset(src, srcRB);
+    src = static_cast<const uint8_t*>(src) + srcRowOffset;
   }
 }
 
@@ -64,10 +69,9 @@ void CopyPixels(const ImageInfo& srcInfo, const void* srcPixels, const ImageInfo
                 void* dstPixels, bool flipY) {
   DEBUG_ASSERT(!srcInfo.isEmpty());
   DEBUG_ASSERT(srcInfo.width() == dstInfo.width() && srcInfo.height() == dstInfo.height());
-  if (!flipY && srcInfo.colorType() == dstInfo.colorType() &&
-      srcInfo.alphaType() == dstInfo.alphaType()) {
+  if (srcInfo.colorType() == dstInfo.colorType() && srcInfo.alphaType() == dstInfo.alphaType()) {
     CopyRectMemory(srcPixels, srcInfo.rowBytes(), dstPixels, dstInfo.rowBytes(),
-                   dstInfo.minRowBytes(), static_cast<size_t>(dstInfo.height()));
+                   dstInfo.minRowBytes(), static_cast<size_t>(dstInfo.height()), flipY);
     return;
   }
   auto srcFormat = ColorMapper.at(srcInfo.colorType());
