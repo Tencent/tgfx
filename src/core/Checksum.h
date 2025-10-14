@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,27 +18,18 @@
 
 #pragma once
 
-#include <CoreImage/CoreImage.h>
-#include "tgfx/core/ImageCodec.h"
+#include <cstddef>
+#include <cstdint>
 
 namespace tgfx {
-class NativeCodec : public ImageCodec {
- public:
-  ~NativeCodec() override;
-
- protected:
-  bool onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
-                    void* dstPixels) const override;
-
- private:
-  std::string imagePath;
-  std::shared_ptr<Data> imageBytes = nullptr;
-  CGImageRef nativeImage = nullptr;
-
-  NativeCodec(int width, int height, Orientation origin, std::shared_ptr<ColorSpace> colorSpace)
-      : ImageCodec(width, height, origin, std::move(colorSpace)) {
-  }
-
-  friend class ImageCodec;
-};
+namespace checksum {
+/**
+ * This is a fast, high-quality 32-bit hash. We make no guarantees about this remaining stable
+ * over time, or being consistent across devices.
+ *
+ * For now, this is a 64-bit wyhash, truncated to 32-bits.
+ * See: https://github.com/wangyi-fudan/wyhash
+ */
+uint32_t Hash32(const void* data, size_t bytes, uint32_t seed = 0);
+}  // namespace checksum
 }  // namespace tgfx

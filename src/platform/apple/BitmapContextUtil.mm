@@ -49,8 +49,9 @@ CGContextRef CreateBitmapContext(const ImageInfo& info, void* pixels) {
   if (bitmapInfo == 0) {
     return nullptr;
   }
-  CGColorSpaceRef colorspace =
-      info.colorType() == ColorType::ALPHA_8 ? nullptr : CGColorSpaceCreateDeviceRGB();
+  CGColorSpaceRef colorspace = info.colorType() == ColorType::ALPHA_8
+                                   ? nullptr
+                                   : CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
   auto cgContext = CGBitmapContextCreate(pixels, static_cast<size_t>(info.width()),
                                          static_cast<size_t>(info.height()), 8, info.rowBytes(),
                                          colorspace, bitmapInfo);

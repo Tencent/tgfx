@@ -121,7 +121,8 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(std::shared_ptr<Data> imageByte
   return codec;
 }
 
-std::shared_ptr<Data> ImageCodec::Encode(const Pixmap& pixmap, EncodedFormat format, int quality) {
+std::shared_ptr<Data> ImageCodec::Encode(const Pixmap& pixmap, EncodedFormat format, int quality,
+                                         std::shared_ptr<ColorSpace> colorSpace) {
   if (pixmap.isEmpty()) {
     return nullptr;
   }
@@ -134,19 +135,20 @@ std::shared_ptr<Data> ImageCodec::Encode(const Pixmap& pixmap, EncodedFormat for
   }
 #ifdef TGFX_USE_JPEG_ENCODE
   if (format == EncodedFormat::JPEG) {
-    return JpegCodec::Encode(pixmap, quality);
+    return JpegCodec::Encode(pixmap, quality, std::move(colorSpace));
   }
 #endif
 #ifdef TGFX_USE_WEBP_ENCODE
   if (format == EncodedFormat::WEBP) {
-    return WebpCodec::Encode(pixmap, quality);
+    return WebpCodec::Encode(pixmap, quality, std::move(colorSpace));
   }
 #endif
 #ifdef TGFX_USE_PNG_ENCODE
   if (format == EncodedFormat::PNG) {
-    return PngCodec::Encode(pixmap, quality);
+    return PngCodec::Encode(pixmap, quality, std::move(colorSpace));
   }
 #endif
+  (void)colorSpace;
   return nullptr;
 }
 

@@ -402,7 +402,6 @@ std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
   sampleCount = caps->getSampleCount(sampleCount, formats.front());
   auto proxy = std::shared_ptr<TextureRenderTargetProxy>(new HardwareRenderTargetProxy(
       hardwareBuffer, size.width, size.height, formats.front(), sampleCount));
-  addResourceProxy(proxy);
   return proxy;
 }
 
@@ -424,7 +423,7 @@ std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
   sampleCount = caps->getSampleCount(sampleCount, format);
   auto hasMipmaps = caps->mipmapSupport ? mipmapped : false;
   auto proxy = std::shared_ptr<TextureRenderTargetProxy>(
-      new TextureRenderTargetProxy(width, height, format, sampleCount, hasMipmaps, origin));
+      new TextureRenderTargetProxy(width, height, format, sampleCount, hasMipmaps, origin, false));
   if (backingFit == BackingFit::Approx) {
     proxy->_backingStoreWidth = GetApproxSize(width);
     proxy->_backingStoreHeight = GetApproxSize(height);

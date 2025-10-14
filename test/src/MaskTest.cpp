@@ -34,7 +34,7 @@ TGFX_TEST(PathRasterizerTest, Rasterize) {
   auto rasterizer = PathRasterizer::MakeFrom(501, 501, path, true);
   ASSERT_TRUE(rasterizer != nullptr);
   auto maskBuffer = std::static_pointer_cast<PixelBuffer>(rasterizer->makeBuffer());
-  EXPECT_TRUE(Baseline::Compare(maskBuffer, "MaskTest/rasterize_path"));
+  EXPECT_TRUE(Baseline::Compare(maskBuffer, "MaskTest/rasterize_path", ColorSpace::MakeSRGB()));
 
   ContextScope scope;
   auto context = scope.getContext();
@@ -51,7 +51,7 @@ TGFX_TEST(PathRasterizerTest, Rasterize) {
   pixmap.clear();
   auto result = surface->readPixels(pixmap.info(), pixmap.writablePixels());
   EXPECT_TRUE(result);
-  EXPECT_TRUE(Baseline::Compare(pixmap, "MaskTest/rasterize_path_texture"));
+  EXPECT_TRUE(Baseline::Compare(pixmap, "MaskTest/rasterize_path_texture", surface->colorSpace()));
 
   auto typeface =
       Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoColorEmoji.ttf"));

@@ -21,6 +21,7 @@
 #include "TextureProxy.h"
 #include "gpu/BackingFit.h"
 #include "gpu/resources/RenderTarget.h"
+#include "tgfx/core/ColorSpace.h"
 
 namespace tgfx {
 /**
@@ -113,6 +114,10 @@ class RenderTargetProxy {
    */
   virtual std::shared_ptr<RenderTarget> getRenderTarget() const = 0;
 
+  virtual std::shared_ptr<ColorSpace> colorSpace() const {
+    return _colorSpace;
+  }
+
   /**
    * Creates a compatible TextureProxy instance matches the properties of the RenderTargetProxy.
    */
@@ -145,5 +150,8 @@ class RenderTargetProxy {
    * Y-axis for ImageOrigin::BottomLeft.
    */
   Matrix getOriginTransform() const;
+
+ private:
+  std::shared_ptr<ColorSpace> _colorSpace = ColorSpace::MakeSRGB();
 };
 }  // namespace tgfx
