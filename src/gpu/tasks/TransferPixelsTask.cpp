@@ -16,19 +16,26 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-#include <memory>
+#include "TransferPixelsTask.h"
 
-namespace tgfx::inspect {
-class LZ4CompressionHandler {
- public:
-  static std::unique_ptr<LZ4CompressionHandler> Make();
+namespace tgfx {
+TransferPixelsTask::TransferPixelsTask(std::shared_ptr<RenderTargetProxy> source,
+                                       const Rect& srcRect, std::shared_ptr<GPUBufferProxy> dest)
+    : source(std::move(source)), srcRect(srcRect), dest(std::move(dest)) {
+}
 
-  static size_t GetMaxOutputSize(size_t inputSize);
-
-  virtual ~LZ4CompressionHandler() = default;
-
-  virtual size_t encode(uint8_t* dstBuffer, size_t dstSize, const uint8_t* srcBuffer,
-                        size_t srcSize) const = 0;
-};
-}  // namespace tgfx::inspect
+void TransferPixelsTask::execute(CommandEncoder* encoder) {
+  auto renderTarget = source->getRenderTarget();
+  if (renderTarget == nullptr) {
+    LOGE("TransferPixelsTask::execute() Failed to get the source render target!");
+    return;
+  }
+  auto readbackBuffer = dest->getBuffer();
+  if (readbackBuffer == nullptr) {
+    LOGE("TransferPixelsTask::execute() Failed to get the dest readback buffer!");
+    return;
+  }
+  encoder->copyTextureToBuffer(renderTarget->getSampleTexture(), srcRect,
+                               readbackBuffer->gpuBuffer());
+}
+}  // namespace tgfx

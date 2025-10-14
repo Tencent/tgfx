@@ -141,8 +141,8 @@
         "ModeColorFilter": "8bd149a4",
         "OpacityShadowTest": "ee2cc771",
         "RuntimeEffect": "aac25365",
-        "Transform3DImageFilterCSSBasic": "d541f591",
-        "Transform3DImageFilterStandardClip": "d541f591",
+        "Transform3DImageFilterCSSBasic": "be02235c",
+        "Transform3DImageFilterStandardClip": "be02235c",
         "Transorm3DImageFilterStandardBasic": "d541f591",
         "Transorm3DImageFilterStandardScale": "8be82b96",
         "blur": "3e0f58ab",
@@ -163,6 +163,8 @@
         "BottomLeftSurface": "67961560",
         "ChildMask": "ee2cc771",
         "ContourTest": "5ccc0507",
+        "DiffFilterModeImagePattern -- zoomIn": "ac049958",
+        "DiffFilterModeImagePattern -- zoomOut": "ac049958",
         "DirtyRegionTest1": "e1604824",
         "DirtyRegionTest10": "31250c62",
         "DirtyRegionTest11": "4bd4e0ad",
@@ -340,6 +342,7 @@
         "ExtremelyThinStrokeLayer": "4bd4e0ad",
         "ExtremelyThinStrokePath": "4bd4e0ad",
         "HairlineLayer": "5be7fc78",
+        "LineRenderAsHairline": "492105ac",
         "ZoomUpTinyStrokeShape": "5be7fc78"
     },
     "SurfaceTest": {

@@ -17,18 +17,19 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <memory>
 
-namespace tgfx::inspect {
-class LZ4CompressionHandler {
+#include "ResourceTask.h"
+#include "gpu/proxies/GPUBufferProxy.h"
+
+namespace tgfx {
+class ReadbackBufferCreateTask : public ResourceTask {
  public:
-  static std::unique_ptr<LZ4CompressionHandler> Make();
+  ReadbackBufferCreateTask(std::shared_ptr<GPUBufferProxy> proxy, size_t size);
 
-  static size_t GetMaxOutputSize(size_t inputSize);
+ protected:
+  std::shared_ptr<Resource> onMakeResource(Context*) override;
 
-  virtual ~LZ4CompressionHandler() = default;
-
-  virtual size_t encode(uint8_t* dstBuffer, size_t dstSize, const uint8_t* srcBuffer,
-                        size_t srcSize) const = 0;
+ private:
+  size_t size = 0;
 };
-}  // namespace tgfx::inspect
+}  // namespace tgfx

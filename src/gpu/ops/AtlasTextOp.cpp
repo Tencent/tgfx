@@ -37,6 +37,7 @@ PlacementPtr<AtlasTextOp> AtlasTextOp::Make(Context* context,
   }
   auto atlasTextOp = context->drawingBuffer()->make<AtlasTextOp>(provider.get(),
                                                                  std::move(textureProxy), sampling);
+  CAPUTRE_RECT_MESH(atlasTextOp.get(), provider.get());
   if (provider->aaType() == AAType::Coverage || provider->rectCount() > 1) {
     atlasTextOp->indexBufferProxy =
         context->globalCache()->getRectIndexBuffer(provider->aaType() == AAType::Coverage);
@@ -68,7 +69,7 @@ PlacementPtr<GeometryProcessor> AtlasTextOp::onMakeGeometryProcessor(RenderTarge
 }
 
 void AtlasTextOp::onDraw(RenderPass* renderPass) {
-  std::shared_ptr<IndexBuffer> indexBuffer = nullptr;
+  std::shared_ptr<BufferResource> indexBuffer = nullptr;
   if (indexBufferProxy) {
     indexBuffer = indexBufferProxy->getBuffer();
     if (indexBuffer == nullptr) {

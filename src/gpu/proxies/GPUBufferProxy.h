@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,18 +17,26 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <memory>
 
-namespace tgfx::inspect {
-class LZ4CompressionHandler {
+#include "ResourceProxy.h"
+#include "gpu/resources/BufferResource.h"
+
+namespace tgfx {
+/**
+ * GPUBufferProxy is a proxy for GPUBuffer resources.
+ */
+class GPUBufferProxy : public ResourceProxy {
  public:
-  static std::unique_ptr<LZ4CompressionHandler> Make();
+  /**
+   * Returns the associated BufferResource instance.
+   */
+  std::shared_ptr<BufferResource> getBuffer() const {
+    return std::static_pointer_cast<BufferResource>(resource);
+  }
 
-  static size_t GetMaxOutputSize(size_t inputSize);
+ private:
+  GPUBufferProxy() = default;
 
-  virtual ~LZ4CompressionHandler() = default;
-
-  virtual size_t encode(uint8_t* dstBuffer, size_t dstSize, const uint8_t* srcBuffer,
-                        size_t srcSize) const = 0;
+  friend class ProxyProvider;
 };
-}  // namespace tgfx::inspect
+}  // namespace tgfx

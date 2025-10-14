@@ -40,9 +40,8 @@ class CommandQueue {
    * @param bufferOffset The offset in the buffer where the data should be written.
    * @param data Pointer to the data to write.
    * @param size The size of the data in bytes.
-   * @return true if the write operation was successful, false otherwise.
    */
-  virtual bool writeBuffer(std::shared_ptr<GPUBuffer> buffer, size_t bufferOffset, const void* data,
+  virtual void writeBuffer(std::shared_ptr<GPUBuffer> buffer, size_t bufferOffset, const void* data,
                            size_t size) = 0;
 
   /**
@@ -56,23 +55,14 @@ class CommandQueue {
                             const void* pixels, size_t rowBytes) = 0;
 
   /**
-   * Copies pixel data from the GPUTexture within the specified rectangle into the provided memory
-   * buffer. The buffer must be large enough to hold all the data for the rectangle. The rectangle
-   * must be entirely within the frame buffer's dimensions. Returns true if the read operation
-   * succeeds, false otherwise.
-   */
-  virtual bool readTexture(std::shared_ptr<GPUTexture> texture, const Rect& rect, void* pixels,
-                           size_t rowBytes) const = 0;
-
-  /**
    * Schedules the execution of the specified command buffer on the GPU.
    */
   virtual void submit(std::shared_ptr<CommandBuffer> commandBuffer) = 0;
 
   /**
-   * Inserts a GPU fence into the command queue. The fence can be used to synchronize CPU and GPU
-   * operations, allowing you to check or wait for the completion of previously submitted GPU
-   * commands. Returns a shared pointer to the GPUFence, or nullptr if fence insertion failed.
+   * Inserts a GPU fence into the command queue. This allows other synchronization points to be
+   * notified when all previous GPU commands have finished executing. Returns nullptr if the
+   * GPUFence cannot be inserted due to lack of support (for example, on WebGPU).
    */
   virtual std::shared_ptr<GPUFence> insertFence() = 0;
 

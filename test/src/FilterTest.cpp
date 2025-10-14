@@ -731,7 +731,7 @@ TGFX_TEST(FilterTest, ClipInnerShadowImageFilter) {
 }
 
 TGFX_TEST(FilterTest, GaussianBlurImageFilter) {
-  const ContextScope scope;
+  ContextScope scope;
   Context* context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
@@ -834,7 +834,7 @@ TGFX_TEST(FilterTest, GaussianBlurImageFilter) {
 }
 
 TGFX_TEST(FilterTest, Transform3DImageFilter) {
-  const ContextScope scope;
+  ContextScope scope;
   Context* context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 200, 200);
@@ -866,8 +866,6 @@ TGFX_TEST(FilterTest, Transform3DImageFilter) {
     Paint paint = {};
     paint.setImageFilter(cssTransform3DFilter);
     canvas->drawImage(image, 45.f, 45.f, &paint);
-
-    context->flushAndSubmit();
     EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/Transform3DImageFilterCSSBasic"));
     canvas->restore();
   }

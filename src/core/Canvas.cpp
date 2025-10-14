@@ -22,6 +22,7 @@
 #include "core/shapes/StrokeShape.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/StrokeUtils.h"
 #include "core/utils/Types.h"
 #include "images/SubsetImage.h"
 #include "shapes/MatrixShape.h"
@@ -339,9 +340,10 @@ void Canvas::drawPath(const Path& path, const Paint& paint) {
   drawPath(path, *mcState, paint.getFill(), paint.getStroke());
 }
 
-/// Check if the line is axis-aligned and convert it to a rect
+// Checks if the line is axis-aligned and not a hairline stroke, allowing it to be converted to a
+// rect.
 static bool StrokeLineIsRect(const Stroke& stroke, const Point line[2], Rect* rect) {
-  if (stroke.cap == LineCap::Round) {
+  if (stroke.cap == LineCap::Round || IsHairlineStroke(stroke)) {
     return false;
   }
   // check if the line is axis-aligned

@@ -21,23 +21,6 @@
 #include "tgfx/gpu/opengl/GLFunctions.h"
 
 namespace tgfx {
-bool GLFence::isSignaled() const {
-  if (_glSync == nullptr) {
-    return false;
-  }
-  auto gl = interface->functions();
-  auto result = gl->clientWaitSync(_glSync, 0, 0);
-  return result == GL_ALREADY_SIGNALED || result == GL_CONDITION_SATISFIED;
-}
-
-void GLFence::waitOnCPU() {
-  if (_glSync == nullptr) {
-    return;
-  }
-  auto gl = interface->functions();
-  gl->clientWaitSync(_glSync, 0, GL_TIMEOUT_IGNORED);
-}
-
 BackendSemaphore GLFence::stealBackendSemaphore() {
   if (_glSync == nullptr) {
     return {};

@@ -32,6 +32,7 @@ PlacementPtr<RectDrawOp> RectDrawOp::Make(Context* context,
     return nullptr;
   }
   auto drawOp = context->drawingBuffer()->make<RectDrawOp>(provider.get());
+  CAPUTRE_RECT_MESH(drawOp.get(), provider.get());
   if (provider->aaType() == AAType::Coverage || provider->rectCount() > 1 ||
       provider->hasStroke()) {
     if (provider->hasStroke()) {
@@ -72,6 +73,7 @@ PlacementPtr<GeometryProcessor> RectDrawOp::onMakeGeometryProcessor(RenderTarget
   ATTRIBUTE_NAME("rectCount", static_cast<int>(rectCount));
   ATTRIBUTE_NAME("commonColor", commonColor);
   ATTRIBUTE_NAME("uvMatrix", uvMatrix);
+  ATTRIBUTE_NAME("hasSubset", hasSubset);
   auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
   return QuadPerEdgeAAGeometryProcessor::Make(drawingBuffer, renderTarget->width(),
                                               renderTarget->height(), aaType, commonColor, uvMatrix,
@@ -94,7 +96,7 @@ static uint16_t GetNumIndicesPerQuad(AAType aaType, bool hasStroke, LineJoin lin
 }
 
 void RectDrawOp::onDraw(RenderPass* renderPass) {
-  std::shared_ptr<IndexBuffer> indexBuffer = nullptr;
+  std::shared_ptr<BufferResource> indexBuffer = nullptr;
   if (indexBufferProxy) {
     indexBuffer = indexBufferProxy->getBuffer();
     if (indexBuffer == nullptr) {

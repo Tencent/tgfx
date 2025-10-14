@@ -24,6 +24,7 @@ namespace tgfx::inspect {
 enum class FrameCaptureMessageType : uint8_t {
   OperateBegin,
   OperateEnd,
+  OperatePtr,
   FrameMarkMessage,
   ValueDataUint32,
   ValueDataFloat4,
@@ -33,13 +34,24 @@ enum class FrameCaptureMessageType : uint8_t {
   ValueDataFloat,
   ValueDataBool,
   ValueDataEnum,
+  ProgramKey,
+  ShaderText,
+  UniformInfo,
+  UniformValue,
+  Mesh,
   InputTexture,
   OutputTexture,
   TextureData,
   KeepAlive,
   StringData,
   ValueName,
-  PixelsData
+  PixelsData,
+  ProgramKeyData,
+  VertexShaderTextData,
+  FragmentShaderTextData,
+  UniformInfoData,
+  UniformValueData,
+  MeshData
 };
 
 #pragma pack(push, 1)
@@ -117,6 +129,33 @@ struct TextureDataMessage : TextureSamplerMessage {
   uint64_t pixels;
 };
 
+struct DirectlySendDataMessage {
+  uint64_t dataPtr;
+  size_t size;
+};
+
+struct ShaderTextMessage : DirectlySendDataMessage {
+  uint8_t type;
+};
+
+struct UniformInfoMessage : DirectlySendDataMessage {
+  uint8_t format;
+};
+
+struct UniformValueMessage : DirectlySendDataMessage {
+  uint64_t valuePtr;
+  size_t valueSize;
+};
+
+struct DrawOpPtrMessage {
+  uint64_t drawOpPtr;
+};
+
+struct MeshMessage : DirectlySendDataMessage {
+  uint64_t extraDataPtr;
+  size_t extraDataSize;
+};
+
 struct FrameCaptureMessageItem {
   FrameCaptureMessageHeader hdr;
   union {
@@ -133,6 +172,12 @@ struct FrameCaptureMessageItem {
     AttributeDataEnumMessage attributeDataEnum;
     TextureSamplerMessage textureSampler;
     TextureDataMessage textureData;
+    DirectlySendDataMessage directlySendDataMessage;
+    ShaderTextMessage shaderTextMessage;
+    UniformInfoMessage uniformInfoMessage;
+    UniformValueMessage uniformValueMessage;
+    DrawOpPtrMessage drawOpPtrMessage;
+    MeshMessage meshMessage;
   };
 };
 #pragma pack(pop)
@@ -140,6 +185,7 @@ struct FrameCaptureMessageItem {
 static constexpr size_t FrameCaptureMessageDataSize[] = {
     sizeof(FrameCaptureMessageHeader) + sizeof(OperateBeginMessage),
     sizeof(FrameCaptureMessageHeader) + sizeof(OperateEndMessage),
+    sizeof(FrameCaptureMessageHeader) + sizeof(DrawOpPtrMessage),
     sizeof(FrameCaptureMessageHeader) + sizeof(FrameMarkMessage),
     sizeof(FrameCaptureMessageHeader) + sizeof(AttributeDataUInt32Message),
     sizeof(FrameCaptureMessageHeader) + sizeof(AttributeDataFloat4Message),
@@ -149,6 +195,11 @@ static constexpr size_t FrameCaptureMessageDataSize[] = {
     sizeof(FrameCaptureMessageHeader) + sizeof(AttributeDataFloatMessage),
     sizeof(FrameCaptureMessageHeader) + sizeof(AttributeDataBoolMessage),
     sizeof(FrameCaptureMessageHeader) + sizeof(AttributeDataEnumMessage),
+    sizeof(FrameCaptureMessageHeader) + sizeof(DirectlySendDataMessage),
+    sizeof(FrameCaptureMessageHeader) + sizeof(ShaderTextMessage),
+    sizeof(FrameCaptureMessageHeader) + sizeof(UniformInfoMessage),
+    sizeof(FrameCaptureMessageHeader) + sizeof(UniformValueMessage),
+    sizeof(FrameCaptureMessageHeader) + sizeof(MeshMessage),
     sizeof(FrameCaptureMessageHeader) + sizeof(TextureSamplerMessage),
     sizeof(FrameCaptureMessageHeader) + sizeof(TextureSamplerMessage),
     sizeof(FrameCaptureMessageHeader) + sizeof(TextureDataMessage),
@@ -156,5 +207,11 @@ static constexpr size_t FrameCaptureMessageDataSize[] = {
     sizeof(FrameCaptureMessageHeader) + sizeof(StringTransferMessage),
     sizeof(FrameCaptureMessageHeader) + sizeof(StringTransferMessage),
     sizeof(FrameCaptureMessageHeader) + sizeof(TextureSamplerMessage),
+    sizeof(FrameCaptureMessageHeader) + sizeof(StringTransferMessage),
+    sizeof(FrameCaptureMessageHeader) + sizeof(StringTransferMessage),
+    sizeof(FrameCaptureMessageHeader) + sizeof(StringTransferMessage),
+    sizeof(FrameCaptureMessageHeader) + sizeof(StringTransferMessage),
+    sizeof(FrameCaptureMessageHeader) + sizeof(StringTransferMessage),
+    sizeof(FrameCaptureMessageHeader) + sizeof(StringTransferMessage),
 };
 }  // namespace tgfx::inspect

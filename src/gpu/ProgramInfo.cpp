@@ -22,15 +22,16 @@
 #include "gpu/GlobalCache.h"
 #include "gpu/ProgramBuilder.h"
 #include "gpu/resources/RenderTarget.h"
+#include "inspect/InspectorMark.h"
 
 namespace tgfx {
 ProgramInfo::ProgramInfo(RenderTarget* renderTarget, GeometryProcessor* geometryProcessor,
                          std::vector<FragmentProcessor*> fragmentProcessors,
                          size_t numColorProcessors, XferProcessor* xferProcessor,
                          BlendMode blendMode)
-    : renderTarget(renderTarget), geometryProcessor(std::move(geometryProcessor)),
+    : renderTarget(renderTarget), geometryProcessor(geometryProcessor),
       fragmentProcessors(std::move(fragmentProcessors)), numColorProcessors(numColorProcessors),
-      xferProcessor(std::move(xferProcessor)), blendMode(blendMode) {
+      xferProcessor(xferProcessor), blendMode(blendMode) {
   updateProcessorIndices();
 }
 
@@ -122,6 +123,7 @@ std::shared_ptr<Program> ProgramInfo::getProgram() const {
   }
   programKey.write(static_cast<uint32_t>(blendMode));
   programKey.write(static_cast<uint32_t>(getOutputSwizzle().asKey()));
+  CAPUTRE_PROGRAM_INFO(programKey, context, this);
   auto program = context->globalCache()->findProgram(programKey);
   if (program == nullptr) {
     program = ProgramBuilder::CreateProgram(context, this);
@@ -162,13 +164,14 @@ std::shared_ptr<GPUBuffer> ProgramInfo::getUniformBuffer(const PipelineProgram* 
     uniformBuffer =
         globalCache->findOrCreateUniformBuffer(totalUniformBufferSize, &lastUniformBufferOffset);
     if (uniformBuffer != nullptr) {
-      auto buffer = static_cast<uint8_t*>(uniformBuffer->map());
+      auto buffer = static_cast<uint8_t*>(
+          uniformBuffer->map(lastUniformBufferOffset, totalUniformBufferSize));
       if (vertexUniformData != nullptr) {
-        vertexUniformData->setBuffer(buffer + lastUniformBufferOffset);
+        vertexUniformData->setBuffer(buffer);
         *vertexOffset = lastUniformBufferOffset;
       }
       if (fragmentUniformData != nullptr) {
-        fragmentUniformData->setBuffer(buffer + lastUniformBufferOffset + vertexUniformBufferSize);
+        fragmentUniformData->setBuffer(buffer + vertexUniformBufferSize);
         *fragmentOffset = lastUniformBufferOffset + vertexUniformBufferSize;
       }
     }
@@ -185,9 +188,11 @@ void ProgramInfo::bindUniformBufferAndUnloadToGPU(const PipelineProgram* program
     return;
   }
 
-  uniformBuffer->unmap();
   auto vertexUniformData = program->getUniformData(ShaderStage::Vertex);
   auto fragmentUniformData = program->getUniformData(ShaderStage::Fragment);
+
+  uniformBuffer->unmap();
+
   if (vertexUniformData != nullptr) {
     renderPass->setUniformBuffer(VERTEX_UBO_BINDING_POINT, uniformBuffer, vertexOffset,
                                  vertexUniformData->size());
@@ -254,7 +259,7 @@ void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, PipelineProgram
   auto gpu = renderTarget->getContext()->gpu();
   for (auto& [texture, state] : samplers) {
     GPUSamplerDescriptor descriptor(ToAddressMode(state.tileModeX), ToAddressMode(state.tileModeY),
-                                    state.filterMode, state.filterMode, state.mipmapMode);
+                                    state.minFilterMode, state.magFilterMode, state.mipmapMode);
     auto sampler = gpu->createSampler(descriptor);
     renderPass->setTexture(textureBinding++, texture, sampler);
   }
