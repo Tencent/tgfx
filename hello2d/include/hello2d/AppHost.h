@@ -110,6 +110,7 @@ class AppHost {
   bool isDirty() const;
   void markDirty() const;
   void resetDirty() const;
+  void SetTileMode() const;
   /**
    * Draws the content of the corresponding SampleBuilder based on the index.
    */
@@ -137,6 +138,7 @@ class AppHost {
   std::unordered_map<std::string, std::shared_ptr<tgfx::Image>> images = {};
   std::unordered_map<std::string, std::shared_ptr<tgfx::Typeface>> typefaces = {};
   mutable bool _dirty = true;
+  mutable bool _isTileMode = true;
 
   mutable int lastDrawIndex = -1;
   mutable std::shared_ptr<tgfx::Layer> root = nullptr;

@@ -38,6 +38,10 @@ void AppHost::resetDirty() const {
   _dirty = false;
 }
 
+void AppHost::SetTileMode() const {
+  _isTileMode = false;
+}
+
 std::shared_ptr<tgfx::Image> AppHost::getImage(const std::string& name) const {
   auto result = images.find(name);
   if (result != images.end()) {
@@ -131,9 +135,11 @@ void AppHost::draw(tgfx::Canvas* canvas, int drawIndex, bool isNeedBackground) c
 
     if (root) {
       displayList.root()->addChild(root);
-      displayList.setRenderMode(tgfx::RenderMode::Tiled);
-      displayList.setAllowZoomBlur(true);
-      displayList.setMaxTileCount(512);
+      if (_isTileMode) {
+        displayList.setRenderMode(tgfx::RenderMode::Tiled);
+        displayList.setAllowZoomBlur(true);
+        displayList.setMaxTileCount(512);
+      }
     }
     lastDrawIndex = drawIndex;
     updateRootMatrix();
