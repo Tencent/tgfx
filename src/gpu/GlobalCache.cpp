@@ -468,7 +468,7 @@ static constexpr uint16_t NonAABevelStrokeRectIndices[] = {
 };
 // clang-format on
 
-std::shared_ptr<IndexBufferProxy> GlobalCache::getMiterStrokeIndexBuffer(bool antialias) {
+std::shared_ptr<GPUBufferProxy> GlobalCache::getMiterStrokeIndexBuffer(bool antialias) {
   auto& indexBuffer = antialias ? aaRectMiterStrokeIndexBuffer : nonAARectMiterStrokeIndexBuffer;
   if (indexBuffer == nullptr) {
     auto pattern = antialias ? AAMiterStrokeRectIndices : NonAAMiterStrokeRectIndices;
@@ -483,7 +483,7 @@ std::shared_ptr<IndexBufferProxy> GlobalCache::getMiterStrokeIndexBuffer(bool an
   return indexBuffer;
 }
 
-std::shared_ptr<IndexBufferProxy> GlobalCache::getBevelStrokeIndexBuffer(bool antialias) {
+std::shared_ptr<GPUBufferProxy> GlobalCache::getBevelStrokeIndexBuffer(bool antialias) {
   auto& indexBuffer = antialias ? aaRectBevelStrokeIndexBuffer : nonAARectBevelStrokeIndexBuffer;
   if (indexBuffer == nullptr) {
     auto pattern = antialias ? AABevelStrokeRectIndices : NonAABevelStrokeRectIndices;
@@ -498,8 +498,8 @@ std::shared_ptr<IndexBufferProxy> GlobalCache::getBevelStrokeIndexBuffer(bool an
   return indexBuffer;
 }
 
-std::shared_ptr<IndexBufferProxy> GlobalCache::getStrokeRectIndexBuffer(bool antialias,
-                                                                        LineJoin join) {
+std::shared_ptr<GPUBufferProxy> GlobalCache::getStrokeRectIndexBuffer(bool antialias,
+                                                                      LineJoin join) {
   switch (join) {
     case LineJoin::Miter:
       return getMiterStrokeIndexBuffer(antialias);

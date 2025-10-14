@@ -212,7 +212,7 @@ class AAStrokeRectsVertexProvider final : public RectsVertexProvider {
 
   size_t vertexCount() const override {
     size_t perVertexCount = (4 + (lineJoin() == LineJoin::Miter ? 4 : 8)) * 2;  // inner + outer
-    size_t perVertexDataSize = 3; // x, y, coverage
+    size_t perVertexDataSize = 3;                                               // x, y, coverage
     if (bitFields.hasUVCoord) {
       perVertexDataSize += 2;
     }
@@ -362,7 +362,7 @@ class NonAAStrokeRectsVertexProvider final : public RectsVertexProvider {
 
   size_t vertexCount() const override {
     size_t perVertexCount = (4 + (lineJoin() == LineJoin::Miter ? 4 : 8));  // outer edge only
-    size_t perVertexDataSize = 2;// x, y
+    size_t perVertexDataSize = 2;                                           // x, y
     if (bitFields.hasUVCoord) {
       perVertexDataSize += 2;
     }
