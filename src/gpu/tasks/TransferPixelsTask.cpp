@@ -16,33 +16,26 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/CommandQueue.h"
+#include "TransferPixelsTask.h"
 
 namespace tgfx {
-class GLGPU;
+TransferPixelsTask::TransferPixelsTask(std::shared_ptr<RenderTargetProxy> source,
+                                       const Rect& srcRect, std::shared_ptr<GPUBufferProxy> dest)
+    : source(std::move(source)), srcRect(srcRect), dest(std::move(dest)) {
+}
 
-class GLCommandQueue : public CommandQueue {
- public:
-  explicit GLCommandQueue(GLGPU* gpu) : gpu(gpu) {
+void TransferPixelsTask::execute(CommandEncoder* encoder) {
+  auto renderTarget = source->getRenderTarget();
+  if (renderTarget == nullptr) {
+    LOGE("TransferPixelsTask::execute() Failed to get the source render target!");
+    return;
   }
-
-  void writeBuffer(std::shared_ptr<GPUBuffer> buffer, size_t bufferOffset, const void* data,
-                   size_t size) override;
-
-  void writeTexture(std::shared_ptr<GPUTexture> texture, const Rect& rect, const void* pixels,
-                    size_t rowBytes) override;
-
-  void submit(std::shared_ptr<CommandBuffer>) override;
-
-  std::shared_ptr<GPUFence> insertFence() override;
-
-  void waitForFence(std::shared_ptr<GPUFence> fence) override;
-
-  void waitUntilCompleted() override;
-
- private:
-  GLGPU* gpu = nullptr;
-};
+  auto readbackBuffer = dest->getBuffer();
+  if (readbackBuffer == nullptr) {
+    LOGE("TransferPixelsTask::execute() Failed to get the dest readback buffer!");
+    return;
+  }
+  encoder->copyTextureToBuffer(renderTarget->getSampleTexture(), srcRect,
+                               readbackBuffer->gpuBuffer());
+}
 }  // namespace tgfx
