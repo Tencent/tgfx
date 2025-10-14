@@ -29,7 +29,8 @@ SurfaceReadback::~SurfaceReadback() {
 }
 
 bool SurfaceReadback::isReady(Context* context) const {
-  if (!checkContext(context)) {
+  if (context != proxy->getContext()) {
+    LOGE("SurfaceReadback::isReady() Context mismatch!");
     return false;
   }
   auto readbackBuffer = proxy->getBuffer();
@@ -40,7 +41,8 @@ bool SurfaceReadback::isReady(Context* context) const {
 }
 
 const void* SurfaceReadback::lockPixels(Context* context, bool flipY) {
-  if (!checkContext(context)) {
+  if (context != proxy->getContext()) {
+    LOGE("SurfaceReadback::lockPixels() Context mismatch!");
     return nullptr;
   }
   if (flipYPixels != nullptr) {
@@ -71,7 +73,8 @@ const void* SurfaceReadback::lockPixels(Context* context, bool flipY) {
 }
 
 void SurfaceReadback::unlockPixels(Context* context) {
-  if (!checkContext(context)) {
+  if (context != proxy->getContext()) {
+    LOGE("SurfaceReadback::unlockPixels() Context mismatch!");
     return;
   }
   if (flipYPixels != nullptr) {
@@ -84,13 +87,5 @@ void SurfaceReadback::unlockPixels(Context* context) {
     return;
   }
   readbackBuffer->gpuBuffer()->unmap();
-}
-
-bool SurfaceReadback::checkContext(Context* context) const {
-  if (context != proxy->getContext()) {
-    LOGE("SurfaceReadback::isReady() Context mismatch!");
-    return false;
-  }
-  return true;
 }
 }  // namespace tgfx

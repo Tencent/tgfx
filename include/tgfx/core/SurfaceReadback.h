@@ -77,8 +77,6 @@ class SurfaceReadback {
       : _info(info), proxy(std::move(proxy)) {
   }
 
-  bool checkContext(Context* context) const;
-
   friend class Surface;
 };
 }  // namespace tgfx
