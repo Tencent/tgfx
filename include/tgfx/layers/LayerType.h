@@ -42,7 +42,6 @@ enum class LayerType {
   /**
    * A layer that fills its bounds with a solid color.
    */
-  Solid,
-  Transform3D
+  Solid
 };
 }  // namespace tgfx

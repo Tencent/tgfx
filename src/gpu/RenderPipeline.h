@@ -268,12 +268,34 @@ class CullFaceDescriptor {
   /**
    * The winding order that determines which polygons are considered front-facing.
    */
-  enum class FrontDirection { CW, CCW };
+  enum class FrontDirection {
+    /**
+     * The front face vertex order is clockwise
+     */
+    CW,
+    /**
+     * The front face vertex order is counterclockwise
+     */
+    CCW
+  };
 
   /**
    * The culling mode: specifies whether to cull front faces, back faces, or both.
    */
-  enum class Mode { Front, Back, FrontAndBack };
+  enum class Mode {
+    /**
+     * Cull front faces
+     */
+    Front,
+    /**
+     * Cull back faces
+     */
+    Back,
+    /**
+     * Cull back faces
+     */
+    FrontAndBack
+  };
 
   /**
    * Enables or disables face culling.

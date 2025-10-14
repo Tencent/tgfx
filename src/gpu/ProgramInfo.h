@@ -98,14 +98,14 @@ class ProgramInfo {
    * Returns the cull face type used for rendering.
    */
   CullFaceType getCullFaceType() const {
-    return cullfaceType;
+    return cullFaceType;
   }
 
   /**
    * Sets the cull face type used for rendering.
    */
   void setCullFaceType(CullFaceType type) {
-    cullfaceType = type;
+    cullFaceType = type;
   }
 
  private:
@@ -117,7 +117,7 @@ class ProgramInfo {
   size_t numColorProcessors = 0;
   XferProcessor* xferProcessor = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
-  CullFaceType cullfaceType = CullFaceType::None;
+  CullFaceType cullFaceType = CullFaceType::None;
 
   void updateProcessorIndices();
 

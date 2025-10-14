@@ -732,15 +732,14 @@ LayerContent* Layer::getContent() {
 }
 
 std::shared_ptr<ImageFilter> Layer::getImageFilter(float contentScale) {
+  if (_filters.empty()) {
+    return nullptr;
+  }
   std::vector<std::shared_ptr<ImageFilter>> filters;
   for (const auto& layerFilter : _filters) {
     if (auto filter = layerFilter->getImageFilter(contentScale)) {
       filters.push_back(filter);
     }
-  }
-  onMakeImageFilters(filters, contentScale);
-  if (filters.empty()) {
-    return nullptr;
   }
   return ImageFilter::Compose(filters);
 }
@@ -831,7 +830,9 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
                               alpha, blendMode);
       }
     }
-  } else if (needDrawOffScreen(args, alpha, blendMode)) {
+  } else if (blendMode != BlendMode::SrcOver || (alpha < 1.0f && bitFields.allowsGroupOpacity) ||
+             bitFields.shouldRasterize || (!_filters.empty() && !args.excludeEffects) ||
+             hasValidMask()) {
     drawOffscreen(args, canvas, alpha, blendMode);
   } else {
     // draw directly
@@ -1275,7 +1276,6 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
       if (transformer) {
         transformer->transform(contentBounds);
       }
-      onUpdateContentBounds(*contentBounds, contentScale);
       _root->invalidateRect(*contentBounds);
     } else {
       contentBounds->setEmpty();
@@ -1410,20 +1410,6 @@ std::shared_ptr<BackgroundContext> Layer::createBackgroundContext(Context* conte
   auto scale = viewMatrix.getMaxScale();
   return BackgroundContext::Make(context, drawRect, maxBackgroundOutset * scale,
                                  minBackgroundOutset * scale, viewMatrix);
-}
-
-void Layer::onUpdateContentBounds(Rect&, float) const {
-  // Default implementation does nothing.
-}
-
-bool Layer::needDrawOffScreen(const DrawArgs& args, float alpha, BlendMode blendMode) const {
-  return (blendMode != BlendMode::SrcOver || (alpha < 1.0f && bitFields.allowsGroupOpacity) ||
-          bitFields.shouldRasterize || (!_filters.empty() && !args.excludeEffects) ||
-          hasValidMask());
-}
-
-void Layer::onMakeImageFilters(std::vector<std::shared_ptr<ImageFilter>>&, float) const {
-  // Default implementation does nothing.
 }
 
 }  // namespace tgfx
