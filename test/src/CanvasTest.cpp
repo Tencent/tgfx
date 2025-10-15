@@ -3018,4 +3018,26 @@ TGFX_TEST(CanvasTest, MatrixShapeStroke) {
 
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/MatrixShapeStroke"));
 }
+
+TGFX_TEST(CanvasTest, uninvertibleStateMatrix) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 128, 128);
+  auto canvas = surface->getCanvas();
+
+  auto path = Path();
+  path.addRect(-5.f, -5.f, 10.f, 10.f);
+
+  Paint paint;
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStroke(Stroke(0.f));
+
+  auto matrix = Matrix::MakeScale(1E-8f, 1E-8f);
+  EXPECT_TRUE(matrix.invertNonIdentity(nullptr));
+  EXPECT_FALSE(matrix.invertible());
+
+  canvas->concat(matrix);
+  canvas->drawPath(path, paint);
+}
 }  // namespace tgfx
