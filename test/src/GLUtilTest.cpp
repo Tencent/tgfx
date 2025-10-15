@@ -37,7 +37,7 @@ const unsigned char* glGetStringMock(unsigned name) {
     return reinterpret_cast<const unsigned char*>(vendors[vendorIndex].first.c_str());
   } else if (name == GL_VERSION) {
     if (vendorIndex != 0) {
-      return reinterpret_cast<const unsigned char*>("2.0");
+      return reinterpret_cast<const unsigned char*>("3.1");
     } else {
       return reinterpret_cast<const unsigned char*>("5.0");
     }
