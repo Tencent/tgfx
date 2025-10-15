@@ -15,7 +15,7 @@ WORKSPACE=$(pwd)
 
 cd $WORKSPACE
 
-./update_baseline.sh $1
+./update_baseline.sh "${1:-""}"
 if test $? -ne 0; then
    exit 1
 fi
@@ -25,7 +25,7 @@ make_dir result
 make_dir build
 cd build
 
-if [[ $1 == "USE_SWIFTSHADER" ]]; then
+if [[ "$1" == "USE_SWIFTSHADER" ]]; then
   cmake -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DTGFX_USE_SWIFTSHADER=ON -DTGFX_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug ../
 else
   cmake -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DTGFX_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug ../
