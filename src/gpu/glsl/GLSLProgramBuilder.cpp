@@ -24,8 +24,6 @@
 namespace tgfx {
 static std::string TypeModifierString(ShaderVar::TypeModifier t, ShaderStage stage) {
   switch (t) {
-    case ShaderVar::TypeModifier::None:
-      return "";
     case ShaderVar::TypeModifier::Attribute:
       return "in";
     case ShaderVar::TypeModifier::Varying:
@@ -187,10 +185,6 @@ std::shared_ptr<PipelineProgram> GLSLProgramBuilder::finalize() {
   if (fragmentShader == nullptr) {
     return nullptr;
   }
-
-  LOGI("vertex shader code :\n%s\n", vertexModule.code.c_str());
-  LOGI("fragment shader code :\n%s\n\n", fragmentModule.code.c_str());
-
   RenderPipelineDescriptor descriptor = {};
   descriptor.vertex = {programInfo->getVertexAttributes()};
   descriptor.vertex.module = vertexShader;
