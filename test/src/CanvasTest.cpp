@@ -3058,6 +3058,6 @@ TGFX_TEST(CanvasTest, ScaleMatrixShader) {
   paint.setShader(shader);
   canvas->scale(0.1f, 0.1f);
   canvas->drawRect(rect, paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ScaleMatrixShader") );
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ScaleMatrixShader"));
 }
 }  // namespace tgfx
