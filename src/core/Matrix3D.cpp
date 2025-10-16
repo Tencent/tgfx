@@ -221,6 +221,11 @@ Rect Matrix3D::mapRect(const Rect& src) const {
   }
 }
 
+Vec3 Matrix3D::mapVec3(const Vec3& v) const {
+  auto r = this->mapPoint(v.x, v.y, v.z, 1.f);
+  return {IEEEFloatDivide(r.x, r.w), IEEEFloatDivide(r.y, r.w), IEEEFloatDivide(r.z, r.w)};
+}
+
 bool Matrix3D::operator==(const Matrix3D& other) const {
   if (this == &other) {
     return true;

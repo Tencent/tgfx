@@ -198,6 +198,12 @@ class Matrix3D {
   Rect mapRect(const Rect& src) const;
 
   /**
+   * Maps a 3D point using this matrix.
+   * The returned result is the coordinate after perspective division.
+   */
+  Vec3 mapVec3(const Vec3& v) const;
+
+  /**
    * Returns true if the matrix is an identity matrix.
    */
   bool isIdentity() const {
