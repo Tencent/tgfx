@@ -1261,6 +1261,9 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     if (transformer) {
       contentScale = transformer->getMaxScale();
     }
+    // The filter and style should calculate bounds based on the original size. The externally
+    // provided Transformer already contains matrix data, which will be applied to the computed size
+    // at the end, including scaling, rotation, and other transformations.
     transformer = RegionTransformer::MakeFromFilters(_filters, 1.0f, std::move(transformer));
     transformer = RegionTransformer::MakeFromStyles(_layerStyles, 1.0f, std::move(transformer));
   }

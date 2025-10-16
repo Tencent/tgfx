@@ -24,7 +24,7 @@ static void SerializeMatrix3DImpl(flexbuffers::Builder& fbb, const Matrix3D* mat
   float buffer[16] = {0.0f};
   matrix->getColumnMajor(buffer);
   std::string key = "";
-  for (int i = 0; i < 6; i++) {
+  for (int i = 0; i < 16; i++) {
     key = "[" + std::to_string(i) + "]";
     SerializeUtils::SetFlexBufferMap(fbb, key.c_str(), buffer[i]);
   }

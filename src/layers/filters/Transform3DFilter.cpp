@@ -61,8 +61,7 @@ std::shared_ptr<ImageFilter> Transform3DFilter::onCreateImageFilter(float scale)
     auto scaleMatrix = Matrix3D::MakeScale(scale, scale, 1.0f);
     adjustedMatrix = scaleMatrix * _matrix * invScaleMatrix;
   }
-  auto filter = std::make_shared<Transform3DImageFilter>(adjustedMatrix);
-  filter->setHideBackFace(_hideBackFace);
+  auto filter = std::make_shared<Transform3DImageFilter>(adjustedMatrix, _hideBackFace);
   return filter;
 }
 

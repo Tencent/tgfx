@@ -124,8 +124,14 @@ class ImageFilter {
    * @param matrix 3D transformation matrix used to 3D model coordinates to destination coordinates
    * for x and y before perspective division. The z value is mapped to the [-1, 1] range before
    * perspective division; content outside this z range will be clipped.
+   * @param hideBackFace Controls whether to hide the back face of the content after the 3D
+   * transformation. The default value is false, which means both the front and back faces are drawn.
+   * When the image model is first created, the front face is oriented toward the user by default.
+   * After applying certain 3D transformations, such as rotating 180 degrees around the X axis, the
+   * back face of the layer may face the user.
    */
-  static std::shared_ptr<ImageFilter> Transform3D(const Matrix3D& matrix);
+  static std::shared_ptr<ImageFilter> Transform3D(const Matrix3D& matrix,
+                                                  bool hideBackFace = false);
 
   virtual ~ImageFilter() = default;
 

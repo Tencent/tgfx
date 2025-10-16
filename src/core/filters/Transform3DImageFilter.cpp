@@ -28,11 +28,12 @@
 
 namespace tgfx {
 
-std::shared_ptr<ImageFilter> ImageFilter::Transform3D(const Matrix3D& matrix) {
-  return std::make_shared<Transform3DImageFilter>(matrix);
+std::shared_ptr<ImageFilter> ImageFilter::Transform3D(const Matrix3D& matrix, bool hideBackFace) {
+  return std::make_shared<Transform3DImageFilter>(matrix, hideBackFace);
 }
 
-Transform3DImageFilter::Transform3DImageFilter(const Matrix3D& matrix) : _matrix(matrix) {
+Transform3DImageFilter::Transform3DImageFilter(const Matrix3D& matrix, bool hideBackFace)
+    : _matrix(matrix), _hideBackFace(hideBackFace) {
 }
 
 Rect Transform3DImageFilter::onFilterBounds(const Rect& srcRect) const {

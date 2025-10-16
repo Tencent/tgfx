@@ -35,18 +35,7 @@ class Transform3DImageFilter final : public ImageFilter {
    * y before perspective division. The z value is mapped to the [-1, 1] range before perspective
    * division; content outside this z range will be clipped.
    */
-  explicit Transform3DImageFilter(const Matrix3D& matrix);
-
-  /**
-   * Sets whether to hide the back face of the content after the 3D transformation. The default
-   * value is false, which means both the front and back faces are drawn.
-   * When the layer is first created, the front face is oriented toward the user by default. After
-   * applying certain 3D transformations, such as rotating 180 degrees around the X axis, the back
-   * face of the layer may face the user.
-   */
-  void setHideBackFace(bool hideBackFace) {
-    _hideBackFace = hideBackFace;
-  }
+  explicit Transform3DImageFilter(const Matrix3D& matrix, bool hideBackFace = false);
 
  private:
   Type type() const override {
