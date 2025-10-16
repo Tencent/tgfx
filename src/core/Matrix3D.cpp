@@ -172,6 +172,11 @@ void Matrix3D::preRotate(const Vec3& axis, float degrees) {
   preConcat(m);
 }
 
+void Matrix3D::postRotate(const Vec3& axis, float degrees) {
+  auto m = MakeRotate(axis, degrees);
+  postConcat(m);
+}
+
 void Matrix3D::postTranslate(float tx, float ty, float tz) {
   values[12] += tx;
   values[13] += ty;
@@ -183,7 +188,9 @@ bool Matrix3D::invert(Matrix3D* inverse) const {
   if (!InvertMatrix3D(values, result)) {
     return false;
   }
-  memcpy(inverse->values, result, sizeof(result));
+  if (inverse != nullptr) {
+    memcpy(inverse->values, result, sizeof(result));
+  }
   return true;
 }
 
@@ -292,11 +299,6 @@ void Matrix3D::preTranslate(float tx, float ty, float tz) {
   auto c3 = getCol(3);
 
   setColumn(3, (c0 * tx + c1 * ty + c2 * tz + c3));
-}
-
-void Matrix3D::postRotate(const Vec3& axis, float degrees) {
-  auto m = MakeRotate(axis, degrees);
-  postConcat(m);
 }
 
 Matrix3D Matrix3D::transpose() const {

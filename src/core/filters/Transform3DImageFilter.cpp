@@ -37,9 +37,9 @@ Transform3DImageFilter::Transform3DImageFilter(const Matrix3D& matrix, bool hide
 }
 
 Rect Transform3DImageFilter::onFilterBounds(const Rect& srcRect) const {
-  // Align the camera center with the center of the source rect.
-  auto srcModelRect = Rect::MakeXYWH(-srcRect.width() * 0.5f, -srcRect.height() * 0.5f,
-                                     srcRect.width(), srcRect.height());
+  // The default transformation anchor is at the top-left origin (0,0) of the image; user-defined
+  // anchors are included in the matrix.
+  auto srcModelRect = Rect::MakeWH(srcRect.width(), srcRect.height());
   auto dstModelRect = _matrix.mapRect(srcModelRect);
   // The minimum axis-aligned bounding rectangle of srcRect after projection is calculated based on
   // its relative position to the standard rectangle.
@@ -70,8 +70,9 @@ std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
 
   auto srcW = static_cast<float>(source->width());
   auto srcH = static_cast<float>(source->height());
-  // Align the camera center with the initial position center of the source model.
-  auto srcModelRect = Rect::MakeXYWH(-srcW * 0.5f, -srcH * 0.5f, srcW, srcH);
+  // The default transformation anchor is at the top-left origin (0,0) of the image; user-defined
+  // anchors are included in the matrix.
+  auto srcModelRect = Rect::MakeXYWH(0.f, 0.f, srcW, srcH);
   auto dstModelRect = _matrix.mapRect(srcModelRect);
   // SrcProjectRect is the result of projecting srcRect onto the canvas. RenderBounds describes a
   // subregion that needs to be drawn within it.

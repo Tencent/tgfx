@@ -171,6 +171,9 @@ void OpsCompositor::drawShape(std::shared_ptr<Shape> shape, const MCState& state
     drawScale = std::min(state.matrix.getMaxScale(), 1.0f);
   }
   shape = Shape::ApplyMatrix(std::move(shape), state.matrix);
+  if (!shape) {
+    return;
+  }
   if (needDeviceBounds) {
     deviceBounds = shape->isInverseFillType() ? clipBounds : shape->getBounds();
   }

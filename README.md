@@ -9,11 +9,10 @@
 
 ## Introduction
 
-TGFX (Tencent Graphics) is a lightweight 2D graphics library for rendering text, shapes, and images. 
-It offers high-performance APIs compatible with various GPU hardware and software platforms, including
-iOS, Android, macOS, Windows, Linux, OpenHarmony, and the Web. Initially developed as the default 
-graphics engine for the [PAG](https://pag.io) project starting from version 4.0, TGFX aims to be a 
-compelling alternative to the Skia graphics library while maintaining a much smaller binary size.
+TGFX (Tencent Graphics) is a lightweight 2D graphics library designed for modern GPUs. It delivers high-performance, feature-rich
+rendering of text, images, and vector graphics on all major platforms, including iOS, Android, macOS, Windows, Linux, OpenHarmony, 
+and the Web. Initially developed as the default graphics engine for the [PAG](https://pag.io) project starting from version 4.0, 
+TGFX aims to be a compelling alternative to the Skia graphics library while maintaining a much smaller binary size.
 Over time, it has found its way into many other products, such as [Hippy](https://github.com/Tencent/Hippy), [Tencent Docs](https://docs.qq.com) 
 and various video-editing apps.
 
