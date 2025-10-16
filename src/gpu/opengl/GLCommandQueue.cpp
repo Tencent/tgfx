@@ -113,7 +113,13 @@ void GLCommandQueue::waitForFence(std::shared_ptr<GPUFence> fence) {
   }
   auto gl = gpu->functions();
   auto glSync = std::static_pointer_cast<GLFence>(fence)->glSync();
+#if defined(__EMSCRIPTEN__)
+  auto timeoutLo = static_cast<uint32_t>(GL_TIMEOUT_IGNORED & 0xFFFFFFFFull);
+  auto timeoutHi = static_cast<uint32_t>(GL_TIMEOUT_IGNORED >> 32);
+  gl->waitSync(glSync, 0, timeoutLo, timeoutHi);
+#else
   gl->waitSync(glSync, 0, GL_TIMEOUT_IGNORED);
+#endif
 }
 
 void GLCommandQueue::waitUntilCompleted() {

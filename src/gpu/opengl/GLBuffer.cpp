@@ -47,7 +47,11 @@ bool GLBuffer::isReady() const {
     return true;
   }
   auto gl = _interface->functions();
+#if defined(__EMSCRIPTEN__)
+  auto result = gl->clientWaitSync(readbackFence, 0, 0, 0);
+#else
   auto result = gl->clientWaitSync(readbackFence, 0, 0);
+#endif
   return result == GL_ALREADY_SIGNALED || result == GL_CONDITION_SATISFIED;
 }
 
