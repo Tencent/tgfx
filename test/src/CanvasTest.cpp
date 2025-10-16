@@ -3040,4 +3040,24 @@ TGFX_TEST(CanvasTest, uninvertibleStateMatrix) {
   canvas->concat(matrix);
   canvas->drawPath(path, paint);
 }
+
+TGFX_TEST(CanvasTest, ScaleMatrixShader) {
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(image != nullptr);
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 100, 100);
+  ASSERT_TRUE(surface != nullptr);
+  auto* canvas = surface->getCanvas();
+  auto paint = Paint();
+  auto shader = Shader::MakeImageShader(image);
+  auto rect = Rect::MakeXYWH(25, 25, 50, 50);
+  rect.scale(10, 10);
+  shader = shader->makeWithMatrix(Matrix::MakeScale(10, 10));
+  paint.setShader(shader);
+  canvas->scale(0.1f, 0.1f);
+  canvas->drawRect(rect, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ScaleMatrixShader") );
+}
 }  // namespace tgfx
