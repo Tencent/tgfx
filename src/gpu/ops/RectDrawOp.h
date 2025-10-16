@@ -21,8 +21,8 @@
 #include <optional>
 #include "gpu/RectsVertexProvider.h"
 #include "gpu/ops/DrawOp.h"
-#include "gpu/proxies/IndexBufferProxy.h"
-#include "gpu/proxies/VertexBufferProxyView.h"
+#include "gpu/proxies/GPUBufferProxy.h"
+#include "gpu/proxies/VertexBufferView.h"
 
 namespace tgfx {
 class RectDrawOp : public DrawOp {
@@ -62,8 +62,8 @@ class RectDrawOp : public DrawOp {
   std::optional<Color> commonColor = std::nullopt;
   std::optional<Matrix> uvMatrix = std::nullopt;
   bool hasSubset = false;
-  std::shared_ptr<IndexBufferProxy> indexBufferProxy = nullptr;
-  std::shared_ptr<VertexBufferProxyView> vertexBufferProxyView = nullptr;
+  std::shared_ptr<GPUBufferProxy> indexBufferProxy = nullptr;
+  std::shared_ptr<VertexBufferView> vertexBufferProxyView = nullptr;
 
   explicit RectDrawOp(RectsVertexProvider* provider);
 

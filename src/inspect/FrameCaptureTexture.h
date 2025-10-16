@@ -40,9 +40,9 @@ class FrameCaptureTexture {
 
   static void ClearReadedTexture();
 
-  explicit FrameCaptureTexture(const std::shared_ptr<GPUTexture> texture, int width, int height,
+  explicit FrameCaptureTexture(std::shared_ptr<GPUTexture> texture, int width, int height,
                                size_t rowBytes, PixelFormat format, bool isInput,
-                               std::shared_ptr<Buffer> imageBuffer);
+                               std::shared_ptr<Data> pixels);
 
   uint64_t textureId() const {
     return _textureId;
@@ -72,8 +72,8 @@ class FrameCaptureTexture {
     return _rowBytes;
   }
 
-  std::shared_ptr<Buffer> imageBuffer() const {
-    return image;
+  std::shared_ptr<Data> imagePixels() const {
+    return pixels;
   }
 
  private:
@@ -84,7 +84,7 @@ class FrameCaptureTexture {
   size_t _rowBytes = 0;
   PixelFormat _format = PixelFormat::Unknown;
   bool _isInput = false;
-  std::shared_ptr<Buffer> image = nullptr;
+  std::shared_ptr<Data> pixels = nullptr;
 };
 
 }  // namespace tgfx::inspect

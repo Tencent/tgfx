@@ -35,12 +35,6 @@ struct GLAttribute {
   size_t offset = 0;
 };
 
-struct GLUniform {
-  UniformFormat format = UniformFormat::Float;
-  int location = -1;
-  size_t offset = 0;
-};
-
 /**
  * GLRenderPipeline is the OpenGL implementation of the RenderPipeline interface. It encapsulates
  * an OpenGL shader program along with its associated state, such as vertex attributes and blending
@@ -84,8 +78,6 @@ class GLRenderPipeline : public RenderPipeline, public GLResource {
   unsigned vertexArray = 0;
   std::vector<GLAttribute> attributes = {};
   size_t vertexStride = 0;
-  // only used if UBOs are not supported.
-  std::unordered_map<unsigned, std::vector<GLUniform>> uniformBlocks = {};
   std::unordered_map<unsigned, unsigned> textureUnits = {};
   uint32_t colorWriteMask = ColorWriteMask::All;
   std::unique_ptr<GLStencilState> stencilState = nullptr;

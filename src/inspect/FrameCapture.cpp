@@ -713,13 +713,13 @@ void FrameCapture::encodeWorker() {
     if (shouldExit()) {
       return;
     }
-    std::shared_ptr<FrameCaptureTexture> frameCaputreTexture = nullptr;
-    while (imageQueue.try_dequeue(frameCaputreTexture)) {
-      const auto width = frameCaputreTexture->width();
-      const auto height = frameCaputreTexture->height();
-      auto colorType = PixelFormatToColorType(frameCaputreTexture->format());
+    std::shared_ptr<FrameCaptureTexture> frameCaptureTexture = nullptr;
+    while (imageQueue.try_dequeue(frameCaptureTexture)) {
+      const auto width = frameCaptureTexture->width();
+      const auto height = frameCaptureTexture->height();
+      auto colorType = PixelFormatToColorType(frameCaptureTexture->format());
       auto imageInfo = ImageInfo::Make(width, height, colorType, AlphaType::Premultiplied,
-                                       frameCaputreTexture->rowBytes());
+                                       frameCaptureTexture->rowBytes());
 #ifdef TGFX_USE_JPEG_ENCODE
       auto encodeFormat = EncodedFormat::JPEG;
 #elif TGFX_USE_WEBP_ENCODE
@@ -728,19 +728,19 @@ void FrameCapture::encodeWorker() {
       auto encodeFormat = EncodedFormat::PNG;
 #endif
       auto jpgBuffer = ImageCodec::Encode(
-          Pixmap(imageInfo, frameCaputreTexture->imageBuffer()->bytes()), encodeFormat, 100);
+          Pixmap(imageInfo, frameCaptureTexture->imagePixels()->data()), encodeFormat, 100);
       auto size = jpgBuffer->size();
       auto pxielsBuffer = static_cast<uint8_t*>(malloc(size));
       memcpy(pxielsBuffer, jpgBuffer->bytes(), size);
 
       FrameCaptureMessageItem item = {};
       item.hdr.type = FrameCaptureMessageType::TextureData;
-      item.textureData.isInput = frameCaputreTexture->isInput();
-      item.textureData.textureId = frameCaputreTexture->textureId();
-      item.textureData.width = frameCaputreTexture->width();
-      item.textureData.height = frameCaputreTexture->height();
-      item.textureData.rowBytes = frameCaputreTexture->rowBytes();
-      item.textureData.format = frameCaputreTexture->format();
+      item.textureData.isInput = frameCaptureTexture->isInput();
+      item.textureData.textureId = frameCaptureTexture->textureId();
+      item.textureData.width = frameCaptureTexture->width();
+      item.textureData.height = frameCaptureTexture->height();
+      item.textureData.rowBytes = frameCaptureTexture->rowBytes();
+      item.textureData.format = frameCaptureTexture->format();
       item.textureData.pixels = reinterpret_cast<uint64_t>(pxielsBuffer);
       item.textureData.pixelsSize = size;
       queueSerialFinish(item);

@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "core/utils/UniqueID.h"
 #include "gpu/GPUBuffer.h"
 #include "gpu/opengl/GLInterface.h"
 #include "gpu/opengl/GLResource.h"
@@ -35,12 +34,10 @@ class GLBuffer : public GPUBuffer, public GLResource {
    */
   GLBuffer(std::shared_ptr<GLInterface> interface, unsigned bufferID, size_t size, uint32_t usage);
 
-  ~GLBuffer() override;
-
   /**
-   * Returns the OpenGL target for this buffer based on its usage flags.
+   * Returns the OpenGL target for the buffer based on its usage flags.
    */
-  unsigned target() const;
+  static unsigned GetTarget(uint32_t usage);
 
   /**
    * Returns the OpenGL buffer ID associated with this buffer.
@@ -49,18 +46,19 @@ class GLBuffer : public GPUBuffer, public GLResource {
     return _bufferID;
   }
 
-  void* map() override;
+  bool isReady() const override;
+
+  void* map(size_t offset, size_t size) override;
 
   void unmap() override;
 
+  void insertReadbackFence();
+
  protected:
   std::shared_ptr<GLInterface> _interface = nullptr;
-  uint32_t uniqueID = 0;
   unsigned _bufferID = 0;
-  void* dataAddress = nullptr;
+  void* readbackFence = nullptr;
 
   void onRelease(GLGPU* gpu) override;
-
-  friend class GLState;
 };
 }  // namespace tgfx

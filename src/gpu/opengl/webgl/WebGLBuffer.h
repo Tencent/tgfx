@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,25 +18,26 @@
 
 #pragma once
 
-#include "ResourceProxy.h"
-#include "gpu/resources/IndexBuffer.h"
+#include "gpu/opengl/GLBuffer.h"
 
 namespace tgfx {
-/**
- * IndexBufferProxy is a proxy for IndexBuffer resources.
- */
-class IndexBufferProxy : public ResourceProxy {
+class WebGLBuffer : public GLBuffer {
  public:
   /**
-   * Returns the associated IndexBuffer instance.
+   * Creates a new WebGLBuffer with the specified size and usage flags.
    */
-  std::shared_ptr<IndexBuffer> getBuffer() const {
-    return std::static_pointer_cast<IndexBuffer>(resource);
-  }
+  WebGLBuffer(std::shared_ptr<GLInterface> interface, unsigned bufferID, size_t size,
+              uint32_t usage);
+
+  ~WebGLBuffer() override;
+
+  void* map(size_t offset, size_t size) override;
+
+  void unmap() override;
 
  private:
-  IndexBufferProxy() = default;
-
-  friend class ProxyProvider;
+  size_t subDataOffset = 0;
+  size_t subDataSize = 0;
+  void* bufferData = nullptr;
 };
 }  // namespace tgfx

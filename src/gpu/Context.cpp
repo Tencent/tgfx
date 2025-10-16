@@ -88,9 +88,7 @@ bool Context::flush(BackendSemaphore* signalSemaphore) {
   _maxValueTracker->addValue(_drawingBuffer->size());
   _drawingBuffer->clear(_maxValueTracker->getMaxValue());
 
-  if (gpu()->caps()->shaderCaps()->uboSupport) {
-    globalCache()->resetUniformBuffer();
-  }
+  globalCache()->resetUniformBuffer();
 
   return true;
 }

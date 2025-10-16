@@ -18,43 +18,33 @@
 
 #pragma once
 
-#include "gpu/proxies/VertexBufferProxy.h"
+#include "gpu/opengl/GLBuffer.h"
+#include "gpu/opengl/GLState.h"
+#include "gpu/opengl/GLTexture.h"
 
 namespace tgfx {
 /**
- * VertexBufferProxyView is a view of a VertexBufferProxy that allows access to a specific range of
- * the vertex buffer.
+ * GLTextureBuffer is a readback buffer implementation that uses a texture as an intermediate buffer
+ * to read pixels from the GPU when PBO is not supported.
  */
-class VertexBufferProxyView {
+class GLTextureBuffer : public GLBuffer {
  public:
-  VertexBufferProxyView(std::shared_ptr<VertexBufferProxy> proxy, size_t _offset, size_t _size)
-      : proxy(std::move(proxy)), _offset(_offset), _size(_size) {
-  }
+  GLTextureBuffer(std::shared_ptr<GLInterface> interface, std::shared_ptr<GLState> state,
+                  size_t size);
 
-  /**
-   * Returns the VertexBuffer associated with this VertexBufferProxyView.
-   */
-  std::shared_ptr<VertexBuffer> getBuffer() const {
-    return proxy ? proxy->getBuffer() : nullptr;
-  }
+  void* map(size_t offset, size_t size) override;
 
-  /**
-   * Returns the offset of the vertex data in the vertex buffer.
-   */
-  size_t offset() const {
-    return _offset;
-  }
+  void unmap() override;
 
-  /**
-   * Returns the size of the vertex data in the vertex buffer.
-   */
-  size_t size() const {
-    return _size;
-  }
+  std::shared_ptr<GPUTexture> acquireTexture(GPU* gpu, std::shared_ptr<GPUTexture> srcTexture,
+                                             const Rect& srcRect, size_t dstOffset,
+                                             size_t dstRowBytes);
 
  private:
-  std::shared_ptr<VertexBufferProxy> proxy = nullptr;
-  size_t _offset = 0;
-  size_t _size = 0;
+  std::shared_ptr<GLState> state = nullptr;
+  std::shared_ptr<GPUTexture> texture = nullptr;
+  size_t readOffset = 0;
+  size_t readRowBytes = 0;
+  void* bufferData = nullptr;
 };
 }  // namespace tgfx

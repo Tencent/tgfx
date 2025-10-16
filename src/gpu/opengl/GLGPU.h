@@ -94,7 +94,7 @@ class GLGPU : public GPU {
   explicit GLGPU(std::shared_ptr<GLInterface> glInterface);
 
  private:
-  std::unique_ptr<GLState> _state = nullptr;
+  std::shared_ptr<GLState> _state = nullptr;
   std::shared_ptr<GLInterface> interface = nullptr;
   std::unique_ptr<GLCommandQueue> commandQueue = nullptr;
   std::list<GLResource*> resources = {};

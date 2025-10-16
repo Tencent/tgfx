@@ -170,12 +170,21 @@ GLCaps::GLCaps(const GLInfo& info) {
   _shaderCaps.floatIs32Bits = IsMediumFloatFp32(info);
   switch (standard) {
     case GLStandard::GL:
+      if (version < GL_VER(3, 1)) {
+        ABORT("OpenGL versions below 3.1 are not supported!");
+      }
       initGLSupport(info);
       break;
     case GLStandard::GLES:
+      if (version < GL_VER(3, 0)) {
+        ABORT("OpenGL ES versions below 3.0 are not supported!");
+      }
       initGLESSupport(info);
       break;
     case GLStandard::WebGL:
+      if (version < GL_VER(2, 0)) {
+        ABORT("WebGL versions below 2.0 are not supported!");
+      }
       initWebGLSupport(info);
       break;
     default:
@@ -245,6 +254,8 @@ void GLCaps::initGLSupport(const GLInfo& info) {
                              info.hasExtension("GL_ARB_vertex_array_object") ||
                              info.hasExtension("GL_APPLE_vertex_array_object");
   textureRedSupport = version >= GL_VER(3, 0) || info.hasExtension("GL_ARB_texture_rg");
+  pboSupport = version >= GL_VER(2, 1) || info.hasExtension("GL_ARB_pixel_buffer_object") ||
+               info.hasExtension("GL_EXT_pixel_buffer_object");
   multisampleDisableSupport = true;
   if (vendor != GLVendor::Intel) {
     textureBarrierSupport = version >= GL_VER(4, 5) ||
@@ -257,7 +268,6 @@ void GLCaps::initGLSupport(const GLInfo& info) {
   }
   _shaderCaps.versionDeclString = "#version 140";
   _shaderCaps.usesCustomColorOutputName = true;
-  _shaderCaps.varyingIsInOut = true;
   _shaderCaps.textureFuncName = "texture";
   if (info.hasExtension("GL_EXT_shader_framebuffer_fetch")) {
     _shaderCaps.frameBufferFetchNeedsCustomOutput = version >= GL_VER(3, 0);
@@ -267,11 +277,8 @@ void GLCaps::initGLSupport(const GLInfo& info) {
     _shaderCaps.frameBufferFetchRequiresEnablePerSample = false;
   }
 
-  _shaderCaps.uboSupport = version >= GL_VER(3, 1);
-  if (_shaderCaps.uboSupport) {
-    info.getIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &_shaderCaps.maxUBOSize);
-    info.getIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &_shaderCaps.uboOffsetAlignment);
-  }
+  info.getIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &_shaderCaps.maxUBOSize);
+  info.getIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &_shaderCaps.uboOffsetAlignment);
 }
 
 void GLCaps::initGLESSupport(const GLInfo& info) {
@@ -280,11 +287,11 @@ void GLCaps::initGLESSupport(const GLInfo& info) {
   vertexArrayObjectSupport =
       version >= GL_VER(3, 0) || info.hasExtension("GL_OES_vertex_array_object");
   textureRedSupport = version >= GL_VER(3, 0) || info.hasExtension("GL_EXT_texture_rg");
+  pboSupport = version >= GL_VER(3, 0);
   multisampleDisableSupport = info.hasExtension("GL_EXT_multisample_compatibility");
   textureBarrierSupport = info.hasExtension("GL_NV_texture_barrier");
   _shaderCaps.versionDeclString = version >= GL_VER(3, 0) ? "#version 300 es" : "#version 100";
   _shaderCaps.usesCustomColorOutputName = version >= GL_VER(3, 0);
-  _shaderCaps.varyingIsInOut = version >= GL_VER(3, 0);
   _shaderCaps.textureFuncName = version >= GL_VER(3, 0) ? "texture" : "texture2D";
   _shaderCaps.oesTextureExtension =
       version >= GL_VER(3, 0) ? "GL_OES_EGL_image_external_essl3" : "GL_OES_EGL_image_external";
@@ -320,11 +327,8 @@ void GLCaps::initGLESSupport(const GLInfo& info) {
   mipmapSupport = npotTextureTileSupport || info.hasExtension("GL_IMG_texture_npot");
   _shaderCaps.usesPrecisionModifiers = true;
 
-  _shaderCaps.uboSupport = version >= GL_VER(3, 0);
-  if (_shaderCaps.uboSupport) {
-    info.getIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &_shaderCaps.maxUBOSize);
-    info.getIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &_shaderCaps.uboOffsetAlignment);
-  }
+  info.getIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &_shaderCaps.maxUBOSize);
+  info.getIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &_shaderCaps.uboOffsetAlignment);
 }
 
 void GLCaps::initWebGLSupport(const GLInfo& info) {
@@ -334,6 +338,7 @@ void GLCaps::initWebGLSupport(const GLInfo& info) {
                              info.hasExtension("GL_OES_vertex_array_object") ||
                              info.hasExtension("OES_vertex_array_object");
   textureRedSupport = version >= GL_VER(2, 0);
+  pboSupport = false;
   multisampleDisableSupport = false;
   textureBarrierSupport = false;
   semaphoreSupport = version >= GL_VER(2, 0);
@@ -341,21 +346,13 @@ void GLCaps::initWebGLSupport(const GLInfo& info) {
   npotTextureTileSupport = version >= GL_VER(2, 0);
   mipmapSupport = npotTextureTileSupport;
   _shaderCaps.usesCustomColorOutputName = version >= GL_VER(2, 0);
-  _shaderCaps.varyingIsInOut = version >= GL_VER(2, 0);
   _shaderCaps.versionDeclString = version >= GL_VER(2, 0) ? "#version 300 es" : "#version 100";
   _shaderCaps.textureFuncName = version >= GL_VER(2, 0) ? "texture" : "texture2D";
   _shaderCaps.frameBufferFetchSupport = false;
   _shaderCaps.usesPrecisionModifiers = true;
 
-  // WebGL does not support glMapBufferRange, and updating UBOs with glBufferSubData is inefficient.
-  // Therefore, UBO support is disabled by default and will be enabled after performance optimizations.
-#if 0
-  _shaderCaps.uboSupport = version >= GL_VER(2, 0);
-  if (_shaderCaps.uboSupport) {
-    info.getIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &_shaderCaps.maxUBOSize);
-    info.getIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &_shaderCaps.uboOffsetAlignment);
-  }
-#endif
+  info.getIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &_shaderCaps.maxUBOSize);
+  info.getIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &_shaderCaps.uboOffsetAlignment);
 }
 
 void GLCaps::initFormatMap(const GLInfo& info) {

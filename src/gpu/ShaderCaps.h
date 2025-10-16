@@ -80,12 +80,6 @@ class ShaderCaps {
   int maxFragmentSamplers = 0;
 
   /**
-   * Indicates if the shader language supports uniform buffer objects (UBOs) for grouping uniform
-   * variables.
-   */
-  bool uboSupport = false;
-
-  /**
    * Returns the maximum size in bytes of a uniform buffer object (UBO) supported by the
    * shader language.
    */
@@ -95,11 +89,6 @@ class ShaderCaps {
    * Returns the required alignment in bytes for offsets within a uniform buffer object (UBO).
    */
   int uboOffsetAlignment = 1;
-
-  /**
-   * Indicates if varying variables are declared using 'in'/'out' instead of 'varying'.
-   */
-  bool varyingIsInOut = false;
 
   /**
    * The version declaration string to be placed at the top of the shader code. For example,

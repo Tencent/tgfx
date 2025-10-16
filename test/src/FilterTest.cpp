@@ -731,7 +731,7 @@ TGFX_TEST(FilterTest, ClipInnerShadowImageFilter) {
 }
 
 TGFX_TEST(FilterTest, GaussianBlurImageFilter) {
-  const ContextScope scope;
+  ContextScope scope;
   Context* context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
@@ -834,7 +834,7 @@ TGFX_TEST(FilterTest, GaussianBlurImageFilter) {
 }
 
 TGFX_TEST(FilterTest, Transform3DImageFilter) {
-  const ContextScope scope;
+  ContextScope scope;
   Context* context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 200, 200);
@@ -842,6 +842,11 @@ TGFX_TEST(FilterTest, Transform3DImageFilter) {
   Canvas* canvas = surface->getCanvas();
   auto image = MakeImage("resources/apitest/imageReplacement.jpg");
   Size imageSize(static_cast<float>(image->width()), static_cast<float>(image->height()));
+  auto anchor = Point::Make(0.5f, 0.5f);
+  auto offsetToAnchorMatrix =
+      Matrix3D::MakeTranslate(-anchor.x * imageSize.width, -anchor.y * imageSize.height, 0);
+  auto invOffsetToAnchorMatrix =
+      Matrix3D::MakeTranslate(anchor.x * imageSize.width, anchor.y * imageSize.height, 0);
 
   // Test basic drawing with css perspective type.
   {
@@ -861,13 +866,12 @@ TGFX_TEST(FilterTest, Transform3DImageFilter) {
 
     auto modelMatrix = Matrix3D::MakeRotate({0.f, 1.f, 0.f}, 45.f);
     modelMatrix.postTranslate(0.f, 0.f, -100.f);
-    auto transform = cssPerspectiveMatrix * modelMatrix;
+    auto transform =
+        invOffsetToAnchorMatrix * cssPerspectiveMatrix * modelMatrix * offsetToAnchorMatrix;
     auto cssTransform3DFilter = ImageFilter::Transform3D(transform);
     Paint paint = {};
     paint.setImageFilter(cssTransform3DFilter);
     canvas->drawImage(image, 45.f, 45.f, &paint);
-
-    context->flushAndSubmit();
     EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/Transform3DImageFilterCSSBasic"));
     canvas->restore();
   }
@@ -898,10 +902,17 @@ TGFX_TEST(FilterTest, Transform3DImageFilter) {
   auto perspectiveMatrix = Matrix3D::Perspective(
       standardFovYDegress, static_cast<float>(image->width()) / static_cast<float>(image->height()),
       nearZ, farZ);
-  auto modelMatrix = Matrix3D::MakeRotate({0.f, 1.f, 0.f}, 45.f);
+  auto modelMatrix = Matrix3D::MakeRotate({0.f, 0.f, 1.f}, 45.f);
+  // Rotate around the ZXY axes of the model coordinate system in sequence; the latest transformation
+  // in the model coordinate system needs to be placed at the far right of the matrix multiplication
+  // equation
+  modelMatrix.preRotate({1.f, 0.f, 0.f}, 45.f);
+  modelMatrix.preRotate({0.f, 1.f, 0.f}, 45.f);
+  // Use Z-axis translation to simulate model depth
   modelMatrix.postTranslate(0.f, 0.f, -10.f / imageSize.width);
-  auto standardTransform = standardvViewportMatrix * perspectiveMatrix * viewMatrix * modelMatrix *
-                           invStandardViewportMatrix;
+  auto standardTransform = invOffsetToAnchorMatrix * standardvViewportMatrix * perspectiveMatrix *
+                           viewMatrix * modelMatrix * invStandardViewportMatrix *
+                           offsetToAnchorMatrix;
   auto standardTransform3DFilter = ImageFilter::Transform3D(standardTransform);
 
   // Test scale drawing with standard perspective type.
@@ -925,7 +936,6 @@ TGFX_TEST(FilterTest, Transform3DImageFilter) {
 
     Paint paint = {};
     paint.setImageFilter(standardTransform3DFilter);
-    canvas->setMatrix(tgfx::Matrix::MakeRotate(45, 100, 100));
     canvas->drawImage(image, 45.f, 45.f, &paint);
 
     context->flushAndSubmit();

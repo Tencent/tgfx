@@ -28,14 +28,11 @@ class GLCommandQueue : public CommandQueue {
   explicit GLCommandQueue(GLGPU* gpu) : gpu(gpu) {
   }
 
-  bool writeBuffer(std::shared_ptr<GPUBuffer> buffer, size_t bufferOffset, const void* data,
+  void writeBuffer(std::shared_ptr<GPUBuffer> buffer, size_t bufferOffset, const void* data,
                    size_t size) override;
 
   void writeTexture(std::shared_ptr<GPUTexture> texture, const Rect& rect, const void* pixels,
                     size_t rowBytes) override;
-
-  bool readTexture(std::shared_ptr<GPUTexture> texture, const Rect& rect, void* pixels,
-                   size_t rowBytes) const override;
 
   void submit(std::shared_ptr<CommandBuffer>) override;
 

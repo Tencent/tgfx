@@ -50,15 +50,12 @@ std::shared_ptr<Program> GlobalCache::findProgram(const BytesKey& programKey) {
 
 std::shared_ptr<GPUBuffer> GlobalCache::findOrCreateUniformBuffer(size_t bufferSize,
                                                                   size_t* lastBufferOffset) {
-  auto uboSupport = context->gpu()->caps()->shaderCaps()->uboSupport;
-  auto maxUBOSize =
-      uboSupport ? std::max(static_cast<size_t>(context->gpu()->caps()->shaderCaps()->maxUBOSize),
-                            MAX_UNIFORM_BUFFER_SIZE)
-                 : MAX_UNIFORM_BUFFER_SIZE;
+  auto maxUBOSize = std::max(static_cast<size_t>(context->gpu()->caps()->shaderCaps()->maxUBOSize),
+                             MAX_UNIFORM_BUFFER_SIZE);
   auto uboOffsetAlignment =
       static_cast<size_t>(context->gpu()->caps()->shaderCaps()->uboOffsetAlignment);
 
-  if (uboSupport && maxUBOSize == 0) {
+  if (maxUBOSize == 0) {
     LOGE("[GlobalCache::findOrCreateUniformBuffer] maxUBOSize is 0");
     return nullptr;
   }
@@ -248,7 +245,7 @@ class RectIndicesProvider : public DataSource<Data> {
   uint16_t vertCount = 0;
 };
 
-std::shared_ptr<IndexBufferProxy> GlobalCache::getRectIndexBuffer(bool antialias) {
+std::shared_ptr<GPUBufferProxy> GlobalCache::getRectIndexBuffer(bool antialias) {
   if (antialias) {
     if (aaQuadIndexBuffer == nullptr) {
       auto provider =
@@ -324,7 +321,7 @@ class RRectIndicesProvider : public DataSource<Data> {
   bool stroke = false;
 };
 
-std::shared_ptr<IndexBufferProxy> GlobalCache::getRRectIndexBuffer(bool stroke) {
+std::shared_ptr<GPUBufferProxy> GlobalCache::getRRectIndexBuffer(bool stroke) {
   auto& indexBuffer = stroke ? rRectStrokeIndexBuffer : rRectFillIndexBuffer;
   if (indexBuffer == nullptr) {
     auto provider = std::make_unique<RRectIndicesProvider>(RRectDrawOp::MaxNumRRects, stroke);

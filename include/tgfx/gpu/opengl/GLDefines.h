@@ -911,6 +911,8 @@ namespace tgfx {
 
 #define GL_SYNC_GPU_COMMANDS_COMPLETE 0x9117
 #define GL_TIMEOUT_IGNORED 0xFFFFFFFFFFFFFFFFull
+#define GL_ALREADY_SIGNALED 0x911A
+#define GL_CONDITION_SATISFIED 0x911C
 
 #endif
 }  // namespace tgfx

@@ -3268,11 +3268,11 @@ TGFX_TEST(LayerTest, Transform3DLayer) {
   modelMatrix.preRotate({0.f, 1.f, 0.f}, 45.f);
   modelMatrix.postTranslate(0.f, 0.f, -1000.f);
   auto offsetToAnchorMatrix =
-      Matrix3D::MakeTranslate((0.5f - layerATransformOrigin.x) * imagesize.width,
-                              (0.5f - layerATransformOrigin.y) * imagesize.height, 0.f);
+      Matrix3D::MakeTranslate(-layerATransformOrigin.x * imagesize.width,
+                              -layerATransformOrigin.y * imagesize.height, 0.f);
   auto invOffsetToAnchorMatrix =
-      Matrix3D::MakeTranslate((layerATransformOrigin.x - 0.5f) * imagesize.width,
-                              (layerATransformOrigin.y - 0.5f) * imagesize.height, 0.f);
+      Matrix3D::MakeTranslate(layerATransformOrigin.x * imagesize.width,
+                              layerATransformOrigin.y * imagesize.height, 0.f);
   auto originTranslateMatrix =
       Matrix3D::MakeTranslate(layerAMatrix.getTranslateX(), layerAMatrix.getTranslateY(), 0.f);
   auto transformMatrix = originTranslateMatrix * invOffsetToAnchorMatrix * perspectiveMatrix *

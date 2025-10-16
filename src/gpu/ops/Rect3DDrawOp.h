@@ -20,8 +20,8 @@
 #include "DrawOp.h"
 #include "core/utils/PlacementPtr.h"
 #include "gpu/RectsVertexProvider.h"
-#include "gpu/proxies/IndexBufferProxy.h"
-#include "gpu/proxies/VertexBufferProxyView.h"
+#include "gpu/proxies/GPUBufferProxy.h"
+#include "gpu/proxies/VertexBufferView.h"
 #include "tgfx/core/Matrix3D.h"
 #include "tgfx/gpu/Context.h"
 
@@ -79,8 +79,8 @@ class Rect3DDrawOp : public DrawOp {
   std::optional<Matrix> uvMatrix = std::nullopt;
   bool hasSubset = false;
 
-  std::shared_ptr<IndexBufferProxy> indexBufferProxy = nullptr;
-  std::shared_ptr<VertexBufferProxyView> vertexBufferProxyView = nullptr;
+  std::shared_ptr<GPUBufferProxy> indexBufferProxy = nullptr;
+  std::shared_ptr<VertexBufferView> vertexBufferProxyView = nullptr;
 
   friend class BlockBuffer;
 };

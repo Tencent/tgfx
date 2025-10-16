@@ -71,7 +71,7 @@ PlacementPtr<GeometryProcessor> RectDrawOp::onMakeGeometryProcessor(RenderTarget
 }
 
 void RectDrawOp::onDraw(RenderPass* renderPass) {
-  std::shared_ptr<IndexBuffer> indexBuffer = nullptr;
+  std::shared_ptr<BufferResource> indexBuffer = nullptr;
   if (indexBufferProxy) {
     indexBuffer = indexBufferProxy->getBuffer();
     if (indexBuffer == nullptr) {

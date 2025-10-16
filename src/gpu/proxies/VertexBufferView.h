@@ -18,42 +18,43 @@
 
 #pragma once
 
-#include "gpu/GPU.h"
-#include "gpu/GPUBuffer.h"
-#include "gpu/resources/Resource.h"
+#include "gpu/proxies/GPUBufferProxy.h"
 
 namespace tgfx {
 /**
- * VertexBuffer is a resource that encapsulates a GPUBuffer, which can be used for vertex data in
- * a RenderPass.
+ * VertexBufferView is a view of a GPUBufferProxy that allows access to a specific range of
+ * the vertex buffer.
  */
-class VertexBuffer : public Resource {
+class VertexBufferView {
  public:
-  size_t memoryUsage() const override {
-    return buffer->size();
+  VertexBufferView(std::shared_ptr<GPUBufferProxy> proxy, size_t _offset, size_t _size)
+      : proxy(std::move(proxy)), _offset(_offset), _size(_size) {
   }
 
   /**
-   * Returns the size of the vertex buffer.
+   * Returns the BufferResource associated with this VertexBufferView.
+   */
+  std::shared_ptr<BufferResource> getBuffer() const {
+    return proxy ? proxy->getBuffer() : nullptr;
+  }
+
+  /**
+   * Returns the offset of the vertex data in the vertex buffer.
+   */
+  size_t offset() const {
+    return _offset;
+  }
+
+  /**
+   * Returns the size of the vertex data in the vertex buffer.
    */
   size_t size() const {
-    return buffer->size();
-  }
-
-  /**
-   * Returns the GPUBuffer associated with this VertexBuffer.
-   */
-  std::shared_ptr<GPUBuffer> gpuBuffer() const {
-    return buffer;
+    return _size;
   }
 
  private:
-  std::shared_ptr<GPUBuffer> buffer = nullptr;
-
-  explicit VertexBuffer(std::shared_ptr<GPUBuffer> buffer) : buffer(std::move(buffer)) {
-  }
-
-  friend class GPUBufferUploadTask;
-  friend class ShapeBufferUploadTask;
+  std::shared_ptr<GPUBufferProxy> proxy = nullptr;
+  size_t _offset = 0;
+  size_t _size = 0;
 };
 }  // namespace tgfx

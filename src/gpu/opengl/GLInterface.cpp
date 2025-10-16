@@ -276,6 +276,8 @@ std::shared_ptr<GLInterface> GLInterface::MakeNativeInterface(const GLProcGetter
   functions->vertexAttribPointer =
       reinterpret_cast<GLVertexAttribPointer*>(getter->getProcAddress("glVertexAttribPointer"));
   functions->viewport = reinterpret_cast<GLViewport*>(getter->getProcAddress("glViewport"));
+  functions->clientWaitSync =
+      reinterpret_cast<GLClientWaitSync*>(getter->getProcAddress("glClientWaitSync"));
   functions->waitSync = reinterpret_cast<GLWaitSync*>(getter->getProcAddress("glWaitSync"));
 
   switch (info.standard) {

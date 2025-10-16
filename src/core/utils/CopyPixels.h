@@ -18,41 +18,13 @@
 
 #pragma once
 
-#include "gpu/GPU.h"
-#include "gpu/GPUBuffer.h"
-#include "gpu/resources/Resource.h"
+#include "tgfx/core/ImageInfo.h"
 
 namespace tgfx {
 /**
- * IndexBuffer is a resource that encapsulates a GPUBuffer, which can be used for index data in
- * a RenderPass.
+ * Copy pixel data from source to destination with optional vertical flipping. The source and
+ * destination ImageInfo must have the same dimensions.
  */
-class IndexBuffer : public Resource {
- public:
-  size_t memoryUsage() const override {
-    return buffer->size();
-  }
-
-  /**
-   * Returns the size of the index buffer.
-   */
-  size_t size() const {
-    return buffer->size();
-  }
-
-  /**
-   * Returns the GPUBuffer associated with this IndexBuffer.
-   */
-  std::shared_ptr<GPUBuffer> gpuBuffer() const {
-    return buffer;
-  }
-
- private:
-  std::shared_ptr<GPUBuffer> buffer = nullptr;
-
-  explicit IndexBuffer(std::shared_ptr<GPUBuffer> buffer) : buffer(std::move(buffer)) {
-  }
-
-  friend class GPUBufferUploadTask;
-};
+void CopyPixels(const ImageInfo& srcInfo, const void* srcPixels, const ImageInfo& dstInfo,
+                void* dstPixels, bool flipY = false);
 }  // namespace tgfx

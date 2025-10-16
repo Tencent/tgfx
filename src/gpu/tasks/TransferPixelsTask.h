@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,25 +18,21 @@
 
 #pragma once
 
-#include "ResourceProxy.h"
-#include "gpu/resources/VertexBuffer.h"
+#include "RenderTask.h"
+#include "gpu/proxies/GPUBufferProxy.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
-/**
- * VertexBufferProxy is a proxy for VertexBuffer resources.
- */
-class VertexBufferProxy : public ResourceProxy {
+class TransferPixelsTask : public RenderTask {
  public:
-  /**
-   * Returns the associated VertexBuffer instance.
-   */
-  std::shared_ptr<VertexBuffer> getBuffer() const {
-    return std::static_pointer_cast<VertexBuffer>(resource);
-  }
+  TransferPixelsTask(std::shared_ptr<RenderTargetProxy> source, const Rect& srcRect,
+                     std::shared_ptr<GPUBufferProxy> dest);
+
+  void execute(CommandEncoder* encoder) override;
 
  private:
-  VertexBufferProxy() = default;
-
-  friend class ProxyProvider;
+  std::shared_ptr<RenderTargetProxy> source = nullptr;
+  Rect srcRect = {};
+  std::shared_ptr<GPUBufferProxy> dest = nullptr;
 };
 }  // namespace tgfx

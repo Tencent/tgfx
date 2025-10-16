@@ -19,6 +19,7 @@
 #pragma once
 
 #include "tgfx/core/Matrix.h"
+#include "tgfx/core/Matrix3D.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/core/PathProvider.h"
 #include "tgfx/core/TextBlob.h"
@@ -84,6 +85,13 @@ class Shape {
   static std::shared_ptr<Shape> ApplyMatrix(std::shared_ptr<Shape> shape, const Matrix& matrix);
 
   /**
+   * Applies the specified 3D matrix to the given Shape. If the matrix is identity, the original
+   * Shape is returned. Returns nullptr if the Shape is nullptr.
+   */
+  static std::shared_ptr<Shape> ApplyMatrix3D(std::shared_ptr<Shape> shape,
+                                              const Matrix3D& matrix3D);
+
+  /**
    * Applies the specified path effect to the given Shape. If the effect is nullptr, the original
    * Shape is returned. Returns nullptr if the Shape is nullptr.
    */
@@ -128,7 +136,19 @@ class Shape {
   }
 
  protected:
-  enum class Type { Append, Effect, Text, Inverse, Matrix, Merge, Path, Stroke, Provider, Glyph };
+  enum class Type {
+    Append,
+    Effect,
+    Text,
+    Inverse,
+    Matrix,
+    Merge,
+    Path,
+    Stroke,
+    Provider,
+    Glyph,
+    Matrix3D
+  };
 
   /**
    * Returns the type of the Shape.
@@ -153,6 +173,7 @@ class Shape {
   friend class AppendShape;
   friend class StrokeShape;
   friend class MatrixShape;
+  friend class Matrix3DShape;
   friend class InverseShape;
   friend class MergeShape;
   friend class EffectShape;
