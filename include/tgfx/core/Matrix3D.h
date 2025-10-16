@@ -146,8 +146,9 @@ class Matrix3D {
   /**
    * Calculates the inverse of the current matrix and stores the result in the Matrix3D object
    * pointed to by inverse.
-   * @param inverse Pointer to the Matrix3D object used to store the inverse matrix. Must not be
-   * nullptr. If the current matrix is not invertible, inverse will not be modified.
+   * @param inverse Pointer to the Matrix3D object used to store the inverse matrix. If nullptr,
+   * the method will only check invertibility and not store the result. If the current matrix is not
+   * invertible, inverse will not be modified.
    * @return Returns true if the inverse matrix exists; otherwise, returns false.
    */
   bool invert(Matrix3D* inverse = nullptr) const;
