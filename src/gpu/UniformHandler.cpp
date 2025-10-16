@@ -76,23 +76,14 @@ std::unique_ptr<UniformData> UniformHandler::makeUniformData(ShaderStage stage) 
     return nullptr;
   }
 
-  auto shaderCaps = programBuilder->getContext()->caps()->shaderCaps();
-  return std::unique_ptr<UniformData>(new UniformData(
-      stage == ShaderStage::Vertex ? vertexUniforms : fragmentUniforms, shaderCaps->uboSupport));
+  return std::unique_ptr<UniformData>(
+      new UniformData(stage == ShaderStage::Vertex ? vertexUniforms : fragmentUniforms));
 }
 
 std::string UniformHandler::getUniformDeclarations(ShaderStage stage) const {
   std::string ret;
   auto& uniforms = stage == ShaderStage::Vertex ? vertexUniforms : fragmentUniforms;
-  auto shaderCaps = programBuilder->getContext()->caps()->shaderCaps();
-  if (shaderCaps->uboSupport) {
-    ret += programBuilder->getUniformBlockDeclaration(stage, uniforms);
-  } else {
-    for (auto& uniform : uniforms) {
-      ret += programBuilder->getShaderVarDeclarations(ShaderVar(uniform), stage);
-      ret += ";\n";
-    }
-  }
+  ret += programBuilder->getUniformBlockDeclaration(stage, uniforms);
 
   if (stage == ShaderStage::Fragment) {
     for (const auto& sampler : samplers) {

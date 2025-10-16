@@ -170,12 +170,21 @@ GLCaps::GLCaps(const GLInfo& info) {
   _shaderCaps.floatIs32Bits = IsMediumFloatFp32(info);
   switch (standard) {
     case GLStandard::GL:
+      if (version < GL_VER(3, 1)) {
+        ABORT("OpenGL versions below 3.1 are not supported!");
+      }
       initGLSupport(info);
       break;
     case GLStandard::GLES:
+      if (version < GL_VER(3, 0)) {
+        ABORT("OpenGL ES versions below 3.0 are not supported!");
+      }
       initGLESSupport(info);
       break;
     case GLStandard::WebGL:
+      if (version < GL_VER(2, 0)) {
+        ABORT("WebGL versions below 2.0 are not supported!");
+      }
       initWebGLSupport(info);
       break;
     default:
@@ -259,7 +268,6 @@ void GLCaps::initGLSupport(const GLInfo& info) {
   }
   _shaderCaps.versionDeclString = "#version 140";
   _shaderCaps.usesCustomColorOutputName = true;
-  _shaderCaps.varyingIsInOut = true;
   _shaderCaps.textureFuncName = "texture";
   if (info.hasExtension("GL_EXT_shader_framebuffer_fetch")) {
     _shaderCaps.frameBufferFetchNeedsCustomOutput = version >= GL_VER(3, 0);
@@ -269,11 +277,8 @@ void GLCaps::initGLSupport(const GLInfo& info) {
     _shaderCaps.frameBufferFetchRequiresEnablePerSample = false;
   }
 
-  _shaderCaps.uboSupport = version >= GL_VER(3, 1);
-  if (_shaderCaps.uboSupport) {
-    info.getIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &_shaderCaps.maxUBOSize);
-    info.getIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &_shaderCaps.uboOffsetAlignment);
-  }
+  info.getIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &_shaderCaps.maxUBOSize);
+  info.getIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &_shaderCaps.uboOffsetAlignment);
 }
 
 void GLCaps::initGLESSupport(const GLInfo& info) {
@@ -287,7 +292,6 @@ void GLCaps::initGLESSupport(const GLInfo& info) {
   textureBarrierSupport = info.hasExtension("GL_NV_texture_barrier");
   _shaderCaps.versionDeclString = version >= GL_VER(3, 0) ? "#version 300 es" : "#version 100";
   _shaderCaps.usesCustomColorOutputName = version >= GL_VER(3, 0);
-  _shaderCaps.varyingIsInOut = version >= GL_VER(3, 0);
   _shaderCaps.textureFuncName = version >= GL_VER(3, 0) ? "texture" : "texture2D";
   _shaderCaps.oesTextureExtension =
       version >= GL_VER(3, 0) ? "GL_OES_EGL_image_external_essl3" : "GL_OES_EGL_image_external";
@@ -323,11 +327,8 @@ void GLCaps::initGLESSupport(const GLInfo& info) {
   mipmapSupport = npotTextureTileSupport || info.hasExtension("GL_IMG_texture_npot");
   _shaderCaps.usesPrecisionModifiers = true;
 
-  _shaderCaps.uboSupport = version >= GL_VER(3, 0);
-  if (_shaderCaps.uboSupport) {
-    info.getIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &_shaderCaps.maxUBOSize);
-    info.getIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &_shaderCaps.uboOffsetAlignment);
-  }
+  info.getIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &_shaderCaps.maxUBOSize);
+  info.getIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &_shaderCaps.uboOffsetAlignment);
 }
 
 void GLCaps::initWebGLSupport(const GLInfo& info) {
@@ -345,17 +346,13 @@ void GLCaps::initWebGLSupport(const GLInfo& info) {
   npotTextureTileSupport = version >= GL_VER(2, 0);
   mipmapSupport = npotTextureTileSupport;
   _shaderCaps.usesCustomColorOutputName = version >= GL_VER(2, 0);
-  _shaderCaps.varyingIsInOut = version >= GL_VER(2, 0);
   _shaderCaps.versionDeclString = version >= GL_VER(2, 0) ? "#version 300 es" : "#version 100";
   _shaderCaps.textureFuncName = version >= GL_VER(2, 0) ? "texture" : "texture2D";
   _shaderCaps.frameBufferFetchSupport = false;
   _shaderCaps.usesPrecisionModifiers = true;
 
-  _shaderCaps.uboSupport = version >= GL_VER(2, 0);
-  if (_shaderCaps.uboSupport) {
-    info.getIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &_shaderCaps.maxUBOSize);
-    info.getIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &_shaderCaps.uboOffsetAlignment);
-  }
+  info.getIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &_shaderCaps.maxUBOSize);
+  info.getIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &_shaderCaps.uboOffsetAlignment);
 }
 
 void GLCaps::initFormatMap(const GLInfo& info) {
