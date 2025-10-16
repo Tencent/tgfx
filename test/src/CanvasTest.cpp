@@ -3060,4 +3060,62 @@ TGFX_TEST(CanvasTest, ScaleMatrixShader) {
   canvas->drawRect(rect, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ScaleMatrixShader"));
 }
+
+TGFX_TEST(CanvasTest, Matrix3DShapeStroke) {
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 300);
+  ASSERT_TRUE(surface != nullptr);
+  auto* canvas = surface->getCanvas();
+
+  auto origin = Point::Make(100, 100);
+  auto originTranslateMatrix = Matrix3D::MakeTranslate(origin.x, origin.y, 0.f);
+  Size pathSize = {100, 100};
+  auto anchor = Point::Make(0.5f, 0.5f);
+  auto invOffsetToAnchorMatrix =
+      Matrix3D::MakeTranslate(anchor.x * pathSize.width, anchor.y * pathSize.height, 0);
+  auto perspectiveMatrix = Matrix3D::I();
+  constexpr float eyeDistance = 1200.f;
+  constexpr float farZ = -1000.f;
+  constexpr float shift = 10.f;
+  const float nearZ = eyeDistance - shift;
+  const float m22 = (2 - (farZ + nearZ) / eyeDistance) / (farZ - nearZ);
+  perspectiveMatrix.setRowColumn(2, 2, m22);
+  const float m23 = -1.f + nearZ / eyeDistance - perspectiveMatrix.getRowColumn(2, 2) * nearZ;
+  perspectiveMatrix.setRowColumn(2, 3, m23);
+  perspectiveMatrix.setRowColumn(3, 2, -1.f / eyeDistance);
+  auto modelMatrix = Matrix3D::MakeScale(2, 2, 1);
+  modelMatrix.postRotate({0, 0, 1}, 45);
+  modelMatrix.postRotate({1, 0, 0}, 45);
+  modelMatrix.postRotate({0, 1, 0}, 45);
+  modelMatrix.postTranslate(0, 0, -20);
+  auto offsetToAnchorMatrix =
+      Matrix3D::MakeTranslate(-anchor.x * pathSize.width, -anchor.y * pathSize.height, 0);
+  auto transform = originTranslateMatrix * invOffsetToAnchorMatrix * perspectiveMatrix *
+                   modelMatrix * offsetToAnchorMatrix;
+
+  auto path = Path();
+  path.addRoundRect(Rect::MakeXYWH(0.f, 0.f, pathSize.width, pathSize.height), 20, 20);
+  auto rawShape = Shape::MakeFrom(path);
+
+  Paint paint1;
+  paint1.setAntiAlias(true);
+  paint1.setColor(Color::FromRGBA(0, 255, 0, 255));
+  paint1.setStyle(PaintStyle::Fill);
+  auto transform3DFilter = ImageFilter::Transform3D(transform);
+  paint1.setImageFilter(transform3DFilter);
+  canvas->drawShape(rawShape, paint1);
+
+  auto mappedShape = Shape::ApplyMatrix3D(rawShape, transform);
+  Paint paint2;
+  paint2.setAntiAlias(true);
+  paint2.setColor(Color::FromRGBA(255, 0, 0, 255));
+  paint2.setStyle(PaintStyle::Stroke);
+  paint2.setStroke(Stroke(2.0f));
+  canvas->drawShape(mappedShape, paint2);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/Matrix3DShapeStroke"));
+}
+
 }  // namespace tgfx
