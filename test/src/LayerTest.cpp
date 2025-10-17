@@ -683,9 +683,9 @@ TGFX_TEST(LayerTest, FilterTest) {
   filter4SrcBounds = filter2->filterBounds(filter4SrcBounds, 1.f);
 
   // The transformation center of the matrix is the center point of the layer, i.e., (0.5, 0.5)
-  auto offsetToAnchorMatrix = Matrix3D::MakeTranslate(
-      -anchor.x * imageSize.width + filter4SrcBounds.left,
-      -anchor.y * imageSize.height + filter4SrcBounds.top, 0.f);
+  auto offsetToAnchorMatrix =
+      Matrix3D::MakeTranslate(-anchor.x * imageSize.width + filter4SrcBounds.left,
+                              -anchor.y * imageSize.height + filter4SrcBounds.top, 0.f);
 
   // 3D model transformations can be stacked based on 2D transformations, and the 2D transformation
   // matrix is based on the origin (0,0)
@@ -728,9 +728,9 @@ TGFX_TEST(LayerTest, FilterTest) {
   perspectiveMatrix.setRowColumn(2, 3, m23);
   perspectiveMatrix.setRowColumn(3, 2, -1.f / eyeDistance);
 
-  auto invOffsetToAnchorMatrix = Matrix3D::MakeTranslate(
-      anchor.x * imageSize.width - filter4SrcBounds.left,
-      anchor.y * imageSize.height - filter4SrcBounds.top, 0.f);
+  auto invOffsetToAnchorMatrix =
+      Matrix3D::MakeTranslate(anchor.x * imageSize.width - filter4SrcBounds.left,
+                              anchor.y * imageSize.height - filter4SrcBounds.top, 0.f);
 
   auto originTranslateMatrix = Matrix3D::MakeTranslate(origin.x, origin.y, 0.f);
 

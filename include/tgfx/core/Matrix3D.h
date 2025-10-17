@@ -68,6 +68,12 @@ class Matrix3D {
   }
 
   /**
+   * Returns specified row of the matrix as a Vec4.
+   * @param i  Row index, valid range 0..3.
+   */
+  Vec4 getRow(int i) const;
+
+  /**
    * Returns the matrix value at the given row and column.
    * @param r  Row index, valid range 0..3.
    * @param c  Column index, valid range 0..3.
@@ -148,14 +154,24 @@ class Matrix3D {
   void preRotate(const Vec3& axis, float degrees);
 
   /**
-  * Post-concatenates a rotation to this matrix. M' = M * R.
-  */
+   * Post-concatenates a rotation to this matrix. M' = M * R.
+   */
   void postRotate(const Vec3& axis, float degrees);
+
+  /**
+   * Pre-concatenates a translation to this matrix. M' = T * M.
+   */
+  void preTranslate(float tx, float ty, float tz);
 
   /**
    * Post-concatenates a translation to this matrix. M' = M * T.
    */
   void postTranslate(float tx, float ty, float tz);
+
+  /**
+   * Concatenates this matrix with the given matrix, and stores the result in this matrix. M' = M * m.
+   */
+  void postConcat(const Matrix3D& m);
 
   /**
    * Calculates the inverse of the current matrix and stores the result in the Matrix3D object
@@ -245,11 +261,6 @@ class Matrix3D {
   void preConcat(const Matrix3D& m);
 
   /**
-   * Concatenates this matrix with the given matrix, and stores the result in this matrix. M' = M * m.
-   */
-  void postConcat(const Matrix3D& m);
-
-  /**
    * Pre-concatenates a scale to this matrix. M' = S * M.
    */
   void preScale(float sx, float sy, float sz);
@@ -258,11 +269,6 @@ class Matrix3D {
    * Post-concatenates a scale to this matrix. M' = M * S.
    */
   void postScale(float sx, float sy, float sz);
-
-  /**
-   * Pre-concatenates a translation to this matrix. M' = T * M.
-   */
-  void preTranslate(float tx, float ty, float tz);
 
   /**
    * Returns the transpose of the current matrix.

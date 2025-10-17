@@ -27,4 +27,13 @@ Vec2 operator/(const Vec2& v, float s) {
   return {v.x / s, v.y / s};
 }
 
+bool Vec3::operator==(const Vec3& v) const {
+  return FloatNearlyEqual(x, v.x) && FloatNearlyEqual(y, v.y) && FloatNearlyEqual(z, v.z);
+}
+
+bool Vec4::operator==(const Vec4& v) const {
+  return FloatNearlyEqual(x, v.x) && FloatNearlyEqual(y, v.y) && FloatNearlyEqual(z, v.z) &&
+         FloatNearlyEqual(w, v.w);
+}
+
 }  // namespace tgfx

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Matrix3D.h"
+#include "utils/Log.h"
 #include "utils/MathExtra.h"
 
 namespace tgfx {
@@ -162,6 +163,11 @@ static Rect MapRectPerspective(const Rect& srcRect, const float mat[16]) {
   return {minMax.x, minMax.y, minMax.z, minMax.w};
 }
 
+Vec4 Matrix3D::getRow(int i) const {
+  DEBUG_ASSERT(i >= 0 && i < 4);
+  return {values[i], values[i + 4], values[i + 8], values[i + 12]};
+}
+
 const Matrix3D& Matrix3D::I() {
   static constexpr Matrix3D identity;
   return identity;
@@ -177,10 +183,23 @@ void Matrix3D::postRotate(const Vec3& axis, float degrees) {
   postConcat(m);
 }
 
+void Matrix3D::preTranslate(float tx, float ty, float tz) {
+  auto c0 = getCol(0);
+  auto c1 = getCol(1);
+  auto c2 = getCol(2);
+  auto c3 = getCol(3);
+
+  setColumn(3, (c0 * tx + c1 * ty + c2 * tz + c3));
+}
+
 void Matrix3D::postTranslate(float tx, float ty, float tz) {
   values[12] += tx;
   values[13] += ty;
   values[14] += tz;
+}
+
+void Matrix3D::postConcat(const Matrix3D& m) {
+  setConcat(m, *this);
 }
 
 bool Matrix3D::invert(Matrix3D* inverse) const {
@@ -271,10 +290,6 @@ void Matrix3D::preConcat(const Matrix3D& m) {
   setConcat(*this, m);
 }
 
-void Matrix3D::postConcat(const Matrix3D& m) {
-  setConcat(m, *this);
-}
-
 void Matrix3D::preScale(float sx, float sy, float sz) {
   if (sx == 1 && sy == 1 && sz == 1) {
     return;
@@ -295,15 +310,6 @@ void Matrix3D::postScale(float sx, float sy, float sz) {
   }
   auto m = MakeScale(sx, sy, sz);
   this->postConcat(m);
-}
-
-void Matrix3D::preTranslate(float tx, float ty, float tz) {
-  auto c0 = getCol(0);
-  auto c1 = getCol(1);
-  auto c2 = getCol(2);
-  auto c3 = getCol(3);
-
-  setColumn(3, (c0 * tx + c1 * ty + c2 * tz + c3));
 }
 
 Matrix3D Matrix3D::transpose() const {

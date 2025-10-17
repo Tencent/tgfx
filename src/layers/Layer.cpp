@@ -136,20 +136,66 @@ void Layer::setBlendMode(BlendMode value) {
   invalidateTransform();
 }
 
-void Layer::setPosition(const Point& value) {
-  if (_matrix.getTranslateX() == value.x && _matrix.getTranslateY() == value.y) {
-    return;
+Point Layer::position() const {
+  if (_matrix3DIsAffine) {
+    return {_matrix3D.getRowColumn(0, 3), _matrix3D.getRowColumn(1, 3)};
   }
-  _matrix.setTranslateX(value.x);
-  _matrix.setTranslateY(value.y);
+
+  auto result = matrix3D().mapVec3(Vec3(0, 0, 1));
+  return {result.x, result.y};
+}
+
+void Layer::setPosition(const Point& value) {
+  if (_matrix3DIsAffine) {
+    DEBUG_ASSERT(FloatNearlyEqual(_affineMatrix.getTranslateX(), _matrix3D.getRowColumn(0, 3)) &&
+                 FloatNearlyEqual(_affineMatrix.getTranslateY(), _matrix3D.getRowColumn(1, 3)));
+    _affineMatrix.setTranslateX(value.x);
+    _affineMatrix.setTranslateY(value.y);
+    _matrix3D.setRowColumn(0, 3, value.x);
+    _matrix3D.setRowColumn(1, 3, value.y);
+  } else {
+    // When there is a 3D transformation or perspective, _affineMatrix is invalid, must be the
+    // identity matrix, and does not need to be updated
+    DEBUG_ASSERT(_affineMatrix.isIdentity());
+    auto curPos = _matrix3D.mapVec3(Vec3(0, 0, 1));
+    if (FloatNearlyEqual(curPos.x, value.x) && FloatNearlyEqual(curPos.y, value.y)) {
+      return;
+    }
+    _matrix3D.postTranslate(value.x - curPos.x, value.y - curPos.y, 0);
+  }
   invalidateTransform();
 }
 
 void Layer::setMatrix(const Matrix& value) {
-  if (_matrix == value) {
+  const Matrix3D value3D(value);
+  if (value3D == _matrix3D) {
     return;
   }
-  _matrix = value;
+  _matrix3D = value3D;
+  _affineMatrix = value;
+  _matrix3DIsAffine = true;
+  invalidateTransform();
+}
+
+static bool IsMatrix3DAffine(const Matrix3D& matrix) {
+  return FloatNearlyZero(matrix.getRowColumn(0, 2)) && FloatNearlyZero(matrix.getRowColumn(1, 2)) &&
+         matrix.getRow(2) == Vec4(0, 0, 0, 0) && matrix.getRow(3) == Vec4(0, 0, 0, 1);
+}
+
+void Layer::setMatrix3D(const Matrix3D& value) {
+  if (value == _matrix3D) {
+    return;
+  }
+  _matrix3D = value;
+  if (IsMatrix3DAffine(value)) {
+    // If it's equivalent to a 2D affine matrix, update _affineMatrix
+    _affineMatrix.setAll(value.getRowColumn(0, 0), value.getRowColumn(0, 1),
+                         value.getRowColumn(0, 3), value.getRowColumn(1, 0),
+                         value.getRowColumn(1, 1), value.getRowColumn(1, 3));
+  } else {
+    // Otherwise, _affineMatrix is invalid and must be set to identity matrix
+    _affineMatrix.setIdentity();
+  }
   invalidateTransform();
 }
 
@@ -707,6 +753,11 @@ Matrix Layer::getGlobalMatrix() const {
   Matrix matrix = {};
   auto layer = this;
   while (layer->_parent) {
+    if (!layer->_matrix3DIsAffine) {
+      matrix.setIdentity();
+      break;
+    }
+
     matrix.postConcat(layer->getMatrixWithScrollRect());
     layer = layer->_parent;
   }
@@ -714,9 +765,27 @@ Matrix Layer::getGlobalMatrix() const {
 }
 
 Matrix Layer::getMatrixWithScrollRect() const {
-  auto matrix = _matrix;
-  if (_scrollRect) {
+  auto matrix = _affineMatrix;
+  if (_matrix3DIsAffine && _scrollRect) {
     matrix.preTranslate(-_scrollRect->left, -_scrollRect->top);
+  }
+  return matrix;
+}
+
+Matrix3D Layer::getGlobalMatrix3D() const {
+  Matrix3D matrix = {};
+  auto layer = this;
+  while (layer->_parent) {
+    matrix.postConcat(layer->getMatrix3DWithScrollRect());
+    layer = layer->_parent;
+  }
+  return matrix;
+}
+
+Matrix3D Layer::getMatrix3DWithScrollRect() const {
+  auto matrix = _matrix3D;
+  if (_scrollRect) {
+    matrix.preTranslate(-_scrollRect->left, -_scrollRect->top, 0);
   }
   return matrix;
 }
