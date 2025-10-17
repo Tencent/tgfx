@@ -18,23 +18,21 @@
 
 #pragma once
 
-#include "drawers/Drawer.h"
+#include "hello2d/SampleBuilder.h"
 
-namespace drawers {
-#define DEFINE_DRAWER(DrawerName)                                             \
-  class DrawerName : public drawers::Drawer {                                 \
-   public:                                                                    \
-    DrawerName() : drawers::Drawer(#DrawerName) {                             \
-    }                                                                         \
-                                                                              \
-   protected:                                                                 \
-    void onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) override; \
+namespace hello2d {
+#define DEFINE_SAMPLE(SampleName)                                                       \
+  class SampleName : public hello2d::Sample {                                           \
+   public:                                                                              \
+    SampleName() : hello2d::Sample(#SampleName) {                                       \
+    }                                                                                   \
+                                                                                        \
+    std::shared_ptr<tgfx::Layer> buildLayerTree(const hello2d::AppHost* host) override; \
   }
 
-DEFINE_DRAWER(GridBackground);
-DEFINE_DRAWER(ConicGradient);
-DEFINE_DRAWER(ImageWithMipmap);
-DEFINE_DRAWER(ImageWithShadow);
-DEFINE_DRAWER(SimpleText);
-
-}  // namespace drawers
+DEFINE_SAMPLE(ConicGradient);
+DEFINE_SAMPLE(ImageWithMipmap);
+DEFINE_SAMPLE(ImageWithShadow);
+DEFINE_SAMPLE(RichText);
+DEFINE_SAMPLE(SimpleLayerTree);
+}  // namespace hello2d
