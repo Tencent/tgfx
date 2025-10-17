@@ -591,7 +591,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   bool getLayersUnderPointInternal(float x, float y, std::vector<std::shared_ptr<Layer>>* results);
 
-  std::shared_ptr<MaskFilter> getMaskFilter(const DrawArgs& args, float scale, const Rect& clipBounds);
+  std::shared_ptr<MaskFilter> getMaskFilter(const DrawArgs& args, float scale, const std::optional<Rect>& clipBounds);
 
   Matrix getRelativeMatrix(const Layer* targetCoordinateSpace) const;
 
@@ -613,7 +613,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
                                                              bool fullLayer = false) const;
 
   static std::shared_ptr<Picture> RecordPicture(DrawMode mode, float contentScale,
-                                                const std::function<void(Canvas*)>& drawFunction);
+                                              const std::function<void(Canvas*)>& drawFunction,
+                                              std::optional<Rect> clipBounds = std::nullopt);
 
   struct {
     bool dirtyContent : 1;        // layer's content needs updating
