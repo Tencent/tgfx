@@ -113,9 +113,7 @@ std::shared_ptr<Image> FilterImage::onMakeScaled(int newWidth, int newHeight,
 }
 
 std::shared_ptr<TextureProxy> FilterImage::lockTextureProxy(const TPArgs& args) const {
-  auto inputBounds = Rect::MakeWH(source->width(), source->height());
-  auto filterBounds = filter->filterBounds(inputBounds);
-  return filter->lockTextureProxy(source, filterBounds, args);
+  return filter->lockTextureProxy(source, bounds, args);
 }
 
 PlacementPtr<FragmentProcessor> FilterImage::asFragmentProcessor(const FPArgs& args,
