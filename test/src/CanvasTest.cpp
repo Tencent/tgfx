@@ -3018,4 +3018,104 @@ TGFX_TEST(CanvasTest, MatrixShapeStroke) {
 
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/MatrixShapeStroke"));
 }
+
+TGFX_TEST(CanvasTest, uninvertibleStateMatrix) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 128, 128);
+  auto canvas = surface->getCanvas();
+
+  auto path = Path();
+  path.addRect(-5.f, -5.f, 10.f, 10.f);
+
+  Paint paint;
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStroke(Stroke(0.f));
+
+  auto matrix = Matrix::MakeScale(1E-8f, 1E-8f);
+  EXPECT_TRUE(matrix.invertNonIdentity(nullptr));
+  EXPECT_FALSE(matrix.invertible());
+
+  canvas->concat(matrix);
+  canvas->drawPath(path, paint);
+}
+
+TGFX_TEST(CanvasTest, ScaleMatrixShader) {
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(image != nullptr);
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 100, 100);
+  ASSERT_TRUE(surface != nullptr);
+  auto* canvas = surface->getCanvas();
+  auto paint = Paint();
+  auto shader = Shader::MakeImageShader(image);
+  auto rect = Rect::MakeXYWH(25, 25, 50, 50);
+  rect.scale(10, 10);
+  shader = shader->makeWithMatrix(Matrix::MakeScale(10, 10));
+  paint.setShader(shader);
+  canvas->scale(0.1f, 0.1f);
+  canvas->drawRect(rect, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ScaleMatrixShader"));
+}
+
+TGFX_TEST(CanvasTest, Matrix3DShapeStroke) {
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 300);
+  ASSERT_TRUE(surface != nullptr);
+  auto* canvas = surface->getCanvas();
+
+  auto origin = Point::Make(100, 100);
+  auto originTranslateMatrix = Matrix3D::MakeTranslate(origin.x, origin.y, 0.f);
+  Size pathSize = {100, 100};
+  auto anchor = Point::Make(0.5f, 0.5f);
+  auto invOffsetToAnchorMatrix =
+      Matrix3D::MakeTranslate(anchor.x * pathSize.width, anchor.y * pathSize.height, 0);
+  auto perspectiveMatrix = Matrix3D::I();
+  constexpr float eyeDistance = 1200.f;
+  constexpr float farZ = -1000.f;
+  constexpr float shift = 10.f;
+  const float nearZ = eyeDistance - shift;
+  const float m22 = (2 - (farZ + nearZ) / eyeDistance) / (farZ - nearZ);
+  perspectiveMatrix.setRowColumn(2, 2, m22);
+  const float m23 = -1.f + nearZ / eyeDistance - perspectiveMatrix.getRowColumn(2, 2) * nearZ;
+  perspectiveMatrix.setRowColumn(2, 3, m23);
+  perspectiveMatrix.setRowColumn(3, 2, -1.f / eyeDistance);
+  auto modelMatrix = Matrix3D::MakeScale(2, 2, 1);
+  modelMatrix.postRotate({0, 0, 1}, 45);
+  modelMatrix.postRotate({1, 0, 0}, 45);
+  modelMatrix.postRotate({0, 1, 0}, 45);
+  modelMatrix.postTranslate(0, 0, -20);
+  auto offsetToAnchorMatrix =
+      Matrix3D::MakeTranslate(-anchor.x * pathSize.width, -anchor.y * pathSize.height, 0);
+  auto transform = originTranslateMatrix * invOffsetToAnchorMatrix * perspectiveMatrix *
+                   modelMatrix * offsetToAnchorMatrix;
+
+  auto path = Path();
+  path.addRoundRect(Rect::MakeXYWH(0.f, 0.f, pathSize.width, pathSize.height), 20, 20);
+  auto rawShape = Shape::MakeFrom(path);
+
+  Paint paint1;
+  paint1.setAntiAlias(true);
+  paint1.setColor(Color::FromRGBA(0, 255, 0, 255));
+  paint1.setStyle(PaintStyle::Fill);
+  auto transform3DFilter = ImageFilter::Transform3D(transform);
+  paint1.setImageFilter(transform3DFilter);
+  canvas->drawShape(rawShape, paint1);
+
+  auto mappedShape = Shape::ApplyMatrix3D(rawShape, transform);
+  Paint paint2;
+  paint2.setAntiAlias(true);
+  paint2.setColor(Color::FromRGBA(255, 0, 0, 255));
+  paint2.setStyle(PaintStyle::Stroke);
+  paint2.setStroke(Stroke(2.0f));
+  canvas->drawShape(mappedShape, paint2);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/Matrix3DShapeStroke"));
+}
+
 }  // namespace tgfx

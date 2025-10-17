@@ -167,6 +167,33 @@ const Matrix3D& Matrix3D::I() {
   return identity;
 }
 
+void Matrix3D::preRotate(const Vec3& axis, float degrees) {
+  auto m = MakeRotate(axis, degrees);
+  preConcat(m);
+}
+
+void Matrix3D::postRotate(const Vec3& axis, float degrees) {
+  auto m = MakeRotate(axis, degrees);
+  postConcat(m);
+}
+
+void Matrix3D::postTranslate(float tx, float ty, float tz) {
+  values[12] += tx;
+  values[13] += ty;
+  values[14] += tz;
+}
+
+bool Matrix3D::invert(Matrix3D* inverse) const {
+  float result[16];
+  if (!InvertMatrix3D(values, result)) {
+    return false;
+  }
+  if (inverse != nullptr) {
+    memcpy(inverse->values, result, sizeof(result));
+  }
+  return true;
+}
+
 Matrix3D Matrix3D::LookAt(const Vec3& eye, const Vec3& center, const Vec3& up) {
   auto viewZ = Vec3::Normalize(eye - center);
   auto viewX = Vec3::Normalize(up.cross(viewZ));
@@ -192,6 +219,24 @@ Rect Matrix3D::mapRect(const Rect& src) const {
   } else {
     return MapRectAffine(src, values);
   }
+}
+
+bool Matrix3D::operator==(const Matrix3D& other) const {
+  if (this == &other) {
+    return true;
+  }
+
+  auto a0 = getCol(0);
+  auto a1 = getCol(1);
+  auto a2 = getCol(2);
+  auto a3 = getCol(3);
+
+  auto b0 = other.getCol(0);
+  auto b1 = other.getCol(1);
+  auto b2 = other.getCol(2);
+  auto b3 = other.getCol(3);
+
+  return ((a0 == b0) && (a1 == b1) && (a2 == b2) && (a3 == b3));
 }
 
 void Matrix3D::getRowMajor(float buffer[16]) const {
@@ -256,31 +301,6 @@ void Matrix3D::preTranslate(float tx, float ty, float tz) {
   setColumn(3, (c0 * tx + c1 * ty + c2 * tz + c3));
 }
 
-void Matrix3D::postTranslate(float tx, float ty, float tz) {
-  values[12] += tx;
-  values[13] += ty;
-  values[14] += tz;
-}
-
-void Matrix3D::preRotate(const Vec3& axis, float degrees) {
-  auto m = MakeRotate(axis, degrees);
-  preConcat(m);
-}
-
-void Matrix3D::postRotate(const Vec3& axis, float degrees) {
-  auto m = MakeRotate(axis, degrees);
-  postConcat(m);
-}
-
-bool Matrix3D::invert(Matrix3D* inverse) const {
-  float result[16];
-  if (!InvertMatrix3D(values, result)) {
-    return false;
-  }
-  memcpy(inverse->values, result, sizeof(result));
-  return true;
-}
-
 Matrix3D Matrix3D::transpose() const {
   Matrix3D m;
   TransposeArrays(values, m.values);
@@ -341,24 +361,6 @@ void Matrix3D::setRotateUnitSinCos(const Vec3& axis, float sinAngle, float cosAn
 
   setAll(t * x * x + c, t * x * y + s * z, t * x * z - s * y, 0, t * x * y - s * z, t * y * y + c,
          t * y * z + s * x, 0, t * x * z + s * y, t * y * z - s * x, t * z * z + c, 0, 0, 0, 0, 1);
-}
-
-bool Matrix3D::operator==(const Matrix3D& other) const {
-  if (this == &other) {
-    return true;
-  }
-
-  auto a0 = getCol(0);
-  auto a1 = getCol(1);
-  auto a2 = getCol(2);
-  auto a3 = getCol(3);
-
-  auto b0 = other.getCol(0);
-  auto b1 = other.getCol(1);
-  auto b2 = other.getCol(2);
-  auto b3 = other.getCol(3);
-
-  return ((a0 == b0) && (a1 == b1) && (a2 == b2) && (a3 == b3));
 }
 
 }  // namespace tgfx

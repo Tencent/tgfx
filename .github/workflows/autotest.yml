@@ -46,7 +46,7 @@ jobs:
       - name: Run Autotest
         run: |
           chmod +x autotest.sh
-          ./autotest.sh
+          ./autotest.sh USE_SWIFTSHADER
         env:
           TRACY_NO_INVARIANT_CHECK: 1
 

@@ -67,15 +67,6 @@ class RenderContext : public DrawContext {
    */
   bool flush();
 
-  /**
-   * Copies a rectangular region of pixels to a GPUBufferProxy. The region must be entirely within
-   * the render target bounds and adjusted for the render target origin. The resulting
-   * GPUBufferProxy will have a size of rect.height() * rowBytes, where rowBytes equals
-   * rect.width() * bytesPerPixel, and bytesPerPixel is determined by the render target's pixel
-   * format.
-   */
-  std::shared_ptr<GPUBufferProxy> copyPixels(const Rect& rect);
-
  private:
   void drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const MCState& state,
                               const Fill& fill, const Stroke* stroke, const Rect& localClipBounds,

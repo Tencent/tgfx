@@ -524,6 +524,22 @@ void Path::transform(const Matrix& matrix) {
   writableRef()->path.transform(skMatrix);
 }
 
+void Path::transform3D(const Matrix3D& matrix) {
+  if (matrix.isIdentity()) {
+    return;
+  }
+  float values[16] = {};
+  matrix.getColumnMajor(values);
+  SkMatrix skMatrix = {};
+  // All vertices inside the Path have an initial z-coordinate of 0, so the third column of the 4x4
+  // matrix does not affect the final transformation result and can be ignored. Additionally, since
+  // we do not care about the final projected z-axis coordinate, the third row can also be ignored.
+  // Therefore, the 4x4 matrix can be simplified to a 3x3 matrix.
+  skMatrix.setAll(values[0], values[4], values[12], values[1], values[5], values[13], values[3],
+                  values[7], values[15]);
+  writableRef()->path.transform(skMatrix);
+}
+
 void Path::reverse() {
   auto& path = writableRef()->path;
   SkPath tempPath;

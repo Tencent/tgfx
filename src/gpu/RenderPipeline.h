@@ -171,12 +171,6 @@ class BindingEntry {
    * The binding point of the resource.
    */
   unsigned binding = 0;
-
-  /**
-   * Lists the uniform variables contained in a uniform block. This is only used when UBOs are not
-   * supported.
-   */
-  std::vector<Uniform> uniforms = {};
 };
 
 /**
