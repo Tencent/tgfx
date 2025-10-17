@@ -198,6 +198,12 @@ void Matrix3D::postTranslate(float tx, float ty, float tz) {
   values[14] += tz;
 }
 
+void Matrix3D::postSkew(float kxy, float kxz, float kyx, float kyz, float kzx, float kzy) {
+  Matrix3D m;
+  m.setSkew(kxy, kxz, kyx, kyz, kzx, kzy);
+  postConcat(m);
+}
+
 void Matrix3D::postConcat(const Matrix3D& m) {
   setConcat(m, *this);
 }
@@ -351,15 +357,15 @@ void Matrix3D::setAll(float m00, float m01, float m02, float m03, float m10, flo
 
 void Matrix3D::setRotate(const Vec3& axis, float degrees) {
   if (auto len = axis.length(); len > 0 && (len * 0 == 0)) {
-    this->setRotateUnit(axis * (1.f / len), degrees);
+    setRotateUnit(axis * (1.f / len), degrees);
   } else {
-    this->setIdentity();
+    setIdentity();
   }
 }
 
 void Matrix3D::setRotateUnit(const Vec3& axis, float degrees) {
   auto radians = DegreesToRadians(degrees);
-  this->setRotateUnitSinCos(axis, sin(radians), cos(radians));
+  setRotateUnitSinCos(axis, sin(radians), cos(radians));
 }
 
 void Matrix3D::setRotateUnitSinCos(const Vec3& axis, float sinAngle, float cosAngle) {
@@ -372,6 +378,15 @@ void Matrix3D::setRotateUnitSinCos(const Vec3& axis, float sinAngle, float cosAn
 
   setAll(t * x * x + c, t * x * y + s * z, t * x * z - s * y, 0, t * x * y - s * z, t * y * y + c,
          t * y * z + s * x, 0, t * x * z + s * y, t * y * z - s * x, t * z * z + c, 0, 0, 0, 0, 1);
+}
+
+void Matrix3D::setSkew(float kxy, float kxz, float kyx, float kyz, float kzx, float kzy) {
+  values[1] = kyx;
+  values[2] = kzx;
+  values[4] = kxy;
+  values[6] = kzy;
+  values[8] = kxz;
+  values[9] = kyz;
 }
 
 }  // namespace tgfx

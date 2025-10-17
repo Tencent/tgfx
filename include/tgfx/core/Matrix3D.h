@@ -149,24 +149,44 @@ class Matrix3D {
   }
 
   /**
-   * Pre-concatenates a rotation to this matrix. M' = R * M.
+   * Pre-concatenates a rotation to this matrix. M' = M * R.
    */
   void preRotate(const Vec3& axis, float degrees);
 
   /**
-   * Post-concatenates a rotation to this matrix. M' = M * R.
+   * Post-concatenates a rotation to this matrix. M' = R * M.
    */
   void postRotate(const Vec3& axis, float degrees);
 
   /**
-   * Pre-concatenates a translation to this matrix. M' = T * M.
+   * Pre-concatenates a translation to this matrix. M' = M * T.
    */
   void preTranslate(float tx, float ty, float tz);
 
   /**
-   * Post-concatenates a translation to this matrix. M' = M * T.
+   * Post-concatenates a translation to this matrix. M' = T * M.
    */
   void postTranslate(float tx, float ty, float tz);
+
+  /**
+   * Post-concatenates a skew to this matrix. M' = K * M
+   * @param kxy Skew factor for x as a function of y
+   * @param kxz Skew factor for x as a function of z
+   * @param kyx Skew factor for y as a function of x
+   * @param kyz Skew factor for y as a function of z
+   * @param kzx Skew factor for z as a function of x
+   * @param kzy Skew factor for z as a function of y
+   */
+  void postSkew(float kxy, float kxz, float kyx, float kyz, float kzx, float kzy);
+
+  /**
+   * Post-concatenates a skew in the XY plane to this matrix. M' = K * M
+   * @param kxy Skew factor for x as a function of y
+   * @param kyx Skew factor for y as a function of x
+   */
+  void postSkewXY(float kxy, float kyx) {
+    postSkew(kxy, 0, kyx, 0, 0, 0);
+  }
 
   /**
    * Concatenates this matrix with the given matrix, and stores the result in this matrix. M' = M * m.
@@ -256,17 +276,17 @@ class Matrix3D {
   void setConcat(const Matrix3D& a, const Matrix3D& b);
 
   /**
-   * Concatenates the given matrix with this matrix, and stores the result in this matrix. M' = m * M.
+   * Concatenates the given matrix with this matrix, and stores the result in this matrix. M' = M * m.
    */
   void preConcat(const Matrix3D& m);
 
   /**
-   * Pre-concatenates a scale to this matrix. M' = S * M.
+   * Pre-concatenates a scale to this matrix. M' = M * S.
    */
   void preScale(float sx, float sy, float sz);
 
   /**
-   * Post-concatenates a scale to this matrix. M' = M * S.
+   * Post-concatenates a scale to this matrix. M' = S * M.
    */
   void postScale(float sx, float sy, float sz);
 
@@ -312,6 +332,8 @@ class Matrix3D {
   void setRotateUnit(const Vec3& axis, float degrees);
 
   void setRotateUnitSinCos(const Vec3& axis, float sinV, float cosV);
+
+  void setSkew(float kxy, float kxz, float kyx, float kyz, float kzx, float kzy);
 
   bool hasPerspective() const {
     return (values[3] != 0 || values[7] != 0 || values[11] != 0 || values[15] != 1);

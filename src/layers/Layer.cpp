@@ -20,6 +20,7 @@
 #include <atomic>
 #include "contents/LayerContent.h"
 #include "contents/RasterizedContent.h"
+#include "core/filters/Transform3DImageFilter.h"
 #include "core/images/PictureImage.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
@@ -28,6 +29,7 @@
 #include "layers/OpaqueThreshold.h"
 #include "layers/RegionTransformer.h"
 #include "layers/RootLayer.h"
+#include "layers/filters/Transform3DFilter.h"
 #include "tgfx/core/Recorder.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/layers/ShapeLayer.h"
@@ -801,7 +803,7 @@ LayerContent* Layer::getContent() {
 }
 
 std::shared_ptr<ImageFilter> Layer::getImageFilter(float contentScale) {
-  if (_filters.empty()) {
+  if (_filters.empty() && _matrix3DIsAffine) {
     return nullptr;
   }
   std::vector<std::shared_ptr<ImageFilter>> filters;
@@ -809,6 +811,10 @@ std::shared_ptr<ImageFilter> Layer::getImageFilter(float contentScale) {
     if (auto filter = layerFilter->getImageFilter(contentScale)) {
       filters.push_back(filter);
     }
+  }
+  if (!_matrix3DIsAffine) {
+    auto transform3DFilter = Transform3DFilter::Make(_matrix3D);
+    filters.push_back(transform3DFilter->getImageFilter(contentScale));
   }
   return ImageFilter::Compose(filters);
 }
@@ -901,7 +907,7 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
     }
   } else if (blendMode != BlendMode::SrcOver || (alpha < 1.0f && bitFields.allowsGroupOpacity) ||
              bitFields.shouldRasterize || (!_filters.empty() && !args.excludeEffects) ||
-             hasValidMask()) {
+             hasValidMask() || !_matrix3DIsAffine) {
     drawOffscreen(args, canvas, alpha, blendMode);
   } else {
     // draw directly
@@ -1333,6 +1339,10 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     // The filter and style should calculate bounds based on the original size. The externally
     // provided Transformer already contains matrix data, which will be applied to the computed size
     // at the end, including scaling, rotation, and other transformations.
+    if (_matrix3DIsAffine) {
+      transformer = RegionTransformer::MakeFromFilters({Transform3DFilter::Make(_matrix3D)}, 1.0f,
+                                                       std::move(transformer));
+    }
     transformer = RegionTransformer::MakeFromFilters(_filters, 1.0f, std::move(transformer));
     transformer = RegionTransformer::MakeFromStyles(_layerStyles, 1.0f, std::move(transformer));
   }

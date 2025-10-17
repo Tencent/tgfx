@@ -18,7 +18,6 @@
 
 #include <math.h>
 #include <tgfx/layers/ImageLayer.h>
-#include <tgfx/layers/filters/Transform3DFilter.h>
 #include <vector>
 #include "core/filters/ComposeImageFilter.h"
 #include "core/filters/GaussianBlurImageFilter.h"
@@ -666,78 +665,7 @@ TGFX_TEST(LayerTest, FilterTest) {
   auto filter = DropShadowFilter::Make(-80, -80, 0, 0, Color::Black());
   auto filter2 = DropShadowFilter::Make(-40, -40, 0, 0, Color::Green());
   auto filter3 = BlurFilter::Make(10, 10);
-
   auto image = MakeImage("resources/apitest/rotation.jpg");
-  auto imageSize =
-      Size::Make(static_cast<float>(image->width()), static_cast<float>(image->height()));
-
-  // In scenarios with multiple filters stacked, the 3D image filter applies its transformation
-  // matrix using the center of the entire image as the anchor point. This image is the result after
-  // all preceding filters have been applied. The anchor set by the user is normalized based on the
-  // original image size. Here, the translation matrix is calculated from the user-specified anchor
-  // to the default anchor.
-  auto anchor = Point::Make(0.f, 0.f);
-  auto rawBounds = Rect::MakeWH(imageSize.width, imageSize.height);
-  auto filter4SrcBounds = filter3->filterBounds(rawBounds, 1.f);
-  filter4SrcBounds = filter->filterBounds(filter4SrcBounds, 1.f);
-  filter4SrcBounds = filter2->filterBounds(filter4SrcBounds, 1.f);
-
-  // The transformation center of the matrix is the center point of the layer, i.e., (0.5, 0.5)
-  auto offsetToAnchorMatrix =
-      Matrix3D::MakeTranslate(-anchor.x * imageSize.width + filter4SrcBounds.left,
-                              -anchor.y * imageSize.height + filter4SrcBounds.top, 0.f);
-
-  // 3D model transformations can be stacked based on 2D transformations, and the 2D transformation
-  // matrix is based on the origin (0,0)
-  auto matrix2D = Matrix::MakeTrans(-imageSize.width * anchor.x, -imageSize.height * anchor.y);
-  // The order of skewing and scaling does not affect the result
-  matrix2D.postScale(0.5f, 0.5f);
-  constexpr float skewXDegrees = 10.f;
-  constexpr float skewYDegrees = 10.f;
-  matrix2D.postSkew(tanf(DegreesToRadians(skewXDegrees)), tanf(DegreesToRadians(skewYDegrees)));
-  // Then, rotation and origin translation operations (layerOrigin) need to be applied sequentially
-  matrix2D.postRotate(-10.f);
-  auto origin = Point::Make(200, 200);
-  matrix2D.postTranslate(imageSize.width * anchor.x + origin.x,
-                         imageSize.height * anchor.y + origin.y);
-  // The default anchor point for 3D model transformation is the center of the layer itself, while
-  // the anchor point for the 2D transformation matrix is the canvas origin (0,0), so only the
-  // non-translation components are inherited, and the translation components are handled separately
-  auto nonTranslateMatrix2D = Matrix::MakeAll(matrix2D.getScaleX(), matrix2D.getSkewX(), 0,
-                                              matrix2D.getSkewY(), matrix2D.getScaleY(), 0);
-  auto modelMatrix = Matrix3D(nonTranslateMatrix2D);
-  // Rotate around the ZXY axes of the model coordinate system in sequence; the latest transformation
-  // in the model coordinate system needs to be placed at the far right of the matrix multiplication
-  // equation
-  modelMatrix.preRotate({1.f, 0.f, 0.f}, 5.f);
-  modelMatrix.preRotate({0.f, 1.f, 0.f}, 15.f);
-  // Use Z-axis translation to simulate model depth
-  modelMatrix.postTranslate(0.f, 0.f, -100.f);
-
-  // Set the 3D transformation matrix on the wrapper layer.
-  auto perspectiveMatrix = Matrix3D::I();
-  constexpr float eyeDistance = 1200.f;
-  constexpr float shift = 10.f;
-  const float nearZ = eyeDistance - shift;
-  // Choose an appropriate far plane to avoid clipping during rotation.
-  auto maxLength = static_cast<float>(std::max(image->width(), image->height())) * 2.f;
-  auto farZ = std::min(-maxLength, -500.f);
-  const float m22 = (2 - (farZ + nearZ) / eyeDistance) / (farZ - nearZ);
-  perspectiveMatrix.setRowColumn(2, 2, m22);
-  const float m23 = -1.f + nearZ / eyeDistance - perspectiveMatrix.getRowColumn(2, 2) * nearZ;
-  perspectiveMatrix.setRowColumn(2, 3, m23);
-  perspectiveMatrix.setRowColumn(3, 2, -1.f / eyeDistance);
-
-  auto invOffsetToAnchorMatrix =
-      Matrix3D::MakeTranslate(anchor.x * imageSize.width - filter4SrcBounds.left,
-                              anchor.y * imageSize.height - filter4SrcBounds.top, 0.f);
-
-  auto originTranslateMatrix = Matrix3D::MakeTranslate(origin.x, origin.y, 0.f);
-
-  auto transformMatrix = originTranslateMatrix * invOffsetToAnchorMatrix * perspectiveMatrix *
-                         modelMatrix * offsetToAnchorMatrix;
-  auto filter4 = Transform3DFilter::Make(transformMatrix);
-
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -745,11 +673,14 @@ TGFX_TEST(LayerTest, FilterTest) {
   auto displayList = std::make_unique<DisplayList>();
   auto layer = ImageLayer::Make();
   layer->setImage(image);
-  layer->setFilters({filter3, filter, filter2, filter4});
+  auto matrix = Matrix::MakeScale(0.5f);
+  matrix.postTranslate(200, 200);
+  layer->setMatrix(matrix);
+  layer->setFilters({filter3, filter, filter2});
   displayList->root()->addChild(layer);
   displayList->render(surface.get());
   auto bounds = displayList->root()->getBounds();
-  EXPECT_EQ(Rect::MakeLTRB(112.f, 136.f, 1729.f, 2736.f), bounds);
+  EXPECT_EQ(Rect::MakeLTRB(130.f, 130.f, 1722.f, 2226.f), bounds);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/filterTest"));
 }
 
@@ -3267,6 +3198,69 @@ TGFX_TEST(LayerTest, DiffFilterModeImagePattern) {
   displayList.setZoomScale(1.5f);
   displayList.render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DiffFilterModeImagePattern -- zoomIn"));
+}
+
+TGFX_TEST(LayerTest, Matrix3D) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  auto canvas = surface->getCanvas();
+  canvas->clear();
+
+  auto shadowFilter = DropShadowFilter::Make(-20, -20, 0, 0, Color::Green());
+  auto image = MakeImage("resources/apitest/imageReplacement.jpg");
+  auto imageSize =
+      Size::Make(static_cast<float>(image->width()), static_cast<float>(image->height()));
+  auto anchor = Point::Make(0.25f, 0.5f);
+  auto rawBounds = Rect::MakeWH(imageSize.width, imageSize.height);
+  auto filteredBounds = shadowFilter->filterBounds(rawBounds, 1.f);
+  // When a layer has filters, the 3D transformation uses the top-left origin of the filtered image
+  // as the anchor point, while the user-specified anchor point is normalized based on the layer's
+  // width and height, with (0,0) at the top-left corner of the layer.
+  auto offsetToAnchorMatrix =
+      Matrix3D::MakeTranslate(filteredBounds.left - anchor.x * imageSize.width,
+                              filteredBounds.top - anchor.y * imageSize.height, 0.f);
+  auto invOffsetToAnchorMatrix =
+      Matrix3D::MakeTranslate(anchor.x * imageSize.width - filteredBounds.left,
+                              anchor.y * imageSize.height - filteredBounds.top, 0.f);
+  // During continuous model transformations, if transforming based on the world coordinate system
+  // requires appending matrix elements on the left side of matrix multiplication, while transforming
+  // based on the model coordinate system appends on the right side
+  auto modelMatrix = Matrix3D::MakeScale(1.2f, 1.2f, 1.f);
+  constexpr float skewXDegrees = -15.f;
+  constexpr float skewYDegrees = -15.f;
+  modelMatrix.postSkewXY(tanf(DegreesToRadians(skewXDegrees)),
+                         tanf(DegreesToRadians(skewYDegrees)));
+  modelMatrix.postRotate({0.f, 0.f, 1.f}, 45.f);
+  modelMatrix.preRotate({1.f, 0.f, 0.f}, 45.f);
+  modelMatrix.preRotate({0.f, 1.f, 0.f}, 15.f);
+  modelMatrix.postTranslate(0.f, 0.f, -50.f);
+  auto perspectiveMatrix = Matrix3D::I();
+  constexpr float eyeDistance = 1200.f;
+  constexpr float shift = 10.f;
+  const float nearZ = eyeDistance - shift;
+  // Choose an appropriate far plane to avoid clipping during rotation.
+  auto maxLength = static_cast<float>(std::max(image->width(), image->height())) * 2.f;
+  auto farZ = std::min(-maxLength, -500.f);
+  const float m22 = (2 - (farZ + nearZ) / eyeDistance) / (farZ - nearZ);
+  perspectiveMatrix.setRowColumn(2, 2, m22);
+  const float m23 = -1.f + nearZ / eyeDistance - perspectiveMatrix.getRowColumn(2, 2) * nearZ;
+  perspectiveMatrix.setRowColumn(2, 3, m23);
+  perspectiveMatrix.setRowColumn(3, 2, -1.f / eyeDistance);
+  auto origin = Point::Make(50, 50);
+  auto originTranslateMatrix = Matrix3D::MakeTranslate(origin.x, origin.y, 0.f);
+  auto transformMatrix = originTranslateMatrix * invOffsetToAnchorMatrix * perspectiveMatrix *
+                         modelMatrix * offsetToAnchorMatrix;
+
+  auto displayList = std::make_unique<DisplayList>();
+  auto layer = ImageLayer::Make();
+  layer->setImage(image);
+  layer->setFilters({shadowFilter});
+  layer->setMatrix3D(transformMatrix);
+  displayList->root()->addChild(layer);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix3D"));
 }
 
 }  // namespace tgfx
