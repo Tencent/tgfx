@@ -175,5 +175,12 @@ struct Point {
   static float Distance(const Point& a, const Point& b) {
     return Length(a.x - b.x, a.y - b.y);
   }
+
+  /**
+   * Returns the dot product of a and b.
+   */
+  static float DotProduct(const Point& a, const Point& b) {
+    return (a.x * b.x) + (a.y * b.y);
+  }
 };
 }  // namespace tgfx
