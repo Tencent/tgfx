@@ -117,7 +117,7 @@ class GlobalCache {
     size_t cursor = 0;
   };
 
-  std::shared_ptr<GPUBufferProxy> getMiterStrokeIndexBuffer(bool antialias);
+  std::shared_ptr<GPUBufferProxy> getMiterOrRoundStrokeIndexBuffer(bool antialias);
   std::shared_ptr<GPUBufferProxy> getBevelStrokeIndexBuffer(bool antialias);
 
   Context* context = nullptr;

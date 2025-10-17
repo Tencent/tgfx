@@ -206,30 +206,9 @@ void Canvas::drawLine(float x0, float y0, float x1, float y1, const Paint& paint
   drawPath(path, realPaint);
 }
 
-static bool UseDrawPath(const Stroke* stroke, const Rect& rect, const Matrix& viewMatrix) {
-  if (!stroke) {
-    return false;
-  }
-  if (!viewMatrix.rectStaysRect()) {
-    return true;
-  }
-
-  if (stroke->join == LineJoin::Round) {
-    return true;
-  }
-
-  float scaledStroke = std::fabs(stroke->width * (viewMatrix.getScaleX() + viewMatrix.getSkewY()));
-  // strokewidth is greater than  the smallest side
-  if (scaledStroke > std::min(rect.width(), rect.height())) {
-    return true;
-  }
-
-  return false;
-}
-
 void Canvas::drawRect(const Rect& rect, const Paint& paint) {
   auto stroke = paint.getStroke();
-  if (UseDrawPath(stroke, rect, mcState->matrix)) {
+  if (stroke && !mcState->matrix.rectStaysRect()) {
     Path path = {};
     path.addRect(rect);
     drawPath(path, paint);

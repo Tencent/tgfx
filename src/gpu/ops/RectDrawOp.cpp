@@ -21,6 +21,7 @@
 #include "gpu/ProxyProvider.h"
 #include "gpu/Quad.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
+#include "gpu/processors/RectRoundStrokeGeometryProcessor.h"
 #include "inspect/InspectorMark.h"
 #include "tgfx/core/RenderFlags.h"
 
@@ -74,7 +75,11 @@ PlacementPtr<GeometryProcessor> RectDrawOp::onMakeGeometryProcessor(RenderTarget
   ATTRIBUTE_NAME("commonColor", commonColor);
   ATTRIBUTE_NAME("uvMatrix", uvMatrix);
   ATTRIBUTE_NAME("hasSubset", hasSubset);
+  ATTRIBUTE_NAME("hasStroke", hasStroke);
   auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
+  if (hasStroke && strokeLineJoin == LineJoin::Round) {
+    return RectRoundStrokeGeometryProcessor::Make(drawingBuffer, aaType, commonColor, uvMatrix);
+  }
   return QuadPerEdgeAAGeometryProcessor::Make(drawingBuffer, renderTarget->width(),
                                               renderTarget->height(), aaType, commonColor, uvMatrix,
                                               hasSubset);
@@ -85,14 +90,17 @@ static uint16_t GetNumIndicesPerQuad(AAType aaType, bool hasStroke, LineJoin lin
     return aaType == AAType::Coverage ? RectDrawOp::IndicesPerAAQuad
                                       : RectDrawOp::IndicesPerNonAAQuad;
   }
-
-  if (aaType == AAType::Coverage) {
-    return lineJoin == LineJoin::Miter ? RectDrawOp::IndicesPerAAMiterStrokeRect
-                                       : RectDrawOp::IndicesPerAABevelStrokeRect;
+  switch (lineJoin) {
+    case LineJoin::Miter:
+    case LineJoin::Round:
+      return aaType == AAType::Coverage ? RectDrawOp::IndicesPerAAMiterStrokeRect
+                                        : RectDrawOp::IndicesPerNonAAMiterStrokeRect;
+    case LineJoin::Bevel:
+      return aaType == AAType::Coverage ? RectDrawOp::IndicesPerAABevelStrokeRect
+                                        : RectDrawOp::IndicesPerNonAABevelStrokeRect;
+    default:
+      return 0;
   }
-
-  return lineJoin == LineJoin::Miter ? RectDrawOp::IndicesPerNonAAMiterStrokeRect
-                                     : RectDrawOp::IndicesPerNonAABevelStrokeRect;
 }
 
 void RectDrawOp::onDraw(RenderPass* renderPass) {

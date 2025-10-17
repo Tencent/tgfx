@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RectsVertexProvider.h"
+#include <optional>
 #include "gpu/Quad.h"
 #include "tgfx/core/Stroke.h"
 
@@ -175,6 +176,11 @@ class NonAARectsVertexProvider : public RectsVertexProvider {
   }
 };
 
+struct RoundJoinParams {
+  Rect innerRect = {};
+  float cornerRadius = 1.0f;
+};
+
 // AAStrokeRectVertexProvider currently only supports Miter and Bevel joins.
 class AAStrokeRectsVertexProvider final : public RectsVertexProvider {
   PlacementArray<Stroke> strokes = {};
@@ -186,19 +192,24 @@ class AAStrokeRectsVertexProvider final : public RectsVertexProvider {
       : RectsVertexProvider(std::move(rects), std::move(uvRects), aaType, hasUVCoord, hasColor,
                             UVSubsetMode::None, std::move(reference)),
         strokes(std::move(strokes)) {
-    if (!this->strokes.empty()) {
-      bitFields.hasStroke = true;
-      bitFields.lineJoin = static_cast<uint8_t>(this->strokes.front()->join);
-    } else {
-      bitFields.hasStroke = false;
-    }
+    bitFields.hasStroke = true;
+    bitFields.lineJoin = static_cast<uint8_t>(this->strokes.front()->join);
   }
 
   void writeQuad(float* vertices, size_t& index, const Quad& quad, const Color& color,
-                 float coverage) const {
+                 float coverage,
+                 const std::optional<RoundJoinParams>& roundParams = std::nullopt) const {
     for (size_t i = 0; i < 4; ++i) {
       vertices[index++] = quad.point(i).x;
       vertices[index++] = quad.point(i).y;
+      if (roundParams.has_value()) {
+        // For round-join, we need to pass the inner round rect and corner radius.
+        vertices[index++] = roundParams->innerRect.left;
+        vertices[index++] = roundParams->innerRect.top;
+        vertices[index++] = roundParams->innerRect.right;
+        vertices[index++] = roundParams->innerRect.bottom;
+        vertices[index++] = roundParams->cornerRadius;
+      }
       vertices[index++] = coverage;
       if (bitFields.hasUVCoord) {
         vertices[index++] = quad.point(i).x;
@@ -213,6 +224,9 @@ class AAStrokeRectsVertexProvider final : public RectsVertexProvider {
   size_t vertexCount() const override {
     size_t perVertexCount = (4 + (lineJoin() == LineJoin::Miter ? 4 : 8)) * 2;  // inner + outer
     size_t perVertexDataSize = 3;                                               // x, y, coverage
+    if (lineJoin() == LineJoin::Round) {
+      perVertexDataSize += 5;  // baseRoundRect + minHalfStroke
+    }
     if (bitFields.hasUVCoord) {
       perVertexDataSize += 2;
     }
@@ -224,6 +238,8 @@ class AAStrokeRectsVertexProvider final : public RectsVertexProvider {
 
   void getVertices(float* vertices) const override {
     size_t index = 0;
+    const auto isBevelJoin = lineJoin() == LineJoin::Bevel;
+    std::optional<RoundJoinParams> roundParams = std::nullopt;
     for (size_t i = 0; i < rects.size(); ++i) {
       const auto& stroke = strokes[i];
       const auto& record = rects[i];
@@ -242,6 +258,9 @@ class AAStrokeRectsVertexProvider final : public RectsVertexProvider {
       const float rx = dx * 0.5f;
       const float ry = dy * 0.5f;
       auto rect = viewMatrix.mapRect(record->rect);  // to device space
+      if (lineJoin() == LineJoin::Round) {
+        roundParams = RoundJoinParams{rect, std::min(rx, ry)};
+      }
       auto outSide = rect.makeOutset(rx, ry);
       auto outSideAssist = rect;
       auto inSide = rect.makeInset(rx, ry);
@@ -258,7 +277,6 @@ class AAStrokeRectsVertexProvider final : public RectsVertexProvider {
       // For bevel-stroke, use 2 Rect instances(outside and outsideAssist)
       // to draw the outside of the octagon. Because there are 8 vertices on the outer
       // edge, while vertex number of inner edge is 4, the same as miter-stroke.
-      const auto isBevelJoin = lineJoin() == LineJoin::Bevel;
       if (isBevelJoin) {
         outSide.inset(0, ry);
         outSideAssist.outset(0, ry);
@@ -282,13 +300,13 @@ class AAStrokeRectsVertexProvider final : public RectsVertexProvider {
       const float interiorCoverage = outerCoverage;
 
       writeQuad(vertices, index, Quad::MakeFrom(outSide.makeInset(-outset, -outset)), record->color,
-                outerCoverage);
+                outerCoverage, roundParams);
       if (isBevelJoin) {
         writeQuad(vertices, index, Quad::MakeFrom(outSideAssist.makeInset(-outset, -outset)),
                   record->color, outerCoverage);
       }
       writeQuad(vertices, index, Quad::MakeFrom(outSide.makeInset(inset, inset)), record->color,
-                innerCoverage);
+                innerCoverage, roundParams);
       if (isBevelJoin) {
         writeQuad(vertices, index, Quad::MakeFrom(outSideAssist.makeInset(inset, inset)),
                   record->color, innerCoverage);
@@ -296,7 +314,7 @@ class AAStrokeRectsVertexProvider final : public RectsVertexProvider {
       if (!isDegenerate) {
         // Interior inset rect (toward stroke).
         writeQuad(vertices, index, Quad::MakeFrom(inSide.makeInset(-inset, -inset)), record->color,
-                  innerCoverage);
+                  innerCoverage, roundParams);
         // Interior outset rect (away from stroke, toward center of rect).
         Rect interiorAABoundary = inSide.makeInset(interiorOutset, interiorOutset);
         float coverageBackset = 0;  // Adds back coverage when the interior AA edges cross.
@@ -318,11 +336,13 @@ class AAStrokeRectsVertexProvider final : public RectsVertexProvider {
           innerCoverage += innerCoverage * (1 - coverageBackset) + innerCoverage * coverageBackset;
         }
         writeQuad(vertices, index, Quad::MakeFrom(interiorAABoundary), record->color,
-                  interiorCoverage);
+                  interiorCoverage, roundParams);
       } else {
         // When the interior rect has become degenerate we smoosh to a single point
-        writeQuad(vertices, index, Quad::MakeFrom(inSide), record->color, innerCoverage);
-        writeQuad(vertices, index, Quad::MakeFrom(inSide), record->color, innerCoverage);
+        writeQuad(vertices, index, Quad::MakeFrom(inSide), record->color, innerCoverage,
+                  roundParams);
+        writeQuad(vertices, index, Quad::MakeFrom(inSide), record->color, innerCoverage,
+                  roundParams);
       }
     }
   }
@@ -338,18 +358,23 @@ class NonAAStrokeRectsVertexProvider final : public RectsVertexProvider {
       : RectsVertexProvider(std::move(rects), std::move(uvRects), aaType, hasUVCoord, hasColor,
                             UVSubsetMode::None, std::move(reference)),
         strokes(std::move(strokes)) {
-    if (!this->strokes.empty()) {
-      bitFields.hasStroke = true;
-      bitFields.lineJoin = static_cast<uint8_t>(this->strokes.front()->join);
-    } else {
-      bitFields.hasStroke = false;
-    }
+    bitFields.hasStroke = true;
+    bitFields.lineJoin = static_cast<uint8_t>(this->strokes.front()->join);
   }
 
-  void writeQuad(float* vertices, size_t& index, const Quad& quad, const Color& color) const {
+  void writeQuad(float* vertices, size_t& index, const Quad& quad, const Color& color,
+                 const std::optional<RoundJoinParams>& roundParams = std::nullopt) const {
     for (size_t i = 0; i < 4; ++i) {
       vertices[index++] = quad.point(i).x;
       vertices[index++] = quad.point(i).y;
+      if (roundParams.has_value()) {
+        // For round-join, we need to pass the inner round rect cornerRadius.
+        vertices[index++] = roundParams->innerRect.left;
+        vertices[index++] = roundParams->innerRect.top;
+        vertices[index++] = roundParams->innerRect.right;
+        vertices[index++] = roundParams->innerRect.bottom;
+        vertices[index++] = roundParams->cornerRadius;
+      }
       if (bitFields.hasUVCoord) {
         vertices[index++] = quad.point(i).x;
         vertices[index++] = quad.point(i).y;
@@ -363,6 +388,9 @@ class NonAAStrokeRectsVertexProvider final : public RectsVertexProvider {
   size_t vertexCount() const override {
     size_t perVertexCount = (4 + (lineJoin() == LineJoin::Miter ? 4 : 8));  // outer edge only
     size_t perVertexDataSize = 2;                                           // x, y
+    if (lineJoin() == LineJoin::Round) {
+      perVertexDataSize += 5;  // baseRoundRect + minHalfStroke
+    }
     if (bitFields.hasUVCoord) {
       perVertexDataSize += 2;
     }
@@ -374,6 +402,7 @@ class NonAAStrokeRectsVertexProvider final : public RectsVertexProvider {
 
   void getVertices(float* vertices) const override {
     size_t index = 0;
+    std::optional<RoundJoinParams> roundParams = std::nullopt;
     for (size_t i = 0; i < rects.size(); ++i) {
       const auto& stroke = strokes[i];
       const auto& record = rects[i];
@@ -395,8 +424,9 @@ class NonAAStrokeRectsVertexProvider final : public RectsVertexProvider {
       auto outSide = rect.makeOutset(rx, ry);
       auto outSideAssist = rect;
       auto inSide = rect.makeInset(rx, ry);
-      const auto isBevelJoin = lineJoin() == LineJoin::Bevel;
-
+      if (lineJoin() == LineJoin::Round) {
+        roundParams = RoundJoinParams{rect, std::min(rx, ry)};
+      }
       // If we have a degenerate stroking rect(ie the stroke is larger than inner rect) then we
       // make a degenerate inside rect to avoid double hitting.  We will also jam all the points
       // together when we render these rects.
@@ -408,16 +438,16 @@ class NonAAStrokeRectsVertexProvider final : public RectsVertexProvider {
       // For bevel-stroke, use 2 Rect instances(outside and outsideAssist)
       // to draw the outside of the octagon. Because there are 8 vertices on the outer
       // edge, while vertex number of inner edge is 4, the same as miter-stroke.
-      if (isBevelJoin) {
+      if (lineJoin() == LineJoin::Bevel) {
         outSide.inset(0, ry);
         outSideAssist.outset(0, ry);
       }
 
-      writeQuad(vertices, index, Quad::MakeFrom(outSide), record->color);
-      if (isBevelJoin) {
+      writeQuad(vertices, index, Quad::MakeFrom(outSide), record->color, roundParams);
+      if (lineJoin() == LineJoin::Bevel) {
         writeQuad(vertices, index, Quad::MakeFrom(outSideAssist), record->color);
       }
-      writeQuad(vertices, index, Quad::MakeFrom(inSide), record->color);
+      writeQuad(vertices, index, Quad::MakeFrom(inSide), record->color, roundParams);
     }
   }
 };
