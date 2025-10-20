@@ -362,7 +362,7 @@ void Canvas::drawPath(const Path& path, const MCState& state, const Fill& fill,
       return;
     }
     if (StrokeLineIsRect(*stroke, line, &rect)) {
-      drawContext->drawRect(rect, state, fill, stroke);
+      drawContext->drawRect(rect, state, fill, nullptr);
       return;
     }
   }

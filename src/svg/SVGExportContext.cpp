@@ -76,10 +76,11 @@ SVGExportContext::SVGExportContext(Context* context, const Rect& viewBox,
 }
 
 void SVGExportContext::drawFill(const Fill& fill) {
-  drawRect(viewBox, {}, fill);
+  drawRect(viewBox, {}, fill, nullptr);
 }
 
-void SVGExportContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill) {
+void SVGExportContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill,
+                                const Stroke*) {
 
   std::unique_ptr<ElementWriter> svg;
   if (RequiresViewportReset(fill)) {
