@@ -120,9 +120,9 @@ EGLHardwareTexture::~EGLHardwareTexture() {
 }
 
 void EGLHardwareTexture::onReleaseTexture(GLGPU* gpu) {
+  GLTexture::onReleaseTexture(gpu);
   auto display = static_cast<EGLGPU*>(gpu)->getDisplay();
   eglext::eglDestroyImageKHR(display, eglImage);
-  GLTexture::onRelease(gpu);
 }
 }  // namespace tgfx
 
