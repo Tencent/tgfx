@@ -231,13 +231,10 @@ bool GLRenderPipeline::setPipelineDescriptor(GLGPU* gpu,
   ClearGLError(gl);
   auto state = gpu->state();
   state->useProgram(programID);
-  auto caps = static_cast<const GLCaps*>(gpu->caps());
-  if (caps->vertexArrayObjectSupport) {
-    gl->genVertexArrays(1, &vertexArray);
-    if (vertexArray == 0) {
-      LOGE("GLRenderPipeline::createVertexArrays: failed to create VAO!");
-      return false;
-    }
+  gl->genVertexArrays(1, &vertexArray);
+  if (vertexArray == 0) {
+    LOGE("GLRenderPipeline::createVertexArrays: failed to create VAO!");
+    return false;
   }
 
   DEBUG_ASSERT(!descriptor.vertex.attributes.empty());
