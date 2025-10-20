@@ -3200,7 +3200,7 @@ TGFX_TEST(LayerTest, DiffFilterModeImagePattern) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DiffFilterModeImagePattern -- zoomIn"));
 }
 
-TGFX_TEST(LayerTest, Matrix3D) {
+TGFX_TEST(LayerTest, Matrix) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
@@ -3254,13 +3254,23 @@ TGFX_TEST(LayerTest, Matrix3D) {
                          modelMatrix * offsetToAnchorMatrix;
 
   auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Tiled);
   auto layer = ImageLayer::Make();
   layer->setImage(image);
   layer->setFilters({shadowFilter});
   layer->setMatrix3D(transformMatrix);
   displayList->root()->addChild(layer);
   displayList->render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix3D"));
+  __unused auto tem = layer->getBounds();
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D"));
+  auto affineMatrix = Matrix::MakeTrans(50, 50);
+  layer->setMatrix(affineMatrix);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D_2D"));
+  layer->setMatrix3D(transformMatrix);
+  EXPECT_TRUE(layer->matrix().isIdentity());
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D_2D_3D"));
 }
 
 }  // namespace tgfx

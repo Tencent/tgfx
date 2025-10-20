@@ -181,7 +181,7 @@ void Layer::setMatrix(const Matrix& value) {
 
 static bool IsMatrix3DAffine(const Matrix3D& matrix) {
   return FloatNearlyZero(matrix.getRowColumn(0, 2)) && FloatNearlyZero(matrix.getRowColumn(1, 2)) &&
-         matrix.getRow(2) == Vec4(0, 0, 0, 0) && matrix.getRow(3) == Vec4(0, 0, 0, 1);
+         matrix.getRow(2) == Vec4(0, 0, 1, 0) && matrix.getRow(3) == Vec4(0, 0, 0, 1);
 }
 
 void Layer::setMatrix3D(const Matrix3D& value) {
@@ -194,9 +194,11 @@ void Layer::setMatrix3D(const Matrix3D& value) {
     _affineMatrix.setAll(value.getRowColumn(0, 0), value.getRowColumn(0, 1),
                          value.getRowColumn(0, 3), value.getRowColumn(1, 0),
                          value.getRowColumn(1, 1), value.getRowColumn(1, 3));
+    _matrix3DIsAffine = true;
   } else {
     // Otherwise, _affineMatrix is invalid and must be set to identity matrix
     _affineMatrix.setIdentity();
+    _matrix3DIsAffine = false;
   }
   invalidateTransform();
 }
@@ -515,6 +517,9 @@ Rect Layer::getBoundsInternal(const Matrix& coordinateMatrix, bool computeTightB
     }
     for (auto& filter : _filters) {
       bounds = filter->filterBounds(bounds, contentScale);
+    }
+    if (!_matrix3DIsAffine) {
+      bounds = Transform3DFilter::Make(_matrix3D)->filterBounds(bounds, contentScale);
     }
   }
   return bounds;
@@ -1332,6 +1337,9 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
   maxBackgroundOutset = 0;
   minBackgroundOutset = std::numeric_limits<float>::max();
   auto contentScale = 1.0f;
+  // Ensure the 3D filter is not released during the entire function lifetime, otherwise the
+  // transformer will have abnormal render bounds calculation
+  auto filter3DVector = std::vector<std::shared_ptr<LayerFilter>>{};
   if (!_layerStyles.empty() || !_filters.empty()) {
     if (transformer) {
       contentScale = transformer->getMaxScale();
@@ -1339,8 +1347,9 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     // The filter and style should calculate bounds based on the original size. The externally
     // provided Transformer already contains matrix data, which will be applied to the computed size
     // at the end, including scaling, rotation, and other transformations.
-    if (_matrix3DIsAffine) {
-      transformer = RegionTransformer::MakeFromFilters({Transform3DFilter::Make(_matrix3D)}, 1.0f,
+    if (!_matrix3DIsAffine) {
+      filter3DVector.push_back(Transform3DFilter::Make(_matrix3D));
+      transformer = RegionTransformer::MakeFromFilters(filter3DVector, 1.0f,
                                                        std::move(transformer));
     }
     transformer = RegionTransformer::MakeFromFilters(_filters, 1.0f, std::move(transformer));

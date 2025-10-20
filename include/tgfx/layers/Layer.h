@@ -663,7 +663,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
   Matrix _affineMatrix = {};
   // The actual transformation matrix that determines the geometric position of the layer
   Matrix3D _matrix3D = {};
-  // Whether the matrix is equivalent to a 2D affine matrix
+  // Whether the matrix3D is equivalent to a 2D affine matrix
   bool _matrix3DIsAffine = true;
   std::shared_ptr<Layer> _mask = nullptr;
   Layer* maskOwner = nullptr;
