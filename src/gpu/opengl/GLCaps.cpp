@@ -92,46 +92,17 @@ GLInfo::GLInfo(GLGetString* getString, GLGetStringi* getStringi, GLGetIntegerv* 
   fetchExtensions();
 }
 
-static void eatSpaceSepStrings(std::vector<std::string>* out, const char text[]) {
-  if (!text) {
-    return;
-  }
-  while (true) {
-    while (' ' == *text) {
-      ++text;
-    }
-    if ('\0' == *text) {
-      break;
-    }
-    size_t length = strcspn(text, " ");
-    out->emplace_back(text, length);
-    text += length;
-  }
-}
-
 void GLInfo::fetchExtensions() {
-  bool indexed = false;
-  if (standard == GLStandard::GL || standard == GLStandard::GLES) {
-    // glGetStringi and indexed extensions were added in version 3.0 of desktop GL and ES.
-    indexed = version >= GL_VER(3, 0);
-  } else if (standard == GLStandard::WebGL) {
-    // WebGL (1.0 or 2.0) doesn't natively support glGetStringi, but emscripten adds it in
-    // https://github.com/emscripten-core/emscripten/issues/3472
-    indexed = version >= GL_VER(2, 0);
-  }
-  if (indexed) {
-    if (getStringi) {
-      int extensionCount = 0;
-      getIntegerv(GL_NUM_EXTENSIONS, &extensionCount);
-      for (int i = 0; i < extensionCount; ++i) {
-        const char* ext =
-            reinterpret_cast<const char*>(getStringi(GL_EXTENSIONS, static_cast<unsigned>(i)));
-        extensions.emplace_back(ext);
-      }
+  // WebGL (1.0 or 2.0) doesn't natively support glGetStringi, but emscripten adds it in
+  // https://github.com/emscripten-core/emscripten/issues/3472
+  if (getStringi) {
+    int extensionCount = 0;
+    getIntegerv(GL_NUM_EXTENSIONS, &extensionCount);
+    for (int i = 0; i < extensionCount; ++i) {
+      const char* ext =
+          reinterpret_cast<const char*>(getStringi(GL_EXTENSIONS, static_cast<unsigned>(i)));
+      extensions.emplace_back(ext);
     }
-  } else {
-    auto text = reinterpret_cast<const char*>(getString(GL_EXTENSIONS));
-    eatSpaceSepStrings(&extensions, text);
   }
 }
 
@@ -235,7 +206,7 @@ void GLCaps::initGLSupport(const GLInfo& info) {
   _shaderCaps.versionDeclString = "#version 140";
   _shaderCaps.usesPrecisionModifiers = false;
   if (info.hasExtension("GL_EXT_shader_framebuffer_fetch")) {
-    _shaderCaps.frameBufferFetchNeedsCustomOutput = version >= GL_VER(3, 0);
+    _shaderCaps.frameBufferFetchNeedsCustomOutput = true;
     _shaderCaps.frameBufferFetchSupport = true;
     _shaderCaps.frameBufferFetchColorName = "gl_LastFragData[0]";
     _shaderCaps.frameBufferFetchExtensionString = "GL_EXT_shader_framebuffer_fetch";
@@ -251,9 +222,9 @@ void GLCaps::initGLESSupport(const GLInfo& info) {
                          info.hasExtension("GL_EXT_texture_border_clamp") ||
                          info.hasExtension("GL_NV_texture_border_clamp") ||
                          info.hasExtension("GL_OES_texture_border_clamp");
-  _shaderCaps.versionDeclString = version >= GL_VER(3, 0) ? "#version 300 es" : "#version 100";
+  _shaderCaps.versionDeclString = "#version 300 es";
   if (info.hasExtension("GL_EXT_shader_framebuffer_fetch")) {
-    _shaderCaps.frameBufferFetchNeedsCustomOutput = version >= GL_VER(3, 0);
+    _shaderCaps.frameBufferFetchNeedsCustomOutput = true;
     _shaderCaps.frameBufferFetchSupport = true;
     _shaderCaps.frameBufferFetchColorName = "gl_LastFragData[0]";
     _shaderCaps.frameBufferFetchExtensionString = "GL_EXT_shader_framebuffer_fetch";
@@ -282,7 +253,7 @@ void GLCaps::initWebGLSupport(const GLInfo&) {
   multisampleDisableSupport = false;
   textureBarrierSupport = false;
   clampToBorderSupport = false;
-  _shaderCaps.versionDeclString = version >= GL_VER(2, 0) ? "#version 300 es" : "#version 100";
+  _shaderCaps.versionDeclString = "#version 300 es";
   _shaderCaps.frameBufferFetchSupport = false;
   _shaderCaps.usesPrecisionModifiers = true;
 }
@@ -322,15 +293,10 @@ void GLCaps::initFormatMap(const GLInfo& info) {
   RGFormat.format.externalType = GL_UNSIGNED_BYTE;
   RGFormat.readSwizzle = Swizzle::RGRG();
 
-  // ES 2.0 requires that the internal/external formats match.
-  bool useSizedTexFormats =
-      (standard == GLStandard::GL || (standard == GLStandard::GLES && version >= GL_VER(3, 0)) ||
-       (standard == GLStandard::WebGL && version >= GL_VER(2, 0)));
   bool useSizedRbFormats = standard == GLStandard::GLES || standard == GLStandard::WebGL;
-
   for (auto& item : pixelFormatMap) {
     auto& format = item.second.format;
-    format.internalFormatTexImage = useSizedTexFormats ? format.sizedFormat : format.externalFormat;
+    format.internalFormatTexImage = format.sizedFormat;
     format.internalFormatRenderBuffer =
         useSizedRbFormats ? format.sizedFormat : format.externalFormat;
   }
@@ -345,7 +311,7 @@ static bool UsesInternalformatQuery(GLStandard standard, const GLInfo& glInterfa
                                     uint32_t version) {
   return (standard == GLStandard::GL &&
           (version >= GL_VER(4, 2) || glInterface.hasExtension("GL_ARB_internalformat_query"))) ||
-         (standard == GLStandard::GLES && version >= GL_VER(3, 0));
+         standard == GLStandard::GLES;
 }
 
 void GLCaps::initColorSampleCount(const GLInfo& info) {
