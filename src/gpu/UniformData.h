@@ -74,25 +74,15 @@ class UniformData {
   template <typename T>
   std::enable_if_t<std::is_same_v<std::decay_t<T>, ColorMatrix33>, void> setData(
       const std::string& name, const T& matrix) const {
-    if (_uboSupport) {
-      // clang-format off
+
+    // clang-format off
       const float data[] = {
         matrix.values[0][0], matrix.values[1][0], matrix.values[2][0], 0,
         matrix.values[0][1], matrix.values[1][1], matrix.values[2][1], 0,
         matrix.values[0][2], matrix.values[1][2], matrix.values[2][2], 0,
       };
-      // clang-format on
-      onSetData(name, data, sizeof(data));
-    } else {
-      // clang-format off
-      const float data[] = {
-        matrix.values[0][0], matrix.values[1][0], matrix.values[2][0],
-        matrix.values[0][1], matrix.values[1][1], matrix.values[2][1],
-        matrix.values[0][2], matrix.values[1][2], matrix.values[2][2],
-      };
-      // clang-format on
-      onSetData(name, data, sizeof(data));
-    }
+    // clang-format on
+    onSetData(name, data, sizeof(data));
   }
 
   /**

@@ -513,7 +513,8 @@ TGFX_TEST(CanvasTest, TileModeFallback) {
                  textureFormat.externalType, pixels);
   bitmap.unlockPixels();
   BackendTexture backendTexture(glInfo, bitmap.width(), bitmap.height());
-  auto image = Image::MakeFrom(context, backendTexture, ImageOrigin::TopLeft, bitmap.gamutColorSpace());
+  auto image =
+      Image::MakeFrom(context, backendTexture, ImageOrigin::TopLeft, bitmap.gamutColorSpace());
   ASSERT_TRUE(image != nullptr);
   image = image->makeOriented(codec->orientation());
   ASSERT_TRUE(image != nullptr);
@@ -3137,7 +3138,6 @@ TGFX_TEST(CanvasTest, Matrix3DShapeStroke) {
 
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/Matrix3DShapeStroke"));
 }
-
 
 TGFX_TEST(CanvasTest, SurfaceColorSpace) {
   TransferFunction tf = NamedTransferFunction::TwoDotTwo;

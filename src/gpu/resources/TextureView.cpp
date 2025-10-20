@@ -78,7 +78,8 @@ std::shared_ptr<TextureView> TextureView::MakeFormat(Context* context, int width
   if (pixelFormat == PixelFormat::ALPHA_8) {
     colorSpace = nullptr;
   }
-  auto scratchKey = ComputeTextureScratchKey(width, height, pixelFormat, mipmapped);
+  auto scratchKey =
+      ComputeTextureScratchKey(width, height, pixelFormat, mipmapped, std::move(colorSpace));
   auto textureView = Resource::Find<TextureView>(context, scratchKey);
   if (textureView) {
     textureView->_origin = origin;
