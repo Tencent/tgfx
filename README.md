@@ -18,16 +18,16 @@ and various video-editing apps.
 
 ## Platform Support
 
-- iOS 9.0 or later
-- Android 4.4 or later
-- macOS 10.15 or later
-- Windows 7.0 or later
-- Chrome 69.0 or later (Web)
-- Safari 11.3 or later (Web)
+- iOS 9.0+
+- Android 4.4+
+- macOS 10.15+
+- Windows 7.0+
+- Chrome 69.0+ (Web)
+- Safari 11.3+ (Web)
 
 ## Rendering Backends
 
-- OpenGL 3.2+
+- OpenGL 3.2+ (Desktop)
 - OpenGL ES 3.0+
 - WebGL 2.0+
 - Metal 1.1+ (in progress)
