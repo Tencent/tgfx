@@ -20,8 +20,10 @@ and various video-editing apps.
 
 - iOS 9.0+
 - Android 4.4+
+- HarmonyOS 5.0+
 - macOS 10.15+
 - Windows 7.0+
+- Linux (No specific version requirement)
 - Chrome 69.0+ (Web)
 - Safari 11.3+ (Web)
 
