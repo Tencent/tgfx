@@ -142,13 +142,6 @@ class RenderTarget {
     return getRenderTexture()->getBackendRenderTarget();
   }
 
-  /**
-   * Copies a rect of pixels to dstPixels with the specified dstInfo. Copy starts at (srcX, srcY),
-   * and does not exceed (width(), height()). Pixels are copied only if pixel conversion is
-   * possible. Returns true if pixels are copied to dstPixels.
-   */
-  bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0, int srcY = 0) const;
-
   virtual void setGamutColorSpace(std::shared_ptr<ColorSpace> colorSpace) = 0;
 
   virtual std::shared_ptr<ColorSpace> gamutColorSpace() const = 0;

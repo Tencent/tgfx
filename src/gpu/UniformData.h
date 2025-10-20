@@ -61,25 +61,14 @@ class UniformData {
     float values[6] = {};
     matrix.get6(values);
 
-    if (_uboSupport) {
-      // clang-format off
-      const float data[] = {
-        values[0], values[3], 0, 0,
-        values[1], values[4], 0, 0,
-        values[2], values[5], 1, 0,
-      };
-      // clang-format on
-      onSetData(name, data, sizeof(data));
-    } else {
-      // clang-format off
-      const float data[] = {
-        values[0], values[3], 0,
-        values[1], values[4], 0,
-        values[2], values[5], 1
-      };
-      // clang-format on
-      onSetData(name, data, sizeof(data));
-    }
+    // clang-format off
+    const float data[] = {
+      values[0], values[3], 0, 0,
+      values[1], values[4], 0, 0,
+      values[2], values[5], 1, 0,
+    };
+    // clang-format on
+    onSetData(name, data, sizeof(data));
   }
 
   template <typename T>
@@ -127,13 +116,6 @@ class UniformData {
     return _uniforms;
   }
 
-  /**
-   * Returns true if UBO is supported in the current context.
-   */
-  bool uboSupport() const {
-    return _uboSupport;
-  }
-
  private:
   struct Field {
     std::string name = "";
@@ -154,9 +136,8 @@ class UniformData {
   std::string nameSuffix = "";
   std::unordered_map<std::string, Field> fieldMap = {};
   size_t cursor = 0;
-  bool _uboSupport = false;
 
-  explicit UniformData(std::vector<Uniform> uniforms, bool uboSupport = false);
+  explicit UniformData(std::vector<Uniform> uniforms);
 
   void onSetData(const std::string& name, const void* data, size_t size) const;
 

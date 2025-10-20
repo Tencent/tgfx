@@ -30,6 +30,7 @@
 #include "core/images/SubsetImage.h"
 #include "core/shapes/TextShape.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/PixelFormatUtil.h"
 #include "core/utils/StrokeUtils.h"
 #include "gpu/DrawingManager.h"
 

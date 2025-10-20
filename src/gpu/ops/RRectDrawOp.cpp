@@ -44,7 +44,7 @@ PlacementPtr<RRectDrawOp> RRectDrawOp::Make(Context* context,
 }
 
 RRectDrawOp::RRectDrawOp(RRectsVertexProvider* provider)
-    : DrawOp(provider->aaType()), rectCount(provider->rectCount()), useScale(provider->useScale()) {
+    : DrawOp(provider->aaType()), rectCount(provider->rectCount()) {
   if (!provider->hasColor()) {
     commonColor = provider->firstColor();
   }
@@ -53,13 +53,11 @@ RRectDrawOp::RRectDrawOp(RRectsVertexProvider* provider)
 
 PlacementPtr<GeometryProcessor> RRectDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {
   ATTRIBUTE_NAME("rectCount", static_cast<uint32_t>(rectCount));
-  ATTRIBUTE_NAME("useScale", useScale);
   ATTRIBUTE_NAME("hasStroke", hasStroke);
   ATTRIBUTE_NAME("commonColor", commonColor);
   auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
   return EllipseGeometryProcessor::Make(drawingBuffer, renderTarget->width(),
-                                        renderTarget->height(), hasStroke, useScale, commonColor,
-                                        renderTarget->gamutColorSpace());
+                                        renderTarget->height(), hasStroke, commonColor, renderTarget->gamutColorSpace());
 }
 
 void RRectDrawOp::onDraw(RenderPass* renderPass) {

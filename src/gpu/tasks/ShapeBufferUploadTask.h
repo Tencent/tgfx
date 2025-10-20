@@ -35,7 +35,5 @@ class ShapeBufferUploadTask : public ResourceTask {
  private:
   std::shared_ptr<ResourceProxy> textureProxy = nullptr;
   std::unique_ptr<DataSource<ShapeBuffer>> source = nullptr;
-
-  friend class ProxyProvider;
 };
 }  // namespace tgfx

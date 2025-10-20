@@ -42,7 +42,7 @@ std::shared_ptr<TextureProxy> RuntimeImageFilter::lockTextureProxy(std::shared_p
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(renderBounds.width()), static_cast<int>(renderBounds.height()),
       source->isAlphaOnly(), effect->sampleCount(), args.mipmapped, ImageOrigin::TopLeft,
-      args.backingFit, source->gamutColorSpace());
+      BackingFit::Exact, source->gamutColorSpace());
   if (renderTarget == nullptr) {
     return nullptr;
   }

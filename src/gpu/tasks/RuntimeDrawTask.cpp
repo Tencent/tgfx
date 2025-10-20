@@ -107,7 +107,7 @@ void RuntimeDrawTask::execute(CommandEncoder* encoder) {
 
 std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
     CommandEncoder* encoder, std::shared_ptr<TextureProxy> textureProxy,
-    VertexBufferProxyView* vertexBufferProxyView, std::shared_ptr<ColorSpace> dstColorSpace) {
+    VertexBufferView* vertexBufferProxyView, std::shared_ptr<ColorSpace> dstColorSpace) {
   auto textureView = textureProxy->getTextureView();
   if (textureView == nullptr) {
     return nullptr;

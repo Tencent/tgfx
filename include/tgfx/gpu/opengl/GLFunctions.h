@@ -218,7 +218,16 @@ using GLVertexAttribPointer = void GL_FUNCTION_TYPE(unsigned indx, int size, uns
                                                     unsigned char normalized, int stride,
                                                     const void* ptr);
 using GLViewport = void GL_FUNCTION_TYPE(int x, int y, int width, int height);
+
+#if defined(__EMSCRIPTEN__)
+using GLClientWaitSync = unsigned GL_FUNCTION_TYPE(void* sync, unsigned flags, unsigned timeoutLo,
+                                                   unsigned timeoutHi);
+using GLWaitSync = void GL_FUNCTION_TYPE(void* sync, unsigned flags, unsigned timeoutLo,
+                                         unsigned timeoutHi);
+#else
+using GLClientWaitSync = unsigned GL_FUNCTION_TYPE(void* sync, unsigned flags, uint64_t timeout);
 using GLWaitSync = void GL_FUNCTION_TYPE(void* sync, unsigned flags, uint64_t timeout);
+#endif
 
 class Context;
 
@@ -364,6 +373,7 @@ class GLFunctions {
   GLVertexAttrib4fv* vertexAttrib4fv = nullptr;
   GLVertexAttribPointer* vertexAttribPointer = nullptr;
   GLViewport* viewport = nullptr;
+  GLClientWaitSync* clientWaitSync = nullptr;
   GLWaitSync* waitSync = nullptr;
 };
 

@@ -28,6 +28,7 @@
 #include "gpu/proxies/HardwareRenderTargetProxy.h"
 #include "gpu/proxies/TextureRenderTargetProxy.h"
 #include "gpu/tasks/GPUBufferUploadTask.h"
+#include "gpu/tasks/ReadbackBufferCreateTask.h"
 #include "gpu/tasks/ShapeBufferUploadTask.h"
 #include "gpu/tasks/TextureUploadTask.h"
 #include "proxies/HardwareTextureProxy.h"
@@ -39,7 +40,7 @@ ProxyProvider::ProxyProvider(Context* context)
     : context(context), vertexBlockBuffer(1 << 14, 1 << 21) {  // 16kb, 2MB
 }
 
-std::shared_ptr<IndexBufferProxy> ProxyProvider::createIndexBufferProxy(
+std::shared_ptr<GPUBufferProxy> ProxyProvider::createIndexBufferProxy(
     std::unique_ptr<DataSource<Data>> source, uint32_t renderFlags) {
   if (source == nullptr) {
     return nullptr;
@@ -51,7 +52,7 @@ std::shared_ptr<IndexBufferProxy> ProxyProvider::createIndexBufferProxy(
 #else
   USE(renderFlags);
 #endif
-  auto proxy = std::shared_ptr<IndexBufferProxy>(new IndexBufferProxy());
+  auto proxy = std::shared_ptr<GPUBufferProxy>(new GPUBufferProxy());
   addResourceProxy(proxy);
   auto task = context->drawingBuffer()->make<GPUBufferUploadTask>(proxy, BufferType::Index,
                                                                   std::move(source));
@@ -59,7 +60,18 @@ std::shared_ptr<IndexBufferProxy> ProxyProvider::createIndexBufferProxy(
   return proxy;
 }
 
-std::shared_ptr<VertexBufferProxyView> ProxyProvider::createVertexBufferProxy(
+std::shared_ptr<GPUBufferProxy> ProxyProvider::createReadbackBufferProxy(size_t size) {
+  if (size == 0) {
+    return nullptr;
+  }
+  auto proxy = std::shared_ptr<GPUBufferProxy>(new GPUBufferProxy());
+  addResourceProxy(proxy);
+  auto task = context->drawingBuffer()->make<ReadbackBufferCreateTask>(proxy, size);
+  context->drawingManager()->addResourceTask(std::move(task));
+  return proxy;
+}
+
+std::shared_ptr<VertexBufferView> ProxyProvider::createVertexBufferProxy(
     PlacementPtr<VertexProvider> provider, uint32_t renderFlags) {
   if (provider == nullptr) {
     return nullptr;
@@ -93,10 +105,10 @@ std::shared_ptr<VertexBufferProxyView> ProxyProvider::createVertexBufferProxy(
   provider->getVertices(vertices);
 #endif
   if (sharedVertexBuffer == nullptr) {
-    sharedVertexBuffer = std::shared_ptr<VertexBufferProxy>(new VertexBufferProxy());
+    sharedVertexBuffer = std::shared_ptr<GPUBufferProxy>(new GPUBufferProxy());
     addResourceProxy(sharedVertexBuffer);
   }
-  return std::make_shared<VertexBufferProxyView>(sharedVertexBuffer, offset, byteSize);
+  return std::make_shared<VertexBufferView>(sharedVertexBuffer, offset, byteSize);
 }
 
 void ProxyProvider::flushSharedVertexBuffer() {
@@ -186,7 +198,7 @@ std::shared_ptr<GPUShapeProxy> ProxyProvider::createGPUShapeProxy(std::shared_pt
   // The triangle and texture proxies might be created by previous tasks that are still in progress.
   // One of them might not have the corresponding resources in the cache yet, so we need to wrap
   // both of them into the GPUShapeProxy.
-  auto triangleProxy = findOrWrapVertexBufferProxy(triangleKey);
+  auto triangleProxy = findOrWrapGPUBufferProxy(triangleKey);
   auto textureKey = UniqueKey::Append(uniqueKey, &TextureShapeType, 1);
   auto textureProxy = findOrWrapTextureProxy(textureKey);
   if (triangleProxy != nullptr || textureProxy != nullptr) {
@@ -207,7 +219,7 @@ std::shared_ptr<GPUShapeProxy> ProxyProvider::createGPUShapeProxy(std::shared_pt
 #else
   dataSource = std::move(rasterizer);
 #endif
-  triangleProxy = std::shared_ptr<VertexBufferProxy>(new VertexBufferProxy());
+  triangleProxy = std::shared_ptr<GPUBufferProxy>(new GPUBufferProxy());
   addResourceProxy(triangleProxy, triangleKey);
   if (!(renderFlags & RenderFlags::DisableCache)) {
     triangleProxy->uniqueKey = triangleKey;
@@ -311,9 +323,8 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
     proxy->_height = height;
     return proxy;
   }
-  auto hasMipmaps = context->caps()->mipmapSupport ? mipmapped : false;
   auto textureProxy = std::shared_ptr<DefaultTextureProxy>(
-      new DefaultTextureProxy(width, height, format, hasMipmaps, origin, std::move(colorSpace)));
+      new DefaultTextureProxy(width, height, format, mipmapped, origin, std::move(colorSpace)));
   if (backingFit == BackingFit::Approx) {
     textureProxy->_backingStoreWidth = GetApproxSize(width);
     textureProxy->_backingStoreHeight = GetApproxSize(height);
@@ -416,9 +427,8 @@ std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
     return nullptr;
   }
   sampleCount = caps->getSampleCount(sampleCount, format);
-  auto hasMipmaps = caps->mipmapSupport ? mipmapped : false;
-  auto proxy = std::shared_ptr<TextureRenderTargetProxy>(new TextureRenderTargetProxy(
-      width, height, format, sampleCount, hasMipmaps, origin, false, std::move(colorSpace)));
+  auto proxy = std::shared_ptr<TextureRenderTargetProxy>(
+      new TextureRenderTargetProxy(width, height, format, sampleCount, mipmapped, origin, false, std::move(colorSpace)));
   if (backingFit == BackingFit::Approx) {
     proxy->_backingStoreWidth = GetApproxSize(width);
     proxy->_backingStoreHeight = GetApproxSize(height);
@@ -440,18 +450,18 @@ void ProxyProvider::purgeExpiredProxies() {
   }
 }
 
-std::shared_ptr<VertexBufferProxy> ProxyProvider::findOrWrapVertexBufferProxy(
+std::shared_ptr<GPUBufferProxy> ProxyProvider::findOrWrapGPUBufferProxy(
     const UniqueKey& uniqueKey) {
-  auto proxy = std::static_pointer_cast<VertexBufferProxy>(findProxy(uniqueKey));
+  auto proxy = std::static_pointer_cast<GPUBufferProxy>(findProxy(uniqueKey));
   if (proxy != nullptr) {
     return proxy;
   }
-  auto vertexBuffer = Resource::Find<VertexBuffer>(context, uniqueKey);
-  if (vertexBuffer == nullptr) {
+  auto resource = Resource::Find<BufferResource>(context, uniqueKey);
+  if (resource == nullptr) {
     return nullptr;
   }
-  proxy = std::shared_ptr<VertexBufferProxy>(new VertexBufferProxy());
-  proxy->resource = std::move(vertexBuffer);
+  proxy = std::shared_ptr<GPUBufferProxy>(new GPUBufferProxy());
+  proxy->resource = std::move(resource);
   addResourceProxy(proxy, uniqueKey);
   return proxy;
 }

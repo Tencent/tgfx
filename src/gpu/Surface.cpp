@@ -19,6 +19,7 @@
 #include "tgfx/core/Surface.h"
 #include "DrawingManager.h"
 #include "core/images/TextureImage.h"
+#include "core/utils/CopyPixels.h"
 #include "core/utils/Log.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "gpu/ProxyProvider.h"
@@ -185,28 +186,55 @@ Color Surface::getColor(int x, int y) {
   return Color::FromRGBA(color[0], color[1], color[2], color[3]);
 }
 
+std::shared_ptr<SurfaceReadback> Surface::asyncReadPixels(const Rect& rect) {
+  if (rect.isEmpty()) {
+    return nullptr;
+  }
+  auto surfaceRect = Rect::MakeWH(width(), height());
+  if (!surfaceRect.contains(rect)) {
+    return nullptr;
+  }
+  auto renderTarget = renderContext->renderTarget;
+  auto srcRect = renderTarget->getOriginTransform().mapRect(rect);
+  auto colorType = PixelFormatToColorType(renderTarget->format());
+  auto info = ImageInfo::Make(static_cast<int>(srcRect.width()), static_cast<int>(srcRect.height()),
+                              colorType, AlphaType::Premultiplied);
+  auto context = renderTarget->getContext();
+  auto readbackBuffer = context->proxyProvider()->createReadbackBufferProxy(info.byteSize());
+  if (readbackBuffer == nullptr) {
+    return nullptr;
+  }
+  renderContext->flush();
+  context->drawingManager()->addTransferPixelsTask(renderTarget, srcRect, readbackBuffer);
+  return std::shared_ptr<SurfaceReadback>(new SurfaceReadback(info, std::move(readbackBuffer)));
+}
+
 bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int srcY) {
-  if (dstInfo.isEmpty() || dstPixels == nullptr) {
+  auto renderTarget = renderContext->renderTarget;
+  auto outInfo = dstInfo.makeIntersect(-srcX, -srcY, renderTarget->width(), renderTarget->height());
+  if (outInfo.isEmpty() || dstPixels == nullptr) {
     return false;
   }
-  auto renderTargetProxy = renderContext->renderTarget;
-  auto textureView = renderTargetProxy->getTextureView();
-  auto hardwareBuffer = textureView ? textureView->getTexture()->getHardwareBuffer() : nullptr;
-  renderTargetProxy->getContext()->flushAndSubmit(hardwareBuffer != nullptr);
-  if (hardwareBuffer != nullptr) {
-    auto pixels = HardwareBufferLock(hardwareBuffer);
-    if (pixels != nullptr) {
-      auto info = HardwareBufferGetInfo(hardwareBuffer);
-      auto success = Pixmap(info, pixels).readPixels(dstInfo, dstPixels, srcX, srcY);
-      HardwareBufferUnlock(hardwareBuffer);
-      return success;
-    }
-  }
-  auto renderTarget = renderTargetProxy->getRenderTarget();
-  if (renderTarget == nullptr) {
+  dstPixels = dstInfo.computeOffset(dstPixels, -srcX, -srcY);
+  auto colorType = PixelFormatToColorType(renderTarget->format());
+  auto srcInfo =
+      ImageInfo::Make(outInfo.width(), outInfo.height(), colorType, AlphaType::Premultiplied);
+  auto readX = std::max(0, srcX);
+  auto readY = std::max(0, srcY);
+  auto rect = Rect::MakeXYWH(readX, readY, outInfo.width(), outInfo.height());
+  auto readback = asyncReadPixels(rect);
+  if (readback == nullptr) {
     return false;
   }
-  return renderTarget->readPixels(dstInfo, dstPixels, srcX, srcY);
+  auto context = renderTarget->getContext();
+  auto srcPixels = readback->lockPixels(context);
+  if (srcPixels == nullptr) {
+    return false;
+  }
+  auto flipY = renderTarget->origin() == ImageOrigin::BottomLeft;
+  CopyPixels(srcInfo, srcPixels, outInfo, dstPixels, flipY);
+  readback->unlockPixels(context);
+  return true;
 }
 
 std::shared_ptr<ColorSpace> Surface::gamutColorSpace() const {

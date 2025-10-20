@@ -18,8 +18,7 @@
 
 #include "GPUBufferUploadTask.h"
 #include "gpu/GPU.h"
-#include "gpu/resources/IndexBuffer.h"
-#include "gpu/resources/VertexBuffer.h"
+#include "gpu/resources/BufferResource.h"
 #include "inspect/InspectorMark.h"
 
 namespace tgfx {
@@ -47,15 +46,9 @@ std::shared_ptr<Resource> GPUBufferUploadTask::onMakeResource(Context* context) 
     LOGE("GPUBufferUploadTask::onMakeResource() Failed to create buffer!");
     return nullptr;
   }
-  if (!gpu->queue()->writeBuffer(gpuBuffer, 0, data->data(), data->size())) {
-    LOGE("GPUBufferUploadTask::onMakeResource() Failed to write buffer!");
-    return nullptr;
-  }
+  gpu->queue()->writeBuffer(gpuBuffer, 0, data->data(), data->size());
   // Free the data source immediately to reduce memory pressure.
   source = nullptr;
-  if (bufferType == BufferType::Index) {
-    return Resource::AddToCache(context, new IndexBuffer(std::move(gpuBuffer)));
-  }
-  return Resource::AddToCache(context, new VertexBuffer(std::move(gpuBuffer)));
+  return BufferResource::Wrap(context, std::move(gpuBuffer));
 }
 }  // namespace tgfx

@@ -107,7 +107,7 @@ inline bool AreWithinUlps(float a, float b, int epsilon) {
  * Returns true if value is a power of 2. Does not explicitly check for value <= 0.
  */
 template <typename T>
-constexpr inline bool IsPow2(T value) {
+constexpr bool IsPow2(T value) {
   return (value & (value - 1)) == 0;
 }
 

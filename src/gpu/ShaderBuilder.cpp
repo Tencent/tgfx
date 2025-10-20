@@ -92,10 +92,8 @@ static std::string TextureSwizzleString(const Swizzle& swizzle) {
 
 void ShaderBuilder::appendTextureLookup(SamplerHandle samplerHandle, const std::string& coordName) {
   auto uniformHandler = programBuilder->uniformHandler();
-  auto shaderCaps = programBuilder->getContext()->caps()->shaderCaps();
   auto sampler = uniformHandler->getSamplerVariable(samplerHandle);
-  codeAppendf("%s(%s, %s)", shaderCaps->textureFuncName.c_str(), sampler.name().c_str(),
-              coordName.c_str());
+  codeAppendf("texture(%s, %s)", sampler.name().c_str(), coordName.c_str());
   codeAppend(TextureSwizzleString(uniformHandler->getSamplerSwizzle(samplerHandle)));
 }
 

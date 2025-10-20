@@ -26,25 +26,23 @@
 #include "tgfx/core/Buffer.h"
 
 namespace tgfx {
-bool GLCommandQueue::writeBuffer(std::shared_ptr<GPUBuffer> buffer, size_t bufferOffset,
+void GLCommandQueue::writeBuffer(std::shared_ptr<GPUBuffer> buffer, size_t bufferOffset,
                                  const void* data, size_t size) {
   if (data == nullptr || size == 0) {
     LOGE("GLCommandQueue::writeBuffer() data is null or size is zero!");
-    return false;
+    return;
   }
   if (bufferOffset + size > buffer->size()) {
     LOGE("GLCommandQueue::writeBuffer() size exceeds buffer size!");
-    return false;
+    return;
   }
   auto gl = gpu->functions();
-  ClearGLError(gl);
   auto glBuffer = std::static_pointer_cast<GLBuffer>(buffer);
-  auto target = glBuffer->target();
+  auto target = GLBuffer::GetTarget(glBuffer->usage());
+  DEBUG_ASSERT(target != 0);
   gl->bindBuffer(target, glBuffer->bufferID());
   gl->bufferSubData(target, static_cast<GLintptr>(bufferOffset), static_cast<GLsizeiptr>(size),
                     data);
-  gl->bindBuffer(target, 0);
-  return CheckGLError(gl);
 }
 
 void GLCommandQueue::writeTexture(std::shared_ptr<GPUTexture> texture, const Rect& rect,
@@ -68,87 +66,11 @@ void GLCommandQueue::writeTexture(std::shared_ptr<GPUTexture> texture, const Rec
   int y = static_cast<int>(rect.y());
   int width = static_cast<int>(rect.width());
   int height = static_cast<int>(rect.height());
-  if (caps->unpackRowLengthSupport) {
-    // the number of pixels, not bytes
-    gl->pixelStorei(GL_UNPACK_ROW_LENGTH, static_cast<int>(rowBytes / bytesPerPixel));
-    gl->texSubImage2D(glTexture->target(), 0, x, y, width, height, textureFormat.externalFormat,
-                      textureFormat.externalType, pixels);
-    gl->pixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-  } else {
-    if (static_cast<size_t>(width) * bytesPerPixel == rowBytes) {
-      gl->texSubImage2D(glTexture->target(), 0, x, y, width, height, textureFormat.externalFormat,
-                        textureFormat.externalType, pixels);
-    } else {
-      auto data = reinterpret_cast<const uint8_t*>(pixels);
-      for (int row = 0; row < height; ++row) {
-        gl->texSubImage2D(glTexture->target(), 0, x, y + row, width, 1,
-                          textureFormat.externalFormat, textureFormat.externalType,
-                          data + (static_cast<size_t>(row) * rowBytes));
-      }
-    }
-  }
-}
-
-bool GLCommandQueue::readTexture(std::shared_ptr<GPUTexture> texture, const Rect& rect,
-                                 void* pixels, size_t rowBytes) const {
-  if (texture == nullptr || rect.isEmpty() || pixels == nullptr) {
-    return false;
-  }
-  auto caps = static_cast<const GLCaps*>(gpu->caps());
-  if (!caps->isFormatRenderable(texture->format())) {
-    return false;
-  }
-  auto gl = gpu->functions();
-  auto glTexture = static_cast<GLTexture*>(texture.get());
-  ClearGLError(gl);
-  if (texture->usage() & GPUTextureUsage::RENDER_ATTACHMENT) {
-    auto state = gpu->state();
-    state->bindFramebuffer(glTexture);
-  } else if (!glTexture->checkFrameBuffer(gpu)) {
-    return false;
-  }
-  auto format = texture->format();
-  auto bytesPerPixel = PixelFormatBytesPerPixel(format);
-  auto minRowBytes = static_cast<size_t>(rect.width()) * bytesPerPixel;
-  if (rowBytes < minRowBytes) {
-    LOGE("GLCommandQueue::readTexture() rowBytes is too small!");
-    return false;
-  }
-  void* outPixels = nullptr;
-  Buffer tempBuffer = {};
-  auto restoreGLRowLength = false;
-  if (rowBytes == minRowBytes) {
-    outPixels = pixels;
-  } else if (caps->packRowLengthSupport) {
-    outPixels = pixels;
-    gl->pixelStorei(GL_PACK_ROW_LENGTH, static_cast<int>(rowBytes / bytesPerPixel));
-    restoreGLRowLength = true;
-  } else {
-    tempBuffer.alloc(minRowBytes * static_cast<size_t>(rect.height()));
-    outPixels = tempBuffer.data();
-  }
-  gl->pixelStorei(GL_PACK_ALIGNMENT, static_cast<int>(bytesPerPixel));
-  auto x = static_cast<int>(rect.left);
-  auto y = static_cast<int>(rect.top);
-  auto width = static_cast<int>(rect.width());
-  auto height = static_cast<int>(rect.height());
-  auto textureFormat = caps->getTextureFormat(format);
-  gl->readPixels(x, y, width, height, textureFormat.externalFormat, textureFormat.externalType,
-                 outPixels);
-  if (restoreGLRowLength) {
-    gl->pixelStorei(GL_PACK_ROW_LENGTH, 0);
-  }
-  if (!tempBuffer.isEmpty()) {
-    auto srcPixels = static_cast<const uint8_t*>(outPixels);
-    auto dstPixels = static_cast<uint8_t*>(pixels);
-    auto rowCount = static_cast<size_t>(rect.height());
-    for (size_t row = 0; row < rowCount; ++row) {
-      memcpy(dstPixels, srcPixels, minRowBytes);
-      dstPixels += rowBytes;
-      srcPixels += minRowBytes;
-    }
-  }
-  return CheckGLError(gl);
+  // the number of pixels, not bytes
+  gl->pixelStorei(GL_UNPACK_ROW_LENGTH, static_cast<int>(rowBytes / bytesPerPixel));
+  gl->texSubImage2D(glTexture->target(), 0, x, y, width, height, textureFormat.externalFormat,
+                    textureFormat.externalType, pixels);
+  gl->pixelStorei(GL_UNPACK_ROW_LENGTH, 0);
 }
 
 void GLCommandQueue::submit(std::shared_ptr<CommandBuffer>) {
@@ -160,16 +82,11 @@ void GLCommandQueue::submit(std::shared_ptr<CommandBuffer>) {
 }
 
 std::shared_ptr<GPUFence> GLCommandQueue::insertFence() {
-  if (!gpu->caps()->semaphoreSupport) {
-    return nullptr;
-  }
   auto gl = gpu->functions();
   auto glSync = gl->fenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
   if (glSync == nullptr) {
     return nullptr;
   }
-  // If we inserted semaphores during the flush, we need to call glFlush.
-  gl->flush();
   return gpu->makeResource<GLFence>(glSync);
 }
 
@@ -179,7 +96,13 @@ void GLCommandQueue::waitForFence(std::shared_ptr<GPUFence> fence) {
   }
   auto gl = gpu->functions();
   auto glSync = std::static_pointer_cast<GLFence>(fence)->glSync();
+#if defined(__EMSCRIPTEN__)
+  auto timeoutLo = static_cast<uint32_t>(GL_TIMEOUT_IGNORED & 0xFFFFFFFFull);
+  auto timeoutHi = static_cast<uint32_t>(GL_TIMEOUT_IGNORED >> 32);
+  gl->waitSync(glSync, 0, timeoutLo, timeoutHi);
+#else
   gl->waitSync(glSync, 0, GL_TIMEOUT_IGNORED);
+#endif
 }
 
 void GLCommandQueue::waitUntilCompleted() {

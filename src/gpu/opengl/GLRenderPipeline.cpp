@@ -67,76 +67,23 @@ void GLRenderPipeline::activate(GLGPU* gpu, bool depthReadOnly, bool stencilRead
 
 void GLRenderPipeline::setUniformBuffer(GLGPU* gpu, unsigned binding, GLBuffer* buffer,
                                         size_t offset, size_t size) {
-  if (gpu == nullptr || buffer == nullptr || size == 0) {
+  DEBUG_ASSERT(gpu != nullptr);
+  if (buffer == nullptr || size == 0) {
     return;
   }
-
-  auto result = uniformBlocks.find(binding);
-  if (result == uniformBlocks.end()) {
-    LOGE("GLRenderPipeline::setUniformBuffer: binding %d not found", binding);
+  if (!(buffer->usage() & GPUBufferUsage::UNIFORM)) {
+    LOGE("GLRenderPipeline::setUniformBuffer error, buffer usage is not UNIFORM!");
     return;
   }
 
   auto gl = gpu->functions();
-  auto& uniforms = result->second;
-  if (uniforms.empty()) {
-    unsigned ubo = buffer->bufferID();
-    if (ubo == 0) {
-      LOGE("GLRenderPipeline::setUniformBuffer error, uniform buffer id is 0");
-      return;
-    }
-
-    gl->bindBufferRange(GL_UNIFORM_BUFFER, binding, ubo, static_cast<int32_t>(offset),
-                        static_cast<int32_t>(size));
-  } else {
-    auto data = static_cast<uint8_t*>(buffer->map()) + offset;
-    for (auto& uniform : uniforms) {
-      auto uniformData = data + uniform.offset;
-      switch (uniform.format) {
-        case UniformFormat::Float:
-          gl->uniform1fv(uniform.location, 1, reinterpret_cast<float*>(uniformData));
-          break;
-        case UniformFormat::Float2:
-          gl->uniform2fv(uniform.location, 1, reinterpret_cast<float*>(uniformData));
-          break;
-        case UniformFormat::Float3:
-          gl->uniform3fv(uniform.location, 1, reinterpret_cast<float*>(uniformData));
-          break;
-        case UniformFormat::Float4:
-          gl->uniform4fv(uniform.location, 1, reinterpret_cast<float*>(uniformData));
-          break;
-        case UniformFormat::Float2x2:
-          gl->uniformMatrix2fv(uniform.location, 1, GL_FALSE,
-                               reinterpret_cast<float*>(uniformData));
-          break;
-        case UniformFormat::Float3x3:
-          gl->uniformMatrix3fv(uniform.location, 1, GL_FALSE,
-                               reinterpret_cast<float*>(uniformData));
-          break;
-        case UniformFormat::Float4x4:
-          gl->uniformMatrix4fv(uniform.location, 1, GL_FALSE,
-                               reinterpret_cast<float*>(uniformData));
-          break;
-        case UniformFormat::Int:
-          gl->uniform1iv(uniform.location, 1, reinterpret_cast<int*>(uniformData));
-          break;
-        case UniformFormat::Int2:
-          gl->uniform2iv(uniform.location, 1, reinterpret_cast<int*>(uniformData));
-          break;
-        case UniformFormat::Int3:
-          gl->uniform3iv(uniform.location, 1, reinterpret_cast<int*>(uniformData));
-          break;
-        case UniformFormat::Int4:
-          gl->uniform4iv(uniform.location, 1, reinterpret_cast<int*>(uniformData));
-          break;
-        case UniformFormat::Texture2DSampler:
-        case UniformFormat::TextureExternalSampler:
-        case UniformFormat::Texture2DRectSampler:
-          gl->uniform1iv(uniform.location, 1, reinterpret_cast<int*>(uniformData));
-          break;
-      }
-    }
+  unsigned ubo = buffer->bufferID();
+  if (ubo == 0) {
+    LOGE("GLRenderPipeline::setUniformBuffer error, uniform buffer id is 0");
+    return;
   }
+  gl->bindBufferRange(GL_UNIFORM_BUFFER, binding, ubo, static_cast<int32_t>(offset),
+                      static_cast<int32_t>(size));
 }
 
 void GLRenderPipeline::setTexture(GLGPU* gpu, unsigned binding, GLTexture* texture,
@@ -159,7 +106,11 @@ void GLRenderPipeline::setVertexBuffer(GLGPU* gpu, GLBuffer* vertexBuffer, size_
     gl->bindBuffer(GL_ARRAY_BUFFER, 0);
     return;
   }
-  gl->bindBuffer(GL_ARRAY_BUFFER, static_cast<GLBuffer*>(vertexBuffer)->bufferID());
+  if (!(vertexBuffer->usage() & GPUBufferUsage::VERTEX)) {
+    LOGE("GLRenderPipeline::setVertexBuffer error, buffer usage is not VERTEX!");
+    return;
+  }
+  gl->bindBuffer(GL_ARRAY_BUFFER, vertexBuffer->bufferID());
   for (auto& attribute : attributes) {
     gl->vertexAttribPointer(static_cast<unsigned>(attribute.location), attribute.count,
                             attribute.type, attribute.normalized, static_cast<int>(vertexStride),
@@ -280,13 +231,10 @@ bool GLRenderPipeline::setPipelineDescriptor(GLGPU* gpu,
   ClearGLError(gl);
   auto state = gpu->state();
   state->useProgram(programID);
-  auto caps = static_cast<const GLCaps*>(gpu->caps());
-  if (caps->vertexArrayObjectSupport) {
-    gl->genVertexArrays(1, &vertexArray);
-    if (vertexArray == 0) {
-      LOGE("GLRenderPipeline::createVertexArrays: failed to create VAO!");
-      return false;
-    }
+  gl->genVertexArrays(1, &vertexArray);
+  if (vertexArray == 0) {
+    LOGE("GLRenderPipeline::createVertexArrays: failed to create VAO!");
+    return false;
   }
 
   DEBUG_ASSERT(!descriptor.vertex.attributes.empty());
@@ -310,24 +258,9 @@ bool GLRenderPipeline::setPipelineDescriptor(GLGPU* gpu,
   blendState = MakeBlendState(attachment);
 
   for (auto& entry : descriptor.layout.uniformBlocks) {
-    if (entry.uniforms.empty()) {
-      auto uniformBlockIndex = gl->getUniformBlockIndex(programID, entry.name.c_str());
-      if (uniformBlockIndex != GL_INVALID_INDEX) {
-        gl->uniformBlockBinding(programID, uniformBlockIndex, entry.binding);
-      }
-      uniformBlocks[entry.binding] = {};
-    } else {
-      std::vector<GLUniform> uniforms = {};
-      uniforms.reserve(entry.uniforms.size());
-      size_t uniformOffset = 0;
-      for (auto& uniform : entry.uniforms) {
-        auto location = gl->getUniformLocation(programID, uniform.name().c_str());
-        if (location != -1) {
-          uniforms.push_back({uniform.format(), location, uniformOffset});
-        }
-        uniformOffset += uniform.size();
-      }
-      uniformBlocks[entry.binding] = uniforms;
+    auto uniformBlockIndex = gl->getUniformBlockIndex(programID, entry.name.c_str());
+    if (uniformBlockIndex != GL_INVALID_INDEX) {
+      gl->uniformBlockBinding(programID, uniformBlockIndex, entry.binding);
     }
   }
 

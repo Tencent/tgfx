@@ -20,19 +20,14 @@
 
 namespace tgfx {
 EllipseGeometryProcessor::EllipseGeometryProcessor(int width, int height, bool stroke,
-                                                   bool useScale, std::optional<Color> commonColor,
-                                                   std::shared_ptr<ColorSpace> colorSpace)
+                                                   std::optional<Color> commonColor, std::shared_ptr<ColorSpace> colorSpace)
     : GeometryProcessor(ClassID()), width(width), height(height), stroke(stroke),
-      useScale(useScale), commonColor(commonColor), dstColorSpace(std::move(colorSpace)) {
+      commonColor(commonColor), dstColorSpace(std::move(colorSpace)) {
   inPosition = {"inPosition", VertexFormat::Float2};
   if (!commonColor.has_value()) {
     inColor = {"inColor", VertexFormat::UByte4Normalized};
   }
-  if (useScale) {
-    inEllipseOffset = {"inEllipseOffset", VertexFormat::Float3};
-  } else {
-    inEllipseOffset = {"inEllipseOffset", VertexFormat::Float2};
-  }
+  inEllipseOffset = {"inEllipseOffset", VertexFormat::Float2};
   inEllipseRadii = {"inEllipseRadii", VertexFormat::Float4};
   this->setVertexAttributes(&inPosition, 4);
 }

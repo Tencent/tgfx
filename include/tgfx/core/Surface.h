@@ -22,6 +22,7 @@
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/RenderFlags.h"
+#include "tgfx/core/SurfaceReadback.h"
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/ImageOrigin.h"
 
@@ -171,9 +172,18 @@ class Surface {
   Color getColor(int x, int y);
 
   /**
+   * Asynchronously copies a rect of pixels from the Surface and returns a SurfaceReadback. Use the
+   * returned SurfaceReadback to check when the pixel data is ready and to access it. Note that the
+   * pixel data respects the Surface's origin; if the origin is bottom-left, the pixel data will be
+   * vertically flipped. Returns nullptr if the rect is empty or outside the bounds of the Surface.
+   */
+  std::shared_ptr<SurfaceReadback> asyncReadPixels(const Rect& rect);
+
+  /**
    * Copies a rect of pixels to dstPixels with specified ImageInfo. Copy starts at (srcX, srcY), and
-   * does not exceed Surface (width(), height()). Pixels are copied only if pixel conversion is
-   * possible. Returns true if pixels are copied to dstPixels.
+   * does not exceed Surface (width(), height()). Pixels are always provided in top-left origin
+   * format; if the Surface's origin is bottom-left, the pixels are flipped during the copy. Pixels
+   * are copied only if pixel conversion is possible. Returns true if pixels are copied to dstPixels.
    */
   bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0, int srcY = 0);
   /**
