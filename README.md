@@ -25,24 +25,14 @@ and various video-editing apps.
 - Chrome 69.0 or later (Web)
 - Safari 11.3 or later (Web)
 
-## Backing Renderers
+## Rendering Backends
 
-|   Vector Backend    | GPU Backend | Target Platforms |   Status    |
-|:-------------------:|:-----------:|:----------------:|:-----------:|
-|      FreeType       |   OpenGL    |       All        |  complete   |
-|    CoreGraphics     |   OpenGL    |    iOS, macOS    |  complete   |
-| Canvas2D / FreeType |    WebGL    |       Web        |  complete   |
-|    CoreGraphics     |    Metal    |    iOS, macOS    | in progress |
-|      FreeType       |   Vulkan    |  Android, Linux  | in progress |
-| Canvas2D / FreeType |   WebGPU    |       Web        | in progress |
-
-
-## Branch Management
-
-- The `main` branch is our active development branch, containing the latest features and bug fixes.
-- The branches under `release/` are our stable milestone branches, which are fully tested. We 
-  periodically create a `release/{version}` branch from the `main` branch. Once a `release/{version}` 
-  branch is created, only high-priority fixes are checked into it.
+- OpenGL 3.2+
+- OpenGL ES 3.0+
+- WebGL 2.0+
+- Metal 1.1+ (in progress)
+- Vulkan 1.1+ (in progress)
+- WebGPU (in progress)
 
 ## Build Prerequisites
 
@@ -63,6 +53,13 @@ Please note the following additional notices:
 
 - Ensure you have installed the **[Desktop development with C++]** and **[Universal Windows Platform development]** components for VS2019.
 - It is **highly recommended** to use the **latest version of CMake**. Many older versions of CMake may have various bugs across different platforms.
+
+## Branch Management
+
+- The `main` branch is our active development branch, containing the latest features and bug fixes.
+- The branches under `release/` are our stable milestone branches, which are fully tested. We
+  periodically create a `release/{version}` branch from the `main` branch. Once a `release/{version}`
+  branch is created, only high-priority fixes are checked into it.
 
 ## Dependencies
 
