@@ -33,7 +33,8 @@ static constexpr uint16_t VERTICES_PER_NON_AA_QUAD = 4;
 static constexpr uint16_t VERTICES_PER_AA_QUAD = 8;
 static constexpr size_t MAX_UNIFORM_BUFFER_SIZE = 64 * 1024;
 
-GlobalCache::GlobalCache(Context* context) : context(context) {
+GlobalCache::GlobalCache(Context* context)
+    : context(context), maxUniformBufferTracker(std::make_unique<SlidingWindowTracker>(10)) {
 }
 
 std::shared_ptr<Program> GlobalCache::findProgram(const BytesKey& programKey) {
@@ -68,10 +69,6 @@ std::shared_ptr<GPUBuffer> GlobalCache::findOrCreateUniformBuffer(size_t bufferS
         "size: %zu, %s:%d",
         bufferSize, maxUBOSize, __FILE__, __LINE__);
     return nullptr;
-  }
-
-  if (maxUniformBufferTracker == nullptr) {
-    maxUniformBufferTracker = std::make_shared<SlidingWindowTracker>(10);
   }
 
   auto& uniformBufferPacket = tripleUniformBuffer[tripleUniformBufferIndex];
