@@ -21,6 +21,7 @@
 #include "gpu/ProgramBuilder.h"
 
 namespace tgfx {
+static constexpr char OES_TEXTURE_EXTENSION[] = "GL_OES_EGL_image_external_essl3";
 
 std::string UniformHandler::addUniform(const std::string& name, UniformFormat format,
                                        ShaderStage stage) {
@@ -43,7 +44,7 @@ SamplerHandle UniformHandler::addSampler(std::shared_ptr<GPUTexture> texture,
   switch (texture->type()) {
     case GPUTextureType::External:
       programBuilder->fragmentShaderBuilder()->addFeature(PrivateFeature::OESTexture,
-                                                          "GL_OES_EGL_image_external_essl3");
+                                                          OES_TEXTURE_EXTENSION);
       format = UniformFormat::TextureExternalSampler;
       break;
     case GPUTextureType::Rectangle:
