@@ -191,10 +191,7 @@ std::string GLSLProgramBuilder::getUniformBlockDeclaration(
 }
 
 std::shared_ptr<PipelineProgram> GLSLProgramBuilder::finalize() {
-  auto shaderCaps = context->caps()->shaderCaps();
-  if (shaderCaps->usesCustomColorOutputName) {
-    fragmentShaderBuilder()->declareCustomOutputColor();
-  }
+  fragmentShaderBuilder()->declareCustomOutputColor();
   finalizeShaders();
   auto gpu = context->gpu();
   ShaderModuleDescriptor vertexModule = {};

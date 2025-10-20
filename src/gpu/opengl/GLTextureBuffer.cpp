@@ -53,9 +53,6 @@ void* GLTextureBuffer::map(size_t offset, size_t size) {
   }
   auto gl = _interface->functions();
   ClearGLError(gl);
-  if (readbackFence != nullptr) {
-    gl->clientWaitSync(readbackFence, 0, GL_TIMEOUT_IGNORED);
-  }
   state->bindFramebuffer(static_cast<GLTexture*>(texture.get()));
   auto format = texture->format();
   auto bytesPerPixel = PixelFormatBytesPerPixel(format);

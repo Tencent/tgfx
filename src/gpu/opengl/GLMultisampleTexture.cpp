@@ -27,17 +27,7 @@ static bool RenderbufferStorageMSAA(GLGPU* gpu, int sampleCount, PixelFormat pix
   ClearGLError(gl);
   auto caps = static_cast<const GLCaps*>(gpu->caps());
   auto format = caps->getTextureFormat(pixelFormat).sizedFormat;
-  switch (caps->msFBOType) {
-    case MSFBOType::Standard:
-      gl->renderbufferStorageMultisample(GL_RENDERBUFFER, sampleCount, format, width, height);
-      break;
-    case MSFBOType::ES_Apple:
-      gl->renderbufferStorageMultisampleAPPLE(GL_RENDERBUFFER, sampleCount, format, width, height);
-      break;
-    case MSFBOType::None:
-      LOGE("Shouldn't be here if we don't support multisampled renderbuffers.");
-      break;
-  }
+  gl->renderbufferStorageMultisample(GL_RENDERBUFFER, sampleCount, format, width, height);
   return CheckGLError(gl);
 }
 

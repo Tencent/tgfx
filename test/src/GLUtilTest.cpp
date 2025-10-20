@@ -37,7 +37,7 @@ const unsigned char* glGetStringMock(unsigned name) {
     return reinterpret_cast<const unsigned char*>(vendors[vendorIndex].first.c_str());
   } else if (name == GL_VERSION) {
     if (vendorIndex != 0) {
-      return reinterpret_cast<const unsigned char*>("3.1");
+      return reinterpret_cast<const unsigned char*>("3.2");
     } else {
       return reinterpret_cast<const unsigned char*>("5.0");
     }
@@ -60,8 +60,8 @@ void glGetInternalformativMock(unsigned target, unsigned, unsigned pname, int, i
     return;
   }
   if (pname == GL_SAMPLES) {
-    params[0] = 4;
-    params[1] = 8;
+    params[0] = 8;
+    params[1] = 4;
   }
 }
 
@@ -102,12 +102,11 @@ TGFX_TEST(GLUtilTest, Caps) {
     GLCaps caps(info);
     EXPECT_EQ(caps.vendor, vendors[vendorIndex].second);
     EXPECT_EQ(caps.standard, GLStandard::GL);
-    EXPECT_TRUE(caps.textureRedSupport);
     EXPECT_TRUE(caps.multisampleDisableSupport);
     EXPECT_EQ(caps.getSampleCount(5, PixelFormat::RGBA_8888), 8);
     EXPECT_EQ(caps.getSampleCount(10, PixelFormat::RGBA_8888), 1);
     EXPECT_EQ(caps.getSampleCount(0, PixelFormat::RGBA_8888), 1);
-    EXPECT_EQ(caps.getSampleCount(5, PixelFormat::ALPHA_8), 1);
+    EXPECT_EQ(caps.getSampleCount(5, PixelFormat::ALPHA_8), 8);
   }
   {
     vendorIndex++;

@@ -322,9 +322,8 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
     proxy->_height = height;
     return proxy;
   }
-  auto hasMipmaps = context->caps()->mipmapSupport ? mipmapped : false;
   auto textureProxy = std::shared_ptr<DefaultTextureProxy>(
-      new DefaultTextureProxy(width, height, format, hasMipmaps, origin));
+      new DefaultTextureProxy(width, height, format, mipmapped, origin));
   if (backingFit == BackingFit::Approx) {
     textureProxy->_backingStoreWidth = GetApproxSize(width);
     textureProxy->_backingStoreHeight = GetApproxSize(height);
@@ -422,9 +421,8 @@ std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
     return nullptr;
   }
   sampleCount = caps->getSampleCount(sampleCount, format);
-  auto hasMipmaps = caps->mipmapSupport ? mipmapped : false;
   auto proxy = std::shared_ptr<TextureRenderTargetProxy>(
-      new TextureRenderTargetProxy(width, height, format, sampleCount, hasMipmaps, origin));
+      new TextureRenderTargetProxy(width, height, format, sampleCount, mipmapped, origin));
   if (backingFit == BackingFit::Approx) {
     proxy->_backingStoreWidth = GetApproxSize(width);
     proxy->_backingStoreHeight = GetApproxSize(height);

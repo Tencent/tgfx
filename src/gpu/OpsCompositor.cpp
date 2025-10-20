@@ -259,10 +259,6 @@ static bool IsPixelAligned(const Rect& rect) {
          fabsf(roundf(rect.bottom) - rect.bottom) <= BOUNDS_TOLERANCE;
 }
 
-static bool RRectUseScale(Context* context) {
-  return !context->caps()->shaderCaps()->floatIs32Bits;
-}
-
 class PendingOpsAutoReset {
  public:
   PendingOpsAutoReset(OpsCompositor* compositor, PendingOpType type, Path clip, Fill fill)
@@ -375,9 +371,8 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
       drawOp = RectDrawOp::Make(context, std::move(provider), renderFlags);
     } break;
     case PendingOpType::RRect: {
-      auto provider =
-          RRectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingRRects), aaType,
-                                         RRectUseScale(context), std::move(pendingStrokes));
+      auto provider = RRectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingRRects),
+                                                     aaType, std::move(pendingStrokes));
       drawOp = RRectDrawOp::Make(context, std::move(provider), renderFlags);
     } break;
     case PendingOpType::Atlas: {

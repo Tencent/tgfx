@@ -122,9 +122,6 @@ void GLCommandEncoder::copyTextureToBuffer(std::shared_ptr<GPUTexture> srcTextur
   } else if (dstRowBytes < minRowBytes) {
     LOGE("GLCommandEncoder::copyTextureToBuffer() dstRowBytes is too small!");
     return;
-  } else if (dstRowBytes > minRowBytes && !caps->packRowLengthSupport) {
-    LOGE("GLCommandEncoder::copyTextureToBuffer() custom dstRowBytes is not supported!");
-    return;
   }
   auto requiredSize = dstOffset + static_cast<size_t>(srcRect.height()) * dstRowBytes;
   if (dstBuffer->size() < requiredSize) {
