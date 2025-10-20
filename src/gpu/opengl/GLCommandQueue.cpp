@@ -66,25 +66,11 @@ void GLCommandQueue::writeTexture(std::shared_ptr<GPUTexture> texture, const Rec
   int y = static_cast<int>(rect.y());
   int width = static_cast<int>(rect.width());
   int height = static_cast<int>(rect.height());
-  if (caps->unpackRowLengthSupport) {
-    // the number of pixels, not bytes
-    gl->pixelStorei(GL_UNPACK_ROW_LENGTH, static_cast<int>(rowBytes / bytesPerPixel));
-    gl->texSubImage2D(glTexture->target(), 0, x, y, width, height, textureFormat.externalFormat,
-                      textureFormat.externalType, pixels);
-    gl->pixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-  } else {
-    if (static_cast<size_t>(width) * bytesPerPixel == rowBytes) {
-      gl->texSubImage2D(glTexture->target(), 0, x, y, width, height, textureFormat.externalFormat,
-                        textureFormat.externalType, pixels);
-    } else {
-      auto data = reinterpret_cast<const uint8_t*>(pixels);
-      for (int row = 0; row < height; ++row) {
-        gl->texSubImage2D(glTexture->target(), 0, x, y + row, width, 1,
-                          textureFormat.externalFormat, textureFormat.externalType,
-                          data + (static_cast<size_t>(row) * rowBytes));
-      }
-    }
-  }
+  // the number of pixels, not bytes
+  gl->pixelStorei(GL_UNPACK_ROW_LENGTH, static_cast<int>(rowBytes / bytesPerPixel));
+  gl->texSubImage2D(glTexture->target(), 0, x, y, width, height, textureFormat.externalFormat,
+                    textureFormat.externalType, pixels);
+  gl->pixelStorei(GL_UNPACK_ROW_LENGTH, 0);
 }
 
 void GLCommandQueue::submit(std::shared_ptr<CommandBuffer>) {
@@ -96,9 +82,6 @@ void GLCommandQueue::submit(std::shared_ptr<CommandBuffer>) {
 }
 
 std::shared_ptr<GPUFence> GLCommandQueue::insertFence() {
-  if (!gpu->caps()->semaphoreSupport) {
-    return nullptr;
-  }
   auto gl = gpu->functions();
   auto glSync = gl->fenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
   if (glSync == nullptr) {

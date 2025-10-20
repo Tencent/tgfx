@@ -44,7 +44,6 @@ std::string GLSLFragmentShaderBuilder::dstColor() {
 }
 
 std::string GLSLFragmentShaderBuilder::colorOutputName() {
-  auto shaderCaps = programBuilder->getContext()->caps()->shaderCaps();
-  return shaderCaps->usesCustomColorOutputName ? CUSTOM_COLOR_OUTPUT_NAME : "gl_FragColor";
+  return CUSTOM_COLOR_OUTPUT_NAME;
 }
 }  // namespace tgfx

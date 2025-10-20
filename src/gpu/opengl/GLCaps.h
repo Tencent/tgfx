@@ -52,27 +52,6 @@ struct ConfigInfo {
 
 enum class GLVendor { ARM, Google, Imagination, Intel, Qualcomm, NVIDIA, ATI, Other };
 
-/**
- * The type of MSAA for FBOs supported. Different extensions have different semantics of how / when
- * a resolve is performed.
- */
-enum class MSFBOType {
-  /**
-   * no support for MSAA FBOs
-   */
-  None,
-  /**
-   * OpenGL 3.0+, OpenGL ES 3.0+, GL_ARB_framebuffer_object,
-   * GL_CHROMIUM_framebuffer_multisample, GL_ANGLE_framebuffer_multisample,
-   * or GL_EXT_framebuffer_multisample
-   */
-  Standard,
-  /**
-   * GL_APPLE_framebuffer_multisample ES extension
-   */
-  ES_Apple
-};
-
 class GLInfo {
  public:
   GLStandard standard = GLStandard::None;
@@ -100,12 +79,7 @@ class GLCaps : public Caps {
   GLStandard standard = GLStandard::None;
   uint32_t version = 0;
   GLVendor vendor = GLVendor::Other;
-  bool vertexArrayObjectSupport = false;
-  bool packRowLengthSupport = false;
-  bool unpackRowLengthSupport = false;
-  bool textureRedSupport = false;
   bool pboSupport = false;
-  MSFBOType msFBOType = MSFBOType::None;
   bool flushBeforeWritePixels = false;
 
   static const GLCaps* Get(Context* context);
@@ -135,6 +109,5 @@ class GLCaps : public Caps {
   void initGLSupport(const GLInfo& info);
   void initGLESSupport(const GLInfo& info);
   void initWebGLSupport(const GLInfo& info);
-  void initMSAASupport(const GLInfo& info);
 };
 }  // namespace tgfx

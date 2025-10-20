@@ -89,7 +89,6 @@ std::shared_ptr<RenderTarget> RenderTarget::Make(Context* context, int width, in
     return nullptr;
   }
   auto caps = context->caps();
-  mipmapped = caps->mipmapSupport && mipmapped;
   sampleCount = caps->getSampleCount(sampleCount, format);
   auto scratchKey = ComputeRenderTargetScratchKey(width, height, format, sampleCount, mipmapped);
   if (auto renderTarget = Resource::Find<TextureRenderTarget>(context, scratchKey)) {

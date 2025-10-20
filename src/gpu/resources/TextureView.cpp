@@ -67,7 +67,6 @@ std::shared_ptr<TextureView> TextureView::MakeFormat(Context* context, int width
     return nullptr;
   }
   auto gpu = context->gpu();
-  mipmapped = context->caps()->mipmapSupport && mipmapped;
   auto scratchKey = ComputeTextureScratchKey(width, height, pixelFormat, mipmapped);
   auto textureView = Resource::Find<TextureView>(context, scratchKey);
   if (textureView) {

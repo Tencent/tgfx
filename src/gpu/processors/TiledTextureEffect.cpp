@@ -80,11 +80,8 @@ TiledTextureEffect::Sampling::Sampling(const TextureView* textureView, SamplerSt
     TileMode hwMode = TileMode::Clamp;
   };
   auto caps = textureView->getContext()->caps();
-  auto canDoWrapInHW = [&](int size, TileMode tileMode) {
+  auto canDoWrapInHW = [&](TileMode tileMode) {
     if (tileMode == TileMode::Decal && !caps->clampToBorderSupport) {
-      return false;
-    }
-    if (tileMode != TileMode::Clamp && !caps->npotTextureTileSupport && !IsPow2(size)) {
       return false;
     }
     if (textureView->getTexture()->type() != GPUTextureType::TwoD &&
@@ -95,7 +92,7 @@ TiledTextureEffect::Sampling::Sampling(const TextureView* textureView, SamplerSt
   };
   auto resolve = [&](int size, TileMode tileMode, Span subsetSpan, float linearFilterInset) {
     Result1D r;
-    bool canDoModeInHW = canDoWrapInHW(size, tileMode);
+    bool canDoModeInHW = canDoWrapInHW(tileMode);
     if (canDoModeInHW && subsetSpan.a <= 0 && subsetSpan.b >= static_cast<float>(size)) {
       r.hwMode = tileMode;
       return r;

@@ -99,10 +99,6 @@ std::shared_ptr<GPUTexture> GLGPU::createTexture(const GPUTextureDescriptor& des
     LOGE("GLGPU::createTexture() format is not renderable, but usage includes RENDER_ATTACHMENT!");
     return nullptr;
   }
-  if (descriptor.mipLevelCount > 1 && !caps()->mipmapSupport) {
-    LOGE("GLGPU::createTexture() mipmaps are not supported!");
-    return nullptr;
-  }
   auto gl = functions();
   // Clear the previously generated GLError, causing the subsequent CheckGLError to return an
   // incorrect result.
@@ -200,7 +196,7 @@ std::shared_ptr<GPUTexture> GLGPU::importExternalTexture(const BackendRenderTarg
 
 std::shared_ptr<GPUFence> GLGPU::importExternalFence(const BackendSemaphore& semaphore) {
   GLSyncInfo glSyncInfo = {};
-  if (!caps()->semaphoreSupport || !semaphore.getGLSync(&glSyncInfo)) {
+  if (!semaphore.getGLSync(&glSyncInfo)) {
     return nullptr;
   }
   return makeResource<GLFence>(glSyncInfo.sync);
