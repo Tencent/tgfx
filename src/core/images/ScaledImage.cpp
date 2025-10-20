@@ -31,9 +31,9 @@ ScaledImage::ScaledImage(std::shared_ptr<Image> image, int width, int height,
       mipmapped(mipmapped) {
 }
 
-PlacementPtr<FragmentProcessor> ScaledImage::asFragmentProcessor(const FPArgs& args,
-                                                                 const SamplingArgs& samplingArgs,
-                                                                 const Matrix* uvMatrix) const {
+PlacementPtr<FragmentProcessor> ScaledImage::asFragmentProcessor(
+    const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix,
+    std::shared_ptr<ColorSpace> dstColorSpace) const {
   auto drawBounds = args.drawRect;
   if (uvMatrix) {
     drawBounds = uvMatrix->mapRect(drawBounds);
@@ -59,7 +59,8 @@ PlacementPtr<FragmentProcessor> ScaledImage::asFragmentProcessor(const FPArgs& a
   }
   auto newSamplingArgs = samplingArgs;
   newSamplingArgs.sampleArea = std::nullopt;
-  return TiledTextureEffect::Make(textureProxy, newSamplingArgs, &fpMatrix, isAlphaOnly());
+  return TiledTextureEffect::Make(textureProxy, newSamplingArgs, &fpMatrix, isAlphaOnly(),
+                                  std::move(dstColorSpace));
 }
 
 std::shared_ptr<TextureProxy> ScaledImage::lockTextureProxy(const TPArgs& args) const {

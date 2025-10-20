@@ -20,8 +20,10 @@
 
 namespace tgfx {
 DefaultTextureProxy::DefaultTextureProxy(int width, int height, PixelFormat pixelFormat,
-                                         bool mipmapped, ImageOrigin origin)
-    : TextureProxy(width, height, pixelFormat, mipmapped, origin) {
+                                         bool mipmapped, ImageOrigin origin,
+                                         std::shared_ptr<ColorSpace> colorSpace)
+    : TextureProxy(width, height, pixelFormat, mipmapped, origin),
+      _gamutColorSpace(std::move(colorSpace)) {
 }
 
 std::shared_ptr<TextureView> DefaultTextureProxy::getTextureView() const {
@@ -36,7 +38,7 @@ std::shared_ptr<TextureView> DefaultTextureProxy::getTextureView() const {
 
 std::shared_ptr<TextureView> DefaultTextureProxy::onMakeTexture(Context* context) const {
   return TextureView::MakeFormat(context, _backingStoreWidth, _backingStoreHeight, _format,
-                                 _mipmapped, _origin);
+                                 _mipmapped, _origin, _gamutColorSpace);
 }
 
 }  // namespace tgfx

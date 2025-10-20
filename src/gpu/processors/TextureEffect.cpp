@@ -23,12 +23,13 @@
 namespace tgfx {
 PlacementPtr<FragmentProcessor> TextureEffect::Make(std::shared_ptr<TextureProxy> proxy,
                                                     const SamplingArgs& args,
-                                                    const Matrix* uvMatrix, bool forceAsMask) {
+                                                    const Matrix* uvMatrix, bool forceAsMask,
+                                                    std::shared_ptr<ColorSpace> dstColorSpace) {
   if (proxy == nullptr) {
     return nullptr;
   }
   auto isAlphaOnly = proxy->isAlphaOnly();
-  auto processor = MakeRGBAAA(proxy, args, {}, uvMatrix);
+  auto processor = MakeRGBAAA(proxy, args, {}, uvMatrix, std::move(dstColorSpace));
   if (forceAsMask && !isAlphaOnly) {
     auto drawingBuffer = proxy->getContext()->drawingBuffer();
     processor = FragmentProcessor::MulInputByChildAlpha(drawingBuffer, std::move(processor));
@@ -38,10 +39,12 @@ PlacementPtr<FragmentProcessor> TextureEffect::Make(std::shared_ptr<TextureProxy
 
 TextureEffect::TextureEffect(std::shared_ptr<TextureProxy> proxy, const SamplingOptions& sampling,
                              SrcRectConstraint constraint, const Point& alphaStart,
-                             const Matrix& uvMatrix, const std::optional<Rect>& subset)
+                             const Matrix& uvMatrix, const std::optional<Rect>& subset,
+                             std::shared_ptr<ColorSpace> dstColorSpace)
     : FragmentProcessor(ClassID()), textureProxy(std::move(proxy)), samplerState(sampling),
       constraint(constraint), alphaStart(alphaStart),
-      coordTransform(uvMatrix, textureProxy.get(), alphaStart), subset(subset) {
+      coordTransform(uvMatrix, textureProxy.get(), alphaStart), subset(subset),
+      dstColorSpace(std::move(dstColorSpace)) {
   addCoordTransform(&coordTransform);
 }
 
@@ -62,6 +65,13 @@ void TextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
   flags |= needSubset() ? 16 : 0;
   flags |= constraint == SrcRectConstraint::Strict ? 32 : 0;
   bytesKey->write(flags);
+  auto srcColorSpace = getTextureView()->gamutColorSpace();
+  auto steps = std::make_shared<ColorSpaceXformSteps>(
+      srcColorSpace.get(), AlphaType::Premultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
+  uint64_t xformKey = ColorSpaceXformSteps::XFormKey(steps.get());
+  auto key = reinterpret_cast<uint32_t*>(&xformKey);
+  bytesKey->write(key[0]);
+  bytesKey->write(key[1]);
 }
 
 size_t TextureEffect::onCountTextureSamplers() const {

@@ -316,7 +316,7 @@ void PDFBitmap::SerializeImage(const std::shared_ptr<Image>& image, int /*encodi
     auto canvas = surface->getCanvas();
     canvas->drawImage(image);
 
-    Bitmap bitmap(surface->width(), surface->height());
+    Bitmap bitmap(surface->width(), surface->height(), false, true, surface->gamutColorSpace());
     auto pixels = bitmap.lockPixels();
     //bitmap in pdf must be unpremultiplied
     if (surface->readPixels(bitmap.info().makeAlphaType(AlphaType::Unpremultiplied), pixels)) {

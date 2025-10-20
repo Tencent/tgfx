@@ -27,9 +27,12 @@ class DefaultTextureProxy : public TextureProxy {
 
  protected:
   DefaultTextureProxy(int width, int height, PixelFormat pixelFormat, bool mipmapped = false,
-                      ImageOrigin origin = ImageOrigin::TopLeft);
+                      ImageOrigin origin = ImageOrigin::TopLeft,
+                      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   virtual std::shared_ptr<TextureView> onMakeTexture(Context* context) const;
+
+  std::shared_ptr<ColorSpace> _gamutColorSpace = ColorSpace::MakeSRGB();
 
  private:
   friend class ProxyProvider;

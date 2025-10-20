@@ -19,8 +19,10 @@
 #include "PixelRef.h"
 
 namespace tgfx {
-std::shared_ptr<PixelRef> PixelRef::Make(int width, int height, bool alphaOnly, bool tryHardware) {
-  auto pixelBuffer = PixelBuffer::Make(width, height, alphaOnly, tryHardware);
+std::shared_ptr<PixelRef> PixelRef::Make(int width, int height, bool alphaOnly, bool tryHardware,
+                                         std::shared_ptr<ColorSpace> colorSpace) {
+  auto pixelBuffer =
+      PixelBuffer::Make(width, height, alphaOnly, tryHardware, std::move(colorSpace));
   return Wrap(std::move(pixelBuffer));
 }
 
@@ -34,6 +36,27 @@ std::shared_ptr<PixelRef> PixelRef::Wrap(std::shared_ptr<PixelBuffer> pixelBuffe
 PixelRef::PixelRef(std::shared_ptr<PixelBuffer> pixelBuffer) : pixelBuffer(std::move(pixelBuffer)) {
 }
 
+void PixelRef::setGamutColorSpace(std::shared_ptr<ColorSpace> colorSpace) {
+  auto pixels = pixelBuffer->lockPixels();
+  if (pixels == nullptr) {
+    return;
+  }
+  if (pixelBuffer.use_count() != 1) {
+    auto& info = pixelBuffer->info();
+    auto newBuffer = PixelBuffer::Make(info.width(), info.height(), info.isAlphaOnly(),
+                                       pixelBuffer->isHardwareBacked());
+    if (newBuffer == nullptr) {
+      pixelBuffer->unlockPixels();
+      return;
+    }
+    auto dstPixels = newBuffer->lockPixels();
+    memcpy(dstPixels, pixels, info.byteSize());
+    pixelBuffer->unlockPixels();
+    pixelBuffer = newBuffer;
+  }
+  pixelBuffer->setGamutColorSpace(std::move(colorSpace));
+}
+
 void* PixelRef::lockWritablePixels() {
   auto pixels = pixelBuffer->lockPixels();
   if (pixels == nullptr) {
@@ -41,8 +64,9 @@ void* PixelRef::lockWritablePixels() {
   }
   if (pixelBuffer.use_count() != 1) {
     auto& info = pixelBuffer->info();
-    auto newBuffer = PixelBuffer::Make(info.width(), info.height(), info.isAlphaOnly(),
-                                       pixelBuffer->isHardwareBacked());
+    auto newBuffer =
+        PixelBuffer::Make(info.width(), info.height(), info.isAlphaOnly(),
+                          pixelBuffer->isHardwareBacked(), pixelBuffer->gamutColorSpace());
     if (newBuffer == nullptr) {
       pixelBuffer->unlockPixels();
       return nullptr;

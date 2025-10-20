@@ -26,7 +26,8 @@ class GLSLQuadPerEdgeAAGeometryProcessor : public QuadPerEdgeAAGeometryProcessor
  public:
   GLSLQuadPerEdgeAAGeometryProcessor(int width, int height, AAType aa,
                                      std::optional<Color> commonColor,
-                                     std::optional<Matrix> uvMatrix, bool hasSubset);
+                                     std::optional<Matrix> uvMatrix, bool hasSubset,
+                                     std::shared_ptr<ColorSpace> colorSpace);
 
   void emitCode(EmitArgs& args) const override;
 

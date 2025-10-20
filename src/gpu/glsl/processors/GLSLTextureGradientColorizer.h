@@ -23,8 +23,12 @@
 namespace tgfx {
 class GLSLTextureGradientColorizer : public TextureGradientColorizer {
  public:
-  explicit GLSLTextureGradientColorizer(std::shared_ptr<TextureProxy> gradient);
+  explicit GLSLTextureGradientColorizer(std::shared_ptr<TextureProxy> gradient,
+                                        std::shared_ptr<ColorSpace> colorSpace);
 
   void emitCode(EmitArgs& args) const override;
+
+ protected:
+  void onSetData(UniformData*, UniformData*) const override;
 };
 }  // namespace tgfx

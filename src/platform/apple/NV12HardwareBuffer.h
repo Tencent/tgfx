@@ -37,6 +37,11 @@ class NV12HardwareBuffer : public ImageBuffer {
     return false;
   }
 
+  std::shared_ptr<ColorSpace> gamutColorSpace() const override;
+
+  void setGamutColorSpace(std::shared_ptr<ColorSpace>) override {
+  }
+
  protected:
   std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) const override;
 

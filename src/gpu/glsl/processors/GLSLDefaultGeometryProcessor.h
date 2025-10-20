@@ -25,7 +25,8 @@ namespace tgfx {
 class GLSLDefaultGeometryProcessor : public DefaultGeometryProcessor {
  public:
   GLSLDefaultGeometryProcessor(Color color, int width, int height, AAType aa,
-                               const Matrix& viewMatrix, const Matrix& uvMatrix);
+                               const Matrix& viewMatrix, const Matrix& uvMatrix,
+                               std::shared_ptr<ColorSpace> dstColorSpace = nullptr);
 
   void emitCode(EmitArgs& args) const override;
 

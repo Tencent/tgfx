@@ -20,11 +20,11 @@
 
 namespace tgfx {
 
-Transform3DGeometryProcessor::Transform3DGeometryProcessor(AAType aa, const Matrix3D& transform,
-                                                           const Vec2& ndcScale,
-                                                           const Vec2& ndcOffset)
+Transform3DGeometryProcessor::Transform3DGeometryProcessor(
+    AAType aa, const Matrix3D& transform, const Vec2& ndcScale, const Vec2& ndcOffset,
+    std::shared_ptr<ColorSpace> dstColorSpace)
     : GeometryProcessor(ClassID()), aa(aa), matrix(transform), ndcScale(ndcScale),
-      ndcOffset(ndcOffset) {
+      ndcOffset(ndcOffset), dstColorSpace(std::move(dstColorSpace)) {
   position = {"aPosition", VertexFormat::Float2};
   if (aa == AAType::Coverage) {
     coverage = {"inCoverage", VertexFormat::Float};

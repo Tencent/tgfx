@@ -35,7 +35,7 @@ namespace tgfx {
 
 TGFX_TEST(ReadPixelsTest, PixelMap) {
   auto codec = MakeImageCodec("resources/apitest/test_timestretch.png");
-  auto colorSpace = codec->colorSpace();
+  auto colorSpace = codec->gamutColorSpace();
   EXPECT_TRUE(codec != nullptr);
   auto width = codec->width();
   auto height = codec->height();
@@ -159,7 +159,7 @@ TGFX_TEST(ReadPixelsTest, PixelMap) {
 TGFX_TEST(ReadPixelsTest, Surface) {
   auto codec = MakeImageCodec("resources/apitest/test_timestretch.png");
   ASSERT_TRUE(codec != nullptr);
-  Bitmap bitmap(codec->width(), codec->height(), false, false);
+  Bitmap bitmap(codec->width(), codec->height(), false, false, codec->gamutColorSpace());
   ASSERT_FALSE(bitmap.isEmpty());
   auto pixels = bitmap.lockPixels();
   auto result = codec->readPixels(bitmap.info(), pixels);
@@ -182,7 +182,7 @@ TGFX_TEST(ReadPixelsTest, Surface) {
 
   auto RGBAInfo = ImageInfo::Make(width, height, ColorType::RGBA_8888, AlphaType::Premultiplied);
   result = surface->readPixels(RGBAInfo, pixels);
-  auto colorSpace = surface->colorSpace();
+  auto colorSpace = surface->gamutColorSpace();
   EXPECT_TRUE(result);
   CHECK_PIXELS(RGBAInfo, pixels, "Surface_rgb_A_to_rgb_A", colorSpace);
 
@@ -208,7 +208,7 @@ TGFX_TEST(ReadPixelsTest, Surface) {
   CHECK_PIXELS(RGBARectInfo, pixels, "Surface_rgb_A_to_rgb_A_100_-100", colorSpace);
 
   surface = Surface::Make(context, width, height, true);
-  colorSpace = surface->colorSpace();
+  colorSpace = surface->gamutColorSpace();
   ASSERT_TRUE(surface != nullptr);
   canvas = surface->getCanvas();
   canvas->drawImage(image);
@@ -232,7 +232,7 @@ TGFX_TEST(ReadPixelsTest, Surface) {
   result = CreateGLTexture(context, width, height, &textureInfo);
   EXPECT_TRUE(result);
   surface = Surface::MakeFrom(context, {textureInfo, width, height}, ImageOrigin::BottomLeft);
-  colorSpace = surface->colorSpace();
+  colorSpace = surface->gamutColorSpace();
   ASSERT_TRUE(surface != nullptr);
   canvas = surface->getCanvas();
   canvas->clear();
@@ -263,7 +263,7 @@ TGFX_TEST(ReadPixelsTest, Surface) {
 
 TGFX_TEST(ReadPixelsTest, PngCodec) {
   auto rgbaCodec = MakeImageCodec("resources/apitest/imageReplacement.png");
-  auto colorSpace = rgbaCodec->colorSpace();
+  auto colorSpace = rgbaCodec->gamutColorSpace();
   ASSERT_TRUE(rgbaCodec != nullptr);
   EXPECT_EQ(rgbaCodec->width(), 110);
   EXPECT_EQ(rgbaCodec->height(), 110);
@@ -280,9 +280,8 @@ TGFX_TEST(ReadPixelsTest, PngCodec) {
     static_cast<uint8_t*>(pixels)[i] = 255;
   }
   CHECK_PIXELS(RGBAInfo, pixels, "PngCodec_Decode_RGBA", colorSpace);
-  auto bytes = ImageCodec::Encode(Pixmap(RGBAInfo, pixels), EncodedFormat::PNG, 100);
+  auto bytes = ImageCodec::Encode(Pixmap(RGBAInfo, pixels), EncodedFormat::PNG, 100, colorSpace);
   auto codec = ImageCodec::MakeFrom(bytes);
-  colorSpace = codec->colorSpace();
   ASSERT_TRUE(codec != nullptr);
   EXPECT_EQ(codec->width(), 110);
   EXPECT_EQ(codec->height(), 110);
@@ -296,9 +295,8 @@ TGFX_TEST(ReadPixelsTest, PngCodec) {
   buffer.clear();
   EXPECT_TRUE(rgbaCodec->readPixels(A8Info, pixels));
   CHECK_PIXELS(A8Info, pixels, "PngCodec_Decode_Alpha8", colorSpace);
-  bytes = ImageCodec::Encode(Pixmap(A8Info, pixels), EncodedFormat::PNG, 100);
+  bytes = ImageCodec::Encode(Pixmap(A8Info, pixels), EncodedFormat::PNG, 100, colorSpace);
   codec = ImageCodec::MakeFrom(bytes);
-  colorSpace = codec->colorSpace();
   ASSERT_TRUE(codec != nullptr);
   buffer.clear();
   EXPECT_TRUE(codec->readPixels(A8Info, pixels));
@@ -309,9 +307,8 @@ TGFX_TEST(ReadPixelsTest, PngCodec) {
   buffer.clear();
   EXPECT_TRUE(rgbaCodec->readPixels(Gray8Info, pixels));
   CHECK_PIXELS(Gray8Info, pixels, "PngCodec_Decode_Gray8", colorSpace);
-  bytes = ImageCodec::Encode(Pixmap(Gray8Info, pixels), EncodedFormat::PNG, 100);
+  bytes = ImageCodec::Encode(Pixmap(Gray8Info, pixels), EncodedFormat::PNG, 100, colorSpace);
   codec = ImageCodec::MakeFrom(bytes);
-  colorSpace = codec->colorSpace();
   ASSERT_TRUE(codec != nullptr);
   buffer.clear();
   EXPECT_TRUE(codec->readPixels(Gray8Info, pixels));
@@ -322,9 +319,8 @@ TGFX_TEST(ReadPixelsTest, PngCodec) {
   buffer.clear();
   EXPECT_TRUE(rgbaCodec->readPixels(RGB565Info, pixels));
   CHECK_PIXELS(RGB565Info, pixels, "PngCodec_Decode_RGB565", colorSpace);
-  bytes = ImageCodec::Encode(Pixmap(RGB565Info, pixels), EncodedFormat::PNG, 100);
+  bytes = ImageCodec::Encode(Pixmap(RGB565Info, pixels), EncodedFormat::PNG, 100, colorSpace);
   codec = ImageCodec::MakeFrom(bytes);
-  colorSpace = codec->colorSpace();
   ASSERT_TRUE(codec != nullptr);
   buffer.clear();
   EXPECT_TRUE(codec->readPixels(RGB565Info, pixels));
@@ -333,7 +329,7 @@ TGFX_TEST(ReadPixelsTest, PngCodec) {
 
 TGFX_TEST(ReadPixelsTest, WebpCodec) {
   auto rgbaCodec = MakeImageCodec("resources/apitest/imageReplacement.webp");
-  auto colorSpace = rgbaCodec->colorSpace();
+  auto colorSpace = rgbaCodec->gamutColorSpace();
   ASSERT_TRUE(rgbaCodec != nullptr);
   EXPECT_EQ(rgbaCodec->width(), 110);
   EXPECT_EQ(rgbaCodec->height(), 110);
@@ -347,9 +343,8 @@ TGFX_TEST(ReadPixelsTest, WebpCodec) {
   EXPECT_TRUE(rgbaCodec->readPixels(RGBAInfo, pixels));
   CHECK_PIXELS(RGBAInfo, pixels, "WebpCodec_Decode_RGBA", colorSpace);
   Pixmap pixmap(RGBAInfo, pixels);
-  auto bytes = ImageCodec::Encode(pixmap, EncodedFormat::WEBP, 100);
+  auto bytes = ImageCodec::Encode(pixmap, EncodedFormat::WEBP, 100, colorSpace);
   auto codec = ImageCodec::MakeFrom(bytes);
-  colorSpace = codec->colorSpace();
   ASSERT_TRUE(codec != nullptr);
   EXPECT_EQ(codec->width(), 110);
   EXPECT_EQ(codec->height(), 110);
@@ -363,9 +358,8 @@ TGFX_TEST(ReadPixelsTest, WebpCodec) {
   buffer.clear();
   EXPECT_TRUE(rgbaCodec->readPixels(A8Info, pixels));
   CHECK_PIXELS(A8Info, pixels, "WebpCodec_Decode_Alpha8", colorSpace);
-  bytes = ImageCodec::Encode(Pixmap(A8Info, pixels), EncodedFormat::WEBP, 100);
+  bytes = ImageCodec::Encode(Pixmap(A8Info, pixels), EncodedFormat::WEBP, 100, colorSpace);
   codec = ImageCodec::MakeFrom(bytes);
-  colorSpace = codec->colorSpace();
   buffer.clear();
   EXPECT_TRUE(codec->readPixels(A8Info, pixels));
   CHECK_PIXELS(A8Info, pixels, "WebpCodec_Encode_Alpha8", colorSpace);
@@ -375,9 +369,8 @@ TGFX_TEST(ReadPixelsTest, WebpCodec) {
   buffer.clear();
   EXPECT_TRUE(rgbaCodec->readPixels(Gray8Info, pixels));
   CHECK_PIXELS(Gray8Info, pixels, "WebpCodec_Decode_Gray8", colorSpace);
-  bytes = ImageCodec::Encode(Pixmap(Gray8Info, pixels), EncodedFormat::WEBP, 100);
+  bytes = ImageCodec::Encode(Pixmap(Gray8Info, pixels), EncodedFormat::WEBP, 100, colorSpace);
   codec = ImageCodec::MakeFrom(bytes);
-  colorSpace = codec->colorSpace();
   buffer.clear();
   EXPECT_TRUE(codec->readPixels(Gray8Info, pixels));
   CHECK_PIXELS(Gray8Info, pixels, "WebpCodec_Encode_Gray8", colorSpace);
@@ -387,9 +380,8 @@ TGFX_TEST(ReadPixelsTest, WebpCodec) {
   buffer.clear();
   EXPECT_TRUE(rgbaCodec->readPixels(RGB565Info, pixels));
   CHECK_PIXELS(RGB565Info, pixels, "WebpCodec_Decode_RGB565", colorSpace);
-  bytes = ImageCodec::Encode(Pixmap(RGB565Info, pixels), EncodedFormat::WEBP, 100);
+  bytes = ImageCodec::Encode(Pixmap(RGB565Info, pixels), EncodedFormat::WEBP, 100, colorSpace);
   codec = ImageCodec::MakeFrom(bytes);
-  colorSpace = codec->colorSpace();
   buffer.clear();
   EXPECT_TRUE(codec->readPixels(RGB565Info, pixels));
   CHECK_PIXELS(RGB565Info, pixels, "WebpCodec_Encode_RGB565", colorSpace);
@@ -397,7 +389,7 @@ TGFX_TEST(ReadPixelsTest, WebpCodec) {
 
 TGFX_TEST(ReadPixelsTest, JpegCodec) {
   auto rgbaCodec = MakeImageCodec("resources/apitest/imageReplacement.jpg");
-  auto colorSpace = rgbaCodec->colorSpace();
+  auto colorSpace = rgbaCodec->gamutColorSpace();
   ASSERT_TRUE(rgbaCodec != nullptr);
   EXPECT_EQ(rgbaCodec->width(), 110);
   EXPECT_EQ(rgbaCodec->height(), 110);
@@ -409,9 +401,8 @@ TGFX_TEST(ReadPixelsTest, JpegCodec) {
   ASSERT_TRUE(pixels);
   EXPECT_TRUE(rgbaCodec->readPixels(RGBAInfo, pixels));
   CHECK_PIXELS(RGBAInfo, pixels, "JpegCodec_Decode_RGBA", colorSpace);
-  auto bytes = ImageCodec::Encode(Pixmap(RGBAInfo, pixels), EncodedFormat::JPEG, 20);
+  auto bytes = ImageCodec::Encode(Pixmap(RGBAInfo, pixels), EncodedFormat::JPEG, 20, colorSpace);
   auto codec = ImageCodec::MakeFrom(bytes);
-  colorSpace = codec->colorSpace();
   ASSERT_TRUE(codec != nullptr);
   EXPECT_EQ(codec->width(), 110);
   EXPECT_EQ(codec->height(), 110);
@@ -425,9 +416,8 @@ TGFX_TEST(ReadPixelsTest, JpegCodec) {
   buffer.clear();
   EXPECT_TRUE(rgbaCodec->readPixels(A8Info, pixels));
   CHECK_PIXELS(A8Info, pixels, "JpegCodec_Decode_Alpha8", colorSpace);
-  bytes = ImageCodec::Encode(Pixmap(A8Info, pixels), EncodedFormat::JPEG, 100);
+  bytes = ImageCodec::Encode(Pixmap(A8Info, pixels), EncodedFormat::JPEG, 100, colorSpace);
   codec = ImageCodec::MakeFrom(bytes);
-  colorSpace = codec->colorSpace();
   buffer.clear();
   EXPECT_TRUE(codec->readPixels(A8Info, pixels));
   CHECK_PIXELS(A8Info, pixels, "JpegCodec_Encode_Alpha8", colorSpace);
@@ -437,9 +427,8 @@ TGFX_TEST(ReadPixelsTest, JpegCodec) {
   buffer.clear();
   EXPECT_TRUE(rgbaCodec->readPixels(Gray8Info, pixels));
   CHECK_PIXELS(Gray8Info, pixels, "JpegCodec_Decode_Gray8", colorSpace);
-  bytes = ImageCodec::Encode(Pixmap(Gray8Info, pixels), EncodedFormat::JPEG, 70);
+  bytes = ImageCodec::Encode(Pixmap(Gray8Info, pixels), EncodedFormat::JPEG, 70, colorSpace);
   codec = ImageCodec::MakeFrom(bytes);
-  colorSpace = codec->colorSpace();
   buffer.clear();
   EXPECT_TRUE(codec->readPixels(Gray8Info, pixels));
   CHECK_PIXELS(Gray8Info, pixels, "JpegCodec_Encode_Gray8", colorSpace);
@@ -449,9 +438,8 @@ TGFX_TEST(ReadPixelsTest, JpegCodec) {
   buffer.clear();
   EXPECT_TRUE(rgbaCodec->readPixels(RGB565Info, pixels));
   CHECK_PIXELS(RGB565Info, pixels, "JpegCodec_Decode_RGB565", colorSpace);
-  bytes = ImageCodec::Encode(Pixmap(RGB565Info, pixels), EncodedFormat::JPEG, 80);
+  bytes = ImageCodec::Encode(Pixmap(RGB565Info, pixels), EncodedFormat::JPEG, 80, colorSpace);
   codec = ImageCodec::MakeFrom(bytes);
-  colorSpace = codec->colorSpace();
   buffer.clear();
   EXPECT_TRUE(codec->readPixels(RGB565Info, pixels));
   CHECK_PIXELS(RGB565Info, pixels, "JpegCodec_Encode_RGB565", colorSpace);
@@ -459,7 +447,7 @@ TGFX_TEST(ReadPixelsTest, JpegCodec) {
 
 TGFX_TEST(ReadPixelsTest, NativeCodec) {
   auto rgbaCodec = MakeNativeCodec("resources/apitest/imageReplacement.png");
-  auto colorSpace = rgbaCodec->colorSpace();
+  auto colorSpace = rgbaCodec->gamutColorSpace();
   ASSERT_TRUE(rgbaCodec != nullptr);
   EXPECT_EQ(rgbaCodec->width(), 110);
   EXPECT_EQ(rgbaCodec->height(), 110);
@@ -473,7 +461,6 @@ TGFX_TEST(ReadPixelsTest, NativeCodec) {
   CHECK_PIXELS(RGBAInfo, pixels, "NativeCodec_Decode_RGBA", colorSpace);
   auto bytes = ImageCodec::Encode(Pixmap(RGBAInfo, pixels), EncodedFormat::PNG, 100, colorSpace);
   auto codec = ImageCodec::MakeNativeCodec(bytes);
-  colorSpace = codec->colorSpace();
   ASSERT_TRUE(codec != nullptr);
   ASSERT_EQ(codec->width(), 110);
   ASSERT_EQ(codec->height(), 110);
@@ -487,9 +474,8 @@ TGFX_TEST(ReadPixelsTest, NativeCodec) {
   buffer.clear();
   EXPECT_TRUE(rgbaCodec->readPixels(A8Info, pixels));
   CHECK_PIXELS(A8Info, pixels, "NativeCodec_Decode_Alpha8", colorSpace);
-  bytes = ImageCodec::Encode(Pixmap(A8Info, pixels), EncodedFormat::PNG, 100);
+  bytes = ImageCodec::Encode(Pixmap(A8Info, pixels), EncodedFormat::PNG, 100, colorSpace);
   codec = ImageCodec::MakeNativeCodec(bytes);
-  colorSpace = codec->colorSpace();
   ASSERT_TRUE(codec != nullptr);
   buffer.clear();
   EXPECT_TRUE(codec->readPixels(A8Info, pixels));
@@ -498,7 +484,7 @@ TGFX_TEST(ReadPixelsTest, NativeCodec) {
 
 TGFX_TEST(ReadPixelsTest, ReadScaleCodec) {
   auto codec = MakeImageCodec("resources/apitest/rotation.jpg");
-  auto colorSpace = codec->colorSpace();
+  auto colorSpace = codec->gamutColorSpace();
   EXPECT_TRUE(codec != nullptr);
   auto width = codec->width() / 10;
   auto height = codec->height() / 10;

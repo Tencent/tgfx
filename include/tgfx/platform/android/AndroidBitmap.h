@@ -19,6 +19,7 @@
 #pragma once
 
 #include <jni.h>
+#include "tgfx/core/ColorSpace.h"
 #include "tgfx/platform/android/HardwareBufferJNI.h"
 
 namespace tgfx {
@@ -42,5 +43,11 @@ class AndroidBitmap {
    * Bitmap is not 'HARDWARE' or the API level of the current system is less than 30.
    */
   static HardwareBufferRef GetHardwareBuffer(JNIEnv* env, jobject bitmap);
+
+  static std::shared_ptr<ColorSpace> GetGamutColorSpace(JNIEnv* env, jobject bitmap);
+
+ private:
+  static void JNIInit(JNIEnv* env);
+  friend class JNIInit;
 };
 }  // namespace tgfx

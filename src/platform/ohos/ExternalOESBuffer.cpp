@@ -18,6 +18,7 @@
 
 #include "ExternalOESBuffer.h"
 #include <mutex>
+#include "core/utils/ColorSpaceHelper.h"
 #include "gpu/resources/TextureView.h"
 
 namespace tgfx {
@@ -71,6 +72,10 @@ int ExternalOESBuffer::height() const {
   OH_NativeBuffer_Config config;
   OH_NativeBuffer_GetConfig(hardwareBuffer, &config);
   return config.height;
+}
+
+std::shared_ptr<ColorSpace> ExternalOESBuffer::gamutColorSpace() const {
+  return MakeColorSpaceFromYUVColorSpace(colorSpace);
 }
 
 std::shared_ptr<TextureView> ExternalOESBuffer::onMakeTexture(Context* context, bool) const {

@@ -124,7 +124,7 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(blurDstWidth), static_cast<int>(blurDstHeight), isAlphaOnly, 1,
       defaultBlurTargetMipmapped, ImageOrigin::TopLeft,
-      blur2D || isBlurDstScaled ? BackingFit::Approx : args.backingFit);
+      blur2D || isBlurDstScaled ? BackingFit::Approx : args.backingFit, source->gamutColorSpace());
   if (!renderTarget) {
     return nullptr;
   }
@@ -134,12 +134,13 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
            args.renderFlags);
 
     SamplingArgs samplingArgs = {tileMode, tileMode, {}, SrcRectConstraint::Fast};
-    sourceFragment = TiledTextureEffect::Make(renderTarget->asTextureProxy(), samplingArgs);
+    sourceFragment = TiledTextureEffect::Make(renderTarget->asTextureProxy(), samplingArgs, nullptr,
+                                              false, renderTarget->gamutColorSpace());
     const bool finalBlurTargetMipmapped = (args.mipmapped && !isBlurDstScaled);
     renderTarget = RenderTargetProxy::MakeFallback(
         args.context, static_cast<int>(blurDstWidth), static_cast<int>(blurDstHeight), isAlphaOnly,
         1, finalBlurTargetMipmapped, ImageOrigin::TopLeft,
-        isBlurDstScaled ? BackingFit::Approx : args.backingFit);
+        isBlurDstScaled ? BackingFit::Approx : args.backingFit, source->gamutColorSpace());
     if (!renderTarget) {
       return nullptr;
     }
@@ -158,10 +159,11 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
                                            clipBounds.height() * blurDstScaleY / dstDrawHeight);
     finalUVMatrix.postTranslate((clipBounds.left - srcSampleBounds.left) * blurDstScaleX,
                                 (clipBounds.top - srcSampleBounds.top) * blurDstScaleY);
-    auto finalProcessor = TextureEffect::Make(renderTarget->asTextureProxy(), {}, &finalUVMatrix);
+    auto finalProcessor = TextureEffect::Make(renderTarget->asTextureProxy(), {}, &finalUVMatrix,
+                                              false, source->gamutColorSpace());
     renderTarget = RenderTargetProxy::MakeFallback(
         args.context, static_cast<int>(dstDrawWidth), static_cast<int>(dstDrawHeight), isAlphaOnly,
-        1, args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
+        1, args.mipmapped, ImageOrigin::TopLeft, args.backingFit, source->gamutColorSpace());
     if (!renderTarget) {
       return nullptr;
     }
@@ -178,8 +180,9 @@ Rect GaussianBlurImageFilter::onFilterBounds(const Rect& srcRect) const {
 
 PlacementPtr<FragmentProcessor> GaussianBlurImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-    SrcRectConstraint constraint, const Matrix* uvMatrix) const {
-  return makeFPFromTextureProxy(source, args, sampling, constraint, uvMatrix);
+    SrcRectConstraint constraint, const Matrix* uvMatrix,
+    std::shared_ptr<ColorSpace> dstColorSpace) const {
+  return makeFPFromTextureProxy(source, args, sampling, constraint, uvMatrix, dstColorSpace);
 }
 
 PlacementPtr<FragmentProcessor> GaussianBlurImageFilter::getSourceFragmentProcessor(
@@ -197,7 +200,8 @@ PlacementPtr<FragmentProcessor> GaussianBlurImageFilter::getSourceFragmentProces
   SamplingArgs samplingArgs = {};
   samplingArgs.tileModeX = tileMode;
   samplingArgs.tileModeY = tileMode;
-  auto fp = FragmentProcessor::Make(source, args, samplingArgs, &uvMatrix);
+  auto fp =
+      FragmentProcessor::Make(source, args, samplingArgs, &uvMatrix, source->gamutColorSpace());
   if (fp == nullptr) {
     return nullptr;
   }
@@ -206,12 +210,14 @@ PlacementPtr<FragmentProcessor> GaussianBlurImageFilter::getSourceFragmentProces
   }
   auto renderTarget = RenderTargetProxy::MakeFallback(
       context, static_cast<int>(scaledDrawRect.width()), static_cast<int>(scaledDrawRect.height()),
-      source->isAlphaOnly(), 1);
+      source->isAlphaOnly(), 1, false, ImageOrigin::TopLeft, BackingFit::Exact,
+      source->gamutColorSpace());
   if (renderTarget == nullptr) {
     return nullptr;
   }
   context->drawingManager()->fillRTWithFP(renderTarget, std::move(fp), renderFlags);
-  return TiledTextureEffect::Make(renderTarget->asTextureProxy(), samplingArgs);
+  return TiledTextureEffect::Make(renderTarget->asTextureProxy(), samplingArgs, nullptr, false,
+                                  source->gamutColorSpace());
 }
 
 }  // namespace tgfx

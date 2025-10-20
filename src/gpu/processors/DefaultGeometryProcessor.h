@@ -24,10 +24,9 @@
 namespace tgfx {
 class DefaultGeometryProcessor : public GeometryProcessor {
  public:
-  static PlacementPtr<DefaultGeometryProcessor> Make(BlockBuffer* buffer, Color color, int width,
-                                                     int height, AAType aa,
-                                                     const Matrix& viewMatrix,
-                                                     const Matrix& uvMatrix);
+  static PlacementPtr<DefaultGeometryProcessor> Make(
+      BlockBuffer* buffer, Color color, int width, int height, AAType aa, const Matrix& viewMatrix,
+      const Matrix& uvMatrix, std::shared_ptr<ColorSpace> dstColorSpace = nullptr);
 
   std::string name() const override {
     return "DefaultGeometryProcessor";
@@ -37,7 +36,7 @@ class DefaultGeometryProcessor : public GeometryProcessor {
   DEFINE_PROCESSOR_CLASS_ID
 
   DefaultGeometryProcessor(Color color, int width, int height, AAType aa, const Matrix& viewMatrix,
-                           const Matrix& uvMatrix);
+                           const Matrix& uvMatrix, std::shared_ptr<ColorSpace> dstColorSpace);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
@@ -50,5 +49,7 @@ class DefaultGeometryProcessor : public GeometryProcessor {
   AAType aa = AAType::None;
   Matrix viewMatrix = {};
   Matrix uvMatrix = {};
+
+  std::shared_ptr<ColorSpace> dstColorSpace = nullptr;
 };
 }  // namespace tgfx

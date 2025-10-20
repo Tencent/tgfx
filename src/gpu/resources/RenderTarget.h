@@ -34,7 +34,8 @@ class RenderTarget {
    */
   static std::shared_ptr<RenderTarget> MakeFrom(Context* context,
                                                 const BackendRenderTarget& backendRenderTarget,
-                                                ImageOrigin origin = ImageOrigin::TopLeft);
+                                                ImageOrigin origin = ImageOrigin::TopLeft,
+                                                std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
    * Creates a new RenderTarget with an existing backend texture. If adopted is true, the
@@ -44,13 +45,15 @@ class RenderTarget {
                                                 const BackendTexture& backendTexture,
                                                 int sampleCount = 1,
                                                 ImageOrigin origin = ImageOrigin::TopLeft,
-                                                bool adopted = false);
+                                                bool adopted = false,
+                                                std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
    * Creates a new RenderTarget with an existing HardwareBuffer and sample count.
    */
   static std::shared_ptr<RenderTarget> MakeFrom(Context* context, HardwareBufferRef hardwareBuffer,
-                                                int sampleCount = 1);
+                                                int sampleCount = 1,
+                                                std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
    * Creates a new RenderTarget instance with specified context, with, height, format, sample count,
@@ -59,7 +62,8 @@ class RenderTarget {
   static std::shared_ptr<RenderTarget> Make(Context* context, int width, int height,
                                             PixelFormat format = PixelFormat::RGBA_8888,
                                             int sampleCount = 1, bool mipmapped = false,
-                                            ImageOrigin origin = ImageOrigin::TopLeft);
+                                            ImageOrigin origin = ImageOrigin::TopLeft,
+                                            std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
    * Returns the context associated with the RenderTarget.
@@ -144,5 +148,9 @@ class RenderTarget {
    * possible. Returns true if pixels are copied to dstPixels.
    */
   bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0, int srcY = 0) const;
+
+  virtual void setGamutColorSpace(std::shared_ptr<ColorSpace> colorSpace) = 0;
+
+  virtual std::shared_ptr<ColorSpace> gamutColorSpace() const = 0;
 };
 }  // namespace tgfx

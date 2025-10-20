@@ -59,7 +59,8 @@ void RuntimeDrawTask::execute(CommandEncoder* encoder) {
   for (size_t i = 0; i < inputTextures.size(); i++) {
     std::shared_ptr<TextureView> textureView = nullptr;
     if (auto inputProxy = inputTextures[i]) {
-      textureView = GetFlatTextureView(encoder, std::move(inputProxy), inputVertexBuffers[i].get());
+      textureView = GetFlatTextureView(encoder, std::move(inputProxy), inputVertexBuffers[i].get(),
+                                       renderTargetProxy->gamutColorSpace());
     }
     if (textureView == nullptr) {
       LOGE("RuntimeDrawTask::execute() Failed to get the input %d texture view!", i);
@@ -106,13 +107,14 @@ void RuntimeDrawTask::execute(CommandEncoder* encoder) {
 
 std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
     CommandEncoder* encoder, std::shared_ptr<TextureProxy> textureProxy,
-    VertexBufferProxyView* vertexBufferProxyView) {
+    VertexBufferProxyView* vertexBufferProxyView, std::shared_ptr<ColorSpace> dstColorSpace) {
   auto textureView = textureProxy->getTextureView();
   if (textureView == nullptr) {
     return nullptr;
   }
   if (!textureView->isYUV() && textureView->getTexture()->type() == GPUTextureType::TwoD &&
-      textureView->origin() == ImageOrigin::TopLeft) {
+      textureView->origin() == ImageOrigin::TopLeft &&
+      ColorSpace::Equals(textureView->gamutColorSpace().get(), dstColorSpace.get())) {
     return textureView;
   }
   auto vertexBuffer = vertexBufferProxyView ? vertexBufferProxyView->getBuffer() : nullptr;
@@ -122,7 +124,7 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
   auto context = textureView->getContext();
   auto renderTargetProxy = RenderTargetProxy::MakeFallback(
       context, textureView->width(), textureView->height(), textureView->isAlphaOnly(), 1,
-      textureView->hasMipmaps(), ImageOrigin::TopLeft, BackingFit::Exact);
+      textureView->hasMipmaps(), ImageOrigin::TopLeft, BackingFit::Exact, dstColorSpace);
   if (renderTargetProxy == nullptr) {
     LOGE("RuntimeDrawTask::getFlatTexture() Failed to create the render target!");
     return nullptr;
@@ -134,14 +136,15 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
     LOGE("RuntimeDrawTask::getFlatTexture() Failed to initialize the render pass!");
     return nullptr;
   }
-  auto colorProcessor = TextureEffect::Make(std::move(textureProxy));
+  auto colorProcessor = TextureEffect::Make(std::move(textureProxy), {}, nullptr, false,
+                                            renderTargetProxy->gamutColorSpace());
   if (colorProcessor == nullptr) {
     LOGE("RuntimeDrawTask::getFlatTexture() Failed to create the color processor!");
     return nullptr;
   }
   auto geometryProcessor =
       DefaultGeometryProcessor::Make(context->drawingBuffer(), {}, renderTarget->width(),
-                                     renderTarget->height(), AAType::None, {}, {});
+                                     renderTarget->height(), AAType::None, {}, {}, dstColorSpace);
   std::vector fragmentProcessors = {colorProcessor.get()};
   ProgramInfo programInfo(renderTarget.get(), geometryProcessor.get(),
                           std::move(fragmentProcessors), 1, nullptr, BlendMode::Src);

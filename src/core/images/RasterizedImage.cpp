@@ -56,7 +56,8 @@ std::shared_ptr<TextureProxy> RasterizedImage::lockTextureProxy(const TPArgs& ar
 }
 
 PlacementPtr<FragmentProcessor> RasterizedImage::asFragmentProcessor(
-    const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix) const {
+    const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix,
+    std::shared_ptr<ColorSpace> dstColorSpace) const {
   auto textureProxy = lockTextureProxy(
       TPArgs(args.context, args.renderFlags, hasMipmaps(), args.drawScale, BackingFit::Exact));
   if (textureProxy == nullptr) {
@@ -75,7 +76,7 @@ PlacementPtr<FragmentProcessor> RasterizedImage::asFragmentProcessor(
     fpMatrix.preConcat(*uvMatrix);
   }
   return TiledTextureEffect::Make(std::move(textureProxy), newSamplingArgs, &fpMatrix,
-                                  isAlphaOnly());
+                                  isAlphaOnly(), std::move(dstColorSpace));
 }
 
 std::shared_ptr<Image> RasterizedImage::onMakeScaled(int newWidth, int newHeight,

@@ -25,8 +25,9 @@
 namespace tgfx {
 class PorterDuffXferProcessor : public XferProcessor {
  public:
-  static PlacementPtr<PorterDuffXferProcessor> Make(BlockBuffer* buffer, BlendMode blend,
-                                                    DstTextureInfo dstTextureInfo);
+  static PlacementPtr<PorterDuffXferProcessor> Make(
+      BlockBuffer* buffer, BlendMode blend, DstTextureInfo dstTextureInfo,
+      std::shared_ptr<ColorSpace> dstColorSpace = nullptr);
 
   std::string name() const override {
     return "PorterDuffXferProcessor";
@@ -39,11 +40,14 @@ class PorterDuffXferProcessor : public XferProcessor {
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  PorterDuffXferProcessor(BlendMode blend, DstTextureInfo dstTextureInfo)
-      : XferProcessor(ClassID()), blendMode(blend), dstTextureInfo(std::move(dstTextureInfo)) {
+  PorterDuffXferProcessor(BlendMode blend, DstTextureInfo dstTextureInfo,
+                          std::shared_ptr<ColorSpace> colorSpace)
+      : XferProcessor(ClassID()), blendMode(blend), dstTextureInfo(std::move(dstTextureInfo)),
+        dstColorSpace(std::move(colorSpace)) {
   }
 
   BlendMode blendMode = BlendMode::SrcOver;
   DstTextureInfo dstTextureInfo = {};
+  std::shared_ptr<ColorSpace> dstColorSpace = nullptr;
 };
 }  // namespace tgfx

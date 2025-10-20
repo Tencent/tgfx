@@ -26,7 +26,8 @@ class GLSLTextureEffect : public TextureEffect {
  public:
   GLSLTextureEffect(std::shared_ptr<TextureProxy> proxy, const Point& alphaStart,
                     const SamplingOptions& sampling, SrcRectConstraint constraint,
-                    const Matrix& uvMatrix, const std::optional<Rect>& subset);
+                    const Matrix& uvMatrix, const std::optional<Rect>& subset,
+                    std::shared_ptr<ColorSpace> dstColorSpace = nullptr);
 
   void emitCode(EmitArgs& args) const override;
 

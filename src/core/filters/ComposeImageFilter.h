@@ -34,11 +34,10 @@ class ComposeImageFilter : public ImageFilter {
 
   Rect onFilterBounds(const Rect& srcRect) const override;
 
-  PlacementPtr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
-                                                      const FPArgs& args,
-                                                      const SamplingOptions& sampling,
-                                                      SrcRectConstraint constraint,
-                                                      const Matrix* uvMatrix) const override;
+  PlacementPtr<FragmentProcessor> asFragmentProcessor(
+      std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
+      SrcRectConstraint constraint, const Matrix* uvMatrix,
+      std::shared_ptr<ColorSpace> dstColorSpace) const override;
 
   friend class ImageFilter;
 };

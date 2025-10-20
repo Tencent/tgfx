@@ -136,11 +136,12 @@ TiledTextureEffect::Sampling::Sampling(const TextureView* textureView, SamplerSt
 TiledTextureEffect::TiledTextureEffect(std::shared_ptr<TextureProxy> proxy,
                                        const SamplerState& samplerState,
                                        SrcRectConstraint constraint, const Matrix& uvMatrix,
-                                       const std::optional<Rect>& subset)
+                                       const std::optional<Rect>& subset,
+                                       std::shared_ptr<ColorSpace> dstColorSpace)
     : FragmentProcessor(ClassID()), textureProxy(std::move(proxy)), samplerState(samplerState),
       coordTransform(uvMatrix, textureProxy.get()),
       subset(subset.value_or(Rect::MakeWH(textureProxy->width(), textureProxy->height()))),
-      constraint(constraint) {
+      constraint(constraint), dstColorSpace(std::move(dstColorSpace)) {
   addCoordTransform(&coordTransform);
 }
 
@@ -157,6 +158,13 @@ void TiledTextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
   flags |= static_cast<uint32_t>(sampling.shaderModeY) << 4;
   flags |= constraint == SrcRectConstraint::Strict ? static_cast<uint32_t>(1) << 8 : 0;
   bytesKey->write(flags);
+  auto srcColorSpace = textureView->gamutColorSpace();
+  auto steps = std::make_shared<ColorSpaceXformSteps>(
+      srcColorSpace.get(), AlphaType::Premultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
+  uint64_t xformKey = ColorSpaceXformSteps::XFormKey(steps.get());
+  auto key = reinterpret_cast<uint32_t*>(&xformKey);
+  bytesKey->write(key[0]);
+  bytesKey->write(key[1]);
 }
 
 size_t TiledTextureEffect::onCountTextureSamplers() const {

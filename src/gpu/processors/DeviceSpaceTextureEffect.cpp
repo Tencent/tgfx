@@ -20,8 +20,21 @@
 
 namespace tgfx {
 DeviceSpaceTextureEffect::DeviceSpaceTextureEffect(std::shared_ptr<TextureProxy> textureProxy,
-                                                   const Matrix& uvMatrix)
-    : FragmentProcessor(ClassID()), textureProxy(std::move(textureProxy)), uvMatrix(uvMatrix) {
+                                                   const Matrix& uvMatrix,
+                                                   std::shared_ptr<ColorSpace> colorSpace)
+    : FragmentProcessor(ClassID()), textureProxy(std::move(textureProxy)), uvMatrix(uvMatrix),
+      dstColorSpace(std::move(colorSpace)) {
+}
+
+void DeviceSpaceTextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
+  auto srcColorSpace = textureProxy->getTextureView()->gamutColorSpace();
+  auto steps = std::make_shared<ColorSpaceXformSteps>(
+      srcColorSpace.get(), AlphaType::Premultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
+  uint64_t xformKey = 0;
+  xformKey = ColorSpaceXformSteps::XFormKey(steps.get());
+  auto key = reinterpret_cast<uint32_t*>(&xformKey);
+  bytesKey->write(key[0]);
+  bytesKey->write(key[1]);
 }
 
 std::shared_ptr<GPUTexture> DeviceSpaceTextureEffect::onTextureAt(size_t) const {

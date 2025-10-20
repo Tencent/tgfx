@@ -46,9 +46,9 @@ class ScaledImage : public TransformImage {
     return Type::Scaled;
   }
 
-  PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
-                                                      const SamplingArgs& samplingArgs,
-                                                      const Matrix* uvMatrix) const override;
+  PlacementPtr<FragmentProcessor> asFragmentProcessor(
+      const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix,
+      std::shared_ptr<ColorSpace> dstColorSpace) const override;
 
   std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
 

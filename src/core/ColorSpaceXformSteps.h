@@ -54,7 +54,7 @@ struct ColorSpaceXformSteps {
 
   void apply(float rgba[4]) const;
 
-  static uint32_t XFormKey(const ColorSpaceXformSteps* xform);
+  static uint64_t XFormKey(const ColorSpaceXformSteps* xform);
 
   Flags flags;
 
@@ -82,6 +82,9 @@ struct ColorSpaceXformSteps {
    * Apply ootf with these r,g,b coefficients and gamma after gamut_transform.
    */
   float dstOOTF[4];
+
+  uint64_t srcHash;
+  uint64_t dstHash;
 };
 
 }  // namespace tgfx

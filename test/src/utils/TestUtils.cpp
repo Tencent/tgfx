@@ -131,27 +131,25 @@ void SaveWebpFile(std::shared_ptr<Data> data, const std::string& key) {
   SaveFile(data, key + WEBP_FILE_EXT);
 }
 
-void SaveImage(const std::shared_ptr<PixelBuffer> pixelBuffer, const std::string& key,
-               std::shared_ptr<ColorSpace> colorSpace) {
+void SaveImage(const std::shared_ptr<PixelBuffer> pixelBuffer, const std::string& key) {
   if (pixelBuffer == nullptr) {
     return;
   }
   auto pixels = pixelBuffer->lockPixels();
-  SaveImage(Pixmap(pixelBuffer->info(), pixels), key, std::move(colorSpace));
+  SaveImage(Pixmap(pixelBuffer->info(), pixels), key, pixelBuffer->gamutColorSpace());
   pixelBuffer->unlockPixels();
 }
 
-void SaveImage(const Bitmap& bitmap, const std::string& key,
-               std::shared_ptr<ColorSpace> colorSpace) {
+void SaveImage(const Bitmap& bitmap, const std::string& key) {
   if (bitmap.isEmpty()) {
     return;
   }
-  SaveImage(Pixmap(bitmap), key, std::move(colorSpace));
+  SaveImage(Pixmap(bitmap), key, bitmap.gamutColorSpace());
 }
 
 void SaveImage(const Pixmap& pixmap, const std::string& key,
                std::shared_ptr<ColorSpace> colorSpace) {
-  auto data = ImageCodec::Encode(pixmap, EncodedFormat::WEBP, 100, std::move(colorSpace));
+  auto data = ImageCodec::Encode(pixmap, EncodedFormat::WEBP, 100, colorSpace);
   if (data == nullptr) {
     return;
   }

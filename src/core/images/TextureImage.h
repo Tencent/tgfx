@@ -30,9 +30,8 @@ class TextureImage : public Image {
   /**
    * Creates an Image wraps the existing TextureProxy, returns nullptr if textureProxy is nullptr.
    */
-  static std::shared_ptr<Image> Wrap(
-      std::shared_ptr<TextureProxy> textureProxy,
-      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+  static std::shared_ptr<Image> Wrap(std::shared_ptr<TextureProxy> textureProxy,
+                                     std::shared_ptr<ColorSpace> colorSpace);
 
   int width() const override {
     return textureProxy->width();
@@ -54,15 +53,15 @@ class TextureImage : public Image {
     return true;
   }
 
-  std::shared_ptr<ColorSpace> colorSpace() const override {
-    return _colorSpace;
-  }
-
   BackendTexture getBackendTexture(Context* context, ImageOrigin* origin) const override;
 
   std::shared_ptr<Image> makeTextureImage(Context* context) const override;
 
   std::shared_ptr<Image> makeRasterized() const override;
+
+  std::shared_ptr<ColorSpace> gamutColorSpace() const override {
+    return _gamutColorSpace;
+  }
 
  protected:
   Type type() const override {
@@ -78,16 +77,16 @@ class TextureImage : public Image {
 
   std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
 
-  PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
-                                                      const SamplingArgs& samplingArgs,
-                                                      const Matrix* uvMatrix) const override;
+  PlacementPtr<FragmentProcessor> asFragmentProcessor(
+      const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix,
+      std::shared_ptr<ColorSpace> dstColorSpace) const override;
 
  private:
   std::shared_ptr<TextureProxy> textureProxy = nullptr;
   uint32_t contextID = 0;
-  std::shared_ptr<ColorSpace> _colorSpace = ColorSpace::MakeSRGB();
+  std::shared_ptr<ColorSpace> _gamutColorSpace = ColorSpace::MakeSRGB();
 
   TextureImage(std::shared_ptr<TextureProxy> textureProxy, uint32_t contextID,
-               std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+               std::shared_ptr<ColorSpace> colorSpace);
 };
 }  // namespace tgfx

@@ -41,6 +41,7 @@ class RuntimeDrawTask : public RenderTask {
 
   static std::shared_ptr<TextureView> GetFlatTextureView(CommandEncoder* encoder,
                                                          std::shared_ptr<TextureProxy> textureProxy,
-                                                         VertexBufferProxyView* vertexProxyView);
+                                                         VertexBufferProxyView* vertexProxyView,
+                                                         std::shared_ptr<ColorSpace> dstColorSpace);
 };
 }  // namespace tgfx

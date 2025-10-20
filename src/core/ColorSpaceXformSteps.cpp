@@ -19,6 +19,7 @@
 #include <skcms.h>
 #include <cmath>
 #include <cstring>
+#include <vector>
 #include "tgfx/core/AlphaType.h"
 #include "tgfx/core/ColorSpace.h"
 #include "utils/Log.h"
@@ -74,7 +75,10 @@ ColorSpaceXformSteps::ColorSpaceXformSteps(const ColorSpace* src, AlphaType srcA
     dst = src;
   }
 
-  if (src->hash() == dst->hash() && srcAT == dstAT) {
+  srcHash = src->hash();
+  dstHash = dst->hash();
+
+  if (srcHash == dstHash && srcAT == dstAT) {
     return;
   }
 
@@ -260,25 +264,11 @@ void ColorSpaceXformSteps::apply(float rgba[4]) const {
   }
 }
 
-uint32_t ColorSpaceXformSteps::XFormKey(const ColorSpaceXformSteps* xform) {
-  // Code generation depends on which steps we apply,
-  // and the kinds of transfer functions (if we're applying those).
+uint64_t ColorSpaceXformSteps::XFormKey(const ColorSpaceXformSteps* xform) {
   if (!xform) {
     return 0;
   }
-  uint32_t key = xform->flags.mask();
-  if (xform->flags.linearize) {
-    key |= static_cast<uint32_t>(
-        gfx::skcms_TransferFunction_getType(
-            reinterpret_cast<const gfx::skcms_TransferFunction*>(&xform->srcTransferFunction))
-        << 8);
-  }
-  if (xform->flags.encode) {
-    key |= static_cast<uint32_t>(
-        gfx::skcms_TransferFunction_getType(reinterpret_cast<const gfx::skcms_TransferFunction*>(
-            &xform->dstTransferFunctionInverse))
-        << 16);
-  }
+  uint64_t key = xform->srcHash + xform->dstHash;
   return key;
 }
 }  // namespace tgfx

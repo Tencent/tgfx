@@ -20,7 +20,6 @@
 #include "core/utils/Types.h"
 #include "gpu/GPUTexture.h"
 #include "gpu/ops/DrawOp.h"
-#include "gpu/processors/ColorSpaceXformEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
@@ -47,14 +46,9 @@ bool ImageShader::isEqual(const Shader* shader) const {
 }
 
 PlacementPtr<FragmentProcessor> ImageShader::asFragmentProcessor(
-    const FPArgs& args, const Matrix* uvMatrix, std::shared_ptr<ColorSpace> colorSpace) const {
+    const FPArgs& args, const Matrix* uvMatrix, std::shared_ptr<ColorSpace> dstColorSpace) const {
   SamplingArgs samplingArgs = {tileModeX, tileModeY, sampling, SrcRectConstraint::Fast};
-  auto fp = image->asFragmentProcessor(args, samplingArgs, uvMatrix);
-  if (fp) {
-    return ColorSpaceXformEffect::Make(args.context->drawingBuffer(), std::move(fp),
-                                       image->colorSpace().get(), AlphaType::Premultiplied,
-                                       colorSpace.get(), AlphaType::Premultiplied);
-  }
+  auto fp = image->asFragmentProcessor(args, samplingArgs, uvMatrix, dstColorSpace);
   return fp;
 }
 }  // namespace tgfx

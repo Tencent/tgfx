@@ -20,15 +20,17 @@
 #include "gpu/glsl/GLSLBlend.h"
 
 namespace tgfx {
-PlacementPtr<PorterDuffXferProcessor> PorterDuffXferProcessor::Make(BlockBuffer* buffer,
-                                                                    BlendMode blend,
-                                                                    DstTextureInfo dstTextureInfo) {
-  return buffer->make<GLSLPorterDuffXferProcessor>(blend, std::move(dstTextureInfo));
+PlacementPtr<PorterDuffXferProcessor> PorterDuffXferProcessor::Make(
+    BlockBuffer* buffer, BlendMode blend, DstTextureInfo dstTextureInfo,
+    std::shared_ptr<ColorSpace> dstColorSpace) {
+  return buffer->make<GLSLPorterDuffXferProcessor>(blend, std::move(dstTextureInfo),
+                                                   std::move(dstColorSpace));
 }
 
 GLSLPorterDuffXferProcessor::GLSLPorterDuffXferProcessor(BlendMode blend,
-                                                         DstTextureInfo dstTextureInfo)
-    : PorterDuffXferProcessor(blend, std::move(dstTextureInfo)) {
+                                                         DstTextureInfo dstTextureInfo,
+                                                         std::shared_ptr<ColorSpace> colorSpace)
+    : PorterDuffXferProcessor(blend, std::move(dstTextureInfo), std::move(colorSpace)) {
 }
 
 void GLSLPorterDuffXferProcessor::emitCode(const EmitArgs& args) const {
@@ -63,6 +65,11 @@ void GLSLPorterDuffXferProcessor::emitCode(const EmitArgs& args) const {
     fragBuilder->codeAppendf("vec4 %s = ", dstColor.c_str());
     fragBuilder->appendTextureLookup(args.dstTextureSamplerHandle, dstTexCoord);
     fragBuilder->codeAppend(";");
+    auto srcColorSpace = dstTextureView()->gamutColorSpace();
+    auto steps =
+        std::make_shared<ColorSpaceXformSteps>(srcColorSpace.get(), AlphaType::Premultiplied,
+                                               dstColorSpace.get(), AlphaType::Premultiplied);
+    fragBuilder->appendColorGamutXform(dstColor.c_str(), steps.get());
   }
 
   const char* outColor = "localOutputColor";
@@ -86,6 +93,11 @@ void GLSLPorterDuffXferProcessor::setData(UniformData* /*vertexUniformData*/,
   if (dstTextureView == nullptr) {
     return;
   }
+  auto srcColorSpace = dstTextureView->gamutColorSpace();
+  auto steps = std::make_shared<ColorSpaceXformSteps>(
+      srcColorSpace.get(), AlphaType::Premultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
+  ColorSpaceXformHelper helper;
+  helper.setData(fragmentUniformData, steps.get());
   fragmentUniformData->setData("DstTextureUpperLeft", dstTextureInfo.offset);
   int width;
   int height;

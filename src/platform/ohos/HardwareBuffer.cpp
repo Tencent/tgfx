@@ -19,6 +19,7 @@
 #include <native_buffer/native_buffer.h>
 #include "ExternalOESBuffer.h"
 #include "core/PixelBuffer.h"
+#include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/PixelFormatUtil.h"
 
 namespace tgfx {
@@ -26,7 +27,8 @@ namespace tgfx {
 
 std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef hardwareBuffer,
                                                    YUVColorSpace colorSpace) {
-  auto pixelBuffer = PixelBuffer::MakeFrom(hardwareBuffer);
+  auto pixelBuffer =
+      PixelBuffer::MakeFrom(hardwareBuffer, MakeColorSpaceFromYUVColorSpace(colorSpace));
   if (pixelBuffer) {
     return pixelBuffer;
   }

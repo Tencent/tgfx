@@ -47,21 +47,20 @@ InnerShadowImageFilter::InnerShadowImageFilter(float dx, float dy, float blurrin
 
 PlacementPtr<FragmentProcessor> InnerShadowImageFilter::getShadowFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-    SrcRectConstraint constraint, const Matrix* uvMatrix) const {
+    SrcRectConstraint constraint, const Matrix* uvMatrix,
+    std::shared_ptr<ColorSpace> dstColorSpace) const {
   auto shadowMatrix = Matrix::MakeTrans(-dx, -dy);
-  auto sourceColorSpace = source->colorSpace();
   if (uvMatrix) {
     shadowMatrix.preConcat(*uvMatrix);
   }
 
   PlacementPtr<FragmentProcessor> invertShadowMask;
   if (blurFilter != nullptr) {
-    invertShadowMask = blurFilter->asFragmentProcessor(std::move(source), args, sampling,
-                                                       constraint, &shadowMatrix);
+    invertShadowMask = blurFilter->asFragmentProcessor(source, args, sampling, constraint,
+                                                       &shadowMatrix, dstColorSpace);
   } else {
-    invertShadowMask =
-        FragmentProcessor::Make(std::move(source), args, TileMode::Decal, TileMode::Decal, sampling,
-                                constraint, &shadowMatrix);
+    invertShadowMask = FragmentProcessor::Make(source, args, TileMode::Decal, TileMode::Decal,
+                                               sampling, constraint, &shadowMatrix, dstColorSpace);
   }
 
   auto buffer = args.context->drawingBuffer();
@@ -71,7 +70,7 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::getShadowFragmentProcess
   }
   auto dstColor = color;
   ColorSpaceXformSteps steps(ColorSpace::MakeSRGB().get(), AlphaType::Unpremultiplied,
-                             sourceColorSpace.get(), AlphaType::Premultiplied);
+                             dstColorSpace.get(), AlphaType::Premultiplied);
   steps.apply(dstColor.array());
   auto colorProcessor = ConstColorProcessor::Make(buffer, dstColor, InputMode::Ignore);
 
@@ -83,18 +82,21 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::getShadowFragmentProcess
 
 PlacementPtr<FragmentProcessor> InnerShadowImageFilter::getSourceFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-    SrcRectConstraint constraint, const Matrix* uvMatrix) const {
-  return FragmentProcessor::Make(std::move(source), args, TileMode::Decal, TileMode::Decal,
-                                 sampling, constraint, uvMatrix);
+    SrcRectConstraint constraint, const Matrix* uvMatrix,
+    std::shared_ptr<ColorSpace> dstColorSpace) const {
+  return FragmentProcessor::Make(source, args, TileMode::Decal, TileMode::Decal, sampling,
+                                 constraint, uvMatrix, std::move(dstColorSpace));
 }
 
 PlacementPtr<FragmentProcessor> InnerShadowImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-    SrcRectConstraint constraint, const Matrix* uvMatrix) const {
+    SrcRectConstraint constraint, const Matrix* uvMatrix,
+    std::shared_ptr<ColorSpace> dstColorSpace) const {
   if (color.alpha <= 0 && shadowOnly) {
     return nullptr;
   }
-  auto imageProcessor = getSourceFragmentProcessor(source, args, sampling, constraint, uvMatrix);
+  auto imageProcessor =
+      getSourceFragmentProcessor(source, args, sampling, constraint, uvMatrix, dstColorSpace);
   if (imageProcessor == nullptr) {
     return nullptr;
   }
@@ -102,7 +104,8 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::asFragmentProcessor(
   auto blendMode = shadowOnly ? BlendMode::SrcIn : BlendMode::SrcATop;
 
   return XfermodeFragmentProcessor::MakeFromTwoProcessors(
-      buffer, getShadowFragmentProcessor(source, args, sampling, constraint, uvMatrix),
+      buffer,
+      getShadowFragmentProcessor(source, args, sampling, constraint, uvMatrix, dstColorSpace),
       std::move(imageProcessor), blendMode);
 }
 

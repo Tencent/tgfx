@@ -98,14 +98,13 @@ static void SetJSONValue(nlohmann::json& target, const std::string& key, const s
   (*json)[jsonKey] = value;
 }
 
-bool Baseline::Compare(std::shared_ptr<PixelBuffer> pixelBuffer, const std::string& key,
-                       std::shared_ptr<ColorSpace> colorSpace) {
+bool Baseline::Compare(std::shared_ptr<PixelBuffer> pixelBuffer, const std::string& key) {
   if (pixelBuffer == nullptr) {
     return false;
   }
   auto pixels = pixelBuffer->lockPixels();
   Pixmap pixmap(pixelBuffer->info(), pixels);
-  auto result = Baseline::Compare(pixmap, key, std::move(colorSpace));
+  auto result = Baseline::Compare(pixmap, key, pixelBuffer->gamutColorSpace());
   pixelBuffer->unlockPixels();
   return result;
 }
@@ -114,22 +113,21 @@ bool Baseline::Compare(const std::shared_ptr<Surface> surface, const std::string
   if (surface == nullptr) {
     return false;
   }
-  Bitmap bitmap(surface->width(), surface->height(), false, false);
+  Bitmap bitmap(surface->width(), surface->height(), false, false, surface->gamutColorSpace());
   Pixmap pixmap(bitmap);
   auto result = surface->readPixels(pixmap.info(), pixmap.writablePixels());
   if (!result) {
     return false;
   }
-  return Baseline::Compare(pixmap, key, surface->colorSpace());
+  return Baseline::Compare(pixmap, key, surface->gamutColorSpace());
 }
 
-bool Baseline::Compare(const Bitmap& bitmap, const std::string& key,
-                       std::shared_ptr<ColorSpace> colorSpace) {
+bool Baseline::Compare(const Bitmap& bitmap, const std::string& key) {
   if (bitmap.isEmpty()) {
     return false;
   }
   Pixmap pixmap(bitmap);
-  return Baseline::Compare(pixmap, key, std::move(colorSpace));
+  return Baseline::Compare(pixmap, key, bitmap.gamutColorSpace());
 }
 
 static bool CompareVersionAndMd5(const std::string& md5, const std::string& key,
@@ -165,7 +163,7 @@ bool Baseline::Compare(const Pixmap& pixmap, const std::string& key,
   if (pixmap.rowBytes() == pixmap.info().minRowBytes()) {
     md5 = DumpMD5(pixmap.pixels(), pixmap.byteSize());
   } else {
-    Bitmap newBitmap(pixmap.width(), pixmap.height(), pixmap.isAlphaOnly(), false);
+    Bitmap newBitmap(pixmap.width(), pixmap.height(), pixmap.isAlphaOnly(), false, colorSpace);
     Pixmap newPixmap(newBitmap);
     auto result = pixmap.readPixels(newPixmap.info(), newPixmap.writablePixels());
     if (!result) {

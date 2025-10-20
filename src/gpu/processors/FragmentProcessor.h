@@ -58,7 +58,8 @@ class FragmentProcessor : public Processor {
    */
   static PlacementPtr<FragmentProcessor> Make(
       std::shared_ptr<Image> image, const FPArgs& args, const SamplingOptions& sampling,
-      SrcRectConstraint constraint = SrcRectConstraint::Fast, const Matrix* uvMatrix = nullptr);
+      SrcRectConstraint constraint = SrcRectConstraint::Fast, const Matrix* uvMatrix = nullptr,
+      std::shared_ptr<ColorSpace> dstColorSpace = nullptr);
 
   /**
    * Creates a fragment processor that will draw the given image with the given options.
@@ -67,21 +68,23 @@ class FragmentProcessor : public Processor {
                                               TileMode tileModeX, TileMode tileModeY,
                                               const SamplingOptions& sampling,
                                               SrcRectConstraint constraint,
-                                              const Matrix* uvMatrix = nullptr);
+                                              const Matrix* uvMatrix = nullptr,
+                                              std::shared_ptr<ColorSpace> dstColorSpace = nullptr);
   /**
    * Creates a fragment processor that will draw the given image with the given options.
    * The samplingArgs contains additional information about how to sample the image.
    */
   static PlacementPtr<FragmentProcessor> Make(std::shared_ptr<Image> image, const FPArgs& args,
                                               const SamplingArgs& samplingArgs,
-                                              const Matrix* uvMatrix = nullptr);
+                                              const Matrix* uvMatrix = nullptr,
+                                              std::shared_ptr<ColorSpace> dstColorSpace = nullptr);
 
   /**
    * Creates a fragment processor that will draw the given Shader with the given options.
    */
-  static PlacementPtr<FragmentProcessor> Make(
-      std::shared_ptr<Shader> shader, const FPArgs& args, const Matrix* uvMatrix = nullptr,
-      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+  static PlacementPtr<FragmentProcessor> Make(std::shared_ptr<Shader> shader, const FPArgs& args,
+                                              const Matrix* uvMatrix = nullptr,
+                                              std::shared_ptr<ColorSpace> dstColorSpace = nullptr);
 
   /**
    *  In many instances (e.g., Shader::asFragmentProcessor() implementations) it is desirable to

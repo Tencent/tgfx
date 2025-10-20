@@ -37,7 +37,7 @@ std::shared_ptr<Image> TextureImage::Wrap(std::shared_ptr<TextureProxy> textureP
 TextureImage::TextureImage(std::shared_ptr<TextureProxy> textureProxy, uint32_t contextID,
                            std::shared_ptr<ColorSpace> colorSpace)
     : textureProxy(std::move(textureProxy)), contextID(contextID),
-      _colorSpace(std::move(colorSpace)) {
+      _gamutColorSpace(std::move(colorSpace)) {
 }
 
 BackendTexture TextureImage::getBackendTexture(Context* context, ImageOrigin* origin) const {
@@ -79,12 +79,13 @@ std::shared_ptr<TextureProxy> TextureImage::lockTextureProxy(const TPArgs& args)
   return textureProxy;
 }
 
-PlacementPtr<FragmentProcessor> TextureImage::asFragmentProcessor(const FPArgs& args,
-                                                                  const SamplingArgs& samplingArgs,
-                                                                  const Matrix* uvMatrix) const {
+PlacementPtr<FragmentProcessor> TextureImage::asFragmentProcessor(
+    const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix,
+    std::shared_ptr<ColorSpace> dstColorSpace) const {
   if (args.context == nullptr || args.context->uniqueID() != contextID) {
     return nullptr;
   }
-  return TiledTextureEffect::Make(textureProxy, samplingArgs, uvMatrix, isAlphaOnly());
+  return TiledTextureEffect::Make(textureProxy, samplingArgs, uvMatrix, isAlphaOnly(),
+                                  std::move(dstColorSpace));
 }
 }  // namespace tgfx

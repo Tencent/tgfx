@@ -46,10 +46,10 @@ bool ColorShader::isEqual(const Shader* shader) const {
 }
 
 PlacementPtr<FragmentProcessor> ColorShader::asFragmentProcessor(
-    const FPArgs& args, const Matrix*, std::shared_ptr<ColorSpace> colorSpace) const {
+    const FPArgs& args, const Matrix*, std::shared_ptr<ColorSpace> dstColorSpace) const {
   auto dstColor = color;
   ColorSpaceXformSteps steps{ColorSpace::MakeSRGB().get(), AlphaType::Unpremultiplied,
-                             colorSpace.get(), AlphaType::Premultiplied};
+                             dstColorSpace.get(), AlphaType::Premultiplied};
   steps.apply(dstColor.array());
   return ConstColorProcessor::Make(args.context->drawingBuffer(), dstColor, InputMode::ModulateA);
 }

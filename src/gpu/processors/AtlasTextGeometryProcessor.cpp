@@ -21,9 +21,10 @@
 namespace tgfx {
 AtlasTextGeometryProcessor::AtlasTextGeometryProcessor(std::shared_ptr<TextureProxy> textureProxy,
                                                        AAType aa, std::optional<Color> commonColor,
-                                                       const SamplingOptions& sampling)
+                                                       const SamplingOptions& sampling,
+                                                       std::shared_ptr<ColorSpace> colorSpace)
     : GeometryProcessor(ClassID()), textureProxy(std::move(textureProxy)), commonColor(commonColor),
-      samplerState(sampling) {
+      samplerState(sampling), dstColorSpace(std::move(colorSpace)) {
   position = {"aPosition", VertexFormat::Float2};
   if (aa == AAType::Coverage) {
     coverage = {"inCoverage", VertexFormat::Float};
@@ -41,5 +42,21 @@ void AtlasTextGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const
   flags |= commonColor.has_value() ? 2 : 0;
   flags |= textureProxy->isAlphaOnly() ? 4 : 0;
   bytesKey->write(flags);
+  auto srcColorSpace = textureProxy->getTextureView()->gamutColorSpace();
+  auto steps = std::make_shared<ColorSpaceXformSteps>(
+      srcColorSpace.get(), AlphaType::Premultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
+  auto xformKey = ColorSpaceXformSteps::XFormKey(steps.get());
+  uint32_t* key = reinterpret_cast<uint32_t*>(&xformKey);
+  bytesKey->write(key[0]);
+  bytesKey->write(key[1]);
+  if (!commonColor.has_value()) {
+    auto vertSteps = std::make_shared<ColorSpaceXformSteps>(
+        ColorSpace::MakeSRGB().get(), AlphaType::Premultiplied, dstColorSpace.get(),
+        AlphaType::Premultiplied);
+    auto vertxformKey = ColorSpaceXformSteps::XFormKey(vertSteps.get());
+    uint32_t* vertKey = reinterpret_cast<uint32_t*>(&vertxformKey);
+    bytesKey->write(vertKey[0]);
+    bytesKey->write(vertKey[1]);
+  }
 }
 }  // namespace tgfx

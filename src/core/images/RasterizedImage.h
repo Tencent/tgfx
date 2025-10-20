@@ -50,8 +50,8 @@ class RasterizedImage : public Image {
     return source->hasMipmaps();
   }
 
-  std::shared_ptr<ColorSpace> colorSpace() const override {
-    return source->colorSpace();
+  std::shared_ptr<ColorSpace> gamutColorSpace() const override {
+    return source->gamutColorSpace();
   }
 
   std::shared_ptr<Image> makeRasterized() const override;
@@ -63,9 +63,9 @@ class RasterizedImage : public Image {
 
   std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
 
-  PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
-                                                      const SamplingArgs& samplingArgs,
-                                                      const Matrix* uvMatrix) const override;
+  PlacementPtr<FragmentProcessor> asFragmentProcessor(
+      const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix,
+      std::shared_ptr<ColorSpace> dstColorSpace) const override;
 
   std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
                                       const SamplingOptions& sampling) const override;

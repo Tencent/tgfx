@@ -21,9 +21,10 @@
 namespace tgfx {
 HardwareRenderTargetProxy::HardwareRenderTargetProxy(HardwareBufferRef hardwareBuffer, int width,
                                                      int height, PixelFormat format,
-                                                     int sampleCount)
+                                                     int sampleCount,
+                                                     std::shared_ptr<ColorSpace> colorSpace)
     : TextureRenderTargetProxy(width, height, format, sampleCount, false, ImageOrigin::TopLeft,
-                               true),
+                               true, std::move(colorSpace)),
       hardwareBuffer(hardwareBuffer) {
   HardwareBufferRetain(hardwareBuffer);
 }
@@ -33,7 +34,8 @@ HardwareRenderTargetProxy::~HardwareRenderTargetProxy() {
 }
 
 std::shared_ptr<TextureView> HardwareRenderTargetProxy::onMakeTexture(Context* context) const {
-  auto renderTarget = RenderTarget::MakeFrom(context, hardwareBuffer, _sampleCount);
+  auto renderTarget =
+      RenderTarget::MakeFrom(context, hardwareBuffer, _sampleCount, _gamutColorSpace);
   if (renderTarget == nullptr) {
     LOGE("HardwareRenderTargetProxy::onMakeTexture() Failed to create the render target!");
   }

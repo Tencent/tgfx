@@ -67,7 +67,7 @@ class ImageFilter {
    * @param dy            The Y offset of the shadow.
    * @param blurrinessX   The blur radius for the shadow, along the X axis.
    * @param blurrinessY   The blur radius for the shadow, along the Y axis.
-   * @param color         The color of the drop shadow.
+   * @param color         The color of the drop shadow in srgb gamut, can overflow 0-1.
    */
   static std::shared_ptr<ImageFilter> DropShadow(float dx, float dy, float blurrinessX,
                                                  float blurrinessY, const Color& color);
@@ -79,7 +79,7 @@ class ImageFilter {
    * @param dy            The Y offset of the shadow.
    * @param blurrinessX   The blur radius for the shadow, along the X axis.
    * @param blurrinessY   The blur radius for the shadow, along the Y axis.
-   * @param color         The color of the drop shadow.
+   * @param color         The color of the drop shadow in srgb gamut, can overflow 0-1.
    */
   static std::shared_ptr<ImageFilter> DropShadowOnly(float dx, float dy, float blurrinessX,
                                                      float blurrinessY, const Color& color);
@@ -91,7 +91,7 @@ class ImageFilter {
    * @param dy            The Y offset of the shadow.
    * @param blurrinessX   The blur radius for the shadow, along the X axis.
    * @param blurrinessY   The blur radius for the shadow, along the Y axis.
-   * @param color         The color of the inner shadow.
+   * @param color         The color of the inner shadow in srgb gamut, can overflow 0-1.
    */
   static std::shared_ptr<ImageFilter> InnerShadow(float dx, float dy, float blurrinessX,
                                                   float blurrinessY, const Color& color);
@@ -103,7 +103,7 @@ class ImageFilter {
    * @param dy            The Y offset of the shadow.
    * @param blurrinessX   The blur radius for the shadow, along the X axis.
    * @param blurrinessY   The blur radius for the shadow, along the Y axis.
-   * @param color         The color of the inner shadow.
+   * @param color         The color of the inner shadow in srgb gamut, can overflow 0-1.
    */
   static std::shared_ptr<ImageFilter> InnerShadowOnly(float dx, float dy, float blurrinessX,
                                                       float blurrinessY, const Color& color);
@@ -163,19 +163,17 @@ class ImageFilter {
    * Returns a FragmentProcessor that applies this filter to the source image. The returned
    * processor is in the coordinate space of the source image.
    */
-  virtual PlacementPtr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
-                                                              const FPArgs& args,
-                                                              const SamplingOptions& sampling,
-                                                              SrcRectConstraint constraint,
-                                                              const Matrix* uvMatrix) const = 0;
+  virtual PlacementPtr<FragmentProcessor> asFragmentProcessor(
+      std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
+      SrcRectConstraint constraint, const Matrix* uvMatrix,
+      std::shared_ptr<ColorSpace> dstColorSpace) const = 0;
 
   bool applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* clipBounds = nullptr) const;
 
-  PlacementPtr<FragmentProcessor> makeFPFromTextureProxy(std::shared_ptr<Image> source,
-                                                         const FPArgs& args,
-                                                         const SamplingOptions& sampling,
-                                                         SrcRectConstraint constraint,
-                                                         const Matrix* uvMatrix) const;
+  PlacementPtr<FragmentProcessor> makeFPFromTextureProxy(
+      std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
+      SrcRectConstraint constraint, const Matrix* uvMatrix,
+      std::shared_ptr<ColorSpace> dstColorSpace) const;
 
   friend class DropShadowImageFilter;
   friend class InnerShadowImageFilter;

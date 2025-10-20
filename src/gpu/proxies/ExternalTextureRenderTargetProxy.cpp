@@ -21,16 +21,16 @@
 namespace tgfx {
 ExternalTextureRenderTargetProxy::ExternalTextureRenderTargetProxy(
     const BackendTexture& backendTexture, PixelFormat format, int sampleCount, ImageOrigin origin,
-    bool adopted)
+    bool adopted, std::shared_ptr<ColorSpace> colorSpace)
     : TextureRenderTargetProxy(backendTexture.width(), backendTexture.height(), format, sampleCount,
-                               false, origin, !adopted),
+                               false, origin, !adopted, std::move(colorSpace)),
       backendTexture(backendTexture) {
 }
 
 std::shared_ptr<TextureView> ExternalTextureRenderTargetProxy::onMakeTexture(
     Context* context) const {
-  auto renderTarget =
-      RenderTarget::MakeFrom(context, backendTexture, _sampleCount, _origin, !externallyOwned());
+  auto renderTarget = RenderTarget::MakeFrom(context, backendTexture, _sampleCount, _origin,
+                                             !externallyOwned(), _gamutColorSpace);
   if (renderTarget == nullptr) {
     LOGE("BackendTextureRenderTargetProxy::onMakeTexture() Failed to create the render target!");
     return nullptr;

@@ -93,8 +93,7 @@ class Image {
    * pixel memory and copy the original pixels into it if there is a subsequent call of pixel
    * writing to the Bitmap. Therefore, the content of the returned Image will always be the same.
    */
-  static std::shared_ptr<Image> MakeFrom(
-      const Bitmap& bitmap, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+  static std::shared_ptr<Image> MakeFrom(const Bitmap& bitmap);
 
   /**
    * Creates an Image from the platform-specific hardware buffer. For example, the hardware buffer
@@ -123,8 +122,9 @@ class Image {
    * @return An Image that matches the content when the picture is drawn with the specified
    * parameters.
    */
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Picture> picture, int width, int height,
-                                         const Matrix* matrix = nullptr);
+  static std::shared_ptr<Image> MakeFrom(
+      std::shared_ptr<Picture> picture, int width, int height, const Matrix* matrix = nullptr,
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Creates an Image in the I420 format with the specified YUVData and the YUVColorSpace. Returns
@@ -144,9 +144,7 @@ class Image {
    * Creates an Image from the ImageBuffer, An Image is returned if the imageBuffer is not nullptr
    * and its dimensions are greater than zero.
    */
-  static std::shared_ptr<Image> MakeFrom(
-      std::shared_ptr<ImageBuffer> imageBuffer,
-      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ImageBuffer> imageBuffer);
 
   /**
    * Creates an Image from the backendTexture associated with the context. The caller must ensure
@@ -190,6 +188,11 @@ class Image {
   virtual bool isAlphaOnly() const = 0;
 
   /**
+   * return image colorspace.
+   */
+  virtual std::shared_ptr<ColorSpace> gamutColorSpace() const = 0;
+
+  /**
    * Returns true if the Image has mipmap levels. The flag was set by the makeMipmapped() method,
    * which may be ignored if the GPU or the associated image source doesn’t support mipmaps.
    */
@@ -211,13 +214,6 @@ class Image {
    */
   virtual bool isTextureBacked() const {
     return false;
-  }
-
-  /**
-   * return colorspace of this image.
-   */
-  virtual std::shared_ptr<ColorSpace> colorSpace() const {
-    return ColorSpace::MakeSRGB();
   }
 
   /**
@@ -368,9 +364,9 @@ class Image {
    * @param samplingArgs The SamplingArgs used to sample the Image.
    * @param uvMatrix The matrix used to transform the uv coordinates.
    */
-  virtual PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
-                                                              const SamplingArgs& samplingArgs,
-                                                              const Matrix* uvMatrix) const = 0;
+  virtual PlacementPtr<FragmentProcessor> asFragmentProcessor(
+      const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix,
+      std::shared_ptr<ColorSpace> dstColorSpace) const = 0;
 
   friend class FragmentProcessor;
   friend class RuntimeImageFilter;

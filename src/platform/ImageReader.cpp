@@ -45,9 +45,18 @@ class ImageReaderBuffer : public ImageBuffer {
     return imageReader->checkExpired(contentVersion);
   }
 
+  void setGamutColorSpace(std::shared_ptr<ColorSpace>) override {
+  }
+
+  std::shared_ptr<ColorSpace> gamutColorSpace() const override {
+    return imageReader->gamutColorSpace();
+  }
+
  protected:
   std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) const override {
-    return imageReader->readTexture(contentVersion, context, mipmapped);
+    auto textureView = imageReader->readTexture(contentVersion, context, mipmapped);
+    textureView->setGamutColorSpace(imageReader->gamutColorSpace());
+    return textureView;
   }
 
  private:

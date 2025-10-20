@@ -68,13 +68,18 @@ class TextureRenderTargetProxy : public DefaultTextureProxy,
 
   std::shared_ptr<RenderTarget> getRenderTarget() const override;
 
+  std::shared_ptr<ColorSpace> gamutColorSpace() const override {
+    return _gamutColorSpace;
+  }
+
  protected:
   int _sampleCount = 1;
   bool _externallyOwned = false;
 
   TextureRenderTargetProxy(int width, int height, PixelFormat format, int sampleCount,
                            bool mipmapped = false, ImageOrigin origin = ImageOrigin::TopLeft,
-                           bool externallyOwned = false);
+                           bool externallyOwned = false,
+                           std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   std::shared_ptr<TextureView> onMakeTexture(Context* context) const override;
 

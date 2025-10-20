@@ -21,14 +21,17 @@
 namespace tgfx {
 PlacementPtr<EllipseGeometryProcessor> EllipseGeometryProcessor::Make(
     BlockBuffer* buffer, int width, int height, bool stroke, bool useScale,
-    std::optional<Color> commonColor) {
-  return buffer->make<GLSLEllipseGeometryProcessor>(width, height, stroke, useScale, commonColor);
+    std::optional<Color> commonColor, std::shared_ptr<ColorSpace> colorSpace) {
+  return buffer->make<GLSLEllipseGeometryProcessor>(width, height, stroke, useScale, commonColor,
+                                                    std::move(colorSpace));
 }
 
 GLSLEllipseGeometryProcessor::GLSLEllipseGeometryProcessor(int width, int height, bool stroke,
                                                            bool useScale,
-                                                           std::optional<Color> commonColor)
-    : EllipseGeometryProcessor(width, height, stroke, useScale, commonColor) {
+                                                           std::optional<Color> commonColor,
+                                                           std::shared_ptr<ColorSpace> colorSpace)
+    : EllipseGeometryProcessor(width, height, stroke, useScale, commonColor,
+                               std::move(colorSpace)) {
 }
 
 void GLSLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
@@ -55,6 +58,9 @@ void GLSLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
   } else {
     auto color = varyingHandler->addVarying("Color", SLType::Float4);
+    ColorSpaceXformSteps steps{ColorSpace::MakeSRGB().get(), AlphaType::Premultiplied,
+                               dstColorSpace.get(), AlphaType::Premultiplied};
+    vertBuilder->appendColorGamutXform(inColor.name().c_str(), &steps);
     vertBuilder->codeAppendf("%s = %s;", color.vsOut().c_str(), inColor.name().c_str());
     fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), color.fsIn().c_str());
   }
@@ -133,8 +139,16 @@ void GLSLEllipseGeometryProcessor::setData(UniformData* vertexUniformData,
                                            UniformData* fragmentUniformData,
                                            FPCoordTransformIter* transformIter) const {
   setTransformDataHelper(Matrix::I(), vertexUniformData, transformIter);
+  auto vertSteps =
+      std::make_shared<ColorSpaceXformSteps>(ColorSpace::MakeSRGB().get(), AlphaType::Premultiplied,
+                                             dstColorSpace.get(), AlphaType::Premultiplied);
   if (commonColor.has_value()) {
-    fragmentUniformData->setData("Color", *commonColor);
+    Color dstCommonColor = commonColor.value();
+    vertSteps->apply(dstCommonColor.array());
+    fragmentUniformData->setData("Color", dstCommonColor);
+  } else {
+    ColorSpaceXformHelper helper{};
+    helper.setData(vertexUniformData, vertSteps.get());
   }
 }
 }  // namespace tgfx

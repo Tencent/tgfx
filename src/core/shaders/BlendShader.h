@@ -42,6 +42,6 @@ class BlendShader : public Shader {
 
   PlacementPtr<FragmentProcessor> asFragmentProcessor(
       const FPArgs& args, const Matrix* uvMatrix,
-      std::shared_ptr<ColorSpace> colorSpace) const override;
+      std::shared_ptr<ColorSpace> dstColorSpace) const override;
 };
 }  // namespace tgfx

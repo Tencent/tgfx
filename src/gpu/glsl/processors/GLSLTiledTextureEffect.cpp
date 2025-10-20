@@ -21,21 +21,21 @@
 #include "gpu/processors/TextureEffect.h"
 
 namespace tgfx {
-PlacementPtr<FragmentProcessor> TiledTextureEffect::Make(std::shared_ptr<TextureProxy> proxy,
-                                                         const SamplingArgs& args,
-                                                         const Matrix* uvMatrix, bool forceAsMask) {
+PlacementPtr<FragmentProcessor> TiledTextureEffect::Make(
+    std::shared_ptr<TextureProxy> proxy, const SamplingArgs& args, const Matrix* uvMatrix,
+    bool forceAsMask, std::shared_ptr<ColorSpace> dstColorSpace) {
   if (proxy == nullptr) {
     return nullptr;
   }
   if (args.tileModeX == TileMode::Clamp && args.tileModeY == TileMode::Clamp) {
-    return TextureEffect::Make(std::move(proxy), args, uvMatrix, forceAsMask);
+    return TextureEffect::Make(std::move(proxy), args, uvMatrix, forceAsMask, dstColorSpace);
   }
   auto matrix = uvMatrix ? *uvMatrix : Matrix::I();
   SamplerState samplerState(args.tileModeX, args.tileModeY, args.sampling);
   auto isAlphaOnly = proxy->isAlphaOnly();
   auto drawingBuffer = proxy->getContext()->drawingBuffer();
   PlacementPtr<FragmentProcessor> processor = drawingBuffer->make<GLSLTiledTextureEffect>(
-      std::move(proxy), samplerState, args.constraint, matrix, args.sampleArea);
+      std::move(proxy), samplerState, args.constraint, matrix, args.sampleArea, dstColorSpace);
   if (forceAsMask && !isAlphaOnly) {
     processor = FragmentProcessor::MulInputByChildAlpha(drawingBuffer, std::move(processor));
   }
@@ -45,8 +45,10 @@ PlacementPtr<FragmentProcessor> TiledTextureEffect::Make(std::shared_ptr<Texture
 GLSLTiledTextureEffect::GLSLTiledTextureEffect(std::shared_ptr<TextureProxy> proxy,
                                                const SamplerState& samplerState,
                                                SrcRectConstraint constraint, const Matrix& uvMatrix,
-                                               const std::optional<Rect>& subset)
-    : TiledTextureEffect(std::move(proxy), samplerState, constraint, uvMatrix, subset) {
+                                               const std::optional<Rect>& subset,
+                                               std::shared_ptr<ColorSpace> dstColorSpace)
+    : TiledTextureEffect(std::move(proxy), samplerState, constraint, uvMatrix, subset,
+                         std::move(dstColorSpace)) {
 }
 
 bool GLSLTiledTextureEffect::ShaderModeRequiresUnormCoord(TiledTextureEffect::ShaderMode mode) {
@@ -109,6 +111,11 @@ void GLSLTiledTextureEffect::readColor(EmitArgs& args, const std::string& dimens
   fragBuilder->codeAppendf("vec4 %s = ", out);
   fragBuilder->appendTextureLookup((*args.textureSamplers)[0], normCoord);
   fragBuilder->codeAppend(";");
+
+  auto srcColorSpace = getTextureView()->gamutColorSpace();
+  auto steps = std::make_shared<ColorSpaceXformSteps>(
+      srcColorSpace.get(), AlphaType::Premultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
+  fragBuilder->appendColorGamutXform(out, steps.get());
 }
 
 void GLSLTiledTextureEffect::subsetCoord(EmitArgs& args, TiledTextureEffect::ShaderMode mode,
@@ -232,6 +239,11 @@ void GLSLTiledTextureEffect::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppendf("%s = ", args.outputColor.c_str());
     fragBuilder->appendTextureLookup((*args.textureSamplers)[0], vertexColor);
     fragBuilder->codeAppend(";");
+    auto srcColorSpace = getTextureView()->gamutColorSpace();
+    auto steps =
+        std::make_shared<ColorSpaceXformSteps>(srcColorSpace.get(), AlphaType::Premultiplied,
+                                               dstColorSpace.get(), AlphaType::Premultiplied);
+    fragBuilder->appendColorGamutXform(args.outputColor.c_str(), steps.get());
   } else {
     fragBuilder->codeAppendf("vec2 inCoord = %s;", vertexColor.c_str());
     bool useClamp[2] = {ShaderModeUsesClamp(sampling.shaderModeX),
@@ -420,6 +432,11 @@ void GLSLTiledTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
   if (textureView == nullptr) {
     return;
   }
+  auto srcColorSpace = textureView->gamutColorSpace();
+  auto steps = std::make_shared<ColorSpaceXformSteps>(
+      srcColorSpace.get(), AlphaType::Premultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
+  ColorSpaceXformHelper helper;
+  helper.setData(fragmentUniformData, steps.get());
   Sampling sampling(textureView, samplerState, subset);
   auto hasDimensionUniform = (ShaderModeRequiresUnormCoord(sampling.shaderModeX) ||
                               ShaderModeRequiresUnormCoord(sampling.shaderModeY)) &&

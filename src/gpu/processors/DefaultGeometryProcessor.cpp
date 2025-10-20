@@ -20,9 +20,10 @@
 
 namespace tgfx {
 DefaultGeometryProcessor::DefaultGeometryProcessor(Color color, int width, int height, AAType aa,
-                                                   const Matrix& viewMatrix, const Matrix& uvMatrix)
+                                                   const Matrix& viewMatrix, const Matrix& uvMatrix,
+                                                   std::shared_ptr<ColorSpace> dstColorSpace)
     : GeometryProcessor(ClassID()), color(color), width(width), height(height), aa(aa),
-      viewMatrix(viewMatrix), uvMatrix(uvMatrix) {
+      viewMatrix(viewMatrix), uvMatrix(uvMatrix), dstColorSpace(std::move(dstColorSpace)) {
   position = {"aPosition", VertexFormat::Float2};
   if (aa == AAType::Coverage) {
     coverage = {"inCoverage", VertexFormat::Float};

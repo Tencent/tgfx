@@ -30,12 +30,12 @@ class TextureEffect : public FragmentProcessor {
   static PlacementPtr<FragmentProcessor> Make(std::shared_ptr<TextureProxy> proxy,
                                               const SamplingArgs& args = {},
                                               const Matrix* uvMatrix = nullptr,
-                                              bool forceAsMask = false);
+                                              bool forceAsMask = false,
+                                              std::shared_ptr<ColorSpace> dstColorSpace = nullptr);
 
-  static PlacementPtr<FragmentProcessor> MakeRGBAAA(std::shared_ptr<TextureProxy> proxy,
-                                                    const SamplingArgs& args,
-                                                    const Point& alphaStart,
-                                                    const Matrix* uvMatrix = nullptr);
+  static PlacementPtr<FragmentProcessor> MakeRGBAAA(
+      std::shared_ptr<TextureProxy> proxy, const SamplingArgs& args, const Point& alphaStart,
+      const Matrix* uvMatrix = nullptr, std::shared_ptr<ColorSpace> dstColorSpace = nullptr);
 
   std::string name() const override {
     return "TextureEffect";
@@ -46,7 +46,7 @@ class TextureEffect : public FragmentProcessor {
 
   TextureEffect(std::shared_ptr<TextureProxy> proxy, const SamplingOptions& sampling,
                 SrcRectConstraint constraint, const Point& alphaStart, const Matrix& uvMatrix,
-                const std::optional<Rect>& subset);
+                const std::optional<Rect>& subset, std::shared_ptr<ColorSpace> dstColorSpace);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
@@ -70,5 +70,6 @@ class TextureEffect : public FragmentProcessor {
   Point alphaStart = {};
   CoordTransform coordTransform;
   std::optional<Rect> subset = std::nullopt;
+  std::shared_ptr<ColorSpace> dstColorSpace = nullptr;
 };
 }  // namespace tgfx

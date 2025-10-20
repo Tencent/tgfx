@@ -48,11 +48,10 @@ class GaussianBlurImageFilter : public ImageFilter {
                                                  const Rect& renderBounds,
                                                  const TPArgs& args) const override;
 
-  PlacementPtr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
-                                                      const FPArgs& args,
-                                                      const SamplingOptions& sampling,
-                                                      SrcRectConstraint constraint,
-                                                      const Matrix* uvMatrix) const override;
+  PlacementPtr<FragmentProcessor> asFragmentProcessor(
+      std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
+      SrcRectConstraint constraint, const Matrix* uvMatrix,
+      std::shared_ptr<ColorSpace> dstColorSpace) const override;
 
   PlacementPtr<FragmentProcessor> getSourceFragmentProcessor(std::shared_ptr<Image> source,
                                                              Context* context, uint32_t renderFlags,

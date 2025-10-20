@@ -446,7 +446,7 @@ TGFX_TEST(CanvasTest, mipmap) {
   ASSERT_TRUE(context != nullptr);
   auto codec = MakeImageCodec("resources/apitest/rotation.jpg");
   ASSERT_TRUE(codec != nullptr);
-  Bitmap bitmap(codec->width(), codec->height(), false, false);
+  Bitmap bitmap(codec->width(), codec->height(), false, false, codec->gamutColorSpace());
   ASSERT_FALSE(bitmap.isEmpty());
   Pixmap pixmap(bitmap);
   auto result = codec->readPixels(pixmap.info(), pixmap.writablePixels());
@@ -517,7 +517,7 @@ TGFX_TEST(CanvasTest, hardwareMipmap) {
   ASSERT_TRUE(context != nullptr);
   auto codec = MakeImageCodec("resources/apitest/rotation.jpg");
   ASSERT_TRUE(codec != nullptr);
-  Bitmap bitmap(codec->width(), codec->height(), false);
+  Bitmap bitmap(codec->width(), codec->height(), false, true, codec->gamutColorSpace());
   ASSERT_FALSE(bitmap.isEmpty());
   Pixmap pixmap(bitmap);
   auto result = codec->readPixels(pixmap.info(), pixmap.writablePixels());
@@ -1109,7 +1109,7 @@ TGFX_TEST(CanvasTest, atlas) {
   EXPECT_TRUE(imageCodec->readPixels(RGBAInfo, pixels));
   auto pixelsData = Data::MakeWithCopy(buffer.data(), buffer.size());
   ASSERT_TRUE(pixelsData != nullptr);
-  auto image = Image::MakeFrom(RGBAInfo, std::move(pixelsData));
+  auto image = Image::MakeFrom(RGBAInfo, std::move(pixelsData), imageCodec->gamutColorSpace());
   ASSERT_TRUE(image != nullptr);
   Matrix matrix[4] = {Matrix::I(), Matrix::MakeTrans(660, 0), Matrix::MakeTrans(0, 380),
                       Matrix::MakeTrans(660, 380)};
@@ -2762,7 +2762,7 @@ TGFX_TEST(CanvasTest, ScaleImage) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/scaled_imageCodec_box_filter"));
   auto codec = MakeImageCodec(imagePath);
   ASSERT_TRUE(codec != nullptr);
-  Bitmap bitmap(codec->width(), codec->height(), false);
+  Bitmap bitmap(codec->width(), codec->height(), false, true, codec->gamutColorSpace());
   ASSERT_FALSE(bitmap.isEmpty());
   Pixmap pixmap(bitmap);
   auto result = codec->readPixels(pixmap.info(), pixmap.writablePixels());
@@ -2962,7 +2962,7 @@ TGFX_TEST(CanvasTest, drawScaleImage) {
   canvas->setMatrix(matrix);
   canvas->drawImage(subImage);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/drawScaleSubImage"));
-  Bitmap bitmap(codec->width(), codec->height(), false);
+  Bitmap bitmap(codec->width(), codec->height(), false, true, codec->gamutColorSpace());
   ASSERT_FALSE(bitmap.isEmpty());
   Pixmap pixmap(bitmap);
   auto result = codec->readPixels(pixmap.info(), pixmap.writablePixels());
@@ -3018,4 +3018,153 @@ TGFX_TEST(CanvasTest, MatrixShapeStroke) {
 
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/MatrixShapeStroke"));
 }
+
+TGFX_TEST(CanvasTest, SurfaceColorSpace) {
+  TransferFunction tf = NamedTransferFunction::TwoDotTwo;
+  ColorSpacePrimaries srgbPrimaries = {0.64f, 0.33f, 0.30f, 0.60f, 0.15f, 0.06f, 0.3127f, 0.3290f};
+
+  ColorSpacePrimaries adobePrimaries = {0.64f, 0.33f, 0.21f, 0.71f, 0.15f, 0.06f, 0.3127f, 0.3290f};
+
+  ColorSpacePrimaries p3Primaries = {0.680f, 0.320f, 0.265f,  0.690f,
+                                     0.150f, 0.060f, 0.3127f, 0.3290f};
+
+  ColorSpacePrimaries rec2020Primaries = {0.708f, 0.292f, 0.170f,  0.797f,
+                                          0.131f, 0.046f, 0.3127f, 0.3290f};
+
+  struct Primaries {
+    const char* name;
+    const ColorSpacePrimaries* primarie;
+  } primaries[] = {{"sRGB", &srgbPrimaries},
+                   {"AdobeRGB", &adobePrimaries},
+                   {"P3", &p3Primaries},
+                   {"Rec.2020", &rec2020Primaries}};
+  float gammas[] = {0.5f, 2.2f, 3.5f};
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  std::shared_ptr<Surface> surface = nullptr;
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  for (float gamma : gammas) {
+    tf.g = gamma;
+    for (auto& primarie : primaries) {
+      ColorMatrix33 toXYZ{};
+      primarie.primarie->toXYZD50(&toXYZ);
+      auto colorSpace = ColorSpace::MakeRGB(tf, toXYZ);
+      surface = Surface::Make(context, 128, 128, false, 1, false, 0, colorSpace);
+      auto canvas = surface->getCanvas();
+      canvas->drawImage(image);
+      context->flushAndSubmit();
+      std::ostringstream keyStream;
+      keyStream << "CanvasTest/"
+                << "SurfaceColorSpace_" << primarie.name << "_" << gamma;
+      EXPECT_TRUE(Baseline::Compare(surface, keyStream.str()));
+    }
+  }
+}
+
+TGFX_TEST(CanvasTest, ConvertColorSpace) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 1024, 1024, false, 1, false, 0,
+                               ColorSpace::MakeSRGB()->makeColorSpin());
+  auto canvas = surface->getCanvas();
+  const TransferFunction tfs[] = {
+      NamedTransferFunction::SRGB,
+      NamedTransferFunction::TwoDotTwo,
+      NamedTransferFunction::Linear,
+      NamedTransferFunction::Rec2020,
+      {-3.0f, 2.0f, 2.0f, 1 / 0.17883277f, 0.28466892f, 0.55991073f, 3.0f}};
+
+  const ColorMatrix33 gamuts[] = {NamedGamut::SRGB, NamedGamut::AdobeRGB, NamedGamut::DisplayP3,
+                                  NamedGamut::Rec2020, NamedGamut::XYZ};
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  const int width = image->width();
+  const int height = image->height();
+  int tfNum = sizeof(tfs) / sizeof(TransferFunction);
+  int gamutNum = sizeof(gamuts) / sizeof(ColorMatrix33);
+  for (int i = 0; i < tfNum; i++) {
+    for (int j = 0; j < gamutNum; j++) {
+      auto midCS = ColorSpace::MakeRGB(tfs[i], gamuts[j]);
+      auto offscreen = Surface::Make(context, width, height, false, 1, false, 0, midCS);
+      offscreen->getCanvas()->drawImage(image);
+      canvas->drawImage(offscreen->makeImageSnapshot(), static_cast<float>(i * width),
+                        static_cast<float>(j * height));
+    }
+  }
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ConvertColorSpace"));
+}
+
+TGFX_TEST(CanvasTest, ColorSpace) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface =
+      Surface::Make(context, 1024, 1024, false, 1, false, 0,
+                    ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3));
+  auto canvas = surface->getCanvas();
+  Paint paint;
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  auto imageShader = Shader::MakeImageShader(image, TileMode::Repeat, TileMode::Repeat);
+  paint.setShader(imageShader);
+  canvas->drawPaint(paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawImageShaderToP3"));
+  canvas->clear();
+  auto colorShader = Shader::MakeColorShader(Color::Green());
+  paint.setShader(colorShader);
+  canvas->drawPaint(paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawSRGBColorShaderToP3"));
+  canvas->clear();
+  auto linearGradient = Shader::MakeLinearGradient(Point::Make(0, 0), Point::Make(1024, 0),
+                                                   {Color::Green(), Color::Red()}, {});
+  paint.setShader(linearGradient);
+  canvas->drawPaint(paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawSRGBLinearShaderToP3"));
+  canvas->clear();
+  auto conicGradient =
+      Shader::MakeConicGradient(Point::Make(512, 512), 0, 360, {Color::Green(), Color::Red()}, {});
+  paint.setShader(conicGradient);
+  canvas->drawPaint(paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawSRGBConicShaderToP3"));
+  canvas->clear();
+  auto diamondGradient =
+      Shader::MakeDiamondGradient(Point::Make(512, 512), 500, {Color::Green(), Color::Red()}, {});
+  paint.setShader(diamondGradient);
+  canvas->drawPaint(paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawSRGBDiamondShaderToP3"));
+  canvas->clear();
+  auto radialGradient =
+      Shader::MakeRadialGradient(Point::Make(512, 512), 500, {Color::Green(), Color::Red()}, {});
+  paint.setShader(radialGradient);
+  canvas->drawPaint(paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawSRGBRadialShaderToP3"));
+  canvas->clear();
+  auto blendFilter = ColorFilter::Blend(Color::FromRGBA(0, 0, 125, 125), BlendMode::SrcOver);
+  paint.setColorFilter(blendFilter);
+  canvas->drawPaint(paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawSRGBBlendFilterToP3"));
+  canvas->clear();
+  auto image1 = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(image1 != nullptr);
+  auto maskShader = Shader::MakeImageShader(std::move(image1), TileMode::Decal, TileMode::Decal);
+  auto maskFilter = MaskFilter::MakeShader(std::move(maskShader));
+  maskFilter = maskFilter->makeWithMatrix(Matrix::MakeTrans(462, 462));
+  paint.setMaskFilter(maskFilter);
+  auto imageFilter = ImageFilter::DropShadow(-10, -10, 10, 10, Color::Green());
+  paint.setImageFilter(imageFilter);
+  canvas->drawPaint(paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawSRGBDropShadowFilterToP3"));
+  canvas->clear();
+  Recorder record;
+  auto recordCanvas = record.beginRecording();
+  recordCanvas->drawColor(Color::Green(), BlendMode::SrcOver);
+  auto picture = record.finishRecordingAsPicture();
+  canvas->drawPicture(picture);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawRecordSRGBColorToP3UseDrawPicture"));
+  canvas->clear();
+  auto pictureImage = Image::MakeFrom(picture, 1024, 1024);
+  canvas->drawImage(pictureImage);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawRecordSRGBColorToP3UseDrawImage"));
+}
+
 }  // namespace tgfx

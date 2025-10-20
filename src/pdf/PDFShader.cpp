@@ -49,7 +49,7 @@ Bitmap ImageExportToBitmap(Context* context, const std::shared_ptr<Image>& image
   auto canvas = surface->getCanvas();
   canvas->drawImage(image);
 
-  Bitmap bitmap(surface->width(), surface->height());
+  Bitmap bitmap(surface->width(), surface->height(), false, true, surface->gamutColorSpace());
   auto pixels = bitmap.lockPixels();
   if (surface->readPixels(bitmap.info(), pixels)) {
     bitmap.unlockPixels();
@@ -109,7 +109,8 @@ Matrix ScaleTranslate(float sx, float sy, float tx, float ty) {
 }
 
 Bitmap ExtractSubset(Bitmap src, Rect subset) {
-  Bitmap destination(static_cast<int>(subset.width()), static_cast<int>(subset.height()));
+  Bitmap destination(static_cast<int>(subset.width()), static_cast<int>(subset.height()), false,
+                     true, src.gamutColorSpace());
   const auto srcPixels = src.lockPixels();
   destination.writePixels(src.info(), srcPixels, static_cast<int>(subset.left),
                           static_cast<int>(subset.top));

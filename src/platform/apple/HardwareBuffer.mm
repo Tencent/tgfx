@@ -20,6 +20,7 @@
 #import <CoreVideo/CoreVideo.h>
 #import <TargetConditionals.h>
 #include "core/PixelBuffer.h"
+#include "core/utils/ColorSpaceHelper.h"
 #include "platform/apple/NV12HardwareBuffer.h"
 
 namespace tgfx {
@@ -32,7 +33,7 @@ std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef hardwareBuf
   if (planeCount > 1) {
     return NV12HardwareBuffer::MakeFrom(hardwareBuffer, colorSpace);
   }
-  return PixelBuffer::MakeFrom(hardwareBuffer);
+  return PixelBuffer::MakeFrom(hardwareBuffer, MakeColorSpaceFromYUVColorSpace(colorSpace));
 }
 
 bool HardwareBufferCheck(HardwareBufferRef buffer) {

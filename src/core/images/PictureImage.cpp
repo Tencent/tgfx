@@ -26,7 +26,8 @@
 
 namespace tgfx {
 std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<Picture> picture, int width, int height,
-                                       const Matrix* matrix) {
+                                       const Matrix* matrix,
+                                       std::shared_ptr<ColorSpace> colorSpace) {
   if (picture == nullptr || width <= 0 || height <= 0) {
     return nullptr;
   }
@@ -44,14 +45,17 @@ std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<Picture> picture, int wid
       return image;
     }
   }
-  auto image = std::make_shared<PictureImage>(std::move(picture), width, height, matrix);
+  auto image = std::make_shared<PictureImage>(std::move(picture), width, height, matrix, false,
+                                              std::move(colorSpace));
   image->weakThis = image;
   return image;
 }
 
 PictureImage::PictureImage(std::shared_ptr<Picture> picture, int width, int height,
-                           const Matrix* matrix, bool mipmapped)
-    : picture(std::move(picture)), _width(width), _height(height), mipmapped(mipmapped) {
+                           const Matrix* matrix, bool mipmapped,
+                           std::shared_ptr<ColorSpace> colorSpace)
+    : picture(std::move(picture)), _width(width), _height(height), mipmapped(mipmapped),
+      _gamutColorSpace(std::move(colorSpace)) {
   if (matrix && !matrix->isIdentity()) {
     this->matrix = new Matrix(*matrix);
   }
@@ -78,9 +82,9 @@ std::shared_ptr<Image> PictureImage::onMakeMipmapped(bool enabled) const {
   return newImage;
 }
 
-PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& args,
-                                                                  const SamplingArgs& samplingArgs,
-                                                                  const Matrix* uvMatrix) const {
+PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(
+    const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix,
+    std::shared_ptr<ColorSpace> dstColorSpace) const {
   auto drawBounds = args.drawRect;
   if (uvMatrix) {
     drawBounds = uvMatrix->mapRect(drawBounds);
@@ -98,7 +102,7 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
   auto mipmapped = samplingArgs.sampling.mipmapMode != MipmapMode::None && hasMipmaps();
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(rect.width()), static_cast<int>(rect.height()), isAlphaOnly(),
-      1, mipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
+      1, mipmapped, ImageOrigin::TopLeft, BackingFit::Approx, _gamutColorSpace);
   if (renderTarget == nullptr) {
     return nullptr;
   }
@@ -116,7 +120,7 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
     newSamplingArgs.sampleArea = extraMatrix.mapRect(*samplingArgs.sampleArea);
   }
   return TiledTextureEffect::Make(renderTarget->asTextureProxy(), newSamplingArgs, &finalUVMatrix,
-                                  isAlphaOnly());
+                                  isAlphaOnly(), std::move(dstColorSpace));
 }
 
 std::shared_ptr<TextureProxy> PictureImage::lockTextureProxy(const TPArgs& args) const {
@@ -128,7 +132,7 @@ std::shared_ptr<TextureProxy> PictureImage::lockTextureProxy(const TPArgs& args)
   }
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, textureWidth, textureHeight, isAlphaOnly(), 1, hasMipmaps() && args.mipmapped,
-      ImageOrigin::TopLeft, args.backingFit);
+      ImageOrigin::TopLeft, args.backingFit, _gamutColorSpace);
   if (renderTarget == nullptr) {
     return nullptr;
   }

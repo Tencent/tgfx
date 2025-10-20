@@ -17,14 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PixelImage.h"
+#include "core/filters/DropShadowImageFilter.h"
 #include "gpu/TPArgs.h"
 #include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
 
-PlacementPtr<FragmentProcessor> PixelImage::asFragmentProcessor(const FPArgs& args,
-                                                                const SamplingArgs& samplingArgs,
-                                                                const Matrix* uvMatrix) const {
+PlacementPtr<FragmentProcessor> PixelImage::asFragmentProcessor(
+    const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix,
+    std::shared_ptr<ColorSpace> dstColorSpace) const {
   auto mipmapped = hasMipmaps() && samplingArgs.sampling.mipmapMode != MipmapMode::None;
   TPArgs tpArgs(args.context, args.renderFlags, mipmapped, args.drawScale, BackingFit::Approx);
   auto textureProxy = lockTextureProxy(tpArgs);
@@ -37,6 +38,7 @@ PlacementPtr<FragmentProcessor> PixelImage::asFragmentProcessor(const FPArgs& ar
   if (uvMatrix) {
     fpMatrix.preConcat(*uvMatrix);
   }
-  return TiledTextureEffect::Make(textureProxy, samplingArgs, &fpMatrix, isAlphaOnly());
+  return TiledTextureEffect::Make(textureProxy, samplingArgs, &fpMatrix, isAlphaOnly(),
+                                  std::move(dstColorSpace));
 }
 }  // namespace tgfx

@@ -65,9 +65,9 @@ std::shared_ptr<Image> SubsetImage::onMakeScaled(int newWidth, int newHeight,
   return MakeFrom(std::move(newSource), newBounds);
 }
 
-PlacementPtr<FragmentProcessor> SubsetImage::asFragmentProcessor(const FPArgs& args,
-                                                                 const SamplingArgs& samplingArgs,
-                                                                 const Matrix* uvMatrix) const {
+PlacementPtr<FragmentProcessor> SubsetImage::asFragmentProcessor(
+    const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix,
+    std::shared_ptr<ColorSpace> dstColorSpace) const {
   auto matrix = concatUVMatrix(uvMatrix);
   auto drawBounds = args.drawRect;
   if (matrix) {
@@ -79,7 +79,8 @@ PlacementPtr<FragmentProcessor> SubsetImage::asFragmentProcessor(const FPArgs& a
       // if samplingArgs has sampleArea, means the area is already subsetted
       newSamplingArgs.sampleArea = getSubset(drawBounds);
     }
-    return FragmentProcessor::Make(source, args, newSamplingArgs, AddressOf(matrix));
+    return FragmentProcessor::Make(source, args, newSamplingArgs, AddressOf(matrix),
+                                   std::move(dstColorSpace));
   }
   if (!drawBounds.intersect(bounds)) {
     return nullptr;
@@ -99,7 +100,8 @@ PlacementPtr<FragmentProcessor> SubsetImage::asFragmentProcessor(const FPArgs& a
   if (uvMatrix) {
     fpMatrix.preConcat(*uvMatrix);
   }
-  return TiledTextureEffect::Make(textureProxy, newSamplingArgs, &fpMatrix, source->isAlphaOnly());
+  return TiledTextureEffect::Make(textureProxy, newSamplingArgs, &fpMatrix, source->isAlphaOnly(),
+                                  std::move(dstColorSpace));
 }
 
 std::optional<Matrix> SubsetImage::concatUVMatrix(const Matrix* uvMatrix) const {

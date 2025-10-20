@@ -26,7 +26,9 @@ class PixelBufferCodec : public ImageCodec {
   static std::shared_ptr<PixelBufferCodec> Make(std::shared_ptr<PixelBuffer> source);
 
   PixelBufferCodec(std::shared_ptr<PixelBuffer> source)
-      : ImageCodec(source->width(), source->height()), source(std::move(source)) {
+      : ImageCodec(source->width(), source->height(), Orientation::TopLeft,
+                   source->gamutColorSpace()),
+        source(std::move(source)) {
   }
 
   bool isAlphaOnly() const override {

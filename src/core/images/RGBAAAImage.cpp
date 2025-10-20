@@ -53,9 +53,9 @@ std::shared_ptr<Image> RGBAAAImage::onCloneWith(std::shared_ptr<Image> newSource
   return image;
 }
 
-PlacementPtr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(const FPArgs& args,
-                                                                 const SamplingArgs& samplingArgs,
-                                                                 const Matrix* uvMatrix) const {
+PlacementPtr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(
+    const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix,
+    std::shared_ptr<ColorSpace> dstColorSpace) const {
   DEBUG_ASSERT(!source->isAlphaOnly());
   auto matrix = concatUVMatrix(uvMatrix);
   auto drawBounds = args.drawRect;
@@ -72,7 +72,7 @@ PlacementPtr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(const FPArgs& a
     TPArgs tpArgs(args.context, args.renderFlags, mipmapped, 1.0f, {});
     auto proxy = source->lockTextureProxy(tpArgs);
     return TextureEffect::MakeRGBAAA(std::move(proxy), newSamplingArgs, alphaStart,
-                                     AddressOf(matrix));
+                                     AddressOf(matrix), std::move(dstColorSpace));
   }
   TPArgs tpArgs(args.context, args.renderFlags, mipmapped, 1.0f, {});
   auto textureProxy = lockTextureProxy(tpArgs);
@@ -80,21 +80,22 @@ PlacementPtr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(const FPArgs& a
     return nullptr;
   }
   newSamplingArgs.sampleArea = std::nullopt;
-  return TiledTextureEffect::Make(textureProxy, newSamplingArgs, uvMatrix);
+  return TiledTextureEffect::Make(textureProxy, newSamplingArgs, uvMatrix, false,
+                                  std::move(dstColorSpace));
 }
 
 std::shared_ptr<TextureProxy> RGBAAAImage::lockTextureProxy(const TPArgs& args) const {
   auto textureWidth = width();
   auto textureHeight = height();
-  auto renderTarget =
-      RenderTargetProxy::MakeFallback(args.context, textureWidth, textureHeight, isAlphaOnly(), 1,
-                                      args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
+  auto renderTarget = RenderTargetProxy::MakeFallback(
+      args.context, textureWidth, textureHeight, isAlphaOnly(), 1, args.mipmapped,
+      ImageOrigin::TopLeft, args.backingFit, gamutColorSpace());
   if (renderTarget == nullptr) {
     return nullptr;
   }
   auto drawRect = Rect::MakeWH(textureWidth, textureHeight);
   FPArgs fpArgs(args.context, args.renderFlags, drawRect, 1.0f);
-  auto processor = asFragmentProcessor(fpArgs, {}, nullptr);
+  auto processor = asFragmentProcessor(fpArgs, {}, nullptr, renderTarget->gamutColorSpace());
   auto drawingManager = args.context->drawingManager();
   if (!drawingManager->fillRTWithFP(renderTarget, std::move(processor), args.renderFlags)) {
     return nullptr;

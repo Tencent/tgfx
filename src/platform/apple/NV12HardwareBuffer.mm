@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "NV12HardwareBuffer.h"
+#include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/USE.h"
 #include "gpu/resources/TextureView.h"
 
@@ -66,6 +67,10 @@ int NV12HardwareBuffer::width() const {
 
 int NV12HardwareBuffer::height() const {
   return static_cast<int>(CVPixelBufferGetHeight(pixelBuffer));
+}
+
+std::shared_ptr<ColorSpace> NV12HardwareBuffer::gamutColorSpace() const {
+  return MakeColorSpaceFromYUVColorSpace(colorSpace);
 }
 
 std::shared_ptr<TextureView> NV12HardwareBuffer::onMakeTexture(Context* context, bool) const {

@@ -83,7 +83,8 @@ PlacementPtr<GeometryProcessor> ShapeDrawOp::onMakeGeometryProcessor(RenderTarge
   }
   auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
   return DefaultGeometryProcessor::Make(drawingBuffer, color, renderTarget->width(),
-                                        renderTarget->height(), aa, viewMatrix, realUVMatrix);
+                                        renderTarget->height(), aa, viewMatrix, realUVMatrix,
+                                        renderTarget->gamutColorSpace());
 }
 
 void ShapeDrawOp::onDraw(RenderPass* renderPass) {

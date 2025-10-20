@@ -26,15 +26,15 @@ static constexpr char UniformNdcOffsetName[] = "ndcOffset";
 
 PlacementPtr<Transform3DGeometryProcessor> Transform3DGeometryProcessor::Make(
     BlockBuffer* buffer, AAType aa, const Matrix3D& matrix, const Vec2& ndcScale,
-    const Vec2& ndcOffset) {
-  return buffer->make<GLSLQuadPerEdgeAA3DGeometryProcessor>(aa, matrix, ndcScale, ndcOffset);
+    const Vec2& ndcOffset, std::shared_ptr<ColorSpace> dstColorSpace) {
+  return buffer->make<GLSLQuadPerEdgeAA3DGeometryProcessor>(aa, matrix, ndcScale, ndcOffset,
+                                                            std::move(dstColorSpace));
 }
 
-GLSLQuadPerEdgeAA3DGeometryProcessor::GLSLQuadPerEdgeAA3DGeometryProcessor(AAType aa,
-                                                                           const Matrix3D& matrix,
-                                                                           const Vec2& ndcScale,
-                                                                           const Vec2& ndcOffset)
-    : Transform3DGeometryProcessor(aa, matrix, ndcScale, ndcOffset) {
+GLSLQuadPerEdgeAA3DGeometryProcessor::GLSLQuadPerEdgeAA3DGeometryProcessor(
+    AAType aa, const Matrix3D& matrix, const Vec2& ndcScale, const Vec2& ndcOffset,
+    std::shared_ptr<ColorSpace> colorSpace)
+    : Transform3DGeometryProcessor(aa, matrix, ndcScale, ndcOffset, std::move(colorSpace)) {
 }
 
 void GLSLQuadPerEdgeAA3DGeometryProcessor::emitCode(EmitArgs& args) const {
@@ -77,7 +77,12 @@ void GLSLQuadPerEdgeAA3DGeometryProcessor::setData(UniformData* vertexUniformDat
                                                    UniformData* fragmentUniformData,
                                                    FPCoordTransformIter* transformIter) const {
   setTransformDataHelper(Matrix::I(), vertexUniformData, transformIter);
-  fragmentUniformData->setData("Color", defaultColor);
+  auto vertSteps =
+      std::make_shared<ColorSpaceXformSteps>(ColorSpace::MakeSRGB().get(), AlphaType::Premultiplied,
+                                             dstColorSpace.get(), AlphaType::Premultiplied);
+  Color dstColor = defaultColor;
+  vertSteps->apply(dstColor.array());
+  fragmentUniformData->setData("Color", dstColor);
   vertexUniformData->setData("transformMatrix", matrix);
   vertexUniformData->setData("ndcScale", ndcScale);
   vertexUniformData->setData("ndcOffset", ndcOffset);

@@ -30,7 +30,6 @@
 #include "gpu/processors/AARectEffect.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "inspect/InspectorMark.h"
-#include "processors/ColorSpaceXformEffect.h"
 #include "processors/PorterDuffXferProcessor.h"
 
 namespace tgfx {
@@ -390,14 +389,11 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
   if (drawOp != nullptr && pendingType == PendingOpType::Image) {
     FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty()),
                    drawScale.value_or(1.0f)};
-    auto processor =
-        FragmentProcessor::Make(pendingImage, args, pendingSampling, pendingConstraint);
+    auto processor = FragmentProcessor::Make(pendingImage, args, pendingSampling, pendingConstraint,
+                                             nullptr, renderTarget->gamutColorSpace());
     if (processor == nullptr) {
       return;
     }
-    processor = ColorSpaceXformEffect::Make(
-        context->drawingBuffer(), std::move(processor), pendingImage->colorSpace().get(),
-        AlphaType::Premultiplied, renderTarget->colorSpace().get(), AlphaType::Premultiplied);
     drawOp->addColorFP(std::move(processor));
   }
   addDrawOp(std::move(drawOp), pendingClip, pendingFill, localBounds, deviceBounds,
@@ -444,7 +440,11 @@ bool OpsCompositor::drawAsClear(const Rect& rect, const MCState& state, const Fi
   auto format = renderTarget->format();
   auto caps = context->caps();
   auto& writeSwizzle = caps->getWriteSwizzle(format);
-  clearColor = writeSwizzle.applyTo(fill.color.premultiply());
+  Color dstColor = fill.color;
+  ColorSpaceXformSteps steps{ColorSpace::MakeSRGB().get(), AlphaType::Unpremultiplied,
+                             renderTarget->gamutColorSpace().get(), AlphaType::Premultiplied};
+  steps.apply(dstColor.array());
+  clearColor = writeSwizzle.applyTo(dstColor);
   return true;
 }
 
@@ -587,7 +587,8 @@ std::pair<PlacementPtr<FragmentProcessor>, bool> OpsCompositor::getClipMaskFP(co
   if (renderTarget->origin() == ImageOrigin::BottomLeft) {
     uvMatrix.preConcat(renderTarget->getOriginTransform());
   }
-  auto processor = DeviceSpaceTextureEffect::Make(buffer, std::move(textureProxy), uvMatrix);
+  auto processor = DeviceSpaceTextureEffect::Make(buffer, std::move(textureProxy), uvMatrix,
+                                                  renderTarget->gamutColorSpace());
   return {FragmentProcessor::MulInputByChildAlpha(buffer, std::move(processor)), true};
 }
 
@@ -625,7 +626,8 @@ DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds, AATyp
   dstTextureInfo.offset = {bounds.x(), bounds.y()};
   textureProxy = proxyProvider()->createTextureProxy(
       {}, static_cast<int>(bounds.width()), static_cast<int>(bounds.height()),
-      renderTarget->format(), false, renderTarget->origin(), BackingFit::Approx);
+      renderTarget->format(), false, renderTarget->origin(), BackingFit::Approx, 0,
+      renderTarget->getRenderTarget()->gamutColorSpace());
   if (textureProxy == nullptr) {
     return {};
   }
@@ -647,10 +649,10 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const F
     return;
   }
 
-  auto colorSpace = renderTarget->colorSpace();
+  auto dstColorSpace = renderTarget->gamutColorSpace();
   FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty()), drawScale};
   if (fill.shader) {
-    if (auto processor = FragmentProcessor::Make(fill.shader, args, nullptr, colorSpace)) {
+    if (auto processor = FragmentProcessor::Make(fill.shader, args, nullptr, dstColorSpace)) {
       op->addColorFP(std::move(processor));
     } else {
       // The shader is the main source of color, so if it fails to create a processor, we can't
@@ -659,7 +661,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const F
     }
   }
   if (fill.colorFilter) {
-    if (auto processor = fill.colorFilter->asFragmentProcessor(context, colorSpace)) {
+    if (auto processor = fill.colorFilter->asFragmentProcessor(context, dstColorSpace)) {
       op->addColorFP(std::move(processor));
     }
   }
@@ -689,7 +691,8 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const F
       return;
     }
     auto xferProcessor =
-        PorterDuffXferProcessor::Make(drawingBuffer(), fill.blendMode, std::move(dstTextureInfo));
+        PorterDuffXferProcessor::Make(drawingBuffer(), fill.blendMode, std::move(dstTextureInfo),
+                                      renderTarget->gamutColorSpace());
     op->setXferProcessor(std::move(xferProcessor));
   }
   drawOps.emplace_back(std::move(op));

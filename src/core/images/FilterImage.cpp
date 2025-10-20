@@ -118,9 +118,9 @@ std::shared_ptr<TextureProxy> FilterImage::lockTextureProxy(const TPArgs& args) 
   return filter->lockTextureProxy(source, filterBounds, args);
 }
 
-PlacementPtr<FragmentProcessor> FilterImage::asFragmentProcessor(const FPArgs& args,
-                                                                 const SamplingArgs& samplingArgs,
-                                                                 const Matrix* uvMatrix) const {
+PlacementPtr<FragmentProcessor> FilterImage::asFragmentProcessor(
+    const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix,
+    std::shared_ptr<ColorSpace> dstColorSpace) const {
   auto fpMatrix = concatUVMatrix(uvMatrix);
   auto inputBounds = Rect::MakeWH(source->width(), source->height());
   auto drawBounds = args.drawRect;
@@ -138,7 +138,7 @@ PlacementPtr<FragmentProcessor> FilterImage::asFragmentProcessor(const FPArgs& a
   auto sampling = samplingArgs.sampling;
   if (dstBounds.contains(drawBounds)) {
     return filter->asFragmentProcessor(source, args, sampling, samplingArgs.constraint,
-                                       AddressOf(fpMatrix));
+                                       AddressOf(fpMatrix), dstColorSpace);
   }
   auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
   TPArgs tpArgs(args.context, args.renderFlags, mipmapped, args.drawScale);
@@ -152,6 +152,7 @@ PlacementPtr<FragmentProcessor> FilterImage::asFragmentProcessor(const FPArgs& a
   if (fpMatrix) {
     matrix.preConcat(*fpMatrix);
   }
-  return TiledTextureEffect::Make(textureProxy, samplingArgs, &matrix, source->isAlphaOnly());
+  return TiledTextureEffect::Make(textureProxy, samplingArgs, &matrix, source->isAlphaOnly(),
+                                  dstColorSpace);
 }
 }  // namespace tgfx

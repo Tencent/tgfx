@@ -18,6 +18,7 @@
 
 #include "tgfx/core/ImageBuffer.h"
 #include <memory>
+#include "core/utils/ColorSpaceHelper.h"
 #include "gpu/resources/YUVTextureView.h"
 
 namespace tgfx {
@@ -42,6 +43,11 @@ class YUVBuffer : public ImageBuffer {
     return false;
   }
 
+  std::shared_ptr<ColorSpace> gamutColorSpace() const override;
+
+  void setGamutColorSpace(std::shared_ptr<ColorSpace>) override {
+  }
+
  protected:
   std::shared_ptr<TextureView> onMakeTexture(Context* context, bool) const override {
     if (format == YUVFormat::NV12) {
@@ -55,6 +61,10 @@ class YUVBuffer : public ImageBuffer {
   YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED;
   YUVFormat format = YUVFormat::Unknown;
 };
+
+std::shared_ptr<ColorSpace> YUVBuffer::gamutColorSpace() const {
+  return MakeColorSpaceFromYUVColorSpace(colorSpace);
+}
 
 std::shared_ptr<ImageBuffer> ImageBuffer::MakeI420(std::shared_ptr<YUVData> yuvData,
                                                    YUVColorSpace colorSpace) {

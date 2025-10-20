@@ -29,33 +29,36 @@ PlacementPtr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Image> i
                                                         const FPArgs& args,
                                                         const SamplingOptions& sampling,
                                                         SrcRectConstraint constraint,
-                                                        const Matrix* uvMatrix) {
+                                                        const Matrix* uvMatrix,
+                                                        std::shared_ptr<ColorSpace> dstColorSpace) {
   DEBUG_ASSERT(image != nullptr);
   SamplingArgs samplingArgs = SamplingArgs(TileMode::Clamp, TileMode::Clamp, sampling, constraint);
-  return image->asFragmentProcessor(args, samplingArgs, uvMatrix);
+  return image->asFragmentProcessor(args, samplingArgs, uvMatrix, std::move(dstColorSpace));
 }
 
 PlacementPtr<FragmentProcessor> FragmentProcessor::Make(
     std::shared_ptr<Image> image, const FPArgs& args, TileMode tileModeX, TileMode tileModeY,
-    const SamplingOptions& sampling, SrcRectConstraint constraint, const Matrix* uvMatrix) {
+    const SamplingOptions& sampling, SrcRectConstraint constraint, const Matrix* uvMatrix,
+    std::shared_ptr<ColorSpace> dstColorSpace) {
   DEBUG_ASSERT(image != nullptr);
   SamplingArgs samplingArgs = SamplingArgs(tileModeX, tileModeY, sampling, constraint);
-  return image->asFragmentProcessor(args, samplingArgs, uvMatrix);
+  return image->asFragmentProcessor(args, samplingArgs, uvMatrix, std::move(dstColorSpace));
 }
 
 PlacementPtr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Image> image,
                                                         const FPArgs& args,
                                                         const SamplingArgs& samplingArgs,
-                                                        const Matrix* uvMatrix) {
+                                                        const Matrix* uvMatrix,
+                                                        std::shared_ptr<ColorSpace> dstColorSpace) {
   DEBUG_ASSERT(image != nullptr);
-  return image->asFragmentProcessor(args, samplingArgs, uvMatrix);
+  return image->asFragmentProcessor(args, samplingArgs, uvMatrix, std::move(dstColorSpace));
 }
 
 PlacementPtr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Shader> shader,
                                                         const FPArgs& args, const Matrix* uvMatrix,
-                                                        std::shared_ptr<ColorSpace> colorSpace) {
+                                                        std::shared_ptr<ColorSpace> dstColorSpace) {
   DEBUG_ASSERT(shader != nullptr);
-  return shader->asFragmentProcessor(args, uvMatrix, std::move(colorSpace));
+  return shader->asFragmentProcessor(args, uvMatrix, std::move(dstColorSpace));
 }
 
 PlacementPtr<FragmentProcessor> FragmentProcessor::MulChildByInputAlpha(

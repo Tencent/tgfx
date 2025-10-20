@@ -18,13 +18,14 @@
 
 #include "AHardwareBufferFunctions.h"
 #include "core/PixelBuffer.h"
+#include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "tgfx/platform/android/HardwareBufferJNI.h"
 
 namespace tgfx {
 std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef hardwareBuffer,
-                                                   YUVColorSpace) {
-  return PixelBuffer::MakeFrom(hardwareBuffer);
+                                                   YUVColorSpace yuvColorSpace) {
+  return PixelBuffer::MakeFrom(hardwareBuffer, MakeColorSpaceFromYUVColorSpace(yuvColorSpace));
 }
 
 bool HardwareBufferCheck(HardwareBufferRef buffer) {

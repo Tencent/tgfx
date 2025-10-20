@@ -24,7 +24,7 @@ namespace tgfx {
 class RawPixelCodec : public ImageCodec {
  public:
   RawPixelCodec(const ImageInfo& info, std::shared_ptr<Data> pixels,
-                std::shared_ptr<ColorSpace> colorSpace)
+                std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB())
       : ImageCodec(info.width(), info.height(), Orientation::TopLeft, std::move(colorSpace)),
         info(info), pixels(std::move(pixels)) {
   }

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLProgramBuilder.h"
+#include <fstream>
 #include <string>
 #include "gpu/GPU.h"
 #include "gpu/UniformData.h"
@@ -167,6 +168,8 @@ std::string GLSLProgramBuilder::getUniformBlockDeclaration(
 }
 
 std::shared_ptr<PipelineProgram> GLSLProgramBuilder::finalize() {
+  std::ofstream vertexShaderFile{"./vertex.glsl"};
+  std::ofstream fragmentShaderFile{"./fragment.glsl"};
   auto shaderCaps = context->caps()->shaderCaps();
   if (shaderCaps->usesCustomColorOutputName) {
     fragmentShaderBuilder()->declareCustomOutputColor();
@@ -175,6 +178,8 @@ std::shared_ptr<PipelineProgram> GLSLProgramBuilder::finalize() {
   auto gpu = context->gpu();
   ShaderModuleDescriptor vertexModule = {};
   vertexModule.code = vertexShaderBuilder()->shaderString();
+  vertexShaderFile << vertexModule.code;
+  vertexShaderFile.close();
   vertexModule.stage = ShaderStage::Vertex;
   auto vertexShader = gpu->createShaderModule(vertexModule);
   if (vertexShader == nullptr) {
@@ -182,6 +187,8 @@ std::shared_ptr<PipelineProgram> GLSLProgramBuilder::finalize() {
   }
   ShaderModuleDescriptor fragmentModule = {};
   fragmentModule.code = fragmentShaderBuilder()->shaderString();
+  fragmentShaderFile << fragmentModule.code;
+  fragmentShaderFile.close();
   fragmentModule.stage = ShaderStage::Fragment;
   auto fragmentShader = gpu->createShaderModule(fragmentModule);
   if (fragmentShader == nullptr) {

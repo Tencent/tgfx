@@ -31,7 +31,8 @@ class GLSLQuadPerEdgeAA3DGeometryProcessor final : public Transform3DGeometryPro
    * Creates a GLSLQuadPerEdgeAA3DGeometryProcessor instance with the specified parameters.
    */
   explicit GLSLQuadPerEdgeAA3DGeometryProcessor(AAType aa, const Matrix3D& matrix,
-                                                const Vec2& ndcScale, const Vec2& ndcOffset);
+                                                const Vec2& ndcScale, const Vec2& ndcOffset,
+                                                std::shared_ptr<ColorSpace> colorSpace);
 
   void emitCode(EmitArgs& args) const override;
 

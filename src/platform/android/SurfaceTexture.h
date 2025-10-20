@@ -55,6 +55,10 @@ class SurfaceTexture : public ImageStream {
    */
   void notifyFrameAvailable();
 
+  std::shared_ptr<ColorSpace> gamutColorSpace() const override {
+    return _gamutColorSpace;
+  }
+
  protected:
   std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) override;
 
@@ -66,6 +70,7 @@ class SurfaceTexture : public ImageStream {
   Global<jobject> surface;
   Global<jobject> surfaceTexture;
   bool frameAvailable = false;
+  std::shared_ptr<ColorSpace> _gamutColorSpace = ColorSpace::MakeSRGB();
 
   static void JNIInit(JNIEnv* env);
 

@@ -45,13 +45,6 @@ class ImageGenerator {
   }
 
   /**
-   * Returns the colorspace of the target image.
-   */
-  std::shared_ptr<ColorSpace> colorSpace() const {
-    return _colorSpace;
-  }
-
-  /**
    * Returns true if the generator is guaranteed to produce transparency only pixels. If true, each
    * pixel is packed in 8 bits as defined by ColorType::ALPHA_8.
    */
@@ -85,10 +78,17 @@ class ImageGenerator {
     return onMakeBuffer(tryHardware);
   }
 
+  std::shared_ptr<ColorSpace> gamutColorSpace() const {
+    return _gamutColorSpace;
+  }
+
+  void setGamutColorSpace(std::shared_ptr<ColorSpace> colorSpace) {
+    _gamutColorSpace = std::move(colorSpace);
+  }
+
  protected:
-  ImageGenerator(int width, int height,
-                 std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB())
-      : _width(width), _height(height), _colorSpace(std::move(colorSpace)) {
+  ImageGenerator(int width, int height, std::shared_ptr<ColorSpace> colorSpace)
+      : _width(width), _height(height), _gamutColorSpace(std::move(colorSpace)) {
   }
 
   virtual std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const = 0;
@@ -96,6 +96,6 @@ class ImageGenerator {
  private:
   int _width = 0;
   int _height = 0;
-  std::shared_ptr<ColorSpace> _colorSpace = ColorSpace::MakeSRGB();
+  std::shared_ptr<ColorSpace> _gamutColorSpace = ColorSpace::MakeSRGB();
 };
 }  // namespace tgfx

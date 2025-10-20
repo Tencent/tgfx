@@ -163,8 +163,8 @@ std::shared_ptr<NativeCodec> NativeCodec::Make(OH_ImageSourceNative* imageSource
   }
 
   OH_ImageSourceInfo_Release(info);
-  return std::shared_ptr<NativeCodec>(new NativeCodec(
-      static_cast<int>(width), static_cast<int>(height), orientation, ColorSpace::MakeSRGB()));
+  return std::shared_ptr<NativeCodec>(
+      new NativeCodec(static_cast<int>(width), static_cast<int>(height), orientation));
 }
 
 ImageInfo NativeCodec::GetPixelmapInfo(OH_PixelmapNative* pixelmap) {

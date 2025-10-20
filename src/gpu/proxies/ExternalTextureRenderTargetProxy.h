@@ -30,7 +30,8 @@ class ExternalTextureRenderTargetProxy : public TextureRenderTargetProxy {
 
   ExternalTextureRenderTargetProxy(const BackendTexture& backendTexture, PixelFormat format,
                                    int sampleCount, ImageOrigin origin = ImageOrigin::TopLeft,
-                                   bool adopted = false);
+                                   bool adopted = false,
+                                   std::shared_ptr<ColorSpace> colorSpace = nullptr);
   friend class ProxyProvider;
 };
 }  // namespace tgfx

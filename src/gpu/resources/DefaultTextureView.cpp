@@ -20,8 +20,12 @@
 #include "core/utils/PixelFormatUtil.h"
 
 namespace tgfx {
-DefaultTextureView::DefaultTextureView(std::shared_ptr<GPUTexture> texture, ImageOrigin origin)
-    : TextureView(origin), _texture(std::move(texture)) {
+DefaultTextureView::DefaultTextureView(std::shared_ptr<GPUTexture> texture, ImageOrigin origin,
+                                       std::shared_ptr<ColorSpace> colorSpace)
+    : TextureView(origin), _texture(std::move(texture)), _gamutColorSpace(std::move(colorSpace)) {
+  if (_texture->format() == PixelFormat::ALPHA_8) {
+    _gamutColorSpace = nullptr;
+  }
 }
 
 size_t DefaultTextureView::memoryUsage() const {

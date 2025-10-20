@@ -19,10 +19,12 @@
 #pragma once
 
 #include <cstdint>
+#include <set>
 #include "gpu/ColorSpaceXformHelper.h"
 #include "gpu/SamplerHandle.h"
 #include "gpu/ShaderStage.h"
 #include "gpu/ShaderVar.h"
+#include "tgfx/core/BytesKey.h"
 
 namespace tgfx {
 class ProgramBuilder;
@@ -55,9 +57,7 @@ class ShaderBuilder {
    */
   void appendTextureLookup(SamplerHandle samplerHandle, const std::string& coordName);
 
-  void appendColorGamutXform(std::string* out, const char* srcColor,
-                             ColorSpaceXformHelper* colorXformHelper);
-
+  void appendColorGamutXform(const char* srcColor, const ColorSpaceXformSteps* steps);
   /**
    * Called by Processors to add code to one of the shaders.
    */
@@ -102,6 +102,10 @@ class ShaderBuilder {
 
   std::string getDeclarations(const std::vector<ShaderVar>& vars, ShaderStage stage) const;
 
+  void appendColorGamutXformUniformAndFunction(const ColorSpaceXformSteps* steps);
+
+  void appendColorGamutXformCode(const char* srcColor, const ColorSpaceXformSteps* steps);
+
   std::vector<std::string> shaderStrings;
   ProgramBuilder* programBuilder = nullptr;
   std::vector<ShaderVar> inputs;
@@ -110,6 +114,7 @@ class ShaderBuilder {
   bool finalized = false;
   int indentation = 0;
   bool atLineStart = false;
+  std::set<uint64_t> stepKeySet;
 
   friend class ProgramBuilder;
   friend class UniformHandler;

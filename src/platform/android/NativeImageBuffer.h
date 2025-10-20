@@ -42,12 +42,18 @@ class NativeImageBuffer : public ImageBuffer {
     return info.isAlphaOnly();
   }
 
+  std::shared_ptr<ColorSpace> gamutColorSpace() const override;
+
+  void setGamutColorSpace(std::shared_ptr<ColorSpace>) override {
+  }
+
  protected:
   std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) const override;
 
  private:
   ImageInfo info = {};
   Global<jobject> bitmap = {};
+  std::shared_ptr<ColorSpace> _gamutColorSpace = ColorSpace::MakeSRGB();
 
   explicit NativeImageBuffer(const ImageInfo& info) : info(info) {
   }

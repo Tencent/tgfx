@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "ColorSpace.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/YUVColorSpace.h"
@@ -90,6 +91,10 @@ class ImageBuffer {
   virtual bool expired() const {
     return false;
   }
+
+  virtual void setGamutColorSpace(std::shared_ptr<ColorSpace> colorSpace) = 0;
+
+  virtual std::shared_ptr<ColorSpace> gamutColorSpace() const = 0;
 
  protected:
   ImageBuffer() = default;

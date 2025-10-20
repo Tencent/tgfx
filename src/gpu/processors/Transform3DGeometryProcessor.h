@@ -32,10 +32,9 @@ class Transform3DGeometryProcessor : public GeometryProcessor {
   /**
    * Creates a Transform3DGeometryProcessor instance with the specified parameters.
    */
-  static PlacementPtr<Transform3DGeometryProcessor> Make(BlockBuffer* buffer, AAType aa,
-                                                         const Matrix3D& matrix,
-                                                         const Vec2& ndcScale,
-                                                         const Vec2& ndcOffset);
+  static PlacementPtr<Transform3DGeometryProcessor> Make(
+      BlockBuffer* buffer, AAType aa, const Matrix3D& matrix, const Vec2& ndcScale,
+      const Vec2& ndcOffset, std::shared_ptr<ColorSpace> dstColorSpace = nullptr);
 
   std::string name() const override {
     return "Transform3DGeometryProcessor";
@@ -45,7 +44,8 @@ class Transform3DGeometryProcessor : public GeometryProcessor {
   DEFINE_PROCESSOR_CLASS_ID
 
   explicit Transform3DGeometryProcessor(AAType aa, const Matrix3D& transform, const Vec2& ndcScale,
-                                        const Vec2& ndcOffset);
+                                        const Vec2& ndcOffset,
+                                        std::shared_ptr<ColorSpace> dstColorSpace);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
@@ -68,6 +68,7 @@ class Transform3DGeometryProcessor : public GeometryProcessor {
    */
   Vec2 ndcScale = Vec2(0.f, 0.f);
   Vec2 ndcOffset = Vec2(0.f, 0.f);
+  std::shared_ptr<ColorSpace> dstColorSpace = nullptr;
 };
 
 }  // namespace tgfx

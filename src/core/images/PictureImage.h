@@ -28,7 +28,8 @@ namespace tgfx {
 class PictureImage : public Image {
  public:
   PictureImage(std::shared_ptr<Picture> picture, int width, int height,
-               const Matrix* matrix = nullptr, bool mipmapped = false);
+               const Matrix* matrix = nullptr, bool mipmapped = false,
+               std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   ~PictureImage() override;
 
@@ -48,6 +49,10 @@ class PictureImage : public Image {
     return mipmapped;
   }
 
+  std::shared_ptr<ColorSpace> gamutColorSpace() const override {
+    return _gamutColorSpace;
+  }
+
   std::shared_ptr<Picture> picture = nullptr;
   Matrix* matrix = nullptr;
 
@@ -61,9 +66,9 @@ class PictureImage : public Image {
 
   std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
 
-  PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
-                                                      const SamplingArgs& samplingArgs,
-                                                      const Matrix* uvMatrix) const override;
+  PlacementPtr<FragmentProcessor> asFragmentProcessor(
+      const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix,
+      std::shared_ptr<ColorSpace> dstColorSpace) const override;
 
   std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
 
@@ -74,5 +79,6 @@ class PictureImage : public Image {
   int _width = 0;
   int _height = 0;
   bool mipmapped = false;
+  std::shared_ptr<ColorSpace> _gamutColorSpace = ColorSpace::MakeSRGB();
 };
 }  // namespace tgfx

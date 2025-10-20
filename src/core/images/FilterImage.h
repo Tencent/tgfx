@@ -45,8 +45,8 @@ class FilterImage : public SubsetImage {
 
   std::shared_ptr<ImageFilter> filter = nullptr;
 
-  std::shared_ptr<ColorSpace> colorSpace() const override {
-    return source->colorSpace();
+  std::shared_ptr<ColorSpace> gamutColorSpace() const override {
+    return source->gamutColorSpace();
   }
 
  protected:
@@ -69,9 +69,9 @@ class FilterImage : public SubsetImage {
 
   std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
 
-  PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
-                                                      const SamplingArgs& samplingArgs,
-                                                      const Matrix* uvMatrix) const override;
+  PlacementPtr<FragmentProcessor> asFragmentProcessor(
+      const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix,
+      std::shared_ptr<ColorSpace> dstColorSpace) const override;
 
  private:
   static std::shared_ptr<Image> Wrap(std::shared_ptr<Image> source, const Rect& bounds,

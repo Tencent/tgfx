@@ -50,7 +50,8 @@ std::shared_ptr<TextureProxy> ImageFilter::lockTextureProxy(std::shared_ptr<Imag
   auto textureScaleY = scaledBounds.height() / renderBounds.height();
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(scaledBounds.width()), static_cast<int>(scaledBounds.height()),
-      source->isAlphaOnly(), 1, args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
+      source->isAlphaOnly(), 1, args.mipmapped, ImageOrigin::TopLeft, args.backingFit,
+      source->gamutColorSpace());
   if (renderTarget == nullptr) {
     return nullptr;
   }
@@ -59,8 +60,8 @@ std::shared_ptr<TextureProxy> ImageFilter::lockTextureProxy(std::shared_ptr<Imag
                 std::max(textureScaleX, textureScaleY));
   Matrix matrix = Matrix::MakeTrans(renderBounds.left, renderBounds.top);
   matrix.preScale(1.0f / textureScaleX, 1.0f / textureScaleY);
-  auto processor =
-      asFragmentProcessor(std::move(source), fpArgs, {}, SrcRectConstraint::Fast, &matrix);
+  auto processor = asFragmentProcessor(source, fpArgs, {}, SrcRectConstraint::Fast, &matrix,
+                                       source->gamutColorSpace());
   auto drawingManager = args.context->drawingManager();
   if (!drawingManager->fillRTWithFP(renderTarget, std::move(processor), args.renderFlags)) {
     return nullptr;
@@ -81,7 +82,8 @@ bool ImageFilter::applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* 
 
 PlacementPtr<FragmentProcessor> ImageFilter::makeFPFromTextureProxy(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-    const SrcRectConstraint constraint, const Matrix* uvMatrix) const {
+    const SrcRectConstraint constraint, const Matrix* uvMatrix,
+    std::shared_ptr<ColorSpace> dstColorSpace) const {
   auto inputBounds = Rect::MakeWH(source->width(), source->height());
   auto clipBounds = args.drawRect;
   if (uvMatrix) {
@@ -94,7 +96,7 @@ PlacementPtr<FragmentProcessor> ImageFilter::makeFPFromTextureProxy(
   auto isAlphaOnly = source->isAlphaOnly();
   auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
   TPArgs tpArgs(args.context, args.renderFlags, mipmapped, args.drawScale);
-  auto textureProxy = lockTextureProxy(std::move(source), dstBounds, tpArgs);
+  auto textureProxy = lockTextureProxy(source, dstBounds, tpArgs);
   if (textureProxy == nullptr) {
     return nullptr;
   }
@@ -106,8 +108,10 @@ PlacementPtr<FragmentProcessor> ImageFilter::makeFPFromTextureProxy(
   }
   SamplingArgs samplingArgs = {TileMode::Decal, TileMode::Decal, sampling, constraint};
   if (dstBounds.contains(clipBounds)) {
-    return TextureEffect::Make(std::move(textureProxy), samplingArgs, &fpMatrix, isAlphaOnly);
+    return TextureEffect::Make(std::move(textureProxy), samplingArgs, &fpMatrix, isAlphaOnly,
+                               dstColorSpace);
   }
-  return TiledTextureEffect::Make(std::move(textureProxy), samplingArgs, &fpMatrix, isAlphaOnly);
+  return TiledTextureEffect::Make(std::move(textureProxy), samplingArgs, &fpMatrix, isAlphaOnly,
+                                  dstColorSpace);
 }
 }  // namespace tgfx

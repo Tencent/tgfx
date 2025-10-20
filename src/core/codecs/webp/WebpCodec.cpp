@@ -76,6 +76,7 @@ bool WebpCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t ds
   if (byteData == nullptr) {
     return false;
   }
+  auto info = WebpUtility::getDecodeInfo(byteData->data(), byteData->size());
   WebPDecoderConfig config;
   if (!WebPInitDecoderConfig(&config)) {
     return false;

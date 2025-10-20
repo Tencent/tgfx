@@ -42,7 +42,7 @@ std::shared_ptr<TextureProxy> RuntimeImageFilter::lockTextureProxy(std::shared_p
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(renderBounds.width()), static_cast<int>(renderBounds.height()),
       source->isAlphaOnly(), effect->sampleCount(), args.mipmapped, ImageOrigin::TopLeft,
-      args.backingFit);
+      args.backingFit, source->gamutColorSpace());
   if (renderTarget == nullptr) {
     return nullptr;
   }
@@ -76,7 +76,8 @@ std::shared_ptr<TextureProxy> RuntimeImageFilter::lockTextureProxy(std::shared_p
 
 PlacementPtr<FragmentProcessor> RuntimeImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-    SrcRectConstraint constraint, const Matrix* uvMatrix) const {
-  return makeFPFromTextureProxy(source, args, sampling, constraint, uvMatrix);
+    SrcRectConstraint constraint, const Matrix* uvMatrix,
+    std::shared_ptr<ColorSpace> dstColorSpace) const {
+  return makeFPFromTextureProxy(source, args, sampling, constraint, uvMatrix, dstColorSpace);
 }
 }  // namespace tgfx
