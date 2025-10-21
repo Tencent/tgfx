@@ -52,7 +52,7 @@ std::shared_ptr<ExternalOESBuffer> ExternalOESBuffer::MakeFrom(OH_NativeBuffer* 
 }
 
 ExternalOESBuffer::ExternalOESBuffer(OH_NativeBuffer* hardwareBuffer, YUVColorSpace colorSpace)
-    : hardwareBuffer(hardwareBuffer), colorSpace(colorSpace) {
+    : hardwareBuffer(hardwareBuffer), _colorSpace(colorSpace) {
   OH_NativeBuffer_Reference(hardwareBuffer);
 }
 
@@ -74,11 +74,11 @@ int ExternalOESBuffer::height() const {
   return config.height;
 }
 
-std::shared_ptr<ColorSpace> ExternalOESBuffer::gamutColorSpace() const {
-  return MakeColorSpaceFromYUVColorSpace(colorSpace);
+std::shared_ptr<ColorSpace> ExternalOESBuffer::colorSpace() const {
+  return MakeColorSpaceFromYUVColorSpace(_colorSpace);
 }
 
 std::shared_ptr<TextureView> ExternalOESBuffer::onMakeTexture(Context* context, bool) const {
-  return TextureView::MakeFrom(context, hardwareBuffer, colorSpace);
+  return TextureView::MakeFrom(context, hardwareBuffer, _colorSpace);
 }
 }  // namespace tgfx

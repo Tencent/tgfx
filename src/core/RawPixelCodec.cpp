@@ -32,10 +32,10 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(const ImageInfo& info,
 class RawPixelData : public ImageBuffer {
  public:
   RawPixelData(const ImageInfo& info, std::shared_ptr<Data> pixels,
-               std::shared_ptr<ColorSpace> gamutColorSpace = ColorSpace::MakeSRGB())
-      : info(info), pixels(std::move(pixels)), _gamutColorSpace(std::move(gamutColorSpace)) {
+               std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB())
+      : info(info), pixels(std::move(pixels)), _colorSpace(std::move(colorSpace)) {
     if (info.colorType() == ColorType::ALPHA_8) {
-      _gamutColorSpace = nullptr;
+      _colorSpace = nullptr;
     }
   }
 
@@ -51,14 +51,14 @@ class RawPixelData : public ImageBuffer {
     return info.isAlphaOnly();
   }
 
-  void setGamutColorSpace(std::shared_ptr<ColorSpace> colorSpace) override {
+  void setColorSpace(std::shared_ptr<ColorSpace> colorSpace) override {
     if (info.colorType() != ColorType::ALPHA_8) {
-      _gamutColorSpace = std::move(colorSpace);
+      _colorSpace = std::move(colorSpace);
     }
   }
 
-  std::shared_ptr<ColorSpace> gamutColorSpace() const override {
-    return _gamutColorSpace;
+  std::shared_ptr<ColorSpace> colorSpace() const override {
+    return _colorSpace;
   }
 
  protected:
@@ -70,11 +70,11 @@ class RawPixelData : public ImageBuffer {
       case ColorType::BGRA_8888:
         return TextureView::MakeFormat(context, info.width(), info.height(), pixels->data(),
                                        info.rowBytes(), PixelFormat::BGRA_8888, mipmapped,
-                                       ImageOrigin::TopLeft, _gamutColorSpace);
+                                       ImageOrigin::TopLeft, _colorSpace);
       case ColorType::RGBA_8888:
         return TextureView::MakeRGBA(context, info.width(), info.height(), pixels->data(),
                                      info.rowBytes(), mipmapped, ImageOrigin::TopLeft,
-                                     _gamutColorSpace);
+                                     _colorSpace);
       default:
         return nullptr;
     }
@@ -83,7 +83,7 @@ class RawPixelData : public ImageBuffer {
  private:
   ImageInfo info = {};
   std::shared_ptr<Data> pixels = nullptr;
-  std::shared_ptr<ColorSpace> _gamutColorSpace = ColorSpace::MakeSRGB();
+  std::shared_ptr<ColorSpace> _colorSpace = ColorSpace::MakeSRGB();
 };
 
 std::shared_ptr<ImageBuffer> RawPixelCodec::onMakeBuffer(bool tryHardware) const {
@@ -92,7 +92,7 @@ std::shared_ptr<ImageBuffer> RawPixelCodec::onMakeBuffer(bool tryHardware) const
       case ColorType::ALPHA_8:
       case ColorType::RGBA_8888:
       case ColorType::BGRA_8888:
-        return std::make_shared<RawPixelData>(info, pixels, gamutColorSpace());
+        return std::make_shared<RawPixelData>(info, pixels, colorSpace());
       default:
         return nullptr;
     }

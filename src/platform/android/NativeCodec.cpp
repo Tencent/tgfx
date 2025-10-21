@@ -176,7 +176,7 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string& fileP
   auto imagePath = SafeToJString(env, filePath);
   auto bitmap = env->CallStaticObjectMethod(BitmapFactoryClass.get(), BitmapFactory_decodeFile,
                                             imagePath, options);
-  auto colorSpace = AndroidBitmap::GetGamutColorSpace(env, bitmap);
+  auto colorSpace = AndroidBitmap::GetColorSpace(env, bitmap);
   if (env->ExceptionCheck()) {
     return nullptr;
   }
@@ -195,7 +195,7 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string& fileP
   auto origin = GetOrientation(env, exifInterface);
   auto codec = std::shared_ptr<NativeCodec>(new NativeCodec(width, height, origin));
   codec->imagePath = filePath;
-  codec->setGamutColorSpace(colorSpace);
+  codec->setColorSpace(colorSpace);
   return codec;
 }
 
@@ -220,7 +220,7 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data> im
                           reinterpret_cast<const jbyte*>(imageBytes->data()));
   auto bitmap = env->CallStaticObjectMethod(BitmapFactoryClass.get(), BitmapFactory_decodeByteArray,
                                             byteArray, 0, byteSize, options);
-  auto colorSpace = AndroidBitmap::GetGamutColorSpace(env, bitmap);
+  auto colorSpace = AndroidBitmap::GetColorSpace(env, bitmap);
   if (env->ExceptionCheck()) {
     return nullptr;
   }
@@ -241,7 +241,7 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data> im
   auto origin = GetOrientation(env, exifInterface);
   auto codec = std::shared_ptr<NativeCodec>(new NativeCodec(width, height, origin));
   codec->imageBytes = imageBytes;
-  codec->setGamutColorSpace(colorSpace);
+  codec->setColorSpace(colorSpace);
   return codec;
 }
 
@@ -259,11 +259,11 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(NativeImageRef nativeImage) {
   if (info.isEmpty()) {
     return nullptr;
   }
-  auto colorSpace = AndroidBitmap::GetGamutColorSpace(env, nativeImage);
+  auto colorSpace = AndroidBitmap::GetColorSpace(env, nativeImage);
   auto image = std::shared_ptr<NativeCodec>(
       new NativeCodec(info.width(), info.height(), Orientation::TopLeft));
   image->nativeImage = nativeImage;
-  image->setGamutColorSpace(colorSpace);
+  image->setColorSpace(colorSpace);
   return image;
 }
 
@@ -335,7 +335,7 @@ std::shared_ptr<ImageBuffer> NativeCodec::onMakeBuffer(bool tryHardware) const {
     return nullptr;
   }
   auto bitmap = decodeBitmap(env, ColorType::RGBA_8888, AlphaType::Premultiplied, tryHardware);
-  auto colorSpace = AndroidBitmap::GetGamutColorSpace(env, bitmap);
+  auto colorSpace = AndroidBitmap::GetColorSpace(env, bitmap);
   if (tryHardware) {
     auto hardwareBuffer = AndroidBitmap::GetHardwareBuffer(env, nativeImage.get());
     auto imageBuffer = PixelBuffer::MakeFrom(hardwareBuffer, colorSpace);

@@ -22,9 +22,9 @@
 namespace tgfx {
 DefaultTextureView::DefaultTextureView(std::shared_ptr<GPUTexture> texture, ImageOrigin origin,
                                        std::shared_ptr<ColorSpace> colorSpace)
-    : TextureView(origin), _texture(std::move(texture)), _gamutColorSpace(std::move(colorSpace)) {
+    : TextureView(origin), _texture(std::move(texture)), _colorSpace(std::move(colorSpace)) {
   if (_texture->format() == PixelFormat::ALPHA_8) {
-    _gamutColorSpace = nullptr;
+    _colorSpace = nullptr;
   }
 }
 

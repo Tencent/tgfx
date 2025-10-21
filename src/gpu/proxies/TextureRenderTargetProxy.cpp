@@ -37,7 +37,7 @@ std::shared_ptr<TextureView> TextureRenderTargetProxy::onMakeTexture(Context* co
     return nullptr;
   }
   auto renderTarget = RenderTarget::Make(context, _backingStoreWidth, _backingStoreHeight, _format,
-                                         _sampleCount, _mipmapped, _origin, _gamutColorSpace);
+                                         _sampleCount, _mipmapped, _origin, _colorSpace);
   if (renderTarget == nullptr) {
     LOGE("TextureRenderTargetProxy::onMakeTexture() Failed to create the render target!");
     return nullptr;

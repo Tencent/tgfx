@@ -20,6 +20,7 @@
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/TPArgs.h"
+#include "gpu/processors/ColorSpaceXFormEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "tgfx/core/RenderFlags.h"
 
@@ -75,8 +76,12 @@ PlacementPtr<FragmentProcessor> RasterizedImage::asFragmentProcessor(
   if (uvMatrix) {
     fpMatrix.preConcat(*uvMatrix);
   }
-  return TiledTextureEffect::Make(std::move(textureProxy), newSamplingArgs, &fpMatrix,
-                                  isAlphaOnly(), std::move(dstColorSpace));
+  auto fp = TiledTextureEffect::Make(std::move(textureProxy), newSamplingArgs, &fpMatrix,
+                                  isAlphaOnly());
+  if(!isAlphaOnly()) {
+    return ColorSpaceXformEffect::Make(args.context->drawingBuffer(), std::move(fp), colorSpace().get(), AlphaType::Premultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
+  }
+  return fp;
 }
 
 std::shared_ptr<Image> RasterizedImage::onMakeScaled(int newWidth, int newHeight,

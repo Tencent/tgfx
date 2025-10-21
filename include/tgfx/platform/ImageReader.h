@@ -56,8 +56,8 @@ class ImageReader {
    */
   int height() const;
 
-  std::shared_ptr<ColorSpace> gamutColorSpace() const {
-    return stream->gamutColorSpace();
+  std::shared_ptr<ColorSpace> colorSpace() const {
+    return stream->colorSpace();
   }
 
   /**

@@ -44,8 +44,8 @@ class GeneratorImage : public PixelImage {
     return false;
   }
 
-  std::shared_ptr<ColorSpace> gamutColorSpace() const override {
-    return generator->gamutColorSpace();
+  std::shared_ptr<ColorSpace> colorSpace() const override {
+    return generator->colorSpace();
   }
 
  protected:

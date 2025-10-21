@@ -92,7 +92,7 @@ std::shared_ptr<TextureView> TextureView::MakeNV12(Context* context, const YUVDa
   return texture;
 }
 
-std::shared_ptr<ColorSpace> YUVTextureView::gamutColorSpace() const {
+std::shared_ptr<ColorSpace> YUVTextureView::colorSpace() const {
   return MakeColorSpaceFromYUVColorSpace(_colorSpace);
 }
 

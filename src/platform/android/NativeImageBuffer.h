@@ -42,9 +42,9 @@ class NativeImageBuffer : public ImageBuffer {
     return info.isAlphaOnly();
   }
 
-  std::shared_ptr<ColorSpace> gamutColorSpace() const override;
+  std::shared_ptr<ColorSpace> colorSpace() const override;
 
-  void setGamutColorSpace(std::shared_ptr<ColorSpace>) override {
+  void setColorSpace(std::shared_ptr<ColorSpace>) override {
   }
 
  protected:
@@ -53,7 +53,7 @@ class NativeImageBuffer : public ImageBuffer {
  private:
   ImageInfo info = {};
   Global<jobject> bitmap = {};
-  std::shared_ptr<ColorSpace> _gamutColorSpace = ColorSpace::MakeSRGB();
+  std::shared_ptr<ColorSpace> _colorSpace = ColorSpace::MakeSRGB();
 
   explicit NativeImageBuffer(const ImageInfo& info) : info(info) {
   }

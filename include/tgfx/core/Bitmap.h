@@ -192,9 +192,15 @@ class Bitmap {
    */
   HardwareBufferRef getHardwareBuffer() const;
 
-  std::shared_ptr<ColorSpace> gamutColorSpace() const;
+  /**
+   * Return the colorSpace of this bitmap.
+   */
+  std::shared_ptr<ColorSpace> colorSpace() const;
 
-  void setGamutColorSpace(std::shared_ptr<ColorSpace> colorSpace);
+  /**
+   * Set the colorSpace of this bitmap.
+   */
+  void setColorSpace(std::shared_ptr<ColorSpace> colorSpace);
 
   /**
    * Encodes the pixels in Bitmap into a binary image format.

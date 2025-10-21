@@ -58,7 +58,7 @@ PlacementPtr<GeometryProcessor> RRectDrawOp::onMakeGeometryProcessor(RenderTarge
   auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
   return EllipseGeometryProcessor::Make(drawingBuffer, renderTarget->width(),
                                         renderTarget->height(), hasStroke, commonColor,
-                                        renderTarget->gamutColorSpace());
+                                        renderTarget->colorSpace());
 }
 
 void RRectDrawOp::onDraw(RenderPass* renderPass) {

@@ -29,12 +29,12 @@ std::shared_ptr<ImageBuffer> NativeImageBuffer::MakeFrom(JNIEnv* env, jobject bi
       info.alphaType() == AlphaType::Unpremultiplied) {
     return nullptr;
   }
-  auto colorSpace = AndroidBitmap::GetGamutColorSpace(env, bitmap);
+  auto colorSpace = AndroidBitmap::GetColorSpace(env, bitmap);
   auto pixelBuffer = std::shared_ptr<NativeImageBuffer>(new NativeImageBuffer(info));
   pixelBuffer->bitmap = bitmap;
-  pixelBuffer->_gamutColorSpace = colorSpace;
+  pixelBuffer->_colorSpace = colorSpace;
   if (info.colorType() == ColorType::ALPHA_8) {
-    pixelBuffer->_gamutColorSpace = nullptr;
+    pixelBuffer->_colorSpace = nullptr;
   }
   return pixelBuffer;
 }
@@ -59,13 +59,13 @@ std::shared_ptr<TextureView> NativeImageBuffer::onMakeTexture(Context* context,
   } else {
     textureView =
         TextureView::MakeRGBA(context, info.width(), info.height(), pixels, info.rowBytes(),
-                              mipmapped, ImageOrigin::TopLeft, _gamutColorSpace);
+                              mipmapped, ImageOrigin::TopLeft, _colorSpace);
   }
   AndroidBitmap_unlockPixels(env, bitmap.get());
   return textureView;
 }
 
-std::shared_ptr<ColorSpace> NativeImageBuffer::gamutColorSpace() const {
-  return _gamutColorSpace;
+std::shared_ptr<ColorSpace> NativeImageBuffer::colorSpace() const {
+  return _colorSpace;
 }
 }  // namespace tgfx

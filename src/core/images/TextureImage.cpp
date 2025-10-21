@@ -19,6 +19,7 @@
 #include "TextureImage.h"
 #include "ScaledImage.h"
 #include "gpu/TPArgs.h"
+#include "gpu/processors/ColorSpaceXFormEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
@@ -37,7 +38,7 @@ std::shared_ptr<Image> TextureImage::Wrap(std::shared_ptr<TextureProxy> textureP
 TextureImage::TextureImage(std::shared_ptr<TextureProxy> textureProxy, uint32_t contextID,
                            std::shared_ptr<ColorSpace> colorSpace)
     : textureProxy(std::move(textureProxy)), contextID(contextID),
-      _gamutColorSpace(std::move(colorSpace)) {
+      _colorSpace(std::move(colorSpace)) {
 }
 
 BackendTexture TextureImage::getBackendTexture(Context* context, ImageOrigin* origin) const {
@@ -85,7 +86,10 @@ PlacementPtr<FragmentProcessor> TextureImage::asFragmentProcessor(
   if (args.context == nullptr || args.context->uniqueID() != contextID) {
     return nullptr;
   }
-  return TiledTextureEffect::Make(textureProxy, samplingArgs, uvMatrix, isAlphaOnly(),
-                                  std::move(dstColorSpace));
+  auto fp = TiledTextureEffect::Make(textureProxy, samplingArgs, uvMatrix, isAlphaOnly());
+  if(!isAlphaOnly()) {
+    return ColorSpaceXformEffect::Make(args.context->drawingBuffer(), std::move(fp), colorSpace().get(), AlphaType::Premultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
+  }
+  return fp;
 }
 }  // namespace tgfx

@@ -137,7 +137,7 @@ std::shared_ptr<Image> Image::makeTextureImage(Context* context) const {
   if (textureProxy == nullptr) {
     return nullptr;
   }
-  return TextureImage::Wrap(std::move(textureProxy), gamutColorSpace());
+  return TextureImage::Wrap(std::move(textureProxy), colorSpace());
 }
 
 BackendTexture Image::getBackendTexture(Context*, ImageOrigin*) const {

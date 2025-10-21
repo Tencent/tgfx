@@ -447,7 +447,7 @@ TGFX_TEST(CanvasTest, mipmap) {
   ASSERT_TRUE(context != nullptr);
   auto codec = MakeImageCodec("resources/apitest/rotation.jpg");
   ASSERT_TRUE(codec != nullptr);
-  Bitmap bitmap(codec->width(), codec->height(), false, false, codec->gamutColorSpace());
+  Bitmap bitmap(codec->width(), codec->height(), false, false, codec->colorSpace());
   ASSERT_FALSE(bitmap.isEmpty());
   Pixmap pixmap(bitmap);
   auto result = codec->readPixels(pixmap.info(), pixmap.writablePixels());
@@ -500,7 +500,7 @@ TGFX_TEST(CanvasTest, TileModeFallback) {
   gl->bindTexture(glInfo.target, glInfo.id);
   auto codec = MakeImageCodec("resources/apitest/rotation.jpg");
   ASSERT_TRUE(codec != nullptr);
-  Bitmap bitmap(codec->width(), codec->height(), false, false, codec->gamutColorSpace());
+  Bitmap bitmap(codec->width(), codec->height(), false, false, codec->colorSpace());
   ASSERT_FALSE(bitmap.isEmpty());
   auto pixels = bitmap.lockPixels();
   ASSERT_TRUE(pixels != nullptr);
@@ -514,7 +514,7 @@ TGFX_TEST(CanvasTest, TileModeFallback) {
   bitmap.unlockPixels();
   BackendTexture backendTexture(glInfo, bitmap.width(), bitmap.height());
   auto image =
-      Image::MakeFrom(context, backendTexture, ImageOrigin::TopLeft, bitmap.gamutColorSpace());
+      Image::MakeFrom(context, backendTexture, ImageOrigin::TopLeft, bitmap.colorSpace());
   ASSERT_TRUE(image != nullptr);
   image = image->makeOriented(codec->orientation());
   ASSERT_TRUE(image != nullptr);
@@ -538,7 +538,7 @@ TGFX_TEST(CanvasTest, hardwareMipmap) {
   ASSERT_TRUE(context != nullptr);
   auto codec = MakeImageCodec("resources/apitest/rotation.jpg");
   ASSERT_TRUE(codec != nullptr);
-  Bitmap bitmap(codec->width(), codec->height(), false, true, codec->gamutColorSpace());
+  Bitmap bitmap(codec->width(), codec->height(), false, true, codec->colorSpace());
   ASSERT_FALSE(bitmap.isEmpty());
   Pixmap pixmap(bitmap);
   auto result = codec->readPixels(pixmap.info(), pixmap.writablePixels());
@@ -1130,7 +1130,7 @@ TGFX_TEST(CanvasTest, atlas) {
   EXPECT_TRUE(imageCodec->readPixels(RGBAInfo, pixels));
   auto pixelsData = Data::MakeWithCopy(buffer.data(), buffer.size());
   ASSERT_TRUE(pixelsData != nullptr);
-  auto image = Image::MakeFrom(RGBAInfo, std::move(pixelsData), imageCodec->gamutColorSpace());
+  auto image = Image::MakeFrom(RGBAInfo, std::move(pixelsData), imageCodec->colorSpace());
   ASSERT_TRUE(image != nullptr);
   Matrix matrix[4] = {Matrix::I(), Matrix::MakeTrans(660, 0), Matrix::MakeTrans(0, 380),
                       Matrix::MakeTrans(660, 380)};
@@ -2783,7 +2783,7 @@ TGFX_TEST(CanvasTest, ScaleImage) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/scaled_imageCodec_box_filter"));
   auto codec = MakeImageCodec(imagePath);
   ASSERT_TRUE(codec != nullptr);
-  Bitmap bitmap(codec->width(), codec->height(), false, true, codec->gamutColorSpace());
+  Bitmap bitmap(codec->width(), codec->height(), false, true, codec->colorSpace());
   ASSERT_FALSE(bitmap.isEmpty());
   Pixmap pixmap(bitmap);
   auto result = codec->readPixels(pixmap.info(), pixmap.writablePixels());
@@ -2983,7 +2983,7 @@ TGFX_TEST(CanvasTest, drawScaleImage) {
   canvas->setMatrix(matrix);
   canvas->drawImage(subImage);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/drawScaleSubImage"));
-  Bitmap bitmap(codec->width(), codec->height(), false, true, codec->gamutColorSpace());
+  Bitmap bitmap(codec->width(), codec->height(), false, true, codec->colorSpace());
   ASSERT_FALSE(bitmap.isEmpty());
   Pixmap pixmap(bitmap);
   auto result = codec->readPixels(pixmap.info(), pixmap.writablePixels());
@@ -3223,6 +3223,10 @@ TGFX_TEST(CanvasTest, ColorSpace) {
       Surface::Make(context, 1024, 1024, false, 1, false, 0,
                     ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3));
   auto canvas = surface->getCanvas();
+  canvas->drawColor(Color::FromRGBA(0, 255, 0, 255, ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3)),
+                    BlendMode::SrcOver);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawP3ColorToP3"));
+  canvas->clear();
   Paint paint;
   auto image = MakeImage("resources/apitest/mandrill_128.png");
   auto imageShader = Shader::MakeImageShader(image, TileMode::Repeat, TileMode::Repeat);

@@ -48,7 +48,7 @@ void TextureView::ComputeTextureKey(const std::shared_ptr<GPUTexture> texture, B
 }
 
 static ScratchKey ComputeTextureScratchKey(int width, int height, PixelFormat format,
-                                           bool mipmapped, std::shared_ptr<ColorSpace> colorSpace) {
+                                           bool mipmapped) {
   static const uint32_t DefaultTextureType = UniqueID::Next();
   BytesKey bytesKey(6);
   bytesKey.write(DefaultTextureType);
@@ -57,12 +57,6 @@ static ScratchKey ComputeTextureScratchKey(int width, int height, PixelFormat fo
   auto formatValue = static_cast<uint32_t>(format);
   auto mipmapValue = static_cast<uint32_t>(mipmapped ? 1 : 0);
   bytesKey.write(formatValue | (mipmapValue << 30));
-  if (colorSpace) {
-    auto key = colorSpace->hash();
-    auto data = reinterpret_cast<uint32_t*>(&key);
-    bytesKey.write(data[0]);
-    bytesKey.write(data[1]);
-  }
   return bytesKey;
 }
 
@@ -79,10 +73,11 @@ std::shared_ptr<TextureView> TextureView::MakeFormat(Context* context, int width
     colorSpace = nullptr;
   }
   auto scratchKey =
-      ComputeTextureScratchKey(width, height, pixelFormat, mipmapped, std::move(colorSpace));
+      ComputeTextureScratchKey(width, height, pixelFormat, mipmapped);
   auto textureView = Resource::Find<TextureView>(context, scratchKey);
   if (textureView) {
     textureView->_origin = origin;
+    textureView->setColorSpace(colorSpace);
   } else {
     GPUTextureDescriptor descriptor = {width, height, pixelFormat, mipmapped};
     auto texture = gpu->createTexture(descriptor);
@@ -119,7 +114,7 @@ std::shared_ptr<TextureView> TextureView::MakeFrom(Context* context,
   if (adopted) {
     scratchKey =
         ComputeTextureScratchKey(backendTexture.width(), backendTexture.height(), texture->format(),
-                                 texture->mipLevelCount() > 1, colorSpace);
+                                 texture->mipLevelCount() > 1);
   }
   auto textureView = new DefaultTextureView(std::move(texture), origin, std::move(colorSpace));
   return Resource::AddToCache(context, textureView, scratchKey);

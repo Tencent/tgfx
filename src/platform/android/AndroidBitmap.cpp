@@ -113,7 +113,7 @@ HardwareBufferRef AndroidBitmap::GetHardwareBuffer(JNIEnv* env, jobject bitmap) 
   return hardwareBuffer;
 }
 
-std::shared_ptr<ColorSpace> AndroidBitmap::GetGamutColorSpace(JNIEnv* env, jobject bitmap) {
+std::shared_ptr<ColorSpace> AndroidBitmap::GetColorSpace(JNIEnv* env, jobject bitmap) {
   if (env == nullptr || bitmap == nullptr) {
     return ColorSpace::MakeSRGB();
   }
@@ -125,7 +125,7 @@ std::shared_ptr<ColorSpace> AndroidBitmap::GetGamutColorSpace(JNIEnv* env, jobje
           env->CallStaticIntMethod(DataSpaceClass.get(), DataSpaceClass_getStandard, dataSpace);
       jint transfer =
           env->CallStaticIntMethod(DataSpaceClass.get(), DataSpaceClass_getTransfer, dataSpace);
-      return AndroidDataSpaceToGamutColorSpace(standard, transfer);
+      return AndroidDataSpaceToColorSpace(standard, transfer);
     }
   }
   return ColorSpace::MakeSRGB();

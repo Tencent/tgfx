@@ -52,10 +52,8 @@ void QuadPerEdgeAAGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) c
     auto steps = std::make_shared<ColorSpaceXformSteps>(
         ColorSpace::MakeSRGB().get(), AlphaType::Premultiplied, dstColorSpace.get(),
         AlphaType::Premultiplied);
-    auto xformKey = ColorSpaceXformSteps::XFormKey(steps.get());
-    uint32_t* key = reinterpret_cast<uint32_t*>(&xformKey);
-    bytesKey->write(key[0]);
-    bytesKey->write(key[1]);
+    auto key = ColorSpaceXformSteps::XFormKey(steps.get());
+    bytesKey->write(key);
   }
 }
 }  // namespace tgfx

@@ -142,8 +142,8 @@ class RenderTarget {
     return getRenderTexture()->getBackendRenderTarget();
   }
 
-  virtual void setGamutColorSpace(std::shared_ptr<ColorSpace> colorSpace) = 0;
+  virtual void setColorSpace(std::shared_ptr<ColorSpace> colorSpace) = 0;
 
-  virtual std::shared_ptr<ColorSpace> gamutColorSpace() const = 0;
+  virtual std::shared_ptr<ColorSpace> colorSpace() const = 0;
 };
 }  // namespace tgfx

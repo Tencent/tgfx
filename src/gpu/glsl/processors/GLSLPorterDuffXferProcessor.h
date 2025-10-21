@@ -23,8 +23,7 @@
 namespace tgfx {
 class GLSLPorterDuffXferProcessor : public PorterDuffXferProcessor {
  public:
-  GLSLPorterDuffXferProcessor(BlendMode blend, DstTextureInfo dstTextureInfo,
-                              std::shared_ptr<ColorSpace> colorSpace);
+  GLSLPorterDuffXferProcessor(BlendMode blend, DstTextureInfo dstTextureInfo);
 
   void emitCode(const EmitArgs& args) const override;
 

@@ -78,17 +78,17 @@ class ImageGenerator {
     return onMakeBuffer(tryHardware);
   }
 
-  std::shared_ptr<ColorSpace> gamutColorSpace() const {
-    return _gamutColorSpace;
+  std::shared_ptr<ColorSpace> colorSpace() const {
+    return _colorSpace;
   }
 
-  void setGamutColorSpace(std::shared_ptr<ColorSpace> colorSpace) {
-    _gamutColorSpace = std::move(colorSpace);
+  void setColorSpace(std::shared_ptr<ColorSpace> colorSpace) {
+    _colorSpace = std::move(colorSpace);
   }
 
  protected:
-  ImageGenerator(int width, int height, std::shared_ptr<ColorSpace> colorSpace)
-      : _width(width), _height(height), _gamutColorSpace(std::move(colorSpace)) {
+  ImageGenerator(int width, int height, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB())
+      : _width(width), _height(height), _colorSpace(std::move(colorSpace)) {
   }
 
   virtual std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const = 0;
@@ -96,6 +96,6 @@ class ImageGenerator {
  private:
   int _width = 0;
   int _height = 0;
-  std::shared_ptr<ColorSpace> _gamutColorSpace = ColorSpace::MakeSRGB();
+  std::shared_ptr<ColorSpace> _colorSpace = ColorSpace::MakeSRGB();
 };
 }  // namespace tgfx

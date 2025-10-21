@@ -175,9 +175,9 @@ bool Pixmap::clear() {
   return true;
 }
 
-std::shared_ptr<ColorSpace> Pixmap::gamutColorSpace() const {
+std::shared_ptr<ColorSpace> Pixmap::colorSpace() const {
   if (pixelRef) {
-    return pixelRef->gamutColorSpace();
+    return pixelRef->colorSpace();
   }
   return nullptr;
 }

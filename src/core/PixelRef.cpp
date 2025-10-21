@@ -36,7 +36,7 @@ std::shared_ptr<PixelRef> PixelRef::Wrap(std::shared_ptr<PixelBuffer> pixelBuffe
 PixelRef::PixelRef(std::shared_ptr<PixelBuffer> pixelBuffer) : pixelBuffer(std::move(pixelBuffer)) {
 }
 
-void PixelRef::setGamutColorSpace(std::shared_ptr<ColorSpace> colorSpace) {
+void PixelRef::setColorSpace(std::shared_ptr<ColorSpace> colorSpace) {
   auto pixels = pixelBuffer->lockPixels();
   if (pixels == nullptr) {
     return;
@@ -54,7 +54,7 @@ void PixelRef::setGamutColorSpace(std::shared_ptr<ColorSpace> colorSpace) {
     pixelBuffer->unlockPixels();
     pixelBuffer = newBuffer;
   }
-  pixelBuffer->setGamutColorSpace(std::move(colorSpace));
+  pixelBuffer->setColorSpace(std::move(colorSpace));
 }
 
 void* PixelRef::lockWritablePixels() {
@@ -66,7 +66,7 @@ void* PixelRef::lockWritablePixels() {
     auto& info = pixelBuffer->info();
     auto newBuffer =
         PixelBuffer::Make(info.width(), info.height(), info.isAlphaOnly(),
-                          pixelBuffer->isHardwareBacked(), pixelBuffer->gamutColorSpace());
+                          pixelBuffer->isHardwareBacked(), pixelBuffer->colorSpace());
     if (newBuffer == nullptr) {
       pixelBuffer->unlockPixels();
       return nullptr;

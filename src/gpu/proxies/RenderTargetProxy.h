@@ -45,8 +45,8 @@ class RenderTargetProxy {
    */
   static std::shared_ptr<RenderTargetProxy> MakeFallback(
       Context* context, int width, int height, bool alphaOnly, int sampleCount = 1,
-      bool mipmapped = false, ImageOrigin origin = ImageOrigin::TopLeft,
-      BackingFit backingFit = BackingFit::Exact, std::shared_ptr<ColorSpace> colorSpace = nullptr);
+      bool mipmapped = false, ImageOrigin origin = ImageOrigin::TopLeft, std::shared_ptr<ColorSpace> colorSpace = nullptr,
+      BackingFit backingFit = BackingFit::Exact);
 
   virtual ~RenderTargetProxy() = default;
 
@@ -113,7 +113,7 @@ class RenderTargetProxy {
    */
   virtual std::shared_ptr<RenderTarget> getRenderTarget() const = 0;
 
-  virtual std::shared_ptr<ColorSpace> gamutColorSpace() const = 0;
+  virtual std::shared_ptr<ColorSpace> colorSpace() const = 0;
 
   /**
    * Creates a compatible TextureProxy instance matches the properties of the RenderTargetProxy.

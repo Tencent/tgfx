@@ -54,7 +54,7 @@ std::shared_ptr<ColorSpace> MakeColorSpaceFromYUVColorSpace(YUVColorSpace yuvCol
   }
 }
 
-std::shared_ptr<ColorSpace> AndroidDataSpaceToGamutColorSpace(int standard, int transfer) {
+std::shared_ptr<ColorSpace> AndroidDataSpaceToColorSpace(int standard, int transfer) {
   ColorMatrix33 gamut{};
   TransferFunction tf{};
   switch (standard) {

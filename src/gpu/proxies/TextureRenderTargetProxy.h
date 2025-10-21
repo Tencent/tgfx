@@ -68,8 +68,8 @@ class TextureRenderTargetProxy : public DefaultTextureProxy,
 
   std::shared_ptr<RenderTarget> getRenderTarget() const override;
 
-  std::shared_ptr<ColorSpace> gamutColorSpace() const override {
-    return _gamutColorSpace;
+  std::shared_ptr<ColorSpace> colorSpace() const override {
+    return _colorSpace;
   }
 
  protected:

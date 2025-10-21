@@ -28,7 +28,7 @@ GradientGenerator::GradientGenerator(const Color* colors, const float* positions
 }
 
 std::shared_ptr<ImageBuffer> GradientGenerator::onMakeBuffer(bool) const {
-  auto pixelBuffer = PixelBuffer::Make(GradientWidth, 1, false, false, gamutColorSpace());
+  auto pixelBuffer = PixelBuffer::Make(GradientWidth, 1, false, false, colorSpace());
   if (pixelBuffer == nullptr) {
     return nullptr;
   }

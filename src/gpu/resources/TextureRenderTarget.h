@@ -52,12 +52,12 @@ class TextureRenderTarget : public DefaultTextureView, public RenderTarget {
     return std::static_pointer_cast<TextureRenderTarget>(weakThis.lock());
   }
 
-  std::shared_ptr<ColorSpace> gamutColorSpace() const override {
-    return DefaultTextureView::gamutColorSpace();
+  std::shared_ptr<ColorSpace> colorSpace() const override {
+    return DefaultTextureView::colorSpace();
   }
 
-  void setGamutColorSpace(std::shared_ptr<ColorSpace> colorSpace) override {
-    DefaultTextureView::setGamutColorSpace(std::move(colorSpace));
+  void setColorSpace(std::shared_ptr<ColorSpace> colorSpace) override {
+    DefaultTextureView::setColorSpace(std::move(colorSpace));
   }
 
  private:

@@ -39,13 +39,9 @@ std::shared_ptr<TextureProxy> TransformImage::lockTextureProxySubset(
   }
   rect.round();
   auto alphaRenderable = args.context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
-  ColorMatrix33 matrix{};
-  NamedPrimaries::ProPhotoRGB.toXYZD50(&matrix);
-  auto colorSpace = ColorSpace::MakeRGB(NamedTransferFunction::SRGB, matrix);
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(rect.width()), static_cast<int>(rect.height()),
-      alphaRenderable && isAlphaOnly(), 1, args.mipmapped, ImageOrigin::TopLeft, args.backingFit,
-      colorSpace);
+      alphaRenderable && isAlphaOnly(), 1, args.mipmapped, ImageOrigin::TopLeft, colorSpace(), args.backingFit);
   if (renderTarget == nullptr) {
     return nullptr;
   }
@@ -57,7 +53,7 @@ std::shared_ptr<TextureProxy> TransformImage::lockTextureProxySubset(
                 1.0f / sourceMatrix->getMinScale());
   auto processor =
       FragmentProcessor::Make(source, fpArgs, samplingOptions, SrcRectConstraint::Fast,
-                              AddressOf(sourceMatrix), renderTarget->gamutColorSpace());
+                              AddressOf(sourceMatrix), renderTarget->colorSpace());
   auto drawingManager = args.context->drawingManager();
   if (!drawingManager->fillRTWithFP(renderTarget, std::move(processor), args.renderFlags)) {
     return nullptr;

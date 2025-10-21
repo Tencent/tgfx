@@ -104,7 +104,7 @@ bool Baseline::Compare(std::shared_ptr<PixelBuffer> pixelBuffer, const std::stri
   }
   auto pixels = pixelBuffer->lockPixels();
   Pixmap pixmap(pixelBuffer->info(), pixels);
-  auto result = Baseline::Compare(pixmap, key, pixelBuffer->gamutColorSpace());
+  auto result = Baseline::Compare(pixmap, key, pixelBuffer->colorSpace());
   pixelBuffer->unlockPixels();
   return result;
 }
@@ -113,13 +113,13 @@ bool Baseline::Compare(const std::shared_ptr<Surface> surface, const std::string
   if (surface == nullptr) {
     return false;
   }
-  Bitmap bitmap(surface->width(), surface->height(), false, false, surface->gamutColorSpace());
+  Bitmap bitmap(surface->width(), surface->height(), false, false, surface->colorSpace());
   Pixmap pixmap(bitmap);
   auto result = surface->readPixels(pixmap.info(), pixmap.writablePixels());
   if (!result) {
     return false;
   }
-  return Baseline::Compare(pixmap, key, surface->gamutColorSpace());
+  return Baseline::Compare(pixmap, key, surface->colorSpace());
 }
 
 bool Baseline::Compare(const Bitmap& bitmap, const std::string& key) {
@@ -127,7 +127,7 @@ bool Baseline::Compare(const Bitmap& bitmap, const std::string& key) {
     return false;
   }
   Pixmap pixmap(bitmap);
-  return Baseline::Compare(pixmap, key, bitmap.gamutColorSpace());
+  return Baseline::Compare(pixmap, key, bitmap.colorSpace());
 }
 
 static bool CompareVersionAndMd5(const std::string& md5, const std::string& key,

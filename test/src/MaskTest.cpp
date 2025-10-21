@@ -45,14 +45,14 @@ TGFX_TEST(PathRasterizerTest, Rasterize) {
   ASSERT_TRUE(surface != nullptr);
   auto canvas = surface->getCanvas();
   canvas->drawImage(image);
-  Bitmap bitmap(rasterizer->width(), rasterizer->height(), true, false, surface->gamutColorSpace());
+  Bitmap bitmap(rasterizer->width(), rasterizer->height(), true, false, surface->colorSpace());
   ASSERT_FALSE(bitmap.isEmpty());
   Pixmap pixmap(bitmap);
   pixmap.clear();
   auto result = surface->readPixels(pixmap.info(), pixmap.writablePixels());
   EXPECT_TRUE(result);
   EXPECT_TRUE(
-      Baseline::Compare(pixmap, "MaskTest/rasterize_path_texture", surface->gamutColorSpace()));
+      Baseline::Compare(pixmap, "MaskTest/rasterize_path_texture", surface->colorSpace()));
 
   auto typeface =
       Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoColorEmoji.ttf"));

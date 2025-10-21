@@ -20,6 +20,7 @@
 #include "core/images/ScaledImage.h"
 #include "core/images/SubsetImage.h"
 #include "core/utils/AddressOf.h"
+#include "gpu/processors/ColorSpaceXFormEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
@@ -152,7 +153,11 @@ PlacementPtr<FragmentProcessor> FilterImage::asFragmentProcessor(
   if (fpMatrix) {
     matrix.preConcat(*fpMatrix);
   }
-  return TiledTextureEffect::Make(textureProxy, samplingArgs, &matrix, source->isAlphaOnly(),
-                                  dstColorSpace);
+  auto fp =  TiledTextureEffect::Make(textureProxy, samplingArgs, &matrix, source->isAlphaOnly());
+  if(!isAlphaOnly()) {
+    return ColorSpaceXformEffect::Make(args.context->drawingBuffer(), std::move(fp), colorSpace().get(), AlphaType::Premultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
+  }
+  return fp;
+
 }
 }  // namespace tgfx

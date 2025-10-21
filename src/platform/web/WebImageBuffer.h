@@ -53,11 +53,11 @@ class WebImageBuffer : public ImageBuffer {
     return false;
   }
 
-  std::shared_ptr<ColorSpace> gamutColorSpace() const override {
+  std::shared_ptr<ColorSpace> colorSpace() const override {
     return ColorSpace::MakeSRGB();
   }
 
-  void setGamutColorSpace(std::shared_ptr<ColorSpace>) override {
+  void setColorSpace(std::shared_ptr<ColorSpace>) override {
   }
 
  protected:

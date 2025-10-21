@@ -292,7 +292,7 @@ ISize SurfaceTexture::updateTexImage() {
         env->CallStaticIntMethod(DataSpaceClass.get(), DataSpaceClass_getStandard, dataSpace);
     jint transfer =
         env->CallStaticIntMethod(DataSpaceClass.get(), DataSpaceClass_getTransfer, dataSpace);
-    _gamutColorSpace = AndroidDataSpaceToGamutColorSpace(standard, transfer);
+    _colorSpace = AndroidDataSpaceToColorSpace(standard, transfer);
   }
   auto floatArray = env->NewFloatArray(16);
   env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_getTransformMatrix, floatArray);

@@ -37,18 +37,18 @@ class DefaultTextureView : public TextureView {
     return _texture;
   }
 
-  void setGamutColorSpace(std::shared_ptr<ColorSpace> colorSpace) override {
+  void setColorSpace(std::shared_ptr<ColorSpace> colorSpace) override {
     if (_texture->format() != PixelFormat::ALPHA_8) {
-      _gamutColorSpace = std::move(colorSpace);
+      _colorSpace = std::move(colorSpace);
     }
   }
 
-  std::shared_ptr<ColorSpace> gamutColorSpace() const override {
-    return _gamutColorSpace;
+  std::shared_ptr<ColorSpace> colorSpace() const override {
+    return _colorSpace;
   }
 
  protected:
   std::shared_ptr<GPUTexture> _texture = nullptr;
-  std::shared_ptr<ColorSpace> _gamutColorSpace = ColorSpace::MakeSRGB();
+  std::shared_ptr<ColorSpace> _colorSpace = ColorSpace::MakeSRGB();
 };
 }  // namespace tgfx

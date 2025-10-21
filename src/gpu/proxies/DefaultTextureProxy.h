@@ -32,7 +32,7 @@ class DefaultTextureProxy : public TextureProxy {
 
   virtual std::shared_ptr<TextureView> onMakeTexture(Context* context) const;
 
-  std::shared_ptr<ColorSpace> _gamutColorSpace = ColorSpace::MakeSRGB();
+  std::shared_ptr<ColorSpace> _colorSpace = ColorSpace::MakeSRGB();
 
  private:
   friend class ProxyProvider;

@@ -55,10 +55,13 @@ void GLSLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
   } else {
     auto color = varyingHandler->addVarying("Color", SLType::Float4);
+    ColorSpaceXformHelper helper{};
     ColorSpaceXformSteps steps{ColorSpace::MakeSRGB().get(), AlphaType::Premultiplied,
                                dstColorSpace.get(), AlphaType::Premultiplied};
-    vertBuilder->appendColorGamutXform(inColor.name().c_str(), &steps);
-    vertBuilder->codeAppendf("%s = %s;", color.vsOut().c_str(), inColor.name().c_str());
+    helper.emitCode(args.uniformHandler, &steps, ShaderStage::Vertex);
+    std::string dstColor;
+    vertBuilder->appendColorGamutXform(&dstColor, inColor.name().c_str(), &helper);
+    vertBuilder->codeAppendf("%s = %s;", color.vsOut().c_str(), dstColor.c_str());
     fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), color.fsIn().c_str());
   }
 

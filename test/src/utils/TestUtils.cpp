@@ -136,7 +136,7 @@ void SaveImage(const std::shared_ptr<PixelBuffer> pixelBuffer, const std::string
     return;
   }
   auto pixels = pixelBuffer->lockPixels();
-  SaveImage(Pixmap(pixelBuffer->info(), pixels), key, pixelBuffer->gamutColorSpace());
+  SaveImage(Pixmap(pixelBuffer->info(), pixels), key, pixelBuffer->colorSpace());
   pixelBuffer->unlockPixels();
 }
 
@@ -144,7 +144,7 @@ void SaveImage(const Bitmap& bitmap, const std::string& key) {
   if (bitmap.isEmpty()) {
     return;
   }
-  SaveImage(Pixmap(bitmap), key, bitmap.gamutColorSpace());
+  SaveImage(Pixmap(bitmap), key, bitmap.colorSpace());
 }
 
 void SaveImage(const Pixmap& pixmap, const std::string& key,

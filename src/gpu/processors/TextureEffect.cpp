@@ -23,13 +23,12 @@
 namespace tgfx {
 PlacementPtr<FragmentProcessor> TextureEffect::Make(std::shared_ptr<TextureProxy> proxy,
                                                     const SamplingArgs& args,
-                                                    const Matrix* uvMatrix, bool forceAsMask,
-                                                    std::shared_ptr<ColorSpace> dstColorSpace) {
+                                                    const Matrix* uvMatrix, bool forceAsMask) {
   if (proxy == nullptr) {
     return nullptr;
   }
   auto isAlphaOnly = proxy->isAlphaOnly();
-  auto processor = MakeRGBAAA(proxy, args, {}, uvMatrix, std::move(dstColorSpace));
+  auto processor = MakeRGBAAA(proxy, args, {}, uvMatrix);
   if (forceAsMask && !isAlphaOnly) {
     auto drawingBuffer = proxy->getContext()->drawingBuffer();
     processor = FragmentProcessor::MulInputByChildAlpha(drawingBuffer, std::move(processor));
@@ -39,12 +38,10 @@ PlacementPtr<FragmentProcessor> TextureEffect::Make(std::shared_ptr<TextureProxy
 
 TextureEffect::TextureEffect(std::shared_ptr<TextureProxy> proxy, const SamplingOptions& sampling,
                              SrcRectConstraint constraint, const Point& alphaStart,
-                             const Matrix& uvMatrix, const std::optional<Rect>& subset,
-                             std::shared_ptr<ColorSpace> dstColorSpace)
+                             const Matrix& uvMatrix, const std::optional<Rect>& subset)
     : FragmentProcessor(ClassID()), textureProxy(std::move(proxy)), samplerState(sampling),
       constraint(constraint), alphaStart(alphaStart),
-      coordTransform(uvMatrix, textureProxy.get(), alphaStart), subset(subset),
-      dstColorSpace(std::move(dstColorSpace)) {
+      coordTransform(uvMatrix, textureProxy.get(), alphaStart), subset(subset) {
   addCoordTransform(&coordTransform);
 }
 
@@ -60,18 +57,11 @@ void TextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
   auto yuvTexture = getYUVTexture();
   if (yuvTexture) {
     flags |= yuvTexture->yuvFormat() == YUVFormat::I420 ? 0 : 4;
-    flags |= IsLimitedYUVColorRange(yuvTexture->colorSpace()) ? 0 : 8;
+    flags |= IsLimitedYUVColorRange(yuvTexture->yuvColorSpace()) ? 0 : 8;
   }
   flags |= needSubset() ? 16 : 0;
   flags |= constraint == SrcRectConstraint::Strict ? 32 : 0;
   bytesKey->write(flags);
-  auto srcColorSpace = getTextureView()->gamutColorSpace();
-  auto steps = std::make_shared<ColorSpaceXformSteps>(
-      srcColorSpace.get(), AlphaType::Premultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
-  uint64_t xformKey = ColorSpaceXformSteps::XFormKey(steps.get());
-  auto key = reinterpret_cast<uint32_t*>(&xformKey);
-  bytesKey->write(key[0]);
-  bytesKey->write(key[1]);
 }
 
 size_t TextureEffect::onCountTextureSamplers() const {

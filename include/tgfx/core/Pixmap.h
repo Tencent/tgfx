@@ -210,7 +210,7 @@ class Pixmap {
    */
   bool clear();
 
-  std::shared_ptr<ColorSpace> gamutColorSpace() const;
+  std::shared_ptr<ColorSpace> colorSpace() const;
 
  private:
   ImageInfo _info = {};

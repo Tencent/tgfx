@@ -24,8 +24,7 @@
 namespace tgfx {
 class GLSLDeviceSpaceTextureEffect : public DeviceSpaceTextureEffect {
  public:
-  GLSLDeviceSpaceTextureEffect(std::shared_ptr<TextureProxy> textureProxy, const Matrix& uvMatrix,
-                               std::shared_ptr<ColorSpace> colorSpace);
+  GLSLDeviceSpaceTextureEffect(std::shared_ptr<TextureProxy> textureProxy, const Matrix& uvMatrix);
 
   void emitCode(EmitArgs& args) const override;
 

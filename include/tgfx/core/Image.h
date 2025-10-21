@@ -190,7 +190,7 @@ class Image {
   /**
    * return image colorspace.
    */
-  virtual std::shared_ptr<ColorSpace> gamutColorSpace() const = 0;
+  virtual std::shared_ptr<ColorSpace> colorSpace() const = 0;
 
   /**
    * Returns true if the Image has mipmap levels. The flag was set by the makeMipmapped() method,

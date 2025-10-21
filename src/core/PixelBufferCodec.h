@@ -27,7 +27,7 @@ class PixelBufferCodec : public ImageCodec {
 
   PixelBufferCodec(std::shared_ptr<PixelBuffer> source)
       : ImageCodec(source->width(), source->height(), Orientation::TopLeft,
-                   source->gamutColorSpace()),
+                   source->colorSpace()),
         source(std::move(source)) {
   }
 

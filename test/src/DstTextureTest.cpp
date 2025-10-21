@@ -44,7 +44,7 @@ TGFX_TEST(DstTextureTest, EmptyLocalBounds) {
   auto backendRenderTarget = renderTarget->getBackendRenderTarget();
 
   auto surface = Surface::MakeFrom(context, backendRenderTarget, ImageOrigin::BottomLeft, 0,
-                                   renderTarget->gamutColorSpace());
+                                   renderTarget->colorSpace());
   auto canvas = surface->getCanvas();
   canvas->clear();
   auto paint = Paint();
@@ -76,7 +76,7 @@ TGFX_TEST(DstTextureTest, OutOfRenderTarget) {
   auto backendRenderTarget = renderTarget->getBackendRenderTarget();
 
   auto surface = Surface::MakeFrom(context, backendRenderTarget, ImageOrigin::BottomLeft, 0,
-                                   renderTarget->gamutColorSpace());
+                                   renderTarget->colorSpace());
   auto canvas = surface->getCanvas();
   canvas->clear();
   auto paint = Paint();

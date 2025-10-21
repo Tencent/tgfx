@@ -58,11 +58,11 @@ class PixelRef {
     return pixelBuffer->isHardwareBacked();
   }
 
-  std::shared_ptr<ColorSpace> gamutColorSpace() const {
-    return pixelBuffer->gamutColorSpace();
+  std::shared_ptr<ColorSpace> colorSpace() const {
+    return pixelBuffer->colorSpace();
   }
 
-  void setGamutColorSpace(std::shared_ptr<ColorSpace> colorSpace);
+  void setColorSpace(std::shared_ptr<ColorSpace> colorSpace);
 
   /**
    * Retrieves the backing hardware buffer. This method does not acquire any additional reference to

@@ -204,7 +204,7 @@ bool ImageCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
 
 std::shared_ptr<ImageBuffer> ImageCodec::onMakeBuffer(bool tryHardware) const {
   auto pixelBuffer =
-      PixelBuffer::Make(width(), height(), isAlphaOnly(), tryHardware, gamutColorSpace());
+      PixelBuffer::Make(width(), height(), isAlphaOnly(), tryHardware, colorSpace());
   if (pixelBuffer == nullptr) {
     return nullptr;
   }

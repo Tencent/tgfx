@@ -24,8 +24,7 @@ namespace tgfx {
 class DeviceSpaceTextureEffect : public FragmentProcessor {
  public:
   static PlacementPtr<DeviceSpaceTextureEffect> Make(
-      BlockBuffer* buffer, std::shared_ptr<TextureProxy> textureProxy, const Matrix& uvMatrix,
-      std::shared_ptr<ColorSpace> dstColorSpace = nullptr);
+      BlockBuffer* buffer, std::shared_ptr<TextureProxy> textureProxy, const Matrix& uvMatrix);
 
   std::string name() const override {
     return "DeviceSpaceTextureEffect";
@@ -34,10 +33,7 @@ class DeviceSpaceTextureEffect : public FragmentProcessor {
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  DeviceSpaceTextureEffect(std::shared_ptr<TextureProxy> textureProxy, const Matrix& uvMatrix,
-                           std::shared_ptr<ColorSpace> colorSpace);
-
-  void onComputeProcessorKey(BytesKey* bytesKey) const override;
+  DeviceSpaceTextureEffect(std::shared_ptr<TextureProxy> textureProxy, const Matrix& uvMatrix);
 
   size_t onCountTextureSamplers() const override {
     return 1;
@@ -47,6 +43,5 @@ class DeviceSpaceTextureEffect : public FragmentProcessor {
 
   std::shared_ptr<TextureProxy> textureProxy = nullptr;
   Matrix uvMatrix = {};
-  std::shared_ptr<ColorSpace> dstColorSpace = nullptr;
 };
 }  // namespace tgfx

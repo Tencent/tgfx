@@ -37,9 +37,9 @@ class NV12HardwareBuffer : public ImageBuffer {
     return false;
   }
 
-  std::shared_ptr<ColorSpace> gamutColorSpace() const override;
+  std::shared_ptr<ColorSpace> colorSpace() const override;
 
-  void setGamutColorSpace(std::shared_ptr<ColorSpace>) override {
+  void setColorSpace(std::shared_ptr<ColorSpace>) override {
   }
 
  protected:
@@ -47,7 +47,7 @@ class NV12HardwareBuffer : public ImageBuffer {
 
  private:
   CVPixelBufferRef pixelBuffer = nullptr;
-  YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED;
+  YUVColorSpace _colorSpace = YUVColorSpace::BT601_LIMITED;
 
   NV12HardwareBuffer(CVPixelBufferRef pixelBuffer, YUVColorSpace colorSpace);
 };

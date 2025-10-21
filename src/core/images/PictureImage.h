@@ -49,8 +49,8 @@ class PictureImage : public Image {
     return mipmapped;
   }
 
-  std::shared_ptr<ColorSpace> gamutColorSpace() const override {
-    return _gamutColorSpace;
+  std::shared_ptr<ColorSpace> colorSpace() const override {
+    return _colorSpace;
   }
 
   std::shared_ptr<Picture> picture = nullptr;
@@ -79,6 +79,6 @@ class PictureImage : public Image {
   int _width = 0;
   int _height = 0;
   bool mipmapped = false;
-  std::shared_ptr<ColorSpace> _gamutColorSpace = ColorSpace::MakeSRGB();
+  std::shared_ptr<ColorSpace> _colorSpace = ColorSpace::MakeSRGB();
 };
 }  // namespace tgfx

@@ -59,10 +59,13 @@ void GLSLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
   } else {
     auto colorVar = varyingHandler->addVarying("Color", SLType::Float4);
+    ColorSpaceXformHelper helper{};
     ColorSpaceXformSteps steps{ColorSpace::MakeSRGB().get(), AlphaType::Premultiplied,
                                dstColorSpace.get(), AlphaType::Premultiplied};
-    vertBuilder->appendColorGamutXform(color.name().c_str(), &steps);
-    vertBuilder->codeAppendf("%s = %s;", colorVar.vsOut().c_str(), color.name().c_str());
+    helper.emitCode(args.uniformHandler, &steps, ShaderStage::Vertex);
+    std::string dstColor;
+    vertBuilder->appendColorGamutXform(&dstColor, color.name().c_str(), &helper);
+    vertBuilder->codeAppendf("%s = %s;", colorVar.vsOut().c_str(), dstColor.c_str());
     fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorVar.fsIn().c_str());
   }
 

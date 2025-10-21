@@ -20,28 +20,15 @@
 
 namespace tgfx {
 PlacementPtr<TextureGradientColorizer> TextureGradientColorizer::Make(
-    BlockBuffer* buffer, std::shared_ptr<TextureProxy> gradient,
-    std::shared_ptr<ColorSpace> dstColorSpace) {
+    BlockBuffer* buffer, std::shared_ptr<TextureProxy> gradient){
   if (gradient == nullptr) {
     return nullptr;
   }
-  return buffer->make<GLSLTextureGradientColorizer>(std::move(gradient), std::move(dstColorSpace));
+  return buffer->make<GLSLTextureGradientColorizer>(std::move(gradient));
 }
 
-void TextureGradientColorizer::onComputeProcessorKey(BytesKey* bytesKey) const {
-  auto srcColorSpace = gradient->getTextureView()->gamutColorSpace();
-  auto steps =
-      std::make_shared<ColorSpaceXformSteps>(srcColorSpace.get(), AlphaType::Unpremultiplied,
-                                             dstColorSpace.get(), AlphaType::Unpremultiplied);
-  uint64_t xformKey = ColorSpaceXformSteps::XFormKey(steps.get());
-  auto key = reinterpret_cast<uint32_t*>(&xformKey);
-  bytesKey->write(key[0]);
-  bytesKey->write(key[1]);
-}
-
-GLSLTextureGradientColorizer::GLSLTextureGradientColorizer(std::shared_ptr<TextureProxy> gradient,
-                                                           std::shared_ptr<ColorSpace> colorSpace)
-    : TextureGradientColorizer(std::move(gradient), std::move(colorSpace)) {
+GLSLTextureGradientColorizer::GLSLTextureGradientColorizer(std::shared_ptr<TextureProxy> gradient)
+    : TextureGradientColorizer(std::move(gradient)) {
 }
 
 void GLSLTextureGradientColorizer::emitCode(EmitArgs& args) const {
@@ -50,20 +37,5 @@ void GLSLTextureGradientColorizer::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("%s = ", args.outputColor.c_str());
   fragBuilder->appendTextureLookup((*args.textureSamplers)[0], "coord");
   fragBuilder->codeAppend(";");
-  auto srcColorSpace = gradient->getTextureView()->gamutColorSpace();
-  auto steps =
-      std::make_shared<ColorSpaceXformSteps>(srcColorSpace.get(), AlphaType::Unpremultiplied,
-                                             dstColorSpace.get(), AlphaType::Unpremultiplied);
-  fragBuilder->appendColorGamutXform(args.outputColor.c_str(), steps.get());
-}
-
-void GLSLTextureGradientColorizer::onSetData(UniformData* /*vertexUniformData*/,
-                                             UniformData* fragmentUniformData) const {
-  auto srcColorSpace = gradient->getTextureView()->gamutColorSpace();
-  auto steps =
-      std::make_shared<ColorSpaceXformSteps>(srcColorSpace.get(), AlphaType::Unpremultiplied,
-                                             dstColorSpace.get(), AlphaType::Unpremultiplied);
-  ColorSpaceXformHelper helper;
-  helper.setData(fragmentUniformData, steps.get());
 }
 }  // namespace tgfx

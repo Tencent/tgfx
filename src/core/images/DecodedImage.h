@@ -42,8 +42,8 @@ class DecodedImage : public PixelImage {
     return _alphaOnly;
   }
 
-  std::shared_ptr<ColorSpace> gamutColorSpace() const override {
-    return _gamutColorSpace;
+  std::shared_ptr<ColorSpace> colorSpace() const override {
+    return _colorSpace;
   }
 
  protected:
@@ -60,7 +60,7 @@ class DecodedImage : public PixelImage {
   int _height = 0;
   bool _alphaOnly = false;
   std::shared_ptr<DataSource<ImageBuffer>> source = nullptr;
-  std::shared_ptr<ColorSpace> _gamutColorSpace = ColorSpace::MakeSRGB();
+  std::shared_ptr<ColorSpace> _colorSpace = ColorSpace::MakeSRGB();
 
   DecodedImage(int width, int height, bool alphaOnly,
                std::shared_ptr<DataSource<ImageBuffer>> source, bool mipmapped,

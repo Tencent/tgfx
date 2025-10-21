@@ -54,7 +54,7 @@ struct ColorSpaceXformSteps {
 
   void apply(float rgba[4]) const;
 
-  static uint64_t XFormKey(const ColorSpaceXformSteps* xform);
+  static uint32_t XFormKey(const ColorSpaceXformSteps* xform);
 
   Flags flags;
 

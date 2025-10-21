@@ -25,8 +25,7 @@
 
 namespace tgfx {
 static ScratchKey ComputeRenderTargetScratchKey(int width, int height, PixelFormat format,
-                                                int sampleCount, bool mipmapped,
-                                                std::shared_ptr<ColorSpace> colorSpace) {
+                                                int sampleCount, bool mipmapped) {
   static const uint32_t TextureRenderTargetType = UniqueID::Next();
   BytesKey bytesKey(7);
   bytesKey.write(TextureRenderTargetType);
@@ -36,12 +35,6 @@ static ScratchKey ComputeRenderTargetScratchKey(int width, int height, PixelForm
   auto formatValue = static_cast<uint32_t>(format);
   auto mipmapValue = static_cast<uint32_t>(mipmapped ? 1 : 0);
   bytesKey.write(formatValue | (mipmapValue << 30));
-  if (colorSpace) {
-    auto key = colorSpace->hash();
-    auto value = reinterpret_cast<uint32_t*>(&key);
-    bytesKey.write(value[0]);
-    bytesKey.write(value[1]);
-  }
   return bytesKey;
 }
 
@@ -63,7 +56,7 @@ std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
   if (adopted) {
     scratchKey = ComputeRenderTargetScratchKey(backendTexture.width(), backendTexture.height(),
                                                texture->format(), sampleCount,
-                                               texture->mipLevelCount() > 1, colorSpace);
+                                               texture->mipLevelCount() > 1);
   }
   return TextureRenderTarget::MakeFrom(context, std::move(texture), sampleCount, origin, !adopted,
                                        scratchKey, std::move(colorSpace));
@@ -102,9 +95,10 @@ std::shared_ptr<RenderTarget> RenderTarget::Make(Context* context, int width, in
   auto caps = context->caps();
   sampleCount = caps->getSampleCount(sampleCount, format);
   auto scratchKey =
-      ComputeRenderTargetScratchKey(width, height, format, sampleCount, mipmapped, colorSpace);
+      ComputeRenderTargetScratchKey(width, height, format, sampleCount, mipmapped);
   if (auto renderTarget = Resource::Find<TextureRenderTarget>(context, scratchKey)) {
     renderTarget->_origin = origin;
+    renderTarget->setColorSpace(colorSpace);
     return renderTarget;
   }
   GPUTextureDescriptor descriptor = {

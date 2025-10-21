@@ -23,5 +23,5 @@
 namespace tgfx {
 std::shared_ptr<ColorSpace> MakeColorSpaceFromYUVColorSpace(YUVColorSpace yuvColorSpace);
 
-std::shared_ptr<ColorSpace> AndroidDataSpaceToGamutColorSpace(int standard, int transfer);
+std::shared_ptr<ColorSpace> AndroidDataSpaceToColorSpace(int standard, int transfer);
 }  // namespace tgfx

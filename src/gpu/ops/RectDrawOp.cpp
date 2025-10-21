@@ -67,7 +67,7 @@ PlacementPtr<GeometryProcessor> RectDrawOp::onMakeGeometryProcessor(RenderTarget
   auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
   return QuadPerEdgeAAGeometryProcessor::Make(drawingBuffer, renderTarget->width(),
                                               renderTarget->height(), aaType, commonColor, uvMatrix,
-                                              hasSubset, renderTarget->gamutColorSpace());
+                                              hasSubset, renderTarget->colorSpace());
 }
 
 void RectDrawOp::onDraw(RenderPass* renderPass) {

@@ -388,7 +388,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
     FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty()),
                    drawScale.value_or(1.0f)};
     auto processor = FragmentProcessor::Make(pendingImage, args, pendingSampling, pendingConstraint,
-                                             nullptr, renderTarget->gamutColorSpace());
+                                             nullptr, renderTarget->colorSpace());
     if (processor == nullptr) {
       return;
     }
@@ -440,7 +440,7 @@ bool OpsCompositor::drawAsClear(const Rect& rect, const MCState& state, const Fi
   auto& writeSwizzle = caps->getWriteSwizzle(format);
   Color dstColor = fill.color;
   ColorSpaceXformSteps steps{ColorSpace::MakeSRGB().get(), AlphaType::Unpremultiplied,
-                             renderTarget->gamutColorSpace().get(), AlphaType::Premultiplied};
+                             renderTarget->colorSpace().get(), AlphaType::Premultiplied};
   steps.apply(dstColor.array());
   clearColor = writeSwizzle.applyTo(dstColor);
   return true;
@@ -541,7 +541,7 @@ std::shared_ptr<TextureProxy> OpsCompositor::getClipTexture(const Path& clip, AA
     auto drawOp = ShapeDrawOp::Make(std::move(shapeProxy), {}, uvMatrix, aaType);
     CAPUTRE_SHAPE_MESH(drawOp.get(), shape, aaType, clipBounds);
     auto clipRenderTarget = RenderTargetProxy::MakeFallback(
-        context, width, height, true, 1, false, ImageOrigin::TopLeft, BackingFit::Approx);
+        context, width, height, true, 1, false, ImageOrigin::TopLeft, ColorSpace::MakeSRGB(), BackingFit::Approx);
     if (clipRenderTarget == nullptr) {
       return nullptr;
     }
@@ -585,8 +585,7 @@ std::pair<PlacementPtr<FragmentProcessor>, bool> OpsCompositor::getClipMaskFP(co
   if (renderTarget->origin() == ImageOrigin::BottomLeft) {
     uvMatrix.preConcat(renderTarget->getOriginTransform());
   }
-  auto processor = DeviceSpaceTextureEffect::Make(buffer, std::move(textureProxy), uvMatrix,
-                                                  renderTarget->gamutColorSpace());
+  auto processor = DeviceSpaceTextureEffect::Make(buffer, std::move(textureProxy), uvMatrix);
   return {FragmentProcessor::MulInputByChildAlpha(buffer, std::move(processor)), true};
 }
 
@@ -624,8 +623,7 @@ DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds, AATyp
   dstTextureInfo.offset = {bounds.x(), bounds.y()};
   textureProxy = proxyProvider()->createTextureProxy(
       {}, static_cast<int>(bounds.width()), static_cast<int>(bounds.height()),
-      renderTarget->format(), false, renderTarget->origin(), BackingFit::Approx, 0,
-      renderTarget->getRenderTarget()->gamutColorSpace());
+      renderTarget->format(), false, renderTarget->origin(), renderTarget->getRenderTarget()->colorSpace(), BackingFit::Approx, 0);
   if (textureProxy == nullptr) {
     return {};
   }
@@ -647,7 +645,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const F
     return;
   }
 
-  auto dstColorSpace = renderTarget->gamutColorSpace();
+  auto dstColorSpace = renderTarget->colorSpace();
   FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty()), drawScale};
   if (fill.shader) {
     if (auto processor = FragmentProcessor::Make(fill.shader, args, nullptr, dstColorSpace)) {
@@ -689,8 +687,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const F
       return;
     }
     auto xferProcessor =
-        PorterDuffXferProcessor::Make(drawingBuffer(), fill.blendMode, std::move(dstTextureInfo),
-                                      renderTarget->gamutColorSpace());
+        PorterDuffXferProcessor::Make(drawingBuffer(), fill.blendMode, std::move(dstTextureInfo));
     op->setXferProcessor(std::move(xferProcessor));
   }
   drawOps.emplace_back(std::move(op));

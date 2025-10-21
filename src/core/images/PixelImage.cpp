@@ -19,6 +19,7 @@
 #include "PixelImage.h"
 #include "core/filters/DropShadowImageFilter.h"
 #include "gpu/TPArgs.h"
+#include "gpu/processors/ColorSpaceXFormEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
@@ -38,7 +39,10 @@ PlacementPtr<FragmentProcessor> PixelImage::asFragmentProcessor(
   if (uvMatrix) {
     fpMatrix.preConcat(*uvMatrix);
   }
-  return TiledTextureEffect::Make(textureProxy, samplingArgs, &fpMatrix, isAlphaOnly(),
-                                  std::move(dstColorSpace));
+  auto fp = TiledTextureEffect::Make(textureProxy, samplingArgs, &fpMatrix, isAlphaOnly());
+  if(!isAlphaOnly()) {
+    return ColorSpaceXformEffect::Make(args.context->drawingBuffer(), std::move(fp), colorSpace().get(), AlphaType::Premultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
+  }
+  return fp;
 }
 }  // namespace tgfx

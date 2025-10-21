@@ -44,7 +44,7 @@ class AndroidBitmap {
    */
   static HardwareBufferRef GetHardwareBuffer(JNIEnv* env, jobject bitmap);
 
-  static std::shared_ptr<ColorSpace> GetGamutColorSpace(JNIEnv* env, jobject bitmap);
+  static std::shared_ptr<ColorSpace> GetColorSpace(JNIEnv* env, jobject bitmap);
 
  private:
   static void JNIInit(JNIEnv* env);

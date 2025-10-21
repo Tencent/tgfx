@@ -128,9 +128,9 @@ std::shared_ptr<PixelBuffer> PixelBuffer::MakeFrom(HardwareBufferRef hardwareBuf
 }
 
 PixelBuffer::PixelBuffer(const ImageInfo& info, std::shared_ptr<ColorSpace> colorSpace)
-    : _info(info), _gamutColorSpace(std::move(colorSpace)) {
+    : _info(info), _colorSpace(std::move(colorSpace)) {
   if (_info.colorType() == ColorType::ALPHA_8) {
-    _gamutColorSpace = nullptr;
+    _colorSpace = nullptr;
   }
 }
 
@@ -153,7 +153,7 @@ std::shared_ptr<TextureView> PixelBuffer::onMakeTexture(Context* context, bool m
   if (!mipmapped && isHardwareBacked()) {
     auto result = onBindToHardwareTexture(context);
     if (result) {
-      result->setGamutColorSpace(_gamutColorSpace);
+      result->setColorSpace(_colorSpace);
     }
     return result;
   }
@@ -164,7 +164,7 @@ std::shared_ptr<TextureView> PixelBuffer::onMakeTexture(Context* context, bool m
   auto format = ColorTypeToPixelFormat(_info.colorType());
   auto textureView =
       TextureView::MakeFormat(context, width(), height(), pixels, _info.rowBytes(), format,
-                              mipmapped, ImageOrigin::TopLeft, _gamutColorSpace);
+                              mipmapped, ImageOrigin::TopLeft, _colorSpace);
   onUnlockPixels();
   return textureView;
 }

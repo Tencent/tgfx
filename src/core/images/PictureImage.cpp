@@ -22,6 +22,7 @@
 #include "gpu/ProxyProvider.h"
 #include "gpu/RenderContext.h"
 #include "gpu/TPArgs.h"
+#include "gpu/processors/ColorSpaceXFormEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
@@ -55,7 +56,7 @@ PictureImage::PictureImage(std::shared_ptr<Picture> picture, int width, int heig
                            const Matrix* matrix, bool mipmapped,
                            std::shared_ptr<ColorSpace> colorSpace)
     : picture(std::move(picture)), _width(width), _height(height), mipmapped(mipmapped),
-      _gamutColorSpace(std::move(colorSpace)) {
+      _colorSpace(std::move(colorSpace)) {
   if (matrix && !matrix->isIdentity()) {
     this->matrix = new Matrix(*matrix);
   }
@@ -102,7 +103,7 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(
   auto mipmapped = samplingArgs.sampling.mipmapMode != MipmapMode::None && hasMipmaps();
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(rect.width()), static_cast<int>(rect.height()), isAlphaOnly(),
-      1, mipmapped, ImageOrigin::TopLeft, BackingFit::Approx, _gamutColorSpace);
+      1, mipmapped, ImageOrigin::TopLeft, _colorSpace, BackingFit::Approx);
   if (renderTarget == nullptr) {
     return nullptr;
   }
@@ -119,8 +120,12 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(
   if (samplingArgs.sampleArea) {
     newSamplingArgs.sampleArea = extraMatrix.mapRect(*samplingArgs.sampleArea);
   }
-  return TiledTextureEffect::Make(renderTarget->asTextureProxy(), newSamplingArgs, &finalUVMatrix,
-                                  isAlphaOnly(), std::move(dstColorSpace));
+  auto fp = TiledTextureEffect::Make(renderTarget->asTextureProxy(), newSamplingArgs, &finalUVMatrix,
+                                  isAlphaOnly());
+  if(!isAlphaOnly()) {
+    return ColorSpaceXformEffect::Make(args.context->drawingBuffer(), std::move(fp), colorSpace().get(), AlphaType::Premultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
+  }
+  return fp;
 }
 
 std::shared_ptr<TextureProxy> PictureImage::lockTextureProxy(const TPArgs& args) const {
@@ -132,7 +137,7 @@ std::shared_ptr<TextureProxy> PictureImage::lockTextureProxy(const TPArgs& args)
   }
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, textureWidth, textureHeight, isAlphaOnly(), 1, hasMipmaps() && args.mipmapped,
-      ImageOrigin::TopLeft, args.backingFit, _gamutColorSpace);
+      ImageOrigin::TopLeft, _colorSpace, args.backingFit);
   if (renderTarget == nullptr) {
     return nullptr;
   }

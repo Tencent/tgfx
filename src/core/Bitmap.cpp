@@ -94,17 +94,17 @@ HardwareBufferRef Bitmap::getHardwareBuffer() const {
   return pixelRef ? pixelRef->getHardwareBuffer() : nullptr;
 }
 
-std::shared_ptr<ColorSpace> Bitmap::gamutColorSpace() const {
-  return pixelRef->gamutColorSpace();
+std::shared_ptr<ColorSpace> Bitmap::colorSpace() const {
+  return pixelRef->colorSpace();
 }
 
-void Bitmap::setGamutColorSpace(std::shared_ptr<ColorSpace> colorSpace) {
-  pixelRef->setGamutColorSpace(std::move(colorSpace));
+void Bitmap::setColorSpace(std::shared_ptr<ColorSpace> colorSpace) {
+  pixelRef->setColorSpace(std::move(colorSpace));
 }
 
 std::shared_ptr<Data> Bitmap::encode(EncodedFormat format, int quality) const {
   Pixmap pixmap(*this);
-  return ImageCodec::Encode(pixmap, format, quality, gamutColorSpace());
+  return ImageCodec::Encode(pixmap, format, quality, colorSpace());
 }
 
 Color Bitmap::getColor(int x, int y) const {

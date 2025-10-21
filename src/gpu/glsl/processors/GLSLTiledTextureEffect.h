@@ -26,8 +26,7 @@ class GLSLTiledTextureEffect : public TiledTextureEffect {
  public:
   GLSLTiledTextureEffect(std::shared_ptr<TextureProxy> proxy, const SamplerState& samplerState,
                          SrcRectConstraint constraint, const Matrix& uvMatrix,
-                         const std::optional<Rect>& subset,
-                         std::shared_ptr<ColorSpace> dstColorSpace);
+                         const std::optional<Rect>& subset);
 
   void emitCode(EmitArgs& args) const override;
 

@@ -264,11 +264,25 @@ void ColorSpaceXformSteps::apply(float rgba[4]) const {
   }
 }
 
-uint64_t ColorSpaceXformSteps::XFormKey(const ColorSpaceXformSteps* xform) {
+uint32_t ColorSpaceXformSteps::XFormKey(const ColorSpaceXformSteps* xform) {
+  // Code generation depends on which steps we apply,
+  // and the kinds of transfer functions (if we're applying those).
   if (!xform) {
     return 0;
   }
-  uint64_t key = xform->srcHash + xform->dstHash;
+  uint32_t key = xform->flags.mask();
+  if (xform->flags.linearize) {
+    key |= static_cast<uint32_t>(
+        gfx::skcms_TransferFunction_getType(
+            reinterpret_cast<const gfx::skcms_TransferFunction*>(&xform->srcTransferFunction))
+        << 8);
+  }
+  if (xform->flags.encode) {
+    key |= static_cast<uint32_t>(
+        gfx::skcms_TransferFunction_getType(
+            reinterpret_cast<const gfx::skcms_TransferFunction*>(&xform->dstTransferFunctionInverse))
+        << 16);
+  }
   return key;
 }
 }  // namespace tgfx

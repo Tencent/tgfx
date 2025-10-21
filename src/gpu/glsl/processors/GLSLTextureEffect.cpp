@@ -60,23 +60,20 @@ static constexpr float ColorConversionJPEGFullRange[] = {
 
 PlacementPtr<FragmentProcessor> TextureEffect::MakeRGBAAA(
     std::shared_ptr<TextureProxy> proxy, const SamplingArgs& args, const Point& alphaStart,
-    const Matrix* uvMatrix, std::shared_ptr<ColorSpace> dstColorSpace) {
+    const Matrix* uvMatrix) {
   if (proxy == nullptr) {
     return nullptr;
   }
   auto matrix = uvMatrix ? *uvMatrix : Matrix::I();
   auto drawingBuffer = proxy->getContext()->drawingBuffer();
   return drawingBuffer->make<GLSLTextureEffect>(std::move(proxy), alphaStart, args.sampling,
-                                                args.constraint, matrix, args.sampleArea,
-                                                std::move(dstColorSpace));
+                                                args.constraint, matrix, args.sampleArea);
 }
 
 GLSLTextureEffect::GLSLTextureEffect(std::shared_ptr<TextureProxy> proxy, const Point& alphaStart,
                                      const SamplingOptions& sampling, SrcRectConstraint constraint,
-                                     const Matrix& uvMatrix, const std::optional<Rect>& subset,
-                                     std::shared_ptr<ColorSpace> dstColorSpace)
-    : TextureEffect(std::move(proxy), sampling, constraint, alphaStart, uvMatrix, subset,
-                    std::move(dstColorSpace)) {
+                                     const Matrix& uvMatrix, const std::optional<Rect>& subset)
+    : TextureEffect(std::move(proxy), sampling, constraint, alphaStart, uvMatrix, subset) {
 }
 
 void GLSLTextureEffect::emitCode(EmitArgs& args) const {
@@ -123,7 +120,6 @@ void GLSLTextureEffect::emitDefaultTextureCode(EmitArgs& args) const {
   fragBuilder->codeAppend("vec4 color = ");
   fragBuilder->appendTextureLookup(textureSampler, finalCoordName);
   fragBuilder->codeAppend(";");
-
   if (alphaStart != Point::Zero()) {
     fragBuilder->codeAppend("color = clamp(color, 0.0, 1.0);");
     auto alphaStartName =
@@ -138,10 +134,6 @@ void GLSLTextureEffect::emitDefaultTextureCode(EmitArgs& args) const {
     fragBuilder->codeAppend("color = vec4(color.rgb * alpha.r, alpha.r);");
   }
   fragBuilder->codeAppendf("%s = color;", args.outputColor.c_str());
-  auto srcColorSpace = getTextureView()->gamutColorSpace();
-  auto defaultTextureSteps = std::make_shared<ColorSpaceXformSteps>(
-      srcColorSpace.get(), AlphaType::Premultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
-  fragBuilder->appendColorGamutXform(args.outputColor.c_str(), defaultTextureSteps.get());
 }
 
 void GLSLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
@@ -180,7 +172,7 @@ void GLSLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
     fragBuilder->appendTextureLookup(textureSamplers[1], finalCoordName);
     fragBuilder->codeAppend(".ra;");
   }
-  if (IsLimitedYUVColorRange(yuvTexture->colorSpace())) {
+  if (IsLimitedYUVColorRange(yuvTexture->yuvColorSpace())) {
     fragBuilder->codeAppend("yuv.x -= (16.0 / 255.0);");
   }
   fragBuilder->codeAppend("yuv.yz -= vec2(0.5, 0.5);");
@@ -202,10 +194,6 @@ void GLSLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
     fragBuilder->codeAppend("yuv_a = clamp(yuv_a, 0.0, 1.0);");
     fragBuilder->codeAppendf("%s = vec4(rgb * yuv_a, yuv_a);", args.outputColor.c_str());
   }
-  auto srcColorSpace = getTextureView()->gamutColorSpace();
-  auto yuvTextureSteps = std::make_shared<ColorSpaceXformSteps>(
-      srcColorSpace.get(), AlphaType::Premultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
-  fragBuilder->appendColorGamutXform(args.outputColor.c_str(), yuvTextureSteps.get());
 }
 
 void GLSLTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
@@ -214,11 +202,6 @@ void GLSLTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
   if (textureView == nullptr) {
     return;
   }
-  auto srcColorSpace = getTextureView()->gamutColorSpace();
-  auto steps = std::make_shared<ColorSpaceXformSteps>(
-      srcColorSpace.get(), AlphaType::Premultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
-  ColorSpaceXformHelper helper;
-  helper.setData(fragmentUniformData, steps.get());
   if (alphaStart != Point::Zero()) {
     auto alphaStartValue = textureView->getTextureCoord(alphaStart.x, alphaStart.y);
     fragmentUniformData->setData("AlphaStart", alphaStartValue);
@@ -226,7 +209,7 @@ void GLSLTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
   auto yuvTexture = getYUVTexture();
   if (yuvTexture) {
     std::string mat3ColorConversion = "Mat3ColorConversion";
-    switch (yuvTexture->colorSpace()) {
+    switch (yuvTexture->yuvColorSpace()) {
       case YUVColorSpace::BT601_LIMITED: {
         fragmentUniformData->setData(mat3ColorConversion, AlignMat3(ColorConversion601LimitRange));
       } break;

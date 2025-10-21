@@ -59,13 +59,13 @@ class PixelBuffer : public ImageBuffer {
     return _info.isAlphaOnly();
   }
 
-  std::shared_ptr<ColorSpace> gamutColorSpace() const override {
-    return _gamutColorSpace;
+  std::shared_ptr<ColorSpace> colorSpace() const override {
+    return _colorSpace;
   }
 
-  void setGamutColorSpace(std::shared_ptr<ColorSpace> colorSpace) override {
+  void setColorSpace(std::shared_ptr<ColorSpace> colorSpace) override {
     if (_info.colorType() != ColorType::ALPHA_8) {
-      _gamutColorSpace = std::move(colorSpace);
+      _colorSpace = std::move(colorSpace);
     }
   }
 
@@ -117,6 +117,6 @@ class PixelBuffer : public ImageBuffer {
  private:
   mutable std::mutex locker = {};
   ImageInfo _info = {};
-  std::shared_ptr<ColorSpace> _gamutColorSpace = ColorSpace::MakeSRGB();
+  std::shared_ptr<ColorSpace> _colorSpace = ColorSpace::MakeSRGB();
 };
 }  // namespace tgfx

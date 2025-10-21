@@ -35,7 +35,7 @@ namespace tgfx {
 
 TGFX_TEST(ReadPixelsTest, PixelMap) {
   auto codec = MakeImageCodec("resources/apitest/test_timestretch.png");
-  auto colorSpace = codec->gamutColorSpace();
+  auto colorSpace = codec->colorSpace();
   EXPECT_TRUE(codec != nullptr);
   auto width = codec->width();
   auto height = codec->height();
@@ -159,7 +159,7 @@ TGFX_TEST(ReadPixelsTest, PixelMap) {
 TGFX_TEST(ReadPixelsTest, Surface) {
   auto codec = MakeImageCodec("resources/apitest/test_timestretch.png");
   ASSERT_TRUE(codec != nullptr);
-  Bitmap bitmap(codec->width(), codec->height(), false, false, codec->gamutColorSpace());
+  Bitmap bitmap(codec->width(), codec->height(), false, false, codec->colorSpace());
   ASSERT_FALSE(bitmap.isEmpty());
   auto pixels = bitmap.lockPixels();
   auto result = codec->readPixels(bitmap.info(), pixels);
@@ -182,7 +182,7 @@ TGFX_TEST(ReadPixelsTest, Surface) {
 
   auto RGBAInfo = ImageInfo::Make(width, height, ColorType::RGBA_8888, AlphaType::Premultiplied);
   result = surface->readPixels(RGBAInfo, pixels);
-  auto colorSpace = surface->gamutColorSpace();
+  auto colorSpace = surface->colorSpace();
   EXPECT_TRUE(result);
   CHECK_PIXELS(RGBAInfo, pixels, "Surface_rgb_A_to_rgb_A", colorSpace);
 
@@ -208,7 +208,7 @@ TGFX_TEST(ReadPixelsTest, Surface) {
   CHECK_PIXELS(RGBARectInfo, pixels, "Surface_rgb_A_to_rgb_A_100_-100", colorSpace);
 
   surface = Surface::Make(context, width, height, true);
-  colorSpace = surface->gamutColorSpace();
+  colorSpace = surface->colorSpace();
   ASSERT_TRUE(surface != nullptr);
   canvas = surface->getCanvas();
   canvas->drawImage(image);
@@ -232,7 +232,7 @@ TGFX_TEST(ReadPixelsTest, Surface) {
   result = CreateGLTexture(context, width, height, &textureInfo);
   EXPECT_TRUE(result);
   surface = Surface::MakeFrom(context, {textureInfo, width, height}, ImageOrigin::BottomLeft);
-  colorSpace = surface->gamutColorSpace();
+  colorSpace = surface->colorSpace();
   ASSERT_TRUE(surface != nullptr);
   canvas = surface->getCanvas();
   canvas->clear();
@@ -263,7 +263,7 @@ TGFX_TEST(ReadPixelsTest, Surface) {
 
 TGFX_TEST(ReadPixelsTest, PngCodec) {
   auto rgbaCodec = MakeImageCodec("resources/apitest/imageReplacement.png");
-  auto colorSpace = rgbaCodec->gamutColorSpace();
+  auto colorSpace = rgbaCodec->colorSpace();
   ASSERT_TRUE(rgbaCodec != nullptr);
   EXPECT_EQ(rgbaCodec->width(), 110);
   EXPECT_EQ(rgbaCodec->height(), 110);
@@ -329,7 +329,7 @@ TGFX_TEST(ReadPixelsTest, PngCodec) {
 
 TGFX_TEST(ReadPixelsTest, WebpCodec) {
   auto rgbaCodec = MakeImageCodec("resources/apitest/imageReplacement.webp");
-  auto colorSpace = rgbaCodec->gamutColorSpace();
+  auto colorSpace = rgbaCodec->colorSpace();
   ASSERT_TRUE(rgbaCodec != nullptr);
   EXPECT_EQ(rgbaCodec->width(), 110);
   EXPECT_EQ(rgbaCodec->height(), 110);
@@ -389,7 +389,7 @@ TGFX_TEST(ReadPixelsTest, WebpCodec) {
 
 TGFX_TEST(ReadPixelsTest, JpegCodec) {
   auto rgbaCodec = MakeImageCodec("resources/apitest/imageReplacement.jpg");
-  auto colorSpace = rgbaCodec->gamutColorSpace();
+  auto colorSpace = rgbaCodec->colorSpace();
   ASSERT_TRUE(rgbaCodec != nullptr);
   EXPECT_EQ(rgbaCodec->width(), 110);
   EXPECT_EQ(rgbaCodec->height(), 110);
@@ -447,7 +447,7 @@ TGFX_TEST(ReadPixelsTest, JpegCodec) {
 
 TGFX_TEST(ReadPixelsTest, NativeCodec) {
   auto rgbaCodec = MakeNativeCodec("resources/apitest/imageReplacement.png");
-  auto colorSpace = rgbaCodec->gamutColorSpace();
+  auto colorSpace = rgbaCodec->colorSpace();
   ASSERT_TRUE(rgbaCodec != nullptr);
   EXPECT_EQ(rgbaCodec->width(), 110);
   EXPECT_EQ(rgbaCodec->height(), 110);
@@ -484,7 +484,7 @@ TGFX_TEST(ReadPixelsTest, NativeCodec) {
 
 TGFX_TEST(ReadPixelsTest, ReadScaleCodec) {
   auto codec = MakeImageCodec("resources/apitest/rotation.jpg");
-  auto colorSpace = codec->gamutColorSpace();
+  auto colorSpace = codec->colorSpace();
   EXPECT_TRUE(codec != nullptr);
   auto width = codec->width() / 10;
   auto height = codec->height() / 10;

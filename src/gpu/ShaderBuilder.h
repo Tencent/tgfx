@@ -57,7 +57,8 @@ class ShaderBuilder {
    */
   void appendTextureLookup(SamplerHandle samplerHandle, const std::string& coordName);
 
-  void appendColorGamutXform(const char* srcColor, const ColorSpaceXformSteps* steps);
+  void appendColorGamutXform(std::string* out, const char* srcColor,
+                            ColorSpaceXformHelper* colorXformHelper);
   /**
    * Called by Processors to add code to one of the shaders.
    */
@@ -101,10 +102,6 @@ class ShaderBuilder {
   void appendIndentationIfNeeded(const std::string& code);
 
   std::string getDeclarations(const std::vector<ShaderVar>& vars, ShaderStage stage) const;
-
-  void appendColorGamutXformUniformAndFunction(const ColorSpaceXformSteps* steps);
-
-  void appendColorGamutXformCode(const char* srcColor, const ColorSpaceXformSteps* steps);
 
   std::vector<std::string> shaderStrings;
   ProgramBuilder* programBuilder = nullptr;

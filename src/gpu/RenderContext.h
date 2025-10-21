@@ -66,8 +66,8 @@ class RenderContext : public DrawContext {
    */
   bool flush();
 
-  std::shared_ptr<ColorSpace> gamutColorSpace() const {
-    return renderTarget->gamutColorSpace();
+  std::shared_ptr<ColorSpace> colorSpace() const {
+    return renderTarget->colorSpace();
   }
 
  private:

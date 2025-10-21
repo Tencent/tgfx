@@ -21,6 +21,7 @@
 #include "core/images/SubsetImage.h"
 #include "core/utils/AddressOf.h"
 #include "gpu/ops/DrawOp.h"
+#include "gpu/processors/ColorSpaceXFormEffect.h"
 
 namespace tgfx {
 static const auto TopLeftMatrix = Matrix::I();
@@ -120,8 +121,12 @@ PlacementPtr<FragmentProcessor> OrientImage::asFragmentProcessor(
   if (OrientationSwapsWidthHeight(orientation)) {
     std::swap(newSamplingArgs.tileModeX, newSamplingArgs.tileModeY);
   }
-  return FragmentProcessor::Make(source, args, newSamplingArgs, AddressOf(matrix),
+  auto fp =  FragmentProcessor::Make(source, args, newSamplingArgs, AddressOf(matrix),
                                  std::move(dstColorSpace));
+  if(!isAlphaOnly()) {
+    return ColorSpaceXformEffect::Make(args.context->drawingBuffer(), std::move(fp), colorSpace().get(), AlphaType::Premultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
+  }
+  return fp;
 }
 
 Orientation OrientImage::concatOrientation(Orientation newOrientation) const {

@@ -26,13 +26,6 @@ const TextureView* PorterDuffXferProcessor::dstTextureView() const {
 
 void PorterDuffXferProcessor::computeProcessorKey(Context*, BytesKey* bytesKey) const {
   bytesKey->write(classID());
-  auto srcColorSpace = dstTextureView()->gamutColorSpace();
-  auto steps = std::make_shared<ColorSpaceXformSteps>(
-      srcColorSpace.get(), AlphaType::Premultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
-  uint64_t xformKey = ColorSpaceXformSteps::XFormKey(steps.get());
-  auto key = reinterpret_cast<uint32_t*>(&xformKey);
-  bytesKey->write(key[0]);
-  bytesKey->write(key[1]);
   if (auto textureView = dstTextureView()) {
     TextureView::ComputeTextureKey(textureView->getTexture(), bytesKey);
   }

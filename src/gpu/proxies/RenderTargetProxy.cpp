@@ -36,29 +36,27 @@ std::shared_ptr<RenderTargetProxy> RenderTargetProxy::MakeFrom(
 
 std::shared_ptr<RenderTargetProxy> RenderTargetProxy::MakeFallback(
     Context* context, int width, int height, bool alphaOnly, int sampleCount, bool mipmapped,
-    ImageOrigin origin, BackingFit backingFit, std::shared_ptr<ColorSpace> colorSpace) {
+    ImageOrigin origin, std::shared_ptr<ColorSpace> colorSpace, BackingFit backingFit) {
   if (context == nullptr) {
     return nullptr;
   }
   auto alphaRenderable = context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
   auto format = alphaOnly && alphaRenderable ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
   return context->proxyProvider()->createRenderTargetProxy({}, width, height, format, sampleCount,
-                                                           mipmapped, origin, backingFit, 0,
-                                                           std::move(colorSpace));
+                                                           mipmapped, origin, std::move(colorSpace), backingFit, 0);
 }
 
 std::shared_ptr<TextureProxy> RenderTargetProxy::makeTextureProxy(int width, int height) const {
   auto textureProxy = asTextureProxy();
   auto hasMipmaps = textureProxy && textureProxy->hasMipmaps();
   return getContext()->proxyProvider()->createTextureProxy(
-      {}, width, height, format(), hasMipmaps, origin(), BackingFit::Exact, 0, gamutColorSpace());
+      {}, width, height, format(), hasMipmaps, origin(), colorSpace(), BackingFit::Exact, 0);
 }
 
 std::shared_ptr<RenderTargetProxy> RenderTargetProxy::makeRenderTargetProxy(int width,
                                                                             int height) const {
   return getContext()->proxyProvider()->createRenderTargetProxy(
-      {}, width, height, format(), sampleCount(), false, ImageOrigin::TopLeft, BackingFit::Exact, 0,
-      gamutColorSpace());
+      {}, width, height, format(), sampleCount(), false, ImageOrigin::TopLeft, colorSpace(), BackingFit::Exact, 0);
 }
 
 Matrix RenderTargetProxy::getOriginTransform() const {

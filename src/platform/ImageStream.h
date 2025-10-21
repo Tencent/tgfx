@@ -52,7 +52,7 @@ class ImageStream {
     return _height;
   }
 
-  virtual std::shared_ptr<ColorSpace> gamutColorSpace() const = 0;
+  virtual std::shared_ptr<ColorSpace> colorSpace() const = 0;
 
  protected:
   ImageStream(int width, int height) : _width(width), _height(height) {

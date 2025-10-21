@@ -64,8 +64,7 @@ std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
 
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(dstDrawWidth), static_cast<int>(dstDrawHeight),
-      source->isAlphaOnly(), 1, args.mipmapped, ImageOrigin::TopLeft, args.backingFit,
-      source->gamutColorSpace());
+      source->isAlphaOnly(), 1, args.mipmapped, ImageOrigin::TopLeft, source->colorSpace(), args.backingFit);
   auto sourceTextureProxy = source->lockTextureProxy(args);
 
   auto srcW = static_cast<float>(source->width());
@@ -113,7 +112,7 @@ std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
   // is the size after applying DrawScale. Texture sampling requires corresponding scaling.
   uvMatrix.postScale(drawScaleX, drawScaleY);
   auto fragmentProcessor = TextureEffect::Make(std::move(sourceTextureProxy), samplingArgs,
-                                               &uvMatrix, false, renderTarget->gamutColorSpace());
+                                               &uvMatrix, false);
   drawOp->addColorFP(std::move(fragmentProcessor));
   std::vector<PlacementPtr<DrawOp>> drawOps;
   drawOps.emplace_back(std::move(drawOp));
