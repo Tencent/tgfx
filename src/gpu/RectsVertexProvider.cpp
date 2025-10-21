@@ -176,11 +176,6 @@ class NonAARectsVertexProvider : public RectsVertexProvider {
   }
 };
 
-struct RoundJoinParams {
-  Rect innerRect = {};
-  float cornerRadius = 1.0f;
-};
-
 class AAStrokeRectsVertexProvider final : public RectsVertexProvider {
   PlacementArray<Stroke> strokes = {};
 
@@ -371,7 +366,6 @@ class NonAAStrokeRectsVertexProvider final : public RectsVertexProvider {
 
   void getVertices(float* vertices) const override {
     size_t index = 0;
-    std::optional<RoundJoinParams> roundParams = std::nullopt;
     for (size_t i = 0; i < rects.size(); ++i) {
       const auto& stroke = strokes[i];
       const auto& record = rects[i];
@@ -391,7 +385,6 @@ class NonAAStrokeRectsVertexProvider final : public RectsVertexProvider {
       const float ry = strokeSize.y * 0.5f;
       auto rect = viewMatrix.mapRect(record->rect);  // to device space
       auto outSide = rect.makeOutset(rx, ry);
-      auto outSideAssist = rect;
       auto inSide = rect.makeInset(rx, ry);
       // If we have a degenerate stroking rect(ie the stroke is larger than inner rect) then we
       // make a degenerate inside rect to avoid double hitting.  We will also jam all the points
