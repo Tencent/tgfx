@@ -114,7 +114,7 @@
         "tile_mode_rgbaaa": "8cb853c",
         "tile_mode_subset": "00bc6d75"
     },
-    "DrawersTest": {
+     "DrawersTest": {
         "ConicGradient": "492105ac",
         "ImageWithMipmap": "492105ac",
         "ImageWithShadow": "492105ac",
@@ -352,7 +352,7 @@
         "ImageSnapshot_Surface2": "d010fb8"
     },
     "TextAlignTest": {
-        "FontFallbackTest": "fdd25097",
+        "FontFallbackTest": "983a559b",
         "SingleLineTextAlign": "6095b909",
         "TextAlign": "6be99a69",
         "TextAlignBlankLineTest": "6095b909",
@@ -362,7 +362,7 @@
         "TruncateTextLineTest": "9060bdb6"
     },
     "TypefaceTest": {
-        "CustomImageTypeface": "2459c70a",
+        "CustomImageTypeface": "983a559b",
         "CustomPathTypeface": "42ecc4c7"
     }
 }
