@@ -18,13 +18,13 @@
 
 #pragma once
 
-#include "gpu/processors/RectRoundStrokeGeometryProcessor.h"
+#include "gpu/processors/RectStrokeGeometryProcessor.h"
 
 namespace tgfx {
-class GLSLRectRoundStrokeGeometryProcessor final : public RectRoundStrokeGeometryProcessor {
+class GLSLRectStrokeGeometryProcessor final : public RectStrokeGeometryProcessor {
  public:
-  GLSLRectRoundStrokeGeometryProcessor(AAType aaType, std::optional<Color> commonColor,
-                                       std::optional<Matrix> uvMatrix);
+  GLSLRectStrokeGeometryProcessor(AAType aaType, std::optional<Color> commonColor,
+                                  std::optional<Matrix> uvMatrix);
 
   void emitCode(EmitArgs&) const override;
 

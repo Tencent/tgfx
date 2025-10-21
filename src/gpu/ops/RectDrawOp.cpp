@@ -21,7 +21,7 @@
 #include "gpu/ProxyProvider.h"
 #include "gpu/Quad.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
-#include "gpu/processors/RectRoundStrokeGeometryProcessor.h"
+#include "gpu/processors/RectStrokeGeometryProcessor.h"
 #include "inspect/InspectorMark.h"
 #include "tgfx/core/RenderFlags.h"
 
@@ -37,8 +37,8 @@ PlacementPtr<RectDrawOp> RectDrawOp::Make(Context* context,
   if (provider->aaType() == AAType::Coverage || provider->rectCount() > 1 ||
       provider->hasStroke()) {
     if (provider->hasStroke()) {
-      drawOp->indexBufferProxy = context->globalCache()->getStrokeRectIndexBuffer(
-          provider->aaType() == AAType::Coverage, provider->lineJoin());
+      drawOp->indexBufferProxy =
+          context->globalCache()->getStrokeRectIndexBuffer(provider->aaType() == AAType::Coverage);
     } else {
       drawOp->indexBufferProxy =
           context->globalCache()->getRectIndexBuffer(provider->aaType() == AAType::Coverage);
@@ -67,7 +67,6 @@ RectDrawOp::RectDrawOp(RectsVertexProvider* provider)
   }
   hasSubset = provider->hasSubset();
   hasStroke = provider->hasStroke();
-  strokeLineJoin = provider->lineJoin();
 }
 
 PlacementPtr<GeometryProcessor> RectDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {
@@ -77,30 +76,21 @@ PlacementPtr<GeometryProcessor> RectDrawOp::onMakeGeometryProcessor(RenderTarget
   ATTRIBUTE_NAME("hasSubset", hasSubset);
   ATTRIBUTE_NAME("hasStroke", hasStroke);
   auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
-  if (hasStroke && strokeLineJoin == LineJoin::Round) {
-    return RectRoundStrokeGeometryProcessor::Make(drawingBuffer, aaType, commonColor, uvMatrix);
+  if (hasStroke) {
+    return RectStrokeGeometryProcessor::Make(drawingBuffer, aaType, commonColor, uvMatrix);
   }
   return QuadPerEdgeAAGeometryProcessor::Make(drawingBuffer, renderTarget->width(),
                                               renderTarget->height(), aaType, commonColor, uvMatrix,
                                               hasSubset);
 }
 
-static uint16_t GetNumIndicesPerQuad(AAType aaType, bool hasStroke, LineJoin lineJoin) {
+static uint16_t GetNumIndicesPerQuad(AAType aaType, bool hasStroke) {
   if (!hasStroke) {
     return aaType == AAType::Coverage ? RectDrawOp::IndicesPerAAQuad
                                       : RectDrawOp::IndicesPerNonAAQuad;
   }
-  switch (lineJoin) {
-    case LineJoin::Miter:
-    case LineJoin::Round:
-      return aaType == AAType::Coverage ? RectDrawOp::IndicesPerAAMiterStrokeRect
-                                        : RectDrawOp::IndicesPerNonAAMiterStrokeRect;
-    case LineJoin::Bevel:
-      return aaType == AAType::Coverage ? RectDrawOp::IndicesPerAABevelStrokeRect
-                                        : RectDrawOp::IndicesPerNonAABevelStrokeRect;
-    default:
-      return 0;
-  }
+  return aaType == AAType::Coverage ? RectDrawOp::IndicesPerAAStrokeRect
+                                    : RectDrawOp::IndicesPerNonAAStrokeRect;
 }
 
 void RectDrawOp::onDraw(RenderPass* renderPass) {
@@ -118,7 +108,7 @@ void RectDrawOp::onDraw(RenderPass* renderPass) {
   renderPass->setVertexBuffer(vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
   renderPass->setIndexBuffer(indexBuffer ? indexBuffer->gpuBuffer() : nullptr);
   if (indexBuffer != nullptr) {
-    auto numIndicesPerQuad = GetNumIndicesPerQuad(aaType, hasStroke, strokeLineJoin);
+    auto numIndicesPerQuad = GetNumIndicesPerQuad(aaType, hasStroke);
     renderPass->drawIndexed(PrimitiveType::Triangles, 0, rectCount * numIndicesPerQuad);
   } else {
     renderPass->draw(PrimitiveType::TriangleStrip, 0, 4);

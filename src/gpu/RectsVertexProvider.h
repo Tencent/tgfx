@@ -96,10 +96,6 @@ class RectsVertexProvider : public VertexProvider {
     return bitFields.hasStroke;
   }
 
-  LineJoin lineJoin() const {
-    return static_cast<LineJoin>(bitFields.lineJoin);
-  }
-
   /**
    * Returns the first rect in the provider.
    */
@@ -138,7 +134,6 @@ class RectsVertexProvider : public VertexProvider {
     bool hasColor : 1;
     bool hasStroke : 1;
     uint8_t subsetMode : 2;
-    uint8_t lineJoin : 2;
   } bitFields = {};
 
   RectsVertexProvider(PlacementArray<RectRecord>&& rects, PlacementArray<Rect>&& uvRects,

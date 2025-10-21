@@ -23,25 +23,26 @@
 #include "gpu/AAType.h"
 
 namespace tgfx {
-class RectRoundStrokeGeometryProcessor : public GeometryProcessor {
+class RectStrokeGeometryProcessor : public GeometryProcessor {
  public:
-  static PlacementPtr<RectRoundStrokeGeometryProcessor> Make(BlockBuffer* buffer, AAType aaType,
-                                                             std::optional<Color> commonColor,
-                                                             std::optional<Matrix> uvMatrix);
+  static PlacementPtr<RectStrokeGeometryProcessor> Make(BlockBuffer* buffer, AAType aaType,
+                                                        std::optional<Color> commonColor,
+                                                        std::optional<Matrix> uvMatrix);
 
   std::string name() const override {
-    return "RectRoundStrokeGeometryProcessor";
+    return "RectStrokeGeometryProcessor";
   }
 
  protected:
   DEFINE_PROCESSOR_CLASS_ID
-  RectRoundStrokeGeometryProcessor(AAType aa, std::optional<Color> commonColor,
-                                   std::optional<Matrix> uvMatrix);
+  RectStrokeGeometryProcessor(AAType aa, std::optional<Color> commonColor,
+                              std::optional<Matrix> uvMatrix);
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
   Attribute inPosition;
   Attribute inInnerRect;
-  Attribute inCornerRadius;
+  Attribute inStrokeWidth;
+  Attribute inStrokeJoin;
   Attribute inCoverage;
   Attribute inUVCoord;
   Attribute inColor;

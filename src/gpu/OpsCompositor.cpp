@@ -106,8 +106,7 @@ void OpsCompositor::fillRect(const Rect& rect, const MCState& state, const Fill&
                              const Stroke* stroke) {
   DEBUG_ASSERT(!rect.isEmpty());
   auto opType = stroke ? PendingOpType::StrokeRect : PendingOpType::Rect;
-  if (!canAppend(opType, state.clip, fill) ||
-      (stroke && (pendingStrokes.empty() || pendingStrokes.front()->join != stroke->join))) {
+  if (!canAppend(opType, state.clip, fill)) {
     flushPendingOps(opType, state.clip, fill);
   }
   auto record = drawingBuffer()->make<RectRecord>(rect, state.matrix, fill.color.premultiply());

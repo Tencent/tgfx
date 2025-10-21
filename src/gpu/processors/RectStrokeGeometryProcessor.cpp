@@ -16,16 +16,17 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "RectRoundStrokeGeometryProcessor.h"
+#include "RectStrokeGeometryProcessor.h"
 
 namespace tgfx {
-RectRoundStrokeGeometryProcessor::RectRoundStrokeGeometryProcessor(AAType aaType,
-                                                                   std::optional<Color> commonColor,
-                                                                   std::optional<Matrix> uvMatrix)
+RectStrokeGeometryProcessor::RectStrokeGeometryProcessor(AAType aaType,
+                                                         std::optional<Color> commonColor,
+                                                         std::optional<Matrix> uvMatrix)
     : GeometryProcessor(ClassID()), aaType(aaType), commonColor(commonColor), uvMatrix(uvMatrix) {
   inPosition = {"inPosition", VertexFormat::Float2};
   inInnerRect = {"inInnerRect", VertexFormat::Float4};
-  inCornerRadius = {"inCornerRadius", VertexFormat::Float};
+  inStrokeWidth = {"inStrokeWidth", VertexFormat::Float2};
+  inStrokeJoin = {"inStrokeJoin", VertexFormat::Float};
   if (aaType == AAType::Coverage) {
     inCoverage = {"inCoverage", VertexFormat::Float};
   }
@@ -35,10 +36,10 @@ RectRoundStrokeGeometryProcessor::RectRoundStrokeGeometryProcessor(AAType aaType
   if (!commonColor.has_value()) {
     inColor = {"inColor", VertexFormat::UByte4Normalized};
   }
-  setVertexAttributes(&inPosition, 6);
+  setVertexAttributes(&inPosition, 7);
 }
 
-void RectRoundStrokeGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
+void RectStrokeGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
   uint32_t flags = aaType == AAType::Coverage ? 1 : 0;
   flags |= commonColor.has_value() ? 2 : 0;
   flags |= uvMatrix.has_value() ? 4 : 0;

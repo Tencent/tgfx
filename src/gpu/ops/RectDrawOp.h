@@ -48,24 +48,14 @@ class RectDrawOp : public DrawOp {
   static constexpr uint16_t IndicesPerAAQuad = 30;
 
   /**
-   * The maximum number of indices per AA rect with miter-stroke.
+   * The maximum number of indices per AA rect
    */
-  static constexpr uint16_t IndicesPerAAMiterStrokeRect = 3 * 24;
+  static constexpr uint16_t IndicesPerAAStrokeRect = 3 * 24;
 
   /**
-   * The maximum number of indices per AA rect with bevel-stroke.
+   * The maximum number of indices per non-AA rect.
    */
-  static constexpr uint16_t IndicesPerAABevelStrokeRect = 48 + 36 + 24;
-
-  /**
-   * The maximum number of indices per non-AA rect with miter-stroke.
-   */
-  static constexpr uint16_t IndicesPerNonAAMiterStrokeRect = 24;
-
-  /**
-   * The maximum number of indices per non-AA rect with bevel-stroke.
-   */
-  static constexpr uint16_t IndicesPerNonAABevelStrokeRect = 36;
+  static constexpr uint16_t IndicesPerNonAAStrokeRect = 24;
 
   /**
    * Create a new RectDrawOp for the specified vertex provider.
@@ -85,7 +75,6 @@ class RectDrawOp : public DrawOp {
  private:
   size_t rectCount = 0;
   bool hasStroke = false;
-  LineJoin strokeLineJoin = LineJoin::Miter;
   std::optional<Color> commonColor = std::nullopt;
   std::optional<Matrix> uvMatrix = std::nullopt;
   bool hasSubset = false;

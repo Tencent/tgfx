@@ -76,10 +76,10 @@ class GlobalCache {
   std::shared_ptr<GPUBufferProxy> getRectIndexBuffer(bool antialias);
 
   /**
-   * Returns a GPU buffer containing indices for rendering a stroked rectangle with the specified
-   * line join style.
+   * Returns a GPU buffer containing indices for rendering a stroked rectangle
+   * with or without antialiasing.
    */
-  std::shared_ptr<GPUBufferProxy> getStrokeRectIndexBuffer(bool antialias, LineJoin join);
+  std::shared_ptr<GPUBufferProxy> getStrokeRectIndexBuffer(bool antialias);
 
   /**
    * Returns a GPU buffer containing indices for rendering a rounded rectangle, either for filling
@@ -117,9 +117,6 @@ class GlobalCache {
     size_t cursor = 0;
   };
 
-  std::shared_ptr<GPUBufferProxy> getMiterOrRoundStrokeIndexBuffer(bool antialias);
-  std::shared_ptr<GPUBufferProxy> getBevelStrokeIndexBuffer(bool antialias);
-
   Context* context = nullptr;
   std::list<Program*> programLRU = {};
   BytesKeyMap<std::shared_ptr<Program>> programMap = {};
@@ -129,10 +126,8 @@ class GlobalCache {
   std::shared_ptr<GPUBufferProxy> nonAAQuadIndexBuffer = nullptr;
   std::shared_ptr<GPUBufferProxy> rRectFillIndexBuffer = nullptr;
   std::shared_ptr<GPUBufferProxy> rRectStrokeIndexBuffer = nullptr;
-  std::shared_ptr<GPUBufferProxy> aaRectMiterStrokeIndexBuffer = nullptr;
-  std::shared_ptr<GPUBufferProxy> aaRectBevelStrokeIndexBuffer = nullptr;
-  std::shared_ptr<GPUBufferProxy> nonAARectMiterStrokeIndexBuffer = nullptr;
-  std::shared_ptr<GPUBufferProxy> nonAARectBevelStrokeIndexBuffer = nullptr;
+  std::shared_ptr<GPUBufferProxy> aaRectStrokeIndexBuffer = nullptr;
+  std::shared_ptr<GPUBufferProxy> nonAARectStrokeIndexBuffer = nullptr;
   ResourceKeyMap<std::shared_ptr<Resource>> staticResources = {};
   // Triple buffering for uniform buffer management
   static constexpr uint32_t UNIFORM_BUFFER_COUNT = 3;
