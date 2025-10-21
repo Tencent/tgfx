@@ -26,7 +26,6 @@
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/resources/Program.h"
 #include "tgfx/core/Color.h"
-#include "tgfx/core/Stroke.h"
 
 namespace tgfx {
 /**

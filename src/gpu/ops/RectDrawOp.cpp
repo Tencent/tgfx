@@ -36,12 +36,11 @@ PlacementPtr<RectDrawOp> RectDrawOp::Make(Context* context,
   CAPUTRE_RECT_MESH(drawOp.get(), provider.get());
   if (provider->aaType() == AAType::Coverage || provider->rectCount() > 1 ||
       provider->hasStroke()) {
+    const auto coverageAA = provider->aaType() == AAType::Coverage;
     if (provider->hasStroke()) {
-      drawOp->indexBufferProxy =
-          context->globalCache()->getStrokeRectIndexBuffer(provider->aaType() == AAType::Coverage);
+      drawOp->indexBufferProxy = context->globalCache()->getStrokeRectIndexBuffer(coverageAA);
     } else {
-      drawOp->indexBufferProxy =
-          context->globalCache()->getRectIndexBuffer(provider->aaType() == AAType::Coverage);
+      drawOp->indexBufferProxy = context->globalCache()->getRectIndexBuffer(coverageAA);
     }
   } else if (provider->rectCount() > 1) {
     drawOp->indexBufferProxy = context->globalCache()->getRectIndexBuffer(false);
@@ -108,7 +107,7 @@ void RectDrawOp::onDraw(RenderPass* renderPass) {
   renderPass->setVertexBuffer(vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
   renderPass->setIndexBuffer(indexBuffer ? indexBuffer->gpuBuffer() : nullptr);
   if (indexBuffer != nullptr) {
-    auto numIndicesPerQuad = GetNumIndicesPerQuad(aaType, hasStroke);
+    const auto numIndicesPerQuad = GetNumIndicesPerQuad(aaType, hasStroke);
     renderPass->drawIndexed(PrimitiveType::Triangles, 0, rectCount * numIndicesPerQuad);
   } else {
     renderPass->draw(PrimitiveType::TriangleStrip, 0, 4);

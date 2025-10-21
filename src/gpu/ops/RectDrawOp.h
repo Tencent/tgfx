@@ -48,12 +48,12 @@ class RectDrawOp : public DrawOp {
   static constexpr uint16_t IndicesPerAAQuad = 30;
 
   /**
-   * The maximum number of indices per AA rect
+   * The number of indices per AA rect
    */
   static constexpr uint16_t IndicesPerAAStrokeRect = 3 * 24;
 
   /**
-   * The maximum number of indices per non-AA rect.
+   * The number of indices per non-AA rect.
    */
   static constexpr uint16_t IndicesPerNonAAStrokeRect = 24;
 

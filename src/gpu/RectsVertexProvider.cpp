@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RectsVertexProvider.h"
-#include <optional>
 #include "gpu/Quad.h"
 #include "tgfx/core/Stroke.h"
 
@@ -334,7 +333,6 @@ class NonAAStrokeRectsVertexProvider final : public RectsVertexProvider {
     for (size_t i = 0; i < 4; ++i) {
       vertices[index++] = quad.point(i).x;
       vertices[index++] = quad.point(i).y;
-      // For round-join, we need to pass the inner round rect cornerRadius.
       vertices[index++] = innerRect.left;
       vertices[index++] = innerRect.top;
       vertices[index++] = innerRect.right;
@@ -353,8 +351,8 @@ class NonAAStrokeRectsVertexProvider final : public RectsVertexProvider {
   }
 
   size_t vertexCount() const override {
-    size_t perVertexCount = (4 + 4);  // outer edge only
-    size_t perVertexDataSize = 9;     // x, y,innerRect(4), strokeWidth(2), strokeType(1)
+    size_t perVertexCount = 4 + 4;  // outer edge only
+    size_t perVertexDataSize = 9;   // x, y,innerRect(4), strokeWidth(2), strokeType(1)
     if (bitFields.hasUVCoord) {
       perVertexDataSize += 2;
     }

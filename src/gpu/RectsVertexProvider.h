@@ -132,8 +132,8 @@ class RectsVertexProvider : public VertexProvider {
     uint8_t aaType : 2;
     bool hasUVCoord : 1;
     bool hasColor : 1;
-    bool hasStroke : 1;
     uint8_t subsetMode : 2;
+    bool hasStroke : 1;
   } bitFields = {};
 
   RectsVertexProvider(PlacementArray<RectRecord>&& rects, PlacementArray<Rect>&& uvRects,
