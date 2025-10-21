@@ -64,9 +64,6 @@ std::shared_ptr<GPUBuffer> GLGPU::createBuffer(size_t size, uint32_t usage) {
     }
     return makeResource<GLTextureBuffer>(interface, _state, size);
   }
-  if (!interface->caps()->shaderCaps()->uboSupport && usage & GPUBufferUsage::UNIFORM) {
-    return makeResource<GLBuffer>(interface, 0u, size, usage);
-  }
 
   auto gl = interface->functions();
   unsigned bufferID = 0;
@@ -100,10 +97,6 @@ std::shared_ptr<GPUTexture> GLGPU::createTexture(const GPUTextureDescriptor& des
   if (descriptor.usage & GPUTextureUsage::RENDER_ATTACHMENT &&
       !caps()->isFormatRenderable(descriptor.format)) {
     LOGE("GLGPU::createTexture() format is not renderable, but usage includes RENDER_ATTACHMENT!");
-    return nullptr;
-  }
-  if (descriptor.mipLevelCount > 1 && !caps()->mipmapSupport) {
-    LOGE("GLGPU::createTexture() mipmaps are not supported!");
     return nullptr;
   }
   auto gl = functions();
@@ -203,7 +196,7 @@ std::shared_ptr<GPUTexture> GLGPU::importExternalTexture(const BackendRenderTarg
 
 std::shared_ptr<GPUFence> GLGPU::importExternalFence(const BackendSemaphore& semaphore) {
   GLSyncInfo glSyncInfo = {};
-  if (!caps()->semaphoreSupport || !semaphore.getGLSync(&glSyncInfo)) {
+  if (!semaphore.getGLSync(&glSyncInfo)) {
     return nullptr;
   }
   return makeResource<GLFence>(glSyncInfo.sync);

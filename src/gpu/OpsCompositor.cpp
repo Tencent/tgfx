@@ -171,6 +171,9 @@ void OpsCompositor::drawShape(std::shared_ptr<Shape> shape, const MCState& state
     drawScale = std::min(state.matrix.getMaxScale(), 1.0f);
   }
   shape = Shape::ApplyMatrix(std::move(shape), state.matrix);
+  if (!shape) {
+    return;
+  }
   if (needDeviceBounds) {
     deviceBounds = shape->isInverseFillType() ? clipBounds : shape->getBounds();
   }
@@ -254,10 +257,6 @@ static bool IsPixelAligned(const Rect& rect) {
          fabsf(roundf(rect.top) - rect.top) <= BOUNDS_TOLERANCE &&
          fabsf(roundf(rect.right) - rect.right) <= BOUNDS_TOLERANCE &&
          fabsf(roundf(rect.bottom) - rect.bottom) <= BOUNDS_TOLERANCE;
-}
-
-static bool RRectUseScale(Context* context) {
-  return !context->caps()->shaderCaps()->floatIs32Bits;
 }
 
 class PendingOpsAutoReset {
@@ -372,9 +371,8 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
       drawOp = RectDrawOp::Make(context, std::move(provider), renderFlags);
     } break;
     case PendingOpType::RRect: {
-      auto provider =
-          RRectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingRRects), aaType,
-                                         RRectUseScale(context), std::move(pendingStrokes));
+      auto provider = RRectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingRRects),
+                                                     aaType, std::move(pendingStrokes));
       drawOp = RRectDrawOp::Make(context, std::move(provider), renderFlags);
     } break;
     case PendingOpType::Atlas: {

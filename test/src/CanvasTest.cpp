@@ -23,6 +23,7 @@
 #include "core/images/SubsetImage.h"
 #include "core/images/TransformImage.h"
 #include "core/shapes/AppendShape.h"
+#include "core/utils/PixelFormatUtil.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/RenderContext.h"
@@ -491,11 +492,30 @@ TGFX_TEST(CanvasTest, TileModeFallback) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto caps = (Caps*)context->caps();
-  caps->npotTextureTileSupport = false;
-  auto image = MakeImage("resources/apitest/rotation.jpg");
+  auto gl = GLFunctions::Get(context);
+  GLTextureInfo glInfo = {};
+  gl->genTextures(1, &(glInfo.id));
+  ASSERT_TRUE(glInfo.id > 0);
+  glInfo.target = GL_TEXTURE_RECTANGLE;
+  gl->bindTexture(glInfo.target, glInfo.id);
+  auto codec = MakeImageCodec("resources/apitest/rotation.jpg");
+  ASSERT_TRUE(codec != nullptr);
+  Bitmap bitmap(codec->width(), codec->height(), false, false);
+  ASSERT_FALSE(bitmap.isEmpty());
+  auto pixels = bitmap.lockPixels();
+  ASSERT_TRUE(pixels != nullptr);
+  auto result = codec->readPixels(bitmap.info(), pixels);
+  ASSERT_TRUE(result);
+  const auto& textureFormat =
+      GLCaps::Get(context)->getTextureFormat(ColorTypeToPixelFormat(bitmap.colorType()));
+  gl->texImage2D(glInfo.target, 0, static_cast<int>(textureFormat.internalFormatTexImage),
+                 bitmap.width(), bitmap.height(), 0, textureFormat.externalFormat,
+                 textureFormat.externalType, pixels);
+  bitmap.unlockPixels();
+  BackendTexture backendTexture(glInfo, bitmap.width(), bitmap.height());
+  auto image = Image::MakeFrom(context, backendTexture, ImageOrigin::TopLeft);
   ASSERT_TRUE(image != nullptr);
-  image = image->makeMipmapped(true);
+  image = image->makeOriented(codec->orientation());
   ASSERT_TRUE(image != nullptr);
   auto surface = Surface::Make(context, image->width() / 2, image->height() / 2);
   auto canvas = surface->getCanvas();
@@ -508,7 +528,7 @@ TGFX_TEST(CanvasTest, TileModeFallback) {
   auto drawRect = Rect::MakeXYWH(0, 0, surface->width() - 200, surface->height() - 200);
   canvas->drawRect(drawRect, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/TileModeFallback"));
-  caps->npotTextureTileSupport = true;
+  gl->deleteTextures(1, &glInfo.id);
 }
 
 TGFX_TEST(CanvasTest, hardwareMipmap) {
@@ -3018,4 +3038,104 @@ TGFX_TEST(CanvasTest, MatrixShapeStroke) {
 
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/MatrixShapeStroke"));
 }
+
+TGFX_TEST(CanvasTest, uninvertibleStateMatrix) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 128, 128);
+  auto canvas = surface->getCanvas();
+
+  auto path = Path();
+  path.addRect(-5.f, -5.f, 10.f, 10.f);
+
+  Paint paint;
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStroke(Stroke(0.f));
+
+  auto matrix = Matrix::MakeScale(1E-8f, 1E-8f);
+  EXPECT_TRUE(matrix.invertNonIdentity(nullptr));
+  EXPECT_FALSE(matrix.invertible());
+
+  canvas->concat(matrix);
+  canvas->drawPath(path, paint);
+}
+
+TGFX_TEST(CanvasTest, ScaleMatrixShader) {
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(image != nullptr);
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 100, 100);
+  ASSERT_TRUE(surface != nullptr);
+  auto* canvas = surface->getCanvas();
+  auto paint = Paint();
+  auto shader = Shader::MakeImageShader(image);
+  auto rect = Rect::MakeXYWH(25, 25, 50, 50);
+  rect.scale(10, 10);
+  shader = shader->makeWithMatrix(Matrix::MakeScale(10, 10));
+  paint.setShader(shader);
+  canvas->scale(0.1f, 0.1f);
+  canvas->drawRect(rect, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ScaleMatrixShader"));
+}
+
+TGFX_TEST(CanvasTest, Matrix3DShapeStroke) {
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 300);
+  ASSERT_TRUE(surface != nullptr);
+  auto* canvas = surface->getCanvas();
+
+  auto origin = Point::Make(100, 100);
+  auto originTranslateMatrix = Matrix3D::MakeTranslate(origin.x, origin.y, 0.f);
+  Size pathSize = {100, 100};
+  auto anchor = Point::Make(0.5f, 0.5f);
+  auto invOffsetToAnchorMatrix =
+      Matrix3D::MakeTranslate(anchor.x * pathSize.width, anchor.y * pathSize.height, 0);
+  auto perspectiveMatrix = Matrix3D::I();
+  constexpr float eyeDistance = 1200.f;
+  constexpr float farZ = -1000.f;
+  constexpr float shift = 10.f;
+  const float nearZ = eyeDistance - shift;
+  const float m22 = (2 - (farZ + nearZ) / eyeDistance) / (farZ - nearZ);
+  perspectiveMatrix.setRowColumn(2, 2, m22);
+  const float m23 = -1.f + nearZ / eyeDistance - perspectiveMatrix.getRowColumn(2, 2) * nearZ;
+  perspectiveMatrix.setRowColumn(2, 3, m23);
+  perspectiveMatrix.setRowColumn(3, 2, -1.f / eyeDistance);
+  auto modelMatrix = Matrix3D::MakeScale(2, 2, 1);
+  modelMatrix.postRotate({0, 0, 1}, 45);
+  modelMatrix.postRotate({1, 0, 0}, 45);
+  modelMatrix.postRotate({0, 1, 0}, 45);
+  modelMatrix.postTranslate(0, 0, -20);
+  auto offsetToAnchorMatrix =
+      Matrix3D::MakeTranslate(-anchor.x * pathSize.width, -anchor.y * pathSize.height, 0);
+  auto transform = originTranslateMatrix * invOffsetToAnchorMatrix * perspectiveMatrix *
+                   modelMatrix * offsetToAnchorMatrix;
+
+  auto path = Path();
+  path.addRoundRect(Rect::MakeXYWH(0.f, 0.f, pathSize.width, pathSize.height), 20, 20);
+  auto rawShape = Shape::MakeFrom(path);
+
+  Paint paint1;
+  paint1.setAntiAlias(true);
+  paint1.setColor(Color::FromRGBA(0, 255, 0, 255));
+  paint1.setStyle(PaintStyle::Fill);
+  auto transform3DFilter = ImageFilter::Transform3D(transform);
+  paint1.setImageFilter(transform3DFilter);
+  canvas->drawShape(rawShape, paint1);
+
+  auto mappedShape = Shape::ApplyMatrix3D(rawShape, transform);
+  Paint paint2;
+  paint2.setAntiAlias(true);
+  paint2.setColor(Color::FromRGBA(255, 0, 0, 255));
+  paint2.setStyle(PaintStyle::Stroke);
+  paint2.setStroke(Stroke(2.0f));
+  canvas->drawShape(mappedShape, paint2);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/Matrix3DShapeStroke"));
+}
+
 }  // namespace tgfx

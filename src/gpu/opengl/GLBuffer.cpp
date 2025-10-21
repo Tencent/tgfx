@@ -24,16 +24,6 @@ namespace tgfx {
 GLBuffer::GLBuffer(std::shared_ptr<GLInterface> interface, unsigned bufferID, size_t size,
                    uint32_t usage)
     : GPUBuffer(size, usage), _interface(std::move(interface)), _bufferID(bufferID) {
-  if (usage & GPUBufferUsage::UNIFORM && !_interface->caps()->shaderCaps()->uboSupport) {
-    dataAddress = malloc(_size);
-  }
-}
-
-GLBuffer::~GLBuffer() {
-  if (dataAddress != nullptr) {
-    free(dataAddress);
-    dataAddress = nullptr;
-  }
 }
 
 unsigned GLBuffer::GetTarget(uint32_t usage) {
@@ -57,7 +47,11 @@ bool GLBuffer::isReady() const {
     return true;
   }
   auto gl = _interface->functions();
+#if defined(__EMSCRIPTEN__)
+  auto result = gl->clientWaitSync(readbackFence, 0, 0, 0);
+#else
   auto result = gl->clientWaitSync(readbackFence, 0, 0);
+#endif
   return result == GL_ALREADY_SIGNALED || result == GL_CONDITION_SATISFIED;
 }
 
@@ -72,9 +66,6 @@ void* GLBuffer::map(size_t offset, size_t size) {
   if (offset + size > _size) {
     LOGE("GLBuffer::map() range out of bounds!");
     return nullptr;
-  }
-  if (dataAddress != nullptr) {
-    return static_cast<uint8_t*>(dataAddress) + offset;
   }
 
   auto gl = _interface->functions();
@@ -94,10 +85,6 @@ void* GLBuffer::map(size_t offset, size_t size) {
 }
 
 void GLBuffer::unmap() {
-  if (dataAddress != nullptr) {
-    return;
-  }
-
   auto gl = _interface->functions();
   if (gl->mapBufferRange != nullptr) {
     auto target = GetTarget(_usage);
@@ -108,9 +95,6 @@ void GLBuffer::unmap() {
 }
 
 void GLBuffer::insertReadbackFence() {
-  if (!_interface->caps()->semaphoreSupport) {
-    return;
-  }
   auto gl = _interface->functions();
   if (readbackFence != nullptr) {
     gl->deleteSync(readbackFence);

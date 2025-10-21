@@ -65,6 +65,8 @@ PlacementPtr<FragmentProcessor> MatrixShader::asFragmentProcessor(const FPArgs& 
   if (uvMatrix) {
     totalMatrix.preConcat(*uvMatrix);
   }
-  return FragmentProcessor::Make(source, args, &totalMatrix);
+  auto newArgs = args;
+  newArgs.drawScale *= matrix.getMaxScale();
+  return FragmentProcessor::Make(source, newArgs, &totalMatrix);
 }
 }  // namespace tgfx

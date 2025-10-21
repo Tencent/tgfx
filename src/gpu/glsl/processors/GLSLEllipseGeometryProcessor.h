@@ -23,7 +23,7 @@
 namespace tgfx {
 class GLSLEllipseGeometryProcessor : public EllipseGeometryProcessor {
  public:
-  GLSLEllipseGeometryProcessor(int width, int height, bool stroke, bool useScale,
+  GLSLEllipseGeometryProcessor(int width, int height, bool stroke,
                                std::optional<Color> commonColor);
 
   void emitCode(EmitArgs& args) const override;
