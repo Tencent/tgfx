@@ -53,7 +53,7 @@ namespace tgfx {
 
 PlacementPtr<RRectsVertexProvider> RRectsVertexProvider::MakeFrom(
     BlockBuffer* buffer, std::vector<PlacementPtr<RRectRecord>>&& rects, AAType aaType,
-    bool useScale, std::vector<PlacementPtr<Stroke>>&& strokes) {
+    std::vector<PlacementPtr<Stroke>>&& strokes) {
   if (rects.empty()) {
     return nullptr;
   }
@@ -69,7 +69,7 @@ PlacementPtr<RRectsVertexProvider> RRectsVertexProvider::MakeFrom(
   }
   auto array = buffer->makeArray(std::move(rects));
   auto strokeArray = buffer->makeArray(std::move(strokes));
-  return buffer->make<RRectsVertexProvider>(std::move(array), aaType, useScale, hasColor,
+  return buffer->make<RRectsVertexProvider>(std::move(array), aaType, hasColor,
                                             std::move(strokeArray), buffer->addReference());
 }
 
@@ -86,12 +86,10 @@ static float FloatInvert(float value) {
 }
 
 RRectsVertexProvider::RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType,
-                                           bool useScale, bool hasColor,
-                                           PlacementArray<Stroke>&& strokes,
+                                           bool hasColor, PlacementArray<Stroke>&& strokes,
                                            std::shared_ptr<BlockBuffer> reference)
     : VertexProvider(std::move(reference)), rects(std::move(rects)), strokes(std::move(strokes)) {
   bitFields.aaType = static_cast<uint8_t>(aaType);
-  bitFields.useScale = useScale;
   bitFields.hasColor = hasColor;
 
   if (!this->strokes.empty()) {
@@ -104,9 +102,6 @@ RRectsVertexProvider::RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, 
 size_t RRectsVertexProvider::vertexCount() const {
   auto floatCount = rects.size() * 4 * 32;
   if (bitFields.hasColor) {
-    floatCount += rects.size() * 4 * 4;
-  }
-  if (bitFields.useScale) {
     floatCount += rects.size() * 4 * 4;
   }
   return floatCount;
@@ -169,7 +164,6 @@ void RRectsVertexProvider::getVertices(float* vertices) const {
         yMaxOffset,
         FLOAT_NEARLY_ZERO,  // we're using inversesqrt() in shader, so can't be exactly 0
         FLOAT_NEARLY_ZERO, yMaxOffset};
-    auto maxRadius = std::max(xRadius, yRadius);
     for (int i = 0; i < 4; ++i) {
       auto point = Point::Make(bounds.left, yCoords[i]);
       viewMatrix.mapPoints(&point, 1);
@@ -180,9 +174,6 @@ void RRectsVertexProvider::getVertices(float* vertices) const {
       }
       vertices[index++] = xMaxOffset;
       vertices[index++] = yOuterOffsets[i];
-      if (bitFields.useScale) {
-        vertices[index++] = maxRadius;
-      }
       vertices[index++] = reciprocalRadii[0];
       vertices[index++] = reciprocalRadii[1];
       vertices[index++] = reciprocalRadii[2];
@@ -197,9 +188,6 @@ void RRectsVertexProvider::getVertices(float* vertices) const {
       }
       vertices[index++] = FLOAT_NEARLY_ZERO;
       vertices[index++] = yOuterOffsets[i];
-      if (bitFields.useScale) {
-        vertices[index++] = maxRadius;
-      }
       vertices[index++] = reciprocalRadii[0];
       vertices[index++] = reciprocalRadii[1];
       vertices[index++] = reciprocalRadii[2];
@@ -214,9 +202,6 @@ void RRectsVertexProvider::getVertices(float* vertices) const {
       }
       vertices[index++] = FLOAT_NEARLY_ZERO;
       vertices[index++] = yOuterOffsets[i];
-      if (bitFields.useScale) {
-        vertices[index++] = maxRadius;
-      }
       vertices[index++] = reciprocalRadii[0];
       vertices[index++] = reciprocalRadii[1];
       vertices[index++] = reciprocalRadii[2];
@@ -231,9 +216,6 @@ void RRectsVertexProvider::getVertices(float* vertices) const {
       }
       vertices[index++] = xMaxOffset;
       vertices[index++] = yOuterOffsets[i];
-      if (bitFields.useScale) {
-        vertices[index++] = maxRadius;
-      }
       vertices[index++] = reciprocalRadii[0];
       vertices[index++] = reciprocalRadii[1];
       vertices[index++] = reciprocalRadii[2];

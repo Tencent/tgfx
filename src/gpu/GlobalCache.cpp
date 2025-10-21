@@ -72,10 +72,6 @@ std::shared_ptr<GPUBuffer> GlobalCache::findOrCreateUniformBuffer(size_t bufferS
     return nullptr;
   }
 
-  if (maxUniformBufferTracker == nullptr) {
-    maxUniformBufferTracker = std::make_shared<SlidingWindowTracker>(10);
-  }
-
   auto& uniformBufferPacket = tripleUniformBuffer[tripleUniformBufferIndex];
 
   auto getAverageUniformBufferSize = [this]() {
@@ -98,7 +94,7 @@ std::shared_ptr<GPUBuffer> GlobalCache::findOrCreateUniformBuffer(size_t bufferS
     uniformBufferPacket.gpuBuffers.emplace_back(std::move(buffer));
     uniformBufferPacket.bufferIndex = 0;
     uniformBufferPacket.cursor = 0;
-    maxUniformBufferTracker->addValue(getAverageUniformBufferSize());
+    maxUniformBufferTracker.addValue(getAverageUniformBufferSize());
   }
 
   // Check if triple buffer has enough space
@@ -125,7 +121,7 @@ std::shared_ptr<GPUBuffer> GlobalCache::findOrCreateUniformBuffer(size_t bufferS
       return nullptr;
     }
     uniformBufferPacket.gpuBuffers.emplace_back(std::move(buffer));
-    maxUniformBufferTracker->addValue(getAverageUniformBufferSize());
+    maxUniformBufferTracker.addValue(getAverageUniformBufferSize());
   }
 
   *lastBufferOffset = uniformBufferPacket.cursor;
@@ -143,7 +139,7 @@ void GlobalCache::resetUniformBuffer() {
 
   auto& currentBuffer = tripleUniformBuffer[tripleUniformBufferIndex];
 
-  size_t maxReuseSize = maxUniformBufferTracker->getMaxValue();
+  size_t maxReuseSize = maxUniformBufferTracker.getMaxValue();
   if (maxReuseSize > 0 && currentBuffer.gpuBuffers.size() > maxReuseSize) {
     currentBuffer.gpuBuffers.resize(maxReuseSize);
   }

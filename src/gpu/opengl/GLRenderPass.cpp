@@ -61,6 +61,9 @@ bool GLRenderPass::begin() {
   state->setViewport(0, 0, renderTexture->width(), renderTexture->height());
   // Disable scissor test by default.
   state->setEnabled(GL_SCISSOR_TEST, false);
+  if (colorAttachment.resolveTexture && gpu->caps()->multisampleDisableSupport) {
+    state->setEnabled(GL_MULTISAMPLE, true);
+  }
   if (colorAttachment.loadAction == LoadAction::Clear) {
     state->setClearColor(colorAttachment.clearValue);
     gl->clear(GL_COLOR_BUFFER_BIT);
@@ -120,7 +123,7 @@ void GLRenderPass::setTexture(unsigned binding, std::shared_ptr<GPUTexture> text
                              static_cast<GLSampler*>(sampler.get()));
   auto renderTexture = descriptor.colorAttachments[0].texture;
   auto caps = static_cast<const GLCaps*>(gpu->caps());
-  if (texture == renderTexture && caps->textureRedSupport) {
+  if (texture == renderTexture && caps->textureBarrierSupport) {
     auto gl = gpu->functions();
     gl->textureBarrier();
   }
@@ -157,7 +160,6 @@ void GLRenderPass::setStencilReference(uint32_t reference) {
 
 void GLRenderPass::onEnd() {
   auto gl = gpu->functions();
-  auto caps = static_cast<const GLCaps*>(gpu->caps());
   auto& attachment = descriptor.colorAttachments[0];
   if (attachment.resolveTexture) {
     auto renderTexture = static_cast<GLTexture*>(attachment.texture.get());
@@ -168,13 +170,9 @@ void GLRenderPass::onEnd() {
     state->bindFramebuffer(sampleTexture, FrameBufferTarget::Draw);
     // MSAA resolve may be affected by the scissor test, so disable it here.
     state->setEnabled(GL_SCISSOR_TEST, false);
-    if (caps->msFBOType == MSFBOType::ES_Apple) {
-      gl->resolveMultisampleFramebuffer();
-    } else {
-      gl->blitFramebuffer(0, 0, renderTexture->width(), renderTexture->height(), 0, 0,
-                          sampleTexture->width(), sampleTexture->height(), GL_COLOR_BUFFER_BIT,
-                          GL_NEAREST);
-    }
+    gl->blitFramebuffer(0, 0, renderTexture->width(), renderTexture->height(), 0, 0,
+                        sampleTexture->width(), sampleTexture->height(), GL_COLOR_BUFFER_BIT,
+                        GL_NEAREST);
   }
 }
 

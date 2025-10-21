@@ -203,7 +203,6 @@ void GLState::bindFramebuffer(GLTexture* texture, FrameBufferTarget target) {
 }
 
 void GLState::bindVertexArray(unsigned vao) {
-  DEBUG_ASSERT(interface->caps()->vertexArrayObjectSupport);
   if (vertexArray == vao) {
     return;
   }

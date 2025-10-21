@@ -147,7 +147,6 @@ struct RectMeshInfo : MeshInfo {
 
 struct RRectMeshInfo : MeshInfo {
   bool hasColor = false;
-  bool useScale = false;
   bool hasStroke = false;
 };
 }  // namespace tgfx::inspect

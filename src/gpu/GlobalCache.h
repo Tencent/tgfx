@@ -134,6 +134,6 @@ class GlobalCache {
   std::array<UniformBufferPacket, UNIFORM_BUFFER_COUNT> tripleUniformBuffer = {};
   uint32_t tripleUniformBufferIndex = 0;
   uint64_t counter = 0;
-  std::shared_ptr<SlidingWindowTracker> maxUniformBufferTracker = nullptr;
+  SlidingWindowTracker maxUniformBufferTracker = {10};
 };
 }  // namespace tgfx

@@ -300,7 +300,6 @@ void FrameCapture::sendRRectMeshData(DrawOp* drawOp, RRectsVertexProvider* provi
   rrectMeshData.drawOpPtr = reinterpret_cast<uint64_t>(drawOp);
   rrectMeshData.rectCount = provider->rectCount();
   rrectMeshData.hasColor = provider->hasColor();
-  rrectMeshData.useScale = provider->useScale();
   rrectMeshData.hasStroke = provider->hasStroke();
   auto extraDataSize = sizeof(RRectMeshInfo) + sizeof(uint8_t);
   auto data = new (std::nothrow) uint8_t[extraDataSize];
@@ -391,10 +390,7 @@ void FrameCapture::captureProgramInfo(const BytesKey& programKey, Context* conte
   if (!builder.emitAndInstallProcessors()) {
     return;
   }
-  auto shaderCaps = context->caps()->shaderCaps();
-  if (shaderCaps->usesCustomColorOutputName) {
-    builder.fragmentShaderBuilder()->declareCustomOutputColor();
-  }
+  builder.fragmentShaderBuilder()->declareCustomOutputColor();
   builder.finalizeShaders();
   ShaderModuleDescriptor vertexModule = {};
   vertexModule.code = builder.vertexShaderBuilder()->shaderString();
