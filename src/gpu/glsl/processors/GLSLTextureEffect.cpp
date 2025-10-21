@@ -58,9 +58,10 @@ static constexpr float ColorConversionJPEGFullRange[] = {
     1.0f, 1.0f, 1.0f, 0.0f, -0.344136f, 1.772000f, 1.402f, -0.714136f, 0.0f,
 };
 
-PlacementPtr<FragmentProcessor> TextureEffect::MakeRGBAAA(
-    std::shared_ptr<TextureProxy> proxy, const SamplingArgs& args, const Point& alphaStart,
-    const Matrix* uvMatrix) {
+PlacementPtr<FragmentProcessor> TextureEffect::MakeRGBAAA(std::shared_ptr<TextureProxy> proxy,
+                                                          const SamplingArgs& args,
+                                                          const Point& alphaStart,
+                                                          const Matrix* uvMatrix) {
   if (proxy == nullptr) {
     return nullptr;
   }

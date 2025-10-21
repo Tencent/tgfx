@@ -54,9 +54,9 @@ std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
   sampleCount = context->caps()->getSampleCount(sampleCount, texture->format());
   ScratchKey scratchKey = {};
   if (adopted) {
-    scratchKey = ComputeRenderTargetScratchKey(backendTexture.width(), backendTexture.height(),
-                                               texture->format(), sampleCount,
-                                               texture->mipLevelCount() > 1);
+    scratchKey =
+        ComputeRenderTargetScratchKey(backendTexture.width(), backendTexture.height(),
+                                      texture->format(), sampleCount, texture->mipLevelCount() > 1);
   }
   return TextureRenderTarget::MakeFrom(context, std::move(texture), sampleCount, origin, !adopted,
                                        scratchKey, std::move(colorSpace));
@@ -94,8 +94,7 @@ std::shared_ptr<RenderTarget> RenderTarget::Make(Context* context, int width, in
   }
   auto caps = context->caps();
   sampleCount = caps->getSampleCount(sampleCount, format);
-  auto scratchKey =
-      ComputeRenderTargetScratchKey(width, height, format, sampleCount, mipmapped);
+  auto scratchKey = ComputeRenderTargetScratchKey(width, height, format, sampleCount, mipmapped);
   if (auto renderTarget = Resource::Find<TextureRenderTarget>(context, scratchKey)) {
     renderTarget->_origin = origin;
     renderTarget->setColorSpace(colorSpace);

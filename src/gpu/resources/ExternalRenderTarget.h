@@ -63,8 +63,7 @@ class ExternalRenderTarget : public Resource, public RenderTarget {
 
   ExternalRenderTarget(std::shared_ptr<GPUTexture> texture, ImageOrigin origin,
                        std::shared_ptr<ColorSpace> colorSpace = nullptr)
-      : renderTexture(std::move(texture)), _origin(origin),
-        _colorSpace(std::move(colorSpace)) {
+      : renderTexture(std::move(texture)), _origin(origin), _colorSpace(std::move(colorSpace)) {
   }
 
   friend class RenderTarget;

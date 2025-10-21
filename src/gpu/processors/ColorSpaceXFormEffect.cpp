@@ -31,7 +31,7 @@ PlacementPtr<FragmentProcessor> ColorSpaceXformEffect::Make(BlockBuffer* buffer,
 PlacementPtr<FragmentProcessor> ColorSpaceXformEffect::Make(
     BlockBuffer* buffer, PlacementPtr<FragmentProcessor> child,
     std::shared_ptr<ColorSpaceXformSteps> colorXform) {
-  if(child == nullptr) {
+  if (child == nullptr) {
     return nullptr;
   }
   return buffer->make<ColorSpaceXformEffect>(std::move(child), std::move(colorXform));
@@ -56,12 +56,12 @@ void ColorSpaceXformEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
 
 ColorSpaceXformEffect::ColorSpaceXformEffect(PlacementPtr<FragmentProcessor> child,
                                              std::shared_ptr<ColorSpaceXformSteps> colorXform)
-    : FragmentProcessor(classID()), colorSpaceXformSteps(std::move(colorXform)){
+    : FragmentProcessor(classID()), colorSpaceXformSteps(std::move(colorXform)) {
   registerChildProcessor(std::move(child));
 }
 
 void ColorSpaceXformEffect::onSetData(UniformData* /*vertexUniformData*/,
-                                             UniformData* fragmentUniformData) const {
+                                      UniformData* fragmentUniformData) const {
   ColorSpaceXformHelper helper{};
   helper.setData(fragmentUniformData, colorSpaceXformSteps.get());
 }

@@ -121,10 +121,12 @@ PlacementPtr<FragmentProcessor> OrientImage::asFragmentProcessor(
   if (OrientationSwapsWidthHeight(orientation)) {
     std::swap(newSamplingArgs.tileModeX, newSamplingArgs.tileModeY);
   }
-  auto fp =  FragmentProcessor::Make(source, args, newSamplingArgs, AddressOf(matrix),
-                                 std::move(dstColorSpace));
-  if(!isAlphaOnly()) {
-    return ColorSpaceXformEffect::Make(args.context->drawingBuffer(), std::move(fp), colorSpace().get(), AlphaType::Premultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
+  auto fp = FragmentProcessor::Make(source, args, newSamplingArgs, AddressOf(matrix),
+                                    std::move(dstColorSpace));
+  if (!isAlphaOnly()) {
+    return ColorSpaceXformEffect::Make(args.context->drawingBuffer(), std::move(fp),
+                                       colorSpace().get(), AlphaType::Premultiplied,
+                                       dstColorSpace.get(), AlphaType::Premultiplied);
   }
   return fp;
 }

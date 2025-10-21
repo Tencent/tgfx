@@ -104,7 +104,9 @@ class ProxyProvider {
    */
   std::shared_ptr<TextureProxy> createTextureProxy(
       const UniqueKey& uniqueKey, int width, int height, PixelFormat format, bool mipmapped = false,
-      ImageOrigin origin = ImageOrigin::TopLeft, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB(), BackingFit backingFit = BackingFit::Exact, uint32_t renderFlags = 0);
+      ImageOrigin origin = ImageOrigin::TopLeft,
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB(),
+      BackingFit backingFit = BackingFit::Exact, uint32_t renderFlags = 0);
 
   /**
    * Creates a TextureProxy for the specified HardwareBuffer. Returns nullptr if
@@ -144,8 +146,9 @@ class ProxyProvider {
    */
   std::shared_ptr<RenderTargetProxy> createRenderTargetProxy(
       const UniqueKey& uniqueKey, int width, int height, PixelFormat format, int sampleCount = 1,
-      bool mipmapped = false, ImageOrigin origin = ImageOrigin::TopLeft, std::shared_ptr<ColorSpace> colorSpace = nullptr,
-      BackingFit backingFit = BackingFit::Exact, uint32_t renderFlags = 0);
+      bool mipmapped = false, ImageOrigin origin = ImageOrigin::TopLeft,
+      std::shared_ptr<ColorSpace> colorSpace = nullptr, BackingFit backingFit = BackingFit::Exact,
+      uint32_t renderFlags = 0);
 
   /*
    * Purges all unreferenced proxies.

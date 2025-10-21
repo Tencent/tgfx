@@ -41,7 +41,8 @@ std::shared_ptr<TextureProxy> TransformImage::lockTextureProxySubset(
   auto alphaRenderable = args.context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(rect.width()), static_cast<int>(rect.height()),
-      alphaRenderable && isAlphaOnly(), 1, args.mipmapped, ImageOrigin::TopLeft, colorSpace(), args.backingFit);
+      alphaRenderable && isAlphaOnly(), 1, args.mipmapped, ImageOrigin::TopLeft, colorSpace(),
+      args.backingFit);
   if (renderTarget == nullptr) {
     return nullptr;
   }
@@ -51,9 +52,8 @@ std::shared_ptr<TextureProxy> TransformImage::lockTextureProxySubset(
   auto sourceMatrix = concatUVMatrix(&uvMatrix);
   FPArgs fpArgs(args.context, args.renderFlags, Rect::MakeWH(rect.width(), rect.height()),
                 1.0f / sourceMatrix->getMinScale());
-  auto processor =
-      FragmentProcessor::Make(source, fpArgs, samplingOptions, SrcRectConstraint::Fast,
-                              AddressOf(sourceMatrix), renderTarget->colorSpace());
+  auto processor = FragmentProcessor::Make(source, fpArgs, samplingOptions, SrcRectConstraint::Fast,
+                                           AddressOf(sourceMatrix), renderTarget->colorSpace());
   auto drawingManager = args.context->drawingManager();
   if (!drawingManager->fillRTWithFP(renderTarget, std::move(processor), args.renderFlags)) {
     return nullptr;

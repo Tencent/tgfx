@@ -541,7 +541,8 @@ std::shared_ptr<TextureProxy> OpsCompositor::getClipTexture(const Path& clip, AA
     auto drawOp = ShapeDrawOp::Make(std::move(shapeProxy), {}, uvMatrix, aaType);
     CAPUTRE_SHAPE_MESH(drawOp.get(), shape, aaType, clipBounds);
     auto clipRenderTarget = RenderTargetProxy::MakeFallback(
-        context, width, height, true, 1, false, ImageOrigin::TopLeft, ColorSpace::MakeSRGB(), BackingFit::Approx);
+        context, width, height, true, 1, false, ImageOrigin::TopLeft, ColorSpace::MakeSRGB(),
+        BackingFit::Approx);
     if (clipRenderTarget == nullptr) {
       return nullptr;
     }
@@ -623,7 +624,8 @@ DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds, AATyp
   dstTextureInfo.offset = {bounds.x(), bounds.y()};
   textureProxy = proxyProvider()->createTextureProxy(
       {}, static_cast<int>(bounds.width()), static_cast<int>(bounds.height()),
-      renderTarget->format(), false, renderTarget->origin(), renderTarget->getRenderTarget()->colorSpace(), BackingFit::Approx, 0);
+      renderTarget->format(), false, renderTarget->origin(),
+      renderTarget->getRenderTarget()->colorSpace(), BackingFit::Approx, 0);
   if (textureProxy == nullptr) {
     return {};
   }

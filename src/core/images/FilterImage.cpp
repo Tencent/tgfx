@@ -153,11 +153,12 @@ PlacementPtr<FragmentProcessor> FilterImage::asFragmentProcessor(
   if (fpMatrix) {
     matrix.preConcat(*fpMatrix);
   }
-  auto fp =  TiledTextureEffect::Make(textureProxy, samplingArgs, &matrix, source->isAlphaOnly());
-  if(!isAlphaOnly()) {
-    return ColorSpaceXformEffect::Make(args.context->drawingBuffer(), std::move(fp), colorSpace().get(), AlphaType::Premultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
+  auto fp = TiledTextureEffect::Make(textureProxy, samplingArgs, &matrix, source->isAlphaOnly());
+  if (!isAlphaOnly()) {
+    return ColorSpaceXformEffect::Make(args.context->drawingBuffer(), std::move(fp),
+                                       colorSpace().get(), AlphaType::Premultiplied,
+                                       dstColorSpace.get(), AlphaType::Premultiplied);
   }
   return fp;
-
 }
 }  // namespace tgfx

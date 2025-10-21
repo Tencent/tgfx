@@ -279,8 +279,8 @@ uint32_t ColorSpaceXformSteps::XFormKey(const ColorSpaceXformSteps* xform) {
   }
   if (xform->flags.encode) {
     key |= static_cast<uint32_t>(
-        gfx::skcms_TransferFunction_getType(
-            reinterpret_cast<const gfx::skcms_TransferFunction*>(&xform->dstTransferFunctionInverse))
+        gfx::skcms_TransferFunction_getType(reinterpret_cast<const gfx::skcms_TransferFunction*>(
+            &xform->dstTransferFunctionInverse))
         << 16);
   }
   return key;

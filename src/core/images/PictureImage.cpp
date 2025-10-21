@@ -120,10 +120,12 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(
   if (samplingArgs.sampleArea) {
     newSamplingArgs.sampleArea = extraMatrix.mapRect(*samplingArgs.sampleArea);
   }
-  auto fp = TiledTextureEffect::Make(renderTarget->asTextureProxy(), newSamplingArgs, &finalUVMatrix,
-                                  isAlphaOnly());
-  if(!isAlphaOnly()) {
-    return ColorSpaceXformEffect::Make(args.context->drawingBuffer(), std::move(fp), colorSpace().get(), AlphaType::Premultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
+  auto fp = TiledTextureEffect::Make(renderTarget->asTextureProxy(), newSamplingArgs,
+                                     &finalUVMatrix, isAlphaOnly());
+  if (!isAlphaOnly()) {
+    return ColorSpaceXformEffect::Make(args.context->drawingBuffer(), std::move(fp),
+                                       colorSpace().get(), AlphaType::Premultiplied,
+                                       dstColorSpace.get(), AlphaType::Premultiplied);
   }
   return fp;
 }

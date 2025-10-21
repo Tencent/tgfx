@@ -20,7 +20,7 @@
 
 namespace tgfx {
 PlacementPtr<TextureGradientColorizer> TextureGradientColorizer::Make(
-    BlockBuffer* buffer, std::shared_ptr<TextureProxy> gradient){
+    BlockBuffer* buffer, std::shared_ptr<TextureProxy> gradient) {
   if (gradient == nullptr) {
     return nullptr;
   }

@@ -72,8 +72,7 @@ std::shared_ptr<TextureView> TextureView::MakeFormat(Context* context, int width
   if (pixelFormat == PixelFormat::ALPHA_8) {
     colorSpace = nullptr;
   }
-  auto scratchKey =
-      ComputeTextureScratchKey(width, height, pixelFormat, mipmapped);
+  auto scratchKey = ComputeTextureScratchKey(width, height, pixelFormat, mipmapped);
   auto textureView = Resource::Find<TextureView>(context, scratchKey);
   if (textureView) {
     textureView->_origin = origin;
@@ -112,9 +111,8 @@ std::shared_ptr<TextureView> TextureView::MakeFrom(Context* context,
   }
   ScratchKey scratchKey = {};
   if (adopted) {
-    scratchKey =
-        ComputeTextureScratchKey(backendTexture.width(), backendTexture.height(), texture->format(),
-                                 texture->mipLevelCount() > 1);
+    scratchKey = ComputeTextureScratchKey(backendTexture.width(), backendTexture.height(),
+                                          texture->format(), texture->mipLevelCount() > 1);
   }
   auto textureView = new DefaultTextureView(std::move(texture), origin, std::move(colorSpace));
   return Resource::AddToCache(context, textureView, scratchKey);

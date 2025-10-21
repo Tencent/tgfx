@@ -64,9 +64,8 @@ void* PixelRef::lockWritablePixels() {
   }
   if (pixelBuffer.use_count() != 1) {
     auto& info = pixelBuffer->info();
-    auto newBuffer =
-        PixelBuffer::Make(info.width(), info.height(), info.isAlphaOnly(),
-                          pixelBuffer->isHardwareBacked(), pixelBuffer->colorSpace());
+    auto newBuffer = PixelBuffer::Make(info.width(), info.height(), info.isAlphaOnly(),
+                                       pixelBuffer->isHardwareBacked(), pixelBuffer->colorSpace());
     if (newBuffer == nullptr) {
       pixelBuffer->unlockPixels();
       return nullptr;

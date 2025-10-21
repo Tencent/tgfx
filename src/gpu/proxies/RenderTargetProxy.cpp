@@ -43,7 +43,8 @@ std::shared_ptr<RenderTargetProxy> RenderTargetProxy::MakeFallback(
   auto alphaRenderable = context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
   auto format = alphaOnly && alphaRenderable ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
   return context->proxyProvider()->createRenderTargetProxy({}, width, height, format, sampleCount,
-                                                           mipmapped, origin, std::move(colorSpace), backingFit, 0);
+                                                           mipmapped, origin, std::move(colorSpace),
+                                                           backingFit, 0);
 }
 
 std::shared_ptr<TextureProxy> RenderTargetProxy::makeTextureProxy(int width, int height) const {
@@ -56,7 +57,8 @@ std::shared_ptr<TextureProxy> RenderTargetProxy::makeTextureProxy(int width, int
 std::shared_ptr<RenderTargetProxy> RenderTargetProxy::makeRenderTargetProxy(int width,
                                                                             int height) const {
   return getContext()->proxyProvider()->createRenderTargetProxy(
-      {}, width, height, format(), sampleCount(), false, ImageOrigin::TopLeft, colorSpace(), BackingFit::Exact, 0);
+      {}, width, height, format(), sampleCount(), false, ImageOrigin::TopLeft, colorSpace(),
+      BackingFit::Exact, 0);
 }
 
 Matrix RenderTargetProxy::getOriginTransform() const {

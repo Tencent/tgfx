@@ -72,10 +72,12 @@ PlacementPtr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(
     }
     TPArgs tpArgs(args.context, args.renderFlags, mipmapped, 1.0f, {});
     auto proxy = source->lockTextureProxy(tpArgs);
-    auto fp = TextureEffect::MakeRGBAAA(std::move(proxy), newSamplingArgs, alphaStart,
-                                     AddressOf(matrix));
-    if(!isAlphaOnly()) {
-      return ColorSpaceXformEffect::Make(args.context->drawingBuffer(), std::move(fp), colorSpace().get(), AlphaType::Premultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
+    auto fp =
+        TextureEffect::MakeRGBAAA(std::move(proxy), newSamplingArgs, alphaStart, AddressOf(matrix));
+    if (!isAlphaOnly()) {
+      return ColorSpaceXformEffect::Make(args.context->drawingBuffer(), std::move(fp),
+                                         colorSpace().get(), AlphaType::Premultiplied,
+                                         dstColorSpace.get(), AlphaType::Premultiplied);
     }
     return fp;
   }
@@ -86,8 +88,10 @@ PlacementPtr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(
   }
   newSamplingArgs.sampleArea = std::nullopt;
   auto fp = TiledTextureEffect::Make(textureProxy, newSamplingArgs, uvMatrix, false);
-  if(!isAlphaOnly()) {
-    return ColorSpaceXformEffect::Make(args.context->drawingBuffer(), std::move(fp), colorSpace().get(), AlphaType::Premultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
+  if (!isAlphaOnly()) {
+    return ColorSpaceXformEffect::Make(args.context->drawingBuffer(), std::move(fp),
+                                       colorSpace().get(), AlphaType::Premultiplied,
+                                       dstColorSpace.get(), AlphaType::Premultiplied);
   }
   return fp;
 }

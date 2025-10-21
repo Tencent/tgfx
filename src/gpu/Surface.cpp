@@ -41,8 +41,8 @@ std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, 
   }
   auto pixelFormat = ColorTypeToPixelFormat(colorType);
   auto proxy = context->proxyProvider()->createRenderTargetProxy(
-      {}, width, height, pixelFormat, sampleCount, mipmapped, ImageOrigin::TopLeft, std::move(colorSpace),
-      BackingFit::Exact,  0);
+      {}, width, height, pixelFormat, sampleCount, mipmapped, ImageOrigin::TopLeft,
+      std::move(colorSpace), BackingFit::Exact, 0);
   return MakeFrom(std::move(proxy), renderFlags, true);
 }
 

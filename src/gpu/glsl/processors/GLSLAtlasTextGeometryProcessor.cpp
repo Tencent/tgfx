@@ -82,11 +82,12 @@ void GLSLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppend("vec4 color = ");
   fragBuilder->appendTextureLookup(samplerHandle, samplerVarying.vsOut());
   fragBuilder->codeAppend(";");
-  if(!textureView->isAlphaOnly()) {
+  if (!textureView->isAlphaOnly()) {
     ColorSpaceXformHelper helper{};
     auto srcColorSpace = textureView->colorSpace();
-    auto steps = std::make_shared<ColorSpaceXformSteps>(
-        srcColorSpace.get(), AlphaType::Premultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
+    auto steps =
+        std::make_shared<ColorSpaceXformSteps>(srcColorSpace.get(), AlphaType::Premultiplied,
+                                               dstColorSpace.get(), AlphaType::Premultiplied);
     helper.emitCode(args.uniformHandler, steps.get(), ShaderStage::Fragment);
     std::string dstColor;
     fragBuilder->appendColorGamutXform(&dstColor, "color", &helper);
@@ -122,10 +123,11 @@ void GLSLAtlasTextGeometryProcessor::setData(UniformData* vertexUniformData,
     ColorSpaceXformHelper helper{};
     helper.setData(vertexUniformData, vertSteps.get());
   }
-  if(!textureProxy->getTextureView()->isAlphaOnly()) {
+  if (!textureProxy->getTextureView()->isAlphaOnly()) {
     auto srcColorSpace = textureProxy->getTextureView()->colorSpace();
-    auto steps = std::make_shared<ColorSpaceXformSteps>(
-        srcColorSpace.get(), AlphaType::Premultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
+    auto steps =
+        std::make_shared<ColorSpaceXformSteps>(srcColorSpace.get(), AlphaType::Premultiplied,
+                                               dstColorSpace.get(), AlphaType::Premultiplied);
     ColorSpaceXformHelper helper{};
     helper.setData(fragmentUniformData, steps.get());
   }

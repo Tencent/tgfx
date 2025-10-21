@@ -42,10 +42,11 @@ void AtlasTextGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const
   flags |= commonColor.has_value() ? 2 : 0;
   flags |= textureProxy->isAlphaOnly() ? 4 : 0;
   bytesKey->write(flags);
-  if(!textureProxy->isAlphaOnly()) {
+  if (!textureProxy->isAlphaOnly()) {
     auto srcColorSpace = textureProxy->getTextureView()->colorSpace();
-    auto steps = std::make_shared<ColorSpaceXformSteps>(
-        srcColorSpace.get(), AlphaType::Premultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
+    auto steps =
+        std::make_shared<ColorSpaceXformSteps>(srcColorSpace.get(), AlphaType::Premultiplied,
+                                               dstColorSpace.get(), AlphaType::Premultiplied);
     auto key = ColorSpaceXformSteps::XFormKey(steps.get());
     bytesKey->write(key);
   }

@@ -45,8 +45,8 @@ class RenderTargetProxy {
    */
   static std::shared_ptr<RenderTargetProxy> MakeFallback(
       Context* context, int width, int height, bool alphaOnly, int sampleCount = 1,
-      bool mipmapped = false, ImageOrigin origin = ImageOrigin::TopLeft, std::shared_ptr<ColorSpace> colorSpace = nullptr,
-      BackingFit backingFit = BackingFit::Exact);
+      bool mipmapped = false, ImageOrigin origin = ImageOrigin::TopLeft,
+      std::shared_ptr<ColorSpace> colorSpace = nullptr, BackingFit backingFit = BackingFit::Exact);
 
   virtual ~RenderTargetProxy() = default;
 

@@ -162,9 +162,8 @@ std::shared_ptr<TextureView> PixelBuffer::onMakeTexture(Context* context, bool m
     return nullptr;
   }
   auto format = ColorTypeToPixelFormat(_info.colorType());
-  auto textureView =
-      TextureView::MakeFormat(context, width(), height(), pixels, _info.rowBytes(), format,
-                              mipmapped, ImageOrigin::TopLeft, _colorSpace);
+  auto textureView = TextureView::MakeFormat(context, width(), height(), pixels, _info.rowBytes(),
+                                             format, mipmapped, ImageOrigin::TopLeft, _colorSpace);
   onUnlockPixels();
   return textureView;
 }

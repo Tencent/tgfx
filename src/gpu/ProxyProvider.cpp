@@ -313,7 +313,8 @@ int GetApproxSize(int value) {
 
 std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
     const UniqueKey& uniqueKey, int width, int height, PixelFormat format, bool mipmapped,
-    ImageOrigin origin, std::shared_ptr<ColorSpace> colorSpace, BackingFit backingFit, uint32_t renderFlags) {
+    ImageOrigin origin, std::shared_ptr<ColorSpace> colorSpace, BackingFit backingFit,
+    uint32_t renderFlags) {
   if (!TextureView::CheckSizeAndFormat(context, width, height, format)) {
     return nullptr;
   }
@@ -411,7 +412,8 @@ std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
 
 std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
     const UniqueKey& uniqueKey, int width, int height, PixelFormat format, int sampleCount,
-    bool mipmapped, ImageOrigin origin, std::shared_ptr<ColorSpace> colorSpace, BackingFit backingFit, uint32_t renderFlags) {
+    bool mipmapped, ImageOrigin origin, std::shared_ptr<ColorSpace> colorSpace,
+    BackingFit backingFit, uint32_t renderFlags) {
   if (!TextureView::CheckSizeAndFormat(context, width, height, format)) {
     return nullptr;
   }

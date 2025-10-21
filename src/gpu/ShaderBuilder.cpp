@@ -98,7 +98,7 @@ void ShaderBuilder::appendTextureLookup(SamplerHandle samplerHandle, const std::
 }
 
 void ShaderBuilder::appendColorGamutXform(std::string* out, const char* srcColor,
-    ColorSpaceXformHelper* colorXformHelper) {
+                                          ColorSpaceXformHelper* colorXformHelper) {
   if (!colorXformHelper || colorXformHelper->isNoop()) {
     *out = srcColor;
     return;

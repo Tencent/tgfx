@@ -56,22 +56,21 @@ static PlacementPtr<FragmentProcessor> MakeColorizer(const Context* context, con
   // Two remaining colors means a single interval from 0 to 1
   // (but it may have originally been a 3 or 4 color gradient with 1-2 hard stops at the ends)
   if (count == 2) {
-    return SingleIntervalGradientColorizer::Make(drawingBuffer, colors[offset],
-                                                 colors[offset + 1]);
+    return SingleIntervalGradientColorizer::Make(drawingBuffer, colors[offset], colors[offset + 1]);
   }
 
   if (count <= UnrolledBinaryGradientColorizer::MaxColorCount) {
     if (count == 3) {
       // Must be a dual interval gradient, where the middle point is at offset+1 and the two
       // intervals share the middle color stop.
-      return DualIntervalGradientColorizer::Make(drawingBuffer, colors[offset],
-                                                 colors[offset + 1], colors[offset + 1],
-                                                 colors[offset + 2], positions[offset + 1]);
+      return DualIntervalGradientColorizer::Make(drawingBuffer, colors[offset], colors[offset + 1],
+                                                 colors[offset + 1], colors[offset + 2],
+                                                 positions[offset + 1]);
     } else if (count == 4 && FloatNearlyEqual(positions[offset + 1], positions[offset + 2])) {
       // Two separate intervals that join at the same threshold position
-      return DualIntervalGradientColorizer::Make(drawingBuffer, colors[offset],
-                                                 colors[offset + 1], colors[offset + 2],
-                                                 colors[offset + 3], positions[offset + 1]);
+      return DualIntervalGradientColorizer::Make(drawingBuffer, colors[offset], colors[offset + 1],
+                                                 colors[offset + 2], colors[offset + 3],
+                                                 positions[offset + 1]);
     }
 
     // The single and dual intervals are a specialized case of the unrolled binary search
@@ -161,7 +160,8 @@ static PlacementPtr<FragmentProcessor> MakeGradient(const Context* context,
   // need to do anything to achieve that: i.e., all the colors have a = 1, in which case
   // premultiply is a no op.
   return ClampedGradientEffect::Make(context->drawingBuffer(), std::move(colorizer),
-                                     std::move(layout), dstColors[0], dstColors[dstColors.size() - 1]);
+                                     std::move(layout), dstColors[0],
+                                     dstColors[dstColors.size() - 1]);
 }
 
 static Matrix PointsToUnitMatrix(const Point& startPoint, const Point& endPoint) {
@@ -240,7 +240,7 @@ PlacementPtr<FragmentProcessor> RadialGradientShader::asFragmentProcessor(
     totalMatrix.preConcat(*uvMatrix);
   }
   ColorSpaceXformSteps steps(ColorSpace::MakeSRGB().get(), AlphaType::Unpremultiplied,
-                           dstColorSpace.get(), AlphaType::Unpremultiplied);
+                             dstColorSpace.get(), AlphaType::Unpremultiplied);
   return MakeGradient(args.context, *this,
                       RadialGradientLayout::Make(args.context->drawingBuffer(), totalMatrix),
                       steps);
@@ -269,11 +269,10 @@ PlacementPtr<FragmentProcessor> ConicGradientShader::asFragmentProcessor(
     totalMatrix.preConcat(*uvMatrix);
   }
   ColorSpaceXformSteps steps(ColorSpace::MakeSRGB().get(), AlphaType::Unpremultiplied,
-                         dstColorSpace.get(), AlphaType::Unpremultiplied);
+                             dstColorSpace.get(), AlphaType::Unpremultiplied);
   return MakeGradient(
       args.context, *this,
-      ConicGradientLayout::Make(args.context->drawingBuffer(), totalMatrix, bias, scale),
-      steps);
+      ConicGradientLayout::Make(args.context->drawingBuffer(), totalMatrix, bias, scale), steps);
 }
 
 GradientType ConicGradientShader::asGradient(GradientInfo* info) const {
@@ -321,7 +320,7 @@ PlacementPtr<FragmentProcessor> DiamondGradientShader::asFragmentProcessor(
     totalMatrix.preConcat(*uvMatrix);
   }
   ColorSpaceXformSteps steps(ColorSpace::MakeSRGB().get(), AlphaType::Unpremultiplied,
-                       dstColorSpace.get(), AlphaType::Unpremultiplied);
+                             dstColorSpace.get(), AlphaType::Unpremultiplied);
   auto layout = DiamondGradientLayout::Make(args.context->drawingBuffer(), totalMatrix);
   return MakeGradient(args.context, *this, std::move(layout), steps);
 }

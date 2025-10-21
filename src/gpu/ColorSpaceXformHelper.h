@@ -20,8 +20,8 @@
 #include <skcms.h>
 #include "UniformData.h"
 #include "UniformHandler.h"
-#include "gpu/ShaderVar.h"
 #include "core/ColorSpaceXformSteps.h"
+#include "gpu/ShaderVar.h"
 
 namespace tgfx {
 class ColorSpaceXformHelper {

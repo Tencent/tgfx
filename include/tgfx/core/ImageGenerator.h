@@ -87,7 +87,8 @@ class ImageGenerator {
   }
 
  protected:
-  ImageGenerator(int width, int height, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB())
+  ImageGenerator(int width, int height,
+                 std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB())
       : _width(width), _height(height), _colorSpace(std::move(colorSpace)) {
   }
 

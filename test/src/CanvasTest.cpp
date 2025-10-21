@@ -513,8 +513,7 @@ TGFX_TEST(CanvasTest, TileModeFallback) {
                  textureFormat.externalType, pixels);
   bitmap.unlockPixels();
   BackendTexture backendTexture(glInfo, bitmap.width(), bitmap.height());
-  auto image =
-      Image::MakeFrom(context, backendTexture, ImageOrigin::TopLeft, bitmap.colorSpace());
+  auto image = Image::MakeFrom(context, backendTexture, ImageOrigin::TopLeft, bitmap.colorSpace());
   ASSERT_TRUE(image != nullptr);
   image = image->makeOriented(codec->orientation());
   ASSERT_TRUE(image != nullptr);
@@ -3223,8 +3222,10 @@ TGFX_TEST(CanvasTest, ColorSpace) {
       Surface::Make(context, 1024, 1024, false, 1, false, 0,
                     ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3));
   auto canvas = surface->getCanvas();
-  canvas->drawColor(Color::FromRGBA(0, 255, 0, 255, ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3)),
-                    BlendMode::SrcOver);
+  canvas->drawColor(
+      Color::FromRGBA(0, 255, 0, 255,
+                      ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3)),
+      BlendMode::SrcOver);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawP3ColorToP3"));
   canvas->clear();
   Paint paint;

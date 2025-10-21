@@ -101,9 +101,12 @@ PlacementPtr<FragmentProcessor> SubsetImage::asFragmentProcessor(
   if (uvMatrix) {
     fpMatrix.preConcat(*uvMatrix);
   }
-  auto fp = TiledTextureEffect::Make(textureProxy, newSamplingArgs, &fpMatrix, source->isAlphaOnly());
-  if(!isAlphaOnly()) {
-    return ColorSpaceXformEffect::Make(args.context->drawingBuffer(), std::move(fp), colorSpace().get(), AlphaType::Premultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
+  auto fp =
+      TiledTextureEffect::Make(textureProxy, newSamplingArgs, &fpMatrix, source->isAlphaOnly());
+  if (!isAlphaOnly()) {
+    return ColorSpaceXformEffect::Make(args.context->drawingBuffer(), std::move(fp),
+                                       colorSpace().get(), AlphaType::Premultiplied,
+                                       dstColorSpace.get(), AlphaType::Premultiplied);
   }
   return fp;
 }

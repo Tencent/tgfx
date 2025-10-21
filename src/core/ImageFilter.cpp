@@ -51,7 +51,8 @@ std::shared_ptr<TextureProxy> ImageFilter::lockTextureProxy(std::shared_ptr<Imag
   auto textureScaleY = scaledBounds.height() / renderBounds.height();
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(scaledBounds.width()), static_cast<int>(scaledBounds.height()),
-      source->isAlphaOnly(), 1, args.mipmapped, ImageOrigin::TopLeft, source->colorSpace(), args.backingFit);
+      source->isAlphaOnly(), 1, args.mipmapped, ImageOrigin::TopLeft, source->colorSpace(),
+      args.backingFit);
   if (renderTarget == nullptr) {
     return nullptr;
   }
@@ -108,15 +109,19 @@ PlacementPtr<FragmentProcessor> ImageFilter::makeFPFromTextureProxy(
   }
   SamplingArgs samplingArgs = {TileMode::Decal, TileMode::Decal, sampling, constraint};
   if (dstBounds.contains(clipBounds)) {
-    auto fp =  TextureEffect::Make(std::move(textureProxy), samplingArgs, &fpMatrix, isAlphaOnly);
-    if(!isAlphaOnly) {
-      return ColorSpaceXformEffect::Make(args.context->drawingBuffer(), std::move(fp), source->colorSpace().get(), AlphaType::Premultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
+    auto fp = TextureEffect::Make(std::move(textureProxy), samplingArgs, &fpMatrix, isAlphaOnly);
+    if (!isAlphaOnly) {
+      return ColorSpaceXformEffect::Make(args.context->drawingBuffer(), std::move(fp),
+                                         source->colorSpace().get(), AlphaType::Premultiplied,
+                                         dstColorSpace.get(), AlphaType::Premultiplied);
     }
     return fp;
   }
-  auto fp =  TiledTextureEffect::Make(std::move(textureProxy), samplingArgs, &fpMatrix, isAlphaOnly);
-  if(!isAlphaOnly) {
-    return ColorSpaceXformEffect::Make(args.context->drawingBuffer(), std::move(fp), source->colorSpace().get(), AlphaType::Premultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
+  auto fp = TiledTextureEffect::Make(std::move(textureProxy), samplingArgs, &fpMatrix, isAlphaOnly);
+  if (!isAlphaOnly) {
+    return ColorSpaceXformEffect::Make(args.context->drawingBuffer(), std::move(fp),
+                                       source->colorSpace().get(), AlphaType::Premultiplied,
+                                       dstColorSpace.get(), AlphaType::Premultiplied);
   }
   return fp;
 }

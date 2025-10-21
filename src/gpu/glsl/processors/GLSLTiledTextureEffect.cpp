@@ -21,9 +21,9 @@
 #include "gpu/processors/TextureEffect.h"
 
 namespace tgfx {
-PlacementPtr<FragmentProcessor> TiledTextureEffect::Make(
-    std::shared_ptr<TextureProxy> proxy, const SamplingArgs& args, const Matrix* uvMatrix,
-    bool forceAsMask) {
+PlacementPtr<FragmentProcessor> TiledTextureEffect::Make(std::shared_ptr<TextureProxy> proxy,
+                                                         const SamplingArgs& args,
+                                                         const Matrix* uvMatrix, bool forceAsMask) {
   if (proxy == nullptr) {
     return nullptr;
   }

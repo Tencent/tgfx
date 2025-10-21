@@ -76,10 +76,12 @@ PlacementPtr<FragmentProcessor> RasterizedImage::asFragmentProcessor(
   if (uvMatrix) {
     fpMatrix.preConcat(*uvMatrix);
   }
-  auto fp = TiledTextureEffect::Make(std::move(textureProxy), newSamplingArgs, &fpMatrix,
-                                  isAlphaOnly());
-  if(!isAlphaOnly()) {
-    return ColorSpaceXformEffect::Make(args.context->drawingBuffer(), std::move(fp), colorSpace().get(), AlphaType::Premultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
+  auto fp =
+      TiledTextureEffect::Make(std::move(textureProxy), newSamplingArgs, &fpMatrix, isAlphaOnly());
+  if (!isAlphaOnly()) {
+    return ColorSpaceXformEffect::Make(args.context->drawingBuffer(), std::move(fp),
+                                       colorSpace().get(), AlphaType::Premultiplied,
+                                       dstColorSpace.get(), AlphaType::Premultiplied);
   }
   return fp;
 }

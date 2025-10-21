@@ -138,8 +138,10 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
     return nullptr;
   }
   auto colorProcessor = TextureEffect::Make(std::move(textureProxy), {}, nullptr, false);
-  if(!textureView->isAlphaOnly()) {
-    colorProcessor =  ColorSpaceXformEffect::Make(context->drawingBuffer(), std::move(colorProcessor), textureView->colorSpace().get(), AlphaType::Premultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
+  if (!textureView->isAlphaOnly()) {
+    colorProcessor = ColorSpaceXformEffect::Make(
+        context->drawingBuffer(), std::move(colorProcessor), textureView->colorSpace().get(),
+        AlphaType::Premultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
   }
   if (colorProcessor == nullptr) {
     LOGE("RuntimeDrawTask::getFlatTexture() Failed to create the color processor!");

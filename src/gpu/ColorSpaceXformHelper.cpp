@@ -19,14 +19,16 @@
 namespace tgfx {
 
 void ColorSpaceXformHelper::emitCode(UniformHandler* uniformHandler,
-    const ColorSpaceXformSteps* colorSpaceXform, ShaderStage shaderStage) {
+                                     const ColorSpaceXformSteps* colorSpaceXform,
+                                     ShaderStage shaderStage) {
   if (colorSpaceXform) {
     flags = colorSpaceXform->flags;
     if (this->applySrcTF()) {
       srcTFVar0 = uniformHandler->addUniform("SrcTF0", UniformFormat::Float4, shaderStage);
       srcTFVar1 = uniformHandler->addUniform("SrcTF1", UniformFormat::Float4, shaderStage);
-      _srcTFType = gfx::skcms_TransferFunction_getType(
-          reinterpret_cast<const gfx::skcms_TransferFunction*>(&colorSpaceXform->srcTransferFunction));
+      _srcTFType =
+          gfx::skcms_TransferFunction_getType(reinterpret_cast<const gfx::skcms_TransferFunction*>(
+              &colorSpaceXform->srcTransferFunction));
     }
     if (this->applySrcOOTF()) {
       srcOOTFVar = uniformHandler->addUniform("SrcOOTF", UniformFormat::Float4, shaderStage);
@@ -41,20 +43,23 @@ void ColorSpaceXformHelper::emitCode(UniformHandler* uniformHandler,
     if (this->applyDstTF()) {
       dstTFVar0 = uniformHandler->addUniform("DstTF0", UniformFormat::Float4, shaderStage);
       dstTFVar1 = uniformHandler->addUniform("DstTF1", UniformFormat::Float4, shaderStage);
-      _dstTFType = gfx::skcms_TransferFunction_getType(
-          reinterpret_cast<const gfx::skcms_TransferFunction*>(&colorSpaceXform->dstTransferFunctionInverse));
+      _dstTFType =
+          gfx::skcms_TransferFunction_getType(reinterpret_cast<const gfx::skcms_TransferFunction*>(
+              &colorSpaceXform->dstTransferFunctionInverse));
     }
   }
 }
 
 void ColorSpaceXformHelper::setData(UniformData* uniformData,
-    const ColorSpaceXformSteps* colorSpaceXform) {
+                                    const ColorSpaceXformSteps* colorSpaceXform) {
   if (colorSpaceXform) {
     flags = colorSpaceXform->flags;
     if (this->applySrcTF()) {
-      float srcTF0[4] = {colorSpaceXform->srcTransferFunction.g, colorSpaceXform->srcTransferFunction.a,
-                         colorSpaceXform->srcTransferFunction.b, colorSpaceXform->srcTransferFunction.c};
-      float srcTF1[4] = {colorSpaceXform->srcTransferFunction.d, colorSpaceXform->srcTransferFunction.e,
+      float srcTF0[4] = {
+          colorSpaceXform->srcTransferFunction.g, colorSpaceXform->srcTransferFunction.a,
+          colorSpaceXform->srcTransferFunction.b, colorSpaceXform->srcTransferFunction.c};
+      float srcTF1[4] = {colorSpaceXform->srcTransferFunction.d,
+                         colorSpaceXform->srcTransferFunction.e,
                          colorSpaceXform->srcTransferFunction.f, 0.0f};
       uniformData->setData("SrcTF0", srcTF0);
       uniformData->setData("SrcTF1", srcTF1);
@@ -69,9 +74,12 @@ void ColorSpaceXformHelper::setData(UniformData* uniformData,
       uniformData->setData("DstOOTF", colorSpaceXform->dstOOTF);
     }
     if (this->applyDstTF()) {
-      float dstTF0[4] = {colorSpaceXform->dstTransferFunctionInverse.g, colorSpaceXform->dstTransferFunctionInverse.a,
-                         colorSpaceXform->dstTransferFunctionInverse.b, colorSpaceXform->dstTransferFunctionInverse.c};
-      float dstTF1[4] = {colorSpaceXform->dstTransferFunctionInverse.d, colorSpaceXform->dstTransferFunctionInverse.e,
+      float dstTF0[4] = {colorSpaceXform->dstTransferFunctionInverse.g,
+                         colorSpaceXform->dstTransferFunctionInverse.a,
+                         colorSpaceXform->dstTransferFunctionInverse.b,
+                         colorSpaceXform->dstTransferFunctionInverse.c};
+      float dstTF1[4] = {colorSpaceXform->dstTransferFunctionInverse.d,
+                         colorSpaceXform->dstTransferFunctionInverse.e,
                          colorSpaceXform->dstTransferFunctionInverse.f, 0.0f};
       uniformData->setData("DstTF0", dstTF0);
       uniformData->setData("DstTF1", dstTF1);

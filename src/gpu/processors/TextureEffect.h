@@ -32,9 +32,10 @@ class TextureEffect : public FragmentProcessor {
                                               const Matrix* uvMatrix = nullptr,
                                               bool forceAsMask = false);
 
-  static PlacementPtr<FragmentProcessor> MakeRGBAAA(
-      std::shared_ptr<TextureProxy> proxy, const SamplingArgs& args, const Point& alphaStart,
-      const Matrix* uvMatrix = nullptr);
+  static PlacementPtr<FragmentProcessor> MakeRGBAAA(std::shared_ptr<TextureProxy> proxy,
+                                                    const SamplingArgs& args,
+                                                    const Point& alphaStart,
+                                                    const Matrix* uvMatrix = nullptr);
 
   std::string name() const override {
     return "TextureEffect";
