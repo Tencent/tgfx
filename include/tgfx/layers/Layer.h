@@ -570,6 +570,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
    */
   Matrix getGlobalMatrix() const;
 
+  Matrix3D getGlobalMatrix3D() const;
+
   /**
    * Returns the transformation matrix of the current layer relative to the parent layer. Note that
    * if the current layer's matrix contains 3D transformations or projection transformations, this
@@ -578,8 +580,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
    * affine transformation matrix.
    */
   Matrix getMatrixWithScrollRect() const;
-
-  Matrix3D getGlobalMatrix3D() const;
 
   Matrix3D getMatrix3DWithScrollRect() const;
 
@@ -627,6 +627,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::shared_ptr<MaskFilter> getMaskFilter(const DrawArgs& args, float scale);
 
   Matrix getRelativeMatrix(const Layer* targetCoordinateSpace) const;
+
+  Matrix3D getRelativeMatrix3D(const Layer* targetCoordinateSpace) const;
 
   bool hasValidMask() const;
 

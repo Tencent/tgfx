@@ -470,8 +470,21 @@ bool Layer::replaceChild(std::shared_ptr<Layer> oldChild, std::shared_ptr<Layer>
 }
 
 Rect Layer::getBounds(const Layer* targetCoordinateSpace, bool computeTightBounds) {
-  auto matrix = getRelativeMatrix(targetCoordinateSpace);
-  return getBoundsInternal(matrix, computeTightBounds);
+  auto matrix3D = getRelativeMatrix3D(targetCoordinateSpace);
+  if (IsMatrix3DAffine(matrix3D)) {
+    auto matrix = Matrix::MakeAll(matrix3D.getRowColumn(0, 0), matrix3D.getRowColumn(0, 1),
+                                  matrix3D.getRowColumn(0, 3), matrix3D.getRowColumn(1, 0),
+                                  matrix3D.getRowColumn(1, 1), matrix3D.getRowColumn(1, 3));
+    return getBoundsInternal(matrix, computeTightBounds);
+  }
+
+  Rect bounds = getBoundsInternal(Matrix::I(), computeTightBounds);
+  if (matrix3D.isIdentity()) {
+    return bounds;
+  }
+  bounds = matrix3D.mapRect(bounds);
+  bounds.roundOut();
+  return bounds;
 }
 
 Rect Layer::getBoundsInternal(const Matrix& coordinateMatrix, bool computeTightBounds) {
@@ -517,9 +530,6 @@ Rect Layer::getBoundsInternal(const Matrix& coordinateMatrix, bool computeTightB
     }
     for (auto& filter : _filters) {
       bounds = filter->filterBounds(bounds, contentScale);
-    }
-    if (!_matrix3DIsAffine) {
-      bounds = Transform3DFilter::Make(_matrix3D)->filterBounds(bounds, contentScale);
     }
   }
   return bounds;
@@ -771,20 +781,20 @@ Matrix Layer::getGlobalMatrix() const {
   return matrix;
 }
 
-Matrix Layer::getMatrixWithScrollRect() const {
-  auto matrix = _affineMatrix;
-  if (_matrix3DIsAffine && _scrollRect) {
-    matrix.preTranslate(-_scrollRect->left, -_scrollRect->top);
-  }
-  return matrix;
-}
-
 Matrix3D Layer::getGlobalMatrix3D() const {
   Matrix3D matrix = {};
   auto layer = this;
   while (layer->_parent) {
     matrix.postConcat(layer->getMatrix3DWithScrollRect());
     layer = layer->_parent;
+  }
+  return matrix;
+}
+
+Matrix Layer::getMatrixWithScrollRect() const {
+  auto matrix = _affineMatrix;
+  if (_matrix3DIsAffine && _scrollRect) {
+    matrix.preTranslate(-_scrollRect->left, -_scrollRect->top);
   }
   return matrix;
 }
@@ -946,6 +956,20 @@ Matrix Layer::getRelativeMatrix(const Layer* targetCoordinateSpace) const {
     return {};
   }
   Matrix relativeMatrix = getGlobalMatrix();
+  relativeMatrix.postConcat(targetLayerInverseMatrix);
+  return relativeMatrix;
+}
+
+Matrix3D Layer::getRelativeMatrix3D(const Layer* targetCoordinateSpace) const {
+  if (targetCoordinateSpace == nullptr || targetCoordinateSpace == this) {
+    return {};
+  }
+  auto targetLayerMatrix = targetCoordinateSpace->getGlobalMatrix3D();
+  Matrix3D targetLayerInverseMatrix = {};
+  if (!targetLayerMatrix.invert(&targetLayerInverseMatrix)) {
+    return {};
+  }
+  Matrix3D relativeMatrix = getGlobalMatrix3D();
   relativeMatrix.postConcat(targetLayerInverseMatrix);
   return relativeMatrix;
 }

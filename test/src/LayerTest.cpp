@@ -3300,7 +3300,8 @@ TGFX_TEST(LayerTest, Matrix) {
 
   imageLayer->setMatrix3D(imageMatrix3D);
   displayList->render(surface.get());
-  EXPECT_EQ(imageLayer->getBounds(), Rect::MakeLTRB(65, 0, 298, 281));
+  EXPECT_EQ(imageLayer->getBounds(contentLayer.get()), Rect::MakeLTRB(65, 0, 298, 281));
+  EXPECT_EQ(imageLayer->getBounds(displayList->root()), Rect::MakeLTRB(99, 15, 190, 162));
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D"));
 
   auto affineMatrix = Matrix::MakeTrans(50, 50);

@@ -42,7 +42,7 @@ class Transform3DImageFilter final : public ImageFilter {
    */
   explicit Transform3DImageFilter(const Matrix3D& matrix, bool hideBackFace = false);
 
-  Matrix3D matrix() const {
+  const Matrix3D& matrix() const {
     return _matrix;
   }
 
