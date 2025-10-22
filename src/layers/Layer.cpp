@@ -807,7 +807,7 @@ LayerContent* Layer::getContent() {
   return layerContent.get();
 }
 
-std::shared_ptr<ImageFilter> Layer::getImageFilter(float contentScale) {
+std::shared_ptr<ImageFilter> Layer::getImageFilter(float contentScale, const Rect& contentBound) {
   if (_filters.empty() && _matrix3DIsAffine) {
     return nullptr;
   }
@@ -818,7 +818,21 @@ std::shared_ptr<ImageFilter> Layer::getImageFilter(float contentScale) {
     }
   }
   if (!_matrix3DIsAffine) {
-    auto transform3DFilter = Transform3DFilter::Make(_matrix3D);
+    // _matrix3DD describes a matrix transformation with the layer origin as the anchor point, i.e.,
+    // point (0, 0). When applying an equivalent matrix transformation to the local coordinate
+    // system, the transformation anchor point will no longer be (0, 0), so the transformation
+    // matrix needs to be recalculated.
+    // _matrix3D is defined based on the layer's local coordinate system. It is necessary to
+    // calculate the coordinates of the local coordinate system's origin in the local coordinate
+    // system before scaling.
+    auto contentOrigin =
+        Point::Make(contentBound.left / contentScale, contentBound.top / contentScale);
+    // Based on the local coordinate system, the anchor point Anchor is (0 - contentOrigin), and the
+    // anchor offset matrix offsetMatrix is (0 - Anchor), which is equivalent to contentOrigin
+    auto offsetMatrix = Matrix3D::MakeTranslate(contentOrigin.x, contentOrigin.y, 0);
+    auto invOffsetMatrix = Matrix3D::MakeTranslate(-contentOrigin.x, -contentOrigin.y, 0);
+    auto contentMatrix3D = invOffsetMatrix * _matrix3D * offsetMatrix;
+    auto transform3DFilter = Transform3DFilter::Make(contentMatrix3D);
     filters.push_back(transform3DFilter->getImageFilter(contentScale));
   }
   return ImageFilter::Compose(filters);
@@ -870,7 +884,9 @@ std::shared_ptr<Image> Layer::getRasterizedImage(const DrawArgs& args, float con
   if (image == nullptr) {
     return nullptr;
   }
-  auto filter = getImageFilter(contentScale);
+  auto contentBound = Rect::MakeXYWH(offset.x, offset.y, static_cast<float>(image->width()),
+                                     static_cast<float>(image->height()));
+  auto filter = getImageFilter(contentScale, contentBound);
   if (filter) {
     Point filterOffset = {};
     image = image->makeWithFilter(std::move(filter), &filterOffset);
@@ -998,7 +1014,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     return;
   }
   if (!args.excludeEffects) {
-    paint.setImageFilter(getImageFilter(contentScale));
+    paint.setImageFilter(getImageFilter(contentScale, picture->getBounds()));
   }
   auto matrix = Matrix::MakeScale(1.0f / contentScale);
   canvas->drawPicture(picture, &matrix, &paint);
@@ -1340,7 +1356,7 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
   // Ensure the 3D filter is not released during the entire function lifetime, otherwise the
   // transformer will have abnormal render bounds calculation
   auto filter3DVector = std::vector<std::shared_ptr<LayerFilter>>{};
-  if (!_layerStyles.empty() || !_filters.empty()) {
+  if (!_layerStyles.empty() || !_filters.empty() || !_matrix3DIsAffine) {
     if (transformer) {
       contentScale = transformer->getMaxScale();
     }
@@ -1349,8 +1365,8 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     // at the end, including scaling, rotation, and other transformations.
     if (!_matrix3DIsAffine) {
       filter3DVector.push_back(Transform3DFilter::Make(_matrix3D));
-      transformer = RegionTransformer::MakeFromFilters(filter3DVector, 1.0f,
-                                                       std::move(transformer));
+      transformer =
+          RegionTransformer::MakeFromFilters(filter3DVector, 1.0f, std::move(transformer));
     }
     transformer = RegionTransformer::MakeFromFilters(_filters, 1.0f, std::move(transformer));
     transformer = RegionTransformer::MakeFromStyles(_layerStyles, 1.0f, std::move(transformer));

@@ -3200,75 +3200,117 @@ TGFX_TEST(LayerTest, DiffFilterModeImagePattern) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DiffFilterModeImagePattern -- zoomIn"));
 }
 
-TGFX_TEST(LayerTest, Matrix) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  EXPECT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 200, 200);
-  auto canvas = surface->getCanvas();
-  canvas->clear();
-
-  auto shadowFilter = DropShadowFilter::Make(-20, -20, 0, 0, Color::Green());
-  auto image = MakeImage("resources/apitest/imageReplacement.jpg");
-  auto imageSize =
-      Size::Make(static_cast<float>(image->width()), static_cast<float>(image->height()));
-  auto anchor = Point::Make(0.25f, 0.5f);
-  auto rawBounds = Rect::MakeWH(imageSize.width, imageSize.height);
-  auto filteredBounds = shadowFilter->filterBounds(rawBounds, 1.f);
-  // When a layer has filters, the 3D transformation uses the top-left origin of the filtered image
-  // as the anchor point, while the user-specified anchor point is normalized based on the layer's
-  // width and height, with (0,0) at the top-left corner of the layer.
-  auto offsetToAnchorMatrix =
-      Matrix3D::MakeTranslate(filteredBounds.left - anchor.x * imageSize.width,
-                              filteredBounds.top - anchor.y * imageSize.height, 0.f);
-  auto invOffsetToAnchorMatrix =
-      Matrix3D::MakeTranslate(anchor.x * imageSize.width - filteredBounds.left,
-                              anchor.y * imageSize.height - filteredBounds.top, 0.f);
-  // During continuous model transformations, if transforming based on the world coordinate system
-  // requires appending matrix elements on the left side of matrix multiplication, while transforming
-  // based on the model coordinate system appends on the right side
-  auto modelMatrix = Matrix3D::MakeScale(1.2f, 1.2f, 1.f);
-  constexpr float skewXDegrees = -15.f;
-  constexpr float skewYDegrees = -15.f;
-  modelMatrix.postSkewXY(tanf(DegreesToRadians(skewXDegrees)),
-                         tanf(DegreesToRadians(skewYDegrees)));
-  modelMatrix.postRotate({0.f, 0.f, 1.f}, 45.f);
-  modelMatrix.preRotate({1.f, 0.f, 0.f}, 45.f);
-  modelMatrix.preRotate({0.f, 1.f, 0.f}, 15.f);
-  modelMatrix.postTranslate(0.f, 0.f, -50.f);
+static Matrix3D MakePerspectiveMatrix(float farZ) {
   auto perspectiveMatrix = Matrix3D::I();
   constexpr float eyeDistance = 1200.f;
   constexpr float shift = 10.f;
   const float nearZ = eyeDistance - shift;
-  // Choose an appropriate far plane to avoid clipping during rotation.
-  auto maxLength = static_cast<float>(std::max(image->width(), image->height())) * 2.f;
-  auto farZ = std::min(-maxLength, -500.f);
   const float m22 = (2 - (farZ + nearZ) / eyeDistance) / (farZ - nearZ);
   perspectiveMatrix.setRowColumn(2, 2, m22);
   const float m23 = -1.f + nearZ / eyeDistance - perspectiveMatrix.getRowColumn(2, 2) * nearZ;
   perspectiveMatrix.setRowColumn(2, 3, m23);
   perspectiveMatrix.setRowColumn(3, 2, -1.f / eyeDistance);
-  auto origin = Point::Make(50, 50);
-  auto originTranslateMatrix = Matrix3D::MakeTranslate(origin.x, origin.y, 0.f);
-  auto transformMatrix = originTranslateMatrix * invOffsetToAnchorMatrix * perspectiveMatrix *
-                         modelMatrix * offsetToAnchorMatrix;
+  return perspectiveMatrix;
+}
+
+TGFX_TEST(LayerTest, Matrix) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 200);
+  auto canvas = surface->getCanvas();
+  canvas->clear();
 
   auto displayList = std::make_unique<DisplayList>();
   displayList->setRenderMode(RenderMode::Tiled);
-  auto layer = ImageLayer::Make();
-  layer->setImage(image);
-  layer->setFilters({shadowFilter});
-  layer->setMatrix3D(transformMatrix);
-  displayList->root()->addChild(layer);
+
+  auto backLayer = SolidLayer::Make();
+  backLayer->setColor(Color::FromRGBA(153, 46, 46, 255));
+  backLayer->setWidth(600);
+  backLayer->setHeight(400);
+  backLayer->setMatrix(Matrix::MakeScale(0.5f, 0.5f));
+  displayList->root()->addChild(backLayer);
+
+  auto contentLayer = SolidLayer::Make();
+  contentLayer->setColor(Color::FromRGBA(151, 153, 46, 255));
+  {
+    auto layerSize = Size::Make(360.f, 320.f);
+    contentLayer->setWidth(layerSize.width);
+    contentLayer->setHeight(layerSize.height);
+    auto anchor = Point::Make(0.3f, 0.3f);
+    // auto anchor = Point::Make(0.f, 0.f);
+    auto offsetToAnchorMatrix =
+        Matrix3D::MakeTranslate(-anchor.x * layerSize.width, -anchor.y * layerSize.height, 0.f);
+    auto invOffsetToAnchorMatrix =
+        Matrix3D::MakeTranslate(anchor.x * layerSize.width, anchor.y * layerSize.height, 0.f);
+    auto modelMatrix = Matrix3D::MakeRotate({0.f, 1.f, 0.f}, -45.f);
+    // Choose an appropriate far plane to avoid clipping during rotation.
+    auto maxLength = static_cast<float>(std::max(layerSize.width, layerSize.height)) * 2.f;
+    auto farZ = std::min(-maxLength, -500.f);
+    auto perspectiveMatrix = MakePerspectiveMatrix(farZ);
+    auto origin = Point::Make(120, 40);
+    auto originTranslateMatrix = Matrix3D::MakeTranslate(origin.x, origin.y, 0.f);
+    auto transformMatrix = originTranslateMatrix * invOffsetToAnchorMatrix * perspectiveMatrix *
+                           modelMatrix * offsetToAnchorMatrix;
+    contentLayer->setMatrix3D(transformMatrix);
+  }
+  backLayer->addChild(contentLayer);
+
+  auto shadowFilter = DropShadowFilter::Make(-20, -20, 0, 0, Color::Green());
+  auto image = MakeImage("resources/apitest/imageReplacement.jpg");
+  auto imageLayer = ImageLayer::Make();
+  imageLayer->setImage(image);
+  imageLayer->setFilters({shadowFilter});
+  auto imageMatrix3D = Matrix3D::I();
+  {
+    auto imageSize =
+        Size::Make(static_cast<float>(image->width()), static_cast<float>(image->height()));
+    auto anchor = Point::Make(0.5f, 0.5f);
+    // The default anchor point for layer filters is the layer origin. Image layers by default align
+    // their content to the layer origin. When using the center point of the image content's
+    // normalized width and height coordinates as the anchor point, additional matrix processing is
+    // required.
+    auto offsetToAnchorMatrix =
+        Matrix3D::MakeTranslate(-anchor.x * imageSize.width, -anchor.y * imageSize.height, 0.f);
+    auto invOffsetToAnchorMatrix =
+        Matrix3D::MakeTranslate(anchor.x * imageSize.width, anchor.y * imageSize.height, 0.f);
+    // During continuous model transformations, if transforming based on the world coordinate system
+    // requires appending matrix elements on the left side of matrix multiplication (using
+    // post-prefix functions), while transforming based on the model coordinate system appends on
+    // the right side (using pre-prefix functions)
+    auto modelMatrix = Matrix3D::MakeScale(2.f, 2.f, 1.f);
+    constexpr float skewXDegrees = -15.f;
+    constexpr float skewYDegrees = -15.f;
+    modelMatrix.postSkewXY(tanf(DegreesToRadians(skewXDegrees)),
+                           tanf(DegreesToRadians(skewYDegrees)));
+    modelMatrix.postRotate({0.f, 0.f, 1.f}, 45.f);
+    modelMatrix.preRotate({1.f, 0.f, 0.f}, 45.f);
+    modelMatrix.preRotate({0.f, 1.f, 0.f}, 45.f);
+    modelMatrix.postTranslate(0.f, 0.f, 100.f);
+    // Choose an appropriate far plane to avoid clipping during rotation.
+    auto maxLength = static_cast<float>(std::max(image->width(), image->height())) * 2.f;
+    auto farZ = std::min(-maxLength, -500.f);
+    auto perspectiveMatrix = MakePerspectiveMatrix(farZ);
+    auto origin = Point::Make(125, 105);
+    // auto origin = Point::Make(0, 0);
+    auto originTranslateMatrix = Matrix3D::MakeTranslate(origin.x, origin.y, 0.f);
+    imageMatrix3D = originTranslateMatrix * invOffsetToAnchorMatrix * perspectiveMatrix *
+                    modelMatrix * offsetToAnchorMatrix;
+  }
+  contentLayer->addChild(imageLayer);
+
+  imageLayer->setMatrix3D(imageMatrix3D);
   displayList->render(surface.get());
-  __unused auto tem = layer->getBounds();
+  EXPECT_EQ(imageLayer->getBounds(), Rect::MakeLTRB(65, 0, 298, 281));
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D"));
+
   auto affineMatrix = Matrix::MakeTrans(50, 50);
-  layer->setMatrix(affineMatrix);
+  imageLayer->setMatrix(affineMatrix);
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D_2D"));
-  layer->setMatrix3D(transformMatrix);
-  EXPECT_TRUE(layer->matrix().isIdentity());
+
+  imageLayer->setMatrix3D(imageMatrix3D);
+  EXPECT_TRUE(imageLayer->matrix().isIdentity());
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D_2D_3D"));
 }

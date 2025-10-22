@@ -37,16 +37,7 @@ Transform3DImageFilter::Transform3DImageFilter(const Matrix3D& matrix, bool hide
 }
 
 Rect Transform3DImageFilter::onFilterBounds(const Rect& srcRect) const {
-  // The default transformation anchor is at the top-left origin (0,0) of the image; user-defined
-  // anchors are included in the matrix.
-  auto srcModelRect = Rect::MakeWH(srcRect.width(), srcRect.height());
-  auto dstModelRect = _matrix.mapRect(srcModelRect);
-  // The minimum axis-aligned bounding rectangle of srcRect after projection is calculated based on
-  // its relative position to the standard rectangle.
-  auto result = Rect::MakeXYWH(dstModelRect.left - srcModelRect.left + srcRect.left,
-                               dstModelRect.top - srcModelRect.top + srcRect.top,
-                               dstModelRect.width(), dstModelRect.height());
-  return result;
+  return _matrix.mapRect(srcRect);
 }
 
 std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(

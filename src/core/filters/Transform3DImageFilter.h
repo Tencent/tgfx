@@ -42,6 +42,14 @@ class Transform3DImageFilter final : public ImageFilter {
    */
   explicit Transform3DImageFilter(const Matrix3D& matrix, bool hideBackFace = false);
 
+  Matrix3D matrix() const {
+    return _matrix;
+  }
+
+  bool hideBackFace() const {
+    return _hideBackFace;
+  }
+
  private:
   Type type() const override {
     return Type::Transform3D;
