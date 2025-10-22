@@ -44,11 +44,25 @@ void HitTestContext::drawRect(const Rect& rect, const MCState& state, const Fill
   if (!GetLocalPoint(state.matrix, deviceX, deviceY, &local)) {
     return;
   }
-  auto strokeRect = rect;
-  if (stroke) {
-    ApplyStrokeToBounds(*stroke, &strokeRect);
+  if (shapeHitTest) {
+    Path path = {};
+    path.addRect(rect);
+    if (stroke) {
+      stroke->applyToPath(&path);
+    }
+    if (!path.contains(local.x, local.y)) {
+      return;
+    }
+  } else {
+    auto strokeRect = rect;
+    if (stroke) {
+      ApplyStrokeToBounds(*stroke, &strokeRect);
+    }
+    if (!strokeRect.contains(local.x, local.y)) {
+      hit = true;
+    }
   }
-  if (strokeRect.contains(local.x, local.y) && checkClip(state.clip, local)) {
+  if (checkClip(state.clip, local)) {
     hit = true;
   }
 }
