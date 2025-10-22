@@ -34,7 +34,7 @@ class ShaderCaps {
 
   /**
    * The version declaration string to be placed at the top of the shader code. For example,
-   * "#version 300 es" for OpenGL ES 3.0, or "#version 140" for OpenGL 3.1.
+   * "#version 300 es" for OpenGL ES 3.0, or "#version 150" for OpenGL 3.2.
    */
   std::string versionDeclString;
 
