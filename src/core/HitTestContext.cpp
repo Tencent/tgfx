@@ -59,7 +59,7 @@ void HitTestContext::drawRect(const Rect& rect, const MCState& state, const Fill
       ApplyStrokeToBounds(*stroke, &strokeRect);
     }
     if (!strokeRect.contains(local.x, local.y)) {
-      hit = true;
+      return;
     }
   }
   if (checkClip(state.clip, local)) {
