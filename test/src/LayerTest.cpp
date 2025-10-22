@@ -3238,7 +3238,6 @@ TGFX_TEST(LayerTest, Matrix) {
     contentLayer->setWidth(layerSize.width);
     contentLayer->setHeight(layerSize.height);
     auto anchor = Point::Make(0.3f, 0.3f);
-    // auto anchor = Point::Make(0.f, 0.f);
     auto offsetToAnchorMatrix =
         Matrix3D::MakeTranslate(-anchor.x * layerSize.width, -anchor.y * layerSize.height, 0.f);
     auto invOffsetToAnchorMatrix =
@@ -3311,6 +3310,32 @@ TGFX_TEST(LayerTest, Matrix) {
 
   imageLayer->setMatrix3D(imageMatrix3D);
   EXPECT_TRUE(imageLayer->matrix().isIdentity());
+  auto rect = Rect::MakeXYWH(50, 50, 200, 100);
+  Path path = {};
+  path.addRoundRect(rect, 20, 20);
+  auto shaperLayer = ShapeLayer::Make();
+  shaperLayer->setPath(path);
+  shaperLayer->setFillStyle(SolidColor::Make(Color::Blue()));
+  {
+    // Verify the correctness of ShaperLayer's effect when the internal matrix is non-zero
+    auto layerSize = Size::Make(300.f, 200.f);
+    auto anchor = Point::Make(0.5f, 0.5f);
+    auto offsetToAnchorMatrix =
+        Matrix3D::MakeTranslate(-anchor.x * layerSize.width, -anchor.y * layerSize.height, 0.f);
+    auto invOffsetToAnchorMatrix =
+        Matrix3D::MakeTranslate(anchor.x * layerSize.width, anchor.y * layerSize.height, 0.f);
+    auto modelMatrix = Matrix3D::MakeRotate({0.f, 1.f, 0.f}, 45.f);
+    // Choose an appropriate far plane to avoid clipping during rotation.
+    auto maxLength = static_cast<float>(std::max(layerSize.width, layerSize.height)) * 2.f;
+    auto farZ = std::min(-maxLength, -500.f);
+    auto perspectiveMatrix = MakePerspectiveMatrix(farZ);
+    auto origin = Point::Make(0, 0);
+    auto originTranslateMatrix = Matrix3D::MakeTranslate(origin.x, origin.y, 0.f);
+    auto transformMatrix = originTranslateMatrix * invOffsetToAnchorMatrix * perspectiveMatrix *
+                           modelMatrix * offsetToAnchorMatrix;
+    shaperLayer->setMatrix3D(transformMatrix);
+  }
+  displayList->root()->addChild(shaperLayer);
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D_2D_3D"));
 }
