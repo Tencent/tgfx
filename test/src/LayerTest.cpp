@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <math.h>
-#include <tgfx/layers/ImageLayer.h>
 #include <vector>
 #include "core/filters/ComposeImageFilter.h"
 #include "core/filters/GaussianBlurImageFilter.h"
@@ -28,7 +27,6 @@
 #include "layers/DrawArgs.h"
 #include "layers/RootLayer.h"
 #include "layers/contents/RasterizedContent.h"
-#include "tgfx/core/PathEffect.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Gradient.h"

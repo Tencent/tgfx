@@ -134,8 +134,10 @@ inline bool IsInteger(float f) {
   return std::floor(f) == f;
 }
 
-// IEEE defines how floating-point division behaves for non-finite values and zero denominators,
-// but C does not. Therefore, we provide a helper to suppress possible undefined-behavior warnings.
+/**
+ * IEEE defines how floating-point division behaves for any values and zero denominators, but C does
+ * not. Therefore, we provide a helper to suppress possible undefined-behavior warnings.
+ */
 TGFX_ATTRIBUTE(no_sanitize("float-divide-by-zero"))
 inline float IEEEFloatDivide(float numer, float denom) {
   return numer / denom;
