@@ -19,7 +19,6 @@
 #pragma once
 
 #include <mutex>
-#include "platform/ImageStream.h"
 #include "tgfx/core/ImageBuffer.h"
 #include "tgfx/core/Rect.h"
 
@@ -56,9 +55,7 @@ class ImageReader {
    */
   int height() const;
 
-  std::shared_ptr<ColorSpace> colorSpace() const {
-    return stream->colorSpace();
-  }
+  std::shared_ptr<ColorSpace> colorSpace() const;
 
   /**
    * Acquires the next ImageBuffer from the ImageReader after a new image frame has been rendered

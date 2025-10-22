@@ -113,7 +113,7 @@ std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
   // is the size after applying DrawScale. Texture sampling requires corresponding scaling.
   uvMatrix.postScale(drawScaleX, drawScaleY);
   auto fragmentProcessor =
-      TextureEffect::Make(std::move(sourceTextureProxy), samplingArgs, &uvMatrix, false);
+      TextureEffect::Make(std::move(sourceTextureProxy), samplingArgs, &uvMatrix);
   drawOp->addColorFP(std::move(fragmentProcessor));
   std::vector<PlacementPtr<DrawOp>> drawOps;
   drawOps.emplace_back(std::move(drawOp));

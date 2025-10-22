@@ -353,8 +353,7 @@ void RenderContext::drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
   viewMatrix.postTranslate(-bounds.x(), -bounds.y());
-  auto image =
-      Image::MakeFrom(std::move(picture), width, height, &viewMatrix, renderTarget->colorSpace());
+  auto image = Image::MakeFrom(std::move(picture), width, height, &viewMatrix);
   if (image == nullptr) {
     return;
   }

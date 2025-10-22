@@ -85,6 +85,10 @@ int ImageReader::height() const {
   return stream->height();
 }
 
+std::shared_ptr<ColorSpace> ImageReader::colorSpace() const {
+  return stream->colorSpace();
+}
+
 std::shared_ptr<ImageBuffer> ImageReader::acquireNextBuffer() {
   std::lock_guard<std::mutex> autoLock(locker);
   DEBUG_ASSERT(!weakThis.expired());

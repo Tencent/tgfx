@@ -65,7 +65,7 @@ PlacementPtr<GeometryProcessor> AtlasTextOp::onMakeGeometryProcessor(RenderTarge
   ATTRIBUTE_NAME("commonColor", commonColor);
   auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
   return AtlasTextGeometryProcessor::Make(drawingBuffer, textureProxy, aaType, commonColor,
-                                          sampling, renderTarget->colorSpace());
+                                          sampling);
 }
 
 void AtlasTextOp::onDraw(RenderPass* renderPass) {

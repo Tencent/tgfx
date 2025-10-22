@@ -26,10 +26,11 @@
 namespace tgfx {
 class QuadPerEdgeAAGeometryProcessor : public GeometryProcessor {
  public:
-  static PlacementPtr<QuadPerEdgeAAGeometryProcessor> Make(
-      BlockBuffer* buffer, int width, int height, AAType aa, std::optional<Color> commonColor,
-      std::optional<Matrix> uvMatrix, bool hasSubset,
-      std::shared_ptr<ColorSpace> dstColorSpace = nullptr);
+  static PlacementPtr<QuadPerEdgeAAGeometryProcessor> Make(BlockBuffer* buffer, int width,
+                                                           int height, AAType aa,
+                                                           std::optional<Color> commonColor,
+                                                           std::optional<Matrix> uvMatrix,
+                                                           bool hasSubset);
   std::string name() const override {
     return "QuadPerEdgeAAGeometryProcessor";
   }
@@ -37,8 +38,7 @@ class QuadPerEdgeAAGeometryProcessor : public GeometryProcessor {
  protected:
   DEFINE_PROCESSOR_CLASS_ID
   QuadPerEdgeAAGeometryProcessor(int width, int height, AAType aa, std::optional<Color> commonColor,
-                                 std::optional<Matrix> uvMatrix, bool hasSubset,
-                                 std::shared_ptr<ColorSpace> dstColorSpace);
+                                 std::optional<Matrix> uvMatrix, bool hasSubset);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
@@ -54,6 +54,5 @@ class QuadPerEdgeAAGeometryProcessor : public GeometryProcessor {
   std::optional<Color> commonColor = std::nullopt;
   std::optional<Matrix> uvMatrix = std::nullopt;
   bool hasSubset = false;
-  std::shared_ptr<ColorSpace> dstColorSpace = nullptr;
 };
 }  // namespace tgfx

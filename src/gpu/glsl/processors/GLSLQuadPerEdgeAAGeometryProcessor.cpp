@@ -21,16 +21,15 @@
 namespace tgfx {
 PlacementPtr<QuadPerEdgeAAGeometryProcessor> QuadPerEdgeAAGeometryProcessor::Make(
     BlockBuffer* buffer, int width, int height, AAType aa, std::optional<Color> commonColor,
-    std::optional<Matrix> uvMatrix, bool hasSubset, std::shared_ptr<ColorSpace> dstColorSpace) {
+    std::optional<Matrix> uvMatrix, bool hasSubset) {
   return buffer->make<GLSLQuadPerEdgeAAGeometryProcessor>(width, height, aa, commonColor, uvMatrix,
-                                                          hasSubset, std::move(dstColorSpace));
+                                                          hasSubset);
 }
 
 GLSLQuadPerEdgeAAGeometryProcessor::GLSLQuadPerEdgeAAGeometryProcessor(
     int width, int height, AAType aa, std::optional<Color> commonColor,
-    std::optional<Matrix> uvMatrix, bool hasSubset, std::shared_ptr<ColorSpace> colorSpace)
-    : QuadPerEdgeAAGeometryProcessor(width, height, aa, commonColor, uvMatrix, hasSubset,
-                                     std::move(colorSpace)) {
+    std::optional<Matrix> uvMatrix, bool hasSubset)
+    : QuadPerEdgeAAGeometryProcessor(width, height, aa, commonColor, uvMatrix, hasSubset) {
 }
 
 void GLSLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
@@ -59,13 +58,7 @@ void GLSLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
   } else {
     auto colorVar = varyingHandler->addVarying("Color", SLType::Float4);
-    ColorSpaceXformHelper helper{};
-    ColorSpaceXformSteps steps{ColorSpace::MakeSRGB().get(), AlphaType::Premultiplied,
-                               dstColorSpace.get(), AlphaType::Premultiplied};
-    helper.emitCode(args.uniformHandler, &steps, ShaderStage::Vertex);
-    std::string dstColor;
-    vertBuilder->appendColorGamutXform(&dstColor, color.name().c_str(), &helper);
-    vertBuilder->codeAppendf("%s = %s;", colorVar.vsOut().c_str(), dstColor.c_str());
+    vertBuilder->codeAppendf("%s = %s;", colorVar.vsOut().c_str(), color.name().c_str());
     fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorVar.fsIn().c_str());
   }
 
@@ -77,16 +70,8 @@ void GLSLQuadPerEdgeAAGeometryProcessor::setData(UniformData* vertexUniformData,
                                                  UniformData* fragmentUniformData,
                                                  FPCoordTransformIter* transformIter) const {
   setTransformDataHelper(uvMatrix.value_or(Matrix::I()), vertexUniformData, transformIter);
-  auto vertSteps =
-      std::make_shared<ColorSpaceXformSteps>(ColorSpace::MakeSRGB().get(), AlphaType::Premultiplied,
-                                             dstColorSpace.get(), AlphaType::Premultiplied);
   if (commonColor.has_value()) {
-    Color dstCommonColor = commonColor.value();
-    vertSteps->apply(dstCommonColor.array());
-    fragmentUniformData->setData("Color", dstCommonColor);
-  } else {
-    ColorSpaceXformHelper helper{};
-    helper.setData(vertexUniformData, vertSteps.get());
+    fragmentUniformData->setData("Color", commonColor.value());
   }
 }
 

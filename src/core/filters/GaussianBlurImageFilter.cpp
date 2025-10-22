@@ -134,8 +134,7 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
            args.renderFlags);
 
     SamplingArgs samplingArgs = {tileMode, tileMode, {}, SrcRectConstraint::Fast};
-    sourceFragment =
-        TiledTextureEffect::Make(renderTarget->asTextureProxy(), samplingArgs, nullptr, false);
+    sourceFragment = TiledTextureEffect::Make(renderTarget->asTextureProxy(), samplingArgs);
     const bool finalBlurTargetMipmapped = (args.mipmapped && !isBlurDstScaled);
     renderTarget = RenderTargetProxy::MakeFallback(
         args.context, static_cast<int>(blurDstWidth), static_cast<int>(blurDstHeight), isAlphaOnly,
@@ -159,8 +158,7 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
                                            clipBounds.height() * blurDstScaleY / dstDrawHeight);
     finalUVMatrix.postTranslate((clipBounds.left - srcSampleBounds.left) * blurDstScaleX,
                                 (clipBounds.top - srcSampleBounds.top) * blurDstScaleY);
-    auto finalProcessor =
-        TextureEffect::Make(renderTarget->asTextureProxy(), {}, &finalUVMatrix, false);
+    auto finalProcessor = TextureEffect::Make(renderTarget->asTextureProxy(), {}, &finalUVMatrix);
     renderTarget = RenderTargetProxy::MakeFallback(
         args.context, static_cast<int>(dstDrawWidth), static_cast<int>(dstDrawHeight), isAlphaOnly,
         1, args.mipmapped, ImageOrigin::TopLeft, source->colorSpace(), args.backingFit);
@@ -215,7 +213,7 @@ PlacementPtr<FragmentProcessor> GaussianBlurImageFilter::getSourceFragmentProces
     return nullptr;
   }
   context->drawingManager()->fillRTWithFP(renderTarget, std::move(fp), renderFlags);
-  return TiledTextureEffect::Make(renderTarget->asTextureProxy(), samplingArgs, nullptr, false);
+  return TiledTextureEffect::Make(renderTarget->asTextureProxy(), samplingArgs);
 }
 
 }  // namespace tgfx

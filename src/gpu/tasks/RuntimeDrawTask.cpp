@@ -149,7 +149,7 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
   }
   auto geometryProcessor =
       DefaultGeometryProcessor::Make(context->drawingBuffer(), {}, renderTarget->width(),
-                                     renderTarget->height(), AAType::None, {}, {}, dstColorSpace);
+                                     renderTarget->height(), AAType::None, {}, {});
   std::vector fragmentProcessors = {colorProcessor.get()};
   ProgramInfo programInfo(renderTarget.get(), geometryProcessor.get(),
                           std::move(fragmentProcessors), 1, nullptr, BlendMode::Src);
