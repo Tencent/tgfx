@@ -71,7 +71,7 @@ void GLSLQuadPerEdgeAAGeometryProcessor::setData(UniformData* vertexUniformData,
                                                  FPCoordTransformIter* transformIter) const {
   setTransformDataHelper(uvMatrix.value_or(Matrix::I()), vertexUniformData, transformIter);
   if (commonColor.has_value()) {
-    fragmentUniformData->setData("Color", commonColor.value());
+    fragmentUniformData->setData("Color", *commonColor);
   }
 }
 

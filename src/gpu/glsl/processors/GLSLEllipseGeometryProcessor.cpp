@@ -102,7 +102,7 @@ void GLSLEllipseGeometryProcessor::setData(UniformData* vertexUniformData,
                                            FPCoordTransformIter* transformIter) const {
   setTransformDataHelper(Matrix::I(), vertexUniformData, transformIter);
   if (commonColor.has_value()) {
-    fragmentUniformData->setData("Color", commonColor.value());
+    fragmentUniformData->setData("Color", *commonColor);
   }
 }
 }  // namespace tgfx

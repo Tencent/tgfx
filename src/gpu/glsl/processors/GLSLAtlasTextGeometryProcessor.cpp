@@ -74,7 +74,6 @@ void GLSLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppend("vec4 color = ");
   fragBuilder->appendTextureLookup(samplerHandle, samplerVarying.vsOut());
   fragBuilder->codeAppend(";");
-
   if (textureView->isAlphaOnly()) {
     fragBuilder->codeAppendf("%s = vec4(color.a);", args.outputCoverage.c_str());
   } else {
@@ -94,7 +93,7 @@ void GLSLAtlasTextGeometryProcessor::setData(UniformData* vertexUniformData,
   vertexUniformData->setData(atlasSizeUniformName, atlasSizeInv);
   setTransformDataHelper(Matrix::I(), vertexUniformData, transformIter);
   if (commonColor.has_value()) {
-    fragmentUniformData->setData("Color", commonColor.value());
+    fragmentUniformData->setData("Color", *commonColor);
   }
 }
 }  // namespace tgfx
