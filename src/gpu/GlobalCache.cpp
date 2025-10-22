@@ -343,6 +343,30 @@ void GlobalCache::addStaticResource(const UniqueKey& uniqueKey,
 }
 
 // clang-format off
+/**
+ * As in stroke, index = a + b, and a is the current index, b is the shift
+ * from the first index. The index layout:
+ * outer AA line: 0 ~ 3
+ * outer edge:    4 ~ 7
+ * inner edge:    8 ~ 11
+ * inner AA line: 12 ~ 15
+ * Following comes a stroke rect and its indices:
+ *    0                                    2
+ *      **********************************
+ *      * 4────────────────────────────6 *
+ *      * │                            │ *
+ *      * │     8────────────────10    │ *
+ *      * │     │  ************  │     │ *
+ *      * │     │  *12      14*  │     │ *
+ *      * │     │  *          *  │     │ *
+ *      * │     │  *13      15*  │     │ *
+ *      * │     │  ************  │     │ *
+ *      * │     9────────────────11    │ *
+ *      * │                            │ *
+ *      * 5────────────────────────────7 *
+ *      **********************************
+ *    1                                    3
+ */
 static constexpr uint16_t AAStrokeRectIndices[] = {
   0 + 0, 1 + 0, 5 + 0, 5 + 0, 4 + 0, 0 + 0,
   1 + 0, 3 + 0, 7 + 0, 7 + 0, 5 + 0, 1 + 0,
@@ -360,6 +384,18 @@ static constexpr uint16_t AAStrokeRectIndices[] = {
   2 + 8, 0 + 8, 4 + 8, 4 + 8, 6 + 8, 2 + 8,
 };
 
+/**  Following comes a stroke rect and its indices:
+ *    0────────────────────────────2
+ *    │                            │
+ *    │     4────────────────6     │
+ *    │     |                │     │
+ *    │     │                │     │
+ *    │     │                │     │
+ *    │     │                │     │
+ *    │     5────────────────7     │
+ *    │                            │
+ *    1────────────────────────────3
+*/
 static constexpr uint16_t NonAAStrokeRectIndices[] = {
   0, 1, 5, 5, 4, 0,
   1, 3, 7, 7, 5, 1,
