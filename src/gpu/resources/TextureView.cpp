@@ -35,8 +35,7 @@ bool TextureView::CheckSizeAndFormat(Context* context, int width, int height, Pi
       format != PixelFormat::BGRA_8888) {
     return false;
   }
-  auto caps = context->caps();
-  auto maxTextureSize = caps->maxTextureSize;
+  auto maxTextureSize = context->gpu()->limits()->maxTextureDimension2D;
   return width <= maxTextureSize && height <= maxTextureSize;
 }
 

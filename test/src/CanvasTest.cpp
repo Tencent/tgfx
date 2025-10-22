@@ -27,7 +27,7 @@
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/RenderContext.h"
-#include "gpu/opengl/GLCaps.h"
+#include "gpu/opengl/GLGPU.h"
 #include "gpu/ops/RRectDrawOp.h"
 #include "gpu/ops/RectDrawOp.h"
 #include "gpu/resources/TextureView.h"
@@ -506,8 +506,9 @@ TGFX_TEST(CanvasTest, TileModeFallback) {
   ASSERT_TRUE(pixels != nullptr);
   auto result = codec->readPixels(bitmap.info(), pixels);
   ASSERT_TRUE(result);
+  auto gpu = static_cast<GLGPU*>(context->gpu());
   const auto& textureFormat =
-      GLCaps::Get(context)->getTextureFormat(ColorTypeToPixelFormat(bitmap.colorType()));
+      gpu->caps()->getTextureFormat(ColorTypeToPixelFormat(bitmap.colorType()));
   gl->texImage2D(glInfo.target, 0, static_cast<int>(textureFormat.internalFormatTexImage),
                  bitmap.width(), bitmap.height(), 0, textureFormat.externalFormat,
                  textureFormat.externalType, pixels);
@@ -1148,7 +1149,8 @@ static GLTextureInfo CreateRectangleTexture(Context* context, int width, int hei
   }
   glInfo.target = GL_TEXTURE_RECTANGLE;
   gl->bindTexture(glInfo.target, glInfo.id);
-  const auto& textureFormat = GLCaps::Get(context)->getTextureFormat(PixelFormat::RGBA_8888);
+  auto gpu = static_cast<GLGPU*>(context->gpu());
+  const auto& textureFormat = gpu->caps()->getTextureFormat(PixelFormat::RGBA_8888);
   gl->texImage2D(glInfo.target, 0, static_cast<int>(textureFormat.internalFormatTexImage), width,
                  heigh, 0, textureFormat.externalFormat, textureFormat.externalType, nullptr);
   return glInfo;

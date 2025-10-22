@@ -30,7 +30,7 @@ std::vector<std::shared_ptr<GPUTexture>> CGLHardwareTexture::MakeFrom(
   auto format = CVPixelBufferGetPixelFormatType(pixelBuffer) == kCVPixelFormatType_OneComponent8
                     ? PixelFormat::ALPHA_8
                     : PixelFormat::RGBA_8888;
-  if (usage & GPUTextureUsage::RENDER_ATTACHMENT && !gpu->caps()->isFormatRenderable(format)) {
+  if (usage & GPUTextureUsage::RENDER_ATTACHMENT && !gpu->isFormatRenderable(format)) {
     return {};
   }
   CVOpenGLTextureRef texture = nil;

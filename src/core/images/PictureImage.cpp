@@ -96,9 +96,9 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
   auto scaleX = rect.width() / clipRect.width();
   auto scaleY = rect.height() / clipRect.height();
   auto mipmapped = samplingArgs.sampling.mipmapMode != MipmapMode::None && hasMipmaps();
-  auto renderTarget = RenderTargetProxy::MakeFallback(
-      args.context, static_cast<int>(rect.width()), static_cast<int>(rect.height()), isAlphaOnly(),
-      1, mipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
+  auto renderTarget = RenderTargetProxy::Make(args.context, static_cast<int>(rect.width()),
+                                              static_cast<int>(rect.height()), isAlphaOnly(), 1,
+                                              mipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
   if (renderTarget == nullptr) {
     return nullptr;
   }
@@ -126,9 +126,9 @@ std::shared_ptr<TextureProxy> PictureImage::lockTextureProxy(const TPArgs& args)
     textureWidth = static_cast<int>(roundf(static_cast<float>(_width) * args.drawScale));
     textureHeight = static_cast<int>(roundf(static_cast<float>(_height) * args.drawScale));
   }
-  auto renderTarget = RenderTargetProxy::MakeFallback(
-      args.context, textureWidth, textureHeight, isAlphaOnly(), 1, hasMipmaps() && args.mipmapped,
-      ImageOrigin::TopLeft, args.backingFit);
+  auto renderTarget = RenderTargetProxy::Make(args.context, textureWidth, textureHeight,
+                                              isAlphaOnly(), 1, hasMipmaps() && args.mipmapped,
+                                              ImageOrigin::TopLeft, args.backingFit);
   if (renderTarget == nullptr) {
     return nullptr;
   }

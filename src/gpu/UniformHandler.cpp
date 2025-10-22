@@ -56,8 +56,7 @@ SamplerHandle UniformHandler::addSampler(std::shared_ptr<GPUTexture> texture,
   }
   auto samplerName = programBuilder->nameVariable(name);
   samplers.emplace_back(samplerName, format);
-  auto caps = programBuilder->getContext()->caps();
-  auto& swizzle = caps->getReadSwizzle(texture->format());
+  auto swizzle = Swizzle::ForRead(texture->format());
   samplerSwizzles.push_back(swizzle);
   return SamplerHandle(samplers.size() - 1);
 }

@@ -95,7 +95,7 @@ std::shared_ptr<GPUTexture> GLGPU::createTexture(const GPUTextureDescriptor& des
     return GLDepthStencilTexture::MakeFrom(this, descriptor);
   }
   if (descriptor.usage & GPUTextureUsage::RENDER_ATTACHMENT &&
-      !caps()->isFormatRenderable(descriptor.format)) {
+      !isFormatRenderable(descriptor.format)) {
     LOGE("GLGPU::createTexture() format is not renderable, but usage includes RENDER_ATTACHMENT!");
     return nullptr;
   }
@@ -147,7 +147,7 @@ std::shared_ptr<GPUTexture> GLGPU::importExternalTexture(const BackendTexture& b
     return nullptr;
   }
   auto format = GLSizeFormatToPixelFormat(textureInfo.format);
-  if (usage & GPUTextureUsage::RENDER_ATTACHMENT && !caps()->isFormatRenderable(format)) {
+  if (usage & GPUTextureUsage::RENDER_ATTACHMENT && !isFormatRenderable(format)) {
     LOGE(
         "GLGPU::importExternalTexture() format is not renderable but RENDER_ATTACHMENT usage is "
         "set!");
@@ -181,7 +181,7 @@ std::shared_ptr<GPUTexture> GLGPU::importExternalTexture(const BackendRenderTarg
     return nullptr;
   }
   auto format = GLSizeFormatToPixelFormat(frameBufferInfo.format);
-  if (!caps()->isFormatRenderable(format)) {
+  if (!isFormatRenderable(format)) {
     return nullptr;
   }
   GPUTextureDescriptor descriptor = {renderTarget.width(),

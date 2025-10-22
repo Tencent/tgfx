@@ -21,6 +21,7 @@
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/TileSortCompareFunc.h"
+#include "gpu/GPU.h"
 #include "inspect/InspectorMark.h"
 #include "layers/DrawArgs.h"
 #include "layers/RootLayer.h"
@@ -795,7 +796,7 @@ int DisplayList::nextSurfaceTileCount(Context* context) const {
 }
 
 int DisplayList::getMaxTileCountPerAtlas(Context* context) const {
-  auto maxTextureSize = std::min(context->caps()->maxTextureSize, MAX_ATLAS_SIZE);
+  auto maxTextureSize = std::min(context->gpu()->limits()->maxTextureDimension2D, MAX_ATLAS_SIZE);
   return (maxTextureSize / _tileSize) * (maxTextureSize / _tileSize);
 }
 
