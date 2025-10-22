@@ -231,11 +231,9 @@ class AAStrokeRectsVertexProvider final : public RectsVertexProvider {
       const auto& record = rects[i];
       auto& viewMatrix = record->viewMatrix;
       Point strokeSize = {stroke->width, stroke->width};
-      if (stroke->width > 0.f) {
-        strokeSize.x =
-            std::abs(strokeSize.x * viewMatrix.getScaleX() + strokeSize.y * viewMatrix.getSkewX());
-        strokeSize.y =
-            std::abs(strokeSize.x * viewMatrix.getSkewY() + strokeSize.y * viewMatrix.getScaleY());
+      if (stroke->width > 0.0f) {
+        strokeSize.x = std::abs(stroke->width * (viewMatrix.getScaleX() + viewMatrix.getSkewX()));
+        strokeSize.y = std::abs(stroke->width * (viewMatrix.getSkewX() + viewMatrix.getScaleY()));
       } else {
         strokeSize.set(1.0f, 1.0f);
       }
@@ -284,23 +282,23 @@ class AAStrokeRectsVertexProvider final : public RectsVertexProvider {
                   innerCoverage, rect, strokeSize, stroke->join);
         // Interior outset rect (away from stroke, toward center of rect).
         Rect interiorAABoundary = inSide.makeInset(interiorOutset, interiorOutset);
-        float coverageBackset = 0;  // Adds back coverage when the interior AA edges cross.
+        float coverageBackset = 0.0f;  // Adds back coverage when the interior AA edges cross.
         if (interiorAABoundary.left > interiorAABoundary.right) {
           coverageBackset =
-              (interiorAABoundary.left - interiorAABoundary.right) / (interiorOutset * 2);
+              (interiorAABoundary.left - interiorAABoundary.right) / (interiorOutset * 2.0f);
           interiorAABoundary.left = interiorAABoundary.right = interiorAABoundary.centerX();
         }
         if (interiorAABoundary.top > interiorAABoundary.bottom) {
           coverageBackset =
-              std::max((interiorAABoundary.top - interiorAABoundary.bottom) / (interiorOutset * 2),
+              std::max((interiorAABoundary.top - interiorAABoundary.bottom) / (interiorOutset * 2.0f),
                        coverageBackset);
           interiorAABoundary.top = interiorAABoundary.bottom = interiorAABoundary.centerY();
         }
-        if (coverageBackset > 0) {
+        if (coverageBackset > 0.0f) {
           // The interior edges crossed. Lerp back toward innerCoverage, which is what this op
           // will draw in the degenerate case. This gives a smooth transition into the degenerate
           // case.
-          innerCoverage += innerCoverage * (1 - coverageBackset) + innerCoverage * coverageBackset;
+          innerCoverage += interiorCoverage * (1.0f - coverageBackset) + innerCoverage * coverageBackset;
         }
         writeQuad(vertices, index, Quad::MakeFrom(interiorAABoundary), record->color,
                   interiorCoverage, rect, strokeSize, stroke->join);
@@ -369,11 +367,9 @@ class NonAAStrokeRectsVertexProvider final : public RectsVertexProvider {
       const auto& record = rects[i];
       auto& viewMatrix = record->viewMatrix;
       Point strokeSize = {stroke->width, stroke->width};
-      if (stroke->width > 0.f) {
-        strokeSize.x =
-            std::abs(strokeSize.x * viewMatrix.getScaleX() + strokeSize.y * viewMatrix.getSkewX());
-        strokeSize.y =
-            std::abs(strokeSize.x * viewMatrix.getSkewY() + strokeSize.y * viewMatrix.getScaleY());
+      if (stroke->width > 0.0f) {
+        strokeSize.x = std::abs(stroke->width * (viewMatrix.getScaleX() + viewMatrix.getSkewX()));
+        strokeSize.y = std::abs(stroke->width * (viewMatrix.getSkewX() + viewMatrix.getScaleY()));
       } else {
         strokeSize.set(1.0f, 1.0f);
       }

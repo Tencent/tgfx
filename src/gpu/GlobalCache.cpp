@@ -220,7 +220,7 @@ class RectIndicesProvider : public DataSource<Data> {
   }
 
   std::shared_ptr<Data> getData() const override {
-    auto size = reps * patternSize * sizeof(uint16_t);
+    auto size = sizeof(uint16_t) * reps * patternSize;
     Buffer buffer(size);
     if (buffer.isEmpty()) {
       return nullptr;

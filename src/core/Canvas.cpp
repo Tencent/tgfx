@@ -368,7 +368,7 @@ void Canvas::drawPath(const Path& path, const MCState& state, const Fill& fill,
   }
   if (stroke == nullptr) {
     if (path.isRect(&rect)) {
-      drawContext->drawRect(rect, state, fill, stroke);
+      drawContext->drawRect(rect, state, fill, nullptr);
       return;
     }
     RRect rRect = {};
