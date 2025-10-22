@@ -286,7 +286,7 @@ class CullFaceDescriptor {
      */
     Back,
     /**
-     * Cull back faces
+     * Cull both front and back faces
      */
     FrontAndBack
   };
