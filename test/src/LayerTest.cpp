@@ -3277,6 +3277,8 @@ TGFX_TEST(LayerTest, Matrix) {
     // requires appending matrix elements on the left side of matrix multiplication (using
     // post-prefix functions), while transforming based on the model coordinate system appends on
     // the right side (using pre-prefix functions)
+    // The following operation order is derived to ensure alignment with CSS effects under various
+    // transformations with identical values
     auto modelMatrix = Matrix3D::MakeScale(2.f, 2.f, 1.f);
     constexpr float skewXDegrees = -15.f;
     constexpr float skewYDegrees = -15.f;
