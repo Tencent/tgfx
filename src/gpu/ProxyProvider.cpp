@@ -368,15 +368,15 @@ std::shared_ptr<TextureProxy> ProxyProvider::wrapExternalTexture(
 
 std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
     const BackendTexture& backendTexture, int sampleCount, ImageOrigin origin, bool adopted) {
-  auto format = context->gpu()->getExternalTextureFormat(backendTexture);
+  auto gpu = context->gpu();
+  auto format = gpu->getExternalTextureFormat(backendTexture);
   if (format == PixelFormat::Unknown) {
     return nullptr;
   }
-  auto caps = context->caps();
-  if (!caps->isFormatRenderable(format)) {
+  if (!gpu->isFormatRenderable(format)) {
     return nullptr;
   }
-  sampleCount = caps->getSampleCount(sampleCount, format);
+  sampleCount = gpu->getSampleCount(sampleCount, format);
   auto proxy = std::shared_ptr<TextureRenderTargetProxy>(
       new ExternalTextureRenderTargetProxy(backendTexture, format, sampleCount, origin, adopted));
   addResourceProxy(proxy);
@@ -390,15 +390,15 @@ std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
     return nullptr;
   }
   YUVFormat yuvFormat = YUVFormat::Unknown;
-  auto formats = context->gpu()->getHardwareTextureFormats(hardwareBuffer, &yuvFormat);
+  auto gpu = context->gpu();
+  auto formats = gpu->getHardwareTextureFormats(hardwareBuffer, &yuvFormat);
   if (formats.size() != 1 || yuvFormat != YUVFormat::Unknown) {
     return nullptr;
   }
-  auto caps = context->caps();
-  if (!caps->isFormatRenderable(formats.front())) {
+  if (!gpu->isFormatRenderable(formats.front())) {
     return nullptr;
   }
-  sampleCount = caps->getSampleCount(sampleCount, formats.front());
+  sampleCount = gpu->getSampleCount(sampleCount, formats.front());
   auto proxy = std::shared_ptr<TextureRenderTargetProxy>(new HardwareRenderTargetProxy(
       hardwareBuffer, size.width, size.height, formats.front(), sampleCount));
   addResourceProxy(proxy);
@@ -416,11 +416,11 @@ std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
     proxy->_height = height;
     return proxy->asRenderTargetProxy();
   }
-  auto caps = context->caps();
-  if (!caps->isFormatRenderable(format)) {
+  auto gpu = context->gpu();
+  if (!gpu->isFormatRenderable(format)) {
     return nullptr;
   }
-  sampleCount = caps->getSampleCount(sampleCount, format);
+  sampleCount = gpu->getSampleCount(sampleCount, format);
   auto proxy = std::shared_ptr<TextureRenderTargetProxy>(
       new TextureRenderTargetProxy(width, height, format, sampleCount, mipmapped, origin));
   if (backingFit == BackingFit::Approx) {

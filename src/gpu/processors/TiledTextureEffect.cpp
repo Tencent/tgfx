@@ -79,9 +79,9 @@ TiledTextureEffect::Sampling::Sampling(const TextureView* textureView, SamplerSt
     Span shaderClamp;
     TileMode hwMode = TileMode::Clamp;
   };
-  auto caps = textureView->getContext()->caps();
+  auto features = textureView->getContext()->gpu()->features();
   auto canDoWrapInHW = [&](TileMode tileMode) {
-    if (tileMode == TileMode::Decal && !caps->clampToBorderSupport) {
+    if (tileMode == TileMode::Decal && !features->clampToBorder) {
       return false;
     }
     if (textureView->getTexture()->type() != GPUTextureType::TwoD &&

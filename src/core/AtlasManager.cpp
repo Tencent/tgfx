@@ -39,7 +39,7 @@ const std::vector<std::shared_ptr<TextureProxy>>& AtlasManager::getTextureProxie
 
 bool AtlasManager::initAtlas(MaskFormat maskFormat) {
   auto index = MaskFormatToAtlasIndex(maskFormat);
-  AtlasConfig atlasConfig(context->caps()->maxTextureSize);
+  AtlasConfig atlasConfig(context->gpu()->limits()->maxTextureDimension2D);
   if (atlases[index] == nullptr) {
     ISize atlasDimensions = atlasConfig.atlasDimensions(maskFormat);
     ISize plotDimensions = atlasConfig.plotDimensions(maskFormat);

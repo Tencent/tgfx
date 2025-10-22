@@ -48,7 +48,7 @@ std::shared_ptr<TextureProxy> ImageFilter::lockTextureProxy(std::shared_ptr<Imag
 
   auto textureScaleX = scaledBounds.width() / renderBounds.width();
   auto textureScaleY = scaledBounds.height() / renderBounds.height();
-  auto renderTarget = RenderTargetProxy::MakeFallback(
+  auto renderTarget = RenderTargetProxy::Make(
       args.context, static_cast<int>(scaledBounds.width()), static_cast<int>(scaledBounds.height()),
       source->isAlphaOnly(), 1, args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
   if (renderTarget == nullptr) {

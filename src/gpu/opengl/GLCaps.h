@@ -23,9 +23,10 @@
 #include <vector>
 #include "core/utils/EnumHasher.h"
 #include "core/utils/Log.h"
+#include "gpu/GPUFeatures.h"
+#include "gpu/GPUInfo.h"
+#include "gpu/GPULimits.h"
 #include "gpu/ShaderCaps.h"
-#include "gpu/Swizzle.h"
-#include "tgfx/gpu/Caps.h"
 #include "tgfx/gpu/PixelFormat.h"
 #include "tgfx/gpu/opengl/GLDefines.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
@@ -46,8 +47,6 @@ struct GLTextureFormat {
 struct ConfigInfo {
   GLTextureFormat format;
   std::vector<int> colorSampleCounts;
-  Swizzle readSwizzle = Swizzle::RGBA();
-  Swizzle writeSwizzle = Swizzle::RGBA();
 };
 
 enum class GLVendor { ARM, Google, Imagination, Intel, Qualcomm, NVIDIA, ATI, Other };
@@ -61,6 +60,7 @@ class GLInfo {
   GLGetIntegerv* getIntegerv = nullptr;
   GLGetInternalformativ* getInternalformativ = nullptr;
   GLGetShaderPrecisionFormat* getShaderPrecisionFormat = nullptr;
+  std::vector<std::string> extensions = {};
 
   GLInfo(GLGetString* getString, GLGetStringi* getStringi, GLGetIntegerv* getIntegerv,
          GLGetInternalformativ* getInternalformativ,
@@ -70,38 +70,42 @@ class GLInfo {
 
  private:
   void fetchExtensions();
-
-  std::vector<std::string> extensions = {};
 };
 
-class GLCaps : public Caps {
+class GLCaps {
  public:
   GLStandard standard = GLStandard::None;
   uint32_t version = 0;
   GLVendor vendor = GLVendor::Other;
   bool pboSupport = false;
+  bool multisampleDisableSupport = false;
+  bool frameBufferFetchRequiresEnablePerSample = false;
   bool flushBeforeWritePixels = false;
-
-  static const GLCaps* Get(Context* context);
 
   explicit GLCaps(const GLInfo& info);
 
-  const ShaderCaps* shaderCaps() const override {
-    return &_shaderCaps;
+  const GPUInfo* info() const {
+    return &_info;
+  }
+
+  const GPUFeatures* features() const {
+    return &_features;
+  }
+
+  const GPULimits* limits() const {
+    return &_limits;
   }
 
   const GLTextureFormat& getTextureFormat(PixelFormat pixelFormat) const;
 
-  const Swizzle& getReadSwizzle(PixelFormat pixelFormat) const override;
+  bool isFormatRenderable(PixelFormat pixelFormat) const;
 
-  const Swizzle& getWriteSwizzle(PixelFormat pixelFormat) const override;
-
-  bool isFormatRenderable(PixelFormat pixelFormat) const override;
-
-  int getSampleCount(int requestedCount, PixelFormat pixelFormat) const override;
+  int getSampleCount(int requestedCount, PixelFormat pixelFormat) const;
 
  private:
-  ShaderCaps _shaderCaps = {};
+  GPUInfo _info = {};
+  GPUFeatures _features = {};
+  GPULimits _limits = {};
   std::unordered_map<PixelFormat, ConfigInfo, EnumHasher> pixelFormatMap = {};
 
   void initFormatMap(const GLInfo& info);

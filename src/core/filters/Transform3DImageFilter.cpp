@@ -62,7 +62,7 @@ std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
   const float drawScaleX = dstDrawWidth / renderBounds.width();
   const float drawScaleY = dstDrawHeight / renderBounds.height();
 
-  auto renderTarget = RenderTargetProxy::MakeFallback(
+  auto renderTarget = RenderTargetProxy::Make(
       args.context, static_cast<int>(dstDrawWidth), static_cast<int>(dstDrawHeight),
       source->isAlphaOnly(), 1, args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
   auto sourceTextureProxy = source->lockTextureProxy(args);
