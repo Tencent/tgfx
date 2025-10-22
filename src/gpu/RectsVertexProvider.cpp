@@ -289,16 +289,17 @@ class AAStrokeRectsVertexProvider final : public RectsVertexProvider {
           interiorAABoundary.left = interiorAABoundary.right = interiorAABoundary.centerX();
         }
         if (interiorAABoundary.top > interiorAABoundary.bottom) {
-          coverageBackset =
-              std::max((interiorAABoundary.top - interiorAABoundary.bottom) / (interiorOutset * 2.0f),
-                       coverageBackset);
+          coverageBackset = std::max(
+              (interiorAABoundary.top - interiorAABoundary.bottom) / (interiorOutset * 2.0f),
+              coverageBackset);
           interiorAABoundary.top = interiorAABoundary.bottom = interiorAABoundary.centerY();
         }
         if (coverageBackset > 0.0f) {
           // The interior edges crossed. Lerp back toward innerCoverage, which is what this op
           // will draw in the degenerate case. This gives a smooth transition into the degenerate
           // case.
-          innerCoverage += interiorCoverage * (1.0f - coverageBackset) + innerCoverage * coverageBackset;
+          innerCoverage +=
+              interiorCoverage * (1.0f - coverageBackset) + innerCoverage * coverageBackset;
         }
         writeQuad(vertices, index, Quad::MakeFrom(interiorAABoundary), record->color,
                   interiorCoverage, rect, strokeSize, stroke->join);
