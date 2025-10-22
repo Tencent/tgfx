@@ -3292,8 +3292,9 @@ TGFX_TEST(LayerTest, Matrix) {
     auto maxLength = static_cast<float>(std::max(image->width(), image->height())) * 2.f;
     auto farZ = std::min(-maxLength, -500.f);
     auto perspectiveMatrix = MakePerspectiveMatrix(farZ);
+    // The origin coordinates of the layer in the local coordinate system when no model
+    // transformation (excluding XY translation) is applied
     auto origin = Point::Make(125, 105);
-    // auto origin = Point::Make(0, 0);
     auto originTranslateMatrix = Matrix3D::MakeTranslate(origin.x, origin.y, 0.f);
     imageMatrix3D = originTranslateMatrix * invOffsetToAnchorMatrix * perspectiveMatrix *
                     modelMatrix * offsetToAnchorMatrix;
