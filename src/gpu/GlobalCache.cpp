@@ -350,7 +350,7 @@ void GlobalCache::addStaticResource(const UniqueKey& uniqueKey,
  * outer edge:    4 ~ 7
  * inner edge:    8 ~ 11
  * inner AA line: 12 ~ 15
- * Following comes a stroke rect and its indices:
+ * Following comes an AA stroke rect and its indices:
  *    0                                    2
  *      **********************************
  *      * 4────────────────────────────6 *
@@ -384,7 +384,7 @@ static constexpr uint16_t AAStrokeRectIndices[] = {
   2 + 8, 0 + 8, 4 + 8, 4 + 8, 6 + 8, 2 + 8,
 };
 
-/**  Following comes a stroke rect and its indices:
+/**  Following comes a non-AA stroke rect and its indices:
  *    0────────────────────────────2
  *    │                            │
  *    │     4────────────────6     │
