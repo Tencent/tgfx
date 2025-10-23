@@ -198,11 +198,6 @@ class Bitmap {
   std::shared_ptr<ColorSpace> colorSpace() const;
 
   /**
-   * Set the colorSpace of this bitmap.
-   */
-  void setColorSpace(std::shared_ptr<ColorSpace> colorSpace);
-
-  /**
    * Encodes the pixels in Bitmap into a binary image format.
    * @param format One of: EncodedFormat::JPEG, EncodedFormat::PNG, EncodedFormat::WEBP
    * @param quality A platform and format specific metric trading off size and encoding error. When

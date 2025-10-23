@@ -98,10 +98,6 @@ std::shared_ptr<ColorSpace> Bitmap::colorSpace() const {
   return pixelRef->colorSpace();
 }
 
-void Bitmap::setColorSpace(std::shared_ptr<ColorSpace> colorSpace) {
-  pixelRef->setColorSpace(std::move(colorSpace));
-}
-
 std::shared_ptr<Data> Bitmap::encode(EncodedFormat format, int quality) const {
   Pixmap pixmap(*this);
   return ImageCodec::Encode(pixmap, format, quality, colorSpace());
