@@ -48,8 +48,9 @@ class OrientImage : public TransformImage {
   std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
                                       const SamplingOptions& sampling) const override;
 
-  PlacementPtr<FragmentProcessor> asFragmentProcessor(
-      const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix) const override;
+  PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
+                                                      const SamplingArgs& samplingArgs,
+                                                      const Matrix* uvMatrix) const override;
 
   Orientation concatOrientation(Orientation newOrientation) const;
 

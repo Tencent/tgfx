@@ -77,8 +77,9 @@ class TextureImage : public Image {
 
   std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
 
-  PlacementPtr<FragmentProcessor> asFragmentProcessor(
-      const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix) const override;
+  PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
+                                                      const SamplingArgs& samplingArgs,
+                                                      const Matrix* uvMatrix) const override;
 
  private:
   std::shared_ptr<TextureProxy> textureProxy = nullptr;

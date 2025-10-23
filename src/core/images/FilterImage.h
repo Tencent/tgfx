@@ -69,8 +69,9 @@ class FilterImage : public SubsetImage {
 
   std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
 
-  PlacementPtr<FragmentProcessor> asFragmentProcessor(
-      const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix) const override;
+  PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
+                                                      const SamplingArgs& samplingArgs,
+                                                      const Matrix* uvMatrix) const override;
 
  private:
   static std::shared_ptr<Image> Wrap(std::shared_ptr<Image> source, const Rect& bounds,

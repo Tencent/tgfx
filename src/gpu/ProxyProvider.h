@@ -102,10 +102,12 @@ class ProxyProvider {
   /**
    * Creates an empty TextureProxy with specified width, height, format, mipmap state and origin.
    */
-  std::shared_ptr<TextureProxy> createTextureProxy(
-      const UniqueKey& uniqueKey, int width, int height, PixelFormat format, bool mipmapped = false,
-      ImageOrigin origin = ImageOrigin::TopLeft,
-      BackingFit backingFit = BackingFit::Exact, uint32_t renderFlags = 0);
+  std::shared_ptr<TextureProxy> createTextureProxy(const UniqueKey& uniqueKey, int width,
+                                                   int height, PixelFormat format,
+                                                   bool mipmapped = false,
+                                                   ImageOrigin origin = ImageOrigin::TopLeft,
+                                                   BackingFit backingFit = BackingFit::Exact,
+                                                   uint32_t renderFlags = 0);
 
   /**
    * Creates a TextureProxy for the specified HardwareBuffer. Returns nullptr if
@@ -117,9 +119,9 @@ class ProxyProvider {
    * Creates a texture proxy for the provided BackendTexture. If adopted is true, the backend
    * texture will be destroyed at a later point after the texture proxy is released.
    */
-  std::shared_ptr<TextureProxy> wrapExternalTexture(
-      const BackendTexture& backendTexture, ImageOrigin origin = ImageOrigin::TopLeft,
-      bool adopted = false);
+  std::shared_ptr<TextureProxy> wrapExternalTexture(const BackendTexture& backendTexture,
+                                                    ImageOrigin origin = ImageOrigin::TopLeft,
+                                                    bool adopted = false);
 
   /**
    * Creates a RenderTargetProxy for the specified BackendTexture, sample count, origin, and
@@ -133,8 +135,8 @@ class ProxyProvider {
    * Creates a RenderTargetProxy for the specified HardwareBuffer and sample count. Returns nullptr
    * if the hardware buffer is not renderable.
    */
-  std::shared_ptr<RenderTargetProxy> createRenderTargetProxy(
-      HardwareBufferRef hardwareBuffer, int sampleCount = 1);
+  std::shared_ptr<RenderTargetProxy> createRenderTargetProxy(HardwareBufferRef hardwareBuffer,
+                                                             int sampleCount = 1);
 
   /**
    * Creates a RenderTargetProxy with specified width, height, format, sample count, mipmap state
@@ -142,8 +144,8 @@ class ProxyProvider {
    */
   std::shared_ptr<RenderTargetProxy> createRenderTargetProxy(
       const UniqueKey& uniqueKey, int width, int height, PixelFormat format, int sampleCount = 1,
-      bool mipmapped = false, ImageOrigin origin = ImageOrigin::TopLeft, BackingFit backingFit = BackingFit::Exact,
-      uint32_t renderFlags = 0);
+      bool mipmapped = false, ImageOrigin origin = ImageOrigin::TopLeft,
+      BackingFit backingFit = BackingFit::Exact, uint32_t renderFlags = 0);
 
   /*
    * Purges all unreferenced proxies.

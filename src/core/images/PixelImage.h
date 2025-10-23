@@ -34,8 +34,9 @@ class PixelImage : public Image {
   explicit PixelImage(bool mipmapped) : mipmapped(mipmapped) {
   }
 
-  PlacementPtr<FragmentProcessor> asFragmentProcessor(
-      const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix) const override;
+  PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
+                                                      const SamplingArgs& samplingArgs,
+                                                      const Matrix* uvMatrix) const override;
   bool mipmapped = false;
 };
 }  // namespace tgfx

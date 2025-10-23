@@ -66,8 +66,9 @@ std::shared_ptr<Image> SubsetImage::onMakeScaled(int newWidth, int newHeight,
   return MakeFrom(std::move(newSource), newBounds);
 }
 
-PlacementPtr<FragmentProcessor> SubsetImage::asFragmentProcessor(
-    const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix) const {
+PlacementPtr<FragmentProcessor> SubsetImage::asFragmentProcessor(const FPArgs& args,
+                                                                 const SamplingArgs& samplingArgs,
+                                                                 const Matrix* uvMatrix) const {
   auto matrix = concatUVMatrix(uvMatrix);
   auto drawBounds = args.drawRect;
   if (matrix) {

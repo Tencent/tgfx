@@ -32,8 +32,9 @@ ScaledImage::ScaledImage(std::shared_ptr<Image> image, int width, int height,
       mipmapped(mipmapped) {
 }
 
-PlacementPtr<FragmentProcessor> ScaledImage::asFragmentProcessor(
-    const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix) const {
+PlacementPtr<FragmentProcessor> ScaledImage::asFragmentProcessor(const FPArgs& args,
+                                                                 const SamplingArgs& samplingArgs,
+                                                                 const Matrix* uvMatrix) const {
   auto drawBounds = args.drawRect;
   if (uvMatrix) {
     drawBounds = uvMatrix->mapRect(drawBounds);

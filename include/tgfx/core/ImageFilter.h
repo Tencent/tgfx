@@ -168,15 +168,19 @@ class ImageFilter {
    * Returns a FragmentProcessor that applies this filter to the source image. The returned
    * processor is in the coordinate space of the source image.
    */
-  virtual PlacementPtr<FragmentProcessor> asFragmentProcessor(
-      std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-      SrcRectConstraint constraint, const Matrix* uvMatrix) const = 0;
+  virtual PlacementPtr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
+                                                              const FPArgs& args,
+                                                              const SamplingOptions& sampling,
+                                                              SrcRectConstraint constraint,
+                                                              const Matrix* uvMatrix) const = 0;
 
   bool applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* clipBounds = nullptr) const;
 
-  PlacementPtr<FragmentProcessor> makeFPFromTextureProxy(
-      std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-      SrcRectConstraint constraint, const Matrix* uvMatrix) const;
+  PlacementPtr<FragmentProcessor> makeFPFromTextureProxy(std::shared_ptr<Image> source,
+                                                         const FPArgs& args,
+                                                         const SamplingOptions& sampling,
+                                                         SrcRectConstraint constraint,
+                                                         const Matrix* uvMatrix) const;
 
   friend class DropShadowImageFilter;
   friend class InnerShadowImageFilter;

@@ -39,8 +39,10 @@ class RuntimeImageFilter : public ImageFilter {
                                                  const Rect& renderBounds,
                                                  const TPArgs& args) const override;
 
-  PlacementPtr<FragmentProcessor> asFragmentProcessor(
-      std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-      SrcRectConstraint constraint, const Matrix* uvMatrix) const override;
+  PlacementPtr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
+                                                      const FPArgs& args,
+                                                      const SamplingOptions& sampling,
+                                                      SrcRectConstraint constraint,
+                                                      const Matrix* uvMatrix) const override;
 };
 }  // namespace tgfx

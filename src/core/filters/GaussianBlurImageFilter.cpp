@@ -206,8 +206,7 @@ PlacementPtr<FragmentProcessor> GaussianBlurImageFilter::getSourceFragmentProces
   }
   auto renderTarget = RenderTargetProxy::MakeFallback(
       context, static_cast<int>(scaledDrawRect.width()), static_cast<int>(scaledDrawRect.height()),
-      source->isAlphaOnly(), 1, false, ImageOrigin::TopLeft,
-      BackingFit::Exact);
+      source->isAlphaOnly(), 1, false, ImageOrigin::TopLeft, BackingFit::Exact);
   if (renderTarget == nullptr) {
     return nullptr;
   }

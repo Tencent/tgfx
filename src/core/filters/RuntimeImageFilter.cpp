@@ -70,7 +70,8 @@ std::shared_ptr<TextureProxy> RuntimeImageFilter::lockTextureProxy(std::shared_p
   }
   auto offset = Point::Make(-renderBounds.x(), -renderBounds.y());
   auto drawingManager = args.context->drawingManager();
-  drawingManager->addRuntimeDrawTask(renderTarget, std::move(textureProxyWithCSVec), effect, offset);
+  drawingManager->addRuntimeDrawTask(renderTarget, std::move(textureProxyWithCSVec), effect,
+                                     offset);
   return renderTarget->asTextureProxy();
 }
 

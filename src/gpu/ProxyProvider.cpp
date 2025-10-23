@@ -313,8 +313,7 @@ int GetApproxSize(int value) {
 
 std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
     const UniqueKey& uniqueKey, int width, int height, PixelFormat format, bool mipmapped,
-    ImageOrigin origin, BackingFit backingFit,
-    uint32_t renderFlags) {
+    ImageOrigin origin, BackingFit backingFit, uint32_t renderFlags) {
   if (!TextureView::CheckSizeAndFormat(context, width, height, format)) {
     return nullptr;
   }
@@ -346,16 +345,15 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(HardwareBufferRe
   if (formats.size() != 1 || yuvFormat != YUVFormat::Unknown) {
     return nullptr;
   }
-  auto proxy = std::shared_ptr<HardwareTextureProxy>(new HardwareTextureProxy(
-      hardwareBuffer, size.width, size.height, formats.front()));
+  auto proxy = std::shared_ptr<HardwareTextureProxy>(
+      new HardwareTextureProxy(hardwareBuffer, size.width, size.height, formats.front()));
   addResourceProxy(proxy);
   return proxy;
 }
 
 std::shared_ptr<TextureProxy> ProxyProvider::wrapExternalTexture(
     const BackendTexture& backendTexture, ImageOrigin origin, bool adopted) {
-  auto textureView =
-      TextureView::MakeFrom(context, backendTexture, origin, adopted);
+  auto textureView = TextureView::MakeFrom(context, backendTexture, origin, adopted);
   if (textureView == nullptr) {
     return nullptr;
   }
@@ -379,8 +377,8 @@ std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
     return nullptr;
   }
   sampleCount = caps->getSampleCount(sampleCount, format);
-  auto proxy = std::shared_ptr<TextureRenderTargetProxy>(new ExternalTextureRenderTargetProxy(
-      backendTexture, format, sampleCount, origin, adopted));
+  auto proxy = std::shared_ptr<TextureRenderTargetProxy>(
+      new ExternalTextureRenderTargetProxy(backendTexture, format, sampleCount, origin, adopted));
   addResourceProxy(proxy);
   return proxy;
 }
@@ -401,16 +399,14 @@ std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
     return nullptr;
   }
   sampleCount = caps->getSampleCount(sampleCount, formats.front());
-  auto proxy = std::shared_ptr<TextureRenderTargetProxy>(
-      new HardwareRenderTargetProxy(hardwareBuffer, size.width, size.height, formats.front(),
-                                    sampleCount));
+  auto proxy = std::shared_ptr<TextureRenderTargetProxy>(new HardwareRenderTargetProxy(
+      hardwareBuffer, size.width, size.height, formats.front(), sampleCount));
   return proxy;
 }
 
 std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
     const UniqueKey& uniqueKey, int width, int height, PixelFormat format, int sampleCount,
-    bool mipmapped, ImageOrigin origin,
-    BackingFit backingFit, uint32_t renderFlags) {
+    bool mipmapped, ImageOrigin origin, BackingFit backingFit, uint32_t renderFlags) {
   if (!TextureView::CheckSizeAndFormat(context, width, height, format)) {
     return nullptr;
   }
@@ -424,8 +420,8 @@ std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
     return nullptr;
   }
   sampleCount = caps->getSampleCount(sampleCount, format);
-  auto proxy = std::shared_ptr<TextureRenderTargetProxy>(new TextureRenderTargetProxy(
-      width, height, format, sampleCount, mipmapped, origin, false));
+  auto proxy = std::shared_ptr<TextureRenderTargetProxy>(
+      new TextureRenderTargetProxy(width, height, format, sampleCount, mipmapped, origin, false));
   if (backingFit == BackingFit::Approx) {
     proxy->_backingStoreWidth = GetApproxSize(width);
     proxy->_backingStoreHeight = GetApproxSize(height);

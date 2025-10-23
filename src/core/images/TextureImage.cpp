@@ -80,8 +80,9 @@ std::shared_ptr<TextureProxy> TextureImage::lockTextureProxy(const TPArgs& args)
   return textureProxy;
 }
 
-PlacementPtr<FragmentProcessor> TextureImage::asFragmentProcessor(
-    const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix) const {
+PlacementPtr<FragmentProcessor> TextureImage::asFragmentProcessor(const FPArgs& args,
+                                                                  const SamplingArgs& samplingArgs,
+                                                                  const Matrix* uvMatrix) const {
   if (args.context == nullptr || args.context->uniqueID() != contextID) {
     return nullptr;
   }

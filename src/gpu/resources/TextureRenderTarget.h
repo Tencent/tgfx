@@ -56,16 +56,18 @@ class TextureRenderTarget : public DefaultTextureView, public RenderTarget {
   std::shared_ptr<GPUTexture> renderTexture = nullptr;
   bool _externallyOwned = false;
 
-  static std::shared_ptr<RenderTarget> MakeFrom(
-      Context* context, std::shared_ptr<GPUTexture> texture, int sampleCount,
-      ImageOrigin origin = ImageOrigin::TopLeft, bool externallyOwned = false,
-      const ScratchKey& scratchKey = {});
+  static std::shared_ptr<RenderTarget> MakeFrom(Context* context,
+                                                std::shared_ptr<GPUTexture> texture,
+                                                int sampleCount,
+                                                ImageOrigin origin = ImageOrigin::TopLeft,
+                                                bool externallyOwned = false,
+                                                const ScratchKey& scratchKey = {});
 
   TextureRenderTarget(std::shared_ptr<GPUTexture> texture,
                       std::shared_ptr<GPUTexture> renderTexture, ImageOrigin origin,
                       bool externallyOwned)
-      : DefaultTextureView(std::move(texture), origin),
-        renderTexture(std::move(renderTexture)), _externallyOwned(externallyOwned) {
+      : DefaultTextureView(std::move(texture), origin), renderTexture(std::move(renderTexture)),
+        _externallyOwned(externallyOwned) {
   }
 
   friend class RenderTarget;

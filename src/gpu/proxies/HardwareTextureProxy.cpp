@@ -21,7 +21,7 @@
 namespace tgfx {
 HardwareTextureProxy::HardwareTextureProxy(HardwareBufferRef hardwareBuffer, int width, int height,
                                            PixelFormat format)
-    : TextureProxy(width, height, format), hardwareBuffer(hardwareBuffer){
+    : TextureProxy(width, height, format), hardwareBuffer(hardwareBuffer) {
   HardwareBufferRetain(hardwareBuffer);
 }
 

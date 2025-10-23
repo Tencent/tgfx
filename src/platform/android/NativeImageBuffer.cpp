@@ -57,9 +57,8 @@ std::shared_ptr<TextureView> NativeImageBuffer::onMakeTexture(Context* context,
     textureView = TextureView::MakeAlpha(context, info.width(), info.height(), pixels,
                                          info.rowBytes(), mipmapped);
   } else {
-    textureView =
-        TextureView::MakeRGBA(context, info.width(), info.height(), pixels, info.rowBytes(),
-                              mipmapped);
+    textureView = TextureView::MakeRGBA(context, info.width(), info.height(), pixels,
+                                        info.rowBytes(), mipmapped);
   }
   AndroidBitmap_unlockPixels(env, bitmap.get());
   return textureView;

@@ -80,8 +80,9 @@ std::shared_ptr<Image> PictureImage::onMakeMipmapped(bool enabled) const {
   return newImage;
 }
 
-PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(
-    const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix) const {
+PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& args,
+                                                                  const SamplingArgs& samplingArgs,
+                                                                  const Matrix* uvMatrix) const {
   auto drawBounds = args.drawRect;
   if (uvMatrix) {
     drawBounds = uvMatrix->mapRect(drawBounds);
@@ -116,8 +117,8 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(
   if (samplingArgs.sampleArea) {
     newSamplingArgs.sampleArea = extraMatrix.mapRect(*samplingArgs.sampleArea);
   }
-  return TiledTextureEffect::Make(renderTarget->asTextureProxy(), newSamplingArgs,
-                                     &finalUVMatrix, isAlphaOnly());
+  return TiledTextureEffect::Make(renderTarget->asTextureProxy(), newSamplingArgs, &finalUVMatrix,
+                                  isAlphaOnly());
 }
 
 std::shared_ptr<TextureProxy> PictureImage::lockTextureProxy(const TPArgs& args) const {

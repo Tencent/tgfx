@@ -54,8 +54,9 @@ std::shared_ptr<Image> RGBAAAImage::onCloneWith(std::shared_ptr<Image> newSource
   return image;
 }
 
-PlacementPtr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(
-    const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix) const {
+PlacementPtr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(const FPArgs& args,
+                                                                 const SamplingArgs& samplingArgs,
+                                                                 const Matrix* uvMatrix) const {
   DEBUG_ASSERT(!source->isAlphaOnly());
   auto matrix = concatUVMatrix(uvMatrix);
   auto drawBounds = args.drawRect;
@@ -71,7 +72,8 @@ PlacementPtr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(
     }
     TPArgs tpArgs(args.context, args.renderFlags, mipmapped, 1.0f, {});
     auto proxy = source->lockTextureProxy(tpArgs);
-    return TextureEffect::MakeRGBAAA(std::move(proxy), newSamplingArgs, alphaStart, AddressOf(matrix));
+    return TextureEffect::MakeRGBAAA(std::move(proxy), newSamplingArgs, alphaStart,
+                                     AddressOf(matrix));
   }
   TPArgs tpArgs(args.context, args.renderFlags, mipmapped, 1.0f, {});
   auto textureProxy = lockTextureProxy(tpArgs);
@@ -85,9 +87,9 @@ PlacementPtr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(
 std::shared_ptr<TextureProxy> RGBAAAImage::lockTextureProxy(const TPArgs& args) const {
   auto textureWidth = width();
   auto textureHeight = height();
-  auto renderTarget = RenderTargetProxy::MakeFallback(
-      args.context, textureWidth, textureHeight, isAlphaOnly(), 1, args.mipmapped,
-      ImageOrigin::TopLeft, args.backingFit);
+  auto renderTarget =
+      RenderTargetProxy::MakeFallback(args.context, textureWidth, textureHeight, isAlphaOnly(), 1,
+                                      args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
   if (renderTarget == nullptr) {
     return nullptr;
   }

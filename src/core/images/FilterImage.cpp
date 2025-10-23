@@ -119,8 +119,9 @@ std::shared_ptr<TextureProxy> FilterImage::lockTextureProxy(const TPArgs& args) 
   return filter->lockTextureProxy(source, filterBounds, args);
 }
 
-PlacementPtr<FragmentProcessor> FilterImage::asFragmentProcessor(
-    const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix) const {
+PlacementPtr<FragmentProcessor> FilterImage::asFragmentProcessor(const FPArgs& args,
+                                                                 const SamplingArgs& samplingArgs,
+                                                                 const Matrix* uvMatrix) const {
   auto fpMatrix = concatUVMatrix(uvMatrix);
   auto inputBounds = Rect::MakeWH(source->width(), source->height());
   auto drawBounds = args.drawRect;

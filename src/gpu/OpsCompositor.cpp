@@ -56,7 +56,8 @@ static bool HasDifferentViewMatrix(const std::vector<PlacementPtr<RectRecord>>& 
 }
 
 OpsCompositor::OpsCompositor(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags,
-                             std::optional<Color> clearColor, std::shared_ptr<ColorSpace> colorSpace)
+                             std::optional<Color> clearColor,
+                             std::shared_ptr<ColorSpace> colorSpace)
     : context(proxy->getContext()), renderTarget(std::move(proxy)), renderFlags(renderFlags),
       clearColor(clearColor), dstColorSpace(std::move(colorSpace)) {
   DEBUG_ASSERT(renderTarget != nullptr);
@@ -388,9 +389,12 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
   if (drawOp != nullptr && pendingType == PendingOpType::Image) {
     FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty()),
                    drawScale.value_or(1.0f)};
-    auto processor = FragmentProcessor::Make(pendingImage, args, pendingSampling, pendingConstraint);
-    if(!pendingImage->isAlphaOnly()) {
-      processor = ColorSpaceXformEffect::Make(context->drawingBuffer(), std::move(processor), pendingImage->colorSpace().get(), AlphaType::Premultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
+    auto processor =
+        FragmentProcessor::Make(pendingImage, args, pendingSampling, pendingConstraint);
+    if (!pendingImage->isAlphaOnly()) {
+      processor = ColorSpaceXformEffect::Make(
+          context->drawingBuffer(), std::move(processor), pendingImage->colorSpace().get(),
+          AlphaType::Premultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
     }
     if (processor == nullptr) {
       return;
@@ -540,8 +544,7 @@ std::shared_ptr<TextureProxy> OpsCompositor::getClipTexture(const Path& clip, AA
     auto drawOp = ShapeDrawOp::Make(std::move(shapeProxy), {}, uvMatrix, aaType);
     CAPUTRE_SHAPE_MESH(drawOp.get(), shape, aaType, clipBounds);
     auto clipRenderTarget = RenderTargetProxy::MakeFallback(
-        context, width, height, true, 1, false, ImageOrigin::TopLeft,
-        BackingFit::Approx);
+        context, width, height, true, 1, false, ImageOrigin::TopLeft, BackingFit::Approx);
     if (clipRenderTarget == nullptr) {
       return nullptr;
     }

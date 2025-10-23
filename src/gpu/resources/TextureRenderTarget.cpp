@@ -106,9 +106,11 @@ std::shared_ptr<RenderTarget> RenderTarget::Make(Context* context, int width, in
                                        scratchKey);
 }
 
-std::shared_ptr<RenderTarget> TextureRenderTarget::MakeFrom(
-    Context* context, std::shared_ptr<GPUTexture> texture, int sampleCount, ImageOrigin origin,
-    bool externallyOwned, const ScratchKey& scratchKey) {
+std::shared_ptr<RenderTarget> TextureRenderTarget::MakeFrom(Context* context,
+                                                            std::shared_ptr<GPUTexture> texture,
+                                                            int sampleCount, ImageOrigin origin,
+                                                            bool externallyOwned,
+                                                            const ScratchKey& scratchKey) {
   DEBUG_ASSERT(context != nullptr);
   DEBUG_ASSERT(texture != nullptr);
   std::shared_ptr<GPUTexture> renderTexture = nullptr;

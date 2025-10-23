@@ -45,7 +45,8 @@ class OpsCompositor {
    * Creates an OpsCompositor with the given render target proxy, render flags and render queue.
    */
   OpsCompositor(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags,
-                std::optional<Color> clearColor = std::nullopt, std::shared_ptr<ColorSpace> colorSpace = nullptr);
+                std::optional<Color> clearColor = std::nullopt,
+                std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
    * Fills the given image with the given sampling options, state and fill.

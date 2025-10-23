@@ -39,7 +39,8 @@ std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, 
   }
   auto pixelFormat = ColorTypeToPixelFormat(colorType);
   auto proxy = context->proxyProvider()->createRenderTargetProxy(
-      {}, width, height, pixelFormat, sampleCount, mipmapped, ImageOrigin::TopLeft, BackingFit::Exact, 0);
+      {}, width, height, pixelFormat, sampleCount, mipmapped, ImageOrigin::TopLeft,
+      BackingFit::Exact, 0);
   return MakeFrom(std::move(proxy), renderFlags, true);
 }
 
@@ -59,8 +60,8 @@ std::shared_ptr<Surface> Surface::MakeFrom(Context* context, const BackendTextur
   if (context == nullptr) {
     return nullptr;
   }
-  auto proxy = context->proxyProvider()->createRenderTargetProxy(
-      backendTexture, sampleCount, origin, false);
+  auto proxy =
+      context->proxyProvider()->createRenderTargetProxy(backendTexture, sampleCount, origin, false);
   return MakeFrom(std::move(proxy), renderFlags);
 }
 
@@ -84,7 +85,8 @@ std::shared_ptr<Surface> Surface::MakeFrom(std::shared_ptr<RenderTargetProxy> re
 Surface::Surface(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags, bool clearAll)
     : _uniqueID(UniqueID::Next()) {
   DEBUG_ASSERT(proxy != nullptr);
-  renderContext = new RenderContext(std::move(proxy), renderFlags, clearAll, this, ColorSpace::MakeSRGB());
+  renderContext =
+      new RenderContext(std::move(proxy), renderFlags, clearAll, this, ColorSpace::MakeSRGB());
 }
 
 Surface::~Surface() {

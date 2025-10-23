@@ -78,9 +78,8 @@ std::shared_ptr<TextureView> TextureView::MakeFormat(Context* context, int width
     if (texture == nullptr) {
       return nullptr;
     }
-    textureView = Resource::AddToCache(
-        context, new DefaultTextureView(std::move(texture), origin),
-        scratchKey);
+    textureView = Resource::AddToCache(context, new DefaultTextureView(std::move(texture), origin),
+                                       scratchKey);
   }
   if (pixels != nullptr) {
     auto texture = textureView->getTexture();

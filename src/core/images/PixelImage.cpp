@@ -24,8 +24,9 @@
 
 namespace tgfx {
 
-PlacementPtr<FragmentProcessor> PixelImage::asFragmentProcessor(
-    const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix) const {
+PlacementPtr<FragmentProcessor> PixelImage::asFragmentProcessor(const FPArgs& args,
+                                                                const SamplingArgs& samplingArgs,
+                                                                const Matrix* uvMatrix) const {
   auto mipmapped = hasMipmaps() && samplingArgs.sampling.mipmapMode != MipmapMode::None;
   TPArgs tpArgs(args.context, args.renderFlags, mipmapped, args.drawScale, BackingFit::Approx);
   auto textureProxy = lockTextureProxy(tpArgs);

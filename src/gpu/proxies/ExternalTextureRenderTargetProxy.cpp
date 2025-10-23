@@ -29,8 +29,8 @@ ExternalTextureRenderTargetProxy::ExternalTextureRenderTargetProxy(
 
 std::shared_ptr<TextureView> ExternalTextureRenderTargetProxy::onMakeTexture(
     Context* context) const {
-  auto renderTarget = RenderTarget::MakeFrom(context, backendTexture, _sampleCount, _origin,
-                                             !externallyOwned());
+  auto renderTarget =
+      RenderTarget::MakeFrom(context, backendTexture, _sampleCount, _origin, !externallyOwned());
   if (renderTarget == nullptr) {
     LOGE("BackendTextureRenderTargetProxy::onMakeTexture() Failed to create the render target!");
     return nullptr;

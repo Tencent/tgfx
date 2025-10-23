@@ -101,8 +101,9 @@ std::shared_ptr<Image> OrientImage::onMakeScaled(int newWidth, int newHeight,
   return MakeFrom(std::move(newSource), orientation);
 }
 
-PlacementPtr<FragmentProcessor> OrientImage::asFragmentProcessor(
-    const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix) const {
+PlacementPtr<FragmentProcessor> OrientImage::asFragmentProcessor(const FPArgs& args,
+                                                                 const SamplingArgs& samplingArgs,
+                                                                 const Matrix* uvMatrix) const {
   std::optional<Matrix> matrix = concatUVMatrix(nullptr);
   SamplingArgs newSamplingArgs = samplingArgs;
   if (matrix.has_value() && samplingArgs.sampleArea) {

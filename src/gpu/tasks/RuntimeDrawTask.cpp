@@ -109,7 +109,7 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
     CommandEncoder* encoder, const TextureProxyWithColorSpace* textureProxyWithCS,
     VertexBufferView* vertexBufferProxyView, std::shared_ptr<ColorSpace> dstColorSpace) {
   auto textureProxy = textureProxyWithCS->textureProxy;
-  if(textureProxy == nullptr) {
+  if (textureProxy == nullptr) {
     return nullptr;
   }
   auto textureView = textureProxy->getTextureView();
@@ -126,9 +126,9 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
     return nullptr;
   }
   auto context = textureView->getContext();
-  auto renderTargetProxy = RenderTargetProxy::MakeFallback(
-      context, textureView->width(), textureView->height(), textureView->isAlphaOnly(), 1,
-      textureView->hasMipmaps());
+  auto renderTargetProxy =
+      RenderTargetProxy::MakeFallback(context, textureView->width(), textureView->height(),
+                                      textureView->isAlphaOnly(), 1, textureView->hasMipmaps());
   if (renderTargetProxy == nullptr) {
     LOGE("RuntimeDrawTask::getFlatTexture() Failed to create the render target!");
     return nullptr;

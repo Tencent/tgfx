@@ -363,8 +363,9 @@ class Image {
    * @param samplingArgs The SamplingArgs used to sample the Image.
    * @param uvMatrix The matrix used to transform the uv coordinates.
    */
-  virtual PlacementPtr<FragmentProcessor> asFragmentProcessor(
-      const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix) const = 0;
+  virtual PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
+                                                              const SamplingArgs& samplingArgs,
+                                                              const Matrix* uvMatrix) const = 0;
 
   friend class FragmentProcessor;
   friend class RuntimeImageFilter;

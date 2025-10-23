@@ -50,7 +50,8 @@ class DrawingManager {
 
   std::shared_ptr<OpsCompositor> addOpsCompositor(std::shared_ptr<RenderTargetProxy> renderTarget,
                                                   uint32_t renderFlags,
-                                                  std::optional<Color> clearColor = std::nullopt, std::shared_ptr<ColorSpace> colorSpace = nullptr);
+                                                  std::optional<Color> clearColor = std::nullopt,
+                                                  std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   void addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTarget,
                         PlacementArray<DrawOp> drawOps, std::optional<Color> clearColor);

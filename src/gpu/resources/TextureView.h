@@ -52,9 +52,10 @@ class TextureView : public Resource {
    * Creates a new texture view from the specified pixel data with each pixel stored as 32-bit RGBA
    * data. Returns nullptr if any of the parameters is invalid.
    */
-  static std::shared_ptr<TextureView> MakeRGBA(
-      Context* context, int width, int height, const void* pixels, size_t rowBytes,
-      bool mipmapped = false, ImageOrigin origin = ImageOrigin::TopLeft) {
+  static std::shared_ptr<TextureView> MakeRGBA(Context* context, int width, int height,
+                                               const void* pixels, size_t rowBytes,
+                                               bool mipmapped = false,
+                                               ImageOrigin origin = ImageOrigin::TopLeft) {
     return MakeFormat(context, width, height, pixels, rowBytes, PixelFormat::RGBA_8888, mipmapped,
                       origin);
   }
@@ -62,10 +63,11 @@ class TextureView : public Resource {
    * Creates an empty texture view with each pixel stored as 32-bit RGBA data. Returns nullptr if
    * any of the parameters is invalid.
    */
-  static std::shared_ptr<TextureView> MakeRGBA(
-      Context* context, int width, int height, bool mipmapped = false,
-      ImageOrigin origin = ImageOrigin::TopLeft) {
-    return MakeFormat(context, width, height, nullptr, 0, PixelFormat::RGBA_8888, mipmapped, origin);
+  static std::shared_ptr<TextureView> MakeRGBA(Context* context, int width, int height,
+                                               bool mipmapped = false,
+                                               ImageOrigin origin = ImageOrigin::TopLeft) {
+    return MakeFormat(context, width, height, nullptr, 0, PixelFormat::RGBA_8888, mipmapped,
+                      origin);
   }
 
   /**
@@ -96,9 +98,9 @@ class TextureView : public Resource {
    * nullptr if any of the parameters is invalid or the backend does not support creating textures
    * of the specified pixelFormat.
    */
-  static std::shared_ptr<TextureView> MakeFormat(
-      Context* context, int width, int height, PixelFormat pixelFormat, bool mipmapped = false,
-      ImageOrigin origin = ImageOrigin::TopLeft) {
+  static std::shared_ptr<TextureView> MakeFormat(Context* context, int width, int height,
+                                                 PixelFormat pixelFormat, bool mipmapped = false,
+                                                 ImageOrigin origin = ImageOrigin::TopLeft) {
     return MakeFormat(context, width, height, nullptr, 0, pixelFormat, mipmapped, origin);
   }
 
@@ -107,17 +109,19 @@ class TextureView : public Resource {
    * pixelFormat describes. Returns nullptr if any of the parameters is invalid or the backend does
    * not support creating textures of the specified pixelFormat.
    */
-  static std::shared_ptr<TextureView> MakeFormat(
-      Context* context, int width, int height, const void* pixels, size_t rowBytes,
-      PixelFormat pixelFormat, bool mipmapped = false, ImageOrigin origin = ImageOrigin::TopLeft);
+  static std::shared_ptr<TextureView> MakeFormat(Context* context, int width, int height,
+                                                 const void* pixels, size_t rowBytes,
+                                                 PixelFormat pixelFormat, bool mipmapped = false,
+                                                 ImageOrigin origin = ImageOrigin::TopLeft);
 
   /**
    * Creates a new texture view which wraps the specified backend texture. The caller must ensure
    * the backend texture is valid for the lifetime of returned TextureView.
    */
-  static std::shared_ptr<TextureView> MakeFrom(
-      Context* context, const BackendTexture& backendTexture,
-      ImageOrigin origin = ImageOrigin::TopLeft, bool adopted = false);
+  static std::shared_ptr<TextureView> MakeFrom(Context* context,
+                                               const BackendTexture& backendTexture,
+                                               ImageOrigin origin = ImageOrigin::TopLeft,
+                                               bool adopted = false);
 
   /**
    * Creates a TextureView from the specified ImageBuffer. Returns nullptr if the context is nullptr

@@ -55,8 +55,8 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::getShadowFragmentProcess
 
   PlacementPtr<FragmentProcessor> invertShadowMask;
   if (blurFilter != nullptr) {
-    invertShadowMask = blurFilter->asFragmentProcessor(source, args, sampling, constraint,
-                                                       &shadowMatrix);
+    invertShadowMask =
+        blurFilter->asFragmentProcessor(source, args, sampling, constraint, &shadowMatrix);
   } else {
     invertShadowMask = FragmentProcessor::Make(source, args, TileMode::Decal, TileMode::Decal,
                                                sampling, constraint, &shadowMatrix);
@@ -92,8 +92,7 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::asFragmentProcessor(
   if (color.alpha <= 0 && shadowOnly) {
     return nullptr;
   }
-  auto imageProcessor =
-      getSourceFragmentProcessor(source, args, sampling, constraint, uvMatrix);
+  auto imageProcessor = getSourceFragmentProcessor(source, args, sampling, constraint, uvMatrix);
   if (imageProcessor == nullptr) {
     return nullptr;
   }
@@ -101,8 +100,7 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::asFragmentProcessor(
   auto blendMode = shadowOnly ? BlendMode::SrcIn : BlendMode::SrcATop;
 
   return XfermodeFragmentProcessor::MakeFromTwoProcessors(
-      buffer,
-      getShadowFragmentProcessor(source, args, sampling, constraint, uvMatrix),
+      buffer, getShadowFragmentProcessor(source, args, sampling, constraint, uvMatrix),
       std::move(imageProcessor), blendMode);
 }
 

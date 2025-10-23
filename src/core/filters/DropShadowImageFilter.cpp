@@ -78,8 +78,8 @@ PlacementPtr<FragmentProcessor> DropShadowImageFilter::getShadowFragmentProcesso
 
   PlacementPtr<FragmentProcessor> shadowProcessor;
   if (blurFilter != nullptr) {
-    shadowProcessor = blurFilter->asFragmentProcessor(source, args, sampling, constraint,
-                                                      &shadowMatrix);
+    shadowProcessor =
+        blurFilter->asFragmentProcessor(source, args, sampling, constraint, &shadowMatrix);
   } else {
     shadowProcessor = FragmentProcessor::Make(source, args, TileMode::Decal, TileMode::Decal,
                                               sampling, constraint, &shadowMatrix);
@@ -103,8 +103,7 @@ PlacementPtr<FragmentProcessor> DropShadowImageFilter::asFragmentProcessor(
   if (color.alpha <= 0 && shadowOnly) {
     return nullptr;
   }
-  auto shadowFragment =
-      getShadowFragmentProcessor(source, args, sampling, constraint, uvMatrix);
+  auto shadowFragment = getShadowFragmentProcessor(source, args, sampling, constraint, uvMatrix);
   if (shadowOnly) {
     return shadowFragment;
   }
