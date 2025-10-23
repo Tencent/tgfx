@@ -149,16 +149,9 @@ Point Layer::position() const {
 
 void Layer::setPosition(const Point& value) {
   if (_matrix3DIsAffine) {
-    DEBUG_ASSERT(FloatNearlyEqual(_affineMatrix.getTranslateX(), _matrix3D.getRowColumn(0, 3)) &&
-                 FloatNearlyEqual(_affineMatrix.getTranslateY(), _matrix3D.getRowColumn(1, 3)));
-    _affineMatrix.setTranslateX(value.x);
-    _affineMatrix.setTranslateY(value.y);
     _matrix3D.setRowColumn(0, 3, value.x);
     _matrix3D.setRowColumn(1, 3, value.y);
   } else {
-    // When there is a 3D transformation or perspective, _affineMatrix is invalid, must be the
-    // identity matrix, and does not need to be updated
-    DEBUG_ASSERT(_affineMatrix.isIdentity());
     auto curPos = _matrix3D.mapVec3(Vec3(0, 0, 1));
     if (FloatNearlyEqual(curPos.x, value.x) && FloatNearlyEqual(curPos.y, value.y)) {
       return;
@@ -168,13 +161,23 @@ void Layer::setPosition(const Point& value) {
   invalidateTransform();
 }
 
+Matrix Layer::matrix() const {
+  auto affineMatrix = Matrix::I();
+  if (!_matrix3DIsAffine) {
+    return Matrix::I();
+  }
+  affineMatrix.setAll(_matrix3D.getRowColumn(0, 0), _matrix3D.getRowColumn(0, 1),
+                      _matrix3D.getRowColumn(0, 3), _matrix3D.getRowColumn(1, 0),
+                      _matrix3D.getRowColumn(1, 1), _matrix3D.getRowColumn(1, 3));
+  return affineMatrix;
+}
+
 void Layer::setMatrix(const Matrix& value) {
   const Matrix3D value3D(value);
   if (value3D == _matrix3D) {
     return;
   }
   _matrix3D = value3D;
-  _affineMatrix = value;
   _matrix3DIsAffine = true;
   invalidateTransform();
 }
@@ -189,17 +192,7 @@ void Layer::setMatrix3D(const Matrix3D& value) {
     return;
   }
   _matrix3D = value;
-  if (IsMatrix3DAffine(value)) {
-    // If it's equivalent to a 2D affine matrix, update _affineMatrix
-    _affineMatrix.setAll(value.getRowColumn(0, 0), value.getRowColumn(0, 1),
-                         value.getRowColumn(0, 3), value.getRowColumn(1, 0),
-                         value.getRowColumn(1, 1), value.getRowColumn(1, 3));
-    _matrix3DIsAffine = true;
-  } else {
-    // Otherwise, _affineMatrix is invalid and must be set to identity matrix
-    _affineMatrix.setIdentity();
-    _matrix3DIsAffine = false;
-  }
+  _matrix3DIsAffine = IsMatrix3DAffine(value);
   invalidateTransform();
 }
 
@@ -792,7 +785,7 @@ Matrix3D Layer::getGlobalMatrix3D() const {
 }
 
 Matrix Layer::getMatrixWithScrollRect() const {
-  auto matrix = _affineMatrix;
+  auto matrix = this->matrix();
   if (_matrix3DIsAffine && _scrollRect) {
     matrix.preTranslate(-_scrollRect->left, -_scrollRect->top);
   }

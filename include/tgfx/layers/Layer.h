@@ -142,9 +142,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
    * interface to obtain the actual matrix. Otherwise, it will return the equivalent simplified
    * affine transformation matrix.
    */
-  const Matrix& matrix() const {
-    return _affineMatrix;
-  }
+  Matrix matrix() const;
 
   /**
    * Sets the transformation matrix applied to the layer.
@@ -665,11 +663,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
   } bitFields = {};
   std::string _name;
   float _alpha = 1.0f;
-  // To maintain backward compatibility with the old 2D interface matrix() that returns a reference,
-  // a 2D matrix is retained here. If the matrix set via setMatrix3D contains 3D transformations
-  // or projection transformations, this matrix will be updated to the identity matrix; otherwise,
-  // it is the equivalent simplified affine transformation matrix of the 4x4 matrix.
-  Matrix _affineMatrix = {};
   // The actual transformation matrix that determines the geometric position of the layer
   Matrix3D _matrix3D = {};
   // Whether the matrix3D is equivalent to a 2D affine matrix
