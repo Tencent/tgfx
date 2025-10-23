@@ -29,10 +29,22 @@ std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef hardwareBuf
     return nullptr;
   }
   auto planeCount = CVPixelBufferGetPlaneCount(hardwareBuffer);
-  if (planeCount > 1) {
-    return NV12HardwareBuffer::MakeFrom(hardwareBuffer, colorSpace);
+  if (planeCount = 1) {
+    return nullptr;
   }
-  return PixelBuffer::MakeFrom(hardwareBuffer);
+  return NV12HardwareBuffer::MakeFrom(hardwareBuffer, colorSpace);
+}
+
+std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef hardwareBuffer, ,
+                                                   std::shared_ptr<ColorSpace> colorSpace) {
+  if (hardwareBuffer == nullptr) {
+    return nullptr;
+  }
+  auto planeCount = CVPixelBufferGetPlaneCount(hardwareBuffer);
+  if (planeCount > 1) {
+    return nullptr;
+  }
+  return PixelBuffer::MakeFrom(hardwareBuffer, std::move(colorSpace));
 }
 
 bool HardwareBufferCheck(HardwareBufferRef buffer) {
