@@ -921,9 +921,16 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   auto offscreenArgs = args;
   offscreenArgs.backgroundContext = subBackgroundContext;
   auto clipBounds = GetClipBounds(canvas);
+  auto inputBounds = clipBounds;
+  if (clipBounds.has_value()) {
+    auto filter = getImageFilter(1.0f);
+    if (filter) {
+      inputBounds = filter->filterBounds(*clipBounds, ImageFilter::MapDirection::Reverse);
+    }
+  }
   auto picture = RecordPicture(offscreenArgs.drawMode, contentScale, [&](Canvas* canvas) {
-    if (clipBounds.has_value()) {
-      canvas->clipRect(*clipBounds);
+    if (inputBounds.has_value()) {
+      canvas->clipRect(*inputBounds);
     }
     drawDirectly(offscreenArgs, canvas, 1.0f);
   });

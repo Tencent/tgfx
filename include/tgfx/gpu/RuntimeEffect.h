@@ -72,11 +72,18 @@ class RuntimeEffect {
     return 1;
   }
 
+  enum MapDirection {
+    Forward,
+    Reverse,
+  };
   /**
    * Returns the bounds of the image that will be produced by this filter when it is applied to an
-   * image of the given bounds.
+  * image of the given bounds. MapDirection::Forward is used to determine which pixels of the
+   * destination canvas a source image rect would touch after filtering. MapDirection::Reverse
+   * is used to determine which rect of the source image would be required to fill the given
+   * rect (typically, clip bounds).
    */
-  virtual Rect filterBounds(const Rect& srcRect) const {
+  virtual Rect filterBounds(const Rect& srcRect, MapDirection) const {
     return srcRect;
   }
 
