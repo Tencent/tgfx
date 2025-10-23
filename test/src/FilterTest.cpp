@@ -979,7 +979,7 @@ TGFX_TEST(FilterTest, Transform3DImageFilter) {
   }
 }
 
-TGFX_TEST(FilterTest, ReserveFilterBounds) {
+TGFX_TEST(FilterTest, ReverseFilterBounds) {
   auto rect = Rect::MakeXYWH(0, 0, 100, 100);
   auto blurFilter = ImageFilter::Blur(10.f, 10.f);
   auto dst = blurFilter->filterBounds(rect);
