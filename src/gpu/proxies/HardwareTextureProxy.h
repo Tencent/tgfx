@@ -36,6 +36,7 @@ class HardwareTextureProxy final : public TextureProxy {
   HardwareTextureProxy(HardwareBufferRef hardwareBuffer, int width, int height, PixelFormat format);
 
   HardwareBufferRef hardwareBuffer = nullptr;
+
   friend class ProxyProvider;
 };
 }  // namespace tgfx

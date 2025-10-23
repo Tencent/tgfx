@@ -44,7 +44,7 @@ static PlacementPtr<FragmentProcessor> MakeColorizer(const Context* context, con
   // simpler.
   bool bottomHardStop = FloatNearlyEqual(positions[0], positions[1]);
   bool topHardStop = FloatNearlyEqual(positions[count - 2], positions[count - 1]);
-  size_t offset = 0;
+  int offset = 0;
   if (bottomHardStop) {
     offset += 1;
     count--;

@@ -20,7 +20,6 @@
 #include "gpu/DrawingManager.h"
 #include "gpu/RenderContext.h"
 #include "gpu/TPArgs.h"
-#include "gpu/processors/ColorSpaceXFormEffect.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
@@ -60,7 +59,8 @@ std::shared_ptr<TextureProxy> ImageFilter::lockTextureProxy(std::shared_ptr<Imag
                 std::max(textureScaleX, textureScaleY));
   Matrix matrix = Matrix::MakeTrans(renderBounds.left, renderBounds.top);
   matrix.preScale(1.0f / textureScaleX, 1.0f / textureScaleY);
-  auto processor = asFragmentProcessor(source, fpArgs, {}, SrcRectConstraint::Fast, &matrix);
+  auto processor =
+      asFragmentProcessor(std::move(source), fpArgs, {}, SrcRectConstraint::Fast, &matrix);
   auto drawingManager = args.context->drawingManager();
   if (!drawingManager->fillRTWithFP(renderTarget, std::move(processor), args.renderFlags)) {
     return nullptr;
@@ -94,7 +94,7 @@ PlacementPtr<FragmentProcessor> ImageFilter::makeFPFromTextureProxy(
   auto isAlphaOnly = source->isAlphaOnly();
   auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
   TPArgs tpArgs(args.context, args.renderFlags, mipmapped, args.drawScale);
-  auto textureProxy = lockTextureProxy(source, dstBounds, tpArgs);
+  auto textureProxy = lockTextureProxy(std::move(source), dstBounds, tpArgs);
   if (textureProxy == nullptr) {
     return nullptr;
   }

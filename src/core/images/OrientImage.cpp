@@ -21,7 +21,6 @@
 #include "core/images/SubsetImage.h"
 #include "core/utils/AddressOf.h"
 #include "gpu/ops/DrawOp.h"
-#include "gpu/processors/ColorSpaceXFormEffect.h"
 
 namespace tgfx {
 static const auto TopLeftMatrix = Matrix::I();

@@ -82,8 +82,8 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::getShadowFragmentProcess
 PlacementPtr<FragmentProcessor> InnerShadowImageFilter::getSourceFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
     SrcRectConstraint constraint, const Matrix* uvMatrix) const {
-  return FragmentProcessor::Make(source, args, TileMode::Decal, TileMode::Decal, sampling,
-                                 constraint, uvMatrix);
+  return FragmentProcessor::Make(std::move(source), args, TileMode::Decal, TileMode::Decal,
+                                 sampling, constraint, uvMatrix);
 }
 
 PlacementPtr<FragmentProcessor> InnerShadowImageFilter::asFragmentProcessor(

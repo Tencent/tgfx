@@ -24,7 +24,6 @@
 #include "gpu/DrawingManager.h"
 #include "gpu/TPArgs.h"
 #include "gpu/ops/RectDrawOp.h"
-#include "gpu/processors/ColorSpaceXFormEffect.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
@@ -81,7 +80,7 @@ PlacementPtr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(const FPArgs& a
     return nullptr;
   }
   newSamplingArgs.sampleArea = std::nullopt;
-  return TiledTextureEffect::Make(textureProxy, newSamplingArgs, uvMatrix, false);
+  return TiledTextureEffect::Make(textureProxy, newSamplingArgs, uvMatrix);
 }
 
 std::shared_ptr<TextureProxy> RGBAAAImage::lockTextureProxy(const TPArgs& args) const {

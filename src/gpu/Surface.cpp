@@ -38,9 +38,8 @@ std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, 
     return nullptr;
   }
   auto pixelFormat = ColorTypeToPixelFormat(colorType);
-  auto proxy = context->proxyProvider()->createRenderTargetProxy(
-      {}, width, height, pixelFormat, sampleCount, mipmapped, ImageOrigin::TopLeft,
-      BackingFit::Exact, 0);
+  auto proxy = context->proxyProvider()->createRenderTargetProxy({}, width, height, pixelFormat,
+                                                                 sampleCount, mipmapped);
   return MakeFrom(std::move(proxy), renderFlags, true);
 }
 
@@ -61,7 +60,7 @@ std::shared_ptr<Surface> Surface::MakeFrom(Context* context, const BackendTextur
     return nullptr;
   }
   auto proxy =
-      context->proxyProvider()->createRenderTargetProxy(backendTexture, sampleCount, origin, false);
+      context->proxyProvider()->createRenderTargetProxy(backendTexture, sampleCount, origin);
   return MakeFrom(std::move(proxy), renderFlags);
 }
 

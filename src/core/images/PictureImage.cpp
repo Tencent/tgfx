@@ -45,7 +45,7 @@ std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<Picture> picture, int wid
       return image;
     }
   }
-  auto image = std::make_shared<PictureImage>(std::move(picture), width, height, matrix, false);
+  auto image = std::make_shared<PictureImage>(std::move(picture), width, height, matrix);
   image->weakThis = image;
   return image;
 }

@@ -19,12 +19,10 @@
 #pragma once
 
 #include <cstdint>
-#include <set>
 #include "gpu/ColorSpaceXformHelper.h"
 #include "gpu/SamplerHandle.h"
 #include "gpu/ShaderStage.h"
 #include "gpu/ShaderVar.h"
-#include "tgfx/core/BytesKey.h"
 
 namespace tgfx {
 class ProgramBuilder;
@@ -111,7 +109,6 @@ class ShaderBuilder {
   bool finalized = false;
   int indentation = 0;
   bool atLineStart = false;
-  std::set<uint64_t> stepKeySet;
 
   friend class ProgramBuilder;
   friend class UniformHandler;

@@ -87,6 +87,6 @@ PlacementPtr<FragmentProcessor> ComposeImageFilter::asFragmentProcessor(
   if (uvMatrix) {
     matrix.preConcat(*uvMatrix);
   }
-  return FragmentProcessor::Make(lastSource, args, sampling, constraint, &matrix);
+  return FragmentProcessor::Make(std::move(lastSource), args, sampling, constraint, &matrix);
 }
 }  // namespace tgfx

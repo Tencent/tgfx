@@ -401,6 +401,7 @@ std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
   sampleCount = caps->getSampleCount(sampleCount, formats.front());
   auto proxy = std::shared_ptr<TextureRenderTargetProxy>(new HardwareRenderTargetProxy(
       hardwareBuffer, size.width, size.height, formats.front(), sampleCount));
+  addResourceProxy(proxy);
   return proxy;
 }
 
@@ -421,7 +422,7 @@ std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
   }
   sampleCount = caps->getSampleCount(sampleCount, format);
   auto proxy = std::shared_ptr<TextureRenderTargetProxy>(
-      new TextureRenderTargetProxy(width, height, format, sampleCount, mipmapped, origin, false));
+      new TextureRenderTargetProxy(width, height, format, sampleCount, mipmapped, origin));
   if (backingFit == BackingFit::Approx) {
     proxy->_backingStoreWidth = GetApproxSize(width);
     proxy->_backingStoreHeight = GetApproxSize(height);

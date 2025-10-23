@@ -20,7 +20,6 @@
 #include "core/images/ScaledImage.h"
 #include "core/images/SubsetImage.h"
 #include "core/utils/AddressOf.h"
-#include "gpu/processors/ColorSpaceXFormEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {

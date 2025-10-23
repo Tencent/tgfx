@@ -17,9 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PixelImage.h"
-#include "core/filters/DropShadowImageFilter.h"
 #include "gpu/TPArgs.h"
-#include "gpu/processors/ColorSpaceXFormEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {

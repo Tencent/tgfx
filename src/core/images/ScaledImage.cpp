@@ -20,7 +20,6 @@
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/TPArgs.h"
-#include "gpu/processors/ColorSpaceXFormEffect.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/TiledTextureEffect.h"
 

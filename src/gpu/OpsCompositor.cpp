@@ -626,7 +626,7 @@ DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds, AATyp
   dstTextureInfo.offset = {bounds.x(), bounds.y()};
   textureProxy = proxyProvider()->createTextureProxy(
       {}, static_cast<int>(bounds.width()), static_cast<int>(bounds.height()),
-      renderTarget->format(), false, renderTarget->origin(), BackingFit::Approx, 0);
+      renderTarget->format(), false, renderTarget->origin(), BackingFit::Approx);
   if (textureProxy == nullptr) {
     return {};
   }

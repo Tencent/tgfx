@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureRenderTarget.h"
-#include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/Log.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/GPU.h"
@@ -27,7 +26,7 @@ namespace tgfx {
 static ScratchKey ComputeRenderTargetScratchKey(int width, int height, PixelFormat format,
                                                 int sampleCount, bool mipmapped) {
   static const uint32_t TextureRenderTargetType = UniqueID::Next();
-  BytesKey bytesKey(7);
+  BytesKey bytesKey(5);
   bytesKey.write(TextureRenderTargetType);
   bytesKey.write(width);
   bytesKey.write(height);
@@ -79,7 +78,8 @@ std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
     return nullptr;
   }
   sampleCount = context->caps()->getSampleCount(sampleCount, formats.front());
-  return TextureRenderTarget::MakeFrom(context, std::move(textures.front()), sampleCount);
+  return TextureRenderTarget::MakeFrom(context, std::move(textures.front()), sampleCount,
+                                       ImageOrigin::TopLeft, true);
 }
 
 std::shared_ptr<RenderTarget> RenderTarget::Make(Context* context, int width, int height,

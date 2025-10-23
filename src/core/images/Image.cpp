@@ -35,7 +35,6 @@
 #include "tgfx/core/Pixmap.h"
 
 namespace tgfx {
-
 std::shared_ptr<Image> Image::MakeFromFile(const std::string& filePath) {
   static WeakMap<std::string, Image> imageMap = {};
   if (filePath.empty()) {

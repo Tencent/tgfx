@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureView.h"
-#include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/GPU.h"
@@ -50,7 +49,7 @@ void TextureView::ComputeTextureKey(const std::shared_ptr<GPUTexture> texture, B
 static ScratchKey ComputeTextureScratchKey(int width, int height, PixelFormat format,
                                            bool mipmapped) {
   static const uint32_t DefaultTextureType = UniqueID::Next();
-  BytesKey bytesKey(6);
+  BytesKey bytesKey(4);
   bytesKey.write(DefaultTextureType);
   bytesKey.write(width);
   bytesKey.write(height);
@@ -163,7 +162,7 @@ std::shared_ptr<TextureView> TextureView::MakeFrom(Context* context,
   }
   TextureView* textureView = nullptr;
   if (textures.size() == 1) {
-    textureView = new DefaultTextureView(std::move(textures.front()), ImageOrigin::TopLeft);
+    textureView = new DefaultTextureView(std::move(textures.front()));
   } else {
     YUVFormat yuvFormat = YUVFormat::Unknown;
     context->gpu()->getHardwareTextureFormats(hardwareBuffer, &yuvFormat);
