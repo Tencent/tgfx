@@ -51,12 +51,6 @@ class RawPixelData : public ImageBuffer {
     return info.isAlphaOnly();
   }
 
-  void setColorSpace(std::shared_ptr<ColorSpace> colorSpace) override {
-    if (info.colorType() != ColorType::ALPHA_8) {
-      _colorSpace = std::move(colorSpace);
-    }
-  }
-
   std::shared_ptr<ColorSpace> colorSpace() const override {
     return _colorSpace;
   }

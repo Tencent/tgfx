@@ -92,8 +92,9 @@ class ImageBuffer {
     return false;
   }
 
-  virtual void setColorSpace(std::shared_ptr<ColorSpace> colorSpace) = 0;
-
+  /**
+   * Return the ColorSpace of this ImageBuffer
+   */
   virtual std::shared_ptr<ColorSpace> colorSpace() const = 0;
 
  protected:

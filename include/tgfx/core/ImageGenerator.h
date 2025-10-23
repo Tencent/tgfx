@@ -78,12 +78,11 @@ class ImageGenerator {
     return onMakeBuffer(tryHardware);
   }
 
+  /**
+   * Return the ColorSpace of this ImageGenerator
+   */
   std::shared_ptr<ColorSpace> colorSpace() const {
     return _colorSpace;
-  }
-
-  void setColorSpace(std::shared_ptr<ColorSpace> colorSpace) {
-    _colorSpace = std::move(colorSpace);
   }
 
  protected:
