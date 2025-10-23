@@ -188,12 +188,12 @@ static SamplingOptions GetSamplingOptions(const std::shared_ptr<ScalerContext>& 
 }
 
 RenderContext::RenderContext(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags,
-                             bool clearAll, Surface* surface)
-    : renderTarget(std::move(proxy)), renderFlags(renderFlags), surface(surface) {
+                             bool clearAll, Surface* surface, std::shared_ptr<ColorSpace> colorSpace)
+    : renderTarget(std::move(proxy)), renderFlags(renderFlags), surface(surface), _colorSpace(std::move(colorSpace)) {
   if (clearAll) {
     auto drawingManager = renderTarget->getContext()->drawingManager();
     opsCompositor =
-        drawingManager->addOpsCompositor(renderTarget, renderFlags, Color::Transparent());
+        drawingManager->addOpsCompositor(renderTarget, renderFlags, Color::Transparent(), _colorSpace);
   }
 }
 
@@ -390,7 +390,7 @@ OpsCompositor* RenderContext::getOpsCompositor(bool discardContent) {
   }
   if (opsCompositor == nullptr || opsCompositor->isClosed()) {
     auto drawingManager = renderTarget->getContext()->drawingManager();
-    opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags);
+    opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags, std::nullopt, _colorSpace);
   } else if (discardContent) {
     opsCompositor->discardAll();
   }
@@ -404,7 +404,7 @@ void RenderContext::replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRe
     DEBUG_ASSERT(oldContent->width() == renderTarget->width() &&
                  oldContent->height() == renderTarget->height());
     auto drawingManager = renderTarget->getContext()->drawingManager();
-    opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags);
+    opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags, std::nullopt, _colorSpace);
     Fill fill = {{}, BlendMode::Src, false};
     opsCompositor->fillImageRect(std::move(oldContent), renderTarget->bounds(),
                                  renderTarget->bounds(), {}, MCState{}, fill,

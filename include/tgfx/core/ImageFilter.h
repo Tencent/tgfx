@@ -170,15 +170,13 @@ class ImageFilter {
    */
   virtual PlacementPtr<FragmentProcessor> asFragmentProcessor(
       std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-      SrcRectConstraint constraint, const Matrix* uvMatrix,
-      std::shared_ptr<ColorSpace> dstColorSpace) const = 0;
+      SrcRectConstraint constraint, const Matrix* uvMatrix) const = 0;
 
   bool applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* clipBounds = nullptr) const;
 
   PlacementPtr<FragmentProcessor> makeFPFromTextureProxy(
       std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-      SrcRectConstraint constraint, const Matrix* uvMatrix,
-      std::shared_ptr<ColorSpace> dstColorSpace) const;
+      SrcRectConstraint constraint, const Matrix* uvMatrix) const;
 
   friend class DropShadowImageFilter;
   friend class InnerShadowImageFilter;

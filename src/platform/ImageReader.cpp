@@ -51,9 +51,7 @@ class ImageReaderBuffer : public ImageBuffer {
 
  protected:
   std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) const override {
-    auto textureView = imageReader->readTexture(contentVersion, context, mipmapped);
-    textureView->setColorSpace(imageReader->colorSpace());
-    return textureView;
+    return imageReader->readTexture(contentVersion, context, mipmapped);
   }
 
  private:

@@ -63,11 +63,10 @@ class RawPixelData : public ImageBuffer {
                                       info.rowBytes(), mipmapped);
       case ColorType::BGRA_8888:
         return TextureView::MakeFormat(context, info.width(), info.height(), pixels->data(),
-                                       info.rowBytes(), PixelFormat::BGRA_8888, mipmapped,
-                                       ImageOrigin::TopLeft, _colorSpace);
+                                       info.rowBytes(), PixelFormat::BGRA_8888, mipmapped);
       case ColorType::RGBA_8888:
         return TextureView::MakeRGBA(context, info.width(), info.height(), pixels->data(),
-                                     info.rowBytes(), mipmapped, ImageOrigin::TopLeft, _colorSpace);
+                                     info.rowBytes(), mipmapped);
       default:
         return nullptr;
     }

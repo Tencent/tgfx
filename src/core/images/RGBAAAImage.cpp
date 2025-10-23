@@ -55,8 +55,7 @@ std::shared_ptr<Image> RGBAAAImage::onCloneWith(std::shared_ptr<Image> newSource
 }
 
 PlacementPtr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(
-    const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix,
-    std::shared_ptr<ColorSpace> dstColorSpace) const {
+    const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix) const {
   DEBUG_ASSERT(!source->isAlphaOnly());
   auto matrix = concatUVMatrix(uvMatrix);
   auto drawBounds = args.drawRect;
@@ -72,14 +71,7 @@ PlacementPtr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(
     }
     TPArgs tpArgs(args.context, args.renderFlags, mipmapped, 1.0f, {});
     auto proxy = source->lockTextureProxy(tpArgs);
-    auto fp =
-        TextureEffect::MakeRGBAAA(std::move(proxy), newSamplingArgs, alphaStart, AddressOf(matrix));
-    if (!isAlphaOnly()) {
-      return ColorSpaceXformEffect::Make(args.context->drawingBuffer(), std::move(fp),
-                                         colorSpace().get(), AlphaType::Premultiplied,
-                                         dstColorSpace.get(), AlphaType::Premultiplied);
-    }
-    return fp;
+    return TextureEffect::MakeRGBAAA(std::move(proxy), newSamplingArgs, alphaStart, AddressOf(matrix));
   }
   TPArgs tpArgs(args.context, args.renderFlags, mipmapped, 1.0f, {});
   auto textureProxy = lockTextureProxy(tpArgs);
@@ -87,13 +79,7 @@ PlacementPtr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(
     return nullptr;
   }
   newSamplingArgs.sampleArea = std::nullopt;
-  auto fp = TiledTextureEffect::Make(textureProxy, newSamplingArgs, uvMatrix, false);
-  if (!isAlphaOnly()) {
-    return ColorSpaceXformEffect::Make(args.context->drawingBuffer(), std::move(fp),
-                                       colorSpace().get(), AlphaType::Premultiplied,
-                                       dstColorSpace.get(), AlphaType::Premultiplied);
-  }
-  return fp;
+  return TiledTextureEffect::Make(textureProxy, newSamplingArgs, uvMatrix, false);
 }
 
 std::shared_ptr<TextureProxy> RGBAAAImage::lockTextureProxy(const TPArgs& args) const {
@@ -101,13 +87,13 @@ std::shared_ptr<TextureProxy> RGBAAAImage::lockTextureProxy(const TPArgs& args) 
   auto textureHeight = height();
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, textureWidth, textureHeight, isAlphaOnly(), 1, args.mipmapped,
-      ImageOrigin::TopLeft, colorSpace(), args.backingFit);
+      ImageOrigin::TopLeft, args.backingFit);
   if (renderTarget == nullptr) {
     return nullptr;
   }
   auto drawRect = Rect::MakeWH(textureWidth, textureHeight);
   FPArgs fpArgs(args.context, args.renderFlags, drawRect, 1.0f);
-  auto processor = asFragmentProcessor(fpArgs, {}, nullptr, renderTarget->colorSpace());
+  auto processor = asFragmentProcessor(fpArgs, {}, nullptr);
   auto drawingManager = args.context->drawingManager();
   if (!drawingManager->fillRTWithFP(renderTarget, std::move(processor), args.renderFlags)) {
     return nullptr;

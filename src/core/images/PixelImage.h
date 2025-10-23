@@ -35,8 +35,7 @@ class PixelImage : public Image {
   }
 
   PlacementPtr<FragmentProcessor> asFragmentProcessor(
-      const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix,
-      std::shared_ptr<ColorSpace> dstColorSpace) const override;
+      const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix) const override;
   bool mipmapped = false;
 };
 }  // namespace tgfx

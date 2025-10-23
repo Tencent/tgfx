@@ -33,11 +33,9 @@ class HardwareTextureProxy final : public TextureProxy {
   }
 
  private:
-  HardwareTextureProxy(HardwareBufferRef hardwareBuffer, int width, int height, PixelFormat format,
-                       YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED);
+  HardwareTextureProxy(HardwareBufferRef hardwareBuffer, int width, int height, PixelFormat format);
 
   HardwareBufferRef hardwareBuffer = nullptr;
-  YUVColorSpace _colorSpace = YUVColorSpace::BT601_LIMITED;
   friend class ProxyProvider;
 };
 }  // namespace tgfx

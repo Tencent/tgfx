@@ -120,8 +120,7 @@ std::shared_ptr<TextureProxy> FilterImage::lockTextureProxy(const TPArgs& args) 
 }
 
 PlacementPtr<FragmentProcessor> FilterImage::asFragmentProcessor(
-    const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix,
-    std::shared_ptr<ColorSpace> dstColorSpace) const {
+    const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix) const {
   auto fpMatrix = concatUVMatrix(uvMatrix);
   auto inputBounds = Rect::MakeWH(source->width(), source->height());
   auto drawBounds = args.drawRect;
@@ -139,7 +138,7 @@ PlacementPtr<FragmentProcessor> FilterImage::asFragmentProcessor(
   auto sampling = samplingArgs.sampling;
   if (dstBounds.contains(drawBounds)) {
     return filter->asFragmentProcessor(source, args, sampling, samplingArgs.constraint,
-                                       AddressOf(fpMatrix), dstColorSpace);
+                                       AddressOf(fpMatrix));
   }
   auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
   TPArgs tpArgs(args.context, args.renderFlags, mipmapped, args.drawScale);
@@ -153,12 +152,6 @@ PlacementPtr<FragmentProcessor> FilterImage::asFragmentProcessor(
   if (fpMatrix) {
     matrix.preConcat(*fpMatrix);
   }
-  auto fp = TiledTextureEffect::Make(textureProxy, samplingArgs, &matrix, source->isAlphaOnly());
-  if (!isAlphaOnly()) {
-    return ColorSpaceXformEffect::Make(args.context->drawingBuffer(), std::move(fp),
-                                       colorSpace().get(), AlphaType::Premultiplied,
-                                       dstColorSpace.get(), AlphaType::Premultiplied);
-  }
-  return fp;
+  return TiledTextureEffect::Make(textureProxy, samplingArgs, &matrix, source->isAlphaOnly());
 }
 }  // namespace tgfx

@@ -81,17 +81,10 @@ std::shared_ptr<TextureProxy> TextureImage::lockTextureProxy(const TPArgs& args)
 }
 
 PlacementPtr<FragmentProcessor> TextureImage::asFragmentProcessor(
-    const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix,
-    std::shared_ptr<ColorSpace> dstColorSpace) const {
+    const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix) const {
   if (args.context == nullptr || args.context->uniqueID() != contextID) {
     return nullptr;
   }
-  auto fp = TiledTextureEffect::Make(textureProxy, samplingArgs, uvMatrix, isAlphaOnly());
-  if (!isAlphaOnly()) {
-    return ColorSpaceXformEffect::Make(args.context->drawingBuffer(), std::move(fp),
-                                       colorSpace().get(), AlphaType::Premultiplied,
-                                       dstColorSpace.get(), AlphaType::Premultiplied);
-  }
-  return fp;
+  return TiledTextureEffect::Make(textureProxy, samplingArgs, uvMatrix, isAlphaOnly());
 }
 }  // namespace tgfx

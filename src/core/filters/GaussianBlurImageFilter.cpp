@@ -123,7 +123,7 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
   const bool defaultBlurTargetMipmapped = (args.mipmapped && !blur2D && !isBlurDstScaled);
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(blurDstWidth), static_cast<int>(blurDstHeight), isAlphaOnly, 1,
-      defaultBlurTargetMipmapped, ImageOrigin::TopLeft, source->colorSpace(),
+      defaultBlurTargetMipmapped, ImageOrigin::TopLeft,
       blur2D || isBlurDstScaled ? BackingFit::Approx : args.backingFit);
   if (!renderTarget) {
     return nullptr;
@@ -138,7 +138,7 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
     const bool finalBlurTargetMipmapped = (args.mipmapped && !isBlurDstScaled);
     renderTarget = RenderTargetProxy::MakeFallback(
         args.context, static_cast<int>(blurDstWidth), static_cast<int>(blurDstHeight), isAlphaOnly,
-        1, finalBlurTargetMipmapped, ImageOrigin::TopLeft, source->colorSpace(),
+        1, finalBlurTargetMipmapped, ImageOrigin::TopLeft,
         isBlurDstScaled ? BackingFit::Approx : args.backingFit);
     if (!renderTarget) {
       return nullptr;
@@ -161,7 +161,7 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
     auto finalProcessor = TextureEffect::Make(renderTarget->asTextureProxy(), {}, &finalUVMatrix);
     renderTarget = RenderTargetProxy::MakeFallback(
         args.context, static_cast<int>(dstDrawWidth), static_cast<int>(dstDrawHeight), isAlphaOnly,
-        1, args.mipmapped, ImageOrigin::TopLeft, source->colorSpace(), args.backingFit);
+        1, args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
     if (!renderTarget) {
       return nullptr;
     }
@@ -178,9 +178,8 @@ Rect GaussianBlurImageFilter::onFilterBounds(const Rect& srcRect) const {
 
 PlacementPtr<FragmentProcessor> GaussianBlurImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-    SrcRectConstraint constraint, const Matrix* uvMatrix,
-    std::shared_ptr<ColorSpace> dstColorSpace) const {
-  return makeFPFromTextureProxy(source, args, sampling, constraint, uvMatrix, dstColorSpace);
+    SrcRectConstraint constraint, const Matrix* uvMatrix) const {
+  return makeFPFromTextureProxy(source, args, sampling, constraint, uvMatrix);
 }
 
 PlacementPtr<FragmentProcessor> GaussianBlurImageFilter::getSourceFragmentProcessor(
@@ -198,7 +197,7 @@ PlacementPtr<FragmentProcessor> GaussianBlurImageFilter::getSourceFragmentProces
   SamplingArgs samplingArgs = {};
   samplingArgs.tileModeX = tileMode;
   samplingArgs.tileModeY = tileMode;
-  auto fp = FragmentProcessor::Make(source, args, samplingArgs, &uvMatrix, source->colorSpace());
+  auto fp = FragmentProcessor::Make(source, args, samplingArgs, &uvMatrix);
   if (fp == nullptr) {
     return nullptr;
   }
@@ -207,7 +206,7 @@ PlacementPtr<FragmentProcessor> GaussianBlurImageFilter::getSourceFragmentProces
   }
   auto renderTarget = RenderTargetProxy::MakeFallback(
       context, static_cast<int>(scaledDrawRect.width()), static_cast<int>(scaledDrawRect.height()),
-      source->isAlphaOnly(), 1, false, ImageOrigin::TopLeft, source->colorSpace(),
+      source->isAlphaOnly(), 1, false, ImageOrigin::TopLeft,
       BackingFit::Exact);
   if (renderTarget == nullptr) {
     return nullptr;

@@ -20,8 +20,8 @@
 
 namespace tgfx {
 HardwareTextureProxy::HardwareTextureProxy(HardwareBufferRef hardwareBuffer, int width, int height,
-                                           PixelFormat format, YUVColorSpace colorSpace)
-    : TextureProxy(width, height, format), hardwareBuffer(hardwareBuffer), _colorSpace(colorSpace) {
+                                           PixelFormat format)
+    : TextureProxy(width, height, format), hardwareBuffer(hardwareBuffer){
   HardwareBufferRetain(hardwareBuffer);
 }
 
@@ -31,7 +31,7 @@ HardwareTextureProxy::~HardwareTextureProxy() {
 
 std::shared_ptr<TextureView> HardwareTextureProxy::getTextureView() const {
   if (resource == nullptr) {
-    resource = TextureView::MakeFrom(context, hardwareBuffer, _colorSpace);
+    resource = TextureView::MakeFrom(context, hardwareBuffer);
     if (resource == nullptr && !uniqueKey.empty()) {
       resource->assignUniqueKey(uniqueKey);
     }

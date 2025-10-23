@@ -78,11 +78,6 @@ class YUVTextureView : public TextureView {
     return {};
   }
 
-  void setColorSpace(std::shared_ptr<ColorSpace>) override {
-  }
-
-  std::shared_ptr<ColorSpace> colorSpace() const override;
-
  protected:
   YUVTextureView(std::vector<std::shared_ptr<GPUTexture>> yuvTextures, YUVFormat yuvFormat,
                  YUVColorSpace colorSpace);

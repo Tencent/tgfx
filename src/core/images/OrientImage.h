@@ -49,8 +49,7 @@ class OrientImage : public TransformImage {
                                       const SamplingOptions& sampling) const override;
 
   PlacementPtr<FragmentProcessor> asFragmentProcessor(
-      const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix,
-      std::shared_ptr<ColorSpace> dstColorSpace) const override;
+      const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix) const override;
 
   Orientation concatOrientation(Orientation newOrientation) const;
 

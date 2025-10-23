@@ -52,14 +52,6 @@ class TextureRenderTarget : public DefaultTextureView, public RenderTarget {
     return std::static_pointer_cast<TextureRenderTarget>(weakThis.lock());
   }
 
-  std::shared_ptr<ColorSpace> colorSpace() const override {
-    return DefaultTextureView::colorSpace();
-  }
-
-  void setColorSpace(std::shared_ptr<ColorSpace> colorSpace) override {
-    DefaultTextureView::setColorSpace(std::move(colorSpace));
-  }
-
  private:
   std::shared_ptr<GPUTexture> renderTexture = nullptr;
   bool _externallyOwned = false;
@@ -67,12 +59,12 @@ class TextureRenderTarget : public DefaultTextureView, public RenderTarget {
   static std::shared_ptr<RenderTarget> MakeFrom(
       Context* context, std::shared_ptr<GPUTexture> texture, int sampleCount,
       ImageOrigin origin = ImageOrigin::TopLeft, bool externallyOwned = false,
-      const ScratchKey& scratchKey = {}, std::shared_ptr<ColorSpace> colorSpace = nullptr);
+      const ScratchKey& scratchKey = {});
 
   TextureRenderTarget(std::shared_ptr<GPUTexture> texture,
                       std::shared_ptr<GPUTexture> renderTexture, ImageOrigin origin,
-                      bool externallyOwned, std::shared_ptr<ColorSpace> colorSpace = nullptr)
-      : DefaultTextureView(std::move(texture), origin, std::move(colorSpace)),
+                      bool externallyOwned)
+      : DefaultTextureView(std::move(texture), origin),
         renderTexture(std::move(renderTexture)), _externallyOwned(externallyOwned) {
   }
 

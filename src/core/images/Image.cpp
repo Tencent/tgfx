@@ -113,7 +113,7 @@ std::shared_ptr<Image> Image::MakeFrom(Context* context, const BackendTexture& b
     return nullptr;
   }
   auto textureProxy =
-      context->proxyProvider()->wrapExternalTexture(backendTexture, origin, false, colorSpace);
+      context->proxyProvider()->wrapExternalTexture(backendTexture, origin, false);
   return TextureImage::Wrap(std::move(textureProxy), std::move(colorSpace));
 }
 
@@ -124,7 +124,7 @@ std::shared_ptr<Image> Image::MakeAdopted(Context* context, const BackendTexture
     return nullptr;
   }
   auto textureProxy =
-      context->proxyProvider()->wrapExternalTexture(backendTexture, origin, true, colorSpace);
+      context->proxyProvider()->wrapExternalTexture(backendTexture, origin, true);
   return TextureImage::Wrap(std::move(textureProxy), std::move(colorSpace));
 }
 

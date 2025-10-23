@@ -48,22 +48,12 @@ class ExternalRenderTarget : public Resource, public RenderTarget {
     return 0;
   }
 
-  std::shared_ptr<ColorSpace> colorSpace() const override {
-    return _colorSpace;
-  }
-
-  void setColorSpace(std::shared_ptr<ColorSpace> colorSpace) override {
-    _colorSpace = std::move(colorSpace);
-  }
-
  private:
   std::shared_ptr<GPUTexture> renderTexture = nullptr;
   ImageOrigin _origin = ImageOrigin::TopLeft;
-  std::shared_ptr<ColorSpace> _colorSpace = nullptr;
 
-  ExternalRenderTarget(std::shared_ptr<GPUTexture> texture, ImageOrigin origin,
-                       std::shared_ptr<ColorSpace> colorSpace = nullptr)
-      : renderTexture(std::move(texture)), _origin(origin), _colorSpace(std::move(colorSpace)) {
+  ExternalRenderTarget(std::shared_ptr<GPUTexture> texture, ImageOrigin origin)
+      : renderTexture(std::move(texture)), _origin(origin) {
   }
 
   friend class RenderTarget;

@@ -59,10 +59,6 @@ class ExternalRenderTargetProxy : public RenderTargetProxy {
     return renderTarget;
   }
 
-  std::shared_ptr<ColorSpace> colorSpace() const override {
-    return renderTarget->colorSpace();
-  }
-
  private:
   std::shared_ptr<RenderTarget> renderTarget = nullptr;
 

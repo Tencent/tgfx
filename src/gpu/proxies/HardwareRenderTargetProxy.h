@@ -36,8 +36,7 @@ class HardwareRenderTargetProxy : public TextureRenderTargetProxy {
   HardwareBufferRef hardwareBuffer = nullptr;
 
   HardwareRenderTargetProxy(HardwareBufferRef hardwareBuffer, int width, int height,
-                            PixelFormat format, int sampleCount,
-                            std::shared_ptr<ColorSpace> colorSpace = nullptr);
+                            PixelFormat format, int sampleCount);
 
   friend class ProxyProvider;
 };

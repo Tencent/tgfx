@@ -39,17 +39,14 @@ class InnerShadowImageFilter : public ImageFilter {
 
   PlacementPtr<FragmentProcessor> getShadowFragmentProcessor(
       std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-      SrcRectConstraint constraint, const Matrix* uvMatrix,
-      std::shared_ptr<ColorSpace> dstColorSpace) const;
+      SrcRectConstraint constraint, const Matrix* uvMatrix) const;
 
   PlacementPtr<FragmentProcessor> getSourceFragmentProcessor(
       std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-      SrcRectConstraint constraint, const Matrix* uvMatrix,
-      std::shared_ptr<ColorSpace> dstColorSpace) const;
+      SrcRectConstraint constraint, const Matrix* uvMatrix) const;
 
   PlacementPtr<FragmentProcessor> asFragmentProcessor(
       std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-      SrcRectConstraint constraint, const Matrix* uvMatrix,
-      std::shared_ptr<ColorSpace> dstColorSpace) const override;
+      SrcRectConstraint constraint, const Matrix* uvMatrix) const override;
 };
 }  // namespace tgfx

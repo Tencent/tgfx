@@ -41,8 +41,7 @@ static ScratchKey ComputeRenderTargetScratchKey(int width, int height, PixelForm
 std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
                                                      const BackendTexture& backendTexture,
                                                      int sampleCount, ImageOrigin origin,
-                                                     bool adopted,
-                                                     std::shared_ptr<ColorSpace> colorSpace) {
+                                                     bool adopted) {
   if (context == nullptr) {
     return nullptr;
   }
@@ -59,13 +58,12 @@ std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
                                       texture->format(), sampleCount, texture->mipLevelCount() > 1);
   }
   return TextureRenderTarget::MakeFrom(context, std::move(texture), sampleCount, origin, !adopted,
-                                       scratchKey, std::move(colorSpace));
+                                       scratchKey);
 }
 
 std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
                                                      HardwareBufferRef hardwareBuffer,
-                                                     int sampleCount,
-                                                     std::shared_ptr<ColorSpace> colorSpace) {
+                                                     int sampleCount) {
   if (context == nullptr) {
     return nullptr;
   }
@@ -81,14 +79,12 @@ std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
     return nullptr;
   }
   sampleCount = context->caps()->getSampleCount(sampleCount, formats.front());
-  return TextureRenderTarget::MakeFrom(context, std::move(textures.front()), sampleCount,
-                                       ImageOrigin::TopLeft, true, {}, std::move(colorSpace));
+  return TextureRenderTarget::MakeFrom(context, std::move(textures.front()), sampleCount);
 }
 
 std::shared_ptr<RenderTarget> RenderTarget::Make(Context* context, int width, int height,
                                                  PixelFormat format, int sampleCount,
-                                                 bool mipmapped, ImageOrigin origin,
-                                                 std::shared_ptr<ColorSpace> colorSpace) {
+                                                 bool mipmapped, ImageOrigin origin) {
   if (!TextureView::CheckSizeAndFormat(context, width, height, format)) {
     return nullptr;
   }
@@ -97,7 +93,6 @@ std::shared_ptr<RenderTarget> RenderTarget::Make(Context* context, int width, in
   auto scratchKey = ComputeRenderTargetScratchKey(width, height, format, sampleCount, mipmapped);
   if (auto renderTarget = Resource::Find<TextureRenderTarget>(context, scratchKey)) {
     renderTarget->_origin = origin;
-    renderTarget->setColorSpace(colorSpace);
     return renderTarget;
   }
   GPUTextureDescriptor descriptor = {
@@ -108,12 +103,12 @@ std::shared_ptr<RenderTarget> RenderTarget::Make(Context* context, int width, in
     return nullptr;
   }
   return TextureRenderTarget::MakeFrom(context, std::move(texture), sampleCount, origin, false,
-                                       scratchKey, std::move(colorSpace));
+                                       scratchKey);
 }
 
 std::shared_ptr<RenderTarget> TextureRenderTarget::MakeFrom(
     Context* context, std::shared_ptr<GPUTexture> texture, int sampleCount, ImageOrigin origin,
-    bool externallyOwned, const ScratchKey& scratchKey, std::shared_ptr<ColorSpace> colorSpace) {
+    bool externallyOwned, const ScratchKey& scratchKey) {
   DEBUG_ASSERT(context != nullptr);
   DEBUG_ASSERT(texture != nullptr);
   std::shared_ptr<GPUTexture> renderTexture = nullptr;
@@ -127,7 +122,7 @@ std::shared_ptr<RenderTarget> TextureRenderTarget::MakeFrom(
     }
   }
   auto renderTarget = new TextureRenderTarget(std::move(texture), std::move(renderTexture), origin,
-                                              externallyOwned, std::move(colorSpace));
+                                              externallyOwned);
   return Resource::AddToCache(context, renderTarget, scratchKey);
 }
 }  // namespace tgfx

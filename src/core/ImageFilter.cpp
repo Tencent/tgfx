@@ -51,7 +51,7 @@ std::shared_ptr<TextureProxy> ImageFilter::lockTextureProxy(std::shared_ptr<Imag
   auto textureScaleY = scaledBounds.height() / renderBounds.height();
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(scaledBounds.width()), static_cast<int>(scaledBounds.height()),
-      source->isAlphaOnly(), 1, args.mipmapped, ImageOrigin::TopLeft, source->colorSpace(),
+      source->isAlphaOnly(), 1, args.mipmapped, ImageOrigin::TopLeft,
       args.backingFit);
   if (renderTarget == nullptr) {
     return nullptr;
@@ -61,8 +61,7 @@ std::shared_ptr<TextureProxy> ImageFilter::lockTextureProxy(std::shared_ptr<Imag
                 std::max(textureScaleX, textureScaleY));
   Matrix matrix = Matrix::MakeTrans(renderBounds.left, renderBounds.top);
   matrix.preScale(1.0f / textureScaleX, 1.0f / textureScaleY);
-  auto processor = asFragmentProcessor(source, fpArgs, {}, SrcRectConstraint::Fast, &matrix,
-                                       source->colorSpace());
+  auto processor = asFragmentProcessor(source, fpArgs, {}, SrcRectConstraint::Fast, &matrix);
   auto drawingManager = args.context->drawingManager();
   if (!drawingManager->fillRTWithFP(renderTarget, std::move(processor), args.renderFlags)) {
     return nullptr;
@@ -83,8 +82,7 @@ bool ImageFilter::applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* 
 
 PlacementPtr<FragmentProcessor> ImageFilter::makeFPFromTextureProxy(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-    const SrcRectConstraint constraint, const Matrix* uvMatrix,
-    std::shared_ptr<ColorSpace> dstColorSpace) const {
+    const SrcRectConstraint constraint, const Matrix* uvMatrix) const {
   auto inputBounds = Rect::MakeWH(source->width(), source->height());
   auto clipBounds = args.drawRect;
   if (uvMatrix) {
@@ -109,20 +107,8 @@ PlacementPtr<FragmentProcessor> ImageFilter::makeFPFromTextureProxy(
   }
   SamplingArgs samplingArgs = {TileMode::Decal, TileMode::Decal, sampling, constraint};
   if (dstBounds.contains(clipBounds)) {
-    auto fp = TextureEffect::Make(std::move(textureProxy), samplingArgs, &fpMatrix, isAlphaOnly);
-    if (!isAlphaOnly) {
-      return ColorSpaceXformEffect::Make(args.context->drawingBuffer(), std::move(fp),
-                                         source->colorSpace().get(), AlphaType::Premultiplied,
-                                         dstColorSpace.get(), AlphaType::Premultiplied);
-    }
-    return fp;
+    return TextureEffect::Make(std::move(textureProxy), samplingArgs, &fpMatrix, isAlphaOnly);
   }
-  auto fp = TiledTextureEffect::Make(std::move(textureProxy), samplingArgs, &fpMatrix, isAlphaOnly);
-  if (!isAlphaOnly) {
-    return ColorSpaceXformEffect::Make(args.context->drawingBuffer(), std::move(fp),
-                                       source->colorSpace().get(), AlphaType::Premultiplied,
-                                       dstColorSpace.get(), AlphaType::Premultiplied);
-  }
-  return fp;
+  return TiledTextureEffect::Make(std::move(textureProxy), samplingArgs, &fpMatrix, isAlphaOnly);
 }
 }  // namespace tgfx

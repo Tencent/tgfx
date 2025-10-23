@@ -24,23 +24,28 @@
 #include "tgfx/gpu/RuntimeEffect.h"
 
 namespace tgfx {
+struct TextureProxyWithColorSpace {
+  std::shared_ptr<TextureProxy> textureProxy = nullptr;
+  std::shared_ptr<ColorSpace> colorSpace = nullptr;
+};
+
 class RuntimeDrawTask : public RenderTask {
  public:
   RuntimeDrawTask(std::shared_ptr<RenderTargetProxy> target,
-                  std::vector<std::shared_ptr<TextureProxy>> inputs,
+                  std::vector<TextureProxyWithColorSpace> inputs,
                   std::shared_ptr<RuntimeEffect> effect, const Point& offset);
 
   void execute(CommandEncoder* encoder) override;
 
  private:
   std::shared_ptr<RenderTargetProxy> renderTargetProxy = nullptr;
-  std::vector<std::shared_ptr<TextureProxy>> inputTextures = {};
+  std::vector<TextureProxyWithColorSpace> inputTexturesWithCS = {};
   std::vector<std::shared_ptr<VertexBufferView>> inputVertexBuffers = {};
   std::shared_ptr<RuntimeEffect> effect = nullptr;
   Point offset = {};
 
   static std::shared_ptr<TextureView> GetFlatTextureView(CommandEncoder* encoder,
-                                                         std::shared_ptr<TextureProxy> textureProxy,
+                                                         const TextureProxyWithColorSpace* textureProxyWithCS,
                                                          VertexBufferView* vertexProxyView,
                                                          std::shared_ptr<ColorSpace> dstColorSpace);
 };

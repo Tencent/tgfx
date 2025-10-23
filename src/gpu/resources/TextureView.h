@@ -54,10 +54,9 @@ class TextureView : public Resource {
    */
   static std::shared_ptr<TextureView> MakeRGBA(
       Context* context, int width, int height, const void* pixels, size_t rowBytes,
-      bool mipmapped = false, ImageOrigin origin = ImageOrigin::TopLeft,
-      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB()) {
+      bool mipmapped = false, ImageOrigin origin = ImageOrigin::TopLeft) {
     return MakeFormat(context, width, height, pixels, rowBytes, PixelFormat::RGBA_8888, mipmapped,
-                      origin, std::move(colorSpace));
+                      origin);
   }
   /**
    * Creates an empty texture view with each pixel stored as 32-bit RGBA data. Returns nullptr if
@@ -65,10 +64,8 @@ class TextureView : public Resource {
    */
   static std::shared_ptr<TextureView> MakeRGBA(
       Context* context, int width, int height, bool mipmapped = false,
-      ImageOrigin origin = ImageOrigin::TopLeft,
-      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB()) {
-    return MakeFormat(context, width, height, nullptr, 0, PixelFormat::RGBA_8888, mipmapped, origin,
-                      std::move(colorSpace));
+      ImageOrigin origin = ImageOrigin::TopLeft) {
+    return MakeFormat(context, width, height, nullptr, 0, PixelFormat::RGBA_8888, mipmapped, origin);
   }
 
   /**
@@ -81,7 +78,7 @@ class TextureView : public Resource {
                                                 bool mipmapped = false,
                                                 ImageOrigin origin = ImageOrigin::TopLeft) {
     return MakeFormat(context, width, height, pixels, rowBytes, PixelFormat::ALPHA_8, mipmapped,
-                      origin, nullptr);
+                      origin);
   }
   /**
    * Creates an empty texture view with each pixel stored as a single translucency (alpha) channel.
@@ -91,8 +88,7 @@ class TextureView : public Resource {
   static std::shared_ptr<TextureView> MakeAlpha(Context* context, int width, int height,
                                                 bool mipmapped = false,
                                                 ImageOrigin origin = ImageOrigin::TopLeft) {
-    return MakeFormat(context, width, height, nullptr, 0, PixelFormat::ALPHA_8, mipmapped, origin,
-                      nullptr);
+    return MakeFormat(context, width, height, nullptr, 0, PixelFormat::ALPHA_8, mipmapped, origin);
   }
 
   /**
@@ -102,10 +98,8 @@ class TextureView : public Resource {
    */
   static std::shared_ptr<TextureView> MakeFormat(
       Context* context, int width, int height, PixelFormat pixelFormat, bool mipmapped = false,
-      ImageOrigin origin = ImageOrigin::TopLeft,
-      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB()) {
-    return MakeFormat(context, width, height, nullptr, 0, pixelFormat, mipmapped, origin,
-                      std::move(colorSpace));
+      ImageOrigin origin = ImageOrigin::TopLeft) {
+    return MakeFormat(context, width, height, nullptr, 0, pixelFormat, mipmapped, origin);
   }
 
   /**
@@ -115,8 +109,7 @@ class TextureView : public Resource {
    */
   static std::shared_ptr<TextureView> MakeFormat(
       Context* context, int width, int height, const void* pixels, size_t rowBytes,
-      PixelFormat pixelFormat, bool mipmapped = false, ImageOrigin origin = ImageOrigin::TopLeft,
-      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+      PixelFormat pixelFormat, bool mipmapped = false, ImageOrigin origin = ImageOrigin::TopLeft);
 
   /**
    * Creates a new texture view which wraps the specified backend texture. The caller must ensure
@@ -124,8 +117,7 @@ class TextureView : public Resource {
    */
   static std::shared_ptr<TextureView> MakeFrom(
       Context* context, const BackendTexture& backendTexture,
-      ImageOrigin origin = ImageOrigin::TopLeft, bool adopted = false,
-      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+      ImageOrigin origin = ImageOrigin::TopLeft, bool adopted = false);
 
   /**
    * Creates a TextureView from the specified ImageBuffer. Returns nullptr if the context is nullptr
@@ -229,10 +221,6 @@ class TextureView : public Resource {
   virtual std::shared_ptr<RenderTarget> asRenderTarget() const {
     return nullptr;
   }
-
-  virtual void setColorSpace(std::shared_ptr<ColorSpace> colorSpace) = 0;
-
-  virtual std::shared_ptr<ColorSpace> colorSpace() const = 0;
 
  protected:
   ImageOrigin _origin = ImageOrigin::TopLeft;

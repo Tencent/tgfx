@@ -64,7 +64,7 @@ std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
 
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(dstDrawWidth), static_cast<int>(dstDrawHeight),
-      source->isAlphaOnly(), 1, args.mipmapped, ImageOrigin::TopLeft, source->colorSpace(),
+      source->isAlphaOnly(), 1, args.mipmapped, ImageOrigin::TopLeft,
       args.backingFit);
   auto sourceTextureProxy = source->lockTextureProxy(args);
 
@@ -125,10 +125,8 @@ std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
 
 PlacementPtr<FragmentProcessor> Transform3DImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-    SrcRectConstraint constraint, const Matrix* uvMatrix,
-    std::shared_ptr<ColorSpace> dstColorSpace) const {
-  return makeFPFromTextureProxy(source, args, sampling, constraint, uvMatrix,
-                                std::move(dstColorSpace));
+    SrcRectConstraint constraint, const Matrix* uvMatrix) const {
+  return makeFPFromTextureProxy(source, args, sampling, constraint, uvMatrix);
 }
 
 }  // namespace tgfx

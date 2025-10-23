@@ -22,8 +22,7 @@
 namespace tgfx {
 std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
                                                      const BackendRenderTarget& backendRenderTarget,
-                                                     ImageOrigin origin,
-                                                     std::shared_ptr<ColorSpace> colorSpace) {
+                                                     ImageOrigin origin) {
   if (context == nullptr) {
     return nullptr;
   }
@@ -31,7 +30,7 @@ std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
   if (!texture) {
     return nullptr;
   }
-  auto renderTarget = new ExternalRenderTarget(std::move(texture), origin, std::move(colorSpace));
+  auto renderTarget = new ExternalRenderTarget(std::move(texture), origin);
   return Resource::AddToCache(context, renderTarget);
 }
 

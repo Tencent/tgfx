@@ -81,8 +81,7 @@ std::shared_ptr<Image> PictureImage::onMakeMipmapped(bool enabled) const {
 }
 
 PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(
-    const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix,
-    std::shared_ptr<ColorSpace> dstColorSpace) const {
+    const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix) const {
   auto drawBounds = args.drawRect;
   if (uvMatrix) {
     drawBounds = uvMatrix->mapRect(drawBounds);
@@ -100,7 +99,7 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(
   auto mipmapped = samplingArgs.sampling.mipmapMode != MipmapMode::None && hasMipmaps();
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(rect.width()), static_cast<int>(rect.height()), isAlphaOnly(),
-      1, mipmapped, ImageOrigin::TopLeft, _colorSpace, BackingFit::Approx);
+      1, mipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
   if (renderTarget == nullptr) {
     return nullptr;
   }
@@ -117,14 +116,8 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(
   if (samplingArgs.sampleArea) {
     newSamplingArgs.sampleArea = extraMatrix.mapRect(*samplingArgs.sampleArea);
   }
-  auto fp = TiledTextureEffect::Make(renderTarget->asTextureProxy(), newSamplingArgs,
+  return TiledTextureEffect::Make(renderTarget->asTextureProxy(), newSamplingArgs,
                                      &finalUVMatrix, isAlphaOnly());
-  if (!isAlphaOnly()) {
-    return ColorSpaceXformEffect::Make(args.context->drawingBuffer(), std::move(fp),
-                                       colorSpace().get(), AlphaType::Premultiplied,
-                                       dstColorSpace.get(), AlphaType::Premultiplied);
-  }
-  return fp;
 }
 
 std::shared_ptr<TextureProxy> PictureImage::lockTextureProxy(const TPArgs& args) const {
@@ -136,7 +129,7 @@ std::shared_ptr<TextureProxy> PictureImage::lockTextureProxy(const TPArgs& args)
   }
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, textureWidth, textureHeight, isAlphaOnly(), 1, hasMipmaps() && args.mipmapped,
-      ImageOrigin::TopLeft, _colorSpace, args.backingFit);
+      ImageOrigin::TopLeft, args.backingFit);
   if (renderTarget == nullptr) {
     return nullptr;
   }
@@ -153,7 +146,7 @@ bool PictureImage::drawPicture(std::shared_ptr<RenderTargetProxy> renderTarget,
   if (renderTarget == nullptr) {
     return false;
   }
-  RenderContext renderContext(std::move(renderTarget), renderFlags, true);
+  RenderContext renderContext(std::move(renderTarget), renderFlags, true, nullptr, _colorSpace);
   Matrix totalMatrix = {};
   if (extraMatrix) {
     totalMatrix = *extraMatrix;

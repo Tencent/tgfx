@@ -36,7 +36,7 @@ class RenderTargetProxy {
    */
   static std::shared_ptr<RenderTargetProxy> MakeFrom(
       Context* context, const BackendRenderTarget& backendRenderTarget,
-      ImageOrigin origin = ImageOrigin::TopLeft, std::shared_ptr<ColorSpace> colorSpace = nullptr);
+      ImageOrigin origin = ImageOrigin::TopLeft);
   /**
    * Creates a new RenderTargetProxy instance with the specified context, width, height, sample
    * count, mipmap state, and origin. If `isAlphaOnly` is true, it will try to use the ALPHA_8
@@ -45,8 +45,7 @@ class RenderTargetProxy {
    */
   static std::shared_ptr<RenderTargetProxy> MakeFallback(
       Context* context, int width, int height, bool alphaOnly, int sampleCount = 1,
-      bool mipmapped = false, ImageOrigin origin = ImageOrigin::TopLeft,
-      std::shared_ptr<ColorSpace> colorSpace = nullptr, BackingFit backingFit = BackingFit::Exact);
+      bool mipmapped = false, ImageOrigin origin = ImageOrigin::TopLeft, BackingFit backingFit = BackingFit::Exact);
 
   virtual ~RenderTargetProxy() = default;
 
@@ -112,8 +111,6 @@ class RenderTargetProxy {
    * Returns the RenderTarget of the proxy. Returns nullptr if the proxy is not instantiated yet.
    */
   virtual std::shared_ptr<RenderTarget> getRenderTarget() const = 0;
-
-  virtual std::shared_ptr<ColorSpace> colorSpace() const = 0;
 
   /**
    * Creates a compatible TextureProxy instance matches the properties of the RenderTargetProxy.

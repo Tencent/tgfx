@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "YUVTextureView.h"
-#include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/Log.h"
 #include "gpu/GPU.h"
 
@@ -90,10 +89,6 @@ std::shared_ptr<TextureView> TextureView::MakeNV12(Context* context, const YUVDa
       std::static_pointer_cast<YUVTextureView>(Resource::AddToCache(context, yuvTexture));
   SubmitYUVTexture(context->gpu(), yuvData, texture->textures.data());
   return texture;
-}
-
-std::shared_ptr<ColorSpace> YUVTextureView::colorSpace() const {
-  return MakeColorSpaceFromYUVColorSpace(_colorSpace);
 }
 
 YUVTextureView::YUVTextureView(std::vector<std::shared_ptr<GPUTexture>> yuvTextures,

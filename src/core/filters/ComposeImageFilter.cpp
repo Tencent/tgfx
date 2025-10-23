@@ -72,8 +72,7 @@ Rect ComposeImageFilter::onFilterBounds(const Rect& srcRect) const {
 
 PlacementPtr<FragmentProcessor> ComposeImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-    SrcRectConstraint constraint, const Matrix* uvMatrix,
-    std::shared_ptr<ColorSpace> dstColorSpace) const {
+    SrcRectConstraint constraint, const Matrix* uvMatrix) const {
   auto lastSource = source;
   Point lastOffset = {};
   for (auto& filter : filters) {
@@ -88,6 +87,6 @@ PlacementPtr<FragmentProcessor> ComposeImageFilter::asFragmentProcessor(
   if (uvMatrix) {
     matrix.preConcat(*uvMatrix);
   }
-  return FragmentProcessor::Make(lastSource, args, sampling, constraint, &matrix, dstColorSpace);
+  return FragmentProcessor::Make(lastSource, args, sampling, constraint, &matrix);
 }
 }  // namespace tgfx

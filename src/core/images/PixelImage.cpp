@@ -25,8 +25,7 @@
 namespace tgfx {
 
 PlacementPtr<FragmentProcessor> PixelImage::asFragmentProcessor(
-    const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix,
-    std::shared_ptr<ColorSpace> dstColorSpace) const {
+    const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix) const {
   auto mipmapped = hasMipmaps() && samplingArgs.sampling.mipmapMode != MipmapMode::None;
   TPArgs tpArgs(args.context, args.renderFlags, mipmapped, args.drawScale, BackingFit::Approx);
   auto textureProxy = lockTextureProxy(tpArgs);
@@ -39,12 +38,6 @@ PlacementPtr<FragmentProcessor> PixelImage::asFragmentProcessor(
   if (uvMatrix) {
     fpMatrix.preConcat(*uvMatrix);
   }
-  auto fp = TiledTextureEffect::Make(textureProxy, samplingArgs, &fpMatrix, isAlphaOnly());
-  if (!isAlphaOnly()) {
-    return ColorSpaceXformEffect::Make(args.context->drawingBuffer(), std::move(fp),
-                                       colorSpace().get(), AlphaType::Premultiplied,
-                                       dstColorSpace.get(), AlphaType::Premultiplied);
-  }
-  return fp;
+  return TiledTextureEffect::Make(textureProxy, samplingArgs, &fpMatrix, isAlphaOnly());
 }
 }  // namespace tgfx

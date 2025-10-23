@@ -23,6 +23,7 @@
 #include "gpu/TPArgs.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/proxies/RenderTargetProxy.h"
+#include "gpu/tasks/RuntimeDrawTask.h"
 
 namespace tgfx {
 std::shared_ptr<ImageFilter> ImageFilter::Runtime(std::shared_ptr<RuntimeEffect> effect) {
@@ -41,13 +42,12 @@ std::shared_ptr<TextureProxy> RuntimeImageFilter::lockTextureProxy(std::shared_p
                                                                    const TPArgs& args) const {
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(renderBounds.width()), static_cast<int>(renderBounds.height()),
-      source->isAlphaOnly(), effect->sampleCount(), args.mipmapped, ImageOrigin::TopLeft,
-      source->colorSpace(), BackingFit::Exact);
+      source->isAlphaOnly(), effect->sampleCount(), args.mipmapped);
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  std::vector<std::shared_ptr<TextureProxy>> textureProxies = {};
-  textureProxies.reserve(1 + effect->extraInputs.size());
+  std::vector<TextureProxyWithColorSpace> textureProxyWithCSVec = {};
+  textureProxyWithCSVec.reserve(1 + effect->extraInputs.size());
   // Request a texture proxy from the source image without mipmaps to save memory.
   // It may be ignored if the source image has preset mipmaps.
   TPArgs tpArgs(args.context, args.renderFlags, false, 1.0f, BackingFit::Exact);
@@ -55,7 +55,7 @@ std::shared_ptr<TextureProxy> RuntimeImageFilter::lockTextureProxy(std::shared_p
   if (textureProxy == nullptr) {
     return nullptr;
   }
-  textureProxies.push_back(textureProxy);
+  textureProxyWithCSVec.push_back({textureProxy, source->colorSpace()});
   for (size_t i = 0; i < effect->extraInputs.size(); i++) {
     const auto& input = effect->extraInputs[i];
     if (input == nullptr) {
@@ -66,18 +66,17 @@ std::shared_ptr<TextureProxy> RuntimeImageFilter::lockTextureProxy(std::shared_p
     if (textureProxy == nullptr) {
       return nullptr;
     }
-    textureProxies.push_back(textureProxy);
+    textureProxyWithCSVec.push_back({textureProxy, input->colorSpace()});
   }
   auto offset = Point::Make(-renderBounds.x(), -renderBounds.y());
   auto drawingManager = args.context->drawingManager();
-  drawingManager->addRuntimeDrawTask(renderTarget, std::move(textureProxies), effect, offset);
+  drawingManager->addRuntimeDrawTask(renderTarget, std::move(textureProxyWithCSVec), effect, offset);
   return renderTarget->asTextureProxy();
 }
 
 PlacementPtr<FragmentProcessor> RuntimeImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-    SrcRectConstraint constraint, const Matrix* uvMatrix,
-    std::shared_ptr<ColorSpace> dstColorSpace) const {
-  return makeFPFromTextureProxy(source, args, sampling, constraint, uvMatrix, dstColorSpace);
+    SrcRectConstraint constraint, const Matrix* uvMatrix) const {
+  return makeFPFromTextureProxy(source, args, sampling, constraint, uvMatrix);
 }
 }  // namespace tgfx
