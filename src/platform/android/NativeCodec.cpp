@@ -193,9 +193,9 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string& fileP
         env->NewObject(ExifInterfaceClass.get(), ExifInterface_Constructor_Path, imagePath);
   }
   auto origin = GetOrientation(env, exifInterface);
-  auto codec = std::shared_ptr<NativeCodec>(new NativeCodec(width, height, origin));
+  auto codec =
+      std::shared_ptr<NativeCodec>(new NativeCodec(width, height, origin, std::move(colorSpace)));
   codec->imagePath = filePath;
-  codec->setColorSpace(colorSpace);
   return codec;
 }
 
@@ -239,9 +239,9 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data> im
         env->NewObject(ExifInterfaceClass.get(), ExifInterface_Constructor_Stream, inputStream);
   }
   auto origin = GetOrientation(env, exifInterface);
-  auto codec = std::shared_ptr<NativeCodec>(new NativeCodec(width, height, origin));
+  auto codec =
+      std::shared_ptr<NativeCodec>(new NativeCodec(width, height, origin, std::move(colorSpace)));
   codec->imageBytes = imageBytes;
-  codec->setColorSpace(colorSpace);
   return codec;
 }
 
@@ -261,9 +261,8 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(NativeImageRef nativeImage) {
   }
   auto colorSpace = AndroidBitmap::GetColorSpace(env, nativeImage);
   auto image = std::shared_ptr<NativeCodec>(
-      new NativeCodec(info.width(), info.height(), Orientation::TopLeft));
+      new NativeCodec(info.width(), info.height(), Orientation::TopLeft, std::move(colorSpace)));
   image->nativeImage = nativeImage;
-  image->setColorSpace(colorSpace);
   return image;
 }
 
