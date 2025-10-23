@@ -172,8 +172,12 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
   return renderTarget->asTextureProxy();
 }
 
-Rect GaussianBlurImageFilter::onFilterBounds(const Rect& srcRect) const {
-  return srcRect.makeOutset(2.f * blurrinessX, 2.f * blurrinessY);
+Rect GaussianBlurImageFilter::onGetOutputBounds(const Rect& inputRect) const {
+  return inputRect.makeOutset(2.f * blurrinessX, 2.f * blurrinessY);
+}
+
+Rect GaussianBlurImageFilter::onGetInputBounds(const Rect& outputRect) const {
+  return outputRect.makeOutset(-2.f * blurrinessX, -2.f * blurrinessY);
 }
 
 PlacementPtr<FragmentProcessor> GaussianBlurImageFilter::asFragmentProcessor(

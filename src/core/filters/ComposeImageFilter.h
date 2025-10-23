@@ -32,7 +32,9 @@ class ComposeImageFilter : public ImageFilter {
     return Type::Compose;
   }
 
-  Rect onFilterBounds(const Rect& srcRect) const override;
+  Rect onGetOutputBounds(const Rect& inputRect) const override;
+
+  Rect onGetInputBounds(const Rect& outputRect) const override;
 
   PlacementPtr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
                                                       const FPArgs& args,

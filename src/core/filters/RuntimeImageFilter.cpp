@@ -32,8 +32,12 @@ std::shared_ptr<ImageFilter> ImageFilter::Runtime(std::shared_ptr<RuntimeEffect>
   return std::make_shared<RuntimeImageFilter>(effect);
 }
 
-Rect RuntimeImageFilter::onFilterBounds(const Rect& srcRect) const {
-  return effect->filterBounds(srcRect);
+Rect RuntimeImageFilter::onGetOutputBounds(const Rect& inputRect) const {
+  return effect->filterBounds(inputRect, RuntimeEffect::MapDirection::Forward);
+}
+
+Rect RuntimeImageFilter::onGetInputBounds(const Rect& outputRect) const {
+  return effect->filterBounds(outputRect, RuntimeEffect::MapDirection::Reverse);
 }
 
 std::shared_ptr<TextureProxy> RuntimeImageFilter::lockTextureProxy(std::shared_ptr<Image> source,

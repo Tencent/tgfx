@@ -47,7 +47,9 @@ class Transform3DImageFilter final : public ImageFilter {
     return Type::Transform3D;
   }
 
-  Rect onFilterBounds(const Rect& srcRect) const override;
+  Rect onGetOutputBounds(const Rect& inputRect) const override;
+
+  Rect onGetInputBounds(const Rect& outputRect) const override;
 
   std::shared_ptr<TextureProxy> lockTextureProxy(std::shared_ptr<Image> source,
                                                  const Rect& renderBounds,

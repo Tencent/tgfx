@@ -44,15 +44,24 @@ DropShadowImageFilter::DropShadowImageFilter(float dx, float dy, float blurrines
       shadowOnly(shadowOnly) {
 }
 
-Rect DropShadowImageFilter::onFilterBounds(const Rect& srcRect) const {
-  auto bounds = srcRect;
+Rect DropShadowImageFilter::onGetOutputBounds(const Rect& inputRect) const {
+  auto bounds = inputRect;
   bounds.offset(dx, dy);
   if (blurFilter != nullptr) {
     bounds = blurFilter->filterBounds(bounds);
   }
   if (!shadowOnly) {
-    bounds.join(srcRect);
+    bounds.join(inputRect);
   }
+  return bounds;
+}
+
+Rect DropShadowImageFilter::onGetInputBounds(const Rect& outputRect) const {
+  Rect bounds = outputRect;
+  if (blurFilter != nullptr) {
+    bounds = blurFilter->filterBounds(bounds, Reverse);
+  }
+  bounds.offset(-dx, -dy);
   return bounds;
 }
 
