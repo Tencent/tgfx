@@ -127,7 +127,8 @@ std::shared_ptr<PixelBuffer> PixelBuffer::MakeFrom(HardwareBufferRef hardwareBuf
              : std::make_shared<HardwarePixelBuffer>(info, hardwareBuffer, std::move(colorSpace));
 }
 
-PixelBuffer::PixelBuffer(const ImageInfo& info, std::shared_ptr<ColorSpace> colorSpace) : _info(info), _colorSpace(std::move(colorSpace) {
+PixelBuffer::PixelBuffer(const ImageInfo& info, std::shared_ptr<ColorSpace> colorSpace)
+    : _info(info), _colorSpace(std::move(colorSpace)) {
   if (_info.colorType() == ColorType::ALPHA_8) {
     _colorSpace = nullptr;
   }
