@@ -159,7 +159,7 @@ class ImageFilter {
   virtual Rect onGetOutputBounds(const Rect& inputRect) const;
 
   /**
-   * Returns the bounds of the source image would be required to fill the given rect
+   * Returns the bounds of the source image that would be required to fill the given rect
    *
    */
   virtual Rect onGetInputBounds(const Rect& outputRect) const;
