@@ -128,9 +128,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
   /**
    * Returns the position of the layer relative to the local coordinates of the parent layer.
    */
-  Point position() const {
-    return {_matrix.getTranslateX(), _matrix.getTranslateY()};
-  }
+  Point position() const;
 
   /**
    * Sets the position of the layer.
@@ -139,15 +137,23 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   /**
    * Returns the transformation matrix applied to the layer.
+   * If the matrix set via the setMatrix3D interface contains 3D transformations or projection
+   * transformations, this interface will return the identity matrix; you need to use the matrix3D
+   * interface to obtain the actual matrix. Otherwise, it will return the equivalent simplified
+   * affine transformation matrix.
    */
-  const Matrix& matrix() const {
-    return _matrix;
-  }
+  Matrix matrix() const;
 
   /**
    * Sets the transformation matrix applied to the layer.
    */
   void setMatrix(const Matrix& value);
+
+  Matrix3D matrix3D() const {
+    return _matrix3D;
+  }
+
+  void setMatrix3D(const Matrix3D& value);
 
   /**
    * Returns whether the layer is visible. The default value is true.
@@ -553,13 +559,38 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   bool doContains(const Layer* child) const;
 
+  /**
+   * Returns the transformation matrix of the current layer relative to the root layer. Note that
+   * if any layer along the path from the current layer to the root layer contains 3D transformations
+   * or projection transformations, this interface will return the identity matrix; you need to use
+   * the getGlobalMatrix3D interface to obtain the actual matrix. Otherwise, it will return the
+   * equivalent simplified affine transformation matrix.
+   */
   Matrix getGlobalMatrix() const;
 
+  Matrix3D getGlobalMatrix3D() const;
+
+  /**
+   * Returns the transformation matrix of the current layer relative to the parent layer. Note that
+   * if the current layer's matrix contains 3D transformations or projection transformations, this
+   * interface will return the identity matrix; you need to use the getMatrix3DWithScrollRect
+   * interface to obtain the actual matrix. Otherwise, it will return the equivalent simplified
+   * affine transformation matrix.
+   */
   Matrix getMatrixWithScrollRect() const;
+
+  Matrix3D getMatrix3DWithScrollRect() const;
 
   LayerContent* getContent();
 
-  std::shared_ptr<ImageFilter> getImageFilter(float contentScale);
+  /**
+   * Generates an image filter for the specified content area within the layer
+   * @param contentScale The scale ratio of the specified area in the layer's local coordinate
+   * system
+   * @param contentBound The rectangular coordinates of the specified area after scaling in the
+   * layer coordinate system
+   */
+  std::shared_ptr<ImageFilter> getImageFilter(float contentScale, const Rect& contentBound);
 
   RasterizedContent* getRasterizedCache(const DrawArgs& args, const Matrix& renderMatrix);
 
@@ -594,6 +625,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::shared_ptr<MaskFilter> getMaskFilter(const DrawArgs& args, float scale);
 
   Matrix getRelativeMatrix(const Layer* targetCoordinateSpace) const;
+
+  Matrix3D getRelativeMatrix3D(const Layer* targetCoordinateSpace) const;
 
   bool hasValidMask() const;
 
@@ -630,7 +663,10 @@ class Layer : public std::enable_shared_from_this<Layer> {
   } bitFields = {};
   std::string _name;
   float _alpha = 1.0f;
-  Matrix _matrix = {};
+  // The actual transformation matrix that determines the geometric position of the layer
+  Matrix3D _matrix3D = {};
+  // Whether the matrix3D is equivalent to a 2D affine matrix
+  bool _matrix3DIsAffine = true;
   std::shared_ptr<Layer> _mask = nullptr;
   Layer* maskOwner = nullptr;
   std::unique_ptr<Rect> _scrollRect = nullptr;

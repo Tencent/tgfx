@@ -16,22 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/core/Vec.h"
-#include "core/utils/MathExtra.h"
+#pragma once
 
-namespace tgfx {
+#include <tgfx/core/Data.h>
+#include "SerializationUtils.h"
 
-Vec2 operator/(const Vec2& v, float s) {
-  return {IEEEFloatDivide(v.x, s), IEEEFloatDivide(v.y, s)};
-}
+namespace tgfx::Matrix3DSerialization {
 
-bool Vec3::operator==(const Vec3& v) const {
-  return FloatNearlyEqual(x, v.x) && FloatNearlyEqual(y, v.y) && FloatNearlyEqual(z, v.z);
-}
+std::shared_ptr<Data> Serialize(const Matrix3D* matrix);
 
-bool Vec4::operator==(const Vec4& v) const {
-  return FloatNearlyEqual(x, v.x) && FloatNearlyEqual(y, v.y) && FloatNearlyEqual(z, v.z) &&
-         FloatNearlyEqual(w, v.w);
-}
-
-}  // namespace tgfx
+}  // namespace tgfx::Matrix3DSerialization

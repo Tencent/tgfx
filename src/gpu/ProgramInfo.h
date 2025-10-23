@@ -19,6 +19,7 @@
 #pragma once
 
 #include <unordered_map>
+#include "CullFaceType.h"
 #include "gpu/RenderPass.h"
 #include "gpu/RenderPipeline.h"
 #include "gpu/processors/EmptyXferProcessor.h"
@@ -93,6 +94,20 @@ class ProgramInfo {
    */
   void setUniformsAndSamplers(RenderPass* renderPass, PipelineProgram* program) const;
 
+  /**
+   * Returns the cull face type used for rendering.
+   */
+  CullFaceType getCullFaceType() const {
+    return cullFaceType;
+  }
+
+  /**
+   * Sets the cull face type used for rendering.
+   */
+  void setCullFaceType(CullFaceType type) {
+    cullFaceType = type;
+  }
+
  private:
   RenderTarget* renderTarget = nullptr;
   GeometryProcessor* geometryProcessor = nullptr;
@@ -102,6 +117,7 @@ class ProgramInfo {
   size_t numColorProcessors = 0;
   XferProcessor* xferProcessor = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
+  CullFaceType cullFaceType = CullFaceType::None;
 
   void updateProcessorIndices();
 

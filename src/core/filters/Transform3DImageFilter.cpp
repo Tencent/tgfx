@@ -28,24 +28,16 @@
 
 namespace tgfx {
 
-std::shared_ptr<ImageFilter> ImageFilter::Transform3D(const Matrix3D& matrix) {
-  return std::make_shared<Transform3DImageFilter>(matrix);
+std::shared_ptr<ImageFilter> ImageFilter::Transform3D(const Matrix3D& matrix, bool hideBackFace) {
+  return std::make_shared<Transform3DImageFilter>(matrix, hideBackFace);
 }
 
-Transform3DImageFilter::Transform3DImageFilter(const Matrix3D& matrix) : matrix(matrix) {
+Transform3DImageFilter::Transform3DImageFilter(const Matrix3D& matrix, bool hideBackFace)
+    : _matrix(matrix), _hideBackFace(hideBackFace) {
 }
 
 Rect Transform3DImageFilter::onFilterBounds(const Rect& srcRect) const {
-  // The default transformation anchor is at the top-left origin (0,0) of the image; user-defined
-  // anchors are included in the matrix.
-  auto srcModelRect = Rect::MakeWH(srcRect.width(), srcRect.height());
-  auto dstModelRect = matrix.mapRect(srcModelRect);
-  // The minimum axis-aligned bounding rectangle of srcRect after projection is calculated based on
-  // its relative position to the standard rectangle.
-  auto result = Rect::MakeXYWH(dstModelRect.left - srcModelRect.left + srcRect.left,
-                               dstModelRect.top - srcModelRect.top + srcRect.top,
-                               dstModelRect.width(), dstModelRect.height());
-  return result;
+  return _matrix.mapRect(srcRect);
 }
 
 std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
@@ -72,7 +64,7 @@ std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
   // The default transformation anchor is at the top-left origin (0,0) of the image; user-defined
   // anchors are included in the matrix.
   auto srcModelRect = Rect::MakeXYWH(0.f, 0.f, srcW, srcH);
-  auto dstModelRect = matrix.mapRect(srcModelRect);
+  auto dstModelRect = _matrix.mapRect(srcModelRect);
   // SrcProjectRect is the result of projecting srcRect onto the canvas. RenderBounds describes a
   // subregion that needs to be drawn within it.
   auto srcProjectRect =
@@ -102,7 +94,7 @@ std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
       RectsVertexProvider::MakeFrom(drawingBuffer, srcModelRect, AAType::Coverage);
   const Size viewportSize(static_cast<float>(renderTarget->width()),
                           static_cast<float>(renderTarget->height()));
-  const Rect3DDrawArgs drawArgs{matrix, ndcScale, ndcOffset, viewportSize};
+  const Rect3DDrawArgs drawArgs{_matrix, ndcScale, ndcOffset, viewportSize};
   auto drawOp =
       Rect3DDrawOp::Make(args.context, std::move(vertexProvider), args.renderFlags, drawArgs);
   const SamplingArgs samplingArgs = {TileMode::Decal, TileMode::Decal, {}, SrcRectConstraint::Fast};
@@ -114,6 +106,9 @@ std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
   auto fragmentProcessor =
       TextureEffect::Make(std::move(sourceTextureProxy), samplingArgs, &uvMatrix);
   drawOp->addColorFP(std::move(fragmentProcessor));
+  if (_hideBackFace) {
+    drawOp->setCullFaceType(CullFaceType::Back);
+  }
   std::vector<PlacementPtr<DrawOp>> drawOps;
   drawOps.emplace_back(std::move(drawOp));
   auto drawOpArray = drawingBuffer->makeArray(std::move(drawOps));

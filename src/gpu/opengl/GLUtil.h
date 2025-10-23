@@ -22,6 +22,7 @@
 #include "gpu/BlendFactor.h"
 #include "gpu/BlendOperation.h"
 #include "gpu/CompareFunction.h"
+#include "gpu/RenderPipeline.h"
 #include "gpu/StencilOperation.h"
 #include "gpu/opengl/GLInterface.h"
 
@@ -41,6 +42,10 @@ unsigned ToGLBlendFactor(BlendFactor blendFactor);
 unsigned ToGLBlendOperation(BlendOperation blendOperation);
 
 unsigned ToGLCompareFunction(CompareFunction compare);
+
+unsigned ToGLFrontFaceDirection(CullFaceDescriptor::FrontDirection direction);
+
+unsigned ToGLCullFaceMode(CullFaceDescriptor::Mode mode);
 
 unsigned ToGLStencilOperation(StencilOperation stencilOp);
 

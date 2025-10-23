@@ -20,6 +20,7 @@
 #include <atomic>
 #include "contents/LayerContent.h"
 #include "contents/RasterizedContent.h"
+#include "core/filters/Transform3DImageFilter.h"
 #include "core/images/PictureImage.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
@@ -28,6 +29,7 @@
 #include "layers/OpaqueThreshold.h"
 #include "layers/RegionTransformer.h"
 #include "layers/RootLayer.h"
+#include "layers/filters/Transform3DFilter.h"
 #include "tgfx/core/Recorder.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/layers/ShapeLayer.h"
@@ -136,20 +138,61 @@ void Layer::setBlendMode(BlendMode value) {
   invalidateTransform();
 }
 
-void Layer::setPosition(const Point& value) {
-  if (_matrix.getTranslateX() == value.x && _matrix.getTranslateY() == value.y) {
-    return;
+Point Layer::position() const {
+  if (_matrix3DIsAffine) {
+    return {_matrix3D.getRowColumn(0, 3), _matrix3D.getRowColumn(1, 3)};
   }
-  _matrix.setTranslateX(value.x);
-  _matrix.setTranslateY(value.y);
+
+  auto result = matrix3D().mapVec3(Vec3(0, 0, 1));
+  return {result.x, result.y};
+}
+
+void Layer::setPosition(const Point& value) {
+  if (_matrix3DIsAffine) {
+    _matrix3D.setRowColumn(0, 3, value.x);
+    _matrix3D.setRowColumn(1, 3, value.y);
+  } else {
+    auto curPos = _matrix3D.mapVec3(Vec3(0, 0, 1));
+    if (FloatNearlyEqual(curPos.x, value.x) && FloatNearlyEqual(curPos.y, value.y)) {
+      return;
+    }
+    _matrix3D.postTranslate(value.x - curPos.x, value.y - curPos.y, 0);
+  }
   invalidateTransform();
 }
 
+Matrix Layer::matrix() const {
+  auto affineMatrix = Matrix::I();
+  if (!_matrix3DIsAffine) {
+    return Matrix::I();
+  }
+  affineMatrix.setAll(_matrix3D.getRowColumn(0, 0), _matrix3D.getRowColumn(0, 1),
+                      _matrix3D.getRowColumn(0, 3), _matrix3D.getRowColumn(1, 0),
+                      _matrix3D.getRowColumn(1, 1), _matrix3D.getRowColumn(1, 3));
+  return affineMatrix;
+}
+
 void Layer::setMatrix(const Matrix& value) {
-  if (_matrix == value) {
+  const Matrix3D value3D(value);
+  if (value3D == _matrix3D) {
     return;
   }
-  _matrix = value;
+  _matrix3D = value3D;
+  _matrix3DIsAffine = true;
+  invalidateTransform();
+}
+
+static bool IsMatrix3DAffine(const Matrix3D& matrix) {
+  return FloatNearlyZero(matrix.getRowColumn(0, 2)) && FloatNearlyZero(matrix.getRowColumn(1, 2)) &&
+         matrix.getRow(2) == Vec4(0, 0, 1, 0) && matrix.getRow(3) == Vec4(0, 0, 0, 1);
+}
+
+void Layer::setMatrix3D(const Matrix3D& value) {
+  if (value == _matrix3D) {
+    return;
+  }
+  _matrix3D = value;
+  _matrix3DIsAffine = IsMatrix3DAffine(value);
   invalidateTransform();
 }
 
@@ -420,8 +463,21 @@ bool Layer::replaceChild(std::shared_ptr<Layer> oldChild, std::shared_ptr<Layer>
 }
 
 Rect Layer::getBounds(const Layer* targetCoordinateSpace, bool computeTightBounds) {
-  auto matrix = getRelativeMatrix(targetCoordinateSpace);
-  return getBoundsInternal(matrix, computeTightBounds);
+  auto matrix3D = getRelativeMatrix3D(targetCoordinateSpace);
+  if (IsMatrix3DAffine(matrix3D)) {
+    auto matrix = Matrix::MakeAll(matrix3D.getRowColumn(0, 0), matrix3D.getRowColumn(0, 1),
+                                  matrix3D.getRowColumn(0, 3), matrix3D.getRowColumn(1, 0),
+                                  matrix3D.getRowColumn(1, 1), matrix3D.getRowColumn(1, 3));
+    return getBoundsInternal(matrix, computeTightBounds);
+  }
+
+  Rect bounds = getBoundsInternal(Matrix::I(), computeTightBounds);
+  if (matrix3D.isIdentity()) {
+    return bounds;
+  }
+  bounds = matrix3D.mapRect(bounds);
+  bounds.roundOut();
+  return bounds;
 }
 
 Rect Layer::getBoundsInternal(const Matrix& coordinateMatrix, bool computeTightBounds) {
@@ -707,16 +763,39 @@ Matrix Layer::getGlobalMatrix() const {
   Matrix matrix = {};
   auto layer = this;
   while (layer->_parent) {
+    if (!layer->_matrix3DIsAffine) {
+      matrix.setIdentity();
+      break;
+    }
+
     matrix.postConcat(layer->getMatrixWithScrollRect());
     layer = layer->_parent;
   }
   return matrix;
 }
 
+Matrix3D Layer::getGlobalMatrix3D() const {
+  Matrix3D matrix = {};
+  auto layer = this;
+  while (layer->_parent) {
+    matrix.postConcat(layer->getMatrix3DWithScrollRect());
+    layer = layer->_parent;
+  }
+  return matrix;
+}
+
 Matrix Layer::getMatrixWithScrollRect() const {
-  auto matrix = _matrix;
-  if (_scrollRect) {
+  auto matrix = this->matrix();
+  if (_matrix3DIsAffine && _scrollRect) {
     matrix.preTranslate(-_scrollRect->left, -_scrollRect->top);
+  }
+  return matrix;
+}
+
+Matrix3D Layer::getMatrix3DWithScrollRect() const {
+  auto matrix = _matrix3D;
+  if (_scrollRect) {
+    matrix.preTranslate(-_scrollRect->left, -_scrollRect->top, 0);
   }
   return matrix;
 }
@@ -731,8 +810,8 @@ LayerContent* Layer::getContent() {
   return layerContent.get();
 }
 
-std::shared_ptr<ImageFilter> Layer::getImageFilter(float contentScale) {
-  if (_filters.empty()) {
+std::shared_ptr<ImageFilter> Layer::getImageFilter(float contentScale, const Rect& contentBound) {
+  if (_filters.empty() && _matrix3DIsAffine) {
     return nullptr;
   }
   std::vector<std::shared_ptr<ImageFilter>> filters;
@@ -740,6 +819,24 @@ std::shared_ptr<ImageFilter> Layer::getImageFilter(float contentScale) {
     if (auto filter = layerFilter->getImageFilter(contentScale)) {
       filters.push_back(filter);
     }
+  }
+  if (!_matrix3DIsAffine) {
+    // _matrix3DD describes a matrix transformation with the layer origin as the anchor point, i.e.,
+    // point (0, 0). When applying an equivalent matrix transformation to the local coordinate
+    // system, the transformation anchor point will no longer be (0, 0), so the transformation
+    // matrix needs to be recalculated.
+    // _matrix3D is defined based on the layer's local coordinate system. It is necessary to
+    // calculate the coordinates of the local coordinate system's origin in the local coordinate
+    // system before scaling.
+    auto contentOrigin =
+        Point::Make(contentBound.left / contentScale, contentBound.top / contentScale);
+    // Based on the local coordinate system, the anchor point Anchor is (0 - contentOrigin), and the
+    // anchor offset matrix offsetMatrix is (0 - Anchor), which is equivalent to contentOrigin
+    auto offsetMatrix = Matrix3D::MakeTranslate(contentOrigin.x, contentOrigin.y, 0);
+    auto invOffsetMatrix = Matrix3D::MakeTranslate(-contentOrigin.x, -contentOrigin.y, 0);
+    auto contentMatrix3D = invOffsetMatrix * _matrix3D * offsetMatrix;
+    auto transform3DFilter = Transform3DFilter::Make(contentMatrix3D);
+    filters.push_back(transform3DFilter->getImageFilter(contentScale));
   }
   return ImageFilter::Compose(filters);
 }
@@ -790,7 +887,9 @@ std::shared_ptr<Image> Layer::getRasterizedImage(const DrawArgs& args, float con
   if (image == nullptr) {
     return nullptr;
   }
-  auto filter = getImageFilter(contentScale);
+  auto contentBound = Rect::MakeXYWH(offset.x, offset.y, static_cast<float>(image->width()),
+                                     static_cast<float>(image->height()));
+  auto filter = getImageFilter(contentScale, contentBound);
   if (filter) {
     Point filterOffset = {};
     image = image->makeWithFilter(std::move(filter), &filterOffset);
@@ -832,7 +931,7 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
     }
   } else if (blendMode != BlendMode::SrcOver || (alpha < 1.0f && bitFields.allowsGroupOpacity) ||
              bitFields.shouldRasterize || (!_filters.empty() && !args.excludeEffects) ||
-             hasValidMask()) {
+             hasValidMask() || !_matrix3DIsAffine) {
     drawOffscreen(args, canvas, alpha, blendMode);
   } else {
     // draw directly
@@ -850,6 +949,20 @@ Matrix Layer::getRelativeMatrix(const Layer* targetCoordinateSpace) const {
     return {};
   }
   Matrix relativeMatrix = getGlobalMatrix();
+  relativeMatrix.postConcat(targetLayerInverseMatrix);
+  return relativeMatrix;
+}
+
+Matrix3D Layer::getRelativeMatrix3D(const Layer* targetCoordinateSpace) const {
+  if (targetCoordinateSpace == nullptr || targetCoordinateSpace == this) {
+    return {};
+  }
+  auto targetLayerMatrix = targetCoordinateSpace->getGlobalMatrix3D();
+  Matrix3D targetLayerInverseMatrix = {};
+  if (!targetLayerMatrix.invert(&targetLayerInverseMatrix)) {
+    return {};
+  }
+  Matrix3D relativeMatrix = getGlobalMatrix3D();
   relativeMatrix.postConcat(targetLayerInverseMatrix);
   return relativeMatrix;
 }
@@ -918,7 +1031,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     return;
   }
   if (!args.excludeEffects) {
-    paint.setImageFilter(getImageFilter(contentScale));
+    paint.setImageFilter(getImageFilter(contentScale, picture->getBounds()));
   }
   auto matrix = Matrix::MakeScale(1.0f / contentScale);
   canvas->drawPicture(picture, &matrix, &paint);
@@ -1257,14 +1370,23 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
   maxBackgroundOutset = 0;
   minBackgroundOutset = std::numeric_limits<float>::max();
   auto contentScale = 1.0f;
-  if (!_layerStyles.empty() || !_filters.empty()) {
+  // Ensure the 3D filter is not released during the entire function lifetime, otherwise the
+  // transformer will have abnormal render bounds calculation
+  auto filter3DVector = std::vector<std::shared_ptr<LayerFilter>>{};
+  if (!_layerStyles.empty() || !_filters.empty() || !_matrix3DIsAffine) {
     if (transformer) {
       contentScale = transformer->getMaxScale();
     }
-    transformer =
-        RegionTransformer::MakeFromFilters(_filters, contentScale, std::move(transformer));
-    transformer =
-        RegionTransformer::MakeFromStyles(_layerStyles, contentScale, std::move(transformer));
+    // The filter and style should calculate bounds based on the original size. The externally
+    // provided Transformer already contains matrix data, which will be applied to the computed size
+    // at the end, including scaling, rotation, and other transformations.
+    if (!_matrix3DIsAffine) {
+      filter3DVector.push_back(Transform3DFilter::Make(_matrix3D));
+      transformer =
+          RegionTransformer::MakeFromFilters(filter3DVector, 1.0f, std::move(transformer));
+    }
+    transformer = RegionTransformer::MakeFromFilters(_filters, 1.0f, std::move(transformer));
+    transformer = RegionTransformer::MakeFromStyles(_layerStyles, 1.0f, std::move(transformer));
   }
   auto content = getContent();
   if (bitFields.dirtyContentBounds || (forceDirty && content)) {

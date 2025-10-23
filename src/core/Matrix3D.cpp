@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Matrix3D.h"
+#include "utils/Log.h"
 #include "utils/MathExtra.h"
 
 namespace tgfx {
@@ -162,6 +163,11 @@ static Rect MapRectPerspective(const Rect& srcRect, const float mat[16]) {
   return {minMax.x, minMax.y, minMax.z, minMax.w};
 }
 
+Vec4 Matrix3D::getRow(int i) const {
+  DEBUG_ASSERT(i >= 0 && i < 4);
+  return {values[i], values[i + 4], values[i + 8], values[i + 12]};
+}
+
 const Matrix3D& Matrix3D::I() {
   static constexpr Matrix3D identity;
   return identity;
@@ -177,10 +183,29 @@ void Matrix3D::postRotate(const Vec3& axis, float degrees) {
   postConcat(m);
 }
 
+void Matrix3D::preTranslate(float tx, float ty, float tz) {
+  auto c0 = getCol(0);
+  auto c1 = getCol(1);
+  auto c2 = getCol(2);
+  auto c3 = getCol(3);
+
+  setColumn(3, (c0 * tx + c1 * ty + c2 * tz + c3));
+}
+
 void Matrix3D::postTranslate(float tx, float ty, float tz) {
   values[12] += tx;
   values[13] += ty;
   values[14] += tz;
+}
+
+void Matrix3D::postSkew(float kxy, float kxz, float kyx, float kyz, float kzx, float kzy) {
+  Matrix3D m;
+  m.setSkew(kxy, kxz, kyx, kyz, kzx, kzy);
+  postConcat(m);
+}
+
+void Matrix3D::postConcat(const Matrix3D& m) {
+  setConcat(m, *this);
 }
 
 bool Matrix3D::invert(Matrix3D* inverse) const {
@@ -219,6 +244,11 @@ Rect Matrix3D::mapRect(const Rect& src) const {
   } else {
     return MapRectAffine(src, values);
   }
+}
+
+Vec3 Matrix3D::mapVec3(const Vec3& v) const {
+  auto r = this->mapPoint(v.x, v.y, v.z, 1.f);
+  return {IEEEFloatDivide(r.x, r.w), IEEEFloatDivide(r.y, r.w), IEEEFloatDivide(r.z, r.w)};
 }
 
 bool Matrix3D::operator==(const Matrix3D& other) const {
@@ -266,10 +296,6 @@ void Matrix3D::preConcat(const Matrix3D& m) {
   setConcat(*this, m);
 }
 
-void Matrix3D::postConcat(const Matrix3D& m) {
-  setConcat(m, *this);
-}
-
 void Matrix3D::preScale(float sx, float sy, float sz) {
   if (sx == 1 && sy == 1 && sz == 1) {
     return;
@@ -290,15 +316,6 @@ void Matrix3D::postScale(float sx, float sy, float sz) {
   }
   auto m = MakeScale(sx, sy, sz);
   this->postConcat(m);
-}
-
-void Matrix3D::preTranslate(float tx, float ty, float tz) {
-  auto c0 = getCol(0);
-  auto c1 = getCol(1);
-  auto c2 = getCol(2);
-  auto c3 = getCol(3);
-
-  setColumn(3, (c0 * tx + c1 * ty + c2 * tz + c3));
 }
 
 Matrix3D Matrix3D::transpose() const {
@@ -340,15 +357,15 @@ void Matrix3D::setAll(float m00, float m01, float m02, float m03, float m10, flo
 
 void Matrix3D::setRotate(const Vec3& axis, float degrees) {
   if (auto len = axis.length(); len > 0 && (len * 0 == 0)) {
-    this->setRotateUnit(axis * (1.f / len), degrees);
+    setRotateUnit(axis * (1.f / len), degrees);
   } else {
-    this->setIdentity();
+    setIdentity();
   }
 }
 
 void Matrix3D::setRotateUnit(const Vec3& axis, float degrees) {
   auto radians = DegreesToRadians(degrees);
-  this->setRotateUnitSinCos(axis, sin(radians), cos(radians));
+  setRotateUnitSinCos(axis, sin(radians), cos(radians));
 }
 
 void Matrix3D::setRotateUnitSinCos(const Vec3& axis, float sinAngle, float cosAngle) {
@@ -361,6 +378,15 @@ void Matrix3D::setRotateUnitSinCos(const Vec3& axis, float sinAngle, float cosAn
 
   setAll(t * x * x + c, t * x * y + s * z, t * x * z - s * y, 0, t * x * y - s * z, t * y * y + c,
          t * y * z + s * x, 0, t * x * z + s * y, t * y * z - s * x, t * z * z + c, 0, 0, 0, 0, 1);
+}
+
+void Matrix3D::setSkew(float kxy, float kxz, float kyx, float kyz, float kzx, float kzy) {
+  values[1] = kyx;
+  values[2] = kzx;
+  values[4] = kxy;
+  values[6] = kzy;
+  values[8] = kxz;
+  values[9] = kyz;
 }
 
 }  // namespace tgfx

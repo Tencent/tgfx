@@ -40,7 +40,15 @@ class Transform3DImageFilter final : public ImageFilter {
    * The default transformation anchor is at the top-left origin (0,0) of the source image,
    * user-defined anchors are included in the matrix.
    */
-  explicit Transform3DImageFilter(const Matrix3D& matrix);
+  explicit Transform3DImageFilter(const Matrix3D& matrix, bool hideBackFace = false);
+
+  const Matrix3D& matrix() const {
+    return _matrix;
+  }
+
+  bool hideBackFace() const {
+    return _hideBackFace;
+  }
 
  private:
   Type type() const override {
@@ -59,7 +67,9 @@ class Transform3DImageFilter final : public ImageFilter {
                                                       SrcRectConstraint constraint,
                                                       const Matrix* uvMatrix) const override;
 
-  Matrix3D matrix = Matrix3D::I();
+  Matrix3D _matrix = Matrix3D::I();
+
+  bool _hideBackFace = false;
 };
 
 }  // namespace tgfx

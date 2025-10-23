@@ -182,9 +182,7 @@ struct Vec3 {
   /**
    * Returns true if this vector is equal to another vector.
    */
-  bool operator==(const Vec3& v) const {
-    return x == v.x && y == v.y && z == v.z;
-  }
+  bool operator==(const Vec3& v) const;
 
   /**
    * Returns true if this vector is not equal to another vector.
@@ -372,9 +370,7 @@ struct Vec4 {
   /**
    * Returns true if this vector is equal to another vector.
    */
-  bool operator==(const Vec4& v) const {
-    return x == v.x && y == v.y && z == v.z && w == v.w;
-  }
+  bool operator==(const Vec4& v) const;
 
   /**
    * Returns true if this vector is not equal to another vector.

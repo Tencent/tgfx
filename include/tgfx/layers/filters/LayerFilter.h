@@ -53,7 +53,8 @@ class LayerFilter : public LayerProperty {
     BlurFilter,
     ColorMatrixFilter,
     DropShadowFilter,
-    InnerShadowFilter
+    InnerShadowFilter,
+    Transform3DFilter
   };
 
   virtual Type type() const {
