@@ -44,20 +44,19 @@ class ImageBuffer {
    * Creates an ImageBuffer from the platform-specific hardware buffer. For example, the hardware
    * buffer could be an AHardwareBuffer on the android platform or a CVPixelBufferRef on the apple
    * platform. The returned ImageBuffer takes a reference to the hardwareBuffer. The caller must
-   * ensure the buffer content stays unchanged for the lifetime of the returned ImageBuffer. The
-   * returned ImageBuffer is nullptr if the hardwareBuffer contains only one plane, which is not in
-   * the YUV format or the hardwareBuffer is nullptr.
+   * ensure the buffer content stays unchanged for the lifetime of the returned ImageBuffer. Returns
+   * nullptr if the hardwareBuffer is nullptr or the hardwareBuffer contains only one plane, which
+   * is not in the YUV format.
    */
-  static std::shared_ptr<ImageBuffer> MakeFrom(
-      HardwareBufferRef hardwareBuffer, YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED);
+  static std::shared_ptr<ImageBuffer> MakeFrom(HardwareBufferRef hardwareBuffer,
+                                               YUVColorSpace colorSpace);
 
   /**
    * Creates an ImageBuffer from the platform-specific hardware buffer. For example, the hardware
    * buffer could be an AHardwareBuffer on the android platform or a CVPixelBufferRef on the apple
    * platform. The returned ImageBuffer takes a reference to the hardwareBuffer. The caller must
-   * ensure the buffer content stays unchanged for the lifetime of the returned ImageBuffer. The
-   * returned ImageBuffer is nullptr if the hardwareBuffer contains more than one plane or the
-   * hardwareBuffer is nullptr.
+   * ensure the buffer content stays unchanged for the lifetime of the returned ImageBuffer. Returns
+   * nullptr if the hardwareBuffer contains more than one plane or the hardwareBuffer is nullptr.
    */
   static std::shared_ptr<ImageBuffer> MakeFrom(
       HardwareBufferRef hardwareBuffer,
