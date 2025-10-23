@@ -73,7 +73,7 @@ std::shared_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(EGLGPU* gpu,
     return nullptr;
   }
   if (usage & GPUTextureUsage::RENDER_ATTACHMENT &&
-      (yuvFormat != YUVFormat::Unknown || !gpu->caps()->isFormatRenderable(formats.front()))) {
+      (yuvFormat != YUVFormat::Unknown || !gpu->isFormatRenderable(formats.front()))) {
     return nullptr;
   }
   unsigned target = yuvFormat == YUVFormat::Unknown ? GL_TEXTURE_2D : GL_TEXTURE_EXTERNAL_OES;

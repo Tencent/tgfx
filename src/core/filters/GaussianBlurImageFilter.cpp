@@ -121,7 +121,7 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
   const bool isBlurDstScaled = (!FloatNearlyEqual(blurDstWidth, dstDrawWidth) ||
                                 !FloatNearlyEqual(blurDstHeight, dstDrawHeight));
   const bool defaultBlurTargetMipmapped = (args.mipmapped && !blur2D && !isBlurDstScaled);
-  auto renderTarget = RenderTargetProxy::MakeFallback(
+  auto renderTarget = RenderTargetProxy::Make(
       args.context, static_cast<int>(blurDstWidth), static_cast<int>(blurDstHeight), isAlphaOnly, 1,
       defaultBlurTargetMipmapped, ImageOrigin::TopLeft,
       blur2D || isBlurDstScaled ? BackingFit::Approx : args.backingFit);
@@ -136,10 +136,10 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
     SamplingArgs samplingArgs = {tileMode, tileMode, {}, SrcRectConstraint::Fast};
     sourceFragment = TiledTextureEffect::Make(renderTarget->asTextureProxy(), samplingArgs);
     const bool finalBlurTargetMipmapped = (args.mipmapped && !isBlurDstScaled);
-    renderTarget = RenderTargetProxy::MakeFallback(
-        args.context, static_cast<int>(blurDstWidth), static_cast<int>(blurDstHeight), isAlphaOnly,
-        1, finalBlurTargetMipmapped, ImageOrigin::TopLeft,
-        isBlurDstScaled ? BackingFit::Approx : args.backingFit);
+    renderTarget = RenderTargetProxy::Make(args.context, static_cast<int>(blurDstWidth),
+                                           static_cast<int>(blurDstHeight), isAlphaOnly, 1,
+                                           finalBlurTargetMipmapped, ImageOrigin::TopLeft,
+                                           isBlurDstScaled ? BackingFit::Approx : args.backingFit);
     if (!renderTarget) {
       return nullptr;
     }
@@ -159,9 +159,9 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
     finalUVMatrix.postTranslate((clipBounds.left - srcSampleBounds.left) * blurDstScaleX,
                                 (clipBounds.top - srcSampleBounds.top) * blurDstScaleY);
     auto finalProcessor = TextureEffect::Make(renderTarget->asTextureProxy(), {}, &finalUVMatrix);
-    renderTarget = RenderTargetProxy::MakeFallback(
-        args.context, static_cast<int>(dstDrawWidth), static_cast<int>(dstDrawHeight), isAlphaOnly,
-        1, args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
+    renderTarget = RenderTargetProxy::Make(args.context, static_cast<int>(dstDrawWidth),
+                                           static_cast<int>(dstDrawHeight), isAlphaOnly, 1,
+                                           args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
     if (!renderTarget) {
       return nullptr;
     }
@@ -204,9 +204,9 @@ PlacementPtr<FragmentProcessor> GaussianBlurImageFilter::getSourceFragmentProces
   if (fp->numCoordTransforms() == 1) {
     return fp;
   }
-  auto renderTarget = RenderTargetProxy::MakeFallback(
-      context, static_cast<int>(scaledDrawRect.width()), static_cast<int>(scaledDrawRect.height()),
-      source->isAlphaOnly(), 1);
+  auto renderTarget =
+      RenderTargetProxy::Make(context, static_cast<int>(scaledDrawRect.width()),
+                              static_cast<int>(scaledDrawRect.height()), source->isAlphaOnly(), 1);
   if (renderTarget == nullptr) {
     return nullptr;
   }

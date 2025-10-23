@@ -599,7 +599,7 @@ static std::shared_ptr<Data> WriteICCProfile(const gfx::skcms_ICCProfile* profil
   tempPtr += sizeof(header);
 
   // Write the tag table. Track the offset and size of the previous tag to
-  // compute each tag's offset. An empty SkData indicates that the previous
+  // compute each tag's offset. An empty Data indicates that the previous
   // tag is to be reused.
   size_t lastTagOffset = sizeof(header) + tagTableSize;
   size_t lastTagSize = 0;

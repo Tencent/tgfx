@@ -256,17 +256,17 @@ enum class TransferFunctionID {
   Rec601 = 6,
   SMPTE_ST_240 = 7,
   Linear = 8,
-  // Value 9 is not supported by `SkColorSpace::MakeCICP`.
-  // Value 10 is not supported by `SkColorSpace::MakeCICP`.
+  // Value 9 is not supported by `ColorSpace::MakeCICP`.
+  // Value 10 is not supported by `ColorSpace::MakeCICP`.
   IEC61966_2_4 = 11,
-  // Value 12 is not supported by `SkColorSpace::MakeCICP`.
+  // Value 12 is not supported by `ColorSpace::MakeCICP`.
   IEC61966_2_1 = 13,
   SRGB = IEC61966_2_1,
   Rec2020_10bit = 14,
   Rec2020_12bit = 15,
-  // Value 16 is not supported by `SkColorSpace::MakeCICP`.
+  // Value 16 is not supported by `ColorSpace::MakeCICP`.
   SMPTE_ST_428_1 = 17,
-  // Value 18 is not supported by `SkColorSpace::MakeCICP`.
+  // Value 18 is not supported by `ColorSpace::MakeCICP`.
   // Values 19-255 are reserved.
 };
 

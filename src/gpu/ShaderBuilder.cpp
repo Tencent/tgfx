@@ -285,7 +285,7 @@ void ShaderBuilder::finalize() {
   if (finalized) {
     return;
   }
-  auto shaderCaps = programBuilder->getContext()->caps()->shaderCaps();
+  auto shaderCaps = programBuilder->getContext()->shaderCaps();
   shaderStrings[Type::VersionDecl] = shaderCaps->versionDeclString;
   auto type = shaderStage();
   shaderStrings[Type::Uniforms] += programBuilder->uniformHandler()->getUniformDeclarations(type);

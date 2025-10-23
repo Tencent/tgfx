@@ -28,10 +28,10 @@ BackendTexture& BackendTexture::operator=(const BackendTexture& that) {
   _height = that._height;
   _backend = that._backend;
   switch (that._backend) {
-    case Backend::OPENGL:
+    case Backend::OpenGL:
       glInfo = that.glInfo;
       break;
-    case Backend::METAL:
+    case Backend::Metal:
       mtlInfo = that.mtlInfo;
       break;
     default:
@@ -41,7 +41,7 @@ BackendTexture& BackendTexture::operator=(const BackendTexture& that) {
 }
 
 bool BackendTexture::getGLTextureInfo(GLTextureInfo* glTextureInfo) const {
-  if (!isValid() || _backend != Backend::OPENGL) {
+  if (!isValid() || _backend != Backend::OpenGL) {
     return false;
   }
   *glTextureInfo = glInfo;
@@ -49,7 +49,7 @@ bool BackendTexture::getGLTextureInfo(GLTextureInfo* glTextureInfo) const {
 }
 
 bool BackendTexture::getMtlTextureInfo(MtlTextureInfo* mtlTextureInfo) const {
-  if (!isValid() || _backend != Backend::METAL) {
+  if (!isValid() || _backend != Backend::Metal) {
     return false;
   }
   *mtlTextureInfo = mtlInfo;
@@ -65,10 +65,10 @@ BackendRenderTarget& BackendRenderTarget::operator=(const BackendRenderTarget& t
   _height = that._height;
   _backend = that._backend;
   switch (that._backend) {
-    case Backend::OPENGL:
+    case Backend::OpenGL:
       glInfo = that.glInfo;
       break;
-    case Backend::METAL:
+    case Backend::Metal:
       mtlInfo = that.mtlInfo;
       break;
     default:
@@ -78,7 +78,7 @@ BackendRenderTarget& BackendRenderTarget::operator=(const BackendRenderTarget& t
 }
 
 bool BackendRenderTarget::getGLFramebufferInfo(GLFrameBufferInfo* glFrameBufferInfo) const {
-  if (!isValid() || _backend != Backend::OPENGL) {
+  if (!isValid() || _backend != Backend::OpenGL) {
     return false;
   }
   *glFrameBufferInfo = glInfo;
@@ -86,7 +86,7 @@ bool BackendRenderTarget::getGLFramebufferInfo(GLFrameBufferInfo* glFrameBufferI
 }
 
 bool BackendRenderTarget::getMtlTextureInfo(MtlTextureInfo* mtlTextureInfo) const {
-  if (!isValid() || _backend != Backend::METAL) {
+  if (!isValid() || _backend != Backend::Metal) {
     return false;
   }
   *mtlTextureInfo = mtlInfo;
@@ -96,7 +96,7 @@ bool BackendRenderTarget::getMtlTextureInfo(MtlTextureInfo* mtlTextureInfo) cons
 BackendSemaphore& BackendSemaphore::operator=(const BackendSemaphore& that) {
   _backend = that._backend;
   switch (that._backend) {
-    case Backend::OPENGL:
+    case Backend::OpenGL:
       glSyncInfo = that.glSyncInfo;
       break;
     default:
@@ -107,7 +107,7 @@ BackendSemaphore& BackendSemaphore::operator=(const BackendSemaphore& that) {
 
 bool BackendSemaphore::isInitialized() const {
   switch (_backend) {
-    case Backend::OPENGL:
+    case Backend::OpenGL:
       return glSyncInfo.sync != nullptr;
     default:
       break;
@@ -116,7 +116,7 @@ bool BackendSemaphore::isInitialized() const {
 }
 
 bool BackendSemaphore::getGLSync(GLSyncInfo* syncInfo) const {
-  if (_backend != Backend::OPENGL || glSyncInfo.sync == nullptr) {
+  if (_backend != Backend::OpenGL || glSyncInfo.sync == nullptr) {
     return false;
   }
   *syncInfo = glSyncInfo;

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,21 +16,28 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLSLVertexShaderBuilder.h"
-#include "gpu/glsl/GLSLProgramBuilder.h"
+#pragma once
 
 namespace tgfx {
-GLSLVertexShaderBuilder::GLSLVertexShaderBuilder(ProgramBuilder* program)
-    : VertexShaderBuilder(program) {
-  auto glProgram = static_cast<GLSLProgramBuilder*>(program);
-  auto shaderCaps = glProgram->getContext()->shaderCaps();
-  if (shaderCaps->usesPrecisionModifiers) {
-    setPrecisionQualifier("precision mediump float;");
-  }
-}
+/**
+ * GPUFeatures describes the various optional features supported by the GPU.
+ */
+class GPUFeatures {
+ public:
+  /**
+   * Indicates if the GPU supports semaphore synchronization primitives.
+   */
+  bool semaphore = false;
 
-void GLSLVertexShaderBuilder::emitNormalizedPosition(const std::string& devPos) {
-  codeAppendf("gl_Position = vec4(%s.xy * %s.xz + %s.yw, 0, 1);", devPos.c_str(),
-              RTAdjustName.c_str(), RTAdjustName.c_str());
-}
+  /**
+   * Indicates whether the GPU supports the CLAMP_TO_BORDER wrap mode for texture coordinates.
+   */
+  bool clampToBorder = false;
+
+  /**
+   * Indicates whether the GPU supports texture barriers. If true, texture writes are
+   * immediately visible to subsequent texture reads without needing to flush the pipeline.
+   */
+  bool textureBarrier = false;
+};
 }  // namespace tgfx

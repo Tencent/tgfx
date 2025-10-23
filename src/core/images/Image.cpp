@@ -96,6 +96,12 @@ std::shared_ptr<Image> Image::MakeFrom(HardwareBufferRef hardwareBuffer, YUVColo
   return MakeFrom(std::move(buffer));
 }
 
+std::shared_ptr<Image> Image::MakeFrom(HardwareBufferRef hardwareBuffer,
+                                       std::shared_ptr<ColorSpace> colorSpace) {
+  auto buffer = ImageBuffer::MakeFrom(hardwareBuffer, std::move(colorSpace));
+  return MakeFrom(std::move(buffer));
+}
+
 std::shared_ptr<Image> Image::MakeI420(std::shared_ptr<YUVData> yuvData, YUVColorSpace colorSpace) {
   auto buffer = ImageBuffer::MakeI420(std::move(yuvData), colorSpace);
   return MakeFrom(std::move(buffer));

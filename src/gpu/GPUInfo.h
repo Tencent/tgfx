@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,21 +16,41 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLSLVertexShaderBuilder.h"
-#include "gpu/glsl/GLSLProgramBuilder.h"
+#pragma once
+
+#include <string>
+#include <vector>
+#include "tgfx/gpu/Backend.h"
 
 namespace tgfx {
-GLSLVertexShaderBuilder::GLSLVertexShaderBuilder(ProgramBuilder* program)
-    : VertexShaderBuilder(program) {
-  auto glProgram = static_cast<GLSLProgramBuilder*>(program);
-  auto shaderCaps = glProgram->getContext()->shaderCaps();
-  if (shaderCaps->usesPrecisionModifiers) {
-    setPrecisionQualifier("precision mediump float;");
-  }
-}
+/**
+ * GPUInfo contains descriptive information about the GPU.
+ */
+class GPUInfo {
+ public:
+  /**
+   * Returns the backend API used by the GPU.
+   */
+  Backend backend = Backend::Unknown;
 
-void GLSLVertexShaderBuilder::emitNormalizedPosition(const std::string& devPos) {
-  codeAppendf("gl_Position = vec4(%s.xy * %s.xz + %s.yw, 0, 1);", devPos.c_str(),
-              RTAdjustName.c_str(), RTAdjustName.c_str());
-}
+  /**
+   * Returns the version string of the GPU.
+   */
+  std::string version;
+
+  /**
+   * Returns the renderer string of the GPU.
+   */
+  std::string renderer;
+
+  /**
+   * Returns the vendor string of the GPU.
+   */
+  std::string vendor;
+
+  /**
+   * Returns a list of supported extensions by the GPU.
+   */
+  std::vector<std::string> extensions = {};
+};
 }  // namespace tgfx

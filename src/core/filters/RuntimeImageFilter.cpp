@@ -40,7 +40,7 @@ Rect RuntimeImageFilter::onFilterBounds(const Rect& srcRect) const {
 std::shared_ptr<TextureProxy> RuntimeImageFilter::lockTextureProxy(std::shared_ptr<Image> source,
                                                                    const Rect& renderBounds,
                                                                    const TPArgs& args) const {
-  auto renderTarget = RenderTargetProxy::MakeFallback(
+  auto renderTarget = RenderTargetProxy::Make(
       args.context, static_cast<int>(renderBounds.width()), static_cast<int>(renderBounds.height()),
       source->isAlphaOnly(), effect->sampleCount(), args.mipmapped);
   if (renderTarget == nullptr) {

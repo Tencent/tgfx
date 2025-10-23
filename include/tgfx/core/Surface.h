@@ -44,8 +44,7 @@ class Surface {
   /**
    * Creates a new Surface on GPU indicated by context. Allocates memory for pixels based on the
    * width, height, and color type (alpha only). A Surface with MSAA enabled is returned if the
-   * sample count is greater than 1. Return nullptr if the size is invalid or the alpha-only
-   * textures are not renderable in the GPU backend.
+   * sample count is greater than 1. Return nullptr if the size is invalid.
    */
   static std::shared_ptr<Surface> Make(Context* context, int width, int height,
                                        bool alphaOnly = false, int sampleCount = 1,

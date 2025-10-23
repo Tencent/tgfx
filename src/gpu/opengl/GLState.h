@@ -23,6 +23,7 @@
 #include <optional>
 #include <unordered_map>
 #include "gpu/opengl/GLInterface.h"
+#include "tgfx/core/Color.h"
 
 namespace tgfx {
 class GLTexture;

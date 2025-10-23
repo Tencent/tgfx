@@ -49,7 +49,7 @@ std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
   if (texture == nullptr) {
     return nullptr;
   }
-  sampleCount = context->caps()->getSampleCount(sampleCount, texture->format());
+  sampleCount = context->gpu()->getSampleCount(sampleCount, texture->format());
   ScratchKey scratchKey = {};
   if (adopted) {
     scratchKey =
@@ -77,7 +77,7 @@ std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
   if (textures.size() != 1) {
     return nullptr;
   }
-  sampleCount = context->caps()->getSampleCount(sampleCount, formats.front());
+  sampleCount = context->gpu()->getSampleCount(sampleCount, formats.front());
   return TextureRenderTarget::MakeFrom(context, std::move(textures.front()), sampleCount,
                                        ImageOrigin::TopLeft, true);
 }
@@ -88,8 +88,8 @@ std::shared_ptr<RenderTarget> RenderTarget::Make(Context* context, int width, in
   if (!TextureView::CheckSizeAndFormat(context, width, height, format)) {
     return nullptr;
   }
-  auto caps = context->caps();
-  sampleCount = caps->getSampleCount(sampleCount, format);
+  auto gpu = context->gpu();
+  sampleCount = gpu->getSampleCount(sampleCount, format);
   auto scratchKey = ComputeRenderTargetScratchKey(width, height, format, sampleCount, mipmapped);
   if (auto renderTarget = Resource::Find<TextureRenderTarget>(context, scratchKey)) {
     renderTarget->_origin = origin;
@@ -98,7 +98,7 @@ std::shared_ptr<RenderTarget> RenderTarget::Make(Context* context, int width, in
   GPUTextureDescriptor descriptor = {
       width,     height, format,
       mipmapped, 1,      GPUTextureUsage::TEXTURE_BINDING | GPUTextureUsage::RENDER_ATTACHMENT};
-  auto texture = context->gpu()->createTexture(descriptor);
+  auto texture = gpu->createTexture(descriptor);
   if (texture == nullptr) {
     return nullptr;
   }

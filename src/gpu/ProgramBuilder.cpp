@@ -68,9 +68,8 @@ void ProgramBuilder::emitAndInstallGeoProc(std::string* outputColor, std::string
 
   GeometryProcessor::FPCoordTransformHandler transformHandler(programInfo, &transformedCoordVars);
   GeometryProcessor::EmitArgs args(vertexShaderBuilder(), fragmentShaderBuilder(), varyingHandler(),
-                                   uniformHandler(), getContext()->caps()->shaderCaps(),
-                                   *outputColor, *outputCoverage, &transformHandler,
-                                   &subsetVarName);
+                                   uniformHandler(), getContext()->shaderCaps(), *outputColor,
+                                   *outputCoverage, &transformHandler, &subsetVarName);
   geometryProcessor->emitCode(args);
   fragmentShaderBuilder()->codeAppend("}");
 }
@@ -163,7 +162,7 @@ SamplerHandle ProgramBuilder::emitSampler(std::shared_ptr<GPUTexture> texture,
 
 void ProgramBuilder::emitFSOutputSwizzle() {
   // Swizzle the fragment shader outputs if necessary.
-  auto& swizzle = programInfo->getOutputSwizzle();
+  auto swizzle = programInfo->getOutputSwizzle();
   if (swizzle == Swizzle::RGBA()) {
     return;
   }

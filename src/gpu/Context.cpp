@@ -26,6 +26,7 @@
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ResourceCache.h"
+#include "gpu/ShaderCaps.h"
 #include "tgfx/core/Clock.h"
 
 namespace tgfx {
@@ -34,6 +35,7 @@ Context::Context(Device* device, GPU* gpu) : _device(device), _gpu(gpu) {
   // fragmentation and slow down allocation. It may also increase the application's memory usage due
   // to pre-allocation optimizations on some platforms.
   _drawingBuffer = new BlockBuffer(1 << 14, 1 << 21);  // 16kb, 2MB
+  _shaderCaps = new ShaderCaps(gpu);
   _globalCache = new GlobalCache(this);
   _resourceCache = new ResourceCache(this);
   _drawingManager = new DrawingManager(this);
@@ -50,14 +52,11 @@ Context::~Context() {
   delete _resourceCache;
   delete _drawingBuffer;
   delete _maxValueTracker;
+  delete _shaderCaps;
 }
 
 Backend Context::backend() const {
-  return _gpu->backend();
-}
-
-const Caps* Context::caps() const {
-  return _gpu->caps();
+  return _gpu->info()->backend;
 }
 
 bool Context::wait(const BackendSemaphore& waitSemaphore) {

@@ -29,12 +29,20 @@ class GLGPU : public GPU {
  public:
   ~GLGPU() override;
 
-  Backend backend() const override {
-    return Backend::OPENGL;
+  const GPUInfo* info() const override {
+    return interface->caps()->info();
   }
 
-  const Caps* caps() const override {
+  const GLCaps* caps() const {
     return interface->caps();
+  }
+
+  const GPUFeatures* features() const override {
+    return interface->caps()->features();
+  }
+
+  const GPULimits* limits() const override {
+    return interface->caps()->limits();
   }
 
   const GLFunctions* functions() const {
@@ -47,6 +55,14 @@ class GLGPU : public GPU {
 
   CommandQueue* queue() const override {
     return commandQueue.get();
+  }
+
+  bool isFormatRenderable(PixelFormat pixelFormat) const override {
+    return interface->caps()->isFormatRenderable(pixelFormat);
+  }
+
+  int getSampleCount(int requestedCount, PixelFormat pixelFormat) const override {
+    return interface->caps()->getSampleCount(requestedCount, pixelFormat);
   }
 
   void resetGLState() override {

@@ -126,9 +126,9 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
     return nullptr;
   }
   auto context = textureView->getContext();
-  auto renderTargetProxy =
-      RenderTargetProxy::MakeFallback(context, textureView->width(), textureView->height(),
-                                      textureView->isAlphaOnly(), 1, textureView->hasMipmaps());
+  auto renderTargetProxy = RenderTargetProxy::Make(
+      context, textureView->width(), textureView->height(), textureView->isAlphaOnly(), 1,
+      textureView->hasMipmaps(), ImageOrigin::TopLeft, BackingFit::Exact);
   if (renderTargetProxy == nullptr) {
     LOGE("RuntimeDrawTask::getFlatTexture() Failed to create the render target!");
     return nullptr;
