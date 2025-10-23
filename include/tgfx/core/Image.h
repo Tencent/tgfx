@@ -103,6 +103,10 @@ class Image {
   static std::shared_ptr<Image> MakeFrom(HardwareBufferRef hardwareBuffer,
                                          YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED);
 
+  static std::shared_ptr<Image> MakeFrom(
+      HardwareBufferRef hardwareBuffer,
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+
   /**
    * Creates an Image from the given picture with the specified width, height, and matrix. The
    * picture will be drawn onto the Image using the provided matrix. The returned Image keeps a

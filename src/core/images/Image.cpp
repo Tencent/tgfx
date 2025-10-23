@@ -92,6 +92,18 @@ std::shared_ptr<Image> Image::MakeFrom(const Bitmap& bitmap) {
 
 std::shared_ptr<Image> Image::MakeFrom(HardwareBufferRef hardwareBuffer, YUVColorSpace colorSpace) {
   auto buffer = ImageBuffer::MakeFrom(hardwareBuffer, colorSpace);
+  if (buffer == nullptr) {
+    return nullptr;
+  }
+  return MakeFrom(std::move(buffer));
+}
+
+std::shared_ptr<Image> Image::MakeFrom(HardwareBufferRef hardwareBuffer,
+                                       std::shared_ptr<ColorSpace> colorSpace) {
+  auto buffer = ImageBuffer::MakeFrom(hardwareBuffer, std::move(colorSpace));
+  if (buffer == nullptr) {
+    return nullptr;
+  }
   return MakeFrom(std::move(buffer));
 }
 
