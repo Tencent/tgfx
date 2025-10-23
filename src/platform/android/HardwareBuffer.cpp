@@ -22,9 +22,13 @@
 #include "tgfx/platform/android/HardwareBufferJNI.h"
 
 namespace tgfx {
-std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef hardwareBuffer,
-                                                   YUVColorSpace) {
-  return PixelBuffer::MakeFrom(hardwareBuffer);
+std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef, YUVColorSpace) {
+  return nullptr;
+}
+
+std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(tgfx::HardwareBufferRef hardwareBuffer,
+                                                   std::shared_ptr<ColorSpace> colorSpace) {
+  return PixelBuffer::MakeFrom(hardwareBuffer, std::move(colorSpace));
 }
 
 bool HardwareBufferCheck(HardwareBufferRef buffer) {

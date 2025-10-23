@@ -23,7 +23,9 @@
 namespace tgfx {
 class RasterPixelBuffer : public PixelBuffer {
  public:
-  RasterPixelBuffer(const ImageInfo& info, uint8_t* pixels) : PixelBuffer(info), _pixels(pixels) {
+  RasterPixelBuffer(const ImageInfo& info, uint8_t* pixels,
+                    std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB())
+      : PixelBuffer(info, std::move(colorSpace)), _pixels(pixels) {
   }
 
   ~RasterPixelBuffer() override {
@@ -56,8 +58,10 @@ class RasterPixelBuffer : public PixelBuffer {
 
 class HardwarePixelBuffer : public PixelBuffer {
  public:
-  HardwarePixelBuffer(const ImageInfo& info, HardwareBufferRef hardwareBuffer)
-      : PixelBuffer(info), hardwareBuffer(HardwareBufferRetain(hardwareBuffer)) {
+  HardwarePixelBuffer(const ImageInfo& info, HardwareBufferRef hardwareBuffer,
+                      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB())
+      : PixelBuffer(info, std::move(colorSpace)),
+        hardwareBuffer(HardwareBufferRetain(hardwareBuffer)) {
   }
 
   ~HardwarePixelBuffer() override {
@@ -90,13 +94,14 @@ class HardwarePixelBuffer : public PixelBuffer {
 };
 
 std::shared_ptr<PixelBuffer> PixelBuffer::Make(int width, int height, bool alphaOnly,
-                                               bool tryHardware) {
+                                               bool tryHardware,
+                                               std::shared_ptr<ColorSpace> colorSpace) {
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
   if (tryHardware) {
     auto hardwareBuffer = HardwareBufferAllocate(width, height, alphaOnly);
-    auto pixelBuffer = PixelBuffer::MakeFrom(hardwareBuffer);
+    auto pixelBuffer = PixelBuffer::MakeFrom(hardwareBuffer, colorSpace);
     HardwareBufferRelease(hardwareBuffer);
     if (pixelBuffer != nullptr) {
       return pixelBuffer;
@@ -111,15 +116,22 @@ std::shared_ptr<PixelBuffer> PixelBuffer::Make(int width, int height, bool alpha
   if (pixels == nullptr) {
     return nullptr;
   }
-  return std::make_shared<RasterPixelBuffer>(info, pixels);
+  return std::make_shared<RasterPixelBuffer>(info, pixels, std::move(colorSpace));
 }
 
-std::shared_ptr<PixelBuffer> PixelBuffer::MakeFrom(HardwareBufferRef hardwareBuffer) {
+std::shared_ptr<PixelBuffer> PixelBuffer::MakeFrom(HardwareBufferRef hardwareBuffer,
+                                                   std::shared_ptr<ColorSpace> colorSpace) {
   auto info = HardwareBufferGetInfo(hardwareBuffer);
-  return info.isEmpty() ? nullptr : std::make_shared<HardwarePixelBuffer>(info, hardwareBuffer);
+  return info.isEmpty()
+             ? nullptr
+             : std::make_shared<HardwarePixelBuffer>(info, hardwareBuffer, std::move(colorSpace));
 }
 
-PixelBuffer::PixelBuffer(const ImageInfo& info) : _info(info) {
+PixelBuffer::PixelBuffer(const ImageInfo& info, std::shared_ptr<ColorSpace> colorSpace)
+    : _info(info), _colorSpace(std::move(colorSpace)) {
+  if (_info.colorType() == ColorType::ALPHA_8) {
+    _colorSpace = nullptr;
+  }
 }
 
 void* PixelBuffer::lockPixels() {
