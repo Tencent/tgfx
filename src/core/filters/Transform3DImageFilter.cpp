@@ -53,14 +53,7 @@ Rect Transform3DImageFilter::onGetInputBounds(const Rect& outputRect) const {
   if (!matrix.invert(&invertedMatrix)) {
     return outputRect;
   }
-  // Mirror the offset adjustment from onGetOutputBounds
-  auto dstModelRect = Rect::MakeWH(outputRect.width(), outputRect.height());
-  auto srcModelRect = invertedMatrix.mapRect(dstModelRect);
-  auto result = Rect::MakeXYWH(
-      srcModelRect.left - dstModelRect.left + outputRect.left,
-      srcModelRect.top - dstModelRect.top + outputRect.top,
-      srcModelRect.width(), srcModelRect.height());
-  return result;
+  return matrix.mapRect(outputRect);
 }
 
 std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
