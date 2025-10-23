@@ -95,14 +95,22 @@ class Image {
   /**
    * Creates an Image from the platform-specific hardware buffer. For example, the hardware buffer
    * could be an AHardwareBuffer on the android platform or a CVPixelBufferRef on the apple
-   * platform. The returned Image takes a reference to the hardwareBuffer. The caller must
-   * ensure the buffer content stays unchanged for the lifetime of the returned Image. The
-   * colorSpace is ignored if the hardwareBuffer contains only one plane, which is not in the YUV
-   * format. Returns nullptr if the hardwareBuffer is nullptr.
+   * platform. The returned Image takes a reference to the hardwareBuffer. The caller must ensure
+   * the buffer content stays unchanged for the lifetime of the returned Image. The returned Image
+   * is nullptr if the hardwareBuffer is nullptr or the hardwareBuffer contains only one plane,
+   * which is not in the YUV format.
    */
   static std::shared_ptr<Image> MakeFrom(HardwareBufferRef hardwareBuffer,
                                          YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED);
 
+  /**
+   * Creates an Image from the platform-specific hardware buffer. For example, the hardware buffer
+   * could be an AHardwareBuffer on the android platform or a CVPixelBufferRef on the apple
+   * platform. The returned Image takes a reference to the hardwareBuffer. The caller must
+   * ensure the buffer content stays unchanged for the lifetime of the returned Image. The returned
+   * Image is nullptr if the hardwareBuffer is nullptr or the hardwareBuffer contains more than one
+   * plane.
+   */
   static std::shared_ptr<Image> MakeFrom(
       HardwareBufferRef hardwareBuffer,
       std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
