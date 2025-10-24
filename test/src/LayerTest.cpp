@@ -3195,4 +3195,49 @@ TGFX_TEST(LayerTest, DiffFilterModeImagePattern) {
   displayList.render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DiffFilterModeImagePattern -- zoomIn"));
 }
+
+TGFX_TEST(LayerTest, TemporaryOffscreenImage) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  auto canvas = surface->getCanvas();
+  canvas->clear();
+  auto image = MakeImage("resources/apitest/image_as_mask.png");
+  EXPECT_TRUE(image != nullptr);
+  auto shapeLayer = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeWH(image->width(), image->height()));
+  shapeLayer->setPath(path);
+  auto pattern = ImagePattern::Make(image, TileMode::Decal, TileMode::Decal,
+                                    SamplingOptions(FilterMode::Linear, FilterMode::Nearest));
+  auto filter = DropShadowFilter::Make(-10, -10, 5, 5, Color::Black());
+  DisplayList displayList;
+  displayList.root()->addChild(shapeLayer);
+  // shapeLayer->setMatrix(Matrix::MakeTrans(-30, -30));
+  shapeLayer->setFillStyle(pattern);
+  shapeLayer->setFilters({filter});
+
+  auto glassLayer = ShapeLayer::Make();
+  Path glassPath;
+  glassPath.addRRect(RRect{Rect::MakeXYWH(10, 10, 80, 80), Point::Make(40, 40)});
+  glassLayer->setPath(glassPath);
+  glassLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 255, 255, 50)));
+  glassLayer->setLayerStyles({BackgroundBlurStyle::Make(6, 6)});
+  shapeLayer->addChild(glassLayer);
+  displayList.setZoomScale(2.f);
+  displayList.setContentOffset(-50, -50);
+  displayList.render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/TemporaryOffscreenImage_pic"));
+
+  displayList.root()->addChild(glassLayer);
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/TemporaryOffscreenImage_image1"));
+
+  shapeLayer->setFilters({});
+  shapeLayer->setAlpha(0.8f);
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/TemporaryOffscreenImage_image2"));
+}
 }  // namespace tgfx

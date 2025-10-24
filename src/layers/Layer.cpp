@@ -920,10 +920,20 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
                                   : nullptr;
   auto offscreenArgs = args;
   offscreenArgs.backgroundContext = subBackgroundContext;
-  auto clipBounds = GetClipBounds(canvas);
+  // canvas of background clip bounds will be more large than canvas clip bounds.
+  auto clipBounds =
+      GetClipBounds(args.backgroundContext ? args.backgroundContext->getCanvas() : canvas);
+  auto inputBounds = clipBounds;
+  if (clipBounds.has_value() && !args.excludeEffects) {
+    // clipBounds is in local coordinate space,  so we getImageFilter with scale 1.0f.
+    auto filter = getImageFilter(1.0f);
+    if (filter) {
+      inputBounds = filter->filterBounds(*clipBounds, MapDirection::Reverse);
+    }
+  }
   auto picture = RecordPicture(offscreenArgs.drawMode, contentScale, [&](Canvas* canvas) {
-    if (clipBounds.has_value()) {
-      canvas->clipRect(*clipBounds);
+    if (inputBounds.has_value()) {
+      canvas->clipRect(*inputBounds);
     }
     drawDirectly(offscreenArgs, canvas, 1.0f);
   });
@@ -952,6 +962,9 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   } else if (subBackgroundContext) {
     subBackgroundContext->drawToParent(matrix, paint);
     canvas->drawPicture(picture, &matrix, &paint);
+  } else if (!clipBounds.has_value()) {
+    canvas->drawPicture(picture, &matrix, &paint);
+    args.backgroundContext->getCanvas()->drawPicture(picture, &matrix, &paint);
   } else {
     auto backgroundCanvas = args.backgroundContext->getCanvas();
     AutoCanvasRestore autoRestore(canvas);
@@ -962,23 +975,11 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
       return;
     }
     auto filter = paint.getImageFilter();
-    if (clipBounds.has_value()) {
-      clipBounds->scale(contentScale, contentScale);
-      clipBounds->offset(-offset.x, -offset.y);
-      clipBounds->roundOut();
-    }
     if (filter) {
       auto filterOffset = Point::Make(0, 0);
-      image = image->makeWithFilter(filter, &filterOffset,
-                                    clipBounds.has_value() ? &*clipBounds : nullptr);
+      image = image->makeWithFilter(filter, &filterOffset);
       paint.setImageFilter(nullptr);
-    } else if (clipBounds.has_value()) {
-      auto imageBounds = Rect::MakeWH(image->width(), image->height());
-      if (!imageBounds.intersect(*clipBounds)) {
-        return;
-      }
-      image = image->makeSubset(imageBounds);
-      offset += Point::Make(imageBounds.left, imageBounds.top);
+      offset += filterOffset;
     }
     if (image == nullptr) {
       return;
@@ -1218,7 +1219,9 @@ void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
     backgroundCanvas->save();
     backgroundCanvas->concat(matrix);
   }
-  auto clipBounds = GetClipBounds(canvas);
+
+  auto clipBounds =
+      args.backgroundContext ? GetClipBounds(args.backgroundContext->getCanvas()) : std::nullopt;
   for (const auto& layerStyle : _layerStyles) {
     if (layerStyle->position() != position) {
       continue;
