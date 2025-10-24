@@ -35,17 +35,24 @@ std::shared_ptr<ImageFilter> ImageFilter::Transform3D(const Matrix3D& matrix) {
 Transform3DImageFilter::Transform3DImageFilter(const Matrix3D& matrix) : matrix(matrix) {
 }
 
-Rect Transform3DImageFilter::onFilterBounds(const Rect& srcRect) const {
-  // The default transformation anchor is at the top-left origin (0,0) of the image; user-defined
-  // anchors are included in the matrix.
-  auto srcModelRect = Rect::MakeWH(srcRect.width(), srcRect.height());
-  auto dstModelRect = matrix.mapRect(srcModelRect);
-  // The minimum axis-aligned bounding rectangle of srcRect after projection is calculated based on
-  // its relative position to the standard rectangle.
-  auto result = Rect::MakeXYWH(dstModelRect.left - srcModelRect.left + srcRect.left,
-                               dstModelRect.top - srcModelRect.top + srcRect.top,
-                               dstModelRect.width(), dstModelRect.height());
-  return result;
+Rect Transform3DImageFilter::onFilterBounds(const Rect& rect, MapDirection mapDirection) const {
+  if (mapDirection == MapDirection::Forward) {
+    // The default transformation anchor is at the top-left origin (0,0) of the image; user-defined
+    // anchors are included in the matrix.
+    auto srcModelRect = Rect::MakeWH(rect.width(), rect.height());
+    auto dstModelRect = matrix.mapRect(srcModelRect);
+    // The minimum axis-aligned bounding rectangle of srcRect after projection is calculated based on
+    // its relative position to the standard rectangle.
+    auto result = Rect::MakeXYWH(dstModelRect.left - srcModelRect.left + rect.left,
+                                 dstModelRect.top - srcModelRect.top + rect.top,
+                                 dstModelRect.width(), dstModelRect.height());
+    return result;
+  }
+  Matrix3D invertedMatrix;
+  if (!matrix.invert(&invertedMatrix)) {
+    return rect;
+  }
+  return matrix.mapRect(rect);
 }
 
 std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
