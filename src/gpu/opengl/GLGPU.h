@@ -79,7 +79,7 @@ class GLGPU : public GPU {
   std::shared_ptr<GPUTexture> importExternalTexture(
       const BackendRenderTarget& renderTarget) override;
 
-  std::shared_ptr<GPUFence> importExternalFence(const BackendSemaphore& semaphore) override;
+  std::shared_ptr<Semaphore> importExternalSemaphore(const BackendSemaphore& semaphore) override;
 
   std::shared_ptr<GPUSampler> createSampler(const GPUSamplerDescriptor& descriptor) override;
 

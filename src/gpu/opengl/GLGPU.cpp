@@ -25,10 +25,10 @@
 #include "gpu/opengl/GLCommandEncoder.h"
 #include "gpu/opengl/GLDepthStencilTexture.h"
 #include "gpu/opengl/GLExternalTexture.h"
-#include "gpu/opengl/GLFence.h"
 #include "gpu/opengl/GLMultisampleTexture.h"
 #include "gpu/opengl/GLRenderPipeline.h"
 #include "gpu/opengl/GLSampler.h"
+#include "gpu/opengl/GLSemaphore.h"
 #include "gpu/opengl/GLShaderModule.h"
 #include "gpu/opengl/GLUtil.h"
 
@@ -178,12 +178,12 @@ std::shared_ptr<GPUTexture> GLGPU::importExternalTexture(const BackendRenderTarg
                                          frameBufferInfo.id);
 }
 
-std::shared_ptr<GPUFence> GLGPU::importExternalFence(const BackendSemaphore& semaphore) {
+std::shared_ptr<Semaphore> GLGPU::importExternalSemaphore(const BackendSemaphore& semaphore) {
   GLSyncInfo glSyncInfo = {};
   if (!semaphore.getGLSync(&glSyncInfo)) {
     return nullptr;
   }
-  return makeResource<GLFence>(glSyncInfo.sync);
+  return makeResource<GLSemaphore>(glSyncInfo.sync);
 }
 
 static int ToGLWrap(AddressMode wrapMode) {

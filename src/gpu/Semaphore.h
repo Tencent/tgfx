@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,21 +18,21 @@
 
 #pragma once
 
-#include <mutex>
+#include "tgfx/gpu/Backend.h"
 
 namespace tgfx {
+/**
+ * Semaphore is a synchronization primitive for GPU-to-GPU operations. Once a Semaphore is signaled,
+ * it remains in that state and cannot be reset; to synchronize again, create a new Semaphore.
+ */
 class Semaphore {
  public:
-  explicit Semaphore(int count) : count(count) {
-  }
+  virtual ~Semaphore() = default;
 
-  void signal();
-
-  void wait();
-
- private:
-  int count = 0;
-  std::mutex locker = {};
-  std::condition_variable condition = {};
+  /**
+   * Returns the BackendSemaphore object and transfers ownership to the caller, who must manage its
+   * lifetime. If the Semaphore is invalid, an empty BackendSemaphore is returned.
+   */
+  virtual BackendSemaphore stealBackend() = 0;
 };
 }  // namespace tgfx
