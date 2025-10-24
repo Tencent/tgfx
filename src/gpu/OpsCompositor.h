@@ -33,6 +33,7 @@ enum class PendingOpType {
   RRect,
   Shape,
   Atlas,
+  StrokeRect,
 };
 
 /**
@@ -61,9 +62,9 @@ class OpsCompositor {
                      SrcRectConstraint constraint);
 
   /**
-   * Fills the given rect with the given state and fill.
+   * Fills the given rect with the given state, fill and optional stroke.
    */
-  void fillRect(const Rect& rect, const MCState& state, const Fill& fill);
+  void fillRect(const Rect& rect, const MCState& state, const Fill& fill, const Stroke* stroke);
 
   /**
    * Draw the given rrect with the given state, fill and optional stroke.

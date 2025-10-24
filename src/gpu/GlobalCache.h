@@ -75,6 +75,12 @@ class GlobalCache {
   std::shared_ptr<GPUBufferProxy> getRectIndexBuffer(bool antialias);
 
   /**
+   * Returns a GPU buffer containing indices for rendering a stroked rectangle
+   * with or without antialiasing.
+   */
+  std::shared_ptr<GPUBufferProxy> getStrokeRectIndexBuffer(bool antialias);
+
+  /**
    * Returns a GPU buffer containing indices for rendering a rounded rectangle, either for filling
    * or stroking.
    */
@@ -119,6 +125,8 @@ class GlobalCache {
   std::shared_ptr<GPUBufferProxy> nonAAQuadIndexBuffer = nullptr;
   std::shared_ptr<GPUBufferProxy> rRectFillIndexBuffer = nullptr;
   std::shared_ptr<GPUBufferProxy> rRectStrokeIndexBuffer = nullptr;
+  std::shared_ptr<GPUBufferProxy> aaRectStrokeIndexBuffer = nullptr;
+  std::shared_ptr<GPUBufferProxy> nonAARectStrokeIndexBuffer = nullptr;
   ResourceKeyMap<std::shared_ptr<Resource>> staticResources = {};
   // Triple buffering for uniform buffer management
   static constexpr uint32_t UNIFORM_BUFFER_COUNT = 3;
