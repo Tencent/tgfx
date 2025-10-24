@@ -64,13 +64,28 @@ std::vector<std::shared_ptr<GPUTexture>> EAGLHardwareTexture::MakeFrom(EAGLGPU* 
   if (textureCache == nil) {
     return {};
   }
-  auto yuvFormat = YUVFormat::Unknown;
-  auto formats = gpu->getHardwareTextureFormats(pixelBuffer, &yuvFormat);
+  auto pixelFormat = CVPixelBufferGetPixelFormatType(pixelBuffer);
+  std::vector<PixelFormat> formats = {};
+  switch (pixelFormat) {
+    case kCVPixelFormatType_OneComponent8:
+      formats.push_back(PixelFormat::ALPHA_8);
+      break;
+    case kCVPixelFormatType_32BGRA:
+      formats.push_back(PixelFormat::BGRA_8888);
+      break;
+    case kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange:
+    case kCVPixelFormatType_420YpCbCr8BiPlanarFullRange:
+      formats.push_back(PixelFormat::GRAY_8);
+      formats.push_back(PixelFormat::RG_88);
+      break;
+    default:
+      break;
+  }
   if (formats.empty()) {
     return {};
   }
   if (usage & GPUTextureUsage::RENDER_ATTACHMENT &&
-      (yuvFormat != YUVFormat::Unknown || !gpu->isFormatRenderable(formats.front()))) {
+      (formats.size() != 1 || !gpu->isFormatRenderable(formats.front()))) {
     return {};
   }
   std::vector<std::shared_ptr<GPUTexture>> textures = {};

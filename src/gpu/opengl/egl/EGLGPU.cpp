@@ -41,82 +41,16 @@ bool HardwareBufferAvailable() {
   return available;
 }
 
-std::vector<PixelFormat> EGLGPU::getHardwareTextureFormats(HardwareBufferRef hardwareBuffer,
-                                                           YUVFormat* yuvFormat) const {
-  static const auto describe = AHardwareBufferFunctions::Get()->describe;
-  if (!HardwareBufferCheck(hardwareBuffer)) {
-    return {};
-  }
-  std::vector<PixelFormat> formats = {};
-  AHardwareBuffer_Desc desc;
-  describe(hardwareBuffer, &desc);
-  switch (desc.format) {
-    case HARDWAREBUFFER_FORMAT_R8_UNORM:
-      formats.push_back(PixelFormat::ALPHA_8);
-      break;
-    case AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM:
-    case AHARDWAREBUFFER_FORMAT_R8G8B8X8_UNORM:
-      formats.push_back(PixelFormat::RGBA_8888);
-      break;
-    default:
-      break;
-  }
-  if (yuvFormat != nullptr) {
-    *yuvFormat = YUVFormat::Unknown;
-  }
-  return formats;
-}
-
 #elif defined(__OHOS__)
 
 bool HardwareBufferAvailable() {
   return true;
 }
 
-std::vector<PixelFormat> EGLGPU::getHardwareTextureFormats(HardwareBufferRef hardwareBuffer,
-                                                           YUVFormat* yuvFormat) const {
-  if (!HardwareBufferCheck(hardwareBuffer)) {
-    return {};
-  }
-  if (yuvFormat != nullptr) {
-    *yuvFormat = YUVFormat::Unknown;
-  }
-  std::vector<PixelFormat> formats = {};
-  OH_NativeBuffer_Config config;
-  OH_NativeBuffer_GetConfig(hardwareBuffer, &config);
-  switch (config.format) {
-    case NATIVEBUFFER_PIXEL_FMT_RGBA_8888:
-    case NATIVEBUFFER_PIXEL_FMT_RGBX_8888:
-      formats.push_back(PixelFormat::RGBA_8888);
-      break;
-    case NATIVEBUFFER_PIXEL_FMT_YCBCR_420_SP:
-    case NATIVEBUFFER_PIXEL_FMT_YCRCB_420_SP:
-      formats.push_back(PixelFormat::RGBA_8888);
-      if (yuvFormat != nullptr) {
-        *yuvFormat = YUVFormat::NV12;
-      }
-      break;
-    case NATIVEBUFFER_PIXEL_FMT_YCBCR_420_P:
-    case NATIVEBUFFER_PIXEL_FMT_YCRCB_420_P:
-      formats.push_back(PixelFormat::RGBA_8888);
-      if (yuvFormat != nullptr) {
-        *yuvFormat = YUVFormat::I420;
-      }
-      break;
-    default:
-      break;
-  }
-  return formats;
-}
-
 #else
 
 bool HardwareBufferAvailable() {
   return false;
-}
-
-std::vector<PixelFormat> EGLGPU::getHardwareTextureFormats(HardwareBufferRef, YUVFormat*) const {
-  return {};
 }
 
 #endif

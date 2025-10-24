@@ -66,19 +66,20 @@ std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
   if (context == nullptr) {
     return nullptr;
   }
-  auto gpu = context->gpu();
-  YUVFormat yuvFormat = YUVFormat::Unknown;
-  auto formats = gpu->getHardwareTextureFormats(hardwareBuffer, &yuvFormat);
-  if (formats.size() != 1 || yuvFormat != YUVFormat::Unknown) {
+  auto info = HardwareBufferGetInfo(hardwareBuffer);
+  if (info.format == HardwareBufferFormat::Unknown ||
+      info.format == HardwareBufferFormat::YCBCR_420_SP) {
     return nullptr;
   }
+  auto gpu = context->gpu();
   uint32_t usage = GPUTextureUsage::TEXTURE_BINDING | GPUTextureUsage::RENDER_ATTACHMENT;
   auto textures = gpu->importHardwareTextures(hardwareBuffer, usage);
   if (textures.size() != 1) {
     return nullptr;
   }
-  sampleCount = context->gpu()->getSampleCount(sampleCount, formats.front());
-  return TextureRenderTarget::MakeFrom(context, std::move(textures.front()), sampleCount,
+  auto& texture = textures[0];
+  sampleCount = context->gpu()->getSampleCount(sampleCount, texture->format());
+  return TextureRenderTarget::MakeFrom(context, std::move(texture), sampleCount,
                                        ImageOrigin::TopLeft, true);
 }
 

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/PixelBuffer.h"
+#include "core/utils/HardwareBufferUtil.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "tgfx/gpu/Device.h"
 
@@ -121,7 +122,7 @@ std::shared_ptr<PixelBuffer> PixelBuffer::Make(int width, int height, bool alpha
 
 std::shared_ptr<PixelBuffer> PixelBuffer::MakeFrom(HardwareBufferRef hardwareBuffer,
                                                    std::shared_ptr<ColorSpace> colorSpace) {
-  auto info = HardwareBufferGetInfo(hardwareBuffer);
+  auto info = GetImageInfo(hardwareBuffer);
   return info.isEmpty()
              ? nullptr
              : std::make_shared<HardwarePixelBuffer>(info, hardwareBuffer, std::move(colorSpace));

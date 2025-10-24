@@ -22,7 +22,6 @@
 #import <TargetConditionals.h>
 #include "EAGLHardwareTexture.h"
 #include "core/PixelBuffer.h"
-#include "platform/apple/NV12HardwareBuffer.h"
 
 namespace tgfx {
 bool HardwareBufferAvailable() {
@@ -38,38 +37,6 @@ EAGLGPU::~EAGLGPU() {
     CFRelease(textureCache);
     textureCache = nil;
   }
-}
-
-std::vector<PixelFormat> EAGLGPU::getHardwareTextureFormats(HardwareBufferRef hardwareBuffer,
-                                                            YUVFormat* yuvFormat) const {
-  if (!HardwareBufferCheck(hardwareBuffer)) {
-    return {};
-  }
-  auto pixelFormat = CVPixelBufferGetPixelFormatType(hardwareBuffer);
-  std::vector<PixelFormat> formats = {};
-  switch (pixelFormat) {
-    case kCVPixelFormatType_OneComponent8:
-      formats.push_back(PixelFormat::ALPHA_8);
-      break;
-    case kCVPixelFormatType_32BGRA:
-      formats.push_back(PixelFormat::BGRA_8888);
-      break;
-    case kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange:
-    case kCVPixelFormatType_420YpCbCr8BiPlanarFullRange:
-      formats.push_back(PixelFormat::GRAY_8);
-      formats.push_back(PixelFormat::RG_88);
-      break;
-    default:
-      break;
-  }
-  if (yuvFormat != nullptr) {
-    if (formats.size() == 2) {
-      *yuvFormat = YUVFormat::NV12;
-    } else {
-      *yuvFormat = YUVFormat::Unknown;
-    }
-  }
-  return formats;
 }
 
 std::vector<std::shared_ptr<GPUTexture>> EAGLGPU::importHardwareTextures(

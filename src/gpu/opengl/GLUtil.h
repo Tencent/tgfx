@@ -44,8 +44,6 @@ unsigned ToGLCompareFunction(CompareFunction compare);
 
 unsigned ToGLStencilOperation(StencilOperation stencilOp);
 
-PixelFormat GLSizeFormatToPixelFormat(unsigned sizeFormat);
-
 unsigned PixelFormatToGLSizeFormat(PixelFormat pixelFormat);
 
 GLVersion GetGLVersion(const char* versionString);
