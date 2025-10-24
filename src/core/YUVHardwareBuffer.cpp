@@ -19,6 +19,9 @@
 #include "YUVHardwareBuffer.h"
 #include "core/utils/USE.h"
 #include "gpu/resources/TextureView.h"
+#if defined(__OHOS__)
+#include <native_buffer/native_buffer.h>
+#endif
 
 namespace tgfx {
 static std::mutex cacheLocker = {};
