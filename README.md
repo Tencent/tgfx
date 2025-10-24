@@ -19,7 +19,7 @@ and various video-editing apps.
 ## Platform Support
 
 - iOS 9.0+
-- Android 4.4+
+- Android 5.0 or later
 - HarmonyOS 5.0+
 - macOS 10.15+
 - Windows 7.0+
