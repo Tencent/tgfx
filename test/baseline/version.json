@@ -210,6 +210,9 @@
         "ShapeStyleWithMatrix": "c475bfb",
         "StrokeOnTop_Off": "80c523ee",
         "StrokeOnTop_On": "80c523ee",
+        "TemporaryOffscreenImage_image1": "ac2aa024",
+        "TemporaryOffscreenImage_image2": "ac2aa024",
+        "TemporaryOffscreenImage_pic": "ac2aa024",
         "ZoomAndOffset": "8bd149a4",
         "backgroundLayerBlur": "cebc420b",
         "draw_shape": "80a4bd69",
@@ -225,10 +228,10 @@
         "greyColorMatrix": "a1605b2",
         "identityMatrix": "a1605b2",
         "imageLayer": "e5103ae6",
-        "imageMask": "00bc6d75",
+        "imageMask": "ac2aa024",
         "innerShadow": "c26ff3d9",
-        "shapeMask": "00bc6d75",
-        "textMask": "00bc6d75"
+        "shapeMask": "ac2aa024",
+        "textMask": "ac2aa024"
     },
     "MaskTest": {
         "rasterize_emoji": "c0f39f8",
