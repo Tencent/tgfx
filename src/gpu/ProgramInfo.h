@@ -63,7 +63,7 @@ class ProgramInfo {
 
   const XferProcessor* getXferProcessor() const;
 
-  const Swizzle& getOutputSwizzle() const;
+  Swizzle getOutputSwizzle() const;
 
   const std::vector<Attribute>& getVertexAttributes() const {
     return geometryProcessor->vertexAttributes();

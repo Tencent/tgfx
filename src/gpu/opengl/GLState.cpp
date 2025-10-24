@@ -27,8 +27,8 @@ bool GLStencil::operator!=(const GLStencil& other) const {
 }
 
 GLState::GLState(std::shared_ptr<GLInterface> glInterface) : interface(std::move(glInterface)) {
-  auto shaderCaps = interface->caps()->shaderCaps();
-  textureUnits.resize(static_cast<size_t>(shaderCaps->maxFragmentSamplers), INVALID_VALUE);
+  auto limits = interface->caps()->limits();
+  textureUnits.resize(static_cast<size_t>(limits->maxSamplersPerShaderStage), INVALID_VALUE);
 }
 
 void GLState::setEnabled(unsigned capability, bool enabled) {

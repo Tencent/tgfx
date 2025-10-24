@@ -29,8 +29,7 @@ void GLRenderPipeline::activate(GLGPU* gpu, bool depthReadOnly, bool stencilRead
                                 unsigned stencilReference) {
   auto state = gpu->state();
   state->useProgram(programID);
-  auto shaderCaps = gpu->caps()->shaderCaps();
-  if (shaderCaps->frameBufferFetchSupport && shaderCaps->frameBufferFetchRequiresEnablePerSample) {
+  if (gpu->caps()->frameBufferFetchRequiresEnablePerSample) {
     if (blendState) {
       state->setEnabled(GL_FETCH_PER_SAMPLE_ARM, false);
     } else {
@@ -38,7 +37,6 @@ void GLRenderPipeline::activate(GLGPU* gpu, bool depthReadOnly, bool stencilRead
     }
   }
   state->setColorMask(colorWriteMask);
-
   state->setEnabled(GL_STENCIL_TEST, stencilState != nullptr);
   if (stencilState) {
     auto stencil = *stencilState;

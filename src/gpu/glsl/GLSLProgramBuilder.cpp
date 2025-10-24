@@ -151,7 +151,7 @@ std::string GLSLProgramBuilder::getShaderVarDeclarations(const ShaderVar& var,
     ret += TypeModifierString(var.modifier(), stage);
     ret += " ";
   }
-  auto shaderCaps = context->caps()->shaderCaps();
+  auto shaderCaps = context->shaderCaps();
   if (shaderCaps->usesPrecisionModifiers) {
     ret += SLTypePrecision(var.type());
     ret += " ";
@@ -175,7 +175,7 @@ std::string GLSLProgramBuilder::getUniformBlockDeclaration(
   static const std::string INDENT_STR = "    ";  // 4 spaces
   result += "layout(std140) uniform " + uniformBlockName + " {\n";
   std::string precision = "";
-  auto shaderCaps = context->caps()->shaderCaps();
+  auto shaderCaps = context->shaderCaps();
   for (const auto& uniform : uniforms) {
     const auto& var = ShaderVar(uniform);
     if (shaderCaps->usesPrecisionModifiers) {
@@ -237,7 +237,7 @@ std::shared_ptr<PipelineProgram> GLSLProgramBuilder::finalize() {
 }
 
 bool GLSLProgramBuilder::checkSamplerCounts() {
-  auto shaderCaps = context->caps()->shaderCaps();
+  auto shaderCaps = context->shaderCaps();
   if (numFragmentSamplers > shaderCaps->maxFragmentSamplers) {
     LOGE("Program would use too many fragment samplers.");
     return false;

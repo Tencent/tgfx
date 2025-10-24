@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,28 +18,39 @@
 
 #pragma once
 
-#include "tgfx/core/ImageFilter.h"
+#include <string>
+#include <vector>
+#include "tgfx/gpu/Backend.h"
 
 namespace tgfx {
-class ComposeImageFilter : public ImageFilter {
+/**
+ * GPUInfo contains descriptive information about the GPU.
+ */
+class GPUInfo {
  public:
-  explicit ComposeImageFilter(std::vector<std::shared_ptr<ImageFilter>> filters);
+  /**
+   * Returns the backend API used by the GPU.
+   */
+  Backend backend = Backend::Unknown;
 
-  std::vector<std::shared_ptr<ImageFilter>> filters = {};
+  /**
+   * Returns the version string of the GPU.
+   */
+  std::string version;
 
- protected:
-  Type type() const override {
-    return Type::Compose;
-  }
+  /**
+   * Returns the renderer string of the GPU.
+   */
+  std::string renderer;
 
-  Rect onFilterBounds(const Rect& rect, MapDirection mapDirection) const override;
+  /**
+   * Returns the vendor string of the GPU.
+   */
+  std::string vendor;
 
-  PlacementPtr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
-                                                      const FPArgs& args,
-                                                      const SamplingOptions& sampling,
-                                                      SrcRectConstraint constraint,
-                                                      const Matrix* uvMatrix) const override;
-
-  friend class ImageFilter;
+  /**
+   * Returns a list of supported extensions by the GPU.
+   */
+  std::vector<std::string> extensions = {};
 };
 }  // namespace tgfx

@@ -36,8 +36,15 @@ Transform3DImageFilter::Transform3DImageFilter(const Matrix3D& matrix, bool hide
     : _matrix(matrix), _hideBackFace(hideBackFace) {
 }
 
-Rect Transform3DImageFilter::onFilterBounds(const Rect& srcRect) const {
-  return _matrix.mapRect(srcRect);
+Rect Transform3DImageFilter::onFilterBounds(const Rect& rect, MapDirection mapDirection) const {
+  if (mapDirection == MapDirection::Forward) {
+    return _matrix.mapRect(rect);
+  }
+  Matrix3D invertedMatrix;
+  if (!_matrix.invert(&invertedMatrix)) {
+    return rect;
+  }
+  return invertedMatrix.mapRect(rect);
 }
 
 std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
@@ -54,7 +61,7 @@ std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
   const float drawScaleX = dstDrawWidth / renderBounds.width();
   const float drawScaleY = dstDrawHeight / renderBounds.height();
 
-  auto renderTarget = RenderTargetProxy::MakeFallback(
+  auto renderTarget = RenderTargetProxy::Make(
       args.context, static_cast<int>(dstDrawWidth), static_cast<int>(dstDrawHeight),
       source->isAlphaOnly(), 1, args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
   auto sourceTextureProxy = source->lockTextureProxy(args);

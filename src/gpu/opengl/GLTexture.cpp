@@ -95,8 +95,7 @@ bool GLTexture::checkFrameBuffer(GLGPU* gpu) {
     return true;
   }
   DEBUG_ASSERT(gpu != nullptr);
-  auto caps = gpu->caps();
-  if (!caps->isFormatRenderable(format())) {
+  if (!gpu->isFormatRenderable(format())) {
     LOGE("GLTexture::makeFrameBuffer() format is not renderable!");
     return false;
   }

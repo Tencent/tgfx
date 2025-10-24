@@ -25,8 +25,7 @@ static bool RenderbufferStorageMSAA(GLGPU* gpu, int sampleCount, PixelFormat pix
                                     int height) {
   auto gl = gpu->functions();
   ClearGLError(gl);
-  auto caps = static_cast<const GLCaps*>(gpu->caps());
-  auto format = caps->getTextureFormat(pixelFormat).sizedFormat;
+  auto format = gpu->caps()->getTextureFormat(pixelFormat).sizedFormat;
   gl->renderbufferStorageMultisample(GL_RENDERBUFFER, sampleCount, format, width, height);
   return CheckGLError(gl);
 }
@@ -47,8 +46,7 @@ std::shared_ptr<GLMultisampleTexture> GLMultisampleTexture::MakeFrom(
     LOGE("GLMultisampleTexture::MakeFrom() mipLevelCount should be 1 for multisample textures!");
     return nullptr;
   }
-  auto caps = static_cast<const GLCaps*>(gpu->caps());
-  if (!caps->isFormatRenderable(descriptor.format)) {
+  if (!gpu->isFormatRenderable(descriptor.format)) {
     LOGE("GLMultisampleTexture::MakeFrom() format is not renderable!");
     return nullptr;
   }

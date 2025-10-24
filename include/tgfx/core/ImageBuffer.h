@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "ColorSpace.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/YUVColorSpace.h"
@@ -43,12 +44,23 @@ class ImageBuffer {
    * Creates an ImageBuffer from the platform-specific hardware buffer. For example, the hardware
    * buffer could be an AHardwareBuffer on the android platform or a CVPixelBufferRef on the apple
    * platform. The returned ImageBuffer takes a reference to the hardwareBuffer. The caller must
-   * ensure the buffer content stays unchanged for the lifetime of the returned ImageBuffer. The
-   * colorSpace is ignored if the hardwareBuffer contains only one plane, which is not in the YUV
-   * format. Returns nullptr if the hardwareBuffer is nullptr.
+   * ensure the buffer content stays unchanged for the lifetime of the returned ImageBuffer. Returns
+   * nullptr if the hardwareBuffer is nullptr or the hardwareBuffer contains only one plane, which
+   * is not in the YUV format.
+   */
+  static std::shared_ptr<ImageBuffer> MakeFrom(HardwareBufferRef hardwareBuffer,
+                                               YUVColorSpace colorSpace);
+
+  /**
+   * Creates an ImageBuffer from the platform-specific hardware buffer. For example, the hardware
+   * buffer could be an AHardwareBuffer on the android platform or a CVPixelBufferRef on the apple
+   * platform. The returned ImageBuffer takes a reference to the hardwareBuffer. The caller must
+   * ensure the buffer content stays unchanged for the lifetime of the returned ImageBuffer. Returns
+   * nullptr if the hardwareBuffer contains more than one plane or the hardwareBuffer is nullptr.
    */
   static std::shared_ptr<ImageBuffer> MakeFrom(
-      HardwareBufferRef hardwareBuffer, YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED);
+      HardwareBufferRef hardwareBuffer,
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Creates an ImageBuffer in the I420 format with the specified YUVData and YUVColorSpace. The

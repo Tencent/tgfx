@@ -18,6 +18,7 @@
 
 #include "CornerPinEffect.h"
 #include <string>
+#include "gpu/GPU.h"
 
 namespace tgfx {
 static constexpr char CORNER_PIN_VERTEX_SHADER[] = R"(
@@ -65,7 +66,11 @@ CornerPinEffect::CornerPinEffect(const Point& upperLeft, const Point& upperRight
   calculateVertexQs();
 }
 
-Rect CornerPinEffect::filterBounds(const Rect&) const {
+Rect CornerPinEffect::filterBounds(const Rect&, MapDirection mapDirection) const {
+  if (mapDirection == MapDirection::Reverse) {
+    const auto largeSize = static_cast<float>(1 << 29);
+    return Rect::MakeLTRB(-largeSize, -largeSize, largeSize, largeSize);
+  }
   auto& lowerLeft = cornerPoints[0];
   auto& lowerRight = cornerPoints[1];
   auto& upperLeft = cornerPoints[2];
@@ -82,8 +87,8 @@ std::unique_ptr<RuntimeProgram> CornerPinEffect::onCreateProgram(Context* contex
   // Clear the previously generated GLError, causing the subsequent CheckGLError to return an
   // incorrect result.
   ClearGLError(gl);
-  const auto caps = GLCaps::Get(context);
-  const auto isDesktop = caps->standard == GLStandard::GL;
+  auto info = context->gpu()->info();
+  auto isDesktop = info->version.find("OpenGL ES") == std::string::npos;
   auto filterProgram =
       FilterProgram::Make(context, GetFinalShaderCode(CORNER_PIN_VERTEX_SHADER, isDesktop),
                           GetFinalShaderCode(CORNER_PIN_FRAGMENT_SHADER, isDesktop));
@@ -111,8 +116,7 @@ bool CornerPinEffect::onDraw(const RuntimeProgram* program,
   ClearGLError(gl);
   auto filterProgram = static_cast<const FilterProgram*>(program);
   auto uniforms = static_cast<const CornerPinUniforms*>(filterProgram->uniforms.get());
-  auto needsMSAA = sampleCount() > 1;
-  if (needsMSAA && context->caps()->multisampleDisableSupport) {
+  if (sampleCount() > 1) {
     gl->enable(GL_MULTISAMPLE);
   }
   gl->useProgram(filterProgram->program);
@@ -150,9 +154,6 @@ bool CornerPinEffect::onDraw(const RuntimeProgram* program,
   gl->drawArrays(GL_TRIANGLE_STRIP, 0, 4);
   if (filterProgram->vertexArray > 0) {
     gl->bindVertexArray(0);
-  }
-  if (needsMSAA && context->caps()->multisampleDisableSupport) {
-    gl->disable(GL_MULTISAMPLE);
   }
   return CheckGLError(gl);
 }

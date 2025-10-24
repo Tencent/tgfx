@@ -24,6 +24,10 @@ std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef, YUVColorSp
   return nullptr;
 }
 
+std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef, std::shared_ptr<ColorSpace>) {
+  return nullptr;
+}
+
 bool HardwareBufferCheck(HardwareBufferRef) {
   return false;
 }

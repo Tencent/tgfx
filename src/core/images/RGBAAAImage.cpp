@@ -87,8 +87,8 @@ std::shared_ptr<TextureProxy> RGBAAAImage::lockTextureProxy(const TPArgs& args) 
   auto textureWidth = width();
   auto textureHeight = height();
   auto renderTarget =
-      RenderTargetProxy::MakeFallback(args.context, textureWidth, textureHeight, isAlphaOnly(), 1,
-                                      args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
+      RenderTargetProxy::Make(args.context, textureWidth, textureHeight, isAlphaOnly(), 1,
+                              args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
   if (renderTarget == nullptr) {
     return nullptr;
   }

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,28 +18,22 @@
 
 #pragma once
 
-#include "tgfx/core/ImageFilter.h"
-
 namespace tgfx {
-class ComposeImageFilter : public ImageFilter {
- public:
-  explicit ComposeImageFilter(std::vector<std::shared_ptr<ImageFilter>> filters);
 
-  std::vector<std::shared_ptr<ImageFilter>> filters = {};
-
- protected:
-  Type type() const override {
-    return Type::Compose;
-  }
-
-  Rect onFilterBounds(const Rect& rect, MapDirection mapDirection) const override;
-
-  PlacementPtr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
-                                                      const FPArgs& args,
-                                                      const SamplingOptions& sampling,
-                                                      SrcRectConstraint constraint,
-                                                      const Matrix* uvMatrix) const override;
-
-  friend class ImageFilter;
+/**
+ * MapDirection specifies the direction in which to map the bounds through the image filter.
+ */
+enum class MapDirection {
+  /**
+   * Forward is used to determine which pixels of the destination canvas a source image rect
+   * would touch after filtering.
+   */
+  Forward,
+  /**
+   * Reverse is used to determine which rect of the source image would be required to fill
+   * the given rect (typically, clip bounds).
+   */
+  Reverse
 };
+
 }  // namespace tgfx

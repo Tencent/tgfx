@@ -436,8 +436,7 @@ bool OpsCompositor::drawAsClear(const Rect& rect, const MCState& state, const Fi
   // discard all previous ops since the clear rect covers the entire render target.
   drawOps.clear();
   auto format = renderTarget->format();
-  auto caps = context->caps();
-  auto& writeSwizzle = caps->getWriteSwizzle(format);
+  auto writeSwizzle = Swizzle::ForWrite(format);
   clearColor = writeSwizzle.applyTo(fill.color.premultiply());
   return true;
 }
@@ -468,9 +467,10 @@ std::pair<bool, bool> OpsCompositor::needComputeBounds(const Fill& fill, bool ha
   bool needLocalBounds = hasImageFill || fill.shader != nullptr || fill.maskFilter != nullptr;
   bool needDeviceBounds = false;
   if (BlendModeNeedDstTexture(fill.blendMode, hasCoverage)) {
-    auto caps = context->caps();
-    if (!caps->shaderCaps()->frameBufferFetchSupport &&
-        (!caps->textureBarrierSupport || renderTarget->asTextureProxy() == nullptr ||
+    auto shaderCaps = context->shaderCaps();
+    auto features = context->gpu()->features();
+    if (!shaderCaps->frameBufferFetchSupport &&
+        (!features->textureBarrier || renderTarget->asTextureProxy() == nullptr ||
          renderTarget->sampleCount() > 1)) {
       needDeviceBounds = true;
     }
@@ -536,8 +536,8 @@ std::shared_ptr<TextureProxy> OpsCompositor::getClipTexture(const Path& clip, AA
     auto uvMatrix = Matrix::MakeTrans(bounds.left, bounds.top);
     auto drawOp = ShapeDrawOp::Make(std::move(shapeProxy), {}, uvMatrix, aaType);
     CAPUTRE_SHAPE_MESH(drawOp.get(), shape, aaType, clipBounds);
-    auto clipRenderTarget = RenderTargetProxy::MakeFallback(
-        context, width, height, true, 1, false, ImageOrigin::TopLeft, BackingFit::Approx);
+    auto clipRenderTarget = RenderTargetProxy::Make(context, width, height, true, 1, false,
+                                                    ImageOrigin::TopLeft, BackingFit::Approx);
     if (clipRenderTarget == nullptr) {
       return nullptr;
     }
@@ -586,12 +586,12 @@ std::pair<PlacementPtr<FragmentProcessor>, bool> OpsCompositor::getClipMaskFP(co
 }
 
 DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds, AAType aaType) {
-  auto caps = context->caps();
-  if (caps->shaderCaps()->frameBufferFetchSupport) {
+  if (context->shaderCaps()->frameBufferFetchSupport) {
     return {};
   }
   Rect bounds = {};
-  auto textureProxy = caps->textureBarrierSupport ? renderTarget->asTextureProxy() : nullptr;
+  auto features = context->gpu()->features();
+  auto textureProxy = features->textureBarrier ? renderTarget->asTextureProxy() : nullptr;
   if (textureProxy == nullptr || renderTarget->sampleCount() > 1) {
     if (deviceBounds.isEmpty()) {
       return {};
@@ -677,7 +677,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const F
   op->setBlendMode(fill.blendMode);
   if (BlendModeNeedDstTexture(fill.blendMode, op->hasCoverage())) {
     auto dstTextureInfo = makeDstTextureInfo(deviceBounds.value_or(Rect::MakeEmpty()), aaType);
-    auto shaderCaps = context->caps()->shaderCaps();
+    auto shaderCaps = context->shaderCaps();
     if (!shaderCaps->frameBufferFetchSupport && dstTextureInfo.textureProxy == nullptr) {
       return;
     }

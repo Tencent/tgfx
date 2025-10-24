@@ -21,12 +21,14 @@
 #include <memory>
 #include "gpu/CommandEncoder.h"
 #include "gpu/CommandQueue.h"
+#include "gpu/GPUFeatures.h"
+#include "gpu/GPUInfo.h"
+#include "gpu/GPULimits.h"
 #include "gpu/GPUSampler.h"
 #include "gpu/RenderPipeline.h"
 #include "gpu/ShaderModule.h"
 #include "gpu/YUVFormat.h"
 #include "tgfx/gpu/Backend.h"
-#include "tgfx/gpu/Caps.h"
 #include "tgfx/platform/HardwareBuffer.h"
 
 namespace tgfx {
@@ -39,14 +41,19 @@ class GPU {
   virtual ~GPU() = default;
 
   /**
-   * Returns the backend type of the GPU.
+   * Returns a GPUInfo object containing detailed information about this GPU.
    */
-  virtual Backend backend() const = 0;
+  virtual const GPUInfo* info() const = 0;
 
   /**
-   * Returns the capability info of the GPU.
+   * Returns a GPUFeatures object describing the features supported by this GPU.
    */
-  virtual const Caps* caps() const = 0;
+  virtual const GPUFeatures* features() const = 0;
+
+  /**
+   * Returns a GPULimits object describing the limits of this GPU.
+   */
+  virtual const GPULimits* limits() const = 0;
 
   /**
    * Returns the primary CommandQueue associated with this GPU.
@@ -62,6 +69,18 @@ class GPU {
    * lifetime of the buffer. If the creation fails, it returns nullptr.
    */
   virtual std::shared_ptr<GPUBuffer> createBuffer(size_t size, uint32_t usage) = 0;
+
+  /**
+   * Returns true if the given pixel format is renderable, meaning it can be used as a render target
+   * in a render pass.
+   */
+  virtual bool isFormatRenderable(PixelFormat pixelFormat) const = 0;
+
+  /**
+   * Finds a supported sample count for a render target with the given format that is greater than
+   * or equal to the requested count, or returns 1 if no such sample count is available.
+   */
+  virtual int getSampleCount(int requestedCount, PixelFormat pixelFormat) const = 0;
 
   /**
    * Creates a new GPUTexture with the given descriptor. The descriptor specifies the texture's

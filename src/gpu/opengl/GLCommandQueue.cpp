@@ -52,7 +52,7 @@ void GLCommandQueue::writeTexture(std::shared_ptr<GPUTexture> texture, const Rec
     return;
   }
   auto gl = gpu->functions();
-  auto caps = static_cast<const GLCaps*>(gpu->caps());
+  auto caps = gpu->caps();
   if (caps->flushBeforeWritePixels) {
     gl->flush();
   }
