@@ -16,16 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "Semaphore.h"
+#include "Fence.h"
 
 namespace tgfx {
-void Semaphore::signal() {
+void Fence::signal() {
   std::lock_guard<std::mutex> autoLock(locker);
   count++;
   condition.notify_one();
 }
 
-void Semaphore::wait() {
+void Fence::wait() {
   std::unique_lock<std::mutex> autoLock(locker);
   if (count <= 0) {
     condition.wait(autoLock);
