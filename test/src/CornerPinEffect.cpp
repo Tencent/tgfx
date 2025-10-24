@@ -67,7 +67,7 @@ CornerPinEffect::CornerPinEffect(const Point& upperLeft, const Point& upperRight
 }
 
 Rect CornerPinEffect::filterBounds(const Rect&, MapDirection mapDirection) const {
-  if (mapDirection == Reverse) {
+  if (mapDirection == MapDirection::Reverse) {
     const auto largeSize = static_cast<float>(1 << 29);
     return Rect::MakeLTRB(-largeSize, -largeSize, largeSize, largeSize);
   }

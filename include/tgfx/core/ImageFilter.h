@@ -20,6 +20,7 @@
 
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/Image.h"
+#include "tgfx/core/MapDirection.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Matrix3D.h"
 #include "tgfx/core/TileMode.h"
@@ -134,7 +135,6 @@ class ImageFilter {
 
   virtual ~ImageFilter() = default;
 
-  enum MapDirection { Forward, Reverse };
   /**
    * Returns the bounds of the image that will be produced by this filter when it is applied to an
    * image of the given bounds. MapDirection::Forward is used to determine which pixels of the
@@ -142,7 +142,7 @@ class ImageFilter {
    * is used to determine which rect of the source image would be required to fill the given
    * rect (typically, clip bounds).
    */
-  Rect filterBounds(const Rect& rect, MapDirection mapDirection = Forward) const;
+  Rect filterBounds(const Rect& rect, MapDirection mapDirection = MapDirection::Forward) const;
 
  protected:
   enum class Type { Blur, DropShadow, InnerShadow, Color, Compose, Runtime, Transform3D };
@@ -155,14 +155,11 @@ class ImageFilter {
   /**
    * Returns the bounds of the image that will be produced by this filter when it is applied to an
    * image of the given bounds.
+   * MapDirection::Forward is used to determine which pixels of the destination canvas a source
+   * image rect would touch after filtering. MapDirection::Reverse is used to determine which rect
+   * of the source image would be required to fill the given rect.
    */
-  virtual Rect onGetOutputBounds(const Rect& inputRect) const;
-
-  /**
-   * Returns the bounds of the source image that would be required to fill the given rect
-   *
-   */
-  virtual Rect onGetInputBounds(const Rect& outputRect) const;
+  virtual Rect onFilterBounds(const Rect& rect, MapDirection mapDirection) const;
 
   /**
    * Returns a texture proxy that applies this filter to the source image.

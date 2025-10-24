@@ -19,6 +19,7 @@
 #pragma once
 
 #include "tgfx/core/Image.h"
+#include "tgfx/core/MapDirection.h"
 #include "tgfx/gpu/RuntimeProgram.h"
 
 #define DEFINE_RUNTIME_EFFECT_PROGRAM_ID                             \
@@ -72,10 +73,6 @@ class RuntimeEffect {
     return 1;
   }
 
-  enum MapDirection {
-    Forward,
-    Reverse,
-  };
   /**
    * Returns the bounds of the image that will be produced by this filter when it is applied to an
   * image of the given bounds. MapDirection::Forward is used to determine which pixels of the

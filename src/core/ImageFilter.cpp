@@ -27,22 +27,13 @@
 
 namespace tgfx {
 Rect ImageFilter::filterBounds(const Rect& rect, MapDirection mapDirection) const {
-  if (mapDirection == Forward) {
-    Rect dstBounds = {};
-    applyCropRect(rect, &dstBounds);
-    return dstBounds;
-  }
-  auto dstBounds = onGetInputBounds(rect);
-  dstBounds.roundOut();
-  return dstBounds;
+  auto result = onFilterBounds(rect, mapDirection);
+  result.roundOut();
+  return result;
 }
 
-Rect ImageFilter::onGetInputBounds(const Rect& outputRect) const {
-  return outputRect;
-}
-
-Rect ImageFilter::onGetOutputBounds(const Rect& inputRect) const {
-  return inputRect;
+Rect ImageFilter::onFilterBounds(const Rect& rect, MapDirection) const {
+  return rect;
 }
 
 std::shared_ptr<TextureProxy> ImageFilter::lockTextureProxy(std::shared_ptr<Image> source,
@@ -78,7 +69,7 @@ std::shared_ptr<TextureProxy> ImageFilter::lockTextureProxy(std::shared_ptr<Imag
 }
 
 bool ImageFilter::applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* clipBounds) const {
-  *dstRect = onGetOutputBounds(srcRect);
+  *dstRect = onFilterBounds(srcRect, MapDirection::Forward);
   if (clipBounds) {
     if (!dstRect->intersect(*clipBounds)) {
       return false;
