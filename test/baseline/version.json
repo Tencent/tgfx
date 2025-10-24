@@ -228,10 +228,10 @@
         "greyColorMatrix": "ac392977",
         "identityMatrix": "ac392977",
         "imageLayer": "e5103ae6",
-        "imageMask": "ac2aa024",
+        "imageMask": "02d24040",
         "innerShadow": "c26ff3d9",
-        "shapeMask": "ac2aa024",
-        "textMask": "ac2aa024"
+        "shapeMask": "02d24040",
+        "textMask": "02d24040"
     },
     "MaskTest": {
         "rasterize_emoji": "c0f39f8",
