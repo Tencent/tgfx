@@ -20,7 +20,7 @@ and various video-editing apps.
 ## Platform Support
 
 - iOS 9.0 or later
-- Android 4.4 or later
+- Android 5.0 or later
 - macOS 10.15 or later
 - Windows 7.0 or later
 - Chrome 69.0 or later (Web)
