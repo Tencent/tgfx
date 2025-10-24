@@ -20,9 +20,9 @@
 
 #include <array>
 #include <memory>
-#include "ColorSpace.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Color.h"
+#include "tgfx/core/ColorSpace.h"
 
 namespace tgfx {
 template <typename T>

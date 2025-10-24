@@ -21,7 +21,7 @@
 #include <cfloat>
 #include <cinttypes>
 #include <limits>
-#include "ColorSpace.h"
+#include "tgfx/core/ColorSpace.h"
 
 namespace tgfx {
 

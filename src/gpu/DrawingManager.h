@@ -26,7 +26,7 @@
 #include "gpu/tasks/ResourceTask.h"
 
 namespace tgfx {
-struct TextureProxyWithColorSpace;
+struct RuntimeInputTexture;
 
 struct AtlasCellData {
   std::shared_ptr<Data> pixels = nullptr;
@@ -57,7 +57,7 @@ class DrawingManager {
                         PlacementArray<DrawOp> drawOps, std::optional<Color> clearColor);
 
   void addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> renderTarget,
-                          std::vector<TextureProxyWithColorSpace> inputs,
+                          std::vector<RuntimeInputTexture> inputs,
                           std::shared_ptr<RuntimeEffect> effect, const Point& offset);
 
   void addGenerateMipmapsTask(std::shared_ptr<TextureProxy> textureProxy);

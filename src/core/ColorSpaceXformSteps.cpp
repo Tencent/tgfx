@@ -285,4 +285,16 @@ uint32_t ColorSpaceXformSteps::XFormKey(const ColorSpaceXformSteps* xform) {
   }
   return key;
 }
+
+Color ColorSpaceXformSteps::ConvertColorSpace(std::shared_ptr<ColorSpace> src, AlphaType srcAT,
+                                              std::shared_ptr<ColorSpace> dst, AlphaType dstAT,
+                                              const Color& srcColor) {
+  if (ColorSpace::Equals(src.get(), dst.get()) && srcAT == dstAT) {
+    return srcColor;
+  }
+  auto dstColor = srcColor;
+  ColorSpaceXformSteps steps(src.get(), srcAT, dst.get(), dstAT);
+  steps.apply(dstColor.array());
+  return dstColor;
+}
 }  // namespace tgfx

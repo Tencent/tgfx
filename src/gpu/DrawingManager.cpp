@@ -97,7 +97,7 @@ void DrawingManager::addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderT
 }
 
 void DrawingManager::addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> renderTarget,
-                                        std::vector<TextureProxyWithColorSpace> inputs,
+                                        std::vector<RuntimeInputTexture> inputs,
                                         std::shared_ptr<RuntimeEffect> effect,
                                         const Point& offset) {
   if (renderTarget == nullptr || inputs.empty() || effect == nullptr) {

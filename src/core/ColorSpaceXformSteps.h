@@ -19,6 +19,7 @@
 #pragma once
 
 #include <cstdint>
+#include "tgfx/core/Color.h"
 #include "tgfx/core/ColorSpace.h"
 
 namespace tgfx {
@@ -55,6 +56,10 @@ struct ColorSpaceXformSteps {
   void apply(float rgba[4]) const;
 
   static uint32_t XFormKey(const ColorSpaceXformSteps* xform);
+
+  static Color ConvertColorSpace(std::shared_ptr<ColorSpace> src, AlphaType srcAT,
+                                 std::shared_ptr<ColorSpace> dst, AlphaType dstAT,
+                                 const Color& srcColor);
 
   Flags flags;
 

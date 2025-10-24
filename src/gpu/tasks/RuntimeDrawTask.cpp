@@ -33,13 +33,13 @@
 
 namespace tgfx {
 RuntimeDrawTask::RuntimeDrawTask(std::shared_ptr<RenderTargetProxy> target,
-                                 std::vector<TextureProxyWithColorSpace> inputs,
+                                 std::vector<RuntimeInputTexture> inputs,
                                  std::shared_ptr<RuntimeEffect> effect, const Point& offset)
-    : renderTargetProxy(std::move(target)), inputTexturesWithCS(std::move(inputs)),
+    : renderTargetProxy(std::move(target)), inputTextures(std::move(inputs)),
       effect(std::move(effect)), offset(offset) {
   auto context = renderTargetProxy->getContext();
-  inputVertexBuffers.reserve(inputTexturesWithCS.size());
-  for (auto& input : inputTexturesWithCS) {
+  inputVertexBuffers.reserve(inputTextures.size());
+  for (auto& input : inputTextures) {
     auto textureProxy = input.textureProxy;
     if (textureProxy != nullptr) {
       auto maskRect = Rect::MakeWH(textureProxy->width(), textureProxy->height());
@@ -57,11 +57,11 @@ RuntimeDrawTask::RuntimeDrawTask(std::shared_ptr<RenderTargetProxy> target,
 void RuntimeDrawTask::execute(CommandEncoder* encoder) {
   TASK_MARK(tgfx::inspect::OpTaskType::RuntimeDrawTask);
   std::vector<std::shared_ptr<TextureView>> textures = {};
-  textures.reserve(inputTexturesWithCS.size());
-  for (size_t i = 0; i < inputTexturesWithCS.size(); i++) {
+  textures.reserve(inputTextures.size());
+  for (size_t i = 0; i < inputTextures.size(); i++) {
     std::shared_ptr<TextureView> textureView = nullptr;
-    textureView = GetFlatTextureView(encoder, &inputTexturesWithCS[i], inputVertexBuffers[i].get(),
-                                     inputTexturesWithCS[0].colorSpace);
+    textureView = GetFlatTextureView(encoder, &inputTextures[i], inputVertexBuffers[i].get(),
+                                     inputTextures[0].colorSpace);
     if (textureView == nullptr) {
       LOGE("RuntimeDrawTask::execute() Failed to get the input %d texture view!", i);
       return;
@@ -106,7 +106,7 @@ void RuntimeDrawTask::execute(CommandEncoder* encoder) {
 }
 
 std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
-    CommandEncoder* encoder, const TextureProxyWithColorSpace* textureProxyWithCS,
+    CommandEncoder* encoder, const RuntimeInputTexture* textureProxyWithCS,
     VertexBufferView* vertexBufferProxyView, std::shared_ptr<ColorSpace> dstColorSpace) {
   auto textureProxy = textureProxyWithCS->textureProxy;
   if (textureProxy == nullptr) {

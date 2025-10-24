@@ -46,8 +46,8 @@ std::shared_ptr<TextureProxy> RuntimeImageFilter::lockTextureProxy(std::shared_p
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  std::vector<TextureProxyWithColorSpace> textureProxyWithCSVec = {};
-  textureProxyWithCSVec.reserve(1 + effect->extraInputs.size());
+  std::vector<RuntimeInputTexture> inputTextures = {};
+  inputTextures.reserve(1 + effect->extraInputs.size());
   // Request a texture proxy from the source image without mipmaps to save memory.
   // It may be ignored if the source image has preset mipmaps.
   TPArgs tpArgs(args.context, args.renderFlags, false, 1.0f, BackingFit::Exact);
@@ -55,7 +55,7 @@ std::shared_ptr<TextureProxy> RuntimeImageFilter::lockTextureProxy(std::shared_p
   if (textureProxy == nullptr) {
     return nullptr;
   }
-  textureProxyWithCSVec.push_back({textureProxy, source->colorSpace()});
+  inputTextures.push_back({textureProxy, source->colorSpace()});
   for (size_t i = 0; i < effect->extraInputs.size(); i++) {
     const auto& input = effect->extraInputs[i];
     if (input == nullptr) {
@@ -66,12 +66,11 @@ std::shared_ptr<TextureProxy> RuntimeImageFilter::lockTextureProxy(std::shared_p
     if (textureProxy == nullptr) {
       return nullptr;
     }
-    textureProxyWithCSVec.push_back({textureProxy, input->colorSpace()});
+    inputTextures.push_back({textureProxy, input->colorSpace()});
   }
   auto offset = Point::Make(-renderBounds.x(), -renderBounds.y());
   auto drawingManager = args.context->drawingManager();
-  drawingManager->addRuntimeDrawTask(renderTarget, std::move(textureProxyWithCSVec), effect,
-                                     offset);
+  drawingManager->addRuntimeDrawTask(renderTarget, std::move(inputTextures), effect, offset);
   return renderTarget->asTextureProxy();
 }
 
