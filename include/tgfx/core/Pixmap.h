@@ -210,6 +210,9 @@ class Pixmap {
    */
   bool clear();
 
+  /**
+   * Return the ColorSpace of this Pixmap. Returns nullptr if the PixelRef is nullptr.
+   */
   std::shared_ptr<ColorSpace> colorSpace() const;
 
  private:
