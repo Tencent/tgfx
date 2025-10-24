@@ -985,7 +985,7 @@ TGFX_TEST(FilterTest, ReverseFilterBounds) {
   auto dst = blurFilter->filterBounds(rect);
   auto src = blurFilter->filterBounds(dst, MapDirection::Reverse);
   EXPECT_TRUE(rect == src);
-  auto dropShadowFilter = ImageFilter::DropShadow(10.f, 10.f, 20.f, 20.f, Color::Black());
+  auto dropShadowFilter = ImageFilter::DropShadowOnly(10.f, 10.f, 20.f, 20.f, Color::Black());
   dst = dropShadowFilter->filterBounds(rect);
   src = dropShadowFilter->filterBounds(dst, MapDirection::Reverse);
   EXPECT_TRUE(rect == src);
@@ -1003,5 +1003,9 @@ TGFX_TEST(FilterTest, ReverseFilterBounds) {
   dst = composeFilter->filterBounds(rect);
   src = composeFilter->filterBounds(dst, MapDirection::Reverse);
   EXPECT_TRUE(rect == src);
+  auto dropShadowFilter2 = ImageFilter::DropShadow(10.f, 10.f, 0, 0, Color::Black());
+  dst = dropShadowFilter2->filterBounds(rect);
+  src = dropShadowFilter2->filterBounds(dst, MapDirection::Reverse);
+  EXPECT_TRUE(src == Rect::MakeXYWH(-10.f, -10.f, 120.f, 120.f));
 }
 }  // namespace tgfx
