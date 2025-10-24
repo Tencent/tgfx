@@ -89,7 +89,7 @@ void GLSLPorterDuffXferProcessor::setData(UniformData* /*vertexUniformData*/,
   fragmentUniformData->setData("DstTextureUpperLeft", dstTextureInfo.offset);
   int width;
   int height;
-  if (dstTextureView->getTexture()->type() == GPUTextureType::Rectangle) {
+  if (dstTextureView->getTexture()->type() == TextureType::Rectangle) {
     width = 1;
     height = 1;
   } else {

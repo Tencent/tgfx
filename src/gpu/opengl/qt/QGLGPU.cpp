@@ -30,7 +30,7 @@ bool HardwareBufferAvailable() {
   return true;
 }
 
-std::vector<std::shared_ptr<GPUTexture>> QGLGPU::importHardwareTextures(
+std::vector<std::shared_ptr<Texture>> QGLGPU::importHardwareTextures(
     HardwareBufferRef hardwareBuffer, uint32_t usage) {
   if (!HardwareBufferCheck(hardwareBuffer)) {
     return {};
@@ -68,8 +68,7 @@ bool HardwareBufferAvailable() {
   return false;
 }
 
-std::vector<std::shared_ptr<GPUTexture>> QGLGPU::importHardwareTextures(HardwareBufferRef,
-                                                                        uint32_t) {
+std::vector<std::shared_ptr<Texture>> QGLGPU::importHardwareTextures(HardwareBufferRef, uint32_t) {
   return {};
 }
 

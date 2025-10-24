@@ -21,7 +21,7 @@
 #include "core/utils/PixelFormatUtil.h"
 
 namespace tgfx {
-DefaultTextureView::DefaultTextureView(std::shared_ptr<GPUTexture> texture, ImageOrigin origin)
+DefaultTextureView::DefaultTextureView(std::shared_ptr<Texture> texture, ImageOrigin origin)
     : TextureView(origin), _texture(std::move(texture)) {
 }
 

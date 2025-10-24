@@ -116,7 +116,7 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
   if (textureView == nullptr) {
     return nullptr;
   }
-  if (!textureView->isYUV() && textureView->getTexture()->type() == GPUTextureType::TwoD &&
+  if (!textureView->isYUV() && textureView->getTexture()->type() == TextureType::TwoD &&
       textureView->origin() == ImageOrigin::TopLeft &&
       ColorSpace::Equals(textureProxyWithCS->colorSpace.get(), dstColorSpace.get())) {
     return textureView;

@@ -31,7 +31,7 @@ class GLCommandQueue : public CommandQueue {
   void writeBuffer(std::shared_ptr<GPUBuffer> buffer, size_t bufferOffset, const void* data,
                    size_t size) override;
 
-  void writeTexture(std::shared_ptr<GPUTexture> texture, const Rect& rect, const void* pixels,
+  void writeTexture(std::shared_ptr<Texture> texture, const Rect& rect, const void* pixels,
                     size_t rowBytes) override;
 
   void submit(std::shared_ptr<CommandBuffer>) override;

@@ -21,7 +21,7 @@
 #include "gpu/opengl/GLGPU.h"
 
 namespace tgfx {
-std::vector<std::shared_ptr<GPUTexture>> CGLHardwareTexture::MakeFrom(
+std::vector<std::shared_ptr<Texture>> CGLHardwareTexture::MakeFrom(
     GLGPU* gpu, CVPixelBufferRef pixelBuffer, uint32_t usage,
     CVOpenGLTextureCacheRef textureCache) {
   if (textureCache == nil) {
@@ -30,7 +30,7 @@ std::vector<std::shared_ptr<GPUTexture>> CGLHardwareTexture::MakeFrom(
   auto format = CVPixelBufferGetPixelFormatType(pixelBuffer) == kCVPixelFormatType_OneComponent8
                     ? PixelFormat::ALPHA_8
                     : PixelFormat::RGBA_8888;
-  if (usage & GPUTextureUsage::RENDER_ATTACHMENT && !gpu->isFormatRenderable(format)) {
+  if (usage & TextureUsage::RENDER_ATTACHMENT && !gpu->isFormatRenderable(format)) {
     return {};
   }
   CVOpenGLTextureRef texture = nil;
@@ -41,24 +41,24 @@ std::vector<std::shared_ptr<GPUTexture>> CGLHardwareTexture::MakeFrom(
   }
   auto target = CVOpenGLTextureGetTarget(texture);
   auto textureID = CVOpenGLTextureGetName(texture);
-  GPUTextureDescriptor descriptor = {static_cast<int>(CVPixelBufferGetWidth(pixelBuffer)),
-                                     static_cast<int>(CVPixelBufferGetHeight(pixelBuffer)),
-                                     format,
-                                     false,
-                                     1,
-                                     usage};
+  TextureDescriptor descriptor = {static_cast<int>(CVPixelBufferGetWidth(pixelBuffer)),
+                                  static_cast<int>(CVPixelBufferGetHeight(pixelBuffer)),
+                                  format,
+                                  false,
+                                  1,
+                                  usage};
   auto glTexture = gpu->makeResource<CGLHardwareTexture>(descriptor, pixelBuffer, textureCache,
                                                          target, textureID);
   glTexture->texture = texture;
-  if (usage & GPUTextureUsage::RENDER_ATTACHMENT && !glTexture->checkFrameBuffer(gpu)) {
+  if (usage & TextureUsage::RENDER_ATTACHMENT && !glTexture->checkFrameBuffer(gpu)) {
     return {};
   }
-  std::vector<std::shared_ptr<GPUTexture>> textures = {};
+  std::vector<std::shared_ptr<Texture>> textures = {};
   textures.push_back(std::move(glTexture));
   return textures;
 }
 
-CGLHardwareTexture::CGLHardwareTexture(const GPUTextureDescriptor& descriptor,
+CGLHardwareTexture::CGLHardwareTexture(const TextureDescriptor& descriptor,
                                        CVPixelBufferRef pixelBuffer,
                                        CVOpenGLTextureCacheRef textureCache, unsigned target,
                                        unsigned textureID)

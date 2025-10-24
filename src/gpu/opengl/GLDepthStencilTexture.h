@@ -24,7 +24,7 @@ namespace tgfx {
 class GLDepthStencilTexture : public GLTexture {
  public:
   static std::shared_ptr<GLDepthStencilTexture> MakeFrom(GLGPU* gpu,
-                                                         const GPUTextureDescriptor& descriptor);
+                                                         const TextureDescriptor& descriptor);
   unsigned renderBufferID() const {
     return _renderBufferID;
   }
@@ -35,7 +35,7 @@ class GLDepthStencilTexture : public GLTexture {
  private:
   unsigned _renderBufferID = 0;
 
-  GLDepthStencilTexture(const GPUTextureDescriptor& descriptor, unsigned renderBufferID)
+  GLDepthStencilTexture(const TextureDescriptor& descriptor, unsigned renderBufferID)
       : GLTexture(descriptor, GL_TEXTURE_2D, 0), _renderBufferID(renderBufferID) {
   }
 

@@ -248,7 +248,7 @@ void GLSLTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
     // Normally this would just need to take 1/2 a texel off each end, but because the chroma
     // channels of YUV420 images are subsampled we may need to shrink the crop region by a whole
     // texel on each side.
-    auto inset = type == GPUTextureType::External ? 1.0f : 0.5f;
+    auto inset = type == TextureType::External ? 1.0f : 0.5f;
     subsetRect = subsetRect.makeInset(inset, inset);
     float rect[4] = {subsetRect.left, subsetRect.top, subsetRect.right, subsetRect.bottom};
     if (textureView->origin() == ImageOrigin::BottomLeft) {
@@ -257,7 +257,7 @@ void GLSLTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
       rect[3] = h - rect[3];
       std::swap(rect[1], rect[3]);
     }
-    if (type != GPUTextureType::Rectangle) {
+    if (type != TextureType::Rectangle) {
       auto lt = textureView->getTextureCoord(rect[0], rect[1]);
       auto rb = textureView->getTextureCoord(rect[2], rect[3]);
       rect[0] = lt.x;

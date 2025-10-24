@@ -21,10 +21,10 @@
 #include "tgfx/gpu/opengl/eagl/EAGLDevice.h"
 
 namespace tgfx {
-static std::shared_ptr<GPUTexture> CreateTextureOfPlane(EAGLGPU* gpu, CVPixelBufferRef pixelBuffer,
-                                                        size_t planeIndex, PixelFormat pixelFormat,
-                                                        uint32_t usage,
-                                                        CVOpenGLESTextureCacheRef textureCache) {
+static std::shared_ptr<Texture> CreateTextureOfPlane(EAGLGPU* gpu, CVPixelBufferRef pixelBuffer,
+                                                     size_t planeIndex, PixelFormat pixelFormat,
+                                                     uint32_t usage,
+                                                     CVOpenGLESTextureCacheRef textureCache) {
   auto width = static_cast<int>(CVPixelBufferGetWidthOfPlane(pixelBuffer, planeIndex));
   auto height = static_cast<int>(CVPixelBufferGetHeightOfPlane(pixelBuffer, planeIndex));
   CVOpenGLESTextureRef texture = nil;
@@ -42,24 +42,24 @@ static std::shared_ptr<GPUTexture> CreateTextureOfPlane(EAGLGPU* gpu, CVPixelBuf
   }
   auto textureID = CVOpenGLESTextureGetName(texture);
   auto target = CVOpenGLESTextureGetTarget(texture);
-  GPUTextureDescriptor descriptor = {static_cast<int>(CVPixelBufferGetWidth(pixelBuffer)),
-                                     static_cast<int>(CVPixelBufferGetHeight(pixelBuffer)),
-                                     pixelFormat,
-                                     false,
-                                     1,
-                                     usage};
+  TextureDescriptor descriptor = {static_cast<int>(CVPixelBufferGetWidth(pixelBuffer)),
+                                  static_cast<int>(CVPixelBufferGetHeight(pixelBuffer)),
+                                  pixelFormat,
+                                  false,
+                                  1,
+                                  usage};
   auto hardwareTexture =
       gpu->makeResource<EAGLHardwareTexture>(descriptor, pixelBuffer, texture, target, textureID);
-  if (hardwareTexture->usage() & GPUTextureUsage::RENDER_ATTACHMENT &&
+  if (hardwareTexture->usage() & TextureUsage::RENDER_ATTACHMENT &&
       !hardwareTexture->checkFrameBuffer(gpu)) {
     return nullptr;
   }
   return hardwareTexture;
 }
 
-std::vector<std::shared_ptr<GPUTexture>> EAGLHardwareTexture::MakeFrom(EAGLGPU* gpu,
-                                                                       CVPixelBufferRef pixelBuffer,
-                                                                       uint32_t usage) {
+std::vector<std::shared_ptr<Texture>> EAGLHardwareTexture::MakeFrom(EAGLGPU* gpu,
+                                                                    CVPixelBufferRef pixelBuffer,
+                                                                    uint32_t usage) {
   auto textureCache = gpu->getTextureCache();
   if (textureCache == nil) {
     return {};
@@ -84,11 +84,11 @@ std::vector<std::shared_ptr<GPUTexture>> EAGLHardwareTexture::MakeFrom(EAGLGPU* 
   if (formats.empty()) {
     return {};
   }
-  if (usage & GPUTextureUsage::RENDER_ATTACHMENT &&
+  if (usage & TextureUsage::RENDER_ATTACHMENT &&
       (formats.size() != 1 || !gpu->isFormatRenderable(formats.front()))) {
     return {};
   }
-  std::vector<std::shared_ptr<GPUTexture>> textures = {};
+  std::vector<std::shared_ptr<Texture>> textures = {};
   for (size_t i = 0; i < formats.size(); ++i) {
     auto texture = CreateTextureOfPlane(gpu, pixelBuffer, i, formats[i], usage, textureCache);
     if (texture == nullptr) {
@@ -99,7 +99,7 @@ std::vector<std::shared_ptr<GPUTexture>> EAGLHardwareTexture::MakeFrom(EAGLGPU* 
   return textures;
 }
 
-EAGLHardwareTexture::EAGLHardwareTexture(const GPUTextureDescriptor& descriptor,
+EAGLHardwareTexture::EAGLHardwareTexture(const TextureDescriptor& descriptor,
                                          CVPixelBufferRef pixelBuffer, CVOpenGLESTextureRef texture,
                                          unsigned target, unsigned textureID)
     : GLTexture(descriptor, target, textureID), pixelBuffer(pixelBuffer), texture(texture) {

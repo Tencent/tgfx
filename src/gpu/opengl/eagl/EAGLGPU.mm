@@ -39,7 +39,7 @@ EAGLGPU::~EAGLGPU() {
   }
 }
 
-std::vector<std::shared_ptr<GPUTexture>> EAGLGPU::importHardwareTextures(
+std::vector<std::shared_ptr<Texture>> EAGLGPU::importHardwareTextures(
     HardwareBufferRef hardwareBuffer, uint32_t usage) {
   if (!HardwareBufferCheck(hardwareBuffer)) {
     return {};

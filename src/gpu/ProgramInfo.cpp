@@ -257,8 +257,8 @@ void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, PipelineProgram
   unsigned textureBinding = TEXTURE_BINDING_POINT_START;
   auto gpu = renderTarget->getContext()->gpu();
   for (auto& [texture, state] : samplers) {
-    GPUSamplerDescriptor descriptor(ToAddressMode(state.tileModeX), ToAddressMode(state.tileModeY),
-                                    state.minFilterMode, state.magFilterMode, state.mipmapMode);
+    SamplerDescriptor descriptor(ToAddressMode(state.tileModeX), ToAddressMode(state.tileModeY),
+                                 state.minFilterMode, state.magFilterMode, state.mipmapMode);
     auto sampler = gpu->createSampler(descriptor);
     renderPass->setTexture(textureBinding++, texture, sampler);
   }

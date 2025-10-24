@@ -45,10 +45,9 @@ void GLCommandQueue::writeBuffer(std::shared_ptr<GPUBuffer> buffer, size_t buffe
                     data);
 }
 
-void GLCommandQueue::writeTexture(std::shared_ptr<GPUTexture> texture, const Rect& rect,
+void GLCommandQueue::writeTexture(std::shared_ptr<Texture> texture, const Rect& rect,
                                   const void* pixels, size_t rowBytes) {
-  if (texture == nullptr || rect.isEmpty() ||
-      !(texture->usage() & GPUTextureUsage::TEXTURE_BINDING)) {
+  if (texture == nullptr || rect.isEmpty() || !(texture->usage() & TextureUsage::TEXTURE_BINDING)) {
     return;
   }
   auto gl = gpu->functions();

@@ -84,7 +84,7 @@ TiledTextureEffect::Sampling::Sampling(const TextureView* textureView, SamplerSt
     if (tileMode == TileMode::Decal && !features->clampToBorder) {
       return false;
     }
-    if (textureView->getTexture()->type() != GPUTextureType::TwoD &&
+    if (textureView->getTexture()->type() != TextureType::TwoD &&
         !(tileMode == TileMode::Clamp || tileMode == TileMode::Decal)) {
       return false;
     }
@@ -161,7 +161,7 @@ size_t TiledTextureEffect::onCountTextureSamplers() const {
   return textureView ? 1 : 0;
 }
 
-std::shared_ptr<GPUTexture> TiledTextureEffect::onTextureAt(size_t) const {
+std::shared_ptr<Texture> TiledTextureEffect::onTextureAt(size_t) const {
   auto textureView = getTextureView();
   if (textureView == nullptr) {
     return nullptr;

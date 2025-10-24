@@ -51,7 +51,7 @@ class ShaderBuilder {
 
   /**
    * Appends a 2D texture sampler. The vec length and swizzle order of the result depends on the
-   * GPUTexture associated with the SamplerHandle.
+   * Texture associated with the SamplerHandle.
    */
   void appendTextureLookup(SamplerHandle samplerHandle, const std::string& coordName);
 
