@@ -23,10 +23,6 @@ bool HardwareBufferAvailable() {
   return false;
 }
 
-std::vector<PixelFormat> WGLGPU::getHardwareTextureFormats(HardwareBufferRef, YUVFormat*) const {
-  return {};
-}
-
 std::vector<std::shared_ptr<GPUTexture>> WGLGPU::importHardwareTextures(HardwareBufferRef,
                                                                         uint32_t) {
   return {};

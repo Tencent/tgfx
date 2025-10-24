@@ -31,9 +31,6 @@ class EGLGPU : public GLGPU {
     return eglDisplay;
   }
 
-  std::vector<PixelFormat> getHardwareTextureFormats(HardwareBufferRef hardwareBuffer,
-                                                     YUVFormat* yuvFormat) const override;
-
   std::vector<std::shared_ptr<GPUTexture>> importHardwareTextures(HardwareBufferRef hardwareBuffer,
                                                                   uint32_t usage) override;
 

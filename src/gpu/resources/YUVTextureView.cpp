@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "YUVTextureView.h"
+#include "core/utils/HardwareBufferUtil.h"
 #include "core/utils/Log.h"
 #include "gpu/GPU.h"
 
@@ -120,7 +121,7 @@ std::shared_ptr<GPUTexture> YUVTextureView::getTextureAt(size_t index) const {
 
 size_t YUVTextureView::memoryUsage() const {
   if (auto hardwareBuffer = textures.front()->getHardwareBuffer()) {
-    return HardwareBufferGetInfo(hardwareBuffer).byteSize();
+    return GetImageInfo(hardwareBuffer).byteSize();
   }
   return static_cast<size_t>(width()) * static_cast<size_t>(height()) * 3 / 2;
 }

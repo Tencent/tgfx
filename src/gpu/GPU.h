@@ -90,18 +90,6 @@ class GPU {
   virtual std::shared_ptr<GPUTexture> createTexture(const GPUTextureDescriptor& descriptor) = 0;
 
   /**
-   * Returns the pixel formats for textures created from a platform-specific hardware buffer, such
-   * as AHardwareBuffer on Android or CVPixelBufferRef on Apple platforms. If yuvFormat is not
-   * nullptr, it will be set to the YUV format of the hardwareBuffer if applicable. Note: On some
-   * platforms, only a single pixel format may be returned, even if yuvFormat is not
-   * YUVFormat::Unknown. In this case, the resulting texture will be read-only and cannot be used as
-   * a render target. Returns an empty vector if the hardwareBuffer is invalid or not supported by
-   * the GPU backend.
-   */
-  virtual std::vector<PixelFormat> getHardwareTextureFormats(
-      HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat = nullptr) const = 0;
-
-  /**
    * Creates one or more textures from a platform-specific hardware buffer, such as AHardwareBuffer
    * on Android or CVPixelBufferRef on Apple platforms. Multiple textures may be created from the
    * same hardwareBuffer, especially for YUV formats.
@@ -113,28 +101,15 @@ class GPU {
       HardwareBufferRef hardwareBuffer, uint32_t usage) = 0;
 
   /**
-   * Returns the pixel format of the given backend texture. If the backend texture is invalid,
-   * returns PixelFormat::Unknown.
+   * Creates a GPUTexture that wraps the specified backend texture.
+   * @param backendTexture The backend texture to be wrapped.
+   * @param usage A bitmask of GPUTextureUsage flags specifying how the texture will be used.
+   * @param adopted If true, the returned GPUTexture takes ownership of the backend texture and will
+   * destroy it when no longer needed. If false, the backend texture must remain valid for the
+   * lifetime of the GPUTexture.
+   * @return A unique pointer to the created GPUTexture. Returns nullptr if the backend texture is
+   * invalid or not supported by the GPU backend.
    */
-  virtual PixelFormat getExternalTextureFormat(const BackendTexture& backendTexture) const = 0;
-
-  /**
-   * Returns the pixel format of the given backend render target. If the backend render target is
-   * invalid, returns PixelFormat::Unknown.
-   */
-  virtual PixelFormat getExternalTextureFormat(
-      const BackendRenderTarget& backendRenderTarget) const = 0;
-
-  /**
-  * Creates a GPUTexture that wraps the specified backend texture.
-  * @param backendTexture The backend texture to be wrapped.
-  * @param usage A bitmask of GPUTextureUsage flags specifying how the texture will be used.
-  * @param adopted If true, the returned GPUTexture takes ownership of the backend texture and will
-  * destroy it when no longer needed. If false, the backend texture must remain valid for the
-  * lifetime of the GPUTexture.
-  * @return A unique pointer to the created GPUTexture. Returns nullptr if the backend texture is
-  * invalid or not supported by the GPU backend.
-  */
   virtual std::shared_ptr<GPUTexture> importExternalTexture(const BackendTexture& backendTexture,
                                                             uint32_t usage,
                                                             bool adopted = false) = 0;
