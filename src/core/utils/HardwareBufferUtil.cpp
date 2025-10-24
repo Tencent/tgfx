@@ -43,24 +43,21 @@ ImageInfo GetImageInfo(HardwareBufferRef hardwareBuffer) {
 }
 
 PixelFormat GetRenderableFormat(HardwareBufferFormat hardwareBufferFormat) {
-  auto format = PixelFormat::Unknown;
   switch (hardwareBufferFormat) {
     case HardwareBufferFormat::ALPHA_8:
-      format = PixelFormat::ALPHA_8;
-      break;
+      return PixelFormat::ALPHA_8;
     case HardwareBufferFormat::RGBA_8888:
-      format = PixelFormat::RGBA_8888;
-      break;
+      return PixelFormat::RGBA_8888;
     case HardwareBufferFormat::BGRA_8888:
 #if TARGET_OS_MAC && !TARGET_OS_IPHONE
       // On macOS, hardware textures always use the RGBA format.
-      format = PixelFormat::RGBA_8888;
+      return PixelFormat::RGBA_8888;
 #else
-      format = PixelFormat::BGRA_8888;
+      return PixelFormat::BGRA_8888;
 #endif
     default:
       break;
   }
-  return format;
+  return PixelFormat::Unknown;
 }
 }  // namespace tgfx
