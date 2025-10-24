@@ -93,7 +93,7 @@ HardwareBufferInfo HardwareBufferGetInfo(HardwareBufferRef buffer) {
   }
   info.width = config.width;
   info.height = config.height;
-  info.range = static_cast<size_t>(config.stride);
+  info.rowBytes = static_cast<size_t>(config.stride);
   return info;
 }
 }  // namespace tgfx
