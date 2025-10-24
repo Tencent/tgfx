@@ -30,6 +30,8 @@ bool HardwareBufferCheck(HardwareBufferRef buffer) {
 
 HardwareBufferRef HardwareBufferAllocate(int width, int height, bool alphaOnly) {
   if (!HardwareBufferAvailable() || alphaOnly) {
+    // Although AHARDWAREBUFFER_FORMAT_R8_UNORM exists, most devices have poor support for it.
+    // Therefore, we currently only support the RGBA_8888 format.
     return nullptr;
   }
   AHardwareBuffer* hardwareBuffer = nullptr;
@@ -89,10 +91,6 @@ HardwareBufferInfo HardwareBufferGetInfo(HardwareBufferRef buffer) {
   describe(buffer, &desc);
   HardwareBufferInfo info = {};
   switch (desc.format) {
-    case HARDWAREBUFFER_FORMAT_R8_UNORM:
-      info.format = HardwareBufferFormat::ALPHA_8;
-      info.rowBytes = static_cast<size_t>(desc.stride);
-      break;
     case AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM:
     case AHARDWAREBUFFER_FORMAT_R8G8B8X8_UNORM:
       info.format = HardwareBufferFormat::RGBA_8888;
