@@ -18,9 +18,9 @@
 
 #include "tgfx/core/ImageBuffer.h"
 #include <memory>
-#include "core/utils/ColorSpaceHelper.h"
 #include "core/PixelBuffer.h"
 #include "core/YUVHardwareBuffer.h"
+#include "core/utils/ColorSpaceHelper.h"
 #include "gpu/resources/YUVTextureView.h"
 
 namespace tgfx {
