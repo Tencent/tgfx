@@ -84,7 +84,6 @@ GLInfo::GLInfo(GLGetString* getString, GLGetStringi* getStringi, GLGetIntegerv* 
     : getString(getString), getStringi(getStringi), getIntegerv(getIntegerv),
       getInternalformativ(getInternalformativ), getShaderPrecisionFormat(getShaderPrecisionFormat) {
   auto versionString = (const char*)getString(GL_VERSION);
-  LOGI("OpenGL Version: %s\n", versionString);
   auto glVersion = GetGLVersion(versionString);
   version = GL_VER(glVersion.majorVersion, glVersion.minorVersion);
   standard = GetGLStandard(versionString);

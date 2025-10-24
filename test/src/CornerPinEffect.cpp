@@ -66,7 +66,11 @@ CornerPinEffect::CornerPinEffect(const Point& upperLeft, const Point& upperRight
   calculateVertexQs();
 }
 
-Rect CornerPinEffect::filterBounds(const Rect&) const {
+Rect CornerPinEffect::filterBounds(const Rect&, MapDirection mapDirection) const {
+  if (mapDirection == MapDirection::Reverse) {
+    const auto largeSize = static_cast<float>(1 << 29);
+    return Rect::MakeLTRB(-largeSize, -largeSize, largeSize, largeSize);
+  }
   auto& lowerLeft = cornerPoints[0];
   auto& lowerRight = cornerPoints[1];
   auto& upperLeft = cornerPoints[2];

@@ -25,10 +25,33 @@ static bool HasExtension(const GPUInfo* info, const std::string& extension) {
   return std::find(extensions.begin(), extensions.end(), extension) != extensions.end();
 }
 
+static void PrintGPUInfo(const GPUInfo* info) {
+  std::string backend;
+  switch (info->backend) {
+    case Backend::OpenGL:
+      backend = "OpenGL";
+      break;
+    case Backend::Metal:
+      backend = "Metal";
+      break;
+    case Backend::Vulkan:
+      backend = "Vulkan";
+      break;
+    case Backend::WebGPU:
+      backend = "WebGPU";
+      break;
+    case Backend::Unknown:
+      backend = "Unknown";
+      break;
+  }
+  LOGI("[GPUInfo] Backend: %s | Version: %s | Renderer: %s | Vendor: %s", backend.c_str(),
+       info->version.c_str(), info->renderer.c_str(), info->vendor.c_str());
+}
+
 ShaderCaps::ShaderCaps(GPU* gpu) {
   DEBUG_ASSERT(gpu != nullptr);
   auto info = gpu->info();
-  auto limits = gpu->limits();
+  PrintGPUInfo(info);
   if (info->backend == Backend::OpenGL) {
     if (info->version.find("OpenGL ES") != std::string::npos) {
       usesPrecisionModifiers = true;
@@ -41,6 +64,7 @@ ShaderCaps::ShaderCaps(GPU* gpu) {
     usesPrecisionModifiers = false;
     versionDeclString = "#version 450";
   }
+  auto limits = gpu->limits();
   maxFragmentSamplers = limits->maxSamplersPerShaderStage;
   maxUBOSize = limits->maxUniformBufferBindingSize;
   uboOffsetAlignment = limits->minUniformBufferOffsetAlignment;

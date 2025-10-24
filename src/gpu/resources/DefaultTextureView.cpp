@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DefaultTextureView.h"
+#include "core/utils/HardwareBufferUtil.h"
 #include "core/utils/PixelFormatUtil.h"
 
 namespace tgfx {
@@ -26,7 +27,7 @@ DefaultTextureView::DefaultTextureView(std::shared_ptr<GPUTexture> texture, Imag
 
 size_t DefaultTextureView::memoryUsage() const {
   if (auto hardwareBuffer = _texture->getHardwareBuffer()) {
-    return HardwareBufferGetInfo(hardwareBuffer).byteSize();
+    return GetImageInfo(hardwareBuffer).byteSize();
   }
   auto colorSize = static_cast<size_t>(width()) * static_cast<size_t>(height()) *
                    PixelFormatBytesPerPixel(_texture->format());

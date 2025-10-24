@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,20 +18,27 @@
 
 #pragma once
 
-#import <CoreVideo/CoreVideo.h>
 #include "tgfx/core/ImageBuffer.h"
 
 namespace tgfx {
-class NV12HardwareBuffer : public ImageBuffer {
+/**
+ * YUVHardwareBuffer represents a pixel array in the YUV format, stored in a platform-specific
+ * hardware buffer.
+ */
+class YUVHardwareBuffer : public ImageBuffer {
  public:
-  static std::shared_ptr<NV12HardwareBuffer> MakeFrom(CVPixelBufferRef pixelBuffer,
-                                                      YUVColorSpace colorSpace);
+  static std::shared_ptr<YUVHardwareBuffer> MakeFrom(HardwareBufferRef hardwareBuffer,
+                                                     YUVColorSpace colorSpace);
 
-  ~NV12HardwareBuffer() override;
+  ~YUVHardwareBuffer() override;
 
-  int width() const override;
+  int width() const override {
+    return _width;
+  }
 
-  int height() const override;
+  int height() const override {
+    return _height;
+  }
 
   bool isAlphaOnly() const final {
     return false;
@@ -43,10 +50,13 @@ class NV12HardwareBuffer : public ImageBuffer {
   std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) const override;
 
  private:
-  CVPixelBufferRef pixelBuffer = nullptr;
+  int _width = 0;
+  int _height = 0;
+  HardwareBufferRef hardwareBuffer = nullptr;
   YUVColorSpace _colorSpace = YUVColorSpace::BT601_LIMITED;
 
-  NV12HardwareBuffer(CVPixelBufferRef pixelBuffer, YUVColorSpace colorSpace);
+  YUVHardwareBuffer(int width, int height, HardwareBufferRef hardwareBuffer,
+                    YUVColorSpace colorSpace);
 };
 
 }  // namespace tgfx

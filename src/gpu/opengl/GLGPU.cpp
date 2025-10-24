@@ -132,21 +132,13 @@ std::shared_ptr<GPUTexture> GLGPU::createTexture(const GPUTextureDescriptor& des
   return texture;
 }
 
-PixelFormat GLGPU::getExternalTextureFormat(const BackendTexture& backendTexture) const {
-  GLTextureInfo textureInfo = {};
-  if (!backendTexture.isValid() || !backendTexture.getGLTextureInfo(&textureInfo)) {
-    return PixelFormat::Unknown;
-  }
-  return GLSizeFormatToPixelFormat(textureInfo.format);
-}
-
 std::shared_ptr<GPUTexture> GLGPU::importExternalTexture(const BackendTexture& backendTexture,
                                                          uint32_t usage, bool adopted) {
   GLTextureInfo textureInfo = {};
   if (!backendTexture.getGLTextureInfo(&textureInfo)) {
     return nullptr;
   }
-  auto format = GLSizeFormatToPixelFormat(textureInfo.format);
+  auto format = backendTexture.format();
   if (usage & GPUTextureUsage::RENDER_ATTACHMENT && !isFormatRenderable(format)) {
     LOGE(
         "GLGPU::importExternalTexture() format is not renderable but RENDER_ATTACHMENT usage is "
@@ -167,20 +159,12 @@ std::shared_ptr<GPUTexture> GLGPU::importExternalTexture(const BackendTexture& b
   return texture;
 }
 
-PixelFormat GLGPU::getExternalTextureFormat(const BackendRenderTarget& renderTarget) const {
-  GLFrameBufferInfo frameBufferInfo = {};
-  if (!renderTarget.getGLFramebufferInfo(&frameBufferInfo)) {
-    return PixelFormat::Unknown;
-  }
-  return GLSizeFormatToPixelFormat(frameBufferInfo.format);
-}
-
 std::shared_ptr<GPUTexture> GLGPU::importExternalTexture(const BackendRenderTarget& renderTarget) {
   GLFrameBufferInfo frameBufferInfo = {};
   if (!renderTarget.getGLFramebufferInfo(&frameBufferInfo)) {
     return nullptr;
   }
-  auto format = GLSizeFormatToPixelFormat(frameBufferInfo.format);
+  auto format = renderTarget.format();
   if (!isFormatRenderable(format)) {
     return nullptr;
   }

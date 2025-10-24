@@ -19,6 +19,8 @@
 #include "tgfx/core/ImageBuffer.h"
 #include <memory>
 #include "core/utils/ColorSpaceHelper.h"
+#include "core/PixelBuffer.h"
+#include "core/YUVHardwareBuffer.h"
 #include "gpu/resources/YUVTextureView.h"
 
 namespace tgfx {
@@ -61,6 +63,16 @@ class YUVBuffer : public ImageBuffer {
 
 std::shared_ptr<ColorSpace> YUVBuffer::colorSpace() const {
   return MakeColorSpaceFromYUVColorSpace(_colorSpace);
+}
+
+std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef hardwareBuffer,
+                                                   YUVColorSpace colorSpace) {
+  return YUVHardwareBuffer::MakeFrom(hardwareBuffer, colorSpace);
+}
+
+std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef hardwareBuffer,
+                                                   std::shared_ptr<ColorSpace> colorSpace) {
+  return PixelBuffer::MakeFrom(hardwareBuffer, std::move(colorSpace));
 }
 
 std::shared_ptr<ImageBuffer> ImageBuffer::MakeI420(std::shared_ptr<YUVData> yuvData,

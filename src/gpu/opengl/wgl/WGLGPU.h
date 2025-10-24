@@ -26,9 +26,6 @@ class WGLGPU : public GLGPU {
   explicit WGLGPU(std::shared_ptr<GLInterface> glInterface) : GLGPU(std::move(glInterface)) {
   }
 
-  std::vector<PixelFormat> getHardwareTextureFormats(HardwareBufferRef hardwareBuffer,
-                                                     YUVFormat* yuvFormat) const override;
-
   std::vector<std::shared_ptr<GPUTexture>> importHardwareTextures(HardwareBufferRef hardwareBuffer,
                                                                   uint32_t usage) override;
 };

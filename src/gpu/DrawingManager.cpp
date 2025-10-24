@@ -21,6 +21,7 @@
 #include "ProxyProvider.h"
 #include "core/AtlasCellDecodeTask.h"
 #include "core/AtlasManager.h"
+#include "core/utils/HardwareBufferUtil.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/tasks/GenerateMipmapsTask.h"
@@ -159,7 +160,7 @@ void DrawingManager::addAtlasCellCodecTask(const std::shared_ptr<TextureProxy>& 
   ImageInfo dstInfo = {};
   auto hardwareBuffer = textureProxy->getHardwareBuffer();
   if (hardwareBuffer != nullptr) {
-    auto hardwareInfo = HardwareBufferGetInfo(hardwareBuffer);
+    auto hardwareInfo = GetImageInfo(hardwareBuffer);
     dstInfo = hardwareInfo.makeIntersect(0, 0, dstWidth, dstHeight);
     void* pixels = nullptr;
     if (auto iter = atlasHardwareBuffers.find(textureProxy.get());

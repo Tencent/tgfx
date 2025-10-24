@@ -17,8 +17,31 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/Backend.h"
+#include "tgfx/gpu/opengl/GLDefines.h"
 
 namespace tgfx {
+static PixelFormat GLSizeFormatToPixelFormat(unsigned sizeFormat) {
+  switch (sizeFormat) {
+    case GL_BGRA:
+    case GL_BGRA8:
+      return PixelFormat::BGRA_8888;
+    case GL_R8:
+    case GL_RED:
+    case GL_ALPHA8:
+    case GL_ALPHA:
+      return PixelFormat::ALPHA_8;
+    case GL_LUMINANCE8:
+    case GL_LUMINANCE:
+      return PixelFormat::GRAY_8;
+    case GL_RG8:
+    case GL_RG:
+      return PixelFormat::RG_88;
+    default:
+      break;
+  }
+  return PixelFormat::RGBA_8888;
+}
+
 BackendTexture& BackendTexture::operator=(const BackendTexture& that) {
   if (!that.isValid()) {
     _width = _height = 0;
@@ -38,6 +61,22 @@ BackendTexture& BackendTexture::operator=(const BackendTexture& that) {
       break;
   }
   return *this;
+}
+
+PixelFormat BackendTexture::format() const {
+  if (!isValid()) {
+    return PixelFormat::Unknown;
+  }
+  switch (_backend) {
+    case Backend::OpenGL:
+      return GLSizeFormatToPixelFormat(glInfo.format);
+    case Backend::Metal:
+      //TODO: Add Metal format mapping.
+      return PixelFormat::RGBA_8888;
+    default:
+      break;
+  }
+  return PixelFormat::Unknown;
 }
 
 bool BackendTexture::getGLTextureInfo(GLTextureInfo* glTextureInfo) const {
@@ -75,6 +114,22 @@ BackendRenderTarget& BackendRenderTarget::operator=(const BackendRenderTarget& t
       break;
   }
   return *this;
+}
+
+PixelFormat BackendRenderTarget::format() const {
+  if (!isValid()) {
+    return PixelFormat::Unknown;
+  }
+  switch (_backend) {
+    case Backend::OpenGL:
+      return GLSizeFormatToPixelFormat(glInfo.format);
+    case Backend::Metal:
+      //TODO: Add Metal format mapping.
+      return PixelFormat::RGBA_8888;
+    default:
+      break;
+  }
+  return PixelFormat::Unknown;
 }
 
 bool BackendRenderTarget::getGLFramebufferInfo(GLFrameBufferInfo* glFrameBufferInfo) const {

@@ -16,37 +16,24 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "CGLGPU.h"
-
-#include "CGLHardwareTexture.h"
-#include "tgfx/gpu/opengl/cgl/CGLDevice.h"
+#pragma once
 
 namespace tgfx {
-bool HardwareBufferAvailable() {
-  return true;
-}
 
-CGLGPU::~CGLGPU() {
-  if (textureCache != nil) {
-    CFRelease(textureCache);
-    textureCache = nil;
-  }
-}
+/**
+ * MapDirection specifies the direction in which to map the bounds through the image filter.
+ */
+enum class MapDirection {
+  /**
+   * Forward is used to determine which pixels of the destination canvas a source image rect
+   * would touch after filtering.
+   */
+  Forward,
+  /**
+   * Reverse is used to determine which rect of the source image would be required to fill
+   * the given rect (typically, clip bounds).
+   */
+  Reverse
+};
 
-std::vector<std::shared_ptr<GPUTexture>> CGLGPU::importHardwareTextures(
-    HardwareBufferRef hardwareBuffer, uint32_t usage) {
-  if (!HardwareBufferCheck(hardwareBuffer)) {
-    return {};
-  }
-  return CGLHardwareTexture::MakeFrom(this, hardwareBuffer, usage, getTextureCache());
-}
-
-CVOpenGLTextureCacheRef CGLGPU::getTextureCache() {
-  if (!textureCache) {
-    auto pixelFormatObj = CGLGetPixelFormat(cglContext);
-    CVOpenGLTextureCacheCreate(kCFAllocatorDefault, nil, cglContext, pixelFormatObj, nil,
-                               &textureCache);
-  }
-  return textureCache;
-}
 }  // namespace tgfx

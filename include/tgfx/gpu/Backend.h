@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "tgfx/gpu/PixelFormat.h"
 #include "tgfx/gpu/metal/MtlTypes.h"
 #include "tgfx/gpu/opengl/GLTypes.h"
 
@@ -85,6 +86,11 @@ class BackendTexture {
   Backend backend() const {
     return _backend;
   }
+
+  /**
+   * Returns the pixel format of this texture.
+   */
+  PixelFormat format() const;
 
   /**
    * If the backend API is GL, copies a snapshot of the GLTextureInfo struct into the passed in
@@ -167,6 +173,11 @@ class BackendRenderTarget {
   Backend backend() const {
     return _backend;
   }
+
+  /**
+   * Returns the pixel format of this render target.
+   */
+  PixelFormat format() const;
 
   /**
    * If the backend API is GL, copies a snapshot of the GLFramebufferInfo struct into the passed
