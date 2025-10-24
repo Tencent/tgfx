@@ -21,8 +21,8 @@
 #include <memory>
 #include "gpu/CommandBuffer.h"
 #include "gpu/GPUBuffer.h"
-#include "gpu/GPUFence.h"
 #include "gpu/GPUTexture.h"
+#include "gpu/Semaphore.h"
 
 namespace tgfx {
 /**
@@ -60,17 +60,17 @@ class CommandQueue {
   virtual void submit(std::shared_ptr<CommandBuffer> commandBuffer) = 0;
 
   /**
-   * Inserts a GPU fence into the command queue. This allows other synchronization points to be
+   * Inserts a Semaphore into the command queue. This allows other synchronization points to be
    * notified when all previous GPU commands have finished executing. Returns nullptr if the
-   * GPUFence cannot be inserted due to lack of support (for example, on WebGPU).
+   * Semaphore cannot be inserted due to lack of support (for example, on WebGPU).
    */
-  virtual std::shared_ptr<GPUFence> insertFence() = 0;
+  virtual std::shared_ptr<Semaphore> insertSemaphore() = 0;
 
   /**
    * Inserts a GPU wait operation into the command queue, making the GPU wait until the specified
-   * fence is signaled before executing subsequent commands.
+   * semaphore is signaled before executing subsequent commands.
    */
-  virtual void waitForFence(std::shared_ptr<GPUFence> fence) = 0;
+  virtual void waitSemaphore(std::shared_ptr<Semaphore> semaphore) = 0;
 
   /**
    * Blocks the current thread until all previously submitted commands in this queue have completed

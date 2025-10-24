@@ -123,11 +123,11 @@ class GPU {
       const BackendRenderTarget& backendRenderTarget) = 0;
 
   /**
-   * Creates a GPUFence that wraps the specified backend semaphore. The returned GPUFence takes
-   * ownership of the backend semaphore and will destroy it when no longer needed. Returns nullptr
-   * if the backend semaphore is invalid or not supported by the GPU backend.
+   * Creates a Semaphore that wraps the specified BackendSemaphore. The returned Semaphore takes
+   * ownership of the BackendSemaphore and will destroy it when no longer needed. Returns nullptr
+   * if the BackendSemaphore is invalid or not supported by the GPU backend.
    */
-  virtual std::shared_ptr<GPUFence> importExternalFence(const BackendSemaphore& semaphore) = 0;
+  virtual std::shared_ptr<Semaphore> importExternalSemaphore(const BackendSemaphore& semaphore) = 0;
 
   /**
    * Creates a GPUSampler with the specified descriptor.
