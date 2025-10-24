@@ -132,8 +132,8 @@ std::shared_ptr<GPUTexture> GLGPU::createTexture(const GPUTextureDescriptor& des
   return texture;
 }
 
-std::shared_ptr<GPUTexture> GLGPU::importExternalTexture(const BackendTexture& backendTexture,
-                                                         uint32_t usage, bool adopted) {
+std::shared_ptr<GPUTexture> GLGPU::importBackendTexture(const BackendTexture& backendTexture,
+                                                        uint32_t usage, bool adopted) {
   GLTextureInfo textureInfo = {};
   if (!backendTexture.getGLTextureInfo(&textureInfo)) {
     return nullptr;
@@ -159,7 +159,8 @@ std::shared_ptr<GPUTexture> GLGPU::importExternalTexture(const BackendTexture& b
   return texture;
 }
 
-std::shared_ptr<GPUTexture> GLGPU::importExternalTexture(const BackendRenderTarget& renderTarget) {
+std::shared_ptr<GPUTexture> GLGPU::importBackendRenderTarget(
+    const BackendRenderTarget& renderTarget) {
   GLFrameBufferInfo frameBufferInfo = {};
   if (!renderTarget.getGLFramebufferInfo(&frameBufferInfo)) {
     return nullptr;
@@ -178,12 +179,21 @@ std::shared_ptr<GPUTexture> GLGPU::importExternalTexture(const BackendRenderTarg
                                          frameBufferInfo.id);
 }
 
-std::shared_ptr<Semaphore> GLGPU::importExternalSemaphore(const BackendSemaphore& semaphore) {
+std::shared_ptr<Semaphore> GLGPU::importBackendSemaphore(const BackendSemaphore& semaphore) {
   GLSyncInfo glSyncInfo = {};
   if (!semaphore.getGLSync(&glSyncInfo)) {
     return nullptr;
   }
   return makeResource<GLSemaphore>(glSyncInfo.sync);
+}
+
+BackendSemaphore GLGPU::stealBackendSemaphore(std::shared_ptr<Semaphore> semaphore) {
+  if (semaphore == nullptr || semaphore.use_count() > 1) {
+    return {};
+  }
+  auto backendSemaphore = semaphore->getBackendSemaphore();
+  static_cast<GLSemaphore*>(semaphore.get())->_glSync = nullptr;
+  return backendSemaphore;
 }
 
 static int ToGLWrap(AddressMode wrapMode) {

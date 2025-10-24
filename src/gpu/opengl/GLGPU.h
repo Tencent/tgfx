@@ -73,13 +73,15 @@ class GLGPU : public GPU {
 
   std::shared_ptr<GPUTexture> createTexture(const GPUTextureDescriptor& descriptor) override;
 
-  std::shared_ptr<GPUTexture> importExternalTexture(const BackendTexture& backendTexture,
-                                                    uint32_t usage, bool adopted) override;
+  std::shared_ptr<GPUTexture> importBackendTexture(const BackendTexture& backendTexture,
+                                                   uint32_t usage, bool adopted) override;
 
-  std::shared_ptr<GPUTexture> importExternalTexture(
+  std::shared_ptr<GPUTexture> importBackendRenderTarget(
       const BackendRenderTarget& renderTarget) override;
 
-  std::shared_ptr<Semaphore> importExternalSemaphore(const BackendSemaphore& semaphore) override;
+  std::shared_ptr<Semaphore> importBackendSemaphore(const BackendSemaphore& semaphore) override;
+
+  BackendSemaphore stealBackendSemaphore(std::shared_ptr<Semaphore> semaphore) override;
 
   std::shared_ptr<GPUSampler> createSampler(const GPUSamplerDescriptor& descriptor) override;
 

@@ -60,7 +60,7 @@ Backend Context::backend() const {
 }
 
 bool Context::wait(const BackendSemaphore& waitSemaphore) {
-  auto semaphore = gpu()->importExternalSemaphore(waitSemaphore);
+  auto semaphore = gpu()->importBackendSemaphore(waitSemaphore);
   if (semaphore == nullptr) {
     return false;
   }
@@ -78,7 +78,7 @@ bool Context::flush(BackendSemaphore* signalSemaphore) {
   if (signalSemaphore != nullptr) {
     auto semaphore = gpu()->queue()->insertSemaphore();
     if (semaphore != nullptr) {
-      *signalSemaphore = semaphore->stealBackend();
+      *signalSemaphore = gpu()->stealBackendSemaphore(std::move(semaphore));
     }
   }
   _atlasManager->postFlush();

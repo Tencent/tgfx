@@ -92,8 +92,8 @@ std::shared_ptr<TextureView> TextureView::MakeFrom(Context* context,
   if (context == nullptr) {
     return nullptr;
   }
-  auto texture = context->gpu()->importExternalTexture(backendTexture,
-                                                       GPUTextureUsage::TEXTURE_BINDING, adopted);
+  auto texture = context->gpu()->importBackendTexture(backendTexture,
+                                                      GPUTextureUsage::TEXTURE_BINDING, adopted);
   if (texture == nullptr) {
     return nullptr;
   }
