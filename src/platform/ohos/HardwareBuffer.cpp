@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "tgfx/platform/HardwareBuffer.h"
 #include <native_buffer/native_buffer.h>
 #include "core/utils/PixelFormatUtil.h"
 
