@@ -19,6 +19,7 @@
 #pragma once
 
 #include "tgfx/core/Canvas.h"
+#include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/RenderFlags.h"
 #include "tgfx/core/SurfaceReadback.h"
@@ -180,6 +181,10 @@ class Surface {
    * are copied only if pixel conversion is possible. Returns true if pixels are copied to dstPixels.
    */
   bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0, int srcY = 0);
+  /**
+   * Returns the colorSpace of the surface.
+   */
+  std::shared_ptr<ColorSpace> colorSpace() const;
 
  private:
   uint32_t _uniqueID = 0;

@@ -22,6 +22,7 @@
 #include "gpu/ProxyProvider.h"
 #include "gpu/RenderContext.h"
 #include "gpu/TPArgs.h"
+#include "gpu/processors/ColorSpaceXFormEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
@@ -51,7 +52,8 @@ std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<Picture> picture, int wid
 
 PictureImage::PictureImage(std::shared_ptr<Picture> picture, int width, int height,
                            const Matrix* matrix, bool mipmapped)
-    : picture(std::move(picture)), _width(width), _height(height), mipmapped(mipmapped) {
+    : picture(std::move(picture)), _width(width), _height(height), mipmapped(mipmapped),
+      _colorSpace(ColorSpace::MakeSRGB()) {
   if (matrix && !matrix->isIdentity()) {
     this->matrix = new Matrix(*matrix);
   }
@@ -145,7 +147,7 @@ bool PictureImage::drawPicture(std::shared_ptr<RenderTargetProxy> renderTarget,
   if (renderTarget == nullptr) {
     return false;
   }
-  RenderContext renderContext(std::move(renderTarget), renderFlags, true);
+  RenderContext renderContext(std::move(renderTarget), renderFlags, true, nullptr, _colorSpace);
   Matrix totalMatrix = {};
   if (extraMatrix) {
     totalMatrix = *extraMatrix;

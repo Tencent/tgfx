@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/ImageGenerator.h"
 #include "tgfx/core/ImageInfo.h"
@@ -83,7 +84,9 @@ class Image {
    * remains unchanged for the lifetime of the Image. Returns nullptr if the ImageInfo is empty or
    * the pixel data is nullptr.
    */
-  static std::shared_ptr<Image> MakeFrom(const ImageInfo& info, std::shared_ptr<Data> pixels);
+  static std::shared_ptr<Image> MakeFrom(
+      const ImageInfo& info, std::shared_ptr<Data> pixels,
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Creates an Image from the Bitmap, sharing bitmap pixels. The Bitmap will allocate new internal
@@ -159,8 +162,10 @@ class Image {
    * is returned if the format of the backendTexture is recognized and supported. Recognized formats
    * vary by GPU back-ends.
    */
-  static std::shared_ptr<Image> MakeFrom(Context* context, const BackendTexture& backendTexture,
-                                         ImageOrigin origin = ImageOrigin::TopLeft);
+  static std::shared_ptr<Image> MakeFrom(
+      Context* context, const BackendTexture& backendTexture,
+      ImageOrigin origin = ImageOrigin::TopLeft,
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Creates an Image from the backendTexture associated with the context, taking ownership of the
@@ -169,8 +174,10 @@ class Image {
    * returned if the format of the backendTexture is recognized and supported. Recognized formats
    * vary by GPU back-ends.
    */
-  static std::shared_ptr<Image> MakeAdopted(Context* context, const BackendTexture& backendTexture,
-                                            ImageOrigin origin = ImageOrigin::TopLeft);
+  static std::shared_ptr<Image> MakeAdopted(
+      Context* context, const BackendTexture& backendTexture,
+      ImageOrigin origin = ImageOrigin::TopLeft,
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   virtual ~Image() = default;
 
@@ -189,6 +196,11 @@ class Image {
    * defined by ColorType::ALPHA_8.
    */
   virtual bool isAlphaOnly() const = 0;
+
+  /**
+   * return image colorspace.
+   */
+  virtual std::shared_ptr<ColorSpace> colorSpace() const = 0;
 
   /**
    * Returns true if the Image has mipmap levels. The flag was set by the makeMipmapped() method,

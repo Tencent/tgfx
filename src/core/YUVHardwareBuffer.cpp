@@ -19,6 +19,7 @@
 #include "YUVHardwareBuffer.h"
 #include "core/utils/USE.h"
 #include "gpu/resources/TextureView.h"
+#include "utils/ColorSpaceHelper.h"
 #if defined(__OHOS__)
 #include <native_buffer/native_buffer.h>
 #endif
@@ -75,8 +76,9 @@ std::shared_ptr<YUVHardwareBuffer> YUVHardwareBuffer::MakeFrom(HardwareBufferRef
 }
 
 YUVHardwareBuffer::YUVHardwareBuffer(int width, int height, HardwareBufferRef hardwareBuffer,
-                                     YUVColorSpace colorSpace)
-    : _width(width), _height(height), hardwareBuffer(hardwareBuffer), colorSpace(colorSpace) {
+                                     YUVColorSpace yuvColorSpace)
+    : _width(width), _height(height), hardwareBuffer(hardwareBuffer), _yuvColorSpace(yuvColorSpace),
+      _colorSpace(MakeColorSpaceFromYUVColorSpace(yuvColorSpace)) {
   HardwareBufferRetain(hardwareBuffer);
 }
 
@@ -86,7 +88,11 @@ YUVHardwareBuffer::~YUVHardwareBuffer() {
   nv12BufferMap.erase(hardwareBuffer);
 }
 
+std::shared_ptr<ColorSpace> YUVHardwareBuffer::colorSpace() const {
+  return _colorSpace;
+}
+
 std::shared_ptr<TextureView> YUVHardwareBuffer::onMakeTexture(Context* context, bool) const {
-  return TextureView::MakeFrom(context, hardwareBuffer, colorSpace);
+  return TextureView::MakeFrom(context, hardwareBuffer, _yuvColorSpace);
 }
 }  // namespace tgfx
