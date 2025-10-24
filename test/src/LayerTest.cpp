@@ -3214,7 +3214,6 @@ TGFX_TEST(LayerTest, TemporaryOffscreenImage) {
   auto filter = DropShadowFilter::Make(-10, -10, 5, 5, Color::Black());
   DisplayList displayList;
   displayList.root()->addChild(shapeLayer);
-  // shapeLayer->setMatrix(Matrix::MakeTrans(-30, -30));
   shapeLayer->setFillStyle(pattern);
   shapeLayer->setFilters({filter});
 
