@@ -63,8 +63,9 @@ std::shared_ptr<Picture> Layer::RecordPicture(DrawMode mode, float contentScale,
   return recorder.finishRecordingAsPicture();
 }
 
-static std::shared_ptr<Image> ToImageWithOffset(std::shared_ptr<Picture> picture, Point* offset,
-                                                const Rect* imageBounds = nullptr) {
+static std::shared_ptr<Image> ToImageWithOffset(
+    std::shared_ptr<Picture> picture, Point* offset, const Rect* imageBounds = nullptr,
+    std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB()) {
   if (picture == nullptr) {
     return nullptr;
   }
@@ -72,7 +73,7 @@ static std::shared_ptr<Image> ToImageWithOffset(std::shared_ptr<Picture> picture
   bounds.roundOut();
   auto matrix = Matrix::MakeTrans(-bounds.x(), -bounds.y());
   auto image = Image::MakeFrom(std::move(picture), static_cast<int>(bounds.width()),
-                               static_cast<int>(bounds.height()), &matrix);
+                               static_cast<int>(bounds.height()), &matrix, std::move(colorSpace));
   if (offset) {
     offset->x = bounds.left;
     offset->y = bounds.top;
@@ -592,6 +593,7 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   }
 
   if (surface) {
+    args.dstColorSpace = surface->colorSpace();
     context = surface->getContext();
     if (!(surface->renderFlags() & RenderFlags::DisableCache)) {
       args.context = context;
@@ -798,7 +800,7 @@ std::shared_ptr<Image> Layer::getRasterizedImage(const DrawArgs& args, float con
     return nullptr;
   }
   Point offset = {};
-  auto image = ToImageWithOffset(std::move(picture), &offset);
+  auto image = ToImageWithOffset(std::move(picture), &offset, nullptr, args.dstColorSpace);
   if (image == nullptr) {
     return nullptr;
   }
@@ -891,7 +893,8 @@ std::shared_ptr<MaskFilter> Layer::getMaskFilter(const DrawArgs& args, float sca
     return nullptr;
   }
   Point maskImageOffset = {};
-  auto maskContentImage = ToImageWithOffset(std::move(maskPicture), &maskImageOffset);
+  auto maskContentImage =
+      ToImageWithOffset(std::move(maskPicture), &maskImageOffset, nullptr, args.dstColorSpace);
   if (maskContentImage == nullptr) {
     return nullptr;
   }
@@ -970,7 +973,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     AutoCanvasRestore autoRestore(canvas);
     AutoCanvasRestore autoRestoreBg(backgroundCanvas);
     Point offset = {};
-    auto image = ToImageWithOffset(std::move(picture), &offset);
+    auto image = ToImageWithOffset(std::move(picture), &offset, nullptr, args.dstColorSpace);
     if (image == nullptr) {
       return;
     }
@@ -1137,7 +1140,8 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
     drawContents(drawArgs, canvas, 1.0f);
   });
   Point contentOffset = {};
-  auto content = ToImageWithOffset(std::move(contentPicture), &contentOffset);
+  auto content =
+      ToImageWithOffset(std::move(contentPicture), &contentOffset, nullptr, args.dstColorSpace);
   if (content == nullptr) {
     return nullptr;
   }
@@ -1157,7 +1161,8 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
     auto contourPicture = RecordPicture(DrawMode::Contour, contentScale, [&](Canvas* canvas) {
       drawContents(drawArgs, canvas, 1.0f);
     });
-    source->contour = ToImageWithOffset(std::move(contourPicture), &source->contourOffset);
+    source->contour = ToImageWithOffset(std::move(contourPicture), &source->contourOffset, nullptr,
+                                        drawArgs.dstColorSpace);
   }
   return source;
 }
@@ -1202,7 +1207,7 @@ std::shared_ptr<Image> Layer::getBackgroundImage(const DrawArgs& args, float con
     }
   }
   auto backgroundPicture = recorder.finishRecordingAsPicture();
-  return ToImageWithOffset(std::move(backgroundPicture), offset, &bounds);
+  return ToImageWithOffset(std::move(backgroundPicture), offset, &bounds, args.dstColorSpace);
 }
 
 void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
@@ -1264,7 +1269,7 @@ void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
       backgroundCanvas->drawPicture(picture);
     } else {
       Point offset = {};
-      auto image = ToImageWithOffset(std::move(picture), &offset);
+      auto image = ToImageWithOffset(std::move(picture), &offset, nullptr, args.dstColorSpace);
       if (image == nullptr) {
         continue;
       }

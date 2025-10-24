@@ -627,20 +627,42 @@ static std::shared_ptr<Data> WriteICCProfile(const gfx::skcms_ICCProfile* profil
   return Data::MakeAdopted(ptr, profileSize, Data::FreeProc);
 }
 
+static LumaFactor AcquireLumaFactorFromColorSpace(const ColorMatrix33& matrix) {
+  ColorMatrix33 tempColorMatrix{};
+
+  NamedPrimaries::Rec601.toXYZD50(&tempColorMatrix);
+  if (NearlyEqual(*reinterpret_cast<const gfx::skcms_Matrix3x3*>(&matrix),
+                  *reinterpret_cast<const gfx::skcms_Matrix3x3*>(&tempColorMatrix))) {
+    return {0.299f, 0.587f, 0.114f};
+  }
+
+  NamedPrimaries::Rec2020.toXYZD50(&tempColorMatrix);
+  if (NearlyEqual(*reinterpret_cast<const gfx::skcms_Matrix3x3*>(&matrix),
+                  *reinterpret_cast<const gfx::skcms_Matrix3x3*>(&tempColorMatrix))) {
+    return {0.2627f, 0.678f, 0.0593f};
+  }
+
+  if (NearlyEqual(*reinterpret_cast<const gfx::skcms_Matrix3x3*>(&matrix),
+                  *reinterpret_cast<const gfx::skcms_Matrix3x3*>(&NamedGamut::AdobeRGB))) {
+    return {0.2973f, 0.6274f, 0.0753f};
+  }
+  return LumaFactor{};
+}
+
 bool ColorSpacePrimaries::toXYZD50(ColorMatrix33* toXYZD50) const {
   return gfx::skcms_PrimariesToXYZD50(rx, ry, gx, gy, bx, by, wx, wy,
                                       reinterpret_cast<gfx::skcms_Matrix3x3*>(toXYZD50));
 }
 
 std::shared_ptr<ColorSpace> ColorSpace::MakeSRGB() {
-  static std::shared_ptr<ColorSpace> cs =
-      std::shared_ptr<ColorSpace>(new ColorSpace(NamedTransferFunction::SRGB, NamedGamut::SRGB));
+  static std::shared_ptr<ColorSpace> cs = std::shared_ptr<ColorSpace>(
+      new ColorSpace(NamedTransferFunction::SRGB, NamedGamut::SRGB, LumaFactor{}));
   return cs;
 }
 
 std::shared_ptr<ColorSpace> ColorSpace::MakeSRGBLinear() {
-  static std::shared_ptr<ColorSpace> cs =
-      std::shared_ptr<ColorSpace>(new ColorSpace(NamedTransferFunction::Linear, NamedGamut::SRGB));
+  static std::shared_ptr<ColorSpace> cs = std::shared_ptr<ColorSpace>(
+      new ColorSpace(NamedTransferFunction::Linear, NamedGamut::SRGB, LumaFactor{}));
   return cs;
 }
 
@@ -667,7 +689,8 @@ std::shared_ptr<ColorSpace> ColorSpace::MakeRGB(const TransferFunction& transfer
     tf = &NamedTransferFunction::Linear;
   }
 
-  return std::shared_ptr<ColorSpace>(new ColorSpace(*tf, toXYZ));
+  return std::shared_ptr<ColorSpace>(
+      new ColorSpace(*tf, toXYZ, AcquireLumaFactorFromColorSpace(toXYZ)));
 }
 
 std::shared_ptr<ColorSpace> ColorSpace::MakeCICP(ColorSpacePrimariesID colorPrimaries,
@@ -765,7 +788,7 @@ std::shared_ptr<ColorSpace> ColorSpace::makeColorSpin() const {
   gfx::skcms_Matrix3x3 spun =
       gfx::skcms_Matrix3x3_concat(reinterpret_cast<const gfx::skcms_Matrix3x3*>(&_toXYZD50), &spin);
   return std::shared_ptr<ColorSpace>(
-      new ColorSpace(_transferFunction, *reinterpret_cast<ColorMatrix33*>(&spun)));
+      new ColorSpace(_transferFunction, *reinterpret_cast<ColorMatrix33*>(&spun), LumaFactor{}));
 }
 
 bool ColorSpace::isSRGB() const {
@@ -831,8 +854,9 @@ void ColorSpace::gamutTransformTo(const ColorSpace* dst, ColorMatrix33* srcToDst
   *srcToDst = *reinterpret_cast<ColorMatrix33*>(&result);
 }
 
-ColorSpace::ColorSpace(const TransferFunction& transferFunction, const ColorMatrix33& toXYZ)
-    : _transferFunction(transferFunction), _toXYZD50(toXYZ) {
+ColorSpace::ColorSpace(const TransferFunction& transferFunction, const ColorMatrix33& toXYZ,
+                       const LumaFactor& lumaFactor)
+    : _transferFunction(transferFunction), _toXYZD50(toXYZ), _lumaFactor(lumaFactor) {
   _transferFunctionHash = checksum::Hash32(&_transferFunction, 7 * sizeof(float));
   _toXYZD50Hash = checksum::Hash32(&_toXYZD50, 9 * sizeof(float));
 }

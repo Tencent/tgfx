@@ -82,7 +82,8 @@ std::shared_ptr<Image> BackgroundContext::getBackgroundImage() const {
   canvas->drawImage(parent->getBackgroundImage());
   canvas->drawImage(image);
   auto picture = recorder.finishRecordingAsPicture();
-  return Image::MakeFrom(std::move(picture), surface->width(), surface->height());
+  return Image::MakeFrom(std::move(picture), surface->width(), surface->height(), nullptr,
+                         surface->colorSpace());
 }
 
 std::shared_ptr<BackgroundContext> BackgroundContext::createSubContext() const {

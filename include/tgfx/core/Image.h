@@ -130,11 +130,13 @@ class Image {
    * @param width The width of the Image.
    * @param height The height of the Image.
    * @param matrix A Matrix to apply transformations to the picture.
+   * @param colorSpace The ColorSpace of this image.
    * @return An Image that matches the content when the picture is drawn with the specified
    * parameters.
    */
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Picture> picture, int width, int height,
-                                         const Matrix* matrix = nullptr);
+  static std::shared_ptr<Image> MakeFrom(
+      std::shared_ptr<Picture> picture, int width, int height, const Matrix* matrix = nullptr,
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Creates an Image in the I420 format with the specified YUVData and the YUVColorSpace. Returns

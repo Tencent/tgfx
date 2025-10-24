@@ -74,8 +74,10 @@ void OpsCompositor::fillImage(std::shared_ptr<Image> image, const SamplingOption
     pendingSampling = sampling;
     pendingConstraint = SrcRectConstraint::Fast;
   }
-  auto record =
-      drawingBuffer()->make<RectRecord>(imageRect, state.matrix, fill.color.premultiply());
+  auto dstColor =
+      ColorSpaceXformSteps::ConvertColorSpace(ColorSpace::MakeSRGB(), AlphaType::Unpremultiplied,
+                                              dstColorSpace, AlphaType::Premultiplied, fill.color);
+  auto record = drawingBuffer()->make<RectRecord>(imageRect, state.matrix, dstColor);
   pendingRects.emplace_back(std::move(record));
   pendingUVRects.emplace_back(drawingBuffer()->make<Rect>(imageRect));
 }
@@ -95,8 +97,10 @@ void OpsCompositor::fillImageRect(std::shared_ptr<Image> image, const Rect& srcR
     pendingSampling = sampling;
     pendingConstraint = constraint;
   }
-  auto record =
-      drawingBuffer()->make<RectRecord>(dstRect, state.matrix, fillInLocal.color.premultiply());
+  auto dstColor = ColorSpaceXformSteps::ConvertColorSpace(
+      ColorSpace::MakeSRGB(), AlphaType::Unpremultiplied, dstColorSpace, AlphaType::Premultiplied,
+      fillInLocal.color);
+  auto record = drawingBuffer()->make<RectRecord>(dstRect, state.matrix, dstColor);
   pendingRects.emplace_back(std::move(record));
   pendingUVRects.emplace_back(drawingBuffer()->make<Rect>(srcRect));
   if (!hasRectToRectDraw && srcRect != dstRect) {
@@ -109,7 +113,10 @@ void OpsCompositor::fillRect(const Rect& rect, const MCState& state, const Fill&
   if (!canAppend(PendingOpType::Rect, state.clip, fill)) {
     flushPendingOps(PendingOpType::Rect, state.clip, fill);
   }
-  auto record = drawingBuffer()->make<RectRecord>(rect, state.matrix, fill.color.premultiply());
+  auto dstColor =
+      ColorSpaceXformSteps::ConvertColorSpace(ColorSpace::MakeSRGB(), AlphaType::Unpremultiplied,
+                                              dstColorSpace, AlphaType::Premultiplied, fill.color);
+  auto record = drawingBuffer()->make<RectRecord>(rect, state.matrix, dstColor);
   pendingRects.emplace_back(std::move(record));
 }
 
@@ -121,8 +128,10 @@ void OpsCompositor::drawRRect(const RRect& rRect, const MCState& state, const Fi
       (pendingStrokes.empty() != (stroke == nullptr))) {
     flushPendingOps(PendingOpType::RRect, state.clip, rectFill);
   }
-  auto record =
-      drawingBuffer()->make<RRectRecord>(rRect, state.matrix, rectFill.color.premultiply());
+  auto dstColor = ColorSpaceXformSteps::ConvertColorSpace(ColorSpace::MakeSRGB(),
+                                                          AlphaType::Unpremultiplied, dstColorSpace,
+                                                          AlphaType::Premultiplied, rectFill.color);
+  auto record = drawingBuffer()->make<RRectRecord>(rRect, state.matrix, dstColor);
   pendingRRects.emplace_back(std::move(record));
   if (stroke) {
     auto strokeRecord = drawingBuffer()->make<Stroke>(*stroke);
@@ -183,7 +192,10 @@ void OpsCompositor::drawShape(std::shared_ptr<Shape> shape, const MCState& state
   auto color = fill.color;
   color.alpha *= ShapeUtils::CalculateAlphaReduceFactorIfHairline(shape);
   auto shapeProxy = proxyProvider()->createGPUShapeProxy(shape, aaType, clipBounds, renderFlags);
-  auto drawOp = ShapeDrawOp::Make(std::move(shapeProxy), color.premultiply(), uvMatrix, aaType);
+  auto dstColor =
+      ColorSpaceXformSteps::ConvertColorSpace(ColorSpace::MakeSRGB(), AlphaType::Unpremultiplied,
+                                              dstColorSpace, AlphaType::Premultiplied, color);
+  auto drawOp = ShapeDrawOp::Make(std::move(shapeProxy), dstColor, uvMatrix, aaType);
   CAPUTRE_SHAPE_MESH(drawOp.get(), shape, aaType, clipBounds);
   addDrawOp(std::move(drawOp), clip, fill, localBounds, deviceBounds, drawScale);
 }
@@ -444,7 +456,10 @@ bool OpsCompositor::drawAsClear(const Rect& rect, const MCState& state, const Fi
   drawOps.clear();
   auto format = renderTarget->format();
   auto writeSwizzle = Swizzle::ForWrite(format);
-  clearColor = writeSwizzle.applyTo(fill.color.premultiply());
+  auto dstColor =
+      ColorSpaceXformSteps::ConvertColorSpace(ColorSpace::MakeSRGB(), AlphaType::Unpremultiplied,
+                                              dstColorSpace, AlphaType::Premultiplied, fill.color);
+  clearColor = writeSwizzle.applyTo(dstColor);
   return true;
 }
 
@@ -706,7 +721,10 @@ void OpsCompositor::fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, co
     pendingAtlasTexture = std::move(textureProxy);
     pendingSampling = sampling;
   }
-  auto record = drawingBuffer()->make<RectRecord>(rect, state.matrix, fill.color.premultiply());
+  auto dstColor =
+      ColorSpaceXformSteps::ConvertColorSpace(ColorSpace::MakeSRGB(), AlphaType::Unpremultiplied,
+                                              dstColorSpace, AlphaType::Premultiplied, fill.color);
+  auto record = drawingBuffer()->make<RectRecord>(rect, state.matrix, dstColor);
   pendingRects.emplace_back(std::move(record));
 }
 
