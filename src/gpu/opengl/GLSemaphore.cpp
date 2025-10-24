@@ -21,13 +21,12 @@
 #include "tgfx/gpu/opengl/GLFunctions.h"
 
 namespace tgfx {
-BackendSemaphore GLSemaphore::stealBackend() {
+BackendSemaphore GLSemaphore::getBackendSemaphore() const {
   if (_glSync == nullptr) {
     return {};
   }
   GLSyncInfo glSyncInfo = {};
   glSyncInfo.sync = _glSync;
-  _glSync = nullptr;
   return {glSyncInfo};
 }
 

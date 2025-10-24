@@ -34,12 +34,14 @@ class GLSemaphore : public Semaphore, public GLResource {
     return _glSync;
   }
 
-  BackendSemaphore stealBackend() override;
+  BackendSemaphore getBackendSemaphore() const override;
 
  protected:
   void onRelease(GLGPU* gpu) override;
 
  private:
   void* _glSync = nullptr;
+
+  friend class GLGPU;
 };
 }  // namespace tgfx

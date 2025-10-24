@@ -110,16 +110,16 @@ class GPU {
    * @return A unique pointer to the created GPUTexture. Returns nullptr if the backend texture is
    * invalid or not supported by the GPU backend.
    */
-  virtual std::shared_ptr<GPUTexture> importExternalTexture(const BackendTexture& backendTexture,
-                                                            uint32_t usage,
-                                                            bool adopted = false) = 0;
+  virtual std::shared_ptr<GPUTexture> importBackendTexture(const BackendTexture& backendTexture,
+                                                           uint32_t usage,
+                                                           bool adopted = false) = 0;
 
   /**
    * Creates a GPUTexture that wraps the given backend render target. The caller must ensure the
    * backend render target is valid for the lifetime of the returned GPUTexture. Returns nullptr
    * if the backend render target is invalid.
    */
-  virtual std::shared_ptr<GPUTexture> importExternalTexture(
+  virtual std::shared_ptr<GPUTexture> importBackendRenderTarget(
       const BackendRenderTarget& backendRenderTarget) = 0;
 
   /**
@@ -127,7 +127,15 @@ class GPU {
    * ownership of the BackendSemaphore and will destroy it when no longer needed. Returns nullptr
    * if the BackendSemaphore is invalid or not supported by the GPU backend.
    */
-  virtual std::shared_ptr<Semaphore> importExternalSemaphore(const BackendSemaphore& semaphore) = 0;
+  virtual std::shared_ptr<Semaphore> importBackendSemaphore(const BackendSemaphore& semaphore) = 0;
+
+  /**
+   * Transfers ownership of the BackendSemaphore from a uniquely owned Semaphore to the caller.
+   * After this call, the caller is responsible for managing the returned BackendSemaphore. You must
+   * use std::move() to pass the Semaphore, and it will be released during this process. Returns an
+   * empty BackendSemaphore if the Semaphore is nullptr or not uniquely owned.
+   */
+  virtual BackendSemaphore stealBackendSemaphore(std::shared_ptr<Semaphore> semaphore) = 0;
 
   /**
    * Creates a GPUSampler with the specified descriptor.

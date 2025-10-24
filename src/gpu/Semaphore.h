@@ -30,9 +30,8 @@ class Semaphore {
   virtual ~Semaphore() = default;
 
   /**
-   * Returns the BackendSemaphore object and transfers ownership to the caller, who must manage its
-   * lifetime. If the Semaphore is invalid, an empty BackendSemaphore is returned.
+   * Returns a BackendSemaphore representing the underlying backend-specific semaphore.
    */
-  virtual BackendSemaphore stealBackend() = 0;
+  virtual BackendSemaphore getBackendSemaphore() const = 0;
 };
 }  // namespace tgfx

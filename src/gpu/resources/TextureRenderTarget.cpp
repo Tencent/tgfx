@@ -45,7 +45,7 @@ std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
     return nullptr;
   }
   uint32_t usage = GPUTextureUsage::TEXTURE_BINDING | GPUTextureUsage::RENDER_ATTACHMENT;
-  auto texture = context->gpu()->importExternalTexture(backendTexture, usage, adopted);
+  auto texture = context->gpu()->importBackendTexture(backendTexture, usage, adopted);
   if (texture == nullptr) {
     return nullptr;
   }
