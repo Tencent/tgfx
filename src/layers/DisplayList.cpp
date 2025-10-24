@@ -901,6 +901,7 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   renderRect.roundOut();
   args.renderRect = &renderRect;
   args.backgroundContext = _root->createBackgroundContext(context, drawRect, viewMatrix);
+  args.dstColorSpace = surface->colorSpace();
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
 }
 
