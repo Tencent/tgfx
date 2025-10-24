@@ -30,7 +30,7 @@ namespace tgfx {
 class YUVBuffer : public ImageBuffer {
  public:
   YUVBuffer(std::shared_ptr<YUVData> data, YUVFormat format, YUVColorSpace colorSpace)
-      : data(std::move(data)), _colorSpace(colorSpace), format(format) {
+      : data(std::move(data)), _yuvColorSpace(colorSpace), format(format) {
   }
 
   int width() const override {
@@ -50,19 +50,23 @@ class YUVBuffer : public ImageBuffer {
  protected:
   std::shared_ptr<TextureView> onMakeTexture(Context* context, bool) const override {
     if (format == YUVFormat::NV12) {
-      return YUVTextureView::MakeNV12(context, data.get(), _colorSpace);
+      return YUVTextureView::MakeNV12(context, data.get(), _yuvColorSpace);
     }
-    return YUVTextureView::MakeI420(context, data.get(), _colorSpace);
+    return YUVTextureView::MakeI420(context, data.get(), _yuvColorSpace);
   }
 
  private:
   std::shared_ptr<YUVData> data = nullptr;
-  YUVColorSpace _colorSpace = YUVColorSpace::BT601_LIMITED;
+  mutable std::shared_ptr<ColorSpace> _colorSpace = nullptr;
+  YUVColorSpace _yuvColorSpace = YUVColorSpace::BT601_LIMITED;
   YUVFormat format = YUVFormat::Unknown;
 };
 
 std::shared_ptr<ColorSpace> YUVBuffer::colorSpace() const {
-  return MakeColorSpaceFromYUVColorSpace(_colorSpace);
+  if (_colorSpace == nullptr) {
+    _colorSpace = MakeColorSpaceFromYUVColorSpace(_yuvColorSpace);
+  }
+  return _colorSpace;
 }
 
 std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef hardwareBuffer,

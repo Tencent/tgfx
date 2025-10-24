@@ -53,7 +53,8 @@ class YUVHardwareBuffer : public ImageBuffer {
   int _width = 0;
   int _height = 0;
   HardwareBufferRef hardwareBuffer = nullptr;
-  YUVColorSpace _colorSpace = YUVColorSpace::BT601_LIMITED;
+  mutable std::shared_ptr<ColorSpace> _colorSpace = nullptr;
+  YUVColorSpace _yuvColorSpace = YUVColorSpace::BT601_LIMITED;
 
   YUVHardwareBuffer(int width, int height, HardwareBufferRef hardwareBuffer,
                     YUVColorSpace colorSpace);

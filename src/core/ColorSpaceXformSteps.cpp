@@ -289,10 +289,17 @@ uint32_t ColorSpaceXformSteps::XFormKey(const ColorSpaceXformSteps* xform) {
 Color ColorSpaceXformSteps::ConvertColorSpace(std::shared_ptr<ColorSpace> src, AlphaType srcAT,
                                               std::shared_ptr<ColorSpace> dst, AlphaType dstAT,
                                               const Color& srcColor) {
-  if (ColorSpace::Equals(src.get(), dst.get()) && srcAT == dstAT) {
-    return srcColor;
-  }
   auto dstColor = srcColor;
+  if (srcAT == AlphaType::Premultiplied && dstAT == AlphaType::Unpremultiplied) {
+    dstColor = dstColor.unpremultiply();
+    srcAT = AlphaType::Unpremultiplied;
+  } else if (srcAT == AlphaType::Unpremultiplied && dstAT == AlphaType::Premultiplied) {
+    dstColor = dstColor.premultiply();
+    srcAT = AlphaType::Premultiplied;
+  }
+  if (ColorSpace::Equals(src.get(), dst.get()) && srcAT == dstAT) {
+    return dstColor;
+  }
   ColorSpaceXformSteps steps(src.get(), srcAT, dst.get(), dstAT);
   steps.apply(dstColor.array());
   return dstColor;

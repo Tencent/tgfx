@@ -77,7 +77,7 @@ std::shared_ptr<YUVHardwareBuffer> YUVHardwareBuffer::MakeFrom(HardwareBufferRef
 
 YUVHardwareBuffer::YUVHardwareBuffer(int width, int height, HardwareBufferRef hardwareBuffer,
                                      YUVColorSpace colorSpace)
-    : _width(width), _height(height), hardwareBuffer(hardwareBuffer), _colorSpace(colorSpace) {
+    : _width(width), _height(height), hardwareBuffer(hardwareBuffer), _yuvColorSpace(colorSpace) {
   HardwareBufferRetain(hardwareBuffer);
 }
 
@@ -88,10 +88,13 @@ YUVHardwareBuffer::~YUVHardwareBuffer() {
 }
 
 std::shared_ptr<ColorSpace> YUVHardwareBuffer::colorSpace() const {
-  return MakeColorSpaceFromYUVColorSpace(_colorSpace);
+  if (_colorSpace == nullptr) {
+    _colorSpace = MakeColorSpaceFromYUVColorSpace(_yuvColorSpace);
+  }
+  return _colorSpace;
 }
 
 std::shared_ptr<TextureView> YUVHardwareBuffer::onMakeTexture(Context* context, bool) const {
-  return TextureView::MakeFrom(context, hardwareBuffer, _colorSpace);
+  return TextureView::MakeFrom(context, hardwareBuffer, _yuvColorSpace);
 }
 }  // namespace tgfx
