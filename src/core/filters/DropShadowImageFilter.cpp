@@ -61,6 +61,9 @@ Rect DropShadowImageFilter::onFilterBounds(const Rect& rect, MapDirection mapDir
     bounds = blurFilter->filterBounds(bounds, mapDirection);
   }
   bounds.offset(-dx, -dy);
+  if (!shadowOnly) {
+    bounds.join(rect);
+  }
   return bounds;
 }
 
