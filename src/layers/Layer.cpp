@@ -1271,8 +1271,8 @@ void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
       image = image->makeRasterized();
       Paint paint = {};
       paint.setBlendMode(layerStyle->blendMode());
-      canvas->drawImage(image, offset.x, offset.y);
-      backgroundCanvas->drawImage(image, offset.x, offset.y);
+      canvas->drawImage(image, offset.x, offset.y, &paint);
+      backgroundCanvas->drawImage(image, offset.x, offset.y, &paint);
     }
   }
   if (backgroundCanvas) {
