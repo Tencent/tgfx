@@ -36,11 +36,11 @@ class ExternalRenderTarget : public Resource, public RenderTarget {
     return true;
   }
 
-  std::shared_ptr<GPUTexture> getRenderTexture() const override {
+  std::shared_ptr<Texture> getRenderTexture() const override {
     return renderTexture;
   }
 
-  std::shared_ptr<GPUTexture> getSampleTexture() const override {
+  std::shared_ptr<Texture> getSampleTexture() const override {
     return renderTexture;
   }
 
@@ -49,10 +49,10 @@ class ExternalRenderTarget : public Resource, public RenderTarget {
   }
 
  private:
-  std::shared_ptr<GPUTexture> renderTexture = nullptr;
+  std::shared_ptr<Texture> renderTexture = nullptr;
   ImageOrigin _origin = ImageOrigin::TopLeft;
 
-  ExternalRenderTarget(std::shared_ptr<GPUTexture> texture, ImageOrigin origin)
+  ExternalRenderTarget(std::shared_ptr<Texture> texture, ImageOrigin origin)
       : renderTexture(std::move(texture)), _origin(origin) {
   }
 

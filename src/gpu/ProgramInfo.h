@@ -30,7 +30,7 @@
 
 namespace tgfx {
 struct SamplerInfo {
-  std::shared_ptr<GPUTexture> texture;
+  std::shared_ptr<Texture> texture;
   SamplerState state;
 };
 

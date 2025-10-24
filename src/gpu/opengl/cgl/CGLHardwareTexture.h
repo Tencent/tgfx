@@ -24,9 +24,9 @@
 namespace tgfx {
 class CGLHardwareTexture : public GLTexture {
  public:
-  static std::vector<std::shared_ptr<GPUTexture>> MakeFrom(GLGPU* gpu, CVPixelBufferRef pixelBuffer,
-                                                           uint32_t usage,
-                                                           CVOpenGLTextureCacheRef textureCache);
+  static std::vector<std::shared_ptr<Texture>> MakeFrom(GLGPU* gpu, CVPixelBufferRef pixelBuffer,
+                                                        uint32_t usage,
+                                                        CVOpenGLTextureCacheRef textureCache);
 
   ~CGLHardwareTexture() override;
 
@@ -42,7 +42,7 @@ class CGLHardwareTexture : public GLTexture {
   CVOpenGLTextureRef texture = nil;
   CVOpenGLTextureCacheRef textureCache = nil;
 
-  CGLHardwareTexture(const GPUTextureDescriptor& descriptor, CVPixelBufferRef pixelBuffer,
+  CGLHardwareTexture(const TextureDescriptor& descriptor, CVPixelBufferRef pixelBuffer,
                      CVOpenGLTextureCacheRef textureCache, unsigned target, unsigned textureID);
 
   friend class GLGPU;

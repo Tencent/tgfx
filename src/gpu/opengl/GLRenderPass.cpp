@@ -110,8 +110,8 @@ void GLRenderPass::setUniformBuffer(unsigned binding, std::shared_ptr<GPUBuffer>
                                    size);
 }
 
-void GLRenderPass::setTexture(unsigned binding, std::shared_ptr<GPUTexture> texture,
-                              std::shared_ptr<GPUSampler> sampler) {
+void GLRenderPass::setTexture(unsigned binding, std::shared_ptr<Texture> texture,
+                              std::shared_ptr<Sampler> sampler) {
   if (texture == nullptr) {
     return;
   }

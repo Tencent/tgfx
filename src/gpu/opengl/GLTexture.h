@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "gpu/GPUTexture.h"
+#include "gpu/Texture.h"
 #include "gpu/opengl/GLInterface.h"
 #include "gpu/opengl/GLResource.h"
 #include "gpu/opengl/GLSampler.h"
@@ -27,15 +27,15 @@ namespace tgfx {
 class GLGPU;
 
 /**
- * GLTexture is a GPUTexture that wraps an OpenGL texture, providing access to its OpenGL texture ID
+ * GLTexture is a Texture that wraps an OpenGL texture, providing access to its OpenGL texture ID
  * and target.
  */
-class GLTexture : public GPUTexture, public GLResource {
+class GLTexture : public Texture, public GLResource {
  public:
   /**
    * Creates a GLTexture with the specified descriptor, OpenGL target, and texture ID.
    */
-  GLTexture(const GPUTextureDescriptor& descriptor, unsigned target, unsigned textureID);
+  GLTexture(const TextureDescriptor& descriptor, unsigned target, unsigned textureID);
 
   /**
    * Returns the OpenGL target for this texture.
@@ -68,7 +68,7 @@ class GLTexture : public GPUTexture, public GLResource {
    */
   void updateSampler(GLGPU* gpu, const GLSampler* sampler);
 
-  GPUTextureType type() const override;
+  TextureType type() const override;
 
   BackendTexture getBackendTexture() const override;
 

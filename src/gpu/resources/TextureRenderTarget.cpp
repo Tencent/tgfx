@@ -20,7 +20,7 @@
 #include "core/utils/Log.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/GPU.h"
-#include "gpu/GPUTexture.h"
+#include "gpu/Texture.h"
 
 namespace tgfx {
 static ScratchKey ComputeRenderTargetScratchKey(int width, int height, PixelFormat format,
@@ -44,7 +44,7 @@ std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
   if (context == nullptr) {
     return nullptr;
   }
-  uint32_t usage = GPUTextureUsage::TEXTURE_BINDING | GPUTextureUsage::RENDER_ATTACHMENT;
+  uint32_t usage = TextureUsage::TEXTURE_BINDING | TextureUsage::RENDER_ATTACHMENT;
   auto texture = context->gpu()->importBackendTexture(backendTexture, usage, adopted);
   if (texture == nullptr) {
     return nullptr;
@@ -72,7 +72,7 @@ std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
     return nullptr;
   }
   auto gpu = context->gpu();
-  uint32_t usage = GPUTextureUsage::TEXTURE_BINDING | GPUTextureUsage::RENDER_ATTACHMENT;
+  uint32_t usage = TextureUsage::TEXTURE_BINDING | TextureUsage::RENDER_ATTACHMENT;
   auto textures = gpu->importHardwareTextures(hardwareBuffer, usage);
   if (textures.size() != 1) {
     return nullptr;
@@ -96,9 +96,9 @@ std::shared_ptr<RenderTarget> RenderTarget::Make(Context* context, int width, in
     renderTarget->_origin = origin;
     return renderTarget;
   }
-  GPUTextureDescriptor descriptor = {
+  TextureDescriptor descriptor = {
       width,     height, format,
-      mipmapped, 1,      GPUTextureUsage::TEXTURE_BINDING | GPUTextureUsage::RENDER_ATTACHMENT};
+      mipmapped, 1,      TextureUsage::TEXTURE_BINDING | TextureUsage::RENDER_ATTACHMENT};
   auto texture = gpu->createTexture(descriptor);
   if (texture == nullptr) {
     return nullptr;
@@ -108,17 +108,17 @@ std::shared_ptr<RenderTarget> RenderTarget::Make(Context* context, int width, in
 }
 
 std::shared_ptr<RenderTarget> TextureRenderTarget::MakeFrom(Context* context,
-                                                            std::shared_ptr<GPUTexture> texture,
+                                                            std::shared_ptr<Texture> texture,
                                                             int sampleCount, ImageOrigin origin,
                                                             bool externallyOwned,
                                                             const ScratchKey& scratchKey) {
   DEBUG_ASSERT(context != nullptr);
   DEBUG_ASSERT(texture != nullptr);
-  std::shared_ptr<GPUTexture> renderTexture = nullptr;
+  std::shared_ptr<Texture> renderTexture = nullptr;
   if (sampleCount > 1) {
-    GPUTextureDescriptor descriptor = {texture->width(),  texture->height(),
-                                       texture->format(), false,
-                                       sampleCount,       GPUTextureUsage::RENDER_ATTACHMENT};
+    TextureDescriptor descriptor = {texture->width(),  texture->height(),
+                                    texture->format(), false,
+                                    sampleCount,       TextureUsage::RENDER_ATTACHMENT};
     renderTexture = context->gpu()->createTexture(descriptor);
     if (renderTexture == nullptr) {
       return nullptr;

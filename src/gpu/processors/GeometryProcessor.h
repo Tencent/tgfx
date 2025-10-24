@@ -21,9 +21,9 @@
 #include <vector>
 #include "gpu/Attribute.h"
 #include "gpu/FragmentShaderBuilder.h"
-#include "gpu/GPUTexture.h"
 #include "gpu/ShaderCaps.h"
 #include "gpu/ShaderVar.h"
+#include "gpu/Texture.h"
 #include "gpu/UniformData.h"
 #include "gpu/VaryingHandler.h"
 #include "gpu/VertexShaderBuilder.h"
@@ -94,7 +94,7 @@ class GeometryProcessor : public Processor {
     return textureSamplerCount;
   }
 
-  std::shared_ptr<GPUTexture> textureAt(size_t index) const {
+  std::shared_ptr<Texture> textureAt(size_t index) const {
     return onTextureAt(index);
   }
 
@@ -130,7 +130,7 @@ class GeometryProcessor : public Processor {
   virtual void onComputeProcessorKey(BytesKey*) const {
   }
 
-  virtual std::shared_ptr<GPUTexture> onTextureAt(size_t) const {
+  virtual std::shared_ptr<Texture> onTextureAt(size_t) const {
     return nullptr;
   }
 

@@ -37,17 +37,17 @@ std::string UniformHandler::addUniform(const std::string& name, UniformFormat fo
   return uniformName;
 }
 
-SamplerHandle UniformHandler::addSampler(std::shared_ptr<GPUTexture> texture,
+SamplerHandle UniformHandler::addSampler(std::shared_ptr<Texture> texture,
                                          const std::string& name) {
   // The same texture can be added multiple times, each with a different name.
   UniformFormat format;
   switch (texture->type()) {
-    case GPUTextureType::External:
+    case TextureType::External:
       programBuilder->fragmentShaderBuilder()->addFeature(PrivateFeature::OESTexture,
                                                           OES_TEXTURE_EXTENSION);
       format = UniformFormat::TextureExternalSampler;
       break;
-    case GPUTextureType::Rectangle:
+    case TextureType::Rectangle:
       format = UniformFormat::Texture2DRectSampler;
       break;
     default:

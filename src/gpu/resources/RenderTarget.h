@@ -113,15 +113,15 @@ class RenderTarget {
   virtual bool externallyOwned() const = 0;
 
   /**
-   * Returns the underlying GPUTexture that can be used for rendering. This may be the same as
+   * Returns the underlying GPU texture that can be used for rendering. This may be the same as
    * getSampleTexture(), or a different texture if MSAA is enabled on the render target.
    */
-  virtual std::shared_ptr<GPUTexture> getRenderTexture() const = 0;
+  virtual std::shared_ptr<Texture> getRenderTexture() const = 0;
 
   /**
-   * Returns the underlying GPUTexture used for sampling in shaders or reading pixels.
+   * Returns the underlying GPU texture used for sampling in shaders or reading pixels.
    */
-  virtual std::shared_ptr<GPUTexture> getSampleTexture() const = 0;
+  virtual std::shared_ptr<Texture> getSampleTexture() const = 0;
 
   /**
    * Returns a reference to the underlying texture representation of this render target, may be

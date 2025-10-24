@@ -19,7 +19,7 @@
 #pragma once
 
 #include <array>
-#include "gpu/GPUTexture.h"
+#include "gpu/Texture.h"
 #include "gpu/YUVFormat.h"
 #include "gpu/resources/TextureView.h"
 #include "tgfx/core/YUVColorSpace.h"
@@ -44,19 +44,19 @@ class YUVTextureView : public TextureView {
     return _colorSpace;
   }
 
-  std::shared_ptr<GPUTexture> getTexture() const override {
+  std::shared_ptr<Texture> getTexture() const override {
     return textures.front();
   }
 
   /**
-   * Returns the number of GPUTextures in the texture view.
+   * Returns the number of Textures in the texture view.
    */
   size_t textureCount() const;
 
   /**
-   * Returns the GPUTexture at the specified index.
+   * Returns the Texture at the specified index.
    */
-  std::shared_ptr<GPUTexture> getTextureAt(size_t index) const;
+  std::shared_ptr<Texture> getTextureAt(size_t index) const;
 
   bool isAlphaOnly() const override {
     return false;
@@ -79,11 +79,11 @@ class YUVTextureView : public TextureView {
   }
 
  protected:
-  YUVTextureView(std::vector<std::shared_ptr<GPUTexture>> yuvTextures, YUVFormat yuvFormat,
+  YUVTextureView(std::vector<std::shared_ptr<Texture>> yuvTextures, YUVFormat yuvFormat,
                  YUVColorSpace colorSpace);
 
  private:
-  std::array<std::shared_ptr<GPUTexture>, 3> textures = {};
+  std::array<std::shared_ptr<Texture>, 3> textures = {};
   YUVFormat _yuvFormat = YUVFormat::Unknown;
   YUVColorSpace _colorSpace = YUVColorSpace::BT601_LIMITED;
 

@@ -22,7 +22,7 @@
 #include "tgfx/platform/android/Global.h"
 
 namespace tgfx {
-class GPUTexture;
+class Texture;
 
 /**
  * The SurfaceTexture class allows direct access to image data rendered into the Java Surface object

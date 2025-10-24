@@ -156,7 +156,7 @@ void GLState::setBlendState(const GLBlendState& state) {
 
 void GLState::bindTexture(GLTexture* texture, unsigned textureUnit) {
   DEBUG_ASSERT(texture != nullptr);
-  DEBUG_ASSERT(texture->usage() & GPUTextureUsage::TEXTURE_BINDING);
+  DEBUG_ASSERT(texture->usage() & TextureUsage::TEXTURE_BINDING);
   auto& uniqueID = textureUnits[textureUnit];
   if (uniqueID == texture->uniqueID) {
     return;
