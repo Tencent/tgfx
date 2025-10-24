@@ -76,8 +76,9 @@ std::shared_ptr<YUVHardwareBuffer> YUVHardwareBuffer::MakeFrom(HardwareBufferRef
 }
 
 YUVHardwareBuffer::YUVHardwareBuffer(int width, int height, HardwareBufferRef hardwareBuffer,
-                                     YUVColorSpace colorSpace)
-    : _width(width), _height(height), hardwareBuffer(hardwareBuffer), _yuvColorSpace(colorSpace) {
+                                     YUVColorSpace yuvColorSpace)
+    : _width(width), _height(height), hardwareBuffer(hardwareBuffer), _yuvColorSpace(yuvColorSpace),
+      _colorSpace(MakeColorSpaceFromYUVColorSpace(yuvColorSpace)) {
   HardwareBufferRetain(hardwareBuffer);
 }
 
@@ -88,9 +89,6 @@ YUVHardwareBuffer::~YUVHardwareBuffer() {
 }
 
 std::shared_ptr<ColorSpace> YUVHardwareBuffer::colorSpace() const {
-  if (_colorSpace == nullptr) {
-    _colorSpace = MakeColorSpaceFromYUVColorSpace(_yuvColorSpace);
-  }
   return _colorSpace;
 }
 

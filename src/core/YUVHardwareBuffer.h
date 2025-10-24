@@ -53,11 +53,11 @@ class YUVHardwareBuffer : public ImageBuffer {
   int _width = 0;
   int _height = 0;
   HardwareBufferRef hardwareBuffer = nullptr;
-  mutable std::shared_ptr<ColorSpace> _colorSpace = nullptr;
+  std::shared_ptr<ColorSpace> _colorSpace = nullptr;
   YUVColorSpace _yuvColorSpace = YUVColorSpace::BT601_LIMITED;
 
   YUVHardwareBuffer(int width, int height, HardwareBufferRef hardwareBuffer,
-                    YUVColorSpace colorSpace);
+                    YUVColorSpace yuvColorSpace);
 };
 
 }  // namespace tgfx

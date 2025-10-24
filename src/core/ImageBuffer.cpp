@@ -29,8 +29,9 @@ namespace tgfx {
  */
 class YUVBuffer : public ImageBuffer {
  public:
-  YUVBuffer(std::shared_ptr<YUVData> data, YUVFormat format, YUVColorSpace colorSpace)
-      : data(std::move(data)), _yuvColorSpace(colorSpace), format(format) {
+  YUVBuffer(std::shared_ptr<YUVData> data, YUVFormat format, YUVColorSpace yuvColorSpace)
+      : data(std::move(data)), _yuvColorSpace(yuvColorSpace), format(format),
+        _colorSpace(MakeColorSpaceFromYUVColorSpace(yuvColorSpace)) {
   }
 
   int width() const override {
@@ -57,15 +58,12 @@ class YUVBuffer : public ImageBuffer {
 
  private:
   std::shared_ptr<YUVData> data = nullptr;
-  mutable std::shared_ptr<ColorSpace> _colorSpace = nullptr;
+  std::shared_ptr<ColorSpace> _colorSpace = nullptr;
   YUVColorSpace _yuvColorSpace = YUVColorSpace::BT601_LIMITED;
   YUVFormat format = YUVFormat::Unknown;
 };
 
 std::shared_ptr<ColorSpace> YUVBuffer::colorSpace() const {
-  if (_colorSpace == nullptr) {
-    _colorSpace = MakeColorSpaceFromYUVColorSpace(_yuvColorSpace);
-  }
   return _colorSpace;
 }
 
