@@ -19,8 +19,10 @@
 #include "PixelRef.h"
 
 namespace tgfx {
-std::shared_ptr<PixelRef> PixelRef::Make(int width, int height, bool alphaOnly, bool tryHardware) {
-  auto pixelBuffer = PixelBuffer::Make(width, height, alphaOnly, tryHardware);
+std::shared_ptr<PixelRef> PixelRef::Make(int width, int height, bool alphaOnly, bool tryHardware,
+                                         std::shared_ptr<ColorSpace> colorSpace) {
+  auto pixelBuffer =
+      PixelBuffer::Make(width, height, alphaOnly, tryHardware, std::move(colorSpace));
   return Wrap(std::move(pixelBuffer));
 }
 
@@ -42,7 +44,7 @@ void* PixelRef::lockWritablePixels() {
   if (pixelBuffer.use_count() != 1) {
     auto& info = pixelBuffer->info();
     auto newBuffer = PixelBuffer::Make(info.width(), info.height(), info.isAlphaOnly(),
-                                       pixelBuffer->isHardwareBacked());
+                                       pixelBuffer->isHardwareBacked(), pixelBuffer->colorSpace());
     if (newBuffer == nullptr) {
       pixelBuffer->unlockPixels();
       return nullptr;

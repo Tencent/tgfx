@@ -21,17 +21,22 @@
 
 namespace tgfx {
 std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(const ImageInfo& info,
-                                                 std::shared_ptr<Data> pixels) {
+                                                 std::shared_ptr<Data> pixels,
+                                                 std::shared_ptr<ColorSpace> colorSpace) {
   if (info.isEmpty() || pixels == nullptr || info.byteSize() > pixels->size()) {
     return nullptr;
   }
-  return std::make_shared<RawPixelCodec>(info, std::move(pixels));
+  return std::make_shared<RawPixelCodec>(info, std::move(pixels), std::move(colorSpace));
 }
 
 class RawPixelData : public ImageBuffer {
  public:
-  RawPixelData(const ImageInfo& info, std::shared_ptr<Data> pixels)
-      : info(info), pixels(std::move(pixels)) {
+  RawPixelData(const ImageInfo& info, std::shared_ptr<Data> pixels,
+               std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB())
+      : info(info), pixels(std::move(pixels)), _colorSpace(std::move(colorSpace)) {
+    if (info.colorType() == ColorType::ALPHA_8) {
+      _colorSpace = nullptr;
+    }
   }
 
   int width() const override {
@@ -44,6 +49,10 @@ class RawPixelData : public ImageBuffer {
 
   bool isAlphaOnly() const override {
     return info.isAlphaOnly();
+  }
+
+  std::shared_ptr<ColorSpace> colorSpace() const override {
+    return _colorSpace;
   }
 
  protected:
@@ -66,6 +75,7 @@ class RawPixelData : public ImageBuffer {
  private:
   ImageInfo info = {};
   std::shared_ptr<Data> pixels = nullptr;
+  std::shared_ptr<ColorSpace> _colorSpace = ColorSpace::MakeSRGB();
 };
 
 std::shared_ptr<ImageBuffer> RawPixelCodec::onMakeBuffer(bool tryHardware) const {
@@ -74,7 +84,7 @@ std::shared_ptr<ImageBuffer> RawPixelCodec::onMakeBuffer(bool tryHardware) const
       case ColorType::ALPHA_8:
       case ColorType::RGBA_8888:
       case ColorType::BGRA_8888:
-        return std::make_shared<RawPixelData>(info, pixels);
+        return std::make_shared<RawPixelData>(info, pixels, colorSpace());
       default:
         return nullptr;
     }

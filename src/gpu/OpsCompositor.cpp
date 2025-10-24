@@ -30,6 +30,7 @@
 #include "gpu/processors/AARectEffect.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "inspect/InspectorMark.h"
+#include "processors/ColorSpaceXFormEffect.h"
 #include "processors/PorterDuffXferProcessor.h"
 
 namespace tgfx {
@@ -55,9 +56,10 @@ static bool HasDifferentViewMatrix(const std::vector<PlacementPtr<RectRecord>>& 
 }
 
 OpsCompositor::OpsCompositor(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags,
-                             std::optional<Color> clearColor)
+                             std::optional<Color> clearColor,
+                             std::shared_ptr<ColorSpace> colorSpace)
     : context(proxy->getContext()), renderTarget(std::move(proxy)), renderFlags(renderFlags),
-      clearColor(clearColor) {
+      clearColor(clearColor), dstColorSpace(std::move(colorSpace)) {
   DEBUG_ASSERT(renderTarget != nullptr);
 }
 
@@ -388,7 +390,12 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
     FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty()),
                    drawScale.value_or(1.0f)};
     auto processor =
-        FragmentProcessor::Make(std::move(pendingImage), args, pendingSampling, pendingConstraint);
+        FragmentProcessor::Make(pendingImage, args, pendingSampling, pendingConstraint);
+    if (!pendingImage->isAlphaOnly()) {
+      processor = ColorSpaceXformEffect::Make(
+          context->drawingBuffer(), std::move(processor), pendingImage->colorSpace().get(),
+          AlphaType::Premultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
+    }
     if (processor == nullptr) {
       return;
     }
@@ -643,7 +650,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const F
 
   FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty()), drawScale};
   if (fill.shader) {
-    if (auto processor = FragmentProcessor::Make(fill.shader, args)) {
+    if (auto processor = FragmentProcessor::Make(fill.shader, args, nullptr, dstColorSpace)) {
       op->addColorFP(std::move(processor));
     } else {
       // The shader is the main source of color, so if it fails to create a processor, we can't
@@ -652,7 +659,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const F
     }
   }
   if (fill.colorFilter) {
-    if (auto processor = fill.colorFilter->asFragmentProcessor(context)) {
+    if (auto processor = fill.colorFilter->asFragmentProcessor(context, dstColorSpace)) {
       op->addColorFP(std::move(processor));
     }
   }

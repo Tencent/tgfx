@@ -44,6 +44,8 @@ class YUVHardwareBuffer : public ImageBuffer {
     return false;
   }
 
+  std::shared_ptr<ColorSpace> colorSpace() const override;
+
  protected:
   std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) const override;
 
@@ -51,10 +53,11 @@ class YUVHardwareBuffer : public ImageBuffer {
   int _width = 0;
   int _height = 0;
   HardwareBufferRef hardwareBuffer = nullptr;
-  YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED;
+  YUVColorSpace _yuvColorSpace = YUVColorSpace::BT601_LIMITED;
+  std::shared_ptr<ColorSpace> _colorSpace = nullptr;
 
   YUVHardwareBuffer(int width, int height, HardwareBufferRef hardwareBuffer,
-                    YUVColorSpace colorSpace);
+                    YUVColorSpace yuvColorSpace);
 };
 
 }  // namespace tgfx

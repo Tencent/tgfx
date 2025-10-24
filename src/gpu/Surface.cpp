@@ -84,7 +84,8 @@ std::shared_ptr<Surface> Surface::MakeFrom(std::shared_ptr<RenderTargetProxy> re
 Surface::Surface(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags, bool clearAll)
     : _uniqueID(UniqueID::Next()) {
   DEBUG_ASSERT(proxy != nullptr);
-  renderContext = new RenderContext(std::move(proxy), renderFlags, clearAll, this);
+  renderContext =
+      new RenderContext(std::move(proxy), renderFlags, clearAll, this, ColorSpace::MakeSRGB());
 }
 
 Surface::~Surface() {
@@ -166,7 +167,7 @@ std::shared_ptr<Image> Surface::makeImageSnapshot() {
     textureProxy = renderTarget->makeTextureProxy();
     drawingManager->addRenderTargetCopyTask(renderTarget, textureProxy);
   }
-  cachedImage = TextureImage::Wrap(std::move(textureProxy));
+  cachedImage = TextureImage::Wrap(std::move(textureProxy), colorSpace());
   return cachedImage;
 }
 
@@ -228,6 +229,10 @@ bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, in
   CopyPixels(srcInfo, srcPixels, outInfo, dstPixels, flipY);
   readback->unlockPixels(context);
   return true;
+}
+
+std::shared_ptr<ColorSpace> Surface::colorSpace() const {
+  return renderContext->colorSpace();
 }
 
 bool Surface::aboutToDraw(bool discardContent) {

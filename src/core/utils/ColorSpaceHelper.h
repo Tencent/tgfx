@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,25 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
-#include "tgfx/core/ColorFilter.h"
+#include "tgfx/core/ColorSpace.h"
+#include "tgfx/core/YUVColorSpace.h"
 
 namespace tgfx {
-class AlphaThresholdColorFilter : public ColorFilter {
- public:
-  explicit AlphaThresholdColorFilter(float threshold) : threshold(threshold){};
+std::shared_ptr<ColorSpace> MakeColorSpaceFromYUVColorSpace(YUVColorSpace yuvColorSpace);
 
-  float threshold = 0.0f;
-
- protected:
-  Type type() const override {
-    return Type::AlphaThreshold;
-  }
-
-  bool isEqual(const ColorFilter* colorFilter) const override;
-
- private:
-  PlacementPtr<FragmentProcessor> asFragmentProcessor(
-      Context* context, std::shared_ptr<ColorSpace> dstColorSpace) const override;
-};
+std::shared_ptr<ColorSpace> AndroidDataSpaceToColorSpace(int standard, int transfer);
 }  // namespace tgfx

@@ -174,8 +174,9 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string& fileP
   }
   env->SetBooleanField(options, BitmapFactoryOptions_inJustDecodeBounds, true);
   auto imagePath = SafeToJString(env, filePath);
-  env->CallStaticObjectMethod(BitmapFactoryClass.get(), BitmapFactory_decodeFile, imagePath,
-                              options);
+  auto bitmap = env->CallStaticObjectMethod(BitmapFactoryClass.get(), BitmapFactory_decodeFile,
+                                            imagePath, options);
+  auto colorSpace = AndroidBitmap::GetColorSpace(env, bitmap);
   if (env->ExceptionCheck()) {
     return nullptr;
   }
@@ -192,7 +193,8 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string& fileP
         env->NewObject(ExifInterfaceClass.get(), ExifInterface_Constructor_Path, imagePath);
   }
   auto origin = GetOrientation(env, exifInterface);
-  auto codec = std::shared_ptr<NativeCodec>(new NativeCodec(width, height, origin));
+  auto codec =
+      std::shared_ptr<NativeCodec>(new NativeCodec(width, height, origin, std::move(colorSpace)));
   codec->imagePath = filePath;
   return codec;
 }
@@ -216,8 +218,9 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data> im
   auto byteArray = env->NewByteArray(byteSize);
   env->SetByteArrayRegion(byteArray, 0, byteSize,
                           reinterpret_cast<const jbyte*>(imageBytes->data()));
-  env->CallStaticObjectMethod(BitmapFactoryClass.get(), BitmapFactory_decodeByteArray, byteArray, 0,
-                              byteSize, options);
+  auto bitmap = env->CallStaticObjectMethod(BitmapFactoryClass.get(), BitmapFactory_decodeByteArray,
+                                            byteArray, 0, byteSize, options);
+  auto colorSpace = AndroidBitmap::GetColorSpace(env, bitmap);
   if (env->ExceptionCheck()) {
     return nullptr;
   }
@@ -236,7 +239,8 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data> im
         env->NewObject(ExifInterfaceClass.get(), ExifInterface_Constructor_Stream, inputStream);
   }
   auto origin = GetOrientation(env, exifInterface);
-  auto codec = std::shared_ptr<NativeCodec>(new NativeCodec(width, height, origin));
+  auto codec =
+      std::shared_ptr<NativeCodec>(new NativeCodec(width, height, origin, std::move(colorSpace)));
   codec->imageBytes = imageBytes;
   return codec;
 }
@@ -255,8 +259,9 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(NativeImageRef nativeImage) {
   if (info.isEmpty()) {
     return nullptr;
   }
+  auto colorSpace = AndroidBitmap::GetColorSpace(env, nativeImage);
   auto image = std::shared_ptr<NativeCodec>(
-      new NativeCodec(info.width(), info.height(), Orientation::TopLeft));
+      new NativeCodec(info.width(), info.height(), Orientation::TopLeft, std::move(colorSpace)));
   image->nativeImage = nativeImage;
   return image;
 }
@@ -329,9 +334,10 @@ std::shared_ptr<ImageBuffer> NativeCodec::onMakeBuffer(bool tryHardware) const {
     return nullptr;
   }
   auto bitmap = decodeBitmap(env, ColorType::RGBA_8888, AlphaType::Premultiplied, tryHardware);
+  auto colorSpace = AndroidBitmap::GetColorSpace(env, bitmap);
   if (tryHardware) {
     auto hardwareBuffer = AndroidBitmap::GetHardwareBuffer(env, nativeImage.get());
-    auto imageBuffer = PixelBuffer::MakeFrom(hardwareBuffer);
+    auto imageBuffer = PixelBuffer::MakeFrom(hardwareBuffer, colorSpace);
     if (imageBuffer != nullptr) {
       return imageBuffer;
     }

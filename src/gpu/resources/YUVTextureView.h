@@ -40,7 +40,7 @@ class YUVTextureView : public TextureView {
   /**
    * The color space of the texture view.
    */
-  YUVColorSpace colorSpace() const {
+  YUVColorSpace yuvColorSpace() const {
     return _colorSpace;
   }
 

@@ -173,7 +173,7 @@ void GLSLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
     fragBuilder->appendTextureLookup(textureSamplers[1], finalCoordName);
     fragBuilder->codeAppend(".ra;");
   }
-  if (IsLimitedYUVColorRange(yuvTexture->colorSpace())) {
+  if (IsLimitedYUVColorRange(yuvTexture->yuvColorSpace())) {
     fragBuilder->codeAppend("yuv.x -= (16.0 / 255.0);");
   }
   fragBuilder->codeAppend("yuv.yz -= vec2(0.5, 0.5);");
@@ -210,7 +210,7 @@ void GLSLTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
   auto yuvTexture = getYUVTexture();
   if (yuvTexture) {
     std::string mat3ColorConversion = "Mat3ColorConversion";
-    switch (yuvTexture->colorSpace()) {
+    switch (yuvTexture->yuvColorSpace()) {
       case YUVColorSpace::BT601_LIMITED: {
         fragmentUniformData->setData(mat3ColorConversion, AlignMat3(ColorConversion601LimitRange));
       } break;
