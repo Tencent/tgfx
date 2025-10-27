@@ -736,7 +736,7 @@ bool ColorSpace::gammaIsLinear() const {
 }
 
 bool ColorSpace::isNumericalTransferFunction(TransferFunction* function) const {
-  this->transferFunction(function);
+  *function = this->transferFunction();
   return gfx::skcms_TransferFunction_getType(
              reinterpret_cast<gfx::skcms_TransferFunction*>(function)) == gfx::skcms_TFType_sRGBish;
 }
@@ -814,13 +814,13 @@ bool ColorSpace::Equals(const ColorSpace* colorSpaceA, const ColorSpace* colorSp
   return false;
 }
 
-void ColorSpace::transferFunction(TransferFunction* function) const {
-  *function = _transferFunction;
+TransferFunction ColorSpace::transferFunction() const {
+  return _transferFunction;
 }
 
-void ColorSpace::invTransferFunction(TransferFunction* function) const {
+TransferFunction ColorSpace::inverseTransferFunction() const {
   computeLazyDstFields();
-  *function = _invTransferFunction;
+  return _invTransferFunction;
 }
 
 void ColorSpace::gamutTransformTo(const ColorSpace* dst, ColorMatrix33* srcToDst) const {
