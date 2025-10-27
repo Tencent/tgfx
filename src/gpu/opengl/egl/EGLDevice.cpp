@@ -50,11 +50,11 @@ static EGLSurface CreateFixedSizeSurfaceForAngle(EGLNativeWindowType nativeWindo
   GetClientRect(nativeWindow, &rect);
   auto width = static_cast<int>(rect.right - rect.left);
   auto height = static_cast<int>(rect.bottom - rect.top);
-  std::vector<EGLint> attributes = {
-      EGL_FIXED_SIZE_ANGLE, EGL_TRUE, EGL_WIDTH, width, EGL_HEIGHT, height, EGL_NONE,
-  };
+  std::vector<EGLint> attributes = {EGL_FIXED_SIZE_ANGLE, EGL_TRUE, EGL_WIDTH, width,
+                                    EGL_HEIGHT,           height};
   attributes.insert(attributes.end(), eglGlobals->windowSurfaceAttributes.begin(),
                     eglGlobals->windowSurfaceAttributes.end());
+  attributes.push_back(EGL_NONE);
   return eglCreateWindowSurface(eglGlobals->display, eglGlobals->windowConfig, nativeWindow,
                                 attributes.data());
 }
@@ -73,8 +73,10 @@ std::shared_ptr<GLDevice> GLDevice::Current() {
 
 std::shared_ptr<GLDevice> GLDevice::Make(void* sharedContext) {
   auto eglGlobals = EGLGlobals::Get();
-  auto eglSurface = eglCreatePbufferSurface(eglGlobals->display, eglGlobals->pbufferConfig,
-                                            eglGlobals->pbufferSurfaceAttributes.data());
+  std::vector<EGLint> attributes = eglGlobals->pbufferSurfaceAttributes;
+  attributes.push_back(EGL_NONE);
+  auto eglSurface =
+      eglCreatePbufferSurface(eglGlobals->display, eglGlobals->pbufferConfig, attributes.data());
   if (eglSurface == nullptr) {
     LOGE("GLDevice::Make() eglCreatePbufferSurface error=%d", eglGetError());
     return nullptr;
@@ -105,9 +107,10 @@ std::shared_ptr<EGLDevice> EGLDevice::MakeFrom(EGLNativeWindowType nativeWindow,
 #if defined(_WIN32)
   auto eglSurface = CreateFixedSizeSurfaceForAngle(nativeWindow, eglGlobals);
 #else
-  auto eglSurface =
-      eglCreateWindowSurface(eglGlobals->display, eglGlobals->windowConfig, nativeWindow,
-                             eglGlobals->windowSurfaceAttributes.data());
+  std::vector<EGLint> attributes = eglGlobals->windowSurfaceAttributes;
+  attributes.push_back(EGL_NONE);
+  auto eglSurface = eglCreateWindowSurface(eglGlobals->display, eglGlobals->windowConfig,
+                                           nativeWindow, attributes.data());
 #endif
   if (eglSurface == nullptr) {
     LOGE("EGLDevice::MakeFrom() eglCreateWindowSurface error=%d", eglGetError());
