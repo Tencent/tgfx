@@ -24,10 +24,6 @@
 #include "EGLDisplayWrapper.h"
 #endif
 
-#ifndef EGL_GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT
-#define EGL_GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT -1
-#endif
-
 namespace tgfx {
 EGLGlobals InitializeEGL() {
   EGLGlobals globals = {};
@@ -38,17 +34,13 @@ EGLGlobals InitializeEGL() {
     globals.display = EGLDisplayWrapper::EGLGetPlatformDisplay();
   } while (eglInitialize(globals.display, &majorVersion, &minorVersion) == EGL_FALSE &&
            EGLDisplayWrapper::HasNext());
-  globals.windowSurfaceAttributes = {EGL_DIRECT_COMPOSITION_ANGLE, EGL_TRUE};
+  globals.windowSurfaceAttributes = {EGL_DIRECT_COMPOSITION_ANGLE, EGL_TRUE, EGL_NONE};
 #else
   globals.display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
   eglInitialize(globals.display, &majorVersion, &minorVersion);
-  const char* extensions = eglQueryString(globals.display, EGL_EXTENSIONS);
-  if (extensions && strstr(extensions, "EGL_EXT_gl_colorspace_display_p3_passthrough")) {
-    globals.windowSurfaceAttributes = {EGL_GL_COLORSPACE_KHR,
-                                       EGL_GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT};
-  }
 #endif
-  globals.pbufferSurfaceAttributes = {EGL_WIDTH, 1, EGL_HEIGHT, 1, EGL_LARGEST_PBUFFER, EGL_TRUE};
+  globals.pbufferSurfaceAttributes = {EGL_WIDTH,           1,        EGL_HEIGHT, 1,
+                                      EGL_LARGEST_PBUFFER, EGL_TRUE, EGL_NONE};
   eglBindAPI(EGL_OPENGL_ES_API);
   EGLint numConfigs = 0;
   const EGLint configAttribs[] = {EGL_SURFACE_TYPE,

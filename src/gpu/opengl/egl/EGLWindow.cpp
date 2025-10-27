@@ -29,10 +29,6 @@
 #include <GLES3/gl3.h>
 #include "core/utils/USE.h"
 
-#ifndef EGL_GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT
-#define EGL_GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT -1
-#endif
-
 namespace tgfx {
 std::shared_ptr<EGLWindow> EGLWindow::Current() {
   auto device = std::static_pointer_cast<EGLDevice>(GLDevice::Current());
@@ -113,16 +109,7 @@ std::shared_ptr<Surface> EGLWindow::onCreateSurface(Context* context) {
   frameBuffer.id = 0;
   frameBuffer.format = GL_RGBA8;
   BackendRenderTarget renderTarget = {frameBuffer, size.width, size.height};
-  std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB();
-  const char* extensions = eglQueryString(eglDevice->eglDisplay, EGL_EXTENSIONS);
-  if (extensions && strstr(extensions, "EGL_KHR_gl_colorspace") != nullptr) {
-    EGLint colorSpaceValue;
-    EGLBoolean success = eglQuerySurface(eglDevice->eglDisplay, eglDevice->eglSurface,
-                                         EGL_GL_COLORSPACE_KHR, &colorSpaceValue);
-    if (success == EGL_TRUE && colorSpaceValue == EGL_GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT) {
-      colorSpace = ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3);
-    }
-  }
+  auto colorSpace = eglDevice->colorSpace();
   return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft, 1, colorSpace);
 }
 

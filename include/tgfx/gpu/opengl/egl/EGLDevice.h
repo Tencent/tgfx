@@ -31,6 +31,7 @@
 #endif
 
 namespace tgfx {
+class ColorSpace;
 class EGLDevice : public GLDevice {
  public:
   /**
@@ -70,6 +71,8 @@ class EGLDevice : public GLDevice {
                                          bool externallyOwned);
 
   EGLDevice(std::unique_ptr<GPU> gpu, void* nativeHandle);
+
+  std::shared_ptr<ColorSpace> colorSpace() const;
 
   friend class GLDevice;
 

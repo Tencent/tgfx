@@ -19,9 +19,23 @@
 #include "tgfx/gpu/opengl/egl/EGLDevice.h"
 #include "core/utils/Log.h"
 #include "gpu/opengl/egl/EGLGPU.h"
+#include "tgfx/core/ColorSpace.h"
 #include "tgfx/gpu/opengl/egl/EGLGlobals.h"
 
+#ifndef EGL_GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT
+#define EGL_GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT -1
+#endif
+
 namespace tgfx {
+static std::vector<EGLint> GetValidAttributes(const std::vector<EGLint>& attributes) {
+  if (!attributes.empty() && attributes.back() == EGL_NONE) {
+    return attributes;
+  }
+  auto tempAttributes = attributes;
+  tempAttributes.push_back(EGL_NONE);
+  return tempAttributes;
+}
+
 static EGLContext CreateContext(EGLContext sharedContext, EGLDisplay eglDisplay,
                                 EGLConfig eglConfig) {
   static const EGLint context3Attributes[] = {EGL_CONTEXT_CLIENT_VERSION, 3, EGL_NONE};
@@ -54,7 +68,7 @@ static EGLSurface CreateFixedSizeSurfaceForAngle(EGLNativeWindowType nativeWindo
                                     EGL_HEIGHT,           height};
   attributes.insert(attributes.end(), eglGlobals->windowSurfaceAttributes.begin(),
                     eglGlobals->windowSurfaceAttributes.end());
-  attributes.push_back(EGL_NONE);
+  attributes = GetValidAttributes(attributes);
   return eglCreateWindowSurface(eglGlobals->display, eglGlobals->windowConfig, nativeWindow,
                                 attributes.data());
 }
@@ -73,8 +87,7 @@ std::shared_ptr<GLDevice> GLDevice::Current() {
 
 std::shared_ptr<GLDevice> GLDevice::Make(void* sharedContext) {
   auto eglGlobals = EGLGlobals::Get();
-  std::vector<EGLint> attributes = eglGlobals->pbufferSurfaceAttributes;
-  attributes.push_back(EGL_NONE);
+  std::vector<EGLint> attributes = GetValidAttributes(eglGlobals->pbufferSurfaceAttributes);
   auto eglSurface =
       eglCreatePbufferSurface(eglGlobals->display, eglGlobals->pbufferConfig, attributes.data());
   if (eglSurface == nullptr) {
@@ -107,8 +120,12 @@ std::shared_ptr<EGLDevice> EGLDevice::MakeFrom(EGLNativeWindowType nativeWindow,
 #if defined(_WIN32)
   auto eglSurface = CreateFixedSizeSurfaceForAngle(nativeWindow, eglGlobals);
 #else
-  std::vector<EGLint> attributes = eglGlobals->windowSurfaceAttributes;
-  attributes.push_back(EGL_NONE);
+  const char* extensions = eglQueryString(eglGlobals->display, EGL_EXTENSIONS);
+  std::vector<EGLint> attributes = GetValidAttributes(eglGlobals->windowSurfaceAttributes);
+  if (extensions && strstr(extensions, "EGL_EXT_gl_colorspace_display_p3_passthrough")) {
+    attributes.insert(attributes.end() - 1,
+                      {EGL_GL_COLORSPACE_KHR, EGL_GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT});
+  }
   auto eglSurface = eglCreateWindowSurface(eglGlobals->display, eglGlobals->windowConfig,
                                            nativeWindow, attributes.data());
 #endif
@@ -232,5 +249,19 @@ void EGLDevice::onUnlockContext() {
     // 可能失败。
     eglMakeCurrent(oldEglDisplay, oldEglDrawSurface, oldEglReadSurface, oldEglContext);
   }
+}
+
+std::shared_ptr<ColorSpace> EGLDevice::colorSpace() const {
+  std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB();
+  const char* extensions = eglQueryString(eglDisplay, EGL_EXTENSIONS);
+  if (extensions && strstr(extensions, "EGL_KHR_gl_colorspace") != nullptr) {
+    EGLint colorSpaceValue;
+    EGLBoolean success =
+        eglQuerySurface(eglDisplay, eglSurface, EGL_GL_COLORSPACE_KHR, &colorSpaceValue);
+    if (success == EGL_TRUE && colorSpaceValue == EGL_GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT) {
+      colorSpace = ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3);
+    }
+  }
+  return colorSpace;
 }
 }  // namespace tgfx
