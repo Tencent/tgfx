@@ -30,7 +30,7 @@ namespace tgfx {
 static constexpr float DefaultTolerance = 0.25f;
 
 // https://chromium-review.googlesource.com/c/chromium/src/+/1099564/
-static constexpr int AA_TESSELLATOR_MAX_VERB_COUNT = 100;
+// static constexpr int AA_TESSELLATOR_MAX_VERB_COUNT = 100;
 
 // A factor used to estimate the memory size of a tessellated path, based on the average value of
 // Buffer.size() / Path.countPoints() from 4300+ tessellated path data.
@@ -39,9 +39,9 @@ static constexpr int AA_TESSELLATOR_BUFFER_SIZE_FACTOR = 170;
 static constexpr int MaxRasterizedTextureSize = 4096;
 
 bool PathTriangulator::ShouldTriangulatePath(const Path& path) {
-  if (path.countVerbs() <= AA_TESSELLATOR_MAX_VERB_COUNT) {
-    return true;
-  }
+  // if (path.countVerbs() <= AA_TESSELLATOR_MAX_VERB_COUNT) {
+  //   return true;
+  // }
   auto bounds = path.getBounds();
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
