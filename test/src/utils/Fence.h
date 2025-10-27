@@ -21,9 +21,9 @@
 #include <mutex>
 
 namespace tgfx {
-class Semaphore {
+class Fence {
  public:
-  explicit Semaphore(int count) : count(count) {
+  explicit Fence(int count) : count(count) {
   }
 
   void signal();

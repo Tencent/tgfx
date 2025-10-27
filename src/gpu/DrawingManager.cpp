@@ -17,10 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawingManager.h"
-#include "GPU.h"
 #include "ProxyProvider.h"
 #include "core/AtlasCellDecodeTask.h"
 #include "core/AtlasManager.h"
+#include "core/utils/HardwareBufferUtil.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/tasks/GenerateMipmapsTask.h"
@@ -28,6 +28,7 @@
 #include "gpu/tasks/RuntimeDrawTask.h"
 #include "inspect/InspectorMark.h"
 #include "tasks/TransferPixelsTask.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 static ColorType GetAtlasColorType(bool isAlphaOnly) {
@@ -75,8 +76,9 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
 
 std::shared_ptr<OpsCompositor> DrawingManager::addOpsCompositor(
     std::shared_ptr<RenderTargetProxy> target, uint32_t renderFlags,
-    std::optional<Color> clearColor) {
-  auto compositor = std::make_shared<OpsCompositor>(std::move(target), renderFlags, clearColor);
+    std::optional<Color> clearColor, std::shared_ptr<ColorSpace> colorSpace) {
+  auto compositor = std::make_shared<OpsCompositor>(std::move(target), renderFlags, clearColor,
+                                                    std::move(colorSpace));
   compositors.push_back(compositor);
   compositor->cachedPosition = --compositors.end();
   return compositor;
@@ -96,7 +98,7 @@ void DrawingManager::addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderT
 }
 
 void DrawingManager::addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> renderTarget,
-                                        std::vector<std::shared_ptr<TextureProxy>> inputs,
+                                        std::vector<RuntimeInputTexture> inputs,
                                         std::shared_ptr<RuntimeEffect> effect,
                                         const Point& offset) {
   if (renderTarget == nullptr || inputs.empty() || effect == nullptr) {
@@ -158,7 +160,7 @@ void DrawingManager::addAtlasCellCodecTask(const std::shared_ptr<TextureProxy>& 
   ImageInfo dstInfo = {};
   auto hardwareBuffer = textureProxy->getHardwareBuffer();
   if (hardwareBuffer != nullptr) {
-    auto hardwareInfo = HardwareBufferGetInfo(hardwareBuffer);
+    auto hardwareInfo = GetImageInfo(hardwareBuffer);
     dstInfo = hardwareInfo.makeIntersect(0, 0, dstWidth, dstHeight);
     void* pixels = nullptr;
     if (auto iter = atlasHardwareBuffers.find(textureProxy.get());

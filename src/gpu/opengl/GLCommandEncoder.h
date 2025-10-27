@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "gpu/CommandEncoder.h"
+#include "tgfx/gpu/CommandEncoder.h"
 
 namespace tgfx {
 class GLGPU;
@@ -28,15 +28,14 @@ class GLCommandEncoder : public CommandEncoder {
   explicit GLCommandEncoder(GLGPU* gpu) : gpu(gpu) {
   }
 
-  void copyTextureToTexture(std::shared_ptr<GPUTexture> srcTexture, const Rect& srcRect,
-                            std::shared_ptr<GPUTexture> dstTexture,
-                            const Point& dstOffset) override;
+  void copyTextureToTexture(std::shared_ptr<Texture> srcTexture, const Rect& srcRect,
+                            std::shared_ptr<Texture> dstTexture, const Point& dstOffset) override;
 
-  void copyTextureToBuffer(std::shared_ptr<GPUTexture> srcTexture, const Rect& srcRect,
+  void copyTextureToBuffer(std::shared_ptr<Texture> srcTexture, const Rect& srcRect,
                            std::shared_ptr<GPUBuffer> dstBuffer, size_t dstOffset,
                            size_t dstRowBytes) override;
 
-  void generateMipmapsForTexture(std::shared_ptr<GPUTexture> texture) override;
+  void generateMipmapsForTexture(std::shared_ptr<Texture> texture) override;
 
  protected:
   std::shared_ptr<RenderPass> onBeginRenderPass(const RenderPassDescriptor& descriptor) override;

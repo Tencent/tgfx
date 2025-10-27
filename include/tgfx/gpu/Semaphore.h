@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,33 +18,20 @@
 
 #pragma once
 
-#include <native_buffer/native_buffer.h>
-#include "tgfx/core/ImageBuffer.h"
+#include "tgfx/gpu/Backend.h"
 
 namespace tgfx {
-class ExternalOESBuffer : public ImageBuffer {
+/**
+ * Semaphore is a synchronization primitive for GPU-to-GPU operations. Once a Semaphore is signaled,
+ * it remains in that state and cannot be reset; to synchronize again, create a new Semaphore.
+ */
+class Semaphore {
  public:
-  static std::shared_ptr<ExternalOESBuffer> MakeFrom(OH_NativeBuffer* hardwareBuffer,
-                                                     YUVColorSpace colorSpace);
+  virtual ~Semaphore() = default;
 
-  ~ExternalOESBuffer() override;
-
-  int width() const override;
-
-  int height() const override;
-
-  bool isAlphaOnly() const final {
-    return false;
-  }
-
- protected:
-  std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) const override;
-
- private:
-  OH_NativeBuffer* hardwareBuffer = nullptr;
-  YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED;
-
-  ExternalOESBuffer(OH_NativeBuffer* hardwareBuffer, YUVColorSpace colorSpace);
+  /**
+   * Returns a BackendSemaphore representing the underlying backend-specific semaphore.
+   */
+  virtual BackendSemaphore getBackendSemaphore() const = 0;
 };
-
 }  // namespace tgfx

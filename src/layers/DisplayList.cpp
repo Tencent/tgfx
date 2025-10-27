@@ -25,6 +25,7 @@
 #include "layers/DrawArgs.h"
 #include "layers/RootLayer.h"
 #include "layers/TileCache.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 static constexpr size_t MAX_DIRTY_REGION_FRAMES = 5;
@@ -795,7 +796,7 @@ int DisplayList::nextSurfaceTileCount(Context* context) const {
 }
 
 int DisplayList::getMaxTileCountPerAtlas(Context* context) const {
-  auto maxTextureSize = std::min(context->caps()->maxTextureSize, MAX_ATLAS_SIZE);
+  auto maxTextureSize = std::min(context->gpu()->limits()->maxTextureDimension2D, MAX_ATLAS_SIZE);
   return (maxTextureSize / _tileSize) * (maxTextureSize / _tileSize);
 }
 
@@ -900,6 +901,7 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   renderRect.roundOut();
   args.renderRect = &renderRect;
   args.backgroundContext = _root->createBackgroundContext(context, drawRect, viewMatrix);
+  args.dstColorSpace = surface->colorSpace();
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
 }
 

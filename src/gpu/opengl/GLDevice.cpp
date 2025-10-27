@@ -77,6 +77,8 @@ GLDevice::~GLDevice() {
 void GLDevice::releaseAll() {
   std::lock_guard<std::mutex> autoLock(locker);
   if (context == nullptr) {
+    // make sure all resources are released even there is no context.
+    static_cast<GLGPU*>(_gpu)->releaseAll(false);
     return;
   }
   auto releaseGPU = onLockContext();

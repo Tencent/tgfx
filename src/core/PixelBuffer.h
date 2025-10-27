@@ -35,14 +35,17 @@ class PixelBuffer : public ImageBuffer {
    * the tryHardware is true, a PixelBuffer backed by hardware is returned if it is available on the
    * current platform. Otherwise, a CPU-backed PixelBuffer is returned.
    */
-  static std::shared_ptr<PixelBuffer> Make(int width, int height, bool alphaOnly = false,
-                                           bool tryHardware = true);
+  static std::shared_ptr<PixelBuffer> Make(
+      int width, int height, bool alphaOnly = false, bool tryHardware = true,
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Creates a PixelBuffer from the specified hardware buffer. Returns nullptr if the hardwareBuffer
    * is invalid or the current platform has no hardware buffer support.
    */
-  static std::shared_ptr<PixelBuffer> MakeFrom(HardwareBufferRef hardwareBuffer);
+  static std::shared_ptr<PixelBuffer> MakeFrom(
+      HardwareBufferRef hardwareBuffer,
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   int width() const override {
     return _info.width();
@@ -54,6 +57,10 @@ class PixelBuffer : public ImageBuffer {
 
   bool isAlphaOnly() const override {
     return _info.isAlphaOnly();
+  }
+
+  std::shared_ptr<ColorSpace> colorSpace() const override {
+    return _colorSpace;
   }
 
   /**
@@ -88,7 +95,8 @@ class PixelBuffer : public ImageBuffer {
   virtual HardwareBufferRef getHardwareBuffer() const = 0;
 
  protected:
-  explicit PixelBuffer(const ImageInfo& info);
+  explicit PixelBuffer(const ImageInfo& info,
+                       std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   bool isPixelBuffer() const final {
     return true;
@@ -103,5 +111,6 @@ class PixelBuffer : public ImageBuffer {
  private:
   mutable std::mutex locker = {};
   ImageInfo _info = {};
+  std::shared_ptr<ColorSpace> _colorSpace = ColorSpace::MakeSRGB();
 };
 }  // namespace tgfx

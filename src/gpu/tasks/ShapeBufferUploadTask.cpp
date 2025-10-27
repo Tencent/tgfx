@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ShapeBufferUploadTask.h"
-#include "gpu/GPU.h"
 #include "gpu/resources/BufferResource.h"
 #include "gpu/resources/TextureView.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 ShapeBufferUploadTask::ShapeBufferUploadTask(std::shared_ptr<ResourceProxy> trianglesProxy,

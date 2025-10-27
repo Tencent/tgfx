@@ -56,9 +56,8 @@ const XferProcessor* ProgramInfo::getXferProcessor() const {
   return xferProcessor;
 }
 
-const Swizzle& ProgramInfo::getOutputSwizzle() const {
-  auto context = renderTarget->getContext();
-  return context->caps()->getWriteSwizzle(renderTarget->format());
+Swizzle ProgramInfo::getOutputSwizzle() const {
+  return Swizzle::ForWrite(renderTarget->format());
 }
 
 PipelineColorAttachment ProgramInfo::getPipelineColorAttachment() const {
@@ -142,8 +141,8 @@ std::shared_ptr<GPUBuffer> ProgramInfo::getUniformBuffer(const PipelineProgram* 
   DEBUG_ASSERT(renderTarget != nullptr);
 
   auto globalCache = renderTarget->getContext()->globalCache();
-  auto uboOffsetAlignment = static_cast<size_t>(
-      renderTarget->getContext()->gpu()->caps()->shaderCaps()->uboOffsetAlignment);
+  auto uboOffsetAlignment =
+      static_cast<size_t>(renderTarget->getContext()->shaderCaps()->uboOffsetAlignment);
   size_t vertexUniformBufferSize = 0;
   auto vertexUniformData = program->getUniformData(ShaderStage::Vertex);
   if (vertexUniformData != nullptr) {
@@ -258,8 +257,8 @@ void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, PipelineProgram
   unsigned textureBinding = TEXTURE_BINDING_POINT_START;
   auto gpu = renderTarget->getContext()->gpu();
   for (auto& [texture, state] : samplers) {
-    GPUSamplerDescriptor descriptor(ToAddressMode(state.tileModeX), ToAddressMode(state.tileModeY),
-                                    state.minFilterMode, state.magFilterMode, state.mipmapMode);
+    SamplerDescriptor descriptor(ToAddressMode(state.tileModeX), ToAddressMode(state.tileModeY),
+                                 state.minFilterMode, state.magFilterMode, state.mipmapMode);
     auto sampler = gpu->createSampler(descriptor);
     renderPass->setTexture(textureBinding++, texture, sampler);
   }

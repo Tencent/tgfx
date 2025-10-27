@@ -25,14 +25,14 @@ static constexpr char DstColorName[] = "_dstColor";
 GLSLFragmentShaderBuilder::GLSLFragmentShaderBuilder(ProgramBuilder* program)
     : FragmentShaderBuilder(program) {
   auto glProgram = static_cast<GLSLProgramBuilder*>(program);
-  auto shaderCaps = glProgram->getContext()->caps()->shaderCaps();
+  auto shaderCaps = glProgram->getContext()->shaderCaps();
   if (shaderCaps->usesPrecisionModifiers) {
     setPrecisionQualifier("precision mediump float;");
   }
 }
 
 std::string GLSLFragmentShaderBuilder::dstColor() {
-  auto shaderCaps = programBuilder->getContext()->caps()->shaderCaps();
+  auto shaderCaps = programBuilder->getContext()->shaderCaps();
   if (shaderCaps->frameBufferFetchSupport) {
     addFeature(PrivateFeature::FramebufferFetch, shaderCaps->frameBufferFetchExtensionString);
     if (shaderCaps->frameBufferFetchNeedsCustomOutput) {

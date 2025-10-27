@@ -21,6 +21,7 @@
 #include <memory>
 #include <mutex>
 #include <vector>
+#include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/Rect.h"
 
 namespace tgfx {
@@ -50,6 +51,8 @@ class ImageStream {
   int height() const {
     return _height;
   }
+
+  virtual std::shared_ptr<ColorSpace> colorSpace() const = 0;
 
  protected:
   ImageStream(int width, int height) : _width(width), _height(height) {

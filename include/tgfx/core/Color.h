@@ -21,6 +21,7 @@
 #include <cfloat>
 #include <cinttypes>
 #include <limits>
+#include "tgfx/core/ColorSpace.h"
 
 namespace tgfx {
 
@@ -60,9 +61,10 @@ struct Color {
   static const Color& Blue();
 
   /**
-   * Returns color value from 8-bit component values.
+   * Returns color value in srgb gamut from 8-bit component values.
    */
-  static Color FromRGBA(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255);
+  static Color FromRGBA(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255,
+                        std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Constructs an opaque white Color.

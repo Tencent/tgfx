@@ -53,7 +53,9 @@ class ImageCodec : public ImageGenerator {
    * the pixels remain unchanged for the lifetime of the ImageCodec. Returns nullptr if ImageInfo is
    * empty or pixels is nullptr.
    */
-  static std::shared_ptr<ImageCodec> MakeFrom(const ImageInfo& info, std::shared_ptr<Data> pixels);
+  static std::shared_ptr<ImageCodec> MakeFrom(
+      const ImageInfo& info, std::shared_ptr<Data> pixels,
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Creates a new ImageCodec object from a platform-specific NativeImage. For example, the
@@ -67,7 +69,9 @@ class ImageCodec : public ImageGenerator {
   /**
    * Encodes the specified Pixmap into a binary image format. Returns nullptr if encoding fails.
    */
-  static std::shared_ptr<Data> Encode(const Pixmap& pixmap, EncodedFormat format, int quality);
+  static std::shared_ptr<Data> Encode(
+      const Pixmap& pixmap, EncodedFormat format, int quality,
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Returns the orientation of the target image.
@@ -93,8 +97,9 @@ class ImageCodec : public ImageGenerator {
   virtual bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const;
 
  protected:
-  ImageCodec(int width, int height, Orientation orientation = Orientation::TopLeft)
-      : ImageGenerator(width, height), _orientation(orientation) {
+  ImageCodec(int width, int height, Orientation orientation = Orientation::TopLeft,
+             std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB())
+      : ImageGenerator(width, height, std::move(colorSpace)), _orientation(orientation) {
   }
 
   std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;

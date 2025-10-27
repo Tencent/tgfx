@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "tgfx/gpu/PixelFormat.h"
 #include "tgfx/gpu/metal/MtlTypes.h"
 #include "tgfx/gpu/opengl/GLTypes.h"
 
@@ -25,16 +26,7 @@ namespace tgfx {
 /**
  * Possible GPU backend APIs that may be used by TGFX.
  */
-enum class Backend {
-  /**
-   * Mock is a backend that does not draw anything. It is used for unit tests and to measure CPU
-   * overhead.
-   */
-  MOCK,
-  OPENGL,
-  METAL,
-  VULKAN,
-};
+enum class Backend { Unknown, OpenGL, Metal, Vulkan, WebGPU };
 
 /**
  * Wrapper class for passing into and receiving data from TGFX about a backend texture object.
@@ -51,14 +43,14 @@ class BackendTexture {
    * Creates an OpenGL backend texture.
    */
   BackendTexture(const GLTextureInfo& glInfo, int width, int height)
-      : _backend(Backend::OPENGL), _width(width), _height(height), glInfo(glInfo) {
+      : _backend(Backend::OpenGL), _width(width), _height(height), glInfo(glInfo) {
   }
 
   /**
    * Creates a Metal backend texture.
    */
   BackendTexture(const MtlTextureInfo& mtlInfo, int width, int height)
-      : _backend(Backend::METAL), _width(width), _height(height), mtlInfo(mtlInfo) {
+      : _backend(Backend::Metal), _width(width), _height(height), mtlInfo(mtlInfo) {
   }
 
   BackendTexture(const BackendTexture& that) {
@@ -96,6 +88,11 @@ class BackendTexture {
   }
 
   /**
+   * Returns the pixel format of this texture.
+   */
+  PixelFormat format() const;
+
+  /**
    * If the backend API is GL, copies a snapshot of the GLTextureInfo struct into the passed in
    * pointer and returns true. Otherwise, returns false if the backend API is not GL.
    */
@@ -108,7 +105,7 @@ class BackendTexture {
   bool getMtlTextureInfo(MtlTextureInfo* mtlTextureInfo) const;
 
  private:
-  Backend _backend = Backend::MOCK;
+  Backend _backend = Backend::Unknown;
   int _width = 0;
   int _height = 0;
 
@@ -133,14 +130,14 @@ class BackendRenderTarget {
    * Creates an OpenGL backend render target.
    */
   BackendRenderTarget(const GLFrameBufferInfo& glInfo, int width, int height)
-      : _backend(Backend::OPENGL), _width(width), _height(height), glInfo(glInfo) {
+      : _backend(Backend::OpenGL), _width(width), _height(height), glInfo(glInfo) {
   }
 
   /**
    * Creates an Metal backend render target.
    */
   BackendRenderTarget(const MtlTextureInfo& mtlInfo, int width, int height)
-      : _backend(Backend::METAL), _width(width), _height(height), mtlInfo(mtlInfo) {
+      : _backend(Backend::Metal), _width(width), _height(height), mtlInfo(mtlInfo) {
   }
 
   BackendRenderTarget(const BackendRenderTarget& that) {
@@ -178,6 +175,11 @@ class BackendRenderTarget {
   }
 
   /**
+   * Returns the pixel format of this render target.
+   */
+  PixelFormat format() const;
+
+  /**
    * If the backend API is GL, copies a snapshot of the GLFramebufferInfo struct into the passed
    * in pointer and returns true. Otherwise, returns false if the backend API is not GL.
    */
@@ -190,7 +192,7 @@ class BackendRenderTarget {
   bool getMtlTextureInfo(MtlTextureInfo* mtlTextureInfo) const;
 
  private:
-  Backend _backend = Backend::MOCK;
+  Backend _backend = Backend::Unknown;
   int _width = 0;
   int _height = 0;
   union {
@@ -207,13 +209,13 @@ class BackendSemaphore {
   /**
    * Creates an uninitialized backend semaphore.
    */
-  BackendSemaphore() : _backend(Backend::MOCK) {
+  BackendSemaphore() : _backend(Backend::Unknown) {
   }
 
   /**
    * Creates an OpenGL backend semaphore.
    */
-  BackendSemaphore(const GLSyncInfo& syncInfo) : _backend(Backend::OPENGL), glSyncInfo(syncInfo) {
+  BackendSemaphore(const GLSyncInfo& syncInfo) : _backend(Backend::OpenGL), glSyncInfo(syncInfo) {
   }
 
   BackendSemaphore(const BackendSemaphore& that) {
@@ -230,7 +232,7 @@ class BackendSemaphore {
   bool getGLSync(GLSyncInfo* syncInfo) const;
 
  private:
-  Backend _backend = Backend::MOCK;
+  Backend _backend = Backend::Unknown;
   union {
     GLSyncInfo glSyncInfo;
   };

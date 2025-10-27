@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,33 +18,32 @@
 
 #pragma once
 
-#import <CoreVideo/CoreVideo.h>
-#include "tgfx/core/ImageBuffer.h"
+#include <cinttypes>
 
 namespace tgfx {
-class NV12HardwareBuffer : public ImageBuffer {
+/**
+ * GPULimits describes the various limits of the GPU.
+ */
+class GPULimits {
  public:
-  static std::shared_ptr<NV12HardwareBuffer> MakeFrom(CVPixelBufferRef pixelBuffer,
-                                                      YUVColorSpace colorSpace);
+  /**
+   * Returns the maximum 2D texture dimension supported by the GPU.
+   */
+  int maxTextureDimension2D = 0;
 
-  ~NV12HardwareBuffer() override;
+  /**
+   * Returns the maximum number of texture samplers available to a single shader stage.
+   */
+  int maxSamplersPerShaderStage = 0;
 
-  int width() const override;
+  /**
+   * Returns the maximum size in bytes of a uniform buffer binding.
+   */
+  int maxUniformBufferBindingSize = 0;
 
-  int height() const override;
-
-  bool isAlphaOnly() const final {
-    return false;
-  }
-
- protected:
-  std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) const override;
-
- private:
-  CVPixelBufferRef pixelBuffer = nullptr;
-  YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED;
-
-  NV12HardwareBuffer(CVPixelBufferRef pixelBuffer, YUVColorSpace colorSpace);
+  /**
+   * Returns the minimum required alignment in bytes for uniform buffer offsets.
+   */
+  int minUniformBufferOffsetAlignment = 0;
 };
-
 }  // namespace tgfx

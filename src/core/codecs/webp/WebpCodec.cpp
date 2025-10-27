@@ -38,7 +38,7 @@ std::shared_ptr<ImageCodec> WebpCodec::MakeFrom(const std::string& filePath) {
     }
   }
   return std::shared_ptr<ImageCodec>(
-      new WebpCodec(info.width, info.height, info.orientation, filePath, nullptr));
+      new WebpCodec(info.width, info.height, info.orientation, filePath, nullptr, info.colorSpace));
 }
 
 std::shared_ptr<ImageCodec> WebpCodec::MakeFrom(std::shared_ptr<Data> imageBytes) {
@@ -49,8 +49,8 @@ std::shared_ptr<ImageCodec> WebpCodec::MakeFrom(std::shared_ptr<Data> imageBytes
   if (info.width == 0 || info.height == 0) {
     return nullptr;
   }
-  return std::shared_ptr<ImageCodec>(
-      new WebpCodec(info.width, info.height, info.orientation, "", std::move(imageBytes)));
+  return std::shared_ptr<ImageCodec>(new WebpCodec(info.width, info.height, info.orientation, "",
+                                                   std::move(imageBytes), info.colorSpace));
 }
 
 static WEBP_CSP_MODE webp_decode_mode(ColorType dstCT, bool premultiply) {
@@ -76,6 +76,7 @@ bool WebpCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t ds
   if (byteData == nullptr) {
     return false;
   }
+  auto info = WebpUtility::getDecodeInfo(byteData->data(), byteData->size());
   WebPDecoderConfig config;
   if (!WebPInitDecoderConfig(&config)) {
     return false;
@@ -145,7 +146,8 @@ static int webp_reader_write_data(const uint8_t* data, size_t data_size,
   return 1;
 }
 
-std::shared_ptr<Data> WebpCodec::Encode(const Pixmap& pixmap, int quality) {
+std::shared_ptr<Data> WebpCodec::Encode(const Pixmap& pixmap, int quality,
+                                        std::shared_ptr<ColorSpace> colorSpace) {
   const uint8_t* srcPixels = static_cast<uint8_t*>(const_cast<void*>(pixmap.pixels()));
   auto srcInfo = pixmap.info();
   Buffer tempBuffer = {};
@@ -209,7 +211,34 @@ std::shared_ptr<Data> WebpCodec::Encode(const Pixmap& pixmap, int quality) {
     return nullptr;
   }
   WebPPictureFree(&pic);
-  return Data::MakeAdopted(webpWriter.data, webpWriter.length, Data::FreeProc);
+  auto encodedData = Data::MakeAdopted(webpWriter.data, webpWriter.length, Data::FreeProc);
+  if (colorSpace) {
+    auto icc = colorSpace->toICCProfile();
+    if (icc) {
+      WebPData encoded = {encodedData->bytes(), encodedData->size()};
+      WebPData iccChunk = {icc->bytes(), icc->size()};
+      WebPMux* mux = WebPMuxNew();
+      if (WEBP_MUX_OK != WebPMuxSetImage(mux, &encoded, 1)) {
+        WebPMuxDelete(mux);
+        return nullptr;
+      }
+      if (WEBP_MUX_OK != WebPMuxSetChunk(mux, "ICCP", &iccChunk, 1)) {
+        WebPMuxDelete(mux);
+        return nullptr;
+      }
+      WebPData assembled;
+      if (WEBP_MUX_OK != WebPMuxAssemble(mux, &assembled)) {
+        WebPMuxDelete(mux);
+        WebPDataClear(&assembled);
+        return nullptr;
+      }
+      auto encodedDataWithICC = Data::MakeWithCopy(assembled.bytes, assembled.size);
+      WebPMuxDelete(mux);
+      WebPDataClear(&assembled);
+      return encodedDataWithICC;
+    }
+  }
+  return encodedData;
 }
 #endif
 

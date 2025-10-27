@@ -19,10 +19,11 @@
 #pragma once
 
 #include <memory>
-#include "gpu/CommandBuffer.h"
-#include "gpu/GPUBuffer.h"
-#include "gpu/GPUFence.h"
-#include "gpu/GPUTexture.h"
+#include "tgfx/core/Rect.h"
+#include "tgfx/gpu/CommandBuffer.h"
+#include "tgfx/gpu/GPUBuffer.h"
+#include "tgfx/gpu/Semaphore.h"
+#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
 /**
@@ -45,14 +46,14 @@ class CommandQueue {
                            size_t size) = 0;
 
   /**
-   * Writes pixel data to the GPUTexture within the specified rectangle. The pixel data must match
+   * Writes pixel data to the texture within the specified rectangle. The pixel data must match
    * the texture's pixel format, and the rectangle must be fully contained within the texture's
    * dimensions. If the texture has mipmaps, you should call CommandEncoder's
    * generateMipmapsForTexture() method after writing the pixels, as mipmaps will not be generated
    * automatically.
    */
-  virtual void writeTexture(std::shared_ptr<GPUTexture> texture, const Rect& rect,
-                            const void* pixels, size_t rowBytes) = 0;
+  virtual void writeTexture(std::shared_ptr<Texture> texture, const Rect& rect, const void* pixels,
+                            size_t rowBytes) = 0;
 
   /**
    * Schedules the execution of the specified command buffer on the GPU.
@@ -60,17 +61,17 @@ class CommandQueue {
   virtual void submit(std::shared_ptr<CommandBuffer> commandBuffer) = 0;
 
   /**
-   * Inserts a GPU fence into the command queue. This allows other synchronization points to be
+   * Inserts a Semaphore into the command queue. This allows other synchronization points to be
    * notified when all previous GPU commands have finished executing. Returns nullptr if the
-   * GPUFence cannot be inserted due to lack of support (for example, on WebGPU).
+   * Semaphore cannot be inserted due to lack of support (for example, on WebGPU).
    */
-  virtual std::shared_ptr<GPUFence> insertFence() = 0;
+  virtual std::shared_ptr<Semaphore> insertSemaphore() = 0;
 
   /**
    * Inserts a GPU wait operation into the command queue, making the GPU wait until the specified
-   * fence is signaled before executing subsequent commands.
+   * semaphore is signaled before executing subsequent commands.
    */
-  virtual void waitForFence(std::shared_ptr<GPUFence> fence) = 0;
+  virtual void waitSemaphore(std::shared_ptr<Semaphore> semaphore) = 0;
 
   /**
    * Blocks the current thread until all previously submitted commands in this queue have completed

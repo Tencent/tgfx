@@ -18,9 +18,10 @@
 
 #pragma once
 
-#include "gpu/CommandBuffer.h"
-#include "gpu/GPUBuffer.h"
-#include "gpu/GPUTexture.h"
+#include "tgfx/core/Rect.h"
+#include "tgfx/gpu/CommandBuffer.h"
+#include "tgfx/gpu/GPUBuffer.h"
+#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
 
@@ -44,20 +45,20 @@ class CommandEncoder {
   std::shared_ptr<RenderPass> beginRenderPass(const RenderPassDescriptor& descriptor);
 
   /**
-   * Encodes a command to copy a region from the source GPUTexture to a region of the destination
-   * GPUTexture. If the texture has mipmaps, you should call the generateMipmapsForTexture() method
+   * Encodes a command to copy a region from the source texture to a region of the destination
+   * texture. If the texture has mipmaps, you should call the generateMipmapsForTexture() method
    * after copying, as mipmaps will not be generated automatically.
    * @param srcTexture The source frame buffer to copy from.
    * @param srcRect The rectangle region of the source texture to copy from.
    * @param dstTexture The destination texture to copy to.
    * @param dstOffset The offset in the destination texture where the copied region will be placed.
    */
-  virtual void copyTextureToTexture(std::shared_ptr<GPUTexture> srcTexture, const Rect& srcRect,
-                                    std::shared_ptr<GPUTexture> dstTexture,
+  virtual void copyTextureToTexture(std::shared_ptr<Texture> srcTexture, const Rect& srcRect,
+                                    std::shared_ptr<Texture> dstTexture,
                                     const Point& dstOffset) = 0;
 
   /**
-   * Encodes a command to copy a region from a source GPUTexture to a GPUBuffer for CPU access. The
+   * Encodes a command to copy a region from a source texture to a GPUBuffer for CPU access. The
    * actual data transfer from the GPU to the CPU occurs asynchronously after the command is
    * submitted. You can use the GPUBuffer's isReady() method to check if the data is available.
    * @param srcTexture The source texture to copy from.
@@ -70,16 +71,15 @@ class CommandEncoder {
    * to the width of the rectangle multiplied by the number of bytes per pixel for the texture's
    * format.
    */
-  virtual void copyTextureToBuffer(std::shared_ptr<GPUTexture> srcTexture, const Rect& srcRect,
+  virtual void copyTextureToBuffer(std::shared_ptr<Texture> srcTexture, const Rect& srcRect,
                                    std::shared_ptr<GPUBuffer> dstBuffer, size_t dstOffset = 0,
                                    size_t dstRowBytes = 0) = 0;
 
   /**
-   * Encodes a command that generates mipmaps for the specified GPUTexture from the base level to
-   * the highest level. This method only has an effect if the texture was created with mipmap
-   * enabled.
+   * Encodes a command that generates mipmaps for the specified texture from the base level to the
+   * highest level. This method only has an effect if the texture was created with mipmap enabled.
    */
-  virtual void generateMipmapsForTexture(std::shared_ptr<GPUTexture> texture) = 0;
+  virtual void generateMipmapsForTexture(std::shared_ptr<Texture> texture) = 0;
 
   /**
    * Finalizes command encoding and returns a CommandBuffer with all recorded commands. You can then

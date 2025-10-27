@@ -110,8 +110,8 @@ void GLRenderPass::setUniformBuffer(unsigned binding, std::shared_ptr<GPUBuffer>
                                    size);
 }
 
-void GLRenderPass::setTexture(unsigned binding, std::shared_ptr<GPUTexture> texture,
-                              std::shared_ptr<GPUSampler> sampler) {
+void GLRenderPass::setTexture(unsigned binding, std::shared_ptr<Texture> texture,
+                              std::shared_ptr<Sampler> sampler) {
   if (texture == nullptr) {
     return;
   }
@@ -122,8 +122,7 @@ void GLRenderPass::setTexture(unsigned binding, std::shared_ptr<GPUTexture> text
   renderPipeline->setTexture(gpu, binding, static_cast<GLTexture*>(texture.get()),
                              static_cast<GLSampler*>(sampler.get()));
   auto renderTexture = descriptor.colorAttachments[0].texture;
-  auto caps = static_cast<const GLCaps*>(gpu->caps());
-  if (texture == renderTexture && caps->textureBarrierSupport) {
+  if (texture == renderTexture && gpu->caps()->features()->textureBarrier) {
     auto gl = gpu->functions();
     gl->textureBarrier();
   }

@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "gpu/GPUBuffer.h"
 #include "gpu/resources/Program.h"
+#include "tgfx/gpu/GPUBuffer.h"
 
 namespace tgfx {
 class PipelineProgram : public Program {

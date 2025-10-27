@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "OpsRenderTask.h"
-#include "gpu/RenderPass.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "inspect/InspectorMark.h"
+#include "tgfx/gpu/RenderPass.h"
 
 namespace tgfx {
 void OpsRenderTask::execute(CommandEncoder* encoder) {
