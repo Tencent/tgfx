@@ -19,8 +19,8 @@
 #include "TextureRenderTarget.h"
 #include "core/utils/Log.h"
 #include "core/utils/UniqueID.h"
-#include "gpu/GPU.h"
-#include "gpu/Texture.h"
+#include "tgfx/gpu/GPU.h"
+#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
 static ScratchKey ComputeRenderTargetScratchKey(int width, int height, PixelFormat format,

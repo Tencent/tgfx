@@ -19,16 +19,16 @@
 #pragma once
 
 #include <vector>
-#include "gpu/Attribute.h"
 #include "gpu/FragmentShaderBuilder.h"
 #include "gpu/ShaderCaps.h"
 #include "gpu/ShaderVar.h"
-#include "gpu/Texture.h"
 #include "gpu/UniformData.h"
 #include "gpu/VaryingHandler.h"
 #include "gpu/VertexShaderBuilder.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/Processor.h"
+#include "tgfx/gpu/Attribute.h"
+#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
 class GeometryProcessor : public Processor {

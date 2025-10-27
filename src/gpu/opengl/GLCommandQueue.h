@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "gpu/CommandQueue.h"
+#include "tgfx/gpu/CommandQueue.h"
 
 namespace tgfx {
 class GLGPU;

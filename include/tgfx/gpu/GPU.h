@@ -19,16 +19,15 @@
 #pragma once
 
 #include <memory>
-#include "gpu/CommandEncoder.h"
-#include "gpu/CommandQueue.h"
-#include "gpu/GPUFeatures.h"
-#include "gpu/GPUInfo.h"
-#include "gpu/GPULimits.h"
-#include "gpu/RenderPipeline.h"
-#include "gpu/Sampler.h"
-#include "gpu/ShaderModule.h"
-#include "gpu/YUVFormat.h"
 #include "tgfx/gpu/Backend.h"
+#include "tgfx/gpu/CommandEncoder.h"
+#include "tgfx/gpu/CommandQueue.h"
+#include "tgfx/gpu/GPUFeatures.h"
+#include "tgfx/gpu/GPUInfo.h"
+#include "tgfx/gpu/GPULimits.h"
+#include "tgfx/gpu/RenderPipeline.h"
+#include "tgfx/gpu/Sampler.h"
+#include "tgfx/gpu/ShaderModule.h"
 #include "tgfx/platform/HardwareBuffer.h"
 
 namespace tgfx {

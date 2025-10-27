@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "gpu/CommandEncoder.h"
+#include "tgfx/gpu/CommandEncoder.h"
 
 namespace tgfx {
 class GLGPU;

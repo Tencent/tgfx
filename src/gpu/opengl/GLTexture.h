@@ -18,10 +18,10 @@
 
 #pragma once
 
-#include "gpu/Texture.h"
 #include "gpu/opengl/GLInterface.h"
 #include "gpu/opengl/GLResource.h"
 #include "gpu/opengl/GLSampler.h"
+#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
 class GLGPU;

@@ -18,10 +18,10 @@
 
 #include "ImageShader.h"
 #include "core/utils/Types.h"
-#include "gpu/Texture.h"
 #include "gpu/ops/DrawOp.h"
 #include "gpu/processors/ColorSpaceXFormEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
+#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
 std::shared_ptr<Shader> Shader::MakeImageShader(std::shared_ptr<Image> image, TileMode tileModeX,

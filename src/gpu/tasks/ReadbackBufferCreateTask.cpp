@@ -18,8 +18,8 @@
 
 #include "ReadbackBufferCreateTask.h"
 #include "core/utils/UniqueID.h"
-#include "gpu/GPU.h"
 #include "gpu/resources/BufferResource.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 ReadbackBufferCreateTask::ReadbackBufferCreateTask(std::shared_ptr<GPUBufferProxy> proxy,

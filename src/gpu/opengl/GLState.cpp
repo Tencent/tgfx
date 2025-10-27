@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLState.h"
-#include "gpu/ColorWriteMask.h"
 #include "gpu/opengl/GLTexture.h"
+#include "tgfx/gpu/ColorWriteMask.h"
 
 namespace tgfx {
 bool GLStencil::operator!=(const GLStencil& other) const {

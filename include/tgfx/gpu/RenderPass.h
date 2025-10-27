@@ -19,11 +19,11 @@
 #pragma once
 
 #include "core/utils/Log.h"
-#include "gpu/GPUBuffer.h"
-#include "gpu/RenderPipeline.h"
-#include "gpu/Sampler.h"
-#include "gpu/Texture.h"
 #include "tgfx/core/Color.h"
+#include "tgfx/gpu/GPUBuffer.h"
+#include "tgfx/gpu/RenderPipeline.h"
+#include "tgfx/gpu/Sampler.h"
+#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
 /**

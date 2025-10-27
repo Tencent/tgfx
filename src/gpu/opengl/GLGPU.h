@@ -19,10 +19,10 @@
 #pragma once
 
 #include <concurrentqueue.h>
-#include "gpu/GPU.h"
 #include "gpu/opengl/GLCommandQueue.h"
 #include "gpu/opengl/GLResource.h"
 #include "gpu/opengl/GLState.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 class GLGPU : public GPU {

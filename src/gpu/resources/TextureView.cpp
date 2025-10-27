@@ -19,9 +19,9 @@
 #include "TextureView.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "core/utils/UniqueID.h"
-#include "gpu/GPU.h"
 #include "gpu/resources/DefaultTextureView.h"
 #include "gpu/resources/YUVTextureView.h"
+#include "tgfx/gpu/GPU.h"
 #if defined(__OHOS__)
 #include <native_buffer/native_buffer.h>
 #endif

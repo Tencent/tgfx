@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "gpu/Semaphore.h"
 #include "gpu/opengl/GLResource.h"
+#include "tgfx/gpu/Semaphore.h"
 
 namespace tgfx {
 /**
