@@ -30,13 +30,13 @@ TGFX_TEST(GPUTest, DepthRenderPassTest) {
   ASSERT_TRUE(context != nullptr);
   auto image = MakeImage("resources/apitest/test_timestretch.png");
   ASSERT_TRUE(image != nullptr);
-  GPUTextureDescriptor depthTextureDesc(110, 110, PixelFormat::DEPTH24_STENCIL8, false, 1,
-                                        GPUTextureUsage::RENDER_ATTACHMENT);
+  TextureDescriptor depthTextureDesc(110, 110, PixelFormat::DEPTH24_STENCIL8, false, 1,
+                                     TextureUsage::RENDER_ATTACHMENT);
   auto depthTexture = context->gpu()->createTexture(depthTextureDesc);
   ASSERT_TRUE(depthTexture != nullptr);
-  GPUTextureDescriptor renderTextureDesc(
+  TextureDescriptor renderTextureDesc(
       110, 110, PixelFormat::RGBA_8888, false, 1,
-      GPUTextureUsage::RENDER_ATTACHMENT | GPUTextureUsage::TEXTURE_BINDING);
+      TextureUsage::RENDER_ATTACHMENT | TextureUsage::TEXTURE_BINDING);
   auto renderTexture = context->gpu()->createTexture(renderTextureDesc);
   ASSERT_TRUE(renderTexture != nullptr);
   RenderPassDescriptor renderPassDescriptor(renderTexture);

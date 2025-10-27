@@ -22,14 +22,14 @@
 
 namespace tgfx {
 std::shared_ptr<GLDepthStencilTexture> GLDepthStencilTexture::MakeFrom(
-    GLGPU* gpu, const GPUTextureDescriptor& descriptor) {
+    GLGPU* gpu, const TextureDescriptor& descriptor) {
   DEBUG_ASSERT(gpu != nullptr);
   DEBUG_ASSERT(descriptor.format == PixelFormat::DEPTH24_STENCIL8);
-  if (!(descriptor.usage & GPUTextureUsage::RENDER_ATTACHMENT)) {
+  if (!(descriptor.usage & TextureUsage::RENDER_ATTACHMENT)) {
     LOGE("GLDepthStencilTexture::MakeFrom() usage does not include RENDER_ATTACHMENT!");
     return nullptr;
   }
-  if (descriptor.usage & GPUTextureUsage::TEXTURE_BINDING) {
+  if (descriptor.usage & TextureUsage::TEXTURE_BINDING) {
     LOGE("GLDepthStencilTexture::MakeFrom() usage includes TEXTURE_BINDING!");
     return nullptr;
   }

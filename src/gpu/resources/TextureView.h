@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "gpu/GPUTexture.h"
+#include "gpu/Texture.h"
 #include "gpu/resources/Resource.h"
 #include "tgfx/core/ImageBuffer.h"
 #include "tgfx/core/Point.h"
@@ -32,9 +32,9 @@ class BackendTexture;
 class RenderTarget;
 
 /**
- * TextureView is a container for GPUTexture objects that provides extra details about the texture,
+ * TextureView is a container for Texture objects that provides extra details about the texture,
  * such as its width, height, origin, and possible YUV formats. For YUV formats, it may contain
- * multiple GPUTexture objects.
+ * multiple Texture objects.
  */
 class TextureView : public Resource {
  public:
@@ -46,7 +46,7 @@ class TextureView : public Resource {
   /**
    * Computes a BytesKey for the texture that can be used to identify it in a cache.
    */
-  static void ComputeTextureKey(std::shared_ptr<GPUTexture> texture, BytesKey* bytesKey);
+  static void ComputeTextureKey(std::shared_ptr<Texture> texture, BytesKey* bytesKey);
 
   /**
    * Creates a new texture view from the specified pixel data with each pixel stored as 32-bit RGBA
@@ -201,9 +201,9 @@ class TextureView : public Resource {
   }
 
   /**
-   * Returns the associated GPUTexture object.
+   * Returns the associated Texture object.
    */
-  virtual std::shared_ptr<GPUTexture> getTexture() const = 0;
+  virtual std::shared_ptr<Texture> getTexture() const = 0;
 
   /**
    * Returns the texture coordinates in backend units corresponding to specified position in pixels.

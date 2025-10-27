@@ -33,7 +33,7 @@ CGLGPU::~CGLGPU() {
   }
 }
 
-std::vector<std::shared_ptr<GPUTexture>> CGLGPU::importHardwareTextures(
+std::vector<std::shared_ptr<Texture>> CGLGPU::importHardwareTextures(
     HardwareBufferRef hardwareBuffer, uint32_t usage) {
   if (!HardwareBufferCheck(hardwareBuffer)) {
     return {};

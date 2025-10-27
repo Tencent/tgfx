@@ -18,7 +18,7 @@
 
 #include "ImageShader.h"
 #include "core/utils/Types.h"
-#include "gpu/GPUTexture.h"
+#include "gpu/Texture.h"
 #include "gpu/ops/DrawOp.h"
 #include "gpu/processors/ColorSpaceXFormEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"

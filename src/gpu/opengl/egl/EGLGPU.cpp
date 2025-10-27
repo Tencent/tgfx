@@ -57,7 +57,7 @@ bool HardwareBufferAvailable() {
 
 #if defined(__ANDROID__) || defined(ANDROID) || defined(__OHOS__)
 
-std::vector<std::shared_ptr<GPUTexture>> EGLGPU::importHardwareTextures(
+std::vector<std::shared_ptr<Texture>> EGLGPU::importHardwareTextures(
     HardwareBufferRef hardwareBuffer, uint32_t usage) {
   if (!HardwareBufferCheck(hardwareBuffer)) {
     return {};
@@ -66,15 +66,14 @@ std::vector<std::shared_ptr<GPUTexture>> EGLGPU::importHardwareTextures(
   if (texture == nullptr) {
     return {};
   }
-  std::vector<std::shared_ptr<GPUTexture>> textures = {};
+  std::vector<std::shared_ptr<Texture>> textures = {};
   textures.push_back(std::move(texture));
   return textures;
 }
 
 #else
 
-std::vector<std::shared_ptr<GPUTexture>> EGLGPU::importHardwareTextures(HardwareBufferRef,
-                                                                        uint32_t) {
+std::vector<std::shared_ptr<Texture>> EGLGPU::importHardwareTextures(HardwareBufferRef, uint32_t) {
   return {};
 }
 

@@ -21,8 +21,8 @@
 #include <memory>
 #include "gpu/CommandBuffer.h"
 #include "gpu/GPUBuffer.h"
-#include "gpu/GPUTexture.h"
 #include "gpu/Semaphore.h"
+#include "gpu/Texture.h"
 
 namespace tgfx {
 /**
@@ -45,14 +45,14 @@ class CommandQueue {
                            size_t size) = 0;
 
   /**
-   * Writes pixel data to the GPUTexture within the specified rectangle. The pixel data must match
+   * Writes pixel data to the texture within the specified rectangle. The pixel data must match
    * the texture's pixel format, and the rectangle must be fully contained within the texture's
    * dimensions. If the texture has mipmaps, you should call CommandEncoder's
    * generateMipmapsForTexture() method after writing the pixels, as mipmaps will not be generated
    * automatically.
    */
-  virtual void writeTexture(std::shared_ptr<GPUTexture> texture, const Rect& rect,
-                            const void* pixels, size_t rowBytes) = 0;
+  virtual void writeTexture(std::shared_ptr<Texture> texture, const Rect& rect, const void* pixels,
+                            size_t rowBytes) = 0;
 
   /**
    * Schedules the execution of the specified command buffer on the GPU.

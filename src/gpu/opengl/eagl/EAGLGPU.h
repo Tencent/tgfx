@@ -36,8 +36,8 @@ class EAGLGPU : public GLGPU {
 
   CVOpenGLESTextureCacheRef getTextureCache();
 
-  std::vector<std::shared_ptr<GPUTexture>> importHardwareTextures(HardwareBufferRef hardwareBuffer,
-                                                                  uint32_t usage) override;
+  std::vector<std::shared_ptr<Texture>> importHardwareTextures(HardwareBufferRef hardwareBuffer,
+                                                               uint32_t usage) override;
 
  private:
   EAGLContext* _eaglContext = nil;

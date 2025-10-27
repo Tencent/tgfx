@@ -41,8 +41,8 @@ class GLRenderPass : public RenderPass {
   void setUniformBuffer(unsigned binding, std::shared_ptr<GPUBuffer> buffer, size_t offset,
                         size_t size) override;
 
-  void setTexture(unsigned binding, std::shared_ptr<GPUTexture> texture,
-                  std::shared_ptr<GPUSampler> sampler) override;
+  void setTexture(unsigned binding, std::shared_ptr<Texture> texture,
+                  std::shared_ptr<Sampler> sampler) override;
 
   void setVertexBuffer(std::shared_ptr<GPUBuffer> buffer, size_t offset) override;
 

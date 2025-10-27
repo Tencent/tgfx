@@ -224,12 +224,12 @@ std::shared_ptr<TextureView> SurfaceTexture::onMakeTexture(Context* context, boo
     gl->deleteTextures(1, &textureID);
     return nullptr;
   }
-  GPUTextureDescriptor descriptor = {textureSize.width,
-                                     textureSize.height,
-                                     PixelFormat::RGBA_8888,
-                                     false,
-                                     1,
-                                     GPUTextureUsage::TEXTURE_BINDING};
+  TextureDescriptor descriptor = {textureSize.width,
+                                  textureSize.height,
+                                  PixelFormat::RGBA_8888,
+                                  false,
+                                  1,
+                                  TextureUsage::TEXTURE_BINDING};
   auto gpu = static_cast<GLGPU*>(context->gpu());
   auto texture = gpu->makeResource<GLTexture>(
       descriptor, static_cast<unsigned>(GL_TEXTURE_EXTERNAL_OES), textureID);

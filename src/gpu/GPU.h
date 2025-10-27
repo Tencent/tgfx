@@ -24,8 +24,8 @@
 #include "gpu/GPUFeatures.h"
 #include "gpu/GPUInfo.h"
 #include "gpu/GPULimits.h"
-#include "gpu/GPUSampler.h"
 #include "gpu/RenderPipeline.h"
+#include "gpu/Sampler.h"
 #include "gpu/ShaderModule.h"
 #include "gpu/YUVFormat.h"
 #include "tgfx/gpu/Backend.h"
@@ -83,43 +83,42 @@ class GPU {
   virtual int getSampleCount(int requestedCount, PixelFormat pixelFormat) const = 0;
 
   /**
-   * Creates a new GPUTexture with the given descriptor. The descriptor specifies the texture's
+   * Creates a new texture with the given descriptor. The descriptor specifies the texture's
    * properties, such as width, height, format, mip levels, sample count and usage flags. Returns
    * nullptr if the texture cannot be created.
    */
-  virtual std::shared_ptr<GPUTexture> createTexture(const GPUTextureDescriptor& descriptor) = 0;
+  virtual std::shared_ptr<Texture> createTexture(const TextureDescriptor& descriptor) = 0;
 
   /**
    * Creates one or more textures from a platform-specific hardware buffer, such as AHardwareBuffer
    * on Android or CVPixelBufferRef on Apple platforms. Multiple textures may be created from the
    * same hardwareBuffer, especially for YUV formats.
    * @param hardwareBuffer The platform-specific hardware buffer to import textures from.
-   * @param usage A bitmask of GPUTextureUsage flags specifying how the textures will be used.
+   * @param usage A bitmask of TextureUsage flags specifying how the textures will be used.
    * @return An empty vector if the hardwareBuffer is invalid or not supported by the GPU backend.
    */
-  virtual std::vector<std::shared_ptr<GPUTexture>> importHardwareTextures(
+  virtual std::vector<std::shared_ptr<Texture>> importHardwareTextures(
       HardwareBufferRef hardwareBuffer, uint32_t usage) = 0;
 
   /**
-   * Creates a GPUTexture that wraps the specified backend texture.
+   * Creates a new Texture that wraps the specified backend texture.
    * @param backendTexture The backend texture to be wrapped.
-   * @param usage A bitmask of GPUTextureUsage flags specifying how the texture will be used.
-   * @param adopted If true, the returned GPUTexture takes ownership of the backend texture and will
+   * @param usage A bitmask of TextureUsage flags specifying how the texture will be used.
+   * @param adopted If true, the returned Texture takes ownership of the backend texture and will
    * destroy it when no longer needed. If false, the backend texture must remain valid for the
-   * lifetime of the GPUTexture.
-   * @return A unique pointer to the created GPUTexture. Returns nullptr if the backend texture is
+   * lifetime of the returned Texture.
+   * @return A unique pointer to the created Texture. Returns nullptr if the backend texture is
    * invalid or not supported by the GPU backend.
    */
-  virtual std::shared_ptr<GPUTexture> importExternalTexture(const BackendTexture& backendTexture,
-                                                            uint32_t usage,
-                                                            bool adopted = false) = 0;
+  virtual std::shared_ptr<Texture> importBackendTexture(const BackendTexture& backendTexture,
+                                                        uint32_t usage, bool adopted = false) = 0;
 
   /**
-   * Creates a GPUTexture that wraps the given backend render target. The caller must ensure the
-   * backend render target is valid for the lifetime of the returned GPUTexture. Returns nullptr
-   * if the backend render target is invalid.
+   * Creates a new Texture that wraps the given backend render target. The caller must ensure the
+   * backend render target is valid for the lifetime of the returned Texture. Returns nullptr if the
+   * backend render target is invalid.
    */
-  virtual std::shared_ptr<GPUTexture> importExternalTexture(
+  virtual std::shared_ptr<Texture> importBackendRenderTarget(
       const BackendRenderTarget& backendRenderTarget) = 0;
 
   /**
@@ -127,12 +126,20 @@ class GPU {
    * ownership of the BackendSemaphore and will destroy it when no longer needed. Returns nullptr
    * if the BackendSemaphore is invalid or not supported by the GPU backend.
    */
-  virtual std::shared_ptr<Semaphore> importExternalSemaphore(const BackendSemaphore& semaphore) = 0;
+  virtual std::shared_ptr<Semaphore> importBackendSemaphore(const BackendSemaphore& semaphore) = 0;
 
   /**
-   * Creates a GPUSampler with the specified descriptor.
+   * Transfers ownership of the BackendSemaphore from a uniquely owned Semaphore to the caller.
+   * After this call, the caller is responsible for managing the returned BackendSemaphore. You must
+   * use std::move() to pass the Semaphore, and it will be released during this process. Returns an
+   * empty BackendSemaphore if the Semaphore is nullptr or not uniquely owned.
    */
-  virtual std::shared_ptr<GPUSampler> createSampler(const GPUSamplerDescriptor& descriptor) = 0;
+  virtual BackendSemaphore stealBackendSemaphore(std::shared_ptr<Semaphore> semaphore) = 0;
+
+  /**
+   * Creates a GPU sampler with the specified descriptor.
+   */
+  virtual std::shared_ptr<Sampler> createSampler(const SamplerDescriptor& descriptor) = 0;
 
   /**
    * Creates a ShaderModule from the provided shader code. The shader code must be valid and

@@ -116,7 +116,7 @@ class FragmentProcessor : public Processor {
     return onCountTextureSamplers();
   }
 
-  std::shared_ptr<GPUTexture> textureAt(size_t i) const {
+  std::shared_ptr<Texture> textureAt(size_t i) const {
     return onTextureAt(i);
   }
 
@@ -236,8 +236,8 @@ class FragmentProcessor : public Processor {
      */
     const TransformedCoordVars* transformedCoords;
     /**
-     * Contains one entry for each GPUTexture of the Processor. These can be passed to the
-     * builder to emit texture reads in the generated code.
+     * Contains one entry for each Texture of the Processor. These can be passed to the builder to
+     * emit texture reads in the generated code.
      */
     const TextureSamplers* textureSamplers;
     const std::function<std::string(std::string_view)> coordFunc;
@@ -323,7 +323,7 @@ class FragmentProcessor : public Processor {
     return 0;
   }
 
-  virtual std::shared_ptr<GPUTexture> onTextureAt(size_t) const {
+  virtual std::shared_ptr<Texture> onTextureAt(size_t) const {
     return nullptr;
   }
 

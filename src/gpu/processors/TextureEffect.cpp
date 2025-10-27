@@ -75,7 +75,7 @@ size_t TextureEffect::onCountTextureSamplers() const {
   return 1;
 }
 
-std::shared_ptr<GPUTexture> TextureEffect::onTextureAt(size_t index) const {
+std::shared_ptr<Texture> TextureEffect::onTextureAt(size_t index) const {
   auto textureView = getTextureView();
   if (textureView == nullptr) {
     return nullptr;

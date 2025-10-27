@@ -23,20 +23,20 @@
 namespace tgfx {
 /**
  * DefaultTextureView is a simple TextureView implementation that stores pixel data using a single
- * GPUTexture.
+ * Texture.
  */
 class DefaultTextureView : public TextureView {
  public:
-  explicit DefaultTextureView(std::shared_ptr<GPUTexture> texture,
+  explicit DefaultTextureView(std::shared_ptr<Texture> texture,
                               ImageOrigin origin = ImageOrigin::TopLeft);
 
   size_t memoryUsage() const override;
 
-  std::shared_ptr<GPUTexture> getTexture() const override {
+  std::shared_ptr<Texture> getTexture() const override {
     return _texture;
   }
 
  protected:
-  std::shared_ptr<GPUTexture> _texture = nullptr;
+  std::shared_ptr<Texture> _texture = nullptr;
 };
 }  // namespace tgfx

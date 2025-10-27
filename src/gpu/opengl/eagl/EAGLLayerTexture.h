@@ -42,7 +42,7 @@ class EAGLLayerTexture : public GLTexture {
   unsigned _frameBufferID = 0;
   unsigned renderBufferID = 0;
 
-  EAGLLayerTexture(const GPUTextureDescriptor& descriptor, unsigned frameBufferID)
+  EAGLLayerTexture(const TextureDescriptor& descriptor, unsigned frameBufferID)
       : GLTexture(descriptor, GL_TEXTURE_2D, 0), _frameBufferID(frameBufferID) {
   }
 };

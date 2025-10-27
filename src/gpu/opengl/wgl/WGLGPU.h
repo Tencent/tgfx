@@ -26,7 +26,7 @@ class WGLGPU : public GLGPU {
   explicit WGLGPU(std::shared_ptr<GLInterface> glInterface) : GLGPU(std::move(glInterface)) {
   }
 
-  std::vector<std::shared_ptr<GPUTexture>> importHardwareTextures(HardwareBufferRef hardwareBuffer,
-                                                                  uint32_t usage) override;
+  std::vector<std::shared_ptr<Texture>> importHardwareTextures(HardwareBufferRef hardwareBuffer,
+                                                               uint32_t usage) override;
 };
 }  // namespace tgfx

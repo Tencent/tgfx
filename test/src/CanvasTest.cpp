@@ -3063,6 +3063,20 @@ TGFX_TEST(CanvasTest, uninvertibleStateMatrix) {
   canvas->drawPath(path, paint);
 }
 
+TGFX_TEST(CanvasTest, FlushSemaphore) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 128, 128);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+  BackendSemaphore backendSemaphore = {};
+  context->flush(&backendSemaphore);
+  EXPECT_TRUE(backendSemaphore.isInitialized());
+  auto semaphore = context->gpu()->importBackendSemaphore(backendSemaphore);
+  EXPECT_TRUE(semaphore != nullptr);
+}
+
 TGFX_TEST(CanvasTest, ScaleMatrixShader) {
   auto image = MakeImage("resources/apitest/imageReplacement.png");
   ASSERT_TRUE(image != nullptr);

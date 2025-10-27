@@ -979,8 +979,15 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     }
     auto filter = paint.getImageFilter();
     if (filter) {
+      if (clipBounds.has_value()) {
+        clipBounds->scale(contentScale, contentScale);
+        clipBounds->offset(-offset.x, -offset.y);
+        clipBounds->roundOut();
+      }
       auto filterOffset = Point::Make(0, 0);
-      image = image->makeWithFilter(filter, &filterOffset);
+      // clipBounds may be smaller than the image bounds, so we need to pass it to makeWithFilter.
+      image = image->makeWithFilter(filter, &filterOffset,
+                                    clipBounds.has_value() ? &*clipBounds : nullptr);
       paint.setImageFilter(nullptr);
       offset += filterOffset;
     }

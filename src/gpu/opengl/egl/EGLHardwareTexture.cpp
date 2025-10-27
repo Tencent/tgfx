@@ -88,7 +88,7 @@ std::shared_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(EGLGPU* gpu,
   if (format == PixelFormat::Unknown) {
     return nullptr;
   }
-  if (usage & GPUTextureUsage::RENDER_ATTACHMENT && (isYUV || !gpu->isFormatRenderable(format))) {
+  if (usage & TextureUsage::RENDER_ATTACHMENT && (isYUV || !gpu->isFormatRenderable(format))) {
     return nullptr;
   }
   unsigned target = isYUV ? GL_TEXTURE_EXTERNAL_OES : GL_TEXTURE_2D;
@@ -110,19 +110,19 @@ std::shared_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(EGLGPU* gpu,
     eglext::eglDestroyImageKHR(display, eglImage);
     return nullptr;
   }
-  GPUTextureDescriptor descriptor = {info.width, info.height, format, false, 1, usage};
+  TextureDescriptor descriptor = {info.width, info.height, format, false, 1, usage};
   auto texture = gpu->makeResource<EGLHardwareTexture>(descriptor, hardwareBuffer, eglImage, target,
                                                        textureID);
   auto state = gpu->state();
   state->bindTexture(texture.get());
   eglext::glEGLImageTargetTexture2DOES(target, (GLeglImageOES)eglImage);
-  if (usage & GPUTextureUsage::RENDER_ATTACHMENT && !texture->checkFrameBuffer(gpu)) {
+  if (usage & TextureUsage::RENDER_ATTACHMENT && !texture->checkFrameBuffer(gpu)) {
     return nullptr;
   }
   return texture;
 }
 
-EGLHardwareTexture::EGLHardwareTexture(const GPUTextureDescriptor& descriptor,
+EGLHardwareTexture::EGLHardwareTexture(const TextureDescriptor& descriptor,
                                        HardwareBufferRef hardwareBuffer, EGLImageKHR eglImage,
                                        unsigned target, unsigned textureID)
     : GLTexture(descriptor, target, textureID), hardwareBuffer(hardwareBuffer), eglImage(eglImage) {

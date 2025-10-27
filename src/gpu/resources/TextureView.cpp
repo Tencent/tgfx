@@ -39,7 +39,7 @@ bool TextureView::CheckSizeAndFormat(Context* context, int width, int height, Pi
   return width <= maxTextureSize && height <= maxTextureSize;
 }
 
-void TextureView::ComputeTextureKey(const std::shared_ptr<GPUTexture> texture, BytesKey* bytesKey) {
+void TextureView::ComputeTextureKey(const std::shared_ptr<Texture> texture, BytesKey* bytesKey) {
   DEBUG_ASSERT(texture != nullptr);
   bytesKey->write(static_cast<uint32_t>(texture->format()) << 16 |
                   static_cast<uint32_t>(texture->type()));
@@ -71,7 +71,7 @@ std::shared_ptr<TextureView> TextureView::MakeFormat(Context* context, int width
   if (textureView) {
     textureView->_origin = origin;
   } else {
-    GPUTextureDescriptor descriptor = {width, height, pixelFormat, mipmapped};
+    TextureDescriptor descriptor = {width, height, pixelFormat, mipmapped};
     auto texture = gpu->createTexture(descriptor);
     if (texture == nullptr) {
       return nullptr;
@@ -92,8 +92,8 @@ std::shared_ptr<TextureView> TextureView::MakeFrom(Context* context,
   if (context == nullptr) {
     return nullptr;
   }
-  auto texture = context->gpu()->importExternalTexture(backendTexture,
-                                                       GPUTextureUsage::TEXTURE_BINDING, adopted);
+  auto texture =
+      context->gpu()->importBackendTexture(backendTexture, TextureUsage::TEXTURE_BINDING, adopted);
   if (texture == nullptr) {
     return nullptr;
   }
@@ -126,7 +126,7 @@ std::shared_ptr<TextureView> TextureView::MakeFrom(Context* context,
     return nullptr;
   }
   auto textures =
-      context->gpu()->importHardwareTextures(hardwareBuffer, GPUTextureUsage::TEXTURE_BINDING);
+      context->gpu()->importHardwareTextures(hardwareBuffer, TextureUsage::TEXTURE_BINDING);
   if (textures.empty()) {
     return nullptr;
   }
@@ -140,7 +140,7 @@ std::shared_ptr<TextureView> TextureView::MakeFrom(Context* context,
 }
 
 Point TextureView::getTextureCoord(float x, float y) const {
-  if (getTexture()->type() == GPUTextureType::Rectangle) {
+  if (getTexture()->type() == TextureType::Rectangle) {
     return {x, y};
   }
   return {x / static_cast<float>(width()), y / static_cast<float>(height())};

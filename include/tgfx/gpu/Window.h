@@ -39,7 +39,7 @@ class Window {
    * Returns the Surface associated with this Window. If the queryOnly is true, it will not create
    * a new surface if it doesn't exist.
    */
-  std::shared_ptr<tgfx::Surface> getSurface(Context* context, bool queryOnly = false);
+  std::shared_ptr<Surface> getSurface(Context* context, bool queryOnly = false);
 
   /**
    * Applies all pending graphics changes to the window. On the Android platform, the
