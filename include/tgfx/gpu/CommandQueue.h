@@ -19,6 +19,7 @@
 #pragma once
 
 #include <memory>
+#include "tgfx/core/Rect.h"
 #include "tgfx/gpu/CommandBuffer.h"
 #include "tgfx/gpu/GPUBuffer.h"
 #include "tgfx/gpu/Semaphore.h"

@@ -19,7 +19,7 @@
 #pragma once
 
 #include <string>
-#include "gpu/ShaderStage.h"
+#include "tgfx/gpu/ShaderStage.h"
 
 namespace tgfx {
 /**

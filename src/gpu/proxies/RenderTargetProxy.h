@@ -21,6 +21,7 @@
 #include "TextureProxy.h"
 #include "gpu/BackingFit.h"
 #include "gpu/resources/RenderTarget.h"
+#include "tgfx/core/Matrix.h"
 
 namespace tgfx {
 /**
