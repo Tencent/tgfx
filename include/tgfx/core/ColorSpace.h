@@ -320,13 +320,6 @@ static constexpr ColorMatrix33 XYZ = {{
 
 }  // namespace NamedGamut
 
-struct LumaFactor {
-  /** default ITU-R Recommendation BT.709 at http://www.itu.int/rec/R-REC-BT.709/ .*/
-  float kr = 0.2126f;
-  float kg = 0.7152f;
-  float kb = 0.0722f;
-};
-
 class ColorSpace : public std::enable_shared_from_this<ColorSpace> {
  public:
   /**
@@ -460,13 +453,6 @@ class ColorSpace : public std::enable_shared_from_this<ColorSpace> {
   void gamutTransformTo(const ColorSpace* dst, ColorMatrix33* srcToDst) const;
 
   /**
-   * Return LumaFactor of this ColorSpacel.
-   */
-  LumaFactor lumaFactor() const {
-    return _lumaFactor;
-  }
-
-  /**
    * Return TransferFunction hash value.
    */
   uint32_t transferFunctionHash() const {
@@ -481,8 +467,7 @@ class ColorSpace : public std::enable_shared_from_this<ColorSpace> {
   }
 
  private:
-  ColorSpace(const TransferFunction& transferFunction, const ColorMatrix33& toXYZ,
-             const LumaFactor& lumaFactor);
+  ColorSpace(const TransferFunction& transferFunction, const ColorMatrix33& toXYZ);
 
   void computeLazyDstFields() const;
 
@@ -491,8 +476,6 @@ class ColorSpace : public std::enable_shared_from_this<ColorSpace> {
 
   TransferFunction _transferFunction;
   ColorMatrix33 _toXYZD50;
-
-  LumaFactor _lumaFactor;
 
   mutable TransferFunction _invTransferFunction;
   mutable ColorMatrix33 _fromXYZD50;

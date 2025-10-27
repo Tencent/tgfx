@@ -37,10 +37,9 @@ void GLSLLumaFragmentProcessor::emitCode(EmitArgs& args) const {
 
 void GLSLLumaFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
                                           UniformData* fragmentUniformData) const {
-  auto lumaFactor = _colorSpace->lumaFactor();
-  fragmentUniformData->setData("Kr", lumaFactor.kr);
-  fragmentUniformData->setData("Kg", lumaFactor.kg);
-  fragmentUniformData->setData("Kb", lumaFactor.kb);
+  fragmentUniformData->setData("Kr", _lumaFactor.kr);
+  fragmentUniformData->setData("Kg", _lumaFactor.kg);
+  fragmentUniformData->setData("Kb", _lumaFactor.kb);
 }
 
 }  // namespace tgfx
