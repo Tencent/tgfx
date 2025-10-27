@@ -27,7 +27,8 @@
 
 namespace tgfx {
 std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<Picture> picture, int width, int height,
-                                       const Matrix* matrix) {
+                                       const Matrix* matrix,
+                                       std::shared_ptr<ColorSpace> colorSpace) {
   if (picture == nullptr || width <= 0 || height <= 0) {
     return nullptr;
   }
@@ -45,15 +46,17 @@ std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<Picture> picture, int wid
       return image;
     }
   }
-  auto image = std::make_shared<PictureImage>(std::move(picture), width, height, matrix);
+  auto image = std::make_shared<PictureImage>(std::move(picture), width, height, matrix, false,
+                                              std::move(colorSpace));
   image->weakThis = image;
   return image;
 }
 
 PictureImage::PictureImage(std::shared_ptr<Picture> picture, int width, int height,
-                           const Matrix* matrix, bool mipmapped)
+                           const Matrix* matrix, bool mipmapped,
+                           std::shared_ptr<ColorSpace> colorSpace)
     : picture(std::move(picture)), _width(width), _height(height), mipmapped(mipmapped),
-      _colorSpace(ColorSpace::MakeSRGB()) {
+      _colorSpace(std::move(colorSpace)) {
   if (matrix && !matrix->isIdentity()) {
     this->matrix = new Matrix(*matrix);
   }

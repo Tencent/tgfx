@@ -438,13 +438,30 @@ class ColorSpace : public std::enable_shared_from_this<ColorSpace> {
    */
   static bool Equals(const ColorSpace* colorSpaceA, const ColorSpace* colorSpaceB);
 
+  /**
+   * Return TransferFunction of this ColorSpace.
+   */
   void transferFunction(TransferFunction* function) const;
+  /**
+   * Return inverse TransferFunction of this ColorSpace.
+   */
   void invTransferFunction(TransferFunction* function) const;
+
+  /**
+   * Compute the Matrix to convert ColorSpace from this to dst.
+   */
   void gamutTransformTo(const ColorSpace* dst, ColorMatrix33* srcToDst) const;
 
+  /**
+   * Return TransferFunction hash value.
+   */
   uint32_t transferFunctionHash() const {
     return _transferFunctionHash;
   }
+
+  /**
+   * Return ColorSpace hash value.
+   */
   uint64_t hash() const {
     return (uint64_t)_transferFunctionHash << 32 | _toXYZD50Hash;
   }
