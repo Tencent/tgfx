@@ -19,7 +19,6 @@
 #pragma once
 
 #include <mutex>
-#include "tgfx/core/Matrix.h"
 
 namespace tgfx {
 class Context;

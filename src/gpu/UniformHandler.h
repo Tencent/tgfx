@@ -19,10 +19,10 @@
 #pragma once
 
 #include "gpu/SamplerHandle.h"
-#include "gpu/ShaderStage.h"
 #include "gpu/ShaderVar.h"
 #include "gpu/Swizzle.h"
 #include "gpu/UniformData.h"
+#include "tgfx/gpu/ShaderStage.h"
 #include "tgfx/gpu/Texture.h"
 
 namespace tgfx {

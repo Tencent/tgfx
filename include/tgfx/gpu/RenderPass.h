@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "core/utils/Log.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/gpu/GPUBuffer.h"
 #include "tgfx/gpu/RenderPipeline.h"
