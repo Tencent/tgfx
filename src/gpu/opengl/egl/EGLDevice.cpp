@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/opengl/egl/EGLDevice.h"
+#include <cstring>
 #include "core/utils/Log.h"
 #include "gpu/opengl/egl/EGLGPU.h"
 #include "tgfx/core/ColorSpace.h"
