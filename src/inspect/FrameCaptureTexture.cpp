@@ -21,7 +21,7 @@
 #include "FrameCapture.h"
 #include "core/utils/CopyPixels.h"
 #include "core/utils/PixelFormatUtil.h"
-#include "gpu/GPU.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx::inspect {
 static std::unordered_map<uint64_t, uint64_t> ReadedInputTexture = {};

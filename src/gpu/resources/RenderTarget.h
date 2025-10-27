@@ -19,6 +19,7 @@
 #pragma once
 
 #include "gpu/resources/TextureView.h"
+#include "tgfx/core/Rect.h"
 
 namespace tgfx {
 /**

@@ -22,7 +22,6 @@
 #include "gpu/ProxyProvider.h"
 #include "gpu/Quad.h"
 #include "gpu/RectsVertexProvider.h"
-#include "gpu/RenderPass.h"
 #include "gpu/processors/ColorSpaceXFormEffect.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/processors/TextureEffect.h"
@@ -30,6 +29,7 @@
 #include "gpu/resources/RuntimeProgramWrapper.h"
 #include "inspect/InspectorMark.h"
 #include "tgfx/core/RenderFlags.h"
+#include "tgfx/gpu/RenderPass.h"
 
 namespace tgfx {
 RuntimeDrawTask::RuntimeDrawTask(std::shared_ptr<RenderTargetProxy> target,

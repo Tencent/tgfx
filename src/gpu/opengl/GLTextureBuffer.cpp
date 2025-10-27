@@ -18,8 +18,8 @@
 
 #include "GLTextureBuffer.h"
 #include "core/utils/PixelFormatUtil.h"
-#include "gpu/GPU.h"
 #include "gpu/opengl/GLUtil.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 GLTextureBuffer::GLTextureBuffer(std::shared_ptr<GLInterface> interface,

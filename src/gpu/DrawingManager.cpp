@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawingManager.h"
-#include "GPU.h"
 #include "ProxyProvider.h"
 #include "core/AtlasCellDecodeTask.h"
 #include "core/AtlasManager.h"
@@ -29,6 +28,7 @@
 #include "gpu/tasks/RuntimeDrawTask.h"
 #include "inspect/InspectorMark.h"
 #include "tasks/TransferPixelsTask.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 static ColorType GetAtlasColorType(bool isAlphaOnly) {

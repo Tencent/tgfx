@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/Context.h"
-#include "GPU.h"
 #include "core/AtlasManager.h"
 #include "core/utils/BlockBuffer.h"
 #include "core/utils/Log.h"
@@ -28,6 +27,7 @@
 #include "gpu/ResourceCache.h"
 #include "gpu/ShaderCaps.h"
 #include "tgfx/core/Clock.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 Context::Context(Device* device, GPU* gpu) : _device(device), _gpu(gpu) {

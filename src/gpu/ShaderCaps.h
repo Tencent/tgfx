@@ -19,7 +19,7 @@
 #pragma once
 
 #include <string>
-#include "gpu/GPU.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 /**

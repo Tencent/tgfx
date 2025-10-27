@@ -19,10 +19,10 @@
 #pragma once
 
 #include <array>
-#include "gpu/Texture.h"
 #include "gpu/YUVFormat.h"
 #include "gpu/resources/TextureView.h"
 #include "tgfx/core/YUVColorSpace.h"
+#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
 /**

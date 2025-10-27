@@ -17,11 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include "gpu/CommandQueue.h"
-#include "gpu/Texture.h"
 #include "gpu/resources/RenderTarget.h"
 #include "tgfx/core/Buffer.h"
+#include "tgfx/gpu/CommandQueue.h"
 #include "tgfx/gpu/PixelFormat.h"
+#include "tgfx/gpu/Texture.h"
 
 namespace tgfx::inspect {
 
