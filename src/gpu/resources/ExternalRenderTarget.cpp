@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ExternalRenderTarget.h"
-#include "gpu/GPU.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,

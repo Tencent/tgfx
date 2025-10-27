@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "gpu/Sampler.h"
+#include "tgfx/gpu/Sampler.h"
 #include "tgfx/gpu/opengl/GLDefines.h"
 
 namespace tgfx {

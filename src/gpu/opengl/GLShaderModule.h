@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "gpu/ShaderModule.h"
 #include "gpu/opengl/GLResource.h"
+#include "tgfx/gpu/ShaderModule.h"
 
 namespace tgfx {
 class GLShaderModule : public ShaderModule, public GLResource {

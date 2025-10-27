@@ -18,13 +18,13 @@
 
 #pragma once
 
-#include "gpu/Texture.h"
 #include "gpu/resources/Resource.h"
 #include "tgfx/core/ImageBuffer.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/YUVColorSpace.h"
 #include "tgfx/core/YUVData.h"
 #include "tgfx/gpu/ImageOrigin.h"
+#include "tgfx/gpu/Texture.h"
 #include "tgfx/platform/HardwareBuffer.h"
 
 namespace tgfx {

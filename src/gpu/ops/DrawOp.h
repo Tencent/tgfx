@@ -20,7 +20,7 @@
 
 #include "gpu/AAType.h"
 #include "gpu/ProgramInfo.h"
-#include "gpu/RenderPass.h"
+#include "tgfx/gpu/RenderPass.h"
 
 namespace tgfx {
 class DrawOp {

@@ -21,7 +21,7 @@
 #include <GLES2/gl2.h>
 #include <GLES2/gl2ext.h>
 #include "core/utils/PixelFormatUtil.h"
-#include "gpu/GPU.h"
+#include "tgfx/gpu/GPU.h"
 #include "tgfx/gpu/PixelFormat.h"
 #include "tgfx/gpu/opengl/egl/EGLDevice.h"
 #include "tgfx/platform/HardwareBuffer.h"

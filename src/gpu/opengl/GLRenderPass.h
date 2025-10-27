@@ -18,10 +18,10 @@
 
 #pragma once
 
-#include "gpu/RenderPass.h"
 #include "gpu/opengl/GLBuffer.h"
 #include "gpu/opengl/GLInterface.h"
 #include "gpu/opengl/GLRenderPipeline.h"
+#include "tgfx/gpu/RenderPass.h"
 
 namespace tgfx {
 class GLGPU;

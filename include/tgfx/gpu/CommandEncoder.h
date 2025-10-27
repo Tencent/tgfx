@@ -18,9 +18,9 @@
 
 #pragma once
 
-#include "gpu/CommandBuffer.h"
-#include "gpu/GPUBuffer.h"
-#include "gpu/Texture.h"
+#include "tgfx/gpu/CommandBuffer.h"
+#include "tgfx/gpu/GPUBuffer.h"
+#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
 

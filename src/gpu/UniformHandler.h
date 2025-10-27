@@ -22,8 +22,8 @@
 #include "gpu/ShaderStage.h"
 #include "gpu/ShaderVar.h"
 #include "gpu/Swizzle.h"
-#include "gpu/Texture.h"
 #include "gpu/UniformData.h"
+#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
 class ProgramBuilder;

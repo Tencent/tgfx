@@ -21,15 +21,14 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include "gpu/Attribute.h"
-#include "gpu/BlendFactor.h"
-#include "gpu/BlendOperation.h"
-#include "gpu/ColorWriteMask.h"
-#include "gpu/CompareFunction.h"
-#include "gpu/ShaderModule.h"
-#include "gpu/StencilOperation.h"
-#include "gpu/Uniform.h"
+#include "tgfx/gpu/Attribute.h"
+#include "tgfx/gpu/BlendFactor.h"
+#include "tgfx/gpu/BlendOperation.h"
+#include "tgfx/gpu/ColorWriteMask.h"
+#include "tgfx/gpu/CompareFunction.h"
 #include "tgfx/gpu/PixelFormat.h"
+#include "tgfx/gpu/ShaderModule.h"
+#include "tgfx/gpu/StencilOperation.h"
 
 namespace tgfx {
 /**
