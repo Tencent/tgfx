@@ -64,14 +64,17 @@ TGFX_TEST(ResourceCacheTest, multiThreadRecycling) {
 #ifdef TGFX_USE_THREADS
 TGFX_TEST(ResourceCacheTest, blockBufferRefCount) {
   BlockBuffer blockBuffer;
+  // make sure vertices expire after task is done
+  float* vertices = nullptr;
   {
     auto vertexProvider =
         RectsVertexProvider::MakeFrom(&blockBuffer, Rect::MakeWH(100, 100), AAType::Coverage);
-    std::array<float, 16> vertices;
-    auto task = std::make_shared<VertexProviderTask>(std::move(vertexProvider), vertices.data());
+    vertices = new float[vertexProvider->vertexCount()];
+    auto task = std::make_shared<VertexProviderTask>(std::move(vertexProvider), vertices);
     Task::Run(task);
   }
   blockBuffer.clear();
+  delete[] vertices;
 }
 #endif
 
