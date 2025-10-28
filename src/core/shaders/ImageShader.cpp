@@ -47,14 +47,17 @@ bool ImageShader::isEqual(const Shader* shader) const {
 }
 
 PlacementPtr<FragmentProcessor> ImageShader::asFragmentProcessor(
-    const FPArgs& args, const Matrix* uvMatrix, std::shared_ptr<ColorSpace> dstColorSpace) const {
+    const FPArgs& args, const Matrix* uvMatrix, std::shared_ptr<ColorSpace>) const {
   SamplingArgs samplingArgs = {tileModeX, tileModeY, sampling, SrcRectConstraint::Fast};
   auto fp = image->asFragmentProcessor(args, samplingArgs, uvMatrix);
+
+  // TODO: Turn on when the wide gumat convertion is Completed
+  /*
   if (!image->isAlphaOnly()) {
     fp = ColorSpaceXformEffect::Make(args.context->drawingBuffer(), std::move(fp),
                                      image->colorSpace().get(), AlphaType::Premultiplied,
                                      dstColorSpace.get(), AlphaType::Premultiplied);
-  }
+  } */
   return fp;
 }
 }  // namespace tgfx
