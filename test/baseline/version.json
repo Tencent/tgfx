@@ -270,6 +270,9 @@
         "Image": "a9b29daa",
         "SimpleText": "a9b29daa"
     },
+    "PathTest": {
+        "DrawInfiniteLoopPath": "898f84dd"
+    },
     "ReadPixelsTest": {
         "JpegCodec_Decode_Alpha8": "afd80b4",
         "JpegCodec_Decode_Gray8": "afd80b4",
