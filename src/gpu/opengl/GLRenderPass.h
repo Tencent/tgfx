@@ -30,6 +30,8 @@ class GLRenderPass : public RenderPass {
  public:
   GLRenderPass(GLGPU* gpu, RenderPassDescriptor descriptor);
 
+  GPU* gpu() const override;
+
   bool begin();
 
   void setViewport(int x, int y, int width, int height) override;
@@ -58,7 +60,7 @@ class GLRenderPass : public RenderPass {
   void onEnd() override;
 
  private:
-  GLGPU* gpu = nullptr;
+  GLGPU* _gpu = nullptr;
   std::shared_ptr<GLRenderPipeline> renderPipeline = nullptr;
   IndexFormat indexFormat = IndexFormat::UInt16;
   uint32_t stencilReference = 0;
