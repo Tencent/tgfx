@@ -403,11 +403,12 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
                    drawScale.value_or(1.0f)};
     auto processor =
         FragmentProcessor::Make(pendingImage, args, pendingSampling, pendingConstraint);
-    if (!pendingImage->isAlphaOnly()) {
+    // TODO: Turn on when the wide gumat convertion is Completed
+    /* if (!pendingImage->isAlphaOnly()) {
       processor = ColorSpaceXformEffect::Make(
           context->drawingBuffer(), std::move(processor), pendingImage->colorSpace().get(),
           AlphaType::Premultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
-    }
+    } */
     if (processor == nullptr) {
       return;
     }

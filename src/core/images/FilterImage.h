@@ -46,7 +46,6 @@ class FilterImage : public SubsetImage {
   std::shared_ptr<ImageFilter> filter = nullptr;
 
   std::shared_ptr<ColorSpace> colorSpace() const override {
-    return ColorSpace::MakeSRGB();
     return source->colorSpace();
   }
 
