@@ -67,11 +67,10 @@ static void HashCombine(std::size_t& seed, const T& v) {
   seed ^= hasher(v) + kMagicConstant + (seed << 6) + (seed >> 2);
 }
 
-
-static std::size_t ComputeFinalHash(uint64_t hash1, uint64_t hash2, AlphaType type1, AlphaType type2) {
+static std::size_t ComputeFinalHash(uint64_t hash1, uint64_t hash2, AlphaType type1,
+                                    AlphaType type2) {
 
   std::size_t seed = 0;
-
 
   HashCombine(seed, hash1);
   HashCombine(seed, hash2);
@@ -82,19 +81,22 @@ static std::size_t ComputeFinalHash(uint64_t hash1, uint64_t hash2, AlphaType ty
 }
 
 static std::unordered_map<std::size_t, std::shared_ptr<ColorSpaceXformSteps>> StepsCache;
-std::shared_ptr<ColorSpaceXformSteps> ColorSpaceXformSteps::Make(
-    const ColorSpace* src, AlphaType srcAT, const ColorSpace* dst, AlphaType dstAT) {
-  if(!src) {
+std::shared_ptr<ColorSpaceXformSteps> ColorSpaceXformSteps::Make(const ColorSpace* src,
+                                                                 AlphaType srcAT,
+                                                                 const ColorSpace* dst,
+                                                                 AlphaType dstAT) {
+  if (!src) {
     src = ColorSpace::MakeSRGB().get();
   }
   if (!dst) {
     dst = src;
   }
   auto hash = ComputeFinalHash(src->hash(), dst->hash(), srcAT, dstAT);
-  if(StepsCache.find(hash) != StepsCache.end()) {
+  if (StepsCache.find(hash) != StepsCache.end()) {
     return StepsCache[hash];
   }
-  auto result = std::shared_ptr<ColorSpaceXformSteps>(new ColorSpaceXformSteps(src, srcAT, dst, dstAT));
+  auto result =
+      std::shared_ptr<ColorSpaceXformSteps>(new ColorSpaceXformSteps(src, srcAT, dst, dstAT));
   StepsCache[hash] = result;
   return result;
 }

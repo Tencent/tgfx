@@ -24,8 +24,7 @@ PlacementPtr<FragmentProcessor> ColorSpaceXformEffect::Make(BlockBuffer* buffer,
                                                             PlacementPtr<FragmentProcessor> child,
                                                             ColorSpace* src, AlphaType srcAT,
                                                             ColorSpace* dst, AlphaType dstAT) {
-  return Make(buffer, std::move(child),
-              ColorSpaceXformSteps::Make(src, srcAT, dst, dstAT));
+  return Make(buffer, std::move(child), ColorSpaceXformSteps::Make(src, srcAT, dst, dstAT));
 }
 
 PlacementPtr<FragmentProcessor> ColorSpaceXformEffect::Make(

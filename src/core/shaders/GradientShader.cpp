@@ -197,7 +197,7 @@ PlacementPtr<FragmentProcessor> LinearGradientShader::asFragmentProcessor(
     totalMatrix.preConcat(*uvMatrix);
   }
   auto steps = ColorSpaceXformSteps::Make(ColorSpace::MakeSRGB().get(), AlphaType::Unpremultiplied,
-                             dstColorSpace.get(), AlphaType::Unpremultiplied);
+                                          dstColorSpace.get(), AlphaType::Unpremultiplied);
   return MakeGradient(args.context, *this,
                       LinearGradientLayout::Make(args.context->drawingBuffer(), totalMatrix),
                       steps);
@@ -240,7 +240,7 @@ PlacementPtr<FragmentProcessor> RadialGradientShader::asFragmentProcessor(
     totalMatrix.preConcat(*uvMatrix);
   }
   auto steps = ColorSpaceXformSteps::Make(ColorSpace::MakeSRGB().get(), AlphaType::Unpremultiplied,
-                           dstColorSpace.get(), AlphaType::Unpremultiplied);
+                                          dstColorSpace.get(), AlphaType::Unpremultiplied);
   return MakeGradient(args.context, *this,
                       RadialGradientLayout::Make(args.context->drawingBuffer(), totalMatrix),
                       steps);
@@ -269,7 +269,7 @@ PlacementPtr<FragmentProcessor> ConicGradientShader::asFragmentProcessor(
     totalMatrix.preConcat(*uvMatrix);
   }
   auto steps = ColorSpaceXformSteps::Make(ColorSpace::MakeSRGB().get(), AlphaType::Unpremultiplied,
-                           dstColorSpace.get(), AlphaType::Unpremultiplied);
+                                          dstColorSpace.get(), AlphaType::Unpremultiplied);
   return MakeGradient(
       args.context, *this,
       ConicGradientLayout::Make(args.context->drawingBuffer(), totalMatrix, bias, scale), steps);
@@ -320,7 +320,7 @@ PlacementPtr<FragmentProcessor> DiamondGradientShader::asFragmentProcessor(
     totalMatrix.preConcat(*uvMatrix);
   }
   auto steps = ColorSpaceXformSteps::Make(ColorSpace::MakeSRGB().get(), AlphaType::Unpremultiplied,
-                           dstColorSpace.get(), AlphaType::Unpremultiplied);
+                                          dstColorSpace.get(), AlphaType::Unpremultiplied);
   auto layout = DiamondGradientLayout::Make(args.context->drawingBuffer(), totalMatrix);
   return MakeGradient(args.context, *this, std::move(layout), steps);
 }
