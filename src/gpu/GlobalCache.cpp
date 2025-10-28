@@ -32,6 +32,8 @@ static constexpr size_t MAX_NUM_CACHED_GRADIENT_BITMAPS = 32;
 static constexpr uint16_t VERTICES_PER_NON_AA_QUAD = 4;
 static constexpr uint16_t VERTICES_PER_AA_QUAD = 8;
 static constexpr size_t MAX_UNIFORM_BUFFER_SIZE = 64 * 1024;
+static constexpr uint16_t VERTICES_PER_AA_STROKE_RECT = 16;
+static constexpr uint16_t VERTICES_PER_NON_AA_STROKE_RECT = 8;
 
 GlobalCache::GlobalCache(Context* context) : context(context) {
 }
@@ -217,14 +219,15 @@ class RectIndicesProvider : public DataSource<Data> {
   }
 
   std::shared_ptr<Data> getData() const override {
-    auto size = reps * patternSize * sizeof(uint16_t);
+    auto size = sizeof(uint16_t) * reps * patternSize;
     Buffer buffer(size);
     if (buffer.isEmpty()) {
       return nullptr;
     }
     auto data = reinterpret_cast<uint16_t*>(buffer.data());
     for (uint16_t i = 0; i < reps; ++i) {
-      uint16_t baseIdx = i * patternSize;
+      //Note: decltype(data[index]) resolves to uint16_t, while decltype(index) is size_t
+      auto baseIdx = static_cast<size_t>(i) * patternSize;
       auto baseVert = static_cast<uint16_t>(i * vertCount);
       for (uint16_t j = 0; j < patternSize; ++j) {
         data[baseIdx + j] = baseVert + pattern[j];
@@ -338,4 +341,79 @@ void GlobalCache::addStaticResource(const UniqueKey& uniqueKey,
   staticResources[uniqueKey] = std::move(resource);
 }
 
+// clang-format off
+/**
+ * As in stroke, index = a + b, and a is the current index, b is the shift
+ * from the first index. The index layout:
+ * outer AA line: 0 ~ 3
+ * outer edge:    4 ~ 7
+ * inner edge:    8 ~ 11
+ * inner AA line: 12 ~ 15
+ * Following comes an AA stroke rect and its indices:
+ *    0                                    2
+ *      **********************************
+ *      * 4────────────────────────────6 *
+ *      * │                            │ *
+ *      * │     8────────────────10    │ *
+ *      * │     │  ************  │     │ *
+ *      * │     │  *12      14*  │     │ *
+ *      * │     │  *          *  │     │ *
+ *      * │     │  *13      15*  │     │ *
+ *      * │     │  ************  │     │ *
+ *      * │     9────────────────11    │ *
+ *      * │                            │ *
+ *      * 5────────────────────────────7 *
+ *      **********************************
+ *    1                                    3
+ */
+static constexpr uint16_t AAStrokeRectIndices[] = {
+  0 + 0, 1 + 0, 5 + 0, 5 + 0, 4 + 0, 0 + 0,
+  1 + 0, 3 + 0, 7 + 0, 7 + 0, 5 + 0, 1 + 0,
+  3 + 0, 2 + 0, 6 + 0, 6 + 0, 7 + 0, 3 + 0,
+  2 + 0, 0 + 0, 4 + 0, 4 + 0, 6 + 0, 2 + 0,
+
+  0 + 4, 1 + 4, 5 + 4, 5 + 4, 4 + 4, 0 + 4,
+  1 + 4, 3 + 4, 7 + 4, 7 + 4, 5 + 4, 1 + 4,
+  3 + 4, 2 + 4, 6 + 4, 6 + 4, 7 + 4, 3 + 4,
+  2 + 4, 0 + 4, 4 + 4, 4 + 4, 6 + 4, 2 + 4,
+
+  0 + 8, 1 + 8, 5 + 8, 5 + 8, 4 + 8, 0 + 8,
+  1 + 8, 3 + 8, 7 + 8, 7 + 8, 5 + 8, 1 + 8,
+  3 + 8, 2 + 8, 6 + 8, 6 + 8, 7 + 8, 3 + 8,
+  2 + 8, 0 + 8, 4 + 8, 4 + 8, 6 + 8, 2 + 8,
+};
+
+/**  Following comes a non-AA stroke rect and its indices:
+ *    0────────────────────────────2
+ *    │                            │
+ *    │     4────────────────6     │
+ *    │     |                │     │
+ *    │     │                │     │
+ *    │     │                │     │
+ *    │     │                │     │
+ *    │     5────────────────7     │
+ *    │                            │
+ *    1────────────────────────────3
+*/
+static constexpr uint16_t NonAAStrokeRectIndices[] = {
+  0, 1, 5, 5, 4, 0,
+  1, 3, 7, 7, 5, 1,
+  3, 2, 6, 6, 7, 3,
+  2, 0, 4, 4, 6, 2,
+};
+// clang-format on
+
+std::shared_ptr<GPUBufferProxy> GlobalCache::getStrokeRectIndexBuffer(bool antialias) {
+  auto& indexBuffer = antialias ? aaRectStrokeIndexBuffer : nonAARectStrokeIndexBuffer;
+  if (indexBuffer == nullptr) {
+    auto pattern = antialias ? AAStrokeRectIndices : NonAAStrokeRectIndices;
+    auto patternSize =
+        antialias ? RectDrawOp::IndicesPerAAStrokeRect : RectDrawOp::IndicesPerNonAAStrokeRect;
+    auto vertCount = antialias ? VERTICES_PER_AA_STROKE_RECT : VERTICES_PER_NON_AA_STROKE_RECT;
+    auto provider = std::make_unique<RectIndicesProvider>(pattern, patternSize,
+                                                          RectDrawOp::MaxNumStrokeRects, vertCount);
+    indexBuffer = context->proxyProvider()->createIndexBufferProxy(std::move(provider));
+  }
+  return indexBuffer;
+}
 }  // namespace tgfx

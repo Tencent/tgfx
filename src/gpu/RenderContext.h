@@ -36,7 +36,8 @@ class RenderContext : public DrawContext {
 
   void drawFill(const Fill& fill) override;
 
-  void drawRect(const Rect& rect, const MCState& state, const Fill& fill) override;
+  void drawRect(const Rect& rect, const MCState& state, const Fill& fill,
+                const Stroke* stroke) override;
 
   void drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
                  const Stroke* stroke) override;

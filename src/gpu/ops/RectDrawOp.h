@@ -33,6 +33,11 @@ class RectDrawOp : public DrawOp {
   static constexpr uint16_t MaxNumRects = 2048;
 
   /**
+   * The maximum number of stroke rects that can be drawn in a single draw call.
+   */
+  static constexpr uint16_t MaxNumStrokeRects = 1024;
+
+  /**
    * The maximum number of vertices per non-AA quad.
    */
   static constexpr uint16_t IndicesPerNonAAQuad = 6;
@@ -41,6 +46,16 @@ class RectDrawOp : public DrawOp {
    * The maximum number of vertices per AA quad.
    */
   static constexpr uint16_t IndicesPerAAQuad = 30;
+
+  /**
+   * The number of indices per AA rect
+   */
+  static constexpr uint16_t IndicesPerAAStrokeRect = 3 * 24;
+
+  /**
+   * The number of indices per non-AA rect.
+   */
+  static constexpr uint16_t IndicesPerNonAAStrokeRect = 24;
 
   /**
    * Create a new RectDrawOp for the specified vertex provider.
@@ -59,6 +74,7 @@ class RectDrawOp : public DrawOp {
 
  private:
   size_t rectCount = 0;
+  bool hasStroke = false;
   std::optional<Color> commonColor = std::nullopt;
   std::optional<Matrix> uvMatrix = std::nullopt;
   bool hasSubset = false;
