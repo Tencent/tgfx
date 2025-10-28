@@ -31,6 +31,7 @@ PlacementPtr<FragmentProcessor> ColorSpaceXformEffect::Make(BlockBuffer* buffer,
 PlacementPtr<FragmentProcessor> ColorSpaceXformEffect::Make(
     BlockBuffer* buffer, PlacementPtr<FragmentProcessor> child,
     std::shared_ptr<ColorSpaceXformSteps> colorXform) {
+  return child;
   if (child == nullptr) {
     return nullptr;
   }
