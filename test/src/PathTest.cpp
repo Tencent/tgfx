@@ -1,0 +1,88 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making tgfx available.
+//
+//  Copyright (C) 2025 Tencent. All rights reserved.
+//
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+//  in compliance with the License. You may obtain a copy of the License at
+//
+//      https://opensource.org/licenses/BSD-3-Clause
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#include <cstddef>
+#include "base/TGFXTest.h"
+#include "core/PathTriangulator.h"
+#include "core/ShapeRasterizer.h"
+#include "gtest/gtest.h"
+#include "tgfx/core/Matrix.h"
+#include "tgfx/core/Paint.h"
+#include "tgfx/core/Surface.h"
+#include "tgfx/svg/SVGPathParser.h"
+#include "utils/Baseline.h"
+#include "utils/ContextScope.h"
+
+namespace tgfx {
+
+TGFX_TEST(PathTest, AvoidInfiniteLoop) {
+  auto path = SVGPathParser::FromSVGString(
+      "M3.1 1L5.1999 1L5.1999 3.1L4.6399 3.1L4.6399 1.956L1.956 4.6399L3.1 4.6399L3.1 5.1999L1 "
+      "5.1999L1 3.1L1.56 3.1L1.56 4.244L4.244 1.56L3.1 1.56L3.1 1Z");
+
+  {
+    ASSERT_FALSE(PathTriangulator::ShouldTriangulatePath(*path));
+    auto bounds = path->getBounds();
+    std::vector<float> vertices = {};
+    auto count = PathTriangulator::ToAATriangles(*path, bounds, &vertices);
+    ASSERT_EQ(count, 0u);
+  }
+
+  {
+    // scale up 100
+    path->transform(Matrix::MakeScale(100, 100));
+    ASSERT_TRUE(PathTriangulator::ShouldTriangulatePath(*path));
+    auto bounds = path->getBounds();
+    std::vector<float> vertices = {};
+    auto count = PathTriangulator::ToAATriangles(*path, bounds, &vertices);
+    ASSERT_EQ(count, 120u);
+  }
+
+  {
+    // scale up 0.5
+    path->transform(Matrix::MakeScale(0.005f, 0.005f));
+    ASSERT_FALSE(PathTriangulator::ShouldTriangulatePath(*path));
+    auto bounds = path->getBounds();
+    std::vector<float> vertices = {};
+    auto count = PathTriangulator::ToAATriangles(*path, bounds, &vertices);
+    ASSERT_EQ(count, 402u);
+  }
+}
+
+TGFX_TEST(PathTest, AAA) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::Black());
+
+  {
+    auto path = SVGPathParser::FromSVGString(
+        "M3.1 1L5.1999 1L5.1999 3.1L4.6399 3.1L4.6399 1.956L1.956 4.6399L3.1 4.6399L3.1 5.1999L1 "
+        "5.1999L1 3.1L1.56 3.1L1.56 4.244L4.244 1.56L3.1 1.56L3.1 1Z");
+
+    Paint cubicPaint;
+    cubicPaint.setColor(Color::FromRGBA(255, 255, 0, 255));
+    canvas->drawPath(*path, cubicPaint);
+  }
+
+  EXPECT_TRUE(Baseline::Compare(surface, "AAA/AAADebug"));
+}
+
+}  // namespace tgfx
