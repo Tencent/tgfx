@@ -159,12 +159,12 @@ void GLRenderPass::setStencilReference(uint32_t reference) {
 
 void GLRenderPass::onEnd() {
   auto gl = gpu->functions();
-  auto& attachment = descriptor.colorAttachments[0];
-  if (attachment.resolveTexture) {
-    auto renderTexture = static_cast<GLTexture*>(attachment.texture.get());
-    auto sampleTexture = static_cast<GLTexture*>(attachment.resolveTexture.get());
+  auto state = gpu->state();
+  auto& colorAttachment = descriptor.colorAttachments[0];
+  if (colorAttachment.resolveTexture) {
+    auto renderTexture = static_cast<GLTexture*>(colorAttachment.texture.get());
+    auto sampleTexture = static_cast<GLTexture*>(colorAttachment.resolveTexture.get());
     DEBUG_ASSERT(renderTexture != sampleTexture);
-    auto state = gpu->state();
     state->bindFramebuffer(renderTexture, FrameBufferTarget::Read);
     state->bindFramebuffer(sampleTexture, FrameBufferTarget::Draw);
     // MSAA resolve may be affected by the scissor test, so disable it here.
@@ -172,6 +172,12 @@ void GLRenderPass::onEnd() {
     gl->blitFramebuffer(0, 0, renderTexture->width(), renderTexture->height(), 0, 0,
                         sampleTexture->width(), sampleTexture->height(), GL_COLOR_BUFFER_BIT,
                         GL_NEAREST);
+  }
+  auto& depthStencilAttachment = descriptor.depthStencilAttachment;
+  if (depthStencilAttachment.texture != nullptr) {
+    auto renderTexture = static_cast<GLTexture*>(colorAttachment.texture.get());
+    state->bindFramebuffer(renderTexture);
+    gl->framebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, 0);
   }
 }
 
