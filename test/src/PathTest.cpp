@@ -19,7 +19,6 @@
 #include <cstddef>
 #include "base/TGFXTest.h"
 #include "core/PathTriangulator.h"
-#include "core/ShapeRasterizer.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
@@ -36,6 +35,7 @@ TGFX_TEST(PathTest, AvoidInfiniteLoop) {
       "5.1999L1 3.1L1.56 3.1L1.56 4.244L4.244 1.56L3.1 1.56L3.1 1Z");
 
   {
+    // infinite loop path, return count 0
     ASSERT_FALSE(PathTriangulator::ShouldTriangulatePath(*path));
     auto bounds = path->getBounds();
     std::vector<float> vertices = {};
@@ -44,7 +44,7 @@ TGFX_TEST(PathTest, AvoidInfiniteLoop) {
   }
 
   {
-    // scale up 100
+    // scale up 100, succeed
     path->transform(Matrix::MakeScale(100, 100));
     ASSERT_TRUE(PathTriangulator::ShouldTriangulatePath(*path));
     auto bounds = path->getBounds();
@@ -54,7 +54,7 @@ TGFX_TEST(PathTest, AvoidInfiniteLoop) {
   }
 
   {
-    // scale up 0.5
+    // scale up 0.5, succeed
     path->transform(Matrix::MakeScale(0.005f, 0.005f));
     ASSERT_FALSE(PathTriangulator::ShouldTriangulatePath(*path));
     auto bounds = path->getBounds();
@@ -64,11 +64,11 @@ TGFX_TEST(PathTest, AvoidInfiniteLoop) {
   }
 }
 
-TGFX_TEST(PathTest, AAA) {
+TGFX_TEST(PathTest, DrawInfiniteLoopPath) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 200, 200);
+  auto surface = Surface::Make(context, 16, 16);
   auto canvas = surface->getCanvas();
   canvas->clear(Color::Black());
 
@@ -82,7 +82,7 @@ TGFX_TEST(PathTest, AAA) {
     canvas->drawPath(*path, cubicPaint);
   }
 
-  EXPECT_TRUE(Baseline::Compare(surface, "AAA/AAADebug"));
+  EXPECT_TRUE(Baseline::Compare(surface, "PathTest/DrawInfiniteLoopPath"));
 }
 
 }  // namespace tgfx
