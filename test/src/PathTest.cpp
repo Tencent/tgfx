@@ -54,7 +54,7 @@ TGFX_TEST(PathTest, AvoidInfiniteLoop) {
   }
 
   {
-    // scale up 0.5, succeed
+    // scale down to 0.5, succeed
     path->transform(Matrix::MakeScale(0.005f, 0.005f));
     ASSERT_FALSE(PathTriangulator::ShouldTriangulatePath(*path));
     auto bounds = path->getBounds();
