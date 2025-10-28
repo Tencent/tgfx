@@ -27,6 +27,8 @@ namespace tgfx {
 enum class AlphaType;
 
 struct ColorSpaceXformSteps {
+  static std::shared_ptr<ColorSpaceXformSteps> Make(const ColorSpace* src, AlphaType srcAT, const ColorSpace* dst,
+                       AlphaType dstAT);
 
   struct Flags {
     bool unPremul = false;
@@ -42,16 +44,6 @@ struct ColorSpaceXformSteps {
              (encode ? 8 : 0) | (premul ? 16 : 0) | (srcOOTF ? 32 : 0) | (dstOOTF ? 64 : 0);
     }
   };
-
-  ColorSpaceXformSteps() {
-  }
-  ColorSpaceXformSteps(const ColorSpace* src, AlphaType srcAT, const ColorSpace* dst,
-                       AlphaType dstAT);
-
-  template <typename S, typename D>
-  ColorSpaceXformSteps(const S& src, const D& dst)
-      : ColorSpaceXformSteps(src.colorSpace(), src.alphaType(), dst.colorSpace(), dst.alphaType()) {
-  }
 
   void apply(float rgba[4]) const;
 
@@ -90,6 +82,9 @@ struct ColorSpaceXformSteps {
 
   uint64_t srcHash;
   uint64_t dstHash;
+private:
+  ColorSpaceXformSteps(const ColorSpace* src, AlphaType srcAT, const ColorSpace* dst,
+                     AlphaType dstAT);
 };
 
 }  // namespace tgfx
