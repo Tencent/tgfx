@@ -205,23 +205,6 @@ class DrawRect : public Record {
   Rect rect;
 };
 
-class StrokeRect : public Record {
- public:
-  StrokeRect(const Rect& rect, const Stroke& stroke) : rect(rect), stroke(stroke) {
-  }
-
-  RecordType type() const override {
-    return RecordType::StrokeRect;
-  }
-
-  void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawRect(rect, playback->state(), playback->fill(), &stroke);
-  }
-
-  Rect rect;
-  Stroke stroke;
-};
-
 class DrawRRect : public Record {
  public:
   explicit DrawRRect(const RRect& rRect) : rRect(rRect) {
