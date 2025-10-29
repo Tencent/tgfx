@@ -145,7 +145,8 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
     LOGE("RuntimeDrawTask::getFlatTexture() Failed to create the color processor!");
     return nullptr;
   }
-  if (!textureView->isAlphaOnly()) {
+  if (!textureView->isAlphaOnly() &&
+      !ColorSpace::Equals(textureProxyWithCS->colorSpace.get(), dstColorSpace.get())) {
     auto xformEffect = ColorSpaceXformEffect::Make(
         context->drawingBuffer(), textureProxyWithCS->colorSpace.get(), AlphaType::Premultiplied,
         dstColorSpace.get(), AlphaType::Premultiplied);

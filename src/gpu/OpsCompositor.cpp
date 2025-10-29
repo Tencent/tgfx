@@ -407,7 +407,8 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
       return;
     }
     drawOp->addColorFP(std::move(processor));
-    if (!pendingImage->isAlphaOnly()) {
+    if (!pendingImage->isAlphaOnly() &&
+        !ColorSpace::Equals(pendingImage->colorSpace().get(), dstColorSpace.get())) {
       auto xformEffect = ColorSpaceXformEffect::Make(
           context->drawingBuffer(), pendingImage->colorSpace().get(), AlphaType::Premultiplied,
           dstColorSpace.get(), AlphaType::Premultiplied);

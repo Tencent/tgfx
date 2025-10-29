@@ -50,7 +50,8 @@ PlacementPtr<FragmentProcessor> ImageShader::asFragmentProcessor(
     const FPArgs& args, const Matrix* uvMatrix, std::shared_ptr<ColorSpace> dstColorSpace) const {
   SamplingArgs samplingArgs = {tileModeX, tileModeY, sampling, SrcRectConstraint::Fast};
   auto fp = image->asFragmentProcessor(args, samplingArgs, uvMatrix);
-  if (!image->isAlphaOnly() && fp) {
+  if (!image->isAlphaOnly() && fp &&
+      !ColorSpace::Equals(image->colorSpace().get(), dstColorSpace.get())) {
     auto xformEffect = ColorSpaceXformEffect::Make(
         args.context->drawingBuffer(), image->colorSpace().get(), AlphaType::Premultiplied,
         dstColorSpace.get(), AlphaType::Premultiplied);
