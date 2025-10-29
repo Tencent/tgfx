@@ -129,14 +129,12 @@
         "tile_mode_rgbaaa": "8cb853c",
         "tile_mode_subset": "2931d737"
     },
-    "DrawersTest": {
-        "ConicGradient": "69683f78",
-        "CustomLayerTreeDrawer": "9060bdb6",
-        "GridBackground": "2ae64df",
-        "ImageWithMipmap": "da590da",
-        "ImageWithShadow": "c26ff3d9",
-        "SimpleLayerTreeDrawer": "9060bdb6",
-        "SimpleText": "983a559b"
+     "DrawersTest": {
+        "ConicGradient": "492105ac",
+        "ImageWithMipmap": "492105ac",
+        "ImageWithShadow": "492105ac",
+        "RichText": "97a50bee",
+        "SimpleLayerTree": "97a50bee"
     },
     "DstTextureTest": {
         "EmptyLocalBounds": "be94e666",
