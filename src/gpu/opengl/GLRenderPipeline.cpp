@@ -17,18 +17,20 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLRenderPipeline.h"
+#include "core/utils/UniqueID.h"
 #include "gpu/UniformData.h"
 #include "gpu/opengl/GLGPU.h"
 #include "gpu/opengl/GLUtil.h"
 
 namespace tgfx {
-GLRenderPipeline::GLRenderPipeline(unsigned programID) : programID(programID) {
+GLRenderPipeline::GLRenderPipeline(unsigned programID)
+    : uniqueID(UniqueID::Next()), programID(programID) {
 }
 
 void GLRenderPipeline::activate(GLGPU* gpu, bool depthReadOnly, bool stencilReadOnly,
                                 unsigned stencilReference) {
   auto state = gpu->state();
-  state->useProgram(programID);
+  state->bindPipeline(this);
   if (gpu->caps()->frameBufferFetchRequiresEnablePerSample) {
     if (blendState) {
       state->setEnabled(GL_FETCH_PER_SAMPLE_ARM, false);
@@ -58,23 +60,17 @@ void GLRenderPipeline::activate(GLGPU* gpu, bool depthReadOnly, bool stencilRead
   if (blendState) {
     state->setBlendState(*blendState);
   }
-  if (vertexArray > 0) {
-    state->bindVertexArray(vertexArray);
-  }
 }
 
 void GLRenderPipeline::setUniformBuffer(GLGPU* gpu, unsigned binding, GLBuffer* buffer,
                                         size_t offset, size_t size) {
   DEBUG_ASSERT(gpu != nullptr);
-  if (buffer == nullptr || size == 0) {
-    return;
-  }
-  if (!(buffer->usage() & GPUBufferUsage::UNIFORM)) {
-    LOGE("GLRenderPipeline::setUniformBuffer error, buffer usage is not UNIFORM!");
-    return;
-  }
-
+  DEBUG_ASSERT(buffer->usage() & GPUBufferUsage::UNIFORM);
   auto gl = gpu->functions();
+  if (buffer == nullptr || size == 0) {
+    gl->bindBufferRange(GL_UNIFORM_BUFFER, binding, 0, 0, 0);
+    return;
+  }
   unsigned ubo = buffer->bufferID();
   if (ubo == 0) {
     LOGE("GLRenderPipeline::setUniformBuffer error, uniform buffer id is 0");
@@ -87,7 +83,6 @@ void GLRenderPipeline::setUniformBuffer(GLGPU* gpu, unsigned binding, GLBuffer* 
 void GLRenderPipeline::setTexture(GLGPU* gpu, unsigned binding, GLTexture* texture,
                                   GLSampler* sampler) {
   DEBUG_ASSERT(texture != nullptr);
-  DEBUG_ASSERT(sampler != nullptr);
   auto result = textureUnits.find(binding);
   if (result == textureUnits.end()) {
     LOGE("GLRenderPipeline::setTexture: binding %d not found", binding);
@@ -95,19 +90,15 @@ void GLRenderPipeline::setTexture(GLGPU* gpu, unsigned binding, GLTexture* textu
   }
   auto state = gpu->state();
   state->bindTexture(texture, result->second);
-  texture->updateSampler(gpu, sampler);
+  if (sampler != nullptr) {
+    texture->updateSampler(gpu, sampler);
+  }
 }
 
 void GLRenderPipeline::setVertexBuffer(GLGPU* gpu, GLBuffer* vertexBuffer, size_t vertexOffset) {
+  DEBUG_ASSERT(vertexBuffer != nullptr);
+  DEBUG_ASSERT(vertexBuffer->usage() & GPUBufferUsage::VERTEX);
   auto gl = gpu->functions();
-  if (vertexBuffer == nullptr) {
-    gl->bindBuffer(GL_ARRAY_BUFFER, 0);
-    return;
-  }
-  if (!(vertexBuffer->usage() & GPUBufferUsage::VERTEX)) {
-    LOGE("GLRenderPipeline::setVertexBuffer error, buffer usage is not VERTEX!");
-    return;
-  }
   gl->bindBuffer(GL_ARRAY_BUFFER, vertexBuffer->bufferID());
   for (auto& attribute : attributes) {
     gl->vertexAttribPointer(static_cast<unsigned>(attribute.location), attribute.count,
@@ -227,13 +218,13 @@ bool GLRenderPipeline::setPipelineDescriptor(GLGPU* gpu,
                                              const RenderPipelineDescriptor& descriptor) {
   auto gl = gpu->functions();
   ClearGLError(gl);
-  auto state = gpu->state();
-  state->useProgram(programID);
   gl->genVertexArrays(1, &vertexArray);
   if (vertexArray == 0) {
     LOGE("GLRenderPipeline::createVertexArrays: failed to create VAO!");
     return false;
   }
+  auto state = gpu->state();
+  state->bindPipeline(this);
 
   DEBUG_ASSERT(!descriptor.vertex.attributes.empty());
   DEBUG_ASSERT(descriptor.vertex.vertexStride > 0);
