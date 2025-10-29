@@ -40,9 +40,9 @@ std::unique_ptr<EAGLLayerTexture> EAGLLayerTexture::MakeFrom(GLGPU* gpu, CAEAGLL
     LOGE("EAGLLayerTexture::MakeFrom() failed to generate framebuffer!");
     return nullptr;
   }
-  GPUTextureDescriptor descriptor = {
-      static_cast<int>(width),           static_cast<int>(height), PixelFormat::RGBA_8888, false, 1,
-      GPUTextureUsage::RENDER_ATTACHMENT};
+  TextureDescriptor descriptor = {
+      static_cast<int>(width),        static_cast<int>(height), PixelFormat::RGBA_8888, false, 1,
+      TextureUsage::RENDER_ATTACHMENT};
   auto texture = std::unique_ptr<EAGLLayerTexture>(new EAGLLayerTexture(descriptor, frameBufferID));
   gl->genRenderbuffers(1, &texture->renderBufferID);
   if (texture->renderBufferID == 0) {

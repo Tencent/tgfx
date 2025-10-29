@@ -17,20 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "AHardwareBufferFunctions.h"
-#include "core/PixelBuffer.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "tgfx/platform/android/HardwareBufferJNI.h"
 
 namespace tgfx {
-std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef, YUVColorSpace) {
-  return nullptr;
-}
-
-std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(tgfx::HardwareBufferRef hardwareBuffer,
-                                                   std::shared_ptr<ColorSpace> colorSpace) {
-  return PixelBuffer::MakeFrom(hardwareBuffer, std::move(colorSpace));
-}
-
 bool HardwareBufferCheck(HardwareBufferRef buffer) {
   if (!HardwareBufferAvailable()) {
     return false;
@@ -40,6 +30,8 @@ bool HardwareBufferCheck(HardwareBufferRef buffer) {
 
 HardwareBufferRef HardwareBufferAllocate(int width, int height, bool alphaOnly) {
   if (!HardwareBufferAvailable() || alphaOnly) {
+    // Although AHARDWAREBUFFER_FORMAT_R8_UNORM exists, most devices have poor support for it.
+    // Therefore, we currently only support the RGBA_8888 format.
     return nullptr;
   }
   AHardwareBuffer* hardwareBuffer = nullptr;
@@ -90,42 +82,31 @@ void HardwareBufferUnlock(HardwareBufferRef buffer) {
   }
 }
 
-ISize HardwareBufferGetSize(HardwareBufferRef buffer) {
+HardwareBufferInfo HardwareBufferGetInfo(HardwareBufferRef buffer) {
   static const auto describe = AHardwareBufferFunctions::Get()->describe;
   if (!HardwareBufferAvailable() || buffer == nullptr) {
     return {};
   }
   AHardwareBuffer_Desc desc;
   describe(buffer, &desc);
-  return {static_cast<int>(desc.width), static_cast<int>(desc.height)};
-}
-
-ImageInfo HardwareBufferGetInfo(HardwareBufferRef buffer) {
-  static const auto describe = AHardwareBufferFunctions::Get()->describe;
-  if (!HardwareBufferAvailable() || buffer == nullptr) {
-    return {};
-  }
-  AHardwareBuffer_Desc desc;
-  describe(buffer, &desc);
-  auto colorType = ColorType::Unknown;
-  auto alphaType = AlphaType::Premultiplied;
+  HardwareBufferInfo info = {};
   switch (desc.format) {
-    case HARDWAREBUFFER_FORMAT_R8_UNORM:
-      colorType = ColorType::ALPHA_8;
-      break;
     case AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM:
-      colorType = ColorType::RGBA_8888;
-      break;
     case AHARDWAREBUFFER_FORMAT_R8G8B8X8_UNORM:
-      colorType = ColorType::RGBA_8888;
-      alphaType = AlphaType::Opaque;
+      info.format = HardwareBufferFormat::RGBA_8888;
+      info.rowBytes = static_cast<size_t>(desc.stride) * 4;
+      break;
+    case AHARDWAREBUFFER_FORMAT_Y8Cb8Cr8_420:
+      info.format = HardwareBufferFormat::YCBCR_420_SP;
+      info.rowBytes = static_cast<size_t>(desc.stride);
       break;
     default:
+      return {};
       break;
   }
-  auto bytesPerPixel = ImageInfo::GetBytesPerPixel(colorType);
-  return ImageInfo::Make(static_cast<int>(desc.width), static_cast<int>(desc.height), colorType,
-                         alphaType, desc.stride * bytesPerPixel);
+  info.width = static_cast<int>(desc.width);
+  info.height = static_cast<int>(desc.height);
+  return info;
 }
 
 HardwareBufferRef HardwareBufferFromJavaObject(JNIEnv* env, jobject hardwareBufferObject) {

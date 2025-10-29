@@ -18,28 +18,21 @@
 
 #pragma once
 
-#include "gpu/GPUFence.h"
-#include "gpu/opengl/GLResource.h"
+#include <mutex>
 
 namespace tgfx {
-/**
- * GLSemaphore is a wrapper class for an OpenGL sync object.
- */
-class GLFence : public GPUFence, public GLResource {
+class Fence {
  public:
-  explicit GLFence(void* glSync) : _glSync(glSync) {
+  explicit Fence(int count) : count(count) {
   }
 
-  void* glSync() const {
-    return _glSync;
-  }
+  void signal();
 
-  BackendSemaphore stealBackendSemaphore() override;
-
- protected:
-  void onRelease(GLGPU* gpu) override;
+  void wait();
 
  private:
-  void* _glSync = nullptr;
+  int count = 0;
+  std::mutex locker = {};
+  std::condition_variable condition = {};
 };
 }  // namespace tgfx

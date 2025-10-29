@@ -18,11 +18,11 @@
 
 #pragma once
 
-#include "gpu/GPUSampler.h"
+#include "tgfx/gpu/Sampler.h"
 #include "tgfx/gpu/opengl/GLDefines.h"
 
 namespace tgfx {
-class GLSampler : public GPUSampler {
+class GLSampler : public Sampler {
  public:
   explicit GLSampler(int wrapS, int wrapT, int minFilter, int magFilter)
       : _wrapS(wrapS), _wrapT(wrapT), _minFilter(minFilter), _magFilter(magFilter) {

@@ -22,7 +22,8 @@
 namespace tgfx {
 class LumaFragmentProcessor : public FragmentProcessor {
  public:
-  static PlacementPtr<FragmentProcessor> Make(BlockBuffer* buffer);
+  static PlacementPtr<FragmentProcessor> Make(
+      BlockBuffer* buffer, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   std::string name() const override {
     return "LumaFragmentProcessor";
@@ -33,7 +34,19 @@ class LumaFragmentProcessor : public FragmentProcessor {
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  LumaFragmentProcessor() : FragmentProcessor(ClassID()) {
-  }
+  LumaFragmentProcessor(std::shared_ptr<ColorSpace> colorSpace);
+
+  struct LumaFactor {
+    /** default ITU-R Recommendation BT.709 at http://www.itu.int/rec/R-REC-BT.709/ .*/
+    float kr = 0.2126f;
+    float kg = 0.7152f;
+    float kb = 0.0722f;
+  };
+
+  std::shared_ptr<ColorSpace> _colorSpace = ColorSpace::MakeSRGB();
+  LumaFactor _lumaFactor;
+
+ private:
+  static LumaFactor AcquireLumaFactorFromColorSpace(const ColorMatrix33& matrix);
 };
 }  // namespace tgfx

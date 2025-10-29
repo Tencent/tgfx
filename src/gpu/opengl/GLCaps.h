@@ -23,10 +23,10 @@
 #include <vector>
 #include "core/utils/EnumHasher.h"
 #include "core/utils/Log.h"
-#include "gpu/GPUFeatures.h"
-#include "gpu/GPUInfo.h"
-#include "gpu/GPULimits.h"
 #include "gpu/ShaderCaps.h"
+#include "tgfx/gpu/GPUFeatures.h"
+#include "tgfx/gpu/GPUInfo.h"
+#include "tgfx/gpu/GPULimits.h"
 #include "tgfx/gpu/PixelFormat.h"
 #include "tgfx/gpu/opengl/GLDefines.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"

@@ -20,6 +20,7 @@
 
 #include "gpu/proxies/GPUBufferProxy.h"
 #include "gpu/proxies/TextureProxy.h"
+#include "tgfx/core/Matrix.h"
 
 namespace tgfx {
 class GPUShapeProxy {

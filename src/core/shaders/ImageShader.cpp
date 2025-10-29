@@ -18,9 +18,10 @@
 
 #include "ImageShader.h"
 #include "core/utils/Types.h"
-#include "gpu/GPUTexture.h"
 #include "gpu/ops/DrawOp.h"
+#include "gpu/processors/ColorSpaceXFormEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
+#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
 std::shared_ptr<Shader> Shader::MakeImageShader(std::shared_ptr<Image> image, TileMode tileModeX,
@@ -45,9 +46,18 @@ bool ImageShader::isEqual(const Shader* shader) const {
          sampling == other->sampling;
 }
 
-PlacementPtr<FragmentProcessor> ImageShader::asFragmentProcessor(const FPArgs& args,
-                                                                 const Matrix* uvMatrix) const {
+PlacementPtr<FragmentProcessor> ImageShader::asFragmentProcessor(
+    const FPArgs& args, const Matrix* uvMatrix, std::shared_ptr<ColorSpace>) const {
   SamplingArgs samplingArgs = {tileModeX, tileModeY, sampling, SrcRectConstraint::Fast};
-  return image->asFragmentProcessor(args, samplingArgs, uvMatrix);
+  auto fp = image->asFragmentProcessor(args, samplingArgs, uvMatrix);
+
+  // TODO: Turn on when the wide gumat convertion is Completed
+  /*
+  if (!image->isAlphaOnly()) {
+    fp = ColorSpaceXformEffect::Make(args.context->drawingBuffer(), std::move(fp),
+                                     image->colorSpace().get(), AlphaType::Premultiplied,
+                                     dstColorSpace.get(), AlphaType::Premultiplied);
+  } */
+  return fp;
 }
 }  // namespace tgfx

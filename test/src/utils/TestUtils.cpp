@@ -136,7 +136,7 @@ void SaveImage(const std::shared_ptr<PixelBuffer> pixelBuffer, const std::string
     return;
   }
   auto pixels = pixelBuffer->lockPixels();
-  SaveImage(Pixmap(pixelBuffer->info(), pixels), key);
+  SaveImage(Pixmap(pixelBuffer->info(), pixels), key, pixelBuffer->colorSpace());
   pixelBuffer->unlockPixels();
 }
 
@@ -144,11 +144,12 @@ void SaveImage(const Bitmap& bitmap, const std::string& key) {
   if (bitmap.isEmpty()) {
     return;
   }
-  SaveImage(Pixmap(bitmap), key);
+  SaveImage(Pixmap(bitmap), key, bitmap.colorSpace());
 }
 
-void SaveImage(const Pixmap& pixmap, const std::string& key) {
-  auto data = ImageCodec::Encode(pixmap, EncodedFormat::WEBP, 100);
+void SaveImage(const Pixmap& pixmap, const std::string& key,
+               std::shared_ptr<ColorSpace> colorSpace) {
+  auto data = ImageCodec::Encode(pixmap, EncodedFormat::WEBP, 100, colorSpace);
   if (data == nullptr) {
     return;
   }

@@ -24,32 +24,32 @@
 #include "gpu/opengl/GLUtil.h"
 
 namespace tgfx {
-GLTexture::GLTexture(const GPUTextureDescriptor& descriptor, unsigned target, unsigned textureID)
-    : GPUTexture(descriptor), _target(target), _textureID(textureID), uniqueID(UniqueID::Next()) {
+GLTexture::GLTexture(const TextureDescriptor& descriptor, unsigned target, unsigned textureID)
+    : Texture(descriptor), _target(target), _textureID(textureID), uniqueID(UniqueID::Next()) {
 }
 
-GPUTextureType GLTexture::type() const {
+TextureType GLTexture::type() const {
   switch (_target) {
     case GL_TEXTURE_2D:
-      return GPUTextureType::TwoD;
+      return TextureType::TwoD;
     case GL_TEXTURE_RECTANGLE:
-      return GPUTextureType::Rectangle;
+      return TextureType::Rectangle;
     case GL_TEXTURE_EXTERNAL_OES:
-      return GPUTextureType::External;
+      return TextureType::External;
     default:
-      return GPUTextureType::None;
+      return TextureType::None;
   }
 }
 
 unsigned GLTexture::frameBufferID() const {
   // Ensure the framebuffer is created if needed.
-  DEBUG_ASSERT(!(descriptor.usage & GPUTextureUsage::RENDER_ATTACHMENT) || textureFrameBuffer > 0 ||
+  DEBUG_ASSERT(!(descriptor.usage & TextureUsage::RENDER_ATTACHMENT) || textureFrameBuffer > 0 ||
                _textureID == 0);
   return textureFrameBuffer;
 }
 
 BackendTexture GLTexture::getBackendTexture() const {
-  if (_textureID == 0 || !(descriptor.usage & GPUTextureUsage::TEXTURE_BINDING)) {
+  if (_textureID == 0 || !(descriptor.usage & TextureUsage::TEXTURE_BINDING)) {
     return {};
   }
   GLTextureInfo textureInfo = {};
@@ -60,7 +60,7 @@ BackendTexture GLTexture::getBackendTexture() const {
 }
 
 BackendRenderTarget GLTexture::getBackendRenderTarget() const {
-  if (!(descriptor.usage & GPUTextureUsage::RENDER_ATTACHMENT)) {
+  if (!(descriptor.usage & TextureUsage::RENDER_ATTACHMENT)) {
     return {};
   }
   GLFrameBufferInfo glInfo = {};
@@ -145,7 +145,8 @@ static int GetGLWrap(int wrapMode, unsigned target) {
 
 void GLTexture::updateSampler(GLGPU* gpu, const GLSampler* sampler) {
   DEBUG_ASSERT(gpu != nullptr);
-  DEBUG_ASSERT(descriptor.usage & GPUTextureUsage::TEXTURE_BINDING);
+  DEBUG_ASSERT(sampler != nullptr);
+  DEBUG_ASSERT(descriptor.usage & TextureUsage::TEXTURE_BINDING);
   auto gl = gpu->functions();
   auto wrapS = GetGLWrap(sampler->wrapS(), _target);
   if (wrapS != lastWrapS) {

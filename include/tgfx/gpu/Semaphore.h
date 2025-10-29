@@ -16,18 +16,22 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/GPUTexture.h"
-#include <algorithm>
-#include <cmath>
+#pragma once
+
+#include "tgfx/gpu/Backend.h"
 
 namespace tgfx {
-GPUTextureDescriptor::GPUTextureDescriptor(int width, int height, PixelFormat format,
-                                           bool mipmapped, int sampleCount, uint32_t usage)
-    : width(width), height(height), format(format), sampleCount(sampleCount), usage(usage) {
-  if (mipmapped) {
-    int maxDimension = std::max(width, height);
-    mipLevelCount = static_cast<int>(std::log2(maxDimension)) + 1;
-  }
-}
+/**
+ * Semaphore is a synchronization primitive for GPU-to-GPU operations. Once a Semaphore is signaled,
+ * it remains in that state and cannot be reset; to synchronize again, create a new Semaphore.
+ */
+class Semaphore {
+ public:
+  virtual ~Semaphore() = default;
 
+  /**
+   * Returns a BackendSemaphore representing the underlying backend-specific semaphore.
+   */
+  virtual BackendSemaphore getBackendSemaphore() const = 0;
+};
 }  // namespace tgfx

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,27 +16,35 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLFence.h"
-#include "gpu/opengl/GLGPU.h"
-#include "tgfx/gpu/opengl/GLFunctions.h"
+#pragma once
+
+#include <string>
+#include "tgfx/gpu/ShaderStage.h"
 
 namespace tgfx {
-BackendSemaphore GLFence::stealBackendSemaphore() {
-  if (_glSync == nullptr) {
-    return {};
-  }
-  GLSyncInfo glSyncInfo = {};
-  glSyncInfo.sync = _glSync;
-  _glSync = nullptr;
-  return {glSyncInfo};
-}
+/**
+ * ShaderModuleDescriptor describes the properties required to create a ShaderModule.
+ */
+class ShaderModuleDescriptor {
+ public:
+  /**
+   * The shader code to be compiled into a ShaderModule.
+   */
+  std::string code;
 
-void GLFence::onRelease(GLGPU* gpu) {
-  if (_glSync != nullptr) {
-    auto gl = gpu->functions();
-    gl->deleteSync(_glSync);
-    _glSync = nullptr;
-  }
-}
+  /**
+   * Specifies the shader stage (e.g., vertex, fragment, compute). Only relevant for the OpenGL
+   * backend; ignored by other backends.
+   */
+  ShaderStage stage = ShaderStage::Vertex;
+};
 
+/**
+ * ShaderModule is an internal object that serves as a container for shader code，allowing it to
+ * be submitted to the GPU for execution within a pipeline.
+ */
+class ShaderModule {
+ public:
+  virtual ~ShaderModule() = default;
+};
 }  // namespace tgfx

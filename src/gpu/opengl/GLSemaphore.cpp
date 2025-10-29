@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,37 +16,26 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "GLSemaphore.h"
+#include "gpu/opengl/GLGPU.h"
+#include "tgfx/gpu/opengl/GLFunctions.h"
 
 namespace tgfx {
-/**
- * Values used to specify a mask to permit or restrict writing to color channels of a color value.
- */
-class ColorWriteMask {
- public:
-  /**
-   * The red color channel is enabled.
-   */
-  static constexpr uint32_t RED = 0x1;
+BackendSemaphore GLSemaphore::getBackendSemaphore() const {
+  if (_glSync == nullptr) {
+    return {};
+  }
+  GLSyncInfo glSyncInfo = {};
+  glSyncInfo.sync = _glSync;
+  return {glSyncInfo};
+}
 
-  /**
-   * The green color channel is enabled.
-   */
-  static constexpr uint32_t GREEN = 0x2;
+void GLSemaphore::onRelease(GLGPU* gpu) {
+  if (_glSync != nullptr) {
+    auto gl = gpu->functions();
+    gl->deleteSync(_glSync);
+    _glSync = nullptr;
+  }
+}
 
-  /**
-   * The blue color channel is enabled.
-   */
-  static constexpr uint32_t BLUE = 0x4;
-
-  /**
-   * The alpha color channel is enabled.
-   */
-  static constexpr uint32_t ALPHA = 0x8;
-
-  /**
-   * All color channels are enabled.
-   */
-  static constexpr uint32_t All = 0xF;
-};
 }  // namespace tgfx

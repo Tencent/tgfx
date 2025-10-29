@@ -137,28 +137,6 @@ unsigned ToGLStencilOperation(StencilOperation stencilOp) {
   return GL_KEEP;
 }
 
-PixelFormat GLSizeFormatToPixelFormat(unsigned sizeFormat) {
-  switch (sizeFormat) {
-    case GL_BGRA:
-    case GL_BGRA8:
-      return PixelFormat::BGRA_8888;
-    case GL_R8:
-    case GL_RED:
-    case GL_ALPHA8:
-    case GL_ALPHA:
-      return PixelFormat::ALPHA_8;
-    case GL_LUMINANCE8:
-    case GL_LUMINANCE:
-      return PixelFormat::GRAY_8;
-    case GL_RG8:
-    case GL_RG:
-      return PixelFormat::RG_88;
-    default:
-      break;
-  }
-  return PixelFormat::RGBA_8888;
-}
-
 unsigned PixelFormatToGLSizeFormat(PixelFormat pixelFormat) {
   switch (pixelFormat) {
     case PixelFormat::ALPHA_8:

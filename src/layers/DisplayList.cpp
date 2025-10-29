@@ -21,11 +21,11 @@
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/TileSortCompareFunc.h"
-#include "gpu/GPU.h"
 #include "inspect/InspectorMark.h"
 #include "layers/DrawArgs.h"
 #include "layers/RootLayer.h"
 #include "layers/TileCache.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 static constexpr size_t MAX_DIRTY_REGION_FRAMES = 5;
@@ -901,6 +901,7 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   renderRect.roundOut();
   args.renderRect = &renderRect;
   args.backgroundContext = _root->createBackgroundContext(context, drawRect, viewMatrix);
+  args.dstColorSpace = surface->colorSpace();
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
 }
 

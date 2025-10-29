@@ -18,33 +18,20 @@
 
 #pragma once
 
-#include <string>
-#include "gpu/ShaderStage.h"
+#include "tgfx/core/ImageInfo.h"
+#include "tgfx/gpu/PixelFormat.h"
+#include "tgfx/platform/HardwareBuffer.h"
 
 namespace tgfx {
 /**
- * ShaderModuleDescriptor describes the properties required to create a ShaderModule.
+ * Returns an ImageInfo describing the specified HardwareBufferRef if recognized; otherwise returns
+ * an empty ImageInfo.
  */
-class ShaderModuleDescriptor {
- public:
-  /**
-   * The shader code to be compiled into a ShaderModule.
-   */
-  std::string code;
-
-  /**
-   * Specifies the shader stage (e.g., vertex, fragment, compute). Only relevant for the OpenGL
-   * backend; ignored by other backends.
-   */
-  ShaderStage stage = ShaderStage::Vertex;
-};
+ImageInfo GetImageInfo(HardwareBufferRef hardwareBuffer);
 
 /**
- * ShaderModule is an internal object that serves as a container for shader code，allowing it to
- * be submitted to the GPU for execution within a pipeline.
+ * Returns the corresponding PixelFormat for the given HardwareBufferFormat if renderable; otherwise
+ * returns PixelFormat::Unknown.
  */
-class ShaderModule {
- public:
-  virtual ~ShaderModule() = default;
-};
+PixelFormat GetRenderableFormat(HardwareBufferFormat hardwareBufferFormat);
 }  // namespace tgfx

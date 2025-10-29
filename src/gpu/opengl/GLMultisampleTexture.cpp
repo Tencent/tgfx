@@ -31,14 +31,14 @@ static bool RenderbufferStorageMSAA(GLGPU* gpu, int sampleCount, PixelFormat pix
 }
 
 std::shared_ptr<GLMultisampleTexture> GLMultisampleTexture::MakeFrom(
-    GLGPU* gpu, const GPUTextureDescriptor& descriptor) {
+    GLGPU* gpu, const TextureDescriptor& descriptor) {
   DEBUG_ASSERT(gpu != nullptr);
   DEBUG_ASSERT(descriptor.sampleCount > 1);
-  if (!(descriptor.usage & GPUTextureUsage::RENDER_ATTACHMENT)) {
+  if (!(descriptor.usage & TextureUsage::RENDER_ATTACHMENT)) {
     LOGE("GLMultisampleTexture::MakeFrom() usage does not include RENDER_ATTACHMENT!");
     return nullptr;
   }
-  if (descriptor.usage & GPUTextureUsage::TEXTURE_BINDING) {
+  if (descriptor.usage & TextureUsage::TEXTURE_BINDING) {
     LOGE("GLMultisampleTexture::MakeFrom() usage includes TEXTURE_BINDING!");
     return nullptr;
   }

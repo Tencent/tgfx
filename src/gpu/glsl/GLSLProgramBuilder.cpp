@@ -18,8 +18,8 @@
 
 #include "GLSLProgramBuilder.h"
 #include <string>
-#include "gpu/GPU.h"
 #include "gpu/UniformData.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 static std::string TypeModifierString(ShaderVar::TypeModifier t, ShaderStage stage) {

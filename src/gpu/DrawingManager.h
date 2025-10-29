@@ -26,6 +26,8 @@
 #include "gpu/tasks/ResourceTask.h"
 
 namespace tgfx {
+struct RuntimeInputTexture;
+
 struct AtlasCellData {
   std::shared_ptr<Data> pixels = nullptr;
   ImageInfo pixelsInfo = {};
@@ -48,13 +50,14 @@ class DrawingManager {
 
   std::shared_ptr<OpsCompositor> addOpsCompositor(std::shared_ptr<RenderTargetProxy> renderTarget,
                                                   uint32_t renderFlags,
-                                                  std::optional<Color> clearColor = std::nullopt);
+                                                  std::optional<Color> clearColor = std::nullopt,
+                                                  std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   void addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTarget,
                         PlacementArray<DrawOp> drawOps, std::optional<Color> clearColor);
 
   void addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> renderTarget,
-                          std::vector<std::shared_ptr<TextureProxy>> inputs,
+                          std::vector<RuntimeInputTexture> inputs,
                           std::shared_ptr<RuntimeEffect> effect, const Point& offset);
 
   void addGenerateMipmapsTask(std::shared_ptr<TextureProxy> textureProxy);

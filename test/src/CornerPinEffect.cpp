@@ -18,7 +18,7 @@
 
 #include "CornerPinEffect.h"
 #include <string>
-#include "gpu/GPU.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 static constexpr char CORNER_PIN_VERTEX_SHADER[] = R"(

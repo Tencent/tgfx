@@ -19,6 +19,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Matrix.h"
@@ -622,7 +623,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   bool getLayersUnderPointInternal(float x, float y, std::vector<std::shared_ptr<Layer>>* results);
 
-  std::shared_ptr<MaskFilter> getMaskFilter(const DrawArgs& args, float scale);
+  std::shared_ptr<MaskFilter> getMaskFilter(const DrawArgs& args, float scale,
+                                            const std::optional<Rect>& layerClipBounds);
 
   Matrix getRelativeMatrix(const Layer* targetCoordinateSpace) const;
 

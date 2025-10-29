@@ -21,8 +21,8 @@
 #include <utility>
 #include <vector>
 #include "SLType.h"
-#include "gpu/Attribute.h"
 #include "gpu/Uniform.h"
+#include "tgfx/gpu/Attribute.h"
 
 namespace tgfx {
 class ShaderVar {

@@ -24,6 +24,10 @@
 #include "gpu/opengl/GLTextureBuffer.h"
 
 namespace tgfx {
+GPU* GLCommandEncoder::gpu() const {
+  return _gpu;
+}
+
 std::shared_ptr<RenderPass> GLCommandEncoder::onBeginRenderPass(
     const RenderPassDescriptor& descriptor) {
   if (descriptor.colorAttachments.empty()) {
@@ -59,33 +63,33 @@ std::shared_ptr<RenderPass> GLCommandEncoder::onBeginRenderPass(
         "attachment texture format must be DEPTH24_STENCIL8!");
     return nullptr;
   }
-  auto renderPass = std::make_shared<GLRenderPass>(gpu, descriptor);
+  auto renderPass = std::make_shared<GLRenderPass>(_gpu, descriptor);
   if (!renderPass->begin()) {
     return nullptr;
   }
   return renderPass;
 }
 
-void GLCommandEncoder::copyTextureToTexture(std::shared_ptr<GPUTexture> srcTexture,
+void GLCommandEncoder::copyTextureToTexture(std::shared_ptr<Texture> srcTexture,
                                             const Rect& srcRect,
-                                            std::shared_ptr<GPUTexture> dstTexture,
+                                            std::shared_ptr<Texture> dstTexture,
                                             const Point& dstOffset) {
   if (srcTexture == nullptr || dstTexture == nullptr || srcRect.isEmpty()) {
     LOGE("GLCommandEncoder::copyTextureToTexture() invalid arguments!");
     return;
   }
   auto glTexture = static_cast<GLTexture*>(srcTexture.get());
-  if (srcTexture->usage() & GPUTextureUsage::RENDER_ATTACHMENT) {
-    auto state = gpu->state();
+  if (srcTexture->usage() & TextureUsage::RENDER_ATTACHMENT) {
+    auto state = _gpu->state();
     state->bindFramebuffer(glTexture);
-  } else if (!glTexture->checkFrameBuffer(gpu)) {
+  } else if (!glTexture->checkFrameBuffer(_gpu)) {
     LOGE(
         "GLCommandEncoder::copyTextureToTexture() failed to create framebuffer for source "
         "texture!");
     return;
   }
-  auto gl = gpu->functions();
-  auto state = gpu->state();
+  auto gl = _gpu->functions();
+  auto state = _gpu->state();
   state->bindTexture(static_cast<GLTexture*>(dstTexture.get()));
   auto offsetX = static_cast<int>(dstOffset.x);
   auto offsetY = static_cast<int>(dstOffset.y);
@@ -97,8 +101,7 @@ void GLCommandEncoder::copyTextureToTexture(std::shared_ptr<GPUTexture> srcTextu
   gl->copyTexSubImage2D(textureTarget, 0, offsetX, offsetY, x, y, width, height);
 }
 
-void GLCommandEncoder::copyTextureToBuffer(std::shared_ptr<GPUTexture> srcTexture,
-                                           const Rect& srcRect,
+void GLCommandEncoder::copyTextureToBuffer(std::shared_ptr<Texture> srcTexture, const Rect& srcRect,
                                            std::shared_ptr<GPUBuffer> dstBuffer, size_t dstOffset,
                                            size_t dstRowBytes) {
   if (srcTexture == nullptr || srcRect.isEmpty()) {
@@ -109,7 +112,7 @@ void GLCommandEncoder::copyTextureToBuffer(std::shared_ptr<GPUTexture> srcTextur
     LOGE("GLCommandEncoder::copyTextureToBuffer() destination buffer is invalid!");
     return;
   }
-  if (!gpu->isFormatRenderable(srcTexture->format())) {
+  if (!_gpu->isFormatRenderable(srcTexture->format())) {
     LOGE("GLCommandEncoder::copyTextureToBuffer() source texture format is not copyable!");
     return;
   }
@@ -127,11 +130,11 @@ void GLCommandEncoder::copyTextureToBuffer(std::shared_ptr<GPUTexture> srcTextur
     LOGE("GLCommandEncoder::copyTextureToBuffer() destination buffer is too small!");
     return;
   }
-  auto caps = gpu->caps();
+  auto caps = _gpu->caps();
   if (!caps->pboSupport) {
     auto textureBuffer = static_cast<GLTextureBuffer*>(dstBuffer.get());
     auto dstTexture =
-        textureBuffer->acquireTexture(gpu, srcTexture, srcRect, dstOffset, dstRowBytes);
+        textureBuffer->acquireTexture(_gpu, srcTexture, srcRect, dstOffset, dstRowBytes);
     if (dstTexture == nullptr) {
       LOGE("GLCommandEncoder::copyTextureToBuffer() failed to acquire intermediate texture!");
       return;
@@ -140,12 +143,12 @@ void GLCommandEncoder::copyTextureToBuffer(std::shared_ptr<GPUTexture> srcTextur
     textureBuffer->insertReadbackFence();
     return;
   }
-  auto gl = gpu->functions();
+  auto gl = _gpu->functions();
   auto glTexture = static_cast<GLTexture*>(srcTexture.get());
-  if (srcTexture->usage() & GPUTextureUsage::RENDER_ATTACHMENT) {
-    auto state = gpu->state();
+  if (srcTexture->usage() & TextureUsage::RENDER_ATTACHMENT) {
+    auto state = _gpu->state();
     state->bindFramebuffer(glTexture);
-  } else if (!glTexture->checkFrameBuffer(gpu)) {
+  } else if (!glTexture->checkFrameBuffer(_gpu)) {
     LOGE(
         "GLCommandEncoder::copyTextureToBuffer() failed to create framebuffer for source texture!");
     return;
@@ -169,14 +172,14 @@ void GLCommandEncoder::copyTextureToBuffer(std::shared_ptr<GPUTexture> srcTextur
   glBuffer->insertReadbackFence();
 }
 
-void GLCommandEncoder::generateMipmapsForTexture(std::shared_ptr<GPUTexture> texture) {
+void GLCommandEncoder::generateMipmapsForTexture(std::shared_ptr<Texture> texture) {
   auto glTexture = static_cast<GLTexture*>(texture.get());
   if (glTexture->mipLevelCount() <= 1 || glTexture->target() != GL_TEXTURE_2D) {
     return;
   }
-  auto state = gpu->state();
+  auto state = _gpu->state();
   state->bindTexture(glTexture);
-  auto gl = gpu->functions();
+  auto gl = _gpu->functions();
   gl->generateMipmap(glTexture->target());
 }
 

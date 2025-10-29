@@ -36,8 +36,9 @@ class PixelRef {
    * @param tryHardware If true, a PixelRef backed by hardware is returned if it is available on
    * the current platform. Otherwise, a raster PixelRef is returned.
    */
-  static std::shared_ptr<PixelRef> Make(int width, int height, bool alphaOnly = false,
-                                        bool tryHardware = true);
+  static std::shared_ptr<PixelRef> Make(
+      int width, int height, bool alphaOnly = false, bool tryHardware = true,
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Creates a new PixelRef with the specified PixelBuffer. Returns nullptr if the pixelBuffer is
@@ -55,6 +56,10 @@ class PixelRef {
 
   bool isHardwareBacked() const {
     return pixelBuffer->isHardwareBacked();
+  }
+
+  std::shared_ptr<ColorSpace> colorSpace() const {
+    return pixelBuffer->colorSpace();
   }
 
   /**

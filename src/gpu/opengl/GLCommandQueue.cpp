@@ -20,8 +20,8 @@
 #include "GLTexture.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "gpu/opengl/GLBuffer.h"
-#include "gpu/opengl/GLFence.h"
 #include "gpu/opengl/GLGPU.h"
+#include "gpu/opengl/GLSemaphore.h"
 #include "gpu/opengl/GLUtil.h"
 #include "tgfx/core/Buffer.h"
 
@@ -45,10 +45,9 @@ void GLCommandQueue::writeBuffer(std::shared_ptr<GPUBuffer> buffer, size_t buffe
                     data);
 }
 
-void GLCommandQueue::writeTexture(std::shared_ptr<GPUTexture> texture, const Rect& rect,
+void GLCommandQueue::writeTexture(std::shared_ptr<Texture> texture, const Rect& rect,
                                   const void* pixels, size_t rowBytes) {
-  if (texture == nullptr || rect.isEmpty() ||
-      !(texture->usage() & GPUTextureUsage::TEXTURE_BINDING)) {
+  if (texture == nullptr || rect.isEmpty() || !(texture->usage() & TextureUsage::TEXTURE_BINDING)) {
     return;
   }
   auto gl = gpu->functions();
@@ -81,21 +80,21 @@ void GLCommandQueue::submit(std::shared_ptr<CommandBuffer>) {
   gpu->resetGLState();
 }
 
-std::shared_ptr<GPUFence> GLCommandQueue::insertFence() {
+std::shared_ptr<Semaphore> GLCommandQueue::insertSemaphore() {
   auto gl = gpu->functions();
   auto glSync = gl->fenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
   if (glSync == nullptr) {
     return nullptr;
   }
-  return gpu->makeResource<GLFence>(glSync);
+  return gpu->makeResource<GLSemaphore>(glSync);
 }
 
-void GLCommandQueue::waitForFence(std::shared_ptr<GPUFence> fence) {
-  if (fence == nullptr) {
+void GLCommandQueue::waitSemaphore(std::shared_ptr<Semaphore> semaphore) {
+  if (semaphore == nullptr) {
     return;
   }
   auto gl = gpu->functions();
-  auto glSync = std::static_pointer_cast<GLFence>(fence)->glSync();
+  auto glSync = std::static_pointer_cast<GLSemaphore>(semaphore)->glSync();
 #if defined(__EMSCRIPTEN__)
   auto timeoutLo = static_cast<uint32_t>(GL_TIMEOUT_IGNORED & 0xFFFFFFFFull);
   auto timeoutHi = static_cast<uint32_t>(GL_TIMEOUT_IGNORED >> 32);

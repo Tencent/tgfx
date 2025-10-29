@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/Context.h"
-#include "GPU.h"
 #include "core/AtlasManager.h"
 #include "core/utils/BlockBuffer.h"
 #include "core/utils/Log.h"
@@ -28,6 +27,7 @@
 #include "gpu/ResourceCache.h"
 #include "gpu/ShaderCaps.h"
 #include "tgfx/core/Clock.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 Context::Context(Device* device, GPU* gpu) : _device(device), _gpu(gpu) {
@@ -60,11 +60,11 @@ Backend Context::backend() const {
 }
 
 bool Context::wait(const BackendSemaphore& waitSemaphore) {
-  auto fence = gpu()->importExternalFence(waitSemaphore);
-  if (fence == nullptr) {
+  auto semaphore = gpu()->importBackendSemaphore(waitSemaphore);
+  if (semaphore == nullptr) {
     return false;
   }
-  gpu()->queue()->waitForFence(std::move(fence));
+  gpu()->queue()->waitSemaphore(std::move(semaphore));
   return true;
 }
 
@@ -76,9 +76,9 @@ bool Context::flush(BackendSemaphore* signalSemaphore) {
     return false;
   }
   if (signalSemaphore != nullptr) {
-    auto fence = gpu()->queue()->insertFence();
-    if (fence != nullptr) {
-      *signalSemaphore = fence->stealBackendSemaphore();
+    auto semaphore = gpu()->queue()->insertSemaphore();
+    if (semaphore != nullptr) {
+      *signalSemaphore = gpu()->stealBackendSemaphore(std::move(semaphore));
     }
   }
   _atlasManager->postFlush();

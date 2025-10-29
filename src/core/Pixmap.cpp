@@ -175,4 +175,11 @@ bool Pixmap::clear() {
   return true;
 }
 
+std::shared_ptr<ColorSpace> Pixmap::colorSpace() const {
+  if (pixelRef) {
+    return pixelRef->colorSpace();
+  }
+  return nullptr;
+}
+
 }  // namespace tgfx
