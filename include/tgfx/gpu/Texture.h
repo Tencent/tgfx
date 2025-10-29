@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "tgfx/gpu/Context.h"
+#include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/PixelFormat.h"
 #include "tgfx/platform/HardwareBuffer.h"
 

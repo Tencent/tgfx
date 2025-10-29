@@ -20,14 +20,9 @@
 
 #include "tgfx/core/Rect.h"
 #include "tgfx/gpu/CommandBuffer.h"
-#include "tgfx/gpu/GPUBuffer.h"
-#include "tgfx/gpu/Texture.h"
+#include "tgfx/gpu/RenderPass.h"
 
 namespace tgfx {
-
-class RenderPass;
-class RenderPassDescriptor;
-
 /**
  * CommandEncoder represents an interface for collecting a sequence of GPU commands to be issued to
  * the GPU.
@@ -35,6 +30,11 @@ class RenderPassDescriptor;
 class CommandEncoder {
  public:
   virtual ~CommandEncoder() = default;
+
+  /**
+   * Returns the GPU associated with this CommandEncoder.
+   */
+  virtual GPU* gpu() const = 0;
 
   /**
    * Begins a render pass using the specified RenderPassDescriptor. Returns a RenderPass object to

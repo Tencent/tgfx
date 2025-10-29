@@ -334,7 +334,6 @@ void GLGPU::releaseAll(bool releaseGPU) {
 
 std::shared_ptr<GLResource> GLGPU::addResource(GLResource* resource) {
   DEBUG_ASSERT(resource != nullptr);
-  processUnreferencedResources();
   resources.push_back(resource);
   resource->cachedPosition = --resources.end();
   return std::static_pointer_cast<GLResource>(returnQueue->makeShared(resource));

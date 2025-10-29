@@ -251,6 +251,11 @@ class RenderPass {
   virtual ~RenderPass() = default;
 
   /**
+   * Returns the GPU associated with this RenderPass.
+   */
+  virtual GPU* gpu() const = 0;
+
+  /**
    * Sets the viewport used during the rasterization stage to linearly map from normalized device
    * coordinates to viewport coordinates.
    */
