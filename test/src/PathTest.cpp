@@ -16,12 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <cmath>
 #include <cstddef>
 #include "base/TGFXTest.h"
+#include "core/PathRasterizer.h"
 #include "core/PathTriangulator.h"
+#include "core/ShapeRasterizer.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
+#include "tgfx/core/Path.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/svg/SVGPathParser.h"
 #include "utils/Baseline.h"
@@ -77,12 +81,55 @@ TGFX_TEST(PathTest, DrawInfiniteLoopPath) {
         "M3.1 1L5.1999 1L5.1999 3.1L4.6399 3.1L4.6399 1.956L1.956 4.6399L3.1 4.6399L3.1 5.1999L1 "
         "5.1999L1 3.1L1.56 3.1L1.56 4.244L4.244 1.56L3.1 1.56L3.1 1Z");
 
-    Paint cubicPaint;
-    cubicPaint.setColor(Color::FromRGBA(255, 255, 0, 255));
-    canvas->drawPath(*path, cubicPaint);
+    Paint paint;
+    paint.setColor(Color::FromRGBA(255, 255, 0, 255));
+    canvas->drawPath(*path, paint);
   }
 
   EXPECT_TRUE(Baseline::Compare(surface, "PathTest/DrawInfiniteLoopPath"));
+}
+
+TGFX_TEST(PathTest, ZeroDimensionPathRasterization) {
+  {
+    //normal case
+    Path path;
+    path.moveTo(10.f, 10.f);
+    path.lineTo(110.f, 110.f);
+    auto bound = path.getBounds();
+    ASSERT_EQ(bound.width(), 100.f);
+    ASSERT_EQ(bound.height(), 100.f);
+    ASSERT_FALSE(PathTriangulator::ShouldTriangulatePath(path));
+    auto rasterizer = PathRasterizer::MakeFrom(static_cast<int>(bound.width()),
+                                               static_cast<int>(bound.height()), path, true);
+    ASSERT_TRUE(rasterizer != nullptr);
+  }
+  {
+    // height is zero
+    Path path;
+    path.moveTo(10.f, 10.f);
+    path.lineTo(110.f, 10.f);
+    auto bound = path.getBounds();
+    ASSERT_EQ(bound.width(), 100.f);
+    ASSERT_EQ(bound.height(), 0.f);
+    ASSERT_TRUE(PathTriangulator::ShouldTriangulatePath(path));
+    auto rasterizer = PathRasterizer::MakeFrom(static_cast<int>(bound.width()),
+                                               static_cast<int>(bound.height()), path, true);
+    ASSERT_TRUE(rasterizer == nullptr);
+  }
+
+  {
+    // width is zero
+    Path path;
+    path.moveTo(10.f, 10.f);
+    path.lineTo(10.f, 110.f);
+    auto bound = path.getBounds();
+    ASSERT_EQ(bound.width(), 0.f);
+    ASSERT_EQ(bound.height(), 100.f);
+    ASSERT_TRUE(PathTriangulator::ShouldTriangulatePath(path));
+    auto rasterizer = PathRasterizer::MakeFrom(static_cast<int>(bound.width()),
+                                               static_cast<int>(bound.height()), path, true);
+    ASSERT_TRUE(rasterizer == nullptr);
+  }
 }
 
 }  // namespace tgfx
