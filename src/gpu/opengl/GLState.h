@@ -27,6 +27,7 @@
 
 namespace tgfx {
 class GLTexture;
+class GLRenderPipeline;
 
 static constexpr unsigned INVALID_VALUE = std::numeric_limits<unsigned>::max();
 
@@ -90,9 +91,7 @@ class GLState {
 
   void bindFramebuffer(GLTexture* texture, FrameBufferTarget target = FrameBufferTarget::Both);
 
-  void bindVertexArray(unsigned vertexArray);
-
-  void useProgram(unsigned programID);
+  void bindPipeline(GLRenderPipeline* pipeline);
 
   void reset();
 
@@ -103,11 +102,10 @@ class GLState {
   std::array<int, 4> scissorRect = {0, 0, 0, 0};
   std::array<int, 4> viewport = {0, 0, 0, 0};
   std::optional<Color> clearColor = std::nullopt;
+  uint32_t activePipeline = 0;
   unsigned activeTextureUint = INVALID_VALUE;
   unsigned readFramebuffer = INVALID_VALUE;
   unsigned drawFramebuffer = INVALID_VALUE;
-  unsigned program = INVALID_VALUE;
-  unsigned vertexArray = INVALID_VALUE;
   uint32_t colorWriteMask = INVALID_VALUE;
   GLStencilState stencilState = {};
   GLDepthState depthState = {};
