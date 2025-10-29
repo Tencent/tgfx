@@ -72,8 +72,6 @@ class EGLDevice : public GLDevice {
 
   EGLDevice(std::unique_ptr<GPU> gpu, void* nativeHandle);
 
-  std::shared_ptr<ColorSpace> colorSpace() const;
-
   friend class GLDevice;
 
   friend class EGLWindow;
