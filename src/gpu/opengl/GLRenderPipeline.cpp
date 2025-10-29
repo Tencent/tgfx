@@ -65,12 +65,12 @@ void GLRenderPipeline::activate(GLGPU* gpu, bool depthReadOnly, bool stencilRead
 void GLRenderPipeline::setUniformBuffer(GLGPU* gpu, unsigned binding, GLBuffer* buffer,
                                         size_t offset, size_t size) {
   DEBUG_ASSERT(gpu != nullptr);
-  DEBUG_ASSERT(buffer->usage() & GPUBufferUsage::UNIFORM);
   auto gl = gpu->functions();
   if (buffer == nullptr || size == 0) {
     gl->bindBufferRange(GL_UNIFORM_BUFFER, binding, 0, 0, 0);
     return;
   }
+  DEBUG_ASSERT(buffer->usage() & GPUBufferUsage::UNIFORM);
   unsigned ubo = buffer->bufferID();
   if (ubo == 0) {
     LOGE("GLRenderPipeline::setUniformBuffer error, uniform buffer id is 0");

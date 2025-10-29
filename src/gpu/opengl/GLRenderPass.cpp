@@ -141,7 +141,7 @@ void GLRenderPass::setIndexBuffer(std::shared_ptr<GPUBuffer> buffer, IndexFormat
     return;
   }
   if (!(buffer->usage() & GPUBufferUsage::INDEX)) {
-    LOGE("GLRenderPass::setUniformBuffer(), buffer usage is not INDEX!");
+    LOGE("GLRenderPass::setIndexBuffer(), buffer usage is not INDEX!");
     return;
   }
   pendingIndexBuffer = std::static_pointer_cast<GLBuffer>(buffer);
