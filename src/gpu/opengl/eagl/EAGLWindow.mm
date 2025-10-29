@@ -18,8 +18,8 @@
 
 #include "tgfx/gpu/opengl/eagl/EAGLWindow.h"
 #include "core/utils/Log.h"
+#include "gpu/opengl/GLFunctions.h"
 #include "gpu/opengl/eagl/EAGLLayerTexture.h"
-#include "tgfx/gpu/opengl/GLFunctions.h"
 
 namespace tgfx {
 std::shared_ptr<EAGLWindow> EAGLWindow::MakeFrom(CAEAGLLayer* layer,

@@ -19,11 +19,10 @@
 #pragma once
 
 #include <unordered_map>
+#include "gpu/Program.h"
 #include "gpu/processors/EmptyXferProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/GeometryProcessor.h"
-#include "gpu/resources/PipelineProgram.h"
-#include "gpu/resources/Program.h"
 #include "gpu/resources/RenderTarget.h"
 #include "tgfx/gpu/RenderPass.h"
 #include "tgfx/gpu/RenderPipeline.h"
@@ -80,10 +79,10 @@ class ProgramInfo {
 
   std::shared_ptr<Program> getProgram() const;
 
-  std::shared_ptr<GPUBuffer> getUniformBuffer(const PipelineProgram* program, size_t* vertexOffset,
+  std::shared_ptr<GPUBuffer> getUniformBuffer(const Program* program, size_t* vertexOffset,
                                               size_t* fragmentOffset) const;
 
-  void bindUniformBufferAndUnloadToGPU(const PipelineProgram* program,
+  void bindUniformBufferAndUnloadToGPU(const Program* program,
                                        std::shared_ptr<GPUBuffer> uniformBuffer,
                                        RenderPass* renderPass, size_t vertexOffset,
                                        size_t fragmentOffset) const;
@@ -91,7 +90,7 @@ class ProgramInfo {
   /**
    * Sets the uniform data and texture samplers on the render pass for the given program.
    */
-  void setUniformsAndSamplers(RenderPass* renderPass, PipelineProgram* program) const;
+  void setUniformsAndSamplers(RenderPass* renderPass, Program* program) const;
 
  private:
   RenderTarget* renderTarget = nullptr;

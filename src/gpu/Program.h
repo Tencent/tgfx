@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,23 +18,31 @@
 
 #pragma once
 
-#include "gpu/resources/Program.h"
-#include "tgfx/gpu/RuntimeProgram.h"
+#include <list>
+#include "gpu/UniformData.h"
+#include "tgfx/core/BytesKey.h"
+#include "tgfx/gpu/RenderPipeline.h"
 
 namespace tgfx {
-class GLRuntimeProgram;
-
-class RuntimeProgramWrapper : public Program {
+class Program {
  public:
-  static std::shared_ptr<Program> Wrap(std::unique_ptr<RuntimeProgram> program);
+  explicit Program(std::shared_ptr<RenderPipeline> pipeline,
+                   std::unique_ptr<UniformData> vertexUniformData,
+                   std::unique_ptr<UniformData> fragmentUniformData);
 
-  static const RuntimeProgram* Unwrap(const Program* program);
+  std::shared_ptr<RenderPipeline> getPipeline() const {
+    return pipeline;
+  }
+
+  UniformData* getUniformData(ShaderStage stage) const;
 
  private:
-  std::shared_ptr<GLRuntimeProgram> runtimeProgram = nullptr;
+  BytesKey programKey = {};
+  std::list<Program*>::iterator cachedPosition;
+  std::shared_ptr<RenderPipeline> pipeline = nullptr;
+  std::unique_ptr<UniformData> vertexUniformData = nullptr;
+  std::unique_ptr<UniformData> fragmentUniformData = nullptr;
 
-  explicit RuntimeProgramWrapper(std::shared_ptr<GLRuntimeProgram> program)
-      : runtimeProgram(std::move(program)) {
-  }
+  friend class GlobalCache;
 };
 }  // namespace tgfx

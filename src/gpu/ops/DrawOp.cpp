@@ -19,7 +19,7 @@
 #include "DrawOp.h"
 #include "gpu/AlignTo.h"
 #include "gpu/GlobalCache.h"
-#include "gpu/resources/PipelineProgram.h"
+#include "gpu/Program.h"
 #include "inspect/InspectorMark.h"
 
 namespace tgfx {
@@ -43,7 +43,7 @@ void DrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
   }
   ProgramInfo programInfo(renderTarget, geometryProcessor.get(), std::move(fragmentProcessors),
                           colors.size(), xferProcessor.get(), blendMode);
-  auto program = std::static_pointer_cast<PipelineProgram>(programInfo.getProgram());
+  auto program = programInfo.getProgram();
   if (program == nullptr) {
     LOGE("DrawOp::execute() Failed to get the program!");
     return;

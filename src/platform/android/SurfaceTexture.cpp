@@ -22,10 +22,10 @@
 #include "JNIUtil.h"
 #include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/Log.h"
+#include "gpu/opengl/GLFunctions.h"
 #include "gpu/opengl/GLGPU.h"
 #include "gpu/opengl/GLTexture.h"
 #include "gpu/resources/DefaultTextureView.h"
-#include "tgfx/gpu/opengl/GLFunctions.h"
 
 namespace tgfx {
 static Global<jclass> SurfaceTextureClass;

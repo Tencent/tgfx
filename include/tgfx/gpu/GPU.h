@@ -158,8 +158,5 @@ class GPU {
    * Creates a command encoder that can be used to encode commands to be issued to the GPU.
    */
   virtual std::shared_ptr<CommandEncoder> createCommandEncoder() = 0;
-
-  // TODO: Remove this method once all runtime effects have fully switched to using GPU commands.
-  virtual void resetGLState() = 0;
 };
 }  // namespace tgfx

@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/Backend.h"
-#include "tgfx/gpu/opengl/GLDefines.h"
+#include "opengl/GLDefines.h"
 
 namespace tgfx {
 static PixelFormat GLSizeFormatToPixelFormat(unsigned sizeFormat) {
