@@ -486,7 +486,7 @@ TGFX_TEST(CanvasTest, mipmap) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/mipmap_linear_texture_effect"));
 }
 
-static GLTextureInfo CreateRectangleTexture(Context* context, int width, int heigh) {
+static GLTextureInfo CreateRectangleTexture(Context* context, int width, int height) {
   auto gl = static_cast<GLGPU*>(context->gpu())->functions();
   GLTextureInfo glInfo = {};
   gl->genTextures(1, &(glInfo.id));
@@ -498,7 +498,7 @@ static GLTextureInfo CreateRectangleTexture(Context* context, int width, int hei
   auto gpu = static_cast<GLGPU*>(context->gpu());
   const auto& textureFormat = gpu->caps()->getTextureFormat(PixelFormat::RGBA_8888);
   gl->texImage2D(glInfo.target, 0, static_cast<int>(textureFormat.internalFormatTexImage), width,
-                 heigh, 0, textureFormat.externalFormat, textureFormat.externalType, nullptr);
+                 height, 0, textureFormat.externalFormat, textureFormat.externalType, nullptr);
   return glInfo;
 }
 
