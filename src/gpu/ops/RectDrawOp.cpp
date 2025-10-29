@@ -36,15 +36,11 @@ PlacementPtr<RectDrawOp> RectDrawOp::Make(Context* context,
   CAPUTRE_RECT_MESH(drawOp.get(), provider.get());
   if (provider->aaType() == AAType::Coverage || provider->rectCount() > 1 ||
       provider->hasStroke()) {
-    if (provider->hasStroke()) {
-      drawOp->indexBufferProxy = context->globalCache()->getStrokeRectIndexBuffer(
-          provider->aaType() == AAType::Coverage, provider->lineJoin());
-    } else {
-      drawOp->indexBufferProxy =
-          context->globalCache()->getRectIndexBuffer(provider->aaType() == AAType::Coverage);
-    }
-  } else if (provider->rectCount() > 1) {
-    drawOp->indexBufferProxy = context->globalCache()->getRectIndexBuffer(false);
+    const auto antialias = provider->aaType() == AAType::Coverage;
+    auto cache = context->globalCache();
+    drawOp->indexBufferProxy =
+        provider->hasStroke() ? cache->getStrokeRectIndexBuffer(antialias, provider->lineJoin())
+                              : cache->getRectIndexBuffer(antialias);
   }
   if (provider->rectCount() <= 1) {
     // If we only have one rect, it is not worth the async task overhead.

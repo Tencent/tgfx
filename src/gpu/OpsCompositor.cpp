@@ -108,13 +108,20 @@ void OpsCompositor::fillImageRect(std::shared_ptr<Image> image, const Rect& srcR
   }
 }
 
+static bool ShouldFlushRectOps(const std::vector<PlacementPtr<Stroke>>& pendingStrokes,
+                               const Stroke* stroke) {
+  if (pendingStrokes.empty()) {
+    return stroke != nullptr;
+  }
+  return stroke == nullptr || pendingStrokes.front()->join != stroke->join;
+}
+
 void OpsCompositor::fillRect(const Rect& rect, const MCState& state, const Fill& fill,
                              const Stroke* stroke) {
   DEBUG_ASSERT(!rect.isEmpty());
-  auto opType = stroke ? PendingOpType::StrokeRect : PendingOpType::Rect;
-  if (!canAppend(opType, state.clip, fill) ||
-      (stroke && (pendingStrokes.empty() || pendingStrokes.front()->join != stroke->join))) {
-    flushPendingOps(opType, state.clip, fill);
+  if (!canAppend(PendingOpType::Rect, state.clip, fill) ||
+      ShouldFlushRectOps(pendingStrokes, stroke)) {
+    flushPendingOps(PendingOpType::Rect, state.clip, fill);
   }
   auto dstColor =
       ColorSpaceXformSteps::ConvertColorSpace(ColorSpace::MakeSRGB(), AlphaType::Unpremultiplied,
