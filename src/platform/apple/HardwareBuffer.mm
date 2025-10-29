@@ -19,21 +19,8 @@
 #include "tgfx/platform/HardwareBuffer.h"
 #import <CoreVideo/CoreVideo.h>
 #import <TargetConditionals.h>
-#include "core/PixelBuffer.h"
-#include "platform/apple/NV12HardwareBuffer.h"
 
 namespace tgfx {
-std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef hardwareBuffer,
-                                                   YUVColorSpace colorSpace) {
-  if (hardwareBuffer == nullptr) {
-    return nullptr;
-  }
-  auto planeCount = CVPixelBufferGetPlaneCount(hardwareBuffer);
-  if (planeCount > 1) {
-    return NV12HardwareBuffer::MakeFrom(hardwareBuffer, colorSpace);
-  }
-  return PixelBuffer::MakeFrom(hardwareBuffer);
-}
 
 bool HardwareBufferCheck(HardwareBufferRef buffer) {
   if (!HardwareBufferAvailable()) {
@@ -88,38 +75,29 @@ void HardwareBufferUnlock(HardwareBufferRef buffer) {
   CVPixelBufferUnlockBaseAddress(buffer, 0);
 }
 
-ISize HardwareBufferGetSize(HardwareBufferRef buffer) {
+HardwareBufferInfo HardwareBufferGetInfo(HardwareBufferRef buffer) {
   if (buffer == nil) {
     return {};
   }
-  auto width = CVPixelBufferGetWidth(buffer);
-  auto height = CVPixelBufferGetHeight(buffer);
-  return {static_cast<int>(width), static_cast<int>(height)};
-}
-
-ImageInfo HardwareBufferGetInfo(HardwareBufferRef buffer) {
-  if (buffer == nil) {
-    return {};
-  }
-  auto planeCount = CVPixelBufferGetPlaneCount(buffer);
-  if (planeCount > 1) {
-    return {};
-  }
-  auto width = static_cast<int>(CVPixelBufferGetWidth(buffer));
-  auto height = static_cast<int>(CVPixelBufferGetHeight(buffer));
   auto pixelFormat = CVPixelBufferGetPixelFormatType(buffer);
-  ColorType colorType = ColorType::Unknown;
+  HardwareBufferInfo info = {};
   switch (pixelFormat) {
     case kCVPixelFormatType_OneComponent8:
-      colorType = ColorType::ALPHA_8;
+      info.format = HardwareBufferFormat::ALPHA_8;
       break;
     case kCVPixelFormatType_32BGRA:
-      colorType = ColorType::BGRA_8888;
+      info.format = HardwareBufferFormat::BGRA_8888;
+      break;
+    case kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange:
+    case kCVPixelFormatType_420YpCbCr8BiPlanarFullRange:
+      info.format = HardwareBufferFormat::YCBCR_420_SP;
       break;
     default:
-      break;
+      return {};
   }
-  auto rowBytes = CVPixelBufferGetBytesPerRow(buffer);
-  return ImageInfo::Make(width, height, colorType, AlphaType::Premultiplied, rowBytes);
+  info.width = static_cast<int>(CVPixelBufferGetWidth(buffer));
+  info.height = static_cast<int>(CVPixelBufferGetHeight(buffer));
+  info.rowBytes = CVPixelBufferGetBytesPerRow(buffer);
+  return info;
 }
 }  // namespace tgfx

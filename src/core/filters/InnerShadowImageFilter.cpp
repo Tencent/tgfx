@@ -55,12 +55,11 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::getShadowFragmentProcess
 
   PlacementPtr<FragmentProcessor> invertShadowMask;
   if (blurFilter != nullptr) {
-    invertShadowMask = blurFilter->asFragmentProcessor(std::move(source), args, sampling,
-                                                       constraint, &shadowMatrix);
-  } else {
     invertShadowMask =
-        FragmentProcessor::Make(std::move(source), args, TileMode::Decal, TileMode::Decal, sampling,
-                                constraint, &shadowMatrix);
+        blurFilter->asFragmentProcessor(source, args, sampling, constraint, &shadowMatrix);
+  } else {
+    invertShadowMask = FragmentProcessor::Make(source, args, TileMode::Decal, TileMode::Decal,
+                                               sampling, constraint, &shadowMatrix);
   }
 
   auto buffer = args.context->drawingBuffer();
@@ -68,7 +67,10 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::getShadowFragmentProcess
     invertShadowMask =
         ConstColorProcessor::Make(buffer, Color::Transparent().premultiply(), InputMode::Ignore);
   }
-  auto colorProcessor = ConstColorProcessor::Make(buffer, color.premultiply(), InputMode::Ignore);
+  auto dstColor = ColorSpaceXformSteps::ConvertColorSpace(
+      ColorSpace::MakeSRGB(), AlphaType::Unpremultiplied, source->colorSpace(),
+      AlphaType::Premultiplied, color);
+  auto colorProcessor = ConstColorProcessor::Make(buffer, dstColor, InputMode::Ignore);
 
   // get shadow mask and fill it with color
   auto colorShadowProcessor = XfermodeFragmentProcessor::MakeFromTwoProcessors(

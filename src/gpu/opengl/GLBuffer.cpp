@@ -95,9 +95,6 @@ void GLBuffer::unmap() {
 }
 
 void GLBuffer::insertReadbackFence() {
-  if (!_interface->caps()->semaphoreSupport) {
-    return;
-  }
   auto gl = _interface->functions();
   if (readbackFence != nullptr) {
     gl->deleteSync(readbackFence);

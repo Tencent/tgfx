@@ -19,8 +19,8 @@
 #include "tgfx/gpu/Device.h"
 #include "core/utils/Log.h"
 #include "core/utils/UniqueID.h"
-#include "gpu/GPU.h"
 #include "tgfx/gpu/Context.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 Device::Device(std::unique_ptr<GPU> gpu) : _gpu(gpu.release()), _uniqueID(UniqueID::Next()) {

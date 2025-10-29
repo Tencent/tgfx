@@ -26,7 +26,11 @@
 
 namespace tgfx {
 GLRenderPass::GLRenderPass(GLGPU* gpu, RenderPassDescriptor descriptor)
-    : RenderPass(std::move(descriptor)), gpu(gpu) {
+    : RenderPass(std::move(descriptor)), _gpu(gpu) {
+}
+
+GPU* GLRenderPass::gpu() const {
+  return _gpu;
 }
 
 bool GLRenderPass::begin() {
@@ -34,9 +38,9 @@ bool GLRenderPass::begin() {
   auto& colorAttachment = descriptor.colorAttachments[0];
   DEBUG_ASSERT(colorAttachment.texture != nullptr);
   auto renderTexture = static_cast<GLTexture*>(colorAttachment.texture.get());
-  auto state = gpu->state();
+  auto state = _gpu->state();
   state->bindFramebuffer(renderTexture);
-  auto gl = gpu->functions();
+  auto gl = _gpu->functions();
 
   auto& depthStencilAttachment = descriptor.depthStencilAttachment;
   if (depthStencilAttachment.texture != nullptr) {
@@ -61,6 +65,9 @@ bool GLRenderPass::begin() {
   state->setViewport(0, 0, renderTexture->width(), renderTexture->height());
   // Disable scissor test by default.
   state->setEnabled(GL_SCISSOR_TEST, false);
+  if (colorAttachment.resolveTexture && _gpu->caps()->multisampleDisableSupport) {
+    state->setEnabled(GL_MULTISAMPLE, true);
+  }
   if (colorAttachment.loadAction == LoadAction::Clear) {
     state->setClearColor(colorAttachment.clearValue);
     gl->clear(GL_COLOR_BUFFER_BIT);
@@ -69,13 +76,13 @@ bool GLRenderPass::begin() {
 }
 
 void GLRenderPass::setViewport(int x, int y, int width, int height) {
-  auto state = gpu->state();
+  auto state = _gpu->state();
   state->setViewport(x, y, width, height);
 }
 
 void GLRenderPass::setScissorRect(int x, int y, int width, int height) {
   auto texture = descriptor.colorAttachments[0].texture;
-  auto state = gpu->state();
+  auto state = _gpu->state();
   if (x == 0 && y == 0 && width == texture->width() && height == texture->height()) {
     state->setEnabled(GL_SCISSOR_TEST, false);
   } else {
@@ -91,7 +98,7 @@ void GLRenderPass::setPipeline(std::shared_ptr<RenderPipeline> pipeline) {
   renderPipeline = std::static_pointer_cast<GLRenderPipeline>(pipeline);
   if (renderPipeline != nullptr) {
     auto& attachment = descriptor.depthStencilAttachment;
-    renderPipeline->activate(gpu, attachment.depthReadOnly, attachment.stencilReadOnly,
+    renderPipeline->activate(_gpu, attachment.depthReadOnly, attachment.stencilReadOnly,
                              stencilReference);
   }
 }
@@ -103,12 +110,12 @@ void GLRenderPass::setUniformBuffer(unsigned binding, std::shared_ptr<GPUBuffer>
     return;
   }
 
-  renderPipeline->setUniformBuffer(gpu, binding, static_cast<GLBuffer*>(buffer.get()), offset,
+  renderPipeline->setUniformBuffer(_gpu, binding, static_cast<GLBuffer*>(buffer.get()), offset,
                                    size);
 }
 
-void GLRenderPass::setTexture(unsigned binding, std::shared_ptr<GPUTexture> texture,
-                              std::shared_ptr<GPUSampler> sampler) {
+void GLRenderPass::setTexture(unsigned binding, std::shared_ptr<Texture> texture,
+                              std::shared_ptr<Sampler> sampler) {
   if (texture == nullptr) {
     return;
   }
@@ -116,12 +123,11 @@ void GLRenderPass::setTexture(unsigned binding, std::shared_ptr<GPUTexture> text
     LOGE("GLRenderPass::setTexture: renderPipeline is null!");
     return;
   }
-  renderPipeline->setTexture(gpu, binding, static_cast<GLTexture*>(texture.get()),
+  renderPipeline->setTexture(_gpu, binding, static_cast<GLTexture*>(texture.get()),
                              static_cast<GLSampler*>(sampler.get()));
   auto renderTexture = descriptor.colorAttachments[0].texture;
-  auto caps = static_cast<const GLCaps*>(gpu->caps());
-  if (texture == renderTexture && caps->textureRedSupport) {
-    auto gl = gpu->functions();
+  if (texture == renderTexture && _gpu->caps()->features()->textureBarrier) {
+    auto gl = _gpu->functions();
     gl->textureBarrier();
   }
 }
@@ -131,7 +137,7 @@ void GLRenderPass::setVertexBuffer(std::shared_ptr<GPUBuffer> buffer, size_t off
     LOGE("GLRenderPass::setVertexBuffer: renderPipeline is null!");
     return;
   }
-  renderPipeline->setVertexBuffer(gpu, static_cast<GLBuffer*>(buffer.get()), offset);
+  renderPipeline->setVertexBuffer(_gpu, static_cast<GLBuffer*>(buffer.get()), offset);
 }
 
 void GLRenderPass::setIndexBuffer(std::shared_ptr<GPUBuffer> buffer, IndexFormat format) {
@@ -140,7 +146,7 @@ void GLRenderPass::setIndexBuffer(std::shared_ptr<GPUBuffer> buffer, IndexFormat
     return;
   }
   auto bufferID = buffer ? static_cast<GLBuffer*>(buffer.get())->bufferID() : 0;
-  auto gl = gpu->functions();
+  auto gl = _gpu->functions();
   gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, bufferID);
   indexFormat = format;
 }
@@ -150,44 +156,45 @@ void GLRenderPass::setStencilReference(uint32_t reference) {
     return;
   }
   if (renderPipeline != nullptr) {
-    renderPipeline->setStencilReference(gpu, reference);
+    renderPipeline->setStencilReference(_gpu, reference);
   }
   stencilReference = reference;
 }
 
 void GLRenderPass::onEnd() {
-  auto gl = gpu->functions();
-  auto caps = static_cast<const GLCaps*>(gpu->caps());
-  auto& attachment = descriptor.colorAttachments[0];
-  if (attachment.resolveTexture) {
-    auto renderTexture = static_cast<GLTexture*>(attachment.texture.get());
-    auto sampleTexture = static_cast<GLTexture*>(attachment.resolveTexture.get());
+  auto gl = _gpu->functions();
+  auto state = _gpu->state();
+  auto& colorAttachment = descriptor.colorAttachments[0];
+  if (colorAttachment.resolveTexture) {
+    auto renderTexture = static_cast<GLTexture*>(colorAttachment.texture.get());
+    auto sampleTexture = static_cast<GLTexture*>(colorAttachment.resolveTexture.get());
     DEBUG_ASSERT(renderTexture != sampleTexture);
-    auto state = gpu->state();
     state->bindFramebuffer(renderTexture, FrameBufferTarget::Read);
     state->bindFramebuffer(sampleTexture, FrameBufferTarget::Draw);
     // MSAA resolve may be affected by the scissor test, so disable it here.
     state->setEnabled(GL_SCISSOR_TEST, false);
-    if (caps->msFBOType == MSFBOType::ES_Apple) {
-      gl->resolveMultisampleFramebuffer();
-    } else {
-      gl->blitFramebuffer(0, 0, renderTexture->width(), renderTexture->height(), 0, 0,
-                          sampleTexture->width(), sampleTexture->height(), GL_COLOR_BUFFER_BIT,
-                          GL_NEAREST);
-    }
+    gl->blitFramebuffer(0, 0, renderTexture->width(), renderTexture->height(), 0, 0,
+                        sampleTexture->width(), sampleTexture->height(), GL_COLOR_BUFFER_BIT,
+                        GL_NEAREST);
+  }
+  auto& depthStencilAttachment = descriptor.depthStencilAttachment;
+  if (depthStencilAttachment.texture != nullptr) {
+    auto renderTexture = static_cast<GLTexture*>(colorAttachment.texture.get());
+    state->bindFramebuffer(renderTexture);
+    gl->framebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, 0);
   }
 }
 
 static constexpr unsigned PrimitiveTypes[] = {GL_TRIANGLES, GL_TRIANGLE_STRIP};
 
 void GLRenderPass::draw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount) {
-  auto gl = gpu->functions();
+  auto gl = _gpu->functions();
   gl->drawArrays(PrimitiveTypes[static_cast<int>(primitiveType)], static_cast<int>(baseVertex),
                  static_cast<int>(vertexCount));
 }
 
 void GLRenderPass::drawIndexed(PrimitiveType primitiveType, size_t baseIndex, size_t indexCount) {
-  auto gl = gpu->functions();
+  auto gl = _gpu->functions();
   unsigned indexType = (indexFormat == IndexFormat::UInt16) ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
   size_t indexSize = (indexFormat == IndexFormat::UInt16) ? sizeof(uint16_t) : sizeof(uint32_t);
   gl->drawElements(PrimitiveTypes[static_cast<int>(primitiveType)], static_cast<int>(indexCount),

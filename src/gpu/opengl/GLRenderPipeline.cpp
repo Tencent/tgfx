@@ -29,8 +29,7 @@ void GLRenderPipeline::activate(GLGPU* gpu, bool depthReadOnly, bool stencilRead
                                 unsigned stencilReference) {
   auto state = gpu->state();
   state->useProgram(programID);
-  auto shaderCaps = gpu->caps()->shaderCaps();
-  if (shaderCaps->frameBufferFetchSupport && shaderCaps->frameBufferFetchRequiresEnablePerSample) {
+  if (gpu->caps()->frameBufferFetchRequiresEnablePerSample) {
     if (blendState) {
       state->setEnabled(GL_FETCH_PER_SAMPLE_ARM, false);
     } else {
@@ -38,7 +37,6 @@ void GLRenderPipeline::activate(GLGPU* gpu, bool depthReadOnly, bool stencilRead
     }
   }
   state->setColorMask(colorWriteMask);
-
   state->setEnabled(GL_STENCIL_TEST, stencilState != nullptr);
   if (stencilState) {
     auto stencil = *stencilState;
@@ -231,13 +229,10 @@ bool GLRenderPipeline::setPipelineDescriptor(GLGPU* gpu,
   ClearGLError(gl);
   auto state = gpu->state();
   state->useProgram(programID);
-  auto caps = static_cast<const GLCaps*>(gpu->caps());
-  if (caps->vertexArrayObjectSupport) {
-    gl->genVertexArrays(1, &vertexArray);
-    if (vertexArray == 0) {
-      LOGE("GLRenderPipeline::createVertexArrays: failed to create VAO!");
-      return false;
-    }
+  gl->genVertexArrays(1, &vertexArray);
+  if (vertexArray == 0) {
+    LOGE("GLRenderPipeline::createVertexArrays: failed to create VAO!");
+    return false;
   }
 
   DEBUG_ASSERT(!descriptor.vertex.attributes.empty());

@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GenerateMipmapsTask.h"
-#include "gpu/GPU.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 GenerateMipmapsTask::GenerateMipmapsTask(std::shared_ptr<TextureProxy> textureProxy)

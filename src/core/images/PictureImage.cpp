@@ -22,11 +22,13 @@
 #include "gpu/ProxyProvider.h"
 #include "gpu/RenderContext.h"
 #include "gpu/TPArgs.h"
+#include "gpu/processors/ColorSpaceXFormEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
 std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<Picture> picture, int width, int height,
-                                       const Matrix* matrix) {
+                                       const Matrix* matrix,
+                                       std::shared_ptr<ColorSpace> colorSpace) {
   if (picture == nullptr || width <= 0 || height <= 0) {
     return nullptr;
   }
@@ -44,14 +46,17 @@ std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<Picture> picture, int wid
       return image;
     }
   }
-  auto image = std::make_shared<PictureImage>(std::move(picture), width, height, matrix);
+  auto image = std::make_shared<PictureImage>(std::move(picture), width, height, matrix, false,
+                                              std::move(colorSpace));
   image->weakThis = image;
   return image;
 }
 
 PictureImage::PictureImage(std::shared_ptr<Picture> picture, int width, int height,
-                           const Matrix* matrix, bool mipmapped)
-    : picture(std::move(picture)), _width(width), _height(height), mipmapped(mipmapped) {
+                           const Matrix* matrix, bool mipmapped,
+                           std::shared_ptr<ColorSpace> colorSpace)
+    : picture(std::move(picture)), _width(width), _height(height), mipmapped(mipmapped),
+      _colorSpace(std::move(colorSpace)) {
   if (matrix && !matrix->isIdentity()) {
     this->matrix = new Matrix(*matrix);
   }
@@ -96,9 +101,9 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
   auto scaleX = rect.width() / clipRect.width();
   auto scaleY = rect.height() / clipRect.height();
   auto mipmapped = samplingArgs.sampling.mipmapMode != MipmapMode::None && hasMipmaps();
-  auto renderTarget = RenderTargetProxy::MakeFallback(
-      args.context, static_cast<int>(rect.width()), static_cast<int>(rect.height()), isAlphaOnly(),
-      1, mipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
+  auto renderTarget = RenderTargetProxy::Make(args.context, static_cast<int>(rect.width()),
+                                              static_cast<int>(rect.height()), isAlphaOnly(), 1,
+                                              mipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
   if (renderTarget == nullptr) {
     return nullptr;
   }
@@ -126,9 +131,9 @@ std::shared_ptr<TextureProxy> PictureImage::lockTextureProxy(const TPArgs& args)
     textureWidth = static_cast<int>(roundf(static_cast<float>(_width) * args.drawScale));
     textureHeight = static_cast<int>(roundf(static_cast<float>(_height) * args.drawScale));
   }
-  auto renderTarget = RenderTargetProxy::MakeFallback(
-      args.context, textureWidth, textureHeight, isAlphaOnly(), 1, hasMipmaps() && args.mipmapped,
-      ImageOrigin::TopLeft, args.backingFit);
+  auto renderTarget = RenderTargetProxy::Make(args.context, textureWidth, textureHeight,
+                                              isAlphaOnly(), 1, hasMipmaps() && args.mipmapped,
+                                              ImageOrigin::TopLeft, args.backingFit);
   if (renderTarget == nullptr) {
     return nullptr;
   }
@@ -145,7 +150,7 @@ bool PictureImage::drawPicture(std::shared_ptr<RenderTargetProxy> renderTarget,
   if (renderTarget == nullptr) {
     return false;
   }
-  RenderContext renderContext(std::move(renderTarget), renderFlags, true);
+  RenderContext renderContext(std::move(renderTarget), renderFlags, true, nullptr, _colorSpace);
   Matrix totalMatrix = {};
   if (extraMatrix) {
     totalMatrix = *extraMatrix;

@@ -27,7 +27,8 @@ namespace tgfx {
 class RenderContext : public DrawContext {
  public:
   RenderContext(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags,
-                bool clearAll = false, Surface* surface = nullptr);
+                bool clearAll = false, Surface* surface = nullptr,
+                std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   Context* getContext() const {
     return renderTarget->getContext();
@@ -67,6 +68,10 @@ class RenderContext : public DrawContext {
    */
   bool flush();
 
+  std::shared_ptr<ColorSpace> colorSpace() const {
+    return _colorSpace;
+  }
+
  private:
   void drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const MCState& state,
                               const Fill& fill, const Stroke* stroke, const Rect& localClipBounds,
@@ -82,6 +87,7 @@ class RenderContext : public DrawContext {
   uint32_t renderFlags = 0;
   Surface* surface = nullptr;
   std::shared_ptr<OpsCompositor> opsCompositor = nullptr;
+  std::shared_ptr<ColorSpace> _colorSpace = nullptr;
 
   Rect getClipBounds(const Path& clip);
   OpsCompositor* getOpsCompositor(bool discardContent = false);

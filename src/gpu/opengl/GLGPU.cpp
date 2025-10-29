@@ -25,10 +25,10 @@
 #include "gpu/opengl/GLCommandEncoder.h"
 #include "gpu/opengl/GLDepthStencilTexture.h"
 #include "gpu/opengl/GLExternalTexture.h"
-#include "gpu/opengl/GLFence.h"
 #include "gpu/opengl/GLMultisampleTexture.h"
 #include "gpu/opengl/GLRenderPipeline.h"
 #include "gpu/opengl/GLSampler.h"
+#include "gpu/opengl/GLSemaphore.h"
 #include "gpu/opengl/GLShaderModule.h"
 #include "gpu/opengl/GLUtil.h"
 
@@ -81,7 +81,7 @@ std::shared_ptr<GPUBuffer> GLGPU::createBuffer(size_t size, uint32_t usage) {
 #endif
 }
 
-std::shared_ptr<GPUTexture> GLGPU::createTexture(const GPUTextureDescriptor& descriptor) {
+std::shared_ptr<Texture> GLGPU::createTexture(const TextureDescriptor& descriptor) {
   if (descriptor.width <= 0 || descriptor.height <= 0 ||
       descriptor.format == PixelFormat::Unknown || descriptor.mipLevelCount < 1 ||
       descriptor.sampleCount < 1 || descriptor.usage == 0) {
@@ -94,13 +94,9 @@ std::shared_ptr<GPUTexture> GLGPU::createTexture(const GPUTextureDescriptor& des
   if (descriptor.format == PixelFormat::DEPTH24_STENCIL8) {
     return GLDepthStencilTexture::MakeFrom(this, descriptor);
   }
-  if (descriptor.usage & GPUTextureUsage::RENDER_ATTACHMENT &&
-      !caps()->isFormatRenderable(descriptor.format)) {
+  if (descriptor.usage & TextureUsage::RENDER_ATTACHMENT &&
+      !isFormatRenderable(descriptor.format)) {
     LOGE("GLGPU::createTexture() format is not renderable, but usage includes RENDER_ATTACHMENT!");
-    return nullptr;
-  }
-  if (descriptor.mipLevelCount > 1 && !caps()->mipmapSupport) {
-    LOGE("GLGPU::createTexture() mipmaps are not supported!");
     return nullptr;
   }
   auto gl = functions();
@@ -130,34 +126,26 @@ std::shared_ptr<GPUTexture> GLGPU::createTexture(const GPUTextureDescriptor& des
   if (!success) {
     return nullptr;
   }
-  if (descriptor.usage & GPUTextureUsage::RENDER_ATTACHMENT && !texture->checkFrameBuffer(this)) {
+  if (descriptor.usage & TextureUsage::RENDER_ATTACHMENT && !texture->checkFrameBuffer(this)) {
     return nullptr;
   }
   return texture;
 }
 
-PixelFormat GLGPU::getExternalTextureFormat(const BackendTexture& backendTexture) const {
-  GLTextureInfo textureInfo = {};
-  if (!backendTexture.isValid() || !backendTexture.getGLTextureInfo(&textureInfo)) {
-    return PixelFormat::Unknown;
-  }
-  return GLSizeFormatToPixelFormat(textureInfo.format);
-}
-
-std::shared_ptr<GPUTexture> GLGPU::importExternalTexture(const BackendTexture& backendTexture,
-                                                         uint32_t usage, bool adopted) {
+std::shared_ptr<Texture> GLGPU::importBackendTexture(const BackendTexture& backendTexture,
+                                                     uint32_t usage, bool adopted) {
   GLTextureInfo textureInfo = {};
   if (!backendTexture.getGLTextureInfo(&textureInfo)) {
     return nullptr;
   }
-  auto format = GLSizeFormatToPixelFormat(textureInfo.format);
-  if (usage & GPUTextureUsage::RENDER_ATTACHMENT && !caps()->isFormatRenderable(format)) {
+  auto format = backendTexture.format();
+  if (usage & TextureUsage::RENDER_ATTACHMENT && !isFormatRenderable(format)) {
     LOGE(
         "GLGPU::importExternalTexture() format is not renderable but RENDER_ATTACHMENT usage is "
         "set!");
     return nullptr;
   }
-  GPUTextureDescriptor descriptor = {
+  TextureDescriptor descriptor = {
       backendTexture.width(), backendTexture.height(), format, false, 1, usage};
   std::shared_ptr<GLTexture> texture = nullptr;
   if (adopted) {
@@ -165,45 +153,43 @@ std::shared_ptr<GPUTexture> GLGPU::importExternalTexture(const BackendTexture& b
   } else {
     texture = makeResource<GLExternalTexture>(descriptor, textureInfo.target, textureInfo.id);
   }
-  if (usage & GPUTextureUsage::RENDER_ATTACHMENT && !texture->checkFrameBuffer(this)) {
+  if (usage & TextureUsage::RENDER_ATTACHMENT && !texture->checkFrameBuffer(this)) {
     return nullptr;
   }
   return texture;
 }
 
-PixelFormat GLGPU::getExternalTextureFormat(const BackendRenderTarget& renderTarget) const {
-  GLFrameBufferInfo frameBufferInfo = {};
-  if (!renderTarget.getGLFramebufferInfo(&frameBufferInfo)) {
-    return PixelFormat::Unknown;
-  }
-  return GLSizeFormatToPixelFormat(frameBufferInfo.format);
-}
-
-std::shared_ptr<GPUTexture> GLGPU::importExternalTexture(const BackendRenderTarget& renderTarget) {
+std::shared_ptr<Texture> GLGPU::importBackendRenderTarget(const BackendRenderTarget& renderTarget) {
   GLFrameBufferInfo frameBufferInfo = {};
   if (!renderTarget.getGLFramebufferInfo(&frameBufferInfo)) {
     return nullptr;
   }
-  auto format = GLSizeFormatToPixelFormat(frameBufferInfo.format);
-  if (!caps()->isFormatRenderable(format)) {
+  auto format = renderTarget.format();
+  if (!isFormatRenderable(format)) {
     return nullptr;
   }
-  GPUTextureDescriptor descriptor = {renderTarget.width(),
-                                     renderTarget.height(),
-                                     format,
-                                     false,
-                                     1,
-                                     GPUTextureUsage::RENDER_ATTACHMENT};
+  TextureDescriptor descriptor = {
+      renderTarget.width(),           renderTarget.height(), format, false, 1,
+      TextureUsage::RENDER_ATTACHMENT};
   return makeResource<GLExternalTexture>(descriptor, static_cast<unsigned>(GL_TEXTURE_2D), 0u,
                                          frameBufferInfo.id);
 }
 
-std::shared_ptr<GPUFence> GLGPU::importExternalFence(const BackendSemaphore& semaphore) {
+std::shared_ptr<Semaphore> GLGPU::importBackendSemaphore(const BackendSemaphore& semaphore) {
   GLSyncInfo glSyncInfo = {};
-  if (!caps()->semaphoreSupport || !semaphore.getGLSync(&glSyncInfo)) {
+  if (!semaphore.getGLSync(&glSyncInfo)) {
     return nullptr;
   }
-  return makeResource<GLFence>(glSyncInfo.sync);
+  return makeResource<GLSemaphore>(glSyncInfo.sync);
+}
+
+BackendSemaphore GLGPU::stealBackendSemaphore(std::shared_ptr<Semaphore> semaphore) {
+  if (semaphore == nullptr || semaphore.use_count() > 1) {
+    return {};
+  }
+  auto backendSemaphore = semaphore->getBackendSemaphore();
+  static_cast<GLSemaphore*>(semaphore.get())->_glSync = nullptr;
+  return backendSemaphore;
 }
 
 static int ToGLWrap(AddressMode wrapMode) {
@@ -220,7 +206,7 @@ static int ToGLWrap(AddressMode wrapMode) {
   return GL_REPEAT;
 }
 
-std::shared_ptr<GPUSampler> GLGPU::createSampler(const GPUSamplerDescriptor& descriptor) {
+std::shared_ptr<Sampler> GLGPU::createSampler(const SamplerDescriptor& descriptor) {
   int minFilter = GL_LINEAR;
   switch (descriptor.mipmapMode) {
     case MipmapMode::None:

@@ -18,9 +18,9 @@
 
 #pragma once
 
-#include "gpu/GPU.h"
-#include "gpu/GPUBuffer.h"
 #include "gpu/resources/Resource.h"
+#include "tgfx/gpu/GPU.h"
+#include "tgfx/gpu/GPUBuffer.h"
 
 namespace tgfx {
 /**

@@ -53,19 +53,19 @@ enum class AddressMode {
 /**
  * An object that you use to configure a texture sampler.
  */
-class GPUSamplerDescriptor {
+class SamplerDescriptor {
  public:
   /**
    * Constructs a sampler descriptor with default parameters.
    */
-  GPUSamplerDescriptor() = default;
+  SamplerDescriptor() = default;
 
   /**
    * Constructs a sampler descriptor with the specified address modes, filter modes, and mipmap
    * modes.
    */
-  GPUSamplerDescriptor(AddressMode addressModeX, AddressMode addressModeY, FilterMode minFilter,
-                       FilterMode magFilter, MipmapMode mipmapMode)
+  SamplerDescriptor(AddressMode addressModeX, AddressMode addressModeY, FilterMode minFilter,
+                    FilterMode magFilter, MipmapMode mipmapMode)
       : addressModeX(addressModeX), addressModeY(addressModeY), minFilter(minFilter),
         magFilter(magFilter), mipmapMode(mipmapMode) {
   }
@@ -97,12 +97,12 @@ class GPUSamplerDescriptor {
 };
 
 /**
- * GPUSampler encapsulates the sampling state for a texture. It defines how texture coordinates
- * outside the range [0, 1] are handled (wrap mode), and how the texture is filtered when it is
- * minified or magnified (filter mode).
+ * Sampler encapsulates the sampling state for a texture. It defines how texture coordinates outside
+ * the range [0, 1] are handled (wrap mode), and how the texture is filtered when it is minified or
+ * magnified (filter mode).
  */
-class GPUSampler {
+class Sampler {
  public:
-  virtual ~GPUSampler() = default;
+  virtual ~Sampler() = default;
 };
 }  // namespace tgfx

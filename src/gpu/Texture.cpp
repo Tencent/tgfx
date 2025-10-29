@@ -16,13 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/GPUTexture.h"
+#include "tgfx/gpu/Texture.h"
 #include <algorithm>
 #include <cmath>
 
 namespace tgfx {
-GPUTextureDescriptor::GPUTextureDescriptor(int width, int height, PixelFormat format,
-                                           bool mipmapped, int sampleCount, uint32_t usage)
+TextureDescriptor::TextureDescriptor(int width, int height, PixelFormat format, bool mipmapped,
+                                     int sampleCount, uint32_t usage)
     : width(width), height(height), format(format), sampleCount(sampleCount), usage(usage) {
   if (mipmapped) {
     int maxDimension = std::max(width, height);

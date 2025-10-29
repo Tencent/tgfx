@@ -32,9 +32,6 @@
 #include "gpu/processors/UnrolledBinaryGradientColorizer.h"
 
 namespace tgfx {
-// Intervals smaller than this (that aren't hard stops) on low-precision-only devices force us to
-// use the textured gradient
-static constexpr float LowPrecisionIntervalLimit = 0.01f;
 static constexpr float DegenerateThreshold = 1.0f / (1 << 15);
 
 // Analyze the shader's color stops and positions and chooses an appropriate colorizer to represent
@@ -62,26 +59,7 @@ static PlacementPtr<FragmentProcessor> MakeColorizer(const Context* context, con
     return SingleIntervalGradientColorizer::Make(drawingBuffer, colors[offset], colors[offset + 1]);
   }
 
-  bool tryAnalyticColorizer = count <= UnrolledBinaryGradientColorizer::MaxColorCount;
-
-  // The remaining analytic colorizes use scale*t+bias, and the scale/bias values can become
-  // quite large when thresholds are close (but still outside the hard stop limit). If float isn't
-  // 32-bit, output can be incorrect if the thresholds are too close together. However, the
-  // analytic shaders are higher quality, so they can be used with lower precision hardware when
-  // the thresholds are not ill-conditioned.
-  auto shaderCaps = context->caps()->shaderCaps();
-  if (!shaderCaps->floatIs32Bits && tryAnalyticColorizer) {
-    // Could run into problems, check if thresholds are close together (with a limit of .01, so
-    // that scales will be less than 100, which leaves 4 decimals of precision on 16-bit).
-    for (int i = offset; i < count - 1; i++) {
-      auto delta = std::abs(positions[i] - positions[i + 1]);
-      if (delta <= LowPrecisionIntervalLimit && delta > FLOAT_NEARLY_ZERO) {
-        tryAnalyticColorizer = false;
-        break;
-      }
-    }
-  }
-  if (tryAnalyticColorizer) {
+  if (count <= UnrolledBinaryGradientColorizer::MaxColorCount) {
     if (count == 3) {
       // Must be a dual interval gradient, where the middle point is at offset+1 and the two
       // intervals share the middle color stop.
@@ -160,14 +138,20 @@ GradientShader::GradientShader(const std::vector<Color>& colors,
 // gradient's tile mode
 static PlacementPtr<FragmentProcessor> MakeGradient(const Context* context,
                                                     const GradientShader& shader,
-                                                    PlacementPtr<FragmentProcessor> layout) {
+                                                    PlacementPtr<FragmentProcessor> layout,
+                                                    const ColorSpaceXformSteps& steps) {
   if (layout == nullptr) {
     return nullptr;
   }
+  auto dstColors = shader.originalColors;
+
+  for (auto& color : dstColors) {
+    steps.apply(color.array());
+  }
   // All gradients are colorized the same way, regardless of layout
   PlacementPtr<FragmentProcessor> colorizer =
-      MakeColorizer(context, shader.originalColors.data(), shader.originalPositions.data(),
-                    static_cast<int>(shader.originalColors.size()));
+      MakeColorizer(context, dstColors.data(), shader.originalPositions.data(),
+                    static_cast<int>(dstColors.size()));
   if (colorizer == nullptr) {
     return nullptr;
   }
@@ -176,8 +160,8 @@ static PlacementPtr<FragmentProcessor> MakeGradient(const Context* context,
   // need to do anything to achieve that: i.e., all the colors have a = 1, in which case
   // premultiply is a no op.
   return ClampedGradientEffect::Make(context->drawingBuffer(), std::move(colorizer),
-                                     std::move(layout), shader.originalColors[0],
-                                     shader.originalColors[shader.originalColors.size() - 1]);
+                                     std::move(layout), dstColors[0],
+                                     dstColors[dstColors.size() - 1]);
 }
 
 static Matrix PointsToUnitMatrix(const Point& startPoint, const Point& endPoint) {
@@ -207,13 +191,16 @@ LinearGradientShader::LinearGradientShader(const Point& startPoint, const Point&
 }
 
 PlacementPtr<FragmentProcessor> LinearGradientShader::asFragmentProcessor(
-    const FPArgs& args, const Matrix* uvMatrix) const {
+    const FPArgs& args, const Matrix* uvMatrix, std::shared_ptr<ColorSpace> dstColorSpace) const {
   auto totalMatrix = pointsToUnit;
   if (uvMatrix) {
     totalMatrix.preConcat(*uvMatrix);
   }
+  ColorSpaceXformSteps steps(ColorSpace::MakeSRGB().get(), AlphaType::Unpremultiplied,
+                             dstColorSpace.get(), AlphaType::Unpremultiplied);
   return MakeGradient(args.context, *this,
-                      LinearGradientLayout::Make(args.context->drawingBuffer(), totalMatrix));
+                      LinearGradientLayout::Make(args.context->drawingBuffer(), totalMatrix),
+                      steps);
 }
 
 GradientType LinearGradientShader::asGradient(GradientInfo* info) const {
@@ -247,13 +234,16 @@ RadialGradientShader::RadialGradientShader(const Point& center, float radius,
 }
 
 PlacementPtr<FragmentProcessor> RadialGradientShader::asFragmentProcessor(
-    const FPArgs& args, const Matrix* uvMatrix) const {
+    const FPArgs& args, const Matrix* uvMatrix, std::shared_ptr<ColorSpace> dstColorSpace) const {
   auto totalMatrix = pointsToUnit;
   if (uvMatrix != nullptr) {
     totalMatrix.preConcat(*uvMatrix);
   }
+  ColorSpaceXformSteps steps(ColorSpace::MakeSRGB().get(), AlphaType::Unpremultiplied,
+                             dstColorSpace.get(), AlphaType::Unpremultiplied);
   return MakeGradient(args.context, *this,
-                      RadialGradientLayout::Make(args.context->drawingBuffer(), totalMatrix));
+                      RadialGradientLayout::Make(args.context->drawingBuffer(), totalMatrix),
+                      steps);
 }
 
 GradientType RadialGradientShader::asGradient(GradientInfo* info) const {
@@ -273,14 +263,16 @@ ConicGradientShader::ConicGradientShader(const Point& center, float t0, float t1
 }
 
 PlacementPtr<FragmentProcessor> ConicGradientShader::asFragmentProcessor(
-    const FPArgs& args, const Matrix* uvMatrix) const {
+    const FPArgs& args, const Matrix* uvMatrix, std::shared_ptr<ColorSpace> dstColorSpace) const {
   auto totalMatrix = pointsToUnit;
   if (uvMatrix != nullptr) {
     totalMatrix.preConcat(*uvMatrix);
   }
+  ColorSpaceXformSteps steps(ColorSpace::MakeSRGB().get(), AlphaType::Unpremultiplied,
+                             dstColorSpace.get(), AlphaType::Unpremultiplied);
   return MakeGradient(
       args.context, *this,
-      ConicGradientLayout::Make(args.context->drawingBuffer(), totalMatrix, bias, scale));
+      ConicGradientLayout::Make(args.context->drawingBuffer(), totalMatrix, bias, scale), steps);
 }
 
 GradientType ConicGradientShader::asGradient(GradientInfo* info) const {
@@ -322,13 +314,15 @@ DiamondGradientShader::DiamondGradientShader(const Point& center, float halfDiag
 }
 
 PlacementPtr<FragmentProcessor> DiamondGradientShader::asFragmentProcessor(
-    const FPArgs& args, const Matrix* uvMatrix) const {
+    const FPArgs& args, const Matrix* uvMatrix, std::shared_ptr<ColorSpace> dstColorSpace) const {
   auto totalMatrix = pointsToUnit;
   if (uvMatrix != nullptr) {
     totalMatrix.preConcat(*uvMatrix);
   }
+  ColorSpaceXformSteps steps(ColorSpace::MakeSRGB().get(), AlphaType::Unpremultiplied,
+                             dstColorSpace.get(), AlphaType::Unpremultiplied);
   auto layout = DiamondGradientLayout::Make(args.context->drawingBuffer(), totalMatrix);
-  return MakeGradient(args.context, *this, std::move(layout));
+  return MakeGradient(args.context, *this, std::move(layout), steps);
 }
 
 GradientType DiamondGradientShader::asGradient(GradientInfo* info) const {

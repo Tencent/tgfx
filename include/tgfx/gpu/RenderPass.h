@@ -18,12 +18,11 @@
 
 #pragma once
 
-#include "core/utils/Log.h"
-#include "gpu/GPUBuffer.h"
-#include "gpu/GPUSampler.h"
-#include "gpu/GPUTexture.h"
-#include "gpu/RenderPipeline.h"
 #include "tgfx/core/Color.h"
+#include "tgfx/gpu/GPUBuffer.h"
+#include "tgfx/gpu/RenderPipeline.h"
+#include "tgfx/gpu/Sampler.h"
+#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
 /**
@@ -77,11 +76,11 @@ class ColorAttachment {
    * Constructs a ColorAttachment with the specified texture, load action, store action, clear value,
    * and resolve texture.
    */
-  explicit ColorAttachment(std::shared_ptr<GPUTexture> texture,
+  explicit ColorAttachment(std::shared_ptr<Texture> texture,
                            LoadAction loadAction = LoadAction::DontCare,
                            StoreAction storeAction = StoreAction::Store,
                            Color clearValue = Color::Transparent(),
-                           std::shared_ptr<GPUTexture> resolveTexture = nullptr)
+                           std::shared_ptr<Texture> resolveTexture = nullptr)
       : texture(std::move(texture)), loadAction(loadAction), storeAction(storeAction),
         clearValue(clearValue), resolveTexture(std::move(resolveTexture)) {
   }
@@ -89,7 +88,7 @@ class ColorAttachment {
   /**
    * Returns the texture associated with this color attachment.
    */
-  std::shared_ptr<GPUTexture> texture = nullptr;
+  std::shared_ptr<Texture> texture = nullptr;
 
   /**
    * The action to perform at the start of the render pass.
@@ -110,7 +109,7 @@ class ColorAttachment {
    * The texture to resolve the color attachment into. This is used for multisampled textures.
    * If this is nullptr, the color attachment will not be resolved.
    */
-  std::shared_ptr<GPUTexture> resolveTexture = nullptr;
+  std::shared_ptr<Texture> resolveTexture = nullptr;
 };
 
 /**
@@ -127,7 +126,7 @@ class DepthStencilAttachment {
    * Constructs a DepthStencilAttachment with the specified texture, load action, store action,
    * depth clear value, depth read-only flag, stencil clear value, and stencil read-only flag.
    */
-  explicit DepthStencilAttachment(std::shared_ptr<GPUTexture> texture,
+  explicit DepthStencilAttachment(std::shared_ptr<Texture> texture,
                                   LoadAction loadAction = LoadAction::Clear,
                                   StoreAction storeAction = StoreAction::DontCare,
                                   float depthClearValue = 1.0f, bool depthReadOnly = false,
@@ -140,7 +139,7 @@ class DepthStencilAttachment {
   /**
    * The texture associated with this depth-stencil attachment.
    */
-  std::shared_ptr<GPUTexture> texture = nullptr;
+  std::shared_ptr<Texture> texture = nullptr;
 
   /**
    * The action to perform at the start of the render pass.
@@ -193,11 +192,11 @@ class RenderPassDescriptor {
    * @param resolveTexture The texture to resolve the color attachment into. This is used for
    * multisampled textures. If this is nullptr, the color attachment will not be resolved.
    */
-  explicit RenderPassDescriptor(std::shared_ptr<GPUTexture> texture,
+  explicit RenderPassDescriptor(std::shared_ptr<Texture> texture,
                                 LoadAction loadAction = LoadAction::DontCare,
                                 StoreAction storeAction = StoreAction::Store,
                                 Color clearValue = Color::Transparent(),
-                                std::shared_ptr<GPUTexture> resolveTexture = nullptr) {
+                                std::shared_ptr<Texture> resolveTexture = nullptr) {
     colorAttachments.emplace_back(std::move(texture), loadAction, storeAction, clearValue,
                                   std::move(resolveTexture));
   }
@@ -208,8 +207,7 @@ class RenderPassDescriptor {
    * @param texture The texture to render to.
    * @param resolveTexture  The texture to resolve the color attachment into.
    */
-  RenderPassDescriptor(std::shared_ptr<GPUTexture> texture,
-                       std::shared_ptr<GPUTexture> resolveTexture) {
+  RenderPassDescriptor(std::shared_ptr<Texture> texture, std::shared_ptr<Texture> resolveTexture) {
     colorAttachments.emplace_back(std::move(texture), LoadAction::Load, StoreAction::Store,
                                   Color::Transparent(), std::move(resolveTexture));
   }
@@ -253,6 +251,11 @@ class RenderPass {
   virtual ~RenderPass() = default;
 
   /**
+   * Returns the GPU associated with this RenderPass.
+   */
+  virtual GPU* gpu() const = 0;
+
+  /**
    * Sets the viewport used during the rasterization stage to linearly map from normalized device
    * coordinates to viewport coordinates.
    */
@@ -279,8 +282,8 @@ class RenderPass {
   /**
    * Sets a texture and its sampler state to a specified binding index in the shader's texture table.
    */
-  virtual void setTexture(unsigned binding, std::shared_ptr<GPUTexture> texture,
-                          std::shared_ptr<GPUSampler> sampler) = 0;
+  virtual void setTexture(unsigned binding, std::shared_ptr<Texture> texture,
+                          std::shared_ptr<Sampler> sampler) = 0;
 
   /**
    * Sets or unsets the current vertex buffer with an optional offset.

@@ -24,8 +24,9 @@
 #include "core/utils/EnumHasher.h"
 #include "core/utils/Log.h"
 #include "gpu/ShaderCaps.h"
-#include "gpu/Swizzle.h"
-#include "tgfx/gpu/Caps.h"
+#include "tgfx/gpu/GPUFeatures.h"
+#include "tgfx/gpu/GPUInfo.h"
+#include "tgfx/gpu/GPULimits.h"
 #include "tgfx/gpu/PixelFormat.h"
 #include "tgfx/gpu/opengl/GLDefines.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
@@ -46,32 +47,9 @@ struct GLTextureFormat {
 struct ConfigInfo {
   GLTextureFormat format;
   std::vector<int> colorSampleCounts;
-  Swizzle readSwizzle = Swizzle::RGBA();
-  Swizzle writeSwizzle = Swizzle::RGBA();
 };
 
 enum class GLVendor { ARM, Google, Imagination, Intel, Qualcomm, NVIDIA, ATI, Other };
-
-/**
- * The type of MSAA for FBOs supported. Different extensions have different semantics of how / when
- * a resolve is performed.
- */
-enum class MSFBOType {
-  /**
-   * no support for MSAA FBOs
-   */
-  None,
-  /**
-   * OpenGL 3.0+, OpenGL ES 3.0+, GL_ARB_framebuffer_object,
-   * GL_CHROMIUM_framebuffer_multisample, GL_ANGLE_framebuffer_multisample,
-   * or GL_EXT_framebuffer_multisample
-   */
-  Standard,
-  /**
-   * GL_APPLE_framebuffer_multisample ES extension
-   */
-  ES_Apple
-};
 
 class GLInfo {
  public:
@@ -82,6 +60,7 @@ class GLInfo {
   GLGetIntegerv* getIntegerv = nullptr;
   GLGetInternalformativ* getInternalformativ = nullptr;
   GLGetShaderPrecisionFormat* getShaderPrecisionFormat = nullptr;
+  std::vector<std::string> extensions = {};
 
   GLInfo(GLGetString* getString, GLGetStringi* getStringi, GLGetIntegerv* getIntegerv,
          GLGetInternalformativ* getInternalformativ,
@@ -91,43 +70,42 @@ class GLInfo {
 
  private:
   void fetchExtensions();
-
-  std::vector<std::string> extensions = {};
 };
 
-class GLCaps : public Caps {
+class GLCaps {
  public:
   GLStandard standard = GLStandard::None;
   uint32_t version = 0;
   GLVendor vendor = GLVendor::Other;
-  bool vertexArrayObjectSupport = false;
-  bool packRowLengthSupport = false;
-  bool unpackRowLengthSupport = false;
-  bool textureRedSupport = false;
   bool pboSupport = false;
-  MSFBOType msFBOType = MSFBOType::None;
+  bool multisampleDisableSupport = false;
+  bool frameBufferFetchRequiresEnablePerSample = false;
   bool flushBeforeWritePixels = false;
-
-  static const GLCaps* Get(Context* context);
 
   explicit GLCaps(const GLInfo& info);
 
-  const ShaderCaps* shaderCaps() const override {
-    return &_shaderCaps;
+  const GPUInfo* info() const {
+    return &_info;
+  }
+
+  const GPUFeatures* features() const {
+    return &_features;
+  }
+
+  const GPULimits* limits() const {
+    return &_limits;
   }
 
   const GLTextureFormat& getTextureFormat(PixelFormat pixelFormat) const;
 
-  const Swizzle& getReadSwizzle(PixelFormat pixelFormat) const override;
+  bool isFormatRenderable(PixelFormat pixelFormat) const;
 
-  const Swizzle& getWriteSwizzle(PixelFormat pixelFormat) const override;
-
-  bool isFormatRenderable(PixelFormat pixelFormat) const override;
-
-  int getSampleCount(int requestedCount, PixelFormat pixelFormat) const override;
+  int getSampleCount(int requestedCount, PixelFormat pixelFormat) const;
 
  private:
-  ShaderCaps _shaderCaps = {};
+  GPUInfo _info = {};
+  GPUFeatures _features = {};
+  GPULimits _limits = {};
   std::unordered_map<PixelFormat, ConfigInfo, EnumHasher> pixelFormatMap = {};
 
   void initFormatMap(const GLInfo& info);
@@ -135,6 +113,5 @@ class GLCaps : public Caps {
   void initGLSupport(const GLInfo& info);
   void initGLESSupport(const GLInfo& info);
   void initWebGLSupport(const GLInfo& info);
-  void initMSAASupport(const GLInfo& info);
 };
 }  // namespace tgfx

@@ -19,9 +19,9 @@
 #include "TextureView.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "core/utils/UniqueID.h"
-#include "gpu/GPU.h"
 #include "gpu/resources/DefaultTextureView.h"
 #include "gpu/resources/YUVTextureView.h"
+#include "tgfx/gpu/GPU.h"
 #if defined(__OHOS__)
 #include <native_buffer/native_buffer.h>
 #endif
@@ -35,12 +35,11 @@ bool TextureView::CheckSizeAndFormat(Context* context, int width, int height, Pi
       format != PixelFormat::BGRA_8888) {
     return false;
   }
-  auto caps = context->caps();
-  auto maxTextureSize = caps->maxTextureSize;
+  auto maxTextureSize = context->gpu()->limits()->maxTextureDimension2D;
   return width <= maxTextureSize && height <= maxTextureSize;
 }
 
-void TextureView::ComputeTextureKey(const std::shared_ptr<GPUTexture> texture, BytesKey* bytesKey) {
+void TextureView::ComputeTextureKey(const std::shared_ptr<Texture> texture, BytesKey* bytesKey) {
   DEBUG_ASSERT(texture != nullptr);
   bytesKey->write(static_cast<uint32_t>(texture->format()) << 16 |
                   static_cast<uint32_t>(texture->type()));
@@ -67,13 +66,12 @@ std::shared_ptr<TextureView> TextureView::MakeFormat(Context* context, int width
     return nullptr;
   }
   auto gpu = context->gpu();
-  mipmapped = context->caps()->mipmapSupport && mipmapped;
   auto scratchKey = ComputeTextureScratchKey(width, height, pixelFormat, mipmapped);
   auto textureView = Resource::Find<TextureView>(context, scratchKey);
   if (textureView) {
     textureView->_origin = origin;
   } else {
-    GPUTextureDescriptor descriptor = {width, height, pixelFormat, mipmapped};
+    TextureDescriptor descriptor = {width, height, pixelFormat, mipmapped};
     auto texture = gpu->createTexture(descriptor);
     if (texture == nullptr) {
       return nullptr;
@@ -94,8 +92,8 @@ std::shared_ptr<TextureView> TextureView::MakeFrom(Context* context,
   if (context == nullptr) {
     return nullptr;
   }
-  auto texture = context->gpu()->importExternalTexture(backendTexture,
-                                                       GPUTextureUsage::TEXTURE_BINDING, adopted);
+  auto texture =
+      context->gpu()->importBackendTexture(backendTexture, TextureUsage::TEXTURE_BINDING, adopted);
   if (texture == nullptr) {
     return nullptr;
   }
@@ -123,58 +121,26 @@ std::shared_ptr<TextureView> TextureView::MakeFrom(Context* context,
   if (context == nullptr) {
     return nullptr;
   }
-
-#if defined(__OHOS__)
-  // On the HarmonyOS platform, video-decoded HardwareBuffers may not have the correct color space
-  // set, so we need to set it manually before creating the texture.
-  OH_NativeBuffer_Config config;
-  OH_NativeBuffer_GetConfig(hardwareBuffer, &config);
-  if (config.format >= NATIVEBUFFER_PIXEL_FMT_YUV_422_I &&
-      config.format <= NATIVEBUFFER_PIXEL_FMT_YCRCB_P010) {
-    switch (colorSpace) {
-      case YUVColorSpace::BT601_LIMITED:
-        OH_NativeBuffer_SetColorSpace(hardwareBuffer, OH_COLORSPACE_BT601_SMPTE_C_LIMIT);
-        break;
-      case YUVColorSpace::BT601_FULL:
-        OH_NativeBuffer_SetColorSpace(hardwareBuffer, OH_COLORSPACE_BT601_SMPTE_C_FULL);
-        break;
-      case YUVColorSpace::BT709_LIMITED:
-        OH_NativeBuffer_SetColorSpace(hardwareBuffer, OH_COLORSPACE_BT709_LIMIT);
-        break;
-      case YUVColorSpace::BT709_FULL:
-        OH_NativeBuffer_SetColorSpace(hardwareBuffer, OH_COLORSPACE_BT709_FULL);
-        break;
-      case YUVColorSpace::BT2020_LIMITED:
-        OH_NativeBuffer_SetColorSpace(hardwareBuffer, OH_COLORSPACE_BT2020_PQ_LIMIT);
-        break;
-      case YUVColorSpace::BT2020_FULL:
-        OH_NativeBuffer_SetColorSpace(hardwareBuffer, OH_COLORSPACE_BT2020_PQ_FULL);
-        break;
-      default:
-        break;
-    }
+  auto info = HardwareBufferGetInfo(hardwareBuffer);
+  if (info.format == HardwareBufferFormat::Unknown) {
+    return nullptr;
   }
-#endif
-
   auto textures =
-      context->gpu()->importHardwareTextures(hardwareBuffer, GPUTextureUsage::TEXTURE_BINDING);
+      context->gpu()->importHardwareTextures(hardwareBuffer, TextureUsage::TEXTURE_BINDING);
   if (textures.empty()) {
     return nullptr;
   }
   TextureView* textureView = nullptr;
-  if (textures.size() == 1) {
-    textureView = new DefaultTextureView(std::move(textures.front()));
+  if (info.format == HardwareBufferFormat::YCBCR_420_SP) {
+    textureView = new YUVTextureView(std::move(textures), YUVFormat::NV12, colorSpace);
   } else {
-    YUVFormat yuvFormat = YUVFormat::Unknown;
-    context->gpu()->getHardwareTextureFormats(hardwareBuffer, &yuvFormat);
-    DEBUG_ASSERT(yuvFormat != YUVFormat::Unknown);
-    textureView = new YUVTextureView(std::move(textures), yuvFormat, colorSpace);
+    textureView = new DefaultTextureView(std::move(textures.front()));
   }
   return Resource::AddToCache(context, textureView);
 }
 
 Point TextureView::getTextureCoord(float x, float y) const {
-  if (getTexture()->type() == GPUTextureType::Rectangle) {
+  if (getTexture()->type() == TextureType::Rectangle) {
     return {x, y};
   }
   return {x / static_cast<float>(width()), y / static_cast<float>(height())};

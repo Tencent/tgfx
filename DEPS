@@ -7,17 +7,17 @@
     "common": [
       {
         "url": "${PAG_GROUP}/vendor_tools.git",
-        "commit": "c4c45c2914d15cf48bbdbd9698c79066a3f9f33f",
+        "commit": "0f4264d14ce6c8d1185d27dc9e2e6ee758a8bbcb",
         "dir": "third_party/vendor_tools"
       },
       {
         "url": "${PAG_GROUP}/pathkit.git",
-        "commit": "1fce60d56f9c08d25d3868b5006dd2c9b52e9201",
+        "commit": "92d98e8c43885aae6ee82f6a163768d27006ddc2",
         "dir": "third_party/pathkit"
       },
       {
         "url": "${PAG_GROUP}/skcms.git",
-        "commit": "2d0ea94be31ed31438c3c7a57752a601ba83ff2c",
+        "commit": "0a4e501a0e61d62dc38a0157e4355a58f5b01b81",
         "dir": "third_party/skcms"
       },
       {

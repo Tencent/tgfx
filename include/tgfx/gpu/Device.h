@@ -18,8 +18,8 @@
 
 #pragma once
 
+#include <memory>
 #include <mutex>
-#include "tgfx/core/Matrix.h"
 
 namespace tgfx {
 class Context;

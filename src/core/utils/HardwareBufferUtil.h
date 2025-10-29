@@ -18,21 +18,20 @@
 
 #pragma once
 
-#include "tgfx/gpu/Backend.h"
+#include "tgfx/core/ImageInfo.h"
+#include "tgfx/gpu/PixelFormat.h"
+#include "tgfx/platform/HardwareBuffer.h"
 
 namespace tgfx {
 /**
- * GPUFence is a synchronization primitive for GPU-to-GPU operations. Once a fence is signaled, it
- * remains in that state and cannot be reset; to synchronize again, create a new fence.
+ * Returns an ImageInfo describing the specified HardwareBufferRef if recognized; otherwise returns
+ * an empty ImageInfo.
  */
-class GPUFence {
- public:
-  virtual ~GPUFence() = default;
+ImageInfo GetImageInfo(HardwareBufferRef hardwareBuffer);
 
-  /**
-   * Returns the backend semaphore object and transfers ownership to the caller, who must manage its
-   * lifetime. If the fence is invalid, an empty semaphore is returned.
-   */
-  virtual BackendSemaphore stealBackendSemaphore() = 0;
-};
+/**
+ * Returns the corresponding PixelFormat for the given HardwareBufferFormat if renderable; otherwise
+ * returns PixelFormat::Unknown.
+ */
+PixelFormat GetRenderableFormat(HardwareBufferFormat hardwareBufferFormat);
 }  // namespace tgfx

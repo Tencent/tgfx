@@ -18,23 +18,23 @@
 
 #pragma once
 
-#include "tgfx/gpu/Context.h"
+#include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/PixelFormat.h"
 #include "tgfx/platform/HardwareBuffer.h"
 
 namespace tgfx {
 /**
- * The type of GPUTexture. While only the 2D value is used by non-GL backends, the type must still
+ * The type of Texture. While only the 2D value is used by non-GL backends, the type must still
  * be known at the API-neutral layer to determine the legality of mipmapped, renderable, and
  * sampling parameters for proxies instantiated with wrapped textures.
  */
-enum class GPUTextureType { None, TwoD, Rectangle, External };
+enum class TextureType { None, TwoD, Rectangle, External };
 
 /**
- * GPUTextureUsage defines the usage flags for GPU textures.
- * These flags indicate how the texture can be used in rendering operations.
+ * TextureUsage defines the usage flags for GPU textures. These flags indicate how the texture can
+ * be used in rendering operations.
  */
-class GPUTextureUsage {
+class TextureUsage {
  public:
   /**
    * The texture can be bound for use as a sampled texture in a shader.
@@ -48,20 +48,20 @@ class GPUTextureUsage {
 };
 
 /**
- * GPUTextureDescriptor is used to describe the properties of a GPUTexture.
+ * TextureDescriptor is used to describe the properties of a Texture.
  */
-class GPUTextureDescriptor {
+class TextureDescriptor {
  public:
   /**
    * Default constructor initializes the texture descriptor with default values.
    */
-  GPUTextureDescriptor() = default;
+  TextureDescriptor() = default;
 
   /**
-   * Constructs a GPUTextureDescriptor with the specified properties.
+   * Constructs a TextureDescriptor with the specified properties.
    */
-  GPUTextureDescriptor(int width, int height, PixelFormat format, bool mipmapped = false,
-                       int sampleCount = 1, uint32_t usage = GPUTextureUsage::TEXTURE_BINDING);
+  TextureDescriptor(int width, int height, PixelFormat format, bool mipmapped = false,
+                    int sampleCount = 1, uint32_t usage = TextureUsage::TEXTURE_BINDING);
 
   /**
    * The width of the texture in pixels.
@@ -90,17 +90,17 @@ class GPUTextureDescriptor {
 
   /**
    * The bitwise flags that indicate the usage options for the texture. The value is the sum of the
-   * decimal values for each flag. See GPUTextureUsage for more details.
+   * decimal values for each flag. See TextureUsage for more details.
    */
-  uint32_t usage = GPUTextureUsage::TEXTURE_BINDING;
+  uint32_t usage = TextureUsage::TEXTURE_BINDING;
 };
 
 /**
- * GPUTexture represents a texture in the GPU backend for rendering operations.
+ * Represents a texture in the GPU backend for rendering operations.
  */
-class GPUTexture {
+class Texture {
  public:
-  virtual ~GPUTexture() = default;
+  virtual ~Texture() = default;
 
   /**
    * Returns the width of the texture in pixels.
@@ -138,8 +138,8 @@ class GPUTexture {
   }
 
   /**
-   * Returns the bitwise flags that indicate the original usage options set when the GPUTexture was
-   * created. The returned value is the sum of the decimal values for each flag. See GPUTextureUsage
+   * Returns the bitwise flags that indicate the original usage options set when the Texture was
+   * created. The returned value is the sum of the decimal values for each flag. See TextureUsage
    * for more details.
    */
   uint32_t usage() const {
@@ -149,19 +149,19 @@ class GPUTexture {
   /**
    * The type of the texture.
    */
-  virtual GPUTextureType type() const {
-    return GPUTextureType::TwoD;
+  virtual TextureType type() const {
+    return TextureType::TwoD;
   }
 
   /**
    * Retrieves the backend texture. An invalid BackendTexture will be returned if the texture
-   * is not created with GPUTextureUsage::TEXTURE_BINDING.
+   * is not created with TextureUsage::TEXTURE_BINDING.
    */
   virtual BackendTexture getBackendTexture() const = 0;
 
   /**
    * Retrieves the backend render target. An invalid BackendRenderTarget will be returned if the
-   * texture is not created with GPUTextureUsage::RENDER_ATTACHMENT.
+   * texture is not created with TextureUsage::RENDER_ATTACHMENT.
    */
   virtual BackendRenderTarget getBackendRenderTarget() const = 0;
 
@@ -175,9 +175,9 @@ class GPUTexture {
   }
 
  protected:
-  GPUTextureDescriptor descriptor = {};
+  TextureDescriptor descriptor = {};
 
-  explicit GPUTexture(const GPUTextureDescriptor& descriptor) : descriptor(descriptor) {
+  explicit Texture(const TextureDescriptor& descriptor) : descriptor(descriptor) {
   }
 };
 }  // namespace tgfx

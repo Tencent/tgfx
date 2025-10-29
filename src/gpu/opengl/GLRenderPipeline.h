@@ -20,11 +20,11 @@
 
 #include <memory>
 #include <unordered_map>
-#include "gpu/RenderPipeline.h"
 #include "gpu/opengl/GLBuffer.h"
 #include "gpu/opengl/GLResource.h"
 #include "gpu/opengl/GLState.h"
 #include "gpu/opengl/GLTexture.h"
+#include "tgfx/gpu/RenderPipeline.h"
 
 namespace tgfx {
 struct GLAttribute {

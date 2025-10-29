@@ -205,8 +205,7 @@ GLSLTiledTextureEffect::UniformNames GLSLTiledTextureEffect::initUniform(
   }
   bool unormCoordsRequiredForShaderMode = ShaderModeRequiresUnormCoord(sampling.shaderModeX) ||
                                           ShaderModeRequiresUnormCoord(sampling.shaderModeY);
-  bool sampleCoordsMustBeNormalized =
-      textureView->getTexture()->type() != GPUTextureType::Rectangle;
+  bool sampleCoordsMustBeNormalized = textureView->getTexture()->type() != TextureType::Rectangle;
   if (unormCoordsRequiredForShaderMode && sampleCoordsMustBeNormalized) {
     names.dimensionsName =
         uniformHandler->addUniform("Dimension", UniformFormat::Float2, ShaderStage::Fragment);
@@ -423,7 +422,7 @@ void GLSLTiledTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
   Sampling sampling(textureView, samplerState, subset);
   auto hasDimensionUniform = (ShaderModeRequiresUnormCoord(sampling.shaderModeX) ||
                               ShaderModeRequiresUnormCoord(sampling.shaderModeY)) &&
-                             textureView->getTexture()->type() != GPUTextureType::Rectangle;
+                             textureView->getTexture()->type() != TextureType::Rectangle;
   if (hasDimensionUniform) {
     auto dimensions = textureView->getTextureCoord(1.f, 1.f);
     fragmentUniformData->setData("Dimension", dimensions);
@@ -437,7 +436,7 @@ void GLSLTiledTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
       std::swap(rect[1], rect[3]);
     }
     auto type = textureView->getTexture()->type();
-    if (!hasDimensionUniform && type != GPUTextureType::Rectangle) {
+    if (!hasDimensionUniform && type != TextureType::Rectangle) {
       auto lt =
           textureView->getTextureCoord(static_cast<float>(rect[0]), static_cast<float>(rect[1]));
       auto rb =

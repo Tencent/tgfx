@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <cstdint>
+
 namespace tgfx {
 /**
  * Values used to specify a mask to permit or restrict writing to color channels of a color value.

@@ -39,7 +39,7 @@ class CornerPinEffect : public RuntimeEffect {
     return 4;
   }
 
-  Rect filterBounds(const Rect&) const override;
+  Rect filterBounds(const Rect& srcRect, MapDirection) const override;
 
   std::unique_ptr<RuntimeProgram> onCreateProgram(Context* context) const override;
 

@@ -46,7 +46,7 @@ class RRectsVertexProvider : public VertexProvider {
    */
   static PlacementPtr<RRectsVertexProvider> MakeFrom(BlockBuffer* blockBuffer,
                                                      std::vector<PlacementPtr<RRectRecord>>&& rects,
-                                                     AAType aaType, bool useScale,
+                                                     AAType aaType,
                                                      std::vector<PlacementPtr<Stroke>>&& strokes);
 
   /**
@@ -61,10 +61,6 @@ class RRectsVertexProvider : public VertexProvider {
    */
   AAType aaType() const {
     return static_cast<AAType>(bitFields.aaType);
-  }
-
-  bool useScale() const {
-    return bitFields.useScale;
   }
 
   /**
@@ -94,14 +90,12 @@ class RRectsVertexProvider : public VertexProvider {
   PlacementArray<Stroke> strokes = {};
   struct {
     uint8_t aaType : 2;
-    bool useScale : 1;
     bool hasColor : 1;
     bool hasStroke : 1;
   } bitFields = {};
 
-  RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType, bool useScale,
-                       bool hasColor, PlacementArray<Stroke>&& strokes,
-                       std::shared_ptr<BlockBuffer> reference);
+  RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType, bool hasColor,
+                       PlacementArray<Stroke>&& strokes, std::shared_ptr<BlockBuffer> reference);
 
   friend class BlockBuffer;
 };

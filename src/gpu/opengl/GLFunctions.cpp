@@ -18,6 +18,7 @@
 
 #include "tgfx/gpu/opengl/GLFunctions.h"
 #include "gpu/opengl/GLGPU.h"
+#include "tgfx/gpu/Context.h"
 
 namespace tgfx {
 const GLFunctions* GLFunctions::Get(const Context* context) {

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,28 +18,26 @@
 
 #pragma once
 
-#include "gpu/GPUFence.h"
-#include "gpu/opengl/GLResource.h"
-
 namespace tgfx {
 /**
- * GLSemaphore is a wrapper class for an OpenGL sync object.
+ * GPUFeatures describes the various optional features supported by the GPU.
  */
-class GLFence : public GPUFence, public GLResource {
+class GPUFeatures {
  public:
-  explicit GLFence(void* glSync) : _glSync(glSync) {
-  }
+  /**
+   * Indicates if the GPU supports semaphore synchronization primitives.
+   */
+  bool semaphore = false;
 
-  void* glSync() const {
-    return _glSync;
-  }
+  /**
+   * Indicates whether the GPU supports the CLAMP_TO_BORDER wrap mode for texture coordinates.
+   */
+  bool clampToBorder = false;
 
-  BackendSemaphore stealBackendSemaphore() override;
-
- protected:
-  void onRelease(GLGPU* gpu) override;
-
- private:
-  void* _glSync = nullptr;
+  /**
+   * Indicates whether the GPU supports texture barriers. If true, texture writes are
+   * immediately visible to subsequent texture reads without needing to flush the pipeline.
+   */
+  bool textureBarrier = false;
 };
 }  // namespace tgfx

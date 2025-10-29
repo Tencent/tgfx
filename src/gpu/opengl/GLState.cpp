@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLState.h"
-#include "gpu/ColorWriteMask.h"
 #include "gpu/opengl/GLTexture.h"
+#include "tgfx/gpu/ColorWriteMask.h"
 
 namespace tgfx {
 bool GLStencil::operator!=(const GLStencil& other) const {
@@ -27,8 +27,8 @@ bool GLStencil::operator!=(const GLStencil& other) const {
 }
 
 GLState::GLState(std::shared_ptr<GLInterface> glInterface) : interface(std::move(glInterface)) {
-  auto shaderCaps = interface->caps()->shaderCaps();
-  textureUnits.resize(static_cast<size_t>(shaderCaps->maxFragmentSamplers), INVALID_VALUE);
+  auto limits = interface->caps()->limits();
+  textureUnits.resize(static_cast<size_t>(limits->maxSamplersPerShaderStage), INVALID_VALUE);
 }
 
 void GLState::setEnabled(unsigned capability, bool enabled) {
@@ -156,7 +156,7 @@ void GLState::setBlendState(const GLBlendState& state) {
 
 void GLState::bindTexture(GLTexture* texture, unsigned textureUnit) {
   DEBUG_ASSERT(texture != nullptr);
-  DEBUG_ASSERT(texture->usage() & GPUTextureUsage::TEXTURE_BINDING);
+  DEBUG_ASSERT(texture->usage() & TextureUsage::TEXTURE_BINDING);
   auto& uniqueID = textureUnits[textureUnit];
   if (uniqueID == texture->uniqueID) {
     return;
@@ -203,7 +203,6 @@ void GLState::bindFramebuffer(GLTexture* texture, FrameBufferTarget target) {
 }
 
 void GLState::bindVertexArray(unsigned vao) {
-  DEBUG_ASSERT(interface->caps()->vertexArrayObjectSupport);
   if (vertexArray == vao) {
     return;
   }

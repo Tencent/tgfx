@@ -19,9 +19,7 @@
 #pragma once
 
 #include <vector>
-#include "gpu/Attribute.h"
 #include "gpu/FragmentShaderBuilder.h"
-#include "gpu/GPUTexture.h"
 #include "gpu/ShaderCaps.h"
 #include "gpu/ShaderVar.h"
 #include "gpu/UniformData.h"
@@ -29,6 +27,8 @@
 #include "gpu/VertexShaderBuilder.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/Processor.h"
+#include "tgfx/gpu/Attribute.h"
+#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
 class GeometryProcessor : public Processor {
@@ -94,7 +94,7 @@ class GeometryProcessor : public Processor {
     return textureSamplerCount;
   }
 
-  std::shared_ptr<GPUTexture> textureAt(size_t index) const {
+  std::shared_ptr<Texture> textureAt(size_t index) const {
     return onTextureAt(index);
   }
 
@@ -130,7 +130,7 @@ class GeometryProcessor : public Processor {
   virtual void onComputeProcessorKey(BytesKey*) const {
   }
 
-  virtual std::shared_ptr<GPUTexture> onTextureAt(size_t) const {
+  virtual std::shared_ptr<Texture> onTextureAt(size_t) const {
     return nullptr;
   }
 

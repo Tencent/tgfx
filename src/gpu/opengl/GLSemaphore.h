@@ -16,27 +16,32 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLFence.h"
-#include "gpu/opengl/GLGPU.h"
-#include "tgfx/gpu/opengl/GLFunctions.h"
+#pragma once
+
+#include "gpu/opengl/GLResource.h"
+#include "tgfx/gpu/Semaphore.h"
 
 namespace tgfx {
-BackendSemaphore GLFence::stealBackendSemaphore() {
-  if (_glSync == nullptr) {
-    return {};
+/**
+ * GLSemaphore is a wrapper class for an OpenGL sync object.
+ */
+class GLSemaphore : public Semaphore, public GLResource {
+ public:
+  explicit GLSemaphore(void* glSync) : _glSync(glSync) {
   }
-  GLSyncInfo glSyncInfo = {};
-  glSyncInfo.sync = _glSync;
-  _glSync = nullptr;
-  return {glSyncInfo};
-}
 
-void GLFence::onRelease(GLGPU* gpu) {
-  if (_glSync != nullptr) {
-    auto gl = gpu->functions();
-    gl->deleteSync(_glSync);
-    _glSync = nullptr;
+  void* glSync() const {
+    return _glSync;
   }
-}
 
+  BackendSemaphore getBackendSemaphore() const override;
+
+ protected:
+  void onRelease(GLGPU* gpu) override;
+
+ private:
+  void* _glSync = nullptr;
+
+  friend class GLGPU;
+};
 }  // namespace tgfx

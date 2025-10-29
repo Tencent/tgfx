@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GPUBufferUploadTask.h"
-#include "gpu/GPU.h"
 #include "gpu/resources/BufferResource.h"
 #include "inspect/InspectorMark.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 GPUBufferUploadTask::GPUBufferUploadTask(std::shared_ptr<ResourceProxy> proxy,

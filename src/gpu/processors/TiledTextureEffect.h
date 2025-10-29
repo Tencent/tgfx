@@ -67,7 +67,7 @@ class TiledTextureEffect : public FragmentProcessor {
 
   size_t onCountTextureSamplers() const override;
 
-  std::shared_ptr<GPUTexture> onTextureAt(size_t) const override;
+  std::shared_ptr<Texture> onTextureAt(size_t) const override;
 
   SamplerState onSamplerStateAt(size_t) const override;
 
