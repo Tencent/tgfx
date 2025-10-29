@@ -22,7 +22,7 @@
 #include <cstddef>
 #include <cstring>
 #include <utility>
-#include "tgfx/gpu/opengl/GLDefines.h"
+#include "gpu/opengl/GLDefines.h"
 
 namespace tgfx {
 #if !defined(GL_FUNCTION_TYPE)
@@ -236,11 +236,6 @@ class Context;
  */
 class GLFunctions {
  public:
-  /**
-   * Returns the GLFunctions pointer associated with the specified context.
-   */
-  static const GLFunctions* Get(const Context* context);
-
   GLActiveTexture* activeTexture = nullptr;
   GLAttachShader* attachShader = nullptr;
   GLBindAttribLocation* bindAttribLocation = nullptr;

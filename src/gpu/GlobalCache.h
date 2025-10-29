@@ -22,9 +22,9 @@
 #include <list>
 #include <unordered_map>
 #include "core/utils/SlidingWindowTracker.h"
+#include "gpu/Program.h"
 #include "gpu/proxies/GPUBufferProxy.h"
 #include "gpu/proxies/TextureProxy.h"
-#include "gpu/resources/Program.h"
 #include "tgfx/core/Color.h"
 
 namespace tgfx {

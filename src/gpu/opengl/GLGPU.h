@@ -65,7 +65,7 @@ class GLGPU : public GPU {
     return interface->caps()->getSampleCount(requestedCount, pixelFormat);
   }
 
-  void resetGLState() override {
+  void resetGLState() {
     _state->reset();
   }
 

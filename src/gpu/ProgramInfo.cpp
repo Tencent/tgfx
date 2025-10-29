@@ -135,7 +135,7 @@ std::shared_ptr<Program> ProgramInfo::getProgram() const {
   return program;
 }
 
-std::shared_ptr<GPUBuffer> ProgramInfo::getUniformBuffer(const PipelineProgram* program,
+std::shared_ptr<GPUBuffer> ProgramInfo::getUniformBuffer(const Program* program,
                                                          size_t* vertexOffset,
                                                          size_t* fragmentOffset) const {
   DEBUG_ASSERT(renderTarget != nullptr);
@@ -179,7 +179,7 @@ std::shared_ptr<GPUBuffer> ProgramInfo::getUniformBuffer(const PipelineProgram* 
   return uniformBuffer;
 }
 
-void ProgramInfo::bindUniformBufferAndUnloadToGPU(const PipelineProgram* program,
+void ProgramInfo::bindUniformBufferAndUnloadToGPU(const Program* program,
                                                   std::shared_ptr<GPUBuffer> uniformBuffer,
                                                   RenderPass* renderPass, size_t vertexOffset,
                                                   size_t fragmentOffset) const {
@@ -218,7 +218,7 @@ static AddressMode ToAddressMode(TileMode tileMode) {
   }
 }
 
-void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, PipelineProgram* program) const {
+void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* program) const {
   DEBUG_ASSERT(renderTarget != nullptr);
   size_t vertexOffset = 0;
   size_t fragmentOffset = 0;
