@@ -223,7 +223,7 @@ class RectIndicesProvider : public DataSource<Data> {
   }
 
   std::shared_ptr<Data> getData() const override {
-    auto size = reps * patternSize * sizeof(uint16_t);
+    auto size = sizeof(uint16_t) * reps * patternSize;
     Buffer buffer(size);
     if (buffer.isEmpty()) {
       return nullptr;
@@ -349,11 +349,11 @@ void GlobalCache::addStaticResource(const UniqueKey& uniqueKey,
 /**
  * As in stroke, index = a + b, and a is the current index, b is the shift
  * from the first index. The index layout:
- * outer AA line: 0 ~ 3
- * outer edge:    4 ~ 7
- * inner edge:    8 ~ 11
- * inner AA line: 12 ~ 15
- * Following comes an AA stroke rect and its indices:
+ * outer AA line: 0~3
+ * outer edge:    4~7
+ * inner edge:    8~11
+ * inner AA line: 12~15
+ * Following comes an AA miter-stroke rect and its indices:
  *    0                                    2
  *      **********************************
  *      * 4────────────────────────────6 *
@@ -388,7 +388,7 @@ static constexpr uint16_t AAMiterStrokeRectIndices[] = {
 };
 
 /**
- *  Following comes a non-AA stroke rect and its indices:
+ *  Following comes a non-AA miter-stroke rect and its indices:
  *    0────────────────────────────2
  *    │                            │
  *    │     4────────────────6     │
@@ -414,7 +414,7 @@ static constexpr uint16_t NonAAMiterStrokeRectIndices[] = {
  * outer edge:    8~11, 12~15
  * inner edge:    16~19
  * inner AA line: 20~23
- * Following comes a bevel-stroke rect and its indices:
+ * Following comes an AA bevel-stroke rect and its indices:
  *
  *           4                                 6
  *            *********************************
@@ -469,7 +469,7 @@ static constexpr uint16_t AABevelStrokeRectIndices[] = {
  * from the first index. The index layout:
  * outer AA edge: 0~3, 4~7
  * inner edge:    8~11
- * Following comes a bevel-stroke rect and its indices:
+ * Following comes a non-AA bevel-stroke rect and its indices:
  *              ______________________________
  *            / 4                           6  \
  *           /                                  \
@@ -499,7 +499,7 @@ static constexpr uint16_t NonAABevelStrokeRectIndices[] = {
 /**
  * As in round-stroke.
  * We take all points for an anti-aliased (AA) stroke,
- * but only points 0-19 for a non-AA stroke.
+ * but only points 0~19 for a non-AA stroke.
  * Following comes a round stroke rect and its indices:
  *
  *   0──1────────────────────────────2──3
@@ -537,7 +537,7 @@ static constexpr uint16_t RoundStrokeRectIndices[] = {
   10, 6, 18, 18, 19, 10,
   6, 5, 16, 16, 18, 6,
 
-  //AA  rect
+  //AA rect
   16, 17, 21, 21, 20, 16,
   17, 19, 23, 23, 21, 17,
   19, 18, 22, 22, 23, 19,

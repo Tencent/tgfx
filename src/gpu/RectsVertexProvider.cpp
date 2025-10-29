@@ -18,7 +18,6 @@
 
 #include "RectsVertexProvider.h"
 #include <array>
-#include <optional>
 #include "core/utils/MathExtra.h"
 #include "gpu/Quad.h"
 #include "tgfx/core/Stroke.h"
@@ -262,7 +261,7 @@ class AAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
       if (isDegenerate) {
         inSide.left = inSide.right = rect.centerX();
         inSide.top = inSide.bottom = rect.centerY();
-        if (bitFields.hasUVCoord) {
+        if (hasUVCoord) {
           inUV.left = inUV.right = uvRects[i]->centerX();
           inUV.top = inUV.bottom = uvRects[i]->centerY();
         }
@@ -273,7 +272,7 @@ class AAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
       if (isBevelJoin) {
         outSide.inset(0, halfWidth);
         outSideAssist.outset(0, halfWidth);
-        if (bitFields.hasUVCoord) {
+        if (hasUVCoord) {
           outUV.inset(0.0f, vOffset);
           assistUV.outset(0.0f, vOffset);
         }
@@ -421,6 +420,7 @@ class NonAAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
 
   void getVertices(float* vertices) const override {
     size_t index = 0;
+    const auto hasUVCoord = bitFields.hasUVCoord;
     for (size_t i = 0; i < rects.size(); ++i) {
       const auto& stroke = strokes[i];
       const auto& record = rects[i];
@@ -443,7 +443,7 @@ class NonAAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
       auto inUV = inSide;
       auto assistUV = outSideAssist;
       auto vOffset = 0.0f;
-      if (bitFields.hasUVCoord) {
+      if (hasUVCoord) {
         auto& uvRect = *uvRects[i];
         const auto uOffset = halfWidth / rect.width() * uvRect.width();
         vOffset = halfWidth / rect.height() * uvRect.height();
@@ -457,7 +457,7 @@ class NonAAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
       if (inSide.isEmpty()) {  // process degenerate rect
         inSide.left = inSide.right = rect.centerX();
         inSide.top = inSide.bottom = rect.centerY();
-        if (bitFields.hasUVCoord) {
+        if (hasUVCoord) {
           inUV.left = inUV.right = uvRects[i]->centerX();
           inUV.top = inUV.bottom = uvRects[i]->centerY();
         }
@@ -468,26 +468,26 @@ class NonAAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
       if (lineJoin() == LineJoin::Bevel) {
         outSide.inset(0, halfWidth);
         outSideAssist.outset(0, halfWidth);
-        if (bitFields.hasUVCoord) {
+        if (hasUVCoord) {
           outUV.inset(0, vOffset);
           assistUV.outset(0, vOffset);
         }
       }
 
       const auto outQuad = Quad::MakeFrom(outSide, &viewMatrix);
-      if (bitFields.hasUVCoord) {
+      if (hasUVCoord) {
         uvQuad = Quad::MakeFrom(outUV);
       }
       writeQuad(vertices, index, outQuad, uvQuad, record->color);
       if (lineJoin() == LineJoin::Bevel) {
         const auto assistQuad = Quad::MakeFrom(outSideAssist, &viewMatrix);
-        if (bitFields.hasUVCoord) {
+        if (hasUVCoord) {
           uvQuad = Quad::MakeFrom(assistUV);
         }
         writeQuad(vertices, index, assistQuad, uvQuad, record->color);
       }
       const auto inQuad = Quad::MakeFrom(inSide, &viewMatrix);
-      if (bitFields.hasUVCoord) {
+      if (hasUVCoord) {
         uvQuad = Quad::MakeFrom(inUV);
       }
       writeQuad(vertices, index, inQuad, uvQuad, record->color);
@@ -524,7 +524,9 @@ class AARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
 
   void getVertices(float* vertices) const override {
     size_t index = 0;
-    auto aaType = static_cast<AAType>(bitFields.aaType);
+    const auto aaType = static_cast<AAType>(bitFields.aaType);
+    const auto hasUVCoord = bitFields.hasUVCoord;
+    const auto hasColor = bitFields.hasColor;
     for (size_t i = 0; i < rects.size(); ++i) {
       const auto& stroke = strokes[i];
       const auto& record = rects[i];
@@ -556,7 +558,7 @@ class AARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
       float xOuterOffsets[4] = {xMaxOffset, FLOAT_NEARLY_ZERO, FLOAT_NEARLY_ZERO, xMaxOffset};
       std::array<float, 4> uCoords = {}, vCoords = {};
       auto uStep = 0.f, vStep = 0.f;
-      if (bitFields.hasUVCoord) {
+      if (hasUVCoord) {
         auto& uvRect = *uvRects[i];
         uStep = stroke->width * 0.5f / record->rect.width() * uvRect.width();
         vStep = stroke->width * 0.5f / record->rect.height() * uvRect.height();
@@ -578,11 +580,11 @@ class AARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
           vertices[index++] = yOuterOffsets[k];
           vertices[index++] = reciprocalRadii[0];
           vertices[index++] = reciprocalRadii[1];
-          if (bitFields.hasUVCoord) {
+          if (hasUVCoord) {
             vertices[index++] = uCoords[j];
             vertices[index++] = vCoords[k];
           }
-          if (bitFields.hasColor) {
+          if (hasColor) {
             WriteUByte4Color(vertices, index, record->color);
           }
         }
@@ -596,7 +598,7 @@ class AARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
       auto outsetBounds = bounds.makeOutset(padding, padding);
       auto insetUV = insetBounds;
       auto outsetUV = outsetBounds;
-      if (bitFields.hasUVCoord) {
+      if (hasUVCoord) {
         const auto& mat = record->viewMatrix;
         auto uvPadding =
             1.0f / std::sqrt(mat.getScaleX() * mat.getScaleX() + mat.getSkewY() * mat.getSkewY());
@@ -625,11 +627,11 @@ class AARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
           vertices[index++] = 0.0f;
           vertices[index++] = 1.0f;
           vertices[index++] = 1.0f;
-          if (bitFields.hasUVCoord) {
+          if (hasUVCoord) {
             vertices[index++] = uvQuad.point(k).x;
             vertices[index++] = uvQuad.point(k).y;
           }
-          if (bitFields.hasColor) {
+          if (hasColor) {
             WriteUByte4Color(vertices, index, record->color);
           }
         }
@@ -668,6 +670,8 @@ class NonAARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
 
   void getVertices(float* vertices) const override {
     size_t index = 0;
+    const auto hasUVCoord = bitFields.hasUVCoord;
+    const auto hasColor = bitFields.hasColor;
     for (size_t i = 0; i < rects.size(); ++i) {
       const auto& stroke = strokes[i];
       const auto& record = rects[i];
@@ -689,7 +693,7 @@ class NonAARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
                                 bounds.bottom};
       std::array<float, 4> uCoords = {}, vCoords = {};
       auto uStep = 0.0f, vStep = 0.0f;
-      if (bitFields.hasUVCoord) {
+      if (hasUVCoord) {
         auto& uvRect = *uvRects[i];
         uStep = stroke->width * 0.5f / record->rect.width() * uvRect.width();
         vStep = stroke->width * 0.5f / record->rect.height() * uvRect.height();
@@ -710,11 +714,11 @@ class NonAARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
           vertices[index++] = points[k].y;
           vertices[index++] = radii[j];
           vertices[index++] = radii[k];
-          if (bitFields.hasUVCoord) {
+          if (hasUVCoord) {
             vertices[index++] = uCoords[k];
             vertices[index++] = vCoords[k];
           }
-          if (bitFields.hasColor) {
+          if (hasColor) {
             WriteUByte4Color(vertices, index, record->color);
           }
         }
@@ -723,7 +727,7 @@ class NonAARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
       //Inner aa stroke ring
       auto inBounds = rect.makeInset(xRadius, yRadius);
       auto inUV = inBounds;
-      if (bitFields.hasUVCoord) {
+      if (hasUVCoord) {
         inUV = *uvRects[i];
         inUV.inset(uStep, vStep);
       }
@@ -740,11 +744,11 @@ class NonAARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
         vertices[index++] = inQuad.point(k).y;
         vertices[index++] = 0.0f;
         vertices[index++] = 0.0f;
-        if (bitFields.hasUVCoord) {
+        if (hasUVCoord) {
           vertices[index++] = inUVQuad.point(k).x;
           vertices[index++] = inUVQuad.point(k).y;
         }
-        if (bitFields.hasColor) {
+        if (hasColor) {
           WriteUByte4Color(vertices, index, record->color);
         }
       }
