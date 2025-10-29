@@ -41,23 +41,22 @@ void GLSLRectRoundStrokeGeometryProcessor::emitCode(EmitArgs& args) const {
   auto& uvCoordsVar = inUVCoord.empty() ? inPosition : inUVCoord;
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(uvCoordsVar));
 
-  auto innerRectVar = varyingHandler->addVarying("InnerRect", SLType::Float4);
-  vertBuilder->codeAppendf("%s = %s;", innerRectVar.vsOut().c_str(), inInnerRect.name().c_str());
-
-  auto radiusVar = varyingHandler->addVarying("CornerRadius", SLType::Float);
-  vertBuilder->codeAppendf("%s = %s;", radiusVar.vsOut().c_str(), inCornerRadius.name().c_str());
-
-  auto positionVar = varyingHandler->addVarying("Position", SLType::Float2);
-  vertBuilder->codeAppendf("%s = %s;", positionVar.vsOut().c_str(), uvCoordsVar.name().c_str());
-
+  Varying ellipseRadii;
   if (aaType == AAType::Coverage) {
     auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
     vertBuilder->codeAppendf("%s = %s;", coverageVar.vsOut().c_str(), inCoverage.name().c_str());
     fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(),
                              coverageVar.fsIn().c_str());
+    ellipseRadii = varyingHandler->addVarying("EllipseRadii", SLType::Float2);
+    vertBuilder->codeAppendf("%s = %s;", ellipseRadii.vsOut().c_str(),
+                             inEllipseRadii.name().c_str());
   } else {
     fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputCoverage.c_str());
   }
+
+  auto ellipseOffsets = varyingHandler->addVarying("EllipseOffsets", SLType::Float2);
+  vertBuilder->codeAppendf("%s = %s;", ellipseOffsets.vsOut().c_str(),
+                           inEllipseOffset.name().c_str());
 
   if (commonColor.has_value()) {
     auto colorName =
@@ -69,34 +68,22 @@ void GLSLRectRoundStrokeGeometryProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorVar.fsIn().c_str());
   }
 
-  //round corner coverage process
-  auto rectVarStr = innerRectVar.fsIn().c_str();
-  fragBuilder->codeAppend("const float epsilon = 0.01;");
-  fragBuilder->codeAppendf("if(%s > epsilon) {", radiusVar.fsIn().c_str());
-  fragBuilder->codeAppendf("vec2 leftTop = %s.xy;", rectVarStr);
-  fragBuilder->codeAppendf("vec2 rightBottom = %s.zw;", rectVarStr);
-  fragBuilder->codeAppendf("vec2 s = step(%s, leftTop) + step(rightBottom, %s);",
-                           positionVar.fsIn().c_str(), positionVar.fsIn().c_str());
-  fragBuilder->codeAppend("bool inSideCornerBox = s.x * s.y > 1.0 - epsilon;");
-  fragBuilder->codeAppend("if(inSideCornerBox) {");
-  fragBuilder->codeAppendf("float l = %s.x; float t = %s.y; float r = %s.z; float b = %s.w;",
-                           rectVarStr, rectVarStr, rectVarStr, rectVarStr);
-  fragBuilder->codeAppend("vec2 CORNERS[4] = vec2[4](vec2(l,t), vec2(l,b), vec2(r,t), vec2(r,b));");
-  fragBuilder->codeAppendf("int index = %s.x <= l ? 0 : 2;", positionVar.fsIn().c_str());
-  fragBuilder->codeAppendf("index += %s.y <= t ? 0 : 1;", positionVar.fsIn().c_str());
-  fragBuilder->codeAppend("vec2 center = CORNERS[index];");
-  fragBuilder->codeAppendf("float dist = length(%s - center);", positionVar.fsIn().c_str());
-  fragBuilder->codeAppendf("float smoothing = min(0.5, %s);", radiusVar.fsIn().c_str());
+  fragBuilder->codeAppendf("vec2 offset = %s;", ellipseOffsets.fsIn().c_str());
   if (aaType == AAType::Coverage) {
-    fragBuilder->codeAppendf(
-        "float alpha = 1.0 - smoothstep(%s - smoothing, %s + smoothing, dist);",
-        radiusVar.fsIn().c_str(), radiusVar.fsIn().c_str());
+    fragBuilder->codeAppend("float test = dot(offset, offset) - 1.0;");
+    fragBuilder->codeAppend("if (test > -0.5) {");
+    fragBuilder->codeAppendf("vec2 grad = 2.0 * offset * %s;", ellipseRadii.fsIn().c_str());
+    fragBuilder->codeAppend("float grad_dot = dot(grad, grad);");
+    fragBuilder->codeAppend("grad_dot = max(grad_dot, 1.1755e-38);");
+    fragBuilder->codeAppend("float invlen = inversesqrt(grad_dot);");
+    fragBuilder->codeAppend("float edgeAlpha = clamp(0.5 - test * invlen, 0.0, 1.0);");
+    fragBuilder->codeAppendf("%s *= edgeAlpha;", args.outputCoverage.c_str());
+    fragBuilder->codeAppendf("}");
   } else {
-    fragBuilder->codeAppendf("float alpha = step(dist, %s);", radiusVar.fsIn().c_str());
+    fragBuilder->codeAppend("float test = dot(offset, offset);");
+    fragBuilder->codeAppend("float edgeAlpha = step(test, 1.0);");
+    fragBuilder->codeAppendf("%s *= edgeAlpha;", args.outputCoverage.c_str());
   }
-  fragBuilder->codeAppendf("%s *= alpha;", args.outputCoverage.c_str());
-  fragBuilder->codeAppend("}");
-  fragBuilder->codeAppend("}");
 
   // Emit the vertex position to the hardware in the normalized window coordinates it expects.
   args.vertBuilder->emitNormalizedPosition(inPosition.name());

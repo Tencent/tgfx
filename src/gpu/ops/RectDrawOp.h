@@ -48,22 +48,32 @@ class RectDrawOp : public DrawOp {
   static constexpr uint16_t IndicesPerAAQuad = 30;
 
   /**
-   * The maximum number of indices per AA rect with miter-stroke.
+   * The number of indices per AA rect with miter-stroke.
    */
-  static constexpr uint16_t IndicesPerAAMiterStrokeRect = 3 * 24;
+  static constexpr uint16_t IndicesPerAAMiterStrokeRect = 72;
 
   /**
-   * The maximum number of indices per AA rect with bevel-stroke.
+   * The number of indices per AA rect with round-stroke.
    */
-  static constexpr uint16_t IndicesPerAABevelStrokeRect = 48 + 36 + 24;
+  static constexpr uint16_t IndicesPerAARoundStrokeRect = 96;
 
   /**
-   * The maximum number of indices per non-AA rect with miter-stroke.
+   * The number of indices per AA rect with bevel-stroke.
+   */
+  static constexpr uint16_t IndicesPerAABevelStrokeRect = 108;
+
+  /**
+   * The number of indices per non-AA rect with miter-stroke.
    */
   static constexpr uint16_t IndicesPerNonAAMiterStrokeRect = 24;
 
   /**
-   * The maximum number of indices per non-AA rect with bevel-stroke.
+   * The number of indices per non-AA rect with round-stroke.
+   */
+  static constexpr uint16_t IndicesPerNonAARoundStrokeRect = 72;
+
+  /**
+   * The number of indices per non-AA rect with bevel-stroke.
    */
   static constexpr uint16_t IndicesPerNonAABevelStrokeRect = 36;
 

@@ -17,7 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RectsVertexProvider.h"
+#include <array>
 #include <optional>
+#include "core/utils/MathExtra.h"
 #include "gpu/Quad.h"
 #include "tgfx/core/Stroke.h"
 
@@ -176,44 +178,33 @@ class NonAARectsVertexProvider : public RectsVertexProvider {
   }
 };
 
-struct RoundJoinParams {
-  Rect innerRect = {};
-  float cornerRadius = 1.0f;
-};
-
-// AAStrokeRectVertexProvider currently only supports Miter and Bevel joins.
-class AAStrokeRectsVertexProvider final : public RectsVertexProvider {
+// Anti-aliased angular stroke joins: Miter and Bevel.
+class AAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
   PlacementArray<Stroke> strokes = {};
 
  public:
-  AAStrokeRectsVertexProvider(PlacementArray<RectRecord>&& rects, PlacementArray<Rect>&& uvRects,
-                              PlacementArray<Stroke>&& strokes, AAType aaType, bool hasUVCoord,
-                              bool hasColor, std::shared_ptr<BlockBuffer> reference)
+  AAAngularStrokeRectsVertexProvider(PlacementArray<RectRecord>&& rects,
+                                     PlacementArray<Rect>&& uvRects,
+                                     PlacementArray<Stroke>&& strokes, AAType aaType,
+                                     bool hasUVCoord, bool hasColor,
+                                     std::shared_ptr<BlockBuffer> reference)
       : RectsVertexProvider(std::move(rects), std::move(uvRects), aaType, hasUVCoord, hasColor,
                             UVSubsetMode::None, std::move(reference)),
         strokes(std::move(strokes)) {
+    DEBUG_ASSERT(!this->strokes.empty() && this->strokes.size() == this->rects.size());
     bitFields.hasStroke = true;
     bitFields.lineJoin = static_cast<uint8_t>(this->strokes.front()->join);
   }
 
-  void writeQuad(float* vertices, size_t& index, const Quad& quad, const Color& color,
-                 float coverage,
-                 const std::optional<RoundJoinParams>& roundParams = std::nullopt) const {
+  void writeQuad(float* vertices, size_t& index, const Quad& quad, const Quad& uvQuad,
+                 const Color& color, float coverage) const {
     for (size_t i = 0; i < 4; ++i) {
       vertices[index++] = quad.point(i).x;
       vertices[index++] = quad.point(i).y;
-      if (roundParams.has_value()) {
-        // For round-join, we need to pass the inner round rect and corner radius.
-        vertices[index++] = roundParams->innerRect.left;
-        vertices[index++] = roundParams->innerRect.top;
-        vertices[index++] = roundParams->innerRect.right;
-        vertices[index++] = roundParams->innerRect.bottom;
-        vertices[index++] = roundParams->cornerRadius;
-      }
       vertices[index++] = coverage;
       if (bitFields.hasUVCoord) {
-        vertices[index++] = quad.point(i).x;
-        vertices[index++] = quad.point(i).y;
+        vertices[index++] = uvQuad.point(i).x;
+        vertices[index++] = uvQuad.point(i).y;
       }
       if (bitFields.hasColor) {
         WriteUByte4Color(vertices, index, color);
@@ -222,11 +213,8 @@ class AAStrokeRectsVertexProvider final : public RectsVertexProvider {
   }
 
   size_t vertexCount() const override {
-    size_t perVertexCount = (4 + (lineJoin() == LineJoin::Miter ? 4 : 8)) * 2;  // inner + outer
-    size_t perVertexDataSize = 3;                                               // x, y, coverage
-    if (lineJoin() == LineJoin::Round) {
-      perVertexDataSize += 5;  // baseRoundRect + minHalfStroke
-    }
+    size_t perVertexCount = (lineJoin() == LineJoin::Miter ? 8 : 12) * 2;  // inner + outer
+    size_t perVertexDataSize = 3;                                          // x, y ,coverage
     if (bitFields.hasUVCoord) {
       perVertexDataSize += 2;
     }
@@ -239,145 +227,179 @@ class AAStrokeRectsVertexProvider final : public RectsVertexProvider {
   void getVertices(float* vertices) const override {
     size_t index = 0;
     const auto isBevelJoin = lineJoin() == LineJoin::Bevel;
-    std::optional<RoundJoinParams> roundParams = std::nullopt;
+    const auto hasUVCoord = bitFields.hasUVCoord;
     for (size_t i = 0; i < rects.size(); ++i) {
       const auto& stroke = strokes[i];
       const auto& record = rects[i];
       auto& viewMatrix = record->viewMatrix;
-      Point strokeSize = {stroke->width, stroke->width};
-      if (stroke->width > 0.f) {
-        strokeSize.x =
-            std::abs(strokeSize.x * viewMatrix.getScaleX() + strokeSize.y * viewMatrix.getSkewX());
-        strokeSize.y =
-            std::abs(strokeSize.x * viewMatrix.getSkewY() + strokeSize.y * viewMatrix.getScaleY());
-      } else {
-        strokeSize.set(1.0f, 1.0f);
-      }
-      const float dx = strokeSize.x;
-      const float dy = strokeSize.y;
-      const float rx = dx * 0.5f;
-      const float ry = dy * 0.5f;
-      auto rect = viewMatrix.mapRect(record->rect);  // to device space
-      if (lineJoin() == LineJoin::Round) {
-        roundParams = RoundJoinParams{rect, std::min(rx, ry)};
-      }
-      auto outSide = rect.makeOutset(rx, ry);
+      const auto scale = std::sqrt(viewMatrix.getScaleX() * viewMatrix.getScaleX() +
+                                   viewMatrix.getSkewY() * viewMatrix.getSkewY());
+      // we want the new edge to be 0.5px away from the old line.
+      const auto padding = 0.5f / scale;
+      auto strokeWidth = stroke->width > 0.f ? stroke->width : 1.0f / scale;
+      const auto halfWidth = strokeWidth * 0.5f;
+      auto& rect = record->rect;
+      auto outSide = rect.makeOutset(halfWidth, halfWidth);
       auto outSideAssist = rect;
-      auto inSide = rect.makeInset(rx, ry);
-
+      auto inSide = rect.makeInset(halfWidth, halfWidth);
+      Quad uvQuad = Quad::MakeFrom({});
+      auto outUV = outSide;
+      auto inUV = inSide;
+      auto assistUV = outSideAssist;
+      float vOffset = 0.0f;
+      if (hasUVCoord) {
+        auto& uvRect = *uvRects[i];
+        auto uOffset = halfWidth / rect.width() * uvRect.width();
+        vOffset = halfWidth / rect.height() * uvRect.height();
+        outUV = uvRect.makeOutset(uOffset, vOffset);
+        inUV = uvRect.makeInset(uOffset, vOffset);
+        assistUV = uvRect;
+      }
       // If we have a degenerate stroking rect(ie the stroke is larger than inner rect) then we
       // make a degenerate inside rect to avoid double hitting.  We will also jam all the points
       // together when we render these rects.
-      const auto spare = std::min(rect.width() - dx, rect.height() - dy);
-      const auto isDegenerate = spare <= 0.0f;
+      const auto isDegenerate = inSide.isEmpty();
       if (isDegenerate) {
         inSide.left = inSide.right = rect.centerX();
         inSide.top = inSide.bottom = rect.centerY();
+        if (bitFields.hasUVCoord) {
+          inUV.left = inUV.right = uvRects[i]->centerX();
+          inUV.top = inUV.bottom = uvRects[i]->centerY();
+        }
       }
       // For bevel-stroke, use 2 Rect instances(outside and outsideAssist)
       // to draw the outside of the octagon. Because there are 8 vertices on the outer
       // edge, while vertex number of inner edge is 4, the same as miter-stroke.
       if (isBevelJoin) {
-        outSide.inset(0, ry);
-        outSideAssist.outset(0, ry);
+        outSide.inset(0, halfWidth);
+        outSideAssist.outset(0, halfWidth);
+        if (bitFields.hasUVCoord) {
+          outUV.inset(0.0f, vOffset);
+          assistUV.outset(0.0f, vOffset);
+        }
       }
 
       // How much do we inset toward the inside of the strokes?
-      const float inset = std::min(0.5f, std::min(rx, ry));
-      float innerCoverage = 1.0f;
-      if (inset < 0.5f) {
+      const float inset = std::min(padding, std::min(halfWidth, halfWidth));
+      auto innerCoverage = 1.0f;
+      if (inset < padding) {
         // Stroke is subpixel, so reduce the coverage to simulate the narrower strokes.
-        innerCoverage = 2.0f * inset / (inset + 0.5f);
+        innerCoverage = 2.0f * inset / (inset + padding);
       }
 
       // How much do we outset away from the outside of the strokes?
       // We always want to keep the AA picture frame one pixel wide.
-      const float outset = 1.0f - inset;
-      const float outerCoverage = 0.0f;
+      const auto outset = 2.0f * padding - inset;
+      constexpr float outerCoverage = 0.0f;
 
       // How much do we outset away from the interior side of the stroke (toward the center)?
-      const float interiorOutset = outset;
-      const float interiorCoverage = outerCoverage;
+      const auto interiorOutset = outset;
+      const auto interiorCoverage = outerCoverage;
 
-      writeQuad(vertices, index, Quad::MakeFrom(outSide.makeInset(-outset, -outset)), record->color,
-                outerCoverage, roundParams);
-      if (isBevelJoin) {
-        writeQuad(vertices, index, Quad::MakeFrom(outSideAssist.makeInset(-outset, -outset)),
-                  record->color, outerCoverage);
+      // Exterior outset rect (away from stroke).
+      const auto outOutsetQuad = Quad::MakeFrom(outSide.makeOutset(outset, outset), &viewMatrix);
+      if (hasUVCoord) {
+        uvQuad = Quad::MakeFrom(outUV.makeOutset(outset, outset));
       }
-      writeQuad(vertices, index, Quad::MakeFrom(outSide.makeInset(inset, inset)), record->color,
-                innerCoverage, roundParams);
+      writeQuad(vertices, index, outOutsetQuad, uvQuad, record->color, outerCoverage);
       if (isBevelJoin) {
-        writeQuad(vertices, index, Quad::MakeFrom(outSideAssist.makeInset(inset, inset)),
-                  record->color, innerCoverage);
+        const auto assistOutsetQuad =
+            Quad::MakeFrom(outSideAssist.makeOutset(outset, outset), &viewMatrix);
+        if (hasUVCoord) {
+          uvQuad = Quad::MakeFrom(assistUV.makeOutset(outset, outset));
+        }
+        writeQuad(vertices, index, assistOutsetQuad, uvQuad, record->color, outerCoverage);
+      }
+      const auto outInsetQuad = Quad::MakeFrom(outSide.makeInset(inset, inset), &viewMatrix);
+      if (hasUVCoord) {
+        uvQuad = Quad::MakeFrom(outUV.makeInset(inset, inset));
+      }
+      writeQuad(vertices, index, outInsetQuad, uvQuad, record->color, innerCoverage);
+      if (isBevelJoin) {
+        const auto assistInsetQuad =
+            Quad::MakeFrom(outSideAssist.makeInset(inset, inset), &viewMatrix);
+        if (hasUVCoord) {
+          uvQuad = Quad::MakeFrom(assistUV.makeInset(inset, inset));
+        }
+        writeQuad(vertices, index, assistInsetQuad, uvQuad, record->color, innerCoverage);
       }
       if (!isDegenerate) {
         // Interior inset rect (toward stroke).
-        writeQuad(vertices, index, Quad::MakeFrom(inSide.makeInset(-inset, -inset)), record->color,
-                  innerCoverage, roundParams);
+        const auto innerInsetQuad = Quad::MakeFrom(inSide.makeOutset(inset, inset), &viewMatrix);
+        if (hasUVCoord) {
+          uvQuad = Quad::MakeFrom(inUV.makeOutset(inset, inset));
+        }
+        writeQuad(vertices, index, innerInsetQuad, uvQuad, record->color, innerCoverage);
         // Interior outset rect (away from stroke, toward center of rect).
         Rect interiorAABoundary = inSide.makeInset(interiorOutset, interiorOutset);
-        float coverageBackset = 0;  // Adds back coverage when the interior AA edges cross.
+        float coverageBackset = 0.0f;  // Adds back coverage when the interior AA edges cross.
         if (interiorAABoundary.left > interiorAABoundary.right) {
           coverageBackset =
-              (interiorAABoundary.left - interiorAABoundary.right) / (interiorOutset * 2);
+              (interiorAABoundary.left - interiorAABoundary.right) / (interiorOutset * 2.0f);
           interiorAABoundary.left = interiorAABoundary.right = interiorAABoundary.centerX();
         }
         if (interiorAABoundary.top > interiorAABoundary.bottom) {
-          coverageBackset =
-              std::max((interiorAABoundary.top - interiorAABoundary.bottom) / (interiorOutset * 2),
-                       coverageBackset);
+          coverageBackset = std::max(
+              (interiorAABoundary.top - interiorAABoundary.bottom) / (interiorOutset * 2.0f),
+              coverageBackset);
           interiorAABoundary.top = interiorAABoundary.bottom = interiorAABoundary.centerY();
         }
-        if (coverageBackset > 0) {
+        if (coverageBackset > 0.0f) {
           // The interior edges crossed. Lerp back toward innerCoverage, which is what this op
           // will draw in the degenerate case. This gives a smooth transition into the degenerate
           // case.
-          innerCoverage += innerCoverage * (1 - coverageBackset) + innerCoverage * coverageBackset;
+          innerCoverage +=
+              interiorCoverage * (1 - coverageBackset) + innerCoverage * coverageBackset;
         }
-        writeQuad(vertices, index, Quad::MakeFrom(interiorAABoundary), record->color,
-                  interiorCoverage, roundParams);
+        const auto innerAAQuad = Quad::MakeFrom(interiorAABoundary, &viewMatrix);
+        if (hasUVCoord) {
+          auto uvBoundary = inUV.makeInset(interiorOutset, interiorOutset);
+          if (uvBoundary.isEmpty()) {
+            uvBoundary.left = uvBoundary.right = inUV.centerX();
+            uvBoundary.top = uvBoundary.bottom = inUV.centerY();
+          }
+          uvQuad = Quad::MakeFrom(uvBoundary);
+        }
+        writeQuad(vertices, index, innerAAQuad, uvQuad, record->color, interiorCoverage);
       } else {
         // When the interior rect has become degenerate we smoosh to a single point
-        writeQuad(vertices, index, Quad::MakeFrom(inSide), record->color, innerCoverage,
-                  roundParams);
-        writeQuad(vertices, index, Quad::MakeFrom(inSide), record->color, innerCoverage,
-                  roundParams);
+        const auto innerQuad = Quad::MakeFrom(inSide, &viewMatrix);
+        if (hasUVCoord) {
+          uvQuad = Quad::MakeFrom(inUV);
+        }
+        writeQuad(vertices, index, innerQuad, uvQuad, record->color, innerCoverage);
+        writeQuad(vertices, index, innerQuad, uvQuad, record->color, innerCoverage);
       }
     }
   }
 };
 
-class NonAAStrokeRectsVertexProvider final : public RectsVertexProvider {
+// Non anti-aliased angular stroke joins: Miter and Bevel.
+class NonAAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
   PlacementArray<Stroke> strokes = {};
 
  public:
-  NonAAStrokeRectsVertexProvider(PlacementArray<RectRecord>&& rects, PlacementArray<Rect>&& uvRects,
-                                 PlacementArray<Stroke>&& strokes, AAType aaType, bool hasUVCoord,
-                                 bool hasColor, std::shared_ptr<BlockBuffer> reference)
+  NonAAAngularStrokeRectsVertexProvider(PlacementArray<RectRecord>&& rects,
+                                        PlacementArray<Rect>&& uvRects,
+                                        PlacementArray<Stroke>&& strokes, AAType aaType,
+                                        bool hasUVCoord, bool hasColor,
+                                        std::shared_ptr<BlockBuffer> reference)
       : RectsVertexProvider(std::move(rects), std::move(uvRects), aaType, hasUVCoord, hasColor,
                             UVSubsetMode::None, std::move(reference)),
         strokes(std::move(strokes)) {
+    DEBUG_ASSERT(!this->strokes.empty() && this->strokes.size() == this->rects.size());
     bitFields.hasStroke = true;
     bitFields.lineJoin = static_cast<uint8_t>(this->strokes.front()->join);
   }
 
-  void writeQuad(float* vertices, size_t& index, const Quad& quad, const Color& color,
-                 const std::optional<RoundJoinParams>& roundParams = std::nullopt) const {
+  void writeQuad(float* vertices, size_t& index, const Quad& quad, const Quad& uvQuad,
+                 const Color& color) const {
     for (size_t i = 0; i < 4; ++i) {
       vertices[index++] = quad.point(i).x;
       vertices[index++] = quad.point(i).y;
-      if (roundParams.has_value()) {
-        // For round-join, we need to pass the inner round rect cornerRadius.
-        vertices[index++] = roundParams->innerRect.left;
-        vertices[index++] = roundParams->innerRect.top;
-        vertices[index++] = roundParams->innerRect.right;
-        vertices[index++] = roundParams->innerRect.bottom;
-        vertices[index++] = roundParams->cornerRadius;
-      }
       if (bitFields.hasUVCoord) {
-        vertices[index++] = quad.point(i).x;
-        vertices[index++] = quad.point(i).y;
+        vertices[index++] = uvQuad.point(i).x;
+        vertices[index++] = uvQuad.point(i).y;
       }
       if (bitFields.hasColor) {
         WriteUByte4Color(vertices, index, color);
@@ -386,11 +408,8 @@ class NonAAStrokeRectsVertexProvider final : public RectsVertexProvider {
   }
 
   size_t vertexCount() const override {
-    size_t perVertexCount = (4 + (lineJoin() == LineJoin::Miter ? 4 : 8));  // outer edge only
-    size_t perVertexDataSize = 2;                                           // x, y
-    if (lineJoin() == LineJoin::Round) {
-      perVertexDataSize += 5;  // baseRoundRect + minHalfStroke
-    }
+    size_t perVertexCount = lineJoin() == LineJoin::Miter ? 8 : 12;  // outer edge only
+    size_t perVertexDataSize = 2;                                    // x, y
     if (bitFields.hasUVCoord) {
       perVertexDataSize += 2;
     }
@@ -402,52 +421,333 @@ class NonAAStrokeRectsVertexProvider final : public RectsVertexProvider {
 
   void getVertices(float* vertices) const override {
     size_t index = 0;
-    std::optional<RoundJoinParams> roundParams = std::nullopt;
     for (size_t i = 0; i < rects.size(); ++i) {
       const auto& stroke = strokes[i];
       const auto& record = rects[i];
       auto& viewMatrix = record->viewMatrix;
-      Point strokeSize = {stroke->width, stroke->width};
-      if (stroke->width > 0.f) {
-        strokeSize.x =
-            std::abs(strokeSize.x * viewMatrix.getScaleX() + strokeSize.y * viewMatrix.getSkewX());
-        strokeSize.y =
-            std::abs(strokeSize.x * viewMatrix.getSkewY() + strokeSize.y * viewMatrix.getScaleY());
-      } else {
-        strokeSize.set(1.0f, 1.0f);
+
+      // we want the new edge to be 0.5px away from the old line.
+      auto strokeWidth = stroke->width;
+      if (strokeWidth < 0.0f) {
+        const auto scale = std::sqrt(viewMatrix.getScaleX() * viewMatrix.getScaleX() +
+                                     viewMatrix.getSkewY() * viewMatrix.getSkewY());
+        strokeWidth = 1.0f / scale;
       }
-      const float dx = strokeSize.x;
-      const float dy = strokeSize.y;
-      const float rx = strokeSize.x * 0.5f;
-      const float ry = strokeSize.y * 0.5f;
-      auto rect = viewMatrix.mapRect(record->rect);  // to device space
-      auto outSide = rect.makeOutset(rx, ry);
+      const auto halfWidth = strokeWidth * 0.5f;
+      auto rect = record->rect;
+      auto outSide = rect.makeOutset(halfWidth, halfWidth);
       auto outSideAssist = rect;
-      auto inSide = rect.makeInset(rx, ry);
-      if (lineJoin() == LineJoin::Round) {
-        roundParams = RoundJoinParams{rect, std::min(rx, ry)};
+      auto inSide = rect.makeInset(halfWidth, halfWidth);
+      Quad uvQuad = Quad::MakeFrom({});
+      auto outUV = outSide;
+      auto inUV = inSide;
+      auto assistUV = outSideAssist;
+      auto vOffset = 0.0f;
+      if (bitFields.hasUVCoord) {
+        auto& uvRect = *uvRects[i];
+        const auto uOffset = halfWidth / rect.width() * uvRect.width();
+        vOffset = halfWidth / rect.height() * uvRect.height();
+        outUV = uvRect.makeOutset(uOffset, vOffset);
+        inUV = uvRect.makeInset(uOffset, vOffset);
+        assistUV = uvRect;
       }
       // If we have a degenerate stroking rect(ie the stroke is larger than inner rect) then we
       // make a degenerate inside rect to avoid double hitting.  We will also jam all the points
       // together when we render these rects.
-      if (auto spare = std::min(rect.width() - dx, rect.height() - dy); spare <= 0.0f) {
-        // process degenerate rect
+      if (inSide.isEmpty()) {  // process degenerate rect
         inSide.left = inSide.right = rect.centerX();
         inSide.top = inSide.bottom = rect.centerY();
+        if (bitFields.hasUVCoord) {
+          inUV.left = inUV.right = uvRects[i]->centerX();
+          inUV.top = inUV.bottom = uvRects[i]->centerY();
+        }
       }
       // For bevel-stroke, use 2 Rect instances(outside and outsideAssist)
       // to draw the outside of the octagon. Because there are 8 vertices on the outer
       // edge, while vertex number of inner edge is 4, the same as miter-stroke.
       if (lineJoin() == LineJoin::Bevel) {
-        outSide.inset(0, ry);
-        outSideAssist.outset(0, ry);
+        outSide.inset(0, halfWidth);
+        outSideAssist.outset(0, halfWidth);
+        if (bitFields.hasUVCoord) {
+          outUV.inset(0, vOffset);
+          assistUV.outset(0, vOffset);
+        }
       }
 
-      writeQuad(vertices, index, Quad::MakeFrom(outSide), record->color, roundParams);
-      if (lineJoin() == LineJoin::Bevel) {
-        writeQuad(vertices, index, Quad::MakeFrom(outSideAssist), record->color);
+      const auto outQuad = Quad::MakeFrom(outSide, &viewMatrix);
+      if (bitFields.hasUVCoord) {
+        uvQuad = Quad::MakeFrom(outUV);
       }
-      writeQuad(vertices, index, Quad::MakeFrom(inSide), record->color, roundParams);
+      writeQuad(vertices, index, outQuad, uvQuad, record->color);
+      if (lineJoin() == LineJoin::Bevel) {
+        const auto assistQuad = Quad::MakeFrom(outSideAssist, &viewMatrix);
+        if (bitFields.hasUVCoord) {
+          uvQuad = Quad::MakeFrom(assistUV);
+        }
+        writeQuad(vertices, index, assistQuad, uvQuad, record->color);
+      }
+      const auto inQuad = Quad::MakeFrom(inSide, &viewMatrix);
+      if (bitFields.hasUVCoord) {
+        uvQuad = Quad::MakeFrom(inUV);
+      }
+      writeQuad(vertices, index, inQuad, uvQuad, record->color);
+    }
+  }
+};
+
+class AARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
+  PlacementArray<Stroke> strokes = {};
+
+ public:
+  AARoundStrokeRectsVertexProvider(PlacementArray<RectRecord>&& rects,
+                                   PlacementArray<Rect>&& uvRects, PlacementArray<Stroke>&& strokes,
+                                   AAType aaType, bool hasUVCoord, bool hasColor,
+                                   std::shared_ptr<BlockBuffer> reference)
+      : RectsVertexProvider(std::move(rects), std::move(uvRects), aaType, hasUVCoord, hasColor,
+                            UVSubsetMode::None, std::move(reference)),
+        strokes(std::move(strokes)) {
+    bitFields.hasStroke = true;
+    bitFields.lineJoin = static_cast<uint8_t>(LineJoin::Round);
+  }
+
+  size_t vertexCount() const override {
+    size_t perVertexCount = 24;
+    size_t perVertexDataSize = 7;  // x, y, coverage, EllipseOffsets(2), EllipseRadii(2)
+    if (bitFields.hasUVCoord) {
+      perVertexDataSize += 2;
+    }
+    if (bitFields.hasColor) {
+      perVertexDataSize += 1;
+    }
+    return rects.size() * perVertexCount * perVertexDataSize;
+  }
+
+  void getVertices(float* vertices) const override {
+    size_t index = 0;
+    auto aaType = static_cast<AAType>(bitFields.aaType);
+    for (size_t i = 0; i < rects.size(); ++i) {
+      const auto& stroke = strokes[i];
+      const auto& record = rects[i];
+      auto viewMatrix = record->viewMatrix;
+      auto scales = viewMatrix.getAxisScales();
+      auto rect = record->rect;
+      rect.scale(scales.x, scales.y);
+      viewMatrix.preScale(1.0f / scales.x, 1.0f / scales.y);
+      Point strokeSize = {stroke->width, stroke->width};
+      if (stroke->width > 0.0f) {
+        strokeSize = {scales.x * stroke->width, scales.y * stroke->width};
+      } else {
+        strokeSize.set(1.0f, 1.0f);
+      }
+      auto xRadius = strokeSize.x * 0.5f;
+      auto yRadius = strokeSize.y * 0.5f;
+      float reciprocalRadii[2] = {1.0f / xRadius, 1.0f / yRadius};
+      const auto aaBloat = aaType == AAType::MSAA ? FLOAT_SQRT2 : 0.5f;
+      auto xOuterRadius = xRadius + aaBloat;
+      auto yOuterRadius = yRadius + aaBloat;
+      auto xMaxOffset = xOuterRadius / xRadius;
+      auto yMaxOffset = yOuterRadius / yRadius;
+      auto bounds = rect.makeOutset(xRadius + aaBloat, yRadius + aaBloat);
+      const float yCoords[4] = {bounds.top, bounds.top + yOuterRadius, bounds.bottom - yOuterRadius,
+                                bounds.bottom};
+
+      // we're using inversesqrt() in shader, so can't be exactly 0
+      float yOuterOffsets[4] = {yMaxOffset, FLOAT_NEARLY_ZERO, FLOAT_NEARLY_ZERO, yMaxOffset};
+      float xOuterOffsets[4] = {xMaxOffset, FLOAT_NEARLY_ZERO, FLOAT_NEARLY_ZERO, xMaxOffset};
+      std::array<float, 4> uCoords = {}, vCoords = {};
+      auto uStep = 0.f, vStep = 0.f;
+      if (bitFields.hasUVCoord) {
+        auto& uvRect = *uvRects[i];
+        uStep = stroke->width * 0.5f / record->rect.width() * uvRect.width();
+        vStep = stroke->width * 0.5f / record->rect.height() * uvRect.height();
+        uCoords = {uvRect.left - uStep, uvRect.left, uvRect.right, uvRect.right + uStep};
+        vCoords = {uvRect.top - vStep, uvRect.top, uvRect.bottom, uvRect.bottom + vStep};
+      }
+      //round corner mesh
+      for (size_t j = 0; j < 4; ++j) {
+        Point points[4] = {{bounds.left, yCoords[j]},
+                           {bounds.left + xRadius, yCoords[j]},
+                           {bounds.right - xRadius, yCoords[j]},
+                           {bounds.right, yCoords[j]}};
+        viewMatrix.mapPoints(points, 4);
+        for (size_t k = 0; k < 4; ++k) {
+          vertices[index++] = points[k].x;
+          vertices[index++] = points[k].y;
+          vertices[index++] = 1.0f;
+          vertices[index++] = xOuterOffsets[j];
+          vertices[index++] = yOuterOffsets[k];
+          vertices[index++] = reciprocalRadii[0];
+          vertices[index++] = reciprocalRadii[1];
+          if (bitFields.hasUVCoord) {
+            vertices[index++] = uCoords[j];
+            vertices[index++] = vCoords[k];
+          }
+          if (bitFields.hasColor) {
+            WriteUByte4Color(vertices, index, record->color);
+          }
+        }
+      }
+
+      //Inner anti-aliased stroke ring
+      bounds = rect.makeInset(xRadius, yRadius);
+      const auto isDegenerate = std::min(bounds.width(), bounds.height()) <= 1.0f;
+      constexpr float padding = 0.5f;
+      auto insetBounds = bounds.makeInset(padding, padding);
+      auto outsetBounds = bounds.makeOutset(padding, padding);
+      auto insetUV = insetBounds;
+      auto outsetUV = outsetBounds;
+      if (bitFields.hasUVCoord) {
+        const auto& mat = record->viewMatrix;
+        auto uvPadding =
+            1.0f / std::sqrt(mat.getScaleX() * mat.getScaleX() + mat.getSkewY() * mat.getSkewY());
+        const auto uvRect = uvRects[i]->makeInset(uStep, vStep);
+        insetUV = uvRect.makeInset(uvPadding, uvPadding);
+        outsetUV = uvRect.makeOutset(uvPadding, uvPadding);
+      }
+      if (isDegenerate) {
+        insetBounds.left = insetBounds.right = bounds.centerX();
+        insetBounds.top = insetBounds.bottom = bounds.centerY();
+        insetUV.setEmpty();
+      }
+      auto insetQuad = Quad::MakeFrom(insetBounds, &viewMatrix);
+      auto outsetQuad = Quad::MakeFrom(outsetBounds, &viewMatrix);
+      auto uvInsetQuad = Quad::MakeFrom(insetUV);
+      auto uvOutsetQuad = Quad::MakeFrom(outsetUV);
+      for (size_t j = 0; j < 2; ++j) {
+        auto& quad = j == 0 ? outsetQuad : insetQuad;
+        auto& uvQuad = j == 0 ? uvOutsetQuad : uvInsetQuad;
+        auto coverage = j == 0 ? 1.0f : 0.0f;
+        for (size_t k = 0; k < 4; ++k) {
+          vertices[index++] = quad.point(k).x;
+          vertices[index++] = quad.point(k).y;
+          vertices[index++] = coverage;
+          vertices[index++] = 0.0f;
+          vertices[index++] = 0.0f;
+          vertices[index++] = 1.0f;
+          vertices[index++] = 1.0f;
+          if (bitFields.hasUVCoord) {
+            vertices[index++] = uvQuad.point(k).x;
+            vertices[index++] = uvQuad.point(k).y;
+          }
+          if (bitFields.hasColor) {
+            WriteUByte4Color(vertices, index, record->color);
+          }
+        }
+      }
+    }
+  }
+};
+
+class NonAARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
+  PlacementArray<Stroke> strokes;
+
+ public:
+  NonAARoundStrokeRectsVertexProvider(PlacementArray<RectRecord>&& rects,
+                                      PlacementArray<Rect>&& uvRects,
+                                      PlacementArray<Stroke>&& strokes, AAType aaType,
+                                      bool hasUVCoord, bool hasColor,
+                                      std::shared_ptr<BlockBuffer> reference)
+      : RectsVertexProvider(std::move(rects), std::move(uvRects), aaType, hasUVCoord, hasColor,
+                            UVSubsetMode::None, std::move(reference)),
+        strokes(std::move(strokes)) {
+    bitFields.hasStroke = true;
+    bitFields.lineJoin = static_cast<uint8_t>(LineJoin::Round);
+  }
+
+  size_t vertexCount() const override {
+    size_t perVertexCount = 20;
+    size_t perVertexDataSize = 4;  // x, y, EllipseOffsets(2)
+    if (bitFields.hasUVCoord) {
+      perVertexDataSize += 2;
+    }
+    if (bitFields.hasColor) {
+      perVertexDataSize += 1;
+    }
+    return rects.size() * perVertexCount * perVertexDataSize;
+  }
+
+  void getVertices(float* vertices) const override {
+    size_t index = 0;
+    for (size_t i = 0; i < rects.size(); ++i) {
+      const auto& stroke = strokes[i];
+      const auto& record = rects[i];
+      auto viewMatrix = record->viewMatrix;
+      auto scales = viewMatrix.getAxisScales();
+      auto rect = record->rect;
+      rect.scale(scales.x, scales.y);
+      viewMatrix.preScale(1.0f / scales.x, 1.0f / scales.y);
+      Point strokeSize = {stroke->width, stroke->width};
+      if (stroke->width > 0.0f) {
+        strokeSize = {scales.x * stroke->width, scales.y * stroke->width};
+      } else {
+        strokeSize.set(1.0f, 1.0f);
+      }
+      const auto xRadius = strokeSize.x * 0.5f;
+      const auto yRadius = strokeSize.y * 0.5f;
+      auto bounds = rect.makeOutset(xRadius, yRadius);
+      const float yCoords[4] = {bounds.top, bounds.top + yRadius, bounds.bottom - yRadius,
+                                bounds.bottom};
+      std::array<float, 4> uCoords = {}, vCoords = {};
+      auto uStep = 0.0f, vStep = 0.0f;
+      if (bitFields.hasUVCoord) {
+        auto& uvRect = *uvRects[i];
+        uStep = stroke->width * 0.5f / record->rect.width() * uvRect.width();
+        vStep = stroke->width * 0.5f / record->rect.height() * uvRect.height();
+        uCoords = {uvRect.left - uStep, uvRect.left, uvRect.right, uvRect.right + uStep};
+        vCoords = {uvRect.top - vStep, uvRect.top, uvRect.bottom, uvRect.bottom + vStep};
+      }
+
+      //round corner mesh
+      constexpr float radii[4] = {1.0f, 0.0f, 0.0f, 1.0f};
+      for (size_t j = 0; j < 4; ++j) {
+        Point points[4] = {{bounds.left, yCoords[j]},
+                           {bounds.left + xRadius, yCoords[j]},
+                           {bounds.right - xRadius, yCoords[j]},
+                           {bounds.right, yCoords[j]}};
+        viewMatrix.mapPoints(points, 4);
+        for (size_t k = 0; k < 4; ++k) {
+          vertices[index++] = points[k].x;
+          vertices[index++] = points[k].y;
+          vertices[index++] = radii[j];
+          vertices[index++] = radii[k];
+          if (bitFields.hasUVCoord) {
+            vertices[index++] = uCoords[k];
+            vertices[index++] = vCoords[k];
+          }
+          if (bitFields.hasColor) {
+            WriteUByte4Color(vertices, index, record->color);
+          }
+        }
+      }
+
+      //Inner aa stroke ring
+      auto inBounds = rect.makeInset(xRadius, yRadius);
+      auto inUV = inBounds;
+      if (bitFields.hasUVCoord) {
+        inUV = *uvRects[i];
+        inUV.inset(uStep, vStep);
+      }
+      if (inBounds.isEmpty()) {  //degenerate
+        inBounds.left = inBounds.right = rect.centerX();
+        inBounds.top = inBounds.bottom = rect.centerY();
+        inUV.left = inUV.right = uvRects[i]->centerX();
+        inUV.top = inUV.bottom = uvRects[i]->centerY();
+      }
+      auto inQuad = Quad::MakeFrom(inBounds, &viewMatrix);
+      auto inUVQuad = Quad::MakeFrom(inUV);
+      for (size_t k = 0; k < 4; ++k) {
+        vertices[index++] = inQuad.point(k).x;
+        vertices[index++] = inQuad.point(k).y;
+        vertices[index++] = 0.0f;
+        vertices[index++] = 0.0f;
+        if (bitFields.hasUVCoord) {
+          vertices[index++] = inUVQuad.point(k).x;
+          vertices[index++] = inUVQuad.point(k).y;
+        }
+        if (bitFields.hasColor) {
+          WriteUByte4Color(vertices, index, record->color);
+        }
+      }
     }
   }
 };
@@ -498,15 +798,27 @@ PlacementPtr<RectsVertexProvider> RectsVertexProvider::MakeFrom(
                                                   buffer->addReference());
   }
 
+  const auto isRound = strokes.front()->join == LineJoin::Round;
   auto strokeArray = buffer->makeArray(std::move(strokes));
   if (aaType == AAType::Coverage) {
-    return buffer->make<AAStrokeRectsVertexProvider>(std::move(rectArray), std::move(uvRectArray),
-                                                     std::move(strokeArray), aaType, needUVCoord,
-                                                     hasColor, buffer->addReference());
+    if (isRound) {
+      return buffer->make<AARoundStrokeRectsVertexProvider>(
+          std::move(rectArray), std::move(uvRectArray), std::move(strokeArray), aaType, needUVCoord,
+          hasColor, buffer->addReference());
+    }
+    return buffer->make<AAAngularStrokeRectsVertexProvider>(
+        std::move(rectArray), std::move(uvRectArray), std::move(strokeArray), aaType, needUVCoord,
+        hasColor, buffer->addReference());
   }
-  return buffer->make<NonAAStrokeRectsVertexProvider>(std::move(rectArray), std::move(uvRectArray),
-                                                      std::move(strokeArray), aaType, needUVCoord,
-                                                      hasColor, buffer->addReference());
+
+  if (isRound) {
+    return buffer->make<NonAARoundStrokeRectsVertexProvider>(
+        std::move(rectArray), std::move(uvRectArray), std::move(strokeArray), aaType, needUVCoord,
+        hasColor, buffer->addReference());
+  }
+  return buffer->make<NonAAAngularStrokeRectsVertexProvider>(
+      std::move(rectArray), std::move(uvRectArray), std::move(strokeArray), aaType, needUVCoord,
+      hasColor, buffer->addReference());
 }
 
 RectsVertexProvider::RectsVertexProvider(PlacementArray<RectRecord>&& rects,

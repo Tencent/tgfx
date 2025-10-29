@@ -40,9 +40,9 @@ class RectRoundStrokeGeometryProcessor : public GeometryProcessor {
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
   Attribute inPosition;
-  Attribute inInnerRect;
-  Attribute inCornerRadius;
   Attribute inCoverage;
+  Attribute inEllipseOffset;
+  Attribute inEllipseRadii;
   Attribute inUVCoord;
   Attribute inColor;
 

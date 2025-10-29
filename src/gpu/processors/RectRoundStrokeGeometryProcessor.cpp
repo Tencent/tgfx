@@ -24,10 +24,12 @@ RectRoundStrokeGeometryProcessor::RectRoundStrokeGeometryProcessor(AAType aaType
                                                                    std::optional<Matrix> uvMatrix)
     : GeometryProcessor(ClassID()), aaType(aaType), commonColor(commonColor), uvMatrix(uvMatrix) {
   inPosition = {"inPosition", VertexFormat::Float2};
-  inInnerRect = {"inInnerRect", VertexFormat::Float4};
-  inCornerRadius = {"inCornerRadius", VertexFormat::Float};
   if (aaType == AAType::Coverage) {
     inCoverage = {"inCoverage", VertexFormat::Float};
+  }
+  inEllipseOffset = {"inEllipseOffset", VertexFormat::Float2};
+  if (aaType == AAType::Coverage) {
+    inEllipseRadii = {"inEllipseRadii", VertexFormat::Float2};
   }
   if (!uvMatrix.has_value()) {
     inUVCoord = {"inUVCoord", VertexFormat::Float2};

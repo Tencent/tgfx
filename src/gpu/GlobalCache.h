@@ -117,8 +117,9 @@ class GlobalCache {
     size_t cursor = 0;
   };
 
-  std::shared_ptr<GPUBufferProxy> getMiterOrRoundStrokeIndexBuffer(bool antialias);
+  std::shared_ptr<GPUBufferProxy> getMiterStrokeIndexBuffer(bool antialias);
   std::shared_ptr<GPUBufferProxy> getBevelStrokeIndexBuffer(bool antialias);
+  std::shared_ptr<GPUBufferProxy> getRoundStrokeIndexBuffer(bool antialias);
 
   Context* context = nullptr;
   std::list<Program*> programLRU = {};
@@ -129,10 +130,13 @@ class GlobalCache {
   std::shared_ptr<GPUBufferProxy> nonAAQuadIndexBuffer = nullptr;
   std::shared_ptr<GPUBufferProxy> rRectFillIndexBuffer = nullptr;
   std::shared_ptr<GPUBufferProxy> rRectStrokeIndexBuffer = nullptr;
-  std::shared_ptr<GPUBufferProxy> aaRectMiterStrokeIndexBuffer = nullptr;
-  std::shared_ptr<GPUBufferProxy> aaRectBevelStrokeIndexBuffer = nullptr;
-  std::shared_ptr<GPUBufferProxy> nonAARectMiterStrokeIndexBuffer = nullptr;
-  std::shared_ptr<GPUBufferProxy> nonAARectBevelStrokeIndexBuffer = nullptr;
+  std::shared_ptr<GPUBufferProxy> aaMiterStrokeRectIndexBuffer = nullptr;
+  std::shared_ptr<GPUBufferProxy> aaRoundStrokeRectIndexBuffer = nullptr;
+  std::shared_ptr<GPUBufferProxy> aaBevelStrokeRectIndexBuffer = nullptr;
+  std::shared_ptr<GPUBufferProxy> nonAAMiterStrokeRectIndexBuffer = nullptr;
+  std::shared_ptr<GPUBufferProxy> nonAABevelStrokeRectIndexBuffer = nullptr;
+  std::shared_ptr<GPUBufferProxy> nonAARoundStrokeRectIndexBuffer = nullptr;
+
   ResourceKeyMap<std::shared_ptr<Resource>> staticResources = {};
   // Triple buffering for uniform buffer management
   static constexpr uint32_t UNIFORM_BUFFER_COUNT = 3;

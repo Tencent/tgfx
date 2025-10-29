@@ -86,18 +86,21 @@ PlacementPtr<GeometryProcessor> RectDrawOp::onMakeGeometryProcessor(RenderTarget
 }
 
 static uint16_t GetNumIndicesPerQuad(AAType aaType, bool hasStroke, LineJoin lineJoin) {
+  const auto isAA = aaType == AAType::Coverage;
   if (!hasStroke) {
-    return aaType == AAType::Coverage ? RectDrawOp::IndicesPerAAQuad
-                                      : RectDrawOp::IndicesPerNonAAQuad;
+    return isAA ? RectDrawOp::IndicesPerAAQuad : RectDrawOp::IndicesPerNonAAQuad;
   }
+
   switch (lineJoin) {
     case LineJoin::Miter:
+      return isAA ? RectDrawOp::IndicesPerAAMiterStrokeRect
+                  : RectDrawOp::IndicesPerNonAAMiterStrokeRect;
     case LineJoin::Round:
-      return aaType == AAType::Coverage ? RectDrawOp::IndicesPerAAMiterStrokeRect
-                                        : RectDrawOp::IndicesPerNonAAMiterStrokeRect;
+      return isAA ? RectDrawOp::IndicesPerAARoundStrokeRect
+                  : RectDrawOp::IndicesPerNonAARoundStrokeRect;
     case LineJoin::Bevel:
-      return aaType == AAType::Coverage ? RectDrawOp::IndicesPerAABevelStrokeRect
-                                        : RectDrawOp::IndicesPerNonAABevelStrokeRect;
+      return isAA ? RectDrawOp::IndicesPerAABevelStrokeRect
+                  : RectDrawOp::IndicesPerNonAABevelStrokeRect;
     default:
       return 0;
   }
@@ -118,7 +121,7 @@ void RectDrawOp::onDraw(RenderPass* renderPass) {
   renderPass->setVertexBuffer(vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
   renderPass->setIndexBuffer(indexBuffer ? indexBuffer->gpuBuffer() : nullptr);
   if (indexBuffer != nullptr) {
-    auto numIndicesPerQuad = GetNumIndicesPerQuad(aaType, hasStroke, strokeLineJoin);
+    const auto numIndicesPerQuad = GetNumIndicesPerQuad(aaType, hasStroke, strokeLineJoin);
     renderPass->drawIndexed(PrimitiveType::Triangles, 0, rectCount * numIndicesPerQuad);
   } else {
     renderPass->draw(PrimitiveType::TriangleStrip, 0, 4);
