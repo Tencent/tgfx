@@ -102,7 +102,7 @@ void GLRenderPass::setPipeline(std::shared_ptr<RenderPipeline> pipeline) {
 
 void GLRenderPass::setUniformBuffer(unsigned binding, std::shared_ptr<GPUBuffer> buffer,
                                     size_t offset, size_t size) {
-  if (!(buffer->usage() & GPUBufferUsage::UNIFORM)) {
+  if (buffer != nullptr && !(buffer->usage() & GPUBufferUsage::UNIFORM)) {
     LOGE("GLRenderPass::setUniformBuffer(), buffer usage is not UNIFORM!");
     return;
   }
