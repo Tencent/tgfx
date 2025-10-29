@@ -33,11 +33,6 @@ class RectDrawOp : public DrawOp {
   static constexpr uint16_t MaxNumRects = 2048;
 
   /**
-   * The maximum number of stroke rects that can be drawn in a single draw call.
-   */
-  static constexpr uint16_t MaxNumStrokeRects = 1024;
-
-  /**
    * The maximum number of vertices per non-AA quad.
    */
   static constexpr uint16_t IndicesPerNonAAQuad = 6;

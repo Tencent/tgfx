@@ -33,7 +33,6 @@ enum class PendingOpType {
   RRect,
   Shape,
   Atlas,
-  StrokeRect,
 };
 
 /**

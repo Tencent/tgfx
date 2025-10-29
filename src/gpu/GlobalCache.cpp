@@ -554,7 +554,7 @@ std::shared_ptr<GPUBufferProxy> GlobalCache::getMiterStrokeIndexBuffer(bool anti
     auto vertCount =
         antialias ? VERTICES_PER_AA_MITER_STROKE_RECT : VERTICES_PER_NON_AA_MITER_STROKE_RECT;
     auto provider = std::make_unique<RectIndicesProvider>(pattern, patternSize,
-                                                          RectDrawOp::MaxNumStrokeRects, vertCount);
+                                                          RectDrawOp::MaxNumRects, vertCount);
     indexBuffer = context->proxyProvider()->createIndexBufferProxy(std::move(provider));
   }
   return indexBuffer;
@@ -569,7 +569,7 @@ std::shared_ptr<GPUBufferProxy> GlobalCache::getBevelStrokeIndexBuffer(bool anti
     auto vertCount =
         antialias ? VERTICES_PER_AA_BEVEL_STROKE_RECT : VERTICES_PER_NON_AA_BEVEL_STROKE_RECT;
     auto provider = std::make_unique<RectIndicesProvider>(pattern, patternSize,
-                                                          RectDrawOp::MaxNumStrokeRects, vertCount);
+                                                          RectDrawOp::MaxNumRects, vertCount);
     indexBuffer = context->proxyProvider()->createIndexBufferProxy(std::move(provider));
   }
   return indexBuffer;

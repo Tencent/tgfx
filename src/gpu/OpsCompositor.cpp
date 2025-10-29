@@ -271,8 +271,6 @@ bool OpsCompositor::canAppend(PendingOpType type, const Path& clip, const Fill& 
       return pendingRects.size() < RectDrawOp::MaxNumRects;
     case PendingOpType::RRect:
       return pendingRRects.size() < RRectDrawOp::MaxNumRRects;
-    case PendingOpType::StrokeRect:
-      return pendingRects.size() < RectDrawOp::MaxNumStrokeRects;
     default:
       break;
   }
@@ -383,7 +381,6 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
         }
       }
     // fallthrough
-    case PendingOpType::StrokeRect:
     case PendingOpType::Image: {
       auto subsetMode = UVSubsetMode::None;
       if (pendingConstraint == SrcRectConstraint::Strict && pendingImage) {
