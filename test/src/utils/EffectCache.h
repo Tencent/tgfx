@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,38 +18,26 @@
 
 #pragma once
 
-#include "tgfx/gpu/Context.h"
+#include <list>
+#include <memory>
+#include <unordered_map>
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
-/**
- * The base class for custom GPU programs. Overrides the onReleaseGPU() method to free all GPU
- * resources. No backend API calls should be made during destructuring since there may be no GPU
- * context that is current on the calling thread.
- */
-class RuntimeProgram {
+struct EffectProgram {
+  std::shared_ptr<RenderPipeline> pipeline = nullptr;
+  uint32_t effectType = 0;
+  std::list<EffectProgram*>::iterator cachedPosition;
+};
+
+class EffectCache {
  public:
-  explicit RuntimeProgram(Context* context) : context(context) {
-  }
+  std::shared_ptr<RenderPipeline> findPipeline(uint32_t effectType);
 
-  virtual ~RuntimeProgram() = default;
-
-  /**
-   * Retrieves the context associated with this RuntimeProgram.
-   */
-  Context* getContext() const {
-    return context;
-  }
-
- protected:
-  /**
-   * Overrides this method to free all GPU resources. After this method is called, the associated
-   * context will be set to nullptr.
-   */
-  virtual void onReleaseGPU() = 0;
+  void addPipeline(uint32_t effectType, std::shared_ptr<RenderPipeline> pipeline);
 
  private:
-  Context* context = nullptr;
-
-  friend class GLRuntimeProgram;
+  std::list<EffectProgram*> programLRU = {};
+  std::unordered_map<uint32_t, std::unique_ptr<EffectProgram>> programMap = {};
 };
 }  // namespace tgfx

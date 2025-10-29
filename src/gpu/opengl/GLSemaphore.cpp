@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSemaphore.h"
+#include "gpu/opengl/GLFunctions.h"
 #include "gpu/opengl/GLGPU.h"
-#include "tgfx/gpu/opengl/GLFunctions.h"
 
 namespace tgfx {
 BackendSemaphore GLSemaphore::getBackendSemaphore() const {

@@ -20,13 +20,7 @@
 
 #include "tgfx/core/Image.h"
 #include "tgfx/core/MapDirection.h"
-#include "tgfx/gpu/RuntimeProgram.h"
-
-#define DEFINE_RUNTIME_EFFECT_PROGRAM_ID                             \
-  uint32_t programID() const override {                              \
-    static uint32_t UniqueID = tgfx::RuntimeEffect::NextProgramID(); \
-    return UniqueID;                                                 \
-  }
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 
@@ -36,12 +30,6 @@ namespace tgfx {
  */
 class RuntimeEffect {
  public:
-  /**
-   * Generates a globally unique program ID for the custom runtime effect. This ID is used by the
-   * RuntimeEffect::programID() method.
-   */
-  static uint32_t NextProgramID();
-
   /**
    * Constructs a RuntimeEffect with the given extra input images.
    * @param extraInputs A collection of additional input images used during rendering. When the
@@ -56,26 +44,8 @@ class RuntimeEffect {
   virtual ~RuntimeEffect() = default;
 
   /**
-   * Returns the unique program ID for this effect. This ID identifies the RuntimeProgram created
-   * by the effect and is used to cache it in the GPU context. Make sure the program ID stays the
-   * same for all instances of the same effect class so the GPU context can reuse the program.
-   *
-   * Use the DEFINE_RUNTIME_EFFECT_PROGRAM_ID macro to implement the programID() method for
-   * subclasses.
-   */
-  virtual uint32_t programID() const = 0;
-
-  /**
-   * Returns the sample count requested by the effect. The default value is 1. Override this method
-   * to return a value > 1 if the effect requires MSAA (multisampling antialiasing).
-   */
-  virtual int sampleCount() const {
-    return 1;
-  }
-
-  /**
    * Returns the bounds of the image that will be produced by this filter when it is applied to an
-  * image of the given bounds. MapDirection::Forward is used to determine which pixels of the
+   * image of the given bounds. MapDirection::Forward is used to determine which pixels of the
    * destination canvas a source image rect would touch after filtering. MapDirection::Reverse
    * is used to determine which rect of the source image would be required to fill the given
    * rect (typically, clip bounds).
@@ -86,19 +56,13 @@ class RuntimeEffect {
 
  protected:
   /**
-   * Creates a new RuntimeProgram for the effect. The program will be cached in the GPU context and
-   * reused for all instances of the effect.
-   */
-  virtual std::unique_ptr<RuntimeProgram> onCreateProgram(Context* context) const = 0;
-
-  /**
-   * Applies the effect to the input textures and draws the result to the specified render target.
+   * Applies the effect to the input textures and draws the result to the specified output texture.
    * inputTextures[0] represents the source image for the ImageFilter, and extraInputs correspond to
    * inputTextures[1...n] in order.
    */
-  virtual bool onDraw(const RuntimeProgram* program,
-                      const std::vector<BackendTexture>& inputTextures,
-                      const BackendRenderTarget& target, const Point& offset) const = 0;
+  virtual bool onDraw(CommandEncoder* encoder,
+                      const std::vector<std::shared_ptr<Texture>>& inputTextures,
+                      std::shared_ptr<Texture> outputTexture, const Point& offset) const = 0;
 
  private:
   std::vector<std::shared_ptr<Image>> extraInputs = {};

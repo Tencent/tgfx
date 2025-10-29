@@ -19,10 +19,10 @@
 #pragma once
 
 #include "GLSLVertexShaderBuilder.h"
+#include "gpu/Program.h"
 #include "gpu/ProgramBuilder.h"
 #include "gpu/UniformHandler.h"
 #include "gpu/glsl/GLSLFragmentShaderBuilder.h"
-#include "gpu/resources/PipelineProgram.h"
 #ifdef TGFX_USE_INSPECTOR
 #include "inspect/FrameCapture.h"
 #endif
@@ -38,7 +38,7 @@ class GLSLProgramBuilder : public ProgramBuilder {
  private:
   GLSLProgramBuilder(Context* context, const ProgramInfo* programInfo);
 
-  std::shared_ptr<PipelineProgram> finalize();
+  std::shared_ptr<Program> finalize();
 
   UniformHandler* uniformHandler() override {
     return &_uniformHandler;
