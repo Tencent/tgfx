@@ -500,7 +500,7 @@ static constexpr uint16_t NonAABevelStrokeRectIndices[] = {
  * As in round-stroke.
  * We take all points for an anti-aliased (AA) stroke,
  * but only points 0~19 for a non-AA stroke.
- * Following comes a round stroke rect and its indices:
+ * Following comes a round-stroke rect and its indices:
  *
  *   0──1────────────────────────────2──3
  *   │  │                            │  │
