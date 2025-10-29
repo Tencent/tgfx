@@ -198,7 +198,7 @@ class DrawRect : public Record {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawRect(rect, playback->state(), playback->fill(), nullptr);
+    context->drawRect(rect, playback->state(), playback->fill(), playback->stroke());
   }
 
   Rect rect;
