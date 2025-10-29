@@ -145,6 +145,7 @@ static int GetGLWrap(int wrapMode, unsigned target) {
 
 void GLTexture::updateSampler(GLGPU* gpu, const GLSampler* sampler) {
   DEBUG_ASSERT(gpu != nullptr);
+  DEBUG_ASSERT(sampler != nullptr);
   DEBUG_ASSERT(descriptor.usage & TextureUsage::TEXTURE_BINDING);
   auto gl = gpu->functions();
   auto wrapS = GetGLWrap(sampler->wrapS(), _target);
