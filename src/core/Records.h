@@ -32,7 +32,6 @@ enum class RecordType {
   SetHasStroke,
   DrawFill,
   DrawRect,
-  StrokeRect,
   DrawRRect,
   DrawPath,
   DrawShape,
