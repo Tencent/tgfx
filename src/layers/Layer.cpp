@@ -1396,9 +1396,22 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     }
     auto childMatrix = child->getMatrixWithScrollRect();
     auto childTransformer = RegionTransformer::MakeFromMatrix(childMatrix, transformer);
+    std::optional<Rect> clipRect = std::nullopt;
     if (child->_scrollRect) {
-      childTransformer =
-          RegionTransformer::MakeFromClip(*child->_scrollRect, std::move(childTransformer));
+      clipRect = *child->_scrollRect;
+    }
+    if (child->hasValidMask()) {
+      auto maskBounds = child->_mask->getBounds(child.get());
+      if (clipRect.has_value()) {
+        if (!clipRect->intersect(maskBounds)) {
+          continue;
+        }
+      } else {
+        clipRect = maskBounds;
+      }
+    }
+    if (clipRect.has_value()) {
+      childTransformer = RegionTransformer::MakeFromClip(*clipRect, std::move(childTransformer));
     }
     auto childForceDirty = forceDirty || child->bitFields.dirtyTransform;
     child->updateRenderBounds(childTransformer, childForceDirty);
