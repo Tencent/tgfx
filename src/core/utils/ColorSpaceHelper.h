@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include <src/skcms_public.h>
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/YUVColorSpace.h"
 
@@ -24,4 +25,6 @@ namespace tgfx {
 std::shared_ptr<ColorSpace> MakeColorSpaceFromYUVColorSpace(YUVColorSpace yuvColorSpace);
 
 std::shared_ptr<ColorSpace> AndroidDataSpaceToColorSpace(int standard, int transfer);
+
+gfx::skcms_ICCProfile ToSkcmsICCProfile(std::shared_ptr<ColorSpace> colorSpace);
 }  // namespace tgfx

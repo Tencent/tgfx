@@ -146,8 +146,7 @@ static int webp_reader_write_data(const uint8_t* data, size_t data_size,
   return 1;
 }
 
-std::shared_ptr<Data> WebpCodec::Encode(const Pixmap& pixmap, int quality,
-                                        std::shared_ptr<ColorSpace> colorSpace) {
+std::shared_ptr<Data> WebpCodec::Encode(const Pixmap& pixmap, int quality) {
   const uint8_t* srcPixels = static_cast<uint8_t*>(const_cast<void*>(pixmap.pixels()));
   auto srcInfo = pixmap.info();
   Buffer tempBuffer = {};
@@ -155,7 +154,8 @@ std::shared_ptr<Data> WebpCodec::Encode(const Pixmap& pixmap, int quality,
       (pixmap.colorType() != ColorType::RGBA_8888 && pixmap.colorType() != ColorType::BGRA_8888)) {
     auto alphaType =
         pixmap.alphaType() == AlphaType::Opaque ? AlphaType::Opaque : AlphaType::Unpremultiplied;
-    srcInfo = ImageInfo::Make(pixmap.width(), pixmap.height(), ColorType::RGBA_8888, alphaType);
+    srcInfo = ImageInfo::Make(pixmap.width(), pixmap.height(), ColorType::RGBA_8888, alphaType, 0,
+                              pixmap.colorSpace());
     tempBuffer.alloc(srcInfo.byteSize());
     srcPixels = tempBuffer.bytes();
     if (!pixmap.readPixels(srcInfo, tempBuffer.data())) {
@@ -212,8 +212,8 @@ std::shared_ptr<Data> WebpCodec::Encode(const Pixmap& pixmap, int quality,
   }
   WebPPictureFree(&pic);
   auto encodedData = Data::MakeAdopted(webpWriter.data, webpWriter.length, Data::FreeProc);
-  if (colorSpace) {
-    auto icc = colorSpace->toICCProfile();
+  if (srcInfo.colorSpace()) {
+    auto icc = srcInfo.colorSpace()->toICCProfile();
     if (icc) {
       WebPData encoded = {encodedData->bytes(), encodedData->size()};
       WebPData iccChunk = {icc->bytes(), icc->size()};

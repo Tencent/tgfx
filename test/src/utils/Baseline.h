@@ -31,8 +31,7 @@ class Baseline {
 
   static bool Compare(const Bitmap& bitmap, const std::string& key);
 
-  static bool Compare(const Pixmap& pixmap, const std::string& key,
-                      std::shared_ptr<ColorSpace> colorSpace);
+  static bool Compare(const Pixmap& pixmap, const std::string& key);
 
   static bool Compare(std::shared_ptr<Data> data, const std::string& key);
 

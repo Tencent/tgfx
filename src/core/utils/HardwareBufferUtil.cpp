@@ -22,7 +22,7 @@
 #endif
 
 namespace tgfx {
-ImageInfo GetImageInfo(HardwareBufferRef hardwareBuffer) {
+ImageInfo GetImageInfo(HardwareBufferRef hardwareBuffer, std::shared_ptr<ColorSpace> colorSpace) {
   auto info = HardwareBufferGetInfo(hardwareBuffer);
   ColorType colorType = ColorType::Unknown;
   switch (info.format) {
@@ -39,7 +39,7 @@ ImageInfo GetImageInfo(HardwareBufferRef hardwareBuffer) {
       return {};
   }
   return ImageInfo::Make(info.width, info.height, colorType, AlphaType::Premultiplied,
-                         info.rowBytes);
+                         info.rowBytes, std::move(colorSpace));
 }
 
 PixelFormat GetRenderableFormat(HardwareBufferFormat hardwareBufferFormat) {

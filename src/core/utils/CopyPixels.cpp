@@ -18,6 +18,7 @@
 
 #include "CopyPixels.h"
 #include <unordered_map>
+#include "ColorSpaceHelper.h"
 #include "core/utils/Log.h"
 #include "skcms.h"
 
@@ -69,7 +70,10 @@ void CopyPixels(const ImageInfo& srcInfo, const void* srcPixels, const ImageInfo
                 void* dstPixels, bool flipY) {
   DEBUG_ASSERT(!srcInfo.isEmpty());
   DEBUG_ASSERT(srcInfo.width() == dstInfo.width() && srcInfo.height() == dstInfo.height());
-  if (srcInfo.colorType() == dstInfo.colorType() && srcInfo.alphaType() == dstInfo.alphaType()) {
+  auto srcColorSpace = srcInfo.colorSpace();
+  auto dstColorSpace = dstInfo.colorSpace();
+  if (srcInfo.colorType() == dstInfo.colorType() && srcInfo.alphaType() == dstInfo.alphaType() &&
+      ColorSpace::Equals(srcColorSpace.get(), dstColorSpace.get())) {
     CopyRectMemory(srcPixels, srcInfo.rowBytes(), dstPixels, dstInfo.rowBytes(),
                    dstInfo.minRowBytes(), static_cast<size_t>(dstInfo.height()), flipY);
     return;
@@ -85,9 +89,17 @@ void CopyPixels(const ImageInfo& srcInfo, const void* srcPixels, const ImageInfo
     srcPixels = AddOffset(srcPixels, static_cast<size_t>(height - 1) * srcInfo.rowBytes());
     srcRowOffset = -srcRowOffset;
   }
+  if (!srcColorSpace) {
+    srcColorSpace = ColorSpace::MakeSRGB();
+  }
+  if (!dstColorSpace) {
+    dstColorSpace = srcColorSpace;
+  }
+  auto srcProfile = ToSkcmsICCProfile(srcColorSpace);
+  auto dstProfile = ToSkcmsICCProfile(dstColorSpace);
   for (int i = 0; i < height; i++) {
-    gfx::skcms_Transform(srcPixels, srcFormat, srcAlpha, nullptr, dstPixels, dstFormat, dstAlpha,
-                         nullptr, static_cast<size_t>(width));
+    gfx::skcms_Transform(srcPixels, srcFormat, srcAlpha, &srcProfile, dstPixels, dstFormat,
+                         dstAlpha, &dstProfile, static_cast<size_t>(width));
     dstPixels = AddOffset(dstPixels, dstInfo.rowBytes());
     srcPixels = static_cast<const uint8_t*>(srcPixels) + srcRowOffset;
   }
