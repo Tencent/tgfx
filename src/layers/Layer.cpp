@@ -607,7 +607,7 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
     if (!(surface->renderFlags() & RenderFlags::DisableCache)) {
       args.context = context;
     }
-  } else if (hasBlendMode) {
+  } else if (bitFields.hasBlendMode) {
     auto scale = canvas->getMatrix().getMaxScale();
     args.blendModeContext = std::make_shared<BlendModeContext>(scale);
   }
@@ -938,7 +938,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   offscreenArgs.blendModeContext = std::make_shared<BlendModeContext>(contentScale);
 
   auto passThough = bitFields.passThoughBackground && blendMode == BlendMode::SrcOver &&
-                    _filters.empty() && hasBlendMode == true;
+                    _filters.empty() && bitFields.hasBlendMode == true;
 
   // canvas of background clip bounds will be more large than canvas clip bounds.
   auto clipBounds =
@@ -1439,7 +1439,7 @@ bool Layer::hasValidMask() const {
 void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, bool forceDirty) {
   if (!forceDirty && !bitFields.dirtyDescendents) {
     if (maxBackgroundOutset > 0) {
-      propagateBackgroundStyleOutset();
+      propagateLayerState();
       if (_root->hasDirtyRegions()) {
         checkBackgroundStyles(transformer);
       }
@@ -1518,9 +1518,9 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     updateBackgroundBounds(contentScale);
   }
   if (bitFields.blendMode != static_cast<uint8_t>(BlendMode::SrcOver)) {
-    hasBlendMode = true;
+    bitFields.hasBlendMode = true;
   }
-  propagateBackgroundStyleOutset();
+  propagateLayerState();
   bitFields.dirtyDescendents = false;
 }
 
@@ -1558,7 +1558,7 @@ void Layer::updateBackgroundBounds(float contentScale) {
   }
 }
 
-void Layer::propagateBackgroundStyleOutset() {
+void Layer::propagateLayerState() {
   auto layer = _parent;
   while (layer) {
     bool change = false;
@@ -1570,8 +1570,8 @@ void Layer::propagateBackgroundStyleOutset() {
       layer->minBackgroundOutset = minBackgroundOutset;
       change = true;
     }
-    if (!layer->hasBlendMode) {
-      layer->hasBlendMode = true;
+    if (!layer->bitFields.hasBlendMode) {
+      layer->bitFields.hasBlendMode = true;
       change = true;
     }
     if (!change) {

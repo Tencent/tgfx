@@ -618,7 +618,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   void updateBackgroundBounds(float contentScale);
 
-  void propagateBackgroundStyleOutset();
+  void propagateLayerState();
 
   bool hasBackgroundStyle();
 
@@ -640,6 +640,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
     bool allowsGroupOpacity : 1;
     bool excludeChildEffectsInLayerStyle : 1;
     bool passThoughBackground : 1;
+    bool hasBlendMode : 1;
     uint8_t blendMode : 5;
     uint8_t maskType : 2;
   } bitFields = {};
@@ -663,7 +664,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
   // if > 0, means the layer or any of its descendants has a background style
   float maxBackgroundOutset = 0.f;
   float minBackgroundOutset = std::numeric_limits<float>::max();
-  bool hasBlendMode = false;
 
   friend class RootLayer;
   friend class DisplayList;
