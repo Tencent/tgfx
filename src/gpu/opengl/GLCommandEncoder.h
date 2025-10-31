@@ -25,8 +25,10 @@ class GLGPU;
 
 class GLCommandEncoder : public CommandEncoder {
  public:
-  explicit GLCommandEncoder(GLGPU* gpu) : gpu(gpu) {
+  explicit GLCommandEncoder(GLGPU* gpu) : _gpu(gpu) {
   }
+
+  GPU* gpu() const override;
 
   void copyTextureToTexture(std::shared_ptr<Texture> srcTexture, const Rect& srcRect,
                             std::shared_ptr<Texture> dstTexture, const Point& dstOffset) override;
@@ -43,6 +45,6 @@ class GLCommandEncoder : public CommandEncoder {
   std::shared_ptr<CommandBuffer> onFinish() override;
 
  private:
-  GLGPU* gpu = nullptr;
+  GLGPU* _gpu = nullptr;
 };
 }  // namespace tgfx

@@ -22,10 +22,10 @@
 #include "JNIUtil.h"
 #include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/Log.h"
+#include "gpu/opengl/GLFunctions.h"
 #include "gpu/opengl/GLGPU.h"
 #include "gpu/opengl/GLTexture.h"
 #include "gpu/resources/DefaultTextureView.h"
-#include "tgfx/gpu/opengl/GLFunctions.h"
 
 namespace tgfx {
 static Global<jclass> SurfaceTextureClass;
@@ -220,7 +220,7 @@ std::shared_ptr<TextureView> SurfaceTexture::onMakeTexture(Context* context, boo
   }
   auto textureSize = updateTexImage();
   if (textureSize.isEmpty()) {
-    auto gl = GLFunctions::Get(context);
+    auto gl = static_cast<GLGPU*>(context->gpu())->functions();
     gl->deleteTextures(1, &textureID);
     return nullptr;
   }
@@ -248,7 +248,7 @@ unsigned SurfaceTexture::makeExternalOESTexture(Context* context) {
   if (env == nullptr) {
     return 0;
   }
-  auto gl = GLFunctions::Get(context);
+  auto gl = static_cast<GLGPU*>(context->gpu())->functions();
   unsigned textureID = 0;
   gl->genTextures(1, &textureID);
   if (textureID == 0) {

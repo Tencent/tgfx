@@ -18,6 +18,7 @@
 
 #include "RuntimeDrawTask.h"
 #include "gpu/GlobalCache.h"
+#include "gpu/Program.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/Quad.h"
@@ -25,8 +26,6 @@
 #include "gpu/processors/ColorSpaceXFormEffect.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/processors/TextureEffect.h"
-#include "gpu/resources/PipelineProgram.h"
-#include "gpu/resources/RuntimeProgramWrapper.h"
 #include "inspect/InspectorMark.h"
 #include "tgfx/core/RenderFlags.h"
 #include "tgfx/gpu/RenderPass.h"
@@ -56,8 +55,8 @@ RuntimeDrawTask::RuntimeDrawTask(std::shared_ptr<RenderTargetProxy> target,
 
 void RuntimeDrawTask::execute(CommandEncoder* encoder) {
   TASK_MARK(tgfx::inspect::OpTaskType::RuntimeDrawTask);
-  std::vector<std::shared_ptr<TextureView>> textures = {};
-  textures.reserve(inputTextures.size());
+  std::vector<std::shared_ptr<TextureView>> flatTextures = {};
+  flatTextures.reserve(inputTextures.size());
   for (size_t i = 0; i < inputTextures.size(); i++) {
     std::shared_ptr<TextureView> textureView = nullptr;
     textureView = GetFlatTextureView(encoder, &inputTextures[i], inputVertexBuffers[i].get(),
@@ -66,42 +65,20 @@ void RuntimeDrawTask::execute(CommandEncoder* encoder) {
       LOGE("RuntimeDrawTask::execute() Failed to get the input %d texture view!", i);
       return;
     }
-    textures.push_back(textureView);
+    flatTextures.push_back(textureView);
   }
   auto renderTarget = renderTargetProxy->getRenderTarget();
   if (renderTarget == nullptr) {
     LOGE("RuntimeDrawTask::execute() Failed to get the render target!");
     return;
   }
-  auto context = renderTarget->getContext();
-  static auto RuntimeProgramType = UniqueID::Next();
-  BytesKey programKey = {};
-  programKey.write(RuntimeProgramType);
-  programKey.write(effect->programID());
-  auto program = context->globalCache()->findProgram(programKey);
-  if (program == nullptr) {
-    program = RuntimeProgramWrapper::Wrap(effect->onCreateProgram(context));
-    if (program == nullptr) {
-      LOGE("RuntimeDrawTask::execute() Failed to create the runtime program!");
-      return;
-    }
-    context->globalCache()->addProgram(programKey, program);
+  std::vector<std::shared_ptr<Texture>> inputs = {};
+  inputs.reserve(flatTextures.size());
+  for (auto& textureView : flatTextures) {
+    inputs.push_back(textureView->getTexture());
   }
-  std::vector<BackendTexture> backendTextures = {};
-  backendTextures.reserve(textures.size());
-  for (auto& textureView : textures) {
-    backendTextures.push_back(textureView->getBackendTexture());
-  }
-  effect->onDraw(RuntimeProgramWrapper::Unwrap(program.get()), backendTextures,
-                 renderTarget->getBackendRenderTarget(), offset);
-  // Reset GL state to prevent side effects from external GL calls.
-  context->gpu()->resetGLState();
-  if (renderTarget->sampleCount() > 1) {
-    RenderPassDescriptor descriptor(renderTarget->getRenderTexture(),
-                                    renderTarget->getSampleTexture());
-    auto renderPass = encoder->beginRenderPass(descriptor);
-    DEBUG_ASSERT(renderPass != nullptr);
-    renderPass->end();
+  if (!effect->onDraw(encoder, inputs, renderTarget->getRenderTexture(), offset)) {
+    LOGE("RuntimeDrawTask::execute() Failed to draw the runtime effect!");
   }
 }
 
@@ -141,14 +118,17 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
     return nullptr;
   }
   auto colorProcessor = TextureEffect::Make(std::move(textureProxy), {}, nullptr, false);
-  if (!textureView->isAlphaOnly()) {
-    colorProcessor = ColorSpaceXformEffect::Make(
-        context->drawingBuffer(), std::move(colorProcessor), textureProxyWithCS->colorSpace.get(),
-        AlphaType::Premultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
-  }
   if (colorProcessor == nullptr) {
     LOGE("RuntimeDrawTask::getFlatTexture() Failed to create the color processor!");
     return nullptr;
+  }
+  if (!textureView->isAlphaOnly() &&
+      !ColorSpace::Equals(textureProxyWithCS->colorSpace.get(), dstColorSpace.get())) {
+    auto xformEffect = ColorSpaceXformEffect::Make(
+        context->drawingBuffer(), textureProxyWithCS->colorSpace.get(), AlphaType::Premultiplied,
+        dstColorSpace.get(), AlphaType::Premultiplied);
+    colorProcessor = FragmentProcessor::Compose(context->drawingBuffer(), std::move(xformEffect),
+                                                std::move(colorProcessor));
   }
   auto geometryProcessor =
       DefaultGeometryProcessor::Make(context->drawingBuffer(), {}, renderTarget->width(),
@@ -156,7 +136,7 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
   std::vector fragmentProcessors = {colorProcessor.get()};
   ProgramInfo programInfo(renderTarget.get(), geometryProcessor.get(),
                           std::move(fragmentProcessors), 1, nullptr, BlendMode::Src);
-  auto program = std::static_pointer_cast<PipelineProgram>(programInfo.getProgram());
+  auto program = programInfo.getProgram();
   if (program == nullptr) {
     LOGE("RuntimeDrawTask::GetFlatTextureView() Failed to get the program!");
     return nullptr;

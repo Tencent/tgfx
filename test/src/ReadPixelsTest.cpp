@@ -236,10 +236,9 @@ TGFX_TEST(ReadPixelsTest, Surface) {
   EXPECT_TRUE(result);
   CHECK_PIXELS(AlphaRectInfo, pixels, "Surface_alpha_to_alpha_100_-100");
 
-  GLTextureInfo textureInfo = {};
-  result = CreateGLTexture(context, width, height, &textureInfo);
-  EXPECT_TRUE(result);
-  surface = Surface::MakeFrom(context, {textureInfo, width, height}, ImageOrigin::BottomLeft);
+  auto texture = context->gpu()->createTexture({width, height, PixelFormat::RGBA_8888});
+  ASSERT_TRUE(texture != nullptr);
+  surface = Surface::MakeFrom(context, texture->getBackendTexture(), ImageOrigin::BottomLeft);
   colorSpace = surface->colorSpace();
   ASSERT_TRUE(surface != nullptr);
   canvas = surface->getCanvas();
@@ -264,8 +263,6 @@ TGFX_TEST(ReadPixelsTest, Surface) {
   result = surface->readPixels(RGBARectInfo, pixels, 100, -100);
   EXPECT_TRUE(result);
   CHECK_PIXELS(RGBARectInfo, pixels, "Surface_BL_rgb_A_to_rgb_A_100_-100");
-  auto gl = GLFunctions::Get(context);
-  gl->deleteTextures(1, &textureInfo.id);
   bitmap.unlockPixels();
 }
 

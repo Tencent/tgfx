@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,11 +16,23 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/gpu/opengl/GLFunctions.h"
-#include "gpu/opengl/GLGPU.h"
+#include "Program.h"
 
 namespace tgfx {
-const GLFunctions* GLFunctions::Get(const Context* context) {
-  return context ? static_cast<const GLGPU*>(context->gpu())->functions() : nullptr;
+Program::Program(std::shared_ptr<RenderPipeline> pipeline,
+                 std::unique_ptr<UniformData> vertexUniformData,
+                 std::unique_ptr<UniformData> fragmentUniformData)
+    : pipeline(std::move(pipeline)), vertexUniformData(std::move(vertexUniformData)),
+      fragmentUniformData(std::move(fragmentUniformData)) {
+}
+
+UniformData* Program::getUniformData(ShaderStage stage) const {
+  if (stage == ShaderStage::Vertex) {
+    return vertexUniformData.get();
+  }
+  if (stage == ShaderStage::Fragment) {
+    return fragmentUniformData.get();
+  }
+  return nullptr;
 }
 }  // namespace tgfx

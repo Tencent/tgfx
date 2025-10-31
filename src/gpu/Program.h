@@ -18,20 +18,30 @@
 
 #pragma once
 
-#include "gpu/resources/Resource.h"
+#include <list>
+#include "gpu/UniformData.h"
 #include "tgfx/core/BytesKey.h"
+#include "tgfx/gpu/RenderPipeline.h"
 
 namespace tgfx {
-/**
- * The base class for GPU programs.
- */
 class Program {
  public:
-  virtual ~Program() = default;
+  explicit Program(std::shared_ptr<RenderPipeline> pipeline,
+                   std::unique_ptr<UniformData> vertexUniformData,
+                   std::unique_ptr<UniformData> fragmentUniformData);
+
+  std::shared_ptr<RenderPipeline> getPipeline() const {
+    return pipeline;
+  }
+
+  UniformData* getUniformData(ShaderStage stage) const;
 
  private:
   BytesKey programKey = {};
   std::list<Program*>::iterator cachedPosition;
+  std::shared_ptr<RenderPipeline> pipeline = nullptr;
+  std::unique_ptr<UniformData> vertexUniformData = nullptr;
+  std::unique_ptr<UniformData> fragmentUniformData = nullptr;
 
   friend class GlobalCache;
 };

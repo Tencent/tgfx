@@ -19,7 +19,7 @@
 #include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
 #include <emscripten.h>
 #include "core/utils/Log.h"
-#include "tgfx/gpu/opengl/GLDefines.h"
+#include "gpu/opengl/GLDefines.h"
 
 namespace tgfx {
 std::shared_ptr<WebGLWindow> WebGLWindow::MakeFrom(const std::string& canvasID) {
