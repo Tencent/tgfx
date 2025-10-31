@@ -111,4 +111,19 @@ std::shared_ptr<ColorSpace> AndroidDataSpaceToColorSpace(int standard, int trans
   }
   return ColorSpace::MakeRGB(tf, gamut);
 }
+
+gfx::skcms_ICCProfile ToSkcmsICCProfile(std::shared_ptr<ColorSpace> colorSpace) {
+  if (colorSpace) {
+    gfx::skcms_ICCProfile profile;
+    gfx::skcms_Init(&profile);
+    auto transferFunction = colorSpace->transferFunction();
+    gfx::skcms_SetTransferFunction(
+        &profile, reinterpret_cast<gfx::skcms_TransferFunction*>(&transferFunction));
+    ColorMatrix33 xyzd50{};
+    colorSpace->toXYZD50(&xyzd50);
+    skcms_SetXYZD50(&profile, reinterpret_cast<gfx::skcms_Matrix3x3*>(&xyzd50));
+    return profile;
+  }
+  return {};
+}
 }  // namespace tgfx

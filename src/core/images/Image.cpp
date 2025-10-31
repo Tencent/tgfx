@@ -81,9 +81,8 @@ std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageGenerator> generator
   return image;
 }
 
-std::shared_ptr<Image> Image::MakeFrom(const ImageInfo& info, std::shared_ptr<Data> pixels,
-                                       std::shared_ptr<ColorSpace> colorSpace) {
-  auto codec = ImageCodec::MakeFrom(info, std::move(pixels), std::move(colorSpace));
+std::shared_ptr<Image> Image::MakeFrom(const ImageInfo& info, std::shared_ptr<Data> pixels) {
+  auto codec = ImageCodec::MakeFrom(info, std::move(pixels));
   return MakeFrom(std::move(codec));
 }
 

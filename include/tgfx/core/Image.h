@@ -84,9 +84,7 @@ class Image {
    * remains unchanged for the lifetime of the Image. Returns nullptr if the ImageInfo is empty or
    * the pixel data is nullptr.
    */
-  static std::shared_ptr<Image> MakeFrom(
-      const ImageInfo& info, std::shared_ptr<Data> pixels,
-      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+  static std::shared_ptr<Image> MakeFrom(const ImageInfo& info, std::shared_ptr<Data> pixels);
 
   /**
    * Creates an Image from the Bitmap, sharing bitmap pixels. The Bitmap will allocate new internal

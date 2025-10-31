@@ -104,7 +104,7 @@ bool Baseline::Compare(std::shared_ptr<PixelBuffer> pixelBuffer, const std::stri
   }
   auto pixels = pixelBuffer->lockPixels();
   Pixmap pixmap(pixelBuffer->info(), pixels);
-  auto result = Baseline::Compare(pixmap, key, pixelBuffer->colorSpace());
+  auto result = Baseline::Compare(pixmap, key);
   pixelBuffer->unlockPixels();
   return result;
 }
@@ -119,7 +119,7 @@ bool Baseline::Compare(const std::shared_ptr<Surface> surface, const std::string
   if (!result) {
     return false;
   }
-  return Baseline::Compare(pixmap, key, surface->colorSpace());
+  return Baseline::Compare(pixmap, key);
 }
 
 bool Baseline::Compare(const Bitmap& bitmap, const std::string& key) {
@@ -127,7 +127,7 @@ bool Baseline::Compare(const Bitmap& bitmap, const std::string& key) {
     return false;
   }
   Pixmap pixmap(bitmap);
-  return Baseline::Compare(pixmap, key, bitmap.colorSpace());
+  return Baseline::Compare(pixmap, key);
 }
 
 static bool CompareVersionAndMd5(const std::string& md5, const std::string& key,
@@ -154,8 +154,7 @@ static bool CompareVersionAndMd5(const std::string& md5, const std::string& key,
   return true;
 }
 
-bool Baseline::Compare(const Pixmap& pixmap, const std::string& key,
-                       std::shared_ptr<ColorSpace> colorSpace) {
+bool Baseline::Compare(const Pixmap& pixmap, const std::string& key) {
   if (pixmap.isEmpty()) {
     return false;
   }
@@ -163,7 +162,8 @@ bool Baseline::Compare(const Pixmap& pixmap, const std::string& key,
   if (pixmap.rowBytes() == pixmap.info().minRowBytes()) {
     md5 = DumpMD5(pixmap.pixels(), pixmap.byteSize());
   } else {
-    Bitmap newBitmap(pixmap.width(), pixmap.height(), pixmap.isAlphaOnly(), false, colorSpace);
+    Bitmap newBitmap(pixmap.width(), pixmap.height(), pixmap.isAlphaOnly(), false,
+                     pixmap.colorSpace());
     Pixmap newPixmap(newBitmap);
     auto result = pixmap.readPixels(newPixmap.info(), newPixmap.writablePixels());
     if (!result) {
@@ -172,13 +172,13 @@ bool Baseline::Compare(const Pixmap& pixmap, const std::string& key,
     md5 = DumpMD5(newPixmap.pixels(), newPixmap.byteSize());
   }
 #ifdef GENERATE_BASELINE_IMAGES
-  SaveImage(pixmap, key + "_base", colorSpace);
+  SaveImage(pixmap, key + "_base");
 #endif
-  return CompareVersionAndMd5(md5, key, [key, pixmap, colorSpace](bool result) {
+  return CompareVersionAndMd5(md5, key, [key, pixmap](bool result) {
     if (result) {
       RemoveImage(key);
     } else {
-      SaveImage(pixmap, key, colorSpace);
+      SaveImage(pixmap, key);
     }
   });
 }

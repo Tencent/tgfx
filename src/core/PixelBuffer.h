@@ -60,7 +60,7 @@ class PixelBuffer : public ImageBuffer {
   }
 
   std::shared_ptr<ColorSpace> colorSpace() const override {
-    return _colorSpace;
+    return _info.colorSpace();
   }
 
   /**
@@ -95,8 +95,7 @@ class PixelBuffer : public ImageBuffer {
   virtual HardwareBufferRef getHardwareBuffer() const = 0;
 
  protected:
-  explicit PixelBuffer(const ImageInfo& info,
-                       std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+  explicit PixelBuffer(const ImageInfo& info);
 
   bool isPixelBuffer() const final {
     return true;
@@ -111,6 +110,5 @@ class PixelBuffer : public ImageBuffer {
  private:
   mutable std::mutex locker = {};
   ImageInfo _info = {};
-  std::shared_ptr<ColorSpace> _colorSpace = ColorSpace::MakeSRGB();
 };
 }  // namespace tgfx

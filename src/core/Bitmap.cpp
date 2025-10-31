@@ -95,12 +95,12 @@ HardwareBufferRef Bitmap::getHardwareBuffer() const {
 }
 
 std::shared_ptr<ColorSpace> Bitmap::colorSpace() const {
-  return pixelRef->colorSpace();
+  return _info.colorSpace();
 }
 
 std::shared_ptr<Data> Bitmap::encode(EncodedFormat format, int quality) const {
   Pixmap pixmap(*this);
-  return ImageCodec::Encode(pixmap, format, quality, colorSpace());
+  return ImageCodec::Encode(pixmap, format, quality);
 }
 
 Color Bitmap::getColor(int x, int y) const {

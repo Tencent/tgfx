@@ -288,7 +288,8 @@ bool PngCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dst
     png_read_image(readInfo->p, readInfo->rowPtrs);
     return true;
   }
-  ImageInfo info = ImageInfo::Make(w, h, ColorType::RGBA_8888, AlphaType::Unpremultiplied);
+  ImageInfo info = ImageInfo::Make(w, h, ColorType::RGBA_8888, AlphaType::Unpremultiplied, 0,
+                                   ImageGenerator::colorSpace());
   readInfo->data = (unsigned char*)malloc(info.byteSize());
   if (readInfo->data == nullptr) {
     return false;
@@ -334,8 +335,7 @@ static void png_reader_write_data(png_structp png_ptr, png_bytep data, png_size_
   writer->length += length;
 }
 
-std::shared_ptr<Data> PngCodec::Encode(const Pixmap& pixmap, int,
-                                       std::shared_ptr<ColorSpace> colorSpace) {
+std::shared_ptr<Data> PngCodec::Encode(const Pixmap& pixmap, int) {
   auto srcPixels = static_cast<png_bytep>(const_cast<void*>((pixmap.pixels())));
   auto srcRowBytes = static_cast<int>(pixmap.rowBytes());
   uint8_t* alphaPixels = nullptr;
@@ -347,7 +347,7 @@ std::shared_ptr<Data> PngCodec::Encode(const Pixmap& pixmap, int,
   } else if (pixmap.colorType() != ColorType::RGBA_8888 ||
              pixmap.alphaType() == AlphaType::Premultiplied) {
     auto dstInfo = ImageInfo::Make(pixmap.width(), pixmap.height(), ColorType::RGBA_8888,
-                                   AlphaType::Unpremultiplied);
+                                   AlphaType::Unpremultiplied, 0, pixmap.colorSpace());
     tempBuffer.alloc(dstInfo.byteSize());
     if (!pixmap.readPixels(dstInfo, tempBuffer.data())) {
       return nullptr;
@@ -383,8 +383,8 @@ std::shared_ptr<Data> PngCodec::Encode(const Pixmap& pixmap, int,
     png_set_IHDR(png_ptr, info_ptr, static_cast<png_uint_32>(pixmap.width()),
                  static_cast<png_uint_32>(pixmap.height()), 8, colorType, PNG_INTERLACE_NONE,
                  PNG_COMPRESSION_TYPE_BASE, PNG_FILTER_TYPE_BASE);
-    if (colorType != PNG_COLOR_TYPE_GRAY_ALPHA && colorSpace) {
-      auto iccData = colorSpace->toICCProfile();
+    if (colorType != PNG_COLOR_TYPE_GRAY_ALPHA && pixmap.colorSpace()) {
+      auto iccData = pixmap.colorSpace()->toICCProfile();
       png_set_iCCP(png_ptr, info_ptr, "TGFX", 0, iccData->bytes(),
                    static_cast<uint32_t>(iccData->size()));
     }

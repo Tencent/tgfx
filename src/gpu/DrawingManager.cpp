@@ -48,7 +48,8 @@ static ImageInfo GetAtlasImageInfo(int width, int height, bool isAlphaOnly) {
   // Align to 4 bytes
   constexpr size_t ALIGNMENT = 4;
   rowBytes = (rowBytes + ALIGNMENT - 1) & ~(ALIGNMENT - 1);
-  return ImageInfo::Make(width, height, colorType, AlphaType::Premultiplied, rowBytes);
+  return ImageInfo::Make(width, height, colorType, AlphaType::Premultiplied, rowBytes,
+                         ColorSpace::MakeSRGB());
 }
 
 DrawingManager::DrawingManager(Context* context)
@@ -160,7 +161,7 @@ void DrawingManager::addAtlasCellCodecTask(const std::shared_ptr<TextureProxy>& 
   ImageInfo dstInfo = {};
   auto hardwareBuffer = textureProxy->getHardwareBuffer();
   if (hardwareBuffer != nullptr) {
-    auto hardwareInfo = GetImageInfo(hardwareBuffer);
+    auto hardwareInfo = GetImageInfo(hardwareBuffer, ColorSpace::MakeSRGB());
     dstInfo = hardwareInfo.makeIntersect(0, 0, dstWidth, dstHeight);
     void* pixels = nullptr;
     if (auto iter = atlasHardwareBuffers.find(textureProxy.get());
