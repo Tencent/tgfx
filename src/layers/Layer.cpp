@@ -970,7 +970,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
         Matrix backgroundMatrix = {};
         auto canvasMatrix = canvas->getMatrix();
         if (canvasMatrix.invert(&backgroundMatrix)) {
-          offscreenCanvas->concat(canvasMatrix);
+          offscreenCanvas->concat(backgroundMatrix);
           offscreenCanvas->drawImage(canvas->getSurface()->makeImageSnapshot());
         }
       } else if (args.blendModeContext) {
