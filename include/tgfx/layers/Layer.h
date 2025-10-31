@@ -127,9 +127,21 @@ class Layer : public std::enable_shared_from_this<Layer> {
   void setBlendMode(BlendMode value);
 
   /**
+   * Returns true if the layer's background is allowed to pass through while drawing offscreen
+   */
+  bool passThoughBackground() const {
+    return bitFields.passThoughBackground;
+  }
+
+  /**
+   * Sets whether the layer's background is allowed to pass through while drawing offscreen
+   */
+  void setPassThoughBackground(bool value);
+
+      /**
    * Returns the position of the layer relative to the local coordinates of the parent layer.
    */
-  Point position() const {
+      Point position() const {
     return {_matrix.getTranslateX(), _matrix.getTranslateY()};
   }
 
@@ -627,6 +639,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
     bool allowsEdgeAntialiasing : 1;
     bool allowsGroupOpacity : 1;
     bool excludeChildEffectsInLayerStyle : 1;
+    bool passThoughBackground : 1;
     uint8_t blendMode : 5;
     uint8_t maskType : 2;
   } bitFields = {};
@@ -650,6 +663,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
   // if > 0, means the layer or any of its descendants has a background style
   float maxBackgroundOutset = 0.f;
   float minBackgroundOutset = std::numeric_limits<float>::max();
+  bool passthroughBackground = false;
+  bool hasBlendMode = false;
 
   friend class RootLayer;
   friend class DisplayList;

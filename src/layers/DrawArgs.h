@@ -19,6 +19,7 @@
 #pragma once
 
 #include "layers/BackgroundContext.h"
+#include "layers/BlendModeContext.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
@@ -52,5 +53,8 @@ class DrawArgs {
   // Indicates whether to force drawing the background, even if there are no background styles.
   bool forceDrawBackground = false;
   std::shared_ptr<ColorSpace> dstColorSpace = ColorSpace::MakeSRGB();
+
+  // Only used while recording.
+  std::shared_ptr<BlendModeContext> blendModeContext;
 };
 }  // namespace tgfx
