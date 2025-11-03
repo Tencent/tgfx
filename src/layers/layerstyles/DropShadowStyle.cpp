@@ -90,6 +90,12 @@ Rect DropShadowStyle::filterBounds(const Rect& srcRect, float contentScale) {
   return filter->filterBounds(srcRect);
 }
 
+bool DropShadowStyle::shouldDraw(float contentScale) const {
+  return _color.alpha > 0 &&
+         (_blurrinessX * contentScale > 0.1f || _blurrinessY * contentScale > 0.1f ||
+          _offsetX * contentScale > 0.05f || _offsetY * contentScale > 0.05f);
+}
+
 void DropShadowStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Image> contour,
                                             float contentScale, std::shared_ptr<Image> extraSource,
                                             const Point& extraSourceOffset, float alpha,

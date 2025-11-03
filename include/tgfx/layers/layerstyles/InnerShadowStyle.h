@@ -103,6 +103,8 @@ class InnerShadowStyle : public LayerStyle {
 
   Rect filterBounds(const Rect& srcRect, float contentScale) override;
 
+  bool shouldDraw(float contentScale) const override;
+
  private:
   InnerShadowStyle(float offsetX, float offsetY, float blurrinessX, float blurrinessY,
                    const Color& color);

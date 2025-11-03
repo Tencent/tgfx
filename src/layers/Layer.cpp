@@ -1129,7 +1129,12 @@ float Layer::drawBackgroundLayers(const DrawArgs& args, Canvas* canvas) {
 
 std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& args,
                                                              const Matrix& matrix) {
-  if (_layerStyles.empty() || args.excludeEffects) {
+  std::vector<std::shared_ptr<LayerStyle>> styles;
+  std::copy_if(_layerStyles.begin(), _layerStyles.end(), std::back_inserter(styles),
+               [contentScale = matrix.getMaxScale()](const auto& layerStyle) {
+                 return layerStyle->shouldDraw(contentScale);
+               });
+  if (styles.empty() || args.excludeEffects) {
     return nullptr;
   }
   auto contentScale = matrix.getMaxScale();
@@ -1157,10 +1162,9 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   source->content = std::move(content);
   source->contentOffset = contentOffset;
 
-  auto needContour =
-      std::any_of(_layerStyles.begin(), _layerStyles.end(), [](const auto& layerStyle) {
-        return layerStyle->extraSourceType() == LayerStyleExtraSourceType::Contour;
-      });
+  auto needContour = std::any_of(styles.begin(), styles.end(), [](const auto& layerStyle) {
+    return layerStyle->extraSourceType() == LayerStyleExtraSourceType::Contour;
+  });
   if (needContour) {
     // Child effects are always excluded when drawing the layer contour.
     drawArgs.excludeEffects = true;
@@ -1235,7 +1239,7 @@ void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
   auto clipBounds =
       args.backgroundContext ? GetClipBounds(args.backgroundContext->getCanvas()) : std::nullopt;
   for (const auto& layerStyle : _layerStyles) {
-    if (layerStyle->position() != position) {
+    if (layerStyle->position() != position || !layerStyle->shouldDraw(source->contentScale)) {
       continue;
     }
     Recorder recorder = {};

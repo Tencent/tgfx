@@ -82,6 +82,12 @@ Rect InnerShadowStyle::filterBounds(const Rect& srcRect, float contentScale) {
   return filter->filterBounds(srcRect);
 }
 
+bool InnerShadowStyle::shouldDraw(float contentScale) const {
+  return _color.alpha > 0 &&
+         (_blurrinessX * contentScale > 0.1f || _blurrinessY * contentScale > 0.1f ||
+          _offsetX * contentScale > 0.05f || _offsetY * contentScale > 0.05f);
+}
+
 void InnerShadowStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> contour, float contentScale,
                               float alpha, BlendMode blendMode) {
   // create opaque image

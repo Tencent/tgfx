@@ -56,6 +56,10 @@ Rect BackgroundBlurStyle::filterBackground(const Rect& srcRect, float contentSca
   return filter->filterBounds(srcRect);
 }
 
+bool BackgroundBlurStyle::shouldDraw(float contentScale) const {
+  return _blurrinessX * contentScale > 0.05f || _blurrinessY * contentScale > 0.05f;
+}
+
 void BackgroundBlurStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Image> contour,
                                                 float contentScale,
                                                 std::shared_ptr<Image> extraSource,

@@ -144,6 +144,10 @@ class LayerStyle : public LayerProperty {
                           extraSourceOffset, alpha, _blendMode);
   }
 
+  virtual bool shouldDraw(float contentScale) const {
+    return true;
+  }
+
  protected:
   /**
    * Applies the layer style to the scaled image of the layer content and draws it on the canvas.

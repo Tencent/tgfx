@@ -87,6 +87,8 @@ class BackgroundBlurStyle : public LayerStyle {
                                                 : LayerStyleExtraSourceType::None;
   }
 
+  bool shouldDraw(float contentScale) const override;
+
  protected:
   void onDraw(Canvas*, std::shared_ptr<Image>, float, float, BlendMode) override {
   }
