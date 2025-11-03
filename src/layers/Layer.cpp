@@ -1503,7 +1503,7 @@ std::shared_ptr<BackgroundContext> Layer::createBackgroundContext(Context* conte
                                                                   const Rect& drawRect,
                                                                   const Matrix& viewMatrix,
                                                                   bool fullLayer) const {
-  if (maxBackgroundOutset <= 0.0f) {
+  if (maxBackgroundOutset <= 0.1f) {
     return nullptr;
   }
   if (fullLayer) {
