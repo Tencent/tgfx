@@ -144,7 +144,7 @@ class LayerStyle : public LayerProperty {
                           extraSourceOffset, alpha, _blendMode);
   }
 
-  virtual bool shouldDraw(float contentScale) const {
+  virtual bool shouldDraw(float) const {
     return true;
   }
 
