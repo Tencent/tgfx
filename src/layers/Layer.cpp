@@ -1503,13 +1503,13 @@ std::shared_ptr<BackgroundContext> Layer::createBackgroundContext(Context* conte
                                                                   const Rect& drawRect,
                                                                   const Matrix& viewMatrix,
                                                                   bool fullLayer) const {
-  if (maxBackgroundOutset <= 0.1f) {
+  auto scale = viewMatrix.getMaxScale();
+  if (maxBackgroundOutset * scale <= 0.1f) {
     return nullptr;
   }
   if (fullLayer) {
     return BackgroundContext::Make(context, drawRect, 0, 0, viewMatrix);
   }
-  auto scale = viewMatrix.getMaxScale();
   return BackgroundContext::Make(context, drawRect, maxBackgroundOutset * scale,
                                  minBackgroundOutset * scale, viewMatrix);
 }
