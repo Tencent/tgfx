@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <src/skcms_public.h>
+#include "skcms.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/YUVColorSpace.h"
 
