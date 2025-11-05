@@ -18,8 +18,6 @@
 
 #pragma once
 
-#include <tuple>
-#include <vector>
 #include "tgfx/core/Shape.h"
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/ShapeStyle.h"

@@ -366,6 +366,7 @@
         "textFont": "6095b909"
     },
     "StrokeTest": {
+        "DashStrokeAsSolidStroke": "3a713e22",
         "DrawPathByHairlinePaint": "f38f0012",
         "DrawShapeByHairlinePaint": "f38f0012",
         "ExtremelyThinStrokeLayer": "cd6a8dff",
