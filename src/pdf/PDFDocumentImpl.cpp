@@ -34,7 +34,8 @@
 namespace tgfx {
 
 std::shared_ptr<PDFDocument> PDFDocument::Make(std::shared_ptr<WriteStream> stream,
-                                               Context* context, PDFMetadata metadata) {
+                                               Context* context, PDFMetadata metadata,
+                                               std::shared_ptr<ColorSpace> colorSpace) {
   if (!stream || !context) {
     return nullptr;
   }
@@ -42,7 +43,7 @@ std::shared_ptr<PDFDocument> PDFDocument::Make(std::shared_ptr<WriteStream> stre
     metadata.rasterDPI = 72.0f;
   }
   metadata.encodingQuality = std::max(metadata.encodingQuality, 0);
-  return std::make_shared<PDFDocumentImpl>(stream, context, metadata);
+  return std::make_shared<PDFDocumentImpl>(stream, context, metadata, std::move(colorSpace));
 }
 
 namespace {
@@ -262,8 +263,9 @@ std::vector<const PDFFont*> get_fonts(const PDFDocumentImpl& canon) {
 }  // namespace
 
 PDFDocumentImpl::PDFDocumentImpl(std::shared_ptr<WriteStream> stream, Context* context,
-                                 PDFMetadata meta)
-    : _stream(std::move(stream)), _context(context), _metadata(std::move(meta)) {
+                                 PDFMetadata meta, std::shared_ptr<ColorSpace> colorSpace)
+    : _stream(std::move(stream)), _context(context), _metadata(std::move(meta)),
+      _colorSpace(std::move(colorSpace)) {
   if (_metadata.rasterDPI != ScalarDefaultRasterDPI) {
     inverseRasterScale = ScalarDefaultRasterDPI / _metadata.rasterDPI;
     rasterScale = _metadata.rasterDPI / ScalarDefaultRasterDPI;
@@ -343,8 +345,8 @@ Canvas* PDFDocumentImpl::onBeginPage(float width, float height) {
   if (pages.empty()) {
     // if this is the first page if the document.
     SerializeHeader(&offsetMap, _stream);
-
     infoDictionary = this->emit(*PDFMetadataUtils::MakeDocumentInformationDict(_metadata));
+    _colorSpaceRef = emitColorSpace();
     if (_metadata.PDFA) {
       documentUUID = PDFMetadataUtils::CreateUUID(_metadata);
       // We use the same UUID for Document ID and Instance ID since this
@@ -381,6 +383,9 @@ void PDFDocumentImpl::onEndPage() {
   auto pageContent = drawContext->getContent();
 
   auto resourceDict = drawContext->makeResourceDict();
+  auto dic = std::make_unique<PDFDictionary>();
+  dic->insertRef("CS", _colorSpaceRef);
+  resourceDict->insertObject("ColorSpace", std::move(dic));
   DEBUG_ASSERT(!pageRefs.empty());
 
   page->insertObject("Resources", std::move(resourceDict));
@@ -489,6 +494,19 @@ std::shared_ptr<WriteStream> PDFDocumentImpl::beginObject(PDFIndirectReference r
 
 void PDFDocumentImpl::endObject() {
   end_indirect_object(_stream);
+}
+
+PDFIndirectReference PDFDocumentImpl::emitColorSpace() {
+  auto dictionary = std::make_unique<PDFDictionary>();
+  dictionary->insertInt("N", 3);
+  dictionary->insertName("Alternate", "DeviceRGB");
+  auto iccProfile = _colorSpace->toICCProfile();
+  auto stream = Stream::MakeFromData(iccProfile);
+  auto ref = PDFStreamOut(std::move(dictionary), std::move(stream), this);
+  PDFArray array{};
+  array.appendName("ICCBased");
+  array.appendRef(ref);
+  return this->emit(array);
 }
 
 PDFIndirectReference PDFDocumentImpl::getPage(size_t pageIndex) const {
