@@ -441,11 +441,11 @@ class ColorSpace : public std::enable_shared_from_this<ColorSpace> {
   /**
    * Return TransferFunction of this ColorSpace.
    */
-  void transferFunction(TransferFunction* function) const;
+  TransferFunction transferFunction() const;
   /**
    * Return inverse TransferFunction of this ColorSpace.
    */
-  void invTransferFunction(TransferFunction* function) const;
+  TransferFunction inverseTransferFunction() const;
 
   /**
    * Compute the Matrix to convert ColorSpace from this to dst.

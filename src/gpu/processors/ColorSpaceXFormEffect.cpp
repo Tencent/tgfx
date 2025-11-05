@@ -20,21 +20,15 @@
 
 namespace tgfx {
 
-PlacementPtr<FragmentProcessor> ColorSpaceXformEffect::Make(BlockBuffer* buffer,
-                                                            PlacementPtr<FragmentProcessor> child,
-                                                            ColorSpace* src, AlphaType srcAT,
-                                                            ColorSpace* dst, AlphaType dstAT) {
-  return Make(buffer, std::move(child),
-              std::make_shared<ColorSpaceXformSteps>(src, srcAT, dst, dstAT));
+PlacementPtr<FragmentProcessor> ColorSpaceXformEffect::Make(BlockBuffer* buffer, ColorSpace* src,
+                                                            AlphaType srcAT, ColorSpace* dst,
+                                                            AlphaType dstAT) {
+  return Make(buffer, std::make_shared<ColorSpaceXformSteps>(src, srcAT, dst, dstAT));
 }
 
 PlacementPtr<FragmentProcessor> ColorSpaceXformEffect::Make(
-    BlockBuffer* buffer, PlacementPtr<FragmentProcessor> child,
-    std::shared_ptr<ColorSpaceXformSteps> colorXform) {
-  if (child == nullptr) {
-    return nullptr;
-  }
-  return buffer->make<ColorSpaceXformEffect>(std::move(child), std::move(colorXform));
+    BlockBuffer* buffer, std::shared_ptr<ColorSpaceXformSteps> colorXform) {
+  return buffer->make<ColorSpaceXformEffect>(std::move(colorXform));
 }
 
 void ColorSpaceXformEffect::emitCode(EmitArgs& args) const {
@@ -42,10 +36,8 @@ void ColorSpaceXformEffect::emitCode(EmitArgs& args) const {
   auto fragBuilder = args.fragBuilder;
   ColorSpaceXformHelper helper{};
   helper.emitCode(uniformHandler, colorSpaceXformSteps.get());
-  std::string childColor;
-  emitChild(0, args.inputColor.c_str(), &childColor, args);
   std::string outputColor;
-  fragBuilder->appendColorGamutXform(&outputColor, childColor.c_str(), &helper);
+  fragBuilder->appendColorGamutXform(&outputColor, args.inputColor.c_str(), &helper);
   fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), outputColor.c_str());
 }
 
@@ -54,10 +46,8 @@ void ColorSpaceXformEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
   bytesKey->write(key);
 }
 
-ColorSpaceXformEffect::ColorSpaceXformEffect(PlacementPtr<FragmentProcessor> child,
-                                             std::shared_ptr<ColorSpaceXformSteps> colorXform)
-    : FragmentProcessor(classID()), colorSpaceXformSteps(std::move(colorXform)) {
-  registerChildProcessor(std::move(child));
+ColorSpaceXformEffect::ColorSpaceXformEffect(std::shared_ptr<ColorSpaceXformSteps> colorXform)
+    : FragmentProcessor(ClassID()), colorSpaceXformSteps(std::move(colorXform)) {
 }
 
 void ColorSpaceXformEffect::onSetData(UniformData* /*vertexUniformData*/,

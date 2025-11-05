@@ -18,8 +18,8 @@
 
 #include "tgfx/gpu/opengl/cgl/CGLWindow.h"
 #include <thread>
+#include "gpu/opengl/GLDefines.h"
 #include "tgfx/gpu/Backend.h"
-#include "tgfx/gpu/opengl/GLDefines.h"
 
 namespace tgfx {
 std::shared_ptr<CGLWindow> CGLWindow::MakeFrom(NSView* view, CGLContextObj sharedContext) {

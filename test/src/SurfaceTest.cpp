@@ -28,12 +28,12 @@ TGFX_TEST(SurfaceTest, ImageSnapshot) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  GLTextureInfo textureInfo;
   auto width = 200;
   auto height = 200;
-  CreateGLTexture(context, width, height, &textureInfo);
-  BackendTexture backendTexture = {textureInfo, width, height};
-  auto surface = Surface::MakeFrom(context, backendTexture, ImageOrigin::BottomLeft, 4);
+  auto texture = context->gpu()->createTexture({width, height, PixelFormat::RGBA_8888});
+  ASSERT_TRUE(texture != nullptr);
+  auto surface =
+      Surface::MakeFrom(context, texture->getBackendTexture(), ImageOrigin::BottomLeft, 4);
   ASSERT_TRUE(surface != nullptr);
   auto image = MakeImage("resources/apitest/imageReplacement.png");
   ASSERT_TRUE(image != nullptr);
@@ -72,8 +72,5 @@ TGFX_TEST(SurfaceTest, ImageSnapshot) {
   compareCanvas->clear();
   compareCanvas->drawImage(snapshotImage);
   EXPECT_TRUE(Baseline::Compare(compareSurface, "SurfaceTest/ImageSnapshot2"));
-
-  auto gl = GLFunctions::Get(context);
-  gl->deleteTextures(1, &textureInfo.id);
 }
 }  // namespace tgfx

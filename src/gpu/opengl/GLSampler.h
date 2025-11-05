@@ -18,8 +18,8 @@
 
 #pragma once
 
+#include "gpu/opengl/GLDefines.h"
 #include "tgfx/gpu/Sampler.h"
-#include "tgfx/gpu/opengl/GLDefines.h"
 
 namespace tgfx {
 class GLSampler : public Sampler {
