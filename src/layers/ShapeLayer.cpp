@@ -309,7 +309,7 @@ std::vector<Paint> ShapeLayer::createShapePaints(
   return paintList;
 }
 
-std::vector<float> ShapeLayer::simplifyLineDashPattern() const {
+std::vector<float> ShapeLayer::getSimplifyLineDashPattern() const {
   if (_lineDashPattern.empty()) {
     return _lineDashPattern;
   }
@@ -345,7 +345,7 @@ std::shared_ptr<Shape> ShapeLayer::createStrokeShape() const {
     auto pathEffect = PathEffect::MakeTrim(_strokeStart, _strokeEnd);
     strokeShape = Shape::ApplyEffect(std::move(strokeShape), std::move(pathEffect));
   }
-  auto dashes = simplifyLineDashPattern();
+  auto dashes = getSimplifyLineDashPattern();
   if (!dashes.empty()) {
     auto dash = PathEffect::MakeDash(dashes.data(), static_cast<int>(dashes.size()), _lineDashPhase,
                                      shapeBitFields.lineDashAdaptive);

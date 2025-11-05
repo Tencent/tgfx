@@ -267,7 +267,7 @@ TGFX_TEST(StrokeTest, SquareCapDashStrokeAsSolidStroke) {
   auto matrix = Matrix::MakeTrans(100, 100);
   shapeLayer1->setMatrix(matrix);
 
-  auto simplifiedDashes1 = shapeLayer1->simplifyLineDashPattern();
+  auto simplifiedDashes1 = shapeLayer1->getSimplifyLineDashPattern();
   EXPECT_EQ(simplifiedDashes1.size(), 0u);
 
   Path path2 = {};
@@ -283,7 +283,7 @@ TGFX_TEST(StrokeTest, SquareCapDashStrokeAsSolidStroke) {
   shapeLayer2->setLineCap(LineCap::Square);
   shapeLayer2->setMatrix(Matrix::MakeTrans(100, 100));
 
-  auto simplifiedDashes2 = shapeLayer2->simplifyLineDashPattern();
+  auto simplifiedDashes2 = shapeLayer2->getSimplifyLineDashPattern();
   EXPECT_EQ(simplifiedDashes2.size(), 2u);
   EXPECT_EQ(simplifiedDashes2[0], 6.f);
   EXPECT_EQ(simplifiedDashes2[1], 4.f);
