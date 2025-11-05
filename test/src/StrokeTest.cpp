@@ -246,4 +246,53 @@ TGFX_TEST(StrokeTest, LineRenderAsHairline) {
   EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/LineRenderAsHairline"));
 }
 
+TGFX_TEST(StrokeTest, SquareCapDashStrokeAsSolidStroke) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  auto canvas = surface->getCanvas();
+  canvas->clear();
+
+  Path path1 = {};
+  path1.addRect(-70, -70, 70, 70);
+  auto shapeLayer1 = ShapeLayer::Make();
+  shapeLayer1->setPath(path1);
+  auto strokeStyle = SolidColor::Make(Color::Red());
+  shapeLayer1->setLineWidth(2.0f);
+  shapeLayer1->setStrokeStyle(strokeStyle);
+  shapeLayer1->setLineDashAdaptive(true);
+  shapeLayer1->setLineDashPattern({2.f, 2.f});
+  shapeLayer1->setLineCap(LineCap::Square);
+  auto matrix = Matrix::MakeTrans(100, 100);
+  shapeLayer1->setMatrix(matrix);
+
+  auto simplifiedDashes1 = shapeLayer1->simplifyLineDashPattern();
+  EXPECT_EQ(simplifiedDashes1.size(), 0u);
+
+  Path path2 = {};
+  path2.addRect(-90, -90, 90, 90);
+  auto shapeLayer2 = ShapeLayer::Make();
+  auto shape = Shape::MakeFrom(path2);
+  shape = Shape::ApplyEffect(shape, PathEffect::MakeCorner(20));
+  shapeLayer2->setShape(shape);
+  shapeLayer2->setLineWidth(2.0f);
+  shapeLayer2->setStrokeStyle(strokeStyle);
+  shapeLayer2->setLineDashAdaptive(true);
+  shapeLayer2->setLineDashPattern({2.f, 2.f, 2.f, 4.f});
+  shapeLayer2->setLineCap(LineCap::Square);
+  shapeLayer2->setMatrix(Matrix::MakeTrans(100, 100));
+
+  auto simplifiedDashes2 = shapeLayer2->simplifyLineDashPattern();
+  EXPECT_EQ(simplifiedDashes2.size(), 2u);
+  EXPECT_EQ(simplifiedDashes2[0], 6.f);
+  EXPECT_EQ(simplifiedDashes2[1], 4.f);
+
+  DisplayList displayList;
+  displayList.root()->addChild(shapeLayer1);
+  displayList.root()->addChild(shapeLayer2);
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/DashStrokeAsSolidStroke"));
+}
+
 }  // namespace tgfx

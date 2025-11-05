@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <tuple>
+#include <vector>
 #include "tgfx/core/Shape.h"
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/ShapeStyle.h"
@@ -319,6 +321,8 @@ class ShapeLayer : public Layer {
 
   std::vector<Paint> createShapePaints(
       const std::vector<std::shared_ptr<ShapeStyle>>& styles) const;
+
+  std::vector<float> simplifyLineDashPattern() const;
 
   std::shared_ptr<Shape> createStrokeShape() const;
 };

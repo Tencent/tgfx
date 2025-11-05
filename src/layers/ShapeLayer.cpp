@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/ShapeLayer.h"
+#include <cstdint>
+#include <vector>
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/PathEffect.h"
@@ -309,17 +311,44 @@ std::vector<Paint> ShapeLayer::createShapePaints(
   return paintList;
 }
 
+std::vector<float> ShapeLayer::simplifyLineDashPattern() const {
+  if (_lineDashPattern.empty()) {
+    return _lineDashPattern;
+  }
+  auto dashes = _lineDashPattern;
+  if (_lineDashPattern.size() % 2 != 0) {
+    dashes.insert(dashes.end(), _lineDashPattern.begin(), _lineDashPattern.end());
+  }
+  // When LineCap is Square, the endpoints extend by half the line width.
+  // If an unpainted dash segment is less than or equal to the line width, the painted segments will
+  // connect seamlessly. Therefore, such a dash segment can be omitted for simplification.
+  if (stroke.cap != LineCap::Square) {
+    return dashes;
+  }
+  float addedPaintLength = 0.0f;
+  std::vector<float> simplifiedDashes = {};
+  for (uint32_t i = 0; i < dashes.size(); i += 2) {
+    auto paintedLength = dashes[i];
+    auto unpaintedLength = dashes[i + 1];
+    if (unpaintedLength <= stroke.width) {
+      addedPaintLength += paintedLength + unpaintedLength;
+    } else {
+      simplifiedDashes.push_back(paintedLength + addedPaintLength);
+      simplifiedDashes.push_back(unpaintedLength);
+      addedPaintLength = 0.0f;
+    }
+  }
+  return simplifiedDashes;
+}
+
 std::shared_ptr<Shape> ShapeLayer::createStrokeShape() const {
   auto strokeShape = _shape;
   if ((_strokeStart != 0 || _strokeEnd != 1)) {
     auto pathEffect = PathEffect::MakeTrim(_strokeStart, _strokeEnd);
     strokeShape = Shape::ApplyEffect(std::move(strokeShape), std::move(pathEffect));
   }
-  if (!_lineDashPattern.empty()) {
-    auto dashes = _lineDashPattern;
-    if (_lineDashPattern.size() % 2 != 0) {
-      dashes.insert(dashes.end(), _lineDashPattern.begin(), _lineDashPattern.end());
-    }
+  auto dashes = simplifyLineDashPattern();
+  if (!dashes.empty()) {
     auto dash = PathEffect::MakeDash(dashes.data(), static_cast<int>(dashes.size()), _lineDashPhase,
                                      shapeBitFields.lineDashAdaptive);
 
