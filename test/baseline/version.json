@@ -237,10 +237,10 @@
         "TemporaryOffscreenImage_image2": "ac2aa024",
         "TemporaryOffscreenImage_pic": "ac2aa024",
         "ZoomAndOffset": "68928515",
-        "backgroundLayerBlur": "897a1ea5",
+        "backgroundLayerBlur": "e36665b9",
         "draw_shape": "80a4bd69",
         "draw_solid": "b4a1231",
-        "draw_text": "983a559b",
+        "draw_text": "e36665b9",
         "dropShadow": "ee2cc771",
         "filterClip": "68928515",
         "filterTest": "68928515",
@@ -254,7 +254,7 @@
         "imageMask": "68928515",
         "innerShadow": "445cf6e8",
         "shapeMask": "68928515",
-        "textMask": "68928515"
+        "textMask": "e36665b9"
     },
     "MaskTest": {
         "rasterize_emoji": "c0f39f8",

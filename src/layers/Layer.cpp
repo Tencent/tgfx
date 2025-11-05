@@ -1009,8 +1009,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     if (!maskFilter) {
       return;
     }
-    maskFilter = maskFilter->makeWithMatrix(
-        Matrix::MakeTrans(-inputBounds.left - offset.x, -inputBounds.top - offset.x));
+    maskFilter = maskFilter->makeWithMatrix(Matrix::MakeTrans(-inputBounds.left, -inputBounds.top));
     paint.setMaskFilter(maskFilter);
   }
 
