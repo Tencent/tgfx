@@ -3267,7 +3267,7 @@ TGFX_TEST(LayerTest, PassThrough_Test) {
   childLayer->setPath(childPath);
   childLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 0, 255, 255)));
   childLayer->setAlpha(0.5f);
-  childLayer->setPassThoughBackground(true);
+  childLayer->setPassThoughMode(true);
   shapeLayer->addChild(childLayer);
 
   auto childLayer2 = ShapeLayer::Make();
