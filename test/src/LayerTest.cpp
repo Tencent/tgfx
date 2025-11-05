@@ -3249,7 +3249,7 @@ TGFX_TEST(LayerTest, PassThrough_Test) {
   canvas->clear();
   auto shapeLayer = ShapeLayer::Make();
   auto value = Layer::DefaultAllowsGroupOpacity();
-  Layer::SetDefaultAllowsGroupOpacity(value);
+  Layer::SetDefaultAllowsGroupOpacity(true);
   Path path;
   path.addRect(Rect::MakeXYWH(-40, -40, 100, 100));
   shapeLayer->setPath(path);
@@ -3266,7 +3266,8 @@ TGFX_TEST(LayerTest, PassThrough_Test) {
   childPath.addRect(Rect::MakeXYWH(25, 25, 50, 50));
   childLayer->setPath(childPath);
   childLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 0, 255, 255)));
-  childLayer->setAlpha(0.9f);
+  childLayer->setAlpha(0.5f);
+  childLayer->setPassThoughBackground(true);
   shapeLayer->addChild(childLayer);
 
   auto childLayer2 = ShapeLayer::Make();
@@ -3289,7 +3290,7 @@ TGFX_TEST(LayerTest, PassThrough_Test) {
   auto picture = recorder.finishRecordingAsPicture();
   canvas->clear();
   canvas->drawPicture(picture);
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PassThrough_Test2"));
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PassThrough_Test_record"));
   Layer::SetDefaultAllowsGroupOpacity(value);
 }
 }  // namespace tgfx

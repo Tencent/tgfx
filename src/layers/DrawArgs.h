@@ -54,7 +54,7 @@ class DrawArgs {
   bool forceDrawBackground = false;
   std::shared_ptr<ColorSpace> dstColorSpace = ColorSpace::MakeSRGB();
 
-  // Only used while recording.
+  // Only used while recording layer's background image.
   std::shared_ptr<BlendModeContext> blendModeContext;
 };
 }  // namespace tgfx

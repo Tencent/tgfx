@@ -149,7 +149,7 @@ Layer::Layer() {
   bitFields.allowsEdgeAntialiasing = AllowsEdgeAntialiasing;
   bitFields.allowsGroupOpacity = AllowsGroupOpacity;
   bitFields.blendMode = static_cast<uint8_t>(BlendMode::SrcOver);
-  bitFields.passThoughBackground = true;
+  bitFields.passThoughBackground = false;
 }
 
 void Layer::setAlpha(float value) {
@@ -1032,35 +1032,25 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   if (finalImage == nullptr) {
     return;
   }
+  if (args.backgroundContext && !subBackgroundContext) {
+    finalImage = finalImage->makeRasterized();
+  }
   AutoCanvasRestore autoRestore(canvas);
   canvas->concat(matrix);
+  canvas->drawImage(finalImage, offset.x, offset.y, &paint);
   if (args.blendModeContext) {
-    args.blendModeContext->getCanvas()->concat(matrix);
+    auto blendCanvas = args.blendModeContext->getCanvas();
+    AutoCanvasRestore autoRestoreBlend(blendCanvas);
+    blendCanvas->concat(matrix);
+    blendCanvas->drawImage(finalImage, offset.x, offset.y, &paint);
   }
-  if (!args.backgroundContext) {
-    canvas->drawImage(finalImage, offset.x, offset.y, &paint);
-    if (args.blendModeContext) {
-      args.blendModeContext->getCanvas()->drawImage(finalImage, offset.x, offset.y, &paint);
-    }
-  } else if (subBackgroundContext) {
-    subBackgroundContext->drawToParent(Matrix::MakeScale(1.0f / contentScale), paint);  //
-    canvas->drawImage(finalImage, offset.x, offset.y, &paint);
-    if (args.blendModeContext) {
-      args.blendModeContext->getCanvas()->drawImage(finalImage, offset.x, offset.y, &paint);
-    }
-  } else {
+  if (subBackgroundContext) {
+    subBackgroundContext->drawToParent(Matrix::MakeScale(1.0f / contentScale), paint);
+  } else if (args.backgroundContext) {
     auto backgroundCanvas = args.backgroundContext->getCanvas();
     AutoCanvasRestore autoRestoreBg(backgroundCanvas);
-    finalImage = finalImage->makeRasterized();
     backgroundCanvas->concat(matrix);
-    canvas->drawImage(finalImage, offset.x, offset.y, &paint);
     backgroundCanvas->drawImage(finalImage, offset.x, offset.y, &paint);
-    if (args.blendModeContext) {
-      args.blendModeContext->getCanvas()->drawImage(finalImage, offset.x, offset.y, &paint);
-    }
-  }
-  if (args.blendModeContext) {
-    args.blendModeContext->getCanvas()->restore();
   }
 }
 
