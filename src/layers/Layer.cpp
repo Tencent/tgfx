@@ -149,7 +149,6 @@ Layer::Layer() {
   bitFields.allowsEdgeAntialiasing = AllowsEdgeAntialiasing;
   bitFields.allowsGroupOpacity = AllowsGroupOpacity;
   bitFields.blendMode = static_cast<uint8_t>(BlendMode::SrcOver);
-  bitFields.passThoughBackground = false;
 }
 
 void Layer::setAlpha(float value) {
@@ -169,11 +168,11 @@ void Layer::setBlendMode(BlendMode value) {
   invalidateTransform();
 }
 
-void Layer::setPassThoughBackground(bool value) {
-  if (bitFields.passThoughBackground == value) {
+void Layer::setPassThoughMode(bool value) {
+  if (bitFields.passThroughMode == value) {
     return;
   }
-  bitFields.passThoughBackground = value;
+  bitFields.passThroughMode = value;
   invalidateTransform();
 }
 
@@ -937,7 +936,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   offscreenArgs.backgroundContext = subBackgroundContext;
   offscreenArgs.blendModeContext = std::make_shared<BlendModeContext>(contentScale);
 
-  auto passThough = bitFields.passThoughBackground && blendMode == BlendMode::SrcOver &&
+  auto passThough = bitFields.passThroughMode && blendMode == BlendMode::SrcOver &&
                     _filters.empty() && bitFields.hasBlendMode == true;
 
   // canvas of background clip bounds will be more large than canvas clip bounds.
