@@ -984,7 +984,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
 
   Point offset = {};
   std::shared_ptr<Image> finalImage = nullptr;
-  if (context) {
+  if (context && passThough) {
     auto offscreenSurface = Surface::Make(context, static_cast<int>(inputBounds.width()),
                                           static_cast<int>(inputBounds.height()), false, 1, false,
                                           0, args.dstColorSpace);
@@ -1009,23 +1009,24 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     if (!maskFilter) {
       return;
     }
-    maskFilter = maskFilter->makeWithMatrix(Matrix::MakeTrans(-inputBounds.left, -inputBounds.top));
+    maskFilter = maskFilter->makeWithMatrix(
+        Matrix::MakeTrans(-inputBounds.left - offset.x, -inputBounds.top - offset.x));
     paint.setMaskFilter(maskFilter);
   }
 
-  auto matrix = Matrix::MakeScale(1.0f / contentScale);
-  matrix.preTranslate(inputBounds.left, inputBounds.top);
   if (!args.excludeEffects) {
     auto filter = getImageFilter(contentScale);
     if (filter) {
       if (clipBounds.has_value()) {
         clipBounds->scale(contentScale, contentScale);
-        clipBounds->offset(-inputBounds.left, -inputBounds.top);
+        clipBounds->offset(-inputBounds.left - offset.x, -inputBounds.top - offset.y);
         clipBounds->roundOut();
       }
+      auto filterOffset = Point::Make(0, 0);
       // clipBounds may be smaller than the image bounds, so we need to pass it to makeWithFilter.
-      finalImage = finalImage->makeWithFilter(filter, &offset,
+      finalImage = finalImage->makeWithFilter(filter, &filterOffset,
                                               clipBounds.has_value() ? &*clipBounds : nullptr);
+      offset += filterOffset;
     }
   }
   if (finalImage == nullptr) {
@@ -1034,6 +1035,9 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   if (args.backgroundContext && !subBackgroundContext) {
     finalImage = finalImage->makeRasterized();
   }
+
+  auto matrix = Matrix::MakeScale(1.0f / contentScale);
+  matrix.preTranslate(inputBounds.left, inputBounds.top);
   AutoCanvasRestore autoRestore(canvas);
   canvas->concat(matrix);
   canvas->drawImage(finalImage, offset.x, offset.y, &paint);
