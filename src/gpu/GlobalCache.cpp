@@ -584,7 +584,7 @@ std::shared_ptr<GPUBufferProxy> GlobalCache::getRoundStrokeIndexBuffer(bool anti
     auto vertCount =
         antialias ? VERTICES_PER_AA_ROUND_STROKE_RECT : VERTICES_PER_NON_AA_ROUND_STROKE_RECT;
     auto provider = std::make_unique<RectIndicesProvider>(pattern, patternSize,
-                                                          RRectDrawOp::MaxNumRRects, vertCount);
+                                                          RectDrawOp::MaxNumRects, vertCount);
     indexBuffer = context->proxyProvider()->createIndexBufferProxy(std::move(provider));
   }
   return indexBuffer;
