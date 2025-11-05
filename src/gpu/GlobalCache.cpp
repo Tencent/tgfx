@@ -347,7 +347,7 @@ void GlobalCache::addStaticResource(const UniqueKey& uniqueKey,
 
 // clang-format off
 /**
- * As in stroke, index = a + b, and a is the current index, b is the shift
+ * As in miter-stroke, index = a + b, and a is the current index, b is the shift
  * from the first index. The index layout:
  * outer AA line: 0~3
  * outer edge:    4~7
@@ -408,7 +408,7 @@ static constexpr uint16_t NonAAMiterStrokeRectIndices[] = {
 };
 
 /**
- * As in miter-stroke, index = a + b, and a is the current index, b is the shift
+ * As in bevel-stroke, index = a + b, and a is the current index, b is the shift
  * from the first index. The index layout:
  * outer AA line: 0~3, 4~7
  * outer edge:    8~11, 12~15
@@ -465,7 +465,7 @@ static constexpr uint16_t AABevelStrokeRectIndices[] = {
 };
 
 /**
- * As in non aa miter-stroke
+ * As in non-AA bevel-stroke
  * from the first index. The index layout:
  * outer AA edge: 0~3, 4~7
  * inner edge:    8~11
