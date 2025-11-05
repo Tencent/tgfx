@@ -67,7 +67,7 @@ class QGLWindow : public Window {
   unsigned pendingTextureID = 0;
   std::shared_ptr<Surface> pendingSurface = nullptr;
   std::shared_ptr<Surface> displayingSurface = nullptr;
-  std::shared_ptr<Surface> fontSurface = nullptr;
+  std::shared_ptr<Surface> frontSurface = nullptr;
   QSGTexture* outTexture = nullptr;
   QGLDeviceCreator* deviceCreator = nullptr;
 

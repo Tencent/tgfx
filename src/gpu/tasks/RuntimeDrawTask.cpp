@@ -118,15 +118,17 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
     return nullptr;
   }
   auto colorProcessor = TextureEffect::Make(std::move(textureProxy), {}, nullptr, false);
-  // TODO: Turn on when the wide gumat convertion is Completed
-  /* if (!textureView->isAlphaOnly()) {
-    colorProcessor = ColorSpaceXformEffect::Make(
-        context->drawingBuffer(), std::move(colorProcessor), textureProxyWithCS->colorSpace.get(),
-        AlphaType::Premultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
-  }*/
   if (colorProcessor == nullptr) {
     LOGE("RuntimeDrawTask::getFlatTexture() Failed to create the color processor!");
     return nullptr;
+  }
+  if (!textureView->isAlphaOnly() &&
+      !ColorSpace::Equals(textureProxyWithCS->colorSpace.get(), dstColorSpace.get())) {
+    auto xformEffect = ColorSpaceXformEffect::Make(
+        context->drawingBuffer(), textureProxyWithCS->colorSpace.get(), AlphaType::Premultiplied,
+        dstColorSpace.get(), AlphaType::Premultiplied);
+    colorProcessor = FragmentProcessor::Compose(context->drawingBuffer(), std::move(xformEffect),
+                                                std::move(colorProcessor));
   }
   auto geometryProcessor =
       DefaultGeometryProcessor::Make(context->drawingBuffer(), {}, renderTarget->width(),

@@ -44,13 +44,18 @@ bool PathTriangulator::ShouldTriangulatePath(const Path& path) {
   auto bounds = path.getBounds();
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
-  if (std::max(width, height) <= MIN_TRIANGULATE_SIZE) {
+  auto maxDimension = std::max(width, height);
+  auto minDimension = std::min(width, height);
+  if (minDimension <= 0) {
+    return true;
+  }
+  if (maxDimension <= MIN_TRIANGULATE_SIZE) {
     return false;
   }
   if (path.countVerbs() <= AA_TESSELLATOR_MAX_VERB_COUNT) {
     return true;
   }
-  if (std::max(width, height) > MAX_RASTERIZED_TEXTURE_SIZE) {
+  if (maxDimension > MAX_RASTERIZED_TEXTURE_SIZE) {
     return true;
   }
   return path.countPoints() * AA_TESSELLATOR_BUFFER_SIZE_FACTOR <= width * height;
