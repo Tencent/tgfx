@@ -22,6 +22,7 @@
 #include <vector>
 #include "tgfx/core/AlphaType.h"
 #include "tgfx/core/ColorSpace.h"
+#include "utils/ColorSpaceHelper.h"
 #include "utils/Log.h"
 
 namespace tgfx {
@@ -294,7 +295,7 @@ Color ColorSpaceXformSteps::ConvertColorSpace(std::shared_ptr<ColorSpace> src, A
     dstColor = dstColor.premultiply();
     srcAT = AlphaType::Premultiplied;
   }
-  if (ColorSpace::Equals(src.get(), dst.get()) && srcAT == dstAT) {
+  if (ColorSpaceIsEqual(src, dst) && srcAT == dstAT) {
     return dstColor;
   }
   ColorSpaceXformSteps steps(src.get(), srcAT, dst.get(), dstAT);

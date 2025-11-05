@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RuntimeDrawTask.h"
+#include "core/utils/ColorSpaceHelper.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/Program.h"
 #include "gpu/ProgramInfo.h"
@@ -95,7 +96,7 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
   }
   if (!textureView->isYUV() && textureView->getTexture()->type() == TextureType::TwoD &&
       textureView->origin() == ImageOrigin::TopLeft &&
-      ColorSpace::Equals(textureProxyWithCS->colorSpace.get(), dstColorSpace.get())) {
+      ColorSpaceIsEqual(textureProxyWithCS->colorSpace, dstColorSpace)) {
     return textureView;
   }
   auto vertexBuffer = vertexBufferProxyView ? vertexBufferProxyView->getBuffer() : nullptr;
@@ -123,7 +124,7 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
     return nullptr;
   }
   if (!textureView->isAlphaOnly() &&
-      !ColorSpace::Equals(textureProxyWithCS->colorSpace.get(), dstColorSpace.get())) {
+      !ColorSpaceIsEqual(textureProxyWithCS->colorSpace, dstColorSpace)) {
     auto xformEffect = ColorSpaceXformEffect::Make(
         context->drawingBuffer(), textureProxyWithCS->colorSpace.get(), AlphaType::Premultiplied,
         dstColorSpace.get(), AlphaType::Premultiplied);

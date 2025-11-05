@@ -19,8 +19,10 @@
 #include "CGPathRasterizer.h"
 #include <CoreGraphics/CGBitmapContext.h>
 #include "core/PixelBuffer.h"
+#include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/GammaCorrection.h"
 #include "platform/apple/BitmapContextUtil.h"
+#include "tgfx/core/Buffer.h"
 #include "tgfx/core/PathTypes.h"
 
 namespace tgfx {
@@ -114,6 +116,7 @@ std::shared_ptr<PathRasterizer> PathRasterizer::MakeFrom(int width, int height,
 }
 
 bool CGPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
+                                    std::shared_ptr<ColorSpace> dstColorSpace,
                                     void* dstPixels) const {
   if (dstPixels == nullptr) {
     return false;
@@ -122,9 +125,20 @@ bool CGPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, si
   if (path.isEmpty()) {
     return false;
   }
-  auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes);
+  auto dstInfo =
+      ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes, dstColorSpace);
   auto targetInfo = dstInfo.makeIntersect(0, 0, width(), height());
-  auto cgContext = CreateBitmapContext(targetInfo, dstPixels);
+  auto outPixels = dstPixels;
+  Buffer buffer;
+  Pixmap tempPixelMap;
+  if (!ColorSpaceIsEqual(colorSpace(), dstColorSpace)) {
+    auto tempImageInfo =
+        ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes, colorSpace());
+    buffer.alloc(tempImageInfo.byteSize());
+    tempPixelMap.reset(tempImageInfo, buffer.data());
+    outPixels = tempPixelMap.writablePixels();
+  }
+  auto cgContext = CreateBitmapContext(targetInfo, outPixels);
   if (cgContext == nullptr) {
     return false;
   }
@@ -164,6 +178,9 @@ bool CGPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, si
   CGContextDrawImage(cgContext, rect, image);
   CGContextRelease(cgContext);
   CGImageRelease(image);
+  if (!tempPixelMap.isEmpty()) {
+    tempPixelMap.readPixels(dstInfo, dstPixels);
+  }
   return true;
 }
 

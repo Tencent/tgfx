@@ -20,6 +20,7 @@
 #include "core/PathRasterizer.h"
 #include "core/PathRef.h"
 #include "core/PathTriangulator.h"
+#include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/RectToRectMatrix.h"
 #include "core/utils/ShapeUtils.h"
@@ -408,7 +409,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
     }
     drawOp->addColorFP(std::move(processor));
     if (!pendingImage->isAlphaOnly() &&
-        !ColorSpace::Equals(pendingImage->colorSpace().get(), dstColorSpace.get())) {
+        !ColorSpaceIsEqual(pendingImage->colorSpace(), dstColorSpace)) {
       auto xformEffect = ColorSpaceXformEffect::Make(
           context->drawingBuffer(), pendingImage->colorSpace().get(), AlphaType::Premultiplied,
           dstColorSpace.get(), AlphaType::Premultiplied);
