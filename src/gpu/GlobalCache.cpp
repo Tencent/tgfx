@@ -546,7 +546,7 @@ static constexpr uint16_t RoundStrokeRectIndices[] = {
 // clang-format on
 
 std::shared_ptr<GPUBufferProxy> GlobalCache::getMiterStrokeIndexBuffer(bool antialias) {
-  auto& indexBuffer = antialias ? aaMiterStrokeRectIndexBuffer : nonAAMiterStrokeRectIndexBuffer;
+  auto& indexBuffer = antialias ? aaRectMiterStrokeIndexBuffer : nonAARectMiterStrokeIndexBuffer;
   if (indexBuffer == nullptr) {
     auto pattern = antialias ? AAMiterStrokeRectIndices : NonAAMiterStrokeRectIndices;
     auto patternSize = antialias ? RectDrawOp::IndicesPerAAMiterStrokeRect
@@ -561,7 +561,7 @@ std::shared_ptr<GPUBufferProxy> GlobalCache::getMiterStrokeIndexBuffer(bool anti
 }
 
 std::shared_ptr<GPUBufferProxy> GlobalCache::getBevelStrokeIndexBuffer(bool antialias) {
-  auto& indexBuffer = antialias ? aaBevelStrokeRectIndexBuffer : nonAABevelStrokeRectIndexBuffer;
+  auto& indexBuffer = antialias ? aaRectBevelStrokeIndexBuffer : nonAARectBevelStrokeIndexBuffer;
   if (indexBuffer == nullptr) {
     auto pattern = antialias ? AABevelStrokeRectIndices : NonAABevelStrokeRectIndices;
     auto patternSize = antialias ? RectDrawOp::IndicesPerAABevelStrokeRect
@@ -576,7 +576,7 @@ std::shared_ptr<GPUBufferProxy> GlobalCache::getBevelStrokeIndexBuffer(bool anti
 }
 
 std::shared_ptr<GPUBufferProxy> GlobalCache::getRoundStrokeIndexBuffer(bool antialias) {
-  auto& indexBuffer = antialias ? aaRoundStrokeRectIndexBuffer : nonAARoundStrokeRectIndexBuffer;
+  auto& indexBuffer = antialias ? aaRectRoundStrokeIndexBuffer : nonAARectRoundStrokeIndexBuffer;
   if (indexBuffer == nullptr) {
     auto pattern = RoundStrokeRectIndices;
     auto patternSize = antialias ? RectDrawOp::IndicesPerAARoundStrokeRect
