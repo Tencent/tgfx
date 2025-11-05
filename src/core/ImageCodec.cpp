@@ -155,13 +155,8 @@ bool ImageCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
     return false;
   }
   if (dstInfo.width() == width() && dstInfo.height() == height()) {
-    auto result =
-        onReadPixels(dstInfo.colorType(), dstInfo.alphaType(), dstInfo.rowBytes(), dstPixels);
-    if (!ColorSpace::Equals(dstInfo.colorSpace().get(), ImageGenerator::colorSpace().get())) {
-      Pixmap pixmap{dstInfo.makeColorSpace(ImageGenerator::colorSpace()), dstPixels};
-      result = pixmap.readPixels(dstInfo, dstPixels);
-    }
-    return result;
+    return onReadPixels(dstInfo.colorType(), dstInfo.alphaType(), dstInfo.rowBytes(),
+                        dstInfo.colorSpace(), dstPixels);
   }
 
   Buffer buffer = {};
@@ -179,7 +174,7 @@ bool ImageCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
     if (dstRowBytes % 16) {
       dstRowBytes = dstImageInfo.rowBytes() + GetPaddingAlignment16(dstImageInfo.rowBytes());
       dstImageInfo = ImageInfo::Make(dstInfo.width(), dstInfo.height(), colorType,
-                                     dstInfo.alphaType(), dstRowBytes);
+                                     dstInfo.alphaType(), dstRowBytes, dstInfo.colorSpace());
     }
     if (!dstTempBuffer.alloc(dstImageInfo.byteSize())) {
       return false;
@@ -190,7 +185,8 @@ bool ImageCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   if (!buffer.alloc(srcRowBytes * static_cast<size_t>(height()))) {
     return false;
   }
-  auto result = onReadPixels(colorType, dstInfo.alphaType(), srcRowBytes, buffer.data());
+  auto result = onReadPixels(colorType, dstInfo.alphaType(), srcRowBytes, dstInfo.colorSpace(),
+                             buffer.data());
   if (!result) {
     return false;
   }
@@ -200,9 +196,7 @@ bool ImageCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   auto outputLayout = PixelLayout{dstImageInfo.width(), dstImageInfo.height(),
                                   static_cast<int>(dstImageInfo.rowBytes())};
   BoxFilterDownsample(buffer.data(), inputLayout, dstData, outputLayout, isOneComponent);
-  dstImageInfo = dstImageInfo.makeColorSpace(ImageGenerator::colorSpace());
-  if (!dstTempBuffer.isEmpty() ||
-      !ColorSpace::Equals(ImageGenerator::colorSpace().get(), dstInfo.colorSpace().get())) {
+  if (!dstTempBuffer.isEmpty()) {
     Pixmap(dstImageInfo, dstData).readPixels(dstInfo, dstPixels);
   }
   return true;

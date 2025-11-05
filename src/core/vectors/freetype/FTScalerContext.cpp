@@ -72,7 +72,15 @@ static gfx::skcms_PixelFormat ToPixelFormat(ColorType colorType) {
 }
 
 static void RenderOutLineGlyph(FT_Face face, const ImageInfo& dstInfo, void* dstPixels) {
-  auto buffer = static_cast<unsigned char*>(dstPixels);
+  auto output = static_cast<unsigned char*>(dstPixels);
+  Buffer buffer;
+  Pixmap tempPixelMap;
+  if (!ColorSpaceIsEqual(ColorSpace::MakeSRGB(), dstInfo.colorSpace())) {
+    auto tempImageInfo = dstInfo.makeColorSpace(ColorSpace::MakeSRGB());
+    buffer.alloc(tempImageInfo.byteSize());
+    tempPixelMap.reset(tempImageInfo, buffer.data());
+    output = static_cast<unsigned char*>(tempPixelMap.writablePixels());
+  }
   auto pitch = static_cast<int>(dstInfo.rowBytes());
   FT_Raster_Params params;
   params.flags = FT_RASTER_FLAG_CLIP | FT_RASTER_FLAG_AA;
@@ -88,7 +96,7 @@ static void RenderOutLineGlyph(FT_Face face, const ImageInfo& dstInfo, void* dst
   bitmap.width = static_cast<unsigned>(dstInfo.width());
   bitmap.rows = static_cast<unsigned>(dstInfo.height());
   bitmap.pitch = pitch;
-  bitmap.buffer = buffer;
+  bitmap.buffer = output;
   bitmap.pixel_mode = FT_PIXEL_MODE_GRAY;
   bitmap.num_grays = 256;
   params.target = &bitmap;
@@ -104,25 +112,8 @@ static void RenderOutLineGlyph(FT_Face face, const ImageInfo& dstInfo, void* dst
   FT_Outline_Translate(outline, -bbox.xMin, -bbox.yMin);
   FT_Outline_Render(face->glyph->library, outline, &params);
 
-  if (!ColorSpace::Equals(dstInfo.colorSpace().get(), ColorSpace::MakeSRGB().get())) {
-    auto src = static_cast<uint8_t*>(dstPixels);
-    auto srcRB = dstInfo.rowBytes();
-    auto srcFormat = gfx::skcms_PixelFormat_A_8;
-
-    auto dst = static_cast<uint8_t*>(dstPixels);
-    auto dstRB = dstInfo.rowBytes();
-    auto dstFormat = gfx::skcms_PixelFormat_A_8;
-    auto width = dstInfo.width();
-    auto height = dstInfo.height();
-    auto dstProfile = ToSkcmsICCProfile(dstInfo.colorSpace());
-    for (size_t i = 0; i < static_cast<size_t>(height); i++) {
-      gfx::skcms_Transform(src, srcFormat, gfx::skcms_AlphaFormat_PremulAsEncoded,
-                           gfx::skcms_sRGB_profile(), dst, dstFormat,
-                           gfx::skcms_AlphaFormat_PremulAsEncoded, &dstProfile,
-                           static_cast<size_t>(width));
-      src += srcRB;
-      dst += dstRB;
-    }
+  if (!tempPixelMap.isEmpty()) {
+    tempPixelMap.readPixels(dstInfo, dstPixels);
   }
 }
 

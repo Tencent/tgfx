@@ -203,14 +203,13 @@ bool JpegCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
 }
 
 bool JpegCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
-                             void* dstPixels) const {
-  return readScaledPixels(colorType, alphaType, dstRowBytes, dstPixels, 8,
-                          ImageGenerator::colorSpace());
+                             std::shared_ptr<ColorSpace> colorSpace, void* dstPixels) const {
+  return readScaledPixels(colorType, alphaType, dstRowBytes, dstPixels, 8, std::move(colorSpace));
 }
 
 bool JpegCodec::readScaledPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
                                  void* dstPixels, uint32_t scaleNum,
-                                 std::shared_ptr<ColorSpace> colorSpace) const {
+                                 std::shared_ptr<ColorSpace> dstColorSpace) const {
   if (dstPixels == nullptr) {
     return false;
   }
@@ -222,10 +221,20 @@ bool JpegCodec::readScaledPixels(ColorType colorType, AlphaType alphaType, size_
   float dstWidth = static_cast<float>(width()) * scale;
   float dstHeight = static_cast<float>(height()) * scale;
   auto dstInfo = ImageInfo::Make(static_cast<int>(dstWidth), static_cast<int>(dstHeight), colorType,
-                                 alphaType, dstRowBytes, ImageGenerator::colorSpace());
-  Bitmap bitmap = {};
+                                 alphaType, dstRowBytes, dstColorSpace);
   auto outPixels = dstPixels;
   auto outRowBytes = dstRowBytes;
+  Buffer buffer;
+  Pixmap tempPixelMap;
+  if (!ColorSpaceIsEqual(colorSpace(), dstColorSpace)) {
+    auto tempImageInfo = ImageInfo::Make(static_cast<int>(dstWidth), static_cast<int>(dstHeight),
+                                         colorType, alphaType, dstRowBytes, colorSpace());
+    buffer.alloc(tempImageInfo.byteSize());
+    tempPixelMap.reset(tempImageInfo, buffer.data());
+    outPixels = tempPixelMap.writablePixels();
+  }
+
+  Bitmap bitmap = {};
   J_COLOR_SPACE out_color_space;
   switch (colorType) {
     case ColorType::RGBA_8888:
@@ -242,7 +251,7 @@ bool JpegCodec::readScaledPixels(ColorType colorType, AlphaType alphaType, size_
       break;
     default:
       auto success = bitmap.allocPixels(static_cast<int>(dstWidth), static_cast<int>(dstHeight),
-                                        false, false, ImageGenerator::colorSpace());
+                                        false, false, colorSpace());
       if (!success) {
         return false;
       }
@@ -313,12 +322,9 @@ bool JpegCodec::readScaledPixels(ColorType colorType, AlphaType alphaType, size_
   }
   if (result) {
     if (!pixmap.isEmpty()) {
-      dstInfo = dstInfo.makeColorSpace(colorSpace);
       pixmap.readPixels(dstInfo, dstPixels);
-    } else if (!ColorSpace::Equals(ImageGenerator::colorSpace().get(), colorSpace.get())) {
-      pixmap.reset(dstInfo, dstPixels);
-      dstInfo = dstInfo.makeColorSpace(colorSpace);
-      pixmap.readPixels(dstInfo, dstPixels);
+    } else if (!tempPixelMap.isEmpty()) {
+      tempPixelMap.readPixels(dstInfo, dstPixels);
     }
   }
   return result;

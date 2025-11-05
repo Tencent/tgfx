@@ -33,9 +33,10 @@ GlyphRasterizer::~GlyphRasterizer() {
 }
 
 bool GlyphRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
+                                   std::shared_ptr<ColorSpace> dstColorSpace,
                                    void* dstPixels) const {
-  auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes,
-                                 ImageGenerator::colorSpace());
+  auto dstInfo =
+      ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes, dstColorSpace);
   return scalerContext->readPixels(glyphID, fauxBold, stroke, dstInfo, dstPixels);
 }
 }  // namespace tgfx

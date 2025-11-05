@@ -35,13 +35,13 @@ class JpegCodec : public ImageCodec {
 
  protected:
   bool onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
-                    void* dstPixels) const override;
+                    std::shared_ptr<ColorSpace> colorSpace, void* dstPixels) const override;
 
   bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
 
   bool readScaledPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
                         void* dstPixels, uint32_t scaleNum,
-                        std::shared_ptr<ColorSpace> colorSpace) const;
+                        std::shared_ptr<ColorSpace> dstColorSpace) const;
 
   std::shared_ptr<Data> getEncodedData() const override;
 

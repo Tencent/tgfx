@@ -126,4 +126,14 @@ gfx::skcms_ICCProfile ToSkcmsICCProfile(std::shared_ptr<ColorSpace> colorSpace) 
   }
   return {};
 }
+
+bool ColorSpaceIsEqual(std::shared_ptr<ColorSpace> src, std::shared_ptr<ColorSpace> dst) {
+  if (dst == nullptr) {
+    return true;
+  }
+  if (src == nullptr) {
+    src = ColorSpace::MakeSRGB();
+  }
+  return ColorSpace::Equals(src.get(), dst.get());
+}
 }  // namespace tgfx

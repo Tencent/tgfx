@@ -27,4 +27,6 @@ std::shared_ptr<ColorSpace> MakeColorSpaceFromYUVColorSpace(YUVColorSpace yuvCol
 std::shared_ptr<ColorSpace> AndroidDataSpaceToColorSpace(int standard, int transfer);
 
 gfx::skcms_ICCProfile ToSkcmsICCProfile(std::shared_ptr<ColorSpace> colorSpace);
+
+bool ColorSpaceIsEqual(std::shared_ptr<ColorSpace> src, std::shared_ptr<ColorSpace> dst);
 }  // namespace tgfx

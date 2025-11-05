@@ -77,7 +77,7 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data> im
 }
 
 bool NativeCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
-                               void* dstPixels) const {
+                               std::shared_ptr<ColorSpace> dstColorSpace, void* dstPixels) const {
   auto image = CreateImageSource();
   if (!image) {
     return false;
@@ -99,7 +99,8 @@ bool NativeCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t 
     return false;
   }
   auto info = GetPixelmapInfo(pixelmap);
-  auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes);
+  auto dstInfo =
+      ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes, dstColorSpace);
   bool result = false;
   if (info == dstInfo) {
     size_t bufferSize = info.byteSize();
@@ -194,7 +195,7 @@ ImageInfo NativeCodec::GetPixelmapInfo(OH_PixelmapNative* pixelmap) {
   uint32_t rowBytes = 0;
   OH_PixelmapImageInfo_GetRowStride(currentInfo, &rowBytes);
   OH_PixelmapImageInfo_Release(currentInfo);
-  return ImageInfo::Make((int)width, (int)height, colorType, alphaType, rowBytes);
+  return ImageInfo::Make((int)width, (int)height, colorType, alphaType, rowBytes, colorSpace());
 }
 
 OH_ImageSourceNative* NativeCodec::CreateImageSource() const {

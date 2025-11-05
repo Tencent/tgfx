@@ -73,7 +73,7 @@ void CopyPixels(const ImageInfo& srcInfo, const void* srcPixels, const ImageInfo
   auto srcColorSpace = srcInfo.colorSpace();
   auto dstColorSpace = dstInfo.colorSpace();
   if (srcInfo.colorType() == dstInfo.colorType() && srcInfo.alphaType() == dstInfo.alphaType() &&
-      ColorSpace::Equals(srcColorSpace.get(), dstColorSpace.get())) {
+      ColorSpaceIsEqual(srcColorSpace, dstColorSpace)) {
     CopyRectMemory(srcPixels, srcInfo.rowBytes(), dstPixels, dstInfo.rowBytes(),
                    dstInfo.minRowBytes(), static_cast<size_t>(dstInfo.height()), flipY);
     return;
