@@ -169,7 +169,7 @@ bool NativeCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t 
     info = info.makeColorSpace(colorSpace());
     tempBuffer.alloc(info.byteSize());
     pixels = tempBuffer.data();
-  } else if (!ColorSpaceIsEqual(colorSpace(), dstColorSpace)) {
+  } else if (!NeedConvertColorSpace(colorSpace(), dstColorSpace)) {
     info = dstInfo.makeColorSpace(colorSpace());
     tempBuffer.alloc(info.byteSize());
     pixels = tempBuffer.data();

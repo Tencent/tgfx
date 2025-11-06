@@ -167,7 +167,7 @@ bool CGPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, si
   CGContextDrawImage(cgContext, rect, image);
   CGContextRelease(cgContext);
   CGImageRelease(image);
-  if (!ColorSpaceIsEqual(colorSpace(), dstColorSpace)) {
+  if (!NeedConvertColorSpace(colorSpace(), dstColorSpace)) {
     ConvertColorSpaceInPlace(ImageGenerator::width(), ImageGenerator::height(), colorType,
                              alphaType, dstRowBytes, colorSpace(), dstColorSpace, dstPixels);
   }
