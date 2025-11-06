@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <optional>
 #include "EGLDevice.h"
 #include "tgfx/gpu/Window.h"
 
