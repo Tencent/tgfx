@@ -374,7 +374,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
 
   switch (pendingType) {
     case PendingOpType::Rect:
-      if (pendingRects.size() == 1) {
+      if (pendingRects.size() == 1 && pendingStrokes.empty()) {
         auto& paint = pendingRects.front();
         if (drawAsClear(paint->rect, {paint->viewMatrix, pendingClip}, pendingFill)) {
           return;

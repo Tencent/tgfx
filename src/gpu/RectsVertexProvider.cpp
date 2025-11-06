@@ -235,7 +235,7 @@ class AAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
                                    viewMatrix.getSkewY() * viewMatrix.getSkewY());
       // we want the new edge to be 0.5px away from the old line.
       const auto padding = 0.5f / scale;
-      auto strokeWidth = stroke->width > 0.f ? stroke->width : 1.0f / scale;
+      auto strokeWidth = stroke->width > 0.0f ? stroke->width : 1.0f / scale;
       const auto halfWidth = strokeWidth * 0.5f;
       auto& rect = record->rect;
       auto outSide = rect.makeOutset(halfWidth, halfWidth);
@@ -279,7 +279,7 @@ class AAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
       }
 
       // How much do we inset toward the inside of the strokes?
-      const float inset = std::min(padding, std::min(halfWidth, halfWidth));
+      const float inset = std::min(padding, halfWidth);
       auto innerCoverage = 1.0f;
       if (inset < padding) {
         // Stroke is subpixel, so reduce the coverage to simulate the narrower strokes.

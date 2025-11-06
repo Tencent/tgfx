@@ -230,7 +230,8 @@ class RectIndicesProvider : public DataSource<Data> {
     }
     auto data = reinterpret_cast<uint16_t*>(buffer.data());
     for (uint16_t i = 0; i < reps; ++i) {
-      //Note: decltype(data[index]) resolves to uint16_t, while decltype(index) is size_t
+      //Note: decltype(data[index]) resolves to uint16_t, while decltype(index) is size_t, so cast
+      // 'i' to size_t before multiplication to prevent overflow when computing the array index.
       auto baseIdx = static_cast<size_t>(i) * patternSize;
       auto baseVert = static_cast<uint16_t>(i * vertCount);
       for (uint16_t j = 0; j < patternSize; ++j) {
