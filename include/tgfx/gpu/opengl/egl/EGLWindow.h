@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <optional>
 #include "EGLDevice.h"
 #include "tgfx/gpu/Window.h"
 
@@ -36,13 +37,21 @@ class EGLWindow : public Window {
   static std::shared_ptr<EGLWindow> MakeFrom(EGLNativeWindowType nativeWindow,
                                              EGLContext sharedContext = nullptr);
 
+  /**
+   * Sets the presentation time for the next frame in microseconds. This is only applicable on
+   * Android. The presentation time will be forwarded to the SurfaceTexture.getTimestamp() method.
+   * If not specified, a system timestamp will be used by default.
+   */
+  void setPresentationTime(int64_t presentationTime);
+
  protected:
   void onInvalidSize() override;
   std::shared_ptr<Surface> onCreateSurface(Context* context) override;
-  void onPresent(Context* context, int64_t presentationTime) override;
+  void onPresent(Context* context) override;
 
  private:
   EGLNativeWindowType nativeWindow;
+  std::optional<int64_t> presentationTime = std::nullopt;
 
   explicit EGLWindow(std::shared_ptr<Device> device);
 };

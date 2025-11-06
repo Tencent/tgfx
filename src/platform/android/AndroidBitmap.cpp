@@ -94,7 +94,7 @@ ImageInfo AndroidBitmap::GetInfo(JNIEnv* env, jobject bitmap) {
       break;
   }
   return ImageInfo::Make(static_cast<int>(bitmapInfo.width), static_cast<int>(bitmapInfo.height),
-                         colorType, alphaType, bitmapInfo.stride);
+                         colorType, alphaType, bitmapInfo.stride, GetColorSpace(env, bitmap));
 }
 
 HardwareBufferRef AndroidBitmap::GetHardwareBuffer(JNIEnv* env, jobject bitmap) {

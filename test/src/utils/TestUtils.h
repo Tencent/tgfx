@@ -50,8 +50,7 @@ void SaveImage(std::shared_ptr<PixelBuffer> pixelBuffer, const std::string& key)
 
 void SaveImage(const Bitmap& bitmap, const std::string& key);
 
-void SaveImage(const Pixmap& pixmap, const std::string& key,
-               std::shared_ptr<ColorSpace> colorSpace);
+void SaveImage(const Pixmap& pixmap, const std::string& key);
 
 void RemoveImage(const std::string& key);
 
