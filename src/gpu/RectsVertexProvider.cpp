@@ -191,8 +191,7 @@ class AAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
                             UVSubsetMode::None, std::move(reference)),
         strokes(std::move(strokes)) {
     DEBUG_ASSERT(!this->strokes.empty() && this->strokes.size() == this->rects.size());
-    bitFields.hasStroke = true;
-    bitFields.lineJoin = static_cast<uint8_t>(this->strokes.front()->join);
+    _lineJoin = this->strokes.front()->join;
   }
 
   void writeQuad(float* vertices, size_t& index, const Quad& quad, const Quad& uvQuad,
@@ -387,8 +386,7 @@ class NonAAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
                             UVSubsetMode::None, std::move(reference)),
         strokes(std::move(strokes)) {
     DEBUG_ASSERT(!this->strokes.empty() && this->strokes.size() == this->rects.size());
-    bitFields.hasStroke = true;
-    bitFields.lineJoin = static_cast<uint8_t>(this->strokes.front()->join);
+    _lineJoin = this->strokes.front()->join;
   }
 
   void writeQuad(float* vertices, size_t& index, const Quad& quad, const Quad& uvQuad,
@@ -506,8 +504,7 @@ class AARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
       : RectsVertexProvider(std::move(rects), std::move(uvRects), aaType, hasUVCoord, hasColor,
                             UVSubsetMode::None, std::move(reference)),
         strokes(std::move(strokes)) {
-    bitFields.hasStroke = true;
-    bitFields.lineJoin = static_cast<uint8_t>(LineJoin::Round);
+    _lineJoin = LineJoin::Round;
   }
 
   size_t vertexCount() const override {
@@ -652,8 +649,7 @@ class NonAARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
       : RectsVertexProvider(std::move(rects), std::move(uvRects), aaType, hasUVCoord, hasColor,
                             UVSubsetMode::None, std::move(reference)),
         strokes(std::move(strokes)) {
-    bitFields.hasStroke = true;
-    bitFields.lineJoin = static_cast<uint8_t>(LineJoin::Round);
+    _lineJoin = LineJoin::Round;
   }
 
   size_t vertexCount() const override {

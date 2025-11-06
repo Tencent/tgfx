@@ -34,11 +34,9 @@ PlacementPtr<RectDrawOp> RectDrawOp::Make(Context* context,
   }
   auto drawOp = context->drawingBuffer()->make<RectDrawOp>(provider.get());
   CAPUTRE_RECT_MESH(drawOp.get(), provider.get());
-  if (provider->aaType() == AAType::Coverage || provider->rectCount() > 1 ||
-      provider->hasStroke()) {
-    auto lineJoin = provider->hasStroke() ? std::make_optional(provider->lineJoin()) : std::nullopt;
+  if (provider->aaType() == AAType::Coverage || provider->rectCount() > 1 || provider->lineJoin()) {
     drawOp->indexBufferProxy = context->globalCache()->getRectIndexBuffer(
-        provider->aaType() == AAType::Coverage, lineJoin);
+        provider->aaType() == AAType::Coverage, provider->lineJoin());
   }
   if (provider->rectCount() <= 1) {
     // If we only have one rect, it is not worth the async task overhead.
@@ -50,7 +48,7 @@ PlacementPtr<RectDrawOp> RectDrawOp::Make(Context* context,
 }
 
 RectDrawOp::RectDrawOp(RectsVertexProvider* provider)
-    : DrawOp(provider->aaType()), rectCount(provider->rectCount()) {
+    : DrawOp(provider->aaType()), rectCount(provider->rectCount()), lineJoin(provider->lineJoin()) {
   if (!provider->hasUVCoord()) {
     auto matrix = provider->firstMatrix();
     matrix.invert(&matrix);
@@ -60,9 +58,6 @@ RectDrawOp::RectDrawOp(RectsVertexProvider* provider)
     commonColor = provider->firstColor();
   }
   hasSubset = provider->hasSubset();
-  if (provider->hasStroke()) {
-    lineJoin = provider->lineJoin();
-  }
 }
 
 PlacementPtr<GeometryProcessor> RectDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {

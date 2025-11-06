@@ -90,14 +90,10 @@ class RectsVertexProvider : public VertexProvider {
   }
 
   /**
-   * Returns true if the provider generates stroke.
+   * Returns the line join type if stroke is enabled, nullopt otherwise.
    */
-  bool hasStroke() const {
-    return bitFields.hasStroke;
-  }
-
-  LineJoin lineJoin() const {
-    return static_cast<LineJoin>(bitFields.lineJoin);
+  std::optional<LineJoin> lineJoin() const {
+    return _lineJoin;
   }
 
   /**
@@ -132,13 +128,12 @@ class RectsVertexProvider : public VertexProvider {
  protected:
   PlacementArray<RectRecord> rects = {};
   PlacementArray<Rect> uvRects = {};
+  std::optional<LineJoin> _lineJoin = std::nullopt;
   struct {
     uint8_t aaType : 2;
     bool hasUVCoord : 1;
     bool hasColor : 1;
     uint8_t subsetMode : 2;
-    uint8_t lineJoin : 2;
-    bool hasStroke : 1;
   } bitFields = {};
 
   RectsVertexProvider(PlacementArray<RectRecord>&& rects, PlacementArray<Rect>&& uvRects,
