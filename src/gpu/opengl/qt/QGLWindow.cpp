@@ -198,7 +198,7 @@ std::shared_ptr<Surface> QGLWindow::onCreateSurface(Context* context) {
   return backSurface;
 }
 
-void QGLWindow::onPresent(Context*, int64_t) {
+void QGLWindow::onPresent(Context*) {
   GLTextureInfo textureInfo = {};
   // Surface->getBackendTexture() triggers a flush, so we need to call it under the context.
   surface->getBackendTexture().getGLTextureInfo(&textureInfo);

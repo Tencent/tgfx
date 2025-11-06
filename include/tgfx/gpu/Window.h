@@ -42,12 +42,9 @@ class Window {
   std::shared_ptr<Surface> getSurface(Context* context, bool queryOnly = false);
 
   /**
-   * Applies all pending graphics changes to the window. On the Android platform, the
-   * presentationTime will be passed to the SurfaceTexture.getTimestamp() method, while it will be
-   * ignored on other platforms. The time is measured in microseconds. If the presentationTime is
-   * not set, a system timestamp will be used instead.
+   * Applies all pending graphics changes to the window.
    */
-  void present(Context* context, int64_t presentationTime = INT64_MIN);
+  void present(Context* context);
 
   /**
    * Invalidates the cached surface associated with this Window. This is useful when the window is
@@ -72,7 +69,7 @@ class Window {
 
   virtual void onInvalidSize();
   virtual std::shared_ptr<Surface> onCreateSurface(Context* context) = 0;
-  virtual void onPresent(Context* context, int64_t presentationTime) = 0;
+  virtual void onPresent(Context* context) = 0;
   virtual void onFreeSurface();
 
  private:

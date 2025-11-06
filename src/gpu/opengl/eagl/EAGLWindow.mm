@@ -53,7 +53,7 @@ std::shared_ptr<Surface> EAGLWindow::onCreateSurface(Context* context) {
   return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
 }
 
-void EAGLWindow::onPresent(Context* context, int64_t) {
+void EAGLWindow::onPresent(Context* context) {
   auto gl = static_cast<GLGPU*>(context->gpu())->functions();
   gl->bindRenderbuffer(GL_RENDERBUFFER, layerTexture->colorBufferID());
   auto eaglContext = static_cast<EAGLDevice*>(context->device())->eaglContext();
