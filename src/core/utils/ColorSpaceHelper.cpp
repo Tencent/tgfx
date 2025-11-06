@@ -127,7 +127,7 @@ gfx::skcms_ICCProfile ToSkcmsICCProfile(std::shared_ptr<ColorSpace> colorSpace) 
   return {};
 }
 
-bool ColorSpaceIsEqual(std::shared_ptr<ColorSpace> src, std::shared_ptr<ColorSpace> dst) {
+bool NeedConvertColorSpace(std::shared_ptr<ColorSpace> src, std::shared_ptr<ColorSpace> dst) {
   if (dst == nullptr) {
     return true;
   }
@@ -140,7 +140,7 @@ bool ColorSpaceIsEqual(std::shared_ptr<ColorSpace> src, std::shared_ptr<ColorSpa
 void ConvertColorSpaceInPlace(int width, int height, ColorType colorType, AlphaType alphaType,
                               size_t rowBytes, std::shared_ptr<ColorSpace> srcCS,
                               std::shared_ptr<ColorSpace> dstCS, void* pixels) {
-  if (ColorSpaceIsEqual(srcCS, dstCS)) {
+  if (NeedConvertColorSpace(srcCS, dstCS)) {
     return;
   }
   auto srcImageInfo = ImageInfo::Make(width, height, colorType, alphaType, rowBytes, srcCS);

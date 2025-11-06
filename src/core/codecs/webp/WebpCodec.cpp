@@ -116,7 +116,7 @@ bool WebpCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t ds
     decodeSuccess = (code == VP8_STATUS_OK);
   }
   WebPFreeDecBuffer(&config.output);
-  if (decodeSuccess && !ColorSpaceIsEqual(colorSpace(), dstColorSpace)) {
+  if (decodeSuccess && !NeedConvertColorSpace(colorSpace(), dstColorSpace)) {
     ConvertColorSpaceInPlace(width(), height(), colorType, alphaType, dstRowBytes, colorSpace(),
                              dstColorSpace, dstPixels);
   }

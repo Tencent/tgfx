@@ -295,7 +295,7 @@ Color ColorSpaceXformSteps::ConvertColorSpace(std::shared_ptr<ColorSpace> src, A
     dstColor = dstColor.premultiply();
     srcAT = AlphaType::Premultiplied;
   }
-  if (ColorSpaceIsEqual(src, dst) && srcAT == dstAT) {
+  if (NeedConvertColorSpace(src, dst) && srcAT == dstAT) {
     return dstColor;
   }
   ColorSpaceXformSteps steps(src.get(), srcAT, dst.get(), dstAT);

@@ -289,7 +289,7 @@ bool PngCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dst
       readInfo->rowPtrs[i] = static_cast<unsigned char*>(dstPixels) + (dstRowBytes * i);
     }
     png_read_image(readInfo->p, readInfo->rowPtrs);
-    if (!ColorSpaceIsEqual(colorSpace(), dstColorSpace)) {
+    if (!NeedConvertColorSpace(colorSpace(), dstColorSpace)) {
       ConvertColorSpaceInPlace(w, h, colorType, alphaType, dstRowBytes, colorSpace(), dstColorSpace,
                                dstPixels);
     }
