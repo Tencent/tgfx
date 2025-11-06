@@ -180,7 +180,7 @@ class Pixmap {
    * a transparent color if the point (x, y) is not contained by bounds.
    * @param x  column index, zero or greater, and less than width()
    * @param y  row index, zero or greater, and less than height()
-   * @return   pixel converted to unpremultiplied color
+   * @return   pixel converted to unpremultiplied color in SRGB gamut.
    */
   Color getColor(int x, int y) const;
 
