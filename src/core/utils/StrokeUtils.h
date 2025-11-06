@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <vector>
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Stroke.h"
 
@@ -31,10 +32,16 @@ void ApplyStrokeToBounds(const Stroke& stroke, Rect* bounds, bool applyMiterLimi
  * Returns true if the stroke is a hairline (width <= 0).
  */
 bool IsHairlineStroke(const Stroke& stroke);
+
 /**
  * If the stroke width is zero or becomes extremely thin after transformation,
  * it can be treated as a hairline to prevent precision issues.
  */
 bool TreatStrokeAsHairline(const Stroke& stroke, const Matrix& matrix);
+
+/**
+ * Simplifies the line dash pattern by removing segments that are too small.
+ */
+std::vector<float> SimplifyLineDashPattern(const std::vector<float>& pattern, const Stroke& stroke);
 
 }  // namespace tgfx

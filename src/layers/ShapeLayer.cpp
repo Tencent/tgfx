@@ -17,9 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/ShapeLayer.h"
+#include "core/utils/StrokeUtils.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/PathEffect.h"
+#include "tgfx/core/Stroke.h"
 
 namespace tgfx {
 std::shared_ptr<ShapeLayer> ShapeLayer::Make() {
@@ -309,61 +311,35 @@ std::vector<Paint> ShapeLayer::createShapePaints(
   return paintList;
 }
 
-std::vector<float> ShapeLayer::getSimplifyLineDashPattern() const {
-  if (_lineDashPattern.empty()) {
-    return _lineDashPattern;
-  }
-  auto dashes = _lineDashPattern;
-  if (_lineDashPattern.size() % 2 != 0) {
-    dashes.insert(dashes.end(), _lineDashPattern.begin(), _lineDashPattern.end());
-  }
-  // When LineCap is Square, the endpoints extend by half the line width.
-  // If an unpainted dash segment is less than or equal to the line width, the painted segments will
-  // connect seamlessly. Therefore, such a dash segment can be omitted for simplification.
-  if (stroke.cap != LineCap::Square) {
-    return dashes;
-  }
-  float addedPaintLength = 0.0f;
-  std::vector<float> simplifiedDashes = {};
-  for (uint32_t i = 0; i < dashes.size(); i += 2) {
-    auto paintedLength = dashes[i];
-    auto unpaintedLength = dashes[i + 1];
-    if (unpaintedLength <= stroke.width) {
-      addedPaintLength += paintedLength + unpaintedLength;
-    } else {
-      simplifiedDashes.push_back(paintedLength + addedPaintLength);
-      simplifiedDashes.push_back(unpaintedLength);
-      addedPaintLength = 0.0f;
-    }
-  }
-  return simplifiedDashes;
-}
-
 std::shared_ptr<Shape> ShapeLayer::createStrokeShape() const {
   auto strokeShape = _shape;
   if ((_strokeStart != 0 || _strokeEnd != 1)) {
     auto pathEffect = PathEffect::MakeTrim(_strokeStart, _strokeEnd);
     strokeShape = Shape::ApplyEffect(std::move(strokeShape), std::move(pathEffect));
   }
-  auto dashes = getSimplifyLineDashPattern();
-  if (!dashes.empty()) {
-    auto dash = PathEffect::MakeDash(dashes.data(), static_cast<int>(dashes.size()), _lineDashPhase,
-                                     shapeBitFields.lineDashAdaptive);
-
-    strokeShape = Shape::ApplyEffect(std::move(strokeShape), std::move(dash));
-  }
   auto strokeAlign = static_cast<StrokeAlign>(shapeBitFields.strokeAlign);
+  auto tempStroke = stroke;
   if (strokeAlign != StrokeAlign::Center) {
-    auto tempStroke = stroke;
     tempStroke.width *= 2;
-    strokeShape = Shape::ApplyStroke(std::move(strokeShape), &tempStroke);
-    if (strokeAlign == StrokeAlign::Inside) {
-      strokeShape = Shape::Merge(std::move(strokeShape), _shape, PathOp::Intersect);
-    } else {
-      strokeShape = Shape::Merge(std::move(strokeShape), _shape, PathOp::Difference);
+  }
+  if (!_lineDashPattern.empty()) {
+    auto dashes = _lineDashPattern;
+    if (_lineDashPattern.size() % 2 != 0) {
+      dashes.insert(dashes.end(), _lineDashPattern.begin(), _lineDashPattern.end());
     }
-  } else {
-    strokeShape = Shape::ApplyStroke(std::move(strokeShape), &stroke);
+    dashes = SimplifyLineDashPattern(dashes, tempStroke);
+    // dashes may be simplified to solid line.
+    if (!dashes.empty()) {
+      auto dash = PathEffect::MakeDash(dashes.data(), static_cast<int>(dashes.size()),
+                                       _lineDashPhase, shapeBitFields.lineDashAdaptive);
+      strokeShape = Shape::ApplyEffect(std::move(strokeShape), std::move(dash));
+    }
+  }
+  strokeShape = Shape::ApplyStroke(std::move(strokeShape), &tempStroke);
+  if (strokeAlign == StrokeAlign::Inside) {
+    strokeShape = Shape::Merge(std::move(strokeShape), _shape, PathOp::Intersect);
+  } else if (strokeAlign == StrokeAlign::Outside) {
+    strokeShape = Shape::Merge(std::move(strokeShape), _shape, PathOp::Difference);
   }
   return strokeShape;
 }

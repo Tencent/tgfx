@@ -320,8 +320,6 @@ class ShapeLayer : public Layer {
   std::vector<Paint> createShapePaints(
       const std::vector<std::shared_ptr<ShapeStyle>>& styles) const;
 
-  std::vector<float> getSimplifyLineDashPattern() const;
-
   std::shared_ptr<Shape> createStrokeShape() const;
 };
 }  // namespace tgfx
