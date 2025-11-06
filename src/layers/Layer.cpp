@@ -1568,7 +1568,8 @@ void Layer::propagateLayerState() {
       layer->minBackgroundOutset = minBackgroundOutset;
       change = true;
     }
-    if (!layer->bitFields.hasBlendMode) {
+    // Only propagate hasBlendMode if this layer actually has a blend mode
+    if (bitFields.hasBlendMode && !layer->bitFields.hasBlendMode) {
       layer->bitFields.hasBlendMode = true;
       change = true;
     }
