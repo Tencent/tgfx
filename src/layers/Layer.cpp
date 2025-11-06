@@ -149,6 +149,7 @@ Layer::Layer() {
   bitFields.allowsEdgeAntialiasing = AllowsEdgeAntialiasing;
   bitFields.allowsGroupOpacity = AllowsGroupOpacity;
   bitFields.blendMode = static_cast<uint8_t>(BlendMode::SrcOver);
+  bitFields.passThroughBackground = true;
 }
 
 void Layer::setAlpha(float value) {
@@ -168,11 +169,11 @@ void Layer::setBlendMode(BlendMode value) {
   invalidateTransform();
 }
 
-void Layer::setPassThoughMode(bool value) {
-  if (bitFields.passThroughMode == value) {
+void Layer::setPassThroughBackground(bool value) {
+  if (bitFields.passThroughBackground == value) {
     return;
   }
-  bitFields.passThroughMode = value;
+  bitFields.passThroughBackground = value;
   invalidateTransform();
 }
 
@@ -855,9 +856,9 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
                               alpha, blendMode);
       }
     }
-  } else if (blendMode != BlendMode::SrcOver || (alpha < 1.0f && bitFields.allowsGroupOpacity) ||
-             bitFields.shouldRasterize || (!_filters.empty() && !args.excludeEffects) ||
-             hasValidMask()) {
+  } else if (blendMode != BlendMode::SrcOver || !bitFields.passThroughBackground ||
+             (alpha < 1.0f && bitFields.allowsGroupOpacity) || bitFields.shouldRasterize ||
+             (!_filters.empty() && !args.excludeEffects) || hasValidMask()) {
     drawOffscreen(args, canvas, alpha, blendMode);
   } else {
     // draw directly
@@ -936,7 +937,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   offscreenArgs.backgroundContext = subBackgroundContext;
   offscreenArgs.blendModeContext = std::make_shared<BlendModeContext>(contentScale);
 
-  auto passThough = bitFields.passThroughMode && blendMode == BlendMode::SrcOver &&
+  auto passThough = bitFields.passThroughBackground && blendMode == BlendMode::SrcOver &&
                     _filters.empty() && bitFields.hasBlendMode == true;
 
   // canvas of background clip bounds will be more large than canvas clip bounds.
@@ -1430,7 +1431,7 @@ bool Layer::hasValidMask() const {
 
 void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, bool forceDirty) {
   if (!forceDirty && !bitFields.dirtyDescendents) {
-    if (maxBackgroundOutset > 0) {
+    if (maxBackgroundOutset > 0 || bitFields.hasBlendMode) {
       propagateLayerState();
       if (_root->hasDirtyRegions()) {
         checkBackgroundStyles(transformer);
@@ -1535,6 +1536,11 @@ void Layer::updateBackgroundBounds(float contentScale) {
       continue;
     }
     if (_root->invalidateBackground(renderBounds, style.get(), contentScale)) {
+      backgroundChanged = true;
+    }
+  }
+  if (!backgroundChanged && bitFields.hasBlendMode) {
+    if (_root->invalidateBackground(renderBounds, nullptr, contentScale)) {
       backgroundChanged = true;
     }
   }

@@ -127,17 +127,18 @@ class Layer : public std::enable_shared_from_this<Layer> {
   void setBlendMode(BlendMode value);
 
   /**
-   * Returns true if the layer ignores offscreen effects caused by alpha in PassThrough mode. The
-   * default value is false.
+   * Returns true if the layer passes through its background to sublayers. Layer with BlendMode or
+   * Filters will ignore this value and not pass through background.
+   * The default value is true.
    */
-  bool passThoughMode() const {
-    return bitFields.passThroughMode;
+  bool passThroughBackground() const {
+    return bitFields.passThroughBackground;
   }
 
   /**
-    * Sets whether the layer ignores offscreen effects caused by alpha in PassThrough mode.
+   * Sets whether the layer passes through its background to sublayers.
    */
-  void setPassThoughMode(bool value);
+  void setPassThroughBackground(bool value);
 
   /**
    * Returns the position of the layer relative to the local coordinates of the parent layer.
@@ -640,7 +641,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
     bool allowsEdgeAntialiasing : 1;
     bool allowsGroupOpacity : 1;
     bool excludeChildEffectsInLayerStyle : 1;
-    bool passThroughMode : 1;
+    bool passThroughBackground : 1;
     bool hasBlendMode : 1;
     uint8_t blendMode : 5;
     uint8_t maskType : 2;

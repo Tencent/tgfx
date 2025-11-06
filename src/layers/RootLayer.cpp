@@ -90,6 +90,9 @@ bool RootLayer::invalidateBackground(const Rect& drawRect, LayerStyle* layerStyl
   for (size_t i = 0; i < dirtySize; i++) {
     auto background = dirtyRects[i];
     if (background.intersect(drawRect)) {
+      if (layerStyle == nullptr) {
+        return true;
+      }
       background = layerStyle->filterBackground(background, contentScale);
       if (background.intersect(drawRect)) {
         dirtyBackgrounds.push_back(background);
