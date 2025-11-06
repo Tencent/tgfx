@@ -28,10 +28,12 @@ void MeasureContext::drawFill(const Fill&) {
 
 void MeasureContext::drawRect(const Rect& rect, const MCState& state, const Fill&,
                               const Stroke* stroke) {
-  auto localBounds = rect;
-  if (stroke) {
-    ApplyStrokeToBounds(*stroke, &localBounds);
+  if (stroke == nullptr) {
+    addLocalBounds(state, rect);
+    return;
   }
+  auto localBounds = rect;
+  ApplyStrokeToBounds(*stroke, &localBounds);
   addLocalBounds(state, localBounds);
 }
 
