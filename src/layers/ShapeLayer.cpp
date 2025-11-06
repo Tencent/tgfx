@@ -21,7 +21,6 @@
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/PathEffect.h"
-#include "tgfx/core/Stroke.h"
 
 namespace tgfx {
 std::shared_ptr<ShapeLayer> ShapeLayer::Make() {

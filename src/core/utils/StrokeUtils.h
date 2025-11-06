@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <vector>
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Stroke.h"
 
