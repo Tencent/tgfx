@@ -285,21 +285,13 @@ bool PngCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dst
   auto dstInfo =
       ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes, dstColorSpace);
   if (colorType == ColorType::RGBA_8888 && alphaType == AlphaType::Unpremultiplied) {
-    auto outPixels = dstPixels;
-    Buffer buffer;
-    Pixmap tempPixelMap;
-    if (!ColorSpaceIsEqual(colorSpace(), dstColorSpace)) {
-      auto tempImageInfo = ImageInfo::Make(w, h, colorType, alphaType, dstRowBytes, colorSpace());
-      buffer.alloc(tempImageInfo.byteSize());
-      tempPixelMap.reset(tempImageInfo, buffer.data());
-      outPixels = tempPixelMap.writablePixels();
-    }
     for (size_t i = 0; i < static_cast<size_t>(h); i++) {
-      readInfo->rowPtrs[i] = static_cast<unsigned char*>(outPixels) + (dstRowBytes * i);
+      readInfo->rowPtrs[i] = static_cast<unsigned char*>(dstPixels) + (dstRowBytes * i);
     }
     png_read_image(readInfo->p, readInfo->rowPtrs);
-    if (!tempPixelMap.isEmpty()) {
-      tempPixelMap.readPixels(dstInfo, dstPixels);
+    if (!ColorSpaceIsEqual(colorSpace(), dstColorSpace)) {
+      ConvertColorSpaceInPlace(w, h, colorType, alphaType, dstRowBytes, colorSpace(), dstColorSpace,
+                               dstPixels);
     }
     return true;
   }

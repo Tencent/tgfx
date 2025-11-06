@@ -224,15 +224,6 @@ bool JpegCodec::readScaledPixels(ColorType colorType, AlphaType alphaType, size_
                                  alphaType, dstRowBytes, dstColorSpace);
   auto outPixels = dstPixels;
   auto outRowBytes = dstRowBytes;
-  Buffer buffer;
-  Pixmap tempPixelMap;
-  if (!ColorSpaceIsEqual(colorSpace(), dstColorSpace)) {
-    auto tempImageInfo = ImageInfo::Make(static_cast<int>(dstWidth), static_cast<int>(dstHeight),
-                                         colorType, alphaType, dstRowBytes, colorSpace());
-    buffer.alloc(tempImageInfo.byteSize());
-    tempPixelMap.reset(tempImageInfo, buffer.data());
-    outPixels = tempPixelMap.writablePixels();
-  }
 
   Bitmap bitmap = {};
   J_COLOR_SPACE out_color_space;
@@ -323,8 +314,9 @@ bool JpegCodec::readScaledPixels(ColorType colorType, AlphaType alphaType, size_
   if (result) {
     if (!pixmap.isEmpty()) {
       pixmap.readPixels(dstInfo, dstPixels);
-    } else if (!tempPixelMap.isEmpty()) {
-      tempPixelMap.readPixels(dstInfo, dstPixels);
+    } else if (!ColorSpaceIsEqual(colorSpace(), dstColorSpace)) {
+      ConvertColorSpaceInPlace(static_cast<int>(dstWidth), static_cast<int>(dstHeight), colorType,
+                               alphaType, dstRowBytes, colorSpace(), dstColorSpace, dstPixels);
     }
   }
   return result;

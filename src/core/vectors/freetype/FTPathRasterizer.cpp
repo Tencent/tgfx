@@ -68,16 +68,6 @@ bool FTPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, si
   if (path.isEmpty()) {
     return false;
   }
-  auto outputPixels = dstPixels;
-  Buffer tempBuffer;
-  Pixmap tempPixelMap;
-  if (!ColorSpaceIsEqual(colorSpace(), dstColorSpace)) {
-    auto tempImageInfo =
-        ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes, colorSpace());
-    tempBuffer.alloc(tempImageInfo.byteSize());
-    tempPixelMap.reset(tempImageInfo, tempBuffer.data());
-    outputPixels = tempPixelMap.writablePixels();
-  }
   auto dstInfo =
       ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes, dstColorSpace);
   auto targetInfo = dstInfo.makeIntersect(0, 0, width(), height());
@@ -89,7 +79,7 @@ bool FTPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, si
     clipPath.addRect(Rect::MakeWH(targetInfo.width(), targetInfo.height()));
     path.addPath(clipPath, PathOp::Intersect);
   }
-  ClearPixels(targetInfo, outputPixels);
+  ClearPixels(targetInfo, dstPixels);
   FTPath ftPath = {};
   path.decompose(Iterator, &ftPath);
   auto fillType = path.getFillType();
@@ -101,14 +91,15 @@ bool FTPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, si
     bitmap.width = static_cast<unsigned>(targetInfo.width());
     bitmap.rows = static_cast<unsigned>(targetInfo.height());
     bitmap.pitch = static_cast<int>(targetInfo.rowBytes());
-    bitmap.buffer = static_cast<unsigned char*>(outputPixels);
+    bitmap.buffer = static_cast<unsigned char*>(dstPixels);
     bitmap.pixel_mode = FT_PIXEL_MODE_GRAY;
     bitmap.num_grays = 256;
     for (auto& outline : outlines) {
       FT_Outline_Get_Bitmap(ftLibrary, &(outline->outline), &bitmap);
     }
-    if (!tempPixelMap.isEmpty()) {
-      tempPixelMap.readPixels(dstInfo, dstPixels);
+    if (!ColorSpaceIsEqual(colorSpace(), dstColorSpace)) {
+      ConvertColorSpaceInPlace(width(), height(), colorType, alphaType, dstRowBytes, colorSpace(),
+                               dstColorSpace, dstPixels);
     }
     return true;
   }
@@ -128,8 +119,9 @@ bool FTPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, si
   for (const auto& outline : outlines) {
     FT_Outline_Render(ftLibrary, &(outline->outline), &params);
   }
-  if (!tempPixelMap.isEmpty()) {
-    tempPixelMap.readPixels(dstInfo, dstPixels);
+  if (!ColorSpaceIsEqual(colorSpace(), dstColorSpace)) {
+    ConvertColorSpaceInPlace(width(), height(), colorType, alphaType, dstRowBytes, colorSpace(),
+                             dstColorSpace, dstPixels);
   }
   return true;
 }

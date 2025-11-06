@@ -86,19 +86,10 @@ bool WebPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, s
   if (!imageData.as<bool>()) {
     return false;
   }
-  auto outPixels = dstPixels;
-  Buffer buffer;
-  Pixmap tempPixelMap;
+  auto result = ReadPixelsFromCanvasImage(imageData, targetInfo, dstPixels);
   if (!ColorSpaceIsEqual(colorSpace(), dstColorSpace)) {
-    auto tempImageInfo =
-        ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes, colorSpace());
-    buffer.alloc(tempImageInfo.byteSize());
-    tempPixelMap.reset(tempImageInfo, buffer.data());
-    outPixels = tempPixelMap.writablePixels();
-  }
-  auto result = ReadPixelsFromCanvasImage(imageData, targetInfo, outPixels);
-  if (result && !tempPixelMap.isEmpty()) {
-    tempPixelMap.readPixels(dstInfo, dstPixels);
+    ConvertColorSpaceInPlace(width(), height(), colorType, alphaType, dstRowBytes, colorSpace(),
+                             dstColorSpace, dstPixels);
   }
   return result;
 }

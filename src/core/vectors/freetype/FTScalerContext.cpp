@@ -72,15 +72,7 @@ static gfx::skcms_PixelFormat ToPixelFormat(ColorType colorType) {
 }
 
 static void RenderOutLineGlyph(FT_Face face, const ImageInfo& dstInfo, void* dstPixels) {
-  auto output = static_cast<unsigned char*>(dstPixels);
-  Buffer buffer;
-  Pixmap tempPixelMap;
-  if (!ColorSpaceIsEqual(ColorSpace::MakeSRGB(), dstInfo.colorSpace())) {
-    auto tempImageInfo = dstInfo.makeColorSpace(ColorSpace::MakeSRGB());
-    buffer.alloc(tempImageInfo.byteSize());
-    tempPixelMap.reset(tempImageInfo, buffer.data());
-    output = static_cast<unsigned char*>(tempPixelMap.writablePixels());
-  }
+  auto buffer = static_cast<unsigned char*>(dstPixels);
   auto pitch = static_cast<int>(dstInfo.rowBytes());
   FT_Raster_Params params;
   params.flags = FT_RASTER_FLAG_CLIP | FT_RASTER_FLAG_AA;
@@ -88,7 +80,7 @@ static void RenderOutLineGlyph(FT_Face face, const ImageInfo& dstInfo, void* dst
   auto rows = dstInfo.height();
   params.flags |= FT_RASTER_FLAG_DIRECT;
   params.gray_spans = GraySpanFunc;
-  FTRasterTarget target = {buffer + (rows - 1) * pitch, pitch,
+  FTRasterTarget target = {output + (rows - 1) * pitch, pitch,
                            GammaCorrection::GammaTable().data()};
   params.user = &target;
 #else
@@ -96,7 +88,7 @@ static void RenderOutLineGlyph(FT_Face face, const ImageInfo& dstInfo, void* dst
   bitmap.width = static_cast<unsigned>(dstInfo.width());
   bitmap.rows = static_cast<unsigned>(dstInfo.height());
   bitmap.pitch = pitch;
-  bitmap.buffer = output;
+  bitmap.buffer = buffer;
   bitmap.pixel_mode = FT_PIXEL_MODE_GRAY;
   bitmap.num_grays = 256;
   params.target = &bitmap;
@@ -112,8 +104,10 @@ static void RenderOutLineGlyph(FT_Face face, const ImageInfo& dstInfo, void* dst
   FT_Outline_Translate(outline, -bbox.xMin, -bbox.yMin);
   FT_Outline_Render(face->glyph->library, outline, &params);
 
-  if (!tempPixelMap.isEmpty()) {
-    tempPixelMap.readPixels(dstInfo, dstPixels);
+  if (!ColorSpaceIsEqual(ColorSpace::MakeSRGB(), dstInfo.colorSpace())) {
+    ConvertColorSpaceInPlace(dstInfo.width(), dstInfo.height(), dstInfo.colorType(),
+                             dstInfo.alphaType(), dstInfo.rowBytes(), ColorSpace::MakeSRGB(),
+                             dstInfo.colorSpace(), dstPixels);
   }
 }
 

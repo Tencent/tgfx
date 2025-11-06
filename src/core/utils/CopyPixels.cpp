@@ -70,10 +70,12 @@ void CopyPixels(const ImageInfo& srcInfo, const void* srcPixels, const ImageInfo
                 void* dstPixels, bool flipY) {
   DEBUG_ASSERT(!srcInfo.isEmpty());
   DEBUG_ASSERT(srcInfo.width() == dstInfo.width() && srcInfo.height() == dstInfo.height());
+  DEBUG_ASSERT(srcPixels != nullptr)
+  DEBUG_ASSERT(dstPixels != nullptr)
   auto srcColorSpace = srcInfo.colorSpace();
   auto dstColorSpace = dstInfo.colorSpace();
   if (srcInfo.colorType() == dstInfo.colorType() && srcInfo.alphaType() == dstInfo.alphaType() &&
-      ColorSpaceIsEqual(srcColorSpace, dstColorSpace)) {
+      ColorSpaceIsEqual(srcColorSpace, dstColorSpace) && srcPixels != dstPixels) {
     CopyRectMemory(srcPixels, srcInfo.rowBytes(), dstPixels, dstInfo.rowBytes(),
                    dstInfo.minRowBytes(), static_cast<size_t>(dstInfo.height()), flipY);
     return;
@@ -85,6 +87,9 @@ void CopyPixels(const ImageInfo& srcInfo, const void* srcPixels, const ImageInfo
   auto width = dstInfo.width();
   auto height = dstInfo.height();
   auto srcRowOffset = static_cast<int64_t>(srcInfo.rowBytes());
+  if (srcPixels == dstPixels) {
+    DEBUG_ASSERT(srcFormat == dstFormat)
+  }
   if (flipY) {
     srcPixels = AddOffset(srcPixels, static_cast<size_t>(height - 1) * srcInfo.rowBytes());
     srcRowOffset = -srcRowOffset;

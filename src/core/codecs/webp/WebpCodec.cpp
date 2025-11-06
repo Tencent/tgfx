@@ -109,26 +109,17 @@ bool WebpCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t ds
       }
     }
   } else {
-    auto outPixels = dstPixels;
-    Buffer buffer;
-    Pixmap tempPixelMap;
-    if (!ColorSpaceIsEqual(colorSpace(), dstColorSpace)) {
-      auto tempImageInfo =
-          ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes, colorSpace());
-      buffer.alloc(tempImageInfo.byteSize());
-      tempPixelMap.reset(tempImageInfo, buffer.data());
-      outPixels = tempPixelMap.writablePixels();
-    }
-    config.output.u.RGBA.rgba = reinterpret_cast<uint8_t*>(outPixels);
+    config.output.u.RGBA.rgba = reinterpret_cast<uint8_t*>(dstPixels);
     config.output.u.RGBA.stride = static_cast<int>(dstRowBytes);
     config.output.u.RGBA.size = dstRowBytes * static_cast<size_t>(height());
     auto code = WebPDecode(byteData->bytes(), byteData->size(), &config);
     decodeSuccess = (code == VP8_STATUS_OK);
-    if (decodeSuccess && !tempPixelMap.isEmpty()) {
-      tempPixelMap.readPixels(dstInfo, dstPixels);
-    }
   }
   WebPFreeDecBuffer(&config.output);
+  if (decodeSuccess && !ColorSpaceIsEqual(colorSpace(), dstColorSpace)) {
+    ConvertColorSpaceInPlace(width(), height(), colorType, alphaType, dstRowBytes, colorSpace(),
+                             dstColorSpace, dstPixels);
+  }
   return decodeSuccess;
 }
 
