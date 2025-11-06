@@ -126,4 +126,25 @@ gfx::skcms_ICCProfile ToSkcmsICCProfile(std::shared_ptr<ColorSpace> colorSpace) 
   }
   return {};
 }
+
+bool NeedConvertColorSpace(std::shared_ptr<ColorSpace> src, std::shared_ptr<ColorSpace> dst) {
+  if (dst == nullptr) {
+    return true;
+  }
+  if (src == nullptr) {
+    src = ColorSpace::MakeSRGB();
+  }
+  return ColorSpace::Equals(src.get(), dst.get());
+}
+
+void ConvertColorSpaceInPlace(int width, int height, ColorType colorType, AlphaType alphaType,
+                              size_t rowBytes, std::shared_ptr<ColorSpace> srcCS,
+                              std::shared_ptr<ColorSpace> dstCS, void* pixels) {
+  if (NeedConvertColorSpace(srcCS, dstCS)) {
+    return;
+  }
+  auto srcImageInfo = ImageInfo::Make(width, height, colorType, alphaType, rowBytes, srcCS);
+  auto dstImageInfo = srcImageInfo.makeColorSpace(dstCS);
+  CopyPixels(srcImageInfo, pixels, dstImageInfo, pixels);
+}
 }  // namespace tgfx

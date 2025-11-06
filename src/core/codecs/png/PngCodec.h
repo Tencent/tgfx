@@ -36,7 +36,7 @@ class PngCodec : public ImageCodec {
 
  protected:
   bool onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
-                    void* dstPixels) const override;
+                    std::shared_ptr<ColorSpace> dstColorSpace, void* dstPixels) const override;
 
   std::shared_ptr<Data> getEncodedData() const override;
 

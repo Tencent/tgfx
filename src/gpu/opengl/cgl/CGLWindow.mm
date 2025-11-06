@@ -66,7 +66,7 @@ std::shared_ptr<Surface> CGLWindow::onCreateSurface(Context* context) {
   return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
 }
 
-void CGLWindow::onPresent(Context*, int64_t) {
+void CGLWindow::onPresent(Context*) {
   auto glContext = static_cast<CGLDevice*>(device.get())->glContext;
   [glContext flushBuffer];
 }

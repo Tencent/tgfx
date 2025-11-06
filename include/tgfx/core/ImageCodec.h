@@ -101,7 +101,7 @@ class ImageCodec : public ImageGenerator {
   std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
 
   virtual bool onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
-                            void* dstPixels) const = 0;
+                            std::shared_ptr<ColorSpace> dstColorSpace, void* dstPixels) const = 0;
 
   virtual std::shared_ptr<Data> getEncodedData() const {
     return nullptr;

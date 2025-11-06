@@ -189,10 +189,7 @@ class ImageInfo {
   /**
    * Returns true if a is equivalent to b.
    */
-  friend bool operator==(const ImageInfo& a, const ImageInfo& b) {
-    return memcmp(&a, &b, sizeof(ImageInfo) - sizeof(std::shared_ptr<ColorSpace>)) == 0 &&
-           ColorSpace::Equals(a._colorSpace.get(), b._colorSpace.get());
-  }
+  friend bool operator==(const ImageInfo& a, const ImageInfo& b);
 
   /**
    * Returns true if a is not equivalent to b.

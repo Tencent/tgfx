@@ -104,25 +104,10 @@ static void RenderOutLineGlyph(FT_Face face, const ImageInfo& dstInfo, void* dst
   FT_Outline_Translate(outline, -bbox.xMin, -bbox.yMin);
   FT_Outline_Render(face->glyph->library, outline, &params);
 
-  if (!ColorSpace::Equals(dstInfo.colorSpace().get(), ColorSpace::MakeSRGB().get())) {
-    auto src = static_cast<uint8_t*>(dstPixels);
-    auto srcRB = dstInfo.rowBytes();
-    auto srcFormat = gfx::skcms_PixelFormat_A_8;
-
-    auto dst = static_cast<uint8_t*>(dstPixels);
-    auto dstRB = dstInfo.rowBytes();
-    auto dstFormat = gfx::skcms_PixelFormat_A_8;
-    auto width = dstInfo.width();
-    auto height = dstInfo.height();
-    auto dstProfile = ToSkcmsICCProfile(dstInfo.colorSpace());
-    for (size_t i = 0; i < static_cast<size_t>(height); i++) {
-      gfx::skcms_Transform(src, srcFormat, gfx::skcms_AlphaFormat_PremulAsEncoded,
-                           gfx::skcms_sRGB_profile(), dst, dstFormat,
-                           gfx::skcms_AlphaFormat_PremulAsEncoded, &dstProfile,
-                           static_cast<size_t>(width));
-      src += srcRB;
-      dst += dstRB;
-    }
+  if (!NeedConvertColorSpace(ColorSpace::MakeSRGB(), dstInfo.colorSpace())) {
+    ConvertColorSpaceInPlace(dstInfo.width(), dstInfo.height(), dstInfo.colorType(),
+                             dstInfo.alphaType(), dstInfo.rowBytes(), ColorSpace::MakeSRGB(),
+                             dstInfo.colorSpace(), dstPixels);
   }
 }
 

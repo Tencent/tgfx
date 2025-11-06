@@ -34,7 +34,7 @@ class EAGLWindow : public Window {
 
  protected:
   std::shared_ptr<Surface> onCreateSurface(Context* context) override;
-  void onPresent(Context* context, int64_t presentationTime) override;
+  void onPresent(Context* context) override;
 
  private:
   CAEAGLLayer* layer = nil;
