@@ -237,6 +237,9 @@ std::shared_ptr<GLInterface> GLInterface::MakeNativeInterface(const GLProcGetter
             reinterpret_cast<GLTextureBarrier*>(getter->getProcAddress("glTextureBarrierNV"));
       }
       break;
+    case GLStandard::WebGL:
+      // No special initialization required for WebGL.
+      break;
     default:
       break;
   }
