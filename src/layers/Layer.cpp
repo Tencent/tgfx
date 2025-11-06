@@ -937,8 +937,8 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   offscreenArgs.backgroundContext = subBackgroundContext;
   offscreenArgs.blendModeContext = std::make_shared<BlendModeContext>(contentScale);
 
-  auto passThough = bitFields.passThroughBackground && blendMode == BlendMode::SrcOver &&
-                    _filters.empty() && bitFields.hasBlendMode == true;
+  auto passThroughBackground = bitFields.passThroughBackground && blendMode == BlendMode::SrcOver &&
+                               _filters.empty() && bitFields.hasBlendMode == true;
 
   // canvas of background clip bounds will be more large than canvas clip bounds.
   auto clipBounds =
@@ -964,7 +964,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     offscreenCanvas->translate(-inputBounds.left, -inputBounds.top);
     offscreenCanvas->clipRect(inputBounds);
     offscreenCanvas->scale(contentScale, contentScale);
-    if (passThough) {
+    if (passThroughBackground) {
       AutoCanvasRestore autoRestore(offscreenCanvas);
       if (canvas->getSurface()) {
         Matrix backgroundMatrix = {};
@@ -985,7 +985,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
 
   Point offset = {};
   std::shared_ptr<Image> finalImage = nullptr;
-  if (context && passThough) {
+  if (context && passThroughBackground) {
     auto offscreenSurface = Surface::Make(context, static_cast<int>(inputBounds.width()),
                                           static_cast<int>(inputBounds.height()), false, 1, false,
                                           0, args.dstColorSpace);
