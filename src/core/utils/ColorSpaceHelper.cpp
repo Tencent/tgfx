@@ -111,4 +111,40 @@ std::shared_ptr<ColorSpace> AndroidDataSpaceToColorSpace(int standard, int trans
   }
   return ColorSpace::MakeRGB(tf, gamut);
 }
+
+gfx::skcms_ICCProfile ToSkcmsICCProfile(std::shared_ptr<ColorSpace> colorSpace) {
+  if (colorSpace) {
+    gfx::skcms_ICCProfile profile;
+    gfx::skcms_Init(&profile);
+    auto transferFunction = colorSpace->transferFunction();
+    gfx::skcms_SetTransferFunction(
+        &profile, reinterpret_cast<gfx::skcms_TransferFunction*>(&transferFunction));
+    ColorMatrix33 xyzd50{};
+    colorSpace->toXYZD50(&xyzd50);
+    skcms_SetXYZD50(&profile, reinterpret_cast<gfx::skcms_Matrix3x3*>(&xyzd50));
+    return profile;
+  }
+  return {};
+}
+
+bool NeedConvertColorSpace(std::shared_ptr<ColorSpace> src, std::shared_ptr<ColorSpace> dst) {
+  if (dst == nullptr) {
+    return true;
+  }
+  if (src == nullptr) {
+    src = ColorSpace::MakeSRGB();
+  }
+  return ColorSpace::Equals(src.get(), dst.get());
+}
+
+void ConvertColorSpaceInPlace(int width, int height, ColorType colorType, AlphaType alphaType,
+                              size_t rowBytes, std::shared_ptr<ColorSpace> srcCS,
+                              std::shared_ptr<ColorSpace> dstCS, void* pixels) {
+  if (NeedConvertColorSpace(srcCS, dstCS)) {
+    return;
+  }
+  auto srcImageInfo = ImageInfo::Make(width, height, colorType, alphaType, rowBytes, srcCS);
+  auto dstImageInfo = srcImageInfo.makeColorSpace(dstCS);
+  CopyPixels(srcImageInfo, pixels, dstImageInfo, pixels);
+}
 }  // namespace tgfx

@@ -18,6 +18,7 @@
 
 #include "core/codecs/jpeg/JpegCodec.h"
 #include <csetjmp>
+#include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/OrientationHelper.h"
 #include "skcms.h"
@@ -150,14 +151,14 @@ bool ConvertCMYKPixels(void* dst, const gfx::skcms_ICCProfile cmykProfile,
     default:
       return false;
   }
-  const gfx::skcms_ICCProfile* dstProfile = gfx::skcms_sRGB_profile();
+  const gfx::skcms_ICCProfile dstProfile = ToSkcmsICCProfile(dstInfo.colorSpace());
   auto width = dstInfo.width();
   auto height = dstInfo.height();
   auto src = dst;
   for (int i = 0; i < height; i++) {
     bool status = gfx::skcms_Transform(
         src, gfx::skcms_PixelFormat_RGBA_8888, gfx::skcms_AlphaFormat_Unpremul, &cmykProfile, dst,
-        dstPixelFormat, gfx::skcms_AlphaFormat_Unpremul, dstProfile, static_cast<size_t>(width));
+        dstPixelFormat, gfx::skcms_AlphaFormat_Unpremul, &dstProfile, static_cast<size_t>(width));
     if (!status) {
       return false;
     }
@@ -196,18 +197,19 @@ uint32_t JpegCodec::getScaledDimensions(int newWidth, int newHeight) const {
 bool JpegCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   if (auto scaleDimensions = getScaledDimensions(dstInfo.width(), dstInfo.height())) {
     return readScaledPixels(dstInfo.colorType(), dstInfo.alphaType(), dstInfo.rowBytes(), dstPixels,
-                            scaleDimensions);
+                            scaleDimensions, dstInfo.colorSpace());
   }
   return ImageCodec::readPixels(dstInfo, dstPixels);
 }
 
 bool JpegCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
-                             void* dstPixels) const {
-  return readScaledPixels(colorType, alphaType, dstRowBytes, dstPixels, 8);
+                             std::shared_ptr<ColorSpace> colorSpace, void* dstPixels) const {
+  return readScaledPixels(colorType, alphaType, dstRowBytes, dstPixels, 8, std::move(colorSpace));
 }
 
 bool JpegCodec::readScaledPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
-                                 void* dstPixels, uint32_t scaleNum) const {
+                                 void* dstPixels, uint32_t scaleNum,
+                                 std::shared_ptr<ColorSpace> dstColorSpace) const {
   if (dstPixels == nullptr) {
     return false;
   }
@@ -215,10 +217,15 @@ bool JpegCodec::readScaledPixels(ColorType colorType, AlphaType alphaType, size_
     memset(dstPixels, 255, dstRowBytes * static_cast<size_t>(height()));
     return true;
   }
-  auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes);
-  Bitmap bitmap = {};
+  float scale = static_cast<float>(scaleNum) / 8.0f;
+  float dstWidth = static_cast<float>(width()) * scale;
+  float dstHeight = static_cast<float>(height()) * scale;
+  auto dstInfo = ImageInfo::Make(static_cast<int>(dstWidth), static_cast<int>(dstHeight), colorType,
+                                 alphaType, dstRowBytes, dstColorSpace);
   auto outPixels = dstPixels;
   auto outRowBytes = dstRowBytes;
+
+  Bitmap bitmap = {};
   J_COLOR_SPACE out_color_space;
   switch (colorType) {
     case ColorType::RGBA_8888:
@@ -234,7 +241,8 @@ bool JpegCodec::readScaledPixels(ColorType colorType, AlphaType alphaType, size_
       out_color_space = JCS_RGB565;
       break;
     default:
-      auto success = bitmap.allocPixels(width(), height(), false, false);
+      auto success = bitmap.allocPixels(static_cast<int>(dstWidth), static_cast<int>(dstHeight),
+                                        false, false, colorSpace());
       if (!success) {
         return false;
       }
@@ -303,8 +311,13 @@ bool JpegCodec::readScaledPixels(ColorType colorType, AlphaType alphaType, size_
   if (infile) {
     fclose(infile);
   }
-  if (result && !pixmap.isEmpty()) {
-    pixmap.readPixels(dstInfo, dstPixels);
+  if (result) {
+    if (!pixmap.isEmpty()) {
+      pixmap.readPixels(dstInfo, dstPixels);
+    } else if (!NeedConvertColorSpace(colorSpace(), dstColorSpace)) {
+      ConvertColorSpaceInPlace(static_cast<int>(dstWidth), static_cast<int>(dstHeight), colorType,
+                               alphaType, dstRowBytes, colorSpace(), dstColorSpace, dstPixels);
+    }
   }
   return result;
 }
@@ -320,8 +333,7 @@ std::shared_ptr<Data> JpegCodec::getEncodedData() const {
 }
 
 #ifdef TGFX_USE_JPEG_ENCODE
-std::shared_ptr<Data> JpegCodec::Encode(const Pixmap& pixmap, int quality,
-                                        std::shared_ptr<ColorSpace> colorSpace) {
+std::shared_ptr<Data> JpegCodec::Encode(const Pixmap& pixmap, int quality) {
   auto srcPixels = static_cast<uint8_t*>(const_cast<void*>(pixmap.pixels()));
   int srcRowBytes = static_cast<int>(pixmap.rowBytes());
   jpeg_compress_struct cinfo = {};
@@ -349,7 +361,8 @@ std::shared_ptr<Data> JpegCodec::Encode(const Pixmap& pixmap, int quality,
       cinfo.input_components = 1;
       break;
     default:
-      auto info = ImageInfo::Make(pixmap.width(), pixmap.height(), ColorType::RGBA_8888);
+      auto info = ImageInfo::Make(pixmap.width(), pixmap.height(), ColorType::RGBA_8888,
+                                  AlphaType::Premultiplied, 0, pixmap.colorSpace());
       buffer.alloc(info.byteSize());
       if (buffer.isEmpty()) {
         return nullptr;
@@ -365,8 +378,8 @@ std::shared_ptr<Data> JpegCodec::Encode(const Pixmap& pixmap, int quality,
   cinfo.optimize_coding = TRUE;
   jpeg_set_quality(&cinfo, quality, TRUE);
   jpeg_start_compress(&cinfo, TRUE);
-  if (colorSpace) {
-    auto iccData = colorSpace->toICCProfile();
+  if (pixmap.colorSpace()) {
+    auto iccData = pixmap.colorSpace()->toICCProfile();
     jpeg_write_icc_profile(&cinfo, iccData->bytes(), static_cast<uint32_t>(iccData->size()));
   }
   while (cinfo.next_scanline < cinfo.image_height) {
