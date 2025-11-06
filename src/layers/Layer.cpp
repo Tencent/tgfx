@@ -1404,6 +1404,11 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
       auto maskBounds = child->_mask->getBounds(child.get());
       if (clipRect.has_value()) {
         if (!clipRect->intersect(maskBounds)) {
+          if (child->bitFields.dirtyTransform) {
+            _root->invalidateRect(child->renderBounds);
+            child->renderBounds = {};
+          }
+          child->bitFields.dirtyTransform = false;
           continue;
         }
       } else {
