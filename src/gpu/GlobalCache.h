@@ -20,6 +20,7 @@
 
 #include <array>
 #include <list>
+#include <optional>
 #include <unordered_map>
 #include "core/utils/SlidingWindowTracker.h"
 #include "gpu/Program.h"
