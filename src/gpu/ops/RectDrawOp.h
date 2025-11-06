@@ -89,8 +89,7 @@ class RectDrawOp : public DrawOp {
 
  private:
   size_t rectCount = 0;
-  bool hasStroke = false;
-  LineJoin strokeLineJoin = LineJoin::Miter;
+  std::optional<LineJoin> lineJoin = std::nullopt;
   std::optional<Color> commonColor = std::nullopt;
   std::optional<Matrix> uvMatrix = std::nullopt;
   bool hasSubset = false;

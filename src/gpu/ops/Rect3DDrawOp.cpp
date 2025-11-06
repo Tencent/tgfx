@@ -40,9 +40,11 @@ PlacementPtr<Rect3DDrawOp> Rect3DDrawOp::Make(Context* context,
   }
   auto drawOp = context->drawingBuffer()->make<Rect3DDrawOp>(provider.get(), drawArgs);
   CAPUTRE_RECT_MESH(drawOp.get(), provider.get());
-  if (provider->aaType() == AAType::Coverage || provider->rectCount() > 1) {
-    drawOp->indexBufferProxy =
-        context->globalCache()->getRectIndexBuffer(provider->aaType() == AAType::Coverage);
+  if (provider->aaType() == AAType::Coverage || provider->rectCount() > 1 ||
+      provider->hasStroke()) {
+    auto lineJoin = provider->hasStroke() ? std::make_optional(provider->lineJoin()) : std::nullopt;
+    drawOp->indexBufferProxy = context->globalCache()->getRectIndexBuffer(
+        provider->aaType() == AAType::Coverage, lineJoin);
   }
   if (provider->rectCount() <= 1) {
     // If we only have one rect, it is not worth the async task overhead.

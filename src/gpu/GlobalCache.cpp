@@ -247,23 +247,36 @@ class RectIndicesProvider : public DataSource<Data> {
   uint16_t vertCount = 0;
 };
 
-std::shared_ptr<GPUBufferProxy> GlobalCache::getRectIndexBuffer(bool antialias) {
-  if (antialias) {
-    if (aaQuadIndexBuffer == nullptr) {
-      auto provider =
-          std::make_unique<RectIndicesProvider>(AAQuadIndexPattern, RectDrawOp::IndicesPerAAQuad,
-                                                RectDrawOp::MaxNumRects, VERTICES_PER_AA_QUAD);
-      aaQuadIndexBuffer = context->proxyProvider()->createIndexBufferProxy(std::move(provider));
+std::shared_ptr<GPUBufferProxy> GlobalCache::getRectIndexBuffer(
+    bool antialias, const std::optional<LineJoin>& lineJoin) {
+  if (!lineJoin) {
+    if (antialias) {
+      if (aaQuadIndexBuffer == nullptr) {
+        auto provider =
+            std::make_unique<RectIndicesProvider>(AAQuadIndexPattern, RectDrawOp::IndicesPerAAQuad,
+                                                  RectDrawOp::MaxNumRects, VERTICES_PER_AA_QUAD);
+        aaQuadIndexBuffer = context->proxyProvider()->createIndexBufferProxy(std::move(provider));
+      }
+      return aaQuadIndexBuffer;
     }
-    return aaQuadIndexBuffer;
+    if (nonAAQuadIndexBuffer == nullptr) {
+      auto provider = std::make_unique<RectIndicesProvider>(
+          NonAAQuadIndexPattern, RectDrawOp::IndicesPerNonAAQuad, RectDrawOp::MaxNumRects,
+          VERTICES_PER_NON_AA_QUAD);
+      nonAAQuadIndexBuffer = context->proxyProvider()->createIndexBufferProxy(std::move(provider));
+    }
+    return nonAAQuadIndexBuffer;
   }
-  if (nonAAQuadIndexBuffer == nullptr) {
-    auto provider = std::make_unique<RectIndicesProvider>(
-        NonAAQuadIndexPattern, RectDrawOp::IndicesPerNonAAQuad, RectDrawOp::MaxNumRects,
-        VERTICES_PER_NON_AA_QUAD);
-    nonAAQuadIndexBuffer = context->proxyProvider()->createIndexBufferProxy(std::move(provider));
+  switch (*lineJoin) {
+    case LineJoin::Miter:
+      return getMiterStrokeIndexBuffer(antialias);
+    case LineJoin::Round:
+      return getRoundStrokeIndexBuffer(antialias);
+    case LineJoin::Bevel:
+      return getBevelStrokeIndexBuffer(antialias);
+    default:
+      return nullptr;
   }
-  return nonAAQuadIndexBuffer;
 }
 
 // clang-format off
@@ -588,19 +601,5 @@ std::shared_ptr<GPUBufferProxy> GlobalCache::getRoundStrokeIndexBuffer(bool anti
     indexBuffer = context->proxyProvider()->createIndexBufferProxy(std::move(provider));
   }
   return indexBuffer;
-}
-
-std::shared_ptr<GPUBufferProxy> GlobalCache::getStrokeRectIndexBuffer(bool antialias,
-                                                                      LineJoin join) {
-  switch (join) {
-    case LineJoin::Miter:
-      return getMiterStrokeIndexBuffer(antialias);
-    case LineJoin::Round:
-      return getRoundStrokeIndexBuffer(antialias);
-    case LineJoin::Bevel:
-      return getBevelStrokeIndexBuffer(antialias);
-    default:
-      return nullptr;
-  }
 }
 }  // namespace tgfx

@@ -16,10 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "RectRoundStrokeGeometryProcessor.h"
+#include "RoundStrokeRectGeometryProcessor.h"
 
 namespace tgfx {
-RectRoundStrokeGeometryProcessor::RectRoundStrokeGeometryProcessor(AAType aaType,
+RoundStrokeRectGeometryProcessor::RoundStrokeRectGeometryProcessor(AAType aaType,
                                                                    std::optional<Color> commonColor,
                                                                    std::optional<Matrix> uvMatrix)
     : GeometryProcessor(ClassID()), aaType(aaType), commonColor(commonColor), uvMatrix(uvMatrix) {
@@ -40,7 +40,7 @@ RectRoundStrokeGeometryProcessor::RectRoundStrokeGeometryProcessor(AAType aaType
   setVertexAttributes(&inPosition, 6);
 }
 
-void RectRoundStrokeGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
+void RoundStrokeRectGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
   uint32_t flags = aaType == AAType::Coverage ? 1 : 0;
   flags |= commonColor.has_value() ? 2 : 0;
   flags |= uvMatrix.has_value() ? 4 : 0;

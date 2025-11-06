@@ -71,15 +71,10 @@ class GlobalCache {
   std::shared_ptr<TextureProxy> getGradient(const Color* colors, const float* positions, int count);
 
   /**
-   * Returns a GPU buffer that contains indices for rendering a quad with or without antialiasing.
+   * Returns a GPU buffer with indices to render a quad, optionally with antialiasing and line join style.
    */
-  std::shared_ptr<GPUBufferProxy> getRectIndexBuffer(bool antialias);
-
-  /**
-   * Returns a GPU buffer containing indices for rendering a stroked rectangle with the specified
-   * line join style.
-   */
-  std::shared_ptr<GPUBufferProxy> getStrokeRectIndexBuffer(bool antialias, LineJoin join);
+  std::shared_ptr<GPUBufferProxy> getRectIndexBuffer(bool antialias,
+                                                     const std::optional<LineJoin>& lineJoin);
 
   /**
    * Returns a GPU buffer containing indices for rendering a rounded rectangle, either for filling

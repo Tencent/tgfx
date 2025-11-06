@@ -16,21 +16,21 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLSLRectRoundStrokeGeometryProcessor.h"
+#include "GLSLRoundStrokeRectGeometryProcessor.h"
 
 namespace tgfx {
-PlacementPtr<RectRoundStrokeGeometryProcessor> RectRoundStrokeGeometryProcessor::Make(
+PlacementPtr<RoundStrokeRectGeometryProcessor> RoundStrokeRectGeometryProcessor::Make(
     BlockBuffer* buffer, AAType aaType, std::optional<Color> commonColor,
     std::optional<Matrix> uvMatrix) {
-  return buffer->make<GLSLRectRoundStrokeGeometryProcessor>(aaType, commonColor, uvMatrix);
+  return buffer->make<GLSLRoundStrokeRectGeometryProcessor>(aaType, commonColor, uvMatrix);
 }
 
-GLSLRectRoundStrokeGeometryProcessor::GLSLRectRoundStrokeGeometryProcessor(
+GLSLRoundStrokeRectGeometryProcessor::GLSLRoundStrokeRectGeometryProcessor(
     AAType aaType, std::optional<Color> commonColor, std::optional<Matrix> uvMatrix)
-    : RectRoundStrokeGeometryProcessor(aaType, commonColor, uvMatrix) {
+    : RoundStrokeRectGeometryProcessor(aaType, commonColor, uvMatrix) {
 }
 
-void GLSLRectRoundStrokeGeometryProcessor::emitCode(EmitArgs& args) const {
+void GLSLRoundStrokeRectGeometryProcessor::emitCode(EmitArgs& args) const {
   auto vertBuilder = args.vertBuilder;
   auto fragBuilder = args.fragBuilder;
   auto varyingHandler = args.varyingHandler;
@@ -89,7 +89,7 @@ void GLSLRectRoundStrokeGeometryProcessor::emitCode(EmitArgs& args) const {
   args.vertBuilder->emitNormalizedPosition(inPosition.name());
 }
 
-void GLSLRectRoundStrokeGeometryProcessor::setData(UniformData* vertexUniformData,
+void GLSLRoundStrokeRectGeometryProcessor::setData(UniformData* vertexUniformData,
                                                    UniformData* fragmentUniformData,
                                                    FPCoordTransformIter* transformIter) const {
   setTransformDataHelper(uvMatrix.value_or(Matrix::I()), vertexUniformData, transformIter);
