@@ -18,7 +18,6 @@
 
 #include "tgfx/layers/Layer.h"
 #include <atomic>
-#include "BlendModeContext.h"
 #include "contents/LayerContent.h"
 #include "contents/RasterizedContent.h"
 #include "core/images/PictureImage.h"
@@ -609,7 +608,8 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
     }
   } else if (bitFields.hasBlendMode) {
     auto scale = canvas->getMatrix().getMaxScale();
-    args.blendModeContext = std::make_shared<BlendModeContext>(scale);
+    args.blendModeContext =
+        BackgroundContext::Make(nullptr, renderRect, 0, 0, Matrix::MakeScale(scale, scale));
   }
 
   if (context && canInvert && hasBackgroundStyle()) {
@@ -935,7 +935,8 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
                                   : nullptr;
   auto offscreenArgs = args;
   offscreenArgs.backgroundContext = subBackgroundContext;
-  offscreenArgs.blendModeContext = std::make_shared<BlendModeContext>(contentScale);
+  offscreenArgs.blendModeContext =
+      BackgroundContext::Make(nullptr, renderBounds, 0, 0, Matrix::MakeScale(contentScale));
 
   auto passThroughBackground = bitFields.passThroughBackground && blendMode == BlendMode::SrcOver &&
                                _filters.empty() && bitFields.hasBlendMode == true;
@@ -974,10 +975,10 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
           offscreenCanvas->drawImage(canvas->getSurface()->makeImageSnapshot());
         }
       } else if (args.blendModeContext) {
-        Matrix backgroundMatrix = {};
-        auto image = args.blendModeContext->getImage(&backgroundMatrix);
-        offscreenCanvas->concat(backgroundMatrix);
-        offscreenCanvas->drawImage(image);
+        Point offset = {};
+        auto image = args.blendModeContext->getBackgroundImage(&offset);
+        offscreenCanvas->concat(args.blendModeContext->backgroundMatrix());
+        offscreenCanvas->drawImage(image, offset.x, offset.y);
       }
     }
     drawDirectly(offscreenArgs, offscreenCanvas, 1.0f);
@@ -1266,8 +1267,10 @@ std::shared_ptr<Image> Layer::getBackgroundImage(const DrawArgs& args, float con
   }
   canvas->concat(invertMatrix);
   if (args.backgroundContext) {
+    Point bgOffset = {};
+    auto image = args.backgroundContext->getBackgroundImage(offset);
     canvas->concat(args.backgroundContext->backgroundMatrix());
-    canvas->drawImage(args.backgroundContext->getBackgroundImage());
+    canvas->drawImage(image, bgOffset.x, bgOffset.y);
   } else {
     auto drawArgs = args;
     drawArgs.excludeEffects = false;

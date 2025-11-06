@@ -19,7 +19,6 @@
 #pragma once
 
 #include "layers/BackgroundContext.h"
-#include "layers/BlendModeContext.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
@@ -55,6 +54,6 @@ class DrawArgs {
   std::shared_ptr<ColorSpace> dstColorSpace = ColorSpace::MakeSRGB();
 
   // Only used while recording layer's background image.
-  std::shared_ptr<BlendModeContext> blendModeContext;
+  std::shared_ptr<BackgroundContext> blendModeContext = nullptr;
 };
 }  // namespace tgfx
