@@ -230,7 +230,8 @@ class RectIndicesProvider : public DataSource<Data> {
     }
     auto data = reinterpret_cast<uint16_t*>(buffer.data());
     for (uint16_t i = 0; i < reps; ++i) {
-      //Note: decltype(data[index]) resolves to uint16_t, while decltype(index) is size_t
+      //Note: decltype(data[index]) resolves to uint16_t, while decltype(index) is size_t, so cast
+      // 'i' to size_t before multiplication to prevent overflow when computing the array index.
       auto baseIdx = static_cast<size_t>(i) * patternSize;
       auto baseVert = static_cast<uint16_t>(i * vertCount);
       for (uint16_t j = 0; j < patternSize; ++j) {
@@ -360,7 +361,7 @@ void GlobalCache::addStaticResource(const UniqueKey& uniqueKey,
 
 // clang-format off
 /**
- * As in stroke, index = a + b, and a is the current index, b is the shift
+ * As in miter-stroke, index = a + b, and a is the current index, b is the shift
  * from the first index. The index layout:
  * outer AA line: 0~3
  * outer edge:    4~7
@@ -421,7 +422,7 @@ static constexpr uint16_t NonAAMiterStrokeRectIndices[] = {
 };
 
 /**
- * As in miter-stroke, index = a + b, and a is the current index, b is the shift
+ * As in bevel-stroke, index = a + b, and a is the current index, b is the shift
  * from the first index. The index layout:
  * outer AA line: 0~3, 4~7
  * outer edge:    8~11, 12~15
@@ -478,7 +479,7 @@ static constexpr uint16_t AABevelStrokeRectIndices[] = {
 };
 
 /**
- * As in non aa miter-stroke
+ * As in non-AA bevel-stroke
  * from the first index. The index layout:
  * outer AA edge: 0~3, 4~7
  * inner edge:    8~11
@@ -559,7 +560,7 @@ static constexpr uint16_t RoundStrokeRectIndices[] = {
 // clang-format on
 
 std::shared_ptr<GPUBufferProxy> GlobalCache::getMiterStrokeIndexBuffer(bool antialias) {
-  auto& indexBuffer = antialias ? aaMiterStrokeRectIndexBuffer : nonAAMiterStrokeRectIndexBuffer;
+  auto& indexBuffer = antialias ? aaRectMiterStrokeIndexBuffer : nonAARectMiterStrokeIndexBuffer;
   if (indexBuffer == nullptr) {
     auto pattern = antialias ? AAMiterStrokeRectIndices : NonAAMiterStrokeRectIndices;
     auto patternSize = antialias ? RectDrawOp::IndicesPerAAMiterStrokeRect
@@ -574,7 +575,7 @@ std::shared_ptr<GPUBufferProxy> GlobalCache::getMiterStrokeIndexBuffer(bool anti
 }
 
 std::shared_ptr<GPUBufferProxy> GlobalCache::getBevelStrokeIndexBuffer(bool antialias) {
-  auto& indexBuffer = antialias ? aaBevelStrokeRectIndexBuffer : nonAABevelStrokeRectIndexBuffer;
+  auto& indexBuffer = antialias ? aaRectBevelStrokeIndexBuffer : nonAARectBevelStrokeIndexBuffer;
   if (indexBuffer == nullptr) {
     auto pattern = antialias ? AABevelStrokeRectIndices : NonAABevelStrokeRectIndices;
     auto patternSize = antialias ? RectDrawOp::IndicesPerAABevelStrokeRect
@@ -589,7 +590,7 @@ std::shared_ptr<GPUBufferProxy> GlobalCache::getBevelStrokeIndexBuffer(bool anti
 }
 
 std::shared_ptr<GPUBufferProxy> GlobalCache::getRoundStrokeIndexBuffer(bool antialias) {
-  auto& indexBuffer = antialias ? aaRoundStrokeRectIndexBuffer : nonAARoundStrokeRectIndexBuffer;
+  auto& indexBuffer = antialias ? aaRectRoundStrokeIndexBuffer : nonAARectRoundStrokeIndexBuffer;
   if (indexBuffer == nullptr) {
     auto pattern = RoundStrokeRectIndices;
     auto patternSize = antialias ? RectDrawOp::IndicesPerAARoundStrokeRect
@@ -597,7 +598,7 @@ std::shared_ptr<GPUBufferProxy> GlobalCache::getRoundStrokeIndexBuffer(bool anti
     auto vertCount =
         antialias ? VERTICES_PER_AA_ROUND_STROKE_RECT : VERTICES_PER_NON_AA_ROUND_STROKE_RECT;
     auto provider = std::make_unique<RectIndicesProvider>(pattern, patternSize,
-                                                          RRectDrawOp::MaxNumRRects, vertCount);
+                                                          RectDrawOp::MaxNumRects, vertCount);
     indexBuffer = context->proxyProvider()->createIndexBufferProxy(std::move(provider));
   }
   return indexBuffer;
