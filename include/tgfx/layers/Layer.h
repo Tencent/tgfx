@@ -127,8 +127,9 @@ class Layer : public std::enable_shared_from_this<Layer> {
   void setBlendMode(BlendMode value);
 
   /**
-   * Returns true if the layer passes through its background to sublayers. Layer with BlendMode or
-   * Filters will ignore this value and not pass through background.
+   * Returns true if the layer allows its background to pass through to sublayers. Note that layers
+   * with non-SrcOver blend modes or filters will ignore this setting and prevent background
+   * pass-through.
    * The default value is true.
    */
   bool passThroughBackground() const {
