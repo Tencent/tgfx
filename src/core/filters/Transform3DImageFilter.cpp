@@ -38,13 +38,10 @@ Transform3DImageFilter::Transform3DImageFilter(const Matrix3D& matrix, bool hide
 
 Rect Transform3DImageFilter::onFilterBounds(const Rect& rect, MapDirection mapDirection) const {
   if (mapDirection == MapDirection::Forward) {
-    return _matrix.mapRect(rect);
+    auto result = _matrix.mapRect(rect);
+    return result;
   }
-  Matrix3D invertedMatrix;
-  if (!_matrix.invert(&invertedMatrix)) {
-    return rect;
-  }
-  return invertedMatrix.mapRect(rect);
+  return rect;
 }
 
 std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(

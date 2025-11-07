@@ -20,6 +20,7 @@
 
 #include <memory>
 #include <optional>
+#include <unordered_set>
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Matrix.h"
@@ -550,7 +551,9 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   void invalidate();
 
-  Rect getBoundsInternal(const Matrix& coordinateMatrix, bool computeTightBounds);
+  Rect getBoundsInternal(const Matrix3D& coordinateMatrix, bool computeTightBounds);
+
+  Rect onGetBoundsInternal(const Matrix& coordinateMatrix, bool computeTightBounds);
 
   void onAttachToRoot(RootLayer* rootLayer);
 
@@ -560,27 +563,9 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   bool doContains(const Layer* child) const;
 
-  /**
-   * Returns the transformation matrix of the current layer relative to the root layer. Note that
-   * if any layer along the path from the current layer to the root layer contains 3D transformations
-   * or projection transformations, this interface will return the identity matrix; you need to use
-   * the getGlobalMatrix3D interface to obtain the actual matrix. Otherwise, it will return the
-   * equivalent simplified affine transformation matrix.
-   */
-  Matrix getGlobalMatrix() const;
+  Matrix3D getGlobalMatrix() const;
 
-  Matrix3D getGlobalMatrix3D() const;
-
-  /**
-   * Returns the transformation matrix of the current layer relative to the parent layer. Note that
-   * if the current layer's matrix contains 3D transformations or projection transformations, this
-   * interface will return the identity matrix; you need to use the getMatrix3DWithScrollRect
-   * interface to obtain the actual matrix. Otherwise, it will return the equivalent simplified
-   * affine transformation matrix.
-   */
-  Matrix getMatrixWithScrollRect() const;
-
-  Matrix3D getMatrix3DWithScrollRect() const;
+  Matrix3D getMatrixWithScrollRect() const;
 
   LayerContent* getContent();
 
@@ -602,6 +587,10 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   void drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
 
+  void onDrawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
+                       const std::function<void(const LayerStyleSource*)>& beforeContentHandler,
+                       const std::function<void(const LayerStyleSource*)>& afterContentHandler);
+
   void drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha);
 
   void drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
@@ -618,6 +607,15 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::shared_ptr<Image> getBackgroundImage(const DrawArgs& args, float contentScale,
                                             Point* offset);
 
+  /**
+   * Gets the background image of the minimum axis-aligned bounding box after drawing the layer
+   * subtree with the current layer as the root node.
+   */
+  std::shared_ptr<Image> getBoundsBackgroundImage(const DrawArgs& args, float contentScale,
+                                                  Point* offset);
+
+  void drawBackgroundImage(const DrawArgs& args, Canvas& canvas);
+
   void drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
                        const LayerStyleSource* source, LayerStylePosition position);
 
@@ -626,9 +624,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::shared_ptr<MaskFilter> getMaskFilter(const DrawArgs& args, float scale,
                                             const std::optional<Rect>& layerClipBounds);
 
-  Matrix getRelativeMatrix(const Layer* targetCoordinateSpace) const;
-
-  Matrix3D getRelativeMatrix3D(const Layer* targetCoordinateSpace) const;
+  Matrix3D getRelativeMatrix(const Layer* targetCoordinateSpace) const;
 
   bool hasValidMask() const;
 

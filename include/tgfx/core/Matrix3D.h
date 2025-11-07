@@ -170,19 +170,19 @@ class Matrix3D {
 
   /**
    * Post-concatenates a skew to this matrix. M' = K * M
-   * @param kxy Skew factor for x as a function of y
-   * @param kxz Skew factor for x as a function of z
-   * @param kyx Skew factor for y as a function of x
-   * @param kyz Skew factor for y as a function of z
-   * @param kzx Skew factor for z as a function of x
-   * @param kzy Skew factor for z as a function of y
+   * @param kxy Skew factor of the original Y component on the X axis
+   * @param kxz Skew factor of the original Z component on the X axis
+   * @param kyx Skew factor of the original X component on the Y axis
+   * @param kyz Skew factor of the original Z component on the Y axis
+   * @param kzx Skew factor of the original X component on the Z axis
+   * @param kzy Skew factor of the original Y component on the Z axis
    */
   void postSkew(float kxy, float kxz, float kyx, float kyz, float kzx, float kzy);
 
   /**
    * Post-concatenates a skew in the XY plane to this matrix. M' = K * M
-   * @param kxy Skew factor for x as a function of y
-   * @param kyx Skew factor for y as a function of x
+   * @param kxy Skew factor of the original X component on the Y axis
+   * @param kyx Skew factor of the original Y component on the X axis
    */
   void postSkewXY(float kxy, float kyx) {
     postSkew(kxy, 0, kyx, 0, 0, 0);
@@ -233,6 +233,8 @@ class Matrix3D {
    */
   Rect mapRect(const Rect& src) const;
 
+  void mapRect(Rect* rect) const;
+
   /**
    * Maps a 3D point using this matrix.
    * The returned result is the coordinate after perspective division.
@@ -269,6 +271,16 @@ class Matrix3D {
    * Copies the matrix values into a 16-element array in row-major order.
    */
   void getRowMajor(float buffer[16]) const;
+
+  /**
+   * Returns the horizontal translation factor.
+   */
+  float getTranslateX() const;
+
+  /**
+   * Returns the vertical translation factor.
+   */
+  float getTranslateY() const;
 
   /**
    * Concatenates two matrices and stores the result in this matrix. M' = a * b.

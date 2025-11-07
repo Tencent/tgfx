@@ -18,8 +18,10 @@
 
 #pragma once
 
+#include <unordered_set>
 #include "layers/BackgroundContext.h"
 #include "tgfx/gpu/Context.h"
+#include "tgfx/layers/layerstyles/LayerStyle.h"
 
 namespace tgfx {
 
@@ -42,6 +44,10 @@ class DrawArgs {
   Context* context = nullptr;
   // Whether to exclude effects during the drawing process.
   bool excludeEffects = false;
+  // Layer styles that require additional resource types to be excluded during the drawing phase.
+  // Note that layer styles are a type of effect. When excludeEffects is true, all layer styles will
+  // not be drawn regardless of how this property is set.
+  std::unordered_set<LayerStyleExtraSourceType> excludeStyleExtraSourceTypes;
   // Determines the draw mode of the Layer.
   DrawMode drawMode = DrawMode::Normal;
   // The rectangle area to be drawn. This is used for clipping the drawing area.
@@ -52,5 +58,7 @@ class DrawArgs {
   // Indicates whether to force drawing the background, even if there are no background styles.
   bool forceDrawBackground = false;
   std::shared_ptr<ColorSpace> dstColorSpace = ColorSpace::MakeSRGB();
+  // Indicates whether to exclude 3D transformations during the drawing process.
+  bool excludeTransform3D = false;
 };
 }  // namespace tgfx

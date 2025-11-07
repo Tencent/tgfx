@@ -22,6 +22,40 @@
 
 namespace tgfx {
 
+// A 4x4 matrix's first three rows describe a 3D affine transformation, which can also be understood
+// as transforming the current coordinate system to a new coordinate system. The first three columns
+// of this matrix represent the coordinates of the new coordinate system's basis vectors in the old
+// coordinate system, while the 4th column describes the position of the new coordinate system's
+// origin in the old coordinate system. The 4th row of the matrix describes projection coefficients.
+// For column-major stored matrices, the meaning of matrix elements and their corresponding index
+// definitions are as follows. Following the general rules in image processing, matrix element
+// m[i][j] represents the element at row i+1, column j+1, and this definition is maintained when
+// naming matrix elements, for example, SKEW_Y_X represents the relationship between X and Y, not Y
+// and X.
+//   | SCALE_X      SKEW_X_Y    SKEW_X_Z    TRANS_X    |
+//   | SKEW_Y_X     SCALE_Y     SKEW_Y_Z    TRANS_Y    |
+//   | SKEW_Z_X     SKEW_Z_Y    SCALE_Z     TRANS_Z    |
+//   | PERS_X       PERS_Y      PERS_Z      PERS_SCALE |
+// Skew value of new coordinate system's X-axis relative to old coordinate system's Y-axis
+static constexpr int SKEW_Y_X = 1;
+// Skew value of new coordinate system's X-axis relative to old coordinate system's Z-axis
+static constexpr int SKEW_Z_X = 2;
+
+// Skew value of new coordinate system's Y-axis relative to old coordinate system's X-axis
+static constexpr int SKEW_X_Y = 4;
+// Skew value of new coordinate system's Y-axis relative to old coordinate system's Z-axis
+static constexpr int SKEW_Z_Y = 6;
+
+// Skew value of new coordinate system's Z-axis relative to old coordinate system's X-axis
+static constexpr int SKEW_X_Z = 8;
+// Skew value of new coordinate system's Z-axis relative to old coordinate system's Y-axis
+static constexpr int SKEW_Y_Z = 9;
+
+// X-coordinate of new coordinate system's origin in old coordinate system
+static constexpr int TRANS_X = 12;
+// Y-coordinate of new coordinate system's origin in old coordinate system
+static constexpr int TRANS_Y = 13;
+
 static void TransposeArrays(const float src[16], float dst[16]) {
   dst[0] = src[0];
   dst[1] = src[4];
@@ -246,6 +280,13 @@ Rect Matrix3D::mapRect(const Rect& src) const {
   }
 }
 
+void Matrix3D::mapRect(Rect* rect) const {
+  if (rect == nullptr) {
+    return;
+  }
+  *rect = mapRect(*rect);
+}
+
 Vec3 Matrix3D::mapVec3(const Vec3& v) const {
   auto r = this->mapPoint(v.x, v.y, v.z, 1.f);
   return {IEEEFloatDivide(r.x, r.w), IEEEFloatDivide(r.y, r.w), IEEEFloatDivide(r.z, r.w)};
@@ -271,6 +312,14 @@ bool Matrix3D::operator==(const Matrix3D& other) const {
 
 void Matrix3D::getRowMajor(float buffer[16]) const {
   TransposeArrays(values, buffer);
+}
+
+float Matrix3D::getTranslateX() const {
+  return values[TRANS_X];
+}
+
+float Matrix3D::getTranslateY() const {
+  return values[TRANS_Y];
 }
 
 void Matrix3D::setConcat(const Matrix3D& a, const Matrix3D& b) {
@@ -381,12 +430,12 @@ void Matrix3D::setRotateUnitSinCos(const Vec3& axis, float sinAngle, float cosAn
 }
 
 void Matrix3D::setSkew(float kxy, float kxz, float kyx, float kyz, float kzx, float kzy) {
-  values[1] = kyx;
-  values[2] = kzx;
-  values[4] = kxy;
-  values[6] = kzy;
-  values[8] = kxz;
-  values[9] = kyz;
+  values[SKEW_X_Y] = kxy;
+  values[SKEW_X_Z] = kxz;
+  values[SKEW_Y_X] = kyx;
+  values[SKEW_Y_Z] = kyz;
+  values[SKEW_Z_X] = kzx;
+  values[SKEW_Z_Y] = kzy;
 }
 
 }  // namespace tgfx

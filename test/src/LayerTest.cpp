@@ -266,7 +266,7 @@ TGFX_TEST(LayerTest, Layer_getTotalMatrix) {
   grandChild->addChild(greatGrandson);
 
   auto greatGrandsonTotalMatrix = greatGrandson->getGlobalMatrix();
-  EXPECT_EQ(greatGrandsonTotalMatrix, Matrix::MakeTrans(30, 30));
+  EXPECT_EQ(greatGrandsonTotalMatrix, Matrix3D::MakeScale(30, 30, 0));
 
   EXPECT_EQ(greatGrandson->matrix(), Matrix::MakeTrans(10, 10));
   EXPECT_EQ(grandChild->matrix(), Matrix::MakeTrans(10, 10));
@@ -3265,10 +3265,9 @@ TGFX_TEST(LayerTest, Matrix) {
   auto displayList = std::make_unique<DisplayList>();
   displayList->setRenderMode(RenderMode::Tiled);
 
-  auto backLayer = SolidLayer::Make();
-  backLayer->setColor(Color::FromRGBA(153, 46, 46, 255));
-  backLayer->setWidth(600);
-  backLayer->setHeight(400);
+  auto backLayer = ImageLayer::Make();
+  auto backImage = MakeImage("resources/assets/HappyNewYear.png");
+  backLayer->setImage(backImage);
   backLayer->setMatrix(Matrix::MakeScale(0.5f, 0.5f));
   displayList->root()->addChild(backLayer);
 
@@ -3360,7 +3359,8 @@ TGFX_TEST(LayerTest, Matrix) {
   path.addRoundRect(rect, 20, 20);
   auto shaperLayer = ShapeLayer::Make();
   shaperLayer->setPath(path);
-  shaperLayer->setFillStyle(SolidColor::Make(Color::Blue()));
+  shaperLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 0, 255, 128)));
+  shaperLayer->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
   {
     // Verify the correctness of ShaperLayer's effect when the internal matrix is non-zero
     auto layerSize = Size::Make(300.f, 200.f);
