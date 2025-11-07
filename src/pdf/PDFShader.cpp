@@ -44,8 +44,10 @@ void Draw(Canvas* canvas, std::shared_ptr<Image> image, Color paintColor) {
   canvas->drawImage(std::move(image), SamplingOptions(), &paint);
 }
 
-Bitmap ImageExportToBitmap(Context* context, const std::shared_ptr<Image>& image) {
-  auto surface = Surface::Make(context, image->width(), image->height());
+Bitmap ImageExportToBitmap(Context* context, const std::shared_ptr<Image>& image,
+                           std::shared_ptr<ColorSpace> colorSpace) {
+  auto surface = Surface::Make(context, image->width(), image->height(), false, 1, false, 0,
+                               std::move(colorSpace));
   auto canvas = surface->getCanvas();
   canvas->drawImage(image);
 
@@ -215,7 +217,7 @@ PDFIndirectReference PDFShader::MakeImageShader(PDFDocumentImpl* doc, Matrix fin
   if (tileModesX == TileMode::Clamp || tileModesY == TileMode::Clamp) {
     // For now, the easiest way to access the colors in the corners and sides is
     // to just make a bitmap from the image.
-    bitmap = ImageExportToBitmap(doc->context(), image);
+    bitmap = ImageExportToBitmap(doc->context(), image, doc->colorSpace());
   }
 
   // If both x and y are in clamp mode, we start by filling in the corners.
@@ -352,7 +354,8 @@ PDFIndirectReference PDFShader::MakeFallbackShader(PDFDocumentImpl* doc,
   Size scale = {static_cast<float>(size.width) / shaderRect.width(),
                 static_cast<float>(size.height) / shaderRect.height()};
 
-  auto surface = Surface::Make(doc->context(), size.width, size.height);
+  auto surface =
+      Surface::Make(doc->context(), size.width, size.height, false, 1, false, 0, doc->colorSpace());
   DEBUG_ASSERT(surface);
   Canvas* canvas = surface->getCanvas();
   canvas->clear(Color::Transparent());

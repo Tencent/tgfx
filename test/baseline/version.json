@@ -260,15 +260,16 @@
         "rasterize_path_texture": "c475bfb"
     },
     "PDFTest": {
-        "Complex": "0cfb8996",
-        "DrawColor": "a9b29daa",
-        "DrawShape": "a9b29daa",
-        "DrawShapeStroke": "a9b29daa",
-        "EmojiText": "0cfb8996",
-        "Empty": "a9b29daa",
-        "EmptyMultiPage": "a9b29daa",
-        "Image": "a9b29daa",
-        "SimpleText": "a9b29daa"
+        "ColorSpace": "468c9428",
+        "Complex": "468c9428",
+        "DrawColor": "3a713e22",
+        "DrawShape": "3a713e22",
+        "DrawShapeStroke": "3a713e22",
+        "EmojiText": "468c9428",
+        "Empty": "3a713e22",
+        "EmptyMultiPage": "3a713e22",
+        "Image": "3a713e22",
+        "SimpleText": "3a713e22"
     },
     "PathTest": {
         "DrawInfiniteLoopPath": "898f84dd"
