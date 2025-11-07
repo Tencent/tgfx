@@ -20,6 +20,7 @@
 #include "core/PathRasterizer.h"
 #include "core/PathRef.h"
 #include "core/PathTriangulator.h"
+#include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/RectToRectMatrix.h"
 #include "core/utils/ShapeUtils.h"
@@ -403,16 +404,17 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
                    drawScale.value_or(1.0f)};
     auto processor =
         FragmentProcessor::Make(pendingImage, args, pendingSampling, pendingConstraint);
-    // TODO: Turn on when the wide gumat convertion is Completed
-    /* if (!pendingImage->isAlphaOnly()) {
-      processor = ColorSpaceXformEffect::Make(
-          context->drawingBuffer(), std::move(processor), pendingImage->colorSpace().get(),
-          AlphaType::Premultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
-    } */
     if (processor == nullptr) {
       return;
     }
     drawOp->addColorFP(std::move(processor));
+    if (!pendingImage->isAlphaOnly() &&
+        !NeedConvertColorSpace(pendingImage->colorSpace(), dstColorSpace)) {
+      auto xformEffect = ColorSpaceXformEffect::Make(
+          context->drawingBuffer(), pendingImage->colorSpace().get(), AlphaType::Premultiplied,
+          dstColorSpace.get(), AlphaType::Premultiplied);
+      drawOp->addColorFP(std::move(xformEffect));
+    }
   }
   addDrawOp(std::move(drawOp), pendingClip, pendingFill, localBounds, deviceBounds,
             drawScale.value_or(1.0f));

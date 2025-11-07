@@ -18,6 +18,7 @@
 
 #include "tgfx/gpu/opengl/qt/QGLWindow.h"
 #include <QApplication>
+#include <QColorSpace>
 #include <QQuickWindow>
 #include <QThread>
 #include "gpu/opengl/GLTexture.h"
@@ -159,7 +160,7 @@ QSGTexture* QGLWindow::getQSGTexture() {
     pendingSurface = nullptr;
     pendingTextureID = 0;
     if (!singleBufferMode) {
-      std::swap(fontSurface, surface);
+      std::swap(frontSurface, surface);
     }
   }
   return outTexture;
@@ -176,22 +177,28 @@ std::shared_ptr<Surface> QGLWindow::onCreateSurface(Context* context) {
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
+  QSurfaceFormat windowFormat = nativeWindow->format();
+  auto icc = windowFormat.colorSpace().iccProfile();
+  std::shared_ptr<ColorSpace> colorSpace =
+      ColorSpace::MakeFromICC(icc.data(), static_cast<size_t>(icc.size()));
   if (!singleBufferMode) {
-    fontSurface = Surface::Make(context, width, height, ColorType::RGBA_8888);
-    if (fontSurface == nullptr) {
+    frontSurface =
+        Surface::Make(context, width, height, ColorType::RGBA_8888, 1, false, 0, colorSpace);
+    if (frontSurface == nullptr) {
       return nullptr;
     }
   }
-  auto backSurface = Surface::Make(context, width, height, ColorType::RGBA_8888);
+  auto backSurface =
+      Surface::Make(context, width, height, ColorType::RGBA_8888, 1, false, 0, colorSpace);
   if (backSurface == nullptr) {
-    fontSurface = nullptr;
+    frontSurface = nullptr;
     return nullptr;
   }
   sizeInvalid = false;
   return backSurface;
 }
 
-void QGLWindow::onPresent(Context*, int64_t) {
+void QGLWindow::onPresent(Context*) {
   GLTextureInfo textureInfo = {};
   // Surface->getBackendTexture() triggers a flush, so we need to call it under the context.
   surface->getBackendTexture().getGLTextureInfo(&textureInfo);
@@ -202,7 +209,7 @@ void QGLWindow::onPresent(Context*, int64_t) {
 }
 
 void QGLWindow::onFreeSurface() {
-  fontSurface = nullptr;
+  frontSurface = nullptr;
   surface = nullptr;
 }
 

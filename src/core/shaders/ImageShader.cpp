@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ImageShader.h"
+#include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/Types.h"
 #include "gpu/ops/DrawOp.h"
 #include "gpu/processors/ColorSpaceXFormEffect.h"
@@ -47,17 +48,16 @@ bool ImageShader::isEqual(const Shader* shader) const {
 }
 
 PlacementPtr<FragmentProcessor> ImageShader::asFragmentProcessor(
-    const FPArgs& args, const Matrix* uvMatrix, std::shared_ptr<ColorSpace>) const {
+    const FPArgs& args, const Matrix* uvMatrix, std::shared_ptr<ColorSpace> dstColorSpace) const {
   SamplingArgs samplingArgs = {tileModeX, tileModeY, sampling, SrcRectConstraint::Fast};
   auto fp = image->asFragmentProcessor(args, samplingArgs, uvMatrix);
-
-  // TODO: Turn on when the wide gumat convertion is Completed
-  /*
-  if (!image->isAlphaOnly()) {
-    fp = ColorSpaceXformEffect::Make(args.context->drawingBuffer(), std::move(fp),
-                                     image->colorSpace().get(), AlphaType::Premultiplied,
-                                     dstColorSpace.get(), AlphaType::Premultiplied);
-  } */
+  if (!image->isAlphaOnly() && fp && !NeedConvertColorSpace(image->colorSpace(), dstColorSpace)) {
+    auto xformEffect = ColorSpaceXformEffect::Make(
+        args.context->drawingBuffer(), image->colorSpace().get(), AlphaType::Premultiplied,
+        dstColorSpace.get(), AlphaType::Premultiplied);
+    fp = FragmentProcessor::Compose(args.context->drawingBuffer(), std::move(xformEffect),
+                                    std::move(fp));
+  }
   return fp;
 }
 }  // namespace tgfx

@@ -300,7 +300,7 @@ static jobject ConvertHardwareBitmap(JNIEnv* env, jobject bitmap) {
 }
 
 bool NativeCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
-                               void* dstPixels) const {
+                               std::shared_ptr<ColorSpace> dstColorSpace, void* dstPixels) const {
   if (dstPixels == nullptr) {
     return false;
   }
@@ -321,7 +321,8 @@ bool NativeCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t 
     LOGE("NativeCodec::readPixels() Failed to lockPixels() of a Java Bitmap!");
     return false;
   }
-  auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes);
+  auto dstInfo =
+      ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes, dstColorSpace);
   auto result = Pixmap(info, pixels).readPixels(dstInfo, dstPixels);
   AndroidBitmap_unlockPixels(env, bitmap);
   return result;

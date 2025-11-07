@@ -39,6 +39,7 @@
 #include "tgfx/core/Size.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/TileMode.h"
+#include "utils/EffectCache.h"
 #include "utils/TestUtils.h"
 #include "utils/common.h"
 
@@ -330,6 +331,7 @@ TGFX_TEST(FilterTest, ComposeImageFilter) {
 TGFX_TEST(FilterTest, RuntimeEffect) {
   ContextScope scope;
   auto context = scope.getContext();
+  EffectCache effectCache = {};
   ASSERT_TRUE(context != nullptr);
   auto image = MakeImage("resources/assets/bridge.jpg");
   ASSERT_TRUE(image != nullptr);
@@ -340,10 +342,10 @@ TGFX_TEST(FilterTest, RuntimeEffect) {
   image = image->makeRasterized();
 
   auto effect1 = CornerPinEffect::Make(
-      {0, 0}, {static_cast<float>(image->width()), 0},
+      &effectCache, {0, 0}, {static_cast<float>(image->width()), 0},
       {static_cast<float>(image->width()), static_cast<float>(image->height())},
       {0, static_cast<float>(image->height())});
-  auto effect2 = CornerPinEffect::Make({484, 54}, {764, 80}, {764, 504}, {482, 512});
+  auto effect2 = CornerPinEffect::Make(&effectCache, {484, 54}, {764, 80}, {764, 504}, {482, 512});
   auto filter1 = ImageFilter::Runtime(std::move(effect1));
   auto filter2 = ImageFilter::Runtime(effect2);
   auto composeFilter = ImageFilter::Compose(filter1, filter2);
@@ -483,7 +485,8 @@ TGFX_TEST(FilterTest, GetFilterProperties) {
   }
 
   {
-    auto effect = CornerPinEffect::Make({484, 54}, {764, 80}, {764, 504}, {482, 512});
+    EffectCache effectCache = {};
+    auto effect = CornerPinEffect::Make(&effectCache, {484, 54}, {764, 80}, {764, 504}, {482, 512});
     auto imageFilter = ImageFilter::Runtime(std::move(effect));
     EXPECT_EQ(imageFilter->type(), ImageFilter::Type::Runtime);
   }

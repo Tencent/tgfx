@@ -27,10 +27,9 @@ bool HardwareBufferCheck(HardwareBufferRef buffer) {
     return false;
   }
   auto success = CVPixelBufferGetIOSurface(buffer) != nil;
-#if TARGET_OS_IPHONE == 0 && TARGET_OS_MAC == 1 && defined(__aarch64__)
+#if TARGET_OS_IPHONE == 0 && TARGET_OS_MAC == 1
   if (success && CVPixelBufferGetPixelFormatType(buffer) == kCVPixelFormatType_OneComponent8) {
-    // The alpha-only CVPixelBuffer on macOS with Apple Silicon does not share memory across GPU and
-    // CPU.
+    // The alpha-only CVPixelBuffer on macOS does not share memory across GPU and CPU.
     return false;
   }
 #endif
@@ -41,7 +40,7 @@ HardwareBufferRef HardwareBufferAllocate(int width, int height, bool alphaOnly) 
   if (!HardwareBufferAvailable() || width <= 0 || height <= 0) {
     return nil;
   }
-#if TARGET_OS_IPHONE == 0 && TARGET_OS_MAC == 1 && defined(__aarch64__)
+#if TARGET_OS_IPHONE == 0 && TARGET_OS_MAC == 1
   if (alphaOnly) {
     return nil;
   }

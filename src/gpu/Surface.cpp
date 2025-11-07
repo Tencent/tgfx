@@ -181,11 +181,12 @@ std::shared_ptr<Image> Surface::makeImageSnapshot() {
 
 Color Surface::getColor(int x, int y) {
   uint8_t color[4];
-  auto info = ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  auto info =
+      ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Premultiplied, 0, colorSpace());
   if (!readPixels(info, color, x, y)) {
     return Color::Transparent();
   }
-  return Color::FromRGBA(color[0], color[1], color[2], color[3]);
+  return Color::FromRGBA(color[0], color[1], color[2], color[3], colorSpace());
 }
 
 std::shared_ptr<SurfaceReadback> Surface::asyncReadPixels(const Rect& rect) {
@@ -200,7 +201,7 @@ std::shared_ptr<SurfaceReadback> Surface::asyncReadPixels(const Rect& rect) {
   auto srcRect = renderTarget->getOriginTransform().mapRect(rect);
   auto colorType = PixelFormatToColorType(renderTarget->format());
   auto info = ImageInfo::Make(static_cast<int>(srcRect.width()), static_cast<int>(srcRect.height()),
-                              colorType, AlphaType::Premultiplied);
+                              colorType, AlphaType::Premultiplied, 0, colorSpace());
   auto context = renderTarget->getContext();
   auto readbackBuffer = context->proxyProvider()->createReadbackBufferProxy(info.byteSize());
   if (readbackBuffer == nullptr) {
@@ -219,8 +220,8 @@ bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, in
   }
   dstPixels = dstInfo.computeOffset(dstPixels, -srcX, -srcY);
   auto colorType = PixelFormatToColorType(renderTarget->format());
-  auto srcInfo =
-      ImageInfo::Make(outInfo.width(), outInfo.height(), colorType, AlphaType::Premultiplied);
+  auto srcInfo = ImageInfo::Make(outInfo.width(), outInfo.height(), colorType,
+                                 AlphaType::Premultiplied, 0, colorSpace());
   auto readX = std::max(0, srcX);
   auto readY = std::max(0, srcY);
   auto rect = Rect::MakeXYWH(readX, readY, outInfo.width(), outInfo.height());

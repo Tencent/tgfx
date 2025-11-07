@@ -190,7 +190,7 @@ std::string GLSLProgramBuilder::getUniformBlockDeclaration(
   return result;
 }
 
-std::shared_ptr<PipelineProgram> GLSLProgramBuilder::finalize() {
+std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
   fragmentShaderBuilder()->declareCustomOutputColor();
   finalizeShaders();
   auto gpu = context->gpu();
@@ -232,8 +232,8 @@ std::shared_ptr<PipelineProgram> GLSLProgramBuilder::finalize() {
   if (pipeline == nullptr) {
     return nullptr;
   }
-  return std::make_shared<PipelineProgram>(std::move(pipeline), std::move(vertexUniformData),
-                                           std::move(fragmentUniformData));
+  return std::make_shared<Program>(std::move(pipeline), std::move(vertexUniformData),
+                                   std::move(fragmentUniformData));
 }
 
 bool GLSLProgramBuilder::checkSamplerCounts() {
