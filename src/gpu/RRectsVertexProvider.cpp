@@ -127,13 +127,18 @@ void RRectsVertexProvider::getVertices(float* vertices) const {
     float innerYRadius = 0;
     auto rectBounds = rRect.rect;
     if (stroke && stroke->width > 0.0f) {
-      float halfStrokeWidth = stroke->width / 2;
-      innerXRadius = rRect.radii.x - halfStrokeWidth;
-      innerYRadius = rRect.radii.y - halfStrokeWidth;
-      stroked = innerXRadius > 0 && innerYRadius > 0;
-      xRadius += halfStrokeWidth;
-      yRadius += halfStrokeWidth;
-      rectBounds.outset(halfStrokeWidth, halfStrokeWidth);
+      Point halfStrokeWidth = {0.5f * scales.x * stroke->width, 0.5f * scales.y * stroke->width};
+      if (viewMatrix.getScaleX() == 0.f) {
+        // The matrix may have a rotation by an odd multiple of 90 degrees.
+        std::swap(xRadius, yRadius);
+        std::swap(halfStrokeWidth.x, halfStrokeWidth.y);
+      }
+      innerXRadius = xRadius - halfStrokeWidth.x;
+      innerYRadius = yRadius - halfStrokeWidth.y;
+      stroked = innerXRadius > 0.0f && innerYRadius > 0.0f;
+      xRadius += halfStrokeWidth.x;
+      yRadius += halfStrokeWidth.y;
+      rectBounds.outset(halfStrokeWidth.x, halfStrokeWidth.y);
     }
 
     float reciprocalRadii[4] = {FloatInvert(xRadius), FloatInvert(yRadius),
@@ -157,7 +162,7 @@ void RRectsVertexProvider::getVertices(float* vertices) const {
       xMaxOffset /= xRadius;
       yMaxOffset /= yRadius;
     }
-    auto bounds = rRect.rect.makeOutset(aaBloat, aaBloat);
+    auto bounds = rectBounds.makeOutset(aaBloat, aaBloat);
     float yCoords[4] = {bounds.top, bounds.top + yOuterRadius, bounds.bottom - yOuterRadius,
                         bounds.bottom};
     float yOuterOffsets[4] = {
