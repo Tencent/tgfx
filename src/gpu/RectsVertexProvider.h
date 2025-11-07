@@ -18,11 +18,13 @@
 
 #pragma once
 
+#include <optional>
 #include "core/utils/BlockBuffer.h"
 #include "gpu/AAType.h"
 #include "gpu/VertexProvider.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Matrix.h"
+#include "tgfx/core/Stroke.h"
 
 namespace tgfx {
 struct RectRecord {
@@ -57,7 +59,8 @@ class RectsVertexProvider : public VertexProvider {
                                                     std::vector<PlacementPtr<RectRecord>>&& rects,
                                                     std::vector<PlacementPtr<Rect>>&& uvRects,
                                                     AAType aaType, bool needUVCoord,
-                                                    UVSubsetMode subsetMode);
+                                                    UVSubsetMode subsetMode,
+                                                    std::vector<PlacementPtr<Stroke>>&& strokes);
 
   /**
    * Returns the number of rects in the provider.
@@ -85,6 +88,13 @@ class RectsVertexProvider : public VertexProvider {
    */
   bool hasColor() const {
     return bitFields.hasColor;
+  }
+
+  /**
+   * Returns the line join type if stroke is enabled, nullopt otherwise.
+   */
+  std::optional<LineJoin> lineJoin() const {
+    return _lineJoin;
   }
 
   /**
@@ -119,6 +129,7 @@ class RectsVertexProvider : public VertexProvider {
  protected:
   PlacementArray<RectRecord> rects = {};
   PlacementArray<Rect> uvRects = {};
+  std::optional<LineJoin> _lineJoin = std::nullopt;
   struct {
     uint8_t aaType : 2;
     bool hasUVCoord : 1;
