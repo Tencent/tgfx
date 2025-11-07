@@ -38,9 +38,8 @@ class PDFDocument {
    * @param metadata Metadata describing the PDF file.
    * @return A Document object that provides interfaces for import operations.
    */
-  static std::shared_ptr<PDFDocument> Make(
-      std::shared_ptr<WriteStream> stream, Context* context, PDFMetadata metadata,
-      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+  static std::shared_ptr<PDFDocument> Make(std::shared_ptr<WriteStream> stream, Context* context,
+                                           PDFMetadata metadata);
 
   /**
    * Destroy the PDFDocument object

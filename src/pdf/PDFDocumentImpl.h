@@ -77,8 +77,7 @@ struct PDFLink {
 
 class PDFDocumentImpl : public PDFDocument {
  public:
-  PDFDocumentImpl(std::shared_ptr<WriteStream> stream, Context* context, PDFMetadata Metadata,
-                  std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+  PDFDocumentImpl(std::shared_ptr<WriteStream> stream, Context* context, PDFMetadata Metadata);
 
   ~PDFDocumentImpl() override;
 
@@ -152,7 +151,7 @@ class PDFDocumentImpl : public PDFDocument {
   const Matrix& currentPageTransform() const;
 
   std::shared_ptr<ColorSpace> colorSpace() const {
-    return _colorSpace;
+    return _metadata.colorSpace;
   }
 
   PDFIndirectReference colorSpaceRef() const {
@@ -200,7 +199,6 @@ class PDFDocumentImpl : public PDFDocument {
   float rasterScale = 1;
   float inverseRasterScale = 1;
   PDFTagTree tagTree;
-  std::shared_ptr<ColorSpace> _colorSpace = nullptr;
   PDFIndirectReference _colorSpaceRef;
 };
 

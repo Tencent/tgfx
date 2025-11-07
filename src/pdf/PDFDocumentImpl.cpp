@@ -34,8 +34,7 @@
 namespace tgfx {
 
 std::shared_ptr<PDFDocument> PDFDocument::Make(std::shared_ptr<WriteStream> stream,
-                                               Context* context, PDFMetadata metadata,
-                                               std::shared_ptr<ColorSpace> colorSpace) {
+                                               Context* context, PDFMetadata metadata) {
   if (!stream || !context) {
     return nullptr;
   }
@@ -43,7 +42,7 @@ std::shared_ptr<PDFDocument> PDFDocument::Make(std::shared_ptr<WriteStream> stre
     metadata.rasterDPI = 72.0f;
   }
   metadata.encodingQuality = std::max(metadata.encodingQuality, 0);
-  return std::make_shared<PDFDocumentImpl>(stream, context, metadata, std::move(colorSpace));
+  return std::make_shared<PDFDocumentImpl>(stream, context, metadata);
 }
 
 namespace {
@@ -263,9 +262,8 @@ std::vector<const PDFFont*> get_fonts(const PDFDocumentImpl& canon) {
 }  // namespace
 
 PDFDocumentImpl::PDFDocumentImpl(std::shared_ptr<WriteStream> stream, Context* context,
-                                 PDFMetadata meta, std::shared_ptr<ColorSpace> colorSpace)
-    : _stream(std::move(stream)), _context(context), _metadata(std::move(meta)),
-      _colorSpace(std::move(colorSpace)) {
+                                 PDFMetadata meta)
+    : _stream(std::move(stream)), _context(context), _metadata(std::move(meta)) {
   if (_metadata.rasterDPI != ScalarDefaultRasterDPI) {
     inverseRasterScale = ScalarDefaultRasterDPI / _metadata.rasterDPI;
     rasterScale = _metadata.rasterDPI / ScalarDefaultRasterDPI;
@@ -383,9 +381,9 @@ void PDFDocumentImpl::onEndPage() {
   auto pageContent = drawContext->getContent();
 
   auto resourceDict = drawContext->makeResourceDict();
-  auto dic = std::make_unique<PDFDictionary>();
-  dic->insertRef("CS", _colorSpaceRef);
-  resourceDict->insertObject("ColorSpace", std::move(dic));
+  auto colorSpaceDic = PDFDictionary::Make();
+  colorSpaceDic->insertRef("CS", _colorSpaceRef);
+  resourceDict->insertObject("ColorSpace", std::move(colorSpaceDic));
   DEBUG_ASSERT(!pageRefs.empty());
 
   page->insertObject("Resources", std::move(resourceDict));
@@ -497,12 +495,12 @@ void PDFDocumentImpl::endObject() {
 }
 
 PDFIndirectReference PDFDocumentImpl::emitColorSpace() {
-  auto dictionary = std::make_unique<PDFDictionary>();
-  dictionary->insertInt("N", 3);
-  dictionary->insertName("Alternate", "DeviceRGB");
-  auto iccProfile = _colorSpace->toICCProfile();
+  auto colorSpaceDictionary = PDFDictionary::Make();
+  colorSpaceDictionary->insertInt("N", 3);
+  colorSpaceDictionary->insertName("Alternate", "DeviceRGB");
+  auto iccProfile = _metadata.colorSpace->toICCProfile();
   auto stream = Stream::MakeFromData(iccProfile);
-  auto ref = PDFStreamOut(std::move(dictionary), std::move(stream), this);
+  auto ref = PDFStreamOut(std::move(colorSpaceDictionary), std::move(stream), this);
   PDFArray array{};
   array.appendName("ICCBased");
   array.appendRef(ref);
