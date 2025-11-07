@@ -121,8 +121,7 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(std::shared_ptr<Data> imageByte
   return codec;
 }
 
-std::shared_ptr<Data> ImageCodec::Encode(const Pixmap& pixmap, EncodedFormat format, int quality,
-                                         std::shared_ptr<ColorSpace> colorSpace) {
+std::shared_ptr<Data> ImageCodec::Encode(const Pixmap& pixmap, EncodedFormat format, int quality) {
   if (pixmap.isEmpty()) {
     return nullptr;
   }
@@ -135,20 +134,19 @@ std::shared_ptr<Data> ImageCodec::Encode(const Pixmap& pixmap, EncodedFormat for
   }
 #ifdef TGFX_USE_JPEG_ENCODE
   if (format == EncodedFormat::JPEG) {
-    return JpegCodec::Encode(pixmap, quality, std::move(colorSpace));
+    return JpegCodec::Encode(pixmap, quality);
   }
 #endif
 #ifdef TGFX_USE_WEBP_ENCODE
   if (format == EncodedFormat::WEBP) {
-    return WebpCodec::Encode(pixmap, quality, std::move(colorSpace));
+    return WebpCodec::Encode(pixmap, quality);
   }
 #endif
 #ifdef TGFX_USE_PNG_ENCODE
   if (format == EncodedFormat::PNG) {
-    return PngCodec::Encode(pixmap, quality, std::move(colorSpace));
+    return PngCodec::Encode(pixmap, quality);
   }
 #endif
-  (void)colorSpace;
   return nullptr;
 }
 
@@ -157,7 +155,8 @@ bool ImageCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
     return false;
   }
   if (dstInfo.width() == width() && dstInfo.height() == height()) {
-    return onReadPixels(dstInfo.colorType(), dstInfo.alphaType(), dstInfo.rowBytes(), dstPixels);
+    return onReadPixels(dstInfo.colorType(), dstInfo.alphaType(), dstInfo.rowBytes(),
+                        dstInfo.colorSpace(), dstPixels);
   }
 
   Buffer buffer = {};
@@ -175,7 +174,7 @@ bool ImageCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
     if (dstRowBytes % 16) {
       dstRowBytes = dstImageInfo.rowBytes() + GetPaddingAlignment16(dstImageInfo.rowBytes());
       dstImageInfo = ImageInfo::Make(dstInfo.width(), dstInfo.height(), colorType,
-                                     dstInfo.alphaType(), dstRowBytes);
+                                     dstInfo.alphaType(), dstRowBytes, dstInfo.colorSpace());
     }
     if (!dstTempBuffer.alloc(dstImageInfo.byteSize())) {
       return false;
@@ -186,7 +185,8 @@ bool ImageCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   if (!buffer.alloc(srcRowBytes * static_cast<size_t>(height()))) {
     return false;
   }
-  auto result = onReadPixels(colorType, dstInfo.alphaType(), srcRowBytes, buffer.data());
+  auto result = onReadPixels(colorType, dstInfo.alphaType(), srcRowBytes, dstInfo.colorSpace(),
+                             buffer.data());
   if (!result) {
     return false;
   }

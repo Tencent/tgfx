@@ -55,7 +55,7 @@ std::shared_ptr<Surface> WGLWindow::onCreateSurface(Context* context) {
   return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
 }
 
-void WGLWindow::onPresent(Context*, int64_t) {
+void WGLWindow::onPresent(Context*) {
   const auto wglDevice = std::static_pointer_cast<WGLDevice>(this->device);
   SwapBuffers(wglDevice->deviceContext);
 }

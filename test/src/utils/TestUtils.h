@@ -32,10 +32,6 @@
 
 namespace tgfx {
 
-unsigned CreateGLProgram(Context* context, const std::string& vertex, const std::string& fragment);
-
-bool CreateGLTexture(Context* context, int width, int height, GLTextureInfo* texture);
-
 std::shared_ptr<ImageCodec> MakeImageCodec(const std::string& path);
 
 std::shared_ptr<ImageCodec> MakeNativeCodec(const std::string& path);
@@ -54,8 +50,7 @@ void SaveImage(std::shared_ptr<PixelBuffer> pixelBuffer, const std::string& key)
 
 void SaveImage(const Bitmap& bitmap, const std::string& key);
 
-void SaveImage(const Pixmap& pixmap, const std::string& key,
-               std::shared_ptr<ColorSpace> colorSpace);
+void SaveImage(const Pixmap& pixmap, const std::string& key);
 
 void RemoveImage(const std::string& key);
 

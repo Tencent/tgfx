@@ -207,17 +207,11 @@ void Canvas::drawLine(float x0, float y0, float x1, float y1, const Paint& paint
 }
 
 void Canvas::drawRect(const Rect& rect, const Paint& paint) {
-  if (paint.getStroke()) {
-    Path path = {};
-    path.addRect(rect);
-    drawPath(path, paint);
-    return;
-  }
   if (rect.isEmpty()) {
     return;
   }
   SaveLayerForImageFilter(paint.getImageFilter());
-  drawContext->drawRect(rect, *mcState, paint.getFill());
+  drawContext->drawRect(rect, *mcState, paint.getFill(), paint.getStroke());
 }
 
 void Canvas::drawOval(const Rect& oval, const Paint& paint) {
@@ -353,13 +347,13 @@ void Canvas::drawPath(const Path& path, const MCState& state, const Fill& fill,
       return;
     }
     if (StrokeLineIsRect(*stroke, line, &rect)) {
-      drawContext->drawRect(rect, state, fill);
+      drawContext->drawRect(rect, state, fill, nullptr);
       return;
     }
   }
   if (stroke == nullptr) {
     if (path.isRect(&rect)) {
-      drawContext->drawRect(rect, state, fill);
+      drawContext->drawRect(rect, state, fill, nullptr);
       return;
     }
     RRect rRect = {};

@@ -52,8 +52,9 @@ void ContourContext::drawFill(const Fill& fill) {
   drawContour(FillContour, {}, fill);
 }
 
-void ContourContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill) {
-  drawContour(Contour(rect), state, fill);
+void ContourContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill,
+                              const Stroke* stroke) {
+  drawContour(Contour(rect), state, fill, stroke);
 }
 
 void ContourContext::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
@@ -74,7 +75,7 @@ void ContourContext::drawImage(std::shared_ptr<Image> image, const SamplingOptio
                                const MCState& state, const Fill& fill) {
   auto newFill = fill;
   newFill.shader = Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp, sampling);
-  drawRect(Rect::MakeWH(image->width(), image->height()), state, newFill);
+  drawRect(Rect::MakeWH(image->width(), image->height()), state, newFill, nullptr);
 }
 
 void ContourContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect,
@@ -90,7 +91,7 @@ void ContourContext::drawImageRect(std::shared_ptr<Image> image, const Rect& src
     newState.clip.addPath(path);
     auto newFill = fill;
     newFill.shader = Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp, sampling);
-    drawRect(dstRect, newState, newFill);
+    drawRect(dstRect, newState, newFill, nullptr);
     return;
   }
   auto bounds = state.matrix.mapRect(dstRect);
@@ -355,7 +356,7 @@ void ContourContext::Contour::draw(RecordingContext& context, const MCState& sta
       break;
     }
     case Type::Rect: {
-      context.drawRect(rect, state, fill);
+      context.drawRect(rect, state, fill, stroke);
       break;
     }
     case Type::RRect: {

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/ShapeLayer.h"
+#include "core/utils/StrokeUtils.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/PathEffect.h"
@@ -315,28 +316,29 @@ std::shared_ptr<Shape> ShapeLayer::createStrokeShape() const {
     auto pathEffect = PathEffect::MakeTrim(_strokeStart, _strokeEnd);
     strokeShape = Shape::ApplyEffect(std::move(strokeShape), std::move(pathEffect));
   }
+  auto strokeAlign = static_cast<StrokeAlign>(shapeBitFields.strokeAlign);
+  auto tempStroke = stroke;
+  if (strokeAlign != StrokeAlign::Center) {
+    tempStroke.width *= 2;
+  }
   if (!_lineDashPattern.empty()) {
     auto dashes = _lineDashPattern;
     if (_lineDashPattern.size() % 2 != 0) {
       dashes.insert(dashes.end(), _lineDashPattern.begin(), _lineDashPattern.end());
     }
-    auto dash = PathEffect::MakeDash(dashes.data(), static_cast<int>(dashes.size()), _lineDashPhase,
-                                     shapeBitFields.lineDashAdaptive);
-
-    strokeShape = Shape::ApplyEffect(std::move(strokeShape), std::move(dash));
-  }
-  auto strokeAlign = static_cast<StrokeAlign>(shapeBitFields.strokeAlign);
-  if (strokeAlign != StrokeAlign::Center) {
-    auto tempStroke = stroke;
-    tempStroke.width *= 2;
-    strokeShape = Shape::ApplyStroke(std::move(strokeShape), &tempStroke);
-    if (strokeAlign == StrokeAlign::Inside) {
-      strokeShape = Shape::Merge(std::move(strokeShape), _shape, PathOp::Intersect);
-    } else {
-      strokeShape = Shape::Merge(std::move(strokeShape), _shape, PathOp::Difference);
+    dashes = SimplifyLineDashPattern(dashes, tempStroke);
+    // dashes may be simplified to solid line.
+    if (!dashes.empty()) {
+      auto dash = PathEffect::MakeDash(dashes.data(), static_cast<int>(dashes.size()),
+                                       _lineDashPhase, shapeBitFields.lineDashAdaptive);
+      strokeShape = Shape::ApplyEffect(std::move(strokeShape), std::move(dash));
     }
-  } else {
-    strokeShape = Shape::ApplyStroke(std::move(strokeShape), &stroke);
+  }
+  strokeShape = Shape::ApplyStroke(std::move(strokeShape), &tempStroke);
+  if (strokeAlign == StrokeAlign::Inside) {
+    strokeShape = Shape::Merge(std::move(strokeShape), _shape, PathOp::Intersect);
+  } else if (strokeAlign == StrokeAlign::Outside) {
+    strokeShape = Shape::Merge(std::move(strokeShape), _shape, PathOp::Difference);
   }
   return strokeShape;
 }

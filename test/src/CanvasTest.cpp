@@ -27,6 +27,7 @@
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/RenderContext.h"
+#include "gpu/opengl/GLFunctions.h"
 #include "gpu/opengl/GLGPU.h"
 #include "gpu/ops/RRectDrawOp.h"
 #include "gpu/ops/RectDrawOp.h"
@@ -48,7 +49,6 @@
 #include "tgfx/core/Shape.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/core/Surface.h"
-#include "tgfx/gpu/opengl/GLFunctions.h"
 #include "tgfx/platform/ImageReader.h"
 #include "tgfx/svg/SVGPathParser.h"
 #include "utils/TestUtils.h"
@@ -62,9 +62,9 @@ TGFX_TEST(CanvasTest, clip) {
   ASSERT_TRUE(context != nullptr);
   auto width = 1080;
   auto height = 1776;
-  GLTextureInfo textureInfo;
-  CreateGLTexture(context, width, height, &textureInfo);
-  auto surface = Surface::MakeFrom(context, {textureInfo, width, height}, ImageOrigin::BottomLeft);
+  auto texture = context->gpu()->createTexture({width, height, PixelFormat::RGBA_8888});
+  ASSERT_TRUE(texture != nullptr);
+  auto surface = Surface::MakeFrom(context, texture->getBackendTexture(), ImageOrigin::BottomLeft);
   auto canvas = surface->getCanvas();
   canvas->clear();
   canvas->setMatrix(Matrix::MakeScale(3));
@@ -82,8 +82,6 @@ TGFX_TEST(CanvasTest, clip) {
   paint.setStyle(PaintStyle::Fill);
   canvas->drawPath(drawPath, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/Clip"));
-  auto gl = GLFunctions::Get(context);
-  gl->deleteTextures(1, &textureInfo.id);
 }
 
 TGFX_TEST(CanvasTest, TileMode) {
@@ -488,16 +486,26 @@ TGFX_TEST(CanvasTest, mipmap) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/mipmap_linear_texture_effect"));
 }
 
+static GLTextureInfo CreateRectangleTexture(Context* context, int width, int height) {
+  auto gl = static_cast<GLGPU*>(context->gpu())->functions();
+  GLTextureInfo glInfo = {};
+  gl->genTextures(1, &(glInfo.id));
+  if (glInfo.id == 0) {
+    return {};
+  }
+  glInfo.target = GL_TEXTURE_RECTANGLE;
+  gl->bindTexture(glInfo.target, glInfo.id);
+  auto gpu = static_cast<GLGPU*>(context->gpu());
+  const auto& textureFormat = gpu->caps()->getTextureFormat(PixelFormat::RGBA_8888);
+  gl->texImage2D(glInfo.target, 0, static_cast<int>(textureFormat.internalFormatTexImage), width,
+                 height, 0, textureFormat.externalFormat, textureFormat.externalType, nullptr);
+  return glInfo;
+}
+
 TGFX_TEST(CanvasTest, TileModeFallback) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto gl = GLFunctions::Get(context);
-  GLTextureInfo glInfo = {};
-  gl->genTextures(1, &(glInfo.id));
-  ASSERT_TRUE(glInfo.id > 0);
-  glInfo.target = GL_TEXTURE_RECTANGLE;
-  gl->bindTexture(glInfo.target, glInfo.id);
   auto codec = MakeImageCodec("resources/apitest/rotation.jpg");
   ASSERT_TRUE(codec != nullptr);
   Bitmap bitmap(codec->width(), codec->height(), false, false, codec->colorSpace());
@@ -507,6 +515,9 @@ TGFX_TEST(CanvasTest, TileModeFallback) {
   auto result = codec->readPixels(bitmap.info(), pixels);
   ASSERT_TRUE(result);
   auto gpu = static_cast<GLGPU*>(context->gpu());
+  auto gl = gpu->functions();
+  GLTextureInfo glInfo = CreateRectangleTexture(context, bitmap.width(), bitmap.height());
+  ASSERT_TRUE(glInfo.id != 0);
   const auto& textureFormat =
       gpu->caps()->getTextureFormat(ColorTypeToPixelFormat(bitmap.colorType()));
   gl->texImage2D(glInfo.target, 0, static_cast<int>(textureFormat.internalFormatTexImage),
@@ -1126,11 +1137,11 @@ TGFX_TEST(CanvasTest, atlas) {
   auto pixels = buffer.data();
   ASSERT_TRUE(pixels != nullptr);
   auto RGBAInfo = ImageInfo::Make(imageCodec->width(), imageCodec->height(), ColorType::RGBA_8888,
-                                  AlphaType::Premultiplied);
+                                  AlphaType::Premultiplied, 0, imageCodec->colorSpace());
   EXPECT_TRUE(imageCodec->readPixels(RGBAInfo, pixels));
   auto pixelsData = Data::MakeWithCopy(buffer.data(), buffer.size());
   ASSERT_TRUE(pixelsData != nullptr);
-  auto image = Image::MakeFrom(RGBAInfo, std::move(pixelsData), imageCodec->colorSpace());
+  auto image = Image::MakeFrom(RGBAInfo, std::move(pixelsData));
   ASSERT_TRUE(image != nullptr);
   Matrix matrix[4] = {Matrix::I(), Matrix::MakeTrans(660, 0), Matrix::MakeTrans(0, 380),
                       Matrix::MakeTrans(660, 380)};
@@ -1138,22 +1149,6 @@ TGFX_TEST(CanvasTest, atlas) {
                   Rect::MakeXYWH(0, 360, 640, 360), Rect::MakeXYWH(640, 360, 640, 360)};
   canvas->drawAtlas(std::move(image), matrix, rect, nullptr, 4);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/altas"));
-}
-
-static GLTextureInfo CreateRectangleTexture(Context* context, int width, int heigh) {
-  auto gl = GLFunctions::Get(context);
-  GLTextureInfo glInfo = {};
-  gl->genTextures(1, &(glInfo.id));
-  if (glInfo.id == 0) {
-    return {};
-  }
-  glInfo.target = GL_TEXTURE_RECTANGLE;
-  gl->bindTexture(glInfo.target, glInfo.id);
-  auto gpu = static_cast<GLGPU*>(context->gpu());
-  const auto& textureFormat = gpu->caps()->getTextureFormat(PixelFormat::RGBA_8888);
-  gl->texImage2D(glInfo.target, 0, static_cast<int>(textureFormat.internalFormatTexImage), width,
-                 heigh, 0, textureFormat.externalFormat, textureFormat.externalType, nullptr);
-  return glInfo;
 }
 
 TGFX_TEST(CanvasTest, rectangleTextureAsBlendDst) {
@@ -1175,7 +1170,8 @@ TGFX_TEST(CanvasTest, rectangleTextureAsBlendDst) {
   paint.setBlendMode(BlendMode::Multiply);
   canvas->drawImage(image, &paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/hardware_render_target_blend"));
-  GLFunctions::Get(context)->deleteTextures(1, &(glInfo.id));
+  auto gl = static_cast<GLGPU*>(context->gpu())->functions();
+  gl->deleteTextures(1, &(glInfo.id));
 }
 
 TGFX_TEST(CanvasTest, YUVImage) {

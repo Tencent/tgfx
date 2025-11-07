@@ -164,9 +164,13 @@ void PDFExportContext::drawFill(const Fill& fill) {
   onDrawPath(MCState(), path, fill);
 };
 
-void PDFExportContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill) {
+void PDFExportContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill,
+                                const Stroke* stroke) {
   Path path;
   path.addRect(rect);
+  if (stroke) {
+    stroke->applyToPath(&path);
+  }
   onDrawPath(state, path, fill);
 }
 

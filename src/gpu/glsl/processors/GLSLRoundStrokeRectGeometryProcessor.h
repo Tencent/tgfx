@@ -18,23 +18,17 @@
 
 #pragma once
 
-#include "gpu/resources/Program.h"
-#include "tgfx/gpu/RuntimeProgram.h"
+#include "gpu/processors/RoundStrokeRectGeometryProcessor.h"
 
 namespace tgfx {
-class GLRuntimeProgram;
-
-class RuntimeProgramWrapper : public Program {
+class GLSLRoundStrokeRectGeometryProcessor final : public RoundStrokeRectGeometryProcessor {
  public:
-  static std::shared_ptr<Program> Wrap(std::unique_ptr<RuntimeProgram> program);
+  GLSLRoundStrokeRectGeometryProcessor(AAType aaType, std::optional<Color> commonColor,
+                                       std::optional<Matrix> uvMatrix);
 
-  static const RuntimeProgram* Unwrap(const Program* program);
+  void emitCode(EmitArgs&) const override;
 
- private:
-  std::shared_ptr<GLRuntimeProgram> runtimeProgram = nullptr;
-
-  explicit RuntimeProgramWrapper(std::shared_ptr<GLRuntimeProgram> program)
-      : runtimeProgram(std::move(program)) {
-  }
+  void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData,
+               FPCoordTransformIter* coordTransformIter) const override;
 };
 }  // namespace tgfx

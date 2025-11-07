@@ -22,6 +22,7 @@
 #include <vector>
 #include "tgfx/core/AlphaType.h"
 #include "tgfx/core/ColorSpace.h"
+#include "utils/ColorSpaceHelper.h"
 #include "utils/Log.h"
 
 namespace tgfx {
@@ -82,10 +83,8 @@ ColorSpaceXformSteps::ColorSpaceXformSteps(const ColorSpace* src, AlphaType srcA
     return;
   }
 
-  TransferFunction srcTrfn;
-  src->transferFunction(&srcTrfn);
-  TransferFunction dstTrfn;
-  dst->transferFunction(&dstTrfn);
+  TransferFunction srcTrfn = src->transferFunction();
+  TransferFunction dstTrfn = dst->transferFunction();
 
   // The scale factor is the amount that values in linear space will be scaled to accommodate
   // peak luminance and HDR reference white luminance.
@@ -120,7 +119,7 @@ ColorSpaceXformSteps::ColorSpaceXformSteps(const ColorSpace* src, AlphaType srcA
       this->flags.linearize =
           memcmp(&srcTrfn, &NamedTransferFunction::Linear, sizeof(srcTrfn)) != 0;
       if (this->flags.linearize) {
-        src->transferFunction(&this->srcTransferFunction);
+        this->srcTransferFunction = src->transferFunction();
       }
       break;
   }
@@ -154,7 +153,7 @@ ColorSpaceXformSteps::ColorSpaceXformSteps(const ColorSpace* src, AlphaType srcA
     default:
       this->flags.encode = memcmp(&dstTrfn, &NamedTransferFunction::Linear, sizeof(dstTrfn)) != 0;
       if (this->flags.encode) {
-        dst->invTransferFunction(&this->dstTransferFunctionInverse);
+        this->dstTransferFunctionInverse = dst->inverseTransferFunction();
       }
       break;
   }
@@ -193,8 +192,7 @@ ColorSpaceXformSteps::ColorSpaceXformSteps(const ColorSpace* src, AlphaType srcA
       !this->flags.dstOOTF && this->flags.encode &&
       src->transferFunctionHash() == dst->transferFunctionHash()) {
 #ifdef DEBUG
-    TransferFunction dstTF;
-    dst->transferFunction(&dstTF);
+    TransferFunction dstTF = dst->transferFunction();
     for (int i = 0; i < 7; i++) {
       DEBUG_ASSERT((&srcTransferFunction.g)[i] == (&dstTF.g)[i] && "Hash collision");
     }
@@ -297,7 +295,7 @@ Color ColorSpaceXformSteps::ConvertColorSpace(std::shared_ptr<ColorSpace> src, A
     dstColor = dstColor.premultiply();
     srcAT = AlphaType::Premultiplied;
   }
-  if (ColorSpace::Equals(src.get(), dst.get()) && srcAT == dstAT) {
+  if (NeedConvertColorSpace(src, dst) && srcAT == dstAT) {
     return dstColor;
   }
   ColorSpaceXformSteps steps(src.get(), srcAT, dst.get(), dstAT);

@@ -16,12 +16,33 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/gpu/opengl/GLFunctions.h"
-#include "gpu/opengl/GLGPU.h"
-#include "tgfx/gpu/Context.h"
+#pragma once
+
+#include <list>
+#include "gpu/UniformData.h"
+#include "tgfx/core/BytesKey.h"
+#include "tgfx/gpu/RenderPipeline.h"
 
 namespace tgfx {
-const GLFunctions* GLFunctions::Get(const Context* context) {
-  return context ? static_cast<const GLGPU*>(context->gpu())->functions() : nullptr;
-}
+class Program {
+ public:
+  explicit Program(std::shared_ptr<RenderPipeline> pipeline,
+                   std::unique_ptr<UniformData> vertexUniformData,
+                   std::unique_ptr<UniformData> fragmentUniformData);
+
+  std::shared_ptr<RenderPipeline> getPipeline() const {
+    return pipeline;
+  }
+
+  UniformData* getUniformData(ShaderStage stage) const;
+
+ private:
+  BytesKey programKey = {};
+  std::list<Program*>::iterator cachedPosition;
+  std::shared_ptr<RenderPipeline> pipeline = nullptr;
+  std::unique_ptr<UniformData> vertexUniformData = nullptr;
+  std::unique_ptr<UniformData> fragmentUniformData = nullptr;
+
+  friend class GlobalCache;
+};
 }  // namespace tgfx

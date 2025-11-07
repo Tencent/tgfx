@@ -19,8 +19,13 @@
 #include "tgfx/gpu/opengl/egl/EGLGlobals.h"
 #include <EGL/eglext.h>
 #include <atomic>
+#include <cstring>
 #if defined(_WIN32)
 #include "EGLDisplayWrapper.h"
+#endif
+
+#ifndef EGL_GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT
+#define EGL_GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT -1
 #endif
 
 namespace tgfx {
@@ -37,6 +42,11 @@ EGLGlobals InitializeEGL() {
 #else
   globals.display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
   eglInitialize(globals.display, &majorVersion, &minorVersion);
+  const char* extensions = eglQueryString(globals.display, EGL_EXTENSIONS);
+  if (extensions && strstr(extensions, "EGL_EXT_gl_colorspace_display_p3_passthrough")) {
+    globals.windowSurfaceAttributes = {EGL_GL_COLORSPACE_KHR,
+                                       EGL_GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT, EGL_NONE};
+  }
 #endif
   globals.pbufferSurfaceAttributes = {EGL_WIDTH,           1,        EGL_HEIGHT, 1,
                                       EGL_LARGEST_PBUFFER, EGL_TRUE, EGL_NONE};

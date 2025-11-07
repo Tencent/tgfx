@@ -19,6 +19,7 @@
 #include "CGPathRasterizer.h"
 #include <CoreGraphics/CGBitmapContext.h>
 #include "core/PixelBuffer.h"
+#include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/GammaCorrection.h"
 #include "platform/apple/BitmapContextUtil.h"
 #include "tgfx/core/PathTypes.h"
@@ -114,6 +115,7 @@ std::shared_ptr<PathRasterizer> PathRasterizer::MakeFrom(int width, int height,
 }
 
 bool CGPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
+                                    std::shared_ptr<ColorSpace> dstColorSpace,
                                     void* dstPixels) const {
   if (dstPixels == nullptr) {
     return false;
@@ -122,7 +124,8 @@ bool CGPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, si
   if (path.isEmpty()) {
     return false;
   }
-  auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes);
+  auto dstInfo =
+      ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes, dstColorSpace);
   auto targetInfo = dstInfo.makeIntersect(0, 0, width(), height());
   auto cgContext = CreateBitmapContext(targetInfo, dstPixels);
   if (cgContext == nullptr) {
@@ -164,6 +167,10 @@ bool CGPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, si
   CGContextDrawImage(cgContext, rect, image);
   CGContextRelease(cgContext);
   CGImageRelease(image);
+  if (!NeedConvertColorSpace(colorSpace(), dstColorSpace)) {
+    ConvertColorSpaceInPlace(ImageGenerator::width(), ImageGenerator::height(), colorType,
+                             alphaType, dstRowBytes, colorSpace(), dstColorSpace, dstPixels);
+  }
   return true;
 }
 

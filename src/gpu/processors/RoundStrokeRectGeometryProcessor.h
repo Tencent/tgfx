@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,36 +17,37 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include "FragmentProcessor.h"
-#include "core/ColorSpaceXformSteps.h"
-#include "gpu/ColorSpaceXformHelper.h"
+
+#include <optional>
+#include "GeometryProcessor.h"
+#include "gpu/AAType.h"
 
 namespace tgfx {
-
-class ColorSpaceXformEffect : public FragmentProcessor {
+class RoundStrokeRectGeometryProcessor : public GeometryProcessor {
  public:
-  static PlacementPtr<FragmentProcessor> Make(BlockBuffer* buffer, ColorSpace* src, AlphaType srcAT,
-                                              ColorSpace* dst, AlphaType dstAT);
-
-  static PlacementPtr<FragmentProcessor> Make(BlockBuffer* buffer,
-                                              std::shared_ptr<ColorSpaceXformSteps> colorXform);
-
-  ColorSpaceXformEffect(std::shared_ptr<ColorSpaceXformSteps> colorXform);
+  static PlacementPtr<RoundStrokeRectGeometryProcessor> Make(BlockBuffer* buffer, AAType aaType,
+                                                             std::optional<Color> commonColor,
+                                                             std::optional<Matrix> uvMatrix);
 
   std::string name() const override {
-    return "ColorSpaceXformEffect";
+    return "RoundStrokeRectGeometryProcessor";
   }
 
-  const ColorSpaceXformSteps* colorXform() const {
-    return colorSpaceXformSteps.get();
-  }
-
-  void emitCode(EmitArgs& args) const override;
-
- private:
+ protected:
   DEFINE_PROCESSOR_CLASS_ID
-  void onSetData(UniformData*, UniformData*) const override;
+  RoundStrokeRectGeometryProcessor(AAType aa, std::optional<Color> commonColor,
+                                   std::optional<Matrix> uvMatrix);
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
-  std::shared_ptr<ColorSpaceXformSteps> colorSpaceXformSteps;
+
+  Attribute inPosition;
+  Attribute inCoverage;
+  Attribute inEllipseOffset;
+  Attribute inEllipseRadii;
+  Attribute inUVCoord;
+  Attribute inColor;
+
+  AAType aaType = AAType::None;
+  std::optional<Color> commonColor = std::nullopt;
+  std::optional<Matrix> uvMatrix = std::nullopt;
 };
 }  // namespace tgfx
