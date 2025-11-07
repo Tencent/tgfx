@@ -216,7 +216,7 @@
         "LayerVisible1": "4edccb64",
         "Layer_drawRRect": "66aef718",
         "Layer_hitTestPoint": "cd6a8dff",
-        "Layer_hitTestPointNested": "00bc6d75",
+        "Layer_hitTestPointNested": "b722a9ab",
         "MaskAlpha": "3dbeed5",
         "ModeColorFilter": "68928515",
         "NotRectBackgroundBlur": "a8b299ea",
@@ -244,7 +244,7 @@
         "filterTest": "68928515",
         "filters": "cebc420b",
         "getBounds": "cd6a8dff",
-        "getLayersUnderPoint": "cd6a8dff",
+        "getLayersUnderPoint": "b722a9ab",
         "getTightBounds": "cd6a8dff",
         "greyColorMatrix": "68928515",
         "identityMatrix": "68928515",
@@ -355,7 +355,7 @@
         "complex4": "f38f0012",
         "complex5": "f38f0012",
         "complex6": "f38f0012",
-        "complex7": "f38f0012",
+        "complex7": "b722a9ab",
         "jpg_image": "b1db872",
         "mask": "da364e8",
         "path": "f38f0012",
@@ -383,13 +383,13 @@
         "ImageSnapshot_Surface2": "0cfb8996"
     },
     "TextAlignTest": {
-        "FontFallbackTest": "cd6a8dff",
+        "FontFallbackTest": "b722a9ab",
         "SingleLineTextAlign": "6095b909",
         "TextAlign": "6be99a69",
         "TextAlignBlankLineTest": "6095b909",
-        "TextAlignSimulateVerticalTextLayout": "9060bdb6",
+        "TextAlignSimulateVerticalTextLayout": "b722a9ab",
         "TextAlignWidth0Height0": "6095b909",
-        "TextAlignWidth1Height10": "f38f0012",
+        "TextAlignWidth1Height10": "b722a9ab",
         "TruncateTextLineTest": "9060bdb6"
     },
     "TypefaceTest": {

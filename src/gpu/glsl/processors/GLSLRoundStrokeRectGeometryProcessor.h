@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,10 +18,17 @@
 
 #pragma once
 
-namespace tgfx {
-class GLProcGetter;
-class GLFunctions;
-class GLInfo;
+#include "gpu/processors/RoundStrokeRectGeometryProcessor.h"
 
-void GLAssembleGLInterface(const GLProcGetter* getter, GLFunctions* functions, const GLInfo& info);
+namespace tgfx {
+class GLSLRoundStrokeRectGeometryProcessor final : public RoundStrokeRectGeometryProcessor {
+ public:
+  GLSLRoundStrokeRectGeometryProcessor(AAType aaType, std::optional<Color> commonColor,
+                                       std::optional<Matrix> uvMatrix);
+
+  void emitCode(EmitArgs&) const override;
+
+  void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData,
+               FPCoordTransformIter* coordTransformIter) const override;
+};
 }  // namespace tgfx
