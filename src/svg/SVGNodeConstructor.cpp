@@ -208,86 +208,90 @@ bool SVGNodeConstructor::SetStyleAttributes(SVGNode& node, SVGAttribute,
   return true;
 }
 
-std::unordered_map<std::string, AttrParseInfo> SVGNodeConstructor::attributeParseInfo = {
-    {"cx", {SVGAttribute::Cx, SVGNodeConstructor::SetLengthAttribute}},
-    {"cy", {SVGAttribute::Cy, SVGNodeConstructor::SetLengthAttribute}},
-    {"filterUnits",
-     {SVGAttribute::FilterUnits, SVGNodeConstructor::SetObjectBoundingBoxUnitsAttribute}},
-    // focal point x & y
-    {"fx", {SVGAttribute::Fx, SVGNodeConstructor::SetLengthAttribute}},
-    {"fy", {SVGAttribute::Fy, SVGNodeConstructor::SetLengthAttribute}},
-    {"height", {SVGAttribute::Height, SVGNodeConstructor::SetLengthAttribute}},
-    {"preserveAspectRatio",
-     {SVGAttribute::PreserveAspectRatio, SVGNodeConstructor::SetPreserveAspectRatioAttribute}},
-    {"r", {SVGAttribute::R, SVGNodeConstructor::SetLengthAttribute}},
-    {"rx", {SVGAttribute::Rx, SVGNodeConstructor::SetLengthAttribute}},
-    {"ry", {SVGAttribute::Ry, SVGNodeConstructor::SetLengthAttribute}},
-    {"style", {SVGAttribute::Unknown, SVGNodeConstructor::SetStyleAttributes}},
-    {"text", {SVGAttribute::Text, SVGNodeConstructor::SetStringAttribute}},
-    {"transform", {SVGAttribute::Transform, SVGNodeConstructor::SetTransformAttribute}},
-    {"viewBox", {SVGAttribute::ViewBox, SVGNodeConstructor::SetViewBoxAttribute}},
-    {"width", {SVGAttribute::Width, SVGNodeConstructor::SetLengthAttribute}},
-    {"x", {SVGAttribute::X, SVGNodeConstructor::SetLengthAttribute}},
-    {"x1", {SVGAttribute::X1, SVGNodeConstructor::SetLengthAttribute}},
-    {"x2", {SVGAttribute::X2, SVGNodeConstructor::SetLengthAttribute}},
-    {"xlink:href", {SVGAttribute::Href, SVGNodeConstructor::SetIRIAttribute}},
-    {"y", {SVGAttribute::Y, SVGNodeConstructor::SetLengthAttribute}},
-    {"y1", {SVGAttribute::Y1, SVGNodeConstructor::SetLengthAttribute}},
-    {"y2", {SVGAttribute::Y2, SVGNodeConstructor::SetLengthAttribute}},
-};
+std::unordered_map<std::string, AttrParseInfo> SVGNodeConstructor::InitAttributeParseInfo() {
+  return {
+      {"cx", {SVGAttribute::Cx, SVGNodeConstructor::SetLengthAttribute}},
+      {"cy", {SVGAttribute::Cy, SVGNodeConstructor::SetLengthAttribute}},
+      {"filterUnits",
+       {SVGAttribute::FilterUnits, SVGNodeConstructor::SetObjectBoundingBoxUnitsAttribute}},
+      // focal point x & y
+      {"fx", {SVGAttribute::Fx, SVGNodeConstructor::SetLengthAttribute}},
+      {"fy", {SVGAttribute::Fy, SVGNodeConstructor::SetLengthAttribute}},
+      {"height", {SVGAttribute::Height, SVGNodeConstructor::SetLengthAttribute}},
+      {"preserveAspectRatio",
+       {SVGAttribute::PreserveAspectRatio, SVGNodeConstructor::SetPreserveAspectRatioAttribute}},
+      {"r", {SVGAttribute::R, SVGNodeConstructor::SetLengthAttribute}},
+      {"rx", {SVGAttribute::Rx, SVGNodeConstructor::SetLengthAttribute}},
+      {"ry", {SVGAttribute::Ry, SVGNodeConstructor::SetLengthAttribute}},
+      {"style", {SVGAttribute::Unknown, SVGNodeConstructor::SetStyleAttributes}},
+      {"text", {SVGAttribute::Text, SVGNodeConstructor::SetStringAttribute}},
+      {"transform", {SVGAttribute::Transform, SVGNodeConstructor::SetTransformAttribute}},
+      {"viewBox", {SVGAttribute::ViewBox, SVGNodeConstructor::SetViewBoxAttribute}},
+      {"width", {SVGAttribute::Width, SVGNodeConstructor::SetLengthAttribute}},
+      {"x", {SVGAttribute::X, SVGNodeConstructor::SetLengthAttribute}},
+      {"x1", {SVGAttribute::X1, SVGNodeConstructor::SetLengthAttribute}},
+      {"x2", {SVGAttribute::X2, SVGNodeConstructor::SetLengthAttribute}},
+      {"xlink:href", {SVGAttribute::Href, SVGNodeConstructor::SetIRIAttribute}},
+      {"y", {SVGAttribute::Y, SVGNodeConstructor::SetLengthAttribute}},
+      {"y1", {SVGAttribute::Y1, SVGNodeConstructor::SetLengthAttribute}},
+      {"y2", {SVGAttribute::Y2, SVGNodeConstructor::SetLengthAttribute}},
+  };
+}
 
-using ElementFactory = std::function<std::shared_ptr<SVGNode>()>;
-std::unordered_map<std::string, ElementFactory> ElementFactories = {
-    {"a", []() -> std::shared_ptr<SVGNode> { return SVGGroup::Make(); }},
-    {"circle", []() -> std::shared_ptr<SVGNode> { return SVGCircle::Make(); }},
-    {"clipPath", []() -> std::shared_ptr<SVGNode> { return SVGClipPath::Make(); }},
-    {"defs", []() -> std::shared_ptr<SVGNode> { return SVGDefs::Make(); }},
-    {"ellipse", []() -> std::shared_ptr<SVGNode> { return SVGEllipse::Make(); }},
-    {"feBlend", []() -> std::shared_ptr<SVGNode> { return SVGFeBlend::Make(); }},
-    {"feColorMatrix", []() -> std::shared_ptr<SVGNode> { return SVGFeColorMatrix::Make(); }},
-    {"feComponentTransfer",
-     []() -> std::shared_ptr<SVGNode> { return SVGFeComponentTransfer::Make(); }},
-    {"feComposite", []() -> std::shared_ptr<SVGNode> { return SVGFeComposite::Make(); }},
-    {"feDiffuseLighting",
-     []() -> std::shared_ptr<SVGNode> { return SVGFeDiffuseLighting::Make(); }},
-    {"feDisplacementMap",
-     []() -> std::shared_ptr<SVGNode> { return SVGFeDisplacementMap::Make(); }},
-    {"feDistantLight", []() -> std::shared_ptr<SVGNode> { return SVGFeDistantLight::Make(); }},
-    {"feFlood", []() -> std::shared_ptr<SVGNode> { return SVGFeFlood::Make(); }},
-    {"feFuncA", []() -> std::shared_ptr<SVGNode> { return SVGFeFunc::MakeFuncA(); }},
-    {"feFuncB", []() -> std::shared_ptr<SVGNode> { return SVGFeFunc::MakeFuncB(); }},
-    {"feFuncG", []() -> std::shared_ptr<SVGNode> { return SVGFeFunc::MakeFuncG(); }},
-    {"feFuncR", []() -> std::shared_ptr<SVGNode> { return SVGFeFunc::MakeFuncR(); }},
-    {"feGaussianBlur", []() -> std::shared_ptr<SVGNode> { return SVGFeGaussianBlur::Make(); }},
-    {"feImage", []() -> std::shared_ptr<SVGNode> { return SVGFeImage::Make(); }},
-    {"feMerge", []() -> std::shared_ptr<SVGNode> { return SVGFeMerge::Make(); }},
-    {"feMergeNode", []() -> std::shared_ptr<SVGNode> { return SVGFeMergeNode::Make(); }},
-    {"feMorphology", []() -> std::shared_ptr<SVGNode> { return SVGFeMorphology::Make(); }},
-    {"feOffset", []() -> std::shared_ptr<SVGNode> { return SVGFeOffset::Make(); }},
-    {"fePointLight", []() -> std::shared_ptr<SVGNode> { return SVGFePointLight::Make(); }},
-    {"feSpecularLighting",
-     []() -> std::shared_ptr<SVGNode> { return SVGFeSpecularLighting::Make(); }},
-    {"feSpotLight", []() -> std::shared_ptr<SVGNode> { return SVGFeSpotLight::Make(); }},
-    {"feTurbulence", []() -> std::shared_ptr<SVGNode> { return SVGFeTurbulence::Make(); }},
-    {"filter", []() -> std::shared_ptr<SVGNode> { return SVGFilter::Make(); }},
-    {"g", []() -> std::shared_ptr<SVGNode> { return SVGGroup::Make(); }},
-    {"image", []() -> std::shared_ptr<SVGNode> { return SVGImage::Make(); }},
-    {"line", []() -> std::shared_ptr<SVGNode> { return SVGLine::Make(); }},
-    {"linearGradient", []() -> std::shared_ptr<SVGNode> { return SVGLinearGradient::Make(); }},
-    {"mask", []() -> std::shared_ptr<SVGNode> { return SVGMask::Make(); }},
-    {"path", []() -> std::shared_ptr<SVGNode> { return SVGPath::Make(); }},
-    {"pattern", []() -> std::shared_ptr<SVGNode> { return SVGPattern::Make(); }},
-    {"polygon", []() -> std::shared_ptr<SVGNode> { return SVGPoly::MakePolygon(); }},
-    {"polyline", []() -> std::shared_ptr<SVGNode> { return SVGPoly::MakePolyline(); }},
-    {"radialGradient", []() -> std::shared_ptr<SVGNode> { return SVGRadialGradient::Make(); }},
-    {"rect", []() -> std::shared_ptr<SVGNode> { return SVGRect::Make(); }},
-    {"stop", []() -> std::shared_ptr<SVGNode> { return SVGStop::Make(); }},
-    //    "svg" handled explicitly
-    {"text", []() -> std::shared_ptr<SVGNode> { return SVGText::Make(); }},
-    {"textPath", []() -> std::shared_ptr<SVGNode> { return SVGTextPath::Make(); }},
-    {"tspan", []() -> std::shared_ptr<SVGNode> { return SVGTSpan::Make(); }},
-    {"use", []() -> std::shared_ptr<SVGNode> { return SVGUse::Make(); }},
-};
+std::unordered_map<std::string, SVGNodeConstructor::ElementFactory>
+SVGNodeConstructor::InitElementFactories() {
+  return {
+      {"a", []() -> std::shared_ptr<SVGNode> { return SVGGroup::Make(); }},
+      {"circle", []() -> std::shared_ptr<SVGNode> { return SVGCircle::Make(); }},
+      {"clipPath", []() -> std::shared_ptr<SVGNode> { return SVGClipPath::Make(); }},
+      {"defs", []() -> std::shared_ptr<SVGNode> { return SVGDefs::Make(); }},
+      {"ellipse", []() -> std::shared_ptr<SVGNode> { return SVGEllipse::Make(); }},
+      {"feBlend", []() -> std::shared_ptr<SVGNode> { return SVGFeBlend::Make(); }},
+      {"feColorMatrix", []() -> std::shared_ptr<SVGNode> { return SVGFeColorMatrix::Make(); }},
+      {"feComponentTransfer",
+       []() -> std::shared_ptr<SVGNode> { return SVGFeComponentTransfer::Make(); }},
+      {"feComposite", []() -> std::shared_ptr<SVGNode> { return SVGFeComposite::Make(); }},
+      {"feDiffuseLighting",
+       []() -> std::shared_ptr<SVGNode> { return SVGFeDiffuseLighting::Make(); }},
+      {"feDisplacementMap",
+       []() -> std::shared_ptr<SVGNode> { return SVGFeDisplacementMap::Make(); }},
+      {"feDistantLight", []() -> std::shared_ptr<SVGNode> { return SVGFeDistantLight::Make(); }},
+      {"feFlood", []() -> std::shared_ptr<SVGNode> { return SVGFeFlood::Make(); }},
+      {"feFuncA", []() -> std::shared_ptr<SVGNode> { return SVGFeFunc::MakeFuncA(); }},
+      {"feFuncB", []() -> std::shared_ptr<SVGNode> { return SVGFeFunc::MakeFuncB(); }},
+      {"feFuncG", []() -> std::shared_ptr<SVGNode> { return SVGFeFunc::MakeFuncG(); }},
+      {"feFuncR", []() -> std::shared_ptr<SVGNode> { return SVGFeFunc::MakeFuncR(); }},
+      {"feGaussianBlur", []() -> std::shared_ptr<SVGNode> { return SVGFeGaussianBlur::Make(); }},
+      {"feImage", []() -> std::shared_ptr<SVGNode> { return SVGFeImage::Make(); }},
+      {"feMerge", []() -> std::shared_ptr<SVGNode> { return SVGFeMerge::Make(); }},
+      {"feMergeNode", []() -> std::shared_ptr<SVGNode> { return SVGFeMergeNode::Make(); }},
+      {"feMorphology", []() -> std::shared_ptr<SVGNode> { return SVGFeMorphology::Make(); }},
+      {"feOffset", []() -> std::shared_ptr<SVGNode> { return SVGFeOffset::Make(); }},
+      {"fePointLight", []() -> std::shared_ptr<SVGNode> { return SVGFePointLight::Make(); }},
+      {"feSpecularLighting",
+       []() -> std::shared_ptr<SVGNode> { return SVGFeSpecularLighting::Make(); }},
+      {"feSpotLight", []() -> std::shared_ptr<SVGNode> { return SVGFeSpotLight::Make(); }},
+      {"feTurbulence", []() -> std::shared_ptr<SVGNode> { return SVGFeTurbulence::Make(); }},
+      {"filter", []() -> std::shared_ptr<SVGNode> { return SVGFilter::Make(); }},
+      {"g", []() -> std::shared_ptr<SVGNode> { return SVGGroup::Make(); }},
+      {"image", []() -> std::shared_ptr<SVGNode> { return SVGImage::Make(); }},
+      {"line", []() -> std::shared_ptr<SVGNode> { return SVGLine::Make(); }},
+      {"linearGradient", []() -> std::shared_ptr<SVGNode> { return SVGLinearGradient::Make(); }},
+      {"mask", []() -> std::shared_ptr<SVGNode> { return SVGMask::Make(); }},
+      {"path", []() -> std::shared_ptr<SVGNode> { return SVGPath::Make(); }},
+      {"pattern", []() -> std::shared_ptr<SVGNode> { return SVGPattern::Make(); }},
+      {"polygon", []() -> std::shared_ptr<SVGNode> { return SVGPoly::MakePolygon(); }},
+      {"polyline", []() -> std::shared_ptr<SVGNode> { return SVGPoly::MakePolyline(); }},
+      {"radialGradient", []() -> std::shared_ptr<SVGNode> { return SVGRadialGradient::Make(); }},
+      {"rect", []() -> std::shared_ptr<SVGNode> { return SVGRect::Make(); }},
+      {"stop", []() -> std::shared_ptr<SVGNode> { return SVGStop::Make(); }},
+      //    "svg" handled explicitly
+      {"text", []() -> std::shared_ptr<SVGNode> { return SVGText::Make(); }},
+      {"textPath", []() -> std::shared_ptr<SVGNode> { return SVGTextPath::Make(); }},
+      {"tspan", []() -> std::shared_ptr<SVGNode> { return SVGTSpan::Make(); }},
+      {"use", []() -> std::shared_ptr<SVGNode> { return SVGUse::Make(); }},
+  };
+}
 
 bool SVGNodeConstructor::SetAttribute(SVGNode& node, const std::string& name,
                                       const std::string& value) {
@@ -296,6 +300,7 @@ bool SVGNodeConstructor::SetAttribute(SVGNode& node, const std::string& name,
     return true;
   }
 
+  static const auto attributeParseInfo = InitAttributeParseInfo();
   if (auto iter = attributeParseInfo.find(name); iter != attributeParseInfo.end()) {
     auto setter = iter->second.setter;
     return setter(node, iter->second.attribute, value);
@@ -430,7 +435,8 @@ std::shared_ptr<SVGNode> SVGNodeConstructor::ConstructSVGNode(const Construction
       return SVGRoot::Make(context.parentNode ? SVGRoot::Type::kInner : SVGRoot::Type::kRoot);
     }
 
-    if (auto iter = ElementFactories.find(elementName); iter != ElementFactories.end()) {
+    static const auto elementFactories = InitElementFactories();
+    if (auto iter = elementFactories.find(elementName); iter != elementFactories.end()) {
       return iter->second();
     }
     //can't find the element factory
