@@ -771,20 +771,36 @@ std::shared_ptr<ImageFilter> Layer::getImageFilter(float contentScale) {
 }
 
 RasterizedContent* Layer::getRasterizedCache(const DrawArgs& args, const Matrix& renderMatrix) {
-  if (!bitFields.shouldRasterize || args.context == nullptr ||
+  auto needRasterize = bitFields.shouldRasterize;
+  auto scaledBounds = renderBounds;
+  auto scale = renderMatrix.getMaxScale();
+  scaledBounds.scale(scale, scale);
+  constexpr float RasterizationThreshold = 64.0f;
+  constexpr float MaxRasterizationScale = 0.2f;
+  needRasterize |= (!_layerStyles.empty() || !_filters.empty()) &&
+                   scaledBounds.width() <= RasterizationThreshold &&
+                   scaledBounds.height() <= RasterizationThreshold &&
+                   scale <= MaxRasterizationScale;
+  if (!needRasterize || args.context == nullptr ||
       (args.drawMode == DrawMode::Background && hasBackgroundStyle()) ||
       args.drawMode == DrawMode::Contour || args.excludeEffects) {
     return nullptr;
   }
   auto contextID = args.context->uniqueID();
   auto content = rasterizedContent.get();
-  float contentScale =
-      _rasterizationScale == 0.0f ? renderMatrix.getMaxScale() : _rasterizationScale;
+  float contentScale = _rasterizationScale;
+  if (contentScale <= 0.0f || !bitFields.shouldRasterize) {
+    contentScale =
+        std::max(MaxRasterizationScale,
+                 RasterizationThreshold / std::max(renderBounds.width(), renderBounds.height()));
+  }
   if (content && content->contextID() == contextID && content->contentScale() == contentScale) {
     return content;
   }
   Matrix drawingMatrix = {};
-  auto image = getRasterizedImage(args, contentScale, &drawingMatrix);
+  auto offscreenArgs = args;
+  offscreenArgs.context = nullptr;
+  auto image = getRasterizedImage(offscreenArgs, contentScale, &drawingMatrix);
   if (image == nullptr) {
     return nullptr;
   }
@@ -829,6 +845,12 @@ std::shared_ptr<Image> Layer::getRasterizedImage(const DrawArgs& args, float con
 
 void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode) {
   DEBUG_ASSERT(canvas != nullptr);
+  auto scale = canvas->getMatrix().getMaxScale();
+  auto scaleBounds = renderBounds;
+  scaleBounds.scale(scale, scale);
+  if (scaleBounds.width() < 0.5f || scaleBounds.height() < 0.5f) {
+    return;
+  }
   if (args.renderRect && !Rect::Intersects(*args.renderRect, renderBounds)) {
     if (args.blurBackground) {
       auto backgroundRect = args.blurBackground->getBackgroundRect();
