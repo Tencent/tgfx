@@ -100,7 +100,8 @@ void Pixmap::reset(Bitmap& bitmap) {
 }
 
 Color Pixmap::getColor(int x, int y) const {
-  auto dstInfo = ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Unpremultiplied, 4);
+  auto dstInfo = ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Unpremultiplied, 4,
+                                 ColorSpace::MakeSRGB());
   uint8_t color[4];
   if (!readPixels(dstInfo, color, x, y)) {
     return Color::Transparent();
@@ -176,10 +177,7 @@ bool Pixmap::clear() {
 }
 
 std::shared_ptr<ColorSpace> Pixmap::colorSpace() const {
-  if (pixelRef) {
-    return pixelRef->colorSpace();
-  }
-  return nullptr;
+  return _info.colorSpace();
 }
 
 }  // namespace tgfx

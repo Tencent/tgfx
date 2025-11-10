@@ -76,7 +76,10 @@ class SVGNodeConstructor {
 
   static void ParseCSSStyle(const DOMNode* xmlNode, CSSMapper* mapper);
 
-  static std::unordered_map<std::string, AttrParseInfo> attributeParseInfo;
+  static std::unordered_map<std::string, AttrParseInfo> InitAttributeParseInfo();
+
+  using ElementFactory = std::function<std::shared_ptr<SVGNode>()>;
+  static std::unordered_map<std::string, ElementFactory> InitElementFactories();
 };
 
 }  // namespace tgfx

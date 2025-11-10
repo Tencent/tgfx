@@ -51,7 +51,7 @@ TGFX_TEST(PathRasterizerTest, Rasterize) {
   pixmap.clear();
   auto result = surface->readPixels(pixmap.info(), pixmap.writablePixels());
   EXPECT_TRUE(result);
-  EXPECT_TRUE(Baseline::Compare(pixmap, "MaskTest/rasterize_path_texture", surface->colorSpace()));
+  EXPECT_TRUE(Baseline::Compare(pixmap, "MaskTest/rasterize_path_texture"));
 
   auto typeface =
       Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoColorEmoji.ttf"));

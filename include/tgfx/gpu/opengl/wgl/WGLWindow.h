@@ -31,7 +31,7 @@ class WGLWindow : public Window {
 
  protected:
   std::shared_ptr<Surface> onCreateSurface(Context* context) override;
-  void onPresent(Context*, int64_t) override;
+  void onPresent(Context*) override;
 
  private:
   HWND nativeWindow = nullptr;

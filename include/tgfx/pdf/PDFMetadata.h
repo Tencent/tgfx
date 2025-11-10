@@ -22,6 +22,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include "tgfx/core/ColorSpace.h"
 
 namespace tgfx {
 class PDFArray;
@@ -220,6 +221,11 @@ struct PDFMetadata {
   };
 
   CompressionLevel compressionLevel = CompressionLevel::Default;
+
+  /**
+   * The ColorSpace of this PDF document.
+   */
+  std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB();
 };
 
 }  // namespace tgfx

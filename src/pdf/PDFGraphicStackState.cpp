@@ -112,10 +112,12 @@ void PDFGraphicStackState::updateDrawingState(const PDFGraphicStackState::Entry&
       currentEntry()->shaderIndex = state.shaderIndex;
     }
   } else if (state.color != currentEntry()->color || currentEntry()->shaderIndex >= 0) {
+    contentStream->writeText("/CS CS\n");
     EmitPDFColor(state.color, contentStream);
-    contentStream->writeText("RG ");
+    contentStream->writeText("SC\n");
+    contentStream->writeText("/CS cs\n");
     EmitPDFColor(state.color, contentStream);
-    contentStream->writeText("rg\n");
+    contentStream->writeText("sc\n");
     currentEntry()->color = state.color;
     currentEntry()->shaderIndex = -1;
   }

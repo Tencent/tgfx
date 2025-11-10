@@ -21,22 +21,17 @@
 
 namespace tgfx {
 std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(const ImageInfo& info,
-                                                 std::shared_ptr<Data> pixels,
-                                                 std::shared_ptr<ColorSpace> colorSpace) {
+                                                 std::shared_ptr<Data> pixels) {
   if (info.isEmpty() || pixels == nullptr || info.byteSize() > pixels->size()) {
     return nullptr;
   }
-  return std::make_shared<RawPixelCodec>(info, std::move(pixels), std::move(colorSpace));
+  return std::make_shared<RawPixelCodec>(info, std::move(pixels));
 }
 
 class RawPixelData : public ImageBuffer {
  public:
-  RawPixelData(const ImageInfo& info, std::shared_ptr<Data> pixels,
-               std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB())
-      : info(info), pixels(std::move(pixels)), _colorSpace(std::move(colorSpace)) {
-    if (info.colorType() == ColorType::ALPHA_8) {
-      _colorSpace = nullptr;
-    }
+  RawPixelData(const ImageInfo& info, std::shared_ptr<Data> pixels)
+      : info(info), pixels(std::move(pixels)) {
   }
 
   int width() const override {
@@ -52,7 +47,7 @@ class RawPixelData : public ImageBuffer {
   }
 
   std::shared_ptr<ColorSpace> colorSpace() const override {
-    return _colorSpace;
+    return info.colorSpace();
   }
 
  protected:
@@ -75,7 +70,6 @@ class RawPixelData : public ImageBuffer {
  private:
   ImageInfo info = {};
   std::shared_ptr<Data> pixels = nullptr;
-  std::shared_ptr<ColorSpace> _colorSpace = ColorSpace::MakeSRGB();
 };
 
 std::shared_ptr<ImageBuffer> RawPixelCodec::onMakeBuffer(bool tryHardware) const {
@@ -84,7 +78,7 @@ std::shared_ptr<ImageBuffer> RawPixelCodec::onMakeBuffer(bool tryHardware) const
       case ColorType::ALPHA_8:
       case ColorType::RGBA_8888:
       case ColorType::BGRA_8888:
-        return std::make_shared<RawPixelData>(info, pixels, colorSpace());
+        return std::make_shared<RawPixelData>(info, pixels);
       default:
         return nullptr;
     }

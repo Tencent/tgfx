@@ -126,17 +126,22 @@ std::shared_ptr<Surface> EGLWindow::onCreateSurface(Context* context) {
   return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft, 1, colorSpace);
 }
 
-void EGLWindow::onPresent(Context*, int64_t presentationTime) {
+void EGLWindow::setPresentationTime(int64_t time) {
+  presentationTime = time;
+}
+
+void EGLWindow::onPresent(Context*) {
   auto device = std::static_pointer_cast<EGLDevice>(this->device);
   auto eglDisplay = device->eglDisplay;
   // eglSurface cannot be nullptr in EGLWindow.
   auto eglSurface = device->eglSurface;
-  if (presentationTime != INT64_MIN) {
+  if (presentationTime.has_value()) {
     static auto eglPresentationTimeANDROID = reinterpret_cast<PFNEGLPRESENTATIONTIMEANDROIDPROC>(
         eglGetProcAddress("eglPresentationTimeANDROID"));
     if (eglPresentationTimeANDROID) {
       // egl uses nano seconds
-      eglPresentationTimeANDROID(eglDisplay, eglSurface, presentationTime * 1000);
+      eglPresentationTimeANDROID(eglDisplay, eglSurface, *presentationTime * 1000);
+      presentationTime = std::nullopt;
     }
   }
   eglSwapBuffers(eglDisplay, eglSurface);
