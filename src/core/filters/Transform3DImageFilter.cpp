@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Transform3DImageFilter.h"
+#include "core/Matrix2D.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/PlacementPtr.h"
 #include "gpu/DrawingManager.h"
@@ -41,7 +42,21 @@ Rect Transform3DImageFilter::onFilterBounds(const Rect& rect, MapDirection mapDi
     auto result = _matrix.mapRect(rect);
     return result;
   }
-  return rect;
+
+  // All vertices inside the rect have an initial z-coordinate of 0, so the third column of the 4x4
+  // matrix does not affect the final transformation result and can be ignored. Additionally, since
+  // we do not care about the final projected z-axis coordinate, the third row can also be ignored.
+  // Therefore, the 4x4 matrix can be simplified to a 3x3 matrix.
+  float values[16] = {};
+  _matrix.getColumnMajor(values);
+  auto matrix2D = Matrix2D::MakeAll(values[0], values[1], values[3], values[4], values[5],
+                                    values[7], values[12], values[13], values[15]);
+  Matrix2D inversedMatrix;
+  if (!matrix2D.invert(&inversedMatrix)) {
+    DEBUG_ASSERT(false);
+    return rect;
+  }
+  return inversedMatrix.mapRect(rect);
 }
 
 std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(

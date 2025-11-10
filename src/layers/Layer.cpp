@@ -1137,10 +1137,7 @@ void Layer::onDrawOffscreen(
     }
   }
   auto picture = RecordPicture(offscreenArgs.drawMode, contentScale, [&](Canvas* canvas) {
-    // When the layer contains 3D transformations or projection transformations, it's impossible to
-    // calculate the element area given the known projection target area, so the clipping step is
-    // skipped here.
-    if (inputBounds.has_value() && _matrix3DIsAffine) {
+    if (inputBounds.has_value()) {
       canvas->clipRect(*inputBounds);
     }
     drawContents(offscreenArgs, canvas, 1.0f, layerStyleSource.get());

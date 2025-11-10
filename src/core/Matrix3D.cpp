@@ -76,6 +76,7 @@ static void TransposeArrays(const float src[16], float dst[16]) {
 }
 
 static bool InvertMatrix3D(const float inMat[16], float outMat[16]) {
+  // a[ij] represents the element at column i, row j
   const float a00 = inMat[0];
   const float a01 = inMat[1];
   const float a02 = inMat[2];
@@ -93,6 +94,9 @@ static bool InvertMatrix3D(const float inMat[16], float outMat[16]) {
   const float a32 = inMat[14];
   const float a33 = inMat[15];
 
+  // Precompute all possible 2x2 determinants to optimize the calculation of cofactors, where a
+  // cofactor refers to the determinant of the remaining matrix after removing a specific row and
+  // column.
   float b00 = a00 * a11 - a01 * a10;
   float b01 = a00 * a12 - a02 * a10;
   float b02 = a00 * a13 - a03 * a10;
