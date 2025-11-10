@@ -1006,7 +1006,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   auto image = getOffscreenContentImage(args, canvas, passThroughBackground, subBackgroundContext,
                                    clipBounds, &imageMatrix);
   auto invertImageMatrix = Matrix::I();
-  if (image && !imageMatrix.invert(&invertImageMatrix)) {
+  if (image == nullptr || !imageMatrix.invert(&invertImageMatrix)) {
     return;
   }
   Paint paint = {};
