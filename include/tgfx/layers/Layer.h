@@ -128,9 +128,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   /**
    * Returns true if the layer allows its background to pass through to sublayers. Note that layers
-   * with non-SrcOver blend modes or filters will ignore this setting and prevent background
-   * pass-through.
-   * The default value is true.
+   * with non-SrcOver blend modes, filters, or 3D transforms will ignore this setting and prevent
+   * background pass-through. The default value is true.
    */
   bool passThroughBackground() const {
     return bitFields.passThroughBackground;
