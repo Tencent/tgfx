@@ -1004,7 +1004,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   auto clipBounds = GetClipBounds(args.blurBackground ? args.blurBackground->getCanvas() : canvas);
   auto imageMatrix = Matrix::I();
   auto image = getOffscreenContentImage(args, canvas, passThroughBackground, subBackgroundContext,
-                                   clipBounds, &imageMatrix);
+                                        clipBounds, &imageMatrix);
   auto invertImageMatrix = Matrix::I();
   if (image == nullptr || !imageMatrix.invert(&invertImageMatrix)) {
     return;
