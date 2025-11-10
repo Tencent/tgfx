@@ -925,32 +925,15 @@ std::shared_ptr<MaskFilter> Layer::getMaskFilter(const DrawArgs& args, float sca
   return MaskFilter::MakeShader(shader);
 }
 
-void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode) {
-  auto contentScale = canvas->getMatrix().getMaxScale();
-  if (FloatNearlyZero(contentScale)) {
-    return;
-  }
-  auto subBackgroundContext = args.blurBackground && hasBackgroundStyle()
-                                  ? args.blurBackground->createSubContext()
-                                  : nullptr;
-  auto offscreenArgs = args;
-  offscreenArgs.blurBackground = subBackgroundContext;
-
-  auto passThroughBackground = bitFields.passThroughBackground && blendMode == BlendMode::SrcOver &&
-                               _filters.empty() && bitFields.hasBlendMode == true;
-
-  if (!canvas->getSurface() && passThroughBackground) {
-    offscreenArgs.blendModeBackground =
-        BackgroundContext::Make(nullptr, renderBounds, 0, 0, Matrix::MakeScale(contentScale));
-  }
-
-  // canvas of background clip bounds will be more large than canvas clip bounds.
-  auto clipBounds = GetClipBounds(args.blurBackground ? args.blurBackground->getCanvas() : canvas);
-
+std::shared_ptr<Image> Layer::getOffscreenContentImage(
+    const DrawArgs& args, const Canvas* canvas, bool passThroughBackground,
+    std::shared_ptr<BackgroundContext> subBackgroundContext, std::optional<Rect> clipBounds,
+    Matrix* imageMatrix) {
+  DEBUG_ASSERT(imageMatrix);
   auto inputBounds = getBounds();
   if (clipBounds.has_value()) {
     if (!inputBounds.intersect(*clipBounds)) {
-      return;
+      return nullptr;
     }
   }
   if (!args.excludeEffects) {
@@ -960,103 +943,125 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
       inputBounds = filter->filterBounds(inputBounds, MapDirection::Reverse);
     }
   }
-  inputBounds.scale(contentScale, contentScale);
-  inputBounds.roundOut();
-  auto context = canvas->getSurface() ? canvas->getSurface()->getContext() : args.context;
-  auto drawContent = [&](Canvas* offscreenCanvas) {
-    offscreenCanvas->translate(-inputBounds.left, -inputBounds.top);
-    offscreenCanvas->clipRect(inputBounds);
-    offscreenCanvas->scale(contentScale, contentScale);
-    if (passThroughBackground) {
-      AutoCanvasRestore autoRestore(offscreenCanvas);
-      if (canvas->getSurface()) {
-        Matrix backgroundMatrix = {};
-        auto canvasMatrix = canvas->getMatrix();
-        if (canvasMatrix.invert(&backgroundMatrix)) {
-          offscreenCanvas->concat(backgroundMatrix);
-          offscreenCanvas->drawImage(canvas->getSurface()->makeImageSnapshot());
-        }
-      } else if (args.blendModeBackground) {
-        Point offset = {};
-        auto image = args.blendModeBackground->getBackgroundImage(&offset);
-        offscreenCanvas->concat(args.blendModeBackground->backgroundMatrix());
-        offscreenCanvas->drawImage(image, offset.x, offset.y);
-      }
-    }
-    drawDirectly(offscreenArgs, offscreenCanvas, 1.0f);
-  };
 
-  Point offset = {};
+  auto offscreenArgs = args;
+  auto contentScale = canvas->getMatrix().getMaxScale();
+  offscreenArgs.blurBackground = std::move(subBackgroundContext);
+  if (!canvas->getSurface() && passThroughBackground) {
+    offscreenArgs.blendModeBackground =
+        BackgroundContext::Make(nullptr, renderBounds, 0, 0, Matrix::MakeScale(contentScale));
+  }
+
   std::shared_ptr<Image> finalImage = nullptr;
+  auto context = canvas->getSurface() ? canvas->getSurface()->getContext() : nullptr;
   if (context && passThroughBackground) {
-    auto offscreenSurface = Surface::Make(context, static_cast<int>(inputBounds.width()),
-                                          static_cast<int>(inputBounds.height()), false, 1, false,
+    auto currentMatrix = canvas->getMatrix();
+    auto surfaceRect = currentMatrix.mapRect(inputBounds);
+    surfaceRect.roundOut();
+    auto offscreenSurface = Surface::Make(context, static_cast<int>(surfaceRect.width()),
+                                          static_cast<int>(surfaceRect.height()), false, 1, false,
                                           0, args.dstColorSpace);
     auto offscreenCanvas = offscreenSurface->getCanvas();
-    drawContent(offscreenCanvas);
+    offscreenCanvas->translate(-surfaceRect.left, -surfaceRect.top);
+    offscreenCanvas->drawImage(canvas->getSurface()->makeImageSnapshot());
+    offscreenCanvas->clipPath(canvas->getTotalClip());
+    offscreenCanvas->concat(currentMatrix);
+    drawDirectly(offscreenArgs, offscreenCanvas, 1.0f);
     finalImage = offscreenSurface->makeImageSnapshot();
+    offscreenCanvas->getMatrix().invert(imageMatrix);
   } else {
     Recorder recorder = {};
     auto offscreenCanvas = recorder.beginRecording();
-    drawContent(offscreenCanvas);
+    offscreenCanvas->scale(contentScale, contentScale);
+    offscreenCanvas->clipRect(inputBounds);
+    if (passThroughBackground && args.blendModeBackground) {
+      Point offset = {};
+      auto image = args.blendModeBackground->getBackgroundImage(&offset);
+      offscreenCanvas->concat(args.blendModeBackground->backgroundMatrix());
+      offscreenCanvas->drawImage(image, offset.x, offset.y);
+    }
+    drawDirectly(offscreenArgs, offscreenCanvas, 1.0f);
+    Point offset;
     finalImage = ToImageWithOffset(recorder.finishRecordingAsPicture(), &offset, nullptr,
                                    args.dstColorSpace);
+    imageMatrix->setScale(1.0f / contentScale, 1.0f / contentScale);
+    imageMatrix->preTranslate(offset.x, offset.y);
   }
+  return finalImage;
+}
 
+void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode) {
+  auto contentScale = canvas->getMatrix().getMaxScale();
+  if (FloatNearlyZero(contentScale)) {
+    return;
+  }
+  auto subBackgroundContext = args.blurBackground && hasBackgroundStyle()
+                                  ? args.blurBackground->createSubContext()
+                                  : nullptr;
+  auto passThroughBackground = bitFields.passThroughBackground && blendMode == BlendMode::SrcOver &&
+                               _filters.empty() && bitFields.hasBlendMode == true;
+  // canvas of background clip bounds will be more large than canvas clip bounds.
+  auto clipBounds = GetClipBounds(args.blurBackground ? args.blurBackground->getCanvas() : canvas);
+  auto imageMatrix = Matrix::I();
+  auto image = getOffscreenContentImage(args, canvas, passThroughBackground, subBackgroundContext,
+                                   clipBounds, &imageMatrix);
+  auto invertImageMatrix = Matrix::I();
+  if (image && !imageMatrix.invert(&invertImageMatrix)) {
+    return;
+  }
   Paint paint = {};
   paint.setAntiAlias(bitFields.allowsEdgeAntialiasing);
   paint.setAlpha(alpha);
   paint.setBlendMode(blendMode);
+
   if (hasValidMask()) {
     auto maskFilter = getMaskFilter(args, contentScale, clipBounds);
     // if mask filter is nullptr while mask is valid, that means the layer is not visible.
     if (!maskFilter) {
       return;
     }
-    maskFilter = maskFilter->makeWithMatrix(Matrix::MakeTrans(-inputBounds.left, -inputBounds.top));
+    auto maskMatrix = Matrix::MakeScale(1.0f / contentScale, 1.0f / contentScale);
+    maskMatrix.postConcat(invertImageMatrix);
+    maskFilter = maskFilter->makeWithMatrix(maskMatrix);
     paint.setMaskFilter(maskFilter);
   }
 
+  auto filterOffset = Point::Make(0, 0);
   if (!args.excludeEffects) {
     auto filter = getImageFilter(contentScale);
     if (filter) {
       if (clipBounds.has_value()) {
-        clipBounds->scale(contentScale, contentScale);
-        clipBounds->offset(-inputBounds.left - offset.x, -inputBounds.top - offset.y);
+        clipBounds = invertImageMatrix.mapRect(*clipBounds);
         clipBounds->roundOut();
       }
-      auto filterOffset = Point::Make(0, 0);
       // clipBounds may be smaller than the image bounds, so we need to pass it to makeWithFilter.
-      finalImage = finalImage->makeWithFilter(filter, &filterOffset,
-                                              clipBounds.has_value() ? &*clipBounds : nullptr);
-      offset += filterOffset;
+      image = image->makeWithFilter(filter, &filterOffset,
+                                    clipBounds.has_value() ? &*clipBounds : nullptr);
     }
   }
-  if (finalImage == nullptr) {
+  if (image == nullptr) {
     return;
   }
   if (args.blurBackground && !subBackgroundContext) {
-    finalImage = finalImage->makeRasterized();
+    image = image->makeRasterized();
   }
 
-  auto matrix = Matrix::MakeScale(1.0f / contentScale);
-  matrix.preTranslate(inputBounds.left, inputBounds.top);
   AutoCanvasRestore autoRestore(canvas);
-  canvas->concat(matrix);
-  canvas->drawImage(finalImage, offset.x, offset.y, &paint);
+  canvas->concat(imageMatrix);
+  canvas->drawImage(image, filterOffset.x, filterOffset.y, &paint);
   if (args.blendModeBackground) {
     auto blendCanvas = args.blendModeBackground->getCanvas();
     AutoCanvasRestore autoRestoreBlend(blendCanvas);
-    blendCanvas->concat(matrix);
-    blendCanvas->drawImage(finalImage, offset.x, offset.y, &paint);
+    blendCanvas->concat(imageMatrix);
+    blendCanvas->drawImage(image, filterOffset.x, filterOffset.y, &paint);
   }
   if (subBackgroundContext) {
     subBackgroundContext->drawToParent(Matrix::MakeScale(1.0f / contentScale), paint);
   } else if (args.blurBackground) {
     auto backgroundCanvas = args.blurBackground->getCanvas();
     AutoCanvasRestore autoRestoreBg(backgroundCanvas);
-    backgroundCanvas->concat(matrix);
-    backgroundCanvas->drawImage(finalImage, offset.x, offset.y, &paint);
+    backgroundCanvas->concat(imageMatrix);
+    backgroundCanvas->drawImage(image, filterOffset.x, filterOffset.y, &paint);
   }
 }
 

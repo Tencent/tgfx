@@ -632,6 +632,11 @@ class Layer : public std::enable_shared_from_this<Layer> {
   static std::shared_ptr<Picture> RecordPicture(DrawMode mode, float contentScale,
                                                 const std::function<void(Canvas*)>& drawFunction);
 
+  std::shared_ptr<Image> getOffscreenContentImage(
+      const DrawArgs& args, const Canvas* canvas, bool passThroughBackground,
+      std::shared_ptr<BackgroundContext> subBackgroundContext, std::optional<Rect> clipBounds,
+      Matrix* imageMatrix);
+
   struct {
     bool dirtyContent : 1;        // layer's content needs updating
     bool dirtyContentBounds : 1;  // layer's content bounds needs updating
