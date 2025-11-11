@@ -1067,23 +1067,21 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
       return;
     }
     AutoCanvasRestore autoRestore(canvas);
-    // The background style is drawn based on the background image, whose dimensions match the
-    // layer's own Bounds. The matrix is calculated to draw the background image within the final
-    // projected area bounding box of the layer.
     auto bounds = getBounds();
     styleClipPath.addRect(bounds);
     styleClipPath.transform3D(_matrix3D);
     // StyleClipPath is the final clipping path based on the parent node, which must be called
     // before setting the matrix, otherwise it will be affected by the matrix.
     canvas->clipPath(styleClipPath);
-    // 3D layers will inevitably trigger offscreen rendering and be drawn onto the parent node. In
-    // this case, the relevant matrices need to be calculated based on the parent node's coordinate
-    // system, rather than the global coordinate system.
+    // The material sources for layer styles are all filled into the bounds. When drawing the
+    // styles, it's necessary to calculate the transformation matrix that maps the bounds to the
+    // actual drawing area localRenderBounds.
     auto localRenderBounds = _matrix3D.mapRect(bounds);
     localRenderBounds.roundOut();
     DEBUG_ASSERT(!FloatNearlyZero(bounds.width() * bounds.height()));
-    styleMatrix = Matrix::MakeScale(localRenderBounds.width() / bounds.width(),
-                                    localRenderBounds.height() / bounds.height());
+    styleMatrix = Matrix::MakeTrans(-bounds.left, -bounds.top);
+    styleMatrix.postScale(localRenderBounds.width() / bounds.width(),
+                          localRenderBounds.height() / bounds.height());
     styleMatrix.postTranslate(localRenderBounds.left, localRenderBounds.top);
     canvas->concat(styleMatrix);
     styleArgs = args;
@@ -1452,9 +1450,12 @@ std::shared_ptr<Image> Layer::getBoundsBackgroundImage(const DrawArgs& args, flo
   bounds.scale(contentScale, contentScale);
   bounds.roundOut();
   canvas->clipRect(bounds);
+  // Calculate the transformation matrix for drawing the background image within renderBounds to
+  // bounds.
   auto matrix = Matrix::MakeTrans(-renderBounds.left, -renderBounds.top);
   matrix.postScale(bounds.width() * contentScale / renderBounds.width(),
                    bounds.height() * contentScale / renderBounds.height());
+  matrix.postTranslate(bounds.left, bounds.top);
   canvas->setMatrix(matrix);
 
   drawBackgroundImage(args, *canvas);
