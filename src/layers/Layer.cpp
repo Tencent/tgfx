@@ -688,12 +688,13 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
     } else {
       // Otherwise, it's impossible to draw an accurate background. Only the background image
       // corresponding to the minimum bounding rectangle of the layer node subtree after drawing can
-      // be drawn, and this rectangle is stretched to fill the layer area. Based on this, the
-      // transformation matrix of the background image is calculated.
+      // be drawn, and this rectangle is stretched to fill the layer area. Based on this, Calculate
+      // the transformation matrix for drawing the background image within renderBounds to bounds.
       DEBUG_ASSERT(!FloatNearlyZero(renderRect.width()) && !FloatNearlyZero(renderRect.height()));
-      backgroundMatrix.postTranslate(-renderRect.left, -renderRect.top);
+      backgroundMatrix = Matrix::MakeTrans(-renderRect.left, -renderRect.top);
       backgroundMatrix.postScale(bounds.width() / renderRect.width(),
                                  bounds.height() / renderRect.height());
+      backgroundMatrix.postTranslate(bounds.left, bounds.top);
     }
     backgroundMatrix.postScale(scale, scale);
     if (auto backgroundContext = createBackgroundContext(context, backgroundRect, backgroundMatrix,
@@ -711,11 +712,12 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
         // correct.
         actualMatrix.preConcat(GetMayLossyAffineMatrix(localToGlobalMatrix));
       } else {
-        // Otherwise, need to superimpose the transformation matrix that maps layer coordinates to
-        // the minimum bounding rectangle of the actual drawing area
+        // Otherwise, need to superimpose the transformation matrix that maps the bounds to the
+        // actual drawing area renderRect.
         DEBUG_ASSERT(!FloatNearlyZero(bounds.width()) && !FloatNearlyZero(bounds.height()));
-        auto toBackgroundMatrix = Matrix::MakeScale(renderRect.width() / bounds.width(),
-                                                    renderRect.height() / bounds.height());
+        auto toBackgroundMatrix = Matrix::MakeTrans(-bounds.left, -bounds.top);
+        toBackgroundMatrix.postScale(renderRect.width() / bounds.width(),
+                                     renderRect.height() / bounds.height());
         toBackgroundMatrix.postTranslate(renderRect.left, renderRect.top);
         actualMatrix.preConcat(toBackgroundMatrix);
       }
