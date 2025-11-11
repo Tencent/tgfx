@@ -772,9 +772,9 @@ std::shared_ptr<ImageFilter> Layer::getImageFilter(float contentScale) {
 
 RasterizedContent* Layer::getRasterizedCache(const DrawArgs& args, const Matrix& renderMatrix) {
   auto needRasterize = bitFields.shouldRasterize;
-  auto scaledBounds = renderBounds;
+  auto bounds = getBounds();
+  auto scaledBounds = bounds;
   auto scale = renderMatrix.getMaxScale();
-  scaledBounds.scale(scale, scale);
   constexpr float RasterizationThreshold = 64.0f;
   constexpr float MaxRasterizationScale = 0.2f;
   needRasterize |= (!_layerStyles.empty() || !_filters.empty()) &&
@@ -789,10 +789,12 @@ RasterizedContent* Layer::getRasterizedCache(const DrawArgs& args, const Matrix&
   auto contextID = args.context->uniqueID();
   auto content = rasterizedContent.get();
   float contentScale = _rasterizationScale;
-  if (contentScale <= 0.0f || !bitFields.shouldRasterize) {
+  if (!bitFields.shouldRasterize) {
     contentScale =
-        std::max(MaxRasterizationScale,
+        std::min(MaxRasterizationScale,
                  RasterizationThreshold / std::max(renderBounds.width(), renderBounds.height()));
+  } else if (contentScale <= 0.0f) {
+    contentScale = scale;
   }
   if (content && content->contextID() == contextID && content->contentScale() == contentScale) {
     return content;
@@ -804,7 +806,7 @@ RasterizedContent* Layer::getRasterizedCache(const DrawArgs& args, const Matrix&
   if (image == nullptr) {
     return nullptr;
   }
-  image = image->makeTextureImage(args.context);
+  image = image->makeRasterized();
   if (image == nullptr) {
     return nullptr;
   }
@@ -845,11 +847,13 @@ std::shared_ptr<Image> Layer::getRasterizedImage(const DrawArgs& args, float con
 
 void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode) {
   DEBUG_ASSERT(canvas != nullptr);
-  auto scale = canvas->getMatrix().getMaxScale();
-  auto scaleBounds = renderBounds;
-  scaleBounds.scale(scale, scale);
-  if (scaleBounds.width() < 0.5f || scaleBounds.height() < 0.5f) {
-    return;
+  if (args.renderRect) {
+    auto scale = canvas->getMatrix().getMaxScale();
+    auto scaleBounds = renderBounds;
+    scaleBounds.scale(scale, scale);
+    if (scaleBounds.width() < 1.f || scaleBounds.height() < 1.f) {
+      return;
+    }
   }
   if (args.renderRect && !Rect::Intersects(*args.renderRect, renderBounds)) {
     if (args.blurBackground) {
@@ -1011,17 +1015,22 @@ std::shared_ptr<Image> Layer::getOffscreenContentImage(
   }
   return finalImage;
 }
-
 void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode) {
   auto contentScale = canvas->getMatrix().getMaxScale();
   if (FloatNearlyZero(contentScale)) {
     return;
   }
-  auto subBackgroundContext = args.blurBackground && hasBackgroundStyle()
-                                  ? args.blurBackground->createSubContext()
-                                  : nullptr;
   auto passThroughBackground = bitFields.passThroughBackground && blendMode == BlendMode::SrcOver &&
                                _filters.empty() && bitFields.hasBlendMode == true;
+
+  std::shared_ptr<BackgroundContext> subBackgroundContext = nullptr;
+  if (passThroughBackground) {
+    subBackgroundContext = args.blurBackground;
+  } else {
+    subBackgroundContext = args.blurBackground && hasBackgroundStyle()
+                               ? args.blurBackground->createSubContext()
+                               : nullptr;
+  }
   // canvas of background clip bounds will be more large than canvas clip bounds.
   auto clipBounds = GetClipBounds(args.blurBackground ? args.blurBackground->getCanvas() : canvas);
   auto imageMatrix = Matrix::I();
@@ -1079,7 +1088,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   }
   if (subBackgroundContext) {
     subBackgroundContext->drawToParent(Matrix::MakeScale(1.0f / contentScale), paint);
-  } else if (args.blurBackground) {
+  } else if (args.blurBackground && subBackgroundContext != args.blurBackground) {
     auto backgroundCanvas = args.blurBackground->getCanvas();
     AutoCanvasRestore autoRestoreBg(backgroundCanvas);
     backgroundCanvas->concat(imageMatrix);
