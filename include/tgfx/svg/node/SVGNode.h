@@ -22,6 +22,7 @@
 #include <string>
 #include <unordered_map>
 #include <utility>
+#include <vector>
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
@@ -29,6 +30,7 @@
 #include "tgfx/svg/SVGAttribute.h"
 #include "tgfx/svg/SVGTypes.h"
 #include "tgfx/svg/SVGValue.h"
+#include "tgfx/svg/xml/XMLDOM.h"
 
 namespace tgfx {
 
@@ -199,10 +201,12 @@ class SVGNode {
   virtual void appendChild(std::shared_ptr<SVGNode> node) = 0;
 
   /**
-   * Returns undefined Attributes that couldn't be parsed
+   * Returns unparsed Attributes.
+   * SVGNode only parses attributes related to presentation rendering; all other attributes are
+   * stored.
    */
-  const std::unordered_map<std::string, std::string>& getUndefinedAttributes() const {
-    return undefinedAttributes;
+  const std::vector<DOMAttribute>& getUnparsedAttributes() const {
+    return unparsedAttributes;
   }
 
  protected:
@@ -242,7 +246,7 @@ class SVGNode {
  private:
   SVGTag _tag;
   SVGPresentationAttributes presentationAttributes;
-  std::unordered_map<std::string, std::string> undefinedAttributes;
+  std::vector<DOMAttribute> unparsedAttributes;
 
   friend class SVGNodeConstructor;
   friend class SVGRenderContext;

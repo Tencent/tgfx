@@ -428,25 +428,22 @@ TGFX_TEST(SVGRenderTest, SaveUndefinedAttribute) {
   auto rootNode = SVGDom->getRoot();
   ASSERT_TRUE(rootNode != nullptr);
   {
-    auto attribute = rootNode->getUndefinedAttributes();
+    auto attribute = rootNode->getUnparsedAttributes();
     EXPECT_TRUE(attribute.size() == 2);
-    auto iter = attribute.find("copyright");
-    EXPECT_TRUE(iter != attribute.end());
-    EXPECT_TRUE(iter->second == "Tencent");
-    iter = attribute.find("producer");
-    EXPECT_TRUE(iter != attribute.end());
-    EXPECT_TRUE(iter->second == "TGFX");
+    EXPECT_TRUE(attribute[0].name == "copyright");
+    EXPECT_TRUE(attribute[0].value == "Tencent");
+    EXPECT_TRUE(attribute[1].name == "producer");
+    EXPECT_TRUE(attribute[1].value == "TGFX");
   }
 
   auto children = rootNode->getChildren();
   EXPECT_TRUE(children.size() == 1);
   auto rectNode = children[0];
   {
-    auto attribute = rectNode->getUndefinedAttributes();
+    auto attribute = rectNode->getUnparsedAttributes();
     EXPECT_TRUE(attribute.size() == 1);
-    auto iter = attribute.find("producer");
-    EXPECT_TRUE(iter != attribute.end());
-    EXPECT_TRUE(iter->second == "TGFX");
+    EXPECT_TRUE(attribute[0].name == "producer");
+    EXPECT_TRUE(attribute[0].value == "TGFX");
   }
 }
 
