@@ -33,6 +33,30 @@ static float ComponentIdxToFloat(const Color& color, int idx) {
   return -1.0f;
 }
 
+Swizzle Swizzle::ForRead(PixelFormat pixelFormat) {
+  switch (pixelFormat) {
+    case PixelFormat::ALPHA_8:
+      return RRRR();
+    case PixelFormat::GRAY_8:
+      return RRRA();
+    case PixelFormat::RG_88:
+      return RGRG();
+    default:
+      break;
+  }
+  return RGBA();
+}
+
+Swizzle Swizzle::ForWrite(PixelFormat pixelFormat) {
+  switch (pixelFormat) {
+    case PixelFormat::ALPHA_8:
+      return AAAA();
+    default:
+      break;
+  }
+  return RGBA();
+}
+
 Color Swizzle::applyTo(const Color& color) const {
   int idx;
   uint32_t k = key;

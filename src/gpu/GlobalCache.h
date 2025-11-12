@@ -20,12 +20,14 @@
 
 #include <array>
 #include <list>
+#include <optional>
 #include <unordered_map>
 #include "core/utils/SlidingWindowTracker.h"
+#include "gpu/Program.h"
 #include "gpu/proxies/GPUBufferProxy.h"
 #include "gpu/proxies/TextureProxy.h"
-#include "gpu/resources/Program.h"
 #include "tgfx/core/Color.h"
+#include "tgfx/core/Stroke.h"
 
 namespace tgfx {
 /**
@@ -70,9 +72,10 @@ class GlobalCache {
   std::shared_ptr<TextureProxy> getGradient(const Color* colors, const float* positions, int count);
 
   /**
-   * Returns a GPU buffer that contains indices for rendering a quad with or without antialiasing.
+   * Returns a GPU buffer with indices to render a quad, optionally with antialiasing and line join style.
    */
-  std::shared_ptr<GPUBufferProxy> getRectIndexBuffer(bool antialias);
+  std::shared_ptr<GPUBufferProxy> getRectIndexBuffer(bool antialias,
+                                                     const std::optional<LineJoin>& lineJoin);
 
   /**
    * Returns a GPU buffer containing indices for rendering a rounded rectangle, either for filling
@@ -110,6 +113,10 @@ class GlobalCache {
     size_t cursor = 0;
   };
 
+  std::shared_ptr<GPUBufferProxy> getMiterStrokeIndexBuffer(bool antialias);
+  std::shared_ptr<GPUBufferProxy> getBevelStrokeIndexBuffer(bool antialias);
+  std::shared_ptr<GPUBufferProxy> getRoundStrokeIndexBuffer(bool antialias);
+
   Context* context = nullptr;
   std::list<Program*> programLRU = {};
   BytesKeyMap<std::shared_ptr<Program>> programMap = {};
@@ -119,12 +126,19 @@ class GlobalCache {
   std::shared_ptr<GPUBufferProxy> nonAAQuadIndexBuffer = nullptr;
   std::shared_ptr<GPUBufferProxy> rRectFillIndexBuffer = nullptr;
   std::shared_ptr<GPUBufferProxy> rRectStrokeIndexBuffer = nullptr;
+  std::shared_ptr<GPUBufferProxy> aaRectMiterStrokeIndexBuffer = nullptr;
+  std::shared_ptr<GPUBufferProxy> aaRectRoundStrokeIndexBuffer = nullptr;
+  std::shared_ptr<GPUBufferProxy> aaRectBevelStrokeIndexBuffer = nullptr;
+  std::shared_ptr<GPUBufferProxy> nonAARectMiterStrokeIndexBuffer = nullptr;
+  std::shared_ptr<GPUBufferProxy> nonAARectBevelStrokeIndexBuffer = nullptr;
+  std::shared_ptr<GPUBufferProxy> nonAARectRoundStrokeIndexBuffer = nullptr;
+
   ResourceKeyMap<std::shared_ptr<Resource>> staticResources = {};
   // Triple buffering for uniform buffer management
   static constexpr uint32_t UNIFORM_BUFFER_COUNT = 3;
   std::array<UniformBufferPacket, UNIFORM_BUFFER_COUNT> tripleUniformBuffer = {};
   uint32_t tripleUniformBufferIndex = 0;
   uint64_t counter = 0;
-  std::shared_ptr<SlidingWindowTracker> maxUniformBufferTracker = nullptr;
+  SlidingWindowTracker maxUniformBufferTracker = {10};
 };
 }  // namespace tgfx

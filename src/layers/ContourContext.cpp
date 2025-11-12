@@ -52,8 +52,9 @@ void ContourContext::drawFill(const Fill& fill) {
   drawContour(FillContour, {}, fill);
 }
 
-void ContourContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill) {
-  drawContour(Contour(rect), state, fill);
+void ContourContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill,
+                              const Stroke* stroke) {
+  drawContour(Contour(rect), state, fill, stroke);
 }
 
 void ContourContext::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
@@ -74,7 +75,7 @@ void ContourContext::drawImage(std::shared_ptr<Image> image, const SamplingOptio
                                const MCState& state, const Fill& fill) {
   auto newFill = fill;
   newFill.shader = Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp, sampling);
-  drawRect(Rect::MakeWH(image->width(), image->height()), state, newFill);
+  drawRect(Rect::MakeWH(image->width(), image->height()), state, newFill, nullptr);
 }
 
 void ContourContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect,
@@ -90,14 +91,14 @@ void ContourContext::drawImageRect(std::shared_ptr<Image> image, const Rect& src
     newState.clip.addPath(path);
     auto newFill = fill;
     newFill.shader = Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp, sampling);
-    drawRect(dstRect, newState, newFill);
+    drawRect(dstRect, newState, newFill, nullptr);
     return;
   }
   auto bounds = state.matrix.mapRect(dstRect);
   if (containContourBound(bounds)) {
     return;
   }
-  recordingContext.drawImageRect(image, srcRect, dstRect, sampling, state, fill, constraint);
+  pictureContext.drawImageRect(image, srcRect, dstRect, sampling, state, fill, constraint);
 }
 
 void ContourContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
@@ -111,7 +112,7 @@ void ContourContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList
   if (containContourBound(bounds)) {
     return;
   }
-  recordingContext.drawGlyphRunList(glyphRunList, state, fill, stroke);
+  pictureContext.drawGlyphRunList(glyphRunList, state, fill, stroke);
 }
 
 void ContourContext::drawPicture(std::shared_ptr<Picture> picture, const MCState& state) {
@@ -139,7 +140,7 @@ void ContourContext::drawLayer(std::shared_ptr<Picture> picture,
     }
   }
   flushPendingContour();
-  recordingContext.drawLayer(picture, filter, state, fill);
+  pictureContext.drawLayer(picture, filter, state, fill);
 }
 
 void ContourContext::drawContour(const Contour& contour, const MCState& state, const Fill& fill,
@@ -208,7 +209,7 @@ void ContourContext::mergeContourBound(const Rect& bounds) {
 
 std::shared_ptr<Picture> ContourContext::finishRecordingAsPicture() {
   flushPendingContour();
-  return recordingContext.finishRecordingAsPicture();
+  return pictureContext.finishRecordingAsPicture();
 }
 
 bool ContourContext::canAppend(const Contour& contour, const MCState& state, const Fill& fill,
@@ -262,7 +263,7 @@ void ContourContext::flushPendingContour(const Contour& contour, const MCState& 
     fillIsFull =
         fillIsFull || ((pendingFill.shader == nullptr || !pendingFill.shader->isAImage()) &&
                        !pendingFill.maskFilter);
-    pendingContour.draw(recordingContext, pendingState, pendingFill, pendingStroke);
+    pendingContour.draw(pictureContext, pendingState, pendingFill, pendingStroke);
   }
   if (fillIsFull && pendingState.matrix.rectStaysRect() &&
       pendingContour.type < Contour::Type::Path && !pendingContour.isInverseFillType()) {
@@ -347,15 +348,15 @@ Rect ContourContext::Contour::getBounds() const {
   return Rect::MakeEmpty();
 }
 
-void ContourContext::Contour::draw(RecordingContext& context, const MCState& state,
-                                   const Fill& fill, const Stroke* stroke) const {
+void ContourContext::Contour::draw(PictureContext& context, const MCState& state, const Fill& fill,
+                                   const Stroke* stroke) const {
   switch (type) {
     case Type::Fill: {
       context.drawFill(fill);
       break;
     }
     case Type::Rect: {
-      context.drawRect(rect, state, fill);
+      context.drawRect(rect, state, fill, stroke);
       break;
     }
     case Type::RRect: {

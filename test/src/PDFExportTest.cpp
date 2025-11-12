@@ -367,4 +367,35 @@ TGFX_TEST(PDFExportTest, MD5Test) {
   EXPECT_EQ(0, std::memcmp(digest.data(), expectedDigest, 16));
 }
 
+TGFX_TEST(PDFExportTest, ColorSpaceTest) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto PDFStream = MemoryWriteStream::Make();
+
+  PDFMetadata metadata;
+  metadata.colorSpace = ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3);
+  auto document = PDFDocument::Make(PDFStream, context, metadata);
+  auto canvas = document->beginPage(256.f, 256.f);
+  canvas->drawColor(Color::FromRGBA(
+      0, 255, 0, 255, ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3)));
+  document->endPage();
+  canvas = document->beginPage(256.f, 256.f);
+  canvas->drawColor(Color::FromRGBA(0, 255, 0, 255, ColorSpace::MakeSRGB()));
+  document->endPage();
+  canvas = document->beginPage(2048.f, 2048.f);
+  auto image = MakeImage("resources/apitest/green_p3.png");
+  canvas->drawImage(image);
+  document->endPage();
+  canvas = document->beginPage(2048.f, 2048.f);
+  Paint paint{};
+  paint.setImageFilter(ImageFilter::DropShadow(500, 500, 10, 10, Color::Green()));
+  canvas->drawImage(image, &paint);
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/ColorSpace"));
+}
+
 }  // namespace tgfx

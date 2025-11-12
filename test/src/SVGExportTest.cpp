@@ -25,7 +25,7 @@
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
-#include "tgfx/core/Recorder.h"
+#include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/WriteStream.h"
@@ -308,9 +308,8 @@ TGFX_TEST(SVGExportTest, BlendMode) {
 TGFX_TEST(SVGExportTest, StrokeWidth) {
   std::string compareString =
       "<?xml version=\"1.0\" encoding=\"utf-8\" ?><svg xmlns=\"http://www.w3.org/2000/svg\" "
-      "xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"200\" height=\"200\"><path "
-      "fill=\"#F00\" d=\"M47.5 47.5L152.5 47.5L152.5 152.5L47.5 152.5L47.5 47.5ZM52.5 52.5L52.5 "
-      "147.5L147.5 147.5L147.5 52.5L52.5 52.5Z\"/></svg>";
+      "xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"200\" height=\"200\"><rect "
+      "fill=\"#F00\" x=\"50\" y=\"50\" width=\"100\" height=\"100\"/></svg>";
 
   ContextScope scope;
   auto context = scope.getContext();
@@ -587,7 +586,7 @@ TGFX_TEST(SVGExportTest, PictureImageMask) {
   auto canvas = exporter->getCanvas();
 
   {
-    Recorder recorder;
+    PictureRecorder recorder;
     auto pictureCanvas = recorder.beginRecording();
     {
       tgfx::Paint paint;
@@ -626,7 +625,7 @@ TGFX_TEST(SVGExportTest, InvertPictureImageMask) {
   auto canvas = exporter->getCanvas();
 
   {
-    Recorder recorder;
+    PictureRecorder recorder;
     auto pictureCanvas = recorder.beginRecording();
     {
       tgfx::Paint paint;

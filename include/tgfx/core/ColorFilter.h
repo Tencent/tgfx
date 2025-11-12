@@ -22,6 +22,7 @@
 #include <memory>
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Color.h"
+#include "tgfx/core/ColorSpace.h"
 
 namespace tgfx {
 template <typename T>
@@ -44,7 +45,7 @@ class ColorFilter {
 
   /**
    * Creates a new ColorFilter that applies blends between the constant color (src) and input color
-   * (dst) based on the BlendMode.
+   * (dst) based on the BlendMode. The color is in the sRGB gamut and may exceed the 0-1 range.
    */
   static std::shared_ptr<ColorFilter> Blend(Color color, BlendMode mode);
 
@@ -113,7 +114,8 @@ class ColorFilter {
   virtual bool isEqual(const ColorFilter* colorFilter) const = 0;
 
  private:
-  virtual PlacementPtr<FragmentProcessor> asFragmentProcessor(Context* context) const = 0;
+  virtual PlacementPtr<FragmentProcessor> asFragmentProcessor(
+      Context* context, std::shared_ptr<ColorSpace> dstColorSpace = nullptr) const = 0;
 
   friend class OpsCompositor;
   friend class ColorFilterShader;

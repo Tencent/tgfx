@@ -18,6 +18,7 @@
 
 #include "core/codecs/webp/WebpCodec.h"
 #include "core/codecs/webp/WebpUtility.h"
+#include "core/utils/ColorSpaceHelper.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Pixmap.h"
 
@@ -38,7 +39,7 @@ std::shared_ptr<ImageCodec> WebpCodec::MakeFrom(const std::string& filePath) {
     }
   }
   return std::shared_ptr<ImageCodec>(
-      new WebpCodec(info.width, info.height, info.orientation, filePath, nullptr));
+      new WebpCodec(info.width, info.height, info.orientation, filePath, nullptr, info.colorSpace));
 }
 
 std::shared_ptr<ImageCodec> WebpCodec::MakeFrom(std::shared_ptr<Data> imageBytes) {
@@ -49,8 +50,8 @@ std::shared_ptr<ImageCodec> WebpCodec::MakeFrom(std::shared_ptr<Data> imageBytes
   if (info.width == 0 || info.height == 0) {
     return nullptr;
   }
-  return std::shared_ptr<ImageCodec>(
-      new WebpCodec(info.width, info.height, info.orientation, "", std::move(imageBytes)));
+  return std::shared_ptr<ImageCodec>(new WebpCodec(info.width, info.height, info.orientation, "",
+                                                   std::move(imageBytes), info.colorSpace));
 }
 
 static WEBP_CSP_MODE webp_decode_mode(ColorType dstCT, bool premultiply) {
@@ -65,7 +66,7 @@ static WEBP_CSP_MODE webp_decode_mode(ColorType dstCT, bool premultiply) {
 }
 
 bool WebpCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
-                             void* dstPixels) const {
+                             std::shared_ptr<ColorSpace> dstColorSpace, void* dstPixels) const {
   if (dstPixels == nullptr) {
     return false;
   }
@@ -76,6 +77,7 @@ bool WebpCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t ds
   if (byteData == nullptr) {
     return false;
   }
+  auto info = WebpUtility::getDecodeInfo(byteData->data(), byteData->size());
   WebPDecoderConfig config;
   if (!WebPInitDecoderConfig(&config)) {
     return false;
@@ -83,12 +85,15 @@ bool WebpCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t ds
   if (WebPGetFeatures(byteData->bytes(), byteData->size(), &config.input) != VP8_STATUS_OK) {
     return false;
   }
+  auto dstInfo =
+      ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes, dstColorSpace);
   config.output.is_external_memory = 1;
   config.output.colorspace = webp_decode_mode(colorType, alphaType == AlphaType::Premultiplied);
   bool decodeSuccess = true;
   if (config.output.colorspace == MODE_LAST) {
     // decode to RGBA_8888
-    auto info = ImageInfo::Make(width(), height(), ColorType::RGBA_8888, alphaType);
+    auto info =
+        ImageInfo::Make(width(), height(), ColorType::RGBA_8888, alphaType, 0, colorSpace());
     config.output.colorspace =
         webp_decode_mode(info.colorType(), info.alphaType() == AlphaType::Premultiplied);
     config.output.u.RGBA.stride = static_cast<int>(info.rowBytes());
@@ -100,7 +105,6 @@ bool WebpCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t ds
       decodeSuccess = WebPDecode(byteData->bytes(), byteData->size(), &config) == VP8_STATUS_OK;
       if (decodeSuccess) {
         Pixmap pixmap(info, pixels);
-        auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes);
         decodeSuccess = pixmap.readPixels(dstInfo, dstPixels);
       }
     }
@@ -112,6 +116,10 @@ bool WebpCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t ds
     decodeSuccess = (code == VP8_STATUS_OK);
   }
   WebPFreeDecBuffer(&config.output);
+  if (decodeSuccess && !NeedConvertColorSpace(colorSpace(), dstColorSpace)) {
+    ConvertColorSpaceInPlace(width(), height(), colorType, alphaType, dstRowBytes, colorSpace(),
+                             dstColorSpace, dstPixels);
+  }
   return decodeSuccess;
 }
 
@@ -153,7 +161,8 @@ std::shared_ptr<Data> WebpCodec::Encode(const Pixmap& pixmap, int quality) {
       (pixmap.colorType() != ColorType::RGBA_8888 && pixmap.colorType() != ColorType::BGRA_8888)) {
     auto alphaType =
         pixmap.alphaType() == AlphaType::Opaque ? AlphaType::Opaque : AlphaType::Unpremultiplied;
-    srcInfo = ImageInfo::Make(pixmap.width(), pixmap.height(), ColorType::RGBA_8888, alphaType);
+    srcInfo = ImageInfo::Make(pixmap.width(), pixmap.height(), ColorType::RGBA_8888, alphaType, 0,
+                              pixmap.colorSpace());
     tempBuffer.alloc(srcInfo.byteSize());
     srcPixels = tempBuffer.bytes();
     if (!pixmap.readPixels(srcInfo, tempBuffer.data())) {
@@ -209,7 +218,34 @@ std::shared_ptr<Data> WebpCodec::Encode(const Pixmap& pixmap, int quality) {
     return nullptr;
   }
   WebPPictureFree(&pic);
-  return Data::MakeAdopted(webpWriter.data, webpWriter.length, Data::FreeProc);
+  auto encodedData = Data::MakeAdopted(webpWriter.data, webpWriter.length, Data::FreeProc);
+  if (srcInfo.colorSpace()) {
+    auto icc = srcInfo.colorSpace()->toICCProfile();
+    if (icc) {
+      WebPData encoded = {encodedData->bytes(), encodedData->size()};
+      WebPData iccChunk = {icc->bytes(), icc->size()};
+      WebPMux* mux = WebPMuxNew();
+      if (WEBP_MUX_OK != WebPMuxSetImage(mux, &encoded, 1)) {
+        WebPMuxDelete(mux);
+        return nullptr;
+      }
+      if (WEBP_MUX_OK != WebPMuxSetChunk(mux, "ICCP", &iccChunk, 1)) {
+        WebPMuxDelete(mux);
+        return nullptr;
+      }
+      WebPData assembled;
+      if (WEBP_MUX_OK != WebPMuxAssemble(mux, &assembled)) {
+        WebPMuxDelete(mux);
+        WebPDataClear(&assembled);
+        return nullptr;
+      }
+      auto encodedDataWithICC = Data::MakeWithCopy(assembled.bytes, assembled.size);
+      WebPMuxDelete(mux);
+      WebPDataClear(&assembled);
+      return encodedDataWithICC;
+    }
+  }
+  return encodedData;
 }
 #endif
 

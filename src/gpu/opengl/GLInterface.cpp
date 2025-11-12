@@ -19,9 +19,6 @@
 #include "GLInterface.h"
 #include <mutex>
 #include <unordered_map>
-#include "GLAssembledGLESInterface.h"
-#include "GLAssembledGLInterface.h"
-#include "GLAssembledWebGLInterface.h"
 #include "GLUtil.h"
 
 namespace tgfx {
@@ -76,8 +73,6 @@ std::shared_ptr<GLInterface> GLInterface::MakeNativeInterface(const GLProcGetter
       reinterpret_cast<GLActiveTexture*>(getter->getProcAddress("glActiveTexture"));
   functions->attachShader =
       reinterpret_cast<GLAttachShader*>(getter->getProcAddress("glAttachShader"));
-  functions->bindAttribLocation =
-      reinterpret_cast<GLBindAttribLocation*>(getter->getProcAddress("glBindAttribLocation"));
   functions->bindBuffer = reinterpret_cast<GLBindBuffer*>(getter->getProcAddress("glBindBuffer"));
   functions->bindFramebuffer =
       reinterpret_cast<GLBindFramebuffer*>(getter->getProcAddress("glBindFramebuffer"));
@@ -85,7 +80,8 @@ std::shared_ptr<GLInterface> GLInterface::MakeNativeInterface(const GLProcGetter
       reinterpret_cast<GLBindRenderbuffer*>(getter->getProcAddress("glBindRenderbuffer"));
   functions->bindTexture =
       reinterpret_cast<GLBindTexture*>(getter->getProcAddress("glBindTexture"));
-  functions->blendColor = reinterpret_cast<GLBlendColor*>(getter->getProcAddress("glBlendColor"));
+  functions->bindVertexArray =
+      reinterpret_cast<GLBindVertexArray*>(getter->getProcAddress("glBindVertexArray"));
   functions->blendEquation =
       reinterpret_cast<GLBlendEquation*>(getter->getProcAddress("glBlendEquation"));
   functions->blendEquationSeparate =
@@ -107,17 +103,12 @@ std::shared_ptr<GLInterface> GLInterface::MakeNativeInterface(const GLProcGetter
   functions->colorMask = reinterpret_cast<GLColorMask*>(getter->getProcAddress("glColorMask"));
   functions->compileShader =
       reinterpret_cast<GLCompileShader*>(getter->getProcAddress("glCompileShader"));
-  functions->compressedTexImage2D =
-      reinterpret_cast<GLCompressedTexImage2D*>(getter->getProcAddress("glCompressedTexImage2D"));
-  functions->compressedTexSubImage2D = reinterpret_cast<GLCompressedTexSubImage2D*>(
-      getter->getProcAddress("glCompressedTexSubImage2D"));
   functions->copyTexSubImage2D =
       reinterpret_cast<GLCopyTexSubImage2D*>(getter->getProcAddress("glCopyTexSubImage2D"));
   functions->createProgram =
       reinterpret_cast<GLCreateProgram*>(getter->getProcAddress("glCreateProgram"));
   functions->createShader =
       reinterpret_cast<GLCreateShader*>(getter->getProcAddress("glCreateShader"));
-  functions->cullFace = reinterpret_cast<GLCullFace*>(getter->getProcAddress("glCullFace"));
   functions->deleteBuffers =
       reinterpret_cast<GLDeleteBuffers*>(getter->getProcAddress("glDeleteBuffers"));
   functions->deleteFramebuffers =
@@ -131,16 +122,15 @@ std::shared_ptr<GLInterface> GLInterface::MakeNativeInterface(const GLProcGetter
   functions->deleteSync = reinterpret_cast<GLDeleteSync*>(getter->getProcAddress("glDeleteSync"));
   functions->deleteTextures =
       reinterpret_cast<GLDeleteTextures*>(getter->getProcAddress("glDeleteTextures"));
+  functions->deleteVertexArrays =
+      reinterpret_cast<GLDeleteVertexArrays*>(getter->getProcAddress("glDeleteVertexArrays"));
   functions->depthFunc = reinterpret_cast<GLDepthFunc*>(getter->getProcAddress("glDepthFunc"));
   functions->depthMask = reinterpret_cast<GLDepthMask*>(getter->getProcAddress("glDepthMask"));
   functions->disable = reinterpret_cast<GLDisable*>(getter->getProcAddress("glDisable"));
-  functions->disableVertexAttribArray = reinterpret_cast<GLDisableVertexAttribArray*>(
-      getter->getProcAddress("glDisableVertexAttribArray"));
   functions->drawArrays = reinterpret_cast<GLDrawArrays*>(getter->getProcAddress("glDrawArrays"));
   functions->drawElements =
       reinterpret_cast<GLDrawElements*>(getter->getProcAddress("glDrawElements"));
   functions->enable = reinterpret_cast<GLEnable*>(getter->getProcAddress("glEnable"));
-  functions->isEnabled = reinterpret_cast<GLIsEnabled*>(getter->getProcAddress("glIsEnabled"));
   functions->enableVertexAttribArray = reinterpret_cast<GLEnableVertexAttribArray*>(
       getter->getProcAddress("glEnableVertexAttribArray"));
   functions->fenceSync = reinterpret_cast<GLFenceSync*>(getter->getProcAddress("glFenceSync"));
@@ -150,7 +140,6 @@ std::shared_ptr<GLInterface> GLInterface::MakeNativeInterface(const GLProcGetter
       getter->getProcAddress("glFramebufferRenderbuffer"));
   functions->framebufferTexture2D =
       reinterpret_cast<GLFramebufferTexture2D*>(getter->getProcAddress("glFramebufferTexture2D"));
-  functions->frontFace = reinterpret_cast<GLFrontFace*>(getter->getProcAddress("glFrontFace"));
   functions->genBuffers = reinterpret_cast<GLGenBuffers*>(getter->getProcAddress("glGenBuffers"));
   functions->genFramebuffers =
       reinterpret_cast<GLGenFramebuffers*>(getter->getProcAddress("glGenFramebuffers"));
@@ -160,24 +149,17 @@ std::shared_ptr<GLInterface> GLInterface::MakeNativeInterface(const GLProcGetter
       reinterpret_cast<GLGenRenderbuffers*>(getter->getProcAddress("glGenRenderbuffers"));
   functions->genTextures =
       reinterpret_cast<GLGenTextures*>(getter->getProcAddress("glGenTextures"));
-  functions->getBufferParameteriv =
-      reinterpret_cast<GLGetBufferParameteriv*>(getter->getProcAddress("glGetBufferParameteriv"));
+  functions->genVertexArrays =
+      reinterpret_cast<GLGenVertexArrays*>(getter->getProcAddress("glGenVertexArrays"));
   functions->getError = reinterpret_cast<GLGetError*>(getter->getProcAddress("glGetError"));
-  functions->getFramebufferAttachmentParameteriv =
-      reinterpret_cast<GLGetFramebufferAttachmentParameteriv*>(
-          getter->getProcAddress("glGetFramebufferAttachmentParameteriv"));
   functions->getIntegerv =
       reinterpret_cast<GLGetIntegerv*>(getter->getProcAddress("glGetIntegerv"));
   functions->getInternalformativ =
       reinterpret_cast<GLGetInternalformativ*>(getter->getProcAddress("glGetInternalformativ"));
-  functions->getBooleanv =
-      reinterpret_cast<GLGetBooleanv*>(getter->getProcAddress("glGetBooleanv"));
   functions->getProgramInfoLog =
       reinterpret_cast<GLGetProgramInfoLog*>(getter->getProcAddress("glGetProgramInfoLog"));
   functions->getProgramiv =
       reinterpret_cast<GLGetProgramiv*>(getter->getProcAddress("glGetProgramiv"));
-  functions->getRenderbufferParameteriv = reinterpret_cast<GLGetRenderbufferParameteriv*>(
-      getter->getProcAddress("glGetRenderbufferParameteriv"));
   functions->getShaderInfoLog =
       reinterpret_cast<GLGetShaderInfoLog*>(getter->getProcAddress("glGetShaderInfoLog"));
   functions->getShaderiv =
@@ -186,10 +168,6 @@ std::shared_ptr<GLInterface> GLInterface::MakeNativeInterface(const GLProcGetter
       getter->getProcAddress("glGetShaderPrecisionFormat"));
   functions->getString = reinterpret_cast<GLGetString*>(getter->getProcAddress("glGetString"));
   functions->getStringi = reinterpret_cast<GLGetStringi*>(getter->getProcAddress("glGetStringi"));
-  functions->getVertexAttribiv =
-      reinterpret_cast<GLGetVertexAttribiv*>(getter->getProcAddress("glGetVertexAttribiv"));
-  functions->getVertexAttribPointerv = reinterpret_cast<GLGetVertexAttribPointerv*>(
-      getter->getProcAddress("glGetVertexAttribPointerv"));
   functions->getAttribLocation =
       reinterpret_cast<GLGetAttribLocation*>(getter->getProcAddress("glGetAttribLocation"));
   functions->getUniformLocation =
@@ -198,16 +176,12 @@ std::shared_ptr<GLInterface> GLInterface::MakeNativeInterface(const GLProcGetter
       reinterpret_cast<GLGetUniformBlockIndex*>(getter->getProcAddress("glGetUniformBlockIndex"));
   functions->uniformBlockBinding =
       reinterpret_cast<GLUniformBlockBinding*>(getter->getProcAddress("glUniformBlockBinding"));
-  functions->bindBufferBase =
-      reinterpret_cast<GLBindBufferBase*>(getter->getProcAddress("glBindBufferBase"));
   functions->bindBufferRange =
       reinterpret_cast<GLBindBufferRange*>(getter->getProcAddress("glBindBufferRange"));
   functions->mapBufferRange =
       reinterpret_cast<GLMapBufferRange*>(getter->getProcAddress("glMapBufferRange"));
   functions->unmapBuffer =
       reinterpret_cast<GLUnmapBuffer*>(getter->getProcAddress("glUnmapBuffer"));
-  functions->isTexture = reinterpret_cast<GLIsTexture*>(getter->getProcAddress("glIsTexture"));
-  functions->lineWidth = reinterpret_cast<GLLineWidth*>(getter->getProcAddress("glLineWidth"));
   functions->linkProgram =
       reinterpret_cast<GLLinkProgram*>(getter->getProcAddress("glLinkProgram"));
   functions->pixelStorei =
@@ -215,8 +189,10 @@ std::shared_ptr<GLInterface> GLInterface::MakeNativeInterface(const GLProcGetter
   functions->readPixels = reinterpret_cast<GLReadPixels*>(getter->getProcAddress("glReadPixels"));
   functions->renderbufferStorage =
       reinterpret_cast<GLRenderbufferStorage*>(getter->getProcAddress("glRenderbufferStorage"));
-  functions->resolveMultisampleFramebuffer = reinterpret_cast<GLResolveMultisampleFramebuffer*>(
-      getter->getProcAddress("glResolveMultisampleFramebufferAPPLE"));
+  functions->renderbufferStorageMultisample = reinterpret_cast<GLRenderbufferStorageMultisample*>(
+      getter->getProcAddress("glRenderbufferStorageMultisample"));
+  functions->blitFramebuffer =
+      reinterpret_cast<GLBlitFramebuffer*>(getter->getProcAddress("glBlitFramebuffer"));
   functions->scissor = reinterpret_cast<GLScissor*>(getter->getProcAddress("glScissor"));
   functions->shaderSource =
       reinterpret_cast<GLShaderSource*>(getter->getProcAddress("glShaderSource"));
@@ -232,47 +208,12 @@ std::shared_ptr<GLInterface> GLInterface::MakeNativeInterface(const GLProcGetter
   functions->stencilOpSeparate =
       reinterpret_cast<GLStencilOpSeparate*>(getter->getProcAddress("glStencilOpSeparate"));
   functions->texImage2D = reinterpret_cast<GLTexImage2D*>(getter->getProcAddress("glTexImage2D"));
-  functions->texParameterf =
-      reinterpret_cast<GLTexParameterf*>(getter->getProcAddress("glTexParameterf"));
-  functions->texParameterfv =
-      reinterpret_cast<GLTexParameterfv*>(getter->getProcAddress("glTexParameterfv"));
   functions->texParameteri =
       reinterpret_cast<GLTexParameteri*>(getter->getProcAddress("glTexParameteri"));
-  functions->texParameteriv =
-      reinterpret_cast<GLTexParameteriv*>(getter->getProcAddress("glTexParameteriv"));
   functions->texSubImage2D =
       reinterpret_cast<GLTexSubImage2D*>(getter->getProcAddress("glTexSubImage2D"));
-  functions->uniform1f = reinterpret_cast<GLUniform1f*>(getter->getProcAddress("glUniform1f"));
   functions->uniform1i = reinterpret_cast<GLUniform1i*>(getter->getProcAddress("glUniform1i"));
-  functions->uniform1fv = reinterpret_cast<GLUniform1fv*>(getter->getProcAddress("glUniform1fv"));
-  functions->uniform1iv = reinterpret_cast<GLUniform1iv*>(getter->getProcAddress("glUniform1iv"));
-  functions->uniform2f = reinterpret_cast<GLUniform2f*>(getter->getProcAddress("glUniform2f"));
-  functions->uniform2i = reinterpret_cast<GLUniform2i*>(getter->getProcAddress("glUniform2i"));
-  functions->uniform2fv = reinterpret_cast<GLUniform2fv*>(getter->getProcAddress("glUniform2fv"));
-  functions->uniform2iv = reinterpret_cast<GLUniform2iv*>(getter->getProcAddress("glUniform2iv"));
-  functions->uniform3f = reinterpret_cast<GLUniform3f*>(getter->getProcAddress("glUniform3f"));
-  functions->uniform3i = reinterpret_cast<GLUniform3i*>(getter->getProcAddress("glUniform3i"));
-  functions->uniform3fv = reinterpret_cast<GLUniform3fv*>(getter->getProcAddress("glUniform3fv"));
-  functions->uniform3iv = reinterpret_cast<GLUniform3iv*>(getter->getProcAddress("glUniform3iv"));
-  functions->uniform4f = reinterpret_cast<GLUniform4f*>(getter->getProcAddress("glUniform4f"));
-  functions->uniform4i = reinterpret_cast<GLUniform4i*>(getter->getProcAddress("glUniform4i"));
-  functions->uniform4fv = reinterpret_cast<GLUniform4fv*>(getter->getProcAddress("glUniform4fv"));
-  functions->uniform4iv = reinterpret_cast<GLUniform4iv*>(getter->getProcAddress("glUniform4iv"));
-  functions->uniformMatrix2fv =
-      reinterpret_cast<GLUniformMatrix2fv*>(getter->getProcAddress("glUniformMatrix2fv"));
-  functions->uniformMatrix3fv =
-      reinterpret_cast<GLUniformMatrix3fv*>(getter->getProcAddress("glUniformMatrix3fv"));
-  functions->uniformMatrix4fv =
-      reinterpret_cast<GLUniformMatrix4fv*>(getter->getProcAddress("glUniformMatrix4fv"));
   functions->useProgram = reinterpret_cast<GLUseProgram*>(getter->getProcAddress("glUseProgram"));
-  functions->vertexAttrib1f =
-      reinterpret_cast<GLVertexAttrib1f*>(getter->getProcAddress("glVertexAttrib1f"));
-  functions->vertexAttrib2fv =
-      reinterpret_cast<GLVertexAttrib2fv*>(getter->getProcAddress("glVertexAttrib2fv"));
-  functions->vertexAttrib3fv =
-      reinterpret_cast<GLVertexAttrib3fv*>(getter->getProcAddress("glVertexAttrib3fv"));
-  functions->vertexAttrib4fv =
-      reinterpret_cast<GLVertexAttrib4fv*>(getter->getProcAddress("glVertexAttrib4fv"));
   functions->vertexAttribPointer =
       reinterpret_cast<GLVertexAttribPointer*>(getter->getProcAddress("glVertexAttribPointer"));
   functions->viewport = reinterpret_cast<GLViewport*>(getter->getProcAddress("glViewport"));
@@ -281,16 +222,25 @@ std::shared_ptr<GLInterface> GLInterface::MakeNativeInterface(const GLProcGetter
   functions->waitSync = reinterpret_cast<GLWaitSync*>(getter->getProcAddress("glWaitSync"));
 
   switch (info.standard) {
-    case GLStandard::None:
-      break;
     case GLStandard::GL:
-      GLAssembleGLInterface(getter, functions.get(), info);
+      if (info.version >= GL_VER(4, 5) || info.hasExtension("GL_ARB_texture_barrier")) {
+        functions->textureBarrier =
+            reinterpret_cast<GLTextureBarrier*>(getter->getProcAddress("glTextureBarrier"));
+      } else if (info.hasExtension("GL_NV_texture_barrier")) {
+        functions->textureBarrier =
+            reinterpret_cast<GLTextureBarrier*>(getter->getProcAddress("glTextureBarrierNV"));
+      }
       break;
     case GLStandard::GLES:
-      GLAssembleGLESInterface(getter, functions.get(), info);
+      if (info.hasExtension("GL_NV_texture_barrier")) {
+        functions->textureBarrier =
+            reinterpret_cast<GLTextureBarrier*>(getter->getProcAddress("glTextureBarrierNV"));
+      }
       break;
     case GLStandard::WebGL:
-      GLAssembleWebGLInterface(getter, functions.get(), info);
+      // No special initialization required for WebGL.
+      break;
+    default:
       break;
   }
   auto caps = std::make_unique<GLCaps>(info);

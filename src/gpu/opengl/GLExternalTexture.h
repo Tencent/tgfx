@@ -23,7 +23,7 @@
 namespace tgfx {
 class GLExternalTexture : public GLTexture {
  public:
-  GLExternalTexture(const GPUTextureDescriptor& descriptor, unsigned target, unsigned textureID,
+  GLExternalTexture(const TextureDescriptor& descriptor, unsigned target, unsigned textureID,
                     unsigned frameBufferID = 0)
       : GLTexture(descriptor, target, textureID), _frameBufferID(frameBufferID) {
   }

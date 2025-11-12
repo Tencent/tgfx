@@ -188,12 +188,14 @@ static SamplingOptions GetSamplingOptions(const std::shared_ptr<ScalerContext>& 
 }
 
 RenderContext::RenderContext(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags,
-                             bool clearAll, Surface* surface)
-    : renderTarget(std::move(proxy)), renderFlags(renderFlags), surface(surface) {
+                             bool clearAll, Surface* surface,
+                             std::shared_ptr<ColorSpace> colorSpace)
+    : renderTarget(std::move(proxy)), renderFlags(renderFlags), surface(surface),
+      _colorSpace(std::move(colorSpace)) {
   if (clearAll) {
     auto drawingManager = renderTarget->getContext()->drawingManager();
-    opsCompositor =
-        drawingManager->addOpsCompositor(renderTarget, renderFlags, Color::Transparent());
+    opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags,
+                                                     Color::Transparent(), _colorSpace);
   }
 }
 
@@ -210,13 +212,14 @@ Rect RenderContext::getClipBounds(const Path& clip) {
 
 void RenderContext::drawFill(const Fill& fill) {
   if (auto compositor = getOpsCompositor(fill.isOpaque())) {
-    compositor->fillRect(renderTarget->bounds(), {}, fill);
+    compositor->fillRect(renderTarget->bounds(), {}, fill, nullptr);
   }
 }
 
-void RenderContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill) {
+void RenderContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill,
+                             const Stroke* stroke) {
   if (auto compositor = getOpsCompositor()) {
-    compositor->fillRect(rect, state, fill);
+    compositor->fillRect(rect, state, fill, stroke);
   }
 }
 
@@ -353,7 +356,7 @@ void RenderContext::drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
   viewMatrix.postTranslate(-bounds.x(), -bounds.y());
-  auto image = Image::MakeFrom(std::move(picture), width, height, &viewMatrix);
+  auto image = Image::MakeFrom(std::move(picture), width, height, &viewMatrix, colorSpace());
   if (image == nullptr) {
     return;
   }
@@ -390,7 +393,8 @@ OpsCompositor* RenderContext::getOpsCompositor(bool discardContent) {
   }
   if (opsCompositor == nullptr || opsCompositor->isClosed()) {
     auto drawingManager = renderTarget->getContext()->drawingManager();
-    opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags);
+    opsCompositor =
+        drawingManager->addOpsCompositor(renderTarget, renderFlags, std::nullopt, _colorSpace);
   } else if (discardContent) {
     opsCompositor->discardAll();
   }
@@ -404,7 +408,8 @@ void RenderContext::replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRe
     DEBUG_ASSERT(oldContent->width() == renderTarget->width() &&
                  oldContent->height() == renderTarget->height());
     auto drawingManager = renderTarget->getContext()->drawingManager();
-    opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags);
+    opsCompositor =
+        drawingManager->addOpsCompositor(renderTarget, renderFlags, std::nullopt, _colorSpace);
     Fill fill = {{}, BlendMode::Src, false};
     opsCompositor->fillImageRect(std::move(oldContent), renderTarget->bounds(),
                                  renderTarget->bounds(), {}, MCState{}, fill,

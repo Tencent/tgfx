@@ -20,11 +20,11 @@
 
 #include <memory>
 #include <unordered_map>
-#include "gpu/RenderPipeline.h"
 #include "gpu/opengl/GLBuffer.h"
 #include "gpu/opengl/GLResource.h"
 #include "gpu/opengl/GLState.h"
 #include "gpu/opengl/GLTexture.h"
+#include "tgfx/gpu/RenderPipeline.h"
 
 namespace tgfx {
 struct GLAttribute {
@@ -74,6 +74,7 @@ class GLRenderPipeline : public RenderPipeline, public GLResource {
   void onRelease(GLGPU* gpu) override;
 
  private:
+  uint32_t uniqueID = 0;
   unsigned programID = 0;
   unsigned vertexArray = 0;
   std::vector<GLAttribute> attributes = {};
@@ -87,5 +88,6 @@ class GLRenderPipeline : public RenderPipeline, public GLResource {
   bool setPipelineDescriptor(GLGPU* gpu, const RenderPipelineDescriptor& descriptor);
 
   friend class GLGPU;
+  friend class GLState;
 };
 }  // namespace tgfx

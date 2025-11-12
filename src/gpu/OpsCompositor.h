@@ -45,7 +45,8 @@ class OpsCompositor {
    * Creates an OpsCompositor with the given render target proxy, render flags and render queue.
    */
   OpsCompositor(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags,
-                std::optional<Color> clearColor = std::nullopt);
+                std::optional<Color> clearColor = std::nullopt,
+                std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
    * Fills the given image with the given sampling options, state and fill.
@@ -61,9 +62,9 @@ class OpsCompositor {
                      SrcRectConstraint constraint);
 
   /**
-   * Fills the given rect with the given state and fill.
+   * Fills the given rect with the given state, fill and optional stroke.
    */
-  void fillRect(const Rect& rect, const MCState& state, const Fill& fill);
+  void fillRect(const Rect& rect, const MCState& state, const Fill& fill, const Stroke* stroke);
 
   /**
    * Draw the given rrect with the given state, fill and optional stroke.
@@ -120,6 +121,7 @@ class OpsCompositor {
   std::vector<PlacementPtr<Stroke>> pendingStrokes = {};
   std::optional<Color> clearColor = std::nullopt;
   std::vector<PlacementPtr<DrawOp>> drawOps = {};
+  std::shared_ptr<ColorSpace> dstColorSpace = nullptr;
 
   static bool CompareFill(const Fill& a, const Fill& b);
 

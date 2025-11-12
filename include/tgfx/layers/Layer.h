@@ -19,6 +19,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Matrix.h"
@@ -124,6 +125,20 @@ class Layer : public std::enable_shared_from_this<Layer> {
    * Sets the blend mode of the layer.
    */
   void setBlendMode(BlendMode value);
+
+  /**
+   * Returns true if the layer allows its background to pass through to sublayers. Note that layers
+   * with non-SrcOver blend modes, filters, or 3D transforms will ignore this setting and prevent
+   * background pass-through. The default value is true.
+   */
+  bool passThroughBackground() const {
+    return bitFields.passThroughBackground;
+  }
+
+  /**
+   * Sets whether the layer passes through its background to sublayers.
+   */
+  void setPassThroughBackground(bool value);
 
   /**
    * Returns the position of the layer relative to the local coordinates of the parent layer.
@@ -591,7 +606,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   bool getLayersUnderPointInternal(float x, float y, std::vector<std::shared_ptr<Layer>>* results);
 
-  std::shared_ptr<MaskFilter> getMaskFilter(const DrawArgs& args, float scale);
+  std::shared_ptr<MaskFilter> getMaskFilter(const DrawArgs& args, float scale,
+                                            const std::optional<Rect>& layerClipBounds);
 
   Matrix getRelativeMatrix(const Layer* targetCoordinateSpace) const;
 
@@ -604,7 +620,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   void updateBackgroundBounds(float contentScale);
 
-  void propagateBackgroundStyleOutset();
+  void propagateLayerState();
 
   bool hasBackgroundStyle();
 
@@ -614,6 +630,11 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   static std::shared_ptr<Picture> RecordPicture(DrawMode mode, float contentScale,
                                                 const std::function<void(Canvas*)>& drawFunction);
+
+  std::shared_ptr<Image> getOffscreenContentImage(
+      const DrawArgs& args, const Canvas* canvas, bool passThroughBackground,
+      std::shared_ptr<BackgroundContext> subBackgroundContext, std::optional<Rect> clipBounds,
+      Matrix* imageMatrix);
 
   struct {
     bool dirtyContent : 1;        // layer's content needs updating
@@ -625,6 +646,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
     bool allowsEdgeAntialiasing : 1;
     bool allowsGroupOpacity : 1;
     bool excludeChildEffectsInLayerStyle : 1;
+    bool passThroughBackground : 1;
+    bool hasBlendMode : 1;
     uint8_t blendMode : 5;
     uint8_t maskType : 2;
   } bitFields = {};

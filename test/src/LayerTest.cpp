@@ -2581,8 +2581,7 @@ TGFX_TEST(LayerTest, BottomLeftSurface) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
-  auto proxy = tgfx::RenderTargetProxy::MakeFallback(context, 200, 200, false, 1, false,
-                                                     ImageOrigin::BottomLeft);
+  auto proxy = RenderTargetProxy::Make(context, 200, 200, false, 1, false, ImageOrigin::BottomLeft);
   auto surface = Surface::MakeFrom(std::move(proxy), 0, true);
 
   // parent
@@ -3195,5 +3194,102 @@ TGFX_TEST(LayerTest, DiffFilterModeImagePattern) {
   displayList.setZoomScale(1.5f);
   displayList.render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DiffFilterModeImagePattern -- zoomIn"));
+}
+
+TGFX_TEST(LayerTest, TemporaryOffscreenImage) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  auto canvas = surface->getCanvas();
+  canvas->clear();
+  auto image = MakeImage("resources/apitest/image_as_mask.png");
+  EXPECT_TRUE(image != nullptr);
+  auto shapeLayer = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeWH(image->width(), image->height()));
+  shapeLayer->setPath(path);
+  auto pattern = ImagePattern::Make(image, TileMode::Decal, TileMode::Decal,
+                                    SamplingOptions(FilterMode::Linear, FilterMode::Nearest));
+  auto filter = DropShadowFilter::Make(-10, -10, 5, 5, Color::Black());
+  DisplayList displayList;
+  displayList.root()->addChild(shapeLayer);
+  shapeLayer->setFillStyle(pattern);
+  shapeLayer->setFilters({filter});
+
+  auto glassLayer = ShapeLayer::Make();
+  Path glassPath;
+  glassPath.addRRect(RRect{Rect::MakeXYWH(10, 10, 80, 80), Point::Make(40, 40)});
+  glassLayer->setPath(glassPath);
+  glassLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 255, 255, 50)));
+  glassLayer->setLayerStyles({BackgroundBlurStyle::Make(6, 6)});
+  shapeLayer->addChild(glassLayer);
+  displayList.setZoomScale(2.f);
+  displayList.setContentOffset(-50, -50);
+  displayList.render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/TemporaryOffscreenImage_pic"));
+
+  displayList.root()->addChild(glassLayer);
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/TemporaryOffscreenImage_image1"));
+
+  shapeLayer->setFilters({});
+  shapeLayer->setAlpha(0.8f);
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/TemporaryOffscreenImage_image2"));
+}
+
+TGFX_TEST(LayerTest, PassThrough_Test) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  auto canvas = surface->getCanvas();
+  canvas->clear();
+  auto shapeLayer = ShapeLayer::Make();
+  auto value = Layer::DefaultAllowsGroupOpacity();
+  Layer::SetDefaultAllowsGroupOpacity(true);
+  Path path;
+  path.addRect(Rect::MakeXYWH(-40, -40, 100, 100));
+  shapeLayer->setPath(path);
+  auto image = MakeImage("resources/apitest/image_as_mask.png");
+  EXPECT_TRUE(image != nullptr);
+  auto pattern = ImagePattern::Make(image, TileMode::Decal, TileMode::Decal,
+                                    SamplingOptions(FilterMode::Linear, FilterMode::Nearest));
+  pattern->setMatrix(Matrix::MakeTrans(-40, -40));
+  shapeLayer->setFillStyle(pattern);
+  shapeLayer->setMatrix(Matrix::MakeRotate(45, 30, 30));
+
+  auto childLayer = ShapeLayer::Make();
+  Path childPath;
+  childPath.addRect(Rect::MakeXYWH(25, 25, 50, 50));
+  childLayer->setPath(childPath);
+  childLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 0, 255, 255)));
+  childLayer->setAlpha(0.5f);
+  shapeLayer->addChild(childLayer);
+
+  auto childLayer2 = ShapeLayer::Make();
+  Path childPath2;
+  childPath2.addRect(Rect::MakeXYWH(10, 10, 30, 30));
+  childLayer2->setPath(childPath2);
+  childLayer2->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 255, 0, 255)));
+  childLayer2->setBlendMode(BlendMode::Exclusion);
+  childLayer->addChild(childLayer2);
+
+  DisplayList displayList;
+  displayList.root()->addChild(shapeLayer);
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PassThrough_Test"));
+
+  PictureRecorder recorder;
+  auto newCanvas = recorder.beginRecording();
+  newCanvas->rotate(45, 30, 30);
+  shapeLayer->draw(newCanvas);
+  auto picture = recorder.finishRecordingAsPicture();
+  canvas->clear();
+  canvas->drawPicture(picture);
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PassThrough_Test_record"));
+  Layer::SetDefaultAllowsGroupOpacity(value);
 }
 }  // namespace tgfx

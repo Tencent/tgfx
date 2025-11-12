@@ -21,6 +21,7 @@
 #include "gpu/ProgramBuilder.h"
 
 namespace tgfx {
+static constexpr char OES_TEXTURE_EXTENSION[] = "GL_OES_EGL_image_external_essl3";
 
 std::string UniformHandler::addUniform(const std::string& name, UniformFormat format,
                                        ShaderStage stage) {
@@ -36,18 +37,17 @@ std::string UniformHandler::addUniform(const std::string& name, UniformFormat fo
   return uniformName;
 }
 
-SamplerHandle UniformHandler::addSampler(std::shared_ptr<GPUTexture> texture,
+SamplerHandle UniformHandler::addSampler(std::shared_ptr<Texture> texture,
                                          const std::string& name) {
   // The same texture can be added multiple times, each with a different name.
   UniformFormat format;
   switch (texture->type()) {
-    case GPUTextureType::External:
-      programBuilder->fragmentShaderBuilder()->addFeature(
-          PrivateFeature::OESTexture,
-          programBuilder->getContext()->caps()->shaderCaps()->oesTextureExtension);
+    case TextureType::External:
+      programBuilder->fragmentShaderBuilder()->addFeature(PrivateFeature::OESTexture,
+                                                          OES_TEXTURE_EXTENSION);
       format = UniformFormat::TextureExternalSampler;
       break;
-    case GPUTextureType::Rectangle:
+    case TextureType::Rectangle:
       format = UniformFormat::Texture2DRectSampler;
       break;
     default:
@@ -56,8 +56,7 @@ SamplerHandle UniformHandler::addSampler(std::shared_ptr<GPUTexture> texture,
   }
   auto samplerName = programBuilder->nameVariable(name);
   samplers.emplace_back(samplerName, format);
-  auto caps = programBuilder->getContext()->caps();
-  auto& swizzle = caps->getReadSwizzle(texture->format());
+  auto swizzle = Swizzle::ForRead(texture->format());
   samplerSwizzles.push_back(swizzle);
   return SamplerHandle(samplers.size() - 1);
 }

@@ -17,9 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/codecs/png/PngCodec.h"
+#include "core/utils/ColorSpaceHelper.h"
 #include "png.h"
+#include "skcms.h"
 #include "tgfx/core/Buffer.h"
+#include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/Pixmap.h"
+#include "tgfx/core/Stream.h"
 
 namespace tgfx {
 std::shared_ptr<ImageCodec> PngCodec::MakeFrom(const std::string& filePath) {
@@ -113,6 +117,97 @@ class ReadInfo {
   unsigned char* data = nullptr;
 };
 
+#if (PNG_LIBPNG_VER_MAJOR > 1) || (PNG_LIBPNG_VER_MAJOR == 1 && PNG_LIBPNG_VER_MINOR >= 6)
+
+static float PngFixedPointToFloat(png_fixed_point x) {
+  return ((float)x) * 0.00001f;
+}
+
+static float PngInvertedFixedPointToFloat(png_fixed_point x) {
+  /**
+   * This is necessary because the gAMA chunk actually stores 1/gamma.
+   */
+  return 1.0f / PngFixedPointToFloat(x);
+}
+
+#endif  // LIBPNG >= 1.6
+
+/**
+ * If there is no color profile information, it will use sRGB.
+ */
+static std::shared_ptr<ColorSpace> ReadColorProfile(png_structp pngPtr, png_infop infoPtr) {
+#if (PNG_LIBPNG_VER_MAJOR > 1) || (PNG_LIBPNG_VER_MAJOR == 1 && PNG_LIBPNG_VER_MINOR >= 6)
+  /**
+   * First check for an ICC profile
+   */
+  png_bytep profile;
+  png_uint_32 length;
+  /**
+   * The below variables are unused, however, we need to pass them in anyway or png_get_iCCP() will
+   * return nothing.
+   */
+  png_charp name;
+  /**
+   * The |compression| is uninteresting since:
+   *  (1) libpng has already decompressed the profile for us.
+   *  (2) "deflate" is the only mode of decompression that libpng supports.
+   */
+  int compression;
+  if (PNG_INFO_iCCP == png_get_iCCP(pngPtr, infoPtr, &name, &compression, &profile, &length)) {
+    return ColorSpace::MakeFromICC(profile, length);
+  }
+
+  /**
+   * Second, check for sRGB. Note that Blink does this first. This code checks ICC first, with the
+   * thinking that an image has both truly wants the potentially more specific ICC chunk, with sRGB
+   * as a backup in case the decoder does not support full color management.
+   */
+  if (png_get_valid(pngPtr, infoPtr, PNG_INFO_sRGB)) {
+    return ColorSpace::MakeSRGB();
+  }
+
+  /**
+   * Default to SRGB gamut.
+   */
+  gfx::skcms_Matrix3x3 toXYZD50 = gfx::skcms_sRGB_profile()->toXYZD50;
+  png_fixed_point chrm[8];
+  png_fixed_point gamma;
+  if (png_get_cHRM_fixed(pngPtr, infoPtr, &chrm[0], &chrm[1], &chrm[2], &chrm[3], &chrm[4],
+                         &chrm[5], &chrm[6], &chrm[7])) {
+    float rx = PngFixedPointToFloat(chrm[2]);
+    float ry = PngFixedPointToFloat(chrm[3]);
+    float gx = PngFixedPointToFloat(chrm[4]);
+    float gy = PngFixedPointToFloat(chrm[5]);
+    float bx = PngFixedPointToFloat(chrm[6]);
+    float by = PngFixedPointToFloat(chrm[7]);
+    float wx = PngFixedPointToFloat(chrm[0]);
+    float wy = PngFixedPointToFloat(chrm[1]);
+
+    gfx::skcms_Matrix3x3 tmp;
+    if (skcms_PrimariesToXYZD50(rx, ry, gx, gy, bx, by, wx, wy, &tmp)) {
+      toXYZD50 = tmp;
+    }
+  }
+
+  gfx::skcms_TransferFunction fn;
+  if (PNG_INFO_gAMA == png_get_gAMA_fixed(pngPtr, infoPtr, &gamma)) {
+    fn.a = 1.0f;
+    fn.b = fn.c = fn.d = fn.e = fn.f = 0.0f;
+    fn.g = PngInvertedFixedPointToFloat(gamma);
+  } else {
+    /**
+     * Default to sRGB gamma if the image has color space information, but does not specify gamma.
+     * Note that Blink would again return nullptr in this case.
+     */
+    fn = *gfx::skcms_sRGB_TransferFunction();
+  }
+  return ColorSpace::MakeRGB(*reinterpret_cast<TransferFunction*>(&fn),
+                             *reinterpret_cast<ColorMatrix33*>(&toXYZD50));
+#else   // LIBPNG < 1.6
+  return ColorSpace::MakeSRGB();
+#endif  // LIBPNG >= 1.6
+}
+
 std::shared_ptr<ImageCodec> PngCodec::MakeFromData(const std::string& filePath,
                                                    std::shared_ptr<Data> byteData) {
   auto readInfo = ReadInfo::Make(filePath, byteData);
@@ -122,6 +217,10 @@ std::shared_ptr<ImageCodec> PngCodec::MakeFromData(const std::string& filePath,
   png_uint_32 w = 0, h = 0;
   int colorType = -1;
   png_get_IHDR(readInfo->p, readInfo->pi, &w, &h, nullptr, &colorType, nullptr, nullptr, nullptr);
+  auto cs = ReadColorProfile(readInfo->p, readInfo->pi);
+  if (!cs) {
+    cs = ColorSpace::MakeSRGB();
+  }
   if (w == 0 || h == 0) {
     return nullptr;
   }
@@ -136,7 +235,7 @@ std::shared_ptr<ImageCodec> PngCodec::MakeFromData(const std::string& filePath,
   }
   return std::shared_ptr<ImageCodec>(new PngCodec(static_cast<int>(w), static_cast<int>(h),
                                                   Orientation::TopLeft, isAlphaOnly, filePath,
-                                                  std::move(byteData)));
+                                                  std::move(byteData), std::move(cs)));
 }
 
 static void UpdateReadInfo(png_structp p, png_infop pi) {
@@ -165,7 +264,7 @@ static void UpdateReadInfo(png_structp p, png_infop pi) {
 }
 
 bool PngCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
-                            void* dstPixels) const {
+                            std::shared_ptr<ColorSpace> dstColorSpace, void* dstPixels) const {
   auto readInfo = ReadInfo::Make(filePath, fileData);
   if (readInfo == nullptr) {
     return false;
@@ -183,14 +282,21 @@ bool PngCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dst
   if (setjmp(png_jmpbuf(readInfo->p))) {
     return false;
   }
+  auto dstInfo =
+      ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes, dstColorSpace);
   if (colorType == ColorType::RGBA_8888 && alphaType == AlphaType::Unpremultiplied) {
     for (size_t i = 0; i < static_cast<size_t>(h); i++) {
       readInfo->rowPtrs[i] = static_cast<unsigned char*>(dstPixels) + (dstRowBytes * i);
     }
     png_read_image(readInfo->p, readInfo->rowPtrs);
+    if (!NeedConvertColorSpace(colorSpace(), dstColorSpace)) {
+      ConvertColorSpaceInPlace(w, h, colorType, alphaType, dstRowBytes, colorSpace(), dstColorSpace,
+                               dstPixels);
+    }
     return true;
   }
-  ImageInfo info = ImageInfo::Make(w, h, ColorType::RGBA_8888, AlphaType::Unpremultiplied);
+  ImageInfo info =
+      ImageInfo::Make(w, h, ColorType::RGBA_8888, AlphaType::Unpremultiplied, 0, colorSpace());
   readInfo->data = (unsigned char*)malloc(info.byteSize());
   if (readInfo->data == nullptr) {
     return false;
@@ -200,7 +306,6 @@ bool PngCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dst
   }
   png_read_image(readInfo->p, readInfo->rowPtrs);
   Pixmap pixmap(info, readInfo->data);
-  auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes);
   return pixmap.readPixels(dstInfo, dstPixels);
 }
 
@@ -248,7 +353,7 @@ std::shared_ptr<Data> PngCodec::Encode(const Pixmap& pixmap, int) {
   } else if (pixmap.colorType() != ColorType::RGBA_8888 ||
              pixmap.alphaType() == AlphaType::Premultiplied) {
     auto dstInfo = ImageInfo::Make(pixmap.width(), pixmap.height(), ColorType::RGBA_8888,
-                                   AlphaType::Unpremultiplied);
+                                   AlphaType::Unpremultiplied, 0, pixmap.colorSpace());
     tempBuffer.alloc(dstInfo.byteSize());
     if (!pixmap.readPixels(dstInfo, tempBuffer.data())) {
       return nullptr;
@@ -284,6 +389,11 @@ std::shared_ptr<Data> PngCodec::Encode(const Pixmap& pixmap, int) {
     png_set_IHDR(png_ptr, info_ptr, static_cast<png_uint_32>(pixmap.width()),
                  static_cast<png_uint_32>(pixmap.height()), 8, colorType, PNG_INTERLACE_NONE,
                  PNG_COMPRESSION_TYPE_BASE, PNG_FILTER_TYPE_BASE);
+    if (colorType != PNG_COLOR_TYPE_GRAY_ALPHA && pixmap.colorSpace()) {
+      auto iccData = pixmap.colorSpace()->toICCProfile();
+      png_set_iCCP(png_ptr, info_ptr, "TGFX", 0, iccData->bytes(),
+                   static_cast<uint32_t>(iccData->size()));
+    }
     png_set_sBIT(png_ptr, info_ptr, &sigBit);
     png_set_write_fn(png_ptr, &pngWriter, png_reader_write_data, nullptr);
     png_write_info(png_ptr, info_ptr);

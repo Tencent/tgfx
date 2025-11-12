@@ -45,7 +45,8 @@ class DrawContext {
   /**
    * Draws a rectangle with the specified MCState and Fill.
    */
-  virtual void drawRect(const Rect& rect, const MCState& state, const Fill& fill) = 0;
+  virtual void drawRect(const Rect& rect, const MCState& state, const Fill& fill,
+                        const Stroke* stroke) = 0;
 
   /**
    * Draws a rounded rectangle with the specified MCState and Fill.

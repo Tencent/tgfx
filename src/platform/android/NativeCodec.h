@@ -28,7 +28,7 @@ class NativeCodec : public ImageCodec {
 
  protected:
   bool onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
-                    void* dstPixels) const override;
+                    std::shared_ptr<ColorSpace> dstColorSpace, void* dstPixels) const override;
 
   std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
 
@@ -39,8 +39,9 @@ class NativeCodec : public ImageCodec {
 
   static std::shared_ptr<NativeCodec> Make(JNIEnv* env, jobject sizeObject, int origin);
 
-  NativeCodec(int width, int height, Orientation orientation)
-      : ImageCodec(width, height, orientation) {
+  NativeCodec(int width, int height, Orientation orientation,
+              std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB())
+      : ImageCodec(width, height, orientation, std::move(colorSpace)) {
   }
 
   jobject decodeBitmap(JNIEnv* env, ColorType colorType, AlphaType alphaType,

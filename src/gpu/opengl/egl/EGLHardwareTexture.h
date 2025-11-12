@@ -43,7 +43,7 @@ class EGLHardwareTexture : public GLTexture {
   HardwareBufferRef hardwareBuffer = nullptr;
   EGLImageKHR eglImage = EGL_NO_IMAGE_KHR;
 
-  EGLHardwareTexture(const GPUTextureDescriptor& descriptor, HardwareBufferRef hardwareBuffer,
+  EGLHardwareTexture(const TextureDescriptor& descriptor, HardwareBufferRef hardwareBuffer,
                      EGLImageKHR eglImage, unsigned target, unsigned textureID);
   friend class GLGPU;
 };

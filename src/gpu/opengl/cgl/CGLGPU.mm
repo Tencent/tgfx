@@ -33,30 +33,7 @@ CGLGPU::~CGLGPU() {
   }
 }
 
-std::vector<PixelFormat> CGLGPU::getHardwareTextureFormats(HardwareBufferRef hardwareBuffer,
-                                                           YUVFormat* yuvFormat) const {
-  if (!HardwareBufferCheck(hardwareBuffer)) {
-    return {};
-  }
-  std::vector<PixelFormat> formats = {};
-  auto pixelFormat = CVPixelBufferGetPixelFormatType(hardwareBuffer);
-  switch (pixelFormat) {
-    case kCVPixelFormatType_OneComponent8:
-      formats.push_back(PixelFormat::ALPHA_8);
-      break;
-    case kCVPixelFormatType_32BGRA:
-      formats.push_back(PixelFormat::RGBA_8888);
-      break;
-    default:
-      break;
-  }
-  if (yuvFormat != nullptr) {
-    *yuvFormat = YUVFormat::Unknown;
-  }
-  return formats;
-}
-
-std::vector<std::shared_ptr<GPUTexture>> CGLGPU::importHardwareTextures(
+std::vector<std::shared_ptr<Texture>> CGLGPU::importHardwareTextures(
     HardwareBufferRef hardwareBuffer, uint32_t usage) {
   if (!HardwareBufferCheck(hardwareBuffer)) {
     return {};

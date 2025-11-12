@@ -45,6 +45,10 @@ class ImageReaderBuffer : public ImageBuffer {
     return imageReader->checkExpired(contentVersion);
   }
 
+  std::shared_ptr<ColorSpace> colorSpace() const override {
+    return imageReader->colorSpace();
+  }
+
  protected:
   std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) const override {
     return imageReader->readTexture(contentVersion, context, mipmapped);
@@ -74,6 +78,10 @@ int ImageReader::width() const {
 
 int ImageReader::height() const {
   return stream->height();
+}
+
+std::shared_ptr<ColorSpace> ImageReader::colorSpace() const {
+  return stream->colorSpace();
 }
 
 std::shared_ptr<ImageBuffer> ImageReader::acquireNextBuffer() {

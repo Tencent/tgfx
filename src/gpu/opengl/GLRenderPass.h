@@ -18,17 +18,32 @@
 
 #pragma once
 
-#include "gpu/RenderPass.h"
 #include "gpu/opengl/GLBuffer.h"
 #include "gpu/opengl/GLInterface.h"
 #include "gpu/opengl/GLRenderPipeline.h"
+#include "tgfx/gpu/RenderPass.h"
 
 namespace tgfx {
 class GLGPU;
 
+struct PendingUniformBuffer {
+  unsigned binding = 0;
+  std::shared_ptr<GLBuffer> buffer = nullptr;
+  size_t offset = 0;
+  size_t size = 0;
+};
+
+struct PendingTexture {
+  unsigned binding = 0;
+  std::shared_ptr<GLTexture> texture = nullptr;
+  std::shared_ptr<GLSampler> sampler = nullptr;
+};
+
 class GLRenderPass : public RenderPass {
  public:
   GLRenderPass(GLGPU* gpu, RenderPassDescriptor descriptor);
+
+  GPU* gpu() const override;
 
   bool begin();
 
@@ -41,8 +56,8 @@ class GLRenderPass : public RenderPass {
   void setUniformBuffer(unsigned binding, std::shared_ptr<GPUBuffer> buffer, size_t offset,
                         size_t size) override;
 
-  void setTexture(unsigned binding, std::shared_ptr<GPUTexture> texture,
-                  std::shared_ptr<GPUSampler> sampler) override;
+  void setTexture(unsigned binding, std::shared_ptr<Texture> texture,
+                  std::shared_ptr<Sampler> sampler) override;
 
   void setVertexBuffer(std::shared_ptr<GPUBuffer> buffer, size_t offset) override;
 
@@ -58,9 +73,17 @@ class GLRenderPass : public RenderPass {
   void onEnd() override;
 
  private:
-  GLGPU* gpu = nullptr;
+  GLGPU* _gpu = nullptr;
   std::shared_ptr<GLRenderPipeline> renderPipeline = nullptr;
+  std::vector<PendingUniformBuffer> pendingUniformBuffers = {};
+  std::vector<PendingTexture> pendingTextures = {};
+  std::shared_ptr<GLBuffer> pendingVertexBuffer = nullptr;
+  size_t pendingVertexOffset = 0;
+  std::shared_ptr<GLBuffer> pendingIndexBuffer = nullptr;
   IndexFormat indexFormat = IndexFormat::UInt16;
   uint32_t stencilReference = 0;
+
+  void bindFramebuffer();
+  bool flushPendingBindings();
 };
 }  // namespace tgfx

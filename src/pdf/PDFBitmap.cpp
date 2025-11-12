@@ -115,22 +115,6 @@ uint32_t GetNeighborAvgColor(const Pixmap& pixmap, int xOrig, int yOrig) {
   return 0x00000000;
 }
 
-bool DoJpeg(std::shared_ptr<Data> data, YUVColorSpace /*imageColorSpace*/, PDFDocumentImpl* doc,
-            ISize size, PDFIndirectReference ref) {
-  if (!JpegCodec::IsJpeg(data)) {
-    return false;
-  }
-
-  ISize jpegSize = size;
-  auto colorSpace = PDFUnion::Name("DeviceRGB");
-  auto streamWriter = [&data](const std::shared_ptr<WriteStream>& stream) {
-    stream->write(data->data(), data->size());
-  };
-  EmitImageStream(doc, ref, streamWriter, jpegSize, std::move(colorSpace), PDFIndirectReference(),
-                  static_cast<int>(data->size()), PDFStreamFormat::DCT);
-  return true;
-}
-
 void DoDeflatedAlpha(const Pixmap& pixmap, PDFDocumentImpl* document, PDFIndirectReference ref) {
   PDFMetadata::CompressionLevel compressionLevel = document->metadata().compressionLevel;
   PDFStreamFormat format = compressionLevel == PDFMetadata::CompressionLevel::None
@@ -248,7 +232,8 @@ void DoDeflatedImage(const Pixmap& pixmap, PDFDocumentImpl* document, bool isOpa
       break;
     }
     default:
-      colorSpace = PDFUnion::Name("DeviceRGB");
+      auto colorSpaceRef = document->colorSpaceRef();
+      colorSpace = PDFUnion::Ref(colorSpaceRef);
       const auto pixelPointer = reinterpret_cast<const uint8_t*>(pixmap.pixels());
       auto rowBytes = pixmap.rowBytes();
 
@@ -298,25 +283,14 @@ void DoDeflatedImage(const Pixmap& pixmap, PDFDocumentImpl* document, bool isOpa
 
 void PDFBitmap::SerializeImage(const std::shared_ptr<Image>& image, int /*encodingQuality*/,
                                PDFDocumentImpl* doc, PDFIndirectReference ref) {
-  auto dimensions = ISize::Make(image->width(), image->height());
-
-  ;
-  if (Types::Get(image.get()) == Types::ImageType::Codec) {
-    const auto codecImage = static_cast<CodecImage*>(image.get());
-    if (auto data = codecImage->getCodec()->getEncodedData()) {
-      if (DoJpeg(std::move(data), YUVColorSpace::JPEG_FULL, doc, dimensions, ref)) {
-        return;
-      }
-    }
-  }
-
   //TODO (YGaurora): is image opaque,encode as jpeg
-  auto image2bitmap = [](Context* context, const std::shared_ptr<Image>& image) {
-    auto surface = Surface::Make(context, image->width(), image->height());
+  auto image2bitmap = [doc](Context* context, const std::shared_ptr<Image>& image) {
+    auto surface = Surface::Make(context, image->width(), image->height(), false, 1, false, 0,
+                                 doc->colorSpace());
     auto canvas = surface->getCanvas();
     canvas->drawImage(image);
 
-    Bitmap bitmap(surface->width(), surface->height());
+    Bitmap bitmap(surface->width(), surface->height(), false, true, surface->colorSpace());
     auto pixels = bitmap.lockPixels();
     //bitmap in pdf must be unpremultiplied
     if (surface->readPixels(bitmap.info().makeAlphaType(AlphaType::Unpremultiplied), pixels)) {
