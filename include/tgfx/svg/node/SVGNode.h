@@ -19,6 +19,8 @@
 #pragma once
 
 #include <memory>
+#include <string>
+#include <unordered_map>
 #include <utility>
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
@@ -196,6 +198,13 @@ class SVGNode {
    */
   virtual void appendChild(std::shared_ptr<SVGNode> node) = 0;
 
+  /**
+   * Returns undefined Attributes that couldn't be parsed
+   */
+  const std::unordered_map<std::string, std::string>& getUndefinedAttributes() const {
+    return undefinedAttributes;
+  }
+
  protected:
   explicit SVGNode(SVGTag tag);
 
@@ -233,6 +242,7 @@ class SVGNode {
  private:
   SVGTag _tag;
   SVGPresentationAttributes presentationAttributes;
+  std::unordered_map<std::string, std::string> undefinedAttributes;
 
   friend class SVGNodeConstructor;
   friend class SVGRenderContext;

@@ -305,6 +305,8 @@ bool SVGNodeConstructor::SetAttribute(SVGNode& node, const std::string& name,
     auto setter = iter->second.setter;
     return setter(node, iter->second.attribute, value);
   }
+  // save undefined attributes
+  node.undefinedAttributes.insert({name, value});
   return true;
 }
 
