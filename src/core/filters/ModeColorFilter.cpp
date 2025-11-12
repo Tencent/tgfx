@@ -73,8 +73,9 @@ PlacementPtr<FragmentProcessor> ModeColorFilter::asFragmentProcessor(
   auto dstColor = ColorSpaceXformSteps::ConvertColorSpace(
       ColorSpace::MakeSRGB(), AlphaType::Unpremultiplied, std::move(dstColorSpace),
       AlphaType::Premultiplied, color);
-  auto processor = ConstColorProcessor::Make(context->drawingBuffer(), dstColor, InputMode::Ignore);
-  return XfermodeFragmentProcessor::MakeFromSrcProcessor(context->drawingBuffer(),
+  auto processor =
+      ConstColorProcessor::Make(context->drawingAllocator(), dstColor, InputMode::Ignore);
+  return XfermodeFragmentProcessor::MakeFromSrcProcessor(context->drawingAllocator(),
                                                          std::move(processor), mode);
 }
 

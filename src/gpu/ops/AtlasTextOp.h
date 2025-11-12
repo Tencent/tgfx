@@ -57,6 +57,6 @@ class AtlasTextOp final : public DrawOp {
   explicit AtlasTextOp(RectsVertexProvider* provider, std::shared_ptr<TextureProxy> textureProxy,
                        const SamplingOptions& sampling);
 
-  friend class BlockBuffer;
+  friend class BlockAllocator;
 };
 }  // namespace tgfx

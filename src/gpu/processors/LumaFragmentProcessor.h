@@ -23,7 +23,7 @@ namespace tgfx {
 class LumaFragmentProcessor : public FragmentProcessor {
  public:
   static PlacementPtr<FragmentProcessor> Make(
-      BlockBuffer* buffer, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+      BlockAllocator* allocator, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   std::string name() const override {
     return "LumaFragmentProcessor";

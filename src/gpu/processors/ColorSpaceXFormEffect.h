@@ -25,10 +25,10 @@ namespace tgfx {
 
 class ColorSpaceXformEffect : public FragmentProcessor {
  public:
-  static PlacementPtr<FragmentProcessor> Make(BlockBuffer* buffer, ColorSpace* src, AlphaType srcAT,
-                                              ColorSpace* dst, AlphaType dstAT);
+  static PlacementPtr<FragmentProcessor> Make(BlockAllocator* allocator, ColorSpace* src,
+                                              AlphaType srcAT, ColorSpace* dst, AlphaType dstAT);
 
-  static PlacementPtr<FragmentProcessor> Make(BlockBuffer* buffer,
+  static PlacementPtr<FragmentProcessor> Make(BlockAllocator* allocator,
                                               std::shared_ptr<ColorSpaceXformSteps> colorXform);
 
   ColorSpaceXformEffect(std::shared_ptr<ColorSpaceXformSteps> colorXform);

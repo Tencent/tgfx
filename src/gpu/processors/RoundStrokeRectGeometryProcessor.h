@@ -25,7 +25,8 @@
 namespace tgfx {
 class RoundStrokeRectGeometryProcessor : public GeometryProcessor {
  public:
-  static PlacementPtr<RoundStrokeRectGeometryProcessor> Make(BlockBuffer* buffer, AAType aaType,
+  static PlacementPtr<RoundStrokeRectGeometryProcessor> Make(BlockAllocator* allocator,
+                                                             AAType aaType,
                                                              std::optional<Color> commonColor,
                                                              std::optional<Matrix> uvMatrix);
 

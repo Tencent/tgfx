@@ -72,6 +72,6 @@ class RRectDrawOp : public DrawOp {
 
   explicit RRectDrawOp(RRectsVertexProvider* provider);
 
-  friend class BlockBuffer;
+  friend class BlockAllocator;
 };
 }  // namespace tgfx

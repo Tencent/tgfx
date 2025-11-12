@@ -48,6 +48,6 @@ class ShapeDrawOp : public DrawOp {
   ShapeDrawOp(std::shared_ptr<GPUShapeProxy> proxy, Color color, const Matrix& uvMatrix,
               AAType aaType);
 
-  friend class BlockBuffer;
+  friend class BlockAllocator;
 };
 }  // namespace tgfx

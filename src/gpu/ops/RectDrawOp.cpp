@@ -32,7 +32,7 @@ PlacementPtr<RectDrawOp> RectDrawOp::Make(Context* context,
   if (provider == nullptr) {
     return nullptr;
   }
-  auto drawOp = context->drawingBuffer()->make<RectDrawOp>(provider.get());
+  auto drawOp = context->drawingAllocator()->make<RectDrawOp>(provider.get());
   CAPUTRE_RECT_MESH(drawOp.get(), provider.get());
   if (provider->aaType() == AAType::Coverage || provider->rectCount() > 1 || provider->lineJoin()) {
     drawOp->indexBufferProxy = context->globalCache()->getRectIndexBuffer(
@@ -66,7 +66,7 @@ PlacementPtr<GeometryProcessor> RectDrawOp::onMakeGeometryProcessor(RenderTarget
   ATTRIBUTE_NAME("uvMatrix", uvMatrix);
   ATTRIBUTE_NAME("hasSubset", hasSubset);
   ATTRIBUTE_NAME("hasStroke", lineJoin.has_value());
-  auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
+  auto drawingBuffer = renderTarget->getContext()->drawingAllocator();
   if (lineJoin == LineJoin::Round) {
     return RoundStrokeRectGeometryProcessor::Make(drawingBuffer, aaType, commonColor, uvMatrix);
   }

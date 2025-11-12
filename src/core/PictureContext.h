@@ -21,7 +21,7 @@
 #include <functional>
 #include "core/DrawContext.h"
 #include "core/PictureRecords.h"
-#include "core/utils/BlockBuffer.h"
+#include "core/utils/BlockAllocator.h"
 #include "tgfx/core/Stroke.h"
 
 namespace tgfx {
@@ -71,7 +71,7 @@ class PictureContext : public DrawContext {
                  const MCState& state, const Fill& fill) override;
 
  private:
-  BlockBuffer blockBuffer = {};
+  BlockAllocator blockAllocator = {};
   std::vector<PlacementPtr<PictureRecord>> records = {};
   size_t drawCount = 0;
   MCState lastState = {};

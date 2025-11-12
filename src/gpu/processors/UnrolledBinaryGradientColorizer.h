@@ -26,7 +26,7 @@ class UnrolledBinaryGradientColorizer : public FragmentProcessor {
  public:
   static constexpr int MaxColorCount = 16;
 
-  static PlacementPtr<UnrolledBinaryGradientColorizer> Make(BlockBuffer* buffer,
+  static PlacementPtr<UnrolledBinaryGradientColorizer> Make(BlockAllocator* allocator,
                                                             const Color* colors,
                                                             const float* positions, int count);
 

@@ -44,7 +44,7 @@ RuntimeDrawTask::RuntimeDrawTask(std::shared_ptr<RenderTargetProxy> target,
     if (textureProxy != nullptr) {
       auto maskRect = Rect::MakeWH(textureProxy->width(), textureProxy->height());
       auto maskVertexProvider =
-          RectsVertexProvider::MakeFrom(context->drawingBuffer(), maskRect, AAType::None);
+          RectsVertexProvider::MakeFrom(context->drawingAllocator(), maskRect, AAType::None);
       auto maskBuffer = context->proxyProvider()->createVertexBufferProxy(
           std::move(maskVertexProvider), RenderFlags::DisableAsyncTask);
       inputVertexBuffers.push_back(std::move(maskBuffer));
@@ -126,13 +126,13 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
   if (!textureView->isAlphaOnly() &&
       !NeedConvertColorSpace(textureProxyWithCS->colorSpace, dstColorSpace)) {
     auto xformEffect = ColorSpaceXformEffect::Make(
-        context->drawingBuffer(), textureProxyWithCS->colorSpace.get(), AlphaType::Premultiplied,
+        context->drawingAllocator(), textureProxyWithCS->colorSpace.get(), AlphaType::Premultiplied,
         dstColorSpace.get(), AlphaType::Premultiplied);
-    colorProcessor = FragmentProcessor::Compose(context->drawingBuffer(), std::move(xformEffect),
+    colorProcessor = FragmentProcessor::Compose(context->drawingAllocator(), std::move(xformEffect),
                                                 std::move(colorProcessor));
   }
   auto geometryProcessor =
-      DefaultGeometryProcessor::Make(context->drawingBuffer(), {}, renderTarget->width(),
+      DefaultGeometryProcessor::Make(context->drawingAllocator(), {}, renderTarget->width(),
                                      renderTarget->height(), AAType::None, {}, {});
   std::vector fragmentProcessors = {colorProcessor.get()};
   ProgramInfo programInfo(renderTarget.get(), geometryProcessor.get(),

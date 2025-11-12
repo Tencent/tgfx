@@ -81,7 +81,7 @@ class DrawingManager {
 
  private:
   Context* context = nullptr;
-  BlockBuffer* drawingBuffer = nullptr;
+  BlockAllocator* drawingAllocator = nullptr;
   std::vector<PlacementPtr<ResourceTask>> resourceTasks = {};
   std::vector<PlacementPtr<RenderTask>> renderTasks = {};
   std::list<std::shared_ptr<OpsCompositor>> compositors = {};

@@ -45,6 +45,7 @@ PlacementPtr<FragmentProcessor> ColorFilterShader::asFragmentProcessor(
     return nullptr;
   }
   auto fp2 = colorFilter->asFragmentProcessor(args.context, dstColorSpace);
-  return FragmentProcessor::Compose(args.context->drawingBuffer(), std::move(fp1), std::move(fp2));
+  return FragmentProcessor::Compose(args.context->drawingAllocator(), std::move(fp1),
+                                    std::move(fp2));
 }
 }  // namespace tgfx

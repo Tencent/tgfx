@@ -23,7 +23,7 @@
 namespace tgfx {
 class LinearGradientLayout : public FragmentProcessor {
  public:
-  static PlacementPtr<LinearGradientLayout> Make(BlockBuffer* buffer, Matrix matrix);
+  static PlacementPtr<LinearGradientLayout> Make(BlockAllocator* allocator, Matrix matrix);
 
   std::string name() const override {
     return "LinearGradientLayout";
