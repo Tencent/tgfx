@@ -35,6 +35,10 @@ class EAGLLayerTexture : public GLTexture {
     return renderBufferID;
   }
 
+  void release(GLGPU* gpu) {
+    onRelease(gpu);
+  }
+
  protected:
   void onReleaseTexture(GLGPU* gpu) override;
 

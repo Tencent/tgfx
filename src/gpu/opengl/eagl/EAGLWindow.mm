@@ -43,6 +43,9 @@ EAGLWindow::EAGLWindow(std::shared_ptr<Device> device, CAEAGLLayer* layer)
 
 std::shared_ptr<Surface> EAGLWindow::onCreateSurface(Context* context) {
   if (layerTexture != nullptr) {
+    // Immediately release the previous layer texture to prevent new texture creation from failing
+    // due to repeated binding of the same layer.
+    layerTexture->release(static_cast<GLGPU*>(context->gpu()));
     layerTexture = nullptr;
   }
   layerTexture = EAGLLayerTexture::MakeFrom(static_cast<GLGPU*>(context->gpu()), layer);
