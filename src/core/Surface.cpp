@@ -17,11 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Surface.h"
-#include "DrawingManager.h"
 #include "core/images/TextureImage.h"
 #include "core/utils/CopyPixels.h"
 #include "core/utils/Log.h"
 #include "core/utils/PixelFormatUtil.h"
+#include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/RenderContext.h"
 
