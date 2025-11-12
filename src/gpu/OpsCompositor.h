@@ -125,8 +125,8 @@ class OpsCompositor {
 
   static bool CompareFill(const Fill& a, const Fill& b);
 
-  BlockBuffer* drawingBuffer() const {
-    return context->drawingBuffer();
+  BlockAllocator* drawingAllocator() const {
+    return context->drawingAllocator();
   }
 
   ProxyProvider* proxyProvider() const {

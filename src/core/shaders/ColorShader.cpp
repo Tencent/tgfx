@@ -50,7 +50,8 @@ PlacementPtr<FragmentProcessor> ColorShader::asFragmentProcessor(
   auto dstColor = ColorSpaceXformSteps::ConvertColorSpace(
       ColorSpace::MakeSRGB(), AlphaType::Unpremultiplied, std::move(dstColorSpace),
       AlphaType::Premultiplied, color);
-  return ConstColorProcessor::Make(args.context->drawingBuffer(), dstColor, InputMode::ModulateA);
+  return ConstColorProcessor::Make(args.context->drawingAllocator(), dstColor,
+                                   InputMode::ModulateA);
 }
 
 }  // namespace tgfx

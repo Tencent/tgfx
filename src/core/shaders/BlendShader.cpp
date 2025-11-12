@@ -67,7 +67,7 @@ PlacementPtr<FragmentProcessor> BlendShader::asFragmentProcessor(
   if (fpB == nullptr) {
     return nullptr;
   }
-  return XfermodeFragmentProcessor::MakeFromTwoProcessors(args.context->drawingBuffer(),
+  return XfermodeFragmentProcessor::MakeFromTwoProcessors(args.context->drawingAllocator(),
                                                           std::move(fpB), std::move(fpA), mode);
 }
 }  // namespace tgfx

@@ -29,7 +29,7 @@ class DrawContext;
 class MCState;
 class Image;
 class Fill;
-class BlockData;
+class BlockBuffer;
 template <typename T>
 class PlacementPtr;
 
@@ -92,13 +92,13 @@ class Picture {
   void playback(Canvas* canvas, const FillModifier* fillModifier = nullptr) const;
 
  private:
-  std::unique_ptr<BlockData> blockData;
+  std::unique_ptr<BlockBuffer> blockBuffer;
   std::vector<PlacementPtr<PictureRecord>> records;
   mutable std::atomic<Rect*> bounds = {nullptr};
   size_t drawCount = 0;
   bool _hasUnboundedFill = false;
 
-  Picture(std::unique_ptr<BlockData> data, std::vector<PlacementPtr<PictureRecord>> records,
+  Picture(std::unique_ptr<BlockBuffer> buffer, std::vector<PlacementPtr<PictureRecord>> records,
           size_t drawCount);
 
   void playback(DrawContext* drawContext, const MCState& state,

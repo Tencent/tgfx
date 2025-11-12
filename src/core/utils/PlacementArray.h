@@ -247,6 +247,6 @@ class PlacementArray {
   PlacementArray(PlacementPtr<T>* data, size_t size) : _data(data), _size(size) {
   }
 
-  friend class BlockBuffer;
+  friend class BlockAllocator;
 };
 }  // namespace tgfx

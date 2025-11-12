@@ -39,7 +39,7 @@ PlacementPtr<FragmentProcessor> ColorImageFilter::asFragmentProcessor(
   if (imageProcessor == nullptr) {
     return nullptr;
   }
-  auto drawingBuffer = args.context->drawingBuffer();
+  auto drawingBuffer = args.context->drawingAllocator();
   auto processor = ComposeFragmentProcessor::Make(
       drawingBuffer, std::move(imageProcessor),
       filter->asFragmentProcessor(args.context, source->colorSpace()));

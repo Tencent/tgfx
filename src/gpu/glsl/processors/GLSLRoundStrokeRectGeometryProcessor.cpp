@@ -20,9 +20,9 @@
 
 namespace tgfx {
 PlacementPtr<RoundStrokeRectGeometryProcessor> RoundStrokeRectGeometryProcessor::Make(
-    BlockBuffer* buffer, AAType aaType, std::optional<Color> commonColor,
+    BlockAllocator* allocator, AAType aaType, std::optional<Color> commonColor,
     std::optional<Matrix> uvMatrix) {
-  return buffer->make<GLSLRoundStrokeRectGeometryProcessor>(aaType, commonColor, uvMatrix);
+  return allocator->make<GLSLRoundStrokeRectGeometryProcessor>(aaType, commonColor, uvMatrix);
 }
 
 GLSLRoundStrokeRectGeometryProcessor::GLSLRoundStrokeRectGeometryProcessor(

@@ -20,11 +20,11 @@
 
 namespace tgfx {
 PlacementPtr<FragmentProcessor> ComposeFragmentProcessor::Make(
-    BlockBuffer* buffer, std::vector<PlacementPtr<FragmentProcessor>> processors) {
+    BlockAllocator* allocator, std::vector<PlacementPtr<FragmentProcessor>> processors) {
   if (processors.empty()) {
     return nullptr;
   }
-  return buffer->make<GLSLComposeFragmentProcessor>(std::move(processors));
+  return allocator->make<GLSLComposeFragmentProcessor>(std::move(processors));
 }
 
 GLSLComposeFragmentProcessor::GLSLComposeFragmentProcessor(

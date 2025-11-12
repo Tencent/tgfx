@@ -19,9 +19,9 @@
 #include "GLSLDiamondGradientLayout.h"
 
 namespace tgfx {
-PlacementPtr<DiamondGradientLayout> DiamondGradientLayout::Make(BlockBuffer* buffer,
+PlacementPtr<DiamondGradientLayout> DiamondGradientLayout::Make(BlockAllocator* allocator,
                                                                 Matrix matrix) {
-  return buffer->make<GLSLDiamondGradientLayout>(matrix);
+  return allocator->make<GLSLDiamondGradientLayout>(matrix);
 }
 
 GLSLDiamondGradientLayout::GLSLDiamondGradientLayout(Matrix matrix)
