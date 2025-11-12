@@ -3398,12 +3398,12 @@ TGFX_TEST(LayerTest, Matrix) {
   displayList->render(surface.get());
   EXPECT_EQ(imageLayer->getBounds(contentLayer.get()), Rect::MakeLTRB(65, 0, 298, 281));
   EXPECT_EQ(imageLayer->getBounds(displayList->root()), Rect::MakeLTRB(99, 15, 190, 162));
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/1Matrix_3D"));
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D"));
 
   auto affineMatrix = Matrix::MakeTrans(50, 50);
   imageLayer->setMatrix(affineMatrix);
   displayList->render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/1Matrix_3D_2D"));
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D_2D"));
 
   imageLayer->setMatrix3D(imageMatrix3D);
   EXPECT_TRUE(imageLayer->matrix().isIdentity());
@@ -3435,7 +3435,7 @@ TGFX_TEST(LayerTest, Matrix) {
   }
   displayList->root()->addChild(shaperLayer);
   displayList->render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/1Matrix_3D_2D_3D"));
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D_2D_3D"));
 }
 
 }  // namespace tgfx

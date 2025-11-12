@@ -1033,7 +1033,8 @@ std::shared_ptr<MaskFilter> Layer::getMaskFilter(const DrawArgs& args, float sca
   // affineRelativeMatrix is an equivalent matrix. Otherwise, directly use the identity matrix to
   // draw the mask content, and this 3D matrix will be applied through a filter during drawing
   auto isMatrixAffine = IsMatrix3DAffine(relativeMatrix);
-  auto affineRelativeMatrix = isMatrixAffine ? GetMayLossyAffineMatrix(relativeMatrix) : Matrix::I();
+  auto affineRelativeMatrix =
+      isMatrixAffine ? GetMayLossyAffineMatrix(relativeMatrix) : Matrix::I();
   auto maskClipBounds = layerClipBounds;
   if (layerClipBounds.has_value()) {
     auto invertedMatrix = Matrix::I();
