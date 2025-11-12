@@ -54,10 +54,14 @@ class DrawArgs {
   Rect* renderRect = nullptr;
 
   // The background context to be used during the drawing process. Note: this could be nullptr.
-  std::shared_ptr<BackgroundContext> backgroundContext = nullptr;
+  std::shared_ptr<BackgroundContext> blurBackground = nullptr;
   // Indicates whether to force drawing the background, even if there are no background styles.
   bool forceDrawBackground = false;
   std::shared_ptr<ColorSpace> dstColorSpace = ColorSpace::MakeSRGB();
+
+  // Only used while recording layer's background image.
+  std::shared_ptr<BackgroundContext> blendModeBackground = nullptr;
+
   // Indicates whether to exclude 3D transformations during the drawing process.
   bool excludeTransform3D = false;
 };

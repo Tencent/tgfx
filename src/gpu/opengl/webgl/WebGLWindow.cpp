@@ -56,7 +56,7 @@ std::shared_ptr<Surface> WebGLWindow::onCreateSurface(Context* context) {
   if (isP3Supported) {
     colorSpace = ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3);
   }
-  return Surface::MakeFrom(context, {glInfo, width, height}, ImageOrigin::BottomLeft, 1,
+  return Surface::MakeFrom(context, {glInfo, width, height}, ImageOrigin::BottomLeft, 0,
                            colorSpace);
 }
 }  // namespace tgfx

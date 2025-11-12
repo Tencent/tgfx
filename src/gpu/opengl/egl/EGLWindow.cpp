@@ -123,7 +123,7 @@ std::shared_ptr<Surface> EGLWindow::onCreateSurface(Context* context) {
       colorSpace = ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3);
     }
   }
-  return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft, 1, colorSpace);
+  return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft, 0, colorSpace);
 }
 
 void EGLWindow::setPresentationTime(int64_t time) {

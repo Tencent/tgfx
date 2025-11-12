@@ -56,7 +56,8 @@ Rect Transform3DImageFilter::onFilterBounds(const Rect& rect, MapDirection mapDi
     DEBUG_ASSERT(false);
     return rect;
   }
-  return inversedMatrix.mapRect(rect);
+  auto result = inversedMatrix.mapRect(rect);
+  return result;
 }
 
 std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(

@@ -206,6 +206,14 @@ Vec4 Matrix3D::getRow(int i) const {
   return {values[i], values[i + 4], values[i + 8], values[i + 12]};
 }
 
+float Matrix3D::getTranslateX() const {
+  return values[TRANS_X];
+}
+
+float Matrix3D::getTranslateY() const {
+  return values[TRANS_Y];
+}
+
 const Matrix3D& Matrix3D::I() {
   static constexpr Matrix3D identity;
   return identity;
@@ -316,14 +324,6 @@ bool Matrix3D::operator==(const Matrix3D& other) const {
 
 void Matrix3D::getRowMajor(float buffer[16]) const {
   TransposeArrays(values, buffer);
-}
-
-float Matrix3D::getTranslateX() const {
-  return values[TRANS_X];
-}
-
-float Matrix3D::getTranslateY() const {
-  return values[TRANS_Y];
 }
 
 void Matrix3D::setConcat(const Matrix3D& a, const Matrix3D& b) {

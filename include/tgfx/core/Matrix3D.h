@@ -92,6 +92,16 @@ class Matrix3D {
   }
 
   /**
+   * Returns the horizontal translation factor.
+   */
+  float getTranslateX() const;
+
+  /**
+   * Returns the vertical translation factor.
+   */
+  float getTranslateY() const;
+
+  /**
    * Returns a reference to a constant identity Matrix3D. The returned Matrix3D is:
    *
    *       | 1 0 0 0 |
@@ -271,16 +281,6 @@ class Matrix3D {
    * Copies the matrix values into a 16-element array in row-major order.
    */
   void getRowMajor(float buffer[16]) const;
-
-  /**
-   * Returns the horizontal translation factor.
-   */
-  float getTranslateX() const;
-
-  /**
-   * Returns the vertical translation factor.
-   */
-  float getTranslateY() const;
 
   /**
    * Concatenates two matrices and stores the result in this matrix. M' = a * b.

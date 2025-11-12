@@ -38,12 +38,33 @@ void HitTestContext::drawFill(const Fill&) {
   hit = true;
 }
 
-void HitTestContext::drawRect(const Rect& rect, const MCState& state, const Fill&) {
+void HitTestContext::drawRect(const Rect& rect, const MCState& state, const Fill&,
+                              const Stroke* stroke) {
   Point local = {};
   if (!GetLocalPoint(state.matrix, deviceX, deviceY, &local)) {
     return;
   }
-  if (rect.contains(local.x, local.y) && checkClip(state.clip, local)) {
+  if (stroke == nullptr) {
+    if (!rect.contains(local.x, local.y)) {
+      return;
+    }
+  } else {
+    if (shapeHitTest) {
+      Path path = {};
+      path.addRect(rect);
+      stroke->applyToPath(&path);
+      if (!path.contains(local.x, local.y)) {
+        return;
+      }
+    } else {
+      auto strokeRect = rect;
+      ApplyStrokeToBounds(*stroke, &strokeRect);
+      if (!strokeRect.contains(local.x, local.y)) {
+        return;
+      }
+    }
+  }
+  if (checkClip(state.clip, local)) {
     hit = true;
   }
 }

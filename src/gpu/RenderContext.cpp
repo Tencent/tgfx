@@ -212,13 +212,14 @@ Rect RenderContext::getClipBounds(const Path& clip) {
 
 void RenderContext::drawFill(const Fill& fill) {
   if (auto compositor = getOpsCompositor(fill.isOpaque())) {
-    compositor->fillRect(renderTarget->bounds(), {}, fill);
+    compositor->fillRect(renderTarget->bounds(), {}, fill, nullptr);
   }
 }
 
-void RenderContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill) {
+void RenderContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill,
+                             const Stroke* stroke) {
   if (auto compositor = getOpsCompositor()) {
-    compositor->fillRect(rect, state, fill);
+    compositor->fillRect(rect, state, fill, stroke);
   }
 }
 

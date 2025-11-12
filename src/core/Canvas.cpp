@@ -207,17 +207,11 @@ void Canvas::drawLine(float x0, float y0, float x1, float y1, const Paint& paint
 }
 
 void Canvas::drawRect(const Rect& rect, const Paint& paint) {
-  if (paint.getStroke()) {
-    Path path = {};
-    path.addRect(rect);
-    drawPath(path, paint);
-    return;
-  }
   if (rect.isEmpty()) {
     return;
   }
   SaveLayerForImageFilter(paint.getImageFilter());
-  drawContext->drawRect(rect, *mcState, paint.getFill());
+  drawContext->drawRect(rect, *mcState, paint.getFill(), paint.getStroke());
 }
 
 void Canvas::drawOval(const Rect& oval, const Paint& paint) {
@@ -243,9 +237,6 @@ static bool UseDrawPath(const Paint& paint, const Point& radii, const Matrix& vi
   if (!stroke) {
     return false;
   }
-  if (!viewMatrix.rectStaysRect()) {
-    return false;
-  }
   float xRadius = std::fabs(viewMatrix.getScaleX() * radii.x + viewMatrix.getSkewY() * radii.y);
   float yRadius = std::fabs(viewMatrix.getSkewX() * radii.x + viewMatrix.getScaleY() * radii.y);
   Point scaledStroke = {};
@@ -254,10 +245,6 @@ static bool UseDrawPath(const Paint& paint, const Point& radii, const Matrix& vi
 
   // Half of strokewidth is greater than radius
   if (scaledStroke.x * 0.5f > xRadius || scaledStroke.y * 0.5f > yRadius) {
-    return true;
-  }
-  // Handle thick strokes for near-circular ellipses
-  if (stroke->width > 1.0f && (radii.x * 0.5f > radii.y || radii.y * 0.5f > radii.x)) {
     return true;
   }
   // The matrix may have a rotation by an odd multiple of 90 degrees.
@@ -276,12 +263,11 @@ static bool UseDrawPath(const Paint& paint, const Point& radii, const Matrix& vi
   if (scaledStroke.length() > 0.5f && (0.5f * xRadius > yRadius || 0.5f * yRadius > xRadius)) {
     return true;
   }
-
   // Curvature of the stroke is less than curvature of the ellipse
-  if (scaledStroke.x * radii.y * radii.y < scaledStroke.y * scaledStroke.y * radii.x) {
+  if (scaledStroke.x * yRadius * yRadius < scaledStroke.y * scaledStroke.y * xRadius) {
     return true;
   }
-  if (scaledStroke.y * radii.x * radii.x < scaledStroke.x * scaledStroke.x * radii.y) {
+  if (scaledStroke.y * xRadius * xRadius < scaledStroke.x * scaledStroke.x * yRadius) {
     return true;
   }
   return false;
@@ -361,13 +347,13 @@ void Canvas::drawPath(const Path& path, const MCState& state, const Fill& fill,
       return;
     }
     if (StrokeLineIsRect(*stroke, line, &rect)) {
-      drawContext->drawRect(rect, state, fill);
+      drawContext->drawRect(rect, state, fill, nullptr);
       return;
     }
   }
   if (stroke == nullptr) {
     if (path.isRect(&rect)) {
-      drawContext->drawRect(rect, state, fill);
+      drawContext->drawRect(rect, state, fill, nullptr);
       return;
     }
     RRect rRect = {};

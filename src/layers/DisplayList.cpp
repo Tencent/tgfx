@@ -900,7 +900,7 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   auto renderRect = inverse.mapRect(drawRect);
   renderRect.roundOut();
   args.renderRect = &renderRect;
-  args.backgroundContext = _root->createBackgroundContext(context, drawRect, viewMatrix);
+  args.blurBackground = _root->createBackgroundContext(context, drawRect, viewMatrix);
   args.dstColorSpace = surface->colorSpace();
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
 }

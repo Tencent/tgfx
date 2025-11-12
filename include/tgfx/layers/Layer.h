@@ -20,7 +20,6 @@
 
 #include <memory>
 #include <optional>
-#include <unordered_set>
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Matrix.h"
@@ -126,6 +125,20 @@ class Layer : public std::enable_shared_from_this<Layer> {
    * Sets the blend mode of the layer.
    */
   void setBlendMode(BlendMode value);
+
+  /**
+   * Returns true if the layer allows its background to pass through to sublayers. Note that layers
+   * with non-SrcOver blend modes, filters, or 3D transforms will ignore this setting and prevent
+   * background pass-through. The default value is true.
+   */
+  bool passThroughBackground() const {
+    return bitFields.passThroughBackground;
+  }
+
+  /**
+   * Sets whether the layer passes through its background to sublayers.
+   */
+  void setPassThroughBackground(bool value);
 
   /**
    * Returns the position of the layer relative to the local coordinates of the parent layer.
@@ -570,11 +583,10 @@ class Layer : public std::enable_shared_from_this<Layer> {
   LayerContent* getContent();
 
   /**
-   * Generates an image filter for the specified content area within the layer
+   * Generates an image filter for the specified content area within the layer.
    * @param contentScale The scale ratio of the specified area in the layer's local coordinate
-   * system
-   * @param contentBound The rectangular coordinates of the specified area after scaling in the
-   * layer coordinate system
+   * system.
+   * @param contentBound The rectangular coordinates of the specified area after scaling.
    */
   std::shared_ptr<ImageFilter> getImageFilter(float contentScale, const Rect& contentBound);
 
@@ -614,7 +626,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::shared_ptr<Image> getBoundsBackgroundImage(const DrawArgs& args, float contentScale,
                                                   Point* offset);
 
-  void drawBackgroundImage(const DrawArgs& args, Canvas& canvas);
+  void drawBackgroundImage(const DrawArgs& args, Canvas& canvas, Point* offset);
 
   void drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
                        const LayerStyleSource* source, LayerStylePosition position);
@@ -635,7 +647,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   void updateBackgroundBounds(float contentScale);
 
-  void propagateBackgroundStyleOutset();
+  void propagateLayerState();
 
   bool hasBackgroundStyle();
 
@@ -645,6 +657,21 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   static std::shared_ptr<Picture> RecordPicture(DrawMode mode, float contentScale,
                                                 const std::function<void(Canvas*)>& drawFunction);
+
+  std::shared_ptr<Image> getOffscreenContentImage(
+      const DrawArgs& args, const Canvas* canvas, bool passThroughBackground,
+      std::shared_ptr<BackgroundContext> subBackgroundContext, std::optional<Rect> clipBounds,
+      Matrix* imageMatrix, const LayerStyleSource* styleSource);
+
+  /**
+   * Returns the equivalent transformation matrix adapted for a custom anchor point.
+   * The layer's matrix _matrix3D is defined based on the parent layer's local coordinate system,
+   * with the transformation anchor point being the origin of that coordinate system. This function
+   * returns the corresponding matrix for applying an equivalent 3D affine transformation at any
+   * arbitrary point within that coordinate system.
+   * @param anchor The specified anchor point
+   */
+  Matrix3D anchorAdaptedMatrix(const Point& anchor) const;
 
   struct {
     bool dirtyContent : 1;        // layer's content needs updating
@@ -656,6 +683,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
     bool allowsEdgeAntialiasing : 1;
     bool allowsGroupOpacity : 1;
     bool excludeChildEffectsInLayerStyle : 1;
+    bool passThroughBackground : 1;
+    bool hasBlendMode : 1;
     uint8_t blendMode : 5;
     uint8_t maskType : 2;
   } bitFields = {};

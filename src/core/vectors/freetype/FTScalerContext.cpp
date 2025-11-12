@@ -80,7 +80,7 @@ static void RenderOutLineGlyph(FT_Face face, const ImageInfo& dstInfo, void* dst
   auto rows = dstInfo.height();
   params.flags |= FT_RASTER_FLAG_DIRECT;
   params.gray_spans = GraySpanFunc;
-  FTRasterTarget target = {output + (rows - 1) * pitch, pitch,
+  FTRasterTarget target = {buffer + (rows - 1) * pitch, pitch,
                            GammaCorrection::GammaTable().data()};
   params.user = &target;
 #else
