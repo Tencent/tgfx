@@ -20,14 +20,14 @@
 
 #include <functional>
 #include "core/DrawContext.h"
-#include "core/Records.h"
+#include "core/PictureRecords.h"
 #include "core/utils/BlockBuffer.h"
 #include "tgfx/core/Stroke.h"
 
 namespace tgfx {
-class RecordingContext : public DrawContext {
+class PictureContext : public DrawContext {
  public:
-  ~RecordingContext() override;
+  ~PictureContext() override;
 
   void clear();
 
@@ -72,7 +72,7 @@ class RecordingContext : public DrawContext {
 
  private:
   BlockBuffer blockBuffer = {};
-  std::vector<PlacementPtr<Record>> records = {};
+  std::vector<PlacementPtr<PictureRecord>> records = {};
   size_t drawCount = 0;
   MCState lastState = {};
   Fill lastFill = {};

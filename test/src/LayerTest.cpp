@@ -3282,7 +3282,7 @@ TGFX_TEST(LayerTest, PassThrough_Test) {
   displayList.render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PassThrough_Test"));
 
-  Recorder recorder;
+  PictureRecorder recorder;
   auto newCanvas = recorder.beginRecording();
   newCanvas->rotate(45, 30, 30);
   shapeLayer->draw(newCanvas);
