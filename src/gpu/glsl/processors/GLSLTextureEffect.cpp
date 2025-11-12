@@ -66,7 +66,7 @@ PlacementPtr<FragmentProcessor> TextureEffect::MakeRGBAAA(std::shared_ptr<Textur
     return nullptr;
   }
   auto matrix = uvMatrix ? *uvMatrix : Matrix::I();
-  auto drawingBuffer = proxy->getContext()->drawingBuffer();
+  auto drawingBuffer = proxy->getContext()->drawingAllocator();
   return drawingBuffer->make<GLSLTextureEffect>(std::move(proxy), alphaStart, args.sampling,
                                                 args.constraint, matrix, args.sampleArea);
 }

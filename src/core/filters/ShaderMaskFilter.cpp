@@ -46,7 +46,7 @@ bool ShaderMaskFilter::isEqual(const MaskFilter* maskFilter) const {
 PlacementPtr<FragmentProcessor> ShaderMaskFilter::asFragmentProcessor(
     const FPArgs& args, const Matrix* uvMatrix) const {
   auto processor = FragmentProcessor::Make(shader, args, uvMatrix);
-  auto drawingBuffer = args.context->drawingBuffer();
+  auto drawingBuffer = args.context->drawingAllocator();
   if (processor == nullptr && inverted) {
     return ConstColorProcessor::Make(drawingBuffer, {}, InputMode::Ignore);
   }

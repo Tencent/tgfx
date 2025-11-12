@@ -24,8 +24,8 @@
 namespace tgfx {
 class DefaultGeometryProcessor : public GeometryProcessor {
  public:
-  static PlacementPtr<DefaultGeometryProcessor> Make(BlockBuffer* buffer, Color color, int width,
-                                                     int height, AAType aa,
+  static PlacementPtr<DefaultGeometryProcessor> Make(BlockAllocator* allocator, Color color,
+                                                     int width, int height, AAType aa,
                                                      const Matrix& viewMatrix,
                                                      const Matrix& uvMatrix);
 

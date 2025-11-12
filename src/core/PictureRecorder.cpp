@@ -16,36 +16,36 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/core/Recorder.h"
-#include "core/RecordingContext.h"
+#include "tgfx/core/PictureRecorder.h"
+#include "core/PictureContext.h"
 
 namespace tgfx {
-Recorder::~Recorder() {
+PictureRecorder::~PictureRecorder() {
   delete canvas;
-  delete recordingContext;
+  delete pictureContext;
 }
 
-Canvas* Recorder::beginRecording() {
+Canvas* PictureRecorder::beginRecording() {
   if (canvas == nullptr) {
-    recordingContext = new RecordingContext();
-    canvas = new Canvas(recordingContext, nullptr, optimizeMemory);
+    pictureContext = new PictureContext();
+    canvas = new Canvas(pictureContext, nullptr, optimizeMemory);
   } else {
     canvas->resetStateStack();
-    recordingContext->clear();
+    pictureContext->clear();
   }
   activelyRecording = true;
   return getRecordingCanvas();
 }
 
-Canvas* Recorder::getRecordingCanvas() const {
+Canvas* PictureRecorder::getRecordingCanvas() const {
   return activelyRecording ? canvas : nullptr;
 }
 
-std::shared_ptr<Picture> Recorder::finishRecordingAsPicture() {
+std::shared_ptr<Picture> PictureRecorder::finishRecordingAsPicture() {
   if (!activelyRecording) {
     return nullptr;
   }
   activelyRecording = false;
-  return recordingContext->finishRecordingAsPicture(optimizeMemory);
+  return pictureContext->finishRecordingAsPicture(optimizeMemory);
 }
 }  // namespace tgfx

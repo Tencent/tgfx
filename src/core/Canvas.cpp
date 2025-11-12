@@ -18,7 +18,7 @@
 
 #include "tgfx/core/Canvas.h"
 #include "core/DrawContext.h"
-#include "core/RecordingContext.h"
+#include "core/PictureContext.h"
 #include "core/shapes/StrokeShape.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
@@ -102,7 +102,7 @@ void Canvas::restore() {
   stateStack.pop();
   if (layer != nullptr) {
     drawContext = layer->drawContext;
-    auto layerContext = reinterpret_cast<RecordingContext*>(layer->layerContext.get());
+    auto layerContext = reinterpret_cast<PictureContext*>(layer->layerContext.get());
     auto picture = layerContext->finishRecordingAsPicture(optimizeMemoryForLayer);
     if (picture != nullptr) {
       drawLayer(std::move(picture), {}, layer->layerPaint.getFill(),

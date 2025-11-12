@@ -21,7 +21,7 @@
 #include "core/DrawContext.h"
 #include "core/MCState.h"
 #include "core/MeasureContext.h"
-#include "core/Records.h"
+#include "core/PictureRecords.h"
 #include "core/ScalerContext.h"
 #include "core/filters/DropShadowImageFilter.h"
 #include "core/filters/GaussianBlurImageFilter.h"
@@ -615,7 +615,7 @@ void PDFExportContext::drawDropShadowBeforeLayer(const std::shared_ptr<Picture>&
   }
 }
 
-void PDFExportContext::drawInnerShadowAfterLayer(const Record* record,
+void PDFExportContext::drawInnerShadowAfterLayer(const PictureRecord* record,
                                                  const InnerShadowImageFilter* innerShadowFilter,
                                                  const MCState& state) {
   MeasureContext measureContext(true);

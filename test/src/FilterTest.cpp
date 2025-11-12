@@ -32,8 +32,8 @@
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/GradientType.h"
 #include "tgfx/core/ImageFilter.h"
+#include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Point.h"
-#include "tgfx/core/Recorder.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/Size.h"
@@ -996,7 +996,7 @@ TGFX_TEST(FilterTest, ReverseFilterBounds) {
   auto paint = Paint();
   canvas->translate(50, 50);
   canvas->clipRect(rect);
-  Recorder recorder;
+  PictureRecorder recorder;
 
   auto blurFilter = ImageFilter::Blur(10.f, 10.f);
   auto dst = blurFilter->filterBounds(rect);

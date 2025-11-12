@@ -20,10 +20,10 @@
 
 namespace tgfx {
 PlacementPtr<AtlasTextGeometryProcessor> AtlasTextGeometryProcessor::Make(
-    BlockBuffer* buffer, std::shared_ptr<TextureProxy> textureProxy, AAType aa,
+    BlockAllocator* allocator, std::shared_ptr<TextureProxy> textureProxy, AAType aa,
     std::optional<Color> commonColor, const SamplingOptions& sampling) {
-  return buffer->make<GLSLAtlasTextGeometryProcessor>(std::move(textureProxy), aa, commonColor,
-                                                      sampling);
+  return allocator->make<GLSLAtlasTextGeometryProcessor>(std::move(textureProxy), aa, commonColor,
+                                                         sampling);
 }
 
 GLSLAtlasTextGeometryProcessor::GLSLAtlasTextGeometryProcessor(

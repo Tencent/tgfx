@@ -266,7 +266,7 @@ TGFX_TEST(LayerTest, Layer_getTotalMatrix) {
   grandChild->addChild(greatGrandson);
 
   auto greatGrandsonTotalMatrix = greatGrandson->getGlobalMatrix();
-  EXPECT_EQ(greatGrandsonTotalMatrix, Matrix3D::MakeScale(30, 30, 0));
+  EXPECT_EQ(greatGrandsonTotalMatrix, Matrix3D::MakeTranslate(30, 30, 0));
 
   EXPECT_EQ(greatGrandson->matrix(), Matrix::MakeTrans(10, 10));
   EXPECT_EQ(grandChild->matrix(), Matrix::MakeTrans(10, 10));
@@ -3283,7 +3283,7 @@ TGFX_TEST(LayerTest, PassThrough_Test) {
   displayList.render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PassThrough_Test"));
 
-  Recorder recorder;
+  PictureRecorder recorder;
   auto newCanvas = recorder.beginRecording();
   newCanvas->rotate(45, 30, 30);
   shapeLayer->draw(newCanvas);
@@ -3398,12 +3398,12 @@ TGFX_TEST(LayerTest, Matrix) {
   displayList->render(surface.get());
   EXPECT_EQ(imageLayer->getBounds(contentLayer.get()), Rect::MakeLTRB(65, 0, 298, 281));
   EXPECT_EQ(imageLayer->getBounds(displayList->root()), Rect::MakeLTRB(99, 15, 190, 162));
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D"));
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/1Matrix_3D"));
 
   auto affineMatrix = Matrix::MakeTrans(50, 50);
   imageLayer->setMatrix(affineMatrix);
   displayList->render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D_2D"));
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/1Matrix_3D_2D"));
 
   imageLayer->setMatrix3D(imageMatrix3D);
   EXPECT_TRUE(imageLayer->matrix().isIdentity());
@@ -3435,7 +3435,7 @@ TGFX_TEST(LayerTest, Matrix) {
   }
   displayList->root()->addChild(shaperLayer);
   displayList->render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D_2D_3D"));
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/1Matrix_3D_2D_3D"));
 }
 
 }  // namespace tgfx

@@ -109,7 +109,7 @@ std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
                        -1.f - ndcRectScaled.top - renderBoundsLTNDCScaled.y);
 
   auto drawingManager = args.context->drawingManager();
-  auto drawingBuffer = args.context->drawingBuffer();
+  auto drawingBuffer = args.context->drawingAllocator();
   auto vertexProvider =
       RectsVertexProvider::MakeFrom(drawingBuffer, srcModelRect, AAType::Coverage);
   const Size viewportSize(static_cast<float>(renderTarget->width()),

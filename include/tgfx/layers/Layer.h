@@ -665,10 +665,10 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   /**
    * Returns the equivalent transformation matrix adapted for a custom anchor point.
-   * The layer's matrix _matrix3D is defined based on the parent layer's local coordinate system,
-   * with the transformation anchor point being the origin of that coordinate system. This function
-   * returns the corresponding matrix for applying an equivalent 3D affine transformation at any
-   * arbitrary point within that coordinate system.
+   * The layer's matrix ‘_matrix3D’ is defined based on the layer's local coordinate system, with
+   * the transformation anchor point being the origin of that coordinate system. This function
+   * returns an affine transformation matrix that produces the same visual effect when using any
+   * point within this coordinate system as the new origin and anchor point.
    * @param anchor The specified anchor point
    */
   Matrix3D anchorAdaptedMatrix(const Point& anchor) const;

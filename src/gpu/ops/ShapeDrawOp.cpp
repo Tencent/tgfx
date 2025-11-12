@@ -33,7 +33,7 @@ PlacementPtr<ShapeDrawOp> ShapeDrawOp::Make(std::shared_ptr<GPUShapeProxy> shape
   if (shapeProxy == nullptr) {
     return nullptr;
   }
-  auto drawingBuffer = shapeProxy->getContext()->drawingBuffer();
+  auto drawingBuffer = shapeProxy->getContext()->drawingAllocator();
   return drawingBuffer->make<ShapeDrawOp>(std::move(shapeProxy), color, uvMatrix, aaType);
 }
 
@@ -44,7 +44,7 @@ ShapeDrawOp::ShapeDrawOp(std::shared_ptr<GPUShapeProxy> proxy, Color color, cons
   if (auto textureProxy = shapeProxy->getTextureProxy()) {
     auto maskRect = Rect::MakeWH(textureProxy->width(), textureProxy->height());
     auto maskVertexProvider =
-        RectsVertexProvider::MakeFrom(context->drawingBuffer(), maskRect, AAType::None);
+        RectsVertexProvider::MakeFrom(context->drawingAllocator(), maskRect, AAType::None);
     maskBufferProxy = context->proxyProvider()->createVertexBufferProxy(
         std::move(maskVertexProvider), RenderFlags::DisableAsyncTask);
   }
@@ -81,7 +81,7 @@ PlacementPtr<GeometryProcessor> ShapeDrawOp::onMakeGeometryProcessor(RenderTarge
     }
     addCoverageFP(std::move(maskFP));
   }
-  auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
+  auto drawingBuffer = renderTarget->getContext()->drawingAllocator();
   return DefaultGeometryProcessor::Make(drawingBuffer, color, renderTarget->width(),
                                         renderTarget->height(), aa, viewMatrix, realUVMatrix);
 }

@@ -20,6 +20,7 @@
 #include <atomic>
 #include "contents/LayerContent.h"
 #include "contents/RasterizedContent.h"
+#include "core/Matrix2D.h"
 #include "core/filters/Transform3DImageFilter.h"
 #include "core/images/PictureImage.h"
 #include "core/utils/Log.h"
@@ -29,7 +30,7 @@
 #include "layers/RegionTransformer.h"
 #include "layers/RootLayer.h"
 #include "layers/filters/Transform3DFilter.h"
-#include "tgfx/core/Recorder.h"
+#include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/layers/ShapeLayer.h"
 
@@ -75,7 +76,7 @@ std::shared_ptr<Picture> Layer::RecordPicture(DrawMode mode, float contentScale,
     drawFunction(&contentCanvas);
     return contourContext.finishRecordingAsPicture();
   }
-  Recorder recorder = {};
+  PictureRecorder recorder = {};
   auto contentCanvas = recorder.beginRecording();
   contentCanvas->scale(contentScale, contentScale);
   drawFunction(contentCanvas);
@@ -591,11 +592,20 @@ Rect Layer::onGetBoundsInternal(const Matrix& coordinateMatrix, bool computeTigh
 
 Point Layer::globalToLocal(const Point& globalPoint) const {
   auto globalMatrix = getGlobalMatrix();
-  Matrix3D inverseMatrix = {};
-  if (!globalMatrix.invert(&inverseMatrix)) {
+  // All vertices inside the rect have an initial z-coordinate of 0, so the third column of the 4x4
+  // matrix does not affect the final transformation result and can be ignored. Additionally, since
+  // we do not care about the final projected z-axis coordinate, the third row can also be ignored.
+  // Therefore, the 4x4 matrix can be simplified to a 3x3 matrix.
+  float values[16] = {};
+  globalMatrix.getColumnMajor(values);
+  auto matrix2D = Matrix2D::MakeAll(values[0], values[1], values[3], values[4], values[5],
+                                    values[7], values[12], values[13], values[15]);
+  Matrix2D inversedMatrix;
+  if (!matrix2D.invert(&inversedMatrix)) {
+    DEBUG_ASSERT(false);
     return Point::Make(0, 0);
   }
-  auto result = inverseMatrix.mapVec3({globalPoint.x, globalPoint.y, 0});
+  auto result = inversedMatrix.mapVec2({globalPoint.x, globalPoint.y});
   return {result.x, result.y};
 }
 
@@ -717,7 +727,6 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
                                                          bounds == clippedBounds)) {
       auto backgroundCanvas = backgroundContext->getCanvas();
       auto actualMatrix = backgroundCanvas->getMatrix();
-
       bool isLocalToGlobalAffine = IsMatrix3DAffine(localToGlobalMatrix);
       if (isLocalToGlobalAffine) {
         // The current layer node to the root node only contains 2D affine transformations, need to
@@ -847,6 +856,9 @@ bool Layer::doContains(const Layer* child) const {
 }
 
 Matrix3D Layer::getGlobalMatrix() const {
+  // The global matrix transforms the layer's local coordinate space to the coordinate space of its
+  // top-level parent layer. This means the top-level parent layer's own matrix is not included in
+  // the global matrix.
   Matrix3D matrix = {};
   auto layer = this;
   while (layer->_parent) {
@@ -885,9 +897,8 @@ std::shared_ptr<ImageFilter> Layer::getImageFilter(float contentScale, const Rec
     }
   }
   if (!_matrix3DIsAffine) {
-    // _matrix3D describes a matrix transformation with the layer origin as the anchor point (i.e.,
-    // point (0, 0)). When applying an equivalent matrix transformation to the content, whose
-    // top-left vertex may not be at (0, 0), the matrix needs to be recalculated.
+    // Calculate the corrected affine transformation matrix using the top-left corner of the content
+    // as the new origin and anchor point.
     auto contentOrigin =
         Point::Make(contentBound.left / contentScale, contentBound.top / contentScale);
     auto contentMatrix3D = anchorAdaptedMatrix(contentOrigin);
@@ -1021,7 +1032,8 @@ std::shared_ptr<MaskFilter> Layer::getMaskFilter(const DrawArgs& args, float sca
   // When the mask's transformation matrix does not contain 3D and projection transformations,
   // affineRelativeMatrix is an equivalent matrix. Otherwise, directly use the identity matrix to
   // draw the mask content, and this 3D matrix will be applied through a filter during drawing
-  auto affineRelativeMatrix = GetMayLossyAffineMatrix(relativeMatrix);
+  auto isMatrixAffine = IsMatrix3DAffine(relativeMatrix);
+  auto affineRelativeMatrix = isMatrixAffine ? GetMayLossyAffineMatrix(relativeMatrix) : Matrix::I();
   auto maskClipBounds = layerClipBounds;
   if (layerClipBounds.has_value()) {
     auto invertedMatrix = Matrix::I();
@@ -1048,6 +1060,9 @@ std::shared_ptr<MaskFilter> Layer::getMaskFilter(const DrawArgs& args, float sca
     maskContentImage =
         maskContentImage->makeWithFilter(ImageFilter::ColorFilter(ColorFilter::Luma()));
   }
+  if (!isMatrixAffine) {
+    maskContentImage = maskContentImage->makeWithFilter(ImageFilter::Transform3D(relativeMatrix));
+  }
   affineRelativeMatrix.preScale(1.0f / scale, 1.0f / scale);
   affineRelativeMatrix.preTranslate(maskImageOffset.x, maskImageOffset.y);
   affineRelativeMatrix.postScale(scale, scale);
@@ -1068,11 +1083,8 @@ std::shared_ptr<Image> Layer::getOffscreenContentImage(
   auto localBounds = getBounds();
   auto inputBounds = localBounds;
   if (!_matrix3DIsAffine) {
-    // The inputBounds passed to the filter for reverse calculation describes the target area after
-    // applying the matrix, here we need to apply 3D transformation.
-    // _matrix3D describes a matrix transformation with the layer origin as the anchor point (i.e.,
-    // point (0, 0)). When applying an equivalent matrix transformation to the content, whose
-    // top-left vertex may not be at (0, 0), the matrix needs to be recalculated.
+    // Calculate the corrected affine transformation matrix using the top-left corner of the content
+    // as the new origin and anchor point.
     auto contentOrigin = Point::Make(localBounds.left, localBounds.top);
     auto contentMatrix3D = anchorAdaptedMatrix(contentOrigin);
     inputBounds = contentMatrix3D.mapRect(inputBounds);
@@ -1121,7 +1133,7 @@ std::shared_ptr<Image> Layer::getOffscreenContentImage(
     finalImage = offscreenSurface->makeImageSnapshot();
     offscreenCanvas->getMatrix().invert(imageMatrix);
   } else {
-    Recorder recorder = {};
+    PictureRecorder recorder = {};
     auto offscreenCanvas = recorder.beginRecording();
     offscreenCanvas->scale(contentScale, contentScale);
     offscreenCanvas->clipRect(inputBounds);
@@ -1511,7 +1523,7 @@ std::shared_ptr<Image> Layer::getBackgroundImage(const DrawArgs& args, float con
   if (args.drawMode == DrawMode::Background) {
     return nullptr;
   }
-  Recorder recorder = {};
+  PictureRecorder recorder = {};
   auto canvas = recorder.beginRecording();
   auto bounds = getBounds();
   bounds.scale(contentScale, contentScale);
@@ -1541,7 +1553,7 @@ std::shared_ptr<Image> Layer::getBoundsBackgroundImage(const DrawArgs& args, flo
     return nullptr;
   }
 
-  Recorder recorder = {};
+  PictureRecorder recorder = {};
   auto canvas = recorder.beginRecording();
   auto bounds = getBounds();
   bounds.scale(contentScale, contentScale);
@@ -1613,7 +1625,7 @@ void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
             args.excludeStyleExtraSourceTypes.end()) {
       continue;
     }
-    Recorder recorder = {};
+    PictureRecorder recorder = {};
     auto pictureCanvas = recorder.beginRecording();
     if (clipBounds.has_value()) {
       pictureCanvas->clipRect(*clipBounds);
@@ -1955,6 +1967,11 @@ std::shared_ptr<BackgroundContext> Layer::createBackgroundContext(Context* conte
 }
 
 Matrix3D Layer::anchorAdaptedMatrix(const Point& anchor) const {
+  // In the new coordinate system defined with anchor as the anchor point and origin, the reference
+  // anchor point for the matrix transformation described by the layer's _matrix is located at
+  // point (-anchor.x, -anchor.y). That is, to maintain the same transformation effect, first
+  // translate the anchor point to the new coordinate origin, apply the original matrix, and then
+  // reverse translate the anchor point.
   auto offsetMatrix = Matrix3D::MakeTranslate(anchor.x, anchor.y, 0);
   auto invOffsetMatrix = Matrix3D::MakeTranslate(-anchor.x, -anchor.y, 0);
   return invOffsetMatrix * getMatrixWithScrollRect() * offsetMatrix;

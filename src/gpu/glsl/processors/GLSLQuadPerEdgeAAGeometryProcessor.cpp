@@ -20,10 +20,10 @@
 
 namespace tgfx {
 PlacementPtr<QuadPerEdgeAAGeometryProcessor> QuadPerEdgeAAGeometryProcessor::Make(
-    BlockBuffer* buffer, int width, int height, AAType aa, std::optional<Color> commonColor,
+    BlockAllocator* allocator, int width, int height, AAType aa, std::optional<Color> commonColor,
     std::optional<Matrix> uvMatrix, bool hasSubset) {
-  return buffer->make<GLSLQuadPerEdgeAAGeometryProcessor>(width, height, aa, commonColor, uvMatrix,
-                                                          hasSubset);
+  return allocator->make<GLSLQuadPerEdgeAAGeometryProcessor>(width, height, aa, commonColor,
+                                                             uvMatrix, hasSubset);
 }
 
 GLSLQuadPerEdgeAAGeometryProcessor::GLSLQuadPerEdgeAAGeometryProcessor(

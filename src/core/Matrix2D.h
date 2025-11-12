@@ -73,17 +73,17 @@ class Matrix2D {
    */
   Rect mapRect(const Rect& src) const;
 
- private:
-  constexpr Matrix2D(float m00, float m01, float m02, float m10, float m11, float m12, float m20,
-                     float m21, float m22)
-      : values{m00, m01, m02, m10, m11, m12, m20, m21, m22} {
-  }
-
   /**
    * Maps a 2D point using this matrix.
    * The returned result is the coordinate after perspective division.
    */
   Vec2 mapVec2(const Vec2& v) const;
+
+ private:
+  constexpr Matrix2D(float m00, float m01, float m02, float m10, float m11, float m12, float m20,
+                     float m21, float m22)
+      : values{m00, m01, m02, m10, m11, m12, m20, m21, m22} {
+  }
 
   /**
    * Maps a 2D point (x, y, w) using this matrix.

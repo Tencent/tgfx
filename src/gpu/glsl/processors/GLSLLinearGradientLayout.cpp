@@ -19,8 +19,9 @@
 #include "GLSLLinearGradientLayout.h"
 
 namespace tgfx {
-PlacementPtr<LinearGradientLayout> LinearGradientLayout::Make(BlockBuffer* buffer, Matrix matrix) {
-  return buffer->make<GLSLLinearGradientLayout>(matrix);
+PlacementPtr<LinearGradientLayout> LinearGradientLayout::Make(BlockAllocator* allocator,
+                                                              Matrix matrix) {
+  return allocator->make<GLSLLinearGradientLayout>(matrix);
 }
 
 GLSLLinearGradientLayout::GLSLLinearGradientLayout(Matrix matrix) : LinearGradientLayout(matrix) {

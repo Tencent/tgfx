@@ -82,7 +82,7 @@ class Rect3DDrawOp : public DrawOp {
   std::shared_ptr<GPUBufferProxy> indexBufferProxy = nullptr;
   std::shared_ptr<VertexBufferView> vertexBufferProxyView = nullptr;
 
-  friend class BlockBuffer;
+  friend class BlockAllocator;
 };
 
 }  // namespace tgfx

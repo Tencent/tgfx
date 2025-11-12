@@ -25,7 +25,7 @@
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
-#include "tgfx/core/Recorder.h"
+#include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/WriteStream.h"
@@ -586,7 +586,7 @@ TGFX_TEST(SVGExportTest, PictureImageMask) {
   auto canvas = exporter->getCanvas();
 
   {
-    Recorder recorder;
+    PictureRecorder recorder;
     auto pictureCanvas = recorder.beginRecording();
     {
       tgfx::Paint paint;
@@ -625,7 +625,7 @@ TGFX_TEST(SVGExportTest, InvertPictureImageMask) {
   auto canvas = exporter->getCanvas();
 
   {
-    Recorder recorder;
+    PictureRecorder recorder;
     auto pictureCanvas = recorder.beginRecording();
     {
       tgfx::Paint paint;

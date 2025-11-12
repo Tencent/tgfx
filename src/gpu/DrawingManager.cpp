@@ -53,7 +53,7 @@ static ImageInfo GetAtlasImageInfo(int width, int height, bool isAlphaOnly) {
 }
 
 DrawingManager::DrawingManager(Context* context)
-    : context(context), drawingBuffer(context->drawingBuffer()) {
+    : context(context), drawingAllocator(context->drawingAllocator()) {
 }
 
 bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarget,
@@ -62,14 +62,14 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
     return false;
   }
   auto bounds = Rect::MakeWH(renderTarget->width(), renderTarget->height());
-  auto provider = RectsVertexProvider::MakeFrom(drawingBuffer, bounds, AAType::None);
+  auto provider = RectsVertexProvider::MakeFrom(drawingAllocator, bounds, AAType::None);
   auto drawOp = RectDrawOp::Make(renderTarget->getContext(), std::move(provider), renderFlags);
   drawOp->addColorFP(std::move(processor));
   drawOp->setBlendMode(BlendMode::Src);
-  auto drawOps = drawingBuffer->makeArray<DrawOp>(&drawOp, 1);
+  auto drawOps = drawingAllocator->makeArray<DrawOp>(&drawOp, 1);
   auto textureProxy = renderTarget->asTextureProxy();
-  auto task =
-      drawingBuffer->make<OpsRenderTask>(std::move(renderTarget), std::move(drawOps), std::nullopt);
+  auto task = drawingAllocator->make<OpsRenderTask>(std::move(renderTarget), std::move(drawOps),
+                                                    std::nullopt);
   renderTasks.emplace_back(std::move(task));
   addGenerateMipmapsTask(std::move(textureProxy));
   return true;
@@ -92,8 +92,8 @@ void DrawingManager::addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderT
     return;
   }
   auto textureProxy = renderTarget->asTextureProxy();
-  auto task =
-      drawingBuffer->make<OpsRenderTask>(std::move(renderTarget), std::move(drawOps), clearColor);
+  auto task = drawingAllocator->make<OpsRenderTask>(std::move(renderTarget), std::move(drawOps),
+                                                    clearColor);
   renderTasks.emplace_back(std::move(task));
   addGenerateMipmapsTask(std::move(textureProxy));
 }
@@ -106,8 +106,8 @@ void DrawingManager::addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> rende
     return;
   }
   auto textureProxy = renderTarget->asTextureProxy();
-  auto task = drawingBuffer->make<RuntimeDrawTask>(std::move(renderTarget), std::move(inputs),
-                                                   std::move(effect), offset);
+  auto task = drawingAllocator->make<RuntimeDrawTask>(std::move(renderTarget), std::move(inputs),
+                                                      std::move(effect), offset);
   renderTasks.emplace_back(std::move(task));
   addGenerateMipmapsTask(std::move(textureProxy));
 }
@@ -116,7 +116,7 @@ void DrawingManager::addGenerateMipmapsTask(std::shared_ptr<TextureProxy> textur
   if (textureProxy == nullptr || !textureProxy->hasMipmaps()) {
     return;
   }
-  auto task = drawingBuffer->make<GenerateMipmapsTask>(std::move(textureProxy));
+  auto task = drawingAllocator->make<GenerateMipmapsTask>(std::move(textureProxy));
   renderTasks.emplace_back(std::move(task));
 }
 
@@ -127,7 +127,7 @@ void DrawingManager::addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> 
     return;
   }
   auto task =
-      drawingBuffer->make<RenderTargetCopyTask>(std::move(source), std::move(dest), srcX, srcY);
+      drawingAllocator->make<RenderTargetCopyTask>(std::move(source), std::move(dest), srcX, srcY);
   renderTasks.emplace_back(std::move(task));
 }
 
@@ -137,7 +137,8 @@ void DrawingManager::addTransferPixelsTask(std::shared_ptr<RenderTargetProxy> so
   if (source == nullptr || dest == nullptr || srcRect.isEmpty()) {
     return;
   }
-  auto task = drawingBuffer->make<TransferPixelsTask>(std::move(source), srcRect, std::move(dest));
+  auto task =
+      drawingAllocator->make<TransferPixelsTask>(std::move(source), srcRect, std::move(dest));
   renderTasks.emplace_back(std::move(task));
 }
 
@@ -177,7 +178,7 @@ void DrawingManager::addAtlasCellCodecTask(const std::shared_ptr<TextureProxy>& 
   } else {
     dstInfo = GetAtlasImageInfo(dstWidth, dstHeight, codec->isAlphaOnly());
     auto length = dstInfo.byteSize();
-    dstPixels = drawingBuffer->allocate(length);
+    dstPixels = drawingAllocator->allocate(length);
     if (dstPixels == nullptr) {
       return;
     }
