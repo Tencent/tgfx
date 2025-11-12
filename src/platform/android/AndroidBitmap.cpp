@@ -19,11 +19,46 @@
 #include "tgfx/platform/android/AndroidBitmap.h"
 #include <android/bitmap.h>
 #include "AHardwareBufferFunctions.h"
+#include "JNIUtil.h"
+#include "core/utils/ColorSpaceHelper.h"
 
 namespace tgfx {
 static constexpr int BITMAP_FLAGS_ALPHA_UNPREMUL = 2;
 static constexpr int BITMAP_FORMAT_RGBA_F16 = 9;
 static constexpr int BITMAP_FORMAT_RGBA_1010102 = 10;
+
+static Global<jclass> BitmapClass;
+static jmethodID Bitmap_getColorSpace;
+static Global<jclass> ColorSpaceClass;
+static jmethodID ColorSpace_getDataSpace;
+static Global<jclass> DataSpaceClass;
+static jmethodID DataSpaceClass_getStandard;
+static jmethodID DataSpaceClass_getTransfer;
+
+void AndroidBitmap::JNIInit(JNIEnv* env) {
+  BitmapClass = env->FindClass("android/graphics/Bitmap");
+  Bitmap_getColorSpace =
+      env->GetMethodID(BitmapClass.get(), "getColorSpace", "()Landroid/graphics/ColorSpace;");
+  if (Bitmap_getColorSpace == nullptr) {
+    env->ExceptionClear();
+  }
+  ColorSpaceClass = env->FindClass("android/graphics/ColorSpace");
+  if (ColorSpaceClass.get() != nullptr) {
+    ColorSpace_getDataSpace = env->GetMethodID(ColorSpaceClass.get(), "getColorSpace", "()I");
+  }
+  if (env->ExceptionCheck()) {
+    env->ExceptionClear();
+  }
+  DataSpaceClass = env->FindClass("android/hardware/DataSpace");
+  if (DataSpaceClass.get() != nullptr) {
+    DataSpaceClass_getStandard =
+        env->GetStaticMethodID(DataSpaceClass.get(), "getStandard", "(I)I");
+    DataSpaceClass_getTransfer =
+        env->GetStaticMethodID(DataSpaceClass.get(), "getTransfer", "(I)I");
+  } else {
+    env->ExceptionClear();
+  }
+}
 
 ImageInfo AndroidBitmap::GetInfo(JNIEnv* env, jobject bitmap) {
   if (env == nullptr || bitmap == nullptr) {
@@ -59,7 +94,7 @@ ImageInfo AndroidBitmap::GetInfo(JNIEnv* env, jobject bitmap) {
       break;
   }
   return ImageInfo::Make(static_cast<int>(bitmapInfo.width), static_cast<int>(bitmapInfo.height),
-                         colorType, alphaType, bitmapInfo.stride);
+                         colorType, alphaType, bitmapInfo.stride, GetColorSpace(env, bitmap));
 }
 
 HardwareBufferRef AndroidBitmap::GetHardwareBuffer(JNIEnv* env, jobject bitmap) {
@@ -76,5 +111,23 @@ HardwareBufferRef AndroidBitmap::GetHardwareBuffer(JNIEnv* env, jobject bitmap) 
     release(hardwareBuffer);
   }
   return hardwareBuffer;
+}
+
+std::shared_ptr<ColorSpace> AndroidBitmap::GetColorSpace(JNIEnv* env, jobject bitmap) {
+  if (env == nullptr || bitmap == nullptr) {
+    return ColorSpace::MakeSRGB();
+  }
+  if (Bitmap_getColorSpace) {
+    jobject colorSpaceObj = env->CallObjectMethod(bitmap, Bitmap_getColorSpace);
+    if (ColorSpace_getDataSpace) {
+      jint dataSpace = env->CallIntMethod(colorSpaceObj, ColorSpace_getDataSpace);
+      jint standard =
+          env->CallStaticIntMethod(DataSpaceClass.get(), DataSpaceClass_getStandard, dataSpace);
+      jint transfer =
+          env->CallStaticIntMethod(DataSpaceClass.get(), DataSpaceClass_getTransfer, dataSpace);
+      return AndroidDataSpaceToColorSpace(standard, transfer);
+    }
+  }
+  return ColorSpace::MakeSRGB();
 }
 }  // namespace tgfx

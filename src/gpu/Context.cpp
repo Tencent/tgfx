@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/Context.h"
-#include "GPU.h"
 #include "core/AtlasManager.h"
 #include "core/utils/BlockBuffer.h"
 #include "core/utils/Log.h"
@@ -26,7 +25,9 @@
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ResourceCache.h"
+#include "gpu/ShaderCaps.h"
 #include "tgfx/core/Clock.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 Context::Context(Device* device, GPU* gpu) : _device(device), _gpu(gpu) {
@@ -34,6 +35,7 @@ Context::Context(Device* device, GPU* gpu) : _device(device), _gpu(gpu) {
   // fragmentation and slow down allocation. It may also increase the application's memory usage due
   // to pre-allocation optimizations on some platforms.
   _drawingBuffer = new BlockBuffer(1 << 14, 1 << 21);  // 16kb, 2MB
+  _shaderCaps = new ShaderCaps(gpu);
   _globalCache = new GlobalCache(this);
   _resourceCache = new ResourceCache(this);
   _drawingManager = new DrawingManager(this);
@@ -50,22 +52,19 @@ Context::~Context() {
   delete _resourceCache;
   delete _drawingBuffer;
   delete _maxValueTracker;
+  delete _shaderCaps;
 }
 
 Backend Context::backend() const {
-  return _gpu->backend();
-}
-
-const Caps* Context::caps() const {
-  return _gpu->caps();
+  return _gpu->info()->backend;
 }
 
 bool Context::wait(const BackendSemaphore& waitSemaphore) {
-  auto fence = gpu()->importExternalFence(waitSemaphore);
-  if (fence == nullptr) {
+  auto semaphore = gpu()->importBackendSemaphore(waitSemaphore);
+  if (semaphore == nullptr) {
     return false;
   }
-  gpu()->queue()->waitForFence(std::move(fence));
+  gpu()->queue()->waitSemaphore(std::move(semaphore));
   return true;
 }
 
@@ -77,9 +76,9 @@ bool Context::flush(BackendSemaphore* signalSemaphore) {
     return false;
   }
   if (signalSemaphore != nullptr) {
-    auto fence = gpu()->queue()->insertFence();
-    if (fence != nullptr) {
-      *signalSemaphore = fence->stealBackendSemaphore();
+    auto semaphore = gpu()->queue()->insertSemaphore();
+    if (semaphore != nullptr) {
+      *signalSemaphore = gpu()->stealBackendSemaphore(std::move(semaphore));
     }
   }
   _atlasManager->postFlush();

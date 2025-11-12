@@ -19,6 +19,7 @@
 #include "ProxyProvider.h"
 #include "core/ShapeRasterizer.h"
 #include "core/shapes/MatrixShape.h"
+#include "core/utils/HardwareBufferUtil.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/USE.h"
 #include "core/utils/UniqueID.h"
@@ -336,17 +337,14 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
 }
 
 std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(HardwareBufferRef hardwareBuffer) {
-  auto size = HardwareBufferGetSize(hardwareBuffer);
-  if (size.isEmpty()) {
+  auto info = HardwareBufferGetInfo(hardwareBuffer);
+  if (info.format == HardwareBufferFormat::Unknown) {
     return nullptr;
   }
-  YUVFormat yuvFormat = YUVFormat::Unknown;
-  auto formats = context->gpu()->getHardwareTextureFormats(hardwareBuffer, &yuvFormat);
-  if (formats.size() != 1 || yuvFormat != YUVFormat::Unknown) {
-    return nullptr;
-  }
+  auto format =
+      info.format == HardwareBufferFormat::ALPHA_8 ? PixelFormat::ALPHA_8 : PixelFormat::Unknown;
   auto proxy = std::shared_ptr<HardwareTextureProxy>(
-      new HardwareTextureProxy(hardwareBuffer, size.width, size.height, formats.front()));
+      new HardwareTextureProxy(hardwareBuffer, info.width, info.height, format));
   addResourceProxy(proxy);
   return proxy;
 }
@@ -357,7 +355,7 @@ std::shared_ptr<TextureProxy> ProxyProvider::wrapExternalTexture(
   if (textureView == nullptr) {
     return nullptr;
   }
-  auto format = context->gpu()->getExternalTextureFormat(backendTexture);
+  auto format = textureView->getTexture()->format();
   auto proxy = std::shared_ptr<TextureProxy>(
       new TextureProxy(textureView->width(), textureView->height(), format,
                        textureView->hasMipmaps(), textureView->origin()));
@@ -368,15 +366,15 @@ std::shared_ptr<TextureProxy> ProxyProvider::wrapExternalTexture(
 
 std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
     const BackendTexture& backendTexture, int sampleCount, ImageOrigin origin, bool adopted) {
-  auto format = context->gpu()->getExternalTextureFormat(backendTexture);
+  auto gpu = context->gpu();
+  auto format = backendTexture.format();
   if (format == PixelFormat::Unknown) {
     return nullptr;
   }
-  auto caps = context->caps();
-  if (!caps->isFormatRenderable(format)) {
+  if (!gpu->isFormatRenderable(format)) {
     return nullptr;
   }
-  sampleCount = caps->getSampleCount(sampleCount, format);
+  sampleCount = gpu->getSampleCount(sampleCount, format);
   auto proxy = std::shared_ptr<TextureRenderTargetProxy>(
       new ExternalTextureRenderTargetProxy(backendTexture, format, sampleCount, origin, adopted));
   addResourceProxy(proxy);
@@ -385,22 +383,18 @@ std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
 
 std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
     HardwareBufferRef hardwareBuffer, int sampleCount) {
-  auto size = HardwareBufferGetSize(hardwareBuffer);
-  if (size.isEmpty()) {
+  auto info = HardwareBufferGetInfo(hardwareBuffer);
+  auto format = GetRenderableFormat(info.format);
+  if (format == PixelFormat::Unknown) {
     return nullptr;
   }
-  YUVFormat yuvFormat = YUVFormat::Unknown;
-  auto formats = context->gpu()->getHardwareTextureFormats(hardwareBuffer, &yuvFormat);
-  if (formats.size() != 1 || yuvFormat != YUVFormat::Unknown) {
+  auto gpu = context->gpu();
+  if (!gpu->isFormatRenderable(format)) {
     return nullptr;
   }
-  auto caps = context->caps();
-  if (!caps->isFormatRenderable(formats.front())) {
-    return nullptr;
-  }
-  sampleCount = caps->getSampleCount(sampleCount, formats.front());
-  auto proxy = std::shared_ptr<TextureRenderTargetProxy>(new HardwareRenderTargetProxy(
-      hardwareBuffer, size.width, size.height, formats.front(), sampleCount));
+  sampleCount = gpu->getSampleCount(sampleCount, format);
+  auto proxy = std::shared_ptr<TextureRenderTargetProxy>(
+      new HardwareRenderTargetProxy(hardwareBuffer, info.width, info.height, format, sampleCount));
   addResourceProxy(proxy);
   return proxy;
 }
@@ -416,11 +410,11 @@ std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
     proxy->_height = height;
     return proxy->asRenderTargetProxy();
   }
-  auto caps = context->caps();
-  if (!caps->isFormatRenderable(format)) {
+  auto gpu = context->gpu();
+  if (!gpu->isFormatRenderable(format)) {
     return nullptr;
   }
-  sampleCount = caps->getSampleCount(sampleCount, format);
+  sampleCount = gpu->getSampleCount(sampleCount, format);
   auto proxy = std::shared_ptr<TextureRenderTargetProxy>(
       new TextureRenderTargetProxy(width, height, format, sampleCount, mipmapped, origin));
   if (backingFit == BackingFit::Approx) {

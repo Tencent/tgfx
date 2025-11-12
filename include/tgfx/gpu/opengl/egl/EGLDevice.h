@@ -31,6 +31,7 @@
 #endif
 
 namespace tgfx {
+class ColorSpace;
 class EGLDevice : public GLDevice {
  public:
   /**

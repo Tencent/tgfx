@@ -17,30 +17,30 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include "gpu/CommandQueue.h"
-#include "gpu/GPUTexture.h"
 #include "gpu/resources/RenderTarget.h"
 #include "tgfx/core/Buffer.h"
+#include "tgfx/gpu/CommandQueue.h"
 #include "tgfx/gpu/PixelFormat.h"
+#include "tgfx/gpu/Texture.h"
 
 namespace tgfx::inspect {
 
 class FrameCaptureTexture {
  public:
-  static std::shared_ptr<FrameCaptureTexture> MakeFrom(std::shared_ptr<GPUTexture> texture,
-                                                       int width, int height, size_t rowBytes,
+  static std::shared_ptr<FrameCaptureTexture> MakeFrom(std::shared_ptr<Texture> texture, int width,
+                                                       int height, size_t rowBytes,
                                                        PixelFormat format, const void* pixels);
 
-  static std::shared_ptr<FrameCaptureTexture> MakeFrom(std::shared_ptr<GPUTexture> texture,
+  static std::shared_ptr<FrameCaptureTexture> MakeFrom(std::shared_ptr<Texture> texture,
                                                        Context* context);
 
   static std::shared_ptr<FrameCaptureTexture> MakeFrom(const RenderTarget* renderTarget);
 
-  static uint64_t GetReadTextureId(std::shared_ptr<GPUTexture> texture);
+  static uint64_t GetReadTextureId(std::shared_ptr<Texture> texture);
 
   static void ClearReadedTexture();
 
-  explicit FrameCaptureTexture(std::shared_ptr<GPUTexture> texture, int width, int height,
+  explicit FrameCaptureTexture(std::shared_ptr<Texture> texture, int width, int height,
                                size_t rowBytes, PixelFormat format, bool isInput,
                                std::shared_ptr<Data> pixels);
 
@@ -48,7 +48,7 @@ class FrameCaptureTexture {
     return _textureId;
   }
 
-  std::shared_ptr<GPUTexture> texture() const {
+  std::shared_ptr<Texture> texture() const {
     return _texture;
   }
 
@@ -78,7 +78,7 @@ class FrameCaptureTexture {
 
  private:
   uint64_t _textureId = 0;
-  std::shared_ptr<GPUTexture> _texture = nullptr;
+  std::shared_ptr<Texture> _texture = nullptr;
   int _width = 0;
   int _height = 0;
   size_t _rowBytes = 0;

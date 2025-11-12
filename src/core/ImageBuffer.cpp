@@ -18,6 +18,9 @@
 
 #include "tgfx/core/ImageBuffer.h"
 #include <memory>
+#include "core/PixelBuffer.h"
+#include "core/YUVHardwareBuffer.h"
+#include "core/utils/ColorSpaceHelper.h"
 #include "gpu/resources/YUVTextureView.h"
 
 namespace tgfx {
@@ -26,8 +29,9 @@ namespace tgfx {
  */
 class YUVBuffer : public ImageBuffer {
  public:
-  YUVBuffer(std::shared_ptr<YUVData> data, YUVFormat format, YUVColorSpace colorSpace)
-      : data(std::move(data)), colorSpace(colorSpace), format(format) {
+  YUVBuffer(std::shared_ptr<YUVData> data, YUVFormat format, YUVColorSpace yuvColorSpace)
+      : data(std::move(data)), _yuvColorSpace(yuvColorSpace),
+        _colorSpace(MakeColorSpaceFromYUVColorSpace(yuvColorSpace)), format(format) {
   }
 
   int width() const override {
@@ -42,19 +46,36 @@ class YUVBuffer : public ImageBuffer {
     return false;
   }
 
+  std::shared_ptr<ColorSpace> colorSpace() const override;
+
  protected:
   std::shared_ptr<TextureView> onMakeTexture(Context* context, bool) const override {
     if (format == YUVFormat::NV12) {
-      return YUVTextureView::MakeNV12(context, data.get(), colorSpace);
+      return YUVTextureView::MakeNV12(context, data.get(), _yuvColorSpace);
     }
-    return YUVTextureView::MakeI420(context, data.get(), colorSpace);
+    return YUVTextureView::MakeI420(context, data.get(), _yuvColorSpace);
   }
 
  private:
   std::shared_ptr<YUVData> data = nullptr;
-  YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED;
+  YUVColorSpace _yuvColorSpace = YUVColorSpace::BT601_LIMITED;
+  std::shared_ptr<ColorSpace> _colorSpace = nullptr;
   YUVFormat format = YUVFormat::Unknown;
 };
+
+std::shared_ptr<ColorSpace> YUVBuffer::colorSpace() const {
+  return _colorSpace;
+}
+
+std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef hardwareBuffer,
+                                                   YUVColorSpace colorSpace) {
+  return YUVHardwareBuffer::MakeFrom(hardwareBuffer, colorSpace);
+}
+
+std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef hardwareBuffer,
+                                                   std::shared_ptr<ColorSpace> colorSpace) {
+  return PixelBuffer::MakeFrom(hardwareBuffer, std::move(colorSpace));
+}
 
 std::shared_ptr<ImageBuffer> ImageBuffer::MakeI420(std::shared_ptr<YUVData> yuvData,
                                                    YUVColorSpace colorSpace) {

@@ -20,6 +20,7 @@
 #include "core/PathRasterizer.h"
 #include "core/PathRef.h"
 #include "core/PathTriangulator.h"
+#include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/RectToRectMatrix.h"
 #include "core/utils/ShapeUtils.h"
@@ -30,6 +31,7 @@
 #include "gpu/processors/AARectEffect.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "inspect/InspectorMark.h"
+#include "processors/ColorSpaceXFormEffect.h"
 #include "processors/PorterDuffXferProcessor.h"
 
 namespace tgfx {
@@ -55,9 +57,10 @@ static bool HasDifferentViewMatrix(const std::vector<PlacementPtr<RectRecord>>& 
 }
 
 OpsCompositor::OpsCompositor(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags,
-                             std::optional<Color> clearColor)
+                             std::optional<Color> clearColor,
+                             std::shared_ptr<ColorSpace> colorSpace)
     : context(proxy->getContext()), renderTarget(std::move(proxy)), renderFlags(renderFlags),
-      clearColor(clearColor) {
+      clearColor(clearColor), dstColorSpace(std::move(colorSpace)) {
   DEBUG_ASSERT(renderTarget != nullptr);
 }
 
@@ -72,8 +75,10 @@ void OpsCompositor::fillImage(std::shared_ptr<Image> image, const SamplingOption
     pendingSampling = sampling;
     pendingConstraint = SrcRectConstraint::Fast;
   }
-  auto record =
-      drawingBuffer()->make<RectRecord>(imageRect, state.matrix, fill.color.premultiply());
+  auto dstColor =
+      ColorSpaceXformSteps::ConvertColorSpace(ColorSpace::MakeSRGB(), AlphaType::Unpremultiplied,
+                                              dstColorSpace, AlphaType::Premultiplied, fill.color);
+  auto record = drawingBuffer()->make<RectRecord>(imageRect, state.matrix, dstColor);
   pendingRects.emplace_back(std::move(record));
   pendingUVRects.emplace_back(drawingBuffer()->make<Rect>(imageRect));
 }
@@ -93,8 +98,10 @@ void OpsCompositor::fillImageRect(std::shared_ptr<Image> image, const Rect& srcR
     pendingSampling = sampling;
     pendingConstraint = constraint;
   }
-  auto record =
-      drawingBuffer()->make<RectRecord>(dstRect, state.matrix, fillInLocal.color.premultiply());
+  auto dstColor = ColorSpaceXformSteps::ConvertColorSpace(
+      ColorSpace::MakeSRGB(), AlphaType::Unpremultiplied, dstColorSpace, AlphaType::Premultiplied,
+      fillInLocal.color);
+  auto record = drawingBuffer()->make<RectRecord>(dstRect, state.matrix, dstColor);
   pendingRects.emplace_back(std::move(record));
   pendingUVRects.emplace_back(drawingBuffer()->make<Rect>(srcRect));
   if (!hasRectToRectDraw && srcRect != dstRect) {
@@ -102,13 +109,30 @@ void OpsCompositor::fillImageRect(std::shared_ptr<Image> image, const Rect& srcR
   }
 }
 
-void OpsCompositor::fillRect(const Rect& rect, const MCState& state, const Fill& fill) {
+static bool ShouldFlushRectOps(const std::vector<PlacementPtr<Stroke>>& pendingStrokes,
+                               const Stroke* stroke) {
+  if (pendingStrokes.empty()) {
+    return stroke != nullptr;
+  }
+  return stroke == nullptr || pendingStrokes.front()->join != stroke->join;
+}
+
+void OpsCompositor::fillRect(const Rect& rect, const MCState& state, const Fill& fill,
+                             const Stroke* stroke) {
   DEBUG_ASSERT(!rect.isEmpty());
-  if (!canAppend(PendingOpType::Rect, state.clip, fill)) {
+  if (!canAppend(PendingOpType::Rect, state.clip, fill) ||
+      ShouldFlushRectOps(pendingStrokes, stroke)) {
     flushPendingOps(PendingOpType::Rect, state.clip, fill);
   }
-  auto record = drawingBuffer()->make<RectRecord>(rect, state.matrix, fill.color.premultiply());
+  auto dstColor =
+      ColorSpaceXformSteps::ConvertColorSpace(ColorSpace::MakeSRGB(), AlphaType::Unpremultiplied,
+                                              dstColorSpace, AlphaType::Premultiplied, fill.color);
+  auto record = drawingBuffer()->make<RectRecord>(rect, state.matrix, dstColor);
   pendingRects.emplace_back(std::move(record));
+  if (stroke) {
+    auto strokeRecord = drawingBuffer()->make<Stroke>(*stroke);
+    pendingStrokes.emplace_back(std::move(strokeRecord));
+  }
 }
 
 void OpsCompositor::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
@@ -119,8 +143,10 @@ void OpsCompositor::drawRRect(const RRect& rRect, const MCState& state, const Fi
       (pendingStrokes.empty() != (stroke == nullptr))) {
     flushPendingOps(PendingOpType::RRect, state.clip, rectFill);
   }
-  auto record =
-      drawingBuffer()->make<RRectRecord>(rRect, state.matrix, rectFill.color.premultiply());
+  auto dstColor = ColorSpaceXformSteps::ConvertColorSpace(ColorSpace::MakeSRGB(),
+                                                          AlphaType::Unpremultiplied, dstColorSpace,
+                                                          AlphaType::Premultiplied, rectFill.color);
+  auto record = drawingBuffer()->make<RRectRecord>(rRect, state.matrix, dstColor);
   pendingRRects.emplace_back(std::move(record));
   if (stroke) {
     auto strokeRecord = drawingBuffer()->make<Stroke>(*stroke);
@@ -181,7 +207,10 @@ void OpsCompositor::drawShape(std::shared_ptr<Shape> shape, const MCState& state
   auto color = fill.color;
   color.alpha *= ShapeUtils::CalculateAlphaReduceFactorIfHairline(shape);
   auto shapeProxy = proxyProvider()->createGPUShapeProxy(shape, aaType, clipBounds, renderFlags);
-  auto drawOp = ShapeDrawOp::Make(std::move(shapeProxy), color.premultiply(), uvMatrix, aaType);
+  auto dstColor =
+      ColorSpaceXformSteps::ConvertColorSpace(ColorSpace::MakeSRGB(), AlphaType::Unpremultiplied,
+                                              dstColorSpace, AlphaType::Premultiplied, color);
+  auto drawOp = ShapeDrawOp::Make(std::move(shapeProxy), dstColor, uvMatrix, aaType);
   CAPUTRE_SHAPE_MESH(drawOp.get(), shape, aaType, clipBounds);
   addDrawOp(std::move(drawOp), clip, fill, localBounds, deviceBounds, drawScale);
 }
@@ -346,7 +375,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
 
   switch (pendingType) {
     case PendingOpType::Rect:
-      if (pendingRects.size() == 1) {
+      if (pendingRects.size() == 1 && pendingStrokes.empty()) {
         auto& paint = pendingRects.front();
         if (drawAsClear(paint->rect, {paint->viewMatrix, pendingClip}, pendingFill)) {
           return;
@@ -365,9 +394,9 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
           needLocalBounds && (hasRectToRectDraw || HasDifferentViewMatrix(pendingRects));
       auto uvRects =
           hasRectToRectDraw ? std::move(pendingUVRects) : std::vector<PlacementPtr<Rect>>();
-      auto provider =
-          RectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingRects),
-                                        std::move(uvRects), aaType, needUVCoord, subsetMode);
+      auto provider = RectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingRects),
+                                                    std::move(uvRects), aaType, needUVCoord,
+                                                    subsetMode, std::move(pendingStrokes));
       drawOp = RectDrawOp::Make(context, std::move(provider), renderFlags);
     } break;
     case PendingOpType::RRect: {
@@ -377,7 +406,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
     } break;
     case PendingOpType::Atlas: {
       auto provider = RectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingRects), {},
-                                                    AAType::None, true, UVSubsetMode::None);
+                                                    AAType::None, true, UVSubsetMode::None, {});
       drawOp = AtlasTextOp::Make(context, std::move(provider), renderFlags,
                                  std::move(pendingAtlasTexture), pendingSampling);
     } break;
@@ -388,11 +417,18 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
     FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty()),
                    drawScale.value_or(1.0f)};
     auto processor =
-        FragmentProcessor::Make(std::move(pendingImage), args, pendingSampling, pendingConstraint);
+        FragmentProcessor::Make(pendingImage, args, pendingSampling, pendingConstraint);
     if (processor == nullptr) {
       return;
     }
     drawOp->addColorFP(std::move(processor));
+    if (!pendingImage->isAlphaOnly() &&
+        !NeedConvertColorSpace(pendingImage->colorSpace(), dstColorSpace)) {
+      auto xformEffect = ColorSpaceXformEffect::Make(
+          context->drawingBuffer(), pendingImage->colorSpace().get(), AlphaType::Premultiplied,
+          dstColorSpace.get(), AlphaType::Premultiplied);
+      drawOp->addColorFP(std::move(xformEffect));
+    }
   }
   addDrawOp(std::move(drawOp), pendingClip, pendingFill, localBounds, deviceBounds,
             drawScale.value_or(1.0f));
@@ -436,9 +472,11 @@ bool OpsCompositor::drawAsClear(const Rect& rect, const MCState& state, const Fi
   // discard all previous ops since the clear rect covers the entire render target.
   drawOps.clear();
   auto format = renderTarget->format();
-  auto caps = context->caps();
-  auto& writeSwizzle = caps->getWriteSwizzle(format);
-  clearColor = writeSwizzle.applyTo(fill.color.premultiply());
+  auto writeSwizzle = Swizzle::ForWrite(format);
+  auto dstColor =
+      ColorSpaceXformSteps::ConvertColorSpace(ColorSpace::MakeSRGB(), AlphaType::Unpremultiplied,
+                                              dstColorSpace, AlphaType::Premultiplied, fill.color);
+  clearColor = writeSwizzle.applyTo(dstColor);
   return true;
 }
 
@@ -468,9 +506,10 @@ std::pair<bool, bool> OpsCompositor::needComputeBounds(const Fill& fill, bool ha
   bool needLocalBounds = hasImageFill || fill.shader != nullptr || fill.maskFilter != nullptr;
   bool needDeviceBounds = false;
   if (BlendModeNeedDstTexture(fill.blendMode, hasCoverage)) {
-    auto caps = context->caps();
-    if (!caps->shaderCaps()->frameBufferFetchSupport &&
-        (!caps->textureBarrierSupport || renderTarget->asTextureProxy() == nullptr ||
+    auto shaderCaps = context->shaderCaps();
+    auto features = context->gpu()->features();
+    if (!shaderCaps->frameBufferFetchSupport &&
+        (!features->textureBarrier || renderTarget->asTextureProxy() == nullptr ||
          renderTarget->sampleCount() > 1)) {
       needDeviceBounds = true;
     }
@@ -536,8 +575,8 @@ std::shared_ptr<TextureProxy> OpsCompositor::getClipTexture(const Path& clip, AA
     auto uvMatrix = Matrix::MakeTrans(bounds.left, bounds.top);
     auto drawOp = ShapeDrawOp::Make(std::move(shapeProxy), {}, uvMatrix, aaType);
     CAPUTRE_SHAPE_MESH(drawOp.get(), shape, aaType, clipBounds);
-    auto clipRenderTarget = RenderTargetProxy::MakeFallback(
-        context, width, height, true, 1, false, ImageOrigin::TopLeft, BackingFit::Approx);
+    auto clipRenderTarget = RenderTargetProxy::Make(context, width, height, true, 1, false,
+                                                    ImageOrigin::TopLeft, BackingFit::Approx);
     if (clipRenderTarget == nullptr) {
       return nullptr;
     }
@@ -586,12 +625,12 @@ std::pair<PlacementPtr<FragmentProcessor>, bool> OpsCompositor::getClipMaskFP(co
 }
 
 DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds, AAType aaType) {
-  auto caps = context->caps();
-  if (caps->shaderCaps()->frameBufferFetchSupport) {
+  if (context->shaderCaps()->frameBufferFetchSupport) {
     return {};
   }
   Rect bounds = {};
-  auto textureProxy = caps->textureBarrierSupport ? renderTarget->asTextureProxy() : nullptr;
+  auto features = context->gpu()->features();
+  auto textureProxy = features->textureBarrier ? renderTarget->asTextureProxy() : nullptr;
   if (textureProxy == nullptr || renderTarget->sampleCount() > 1) {
     if (deviceBounds.isEmpty()) {
       return {};
@@ -643,7 +682,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const F
 
   FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty()), drawScale};
   if (fill.shader) {
-    if (auto processor = FragmentProcessor::Make(fill.shader, args)) {
+    if (auto processor = FragmentProcessor::Make(fill.shader, args, nullptr, dstColorSpace)) {
       op->addColorFP(std::move(processor));
     } else {
       // The shader is the main source of color, so if it fails to create a processor, we can't
@@ -652,7 +691,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const F
     }
   }
   if (fill.colorFilter) {
-    if (auto processor = fill.colorFilter->asFragmentProcessor(context)) {
+    if (auto processor = fill.colorFilter->asFragmentProcessor(context, dstColorSpace)) {
       op->addColorFP(std::move(processor));
     }
   }
@@ -677,7 +716,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const F
   op->setBlendMode(fill.blendMode);
   if (BlendModeNeedDstTexture(fill.blendMode, op->hasCoverage())) {
     auto dstTextureInfo = makeDstTextureInfo(deviceBounds.value_or(Rect::MakeEmpty()), aaType);
-    auto shaderCaps = context->caps()->shaderCaps();
+    auto shaderCaps = context->shaderCaps();
     if (!shaderCaps->frameBufferFetchSupport && dstTextureInfo.textureProxy == nullptr) {
       return;
     }
@@ -699,7 +738,10 @@ void OpsCompositor::fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, co
     pendingAtlasTexture = std::move(textureProxy);
     pendingSampling = sampling;
   }
-  auto record = drawingBuffer()->make<RectRecord>(rect, state.matrix, fill.color.premultiply());
+  auto dstColor =
+      ColorSpaceXformSteps::ConvertColorSpace(ColorSpace::MakeSRGB(), AlphaType::Unpremultiplied,
+                                              dstColorSpace, AlphaType::Premultiplied, fill.color);
+  auto record = drawingBuffer()->make<RectRecord>(rect, state.matrix, dstColor);
   pendingRects.emplace_back(std::move(record));
 }
 

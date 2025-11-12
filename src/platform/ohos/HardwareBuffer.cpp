@@ -16,22 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "tgfx/platform/HardwareBuffer.h"
 #include <native_buffer/native_buffer.h>
-#include "ExternalOESBuffer.h"
-#include "core/PixelBuffer.h"
 #include "core/utils/PixelFormatUtil.h"
 
 namespace tgfx {
 #define BUFFER_USAGE_MEM_MMZ_CACHE (1ULL << 5)
-
-std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef hardwareBuffer,
-                                                   YUVColorSpace colorSpace) {
-  auto pixelBuffer = PixelBuffer::MakeFrom(hardwareBuffer);
-  if (pixelBuffer) {
-    return pixelBuffer;
-  }
-  return ExternalOESBuffer::MakeFrom(hardwareBuffer, colorSpace);
-}
 
 bool HardwareBufferCheck(HardwareBufferRef buffer) {
   if (!HardwareBufferAvailable()) {
@@ -83,35 +73,27 @@ void HardwareBufferUnlock(HardwareBufferRef buffer) {
   }
 }
 
-ISize HardwareBufferGetSize(HardwareBufferRef buffer) {
+HardwareBufferInfo HardwareBufferGetInfo(HardwareBufferRef buffer) {
   if (!HardwareBufferAvailable() || buffer == nullptr) {
     return {};
   }
   OH_NativeBuffer_Config config;
   OH_NativeBuffer_GetConfig(buffer, &config);
-  return {config.width, config.height};
-}
-
-ImageInfo HardwareBufferGetInfo(HardwareBufferRef buffer) {
-  if (!HardwareBufferAvailable() || buffer == nullptr) {
-    return {};
-  }
-  OH_NativeBuffer_Config config;
-  OH_NativeBuffer_GetConfig(buffer, &config);
-  auto colorType = ColorType::Unknown;
-  auto alphaType = AlphaType::Premultiplied;
+  HardwareBufferInfo info = {};
   switch (config.format) {
     case NATIVEBUFFER_PIXEL_FMT_RGBA_8888:
-      colorType = ColorType::RGBA_8888;
-      break;
     case NATIVEBUFFER_PIXEL_FMT_RGBX_8888:
-      colorType = ColorType::RGBA_8888;
-      alphaType = AlphaType::Opaque;
+      info.format = HardwareBufferFormat::RGBA_8888;
+      break;
+    case NATIVEBUFFER_PIXEL_FMT_YCBCR_420_SP:
+      info.format = HardwareBufferFormat::YCBCR_420_SP;
       break;
     default:
-      break;
+      return {};
   }
-  return ImageInfo::Make(config.width, config.height, colorType, alphaType,
-                         static_cast<size_t>(config.stride));
+  info.width = config.width;
+  info.height = config.height;
+  info.rowBytes = static_cast<size_t>(config.stride);
+  return info;
 }
 }  // namespace tgfx

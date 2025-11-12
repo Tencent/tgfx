@@ -18,8 +18,8 @@
 
 #include "GLSLProgramBuilder.h"
 #include <string>
-#include "gpu/GPU.h"
 #include "gpu/UniformData.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 static std::string TypeModifierString(ShaderVar::TypeModifier t, ShaderStage stage) {
@@ -125,7 +125,7 @@ std::string GLSLProgramBuilder::getShaderVarDeclarations(const ShaderVar& var,
     ret += TypeModifierString(var.modifier(), stage);
     ret += " ";
   }
-  auto shaderCaps = context->caps()->shaderCaps();
+  auto shaderCaps = context->shaderCaps();
   if (shaderCaps->usesPrecisionModifiers) {
     ret += SLTypePrecision(var.type());
     ret += " ";
@@ -149,7 +149,7 @@ std::string GLSLProgramBuilder::getUniformBlockDeclaration(
   static const std::string INDENT_STR = "    ";  // 4 spaces
   result += "layout(std140) uniform " + uniformBlockName + " {\n";
   std::string precision = "";
-  auto shaderCaps = context->caps()->shaderCaps();
+  auto shaderCaps = context->shaderCaps();
   for (const auto& uniform : uniforms) {
     const auto& var = ShaderVar(uniform);
     if (shaderCaps->usesPrecisionModifiers) {
@@ -164,7 +164,7 @@ std::string GLSLProgramBuilder::getUniformBlockDeclaration(
   return result;
 }
 
-std::shared_ptr<PipelineProgram> GLSLProgramBuilder::finalize() {
+std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
   fragmentShaderBuilder()->declareCustomOutputColor();
   finalizeShaders();
   auto gpu = context->gpu();
@@ -205,12 +205,12 @@ std::shared_ptr<PipelineProgram> GLSLProgramBuilder::finalize() {
   if (pipeline == nullptr) {
     return nullptr;
   }
-  return std::make_shared<PipelineProgram>(std::move(pipeline), std::move(vertexUniformData),
-                                           std::move(fragmentUniformData));
+  return std::make_shared<Program>(std::move(pipeline), std::move(vertexUniformData),
+                                   std::move(fragmentUniformData));
 }
 
 bool GLSLProgramBuilder::checkSamplerCounts() {
-  auto shaderCaps = context->caps()->shaderCaps();
+  auto shaderCaps = context->shaderCaps();
   if (numFragmentSamplers > shaderCaps->maxFragmentSamplers) {
     LOGE("Program would use too many fragment samplers.");
     return false;

@@ -20,9 +20,9 @@
 
 #include <cstdint>
 #include <cstring>
-#include "gpu/BlendFactor.h"
-#include "gpu/BlendOperation.h"
 #include "tgfx/core/BlendMode.h"
+#include "tgfx/gpu/BlendFactor.h"
+#include "tgfx/gpu/BlendOperation.h"
 
 namespace tgfx {
 struct BlendFormula {

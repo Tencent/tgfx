@@ -113,7 +113,7 @@ bool Baseline::Compare(const std::shared_ptr<Surface> surface, const std::string
   if (surface == nullptr) {
     return false;
   }
-  Bitmap bitmap(surface->width(), surface->height(), false, false);
+  Bitmap bitmap(surface->width(), surface->height(), false, false, surface->colorSpace());
   Pixmap pixmap(bitmap);
   auto result = surface->readPixels(pixmap.info(), pixmap.writablePixels());
   if (!result) {
@@ -162,7 +162,8 @@ bool Baseline::Compare(const Pixmap& pixmap, const std::string& key) {
   if (pixmap.rowBytes() == pixmap.info().minRowBytes()) {
     md5 = DumpMD5(pixmap.pixels(), pixmap.byteSize());
   } else {
-    Bitmap newBitmap(pixmap.width(), pixmap.height(), pixmap.isAlphaOnly(), false);
+    Bitmap newBitmap(pixmap.width(), pixmap.height(), pixmap.isAlphaOnly(), false,
+                     pixmap.colorSpace());
     Pixmap newPixmap(newBitmap);
     auto result = pixmap.readPixels(newPixmap.info(), newPixmap.writablePixels());
     if (!result) {

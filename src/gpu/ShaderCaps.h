@@ -19,6 +19,7 @@
 #pragma once
 
 #include <string>
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 /**
@@ -26,6 +27,17 @@ namespace tgfx {
  */
 class ShaderCaps {
  public:
+  /**
+   * Creates a new ShaderCaps instance based on the provided GPU backend.
+   */
+  explicit ShaderCaps(GPU* gpu);
+
+  /**
+   * The version declaration string to be placed at the top of the shader code. For example,
+   * "#version 300 es" for OpenGL ES 3.0, or "#version 150" for OpenGL 3.2.
+   */
+  std::string versionDeclString;
+
   /**
    * Indicates if the shader language requires precision modifiers (lowp, mediump, highp) to be
    * explicitly specified for floating point types.
@@ -57,12 +69,6 @@ class ShaderCaps {
   std::string frameBufferFetchExtensionString;
 
   /**
-   * Indicates if the framebuffer fetch requires enabling per-sample shading. This is true for
-   * certain extensions like GL_NV_fragment_shader_barycentric.
-   */
-  bool frameBufferFetchRequiresEnablePerSample = false;
-
-  /**
    * Returns the maximum number of texture samplers that can be used in a shader.
    */
   int maxFragmentSamplers = 0;
@@ -77,11 +83,5 @@ class ShaderCaps {
    * Returns the required alignment in bytes for offsets within a uniform buffer object (UBO).
    */
   int uboOffsetAlignment = 1;
-
-  /**
-   * The version declaration string to be placed at the top of the shader code. For example,
-   * "#version 300 es" for OpenGL ES 3.0, or "#version 140" for OpenGL 3.1.
-   */
-  std::string versionDeclString;
 };
 }  // namespace tgfx

@@ -19,8 +19,8 @@
 #include "TextureRenderTarget.h"
 #include "core/utils/Log.h"
 #include "core/utils/UniqueID.h"
-#include "gpu/GPU.h"
-#include "gpu/GPUTexture.h"
+#include "tgfx/gpu/GPU.h"
+#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
 static ScratchKey ComputeRenderTargetScratchKey(int width, int height, PixelFormat format,
@@ -44,12 +44,12 @@ std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
   if (context == nullptr) {
     return nullptr;
   }
-  uint32_t usage = GPUTextureUsage::TEXTURE_BINDING | GPUTextureUsage::RENDER_ATTACHMENT;
-  auto texture = context->gpu()->importExternalTexture(backendTexture, usage, adopted);
+  uint32_t usage = TextureUsage::TEXTURE_BINDING | TextureUsage::RENDER_ATTACHMENT;
+  auto texture = context->gpu()->importBackendTexture(backendTexture, usage, adopted);
   if (texture == nullptr) {
     return nullptr;
   }
-  sampleCount = context->caps()->getSampleCount(sampleCount, texture->format());
+  sampleCount = context->gpu()->getSampleCount(sampleCount, texture->format());
   ScratchKey scratchKey = {};
   if (adopted) {
     scratchKey =
@@ -66,19 +66,20 @@ std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
   if (context == nullptr) {
     return nullptr;
   }
-  auto gpu = context->gpu();
-  YUVFormat yuvFormat = YUVFormat::Unknown;
-  auto formats = gpu->getHardwareTextureFormats(hardwareBuffer, &yuvFormat);
-  if (formats.size() != 1 || yuvFormat != YUVFormat::Unknown) {
+  auto info = HardwareBufferGetInfo(hardwareBuffer);
+  if (info.format == HardwareBufferFormat::Unknown ||
+      info.format == HardwareBufferFormat::YCBCR_420_SP) {
     return nullptr;
   }
-  uint32_t usage = GPUTextureUsage::TEXTURE_BINDING | GPUTextureUsage::RENDER_ATTACHMENT;
+  auto gpu = context->gpu();
+  uint32_t usage = TextureUsage::TEXTURE_BINDING | TextureUsage::RENDER_ATTACHMENT;
   auto textures = gpu->importHardwareTextures(hardwareBuffer, usage);
   if (textures.size() != 1) {
     return nullptr;
   }
-  sampleCount = context->caps()->getSampleCount(sampleCount, formats.front());
-  return TextureRenderTarget::MakeFrom(context, std::move(textures.front()), sampleCount,
+  auto& texture = textures[0];
+  sampleCount = context->gpu()->getSampleCount(sampleCount, texture->format());
+  return TextureRenderTarget::MakeFrom(context, std::move(texture), sampleCount,
                                        ImageOrigin::TopLeft, true);
 }
 
@@ -88,17 +89,17 @@ std::shared_ptr<RenderTarget> RenderTarget::Make(Context* context, int width, in
   if (!TextureView::CheckSizeAndFormat(context, width, height, format)) {
     return nullptr;
   }
-  auto caps = context->caps();
-  sampleCount = caps->getSampleCount(sampleCount, format);
+  auto gpu = context->gpu();
+  sampleCount = gpu->getSampleCount(sampleCount, format);
   auto scratchKey = ComputeRenderTargetScratchKey(width, height, format, sampleCount, mipmapped);
   if (auto renderTarget = Resource::Find<TextureRenderTarget>(context, scratchKey)) {
     renderTarget->_origin = origin;
     return renderTarget;
   }
-  GPUTextureDescriptor descriptor = {
+  TextureDescriptor descriptor = {
       width,     height, format,
-      mipmapped, 1,      GPUTextureUsage::TEXTURE_BINDING | GPUTextureUsage::RENDER_ATTACHMENT};
-  auto texture = context->gpu()->createTexture(descriptor);
+      mipmapped, 1,      TextureUsage::TEXTURE_BINDING | TextureUsage::RENDER_ATTACHMENT};
+  auto texture = gpu->createTexture(descriptor);
   if (texture == nullptr) {
     return nullptr;
   }
@@ -107,17 +108,17 @@ std::shared_ptr<RenderTarget> RenderTarget::Make(Context* context, int width, in
 }
 
 std::shared_ptr<RenderTarget> TextureRenderTarget::MakeFrom(Context* context,
-                                                            std::shared_ptr<GPUTexture> texture,
+                                                            std::shared_ptr<Texture> texture,
                                                             int sampleCount, ImageOrigin origin,
                                                             bool externallyOwned,
                                                             const ScratchKey& scratchKey) {
   DEBUG_ASSERT(context != nullptr);
   DEBUG_ASSERT(texture != nullptr);
-  std::shared_ptr<GPUTexture> renderTexture = nullptr;
+  std::shared_ptr<Texture> renderTexture = nullptr;
   if (sampleCount > 1) {
-    GPUTextureDescriptor descriptor = {texture->width(),  texture->height(),
-                                       texture->format(), false,
-                                       sampleCount,       GPUTextureUsage::RENDER_ATTACHMENT};
+    TextureDescriptor descriptor = {texture->width(),  texture->height(),
+                                    texture->format(), false,
+                                    sampleCount,       TextureUsage::RENDER_ATTACHMENT};
     renderTexture = context->gpu()->createTexture(descriptor);
     if (renderTexture == nullptr) {
       return nullptr;

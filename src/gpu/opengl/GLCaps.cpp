@@ -18,7 +18,6 @@
 
 #include "GLCaps.h"
 #include "GLUtil.h"
-#include "tgfx/gpu/Context.h"
 
 namespace tgfx {
 static GLStandard GetGLStandard(const char* versionString) {
@@ -85,7 +84,6 @@ GLInfo::GLInfo(GLGetString* getString, GLGetStringi* getStringi, GLGetIntegerv* 
     : getString(getString), getStringi(getStringi), getIntegerv(getIntegerv),
       getInternalformativ(getInternalformativ), getShaderPrecisionFormat(getShaderPrecisionFormat) {
   auto versionString = (const char*)getString(GL_VERSION);
-  LOGI("OpenGL Version: %s\n", versionString);
   auto glVersion = GetGLVersion(versionString);
   version = GL_VER(glVersion.majorVersion, glVersion.minorVersion);
   standard = GetGLStandard(versionString);
@@ -111,15 +109,20 @@ bool GLInfo::hasExtension(const std::string& extension) const {
   return result != extensions.end();
 }
 
-const GLCaps* GLCaps::Get(Context* context) {
-  return context ? static_cast<const GLCaps*>(context->caps()) : nullptr;
+static std::string ToStdString(const unsigned char* str) {
+  return str ? std::string(reinterpret_cast<const char*>(str)) : "";
 }
 
 GLCaps::GLCaps(const GLInfo& info) {
+  _info.backend = Backend::OpenGL;
+  _info.version = ToStdString(info.getString(GL_VERSION));
+  _info.renderer = ToStdString(info.getString(GL_RENDERER));
+  _info.vendor = ToStdString(info.getString(GL_VENDOR));
+  _info.extensions = info.extensions;
   standard = info.standard;
   version = info.version;
-  vendor = GetVendorFromString((const char*)info.getString(GL_VENDOR));
-  fenceSupport = true;
+  vendor = GetVendorFromString(_info.vendor.c_str());
+
   switch (standard) {
     case GLStandard::GL:
       if (version < GL_VER(3, 2)) {
@@ -142,10 +145,11 @@ GLCaps::GLCaps(const GLInfo& info) {
     default:
       break;
   }
-  info.getIntegerv(GL_MAX_TEXTURE_SIZE, &maxTextureSize);
-  info.getIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &_shaderCaps.maxFragmentSamplers);
-  info.getIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &_shaderCaps.maxUBOSize);
-  info.getIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &_shaderCaps.uboOffsetAlignment);
+  _features.semaphore = true;
+  info.getIntegerv(GL_MAX_TEXTURE_SIZE, &_limits.maxTextureDimension2D);
+  info.getIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &_limits.maxSamplersPerShaderStage);
+  info.getIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &_limits.maxUniformBufferBindingSize);
+  info.getIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &_limits.minUniformBufferOffsetAlignment);
   if (vendor == GLVendor::Qualcomm) {
     // https://skia-review.googlesource.com/c/skia/+/571418
     // On certain Adreno devices running WebGL, glTexSubImage2D() may not upload texels in time for
@@ -160,19 +164,12 @@ const GLTextureFormat& GLCaps::getTextureFormat(PixelFormat pixelFormat) const {
   return pixelFormatMap.at(pixelFormat).format;
 }
 
-const Swizzle& GLCaps::getReadSwizzle(PixelFormat pixelFormat) const {
-  return pixelFormatMap.at(pixelFormat).readSwizzle;
-}
-
-const Swizzle& GLCaps::getWriteSwizzle(PixelFormat pixelFormat) const {
-  return pixelFormatMap.at(pixelFormat).writeSwizzle;
-}
-
 bool GLCaps::isFormatRenderable(PixelFormat pixelFormat) const {
   switch (pixelFormat) {
     case PixelFormat::RGBA_8888:
     case PixelFormat::BGRA_8888:
     case PixelFormat::ALPHA_8:
+    case PixelFormat::RG_88:
       return true;
     default:
       break;
@@ -199,63 +196,33 @@ int GLCaps::getSampleCount(int requestedCount, PixelFormat pixelFormat) const {
 void GLCaps::initGLSupport(const GLInfo& info) {
   pboSupport = true;
   multisampleDisableSupport = true;
-  textureBarrierSupport = vendor != GLVendor::Intel &&
-                          (version >= GL_VER(4, 5) || info.hasExtension("GL_ARB_texture_barrier") ||
-                           info.hasExtension("GL_NV_texture_barrier"));
-  clampToBorderSupport = true;
-  _shaderCaps.versionDeclString = "#version 140";
-  _shaderCaps.usesPrecisionModifiers = false;
-  if (info.hasExtension("GL_EXT_shader_framebuffer_fetch")) {
-    _shaderCaps.frameBufferFetchNeedsCustomOutput = true;
-    _shaderCaps.frameBufferFetchSupport = true;
-    _shaderCaps.frameBufferFetchColorName = "gl_LastFragData[0]";
-    _shaderCaps.frameBufferFetchExtensionString = "GL_EXT_shader_framebuffer_fetch";
-    _shaderCaps.frameBufferFetchRequiresEnablePerSample = false;
-  }
+  _features.textureBarrier =
+      vendor != GLVendor::Intel &&
+      (version >= GL_VER(4, 5) || info.hasExtension("GL_ARB_texture_barrier") ||
+       info.hasExtension("GL_NV_texture_barrier"));
+  _features.clampToBorder = true;
+  frameBufferFetchRequiresEnablePerSample = false;
 }
 
 void GLCaps::initGLESSupport(const GLInfo& info) {
   pboSupport = true;
   multisampleDisableSupport = info.hasExtension("GL_EXT_multisample_compatibility");
-  textureBarrierSupport = info.hasExtension("GL_NV_texture_barrier");
-  clampToBorderSupport = version > GL_VER(3, 2) ||
-                         info.hasExtension("GL_EXT_texture_border_clamp") ||
-                         info.hasExtension("GL_NV_texture_border_clamp") ||
-                         info.hasExtension("GL_OES_texture_border_clamp");
-  _shaderCaps.versionDeclString = "#version 300 es";
-  if (info.hasExtension("GL_EXT_shader_framebuffer_fetch")) {
-    _shaderCaps.frameBufferFetchNeedsCustomOutput = true;
-    _shaderCaps.frameBufferFetchSupport = true;
-    _shaderCaps.frameBufferFetchColorName = "gl_LastFragData[0]";
-    _shaderCaps.frameBufferFetchExtensionString = "GL_EXT_shader_framebuffer_fetch";
-    _shaderCaps.frameBufferFetchRequiresEnablePerSample = false;
-  } else if (info.hasExtension("GL_NV_shader_framebuffer_fetch")) {
-    // Actually, we haven't seen an ES3.0 device with this extension yet, so we don't know.
-    _shaderCaps.frameBufferFetchNeedsCustomOutput = false;
-    _shaderCaps.frameBufferFetchSupport = true;
-    _shaderCaps.frameBufferFetchColorName = "gl_LastFragData[0]";
-    _shaderCaps.frameBufferFetchExtensionString = "GL_NV_shader_framebuffer_fetch";
-    _shaderCaps.frameBufferFetchRequiresEnablePerSample = false;
-  } else if (info.hasExtension("GL_ARM_shader_framebuffer_fetch")) {
-    _shaderCaps.frameBufferFetchNeedsCustomOutput = false;
-    _shaderCaps.frameBufferFetchSupport = true;
-    _shaderCaps.frameBufferFetchColorName = "gl_LastFragColorARM";
-    _shaderCaps.frameBufferFetchExtensionString = "GL_ARM_shader_framebuffer_fetch";
-    // The arm extension requires specifically enabling MSAA fetching per sample.
-    // On some devices this may have a perf hit. Also multiple render targets are disabled
-    _shaderCaps.frameBufferFetchRequiresEnablePerSample = true;
-  }
-  _shaderCaps.usesPrecisionModifiers = true;
+  _features.textureBarrier = info.hasExtension("GL_NV_texture_barrier");
+  _features.clampToBorder = version > GL_VER(3, 2) ||
+                            info.hasExtension("GL_EXT_texture_border_clamp") ||
+                            info.hasExtension("GL_NV_texture_border_clamp") ||
+                            info.hasExtension("GL_OES_texture_border_clamp");
+  // The ARM extension requires enabling MSAA fetching on a per-sample basis.
+  // This can hurt performance on some devices and disables multiple render targets.
+  frameBufferFetchRequiresEnablePerSample = info.hasExtension("GL_ARM_shader_framebuffer_fetch");
 }
 
 void GLCaps::initWebGLSupport(const GLInfo&) {
   pboSupport = false;
   multisampleDisableSupport = false;
-  textureBarrierSupport = false;
-  clampToBorderSupport = false;
-  _shaderCaps.versionDeclString = "#version 300 es";
-  _shaderCaps.frameBufferFetchSupport = false;
-  _shaderCaps.usesPrecisionModifiers = true;
+  frameBufferFetchRequiresEnablePerSample = false;
+  _features.textureBarrier = false;
+  _features.clampToBorder = false;
 }
 
 void GLCaps::initFormatMap(const GLInfo& info) {
@@ -263,12 +230,10 @@ void GLCaps::initFormatMap(const GLInfo& info) {
   RGBAFormat.format.sizedFormat = GL_RGBA8;
   RGBAFormat.format.externalFormat = GL_RGBA;
   RGBAFormat.format.externalType = GL_UNSIGNED_BYTE;
-  RGBAFormat.readSwizzle = Swizzle::RGBA();
   auto& BGRAFormat = pixelFormatMap[PixelFormat::BGRA_8888];
   BGRAFormat.format.sizedFormat = GL_RGBA8;
   BGRAFormat.format.externalFormat = GL_BGRA;
   BGRAFormat.format.externalType = GL_UNSIGNED_BYTE;
-  BGRAFormat.readSwizzle = Swizzle::RGBA();
   auto& DEPTHSTENCILFormat = pixelFormatMap[PixelFormat::DEPTH24_STENCIL8];
   DEPTHSTENCILFormat.format.sizedFormat = GL_DEPTH24_STENCIL8;
   DEPTHSTENCILFormat.format.externalFormat = GL_DEPTH_STENCIL;
@@ -277,21 +242,14 @@ void GLCaps::initFormatMap(const GLInfo& info) {
   ALPHAFormat.format.sizedFormat = GL_R8;
   ALPHAFormat.format.externalFormat = GL_RED;
   ALPHAFormat.format.externalType = GL_UNSIGNED_BYTE;
-  ALPHAFormat.readSwizzle = Swizzle::RRRR();
-  // Shader output swizzles will default to RGBA. When we've use GL_RED instead of GL_ALPHA to
-  // implement PixelFormat::ALPHA_8 we need to swizzle the shader outputs so the alpha channel
-  // gets written to the single component.
-  ALPHAFormat.writeSwizzle = Swizzle::AAAA();
   auto& GrayFormat = pixelFormatMap[PixelFormat::GRAY_8];
   GrayFormat.format.sizedFormat = GL_R8;
   GrayFormat.format.externalFormat = GL_RED;
   GrayFormat.format.externalType = GL_UNSIGNED_BYTE;
-  GrayFormat.readSwizzle = Swizzle::RRRA();
   auto& RGFormat = pixelFormatMap[PixelFormat::RG_88];
   RGFormat.format.sizedFormat = GL_RG8;
   RGFormat.format.externalFormat = GL_RG;
   RGFormat.format.externalType = GL_UNSIGNED_BYTE;
-  RGFormat.readSwizzle = Swizzle::RGRG();
 
   bool useSizedRbFormats = standard == GLStandard::GLES || standard == GLStandard::WebGL;
   for (auto& item : pixelFormatMap) {
@@ -315,7 +273,8 @@ static bool UsesInternalformatQuery(GLStandard standard, const GLInfo& glInterfa
 }
 
 void GLCaps::initColorSampleCount(const GLInfo& info) {
-  std::vector<PixelFormat> pixelFormats = {PixelFormat::RGBA_8888, PixelFormat::ALPHA_8};
+  std::vector<PixelFormat> pixelFormats = {PixelFormat::RGBA_8888, PixelFormat::ALPHA_8,
+                                           PixelFormat::BGRA_8888, PixelFormat::RG_88};
   for (auto pixelFormat : pixelFormats) {
     if (vendor == GLVendor::Intel) {
       // We disable MSAA across the board for Intel GPUs for performance reasons.
@@ -327,7 +286,7 @@ void GLCaps::initColorSampleCount(const GLInfo& info) {
       if (count) {
         int* temp = new int[static_cast<size_t>(count)];
         info.getInternalformativ(GL_RENDERBUFFER, format, GL_SAMPLES, count, temp);
-        // GL has a concept of MSAA rasterization with a single sample but we do not.
+        // GL has a concept of MSAA rasterization with a single sample, but we do not.
         if (temp[count - 1] == 1) {
           --count;
         }

@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/ImageGenerator.h"
 #include "tgfx/core/ImageInfo.h"
@@ -95,13 +96,24 @@ class Image {
   /**
    * Creates an Image from the platform-specific hardware buffer. For example, the hardware buffer
    * could be an AHardwareBuffer on the android platform or a CVPixelBufferRef on the apple
-   * platform. The returned Image takes a reference to the hardwareBuffer. The caller must
-   * ensure the buffer content stays unchanged for the lifetime of the returned Image. The
-   * colorSpace is ignored if the hardwareBuffer contains only one plane, which is not in the YUV
-   * format. Returns nullptr if the hardwareBuffer is nullptr.
+   * platform. The returned Image takes a reference to the hardwareBuffer. The caller must ensure
+   * the buffer content stays unchanged for the lifetime of the returned Image. Returns nullptr if
+   * the hardwareBuffer is nullptr or the hardwareBuffer contains only one plane, which is not in
+   * the YUV format.
    */
   static std::shared_ptr<Image> MakeFrom(HardwareBufferRef hardwareBuffer,
-                                         YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED);
+                                         YUVColorSpace colorSpace);
+
+  /**
+   * Creates an Image from the platform-specific hardware buffer. For example, the hardware buffer
+   * could be an AHardwareBuffer on the android platform or a CVPixelBufferRef on the apple
+   * platform. The returned Image takes a reference to the hardwareBuffer. The caller must
+   * ensure the buffer content stays unchanged for the lifetime of the returned Image. Returns
+   * nullptr if the hardwareBuffer is nullptr or the hardwareBuffer contains more than one plane.
+   */
+  static std::shared_ptr<Image> MakeFrom(
+      HardwareBufferRef hardwareBuffer,
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Creates an Image from the given picture with the specified width, height, and matrix. The
@@ -116,11 +128,13 @@ class Image {
    * @param width The width of the Image.
    * @param height The height of the Image.
    * @param matrix A Matrix to apply transformations to the picture.
+   * @param colorSpace The ColorSpace of this image.
    * @return An Image that matches the content when the picture is drawn with the specified
    * parameters.
    */
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Picture> picture, int width, int height,
-                                         const Matrix* matrix = nullptr);
+  static std::shared_ptr<Image> MakeFrom(
+      std::shared_ptr<Picture> picture, int width, int height, const Matrix* matrix = nullptr,
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Creates an Image in the I420 format with the specified YUVData and the YUVColorSpace. Returns
@@ -148,8 +162,10 @@ class Image {
    * is returned if the format of the backendTexture is recognized and supported. Recognized formats
    * vary by GPU back-ends.
    */
-  static std::shared_ptr<Image> MakeFrom(Context* context, const BackendTexture& backendTexture,
-                                         ImageOrigin origin = ImageOrigin::TopLeft);
+  static std::shared_ptr<Image> MakeFrom(
+      Context* context, const BackendTexture& backendTexture,
+      ImageOrigin origin = ImageOrigin::TopLeft,
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Creates an Image from the backendTexture associated with the context, taking ownership of the
@@ -158,8 +174,10 @@ class Image {
    * returned if the format of the backendTexture is recognized and supported. Recognized formats
    * vary by GPU back-ends.
    */
-  static std::shared_ptr<Image> MakeAdopted(Context* context, const BackendTexture& backendTexture,
-                                            ImageOrigin origin = ImageOrigin::TopLeft);
+  static std::shared_ptr<Image> MakeAdopted(
+      Context* context, const BackendTexture& backendTexture,
+      ImageOrigin origin = ImageOrigin::TopLeft,
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   virtual ~Image() = default;
 
@@ -178,6 +196,11 @@ class Image {
    * defined by ColorType::ALPHA_8.
    */
   virtual bool isAlphaOnly() const = 0;
+
+  /**
+   * return image colorspace.
+   */
+  virtual std::shared_ptr<ColorSpace> colorSpace() const = 0;
 
   /**
    * Returns true if the Image has mipmap levels. The flag was set by the makeMipmapped() method,

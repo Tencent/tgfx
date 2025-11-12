@@ -44,14 +44,25 @@ DropShadowImageFilter::DropShadowImageFilter(float dx, float dy, float blurrines
       shadowOnly(shadowOnly) {
 }
 
-Rect DropShadowImageFilter::onFilterBounds(const Rect& srcRect) const {
-  auto bounds = srcRect;
-  bounds.offset(dx, dy);
-  if (blurFilter != nullptr) {
-    bounds = blurFilter->filterBounds(bounds);
+Rect DropShadowImageFilter::onFilterBounds(const Rect& rect, MapDirection mapDirection) const {
+  if (mapDirection == MapDirection::Forward) {
+    auto bounds = rect;
+    bounds.offset(dx, dy);
+    if (blurFilter != nullptr) {
+      bounds = blurFilter->filterBounds(bounds);
+    }
+    if (!shadowOnly) {
+      bounds.join(rect);
+    }
+    return bounds;
   }
+  Rect bounds = rect;
+  if (blurFilter != nullptr) {
+    bounds = blurFilter->filterBounds(bounds, mapDirection);
+  }
+  bounds.offset(-dx, -dy);
   if (!shadowOnly) {
-    bounds.join(srcRect);
+    bounds.join(rect);
   }
   return bounds;
 }
@@ -78,17 +89,20 @@ PlacementPtr<FragmentProcessor> DropShadowImageFilter::getShadowFragmentProcesso
 
   PlacementPtr<FragmentProcessor> shadowProcessor;
   if (blurFilter != nullptr) {
-    shadowProcessor = blurFilter->asFragmentProcessor(std::move(source), args, sampling, constraint,
-                                                      &shadowMatrix);
+    shadowProcessor =
+        blurFilter->asFragmentProcessor(source, args, sampling, constraint, &shadowMatrix);
   } else {
-    shadowProcessor = FragmentProcessor::Make(std::move(source), args, TileMode::Decal,
-                                              TileMode::Decal, sampling, constraint, &shadowMatrix);
+    shadowProcessor = FragmentProcessor::Make(source, args, TileMode::Decal, TileMode::Decal,
+                                              sampling, constraint, &shadowMatrix);
   }
   if (shadowProcessor == nullptr) {
     return nullptr;
   }
   auto buffer = args.context->drawingBuffer();
-  auto colorProcessor = ConstColorProcessor::Make(buffer, color.premultiply(), InputMode::Ignore);
+  auto dstColor = ColorSpaceXformSteps::ConvertColorSpace(
+      ColorSpace::MakeSRGB(), AlphaType::Unpremultiplied, source->colorSpace(),
+      AlphaType::Premultiplied, color);
+  auto colorProcessor = ConstColorProcessor::Make(buffer, dstColor, InputMode::Ignore);
   return XfermodeFragmentProcessor::MakeFromTwoProcessors(
       buffer, std::move(colorProcessor), std::move(shadowProcessor), BlendMode::SrcIn);
 }

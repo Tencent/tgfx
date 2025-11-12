@@ -39,8 +39,8 @@ PlacementPtr<AtlasTextOp> AtlasTextOp::Make(Context* context,
                                                                  std::move(textureProxy), sampling);
   CAPUTRE_RECT_MESH(atlasTextOp.get(), provider.get());
   if (provider->aaType() == AAType::Coverage || provider->rectCount() > 1) {
-    atlasTextOp->indexBufferProxy =
-        context->globalCache()->getRectIndexBuffer(provider->aaType() == AAType::Coverage);
+    atlasTextOp->indexBufferProxy = context->globalCache()->getRectIndexBuffer(
+        provider->aaType() == AAType::Coverage, std::nullopt);
   }
   if (provider->rectCount() <= 1) {
     // If we only have one rect, it is not worth the async task overhead.

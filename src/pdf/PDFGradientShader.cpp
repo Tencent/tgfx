@@ -18,6 +18,7 @@
 
 #include "PDFGradientShader.h"
 #include <algorithm>
+#include "core/ColorSpaceXformSteps.h"
 #include "core/shaders/GradientShader.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
@@ -867,7 +868,8 @@ PDFIndirectReference MakeFunctionShader(PDFDocumentImpl* doc, const PDFGradientS
   }
 
   pdfShader->insertInt("ShadingType", static_cast<int>(shadingType));
-  pdfShader->insertName("ColorSpace", "DeviceRGB");
+  auto ref = doc->colorSpaceRef();
+  pdfShader->insertRef("ColorSpace", ref);
 
   auto pdfFunctionShader = PDFDictionary::Make("Pattern");
   pdfFunctionShader->insertInt("PatternType", 2);
@@ -895,6 +897,11 @@ PDFIndirectReference PDFGradientShader::Make(PDFDocumentImpl* doc, const Gradien
   DEBUG_ASSERT(shader);
 
   PDFGradientShader::Key key = MakeKey(shader, matrix, surfaceBBox);
+  for (auto& color : key.info.colors) {
+    color = ColorSpaceXformSteps::ConvertColorSpace(ColorSpace::MakeSRGB(),
+                                                    AlphaType::Unpremultiplied, doc->colorSpace(),
+                                                    AlphaType::Unpremultiplied, color);
+  }
   bool alpha = GradientHasAlpha(key);
   return FindPDFShader(doc, std::move(key), alpha);
 }

@@ -21,7 +21,6 @@
 #include <chrono>
 #include <deque>
 #include "tgfx/gpu/Backend.h"
-#include "tgfx/gpu/Caps.h"
 #include "tgfx/gpu/Device.h"
 
 namespace tgfx {
@@ -35,6 +34,7 @@ class BlockBuffer;
 class SlidingWindowTracker;
 class AtlasManager;
 class CommandBuffer;
+class ShaderCaps;
 
 /**
  * Context is responsible for creating and managing GPU resources, as well as issuing drawing
@@ -64,9 +64,11 @@ class Context {
   Backend backend() const;
 
   /**
-   * Returns the capability info of the backend GPU.
+   * Returns the shader capability info of the backend GPU.
    */
-  const Caps* caps() const;
+  const ShaderCaps* shaderCaps() const {
+    return _shaderCaps;
+  }
 
   /**
    * Returns the GPU instance associated with this context.
@@ -195,6 +197,7 @@ class Context {
  private:
   Device* _device = nullptr;
   GPU* _gpu = nullptr;
+  ShaderCaps* _shaderCaps = nullptr;
   GlobalCache* _globalCache = nullptr;
   ResourceCache* _resourceCache = nullptr;
   DrawingManager* _drawingManager = nullptr;

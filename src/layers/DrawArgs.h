@@ -32,8 +32,10 @@ class DrawArgs {
  public:
   DrawArgs() = default;
 
-  DrawArgs(Context* context, bool excludeEffects = false, DrawMode drawMode = DrawMode::Normal)
-      : context(context), excludeEffects(excludeEffects), drawMode(drawMode) {
+  DrawArgs(Context* context, bool excludeEffects = false, DrawMode drawMode = DrawMode::Normal,
+           std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB())
+      : context(context), excludeEffects(excludeEffects), drawMode(drawMode),
+        dstColorSpace(std::move(colorSpace)) {
   }
 
   // The GPU context to be used during the drawing process. Note: this could be nullptr.
@@ -46,8 +48,12 @@ class DrawArgs {
   Rect* renderRect = nullptr;
 
   // The background context to be used during the drawing process. Note: this could be nullptr.
-  std::shared_ptr<BackgroundContext> backgroundContext = nullptr;
+  std::shared_ptr<BackgroundContext> blurBackground = nullptr;
   // Indicates whether to force drawing the background, even if there are no background styles.
   bool forceDrawBackground = false;
+  std::shared_ptr<ColorSpace> dstColorSpace = ColorSpace::MakeSRGB();
+
+  // Only used while recording layer's background image.
+  std::shared_ptr<BackgroundContext> blendModeBackground = nullptr;
 };
 }  // namespace tgfx

@@ -173,7 +173,7 @@ void GLSLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
     fragBuilder->appendTextureLookup(textureSamplers[1], finalCoordName);
     fragBuilder->codeAppend(".ra;");
   }
-  if (IsLimitedYUVColorRange(yuvTexture->colorSpace())) {
+  if (IsLimitedYUVColorRange(yuvTexture->yuvColorSpace())) {
     fragBuilder->codeAppend("yuv.x -= (16.0 / 255.0);");
   }
   fragBuilder->codeAppend("yuv.yz -= vec2(0.5, 0.5);");
@@ -210,7 +210,7 @@ void GLSLTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
   auto yuvTexture = getYUVTexture();
   if (yuvTexture) {
     std::string mat3ColorConversion = "Mat3ColorConversion";
-    switch (yuvTexture->colorSpace()) {
+    switch (yuvTexture->yuvColorSpace()) {
       case YUVColorSpace::BT601_LIMITED: {
         fragmentUniformData->setData(mat3ColorConversion, AlignMat3(ColorConversion601LimitRange));
       } break;
@@ -248,7 +248,7 @@ void GLSLTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
     // Normally this would just need to take 1/2 a texel off each end, but because the chroma
     // channels of YUV420 images are subsampled we may need to shrink the crop region by a whole
     // texel on each side.
-    auto inset = type == GPUTextureType::External ? 1.0f : 0.5f;
+    auto inset = type == TextureType::External ? 1.0f : 0.5f;
     subsetRect = subsetRect.makeInset(inset, inset);
     float rect[4] = {subsetRect.left, subsetRect.top, subsetRect.right, subsetRect.bottom};
     if (textureView->origin() == ImageOrigin::BottomLeft) {
@@ -257,7 +257,7 @@ void GLSLTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
       rect[3] = h - rect[3];
       std::swap(rect[1], rect[3]);
     }
-    if (type != GPUTextureType::Rectangle) {
+    if (type != TextureType::Rectangle) {
       auto lt = textureView->getTextureCoord(rect[0], rect[1]);
       auto rb = textureView->getTextureCoord(rect[2], rect[3]);
       rect[0] = lt.x;

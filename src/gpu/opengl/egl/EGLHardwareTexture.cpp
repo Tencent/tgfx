@@ -17,13 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #if defined(__ANDROID__) || defined(ANDROID) || defined(__OHOS__)
-
 #include "EGLHardwareTexture.h"
 #include <GLES2/gl2.h>
 #include <GLES2/gl2ext.h>
 #include "core/utils/PixelFormatUtil.h"
-#include "gpu/GPU.h"
+#include "tgfx/gpu/GPU.h"
+#include "tgfx/gpu/PixelFormat.h"
 #include "tgfx/gpu/opengl/egl/EGLDevice.h"
+#include "tgfx/platform/HardwareBuffer.h"
 #if defined(__OHOS__)
 #include <native_buffer/native_buffer.h>
 #include <native_window/external_window.h>
@@ -64,19 +65,33 @@ std::shared_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(EGLGPU* gpu,
                                                                  HardwareBufferRef hardwareBuffer,
                                                                  uint32_t usage) {
   static const bool initialized = InitEGLEXTProc();
-  if (!initialized || hardwareBuffer == nullptr) {
+  if (!initialized) {
     return nullptr;
   }
-  auto yuvFormat = YUVFormat::Unknown;
-  auto formats = gpu->getHardwareTextureFormats(hardwareBuffer, &yuvFormat);
-  if (formats.empty()) {
+  auto info = HardwareBufferGetInfo(hardwareBuffer);
+  auto format = PixelFormat::Unknown;
+  bool isYUV = false;
+  switch (info.format) {
+    case HardwareBufferFormat::ALPHA_8:
+      format = PixelFormat::ALPHA_8;
+      break;
+    case HardwareBufferFormat::RGBA_8888:
+      format = PixelFormat::RGBA_8888;
+      break;
+    case HardwareBufferFormat::YCBCR_420_SP:
+      isYUV = true;
+      format = PixelFormat::RGBA_8888;
+      break;
+    default:
+      break;
+  }
+  if (format == PixelFormat::Unknown) {
     return nullptr;
   }
-  if (usage & GPUTextureUsage::RENDER_ATTACHMENT &&
-      (yuvFormat != YUVFormat::Unknown || !gpu->caps()->isFormatRenderable(formats.front()))) {
+  if (usage & TextureUsage::RENDER_ATTACHMENT && (isYUV || !gpu->isFormatRenderable(format))) {
     return nullptr;
   }
-  unsigned target = yuvFormat == YUVFormat::Unknown ? GL_TEXTURE_2D : GL_TEXTURE_EXTERNAL_OES;
+  unsigned target = isYUV ? GL_TEXTURE_EXTERNAL_OES : GL_TEXTURE_2D;
   auto clientBuffer = eglext::eglGetNativeClientBuffer(hardwareBuffer);
   if (!clientBuffer) {
     return nullptr;
@@ -95,20 +110,19 @@ std::shared_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(EGLGPU* gpu,
     eglext::eglDestroyImageKHR(display, eglImage);
     return nullptr;
   }
-  auto size = HardwareBufferGetSize(hardwareBuffer);
-  GPUTextureDescriptor descriptor = {size.width, size.height, formats.front(), false, 1, usage};
+  TextureDescriptor descriptor = {info.width, info.height, format, false, 1, usage};
   auto texture = gpu->makeResource<EGLHardwareTexture>(descriptor, hardwareBuffer, eglImage, target,
                                                        textureID);
   auto state = gpu->state();
   state->bindTexture(texture.get());
   eglext::glEGLImageTargetTexture2DOES(target, (GLeglImageOES)eglImage);
-  if (usage & GPUTextureUsage::RENDER_ATTACHMENT && !texture->checkFrameBuffer(gpu)) {
+  if (usage & TextureUsage::RENDER_ATTACHMENT && !texture->checkFrameBuffer(gpu)) {
     return nullptr;
   }
   return texture;
 }
 
-EGLHardwareTexture::EGLHardwareTexture(const GPUTextureDescriptor& descriptor,
+EGLHardwareTexture::EGLHardwareTexture(const TextureDescriptor& descriptor,
                                        HardwareBufferRef hardwareBuffer, EGLImageKHR eglImage,
                                        unsigned target, unsigned textureID)
     : GLTexture(descriptor, target, textureID), hardwareBuffer(hardwareBuffer), eglImage(eglImage) {

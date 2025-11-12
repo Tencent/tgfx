@@ -17,8 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLState.h"
-#include "gpu/ColorWriteMask.h"
+#include "GLRenderPipeline.h"
 #include "gpu/opengl/GLTexture.h"
+#include "tgfx/gpu/ColorWriteMask.h"
 
 namespace tgfx {
 bool GLStencil::operator!=(const GLStencil& other) const {
@@ -27,8 +28,8 @@ bool GLStencil::operator!=(const GLStencil& other) const {
 }
 
 GLState::GLState(std::shared_ptr<GLInterface> glInterface) : interface(std::move(glInterface)) {
-  auto shaderCaps = interface->caps()->shaderCaps();
-  textureUnits.resize(static_cast<size_t>(shaderCaps->maxFragmentSamplers), INVALID_VALUE);
+  auto limits = interface->caps()->limits();
+  textureUnits.resize(static_cast<size_t>(limits->maxSamplersPerShaderStage), INVALID_VALUE);
 }
 
 void GLState::setEnabled(unsigned capability, bool enabled) {
@@ -156,8 +157,9 @@ void GLState::setBlendState(const GLBlendState& state) {
 
 void GLState::bindTexture(GLTexture* texture, unsigned textureUnit) {
   DEBUG_ASSERT(texture != nullptr);
-  DEBUG_ASSERT(texture->usage() & GPUTextureUsage::TEXTURE_BINDING);
+  DEBUG_ASSERT(texture->usage() & TextureUsage::TEXTURE_BINDING);
   auto& uniqueID = textureUnits[textureUnit];
+  // Use uniqueID for comparison to prevent conflicts when GL resources are released and recreated.
   if (uniqueID == texture->uniqueID) {
     return;
   }
@@ -202,22 +204,16 @@ void GLState::bindFramebuffer(GLTexture* texture, FrameBufferTarget target) {
   gl->bindFramebuffer(frameBufferTarget, texture->frameBufferID());
 }
 
-void GLState::bindVertexArray(unsigned vao) {
-  if (vertexArray == vao) {
+void GLState::bindPipeline(GLRenderPipeline* pipeline) {
+  DEBUG_ASSERT(pipeline != nullptr);
+  // Use uniqueID for comparison to prevent conflicts when GL resources are released and recreated.
+  if (activePipeline == pipeline->uniqueID) {
     return;
   }
   auto gl = interface->functions();
-  gl->bindVertexArray(vao);
-  vertexArray = vao;
-}
-
-void GLState::useProgram(unsigned programID) {
-  if (program == programID) {
-    return;
-  }
-  auto gl = interface->functions();
-  gl->useProgram(programID);
-  program = programID;
+  gl->bindVertexArray(pipeline->vertexArray);
+  gl->useProgram(pipeline->programID);
+  activePipeline = pipeline->uniqueID;
 }
 
 void GLState::reset() {
@@ -226,11 +222,10 @@ void GLState::reset() {
   viewport = {0, 0, 0, 0};
   textureUnits.assign(textureUnits.size(), INVALID_VALUE);
   clearColor = std::nullopt;
+  activePipeline = 0;
   activeTextureUint = INVALID_VALUE;
   readFramebuffer = INVALID_VALUE;
   drawFramebuffer = INVALID_VALUE;
-  program = INVALID_VALUE;
-  vertexArray = INVALID_VALUE;
   colorWriteMask = INVALID_VALUE;
   stencilState = {};
   depthState = {};

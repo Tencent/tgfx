@@ -23,6 +23,7 @@
 #include "gpu/TPArgs.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/proxies/RenderTargetProxy.h"
+#include "gpu/tasks/RuntimeDrawTask.h"
 
 namespace tgfx {
 std::shared_ptr<ImageFilter> ImageFilter::Runtime(std::shared_ptr<RuntimeEffect> effect) {
@@ -32,22 +33,21 @@ std::shared_ptr<ImageFilter> ImageFilter::Runtime(std::shared_ptr<RuntimeEffect>
   return std::make_shared<RuntimeImageFilter>(effect);
 }
 
-Rect RuntimeImageFilter::onFilterBounds(const Rect& srcRect) const {
-  return effect->filterBounds(srcRect);
+Rect RuntimeImageFilter::onFilterBounds(const Rect& rect, MapDirection mapDirection) const {
+  return effect->filterBounds(rect, mapDirection);
 }
 
 std::shared_ptr<TextureProxy> RuntimeImageFilter::lockTextureProxy(std::shared_ptr<Image> source,
                                                                    const Rect& renderBounds,
                                                                    const TPArgs& args) const {
-  auto renderTarget = RenderTargetProxy::MakeFallback(
-      args.context, static_cast<int>(renderBounds.width()), static_cast<int>(renderBounds.height()),
-      source->isAlphaOnly(), effect->sampleCount(), args.mipmapped, ImageOrigin::TopLeft,
-      BackingFit::Exact);
+  auto renderTarget = RenderTargetProxy::Make(args.context, static_cast<int>(renderBounds.width()),
+                                              static_cast<int>(renderBounds.height()),
+                                              source->isAlphaOnly(), 1, args.mipmapped);
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  std::vector<std::shared_ptr<TextureProxy>> textureProxies = {};
-  textureProxies.reserve(1 + effect->extraInputs.size());
+  std::vector<RuntimeInputTexture> inputTextures = {};
+  inputTextures.reserve(1 + effect->extraInputs.size());
   // Request a texture proxy from the source image without mipmaps to save memory.
   // It may be ignored if the source image has preset mipmaps.
   TPArgs tpArgs(args.context, args.renderFlags, false, 1.0f, BackingFit::Exact);
@@ -55,7 +55,7 @@ std::shared_ptr<TextureProxy> RuntimeImageFilter::lockTextureProxy(std::shared_p
   if (textureProxy == nullptr) {
     return nullptr;
   }
-  textureProxies.push_back(textureProxy);
+  inputTextures.push_back({textureProxy, source->colorSpace()});
   for (size_t i = 0; i < effect->extraInputs.size(); i++) {
     const auto& input = effect->extraInputs[i];
     if (input == nullptr) {
@@ -66,11 +66,11 @@ std::shared_ptr<TextureProxy> RuntimeImageFilter::lockTextureProxy(std::shared_p
     if (textureProxy == nullptr) {
       return nullptr;
     }
-    textureProxies.push_back(textureProxy);
+    inputTextures.push_back({textureProxy, input->colorSpace()});
   }
   auto offset = Point::Make(-renderBounds.x(), -renderBounds.y());
   auto drawingManager = args.context->drawingManager();
-  drawingManager->addRuntimeDrawTask(renderTarget, std::move(textureProxies), effect, offset);
+  drawingManager->addRuntimeDrawTask(renderTarget, std::move(inputTextures), effect, offset);
   return renderTarget->asTextureProxy();
 }
 
