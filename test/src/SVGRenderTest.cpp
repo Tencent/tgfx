@@ -16,13 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <iostream>
-#include <memory>
-#include <unordered_map>
-#include <vector>
 #include "gtest/gtest.h"
 #include "tgfx/core/Data.h"
-#include "tgfx/core/FontStyle.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/Typeface.h"
 #include "tgfx/svg/SVGDOM.h"
@@ -411,6 +406,39 @@ TGFX_TEST(SVGRenderTest, ReferenceStyleSVG) {
 
   SVGDom->render(canvas);
   EXPECT_TRUE(Baseline::Compare(surface, "SVGTest/referenceStyle"));
+}
+
+TGFX_TEST(SVGRenderTest, SaveUndefinedAttribute) {
+  std::string SVGString = R"(
+    <svg width="100" height="100" copyright="Tencent" producer="TGFX">
+      <rect width="100%" height="100%" fill="red" producer="TGFX"/>
+    </svg>
+  )";
+
+  auto data = Data::MakeWithCopy(SVGString.c_str(), SVGString.size());
+  auto stream = Stream::MakeFromData(data);
+  ASSERT_TRUE(stream != nullptr);
+  auto SVGDom = SVGDOM::Make(*stream);
+  auto rootNode = SVGDom->getRoot();
+  ASSERT_TRUE(rootNode != nullptr);
+  {
+    auto attribute = rootNode->getUnparsedAttributes();
+    EXPECT_TRUE(attribute.size() == 2);
+    EXPECT_TRUE(attribute[0].name == "copyright");
+    EXPECT_TRUE(attribute[0].value == "Tencent");
+    EXPECT_TRUE(attribute[1].name == "producer");
+    EXPECT_TRUE(attribute[1].value == "TGFX");
+  }
+
+  auto children = rootNode->getChildren();
+  EXPECT_TRUE(children.size() == 1);
+  auto rectNode = children[0];
+  {
+    auto attribute = rectNode->getUnparsedAttributes();
+    EXPECT_TRUE(attribute.size() == 1);
+    EXPECT_TRUE(attribute[0].name == "producer");
+    EXPECT_TRUE(attribute[0].value == "TGFX");
+  }
 }
 
 }  // namespace tgfx
