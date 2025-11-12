@@ -16,17 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <iostream>
-#include <memory>
-#include <unordered_map>
-#include <vector>
 #include "gtest/gtest.h"
 #include "tgfx/core/Data.h"
-#include "tgfx/core/FontStyle.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/Typeface.h"
 #include "tgfx/svg/SVGDOM.h"
-#include "tgfx/svg/node/SVGText.h"
 #include "tgfx/svg/xml/XMLDOM.h"
 #include "utils/TestUtils.h"
 

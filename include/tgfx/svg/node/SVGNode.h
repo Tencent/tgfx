@@ -18,11 +18,6 @@
 
 #pragma once
 
-#include <memory>
-#include <string>
-#include <unordered_map>
-#include <utility>
-#include <vector>
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
@@ -203,7 +198,7 @@ class SVGNode {
   /**
    * Returns unparsed Attributes.
    * SVGNode only parses attributes related to presentation rendering; all other attributes are
-   * stored.
+   * stored in unparsedAttributes.
    */
   const std::vector<DOMAttribute>& getUnparsedAttributes() const {
     return unparsedAttributes;
