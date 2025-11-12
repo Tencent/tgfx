@@ -27,7 +27,7 @@
 #include "layers/DrawArgs.h"
 #include "layers/RegionTransformer.h"
 #include "layers/RootLayer.h"
-#include "tgfx/core/Recorder.h"
+#include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/layers/ShapeLayer.h"
 
@@ -55,7 +55,7 @@ std::shared_ptr<Picture> Layer::RecordPicture(DrawMode mode, float contentScale,
     drawFunction(&contentCanvas);
     return contourContext.finishRecordingAsPicture();
   }
-  Recorder recorder = {};
+  PictureRecorder recorder = {};
   auto contentCanvas = recorder.beginRecording();
   contentCanvas->scale(contentScale, contentScale);
   drawFunction(contentCanvas);
@@ -970,7 +970,7 @@ std::shared_ptr<Image> Layer::getOffscreenContentImage(
     finalImage = offscreenSurface->makeImageSnapshot();
     offscreenCanvas->getMatrix().invert(imageMatrix);
   } else {
-    Recorder recorder = {};
+    PictureRecorder recorder = {};
     auto offscreenCanvas = recorder.beginRecording();
     offscreenCanvas->scale(contentScale, contentScale);
     offscreenCanvas->clipRect(inputBounds);
@@ -1260,7 +1260,7 @@ std::shared_ptr<Image> Layer::getBackgroundImage(const DrawArgs& args, float con
   if (args.drawMode == DrawMode::Background) {
     return nullptr;
   }
-  Recorder recorder = {};
+  PictureRecorder recorder = {};
   auto canvas = recorder.beginRecording();
   auto bounds = getBounds();
   bounds.scale(contentScale, contentScale);
@@ -1325,7 +1325,7 @@ void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
     if (layerStyle->position() != position) {
       continue;
     }
-    Recorder recorder = {};
+    PictureRecorder recorder = {};
     auto pictureCanvas = recorder.beginRecording();
     if (clipBounds.has_value()) {
       pictureCanvas->clipRect(*clipBounds);

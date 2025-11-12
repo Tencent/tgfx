@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/RecordingContext.h"
+#include "core/PictureContext.h"
 #include "utils/Log.h"
 #include "utils/RectToRectMatrix.h"
 
@@ -29,12 +29,12 @@ namespace tgfx {
  */
 constexpr int MaxPictureDrawsToUnrollInsteadOfReference = 1;
 
-RecordingContext::~RecordingContext() {
+PictureContext::~PictureContext() {
   // make sure the records are cleared before the blockBuffer is destroyed.
   records.clear();
 }
 
-void RecordingContext::clear() {
+void PictureContext::clear() {
   records.clear();
   blockBuffer.clear();
   lastState = {};
@@ -44,7 +44,7 @@ void RecordingContext::clear() {
   drawCount = 0;
 }
 
-std::shared_ptr<Picture> RecordingContext::finishRecordingAsPicture(bool shrinkToFit) {
+std::shared_ptr<Picture> PictureContext::finishRecordingAsPicture(bool shrinkToFit) {
   if (records.empty()) {
     return nullptr;
   }
@@ -79,7 +79,7 @@ std::shared_ptr<Picture> RecordingContext::finishRecordingAsPicture(bool shrinkT
   return picture;
 }
 
-void RecordingContext::drawFill(const Fill& fill) {
+void PictureContext::drawFill(const Fill& fill) {
   if (fill.isOpaque()) {
     // The clip is wide open, and the fill is opaque, so we can discard all previous records as
     // they are now invisible.
@@ -93,31 +93,31 @@ void RecordingContext::drawFill(const Fill& fill) {
   }
 }
 
-void RecordingContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill,
-                                const Stroke* stroke) {
+void PictureContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill,
+                              const Stroke* stroke) {
   recordAll(state, fill, stroke);
   auto record = blockBuffer.make<DrawRect>(rect);
   records.emplace_back(std::move(record));
   drawCount++;
 }
 
-void RecordingContext::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
-                                 const Stroke* stroke) {
+void PictureContext::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
+                               const Stroke* stroke) {
   recordAll(state, fill, stroke);
   auto record = blockBuffer.make<DrawRRect>(rRect);
   records.emplace_back(std::move(record));
   drawCount++;
 }
 
-void RecordingContext::drawPath(const Path& path, const MCState& state, const Fill& fill) {
+void PictureContext::drawPath(const Path& path, const MCState& state, const Fill& fill) {
   recordAll(state, fill);
   auto record = blockBuffer.make<DrawPath>(path);
   records.emplace_back(std::move(record));
   drawCount++;
 }
 
-void RecordingContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
-                                 const Fill& fill, const Stroke* stroke) {
+void PictureContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill,
+                               const Stroke* stroke) {
   DEBUG_ASSERT(shape != nullptr);
   recordAll(state, fill, stroke);
   auto record = blockBuffer.make<DrawShape>(std::move(shape));
@@ -125,20 +125,20 @@ void RecordingContext::drawShape(std::shared_ptr<Shape> shape, const MCState& st
   drawCount++;
 }
 
-void RecordingContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                                 const MCState& state, const Fill& fill) {
+void PictureContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
+                               const MCState& state, const Fill& fill) {
   DEBUG_ASSERT(image != nullptr);
   recordAll(state, fill);
-  PlacementPtr<Record> record = nullptr;
+  PlacementPtr<PictureRecord> record = nullptr;
   record = blockBuffer.make<DrawImage>(std::move(image), sampling);
   records.emplace_back(std::move(record));
   drawCount++;
 }
 
-void RecordingContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect,
-                                     const Rect& dstRect, const SamplingOptions& sampling,
-                                     const MCState& state, const Fill& fill,
-                                     SrcRectConstraint constraint) {
+void PictureContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect,
+                                   const Rect& dstRect, const SamplingOptions& sampling,
+                                   const MCState& state, const Fill& fill,
+                                   SrcRectConstraint constraint) {
   DEBUG_ASSERT(image != nullptr);
   auto newState = state;
   auto newFill = fill;
@@ -153,7 +153,7 @@ void RecordingContext::drawImageRect(std::shared_ptr<Image> image, const Rect& s
   }
   recordAll(newState, newFill);
   auto imageRect = Rect::MakeWH(image->width(), image->height());
-  PlacementPtr<Record> record = nullptr;
+  PlacementPtr<PictureRecord> record = nullptr;
   if (srcRect == imageRect && !needDstRect) {
     record = blockBuffer.make<DrawImage>(std::move(image), sampling);
   } else if (!needDstRect) {
@@ -166,9 +166,9 @@ void RecordingContext::drawImageRect(std::shared_ptr<Image> image, const Rect& s
   drawCount++;
 }
 
-void RecordingContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
-                                        const MCState& state, const Fill& fill,
-                                        const Stroke* stroke) {
+void PictureContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
+                                      const MCState& state, const Fill& fill,
+                                      const Stroke* stroke) {
   DEBUG_ASSERT(glyphRunList != nullptr);
   recordAll(state, fill, stroke);
   auto record = blockBuffer.make<DrawGlyphRunList>(std::move(glyphRunList));
@@ -176,9 +176,9 @@ void RecordingContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunLi
   drawCount++;
 }
 
-void RecordingContext::drawLayer(std::shared_ptr<Picture> picture,
-                                 std::shared_ptr<ImageFilter> filter, const MCState& state,
-                                 const Fill& fill) {
+void PictureContext::drawLayer(std::shared_ptr<Picture> picture,
+                               std::shared_ptr<ImageFilter> filter, const MCState& state,
+                               const Fill& fill) {
   DEBUG_ASSERT(picture != nullptr);
   recordAll(state, fill);
   auto record = blockBuffer.make<DrawLayer>(std::move(picture), std::move(filter));
@@ -186,7 +186,7 @@ void RecordingContext::drawLayer(std::shared_ptr<Picture> picture,
   drawCount++;
 }
 
-void RecordingContext::drawPicture(std::shared_ptr<Picture> picture, const MCState& state) {
+void PictureContext::drawPicture(std::shared_ptr<Picture> picture, const MCState& state) {
   DEBUG_ASSERT(picture != nullptr);
   if (picture->drawCount > MaxPictureDrawsToUnrollInsteadOfReference) {
     recordState(state);
@@ -204,7 +204,7 @@ static bool CompareFill(const Fill& a, const Fill& b) {
          a.maskFilter == b.maskFilter && a.colorFilter == b.colorFilter;
 }
 
-void RecordingContext::recordState(const MCState& state) {
+void PictureContext::recordState(const MCState& state) {
   if (lastState.matrix != state.matrix) {
     auto record = blockBuffer.make<SetMatrix>(state.matrix);
     records.emplace_back(std::move(record));
@@ -217,7 +217,7 @@ void RecordingContext::recordState(const MCState& state) {
   }
 }
 
-void RecordingContext::recordFill(const Fill& fill) {
+void PictureContext::recordFill(const Fill& fill) {
   if (!CompareFill(lastFill, fill)) {
     auto record = blockBuffer.make<SetFill>(fill);
     records.emplace_back(std::move(record));
@@ -229,7 +229,7 @@ void RecordingContext::recordFill(const Fill& fill) {
   }
 }
 
-void RecordingContext::recordStroke(const Stroke& stroke) {
+void PictureContext::recordStroke(const Stroke& stroke) {
   if (stroke.cap != lastStroke.cap || stroke.join != lastStroke.join ||
       stroke.miterLimit != lastStroke.miterLimit) {
     auto record = blockBuffer.make<SetStroke>(stroke);
@@ -246,7 +246,7 @@ void RecordingContext::recordStroke(const Stroke& stroke) {
   hasStroke = true;
 }
 
-void RecordingContext::recordAll(const MCState& state, const Fill& fill, const Stroke* stroke) {
+void PictureContext::recordAll(const MCState& state, const Fill& fill, const Stroke* stroke) {
   recordState(state);
   recordFill(fill);
   if (stroke) {

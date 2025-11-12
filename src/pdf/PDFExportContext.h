@@ -21,7 +21,7 @@
 #include <unordered_set>
 #include "core/DrawContext.h"
 #include "core/MCState.h"
-#include "core/Records.h"
+#include "core/PictureRecords.h"
 #include "core/filters/DropShadowImageFilter.h"
 #include "core/filters/InnerShadowImageFilter.h"
 #include "pdf/PDFGraphicStackState.h"
@@ -137,7 +137,7 @@ class PDFExportContext : public DrawContext {
                                  const DropShadowImageFilter* dropShadowFilter,
                                  const MCState& state, const Fill& fill);
 
-  void drawInnerShadowAfterLayer(const Record* record,
+  void drawInnerShadowAfterLayer(const PictureRecord* record,
                                  const InnerShadowImageFilter* innerShadowFilter,
                                  const MCState& state);
 

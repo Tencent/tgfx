@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/PathRef.h"
-#include "core/Records.h"
+#include "core/PictureRecords.h"
 #include "core/images/SubsetImage.h"
 #include "core/shapes/AppendShape.h"
 #include "core/shapes/ProviderShape.h"

@@ -23,7 +23,7 @@
 #include "tgfx/core/Matrix.h"
 
 namespace tgfx {
-class Record;
+class PictureRecord;
 class Canvas;
 class DrawContext;
 class MCState;
@@ -36,7 +36,7 @@ class PlacementPtr;
 /**
  * The Picture class captures the drawing commands made on a Canvas, which can be replayed later.
  * The Picture object is thread-safe and immutable once created. Pictures can be created by a
- * Recorder or loaded from serialized data.
+ * PictureRecorder or loaded from serialized data.
  */
 class Picture {
  public:
@@ -93,12 +93,12 @@ class Picture {
 
  private:
   std::unique_ptr<BlockData> blockData;
-  std::vector<PlacementPtr<Record>> records;
+  std::vector<PlacementPtr<PictureRecord>> records;
   mutable std::atomic<Rect*> bounds = {nullptr};
   size_t drawCount = 0;
   bool _hasUnboundedFill = false;
 
-  Picture(std::unique_ptr<BlockData> data, std::vector<PlacementPtr<Record>> records,
+  Picture(std::unique_ptr<BlockData> data, std::vector<PlacementPtr<PictureRecord>> records,
           size_t drawCount);
 
   void playback(DrawContext* drawContext, const MCState& state,
@@ -107,13 +107,13 @@ class Picture {
   std::shared_ptr<Image> asImage(Point* offset, const Matrix* matrix = nullptr,
                                  const ISize* clipSize = nullptr) const;
 
-  const Record* getFirstDrawRecord(MCState* state = nullptr, Fill* fill = nullptr,
-                                   bool* hasStroke = nullptr) const;
+  const PictureRecord* getFirstDrawRecord(MCState* state = nullptr, Fill* fill = nullptr,
+                                          bool* hasStroke = nullptr) const;
 
   friend class MeasureContext;
   friend class HitTestContext;
   friend class RenderContext;
-  friend class RecordingContext;
+  friend class PictureContext;
   friend class SVGExportContext;
   friend class Image;
   friend class PictureImage;
