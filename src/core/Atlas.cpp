@@ -307,6 +307,7 @@ ISize AtlasConfig::atlasDimensions(MaskFormat maskFormat) const {
 }
 
 ISize AtlasConfig::PlotDimensions() {
-  return {PlotSize, PlotSize};
+  static ISize Dimensions{PlotSize, PlotSize};
+  return Dimensions;
 }
 }  // namespace tgfx
