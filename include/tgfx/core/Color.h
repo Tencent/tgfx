@@ -64,7 +64,7 @@ struct Color {
    * Returns color value from 8-bit component values and ColorSpace.
    */
   static Color FromRGBA(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255,
-                        std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB());
+                        std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
    * Constructs an opaque white Color.
@@ -113,19 +113,7 @@ struct Color {
   /**
    * Compares Color with other, and returns true if all components are equal.
    */
-  bool operator==(const Color& other) const {
-    auto thisColorSpace = colorSpace;
-    auto otherColorSpace = other.colorSpace;
-    if (thisColorSpace == nullptr) {
-      thisColorSpace = ColorSpace::SRGB();
-    }
-    if (otherColorSpace == nullptr) {
-      otherColorSpace = ColorSpace::SRGB();
-    }
-
-    return alpha == other.alpha && red == other.red && green == other.green && blue == other.blue &&
-           ColorSpace::Equals(thisColorSpace.get(), otherColorSpace.get());
-  }
+  bool operator==(const Color& other) const;
 
   /**
    * Compares Color with other, and returns true if not all components are equal.

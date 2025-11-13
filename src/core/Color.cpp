@@ -60,6 +60,20 @@ Color Color::FromRGBA(uint8_t r, uint8_t g, uint8_t b, uint8_t a,
           std::move(colorSpace)};
 }
 
+bool Color::operator==(const Color& other) const {
+  auto thisColorSpace = colorSpace;
+  auto otherColorSpace = other.colorSpace;
+  if (thisColorSpace == nullptr) {
+    thisColorSpace = ColorSpace::SRGB();
+  }
+  if (otherColorSpace == nullptr) {
+    otherColorSpace = ColorSpace::SRGB();
+  }
+
+  return alpha == other.alpha && red == other.red && green == other.green && blue == other.blue &&
+         ColorSpace::Equals(thisColorSpace.get(), otherColorSpace.get());
+}
+
 float Color::operator[](int index) const {
   DEBUG_ASSERT(index >= 0 && index < 4);
   return (&red)[index];
