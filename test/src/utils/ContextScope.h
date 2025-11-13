@@ -19,13 +19,18 @@
 #pragma once
 
 #include "DevicePool.h"
+#include "core/AtlasManager.h"
+#include "tgfx/gpu/Context.h"
 
 namespace tgfx {
 class ContextScope {
  public:
-  explicit ContextScope() : device(DevicePool::Make()) {
+  explicit ContextScope(bool clearAtlas = true) : device(DevicePool::Make()) {
     if (device != nullptr) {
       context = device->lockContext();
+      if (context && clearAtlas) {
+        context->atlasManager()->reset();
+      }
     }
   }
 
