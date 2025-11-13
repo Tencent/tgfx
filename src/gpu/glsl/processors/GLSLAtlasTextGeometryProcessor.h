@@ -31,10 +31,6 @@ class GLSLAtlasTextGeometryProcessor : public AtlasTextGeometryProcessor {
   void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData,
                FPCoordTransformIter* coordTransformIter) const override;
 
-  SamplerState onSamplerStateAt(size_t) const override {
-    return samplerState;
-  }
-
  private:
   std::string atlasSizeUniformName = "atlasSizeInv";
 };

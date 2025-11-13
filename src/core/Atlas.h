@@ -50,6 +50,9 @@ class Atlas {
 
   void removeExpiredKeys();
 
+  //Rests all pages
+  void reset();
+
  private:
   Atlas(ProxyProvider* proxyProvider, PixelFormat pixelFormat, int width, int height, int plotWidth,
         int plotHeight, AtlasGenerationCounter* generationCounter);
@@ -92,10 +95,11 @@ class AtlasConfig {
 
   ISize atlasDimensions(MaskFormat maskFormat) const;
 
-  ISize plotDimensions(MaskFormat maskFormat) const;
+  static ISize PlotDimensions();
 
  private:
-  static constexpr int MaxTextureSize = 2048;
-  ISize RGBADimensions = {MaxTextureSize, MaxTextureSize};
+  static constexpr int MaxAtlasSize = 2048;
+  static constexpr int PlotSize = 512;
+  ISize RGBADimensions = {MaxAtlasSize, MaxAtlasSize};
 };
 }  //namespace tgfx

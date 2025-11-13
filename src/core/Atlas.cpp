@@ -282,9 +282,21 @@ void Atlas::removeExpiredKeys() {
   expiredKeys.clear();
 }
 
+void Atlas::reset() {
+  for (auto& page : pages) {
+    auto& plotList = page.plotList;
+    for (const auto& plot : plotList) {
+      plot->resetRects();
+    }
+    plotList.sort([](const Plot* a, const Plot* b) { return a->plotIndex() > b->plotIndex(); });
+  }
+  expiredKeys.clear();
+  cellLocators.clear();
+}
+
 AtlasConfig::AtlasConfig(int maxTextureSize) {
-  RGBADimensions.set(std::min(MaxTextureSize, maxTextureSize),
-                     std::min(MaxTextureSize, maxTextureSize));
+  RGBADimensions.set(std::min(MaxAtlasSize, maxTextureSize),
+                     std::min(MaxAtlasSize, maxTextureSize));
 }
 
 ISize AtlasConfig::atlasDimensions(MaskFormat maskFormat) const {
@@ -294,10 +306,7 @@ ISize AtlasConfig::atlasDimensions(MaskFormat maskFormat) const {
   return {RGBADimensions.width, RGBADimensions.height / 2};
 }
 
-ISize AtlasConfig::plotDimensions(MaskFormat maskFormat) const {
-  auto atlasDimensions = this->atlasDimensions(maskFormat);
-  auto plotWidth = atlasDimensions.width >= MaxTextureSize ? 512 : 256;
-  auto plotHeight = atlasDimensions.height >= MaxTextureSize ? 512 : 256;
-  return {plotWidth, plotHeight};
+ISize AtlasConfig::PlotDimensions() {
+  return {PlotSize, PlotSize};
 }
 }  // namespace tgfx
