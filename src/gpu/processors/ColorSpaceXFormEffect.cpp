@@ -20,15 +20,15 @@
 
 namespace tgfx {
 
-PlacementPtr<FragmentProcessor> ColorSpaceXformEffect::Make(BlockBuffer* buffer, ColorSpace* src,
-                                                            AlphaType srcAT, ColorSpace* dst,
-                                                            AlphaType dstAT) {
-  return Make(buffer, std::make_shared<ColorSpaceXformSteps>(src, srcAT, dst, dstAT));
+PlacementPtr<FragmentProcessor> ColorSpaceXformEffect::Make(BlockAllocator* allocator,
+                                                            ColorSpace* src, AlphaType srcAT,
+                                                            ColorSpace* dst, AlphaType dstAT) {
+  return Make(allocator, std::make_shared<ColorSpaceXformSteps>(src, srcAT, dst, dstAT));
 }
 
 PlacementPtr<FragmentProcessor> ColorSpaceXformEffect::Make(
-    BlockBuffer* buffer, std::shared_ptr<ColorSpaceXformSteps> colorXform) {
-  return buffer->make<ColorSpaceXformEffect>(std::move(colorXform));
+    BlockAllocator* allocator, std::shared_ptr<ColorSpaceXformSteps> colorXform) {
+  return allocator->make<ColorSpaceXformEffect>(std::move(colorXform));
 }
 
 void ColorSpaceXformEffect::emitCode(EmitArgs& args) const {

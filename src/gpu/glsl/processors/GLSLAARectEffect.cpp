@@ -19,8 +19,8 @@
 #include "GLSLAARectEffect.h"
 
 namespace tgfx {
-PlacementPtr<AARectEffect> AARectEffect::Make(BlockBuffer* buffer, const Rect& rect) {
-  return buffer->make<GLSLAARectEffect>(rect);
+PlacementPtr<AARectEffect> AARectEffect::Make(BlockAllocator* allocator, const Rect& rect) {
+  return allocator->make<GLSLAARectEffect>(rect);
 }
 
 GLSLAARectEffect::GLSLAARectEffect(const Rect& rect) : AARectEffect(rect) {

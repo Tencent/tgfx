@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "core/utils/BlockBuffer.h"
+#include "core/utils/BlockAllocator.h"
 #include "gpu/AAType.h"
 #include "gpu/VertexProvider.h"
 #include "tgfx/core/Color.h"
@@ -44,7 +44,7 @@ class RRectsVertexProvider : public VertexProvider {
   /**
    * Creates a new RRectsVertexProvider from a list of RRect records.
    */
-  static PlacementPtr<RRectsVertexProvider> MakeFrom(BlockBuffer* blockBuffer,
+  static PlacementPtr<RRectsVertexProvider> MakeFrom(BlockAllocator* allocator,
                                                      std::vector<PlacementPtr<RRectRecord>>&& rects,
                                                      AAType aaType,
                                                      std::vector<PlacementPtr<Stroke>>&& strokes);
@@ -95,8 +95,8 @@ class RRectsVertexProvider : public VertexProvider {
   } bitFields = {};
 
   RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType, bool hasColor,
-                       PlacementArray<Stroke>&& strokes, std::shared_ptr<BlockBuffer> reference);
+                       PlacementArray<Stroke>&& strokes, std::shared_ptr<BlockAllocator> reference);
 
-  friend class BlockBuffer;
+  friend class BlockAllocator;
 };
 }  // namespace tgfx

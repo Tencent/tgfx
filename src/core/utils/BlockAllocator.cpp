@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "BlockBuffer.h"
+#include "BlockAllocator.h"
 #include "core/utils/Log.h"
 
 namespace tgfx {
@@ -24,17 +24,17 @@ namespace tgfx {
 // cache lines.
 static constexpr size_t BLOCK_ALIGNMENT = 64;
 
-BlockData::BlockData(std::vector<uint8_t*> blocks) : blocks(std::move(blocks)) {
+BlockBuffer::BlockBuffer(std::vector<uint8_t*> blocks) : blocks(std::move(blocks)) {
   DEBUG_ASSERT(!this->blocks.empty());
 }
 
-BlockData::~BlockData() {
+BlockBuffer::~BlockBuffer() {
   for (auto& block : blocks) {
     free(block);
   }
 }
 
-void* BlockData::shrinkLastBlockTo(size_t newSize) {
+void* BlockBuffer::shrinkLastBlockTo(size_t newSize) {
   auto& lastBlock = blocks.back();
   if (auto resizedBlock = static_cast<uint8_t*>(realloc(lastBlock, newSize))) {
     lastBlock = resizedBlock;
@@ -42,19 +42,19 @@ void* BlockData::shrinkLastBlockTo(size_t newSize) {
   return lastBlock;
 }
 
-BlockBuffer::BlockBuffer(size_t initBlockSize, size_t maxBlockSize)
+BlockAllocator::BlockAllocator(size_t initBlockSize, size_t maxBlockSize)
     : initBlockSize(initBlockSize), maxBlockSize(maxBlockSize) {
   DEBUG_ASSERT(initBlockSize > 0);
 }
 
-BlockBuffer::~BlockBuffer() {
+BlockAllocator::~BlockAllocator() {
   waitForReferencesExpired();
   for (auto& block : blocks) {
     free(block.data);
   }
 }
 
-void* BlockBuffer::allocate(size_t size) {
+void* BlockAllocator::allocate(size_t size) {
   auto block = findOrAllocateBlock(size);
   if (block == nullptr) {
     return nullptr;
@@ -65,7 +65,7 @@ void* BlockBuffer::allocate(size_t size) {
   return data;
 }
 
-BlockBuffer::Block* BlockBuffer::findOrAllocateBlock(size_t requestedSize) {
+BlockAllocator::Block* BlockAllocator::findOrAllocateBlock(size_t requestedSize) {
   // Try to use an existing block
   while (currentBlockIndex < blocks.size()) {
     auto& block = blocks[currentBlockIndex];
@@ -81,7 +81,7 @@ BlockBuffer::Block* BlockBuffer::findOrAllocateBlock(size_t requestedSize) {
   return &blocks[currentBlockIndex];
 }
 
-std::pair<const void*, size_t> BlockBuffer::currentBlock() const {
+std::pair<const void*, size_t> BlockAllocator::currentBlock() const {
   if (usedSize == 0) {
     return {nullptr, 0};
   }
@@ -89,7 +89,7 @@ std::pair<const void*, size_t> BlockBuffer::currentBlock() const {
   return {block.data, block.offset};
 }
 
-void BlockBuffer::clear(size_t maxReuseSize) {
+void BlockAllocator::clear(size_t maxReuseSize) {
   if (blocks.empty()) {
     return;
   }
@@ -110,7 +110,7 @@ void BlockBuffer::clear(size_t maxReuseSize) {
   blocks.resize(reusedBlockCount);
 }
 
-std::unique_ptr<BlockData> BlockBuffer::release() {
+std::unique_ptr<BlockBuffer> BlockAllocator::release() {
   if (usedSize == 0) {
     return nullptr;
   }
@@ -127,10 +127,10 @@ std::unique_ptr<BlockData> BlockBuffer::release() {
   blocks.clear();
   currentBlockIndex = 0;
   usedSize = 0;
-  return std::make_unique<BlockData>(std::move(usedBlocks));
+  return std::make_unique<BlockBuffer>(std::move(usedBlocks));
 }
 
-bool BlockBuffer::allocateNewBlock(size_t requestSize) {
+bool BlockAllocator::allocateNewBlock(size_t requestSize) {
   size_t blockSize;
   if (requestSize <= maxBlockSize) {
     blockSize = blocks.empty() ? initBlockSize : nextBlockSize(blocks.back().size);
@@ -144,7 +144,7 @@ bool BlockBuffer::allocateNewBlock(size_t requestSize) {
   blockSize = (blockSize + BLOCK_ALIGNMENT - 1) & ~(BLOCK_ALIGNMENT - 1);
   auto data = static_cast<uint8_t*>(malloc(blockSize));
   if (data == nullptr) {
-    LOGE("BlockBuffer::allocateNewBlock() Failed to allocate memory block size: %zu", blockSize);
+    LOGE("BlockAllocator::allocateNewBlock() Failed to allocate memory block size: %zu", blockSize);
     return false;
   }
   currentBlockIndex = blocks.size();
@@ -152,24 +152,24 @@ bool BlockBuffer::allocateNewBlock(size_t requestSize) {
   return true;
 }
 
-std::shared_ptr<BlockBuffer> BlockBuffer::addReference() {
+std::shared_ptr<BlockAllocator> BlockAllocator::addReference() {
   auto reference = externalReferences.lock();
   if (reference) {
     return reference;
   }
-  reference = std::shared_ptr<BlockBuffer>(this, NotifyReferenceReachedZero);
+  reference = std::shared_ptr<BlockAllocator>(this, NotifyReferenceReachedZero);
   externalReferences = reference;
   return reference;
 }
 
-void BlockBuffer::waitForReferencesExpired() {
+void BlockAllocator::waitForReferencesExpired() {
   std::unique_lock<std::mutex> lock(mutex);
   condition.wait(lock, [this]() { return externalReferences.expired(); });
 }
 
-void BlockBuffer::NotifyReferenceReachedZero(BlockBuffer* blockBuffer) {
-  std::unique_lock<std::mutex> lock(blockBuffer->mutex);
-  blockBuffer->condition.notify_all();
+void BlockAllocator::NotifyReferenceReachedZero(BlockAllocator* allocator) {
+  std::unique_lock<std::mutex> lock(allocator->mutex);
+  allocator->condition.notify_all();
 }
 
 }  // namespace tgfx

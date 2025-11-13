@@ -20,7 +20,7 @@
 
 #include <array>
 #include "tgfx/core/Canvas.h"
-#include "tgfx/core/Recorder.h"
+#include "tgfx/core/PictureRecorder.h"
 
 namespace tgfx {
 class LayerContent;
@@ -66,7 +66,7 @@ class LayerRecorder {
   Canvas* getCanvas(LayerContentType contentType = LayerContentType::Default);
 
  private:
-  std::array<std::unique_ptr<Recorder>, 3> recorders = {};
+  std::array<std::unique_ptr<PictureRecorder>, 3> recorders = {};
 
   std::unique_ptr<LayerContent> finishRecording();
 

@@ -30,7 +30,7 @@ PlacementPtr<FragmentProcessor> TextureEffect::Make(std::shared_ptr<TextureProxy
   auto isAlphaOnly = proxy->isAlphaOnly();
   auto processor = MakeRGBAAA(proxy, args, {}, uvMatrix);
   if (forceAsMask && !isAlphaOnly) {
-    auto drawingBuffer = proxy->getContext()->drawingBuffer();
+    auto drawingBuffer = proxy->getContext()->drawingAllocator();
     processor = FragmentProcessor::MulInputByChildAlpha(drawingBuffer, std::move(processor));
   }
   return processor;

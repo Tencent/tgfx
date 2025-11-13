@@ -31,7 +31,7 @@ void VertexProviderTask::onCancel() {
 }
 
 AsyncVertexSource::~AsyncVertexSource() {
-  // The vertex source might have objects created in shared memory (like BlockBuffer), so we
+  // The vertex source might have objects created in shared memory (like BlockAllocator), so we
   // need to wait for the task to finish before destroying it.
   for (auto& task : tasks) {
     task->cancel();

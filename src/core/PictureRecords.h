@@ -22,7 +22,7 @@
 #include "core/PlaybackContext.h"
 
 namespace tgfx {
-enum class RecordType {
+enum class PictureRecordType {
   SetMatrix,
   SetClip,
   SetColor,
@@ -43,11 +43,11 @@ enum class RecordType {
   DrawLayer
 };
 
-class Record {
+class PictureRecord {
  public:
-  virtual ~Record() = default;
+  virtual ~PictureRecord() = default;
 
-  virtual RecordType type() const = 0;
+  virtual PictureRecordType type() const = 0;
 
   virtual bool hasUnboundedFill(bool& /*hasInverseClip*/) const {
     return false;
@@ -56,13 +56,13 @@ class Record {
   virtual void playback(DrawContext* context, PlaybackContext* playback) const = 0;
 };
 
-class SetMatrix : public Record {
+class SetMatrix : public PictureRecord {
  public:
   explicit SetMatrix(const Matrix& matrix) : matrix(matrix) {
   }
 
-  RecordType type() const override {
-    return RecordType::SetMatrix;
+  PictureRecordType type() const override {
+    return PictureRecordType::SetMatrix;
   }
 
   void playback(DrawContext*, PlaybackContext* playback) const override {
@@ -72,13 +72,13 @@ class SetMatrix : public Record {
   Matrix matrix = {};
 };
 
-class SetClip : public Record {
+class SetClip : public PictureRecord {
  public:
   explicit SetClip(Path clip) : clip(std::move(clip)) {
   }
 
-  RecordType type() const override {
-    return RecordType::SetClip;
+  PictureRecordType type() const override {
+    return PictureRecordType::SetClip;
   }
 
   bool hasUnboundedFill(bool& hasInverseClip) const override {
@@ -93,13 +93,13 @@ class SetClip : public Record {
   Path clip = {};
 };
 
-class SetColor : public Record {
+class SetColor : public PictureRecord {
  public:
   explicit SetColor(Color color) : color(color) {
   }
 
-  RecordType type() const override {
-    return RecordType::SetColor;
+  PictureRecordType type() const override {
+    return PictureRecordType::SetColor;
   }
 
   void playback(DrawContext*, PlaybackContext* playback) const override {
@@ -109,13 +109,13 @@ class SetColor : public Record {
   Color color = {};
 };
 
-class SetFill : public Record {
+class SetFill : public PictureRecord {
  public:
   explicit SetFill(Fill fill) : fill(std::move(fill)) {
   }
 
-  RecordType type() const override {
-    return RecordType::SetFill;
+  PictureRecordType type() const override {
+    return PictureRecordType::SetFill;
   }
 
   void playback(DrawContext*, PlaybackContext* playback) const override {
@@ -125,13 +125,13 @@ class SetFill : public Record {
   Fill fill = {};
 };
 
-class SetStrokeWidth : public Record {
+class SetStrokeWidth : public PictureRecord {
  public:
   explicit SetStrokeWidth(float width) : width(width) {
   }
 
-  RecordType type() const override {
-    return RecordType::SetStrokeWidth;
+  PictureRecordType type() const override {
+    return PictureRecordType::SetStrokeWidth;
   }
 
   void playback(DrawContext*, PlaybackContext* playback) const override {
@@ -141,13 +141,13 @@ class SetStrokeWidth : public Record {
   float width = 0.0f;
 };
 
-class SetStroke : public Record {
+class SetStroke : public PictureRecord {
  public:
   explicit SetStroke(const Stroke& stroke) : stroke(stroke) {
   }
 
-  RecordType type() const override {
-    return RecordType::SetStroke;
+  PictureRecordType type() const override {
+    return PictureRecordType::SetStroke;
   }
 
   void playback(DrawContext*, PlaybackContext* playback) const override {
@@ -157,13 +157,13 @@ class SetStroke : public Record {
   Stroke stroke = {};
 };
 
-class SetHasStroke : public Record {
+class SetHasStroke : public PictureRecord {
  public:
   explicit SetHasStroke(bool hasStroke) : hasStroke(hasStroke) {
   }
 
-  RecordType type() const override {
-    return RecordType::SetHasStroke;
+  PictureRecordType type() const override {
+    return PictureRecordType::SetHasStroke;
   }
 
   void playback(DrawContext*, PlaybackContext* playback) const override {
@@ -173,10 +173,10 @@ class SetHasStroke : public Record {
   bool hasStroke = false;
 };
 
-class DrawFill : public Record {
+class DrawFill : public PictureRecord {
  public:
-  RecordType type() const override {
-    return RecordType::DrawFill;
+  PictureRecordType type() const override {
+    return PictureRecordType::DrawFill;
   }
 
   bool hasUnboundedFill(bool& hasInverseClip) const override {
@@ -188,13 +188,13 @@ class DrawFill : public Record {
   }
 };
 
-class DrawRect : public Record {
+class DrawRect : public PictureRecord {
  public:
   explicit DrawRect(const Rect& rect) : rect(rect) {
   }
 
-  RecordType type() const override {
-    return RecordType::DrawRect;
+  PictureRecordType type() const override {
+    return PictureRecordType::DrawRect;
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
@@ -204,13 +204,13 @@ class DrawRect : public Record {
   Rect rect;
 };
 
-class DrawRRect : public Record {
+class DrawRRect : public PictureRecord {
  public:
   explicit DrawRRect(const RRect& rRect) : rRect(rRect) {
   }
 
-  RecordType type() const override {
-    return RecordType::DrawRRect;
+  PictureRecordType type() const override {
+    return PictureRecordType::DrawRRect;
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
@@ -220,13 +220,13 @@ class DrawRRect : public Record {
   RRect rRect;
 };
 
-class DrawPath : public Record {
+class DrawPath : public PictureRecord {
  public:
   explicit DrawPath(Path path) : path(std::move(path)) {
   }
 
-  RecordType type() const override {
-    return RecordType::DrawPath;
+  PictureRecordType type() const override {
+    return PictureRecordType::DrawPath;
   }
 
   bool hasUnboundedFill(bool& hasInverseClip) const override {
@@ -240,13 +240,13 @@ class DrawPath : public Record {
   Path path;
 };
 
-class DrawShape : public Record {
+class DrawShape : public PictureRecord {
  public:
   explicit DrawShape(std::shared_ptr<Shape> shape) : shape(std::move(shape)) {
   }
 
-  RecordType type() const override {
-    return RecordType::DrawShape;
+  PictureRecordType type() const override {
+    return PictureRecordType::DrawShape;
   }
 
   bool hasUnboundedFill(bool& hasInverseClip) const override {
@@ -260,14 +260,14 @@ class DrawShape : public Record {
   std::shared_ptr<Shape> shape;
 };
 
-class DrawImage : public Record {
+class DrawImage : public PictureRecord {
  public:
   DrawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling)
       : image(std::move(image)), sampling(sampling) {
   }
 
-  RecordType type() const override {
-    return RecordType::DrawImage;
+  PictureRecordType type() const override {
+    return PictureRecordType::DrawImage;
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
@@ -285,8 +285,8 @@ class DrawImageRect : public DrawImage {
       : DrawImage(std::move(image), sampling), rect(rect), constraint(constraint) {
   }
 
-  RecordType type() const override {
-    return RecordType::DrawImageRect;
+  PictureRecordType type() const override {
+    return PictureRecordType::DrawImageRect;
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
@@ -305,8 +305,8 @@ class DrawImageRectToRect : public DrawImageRect {
       : DrawImageRect(std::move(image), srcRect, sampling, constraint), dstRect(dstRect) {
   }
 
-  RecordType type() const override {
-    return RecordType::DrawImageRectToRect;
+  PictureRecordType type() const override {
+    return PictureRecordType::DrawImageRectToRect;
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
@@ -317,14 +317,14 @@ class DrawImageRectToRect : public DrawImageRect {
   Rect dstRect;
 };
 
-class DrawGlyphRunList : public Record {
+class DrawGlyphRunList : public PictureRecord {
  public:
   explicit DrawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList)
       : glyphRunList(std::move(glyphRunList)) {
   }
 
-  RecordType type() const override {
-    return RecordType::DrawGlyphRunList;
+  PictureRecordType type() const override {
+    return PictureRecordType::DrawGlyphRunList;
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
@@ -335,13 +335,13 @@ class DrawGlyphRunList : public Record {
   std::shared_ptr<GlyphRunList> glyphRunList;
 };
 
-class DrawPicture : public Record {
+class DrawPicture : public PictureRecord {
  public:
   explicit DrawPicture(std::shared_ptr<Picture> picture) : picture(std::move(picture)) {
   }
 
-  RecordType type() const override {
-    return RecordType::DrawPicture;
+  PictureRecordType type() const override {
+    return PictureRecordType::DrawPicture;
   }
 
   bool hasUnboundedFill(bool& hasInverseClip) const override {
@@ -355,14 +355,14 @@ class DrawPicture : public Record {
   std::shared_ptr<Picture> picture;
 };
 
-class DrawLayer : public Record {
+class DrawLayer : public PictureRecord {
  public:
   DrawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<ImageFilter> filter)
       : picture(std::move(picture)), filter(std::move(filter)) {
   }
 
-  RecordType type() const override {
-    return RecordType::DrawLayer;
+  PictureRecordType type() const override {
+    return PictureRecordType::DrawLayer;
   }
 
   bool hasUnboundedFill(bool& hasInverseClip) const override {

@@ -481,7 +481,7 @@ class Canvas {
 
   friend class Surface;
   friend class Picture;
-  friend class Recorder;
+  friend class PictureRecorder;
   friend class SVGExporter;
   friend class PDFDocumentImpl;
   friend class PDFShader;

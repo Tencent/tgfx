@@ -25,9 +25,9 @@ static constexpr char UniformNdcScaleName[] = "ndcScale";
 static constexpr char UniformNdcOffsetName[] = "ndcOffset";
 
 PlacementPtr<Transform3DGeometryProcessor> Transform3DGeometryProcessor::Make(
-    BlockBuffer* buffer, AAType aa, const Matrix3D& matrix, const Vec2& ndcScale,
+    BlockAllocator* allocator, AAType aa, const Matrix3D& matrix, const Vec2& ndcScale,
     const Vec2& ndcOffset) {
-  return buffer->make<GLSLQuadPerEdgeAA3DGeometryProcessor>(aa, matrix, ndcScale, ndcOffset);
+  return allocator->make<GLSLQuadPerEdgeAA3DGeometryProcessor>(aa, matrix, ndcScale, ndcOffset);
 }
 
 GLSLQuadPerEdgeAA3DGeometryProcessor::GLSLQuadPerEdgeAA3DGeometryProcessor(AAType aa,

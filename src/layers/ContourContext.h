@@ -18,7 +18,7 @@
 
 #pragma once
 #include "core/DrawContext.h"
-#include "core/RecordingContext.h"
+#include "core/PictureContext.h"
 
 namespace tgfx {
 class ContourContext : public DrawContext {
@@ -97,7 +97,7 @@ class ContourContext : public DrawContext {
     Type type = Type::None;
     bool isInverseFillType() const;
     Rect getBounds() const;
-    void draw(RecordingContext& context, const MCState& state, const Fill& fill,
+    void draw(PictureContext& context, const MCState& state, const Fill& fill,
               const Stroke* stroke) const;
     bool operator==(const Contour& other) const;
     bool operator!=(const Contour& other) const {
@@ -130,7 +130,7 @@ class ContourContext : public DrawContext {
   std::vector<const Stroke*> pendingStrokes = {};
 
   std::vector<Rect> contourBounds = {};
-  RecordingContext recordingContext = {};
+  PictureContext pictureContext = {};
 
   friend class PendingContourAutoReset;
 };

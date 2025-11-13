@@ -31,7 +31,7 @@ PlacementPtr<RRectDrawOp> RRectDrawOp::Make(Context* context,
   if (provider == nullptr) {
     return nullptr;
   }
-  auto drawOp = context->drawingBuffer()->make<RRectDrawOp>(provider.get());
+  auto drawOp = context->drawingAllocator()->make<RRectDrawOp>(provider.get());
   CAPUTRE_RRECT_MESH(drawOp.get(), provider.get());
   drawOp->indexBufferProxy = context->globalCache()->getRRectIndexBuffer(provider->hasStroke());
   if (provider->rectCount() <= 1) {
@@ -55,7 +55,7 @@ PlacementPtr<GeometryProcessor> RRectDrawOp::onMakeGeometryProcessor(RenderTarge
   ATTRIBUTE_NAME("rectCount", static_cast<uint32_t>(rectCount));
   ATTRIBUTE_NAME("hasStroke", hasStroke);
   ATTRIBUTE_NAME("commonColor", commonColor);
-  auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
+  auto drawingBuffer = renderTarget->getContext()->drawingAllocator();
   return EllipseGeometryProcessor::Make(drawingBuffer, renderTarget->width(),
                                         renderTarget->height(), hasStroke, commonColor);
 }

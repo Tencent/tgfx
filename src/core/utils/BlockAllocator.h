@@ -31,14 +31,14 @@
 namespace tgfx {
 
 /**
- * BlockData is a helper class that manages the memory blocks released from a BlockBuffer. It is
- * responsible for freeing the memory blocks when they are no longer needed.
+ * BlockBuffer is a helper class that manages the memory blocks released from a BlockAllocator. It
+ * is responsible for freeing the memory blocks when they are no longer needed.
  */
-class BlockData {
+class BlockBuffer {
  public:
-  explicit BlockData(std::vector<uint8_t*> blocks);
+  explicit BlockBuffer(std::vector<uint8_t*> blocks);
 
-  ~BlockData();
+  ~BlockBuffer();
 
   /**
    * Shrinks the last memory block to the specified size. Returns a pointer to the resized block.
@@ -50,37 +50,37 @@ class BlockData {
 };
 
 /**
- * A buffer that allocates memory in blocks. This can be used to allocate many small objects in
+ * An allocator that allocates memory in blocks. This can be used to allocate many small objects in
  * shared memory blocks to reduce the overhead of memory allocation. All objects created in the
- * BlockBuffer must be destroyed before the BlockBuffer itself is cleared or destroyed.
+ * BlockAllocator must be destroyed before the BlockAllocator itself is cleared or destroyed.
  */
-class BlockBuffer {
+class BlockAllocator {
  public:
   /**
-   * Constructs a BlockBuffer with the given initial and maximum block sizes.
+   * Constructs a BlockAllocator with the given initial and maximum block sizes.
    * @param initBlockSize The initial size of each memory block. Must be greater than zero.
    * @param maxBlockSize The maximum size for any memory block. If this is too small, larger blocks
    * may still be allocated as needed.
    */
-  explicit BlockBuffer(size_t initBlockSize, size_t maxBlockSize = SIZE_MAX);
+  explicit BlockAllocator(size_t initBlockSize, size_t maxBlockSize = SIZE_MAX);
 
   /**
-   * Constructs a BlockBuffer with a default initial block size of 256 bytes and no maximum block
+   * Constructs a BlockAllocator with a default initial block size of 256 bytes and no maximum block
    * size limit.
    */
-  BlockBuffer() : BlockBuffer(256, SIZE_MAX) {
+  BlockAllocator() : BlockAllocator(256, SIZE_MAX) {
   }
 
-  BlockBuffer(const BlockBuffer&) = delete;
-  BlockBuffer& operator=(const BlockBuffer&) = delete;
+  BlockAllocator(const BlockAllocator&) = delete;
+  BlockAllocator& operator=(const BlockAllocator&) = delete;
 
   /**
-   * Destroys the BlockBuffer and frees all allocated memory blocks.
+   * Destroys the BlockAllocator and frees all allocated memory blocks.
    */
-  ~BlockBuffer();
+  ~BlockAllocator();
 
   /**
-   * Creates an object of the given type in the BlockBuffer. Returns a PlacementPtr to wrap the
+   * Creates an object of the given type in the BlockAllocator. Returns a PlacementPtr to wrap the
    * created object. Returns nullptr if the allocation fails.
    */
   template <typename T, typename... Args>
@@ -161,18 +161,18 @@ class BlockBuffer {
   void clear(size_t maxReuseSize = std::numeric_limits<size_t>::max());
 
   /**
-   * Transfers ownership of the memory blocks to the returned BlockData object and resets this
-   * BlockBuffer to its initial state. Returns nullptr if the BlockBuffer size is zero and leaves
-   * it unchanged.
+   * Transfers ownership of the memory blocks to the returned BlockBuffer object and resets this
+   * BlockAllocator to its initial state. Returns nullptr if the BlockAllocator size is zero and
+   * leaves it unchanged.
    */
-  std::unique_ptr<BlockData> release();
+  std::unique_ptr<BlockBuffer> release();
 
   /**
-   * Returns a shared pointer that acts as a reference counter for this BlockBuffer.
-   * Asynchronous objects using the BlockBuffer can hold this shared pointer. When all references
-   * are released, the BlockBuffer will be notified.
+   * Returns a shared pointer that acts as a reference counter for this BlockAllocator.
+   * Asynchronous objects using the BlockAllocator can hold this shared pointer. When all references
+   * are released, the BlockAllocator will be notified.
    */
-  std::shared_ptr<BlockBuffer> addReference();
+  std::shared_ptr<BlockAllocator> addReference();
 
  private:
   struct Block {
@@ -188,7 +188,7 @@ class BlockBuffer {
 
   std::mutex mutex = {};
   std::condition_variable condition = {};
-  std::weak_ptr<BlockBuffer> externalReferences;
+  std::weak_ptr<BlockAllocator> externalReferences;
   std::vector<Block> blocks = {};
   size_t initBlockSize = 0;
   size_t maxBlockSize = SIZE_MAX;
@@ -199,7 +199,7 @@ class BlockBuffer {
    * Notifies when the reference count drops to zero. Called by the destructor of the reference
    * counter shared pointer.
    */
-  static void NotifyReferenceReachedZero(BlockBuffer* blockBuffer);
+  static void NotifyReferenceReachedZero(BlockAllocator* allocator);
 
   /**
    * Waits until all references are released, ensuring that all threads have finished using the

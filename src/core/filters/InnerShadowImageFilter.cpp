@@ -62,7 +62,7 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::getShadowFragmentProcess
                                                sampling, constraint, &shadowMatrix);
   }
 
-  auto buffer = args.context->drawingBuffer();
+  auto buffer = args.context->drawingAllocator();
   if (invertShadowMask == nullptr) {
     invertShadowMask =
         ConstColorProcessor::Make(buffer, Color::Transparent().premultiply(), InputMode::Ignore);
@@ -95,7 +95,7 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::asFragmentProcessor(
   if (imageProcessor == nullptr) {
     return nullptr;
   }
-  auto buffer = args.context->drawingBuffer();
+  auto buffer = args.context->drawingAllocator();
   auto blendMode = shadowOnly ? BlendMode::SrcIn : BlendMode::SrcATop;
 
   return XfermodeFragmentProcessor::MakeFromTwoProcessors(
