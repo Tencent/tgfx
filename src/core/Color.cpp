@@ -100,6 +100,9 @@ Color Color::unpremultiply() const {
 
 Color Color::makeColorSpace(std::shared_ptr<ColorSpace> colorSpace) const {
   auto dstColor = *this;
+  if(colorSpace == nullptr) {
+    colorSpace = ColorSpace::SRGB();
+  }
   if (!NeedConvertColorSpace(this->colorSpace, colorSpace)) {
     return dstColor;
   }
