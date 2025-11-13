@@ -566,8 +566,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   Rect getBoundsInternal(const Matrix3D& coordinateMatrix, bool computeTightBounds);
 
-  Rect onGetBoundsInternal(const Matrix& coordinateMatrix, bool computeTightBounds);
-
   void onAttachToRoot(RootLayer* rootLayer);
 
   void onDetachFromRoot();
