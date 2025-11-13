@@ -98,18 +98,18 @@ Color Color::unpremultiply() const {
   }
 }
 
-Color Color::makeColorSpace(std::shared_ptr<ColorSpace> colorSpace) const {
+Color Color::makeColorSpace(std::shared_ptr<ColorSpace> dstColorSpace) const {
   auto dstColor = *this;
-  if (colorSpace == nullptr) {
-    colorSpace = ColorSpace::SRGB();
+  if (dstColorSpace == nullptr) {
+    dstColorSpace = ColorSpace::SRGB();
   }
-  if (!NeedConvertColorSpace(this->colorSpace, colorSpace)) {
+  if (!NeedConvertColorSpace(colorSpace, dstColorSpace)) {
     return dstColor;
   }
-  ColorSpaceXformSteps steps(this->colorSpace.get(), AlphaType::Unpremultiplied, colorSpace.get(),
+  ColorSpaceXformSteps steps(colorSpace.get(), AlphaType::Unpremultiplied, dstColorSpace.get(),
                              AlphaType::Unpremultiplied);
   steps.apply(dstColor.array());
-  dstColor.colorSpace = colorSpace;
+  dstColor.colorSpace = dstColorSpace;
   return dstColor;
 }
 

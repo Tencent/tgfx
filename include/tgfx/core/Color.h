@@ -165,7 +165,7 @@ struct Color {
   /**
    * Return a new color that is the original color converted to the dst color space.
    */
-  Color makeColorSpace(std::shared_ptr<ColorSpace> colorSpace) const;
+  Color makeColorSpace(std::shared_ptr<ColorSpace> dstColorSpace) const;
 
   /**
    * Returns a Color premultiplied by alpha.
