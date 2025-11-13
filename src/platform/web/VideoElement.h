@@ -35,7 +35,7 @@ class VideoElement : public ImageStream {
   static std::shared_ptr<VideoElement> MakeFrom(emscripten::val video, int width, int height);
 
   std::shared_ptr<ColorSpace> colorSpace() const override {
-    return ColorSpace::MakeSRGB();
+    return ColorSpace::SRGB();
   }
 
  protected:

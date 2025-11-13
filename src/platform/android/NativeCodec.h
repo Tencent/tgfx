@@ -40,7 +40,7 @@ class NativeCodec : public ImageCodec {
   static std::shared_ptr<NativeCodec> Make(JNIEnv* env, jobject sizeObject, int origin);
 
   NativeCodec(int width, int height, Orientation orientation,
-              std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB())
+              std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB())
       : ImageCodec(width, height, orientation, std::move(colorSpace)) {
   }
 

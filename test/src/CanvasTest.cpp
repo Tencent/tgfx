@@ -3184,8 +3184,8 @@ TGFX_TEST(CanvasTest, ConvertColorSpace) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 1024, 1024, false, 1, false, 0,
-                               ColorSpace::MakeSRGB()->makeColorSpin());
+  auto surface =
+      Surface::Make(context, 1024, 1024, false, 1, false, 0, ColorSpace::SRGB()->makeColorSpin());
   auto canvas = surface->getCanvas();
   const TransferFunction tfs[] = {
       NamedTransferFunction::SRGB,

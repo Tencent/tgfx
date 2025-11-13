@@ -632,13 +632,13 @@ bool ColorSpacePrimaries::toXYZD50(ColorMatrix33* toXYZD50) const {
                                       reinterpret_cast<gfx::skcms_Matrix3x3*>(toXYZD50));
 }
 
-std::shared_ptr<ColorSpace> ColorSpace::MakeSRGB() {
+std::shared_ptr<ColorSpace> ColorSpace::SRGB() {
   static std::shared_ptr<ColorSpace> cs =
       std::shared_ptr<ColorSpace>(new ColorSpace(NamedTransferFunction::SRGB, NamedGamut::SRGB));
   return cs;
 }
 
-std::shared_ptr<ColorSpace> ColorSpace::MakeSRGBLinear() {
+std::shared_ptr<ColorSpace> ColorSpace::SRGBLinear() {
   static std::shared_ptr<ColorSpace> cs =
       std::shared_ptr<ColorSpace>(new ColorSpace(NamedTransferFunction::Linear, NamedGamut::SRGB));
   return cs;
@@ -655,14 +655,14 @@ std::shared_ptr<ColorSpace> ColorSpace::MakeRGB(const TransferFunction& transfer
 
   if (IsAlmostSRGB(transferFunction)) {
     if (XYZAlmostEqual(toXYZ, NamedGamut::SRGB)) {
-      return ColorSpace::MakeSRGB();
+      return ColorSpace::SRGB();
     }
     tf = &NamedTransferFunction::SRGB;
   } else if (IsAlmost2dot2(transferFunction)) {
     tf = &NamedTransferFunction::TwoDotTwo;
   } else if (IsAlmostLinear(transferFunction)) {
     if (XYZAlmostEqual(toXYZ, NamedGamut::SRGB)) {
-      return ColorSpace::MakeSRGBLinear();
+      return ColorSpace::SRGBLinear();
     }
     tf = &NamedTransferFunction::Linear;
   }
@@ -699,7 +699,7 @@ std::shared_ptr<ColorSpace> ColorSpace::MakeFromICC(const void* data, size_t siz
     return nullptr;
   }
   if (skcms_ApproximatelyEqualProfiles(&profile, gfx::skcms_sRGB_profile())) {
-    return ColorSpace::MakeSRGB();
+    return ColorSpace::SRGB();
   }
 
   gfx::skcms_Matrix3x3 inv;
@@ -769,7 +769,7 @@ std::shared_ptr<ColorSpace> ColorSpace::makeColorSpin() const {
 }
 
 bool ColorSpace::isSRGB() const {
-  return this == MakeSRGB().get();
+  return this == SRGB().get();
 }
 
 std::shared_ptr<Data> ColorSpace::toICCProfile() const {

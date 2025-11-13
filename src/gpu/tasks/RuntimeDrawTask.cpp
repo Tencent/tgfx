@@ -96,7 +96,7 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
   }
   if (!textureView->isYUV() && textureView->getTexture()->type() == TextureType::TwoD &&
       textureView->origin() == ImageOrigin::TopLeft &&
-      NeedConvertColorSpace(textureProxyWithCS->colorSpace, dstColorSpace)) {
+      !NeedConvertColorSpace(textureProxyWithCS->colorSpace, dstColorSpace)) {
     return textureView;
   }
   auto vertexBuffer = vertexBufferProxyView ? vertexBufferProxyView->getBuffer() : nullptr;
@@ -124,7 +124,7 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
     return nullptr;
   }
   if (!textureView->isAlphaOnly() &&
-      !NeedConvertColorSpace(textureProxyWithCS->colorSpace, dstColorSpace)) {
+      NeedConvertColorSpace(textureProxyWithCS->colorSpace, dstColorSpace)) {
     auto xformEffect = ColorSpaceXformEffect::Make(
         context->drawingAllocator(), textureProxyWithCS->colorSpace.get(), AlphaType::Premultiplied,
         dstColorSpace.get(), AlphaType::Premultiplied);
