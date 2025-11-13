@@ -45,7 +45,7 @@ class ColorFilter {
 
   /**
    * Creates a new ColorFilter that applies blends between the constant color (src) and input color
-   * (dst) based on the BlendMode. The color may exceed the 0-1 range.
+   * (dst) based on the BlendMode.
    */
   static std::shared_ptr<ColorFilter> Blend(Color color, BlendMode mode);
 

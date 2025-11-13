@@ -898,7 +898,7 @@ PDFIndirectReference PDFGradientShader::Make(PDFDocumentImpl* doc, const Gradien
 
   PDFGradientShader::Key key = MakeKey(shader, matrix, surfaceBBox);
   for (auto& color : key.info.colors) {
-    color = color.convertColorSpace(doc->colorSpace());
+    color = color.makeColorSpace(doc->colorSpace());
   }
   bool alpha = GradientHasAlpha(key);
   return FindPDFShader(doc, std::move(key), alpha);

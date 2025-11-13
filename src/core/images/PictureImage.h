@@ -29,7 +29,7 @@ class PictureImage : public Image {
  public:
   PictureImage(std::shared_ptr<Picture> picture, int width, int height,
                const Matrix* matrix = nullptr, bool mipmapped = false,
-               std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+               std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB());
 
   ~PictureImage() override;
 
@@ -79,6 +79,6 @@ class PictureImage : public Image {
   int _width = 0;
   int _height = 0;
   bool mipmapped = false;
-  std::shared_ptr<ColorSpace> _colorSpace = ColorSpace::MakeSRGB();
+  std::shared_ptr<ColorSpace> _colorSpace = ColorSpace::SRGB();
 };
 }  // namespace tgfx

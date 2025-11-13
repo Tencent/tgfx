@@ -23,7 +23,7 @@ namespace tgfx {
 static constexpr int GradientWidth = 256;
 
 GradientGenerator::GradientGenerator(const Color* colors, const float* positions, int count)
-    : ImageGenerator(GradientWidth, 1, ColorSpace::MakeSRGB()), colors(colors, colors + count),
+    : ImageGenerator(GradientWidth, 1, ColorSpace::SRGB()), colors(colors, colors + count),
       positions(positions, positions + count) {
 }
 

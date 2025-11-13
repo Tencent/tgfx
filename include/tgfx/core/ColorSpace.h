@@ -325,12 +325,12 @@ class ColorSpace : public std::enable_shared_from_this<ColorSpace> {
   /**
    * Create the sRGB color space.
    */
-  static std::shared_ptr<ColorSpace> MakeSRGB();
+  static std::shared_ptr<ColorSpace> SRGB();
 
   /**
    * Colorspace with the sRGB primaries, but a linear (1.0) gamma.
    */
-  static std::shared_ptr<ColorSpace> MakeSRGBLinear();
+  static std::shared_ptr<ColorSpace> SRGBLinear();
 
   /**
    * Create an ColorSpace from a transfer function and a row-major 3x3 transformation to XYZ.

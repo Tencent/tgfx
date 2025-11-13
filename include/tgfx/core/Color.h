@@ -31,45 +31,45 @@ namespace tgfx {
  */
 struct Color {
   /**
-   * Returns a fully transparent Color with colorSpace.
+   * Returns a fully transparent Color in srgb gamut.
    */
-  static Color Transparent(std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+  static const Color& Transparent();
 
   /**
-   * Returns a fully opaque black Color with colorSpace..
+   * Returns a fully opaque black Color in srgb gamut.
    */
-  static Color Black(std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+  static const Color& Black();
 
   /**
-   * Returns a fully opaque white Color with colorSpace..
+   * Returns a fully opaque white Color in srgb gamut.
    */
-  static Color White(std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+  static const Color& White();
 
   /**
-   * Returns a fully opaque red Color with colorSpace..
+   * Returns a fully opaque red Color in srgb gamut.
    */
-  static Color Red(std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+  static const Color& Red();
 
   /**
-   * Returns a fully opaque green Color with colorSpace..
+   * Returns a fully opaque green Color in srgb gamut.
    */
-  static Color Green(std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+  static const Color& Green();
 
   /**
-   * Returns a fully opaque blue Color with colorSpace..
+   * Returns a fully opaque blue Color in srgb gamut.
    */
-  static Color Blue(std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+  static const Color& Blue();
 
   /**
    * Returns color value from 8-bit component values and ColorSpace.
    */
   static Color FromRGBA(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255,
-                        std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+                        std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB());
 
   /**
    * Constructs an opaque white Color.
    */
-  Color() : red(1.0f), green(1.0f), blue(1.0f), alpha(1.0f), colorSpace(ColorSpace::MakeSRGB()) {
+  Color() : red(1.0f), green(1.0f), blue(1.0f), alpha(1.0f), colorSpace(nullptr) {
   }
 
   /**
@@ -81,12 +81,8 @@ struct Color {
    * @param a  alpha component
    * @param colorSpace colorSpace of this color
    */
-  Color(float r, float g, float b, float a = 1.0f,
-        std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB())
+  Color(float r, float g, float b, float a = 1.0f, std::shared_ptr<ColorSpace> colorSpace = nullptr)
       : red(r), green(g), blue(b), alpha(a), colorSpace(std::move(colorSpace)) {
-    if (this->colorSpace == nullptr) {
-      this->colorSpace = ColorSpace::MakeSRGB();
-    }
   }
 
   /**
@@ -110,9 +106,9 @@ struct Color {
   float alpha;
 
   /**
-   * ColorSpace of this Color.
+   * ColorSpace of this Color. If the color space is nullptr, it will be treated as sRGB.
    */
-  std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB();
+  std::shared_ptr<ColorSpace> colorSpace = nullptr;
 
   /**
    * Compares Color with other, and returns true if all components are equal.
@@ -121,10 +117,10 @@ struct Color {
     auto thisColorSpace = colorSpace;
     auto otherColorSpace = other.colorSpace;
     if (thisColorSpace == nullptr) {
-      thisColorSpace = ColorSpace::MakeSRGB();
+      thisColorSpace = ColorSpace::SRGB();
     }
     if (otherColorSpace == nullptr) {
-      otherColorSpace = ColorSpace::MakeSRGB();
+      otherColorSpace = ColorSpace::SRGB();
     }
 
     return alpha == other.alpha && red == other.red && green == other.green && blue == other.blue &&
@@ -179,6 +175,11 @@ struct Color {
   }
 
   /**
+   * Return a new color that is the original color converted to the dst color space.
+   */
+  Color makeColorSpace(std::shared_ptr<ColorSpace> colorSpace) const;
+
+  /**
    * Returns a Color premultiplied by alpha.
    */
   Color premultiply() const {
@@ -189,15 +190,5 @@ struct Color {
    * Returns a Color unpremultiplied by alpha.
    */
   Color unpremultiply() const;
-
-  /**
-   * Return a new color, which is the original color assigned to the dst color space.
-   */
-  Color assignColorSpace(std::shared_ptr<ColorSpace> colorSpace) const;
-
-  /**
-   * Return a new color that is the original color converted to the dst color space.
-   */
-  Color convertColorSpace(std::shared_ptr<ColorSpace> colorSpace) const;
 };
 }  // namespace tgfx

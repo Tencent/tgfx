@@ -93,7 +93,7 @@ void CopyPixels(const ImageInfo& srcInfo, const void* srcPixels, const ImageInfo
     srcRowOffset = -srcRowOffset;
   }
   if (!srcColorSpace) {
-    srcColorSpace = ColorSpace::MakeSRGB();
+    srcColorSpace = ColorSpace::SRGB();
   }
   if (!dstColorSpace) {
     dstColorSpace = srcColorSpace;

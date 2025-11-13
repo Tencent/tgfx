@@ -125,7 +125,7 @@ std::shared_ptr<ImageCodec> JpegCodec::MakeFromData(const std::string& filePath,
       cs = ColorSpace::MakeFromICC(iccProfileData.data(), iccProfileData.size());
     }
     if (!cs) {
-      cs = ColorSpace::MakeSRGB();
+      cs = ColorSpace::SRGB();
     }
   } while (false);
   jpeg_destroy_decompress(&cinfo);

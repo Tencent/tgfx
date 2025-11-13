@@ -50,7 +50,7 @@ class NativeImageBuffer : public ImageBuffer {
  private:
   ImageInfo info = {};
   Global<jobject> bitmap = {};
-  std::shared_ptr<ColorSpace> _colorSpace = ColorSpace::MakeSRGB();
+  std::shared_ptr<ColorSpace> _colorSpace = ColorSpace::SRGB();
 
   explicit NativeImageBuffer(const ImageInfo& info) : info(info) {
   }

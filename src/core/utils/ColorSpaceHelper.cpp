@@ -132,7 +132,7 @@ bool NeedConvertColorSpace(std::shared_ptr<ColorSpace> src, std::shared_ptr<Colo
     return false;
   }
   if (src == nullptr) {
-    src = ColorSpace::MakeSRGB();
+    src = ColorSpace::SRGB();
   }
   return !ColorSpace::Equals(src.get(), dst.get());
 }

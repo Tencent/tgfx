@@ -20,35 +20,36 @@
 #include "core/ColorSpaceXformSteps.h"
 #include "core/utils/Log.h"
 #include "tgfx/core/AlphaType.h"
+#include "utils/ColorSpaceHelper.h"
 
 namespace tgfx {
-Color Color::Transparent(std::shared_ptr<ColorSpace> colorSpace) {
-  Color color = {0.0f, 0.0f, 0.0f, 0.0f, std::move(colorSpace)};
+const Color& Color::Transparent() {
+  static const Color color = {0.0f, 0.0f, 0.0f, 0.0f};
   return color;
 }
 
-Color Color::Black(std::shared_ptr<ColorSpace> colorSpace) {
-  Color color = {0.0f, 0.0f, 0.0f, 1.0f, std::move(colorSpace)};
+const Color& Color::Black() {
+  static const Color color = {0.0f, 0.0f, 0.0f, 1.0f};
   return color;
 }
 
-Color Color::White(std::shared_ptr<ColorSpace> colorSpace) {
-  Color color = {1.0f, 1.0f, 1.0f, 1.0f, std::move(colorSpace)};
+const Color& Color::White() {
+  static const Color color = {1.0f, 1.0f, 1.0f, 1.0f};
   return color;
 }
 
-Color Color::Red(std::shared_ptr<ColorSpace> colorSpace) {
-  Color color = {1.0f, 0.0f, 0.0f, 1.0f, std::move(colorSpace)};
+const Color& Color::Red() {
+  static const Color color = {1.0f, 0.0f, 0.0f, 1.0f};
   return color;
 }
 
-Color Color::Green(std::shared_ptr<ColorSpace> colorSpace) {
-  Color color = {0.0f, 1.0f, 0.0f, 1.0f, std::move(colorSpace)};
+const Color& Color::Green() {
+  static const Color color = {0.0f, 1.0f, 0.0f, 1.0f};
   return color;
 }
 
-Color Color::Blue(std::shared_ptr<ColorSpace> colorSpace) {
-  Color color = {0.0f, 0.0f, 1.0f, 1.0f, std::move(colorSpace)};
+const Color& Color::Blue() {
+  static const Color color = {0.0f, 0.0f, 1.0f, 1.0f};
   return color;
 }
 
@@ -83,12 +84,16 @@ Color Color::unpremultiply() const {
   }
 }
 
-Color Color::assignColorSpace(std::shared_ptr<ColorSpace> colorSpace) const {
-  return {red, green, blue, alpha, std::move(colorSpace)};
-}
-
-Color Color::convertColorSpace(std::shared_ptr<ColorSpace> colorSpace) const {
-  return ColorSpaceXformSteps::ConvertColorSpace(*this, std::move(colorSpace));
+Color Color::makeColorSpace(std::shared_ptr<ColorSpace> colorSpace) const {
+  auto dstColor = *this;
+  if (!NeedConvertColorSpace(this->colorSpace, colorSpace)) {
+    return dstColor;
+  }
+  ColorSpaceXformSteps steps(this->colorSpace.get(), AlphaType::Unpremultiplied, colorSpace.get(),
+                             AlphaType::Unpremultiplied);
+  steps.apply(dstColor.array());
+  dstColor.colorSpace = colorSpace;
+  return dstColor;
 }
 
 }  // namespace tgfx

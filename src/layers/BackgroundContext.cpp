@@ -151,10 +151,10 @@ std::shared_ptr<BackgroundContext> BackgroundContext::Make(Context* context, con
   imageMatrix.mapRect(&backgroundRect);
   std::shared_ptr<BackgroundContext> result = nullptr;
   if (context) {
-    result = SurfaceBackgroundContext::Make(context, imageMatrix, backgroundRect,
-                                            ColorSpace::MakeSRGB());
+    result =
+        SurfaceBackgroundContext::Make(context, imageMatrix, backgroundRect, ColorSpace::SRGB());
   } else {
-    result = PictureBackgroundContext::Make(imageMatrix, backgroundRect, ColorSpace::MakeSRGB());
+    result = PictureBackgroundContext::Make(imageMatrix, backgroundRect, ColorSpace::SRGB());
   }
   if (!result) {
     return result;

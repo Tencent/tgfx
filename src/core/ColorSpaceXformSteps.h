@@ -57,8 +57,6 @@ struct ColorSpaceXformSteps {
 
   static uint32_t XFormKey(const ColorSpaceXformSteps* xform);
 
-  static Color ConvertColorSpace(const Color& srcColor, std::shared_ptr<ColorSpace> dstColorSpace);
-
   Flags flags;
 
   /**

@@ -163,7 +163,7 @@ static std::shared_ptr<ColorSpace> ReadColorProfile(png_structp pngPtr, png_info
    * as a backup in case the decoder does not support full color management.
    */
   if (png_get_valid(pngPtr, infoPtr, PNG_INFO_sRGB)) {
-    return ColorSpace::MakeSRGB();
+    return ColorSpace::SRGB();
   }
 
   /**
@@ -204,7 +204,7 @@ static std::shared_ptr<ColorSpace> ReadColorProfile(png_structp pngPtr, png_info
   return ColorSpace::MakeRGB(*reinterpret_cast<TransferFunction*>(&fn),
                              *reinterpret_cast<ColorMatrix33*>(&toXYZD50));
 #else   // LIBPNG < 1.6
-  return ColorSpace::MakeSRGB();
+  return ColorSpace::SRGB();
 #endif  // LIBPNG >= 1.6
 }
 
@@ -219,7 +219,7 @@ std::shared_ptr<ImageCodec> PngCodec::MakeFromData(const std::string& filePath,
   png_get_IHDR(readInfo->p, readInfo->pi, &w, &h, nullptr, &colorType, nullptr, nullptr, nullptr);
   auto cs = ReadColorProfile(readInfo->p, readInfo->pi);
   if (!cs) {
-    cs = ColorSpace::MakeSRGB();
+    cs = ColorSpace::SRGB();
   }
   if (w == 0 || h == 0) {
     return nullptr;
