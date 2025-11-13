@@ -42,7 +42,7 @@ class Fill {
   }
 
   /**
-   * The input color, which is unpremultiplied and in the sRGB gamut, may exceed the 0-1 range. The
+   * The input color, which is unpremultiplied, may exceed the 0-1 range. The
    * default value is opaque white.
    */
   Color color = {};

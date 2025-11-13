@@ -22,33 +22,33 @@
 #include "tgfx/core/AlphaType.h"
 
 namespace tgfx {
-const Color& Color::Transparent(std::shared_ptr<ColorSpace> colorSpace) {
-  static const Color color = {0.0f, 0.0f, 0.0f, 0.0f, std::move(colorSpace)};
+Color Color::Transparent(std::shared_ptr<ColorSpace> colorSpace) {
+  Color color = {0.0f, 0.0f, 0.0f, 0.0f, std::move(colorSpace)};
   return color;
 }
 
-const Color& Color::Black(std::shared_ptr<ColorSpace> colorSpace) {
-  static const Color color = {0.0f, 0.0f, 0.0f, 1.0f, std::move(colorSpace)};
+Color Color::Black(std::shared_ptr<ColorSpace> colorSpace) {
+  Color color = {0.0f, 0.0f, 0.0f, 1.0f, std::move(colorSpace)};
   return color;
 }
 
-const Color& Color::White(std::shared_ptr<ColorSpace> colorSpace) {
-  static const Color color = {1.0f, 1.0f, 1.0f, 1.0f, std::move(colorSpace)};
+Color Color::White(std::shared_ptr<ColorSpace> colorSpace) {
+  Color color = {1.0f, 1.0f, 1.0f, 1.0f, std::move(colorSpace)};
   return color;
 }
 
-const Color& Color::Red(std::shared_ptr<ColorSpace> colorSpace) {
-  static const Color color = {1.0f, 0.0f, 0.0f, 1.0f, std::move(colorSpace)};
+Color Color::Red(std::shared_ptr<ColorSpace> colorSpace) {
+  Color color = {1.0f, 0.0f, 0.0f, 1.0f, std::move(colorSpace)};
   return color;
 }
 
-const Color& Color::Green(std::shared_ptr<ColorSpace> colorSpace) {
-  static const Color color = {0.0f, 1.0f, 0.0f, 1.0f, std::move(colorSpace)};
+Color Color::Green(std::shared_ptr<ColorSpace> colorSpace) {
+  Color color = {0.0f, 1.0f, 0.0f, 1.0f, std::move(colorSpace)};
   return color;
 }
 
-const Color& Color::Blue(std::shared_ptr<ColorSpace> colorSpace) {
-  static const Color color = {0.0f, 0.0f, 1.0f, 1.0f, std::move(colorSpace)};
+Color Color::Blue(std::shared_ptr<ColorSpace> colorSpace) {
+  Color color = {0.0f, 0.0f, 1.0f, 1.0f, std::move(colorSpace)};
   return color;
 }
 

@@ -33,32 +33,32 @@ struct Color {
   /**
    * Returns a fully transparent Color with colorSpace.
    */
-  static const Color& Transparent(std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+  static Color Transparent(std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Returns a fully opaque black Color with colorSpace..
    */
-  static const Color& Black(std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+  static Color Black(std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Returns a fully opaque white Color with colorSpace..
    */
-  static const Color& White(std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+  static Color White(std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Returns a fully opaque red Color with colorSpace..
    */
-  static const Color& Red(std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+  static Color Red(std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Returns a fully opaque green Color with colorSpace..
    */
-  static const Color& Green(std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+  static Color Green(std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Returns a fully opaque blue Color with colorSpace..
    */
-  static const Color& Blue(std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+  static Color Blue(std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Returns color value from 8-bit component values and ColorSpace.
