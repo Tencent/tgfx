@@ -20,13 +20,20 @@
 
 namespace tgfx {
 void RasterizedContent::draw(Canvas* canvas, bool antiAlias, float alpha,
-                             BlendMode blendMode) const {
+                             const std::shared_ptr<MaskFilter>& mask, BlendMode blendMode) const {
   auto oldMatrix = canvas->getMatrix();
   canvas->concat(matrix);
   Paint paint = {};
   paint.setAntiAlias(antiAlias);
   paint.setAlpha(alpha);
   paint.setBlendMode(blendMode);
+
+  if (mask) {
+    auto invertMatrix = Matrix::I();
+    if (matrix.invert(&invertMatrix)) {
+      paint.setMaskFilter(mask->makeWithMatrix(matrix));
+    }
+  }
   canvas->drawImage(image, &paint);
   canvas->setMatrix(oldMatrix);
 }

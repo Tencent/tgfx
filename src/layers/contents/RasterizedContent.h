@@ -48,7 +48,7 @@ class RasterizedContent {
     return matrix;
   }
 
-  void draw(Canvas* canvas, bool antiAlias, float alpha,
+  void draw(Canvas* canvas, bool antiAlias, float alpha, const std::shared_ptr<MaskFilter>& mask,
             BlendMode blendMode = BlendMode::SrcOver) const;
 
  private:
