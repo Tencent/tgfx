@@ -100,13 +100,13 @@ void Pixmap::reset(Bitmap& bitmap) {
 }
 
 Color Pixmap::getColor(int x, int y) const {
-  auto dstInfo = ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Unpremultiplied, 4,
-                                 ColorSpace::MakeSRGB());
+  auto dstInfo =
+      ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Unpremultiplied, 4, colorSpace());
   uint8_t color[4];
   if (!readPixels(dstInfo, color, x, y)) {
     return Color::Transparent();
   }
-  return Color::FromRGBA(color[0], color[1], color[2], color[3]);
+  return Color::FromRGBA(color[0], color[1], color[2], color[3], colorSpace());
 }
 
 Pixmap Pixmap::makeSubset(const Rect& subset) const {
