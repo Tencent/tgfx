@@ -284,22 +284,16 @@ uint32_t ColorSpaceXformSteps::XFormKey(const ColorSpaceXformSteps* xform) {
   return key;
 }
 
-Color ColorSpaceXformSteps::ConvertColorSpace(std::shared_ptr<ColorSpace> src, AlphaType srcAT,
-                                              std::shared_ptr<ColorSpace> dst, AlphaType dstAT,
-                                              const Color& srcColor) {
+Color ColorSpaceXformSteps::ConvertColorSpace(const Color& srcColor,
+                                              std::shared_ptr<ColorSpace> dstColorSpace) {
   auto dstColor = srcColor;
-  if (srcAT == AlphaType::Premultiplied && dstAT == AlphaType::Unpremultiplied) {
-    dstColor = dstColor.unpremultiply();
-    srcAT = AlphaType::Unpremultiplied;
-  } else if (srcAT == AlphaType::Unpremultiplied && dstAT == AlphaType::Premultiplied) {
-    dstColor = dstColor.premultiply();
-    srcAT = AlphaType::Premultiplied;
-  }
-  if (NeedConvertColorSpace(src, dst) && srcAT == dstAT) {
+  if (!NeedConvertColorSpace(srcColor.colorSpace, dstColorSpace)) {
     return dstColor;
   }
-  ColorSpaceXformSteps steps(src.get(), srcAT, dst.get(), dstAT);
+  ColorSpaceXformSteps steps(srcColor.colorSpace.get(), AlphaType::Unpremultiplied,
+                             dstColorSpace.get(), AlphaType::Unpremultiplied);
   steps.apply(dstColor.array());
+  dstColor = dstColor.assignColorSpace(dstColorSpace);
   return dstColor;
 }
 }  // namespace tgfx

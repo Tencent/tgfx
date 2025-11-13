@@ -70,11 +70,9 @@ bool ModeColorFilter::isEqual(const ColorFilter* colorFilter) const {
 
 PlacementPtr<FragmentProcessor> ModeColorFilter::asFragmentProcessor(
     Context* context, std::shared_ptr<ColorSpace> dstColorSpace) const {
-  auto dstColor = ColorSpaceXformSteps::ConvertColorSpace(
-      ColorSpace::MakeSRGB(), AlphaType::Unpremultiplied, std::move(dstColorSpace),
-      AlphaType::Premultiplied, color);
-  auto processor =
-      ConstColorProcessor::Make(context->drawingAllocator(), dstColor, InputMode::Ignore);
+  auto dstColor = color.convertColorSpace(std::move(dstColorSpace));
+  auto processor = ConstColorProcessor::Make(context->drawingAllocator(), dstColor.premultiply(),
+                                             InputMode::Ignore);
   return XfermodeFragmentProcessor::MakeFromSrcProcessor(context->drawingAllocator(),
                                                          std::move(processor), mode);
 }

@@ -17,51 +17,46 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Color.h"
-#include <utility>
 #include "core/ColorSpaceXformSteps.h"
 #include "core/utils/Log.h"
 #include "tgfx/core/AlphaType.h"
 
 namespace tgfx {
-const Color& Color::Transparent() {
-  static const Color color = {0.0f, 0.0f, 0.0f, 0.0f};
+const Color& Color::Transparent(std::shared_ptr<ColorSpace> colorSpace) {
+  static const Color color = {0.0f, 0.0f, 0.0f, 0.0f, std::move(colorSpace)};
   return color;
 }
 
-const Color& Color::Black() {
-  static const Color color = {0.0f, 0.0f, 0.0f, 1.0f};
+const Color& Color::Black(std::shared_ptr<ColorSpace> colorSpace) {
+  static const Color color = {0.0f, 0.0f, 0.0f, 1.0f, std::move(colorSpace)};
   return color;
 }
 
-const Color& Color::White() {
-  static const Color color = {1.0f, 1.0f, 1.0f, 1.0f};
+const Color& Color::White(std::shared_ptr<ColorSpace> colorSpace) {
+  static const Color color = {1.0f, 1.0f, 1.0f, 1.0f, std::move(colorSpace)};
   return color;
 }
 
-const Color& Color::Red() {
-  static const Color color = {1.0f, 0.0f, 0.0f, 1.0f};
+const Color& Color::Red(std::shared_ptr<ColorSpace> colorSpace) {
+  static const Color color = {1.0f, 0.0f, 0.0f, 1.0f, std::move(colorSpace)};
   return color;
 }
 
-const Color& Color::Green() {
-  static const Color color = {0.0f, 1.0f, 0.0f, 1.0f};
+const Color& Color::Green(std::shared_ptr<ColorSpace> colorSpace) {
+  static const Color color = {0.0f, 1.0f, 0.0f, 1.0f, std::move(colorSpace)};
   return color;
 }
 
-const Color& Color::Blue() {
-  static const Color color = {0.0f, 0.0f, 1.0f, 1.0f};
+const Color& Color::Blue(std::shared_ptr<ColorSpace> colorSpace) {
+  static const Color color = {0.0f, 0.0f, 1.0f, 1.0f, std::move(colorSpace)};
   return color;
 }
 
 Color Color::FromRGBA(uint8_t r, uint8_t g, uint8_t b, uint8_t a,
                       std::shared_ptr<ColorSpace> colorSpace) {
-  float srcColor[4] = {static_cast<float>(r) / 255.0f, static_cast<float>(g) / 255.0f,
-                       static_cast<float>(b) / 255.0f,
-                       a == 255 ? 1.0f : static_cast<float>(a) / 255.0f};
-  Color color(srcColor[0], srcColor[1], srcColor[2], srcColor[3]);
-  return ColorSpaceXformSteps::ConvertColorSpace(std::move(colorSpace), AlphaType::Unpremultiplied,
-                                                 ColorSpace::MakeSRGB(), AlphaType::Unpremultiplied,
-                                                 color);
+  return {static_cast<float>(r) / 255.0f, static_cast<float>(g) / 255.0f,
+          static_cast<float>(b) / 255.0f, a == 255 ? 1.0f : static_cast<float>(a) / 255.0f,
+          std::move(colorSpace)};
 }
 
 float Color::operator[](int index) const {
@@ -81,11 +76,19 @@ bool Color::isOpaque() const {
 
 Color Color::unpremultiply() const {
   if (alpha == 0.0f) {
-    return {0, 0, 0, 0};
+    return {0, 0, 0, 0, colorSpace};
   } else {
     float invAlpha = 1 / alpha;
-    return {red * invAlpha, green * invAlpha, blue * invAlpha, alpha};
+    return {red * invAlpha, green * invAlpha, blue * invAlpha, alpha, colorSpace};
   }
+}
+
+Color Color::assignColorSpace(std::shared_ptr<ColorSpace> colorSpace) const {
+  return {red, green, blue, alpha, std::move(colorSpace)};
+}
+
+Color Color::convertColorSpace(std::shared_ptr<ColorSpace> colorSpace) const {
+  return ColorSpaceXformSteps::ConvertColorSpace(*this, std::move(colorSpace));
 }
 
 }  // namespace tgfx

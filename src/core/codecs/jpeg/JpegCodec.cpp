@@ -314,7 +314,7 @@ bool JpegCodec::readScaledPixels(ColorType colorType, AlphaType alphaType, size_
   if (result) {
     if (!pixmap.isEmpty()) {
       pixmap.readPixels(dstInfo, dstPixels);
-    } else if (!NeedConvertColorSpace(colorSpace(), dstColorSpace)) {
+    } else if (NeedConvertColorSpace(colorSpace(), dstColorSpace)) {
       ConvertColorSpaceInPlace(static_cast<int>(dstWidth), static_cast<int>(dstHeight), colorType,
                                alphaType, dstRowBytes, colorSpace(), dstColorSpace, dstPixels);
     }

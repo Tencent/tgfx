@@ -87,7 +87,7 @@ bool WebPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, s
     return false;
   }
   auto result = ReadPixelsFromCanvasImage(imageData, targetInfo, dstPixels);
-  if (!NeedConvertColorSpace(colorSpace(), dstColorSpace)) {
+  if (NeedConvertColorSpace(colorSpace(), dstColorSpace)) {
     ConvertColorSpaceInPlace(width(), height(), colorType, alphaType, dstRowBytes, colorSpace(),
                              dstColorSpace, dstPixels);
   }

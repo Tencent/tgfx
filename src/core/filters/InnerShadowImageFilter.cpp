@@ -67,10 +67,9 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::getShadowFragmentProcess
     invertShadowMask =
         ConstColorProcessor::Make(buffer, Color::Transparent().premultiply(), InputMode::Ignore);
   }
-  auto dstColor = ColorSpaceXformSteps::ConvertColorSpace(
-      ColorSpace::MakeSRGB(), AlphaType::Unpremultiplied, source->colorSpace(),
-      AlphaType::Premultiplied, color);
-  auto colorProcessor = ConstColorProcessor::Make(buffer, dstColor, InputMode::Ignore);
+  auto dstColor = color.convertColorSpace(source->colorSpace());
+  auto colorProcessor =
+      ConstColorProcessor::Make(buffer, dstColor.premultiply(), InputMode::Ignore);
 
   // get shadow mask and fill it with color
   auto colorShadowProcessor = XfermodeFragmentProcessor::MakeFromTwoProcessors(

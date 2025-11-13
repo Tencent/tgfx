@@ -97,7 +97,7 @@ bool FTPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, si
     for (auto& outline : outlines) {
       FT_Outline_Get_Bitmap(ftLibrary, &(outline->outline), &bitmap);
     }
-    if (!NeedConvertColorSpace(colorSpace(), dstColorSpace)) {
+    if (NeedConvertColorSpace(colorSpace(), dstColorSpace)) {
       ConvertColorSpaceInPlace(width(), height(), colorType, alphaType, dstRowBytes, colorSpace(),
                                dstColorSpace, dstPixels);
     }
@@ -119,7 +119,7 @@ bool FTPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, si
   for (const auto& outline : outlines) {
     FT_Outline_Render(ftLibrary, &(outline->outline), &params);
   }
-  if (!NeedConvertColorSpace(colorSpace(), dstColorSpace)) {
+  if (NeedConvertColorSpace(colorSpace(), dstColorSpace)) {
     ConvertColorSpaceInPlace(width(), height(), colorType, alphaType, dstRowBytes, colorSpace(),
                              dstColorSpace, dstPixels);
   }
