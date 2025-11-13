@@ -520,8 +520,10 @@ class Layer : public std::enable_shared_from_this<Layer> {
    * @param alpha The alpha transparency value used for drawing the layer and its children.
    * @param blendMode The blend mode used to composite the layer with the existing content on the
    * canvas.
+   * @param transform The transform used to draw the layer.
    */
-  void draw(Canvas* canvas, float alpha = 1.0f, BlendMode blendMode = BlendMode::SrcOver);
+  void draw(Canvas* canvas, float alpha = 1.0f, BlendMode blendMode = BlendMode::SrcOver,
+            const Matrix3D* transform = nullptr);
 
  protected:
   Layer();
@@ -585,19 +587,24 @@ class Layer : public std::enable_shared_from_this<Layer> {
    * @param contentScale The scale ratio of the specified area in the layer's local coordinate
    * system.
    * @param contentBound The rectangular coordinates of the specified area after scaling.
+   * @param transform The transform matrix to apply to the content.
    */
-  std::shared_ptr<ImageFilter> getImageFilter(float contentScale, const Rect& contentBound);
+  std::shared_ptr<ImageFilter> getImageFilter(float contentScale, const Rect& contentBound,
+                                              const Matrix3D* transform = nullptr);
 
   RasterizedContent* getRasterizedCache(const DrawArgs& args, const Matrix& renderMatrix);
 
   std::shared_ptr<Image> getRasterizedImage(const DrawArgs& args, float contentScale,
                                             Matrix* drawingMatrix);
 
-  void drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
+  void drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
+                 const Matrix3D* transform = nullptr);
 
-  void drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
+  void drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
+                     const Matrix3D* transform);
 
   void onDrawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
+                       const Matrix3D* transform,
                        const std::function<void(const LayerStyleSource*)>& beforeContentHandler,
                        const std::function<void(const LayerStyleSource*)>& afterContentHandler);
 
@@ -659,17 +666,18 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::shared_ptr<Image> getOffscreenContentImage(
       const DrawArgs& args, const Canvas* canvas, bool passThroughBackground,
       std::shared_ptr<BackgroundContext> subBackgroundContext, std::optional<Rect> clipBounds,
-      Matrix* imageMatrix, const LayerStyleSource* styleSource);
+      Matrix* imageMatrix, const LayerStyleSource* styleSource, const Matrix3D* transform);
 
   /**
    * Returns the equivalent transformation matrix adapted for a custom anchor point.
-   * The layer's matrix ‘_matrix3D’ is defined based on the layer's local coordinate system, with
-   * the transformation anchor point being the origin of that coordinate system. This function
-   * returns an affine transformation matrix that produces the same visual effect when using any
-   * point within this coordinate system as the new origin and anchor point.
-   * @param anchor The specified anchor point
+   * The matrix is defined based on a local coordinate system, with the transformation anchor point
+   * being the origin of that coordinate system. This function returns an affine transformation
+   * matrix that produces the same visual effect when using any point within this coordinate system
+   * as the new origin and anchor point.
+   * @param matrix The original transformation matrix.
+   * @param anchor The specified anchor point.
    */
-  Matrix3D anchorAdaptedMatrix(const Point& anchor) const;
+  Matrix3D anchorAdaptedMatrix(const Matrix3D& matrix, const Point& anchor) const;
 
   struct {
     bool dirtyContent : 1;        // layer's content needs updating

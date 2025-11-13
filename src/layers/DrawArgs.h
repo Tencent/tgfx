@@ -61,8 +61,5 @@ class DrawArgs {
 
   // Only used while recording layer's background image.
   std::shared_ptr<BackgroundContext> blendModeBackground = nullptr;
-
-  // Indicates whether to exclude 3D transformations during the drawing process.
-  bool excludeTransform3D = false;
 };
 }  // namespace tgfx

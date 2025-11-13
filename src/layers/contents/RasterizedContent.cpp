@@ -19,14 +19,17 @@
 #include "RasterizedContent.h"
 
 namespace tgfx {
-void RasterizedContent::draw(Canvas* canvas, bool antiAlias, float alpha,
-                             BlendMode blendMode) const {
+void RasterizedContent::draw(Canvas* canvas, bool antiAlias, float alpha, BlendMode blendMode,
+                             const Matrix3D* transform) const {
   auto oldMatrix = canvas->getMatrix();
   canvas->concat(matrix);
   Paint paint = {};
   paint.setAntiAlias(antiAlias);
   paint.setAlpha(alpha);
   paint.setBlendMode(blendMode);
+  if (transform != nullptr) {
+    paint.setImageFilter(ImageFilter::Transform3D(*transform));
+  }
   canvas->drawImage(image, &paint);
   canvas->setMatrix(oldMatrix);
 }
