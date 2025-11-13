@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "tgfx/core/Point.h"
 #include "tgfx/core/Size.h"
 #include "tgfx/svg/SVGTypes.h"
 
@@ -73,6 +74,25 @@ class SVGLengthContext {
   Rect resolveRect(const SVGLength& x, const SVGLength& y, const SVGLength& w,
                    const SVGLength& h) const;
 
+  /**
+   * Resolves a point using the given SVGLength values for x and y.
+   */
+  Point resolvePoint(const SVGLength& x, const SVGLength& y) const;
+
+  /**
+   * Resolves a point from raw coordinates into user-space coordinates
+   * according to the given SVG unit type.
+   *
+   * @param p The input point, whose x and y are interpreted using the unit type `u`.
+   * @param u The SVG length unit to apply when resolving the coordinates.
+   *          Defaults to SVGLength::Unit::Number (unitless, treated as user units).
+   *
+   * @return The resolved point in user-space coordinates.
+   *
+   * @note This function is useful when the input point uses relative or
+   *       percentage-based units that must be converted to absolute coordinates.
+   */
+  Point resolvePoint(const Point& p, SVGLength::Unit u = SVGLength::Unit::Number) const;
   /**
    * Resolves radii for an ellipse or rounded rectangle.
    */

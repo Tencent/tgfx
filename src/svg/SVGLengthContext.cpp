@@ -92,6 +92,16 @@ Rect SVGLengthContext::resolveRect(const SVGLength& x, const SVGLength& y, const
                         this->resolve(height, SVGLengthContext::LengthType::Vertical));
 }
 
+Point SVGLengthContext::resolvePoint(const SVGLength& x, const SVGLength& y) const {
+  return Point::Make(this->resolve(x, SVGLengthContext::LengthType::Horizontal),
+                     this->resolve(y, SVGLengthContext::LengthType::Vertical));
+}
+
+Point SVGLengthContext::resolvePoint(const Point& p, SVGLength::Unit u) const {
+  return Point::Make(this->resolve(SVGLength(p.x, u), SVGLengthContext::LengthType::Horizontal),
+                     this->resolve(SVGLength(p.y, u), SVGLengthContext::LengthType::Vertical));
+}
+
 std::tuple<float, float> SVGLengthContext::resolveOptionalRadii(
     const std::optional<SVGLength>& optionalRx, const std::optional<SVGLength>& optionalRy) const {
   // https://www.w3.org/TR/SVG2/shapes.html#RectElement
