@@ -50,7 +50,7 @@ class Atlas {
 
   void removeExpiredKeys();
 
-  //Rests all pages
+  //Resets all pages
   void reset();
 
  private:
@@ -102,4 +102,4 @@ class AtlasConfig {
   static constexpr int PlotSize = 512;
   ISize A8Dimensions = {MaxAtlasSize, MaxAtlasSize};
 };
-}  //namespace tgfx
+}  // namespace tgfx

@@ -28,7 +28,7 @@ class AtlasManager : public AtlasGenerationCounter {
   explicit AtlasManager(Context* context);
 
   // This function must be called first, before other functions which use the atlas.
-  // if return empty, the client must not try to use other functions.
+  // if it returns empty, the client must not try to use other functions.
   const std::vector<std::shared_ptr<TextureProxy>>& getTextureProxies(MaskFormat maskFormat);
 
   bool getCellLocator(MaskFormat, const BytesKey& key, AtlasCellLocator& locator) const;
@@ -43,7 +43,7 @@ class AtlasManager : public AtlasGenerationCounter {
 
   AtlasToken nextFlushToken() const;
 
-  // Resets atlas, does not destroy the underlying texture
+  // Resets atlas, does not destroy the underlying texture.
   void reset();
 
   // Releases all atlas resources,
