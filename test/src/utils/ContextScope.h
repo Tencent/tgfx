@@ -25,10 +25,10 @@
 namespace tgfx {
 class ContextScope {
  public:
-  explicit ContextScope(bool releaseAtlas = true) : device(DevicePool::Make()) {
+  explicit ContextScope() : device(DevicePool::Make()) {
     if (device != nullptr) {
       context = device->lockContext();
-      if (context && releaseAtlas) {
+      if (context) {
         //Clearing the atlas cache to prevent interference between different test cases.
         //For glyphs with Linear sampling, when placed at different locations within the atlas,
         //interpolation errors in texture coordinates can lead to slight variations in
