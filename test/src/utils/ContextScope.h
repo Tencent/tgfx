@@ -25,11 +25,11 @@
 namespace tgfx {
 class ContextScope {
  public:
-  explicit ContextScope(bool clearAtlas = true) : device(DevicePool::Make()) {
+  explicit ContextScope(bool freeAtlas = true) : device(DevicePool::Make()) {
     if (device != nullptr) {
       context = device->lockContext();
-      if (context && clearAtlas) {
-        context->atlasManager()->reset();
+      if (context && freeAtlas) {
+        context->atlasManager()->freeAll();
       }
     }
   }

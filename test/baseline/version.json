@@ -131,7 +131,7 @@
     },
     "DrawersTest": {
         "ConicGradient": "69683f78",
-        "CustomLayerTreeDrawer": "9060bdb6",
+        "CustomLayerTreeDrawer": "de8199b2",
         "GridBackground": "2ae64df",
         "ImageWithMipmap": "da590da",
         "ImageWithShadow": "c26ff3d9",
@@ -366,7 +366,7 @@
         "referenceStyle": "f38f0012",
         "text": "9bfe8c34",
         "textEmoji": "9bfe8c34",
-        "textFont": "6095b909"
+        "textFont": "de8199b2"
     },
     "StrokeTest": {
         "DashStrokeAsSolidStroke": "3a713e22",
@@ -392,10 +392,10 @@
         "TextAlignSimulateVerticalTextLayout": "9bfe8c34",
         "TextAlignWidth0Height0": "6095b909",
         "TextAlignWidth1Height10": "b722a9ab",
-        "TruncateTextLineTest": "9060bdb6"
+        "TruncateTextLineTest": "de8199b2"
     },
     "TypefaceTest": {
-        "CustomImageTypeface": "983a559b",
+        "CustomImageTypeface": "de8199b2",
         "CustomPathTypeface": "42ecc4c7"
     }
 }
