@@ -478,16 +478,32 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
     maxRefinedCount = 0;
   }
   hasZoomBlurTiles = false;
+  auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
+  
+  // Check if current zoom scale is below minimum tile scale
+  bool useFallbackTiles = _minTileScale > 0.0f && currentZoomScale < _minTileScale;
+  int64_t targetZoomScaleInt = _zoomScaleInt;
+  if (useFallbackTiles) {
+    targetZoomScaleInt = ToZoomScaleInt(_minTileScale, _zoomScalePrecision);
+  }
+  
   TileCache* currentTileCache = nullptr;
-  auto result = tileCaches.find(_zoomScaleInt);
+  auto result = tileCaches.find(targetZoomScaleInt);
   if (result != tileCaches.end()) {
     currentTileCache = result->second;
   } else {
     currentTileCache = new TileCache(_tileSize);
-    tileCaches[_zoomScaleInt] = currentTileCache;
+    tileCaches[targetZoomScaleInt] = currentTileCache;
   }
+  
   auto renderRect = Rect::MakeWH(surface->width(), surface->height());
   renderRect.offset(-_contentOffset.x, -_contentOffset.y);
+  
+  // If using fallback tiles, scale the render rect to match the target scale
+  if (useFallbackTiles) {
+    auto scaleRatio = _minTileScale / currentZoomScale;
+    renderRect.scale(scaleRatio, scaleRatio);
+  }
   int startX = static_cast<int>(floorf(renderRect.left / static_cast<float>(_tileSize)));
   int startY = static_cast<int>(floorf(renderRect.top / static_cast<float>(_tileSize)));
   int endX = static_cast<int>(ceilf(renderRect.right / static_cast<float>(_tileSize)));
@@ -505,7 +521,7 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
     if (tile != nullptr) {
       screenTasks.emplace_back(tile, _tileSize);
     } else {
-      if (_allowZoomBlur) {
+      if (!useFallbackTiles && _allowZoomBlur) {
         auto fallbackTasks = getFallbackDrawTasks(tileX, tileY, fallbackTileCaches);
         if (!fallbackTasks.empty()) {
           if (maxRefinedCount <= 0) {
