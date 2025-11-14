@@ -284,30 +284,29 @@ void Atlas::removeExpiredKeys() {
 
 void Atlas::reset() {
   for (auto& page : pages) {
-    auto& plotList = page.plotList;
-    for (const auto& plot : plotList) {
+    for (const auto& plot : page.plotList) {
       plot->resetRects();
     }
-    plotList.sort([](const Plot* a, const Plot* b) { return a->plotIndex() > b->plotIndex(); });
+    page.plotList.sort(
+        [](const Plot* a, const Plot* b) { return a->plotIndex() > b->plotIndex(); });
   }
   expiredKeys.clear();
   cellLocators.clear();
 }
 
 AtlasConfig::AtlasConfig(int maxTextureSize) {
-  RGBADimensions.set(std::min(MaxAtlasSize, maxTextureSize),
-                     std::min(MaxAtlasSize, maxTextureSize));
+  A8Dimensions.set(std::min(MaxAtlasSize, maxTextureSize), std::min(MaxAtlasSize, maxTextureSize));
 }
 
 ISize AtlasConfig::atlasDimensions(MaskFormat maskFormat) const {
   if (maskFormat == MaskFormat::A8) {
-    return RGBADimensions;
+    return A8Dimensions;
   }
-  return {RGBADimensions.width, RGBADimensions.height / 2};
+  return {A8Dimensions.width, A8Dimensions.height / 2};
 }
 
 ISize AtlasConfig::PlotDimensions() {
-  static ISize Dimensions{PlotSize, PlotSize};
-  return Dimensions;
+  static ISize dimensions{PlotSize, PlotSize};
+  return dimensions;
 }
 }  // namespace tgfx

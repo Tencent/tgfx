@@ -100,6 +100,6 @@ class AtlasConfig {
  private:
   static constexpr int MaxAtlasSize = 2048;
   static constexpr int PlotSize = 512;
-  ISize RGBADimensions = {MaxAtlasSize, MaxAtlasSize};
+  ISize A8Dimensions = {MaxAtlasSize, MaxAtlasSize};
 };
 }  //namespace tgfx
