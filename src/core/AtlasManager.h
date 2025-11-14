@@ -45,7 +45,7 @@ class AtlasManager : public AtlasGenerationCounter {
 
   // Releases all atlas resources,
   // including their underlying textures.
-  void freeAll();
+  void releaseAll();
 
  private:
   bool initAtlas(MaskFormat format);

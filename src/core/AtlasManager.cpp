@@ -98,7 +98,7 @@ AtlasToken AtlasManager::nextFlushToken() const {
   return atlasTokenTracker.nextToken();
 }
 
-void AtlasManager::freeAll() {
+void AtlasManager::releaseAll() {
   for (auto& atlas : atlases) {
     atlas = nullptr;
   }
