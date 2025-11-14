@@ -282,18 +282,6 @@ void Atlas::removeExpiredKeys() {
   expiredKeys.clear();
 }
 
-void Atlas::reset() {
-  for (auto& page : pages) {
-    for (const auto& plot : page.plotList) {
-      plot->resetRects();
-    }
-    page.plotList.sort(
-        [](const Plot* a, const Plot* b) { return a->plotIndex() > b->plotIndex(); });
-  }
-  expiredKeys.clear();
-  cellLocators.clear();
-}
-
 AtlasConfig::AtlasConfig(int maxTextureSize) {
   A8Dimensions.set(std::min(MaxAtlasSize, maxTextureSize), std::min(MaxAtlasSize, maxTextureSize));
 }

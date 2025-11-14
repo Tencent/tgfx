@@ -43,9 +43,6 @@ class AtlasManager : public AtlasGenerationCounter {
 
   AtlasToken nextFlushToken() const;
 
-  // Resets atlas, does not destroy the underlying texture.
-  void reset();
-
   // Releases all atlas resources,
   // including their underlying textures.
   void freeAll();

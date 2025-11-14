@@ -50,9 +50,6 @@ class Atlas {
 
   void removeExpiredKeys();
 
-  //Resets all pages
-  void reset();
-
  private:
   Atlas(ProxyProvider* proxyProvider, PixelFormat pixelFormat, int width, int height, int plotWidth,
         int plotHeight, AtlasGenerationCounter* generationCounter);

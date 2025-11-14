@@ -98,13 +98,6 @@ AtlasToken AtlasManager::nextFlushToken() const {
   return atlasTokenTracker.nextToken();
 }
 
-void AtlasManager::reset() {
-  for (const auto& atlas : atlases) {
-    if (atlas) {
-      atlas->reset();
-    }
-  }
-}
 void AtlasManager::freeAll() {
   for (auto& atlas : atlases) {
     atlas = nullptr;
