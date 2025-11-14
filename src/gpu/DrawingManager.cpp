@@ -18,7 +18,6 @@
 
 #include "DrawingManager.h"
 #include "ProxyProvider.h"
-#include "core/AtlasCellDecodeTask.h"
 #include "core/AtlasManager.h"
 #include "core/utils/HardwareBufferUtil.h"
 #include "gpu/proxies/RenderTargetProxy.h"
@@ -31,27 +30,6 @@
 #include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
-static ColorType GetAtlasColorType(bool isAlphaOnly) {
-  if (isAlphaOnly) {
-    return ColorType::ALPHA_8;
-  }
-#ifdef __APPLE__
-  return ColorType::BGRA_8888;
-#else
-  return ColorType::RGBA_8888;
-#endif
-}
-
-static ImageInfo GetAtlasImageInfo(int width, int height, bool isAlphaOnly) {
-  auto colorType = GetAtlasColorType(isAlphaOnly);
-  auto rowBytes = static_cast<size_t>(width * (isAlphaOnly ? 1 : 4));
-  // Align to 4 bytes
-  constexpr size_t ALIGNMENT = 4;
-  rowBytes = (rowBytes + ALIGNMENT - 1) & ~(ALIGNMENT - 1);
-  return ImageInfo::Make(width, height, colorType, AlphaType::Premultiplied, rowBytes,
-                         ColorSpace::SRGB());
-}
-
 DrawingManager::DrawingManager(Context* context)
     : context(context), drawingAllocator(context->drawingAllocator()) {
 }
@@ -149,47 +127,21 @@ void DrawingManager::addResourceTask(PlacementPtr<ResourceTask> resourceTask) {
   resourceTasks.emplace_back(std::move(resourceTask));
 }
 
-void DrawingManager::addAtlasCellCodecTask(const std::shared_ptr<TextureProxy>& textureProxy,
-                                           const Point& atlasOffset,
-                                           std::shared_ptr<ImageCodec> codec) {
+void DrawingManager::addAtlasCellTask(std::shared_ptr<TextureProxy> textureProxy,
+                                      const Point& atlasOffset, std::shared_ptr<ImageCodec> codec) {
   if (textureProxy == nullptr || codec == nullptr) {
     return;
   }
-  auto padding = Plot::CellPadding;
-  void* dstPixels = nullptr;
-  auto dstWidth = codec->width() + 2 * padding;
-  auto dstHeight = codec->height() + 2 * padding;
-  ImageInfo dstInfo = {};
-  auto hardwareBuffer = textureProxy->getHardwareBuffer();
-  if (hardwareBuffer != nullptr) {
-    auto hardwareInfo = GetImageInfo(hardwareBuffer, ColorSpace::SRGB());
-    dstInfo = hardwareInfo.makeIntersect(0, 0, dstWidth, dstHeight);
-    void* pixels = nullptr;
-    if (auto iter = atlasHardwareBuffers.find(textureProxy.get());
-        iter == atlasHardwareBuffers.end()) {
-      pixels = HardwareBufferLock(hardwareBuffer);
-      atlasHardwareBuffers.emplace(textureProxy.get(), std::make_pair(hardwareBuffer, pixels));
-    } else {
-      pixels = iter->second.second;
-    }
-    auto offsetX = static_cast<int>(atlasOffset.x) - padding;
-    auto offsetY = static_cast<int>(atlasOffset.y) - padding;
-    dstPixels = hardwareInfo.computeOffset(pixels, offsetX, offsetY);
+  AtlasUploadTask* atlasUploadTask = nullptr;
+  auto result = atlasTasks.find(textureProxy.get());
+  if (result != atlasTasks.end()) {
+    atlasUploadTask = result->second.get();
   } else {
-    dstInfo = GetAtlasImageInfo(dstWidth, dstHeight, codec->isAlphaOnly());
-    auto length = dstInfo.byteSize();
-    dstPixels = drawingAllocator->allocate(length);
-    if (dstPixels == nullptr) {
-      return;
-    }
-    auto data = Data::MakeWithoutCopy(dstPixels, length);
-    auto uploadOffset = atlasOffset;
-    auto floatPadding = static_cast<float>(padding);
-    uploadOffset.offset(-floatPadding, -floatPadding);
-    atlasCellDatas[textureProxy].emplace_back(std::move(data), dstInfo, uploadOffset);
+    auto atlasTask = drawingAllocator->make<AtlasUploadTask>(textureProxy);
+    atlasUploadTask = atlasTask.get();
+    atlasTasks[textureProxy.get()] = std::move(atlasTask);
   }
-  auto task = std::make_shared<AtlasCellDecodeTask>(std::move(codec), dstPixels, dstInfo, padding);
-  atlasCellCodecTasks.emplace_back(std::move(task));
+  atlasUploadTask->addCell(drawingAllocator, std::move(codec), atlasOffset);
 }
 
 std::shared_ptr<CommandBuffer> DrawingManager::flush() {
@@ -203,9 +155,8 @@ std::shared_ptr<CommandBuffer> DrawingManager::flush() {
   // Flush the shared vertex buffer before executing the tasks. It may generate new resource tasks.
   proxyProvider->flushSharedVertexBuffer();
 
-  if (resourceTasks.empty() && renderTasks.empty()) {
+  if (resourceTasks.empty() && renderTasks.empty() && atlasTasks.empty()) {
     proxyProvider->clearSharedVertexBuffer();
-    resetAtlasCache();
     return nullptr;
   }
   {
@@ -215,11 +166,13 @@ std::shared_ptr<CommandBuffer> DrawingManager::flush() {
       task = nullptr;
     }
   }
-  uploadAtlasToGPU();
   resourceTasks.clear();
+  for (auto& task : atlasTasks) {
+    task.second->upload(context);
+  }
+  atlasTasks.clear();
   proxyProvider->clearSharedVertexBuffer();
   auto commandEncoder = context->gpu()->createCommandEncoder();
-
   {
     TASK_MARK(tgfx::inspect::OpTaskType::RenderTask);
     for (auto& task : renderTasks) {
@@ -230,40 +183,4 @@ std::shared_ptr<CommandBuffer> DrawingManager::flush() {
   renderTasks.clear();
   return commandEncoder->finish();
 }
-
-void DrawingManager::resetAtlasCache() {
-  atlasCellCodecTasks.clear();
-  atlasCellDatas.clear();
-  atlasHardwareBuffers.clear();
-}
-
-void DrawingManager::uploadAtlasToGPU() {
-  auto queue = context->gpu()->queue();
-  for (auto& task : atlasCellCodecTasks) {
-    task->wait();
-  }
-  for (auto& [_, buffer] : atlasHardwareBuffers) {
-    HardwareBufferUnlock(buffer.first);
-  }
-  for (auto& [textureProxy, cellDatas] : atlasCellDatas) {
-    if (textureProxy == nullptr || cellDatas.empty()) {
-      continue;
-    }
-    auto textureView = textureProxy->getTextureView();
-    if (textureView == nullptr) {
-      continue;
-    }
-    for (auto& [data, info, atlasOffset] : cellDatas) {
-      if (data == nullptr) {
-        continue;
-      }
-      auto rect = Rect::MakeXYWH(atlasOffset.x, atlasOffset.y, static_cast<float>(info.width()),
-                                 static_cast<float>(info.height()));
-      queue->writeTexture(textureView->getTexture(), rect, data->data(), info.rowBytes());
-      // Text atlas has no mipmaps, so we don't need to regenerate mipmaps.
-    }
-  }
-  resetAtlasCache();
-}
-
 }  // namespace tgfx
