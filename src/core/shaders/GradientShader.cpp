@@ -139,14 +139,14 @@ GradientShader::GradientShader(const std::vector<Color>& colors,
 static PlacementPtr<FragmentProcessor> MakeGradient(const Context* context,
                                                     const GradientShader& shader,
                                                     PlacementPtr<FragmentProcessor> layout,
-                                                    const ColorSpaceXformSteps& steps) {
+                                                    std::shared_ptr<ColorSpace> dstColorSpace) {
   if (layout == nullptr) {
     return nullptr;
   }
   auto dstColors = shader.originalColors;
 
   for (auto& color : dstColors) {
-    steps.apply(color.array());
+    color = color.makeColorSpace(std::move(dstColorSpace));
   }
   // All gradients are colorized the same way, regardless of layout
   PlacementPtr<FragmentProcessor> colorizer =
@@ -196,11 +196,9 @@ PlacementPtr<FragmentProcessor> LinearGradientShader::asFragmentProcessor(
   if (uvMatrix) {
     totalMatrix.preConcat(*uvMatrix);
   }
-  ColorSpaceXformSteps steps(ColorSpace::MakeSRGB().get(), AlphaType::Unpremultiplied,
-                             dstColorSpace.get(), AlphaType::Unpremultiplied);
   return MakeGradient(args.context, *this,
                       LinearGradientLayout::Make(args.context->drawingAllocator(), totalMatrix),
-                      steps);
+                      std::move(dstColorSpace));
 }
 
 GradientType LinearGradientShader::asGradient(GradientInfo* info) const {
@@ -239,11 +237,9 @@ PlacementPtr<FragmentProcessor> RadialGradientShader::asFragmentProcessor(
   if (uvMatrix != nullptr) {
     totalMatrix.preConcat(*uvMatrix);
   }
-  ColorSpaceXformSteps steps(ColorSpace::MakeSRGB().get(), AlphaType::Unpremultiplied,
-                             dstColorSpace.get(), AlphaType::Unpremultiplied);
   return MakeGradient(args.context, *this,
                       RadialGradientLayout::Make(args.context->drawingAllocator(), totalMatrix),
-                      steps);
+                      std::move(dstColorSpace));
 }
 
 GradientType RadialGradientShader::asGradient(GradientInfo* info) const {
@@ -268,11 +264,10 @@ PlacementPtr<FragmentProcessor> ConicGradientShader::asFragmentProcessor(
   if (uvMatrix != nullptr) {
     totalMatrix.preConcat(*uvMatrix);
   }
-  ColorSpaceXformSteps steps(ColorSpace::MakeSRGB().get(), AlphaType::Unpremultiplied,
-                             dstColorSpace.get(), AlphaType::Unpremultiplied);
   return MakeGradient(
       args.context, *this,
-      ConicGradientLayout::Make(args.context->drawingAllocator(), totalMatrix, bias, scale), steps);
+      ConicGradientLayout::Make(args.context->drawingAllocator(), totalMatrix, bias, scale),
+      std::move(dstColorSpace));
 }
 
 GradientType ConicGradientShader::asGradient(GradientInfo* info) const {
@@ -319,10 +314,8 @@ PlacementPtr<FragmentProcessor> DiamondGradientShader::asFragmentProcessor(
   if (uvMatrix != nullptr) {
     totalMatrix.preConcat(*uvMatrix);
   }
-  ColorSpaceXformSteps steps(ColorSpace::MakeSRGB().get(), AlphaType::Unpremultiplied,
-                             dstColorSpace.get(), AlphaType::Unpremultiplied);
   auto layout = DiamondGradientLayout::Make(args.context->drawingAllocator(), totalMatrix);
-  return MakeGradient(args.context, *this, std::move(layout), steps);
+  return MakeGradient(args.context, *this, std::move(layout), std::move(dstColorSpace));
 }
 
 GradientType DiamondGradientShader::asGradient(GradientInfo* info) const {

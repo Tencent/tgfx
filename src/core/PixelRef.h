@@ -38,7 +38,7 @@ class PixelRef {
    */
   static std::shared_ptr<PixelRef> Make(
       int width, int height, bool alphaOnly = false, bool tryHardware = true,
-      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB());
 
   /**
    * Creates a new PixelRef with the specified PixelBuffer. Returns nullptr if the pixelBuffer is

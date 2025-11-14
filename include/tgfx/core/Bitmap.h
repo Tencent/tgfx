@@ -50,7 +50,7 @@ class Bitmap {
    * of the Bitmap will return true if allocation fails.
    */
   Bitmap(int width, int height, bool alphaOnly = false, bool tryHardware = true,
-         std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+         std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB());
 
   /**
    * Copies settings from src to returned Bitmap. Shares pixels if src has pixels allocated, so both
@@ -69,7 +69,7 @@ class Bitmap {
    * platform. The Bitmap takes a reference to the hardwareBuffer.
    */
   explicit Bitmap(HardwareBufferRef hardwareBuffer,
-                  std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+                  std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB());
 
   /**
    * Copies settings from src to returned Bitmap. Shares pixels if src has pixels allocated, so both
@@ -90,7 +90,7 @@ class Bitmap {
    * allocated successfully.
    */
   bool allocPixels(int width, int height, bool alphaOnly = false, bool tryHardware = true,
-                   std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+                   std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB());
 
   /**
    * Locks and returns the writable pixels, the base address corresponding to the pixel origin.

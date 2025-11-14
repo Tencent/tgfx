@@ -72,6 +72,6 @@ Color Swizzle::applyTo(const Color& color) const {
   k >>= 4;
   idx = static_cast<int>(k & 15);
   float outA = ComponentIdxToFloat(color, idx);
-  return {outR, outG, outB, outA};
+  return {outR, outG, outB, outA, color.colorSpace};
 }
 }  // namespace tgfx

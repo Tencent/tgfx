@@ -104,9 +104,9 @@ static void RenderOutLineGlyph(FT_Face face, const ImageInfo& dstInfo, void* dst
   FT_Outline_Translate(outline, -bbox.xMin, -bbox.yMin);
   FT_Outline_Render(face->glyph->library, outline, &params);
 
-  if (!NeedConvertColorSpace(ColorSpace::MakeSRGB(), dstInfo.colorSpace())) {
+  if (NeedConvertColorSpace(ColorSpace::SRGB(), dstInfo.colorSpace())) {
     ConvertColorSpaceInPlace(dstInfo.width(), dstInfo.height(), dstInfo.colorType(),
-                             dstInfo.alphaType(), dstInfo.rowBytes(), ColorSpace::MakeSRGB(),
+                             dstInfo.alphaType(), dstInfo.rowBytes(), ColorSpace::SRGB(),
                              dstInfo.colorSpace(), dstPixels);
   }
 }

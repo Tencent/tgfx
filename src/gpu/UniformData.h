@@ -23,6 +23,7 @@
 #include <unordered_map>
 #include <vector>
 #include "gpu/Uniform.h"
+#include "tgfx/core/Color.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/Matrix.h"
 
@@ -50,6 +51,15 @@ class UniformData {
                    void>
   setData(const std::string& name, const T& value) const {
     onSetData(name, &value, sizeof(value));
+  }
+
+  /**
+   * Convenience method for Color.
+   */
+  template <typename T>
+  std::enable_if_t<std::is_same_v<std::decay_t<T>, Color>, void> setData(const std::string& name,
+                                                                         const T& color) const {
+    onSetData(name, color.array(), sizeof(float) * 4);
   }
 
   /**
