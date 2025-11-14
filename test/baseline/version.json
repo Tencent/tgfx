@@ -130,21 +130,11 @@
         "tile_mode_subset": "2931d737"
     },
     "DrawersTest": {
-<<<<<<< HEAD
         "ConicGradient": "492105ac",
         "ImageWithMipmap": "492105ac",
         "ImageWithShadow": "492105ac",
         "RichText": "97a50bee",
         "SimpleLayerTree": "97a50bee"
-=======
-        "ConicGradient": "69683f78",
-        "CustomLayerTreeDrawer": "de8199b2",
-        "GridBackground": "2ae64df",
-        "ImageWithMipmap": "da590da",
-        "ImageWithShadow": "c26ff3d9",
-        "SimpleLayerTreeDrawer": "82a72562",
-        "SimpleText": "c73fb3b5"
->>>>>>> origin/main
     },
     "DstTextureTest": {
         "EmptyLocalBounds": "be94e666",
