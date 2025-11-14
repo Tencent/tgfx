@@ -36,7 +36,7 @@ class Font {
   Font();
 
   /**
-   * Constructs Font with default values with Typeface and size in points.
+   * Constructs Font with default values with Typeface and size.
    */
   Font(std::shared_ptr<Typeface> typeface, float size);
 
@@ -66,12 +66,12 @@ class Font {
   void setTypeface(std::shared_ptr<Typeface> newTypeface);
 
   /**
-   * Returns the point size of this font.
+   * Returns the size of this font.
    */
   float getSize() const;
 
   /**
-   * Sets text size in points. Has no effect if textSize is not greater than or equal to zero.
+   * Sets text size. Has no effect if textSize is not greater than or equal to zero.
    */
   void setSize(float newSize);
 
