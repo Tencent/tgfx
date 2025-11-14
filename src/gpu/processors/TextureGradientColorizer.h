@@ -24,7 +24,7 @@
 namespace tgfx {
 class TextureGradientColorizer : public FragmentProcessor {
  public:
-  static PlacementPtr<TextureGradientColorizer> Make(BlockBuffer* buffer,
+  static PlacementPtr<TextureGradientColorizer> Make(BlockAllocator* allocator,
                                                      std::shared_ptr<TextureProxy> gradient);
 
   std::string name() const override {

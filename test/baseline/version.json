@@ -17,13 +17,13 @@
         "DrawPathProvider": "cd6a8dff",
         "DrawRecordSRGBColorToP3UseDrawImage": "68928515",
         "DrawRecordSRGBColorToP3UseDrawPicture": "82494664",
-        "DrawSRGBBlendFilterToP3": "82494664",
+        "DrawSRGBBlendFilterToP3": "c73fb3b5",
         "DrawSRGBColorShaderToP3": "82494664",
-        "DrawSRGBConicShaderToP3": "82494664",
-        "DrawSRGBDiamondShaderToP3": "82494664",
-        "DrawSRGBDropShadowFilterToP3": "82494664",
-        "DrawSRGBLinearShaderToP3": "82494664",
-        "DrawSRGBRadialShaderToP3": "82494664",
+        "DrawSRGBConicShaderToP3": "c73fb3b5",
+        "DrawSRGBDiamondShaderToP3": "c73fb3b5",
+        "DrawSRGBDropShadowFilterToP3": "c73fb3b5",
+        "DrawSRGBLinearShaderToP3": "c73fb3b5",
+        "DrawSRGBRadialShaderToP3": "c73fb3b5",
         "FillModifier": "fa2f12b1",
         "LumaFilterToRec2020": "82494664",
         "LumaFilterToRec601": "82494664",
@@ -90,7 +90,7 @@
         "drawScalePictureImage": "68928515",
         "drawScaleSubImage": "68928515",
         "drawShape": "cd6a8dff",
-        "emojiTextStrokeBlending": "97331a7d",
+        "emojiTextStrokeBlending": "9bfe8c34",
         "filter_mode_linear": "0cfb8996",
         "filter_mode_nearest": "0cfb8996",
         "hardware_render_target_blend": "0cfb8996",
@@ -121,20 +121,30 @@
         "scaled_mipmap": "68928515",
         "scaled_scale_up": "68928515",
         "shape": "e39a63cd",
-        "textEmojiMixedBlendModes": "983a559b",
-        "textEmojiMixedBlendModes2": "983a559b",
-        "textEmojiOverlayBlendModes": "983a559b",
-        "text_shape": "cd6a8dff",
+        "textEmojiMixedBlendModes": "9bfe8c34",
+        "textEmojiMixedBlendModes2": "9bfe8c34",
+        "textEmojiOverlayBlendModes": "9bfe8c34",
+        "text_shape": "9bfe8c34",
         "tile_mode_normal": "2931d737",
         "tile_mode_rgbaaa": "8cb853c",
         "tile_mode_subset": "2931d737"
     },
     "DrawersTest": {
+<<<<<<< HEAD
         "ConicGradient": "492105ac",
         "ImageWithMipmap": "492105ac",
         "ImageWithShadow": "492105ac",
         "RichText": "97a50bee",
         "SimpleLayerTree": "97a50bee"
+=======
+        "ConicGradient": "69683f78",
+        "CustomLayerTreeDrawer": "de8199b2",
+        "GridBackground": "2ae64df",
+        "ImageWithMipmap": "da590da",
+        "ImageWithShadow": "c26ff3d9",
+        "SimpleLayerTreeDrawer": "82a72562",
+        "SimpleText": "c73fb3b5"
+>>>>>>> origin/main
     },
     "DstTextureTest": {
         "EmptyLocalBounds": "be94e666",
@@ -214,7 +224,7 @@
         "LayerVisible1": "4edccb64",
         "Layer_drawRRect": "e39a63cd",
         "Layer_hitTestPoint": "cd6a8dff",
-        "Layer_hitTestPointNested": "b722a9ab",
+        "Layer_hitTestPointNested": "9bfe8c34",
         "MaskAlpha": "3dbeed5",
         "ModeColorFilter": "68928515",
         "NotRectBackgroundBlur": "a8b299ea",
@@ -238,7 +248,7 @@
         "backgroundLayerBlur": "82a72562",
         "draw_shape": "0cfb8996",
         "draw_solid": "b4a1231",
-        "draw_text": "82a72562",
+        "draw_text": "9bfe8c34",
         "dropShadow": "ee2cc771",
         "filterClip": "68928515",
         "filterTest": "68928515",
@@ -252,7 +262,7 @@
         "imageMask": "68928515",
         "innerShadow": "0cfb8996",
         "shapeMask": "68928515",
-        "textMask": "82a72562"
+        "textMask": "9bfe8c34"
     },
     "MaskTest": {
         "rasterize_emoji": "c0f39f8",
@@ -260,7 +270,7 @@
         "rasterize_path_texture": "c475bfb"
     },
     "PDFTest": {
-        "ColorSpace": "468c9428",
+        "ColorSpace": "c73fb3b5",
         "Complex": "468c9428",
         "DrawColor": "3a713e22",
         "DrawShape": "3a713e22",
@@ -362,9 +372,9 @@
         "png_image": "b1db872",
         "radialGradient": "b1db872",
         "referenceStyle": "f38f0012",
-        "text": "9060bdb6",
-        "textEmoji": "983a559b",
-        "textFont": "6095b909"
+        "text": "9bfe8c34",
+        "textEmoji": "9bfe8c34",
+        "textFont": "de8199b2"
     },
     "StrokeTest": {
         "DashStrokeAsSolidStroke": "3a713e22",
@@ -383,17 +393,17 @@
         "ImageSnapshot_Surface2": "0cfb8996"
     },
     "TextAlignTest": {
-        "FontFallbackTest": "b722a9ab",
+        "FontFallbackTest": "9bfe8c34",
         "SingleLineTextAlign": "6095b909",
-        "TextAlign": "6be99a69",
+        "TextAlign": "9bfe8c34",
         "TextAlignBlankLineTest": "6095b909",
-        "TextAlignSimulateVerticalTextLayout": "b722a9ab",
+        "TextAlignSimulateVerticalTextLayout": "9bfe8c34",
         "TextAlignWidth0Height0": "6095b909",
         "TextAlignWidth1Height10": "b722a9ab",
-        "TruncateTextLineTest": "9060bdb6"
+        "TruncateTextLineTest": "de8199b2"
     },
     "TypefaceTest": {
-        "CustomImageTypeface": "983a559b",
+        "CustomImageTypeface": "de8199b2",
         "CustomPathTypeface": "42ecc4c7"
     }
 }

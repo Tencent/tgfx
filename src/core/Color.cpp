@@ -17,10 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Color.h"
-#include <utility>
 #include "core/ColorSpaceXformSteps.h"
 #include "core/utils/Log.h"
 #include "tgfx/core/AlphaType.h"
+#include "utils/ColorSpaceHelper.h"
 
 namespace tgfx {
 const Color& Color::Transparent() {
@@ -55,13 +55,23 @@ const Color& Color::Blue() {
 
 Color Color::FromRGBA(uint8_t r, uint8_t g, uint8_t b, uint8_t a,
                       std::shared_ptr<ColorSpace> colorSpace) {
-  float srcColor[4] = {static_cast<float>(r) / 255.0f, static_cast<float>(g) / 255.0f,
-                       static_cast<float>(b) / 255.0f,
-                       a == 255 ? 1.0f : static_cast<float>(a) / 255.0f};
-  Color color(srcColor[0], srcColor[1], srcColor[2], srcColor[3]);
-  return ColorSpaceXformSteps::ConvertColorSpace(std::move(colorSpace), AlphaType::Unpremultiplied,
-                                                 ColorSpace::MakeSRGB(), AlphaType::Unpremultiplied,
-                                                 color);
+  return {static_cast<float>(r) / 255.0f, static_cast<float>(g) / 255.0f,
+          static_cast<float>(b) / 255.0f, a == 255 ? 1.0f : static_cast<float>(a) / 255.0f,
+          std::move(colorSpace)};
+}
+
+bool Color::operator==(const Color& other) const {
+  auto thisColorSpace = colorSpace;
+  auto otherColorSpace = other.colorSpace;
+  if (thisColorSpace == nullptr) {
+    thisColorSpace = ColorSpace::SRGB();
+  }
+  if (otherColorSpace == nullptr) {
+    otherColorSpace = ColorSpace::SRGB();
+  }
+
+  return alpha == other.alpha && red == other.red && green == other.green && blue == other.blue &&
+         ColorSpace::Equals(thisColorSpace.get(), otherColorSpace.get());
 }
 
 float Color::operator[](int index) const {
@@ -81,11 +91,26 @@ bool Color::isOpaque() const {
 
 Color Color::unpremultiply() const {
   if (alpha == 0.0f) {
-    return {0, 0, 0, 0};
+    return {0, 0, 0, 0, colorSpace};
   } else {
     float invAlpha = 1 / alpha;
-    return {red * invAlpha, green * invAlpha, blue * invAlpha, alpha};
+    return {red * invAlpha, green * invAlpha, blue * invAlpha, alpha, colorSpace};
   }
+}
+
+Color Color::makeColorSpace(std::shared_ptr<ColorSpace> dstColorSpace) const {
+  auto dstColor = *this;
+  if (dstColorSpace == nullptr) {
+    dstColorSpace = ColorSpace::SRGB();
+  }
+  if (!NeedConvertColorSpace(colorSpace, dstColorSpace)) {
+    return dstColor;
+  }
+  ColorSpaceXformSteps steps(colorSpace.get(), AlphaType::Unpremultiplied, dstColorSpace.get(),
+                             AlphaType::Unpremultiplied);
+  steps.apply(dstColor.array());
+  dstColor.colorSpace = dstColorSpace;
+  return dstColor;
 }
 
 }  // namespace tgfx

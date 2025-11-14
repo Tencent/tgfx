@@ -38,7 +38,7 @@ PlacementPtr<Rect3DDrawOp> Rect3DDrawOp::Make(Context* context,
   if (provider == nullptr) {
     return nullptr;
   }
-  auto drawOp = context->drawingBuffer()->make<Rect3DDrawOp>(provider.get(), drawArgs);
+  auto drawOp = context->drawingAllocator()->make<Rect3DDrawOp>(provider.get(), drawArgs);
   CAPUTRE_RECT_MESH(drawOp.get(), provider.get());
   if (provider->aaType() == AAType::Coverage || provider->rectCount() > 1 || provider->lineJoin()) {
     drawOp->indexBufferProxy = context->globalCache()->getRectIndexBuffer(
@@ -71,7 +71,7 @@ PlacementPtr<GeometryProcessor> Rect3DDrawOp::onMakeGeometryProcessor(RenderTarg
   ATTRIBUTE_NAME("commonColor", commonColor);
   ATTRIBUTE_NAME("uvMatrix", uvMatrix);
   ATTRIBUTE_NAME("hasSubset", hasSubset);
-  auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
+  auto drawingBuffer = renderTarget->getContext()->drawingAllocator();
   // The actual size of the rendered texture is larger than the valid size, while the current
   // NDC coordinates were calculated based on the valid size, so they need to be adjusted
   // accordingly.

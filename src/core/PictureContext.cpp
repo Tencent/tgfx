@@ -30,13 +30,13 @@ namespace tgfx {
 constexpr int MaxPictureDrawsToUnrollInsteadOfReference = 1;
 
 PictureContext::~PictureContext() {
-  // make sure the records are cleared before the blockBuffer is destroyed.
+  // make sure the records are cleared before the blockAllocator is destroyed.
   records.clear();
 }
 
 void PictureContext::clear() {
   records.clear();
-  blockBuffer.clear();
+  blockAllocator.clear();
   lastState = {};
   lastFill = {};
   lastStroke = {};
@@ -48,16 +48,16 @@ std::shared_ptr<Picture> PictureContext::finishRecordingAsPicture(bool shrinkToF
   if (records.empty()) {
     return nullptr;
   }
-  auto lastBlock = blockBuffer.currentBlock();
-  auto blockData = blockBuffer.release();
-  if (blockData == nullptr) {
+  auto lastBlock = blockAllocator.currentBlock();
+  auto blockBuffer = blockAllocator.release();
+  if (blockBuffer == nullptr) {
     return nullptr;
   }
   if (shrinkToFit) {
     records.shrink_to_fit();
     auto oldBlockStart = reinterpret_cast<const uint8_t*>(lastBlock.first);
     auto oldBlockEnd = oldBlockStart + lastBlock.second;
-    auto newBlock = blockData->shrinkLastBlockTo(lastBlock.second);
+    auto newBlock = blockBuffer->shrinkLastBlockTo(lastBlock.second);
     if (newBlock != oldBlockStart) {
       for (auto it = records.rbegin(); it != records.rend(); ++it) {
         auto pointer = reinterpret_cast<const uint8_t*>(it->get());
@@ -70,7 +70,7 @@ std::shared_ptr<Picture> PictureContext::finishRecordingAsPicture(bool shrinkToF
     }
   }
   std::shared_ptr<Picture> picture =
-      std::shared_ptr<Picture>(new Picture(std::move(blockData), std::move(records), drawCount));
+      std::shared_ptr<Picture>(new Picture(std::move(blockBuffer), std::move(records), drawCount));
   lastState = {};
   lastFill = {};
   lastStroke = {};
@@ -87,7 +87,7 @@ void PictureContext::drawFill(const Fill& fill) {
   }
   if (fill.color.alpha > 0.0f) {
     recordAll({}, fill);
-    auto record = blockBuffer.make<DrawFill>();
+    auto record = blockAllocator.make<DrawFill>();
     records.emplace_back(std::move(record));
     drawCount++;
   }
@@ -96,7 +96,7 @@ void PictureContext::drawFill(const Fill& fill) {
 void PictureContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill,
                               const Stroke* stroke) {
   recordAll(state, fill, stroke);
-  auto record = blockBuffer.make<DrawRect>(rect);
+  auto record = blockAllocator.make<DrawRect>(rect);
   records.emplace_back(std::move(record));
   drawCount++;
 }
@@ -104,14 +104,14 @@ void PictureContext::drawRect(const Rect& rect, const MCState& state, const Fill
 void PictureContext::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
                                const Stroke* stroke) {
   recordAll(state, fill, stroke);
-  auto record = blockBuffer.make<DrawRRect>(rRect);
+  auto record = blockAllocator.make<DrawRRect>(rRect);
   records.emplace_back(std::move(record));
   drawCount++;
 }
 
 void PictureContext::drawPath(const Path& path, const MCState& state, const Fill& fill) {
   recordAll(state, fill);
-  auto record = blockBuffer.make<DrawPath>(path);
+  auto record = blockAllocator.make<DrawPath>(path);
   records.emplace_back(std::move(record));
   drawCount++;
 }
@@ -120,7 +120,7 @@ void PictureContext::drawShape(std::shared_ptr<Shape> shape, const MCState& stat
                                const Stroke* stroke) {
   DEBUG_ASSERT(shape != nullptr);
   recordAll(state, fill, stroke);
-  auto record = blockBuffer.make<DrawShape>(std::move(shape));
+  auto record = blockAllocator.make<DrawShape>(std::move(shape));
   records.emplace_back(std::move(record));
   drawCount++;
 }
@@ -130,7 +130,7 @@ void PictureContext::drawImage(std::shared_ptr<Image> image, const SamplingOptio
   DEBUG_ASSERT(image != nullptr);
   recordAll(state, fill);
   PlacementPtr<PictureRecord> record = nullptr;
-  record = blockBuffer.make<DrawImage>(std::move(image), sampling);
+  record = blockAllocator.make<DrawImage>(std::move(image), sampling);
   records.emplace_back(std::move(record));
   drawCount++;
 }
@@ -155,12 +155,12 @@ void PictureContext::drawImageRect(std::shared_ptr<Image> image, const Rect& src
   auto imageRect = Rect::MakeWH(image->width(), image->height());
   PlacementPtr<PictureRecord> record = nullptr;
   if (srcRect == imageRect && !needDstRect) {
-    record = blockBuffer.make<DrawImage>(std::move(image), sampling);
+    record = blockAllocator.make<DrawImage>(std::move(image), sampling);
   } else if (!needDstRect) {
-    record = blockBuffer.make<DrawImageRect>(std::move(image), srcRect, sampling, constraint);
+    record = blockAllocator.make<DrawImageRect>(std::move(image), srcRect, sampling, constraint);
   } else {
-    record = blockBuffer.make<DrawImageRectToRect>(std::move(image), srcRect, dstRect, sampling,
-                                                   constraint);
+    record = blockAllocator.make<DrawImageRectToRect>(std::move(image), srcRect, dstRect, sampling,
+                                                      constraint);
   }
   records.emplace_back(std::move(record));
   drawCount++;
@@ -171,7 +171,7 @@ void PictureContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList
                                       const Stroke* stroke) {
   DEBUG_ASSERT(glyphRunList != nullptr);
   recordAll(state, fill, stroke);
-  auto record = blockBuffer.make<DrawGlyphRunList>(std::move(glyphRunList));
+  auto record = blockAllocator.make<DrawGlyphRunList>(std::move(glyphRunList));
   records.emplace_back(std::move(record));
   drawCount++;
 }
@@ -181,7 +181,7 @@ void PictureContext::drawLayer(std::shared_ptr<Picture> picture,
                                const Fill& fill) {
   DEBUG_ASSERT(picture != nullptr);
   recordAll(state, fill);
-  auto record = blockBuffer.make<DrawLayer>(std::move(picture), std::move(filter));
+  auto record = blockAllocator.make<DrawLayer>(std::move(picture), std::move(filter));
   records.emplace_back(std::move(record));
   drawCount++;
 }
@@ -191,7 +191,7 @@ void PictureContext::drawPicture(std::shared_ptr<Picture> picture, const MCState
   if (picture->drawCount > MaxPictureDrawsToUnrollInsteadOfReference) {
     recordState(state);
     drawCount += picture->drawCount;
-    auto record = blockBuffer.make<DrawPicture>(std::move(picture));
+    auto record = blockAllocator.make<DrawPicture>(std::move(picture));
     records.emplace_back(std::move(record));
   } else {
     picture->playback(this, state);
@@ -206,12 +206,12 @@ static bool CompareFill(const Fill& a, const Fill& b) {
 
 void PictureContext::recordState(const MCState& state) {
   if (lastState.matrix != state.matrix) {
-    auto record = blockBuffer.make<SetMatrix>(state.matrix);
+    auto record = blockAllocator.make<SetMatrix>(state.matrix);
     records.emplace_back(std::move(record));
     lastState.matrix = state.matrix;
   }
   if (lastState.clip != state.clip) {
-    auto record = blockBuffer.make<SetClip>(state.clip);
+    auto record = blockAllocator.make<SetClip>(state.clip);
     records.emplace_back(std::move(record));
     lastState.clip = state.clip;
   }
@@ -219,11 +219,11 @@ void PictureContext::recordState(const MCState& state) {
 
 void PictureContext::recordFill(const Fill& fill) {
   if (!CompareFill(lastFill, fill)) {
-    auto record = blockBuffer.make<SetFill>(fill);
+    auto record = blockAllocator.make<SetFill>(fill);
     records.emplace_back(std::move(record));
     lastFill = fill;
   } else if (lastFill.color != fill.color) {
-    auto record = blockBuffer.make<SetColor>(fill.color);
+    auto record = blockAllocator.make<SetColor>(fill.color);
     records.emplace_back(std::move(record));
     lastFill.color = fill.color;
   }
@@ -232,15 +232,15 @@ void PictureContext::recordFill(const Fill& fill) {
 void PictureContext::recordStroke(const Stroke& stroke) {
   if (stroke.cap != lastStroke.cap || stroke.join != lastStroke.join ||
       stroke.miterLimit != lastStroke.miterLimit) {
-    auto record = blockBuffer.make<SetStroke>(stroke);
+    auto record = blockAllocator.make<SetStroke>(stroke);
     records.emplace_back(std::move(record));
     lastStroke = stroke;
   } else if (stroke.width != lastStroke.width) {
-    auto record = blockBuffer.make<SetStrokeWidth>(stroke.width);
+    auto record = blockAllocator.make<SetStrokeWidth>(stroke.width);
     records.emplace_back(std::move(record));
     lastStroke.width = stroke.width;
   } else if (!hasStroke) {
-    auto record = blockBuffer.make<SetHasStroke>(true);
+    auto record = blockAllocator.make<SetHasStroke>(true);
     records.emplace_back(std::move(record));
   }
   hasStroke = true;
@@ -252,7 +252,7 @@ void PictureContext::recordAll(const MCState& state, const Fill& fill, const Str
   if (stroke) {
     recordStroke(*stroke);
   } else if (hasStroke) {
-    auto record = blockBuffer.make<SetHasStroke>(false);
+    auto record = blockAllocator.make<SetHasStroke>(false);
     records.emplace_back(std::move(record));
     hasStroke = false;
   }

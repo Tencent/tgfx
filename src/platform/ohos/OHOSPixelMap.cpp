@@ -26,7 +26,7 @@ ImageInfo OHOSPixelMap::GetInfo(napi_env env, napi_value value) {
   }
   return ImageInfo::Make(static_cast<int>(info.width), static_cast<int>(info.height),
                          OHOSImageInfo::ToTGFXColorType(info.pixelFormat), AlphaType::Premultiplied,
-                         info.rowSize, ColorSpace::MakeSRGB());
+                         info.rowSize, ColorSpace::SRGB());
 }
 
 Bitmap OHOSPixelMap::CopyBitmap(napi_env env, napi_value value) {

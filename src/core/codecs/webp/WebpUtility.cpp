@@ -298,7 +298,7 @@ DecodeInfo WebpUtility::getDecodeInfo(const std::string& filePath) {
         }
         decodeInfo.colorSpace = ColorSpace::MakeFromICC(profiler, chunk_size);
         if (decodeInfo.colorSpace == nullptr) {
-          decodeInfo.colorSpace = ColorSpace::MakeSRGB();
+          decodeInfo.colorSpace = ColorSpace::SRGB();
         }
         if (chunk_size_padded <= webpFile._end - webpFile._start) {
           Skip(&webpFile, chunk_size_padded + CHUNK_HEADER_SIZE);
@@ -365,7 +365,7 @@ DecodeInfo WebpUtility::getDecodeInfo(const void* fileBytes, size_t byteLength) 
       colorSpace = ColorSpace::MakeFromICC(chunk->data(), chunk->size());
     }
     if (colorSpace == nullptr) {
-      colorSpace = ColorSpace::MakeSRGB();
+      colorSpace = ColorSpace::SRGB();
     }
     WebPDemuxReleaseChunkIterator(&chunkIterator);
   }

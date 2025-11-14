@@ -24,7 +24,7 @@
 namespace tgfx {
 class ColorMatrixFragmentProcessor : public FragmentProcessor {
  public:
-  static PlacementPtr<ColorMatrixFragmentProcessor> Make(BlockBuffer* buffer,
+  static PlacementPtr<ColorMatrixFragmentProcessor> Make(BlockAllocator* allocator,
                                                          const std::array<float, 20>& matrix);
 
   std::string name() const override {

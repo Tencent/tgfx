@@ -20,17 +20,17 @@
 #include "core/HitTestContext.h"
 #include "core/MeasureContext.h"
 #include "core/PictureRecords.h"
-#include "core/utils/BlockBuffer.h"
+#include "core/utils/BlockAllocator.h"
 #include "core/utils/Log.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Image.h"
 #include "utils/MathExtra.h"
 
 namespace tgfx {
-Picture::Picture(std::unique_ptr<BlockData> data,
+Picture::Picture(std::unique_ptr<BlockBuffer> buffer,
                  std::vector<PlacementPtr<PictureRecord>> recordList, size_t drawCount)
-    : blockData(std::move(data)), records(std::move(recordList)), drawCount(drawCount) {
-  DEBUG_ASSERT(blockData != nullptr);
+    : blockBuffer(std::move(buffer)), records(std::move(recordList)), drawCount(drawCount) {
+  DEBUG_ASSERT(blockBuffer != nullptr);
   DEBUG_ASSERT(!records.empty());
   bool hasInverseClip = true;
   for (auto& record : records) {

@@ -26,7 +26,7 @@
 namespace tgfx {
 class QuadPerEdgeAAGeometryProcessor : public GeometryProcessor {
  public:
-  static PlacementPtr<QuadPerEdgeAAGeometryProcessor> Make(BlockBuffer* buffer, int width,
+  static PlacementPtr<QuadPerEdgeAAGeometryProcessor> Make(BlockAllocator* allocator, int width,
                                                            int height, AAType aa,
                                                            std::optional<Color> commonColor,
                                                            std::optional<Matrix> uvMatrix,

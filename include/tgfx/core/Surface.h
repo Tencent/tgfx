@@ -46,10 +46,10 @@ class Surface {
    * width, height, and color type (alpha only). A Surface with MSAA enabled is returned if the
    * sample count is greater than 1. Return nullptr if the size is invalid.
    */
-  static std::shared_ptr<Surface> Make(
-      Context* context, int width, int height, bool alphaOnly = false, int sampleCount = 1,
-      bool mipmapped = false, uint32_t renderFlags = 0,
-      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+  static std::shared_ptr<Surface> Make(Context* context, int width, int height,
+                                       bool alphaOnly = false, int sampleCount = 1,
+                                       bool mipmapped = false, uint32_t renderFlags = 0,
+                                       std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB());
 
   /**
    * Creates a new Surface on GPU indicated by context. Allocates memory for pixels based on the
@@ -57,10 +57,10 @@ class Surface {
    * greater than 1. Return nullptr if the size is invalid or the colorType is not renderable in
    * the GPU backend.
    */
-  static std::shared_ptr<Surface> Make(
-      Context* context, int width, int height, ColorType colorType, int sampleCount = 1,
-      bool mipmapped = false, uint32_t renderFlags = 0,
-      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+  static std::shared_ptr<Surface> Make(Context* context, int width, int height, ColorType colorType,
+                                       int sampleCount = 1, bool mipmapped = false,
+                                       uint32_t renderFlags = 0,
+                                       std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB());
 
   /**
    * Wraps a backend render target into Surface. The caller must ensure the renderTarget is valid
@@ -69,7 +69,7 @@ class Surface {
    */
   static std::shared_ptr<Surface> MakeFrom(
       Context* context, const BackendRenderTarget& renderTarget, ImageOrigin origin,
-      uint32_t renderFlags = 0, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+      uint32_t renderFlags = 0, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB());
 
   /**
    * Wraps a BackendTexture into the Surface. The caller must ensure the texture is valid for the
@@ -80,7 +80,7 @@ class Surface {
   static std::shared_ptr<Surface> MakeFrom(
       Context* context, const BackendTexture& backendTexture, ImageOrigin origin,
       int sampleCount = 1, uint32_t renderFlags = 0,
-      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB());
 
   /**
    * Creates a Surface from the platform-specific hardware buffer. For example, the hardware buffer
@@ -90,7 +90,7 @@ class Surface {
    */
   static std::shared_ptr<Surface> MakeFrom(
       Context* context, HardwareBufferRef hardwareBuffer, int sampleCount = 1,
-      uint32_t renderFlags = 0, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+      uint32_t renderFlags = 0, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB());
 
   virtual ~Surface();
 
@@ -198,10 +198,10 @@ class Surface {
 
   static std::shared_ptr<Surface> MakeFrom(
       std::shared_ptr<RenderTargetProxy> renderTargetProxy, uint32_t renderFlags = 0,
-      bool clearAll = false, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+      bool clearAll = false, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB());
 
   Surface(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags = 0, bool clearAll = false,
-          std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+          std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB());
 
   bool aboutToDraw(bool discardContent = false);
 

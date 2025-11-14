@@ -52,7 +52,7 @@ namespace tgfx {
 // vertical line).
 
 PlacementPtr<RRectsVertexProvider> RRectsVertexProvider::MakeFrom(
-    BlockBuffer* buffer, std::vector<PlacementPtr<RRectRecord>>&& rects, AAType aaType,
+    BlockAllocator* allocator, std::vector<PlacementPtr<RRectRecord>>&& rects, AAType aaType,
     std::vector<PlacementPtr<Stroke>>&& strokes) {
   if (rects.empty()) {
     return nullptr;
@@ -67,10 +67,10 @@ PlacementPtr<RRectsVertexProvider> RRectsVertexProvider::MakeFrom(
       }
     }
   }
-  auto array = buffer->makeArray(std::move(rects));
-  auto strokeArray = buffer->makeArray(std::move(strokes));
-  return buffer->make<RRectsVertexProvider>(std::move(array), aaType, hasColor,
-                                            std::move(strokeArray), buffer->addReference());
+  auto array = allocator->makeArray(std::move(rects));
+  auto strokeArray = allocator->makeArray(std::move(strokes));
+  return allocator->make<RRectsVertexProvider>(std::move(array), aaType, hasColor,
+                                               std::move(strokeArray), allocator->addReference());
 }
 
 static void WriteUByte4Color(float* vertices, int& index, const Color& color) {
@@ -87,7 +87,7 @@ static float FloatInvert(float value) {
 
 RRectsVertexProvider::RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType,
                                            bool hasColor, PlacementArray<Stroke>&& strokes,
-                                           std::shared_ptr<BlockBuffer> reference)
+                                           std::shared_ptr<BlockAllocator> reference)
     : VertexProvider(std::move(reference)), rects(std::move(rects)), strokes(std::move(strokes)) {
   bitFields.aaType = static_cast<uint8_t>(aaType);
   bitFields.hasColor = hasColor;

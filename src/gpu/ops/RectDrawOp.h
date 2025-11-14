@@ -98,6 +98,6 @@ class RectDrawOp : public DrawOp {
 
   explicit RectDrawOp(RectsVertexProvider* provider);
 
-  friend class BlockBuffer;
+  friend class BlockAllocator;
 };
 }  // namespace tgfx

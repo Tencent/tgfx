@@ -35,8 +35,8 @@ PlacementPtr<AtlasTextOp> AtlasTextOp::Make(Context* context,
       textureProxy->height() <= 0) {
     return nullptr;
   }
-  auto atlasTextOp = context->drawingBuffer()->make<AtlasTextOp>(provider.get(),
-                                                                 std::move(textureProxy), sampling);
+  auto atlasTextOp = context->drawingAllocator()->make<AtlasTextOp>(
+      provider.get(), std::move(textureProxy), sampling);
   CAPUTRE_RECT_MESH(atlasTextOp.get(), provider.get());
   if (provider->aaType() == AAType::Coverage || provider->rectCount() > 1) {
     atlasTextOp->indexBufferProxy = context->globalCache()->getRectIndexBuffer(
@@ -63,7 +63,7 @@ AtlasTextOp::AtlasTextOp(RectsVertexProvider* provider, std::shared_ptr<TextureP
 PlacementPtr<GeometryProcessor> AtlasTextOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {
   ATTRIBUTE_NAME("rectCount", static_cast<uint32_t>(rectCount));
   ATTRIBUTE_NAME("commonColor", commonColor);
-  auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
+  auto drawingBuffer = renderTarget->getContext()->drawingAllocator();
   return AtlasTextGeometryProcessor::Make(drawingBuffer, textureProxy, aaType, commonColor,
                                           sampling);
 }
