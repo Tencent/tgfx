@@ -76,7 +76,7 @@ class LayerCache::Impl {
 
     auto& entry = it->second;
     // Check if content scale matches exactly (within floating point tolerance)
-    if (std::abs(entry.contentScale - contentScale) > 1e-6f) {
+    if (entry.contentScale < contentScale) {
       return nullptr;
     }
 
@@ -172,8 +172,7 @@ class LayerCache::Impl {
     if (!image) {
       return 0;
     }
-    // Add 10% overhead for metadata and internal structures
-    return static_cast<size_t>(image->width() * image->height() * 4 * 1.1f);
+    return static_cast<size_t>(image->width() * image->height() * 4);
   }
 
   /**
