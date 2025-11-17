@@ -18,27 +18,15 @@
 
 #pragma once
 
-#include "pdf/PDFTypes.h"
-#include "tgfx/core/WriteStream.h"
+#include "tgfx/core/Color.h"
+#include "tgfx/core/Image.h"
 
 namespace tgfx {
-
-enum class PDFResourceType {
-  ExtGState,
-  Pattern,
-  XObject,
-  Font,
-  ColorSpace,
-};
-
-std::unique_ptr<PDFDictionary> MakePDFResourceDictionary(
-    const std::vector<PDFIndirectReference>& graphicStateResources,
-    const std::vector<PDFIndirectReference>& shaderResources,
-    const std::vector<PDFIndirectReference>& xObjectResources,
-    const std::vector<PDFIndirectReference>& fontResources,
-    const std::vector<PDFIndirectReference>& colorSpaceResources);
-
-void PDFWriteResourceName(const std::shared_ptr<WriteStream>& stream, PDFResourceType type,
-                          int key);
-
+  class ColorSpaceConverter {
+  public:
+    static std::shared_ptr<ColorSpaceConverter> MakeDefaultConverter();
+    virtual ~ColorSpaceConverter() = default;
+    virtual Color convertColor(const Color& color) const = 0;
+    virtual std::shared_ptr<Image> convertImage(std::shared_ptr<Image> image) const = 0;
+  };
 }  // namespace tgfx

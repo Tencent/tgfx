@@ -27,7 +27,8 @@ std::string GetResourceName(PDFResourceType type, int index) {
       'G',  // ExtGState
       'P',  // Pattern
       'X',  // XObject
-      'F'   // Font
+      'F',  // Font
+      'C',  // ColorSpace
   };
   return ResourceTypePrefixes[static_cast<size_t>(type)] + std::to_string(index);
 }
@@ -43,7 +44,7 @@ std::unique_ptr<PDFArray> MakeProcSet() {
 }
 
 const char* ResourceName(PDFResourceType type) {
-  constexpr const char* ResourceTypeNames[] = {"ExtGState", "Pattern", "XObject", "Font"};
+  constexpr const char* ResourceTypeNames[] = {"ExtGState", "Pattern", "XObject", "Font", "ColorSpace"};
   return ResourceTypeNames[static_cast<size_t>(type)];
 }
 
@@ -64,13 +65,15 @@ std::unique_ptr<PDFDictionary> MakePDFResourceDictionary(
     const std::vector<PDFIndirectReference>& graphicStateResources,
     const std::vector<PDFIndirectReference>& shaderResources,
     const std::vector<PDFIndirectReference>& xObjectResources,
-    const std::vector<PDFIndirectReference>& fontResources) {
+    const std::vector<PDFIndirectReference>& fontResources,
+    const std::vector<PDFIndirectReference>& colorSpaceResources) {
   auto dict = PDFDictionary::Make();
   dict->insertObject("ProcSet", MakeProcSet());
   AddSubDictionary(graphicStateResources, PDFResourceType::ExtGState, dict.get());
   AddSubDictionary(shaderResources, PDFResourceType::Pattern, dict.get());
   AddSubDictionary(xObjectResources, PDFResourceType::XObject, dict.get());
   AddSubDictionary(fontResources, PDFResourceType::Font, dict.get());
+  AddSubDictionary(colorSpaceResources, PDFResourceType::ColorSpace, dict.get());
   return dict;
 }
 

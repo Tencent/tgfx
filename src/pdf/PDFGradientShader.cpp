@@ -563,6 +563,7 @@ std::unique_ptr<PDFDictionary> GetGradientResourceDictionary(PDFIndirectReferenc
   }
   return MakePDFResourceDictionary(std::move(graphicStates), std::move(patternShaders),
                                    std::vector<PDFIndirectReference>(),
+                                   std::vector<PDFIndirectReference>(),
                                    std::vector<PDFIndirectReference>());
 }
 
@@ -868,9 +869,8 @@ PDFIndirectReference MakeFunctionShader(PDFDocumentImpl* doc, const PDFGradientS
   }
 
   pdfShader->insertInt("ShadingType", static_cast<int>(shadingType));
-  auto ref = doc->colorSpaceRef();
+  auto ref = doc->emitColorSpace(ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3));
   pdfShader->insertRef("ColorSpace", ref);
-
   auto pdfFunctionShader = PDFDictionary::Make("Pattern");
   pdfFunctionShader->insertInt("PatternType", 2);
   pdfFunctionShader->insertObject("Matrix", PDFUtils::MatrixToArray(finalMatrix));
@@ -897,8 +897,9 @@ PDFIndirectReference PDFGradientShader::Make(PDFDocumentImpl* doc, const Gradien
   DEBUG_ASSERT(shader);
 
   PDFGradientShader::Key key = MakeKey(shader, matrix, surfaceBBox);
-  for (auto& color : key.info.colors) {
-    color = color.makeColorSpace(doc->colorSpace());
+  for(auto& color : key.info.colors) {
+    color = doc->converter()->convertColor(color);
+    color = color.makeColorSpace(ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3));
   }
   bool alpha = GradientHasAlpha(key);
   return FindPDFShader(doc, std::move(key), alpha);

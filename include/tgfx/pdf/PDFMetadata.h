@@ -220,12 +220,7 @@ struct PDFMetadata {
     HighButSlow = 9,
   };
 
-  CompressionLevel compressionLevel = CompressionLevel::Default;
-
-  /**
-   * The ColorSpace of this PDF document.
-   */
-  std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB();
+  CompressionLevel compressionLevel = CompressionLevel::None;
 };
 
 }  // namespace tgfx

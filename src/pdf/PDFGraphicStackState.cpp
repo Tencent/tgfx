@@ -25,6 +25,7 @@
 #include "tgfx/core/Path.h"
 #include "tgfx/core/PathTypes.h"
 #include "tgfx/core/WriteStream.h"
+#include "PDFDocumentImpl.h"
 
 namespace tgfx {
 
@@ -112,10 +113,13 @@ void PDFGraphicStackState::updateDrawingState(const PDFGraphicStackState::Entry&
       currentEntry()->shaderIndex = state.shaderIndex;
     }
   } else if (state.color != currentEntry()->color || currentEntry()->shaderIndex >= 0) {
-    contentStream->writeText("/CS CS\n");
+    auto ref = document->emitColorSpace(state.color.colorSpace);
+    colorSpaceResources->insert(ref);
+    std::string command = "/C" + std::to_string(ref.value);
+    contentStream->writeText(command + " CS\n");
     EmitPDFColor(state.color, contentStream);
     contentStream->writeText("SC\n");
-    contentStream->writeText("/CS cs\n");
+    contentStream->writeText(command + " cs\n");
     EmitPDFColor(state.color, contentStream);
     contentStream->writeText("sc\n");
     currentEntry()->color = state.color;

@@ -15,30 +15,9 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-
-#pragma once
-
-#include "pdf/PDFTypes.h"
-#include "tgfx/core/WriteStream.h"
-
+#include "DefaultColorSpaceConverter.h"
 namespace tgfx {
-
-enum class PDFResourceType {
-  ExtGState,
-  Pattern,
-  XObject,
-  Font,
-  ColorSpace,
-};
-
-std::unique_ptr<PDFDictionary> MakePDFResourceDictionary(
-    const std::vector<PDFIndirectReference>& graphicStateResources,
-    const std::vector<PDFIndirectReference>& shaderResources,
-    const std::vector<PDFIndirectReference>& xObjectResources,
-    const std::vector<PDFIndirectReference>& fontResources,
-    const std::vector<PDFIndirectReference>& colorSpaceResources);
-
-void PDFWriteResourceName(const std::shared_ptr<WriteStream>& stream, PDFResourceType type,
-                          int key);
-
+  std::shared_ptr<ColorSpaceConverter> ColorSpaceConverter::MakeDefaultConverter() {
+    return std::make_shared<DefaultColorSpaceConverter>();
+  }
 }  // namespace tgfx

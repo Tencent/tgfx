@@ -77,7 +77,7 @@ struct PDFLink {
 
 class PDFDocumentImpl : public PDFDocument {
  public:
-  PDFDocumentImpl(std::shared_ptr<WriteStream> stream, Context* context, PDFMetadata Metadata);
+  PDFDocumentImpl(std::shared_ptr<WriteStream> stream, Context* context, PDFMetadata Metadata, std::shared_ptr<ColorSpaceConverter> converter);
 
   ~PDFDocumentImpl() override;
 
@@ -150,12 +150,10 @@ class PDFDocumentImpl : public PDFDocument {
 
   const Matrix& currentPageTransform() const;
 
-  std::shared_ptr<ColorSpace> colorSpace() const {
-    return _metadata.colorSpace;
-  }
+  PDFIndirectReference emitColorSpace(std::shared_ptr<ColorSpace> colorSpace);
 
-  PDFIndirectReference colorSpaceRef() const {
-    return _colorSpaceRef;
+  std::shared_ptr<ColorSpaceConverter> converter() const {
+    return _converter;
   }
 
   std::unordered_map<uint32_t, std::unique_ptr<AdvancedTypefaceInfo>> fontAdvancedInfo;
@@ -172,8 +170,6 @@ class PDFDocumentImpl : public PDFDocument {
   std::shared_ptr<WriteStream> beginObject(PDFIndirectReference ref);
 
   void endObject();
-
-  PDFIndirectReference emitColorSpace();
 
   enum class State {
     BetweenPages,
@@ -199,7 +195,8 @@ class PDFDocumentImpl : public PDFDocument {
   float rasterScale = 1;
   float inverseRasterScale = 1;
   PDFTagTree tagTree;
-  PDFIndirectReference _colorSpaceRef;
+  std::shared_ptr<ColorSpaceConverter> _converter = nullptr;
+  std::unordered_map<uint64_t, PDFIndirectReference> _colorSpaceMap;
 };
 
 }  // namespace tgfx

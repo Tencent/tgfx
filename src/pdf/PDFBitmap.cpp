@@ -232,8 +232,8 @@ void DoDeflatedImage(const Pixmap& pixmap, PDFDocumentImpl* document, bool isOpa
       break;
     }
     default:
-      auto colorSpaceRef = document->colorSpaceRef();
-      colorSpace = PDFUnion::Ref(colorSpaceRef);
+      //auto colorSpaceRef = document->colorSpaceRef();
+      //colorSpace = PDFUnion::Ref(colorSpaceRef);
       const auto pixelPointer = reinterpret_cast<const uint8_t*>(pixmap.pixels());
       auto rowBytes = pixmap.rowBytes();
 
@@ -284,9 +284,8 @@ void DoDeflatedImage(const Pixmap& pixmap, PDFDocumentImpl* document, bool isOpa
 void PDFBitmap::SerializeImage(const std::shared_ptr<Image>& image, int /*encodingQuality*/,
                                PDFDocumentImpl* doc, PDFIndirectReference ref) {
   //TODO (YGaurora): is image opaque,encode as jpeg
-  auto image2bitmap = [doc](Context* context, const std::shared_ptr<Image>& image) {
-    auto surface = Surface::Make(context, image->width(), image->height(), false, 1, false, 0,
-                                 doc->colorSpace());
+  auto image2bitmap = [](Context* context, const std::shared_ptr<Image>& image) {
+    auto surface = Surface::Make(context, image->width(), image->height(), false, 1, false, 0);
     auto canvas = surface->getCanvas();
     canvas->drawImage(image);
 

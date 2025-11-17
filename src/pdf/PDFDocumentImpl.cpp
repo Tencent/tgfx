@@ -34,7 +34,7 @@
 namespace tgfx {
 
 std::shared_ptr<PDFDocument> PDFDocument::Make(std::shared_ptr<WriteStream> stream,
-                                               Context* context, PDFMetadata metadata) {
+                                               Context* context, PDFMetadata metadata, std::shared_ptr<ColorSpaceConverter> converter) {
   if (!stream || !context) {
     return nullptr;
   }
@@ -42,7 +42,7 @@ std::shared_ptr<PDFDocument> PDFDocument::Make(std::shared_ptr<WriteStream> stre
     metadata.rasterDPI = 72.0f;
   }
   metadata.encodingQuality = std::max(metadata.encodingQuality, 0);
-  return std::make_shared<PDFDocumentImpl>(stream, context, metadata);
+  return std::make_shared<PDFDocumentImpl>(stream, context, metadata, std::move(converter));
 }
 
 namespace {
@@ -262,7 +262,7 @@ std::vector<const PDFFont*> get_fonts(const PDFDocumentImpl& canon) {
 }  // namespace
 
 PDFDocumentImpl::PDFDocumentImpl(std::shared_ptr<WriteStream> stream, Context* context,
-                                 PDFMetadata meta)
+                                 PDFMetadata meta, std::shared_ptr<ColorSpaceConverter> converter)
     : _stream(std::move(stream)), _context(context), _metadata(std::move(meta)) {
   if (_metadata.rasterDPI != ScalarDefaultRasterDPI) {
     inverseRasterScale = ScalarDefaultRasterDPI / _metadata.rasterDPI;
@@ -271,6 +271,10 @@ PDFDocumentImpl::PDFDocumentImpl(std::shared_ptr<WriteStream> stream, Context* c
   if (_metadata.structureElementTreeRoot) {
     tagTree.init(_metadata.structureElementTreeRoot, _metadata.outline);
   }
+  if(converter == nullptr) {
+    _converter = ColorSpaceConverter::MakeDefaultConverter();
+  }
+  _converter = converter;
 }
 
 PDFDocumentImpl::~PDFDocumentImpl() {
@@ -344,7 +348,6 @@ Canvas* PDFDocumentImpl::onBeginPage(float width, float height) {
     // if this is the first page if the document.
     SerializeHeader(&offsetMap, _stream);
     infoDictionary = this->emit(*PDFMetadataUtils::MakeDocumentInformationDict(_metadata));
-    _colorSpaceRef = emitColorSpace();
     if (_metadata.PDFA) {
       documentUUID = PDFMetadataUtils::CreateUUID(_metadata);
       // We use the same UUID for Document ID and Instance ID since this
@@ -380,10 +383,7 @@ void PDFDocumentImpl::onEndPage() {
                   static_cast<float>(drawContext->pageSize().height) * inverseRasterScale);
   auto pageContent = drawContext->getContent();
 
-  auto resourceDict = drawContext->makeResourceDict();
-  auto colorSpaceDic = PDFDictionary::Make();
-  colorSpaceDic->insertRef("CS", _colorSpaceRef);
-  resourceDict->insertObject("ColorSpace", std::move(colorSpaceDic));
+  auto resourceDict = drawContext->makeResourceDictionary();
   DEBUG_ASSERT(!pageRefs.empty());
 
   page->insertObject("Resources", std::move(resourceDict));
@@ -494,17 +494,26 @@ void PDFDocumentImpl::endObject() {
   end_indirect_object(_stream);
 }
 
-PDFIndirectReference PDFDocumentImpl::emitColorSpace() {
+PDFIndirectReference PDFDocumentImpl::emitColorSpace(std::shared_ptr<ColorSpace> colorSpace) {
+  if(colorSpace == nullptr) {
+    colorSpace = ColorSpace::SRGB();
+  }
+  auto hash = colorSpace->hash();
+  if(_colorSpaceMap.find(hash) != _colorSpaceMap.end()) {
+    return _colorSpaceMap[hash];
+  }
   auto colorSpaceDictionary = PDFDictionary::Make();
   colorSpaceDictionary->insertInt("N", 3);
   colorSpaceDictionary->insertName("Alternate", "DeviceRGB");
-  auto iccProfile = _metadata.colorSpace->toICCProfile();
+  auto iccProfile = colorSpace->toICCProfile();
   auto stream = Stream::MakeFromData(iccProfile);
   auto ref = PDFStreamOut(std::move(colorSpaceDictionary), std::move(stream), this);
-  PDFArray array{};
-  array.appendName("ICCBased");
-  array.appendRef(ref);
-  return this->emit(array);
+  PDFArray colorSpaceArray;
+  colorSpaceArray.appendName("ICCBased");
+  colorSpaceArray.appendRef(ref);
+  ref = this->emit(colorSpaceArray);
+  _colorSpaceMap[hash] = ref;
+  return ref;
 }
 
 PDFIndirectReference PDFDocumentImpl::getPage(size_t pageIndex) const {
