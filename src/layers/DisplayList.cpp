@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/DisplayList.h"
+#include "LayerCache.h"
 #include "core/utils/DecomposeRects.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
@@ -137,7 +138,8 @@ static std::vector<std::pair<int, int>> GetSortedTiles(int startX, int endX, int
   return tiles;
 }
 
-DisplayList::DisplayList() : _root(RootLayer::Make()) {
+DisplayList::DisplayList()
+    : _root(RootLayer::Make(this)), layerCache(std::make_unique<LayerCache>()) {
   _root->_root = _root.get();
   SET_DISPLAY_LIST(this);
 }
@@ -232,6 +234,16 @@ void DisplayList::setMaxTileCount(int count) {
   }
   _maxTileCount = count;
   resetCaches();
+}
+
+void DisplayList::setLayerCacheMaxSize(size_t maxSize) {
+  if (maxSize < 0) {
+    maxSize = 0;
+  }
+  if (layerCache->maxCacheSize() == maxSize) {
+    return;
+  }
+  // layerCache->setLayerCacheMaxSize(maxSize);
 }
 
 void DisplayList::showDirtyRegions(bool show) {
@@ -876,6 +888,7 @@ void DisplayList::resetCaches() {
   surfaceCaches = {};
   totalTileCount = 0;
   emptyTiles.clear();
+  layerCache->clear();
 }
 
 void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
@@ -902,6 +915,7 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   args.renderRect = &renderRect;
   args.blurBackground = _root->createBackgroundContext(context, drawRect, viewMatrix);
   args.dstColorSpace = surface->colorSpace();
+  args.layerCache = layerCache.get();
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
 }
 

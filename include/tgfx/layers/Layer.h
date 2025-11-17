@@ -633,6 +633,12 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   bool drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
 
+  void drawContentOffscreen(const DrawArgs& args, Canvas* canvas,
+                            const std::optional<Rect>& clipBounds, float contentScale,
+                            BlendMode blendMode, float alpha,
+                            const std::function<void(std::shared_ptr<Image>, const Matrix&)>&
+                                extraImageFuction = nullptr);
+
   std::shared_ptr<Image> getContentImage(const DrawArgs& args, float contentScale,
                                          const std::shared_ptr<Image>& passThroughImage,
                                          const Matrix& passThroughImageMatrix,
@@ -666,7 +672,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::vector<std::shared_ptr<LayerStyle>> _layerStyles = {};
   float _rasterizationScale = 0.0f;
   std::unique_ptr<RasterizedContent> rasterizedContent;
-  std::unique_ptr<RasterizedContent> cacheContent;
   std::shared_ptr<LayerContent> layerContent = nullptr;
   Rect renderBounds = {};         // in global coordinates
   Rect* contentBounds = nullptr;  //  in global coordinates

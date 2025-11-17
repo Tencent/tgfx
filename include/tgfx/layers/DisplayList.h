@@ -19,6 +19,7 @@
 #pragma once
 
 #include <deque>
+#include <memory>
 #include <unordered_map>
 #include "tgfx/core/Surface.h"
 #include "tgfx/layers/Layer.h"
@@ -28,6 +29,7 @@ class RootLayer;
 class Tile;
 class TileCache;
 class DrawTask;
+class LayerCache;
 
 /**
  * RenderMode defines the different modes of rendering a DisplayList.
@@ -222,6 +224,14 @@ class DisplayList {
   }
 
   /**
+   * Sets the maximum cache size for layer surface caching. This affects the total size of cached
+   * surfaces that can be stored. When the cache exceeds this limit, least recently used entries
+   * are evicted. Set to 0 to disable layer caching.
+   * @param maxSize The maximum cache size in bytes. Default is 16MB.
+   */
+  void setLayerCacheMaxSize(size_t maxSize);
+
+  /**
    * Sets whether to show dirty regions during rendering. When enabled, the dirty regions will be
    * highlighted in the rendered output. This is useful for debugging to visualize which parts of
    * the display list are being updated. The default value is false.
@@ -244,6 +254,7 @@ class DisplayList {
 
  private:
   std::shared_ptr<RootLayer> _root = nullptr;
+  std::unique_ptr<LayerCache> layerCache;
   int64_t _zoomScaleInt = 1000;
   int _zoomScalePrecision = 1000;
   Point _contentOffset = {};
@@ -316,5 +327,7 @@ class DisplayList {
   void drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
                      bool autoClear) const;
   void updateMousePosition();
+
+  friend class RootLayer;
 };
 }  // namespace tgfx

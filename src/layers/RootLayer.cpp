@@ -20,6 +20,8 @@
 #include <limits>
 #include "core/utils/DecomposeRects.h"
 #include "core/utils/Log.h"
+#include "tgfx/layers/DisplayList.h"
+#include "layers/LayerCache.h"
 
 namespace tgfx {
 static float UnionArea(const Rect& rect1, const Rect& rect2) {
@@ -30,8 +32,8 @@ static float UnionArea(const Rect& rect1, const Rect& rect2) {
   return (right - left) * (bottom - top);
 }
 
-std::shared_ptr<RootLayer> RootLayer::Make() {
-  return std::shared_ptr<RootLayer>(new RootLayer());
+std::shared_ptr<RootLayer> RootLayer::Make(DisplayList* displayList) {
+  return std::shared_ptr<RootLayer>(new RootLayer(displayList));
 }
 
 RootLayer::~RootLayer() {
@@ -112,6 +114,10 @@ std::vector<Rect> RootLayer::updateDirtyRegions() {
   dirtyAreas.clear();
   DecomposeRects(dirtyRects.data(), dirtyRects.size());
   return std::move(dirtyRects);
+}
+
+void RootLayer::invalidCache(const Layer* layer) {
+  displayList->layerCache->invalidateLayer(layer);
 }
 
 }  // namespace tgfx
