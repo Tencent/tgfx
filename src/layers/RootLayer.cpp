@@ -117,6 +117,9 @@ std::vector<Rect> RootLayer::updateDirtyRegions() {
 }
 
 void RootLayer::invalidCache(const Layer* layer) {
+  if (!displayList->layerCache) {
+    return;
+  }
   displayList->layerCache->invalidateLayer(layer);
 }
 

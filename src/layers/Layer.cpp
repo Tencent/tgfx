@@ -1118,8 +1118,8 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   RasterizedContent* cache = nullptr;
   if (auto rasterizedCache = getRasterizedCache(args, canvas->getMatrix())) {
     cache = rasterizedCache;
-  } else if (auto imageCache = args.layerCache->getCachedImageAndRect(this, contentScale)) {
-    cache = imageCache;
+  } else if (args.layerCache) {
+   cache= args.layerCache->getCachedImageAndRect(this, contentScale);
   }
 
   std::optional<Rect> clipBounds = std::nullopt;
@@ -1152,8 +1152,8 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   scaledBounds.scale(contentScale, contentScale);
   constexpr float MaxCacheSize = 128.f;
   constexpr float MaxCacheScale = 0.2f;
-  if (args.layerCache && scaledBounds.width() <= MaxCacheSize &&
-      scaledBounds.height() <= MaxCacheSize && contentScale <= MaxCacheScale) {
+  if (!args.layerCache || scaledBounds.width() > MaxCacheSize ||
+      scaledBounds.height() > MaxCacheSize || contentScale > MaxCacheScale) {
     return false;
   }
 
@@ -1172,6 +1172,9 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     contentScale = std::min(MaxCacheScale,
                             MaxCacheSize / std::max(renderBounds.width(), renderBounds.height()));
   }
+
+  auto cacheArgs = args;
+  cacheArgs.layerCache = nullptr;
 
   drawContentOffscreen(args, canvas, clipBounds, contentScale, blendMode, alpha,
                        [&](std::shared_ptr<Image> image, const Matrix& imageMatrix) {
