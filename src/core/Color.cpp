@@ -98,19 +98,18 @@ Color Color::unpremultiply() const {
   }
 }
 
-Color Color::makeColorSpace(std::shared_ptr<ColorSpace> dstColorSpace) const {
-  auto dstColor = *this;
-  if (dstColorSpace == nullptr) {
-    dstColorSpace = ColorSpace::SRGB();
+void Color::applyColorSpace(std::shared_ptr<ColorSpace> targetColorSpace, bool isPremultiply) {
+  if (targetColorSpace == nullptr) {
+    targetColorSpace = ColorSpace::SRGB();
   }
-  if (!NeedConvertColorSpace(colorSpace, dstColorSpace)) {
-    return dstColor;
+  if (!NeedConvertColorSpace(colorSpace, targetColorSpace)) {
+    return;
   }
-  ColorSpaceXformSteps steps(colorSpace.get(), AlphaType::Unpremultiplied, dstColorSpace.get(),
-                             AlphaType::Unpremultiplied);
-  steps.apply(dstColor.array());
-  dstColor.colorSpace = dstColorSpace;
-  return dstColor;
+  auto alphaType = isPremultiply ? AlphaType::Premultiplied : AlphaType::Unpremultiplied;
+  ColorSpaceXformSteps steps(colorSpace.get(), alphaType, targetColorSpace.get(),
+                             alphaType);
+  steps.apply(&red);
+  colorSpace = targetColorSpace;
 }
 
 }  // namespace tgfx

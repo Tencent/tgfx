@@ -145,9 +145,12 @@ static PlacementPtr<FragmentProcessor> MakeGradient(const Context* context,
   }
   auto dstColors = shader.originalColors;
 
-  for (auto& color : dstColors) {
-    color = color.makeColorSpace(std::move(dstColorSpace));
+  if(dstColorSpace != nullptr) {
+    for (auto& color : dstColors) {
+      color.applyColorSpace(std::move(dstColorSpace), false);
+    }
   }
+
   // All gradients are colorized the same way, regardless of layout
   PlacementPtr<FragmentProcessor> colorizer =
       MakeColorizer(context, dstColors.data(), shader.originalPositions.data(),

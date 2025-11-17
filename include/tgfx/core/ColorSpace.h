@@ -480,6 +480,9 @@ class ColorSpace : public std::enable_shared_from_this<ColorSpace> {
   mutable TransferFunction _invTransferFunction;
   mutable ColorMatrix33 _fromXYZD50;
   mutable bool isLazyDstFieldsResolved = false;
+
+  static std::shared_ptr<ColorSpace> SSRGB;
+  static std::shared_ptr<ColorSpace> SSRGBLinear;
 };
 
 }  // namespace tgfx
