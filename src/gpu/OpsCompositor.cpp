@@ -76,11 +76,10 @@ void OpsCompositor::fillImage(std::shared_ptr<Image> image, const SamplingOption
     pendingConstraint = SrcRectConstraint::Fast;
   }
   auto dstColor = fill.color.premultiply();
-  if(dstColorSpace != nullptr) {
+  if (dstColorSpace != nullptr) {
     dstColor.applyColorSpace(dstColorSpace, true);
   }
-  auto record =
-      drawingAllocator()->make<RectRecord>(imageRect, state.matrix, dstColor);
+  auto record = drawingAllocator()->make<RectRecord>(imageRect, state.matrix, dstColor);
   pendingRects.emplace_back(std::move(record));
   pendingUVRects.emplace_back(drawingAllocator()->make<Rect>(imageRect));
 }
@@ -101,7 +100,7 @@ void OpsCompositor::fillImageRect(std::shared_ptr<Image> image, const Rect& srcR
     pendingConstraint = constraint;
   }
   auto dstColor = fillInLocal.color.premultiply();
-  if(dstColorSpace != nullptr) {
+  if (dstColorSpace != nullptr) {
     dstColor.applyColorSpace(dstColorSpace, true);
   }
   auto record = drawingAllocator()->make<RectRecord>(dstRect, state.matrix, dstColor);
@@ -128,7 +127,7 @@ void OpsCompositor::fillRect(const Rect& rect, const MCState& state, const Fill&
     flushPendingOps(PendingOpType::Rect, state.clip, fill);
   }
   auto dstColor = fill.color.premultiply();
-  if(dstColorSpace != nullptr) {
+  if (dstColorSpace != nullptr) {
     dstColor.applyColorSpace(dstColorSpace, true);
   }
   auto record = drawingAllocator()->make<RectRecord>(rect, state.matrix, dstColor);
@@ -148,7 +147,7 @@ void OpsCompositor::drawRRect(const RRect& rRect, const MCState& state, const Fi
     flushPendingOps(PendingOpType::RRect, state.clip, rectFill);
   }
   auto dstColor = rectFill.color.premultiply();
-  if(dstColorSpace != nullptr) {
+  if (dstColorSpace != nullptr) {
     dstColor.applyColorSpace(dstColorSpace, true);
   }
   auto record = drawingAllocator()->make<RRectRecord>(rRect, state.matrix, dstColor);
@@ -213,7 +212,7 @@ void OpsCompositor::drawShape(std::shared_ptr<Shape> shape, const MCState& state
   color.alpha *= ShapeUtils::CalculateAlphaReduceFactorIfHairline(shape);
   auto shapeProxy = proxyProvider()->createGPUShapeProxy(shape, aaType, clipBounds, renderFlags);
   auto dstColor = color.premultiply();
-  if(dstColorSpace != nullptr) {
+  if (dstColorSpace != nullptr) {
     dstColor.applyColorSpace(dstColorSpace, true);
   }
   auto drawOp = ShapeDrawOp::Make(std::move(shapeProxy), dstColor, uvMatrix, aaType);
@@ -480,7 +479,7 @@ bool OpsCompositor::drawAsClear(const Rect& rect, const MCState& state, const Fi
   auto format = renderTarget->format();
   auto writeSwizzle = Swizzle::ForWrite(format);
   auto dstColor = fill.color.premultiply();
-  if(dstColorSpace != nullptr) {
+  if (dstColorSpace != nullptr) {
     dstColor.applyColorSpace(dstColorSpace, true);
   }
   clearColor = writeSwizzle.applyTo(dstColor);
@@ -746,7 +745,7 @@ void OpsCompositor::fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, co
     pendingSampling = sampling;
   }
   auto dstColor = fill.color.premultiply();
-  if(dstColorSpace != nullptr) {
+  if (dstColorSpace != nullptr) {
     dstColor.applyColorSpace(dstColorSpace, true);
   }
   auto record = drawingAllocator()->make<RectRecord>(rect, state.matrix, dstColor);

@@ -99,6 +99,15 @@ Color Color::unpremultiply() const {
 }
 
 void Color::applyColorSpace(std::shared_ptr<ColorSpace> targetColorSpace, bool isPremultiply) {
+  if (targetColorSpace->isSRGB() && colorSpace == nullptr) {
+    return;
+  }
+  if (targetColorSpace == nullptr && colorSpace->isSRGB()) {
+    return;
+  }
+  if (targetColorSpace == nullptr && colorSpace == nullptr) {
+    return;
+  }
   if (targetColorSpace == nullptr) {
     targetColorSpace = ColorSpace::SRGB();
   }
@@ -106,8 +115,7 @@ void Color::applyColorSpace(std::shared_ptr<ColorSpace> targetColorSpace, bool i
     return;
   }
   auto alphaType = isPremultiply ? AlphaType::Premultiplied : AlphaType::Unpremultiplied;
-  ColorSpaceXformSteps steps(colorSpace.get(), alphaType, targetColorSpace.get(),
-                             alphaType);
+  ColorSpaceXformSteps steps(colorSpace.get(), alphaType, targetColorSpace.get(), alphaType);
   steps.apply(&red);
   colorSpace = targetColorSpace;
 }

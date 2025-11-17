@@ -145,7 +145,7 @@ static PlacementPtr<FragmentProcessor> MakeGradient(const Context* context,
   }
   auto dstColors = shader.originalColors;
 
-  if(dstColorSpace != nullptr) {
+  if (dstColorSpace != nullptr) {
     for (auto& color : dstColors) {
       color.applyColorSpace(std::move(dstColorSpace), false);
     }

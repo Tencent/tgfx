@@ -19,6 +19,7 @@
 #include "tgfx/core/ColorSpace.h"
 #include <skcms.h>
 #include <cmath>
+#include <memory>
 #include <sstream>
 #include <vector>
 #include "Checksum.h"
@@ -632,8 +633,10 @@ bool ColorSpacePrimaries::toXYZD50(ColorMatrix33* toXYZD50) const {
                                       reinterpret_cast<gfx::skcms_Matrix3x3*>(toXYZD50));
 }
 
-std::shared_ptr<ColorSpace> ColorSpace::SSRGB = std::shared_ptr<ColorSpace>(new ColorSpace(NamedTransferFunction::SRGB, NamedGamut::SRGB));
-std::shared_ptr<ColorSpace> ColorSpace::SSRGBLinear = std::shared_ptr<ColorSpace>(new ColorSpace(NamedTransferFunction::Linear, NamedGamut::SRGB));
+static std::shared_ptr<ColorSpace> SSRGB =
+    std::make_shared<ColorSpace>(NamedTransferFunction::SRGB, NamedGamut::SRGB);
+static std::shared_ptr<ColorSpace> SSRGBLinear =
+    std::make_shared<ColorSpace>(NamedTransferFunction::Linear, NamedGamut::SRGB);
 
 std::shared_ptr<ColorSpace> ColorSpace::SRGB() {
   return SSRGB;
