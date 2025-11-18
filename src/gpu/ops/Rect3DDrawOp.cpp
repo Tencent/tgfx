@@ -71,7 +71,7 @@ PlacementPtr<GeometryProcessor> Rect3DDrawOp::onMakeGeometryProcessor(RenderTarg
   ATTRIBUTE_NAME("commonColor", commonColor);
   ATTRIBUTE_NAME("uvMatrix", uvMatrix);
   ATTRIBUTE_NAME("hasSubset", hasSubset);
-  auto drawingBuffer = renderTarget->getContext()->drawingAllocator();
+  auto allocator = renderTarget->getContext()->drawingAllocator();
   // The actual size of the rendered texture is larger than the valid size, while the current
   // NDC coordinates were calculated based on the valid size, so they need to be adjusted
   // accordingly.
@@ -93,8 +93,8 @@ PlacementPtr<GeometryProcessor> Rect3DDrawOp::onMakeGeometryProcessor(RenderTarg
     ndcScale.y = -ndcScale.y;
     ndcOffset.y = -ndcOffset.y;
   }
-  return Transform3DGeometryProcessor::Make(drawingBuffer, aaType, drawArgs.transformMatrix,
-                                            ndcScale, ndcOffset);
+  return Transform3DGeometryProcessor::Make(allocator, aaType, drawArgs.transformMatrix, ndcScale,
+                                            ndcOffset);
 }
 
 void Rect3DDrawOp::onDraw(RenderPass* renderPass) {

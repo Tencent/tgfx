@@ -104,9 +104,8 @@ std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
                        -1.f - ndcRectScaled.top - renderBoundsLTNDCScaled.y);
 
   auto drawingManager = args.context->drawingManager();
-  auto drawingBuffer = args.context->drawingAllocator();
-  auto vertexProvider =
-      RectsVertexProvider::MakeFrom(drawingBuffer, srcModelRect, AAType::Coverage);
+  auto allocator = args.context->drawingAllocator();
+  auto vertexProvider = RectsVertexProvider::MakeFrom(allocator, srcModelRect, AAType::Coverage);
   const Size viewportSize(static_cast<float>(renderTarget->width()),
                           static_cast<float>(renderTarget->height()));
   const Rect3DDrawArgs drawArgs{matrix, ndcScale, ndcOffset, viewportSize};
@@ -119,13 +118,12 @@ std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
   // is the size after applying DrawScale. Texture sampling requires corresponding scaling.
   uvMatrix.postScale(drawScaleX, drawScaleY);
   auto fragmentProcessor =
-      TextureEffect::Make(std::move(sourceTextureProxy), samplingArgs, &uvMatrix);
+      TextureEffect::Make(allocator, std::move(sourceTextureProxy), samplingArgs, &uvMatrix);
   drawOp->addColorFP(std::move(fragmentProcessor));
   std::vector<PlacementPtr<DrawOp>> drawOps;
   drawOps.emplace_back(std::move(drawOp));
-  auto drawOpArray = drawingBuffer->makeArray(std::move(drawOps));
-  drawingManager->addOpsRenderTask(renderTarget, std::move(drawOpArray),
-                                   Color::Transparent().premultiply());
+  auto drawOpArray = allocator->makeArray(std::move(drawOps));
+  drawingManager->addOpsRenderTask(renderTarget, std::move(drawOpArray), Color::Transparent().premultiply());
 
   return renderTarget->asTextureProxy();
 }
