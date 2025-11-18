@@ -110,6 +110,15 @@ bool Context::flushAndSubmit(bool syncCpu) {
   return result;
 }
 
+int32_t Context::numDrawCalls() const {
+  return _drawingManager->numDrawCalls();
+}
+
+int32_t Context::numRenderTasks() const {
+  return _drawingManager->numRenderTasks();
+}
+
+
 size_t Context::memoryUsage() const {
   return _resourceCache->getResourceBytes();
 }

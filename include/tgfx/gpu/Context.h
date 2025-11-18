@@ -170,6 +170,10 @@ class Context {
    */
   bool flushAndSubmit(bool syncCpu = false);
 
+  int32_t numDrawCalls() const;
+
+  int32_t numRenderTasks() const;
+
   GlobalCache* globalCache() const {
     return _globalCache;
   }
