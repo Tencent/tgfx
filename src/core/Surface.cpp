@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Surface.h"
-#include "../../include/tgfx/core/Log.h"
 #include "core/images/TextureImage.h"
 #include "core/utils/CopyPixels.h"
+#include "core/utils/Log.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"

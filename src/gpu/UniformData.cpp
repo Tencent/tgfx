@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "UniformData.h"
-#include "../../include/tgfx/core/Log.h"
+#include "core/utils/Log.h"
 #include "inspect/InspectorMark.h"
 
 namespace tgfx {

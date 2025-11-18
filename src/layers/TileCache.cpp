@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TileCache.h"
-#include "../../include/tgfx/core/Log.h"
+#include "core/utils/Log.h"
 #include "core/utils/TileSortCompareFunc.h"
 
 namespace tgfx {

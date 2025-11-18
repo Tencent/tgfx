@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "../../../include/tgfx/core/Log.h"
+#include "core/utils/Log.h"
 #include "layers/contents/LayerContent.h"
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/ImageFilter.h"

@@ -31,9 +31,9 @@
 #elif TGFX_USE_PNG_ENCODE
 #include "core/codecs/png/PngCodec.h"
 #endif
-#include "../../include/tgfx/core/Log.h"
 #include "core/PathTriangulator.h"
 #include "core/ShapeRasterizer.h"
+#include "core/utils/Log.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "gpu/glsl/GLSLProgramBuilder.h"
 #include "gpu/ops/RectDrawOp.h"

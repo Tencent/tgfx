@@ -18,10 +18,10 @@
 
 #include "tgfx/layers/Layer.h"
 #include <atomic>
-#include "../../include/tgfx/core/Log.h"
 #include "contents/LayerContent.h"
 #include "contents/RasterizedContent.h"
 #include "core/images/PictureImage.h"
+#include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "layers/ContourContext.h"
 #include "layers/DrawArgs.h"

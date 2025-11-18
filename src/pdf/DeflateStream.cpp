@@ -19,7 +19,7 @@
 #include "DeflateStream.h"
 #include <cstddef>
 #include <cstring>
-#include "../../include/tgfx/core/Log.h"
+#include "core/utils/Log.h"
 #include "tgfx/core/WriteStream.h"
 #include "zlib.h"
 

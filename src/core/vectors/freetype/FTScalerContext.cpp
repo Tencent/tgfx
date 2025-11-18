@@ -22,12 +22,12 @@
 #include FT_OUTLINE_H
 #include FT_SIZES_H
 #include FT_TRUETYPE_TABLES_H
-#include "../../../../include/tgfx/core/Log.h"
 #include "FTRasterTarget.h"
 #include "FTUtil.h"
 #include "core/utils/ClearPixels.h"
 #include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/GammaCorrection.h"
+#include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "skcms.h"
 #include "tgfx/core/Buffer.h"

@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RegionTransformer.h"
-#include "../../include/tgfx/core/Log.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
 class ClipRegionTransformer : public RegionTransformer {

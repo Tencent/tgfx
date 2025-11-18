@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/svg/node/SVGContainer.h"
-#include "../../../include/tgfx/core/Log.h"
+#include "core/utils/Log.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/PathTypes.h"
 #include "tgfx/core/Rect.h"

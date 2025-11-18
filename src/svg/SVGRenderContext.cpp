@@ -21,8 +21,8 @@
 #include <cmath>
 #include <memory>
 #include <optional>
-#include "../../include/tgfx/core/Log.h"
 #include "core/utils/AddressOf.h"
+#include "core/utils/Log.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/ImageFilter.h"

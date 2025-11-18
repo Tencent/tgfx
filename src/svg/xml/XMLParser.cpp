@@ -20,7 +20,7 @@
 #include <cstddef>
 #include <cstdlib>
 #include <string>
-#include "../../../include/tgfx/core/Log.h"
+#include "core/utils/Log.h"
 #include "expat/lib/expat.h"
 
 namespace tgfx {

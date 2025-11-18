@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/Device.h"
-#include "../../include/tgfx/core/Log.h"
+#include "core/utils/Log.h"
 #include "core/utils/UniqueID.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/GPU.h"

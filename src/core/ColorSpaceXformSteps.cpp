@@ -20,10 +20,10 @@
 #include <cmath>
 #include <cstring>
 #include <vector>
-#include "../../include/tgfx/core/Log.h"
 #include "tgfx/core/AlphaType.h"
 #include "tgfx/core/ColorSpace.h"
 #include "utils/ColorSpaceHelper.h"
+#include "utils/Log.h"
 
 namespace tgfx {
 

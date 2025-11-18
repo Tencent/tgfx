@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFMetadataUtils.h"
-#include "../../include/tgfx/core/Log.h"
+#include "core/utils/Log.h"
 #include "core/utils/MD5.h"
 #include "pdf/PDFTypes.h"
 #include "pdf/PDFUtils.h"

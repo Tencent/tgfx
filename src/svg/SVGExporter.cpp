@@ -20,8 +20,8 @@
 #include <cstdint>
 #include <memory>
 #include <utility>
-#include "../../include/tgfx/core/Log.h"
 #include "ElementWriter.h"
+#include "core/utils/Log.h"
 #include "svg/SVGExportContext.h"
 #include "svg/xml/XMLWriter.h"
 #include "tgfx/core/Canvas.h"

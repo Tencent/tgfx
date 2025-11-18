@@ -19,7 +19,7 @@
 #pragma once
 
 #include <cstddef>
-#include "../../include/tgfx/core/Log.h"
+#include "core/utils/Log.h"
 #include "tgfx/core/Typeface.h"
 
 namespace tgfx {

@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "../../include/tgfx/core/Log.h"
+#include "core/utils/Log.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Rect.h"

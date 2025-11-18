@@ -21,7 +21,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
-#include "../../../include/tgfx/core/Log.h"
+#include "core/utils/Log.h"
 #include "hb.h"
 #include "tgfx/core/Buffer.h"
 #include "utils/ProjectPath.h"

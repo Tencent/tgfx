@@ -21,10 +21,10 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include "../../../include/tgfx/core/Log.h"
 #include "GLDefines.h"
 #include "GLFunctions.h"
 #include "core/utils/EnumHasher.h"
+#include "core/utils/Log.h"
 #include "gpu/ShaderCaps.h"
 #include "tgfx/gpu/GPUFeatures.h"
 #include "tgfx/gpu/GPUInfo.h"

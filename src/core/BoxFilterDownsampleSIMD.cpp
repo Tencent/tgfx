@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #include "BoxFilterDownsampleSIMD.h"
-#include "../../include/tgfx/core/Log.h"
+#include "utils/Log.h"
 // First undef to prevent error when re-included.
 #undef HWY_TARGET_INCLUDE
 // For dynamic dispatch, specify the name of the current file (unfortunately

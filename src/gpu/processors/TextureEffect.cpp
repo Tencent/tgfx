@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureEffect.h"
-#include "../../../include/tgfx/core/Log.h"
+#include "core/utils/Log.h"
 #include "gpu/ProxyProvider.h"
 
 namespace tgfx {

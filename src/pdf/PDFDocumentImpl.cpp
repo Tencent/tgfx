@@ -18,7 +18,7 @@
 
 #include "PDFDocumentImpl.h"
 #include <utility>
-#include "../../include/tgfx/core/Log.h"
+#include "core/utils/Log.h"
 #include "pdf/PDFMetadataUtils.h"
 #include "pdf/PDFTypes.h"
 #include "tgfx/core/Canvas.h"

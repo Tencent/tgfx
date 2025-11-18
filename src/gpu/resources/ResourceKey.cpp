@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ResourceKey.h"
-#include "../../../include/tgfx/core/Log.h"
 #include "core/utils/HashRange.h"
+#include "core/utils/Log.h"
 #include "gpu/UniqueDomain.h"
 
 namespace tgfx {

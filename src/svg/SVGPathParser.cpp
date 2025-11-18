@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/svg/SVGPathParser.h"
-#include "../../include/tgfx/core/Log.h"
+#include "core/utils/Log.h"
 #include "svg/SVGUtils.h"
 
 namespace tgfx {

@@ -19,9 +19,9 @@
 #pragma once
 
 #include <list>
-#include "../../include/tgfx/core/Log.h"
 #include "RectPackSkyline.h"
 #include "tgfx/core/Rect.h"
+#include "utils/Log.h"
 
 namespace tgfx {
 enum class MaskFormat : int { A8, RGBA, BGRA, Last = BGRA };

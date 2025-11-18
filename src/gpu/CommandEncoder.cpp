@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/CommandEncoder.h"
-#include "../../include/tgfx/core/Log.h"
+#include "core/utils/Log.h"
 #include "tgfx/gpu/RenderPass.h"
 
 namespace tgfx {

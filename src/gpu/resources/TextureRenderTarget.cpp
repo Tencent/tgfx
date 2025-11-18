@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureRenderTarget.h"
-#include "../../../include/tgfx/core/Log.h"
+#include "core/utils/Log.h"
 #include "core/utils/UniqueID.h"
 #include "tgfx/gpu/GPU.h"
 #include "tgfx/gpu/Texture.h"

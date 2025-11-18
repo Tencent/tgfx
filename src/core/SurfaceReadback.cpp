@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/SurfaceReadback.h"
-#include "../../include/tgfx/core/Log.h"
 #include "core/utils/CopyPixels.h"
+#include "core/utils/Log.h"
 #include "gpu/proxies/GPUBufferProxy.h"
 
 namespace tgfx {

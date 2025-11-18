@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Canvas.h"
-#include "../../include/tgfx/core/Log.h"
 #include "core/DrawContext.h"
 #include "core/PictureContext.h"
 #include "core/shapes/StrokeShape.h"
@@ -28,6 +27,7 @@
 #include "shapes/MatrixShape.h"
 #include "shapes/PathShape.h"
 #include "tgfx/core/Surface.h"
+#include "utils/Log.h"
 
 namespace tgfx {
 class AutoLayerForImageFilter {

@@ -18,12 +18,12 @@
 
 #pragma once
 
+#include <assert.h>
 #include <cfloat>
 #include <cinttypes>
 #include <limits>
 #include "tgfx/core/AlphaType.h"
 #include "tgfx/core/ColorSpace.h"
-#include "tgfx/core/Log.h"
 
 namespace tgfx {
 
@@ -186,7 +186,7 @@ struct RGBA4f {
    * @return value corresponding to index.
    */
   float operator[](int index) const {
-    DEBUG_ASSERT(index >= 0 && index < 4);
+    assert(index >= 0 && index < 4);
     return (&red)[index];
   }
 
@@ -196,7 +196,7 @@ struct RGBA4f {
    * @return value corresponding to index.
    */
   float& operator[](int index) {
-    DEBUG_ASSERT(index >= 0 && index < 4);
+    assert(index >= 0 && index < 4);
     return (&red)[index];
   }
 
@@ -204,7 +204,7 @@ struct RGBA4f {
    * Returns true if Color is an opaque color.
    */
   bool isOpaque() const {
-    DEBUG_ASSERT(alpha <= 1.0f && alpha >= 0.0f);
+    assert(alpha <= 1.0f && alpha >= 0.0f);
     return alpha == 1.0f;
   }
 

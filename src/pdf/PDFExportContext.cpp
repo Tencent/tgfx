@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFExportContext.h"
-#include "../../include/tgfx/core/Log.h"
 #include "core/AdvancedTypefaceInfo.h"
 #include "core/DrawContext.h"
 #include "core/MCState.h"
@@ -32,6 +31,7 @@
 #include "core/shaders/ColorShader.h"
 #include "core/shaders/ImageShader.h"
 #include "core/shaders/MatrixShader.h"
+#include "core/utils/Log.h"
 #include "core/utils/PlacementPtr.h"
 #include "core/utils/ShapeUtils.h"
 #include "core/utils/Types.h"

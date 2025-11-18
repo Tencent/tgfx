@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/svg/SVGLengthContext.h"
-#include "../../include/tgfx/core/Log.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
 

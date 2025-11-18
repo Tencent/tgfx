@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/TextLayer.h"
-#include "../../include/tgfx/core/Log.h"
+#include "core/utils/Log.h"
 #include "tgfx/core/UTF.h"
 
 namespace tgfx {

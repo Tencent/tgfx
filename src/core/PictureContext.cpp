@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/PictureContext.h"
-#include "../../include/tgfx/core/Log.h"
+#include "core/utils/Log.h"
 #include "utils/RectToRectMatrix.h"
 
 namespace tgfx {

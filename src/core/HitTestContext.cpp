@@ -18,7 +18,7 @@
 
 #include "HitTestContext.h"
 #include <algorithm>
-#include "../../include/tgfx/core/Log.h"
+#include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/ShapeUtils.h"
 #include "core/utils/StrokeUtils.h"

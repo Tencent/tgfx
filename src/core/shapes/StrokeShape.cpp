@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "StrokeShape.h"
-#include "../../../include/tgfx/core/Log.h"
 #include "core/shapes/MatrixShape.h"
+#include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/StrokeUtils.h"
 #include "core/utils/UniqueID.h"

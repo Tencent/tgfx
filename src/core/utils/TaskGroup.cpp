@@ -19,7 +19,7 @@
 #include "TaskGroup.h"
 #include <cmath>
 #include <cstdlib>
-#include "../../../include/tgfx/core/Log.h"
+#include "core/utils/Log.h"
 
 #ifdef __APPLE__
 #include <sys/sysctl.h>

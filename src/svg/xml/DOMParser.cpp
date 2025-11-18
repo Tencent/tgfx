@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DOMParser.h"
-#include "../../../include/tgfx/core/Log.h"
+#include "core/utils/Log.h"
 #include "tgfx/svg/xml/XMLDOM.h"
 
 namespace tgfx {

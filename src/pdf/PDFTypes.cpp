@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFTypes.h"
-#include "../../include/tgfx/core/Log.h"
+#include "core/utils/Log.h"
 #include "pdf/DeflateStream.h"
 #include "pdf/PDFDocumentImpl.h"
 #include "tgfx/core/Data.h"

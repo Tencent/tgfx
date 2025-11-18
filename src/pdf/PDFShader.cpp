@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFShader.h"
-#include "../../include/tgfx/core/Log.h"
 #include "core/shaders/ImageShader.h"
+#include "core/utils/Log.h"
 #include "core/utils/Types.h"
 #include "pdf/PDFDocumentImpl.h"
 #include "pdf/PDFExportContext.h"

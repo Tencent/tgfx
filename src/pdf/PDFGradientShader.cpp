@@ -18,9 +18,9 @@
 
 #include "PDFGradientShader.h"
 #include <algorithm>
-#include "../../include/tgfx/core/Log.h"
 #include "core/ColorSpaceXformSteps.h"
 #include "core/shaders/GradientShader.h"
+#include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "pdf/PDFDocumentImpl.h"
 #include "pdf/PDFFormXObject.h"

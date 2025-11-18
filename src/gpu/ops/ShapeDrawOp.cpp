@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ShapeDrawOp.h"
-#include "../../../include/tgfx/core/Log.h"
 #include "core/PathTriangulator.h"
+#include "core/utils/Log.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/Quad.h"
 #include "gpu/RectsVertexProvider.h"

@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextShape.h"
-#include "../../../include/tgfx/core/Log.h"
 #include "core/GlyphRunList.h"
+#include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "tgfx/core/Matrix.h"
 

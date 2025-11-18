@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DecomposeRects.h"
-#include "../../../include/tgfx/core/Log.h"
+#include "Log.h"
 
 namespace tgfx {
 static void DecomposeRect(Rect* rectA, Rect* rectB) {
