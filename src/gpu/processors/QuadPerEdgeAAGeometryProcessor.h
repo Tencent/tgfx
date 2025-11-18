@@ -51,7 +51,7 @@ class QuadPerEdgeAAGeometryProcessor : public GeometryProcessor {
   int width = 1;
   int height = 1;
   AAType aa = AAType::None;
-  std::optional<Color> commonColor = std::nullopt;
+  std::optional<PMColor> commonColor = std::nullopt;
   std::optional<Matrix> uvMatrix = std::nullopt;
   bool hasSubset = false;
 };
