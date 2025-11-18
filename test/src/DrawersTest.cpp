@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/utils/Log.h"
+#include "../../include/tgfx/core/Log.h"
 #include "drawers/Drawer.h"
 #include "utils/TestUtils.h"
 

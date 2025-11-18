@@ -57,7 +57,7 @@ class UniformData {
    * Convenience method for Color.
    */
   template <typename T>
-  std::enable_if_t<std::is_same_v<std::decay_t<T>, Color>, void> setData(const std::string& name,
+  std::enable_if_t<std::is_same_v<std::decay_t<T>, PMColor> || std::is_same_v<std::decay_t<T>, Color>, void> setData(const std::string& name,
                                                                          const T& color) const {
     onSetData(name, color.array(), sizeof(float) * 4);
   }

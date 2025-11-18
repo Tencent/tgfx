@@ -18,7 +18,7 @@
 
 #include "gpu/ResourceCache.h"
 #include <unordered_map>
-#include "core/utils/Log.h"
+#include "../../include/tgfx/core/Log.h"
 #include "gpu/resources/Resource.h"
 
 namespace tgfx {

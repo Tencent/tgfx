@@ -19,7 +19,7 @@
 #pragma once
 
 #include <cstdlib>
-#include "tgfx/platform/Print.h"
+#include "../platform/Print.h"
 
 namespace tgfx {
 #define ABORT(msg)                                                                \

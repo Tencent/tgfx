@@ -28,7 +28,7 @@ class QuadPerEdgeAAGeometryProcessor : public GeometryProcessor {
  public:
   static PlacementPtr<QuadPerEdgeAAGeometryProcessor> Make(BlockAllocator* allocator, int width,
                                                            int height, AAType aa,
-                                                           std::optional<Color> commonColor,
+                                                           std::optional<PMColor> commonColor,
                                                            std::optional<Matrix> uvMatrix,
                                                            bool hasSubset);
   std::string name() const override {
@@ -37,7 +37,7 @@ class QuadPerEdgeAAGeometryProcessor : public GeometryProcessor {
 
  protected:
   DEFINE_PROCESSOR_CLASS_ID
-  QuadPerEdgeAAGeometryProcessor(int width, int height, AAType aa, std::optional<Color> commonColor,
+  QuadPerEdgeAAGeometryProcessor(int width, int height, AAType aa, std::optional<PMColor> commonColor,
                                  std::optional<Matrix> uvMatrix, bool hasSubset);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;

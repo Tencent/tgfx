@@ -75,7 +75,7 @@ PlacementPtr<FragmentProcessor> DropShadowImageFilter::getSourceFragmentProcesso
   if (result) {
     return result;
   }
-  return ConstColorProcessor::Make(args.context->drawingAllocator(), Color::Transparent(),
+  return ConstColorProcessor::Make(args.context->drawingAllocator(), Color::Transparent().premultiply(),
                                    InputMode::Ignore);
 }
 
@@ -99,9 +99,9 @@ PlacementPtr<FragmentProcessor> DropShadowImageFilter::getShadowFragmentProcesso
     return nullptr;
   }
   auto buffer = args.context->drawingAllocator();
-  auto dstColor = color.makeColorSpace(source->colorSpace());
+  auto dstColor = color.makeColorSpaceWithPremultiply(source->colorSpace());
   auto colorProcessor =
-      ConstColorProcessor::Make(buffer, dstColor.premultiply(), InputMode::Ignore);
+      ConstColorProcessor::Make(buffer, dstColor, InputMode::Ignore);
   return XfermodeFragmentProcessor::MakeFromTwoProcessors(
       buffer, std::move(colorProcessor), std::move(shadowProcessor), BlendMode::SrcIn);
 }

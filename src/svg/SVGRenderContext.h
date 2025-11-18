@@ -24,7 +24,7 @@
 #include <string>
 #include <unordered_map>
 #include "core/utils/AddressOf.h"
-#include "core/utils/Log.h"
+#include "../../include/tgfx/core/Log.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/MaskFilter.h"
 #include "tgfx/core/Matrix.h"

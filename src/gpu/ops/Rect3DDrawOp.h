@@ -75,7 +75,7 @@ class Rect3DDrawOp : public DrawOp {
   Rect3DDrawArgs drawArgs;
 
   size_t rectCount = 0;
-  std::optional<Color> commonColor = std::nullopt;
+  std::optional<PMColor> commonColor = std::nullopt;
   std::optional<Matrix> uvMatrix = std::nullopt;
   bool hasSubset = false;
 

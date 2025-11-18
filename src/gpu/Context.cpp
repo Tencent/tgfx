@@ -19,7 +19,7 @@
 #include "tgfx/gpu/Context.h"
 #include "core/AtlasManager.h"
 #include "core/utils/BlockAllocator.h"
-#include "core/utils/Log.h"
+#include "../../include/tgfx/core/Log.h"
 #include "core/utils/SlidingWindowTracker.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/GlobalCache.h"

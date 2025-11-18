@@ -22,7 +22,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <tuple>
-#include "core/utils/Log.h"
+#include "../../../include/tgfx/core/Log.h"
 #include "svg/SVGAttributeParser.h"
 #include "tgfx/svg/SVGTypes.h"
 

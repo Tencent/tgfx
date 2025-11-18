@@ -27,7 +27,7 @@
 #include "core/utils/ClearPixels.h"
 #include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/GammaCorrection.h"
-#include "core/utils/Log.h"
+#include "../../../../include/tgfx/core/Log.h"
 #include "core/utils/MathExtra.h"
 #include "skcms.h"
 #include "tgfx/core/Buffer.h"

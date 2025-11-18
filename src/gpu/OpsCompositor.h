@@ -119,7 +119,7 @@ class OpsCompositor {
   std::vector<PlacementPtr<Rect>> pendingUVRects = {};
   std::vector<PlacementPtr<RRectRecord>> pendingRRects = {};
   std::vector<PlacementPtr<Stroke>> pendingStrokes = {};
-  std::optional<Color> clearColor = std::nullopt;
+  std::optional<PMColor> clearColor = std::nullopt;
   std::vector<PlacementPtr<DrawOp>> drawOps = {};
   std::shared_ptr<ColorSpace> dstColorSpace = nullptr;
 

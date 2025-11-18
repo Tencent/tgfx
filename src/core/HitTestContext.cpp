@@ -22,7 +22,7 @@
 #include "core/utils/ShapeUtils.h"
 #include "core/utils/StrokeUtils.h"
 #include "tgfx/core/Stroke.h"
-#include "utils/Log.h"
+#include "../../include/tgfx/core/Log.h"
 
 namespace tgfx {
 static bool GetLocalPoint(const Matrix& matrix, float deviceX, float deviceY, Point* localPoint) {

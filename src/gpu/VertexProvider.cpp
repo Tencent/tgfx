@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "VertexProvider.h"
-#include "core/utils/Log.h"
+#include "../../include/tgfx/core/Log.h"
 
 namespace tgfx {
 void VertexProviderTask::onExecute() {

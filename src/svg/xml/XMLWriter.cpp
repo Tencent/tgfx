@@ -21,7 +21,7 @@
 #include <string>
 #include <utility>
 #include "XMLParser.h"
-#include "core/utils/Log.h"
+#include "../../../include/tgfx/core/Log.h"
 #include "svg/SVGUtils.h"
 #include "tgfx/svg/xml/XMLDOM.h"
 

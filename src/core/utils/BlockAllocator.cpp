@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "BlockAllocator.h"
-#include "core/utils/Log.h"
+#include "../../../include/tgfx/core/Log.h"
 
 namespace tgfx {
 // The alignment of memory blocks. Set to 64 bytes to ensure that the memory blocks are aligned to

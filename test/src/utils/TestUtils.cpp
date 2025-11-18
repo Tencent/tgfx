@@ -20,7 +20,7 @@
 #include <dirent.h>
 #include <fstream>
 #include "ProjectPath.h"
-#include "core/utils/Log.h"
+#include "../../../include/tgfx/core/Log.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Stream.h"
 

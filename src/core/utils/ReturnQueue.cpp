@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ReturnQueue.h"
-#include "core/utils/Log.h"
+#include "../../../include/tgfx/core/Log.h"
 
 namespace tgfx {
 std::shared_ptr<ReturnQueue> ReturnQueue::Make() {

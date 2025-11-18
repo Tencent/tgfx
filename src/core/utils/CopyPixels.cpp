@@ -19,7 +19,7 @@
 #include "CopyPixels.h"
 #include <unordered_map>
 #include "ColorSpaceHelper.h"
-#include "core/utils/Log.h"
+#include "../../../include/tgfx/core/Log.h"
 #include "skcms.h"
 
 namespace tgfx {

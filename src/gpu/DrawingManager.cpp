@@ -65,7 +65,7 @@ std::shared_ptr<OpsCompositor> DrawingManager::addOpsCompositor(
 
 void DrawingManager::addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTarget,
                                       PlacementArray<DrawOp> drawOps,
-                                      std::optional<Color> clearColor) {
+                                      std::optional<PMColor> clearColor) {
   if (renderTarget == nullptr || (drawOps.empty() && !clearColor.has_value())) {
     return;
   }

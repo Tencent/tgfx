@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RectPackSkyline.h"
-#include "core/utils/Log.h"
+#include "../../include/tgfx/core/Log.h"
 
 namespace tgfx {
 bool RectPackSkyline::addRect(int width, int height, Point& location) {

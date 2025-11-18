@@ -25,7 +25,7 @@
 #include <functional>
 #include <memory>
 #include "BoxFilterDownsampleSIMD.h"
-#include "utils/Log.h"
+#include "../../include/tgfx/core/Log.h"
 
 namespace tgfx {
 constexpr int ChannelSizeInBytes = 1;

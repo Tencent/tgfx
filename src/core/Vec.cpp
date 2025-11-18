@@ -18,7 +18,7 @@
 
 #include "tgfx/core/Vec.h"
 #include "core/utils/MathExtra.h"
-#include "utils/Log.h"
+#include "../../include/tgfx/core/Log.h"
 
 namespace tgfx {
 

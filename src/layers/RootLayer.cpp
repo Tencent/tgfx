@@ -19,7 +19,7 @@
 #include "RootLayer.h"
 #include <limits>
 #include "core/utils/DecomposeRects.h"
-#include "core/utils/Log.h"
+#include "../../include/tgfx/core/Log.h"
 
 namespace tgfx {
 static float UnionArea(const Rect& rect1, const Rect& rect2) {

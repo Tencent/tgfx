@@ -23,7 +23,7 @@
 #include <regex>
 #include <unordered_map>
 #include <utility>
-#include "core/utils/Log.h"
+#include "../../../include/tgfx/core/Log.h"
 #include "tgfx/core/Data.h"
 
 namespace tgfx {

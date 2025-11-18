@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFTag.h"
-#include "core/utils/Log.h"
+#include "../../include/tgfx/core/Log.h"
 #include "pdf/PDFDocumentImpl.h"
 #include "pdf/PDFTypes.h"
 

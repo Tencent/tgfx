@@ -24,7 +24,7 @@
 #include <string>
 #include <utility>
 #include <vector>
-#include "core/utils/Log.h"
+#include "../../include/tgfx/core/Log.h"
 #include "core/utils/MathExtra.h"
 #include "svg/SVGUtils.h"
 #include "tgfx/core/Color.h"

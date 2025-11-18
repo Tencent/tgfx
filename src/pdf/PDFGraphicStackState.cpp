@@ -18,7 +18,7 @@
 
 #include "PDFGraphicStackState.h"
 #include "core/MCState.h"
-#include "core/utils/Log.h"
+#include "../../include/tgfx/core/Log.h"
 #include "pdf/PDFUtils.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Matrix.h"

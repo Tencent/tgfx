@@ -18,7 +18,7 @@
 
 #include "YUVTextureView.h"
 #include "core/utils/HardwareBufferUtil.h"
-#include "core/utils/Log.h"
+#include "../../../include/tgfx/core/Log.h"
 #include "tgfx/gpu/GPU.h"
 
 namespace tgfx {

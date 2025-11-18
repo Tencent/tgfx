@@ -20,7 +20,7 @@
 #include <algorithm>
 #include "core/ColorSpaceXformSteps.h"
 #include "core/shaders/GradientShader.h"
-#include "core/utils/Log.h"
+#include "../../include/tgfx/core/Log.h"
 #include "core/utils/MathExtra.h"
 #include "pdf/PDFDocumentImpl.h"
 #include "pdf/PDFFormXObject.h"

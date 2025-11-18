@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "core/utils/Log.h"
+#include "../../../include/tgfx/core/Log.h"
 #include "core/utils/PlacementPtr.h"
 
 namespace tgfx {

@@ -22,7 +22,7 @@
 #include <regex>
 #include <string>
 #include <utility>
-#include "core/utils/Log.h"
+#include "../../include/tgfx/core/Log.h"
 #include "svg/SVGAttributeParser.h"
 #include "svg/SVGUtils.h"
 #include "tgfx/svg/SVGAttribute.h"

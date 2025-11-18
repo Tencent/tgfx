@@ -18,7 +18,7 @@
 
 #include "tgfx/svg/node/SVGShape.h"
 #include <memory>
-#include "core/utils/Log.h"
+#include "../../../include/tgfx/core/Log.h"
 #include "svg/SVGRenderContext.h"
 #include "tgfx/core/Size.h"
 

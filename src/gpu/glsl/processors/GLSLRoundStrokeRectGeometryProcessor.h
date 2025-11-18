@@ -23,7 +23,7 @@
 namespace tgfx {
 class GLSLRoundStrokeRectGeometryProcessor final : public RoundStrokeRectGeometryProcessor {
  public:
-  GLSLRoundStrokeRectGeometryProcessor(AAType aaType, std::optional<Color> commonColor,
+  GLSLRoundStrokeRectGeometryProcessor(AAType aaType, std::optional<PMColor> commonColor,
                                        std::optional<Matrix> uvMatrix);
 
   void emitCode(EmitArgs&) const override;

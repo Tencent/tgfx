@@ -77,7 +77,7 @@ class GLState {
 
   void setViewport(int x, int y, int width, int height);
 
-  void setClearColor(Color color);
+  void setClearColor(PMColor color);
 
   void setColorMask(uint32_t colorMask);
 
@@ -101,7 +101,7 @@ class GLState {
   std::vector<uint32_t> textureUnits = {};
   std::array<int, 4> scissorRect = {0, 0, 0, 0};
   std::array<int, 4> viewport = {0, 0, 0, 0};
-  std::optional<Color> clearColor = std::nullopt;
+  std::optional<PMColor> clearColor = std::nullopt;
   uint32_t activePipeline = 0;
   unsigned activeTextureUint = INVALID_VALUE;
   unsigned readFramebuffer = INVALID_VALUE;

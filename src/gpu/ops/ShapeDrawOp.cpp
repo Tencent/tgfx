@@ -18,7 +18,7 @@
 
 #include "ShapeDrawOp.h"
 #include "core/PathTriangulator.h"
-#include "core/utils/Log.h"
+#include "../../../include/tgfx/core/Log.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/Quad.h"
 #include "gpu/RectsVertexProvider.h"
@@ -28,7 +28,7 @@
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
-PlacementPtr<ShapeDrawOp> ShapeDrawOp::Make(std::shared_ptr<GPUShapeProxy> shapeProxy, Color color,
+PlacementPtr<ShapeDrawOp> ShapeDrawOp::Make(std::shared_ptr<GPUShapeProxy> shapeProxy, PMColor color,
                                             const Matrix& uvMatrix, AAType aaType) {
   if (shapeProxy == nullptr) {
     return nullptr;
@@ -37,7 +37,7 @@ PlacementPtr<ShapeDrawOp> ShapeDrawOp::Make(std::shared_ptr<GPUShapeProxy> shape
   return drawingBuffer->make<ShapeDrawOp>(std::move(shapeProxy), color, uvMatrix, aaType);
 }
 
-ShapeDrawOp::ShapeDrawOp(std::shared_ptr<GPUShapeProxy> proxy, Color color, const Matrix& uvMatrix,
+ShapeDrawOp::ShapeDrawOp(std::shared_ptr<GPUShapeProxy> proxy, PMColor color, const Matrix& uvMatrix,
                          AAType aaType)
     : DrawOp(aaType), shapeProxy(std::move(proxy)), color(color), uvMatrix(uvMatrix) {
   auto context = shapeProxy->getContext();

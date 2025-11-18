@@ -22,7 +22,7 @@
 #include <sstream>
 #include "core/codecs/jpeg/JpegCodec.h"
 #include "core/codecs/png/PngCodec.h"
-#include "core/utils/Log.h"
+#include "../../include/tgfx/core/Log.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/ImageCodec.h"

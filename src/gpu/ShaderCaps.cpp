@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ShaderCaps.h"
-#include "core/utils/Log.h"
+#include "../../include/tgfx/core/Log.h"
 
 namespace tgfx {
 static bool HasExtension(const GPUInfo* info, const std::string& extension) {

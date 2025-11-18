@@ -22,7 +22,7 @@
 #include <sstream>
 #include <vector>
 #include "Checksum.h"
-#include "utils/Log.h"
+#include "../../include/tgfx/core/Log.h"
 
 namespace tgfx {
 

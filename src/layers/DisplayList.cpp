@@ -18,7 +18,7 @@
 
 #include "tgfx/layers/DisplayList.h"
 #include "core/utils/DecomposeRects.h"
-#include "core/utils/Log.h"
+#include "../../include/tgfx/core/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/TileSortCompareFunc.h"
 #include "inspect/InspectorMark.h"

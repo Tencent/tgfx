@@ -81,7 +81,7 @@ class Swizzle {
     return Swizzle("rara");
   }
 
-  Color applyTo(const Color& color) const;
+  PMColor applyTo(const PMColor& color) const;
 
  private:
   char swiz[5];

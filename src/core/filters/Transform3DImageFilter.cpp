@@ -124,7 +124,7 @@ std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
   std::vector<PlacementPtr<DrawOp>> drawOps;
   drawOps.emplace_back(std::move(drawOp));
   auto drawOpArray = drawingBuffer->makeArray(std::move(drawOps));
-  drawingManager->addOpsRenderTask(renderTarget, std::move(drawOpArray), Color::Transparent());
+  drawingManager->addOpsRenderTask(renderTarget, std::move(drawOpArray), Color::Transparent().premultiply());
 
   return renderTarget->asTextureProxy();
 }

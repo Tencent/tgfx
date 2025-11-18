@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MeasureContext.h"
-#include "core/utils/Log.h"
+#include "../../include/tgfx/core/Log.h"
 #include "core/utils/StrokeUtils.h"
 #include "tgfx/core/Shape.h"
 #include "utils/MathExtra.h"

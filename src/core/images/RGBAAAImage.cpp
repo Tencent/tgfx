@@ -19,7 +19,7 @@
 #include "RGBAAAImage.h"
 #include "ScaledImage.h"
 #include "core/utils/AddressOf.h"
-#include "core/utils/Log.h"
+#include "../../../include/tgfx/core/Log.h"
 #include "core/utils/MathExtra.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/TPArgs.h"

@@ -20,7 +20,7 @@
 #include <memory>
 #include "core/AdvancedTypefaceInfo.h"
 #include "core/ScalerContext.h"
-#include "core/utils/Log.h"
+#include "../../../include/tgfx/core/Log.h"
 #include "pdf/PDFDocumentImpl.h"
 #include "pdf/PDFFont.h"
 #include "pdf/PDFTypes.h"

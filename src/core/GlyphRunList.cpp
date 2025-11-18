@@ -19,7 +19,7 @@
 #include "GlyphRunList.h"
 #include "ScalerContext.h"
 #include "core/utils/FauxBoldScale.h"
-#include "core/utils/Log.h"
+#include "../../include/tgfx/core/Log.h"
 #include "core/utils/MathExtra.h"
 #include "tgfx/core/TextBlob.h"
 

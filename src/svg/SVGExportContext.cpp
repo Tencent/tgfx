@@ -23,7 +23,7 @@
 #include "core/images/FilterImage.h"
 #include "core/images/PictureImage.h"
 #include "core/images/SubsetImage.h"
-#include "core/utils/Log.h"
+#include "../../include/tgfx/core/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/RectToRectMatrix.h"
 #include "core/utils/ShapeUtils.h"

@@ -20,7 +20,7 @@
 
 #include <list>
 #include "RectPackSkyline.h"
-#include "core/utils/Log.h"
+#include "../../include/tgfx/core/Log.h"
 #include "tgfx/core/Rect.h"
 
 namespace tgfx {

@@ -55,7 +55,7 @@ class DrawingManager {
                                                   std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   void addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTarget,
-                        PlacementArray<DrawOp> drawOps, std::optional<Color> clearColor);
+                        PlacementArray<DrawOp> drawOps, std::optional<PMColor> clearColor);
 
   void addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> renderTarget,
                           std::vector<RuntimeInputTexture> inputs,

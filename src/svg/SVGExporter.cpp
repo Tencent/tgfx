@@ -21,7 +21,7 @@
 #include <memory>
 #include <utility>
 #include "ElementWriter.h"
-#include "core/utils/Log.h"
+#include "../../include/tgfx/core/Log.h"
 #include "svg/SVGExportContext.h"
 #include "svg/xml/XMLWriter.h"
 #include "tgfx/core/Canvas.h"

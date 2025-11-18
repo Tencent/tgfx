@@ -66,7 +66,7 @@ class RRectDrawOp : public DrawOp {
  private:
   size_t rectCount = 0;
   bool hasStroke = false;
-  std::optional<Color> commonColor = std::nullopt;
+  std::optional<PMColor> commonColor = std::nullopt;
   std::shared_ptr<GPUBufferProxy> indexBufferProxy = nullptr;
   std::shared_ptr<VertexBufferView> vertexBufferProxyView = nullptr;
 

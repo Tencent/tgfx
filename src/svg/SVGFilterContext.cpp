@@ -18,7 +18,7 @@
 
 #include "SVGFilterContext.h"
 #include <memory>
-#include "core/utils/Log.h"
+#include "../../include/tgfx/core/Log.h"
 #include "svg/SVGRenderContext.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/ColorFilter.h"

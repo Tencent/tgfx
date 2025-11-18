@@ -33,7 +33,7 @@
 #endif
 #include "core/PathTriangulator.h"
 #include "core/ShapeRasterizer.h"
-#include "core/utils/Log.h"
+#include "../../include/tgfx/core/Log.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "gpu/glsl/GLSLProgramBuilder.h"
 #include "gpu/ops/RectDrawOp.h"
@@ -100,7 +100,7 @@ void FrameCapture::sendAttributeData(const char* name, const std::optional<Matri
   sendAttributeData(name, value);
 }
 
-void FrameCapture::sendAttributeData(const char* name, const Color& color) {
+void FrameCapture::sendAttributeData(const char* name, const PMColor& color) {
   auto r = static_cast<uint8_t>(color.red * 255.f);
   auto g = static_cast<uint8_t>(color.green * 255.f);
   auto b = static_cast<uint8_t>(color.blue * 255.f);
@@ -109,8 +109,8 @@ void FrameCapture::sendAttributeData(const char* name, const Color& color) {
   sendAttributeData(name, value, FrameCaptureMessageType::ValueDataColor);
 }
 
-void FrameCapture::sendAttributeData(const char* name, const std::optional<Color>& color) {
-  auto value = Color::FromRGBA(255, 255, 255, 255);
+void FrameCapture::sendAttributeData(const char* name, const std::optional<PMColor>& color) {
+  auto value = PMColor::FromRGBA(255, 255, 255, 255);
   if (color.has_value()) {
     value = color.value();
   }

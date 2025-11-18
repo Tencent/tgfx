@@ -20,7 +20,7 @@
 #include <src/skcms_public.h>
 #include <cstdint>
 #include <cstdio>
-#include "core/utils/Log.h"
+#include "../../../../include/tgfx/core/Log.h"
 #include "core/utils/OrientationHelper.h"
 #include "webp/decode.h"
 #include "webp/demux.h"

@@ -25,7 +25,7 @@
 namespace tgfx {
 class ShapeDrawOp : public DrawOp {
  public:
-  static PlacementPtr<ShapeDrawOp> Make(std::shared_ptr<GPUShapeProxy> shapeProxy, Color color,
+  static PlacementPtr<ShapeDrawOp> Make(std::shared_ptr<GPUShapeProxy> shapeProxy, PMColor color,
                                         const Matrix& uvMatrix, AAType aaType);
 
   bool hasCoverage() const override;
@@ -42,10 +42,10 @@ class ShapeDrawOp : public DrawOp {
  private:
   std::shared_ptr<GPUShapeProxy> shapeProxy = nullptr;
   std::shared_ptr<VertexBufferView> maskBufferProxy = {};
-  Color color = Color::Transparent();
+  PMColor color = Color::Transparent().premultiply();
   Matrix uvMatrix = {};
 
-  ShapeDrawOp(std::shared_ptr<GPUShapeProxy> proxy, Color color, const Matrix& uvMatrix,
+  ShapeDrawOp(std::shared_ptr<GPUShapeProxy> proxy, PMColor color, const Matrix& uvMatrix,
               AAType aaType);
 
   friend class BlockAllocator;

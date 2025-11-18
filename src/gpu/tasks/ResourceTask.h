@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "core/utils/Log.h"
+#include "../../../include/tgfx/core/Log.h"
 #include "gpu/proxies/ResourceProxy.h"
 #include "gpu/resources/Resource.h"
 

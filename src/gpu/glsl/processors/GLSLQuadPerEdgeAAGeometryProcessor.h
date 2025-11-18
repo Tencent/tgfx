@@ -25,7 +25,7 @@ namespace tgfx {
 class GLSLQuadPerEdgeAAGeometryProcessor : public QuadPerEdgeAAGeometryProcessor {
  public:
   GLSLQuadPerEdgeAAGeometryProcessor(int width, int height, AAType aa,
-                                     std::optional<Color> commonColor,
+                                     std::optional<PMColor> commonColor,
                                      std::optional<Matrix> uvMatrix, bool hasSubset);
 
   void emitCode(EmitArgs& args) const override;

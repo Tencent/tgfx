@@ -20,7 +20,7 @@
 #include <utility>
 #include "DOMParser.h"
 #include "XMLParser.h"
-#include "core/utils/Log.h"
+#include "../../../include/tgfx/core/Log.h"
 #include "tgfx/core/Data.h"
 
 namespace tgfx {

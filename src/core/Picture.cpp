@@ -21,7 +21,7 @@
 #include "core/MeasureContext.h"
 #include "core/PictureRecords.h"
 #include "core/utils/BlockAllocator.h"
-#include "core/utils/Log.h"
+#include "../../include/tgfx/core/Log.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Image.h"
 #include "utils/MathExtra.h"

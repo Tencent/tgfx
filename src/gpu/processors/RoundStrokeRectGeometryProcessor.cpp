@@ -20,7 +20,7 @@
 
 namespace tgfx {
 RoundStrokeRectGeometryProcessor::RoundStrokeRectGeometryProcessor(AAType aaType,
-                                                                   std::optional<Color> commonColor,
+                                                                   std::optional<PMColor> commonColor,
                                                                    std::optional<Matrix> uvMatrix)
     : GeometryProcessor(ClassID()), aaType(aaType), commonColor(commonColor), uvMatrix(uvMatrix) {
   inPosition = {"inPosition", VertexFormat::Float2};

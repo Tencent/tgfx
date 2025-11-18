@@ -23,7 +23,7 @@
 #include "tgfx/core/AlphaType.h"
 #include "tgfx/core/ColorSpace.h"
 #include "utils/ColorSpaceHelper.h"
-#include "utils/Log.h"
+#include "../../include/tgfx/core/Log.h"
 
 namespace tgfx {
 

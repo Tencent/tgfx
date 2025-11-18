@@ -22,7 +22,7 @@
 #include <tgfx/layers/filters/ColorMatrixFilter.h>
 #include <tgfx/layers/filters/DropShadowFilter.h>
 #include <tgfx/layers/filters/InnerShadowFilter.h>
-#include "core/utils/Log.h"
+#include "../../../include/tgfx/core/Log.h"
 #include "tgfx/layers/filters/LayerFilter.h"
 
 namespace tgfx {

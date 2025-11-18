@@ -19,7 +19,7 @@
 #include "tgfx/svg/node/SVGImage.h"
 #include <filesystem>
 #include <memory>
-#include "core/utils/Log.h"
+#include "../../../include/tgfx/core/Log.h"
 #include "svg/SVGAttributeParser.h"
 #include "svg/SVGRenderContext.h"
 #include "svg/SVGUtils.h"
