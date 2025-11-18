@@ -35,7 +35,6 @@ static void DecomposeRect(Rect* rectA, Rect* rectB) {
     rects[0].top = rectB->top;
     rects[0].bottom = rectA->top;
     rects[0].left = rectB->left;
-
     rects[0].right = rectB->right;
   }
   if (rectA->bottom < rectB->bottom) {
