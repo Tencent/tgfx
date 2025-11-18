@@ -794,6 +794,9 @@ RasterizedContent* Layer::getRasterizedCache(const DrawArgs& args, const Matrix&
   if (content && content->contextID() == contextID && content->contentScale() == contentScale) {
     return content;
   }
+  if (args.renderFlags & RenderFlags::DisableCache) {
+    return nullptr;
+  }
   Matrix drawingMatrix = {};
   auto offscreenArgs = args;
   offscreenArgs.context = nullptr;
