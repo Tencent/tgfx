@@ -18,8 +18,8 @@
 
 #pragma once
 
+#include "core/utils/Log.h"
 #include "tgfx/core/Task.h"
-#include "utils/Log.h"
 
 namespace tgfx {
 template <typename T>

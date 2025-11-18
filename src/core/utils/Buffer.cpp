@@ -18,7 +18,7 @@
 
 #include "tgfx/core/Buffer.h"
 #include <cstring>
-#include "Log.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
 Buffer::Buffer(size_t size) {

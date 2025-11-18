@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/DataView.h"
-#include "Log.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
 static ByteOrder EndianTest() {

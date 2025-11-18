@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Clock.h"
-#include "Log.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
 int64_t Clock::Now() {

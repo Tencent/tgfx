@@ -20,6 +20,7 @@
 #include "core/DrawContext.h"
 #include "core/PictureContext.h"
 #include "core/shapes/StrokeShape.h"
+#include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/StrokeUtils.h"
 #include "core/utils/Types.h"
@@ -27,7 +28,6 @@
 #include "shapes/MatrixShape.h"
 #include "shapes/PathShape.h"
 #include "tgfx/core/Surface.h"
-#include "utils/Log.h"
 
 namespace tgfx {
 class AutoLayerForImageFilter {

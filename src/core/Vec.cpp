@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Vec.h"
-#include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
+#include "utils/Log.h"
 
 namespace tgfx {
 

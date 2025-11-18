@@ -20,8 +20,8 @@
 
 #include <list>
 #include "RectPackSkyline.h"
+#include "core/utils/Log.h"
 #include "tgfx/core/Rect.h"
-#include "utils/Log.h"
 
 namespace tgfx {
 enum class MaskFormat : int { A8, RGBA, BGRA, Last = BGRA };
