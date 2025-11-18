@@ -609,9 +609,8 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   if (surface) {
     args.dstColorSpace = surface->colorSpace();
     context = surface->getContext();
-    if (!(surface->renderFlags() & RenderFlags::DisableCache)) {
-      args.context = context;
-    }
+    args.context = context;
+    args.renderFlags = surface->renderFlags();
   } else if (bitFields.hasBlendMode) {
     auto scale = canvas->getMatrix().getMaxScale();
     args.blendModeBackground =
@@ -1119,7 +1118,7 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   if (auto rasterizedCache = getRasterizedCache(args, canvas->getMatrix())) {
     cache = rasterizedCache;
   } else if (args.layerCache) {
-   cache= args.layerCache->getCachedImageAndRect(this, contentScale);
+    cache = args.layerCache->getCachedImageAndRect(this, contentScale);
   }
 
   std::optional<Rect> clipBounds = std::nullopt;
@@ -1148,12 +1147,20 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     return true;
   }
 
+  if (args.renderFlags & RenderFlags::DisableCache) {
+    return false;
+  }
+
   auto scaledBounds = renderBounds;
   scaledBounds.scale(contentScale, contentScale);
   constexpr float MaxCacheSize = 128.f;
   constexpr float MaxCacheScale = 0.2f;
   if (!args.layerCache || scaledBounds.width() > MaxCacheSize ||
       scaledBounds.height() > MaxCacheSize || contentScale > MaxCacheScale) {
+    return false;
+  }
+
+  if (_filters.empty() && layerStyles().empty()) {
     return false;
   }
 
@@ -1174,9 +1181,9 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   }
 
   auto cacheArgs = args;
-  cacheArgs.layerCache = nullptr;
+  cacheArgs.renderFlags |= RenderFlags::DisableCache;
 
-  drawContentOffscreen(args, canvas, clipBounds, contentScale, blendMode, alpha,
+  drawContentOffscreen(cacheArgs, canvas, clipBounds, contentScale, blendMode, alpha,
                        [&](std::shared_ptr<Image> image, const Matrix& imageMatrix) {
                          args.layerCache->cacheImage(this, contentScale, image, imageMatrix);
                        });
@@ -1701,7 +1708,7 @@ void Layer::updateBackgroundBounds(float contentScale) {
     while (layer && !layer->bitFields.dirtyDescendents) {
       layer->rasterizedContent = nullptr;
       if (_root) {
-        _root->invalidCache(this);
+        _root->invalidCache(layer);
       }
       if (layer->maskOwner) {
         break;

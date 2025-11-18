@@ -31,7 +31,7 @@ void RasterizedContent::draw(Canvas* canvas, bool antiAlias, float alpha,
   if (mask) {
     auto invertMatrix = Matrix::I();
     if (matrix.invert(&invertMatrix)) {
-      paint.setMaskFilter(mask->makeWithMatrix(matrix));
+      paint.setMaskFilter(mask->makeWithMatrix(invertMatrix));
     }
   }
   canvas->drawImage(image, &paint);
