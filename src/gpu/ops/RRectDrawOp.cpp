@@ -55,9 +55,9 @@ PlacementPtr<GeometryProcessor> RRectDrawOp::onMakeGeometryProcessor(RenderTarge
   ATTRIBUTE_NAME("rectCount", static_cast<uint32_t>(rectCount));
   ATTRIBUTE_NAME("hasStroke", hasStroke);
   ATTRIBUTE_NAME("commonColor", commonColor);
-  auto drawingBuffer = renderTarget->getContext()->drawingAllocator();
-  return EllipseGeometryProcessor::Make(drawingBuffer, renderTarget->width(),
-                                        renderTarget->height(), hasStroke, commonColor);
+  auto allocator = renderTarget->getContext()->drawingAllocator();
+  return EllipseGeometryProcessor::Make(allocator, renderTarget->width(), renderTarget->height(),
+                                        hasStroke, commonColor);
 }
 
 void RRectDrawOp::onDraw(RenderPass* renderPass) {

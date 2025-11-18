@@ -27,12 +27,14 @@
 namespace tgfx {
 class TextureEffect : public FragmentProcessor {
  public:
-  static PlacementPtr<FragmentProcessor> Make(std::shared_ptr<TextureProxy> proxy,
+  static PlacementPtr<FragmentProcessor> Make(BlockAllocator* allocator,
+                                              std::shared_ptr<TextureProxy> proxy,
                                               const SamplingArgs& args = {},
                                               const Matrix* uvMatrix = nullptr,
                                               bool forceAsMask = false);
 
-  static PlacementPtr<FragmentProcessor> MakeRGBAAA(std::shared_ptr<TextureProxy> proxy,
+  static PlacementPtr<FragmentProcessor> MakeRGBAAA(BlockAllocator* allocator,
+                                                    std::shared_ptr<TextureProxy> proxy,
                                                     const SamplingArgs& args,
                                                     const Point& alphaStart,
                                                     const Matrix* uvMatrix = nullptr);

@@ -33,8 +33,8 @@ PlacementPtr<ShapeDrawOp> ShapeDrawOp::Make(std::shared_ptr<GPUShapeProxy> shape
   if (shapeProxy == nullptr) {
     return nullptr;
   }
-  auto drawingBuffer = shapeProxy->getContext()->drawingAllocator();
-  return drawingBuffer->make<ShapeDrawOp>(std::move(shapeProxy), color, uvMatrix, aaType);
+  auto allocator = shapeProxy->getContext()->drawingAllocator();
+  return allocator->make<ShapeDrawOp>(std::move(shapeProxy), color, uvMatrix, aaType);
 }
 
 ShapeDrawOp::ShapeDrawOp(std::shared_ptr<GPUShapeProxy> proxy, Color color, const Matrix& uvMatrix,
@@ -60,6 +60,7 @@ PlacementPtr<GeometryProcessor> ShapeDrawOp::onMakeGeometryProcessor(RenderTarge
   auto realUVMatrix = uvMatrix;
   realUVMatrix.preConcat(viewMatrix);
   auto vertexBuffer = shapeProxy->getTriangles();
+  auto allocator = renderTarget->getContext()->drawingAllocator();
   auto aa = aaType;
   if (vertexBuffer == nullptr) {
     aa = AAType::None;
@@ -75,14 +76,13 @@ PlacementPtr<GeometryProcessor> ShapeDrawOp::onMakeGeometryProcessor(RenderTarge
     static SamplingArgs args(TileMode::Clamp, TileMode::Clamp,
                              SamplingOptions(FilterMode::Nearest, MipmapMode::None),
                              SrcRectConstraint::Fast);
-    auto maskFP = TextureEffect::Make(std::move(textureProxy), args, &maskMatrix, true);
+    auto maskFP = TextureEffect::Make(allocator, std::move(textureProxy), args, &maskMatrix, true);
     if (maskFP == nullptr) {
       return nullptr;
     }
     addCoverageFP(std::move(maskFP));
   }
-  auto drawingBuffer = renderTarget->getContext()->drawingAllocator();
-  return DefaultGeometryProcessor::Make(drawingBuffer, color, renderTarget->width(),
+  return DefaultGeometryProcessor::Make(allocator, color, renderTarget->width(),
                                         renderTarget->height(), aa, viewMatrix, realUVMatrix);
 }
 

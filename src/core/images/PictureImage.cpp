@@ -120,8 +120,9 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
   if (samplingArgs.sampleArea) {
     newSamplingArgs.sampleArea = extraMatrix.mapRect(*samplingArgs.sampleArea);
   }
-  return TiledTextureEffect::Make(renderTarget->asTextureProxy(), newSamplingArgs, &finalUVMatrix,
-                                  isAlphaOnly());
+  auto allocator = args.context->drawingAllocator();
+  return TiledTextureEffect::Make(allocator, renderTarget->asTextureProxy(), newSamplingArgs,
+                                  &finalUVMatrix, isAlphaOnly());
 }
 
 std::shared_ptr<TextureProxy> PictureImage::lockTextureProxy(const TPArgs& args) const {
