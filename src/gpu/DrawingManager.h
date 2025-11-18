@@ -79,11 +79,11 @@ class DrawingManager {
    */
   std::shared_ptr<CommandBuffer> flush();
 
-  uint32_t numDrawCalls() const {
+  size_t numDrawCalls() const {
     return numDrawCall;
   }
 
-  uint32_t numRenderTasks() const {
+  size_t numRenderTasks() const {
     return numRenderTask;
   }
 
@@ -96,8 +96,8 @@ class DrawingManager {
   std::vector<std::shared_ptr<Task>> atlasCellCodecTasks = {};
   std::map<std::shared_ptr<TextureProxy>, std::vector<AtlasCellData>> atlasCellDatas = {};
   std::map<const TextureProxy*, std::pair<HardwareBufferRef, void*>> atlasHardwareBuffers = {};
-  uint32_t numDrawCall = 0;
-  uint32_t numRenderTask = 0;
+  size_t numDrawCall = 0;
+  size_t numRenderTask = 0;
 
   void uploadAtlasToGPU();
 

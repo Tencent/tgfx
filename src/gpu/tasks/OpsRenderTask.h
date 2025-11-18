@@ -33,7 +33,7 @@ class OpsRenderTask : public RenderTask {
 
   void execute(CommandEncoder* encoder) override;
 
-  uint32_t numDrawCalls() const override {
+  size_t numDrawCalls() const override {
     return drawOps.size();
   }
 

@@ -27,7 +27,7 @@ class RenderTask {
 
   virtual void execute(CommandEncoder* encoder) = 0;
 
-  virtual uint32_t numDrawCalls() const {
+  virtual size_t numDrawCalls() const {
     return 0;
   }
 };
