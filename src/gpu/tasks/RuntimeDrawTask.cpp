@@ -118,7 +118,8 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
     LOGE("RuntimeDrawTask::getFlatTexture() Failed to initialize the render pass!");
     return nullptr;
   }
-  auto colorProcessor = TextureEffect::Make(std::move(textureProxy), {}, nullptr, false);
+  auto allocator = context->drawingAllocator();
+  auto colorProcessor = TextureEffect::Make(allocator, std::move(textureProxy), {}, nullptr, false);
   if (colorProcessor == nullptr) {
     LOGE("RuntimeDrawTask::getFlatTexture() Failed to create the color processor!");
     return nullptr;

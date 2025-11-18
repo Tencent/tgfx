@@ -137,7 +137,9 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
            args.renderFlags);
 
     SamplingArgs samplingArgs = {tileMode, tileMode, {}, SrcRectConstraint::Fast};
-    sourceFragment = TiledTextureEffect::Make(renderTarget->asTextureProxy(), samplingArgs);
+    auto allocator = args.context->drawingAllocator();
+    sourceFragment =
+        TiledTextureEffect::Make(allocator, renderTarget->asTextureProxy(), samplingArgs);
     const bool finalBlurTargetMipmapped = (args.mipmapped && !needExtraTransform);
     renderTarget = RenderTargetProxy::Make(
         args.context, static_cast<int>(blurDstWidth), static_cast<int>(blurDstHeight), isAlphaOnly,
@@ -164,7 +166,9 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
                                          clipBounds.height() * blurDstScaleY / dstDrawHeight);
   finalUVMatrix.postTranslate((clipBounds.left - srcSampleBounds.left) * blurDstScaleX,
                               (clipBounds.top - srcSampleBounds.top) * blurDstScaleY);
-  auto finalProcessor = TextureEffect::Make(renderTarget->asTextureProxy(), {}, &finalUVMatrix);
+  auto allocator = args.context->drawingAllocator();
+  auto finalProcessor =
+      TextureEffect::Make(allocator, renderTarget->asTextureProxy(), {}, &finalUVMatrix);
   renderTarget = RenderTargetProxy::Make(args.context, static_cast<int>(dstDrawWidth),
                                          static_cast<int>(dstDrawHeight), isAlphaOnly, 1,
                                          args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
@@ -216,7 +220,8 @@ PlacementPtr<FragmentProcessor> GaussianBlurImageFilter::getSourceFragmentProces
     return nullptr;
   }
   context->drawingManager()->fillRTWithFP(renderTarget, std::move(fp), renderFlags);
-  return TiledTextureEffect::Make(renderTarget->asTextureProxy(), samplingArgs);
+  auto allocator = context->drawingAllocator();
+  return TiledTextureEffect::Make(allocator, renderTarget->asTextureProxy(), samplingArgs);
 }
 
 }  // namespace tgfx

@@ -66,11 +66,11 @@ PlacementPtr<GeometryProcessor> RectDrawOp::onMakeGeometryProcessor(RenderTarget
   ATTRIBUTE_NAME("uvMatrix", uvMatrix);
   ATTRIBUTE_NAME("hasSubset", hasSubset);
   ATTRIBUTE_NAME("hasStroke", lineJoin.has_value());
-  auto drawingBuffer = renderTarget->getContext()->drawingAllocator();
+  auto allocator = renderTarget->getContext()->drawingAllocator();
   if (lineJoin == LineJoin::Round) {
-    return RoundStrokeRectGeometryProcessor::Make(drawingBuffer, aaType, commonColor, uvMatrix);
+    return RoundStrokeRectGeometryProcessor::Make(allocator, aaType, commonColor, uvMatrix);
   }
-  return QuadPerEdgeAAGeometryProcessor::Make(drawingBuffer, renderTarget->width(),
+  return QuadPerEdgeAAGeometryProcessor::Make(allocator, renderTarget->width(),
                                               renderTarget->height(), aaType, commonColor, uvMatrix,
                                               hasSubset);
 }

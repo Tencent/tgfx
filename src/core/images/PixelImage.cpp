@@ -37,6 +37,7 @@ PlacementPtr<FragmentProcessor> PixelImage::asFragmentProcessor(const FPArgs& ar
   if (uvMatrix) {
     fpMatrix.preConcat(*uvMatrix);
   }
-  return TiledTextureEffect::Make(textureProxy, samplingArgs, &fpMatrix, isAlphaOnly());
+  auto allocator = args.context->drawingAllocator();
+  return TiledTextureEffect::Make(allocator, textureProxy, samplingArgs, &fpMatrix, isAlphaOnly());
 }
 }  // namespace tgfx

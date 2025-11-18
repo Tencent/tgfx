@@ -63,9 +63,8 @@ AtlasTextOp::AtlasTextOp(RectsVertexProvider* provider, std::shared_ptr<TextureP
 PlacementPtr<GeometryProcessor> AtlasTextOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {
   ATTRIBUTE_NAME("rectCount", static_cast<uint32_t>(rectCount));
   ATTRIBUTE_NAME("commonColor", commonColor);
-  auto drawingBuffer = renderTarget->getContext()->drawingAllocator();
-  return AtlasTextGeometryProcessor::Make(drawingBuffer, textureProxy, aaType, commonColor,
-                                          sampling);
+  auto allocator = renderTarget->getContext()->drawingAllocator();
+  return AtlasTextGeometryProcessor::Make(allocator, textureProxy, aaType, commonColor, sampling);
 }
 
 void AtlasTextOp::onDraw(RenderPass* renderPass) {
