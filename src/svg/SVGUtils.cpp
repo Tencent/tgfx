@@ -20,9 +20,9 @@
 #include <cstdlib>
 #include <iomanip>
 #include <sstream>
+#include "../../include/tgfx/core/Log.h"
 #include "core/codecs/jpeg/JpegCodec.h"
 #include "core/codecs/png/PngCodec.h"
-#include "../../include/tgfx/core/Log.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/ImageCodec.h"

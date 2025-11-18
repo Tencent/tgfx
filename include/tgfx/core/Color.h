@@ -21,10 +21,9 @@
 #include <cfloat>
 #include <cinttypes>
 #include <limits>
-
-#include "tgfx/core/Log.h"
 #include "tgfx/core/AlphaType.h"
 #include "tgfx/core/ColorSpace.h"
+#include "tgfx/core/Log.h"
 
 namespace tgfx {
 
@@ -32,7 +31,7 @@ namespace tgfx {
  * RGBA color value, holding four floating point components. Color components are always in a known
  * order.
  */
-template<AlphaType AT>
+template <AlphaType AT>
 struct RGBA4f {
   /**
    * Returns a fully transparent Color in srgb gamut. Only for unpremultiplied color.
@@ -92,10 +91,10 @@ struct RGBA4f {
    * Returns color value from 8-bit component values and ColorSpace.
    */
   static RGBA4f FromRGBA(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255,
-                        std::shared_ptr<ColorSpace> colorSpace = nullptr) {
+                         std::shared_ptr<ColorSpace> colorSpace = nullptr) {
     return {static_cast<float>(r) / 255.0f, static_cast<float>(g) / 255.0f,
-          static_cast<float>(b) / 255.0f, a == 255 ? 1.0f : static_cast<float>(a) / 255.0f,
-          std::move(colorSpace)};
+            static_cast<float>(b) / 255.0f, a == 255 ? 1.0f : static_cast<float>(a) / 255.0f,
+            std::move(colorSpace)};
   }
 
   /**
@@ -113,9 +112,9 @@ struct RGBA4f {
    * @param a  alpha component
    * @param colorSpace colorSpace of this color
    */
-  RGBA4f(float r, float g, float b, float a = 1.0f, std::shared_ptr<ColorSpace> colorSpace = nullptr)
-    :red(r), green(g), blue(b), alpha(a), colorSpace(std::move(colorSpace)) {
-
+  RGBA4f(float r, float g, float b, float a = 1.0f,
+         std::shared_ptr<ColorSpace> colorSpace = nullptr)
+      : red(r), green(g), blue(b), alpha(a), colorSpace(std::move(colorSpace)) {
   }
 
   /**
@@ -235,11 +234,12 @@ struct RGBA4f {
    * Return a premultiply color that is the original color converted to the dst color space. If the
    * dstColorSpace is nullptr, no convert.
    */
-  RGBA4f<AlphaType::Premultiplied> makeColorSpaceWithPremultiply(std::shared_ptr<ColorSpace> dstColorSpace) const {
+  RGBA4f<AlphaType::Premultiplied> makeColorSpaceWithPremultiply(
+      std::shared_ptr<ColorSpace> dstColorSpace) const {
     RGBA4f<AlphaType::Premultiplied> dstColor;
     if constexpr (AT == AlphaType::Unpremultiplied) {
       dstColor = this->premultiply();
-    }else {
+    } else {
       dstColor = this;
     }
     dstColor.applyColorSpace(std::move(dstColorSpace));
@@ -292,6 +292,5 @@ void Color::applyColorSpace(std::shared_ptr<ColorSpace> dstColorSpace);
 
 template <>
 void PMColor::applyColorSpace(std::shared_ptr<ColorSpace> dstColorSpace);
-
 
 }  // namespace tgfx

@@ -19,8 +19,8 @@
 #include "GLSLConstColorProcessor.h"
 
 namespace tgfx {
-PlacementPtr<ConstColorProcessor> ConstColorProcessor::Make(BlockAllocator* allocator, PMColor color,
-                                                            InputMode mode) {
+PlacementPtr<ConstColorProcessor> ConstColorProcessor::Make(BlockAllocator* allocator,
+                                                            PMColor color, InputMode mode) {
   return allocator->make<GLSLConstColorProcessor>(color, mode);
 }
 

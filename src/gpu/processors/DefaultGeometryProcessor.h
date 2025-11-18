@@ -36,8 +36,8 @@ class DefaultGeometryProcessor : public GeometryProcessor {
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  DefaultGeometryProcessor(PMColor color, int width, int height, AAType aa, const Matrix& viewMatrix,
-                           const Matrix& uvMatrix);
+  DefaultGeometryProcessor(PMColor color, int width, int height, AAType aa,
+                           const Matrix& viewMatrix, const Matrix& uvMatrix);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 

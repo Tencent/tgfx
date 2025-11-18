@@ -17,10 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Canvas.h"
+#include "../../include/tgfx/core/Log.h"
 #include "core/DrawContext.h"
 #include "core/PictureContext.h"
 #include "core/shapes/StrokeShape.h"
-#include "../../include/tgfx/core/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/StrokeUtils.h"
 #include "core/utils/Types.h"

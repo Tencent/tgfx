@@ -18,9 +18,9 @@
 
 #include "PDFType1Font.h"
 #include <memory>
+#include "../../../include/tgfx/core/Log.h"
 #include "core/AdvancedTypefaceInfo.h"
 #include "core/ScalerContext.h"
-#include "../../../include/tgfx/core/Log.h"
 #include "pdf/PDFDocumentImpl.h"
 #include "pdf/PDFFont.h"
 #include "pdf/PDFTypes.h"

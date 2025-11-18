@@ -24,7 +24,7 @@
 namespace tgfx {
 
 template <>
-void Color::applyColorSpace(std::shared_ptr<ColorSpace> dstColorSpace){
+void Color::applyColorSpace(std::shared_ptr<ColorSpace> dstColorSpace) {
   if (!NeedConvertColorSpace(colorSpace, dstColorSpace)) {
     return;
   }

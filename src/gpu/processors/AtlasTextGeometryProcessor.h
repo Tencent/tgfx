@@ -27,7 +27,8 @@ class AtlasTextGeometryProcessor : public GeometryProcessor {
  public:
   static PlacementPtr<AtlasTextGeometryProcessor> Make(BlockAllocator* allocator,
                                                        std::shared_ptr<TextureProxy> textureProxy,
-                                                       AAType aa, std::optional<PMColor> commonColor,
+                                                       AAType aa,
+                                                       std::optional<PMColor> commonColor,
                                                        const SamplingOptions& sampling);
   std::string name() const override {
     return "AtlasTextGeometryProcessor";

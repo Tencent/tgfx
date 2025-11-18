@@ -76,8 +76,7 @@ void OpsCompositor::fillImage(std::shared_ptr<Image> image, const SamplingOption
     pendingConstraint = SrcRectConstraint::Fast;
   }
   auto dstColor = fill.color.makeColorSpaceWithPremultiply(dstColorSpace);
-  auto record =
-      drawingAllocator()->make<RectRecord>(imageRect, state.matrix, dstColor);
+  auto record = drawingAllocator()->make<RectRecord>(imageRect, state.matrix, dstColor);
   pendingRects.emplace_back(std::move(record));
   pendingUVRects.emplace_back(drawingAllocator()->make<Rect>(imageRect));
 }

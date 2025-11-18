@@ -20,7 +20,8 @@
 
 namespace tgfx {
 AtlasTextGeometryProcessor::AtlasTextGeometryProcessor(std::shared_ptr<TextureProxy> textureProxy,
-                                                       AAType aa, std::optional<PMColor> commonColor,
+                                                       AAType aa,
+                                                       std::optional<PMColor> commonColor,
                                                        const SamplingOptions& sampling)
     : GeometryProcessor(ClassID()), textureProxy(std::move(textureProxy)), commonColor(commonColor),
       samplerState(sampling) {

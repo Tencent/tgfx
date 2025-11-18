@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/processors/FragmentProcessor.h"
-#include "ComposeFragmentProcessor.h"
 #include "../../../include/tgfx/core/Log.h"
+#include "ComposeFragmentProcessor.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
 #include "tgfx/core/Image.h"

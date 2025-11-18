@@ -17,10 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFFont.h"
+#include "../../include/tgfx/core/Log.h"
 #include "core/AdvancedTypefaceInfo.h"
 #include "core/ScalerContext.h"
 #include "core/utils/FontTableTag.h"
-#include "../../include/tgfx/core/Log.h"
 #include "core/utils/MathExtra.h"
 #include "pdf/PDFDocumentImpl.h"
 #include "pdf/PDFTypes.h"

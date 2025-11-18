@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ShapeRasterizer.h"
+#include "../../include/tgfx/core/Log.h"
 #include "core/PathRasterizer.h"
 #include "core/PathTriangulator.h"
-#include "../../include/tgfx/core/Log.h"
 
 namespace tgfx {
 ShapeRasterizer::ShapeRasterizer(int width, int height, std::shared_ptr<Shape> shape, AAType aaType)

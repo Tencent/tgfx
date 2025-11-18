@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ElementWriter.h"
+#include "../../include/tgfx/core/Log.h"
 #include "SVGExportContext.h"
 #include "SVGUtils.h"
 #include "core/codecs/jpeg/JpegCodec.h"
@@ -25,7 +26,6 @@
 #include "core/filters/GaussianBlurImageFilter.h"
 #include "core/filters/ShaderMaskFilter.h"
 #include "core/shaders/MatrixShader.h"
-#include "../../include/tgfx/core/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/Types.h"
 #include "tgfx/core/BlendMode.h"

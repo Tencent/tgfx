@@ -23,8 +23,8 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
-#include "core/utils/AddressOf.h"
 #include "../../include/tgfx/core/Log.h"
+#include "core/utils/AddressOf.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/MaskFilter.h"
 #include "tgfx/core/Matrix.h"

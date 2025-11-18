@@ -19,8 +19,8 @@
 #pragma once
 
 #include <list>
-#include "RectPackSkyline.h"
 #include "../../include/tgfx/core/Log.h"
+#include "RectPackSkyline.h"
 #include "tgfx/core/Rect.h"
 
 namespace tgfx {

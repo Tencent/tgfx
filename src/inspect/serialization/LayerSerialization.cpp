@@ -21,8 +21,8 @@
 #include <tgfx/layers/ShapeLayer.h>
 #include <tgfx/layers/SolidLayer.h>
 #include <tgfx/layers/TextLayer.h>
-#include "LayerFilterSerialization.h"
 #include "../../../include/tgfx/core/Log.h"
+#include "LayerFilterSerialization.h"
 #include "tgfx/layers/Layer.h"
 
 namespace tgfx {

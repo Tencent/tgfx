@@ -21,8 +21,8 @@
 #include <cmath>
 #include <sstream>
 #include <vector>
-#include "Checksum.h"
 #include "../../include/tgfx/core/Log.h"
+#include "Checksum.h"
 
 namespace tgfx {
 

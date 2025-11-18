@@ -20,8 +20,8 @@
 #include <cstring>
 #include <string>
 #include <utility>
-#include "XMLParser.h"
 #include "../../../include/tgfx/core/Log.h"
+#include "XMLParser.h"
 #include "svg/SVGUtils.h"
 #include "tgfx/svg/xml/XMLDOM.h"
 

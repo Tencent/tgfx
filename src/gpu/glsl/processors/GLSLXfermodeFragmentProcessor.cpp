@@ -29,7 +29,8 @@ PlacementPtr<FragmentProcessor> XfermodeFragmentProcessor::MakeFromTwoProcessors
   }
   switch (mode) {
     case BlendMode::Clear:
-      return ConstColorProcessor::Make(allocator, Color::Transparent().premultiply(), InputMode::Ignore);
+      return ConstColorProcessor::Make(allocator, Color::Transparent().premultiply(),
+                                       InputMode::Ignore);
     case BlendMode::Src:
       return src;
     case BlendMode::Dst:

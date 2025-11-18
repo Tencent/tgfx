@@ -18,11 +18,11 @@
 
 #include "HitTestContext.h"
 #include <algorithm>
+#include "../../include/tgfx/core/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/ShapeUtils.h"
 #include "core/utils/StrokeUtils.h"
 #include "tgfx/core/Stroke.h"
-#include "../../include/tgfx/core/Log.h"
 
 namespace tgfx {
 static bool GetLocalPoint(const Matrix& matrix, float deviceX, float deviceY, Point* localPoint) {

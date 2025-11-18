@@ -19,9 +19,8 @@
 #include "RoundStrokeRectGeometryProcessor.h"
 
 namespace tgfx {
-RoundStrokeRectGeometryProcessor::RoundStrokeRectGeometryProcessor(AAType aaType,
-                                                                   std::optional<PMColor> commonColor,
-                                                                   std::optional<Matrix> uvMatrix)
+RoundStrokeRectGeometryProcessor::RoundStrokeRectGeometryProcessor(
+    AAType aaType, std::optional<PMColor> commonColor, std::optional<Matrix> uvMatrix)
     : GeometryProcessor(ClassID()), aaType(aaType), commonColor(commonColor), uvMatrix(uvMatrix) {
   inPosition = {"inPosition", VertexFormat::Float2};
   if (aaType == AAType::Coverage) {

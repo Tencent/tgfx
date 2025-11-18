@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/platform/ImageReader.h"
-#include "core/PixelRef.h"
 #include "../../include/tgfx/core/Log.h"
+#include "core/PixelRef.h"
 #include "gpu/resources/TextureView.h"
 #include "platform/ImageStream.h"
 
