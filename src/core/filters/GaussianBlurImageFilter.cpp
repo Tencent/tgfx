@@ -132,12 +132,12 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
     return nullptr;
   }
 
+  auto allocator = args.context->drawingAllocator();
   if (blur2D) {
     Blur1D(std::move(sourceFragment), renderTarget, sigmaX, GaussianBlurDirection::Horizontal, 1.0f,
            args.renderFlags);
 
     SamplingArgs samplingArgs = {tileMode, tileMode, {}, SrcRectConstraint::Fast};
-    auto allocator = args.context->drawingAllocator();
     sourceFragment =
         TiledTextureEffect::Make(allocator, renderTarget->asTextureProxy(), samplingArgs);
     const bool finalBlurTargetMipmapped = (args.mipmapped && !needExtraTransform);
@@ -166,7 +166,6 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
                                          clipBounds.height() * blurDstScaleY / dstDrawHeight);
   finalUVMatrix.postTranslate((clipBounds.left - srcSampleBounds.left) * blurDstScaleX,
                               (clipBounds.top - srcSampleBounds.top) * blurDstScaleY);
-  auto allocator = args.context->drawingAllocator();
   auto finalProcessor =
       TextureEffect::Make(allocator, renderTarget->asTextureProxy(), {}, &finalUVMatrix);
   renderTarget = RenderTargetProxy::Make(args.context, static_cast<int>(dstDrawWidth),
