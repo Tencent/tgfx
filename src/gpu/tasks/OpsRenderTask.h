@@ -33,6 +33,10 @@ class OpsRenderTask : public RenderTask {
 
   void execute(CommandEncoder* encoder) override;
 
+  uint32_t numDrawCalls() const override {
+    return drawOps.size();
+  }
+
  private:
   std::shared_ptr<RenderTargetProxy> renderTargetProxy = nullptr;
   PlacementArray<DrawOp> drawOps = {};

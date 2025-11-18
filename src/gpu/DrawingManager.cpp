@@ -219,9 +219,12 @@ std::shared_ptr<CommandBuffer> DrawingManager::flush() {
   proxyProvider->clearSharedVertexBuffer();
   auto commandEncoder = context->gpu()->createCommandEncoder();
 
+  numRenderTask = renderTasks.size();
+  numDrawCall = 0;
   {
     TASK_MARK(tgfx::inspect::OpTaskType::RenderTask);
     for (auto& task : renderTasks) {
+      numDrawCall += task->numDrawCalls();
       task->execute(commandEncoder.get());
       task = nullptr;
     }

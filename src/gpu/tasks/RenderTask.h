@@ -26,5 +26,9 @@ class RenderTask {
   virtual ~RenderTask() = default;
 
   virtual void execute(CommandEncoder* encoder) = 0;
+
+  virtual uint32_t numDrawCalls() const {
+    return 0;
+  }
 };
 }  // namespace tgfx
