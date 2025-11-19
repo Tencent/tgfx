@@ -619,7 +619,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   float drawBackgroundLayers(const DrawArgs& args, Canvas* canvas);
 
-  std::unique_ptr<LayerStyleSource> getLayerStyleSource(const DrawArgs& args, const Matrix& matrix);
+  std::unique_ptr<LayerStyleSource> getLayerStyleSource(const DrawArgs& args, const Matrix& matrix,
+                                                        bool excludeContour = false);
 
   std::shared_ptr<Image> getBackgroundImage(const DrawArgs& args, float contentScale,
                                             Point* offset);
@@ -641,7 +642,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
                        const std::unordered_set<LayerStyleExtraSourceType>& styleExtraSourceTypes);
 
   void drawBackgroundLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
-                                 LayerStylePosition position, const Matrix3D& transform);
+                                 const Matrix3D& transform);
 
   bool getLayersUnderPointInternal(float x, float y, std::vector<std::shared_ptr<Layer>>* results);
 

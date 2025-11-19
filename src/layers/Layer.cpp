@@ -1165,7 +1165,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   }
 
   if (transform != nullptr) {
-    drawBackgroundLayerStyles(args, canvas, alpha, LayerStylePosition::Below, *transform);
+    drawBackgroundLayerStyles(args, canvas, alpha, *transform);
   }
 
   auto passThroughBackground = bitFields.passThroughBackground && blendMode == BlendMode::SrcOver &&
@@ -1436,7 +1436,8 @@ float Layer::drawBackgroundLayers(const DrawArgs& args, Canvas* canvas) {
 }
 
 std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& args,
-                                                             const Matrix& matrix) {
+                                                             const Matrix& matrix,
+                                                             bool excludeContour) {
   if (_layerStyles.empty() || args.excludeEffects) {
     return nullptr;
   }
@@ -1466,9 +1467,11 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   source->contentOffset = contentOffset;
 
   auto needContour =
-      std::any_of(_layerStyles.begin(), _layerStyles.end(), [](const auto& layerStyle) {
-        return layerStyle->extraSourceType() == LayerStyleExtraSourceType::Contour;
-      });
+      excludeContour
+          ? false
+          : std::any_of(_layerStyles.begin(), _layerStyles.end(), [](const auto& layerStyle) {
+              return layerStyle->extraSourceType() == LayerStyleExtraSourceType::Contour;
+            });
   if (needContour) {
     // Child effects are always excluded when drawing the layer contour.
     drawArgs.excludeEffects = true;
@@ -1671,8 +1674,8 @@ void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
 }
 
 void Layer::drawBackgroundLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
-                                      LayerStylePosition position, const Matrix3D& transform) {
-  auto styleSource = getLayerStyleSource(args, canvas->getMatrix());
+                                      const Matrix3D& transform) {
+  auto styleSource = getLayerStyleSource(args, canvas->getMatrix(), true);
   if (styleSource == nullptr) {
     return;
   }
@@ -1724,7 +1727,9 @@ void Layer::drawBackgroundLayerStyles(const DrawArgs& args, Canvas* canvas, floa
                         transformedBounds.height() / bounds.height());
   styleMatrix.postTranslate(transformedBounds.left, transformedBounds.top);
   canvas->concat(styleMatrix);
-  drawLayerStyles(args, canvas, alpha, styleSource.get(), position,
+  // When LayerStyle's ExtraSourceType is Background, its Position can only be Below, so there's no
+  // need to handle the Position Above case here.
+  drawLayerStyles(args, canvas, alpha, styleSource.get(), LayerStylePosition::Below,
                   {LayerStyleExtraSourceType::Background});
 }
 
