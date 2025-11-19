@@ -18,10 +18,8 @@
 
 #pragma once
 
-#include <unordered_set>
 #include "layers/BackgroundContext.h"
 #include "tgfx/gpu/Context.h"
-#include "tgfx/layers/layerstyles/LayerStyle.h"
 
 namespace tgfx {
 
