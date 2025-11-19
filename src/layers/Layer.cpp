@@ -1701,9 +1701,6 @@ void Layer::drawBackgroundLayerStyles(const DrawArgs& args, Canvas* canvas, floa
     styleSourceFilter = transform3DFilter->getImageFilter(styleSource->contentScale);
     styleSource->content = styleSource->content->makeWithFilter(styleSourceFilter);
   }
-  if (styleSource->contour != nullptr) {
-    styleSource->contour = styleSource->contour->makeWithFilter(styleSourceFilter);
-  }
 
   // When rendering offscreen, if the layer contains 3D transformations, since it's impossible to
   // accurately stretch and fill the background into a rectangular texture and then apply the 3D
