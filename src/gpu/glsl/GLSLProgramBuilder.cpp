@@ -104,27 +104,26 @@ static std::string SLTypeString(SLType t) {
   return "";
 }
 
-static CullFaceDescriptor MakeCullFaceDescriptor(CullFaceType cullFaceType) {
+static PrimitiveDescriptor MakePrimitiveDescriptor(CullFaceType cullFaceType) {
   // Although the vertexProvider constructs the rectangle in a counterclockwise order, the model
   // uses a coordinate system with the Y-axis pointing downward, which is opposite to OpenGL's
   // default Y-axis direction (upward). Therefore, it is necessary to define the clockwise
   // direction as the front face, which is the opposite of OpenGL's default.
-  CullFaceDescriptor descriptor = {false, CullFaceDescriptor::FrontDirection::CW,
-                                   CullFaceDescriptor::Mode::Back};
+  PrimitiveDescriptor descriptor = {false, FrontFaceDirection::CW, CullFaceMode::Back};
   switch (cullFaceType) {
     case CullFaceType::None:
       break;
     case CullFaceType::Front:
       descriptor.enabled = true;
-      descriptor.mode = CullFaceDescriptor::Mode::Front;
+      descriptor.mode = CullFaceMode::Front;
       break;
     case CullFaceType::Back:
       descriptor.enabled = true;
-      descriptor.mode = CullFaceDescriptor::Mode::Back;
+      descriptor.mode = CullFaceMode::Back;
       break;
     case CullFaceType::FrontAndBack:
       descriptor.enabled = true;
-      descriptor.mode = CullFaceDescriptor::Mode::FrontAndBack;
+      descriptor.mode = CullFaceMode::FrontAndBack;
       break;
   }
   return descriptor;
@@ -227,7 +226,7 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
   for (const auto& sampler : _uniformHandler.getSamplers()) {
     descriptor.layout.textureSamplers.emplace_back(sampler.name(), textureBinding++);
   }
-  descriptor.cullFace = MakeCullFaceDescriptor(programInfo->getCullFaceType());
+  descriptor.primitive = MakePrimitiveDescriptor(programInfo->getCullFaceType());
   auto pipeline = gpu->createRenderPipeline(descriptor);
   if (pipeline == nullptr) {
     return nullptr;

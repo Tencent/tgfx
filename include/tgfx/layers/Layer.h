@@ -165,10 +165,16 @@ class Layer : public std::enable_shared_from_this<Layer> {
    */
   void setMatrix(const Matrix& value);
 
+  /**
+   * Returns the 3D transformation matrix applied to the layer.
+   */
   Matrix3D matrix3D() const {
     return _matrix3D;
   }
 
+  /**
+   * Sets the 3D transformation matrix applied to the layer.
+   */
   void setMatrix3D(const Matrix3D& value);
 
   /**

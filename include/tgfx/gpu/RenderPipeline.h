@@ -254,42 +254,42 @@ class DepthStencilDescriptor {
 };
 
 /**
- * CullFaceDescriptor defines the face culling configuration for a render pipeline.
+ * The winding order that determines which polygons are considered front-facing.
  */
-class CullFaceDescriptor {
+enum class FrontFaceDirection {
+  /**
+   * The front face vertex order is clockwise
+   */
+  CW,
+  /**
+   * The front face vertex order is counterclockwise
+   */
+  CCW
+};
+
+/**
+ * The culling mode: specifies whether to cull front faces, back faces, or both.
+ */
+enum class CullFaceMode {
+  /**
+   * Cull front faces
+   */
+  Front,
+  /**
+   * Cull back faces
+   */
+  Back,
+  /**
+   * Cull both front and back faces
+   */
+  FrontAndBack
+};
+
+/**
+ * PrimitiveDescriptor defines the face culling configuration for a render pipeline.
+ */
+class PrimitiveDescriptor {
  public:
-  /**
-   * The winding order that determines which polygons are considered front-facing.
-   */
-  enum class FrontDirection {
-    /**
-     * The front face vertex order is clockwise
-     */
-    CW,
-    /**
-     * The front face vertex order is counterclockwise
-     */
-    CCW
-  };
-
-  /**
-   * The culling mode: specifies whether to cull front faces, back faces, or both.
-   */
-  enum class Mode {
-    /**
-     * Cull front faces
-     */
-    Front,
-    /**
-     * Cull back faces
-     */
-    Back,
-    /**
-     * Cull both front and back faces
-     */
-    FrontAndBack
-  };
-
   /**
    * Enables or disables face culling.
    */
@@ -298,12 +298,12 @@ class CullFaceDescriptor {
   /**
    * The winding order used to identify front-facing polygons.
    */
-  FrontDirection frontDirection = FrontDirection::CCW;
+  FrontFaceDirection frontDirection = FrontFaceDirection::CCW;
 
   /**
    * The culling mode: determines which faces (front, back, or both) are culled.
    */
-  Mode mode = Mode::Back;
+  CullFaceMode mode = CullFaceMode::Back;
 };
 
 /**
@@ -336,7 +336,7 @@ class RenderPipelineDescriptor {
   /**
    * An object that describes the face culling configuration for the render pipeline.
    */
-  CullFaceDescriptor cullFace = {};
+  PrimitiveDescriptor primitive = {};
 };
 
 /**

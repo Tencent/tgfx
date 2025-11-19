@@ -184,7 +184,7 @@ static std::unique_ptr<GLBlendState> MakeBlendState(const PipelineColorAttachmen
   return blendState;
 }
 
-static std::unique_ptr<GLCullFaceState> MakeCullFaceState(const CullFaceDescriptor& descriptor) {
+static std::unique_ptr<GLCullFaceState> MakeCullFaceState(const PrimitiveDescriptor& descriptor) {
   if (!descriptor.enabled) {
     return nullptr;
   }
@@ -259,7 +259,7 @@ bool GLRenderPipeline::setPipelineDescriptor(GLGPU* gpu,
   stencilState = MakeStencilState(descriptor.depthStencil);
   depthState = MakeDepthState(descriptor.depthStencil);
   blendState = MakeBlendState(attachment);
-  cullFaceState = MakeCullFaceState(descriptor.cullFace);
+  cullFaceState = MakeCullFaceState(descriptor.primitive);
 
   for (auto& entry : descriptor.layout.uniformBlocks) {
     auto uniformBlockIndex = gl->getUniformBlockIndex(programID, entry.name.c_str());
