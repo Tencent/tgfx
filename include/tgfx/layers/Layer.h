@@ -20,6 +20,7 @@
 
 #include <memory>
 #include <optional>
+#include <unordered_set>
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Matrix.h"
@@ -603,16 +604,15 @@ class Layer : public std::enable_shared_from_this<Layer> {
   void drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                      const Matrix3D* transform);
 
-  void onDrawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
-                       const Matrix3D* transform = nullptr,
-                       const std::function<void()>& beforeContentHandler = nullptr,
-                       const std::function<void()>& afterContentHandler = nullptr);
-
   void drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha);
 
-  void drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
-                    const LayerStyleSource* layerStyleSource = nullptr,
-                    const Layer* stopChild = nullptr);
+  void drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha,
+                    const std::unordered_set<LayerStyleExtraSourceType>& styleExtraSourceTypes);
+
+  void drawContents(
+      const DrawArgs& args, Canvas* canvas, float alpha,
+      const LayerStyleSource* layerStyleSource = nullptr, const Layer* stopChild = nullptr,
+      const std::unordered_set<LayerStyleExtraSourceType>& styleExtraSourceTypes = {});
 
   bool drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
                     const Layer* stopChild = nullptr);
@@ -635,6 +635,13 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   void drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
                        const LayerStyleSource* source, LayerStylePosition position);
+
+  void drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
+                       const LayerStyleSource* source, LayerStylePosition position,
+                       const std::unordered_set<LayerStyleExtraSourceType>& styleExtraSourceTypes);
+
+  void drawBackgroundLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
+                                 LayerStylePosition position, const Matrix3D& transform);
 
   bool getLayersUnderPointInternal(float x, float y, std::vector<std::shared_ptr<Layer>>* results);
 

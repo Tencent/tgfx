@@ -44,10 +44,6 @@ class DrawArgs {
   Context* context = nullptr;
   // Whether to exclude effects during the drawing process.
   bool excludeEffects = false;
-  // Layer styles that require additional resource types to be excluded during the drawing phase.
-  // Note that layer styles are a type of effect. When excludeEffects is true, all layer styles will
-  // not be drawn regardless of how this property is set.
-  std::unordered_set<LayerStyleExtraSourceType> excludeStyleExtraSourceTypes;
   // Determines the draw mode of the Layer.
   DrawMode drawMode = DrawMode::Normal;
   // The rectangle area to be drawn. This is used for clipping the drawing area.

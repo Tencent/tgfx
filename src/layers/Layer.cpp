@@ -1105,16 +1105,18 @@ std::shared_ptr<Image> Layer::getOffscreenContentImage(
   }
 
   auto offscreenArgs = args;
-  if (!_matrix3DIsAffine) {
-    // When drawing offscreen, if the layer contains 3D transformations, the background cannot be
-    // accurately stretched to fill a rectangle, so the background is drawn separately.
-    offscreenArgs.excludeStyleExtraSourceTypes = {LayerStyleExtraSourceType::Background};
-  }
   auto contentScale = canvas->getMatrix().getMaxScale();
   offscreenArgs.blurBackground = std::move(subBackgroundContext);
   if (!canvas->getSurface() && passThroughBackground) {
     offscreenArgs.blendModeBackground =
         BackgroundContext::Make(nullptr, renderBounds, 0, 0, Matrix::MakeScale(contentScale));
+  }
+  // When drawing offscreen, if the layer contains 3D transformations, the background cannot be
+  // accurately stretched to fill a rectangle, so the background is drawn separately.
+  std::unordered_set<LayerStyleExtraSourceType> styleExtraSourceTypes = {
+      LayerStyleExtraSourceType::None, LayerStyleExtraSourceType::Contour};
+  if (_matrix3DIsAffine) {
+    styleExtraSourceTypes.insert(LayerStyleExtraSourceType::Background);
   }
 
   std::shared_ptr<Image> finalImage = nullptr;
@@ -1131,7 +1133,7 @@ std::shared_ptr<Image> Layer::getOffscreenContentImage(
     offscreenCanvas->drawImage(canvas->getSurface()->makeImageSnapshot());
     offscreenCanvas->clipPath(canvas->getTotalClip());
     offscreenCanvas->concat(currentMatrix);
-    drawDirectly(offscreenArgs, offscreenCanvas, 1.0f);
+    drawDirectly(offscreenArgs, offscreenCanvas, 1.0f, styleExtraSourceTypes);
     finalImage = offscreenSurface->makeImageSnapshot();
     offscreenCanvas->getMatrix().invert(imageMatrix);
   } else {
@@ -1145,7 +1147,7 @@ std::shared_ptr<Image> Layer::getOffscreenContentImage(
       offscreenCanvas->concat(args.blendModeBackground->backgroundMatrix());
       offscreenCanvas->drawImage(image, offset.x, offset.y);
     }
-    drawDirectly(offscreenArgs, offscreenCanvas, 1.0f);
+    drawDirectly(offscreenArgs, offscreenCanvas, 1.0f, styleExtraSourceTypes);
     Point offset;
     finalImage = ToImageWithOffset(recorder.finishRecordingAsPicture(), &offset, nullptr,
                                    args.dstColorSpace);
@@ -1157,91 +1159,13 @@ std::shared_ptr<Image> Layer::getOffscreenContentImage(
 
 void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                           const Matrix3D* transform) {
-  if (transform == nullptr || transform->isIdentity()) {
-    onDrawOffscreen(args, canvas, alpha, blendMode);
-    return;
-  }
-  auto styleSource = getLayerStyleSource(args, canvas->getMatrix());
-  if (styleSource == nullptr) {
-    onDrawOffscreen(args, canvas, alpha, blendMode, transform);
-    return;
-  }
-
-  // If transform is not empty, additional mapping is required. Apply an equivalent transformation
-  // to the content of StyleSource so that when used as a mask for background processing, it can
-  // accurately coincide with the actual content rendering area, ensuring that only the actual
-  // rendering region of the layer reveals the background.
-  std::shared_ptr<ImageFilter> styleSourceFilter = nullptr;
-  auto bounds = getBounds();
-  auto transformedBounds = transform->mapRect(bounds);
-  transformedBounds.roundOut();
-  if (styleSource->content != nullptr) {
-    // The object of styleSourceMatrix is Image. When drawing directly, Image doesn't care about
-    // actual translation, so it can be ignored when constructing the matrix here.
-    auto styleSourceAnchor = Point::Make(bounds.left, bounds.top);
-    // StyleSourceMatrix acts on the content of styleSource, which is a subregion extracted from
-    // within the Layer. For transformations based on the local coordinate system of this subregion,
-    // anchor point adaptation is required for the matrix described based on the layer.
-    auto styleSourceMatrix = anchorAdaptedMatrix(*transform, styleSourceAnchor);
-    styleSourceMatrix.postScale(bounds.width() / transformedBounds.width(),
-                                bounds.height() / transformedBounds.height(), 1.0f);
-    auto transform3DFilter = Transform3DFilter::Make(styleSourceMatrix);
-    styleSourceFilter = transform3DFilter->getImageFilter(styleSource->contentScale);
-    styleSource->content = styleSource->content->makeWithFilter(styleSourceFilter);
-  }
-  if (styleSource->contour != nullptr) {
-    styleSource->contour = styleSource->contour->makeWithFilter(styleSourceFilter);
-  }
-
-  // When rendering offscreen, if the layer contains 3D transformations, since it's impossible to
-  // accurately stretch and fill the background into a rectangular texture and then apply the 3D
-  // matrix, we can only independently draw the background area. Then, by setting the effective
-  // clipping area through the layer contour, we ensure that only the strictly projected background
-  // area is correctly drawn.
-  DrawArgs styleArgs = {};
-  Matrix styleMatrix = {};
-  Path styleClipPath = {};
-  auto beforeHandler = [&]() {
-    AutoCanvasRestore autoRestore(canvas);
-    styleClipPath.addRect(bounds);
-    styleClipPath.transform3D(*transform);
-    // StyleClipPath is the final clipping path based on the parent node, which must be called
-    // before setting the matrix, otherwise it will be affected by the matrix.
-    canvas->clipPath(styleClipPath);
-    // The material sources for layer styles are all filled into the bounds. When drawing the
-    // styles, it's necessary to calculate the transformation matrix that maps the bounds to the
-    // actual drawing area transformedBounds.
-    DEBUG_ASSERT(!FloatNearlyZero(bounds.width() * bounds.height()));
-    styleMatrix = Matrix::MakeTrans(-bounds.left, -bounds.top);
-    styleMatrix.postScale(transformedBounds.width() / bounds.width(),
-                          transformedBounds.height() / bounds.height());
-    styleMatrix.postTranslate(transformedBounds.left, transformedBounds.top);
-    canvas->concat(styleMatrix);
-    styleArgs = args;
-    styleArgs.excludeStyleExtraSourceTypes = {LayerStyleExtraSourceType::None,
-                                              LayerStyleExtraSourceType::Contour};
-    drawLayerStyles(styleArgs, canvas, alpha, styleSource.get(), LayerStylePosition::Below);
-  };
-  auto afterHandler = [&]() {
-    AutoCanvasRestore autoRestore(canvas);
-    canvas->clipPath(styleClipPath);
-    canvas->concat(styleMatrix);
-    drawLayerStyles(styleArgs, canvas, alpha, styleSource.get(), LayerStylePosition::Above);
-  };
-  onDrawOffscreen(args, canvas, alpha, blendMode, transform, beforeHandler, afterHandler);
-}
-
-void Layer::onDrawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
-                            const Matrix3D* transform,
-                            const std::function<void()>& beforeContentHandler,
-                            const std::function<void()>& afterContentHandler) {
   auto contentScale = canvas->getMatrix().getMaxScale();
   if (FloatNearlyZero(contentScale)) {
     return;
   }
 
-  if (beforeContentHandler != nullptr) {
-    beforeContentHandler();
+  if (transform != nullptr) {
+    drawBackgroundLayerStyles(args, canvas, alpha, LayerStylePosition::Below, *transform);
   }
 
   auto passThroughBackground = bitFields.passThroughBackground && blendMode == BlendMode::SrcOver &&
@@ -1321,14 +1245,22 @@ void Layer::onDrawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, B
     backgroundCanvas->drawImage(image, filterOffset.x, filterOffset.y, &paint);
   }
 
-  if (afterContentHandler != nullptr) {
-    afterContentHandler();
-  }
+  // There is no scenario where LayerStyle's Position and ExtraSourceType are 'above' and
+  // 'background' respectively at the same time, so no special handling is needed after drawing the
+  // content.
 }
 
 void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha) {
+  std::unordered_set<LayerStyleExtraSourceType> styleExtraSourceTypes = {
+      LayerStyleExtraSourceType::None, LayerStyleExtraSourceType::Contour,
+      LayerStyleExtraSourceType::Background};
+  drawDirectly(args, canvas, alpha, styleExtraSourceTypes);
+}
+
+void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha,
+                         const std::unordered_set<LayerStyleExtraSourceType>& extraSourceTypes) {
   auto layerStyleSource = getLayerStyleSource(args, canvas->getMatrix());
-  drawContents(args, canvas, alpha, layerStyleSource.get(), nullptr);
+  drawContents(args, canvas, alpha, layerStyleSource.get(), nullptr, extraSourceTypes);
 }
 
 class LayerFill : public FillModifier {
@@ -1349,9 +1281,11 @@ class LayerFill : public FillModifier {
 };
 
 void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
-                         const LayerStyleSource* layerStyleSource, const Layer* stopChild) {
+                         const LayerStyleSource* layerStyleSource, const Layer* stopChild,
+                         const std::unordered_set<LayerStyleExtraSourceType>& extraSourceTypes) {
   if (layerStyleSource) {
-    drawLayerStyles(args, canvas, alpha, layerStyleSource, LayerStylePosition::Below);
+    drawLayerStyles(args, canvas, alpha, layerStyleSource, LayerStylePosition::Below,
+                    extraSourceTypes);
   }
   LayerFill layerFill(bitFields.allowsEdgeAntialiasing, alpha);
   auto content = getContent();
@@ -1372,7 +1306,8 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
     return;
   }
   if (layerStyleSource) {
-    drawLayerStyles(args, canvas, alpha, layerStyleSource, LayerStylePosition::Above);
+    drawLayerStyles(args, canvas, alpha, layerStyleSource, LayerStylePosition::Above,
+                    extraSourceTypes);
   }
   if (content && args.drawMode != DrawMode::Contour) {
     content->drawForeground(canvas, &layerFill);
@@ -1629,6 +1564,15 @@ void Layer::drawBackgroundImage(const DrawArgs& args, Canvas& canvas, Point* off
 
 void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
                             const LayerStyleSource* source, LayerStylePosition position) {
+  std::unordered_set<LayerStyleExtraSourceType> extraSourceTypes = {
+      LayerStyleExtraSourceType::None, LayerStyleExtraSourceType::Contour,
+      LayerStyleExtraSourceType::Background};
+  drawLayerStyles(args, canvas, alpha, source, position, extraSourceTypes);
+}
+
+void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
+                            const LayerStyleSource* source, LayerStylePosition position,
+                            const std::unordered_set<LayerStyleExtraSourceType>& extraSourceTypes) {
   DEBUG_ASSERT(source != nullptr && !FloatNearlyZero(source->contentScale));
   auto& contour = source->contour;
   auto contourOffset = source->contourOffset - source->contentOffset;
@@ -1650,8 +1594,7 @@ void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
       args.blurBackground ? GetClipBounds(args.blurBackground->getCanvas()) : std::nullopt;
   for (const auto& layerStyle : _layerStyles) {
     if (layerStyle->position() != position ||
-        args.excludeStyleExtraSourceTypes.find(layerStyle->extraSourceType()) !=
-            args.excludeStyleExtraSourceTypes.end()) {
+        extraSourceTypes.find(layerStyle->extraSourceType()) == extraSourceTypes.end()) {
       continue;
     }
     PictureRecorder recorder = {};
@@ -1725,6 +1668,64 @@ void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
   if (blendModeCanvas) {
     blendModeCanvas->restore();
   }
+}
+
+void Layer::drawBackgroundLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
+                                      LayerStylePosition position, const Matrix3D& transform) {
+  auto styleSource = getLayerStyleSource(args, canvas->getMatrix());
+  if (styleSource == nullptr) {
+    return;
+  }
+
+  // Apply an equivalent transformation to the content of StyleSource so that when used as a mask
+  // for background processing, it can accurately coincide with the actual content rendering area,
+  // ensuring that only the actual rendering region of the layer reveals the background.
+  std::shared_ptr<ImageFilter> styleSourceFilter = nullptr;
+  auto bounds = getBounds();
+  auto transformedBounds = transform.mapRect(bounds);
+  transformedBounds.roundOut();
+  if (styleSource->content != nullptr) {
+    // The object of styleSourceMatrix is Image. When drawing directly, Image doesn't care about
+    // actual translation, so it can be ignored when constructing the matrix here.
+    auto styleSourceAnchor = Point::Make(bounds.left, bounds.top);
+    // StyleSourceMatrix acts on the content of styleSource, which is a subregion extracted from
+    // within the Layer. For transformations based on the local coordinate system of this subregion,
+    // anchor point adaptation is required for the matrix described based on the layer.
+    auto styleSourceMatrix = anchorAdaptedMatrix(transform, styleSourceAnchor);
+    styleSourceMatrix.postScale(bounds.width() / transformedBounds.width(),
+                                bounds.height() / transformedBounds.height(), 1.0f);
+    auto transform3DFilter = Transform3DFilter::Make(styleSourceMatrix);
+    styleSourceFilter = transform3DFilter->getImageFilter(styleSource->contentScale);
+    styleSource->content = styleSource->content->makeWithFilter(styleSourceFilter);
+  }
+  if (styleSource->contour != nullptr) {
+    styleSource->contour = styleSource->contour->makeWithFilter(styleSourceFilter);
+  }
+
+  // When rendering offscreen, if the layer contains 3D transformations, since it's impossible to
+  // accurately stretch and fill the background into a rectangular texture and then apply the 3D
+  // matrix, we can only independently draw the background area. Then, by setting the effective
+  // clipping area through the layer contour, we ensure that only the strictly projected background
+  // area is correctly drawn.
+  Matrix styleMatrix = {};
+  Path styleClipPath = {};
+  AutoCanvasRestore autoRestore(canvas);
+  styleClipPath.addRect(bounds);
+  styleClipPath.transform3D(transform);
+  // StyleClipPath is the final clipping path based on the parent node, which must be called
+  // before setting the matrix, otherwise it will be affected by the matrix.
+  canvas->clipPath(styleClipPath);
+  // The material sources for layer styles are all filled into the bounds. When drawing the
+  // styles, it's necessary to calculate the transformation matrix that maps the bounds to the
+  // actual drawing area transformedBounds.
+  DEBUG_ASSERT(!FloatNearlyZero(bounds.width() * bounds.height()));
+  styleMatrix = Matrix::MakeTrans(-bounds.left, -bounds.top);
+  styleMatrix.postScale(transformedBounds.width() / bounds.width(),
+                        transformedBounds.height() / bounds.height());
+  styleMatrix.postTranslate(transformedBounds.left, transformedBounds.top);
+  canvas->concat(styleMatrix);
+  drawLayerStyles(args, canvas, alpha, styleSource.get(), position,
+                  {LayerStyleExtraSourceType::Background});
 }
 
 bool Layer::getLayersUnderPointInternal(float x, float y,
