@@ -52,23 +52,23 @@ static PlacementPtr<FragmentProcessor> MakeColorizer(const Context* context, con
   if (topHardStop) {
     count--;
   }
-  auto drawingBuffer = context->drawingAllocator();
+  auto allocator = context->drawingAllocator();
   // Two remaining colors means a single interval from 0 to 1
   // (but it may have originally been a 3 or 4 color gradient with 1-2 hard stops at the ends)
   if (count == 2) {
-    return SingleIntervalGradientColorizer::Make(drawingBuffer, colors[offset], colors[offset + 1]);
+    return SingleIntervalGradientColorizer::Make(allocator, colors[offset], colors[offset + 1]);
   }
 
   if (count <= UnrolledBinaryGradientColorizer::MaxColorCount) {
     if (count == 3) {
       // Must be a dual interval gradient, where the middle point is at offset+1 and the two
       // intervals share the middle color stop.
-      return DualIntervalGradientColorizer::Make(drawingBuffer, colors[offset], colors[offset + 1],
+      return DualIntervalGradientColorizer::Make(allocator, colors[offset], colors[offset + 1],
                                                  colors[offset + 1], colors[offset + 2],
                                                  positions[offset + 1]);
     } else if (count == 4 && FloatNearlyEqual(positions[offset + 1], positions[offset + 2])) {
       // Two separate intervals that join at the same threshold position
-      return DualIntervalGradientColorizer::Make(drawingBuffer, colors[offset], colors[offset + 1],
+      return DualIntervalGradientColorizer::Make(allocator, colors[offset], colors[offset + 1],
                                                  colors[offset + 2], colors[offset + 3],
                                                  positions[offset + 1]);
     }
@@ -76,7 +76,7 @@ static PlacementPtr<FragmentProcessor> MakeColorizer(const Context* context, con
     // The single and dual intervals are a specialized case of the unrolled binary search
     // colorizer which can analytically render gradients of up to 8 intervals (up to 9 or 16
     // colors depending on how many hard stops are inserted).
-    auto unrolled = UnrolledBinaryGradientColorizer::Make(drawingBuffer, colors + offset,
+    auto unrolled = UnrolledBinaryGradientColorizer::Make(allocator, colors + offset,
                                                           positions + offset, count);
     if (unrolled) {
       return unrolled;
@@ -85,7 +85,7 @@ static PlacementPtr<FragmentProcessor> MakeColorizer(const Context* context, con
   // Otherwise, fall back to a raster gradient sample by a texture, which can handle
   // arbitrary gradients (the only downside being sampling resolution).
   auto gradient = context->globalCache()->getGradient(colors + offset, positions + offset, count);
-  return TextureGradientColorizer::Make(drawingBuffer, std::move(gradient));
+  return TextureGradientColorizer::Make(allocator, std::move(gradient));
 }
 
 GradientShader::GradientShader(const std::vector<Color>& colors,

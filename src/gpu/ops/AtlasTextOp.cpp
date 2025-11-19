@@ -35,8 +35,9 @@ PlacementPtr<AtlasTextOp> AtlasTextOp::Make(Context* context,
       textureProxy->height() <= 0) {
     return nullptr;
   }
-  auto atlasTextOp = context->drawingAllocator()->make<AtlasTextOp>(
-      provider.get(), std::move(textureProxy), sampling);
+  auto allocator = context->drawingAllocator();
+  auto atlasTextOp =
+      allocator->make<AtlasTextOp>(allocator, provider.get(), std::move(textureProxy), sampling);
   CAPUTRE_RECT_MESH(atlasTextOp.get(), provider.get());
   if (provider->aaType() == AAType::Coverage || provider->rectCount() > 1) {
     atlasTextOp->indexBufferProxy = context->globalCache()->getRectIndexBuffer(
@@ -51,21 +52,20 @@ PlacementPtr<AtlasTextOp> AtlasTextOp::Make(Context* context,
   return atlasTextOp;
 }
 
-AtlasTextOp::AtlasTextOp(RectsVertexProvider* provider, std::shared_ptr<TextureProxy> textureProxy,
+AtlasTextOp::AtlasTextOp(BlockAllocator* allocator, RectsVertexProvider* provider,
+                         std::shared_ptr<TextureProxy> textureProxy,
                          const SamplingOptions& sampling)
-    : DrawOp(provider->aaType()), rectCount(provider->rectCount()),
+    : DrawOp(allocator, provider->aaType()), rectCount(provider->rectCount()),
       textureProxy(std::move(textureProxy)), sampling(sampling) {
   if (!provider->hasColor()) {
     commonColor = provider->firstColor();
   }
 }
 
-PlacementPtr<GeometryProcessor> AtlasTextOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {
+PlacementPtr<GeometryProcessor> AtlasTextOp::onMakeGeometryProcessor(RenderTarget*) {
   ATTRIBUTE_NAME("rectCount", static_cast<uint32_t>(rectCount));
   ATTRIBUTE_NAME("commonColor", commonColor);
-  auto drawingBuffer = renderTarget->getContext()->drawingAllocator();
-  return AtlasTextGeometryProcessor::Make(drawingBuffer, textureProxy, aaType, commonColor,
-                                          sampling);
+  return AtlasTextGeometryProcessor::Make(allocator, textureProxy, aaType, commonColor, sampling);
 }
 
 void AtlasTextOp::onDraw(RenderPass* renderPass) {

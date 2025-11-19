@@ -18,27 +18,28 @@
 
 #pragma once
 
+#include "gpu/proxies/TextureProxy.h"
 #include "tgfx/core/ImageCodec.h"
-#include "tgfx/core/Task.h"
+#include "tgfx/gpu/Context.h"
 
 namespace tgfx {
-class AtlasCellDecodeTask final : public Task {
+class CellDecodeTask;
+
+class AtlasUploadTask {
  public:
-  AtlasCellDecodeTask(std::shared_ptr<ImageCodec> imageCodec, void* dstPixels,
-                      const ImageInfo& dstInfo, int padding)
-      : imageCodec(std::move(imageCodec)), dstPixels(dstPixels), dstInfo(dstInfo),
-        padding(padding) {
-  }
+  explicit AtlasUploadTask(std::shared_ptr<TextureProxy> proxy);
 
- protected:
-  void onExecute() override;
+  ~AtlasUploadTask();
 
-  void onCancel() override;
+  void addCell(BlockAllocator* allocator, std::shared_ptr<ImageCodec> codec,
+               const Point& atlasOffset);
+
+  void upload(Context* context);
 
  private:
-  std::shared_ptr<ImageCodec> imageCodec = nullptr;
-  void* dstPixels = nullptr;
-  ImageInfo dstInfo = {};
-  int padding = 0;
+  std::shared_ptr<TextureProxy> textureProxy = nullptr;
+  ImageInfo hardwareInfo = {};
+  void* hardwarePixels = nullptr;
+  std::vector<std::shared_ptr<CellDecodeTask>> tasks = {};
 };
 }  // namespace tgfx

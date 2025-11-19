@@ -92,10 +92,11 @@ class AtlasConfig {
 
   ISize atlasDimensions(MaskFormat maskFormat) const;
 
-  ISize plotDimensions(MaskFormat maskFormat) const;
+  static ISize PlotDimensions();
 
  private:
-  static constexpr int MaxTextureSize = 2048;
-  ISize RGBADimensions = {MaxTextureSize, MaxTextureSize};
+  static constexpr int MaxAtlasSize = 2048;
+  static constexpr int PlotSize = 512;
+  ISize A8Dimensions = {MaxAtlasSize, MaxAtlasSize};
 };
-}  //namespace tgfx
+}  // namespace tgfx

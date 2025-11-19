@@ -33,6 +33,10 @@ class AtlasTextGeometryProcessor : public GeometryProcessor {
     return "AtlasTextGeometryProcessor";
   }
 
+  SamplerState onSamplerStateAt(size_t) const override {
+    return samplerState;
+  }
+
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
