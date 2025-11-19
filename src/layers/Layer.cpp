@@ -1121,7 +1121,7 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   if (auto rasterizedCache = getRasterizedCache(args, canvas->getMatrix())) {
     cache = rasterizedCache;
   } else if (args.layerCache) {
-    cache = args.layerCache->getCachedImageAndRect(this, contentScale);
+    cache = args.layerCache->getCachedImage(this, contentScale);
   }
   std::optional<Rect> clipBounds = std::nullopt;
   if (cache) {

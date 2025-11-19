@@ -17,13 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/DisplayList.h"
-#include "LayerCache.h"
 #include "core/utils/DecomposeRects.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/TileSortCompareFunc.h"
 #include "inspect/InspectorMark.h"
 #include "layers/DrawArgs.h"
+#include "layers/LayerCache.h"
 #include "layers/RootLayer.h"
 #include "layers/TileCache.h"
 #include "tgfx/gpu/GPU.h"
@@ -276,6 +276,7 @@ void DisplayList::render(Surface* surface, bool autoClear) {
     return;
   }
   RENDER_VISABLE_OBJECT(surface->getContext());
+  layerCache->setContext(surface->getContext());
   _hasContentChanged = false;
   auto dirtyRegions = _root->updateDirtyRegions();
   if (_zoomScaleInt == 0) {
