@@ -54,8 +54,8 @@ class AtlasTextOp final : public DrawOp {
   std::shared_ptr<TextureProxy> textureProxy = nullptr;
   SamplingOptions sampling{FilterMode::Nearest, MipmapMode::None};
 
-  explicit AtlasTextOp(RectsVertexProvider* provider, std::shared_ptr<TextureProxy> textureProxy,
-                       const SamplingOptions& sampling);
+  AtlasTextOp(BlockAllocator* allocator, RectsVertexProvider* provider,
+              std::shared_ptr<TextureProxy> textureProxy, const SamplingOptions& sampling);
 
   friend class BlockAllocator;
 };

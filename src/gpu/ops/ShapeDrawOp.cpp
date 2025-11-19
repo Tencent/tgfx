@@ -34,17 +34,16 @@ PlacementPtr<ShapeDrawOp> ShapeDrawOp::Make(std::shared_ptr<GPUShapeProxy> shape
     return nullptr;
   }
   auto allocator = shapeProxy->getContext()->drawingAllocator();
-  return allocator->make<ShapeDrawOp>(std::move(shapeProxy), color, uvMatrix, aaType);
+  return allocator->make<ShapeDrawOp>(allocator, std::move(shapeProxy), color, uvMatrix, aaType);
 }
 
-ShapeDrawOp::ShapeDrawOp(std::shared_ptr<GPUShapeProxy> proxy, Color color, const Matrix& uvMatrix,
-                         AAType aaType)
-    : DrawOp(aaType), shapeProxy(std::move(proxy)), color(color), uvMatrix(uvMatrix) {
+ShapeDrawOp::ShapeDrawOp(BlockAllocator* allocator, std::shared_ptr<GPUShapeProxy> proxy,
+                         Color color, const Matrix& uvMatrix, AAType aaType)
+    : DrawOp(allocator, aaType), shapeProxy(std::move(proxy)), color(color), uvMatrix(uvMatrix) {
   auto context = shapeProxy->getContext();
   if (auto textureProxy = shapeProxy->getTextureProxy()) {
     auto maskRect = Rect::MakeWH(textureProxy->width(), textureProxy->height());
-    auto maskVertexProvider =
-        RectsVertexProvider::MakeFrom(context->drawingAllocator(), maskRect, AAType::None);
+    auto maskVertexProvider = RectsVertexProvider::MakeFrom(allocator, maskRect, AAType::None);
     maskBufferProxy = context->proxyProvider()->createVertexBufferProxy(
         std::move(maskVertexProvider), RenderFlags::DisableAsyncTask);
   }
@@ -60,7 +59,6 @@ PlacementPtr<GeometryProcessor> ShapeDrawOp::onMakeGeometryProcessor(RenderTarge
   auto realUVMatrix = uvMatrix;
   realUVMatrix.preConcat(viewMatrix);
   auto vertexBuffer = shapeProxy->getTriangles();
-  auto allocator = renderTarget->getContext()->drawingAllocator();
   auto aa = aaType;
   if (vertexBuffer == nullptr) {
     aa = AAType::None;
