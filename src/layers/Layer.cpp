@@ -1123,7 +1123,6 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   } else if (args.layerCache) {
     cache = args.layerCache->getCachedImageAndRect(this, contentScale);
   }
-
   std::optional<Rect> clipBounds = std::nullopt;
   if (cache) {
     if (hasValidMask()) {
@@ -1136,6 +1135,10 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
       maskFilter = maskFilter->makeWithMatrix(maskMatrix);
     }
     cache->draw(canvas, bitFields.allowsEdgeAntialiasing, alpha, maskFilter, blendMode);
+    if (args.blendModeBackground) {
+      cache->draw(args.blendModeBackground->getCanvas(), bitFields.allowsEdgeAntialiasing, alpha,
+                  maskFilter, blendMode);
+    }
     if (args.blurBackground) {
       if (!hasBackgroundStyle()) {
         cache->draw(args.blurBackground->getCanvas(), bitFields.allowsEdgeAntialiasing, alpha,
@@ -1156,37 +1159,28 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
 
   auto scaledBounds = renderBounds;
   scaledBounds.scale(contentScale, contentScale);
-  constexpr float MaxCacheSize = 128.f;
-  constexpr float MaxCacheScale = 0.2f;
+  constexpr float MaxCacheSize = 64.f;
+  constexpr float MaxCacheScale = 0.3f;
   if (!args.layerCache || scaledBounds.width() > MaxCacheSize ||
       scaledBounds.height() > MaxCacheSize || contentScale > MaxCacheScale) {
     return false;
   }
 
-  if (_filters.empty() && layerStyles().empty()) {
-    return false;
-  }
-
   auto passThroughBackground = bitFields.passThroughBackground && blendMode == BlendMode::SrcOver &&
-                               _filters.empty() && bitFields.hasBlendMode == true;
-
-  if (passThroughBackground) {
-    if (!clipBounds.has_value()) {
-      clipBounds = GetClipBounds(args.blurBackground ? args.blurBackground->getCanvas() : canvas);
-    }
-    if (clipBounds.has_value() && !clipBounds->contains(renderBounds)) {
-      // cache the layer only if the layer is fully contained in the clip bounds.
+                               _filters.empty() && bitFields.hasBlendMode;
+  if (passThroughBackground || hasBackgroundStyle()) {
+    if (!args.renderRect || !args.renderRect->contains(renderBounds)) {
       return false;
     }
   } else {
     contentScale = std::min(MaxCacheScale,
                             MaxCacheSize / std::max(renderBounds.width(), renderBounds.height()));
   }
-
   auto cacheArgs = args;
   cacheArgs.renderFlags |= RenderFlags::DisableCache;
+  cacheArgs.renderRect = &renderBounds;
 
-  drawContentOffscreen(cacheArgs, canvas, clipBounds, contentScale, blendMode, alpha,
+  drawContentOffscreen(cacheArgs, canvas, std::nullopt, contentScale, blendMode, alpha,
                        [&](std::shared_ptr<Image> image, const Matrix& imageMatrix) {
                          args.layerCache->cacheImage(this, contentScale, image, imageMatrix);
                        });
