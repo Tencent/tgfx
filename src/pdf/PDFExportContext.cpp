@@ -156,141 +156,17 @@ PDFExportContext::PDFExportContext(ISize pageSize, PDFDocumentImpl* document,
 
 PDFExportContext::~PDFExportContext() = default;
 
-void PDFExportContext::drawFill(const Fill& fill) {
-  auto dstFill = convertFill(fill);
-  drawFillImpl(dstFill);
-}
-
-void PDFExportContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill,
-    const Stroke* stroke) {
-  auto dstFill = convertFill(fill);
-  drawRectImpl(rect, state, dstFill, stroke);
-}
-
-void PDFExportContext::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
-    const Stroke* stroke) {
-  auto dstFill = convertFill(fill);
-  drawRRectImpl(rRect,state, dstFill, stroke);
-}
-
-void PDFExportContext::drawPath(const Path& path, const MCState& state, const Fill& fill) {
-  auto dstFill = convertFill(fill);
-  drawPathImpl(path, state, dstFill);
-}
-
-void PDFExportContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
-    const Fill& fill, const Stroke* stroke) {
-  auto dstFill = convertFill(fill);
-  drawShapeImpl(shape, state, dstFill, stroke);
-}
-
-void PDFExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-    const MCState& state, const Fill& fill) {
-  auto dstFill = convertFill(fill);
-  auto dstImage = convertImage(image);
-  drawImageImpl(dstImage, sampling, state, dstFill);
-}
-
-void PDFExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect,
-    const Rect& dstRect, const SamplingOptions& sampling, const MCState& state, const Fill& fill,
-    SrcRectConstraint constraint) {
-  auto dstFill = convertFill(fill);
-  auto dstImage = convertImage(image);
-  drawImageRectImpl(dstImage, srcRect, dstRect, sampling, state, dstFill, constraint);
-}
-
-void PDFExportContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
-    const MCState& state, const Fill& fill, const Stroke* stroke) {
-  auto dstFill = convertFill(fill);
-  drawGlyphRunListImpl(glyphRunList, state, dstFill, stroke);
-}
-
-Fill PDFExportContext::convertFill(const Fill& fill) {
-  auto converter = document->converter();
-  Fill result = fill;
-  result.color = converter->convertColor(fill.color);
-
-}
-
-std::shared_ptr<Shader> PDFExportContext::convertShader(std::shared_ptr<const Shader> shader, std::shared_ptr<ColorSpaceConverter> converter) {
-  std::shared_ptr<Shader> result = nullptr;
-    if(shader == nullptr) {
-      return result;
-    }
-    if(Types::Get(shader.get()) == Types::ShaderType::Blend) {
-      auto blendShader = std::static_pointer_cast<const BlendShader>(shader);
-      auto src = convertShader(blendShader->src, converter);
-      auto dst = convertShader(blendShader->src, converter);
-    }
-    if(Types::Get(shader.get()) == Types::ShaderType::Matrix) {
-      auto matrixShader = std::static_pointer_cast<const MatrixShader>(shader);
-      auto dstShader = convertShader(matrixShader->source, converter);
-      result = std::make_shared<MatrixShader>(dstShader, matrixShader->matrix);
-    }
-    if(Types::Get(shader.get()) == Types::ShaderType::Color) {
-      auto colorShader = std::static_pointer_cast<const ColorShader>(shader);
-      auto dstColor = converter->convertColor(colorShader->color);
-      result = Shader::MakeColorShader(dstColor);
-    }
-    if(Types::Get(shader.get()) == Types::ShaderType::Gradient) {
-      auto gradientShader = std::static_pointer_cast<const GradientShader>(shader);
-      auto type = gradientShader->asGradient(nullptr);
-      switch (type) {
-        case GradientType::Linear: {
-          auto shader = std::make_shared<LinearGradientShader>(*std::static_pointer_cast<const LinearGradientShader>(shader));
-          for(auto& color : shader->originalColors) {
-            color = converter->convertColor(color);
-          }
-          result = shader;
-          break;
-        }
-        case GradientType::Conic: {
-          auto shader = std::make_shared<ConicGradientShader>(*std::static_pointer_cast<const ConicGradientShader>(shader));
-          for(auto& color : shader->originalColors) {
-            color = converter->convertColor(color);
-          }
-          result = shader;
-          break;
-        }
-        case GradientType::Diamond: {
-          auto shader = std::make_shared<DiamondGradientShader>(*std::static_pointer_cast<const DiamondGradientShader>(shader));
-          for(auto& color : shader->originalColors) {
-            color = converter->convertColor(color);
-          }
-          result = shader;
-          break;
-        }
-        case GradientType::Radial: {
-          auto shader = std::make_shared<RadialGradientShader>(*std::static_pointer_cast<const RadialGradientShader>(shader));
-          for(auto& color : shader->originalColors) {
-            color = converter->convertColor(color);
-          }
-          result = shader;
-          break;
-        }
-      }
-    }
-    if(Types::Get(shader.get()) == Types::ShaderType::Image) {
-      auto shader = std::make_shared<ImageShader>(*std::static_pointer_cast<const ImageShader>(shader));
-      shader->image = convertImage(shader->image);
-      result = shader;
-    }
-}
-
-std::shared_ptr<Image> PDFExportContext::convertImage(std::shared_ptr<Image> image) {
-}
-
 void PDFExportContext::reset() {
   content.reset();
 }
 
-void PDFExportContext::drawFillImpl(const Fill& fill) {
+void PDFExportContext::drawFill(const Fill& fill) {
   Path path;
   path.addRect(Rect::MakeSize(_pageSize));
   onDrawPath(MCState(), path, fill);
 };
 
-void PDFExportContext::drawRectImpl(const Rect& rect, const MCState& state, const Fill& fill,
+void PDFExportContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill,
                                 const Stroke* stroke) {
   Path path;
   path.addRect(rect);
@@ -300,7 +176,7 @@ void PDFExportContext::drawRectImpl(const Rect& rect, const MCState& state, cons
   onDrawPath(state, path, fill);
 }
 
-void PDFExportContext::drawRRectImpl(const RRect& rRect, const MCState& state, const Fill& fill,
+void PDFExportContext::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
                                  const Stroke* stroke) {
   Path path;
   path.addRRect(rRect);
@@ -310,24 +186,24 @@ void PDFExportContext::drawRRectImpl(const RRect& rRect, const MCState& state, c
   onDrawPath(state, path, fill);
 }
 
-void PDFExportContext::drawPathImpl(const Path& path, const MCState& state, const Fill& fill) {
+void PDFExportContext::drawPath(const Path& path, const MCState& state, const Fill& fill) {
   this->onDrawPath(state, path, fill);
 };
 
-void PDFExportContext::drawShapeImpl(std::shared_ptr<Shape> shape, const MCState& state,
+void PDFExportContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
                                  const Fill& fill, const Stroke* stroke) {
   shape = Shape::ApplyStroke(std::move(shape), stroke);
   auto path = ShapeUtils::GetShapeRenderingPath(shape, state.matrix.getMaxScale());
   this->onDrawPath(state, path, fill);
 }
 
-void PDFExportContext::drawImageImpl(std::shared_ptr<Image> image, const SamplingOptions& sampling,
+void PDFExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
                                  const MCState& state, const Fill& fill) {
   auto rect = Rect::MakeWH(image->width(), image->height());
   onDrawImageRect(image, rect, sampling, state, fill);
 }
 
-void PDFExportContext::drawImageRectImpl(std::shared_ptr<Image> image, const Rect& srcRect,
+void PDFExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect,
                                      const Rect& dstRect, const SamplingOptions& sampling,
                                      const MCState& state, const Fill& fill, SrcRectConstraint) {
   auto subsetImage = image->makeSubset(srcRect);
@@ -720,7 +596,7 @@ void PDFExportContext::drawDropShadowBeforeLayer(const std::shared_ptr<Picture>&
   auto offset = Point::Make(pictureBounds.x() - blurBounds.x(), pictureBounds.y() - blurBounds.y());
 
   auto surface = Surface::Make(document->context(), static_cast<int>(blurBounds.width()),
-                               static_cast<int>(blurBounds.height()), false, 1, false, 0);
+                               static_cast<int>(blurBounds.height()), false, 1, false, 0, ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3));
   DEBUG_ASSERT(surface);
   auto canvas = surface->getCanvas();
 
@@ -752,7 +628,7 @@ void PDFExportContext::drawInnerShadowAfterLayer(const PictureRecord* record,
   }
 
   auto surface = Surface::Make(document->context(), static_cast<int>(pictureBounds.width()),
-                               static_cast<int>(pictureBounds.height()), false, 1, false, 0);
+                               static_cast<int>(pictureBounds.height()), false, 1, false, 0, ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3));
   DEBUG_ASSERT(surface);
   auto canvas = surface->getCanvas();
   canvas->translate(-pictureBounds.x(), -pictureBounds.y());
@@ -800,7 +676,7 @@ void PDFExportContext::drawBlurLayer(const std::shared_ptr<Picture>& picture,
   Point offset = {pictureBounds.x() - blurBounds.x(), pictureBounds.y() - blurBounds.y()};
 
   auto surface = Surface::Make(document->context(), static_cast<int>(blurBounds.width()),
-                               static_cast<int>(blurBounds.height()), false, 1, false, 0);
+                               static_cast<int>(blurBounds.height()), false, 1, false, 0, ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3));
   DEBUG_ASSERT(surface);
 
   Canvas* canvas = surface->getCanvas();
@@ -909,7 +785,7 @@ void PDFExportContext::onDrawImageRect(std::shared_ptr<Image> image, const Rect&
   if (image->isAlphaOnly() && modifiedFill.colorFilter) {
     // must blend alpha image and shader before applying colorfilter.
     auto surface = Surface::Make(document->context(), image->width(), image->height(), false, 1,
-                                 false, 0);
+                                 false, 0, ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3));
     Canvas* canvas = surface->getCanvas();
     Paint tmpPaint;
     // In the case of alpha images with shaders, the shader's coordinate system is the image's
@@ -1158,9 +1034,11 @@ std::shared_ptr<MemoryWriteStream> PDFExportContext::setUpContentEntry(
   PopulateGraphicStateEntryFromPaint(document, matrix, state, Rect::MakeSize(_pageSize), fill,
                                      _initialTransform, scale, &entry,
                                      &shaderResources, &graphicStateResources);
-  entry.color = document->converter()->convertColor(entry.color);
   fActiveStackState.updateClip(state);
   fActiveStackState.updateMatrix(entry.matrix);
+  if(document->converter()) {
+    entry.color = document->converter()->convertColor(entry.color);
+  }
   fActiveStackState.updateDrawingState(entry);
 
   return fActiveStackState.contentStream;

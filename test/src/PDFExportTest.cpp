@@ -37,7 +37,6 @@
 #include "utils/ContextScope.h"
 #include "utils/ProjectPath.h"
 #include "utils/TestUtils.h"
-#include <fstream>
 
 namespace tgfx {
 
@@ -376,30 +375,26 @@ TGFX_TEST(PDFExportTest, ColorSpaceTest) {
   auto PDFStream = MemoryWriteStream::Make();
 
   PDFMetadata metadata;
-  auto document = PDFDocument::Make(PDFStream, context, metadata);
+  auto document = PDFDocument::Make(PDFStream, context, metadata, ColorSpaceConverter::MakeDefaultConverter());
   auto canvas = document->beginPage(256.f, 256.f);
-  Paint paint;
-  paint.setShader(Shader::MakeLinearGradient({0, 0}, {256, 0}, {Color::Red(), Color::FromRGBA(0, 255, 0, 255, ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3))}));
-  canvas->drawPaint(paint);
+  canvas->drawColor(Color::FromRGBA(
+      0, 255, 0, 255, ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3)));
   document->endPage();
-  // canvas = document->beginPage(256.f, 256.f);
-  // canvas->drawColor(Color::FromRGBA(0, 255, 0, 255, ColorSpace::SRGB()));
-  // document->endPage();
-  // canvas = document->beginPage(2048.f, 2048.f);
-  // auto image = MakeImage("resources/apitest/green_p3.png");
-  // canvas->drawImage(image);
-  // document->endPage();
-  // canvas = document->beginPage(2048.f, 2048.f);
-  // Paint paint{};
-  // paint.setImageFilter(ImageFilter::DropShadow(500, 500, 10, 10, Color::Green()));
-  // canvas->drawImage(image, &paint);
-  // document->endPage();
+  canvas = document->beginPage(256.f, 256.f);
+  canvas->drawColor(Color::FromRGBA(0, 255, 0, 255, ColorSpace::SRGB()));
+  document->endPage();
+  canvas = document->beginPage(2048.f, 2048.f);
+  auto image = MakeImage("resources/apitest/green_p3.png");
+  canvas->drawImage(image);
+  document->endPage();
+  canvas = document->beginPage(2048.f, 2048.f);
+  Paint paint{};
+  paint.setImageFilter(ImageFilter::DropShadow(500, 500, 10, 10, Color::Green()));
+  canvas->drawImage(image, &paint);
+  document->endPage();
   document->close();
   PDFStream->flush();
-  std::ofstream file("./pdf.txt");
-  file << PDFStream->readString();
-  file.close();
-  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/ColorSpace111"));
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/ColorSpace"));
 }
 
 }  // namespace tgfx

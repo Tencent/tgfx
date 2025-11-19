@@ -271,9 +271,6 @@ PDFDocumentImpl::PDFDocumentImpl(std::shared_ptr<WriteStream> stream, Context* c
   if (_metadata.structureElementTreeRoot) {
     tagTree.init(_metadata.structureElementTreeRoot, _metadata.outline);
   }
-  if(converter == nullptr) {
-    _converter = ColorSpaceConverter::MakeDefaultConverter();
-  }
   _converter = converter;
 }
 

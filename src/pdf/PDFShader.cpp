@@ -131,7 +131,6 @@ PDFIndirectReference PDFShader::Make(PDFDocumentImpl* doc, const std::shared_ptr
   if (surfaceBBox.isEmpty()) {
     return PDFIndirectReference();
   }
-  Bitmap image;
 
   paintColor = AdjustColor(shader, paintColor);
   TileMode imageTileModes[2];
@@ -353,7 +352,7 @@ PDFIndirectReference PDFShader::MakeFallbackShader(PDFDocumentImpl* doc,
                 static_cast<float>(size.height) / shaderRect.height()};
 
   auto surface =
-      Surface::Make(doc->context(), size.width, size.height, false, 1, false, 0, nullptr);
+      Surface::Make(doc->context(), size.width, size.height, false, 1, false, 0, ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3));
   DEBUG_ASSERT(surface);
   Canvas* canvas = surface->getCanvas();
   canvas->clear(Color::Transparent());

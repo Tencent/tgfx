@@ -27,8 +27,8 @@ class DefaultColorSpaceConverter : public ColorSpaceConverter{
   Color convertColor(const Color& color) const override {
     return color;
   }
-  std::shared_ptr<Image> convertImage(std::shared_ptr<Image> image) const override {
-    return image;
+  Pixmap convertPixmap(const Pixmap& pixmap) const override {
+    return pixmap;
   }
 };
 }  // namespace tgfx

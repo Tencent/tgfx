@@ -86,32 +86,6 @@ class PDFExportContext : public DrawContext {
   }
 
  private:
-  Fill convertFill(const Fill& fill);
-  std::shared_ptr<Shader> convertShader(std::shared_ptr<const Shader> shader, std::shared_ptr<ColorSpaceConverter> converter);
-
-  std::shared_ptr<Image> convertImage(std::shared_ptr<Image> image);
-
-  void drawFillImpl(const Fill& fill);
-
-  void drawRectImpl(const Rect& rect, const MCState& state, const Fill& fill,
-                const Stroke* stroke);
-
-  void drawRRectImpl(const RRect& rRect, const MCState& state, const Fill& fill,
-                 const Stroke* stroke);
-
-  void drawPathImpl(const Path& path, const MCState& state, const Fill& fill);
-
-  void drawShapeImpl(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill,
-                 const Stroke* stroke);
-
-  void drawImageImpl(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                 const MCState& state, const Fill& fill);
-
-  void drawImageRectImpl(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
-                     const SamplingOptions& sampling, const MCState& state, const Fill& fill,
-                     SrcRectConstraint constraint);
-  void drawGlyphRunListImpl(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
-                        const Fill& fill, const Stroke* stroke);
 
   void reset();
 
