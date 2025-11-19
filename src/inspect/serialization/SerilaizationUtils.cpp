@@ -20,7 +20,6 @@
 #include "LayerFilterSerialization.h"
 #include "LayerSerialization.h"
 #include "LayerStyleSerialization.h"
-#include "Matrix3DSerialization.h"
 #include "MatrixSerialization.h"
 #include "PictureSerialization.h"
 #include "PointSerialization.h"
@@ -373,11 +372,6 @@ void SerializeUtils::FillRenderableObjSerMap(const std::shared_ptr<Picture>& pic
 void SerializeUtils::FillComplexObjSerMap(const Color& color, uint64_t objID,
                                           ComplexObjSerMap* map) {
   (*map)[objID] = [color]() { return ColorSerialization::Serialize(&color); };
-}
-
-void SerializeUtils::FillComplexObjSerMap(const Matrix3D& matrix, uint64_t objID,
-                                          ComplexObjSerMap* map) {
-  (*map)[objID] = [matrix]() { return Matrix3DSerialization::Serialize(&matrix); };
 }
 
 void SerializeUtils::SetFlexBufferMap(flexbuffers::Builder& fbb, const char* key, const char* value,

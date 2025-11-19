@@ -102,17 +102,6 @@ static void SerializeInnerShadowFilterImpl(flexbuffers::Builder& fbb,
   SerializeUtils::SetFlexBufferMap(fbb, "innerShadowOnly", innerShadowFilter->innerShadowOnly());
 }
 
-static void SerializeTransform3DFilterImpl(flexbuffers::Builder& fbb,
-                                           const LayerFilter* layerFilter,
-                                           SerializeUtils::ComplexObjSerMap* map) {
-  SerializeBasicLayerFilterImpl(fbb, layerFilter);
-  const Transform3DFilter* transform3DFilter = static_cast<const Transform3DFilter*>(layerFilter);
-  auto matrixID = SerializeUtils::GetObjID();
-  SerializeUtils::SetFlexBufferMap(fbb, "matrix", "", false, true, matrixID);
-  SerializeUtils::FillComplexObjSerMap(transform3DFilter->matrix(), matrixID, map);
-  SerializeUtils::SetFlexBufferMap(fbb, "hideBackFace", transform3DFilter->hideBackFace());
-}
-
 std::shared_ptr<Data> LayerFilterSerialization::Serialize(const LayerFilter* layerFilter,
                                                           SerializeUtils::ComplexObjSerMap* map) {
   DEBUG_ASSERT(layerFilter != nullptr)
@@ -142,7 +131,8 @@ std::shared_ptr<Data> LayerFilterSerialization::Serialize(const LayerFilter* lay
       SerializeInnerShadowFilterImpl(fbb, layerFilter, map);
       break;
     case Types::LayerFilterType::Transform3DFilter:
-      SerializeTransform3DFilterImpl(fbb, layerFilter, map);
+      // Filters stored within the Layer itself need to be serialized. Transform3DFilter type
+      // filters are not stored inside the Layer and do not require processing.
       break;
   }
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);

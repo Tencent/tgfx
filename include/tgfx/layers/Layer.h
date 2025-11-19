@@ -586,10 +586,10 @@ class Layer : public std::enable_shared_from_this<Layer> {
    * Generates an image filter for the specified content area within the layer.
    * @param contentScale The scale ratio of the specified area in the layer's local coordinate
    * system.
-   * @param contentBound The rectangular coordinates of the specified area after scaling.
-   * @param transform The transform matrix to apply to the content.
+   * @param transform The affine transformation matrix referenced by the local coordinate system
+   * with the top-left vertex of the content rectangle as the origin.
    */
-  std::shared_ptr<ImageFilter> getImageFilter(float contentScale, const Rect& contentBound,
+  std::shared_ptr<ImageFilter> getImageFilter(float contentScale,
                                               const Matrix3D* transform = nullptr);
 
   RasterizedContent* getRasterizedCache(const DrawArgs& args, const Matrix& renderMatrix);
@@ -604,9 +604,9 @@ class Layer : public std::enable_shared_from_this<Layer> {
                      const Matrix3D* transform);
 
   void onDrawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
-                       const Matrix3D* transform,
-                       const std::function<void(const LayerStyleSource*)>& beforeContentHandler,
-                       const std::function<void(const LayerStyleSource*)>& afterContentHandler);
+                       const Matrix3D* transform = nullptr,
+                       const std::function<void()>& beforeContentHandler = nullptr,
+                       const std::function<void()>& afterContentHandler = nullptr);
 
   void drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha);
 
@@ -666,7 +666,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::shared_ptr<Image> getOffscreenContentImage(
       const DrawArgs& args, const Canvas* canvas, bool passThroughBackground,
       std::shared_ptr<BackgroundContext> subBackgroundContext, std::optional<Rect> clipBounds,
-      Matrix* imageMatrix, const LayerStyleSource* styleSource, const Matrix3D* transform);
+      Matrix* imageMatrix);
 
   /**
    * Returns the equivalent transformation matrix adapted for a custom anchor point.

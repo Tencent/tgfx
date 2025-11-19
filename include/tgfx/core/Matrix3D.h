@@ -159,6 +159,11 @@ class Matrix3D {
   }
 
   /**
+   * Post-concatenates a scale to this matrix. M' = S * M.
+   */
+  void postScale(float sx, float sy, float sz);
+
+  /**
    * Pre-concatenates a rotation to this matrix. M' = M * R.
    */
   void preRotate(const Vec3& axis, float degrees);
@@ -296,11 +301,6 @@ class Matrix3D {
    * Pre-concatenates a scale to this matrix. M' = M * S.
    */
   void preScale(float sx, float sy, float sz);
-
-  /**
-   * Post-concatenates a scale to this matrix. M' = S * M.
-   */
-  void postScale(float sx, float sy, float sz);
 
   /**
    * Returns the transpose of the current matrix.

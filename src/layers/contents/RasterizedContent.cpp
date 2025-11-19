@@ -27,10 +27,27 @@ void RasterizedContent::draw(Canvas* canvas, bool antiAlias, float alpha, BlendM
   paint.setAntiAlias(antiAlias);
   paint.setAlpha(alpha);
   paint.setBlendMode(blendMode);
-  if (transform != nullptr) {
-    paint.setImageFilter(ImageFilter::Transform3D(*transform));
+  if (transform == nullptr) {
+    canvas->drawImage(image, &paint);
+  } else {
+    // Transform describes a transformation based on the layer's coordinate system, but the
+    // rasterized content is only a small sub-rectangle within the layer. We need to calculate an
+    // equivalent affine transformation matrix referenced to the local coordinate system with the
+    // top-left vertex of this sub-rectangle as the origin.
+    auto adaptedMatrix = *transform;
+    auto offsetMatrix = Matrix3D::MakeTranslate(matrix.getTranslateX(), matrix.getTranslateY(), 0);
+    auto invOffsetMatrix =
+        Matrix3D::MakeTranslate(-matrix.getTranslateX(), -matrix.getTranslateY(), 0);
+    auto scaleMatrix = Matrix3D::MakeScale(matrix.getScaleX(), matrix.getScaleY(), 1.0f);
+    auto invScaleMatrix =
+        Matrix3D::MakeScale(1.0f / matrix.getScaleX(), 1.0f / matrix.getScaleY(), 1.0f);
+    adaptedMatrix = invScaleMatrix * invOffsetMatrix * adaptedMatrix * offsetMatrix * scaleMatrix;
+    auto imageFilter = ImageFilter::Transform3D(adaptedMatrix);
+    auto offSet = Point();
+    auto filteredeImage = image->makeWithFilter(imageFilter, &offSet);
+    canvas->concat(Matrix::MakeTrans(offSet.x, offSet.y));
+    canvas->drawImage(filteredeImage, &paint);
   }
-  canvas->drawImage(image, &paint);
   canvas->setMatrix(oldMatrix);
 }
 }  // namespace tgfx

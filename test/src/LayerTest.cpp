@@ -3406,6 +3406,7 @@ TGFX_TEST(LayerTest, Matrix) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D_2D"));
 
   imageLayer->setMatrix3D(imageMatrix3D);
+  imageLayer->setShouldRasterize(true);
   EXPECT_TRUE(imageLayer->matrix().isIdentity());
   auto rect = Rect::MakeXYWH(50, 50, 200, 100);
   Path path = {};

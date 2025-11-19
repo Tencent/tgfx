@@ -219,6 +219,14 @@ const Matrix3D& Matrix3D::I() {
   return identity;
 }
 
+void Matrix3D::postScale(float sx, float sy, float sz) {
+  if (sx == 1 && sy == 1 && sz == 1) {
+    return;
+  }
+  auto m = MakeScale(sx, sy, sz);
+  this->postConcat(m);
+}
+
 void Matrix3D::preRotate(const Vec3& axis, float degrees) {
   auto m = MakeRotate(axis, degrees);
   preConcat(m);
@@ -361,14 +369,6 @@ void Matrix3D::preScale(float sx, float sy, float sz) {
   setColumn(0, c0 * sx);
   setColumn(1, c1 * sy);
   setColumn(2, c2 * sz);
-}
-
-void Matrix3D::postScale(float sx, float sy, float sz) {
-  if (sx == 1 && sy == 1 && sz == 1) {
-    return;
-  }
-  auto m = MakeScale(sx, sy, sz);
-  this->postConcat(m);
 }
 
 Matrix3D Matrix3D::transpose() const {
