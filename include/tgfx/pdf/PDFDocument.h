@@ -20,10 +20,10 @@
 
 #include <memory>
 #include "tgfx/core/Canvas.h"
+#include "tgfx/core/ColorSpaceConverter.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/WriteStream.h"
 #include "tgfx/pdf/PDFMetadata.h"
-#include "tgfx/core/ColorSpaceConverter.h"
 
 namespace tgfx {
 
@@ -40,8 +40,9 @@ class PDFDocument {
    * @param converter The CallBack base class for Convert Color and image.
    * @return A Document object that provides interfaces for import operations.
    */
-  static std::shared_ptr<PDFDocument> Make(std::shared_ptr<WriteStream> stream, Context* context,
-                                           PDFMetadata metadata, std::shared_ptr<ColorSpaceConverter> converter = ColorSpaceConverter::MakeDefaultConverter());
+  static std::shared_ptr<PDFDocument> Make(
+      std::shared_ptr<WriteStream> stream, Context* context, PDFMetadata metadata,
+      std::shared_ptr<ColorSpaceConverter> converter = ColorSpaceConverter::MakeDefaultConverter());
 
   /**
    * Destroy the PDFDocument object

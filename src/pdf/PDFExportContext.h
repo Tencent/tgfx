@@ -86,7 +86,6 @@ class PDFExportContext : public DrawContext {
   }
 
  private:
-
   void reset();
 
   void onDrawPath(const MCState& state, const Path& path, const Fill& fill);

@@ -45,7 +45,8 @@ void Draw(Canvas* canvas, std::shared_ptr<Image> image, Color paintColor) {
 }
 
 Bitmap ImageExportToBitmap(Context* context, const std::shared_ptr<Image>& image) {
-  auto surface = Surface::Make(context, image->width(), image->height(), false, 1, false, 0, image->colorSpace());
+  auto surface = Surface::Make(context, image->width(), image->height(), false, 1, false, 0,
+                               image->colorSpace());
   auto canvas = surface->getCanvas();
   canvas->drawImage(image);
 
@@ -352,7 +353,8 @@ PDFIndirectReference PDFShader::MakeFallbackShader(PDFDocumentImpl* doc,
                 static_cast<float>(size.height) / shaderRect.height()};
 
   auto surface =
-      Surface::Make(doc->context(), size.width, size.height, false, 1, false, 0, ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3));
+      Surface::Make(doc->context(), size.width, size.height, false, 1, false, 0,
+                    ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3));
   DEBUG_ASSERT(surface);
   Canvas* canvas = surface->getCanvas();
   canvas->clear(Color::Transparent());

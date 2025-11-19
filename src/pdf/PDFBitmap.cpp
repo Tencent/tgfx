@@ -287,10 +287,13 @@ void PDFBitmap::SerializeImage(const std::shared_ptr<Image>& image, int /*encodi
   //TODO (YGaurora): is image opaque,encode as jpeg
   Buffer buffer;
   auto image2Pixmap = [&buffer](Context* context, const std::shared_ptr<Image>& image) {
-    auto surface = Surface::Make(context, image->width(), image->height(), false, 1, false, 0, ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3));
+    auto surface =
+        Surface::Make(context, image->width(), image->height(), false, 1, false, 0,
+                      ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3));
     auto canvas = surface->getCanvas();
     canvas->drawImage(image);
-    auto info = ImageInfo::Make(surface->width(), surface->height(), ColorType::BGRA_8888, AlphaType::Unpremultiplied, 0, surface->colorSpace());
+    auto info = ImageInfo::Make(surface->width(), surface->height(), ColorType::BGRA_8888,
+                                AlphaType::Unpremultiplied, 0, surface->colorSpace());
     buffer.alloc(info.byteSize());
     Pixmap pixmap(info, buffer.bytes());
     auto pixels = pixmap.writablePixels();
@@ -305,7 +308,7 @@ void PDFBitmap::SerializeImage(const std::shared_ptr<Image>& image, int /*encodi
   if (pixmap.isEmpty()) {
     return;
   }
-  if(doc->converter()) {
+  if (doc->converter()) {
     pixmap = doc->converter()->convertPixmap(pixmap);
   }
   DoDeflatedImage(pixmap, doc, pixmap.info().isOpaque(), ref);

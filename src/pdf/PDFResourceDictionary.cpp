@@ -44,7 +44,8 @@ std::unique_ptr<PDFArray> MakeProcSet() {
 }
 
 const char* ResourceName(PDFResourceType type) {
-  constexpr const char* ResourceTypeNames[] = {"ExtGState", "Pattern", "XObject", "Font", "ColorSpace"};
+  constexpr const char* ResourceTypeNames[] = {"ExtGState", "Pattern", "XObject", "Font",
+                                               "ColorSpace"};
   return ResourceTypeNames[static_cast<size_t>(type)];
 }
 

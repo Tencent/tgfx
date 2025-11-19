@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFGraphicStackState.h"
+#include "PDFDocumentImpl.h"
 #include "core/MCState.h"
 #include "core/utils/Log.h"
 #include "pdf/PDFUtils.h"
@@ -25,7 +26,6 @@
 #include "tgfx/core/Path.h"
 #include "tgfx/core/PathTypes.h"
 #include "tgfx/core/WriteStream.h"
-#include "PDFDocumentImpl.h"
 
 namespace tgfx {
 

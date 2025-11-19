@@ -28,6 +28,7 @@
 #include "core/filters/InnerShadowImageFilter.h"
 #include "core/filters/ShaderMaskFilter.h"
 #include "core/images/PictureImage.h"
+#include "core/shaders/BlendShader.h"
 #include "core/shaders/ColorShader.h"
 #include "core/shaders/GradientShader.h"
 #include "core/shaders/ImageShader.h"
@@ -73,7 +74,6 @@
 #include "tgfx/core/UTF.h"
 #include "tgfx/core/WriteStream.h"
 #include "tgfx/layers/filters/DropShadowFilter.h"
-#include "core/shaders/BlendShader.h"
 
 namespace tgfx {
 
@@ -595,8 +595,10 @@ void PDFExportContext::drawDropShadowBeforeLayer(const std::shared_ptr<Picture>&
   auto blurBounds = copyFilter->filterBounds(pictureBounds);
   auto offset = Point::Make(pictureBounds.x() - blurBounds.x(), pictureBounds.y() - blurBounds.y());
 
-  auto surface = Surface::Make(document->context(), static_cast<int>(blurBounds.width()),
-                               static_cast<int>(blurBounds.height()), false, 1, false, 0, ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3));
+  auto surface =
+      Surface::Make(document->context(), static_cast<int>(blurBounds.width()),
+                    static_cast<int>(blurBounds.height()), false, 1, false, 0,
+                    ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3));
   DEBUG_ASSERT(surface);
   auto canvas = surface->getCanvas();
 
@@ -627,8 +629,10 @@ void PDFExportContext::drawInnerShadowAfterLayer(const PictureRecord* record,
     return;
   }
 
-  auto surface = Surface::Make(document->context(), static_cast<int>(pictureBounds.width()),
-                               static_cast<int>(pictureBounds.height()), false, 1, false, 0, ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3));
+  auto surface =
+      Surface::Make(document->context(), static_cast<int>(pictureBounds.width()),
+                    static_cast<int>(pictureBounds.height()), false, 1, false, 0,
+                    ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3));
   DEBUG_ASSERT(surface);
   auto canvas = surface->getCanvas();
   canvas->translate(-pictureBounds.x(), -pictureBounds.y());
@@ -675,8 +679,10 @@ void PDFExportContext::drawBlurLayer(const std::shared_ptr<Picture>& picture,
   blurBounds = blurBounds.makeOutset(100, 100);
   Point offset = {pictureBounds.x() - blurBounds.x(), pictureBounds.y() - blurBounds.y()};
 
-  auto surface = Surface::Make(document->context(), static_cast<int>(blurBounds.width()),
-                               static_cast<int>(blurBounds.height()), false, 1, false, 0, ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3));
+  auto surface =
+      Surface::Make(document->context(), static_cast<int>(blurBounds.width()),
+                    static_cast<int>(blurBounds.height()), false, 1, false, 0,
+                    ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3));
   DEBUG_ASSERT(surface);
 
   Canvas* canvas = surface->getCanvas();
@@ -784,8 +790,9 @@ void PDFExportContext::onDrawImageRect(std::shared_ptr<Image> image, const Rect&
   auto modifiedFill = fill;
   if (image->isAlphaOnly() && modifiedFill.colorFilter) {
     // must blend alpha image and shader before applying colorfilter.
-    auto surface = Surface::Make(document->context(), image->width(), image->height(), false, 1,
-                                 false, 0, ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3));
+    auto surface =
+        Surface::Make(document->context(), image->width(), image->height(), false, 1, false, 0,
+                      ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3));
     Canvas* canvas = surface->getCanvas();
     Paint tmpPaint;
     // In the case of alpha images with shaders, the shader's coordinate system is the image's
@@ -903,7 +910,8 @@ std::vector<PDFIndirectReference> Sort(const std::unordered_set<PDFIndirectRefer
 
 std::unique_ptr<PDFDictionary> PDFExportContext::makeResourceDictionary() {
   return MakePDFResourceDictionary(Sort(graphicStateResources), Sort(shaderResources),
-                                   Sort(xObjectResources), Sort(fontResources), Sort(colorSpaceResources));
+                                   Sort(xObjectResources), Sort(fontResources),
+                                   Sort(colorSpaceResources));
 }
 
 bool PDFExportContext::isContentEmpty() {
@@ -944,8 +952,8 @@ bool TreatAsRegularPDFBlendMode(BlendMode blendMode) {
 
 void PopulateGraphicStateEntryFromPaint(
     PDFDocumentImpl* document, const Matrix& matrix, const MCState& state, Rect deviceBounds,
-    const Fill& fill, const Matrix& initialTransform, float textScale, PDFGraphicStackState::Entry* entry,
-    std::unordered_set<PDFIndirectReference>* shaderResources,
+    const Fill& fill, const Matrix& initialTransform, float textScale,
+    PDFGraphicStackState::Entry* entry, std::unordered_set<PDFIndirectReference>* shaderResources,
     std::unordered_set<PDFIndirectReference>* graphicStateResources) {
 
   entry->matrix = state.matrix * matrix;
@@ -1032,11 +1040,11 @@ std::shared_ptr<MemoryWriteStream> PDFExportContext::setUpContentEntry(
   DEBUG_ASSERT(fActiveStackState.contentStream);
   PDFGraphicStackState::Entry entry;
   PopulateGraphicStateEntryFromPaint(document, matrix, state, Rect::MakeSize(_pageSize), fill,
-                                     _initialTransform, scale, &entry,
-                                     &shaderResources, &graphicStateResources);
+                                     _initialTransform, scale, &entry, &shaderResources,
+                                     &graphicStateResources);
   fActiveStackState.updateClip(state);
   fActiveStackState.updateMatrix(entry.matrix);
-  if(document->converter()) {
+  if (document->converter()) {
     entry.color = document->converter()->convertColor(entry.color);
   }
   fActiveStackState.updateDrawingState(entry);

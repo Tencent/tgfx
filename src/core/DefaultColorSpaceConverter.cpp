@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #include "DefaultColorSpaceConverter.h"
 namespace tgfx {
-  std::shared_ptr<ColorSpaceConverter> ColorSpaceConverter::MakeDefaultConverter() {
-    return std::make_shared<DefaultColorSpaceConverter>();
-  }
+std::shared_ptr<ColorSpaceConverter> ColorSpaceConverter::MakeDefaultConverter() {
+  return std::make_shared<DefaultColorSpaceConverter>();
+}
 }  // namespace tgfx

@@ -20,7 +20,7 @@
 #include "tgfx/core/ColorSpaceConverter.h"
 
 namespace tgfx {
-class DefaultColorSpaceConverter : public ColorSpaceConverter{
+class DefaultColorSpaceConverter : public ColorSpaceConverter {
  public:
   DefaultColorSpaceConverter() = default;
   ~DefaultColorSpaceConverter() override = default;

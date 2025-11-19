@@ -20,12 +20,12 @@
 
 #include <limits>
 #include <memory>
+#include <unordered_set>
 #include <utility>
 #include "core/MCState.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/WriteStream.h"
-#include <unordered_set>
 
 namespace tgfx {
 class ColorSpaceConverter;
@@ -53,8 +53,11 @@ struct PDFGraphicStackState {
   std::shared_ptr<MemoryWriteStream> contentStream;
   PDFDocumentImpl* document;
   std::unordered_set<PDFIndirectReference>* colorSpaceResources;
-  explicit PDFGraphicStackState(std::shared_ptr<MemoryWriteStream> stream = nullptr, PDFDocumentImpl* doc = nullptr, std::unordered_set<PDFIndirectReference>* colorSpaceResources = nullptr)
-      : contentStream(std::move(stream)), document(std::move(doc)), colorSpaceResources(colorSpaceResources) {
+  explicit PDFGraphicStackState(
+      std::shared_ptr<MemoryWriteStream> stream = nullptr, PDFDocumentImpl* doc = nullptr,
+      std::unordered_set<PDFIndirectReference>* colorSpaceResources = nullptr)
+      : contentStream(std::move(stream)), document(std::move(doc)),
+        colorSpaceResources(colorSpaceResources) {
   }
 
   void updateClip(const MCState& state);

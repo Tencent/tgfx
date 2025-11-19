@@ -34,7 +34,8 @@
 namespace tgfx {
 
 std::shared_ptr<PDFDocument> PDFDocument::Make(std::shared_ptr<WriteStream> stream,
-                                               Context* context, PDFMetadata metadata, std::shared_ptr<ColorSpaceConverter> converter) {
+                                               Context* context, PDFMetadata metadata,
+                                               std::shared_ptr<ColorSpaceConverter> converter) {
   if (!stream || !context) {
     return nullptr;
   }
@@ -492,11 +493,11 @@ void PDFDocumentImpl::endObject() {
 }
 
 PDFIndirectReference PDFDocumentImpl::emitColorSpace(std::shared_ptr<ColorSpace> colorSpace) {
-  if(colorSpace == nullptr) {
+  if (colorSpace == nullptr) {
     colorSpace = ColorSpace::SRGB();
   }
   auto hash = colorSpace->hash();
-  if(_colorSpaceMap.find(hash) != _colorSpaceMap.end()) {
+  if (_colorSpaceMap.find(hash) != _colorSpaceMap.end()) {
     return _colorSpaceMap[hash];
   }
   auto colorSpaceDictionary = PDFDictionary::Make();

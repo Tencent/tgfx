@@ -77,7 +77,8 @@ struct PDFLink {
 
 class PDFDocumentImpl : public PDFDocument {
  public:
-  PDFDocumentImpl(std::shared_ptr<WriteStream> stream, Context* context, PDFMetadata Metadata, std::shared_ptr<ColorSpaceConverter> converter);
+  PDFDocumentImpl(std::shared_ptr<WriteStream> stream, Context* context, PDFMetadata Metadata,
+                  std::shared_ptr<ColorSpaceConverter> converter);
 
   ~PDFDocumentImpl() override;
 

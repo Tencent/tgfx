@@ -22,11 +22,11 @@
 #include "tgfx/core/Pixmap.h"
 
 namespace tgfx {
-  class ColorSpaceConverter {
-  public:
-    static std::shared_ptr<ColorSpaceConverter> MakeDefaultConverter();
-    virtual ~ColorSpaceConverter() = default;
-    virtual Color convertColor(const Color& color) const = 0;
-    virtual Pixmap convertPixmap(const Pixmap& pixmap) const = 0;
-  };
+class ColorSpaceConverter {
+ public:
+  static std::shared_ptr<ColorSpaceConverter> MakeDefaultConverter();
+  virtual ~ColorSpaceConverter() = default;
+  virtual Color convertColor(const Color& color) const = 0;
+  virtual Pixmap convertPixmap(const Pixmap& pixmap) const = 0;
+};
 }  // namespace tgfx
