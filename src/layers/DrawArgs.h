@@ -35,7 +35,7 @@ class DrawArgs {
   DrawArgs() = default;
 
   DrawArgs(Context* context, bool excludeEffects = false, DrawMode drawMode = DrawMode::Normal,
-           std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB())
+           std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB())
       : context(context), excludeEffects(excludeEffects), drawMode(drawMode),
         dstColorSpace(std::move(colorSpace)) {
   }
@@ -57,7 +57,7 @@ class DrawArgs {
   std::shared_ptr<BackgroundContext> blurBackground = nullptr;
   // Indicates whether to force drawing the background, even if there are no background styles.
   bool forceDrawBackground = false;
-  std::shared_ptr<ColorSpace> dstColorSpace = ColorSpace::MakeSRGB();
+  std::shared_ptr<ColorSpace> dstColorSpace = ColorSpace::SRGB();
 
   // Only used while recording layer's background image.
   std::shared_ptr<BackgroundContext> blendModeBackground = nullptr;

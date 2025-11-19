@@ -54,7 +54,7 @@ class WebImageBuffer : public ImageBuffer {
   }
 
   std::shared_ptr<ColorSpace> colorSpace() const override {
-    return ColorSpace::MakeSRGB();
+    return ColorSpace::SRGB();
   }
 
  protected:

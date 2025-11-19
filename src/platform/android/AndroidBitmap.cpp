@@ -115,7 +115,7 @@ HardwareBufferRef AndroidBitmap::GetHardwareBuffer(JNIEnv* env, jobject bitmap) 
 
 std::shared_ptr<ColorSpace> AndroidBitmap::GetColorSpace(JNIEnv* env, jobject bitmap) {
   if (env == nullptr || bitmap == nullptr) {
-    return ColorSpace::MakeSRGB();
+    return ColorSpace::SRGB();
   }
   if (Bitmap_getColorSpace) {
     jobject colorSpaceObj = env->CallObjectMethod(bitmap, Bitmap_getColorSpace);
@@ -128,6 +128,6 @@ std::shared_ptr<ColorSpace> AndroidBitmap::GetColorSpace(JNIEnv* env, jobject bi
       return AndroidDataSpaceToColorSpace(standard, transfer);
     }
   }
-  return ColorSpace::MakeSRGB();
+  return ColorSpace::SRGB();
 }
 }  // namespace tgfx

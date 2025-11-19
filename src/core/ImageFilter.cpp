@@ -105,9 +105,12 @@ PlacementPtr<FragmentProcessor> ImageFilter::makeFPFromTextureProxy(
     fpMatrix.preConcat(*uvMatrix);
   }
   SamplingArgs samplingArgs = {TileMode::Decal, TileMode::Decal, sampling, constraint};
+  auto allocator = args.context->drawingAllocator();
   if (dstBounds.contains(clipBounds)) {
-    return TextureEffect::Make(std::move(textureProxy), samplingArgs, &fpMatrix, isAlphaOnly);
+    return TextureEffect::Make(allocator, std::move(textureProxy), samplingArgs, &fpMatrix,
+                               isAlphaOnly);
   }
-  return TiledTextureEffect::Make(std::move(textureProxy), samplingArgs, &fpMatrix, isAlphaOnly);
+  return TiledTextureEffect::Make(allocator, std::move(textureProxy), samplingArgs, &fpMatrix,
+                                  isAlphaOnly);
 }
 }  // namespace tgfx

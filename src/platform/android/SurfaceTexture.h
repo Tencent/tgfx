@@ -70,7 +70,7 @@ class SurfaceTexture : public ImageStream {
   Global<jobject> surface;
   Global<jobject> surfaceTexture;
   bool frameAvailable = false;
-  std::shared_ptr<ColorSpace> _colorSpace = ColorSpace::MakeSRGB();
+  std::shared_ptr<ColorSpace> _colorSpace = ColorSpace::SRGB();
 
   static void JNIInit(JNIEnv* env);
 

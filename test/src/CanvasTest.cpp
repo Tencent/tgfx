@@ -2455,6 +2455,9 @@ TGFX_TEST(CanvasTest, emojiTextStrokeBlending) {
   auto serifTypeface =
       Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
   ASSERT_TRUE(serifTypeface != nullptr);
+  auto emojiTypeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoColorEmoji.ttf"));
+  ASSERT_TRUE(emojiTypeface != nullptr);
 
   ContextScope scope;
   auto context = scope.getContext();
@@ -2494,7 +2497,7 @@ TGFX_TEST(CanvasTest, emojiTextStrokeBlending) {
     float y = 80 + i * 80;
 
     // Process emoji text using TextShaper
-    auto emojiPositionedGlyphs = TextShaper::Shape(emojiText, serifTypeface);
+    auto emojiPositionedGlyphs = TextShaper::Shape(emojiText, emojiTypeface);
     struct TextRun {
       std::vector<GlyphID> ids;
       std::vector<Point> positions;
@@ -2518,22 +2521,12 @@ TGFX_TEST(CanvasTest, emojiTextStrokeBlending) {
       emojiX += emojiRun->font.getAdvance(glyphID);
     }
 
-    // Draw emoji with stroke and fill
-    Paint emojiStrokePaint;
-    emojiStrokePaint.setColor(Color::White());
-    emojiStrokePaint.setStyle(PaintStyle::Stroke);
-    emojiStrokePaint.setStrokeWidth(3.0f);
-    emojiStrokePaint.setBlendMode(blendMode);
-
-    Paint emojiFillPaint;
-    emojiFillPaint.setColor(Color::FromRGBA(255, 200, 100, 200));
-    emojiFillPaint.setBlendMode(blendMode);
+    Paint emojiPaint;
+    emojiPaint.setBlendMode(blendMode);
 
     for (const auto& textRun : emojiTextRuns) {
       canvas->drawGlyphs(textRun.ids.data(), textRun.positions.data(), textRun.ids.size(),
-                         textRun.font, emojiStrokePaint);
-      canvas->drawGlyphs(textRun.ids.data(), textRun.positions.data(), textRun.ids.size(),
-                         textRun.font, emojiFillPaint);
+                         textRun.font, emojiPaint);
     }
 
     // Process normal text using TextShaper
@@ -2583,6 +2576,9 @@ TGFX_TEST(CanvasTest, textEmojiOverlayBlendModes) {
   auto serifTypeface =
       Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
   ASSERT_TRUE(serifTypeface != nullptr);
+  auto emojiTypeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoColorEmoji.ttf"));
+  ASSERT_TRUE(emojiTypeface != nullptr);
 
   ContextScope scope;
   auto context = scope.getContext();
@@ -2674,7 +2670,7 @@ TGFX_TEST(CanvasTest, textEmojiOverlayBlendModes) {
     }
 
     // Then overlay emoji with different blend modes
-    auto emojiPositionedGlyphs = TextShaper::Shape(emojiText, serifTypeface);
+    auto emojiPositionedGlyphs = TextShaper::Shape(emojiText, emojiTypeface);
     std::vector<TextRun> emojiTextRuns;
     TextRun* emojiRun = nullptr;
     auto emojiCount = emojiPositionedGlyphs.glyphCount();
@@ -3184,8 +3180,8 @@ TGFX_TEST(CanvasTest, ConvertColorSpace) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 1024, 1024, false, 1, false, 0,
-                               ColorSpace::MakeSRGB()->makeColorSpin());
+  auto surface =
+      Surface::Make(context, 1024, 1024, false, 1, false, 0, ColorSpace::SRGB()->makeColorSpin());
   auto canvas = surface->getCanvas();
   const TransferFunction tfs[] = {
       NamedTransferFunction::SRGB,

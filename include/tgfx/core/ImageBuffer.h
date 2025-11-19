@@ -60,7 +60,7 @@ class ImageBuffer {
    */
   static std::shared_ptr<ImageBuffer> MakeFrom(
       HardwareBufferRef hardwareBuffer,
-      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB());
 
   /**
    * Creates an ImageBuffer in the I420 format with the specified YUVData and YUVColorSpace. The

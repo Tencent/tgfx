@@ -94,7 +94,7 @@ class ImageCodec : public ImageGenerator {
 
  protected:
   ImageCodec(int width, int height, Orientation orientation = Orientation::TopLeft,
-             std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB())
+             std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB())
       : ImageGenerator(width, height, std::move(colorSpace)), _orientation(orientation) {
   }
 

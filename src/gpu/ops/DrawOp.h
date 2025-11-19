@@ -60,6 +60,7 @@ class DrawOp {
   void execute(RenderPass* renderPass, RenderTarget* renderTarget);
 
  protected:
+  BlockAllocator* allocator = nullptr;
   AAType aaType = AAType::None;
   Rect scissorRect = {};
   std::vector<PlacementPtr<FragmentProcessor>> colors = {};
@@ -68,7 +69,7 @@ class DrawOp {
   BlendMode blendMode = BlendMode::SrcOver;
   CullFaceType cullFaceType = CullFaceType::None;
 
-  explicit DrawOp(AAType aaType) : aaType(aaType) {
+  DrawOp(BlockAllocator* allocator, AAType aaType) : allocator(allocator), aaType(aaType) {
   }
 
   virtual PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) = 0;

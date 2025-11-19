@@ -125,7 +125,7 @@ std::shared_ptr<ImageCodec> JpegCodec::MakeFromData(const std::string& filePath,
       cs = ColorSpace::MakeFromICC(iccProfileData.data(), iccProfileData.size());
     }
     if (!cs) {
-      cs = ColorSpace::MakeSRGB();
+      cs = ColorSpace::SRGB();
     }
   } while (false);
   jpeg_destroy_decompress(&cinfo);
@@ -314,7 +314,7 @@ bool JpegCodec::readScaledPixels(ColorType colorType, AlphaType alphaType, size_
   if (result) {
     if (!pixmap.isEmpty()) {
       pixmap.readPixels(dstInfo, dstPixels);
-    } else if (!NeedConvertColorSpace(colorSpace(), dstColorSpace)) {
+    } else if (NeedConvertColorSpace(colorSpace(), dstColorSpace)) {
       ConvertColorSpaceInPlace(static_cast<int>(dstWidth), static_cast<int>(dstHeight), colorType,
                                alphaType, dstRowBytes, colorSpace(), dstColorSpace, dstPixels);
     }

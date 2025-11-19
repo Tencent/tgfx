@@ -85,7 +85,7 @@ std::shared_ptr<Picture> Layer::RecordPicture(DrawMode mode, float contentScale,
 
 static std::shared_ptr<Image> ToImageWithOffset(
     std::shared_ptr<Picture> picture, Point* offset, const Rect* imageBounds = nullptr,
-    std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB()) {
+    std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB()) {
   if (picture == nullptr) {
     return nullptr;
   }

@@ -382,7 +382,7 @@ TGFX_TEST(PDFExportTest, ColorSpaceTest) {
       0, 255, 0, 255, ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3)));
   document->endPage();
   canvas = document->beginPage(256.f, 256.f);
-  canvas->drawColor(Color::FromRGBA(0, 255, 0, 255, ColorSpace::MakeSRGB()));
+  canvas->drawColor(Color::FromRGBA(0, 255, 0, 255, ColorSpace::SRGB()));
   document->endPage();
   canvas = document->beginPage(2048.f, 2048.f);
   auto image = MakeImage("resources/apitest/green_p3.png");
