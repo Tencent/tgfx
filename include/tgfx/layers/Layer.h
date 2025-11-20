@@ -527,10 +527,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
    * @param alpha The alpha transparency value used for drawing the layer and its children.
    * @param blendMode The blend mode used to composite the layer with the existing content on the
    * canvas.
-   * @param transform The transform used to draw the layer.
    */
-  void draw(Canvas* canvas, float alpha = 1.0f, BlendMode blendMode = BlendMode::SrcOver,
-            const Matrix3D* transform = nullptr);
+  void draw(Canvas* canvas, float alpha = 1.0f, BlendMode blendMode = BlendMode::SrcOver);
 
  protected:
   Layer();

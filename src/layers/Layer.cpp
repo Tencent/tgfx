@@ -664,7 +664,7 @@ static Rect GetClippedBounds(const Rect& bounds, const Canvas* canvas) {
   return clippedBounds;
 }
 
-void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode, const Matrix3D* transform) {
+void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   if (canvas == nullptr || alpha <= 0) {
     return;
   }
@@ -763,7 +763,7 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode, const Matrix3
       args.blurBackground = std::move(backgroundContext);
     }
   }
-  drawLayer(args, canvas, alpha, blendMode, transform);
+  drawLayer(args, canvas, alpha, blendMode, nullptr);
 }
 
 void Layer::invalidateContent() {
