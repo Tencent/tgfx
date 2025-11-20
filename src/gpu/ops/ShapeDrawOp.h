@@ -45,8 +45,8 @@ class ShapeDrawOp : public DrawOp {
   PMColor color = PMColor::Transparent();
   Matrix uvMatrix = {};
 
-  ShapeDrawOp(std::shared_ptr<GPUShapeProxy> proxy, PMColor color, const Matrix& uvMatrix,
-              AAType aaType);
+  ShapeDrawOp(BlockAllocator* allocator, std::shared_ptr<GPUShapeProxy> proxy, PMColor color,
+              const Matrix& uvMatrix, AAType aaType);
 
   friend class BlockAllocator;
 };

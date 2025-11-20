@@ -70,7 +70,7 @@ class RRectDrawOp : public DrawOp {
   std::shared_ptr<GPUBufferProxy> indexBufferProxy = nullptr;
   std::shared_ptr<VertexBufferView> vertexBufferProxyView = nullptr;
 
-  explicit RRectDrawOp(RRectsVertexProvider* provider);
+  RRectDrawOp(BlockAllocator* allocator, RRectsVertexProvider* provider);
 
   friend class BlockAllocator;
 };

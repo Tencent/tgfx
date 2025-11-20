@@ -18,13 +18,20 @@
 
 #pragma once
 
+#include "core/utils/BlockAllocator.h"
 #include "tgfx/gpu/CommandEncoder.h"
 
 namespace tgfx {
 class RenderTask {
  public:
+  explicit RenderTask(BlockAllocator* allocator) : allocator(allocator) {
+  }
+
   virtual ~RenderTask() = default;
 
   virtual void execute(CommandEncoder* encoder) = 0;
+
+ protected:
+  BlockAllocator* allocator = nullptr;
 };
 }  // namespace tgfx

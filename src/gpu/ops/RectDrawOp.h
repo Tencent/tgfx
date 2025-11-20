@@ -96,7 +96,7 @@ class RectDrawOp : public DrawOp {
   std::shared_ptr<GPUBufferProxy> indexBufferProxy = nullptr;
   std::shared_ptr<VertexBufferView> vertexBufferProxyView = nullptr;
 
-  explicit RectDrawOp(RectsVertexProvider* provider);
+  RectDrawOp(BlockAllocator* allocator, RectsVertexProvider* provider);
 
   friend class BlockAllocator;
 };
