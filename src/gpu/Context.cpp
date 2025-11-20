@@ -69,7 +69,9 @@ bool Context::wait(const BackendSemaphore& waitSemaphore) {
 }
 
 bool Context::flush(BackendSemaphore* signalSemaphore) {
-  _resourceCache->processUnreferencedResources();
+  // Purge resources before flushing to ensure all GPU work from the previous frame is complete
+  // before releasing them, preventing sync stalls from early cleanup.
+  _resourceCache->advanceFrameAndPurge();
   _atlasManager->preFlush();
   commandBuffer = _drawingManager->flush();
   if (commandBuffer == nullptr) {
@@ -83,7 +85,6 @@ bool Context::flush(BackendSemaphore* signalSemaphore) {
   }
   _atlasManager->postFlush();
   _proxyProvider->purgeExpiredProxies();
-  _resourceCache->advanceFrameAndPurge();
   _maxValueTracker->addValue(_drawingAllocator->size());
   _drawingAllocator->clear(_maxValueTracker->getMaxValue());
 
