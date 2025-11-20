@@ -73,7 +73,7 @@ RasterizedContent* LayerCache::getCachedImage(const Layer* layer, float contentS
   }
 
   auto& entry = it->second;
-  if (std::abs(entry.contentScale - contentScale) > 1e-6f) {
+  if (entry.contentScale < contentScale) {
     return nullptr;
   }
 
