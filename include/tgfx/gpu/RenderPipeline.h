@@ -254,23 +254,13 @@ class DepthStencilDescriptor {
 };
 
 /**
- * The winding order that determines which polygons are considered front-facing.
- */
-enum class FrontFaceDirection {
-  /**
-   * The front face vertex order is clockwise
-   */
-  CW,
-  /**
-   * The front face vertex order is counterclockwise
-   */
-  CCW
-};
-
-/**
  * The culling mode: specifies whether to cull front faces, back faces, or both.
  */
-enum class CullFaceMode {
+enum class CullMode {
+  /**
+   * No faces are culled
+   */
+  None,
   /**
    * Cull front faces
    */
@@ -286,24 +276,33 @@ enum class CullFaceMode {
 };
 
 /**
+ * The winding order that determines which polygons are considered front-facing.
+ */
+enum class FrontFace {
+  /**
+   * The front face vertex order is clockwise
+   */
+  CW,
+  /**
+   * The front face vertex order is counterclockwise
+   */
+  CCW
+};
+
+/**
  * PrimitiveDescriptor defines the face culling configuration for a render pipeline.
  */
 class PrimitiveDescriptor {
  public:
   /**
-   * Enables or disables face culling.
-   */
-  bool enabled = false;
+ * The culling mode: determines which faces (none, front, back, or both) are culled.
+ */
+  CullMode cullMode = CullMode::None;
 
   /**
    * The winding order used to identify front-facing polygons.
    */
-  FrontFaceDirection frontDirection = FrontFaceDirection::CCW;
-
-  /**
-   * The culling mode: determines which faces (front, back, or both) are culled.
-   */
-  CullFaceMode mode = CullFaceMode::Back;
+  FrontFace frontFace = FrontFace::CCW;
 };
 
 /**

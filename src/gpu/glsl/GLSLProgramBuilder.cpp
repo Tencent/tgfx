@@ -104,31 +104,6 @@ static std::string SLTypeString(SLType t) {
   return "";
 }
 
-static PrimitiveDescriptor MakePrimitiveDescriptor(CullFaceType cullFaceType) {
-  // Although the vertexProvider constructs the rectangle in a counterclockwise order, the model
-  // uses a coordinate system with the Y-axis pointing downward, which is opposite to OpenGL's
-  // default Y-axis direction (upward). Therefore, it is necessary to define the clockwise
-  // direction as the front face, which is the opposite of OpenGL's default.
-  PrimitiveDescriptor descriptor = {false, FrontFaceDirection::CW, CullFaceMode::Back};
-  switch (cullFaceType) {
-    case CullFaceType::None:
-      break;
-    case CullFaceType::Front:
-      descriptor.enabled = true;
-      descriptor.mode = CullFaceMode::Front;
-      break;
-    case CullFaceType::Back:
-      descriptor.enabled = true;
-      descriptor.mode = CullFaceMode::Back;
-      break;
-    case CullFaceType::FrontAndBack:
-      descriptor.enabled = true;
-      descriptor.mode = CullFaceMode::FrontAndBack;
-      break;
-  }
-  return descriptor;
-}
-
 std::shared_ptr<Program> ProgramBuilder::CreateProgram(Context* context,
                                                        const ProgramInfo* programInfo) {
   GLSLProgramBuilder builder(context, programInfo);
@@ -226,7 +201,11 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
   for (const auto& sampler : _uniformHandler.getSamplers()) {
     descriptor.layout.textureSamplers.emplace_back(sampler.name(), textureBinding++);
   }
-  descriptor.primitive = MakePrimitiveDescriptor(programInfo->getCullFaceType());
+  // Although the vertexProvider constructs the rectangle in a counterclockwise order, the model
+  // uses a coordinate system with the Y-axis pointing downward, which is opposite to OpenGL's
+  // default Y-axis direction (upward). Therefore, it is necessary to define the clockwise
+  // direction as the front face, which is the opposite of OpenGL's default.
+  descriptor.primitive = {programInfo->getCullMode(), FrontFace::CW};
   auto pipeline = gpu->createRenderPipeline(descriptor);
   if (pipeline == nullptr) {
     return nullptr;

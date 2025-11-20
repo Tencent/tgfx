@@ -42,9 +42,9 @@ unsigned ToGLBlendOperation(BlendOperation blendOperation);
 
 unsigned ToGLCompareFunction(CompareFunction compare);
 
-unsigned ToGLFrontFaceDirection(FrontFaceDirection direction);
+unsigned ToGLFrontFace(FrontFace frontFace);
 
-unsigned ToGLCullFaceMode(CullFaceMode mode);
+unsigned ToGLCullMode(CullMode mode);
 
 unsigned ToGLStencilOperation(StencilOperation stencilOp);
 

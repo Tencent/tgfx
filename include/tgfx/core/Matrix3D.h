@@ -56,8 +56,9 @@ class Matrix3D {
    *       | 0         0         0  1        |
    */
   explicit Matrix3D(const Matrix& m)
-      : Matrix3D(m.get(0), m.get(3), 0, 0, m.get(1), m.get(4), 0, 0, 0, 0, 1, 0, m.get(2), m.get(5),
-                 0, 1) {
+      : Matrix3D(m.values[Matrix::SCALE_X], m.values[Matrix::SKEW_Y], 0, 0,
+                 m.values[Matrix::SKEW_X], m.values[Matrix::SCALE_Y], 0, 0, 0, 0, 1, 0,
+                 m.values[Matrix::TRANS_X], m.values[Matrix::TRANS_Y], 0, 1) {
   }
 
   /**

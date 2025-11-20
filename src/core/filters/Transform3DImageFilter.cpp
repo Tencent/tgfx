@@ -122,7 +122,7 @@ std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
       TextureEffect::Make(allocator, std::move(sourceTextureProxy), samplingArgs, &uvMatrix);
   drawOp->addColorFP(std::move(fragmentProcessor));
   if (_hideBackFace) {
-    drawOp->setCullFaceType(CullFaceType::Back);
+    drawOp->setCullMode(CullMode::Back);
   }
   std::vector<PlacementPtr<DrawOp>> drawOps;
   drawOps.emplace_back(std::move(drawOp));

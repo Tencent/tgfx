@@ -185,12 +185,12 @@ static std::unique_ptr<GLBlendState> MakeBlendState(const PipelineColorAttachmen
 }
 
 static std::unique_ptr<GLCullFaceState> MakeCullFaceState(const PrimitiveDescriptor& descriptor) {
-  if (!descriptor.enabled) {
+  if (descriptor.cullMode == CullMode::None) {
     return nullptr;
   }
   auto cullFaceState = std::make_unique<GLCullFaceState>();
-  cullFaceState->frontFace = ToGLFrontFaceDirection(descriptor.frontDirection);
-  cullFaceState->cullFace = ToGLCullFaceMode(descriptor.mode);
+  cullFaceState->cullFace = ToGLCullMode(descriptor.cullMode);
+  cullFaceState->frontFace = ToGLFrontFace(descriptor.frontFace);
   return cullFaceState;
 }
 
