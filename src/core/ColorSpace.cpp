@@ -639,7 +639,8 @@ static std::shared_ptr<ColorSpace> SSRGB =
 static std::shared_ptr<ColorSpace> SSRGBLinear =
     std::make_shared<ColorSpace>(NamedTransferFunction::Linear, NamedGamut::SRGB);
 
-static std::shared_ptr<ColorSpace> SDisplayP3 = std::make_shared<ColorSpace>(NamedTransferFunction::SRGB, NamedGamut::DisplayP3);
+static std::shared_ptr<ColorSpace> SDisplayP3 =
+    std::make_shared<ColorSpace>(NamedTransferFunction::SRGB, NamedGamut::DisplayP3);
 
 std::shared_ptr<ColorSpace> ColorSpace::SRGB() {
   return SSRGB;
