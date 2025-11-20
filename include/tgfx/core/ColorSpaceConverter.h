@@ -22,11 +22,36 @@
 #include "tgfx/core/Pixmap.h"
 
 namespace tgfx {
+
+/**
+ * ImageData contains imageinfo and data for ColorSpaceConverter.
+ */
+struct ImageData {
+  ImageInfo info = ImageInfo{};
+  std::shared_ptr<Data> data = nullptr;
+};
+
+/**
+ * ColorSpaceConverteris an abstract callback base class for the PDF and SVG exporters. Users can
+ * inherit from this class to implement custom color and image conversion logic.
+ */
 class ColorSpaceConverter {
  public:
+  /**
+   * Create a default converter that performs no conversion.
+   */
   static std::shared_ptr<ColorSpaceConverter> MakeDefaultConverter();
-  virtual ~ColorSpaceConverter() = default;
+
+  /**
+   * Pure virtual function for Color conversion.
+   */
   virtual Color convertColor(const Color& color) const = 0;
-  virtual Pixmap convertPixmap(const Pixmap& pixmap) const = 0;
+
+  /**
+   * Pure virtual function for image conversion.
+   */
+  virtual ImageData convertImage(const ImageData& imageData) const = 0;
+
+  virtual ~ColorSpaceConverter() = default;
 };
 }  // namespace tgfx

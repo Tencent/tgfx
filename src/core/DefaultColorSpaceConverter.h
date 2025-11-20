@@ -27,8 +27,8 @@ class DefaultColorSpaceConverter : public ColorSpaceConverter {
   Color convertColor(const Color& color) const override {
     return color;
   }
-  Pixmap convertPixmap(const Pixmap& pixmap) const override {
-    return pixmap;
+  ImageData convertImage(const ImageData& imageData) const override {
+    return imageData;
   }
 };
 }  // namespace tgfx

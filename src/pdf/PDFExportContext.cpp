@@ -1047,7 +1047,7 @@ std::shared_ptr<MemoryWriteStream> PDFExportContext::setUpContentEntry(
   if (document->converter()) {
     entry.color = document->converter()->convertColor(entry.color);
   }
-  if(!entry.color.colorSpace) {
+  if (!entry.color.colorSpace) {
     entry.color.colorSpace = ColorSpace::SRGB();
   }
   fActiveStackState.updateDrawingState(entry);

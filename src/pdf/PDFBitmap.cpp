@@ -285,8 +285,7 @@ void DoDeflatedImage(const Pixmap& pixmap, PDFDocumentImpl* document, bool isOpa
 void PDFBitmap::SerializeImage(const std::shared_ptr<Image>& image, int /*encodingQuality*/,
                                PDFDocumentImpl* doc, PDFIndirectReference ref) {
   //TODO (YGaurora): is image opaque,encode as jpeg
-  Buffer buffer;
-  auto image2Pixmap = [&buffer](Context* context, const std::shared_ptr<Image>& image) {
+  auto image2ImageData = [](Context* context, const std::shared_ptr<Image>& image) {
     auto surface =
         Surface::Make(context, image->width(), image->height(), false, 1, false, 0,
                       ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3));
@@ -294,23 +293,22 @@ void PDFBitmap::SerializeImage(const std::shared_ptr<Image>& image, int /*encodi
     canvas->drawImage(image);
     auto info = ImageInfo::Make(surface->width(), surface->height(), ColorType::BGRA_8888,
                                 AlphaType::Unpremultiplied, 0, surface->colorSpace());
+    Buffer buffer;
     buffer.alloc(info.byteSize());
-    Pixmap pixmap(info, buffer.bytes());
-    auto pixels = pixmap.writablePixels();
-    //bitmap in pdf must be unpremultiplied
-    if (surface->readPixels(info, pixels)) {
-      return pixmap;
+    if (surface->readPixels(info, buffer.bytes())) {
+      return ImageData{info, Data::MakeWithCopy(buffer.bytes(), buffer.size())};
     }
-    return Pixmap{};
+    return ImageData{};
   };
 
-  auto pixmap = image2Pixmap(doc->context(), image);
-  if (pixmap.isEmpty()) {
+  auto imageData = image2ImageData(doc->context(), image);
+  if (imageData.data == nullptr || imageData.info.isEmpty()) {
     return;
   }
   if (doc->converter()) {
-    pixmap = doc->converter()->convertPixmap(pixmap);
+    imageData = doc->converter()->convertImage(imageData);
   }
+  Pixmap pixmap{imageData.info, imageData.data->bytes()};
   DoDeflatedImage(pixmap, doc, pixmap.info().isOpaque(), ref);
 }
 
