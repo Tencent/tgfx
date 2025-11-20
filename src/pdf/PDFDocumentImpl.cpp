@@ -264,7 +264,7 @@ std::vector<const PDFFont*> get_fonts(const PDFDocumentImpl& canon) {
 
 PDFDocumentImpl::PDFDocumentImpl(std::shared_ptr<WriteStream> stream, Context* context,
                                  PDFMetadata meta, std::shared_ptr<ColorSpaceConverter> converter)
-    : _stream(std::move(stream)), _context(context), _metadata(std::move(meta)) {
+    : _stream(std::move(stream)), _context(context), _metadata(std::move(meta)), _converter(std::move(converter)) {
   if (_metadata.rasterDPI != ScalarDefaultRasterDPI) {
     inverseRasterScale = ScalarDefaultRasterDPI / _metadata.rasterDPI;
     rasterScale = _metadata.rasterDPI / ScalarDefaultRasterDPI;
@@ -272,7 +272,6 @@ PDFDocumentImpl::PDFDocumentImpl(std::shared_ptr<WriteStream> stream, Context* c
   if (_metadata.structureElementTreeRoot) {
     tagTree.init(_metadata.structureElementTreeRoot, _metadata.outline);
   }
-  _converter = converter;
 }
 
 PDFDocumentImpl::~PDFDocumentImpl() {

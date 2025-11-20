@@ -28,12 +28,9 @@
 #include "tgfx/core/WriteStream.h"
 
 namespace tgfx {
-class ColorSpaceConverter;
-}
-
-namespace tgfx {
 struct PDFIndirectReference;
 class PDFDocumentImpl;
+class ColorSpaceConverter;
 struct PDFGraphicStackState {
   struct Entry {
     Matrix matrix = Matrix::I();

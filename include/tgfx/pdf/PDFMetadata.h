@@ -220,7 +220,7 @@ struct PDFMetadata {
     HighButSlow = 9,
   };
 
-  CompressionLevel compressionLevel = CompressionLevel::None;
+  CompressionLevel compressionLevel = CompressionLevel::Default;
 };
 
 }  // namespace tgfx
