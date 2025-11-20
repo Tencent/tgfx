@@ -18,6 +18,7 @@
 
 #include "InnerShadowImageFilter.h"
 #include "core/images/TextureImage.h"
+#include "core/utils/ColorHelper.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
@@ -67,7 +68,7 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::getShadowFragmentProcess
     invertShadowMask =
         ConstColorProcessor::Make(allocator, PMColor::Transparent(), InputMode::Ignore);
   }
-  auto dstColor = color.makeColorSpaceWithPremultiply(source->colorSpace());
+  auto dstColor = ToPMColor(color, source->colorSpace());
   auto colorProcessor = ConstColorProcessor::Make(allocator, dstColor, InputMode::Ignore);
 
   // get shadow mask and fill it with color

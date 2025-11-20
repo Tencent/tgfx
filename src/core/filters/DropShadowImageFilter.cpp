@@ -18,6 +18,7 @@
 
 #include "DropShadowImageFilter.h"
 #include "core/images/TextureImage.h"
+#include "core/utils/ColorHelper.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
@@ -99,7 +100,7 @@ PlacementPtr<FragmentProcessor> DropShadowImageFilter::getShadowFragmentProcesso
     return nullptr;
   }
   auto allocator = args.context->drawingAllocator();
-  auto dstColor = color.makeColorSpaceWithPremultiply(source->colorSpace());
+  auto dstColor = ToPMColor(color, source->colorSpace());
   auto colorProcessor = ConstColorProcessor::Make(allocator, dstColor, InputMode::Ignore);
   return XfermodeFragmentProcessor::MakeFromTwoProcessors(
       allocator, std::move(colorProcessor), std::move(shadowProcessor), BlendMode::SrcIn);

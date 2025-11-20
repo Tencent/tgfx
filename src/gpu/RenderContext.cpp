@@ -195,7 +195,7 @@ RenderContext::RenderContext(std::shared_ptr<RenderTargetProxy> proxy, uint32_t 
   if (clearAll) {
     auto drawingManager = renderTarget->getContext()->drawingManager();
     opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags,
-                                                     Color::Transparent(), _colorSpace);
+                                                     PMColor::Transparent(), _colorSpace);
   }
 }
 

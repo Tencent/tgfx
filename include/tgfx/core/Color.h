@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include <assert.h>
+#include <cassert>
 #include <cfloat>
 #include <cinttypes>
 #include <limits>
@@ -137,20 +137,13 @@ struct RGBA4f {
   std::shared_ptr<ColorSpace> colorSpace = nullptr;
 
   /**
-   * Compares Color with other, and returns true if all components are equal.
+   * Compares Color with other, and returns true if all components are equal. For performance
+   * reasons, the comparison of internal colorspaces is done by merely checking if the pointer
+   * addresses are equal.
    */
   bool operator==(const RGBA4f& other) const {
-    auto thisColorSpace = colorSpace;
-    auto otherColorSpace = other.colorSpace;
-    if (thisColorSpace == nullptr) {
-      thisColorSpace = ColorSpace::SRGB();
-    }
-    if (otherColorSpace == nullptr) {
-      otherColorSpace = ColorSpace::SRGB();
-    }
-
     return alpha == other.alpha && red == other.red && green == other.green && blue == other.blue &&
-           ColorSpace::Equals(thisColorSpace.get(), otherColorSpace.get());
+           colorSpace == other.colorSpace;
   }
 
   /**
@@ -210,35 +203,10 @@ struct RGBA4f {
   }
 
   /**
-   * Apply colorSpace to this color. If the dstColorSpace is nullptr, no convert.
-   */
-  void applyColorSpace(std::shared_ptr<ColorSpace> dstColorSpace);
-
-  /**
    * Return a new color that is the original color converted to the dst color space. If the
    * dstColorSpace is nullptr, no convert.
    */
-  RGBA4f makeColorSpace(std::shared_ptr<ColorSpace> dstColorSpace) const {
-    auto dstColor = *this;
-    dstColor.applyColorSpace(std::move(dstColorSpace));
-    return dstColor;
-  }
-
-  /**
-   * Return a premultiply color that is the original color converted to the dst color space. If the
-   * dstColorSpace is nullptr, no convert.
-   */
-  RGBA4f<AlphaType::Premultiplied> makeColorSpaceWithPremultiply(
-      std::shared_ptr<ColorSpace> dstColorSpace) const {
-    RGBA4f<AlphaType::Premultiplied> dstColor;
-    if constexpr (AT == AlphaType::Unpremultiplied) {
-      dstColor = this->premultiply();
-    } else {
-      dstColor = this;
-    }
-    dstColor.applyColorSpace(std::move(dstColorSpace));
-    return dstColor;
-  }
+  RGBA4f makeColorSpace(std::shared_ptr<ColorSpace> dstColorSpace) const;
 
   /**
    * Returns a Color premultiplied by alpha. Asserts at compile time if RGBA4f is already
@@ -262,29 +230,24 @@ struct RGBA4f {
       return {red * invAlpha, green * invAlpha, blue * invAlpha, alpha, colorSpace};
     }
   }
-
-  explicit operator RGBA4f<AlphaType::Unpremultiplied>() const {
-    if constexpr (AT == AlphaType::Unpremultiplied) {
-      return *this;
-    }
-    return this->unpremultiply();
-  }
-
-  explicit operator RGBA4f<AlphaType::Premultiplied>() const {
-    if constexpr (AT == AlphaType::Premultiplied) {
-      return *this;
-    }
-    return this->premultiply();
-  }
 };
 
+template <>
+RGBA4f<AlphaType::Unpremultiplied> RGBA4f<AlphaType::Unpremultiplied>::makeColorSpace(
+    std::shared_ptr<ColorSpace> dstColorSpace) const;
+
+template <>
+RGBA4f<AlphaType::Premultiplied> RGBA4f<AlphaType::Premultiplied>::makeColorSpace(
+    std::shared_ptr<ColorSpace> dstColorSpace) const;
+
+/**
+ * For convenience, Color is an alias for RGBA4f<AlphaType::Unpremultiplied>.
+ */
 using Color = RGBA4f<AlphaType::Unpremultiplied>;
+
+/**
+ * For convenience, PMColor is an alias for RGBA4f<AlphaType::Premultiplied>.
+ */
 using PMColor = RGBA4f<AlphaType::Premultiplied>;
-
-template <>
-void Color::applyColorSpace(std::shared_ptr<ColorSpace> dstColorSpace);
-
-template <>
-void PMColor::applyColorSpace(std::shared_ptr<ColorSpace> dstColorSpace);
 
 }  // namespace tgfx

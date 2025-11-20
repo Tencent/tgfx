@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,39 +16,28 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/core/Color.h"
+#include "ColorHelper.h"
+#include "ColorSpaceHelper.h"
 #include "core/ColorSpaceXformSteps.h"
-#include "tgfx/core/AlphaType.h"
-#include "utils/ColorSpaceHelper.h"
 
 namespace tgfx {
 
-template <>
-RGBA4f<AlphaType::Unpremultiplied> RGBA4f<AlphaType::Unpremultiplied>::makeColorSpace(
-    std::shared_ptr<ColorSpace> dstColorSpace) const {
-  auto dstColor = *this;
-  if (!NeedConvertColorSpace(colorSpace, dstColorSpace)) {
-    return dstColor;
+PMColor ToPMColor(const Color& color, std::shared_ptr<ColorSpace> dstColorSpace) {
+  if (dstColorSpace == nullptr) {
+    return PMColor{color.red * color.alpha, color.green * color.alpha, color.blue * color.alpha,
+                   color.alpha, color.colorSpace};
   }
-  ColorSpaceXformSteps steps(colorSpace.get(), AlphaType::Unpremultiplied, dstColorSpace.get(),
-                             AlphaType::Unpremultiplied);
-  steps.apply(dstColor.array());
-  dstColor.colorSpace = std::move(dstColorSpace);
-  return dstColor;
-}
 
-template <>
-RGBA4f<AlphaType::Premultiplied> RGBA4f<AlphaType::Premultiplied>::makeColorSpace(
-    std::shared_ptr<ColorSpace> dstColorSpace) const {
-  auto dstColor = *this;
-  if (!NeedConvertColorSpace(colorSpace, dstColorSpace)) {
-    return dstColor;
+  if (!NeedConvertColorSpace(color.colorSpace, dstColorSpace)) {
+    return PMColor{color.red * color.alpha, color.green * color.alpha, color.blue * color.alpha,
+                   color.alpha, color.colorSpace};
+    ;
   }
-  ColorSpaceXformSteps steps(colorSpace.get(), AlphaType::Premultiplied, dstColorSpace.get(),
+  ColorSpaceXformSteps steps(color.colorSpace.get(), AlphaType::Premultiplied, dstColorSpace.get(),
                              AlphaType::Premultiplied);
+  auto dstColor = color.premultiply();
   steps.apply(dstColor.array());
   dstColor.colorSpace = std::move(dstColorSpace);
   return dstColor;
 }
-
 }  // namespace tgfx

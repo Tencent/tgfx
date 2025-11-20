@@ -55,7 +55,7 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
 
 std::shared_ptr<OpsCompositor> DrawingManager::addOpsCompositor(
     std::shared_ptr<RenderTargetProxy> target, uint32_t renderFlags,
-    std::optional<Color> clearColor, std::shared_ptr<ColorSpace> colorSpace) {
+    std::optional<PMColor> clearColor, std::shared_ptr<ColorSpace> colorSpace) {
   auto compositor = std::make_shared<OpsCompositor>(std::move(target), renderFlags, clearColor,
                                                     std::move(colorSpace));
   compositors.push_back(compositor);
