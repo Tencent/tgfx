@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ColorHelper.h"
+#include "ToPMColor.h"
 #include "ColorSpaceHelper.h"
 #include "core/ColorSpaceXformSteps.h"
 

@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ColorShader.h"
-#include "core/utils/ColorHelper.h"
+#include "core/utils/ToPMColor.h"
 #include "core/utils/Types.h"
 #include "gpu/processors/ConstColorProcessor.h"
 
