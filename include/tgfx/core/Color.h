@@ -31,55 +31,58 @@ namespace tgfx {
  */
 struct Color {
   /**
-   * Returns a fully transparent Color.
+   * Returns a fully transparent Color in srgb gamut.
    */
   static const Color& Transparent();
 
   /**
-   * Returns a fully opaque black Color.
+   * Returns a fully opaque black Color in srgb gamut.
    */
   static const Color& Black();
 
   /**
-   * Returns a fully opaque white Color.
+   * Returns a fully opaque white Color in srgb gamut.
    */
   static const Color& White();
 
   /**
-   * Returns a fully opaque red Color.
+   * Returns a fully opaque red Color in srgb gamut.
    */
   static const Color& Red();
 
   /**
-   * Returns a fully opaque green Color.
+   * Returns a fully opaque green Color in srgb gamut.
    */
   static const Color& Green();
 
   /**
-   * Returns a fully opaque blue Color.
+   * Returns a fully opaque blue Color in srgb gamut.
    */
   static const Color& Blue();
 
   /**
-   * Returns color value in srgb gamut from 8-bit component values.
+   * Returns color value from 8-bit component values and ColorSpace.
    */
   static Color FromRGBA(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255,
-                        std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
+                        std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
    * Constructs an opaque white Color.
    */
-  constexpr Color() : red(1.0f), green(1.0f), blue(1.0f), alpha(1.0f) {
+  Color() : red(1.0f), green(1.0f), blue(1.0f), alpha(1.0f), colorSpace(nullptr) {
   }
 
   /**
-   * Constructs a Color with the specified red, green, blue, and alpha values.
+   * Constructs a Color with the specified red, green, blue, alpha values and colorSpace. If the
+   * color space is nullptr, it will be treated as sRGB.
    * @param r  red component
    * @param g  green component
    * @param b  blue component
    * @param a  alpha component
+   * @param colorSpace colorSpace of this color
    */
-  constexpr Color(float r, float g, float b, float a = 1.0f) : red(r), green(g), blue(b), alpha(a) {
+  Color(float r, float g, float b, float a = 1.0f, std::shared_ptr<ColorSpace> colorSpace = nullptr)
+      : red(r), green(g), blue(b), alpha(a), colorSpace(std::move(colorSpace)) {
   }
 
   /**
@@ -103,11 +106,14 @@ struct Color {
   float alpha;
 
   /**
+   * ColorSpace of this Color. If the color space is nullptr, it will be treated as sRGB.
+   */
+  std::shared_ptr<ColorSpace> colorSpace = nullptr;
+
+  /**
    * Compares Color with other, and returns true if all components are equal.
    */
-  bool operator==(const Color& other) const {
-    return alpha == other.alpha && red == other.red && green == other.green && blue == other.blue;
-  }
+  bool operator==(const Color& other) const;
 
   /**
    * Compares Color with other, and returns true if not all components are equal.
@@ -153,14 +159,19 @@ struct Color {
    * Returns a Color with the alpha set to 1.0.
    */
   Color makeOpaque() const {
-    return {red, green, blue, 1.0f};
+    return {red, green, blue, 1.0f, colorSpace};
   }
+
+  /**
+   * Return a new color that is the original color converted to the dst color space.
+   */
+  Color makeColorSpace(std::shared_ptr<ColorSpace> dstColorSpace) const;
 
   /**
    * Returns a Color premultiplied by alpha.
    */
   Color premultiply() const {
-    return {red * alpha, green * alpha, blue * alpha, alpha};
+    return {red * alpha, green * alpha, blue * alpha, alpha, colorSpace};
   }
 
   /**

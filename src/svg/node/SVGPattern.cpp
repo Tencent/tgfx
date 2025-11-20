@@ -142,7 +142,7 @@ bool SVGPattern::onAsPaint(const SVGRenderContext& context, Paint* paint) const 
     return false;
   }
 
-  Recorder patternRecorder;
+  PictureRecorder patternRecorder;
   auto canvas = patternRecorder.beginRecording();
   auto patternMatrix = attrs.patternTransform.value_or(Matrix::I());
   canvas->concat(patternMatrix);

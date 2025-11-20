@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "core/utils/BlockBuffer.h"
+#include "core/utils/BlockAllocator.h"
 #include "core/utils/SlidingWindowTracker.h"
 #include "gpu/AAType.h"
 #include "gpu/BackingFit.h"
@@ -173,7 +173,7 @@ class ProxyProvider {
   bool sharedVertexBufferFlushed = false;
   std::shared_ptr<GPUBufferProxy> sharedVertexBuffer = nullptr;
   std::vector<std::shared_ptr<Task>> sharedVertexBufferTasks = {};
-  BlockBuffer vertexBlockBuffer = {};
+  BlockAllocator vertexBlockAllocator = {};
   SlidingWindowTracker maxValueTracker = {10};
 
   std::shared_ptr<GPUBufferProxy> findOrWrapGPUBufferProxy(const UniqueKey& uniqueKey);

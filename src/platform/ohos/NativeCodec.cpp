@@ -196,7 +196,7 @@ ImageInfo NativeCodec::GetPixelmapInfo(OH_PixelmapNative* pixelmap) {
   OH_PixelmapImageInfo_GetRowStride(currentInfo, &rowBytes);
   OH_PixelmapImageInfo_Release(currentInfo);
   return ImageInfo::Make((int)width, (int)height, colorType, alphaType, rowBytes,
-                         ColorSpace::MakeSRGB());
+                         ColorSpace::SRGB());
 }
 
 OH_ImageSourceNative* NativeCodec::CreateImageSource() const {

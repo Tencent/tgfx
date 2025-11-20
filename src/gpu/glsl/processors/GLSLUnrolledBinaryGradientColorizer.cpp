@@ -44,7 +44,7 @@ struct UnrolledBinaryUniformName {
 static constexpr int MaxIntervals = 8;
 
 PlacementPtr<UnrolledBinaryGradientColorizer> UnrolledBinaryGradientColorizer::Make(
-    BlockBuffer* buffer, const Color* colors, const float* positions, int count) {
+    BlockAllocator* allocator, const Color* colors, const float* positions, int count) {
   // Depending on how the positions resolve into hard stops or regular stops, the number of
   // intervals specified by the number of colors/positions can change. For instance, a plain
   // 3 color gradient is two intervals, but a 4 color gradient with a hard stop is also
@@ -100,7 +100,7 @@ PlacementPtr<UnrolledBinaryGradientColorizer> UnrolledBinaryGradientColorizer::M
     thresholds[i] = 0.0;
   }
 
-  return buffer->make<GLSLUnrolledBinaryGradientColorizer>(
+  return allocator->make<GLSLUnrolledBinaryGradientColorizer>(
       intervalCount, scales, biases,
       Rect::MakeLTRB(thresholds[0], thresholds[1], thresholds[2], thresholds[3]),
       Rect::MakeLTRB(thresholds[4], thresholds[5], thresholds[6], 0.0));

@@ -64,6 +64,11 @@ struct GLBlendState {
   unsigned alphaOp = INVALID_VALUE;
 };
 
+struct GLCullFaceState {
+  unsigned frontFace = INVALID_VALUE;
+  unsigned cullFace = INVALID_VALUE;
+};
+
 /**
  * GLState is used to cache and manage the OpenGL state to minimize redundant state changes.
  */
@@ -86,6 +91,8 @@ class GLState {
   void setDepthState(const GLDepthState& state);
 
   void setBlendState(const GLBlendState& state);
+
+  void setCullFaceState(const GLCullFaceState& state);
 
   void bindTexture(GLTexture* texture, unsigned textureUnit = 0);
 
@@ -110,5 +117,6 @@ class GLState {
   GLStencilState stencilState = {};
   GLDepthState depthState = {};
   GLBlendState blendState = {};
+  GLCullFaceState cullFaceState = {};
 };
 }  // namespace tgfx

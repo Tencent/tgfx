@@ -22,35 +22,35 @@
 #include "tgfx/core/Picture.h"
 
 namespace tgfx {
-class RecordingContext;
+class PictureContext;
 
 /**
- * The Recorder class records drawing commands made to a Canvas and generates a Picture object that
- * captures all these commands, allowing them to be replayed at a later time.
+ * The PictureRecorder class records drawing commands made to a Canvas and generates a Picture
+ * object that captures all these commands, allowing them to be replayed at a later time.
  */
-class Recorder {
+class PictureRecorder {
  public:
   /**
-   * Constructs a Recorder object. If optimizeMemory is true, the recorder will optimize the Picture
-   * generated to use minimal memory, which may involve copying and a slight overhead. This is
-   * recommended for long-lived Pictures. If false, memory is transferred directly for better
+   * Constructs a PictureRecorder object. If optimizeMemory is true, the recorder will optimize the
+   * Picture generated to use minimal memory, which may involve copying and a slight overhead. This
+   * is recommended for long-lived Pictures. If false, memory is transferred directly for better
    * performance, making it ideal for short-lived Pictures.
    */
-  explicit Recorder(bool optimizeMemory) : optimizeMemory(optimizeMemory) {
+  explicit PictureRecorder(bool optimizeMemory) : optimizeMemory(optimizeMemory) {
   }
 
   /**
-   * Constructs a Recorder object with memory optimization disabled.
+   * Constructs a PictureRecorder object with memory optimization disabled.
    */
-  Recorder() : Recorder(false) {
+  PictureRecorder() : PictureRecorder(false) {
   }
 
-  ~Recorder();
+  ~PictureRecorder();
 
   /**
    * Begins recording drawing commands. If recording is already active, it clears the existing
    * commands and starts afresh. Returns the canvas that captures the drawing commands. The returned
-   * Canvas is managed by the Recorder and is deleted when the Recorder is deleted.
+   * Canvas is managed by the PictureRecorder and is deleted when the PictureRecorder is deleted.
    */
   Canvas* beginRecording();
 
@@ -69,7 +69,7 @@ class Recorder {
  private:
   bool optimizeMemory = false;
   bool activelyRecording = false;
-  RecordingContext* recordingContext = nullptr;
+  PictureContext* pictureContext = nullptr;
   Canvas* canvas = nullptr;
 };
 }  // namespace tgfx

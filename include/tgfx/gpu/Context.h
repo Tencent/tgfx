@@ -30,7 +30,7 @@ class DrawingManager;
 class GPU;
 class ResourceProvider;
 class ProxyProvider;
-class BlockBuffer;
+class BlockAllocator;
 class SlidingWindowTracker;
 class AtlasManager;
 class CommandBuffer;
@@ -170,10 +170,6 @@ class Context {
    */
   bool flushAndSubmit(bool syncCpu = false);
 
-  size_t numDrawCalls() const;
-
-  size_t numRenderTasks() const;
-
   GlobalCache* globalCache() const {
     return _globalCache;
   }
@@ -186,8 +182,8 @@ class Context {
     return _drawingManager;
   }
 
-  BlockBuffer* drawingBuffer() const {
-    return _drawingBuffer;
+  BlockAllocator* drawingAllocator() const {
+    return _drawingAllocator;
   }
 
   ProxyProvider* proxyProvider() const {
@@ -206,7 +202,7 @@ class Context {
   ResourceCache* _resourceCache = nullptr;
   DrawingManager* _drawingManager = nullptr;
   ProxyProvider* _proxyProvider = nullptr;
-  BlockBuffer* _drawingBuffer = nullptr;
+  BlockAllocator* _drawingAllocator = nullptr;
   SlidingWindowTracker* _maxValueTracker = nullptr;
   AtlasManager* _atlasManager = nullptr;
   std::shared_ptr<CommandBuffer> commandBuffer = nullptr;

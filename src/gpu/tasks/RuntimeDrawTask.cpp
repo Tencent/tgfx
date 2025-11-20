@@ -32,10 +32,11 @@
 #include "tgfx/gpu/RenderPass.h"
 
 namespace tgfx {
-RuntimeDrawTask::RuntimeDrawTask(std::shared_ptr<RenderTargetProxy> target,
+RuntimeDrawTask::RuntimeDrawTask(BlockAllocator* allocator,
+                                 std::shared_ptr<RenderTargetProxy> target,
                                  std::vector<RuntimeInputTexture> inputs,
                                  std::shared_ptr<RuntimeEffect> effect, const Point& offset)
-    : renderTargetProxy(std::move(target)), inputTextures(std::move(inputs)),
+    : RenderTask(allocator), renderTargetProxy(std::move(target)), inputTextures(std::move(inputs)),
       effect(std::move(effect)), offset(offset) {
   auto context = renderTargetProxy->getContext();
   inputVertexBuffers.reserve(inputTextures.size());
@@ -43,8 +44,7 @@ RuntimeDrawTask::RuntimeDrawTask(std::shared_ptr<RenderTargetProxy> target,
     auto textureProxy = input.textureProxy;
     if (textureProxy != nullptr) {
       auto maskRect = Rect::MakeWH(textureProxy->width(), textureProxy->height());
-      auto maskVertexProvider =
-          RectsVertexProvider::MakeFrom(context->drawingBuffer(), maskRect, AAType::None);
+      auto maskVertexProvider = RectsVertexProvider::MakeFrom(allocator, maskRect, AAType::None);
       auto maskBuffer = context->proxyProvider()->createVertexBufferProxy(
           std::move(maskVertexProvider), RenderFlags::DisableAsyncTask);
       inputVertexBuffers.push_back(std::move(maskBuffer));
@@ -60,8 +60,8 @@ void RuntimeDrawTask::execute(CommandEncoder* encoder) {
   flatTextures.reserve(inputTextures.size());
   for (size_t i = 0; i < inputTextures.size(); i++) {
     std::shared_ptr<TextureView> textureView = nullptr;
-    textureView = GetFlatTextureView(encoder, &inputTextures[i], inputVertexBuffers[i].get(),
-                                     inputTextures[0].colorSpace);
+    textureView = GetFlatTextureView(allocator, encoder, &inputTextures[i],
+                                     inputVertexBuffers[i].get(), inputTextures[0].colorSpace);
     if (textureView == nullptr) {
       LOGE("RuntimeDrawTask::execute() Failed to get the input %d texture view!", i);
       return;
@@ -84,8 +84,9 @@ void RuntimeDrawTask::execute(CommandEncoder* encoder) {
 }
 
 std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
-    CommandEncoder* encoder, const RuntimeInputTexture* textureProxyWithCS,
-    VertexBufferView* vertexBufferProxyView, std::shared_ptr<ColorSpace> dstColorSpace) {
+    BlockAllocator* allocator, CommandEncoder* encoder,
+    const RuntimeInputTexture* textureProxyWithCS, VertexBufferView* vertexBufferProxyView,
+    std::shared_ptr<ColorSpace> dstColorSpace) {
   auto textureProxy = textureProxyWithCS->textureProxy;
   if (textureProxy == nullptr) {
     return nullptr;
@@ -96,7 +97,7 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
   }
   if (!textureView->isYUV() && textureView->getTexture()->type() == TextureType::TwoD &&
       textureView->origin() == ImageOrigin::TopLeft &&
-      NeedConvertColorSpace(textureProxyWithCS->colorSpace, dstColorSpace)) {
+      !NeedConvertColorSpace(textureProxyWithCS->colorSpace, dstColorSpace)) {
     return textureView;
   }
   auto vertexBuffer = vertexBufferProxyView ? vertexBufferProxyView->getBuffer() : nullptr;
@@ -118,22 +119,21 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
     LOGE("RuntimeDrawTask::getFlatTexture() Failed to initialize the render pass!");
     return nullptr;
   }
-  auto colorProcessor = TextureEffect::Make(std::move(textureProxy), {}, nullptr, false);
+  auto colorProcessor = TextureEffect::Make(allocator, std::move(textureProxy), {}, nullptr, false);
   if (colorProcessor == nullptr) {
     LOGE("RuntimeDrawTask::getFlatTexture() Failed to create the color processor!");
     return nullptr;
   }
   if (!textureView->isAlphaOnly() &&
-      !NeedConvertColorSpace(textureProxyWithCS->colorSpace, dstColorSpace)) {
-    auto xformEffect = ColorSpaceXformEffect::Make(
-        context->drawingBuffer(), textureProxyWithCS->colorSpace.get(), AlphaType::Premultiplied,
-        dstColorSpace.get(), AlphaType::Premultiplied);
-    colorProcessor = FragmentProcessor::Compose(context->drawingBuffer(), std::move(xformEffect),
-                                                std::move(colorProcessor));
+      NeedConvertColorSpace(textureProxyWithCS->colorSpace, dstColorSpace)) {
+    auto xformEffect = ColorSpaceXformEffect::Make(allocator, textureProxyWithCS->colorSpace.get(),
+                                                   AlphaType::Premultiplied, dstColorSpace.get(),
+                                                   AlphaType::Premultiplied);
+    colorProcessor =
+        FragmentProcessor::Compose(allocator, std::move(xformEffect), std::move(colorProcessor));
   }
-  auto geometryProcessor =
-      DefaultGeometryProcessor::Make(context->drawingBuffer(), {}, renderTarget->width(),
-                                     renderTarget->height(), AAType::None, {}, {});
+  auto geometryProcessor = DefaultGeometryProcessor::Make(
+      allocator, {}, renderTarget->width(), renderTarget->height(), AAType::None, {}, {});
   std::vector fragmentProcessors = {colorProcessor.get()};
   ProgramInfo programInfo(renderTarget.get(), geometryProcessor.get(),
                           std::move(fragmentProcessors), 1, nullptr, BlendMode::Src);

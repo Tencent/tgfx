@@ -113,7 +113,7 @@ std::shared_ptr<Surface> EGLWindow::onCreateSurface(Context* context) {
   frameBuffer.id = 0;
   frameBuffer.format = GL_RGBA8;
   BackendRenderTarget renderTarget = {frameBuffer, size.width, size.height};
-  std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB();
+  std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB();
   const char* extensions = eglQueryString(eglDevice->eglDisplay, EGL_EXTENSIONS);
   if (extensions && strstr(extensions, "EGL_KHR_gl_colorspace") != nullptr) {
     EGLint colorSpaceValue;
@@ -123,7 +123,7 @@ std::shared_ptr<Surface> EGLWindow::onCreateSurface(Context* context) {
       colorSpace = ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3);
     }
   }
-  return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft, 1, colorSpace);
+  return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft, 0, colorSpace);
 }
 
 void EGLWindow::setPresentationTime(int64_t time) {

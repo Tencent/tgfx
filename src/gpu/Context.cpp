@@ -18,7 +18,7 @@
 
 #include "tgfx/gpu/Context.h"
 #include "core/AtlasManager.h"
-#include "core/utils/BlockBuffer.h"
+#include "core/utils/BlockAllocator.h"
 #include "core/utils/Log.h"
 #include "core/utils/SlidingWindowTracker.h"
 #include "gpu/DrawingManager.h"
@@ -34,7 +34,7 @@ Context::Context(Device* device, GPU* gpu) : _device(device), _gpu(gpu) {
   // We set the maxBlockSize to 2MB because allocating blocks that are too large can cause memory
   // fragmentation and slow down allocation. It may also increase the application's memory usage due
   // to pre-allocation optimizations on some platforms.
-  _drawingBuffer = new BlockBuffer(1 << 14, 1 << 21);  // 16kb, 2MB
+  _drawingAllocator = new BlockAllocator(1 << 14, 1 << 21);  // 16kb, 2MB
   _shaderCaps = new ShaderCaps(gpu);
   _globalCache = new GlobalCache(this);
   _resourceCache = new ResourceCache(this);
@@ -50,7 +50,7 @@ Context::~Context() {
   delete _globalCache;
   delete _proxyProvider;
   delete _resourceCache;
-  delete _drawingBuffer;
+  delete _drawingAllocator;
   delete _maxValueTracker;
   delete _shaderCaps;
 }
@@ -84,8 +84,8 @@ bool Context::flush(BackendSemaphore* signalSemaphore) {
   _atlasManager->postFlush();
   _proxyProvider->purgeExpiredProxies();
   _resourceCache->advanceFrameAndPurge();
-  _maxValueTracker->addValue(_drawingBuffer->size());
-  _drawingBuffer->clear(_maxValueTracker->getMaxValue());
+  _maxValueTracker->addValue(_drawingAllocator->size());
+  _drawingAllocator->clear(_maxValueTracker->getMaxValue());
 
   globalCache()->resetUniformBuffer();
 
@@ -109,15 +109,6 @@ bool Context::flushAndSubmit(bool syncCpu) {
   }
   return result;
 }
-
-size_t Context::numDrawCalls() const {
-  return _drawingManager->numDrawCalls();
-}
-
-size_t Context::numRenderTasks() const {
-  return _drawingManager->numRenderTasks();
-}
-
 
 size_t Context::memoryUsage() const {
   return _resourceCache->getResourceBytes();

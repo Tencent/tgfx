@@ -32,7 +32,7 @@ class Transform3DGeometryProcessor : public GeometryProcessor {
   /**
    * Creates a Transform3DGeometryProcessor instance with the specified parameters.
    */
-  static PlacementPtr<Transform3DGeometryProcessor> Make(BlockBuffer* buffer, AAType aa,
+  static PlacementPtr<Transform3DGeometryProcessor> Make(BlockAllocator* allocator, AAType aa,
                                                          const Matrix3D& matrix,
                                                          const Vec2& ndcScale,
                                                          const Vec2& ndcOffset);

@@ -31,7 +31,7 @@ struct RuntimeInputTexture {
 
 class RuntimeDrawTask : public RenderTask {
  public:
-  RuntimeDrawTask(std::shared_ptr<RenderTargetProxy> target,
+  RuntimeDrawTask(BlockAllocator* allocator, std::shared_ptr<RenderTargetProxy> target,
                   std::vector<RuntimeInputTexture> inputs, std::shared_ptr<RuntimeEffect> effect,
                   const Point& offset);
 
@@ -45,7 +45,8 @@ class RuntimeDrawTask : public RenderTask {
   Point offset = {};
 
   static std::shared_ptr<TextureView> GetFlatTextureView(
-      CommandEncoder* encoder, const RuntimeInputTexture* textureProxyWithCS,
-      VertexBufferView* vertexProxyView, std::shared_ptr<ColorSpace> dstColorSpace);
+      BlockAllocator* allocator, CommandEncoder* encoder,
+      const RuntimeInputTexture* textureProxyWithCS, VertexBufferView* vertexProxyView,
+      std::shared_ptr<ColorSpace> dstColorSpace);
 };
 }  // namespace tgfx

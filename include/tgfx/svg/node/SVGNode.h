@@ -18,8 +18,6 @@
 
 #pragma once
 
-#include <memory>
-#include <utility>
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
@@ -27,6 +25,7 @@
 #include "tgfx/svg/SVGAttribute.h"
 #include "tgfx/svg/SVGTypes.h"
 #include "tgfx/svg/SVGValue.h"
+#include "tgfx/svg/xml/XMLDOM.h"
 
 namespace tgfx {
 
@@ -196,6 +195,15 @@ class SVGNode {
    */
   virtual void appendChild(std::shared_ptr<SVGNode> node) = 0;
 
+  /**
+   * Returns unparsed Attributes.
+   * SVGNode only parses attributes related to presentation rendering; all other attributes are
+   * stored in unparsedAttributes.
+   */
+  const std::vector<DOMAttribute>& getUnparsedAttributes() const {
+    return unparsedAttributes;
+  }
+
  protected:
   explicit SVGNode(SVGTag tag);
 
@@ -233,6 +241,7 @@ class SVGNode {
  private:
   SVGTag _tag;
   SVGPresentationAttributes presentationAttributes;
+  std::vector<DOMAttribute> unparsedAttributes;
 
   friend class SVGNodeConstructor;
   friend class SVGRenderContext;

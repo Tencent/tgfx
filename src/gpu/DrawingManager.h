@@ -21,6 +21,7 @@
 #include <map>
 #include <vector>
 #include "gpu/OpsCompositor.h"
+#include "gpu/tasks/AtlasUploadTask.h"
 #include "gpu/tasks/OpsRenderTask.h"
 #include "gpu/tasks/RenderTask.h"
 #include "gpu/tasks/ResourceTask.h"
@@ -70,8 +71,8 @@ class DrawingManager {
 
   void addResourceTask(PlacementPtr<ResourceTask> resourceTask);
 
-  void addAtlasCellCodecTask(const std::shared_ptr<TextureProxy>& textureProxy,
-                             const Point& atlasOffset, std::shared_ptr<ImageCodec> codec);
+  void addAtlasCellTask(std::shared_ptr<TextureProxy> textureProxy, const Point& atlasOffset,
+                        std::shared_ptr<ImageCodec> codec);
 
   /**
    * Flushes all recorded tasks and returns a CommandBuffer containing the GPU commands. If no tasks
@@ -79,29 +80,13 @@ class DrawingManager {
    */
   std::shared_ptr<CommandBuffer> flush();
 
-  size_t numDrawCalls() const {
-    return numDrawCall;
-  }
-
-  size_t numRenderTasks() const {
-    return numRenderTask;
-  }
-
  private:
   Context* context = nullptr;
-  BlockBuffer* drawingBuffer = nullptr;
+  BlockAllocator* drawingAllocator = nullptr;
   std::vector<PlacementPtr<ResourceTask>> resourceTasks = {};
   std::vector<PlacementPtr<RenderTask>> renderTasks = {};
   std::list<std::shared_ptr<OpsCompositor>> compositors = {};
-  std::vector<std::shared_ptr<Task>> atlasCellCodecTasks = {};
-  std::map<std::shared_ptr<TextureProxy>, std::vector<AtlasCellData>> atlasCellDatas = {};
-  std::map<const TextureProxy*, std::pair<HardwareBufferRef, void*>> atlasHardwareBuffers = {};
-  size_t numDrawCall = 0;
-  size_t numRenderTask = 0;
-
-  void uploadAtlasToGPU();
-
-  void resetAtlasCache();
+  std::map<TextureProxy*, PlacementPtr<AtlasUploadTask>> atlasTasks = {};
 
   friend class OpsCompositor;
 };

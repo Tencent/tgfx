@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/PathRef.h"
-#include "core/Records.h"
+#include "core/PictureRecords.h"
 #include "core/images/CodecImage.h"
 #include "core/images/RasterizedImage.h"
 #include "core/images/SubsetImage.h"
@@ -42,8 +42,8 @@
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/PathTypes.h"
+#include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/RRect.h"
-#include "tgfx/core/Recorder.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/Shape.h"
@@ -1228,7 +1228,7 @@ TGFX_TEST(CanvasTest, Picture) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  Recorder recorder = {};
+  PictureRecorder recorder = {};
   auto canvas = recorder.beginRecording();
   EXPECT_TRUE(recorder.getRecordingCanvas() != nullptr);
   Path path = {};
@@ -1324,7 +1324,7 @@ TGFX_TEST(CanvasTest, Picture) {
   auto imagePicture = recorder.finishRecordingAsPicture();
   ASSERT_TRUE(imagePicture != nullptr);
   ASSERT_TRUE(imagePicture->drawCount == 1);
-  EXPECT_EQ(imagePicture->getFirstDrawRecord()->type(), RecordType::DrawImage);
+  EXPECT_EQ(imagePicture->getFirstDrawRecord()->type(), PictureRecordType::DrawImage);
 
   surface = Surface::Make(context, image->width() - 200, image->height() - 200);
   canvas = surface->getCanvas();
@@ -1418,7 +1418,7 @@ TGFX_TEST(CanvasTest, FillModifier) {
   ASSERT_TRUE(context != nullptr);
 
   // Record a rectangle with default fill
-  Recorder recorder = {};
+  PictureRecorder recorder = {};
   auto canvas = recorder.beginRecording();
   Paint paint;
   paint.setColor(Color::Red());
@@ -1783,7 +1783,7 @@ TGFX_TEST(CanvasTest, ShadowBoundIntersect) {
   auto surface = Surface::Make(context, 400, 400);
   auto canvas = surface->getCanvas();
 
-  Recorder shadowRecorder = {};
+  PictureRecorder shadowRecorder = {};
   auto picCanvas = shadowRecorder.beginRecording();
   Paint dropShadowPaint = {};
   dropShadowPaint.setImageFilter(ImageFilter::DropShadowOnly(0, -8.f, .5f, .5f, Color::Red()));
@@ -2455,6 +2455,9 @@ TGFX_TEST(CanvasTest, emojiTextStrokeBlending) {
   auto serifTypeface =
       Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
   ASSERT_TRUE(serifTypeface != nullptr);
+  auto emojiTypeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoColorEmoji.ttf"));
+  ASSERT_TRUE(emojiTypeface != nullptr);
 
   ContextScope scope;
   auto context = scope.getContext();
@@ -2494,7 +2497,7 @@ TGFX_TEST(CanvasTest, emojiTextStrokeBlending) {
     float y = 80 + i * 80;
 
     // Process emoji text using TextShaper
-    auto emojiPositionedGlyphs = TextShaper::Shape(emojiText, serifTypeface);
+    auto emojiPositionedGlyphs = TextShaper::Shape(emojiText, emojiTypeface);
     struct TextRun {
       std::vector<GlyphID> ids;
       std::vector<Point> positions;
@@ -2518,22 +2521,12 @@ TGFX_TEST(CanvasTest, emojiTextStrokeBlending) {
       emojiX += emojiRun->font.getAdvance(glyphID);
     }
 
-    // Draw emoji with stroke and fill
-    Paint emojiStrokePaint;
-    emojiStrokePaint.setColor(Color::White());
-    emojiStrokePaint.setStyle(PaintStyle::Stroke);
-    emojiStrokePaint.setStrokeWidth(3.0f);
-    emojiStrokePaint.setBlendMode(blendMode);
-
-    Paint emojiFillPaint;
-    emojiFillPaint.setColor(Color::FromRGBA(255, 200, 100, 200));
-    emojiFillPaint.setBlendMode(blendMode);
+    Paint emojiPaint;
+    emojiPaint.setBlendMode(blendMode);
 
     for (const auto& textRun : emojiTextRuns) {
       canvas->drawGlyphs(textRun.ids.data(), textRun.positions.data(), textRun.ids.size(),
-                         textRun.font, emojiStrokePaint);
-      canvas->drawGlyphs(textRun.ids.data(), textRun.positions.data(), textRun.ids.size(),
-                         textRun.font, emojiFillPaint);
+                         textRun.font, emojiPaint);
     }
 
     // Process normal text using TextShaper
@@ -2583,6 +2576,9 @@ TGFX_TEST(CanvasTest, textEmojiOverlayBlendModes) {
   auto serifTypeface =
       Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
   ASSERT_TRUE(serifTypeface != nullptr);
+  auto emojiTypeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoColorEmoji.ttf"));
+  ASSERT_TRUE(emojiTypeface != nullptr);
 
   ContextScope scope;
   auto context = scope.getContext();
@@ -2674,7 +2670,7 @@ TGFX_TEST(CanvasTest, textEmojiOverlayBlendModes) {
     }
 
     // Then overlay emoji with different blend modes
-    auto emojiPositionedGlyphs = TextShaper::Shape(emojiText, serifTypeface);
+    auto emojiPositionedGlyphs = TextShaper::Shape(emojiText, emojiTypeface);
     std::vector<TextRun> emojiTextRuns;
     TextRun* emojiRun = nullptr;
     auto emojiCount = emojiPositionedGlyphs.glyphCount();
@@ -2800,7 +2796,7 @@ TGFX_TEST(CanvasTest, ScalePictureImage) {
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto image = MakeImage("resources/apitest/rotation.jpg");
-  Recorder recorder;
+  PictureRecorder recorder;
   auto canvas = recorder.beginRecording();
   auto filter = ImageFilter::DropShadow(10, 10, 0, 0, Color::Black());
   auto paint = Paint();
@@ -2948,7 +2944,7 @@ TGFX_TEST(CanvasTest, drawScaleImage) {
   ASSERT_TRUE(codec != nullptr);
   auto image = Image::MakeFrom(codec);
   ASSERT_TRUE(image != nullptr);
-  Recorder recorder = {};
+  PictureRecorder recorder = {};
   auto canvas = recorder.beginRecording();
   auto paint = Paint();
   paint.setColor(Color::Red());
@@ -3184,8 +3180,8 @@ TGFX_TEST(CanvasTest, ConvertColorSpace) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 1024, 1024, false, 1, false, 0,
-                               ColorSpace::MakeSRGB()->makeColorSpin());
+  auto surface =
+      Surface::Make(context, 1024, 1024, false, 1, false, 0, ColorSpace::SRGB()->makeColorSpin());
   auto canvas = surface->getCanvas();
   const TransferFunction tfs[] = {
       NamedTransferFunction::SRGB,
@@ -3279,7 +3275,7 @@ TGFX_TEST(CanvasTest, ColorSpace) {
   canvas->drawPaint(paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawSRGBDropShadowFilterToP3"));
   canvas->clear();
-  Recorder record;
+  PictureRecorder record;
   auto recordCanvas = record.beginRecording();
   recordCanvas->drawColor(Color::Green(), BlendMode::SrcOver);
   auto picture = record.finishRecordingAsPicture();

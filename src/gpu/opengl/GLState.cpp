@@ -155,6 +155,21 @@ void GLState::setBlendState(const GLBlendState& state) {
   blendState = state;
 }
 
+void GLState::setCullFaceState(const GLCullFaceState& state) {
+  if (state.cullFace == cullFaceState.cullFace && state.frontFace == cullFaceState.frontFace) {
+    return;
+  }
+
+  auto gl = interface->functions();
+  if (state.frontFace != cullFaceState.frontFace) {
+    gl->frontFace(state.frontFace);
+  }
+  if (state.cullFace != cullFaceState.cullFace) {
+    gl->cullFace(state.cullFace);
+  }
+  cullFaceState = state;
+}
+
 void GLState::bindTexture(GLTexture* texture, unsigned textureUnit) {
   DEBUG_ASSERT(texture != nullptr);
   DEBUG_ASSERT(texture->usage() & TextureUsage::TEXTURE_BINDING);

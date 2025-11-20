@@ -86,8 +86,7 @@ class ImageGenerator {
   }
 
  protected:
-  ImageGenerator(int width, int height,
-                 std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB())
+  ImageGenerator(int width, int height, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB())
       : _width(width), _height(height), _colorSpace(std::move(colorSpace)) {
   }
 
@@ -96,6 +95,6 @@ class ImageGenerator {
  private:
   int _width = 0;
   int _height = 0;
-  std::shared_ptr<ColorSpace> _colorSpace = ColorSpace::MakeSRGB();
+  std::shared_ptr<ColorSpace> _colorSpace = ColorSpace::SRGB();
 };
 }  // namespace tgfx

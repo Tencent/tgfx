@@ -19,8 +19,9 @@
 #include "GLSLRadialGradientLayout.h"
 
 namespace tgfx {
-PlacementPtr<RadialGradientLayout> RadialGradientLayout::Make(BlockBuffer* buffer, Matrix matrix) {
-  return buffer->make<GLSLRadialGradientLayout>(matrix);
+PlacementPtr<RadialGradientLayout> RadialGradientLayout::Make(BlockAllocator* allocator,
+                                                              Matrix matrix) {
+  return allocator->make<GLSLRadialGradientLayout>(matrix);
 }
 
 GLSLRadialGradientLayout::GLSLRadialGradientLayout(Matrix matrix) : RadialGradientLayout(matrix) {

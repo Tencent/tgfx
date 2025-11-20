@@ -18,30 +18,30 @@
 
 #include "BackgroundContext.h"
 #include "core/filters/GaussianBlurImageFilter.h"
-#include "tgfx/core/Recorder.h"
+#include "tgfx/core/PictureRecorder.h"
 
 namespace tgfx {
 
-class RecordBackgroundContext : public BackgroundContext {
+class PictureBackgroundContext : public BackgroundContext {
  public:
   static std::shared_ptr<BackgroundContext> Make(const Matrix& imageMatrix, const Rect& rect,
                                                  std::shared_ptr<ColorSpace> colorSpace) {
-    return std::shared_ptr<RecordBackgroundContext>(
-        new RecordBackgroundContext(imageMatrix, rect, std::move(colorSpace)));
+    return std::shared_ptr<PictureBackgroundContext>(
+        new PictureBackgroundContext(imageMatrix, rect, std::move(colorSpace)));
   }
-  ~RecordBackgroundContext() = default;
+  ~PictureBackgroundContext() = default;
   Canvas* getCanvas() override {
     return canvas;
   }
   std::shared_ptr<Image> onGetBackgroundImage(Point* offset) override;
 
  private:
-  RecordBackgroundContext(const Matrix& imageMatrix, const Rect& rect,
-                          std::shared_ptr<ColorSpace> colorSpace)
+  PictureBackgroundContext(const Matrix& imageMatrix, const Rect& rect,
+                           std::shared_ptr<ColorSpace> colorSpace)
       : BackgroundContext(nullptr, imageMatrix, rect, std::move(colorSpace)) {
     canvas = recorder.beginRecording();
   }
-  Recorder recorder;
+  PictureRecorder recorder;
   Canvas* canvas = nullptr;
 };
 
@@ -75,7 +75,7 @@ class SurfaceBackgroundContext : public BackgroundContext {
   std::shared_ptr<Surface> surface = nullptr;
 };
 
-std::shared_ptr<Image> RecordBackgroundContext::onGetBackgroundImage(Point* offset) {
+std::shared_ptr<Image> PictureBackgroundContext::onGetBackgroundImage(Point* offset) {
   auto matrix = canvas->getMatrix();
   auto clip = canvas->getTotalClip();
   auto picture = recorder.finishRecordingAsPicture();
@@ -107,7 +107,7 @@ std::shared_ptr<Image> SurfaceBackgroundContext::onGetBackgroundImage(Point* off
   if (!parent) {
     return image;
   }
-  Recorder recorder;
+  PictureRecorder recorder;
   auto canvas = recorder.beginRecording();
   canvas->drawImage(parent->getBackgroundImage(nullptr));
   canvas->drawImage(image);
@@ -151,10 +151,10 @@ std::shared_ptr<BackgroundContext> BackgroundContext::Make(Context* context, con
   imageMatrix.mapRect(&backgroundRect);
   std::shared_ptr<BackgroundContext> result = nullptr;
   if (context) {
-    result = SurfaceBackgroundContext::Make(context, imageMatrix, backgroundRect,
-                                            ColorSpace::MakeSRGB());
+    result =
+        SurfaceBackgroundContext::Make(context, imageMatrix, backgroundRect, ColorSpace::SRGB());
   } else {
-    result = RecordBackgroundContext::Make(imageMatrix, backgroundRect, ColorSpace::MakeSRGB());
+    result = PictureBackgroundContext::Make(imageMatrix, backgroundRect, ColorSpace::SRGB());
   }
   if (!result) {
     return result;
@@ -197,7 +197,7 @@ std::shared_ptr<Image> BackgroundContext::getBackgroundImage(Point* offset) {
     }
     return image;
   }
-  Recorder recorder;
+  PictureRecorder recorder;
   auto canvas = recorder.beginRecording();
   auto parentOffset = Point::Make(0, 0);
   auto parentImage = parent->getBackgroundImage(&parentOffset);
@@ -218,7 +218,7 @@ std::shared_ptr<BackgroundContext> BackgroundContext::createSubContext() {
   if (context) {
     child = SurfaceBackgroundContext::Make(context, imageMatrix, backgroundRect, colorSpace);
   } else {
-    child = RecordBackgroundContext::Make(imageMatrix, backgroundRect, colorSpace);
+    child = PictureBackgroundContext::Make(imageMatrix, backgroundRect, colorSpace);
   }
   if (!child) {
     return nullptr;

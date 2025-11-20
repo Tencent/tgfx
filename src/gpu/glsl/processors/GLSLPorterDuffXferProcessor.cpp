@@ -20,10 +20,10 @@
 #include "gpu/glsl/GLSLBlend.h"
 
 namespace tgfx {
-PlacementPtr<PorterDuffXferProcessor> PorterDuffXferProcessor::Make(BlockBuffer* buffer,
+PlacementPtr<PorterDuffXferProcessor> PorterDuffXferProcessor::Make(BlockAllocator* allocator,
                                                                     BlendMode blend,
                                                                     DstTextureInfo dstTextureInfo) {
-  return buffer->make<GLSLPorterDuffXferProcessor>(blend, std::move(dstTextureInfo));
+  return allocator->make<GLSLPorterDuffXferProcessor>(blend, std::move(dstTextureInfo));
 }
 
 GLSLPorterDuffXferProcessor::GLSLPorterDuffXferProcessor(BlendMode blend,

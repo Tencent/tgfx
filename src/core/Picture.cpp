@@ -19,18 +19,18 @@
 #include "tgfx/core/Picture.h"
 #include "core/HitTestContext.h"
 #include "core/MeasureContext.h"
-#include "core/Records.h"
-#include "core/utils/BlockBuffer.h"
+#include "core/PictureRecords.h"
+#include "core/utils/BlockAllocator.h"
 #include "core/utils/Log.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Image.h"
 #include "utils/MathExtra.h"
 
 namespace tgfx {
-Picture::Picture(std::unique_ptr<BlockData> data, std::vector<PlacementPtr<Record>> recordList,
-                 size_t drawCount)
-    : blockData(std::move(data)), records(std::move(recordList)), drawCount(drawCount) {
-  DEBUG_ASSERT(blockData != nullptr);
+Picture::Picture(std::unique_ptr<BlockBuffer> buffer,
+                 std::vector<PlacementPtr<PictureRecord>> recordList, size_t drawCount)
+    : blockBuffer(std::move(buffer)), records(std::move(recordList)), drawCount(drawCount) {
+  DEBUG_ASSERT(blockBuffer != nullptr);
   DEBUG_ASSERT(!records.empty());
   bool hasInverseClip = true;
   for (auto& record : records) {
@@ -133,7 +133,8 @@ std::shared_ptr<Image> Picture::asImage(Point* offset, const Matrix* matrix,
   if (record == nullptr || hasStroke) {
     return nullptr;
   }
-  if (record->type() != RecordType::DrawImage && record->type() != RecordType::DrawImageRect) {
+  if (record->type() != PictureRecordType::DrawImage &&
+      record->type() != PictureRecordType::DrawImageRect) {
     return nullptr;
   }
   auto imageRecord = static_cast<const DrawImage*>(record);
@@ -166,7 +167,7 @@ std::shared_ptr<Image> Picture::asImage(Point* offset, const Matrix* matrix,
   } else if (!clipRect.isEmpty()) {
     subset = clipRect;
   }
-  if (record->type() == RecordType::DrawImageRect) {
+  if (record->type() == PictureRecordType::DrawImageRect) {
     image = image->makeSubset(static_cast<const DrawImageRect*>(record)->rect);
     DEBUG_ASSERT(image != nullptr);
   }
@@ -192,11 +193,12 @@ std::shared_ptr<Image> Picture::asImage(Point* offset, const Matrix* matrix,
   return image;
 }
 
-const Record* Picture::getFirstDrawRecord(MCState* state, Fill* fill, bool* hasStroke) const {
+const PictureRecord* Picture::getFirstDrawRecord(MCState* state, Fill* fill,
+                                                 bool* hasStroke) const {
   PlaybackContext playback = {};
-  Record* drawRecord = nullptr;
+  PictureRecord* drawRecord = nullptr;
   for (auto& record : records) {
-    if (record->type() >= RecordType::DrawFill) {
+    if (record->type() >= PictureRecordType::DrawFill) {
       drawRecord = record.get();
       break;
     }
