@@ -19,7 +19,8 @@
 #pragma once
 
 #include "tgfx/core/Color.h"
-#include "tgfx/core/Pixmap.h"
+#include "tgfx/core/Data.h"
+#include "tgfx/core/ImageInfo.h"
 
 namespace tgfx {
 
