@@ -20,7 +20,7 @@
 
 namespace tgfx {
 EllipseGeometryProcessor::EllipseGeometryProcessor(int width, int height, bool stroke,
-                                                   std::optional<Color> commonColor)
+                                                   std::optional<PMColor> commonColor)
     : GeometryProcessor(ClassID()), width(width), height(height), stroke(stroke),
       commonColor(commonColor) {
   inPosition = {"inPosition", VertexFormat::Float2};

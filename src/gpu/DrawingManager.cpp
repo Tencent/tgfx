@@ -46,8 +46,8 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
   drawOp->setBlendMode(BlendMode::Src);
   auto drawOps = drawingAllocator->makeArray<DrawOp>(&drawOp, 1);
   auto textureProxy = renderTarget->asTextureProxy();
-  auto task = drawingAllocator->make<OpsRenderTask>(std::move(renderTarget), std::move(drawOps),
-                                                    std::nullopt);
+  auto task = drawingAllocator->make<OpsRenderTask>(drawingAllocator, std::move(renderTarget),
+                                                    std::move(drawOps), std::nullopt);
   renderTasks.emplace_back(std::move(task));
   addGenerateMipmapsTask(std::move(textureProxy));
   return true;
@@ -55,7 +55,7 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
 
 std::shared_ptr<OpsCompositor> DrawingManager::addOpsCompositor(
     std::shared_ptr<RenderTargetProxy> target, uint32_t renderFlags,
-    std::optional<Color> clearColor, std::shared_ptr<ColorSpace> colorSpace) {
+    std::optional<PMColor> clearColor, std::shared_ptr<ColorSpace> colorSpace) {
   auto compositor = std::make_shared<OpsCompositor>(std::move(target), renderFlags, clearColor,
                                                     std::move(colorSpace));
   compositors.push_back(compositor);
@@ -65,13 +65,13 @@ std::shared_ptr<OpsCompositor> DrawingManager::addOpsCompositor(
 
 void DrawingManager::addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTarget,
                                       PlacementArray<DrawOp> drawOps,
-                                      std::optional<Color> clearColor) {
+                                      std::optional<PMColor> clearColor) {
   if (renderTarget == nullptr || (drawOps.empty() && !clearColor.has_value())) {
     return;
   }
   auto textureProxy = renderTarget->asTextureProxy();
-  auto task = drawingAllocator->make<OpsRenderTask>(std::move(renderTarget), std::move(drawOps),
-                                                    clearColor);
+  auto task = drawingAllocator->make<OpsRenderTask>(drawingAllocator, std::move(renderTarget),
+                                                    std::move(drawOps), clearColor);
   renderTasks.emplace_back(std::move(task));
   addGenerateMipmapsTask(std::move(textureProxy));
 }
@@ -84,8 +84,8 @@ void DrawingManager::addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> rende
     return;
   }
   auto textureProxy = renderTarget->asTextureProxy();
-  auto task = drawingAllocator->make<RuntimeDrawTask>(std::move(renderTarget), std::move(inputs),
-                                                      std::move(effect), offset);
+  auto task = drawingAllocator->make<RuntimeDrawTask>(drawingAllocator, std::move(renderTarget),
+                                                      std::move(inputs), std::move(effect), offset);
   renderTasks.emplace_back(std::move(task));
   addGenerateMipmapsTask(std::move(textureProxy));
 }
@@ -94,7 +94,8 @@ void DrawingManager::addGenerateMipmapsTask(std::shared_ptr<TextureProxy> textur
   if (textureProxy == nullptr || !textureProxy->hasMipmaps()) {
     return;
   }
-  auto task = drawingAllocator->make<GenerateMipmapsTask>(std::move(textureProxy));
+  auto task =
+      drawingAllocator->make<GenerateMipmapsTask>(drawingAllocator, std::move(textureProxy));
   renderTasks.emplace_back(std::move(task));
 }
 
@@ -104,8 +105,8 @@ void DrawingManager::addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> 
   if (source == nullptr || dest == nullptr) {
     return;
   }
-  auto task =
-      drawingAllocator->make<RenderTargetCopyTask>(std::move(source), std::move(dest), srcX, srcY);
+  auto task = drawingAllocator->make<RenderTargetCopyTask>(drawingAllocator, std::move(source),
+                                                           std::move(dest), srcX, srcY);
   renderTasks.emplace_back(std::move(task));
 }
 
@@ -115,8 +116,8 @@ void DrawingManager::addTransferPixelsTask(std::shared_ptr<RenderTargetProxy> so
   if (source == nullptr || dest == nullptr || srcRect.isEmpty()) {
     return;
   }
-  auto task =
-      drawingAllocator->make<TransferPixelsTask>(std::move(source), srcRect, std::move(dest));
+  auto task = drawingAllocator->make<TransferPixelsTask>(drawingAllocator, std::move(source),
+                                                         srcRect, std::move(dest));
   renderTasks.emplace_back(std::move(task));
 }
 

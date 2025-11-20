@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,21 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GenerateMipmapsTask.h"
-#include "tgfx/gpu/GPU.h"
-
+#pragma once
+#include "tgfx/core/Color.h"
 namespace tgfx {
-GenerateMipmapsTask::GenerateMipmapsTask(BlockAllocator* allocator,
-                                         std::shared_ptr<TextureProxy> textureProxy)
-    : RenderTask(allocator), textureProxy(std::move(textureProxy)) {
-}
-
-void GenerateMipmapsTask::execute(CommandEncoder* encoder) {
-  auto textureView = textureProxy->getTextureView();
-  if (textureView == nullptr) {
-    LOGE("GenerateMipmapsTask::execute() Failed to get texture view!");
-    return;
-  }
-  encoder->generateMipmapsForTexture(textureView->getTexture());
-}
+PMColor ToPMColor(const Color& color, std::shared_ptr<ColorSpace> dstColorSpace);
 }  // namespace tgfx

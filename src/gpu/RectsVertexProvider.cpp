@@ -23,7 +23,7 @@
 #include "tgfx/core/Stroke.h"
 
 namespace tgfx {
-inline void WriteUByte4Color(float* vertices, size_t& index, const Color& color) {
+inline void WriteUByte4Color(float* vertices, size_t& index, const PMColor& color) {
   auto bytes = reinterpret_cast<uint8_t*>(&vertices[index++]);
   bytes[0] = static_cast<uint8_t>(color.red * 255);
   bytes[1] = static_cast<uint8_t>(color.green * 255);
@@ -195,7 +195,7 @@ class AAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
   }
 
   void writeQuad(float* vertices, size_t& index, const Quad& quad, const Quad& uvQuad,
-                 const Color& color, float coverage) const {
+                 const PMColor& color, float coverage) const {
     for (size_t i = 0; i < 4; ++i) {
       vertices[index++] = quad.point(i).x;
       vertices[index++] = quad.point(i).y;
@@ -390,7 +390,7 @@ class NonAAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
   }
 
   void writeQuad(float* vertices, size_t& index, const Quad& quad, const Quad& uvQuad,
-                 const Color& color) const {
+                 const PMColor& color) const {
     for (size_t i = 0; i < 4; ++i) {
       vertices[index++] = quad.point(i).x;
       vertices[index++] = quad.point(i).y;

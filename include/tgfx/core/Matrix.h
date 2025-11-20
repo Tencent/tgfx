@@ -887,5 +887,7 @@ class Matrix {
   bool invertNonIdentity(Matrix* inverse) const;
 
   bool getMinMaxScaleFactors(float results[2]) const;
+
+  friend class Matrix3D;
 };
 }  // namespace tgfx

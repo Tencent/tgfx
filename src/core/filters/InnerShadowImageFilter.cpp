@@ -18,6 +18,7 @@
 
 #include "InnerShadowImageFilter.h"
 #include "core/images/TextureImage.h"
+#include "core/utils/ToPMColor.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
@@ -62,18 +63,17 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::getShadowFragmentProcess
                                                sampling, constraint, &shadowMatrix);
   }
 
-  auto buffer = args.context->drawingAllocator();
+  auto allocator = args.context->drawingAllocator();
   if (invertShadowMask == nullptr) {
     invertShadowMask =
-        ConstColorProcessor::Make(buffer, Color::Transparent().premultiply(), InputMode::Ignore);
+        ConstColorProcessor::Make(allocator, PMColor::Transparent(), InputMode::Ignore);
   }
-  auto dstColor = color.premultiply();
-  dstColor.applyColorSpace(source->colorSpace(), true);
-  auto colorProcessor = ConstColorProcessor::Make(buffer, dstColor, InputMode::Ignore);
+  auto dstColor = ToPMColor(color, source->colorSpace());
+  auto colorProcessor = ConstColorProcessor::Make(allocator, dstColor, InputMode::Ignore);
 
   // get shadow mask and fill it with color
   auto colorShadowProcessor = XfermodeFragmentProcessor::MakeFromTwoProcessors(
-      buffer, std::move(colorProcessor), std::move(invertShadowMask), BlendMode::SrcOut);
+      allocator, std::move(colorProcessor), std::move(invertShadowMask), BlendMode::SrcOut);
   return colorShadowProcessor;
 }
 
@@ -94,11 +94,11 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::asFragmentProcessor(
   if (imageProcessor == nullptr) {
     return nullptr;
   }
-  auto buffer = args.context->drawingAllocator();
+  auto allocator = args.context->drawingAllocator();
   auto blendMode = shadowOnly ? BlendMode::SrcIn : BlendMode::SrcATop;
 
   return XfermodeFragmentProcessor::MakeFromTwoProcessors(
-      buffer, getShadowFragmentProcessor(source, args, sampling, constraint, uvMatrix),
+      allocator, getShadowFragmentProcessor(source, args, sampling, constraint, uvMatrix),
       std::move(imageProcessor), blendMode);
 }
 

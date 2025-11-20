@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ModeColorFilter.h"
+#include "core/utils/ToPMColor.h"
 #include "core/utils/Types.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
@@ -70,10 +71,7 @@ bool ModeColorFilter::isEqual(const ColorFilter* colorFilter) const {
 
 PlacementPtr<FragmentProcessor> ModeColorFilter::asFragmentProcessor(
     Context* context, std::shared_ptr<ColorSpace> dstColorSpace) const {
-  auto dstColor = color.premultiply();
-  if (dstColorSpace != nullptr) {
-    dstColor.applyColorSpace(dstColorSpace, true);
-  }
+  auto dstColor = ToPMColor(color, std::move(dstColorSpace));
   auto processor =
       ConstColorProcessor::Make(context->drawingAllocator(), dstColor, InputMode::Ignore);
   return XfermodeFragmentProcessor::MakeFromSrcProcessor(context->drawingAllocator(),

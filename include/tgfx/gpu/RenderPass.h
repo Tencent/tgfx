@@ -79,7 +79,7 @@ class ColorAttachment {
   explicit ColorAttachment(std::shared_ptr<Texture> texture,
                            LoadAction loadAction = LoadAction::DontCare,
                            StoreAction storeAction = StoreAction::Store,
-                           Color clearValue = Color::Transparent(),
+                           PMColor clearValue = Color::Transparent().premultiply(),
                            std::shared_ptr<Texture> resolveTexture = nullptr)
       : texture(std::move(texture)), loadAction(loadAction), storeAction(storeAction),
         clearValue(clearValue), resolveTexture(std::move(resolveTexture)) {
@@ -103,7 +103,7 @@ class ColorAttachment {
   /**
    * The color value to clear the attachment with if the load action is LoadAction::Clear.
    */
-  Color clearValue = Color::Transparent();
+  PMColor clearValue = PMColor::Transparent();
 
   /**
    * The texture to resolve the color attachment into. This is used for multisampled textures.
@@ -195,7 +195,7 @@ class RenderPassDescriptor {
   explicit RenderPassDescriptor(std::shared_ptr<Texture> texture,
                                 LoadAction loadAction = LoadAction::DontCare,
                                 StoreAction storeAction = StoreAction::Store,
-                                Color clearValue = Color::Transparent(),
+                                PMColor clearValue = PMColor::Transparent(),
                                 std::shared_ptr<Texture> resolveTexture = nullptr) {
     colorAttachments.emplace_back(std::move(texture), loadAction, storeAction, clearValue,
                                   std::move(resolveTexture));
@@ -209,7 +209,7 @@ class RenderPassDescriptor {
    */
   RenderPassDescriptor(std::shared_ptr<Texture> texture, std::shared_ptr<Texture> resolveTexture) {
     colorAttachments.emplace_back(std::move(texture), LoadAction::Load, StoreAction::Store,
-                                  Color::Transparent(), std::move(resolveTexture));
+                                  PMColor::Transparent(), std::move(resolveTexture));
   }
 
   /**

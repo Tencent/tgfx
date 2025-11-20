@@ -210,7 +210,7 @@ TGFX_TEST(TextAlignTest, TextAlignWidth1Height10) {
   textLayer->setFont(font);
   parentLayer->addChild(textLayer);
   auto textLayerBounds = textLayer->getBounds(nullptr, true);
-  textLayer->getGlobalMatrix().mapRect(&textLayerBounds);
+  textLayerBounds = textLayer->getGlobalMatrix().mapRect(textLayerBounds);
 
   auto textLayer2 = TextLayer::Make();
   textLayer2->setMatrix(Matrix::MakeTrans(50.0f, 100.0f));
@@ -224,7 +224,7 @@ TGFX_TEST(TextAlignTest, TextAlignWidth1Height10) {
   textLayer2->setFont(font);
   parentLayer->addChild(textLayer2);
   auto textLayer2Bounds = textLayer2->getBounds(nullptr, true);
-  textLayer2->getGlobalMatrix().mapRect(&textLayer2Bounds);
+  textLayer2Bounds = textLayer2->getGlobalMatrix().mapRect(textLayer2Bounds);
 
   auto textLayer3 = TextLayer::Make();
   textLayer3->setMatrix(Matrix::MakeTrans(50.0f, 200.0f));
@@ -238,7 +238,7 @@ TGFX_TEST(TextAlignTest, TextAlignWidth1Height10) {
   textLayer3->setFont(font);
   parentLayer->addChild(textLayer3);
   auto textLayer3Bounds = textLayer3->getBounds(nullptr, true);
-  textLayer3->getGlobalMatrix().mapRect(&textLayer3Bounds);
+  textLayer3Bounds = textLayer3->getGlobalMatrix().mapRect(textLayer3Bounds);
 
   auto textLayer4 = TextLayer::Make();
   textLayer4->setMatrix(Matrix::MakeTrans(50.0f, 300.0f));
@@ -252,7 +252,7 @@ TGFX_TEST(TextAlignTest, TextAlignWidth1Height10) {
   textLayer4->setFont(font);
   parentLayer->addChild(textLayer4);
   auto textLayer4Bounds = textLayer4->getBounds(nullptr, true);
-  textLayer4->getGlobalMatrix().mapRect(&textLayer4Bounds);
+  textLayer4Bounds = textLayer4->getGlobalMatrix().mapRect(textLayer4Bounds);
 
   auto textLayer5 = TextLayer::Make();
   textLayer5->setMatrix(Matrix::MakeTrans(50.0f, 400.0f));
@@ -266,7 +266,7 @@ TGFX_TEST(TextAlignTest, TextAlignWidth1Height10) {
   textLayer5->setFont(font);
   parentLayer->addChild(textLayer5);
   auto textLayer5Bounds = textLayer5->getBounds(nullptr, true);
-  textLayer5->getGlobalMatrix().mapRect(&textLayer5Bounds);
+  textLayer5Bounds = textLayer5->getGlobalMatrix().mapRect(textLayer5Bounds);
 
   displayList->root()->addChild(rootLayer);
   displayList->render(surface.get());

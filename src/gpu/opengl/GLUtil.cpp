@@ -93,6 +93,29 @@ unsigned ToGLCompareFunction(CompareFunction compare) {
   return GL_ALWAYS;
 }
 
+unsigned ToGLFrontFace(FrontFace frontFace) {
+  switch (frontFace) {
+    case FrontFace::CW:
+      return GL_CW;
+    case FrontFace::CCW:
+      return GL_CCW;
+  }
+  return GL_CCW;
+}
+
+unsigned ToGLCullMode(CullMode mode) {
+  switch (mode) {
+    case CullMode::None:
+      DEBUG_ASSERT(false);
+      return GL_BACK;
+    case CullMode::Front:
+      return GL_FRONT;
+    case CullMode::Back:
+      return GL_BACK;
+  }
+  return GL_BACK;
+}
+
 unsigned ToGLStencilOperation(StencilOperation stencilOp) {
   switch (stencilOp) {
     case StencilOperation::Keep:
