@@ -571,7 +571,7 @@ std::shared_ptr<TextureProxy> OpsCompositor::getClipTexture(const Path& clip, AA
     clipTexture = clipRenderTarget->asTextureProxy();
     auto opList = drawingAllocator()->makeArray<DrawOp>(&drawOp, 1);
     context->drawingManager()->addOpsRenderTask(std::move(clipRenderTarget), std::move(opList),
-                                                Color::Transparent().premultiply());
+                                                PMColor::Transparent());
   } else {
     auto rasterizer =
         PathRasterizer::MakeFrom(width, height, clip, aaType != AAType::None, &rasterizeMatrix);

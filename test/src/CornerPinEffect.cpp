@@ -137,7 +137,7 @@ bool CornerPinEffect::onDraw(CommandEncoder* encoder,
     return false;
   }
   RenderPassDescriptor renderPassDesc(renderTexture, LoadAction::Clear, StoreAction::Store,
-                                      Color::Transparent().premultiply(), outputTexture);
+                                      PMColor::Transparent(), outputTexture);
   auto renderPass = encoder->beginRenderPass(renderPassDesc);
   if (renderPass == nullptr) {
     return false;

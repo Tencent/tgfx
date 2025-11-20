@@ -42,7 +42,7 @@ class ShapeDrawOp : public DrawOp {
  private:
   std::shared_ptr<GPUShapeProxy> shapeProxy = nullptr;
   std::shared_ptr<VertexBufferView> maskBufferProxy = {};
-  PMColor color = Color::Transparent().premultiply();
+  PMColor color = PMColor::Transparent();
   Matrix uvMatrix = {};
 
   ShapeDrawOp(std::shared_ptr<GPUShapeProxy> proxy, PMColor color, const Matrix& uvMatrix,

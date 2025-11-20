@@ -34,56 +34,50 @@ namespace tgfx {
 template <AlphaType AT>
 struct RGBA4f {
   /**
-   * Returns a fully transparent Color in srgb gamut. Only for unpremultiplied color.
+   * Returns a fully transparent Color in srgb gamut.
    */
-  static const RGBA4f<AlphaType::Unpremultiplied>& Transparent() {
-    static_assert(AT == AlphaType::Unpremultiplied);
-    static const RGBA4f<AlphaType::Unpremultiplied> color = {0.0f, 0.0f, 0.0f, 0.0f};
+  static const RGBA4f& Transparent() {
+    static const RGBA4f color = {0.0f, 0.0f, 0.0f, 0.0f};
     return color;
   }
 
   /**
-   * Returns a fully opaque black Color in srgb gamut. Only for unpremultiplied color.
+   * Returns a fully opaque black Color in srgb gamut.
    */
-  static const RGBA4f<AlphaType::Unpremultiplied>& Black() {
-    static_assert(AT == AlphaType::Unpremultiplied);
-    static const RGBA4f<AlphaType::Unpremultiplied> color = {0.0f, 0.0f, 0.0f, 1.0f};
+  static const RGBA4f& Black() {
+    static const RGBA4f color = {0.0f, 0.0f, 0.0f, 1.0f};
     return color;
   }
 
   /**
-   * Returns a fully opaque white Color in srgb gamut. Only for unpremultiplied color.
+   * Returns a fully opaque white Color in srgb gamut.
    */
-  static const RGBA4f<AlphaType::Unpremultiplied>& White() {
-    static_assert(AT == AlphaType::Unpremultiplied);
-    static const RGBA4f<AlphaType::Unpremultiplied> color = {1.0f, 1.0f, 1.0f, 1.0f};
+  static const RGBA4f& White() {
+    static const RGBA4f color = {1.0f, 1.0f, 1.0f, 1.0f};
     return color;
   }
 
   /**
-   * Returns a fully opaque red Color in srgb gamut. Only for unpremultiplied color.
+   * Returns a fully opaque red Color in srgb gamut.
    */
-  static const RGBA4f<AlphaType::Unpremultiplied>& Red() {
-    static_assert(AT == AlphaType::Unpremultiplied);
-    static const RGBA4f<AlphaType::Unpremultiplied> color = {1.0f, 0.0f, 0.0f, 1.0f};
+  static const RGBA4f& Red() {
+    static const RGBA4f color = {1.0f, 0.0f, 0.0f, 1.0f};
     return color;
   }
 
   /**
-   * Returns a fully opaque green Color in srgb gamut. Only for unpremultiplied color.
+   * Returns a fully opaque green Color in srgb gamut.
    */
-  static const RGBA4f<AlphaType::Unpremultiplied>& Green() {
-    static_assert(AT == AlphaType::Unpremultiplied);
-    static const RGBA4f<AlphaType::Unpremultiplied> color = {0.0f, 1.0f, 0.0f, 1.0f};
+  static const RGBA4f& Green() {
+    static const RGBA4f color = {0.0f, 1.0f, 0.0f, 1.0f};
     return color;
   }
 
   /**
-   * Returns a fully opaque blue Color in srgb gamut. Only for unpremultiplied color.
+   * Returns a fully opaque blue Color in srgb gamut.
    */
-  static const RGBA4f<AlphaType::Unpremultiplied>& Blue() {
-    static_assert(AT == AlphaType::Unpremultiplied);
-    static const RGBA4f<AlphaType::Unpremultiplied> color = {0.0f, 0.0f, 1.0f, 1.0f};
+  static const RGBA4f& Blue() {
+    static const RGBA4f color = {0.0f, 0.0f, 1.0f, 1.0f};
     return color;
   }
 

@@ -75,8 +75,8 @@ PlacementPtr<FragmentProcessor> DropShadowImageFilter::getSourceFragmentProcesso
   if (result) {
     return result;
   }
-  return ConstColorProcessor::Make(args.context->drawingAllocator(),
-                                   Color::Transparent().premultiply(), InputMode::Ignore);
+  return ConstColorProcessor::Make(args.context->drawingAllocator(), PMColor::Transparent(),
+                                   InputMode::Ignore);
 }
 
 PlacementPtr<FragmentProcessor> DropShadowImageFilter::getShadowFragmentProcessor(
