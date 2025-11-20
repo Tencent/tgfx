@@ -19,9 +19,10 @@
 #include "TransferPixelsTask.h"
 
 namespace tgfx {
-TransferPixelsTask::TransferPixelsTask(std::shared_ptr<RenderTargetProxy> source,
+TransferPixelsTask::TransferPixelsTask(BlockAllocator* allocator,
+                                       std::shared_ptr<RenderTargetProxy> source,
                                        const Rect& srcRect, std::shared_ptr<GPUBufferProxy> dest)
-    : source(std::move(source)), srcRect(srcRect), dest(std::move(dest)) {
+    : RenderTask(allocator), source(std::move(source)), srcRect(srcRect), dest(std::move(dest)) {
 }
 
 void TransferPixelsTask::execute(CommandEncoder* encoder) {

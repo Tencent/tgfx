@@ -588,14 +588,14 @@ std::pair<PlacementPtr<FragmentProcessor>, bool> OpsCompositor::getClipMaskFP(co
   if (clip.isEmpty() && clip.isInverseFillType()) {
     return {nullptr, false};
   }
-  auto buffer = context->drawingAllocator();
+  auto allocator = context->drawingAllocator();
   auto [rect, useScissor] = getClipRect(clip);
   if (rect.has_value()) {
     if (!rect->isEmpty()) {
       *scissorRect = *rect;
       if (!useScissor) {
         scissorRect->roundOut();
-        return {AARectEffect::Make(buffer, *rect), true};
+        return {AARectEffect::Make(allocator, *rect), true};
       }
     }
     return {nullptr, false};
@@ -609,8 +609,8 @@ std::pair<PlacementPtr<FragmentProcessor>, bool> OpsCompositor::getClipMaskFP(co
   if (renderTarget->origin() == ImageOrigin::BottomLeft) {
     uvMatrix.preConcat(renderTarget->getOriginTransform());
   }
-  auto processor = DeviceSpaceTextureEffect::Make(buffer, std::move(textureProxy), uvMatrix);
-  return {FragmentProcessor::MulInputByChildAlpha(buffer, std::move(processor)), true};
+  auto processor = DeviceSpaceTextureEffect::Make(allocator, std::move(textureProxy), uvMatrix);
+  return {FragmentProcessor::MulInputByChildAlpha(allocator, std::move(processor)), true};
 }
 
 DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds, AAType aaType) {

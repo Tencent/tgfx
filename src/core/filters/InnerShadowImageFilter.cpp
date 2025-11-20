@@ -62,18 +62,18 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::getShadowFragmentProcess
                                                sampling, constraint, &shadowMatrix);
   }
 
-  auto buffer = args.context->drawingAllocator();
+  auto allocator = args.context->drawingAllocator();
   if (invertShadowMask == nullptr) {
     invertShadowMask =
-        ConstColorProcessor::Make(buffer, Color::Transparent().premultiply(), InputMode::Ignore);
+        ConstColorProcessor::Make(allocator, Color::Transparent().premultiply(), InputMode::Ignore);
   }
   auto dstColor = color.makeColorSpace(source->colorSpace());
   auto colorProcessor =
-      ConstColorProcessor::Make(buffer, dstColor.premultiply(), InputMode::Ignore);
+      ConstColorProcessor::Make(allocator, dstColor.premultiply(), InputMode::Ignore);
 
   // get shadow mask and fill it with color
   auto colorShadowProcessor = XfermodeFragmentProcessor::MakeFromTwoProcessors(
-      buffer, std::move(colorProcessor), std::move(invertShadowMask), BlendMode::SrcOut);
+      allocator, std::move(colorProcessor), std::move(invertShadowMask), BlendMode::SrcOut);
   return colorShadowProcessor;
 }
 
@@ -94,11 +94,11 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::asFragmentProcessor(
   if (imageProcessor == nullptr) {
     return nullptr;
   }
-  auto buffer = args.context->drawingAllocator();
+  auto allocator = args.context->drawingAllocator();
   auto blendMode = shadowOnly ? BlendMode::SrcIn : BlendMode::SrcATop;
 
   return XfermodeFragmentProcessor::MakeFromTwoProcessors(
-      buffer, getShadowFragmentProcessor(source, args, sampling, constraint, uvMatrix),
+      allocator, getShadowFragmentProcessor(source, args, sampling, constraint, uvMatrix),
       std::move(imageProcessor), blendMode);
 }
 

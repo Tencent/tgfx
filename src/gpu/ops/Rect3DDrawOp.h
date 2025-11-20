@@ -62,7 +62,8 @@ class Rect3DDrawOp : public DrawOp {
                                          uint32_t renderFlags, const Rect3DDrawArgs& drawArgs);
 
  private:
-  Rect3DDrawOp(RectsVertexProvider* provider, const Rect3DDrawArgs& drawArgs);
+  Rect3DDrawOp(BlockAllocator* allocator, RectsVertexProvider* provider,
+               const Rect3DDrawArgs& drawArgs);
 
   PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
 

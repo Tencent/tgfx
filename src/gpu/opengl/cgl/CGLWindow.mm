@@ -21,6 +21,9 @@
 #include "gpu/opengl/GLDefines.h"
 #include "tgfx/gpu/Backend.h"
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+
 namespace tgfx {
 std::shared_ptr<CGLWindow> CGLWindow::MakeFrom(NSView* view, CGLContextObj sharedContext) {
   if (view == nil) {
@@ -40,10 +43,7 @@ CGLWindow::CGLWindow(std::shared_ptr<Device> device, NSView* view)
 
 CGLWindow::~CGLWindow() {
   auto glContext = static_cast<CGLDevice*>(device.get())->glContext;
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   [glContext setView:nil];
-#pragma clang diagnostic pop
   view = nil;
 }
 
@@ -54,10 +54,7 @@ std::shared_ptr<Surface> CGLWindow::onCreateSurface(Context* context) {
   if (size.width <= 0 || size.height <= 0) {
     return nullptr;
   }
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   [glContext setView:view];
-#pragma clang diagnostic pop
   GLFrameBufferInfo frameBuffer = {};
   frameBuffer.id = 0;
   frameBuffer.format = GL_RGBA8;
@@ -71,3 +68,5 @@ void CGLWindow::onPresent(Context*) {
   [glContext flushBuffer];
 }
 }  // namespace tgfx
+
+#pragma clang diagnostic pop
