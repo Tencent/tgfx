@@ -333,6 +333,11 @@ class ColorSpace : public std::enable_shared_from_this<ColorSpace> {
   static std::shared_ptr<ColorSpace> SRGBLinear();
 
   /**
+   * Create the P3 color space.
+   */
+  static std::shared_ptr<ColorSpace> DisplayP3();
+
+  /**
    * Create an ColorSpace from a transfer function and a row-major 3x3 transformation to XYZ.
    */
   static std::shared_ptr<ColorSpace> MakeRGB(const TransferFunction& transferFunction,

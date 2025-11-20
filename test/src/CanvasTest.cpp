@@ -3215,11 +3215,11 @@ TGFX_TEST(CanvasTest, ColorSpace) {
   ASSERT_TRUE(context != nullptr);
   auto surface =
       Surface::Make(context, 1024, 1024, false, 1, false, 0,
-                    ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3));
+                    ColorSpace::DisplayP3());
   auto canvas = surface->getCanvas();
   canvas->drawColor(
       Color::FromRGBA(0, 255, 0, 255,
-                      ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3)),
+                      ColorSpace::DisplayP3()),
       BlendMode::SrcOver);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawP3ColorToP3"));
   canvas->clear();

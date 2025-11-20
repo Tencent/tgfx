@@ -957,7 +957,7 @@ void PopulateGraphicStateEntryFromPaint(
 
   entry->matrix = state.matrix * matrix;
   auto color = fill.color;
-  color.applyColorSpace(std::move(colorSpace), false);
+  color = color.makeColorSpace(std::move(colorSpace));
   color.alpha = 1;
   entry->color = color;
   entry->shaderIndex = -1;
@@ -969,7 +969,7 @@ void PopulateGraphicStateEntryFromPaint(
     if (Types::Get(shader.get()) == Types::ShaderType::Color) {
       const auto colorShader = static_cast<const ColorShader*>(shader.get());
       if (colorShader->asColor(&color)) {
-        color.applyColorSpace(std::move(colorSpace), false);
+        color = color.makeColorSpace(std::move(colorSpace));
         color.alpha = 1;
         entry->color = color;
       }
