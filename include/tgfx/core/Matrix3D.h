@@ -19,6 +19,7 @@
 #pragma once
 
 #include <cstring>
+#include "Matrix.h"
 #include "Vec.h"
 #include "tgfx/core/Rect.h"
 
@@ -47,11 +48,31 @@ class Matrix3D {
   }
 
   /**
-  * Copies the matrix values into a 16-element array in column-major order.
-  */
+   * Creates a Matrix3D with the given matrix. The created Matrix3D is:
+   *
+   *       | m.scaleX  m.skewX   0  m.transX |
+   *       | m.skewY   m.scaleY  0  m.transY |
+   *       | 0         0         1  0        |
+   *       | 0         0         0  1        |
+   */
+  explicit Matrix3D(const Matrix& m)
+      : Matrix3D(m.values[Matrix::SCALE_X], m.values[Matrix::SKEW_Y], 0, 0,
+                 m.values[Matrix::SKEW_X], m.values[Matrix::SCALE_Y], 0, 0, 0, 0, 1, 0,
+                 m.values[Matrix::TRANS_X], m.values[Matrix::TRANS_Y], 0, 1) {
+  }
+
+  /**
+   * Copies the matrix values into a 16-element array in column-major order.
+   */
   void getColumnMajor(float buffer[16]) const {
     memcpy(buffer, values, sizeof(values));
   }
+
+  /**
+   * Returns specified row of the matrix as a Vec4.
+   * @param i  Row index, valid range 0..3.
+   */
+  Vec4 getRow(int i) const;
 
   /**
    * Returns the matrix value at the given row and column.
@@ -70,6 +91,16 @@ class Matrix3D {
   void setRowColumn(int r, int c, float value) {
     values[c * 4 + r] = value;
   }
+
+  /**
+   * Returns the horizontal translation factor.
+   */
+  float getTranslateX() const;
+
+  /**
+   * Returns the vertical translation factor.
+   */
+  float getTranslateY() const;
 
   /**
    * Returns a reference to a constant identity Matrix3D. The returned Matrix3D is:
@@ -129,19 +160,54 @@ class Matrix3D {
   }
 
   /**
-   * Pre-concatenates a rotation to this matrix. M' = R * M.
+   * Post-concatenates a scale to this matrix. M' = S * M.
+   */
+  void postScale(float sx, float sy, float sz);
+
+  /**
+   * Pre-concatenates a rotation to this matrix. M' = M * R.
    */
   void preRotate(const Vec3& axis, float degrees);
 
   /**
-  * Post-concatenates a rotation to this matrix. M' = M * R.
-  */
+   * Post-concatenates a rotation to this matrix. M' = R * M.
+   */
   void postRotate(const Vec3& axis, float degrees);
 
   /**
-   * Post-concatenates a translation to this matrix. M' = M * T.
+   * Pre-concatenates a translation to this matrix. M' = M * T.
+   */
+  void preTranslate(float tx, float ty, float tz);
+
+  /**
+   * Post-concatenates a translation to this matrix. M' = T * M.
    */
   void postTranslate(float tx, float ty, float tz);
+
+  /**
+   * Post-concatenates a skew to this matrix. M' = K * M
+   * @param kxy Skew factor of the original Y component on the X axis
+   * @param kxz Skew factor of the original Z component on the X axis
+   * @param kyx Skew factor of the original X component on the Y axis
+   * @param kyz Skew factor of the original Z component on the Y axis
+   * @param kzx Skew factor of the original X component on the Z axis
+   * @param kzy Skew factor of the original Y component on the Z axis
+   */
+  void postSkew(float kxy, float kxz, float kyx, float kyz, float kzx, float kzy);
+
+  /**
+   * Post-concatenates a skew in the XY plane to this matrix. M' = K * M
+   * @param kxy Skew factor of the original X component on the Y axis
+   * @param kyx Skew factor of the original Y component on the X axis
+   */
+  void postSkewXY(float kxy, float kyx) {
+    postSkew(kxy, 0, kyx, 0, 0, 0);
+  }
+
+  /**
+   * Concatenates this matrix with the given matrix, and stores the result in this matrix. M' = M * m.
+   */
+  void postConcat(const Matrix3D& m);
 
   /**
    * Calculates the inverse of the current matrix and stores the result in the Matrix3D object
@@ -183,6 +249,14 @@ class Matrix3D {
    */
   Rect mapRect(const Rect& src) const;
 
+  void mapRect(Rect* rect) const;
+
+  /**
+   * Maps a 3D point using this matrix.
+   * The returned result is the coordinate after perspective division.
+   */
+  Vec3 mapVec3(const Vec3& v) const;
+
   /**
    * Returns true if the matrix is an identity matrix.
    */
@@ -210,13 +284,6 @@ class Matrix3D {
   }
 
   /**
-   * Copies the matrix values into a 16-element array in column-major order.
-   */
-  void getColMajor(float buffer[16]) const {
-    memcpy(buffer, values, sizeof(values));
-  }
-
-  /**
    * Copies the matrix values into a 16-element array in row-major order.
    */
   void getRowMajor(float buffer[16]) const;
@@ -227,29 +294,14 @@ class Matrix3D {
   void setConcat(const Matrix3D& a, const Matrix3D& b);
 
   /**
-   * Concatenates the given matrix with this matrix, and stores the result in this matrix. M' = m * M.
+   * Concatenates the given matrix with this matrix, and stores the result in this matrix. M' = M * m.
    */
   void preConcat(const Matrix3D& m);
 
   /**
-   * Concatenates this matrix with the given matrix, and stores the result in this matrix. M' = M * m.
-   */
-  void postConcat(const Matrix3D& m);
-
-  /**
-   * Pre-concatenates a scale to this matrix. M' = S * M.
+   * Pre-concatenates a scale to this matrix. M' = M * S.
    */
   void preScale(float sx, float sy, float sz);
-
-  /**
-   * Post-concatenates a scale to this matrix. M' = M * S.
-   */
-  void postScale(float sx, float sy, float sz);
-
-  /**
-   * Pre-concatenates a translation to this matrix. M' = T * M.
-   */
-  void preTranslate(float tx, float ty, float tz);
 
   /**
    * Returns the transpose of the current matrix.
@@ -293,6 +345,8 @@ class Matrix3D {
   void setRotateUnit(const Vec3& axis, float degrees);
 
   void setRotateUnitSinCos(const Vec3& axis, float sinV, float cosV);
+
+  void setSkew(float kxy, float kxz, float kyx, float kyz, float kzx, float kzy);
 
   bool hasPerspective() const {
     return (values[3] != 0 || values[7] != 0 || values[11] != 0 || values[15] != 1);

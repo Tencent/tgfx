@@ -34,7 +34,7 @@ struct Rect3DDrawArgs {
   /**
    * The transformation matrix from local space to clip space.
    */
-  Matrix3D transformMatrix;
+  Matrix3D transformMatrix = Matrix3D::I();
 
   /**
    * The scaling and translation parameters in NDC space. After the projected model's vertex
@@ -42,14 +42,14 @@ struct Rect3DDrawArgs {
    * translation. These two properties allow any rectangular region of the projected model to be
    * mapped to any position within the target texture.
    */
-  Vec2 ndcScale;
-  Vec2 ndcOffset;
+  Vec2 ndcScale = Vec2(1.f, 1.f);
+  Vec2 ndcOffset = Vec2(0.f, 0.f);
 
   /**
    * Reference viewport size, used to convert NDC coordinates to window coordinates. The external
    * transformMatrix, ndcScale, and ndcOffset are all defined based on this viewport size.
    */
-  Size viewportSize;
+  Size viewportSize = Size(1.f, 1.f);
 };
 
 class Rect3DDrawOp : public DrawOp {

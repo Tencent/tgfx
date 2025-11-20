@@ -37,6 +37,10 @@ class DrawOp {
     blendMode = mode;
   }
 
+  void setCullMode(CullMode mode) {
+    cullMode = mode;
+  }
+
   void setXferProcessor(PlacementPtr<XferProcessor> processor) {
     xferProcessor = std::move(processor);
   }
@@ -63,6 +67,7 @@ class DrawOp {
   std::vector<PlacementPtr<FragmentProcessor>> coverages = {};
   PlacementPtr<XferProcessor> xferProcessor = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
+  CullMode cullMode = CullMode::None;
 
   DrawOp(BlockAllocator* allocator, AAType aaType) : allocator(allocator), aaType(aaType) {
   }
