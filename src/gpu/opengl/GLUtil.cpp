@@ -112,8 +112,6 @@ unsigned ToGLCullMode(CullMode mode) {
       return GL_FRONT;
     case CullMode::Back:
       return GL_BACK;
-    case CullMode::FrontAndBack:
-      return GL_FRONT_AND_BACK;
   }
   return GL_BACK;
 }

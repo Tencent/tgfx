@@ -268,11 +268,7 @@ enum class CullMode {
   /**
    * Cull back faces
    */
-  Back,
-  /**
-   * Cull both front and back faces
-   */
-  FrontAndBack
+  Back
 };
 
 /**
