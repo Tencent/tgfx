@@ -108,19 +108,19 @@ class AppHost {
   void addTypeface(const std::string& name, std::shared_ptr<tgfx::Typeface> typeface);
 
   bool isDirty() const;
-  void markDirty() const;
-  void resetDirty() const;
-  void setTileMode() const;
+  void markDirty();
+  void resetDirty();
+  void setRenderMode(tgfx::RenderMode renderMode);
   /**
    * Draws the content of the corresponding SampleBuilder based on the index.
    */
-  void draw(tgfx::Canvas* canvas, int drawIndex, bool isNeedBackground) const;
+  void draw(tgfx::Canvas* canvas, int drawIndex, bool isNeedBackground);
   /**
    * Calculates and sets the transformation matrix for the current root layer
    * (displayList.root()->firstChild()), centering it in the window, scaling it proportionally, and
    * leaving a 30px padding on all sides.
    */
-  void updateRootMatrix() const;
+  void updateRootMatrix();
 
   /**
    * Returns all layers hit at the specified logical coordinates (sorted by depth then by level).
@@ -137,10 +137,10 @@ class AppHost {
   tgfx::Point _contentOffset = {};
   std::unordered_map<std::string, std::shared_ptr<tgfx::Image>> images = {};
   std::unordered_map<std::string, std::shared_ptr<tgfx::Typeface>> typefaces = {};
-  mutable bool _dirty = true;
-  mutable bool _isTileMode = true;
+  bool _dirty = true;
+  bool _isTileMode = true;
 
-  mutable int lastDrawIndex = -1;
-  mutable std::shared_ptr<tgfx::Layer> root = nullptr;
+  int lastDrawIndex = -1;
+  std::shared_ptr<tgfx::Layer> root = nullptr;
 };
 }  // namespace hello2d

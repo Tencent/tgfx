@@ -27,7 +27,7 @@ namespace hello2d {
 // Base class for individual samples
 class Sample {
  public:
-  explicit Sample(std::string name);
+  explicit Sample(const std::string& name);
   virtual ~Sample() = default;
 
   std::string name() const {

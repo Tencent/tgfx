@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -28,7 +28,7 @@
 namespace hello2d {
 static auto strokeOffset = 0.f;
 
-static void mergeLines(std::vector<TextLine>& lines) {
+static void MergeLines(std::vector<TextLine>& lines) {
   if (lines.empty()) {
     return;
   }
@@ -58,8 +58,8 @@ static void mergeLines(std::vector<TextLine>& lines) {
 }
 
 // Set the positions of the first occurrence of B in string A to true, for quickly setting underlineIndex and deletelineIndex
-std::vector<std::pair<size_t, size_t>> findFirstOccurrence(const std::string& A,
-                                                           const std::string& B) {
+static std::vector<std::pair<size_t, size_t>> FindFirstOccurrence(const std::string& A,
+                                                                  const std::string& B) {
   if (B.empty() || A.empty() || B.size() > A.size()) {
     return {};
   }
@@ -235,8 +235,8 @@ void SimpleTextLayer::invalidateLayout() {
   }
 
   for (auto& richText : richTexts) {
-    mergeLines(richText.underline);
-    mergeLines(richText.deleteline);
+    MergeLines(richText.underline);
+    MergeLines(richText.deleteline);
   }
 }
 
@@ -297,12 +297,12 @@ std::shared_ptr<tgfx::Layer> RichText::buildLayerTree(const AppHost* host) {
   elements[2].text = texts[1];
   elements[2].font = fonts[1];
   elements[2].paints = {paints[0], paints[1]};
-  elements[2].underlineIndex = findFirstOccurrence(texts[1], "TGFX");
+  elements[2].underlineIndex = FindFirstOccurrence(texts[1], "TGFX");
   elements[3].text = texts[2];
   elements[3].font = fonts[2];
   elements[3].paints = {paints[0], paints[1]};
-  elements[3].underlineIndex = findFirstOccurrence(texts[2], "(Tencent Graphics)");
-  elements[3].deletelineIndex = findFirstOccurrence(texts[2], "video");
+  elements[3].underlineIndex = FindFirstOccurrence(texts[2], "(Tencent Graphics)");
+  elements[3].deletelineIndex = FindFirstOccurrence(texts[2], "video");
   elements[4].text = texts[3];
   elements[4].font = fonts[3];
   elements[4].paints = {{}};

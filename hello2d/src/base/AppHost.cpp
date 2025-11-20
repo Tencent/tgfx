@@ -30,16 +30,20 @@ bool AppHost::isDirty() const {
   return _dirty;
 }
 
-void AppHost::markDirty() const {
+void AppHost::markDirty() {
   _dirty = true;
 }
 
-void AppHost::resetDirty() const {
+void AppHost::resetDirty() {
   _dirty = false;
 }
 
-void AppHost::setTileMode() const {
-  _isTileMode = false;
+void AppHost::setRenderMode(tgfx::RenderMode renderMode) {
+  if (renderMode == tgfx::RenderMode::Tiled) {
+    _isTileMode = true;
+  } else {
+    _isTileMode = false;
+  }
 }
 
 std::shared_ptr<tgfx::Image> AppHost::getImage(const std::string& name) const {
@@ -113,7 +117,7 @@ void AppHost::addTypeface(const std::string& name, std::shared_ptr<tgfx::Typefac
   }
   typefaces[name] = std::move(typeface);
 }
-void AppHost::draw(tgfx::Canvas* canvas, int drawIndex, bool isNeedBackground) const {
+void AppHost::draw(tgfx::Canvas* canvas, int drawIndex, bool isNeedBackground) {
   if (drawIndex < 0 || drawIndex >= static_cast<int>(SampleManager::Count())) {
     return;
   }
@@ -153,7 +157,7 @@ void AppHost::draw(tgfx::Canvas* canvas, int drawIndex, bool isNeedBackground) c
   displayList.render(canvas->getSurface(), false);
 }
 
-void AppHost::updateRootMatrix() const {
+void AppHost::updateRootMatrix() {
   if (!root) {
     return;
   }

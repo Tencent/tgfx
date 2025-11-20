@@ -47,7 +47,7 @@ static std::unordered_map<std::string, Sample*> GetSampleMap() {
 }
 
 // Sample class implementation
-Sample::Sample(std::string name) : _name(std::move(name)) {
+Sample::Sample(const std::string& name) : _name(name) {
 }
 
 void Sample::build(const AppHost* host) {
