@@ -90,7 +90,7 @@ class RectDrawOp : public DrawOp {
  private:
   size_t rectCount = 0;
   std::optional<LineJoin> lineJoin = std::nullopt;
-  std::optional<Color> commonColor = std::nullopt;
+  std::optional<PMColor> commonColor = std::nullopt;
   std::optional<Matrix> uvMatrix = std::nullopt;
   bool hasSubset = false;
   std::shared_ptr<GPUBufferProxy> indexBufferProxy = nullptr;

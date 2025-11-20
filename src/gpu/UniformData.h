@@ -47,7 +47,9 @@ class UniformData {
   template <typename T>
   std::enable_if_t<std::is_trivially_copyable_v<T> && !std::is_pointer_v<T> &&
                        !std::is_same_v<std::decay_t<T>, Matrix> &&
-                       !std::is_same_v<std::decay_t<T>, ColorMatrix33>,
+                       !std::is_same_v<std::decay_t<T>, ColorMatrix33> &&
+                       !std::is_same_v<std::decay_t<T>, PMColor> &&
+                       !std::is_same_v<std::decay_t<T>, Color>,
                    void>
   setData(const std::string& name, const T& value) const {
     onSetData(name, &value, sizeof(value));
@@ -57,8 +59,9 @@ class UniformData {
    * Convenience method for Color.
    */
   template <typename T>
-  std::enable_if_t<std::is_same_v<std::decay_t<T>, Color>, void> setData(const std::string& name,
-                                                                         const T& color) const {
+  std::enable_if_t<
+      std::is_same_v<std::decay_t<T>, PMColor> || std::is_same_v<std::decay_t<T>, Color>, void>
+  setData(const std::string& name, const T& color) const {
     onSetData(name, color.array(), sizeof(float) * 4);
   }
 

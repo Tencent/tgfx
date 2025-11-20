@@ -71,7 +71,7 @@ void GLState::setViewport(int x, int y, int width, int height) {
   viewport[3] = height;
 }
 
-void GLState::setClearColor(Color color) {
+void GLState::setClearColor(PMColor color) {
   if (clearColor.has_value() && *clearColor == color) {
     return;
   }
