@@ -26,6 +26,7 @@
 
 @interface TGFXView : UIView
 
-- (void)draw:(int)index zoom:(float)zoom offset:(CGPoint)offset;
+- (bool)draw:(int)index zoom:(float)zoom offset:(CGPoint)offset;
+- (void)markDirty;
 
 @end
