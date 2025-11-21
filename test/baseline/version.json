@@ -345,6 +345,16 @@
         "read_RGBA_F16_scaled_codec": "eefb7a46",
         "read_RGB_565_scaled_codec": "29745c73"
     },
+    "RecordingTest": {
+        "BasicFlushAndSubmit": "3c65b221",
+        "FlushAndSubmitHelper": "3c65b221",
+        "FlushAndSubmitWithSync": "3c65b221",
+        "MultipleDrawingBuffers_surface1": "3c65b221",
+        "MultipleDrawingBuffers_surface2": "3c65b221",
+        "MultipleRecordingsInOrder": "3c65b221",
+        "OutOfOrderSubmission": "3c65b221",
+        "RecordingWithSemaphore": "3c65b221"
+    },
     "SVGExportTest": {
         "DrawImageRect": "0cfb8996",
         "ImageMask": "0cfb8996",
