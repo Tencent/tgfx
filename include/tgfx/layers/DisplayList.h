@@ -227,9 +227,23 @@ class DisplayList {
    * Sets the maximum cache size for layer surface caching. This affects the total size of cached
    * surfaces that can be stored. When the cache exceeds this limit, least recently used entries
    * are evicted. Set to 0 to disable layer caching.
-   * @param maxSize The maximum cache size in bytes. Default is 16MB.
+   * @param maxSize The maximum cache size in bytes. Default is 64MB.
    */
   void setLayerCacheMaxSize(size_t maxSize);
+
+  /**
+   * Sets the maximum size of rasterized layer content (in pixels) that can be cached.
+   * Layers with rasterized bounds larger than this size will not be cached.
+   * @param maxSize Maximum width or height in pixels. Default is 64 pixels.
+   */
+  void setMaxCacheContentSize(float maxSize);
+
+  /**
+   * Sets the maximum content scale for layer caching. Layers with content scale greater than
+   * this value will not be cached to avoid excessive memory usage at high zoom levels.
+   * @param maxScale Maximum content scale. Default is 0.3.
+   */
+  void setMaxCacheContentScale(float maxScale);
 
   /**
    * Sets whether to show dirty regions during rendering. When enabled, the dirty regions will be

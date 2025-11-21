@@ -29,6 +29,7 @@ class RasterizedContent;
 class Image;
 class ColorSpace;
 class Matrix;
+class Context;
 
 struct CacheEntry;
 
@@ -43,10 +44,10 @@ class LayerCache {
  public:
   /**
    * Creates a new LayerCache instance with the specified maximum size in bytes.
-   * @param maxCacheSize The maximum size of cached content in bytes. Default is 16MB.
+   * @param maxCacheSize The maximum size of cached content in bytes. Default is 64MB.
    * @param colorSpace The color space for cached images.
    */
-  explicit LayerCache(size_t maxCacheSize = 16 * 1024 * 1024,
+  explicit LayerCache(size_t maxCacheSize = 64 * 1024 * 1024,
                       std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   ~LayerCache();
@@ -100,12 +101,52 @@ class LayerCache {
    */
   void clear();
 
+  /*
+   * Sets the context for the cache.
+   */
+  void setContext(Context* context);
+
+  /**
+   * Sets the maximum size of rasterized layer content (in pixels) that can be cached.
+   * Layers with rasterized bounds larger than this size will not be cached.
+   * @param maxSize Maximum width or height in pixels. Default is 64 pixels.
+   */
+  void setMaxCacheContentSize(float maxSize) {
+    _maxCacheContentSize = maxSize;
+  }
+
+  /**
+   * Returns the maximum size of rasterized layer content that can be cached.
+   */
+  float maxCacheContentSize() const {
+    return _maxCacheContentSize;
+  }
+
+  /**
+   * Sets the maximum content scale for layer caching. Layers with content scale greater than
+   * this value will not be cached to avoid excessive memory usage at high zoom levels.
+   * @param maxScale Maximum content scale. Default is 0.3.
+   */
+  void setMaxCacheContentScale(float maxScale) {
+    _maxCacheContentScale = maxScale;
+  }
+
+  /**
+   * Returns the maximum content scale for layer caching.
+   */
+  float maxCacheContentScale() const {
+    return _maxCacheContentScale;
+  }
+
  private:
+  Context* _context = nullptr;
   size_t _maxCacheSize = 0;
   size_t _currentCacheSize = 0;
   std::shared_ptr<ColorSpace> _colorSpace;
+  float _maxCacheContentSize = 64.0f;
+  float _maxCacheContentScale = 0.3f;
 
-  std::unordered_map<const Layer*, CacheEntry> _cacheMap;
+  std::map<const Layer*, CacheEntry> _cacheMap;
   std::list<const Layer*> _accessList;
 
   void evictLRU();

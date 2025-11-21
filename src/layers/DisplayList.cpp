@@ -237,13 +237,22 @@ void DisplayList::setMaxTileCount(int count) {
 }
 
 void DisplayList::setLayerCacheMaxSize(size_t maxSize) {
-  if (maxSize < 0) {
-    maxSize = 0;
-  }
   if (layerCache->maxCacheSize() == maxSize) {
     return;
   }
-  // layerCache->setLayerCacheMaxSize(maxSize);
+  layerCache->setMaxCacheSize(maxSize);
+}
+
+void DisplayList::setMaxCacheContentSize(float maxSize) {
+  if (layerCache) {
+    layerCache->setMaxCacheContentSize(maxSize);
+  }
+}
+
+void DisplayList::setMaxCacheContentScale(float maxScale) {
+  if (layerCache) {
+    layerCache->setMaxCacheContentScale(maxScale);
+  }
 }
 
 void DisplayList::showDirtyRegions(bool show) {
@@ -276,6 +285,7 @@ void DisplayList::render(Surface* surface, bool autoClear) {
     return;
   }
   RENDER_VISABLE_OBJECT(surface->getContext());
+  layerCache->setContext(surface->getContext());
   _hasContentChanged = false;
   auto dirtyRegions = _root->updateDirtyRegions();
   if (_zoomScaleInt == 0) {
@@ -888,7 +898,6 @@ void DisplayList::resetCaches() {
   surfaceCaches = {};
   totalTileCount = 0;
   emptyTiles.clear();
-  layerCache->clear();
 }
 
 void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,

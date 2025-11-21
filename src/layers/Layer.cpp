@@ -1349,12 +1349,17 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     return false;
   }
 
+  if (!args.layerCache) {
+    return false;
+  }
+
+  auto maxCacheSize = args.layerCache->maxCacheContentSize();
+  auto maxCacheScale = args.layerCache->maxCacheContentScale();
+
   auto scaledBounds = renderBounds;
   scaledBounds.scale(contentScale, contentScale);
-  constexpr float MaxCacheSize = 64.f;
-  constexpr float MaxCacheScale = 0.3f;
-  if (!args.layerCache || scaledBounds.width() > MaxCacheSize ||
-      scaledBounds.height() > MaxCacheSize || contentScale > MaxCacheScale) {
+  if (scaledBounds.width() > maxCacheSize || scaledBounds.height() > maxCacheSize ||
+      contentScale > maxCacheScale) {
     return false;
   }
 
@@ -1363,8 +1368,8 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
       return false;
     }
   } else {
-    contentScale = std::min(MaxCacheScale,
-                            MaxCacheSize / std::max(renderBounds.width(), renderBounds.height()));
+    contentScale = std::min(maxCacheScale,
+                            maxCacheSize / std::max(renderBounds.width(), renderBounds.height()));
   }
   auto cacheArgs = args;
   cacheArgs.renderFlags |= RenderFlags::DisableCache;
