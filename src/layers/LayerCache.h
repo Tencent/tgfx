@@ -76,14 +76,14 @@ class LayerCache {
   size_t currentCacheSize() const;
 
   /**
-   * Gets cached RasterizedContent for the specified layer if it exists and content scale matches.
-   * Returns the cached RasterizedContent if available and the content scale matches exactly.
+   * Gets cached RasterizedContent for the specified layer if it exists and the cached content scale
+   * is greater than or equal to the requested content scale.
+   * Returns the cached RasterizedContent if available and the cached scale is >= the requested scale.
    * This method marks the cached entry as recently used.
    *
    * @param layer The layer to get cached content for
-   * @param contentScale The desired content scale to match
-   * @return Pointer to RasterizedContent if found and scale matches, nullptr otherwise
-   */
+   * @param contentScale The desired minimum content scale
+   * @return Pointer to RasterizedContent if found and scale is >= requested, nullptr otherwise
   RasterizedContent* getCachedImage(const Layer* layer, float contentScale);
 
   /**
