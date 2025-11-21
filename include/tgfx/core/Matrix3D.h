@@ -75,6 +75,13 @@ class Matrix3D {
   Vec4 getRow(int i) const;
 
   /**
+   * Sets the matrix values at the given row.
+   * @param i  Row index, valid range 0..3.
+   * @param v  Vector containing the values to set.
+   */
+  void setRow(int i, const Vec4& v);
+
+  /**
    * Returns the matrix value at the given row and column.
    * @param r  Row index, valid range 0..3.
    * @param c  Column index, valid range 0..3.
@@ -258,6 +265,13 @@ class Matrix3D {
   Vec3 mapVec3(const Vec3& v) const;
 
   /**
+   * Maps a 4D point (x, y, z, w) using this matrix.
+   * If the current matrix contains a perspective transformation, the returned Vec4 is not
+   * perspective-divided; i.e., the w component of the result may not be 1.
+   */
+  Vec4 mapPoint(float x, float y, float z, float w) const;
+
+  /**
    * Returns true if the matrix is an identity matrix.
    */
   bool isIdentity() const {
@@ -308,33 +322,24 @@ class Matrix3D {
    */
   Matrix3D transpose() const;
 
-  /**
-   * Maps a 4D point (x, y, z, w) using this matrix.
-   * If the current matrix contains a perspective transformation, the returned Vec4 is not
-   * perspective-divided; i.e., the w component of the result may not be 1.
-   */
-  Vec4 mapPoint(float x, float y, float z, float w) const;
-
   Vec4 getCol(int i) const {
     Vec4 v;
     memcpy(&v, values + i * 4, sizeof(Vec4));
     return v;
   }
 
-  void setAll(float m00, float m01, float m02, float m03, float m10, float m11, float m12,
-              float m13, float m20, float m21, float m22, float m23, float m30, float m31,
-              float m32, float m33);
-
-  void setRow(int i, const Vec4& v) {
-    values[i + 0] = v.x;
-    values[i + 4] = v.y;
-    values[i + 8] = v.z;
-    values[i + 12] = v.w;
-  }
-
+  /**
+   * Sets the matrix values at the given column.
+   * @param i  Column index, valid range 0..3.
+   * @param v  Vector containing the values to set.
+   */
   void setColumn(int i, const Vec4& v) {
     memcpy(&values[i * 4], v.ptr(), sizeof(v));
   }
+
+  void setAll(float m00, float m01, float m02, float m03, float m10, float m11, float m12,
+              float m13, float m20, float m21, float m22, float m23, float m30, float m31,
+              float m32, float m33);
 
   void setIdentity() {
     *this = Matrix3D();

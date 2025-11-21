@@ -206,6 +206,14 @@ Vec4 Matrix3D::getRow(int i) const {
   return {values[i], values[i + 4], values[i + 8], values[i + 12]};
 }
 
+void Matrix3D::setRow(int i, const Vec4& v) {
+  DEBUG_ASSERT(i >= 0 && i < 4);
+  values[i] = v.x;
+  values[i + 4] = v.y;
+  values[i + 8] = v.z;
+  values[i + 12] = v.w;
+}
+
 float Matrix3D::getTranslateX() const {
   return values[TRANS_X];
 }
@@ -312,6 +320,16 @@ Vec3 Matrix3D::mapVec3(const Vec3& v) const {
   return {IEEEFloatDivide(r.x, r.w), IEEEFloatDivide(r.y, r.w), IEEEFloatDivide(r.z, r.w)};
 }
 
+Vec4 Matrix3D::mapPoint(float x, float y, float z, float w) const {
+  auto c0 = getCol(0);
+  auto c1 = getCol(1);
+  auto c2 = getCol(2);
+  auto c3 = getCol(3);
+
+  const Vec4 result = (c0 * x + c1 * y + c2 * z + c3 * w);
+  return result;
+}
+
 bool Matrix3D::operator==(const Matrix3D& other) const {
   if (this == &other) {
     return true;
@@ -375,16 +393,6 @@ Matrix3D Matrix3D::transpose() const {
   Matrix3D m;
   TransposeArrays(values, m.values);
   return m;
-}
-
-Vec4 Matrix3D::mapPoint(float x, float y, float z, float w) const {
-  auto c0 = getCol(0);
-  auto c1 = getCol(1);
-  auto c2 = getCol(2);
-  auto c3 = getCol(3);
-
-  const Vec4 result = (c0 * x + c1 * y + c2 * z + c3 * w);
-  return result;
 }
 
 void Matrix3D::setAll(float m00, float m01, float m02, float m03, float m10, float m11, float m12,

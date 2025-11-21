@@ -42,6 +42,9 @@ void RasterizedContent::draw(Canvas* canvas, bool antiAlias, float alpha, BlendM
     auto invScaleMatrix =
         Matrix3D::MakeScale(1.0f / matrix.getScaleX(), 1.0f / matrix.getScaleY(), 1.0f);
     adaptedMatrix = invScaleMatrix * invOffsetMatrix * adaptedMatrix * offsetMatrix * scaleMatrix;
+    // Layer visibility is handled in the CPU stage, update the matrix to keep the Z-axis of
+    // vertices sent to the GPU at 0.
+    adaptedMatrix.setRow(2, {0, 0, 0, 0});
     auto imageFilter = ImageFilter::Transform3D(adaptedMatrix);
     auto offSet = Point();
     auto filteredeImage = image->makeWithFilter(imageFilter, &offSet);

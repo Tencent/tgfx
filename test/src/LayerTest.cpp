@@ -3294,15 +3294,9 @@ TGFX_TEST(LayerTest, PassThrough_Test) {
   Layer::SetDefaultAllowsGroupOpacity(value);
 }
 
-static Matrix3D MakePerspectiveMatrix(float farZ) {
+static inline Matrix3D MakePerspectiveMatrix() {
   auto perspectiveMatrix = Matrix3D::I();
   constexpr float eyeDistance = 1200.f;
-  constexpr float shift = 10.f;
-  const float nearZ = eyeDistance - shift;
-  const float m22 = (2 - (farZ + nearZ) / eyeDistance) / (farZ - nearZ);
-  perspectiveMatrix.setRowColumn(2, 2, m22);
-  const float m23 = -1.f + nearZ / eyeDistance - perspectiveMatrix.getRowColumn(2, 2) * nearZ;
-  perspectiveMatrix.setRowColumn(2, 3, m23);
   perspectiveMatrix.setRowColumn(3, 2, -1.f / eyeDistance);
   return perspectiveMatrix;
 }
@@ -3336,10 +3330,7 @@ TGFX_TEST(LayerTest, Matrix) {
     auto invOffsetToAnchorMatrix =
         Matrix3D::MakeTranslate(anchor.x * layerSize.width, anchor.y * layerSize.height, 0.f);
     auto modelMatrix = Matrix3D::MakeRotate({0.f, 1.f, 0.f}, -45.f);
-    // Choose an appropriate far plane to avoid clipping during rotation.
-    auto maxLength = static_cast<float>(std::max(layerSize.width, layerSize.height)) * 2.f;
-    auto farZ = std::min(-maxLength, -500.f);
-    auto perspectiveMatrix = MakePerspectiveMatrix(farZ);
+    auto perspectiveMatrix = MakePerspectiveMatrix();
     auto origin = Point::Make(120, 40);
     auto originTranslateMatrix = Matrix3D::MakeTranslate(origin.x, origin.y, 0.f);
     auto transformMatrix = originTranslateMatrix * invOffsetToAnchorMatrix * perspectiveMatrix *
@@ -3381,10 +3372,7 @@ TGFX_TEST(LayerTest, Matrix) {
     modelMatrix.preRotate({1.f, 0.f, 0.f}, 45.f);
     modelMatrix.preRotate({0.f, 1.f, 0.f}, 45.f);
     modelMatrix.postTranslate(0.f, 0.f, 100.f);
-    // Choose an appropriate far plane to avoid clipping during rotation.
-    auto maxLength = static_cast<float>(std::max(image->width(), image->height())) * 2.f;
-    auto farZ = std::min(-maxLength, -500.f);
-    auto perspectiveMatrix = MakePerspectiveMatrix(farZ);
+    auto perspectiveMatrix = MakePerspectiveMatrix();
     // The origin coordinates of the layer in the local coordinate system when no model
     // transformation (excluding XY translation) is applied
     auto origin = Point::Make(125, 105);
@@ -3424,10 +3412,7 @@ TGFX_TEST(LayerTest, Matrix) {
     auto invOffsetToAnchorMatrix =
         Matrix3D::MakeTranslate(anchor.x * layerSize.width, anchor.y * layerSize.height, 0.f);
     auto modelMatrix = Matrix3D::MakeRotate({0.f, 1.f, 0.f}, 45.f);
-    // Choose an appropriate far plane to avoid clipping during rotation.
-    auto maxLength = static_cast<float>(std::max(layerSize.width, layerSize.height)) * 2.f;
-    auto farZ = std::min(-maxLength, -500.f);
-    auto perspectiveMatrix = MakePerspectiveMatrix(farZ);
+    auto perspectiveMatrix = MakePerspectiveMatrix();
     auto origin = Point::Make(0, 0);
     auto originTranslateMatrix = Matrix3D::MakeTranslate(origin.x, origin.y, 0.f);
     auto transformMatrix = originTranslateMatrix * invOffsetToAnchorMatrix * perspectiveMatrix *

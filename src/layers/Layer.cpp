@@ -859,7 +859,16 @@ Matrix3D Layer::getGlobalMatrix() const {
   Matrix3D matrix = {};
   auto layer = this;
   while (layer->_parent) {
-    matrix.postConcat(layer->getMatrixWithScrollRect());
+    // If the layer has 3D and projection transformations, the points of the current layer will be
+    // projected onto the plane of the parent layer's coordinate system. The adaptation matrix
+    // ensures that the Y value is not modified.
+    if (_matrix3DIsAffine) {
+      matrix.postConcat(layer->getMatrixWithScrollRect());
+    } else {
+      auto selfMatrix = layer->getMatrixWithScrollRect();
+      selfMatrix.setRow(2, {0, 0, 1, 0});
+      matrix.postConcat(selfMatrix);
+    }
     layer = layer->_parent;
   }
   return matrix;
@@ -894,7 +903,11 @@ std::shared_ptr<ImageFilter> Layer::getImageFilter(float contentScale, const Mat
     }
   }
   if (transform != nullptr) {
-    auto content3DFilter = Transform3DFilter::Make(*transform);
+    // Layer visibility is handled in the CPU stage, update the matrix to keep the Z-axis of
+    // vertices sent to the GPU at 0.
+    auto finalMatrix = *transform;
+    finalMatrix.setRow(2, {0, 0, 0, 0});
+    auto content3DFilter = Transform3DFilter::Make(finalMatrix);
     filters.push_back(content3DFilter->getImageFilter(contentScale));
   }
   return ImageFilter::Compose(filters);
@@ -1159,6 +1172,12 @@ std::shared_ptr<Image> Layer::getOffscreenContentImage(
 
 void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                           const Matrix3D* transform) {
+  // The matrix acts on the anchor point at the origin of the layer's local coordinate system. If
+  // the w-component of this point after transformation is less than 0, it indicates the layer is
+  // behind the viewer, so the layer subtree is hidden.
+  if (transform != nullptr && transform->mapPoint(0, 0, 0, 1).w < 0) {
+    return;
+  }
   auto contentScale = canvas->getMatrix().getMaxScale();
   if (FloatNearlyZero(contentScale)) {
     return;
@@ -1697,6 +1716,9 @@ void Layer::drawBackgroundLayerStyles(const DrawArgs& args, Canvas* canvas, floa
     auto styleSourceMatrix = anchorAdaptedMatrix(transform, styleSourceAnchor);
     styleSourceMatrix.postScale(bounds.width() / transformedBounds.width(),
                                 bounds.height() / transformedBounds.height(), 1.0f);
+    // Layer visibility is handled in the CPU stage, update the matrix to keep the Z-axis of
+    // vertices sent to the GPU at 0.
+    styleSourceMatrix.setRow(2, {0, 0, 0, 0});
     auto transform3DFilter = Transform3DFilter::Make(styleSourceMatrix);
     styleSourceFilter = transform3DFilter->getImageFilter(styleSource->contentScale);
     styleSource->content = styleSource->content->makeWithFilter(styleSourceFilter);
