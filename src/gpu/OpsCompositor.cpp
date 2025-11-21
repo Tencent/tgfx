@@ -121,6 +121,7 @@ void OpsCompositor::fillRect(const Rect& rect, const MCState& state, const Fill&
       ShouldFlushRectOps(pendingStrokes, stroke)) {
     flushPendingOps(PendingOpType::Rect, state.clip, fill);
   }
+
   auto dstColor = ToPMColor(fill.color, dstColorSpace);
   auto record = drawingAllocator()->make<RectRecord>(rect, state.matrix, dstColor);
   pendingRects.emplace_back(std::move(record));
