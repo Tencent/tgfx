@@ -1348,7 +1348,7 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     return false;
   }
 
-  auto maxCacheSize = args.layerCache->maxCacheContentSize();
+  auto maxCacheSize = static_cast<float>(args.layerCache->maxCacheContentSize());
   auto maxCacheScale = args.layerCache->maxCacheContentScale();
 
   auto scaledBounds = renderBounds;

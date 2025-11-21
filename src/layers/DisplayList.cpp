@@ -146,6 +146,8 @@ DisplayList::DisplayList()
 
 DisplayList::~DisplayList() {
   resetCaches();
+  // make sure layerCache is destroyed before _root
+  layerCache = nullptr;
 }
 
 Layer* DisplayList::root() const {
@@ -236,23 +238,28 @@ void DisplayList::setMaxTileCount(int count) {
   resetCaches();
 }
 
+size_t DisplayList::layerCacheMaxSize() const {
+  return layerCache->currentCacheSize();
+}
+
 void DisplayList::setLayerCacheMaxSize(size_t maxSize) {
-  if (layerCache->maxCacheSize() == maxSize) {
-    return;
-  }
   layerCache->setMaxCacheSize(maxSize);
 }
 
-void DisplayList::setMaxCacheContentSize(float maxSize) {
-  if (layerCache) {
-    layerCache->setMaxCacheContentSize(maxSize);
-  }
+int DisplayList::maxCacheContentSize() const {
+  return layerCache->maxCacheContentSize();
+}
+
+void DisplayList::setMaxCacheContentSize(int maxSize) {
+  layerCache->setMaxCacheContentSize(maxSize);
+}
+
+float DisplayList::maxCacheContentScale() const {
+  return layerCache->maxCacheContentScale();
 }
 
 void DisplayList::setMaxCacheContentScale(float maxScale) {
-  if (layerCache) {
-    layerCache->setMaxCacheContentScale(maxScale);
-  }
+  layerCache->setMaxCacheContentScale(maxScale);
 }
 
 void DisplayList::showDirtyRegions(bool show) {

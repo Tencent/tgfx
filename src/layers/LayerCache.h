@@ -108,7 +108,7 @@ class LayerCache {
    */
   void clear();
 
-  /*
+  /**
    * Sets the context for the cache.
    */
   void setContext(Context* context);
@@ -118,14 +118,17 @@ class LayerCache {
    * Layers with rasterized bounds larger than this size will not be cached.
    * @param maxSize Maximum width or height in pixels. Default is 64 pixels.
    */
-  void setMaxCacheContentSize(float maxSize) {
+  void setMaxCacheContentSize(int maxSize) {
+    if (maxSize < 0) {
+      maxSize = 0;
+    }
     _maxCacheContentSize = maxSize;
   }
 
   /**
    * Returns the maximum size of rasterized layer content that can be cached.
    */
-  float maxCacheContentSize() const {
+  int maxCacheContentSize() const {
     return _maxCacheContentSize;
   }
 
@@ -135,6 +138,9 @@ class LayerCache {
    * @param maxScale Maximum content scale. Default is 0.3.
    */
   void setMaxCacheContentScale(float maxScale) {
+    if (maxScale < 0) {
+      maxScale = 0;
+    }
     _maxCacheContentScale = maxScale;
   }
 
@@ -150,7 +156,7 @@ class LayerCache {
   size_t _maxCacheSize = 0;
   size_t _currentCacheSize = 0;
   std::shared_ptr<ColorSpace> _colorSpace;
-  float _maxCacheContentSize = 64.0f;
+  int _maxCacheContentSize = 64;
   float _maxCacheContentScale = 0.3f;
 
   std::map<const Layer*, CacheEntry> _cacheMap;

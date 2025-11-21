@@ -224,24 +224,43 @@ class DisplayList {
   }
 
   /**
-   * Sets the maximum cache size for layer surface caching. This affects the total size of cached
+   * Returns the maximum cache size for layer surface caching. This affects the total size of cached
    * surfaces that can be stored. When the cache exceeds this limit, least recently used entries
-   * are evicted. Set to 0 to disable layer caching.
-   * @param maxSize The maximum cache size in bytes. Default is 64MB.
+   * are evicted. Set to 0 to disable layer caching.  Default is 64MB.
+   */
+  size_t layerCacheMaxSize() const;
+
+  /**
+   * Sets the maximum cache size for layer surface caching.
+   * @param maxSize The maximum cache size in bytes.
    */
   void setLayerCacheMaxSize(size_t maxSize);
 
   /**
-   * Sets the maximum size of rasterized layer content (in pixels) that can be cached.
+   * Returns the maximum size of rasterized layer content (in pixels) that can be cached.
    * Layers with rasterized bounds larger than this size will not be cached.
-   * @param maxSize Maximum width or height in pixels. Default is 64 pixels.
+   * The default is 64 pixels.
    */
-  void setMaxCacheContentSize(float maxSize);
+  int maxCacheContentSize() const;
 
   /**
-   * Sets the maximum content scale for layer caching. Layers with content scale greater than
+   * Sets the maximum size of rasterized layer content (in pixels) that can be cached.
+   * Changes to maxCacheContentSize and maxCacheContentScale do not affect layers
+   * that have already been cached.
+   */
+  void setMaxCacheContentSize(int maxSize);
+
+  /**
+   * Returns the maximum content scale for layer caching. Layers with content scale greater than
    * this value will not be cached to avoid excessive memory usage at high zoom levels.
-   * @param maxScale Maximum content scale. Default is 0.3.
+   * The default is 0.3.
+   */
+  float maxCacheContentScale() const;
+
+  /**
+   * Sets the maximum content scale for layer caching.
+   * Changes to maxCacheContentSize and maxCacheContentScale do not affect layers
+   * that have already been cached.
    */
   void setMaxCacheContentScale(float maxScale);
 

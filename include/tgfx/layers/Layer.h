@@ -587,13 +587,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   LayerContent* getContent();
 
-  /**
-   * Generates an image filter for the specified content area within the layer.
-   * @param contentScale The scale ratio of the specified area in the layer's local coordinate
-   * system.
-   * @param transform The affine transformation matrix referenced by the local coordinate system
-   * with the top-left vertex of the content rectangle as the origin.
-   */
   std::shared_ptr<ImageFilter> getImageFilter(float contentScale);
 
   RasterizedContent* getRasterizedCache(const DrawArgs& args, const Matrix& renderMatrix);
