@@ -19,7 +19,6 @@
 #include "layers/LayerCache.h"
 #include <algorithm>
 #include <cmath>
-#include "LayerCache.h"
 #include "contents/RasterizedContent.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Matrix.h"
