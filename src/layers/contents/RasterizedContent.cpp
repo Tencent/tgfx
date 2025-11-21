@@ -20,7 +20,7 @@
 
 namespace tgfx {
 void RasterizedContent::draw(Canvas* canvas, bool antiAlias, float alpha,
-                             const std::shared_ptr<MaskFilter>& mask, BlendMode blendMode, 
+                             const std::shared_ptr<MaskFilter>& mask, BlendMode blendMode,
                              const Matrix3D* transform) const {
   auto oldMatrix = canvas->getMatrix();
   canvas->concat(matrix);

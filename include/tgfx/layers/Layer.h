@@ -674,20 +674,19 @@ class Layer : public std::enable_shared_from_this<Layer> {
   static std::shared_ptr<Picture> RecordPicture(DrawMode mode, float contentScale,
                                                 const std::function<void(Canvas*)>& drawFunction);
 
+  bool shouldPassThroughBackground(BlendMode blendMode, const Matrix3D* transform) const;
+
   bool drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                      const Matrix3D* transform);
 
   void drawContentOffscreen(const DrawArgs& args, Canvas* canvas, std::optional<Rect> clipBounds,
                             float contentScale, BlendMode blendMode, float alpha,
-                            const Matrix3D* transform,
-                            const std::function<void(std::shared_ptr<Image>, const Matrix&)>&
-                                extraImageFuction = nullptr);
+                            const Matrix3D* transform, bool cacheContent);
 
   std::shared_ptr<Image> getContentImage(const DrawArgs& args, float contentScale,
                                          const std::shared_ptr<Image>& passThroughImage,
                                          const Matrix& passThroughImageMatrix,
-                                         const std::optional<Rect>& clipBounds,
-                                         Matrix* imageMatrix);
+                                         std::optional<Rect> clipBounds, Matrix* imageMatrix);
 
   /**
    * Returns the equivalent transformation matrix adapted for a custom anchor point.

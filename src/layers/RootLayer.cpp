@@ -20,8 +20,8 @@
 #include <limits>
 #include "core/utils/DecomposeRects.h"
 #include "core/utils/Log.h"
-#include "tgfx/layers/DisplayList.h"
 #include "layers/LayerCache.h"
+#include "tgfx/layers/DisplayList.h"
 
 namespace tgfx {
 static float UnionArea(const Rect& rect1, const Rect& rect2) {
