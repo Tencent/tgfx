@@ -85,8 +85,6 @@ class PDFExportContext : public DrawContext {
     return _initialTransform;
   }
 
-  std::unique_ptr<PDFDictionary> makeResourceDict();
-
  private:
   void reset();
 
@@ -161,6 +159,7 @@ class PDFExportContext : public DrawContext {
   std::unordered_set<PDFIndirectReference> xObjectResources;
   std::unordered_set<PDFIndirectReference> shaderResources;
   std::unordered_set<PDFIndirectReference> fontResources;
+  std::unordered_set<PDFIndirectReference> colorSpaceResources;
 
   friend class ScopedContentEntry;
   friend class PDFFont;

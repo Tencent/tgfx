@@ -28,7 +28,9 @@
 #include "core/filters/InnerShadowImageFilter.h"
 #include "core/filters/ShaderMaskFilter.h"
 #include "core/images/PictureImage.h"
+#include "core/shaders/BlendShader.h"
 #include "core/shaders/ColorShader.h"
+#include "core/shaders/GradientShader.h"
 #include "core/shaders/ImageShader.h"
 #include "core/shaders/MatrixShader.h"
 #include "core/utils/Log.h"
@@ -593,9 +595,10 @@ void PDFExportContext::drawDropShadowBeforeLayer(const std::shared_ptr<Picture>&
   auto blurBounds = copyFilter->filterBounds(pictureBounds);
   auto offset = Point::Make(pictureBounds.x() - blurBounds.x(), pictureBounds.y() - blurBounds.y());
 
-  auto surface = Surface::Make(document->context(), static_cast<int>(blurBounds.width()),
-                               static_cast<int>(blurBounds.height()), false, 1, false, 0,
-                               document->colorSpace());
+  auto surface =
+      Surface::Make(document->context(), static_cast<int>(blurBounds.width()),
+                    static_cast<int>(blurBounds.height()), false, 1, false, 0,
+                    ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3));
   DEBUG_ASSERT(surface);
   auto canvas = surface->getCanvas();
 
@@ -626,9 +629,10 @@ void PDFExportContext::drawInnerShadowAfterLayer(const PictureRecord* record,
     return;
   }
 
-  auto surface = Surface::Make(document->context(), static_cast<int>(pictureBounds.width()),
-                               static_cast<int>(pictureBounds.height()), false, 1, false, 0,
-                               document->colorSpace());
+  auto surface =
+      Surface::Make(document->context(), static_cast<int>(pictureBounds.width()),
+                    static_cast<int>(pictureBounds.height()), false, 1, false, 0,
+                    ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3));
   DEBUG_ASSERT(surface);
   auto canvas = surface->getCanvas();
   canvas->translate(-pictureBounds.x(), -pictureBounds.y());
@@ -675,9 +679,10 @@ void PDFExportContext::drawBlurLayer(const std::shared_ptr<Picture>& picture,
   blurBounds = blurBounds.makeOutset(100, 100);
   Point offset = {pictureBounds.x() - blurBounds.x(), pictureBounds.y() - blurBounds.y()};
 
-  auto surface = Surface::Make(document->context(), static_cast<int>(blurBounds.width()),
-                               static_cast<int>(blurBounds.height()), false, 1, false, 0,
-                               document->colorSpace());
+  auto surface =
+      Surface::Make(document->context(), static_cast<int>(blurBounds.width()),
+                    static_cast<int>(blurBounds.height()), false, 1, false, 0,
+                    ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3));
   DEBUG_ASSERT(surface);
 
   Canvas* canvas = surface->getCanvas();
@@ -785,8 +790,9 @@ void PDFExportContext::onDrawImageRect(std::shared_ptr<Image> image, const Rect&
   auto modifiedFill = fill;
   if (image->isAlphaOnly() && modifiedFill.colorFilter) {
     // must blend alpha image and shader before applying colorfilter.
-    auto surface = Surface::Make(document->context(), image->width(), image->height(), false, 1,
-                                 false, 0, document->colorSpace());
+    auto surface =
+        Surface::Make(document->context(), image->width(), image->height(), false, 1, false, 0,
+                      ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3));
     Canvas* canvas = surface->getCanvas();
     Paint tmpPaint;
     // In the case of alpha images with shaders, the shader's coordinate system is the image's
@@ -902,14 +908,10 @@ std::vector<PDFIndirectReference> Sort(const std::unordered_set<PDFIndirectRefer
 }
 }  // namespace
 
-std::unique_ptr<PDFDictionary> PDFExportContext::makeResourceDict() {
-  return MakePDFResourceDictionary(Sort(graphicStateResources), Sort(shaderResources),
-                                   Sort(xObjectResources), Sort(fontResources));
-}
-
 std::unique_ptr<PDFDictionary> PDFExportContext::makeResourceDictionary() {
   return MakePDFResourceDictionary(Sort(graphicStateResources), Sort(shaderResources),
-                                   Sort(xObjectResources), Sort(fontResources));
+                                   Sort(xObjectResources), Sort(fontResources),
+                                   Sort(colorSpaceResources));
 }
 
 bool PDFExportContext::isContentEmpty() {
@@ -951,13 +953,11 @@ bool TreatAsRegularPDFBlendMode(BlendMode blendMode) {
 void PopulateGraphicStateEntryFromPaint(
     PDFDocumentImpl* document, const Matrix& matrix, const MCState& state, Rect deviceBounds,
     const Fill& fill, const Matrix& initialTransform, float textScale,
-    std::shared_ptr<ColorSpace> colorSpace, PDFGraphicStackState::Entry* entry,
-    std::unordered_set<PDFIndirectReference>* shaderResources,
+    PDFGraphicStackState::Entry* entry, std::unordered_set<PDFIndirectReference>* shaderResources,
     std::unordered_set<PDFIndirectReference>* graphicStateResources) {
 
   entry->matrix = state.matrix * matrix;
   auto color = fill.color;
-  color = color.makeColorSpace(std::move(colorSpace));
   color.alpha = 1;
   entry->color = color;
   entry->shaderIndex = -1;
@@ -969,7 +969,6 @@ void PopulateGraphicStateEntryFromPaint(
     if (Types::Get(shader.get()) == Types::ShaderType::Color) {
       const auto colorShader = static_cast<const ColorShader*>(shader.get());
       if (colorShader->asColor(&color)) {
-        color = color.makeColorSpace(std::move(colorSpace));
         color.alpha = 1;
         entry->color = color;
       }
@@ -1029,22 +1028,28 @@ std::shared_ptr<MemoryWriteStream> PDFExportContext::setUpContentEntry(
         content->writeText("Q\nq\n");
         needsExtraSave = true;
       }
-      fActiveStackState = PDFGraphicStackState(content);
+      fActiveStackState = PDFGraphicStackState(content, document, &colorSpaceResources);
     } else {
       DEBUG_ASSERT(fActiveStackState.contentStream == content);
     }
   } else {
     fActiveStackState.drainStack();
-    fActiveStackState = PDFGraphicStackState(contentBuffer);
+    fActiveStackState = PDFGraphicStackState(contentBuffer, document, &colorSpaceResources);
   }
 
   DEBUG_ASSERT(fActiveStackState.contentStream);
   PDFGraphicStackState::Entry entry;
   PopulateGraphicStateEntryFromPaint(document, matrix, state, Rect::MakeSize(_pageSize), fill,
-                                     _initialTransform, scale, document->colorSpace(), &entry,
-                                     &shaderResources, &graphicStateResources);
+                                     _initialTransform, scale, &entry, &shaderResources,
+                                     &graphicStateResources);
   fActiveStackState.updateClip(state);
   fActiveStackState.updateMatrix(entry.matrix);
+  if (document->converter()) {
+    entry.color = document->converter()->convertColor(entry.color);
+  }
+  if (!entry.color.colorSpace) {
+    entry.color.colorSpace = ColorSpace::SRGB();
+  }
   fActiveStackState.updateDrawingState(entry);
 
   return fActiveStackState.contentStream;
@@ -1269,8 +1274,7 @@ void PDFExportContext::drawPathWithFilter(const MCState& state, const Path& orig
   auto maskContext = makeCongruentDevice();
   if (!picture) {  //mask as image
     auto surface = Surface::Make(document->context(), static_cast<int>(maskBound.width()),
-                                 static_cast<int>(maskBound.height()), false, 1, false, 0,
-                                 document->colorSpace());
+                                 static_cast<int>(maskBound.height()), false, 1, false, 0);
     Canvas* maskCanvas = surface->getCanvas();
     Paint maskPaint;
     maskPaint.setShader(shaderMaskFilter->getShader());
@@ -1286,7 +1290,7 @@ void PDFExportContext::drawPathWithFilter(const MCState& state, const Path& orig
     auto pixelData = Data::MakeAdopted(pixels, byteSize, Data::FreeProc);
     // Convert alpha-8 to a grayscale image
     grayscaleInfo = ImageInfo::Make(surface->width(), surface->height(), ColorType::Gray_8,
-                                    AlphaType::Premultiplied, 0, document->colorSpace());
+                                    AlphaType::Premultiplied, 0);
     auto maskImage = Image::MakeFrom(grayscaleInfo, pixelData);
 
     // PDF doesn't seem to allow masking vector graphics with an Image XObject.

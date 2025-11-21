@@ -20,6 +20,7 @@
 
 #include <memory>
 #include "tgfx/core/Canvas.h"
+#include "tgfx/core/ColorSpaceConverter.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/WriteStream.h"
 #include "tgfx/pdf/PDFMetadata.h"
@@ -36,10 +37,12 @@ class PDFDocument {
    * @param stream The output stream where the PDF file will be written.
    * @param context The GPU context used for processing images.
    * @param metadata Metadata describing the PDF file.
+   * @param converter The CallBack base class for Convert Color and image.
    * @return A Document object that provides interfaces for import operations.
    */
-  static std::shared_ptr<PDFDocument> Make(std::shared_ptr<WriteStream> stream, Context* context,
-                                           PDFMetadata metadata);
+  static std::shared_ptr<PDFDocument> Make(
+      std::shared_ptr<WriteStream> stream, Context* context, PDFMetadata metadata,
+      std::shared_ptr<ColorSpaceConverter> converter = ColorSpaceConverter::MakeDefaultConverter());
 
   /**
    * Destroy the PDFDocument object

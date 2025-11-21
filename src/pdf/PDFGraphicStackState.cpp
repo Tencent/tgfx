@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFGraphicStackState.h"
+#include "PDFDocumentImpl.h"
 #include "core/MCState.h"
 #include "core/utils/Log.h"
 #include "pdf/PDFUtils.h"
@@ -112,10 +113,15 @@ void PDFGraphicStackState::updateDrawingState(const PDFGraphicStackState::Entry&
       currentEntry()->shaderIndex = state.shaderIndex;
     }
   } else if (state.color != currentEntry()->color || currentEntry()->shaderIndex >= 0) {
-    contentStream->writeText("/CS CS\n");
+    if (!ColorSpace::Equals(currentEntry()->color.colorSpace.get(), state.color.colorSpace.get())) {
+      auto ref = document->emitColorSpace(state.color.colorSpace);
+      colorSpaceResources->insert(ref);
+      std::string command = "/C" + std::to_string(ref.value);
+      contentStream->writeText(command + " CS\n");
+      contentStream->writeText(command + " cs\n");
+    }
     EmitPDFColor(state.color, contentStream);
     contentStream->writeText("SC\n");
-    contentStream->writeText("/CS cs\n");
     EmitPDFColor(state.color, contentStream);
     contentStream->writeText("sc\n");
     currentEntry()->color = state.color;

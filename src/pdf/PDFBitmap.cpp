@@ -24,6 +24,7 @@
 #include "pdf/PDFDocumentImpl.h"
 #include "pdf/PDFTypes.h"
 #include "tgfx/core/AlphaType.h"
+#include "tgfx/core/Buffer.h"
 #include "tgfx/core/ColorType.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Pixmap.h"
@@ -232,7 +233,7 @@ void DoDeflatedImage(const Pixmap& pixmap, PDFDocumentImpl* document, bool isOpa
       break;
     }
     default:
-      auto colorSpaceRef = document->colorSpaceRef();
+      auto colorSpaceRef = document->emitColorSpace(pixmap.colorSpace());
       colorSpace = PDFUnion::Ref(colorSpaceRef);
       const auto pixelPointer = reinterpret_cast<const uint8_t*>(pixmap.pixels());
       auto rowBytes = pixmap.rowBytes();
@@ -284,28 +285,31 @@ void DoDeflatedImage(const Pixmap& pixmap, PDFDocumentImpl* document, bool isOpa
 void PDFBitmap::SerializeImage(const std::shared_ptr<Image>& image, int /*encodingQuality*/,
                                PDFDocumentImpl* doc, PDFIndirectReference ref) {
   //TODO (YGaurora): is image opaque,encode as jpeg
-  auto image2bitmap = [doc](Context* context, const std::shared_ptr<Image>& image) {
-    auto surface = Surface::Make(context, image->width(), image->height(), false, 1, false, 0,
-                                 doc->colorSpace());
+  auto image2ImageData = [](Context* context, const std::shared_ptr<Image>& image) {
+    auto surface =
+        Surface::Make(context, image->width(), image->height(), false, 1, false, 0,
+                      ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3));
     auto canvas = surface->getCanvas();
     canvas->drawImage(image);
-
-    Bitmap bitmap(surface->width(), surface->height(), false, true, surface->colorSpace());
-    auto pixels = bitmap.lockPixels();
-    //bitmap in pdf must be unpremultiplied
-    if (surface->readPixels(bitmap.info().makeAlphaType(AlphaType::Unpremultiplied), pixels)) {
-      bitmap.unlockPixels();
-      return bitmap;
+    auto info = ImageInfo::Make(surface->width(), surface->height(), ColorType::BGRA_8888,
+                                AlphaType::Unpremultiplied, 0, surface->colorSpace());
+    Buffer buffer;
+    buffer.alloc(info.byteSize());
+    if (surface->readPixels(info, buffer.bytes())) {
+      return ImageData{info, Data::MakeWithCopy(buffer.bytes(), buffer.size())};
     }
-    return Bitmap();
+    return ImageData{};
   };
 
-  auto bitmap = image2bitmap(doc->context(), image);
-  if (bitmap.isEmpty()) {
+  auto imageData = image2ImageData(doc->context(), image);
+  if (imageData.data == nullptr || imageData.info.isEmpty()) {
     return;
   }
-  auto pixmap = Pixmap(bitmap);
-  DoDeflatedImage(pixmap, doc, bitmap.isOpaque(), ref);
+  if (doc->converter()) {
+    imageData = doc->converter()->convertImage(imageData);
+  }
+  Pixmap pixmap{imageData.info, imageData.data->bytes()};
+  DoDeflatedImage(pixmap, doc, pixmap.info().isOpaque(), ref);
 }
 
 PDFIndirectReference PDFBitmap::Serialize(const std::shared_ptr<Image>& image,
