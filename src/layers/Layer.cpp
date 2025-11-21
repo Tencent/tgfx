@@ -913,24 +913,20 @@ RasterizedContent* Layer::getRasterizedCache(const DrawArgs& args, const Matrix&
   }
   auto contextID = args.context->uniqueID();
   auto content = rasterizedContent.get();
-  float contentScale = _rasterizationScale;
-  if (contentScale <= 0.0f) {
-    contentScale = scale;
-  }
+  float contentScale =
+      _rasterizationScale == 0.0f ? renderMatrix.getMaxScale() : _rasterizationScale;
   if (content && content->contextID() == contextID && content->contentScale() == contentScale) {
     return content;
   }
-  if (args.renderFlags & RenderFlags::DisableCache) {
+  if (args.renderFlags & RenderFlags::DisableCache || args.context == nullptr) {
     return nullptr;
   }
   Matrix drawingMatrix = {};
-  auto offscreenArgs = args;
-  offscreenArgs.context = nullptr;
-  auto image = getRasterizedImage(offscreenArgs, contentScale, &drawingMatrix);
+  auto image = getRasterizedImage(args, contentScale, &drawingMatrix);
   if (image == nullptr) {
     return nullptr;
   }
-  image = image->makeRasterized();
+  image = image->makeTextureImage(args.context);
   if (image == nullptr) {
     return nullptr;
   }

@@ -39,6 +39,13 @@ struct CacheEntry;
  *
  * This cache stores RasterizedContent directly (wrapping Image + Matrix).
  * Each layer can have at most one cached RasterizedContent per content scale.
+ *
+ * Performance Note:
+ * While using Atlas can reduce the peak number of drawCalls, under the current cacheImage behavior,
+ * performance may be degraded due to eviction mechanisms and frequent offscreen rendering.
+ * The LRU eviction policy combined with multiple offscreen rendering operations may cause
+ * more overhead than the benefit gained from reduced drawCalls. Future optimization should
+ * focus on improving cache reuse strategies and reducing unnecessary evictions.
  */
 class LayerCache {
  public:
