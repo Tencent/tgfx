@@ -19,7 +19,8 @@
 #include "RasterizedContent.h"
 
 namespace tgfx {
-void RasterizedContent::draw(Canvas* canvas, bool antiAlias, float alpha, BlendMode blendMode,
+void RasterizedContent::draw(Canvas* canvas, bool antiAlias, float alpha,
+                             const std::shared_ptr<MaskFilter>& mask, BlendMode blendMode,
                              const Matrix3D* transform) const {
   auto oldMatrix = canvas->getMatrix();
   canvas->concat(matrix);
@@ -27,6 +28,12 @@ void RasterizedContent::draw(Canvas* canvas, bool antiAlias, float alpha, BlendM
   paint.setAntiAlias(antiAlias);
   paint.setAlpha(alpha);
   paint.setBlendMode(blendMode);
+  if (mask) {
+    auto invertMatrix = Matrix::I();
+    if (matrix.invert(&invertMatrix)) {
+      paint.setMaskFilter(mask->makeWithMatrix(invertMatrix));
+    }
+  }
   if (transform == nullptr) {
     canvas->drawImage(image, &paint);
   } else {

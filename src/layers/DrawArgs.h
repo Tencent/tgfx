@@ -19,6 +19,7 @@
 #pragma once
 
 #include "layers/BackgroundContext.h"
+#include "layers/LayerCache.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
@@ -40,6 +41,9 @@ class DrawArgs {
 
   // The GPU context to be used during the drawing process. Note: this could be nullptr.
   Context* context = nullptr;
+
+  uint32_t renderFlags = 0;
+
   // Whether to exclude effects during the drawing process.
   bool excludeEffects = false;
   // Determines the draw mode of the Layer.
@@ -55,5 +59,8 @@ class DrawArgs {
 
   // Only used while recording layer's background image.
   std::shared_ptr<BackgroundContext> blendModeBackground = nullptr;
+
+  // Layer cache for storing cached surfaces during rendering. Note: this could be nullptr.
+  LayerCache* layerCache = nullptr;
 };
 }  // namespace tgfx
