@@ -84,6 +84,7 @@ class LayerCache {
    * @param layer The layer to get cached content for
    * @param contentScale The desired minimum content scale
    * @return Pointer to RasterizedContent if found and scale is >= requested, nullptr otherwise
+   */
   RasterizedContent* getCachedImage(const Layer* layer, float contentScale);
 
   /**
