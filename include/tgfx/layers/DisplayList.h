@@ -222,6 +222,25 @@ class DisplayList {
   }
 
   /**
+   * Returns the minimum zoom scale for tiled rendering mode. If the current zoomScale is less than
+   * this minimum value, tiles will not be created at the current scale. Instead, tiles from the
+   * minimum zoom scale will be used and downscaled for rendering. This prevents excessive tile
+   * creation when zooming out. The default value is 0.0f, meaning no minimum limit is applied.
+   */
+  float minZoomScale() const {
+    return _minZoomScale;
+  }
+
+  /**
+   * Sets the minimum zoom scale for tiled rendering mode. When the current zoomScale falls below
+   * this threshold, the display list will use cached tiles from this minimum scale and render them
+   * at the smaller size, avoiding the creation of excessive small tiles. This optimization improves
+   * performance during aggressive zooming out operations.
+   * @param scale The minimum zoom scale value. Must be greater than 0.
+   */
+  void setMinZoomScale(float scale);
+
+  /**
    * Sets whether to show dirty regions during rendering. When enabled, the dirty regions will be
    * highlighted in the rendered output. This is useful for debugging to visualize which parts of
    * the display list are being updated. The default value is false.
@@ -252,6 +271,7 @@ class DisplayList {
   int _maxTileCount = 0;
   bool _allowZoomBlur = false;
   int _maxTilesRefinedPerFrame = 5;
+  float _minZoomScale = 0.0f;
   bool _showDirtyRegions = false;
   bool _hasContentChanged = false;
   bool hasZoomBlurTiles = false;

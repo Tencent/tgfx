@@ -234,6 +234,16 @@ void DisplayList::setMaxTileCount(int count) {
   resetCaches();
 }
 
+void DisplayList::setMinZoomScale(float scale) {
+  if (scale < 0.0f) {
+    scale = 0.0f;
+  }
+  if (FloatNearlyEqual(_minZoomScale, scale)) {
+    return;
+  }
+  _minZoomScale = scale;
+}
+
 void DisplayList::showDirtyRegions(bool show) {
   if (_showDirtyRegions == show) {
     return;
@@ -392,6 +402,21 @@ void DisplayList::checkTileCount(Surface* renderSurface) {
   auto tileCountY =
       ceilf(static_cast<float>(renderSurface->height()) / static_cast<float>(_tileSize));
   auto minTileCount = static_cast<int>(tileCountX + 1) * static_cast<int>(tileCountY + 1);
+  
+  // Calculate the maximum tile count based on root layer bounds.
+  int maxTileCountFromBounds = 0;
+  if (_root) {
+    auto rootBounds = _root->getBounds();
+    if (!rootBounds.isEmpty()) {
+      auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
+      auto boundsWidth = rootBounds.width() * currentZoomScale;
+      auto boundsHeight = rootBounds.height() * currentZoomScale;
+      auto boundsTileCountX = static_cast<int>(ceilf(boundsWidth / static_cast<float>(_tileSize)));
+      auto boundsTileCountY = static_cast<int>(ceilf(boundsHeight / static_cast<float>(_tileSize)));
+      maxTileCountFromBounds = (boundsTileCountX + 1) * (boundsTileCountY + 1);
+    }
+  }
+  
   if (totalTileCount > 0) {
     if (totalTileCount >= minTileCount) {
       return;
@@ -399,6 +424,12 @@ void DisplayList::checkTileCount(Surface* renderSurface) {
     resetCaches();
   }
   totalTileCount = std::max(minTileCount, _maxTileCount);
+  
+  // Limit tile count by root layer bounds if available.
+  if (maxTileCountFromBounds > 0) {
+    totalTileCount = std::min(totalTileCount, maxTileCountFromBounds);
+  }
+  
   auto maxTileCountPerAtlas = getMaxTileCountPerAtlas(renderSurface->getContext());
   if (maxTileCountPerAtlas <= 0) {
     return;
@@ -478,20 +509,56 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
     maxRefinedCount = 0;
   }
   hasZoomBlurTiles = false;
+  
+  // Determine the effective zoom scale and tile cache to use.
+  auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
+  int64_t effectiveZoomScaleInt = _zoomScaleInt;
+  if (_minZoomScale > 0.0f && currentZoomScale < _minZoomScale) {
+    // If current zoom is below minimum, use the minimum zoom scale instead.
+    effectiveZoomScaleInt = ToZoomScaleInt(_minZoomScale, _zoomScalePrecision);
+  }
+  
   TileCache* currentTileCache = nullptr;
-  auto result = tileCaches.find(_zoomScaleInt);
+  auto result = tileCaches.find(effectiveZoomScaleInt);
   if (result != tileCaches.end()) {
     currentTileCache = result->second;
   } else {
     currentTileCache = new TileCache(_tileSize);
-    tileCaches[_zoomScaleInt] = currentTileCache;
+    tileCaches[effectiveZoomScaleInt] = currentTileCache;
   }
+  // Calculate effective zoom scale for tile coordinate calculations.
+  auto effectiveZoomScale = ToZoomScaleFloat(effectiveZoomScaleInt, _zoomScalePrecision);
+  auto scaleAdjustment = effectiveZoomScale / currentZoomScale;  // > 1.0 when zooming out below min
+  
   auto renderRect = Rect::MakeWH(surface->width(), surface->height());
   renderRect.offset(-_contentOffset.x, -_contentOffset.y);
+  // Adjust render rect by the effective scale ratio
+  renderRect.scale(1.0f / scaleAdjustment, 1.0f / scaleAdjustment);
   int startX = static_cast<int>(floorf(renderRect.left / static_cast<float>(_tileSize)));
   int startY = static_cast<int>(floorf(renderRect.top / static_cast<float>(_tileSize)));
   int endX = static_cast<int>(ceilf(renderRect.right / static_cast<float>(_tileSize)));
   int endY = static_cast<int>(ceilf(renderRect.bottom / static_cast<float>(_tileSize)));
+  
+  // Constrain tile coordinates by root layer bounds.
+  if (_root) {
+    auto rootBounds = _root->getBounds();
+    if (!rootBounds.isEmpty()) {
+      auto boundsStartX = static_cast<int>(floorf(rootBounds.left / static_cast<float>(_tileSize)));
+      auto boundsStartY = static_cast<int>(floorf(rootBounds.top / static_cast<float>(_tileSize)));
+      auto boundsEndX = static_cast<int>(ceilf(rootBounds.right / static_cast<float>(_tileSize)));
+      auto boundsEndY = static_cast<int>(ceilf(rootBounds.bottom / static_cast<float>(_tileSize)));
+      startX = std::max(startX, boundsStartX);
+      startY = std::max(startY, boundsStartY);
+      endX = std::min(endX, boundsEndX);
+      endY = std::min(endY, boundsEndY);
+    }
+  }
+  
+  // If constrained bounds result in no tiles, return empty.
+  if (startX >= endX || startY >= endY) {
+    return {};
+  }
+  
   std::vector<DrawTask> screenTasks = {};
   std::vector<std::pair<int, int>> dirtyGrids = {};
   auto tileCount = static_cast<size_t>(endX - startX) * static_cast<size_t>(endY - startY);
@@ -503,7 +570,12 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
   for (const auto& [tileX, tileY] : sortedTiles) {
     auto tile = currentTileCache->getTile(tileX, tileY);
     if (tile != nullptr) {
-      screenTasks.emplace_back(tile, _tileSize);
+      // If we're using a downscaled tile cache, apply the scale adjustment.
+      if (scaleAdjustment > 1.001f) {
+        screenTasks.emplace_back(tile, _tileSize, {}, scaleAdjustment);
+      } else {
+        screenTasks.emplace_back(tile, _tileSize);
+      }
     } else {
       if (_allowZoomBlur) {
         auto fallbackTasks = getFallbackDrawTasks(tileX, tileY, fallbackTileCaches);
