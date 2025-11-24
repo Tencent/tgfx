@@ -225,7 +225,7 @@ struct PDFMetadata {
   /**
    * The ColorSpace of this PDF document.
    */
-  std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB();
+  std::shared_ptr<ColorSpace> colorSpace = nullptr;
 };
 
 }  // namespace tgfx

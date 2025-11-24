@@ -697,8 +697,8 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
     }
   } else if (bitFields.hasBlendMode) {
     auto scale = canvas->getMatrix().getMaxScale();
-    args.blendModeBackground =
-        BackgroundContext::Make(nullptr, Rect::MakeEmpty(), 0, 0, Matrix::MakeScale(scale, scale));
+    args.blendModeBackground = BackgroundContext::Make(
+        nullptr, Rect::MakeEmpty(), 0, 0, Matrix::MakeScale(scale, scale), args.dstColorSpace);
   }
 
   if (context && canInvert && hasBackgroundStyle()) {
@@ -723,8 +723,9 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
       backgroundMatrix.postTranslate(bounds.left, bounds.top);
     }
     backgroundMatrix.postScale(scale, scale);
-    if (auto backgroundContext = createBackgroundContext(context, backgroundRect, backgroundMatrix,
-                                                         bounds == clippedBounds)) {
+    if (auto backgroundContext =
+            createBackgroundContext(context, backgroundRect, backgroundMatrix,
+                                    bounds == clippedBounds, surface->colorSpace())) {
       auto backgroundCanvas = backgroundContext->getCanvas();
       auto actualMatrix = backgroundCanvas->getMatrix();
       bool isLocalToGlobalAffine = IsMatrix3DAffine(localToGlobalMatrix);
@@ -1108,8 +1109,8 @@ std::shared_ptr<Image> Layer::getOffscreenContentImage(
   auto contentScale = canvas->getMatrix().getMaxScale();
   offscreenArgs.blurBackground = std::move(subBackgroundContext);
   if (!canvas->getSurface() && passThroughBackground) {
-    offscreenArgs.blendModeBackground =
-        BackgroundContext::Make(nullptr, renderBounds, 0, 0, Matrix::MakeScale(contentScale));
+    offscreenArgs.blendModeBackground = BackgroundContext::Make(
+        nullptr, renderBounds, 0, 0, Matrix::MakeScale(contentScale), offscreenArgs.dstColorSpace);
   }
   // When drawing offscreen, if the layer contains 3D transformations, the background cannot be
   // accurately stretched to fill a rectangle, so the background is drawn separately.
@@ -1983,19 +1984,18 @@ bool Layer::hasBackgroundStyle() {
   return false;
 }
 
-std::shared_ptr<BackgroundContext> Layer::createBackgroundContext(Context* context,
-                                                                  const Rect& drawRect,
-                                                                  const Matrix& viewMatrix,
-                                                                  bool fullLayer) const {
+std::shared_ptr<BackgroundContext> Layer::createBackgroundContext(
+    Context* context, const Rect& drawRect, const Matrix& viewMatrix, bool fullLayer,
+    std::shared_ptr<ColorSpace> colorSpace) const {
   if (maxBackgroundOutset <= 0.0f) {
     return nullptr;
   }
   if (fullLayer) {
-    return BackgroundContext::Make(context, drawRect, 0, 0, viewMatrix);
+    return BackgroundContext::Make(context, drawRect, 0, 0, viewMatrix, colorSpace);
   }
   auto scale = viewMatrix.getMaxScale();
   return BackgroundContext::Make(context, drawRect, maxBackgroundOutset * scale,
-                                 minBackgroundOutset * scale, viewMatrix);
+                                 minBackgroundOutset * scale, viewMatrix, colorSpace);
 }
 
 Matrix3D Layer::anchorAdaptedMatrix(const Matrix3D& matrix, const Point& anchor) const {
