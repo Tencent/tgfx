@@ -113,12 +113,23 @@ void PDFGraphicStackState::updateDrawingState(const PDFGraphicStackState::Entry&
       currentEntry()->shaderIndex = state.shaderIndex;
     }
   } else if (state.color != currentEntry()->color || currentEntry()->shaderIndex >= 0) {
-    if (!ColorSpace::Equals(currentEntry()->color.colorSpace.get(), state.color.colorSpace.get())) {
-      auto ref = document->emitColorSpace(state.color.colorSpace);
-      colorSpaceResources->insert(ref);
-      std::string command = "/C" + std::to_string(ref.value);
-      contentStream->writeText(command + " CS\n");
-      contentStream->writeText(command + " cs\n");
+    if(firstUpdateColor && ColorSpace::Equals(currentEntry()->color.colorSpace.get(), state.color.colorSpace.get())) {
+      contentStream->writeText("/DeviceRGB CS\n");
+      contentStream->writeText("/DeviceRGB cs\n");
+    }else if (!ColorSpace::Equals(currentEntry()->color.colorSpace.get(), state.color.colorSpace.get())) {
+      if(state.color.colorSpace == nullptr) {
+        contentStream->writeText("/DeviceRGB CS\n");
+        contentStream->writeText("/DeviceRGB cs\n");
+      }else {
+        auto ref = document->emitColorSpace(state.color.colorSpace);
+        colorSpaceResources->insert(ref);
+        std::string command = "/C" + std::to_string(ref.value);
+        contentStream->writeText(command + " CS\n");
+        contentStream->writeText(command + " cs\n");
+      }
+    }
+    if(firstUpdateColor) {
+      firstUpdateColor = false;
     }
     EmitPDFColor(state.color, contentStream);
     contentStream->writeText("SC\n");

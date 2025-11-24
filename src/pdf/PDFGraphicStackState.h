@@ -37,7 +37,7 @@ struct PDFGraphicStackState {
     MCState state;
     Color color = {std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::quiet_NaN(),
                    std::numeric_limits<float>::quiet_NaN(),
-                   std::numeric_limits<float>::quiet_NaN()};
+                   std::numeric_limits<float>::quiet_NaN(), nullptr};
     float textScaleX = 1;  // Zero means we don't care what the value is.
     int shaderIndex = -1;
     int graphicStateIndex = -1;
@@ -50,6 +50,7 @@ struct PDFGraphicStackState {
   std::shared_ptr<MemoryWriteStream> contentStream;
   PDFDocumentImpl* document;
   std::unordered_set<PDFIndirectReference>* colorSpaceResources;
+  bool firstUpdateColor = true;
   explicit PDFGraphicStackState(
       std::shared_ptr<MemoryWriteStream> stream = nullptr, PDFDocumentImpl* doc = nullptr,
       std::unordered_set<PDFIndirectReference>* colorSpaceResources = nullptr)
