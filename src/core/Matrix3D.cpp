@@ -266,6 +266,10 @@ void Matrix3D::postSkew(float kxy, float kxz, float kyx, float kyz, float kzx, f
   postConcat(m);
 }
 
+void Matrix3D::preConcat(const Matrix3D& m) {
+  setConcat(*this, m);
+}
+
 void Matrix3D::postConcat(const Matrix3D& m) {
   setConcat(m, *this);
 }
@@ -369,10 +373,6 @@ void Matrix3D::setConcat(const Matrix3D& a, const Matrix3D& b) {
   setColumn(1, m1);
   setColumn(2, m2);
   setColumn(3, m3);
-}
-
-void Matrix3D::preConcat(const Matrix3D& m) {
-  setConcat(*this, m);
 }
 
 void Matrix3D::preScale(float sx, float sy, float sz) {

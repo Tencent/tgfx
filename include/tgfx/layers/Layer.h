@@ -21,6 +21,7 @@
 #include <memory>
 #include <optional>
 #include <unordered_set>
+#include "TransformStyle.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Matrix.h"
@@ -176,6 +177,30 @@ class Layer : public std::enable_shared_from_this<Layer> {
    * Sets the 3D transformation matrix applied to the layer.
    */
   void setMatrix3D(const Matrix3D& value);
+
+  /**
+   * Returns the transform style of the layer. The default value is TransformStyle::Flat.
+   * TransformStyle defines the drawing behavior of child layers containing 3D transformations.
+   * The Flat type projects 3D child layers directly onto their parent layer, and all child layers
+   * are drawn in the order they were added. This means that later-added opaque child layers will
+   * completely cover earlier-added child layers. The Preserve3D type preserves the 3D state of child
+   * layers.
+   * If a layer's TransformStyle is Preserve3D and its parent layer is Flat, this layer establishes
+   * a 3D Render Context. If the parent layer is Preserve3D, this layer inherits the parent's 3D
+   * Render Context and passes it to its child layers.
+   * All child layers within a 3D Render Context share the coordinate space of the layer that
+   * established the context. Within this context, all layers apply depth occlusion based on their
+   * actual positions: opaque pixels in layers closer to the observer will occlude pixels in layers
+   * farther from the observer at the same position (same xy coordinates).
+   */
+  TransformStyle transformStyle() const {
+    return _transformStyle;
+  }
+
+  /**
+   * Sets the transform style of the layer.
+   */
+  void setTransformStyle(TransformStyle style);
 
   /**
    * Returns whether the layer is visible. The default value is true.
@@ -571,6 +596,11 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   void invalidate();
 
+  /**
+   * Returns the content bounds of the layer, excluding child layers.
+   */
+  Rect getContentBounds();
+
   Rect getBoundsInternal(const Matrix3D& coordinateMatrix, bool computeTightBounds);
 
   void onAttachToRoot(RootLayer* rootLayer);
@@ -606,20 +636,28 @@ class Layer : public std::enable_shared_from_this<Layer> {
                  const Matrix3D* transform = nullptr);
 
   void drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
-                     const Matrix3D* transform);
-
-  void drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha);
+                     const Matrix3D* transform, bool excludeContent = false,
+                     bool excludeChildren = false);
 
   void drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha,
-                    const std::unordered_set<LayerStyleExtraSourceType>& styleExtraSourceTypes);
+                    const Matrix3D* transform = nullptr);
 
-  void drawContents(
-      const DrawArgs& args, Canvas* canvas, float alpha,
-      const LayerStyleSource* layerStyleSource = nullptr, const Layer* stopChild = nullptr,
-      const std::unordered_set<LayerStyleExtraSourceType>& styleExtraSourceTypes = {});
+  void drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha, const Matrix3D* transform,
+                    const std::unordered_set<LayerStyleExtraSourceType>& styleExtraSourceTypes,
+                    bool excludeContent, bool excludeChild);
+
+  void drawContentOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
+                            const Matrix3D* transform);
+
+  void drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
+                    const LayerStyleSource* layerStyleSource = nullptr,
+                    const Layer* stopChild = nullptr,
+                    const std::unordered_set<LayerStyleExtraSourceType>& styleExtraSourceTypes = {},
+                    const Matrix3D* transform = nullptr, bool excludeContent = false,
+                    bool excludeChild = false);
 
   bool drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
-                    const Layer* stopChild = nullptr);
+                    const Layer* stopChild = nullptr, const Matrix3D* transform = nullptr);
 
   float drawBackgroundLayers(const DrawArgs& args, Canvas* canvas);
 
@@ -678,7 +716,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::shared_ptr<Image> getOffscreenContentImage(
       const DrawArgs& args, const Canvas* canvas, bool passThroughBackground,
       std::shared_ptr<BackgroundContext> subBackgroundContext, std::optional<Rect> clipBounds,
-      Matrix* imageMatrix);
+      Matrix* imageMatrix, bool excludeContent, bool excludeChild);
 
   /**
    * Returns the equivalent transformation matrix adapted for a custom anchor point.
@@ -712,6 +750,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
   Matrix3D _matrix3D = {};
   // Whether the matrix3D is equivalent to a 2D affine matrix
   bool _matrix3DIsAffine = true;
+  TransformStyle _transformStyle = TransformStyle::Flat;
   std::shared_ptr<Layer> _mask = nullptr;
   Layer* maskOwner = nullptr;
   std::unique_ptr<Rect> _scrollRect = nullptr;

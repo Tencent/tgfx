@@ -212,6 +212,11 @@ class Matrix3D {
   }
 
   /**
+   * Concatenates the given matrix with this matrix, and stores the result in this matrix. M' = M * m.
+   */
+  void preConcat(const Matrix3D& m);
+
+  /**
    * Concatenates this matrix with the given matrix, and stores the result in this matrix. M' = M * m.
    */
   void postConcat(const Matrix3D& m);
@@ -306,11 +311,6 @@ class Matrix3D {
    * Concatenates two matrices and stores the result in this matrix. M' = a * b.
    */
   void setConcat(const Matrix3D& a, const Matrix3D& b);
-
-  /**
-   * Concatenates the given matrix with this matrix, and stores the result in this matrix. M' = M * m.
-   */
-  void preConcat(const Matrix3D& m);
 
   /**
    * Pre-concatenates a scale to this matrix. M' = M * S.

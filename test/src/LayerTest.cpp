@@ -3320,15 +3320,15 @@ TGFX_TEST(LayerTest, Matrix) {
 
   auto contentLayer = SolidLayer::Make();
   contentLayer->setColor(Color::FromRGBA(151, 153, 46, 255));
+  auto contentLayerSize = Size::Make(360.f, 320.f);
+  contentLayer->setWidth(contentLayerSize.width);
+  contentLayer->setHeight(contentLayerSize.height);
   {
-    auto layerSize = Size::Make(360.f, 320.f);
-    contentLayer->setWidth(layerSize.width);
-    contentLayer->setHeight(layerSize.height);
     auto anchor = Point::Make(0.3f, 0.3f);
-    auto offsetToAnchorMatrix =
-        Matrix3D::MakeTranslate(-anchor.x * layerSize.width, -anchor.y * layerSize.height, 0.f);
-    auto invOffsetToAnchorMatrix =
-        Matrix3D::MakeTranslate(anchor.x * layerSize.width, anchor.y * layerSize.height, 0.f);
+    auto offsetToAnchorMatrix = Matrix3D::MakeTranslate(-anchor.x * contentLayerSize.width,
+                                                        -anchor.y * contentLayerSize.height, 0.f);
+    auto invOffsetToAnchorMatrix = Matrix3D::MakeTranslate(anchor.x * contentLayerSize.width,
+                                                           anchor.y * contentLayerSize.height, 0.f);
     auto modelMatrix = Matrix3D::MakeRotate({0.f, 1.f, 0.f}, -45.f);
     auto perspectiveMatrix = MakePerspectiveMatrix();
     auto origin = Point::Make(120, 40);
@@ -3393,6 +3393,7 @@ TGFX_TEST(LayerTest, Matrix) {
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D_2D"));
 
+  contentLayer->setTransformStyle(TransformStyle::Preserve3D);
   imageLayer->setMatrix3D(imageMatrix3D);
   imageLayer->setShouldRasterize(true);
   EXPECT_TRUE(imageLayer->matrix().isIdentity());
@@ -3422,6 +3423,24 @@ TGFX_TEST(LayerTest, Matrix) {
   displayList->root()->addChild(shaperLayer);
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D_2D_3D"));
+
+  {
+    auto anchor = Point::Make(0.3f, 0.3f);
+    auto offsetToAnchorMatrix = Matrix3D::MakeTranslate(-anchor.x * contentLayerSize.width,
+                                                        -anchor.y * contentLayerSize.height, 0.f);
+    auto invOffsetToAnchorMatrix = Matrix3D::MakeTranslate(anchor.x * contentLayerSize.width,
+                                                           anchor.y * contentLayerSize.height, 0.f);
+    auto modelMatrix = Matrix3D::MakeRotate({0.f, 1.f, 0.f}, -45.f);
+    modelMatrix.postTranslate(0.f, 0.f, 1200.f);
+    auto perspectiveMatrix = MakePerspectiveMatrix();
+    auto origin = Point::Make(120, 40);
+    auto originTranslateMatrix = Matrix3D::MakeTranslate(origin.x, origin.y, 0.f);
+    auto transformMatrix = originTranslateMatrix * invOffsetToAnchorMatrix * perspectiveMatrix *
+                           modelMatrix * offsetToAnchorMatrix;
+    contentLayer->setMatrix3D(transformMatrix);
+  }
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_Behind_Viewer"));
 }
 
 }  // namespace tgfx
