@@ -27,7 +27,8 @@ class AtlasTextGeometryProcessor : public GeometryProcessor {
  public:
   static PlacementPtr<AtlasTextGeometryProcessor> Make(BlockAllocator* allocator,
                                                        std::shared_ptr<TextureProxy> textureProxy,
-                                                       AAType aa, std::optional<Color> commonColor,
+                                                       AAType aa,
+                                                       std::optional<PMColor> commonColor,
                                                        const SamplingOptions& sampling);
   std::string name() const override {
     return "AtlasTextGeometryProcessor";
@@ -41,7 +42,7 @@ class AtlasTextGeometryProcessor : public GeometryProcessor {
   DEFINE_PROCESSOR_CLASS_ID
 
   AtlasTextGeometryProcessor(std::shared_ptr<TextureProxy> textureProxy, AAType aa,
-                             std::optional<Color> commonColor, const SamplingOptions& sampling);
+                             std::optional<PMColor> commonColor, const SamplingOptions& sampling);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
@@ -57,7 +58,7 @@ class AtlasTextGeometryProcessor : public GeometryProcessor {
 
   std::shared_ptr<TextureProxy> textureProxy = nullptr;
   AAType aa = AAType::None;
-  std::optional<Color> commonColor = std::nullopt;
+  std::optional<PMColor> commonColor = std::nullopt;
   std::vector<std::shared_ptr<Texture>> textures;
   SamplerState samplerState = {};
 };

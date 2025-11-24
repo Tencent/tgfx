@@ -16,22 +16,29 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/core/Vec.h"
-#include "core/utils/MathExtra.h"
+#pragma once
+
+#include <cstdint>
 
 namespace tgfx {
+/**
+ * Recording represents a snapshot of rendering commands that have been flushed from a Context but
+ * not yet submitted to the GPU. This allows for deferred submission, giving applications control
+ * over when GPU work is actually queued for execution. A Recording can be submitted to the GPU via
+ * Context::submit().
+ * Note: If multiple Recording objects are created, submitting a later Recording will force all
+ * earlier Recordings to be submitted first, maintaining the correct rendering order.
+ */
+class Recording {
+ private:
+  Recording(uint32_t contextID, uint32_t drawingBufferID, uint64_t generation)
+      : contextID(contextID), drawingBufferID(drawingBufferID), generation(generation) {
+  }
 
-Vec2 operator/(const Vec2& v, float s) {
-  return {IEEEFloatDivide(v.x, s), IEEEFloatDivide(v.y, s)};
-}
+  uint32_t contextID = 0;
+  uint32_t drawingBufferID = 0;
+  uint64_t generation = 0;
 
-bool Vec3::operator==(const Vec3& v) const {
-  return FloatNearlyEqual(x, v.x) && FloatNearlyEqual(y, v.y) && FloatNearlyEqual(z, v.z);
-}
-
-bool Vec4::operator==(const Vec4& v) const {
-  return FloatNearlyEqual(x, v.x) && FloatNearlyEqual(y, v.y) && FloatNearlyEqual(z, v.z) &&
-         FloatNearlyEqual(w, v.w);
-}
-
+  friend class Context;
+};
 }  // namespace tgfx

@@ -122,6 +122,7 @@ std::shared_ptr<Program> ProgramInfo::getProgram() const {
   }
   programKey.write(static_cast<uint32_t>(blendMode));
   programKey.write(static_cast<uint32_t>(getOutputSwizzle().asKey()));
+  programKey.write(static_cast<uint32_t>(cullMode));
   CAPUTRE_PROGRAM_INFO(programKey, context, this);
   auto program = context->globalCache()->findProgram(programKey);
   if (program == nullptr) {

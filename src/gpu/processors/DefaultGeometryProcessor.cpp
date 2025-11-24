@@ -19,7 +19,7 @@
 #include "DefaultGeometryProcessor.h"
 
 namespace tgfx {
-DefaultGeometryProcessor::DefaultGeometryProcessor(Color color, int width, int height, AAType aa,
+DefaultGeometryProcessor::DefaultGeometryProcessor(PMColor color, int width, int height, AAType aa,
                                                    const Matrix& viewMatrix, const Matrix& uvMatrix)
     : GeometryProcessor(ClassID()), color(color), width(width), height(height), aa(aa),
       viewMatrix(viewMatrix), uvMatrix(uvMatrix) {

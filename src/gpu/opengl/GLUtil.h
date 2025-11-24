@@ -42,6 +42,10 @@ unsigned ToGLBlendOperation(BlendOperation blendOperation);
 
 unsigned ToGLCompareFunction(CompareFunction compare);
 
+unsigned ToGLFrontFace(FrontFace frontFace);
+
+unsigned ToGLCullMode(CullMode mode);
+
 unsigned ToGLStencilOperation(StencilOperation stencilOp);
 
 unsigned PixelFormatToGLSizeFormat(PixelFormat pixelFormat);

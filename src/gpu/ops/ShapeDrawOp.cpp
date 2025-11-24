@@ -28,8 +28,8 @@
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
-PlacementPtr<ShapeDrawOp> ShapeDrawOp::Make(std::shared_ptr<GPUShapeProxy> shapeProxy, Color color,
-                                            const Matrix& uvMatrix, AAType aaType) {
+PlacementPtr<ShapeDrawOp> ShapeDrawOp::Make(std::shared_ptr<GPUShapeProxy> shapeProxy,
+                                            PMColor color, const Matrix& uvMatrix, AAType aaType) {
   if (shapeProxy == nullptr) {
     return nullptr;
   }
@@ -38,7 +38,7 @@ PlacementPtr<ShapeDrawOp> ShapeDrawOp::Make(std::shared_ptr<GPUShapeProxy> shape
 }
 
 ShapeDrawOp::ShapeDrawOp(BlockAllocator* allocator, std::shared_ptr<GPUShapeProxy> proxy,
-                         Color color, const Matrix& uvMatrix, AAType aaType)
+                         PMColor color, const Matrix& uvMatrix, AAType aaType)
     : DrawOp(allocator, aaType), shapeProxy(std::move(proxy)), color(color), uvMatrix(uvMatrix) {
   auto context = shapeProxy->getContext();
   if (auto textureProxy = shapeProxy->getTextureProxy()) {

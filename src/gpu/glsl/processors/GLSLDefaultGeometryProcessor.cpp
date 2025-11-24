@@ -20,7 +20,7 @@
 
 namespace tgfx {
 PlacementPtr<DefaultGeometryProcessor> DefaultGeometryProcessor::Make(BlockAllocator* allocator,
-                                                                      Color color, int width,
+                                                                      PMColor color, int width,
                                                                       int height, AAType aa,
                                                                       const Matrix& viewMatrix,
                                                                       const Matrix& uvMatrix) {
@@ -28,7 +28,7 @@ PlacementPtr<DefaultGeometryProcessor> DefaultGeometryProcessor::Make(BlockAlloc
                                                        uvMatrix);
 }
 
-GLSLDefaultGeometryProcessor::GLSLDefaultGeometryProcessor(Color color, int width, int height,
+GLSLDefaultGeometryProcessor::GLSLDefaultGeometryProcessor(PMColor color, int width, int height,
                                                            AAType aa, const Matrix& viewMatrix,
                                                            const Matrix& uvMatrix)
     : DefaultGeometryProcessor(color, width, height, aa, viewMatrix, uvMatrix) {
