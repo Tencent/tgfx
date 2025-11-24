@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ColorSpaceHelper.h"
+#include "Log.h"
 
 namespace tgfx {
 static constexpr int32_t STANDARD_ADOBE_RGB = 0x000b0000;
@@ -113,18 +114,16 @@ std::shared_ptr<ColorSpace> AndroidDataSpaceToColorSpace(int standard, int trans
 }
 
 gfx::skcms_ICCProfile ToSkcmsICCProfile(std::shared_ptr<ColorSpace> colorSpace) {
-  if (colorSpace) {
-    gfx::skcms_ICCProfile profile;
-    gfx::skcms_Init(&profile);
-    auto transferFunction = colorSpace->transferFunction();
-    gfx::skcms_SetTransferFunction(
-        &profile, reinterpret_cast<gfx::skcms_TransferFunction*>(&transferFunction));
-    ColorMatrix33 xyzd50{};
-    colorSpace->toXYZD50(&xyzd50);
-    skcms_SetXYZD50(&profile, reinterpret_cast<gfx::skcms_Matrix3x3*>(&xyzd50));
-    return profile;
-  }
-  return {};
+  DEBUG_ASSERT(colorSpace != nullptr);
+  gfx::skcms_ICCProfile profile;
+  gfx::skcms_Init(&profile);
+  auto transferFunction = colorSpace->transferFunction();
+  gfx::skcms_SetTransferFunction(&profile,
+                                 reinterpret_cast<gfx::skcms_TransferFunction*>(&transferFunction));
+  ColorMatrix33 xyzd50{};
+  colorSpace->toXYZD50(&xyzd50);
+  skcms_SetXYZD50(&profile, reinterpret_cast<gfx::skcms_Matrix3x3*>(&xyzd50));
+  return profile;
 }
 
 bool NeedConvertColorSpace(std::shared_ptr<ColorSpace> src, std::shared_ptr<ColorSpace> dst) {

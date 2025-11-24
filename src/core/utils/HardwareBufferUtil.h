@@ -28,7 +28,7 @@ namespace tgfx {
  * an empty ImageInfo.
  */
 ImageInfo GetImageInfo(HardwareBufferRef hardwareBuffer,
-                       std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB());
+                       std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
 /**
  * Returns the corresponding PixelFormat for the given HardwareBufferFormat if renderable; otherwise
