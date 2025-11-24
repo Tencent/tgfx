@@ -498,7 +498,7 @@ PDFIndirectReference PDFDocumentImpl::emitColorSpace() {
   auto colorSpaceDictionary = PDFDictionary::Make();
   colorSpaceDictionary->insertInt("N", 3);
   colorSpaceDictionary->insertName("Alternate", "DeviceRGB");
-  if(_metadata.colorSpace == nullptr) {
+  if (_metadata.colorSpace == nullptr) {
     _metadata.colorSpace = ColorSpace::SRGB();
   }
   auto iccProfile = _metadata.colorSpace->toICCProfile();

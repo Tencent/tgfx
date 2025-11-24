@@ -635,19 +635,19 @@ bool ColorSpacePrimaries::toXYZD50(ColorMatrix33* toXYZD50) const {
 
 std::shared_ptr<ColorSpace> ColorSpace::SRGB() {
   static std::shared_ptr<ColorSpace> cs =
-    std::make_shared<ColorSpace>(NamedTransferFunction::SRGB, NamedGamut::SRGB);
+      std::make_shared<ColorSpace>(NamedTransferFunction::SRGB, NamedGamut::SRGB);
   return cs;
 }
 
 std::shared_ptr<ColorSpace> ColorSpace::SRGBLinear() {
   static std::shared_ptr<ColorSpace> cs =
-    std::make_shared<ColorSpace>(NamedTransferFunction::Linear, NamedGamut::SRGB);
+      std::make_shared<ColorSpace>(NamedTransferFunction::Linear, NamedGamut::SRGB);
   return cs;
 }
 
 std::shared_ptr<ColorSpace> ColorSpace::DisplayP3() {
   static std::shared_ptr<ColorSpace> cs =
-    std::make_shared<ColorSpace>(NamedTransferFunction::SRGB, NamedGamut::DisplayP3);
+      std::make_shared<ColorSpace>(NamedTransferFunction::SRGB, NamedGamut::DisplayP3);
   return cs;
 }
 
