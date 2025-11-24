@@ -36,8 +36,8 @@ struct PDFGraphicStackState {
     Matrix matrix = Matrix::I();
     MCState state;
     Color color = {std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::quiet_NaN(),
-                   std::numeric_limits<float>::quiet_NaN(),
-                   std::numeric_limits<float>::quiet_NaN(), nullptr};
+                   std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::quiet_NaN(),
+                   nullptr};
     float textScaleX = 1;  // Zero means we don't care what the value is.
     int shaderIndex = -1;
     int graphicStateIndex = -1;
