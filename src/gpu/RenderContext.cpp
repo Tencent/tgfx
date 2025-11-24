@@ -153,8 +153,8 @@ static void ComputeGlyphFinalMatrix(const Rect& atlasLocation, const Matrix& sta
   glyphMatrix->preTranslate(-atlasLocation.x(), -atlasLocation.y());
   if (needsPixelAlignment) {
     // Pixel alignment for nearest-neighbor sampling to prevent texture artifacts like pixel truncation
-    (*glyphMatrix)[2] = std::floorf((*glyphMatrix)[2] + HalfAxisSampleFrequency);
-    (*glyphMatrix)[5] = std::floorf((*glyphMatrix)[5] + HalfAxisSampleFrequency);
+    (*glyphMatrix)[2] = std::floor((*glyphMatrix)[2] + HalfAxisSampleFrequency);
+    (*glyphMatrix)[5] = std::floor((*glyphMatrix)[5] + HalfAxisSampleFrequency);
   }
 }
 
