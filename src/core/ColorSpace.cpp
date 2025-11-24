@@ -19,7 +19,6 @@
 #include "tgfx/core/ColorSpace.h"
 #include <skcms.h>
 #include <cmath>
-#include <memory>
 #include <sstream>
 #include <vector>
 #include "Checksum.h"
