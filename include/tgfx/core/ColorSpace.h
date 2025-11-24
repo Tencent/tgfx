@@ -333,7 +333,7 @@ class ColorSpace : public std::enable_shared_from_this<ColorSpace> {
   static std::shared_ptr<ColorSpace> SRGBLinear();
 
   /**
-   * Returns the DisplayP3 color space.
+   * Returns the Display P3 color space.
    */
   static std::shared_ptr<ColorSpace> DisplayP3();
 
