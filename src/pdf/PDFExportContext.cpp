@@ -595,10 +595,9 @@ void PDFExportContext::drawDropShadowBeforeLayer(const std::shared_ptr<Picture>&
   auto blurBounds = copyFilter->filterBounds(pictureBounds);
   auto offset = Point::Make(pictureBounds.x() - blurBounds.x(), pictureBounds.y() - blurBounds.y());
 
-  auto surface =
-      Surface::Make(document->context(), static_cast<int>(blurBounds.width()),
-                    static_cast<int>(blurBounds.height()), false, 1, false, 0,
-                    ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3));
+  auto surface = Surface::Make(document->context(), static_cast<int>(blurBounds.width()),
+                               static_cast<int>(blurBounds.height()), false, 1, false, 0,
+                               ColorSpace::DisplayP3());
   DEBUG_ASSERT(surface);
   auto canvas = surface->getCanvas();
 
@@ -629,10 +628,9 @@ void PDFExportContext::drawInnerShadowAfterLayer(const PictureRecord* record,
     return;
   }
 
-  auto surface =
-      Surface::Make(document->context(), static_cast<int>(pictureBounds.width()),
-                    static_cast<int>(pictureBounds.height()), false, 1, false, 0,
-                    ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3));
+  auto surface = Surface::Make(document->context(), static_cast<int>(pictureBounds.width()),
+                               static_cast<int>(pictureBounds.height()), false, 1, false, 0,
+                               ColorSpace::DisplayP3());
   DEBUG_ASSERT(surface);
   auto canvas = surface->getCanvas();
   canvas->translate(-pictureBounds.x(), -pictureBounds.y());
@@ -679,10 +677,9 @@ void PDFExportContext::drawBlurLayer(const std::shared_ptr<Picture>& picture,
   blurBounds = blurBounds.makeOutset(100, 100);
   Point offset = {pictureBounds.x() - blurBounds.x(), pictureBounds.y() - blurBounds.y()};
 
-  auto surface =
-      Surface::Make(document->context(), static_cast<int>(blurBounds.width()),
-                    static_cast<int>(blurBounds.height()), false, 1, false, 0,
-                    ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3));
+  auto surface = Surface::Make(document->context(), static_cast<int>(blurBounds.width()),
+                               static_cast<int>(blurBounds.height()), false, 1, false, 0,
+                               ColorSpace::DisplayP3());
   DEBUG_ASSERT(surface);
 
   Canvas* canvas = surface->getCanvas();

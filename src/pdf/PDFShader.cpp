@@ -352,9 +352,8 @@ PDFIndirectReference PDFShader::MakeFallbackShader(PDFDocumentImpl* doc,
   Size scale = {static_cast<float>(size.width) / shaderRect.width(),
                 static_cast<float>(size.height) / shaderRect.height()};
 
-  auto surface =
-      Surface::Make(doc->context(), size.width, size.height, false, 1, false, 0,
-                    ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3));
+  auto surface = Surface::Make(doc->context(), size.width, size.height, false, 1, false, 0,
+                               ColorSpace::DisplayP3());
   DEBUG_ASSERT(surface);
   Canvas* canvas = surface->getCanvas();
   canvas->clear(Color::Transparent());

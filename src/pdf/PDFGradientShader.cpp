@@ -868,8 +868,7 @@ PDFIndirectReference MakeFunctionShader(PDFDocumentImpl* doc, const PDFGradientS
   }
 
   pdfShader->insertInt("ShadingType", static_cast<int>(shadingType));
-  auto ref =
-      doc->emitColorSpace(ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3));
+  auto ref = doc->emitColorSpace(ColorSpace::DisplayP3());
   pdfShader->insertRef("ColorSpace", ref);
   auto pdfFunctionShader = PDFDictionary::Make("Pattern");
   pdfFunctionShader->insertInt("PatternType", 2);
@@ -901,8 +900,7 @@ PDFIndirectReference PDFGradientShader::Make(PDFDocumentImpl* doc, const Gradien
     if (doc->converter()) {
       color = doc->converter()->convertColor(color);
     }
-    color = color.makeColorSpace(
-        ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3));
+    color = color.makeColorSpace(ColorSpace::DisplayP3());
   }
   bool alpha = GradientHasAlpha(key);
   return FindPDFShader(doc, std::move(key), alpha);
