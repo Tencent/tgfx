@@ -60,9 +60,6 @@ PictureImage::PictureImage(std::shared_ptr<Picture> picture, int width, int heig
   if (matrix && !matrix->isIdentity()) {
     this->matrix = new Matrix(*matrix);
   }
-  if (!_colorSpace) {
-    _colorSpace = ColorSpace::SRGB();
-  }
 }
 
 PictureImage::~PictureImage() {
