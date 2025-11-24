@@ -790,9 +790,8 @@ void PDFExportContext::onDrawImageRect(std::shared_ptr<Image> image, const Rect&
   auto modifiedFill = fill;
   if (image->isAlphaOnly() && modifiedFill.colorFilter) {
     // must blend alpha image and shader before applying colorfilter.
-    auto surface =
-        Surface::Make(document->context(), image->width(), image->height(), false, 1, false, 0,
-                      ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3));
+    auto surface = Surface::Make(document->context(), image->width(), image->height(), false, 1,
+                                 false, 0, image->colorSpace());
     Canvas* canvas = surface->getCanvas();
     Paint tmpPaint;
     // In the case of alpha images with shaders, the shader's coordinate system is the image's

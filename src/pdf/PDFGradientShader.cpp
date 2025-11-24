@@ -898,7 +898,9 @@ PDFIndirectReference PDFGradientShader::Make(PDFDocumentImpl* doc, const Gradien
 
   PDFGradientShader::Key key = MakeKey(shader, matrix, surfaceBBox);
   for (auto& color : key.info.colors) {
-    color = doc->converter()->convertColor(color);
+    if (doc->converter()) {
+      color = doc->converter()->convertColor(color);
+    }
     color = color.makeColorSpace(
         ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3));
   }
