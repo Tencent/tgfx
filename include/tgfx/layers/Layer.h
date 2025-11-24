@@ -670,7 +670,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   std::shared_ptr<BackgroundContext> createBackgroundContext(Context* context, const Rect& drawRect,
                                                              const Matrix& viewMatrix,
-                                                             bool fullLayer = false) const;
+                                                             bool fullLayer = false, std::shared_ptr<ColorSpace> colorSpace) const;
 
   static std::shared_ptr<Picture> RecordPicture(DrawMode mode, float contentScale,
                                                 const std::function<void(Canvas*)>& drawFunction);

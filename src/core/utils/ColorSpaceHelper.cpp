@@ -124,7 +124,7 @@ gfx::skcms_ICCProfile ToSkcmsICCProfile(std::shared_ptr<ColorSpace> colorSpace) 
     skcms_SetXYZD50(&profile, reinterpret_cast<gfx::skcms_Matrix3x3*>(&xyzd50));
     return profile;
   }
-  return {};
+  return *gfx::skcms_sRGB_profile();
 }
 
 bool NeedConvertColorSpace(std::shared_ptr<ColorSpace> src, std::shared_ptr<ColorSpace> dst) {

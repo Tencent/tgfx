@@ -25,7 +25,7 @@ class BackgroundContext {
  public:
   static std::shared_ptr<BackgroundContext> Make(Context* context, const Rect& drawRect,
                                                  float maxOutset, float minOutset,
-                                                 const Matrix& matrix);
+                                                 const Matrix& matrix, std::shared_ptr<ColorSpace> colorSpace);
 
   virtual ~BackgroundContext() = default;
 

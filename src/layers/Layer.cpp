@@ -698,7 +698,7 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   } else if (bitFields.hasBlendMode) {
     auto scale = canvas->getMatrix().getMaxScale();
     args.blendModeBackground =
-        BackgroundContext::Make(nullptr, Rect::MakeEmpty(), 0, 0, Matrix::MakeScale(scale, scale));
+        BackgroundContext::Make(nullptr, Rect::MakeEmpty(), 0, 0, Matrix::MakeScale(scale, scale), args.dstColorSpace);
   }
 
   if (context && canInvert && hasBackgroundStyle()) {
@@ -724,7 +724,7 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
     }
     backgroundMatrix.postScale(scale, scale);
     if (auto backgroundContext = createBackgroundContext(context, backgroundRect, backgroundMatrix,
-                                                         bounds == clippedBounds)) {
+                                                         bounds == clippedBounds, surface->colorSpace())) {
       auto backgroundCanvas = backgroundContext->getCanvas();
       auto actualMatrix = backgroundCanvas->getMatrix();
       bool isLocalToGlobalAffine = IsMatrix3DAffine(localToGlobalMatrix);
@@ -1109,7 +1109,7 @@ std::shared_ptr<Image> Layer::getOffscreenContentImage(
   offscreenArgs.blurBackground = std::move(subBackgroundContext);
   if (!canvas->getSurface() && passThroughBackground) {
     offscreenArgs.blendModeBackground =
-        BackgroundContext::Make(nullptr, renderBounds, 0, 0, Matrix::MakeScale(contentScale));
+        BackgroundContext::Make(nullptr, renderBounds, 0, 0, Matrix::MakeScale(contentScale), offscreenArgs.dstColorSpace);
   }
   // When drawing offscreen, if the layer contains 3D transformations, the background cannot be
   // accurately stretched to fill a rectangle, so the background is drawn separately.
@@ -1986,16 +1986,16 @@ bool Layer::hasBackgroundStyle() {
 std::shared_ptr<BackgroundContext> Layer::createBackgroundContext(Context* context,
                                                                   const Rect& drawRect,
                                                                   const Matrix& viewMatrix,
-                                                                  bool fullLayer) const {
+                                                                  bool fullLayer, std::shared_ptr<ColorSpace> colorSpace) const {
   if (maxBackgroundOutset <= 0.0f) {
     return nullptr;
   }
   if (fullLayer) {
-    return BackgroundContext::Make(context, drawRect, 0, 0, viewMatrix);
+    return BackgroundContext::Make(context, drawRect, 0, 0, viewMatrix, colorSpace);
   }
   auto scale = viewMatrix.getMaxScale();
   return BackgroundContext::Make(context, drawRect, maxBackgroundOutset * scale,
-                                 minBackgroundOutset * scale, viewMatrix);
+                                 minBackgroundOutset * scale, viewMatrix, colorSpace);
 }
 
 Matrix3D Layer::anchorAdaptedMatrix(const Matrix3D& matrix, const Point& anchor) const {

@@ -633,25 +633,22 @@ bool ColorSpacePrimaries::toXYZD50(ColorMatrix33* toXYZD50) const {
                                       reinterpret_cast<gfx::skcms_Matrix3x3*>(toXYZD50));
 }
 
-static std::shared_ptr<ColorSpace> SSRGB =
-    std::make_shared<ColorSpace>(NamedTransferFunction::SRGB, NamedGamut::SRGB);
-
-static std::shared_ptr<ColorSpace> SSRGBLinear =
-    std::make_shared<ColorSpace>(NamedTransferFunction::Linear, NamedGamut::SRGB);
-
-static std::shared_ptr<ColorSpace> SDisplayP3 =
-    std::make_shared<ColorSpace>(NamedTransferFunction::SRGB, NamedGamut::DisplayP3);
-
 std::shared_ptr<ColorSpace> ColorSpace::SRGB() {
-  return SSRGB;
+  static std::shared_ptr<ColorSpace> cs =
+    std::make_shared<ColorSpace>(NamedTransferFunction::SRGB, NamedGamut::SRGB);
+  return cs;
 }
 
 std::shared_ptr<ColorSpace> ColorSpace::SRGBLinear() {
-  return SSRGBLinear;
+  static std::shared_ptr<ColorSpace> cs =
+    std::make_shared<ColorSpace>(NamedTransferFunction::Linear, NamedGamut::SRGB);
+  return cs;
 }
 
 std::shared_ptr<ColorSpace> ColorSpace::DisplayP3() {
-  return SDisplayP3;
+  static std::shared_ptr<ColorSpace> cs =
+    std::make_shared<ColorSpace>(NamedTransferFunction::SRGB, NamedGamut::DisplayP3);
+  return cs;
 }
 
 std::shared_ptr<ColorSpace> ColorSpace::MakeRGB(const TransferFunction& transferFunction,

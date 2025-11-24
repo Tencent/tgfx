@@ -54,7 +54,7 @@ class SurfaceBackgroundContext : public BackgroundContext {
     matrix.invert(&invertMatrix);
     auto surfaceRect = invertMatrix.mapRect(rect);
     auto surface = Surface::Make(context, static_cast<int>(surfaceRect.width()),
-                                 static_cast<int>(surfaceRect.height()));
+                                 static_cast<int>(surfaceRect.height()), false, 1, false, 0, colorSpace);
     if (!surface) {
       return nullptr;
     }
@@ -129,7 +129,7 @@ static float MaxBlurOutset() {
 
 std::shared_ptr<BackgroundContext> BackgroundContext::Make(Context* context, const Rect& drawRect,
                                                            float maxOutset, float minOutset,
-                                                           const Matrix& matrix) {
+                                                           const Matrix& matrix, std::shared_ptr<ColorSpace> colorSpace) {
   auto surfaceScale = 1.0f;
   auto rect = drawRect;
   rect.outset(maxOutset, maxOutset);
@@ -152,9 +152,9 @@ std::shared_ptr<BackgroundContext> BackgroundContext::Make(Context* context, con
   std::shared_ptr<BackgroundContext> result = nullptr;
   if (context) {
     result =
-        SurfaceBackgroundContext::Make(context, imageMatrix, backgroundRect, ColorSpace::SRGB());
+        SurfaceBackgroundContext::Make(context, imageMatrix, backgroundRect, colorSpace);
   } else {
-    result = PictureBackgroundContext::Make(imageMatrix, backgroundRect, ColorSpace::SRGB());
+    result = PictureBackgroundContext::Make(imageMatrix, backgroundRect, colorSpace);
   }
   if (!result) {
     return result;
