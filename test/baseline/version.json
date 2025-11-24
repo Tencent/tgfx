@@ -131,11 +131,11 @@
     },
     "DrawersTest": {
         "ConicGradient": "69683f78",
-        "CustomLayerTreeDrawer": "de8199b2",
+        "CustomLayerTreeDrawer": "b33325c8",
         "GridBackground": "2ae64df",
         "ImageWithMipmap": "da590da",
         "ImageWithShadow": "c26ff3d9",
-        "SimpleLayerTreeDrawer": "c33b0500",
+        "SimpleLayerTreeDrawer": "b33325c8",
         "SimpleText": "c4c06bec"
     },
     "DstTextureTest": {
@@ -398,7 +398,7 @@
         "ImageSnapshot_Surface2": "0cfb8996"
     },
     "TextAlignTest": {
-        "FontFallbackTest": "9bfe8c34",
+        "FontFallbackTest": "b33325c8",
         "SingleLineTextAlign": "6095b909",
         "TextAlign": "c4c06bec",
         "TextAlignBlankLineTest": "6095b909",
