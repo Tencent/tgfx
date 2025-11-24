@@ -151,14 +151,18 @@ bool ConvertCMYKPixels(void* dst, const gfx::skcms_ICCProfile cmykProfile,
     default:
       return false;
   }
-  const gfx::skcms_ICCProfile* dstProfile = gfx::skcms_sRGB_profile();
+  auto dstColorSpace = dstInfo.colorSpace();
+  if (dstColorSpace == nullptr) {
+    dstColorSpace = ColorSpace::SRGB();
+  }
+  const gfx::skcms_ICCProfile dstProfile = ToSkcmsICCProfile(dstColorSpace);
   auto width = dstInfo.width();
   auto height = dstInfo.height();
   auto src = dst;
   for (int i = 0; i < height; i++) {
     bool status = gfx::skcms_Transform(
         src, gfx::skcms_PixelFormat_RGBA_8888, gfx::skcms_AlphaFormat_Unpremul, &cmykProfile, dst,
-        dstPixelFormat, gfx::skcms_AlphaFormat_Unpremul, dstProfile, static_cast<size_t>(width));
+        dstPixelFormat, gfx::skcms_AlphaFormat_Unpremul, &dstProfile, static_cast<size_t>(width));
     if (!status) {
       return false;
     }
