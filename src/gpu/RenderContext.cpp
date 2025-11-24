@@ -145,16 +145,14 @@ static std::shared_ptr<ImageCodec> GetGlyphCodec(
 static void ComputeGlyphFinalMatrix(const Rect& atlasLocation, const Matrix& stateMatrix,
                                     float scale, const Point& position, Matrix* glyphMatrix,
                                     bool needsPixelAlignment) {
-  static constexpr float HalfAxisSampleFrequency = 0.5f;
-
   glyphMatrix->postScale(scale, scale);
   glyphMatrix->postTranslate(position.x, position.y);
   glyphMatrix->postConcat(stateMatrix);
   glyphMatrix->preTranslate(-atlasLocation.x(), -atlasLocation.y());
   if (needsPixelAlignment) {
     // Pixel alignment for nearest-neighbor sampling to prevent texture artifacts like pixel truncation
-    (*glyphMatrix)[2] = std::floor((*glyphMatrix)[2] + HalfAxisSampleFrequency);
-    (*glyphMatrix)[5] = std::floor((*glyphMatrix)[5] + HalfAxisSampleFrequency);
+    (*glyphMatrix)[2] = std::round((*glyphMatrix)[2]);
+    (*glyphMatrix)[5] = std::round((*glyphMatrix)[5]);
   }
 }
 
