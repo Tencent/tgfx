@@ -323,17 +323,17 @@ static constexpr ColorMatrix33 XYZ = {{
 class ColorSpace : public std::enable_shared_from_this<ColorSpace> {
  public:
   /**
-   * Create the sRGB color space.
+   * Returns the sRGB color space.
    */
   static std::shared_ptr<ColorSpace> SRGB();
 
   /**
-   * Colorspace with the sRGB primaries, but a linear (1.0) gamma.
+   * Returns the Colorspace with the sRGB primaries, but a linear (1.0) gamma.
    */
   static std::shared_ptr<ColorSpace> SRGBLinear();
 
   /**
-   * Create the P3 color space.
+   * Returns the DisplayP3 color space.
    */
   static std::shared_ptr<ColorSpace> DisplayP3();
 

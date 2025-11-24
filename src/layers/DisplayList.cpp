@@ -324,9 +324,9 @@ std::vector<Rect> DisplayList::renderPartial(Surface* surface, bool autoClear,
   bool cacheChanged = false;
   auto partialCache = surfaceCaches.empty() ? nullptr : surfaceCaches.front();
   if (partialCache == nullptr || partialCache->getContext() != context ||
-      partialCache->width() != surface->width() || partialCache->height() != surface->height()) {
+      partialCache->width() != surface->width() || partialCache->height() != surface->height() || !ColorSpace::Equals(partialCache->colorSpace().get(), surface->colorSpace().get())) {
     partialCache = Surface::Make(context, surface->width(), surface->height(), ColorType::RGBA_8888,
-                                 1, false, surface->renderFlags());
+                                 1, false, surface->renderFlags(), surface->colorSpace());
     if (partialCache == nullptr) {
       LOGE("DisplayList::renderPartial: Failed to create partial cache surface.");
       return renderDirect(surface, autoClear);

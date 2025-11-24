@@ -37,7 +37,7 @@ class PixelBuffer : public ImageBuffer {
    */
   static std::shared_ptr<PixelBuffer> Make(
       int width, int height, bool alphaOnly = false, bool tryHardware = true,
-      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB());
+      std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
    * Creates a PixelBuffer from the specified hardware buffer. Returns nullptr if the hardwareBuffer
@@ -45,7 +45,7 @@ class PixelBuffer : public ImageBuffer {
    */
   static std::shared_ptr<PixelBuffer> MakeFrom(
       HardwareBufferRef hardwareBuffer,
-      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB());
+      std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   int width() const override {
     return _info.width();
