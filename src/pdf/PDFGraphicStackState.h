@@ -27,7 +27,7 @@
 #include "tgfx/core/WriteStream.h"
 
 namespace tgfx {
-class PDFDocumentImpl;
+struct PDFIndirectReference;
 struct PDFGraphicStackState {
   struct Entry {
     Matrix matrix = Matrix::I();
@@ -52,7 +52,7 @@ struct PDFGraphicStackState {
 
   void updateClip(const MCState& state);
   void updateMatrix(const Matrix& matrix);
-  void updateDrawingState(const Entry& state, PDFDocumentImpl* doc);
+  void updateDrawingState(const Entry& state, const PDFIndirectReference& ref);
   void push();
   void pop();
   void drainStack();

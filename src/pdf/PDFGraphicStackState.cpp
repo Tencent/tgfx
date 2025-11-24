@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFGraphicStackState.h"
-#include "PDFDocumentImpl.h"
 #include "core/MCState.h"
 #include "core/utils/Log.h"
 #include "pdf/PDFUtils.h"
@@ -106,7 +105,7 @@ void PDFGraphicStackState::updateMatrix(const Matrix& matrix) {
 }
 
 void PDFGraphicStackState::updateDrawingState(const PDFGraphicStackState::Entry& state,
-                                              PDFDocumentImpl* doc) {
+                                              const PDFIndirectReference& ref) {
   // PDF treats a shader as a color, so we only set one or the other.
   if (state.shaderIndex >= 0) {
     if (state.shaderIndex != currentEntry()->shaderIndex) {
@@ -114,7 +113,7 @@ void PDFGraphicStackState::updateDrawingState(const PDFGraphicStackState::Entry&
       currentEntry()->shaderIndex = state.shaderIndex;
     }
   } else if (state.color != currentEntry()->color || currentEntry()->shaderIndex >= 0) {
-    if (doc->colorSpaceRef()) {
+    if (ref) {
       contentStream->writeText("/CS CS\n");
       EmitPDFColor(state.color, contentStream);
       contentStream->writeText("SC\n");
