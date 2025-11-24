@@ -3439,4 +3439,170 @@ TGFX_TEST(LayerTest, Matrix) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D_2D_3D"));
 }
 
+TGFX_TEST(LayerTest, DisplayListMinZoomScale) {
+  auto displayList = std::make_unique<DisplayList>();
+
+  // Test initial min zoom scale is 0 (no limit)
+  EXPECT_EQ(displayList->minZoomScale(), 0.0f);
+
+  // Test setting min zoom scale
+  displayList->setMinZoomScale(0.5f);
+  EXPECT_FLOAT_EQ(displayList->minZoomScale(), 0.5f);
+
+  // Test that negative values are clamped to 0
+  displayList->setMinZoomScale(-0.5f);
+  EXPECT_EQ(displayList->minZoomScale(), 0.0f);
+
+  // Test various valid values
+  displayList->setMinZoomScale(0.1f);
+  EXPECT_FLOAT_EQ(displayList->minZoomScale(), 0.1f);
+
+  displayList->setMinZoomScale(2.0f);
+  EXPECT_FLOAT_EQ(displayList->minZoomScale(), 2.0f);
+}
+
+TGFX_TEST(LayerTest, DisplayListMinZoomScaleWithTiledRendering) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto surface = Surface::Make(context, 512, 512);
+  ASSERT_TRUE(surface != nullptr);
+
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Tiled);
+  displayList->setTileSize(256);
+  displayList->setMaxTileCount(16);
+  displayList->setMinZoomScale(0.5f);
+
+  // Create a simple layer
+  auto solidLayer = SolidLayer::Make();
+  solidLayer->setColor(Color::Red());
+  solidLayer->setWidth(512);
+  solidLayer->setHeight(512);
+  displayList->root()->addChild(solidLayer);
+
+  // Test rendering at normal scale (1.0)
+  displayList->setZoomScale(1.0f);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/MinZoomScale_Normal_1_0"));
+
+  // Test rendering at zoom scale below minimum (0.25)
+  // Should use 0.5f scale instead of creating new tiles at 0.25f
+  displayList->setZoomScale(0.25f);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/MinZoomScale_Below_Min_0_25"));
+
+  // Test rendering at zoom scale equal to minimum (0.5)
+  displayList->setZoomScale(0.5f);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/MinZoomScale_Equal_Min_0_5"));
+
+  // Test rendering at zoom scale above minimum (1.5)
+  displayList->setZoomScale(1.5f);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/MinZoomScale_Above_Min_1_5"));
+}
+
+TGFX_TEST(LayerTest, DisplayListRootLayerBoundConstraint) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto surface = Surface::Make(context, 512, 512);
+  ASSERT_TRUE(surface != nullptr);
+
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Tiled);
+  displayList->setTileSize(256);
+  displayList->setMaxTileCount(32);
+
+  // Create a layer with specific bounds
+  auto shapeLayer = ShapeLayer::Make();
+  Path path = {};
+  path.addRect(Rect::MakeXYWH(100, 100, 300, 300));
+  shapeLayer->setPath(path);
+  shapeLayer->setFillStyle(SolidColor::Make(Color::Blue()));
+  displayList->root()->addChild(shapeLayer);
+
+  // Render and verify bounds are respected
+  displayList->setZoomScale(1.0f);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/RootBoundConstraint_Blue_Box"));
+
+  // Get root bounds
+  auto rootBounds = displayList->root()->getBounds();
+  EXPECT_FALSE(rootBounds.isEmpty());
+
+  // Verify the shape layer is within the root bounds
+  auto shapeLayerBounds = shapeLayer->getBounds();
+  EXPECT_TRUE(rootBounds.contains(shapeLayerBounds));
+}
+
+TGFX_TEST(LayerTest, DisplayListMinZoomScaleAndBoundConstraint) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto surface = Surface::Make(context, 512, 512);
+  ASSERT_TRUE(surface != nullptr);
+
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Tiled);
+  displayList->setTileSize(128);
+  displayList->setMaxTileCount(64);
+  displayList->setMinZoomScale(0.5f);
+
+  // Create multiple layers with specific bounds
+  auto layer1 = SolidLayer::Make();
+  layer1->setColor(Color::Red());
+  layer1->setWidth(256);
+  layer1->setHeight(256);
+  layer1->setPosition(Point::Make(0, 0));
+
+  auto layer2 = SolidLayer::Make();
+  layer2->setColor(Color::Green());
+  layer2->setWidth(256);
+  layer2->setHeight(256);
+  layer2->setPosition(Point::Make(256, 256));
+
+  displayList->root()->addChild(layer1);
+  displayList->root()->addChild(layer2);
+
+  // Test with both min zoom scale and bounds constraints
+  displayList->setZoomScale(0.25f);  // Below min zoom scale
+  displayList->setContentOffset(-100, -100);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/MinZoomAndBound_Constraint_Below_Min"));
+
+  auto rootBounds = displayList->root()->getBounds();
+  EXPECT_FALSE(rootBounds.isEmpty());
+
+  // Verify constraints are applied
+  displayList->setZoomScale(2.0f);
+  displayList->setContentOffset(0, 0);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/MinZoomAndBound_Constraint_Above_Normal"));
+}
+
+TGFX_TEST(LayerTest, DisplayListZoomScalePrecisionWithMinScale) {
+  auto displayList = std::make_unique<DisplayList>();
+
+  // Test with default precision (1000)
+  displayList->setMinZoomScale(0.5f);
+  EXPECT_FLOAT_EQ(displayList->minZoomScale(), 0.5f);
+
+  // Change precision and verify min scale is adjusted
+  displayList->setZoomScalePrecision(100);
+  EXPECT_FLOAT_EQ(displayList->minZoomScale(), 0.5f);
+
+  // Set a new min scale with new precision
+  displayList->setMinZoomScale(0.25f);
+  EXPECT_FLOAT_EQ(displayList->minZoomScale(), 0.25f);
+
+  // Change precision again
+  displayList->setZoomScalePrecision(10000);
+  EXPECT_FLOAT_EQ(displayList->minZoomScale(), 0.25f);
+}
+
 }  // namespace tgfx

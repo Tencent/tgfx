@@ -244,6 +244,14 @@ void DisplayList::setMinZoomScale(float scale) {
   _minZoomScale = scale;
 }
 
+int64_t DisplayList::getEffectiveZoomScaleInt() const {
+  auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
+  if (_minZoomScale > 0.0f && currentZoomScale < _minZoomScale) {
+    return ToZoomScaleInt(_minZoomScale, _zoomScalePrecision);
+  }
+  return _zoomScaleInt;
+}
+
 void DisplayList::showDirtyRegions(bool show) {
   if (_showDirtyRegions == show) {
     return;
@@ -383,6 +391,9 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
   }
   std::vector<Rect> dirtyRects = {};
   auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
+  if (autoClear) {
+    surface->getCanvas()->clear();
+  }
   for (auto& task : tileTasks) {
     drawTileTask(task);
     auto dirtyRect = task.tileRect();
@@ -402,21 +413,24 @@ void DisplayList::checkTileCount(Surface* renderSurface) {
   auto tileCountY =
       ceilf(static_cast<float>(renderSurface->height()) / static_cast<float>(_tileSize));
   auto minTileCount = static_cast<int>(tileCountX + 1) * static_cast<int>(tileCountY + 1);
-  
-  // Calculate the maximum tile count based on root layer bounds.
+
+  // Determine the effective zoom scale considering the minimum zoom scale.
+  auto effectiveZoomScaleInt = getEffectiveZoomScaleInt();
+  auto effectiveZoomScale = ToZoomScaleFloat(effectiveZoomScaleInt, _zoomScalePrecision);
+
+  // Calculate the maximum tile count based on root layer bounds using effective zoom scale.
   int maxTileCountFromBounds = 0;
   if (_root) {
     auto rootBounds = _root->getBounds();
     if (!rootBounds.isEmpty()) {
-      auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
-      auto boundsWidth = rootBounds.width() * currentZoomScale;
-      auto boundsHeight = rootBounds.height() * currentZoomScale;
+      auto boundsWidth = rootBounds.width() * effectiveZoomScale;
+      auto boundsHeight = rootBounds.height() * effectiveZoomScale;
       auto boundsTileCountX = static_cast<int>(ceilf(boundsWidth / static_cast<float>(_tileSize)));
       auto boundsTileCountY = static_cast<int>(ceilf(boundsHeight / static_cast<float>(_tileSize)));
       maxTileCountFromBounds = (boundsTileCountX + 1) * (boundsTileCountY + 1);
     }
   }
-  
+
   if (totalTileCount > 0) {
     if (totalTileCount >= minTileCount) {
       return;
@@ -424,12 +438,12 @@ void DisplayList::checkTileCount(Surface* renderSurface) {
     resetCaches();
   }
   totalTileCount = std::max(minTileCount, _maxTileCount);
-  
+
   // Limit tile count by root layer bounds if available.
   if (maxTileCountFromBounds > 0) {
     totalTileCount = std::min(totalTileCount, maxTileCountFromBounds);
   }
-  
+
   auto maxTileCountPerAtlas = getMaxTileCountPerAtlas(renderSurface->getContext());
   if (maxTileCountPerAtlas <= 0) {
     return;
@@ -446,10 +460,14 @@ std::vector<DrawTask> DisplayList::invalidateTileCaches(const std::vector<Rect>&
   if (dirtyRegions.empty()) {
     return {};
   }
+
+  // Determine the effective zoom scale considering the minimum zoom scale.
+  auto effectiveZoomScaleInt = getEffectiveZoomScaleInt();
+
   std::vector<DrawTask> tileTasks = {};
   std::vector<int64_t> emptyScales = {};
   for (auto& [scaleInt, tileCache] : tileCaches) {
-    if (scaleInt == _zoomScaleInt) {
+    if (scaleInt == effectiveZoomScaleInt) {
       invalidateCurrentTileCache(tileCache, dirtyRegions, &tileTasks);
       continue;
     }
@@ -479,7 +497,11 @@ std::vector<DrawTask> DisplayList::invalidateTileCaches(const std::vector<Rect>&
 void DisplayList::invalidateCurrentTileCache(const TileCache* tileCache,
                                              const std::vector<Rect>& dirtyRegions,
                                              std::vector<DrawTask>* tileTasks) const {
-  auto zoomMatrix = Matrix::MakeScale(ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision));
+  // Determine the effective zoom scale considering the minimum zoom scale.
+  auto effectiveZoomScaleInt = getEffectiveZoomScaleInt();
+  auto effectiveZoomScale = ToZoomScaleFloat(effectiveZoomScaleInt, _zoomScalePrecision);
+
+  auto zoomMatrix = Matrix::MakeScale(effectiveZoomScale);
   auto dirtyRects = MapDirtyRegions(dirtyRegions, zoomMatrix, true);
   for (auto& dirtyRect : dirtyRects) {
     bool continuous = false;
@@ -509,15 +531,11 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
     maxRefinedCount = 0;
   }
   hasZoomBlurTiles = false;
-  
+
   // Determine the effective zoom scale and tile cache to use.
   auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
-  int64_t effectiveZoomScaleInt = _zoomScaleInt;
-  if (_minZoomScale > 0.0f && currentZoomScale < _minZoomScale) {
-    // If current zoom is below minimum, use the minimum zoom scale instead.
-    effectiveZoomScaleInt = ToZoomScaleInt(_minZoomScale, _zoomScalePrecision);
-  }
-  
+  auto effectiveZoomScaleInt = getEffectiveZoomScaleInt();
+
   TileCache* currentTileCache = nullptr;
   auto result = tileCaches.find(effectiveZoomScaleInt);
   if (result != tileCaches.end()) {
@@ -529,19 +547,21 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
   // Calculate effective zoom scale for tile coordinate calculations.
   auto effectiveZoomScale = ToZoomScaleFloat(effectiveZoomScaleInt, _zoomScalePrecision);
   auto scaleAdjustment = effectiveZoomScale / currentZoomScale;  // > 1.0 when zooming out below min
-  
+
   auto renderRect = Rect::MakeWH(surface->width(), surface->height());
   renderRect.offset(-_contentOffset.x, -_contentOffset.y);
   // Adjust render rect by the effective scale ratio
-  renderRect.scale(1.0f / scaleAdjustment, 1.0f / scaleAdjustment);
+  renderRect.scale(scaleAdjustment, scaleAdjustment);
   int startX = static_cast<int>(floorf(renderRect.left / static_cast<float>(_tileSize)));
   int startY = static_cast<int>(floorf(renderRect.top / static_cast<float>(_tileSize)));
   int endX = static_cast<int>(ceilf(renderRect.right / static_cast<float>(_tileSize)));
   int endY = static_cast<int>(ceilf(renderRect.bottom / static_cast<float>(_tileSize)));
-  
+
   // Constrain tile coordinates by root layer bounds.
   if (_root) {
     auto rootBounds = _root->getBounds();
+    rootBounds.offset(-_contentOffset.x, -_contentOffset.y);
+    rootBounds.scale(effectiveZoomScale, effectiveZoomScale);
     if (!rootBounds.isEmpty()) {
       auto boundsStartX = static_cast<int>(floorf(rootBounds.left / static_cast<float>(_tileSize)));
       auto boundsStartY = static_cast<int>(floorf(rootBounds.top / static_cast<float>(_tileSize)));
@@ -553,12 +573,12 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
       endY = std::min(endY, boundsEndY);
     }
   }
-  
+
   // If constrained bounds result in no tiles, return empty.
   if (startX >= endX || startY >= endY) {
     return {};
   }
-  
+
   std::vector<DrawTask> screenTasks = {};
   std::vector<std::pair<int, int>> dirtyGrids = {};
   auto tileCount = static_cast<size_t>(endX - startX) * static_cast<size_t>(endY - startY);
@@ -572,7 +592,7 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
     if (tile != nullptr) {
       // If we're using a downscaled tile cache, apply the scale adjustment.
       if (scaleAdjustment > 1.001f) {
-        screenTasks.emplace_back(tile, _tileSize, {}, scaleAdjustment);
+        screenTasks.emplace_back(tile, _tileSize, Rect::MakeEmpty(), 1.0f / scaleAdjustment);
       } else {
         screenTasks.emplace_back(tile, _tileSize);
       }
@@ -613,7 +633,11 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
     tile->tileX = grid.first;
     tile->tileY = grid.second;
     taskTiles.push_back(tile);
-    screenTasks.emplace_back(tile, _tileSize);
+    if (scaleAdjustment > 1.001f) {
+      screenTasks.emplace_back(tile, _tileSize, Rect::MakeEmpty(), 1.0f / scaleAdjustment);
+    } else {
+      screenTasks.emplace_back(tile, _tileSize);
+    }
     currentTileCache->addTile(tile);
   }
   if (continuous && !hasZoomBlurTiles) {
@@ -656,14 +680,18 @@ std::vector<std::pair<float, TileCache*>> DisplayList::getFallbackTileCaches(
   if (!_allowZoomBlur) {
     return {};
   }
-  auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
-  DEBUG_ASSERT(currentZoomScale != 0.0f);
+
+  // Determine the effective zoom scale considering the minimum zoom scale.
+  auto effectiveZoomScaleInt = getEffectiveZoomScaleInt();
+  auto effectiveZoomScale = ToZoomScaleFloat(effectiveZoomScaleInt, _zoomScalePrecision);
+  DEBUG_ASSERT(effectiveZoomScale != 0.0f);
+
   auto cacheCount = sortedCaches.size();
   std::vector<std::pair<float, TileCache*>> fallbackCaches = {};
   fallbackCaches.reserve(cacheCount);
   size_t firstGreaterIndex = 0;
   for (auto& item : sortedCaches) {
-    if (item.first < currentZoomScale) {
+    if (item.first < effectiveZoomScale) {
       firstGreaterIndex++;
     } else {
       fallbackCaches.push_back(item);
@@ -678,8 +706,11 @@ std::vector<std::pair<float, TileCache*>> DisplayList::getFallbackTileCaches(
 
 std::vector<DrawTask> DisplayList::getFallbackDrawTasks(
     int tileX, int tileY, const std::vector<std::pair<float, TileCache*>>& fallbackCaches) const {
-  auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
-  DEBUG_ASSERT(currentZoomScale != 0.0f);
+  // Determine the effective zoom scale considering the minimum zoom scale.
+  auto effectiveZoomScaleInt = getEffectiveZoomScaleInt();
+  auto effectiveZoomScale = ToZoomScaleFloat(effectiveZoomScaleInt, _zoomScalePrecision);
+  DEBUG_ASSERT(effectiveZoomScale != 0.0f);
+
   auto gridCount = std::max(_tileSize / FALLBACK_GRID_SIZE, 1);
   auto gridSize = _tileSize / gridCount;
   auto tileStartX = tileX * _tileSize;
@@ -691,10 +722,10 @@ std::vector<DrawTask> DisplayList::getFallbackDrawTasks(
       auto gridStartY = tileStartY + gridY * gridSize;
       bool found = false;
       for (auto& [scale, tileCache] : fallbackCaches) {
-        if (scale == currentZoomScale || tileCache->empty()) {
+        if (scale == effectiveZoomScale || tileCache->empty()) {
           continue;
         }
-        auto scaleRatio = scale / currentZoomScale;
+        auto scaleRatio = scale / effectiveZoomScale;
         DEBUG_ASSERT(scaleRatio != 0.0f);
         auto zoomedRect = Rect::MakeXYWH(gridStartX, gridStartY, gridSize, gridSize);
         zoomedRect.scale(scaleRatio, scaleRatio);
@@ -736,15 +767,19 @@ std::vector<std::shared_ptr<Tile>> DisplayList::getFreeTiles(
   }
   tiles.insert(tiles.end(), emptyTiles.begin(), emptyTiles.end());
   emptyTiles.clear();
-  auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
-  DEBUG_ASSERT(currentZoomScale != 0.0f);
+
+  // Determine the effective zoom scale considering the minimum zoom scale.
+  auto effectiveZoomScaleInt = getEffectiveZoomScaleInt();
+  auto effectiveZoomScale = ToZoomScaleFloat(effectiveZoomScaleInt, _zoomScalePrecision);
+  DEBUG_ASSERT(effectiveZoomScale != 0.0f);
+
   // Reverse iterate through sorted caches to get the farest tiles first.
   for (size_t i = 0, j = sortedCaches.size(); i < j;) {
     auto& [scaleS, tileCacheS] = sortedCaches.at(i);
     auto& [scaleL, tileCacheL] = sortedCaches.at(j - 1);
     auto scale = scaleS;
     auto tileCache = tileCacheS;
-    if (ScaleRatio(scaleS, currentZoomScale) < ScaleRatio(scaleL, currentZoomScale)) {
+    if (ScaleRatio(scaleS, effectiveZoomScale) < ScaleRatio(scaleL, effectiveZoomScale)) {
       scale = scaleL;
       tileCache = tileCacheL;
       j--;
@@ -753,8 +788,8 @@ std::vector<std::shared_ptr<Tile>> DisplayList::getFreeTiles(
     }
     auto centerX = static_cast<float>(renderSurface->width()) * 0.5f - _contentOffset.x;
     auto centerY = static_cast<float>(renderSurface->height()) * 0.5f - _contentOffset.y;
-    centerX *= scale / currentZoomScale;
-    centerY *= scale / currentZoomScale;
+    centerX *= scale / effectiveZoomScale;
+    centerY *= scale / effectiveZoomScale;
     auto reusableTiles = tileCache->getReusableTiles(centerX, centerY);
     for (auto& tile : reusableTiles) {
       tileCache->removeTile(tile->tileX, tile->tileY);
@@ -877,9 +912,13 @@ void DisplayList::drawTileTask(const DrawTask& task) const {
   DEBUG_ASSERT(surface != nullptr);
   auto canvas = surface->getCanvas();
   AutoCanvasRestore autoRestore(canvas);
-  auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
-  DEBUG_ASSERT(currentZoomScale != 0.0f);
-  auto viewMatrix = Matrix::MakeScale(currentZoomScale);
+
+  // Determine the effective zoom scale considering the minimum zoom scale.
+  auto effectiveZoomScaleInt = getEffectiveZoomScaleInt();
+  auto effectiveZoomScale = ToZoomScaleFloat(effectiveZoomScaleInt, _zoomScalePrecision);
+  DEBUG_ASSERT(effectiveZoomScale != 0.0f);
+
+  auto viewMatrix = Matrix::MakeScale(effectiveZoomScale);
   auto& tileRect = task.tileRect();
   auto& sourceRect = task.sourceRect();
   auto offsetX = sourceRect.left - tileRect.left;
@@ -935,7 +974,11 @@ void DisplayList::renderDirtyRegions(Canvas* canvas, std::vector<Rect> dirtyRegi
 }
 
 Matrix DisplayList::getViewMatrix() const {
-  auto viewMatrix = Matrix::MakeScale(ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision));
+  // Determine the effective zoom scale considering the minimum zoom scale.
+  auto effectiveZoomScaleInt = getEffectiveZoomScaleInt();
+  auto effectiveZoomScale = ToZoomScaleFloat(effectiveZoomScaleInt, _zoomScalePrecision);
+
+  auto viewMatrix = Matrix::MakeScale(effectiveZoomScale);
   viewMatrix.postTranslate(_contentOffset.x, _contentOffset.y);
   return viewMatrix;
 }

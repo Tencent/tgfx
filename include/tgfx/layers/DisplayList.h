@@ -222,21 +222,20 @@ class DisplayList {
   }
 
   /**
-   * Returns the minimum zoom scale for tiled rendering mode. If the current zoomScale is less than
-   * this minimum value, tiles will not be created at the current scale. Instead, tiles from the
-   * minimum zoom scale will be used and downscaled for rendering. This prevents excessive tile
-   * creation when zooming out. The default value is 0.0f, meaning no minimum limit is applied.
+   * Returns the minimum zoom scale allowed in tiled rendering mode. When the current zoom scale
+   * is below this threshold, tiles will be rendered using this minimum zoom scale and then scaled
+   * down for display. This prevents excessive memory usage by limiting the number of tiles created
+   * for very small zoom scales. The default value is 0.0f, which means no minimum limit.
    */
   float minZoomScale() const {
     return _minZoomScale;
   }
 
   /**
-   * Sets the minimum zoom scale for tiled rendering mode. When the current zoomScale falls below
-   * this threshold, the display list will use cached tiles from this minimum scale and render them
-   * at the smaller size, avoiding the creation of excessive small tiles. This optimization improves
-   * performance during aggressive zooming out operations.
-   * @param scale The minimum zoom scale value. Must be greater than 0.
+   * Sets the minimum zoom scale allowed in tiled rendering mode. When the current zoom scale
+   * falls below this threshold, the display list will use this minimum scale to create tiles,
+   * then scale them down for rendering. This is combined with root layer bounds checking to
+   * prevent excessive tile creation. The minimum zoom scale applies only in tiled rendering mode.
    */
   void setMinZoomScale(float scale);
 
@@ -265,13 +264,13 @@ class DisplayList {
   std::shared_ptr<RootLayer> _root = nullptr;
   int64_t _zoomScaleInt = 1000;
   int _zoomScalePrecision = 1000;
+  float _minZoomScale = 0.0f;
   Point _contentOffset = {};
   RenderMode _renderMode = RenderMode::Partial;
   int _tileSize = 256;
   int _maxTileCount = 0;
   bool _allowZoomBlur = false;
   int _maxTilesRefinedPerFrame = 5;
-  float _minZoomScale = 0.0f;
   bool _showDirtyRegions = false;
   bool _hasContentChanged = false;
   bool hasZoomBlurTiles = false;
@@ -336,5 +335,12 @@ class DisplayList {
   void drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
                      bool autoClear) const;
   void updateMousePosition();
+
+  /**
+   * Computes the effective zoom scale int, considering both the current zoom scale and the
+   * minimum zoom scale limit. If the current zoom scale is below the minimum, returns the int
+   * representation of the minimum zoom scale; otherwise returns the current zoom scale int.
+   */
+  int64_t getEffectiveZoomScaleInt() const;
 };
 }  // namespace tgfx
