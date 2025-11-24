@@ -266,15 +266,15 @@
     },
     "PDFTest": {
         "ColorSpace": "c73fb3b5",
-        "Complex": "eefb7a46",
-        "DrawColor": "3a713e22",
-        "DrawShape": "3a713e22",
-        "DrawShapeStroke": "eefb7a46",
-        "EmojiText": "468c9428",
-        "Empty": "3a713e22",
-        "EmptyMultiPage": "3a713e22",
-        "Image": "3a713e22",
-        "SimpleText": "eefb7a46"
+        "Complex": "79ce3a28",
+        "DrawColor": "79ce3a28",
+        "DrawShape": "79ce3a28",
+        "DrawShapeStroke": "79ce3a28",
+        "EmojiText": "79ce3a28",
+        "Empty": "79ce3a28",
+        "EmptyMultiPage": "79ce3a28",
+        "Image": "79ce3a28",
+        "SimpleText": "79ce3a28"
     },
     "PathTest": {
         "DrawInfiniteLoopPath": "898f84dd"

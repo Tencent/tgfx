@@ -1045,7 +1045,7 @@ std::shared_ptr<MemoryWriteStream> PDFExportContext::setUpContentEntry(
                                      &shaderResources, &graphicStateResources);
   fActiveStackState.updateClip(state);
   fActiveStackState.updateMatrix(entry.matrix);
-  fActiveStackState.updateDrawingState(entry);
+  fActiveStackState.updateDrawingState(entry, document);
 
   return fActiveStackState.contentStream;
 }
