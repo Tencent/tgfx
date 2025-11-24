@@ -113,7 +113,7 @@
         "rasterized_scale_up": "6b4e5ce0",
         "roundRectRadii": "c83a3646",
         "roundRectRadiiStroke": "c83a3646",
-        "saveLayer": "eefb7a46",
+        "saveLayer": "c4c06bec",
         "scaled_clip": "6b4e5ce0",
         "scaled_image": "6b4e5ce0",
         "scaled_imageBuffer_box_filter": "6b4e5ce0",
@@ -131,12 +131,12 @@
     },
     "DrawersTest": {
         "ConicGradient": "69683f78",
-        "CustomLayerTreeDrawer": "de8199b2",
+        "CustomLayerTreeDrawer": "b33325c8",
         "GridBackground": "2ae64df",
         "ImageWithMipmap": "da590da",
         "ImageWithShadow": "c26ff3d9",
-        "SimpleLayerTreeDrawer": "c33b0500",
-        "SimpleText": "eefb7a46"
+        "SimpleLayerTreeDrawer": "b33325c8",
+        "SimpleText": "c4c06bec"
     },
     "DstTextureTest": {
         "EmptyLocalBounds": "be94e666",
@@ -257,7 +257,7 @@
         "imageMask": "6b4e5ce0",
         "innerShadow": "0cfb8996",
         "shapeMask": "6b4e5ce0",
-        "textMask": "6b4e5ce0"
+        "textMask": "db19a898"
     },
     "MaskTest": {
         "rasterize_emoji": "c0f39f8",
@@ -367,7 +367,7 @@
         "complex1": "f38f0012",
         "complex2": "cd6a8dff",
         "complex3": "eefb7a46",
-        "complex4": "eefb7a46",
+        "complex4": "c4c06bec",
         "complex5": "eefb7a46",
         "complex6": "eefb7a46",
         "complex7": "eefb7a46",
@@ -377,9 +377,9 @@
         "png_image": "b1db872",
         "radialGradient": "b1db872",
         "referenceStyle": "f38f0012",
-        "text": "9bfe8c34",
+        "text": "c4c06bec",
         "textEmoji": "9bfe8c34",
-        "textFont": "de8199b2"
+        "textFont": "c4c06bec"
     },
     "StrokeTest": {
         "DashStrokeAsSolidStroke": "eefb7a46",
@@ -398,14 +398,14 @@
         "ImageSnapshot_Surface2": "0cfb8996"
     },
     "TextAlignTest": {
-        "FontFallbackTest": "9bfe8c34",
+        "FontFallbackTest": "b33325c8",
         "SingleLineTextAlign": "6095b909",
-        "TextAlign": "9bfe8c34",
+        "TextAlign": "c4c06bec",
         "TextAlignBlankLineTest": "6095b909",
-        "TextAlignSimulateVerticalTextLayout": "9bfe8c34",
+        "TextAlignSimulateVerticalTextLayout": "c4c06bec",
         "TextAlignWidth0Height0": "6095b909",
         "TextAlignWidth1Height10": "b722a9ab",
-        "TruncateTextLineTest": "de8199b2"
+        "TruncateTextLineTest": "c4c06bec"
     },
     "TypefaceTest": {
         "CustomImageTypeface": "de8199b2",
