@@ -415,21 +415,21 @@ void DisplayList::checkTileCount(Surface* renderSurface) {
   auto minTileCount = static_cast<int>(tileCountX + 1) * static_cast<int>(tileCountY + 1);
 
   // Determine the effective zoom scale considering the minimum zoom scale.
-  auto effectiveZoomScaleInt = getEffectiveZoomScaleInt();
-  auto effectiveZoomScale = ToZoomScaleFloat(effectiveZoomScaleInt, _zoomScalePrecision);
+//  auto effectiveZoomScaleInt = getEffectiveZoomScaleInt();
+//  auto effectiveZoomScale = ToZoomScaleFloat(effectiveZoomScaleInt, _zoomScalePrecision);
 
   // Calculate the maximum tile count based on root layer bounds using effective zoom scale.
-  int maxTileCountFromBounds = 0;
-  if (_root) {
-    auto rootBounds = _root->getBounds();
-    if (!rootBounds.isEmpty()) {
-      auto boundsWidth = rootBounds.width() * effectiveZoomScale;
-      auto boundsHeight = rootBounds.height() * effectiveZoomScale;
-      auto boundsTileCountX = static_cast<int>(ceilf(boundsWidth / static_cast<float>(_tileSize)));
-      auto boundsTileCountY = static_cast<int>(ceilf(boundsHeight / static_cast<float>(_tileSize)));
-      maxTileCountFromBounds = (boundsTileCountX + 1) * (boundsTileCountY + 1);
-    }
-  }
+//  int maxTileCountFromBounds = 0;
+//  if (_root) {
+//    auto rootBounds = _root->getBounds();
+//    if (!rootBounds.isEmpty()) {
+//      auto boundsWidth = rootBounds.width() * effectiveZoomScale;
+//      auto boundsHeight = rootBounds.height() * effectiveZoomScale;
+//      auto boundsTileCountX = static_cast<int>(ceilf(boundsWidth / static_cast<float>(_tileSize)));
+//      auto boundsTileCountY = static_cast<int>(ceilf(boundsHeight / static_cast<float>(_tileSize)));
+//      maxTileCountFromBounds = (boundsTileCountX + 1) * (boundsTileCountY + 1);
+//    }
+//  }
 
   if (totalTileCount > 0) {
     if (totalTileCount >= minTileCount) {
@@ -440,9 +440,9 @@ void DisplayList::checkTileCount(Surface* renderSurface) {
   totalTileCount = std::max(minTileCount, _maxTileCount);
 
   // Limit tile count by root layer bounds if available.
-  if (maxTileCountFromBounds > 0) {
-    totalTileCount = std::min(totalTileCount, maxTileCountFromBounds);
-  }
+//  if (maxTileCountFromBounds > 0) {
+//    totalTileCount = std::min(totalTileCount, maxTileCountFromBounds);
+//  }
 
   auto maxTileCountPerAtlas = getMaxTileCountPerAtlas(renderSurface->getContext());
   if (maxTileCountPerAtlas <= 0) {
@@ -560,7 +560,6 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
   // Constrain tile coordinates by root layer bounds.
   if (_root) {
     auto rootBounds = _root->getBounds();
-    rootBounds.offset(-_contentOffset.x, -_contentOffset.y);
     rootBounds.scale(effectiveZoomScale, effectiveZoomScale);
     if (!rootBounds.isEmpty()) {
       auto boundsStartX = static_cast<int>(floorf(rootBounds.left / static_cast<float>(_tileSize)));
@@ -974,9 +973,7 @@ void DisplayList::renderDirtyRegions(Canvas* canvas, std::vector<Rect> dirtyRegi
 }
 
 Matrix DisplayList::getViewMatrix() const {
-  // Determine the effective zoom scale considering the minimum zoom scale.
-  auto effectiveZoomScaleInt = getEffectiveZoomScaleInt();
-  auto effectiveZoomScale = ToZoomScaleFloat(effectiveZoomScaleInt, _zoomScalePrecision);
+  auto effectiveZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
 
   auto viewMatrix = Matrix::MakeScale(effectiveZoomScale);
   viewMatrix.postTranslate(_contentOffset.x, _contentOffset.y);
