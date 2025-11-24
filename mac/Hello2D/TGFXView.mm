@@ -171,7 +171,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
                                            static_cast<float>(self.contentOffset.y)));
   auto canvas = surface->getCanvas();
   canvas->clear();
-  auto numBuilders = hello2d::SampleManager::Count();
+  auto numBuilders = hello2d::GetSampleCount();
   auto index = (self.drawIndex % numBuilders);
   appHost->draw(canvas, index, true);
   context->flushAndSubmit();

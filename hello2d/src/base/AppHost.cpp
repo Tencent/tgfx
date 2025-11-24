@@ -118,16 +118,16 @@ void AppHost::addTypeface(const std::string& name, std::shared_ptr<tgfx::Typefac
   typefaces[name] = std::move(typeface);
 }
 void AppHost::draw(tgfx::Canvas* canvas, int drawIndex, bool isNeedBackground) {
-  if (drawIndex < 0 || drawIndex >= static_cast<int>(SampleManager::Count())) {
+  if (drawIndex < 0 || drawIndex >= static_cast<int>(GetSampleCount())) {
     return;
   }
   canvas->clear();
 
   if (isNeedBackground) {
-    SampleManager::DrawBackground(canvas, this);
+    DrawSampleBackground(canvas, this);
   }
 
-  auto currentBuilder = SampleManager::GetByIndex(drawIndex);
+  auto currentBuilder = GetSampleByIndex(drawIndex);
   if (!currentBuilder) {
     return;
   }
@@ -148,7 +148,7 @@ void AppHost::draw(tgfx::Canvas* canvas, int drawIndex, bool isNeedBackground) {
     lastDrawIndex = drawIndex;
     updateRootMatrix();
   }
-  auto builder = SampleManager::GetByIndex(drawIndex % SampleManager::Count());
+  auto builder = GetSampleByIndex(drawIndex % GetSampleCount());
   if (builder == nullptr) {
     return;
   }

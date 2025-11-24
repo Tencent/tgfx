@@ -127,7 +127,7 @@ class AppHost {
    */
   std::vector<std::shared_ptr<tgfx::Layer>> getLayersUnderPoint(float x, float y) const;
 
-  mutable tgfx::DisplayList displayList = {};
+  tgfx::DisplayList displayList = {};
 
  private:
   int _width = 1280;

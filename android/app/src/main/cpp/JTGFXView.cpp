@@ -58,7 +58,7 @@ bool JTGFXView::draw(int drawIndex, float zoom, float offsetX, float offsetY) {
   appHost->updateZoomAndOffset(zoom, tgfx::Point(offsetX, offsetY));
   auto canvas = surface->getCanvas();
   canvas->clear();
-  auto numDrawers = hello2d::SampleManager::Count();
+  auto numDrawers = hello2d::GetSampleCount();
   auto index = (drawIndex % numDrawers);
   appHost->draw(canvas, index, true);
   context->flushAndSubmit();

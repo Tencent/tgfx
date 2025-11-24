@@ -104,7 +104,7 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
       break;
     }
     case WM_LBUTTONUP: {
-      int count = hello2d::SampleManager::Count();
+      int count = hello2d::GetSampleCount();
       if (count > 0) {
         currentDrawerIndex = (currentDrawerIndex + 1) % count;
         appHost->markDirty();
@@ -305,7 +305,7 @@ void TGFXWindow::draw() {
   canvas->clear();
   canvas->save();
 
-  int count = hello2d::SampleManager::Count();
+  int count = hello2d::GetSampleCount();
   int index = (count > 0) ? (currentDrawerIndex % count) : 0;
   appHost->draw(canvas, index, true);
   canvas->restore();

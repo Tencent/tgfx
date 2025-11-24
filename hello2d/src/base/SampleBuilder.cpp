@@ -28,15 +28,6 @@ static std::vector<Sample*> samples = {
     new RichText(),      new SimpleLayerTree(),
 };
 
-static std::vector<std::string> GetSampleNames() {
-  std::vector<std::string> names;
-  names.reserve(samples.size());
-  for (const auto& sample : samples) {
-    names.push_back(sample->name());
-  }
-  return names;
-}
-
 static std::unordered_map<std::string, Sample*> GetSampleMap() {
   std::unordered_map<std::string, Sample*> map;
   map.reserve(samples.size());
@@ -63,23 +54,28 @@ std::vector<std::shared_ptr<tgfx::Layer>> Sample::getLayersUnderPoint(float x, f
   return _root->getLayersUnderPoint(x, y);
 }
 
-// SampleManager class implementation
-int SampleManager::Count() {
+// Global functions implementation (replacing SampleManager static methods)
+int GetSampleCount() {
   return static_cast<int>(samples.size());
 }
 
-std::vector<std::string> SampleManager::Names() {
-  return GetSampleNames();
+std::vector<std::string> GetSampleNames() {
+  std::vector<std::string> names;
+  names.reserve(samples.size());
+  for (const auto& sample : samples) {
+    names.push_back(sample->name());
+  }
+  return names;
 }
 
-Sample* SampleManager::GetByIndex(int index) {
-  if (index < 0 || index >= Count()) {
+Sample* GetSampleByIndex(int index) {
+  if (index < 0 || index >= GetSampleCount()) {
     return nullptr;
   }
   return samples[static_cast<size_t>(index)];
 }
 
-Sample* SampleManager::GetByName(const std::string& name) {
+Sample* GetSampleByName(const std::string& name) {
   auto sampleMap = GetSampleMap();
   auto it = sampleMap.find(name);
   if (it == sampleMap.end()) {
@@ -88,7 +84,7 @@ Sample* SampleManager::GetByName(const std::string& name) {
   return it->second;
 }
 
-void SampleManager::DrawBackground(tgfx::Canvas* canvas, const AppHost* host) {
+void DrawSampleBackground(tgfx::Canvas* canvas, const AppHost* host) {
   static auto layer = GridBackgroundLayer::Make();
   layer->setSize(host->width(), host->height(), host->density());
   layer->draw(canvas);

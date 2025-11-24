@@ -51,31 +51,30 @@ class Sample {
   std::string _name = "";
 };
 
-// Manager class for handling multiple samples
-class SampleManager {
- public:
-  /**
-   * Returns the number of samples.
-   */
-  static int Count();
+/**
+ * Returns the number of samples.
+ */
+int GetSampleCount();
 
-  /**
-   * Returns the names of all samples.
-   */
-  static std::vector<std::string> Names();
+/**
+ * Returns the names of all samples.
+ */
+std::vector<std::string> GetSampleNames();
 
-  /**
-   * Returns the sample with the given index.
-   */
-  static Sample* GetByIndex(int index);
+/**
+ * Returns the sample with the given index.
+ */
+Sample* GetSampleByIndex(int index);
 
-  /**
-   * Returns the sample with the given name.
-   */
-  static Sample* GetByName(const std::string& name);
+/**
+ * Returns the sample with the given name.
+ */
+Sample* GetSampleByName(const std::string& name);
 
-  static void DrawBackground(tgfx::Canvas* canvas, const hello2d::AppHost* host);
-};
+/**
+ * Draws the background for samples.
+ */
+void DrawSampleBackground(tgfx::Canvas* canvas, const hello2d::AppHost* host);
 
 // For backward compatibility, alias SampleBuilder to Sample
 using SampleBuilder = Sample;

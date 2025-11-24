@@ -129,7 +129,7 @@ bool TGFXView::draw() {
       zoom, tgfx::Point(static_cast<float>(offset.x()), static_cast<float>(offset.y())));
   auto canvas = surface->getCanvas();
   canvas->clear();
-  auto numBuilders = hello2d::SampleManager::Count();
+  auto numBuilders = hello2d::GetSampleCount();
   auto index = (currentDrawerIndex % numBuilders);
   appHost->draw(canvas, index, true);
   context->flushAndSubmit();

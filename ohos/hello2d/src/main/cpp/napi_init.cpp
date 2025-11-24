@@ -73,7 +73,7 @@ static bool Draw(int drawIndex, float zoom = 1.0f, float offsetX = 0.0f, float o
   auto canvas = surface->getCanvas();
   canvas->clear();
 
-  auto index = (drawIndex % hello2d::SampleManager::Count());
+  auto index = (drawIndex % hello2d::GetSampleCount());
   appHost->draw(canvas, index, true);
   context->flushAndSubmit();
   window->present(context);
