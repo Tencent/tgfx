@@ -113,7 +113,7 @@
         "rasterized_scale_up": "eefb7a46",
         "roundRectRadii": "c83a3646",
         "roundRectRadiiStroke": "c83a3646",
-        "saveLayer": "eefb7a46",
+        "saveLayer": "c4c06bec",
         "scaled_clip": "68928515",
         "scaled_image": "eefb7a46",
         "scaled_imageBuffer_box_filter": "eefb7a46",
@@ -136,7 +136,7 @@
         "ImageWithMipmap": "da590da",
         "ImageWithShadow": "c26ff3d9",
         "SimpleLayerTreeDrawer": "c33b0500",
-        "SimpleText": "eefb7a46"
+        "SimpleText": "c4c06bec"
     },
     "DstTextureTest": {
         "EmptyLocalBounds": "be94e666",
@@ -257,7 +257,7 @@
         "imageMask": "eefb7a46",
         "innerShadow": "0cfb8996",
         "shapeMask": "eefb7a46",
-        "textMask": "eefb7a46"
+        "textMask": "c4c06bec"
     },
     "MaskTest": {
         "rasterize_emoji": "c0f39f8",
@@ -367,7 +367,7 @@
         "complex1": "f38f0012",
         "complex2": "cd6a8dff",
         "complex3": "eefb7a46",
-        "complex4": "eefb7a46",
+        "complex4": "c4c06bec",
         "complex5": "eefb7a46",
         "complex6": "eefb7a46",
         "complex7": "eefb7a46",
@@ -377,9 +377,9 @@
         "png_image": "b1db872",
         "radialGradient": "b1db872",
         "referenceStyle": "f38f0012",
-        "text": "9bfe8c34",
+        "text": "c4c06bec",
         "textEmoji": "9bfe8c34",
-        "textFont": "de8199b2"
+        "textFont": "c4c06bec"
     },
     "StrokeTest": {
         "DashStrokeAsSolidStroke": "eefb7a46",
@@ -400,12 +400,12 @@
     "TextAlignTest": {
         "FontFallbackTest": "9bfe8c34",
         "SingleLineTextAlign": "6095b909",
-        "TextAlign": "9bfe8c34",
+        "TextAlign": "c4c06bec",
         "TextAlignBlankLineTest": "6095b909",
-        "TextAlignSimulateVerticalTextLayout": "9bfe8c34",
+        "TextAlignSimulateVerticalTextLayout": "c4c06bec",
         "TextAlignWidth0Height0": "6095b909",
         "TextAlignWidth1Height10": "b722a9ab",
-        "TruncateTextLineTest": "de8199b2"
+        "TruncateTextLineTest": "c4c06bec"
     },
     "TypefaceTest": {
         "CustomImageTypeface": "de8199b2",
