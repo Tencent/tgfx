@@ -158,11 +158,6 @@ class ProxyProvider {
   void flushSharedVertexBuffer();
 
   /**
-   * Clears the block buffer used for shared vertex buffer.
-   */
-  void clearSharedVertexBuffer();
-
-  /**
    * Stores the given proxy in the map with the new uniqueKey.
    */
   void assignProxyUniqueKey(std::shared_ptr<ResourceProxy> proxy, const UniqueKey& uniqueKey);
@@ -170,12 +165,8 @@ class ProxyProvider {
  private:
   Context* context = nullptr;
   ResourceKeyMap<std::weak_ptr<ResourceProxy>> proxyMap = {};
-  bool sharedVertexBufferFlushed = false;
   std::shared_ptr<GPUBufferProxy> sharedVertexBuffer = nullptr;
   std::vector<std::shared_ptr<Task>> sharedVertexBufferTasks = {};
-  BlockAllocator vertexBlockAllocator = {};
-  SlidingWindowTracker maxValueTracker = {10};
-
   std::shared_ptr<GPUBufferProxy> findOrWrapGPUBufferProxy(const UniqueKey& uniqueKey);
 
   void addResourceProxy(std::shared_ptr<ResourceProxy> proxy, const UniqueKey& uniqueKey = {});

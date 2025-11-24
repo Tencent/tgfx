@@ -653,11 +653,15 @@ bool FTScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke*,
   auto srcRB = ftBitmap.pitch;
   auto srcFormat = ftBitmap.pixel_mode == FT_PIXEL_MODE_GRAY ? gfx::skcms_PixelFormat_A_8
                                                              : gfx::skcms_PixelFormat_BGRA_8888;
+  auto srcProfile = *gfx::skcms_sRGB_profile();
 
   auto dst = static_cast<uint8_t*>(dstPixels);
   auto dstRB = dstInfo.rowBytes();
   auto dstFormat = ToPixelFormat(dstInfo.colorType());
-  auto dstProfile = ToSkcmsICCProfile(dstInfo.colorSpace());
+  auto dstProfile = srcProfile;
+  if (dstInfo.colorSpace() != nullptr) {
+    dstProfile = ToSkcmsICCProfile(dstInfo.colorSpace());
+  }
   for (size_t i = 0; i < height; i++) {
     gfx::skcms_Transform(src, srcFormat, gfx::skcms_AlphaFormat_PremulAsEncoded,
                          gfx::skcms_sRGB_profile(), dst, dstFormat,

@@ -130,8 +130,14 @@ class ImageFilter {
    * content with a z component outside this range will be clipped.
    * The default transformation anchor is at the top-left origin (0,0) of the source image,
    * user-defined anchors are included in the matrix.
+   * @param hideBackFace Controls whether to hide the back face of the content after the 3D
+   * transformation. The default value is false, which means both the front and back faces are drawn.
+   * When the image model is first created, the front face is oriented toward the user by default.
+   * After applying certain 3D transformations, such as rotating 180 degrees around the X axis, the
+   * back face of the layer may face the user.
    */
-  static std::shared_ptr<ImageFilter> Transform3D(const Matrix3D& matrix);
+  static std::shared_ptr<ImageFilter> Transform3D(const Matrix3D& matrix,
+                                                  bool hideBackFace = false);
 
   virtual ~ImageFilter() = default;
 

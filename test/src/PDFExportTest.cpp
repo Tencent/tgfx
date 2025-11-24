@@ -378,8 +378,7 @@ TGFX_TEST(PDFExportTest, ColorSpaceTest) {
   auto document =
       PDFDocument::Make(PDFStream, context, metadata, ColorSpaceConverter::MakeDefaultConverter());
   auto canvas = document->beginPage(256.f, 256.f);
-  canvas->drawColor(Color::FromRGBA(
-      0, 255, 0, 255, ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3)));
+  canvas->drawColor(Color::FromRGBA(0, 255, 0, 255, ColorSpace::DisplayP3()));
   document->endPage();
   canvas = document->beginPage(256.f, 256.f);
   canvas->drawColor(Color::FromRGBA(0, 255, 0, 255, ColorSpace::SRGB()));

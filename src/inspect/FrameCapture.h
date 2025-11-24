@@ -71,9 +71,9 @@ class FrameCapture {
 
   void sendAttributeData(const char* name, const std::optional<Matrix>& matrix);
 
-  void sendAttributeData(const char* name, const Color& color);
+  void sendAttributeData(const char* name, const PMColor& color);
 
-  void sendAttributeData(const char* name, const std::optional<Color>& color);
+  void sendAttributeData(const char* name, const std::optional<PMColor>& color);
 
   void sendFrameMark(const char* name);
 

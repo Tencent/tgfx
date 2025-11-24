@@ -493,6 +493,7 @@ void PDFDocumentImpl::endObject() {
 }
 
 PDFIndirectReference PDFDocumentImpl::emitColorSpace(std::shared_ptr<ColorSpace> colorSpace) {
+  DEBUG_ASSERT(colorSpace != nullptr);
   auto hash = colorSpace->hash();
   if (_colorSpaceMap.find(hash) != _colorSpaceMap.end()) {
     return _colorSpaceMap[hash];

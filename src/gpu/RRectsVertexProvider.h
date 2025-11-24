@@ -27,13 +27,13 @@
 
 namespace tgfx {
 struct RRectRecord {
-  RRectRecord(const RRect& rRect, const Matrix& viewMatrix, Color color = {})
+  RRectRecord(const RRect& rRect, const Matrix& viewMatrix, PMColor color = {})
       : rRect(rRect), viewMatrix(viewMatrix), color(color) {
   }
 
   RRect rRect;
   Matrix viewMatrix;
-  Color color;
+  PMColor color;
 };
 
 /**
@@ -77,7 +77,7 @@ class RRectsVertexProvider : public VertexProvider {
   /**
    * Returns the first color in the provider. If no color record exists, a white color is returned.
    */
-  const Color& firstColor() const {
+  const PMColor& firstColor() const {
     return rects.front()->color;
   }
 
