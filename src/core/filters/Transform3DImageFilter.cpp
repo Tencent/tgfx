@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Transform3DImageFilter.h"
+#include "core/Matrix2D.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/PlacementPtr.h"
 #include "gpu/DrawingManager.h"
@@ -28,31 +29,35 @@
 
 namespace tgfx {
 
-std::shared_ptr<ImageFilter> ImageFilter::Transform3D(const Matrix3D& matrix) {
-  return std::make_shared<Transform3DImageFilter>(matrix);
+std::shared_ptr<ImageFilter> ImageFilter::Transform3D(const Matrix3D& matrix, bool hideBackFace) {
+  return std::make_shared<Transform3DImageFilter>(matrix, hideBackFace);
 }
 
-Transform3DImageFilter::Transform3DImageFilter(const Matrix3D& matrix) : matrix(matrix) {
+Transform3DImageFilter::Transform3DImageFilter(const Matrix3D& matrix, bool hideBackFace)
+    : _matrix(matrix), _hideBackFace(hideBackFace) {
 }
 
 Rect Transform3DImageFilter::onFilterBounds(const Rect& rect, MapDirection mapDirection) const {
   if (mapDirection == MapDirection::Forward) {
-    // The default transformation anchor is at the top-left origin (0,0) of the image; user-defined
-    // anchors are included in the matrix.
-    auto srcModelRect = Rect::MakeWH(rect.width(), rect.height());
-    auto dstModelRect = matrix.mapRect(srcModelRect);
-    // The minimum axis-aligned bounding rectangle of srcRect after projection is calculated based on
-    // its relative position to the standard rectangle.
-    auto result = Rect::MakeXYWH(dstModelRect.left - srcModelRect.left + rect.left,
-                                 dstModelRect.top - srcModelRect.top + rect.top,
-                                 dstModelRect.width(), dstModelRect.height());
+    auto result = _matrix.mapRect(rect);
     return result;
   }
-  Matrix3D invertedMatrix;
-  if (!matrix.invert(&invertedMatrix)) {
+
+  // All vertices inside the rect have an initial z-coordinate of 0, so the third column of the 4x4
+  // matrix does not affect the final transformation result and can be ignored. Additionally, since
+  // we do not care about the final projected z-axis coordinate, the third row can also be ignored.
+  // Therefore, the 4x4 matrix can be simplified to a 3x3 matrix.
+  float values[16] = {};
+  _matrix.getColumnMajor(values);
+  auto matrix2D = Matrix2D::MakeAll(values[0], values[1], values[3], values[4], values[5],
+                                    values[7], values[12], values[13], values[15]);
+  Matrix2D inversedMatrix;
+  if (!matrix2D.invert(&inversedMatrix)) {
+    DEBUG_ASSERT(false);
     return rect;
   }
-  return matrix.mapRect(rect);
+  auto result = inversedMatrix.mapRect(rect);
+  return result;
 }
 
 std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
@@ -66,8 +71,6 @@ std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
   }
   dstDrawWidth = std::ceil(dstDrawWidth);
   dstDrawHeight = std::ceil(dstDrawHeight);
-  const float drawScaleX = dstDrawWidth / renderBounds.width();
-  const float drawScaleY = dstDrawHeight / renderBounds.height();
 
   auto renderTarget = RenderTargetProxy::Make(
       args.context, static_cast<int>(dstDrawWidth), static_cast<int>(dstDrawHeight),
@@ -79,12 +82,9 @@ std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
   // The default transformation anchor is at the top-left origin (0,0) of the image; user-defined
   // anchors are included in the matrix.
   auto srcModelRect = Rect::MakeXYWH(0.f, 0.f, srcW, srcH);
-  auto dstModelRect = matrix.mapRect(srcModelRect);
   // SrcProjectRect is the result of projecting srcRect onto the canvas. RenderBounds describes a
   // subregion that needs to be drawn within it.
-  auto srcProjectRect =
-      Rect::MakeXYWH(dstModelRect.left - srcModelRect.left, dstModelRect.top - srcModelRect.top,
-                     dstModelRect.width(), dstModelRect.height());
+  auto srcProjectRect = _matrix.mapRect(srcModelRect);
   // ndcScale and ndcOffset are used to scale and translate the NDC coordinates to ensure that only
   // the content within RenderBounds is drawn to the render target. This clips regions beyond the
   // clip space.
@@ -96,35 +96,38 @@ std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
   // ndcOffset translates the NDC coordinates so that the local area to be drawn aligns exactly with
   // the (-1, -1) point.
   auto ndcRectScaled =
-      Rect::MakeXYWH(dstModelRect.left * ndcScale.x, dstModelRect.top * ndcScale.y,
-                     dstModelRect.width() * ndcScale.x, dstModelRect.height() * ndcScale.y);
+      Rect::MakeXYWH(srcProjectRect.left * ndcScale.x, srcProjectRect.top * ndcScale.y,
+                     srcProjectRect.width() * ndcScale.x, srcProjectRect.height() * ndcScale.y);
   const Vec2 renderBoundsLTNDCScaled((renderBounds.left - srcProjectRect.left) * ndcScale.x,
                                      (renderBounds.top - srcProjectRect.top) * ndcScale.y);
   const Vec2 ndcOffset(-1.f - ndcRectScaled.left - renderBoundsLTNDCScaled.x,
                        -1.f - ndcRectScaled.top - renderBoundsLTNDCScaled.y);
 
   auto drawingManager = args.context->drawingManager();
-  auto drawingBuffer = args.context->drawingAllocator();
-  auto vertexProvider =
-      RectsVertexProvider::MakeFrom(drawingBuffer, srcModelRect, AAType::Coverage);
+  auto allocator = args.context->drawingAllocator();
+  auto vertexProvider = RectsVertexProvider::MakeFrom(allocator, srcModelRect, AAType::Coverage);
   const Size viewportSize(static_cast<float>(renderTarget->width()),
                           static_cast<float>(renderTarget->height()));
-  const Rect3DDrawArgs drawArgs{matrix, ndcScale, ndcOffset, viewportSize};
+  const Rect3DDrawArgs drawArgs{_matrix, ndcScale, ndcOffset, viewportSize};
   auto drawOp =
       Rect3DDrawOp::Make(args.context, std::move(vertexProvider), args.renderFlags, drawArgs);
   const SamplingArgs samplingArgs = {TileMode::Decal, TileMode::Decal, {}, SrcRectConstraint::Fast};
   // Ensure the vertex texture sampling coordinates are in the range [0, 1]
-  auto uvMatrix = Matrix::MakeTrans(-srcModelRect.left, -srcModelRect.top);
+  DEBUG_ASSERT(srcW > 0 && srcH > 0);
   // The Size obtained from Source is the original size, while the texture size generated by Source
   // is the size after applying DrawScale. Texture sampling requires corresponding scaling.
-  uvMatrix.postScale(drawScaleX, drawScaleY);
+  auto uvMatrix = Matrix::MakeScale(static_cast<float>(sourceTextureProxy->width()) / srcW,
+                                    static_cast<float>(sourceTextureProxy->height()) / srcH);
   auto fragmentProcessor =
-      TextureEffect::Make(std::move(sourceTextureProxy), samplingArgs, &uvMatrix);
+      TextureEffect::Make(allocator, std::move(sourceTextureProxy), samplingArgs, &uvMatrix);
   drawOp->addColorFP(std::move(fragmentProcessor));
+  if (_hideBackFace) {
+    drawOp->setCullMode(CullMode::Back);
+  }
   std::vector<PlacementPtr<DrawOp>> drawOps;
   drawOps.emplace_back(std::move(drawOp));
-  auto drawOpArray = drawingBuffer->makeArray(std::move(drawOps));
-  drawingManager->addOpsRenderTask(renderTarget, std::move(drawOpArray), Color::Transparent());
+  auto drawOpArray = allocator->makeArray(std::move(drawOps));
+  drawingManager->addOpsRenderTask(renderTarget, std::move(drawOpArray), PMColor::Transparent());
 
   return renderTarget->asTextureProxy();
 }

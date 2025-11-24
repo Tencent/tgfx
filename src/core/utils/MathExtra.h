@@ -133,4 +133,21 @@ inline bool IsInteger(float f) {
   return std::floor(f) == f;
 }
 
+#if !defined(TGFX_ATTRIBUTE)
+#if defined(__clang__) || defined(__GNUC__)
+#define TGFX_ATTRIBUTE(attr) __attribute__((attr))
+#else
+#define TGFX_ATTRIBUTE(attr)
+#endif
+#endif
+
+/**
+ * IEEE defines how floating-point division behaves for any values and zero denominators, but C does
+ * not. Therefore, we provide a helper to suppress possible undefined-behavior warnings.
+ */
+TGFX_ATTRIBUTE(no_sanitize("float-divide-by-zero"))
+inline float IEEEFloatDivide(float numer, float denom) {
+  return numer / denom;
+}
+
 }  // namespace tgfx

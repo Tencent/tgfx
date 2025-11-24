@@ -18,13 +18,20 @@
 
 #include "tgfx/core/Vec.h"
 #include "core/utils/MathExtra.h"
-#include "utils/Log.h"
 
 namespace tgfx {
 
 Vec2 operator/(const Vec2& v, float s) {
-  DEBUG_ASSERT(!FloatNearlyZero(s));
-  return {v.x / s, v.y / s};
+  return {IEEEFloatDivide(v.x, s), IEEEFloatDivide(v.y, s)};
+}
+
+bool Vec3::operator==(const Vec3& v) const {
+  return FloatNearlyEqual(x, v.x) && FloatNearlyEqual(y, v.y) && FloatNearlyEqual(z, v.z);
+}
+
+bool Vec4::operator==(const Vec4& v) const {
+  return FloatNearlyEqual(x, v.x) && FloatNearlyEqual(y, v.y) && FloatNearlyEqual(z, v.z) &&
+         FloatNearlyEqual(w, v.w);
 }
 
 }  // namespace tgfx

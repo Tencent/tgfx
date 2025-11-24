@@ -129,9 +129,9 @@ TGFX_TEST(CanvasTest, DiscardContent) {
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
   surface->renderContext->flush();
-  auto drawingManager = context->drawingManager();
-  ASSERT_TRUE(drawingManager->renderTasks.size() == 1);
-  auto task = static_cast<OpsRenderTask*>(drawingManager->renderTasks.front().get());
+  auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+  ASSERT_TRUE(drawingBuffer->renderTasks.size() == 1);
+  auto task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.front().get());
   EXPECT_TRUE(task->drawOps.size() == 0);
 
   Paint paint;
@@ -140,8 +140,8 @@ TGFX_TEST(CanvasTest, DiscardContent) {
   paint.setBlendMode(BlendMode::Src);
   canvas->drawRect(Rect::MakeWH(width, height), paint);
   surface->renderContext->flush();
-  ASSERT_TRUE(drawingManager->renderTasks.size() == 2);
-  task = static_cast<OpsRenderTask*>(drawingManager->renderTasks.back().get());
+  ASSERT_TRUE(drawingBuffer->renderTasks.size() == 2);
+  task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
   EXPECT_TRUE(task->drawOps.size() == 0);
 
   paint.setColor(Color{0.8f, 0.8f, 0.8f, 1.f});
@@ -152,8 +152,8 @@ TGFX_TEST(CanvasTest, DiscardContent) {
       {Color{0.f, 1.f, 0.f, 1.f}, Color{0.f, 0.f, 0.f, 1.f}}, {}));
   canvas->drawPaint(paint);
   surface->renderContext->flush();
-  ASSERT_TRUE(drawingManager->renderTasks.size() == 3);
-  task = static_cast<OpsRenderTask*>(drawingManager->renderTasks.back().get());
+  ASSERT_TRUE(drawingBuffer->renderTasks.size() == 3);
+  task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
   EXPECT_TRUE(task->drawOps.size() == 1);
   context->flushAndSubmit();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DiscardContent"));
@@ -187,9 +187,9 @@ TGFX_TEST(CanvasTest, merge_draw_call_rect) {
     }
   }
   surface->renderContext->flush();
-  auto drawingManager = context->drawingManager();
-  EXPECT_TRUE(drawingManager->renderTasks.size() == 1);
-  auto task = static_cast<OpsRenderTask*>(drawingManager->renderTasks.front().get());
+  auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+  EXPECT_TRUE(drawingBuffer->renderTasks.size() == 1);
+  auto task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.front().get());
   ASSERT_TRUE(task->drawOps.size() == 1);
   EXPECT_EQ(static_cast<RectDrawOp*>(task->drawOps.back().get())->rectCount, drawCallCount);
   context->flushAndSubmit();
@@ -227,9 +227,9 @@ TGFX_TEST(CanvasTest, merge_draw_call_rrect) {
     }
   }
   surface->renderContext->flush();
-  auto drawingManager = context->drawingManager();
-  EXPECT_TRUE(drawingManager->renderTasks.size() == 1);
-  auto task = static_cast<OpsRenderTask*>(drawingManager->renderTasks.front().get());
+  auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+  EXPECT_TRUE(drawingBuffer->renderTasks.size() == 1);
+  auto task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.front().get());
   ASSERT_TRUE(task->drawOps.size() == 1);
   EXPECT_EQ(static_cast<RRectDrawOp*>(task->drawOps.back().get())->rectCount, drawCallCount);
   context->flushAndSubmit();

@@ -33,7 +33,7 @@ void OpsRenderTask::execute(CommandEncoder* encoder) {
   auto resolveTexture =
       renderTarget->sampleCount() > 1 ? renderTarget->getSampleTexture() : nullptr;
   RenderPassDescriptor descriptor(renderTarget->getRenderTexture(), loadOp, StoreAction::Store,
-                                  clearColor.value_or(Color::Transparent()), resolveTexture);
+                                  clearColor.value_or(PMColor::Transparent()), resolveTexture);
   auto renderPass = encoder->beginRenderPass(descriptor);
   if (renderPass == nullptr) {
     LOGE("OpsRenderTask::execute() Failed to initialize the render pass!");

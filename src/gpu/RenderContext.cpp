@@ -205,7 +205,7 @@ RenderContext::RenderContext(std::shared_ptr<RenderTargetProxy> proxy, uint32_t 
   if (clearAll) {
     auto drawingManager = renderTarget->getContext()->drawingManager();
     opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags,
-                                                     Color::Transparent(), _colorSpace);
+                                                     PMColor::Transparent(), _colorSpace);
   }
 }
 
@@ -499,8 +499,8 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
         auto pageIndex = atlasLocator.pageIndex();
         auto atlasOffset =
             Point::Make(atlasLocator.getLocation().left, atlasLocator.getLocation().top);
-        drawingManager->addAtlasCellCodecTask(textureProxies[pageIndex], atlasOffset,
-                                              std::move(glyphCodec));
+        drawingManager->addAtlasCellTask(textureProxies[pageIndex], atlasOffset,
+                                         std::move(glyphCodec));
       } else {
         rejectedGlyphRun->glyphs.push_back(glyphID);
         rejectedGlyphRun->positions.push_back(glyphPosition);
@@ -614,8 +614,7 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
       }
       auto pageIndex = atlasLocator.pageIndex();
       auto offset = Point::Make(atlasLocator.getLocation().left, atlasLocator.getLocation().top);
-      drawingManager->addAtlasCellCodecTask(textureProxies[pageIndex], offset,
-                                            std::move(glyphCodec));
+      drawingManager->addAtlasCellTask(textureProxies[pageIndex], offset, std::move(glyphCodec));
     }
     atlasManager->setPlotUseToken(plotUseUpdater, atlasLocator.plotLocator(), maskFormat,
                                   nextFlushToken);

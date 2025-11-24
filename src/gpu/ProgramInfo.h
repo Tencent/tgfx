@@ -92,6 +92,20 @@ class ProgramInfo {
    */
   void setUniformsAndSamplers(RenderPass* renderPass, Program* program) const;
 
+  /**
+   * Returns the cull face mode used for rendering.
+   */
+  CullMode getCullMode() const {
+    return cullMode;
+  }
+
+  /**
+   * Sets the cull face mode used for rendering.
+   */
+  void setCullMode(CullMode mode) {
+    cullMode = mode;
+  }
+
  private:
   RenderTarget* renderTarget = nullptr;
   GeometryProcessor* geometryProcessor = nullptr;
@@ -101,6 +115,7 @@ class ProgramInfo {
   size_t numColorProcessors = 0;
   XferProcessor* xferProcessor = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
+  CullMode cullMode = CullMode::None;
 
   void updateProcessorIndices();
 

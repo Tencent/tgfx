@@ -20,6 +20,7 @@
 
 #include <memory>
 #include <optional>
+#include <unordered_set>
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Matrix.h"
@@ -143,9 +144,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
   /**
    * Returns the position of the layer relative to the local coordinates of the parent layer.
    */
-  Point position() const {
-    return {_matrix.getTranslateX(), _matrix.getTranslateY()};
-  }
+  Point position() const;
 
   /**
    * Sets the position of the layer.
@@ -154,15 +153,29 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   /**
    * Returns the transformation matrix applied to the layer.
+   * If the matrix set via the setMatrix3D interface contains 3D transformations or projection
+   * transformations, this interface will return the identity matrix; you need to use the matrix3D
+   * interface to obtain the actual matrix. Otherwise, it will return the equivalent simplified
+   * affine transformation matrix.
    */
-  const Matrix& matrix() const {
-    return _matrix;
-  }
+  Matrix matrix() const;
 
   /**
    * Sets the transformation matrix applied to the layer.
    */
   void setMatrix(const Matrix& value);
+
+  /**
+   * Returns the 3D transformation matrix applied to the layer.
+   */
+  Matrix3D matrix3D() const {
+    return _matrix3D;
+  }
+
+  /**
+   * Sets the 3D transformation matrix applied to the layer.
+   */
+  void setMatrix3D(const Matrix3D& value);
 
   /**
    * Returns whether the layer is visible. The default value is true.
@@ -558,7 +571,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   void invalidate();
 
-  Rect getBoundsInternal(const Matrix& coordinateMatrix, bool computeTightBounds);
+  Rect getBoundsInternal(const Matrix3D& coordinateMatrix, bool computeTightBounds);
 
   void onAttachToRoot(RootLayer* rootLayer);
 
@@ -568,48 +581,79 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   bool doContains(const Layer* child) const;
 
-  Matrix getGlobalMatrix() const;
+  Matrix3D getGlobalMatrix() const;
 
-  Matrix getMatrixWithScrollRect() const;
+  Matrix3D getMatrixWithScrollRect() const;
 
   LayerContent* getContent();
 
-  std::shared_ptr<ImageFilter> getImageFilter(float contentScale);
+  /**
+   * Generates an image filter for the specified content area within the layer.
+   * @param contentScale The scale ratio of the specified area in the layer's local coordinate
+   * system.
+   * @param transform The affine transformation matrix referenced by the local coordinate system
+   * with the top-left vertex of the content rectangle as the origin.
+   */
+  std::shared_ptr<ImageFilter> getImageFilter(float contentScale,
+                                              const Matrix3D* transform = nullptr);
 
   RasterizedContent* getRasterizedCache(const DrawArgs& args, const Matrix& renderMatrix);
 
   std::shared_ptr<Image> getRasterizedImage(const DrawArgs& args, float contentScale,
                                             Matrix* drawingMatrix);
 
-  void drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
+  void drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
+                 const Matrix3D* transform = nullptr);
 
-  void drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
+  void drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
+                     const Matrix3D* transform);
 
   void drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha);
 
-  void drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
-                    const LayerStyleSource* layerStyleSource = nullptr,
-                    const Layer* stopChild = nullptr);
+  void drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha,
+                    const std::unordered_set<LayerStyleExtraSourceType>& styleExtraSourceTypes);
+
+  void drawContents(
+      const DrawArgs& args, Canvas* canvas, float alpha,
+      const LayerStyleSource* layerStyleSource = nullptr, const Layer* stopChild = nullptr,
+      const std::unordered_set<LayerStyleExtraSourceType>& styleExtraSourceTypes = {});
 
   bool drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
                     const Layer* stopChild = nullptr);
 
   float drawBackgroundLayers(const DrawArgs& args, Canvas* canvas);
 
-  std::unique_ptr<LayerStyleSource> getLayerStyleSource(const DrawArgs& args, const Matrix& matrix);
+  std::unique_ptr<LayerStyleSource> getLayerStyleSource(const DrawArgs& args, const Matrix& matrix,
+                                                        bool excludeContour = false);
 
   std::shared_ptr<Image> getBackgroundImage(const DrawArgs& args, float contentScale,
                                             Point* offset);
 
+  /**
+   * Gets the background image of the minimum axis-aligned bounding box after drawing the layer
+   * subtree with the current layer as the root node.
+   */
+  std::shared_ptr<Image> getBoundsBackgroundImage(const DrawArgs& args, float contentScale,
+                                                  Point* offset);
+
+  void drawBackgroundImage(const DrawArgs& args, Canvas& canvas, Point* offset);
+
   void drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
                        const LayerStyleSource* source, LayerStylePosition position);
+
+  void drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
+                       const LayerStyleSource* source, LayerStylePosition position,
+                       const std::unordered_set<LayerStyleExtraSourceType>& styleExtraSourceTypes);
+
+  void drawBackgroundLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
+                                 const Matrix3D& transform);
 
   bool getLayersUnderPointInternal(float x, float y, std::vector<std::shared_ptr<Layer>>* results);
 
   std::shared_ptr<MaskFilter> getMaskFilter(const DrawArgs& args, float scale,
                                             const std::optional<Rect>& layerClipBounds);
 
-  Matrix getRelativeMatrix(const Layer* targetCoordinateSpace) const;
+  Matrix3D getRelativeMatrix(const Layer* targetCoordinateSpace) const;
 
   bool hasValidMask() const;
 
@@ -636,6 +680,17 @@ class Layer : public std::enable_shared_from_this<Layer> {
       std::shared_ptr<BackgroundContext> subBackgroundContext, std::optional<Rect> clipBounds,
       Matrix* imageMatrix);
 
+  /**
+   * Returns the equivalent transformation matrix adapted for a custom anchor point.
+   * The matrix is defined based on a local coordinate system, with the transformation anchor point
+   * being the origin of that coordinate system. This function returns an affine transformation
+   * matrix that produces the same visual effect when using any point within this coordinate system
+   * as the new origin and anchor point.
+   * @param matrix The original transformation matrix.
+   * @param anchor The specified anchor point.
+   */
+  Matrix3D anchorAdaptedMatrix(const Matrix3D& matrix, const Point& anchor) const;
+
   struct {
     bool dirtyContent : 1;        // layer's content needs updating
     bool dirtyContentBounds : 1;  // layer's content bounds needs updating
@@ -653,7 +708,10 @@ class Layer : public std::enable_shared_from_this<Layer> {
   } bitFields = {};
   std::string _name;
   float _alpha = 1.0f;
-  Matrix _matrix = {};
+  // The actual transformation matrix that determines the geometric position of the layer
+  Matrix3D _matrix3D = {};
+  // Whether the matrix3D is equivalent to a 2D affine matrix
+  bool _matrix3DIsAffine = true;
   std::shared_ptr<Layer> _mask = nullptr;
   Layer* maskOwner = nullptr;
   std::unique_ptr<Rect> _scrollRect = nullptr;

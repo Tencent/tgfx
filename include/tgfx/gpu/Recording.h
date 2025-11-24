@@ -18,27 +18,27 @@
 
 #pragma once
 
-#include "tgfx/core/ImageCodec.h"
-#include "tgfx/core/Task.h"
+#include <cstdint>
 
 namespace tgfx {
-class AtlasCellDecodeTask final : public Task {
- public:
-  AtlasCellDecodeTask(std::shared_ptr<ImageCodec> imageCodec, void* dstPixels,
-                      const ImageInfo& dstInfo, int padding)
-      : imageCodec(std::move(imageCodec)), dstPixels(dstPixels), dstInfo(dstInfo),
-        padding(padding) {
+/**
+ * Recording represents a snapshot of rendering commands that have been flushed from a Context but
+ * not yet submitted to the GPU. This allows for deferred submission, giving applications control
+ * over when GPU work is actually queued for execution. A Recording can be submitted to the GPU via
+ * Context::submit().
+ * Note: If multiple Recording objects are created, submitting a later Recording will force all
+ * earlier Recordings to be submitted first, maintaining the correct rendering order.
+ */
+class Recording {
+ private:
+  Recording(uint32_t contextID, uint32_t drawingBufferID, uint64_t generation)
+      : contextID(contextID), drawingBufferID(drawingBufferID), generation(generation) {
   }
 
- protected:
-  void onExecute() override;
+  uint32_t contextID = 0;
+  uint32_t drawingBufferID = 0;
+  uint64_t generation = 0;
 
-  void onCancel() override;
-
- private:
-  std::shared_ptr<ImageCodec> imageCodec = nullptr;
-  void* dstPixels = nullptr;
-  ImageInfo dstInfo = {};
-  int padding = 0;
+  friend class Context;
 };
 }  // namespace tgfx

@@ -16,21 +16,28 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "AtlasCellDecodeTask.h"
-#include "core/utils/ClearPixels.h"
-#include "utils/Log.h"
+#include "ToPMColor.h"
+#include "ColorSpaceHelper.h"
+#include "core/ColorSpaceXformSteps.h"
 
 namespace tgfx {
-void AtlasCellDecodeTask::onExecute() {
-  DEBUG_ASSERT(imageCodec != nullptr)
-  ClearPixels(dstInfo, dstPixels);
-  auto targetInfo = dstInfo.makeIntersect(0, 0, imageCodec->width(), imageCodec->height());
-  auto targetPixels = dstInfo.computeOffset(dstPixels, padding, padding);
-  imageCodec->readPixels(targetInfo, targetPixels);
-  imageCodec = nullptr;
-}
 
-void AtlasCellDecodeTask::onCancel() {
-  imageCodec = nullptr;
+PMColor ToPMColor(const Color& color, std::shared_ptr<ColorSpace> dstColorSpace) {
+  if (dstColorSpace == nullptr) {
+    return PMColor{color.red * color.alpha, color.green * color.alpha, color.blue * color.alpha,
+                   color.alpha, color.colorSpace};
+  }
+
+  if (!NeedConvertColorSpace(color.colorSpace, dstColorSpace)) {
+    return PMColor{color.red * color.alpha, color.green * color.alpha, color.blue * color.alpha,
+                   color.alpha, color.colorSpace};
+    ;
+  }
+  ColorSpaceXformSteps steps(color.colorSpace.get(), AlphaType::Premultiplied, dstColorSpace.get(),
+                             AlphaType::Premultiplied);
+  auto dstColor = color.premultiply();
+  steps.apply(dstColor.array());
+  dstColor.colorSpace = std::move(dstColorSpace);
+  return dstColor;
 }
 }  // namespace tgfx
