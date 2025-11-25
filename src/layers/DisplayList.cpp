@@ -236,7 +236,7 @@ void DisplayList::setMaxTileCount(int count) {
 
 int64_t DisplayList::getEffectiveZoomScaleInt() const {
   auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
-  if (currentZoomScale < _minZoomScale && _fullSizeZoomScale > 0.0f) {
+  if (_fullSizeZoomScale > 0.0f && currentZoomScale < _fullSizeZoomScale) {
     return ToZoomScaleInt(_fullSizeZoomScale, _zoomScalePrecision);
   }
   return _zoomScaleInt;
@@ -829,7 +829,7 @@ bool DisplayList::createEmptyTiles(const Surface* renderSurface) {
   int countX = static_cast<int>(sqrtf(static_cast<float>(tileCount)));
   int countY = static_cast<int>(ceilf(static_cast<float>(tileCount) / static_cast<float>(countX)));
   auto surface = Surface::Make(context, countX * _tileSize, countY * _tileSize,
-                               ColorType::RGBA_8888, 1, false, renderSurface->renderFlags());
+                               ColorType::RGBA_8888, 1, true, renderSurface->renderFlags());
   if (surface == nullptr) {
     return false;
   }
@@ -902,7 +902,7 @@ void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* su
   if (autoClear) {
     paint.setBlendMode(BlendMode::Src);
   }
-  static SamplingOptions sampling(FilterMode::Nearest, MipmapMode::None);
+  static SamplingOptions sampling(FilterMode::Nearest, MipmapMode::Nearest);
   canvas->setMatrix(Matrix::MakeTrans(_contentOffset.x, _contentOffset.y));
   for (auto& task : screenTasks) {
     auto surfaceCache = surfaceCaches[task.sourceIndex()];
@@ -1000,7 +1000,6 @@ void DisplayList::updateFullSizeScale(int surfaceWidth, int surfaceHeight) {
   }
   auto minZoomScale = std::min(static_cast<float>(surfaceWidth) / _root->renderBounds.width(),
                                static_cast<float>(surfaceHeight) / _root->renderBounds.height());
-  minZoomScale = std::min(minZoomScale, 0.3f);
   _fullSizeZoomScale = minZoomScale;
 }
 
