@@ -114,10 +114,11 @@ std::shared_ptr<QGLWindow> QGLWindow::MakeFrom(QQuickItem* quickItem, bool singl
 
 QGLWindow::QGLWindow(QQuickItem* quickItem, bool singleBufferMode,
                      std::shared_ptr<ColorSpace> colorSpace)
-    : quickItem(quickItem), singleBufferMode(singleBufferMode), colorSpace(std::move(colorSpace)) {
+    : quickItem(quickItem), singleBufferMode(singleBufferMode) {
   if (QThread::currentThread() != QApplication::instance()->thread()) {
     renderThread = QThread::currentThread();
   }
+  this->colorSpace = std::move(colorSpace);
 }
 
 QGLWindow::~QGLWindow() {

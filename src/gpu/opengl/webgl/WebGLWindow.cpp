@@ -38,8 +38,8 @@ std::shared_ptr<WebGLWindow> WebGLWindow::MakeFrom(const std::string& canvasID,
 
 WebGLWindow::WebGLWindow(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace)
     : Window(std::move(device), std::move(colorSpace)) {
-  if(colorSpace != nullptr && !ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get() &&
-		!ColorSpace::Equals(colorSpace.get(), ColorSpace::DisplayP3().get())){
+  if (colorSpace != nullptr && !ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get()) &&
+      !ColorSpace::Equals(colorSpace.get(), ColorSpace::DisplayP3().get())) {
     this->colorSpace = nullptr;
   }
 }
