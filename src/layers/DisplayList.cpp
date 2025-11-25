@@ -236,8 +236,8 @@ void DisplayList::setMaxTileCount(int count) {
 
 int64_t DisplayList::getEffectiveZoomScaleInt() const {
   auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
-  if (_minZoomScale > 0.0f && currentZoomScale < _minZoomScale) {
-    return ToZoomScaleInt(_minZoomScale, _zoomScalePrecision);
+  if (currentZoomScale < _minZoomScale && _fullSizeZoomScale > 0.0f) {
+    return ToZoomScaleInt(_fullSizeZoomScale, _zoomScalePrecision);
   }
   return _zoomScaleInt;
 }
@@ -373,7 +373,7 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
   if (!surfaceCaches.empty() && surfaceCaches.front()->getContext() != surface->getContext()) {
     resetCaches();
   }
-  updateMinZoomScale(surface->width(), surface->height());
+  updateFullSizeScale(surface->width(), surface->height());
   checkTileCount(surface);
   auto tileTasks = invalidateTileCaches(dirtyRegions);
   auto screenTasks = collectScreenTasks(surface, &tileTasks);
@@ -515,7 +515,7 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
   }
   // Calculate effective zoom scale for tile coordinate calculations.
   auto effectiveZoomScale = ToZoomScaleFloat(effectiveZoomScaleInt, _zoomScalePrecision);
-  auto scaleAdjustment = effectiveZoomScale / currentZoomScale;  // > 1.0 when zooming out below min
+  auto scaleAdjustment = effectiveZoomScale / currentZoomScale;
 
   auto renderRect = Rect::MakeWH(surface->width(), surface->height());
   renderRect.offset(-_contentOffset.x, -_contentOffset.y);
@@ -558,12 +558,7 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
   for (const auto& [tileX, tileY] : sortedTiles) {
     auto tile = currentTileCache->getTile(tileX, tileY);
     if (tile != nullptr) {
-      // If we're using a downscaled tile cache, apply the scale adjustment.
-      if (scaleAdjustment > 1.001f) {
-        screenTasks.emplace_back(tile, _tileSize, Rect::MakeEmpty(), 1.0f / scaleAdjustment);
-      } else {
-        screenTasks.emplace_back(tile, _tileSize);
-      }
+      screenTasks.emplace_back(tile, _tileSize, Rect::MakeEmpty(), 1.0f / scaleAdjustment);
     } else {
       if (_allowZoomBlur) {
         auto fallbackTasks = getFallbackDrawTasks(tileX, tileY, fallbackTileCaches);
@@ -601,11 +596,7 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
     tile->tileX = grid.first;
     tile->tileY = grid.second;
     taskTiles.push_back(tile);
-    if (scaleAdjustment > 1.001f) {
-      screenTasks.emplace_back(tile, _tileSize, Rect::MakeEmpty(), 1.0f / scaleAdjustment);
-    } else {
-      screenTasks.emplace_back(tile, _tileSize);
-    }
+    screenTasks.emplace_back(tile, _tileSize, Rect::MakeEmpty(), 1.0f / scaleAdjustment);
     currentTileCache->addTile(tile);
   }
   if (continuous && !hasZoomBlurTiles) {
@@ -702,11 +693,11 @@ std::vector<DrawTask> DisplayList::getFallbackDrawTasks(
         if (tiles.empty()) {
           continue;
         }
-        scaleRatio = scale / currentZoomScale;
+        scaleRatio = currentZoomScale / scale;
         for (auto& tile : tiles) {
           auto drawRect = tile->getTileRect(_tileSize);
           if (drawRect.intersect(zoomedRect)) {
-            tasks.emplace_back(tile, _tileSize, drawRect, 1.0f / scaleRatio);
+            tasks.emplace_back(tile, _tileSize, drawRect, scaleRatio);
           }
         }
         found = true;
@@ -1002,15 +993,15 @@ void DisplayList::updateMousePosition() {
   mousePosition -= _contentOffset;
 }
 
-void DisplayList::updateMinZoomScale(int surfaceWidth, int surfaceHeight) {
+void DisplayList::updateFullSizeScale(int surfaceWidth, int surfaceHeight) {
   if (_root->renderBounds.isEmpty()) {
-    _minZoomScale = 0;
+    _fullSizeZoomScale = 0;
     return;
   }
   auto minZoomScale = std::min(static_cast<float>(surfaceWidth) / _root->renderBounds.width(),
                                static_cast<float>(surfaceHeight) / _root->renderBounds.height());
   minZoomScale = std::min(minZoomScale, 0.3f);
-  _minZoomScale = minZoomScale;
+  _fullSizeZoomScale = minZoomScale;
 }
 
 }  // namespace tgfx

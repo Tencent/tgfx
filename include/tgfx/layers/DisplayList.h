@@ -242,11 +242,16 @@ class DisplayList {
    */
   void render(Surface* surface, bool autoClear = true);
 
+  void setMinZoomScale(float minZoomScale) {
+    _minZoomScale = minZoomScale;
+  }
+
  private:
   std::shared_ptr<RootLayer> _root = nullptr;
   int64_t _zoomScaleInt = 1000;
   int _zoomScalePrecision = 1000;
-  float _minZoomScale = 0;
+  float _fullSizeZoomScale = 0;
+  float _minZoomScale = 0.3f;
   Point _contentOffset = {};
   RenderMode _renderMode = RenderMode::Partial;
   int _tileSize = 256;
@@ -318,7 +323,7 @@ class DisplayList {
                      bool autoClear) const;
   void updateMousePosition();
 
-  void updateMinZoomScale(int surfaceWidth, int surfaceHeight);
+  void updateFullSizeScale(int surfaceWidth, int surfaceHeight);
 
   int64_t getEffectiveZoomScaleInt() const;
 };
