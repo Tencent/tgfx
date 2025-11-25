@@ -38,7 +38,6 @@ EGLGlobals InitializeEGL() {
 #else
   globals.display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
   eglInitialize(globals.display, &majorVersion, &minorVersion);
-}
 #endif
   globals.pbufferSurfaceAttributes = {EGL_WIDTH,           1,        EGL_HEIGHT, 1,
                                       EGL_LARGEST_PBUFFER, EGL_TRUE, EGL_NONE};
