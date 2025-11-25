@@ -30,8 +30,13 @@ std::shared_ptr<Device> Window::getDevice() {
   return device;
 }
 
-std::shared_ptr<tgfx::Surface> Window::getSurface(Context* context, bool queryOnly) {
+std::shared_ptr<tgfx::Surface> Window::getSurface(Context* context, bool queryOnly,
+                                                  std::shared_ptr<ColorSpace> colorSpace) {
   std::lock_guard<std::mutex> autoLock(locker);
+  if (colorSpace != nullptr && !ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get()) &&
+      !ColorSpace::Equals(colorSpace.get(), ColorSpace::DisplayP3().get())) {
+    return nullptr;
+  }
   if (!checkContext(context)) {
     return nullptr;
   }
@@ -41,7 +46,7 @@ std::shared_ptr<tgfx::Surface> Window::getSurface(Context* context, bool queryOn
   if (queryOnly) {
     return nullptr;
   }
-  surface = onCreateSurface(context);
+  surface = onCreateSurface(context, std::move(colorSpace));
   sizeInvalid = false;
   return surface;
 }

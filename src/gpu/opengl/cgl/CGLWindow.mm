@@ -47,7 +47,8 @@ CGLWindow::~CGLWindow() {
   view = nil;
 }
 
-std::shared_ptr<Surface> CGLWindow::onCreateSurface(Context* context) {
+std::shared_ptr<Surface> CGLWindow::onCreateSurface(Context* context,
+                                                    std::shared_ptr<ColorSpace> colorSpace) {
   auto glContext = static_cast<CGLDevice*>(device.get())->glContext;
   [glContext update];
   CGSize size = [view convertSizeToBacking:view.bounds.size];
@@ -60,7 +61,8 @@ std::shared_ptr<Surface> CGLWindow::onCreateSurface(Context* context) {
   frameBuffer.format = GL_RGBA8;
   BackendRenderTarget renderTarget(frameBuffer, static_cast<int>(size.width),
                                    static_cast<int>(size.height));
-  return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
+  return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft, 0,
+                           std::move(colorSpace));
 }
 
 void CGLWindow::onPresent(Context*) {

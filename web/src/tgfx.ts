@@ -16,11 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-import {getCanvas2D, releaseCanvas2D, isCanvas} from './utils/canvas';
+import {getCanvas2D, isCanvas, releaseCanvas2D} from './utils/canvas';
 import {BitmapImage} from './core/bitmap-image';
 import {isInstanceOf} from './utils/type-utils';
 
-import type {EmscriptenGL, TGFX} from './types';
+import {EmscriptenGL, TGFX, WindowColorSpace} from './types';
 import type {wx} from './wechat/interfaces';
 
 declare const wx: wx;
@@ -102,15 +102,22 @@ export const uploadToTexture = (
     }
 };
 
-export const isDisplayP3Supported = (
-    GL: EmscriptenGL
+export const setColorSpace = (
+    GL: EmscriptenGL,
+    colorSpace : WindowColorSpace
 ) => {
     const gl = GL.currentContext?.GLctx as WebGLRenderingContext;
     if ('drawingBufferColorSpace' in gl) {
-        gl.drawingBufferColorSpace = "display-p3";
+        if(colorSpace == WindowColorSpace.None || colorSpace == WindowColorSpace.SRGB){
+            gl.drawingBufferColorSpace = "srgb";
+        }else{
+            gl.drawingBufferColorSpace = "display-p3";
+        }
         return true;
-    } else {
+    } else if(colorSpace == WindowColorSpace.DisplayP3){
         return false;
+    } else {
+        return true;
     }
 };
 

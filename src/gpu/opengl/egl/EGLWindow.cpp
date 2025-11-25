@@ -95,7 +95,8 @@ void EGLWindow::onInvalidSize() {
 #endif
 }
 
-std::shared_ptr<Surface> EGLWindow::onCreateSurface(Context* context) {
+std::shared_ptr<Surface> EGLWindow::onCreateSurface(Context* context,
+                                                    std::shared_ptr<ColorSpace> colorSpace) {
   ISize size = {0, 0};
   if (nativeWindow) {
     // If the rendering size changes，eglQuerySurface() may give the wrong size on same platforms.
@@ -113,17 +114,8 @@ std::shared_ptr<Surface> EGLWindow::onCreateSurface(Context* context) {
   frameBuffer.id = 0;
   frameBuffer.format = GL_RGBA8;
   BackendRenderTarget renderTarget = {frameBuffer, size.width, size.height};
-  std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB();
-  const char* extensions = eglQueryString(eglDevice->eglDisplay, EGL_EXTENSIONS);
-  if (extensions && strstr(extensions, "EGL_KHR_gl_colorspace") != nullptr) {
-    EGLint colorSpaceValue;
-    EGLBoolean success = eglQuerySurface(eglDevice->eglDisplay, eglDevice->eglSurface,
-                                         EGL_GL_COLORSPACE_KHR, &colorSpaceValue);
-    if (success == EGL_TRUE && colorSpaceValue == EGL_GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT) {
-      colorSpace = ColorSpace::DisplayP3();
-    }
-  }
-  return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft, 0, colorSpace);
+  return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft, 0,
+                           std::move(colorSpace));
 }
 
 void EGLWindow::setPresentationTime(int64_t time) {

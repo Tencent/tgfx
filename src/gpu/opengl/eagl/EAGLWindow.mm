@@ -41,7 +41,8 @@ EAGLWindow::EAGLWindow(std::shared_ptr<Device> device, CAEAGLLayer* layer)
   // do not retain layer here, otherwise it can cause circular reference.
 }
 
-std::shared_ptr<Surface> EAGLWindow::onCreateSurface(Context* context) {
+std::shared_ptr<Surface> EAGLWindow::onCreateSurface(Context* context,
+                                                     std::shared_ptr<ColorSpace> colorSpace) {
   if (layerTexture != nullptr) {
     // Immediately release the previous layer texture to prevent new texture creation from failing
     // due to repeated binding of the same layer.
@@ -53,7 +54,8 @@ std::shared_ptr<Surface> EAGLWindow::onCreateSurface(Context* context) {
     return nullptr;
   }
   BackendRenderTarget renderTarget = layerTexture->getBackendRenderTarget();
-  return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
+  return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft, 0,
+                           std::move(colorSpace));
 }
 
 void EAGLWindow::onPresent(Context* context) {

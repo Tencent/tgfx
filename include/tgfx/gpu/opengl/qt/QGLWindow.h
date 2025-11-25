@@ -55,7 +55,8 @@ class QGLWindow : public Window {
   QSGTexture* getQSGTexture();
 
  protected:
-  std::shared_ptr<Surface> onCreateSurface(Context* context) override;
+  std::shared_ptr<Surface> onCreateSurface(Context* context,
+                                           std::shared_ptr<ColorSpace> colorSpace) override;
   void onPresent(Context* context) override;
   void onFreeSurface() override;
 

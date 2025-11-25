@@ -166,7 +166,8 @@ QSGTexture* QGLWindow::getQSGTexture() {
   return outTexture;
 }
 
-std::shared_ptr<Surface> QGLWindow::onCreateSurface(Context* context) {
+std::shared_ptr<Surface> QGLWindow::onCreateSurface(Context* context,
+                                                    std::shared_ptr<ColorSpace> colorSpace) {
   auto nativeWindow = quickItem->window();
   if (nativeWindow == nullptr) {
     return nullptr;
@@ -177,10 +178,6 @@ std::shared_ptr<Surface> QGLWindow::onCreateSurface(Context* context) {
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
-  QSurfaceFormat windowFormat = nativeWindow->format();
-  auto icc = windowFormat.colorSpace().iccProfile();
-  std::shared_ptr<ColorSpace> colorSpace =
-      ColorSpace::MakeFromICC(icc.data(), static_cast<size_t>(icc.size()));
   if (!singleBufferMode) {
     frontSurface =
         Surface::Make(context, width, height, ColorType::RGBA_8888, 1, false, 0, colorSpace);

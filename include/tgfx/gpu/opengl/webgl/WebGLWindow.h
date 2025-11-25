@@ -30,7 +30,8 @@ class WebGLWindow : public Window {
   static std::shared_ptr<WebGLWindow> MakeFrom(const std::string& canvasID);
 
  protected:
-  std::shared_ptr<Surface> onCreateSurface(Context* context) override;
+  std::shared_ptr<Surface> onCreateSurface(Context* context,
+                                           std::shared_ptr<ColorSpace> colorSpace) override;
 
   void onPresent(Context*) override {
   }

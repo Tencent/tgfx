@@ -38,7 +38,8 @@ std::shared_ptr<WGLWindow> WGLWindow::MakeFrom(HWND nativeWindow, HGLRC sharedCo
 WGLWindow::WGLWindow(std::shared_ptr<Device> device) : Window(std::move(device)) {
 }
 
-std::shared_ptr<Surface> WGLWindow::onCreateSurface(Context* context) {
+std::shared_ptr<Surface> WGLWindow::onCreateSurface(Context* context,
+                                                    std::shared_ptr<ColorSpace> colorSpace) {
   ISize size = {0, 0};
   if (nativeWindow) {
     RECT rect = {};
@@ -52,7 +53,8 @@ std::shared_ptr<Surface> WGLWindow::onCreateSurface(Context* context) {
 
   GLFrameBufferInfo frameBuffer = {0, GL_RGBA8};
   BackendRenderTarget renderTarget = {frameBuffer, size.width, size.height};
-  return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
+  return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft, 0,
+                           std::move(colorSpace));
 }
 
 void WGLWindow::onPresent(Context*) {
