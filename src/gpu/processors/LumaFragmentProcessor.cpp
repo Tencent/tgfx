@@ -41,7 +41,9 @@ void LumaFragmentProcessor::computeProcessorKey(Context*, BytesKey* bytesKey) co
 LumaFragmentProcessor::LumaFragmentProcessor(std::shared_ptr<ColorSpace> colorSpace)
     : FragmentProcessor(ClassID()), _colorSpace(std::move(colorSpace)) {
   ColorMatrix33 tempColorMatrix{};
-  _colorSpace->toXYZD50(&tempColorMatrix);
+  if (_colorSpace) {
+    _colorSpace->toXYZD50(&tempColorMatrix);
+  }
   _lumaFactor = AcquireLumaFactorFromColorSpace(tempColorMatrix);
 }
 

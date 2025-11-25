@@ -58,9 +58,8 @@ class ImageBuffer {
    * ensure the buffer content stays unchanged for the lifetime of the returned ImageBuffer. Returns
    * nullptr if the hardwareBuffer contains more than one plane or the hardwareBuffer is nullptr.
    */
-  static std::shared_ptr<ImageBuffer> MakeFrom(
-      HardwareBufferRef hardwareBuffer,
-      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB());
+  static std::shared_ptr<ImageBuffer> MakeFrom(HardwareBufferRef hardwareBuffer,
+                                               std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
    * Creates an ImageBuffer in the I420 format with the specified YUVData and YUVColorSpace. The

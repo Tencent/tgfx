@@ -644,6 +644,12 @@ std::shared_ptr<ColorSpace> ColorSpace::SRGBLinear() {
   return cs;
 }
 
+std::shared_ptr<ColorSpace> ColorSpace::DisplayP3() {
+  static std::shared_ptr<ColorSpace> cs = std::shared_ptr<ColorSpace>(
+      new ColorSpace(NamedTransferFunction::SRGB, NamedGamut::DisplayP3));
+  return cs;
+}
+
 std::shared_ptr<ColorSpace> ColorSpace::MakeRGB(const TransferFunction& transferFunction,
                                                 const ColorMatrix33& toXYZ) {
   if (gfx::skcms_TransferFunction_getType(reinterpret_cast<const gfx::skcms_TransferFunction*>(

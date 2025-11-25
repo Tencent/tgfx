@@ -143,11 +143,17 @@ static std::shared_ptr<ImageCodec> GetGlyphCodec(
 }
 
 static void ComputeGlyphFinalMatrix(const Rect& atlasLocation, const Matrix& stateMatrix,
-                                    float scale, const Point& position, Matrix* glyphMatrix) {
+                                    float scale, const Point& position, Matrix* glyphMatrix,
+                                    bool needsPixelAlignment) {
   glyphMatrix->postScale(scale, scale);
   glyphMatrix->postTranslate(position.x, position.y);
   glyphMatrix->postConcat(stateMatrix);
   glyphMatrix->preTranslate(-atlasLocation.x(), -atlasLocation.y());
+  if (needsPixelAlignment) {
+    // Pixel alignment for nearest-neighbor sampling to prevent texture artifacts like pixel truncation
+    (*glyphMatrix)[2] = std::round((*glyphMatrix)[2]);
+    (*glyphMatrix)[5] = std::round((*glyphMatrix)[5]);
+  }
 }
 
 static bool IsGlyphVisible(const Font& font, GlyphID glyphID, const Rect& clipBounds,
@@ -183,7 +189,9 @@ static SamplingOptions GetSamplingOptions(const std::shared_ptr<ScalerContext>& 
   if (fauxItalic || !FloatNearlyEqual(scalerContext->getBackingSize(), scalerContext->getSize())) {
     return SamplingOptions{FilterMode::Linear, MipmapMode::None};
   }
-  const auto filterMode = stateMatrix.isScaleTranslate() ? FilterMode::Nearest : FilterMode::Linear;
+  const auto isUniformScale = stateMatrix.isScaleTranslate() &&
+                              FloatNearlyEqual(stateMatrix.getScaleX(), stateMatrix.getScaleY());
+  const auto filterMode = isUniformScale ? FilterMode::Nearest : FilterMode::Linear;
   return SamplingOptions{filterMode, MipmapMode::None};
 }
 
@@ -509,9 +517,10 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
 
     auto glyphState = state;
     GetGlyphMatrix(font.scalerContext, glyphOffset, font.isFauxItalic(), &glyphState.matrix);
-    auto rect = atlasLocator.getLocation();
-    ComputeGlyphFinalMatrix(rect, state.matrix, inverseScale, glyphPosition, &glyphState.matrix);
-    auto sampling = GetSamplingOptions(font.scalerContext, font.isFauxItalic(), state.matrix);
+    const auto rect = atlasLocator.getLocation();
+    const auto sampling = GetSamplingOptions(font.scalerContext, font.isFauxItalic(), state.matrix);
+    ComputeGlyphFinalMatrix(rect, state.matrix, inverseScale, glyphPosition, &glyphState.matrix,
+                            sampling.minFilterMode == FilterMode::Nearest);
     compositor->fillTextAtlas(std::move(textureProxy), rect, sampling, glyphState,
                               fill.makeWithMatrix(state.matrix));
   }
@@ -616,7 +625,7 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
     GetGlyphMatrix(font.scalerContext, glyphOffset, font.isFauxItalic(), &glyphState.matrix);
     auto rect = atlasLocator.getLocation();
     ComputeGlyphFinalMatrix(rect, state.matrix, 1.f / (maxScale * cellScale), glyphPosition,
-                            &glyphState.matrix);
+                            &glyphState.matrix, false);
     compositor->fillTextAtlas(std::move(textureProxy), rect,
                               SamplingOptions(FilterMode::Linear, MipmapMode::None), glyphState,
                               fill.makeWithMatrix(state.matrix));

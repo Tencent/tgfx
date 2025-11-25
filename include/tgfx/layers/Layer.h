@@ -668,9 +668,9 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   bool hasBackgroundStyle();
 
-  std::shared_ptr<BackgroundContext> createBackgroundContext(Context* context, const Rect& drawRect,
-                                                             const Matrix& viewMatrix,
-                                                             bool fullLayer = false) const;
+  std::shared_ptr<BackgroundContext> createBackgroundContext(
+      Context* context, const Rect& drawRect, const Matrix& viewMatrix, bool fullLayer = false,
+      std::shared_ptr<ColorSpace> colorSpace = nullptr) const;
 
   static std::shared_ptr<Picture> RecordPicture(DrawMode mode, float contentScale,
                                                 const std::function<void(Canvas*)>& drawFunction);
