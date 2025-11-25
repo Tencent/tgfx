@@ -18,21 +18,24 @@
 
 #pragma once
 
-#include "hello2d/SampleBuilder.h"
+#include "hello2d/LayerBuilder.h"
 
 namespace hello2d {
-#define DEFINE_SAMPLE(SampleName)                                                       \
-  class SampleName : public hello2d::Sample {                                           \
+#define DEFINE_LAYER_BUILDER(BuilderName)                                               \
+  class BuilderName : public hello2d::LayerBuilder {                                    \
    public:                                                                              \
-    SampleName() : hello2d::Sample(#SampleName) {                                       \
+    BuilderName() : hello2d::LayerBuilder(#BuilderName) {                               \
     }                                                                                   \
                                                                                         \
     std::shared_ptr<tgfx::Layer> buildLayerTree(const hello2d::AppHost* host) override; \
   }
 
-DEFINE_SAMPLE(ConicGradient);
-DEFINE_SAMPLE(ImageWithMipmap);
-DEFINE_SAMPLE(ImageWithShadow);
-DEFINE_SAMPLE(RichText);
-DEFINE_SAMPLE(SimpleLayerTree);
+// For backward compatibility
+#define DEFINE_SAMPLE DEFINE_LAYER_BUILDER
+
+DEFINE_LAYER_BUILDER(ConicGradient);
+DEFINE_LAYER_BUILDER(ImageWithMipmap);
+DEFINE_LAYER_BUILDER(ImageWithShadow);
+DEFINE_LAYER_BUILDER(RichText);
+DEFINE_LAYER_BUILDER(SimpleLayerTree);
 }  // namespace hello2d

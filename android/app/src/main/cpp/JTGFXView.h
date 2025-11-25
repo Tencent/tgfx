@@ -22,9 +22,10 @@
 #include <jni.h>
 #include <string>
 #include "hello2d/AppHost.h"
-#include "hello2d/SampleBuilder.h"
+#include "hello2d/LayerBuilder.h"
 #include "tgfx/gpu/Window.h"
 #include "tgfx/gpu/opengl/egl/EGLWindow.h"
+#include "tgfx/layers/DisplayList.h"
 
 namespace hello2d {
 class JTGFXView {
@@ -32,6 +33,9 @@ class JTGFXView {
   explicit JTGFXView(ANativeWindow* nativeWindow, std::shared_ptr<tgfx::Window> window,
                      std::unique_ptr<hello2d::AppHost> appHost)
       : nativeWindow(nativeWindow), window(std::move(window)), appHost(std::move(appHost)) {
+    displayList.setRenderMode(tgfx::RenderMode::Tiled);
+    displayList.setAllowZoomBlur(true);
+    displayList.setMaxTileCount(512);
     updateSize();
   }
 
@@ -47,5 +51,8 @@ class JTGFXView {
   ANativeWindow* nativeWindow = nullptr;
   std::shared_ptr<tgfx::Window> window;
   std::shared_ptr<hello2d::AppHost> appHost = nullptr;
+  tgfx::DisplayList displayList;
+  int lastDrawIndex = -1;
+  bool needsRedraw = true;
 };
 }  // namespace hello2d

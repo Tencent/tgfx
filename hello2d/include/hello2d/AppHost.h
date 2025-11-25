@@ -22,11 +22,11 @@
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Typeface.h"
-#include "tgfx/layers/DisplayList.h"
 
 namespace hello2d {
 /**
- * AppHost provides information about the current app context.
+ * AppHost provides screen information and resources for building layer trees.
+ * It is a pure information provider and does not manage rendering or display lists.
  */
 class AppHost {
  public:
@@ -60,22 +60,6 @@ class AppHost {
   }
 
   /**
-   * Returns the current scale factor applied to the view. The default value is 1.0, which means no
-   * zooming is applied.
-   */
-  float zoomScale() const {
-    return _zoomScale;
-  }
-
-  /**
-   * Returns the current content offset of the view after applying the zoomScale. The default value
-   * is (0, 0).
-   */
-  const tgfx::Point& contentOffset() const {
-    return _contentOffset;
-  }
-
-  /**
    * Returns an image with the given name.
    */
   std::shared_ptr<tgfx::Image> getImage(const std::string& name) const;
@@ -93,11 +77,6 @@ class AppHost {
   bool updateScreen(int width, int height, float density);
 
   /**
-   * Updates the zoom scale and content offset.
-   */
-  bool updateZoomAndOffset(float zoomScale, const tgfx::Point& contentOffset);
-
-  /**
    * Add an image for the given resource name.
    */
   void addImage(const std::string& name, std::shared_ptr<tgfx::Image> image);
@@ -107,40 +86,11 @@ class AppHost {
    */
   void addTypeface(const std::string& name, std::shared_ptr<tgfx::Typeface> typeface);
 
-  bool isDirty() const;
-  void markDirty();
-  void resetDirty();
-  void setTileModeEnable(bool enable);
-  /**
-   * Draws the content of the corresponding SampleBuilder based on the index.
-   */
-  void draw(tgfx::Canvas* canvas, int drawIndex, bool isNeedBackground);
-  /**
-   * Calculates and sets the transformation matrix for the current root layer
-   * (displayList.root()->firstChild()), centering it in the window, scaling it proportionally, and
-   * leaving a 30px padding on all sides.
-   */
-  void updateRootMatrix();
-
-  /**
-   * Returns all layers hit at the specified logical coordinates (sorted by depth then by level).
-   */
-  std::vector<std::shared_ptr<tgfx::Layer>> getLayersUnderPoint(float x, float y) const;
-
-  tgfx::DisplayList displayList = {};
-
  private:
   int _width = 1280;
   int _height = 720;
   float _density = 1.0f;
-  float _zoomScale = 1.0f;
-  tgfx::Point _contentOffset = {};
   std::unordered_map<std::string, std::shared_ptr<tgfx::Image>> images = {};
   std::unordered_map<std::string, std::shared_ptr<tgfx::Typeface>> typefaces = {};
-  bool _dirty = true;
-  bool _isTileMode = true;
-
-  int lastDrawIndex = -1;
-  std::shared_ptr<tgfx::Layer> root = nullptr;
 };
 }  // namespace hello2d

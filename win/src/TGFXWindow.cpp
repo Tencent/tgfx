@@ -25,7 +25,7 @@
 #include <shellscalingapi.h>
 #endif
 #include "hello2d/AppHost.h"
-#include "hello2d/SampleBuilder.h"
+#include "hello2d/LayerBuilder.h"
 
 namespace hello2d {
 static constexpr LPCWSTR ClassName = L"TGFXWindow";

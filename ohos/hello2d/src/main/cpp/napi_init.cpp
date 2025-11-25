@@ -2,8 +2,9 @@
 #include <ace/xcomponent/native_interface_xcomponent.h>
 #include "tgfx/gpu/opengl/egl/EGLWindow.h"
 #include "hello2d/AppHost.h"
-#include "hello2d/SampleBuilder.h"
+#include "hello2d/LayerBuilder.h"
 #include "DisplayLink.h"
+#include "tgfx/layers/DisplayList.h"
 
 static float screenDensity = 1.0f;
 static double drawIndex = 0;
@@ -13,6 +14,9 @@ static double contentOffsetY = 0;
 static std::shared_ptr<hello2d::AppHost> appHost = nullptr;
 static std::shared_ptr<tgfx::Window> window = nullptr;
 static std::shared_ptr<DisplayLink> displayLink = nullptr;
+static tgfx::DisplayList displayList;
+static int lastDrawIndex = -1;
+static bool needsRedraw = true;
 
 static std::shared_ptr<hello2d::AppHost> CreateAppHost();
 
@@ -50,10 +54,9 @@ static napi_value AddImageFromEncoded(napi_env env, napi_callback_info info) {
 }
 
 static bool Draw(int drawIndex, float zoom = 1.0f, float offsetX = 0.0f, float offsetY = 0.0f) {
-  if (!appHost || !appHost->isDirty()) {
+  if (!appHost || !needsRedraw) {
     return false;
   }
-  appHost->resetDirty();
 
   if (window == nullptr || appHost->width() <= 0 || appHost->height() <= 0) {
     return false;
@@ -69,16 +72,33 @@ static bool Draw(int drawIndex, float zoom = 1.0f, float offsetX = 0.0f, float o
     return false;
   }
 
-  appHost->updateZoomAndOffset(zoom, tgfx::Point(offsetX, offsetY));
+  // Switch sample when drawIndex changes
+  auto numDrawers = hello2d::GetLayerBuilderCount();
+  auto index = (drawIndex % numDrawers);
+  if (index != lastDrawIndex) {
+    auto layer = hello2d::BuildAndCenterLayer(index, appHost.get());
+    if (layer) {
+      displayList.root()->removeChildren();
+      displayList.root()->addChild(layer);
+    }
+    lastDrawIndex = index;
+  }
+
+  // Directly set zoom and offset on DisplayList
+  displayList.setZoomScale(zoom);
+  displayList.setContentOffset(offsetX, offsetY);
+
+  // Draw background and render DisplayList
   auto canvas = surface->getCanvas();
   canvas->clear();
+  hello2d::DrawSampleBackground(canvas, appHost.get());
+  displayList.render(surface.get(), false);
 
-  auto index = (drawIndex % hello2d::GetSampleCount());
-  appHost->draw(canvas, index, true);
   context->flushAndSubmit();
   window->present(context);
   device->unlock();
 
+  needsRedraw = false;
   return true;
 }
 
@@ -93,11 +113,11 @@ static napi_value UpdateDrawParams(napi_env env, napi_callback_info info) {
   napi_get_value_double(env, args[3], &contentOffsetY);
 
   if (appHost) {
-      appHost->markDirty();
+    needsRedraw = true;
   }
 
   if (displayLink) {
-      displayLink->start();
+    displayLink->start();
   }
   return nullptr;
 }
@@ -129,6 +149,9 @@ static napi_value StopDrawLoop(napi_env, napi_callback_info) {
 
 static std::shared_ptr<hello2d::AppHost> CreateAppHost() {
   auto appHost = std::make_shared<hello2d::AppHost>();
+  displayList.setRenderMode(tgfx::RenderMode::Tiled);
+  displayList.setAllowZoomBlur(true);
+  displayList.setMaxTileCount(512);
   static const std::string FallbackFontFileNames[] = {"/system/fonts/HarmonyOS_Sans.ttf",
                                                       "/system/fonts/HarmonyOS_Sans_SC.ttf",
                                                       "/system/fonts/HarmonyOS_Sans_TC.ttf"};
@@ -160,9 +183,9 @@ static void UpdateSize(OH_NativeXComponent* component, void* nativeWindow) {
   appHost->updateScreen(static_cast<int>(width), static_cast<int>(height), screenDensity);
   if (window != nullptr) {
     window->invalidSize();
-    appHost->markDirty();
+    needsRedraw = true;
     if (displayLink) {
-        displayLink->start();
+      displayLink->start();
     }
   }
 }
@@ -183,13 +206,12 @@ static void OnSurfaceCreatedCB(OH_NativeXComponent* component, void* nativeWindo
   UpdateSize(component, nativeWindow);
   window = tgfx::EGLWindow::MakeFrom(reinterpret_cast<EGLNativeWindowType>(nativeWindow));
   if (window == nullptr) {
-
     return;
   }
   if (appHost) {
-    appHost->markDirty();
+    needsRedraw = true;
     if (displayLink) {
-        displayLink->start();
+      displayLink->start();
     }
   }
 }

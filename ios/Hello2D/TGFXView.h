@@ -23,6 +23,7 @@
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/opengl/GLDevice.h"
 #include "tgfx/gpu/opengl/eagl/EAGLWindow.h"
+#include "tgfx/layers/DisplayList.h"
 
 @interface TGFXView : UIView
 

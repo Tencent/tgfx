@@ -18,7 +18,7 @@
 
 #include "TGFXBaseView.h"
 #include <cmath>
-#include "hello2d/SampleBuilder.h"
+#include "hello2d/LayerBuilder.h"
 #include "tgfx/core/Point.h"
 
 using namespace emscripten;
@@ -26,6 +26,10 @@ namespace hello2d {
 
 TGFXBaseView::TGFXBaseView(const std::string& canvasID) : canvasID(canvasID) {
   appHost = std::make_shared<hello2d::AppHost>();
+  // Initialize DisplayList with tiled rendering mode
+  displayList.setRenderMode(tgfx::RenderMode::Tiled);
+  displayList.setAllowZoomBlur(true);
+  displayList.setMaxTileCount(512);
 }
 
 void TGFXBaseView::updateSize(float devicePixelRatio) {
@@ -37,7 +41,7 @@ void TGFXBaseView::updateSize(float devicePixelRatio) {
     if (sizeChanged && window) {
       window->invalidSize();
     }
-    appHost->markDirty();
+    needsRedraw = true;
   }
 }
 
@@ -46,52 +50,71 @@ void TGFXBaseView::setImagePath(const std::string& name, tgfx::NativeImageRef na
   if (image) {
     appHost->addImage(name, std::move(image));
   }
-  appHost->markDirty();
+  needsRedraw = true;
 }
 
 void TGFXBaseView::onWheelEvent() {
-  appHost->markDirty();
+  needsRedraw = true;
 }
 
 void TGFXBaseView::onClickEvent() {
-  appHost->updateZoomAndOffset(1.0, tgfx::Point(0, 0));
-  appHost->markDirty();
+  needsRedraw = true;
 }
 
 bool TGFXBaseView::draw(int drawIndex, float zoom, float offsetX, float offsetY) {
-  if (!appHost->isDirty()) {
+  if (!needsRedraw) {
     return true;
   }
-  appHost->resetDirty();
 
   if (appHost->width() <= 0 || appHost->height() <= 0) {
     return true;
   }
+
+  // Initialize window if needed
   if (window == nullptr) {
     window = tgfx::WebGLWindow::MakeFrom(canvasID);
   }
   if (window == nullptr) {
     return true;
   }
+
   auto device = window->getDevice();
   auto context = device->lockContext();
   if (context == nullptr) {
     return true;
   }
+
   auto surface = window->getSurface(context);
   if (surface == nullptr) {
     device->unlock();
     return true;
   }
-  appHost->updateZoomAndOffset(zoom, tgfx::Point(offsetX, offsetY));
+
+  // Switch sample when drawIndex changes
+  if (drawIndex != lastDrawIndex) {
+    auto layer = BuildAndCenterLayer(drawIndex % GetLayerBuilderCount(), appHost.get());
+    if (layer) {
+      displayList.root()->removeChildren();
+      displayList.root()->addChild(layer);
+    }
+    lastDrawIndex = drawIndex;
+  }
+
+  // Directly set zoom and offset on DisplayList
+  displayList.setZoomScale(zoom);
+  displayList.setContentOffset(offsetX, offsetY);
+
+  // Draw background and render DisplayList
   auto canvas = surface->getCanvas();
   canvas->clear();
-  auto sampleCount = hello2d::GetSampleCount();
-  auto index = (drawIndex % sampleCount);
-  appHost->draw(canvas, index, true);
+  DrawSampleBackground(canvas, appHost.get());
+  displayList.render(surface.get(), false);
+
   context->flushAndSubmit();
   window->present(context);
   device->unlock();
+
+  needsRedraw = false;
   return true;
 }
 

@@ -18,11 +18,14 @@
 
 #import "TGFXView.h"
 #include <cmath>
-#include "hello2d/SampleBuilder.h"
+#include "hello2d/LayerBuilder.h"
 
 @implementation TGFXView {
   std::shared_ptr<tgfx::EAGLWindow> tgfxWindow;
   std::unique_ptr<hello2d::AppHost> appHost;
+  tgfx::DisplayList displayList;
+  int lastDrawIndex;
+  bool needsRedraw;
 }
 
 + (Class)layerClass {
@@ -68,21 +71,27 @@
     appHost->addTypeface("default", typeface);
     typeface = tgfx::Typeface::MakeFromName("Apple Color Emoji", "");
     appHost->addTypeface("emoji", typeface);
+    lastDrawIndex = -1;
+    needsRedraw = true;
+    displayList.setRenderMode(tgfx::RenderMode::Tiled);
+    displayList.setAllowZoomBlur(true);
+    displayList.setMaxTileCount(512);
   }
   auto sizeChanged = appHost->updateScreen(width, height, self.layer.contentsScale);
   if (sizeChanged && tgfxWindow != nullptr) {
     tgfxWindow->invalidSize();
+    needsRedraw = true;
   }
 }
 - (void)markDirty {
-  appHost->markDirty();
+  needsRedraw = true;
 }
 
 - (BOOL)draw:(int)drawIndex zoom:(float)zoom offset:(CGPoint)offset {
-  if (!appHost->isDirty()) {
+  if (!needsRedraw) {
     return false;
   }
-  appHost->resetDirty();
+
   if (self.window == nil) {
     return false;
   }
@@ -106,17 +115,33 @@
     return false;
   }
 
-  appHost->updateZoomAndOffset(
-      zoom, tgfx::Point(static_cast<float>(offset.x), static_cast<float>(offset.y)));
+  // Switch sample when drawIndex changes
+  auto numBuilders = hello2d::GetLayerBuilderCount();
+  auto index = (drawIndex % numBuilders);
+  if (index != lastDrawIndex) {
+    auto layer = hello2d::BuildAndCenterLayer(index, appHost.get());
+    if (layer) {
+      displayList.root()->removeChildren();
+      displayList.root()->addChild(layer);
+    }
+    lastDrawIndex = index;
+  }
+
+  // Directly set zoom and offset on DisplayList
+  displayList.setZoomScale(zoom);
+  displayList.setContentOffset(static_cast<float>(offset.x), static_cast<float>(offset.y));
+
+  // Draw background and render DisplayList
   auto canvas = surface->getCanvas();
   canvas->clear();
-  auto numBuilders = hello2d::GetSampleCount();
-  auto index = (drawIndex % numBuilders);
-  appHost->draw(canvas, index, true);
+  hello2d::DrawSampleBackground(canvas, appHost.get());
+  displayList.render(surface.get(), false);
+
   context->flushAndSubmit();
   tgfxWindow->present(context);
   device->unlock();
 
+  needsRedraw = false;
   return true;
 }
 

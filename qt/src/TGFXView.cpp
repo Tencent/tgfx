@@ -22,7 +22,7 @@
 #include <QQuickWindow>
 #include <QSGImageNode>
 #include <QThread>
-#include "hello2d/SampleBuilder.h"
+#include "hello2d/LayerBuilder.h"
 
 namespace hello2d {
 TGFXView::TGFXView(QQuickItem* parent) : QQuickItem(parent) {
@@ -32,12 +32,16 @@ TGFXView::TGFXView(QQuickItem* parent) : QQuickItem(parent) {
   setAcceptTouchEvents(true);
   setFocus(true);
   createAppHost();
+  displayList.setRenderMode(tgfx::RenderMode::Tiled);
+  displayList.setAllowZoomBlur(true);
+  displayList.setMaxTileCount(512);
 }
 
 void TGFXView::updateTransform(qreal zoomLevel, QPointF panOffset) {
   float clampedZoom = std::max(0.001f, std::min(1000.0f, static_cast<float>(zoomLevel)));
   zoom = clampedZoom;
   offset = panOffset;
+  needsRedraw = true;
   update();
 }
 
@@ -45,6 +49,7 @@ void TGFXView::onClicked() {
   currentDrawerIndex++;
   zoom = 1.0f;
   offset = QPointF(0, 0);
+  needsRedraw = true;
   update();
 }
 
@@ -104,14 +109,14 @@ void TGFXView::createAppHost() {
   appHost->addTypeface("emoji", emojiTypeface);
 }
 void TGFXView::markDirty() {
-  appHost->markDirty();
+  needsRedraw = true;
 }
 
 bool TGFXView::draw() {
-  if (!appHost->isDirty()) {
+  if (!needsRedraw) {
     return false;
   }
-  appHost->resetDirty();
+
   auto device = tgfxWindow->getDevice();
   if (device == nullptr) {
     return false;
@@ -125,17 +130,34 @@ bool TGFXView::draw() {
     device->unlock();
     return false;
   }
-  appHost->updateZoomAndOffset(
-      zoom, tgfx::Point(static_cast<float>(offset.x()), static_cast<float>(offset.y())));
+
+  // Switch sample when drawIndex changes
+  auto numBuilders = hello2d::GetLayerBuilderCount();
+  auto index = (currentDrawerIndex % numBuilders);
+  if (index != lastDrawIndex) {
+    auto layer = BuildAndCenterLayer(index, appHost.get());
+    if (layer) {
+      displayList.root()->removeChildren();
+      displayList.root()->addChild(layer);
+    }
+    lastDrawIndex = index;
+  }
+
+  // Directly set zoom and offset on DisplayList
+  displayList.setZoomScale(zoom);
+  displayList.setContentOffset(static_cast<float>(offset.x()), static_cast<float>(offset.y()));
+
+  // Draw background and render DisplayList
   auto canvas = surface->getCanvas();
   canvas->clear();
-  auto numBuilders = hello2d::GetSampleCount();
-  auto index = (currentDrawerIndex % numBuilders);
-  appHost->draw(canvas, index, true);
+  DrawSampleBackground(canvas, appHost.get());
+  displayList.render(surface.get(), false);
+
   context->flushAndSubmit();
   tgfxWindow->present(context);
   device->unlock();
 
+  needsRedraw = false;
   return true;
 }
 }  // namespace hello2d

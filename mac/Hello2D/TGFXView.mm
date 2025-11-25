@@ -19,7 +19,7 @@
 #import "TGFXView.h"
 #import <QuartzCore/CADisplayLink.h>
 #include <cmath>
-#include "hello2d/SampleBuilder.h"
+#include "hello2d/LayerBuilder.h"
 #include "tgfx/core/Point.h"
 
 static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, const CVTimeStamp*,
@@ -32,6 +32,9 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
 @implementation TGFXView {
   std::shared_ptr<tgfx::CGLWindow> tgfxWindow;
   std::unique_ptr<hello2d::AppHost> appHost;
+  tgfx::DisplayList displayList;
+  int lastDrawIndex;
+  bool needsRedraw;
 }
 
 - (BOOL)acceptsFirstResponder {
@@ -75,6 +78,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   auto sizeChanged = appHost->updateScreen(width, height, contentScale);
   if (sizeChanged && tgfxWindow != nullptr) {
     tgfxWindow->invalidSize();
+    needsRedraw = true;
     [self draw];
   }
 }
@@ -84,6 +88,11 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   self.drawIndex = 0;
   self.zoomScale = 1.0f;
   self.contentOffset = CGPointZero;
+  lastDrawIndex = -1;
+  needsRedraw = true;
+  displayList.setRenderMode(tgfx::RenderMode::Tiled);
+  displayList.setAllowZoomBlur(true);
+  displayList.setMaxTileCount(512);
   [self.window makeFirstResponder:self];
 
   if (@available(macOS 14, *)) {
@@ -135,14 +144,14 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   }
 }
 - (void)markDirty {
-  appHost->markDirty();
+  needsRedraw = true;
 }
 
 - (BOOL)draw {
-  if (!appHost->isDirty()) {
+  if (!needsRedraw) {
     return false;
   }
-  appHost->resetDirty();
+
   if (self.window == nil) {
     return false;
   }
@@ -166,18 +175,34 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
     return false;
   }
 
-  appHost->updateZoomAndOffset(self.zoomScale,
-                               tgfx::Point(static_cast<float>(self.contentOffset.x),
-                                           static_cast<float>(self.contentOffset.y)));
+  // Switch sample when drawIndex changes
+  auto numBuilders = hello2d::GetLayerBuilderCount();
+  auto index = (self.drawIndex % numBuilders);
+  if (index != lastDrawIndex) {
+    auto layer = hello2d::BuildAndCenterLayer(index, appHost.get());
+    if (layer) {
+      displayList.root()->removeChildren();
+      displayList.root()->addChild(layer);
+    }
+    lastDrawIndex = index;
+  }
+
+  // Directly set zoom and offset on DisplayList
+  displayList.setZoomScale(self.zoomScale);
+  displayList.setContentOffset(static_cast<float>(self.contentOffset.x),
+                               static_cast<float>(self.contentOffset.y));
+
+  // Draw background and render DisplayList
   auto canvas = surface->getCanvas();
   canvas->clear();
-  auto numBuilders = hello2d::GetSampleCount();
-  auto index = (self.drawIndex % numBuilders);
-  appHost->draw(canvas, index, true);
+  hello2d::DrawSampleBackground(canvas, appHost.get());
+  displayList.render(surface.get(), false);
+
   context->flushAndSubmit();
   tgfxWindow->present(context);
   device->unlock();
 
+  needsRedraw = false;
   return true;
 }
 

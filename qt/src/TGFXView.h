@@ -22,6 +22,7 @@
 #include <QQuickItem>
 #include "hello2d/AppHost.h"
 #include "tgfx/gpu/opengl/qt/QGLWindow.h"
+#include "tgfx/layers/DisplayList.h"
 
 namespace hello2d {
 class TGFXView : public QQuickItem {
@@ -39,10 +40,13 @@ class TGFXView : public QQuickItem {
 
  private:
   int currentDrawerIndex = 0;
+  int lastDrawIndex = -1;
   std::shared_ptr<tgfx::QGLWindow> tgfxWindow = nullptr;
   std::shared_ptr<hello2d::AppHost> appHost = nullptr;
+  tgfx::DisplayList displayList;
   float zoom = 1.0f;
   QPointF offset = {0, 0};
+  bool needsRedraw = true;
 
   void createAppHost();
  private Q_SLOTS:

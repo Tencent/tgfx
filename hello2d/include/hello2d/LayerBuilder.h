@@ -24,59 +24,66 @@
 
 namespace hello2d {
 
-// Base class for individual samples
-class Sample {
+// Base class for individual layer builders (factory pattern)
+class LayerBuilder {
  public:
-  explicit Sample(const std::string& name);
-  virtual ~Sample() = default;
+  explicit LayerBuilder(const std::string& name);
+  virtual ~LayerBuilder() = default;
 
   std::string name() const {
     return _name;
   }
 
   /**
-   * Build the contents.
+   * Builds and returns a layer tree based on the provided AppHost information.
+   * This is a pure factory method with no side effects or state caching.
    */
-  void build(const hello2d::AppHost* host);
-
-  std::vector<std::shared_ptr<tgfx::Layer>> getLayersUnderPoint(float x, float y);
-
   virtual std::shared_ptr<tgfx::Layer> buildLayerTree(const hello2d::AppHost* host) = 0;
 
  protected:
   float padding = 30.f;
-  std::shared_ptr<tgfx::Layer> _root = nullptr;
 
  private:
   std::string _name = "";
 };
 
 /**
- * Returns the number of samples.
+ * Returns the number of layer builders.
  */
-int GetSampleCount();
+int GetLayerBuilderCount();
 
 /**
- * Returns the names of all samples.
+ * Returns the names of all layer builders.
  */
-std::vector<std::string> GetSampleNames();
+std::vector<std::string> GetLayerBuilderNames();
 
 /**
- * Returns the sample with the given index.
+ * Returns the layer builder with the given index.
  */
-Sample* GetSampleByIndex(int index);
+LayerBuilder* GetLayerBuilderByIndex(int index);
 
 /**
- * Returns the sample with the given name.
+ * Returns the layer builder with the given name.
  */
-Sample* GetSampleByName(const std::string& name);
+LayerBuilder* GetLayerBuilderByName(const std::string& name);
 
 /**
  * Draws the background for samples.
  */
 void DrawSampleBackground(tgfx::Canvas* canvas, const hello2d::AppHost* host);
 
-// For backward compatibility, alias SampleBuilder to Sample
-using SampleBuilder = Sample;
+/**
+ * Helper function: Builds a layer tree and centers it within the screen.
+ * This encapsulates the common logic for centering layers with padding.
+ */
+std::shared_ptr<tgfx::Layer> BuildAndCenterLayer(int builderIndex, const AppHost* host);
+
+// For backward compatibility
+using Sample = LayerBuilder;
+using SampleBuilder = LayerBuilder;
+int GetSampleCount();
+std::vector<std::string> GetSampleNames();
+Sample* GetSampleByIndex(int index);
+Sample* GetSampleByName(const std::string& name);
 
 }  // namespace hello2d

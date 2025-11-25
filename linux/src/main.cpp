@@ -18,7 +18,7 @@
 
 #include <filesystem>
 #include <fstream>
-#include "hello2d/SampleBuilder.h"
+#include "hello2d/LayerBuilder.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/opengl/GLDevice.h"
 #include "tgfx/platform/Print.h"

@@ -20,8 +20,9 @@
 
 #include <emscripten/bind.h>
 #include "hello2d/AppHost.h"
-#include "hello2d/SampleBuilder.h"
+#include "hello2d/LayerBuilder.h"
 #include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
+#include "tgfx/layers/DisplayList.h"
 
 namespace hello2d {
 
@@ -44,6 +45,9 @@ class TGFXBaseView {
  private:
   std::string canvasID = "";
   std::shared_ptr<tgfx::Window> window = nullptr;
+  tgfx::DisplayList displayList = {};  // Platform layer owns DisplayList
+  int lastDrawIndex = -1;
+  bool needsRedraw = true;
 };
 
 }  // namespace hello2d

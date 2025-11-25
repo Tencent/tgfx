@@ -17,7 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/utils/Log.h"
-#include "hello2d/SampleBuilder.h"
+#include "hello2d/LayerBuilder.h"
+#include "tgfx/layers/DisplayList.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
@@ -33,11 +34,25 @@ TGFX_TEST(Hello2DTest, Compare) {
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, appHost.width(), appHost.height(), false, 4);
   auto canvas = surface->getCanvas();
+
+  DisplayList displayList;
+  displayList.setRenderMode(RenderMode::Direct);
+
   auto builderNames = hello2d::GetSampleNames();
   for (size_t i = 0; i < builderNames.size(); ++i) {
     const auto& name = builderNames[i];
-    bool isNeedBackground = false;
-    appHost.draw(canvas, static_cast<int>(i), isNeedBackground);
+
+    // Build layer and add to DisplayList
+    auto layer = hello2d::BuildAndCenterLayer(static_cast<int>(i), &appHost);
+    if (layer) {
+      displayList.root()->removeChildren();
+      displayList.root()->addChild(layer);
+    }
+
+    // Draw background and render DisplayList
+    canvas->clear();
+    hello2d::DrawSampleBackground(canvas, &appHost);
+    displayList.render(surface.get(), false);
 
     auto key = "DrawersTest/" + name;
     auto result = Baseline::Compare(surface, key);

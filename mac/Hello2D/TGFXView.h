@@ -23,6 +23,7 @@
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/opengl/GLDevice.h"
 #include "tgfx/gpu/opengl/cgl/CGLWindow.h"
+#include "tgfx/layers/DisplayList.h"
 
 @interface TGFXView : NSView
 

@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "JTGFXView.h"
-#include "hello2d/SampleBuilder.h"
+#include "hello2d/LayerBuilder.h"
 
 namespace hello2d {
 static jfieldID TGFXView_nativePtr;
@@ -28,18 +28,18 @@ void JTGFXView::updateSize() {
   auto sizeChanged = appHost->updateScreen(width, height, appHost->density());
   if (sizeChanged) {
     window->invalidSize();
+    needsRedraw = true;
   }
 }
 
 void JTGFXView::markDirty() {
-  appHost->markDirty();
+  needsRedraw = true;
 }
 
 bool JTGFXView::draw(int drawIndex, float zoom, float offsetX, float offsetY) {
-  if (!appHost->isDirty()) {
+  if (!needsRedraw) {
     return false;
   }
-  appHost->resetDirty();
 
   if (appHost->width() <= 0 || appHost->height() <= 0) {
     return false;
@@ -55,15 +55,33 @@ bool JTGFXView::draw(int drawIndex, float zoom, float offsetX, float offsetY) {
     return false;
   }
 
-  appHost->updateZoomAndOffset(zoom, tgfx::Point(offsetX, offsetY));
+  // Switch sample when drawIndex changes
+  auto numDrawers = hello2d::GetLayerBuilderCount();
+  auto index = (drawIndex % numDrawers);
+  if (index != lastDrawIndex) {
+    auto layer = hello2d::BuildAndCenterLayer(index, appHost.get());
+    if (layer) {
+      displayList.root()->removeChildren();
+      displayList.root()->addChild(layer);
+    }
+    lastDrawIndex = index;
+  }
+
+  // Directly set zoom and offset on DisplayList
+  displayList.setZoomScale(zoom);
+  displayList.setContentOffset(offsetX, offsetY);
+
+  // Draw background and render DisplayList
   auto canvas = surface->getCanvas();
   canvas->clear();
-  auto numDrawers = hello2d::GetSampleCount();
-  auto index = (drawIndex % numDrawers);
-  appHost->draw(canvas, index, true);
+  hello2d::DrawSampleBackground(canvas, appHost.get());
+  displayList.render(surface.get(), false);
+
   context->flushAndSubmit();
   window->present(context);
   device->unlock();
+
+  needsRedraw = false;
   return true;
 }
 }  // namespace hello2d
