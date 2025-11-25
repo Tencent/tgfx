@@ -21,6 +21,7 @@
 #include "hello2d/LayerBuilder.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/opengl/GLDevice.h"
+#include "tgfx/layers/DisplayList.h"
 #include "tgfx/platform/Print.h"
 
 static std::string GetRootPath() {
@@ -62,12 +63,23 @@ int main() {
   }
   auto surface = tgfx::Surface::Make(context, appHost.width(), appHost.height());
   auto canvas = surface->getCanvas();
+  
+  tgfx::DisplayList displayList;
+  displayList.setRenderMode(tgfx::RenderMode::Direct);
+  
   auto builderNames = hello2d::GetSampleNames();
   auto index = 0;
 
   for (auto& name : builderNames) {
+    auto layer = hello2d::BuildAndCenterLayer(index, &appHost);
+    if (layer) {
+      displayList.root()->removeChildren();
+      displayList.root()->addChild(layer);
+    }
+    
     canvas->clear();
-    appHost.draw(canvas, index, true);
+    hello2d::DrawSampleBackground(canvas, &appHost);
+    displayList.render(surface.get(), false);
 
     tgfx::Bitmap bitmap = {};
     bitmap.allocPixels(surface->width(), surface->height());

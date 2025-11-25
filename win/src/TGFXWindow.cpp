@@ -107,7 +107,7 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
       int count = hello2d::GetSampleCount();
       if (count > 0) {
         currentDrawerIndex = (currentDrawerIndex + 1) % count;
-        appHost->markDirty();
+        markDirty();
       }
       ::InvalidateRect(windowHandle, nullptr, TRUE);
       break;
@@ -118,15 +118,16 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
       bool isCtrlPressed = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
       bool isShiftPressed = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
 
-      float curZoom = appHost->zoomScale();
-      tgfx::Point offset = appHost->contentOffset();
+      float curZoom = displayList.zoomScale();
+      auto offset = displayList.contentOffset();
 
       if (isCtrlPressed) {
         float zoomStep = std::exp(GET_WHEEL_DELTA_WPARAM(wparam) / WHEEL_RATIO);
         float newZoom = std::clamp(curZoom * zoomStep, MIN_ZOOM, MAX_ZOOM);
         offset.x = mousePoint.x - ((mousePoint.x - offset.x) / curZoom) * newZoom;
         offset.y = mousePoint.y - ((mousePoint.y - offset.y) / curZoom) * newZoom;
-        appHost->updateZoomAndOffset(newZoom, offset);
+        displayList.setZoomScale(newZoom);
+        displayList.setContentOffset(offset.x, offset.y);
       } else {
         float wheelDelta = static_cast<float>(GET_WHEEL_DELTA_WPARAM(wparam));
         if (isShiftPressed) {
@@ -134,8 +135,9 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
         } else {
           offset.y -= wheelDelta;
         }
-        appHost->updateZoomAndOffset(curZoom, offset);
+        displayList.setContentOffset(offset.x, offset.y);
       }
+      markDirty();
       ::InvalidateRect(windowHandle, nullptr, TRUE);
       break;
     }
@@ -145,8 +147,8 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
       if (GetGestureInfo(reinterpret_cast<HGESTUREINFO>(lparam), &gestureInfo)) {
         if (gestureInfo.dwID == GID_ZOOM) {
           double currentArgument = gestureInfo.ullArguments;
-          float curZoom = appHost->zoomScale();
-          tgfx::Point offset = appHost->contentOffset();
+          float curZoom = displayList.zoomScale();
+          auto offset = displayList.contentOffset();
           if (lastZoomArgument != 0.0) {
             double zoomFactor = currentArgument / lastZoomArgument;
             POINT mousePoint = {GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
@@ -155,7 +157,8 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
                 std::clamp(curZoom * static_cast<float>(zoomFactor), MIN_ZOOM, MAX_ZOOM);
             offset.x = mousePoint.x - ((mousePoint.x - offset.x) / curZoom) * newZoom;
             offset.y = mousePoint.y - ((mousePoint.y - offset.y) / curZoom) * newZoom;
-            appHost->updateZoomAndOffset(newZoom, offset);
+            displayList.setZoomScale(newZoom);
+            displayList.setContentOffset(offset.x, offset.y);
           }
           lastZoomArgument = currentArgument;
         }
@@ -164,6 +167,7 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
         }
         CloseGestureInfoHandle(reinterpret_cast<HGESTUREINFO>(lparam));
       }
+      markDirty();
       ::InvalidateRect(windowHandle, nullptr, TRUE);
       break;
     }
@@ -272,6 +276,10 @@ void TGFXWindow::createAppHost() {
 }
 
 void TGFXWindow::draw() {
+  if (!needsRedraw) {
+    return;
+  }
+  
   if (!tgfxWindow) {
     tgfxWindow = tgfx::WGLWindow::MakeFrom(windowHandle);
   }
@@ -302,16 +310,28 @@ void TGFXWindow::draw() {
     return;
   }
   auto canvas = surface->getCanvas();
-  canvas->clear();
-  canvas->save();
 
   int count = hello2d::GetSampleCount();
   int index = (count > 0) ? (currentDrawerIndex % count) : 0;
-  appHost->draw(canvas, index, true);
-  canvas->restore();
+  
+  auto layer = hello2d::BuildAndCenterLayer(index, appHost.get());
+  if (layer) {
+    displayList.root()->removeChildren();
+    displayList.root()->addChild(layer);
+  }
+  
+  canvas->clear();
+  hello2d::DrawSampleBackground(canvas, appHost.get());
+  displayList.render(surface.get(), false);
+  
   context->flushAndSubmit();
   tgfxWindow->present(context);
   device->unlock();
-  return;
+  
+  needsRedraw = false;
+}
+
+void TGFXWindow::markDirty() {
+  needsRedraw = true;
 }
 }  // namespace hello2d
