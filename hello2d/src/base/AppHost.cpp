@@ -38,12 +38,8 @@ void AppHost::resetDirty() {
   _dirty = false;
 }
 
-void AppHost::setRenderMode(tgfx::RenderMode renderMode) {
-  if (renderMode == tgfx::RenderMode::Tiled) {
-    _isTileMode = true;
-  } else {
-    _isTileMode = false;
-  }
+void AppHost::setTileModeEnable(bool enable) {
+  _isTileMode = enable;
 }
 
 std::shared_ptr<tgfx::Image> AppHost::getImage(const std::string& name) const {
@@ -117,6 +113,7 @@ void AppHost::addTypeface(const std::string& name, std::shared_ptr<tgfx::Typefac
   }
   typefaces[name] = std::move(typeface);
 }
+
 void AppHost::draw(tgfx::Canvas* canvas, int drawIndex, bool isNeedBackground) {
   if (drawIndex < 0 || drawIndex >= static_cast<int>(GetSampleCount())) {
     return;

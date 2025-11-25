@@ -110,7 +110,7 @@ class AppHost {
   bool isDirty() const;
   void markDirty();
   void resetDirty();
-  void setRenderMode(tgfx::RenderMode renderMode);
+  void setTileModeEnable(bool enable);
   /**
    * Draws the content of the corresponding SampleBuilder based on the index.
    */
