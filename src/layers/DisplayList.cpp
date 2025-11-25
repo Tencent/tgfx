@@ -234,6 +234,16 @@ void DisplayList::setMaxTileCount(int count) {
   resetCaches();
 }
 
+Color DisplayList::backgroundColor() const {
+  return _root->backgroundColor();
+}
+
+void DisplayList::setBackgroundColor(const Color& color) {
+  if (_root->setBackgroundColor(color)) {
+    resetCaches();
+  }
+}
+
 void DisplayList::showDirtyRegions(bool show) {
   if (_showDirtyRegions == show) {
     return;
@@ -493,6 +503,23 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
   int startY = static_cast<int>(floorf(renderRect.top / static_cast<float>(_tileSize)));
   int endX = static_cast<int>(ceilf(renderRect.right / static_cast<float>(_tileSize)));
   int endY = static_cast<int>(ceilf(renderRect.bottom / static_cast<float>(_tileSize)));
+
+  auto zoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
+  auto renderBounds = _root->renderBounds;
+  renderBounds.scale(zoomScale, zoomScale);
+  int renderStartX = static_cast<int>(floorf(renderBounds.left / static_cast<float>(_tileSize)));
+  int renderStartY = static_cast<int>(floorf(renderBounds.top / static_cast<float>(_tileSize)));
+  int renderEndX = static_cast<int>(ceilf(renderBounds.right / static_cast<float>(_tileSize)));
+  int renderEndY = static_cast<int>(ceilf(renderBounds.bottom / static_cast<float>(_tileSize)));
+
+  startX = std::max(startX, renderStartX);
+  startY = std::max(startY, renderStartY);
+  endX = std::min(endX, renderEndX);
+  endY = std::min(endY, renderEndY);
+  if (startX >= endX || startY >= endY) {
+    return {};
+  }
+
   std::vector<DrawTask> screenTasks = {};
   std::vector<std::pair<int, int>> dirtyGrids = {};
   auto tileCount = static_cast<size_t>(endX - startX) * static_cast<size_t>(endY - startY);
@@ -614,18 +641,24 @@ std::vector<DrawTask> DisplayList::getFallbackDrawTasks(
   auto tileStartX = tileX * _tileSize;
   auto tileStartY = tileY * _tileSize;
   std::vector<DrawTask> tasks = {};
+  auto renderBounds = _root->renderBounds;
+  renderBounds.scale(currentZoomScale, currentZoomScale);
   for (int gridX = 0; gridX < gridCount; gridX++) {
     for (int gridY = 0; gridY < gridCount; gridY++) {
       auto gridStartX = tileStartX + gridX * gridSize;
       auto gridStartY = tileStartY + gridY * gridSize;
       bool found = false;
+      auto gridRect = Rect::MakeXYWH(gridStartX, gridStartY, gridSize, gridSize);
+      if (!gridRect.intersect(renderBounds)) {
+        continue;
+      }
       for (auto& [scale, tileCache] : fallbackCaches) {
         if (scale == currentZoomScale || tileCache->empty()) {
           continue;
         }
         auto scaleRatio = scale / currentZoomScale;
         DEBUG_ASSERT(scaleRatio != 0.0f);
-        auto zoomedRect = Rect::MakeXYWH(gridStartX, gridStartY, gridSize, gridSize);
+        auto zoomedRect = gridRect;
         zoomedRect.scale(scaleRatio, scaleRatio);
         auto tiles = tileCache->getTilesUnderRect(zoomedRect, true);
         if (tiles.empty()) {
@@ -828,6 +861,7 @@ void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* su
             [](const DrawTask& a, const DrawTask& b) { return a.sourceIndex() < b.sourceIndex(); });
   auto canvas = surface->getCanvas();
   AutoCanvasRestore autoRestore(canvas);
+  drawBackground(canvas, autoClear);
   Paint paint = {};
   paint.setAntiAlias(false);
   if (autoClear) {
@@ -892,6 +926,10 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   if (!fullScreen) {
     canvas->clipRect(drawRect);
   }
+  if (_root->renderBounds.isEmpty()) {
+    drawBackground(canvas, autoClear);
+    return;
+  }
   if (autoClear) {
     canvas->clear();
   }
@@ -922,4 +960,14 @@ void DisplayList::updateMousePosition() {
   mousePosition = (_contentOffset - lastContentOffset * scale) * invScaleFactor;
   mousePosition -= _contentOffset;
 }
+
+void DisplayList::drawBackground(Canvas* canvas, bool autoClear) const {
+  auto backgroundColor = _root->backgroundColor();
+  if (autoClear || backgroundColor.isOpaque()) {
+    canvas->clear(backgroundColor);
+  } else if (backgroundColor.alpha > 0.0f) {
+    canvas->drawColor(backgroundColor);
+  }
+}
+
 }  // namespace tgfx

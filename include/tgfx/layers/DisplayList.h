@@ -222,6 +222,17 @@ class DisplayList {
   }
 
   /**
+   * The background color of the display list. If the background color is not transparent,
+   * it will be used to fill the entire surface. Default is transparent.
+   */
+  Color backgroundColor() const;
+
+  /**
+   *  Sets the background color of the display list.
+   */
+  void setBackgroundColor(const Color& color);
+
+  /**
    * Sets whether to show dirty regions during rendering. When enabled, the dirty regions will be
    * highlighted in the rendered output. This is useful for debugging to visualize which parts of
    * the display list are being updated. The default value is false.
@@ -315,6 +326,9 @@ class DisplayList {
 
   void drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
                      bool autoClear) const;
+
   void updateMousePosition();
+
+  void drawBackground(Canvas* canvas, bool autoClear) const;
 };
 }  // namespace tgfx

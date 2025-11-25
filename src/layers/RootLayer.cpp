@@ -114,4 +114,22 @@ std::vector<Rect> RootLayer::updateDirtyRegions() {
   return std::move(dirtyRects);
 }
 
+bool RootLayer::setBackgroundColor(const Color& color) {
+  if (_backgroundColor == color) {
+    return false;
+  }
+  _backgroundColor = color;
+  invalidateContent();
+  return true;
+}
+
+void RootLayer::onUpdateContent(LayerRecorder* recorder) {
+  auto canvas = recorder->getCanvas();
+  if (_backgroundColor.isOpaque()) {
+    canvas->clear(_backgroundColor);
+  } else if (_backgroundColor.alpha > 0) {
+    canvas->drawColor(_backgroundColor);
+  }
+}
+
 }  // namespace tgfx
