@@ -324,9 +324,10 @@ std::vector<Rect> DisplayList::renderPartial(Surface* surface, bool autoClear,
   bool cacheChanged = false;
   auto partialCache = surfaceCaches.empty() ? nullptr : surfaceCaches.front();
   if (partialCache == nullptr || partialCache->getContext() != context ||
-      partialCache->width() != surface->width() || partialCache->height() != surface->height()) {
+      partialCache->width() != surface->width() || partialCache->height() != surface->height() ||
+      !ColorSpace::Equals(partialCache->colorSpace().get(), surface->colorSpace().get())) {
     partialCache = Surface::Make(context, surface->width(), surface->height(), ColorType::RGBA_8888,
-                                 1, false, surface->renderFlags());
+                                 1, false, surface->renderFlags(), surface->colorSpace());
     if (partialCache == nullptr) {
       LOGE("DisplayList::renderPartial: Failed to create partial cache surface.");
       return renderDirect(surface, autoClear);
@@ -724,8 +725,9 @@ std::vector<std::shared_ptr<Tile>> DisplayList::createContinuousTiles(const Surf
     countY = requestCountY;
     countX = static_cast<int>(ceilf(static_cast<float>(tileCount) / static_cast<float>(countY)));
   }
-  auto surface = Surface::Make(context, countX * _tileSize, countY * _tileSize,
-                               ColorType::RGBA_8888, 1, false, renderSurface->renderFlags());
+  auto surface =
+      Surface::Make(context, countX * _tileSize, countY * _tileSize, ColorType::RGBA_8888, 1, false,
+                    renderSurface->renderFlags(), renderSurface->colorSpace());
   if (surface == nullptr) {
     return {};
   }
@@ -760,8 +762,9 @@ bool DisplayList::createEmptyTiles(const Surface* renderSurface) {
   }
   int countX = static_cast<int>(sqrtf(static_cast<float>(tileCount)));
   int countY = static_cast<int>(ceilf(static_cast<float>(tileCount) / static_cast<float>(countX)));
-  auto surface = Surface::Make(context, countX * _tileSize, countY * _tileSize,
-                               ColorType::RGBA_8888, 1, false, renderSurface->renderFlags());
+  auto surface =
+      Surface::Make(context, countX * _tileSize, countY * _tileSize, ColorType::RGBA_8888, 1, false,
+                    renderSurface->renderFlags(), renderSurface->colorSpace());
   if (surface == nullptr) {
     return false;
   }
@@ -900,7 +903,8 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   auto renderRect = inverse.mapRect(drawRect);
   renderRect.roundOut();
   args.renderRect = &renderRect;
-  args.blurBackground = _root->createBackgroundContext(context, drawRect, viewMatrix);
+  args.blurBackground =
+      _root->createBackgroundContext(context, drawRect, viewMatrix, false, args.dstColorSpace);
   args.dstColorSpace = surface->colorSpace();
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
 }

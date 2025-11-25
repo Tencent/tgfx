@@ -54,7 +54,7 @@ std::shared_ptr<Surface> WebGLWindow::onCreateSurface(Context* context) {
   bool isP3Supported = emscripten::val::module_property("tgfx").call<bool>(
       "isDisplayP3Supported", emscripten::val::module_property("GL"));
   if (isP3Supported) {
-    colorSpace = ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3);
+    colorSpace = ColorSpace::DisplayP3();
   }
   return Surface::MakeFrom(context, {glInfo, width, height}, ImageOrigin::BottomLeft, 0,
                            colorSpace);
