@@ -55,5 +55,9 @@ class DrawArgs {
 
   // Only used while recording layer's background image.
   std::shared_ptr<BackgroundContext> blendModeBackground = nullptr;
+
+  // The depth mapping matrix applied to all layers within the 3D render context, which maps the
+  // depth of all layers to the range [-1, 1].
+  std::optional<Matrix3D> context3DDepthMatrix = std::nullopt;
 };
 }  // namespace tgfx

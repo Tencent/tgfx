@@ -639,6 +639,13 @@ class Layer : public std::enable_shared_from_this<Layer> {
                      const Matrix3D* transform, bool excludeContent = false,
                      bool excludeChildren = false);
 
+  /**
+   * Draws the current layer offscreen, with both content and child layers rendered to separate
+   * offscreen textures.
+   */
+  void drawOffscreenSplitChildren(const DrawArgs& args, Canvas* canvas, float alpha,
+                                  BlendMode blendMode, const Matrix3D* transform);
+
   void drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha,
                     const Matrix3D* transform = nullptr);
 
@@ -728,6 +735,13 @@ class Layer : public std::enable_shared_from_this<Layer> {
    * @param anchor The specified anchor point.
    */
   Matrix3D anchorAdaptedMatrix(const Matrix3D& matrix, const Point& anchor) const;
+
+  /**
+   * Calculates the 3D context depth matrix for the layer.
+   * This matrix maps the depth of all sublayers within the 3D render context rooted at this layer
+   * to the [-1, 1] range.
+   */
+  Matrix3D calculate3DContextDepthMatrix();
 
   struct {
     bool dirtyContent : 1;        // layer's content needs updating

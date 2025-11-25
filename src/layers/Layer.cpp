@@ -537,6 +537,18 @@ Rect Layer::getContentBounds() {
   if (auto content = getContent()) {
     bounds = content->getBounds();
   }
+
+  if (!_layerStyles.empty() || !_filters.empty()) {
+    auto layerBounds = bounds;
+    for (auto& layerStyle : _layerStyles) {
+      auto styleBounds = layerStyle->filterBounds(layerBounds, 1);
+      bounds.join(styleBounds);
+    }
+    for (auto& filter : _filters) {
+      bounds = filter->filterBounds(bounds, 1);
+    }
+  }
+
   return bounds;
 }
 
@@ -919,11 +931,7 @@ std::shared_ptr<ImageFilter> Layer::getImageFilter(float contentScale, const Mat
     }
   }
   if (transform != nullptr) {
-    // Layer visibility is handled in the CPU stage, update the matrix to keep the Z-axis of
-    // vertices sent to the GPU at 0.
-    auto finalMatrix = *transform;
-    finalMatrix.setRow(2, {0, 0, 0, 0});
-    auto content3DFilter = Transform3DFilter::Make(finalMatrix);
+    auto content3DFilter = Transform3DFilter::Make(*transform);
     filters.push_back(content3DFilter->getImageFilter(contentScale));
   }
   return ImageFilter::Compose(filters);
@@ -1020,8 +1028,17 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
   } else if (blendMode != BlendMode::SrcOver || !bitFields.passThroughBackground ||
              (alpha < 1.0f && bitFields.allowsGroupOpacity) || bitFields.shouldRasterize ||
              (!_filters.empty() && !args.excludeEffects) || hasValidMask() ||
-             (transform != nullptr && _transformStyle == TransformStyle::Flat)) {
+             (_transformStyle == TransformStyle::Flat && transform != nullptr)) {
+    // If the current layer's TransformStyle is Flat and transform is not null, it means the layer
+    // is not in any 3D rendering context and should be rendered offscreen directly.
     drawOffscreen(args, canvas, alpha, blendMode, transform);
+  } else if (_transformStyle == TransformStyle::Preserve3D &&
+             _parent->_transformStyle == TransformStyle::Flat) {
+    // If the current layer has enabled 3D rendering context based on TransformStyle, it needs
+    // offscreen rendering with depth testing enabled.
+    auto renderArgs = args;
+    renderArgs.context3DDepthMatrix = calculate3DContextDepthMatrix();
+    drawOffscreenSplitChildren(renderArgs, canvas, alpha, blendMode, transform);
   } else if (transform != nullptr) {
     drawContentOffscreen(args, canvas, alpha, blendMode, transform);
   } else {
@@ -1247,6 +1264,15 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     } else {
       auto contentOrigin = Point::Make(imageMatrix.getTranslateX(), imageMatrix.getTranslateY());
       auto contentTransform = anchorAdaptedMatrix(*transform, contentOrigin);
+      if (args.context3DDepthMatrix.has_value()) {
+        // 3D layers within a 3D rendering context require unified depth mapping to ensure correct
+        // depth occlusion visual effects.
+        contentTransform.postConcat(*args.context3DDepthMatrix);
+      } else {
+        // 3D layers not within a 3D rendering context ignore depth mapping to ensure layer depth
+        // remains 0, maintaining layer visibility.
+        contentTransform.setRow(2, {0, 0, 0, 0});
+      }
       filter = getImageFilter(contentScale, &contentTransform);
     }
     if (filter) {
@@ -1287,6 +1313,141 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   // There is no scenario where LayerStyle's Position and ExtraSourceType are 'above' and
   // 'background' respectively at the same time, so no special handling is needed after drawing the
   // content.
+}
+
+void Layer::drawOffscreenSplitChildren(const DrawArgs& args, Canvas* canvas, float alpha,
+                                       BlendMode blendMode, const Matrix3D* transform) {
+  // The matrix acts on the anchor point at the origin of the layer's local coordinate system. If
+  // the w-component of this point after transformation is less than 0, it indicates the layer is
+  // behind the viewer, so the layer subtree is hidden.
+  if (transform != nullptr && transform->mapPoint(0, 0, 0, 1).w < 0) {
+    return;
+  }
+  auto contentScale = canvas->getMatrix().getMaxScale();
+  if (FloatNearlyZero(contentScale)) {
+    return;
+  }
+  // canvas of background clip bounds will be more large than canvas clip bounds.
+  auto clipBounds = GetClipBounds(args.blurBackground ? args.blurBackground->getCanvas() : canvas);
+  std::shared_ptr<MaskFilter> maskFilter = nullptr;
+  if (hasValidMask()) {
+    maskFilter = getMaskFilter(args, contentScale, clipBounds);
+    if (maskFilter == nullptr) {
+      // if mask filter is nullptr while mask is valid, that means the layer is not visible.
+      return;
+    }
+  }
+
+  PictureRecorder recorder = {};
+  auto offscreenCanvas = recorder.beginRecording();
+  offscreenCanvas->scale(contentScale, contentScale);
+  auto subBackgroundContext = args.blurBackground && hasBackgroundStyle()
+                                  ? args.blurBackground->createSubContext()
+                                  : nullptr;
+  // Draw content.
+  do {
+    if (transform != nullptr) {
+      drawBackgroundLayerStyles(args, offscreenCanvas, alpha, *transform);
+    }
+
+    auto passThroughBackground = bitFields.passThroughBackground &&
+                                 blendMode == BlendMode::SrcOver && _filters.empty() &&
+                                 bitFields.hasBlendMode == true && transform == nullptr;
+    auto contentMatrix = Matrix::I();
+    auto contentImage =
+        getOffscreenContentImage(args, offscreenCanvas, passThroughBackground, subBackgroundContext,
+                                 clipBounds, &contentMatrix, false, true);
+    auto invertContentMatrix = Matrix::I();
+    if (contentImage == nullptr || !contentMatrix.invert(&invertContentMatrix)) {
+      break;
+      ;
+    }
+
+    auto filterOffset = Point::Make(0, 0);
+    if (!args.excludeEffects) {
+      std::shared_ptr<ImageFilter> filter = nullptr;
+      if (transform == nullptr) {
+        filter = getImageFilter(contentScale);
+      } else {
+        auto contentOrigin =
+            Point::Make(contentMatrix.getTranslateX(), contentMatrix.getTranslateY());
+        auto contentTransform = anchorAdaptedMatrix(*transform, contentOrigin);
+        if (args.context3DDepthMatrix.has_value()) {
+          // 3D layers within a 3D rendering context require unified depth mapping to ensure correct
+          // depth occlusion visual effects.
+          contentTransform.postConcat(*args.context3DDepthMatrix);
+        } else {
+          // 3D layers not within a 3D rendering context ignore depth mapping to ensure layer depth
+          // remains 0, maintaining layer visibility.
+          contentTransform.setRow(2, {0, 0, 0, 0});
+        }
+        filter = getImageFilter(contentScale, &contentTransform);
+      }
+      if (filter) {
+        if (clipBounds.has_value()) {
+          clipBounds = invertContentMatrix.mapRect(*clipBounds);
+          clipBounds->roundOut();
+        }
+        // clipBounds may be smaller than the image bounds, so we need to pass it to makeWithFilter.
+        contentImage = contentImage->makeWithFilter(
+            filter, &filterOffset, clipBounds.has_value() ? &*clipBounds : nullptr);
+      }
+    }
+    if (contentImage == nullptr) {
+      break;
+    }
+
+    if (args.blurBackground && !subBackgroundContext) {
+      contentImage = contentImage->makeRasterized();
+    }
+    AutoCanvasRestore autoRestore(offscreenCanvas);
+    offscreenCanvas->concat(contentMatrix);
+    offscreenCanvas->drawImage(contentImage, filterOffset.x, filterOffset.y);
+  } while (false);
+
+  // Draw child layers.
+  std::unordered_set<LayerStyleExtraSourceType> styleExtraSourceTypes = {
+      LayerStyleExtraSourceType::None, LayerStyleExtraSourceType::Contour,
+      LayerStyleExtraSourceType::Background};
+  drawDirectly(args, offscreenCanvas, alpha, transform, styleExtraSourceTypes, true, false);
+
+  // There is no scenario where LayerStyle's Position and ExtraSourceType are 'above' and
+  // 'background' respectively at the same time, so no special handling is needed after drawing the
+  // content.
+
+  // Draw offscreen texture.
+  Point offset;
+  auto image =
+      ToImageWithOffset(recorder.finishRecordingAsPicture(), &offset, nullptr, args.dstColorSpace);
+  auto imageMatrix = Matrix::I();
+  imageMatrix.setScale(1.0f / contentScale, 1.0f / contentScale);
+  imageMatrix.preTranslate(offset.x, offset.y);
+
+  Paint paint = {};
+  paint.setAntiAlias(bitFields.allowsEdgeAntialiasing);
+  paint.setAlpha(alpha);
+  paint.setBlendMode(blendMode);
+  if (maskFilter != nullptr) {
+    paint.setMaskFilter(maskFilter);
+  }
+
+  AutoCanvasRestore autoRestore(canvas);
+  canvas->concat(imageMatrix);
+  canvas->drawImage(image, 0.f, 0.f, &paint);
+  if (args.blendModeBackground) {
+    auto blendCanvas = args.blendModeBackground->getCanvas();
+    AutoCanvasRestore autoRestoreBlend(blendCanvas);
+    blendCanvas->concat(imageMatrix);
+    blendCanvas->drawImage(image, 0.f, 0.f, &paint);
+  }
+  if (subBackgroundContext) {
+    subBackgroundContext->drawToParent(Matrix::MakeScale(1.0f / contentScale), paint);
+  } else if (args.blurBackground) {
+    auto backgroundCanvas = args.blurBackground->getCanvas();
+    AutoCanvasRestore autoRestoreBg(backgroundCanvas);
+    backgroundCanvas->concat(imageMatrix);
+    backgroundCanvas->drawImage(image, 0.f, 0.f, &paint);
+  }
 }
 
 void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha,
@@ -1452,14 +1613,22 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, cons
       clipChildScrollRectHandler(*blendCanvas);
     }
 
+    if (childArgs.context3DDepthMatrix.has_value() && _transformStyle == TransformStyle::Flat) {
+      // Flat-type layers already in a 3D rendering environment do not pass the 3D rendering
+      // environment to child layers.
+      childArgs.context3DDepthMatrix = std::nullopt;
+    }
     if (transform == nullptr) {
-      // For layers not in a 3D rendering context, when drawing 2D sublayers, directly apply the
-      // sublayer's Matrix to the Canvas without additional processing. When drawing 3D sublayers,
-      // explicitly specify the 3D transformation matrix that the sublayer needs to apply.
+      // When no additional 3D transformation is needed, when drawing 2D sublayers, directly apply
+      // the sublayer's Matrix to the Canvas without additional processing. When drawing 3D
+      // sublayers, explicitly specify the 3D transformation matrix that the sublayer needs to
+      // apply.
       auto childTransform = isChildMatrixAffine ? nullptr : &childMatrix;
+      // childArgs.context3DDepthMatrix = std::nullopt;
       child->drawLayer(childArgs, canvas, child->_alpha * alpha,
                        static_cast<BlendMode>(child->bitFields.blendMode), childTransform);
     } else {
+      // If transform is not null, it indicates that the current layer is in a 3D rendering context.
       // For layers in a 3D rendering context, whether drawing 2D or 3D sublayers, it is necessary
       // to explicitly specify the 3D transformation matrix of the sublayer relative to the layer
       // that established the 3D rendering context.
@@ -2079,6 +2248,53 @@ Matrix3D Layer::anchorAdaptedMatrix(const Matrix3D& matrix, const Point& anchor)
   auto offsetMatrix = Matrix3D::MakeTranslate(anchor.x, anchor.y, 0);
   auto invOffsetMatrix = Matrix3D::MakeTranslate(-anchor.x, -anchor.y, 0);
   return invOffsetMatrix * matrix * offsetMatrix;
+}
+
+Matrix3D Layer::calculate3DContextDepthMatrix() {
+  auto minDepth = std::numeric_limits<float>::max();
+  auto maxDepth = -std::numeric_limits<float>::max();
+
+  using Item = std::tuple<Layer*, Matrix3D>;
+  std::queue<Item> queue;
+  queue.emplace(this, _matrix3D);
+  while (!queue.empty()) {
+    auto [layer, matrix] = queue.front();
+    queue.pop();
+
+    auto contentBounds = layer->getContentBounds();
+    if (!contentBounds.isEmpty()) {
+      auto corners = std::array<Vec3, 4>{Vec3(contentBounds.left, contentBounds.top, 0),
+                                         Vec3(contentBounds.right, contentBounds.top, 0),
+                                         Vec3(contentBounds.right, contentBounds.bottom, 0),
+                                         Vec3(contentBounds.left, contentBounds.bottom, 0)};
+      for (const auto& corner : corners) {
+        auto transformedPoint = matrix.mapVec3(corner);
+        minDepth = std::min(minDepth, transformedPoint.z);
+        maxDepth = std::max(maxDepth, transformedPoint.z);
+      }
+    }
+
+    // If the Layer's transformStyle is Preserve3D, include child layers in the 3D rendering context.
+    if (layer->_transformStyle == TransformStyle::Preserve3D) {
+      for (auto& child :layer->_children) {
+        auto childMatrix = child->getMatrixWithScrollRect();
+        auto childCumulativeMatrix = childMatrix;
+        childCumulativeMatrix.postConcat(matrix);
+        queue.emplace(child.get(), childCumulativeMatrix);
+      }
+    }
+  }
+
+  auto matrix = Matrix3D::I();
+  if (FloatNearlyZero(maxDepth - minDepth)) {
+    // If depth remains unchanged, keep z unchanged.
+    matrix.setRow(2, {0, 0, 0, 0});
+    return matrix;
+  }
+
+  matrix.setRowColumn(2, 2, 2.0f / (maxDepth - minDepth));
+  matrix.setRowColumn(2, 3, -(maxDepth + minDepth) / (maxDepth - minDepth));
+  return matrix;
 }
 
 }  // namespace tgfx
