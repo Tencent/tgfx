@@ -100,18 +100,21 @@ class QGLDeviceCreator : public QObject {
   }
 };
 
-std::shared_ptr<QGLWindow> QGLWindow::MakeFrom(QQuickItem* quickItem, bool singleBufferMode) {
+std::shared_ptr<QGLWindow> QGLWindow::MakeFrom(QQuickItem* quickItem, bool singleBufferMode,
+                                               std::shared_ptr<ColorSpace> colorSpace) {
   if (quickItem == nullptr) {
     return nullptr;
   }
-  auto window = std::shared_ptr<QGLWindow>(new QGLWindow(quickItem, singleBufferMode));
+  auto window =
+      std::shared_ptr<QGLWindow>(new QGLWindow(quickItem, singleBufferMode, std::move(colorSpace)));
   window->weakThis = window;
   window->initDevice();
   return window;
 }
 
-QGLWindow::QGLWindow(QQuickItem* quickItem, bool singleBufferMode)
-    : quickItem(quickItem), singleBufferMode(singleBufferMode) {
+QGLWindow::QGLWindow(QQuickItem* quickItem, bool singleBufferMode,
+                     std::shared_ptr<ColorSpace> colorSpace)
+    : quickItem(quickItem), singleBufferMode(singleBufferMode), colorSpace(std::move(colorSpace)) {
   if (QThread::currentThread() != QApplication::instance()->thread()) {
     renderThread = QThread::currentThread();
   }
@@ -166,8 +169,7 @@ QSGTexture* QGLWindow::getQSGTexture() {
   return outTexture;
 }
 
-std::shared_ptr<Surface> QGLWindow::onCreateSurface(Context* context,
-                                                    std::shared_ptr<ColorSpace> colorSpace) {
+std::shared_ptr<Surface> QGLWindow::onCreateSurface(Context* context) {
   auto nativeWindow = quickItem->window();
   if (nativeWindow == nullptr) {
     return nullptr;

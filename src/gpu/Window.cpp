@@ -22,7 +22,8 @@
 #include "tgfx/gpu/Device.h"
 
 namespace tgfx {
-Window::Window(std::shared_ptr<Device> device) : device(std::move(device)) {
+Window::Window(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace)
+    : device(std::move(device)), colorSpace(std::move(colorSpace)) {
 }
 
 std::shared_ptr<Device> Window::getDevice() {
@@ -30,13 +31,8 @@ std::shared_ptr<Device> Window::getDevice() {
   return device;
 }
 
-std::shared_ptr<tgfx::Surface> Window::getSurface(Context* context, bool queryOnly,
-                                                  std::shared_ptr<ColorSpace> colorSpace) {
+std::shared_ptr<tgfx::Surface> Window::getSurface(Context* context, bool queryOnly) {
   std::lock_guard<std::mutex> autoLock(locker);
-  if (colorSpace != nullptr && !ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get()) &&
-      !ColorSpace::Equals(colorSpace.get(), ColorSpace::DisplayP3().get())) {
-    return nullptr;
-  }
   if (!checkContext(context)) {
     return nullptr;
   }
@@ -46,7 +42,7 @@ std::shared_ptr<tgfx::Surface> Window::getSurface(Context* context, bool queryOn
   if (queryOnly) {
     return nullptr;
   }
-  surface = onCreateSurface(context, std::move(colorSpace));
+  surface = onCreateSurface(context);
   sizeInvalid = false;
   return surface;
 }

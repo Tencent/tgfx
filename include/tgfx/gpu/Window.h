@@ -39,8 +39,7 @@ class Window {
    * Returns the Surface associated with this Window. If the queryOnly is true, it will not create
    * a new surface if it doesn't exist.
    */
-  std::shared_ptr<Surface> getSurface(Context* context, bool queryOnly = false,
-                                      std::shared_ptr<ColorSpace> colorSpace = nullptr);
+  std::shared_ptr<Surface> getSurface(Context* context, bool queryOnly = false);
 
   /**
    * Applies all pending graphics changes to the window.
@@ -64,13 +63,13 @@ class Window {
   bool sizeInvalid = false;
   std::shared_ptr<Device> device = nullptr;
   std::shared_ptr<Surface> surface = nullptr;
+  std::shared_ptr<ColorSpace> colorSpace = nullptr;
 
-  explicit Window(std::shared_ptr<Device> device);
+  explicit Window(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace);
   Window() = default;
 
   virtual void onInvalidSize();
-  virtual std::shared_ptr<Surface> onCreateSurface(Context* context,
-                                                   std::shared_ptr<ColorSpace> colorSpace) = 0;
+  virtual std::shared_ptr<Surface> onCreateSurface(Context* context) = 0;
   virtual void onPresent(Context* context) = 0;
   virtual void onFreeSurface();
 

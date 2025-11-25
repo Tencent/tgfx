@@ -30,17 +30,18 @@ class EAGLWindow : public Window {
    * Creates a new window from a CAEAGLLayer with the specified device.
    */
   static std::shared_ptr<EAGLWindow> MakeFrom(CAEAGLLayer* layer,
-                                              std::shared_ptr<GLDevice> device = nullptr);
+                                              std::shared_ptr<GLDevice> device = nullptr,
+                                              std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
  protected:
-  std::shared_ptr<Surface> onCreateSurface(Context* context,
-                                           std::shared_ptr<ColorSpace> colorSpace) override;
+  std::shared_ptr<Surface> onCreateSurface(Context* context) override;
   void onPresent(Context* context) override;
 
  private:
   CAEAGLLayer* layer = nil;
   std::shared_ptr<EAGLLayerTexture> layerTexture;
 
-  EAGLWindow(std::shared_ptr<Device> device, CAEAGLLayer* layer);
+  EAGLWindow(std::shared_ptr<Device> device, CAEAGLLayer* layer,
+             std::shared_ptr<ColorSpace> colorSpace);
 };
 }  // namespace tgfx
