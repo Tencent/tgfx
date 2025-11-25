@@ -19,7 +19,6 @@
 #include "tgfx/gpu/opengl/egl/EGLGlobals.h"
 #include <EGL/eglext.h>
 #include <atomic>
-#include <cstring>
 #if defined(_WIN32)
 #include "EGLDisplayWrapper.h"
 #endif
