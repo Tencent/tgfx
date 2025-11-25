@@ -34,16 +34,17 @@
 #endif
 
 namespace tgfx {
-std::shared_ptr<EGLWindow> EGLWindow::Current() {
+std::shared_ptr<EGLWindow> EGLWindow::Current(std::shared_ptr<ColorSpace> colorSpace) {
   auto device = std::static_pointer_cast<EGLDevice>(GLDevice::Current());
   if (device == nullptr || device->eglSurface == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<EGLWindow>(new EGLWindow(device));
+  return std::shared_ptr<EGLWindow>(new EGLWindow(device, std::move(colorSpace)));
 }
 
 std::shared_ptr<EGLWindow> EGLWindow::MakeFrom(EGLNativeWindowType nativeWindow,
-                                               EGLContext sharedContext) {
+                                               EGLContext sharedContext,
+                                               std::shared_ptr<ColorSpace> colorSpace) {
   if (!nativeWindow) {
     return nullptr;
   }
@@ -51,12 +52,13 @@ std::shared_ptr<EGLWindow> EGLWindow::MakeFrom(EGLNativeWindowType nativeWindow,
   if (device == nullptr) {
     return nullptr;
   }
-  auto eglWindow = std::shared_ptr<EGLWindow>(new EGLWindow(device));
+  auto eglWindow = std::shared_ptr<EGLWindow>(new EGLWindow(device, std::move(colorSpace)));
   eglWindow->nativeWindow = nativeWindow;
   return eglWindow;
 }
 
-EGLWindow::EGLWindow(std::shared_ptr<Device> device) : Window(std::move(device)) {
+EGLWindow::EGLWindow(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace)
+    : Window(std::move(device), std::move(colorSpace)) {
 }
 
 ISize GetNativeWindowSize(EGLNativeWindowType nativeWindow) {
@@ -113,16 +115,6 @@ std::shared_ptr<Surface> EGLWindow::onCreateSurface(Context* context) {
   frameBuffer.id = 0;
   frameBuffer.format = GL_RGBA8;
   BackendRenderTarget renderTarget = {frameBuffer, size.width, size.height};
-  std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB();
-  const char* extensions = eglQueryString(eglDevice->eglDisplay, EGL_EXTENSIONS);
-  if (extensions && strstr(extensions, "EGL_KHR_gl_colorspace") != nullptr) {
-    EGLint colorSpaceValue;
-    EGLBoolean success = eglQuerySurface(eglDevice->eglDisplay, eglDevice->eglSurface,
-                                         EGL_GL_COLORSPACE_KHR, &colorSpaceValue);
-    if (success == EGL_TRUE && colorSpaceValue == EGL_GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT) {
-      colorSpace = ColorSpace::DisplayP3();
-    }
-  }
   return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft, 0, colorSpace);
 }
 

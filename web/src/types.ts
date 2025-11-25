@@ -50,6 +50,12 @@ export const enum MatrixIndex {
     ty,
 }
 
+export const enum WindowColorSpace{
+    None,
+    SRGB,
+    DisplayP3,
+}
+
 export interface ctor {
     value: number;
 }

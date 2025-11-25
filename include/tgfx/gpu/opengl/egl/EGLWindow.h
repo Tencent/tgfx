@@ -29,13 +29,14 @@ class EGLWindow : public Window {
    * Returns an EGLWindow associated with current EGLSurface. Returns nullptr if there is no current
    * EGLSurface on the calling thread.
    */
-  static std::shared_ptr<EGLWindow> Current();
+  static std::shared_ptr<EGLWindow> Current(std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
    * Creates a new window from an EGL native window with specified shared context.
    */
   static std::shared_ptr<EGLWindow> MakeFrom(EGLNativeWindowType nativeWindow,
-                                             EGLContext sharedContext = nullptr);
+                                             EGLContext sharedContext = nullptr,
+                                             std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
    * Sets the presentation time for the next frame in microseconds. This is only applicable on
@@ -53,6 +54,7 @@ class EGLWindow : public Window {
   EGLNativeWindowType nativeWindow;
   std::optional<int64_t> presentationTime = std::nullopt;
 
-  explicit EGLWindow(std::shared_ptr<Device> device);
+  explicit EGLWindow(std::shared_ptr<Device> device,
+                     std::shared_ptr<ColorSpace> colorSpace = nullptr);
 };
 }  // namespace tgfx

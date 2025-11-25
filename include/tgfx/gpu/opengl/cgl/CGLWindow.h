@@ -32,7 +32,8 @@ class CGLWindow : public Window {
   ~CGLWindow() override;
 
  protected:
-  std::shared_ptr<Surface> onCreateSurface(Context* context) override;
+  std::shared_ptr<Surface> onCreateSurface(Context* context,
+                                           std::shared_ptr<ColorSpace> colorSpace) override;
   void onPresent(Context* context) override;
 
  private:

@@ -22,7 +22,8 @@
 #include "tgfx/gpu/Device.h"
 
 namespace tgfx {
-Window::Window(std::shared_ptr<Device> device) : device(std::move(device)) {
+Window::Window(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace)
+    : device(std::move(device)), colorSpace(std::move(colorSpace)) {
 }
 
 std::shared_ptr<Device> Window::getDevice() {

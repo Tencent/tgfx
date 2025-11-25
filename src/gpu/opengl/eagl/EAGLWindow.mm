@@ -23,7 +23,8 @@
 
 namespace tgfx {
 std::shared_ptr<EAGLWindow> EAGLWindow::MakeFrom(CAEAGLLayer* layer,
-                                                 std::shared_ptr<GLDevice> device) {
+                                                 std::shared_ptr<GLDevice> device,
+                                                 std::shared_ptr<ColorSpace> colorSpace) {
   if (layer == nil) {
     return nullptr;
   }
@@ -33,11 +34,12 @@ std::shared_ptr<EAGLWindow> EAGLWindow::MakeFrom(CAEAGLLayer* layer,
   if (device == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<EAGLWindow>(new EAGLWindow(device, layer));
+  return std::shared_ptr<EAGLWindow>(new EAGLWindow(device, layer, std::move(colorSpace)));
 }
 
-EAGLWindow::EAGLWindow(std::shared_ptr<Device> device, CAEAGLLayer* layer)
-    : Window(std::move(device)), layer(layer) {
+EAGLWindow::EAGLWindow(std::shared_ptr<Device> device, CAEAGLLayer* layer,
+                       std::shared_ptr<ColorSpace> colorSpace)
+    : Window(std::move(device), std::move(colorSpace)), layer(layer) {
   // do not retain layer here, otherwise it can cause circular reference.
 }
 
@@ -53,7 +55,7 @@ std::shared_ptr<Surface> EAGLWindow::onCreateSurface(Context* context) {
     return nullptr;
   }
   BackendRenderTarget renderTarget = layerTexture->getBackendRenderTarget();
-  return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
+  return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft, 0, colorSpace);
 }
 
 void EAGLWindow::onPresent(Context* context) {
