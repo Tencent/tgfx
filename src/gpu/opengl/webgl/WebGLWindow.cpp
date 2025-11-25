@@ -22,6 +22,18 @@
 #include "gpu/opengl/GLDefines.h"
 
 namespace tgfx {
+enum class WindowColorSpace{
+	None = 0,
+	SRGB = 1,
+	DisplayP3 = 2
+};
+
+std::shared_ptr<ColorSpace> Window::DeviceColorSpace(){
+     bool p3Support =  emscripten::val::module_property("tgfx").call<bool>(
+          "isDisplayP3Support");
+    return p3Support ? ColorSpace::DisplayP3() : nullptr;
+}
+
 std::shared_ptr<WebGLWindow> WebGLWindow::MakeFrom(const std::string& canvasID,
                                                    std::shared_ptr<ColorSpace> colorSpace) {
   if (canvasID.empty()) {
@@ -38,10 +50,6 @@ std::shared_ptr<WebGLWindow> WebGLWindow::MakeFrom(const std::string& canvasID,
 
 WebGLWindow::WebGLWindow(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace)
     : Window(std::move(device), std::move(colorSpace)) {
-  if (colorSpace != nullptr && !ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get()) &&
-      !ColorSpace::Equals(colorSpace.get(), ColorSpace::DisplayP3().get())) {
-    this->colorSpace = nullptr;
-  }
 }
 
 std::shared_ptr<Surface> WebGLWindow::onCreateSurface(Context* context) {
@@ -55,6 +63,16 @@ std::shared_ptr<Surface> WebGLWindow::onCreateSurface(Context* context) {
   GLFrameBufferInfo glInfo = {};
   glInfo.id = 0;
   glInfo.format = GL_RGBA8;
+  WindowColorSpace cs;
+  if(ColorSpace::Equals(colorSpace.get(), ColorSpace::DisplayP3().get())){
+		cs = WindowColorSpace::DisplayP3;
+  }else if(ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get())){
+		cs = WindowColorSpace::SRGB;
+  }else{
+		cs = WindowColorSpace::None;
+  }
+  emscripten::val::module_property("tgfx").call<bool>(
+      "setColorSpace", emscripten::val::module_property("GL"), static_cast<int>(cs));
   return Surface::MakeFrom(context, {glInfo, width, height}, ImageOrigin::BottomLeft, 0,
                            colorSpace);
 }

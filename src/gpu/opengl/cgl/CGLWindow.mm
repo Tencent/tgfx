@@ -25,6 +25,10 @@
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
 namespace tgfx {
+std::shared_ptr<ColorSpace> Window::DeviceColorSpace(){
+    return nullptr;
+}
+
 std::shared_ptr<CGLWindow> CGLWindow::MakeFrom(NSView* view, CGLContextObj sharedContext,
                                                std::shared_ptr<ColorSpace> colorSpace) {
   if (view == nil) {

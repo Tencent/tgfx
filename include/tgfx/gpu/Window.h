@@ -27,6 +27,12 @@ namespace tgfx {
  */
 class Window {
  public:
+  /**
+   * Returns the wide color gamut supported by this device. It may return nullptr if there is no
+   * wide color gamut support.
+   */
+  static std::shared_ptr<ColorSpace> DeviceColorSpace();
+
   virtual ~Window() = default;
 
   /**

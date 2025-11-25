@@ -24,6 +24,10 @@
 #include "gpu/opengl/GLTexture.h"
 
 namespace tgfx {
+std::shared_ptr<ColorSpace> Window::DeviceColorSpace() {
+  return nullptr;
+}
+
 class QGLDeviceCreator : public QObject {
   Q_OBJECT
  public:
@@ -100,25 +104,22 @@ class QGLDeviceCreator : public QObject {
   }
 };
 
-std::shared_ptr<QGLWindow> QGLWindow::MakeFrom(QQuickItem* quickItem, bool singleBufferMode,
-                                               std::shared_ptr<ColorSpace> colorSpace) {
+std::shared_ptr<QGLWindow> QGLWindow::MakeFrom(QQuickItem* quickItem, bool singleBufferMode) {
   if (quickItem == nullptr) {
     return nullptr;
   }
   auto window =
-      std::shared_ptr<QGLWindow>(new QGLWindow(quickItem, singleBufferMode, std::move(colorSpace)));
+      std::shared_ptr<QGLWindow>(new QGLWindow(quickItem, singleBufferMode));
   window->weakThis = window;
   window->initDevice();
   return window;
 }
 
-QGLWindow::QGLWindow(QQuickItem* quickItem, bool singleBufferMode,
-                     std::shared_ptr<ColorSpace> colorSpace)
+QGLWindow::QGLWindow(QQuickItem* quickItem, bool singleBufferMode)
     : quickItem(quickItem), singleBufferMode(singleBufferMode) {
   if (QThread::currentThread() != QApplication::instance()->thread()) {
     renderThread = QThread::currentThread();
   }
-  this->colorSpace = std::move(colorSpace);
 }
 
 QGLWindow::~QGLWindow() {
@@ -181,6 +182,10 @@ std::shared_ptr<Surface> QGLWindow::onCreateSurface(Context* context) {
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
+  QSurfaceFormat windowFormat = nativeWindow->format();
+  auto icc = windowFormat.colorSpace().iccProfile();
+  std::shared_ptr<ColorSpace> colorSpace =
+      ColorSpace::MakeFromICC(icc.data(), static_cast<size_t>(icc.size()));
   if (!singleBufferMode) {
     frontSurface =
         Surface::Make(context, width, height, ColorType::RGBA_8888, 1, false, 0, colorSpace);
