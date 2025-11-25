@@ -234,16 +234,6 @@ void DisplayList::setMaxTileCount(int count) {
   resetCaches();
 }
 
-void DisplayList::setMinZoomScale(float scale) {
-  if (scale < 0.0f) {
-    scale = 0.0f;
-  }
-  if (FloatNearlyEqual(_minZoomScale, scale)) {
-    return;
-  }
-  _minZoomScale = scale;
-}
-
 int64_t DisplayList::getEffectiveZoomScaleInt() const {
   auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
   if (_minZoomScale > 0.0f && currentZoomScale < _minZoomScale) {
@@ -383,6 +373,7 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
   if (!surfaceCaches.empty() && surfaceCaches.front()->getContext() != surface->getContext()) {
     resetCaches();
   }
+  updateMinZoomScale(surface->width(), surface->height());
   checkTileCount(surface);
   auto tileTasks = invalidateTileCaches(dirtyRegions);
   auto screenTasks = collectScreenTasks(surface, &tileTasks);
@@ -414,23 +405,6 @@ void DisplayList::checkTileCount(Surface* renderSurface) {
       ceilf(static_cast<float>(renderSurface->height()) / static_cast<float>(_tileSize));
   auto minTileCount = static_cast<int>(tileCountX + 1) * static_cast<int>(tileCountY + 1);
 
-  // Determine the effective zoom scale considering the minimum zoom scale.
-//  auto effectiveZoomScaleInt = getEffectiveZoomScaleInt();
-//  auto effectiveZoomScale = ToZoomScaleFloat(effectiveZoomScaleInt, _zoomScalePrecision);
-
-  // Calculate the maximum tile count based on root layer bounds using effective zoom scale.
-//  int maxTileCountFromBounds = 0;
-//  if (_root) {
-//    auto rootBounds = _root->getBounds();
-//    if (!rootBounds.isEmpty()) {
-//      auto boundsWidth = rootBounds.width() * effectiveZoomScale;
-//      auto boundsHeight = rootBounds.height() * effectiveZoomScale;
-//      auto boundsTileCountX = static_cast<int>(ceilf(boundsWidth / static_cast<float>(_tileSize)));
-//      auto boundsTileCountY = static_cast<int>(ceilf(boundsHeight / static_cast<float>(_tileSize)));
-//      maxTileCountFromBounds = (boundsTileCountX + 1) * (boundsTileCountY + 1);
-//    }
-//  }
-
   if (totalTileCount > 0) {
     if (totalTileCount >= minTileCount) {
       return;
@@ -438,11 +412,6 @@ void DisplayList::checkTileCount(Surface* renderSurface) {
     resetCaches();
   }
   totalTileCount = std::max(minTileCount, _maxTileCount);
-
-  // Limit tile count by root layer bounds if available.
-//  if (maxTileCountFromBounds > 0) {
-//    totalTileCount = std::min(totalTileCount, maxTileCountFromBounds);
-//  }
 
   auto maxTileCountPerAtlas = getMaxTileCountPerAtlas(renderSurface->getContext());
   if (maxTileCountPerAtlas <= 0) {
@@ -559,7 +528,7 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
 
   // Constrain tile coordinates by root layer bounds.
   if (_root) {
-    auto rootBounds = _root->getBounds();
+    auto rootBounds = _root->renderBounds;
     rootBounds.scale(effectiveZoomScale, effectiveZoomScale);
     if (!rootBounds.isEmpty()) {
       auto boundsStartX = static_cast<int>(floorf(rootBounds.left / static_cast<float>(_tileSize)));
@@ -708,6 +677,7 @@ std::vector<DrawTask> DisplayList::getFallbackDrawTasks(
   // Determine the effective zoom scale considering the minimum zoom scale.
   auto effectiveZoomScaleInt = getEffectiveZoomScaleInt();
   auto effectiveZoomScale = ToZoomScaleFloat(effectiveZoomScaleInt, _zoomScalePrecision);
+  auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
   DEBUG_ASSERT(effectiveZoomScale != 0.0f);
 
   auto gridCount = std::max(_tileSize / FALLBACK_GRID_SIZE, 1);
@@ -732,6 +702,7 @@ std::vector<DrawTask> DisplayList::getFallbackDrawTasks(
         if (tiles.empty()) {
           continue;
         }
+        scaleRatio = scale / currentZoomScale;
         for (auto& tile : tiles) {
           auto drawRect = tile->getTileRect(_tileSize);
           if (drawRect.intersect(zoomedRect)) {
@@ -1030,4 +1001,16 @@ void DisplayList::updateMousePosition() {
   mousePosition = (_contentOffset - lastContentOffset * scale) * invScaleFactor;
   mousePosition -= _contentOffset;
 }
+
+void DisplayList::updateMinZoomScale(int surfaceWidth, int surfaceHeight) {
+  if (_root->renderBounds.isEmpty()) {
+    _minZoomScale = 0;
+    return;
+  }
+  auto minZoomScale = std::min(static_cast<float>(surfaceWidth) / _root->renderBounds.width(),
+                               static_cast<float>(surfaceHeight) / _root->renderBounds.height());
+  minZoomScale = std::min(minZoomScale, 0.3f);
+  _minZoomScale = minZoomScale;
+}
+
 }  // namespace tgfx

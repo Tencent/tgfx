@@ -222,24 +222,6 @@ class DisplayList {
   }
 
   /**
-   * Returns the minimum zoom scale allowed in tiled rendering mode. When the current zoom scale
-   * is below this threshold, tiles will be rendered using this minimum zoom scale and then scaled
-   * down for display. This prevents excessive memory usage by limiting the number of tiles created
-   * for very small zoom scales. The default value is 0.0f, which means no minimum limit.
-   */
-  float minZoomScale() const {
-    return _minZoomScale;
-  }
-
-  /**
-   * Sets the minimum zoom scale allowed in tiled rendering mode. When the current zoom scale
-   * falls below this threshold, the display list will use this minimum scale to create tiles,
-   * then scale them down for rendering. This is combined with root layer bounds checking to
-   * prevent excessive tile creation. The minimum zoom scale applies only in tiled rendering mode.
-   */
-  void setMinZoomScale(float scale);
-
-  /**
    * Sets whether to show dirty regions during rendering. When enabled, the dirty regions will be
    * highlighted in the rendered output. This is useful for debugging to visualize which parts of
    * the display list are being updated. The default value is false.
@@ -264,7 +246,7 @@ class DisplayList {
   std::shared_ptr<RootLayer> _root = nullptr;
   int64_t _zoomScaleInt = 1000;
   int _zoomScalePrecision = 1000;
-  float _minZoomScale = 0.0f;
+  float _minZoomScale = 0;
   Point _contentOffset = {};
   RenderMode _renderMode = RenderMode::Partial;
   int _tileSize = 256;
@@ -336,11 +318,8 @@ class DisplayList {
                      bool autoClear) const;
   void updateMousePosition();
 
-  /**
-   * Computes the effective zoom scale int, considering both the current zoom scale and the
-   * minimum zoom scale limit. If the current zoom scale is below the minimum, returns the int
-   * representation of the minimum zoom scale; otherwise returns the current zoom scale int.
-   */
+  void updateMinZoomScale(int surfaceWidth, int surfaceHeight);
+
   int64_t getEffectiveZoomScaleInt() const;
 };
 }  // namespace tgfx
