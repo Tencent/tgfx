@@ -34,12 +34,12 @@
 #endif
 
 namespace tgfx {
-std::shared_ptr<EGLWindow> EGLWindow::Current(std::shared_ptr<ColorSpace> colorSpace) {
+std::shared_ptr<EGLWindow> EGLWindow::Current() {
   auto device = std::static_pointer_cast<EGLDevice>(GLDevice::Current());
   if (device == nullptr || device->eglSurface == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<EGLWindow>(new EGLWindow(device, std::move(colorSpace)));
+  return std::shared_ptr<EGLWindow>(new EGLWindow(device));
 }
 
 std::shared_ptr<EGLWindow> EGLWindow::MakeFrom(EGLNativeWindowType nativeWindow,
@@ -48,7 +48,7 @@ std::shared_ptr<EGLWindow> EGLWindow::MakeFrom(EGLNativeWindowType nativeWindow,
   if (!nativeWindow) {
     return nullptr;
   }
-  auto device = EGLDevice::MakeFrom(nativeWindow, sharedContext);
+  auto device = EGLDevice::MakeFrom(nativeWindow, sharedContext, colorSpace);
   if (device == nullptr) {
     return nullptr;
   }

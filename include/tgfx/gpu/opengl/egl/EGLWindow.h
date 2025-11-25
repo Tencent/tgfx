@@ -29,7 +29,7 @@ class EGLWindow : public Window {
    * Returns an EGLWindow associated with current EGLSurface. Returns nullptr if there is no current
    * EGLSurface on the calling thread.
    */
-  static std::shared_ptr<EGLWindow> Current(std::shared_ptr<ColorSpace> colorSpace = nullptr);
+  static std::shared_ptr<EGLWindow> Current();
 
   /**
    * Creates a new window from an EGL native window with specified shared context.
