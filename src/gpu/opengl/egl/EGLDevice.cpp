@@ -20,6 +20,11 @@
 #include "core/utils/Log.h"
 #include "gpu/opengl/egl/EGLGPU.h"
 #include "tgfx/gpu/opengl/egl/EGLGlobals.h"
+#include <cstring>
+
+#ifndef EGL_GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT
+#define EGL_GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT -1
+#endif
 
 namespace tgfx {
 static std::vector<EGLint> GetValidAttributes(const std::vector<EGLint>& attributes) {
@@ -110,12 +115,21 @@ std::shared_ptr<EGLDevice> EGLDevice::MakeFrom(EGLDisplay eglDisplay, EGLSurface
 }
 
 std::shared_ptr<EGLDevice> EGLDevice::MakeFrom(EGLNativeWindowType nativeWindow,
-                                               EGLContext sharedContext) {
+                                               EGLContext sharedContext, std::shared_ptr<ColorSpace> colorSpace) {
   auto eglGlobals = EGLGlobals::Get();
 #if defined(_WIN32)
   auto eglSurface = CreateFixedSizeSurfaceForAngle(nativeWindow, eglGlobals);
 #else
-  std::vector<EGLint> attributes = GetValidAttributes(eglGlobals->windowSurfaceAttributes);
+  std::vector<EGLint> attributes = {};
+  if(ColorSpace::Equals(colorSpace.get(), ColorSpace::DisplayP3().get())){
+    const char* extensions = eglQueryString(eglGlobals->display, EGL_EXTENSIONS);
+    if(extensions && strstr(extensions, "EGL_EXT_gl_colorspace_display_p3_passthrough")){
+      attributes = {EGL_GL_COLORSPACE_KHR, EGL_GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT};
+    }
+  }
+  attributes.insert(attributes.end(), eglGlobals->windowSurfaceAttributes.begin(),
+                    eglGlobals->windowSurfaceAttributes.end());
+  attributes = GetValidAttributes(attributes);
   auto eglSurface = eglCreateWindowSurface(eglGlobals->display, eglGlobals->windowConfig,
                                            nativeWindow, attributes.data());
 #endif

@@ -64,7 +64,7 @@ class EGLDevice : public GLDevice {
   EGLSurface oldEglDrawSurface = nullptr;
 
   static std::shared_ptr<EGLDevice> MakeFrom(EGLNativeWindowType nativeWindow,
-                                             EGLContext sharedContext = nullptr);
+                                             EGLContext sharedContext = nullptr, std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   static std::shared_ptr<EGLDevice> Wrap(EGLDisplay eglDisplay, EGLSurface eglSurface,
                                          EGLContext eglContext, EGLContext shareContext,
