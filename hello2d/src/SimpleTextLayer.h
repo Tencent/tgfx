@@ -64,8 +64,6 @@ class SimpleTextLayer : public tgfx::Layer {
   void invalidateLayout();
 
  protected:
-  SimpleTextLayer() = default;
-
   void onUpdateContent(tgfx::LayerRecorder* recorder) override;
 
  private:

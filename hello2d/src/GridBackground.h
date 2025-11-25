@@ -27,8 +27,6 @@ class GridBackgroundLayer : public tgfx::Layer {
   void setSize(int width, int height, float density);
 
  protected:
-  GridBackgroundLayer() = default;
-
   void onUpdateContent(tgfx::LayerRecorder* recorder) override;
 
  private:
