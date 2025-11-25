@@ -19,12 +19,10 @@
 #include "SVGNodeConstructor.h"
 #include <cstddef>
 #include <memory>
-#include <regex>
 #include <string>
 #include <utility>
 #include "core/utils/Log.h"
 #include "svg/SVGAttributeParser.h"
-#include "svg/SVGUtils.h"
 #include "tgfx/svg/SVGAttribute.h"
 #include "tgfx/svg/node/SVGCircle.h"
 #include "tgfx/svg/node/SVGClipPath.h"
@@ -202,7 +200,7 @@ bool SVGNodeConstructor::SetStyleAttributes(SVGNode& node, SVGAttribute,
     if (name.empty()) {
       break;
     }
-    SetAttribute(node, name, value);
+    SetAttribute(node, name, value, nullptr);
   }
 
   return true;
@@ -294,34 +292,41 @@ SVGNodeConstructor::InitElementFactories() {
 }
 
 bool SVGNodeConstructor::SetAttribute(SVGNode& node, const std::string& name,
-                                      const std::string& value) {
+                                      const std::string& value,
+                                      const std::shared_ptr<SVGParseSetter>& setter) {
+  bool setToNode = true;
+  if (setter) {
+    setToNode = setter->setAttribute(node, name, value);
+  }
+
   if (node.parseAndSetAttribute(name, value)) {
     // Handled by new code path
     return true;
   }
-
   static const auto attributeParseInfo = InitAttributeParseInfo();
   if (auto iter = attributeParseInfo.find(name); iter != attributeParseInfo.end()) {
     auto setter = iter->second.setter;
     return setter(node, iter->second.attribute, value);
   }
-  // save unparsed attributes
-  node.unparsedAttributes.push_back({name, value});
+  if (setToNode) {
+    // save unparsed attributes
+    node.unparsedAttributes.push_back({name, value});
+  }
   return true;
 }
 
 void SVGNodeConstructor::ParseNodeAttributes(const DOMNode* xmlNode,
                                              const std::shared_ptr<SVGNode>& svgNode,
-                                             SVGIDMapper* mapper) {
+                                             SVGIDMapper* mapper,
+                                             const std::shared_ptr<SVGParseSetter>& setter) {
 
   for (const auto& attr : xmlNode->attributes) {
     auto name = attr.name;
     auto value = attr.value;
     if (name == "id") {
       mapper->insert({value, svgNode});
-      continue;
     }
-    SetAttribute(*svgNode, name, value);
+    SetAttribute(*svgNode, name, value, setter);
   }
 }
 
@@ -451,7 +456,7 @@ std::shared_ptr<SVGNode> SVGNodeConstructor::ConstructSVGNode(const Construction
     return nullptr;
   }
 
-  ParseNodeAttributes(xmlNode, node, context.nodeIDMapper);
+  ParseNodeAttributes(xmlNode, node, context.nodeIDMapper, context.attributeSetter);
 
   ConstructionContext localCtx(context, node);
   std::shared_ptr<DOMNode> child = xmlNode->firstChild;

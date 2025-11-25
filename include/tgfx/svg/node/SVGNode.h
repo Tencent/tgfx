@@ -161,6 +161,7 @@ class SVGNode {
   SVG_PRES_ATTR(StopOpacity, SVGNumberType, false)
   SVG_PRES_ATTR(FloodColor, SVGColor, false)
   SVG_PRES_ATTR(FloodOpacity, SVGNumberType, false)
+  SVG_PRES_ATTR(ID, SVGStringType, false)
   SVG_PRES_ATTR(LightingColor, SVGColor, false)
 
   /**

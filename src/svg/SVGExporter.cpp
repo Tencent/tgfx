@@ -31,18 +31,22 @@ namespace tgfx {
 
 std::shared_ptr<SVGExporter> SVGExporter::Make(const std::shared_ptr<WriteStream>& svgStream,
                                                Context* context, const Rect& viewBox,
-                                               uint32_t exportFlags) {
+                                               uint32_t exportFlags,
+                                               const std::shared_ptr<SVGExportWriter>& writer) {
   if (!context || !svgStream || viewBox.isEmpty()) {
     return nullptr;
   }
-  return std::shared_ptr<SVGExporter>(new SVGExporter(svgStream, context, viewBox, exportFlags));
+  return std::shared_ptr<SVGExporter>(
+      new SVGExporter(svgStream, context, viewBox, exportFlags, writer));
 }
 
 SVGExporter::SVGExporter(const std::shared_ptr<WriteStream>& svgStream, Context* context,
-                         const Rect& viewBox, uint32_t exportFlags) {
-  auto writer =
+                         const Rect& viewBox, uint32_t exportFlags,
+                         const std::shared_ptr<SVGExportWriter>& writer) {
+  auto streamWriter =
       std::make_unique<XMLStreamWriter>(svgStream, exportFlags & SVGExportFlags::DisablePrettyXML);
-  drawContext = new SVGExportContext(context, viewBox, std::move(writer), exportFlags);
+  drawContext =
+      new SVGExportContext(context, viewBox, std::move(streamWriter), exportFlags, writer);
   canvas = new Canvas(drawContext);
   drawContext->setCanvas(canvas);
 };

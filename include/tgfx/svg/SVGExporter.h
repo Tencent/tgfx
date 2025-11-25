@@ -23,6 +23,7 @@
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/WriteStream.h"
 #include "tgfx/gpu/Context.h"
+#include "tgfx/svg/SVGAttributeHandler.h"
 
 namespace tgfx {
 class SVGExportContext;
@@ -91,9 +92,9 @@ class SVGExporter {
    * @return A shared pointer to the SVG exporter object. If svgStream is nullptr, context is
    * nullptr, or viewBox is empty, nullptr is returned.
    */
-  static std::shared_ptr<SVGExporter> Make(const std::shared_ptr<WriteStream>& svgStream,
-                                           Context* context, const Rect& viewBox,
-                                           uint32_t exportFlags = 0);
+  static std::shared_ptr<SVGExporter> Make(
+      const std::shared_ptr<WriteStream>& svgStream, Context* context, const Rect& viewBox,
+      uint32_t exportFlags = 0, const std::shared_ptr<SVGExportWriter>& writer = nullptr);
 
   /**
    * Destroys the SVG exporter object. If close() hasn't been called, it will be invoked 
@@ -117,7 +118,7 @@ class SVGExporter {
    * Construct a SVG exporter object
    */
   SVGExporter(const std::shared_ptr<WriteStream>& svgStream, Context* context, const Rect& viewBox,
-              uint32_t exportFlags);
+              uint32_t exportFlags, const std::shared_ptr<SVGExportWriter>& writer);
 
   SVGExportContext* drawContext = nullptr;
   Canvas* canvas = nullptr;

@@ -18,28 +18,34 @@
 
 #pragma once
 
+#include <utility>
+#include "tgfx/svg/SVGAttributeHandler.h"
 #include "tgfx/svg/SVGDOM.h"
 #include "tgfx/svg/xml/XMLDOM.h"
 
 namespace tgfx {
 
 struct ConstructionContext {
-  explicit ConstructionContext(SVGIDMapper* mapper, CSSMapper* cssMapper)
-      : parentNode(nullptr), nodeIDMapper(mapper), cssMapper(cssMapper) {
+  ConstructionContext(SVGIDMapper* mapper, CSSMapper* cssMapper,
+                      std::shared_ptr<SVGParseSetter> setter)
+      : parentNode(nullptr), nodeIDMapper(mapper), cssMapper(cssMapper),
+        attributeSetter(std::move(setter)) {
   }
   ConstructionContext(const ConstructionContext& other, const std::shared_ptr<SVGNode>& newParent)
-      : parentNode(newParent.get()), nodeIDMapper(other.nodeIDMapper), cssMapper(other.cssMapper) {
+      : parentNode(newParent.get()), nodeIDMapper(other.nodeIDMapper), cssMapper(other.cssMapper),
+        attributeSetter(other.attributeSetter) {
   }
 
   SVGNode* parentNode;
   SVGIDMapper* nodeIDMapper;
   CSSMapper* cssMapper;
+  std::shared_ptr<SVGParseSetter> attributeSetter;
 };
 
-using AttributeSetter = std::function<bool(SVGNode&, SVGAttribute, const std::string&)>;
+using setter = std::function<bool(SVGNode&, SVGAttribute, const std::string&)>;
 struct AttrParseInfo {
   SVGAttribute attribute;
-  AttributeSetter setter;
+  setter setter;
 };
 
 class SVGNodeConstructor {
@@ -47,13 +53,15 @@ class SVGNodeConstructor {
   static std::shared_ptr<SVGNode> ConstructSVGNode(const ConstructionContext& context,
                                                    const DOMNode* xmlNode);
 
-  static bool SetAttribute(SVGNode& node, const std::string& name, const std::string& value);
+  static bool SetAttribute(SVGNode& node, const std::string& name, const std::string& value,
+                           const std::shared_ptr<SVGParseSetter>& setter);
 
   static void SetClassStyleAttributes(SVGNode& root, const CSSMapper& mapper);
 
  private:
   static void ParseNodeAttributes(const DOMNode* xmlNode, const std::shared_ptr<SVGNode>& svgNode,
-                                  SVGIDMapper* mapper);
+                                  SVGIDMapper* mapper,
+                                  const std::shared_ptr<SVGParseSetter>& setter);
 
   static bool SetStyleAttributes(SVGNode& node, SVGAttribute, const std::string& stringValue);
 

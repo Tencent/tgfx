@@ -23,6 +23,7 @@
 #include "tgfx/core/Picture.h"
 #include "tgfx/core/Size.h"
 #include "tgfx/core/Stream.h"
+#include "tgfx/svg/SVGAttributeHandler.h"
 #include "tgfx/svg/TextShaper.h"
 #include "tgfx/svg/node/SVGRoot.h"
 
@@ -55,7 +56,8 @@ class SVGDOM {
    * specified font or requiring fallback fonts will not render.
    */
   static std::shared_ptr<SVGDOM> Make(Stream& stream,
-                                      std::shared_ptr<TextShaper> textShaper = nullptr);
+                                      std::shared_ptr<TextShaper> textShaper = nullptr,
+                                      std::shared_ptr<SVGParseSetter> attributeSetter = nullptr);
 
   /**
    * Returns the root SVG node.

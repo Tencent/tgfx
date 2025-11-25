@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <memory>
 #include "ResourceStore.h"
 #include "core/filters/DropShadowImageFilter.h"
 #include "core/filters/GaussianBlurImageFilter.h"
@@ -34,6 +35,7 @@
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/gpu/Context.h"
+#include "tgfx/svg/SVGAttributeHandler.h"
 #include "tgfx/svg/SVGPathParser.h"
 #include "xml/XMLWriter.h"
 
@@ -62,7 +64,8 @@ class ElementWriter {
   void addEllipseAttributes(const Rect& bound);
   void addPathAttributes(const Path& path, SVGPathParser::PathEncoding encoding);
 
-  Resources addImageFilterResource(const std::shared_ptr<ImageFilter>& imageFilter, Rect bound);
+  Resources addImageFilterResource(const std::shared_ptr<ImageFilter>& imageFilter, Rect bound,
+                                   const std::shared_ptr<SVGExportWriter>& exportWriter);
 
  private:
   Resources addResources(const Fill& fill, Context* context, SVGExportContext* svgContext);
@@ -102,7 +105,8 @@ class ElementWriter {
   std::string addRadialGradientDef(const GradientInfo& info, const Matrix& matrix);
   std::string addUnsupportedGradientDef(const GradientInfo& info, const Matrix& matrix);
 
-  std::string addImageFilter(const std::shared_ptr<ImageFilter>& imageFilter, Rect bound);
+  std::string addImageFilter(const std::shared_ptr<ImageFilter>& imageFilter, Rect bound,
+                             const std::shared_ptr<SVGExportWriter>& exportWriter);
   void addBlurImageFilter(const GaussianBlurImageFilter* filter);
   void addDropShadowImageFilter(const DropShadowImageFilter* filter);
   void addInnerShadowImageFilter(const InnerShadowImageFilter* filter);

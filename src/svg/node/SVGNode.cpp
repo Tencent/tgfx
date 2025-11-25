@@ -97,7 +97,7 @@ void SVGNode::setAttribute(SVGAttribute attribute, const SVGValue& value) {
 }
 
 bool SVGNode::setAttribute(const std::string& attributeName, const std::string& attributeValue) {
-  return SVGNodeConstructor::SetAttribute(*this, attributeName, attributeValue);
+  return SVGNodeConstructor::SetAttribute(*this, attributeName, attributeValue, nullptr);
 }
 
 template <typename T>
@@ -126,7 +126,7 @@ bool SVGNode::parseAndSetAttribute(const std::string& name, const std::string& v
          PARSE_AND_SET("filter", Filter) || PARSE_AND_SET("flood-color", FloodColor) ||
          PARSE_AND_SET("flood-opacity", FloodOpacity) || PARSE_AND_SET("font-family", FontFamily) ||
          PARSE_AND_SET("font-size", FontSize) || PARSE_AND_SET("font-style", FontStyle) ||
-         PARSE_AND_SET("font-weight", FontWeight) ||
+         PARSE_AND_SET("font-weight", FontWeight) || PARSE_AND_SET("id", ID) ||
          PARSE_AND_SET("lighting-color", LightingColor) || PARSE_AND_SET("mask", Mask) ||
          PARSE_AND_SET("opacity", Opacity) || PARSE_AND_SET("stop-color", StopColor) ||
          PARSE_AND_SET("stop-opacity", StopOpacity) || PARSE_AND_SET("stroke", Stroke) ||
