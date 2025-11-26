@@ -36,7 +36,7 @@ class RootLayer : public Layer {
   /**
    * Creates a new RootLayer instance.
    */
-  static std::shared_ptr<RootLayer> Make(DisplayList* displayList);
+  static std::shared_ptr<RootLayer> Make();
 
   ~RootLayer() override;
 
@@ -64,14 +64,11 @@ class RootLayer : public Layer {
    */
   std::vector<Rect> updateDirtyRegions();
 
-  void invalidCache(const Layer* layer);
-
  private:
   std::vector<Rect> dirtyRects = {};
   std::vector<float> dirtyAreas = {};
-  DisplayList* displayList = nullptr;
 
-  explicit RootLayer(DisplayList* displayList) : displayList(displayList){};
+  RootLayer() = default;
 
   bool mergeDirtyList(bool forceMerge);
 

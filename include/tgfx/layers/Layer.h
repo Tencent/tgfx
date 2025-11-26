@@ -672,10 +672,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
   bool drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                      const Matrix3D* transform);
 
-  void drawContentOffscreen(const DrawArgs& args, Canvas* canvas, std::optional<Rect> clipBounds,
-                            float contentScale, BlendMode blendMode, float alpha,
-                            const Matrix3D* transform, bool cacheContent);
-
   std::shared_ptr<Image> getContentImage(const DrawArgs& args, float contentScale,
                                          const std::shared_ptr<Image>& passThroughImage,
                                          const Matrix& passThroughImageMatrix,

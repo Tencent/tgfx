@@ -305,9 +305,6 @@ void Layer::setFilters(std::vector<std::shared_ptr<LayerFilter>> value) {
     filter->attachToLayer(this);
   }
   rasterizedContent = nullptr;
-  if (_root) {
-    _root->invalidCache(this);
-  }
   invalidateTransform();
 }
 
@@ -372,9 +369,6 @@ void Layer::setLayerStyles(std::vector<std::shared_ptr<LayerStyle>> value) {
     layerStyle->attachToLayer(this);
   }
   rasterizedContent = nullptr;
-  if (_root) {
-    _root->invalidCache(this);
-  }
   invalidateTransform();
 }
 
@@ -794,9 +788,6 @@ void Layer::invalidateDescendents() {
   }
   bitFields.dirtyDescendents = true;
   rasterizedContent = nullptr;
-  if (_root) {
-    _root->invalidCache(this);
-  }
   invalidate();
 }
 
@@ -1167,15 +1158,61 @@ std::shared_ptr<Image> Layer::getContentImage(const DrawArgs& contentArgs, float
   return finalImage;
 }
 
-void Layer::drawContentOffscreen(const DrawArgs& args, Canvas* canvas,
-                                 std::optional<Rect> clipBounds, float contentScale,
-                                 BlendMode blendMode, float alpha, const Matrix3D* transform,
-                                 bool cacheContent) {
+bool Layer::shouldPassThroughBackground(BlendMode blendMode, const Matrix3D* transform) const {
+  return bitFields.passThroughBackground && blendMode == BlendMode::SrcOver && _filters.empty() &&
+         bitFields.hasBlendMode && transform == nullptr;
+}
 
+bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
+                          const Matrix3D* transform) {
+  if (args.drawMode != DrawMode::Normal || args.excludeEffects) {
+    return false;
+  }
+  std::shared_ptr<MaskFilter> maskFilter = nullptr;
+  auto contentScale = canvas->getMatrix().getMaxScale();
+  RasterizedContent* cache = nullptr;
+  if (auto rasterizedCache = getRasterizedCache(args, canvas->getMatrix())) {
+    cache = rasterizedCache;
+  }
+  if (!cache) {
+    return false;
+  }
+  std::optional<Rect> clipBounds = std::nullopt;
+  if (hasValidMask()) {
+    clipBounds = GetClipBounds(args.blurBackground ? args.blurBackground->getCanvas() : canvas);
+    maskFilter = getMaskFilter(args, contentScale, clipBounds);
+    if (maskFilter == nullptr) {
+      return true;
+    }
+    auto maskMatrix = Matrix::MakeScale(1.0f / contentScale, 1.0f / contentScale);
+    maskFilter = maskFilter->makeWithMatrix(maskMatrix);
+  }
+  cache->draw(canvas, bitFields.allowsEdgeAntialiasing, alpha, maskFilter, blendMode, transform);
+  if (args.blendModeBackground) {
+    cache->draw(args.blendModeBackground->getCanvas(), bitFields.allowsEdgeAntialiasing, alpha,
+                maskFilter, blendMode, transform);
+  }
+  if (args.blurBackground) {
+    if (!hasBackgroundStyle()) {
+      cache->draw(args.blurBackground->getCanvas(), bitFields.allowsEdgeAntialiasing, alpha,
+                  maskFilter, blendMode, transform);
+    } else {
+      auto backgroundArgs = args;
+      backgroundArgs.drawMode = DrawMode::Background;
+      backgroundArgs.blurBackground = nullptr;
+      drawOffscreen(backgroundArgs, args.blurBackground->getCanvas(), alpha, blendMode, transform);
+    }
+  }
+  return true;
+}
+
+void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
+                          const Matrix3D* transform) {
+  auto clipBounds = GetClipBounds(args.blurBackground ? args.blurBackground->getCanvas() : canvas);
+  auto contentScale = canvas->getMatrix().getMaxScale();
   if (transform != nullptr) {
     drawBackgroundLayerStyles(args, canvas, alpha, *transform);
   }
-
   auto contentArgs = args;
   auto onlyOffscreen = blendMode == BlendMode::SrcOver && !hasValidMask() && alpha == 1.0 &&
                        (_filters.empty() || args.excludeEffects) && transform == nullptr;
@@ -1212,11 +1249,6 @@ void Layer::drawContentOffscreen(const DrawArgs& args, Canvas* canvas,
   auto invertImageMatrix = Matrix::I();
   if (image == nullptr || !imageMatrix.invert(&invertImageMatrix)) {
     return;
-  }
-
-  if (cacheContent) {
-    image = image->makeTextureImage(args.context);
-    args.layerCache->cacheImage(this, contentScale, image, imageMatrix);
   }
 
   if (transform != nullptr) {
@@ -1284,102 +1316,6 @@ void Layer::drawContentOffscreen(const DrawArgs& args, Canvas* canvas,
   // There is no scenario where LayerStyle's Position and ExtraSourceType are 'above' and
   // 'background' respectively at the same time, so no special handling is needed after drawing the
   // content.
-}
-
-bool Layer::shouldPassThroughBackground(BlendMode blendMode, const Matrix3D* transform) const {
-  return bitFields.passThroughBackground && blendMode == BlendMode::SrcOver && _filters.empty() &&
-         bitFields.hasBlendMode && transform == nullptr;
-}
-
-bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
-                          const Matrix3D* transform) {
-  if (args.drawMode != DrawMode::Normal || args.excludeEffects) {
-    return false;
-  }
-  std::shared_ptr<MaskFilter> maskFilter = nullptr;
-  auto contentScale = canvas->getMatrix().getMaxScale();
-  RasterizedContent* cache = nullptr;
-  if (auto rasterizedCache = getRasterizedCache(args, canvas->getMatrix())) {
-    cache = rasterizedCache;
-  } else if (args.layerCache) {
-    cache = args.layerCache->getCachedImage(this, contentScale);
-    // rasterizedCache contains the background layer styles, but layer cache does not because of different
-    // background logic.
-    if (cache && transform != nullptr) {
-      drawBackgroundLayerStyles(args, canvas, alpha, *transform);
-    }
-  }
-  std::optional<Rect> clipBounds = std::nullopt;
-  if (cache) {
-    if (hasValidMask()) {
-      clipBounds = GetClipBounds(args.blurBackground ? args.blurBackground->getCanvas() : canvas);
-      maskFilter = getMaskFilter(args, contentScale, clipBounds);
-      if (maskFilter == nullptr) {
-        return true;
-      }
-      auto maskMatrix = Matrix::MakeScale(1.0f / contentScale, 1.0f / contentScale);
-      maskFilter = maskFilter->makeWithMatrix(maskMatrix);
-    }
-    cache->draw(canvas, bitFields.allowsEdgeAntialiasing, alpha, maskFilter, blendMode, transform);
-    if (args.blendModeBackground) {
-      cache->draw(args.blendModeBackground->getCanvas(), bitFields.allowsEdgeAntialiasing, alpha,
-                  maskFilter, blendMode, transform);
-    }
-    if (args.blurBackground) {
-      if (!hasBackgroundStyle()) {
-        cache->draw(args.blurBackground->getCanvas(), bitFields.allowsEdgeAntialiasing, alpha,
-                    maskFilter, blendMode, transform);
-      } else {
-        auto backgroundArgs = args;
-        backgroundArgs.drawMode = DrawMode::Background;
-        backgroundArgs.blurBackground = nullptr;
-        drawOffscreen(backgroundArgs, args.blurBackground->getCanvas(), alpha, blendMode,
-                      transform);
-      }
-    }
-    return true;
-  }
-
-  if (args.renderFlags & RenderFlags::DisableCache) {
-    return false;
-  }
-
-  if (!args.layerCache) {
-    return false;
-  }
-
-  auto maxCacheSize = static_cast<float>(args.layerCache->maxCacheContentSize());
-  auto maxCacheScale = args.layerCache->maxCacheContentScale();
-
-  auto scaledBounds = renderBounds;
-  scaledBounds.scale(contentScale, contentScale);
-  if (scaledBounds.width() > maxCacheSize || scaledBounds.height() > maxCacheSize ||
-      contentScale > maxCacheScale) {
-    return false;
-  }
-
-  if (shouldPassThroughBackground(blendMode, transform) || hasBackgroundStyle()) {
-    if (!args.renderRect || !args.renderRect->contains(renderBounds)) {
-      return false;
-    }
-  } else {
-    contentScale = std::min(maxCacheScale,
-                            maxCacheSize / std::max(renderBounds.width(), renderBounds.height()));
-  }
-  auto cacheArgs = args;
-  cacheArgs.renderFlags |= RenderFlags::DisableCache;
-  cacheArgs.renderRect = &renderBounds;
-
-  drawContentOffscreen(cacheArgs, canvas, std::nullopt, contentScale, blendMode, alpha, transform,
-                       true);
-  return true;
-}
-
-void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
-                          const Matrix3D* transform) {
-  auto clipBounds = GetClipBounds(args.blurBackground ? args.blurBackground->getCanvas() : canvas);
-  drawContentOffscreen(args, canvas, clipBounds, canvas->getMatrix().getMaxScale(), blendMode,
-                       alpha, transform, false);
 }
 
 void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha) {
@@ -2066,9 +2002,6 @@ void Layer::updateBackgroundBounds(float contentScale) {
     auto layer = this;
     while (layer && !layer->bitFields.dirtyDescendents) {
       layer->rasterizedContent = nullptr;
-      if (_root) {
-        _root->invalidCache(layer);
-      }
       if (layer->maskOwner) {
         break;
       }

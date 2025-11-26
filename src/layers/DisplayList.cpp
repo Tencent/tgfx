@@ -23,7 +23,6 @@
 #include "core/utils/TileSortCompareFunc.h"
 #include "inspect/InspectorMark.h"
 #include "layers/DrawArgs.h"
-#include "layers/LayerCache.h"
 #include "layers/RootLayer.h"
 #include "layers/TileCache.h"
 #include "tgfx/gpu/GPU.h"
@@ -138,16 +137,13 @@ static std::vector<std::pair<int, int>> GetSortedTiles(int startX, int endX, int
   return tiles;
 }
 
-DisplayList::DisplayList()
-    : _root(RootLayer::Make(this)), layerCache(std::make_unique<LayerCache>()) {
+DisplayList::DisplayList() : _root(RootLayer::Make()) {
   _root->_root = _root.get();
   SET_DISPLAY_LIST(this);
 }
 
 DisplayList::~DisplayList() {
   resetCaches();
-  // make sure layerCache is destroyed before _root
-  layerCache = nullptr;
 }
 
 Layer* DisplayList::root() const {
@@ -238,30 +234,6 @@ void DisplayList::setMaxTileCount(int count) {
   resetCaches();
 }
 
-size_t DisplayList::layerCacheMaxSize() const {
-  return layerCache->currentCacheSize();
-}
-
-void DisplayList::setLayerCacheMaxSize(size_t maxSize) {
-  layerCache->setMaxCacheSize(maxSize);
-}
-
-int DisplayList::maxCacheContentSize() const {
-  return layerCache->maxCacheContentSize();
-}
-
-void DisplayList::setMaxCacheContentSize(int maxSize) {
-  layerCache->setMaxCacheContentSize(maxSize);
-}
-
-float DisplayList::maxCacheContentScale() const {
-  return layerCache->maxCacheContentScale();
-}
-
-void DisplayList::setMaxCacheContentScale(float maxScale) {
-  layerCache->setMaxCacheContentScale(maxScale);
-}
-
 void DisplayList::showDirtyRegions(bool show) {
   if (_showDirtyRegions == show) {
     return;
@@ -292,7 +264,6 @@ void DisplayList::render(Surface* surface, bool autoClear) {
     return;
   }
   RENDER_VISABLE_OBJECT(surface->getContext());
-  layerCache->setContext(surface->getContext());
   _hasContentChanged = false;
   auto dirtyRegions = _root->updateDirtyRegions();
   if (_zoomScaleInt == 0) {
@@ -931,7 +902,6 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   args.renderRect = &renderRect;
   args.blurBackground = _root->createBackgroundContext(context, drawRect, viewMatrix);
   args.dstColorSpace = surface->colorSpace();
-  args.layerCache = layerCache.get();
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
 }
 
