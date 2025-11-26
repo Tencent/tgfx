@@ -224,7 +224,8 @@ class Canvas {
 
   /**
    * Fills the current clip with the specified paint. The paint's shader, color, blend mode, color
-   * filter, mask filter, and image filter are applied. Other paint properties are ignored.
+   * filter, mask filter, and image filter are applied during the fill. Other paint properties are
+   * ignored.
    * @param paint The paint to use for filling.
    */
   void drawPaint(const Paint& paint);
