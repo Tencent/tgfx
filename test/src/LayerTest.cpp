@@ -3486,7 +3486,6 @@ TGFX_TEST(LayerTest, RasterizedContentWithMask) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/RasterizedContentWithMask"));
 }
 
-}  // namespace tgfx
 TGFX_TEST(LayerTest, DisplayListBackground) {
   ContextScope scope;
   auto context = scope.getContext();

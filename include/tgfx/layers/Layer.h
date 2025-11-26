@@ -595,7 +595,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
                                             Matrix* drawingMatrix);
 
   virtual void drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
-                 const Matrix3D* transform = nullptr);
+                         const Matrix3D* transform = nullptr);
 
   void drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                      const Matrix3D* transform);
@@ -666,8 +666,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   static std::shared_ptr<Picture> RecordPicture(DrawMode mode, float contentScale,
                                                 const std::function<void(Canvas*)>& drawFunction);
-
-  bool shouldPassThroughBackground(BlendMode blendMode, const Matrix3D* transform) const;
 
   bool drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                      const Matrix3D* transform);
