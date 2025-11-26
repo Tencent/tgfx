@@ -55,7 +55,7 @@ class DrawTask {
    * Returns the index of the atlas in the surface caches.
    */
   size_t sourceIndex() const {
-    return !tiles.empty() ? tiles.front()->sourceIndex : SIZE_T_MAX;
+    return !tiles.empty() ? tiles.front()->sourceIndex : std::numeric_limits<size_t>::max();
   }
 
   /**
