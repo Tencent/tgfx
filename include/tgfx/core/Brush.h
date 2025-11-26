@@ -25,19 +25,19 @@
 
 namespace tgfx {
 /**
- * Fill specifies how the geometry of a drawing operation is filled.
+ * Brush defines how to generate pixels within the geometry of a drawing operation.
  */
-class Fill {
+class Brush {
  public:
   /**
-   * Constructs a Fill with default values.
+   * Constructs a Brush with default values.
    */
-  Fill() = default;
+  Brush() = default;
 
   /**
-   * Constructs a Fill with the specified color, blend mode, and antialiasing.
+   * Constructs a Brush with the specified color, blend mode, and antialiasing.
    */
-  Fill(const Color& color, BlendMode blendMode, bool antiAlias = true)
+  Brush(const Color& color, BlendMode blendMode, bool antiAlias = true)
       : color(color), blendMode(blendMode), antiAlias(antiAlias) {
   }
 
@@ -59,22 +59,22 @@ class Fill {
   bool antiAlias = true;
 
   /**
-   * Optional colors used when filling a geometry if set, such as a gradient.
+   * Optional colors used when rendering a geometry if set, such as a gradient.
    */
   std::shared_ptr<Shader> shader = nullptr;
 
   /**
-   * Optional mask filter used to modify the alpha channel of the fill when drawing.
+   * Optional mask filter used to modify the alpha channel of the brush when drawing.
    */
   std::shared_ptr<MaskFilter> maskFilter = nullptr;
 
   /**
-   * Optional color filter used to modify the color of the fill when drawing.
+   * Optional color filter used to modify the color of the brush when drawing.
    */
   std::shared_ptr<ColorFilter> colorFilter = nullptr;
 
   /**
-   * Returns true if the Fill is guaranteed to produce only opaque colors.
+   * Returns true if the Brush is guaranteed to produce only opaque colors.
    */
   bool isOpaque() const;
 
@@ -84,8 +84,8 @@ class Fill {
   bool nothingToDraw() const;
 
   /**
-   * Returns a new Fill applying the given matrix to the shader and mask filter.
+   * Returns a new Brush applying the given matrix to the shader and mask filter.
    */
-  Fill makeWithMatrix(const Matrix& matrix) const;
+  Brush makeWithMatrix(const Matrix& matrix) const;
 };
 }  // namespace tgfx

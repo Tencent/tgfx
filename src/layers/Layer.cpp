@@ -1264,16 +1264,16 @@ void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha,
   drawContents(args, canvas, alpha, layerStyleSource.get(), nullptr, extraSourceTypes);
 }
 
-class LayerFill : public FillModifier {
+class LayerBrushModifier : public BrushModifier {
  public:
-  LayerFill(bool antiAlias, float alpha) : antiAlias(antiAlias), alpha(alpha) {
+  LayerBrushModifier(bool antiAlias, float alpha) : antiAlias(antiAlias), alpha(alpha) {
   }
 
-  Fill transform(const Fill& fill) const override {
-    auto newFill = fill;
-    newFill.color.alpha *= alpha;
-    newFill.antiAlias = antiAlias;
-    return newFill;
+  Brush transform(const Brush& brush) const override {
+    auto newBrush = brush;
+    newBrush.color.alpha *= alpha;
+    newBrush.antiAlias = antiAlias;
+    return newBrush;
   }
 
  private:
@@ -1288,7 +1288,7 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
     drawLayerStyles(args, canvas, alpha, layerStyleSource, LayerStylePosition::Below,
                     extraSourceTypes);
   }
-  LayerFill layerFill(bitFields.allowsEdgeAntialiasing, alpha);
+  LayerBrushModifier layerFill(bitFields.allowsEdgeAntialiasing, alpha);
   auto content = getContent();
   if (content) {
     if (args.drawMode == DrawMode::Contour) {

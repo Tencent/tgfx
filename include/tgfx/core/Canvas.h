@@ -464,16 +464,16 @@ class Canvas {
 
   explicit Canvas(DrawContext* drawContext, Surface* surface = nullptr,
                   bool optimizeMemoryForLayer = false);
-  void drawPath(const Path& path, const MCState& state, const Fill& fill,
-                const Stroke* stroke) const;
-  void drawImage(std::shared_ptr<Image> image, const Fill& fill, const SamplingOptions& sampling,
+  void drawPath(const Path& path, const MCState& state, const Brush& brush,
+                const Stroke* stroke = nullptr) const;
+  void drawImage(std::shared_ptr<Image> image, const Brush& brush, const SamplingOptions& sampling,
                  const Matrix* dstMatrix);
   void drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
-                     const SamplingOptions& sampling, const Fill& fill,
+                     const SamplingOptions& sampling, const Brush& brush,
                      SrcRectConstraint constraint = SrcRectConstraint::Fast);
-  void drawLayer(std::shared_ptr<Picture> picture, const MCState& state, const Fill& fill,
+  void drawLayer(std::shared_ptr<Picture> picture, const MCState& state, const Brush& brush,
                  std::shared_ptr<ImageFilter> imageFilter = nullptr);
-  void drawFill(const MCState& state, const Fill& fill) const;
+  void drawFill(const MCState& state, const Brush& brush) const;
   void resetStateStack();
 
   friend class Surface;
