@@ -48,14 +48,11 @@ class DrawTask {
     calculateRects(tileSize, drawRect, 1.0f);
   }
 
-  explicit DrawTask(const Rect& drawRect) : _tileRect(drawRect) {
-  }
-
   /**
    * Returns the index of the atlas in the surface caches.
    */
   size_t sourceIndex() const {
-    return !tiles.empty() ? tiles.front()->sourceIndex : std::numeric_limits<size_t>::max();
+    return tiles.front()->sourceIndex;
   }
 
   /**
@@ -70,10 +67,6 @@ class DrawTask {
    */
   const Rect& tileRect() const {
     return _tileRect;
-  }
-
-  bool hasTiles() const {
-    return !tiles.empty();
   }
 
  private:
@@ -555,7 +548,8 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
   for (const auto& [tileX, tileY] : sortedTiles) {
     auto tile = currentTileCache->getTile(tileX, tileY);
     if (tile != nullptr) {
-      screenTasks.emplace_back(tile, _tileSize);
+      auto tileRect = tile->getTileRect(_tileSize, &renderRect);
+      screenTasks.emplace_back(tile, _tileSize, tileRect);
     } else {
       if (_allowZoomBlur) {
         auto fallbackTasks = getFallbackDrawTasks(tileX, tileY, fallbackTileCaches);
@@ -593,7 +587,8 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
     tile->tileX = grid.first;
     tile->tileY = grid.second;
     taskTiles.push_back(tile);
-    screenTasks.emplace_back(tile, _tileSize);
+    auto tileRect = tile->getTileRect(_tileSize, &renderRect);
+    screenTasks.emplace_back(tile, _tileSize, tileRect);
     currentTileCache->addTile(tile);
   }
   if (continuous && !hasZoomBlurTiles) {
@@ -675,7 +670,6 @@ std::vector<DrawTask> DisplayList::getFallbackDrawTasks(
       bool found = false;
       auto gridRect = Rect::MakeXYWH(gridStartX, gridStartY, gridSize, gridSize);
       if (!gridRect.intersect(renderBounds)) {
-        tasks.emplace_back(gridRect);
         continue;
       }
       for (auto& [scale, tileCache] : fallbackCaches) {
@@ -701,11 +695,6 @@ std::vector<DrawTask> DisplayList::getFallbackDrawTasks(
       }
       if (!found) {
         return {};
-      }
-      auto backgroundRects = GetNonIntersectingRects(
-          Rect::MakeXYWH(gridStartX, gridStartY, gridSize, gridSize), gridRect);
-      for (const auto& rect : backgroundRects) {
-        tasks.emplace_back(rect);
       }
     }
   }
@@ -897,21 +886,15 @@ void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* su
   if (autoClear) {
     paint.setBlendMode(BlendMode::Src);
   }
-  auto backgroundPaint = paint;
-  backgroundPaint.setColor(_root->backgroundColor());
   static SamplingOptions sampling(FilterMode::Nearest, MipmapMode::None);
   canvas->setMatrix(Matrix::MakeTrans(_contentOffset.x, _contentOffset.y));
   Rect tileRect = {};
   for (auto& task : screenTasks) {
-    if (task.hasTiles()) {
-      auto surfaceCache = surfaceCaches[task.sourceIndex()];
-      DEBUG_ASSERT(surfaceCache != nullptr);
-      auto image = surfaceCache->makeImageSnapshot();
-      canvas->drawImageRect(image, task.sourceRect(), task.tileRect(), sampling, &paint,
-                            SrcRectConstraint::Strict);
-    } else {
-      canvas->drawRect(task.tileRect(), backgroundPaint);
-    }
+    auto surfaceCache = surfaceCaches[task.sourceIndex()];
+    DEBUG_ASSERT(surfaceCache != nullptr);
+    auto image = surfaceCache->makeImageSnapshot();
+    canvas->drawImageRect(image, task.sourceRect(), task.tileRect(), sampling, &paint,
+                          SrcRectConstraint::Strict);
     tileRect.join(task.tileRect());
   }
 
@@ -922,9 +905,10 @@ void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* su
     return;
   }
 
+  paint.setColor(_root->backgroundColor());
   auto backgroundRect = GetNonIntersectingRects(screenRect, tileRect);
   for (auto& rect : backgroundRect) {
-    canvas->drawRect(rect, backgroundPaint);
+    canvas->drawRect(rect, paint);
   }
 }
 
