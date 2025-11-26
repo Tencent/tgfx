@@ -222,13 +222,14 @@ class DisplayList {
   }
 
   /**
-   * The background color of the display list. If the background color is not transparent,
-   * it will be used to fill the entire surface. Default is transparent.
+   * Returns the background color of the root layer. The background is an infinite rectangle that
+   * covers the entire display area and is drawn using the SrcOver blend mode.
+   * The default value is transparent.
    */
   Color backgroundColor() const;
 
   /**
-   *  Sets the background color of the display list.
+   * Sets the background color of the root layer. 
    */
   void setBackgroundColor(const Color& color);
 
@@ -328,7 +329,5 @@ class DisplayList {
                      bool autoClear) const;
 
   void updateMousePosition();
-
-  void drawBackground(Canvas* canvas, bool autoClear) const;
 };
 }  // namespace tgfx

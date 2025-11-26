@@ -48,11 +48,14 @@ class DrawTask {
     calculateRects(tileSize, drawRect, 1.0f);
   }
 
+  explicit DrawTask(const Rect& drawRect) : _tileRect(drawRect) {
+  }
+
   /**
    * Returns the index of the atlas in the surface caches.
    */
   size_t sourceIndex() const {
-    return tiles.front()->sourceIndex;
+    return !tiles.empty() ? tiles.front()->sourceIndex : SIZE_T_MAX;
   }
 
   /**
@@ -67,6 +70,10 @@ class DrawTask {
    */
   const Rect& tileRect() const {
     return _tileRect;
+  }
+
+  bool hasTiles() const {
+    return !tiles.empty();
   }
 
  private:
@@ -90,6 +97,27 @@ class DrawTask {
     _tileRect.round();
   }
 };
+
+static std::vector<Rect> GetNonIntersectingRects(const Rect& a, const Rect& b) {
+  std::vector<Rect> rects = {};
+  auto leftRect = Rect::MakeLTRB(a.left, a.top, b.left, b.bottom);
+  if (!leftRect.isEmpty()) {
+    rects.emplace_back(leftRect);
+  }
+  auto topRect = Rect::MakeLTRB(b.left, a.top, a.right, b.top);
+  if (!topRect.isEmpty()) {
+    rects.emplace_back(topRect);
+  }
+  auto rightRect = Rect::MakeLTRB(b.right, b.top, a.right, a.bottom);
+  if (!rightRect.isEmpty()) {
+    rects.emplace_back(rightRect);
+  }
+  auto bottomRect = Rect::MakeLTRB(a.left, b.bottom, b.right, a.bottom);
+  if (!bottomRect.isEmpty()) {
+    rects.emplace_back(bottomRect);
+  }
+  return rects;
+}
 
 static float ToZoomScaleFloat(int64_t zoomScaleInt, int64_t precision) {
   if (zoomScaleInt < 0) {
@@ -499,23 +527,19 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
   }
   auto renderRect = Rect::MakeWH(surface->width(), surface->height());
   renderRect.offset(-_contentOffset.x, -_contentOffset.y);
+
+  auto renderBounds = _root->renderBounds;
+  auto zoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
+  renderBounds.scale(zoomScale, zoomScale);
+  renderBounds.roundOut();
+  if (!renderRect.intersect(renderBounds)) {
+    return {};
+  }
   int startX = static_cast<int>(floorf(renderRect.left / static_cast<float>(_tileSize)));
   int startY = static_cast<int>(floorf(renderRect.top / static_cast<float>(_tileSize)));
   int endX = static_cast<int>(ceilf(renderRect.right / static_cast<float>(_tileSize)));
   int endY = static_cast<int>(ceilf(renderRect.bottom / static_cast<float>(_tileSize)));
 
-  auto zoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
-  auto renderBounds = _root->renderBounds;
-  renderBounds.scale(zoomScale, zoomScale);
-  int renderStartX = static_cast<int>(floorf(renderBounds.left / static_cast<float>(_tileSize)));
-  int renderStartY = static_cast<int>(floorf(renderBounds.top / static_cast<float>(_tileSize)));
-  int renderEndX = static_cast<int>(ceilf(renderBounds.right / static_cast<float>(_tileSize)));
-  int renderEndY = static_cast<int>(ceilf(renderBounds.bottom / static_cast<float>(_tileSize)));
-
-  startX = std::max(startX, renderStartX);
-  startY = std::max(startY, renderStartY);
-  endX = std::min(endX, renderEndX);
-  endY = std::min(endY, renderEndY);
   if (startX >= endX || startY >= endY) {
     return {};
   }
@@ -643,6 +667,7 @@ std::vector<DrawTask> DisplayList::getFallbackDrawTasks(
   std::vector<DrawTask> tasks = {};
   auto renderBounds = _root->renderBounds;
   renderBounds.scale(currentZoomScale, currentZoomScale);
+  renderBounds.roundOut();
   for (int gridX = 0; gridX < gridCount; gridX++) {
     for (int gridY = 0; gridY < gridCount; gridY++) {
       auto gridStartX = tileStartX + gridX * gridSize;
@@ -650,6 +675,7 @@ std::vector<DrawTask> DisplayList::getFallbackDrawTasks(
       bool found = false;
       auto gridRect = Rect::MakeXYWH(gridStartX, gridStartY, gridSize, gridSize);
       if (!gridRect.intersect(renderBounds)) {
+        tasks.emplace_back(gridRect);
         continue;
       }
       for (auto& [scale, tileCache] : fallbackCaches) {
@@ -675,6 +701,11 @@ std::vector<DrawTask> DisplayList::getFallbackDrawTasks(
       }
       if (!found) {
         return {};
+      }
+      auto backgroundRects = GetNonIntersectingRects(
+          Rect::MakeXYWH(gridStartX, gridStartY, gridSize, gridSize), gridRect);
+      for (const auto& rect : backgroundRects) {
+        tasks.emplace_back(rect);
       }
     }
   }
@@ -861,20 +892,39 @@ void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* su
             [](const DrawTask& a, const DrawTask& b) { return a.sourceIndex() < b.sourceIndex(); });
   auto canvas = surface->getCanvas();
   AutoCanvasRestore autoRestore(canvas);
-  drawBackground(canvas, autoClear);
   Paint paint = {};
   paint.setAntiAlias(false);
   if (autoClear) {
     paint.setBlendMode(BlendMode::Src);
   }
+  auto backgroundPaint = paint;
+  backgroundPaint.setColor(_root->backgroundColor());
   static SamplingOptions sampling(FilterMode::Nearest, MipmapMode::None);
   canvas->setMatrix(Matrix::MakeTrans(_contentOffset.x, _contentOffset.y));
+  Rect tileRect = {};
   for (auto& task : screenTasks) {
-    auto surfaceCache = surfaceCaches[task.sourceIndex()];
-    DEBUG_ASSERT(surfaceCache != nullptr);
-    auto image = surfaceCache->makeImageSnapshot();
-    canvas->drawImageRect(image, task.sourceRect(), task.tileRect(), sampling, &paint,
-                          SrcRectConstraint::Strict);
+    if (task.hasTiles()) {
+      auto surfaceCache = surfaceCaches[task.sourceIndex()];
+      DEBUG_ASSERT(surfaceCache != nullptr);
+      auto image = surfaceCache->makeImageSnapshot();
+      canvas->drawImageRect(image, task.sourceRect(), task.tileRect(), sampling, &paint,
+                            SrcRectConstraint::Strict);
+    } else {
+      canvas->drawRect(task.tileRect(), backgroundPaint);
+    }
+    tileRect.join(task.tileRect());
+  }
+
+  auto screenRect = Rect::MakeWH(surface->width(), surface->height());
+  screenRect.offset(-_contentOffset.x, -_contentOffset.y);
+  screenRect.roundOut();
+  if (tileRect.contains(screenRect)) {
+    return;
+  }
+
+  auto backgroundRect = GetNonIntersectingRects(screenRect, tileRect);
+  for (auto& rect : backgroundRect) {
+    canvas->drawRect(rect, backgroundPaint);
   }
 }
 
@@ -926,10 +976,6 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   if (!fullScreen) {
     canvas->clipRect(drawRect);
   }
-  if (_root->renderBounds.isEmpty()) {
-    drawBackground(canvas, autoClear);
-    return;
-  }
   if (autoClear) {
     canvas->clear();
   }
@@ -959,15 +1005,6 @@ void DisplayList::updateMousePosition() {
   const auto invScaleFactor = 1.0f / (1.0f - scale);
   mousePosition = (_contentOffset - lastContentOffset * scale) * invScaleFactor;
   mousePosition -= _contentOffset;
-}
-
-void DisplayList::drawBackground(Canvas* canvas, bool autoClear) const {
-  auto backgroundColor = _root->backgroundColor();
-  if (autoClear || backgroundColor.isOpaque()) {
-    canvas->clear(backgroundColor);
-  } else if (backgroundColor.alpha > 0.0f) {
-    canvas->drawColor(backgroundColor);
-  }
 }
 
 }  // namespace tgfx
