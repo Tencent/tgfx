@@ -594,7 +594,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::shared_ptr<Image> getRasterizedImage(const DrawArgs& args, float contentScale,
                                             Matrix* drawingMatrix);
 
-  void drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
+  virtual void drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                  const Matrix3D* transform = nullptr);
 
   void drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
