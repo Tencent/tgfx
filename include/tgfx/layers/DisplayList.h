@@ -222,6 +222,18 @@ class DisplayList {
   }
 
   /**
+   * Returns the background color of the root layer. The background is an infinite rectangle that
+   * covers the entire display area and is drawn using the SrcOver blend mode.
+   * The default value is transparent.
+   */
+  Color backgroundColor() const;
+
+  /**
+   * Sets the background color of the root layer. 
+   */
+  void setBackgroundColor(const Color& color);
+
+  /**
    * Sets whether to show dirty regions during rendering. When enabled, the dirty regions will be
    * highlighted in the rendered output. This is useful for debugging to visualize which parts of
    * the display list are being updated. The default value is false.
@@ -315,6 +327,7 @@ class DisplayList {
 
   void drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
                      bool autoClear) const;
+
   void updateMousePosition();
 };
 }  // namespace tgfx
