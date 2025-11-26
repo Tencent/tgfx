@@ -1396,23 +1396,23 @@ TGFX_TEST(CanvasTest, Picture) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/PictureImage_Path"));
 }
 
-class ColorModifier : public FillModifier {
+class ColorModifier : public BrushModifier {
  public:
   explicit ColorModifier(Color color) : color(color) {
   }
 
-  Fill transform(const Fill& fill) const override {
-    auto newFill = fill;
-    newFill.color = color;
-    newFill.color.alpha *= fill.color.alpha;
-    return newFill;
+  Brush transform(const Brush& brush) const override {
+    auto newBrush = brush;
+    newBrush.color = color;
+    newBrush.color.alpha *= brush.color.alpha;
+    return newBrush;
   }
 
  private:
   Color color = {};
 };
 
-TGFX_TEST(CanvasTest, FillModifier) {
+TGFX_TEST(CanvasTest, BrushModifier) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -1433,7 +1433,7 @@ TGFX_TEST(CanvasTest, FillModifier) {
   canvas->translate(15, 15);
   ColorModifier colorModifier(Color::Green());
   picture->playback(canvas, &colorModifier);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/FillModifier"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/BrushModifier"));
 }
 
 TGFX_TEST(CanvasTest, BlendModeTest) {

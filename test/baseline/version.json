@@ -2,6 +2,7 @@
     "CanvasTest": {
         "AdaptiveDashEffect": "330279d",
         "BlendFormula": "cd6a8dff",
+        "BrushModifier": "fa2f12b1",
         "Clip": "d010fb8",
         "ClipAll": "d0e35c3",
         "CloseQuadShape": "cd6a8dff",
@@ -24,7 +25,6 @@
         "DrawSRGBDropShadowFilterToP3": "c73fb3b5",
         "DrawSRGBLinearShaderToP3": "c73fb3b5",
         "DrawSRGBRadialShaderToP3": "c73fb3b5",
-        "FillModifier": "fa2f12b1",
         "LumaFilterToRec2020": "82494664",
         "LumaFilterToRec601": "82494664",
         "LumaFilterToSRGB": "82494664",

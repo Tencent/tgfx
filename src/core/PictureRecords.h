@@ -109,9 +109,9 @@ class SetColor : public PictureRecord {
   Color color = {};
 };
 
-class SetFill : public PictureRecord {
+class SetBrush : public PictureRecord {
  public:
-  explicit SetFill(Fill fill) : fill(std::move(fill)) {
+  explicit SetBrush(Brush brush) : brush(std::move(brush)) {
   }
 
   PictureRecordType type() const override {
@@ -119,10 +119,10 @@ class SetFill : public PictureRecord {
   }
 
   void playback(DrawContext*, PlaybackContext* playback) const override {
-    playback->setFill(fill);
+    playback->setBrush(brush);
   }
 
-  Fill fill = {};
+  Brush brush = {};
 };
 
 class SetStrokeWidth : public PictureRecord {
@@ -198,7 +198,7 @@ class DrawRect : public PictureRecord {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawRect(rect, playback->state(), playback->fill(), playback->stroke());
+    context->drawRect(rect, playback->state(), playback->brush(), playback->stroke());
   }
 
   Rect rect;
@@ -214,7 +214,7 @@ class DrawRRect : public PictureRecord {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawRRect(rRect, playback->state(), playback->fill(), playback->stroke());
+    context->drawRRect(rRect, playback->state(), playback->brush(), playback->stroke());
   }
 
   RRect rRect;
@@ -234,7 +234,7 @@ class DrawPath : public PictureRecord {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawPath(path, playback->state(), playback->fill());
+    context->drawPath(path, playback->state(), playback->brush());
   }
 
   Path path;
@@ -254,7 +254,7 @@ class DrawShape : public PictureRecord {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawShape(shape, playback->state(), playback->fill(), playback->stroke());
+    context->drawShape(shape, playback->state(), playback->brush(), playback->stroke());
   }
 
   std::shared_ptr<Shape> shape;
@@ -271,7 +271,7 @@ class DrawImage : public PictureRecord {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawImage(image, sampling, playback->state(), playback->fill());
+    context->drawImage(image, sampling, playback->state(), playback->brush());
   }
 
   std::shared_ptr<Image> image;
@@ -290,7 +290,7 @@ class DrawImageRect : public DrawImage {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawImageRect(image, rect, rect, sampling, playback->state(), playback->fill(),
+    context->drawImageRect(image, rect, rect, sampling, playback->state(), playback->brush(),
                            constraint);
   }
 
@@ -310,7 +310,7 @@ class DrawImageRectToRect : public DrawImageRect {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawImageRect(image, rect, dstRect, sampling, playback->state(), playback->fill(),
+    context->drawImageRect(image, rect, dstRect, sampling, playback->state(), playback->brush(),
                            constraint);
   }
 
@@ -328,7 +328,7 @@ class DrawGlyphRunList : public PictureRecord {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawGlyphRunList(glyphRunList, playback->state(), playback->fill(),
+    context->drawGlyphRunList(glyphRunList, playback->state(), playback->brush(),
                               playback->stroke());
   }
 
@@ -370,7 +370,7 @@ class DrawLayer : public PictureRecord {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawLayer(picture, filter, playback->state(), playback->fill());
+    context->drawLayer(picture, filter, playback->state(), playback->brush());
   }
 
   std::shared_ptr<Picture> picture;

@@ -34,33 +34,33 @@ class RenderContext : public DrawContext {
     return renderTarget->getContext();
   }
 
-  void drawFill(const Fill& fill) override;
+  void drawFill(const Brush& brush) override;
 
-  void drawRect(const Rect& rect, const MCState& state, const Fill& fill,
+  void drawRect(const Rect& rect, const MCState& state, const Brush& brush,
                 const Stroke* stroke) override;
 
-  void drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
+  void drawRRect(const RRect& rRect, const MCState& state, const Brush& brush,
                  const Stroke* stroke) override;
 
-  void drawPath(const Path& path, const MCState& state, const Fill& fill) override;
+  void drawPath(const Path& path, const MCState& state, const Brush& brush) override;
 
-  void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill,
+  void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Brush& brush,
                  const Stroke* stroke) override;
 
   void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                 const MCState& state, const Fill& fill) override;
+                 const MCState& state, const Brush& brush) override;
 
   void drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
-                     const SamplingOptions& sampling, const MCState& state, const Fill& fill,
+                     const SamplingOptions& sampling, const MCState& state, const Brush& brush,
                      SrcRectConstraint constraint) override;
 
   void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
-                        const Fill& fill, const Stroke* stroke) override;
+                        const Brush& brush, const Stroke* stroke) override;
 
   void drawPicture(std::shared_ptr<Picture> picture, const MCState& state) override;
 
   void drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<ImageFilter> filter,
-                 const MCState& state, const Fill& fill) override;
+                 const MCState& state, const Brush& brush) override;
 
   /**
    * Flushes the render context, submitting all pending operations to the drawing manager. Returns
@@ -74,14 +74,14 @@ class RenderContext : public DrawContext {
 
  private:
   void drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const MCState& state,
-                              const Fill& fill, const Stroke* stroke, const Rect& localClipBounds,
+                              const Brush& brush, const Stroke* stroke, const Rect& localClipBounds,
                               GlyphRun* rejectedGlyphRun);
 
   void drawGlyphsAsPath(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
-                        const Fill& fill, const Stroke* stroke, Rect& localClipBounds);
+                        const Brush& brush, const Stroke* stroke, Rect& localClipBounds);
 
   void drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun, const MCState& state,
-                                   const Fill& fill, const Stroke* stroke);
+                                   const Brush& brush, const Stroke* stroke);
 
   std::shared_ptr<RenderTargetProxy> renderTarget = nullptr;
   uint32_t renderFlags = 0;
