@@ -3439,4 +3439,51 @@ TGFX_TEST(LayerTest, Matrix) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D_2D_3D"));
 }
 
+TGFX_TEST(LayerTest, RasterizedContentWithMask) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 200);
+  auto displayList = std::make_unique<DisplayList>();
+
+  // Create a rasterized content layer with a mask
+  auto rootLayer = Layer::Make();
+  displayList->root()->addChild(rootLayer);
+
+  // Create a rasterized content layer with some shapes
+  auto rasterizedLayer = Layer::Make();
+  rasterizedLayer->setMatrix(Matrix::MakeTrans(50, 50));
+  rasterizedLayer->setShouldRasterize(true);
+  rootLayer->addChild(rasterizedLayer);
+
+  // Add a blue rectangle
+  auto blueRect = ShapeLayer::Make();
+  Path bluePath;
+  bluePath.addRect(Rect::MakeWH(80, 80));
+  blueRect->setPath(bluePath);
+  blueRect->setFillStyle(SolidColor::Make(Color::Blue()));
+  rasterizedLayer->addChild(blueRect);
+
+  // Add a red oval
+  auto redOval = ShapeLayer::Make();
+  redOval->setMatrix(Matrix::MakeTrans(60, 0));
+  Path ovalPath;
+  ovalPath.addOval(Rect::MakeXYWH(0, 0, 80, 80));
+  redOval->setPath(ovalPath);
+  redOval->setFillStyle(SolidColor::Make(Color::Red()));
+  rasterizedLayer->addChild(redOval);
+
+  // Create a mask for the rasterized layer
+  auto maskLayer = ShapeLayer::Make();
+  Path maskPath;
+  maskPath.addOval(Rect::MakeXYWH(-10, -10, 100, 100));
+  maskLayer->setPath(maskPath);
+  maskLayer->setFillStyle(SolidColor::Make(Color::White()));
+  rasterizedLayer->setMask(maskLayer);
+  rootLayer->addChild(maskLayer);
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/RasterizedContentWithMask"));
+}
+
 }  // namespace tgfx
