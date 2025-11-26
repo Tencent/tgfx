@@ -22,16 +22,15 @@ namespace tgfx {
 class Brush;
 
 /**
- * BrushModifier is an interface for modifying the properties of a Brush used in drawing commands. It
- * allows you to adjust the color, alpha, or other attributes of a Brush before it is applied to a
- * picture record.
+ * BrushModifier is an interface for modifying Brush properties before they are applied in drawing
+ * operations. It allows dynamic adjustment of attributes such as color, alpha, or filters.
  */
 class BrushModifier {
  public:
   virtual ~BrushModifier() = default;
 
   /**
-   * Transforms the given Brush and returns a new Brush with the modifications applied.
+   * Transforms the given Brush and returns a new Brush with modifications applied.
    */
   virtual Brush transform(const Brush& brush) const = 0;
 };

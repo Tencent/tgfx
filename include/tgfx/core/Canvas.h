@@ -224,8 +224,7 @@ class Canvas {
 
   /**
    * Fills the current clip with the specified paint. The paint's shader, color, blend mode, color
-   * filter, mask filter, and image filter are applied during the fill. Other paint properties are
-   * ignored.
+   * filter, mask filter, and image filter are applied. Other paint properties are ignored.
    * @param paint The paint to use for filling.
    */
   void drawPaint(const Paint& paint);
@@ -237,7 +236,7 @@ class Canvas {
    * @param y0  the y-coordinate of the start point.
    * @param x1  the x-coordinate of the end point.
    * @param y1  the y-coordinate of the end point.
-   * @param paint  stroke, blend, color, and so on, used to draw.
+   * @param paint  the paint to use for stroke, blend, color, etc.
    */
   void drawLine(float x0, float y0, float x1, float y1, const Paint& paint);
 
@@ -246,7 +245,7 @@ class Canvas {
    * Paint::style is always treated as PaintStyle::Stroke.
    * @param p0  the start point.
    * @param p1  the end point.
-   * @param paint  stroke, blend, color, and so on, used to draw.
+   * @param paint  the paint to use for stroke, blend, color, etc.
    */
   void drawLine(const Point& p0, const Point& p1, const Paint& paint) {
     drawLine(p0.x, p0.y, p1.x, p1.y, paint);
@@ -290,7 +289,7 @@ class Canvas {
    * @param rect bounds of the round rectangle to draw
    * @param radiusX axis length on x-axis of the rounded corners.
    * @param radiusY axis length on y-axis of the rounded corners.
-   * @param paint stroke, blend, color, and so on, used to draw.
+   * @param paint the paint to use for stroke, blend, color, etc.
    */
   void drawRoundRect(const Rect& rect, float radiusX, float radiusY, const Paint& paint);
 

@@ -37,7 +37,8 @@ enum class PaintStyle {
 };
 
 /**
- * Paint controls options applied when drawing.
+ * Paint controls the appearance and style of drawing operations, including brush properties for
+ * color and effects, stroke parameters for outlining, and an image filter for post-processing.
  */
 class Paint {
  public:
@@ -86,64 +87,63 @@ class Paint {
   }
 
   /**
-   * Returns optional colors used when filling a path if previously set, such as a gradient.
+   * Returns optional shader used to generate colors, such as gradients or image patterns.
    */
   std::shared_ptr<Shader> getShader() const {
     return brush.shader;
   }
 
   /**
-   * Sets optional colors used when filling a path, such as a gradient. If nullptr, color is used
-   * instead. The shader remains unaffected by the canvas matrix and always exists in the coordinate
-   * space of the associated surface.
+   * Sets optional shader used to generate colors, such as gradients or image patterns. If nullptr,
+   * the solid color is used instead. The shader exists in the coordinate space of the associated
+   * surface and is unaffected by the canvas matrix.
    */
   void setShader(std::shared_ptr<Shader> newShader);
 
   /**
-   * Returns the mask filter used to modify the alpha channel of the paint when drawing.
+   * Returns the mask filter used to modify the alpha channel when drawing.
    */
   std::shared_ptr<MaskFilter> getMaskFilter() const {
     return brush.maskFilter;
   }
 
   /**
-   * Sets the mask filter used to modify the alpha channel of the paint when drawing.
+   * Sets the mask filter used to modify the alpha channel when drawing.
    */
   void setMaskFilter(std::shared_ptr<MaskFilter> newMaskFilter) {
     brush.maskFilter = std::move(newMaskFilter);
   }
 
   /**
-   * Returns the color filter used to modify the color of the paint when drawing.
+   * Returns the color filter used to modify the color when drawing.
    */
   std::shared_ptr<ColorFilter> getColorFilter() const {
     return brush.colorFilter;
   }
 
   /**
-   * Sets the color filter used to modify the color of the paint when drawing.
+   * Sets the color filter used to modify the color when drawing.
    */
   void setColorFilter(std::shared_ptr<ColorFilter> newColorFilter) {
     brush.colorFilter = std::move(newColorFilter);
   }
 
   /**
-   * Returns the blend mode used to combine the paint with the destination pixels.
+   * Returns the blend mode used to combine the brush color with the destination pixels.
    */
   BlendMode getBlendMode() const {
     return brush.blendMode;
   }
 
   /**
-   * Sets the blend mode used to combine the paint with the destination pixels.
+   * Sets the blend mode used to combine the brush color with the destination pixels.
    */
   void setBlendMode(BlendMode mode) {
     brush.blendMode = mode;
   }
 
   /**
-   * Returns the Brush object containing the color, blend mode, antialiasing, shader, mask filter,
-   * and color filter.
+   * Returns the Brush object containing color, blending, and filtering properties.
    */
   const Brush& getBrush() const {
     return brush;

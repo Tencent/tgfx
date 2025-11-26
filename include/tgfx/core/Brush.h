@@ -25,7 +25,8 @@
 
 namespace tgfx {
 /**
- * Brush defines how to generate pixels within the geometry of a drawing operation.
+ * Brush defines the appearance attributes for rendering geometry, including color, shader,
+ * blending, and filtering options. It applies to both fill and stroke operations.
  */
 class Brush {
  public:
@@ -48,28 +49,28 @@ class Brush {
   Color color = {};
 
   /**
-   * The blend mode used to combine the fill with the destination pixels.
+   * The blend mode used to combine the brush color with the destination pixels.
    */
   BlendMode blendMode = BlendMode::SrcOver;
 
   /**
-   * Returns true if pixels on the active edges of Path may be drawn with partial transparency. The
+   * Specifies whether pixels on the active edges may be drawn with partial transparency. The
    * default value is true.
    */
   bool antiAlias = true;
 
   /**
-   * Optional colors used when rendering a geometry if set, such as a gradient.
+   * Optional shader used to generate colors when rendering, such as gradients or image patterns.
    */
   std::shared_ptr<Shader> shader = nullptr;
 
   /**
-   * Optional mask filter used to modify the alpha channel of the brush when drawing.
+   * Optional mask filter used to modify the alpha channel when drawing.
    */
   std::shared_ptr<MaskFilter> maskFilter = nullptr;
 
   /**
-   * Optional color filter used to modify the color of the brush when drawing.
+   * Optional color filter used to modify the color when drawing.
    */
   std::shared_ptr<ColorFilter> colorFilter = nullptr;
 
@@ -79,12 +80,12 @@ class Brush {
   bool isOpaque() const;
 
   /**
-   * Returns true if the Paint prevents any drawing.
+   * Returns true if the Brush prevents any drawing.
    */
   bool nothingToDraw() const;
 
   /**
-   * Returns a new Brush applying the given matrix to the shader and mask filter.
+   * Returns a new Brush with the given matrix applied to the shader and mask filter.
    */
   Brush makeWithMatrix(const Matrix& matrix) const;
 };
