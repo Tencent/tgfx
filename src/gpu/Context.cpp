@@ -67,7 +67,6 @@ bool Context::wait(const BackendSemaphore& waitSemaphore) {
 }
 
 std::unique_ptr<Recording> Context::flush(BackendSemaphore* signalSemaphore) {
-  _resourceCache->processUnreferencedResources();
   _atlasManager->preFlush();
   auto drawingBuffer = _drawingManager->flush();
   if (drawingBuffer == nullptr) {
@@ -81,10 +80,6 @@ std::unique_ptr<Recording> Context::flush(BackendSemaphore* signalSemaphore) {
   }
   _atlasManager->postFlush();
   _proxyProvider->purgeExpiredProxies();
-  // Normally we would purge after drawingBuffer->encode() to free this frame's resources
-  // immediately. However, that can cause GPU sync stalls by releasing them before rendering
-  // finishes. So we purge here instead to skip in-use resources and avoid those stalls.
-  _resourceCache->advanceFrameAndPurge();
   pendingDrawingBuffers.push_back(drawingBuffer);
   return std::unique_ptr<Recording>(
       new Recording(uniqueID(), drawingBuffer->uniqueID(), drawingBuffer->generation()));
@@ -110,12 +105,14 @@ std::shared_ptr<DrawingBuffer> Context::getDrawingBuffer(const Recording* record
 }
 
 void Context::submit(std::unique_ptr<Recording> recording, bool syncCpu) {
+  _resourceCache->processUnreferencedResources();
   auto queue = gpu()->queue();
   auto targetBuffer = getDrawingBuffer(recording.get());
   if (targetBuffer != nullptr) {
     while (!pendingDrawingBuffers.empty()) {
       auto drawingBuffer = pendingDrawingBuffers.front();
       auto commandBuffer = drawingBuffer->encode();
+      _resourceCache->advanceFrameAndPurge();
       queue->submit(std::move(commandBuffer));
       pendingDrawingBuffers.pop_front();
       if (drawingBuffer == targetBuffer) {
