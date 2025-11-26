@@ -587,15 +587,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   LayerContent* getContent();
 
-  /**
-   * Generates an image filter for the specified content area within the layer.
-   * @param contentScale The scale ratio of the specified area in the layer's local coordinate
-   * system.
-   * @param transform The affine transformation matrix referenced by the local coordinate system
-   * with the top-left vertex of the content rectangle as the origin.
-   */
-  std::shared_ptr<ImageFilter> getImageFilter(float contentScale,
-                                              const Matrix3D* transform = nullptr);
+  std::shared_ptr<ImageFilter> getImageFilter(float contentScale);
 
   RasterizedContent* getRasterizedCache(const DrawArgs& args, const Matrix& renderMatrix);
 
@@ -603,7 +595,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
                                             Matrix* drawingMatrix);
 
   virtual void drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
-                 const Matrix3D* transform = nullptr);
+                         const Matrix3D* transform = nullptr);
 
   void drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                      const Matrix3D* transform);
@@ -675,10 +667,13 @@ class Layer : public std::enable_shared_from_this<Layer> {
   static std::shared_ptr<Picture> RecordPicture(DrawMode mode, float contentScale,
                                                 const std::function<void(Canvas*)>& drawFunction);
 
-  std::shared_ptr<Image> getOffscreenContentImage(
-      const DrawArgs& args, const Canvas* canvas, bool passThroughBackground,
-      std::shared_ptr<BackgroundContext> subBackgroundContext, std::optional<Rect> clipBounds,
-      Matrix* imageMatrix);
+  bool drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
+                     const Matrix3D* transform);
+
+  std::shared_ptr<Image> getContentImage(const DrawArgs& args, float contentScale,
+                                         const std::shared_ptr<Image>& passThroughImage,
+                                         const Matrix& passThroughImageMatrix,
+                                         std::optional<Rect> clipBounds, Matrix* imageMatrix);
 
   /**
    * Returns the equivalent transformation matrix adapted for a custom anchor point.
@@ -703,6 +698,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
     bool excludeChildEffectsInLayerStyle : 1;
     bool passThroughBackground : 1;
     bool hasBlendMode : 1;
+    bool matrix3DIsAffine : 1;  // Whether the matrix3D is equivalent to a 2D affine matrix
     uint8_t blendMode : 5;
     uint8_t maskType : 2;
   } bitFields = {};
@@ -710,8 +706,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
   float _alpha = 1.0f;
   // The actual transformation matrix that determines the geometric position of the layer
   Matrix3D _matrix3D = {};
-  // Whether the matrix3D is equivalent to a 2D affine matrix
-  bool _matrix3DIsAffine = true;
   std::shared_ptr<Layer> _mask = nullptr;
   Layer* maskOwner = nullptr;
   std::unique_ptr<Rect> _scrollRect = nullptr;
