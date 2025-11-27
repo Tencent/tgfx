@@ -39,14 +39,14 @@ class DefaultContent : public LayerContent {
     return content->hitTestPoint(localX, localY, shapeHitTest);
   }
 
-  void drawDefault(Canvas* canvas, const FillModifier* modifier) const override {
+  void drawDefault(Canvas* canvas, const BrushModifier* modifier) const override {
     content->playback(canvas, modifier);
   }
 
-  void drawForeground(Canvas*, const FillModifier*) const override {
+  void drawForeground(Canvas*, const BrushModifier*) const override {
   }
 
-  void drawContour(Canvas* canvas, const FillModifier* modifier) const override {
+  void drawContour(Canvas* canvas, const BrushModifier* modifier) const override {
     content->playback(canvas, modifier);
   }
 

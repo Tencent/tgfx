@@ -19,20 +19,19 @@
 #pragma once
 
 namespace tgfx {
-class Fill;
+class Brush;
 
 /**
- * FillModifier is an interface for modifying the properties of a Fill used in drawing commands. It
- * allows you to adjust the color, alpha, or other attributes of a Fill before it is applied to a
- * picture record.
+ * BrushModifier is an interface for modifying Brush properties before they are applied in drawing
+ * operations. It allows dynamic adjustment of attributes such as color, alpha, or filters.
  */
-class FillModifier {
+class BrushModifier {
  public:
-  virtual ~FillModifier() = default;
+  virtual ~BrushModifier() = default;
 
   /**
-   * Transforms the given Fill and returns a new Fill with the modifications applied.
+   * Transforms the given Brush and returns a new Brush with modifications applied.
    */
-  virtual Fill transform(const Fill& fill) const = 0;
+  virtual Brush transform(const Brush& brush) const = 0;
 };
 }  // namespace tgfx

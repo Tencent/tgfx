@@ -19,7 +19,7 @@
 #pragma once
 
 #include <atomic>
-#include "tgfx/core/FillModifier.h"
+#include "tgfx/core/BrushModifier.h"
 #include "tgfx/core/Matrix.h"
 
 namespace tgfx {
@@ -28,7 +28,7 @@ class Canvas;
 class DrawContext;
 class MCState;
 class Image;
-class Fill;
+class Brush;
 class BlockBuffer;
 template <typename T>
 class PlacementPtr;
@@ -87,9 +87,9 @@ class Picture {
    * recorded, each command in the Picture is sent separately to canvas. To add a single command to
    * draw the Picture to a canvas, call Canvas::drawPicture() instead.
    * @param canvas The receiver of drawing commands
-   * @param fillModifier An optional FillModifier to modify the Fill properties of drawing commands.
+   * @param brushModifier An optional BrushModifier to modify the Brush properties of drawing commands.
    */
-  void playback(Canvas* canvas, const FillModifier* fillModifier = nullptr) const;
+  void playback(Canvas* canvas, const BrushModifier* brushModifier = nullptr) const;
 
  private:
   std::unique_ptr<BlockBuffer> blockBuffer;
@@ -102,12 +102,12 @@ class Picture {
           size_t drawCount);
 
   void playback(DrawContext* drawContext, const MCState& state,
-                const FillModifier* fillModifier = nullptr) const;
+                const BrushModifier* brushModifier = nullptr) const;
 
   std::shared_ptr<Image> asImage(Point* offset, const Matrix* matrix = nullptr,
                                  const ISize* clipSize = nullptr) const;
 
-  const PictureRecord* getFirstDrawRecord(MCState* state = nullptr, Fill* fill = nullptr,
+  const PictureRecord* getFirstDrawRecord(MCState* state = nullptr, Brush* brush = nullptr,
                                           bool* hasStroke = nullptr) const;
 
   friend class MeasureContext;
