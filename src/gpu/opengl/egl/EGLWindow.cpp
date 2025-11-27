@@ -27,21 +27,21 @@
 #endif
 #include <EGL/eglext.h>
 #include <GLES3/gl3.h>
-#include "core/utils/USE.h"
 #include <cstring>
+#include "core/utils/USE.h"
 
 #ifndef EGL_GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT
 #define EGL_GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT -1
 #endif
 
 namespace tgfx {
-std::shared_ptr<ColorSpace> Window::DeviceColorSpace(){
-    auto display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
-    const char* extensions = eglQueryString(display, EGL_EXTENSIONS);
-    if (extensions && strstr(extensions, "EGL_EXT_gl_colorspace_display_p3_passthrough")) {
-        return ColorSpace::DisplayP3();
-    }
-    return nullptr;
+std::shared_ptr<ColorSpace> Window::DeviceColorSpace() {
+  auto display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+  const char* extensions = eglQueryString(display, EGL_EXTENSIONS);
+  if (extensions && strstr(extensions, "EGL_EXT_gl_colorspace_display_p3_passthrough")) {
+    return ColorSpace::DisplayP3();
+  }
+  return nullptr;
 }
 
 std::shared_ptr<EGLWindow> EGLWindow::Current() {
@@ -51,7 +51,7 @@ std::shared_ptr<EGLWindow> EGLWindow::Current() {
   }
   std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB();
   const char* extensions = eglQueryString(device->eglDisplay, EGL_EXTENSIONS);
-  if(extensions && strstr(extensions, "EGL_KHR_gl_colorspace") != nullptr){
+  if (extensions && strstr(extensions, "EGL_KHR_gl_colorspace") != nullptr) {
     EGLint colorSpaceValue;
     EGLBoolean success = eglQuerySurface(device->eglDisplay, device->eglSurface,
                                          EGL_GL_COLORSPACE_KHR, &colorSpaceValue);

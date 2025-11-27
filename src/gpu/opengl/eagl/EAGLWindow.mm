@@ -22,8 +22,8 @@
 #include "gpu/opengl/eagl/EAGLLayerTexture.h"
 
 namespace tgfx {
-std::shared_ptr<ColorSpace> Window::DeviceColorSpace(){
-    return nullptr;
+std::shared_ptr<ColorSpace> Window::DeviceColorSpace() {
+  return nullptr;
 }
 
 std::shared_ptr<EAGLWindow> EAGLWindow::MakeFrom(CAEAGLLayer* layer,

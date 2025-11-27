@@ -108,8 +108,7 @@ std::shared_ptr<QGLWindow> QGLWindow::MakeFrom(QQuickItem* quickItem, bool singl
   if (quickItem == nullptr) {
     return nullptr;
   }
-  auto window =
-      std::shared_ptr<QGLWindow>(new QGLWindow(quickItem, singleBufferMode));
+  auto window = std::shared_ptr<QGLWindow>(new QGLWindow(quickItem, singleBufferMode));
   window->weakThis = window;
   window->initDevice();
   return window;
