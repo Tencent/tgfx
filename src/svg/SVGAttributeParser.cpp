@@ -238,7 +238,7 @@ bool SVGAttributeParser::parseLengthUnitToken(SVGLength::Unit& unit) {
       Unit("%", SVGLength::Unit::Percentage), Unit("em", SVGLength::Unit::EMS),
       Unit("ex", SVGLength::Unit::EXS),       Unit("px", SVGLength::Unit::PX),
       Unit("cm", SVGLength::Unit::CM),        Unit("mm", SVGLength::Unit::MM),
-      Unit("in", SVGLength::Unit::IN),        Unit("pt", SVGLength::Unit::PT),
+      Unit("in", SVGLength::Unit::Inches),    Unit("pt", SVGLength::Unit::PT),
       Unit("pc", SVGLength::Unit::PC),
   };
 
