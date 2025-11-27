@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <utility>
 #include "tgfx/svg/SVGCallback.h"
 #include "tgfx/svg/SVGDOM.h"
 #include "tgfx/svg/xml/XMLDOM.h"
@@ -42,10 +41,10 @@ struct ConstructionContext {
   std::shared_ptr<SVGParseSetter> parseSetter;
 };
 
-using setter = std::function<bool(SVGNode&, SVGAttribute, const std::string&)>;
+using AttributeSetter = std::function<bool(SVGNode&, SVGAttribute, const std::string&)>;
 struct AttrParseInfo {
   SVGAttribute attribute;
-  setter setter;
+  AttributeSetter setter;
 };
 
 class SVGNodeConstructor {

@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <memory>
 #include "ResourceStore.h"
 #include "core/filters/DropShadowImageFilter.h"
 #include "core/filters/GaussianBlurImageFilter.h"
@@ -107,6 +106,15 @@ class ElementWriter {
 
   std::string addImageFilter(const std::shared_ptr<ImageFilter>& imageFilter, Rect bound,
                              const std::shared_ptr<SVGExportWriter>& exportWriter);
+  void callbackBlurImageFilter(const GaussianBlurImageFilter* filter,
+                               const std::shared_ptr<SVGExportWriter>& exportWriter,
+                               ElementWriter& filterElement);
+  void callbackDropShadowImageFilter(const DropShadowImageFilter* filter,
+                                     const std::shared_ptr<SVGExportWriter>& exportWriter,
+                                     ElementWriter& filterElement);
+  void callbackInnerShadowImageFilter(const InnerShadowImageFilter* filter,
+                                      const std::shared_ptr<SVGExportWriter>& exportWriter,
+                                      ElementWriter& filterElement);
   void addBlurImageFilter(const GaussianBlurImageFilter* filter);
   void addDropShadowImageFilter(const DropShadowImageFilter* filter);
   void addInnerShadowImageFilter(const InnerShadowImageFilter* filter);

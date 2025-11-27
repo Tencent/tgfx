@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <memory>
 #include "core/DrawContext.h"
 #include "svg/SVGTextBuilder.h"
 #include "svg/xml/XMLWriter.h"
