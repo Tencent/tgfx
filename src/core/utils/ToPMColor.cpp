@@ -16,19 +16,28 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/processors/RoundStrokeRectGeometryProcessor.h"
+#include "ToPMColor.h"
+#include "ColorSpaceHelper.h"
+#include "core/ColorSpaceXformSteps.h"
 
 namespace tgfx {
-class GLSLRoundStrokeRectGeometryProcessor final : public RoundStrokeRectGeometryProcessor {
- public:
-  GLSLRoundStrokeRectGeometryProcessor(AAType aaType, std::optional<PMColor> commonColor,
-                                       std::optional<Matrix> uvMatrix);
 
-  void emitCode(EmitArgs&) const override;
+PMColor ToPMColor(const Color& color, std::shared_ptr<ColorSpace> dstColorSpace) {
+  if (dstColorSpace == nullptr) {
+    return PMColor{color.red * color.alpha, color.green * color.alpha, color.blue * color.alpha,
+                   color.alpha, color.colorSpace};
+  }
 
-  void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData,
-               FPCoordTransformIter* coordTransformIter) const override;
-};
+  if (!NeedConvertColorSpace(color.colorSpace, dstColorSpace)) {
+    return PMColor{color.red * color.alpha, color.green * color.alpha, color.blue * color.alpha,
+                   color.alpha, color.colorSpace};
+    ;
+  }
+  ColorSpaceXformSteps steps(color.colorSpace.get(), AlphaType::Premultiplied, dstColorSpace.get(),
+                             AlphaType::Premultiplied);
+  auto dstColor = color.premultiply();
+  steps.apply(dstColor.array());
+  dstColor.colorSpace = std::move(dstColorSpace);
+  return dstColor;
+}
 }  // namespace tgfx

@@ -19,7 +19,6 @@
 #pragma once
 
 #include <deque>
-#include <memory>
 #include <unordered_map>
 #include "tgfx/core/Surface.h"
 #include "tgfx/layers/Layer.h"
@@ -29,7 +28,6 @@ class RootLayer;
 class Tile;
 class TileCache;
 class DrawTask;
-class LayerCache;
 
 /**
  * RenderMode defines the different modes of rendering a DisplayList.
@@ -224,45 +222,16 @@ class DisplayList {
   }
 
   /**
-   * Returns the maximum cache size for layer surface caching. This affects the total size of cached
-   * surfaces that can be stored. When the cache exceeds this limit, least recently used entries
-   * are evicted. Set to 0 to disable layer caching.  Default is 64MB.
+   * Returns the background color of the root layer. The background is an infinite rectangle that
+   * covers the entire display area and is drawn using the SrcOver blend mode.
+   * The default value is transparent.
    */
-  size_t layerCacheMaxSize() const;
+  Color backgroundColor() const;
 
   /**
-   * Sets the maximum cache size for layer surface caching.
-   * @param maxSize The maximum cache size in bytes.
+   * Sets the background color of the root layer. 
    */
-  void setLayerCacheMaxSize(size_t maxSize);
-
-  /**
-   * Returns the maximum size of rasterized layer content (in pixels) that can be cached.
-   * Layers with rasterized bounds larger than this size will not be cached.
-   * The default is 64 pixels.
-   */
-  int maxCacheContentSize() const;
-
-  /**
-   * Sets the maximum size of rasterized layer content (in pixels) that can be cached.
-   * Changes to maxCacheContentSize and maxCacheContentScale do not affect layers
-   * that have already been cached.
-   */
-  void setMaxCacheContentSize(int maxSize);
-
-  /**
-   * Returns the maximum content scale for layer caching. Layers with content scale greater than
-   * this value will not be cached to avoid excessive memory usage at high zoom levels.
-   * The default is 0.3.
-   */
-  float maxCacheContentScale() const;
-
-  /**
-   * Sets the maximum content scale for layer caching.
-   * Changes to maxCacheContentSize and maxCacheContentScale do not affect layers
-   * that have already been cached.
-   */
-  void setMaxCacheContentScale(float maxScale);
+  void setBackgroundColor(const Color& color);
 
   /**
    * Sets whether to show dirty regions during rendering. When enabled, the dirty regions will be
@@ -287,7 +256,6 @@ class DisplayList {
 
  private:
   std::shared_ptr<RootLayer> _root = nullptr;
-  std::unique_ptr<LayerCache> layerCache;
   int64_t _zoomScaleInt = 1000;
   int _zoomScalePrecision = 1000;
   Point _contentOffset = {};
@@ -359,8 +327,7 @@ class DisplayList {
 
   void drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
                      bool autoClear) const;
-  void updateMousePosition();
 
-  friend class RootLayer;
+  void updateMousePosition();
 };
 }  // namespace tgfx

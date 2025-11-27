@@ -3439,159 +3439,117 @@ TGFX_TEST(LayerTest, Matrix) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D_2D_3D"));
 }
 
-TGFX_TEST(LayerTest, DisplayListLayerCacheWithSmallSize) {
+TGFX_TEST(LayerTest, RasterizedContentWithMask) {
   ContextScope scope;
   auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-
-  // Create a display list with very restrictive cache settings
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 200);
   auto displayList = std::make_unique<DisplayList>();
-  // Set max cache size to 20x20 pixels - smaller than the layer we'll create
-  displayList->setMaxCacheContentSize(20.0f);
-  displayList->setMaxCacheContentScale(0.5f);
 
-  auto surface = Surface::Make(context, 200, 200);
-  ASSERT_TRUE(surface != nullptr);
+  // Create a rasterized content layer with a mask
+  auto rootLayer = Layer::Make();
+  displayList->root()->addChild(rootLayer);
 
-  // Create a layer that's larger than the max cache size (50x50)
-  auto rootLayer = displayList->root();
-  auto shapeLayer = ShapeLayer::Make();
-  Path path;
-  path.addRect(Rect::MakeXYWH(50, 50, 50, 50));
-  shapeLayer->setPath(path);
-  shapeLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 0, 0, 255)));
-  rootLayer->addChild(shapeLayer);
+  // Create a rasterized content layer with some shapes
+  auto rasterizedLayer = Layer::Make();
+  rasterizedLayer->setMatrix(Matrix::MakeTrans(50, 50));
+  rasterizedLayer->setShouldRasterize(true);
+  rootLayer->addChild(rasterizedLayer);
 
-  // First render - layer should NOT be cached because it exceeds max cache size
+  // Add a blue rectangle
+  auto blueRect = ShapeLayer::Make();
+  Path bluePath;
+  bluePath.addRect(Rect::MakeWH(80, 80));
+  blueRect->setPath(bluePath);
+  blueRect->setFillStyle(SolidColor::Make(Color::Blue()));
+  rasterizedLayer->addChild(blueRect);
+
+  // Add a red oval
+  auto redOval = ShapeLayer::Make();
+  redOval->setMatrix(Matrix::MakeTrans(60, 0));
+  Path ovalPath;
+  ovalPath.addOval(Rect::MakeXYWH(0, 0, 80, 80));
+  redOval->setPath(ovalPath);
+  redOval->setFillStyle(SolidColor::Make(Color::Red()));
+  rasterizedLayer->addChild(redOval);
+
+  // Create a mask for the rasterized layer
+  auto maskLayer = ShapeLayer::Make();
+  Path maskPath;
+  maskPath.addOval(Rect::MakeXYWH(-10, -10, 100, 100));
+  maskLayer->setPath(maskPath);
+  maskLayer->setFillStyle(SolidColor::Make(Color::White()));
+  rasterizedLayer->setMask(maskLayer);
+  rootLayer->addChild(maskLayer);
+
   displayList->render(surface.get());
-  auto initialCacheSize = displayList->layerCache->currentCacheSize();
-
-  // Render again - still should not use cache
-  surface = Surface::Make(context, 200, 200);
-  displayList->render(surface.get());
-
-  // Cache size should remain zero since layer is too large
-  EXPECT_EQ(displayList->layerCache->currentCacheSize(), initialCacheSize);
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/RasterizedContentWithMask"));
 }
 
-TGFX_TEST(LayerTest, DisplayListLayerCacheWithLargeScale) {
+TGFX_TEST(LayerTest, DisplayListBackground) {
   ContextScope scope;
   auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-
-  // Create a display list with scale restriction
-  auto displayList = std::make_unique<DisplayList>();
-  displayList->setMaxCacheContentSize(100.0f);
-  displayList->setMaxCacheContentScale(0.2f);  // Very restrictive scale limit
-
+  EXPECT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 200, 200);
-  ASSERT_TRUE(surface != nullptr);
+  auto displayList = std::make_unique<DisplayList>();
 
-  // Create a small rasterizable layer
-  auto rootLayer = displayList->root();
+  // Test default background color (transparent)
+  auto defaultColor = displayList->backgroundColor();
+  EXPECT_EQ(defaultColor, Color::Transparent());
+
+  // Test setting opaque background color
+  auto opaqueColor = Color::FromRGBA(255, 0, 0, 255);
+  displayList->setBackgroundColor(opaqueColor);
+  EXPECT_EQ(displayList->backgroundColor(), opaqueColor);
+
+  // Render with opaque background
+  auto rootLayer = Layer::Make();
+  displayList->root()->addChild(rootLayer);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DisplayListBackground_OpaqueRed"));
+
+  // Test setting semi-transparent background color
+  auto semiTransparentColor = Color::FromRGBA(0, 255, 0, 128);
+  displayList->setBackgroundColor(semiTransparentColor);
+  EXPECT_EQ(displayList->backgroundColor(), semiTransparentColor);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DisplayListBackground_SemiTransparentGreen"));
+
+  // Test setting different background colors
+  auto blueColor = Color::FromRGBA(0, 0, 255, 255);
+  displayList->setBackgroundColor(blueColor);
+  EXPECT_EQ(displayList->backgroundColor(), blueColor);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DisplayListBackground_Blue"));
+
+  // Test adding layers and rendering with different background colors
   auto shapeLayer = ShapeLayer::Make();
   Path path;
-  path.addOval(Rect::MakeXYWH(50, 50, 30, 30));
+  path.addRect(Rect::MakeXYWH(50, 50, 100, 100));
   shapeLayer->setPath(path);
-  shapeLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 255, 0, 255)));
+  shapeLayer->setFillStyle(SolidColor::Make(Color::White()));
   rootLayer->addChild(shapeLayer);
 
-  // Render with zoom scale that exceeds max cache scale
-  displayList->setZoomScale(0.5f);  // Exceeds max cache scale of 0.2f
+  auto whiteBackgroundColor = Color::FromRGBA(255, 255, 255, 255);
+  displayList->setBackgroundColor(whiteBackgroundColor);
   displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DisplayListBackground_WhiteWithShape"));
 
-  // Reset zoom and render again
-  displayList->setZoomScale(1.0f);
-  surface = Surface::Make(context, 200, 200);
+  // Test resetting to transparent background
+  displayList->setBackgroundColor(Color::Transparent());
+  EXPECT_EQ(displayList->backgroundColor(), Color::Transparent());
   displayList->render(surface.get());
-  auto cacheSize2 = displayList->layerCache->currentCacheSize();
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DisplayListBackground_TransparentWithShape"));
 
-  // With lower zoom, cache should now work (if layer size is appropriate)
-  EXPECT_GE(cacheSize2, static_cast<size_t>(0));
-}
-
-TGFX_TEST(LayerTest, DisplayListLayerCacheVerification) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-
-  // Create a display list with reasonable cache settings
-  auto displayList = std::make_unique<DisplayList>();
-  displayList->setMaxCacheContentSize(100.0f);  // Can cache up to 100x100 layers
-  displayList->setMaxCacheContentScale(0.5f);   // Can cache content up to 0.5x scale
-
-  auto surface = Surface::Make(context, 200, 200);
-  ASSERT_TRUE(surface != nullptr);
-
-  // Create a small rasterizable layer that fits cache requirements
-  auto rootLayer = displayList->root();
-  auto shapeLayer = ShapeLayer::Make();
-  Path path;
-  path.addOval(Rect::MakeXYWH(60, 60, 40, 40));
-  shapeLayer->setPath(path);
-  shapeLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 0, 0, 255)));
-  rootLayer->addChild(shapeLayer);
-
-  // First render - content should be cached
+  // Test background color with different render modes
+  displayList->setBackgroundColor(Color::FromRGBA(200, 100, 50, 255));
+  displayList->setRenderMode(RenderMode::Partial);
   displayList->render(surface.get());
-  auto snapshot1 = surface->makeImageSnapshot();
-  ASSERT_TRUE(snapshot1 != nullptr);
-  auto cacheSize1 = displayList->layerCache->currentCacheSize();
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DisplayListBackground_PartialRender"));
 
-  // Render again - should use cached content
-  surface = Surface::Make(context, 200, 200);
+  displayList->setRenderMode(RenderMode::Tiled);
   displayList->render(surface.get());
-  auto snapshot2 = surface->makeImageSnapshot();
-  ASSERT_TRUE(snapshot2 != nullptr);
-  auto cacheSize2 = displayList->layerCache->currentCacheSize();
-
-  // Cache should be reused
-  EXPECT_EQ(cacheSize1, cacheSize2);
-  EXPECT_EQ(snapshot1->width(), snapshot2->width());
-  EXPECT_EQ(snapshot1->height(), snapshot2->height());
-
-  // Verify baseline
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DisplayListLayerCacheVerification"));
-}
-
-TGFX_TEST(LayerTest, DisplayListLayerCacheUpdate) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-
-  auto displayList = std::make_unique<DisplayList>();
-  displayList->setMaxCacheContentSize(100.0f);
-  displayList->setMaxCacheContentScale(0.5f);
-  displayList->setZoomScale(0.4f);
-
-  auto surface = Surface::Make(context, 200, 200);
-  ASSERT_TRUE(surface != nullptr);
-
-  // Create a rasterizable layer
-  auto rootLayer = displayList->root();
-  auto shapeLayer = ShapeLayer::Make();
-  Path path;
-  path.addRect(Rect::MakeXYWH(60, 60, 40, 40));
-  shapeLayer->setPath(path);
-  shapeLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 255, 0, 255)));
-  rootLayer->addChild(shapeLayer);
-
-  // First render - cache content
-  displayList->render(surface.get());
-  auto cachedSizeBefore = displayList->layerCache->currentCacheSize();
-
-  // Modify the layer
-  Path newPath;
-  newPath.addRect(Rect::MakeXYWH(70, 70, 30, 30));
-  shapeLayer->setPath(newPath);
-
-  // Re-render - cache should be updated
-  surface = Surface::Make(context, 200, 200);
-  displayList->render(surface.get());
-  auto updatedCacheSize = displayList->layerCache->currentCacheSize();
-
-  // Cache should be updated with new content
-  EXPECT_NE(updatedCacheSize, cachedSizeBefore);
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DisplayListBackground_TiledRender"));
 }
 
 }  // namespace tgfx

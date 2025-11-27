@@ -594,8 +594,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::shared_ptr<Image> getRasterizedImage(const DrawArgs& args, float contentScale,
                                             Matrix* drawingMatrix);
 
-  void drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
-                 const Matrix3D* transform = nullptr);
+  virtual void drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
+                         const Matrix3D* transform = nullptr);
 
   void drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                      const Matrix3D* transform);
@@ -660,21 +660,15 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   bool hasBackgroundStyle();
 
-  std::shared_ptr<BackgroundContext> createBackgroundContext(Context* context, const Rect& drawRect,
-                                                             const Matrix& viewMatrix,
-                                                             bool fullLayer = false) const;
+  std::shared_ptr<BackgroundContext> createBackgroundContext(
+      Context* context, const Rect& drawRect, const Matrix& viewMatrix, bool fullLayer = false,
+      std::shared_ptr<ColorSpace> colorSpace = nullptr) const;
 
   static std::shared_ptr<Picture> RecordPicture(DrawMode mode, float contentScale,
                                                 const std::function<void(Canvas*)>& drawFunction);
 
-  bool shouldPassThroughBackground(BlendMode blendMode, const Matrix3D* transform) const;
-
   bool drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                      const Matrix3D* transform);
-
-  void drawContentOffscreen(const DrawArgs& args, Canvas* canvas, std::optional<Rect> clipBounds,
-                            float contentScale, BlendMode blendMode, float alpha,
-                            const Matrix3D* transform, bool cacheContent);
 
   std::shared_ptr<Image> getContentImage(const DrawArgs& args, float contentScale,
                                          const std::shared_ptr<Image>& passThroughImage,

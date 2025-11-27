@@ -28,13 +28,13 @@
 
 namespace tgfx {
 struct RectRecord {
-  RectRecord(const Rect& rect, const Matrix& viewMatrix, const Color& color = {})
+  RectRecord(const Rect& rect, const Matrix& viewMatrix, const PMColor& color = {})
       : rect(rect), viewMatrix(viewMatrix), color(color) {
   }
 
   Rect rect;
   Matrix viewMatrix;
-  Color color;
+  PMColor color;
 };
 
 enum class UVSubsetMode { None, SubsetOnly, RoundOutAndSubset };
@@ -115,7 +115,7 @@ class RectsVertexProvider : public VertexProvider {
   /**
    * Returns the first color in the provider. If no color record exists, a white color is returned.
    */
-  const Color& firstColor() const {
+  const PMColor& firstColor() const {
     return rects.front()->color;
   }
 

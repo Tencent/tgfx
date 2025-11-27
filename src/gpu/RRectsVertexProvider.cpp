@@ -73,7 +73,7 @@ PlacementPtr<RRectsVertexProvider> RRectsVertexProvider::MakeFrom(
                                                std::move(strokeArray), allocator->addReference());
 }
 
-static void WriteUByte4Color(float* vertices, int& index, const Color& color) {
+static void WriteUByte4Color(float* vertices, int& index, const PMColor& color) {
   auto bytes = reinterpret_cast<uint8_t*>(&vertices[index++]);
   bytes[0] = static_cast<uint8_t>(color.red * 255);
   bytes[1] = static_cast<uint8_t>(color.green * 255);

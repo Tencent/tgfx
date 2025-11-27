@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,18 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
-#include "gpu/processors/EllipseGeometryProcessor.h"
-
+#include "tgfx/core/Color.h"
 namespace tgfx {
-class GLSLEllipseGeometryProcessor : public EllipseGeometryProcessor {
- public:
-  GLSLEllipseGeometryProcessor(int width, int height, bool stroke,
-                               std::optional<PMColor> commonColor);
-
-  void emitCode(EmitArgs& args) const override;
-
-  void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData,
-               FPCoordTransformIter* transformIter) const override;
-};
+PMColor ToPMColor(const Color& color, std::shared_ptr<ColorSpace> dstColorSpace);
 }  // namespace tgfx

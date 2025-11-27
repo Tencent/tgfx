@@ -18,21 +18,27 @@
 
 #pragma once
 
+#include <cstdint>
+
 namespace tgfx {
-class Fill;
-
 /**
- * FillModifier is an interface for modifying the properties of a Fill used in drawing commands. It
- * allows you to adjust the color, alpha, or other attributes of a Fill before it is applied to a
- * picture record.
+ * Recording represents a snapshot of rendering commands that have been flushed from a Context but
+ * not yet submitted to the GPU. This allows for deferred submission, giving applications control
+ * over when GPU work is actually queued for execution. A Recording can be submitted to the GPU via
+ * Context::submit().
+ * Note: If multiple Recording objects are created, submitting a later Recording will force all
+ * earlier Recordings to be submitted first, maintaining the correct rendering order.
  */
-class FillModifier {
- public:
-  virtual ~FillModifier() = default;
+class Recording {
+ private:
+  Recording(uint32_t contextID, uint32_t drawingBufferID, uint64_t generation)
+      : contextID(contextID), drawingBufferID(drawingBufferID), generation(generation) {
+  }
 
-  /**
-   * Transforms the given Fill and returns a new Fill with the modifications applied.
-   */
-  virtual Fill transform(const Fill& fill) const = 0;
+  uint32_t contextID = 0;
+  uint32_t drawingBufferID = 0;
+  uint64_t generation = 0;
+
+  friend class Context;
 };
 }  // namespace tgfx

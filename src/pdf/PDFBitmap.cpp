@@ -233,7 +233,11 @@ void DoDeflatedImage(const Pixmap& pixmap, PDFDocumentImpl* document, bool isOpa
     }
     default:
       auto colorSpaceRef = document->colorSpaceRef();
-      colorSpace = PDFUnion::Ref(colorSpaceRef);
+      if (colorSpaceRef) {
+        colorSpace = PDFUnion::Ref(colorSpaceRef);
+      } else {
+        colorSpace = PDFUnion::Name("DeviceRGB");
+      }
       const auto pixelPointer = reinterpret_cast<const uint8_t*>(pixmap.pixels());
       auto rowBytes = pixmap.rowBytes();
 

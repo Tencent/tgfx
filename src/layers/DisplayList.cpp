@@ -92,6 +92,27 @@ class DrawTask {
   }
 };
 
+static std::vector<Rect> GetNonIntersectingRects(const Rect& a, const Rect& b) {
+  std::vector<Rect> rects = {};
+  auto leftRect = Rect::MakeLTRB(a.left, a.top, b.left, b.bottom);
+  if (!leftRect.isEmpty()) {
+    rects.emplace_back(leftRect);
+  }
+  auto topRect = Rect::MakeLTRB(b.left, a.top, a.right, b.top);
+  if (!topRect.isEmpty()) {
+    rects.emplace_back(topRect);
+  }
+  auto rightRect = Rect::MakeLTRB(b.right, b.top, a.right, a.bottom);
+  if (!rightRect.isEmpty()) {
+    rects.emplace_back(rightRect);
+  }
+  auto bottomRect = Rect::MakeLTRB(a.left, b.bottom, b.right, a.bottom);
+  if (!bottomRect.isEmpty()) {
+    rects.emplace_back(bottomRect);
+  }
+  return rects;
+}
+
 static float ToZoomScaleFloat(int64_t zoomScaleInt, int64_t precision) {
   if (zoomScaleInt < 0) {
     return static_cast<float>(precision) / static_cast<float>(-zoomScaleInt);
@@ -238,28 +259,14 @@ void DisplayList::setMaxTileCount(int count) {
   resetCaches();
 }
 
-size_t DisplayList::layerCacheMaxSize() const {
-  return layerCache->currentCacheSize();
+Color DisplayList::backgroundColor() const {
+  return _root->backgroundColor();
 }
 
-void DisplayList::setLayerCacheMaxSize(size_t maxSize) {
-  layerCache->setMaxCacheSize(maxSize);
-}
-
-int DisplayList::maxCacheContentSize() const {
-  return layerCache->maxCacheContentSize();
-}
-
-void DisplayList::setMaxCacheContentSize(int maxSize) {
-  layerCache->setMaxCacheContentSize(maxSize);
-}
-
-float DisplayList::maxCacheContentScale() const {
-  return layerCache->maxCacheContentScale();
-}
-
-void DisplayList::setMaxCacheContentScale(float maxScale) {
-  layerCache->setMaxCacheContentScale(maxScale);
+void DisplayList::setBackgroundColor(const Color& color) {
+  if (_root->setBackgroundColor(color)) {
+    resetCaches();
+  }
 }
 
 void DisplayList::showDirtyRegions(bool show) {
@@ -353,9 +360,10 @@ std::vector<Rect> DisplayList::renderPartial(Surface* surface, bool autoClear,
   bool cacheChanged = false;
   auto partialCache = surfaceCaches.empty() ? nullptr : surfaceCaches.front();
   if (partialCache == nullptr || partialCache->getContext() != context ||
-      partialCache->width() != surface->width() || partialCache->height() != surface->height()) {
+      partialCache->width() != surface->width() || partialCache->height() != surface->height() ||
+      !ColorSpace::Equals(partialCache->colorSpace().get(), surface->colorSpace().get())) {
     partialCache = Surface::Make(context, surface->width(), surface->height(), ColorType::RGBA_8888,
-                                 1, false, surface->renderFlags());
+                                 1, false, surface->renderFlags(), surface->colorSpace());
     if (partialCache == nullptr) {
       LOGE("DisplayList::renderPartial: Failed to create partial cache surface.");
       return renderDirect(surface, autoClear);
@@ -517,10 +525,23 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
   }
   auto renderRect = Rect::MakeWH(surface->width(), surface->height());
   renderRect.offset(-_contentOffset.x, -_contentOffset.y);
+
+  auto renderBounds = _root->renderBounds;
+  auto zoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
+  renderBounds.scale(zoomScale, zoomScale);
+  renderBounds.roundOut();
+  if (!renderRect.intersect(renderBounds)) {
+    return {};
+  }
   int startX = static_cast<int>(floorf(renderRect.left / static_cast<float>(_tileSize)));
   int startY = static_cast<int>(floorf(renderRect.top / static_cast<float>(_tileSize)));
   int endX = static_cast<int>(ceilf(renderRect.right / static_cast<float>(_tileSize)));
   int endY = static_cast<int>(ceilf(renderRect.bottom / static_cast<float>(_tileSize)));
+
+  if (startX >= endX || startY >= endY) {
+    return {};
+  }
+
   std::vector<DrawTask> screenTasks = {};
   std::vector<std::pair<int, int>> dirtyGrids = {};
   auto tileCount = static_cast<size_t>(endX - startX) * static_cast<size_t>(endY - startY);
@@ -532,7 +553,8 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
   for (const auto& [tileX, tileY] : sortedTiles) {
     auto tile = currentTileCache->getTile(tileX, tileY);
     if (tile != nullptr) {
-      screenTasks.emplace_back(tile, _tileSize);
+      auto tileRect = tile->getTileRect(_tileSize, &renderRect);
+      screenTasks.emplace_back(tile, _tileSize, tileRect);
     } else {
       if (_allowZoomBlur) {
         auto fallbackTasks = getFallbackDrawTasks(tileX, tileY, fallbackTileCaches);
@@ -570,7 +592,8 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
     tile->tileX = grid.first;
     tile->tileY = grid.second;
     taskTiles.push_back(tile);
-    screenTasks.emplace_back(tile, _tileSize);
+    auto tileRect = tile->getTileRect(_tileSize, &renderRect);
+    screenTasks.emplace_back(tile, _tileSize, tileRect);
     currentTileCache->addTile(tile);
   }
   if (continuous && !hasZoomBlurTiles) {
@@ -642,18 +665,25 @@ std::vector<DrawTask> DisplayList::getFallbackDrawTasks(
   auto tileStartX = tileX * _tileSize;
   auto tileStartY = tileY * _tileSize;
   std::vector<DrawTask> tasks = {};
+  auto renderBounds = _root->renderBounds;
+  renderBounds.scale(currentZoomScale, currentZoomScale);
+  renderBounds.roundOut();
   for (int gridX = 0; gridX < gridCount; gridX++) {
     for (int gridY = 0; gridY < gridCount; gridY++) {
       auto gridStartX = tileStartX + gridX * gridSize;
       auto gridStartY = tileStartY + gridY * gridSize;
       bool found = false;
+      auto gridRect = Rect::MakeXYWH(gridStartX, gridStartY, gridSize, gridSize);
+      if (!gridRect.intersect(renderBounds)) {
+        continue;
+      }
       for (auto& [scale, tileCache] : fallbackCaches) {
         if (scale == currentZoomScale || tileCache->empty()) {
           continue;
         }
         auto scaleRatio = scale / currentZoomScale;
         DEBUG_ASSERT(scaleRatio != 0.0f);
-        auto zoomedRect = Rect::MakeXYWH(gridStartX, gridStartY, gridSize, gridSize);
+        auto zoomedRect = gridRect;
         zoomedRect.scale(scaleRatio, scaleRatio);
         auto tiles = tileCache->getTilesUnderRect(zoomedRect, true);
         if (tiles.empty()) {
@@ -753,8 +783,9 @@ std::vector<std::shared_ptr<Tile>> DisplayList::createContinuousTiles(const Surf
     countY = requestCountY;
     countX = static_cast<int>(ceilf(static_cast<float>(tileCount) / static_cast<float>(countY)));
   }
-  auto surface = Surface::Make(context, countX * _tileSize, countY * _tileSize,
-                               ColorType::RGBA_8888, 1, false, renderSurface->renderFlags());
+  auto surface =
+      Surface::Make(context, countX * _tileSize, countY * _tileSize, ColorType::RGBA_8888, 1, false,
+                    renderSurface->renderFlags(), renderSurface->colorSpace());
   if (surface == nullptr) {
     return {};
   }
@@ -789,8 +820,9 @@ bool DisplayList::createEmptyTiles(const Surface* renderSurface) {
   }
   int countX = static_cast<int>(sqrtf(static_cast<float>(tileCount)));
   int countY = static_cast<int>(ceilf(static_cast<float>(tileCount) / static_cast<float>(countX)));
-  auto surface = Surface::Make(context, countX * _tileSize, countY * _tileSize,
-                               ColorType::RGBA_8888, 1, false, renderSurface->renderFlags());
+  auto surface =
+      Surface::Make(context, countX * _tileSize, countY * _tileSize, ColorType::RGBA_8888, 1, false,
+                    renderSurface->renderFlags(), renderSurface->colorSpace());
   if (surface == nullptr) {
     return false;
   }
@@ -861,12 +893,27 @@ void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* su
   }
   static SamplingOptions sampling(FilterMode::Nearest, MipmapMode::None);
   canvas->setMatrix(Matrix::MakeTrans(_contentOffset.x, _contentOffset.y));
+  Rect tileRect = {};
   for (auto& task : screenTasks) {
     auto surfaceCache = surfaceCaches[task.sourceIndex()];
     DEBUG_ASSERT(surfaceCache != nullptr);
     auto image = surfaceCache->makeImageSnapshot();
     canvas->drawImageRect(image, task.sourceRect(), task.tileRect(), sampling, &paint,
                           SrcRectConstraint::Strict);
+    tileRect.join(task.tileRect());
+  }
+
+  auto screenRect = Rect::MakeWH(surface->width(), surface->height());
+  screenRect.offset(-_contentOffset.x, -_contentOffset.y);
+  screenRect.roundOut();
+  if (tileRect.contains(screenRect)) {
+    return;
+  }
+
+  paint.setColor(_root->backgroundColor());
+  auto backgroundRect = GetNonIntersectingRects(screenRect, tileRect);
+  for (auto& rect : backgroundRect) {
+    canvas->drawRect(rect, paint);
   }
 }
 
@@ -929,7 +976,8 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   auto renderRect = inverse.mapRect(drawRect);
   renderRect.roundOut();
   args.renderRect = &renderRect;
-  args.blurBackground = _root->createBackgroundContext(context, drawRect, viewMatrix);
+  args.blurBackground =
+      _root->createBackgroundContext(context, drawRect, viewMatrix, false, args.dstColorSpace);
   args.dstColorSpace = surface->colorSpace();
   args.layerCache = layerCache.get();
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
@@ -948,4 +996,5 @@ void DisplayList::updateMousePosition() {
   mousePosition = (_contentOffset - lastContentOffset * scale) * invScaleFactor;
   mousePosition -= _contentOffset;
 }
+
 }  // namespace tgfx

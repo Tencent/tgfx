@@ -40,8 +40,8 @@
 
 namespace tgfx {
 
-Resources::Resources(const Fill& fill) {
-  paintColor = ToSVGColor(fill.color);
+Resources::Resources(const Brush& brush) {
+  paintColor = ToSVGColor(brush.color);
 }
 
 ElementWriter::ElementWriter(const std::string& name, XMLWriter* writer) : writer(writer) {
@@ -60,14 +60,14 @@ ElementWriter::ElementWriter(const std::string& name, const std::unique_ptr<XMLW
 
 ElementWriter::ElementWriter(const std::string& name, Context* context,
                              SVGExportContext* svgContext, XMLWriter* writer, ResourceStore* bucket,
-                             bool disableWarning, const MCState& state, const Fill& fill,
+                             bool disableWarning, const MCState& state, const Brush& brush,
                              const Stroke* stroke)
     : writer(writer), resourceStore(bucket), disableWarning(disableWarning) {
-  Resources resource = addResources(fill, context, svgContext);
+  Resources resource = addResources(brush, context, svgContext);
 
   writer->startElement(name);
 
-  addFillAndStroke(fill, stroke, resource);
+  addFillAndStroke(brush, stroke, resource);
 
   if (!state.matrix.isIdentity()) {
     addAttribute("transform", ToSVGTransform(state.matrix));
@@ -85,15 +85,15 @@ void ElementWriter::reportUnsupportedElement(const char* message) const {
   }
 }
 
-void ElementWriter::addFillAndStroke(const Fill& fill, const Stroke* stroke,
+void ElementWriter::addFillAndStroke(const Brush& brush, const Stroke* stroke,
                                      const Resources& resources) {
   if (!stroke) {  //fill draw
     static const std::string defaultFill = "black";
     if (resources.paintColor != defaultFill) {
       addAttribute("fill", resources.paintColor);
     }
-    if (!fill.isOpaque()) {
-      addAttribute("fill-opacity", fill.color.alpha);
+    if (!brush.isOpaque()) {
+      addAttribute("fill-opacity", brush.color.alpha);
     }
   } else {  //stroke draw
     addAttribute("fill", "none");
@@ -122,13 +122,13 @@ void ElementWriter::addFillAndStroke(const Fill& fill, const Stroke* stroke,
       addAttribute("stroke-miterlimit", stroke->miterLimit);
     }
 
-    if (!fill.isOpaque()) {
-      addAttribute("stroke-opacity", fill.color.alpha);
+    if (!brush.isOpaque()) {
+      addAttribute("stroke-opacity", brush.color.alpha);
     }
   }
 
-  if (fill.blendMode != BlendMode::SrcOver) {
-    auto blendModeString = ToSVGBlendMode(fill.blendMode);
+  if (brush.blendMode != BlendMode::SrcOver) {
+    auto blendModeString = ToSVGBlendMode(brush.blendMode);
     if (!blendModeString.empty()) {
       addAttribute("style", blendModeString);
     } else {
@@ -393,16 +393,16 @@ void ElementWriter::addInnerShadowImageFilter(const InnerShadowImageFilter* filt
   }
 }
 
-Resources ElementWriter::addResources(const Fill& fill, Context* context,
+Resources ElementWriter::addResources(const Brush& brush, Context* context,
                                       SVGExportContext* svgContext) {
-  Resources resources(fill);
+  Resources resources(brush);
 
-  if (auto shader = fill.shader) {
+  if (auto shader = brush.shader) {
     ElementWriter defs("defs", writer);
     addShaderResources(shader, context, &resources);
   }
 
-  if (auto colorFilter = fill.colorFilter) {
+  if (auto colorFilter = brush.colorFilter) {
     auto type = Types::Get(colorFilter.get());
     switch (type) {
       case Types::ColorFilterType::Blend:
@@ -419,7 +419,7 @@ Resources ElementWriter::addResources(const Fill& fill, Context* context,
     }
   }
 
-  if (auto maskFilter = fill.maskFilter) {
+  if (auto maskFilter = brush.maskFilter) {
     addMaskResources(maskFilter, &resources, context, svgContext);
   }
 

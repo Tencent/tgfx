@@ -24,7 +24,7 @@
 namespace tgfx {
 class DefaultGeometryProcessor : public GeometryProcessor {
  public:
-  static PlacementPtr<DefaultGeometryProcessor> Make(BlockAllocator* allocator, Color color,
+  static PlacementPtr<DefaultGeometryProcessor> Make(BlockAllocator* allocator, PMColor color,
                                                      int width, int height, AAType aa,
                                                      const Matrix& viewMatrix,
                                                      const Matrix& uvMatrix);
@@ -36,15 +36,15 @@ class DefaultGeometryProcessor : public GeometryProcessor {
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  DefaultGeometryProcessor(Color color, int width, int height, AAType aa, const Matrix& viewMatrix,
-                           const Matrix& uvMatrix);
+  DefaultGeometryProcessor(PMColor color, int width, int height, AAType aa,
+                           const Matrix& viewMatrix, const Matrix& uvMatrix);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
   Attribute position;
   Attribute coverage;
 
-  Color color;
+  PMColor color;
   int width = 1;
   int height = 1;
   AAType aa = AAType::None;

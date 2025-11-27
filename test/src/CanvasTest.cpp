@@ -129,9 +129,9 @@ TGFX_TEST(CanvasTest, DiscardContent) {
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
   surface->renderContext->flush();
-  auto drawingManager = context->drawingManager();
-  ASSERT_TRUE(drawingManager->renderTasks.size() == 1);
-  auto task = static_cast<OpsRenderTask*>(drawingManager->renderTasks.front().get());
+  auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+  ASSERT_TRUE(drawingBuffer->renderTasks.size() == 1);
+  auto task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.front().get());
   EXPECT_TRUE(task->drawOps.size() == 0);
 
   Paint paint;
@@ -140,8 +140,8 @@ TGFX_TEST(CanvasTest, DiscardContent) {
   paint.setBlendMode(BlendMode::Src);
   canvas->drawRect(Rect::MakeWH(width, height), paint);
   surface->renderContext->flush();
-  ASSERT_TRUE(drawingManager->renderTasks.size() == 2);
-  task = static_cast<OpsRenderTask*>(drawingManager->renderTasks.back().get());
+  ASSERT_TRUE(drawingBuffer->renderTasks.size() == 2);
+  task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
   EXPECT_TRUE(task->drawOps.size() == 0);
 
   paint.setColor(Color{0.8f, 0.8f, 0.8f, 1.f});
@@ -152,8 +152,8 @@ TGFX_TEST(CanvasTest, DiscardContent) {
       {Color{0.f, 1.f, 0.f, 1.f}, Color{0.f, 0.f, 0.f, 1.f}}, {}));
   canvas->drawPaint(paint);
   surface->renderContext->flush();
-  ASSERT_TRUE(drawingManager->renderTasks.size() == 3);
-  task = static_cast<OpsRenderTask*>(drawingManager->renderTasks.back().get());
+  ASSERT_TRUE(drawingBuffer->renderTasks.size() == 3);
+  task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
   EXPECT_TRUE(task->drawOps.size() == 1);
   context->flushAndSubmit();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DiscardContent"));
@@ -187,9 +187,9 @@ TGFX_TEST(CanvasTest, merge_draw_call_rect) {
     }
   }
   surface->renderContext->flush();
-  auto drawingManager = context->drawingManager();
-  EXPECT_TRUE(drawingManager->renderTasks.size() == 1);
-  auto task = static_cast<OpsRenderTask*>(drawingManager->renderTasks.front().get());
+  auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+  EXPECT_TRUE(drawingBuffer->renderTasks.size() == 1);
+  auto task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.front().get());
   ASSERT_TRUE(task->drawOps.size() == 1);
   EXPECT_EQ(static_cast<RectDrawOp*>(task->drawOps.back().get())->rectCount, drawCallCount);
   context->flushAndSubmit();
@@ -227,9 +227,9 @@ TGFX_TEST(CanvasTest, merge_draw_call_rrect) {
     }
   }
   surface->renderContext->flush();
-  auto drawingManager = context->drawingManager();
-  EXPECT_TRUE(drawingManager->renderTasks.size() == 1);
-  auto task = static_cast<OpsRenderTask*>(drawingManager->renderTasks.front().get());
+  auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+  EXPECT_TRUE(drawingBuffer->renderTasks.size() == 1);
+  auto task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.front().get());
   ASSERT_TRUE(task->drawOps.size() == 1);
   EXPECT_EQ(static_cast<RRectDrawOp*>(task->drawOps.back().get())->rectCount, drawCallCount);
   context->flushAndSubmit();
@@ -1396,23 +1396,23 @@ TGFX_TEST(CanvasTest, Picture) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/PictureImage_Path"));
 }
 
-class ColorModifier : public FillModifier {
+class ColorModifier : public BrushModifier {
  public:
   explicit ColorModifier(Color color) : color(color) {
   }
 
-  Fill transform(const Fill& fill) const override {
-    auto newFill = fill;
-    newFill.color = color;
-    newFill.color.alpha *= fill.color.alpha;
-    return newFill;
+  Brush transform(const Brush& brush) const override {
+    auto newBrush = brush;
+    newBrush.color = color;
+    newBrush.color.alpha *= brush.color.alpha;
+    return newBrush;
   }
 
  private:
   Color color = {};
 };
 
-TGFX_TEST(CanvasTest, FillModifier) {
+TGFX_TEST(CanvasTest, BrushModifier) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -1433,7 +1433,7 @@ TGFX_TEST(CanvasTest, FillModifier) {
   canvas->translate(15, 15);
   ColorModifier colorModifier(Color::Green());
   picture->playback(canvas, &colorModifier);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/FillModifier"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/BrushModifier"));
 }
 
 TGFX_TEST(CanvasTest, BlendModeTest) {
@@ -3213,14 +3213,9 @@ TGFX_TEST(CanvasTest, ColorSpace) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface =
-      Surface::Make(context, 1024, 1024, false, 1, false, 0,
-                    ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3));
+  auto surface = Surface::Make(context, 1024, 1024, false, 1, false, 0, ColorSpace::DisplayP3());
   auto canvas = surface->getCanvas();
-  canvas->drawColor(
-      Color::FromRGBA(0, 255, 0, 255,
-                      ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3)),
-      BlendMode::SrcOver);
+  canvas->drawColor(Color::FromRGBA(0, 255, 0, 255, ColorSpace::DisplayP3()), BlendMode::SrcOver);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawP3ColorToP3"));
   canvas->clear();
   Paint paint;

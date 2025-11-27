@@ -64,14 +64,29 @@ class RootLayer : public Layer {
    */
   std::vector<Rect> updateDirtyRegions();
 
+  /**
+   * Returns the background color of the root layer.
+   */
+  Color backgroundColor() const {
+    return _backgroundColor;
+  }
+
+  /**
+   * Sets the background color of the root layer.
+   * @return true if the background color is changed.
+   */
+  bool setBackgroundColor(const Color& color);
+
   void invalidCache(const Layer* layer);
+
+ protected:
+  void drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
+                 const Matrix3D* transform = nullptr) override;
 
  private:
   std::vector<Rect> dirtyRects = {};
   std::vector<float> dirtyAreas = {};
-  DisplayList* displayList = nullptr;
-
-  explicit RootLayer(DisplayList* displayList) : displayList(displayList){};
+  Color _backgroundColor = Color::Transparent();
 
   bool mergeDirtyList(bool forceMerge);
 
