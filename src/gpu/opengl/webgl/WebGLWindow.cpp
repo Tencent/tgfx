@@ -65,11 +65,11 @@ std::shared_ptr<Surface> WebGLWindow::onCreateSurface(Context* context) {
   glInfo.format = GL_RGBA8;
   WindowColorSpace cs;
   if(ColorSpace::Equals(colorSpace.get(), ColorSpace::DisplayP3().get())){
-		cs = WindowColorSpace::DisplayP3;
+	cs = WindowColorSpace::DisplayP3;
   }else if(ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get())){
-		cs = WindowColorSpace::SRGB;
+	cs = WindowColorSpace::SRGB;
   }else{
-		cs = WindowColorSpace::None;
+	cs = WindowColorSpace::None;
   }
   emscripten::val::module_property("tgfx").call<bool>(
       "setColorSpace", emscripten::val::module_property("GL"), static_cast<int>(cs));
