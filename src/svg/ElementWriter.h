@@ -34,7 +34,7 @@
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/gpu/Context.h"
-#include "tgfx/svg/SVGCallback.h"
+#include "tgfx/svg/SVGExportWriter.h"
 #include "tgfx/svg/SVGPathParser.h"
 #include "xml/XMLWriter.h"
 

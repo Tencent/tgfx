@@ -23,7 +23,7 @@
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/WriteStream.h"
 #include "tgfx/gpu/Context.h"
-#include "tgfx/svg/SVGCallback.h"
+#include "tgfx/svg/SVGExportWriter.h"
 
 namespace tgfx {
 class SVGExportContext;

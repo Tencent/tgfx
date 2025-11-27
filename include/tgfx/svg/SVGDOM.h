@@ -23,7 +23,7 @@
 #include "tgfx/core/Picture.h"
 #include "tgfx/core/Size.h"
 #include "tgfx/core/Stream.h"
-#include "tgfx/svg/SVGCallback.h"
+#include "tgfx/svg/SVGCustomParser.h"
 #include "tgfx/svg/TextShaper.h"
 #include "tgfx/svg/node/SVGRoot.h"
 
@@ -59,7 +59,7 @@ class SVGDOM {
    */
   static std::shared_ptr<SVGDOM> Make(
       Stream& stream, std::shared_ptr<TextShaper> textShaper = nullptr,
-      std::shared_ptr<SVGParseSetter> parseSetter = SVGParseSetter::Make());
+      std::shared_ptr<SVGCustomParser> parseSetter = SVGCustomParser::Make());
 
   /**
    * Returns the root SVG node.

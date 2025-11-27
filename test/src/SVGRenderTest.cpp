@@ -27,8 +27,9 @@
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/Typeface.h"
-#include "tgfx/svg/SVGCallback.h"
+#include "tgfx/svg/SVGCustomParser.h"
 #include "tgfx/svg/SVGDOM.h"
+#include "tgfx/svg/SVGExportWriter.h"
 #include "tgfx/svg/SVGExporter.h"
 #include "tgfx/svg/node/SVGNode.h"
 #include "tgfx/svg/xml/XMLDOM.h"
@@ -478,7 +479,7 @@ TGFX_TEST(SVGRenderTest, IDAttribute) {
 }
 
 TGFX_TEST(SVGRenderTest, FilterCustomAttribute) {
-  class FilterAttributeSetter : public SVGParseSetter {
+  class FilterAttributeSetter : public SVGCustomParser {
     void handleCustomAttribute(SVGNode& node, const std::string& name,
                                const std::string& value) override {
       if ((node.tag() == SVGTag::Svg && name == "copyright") ||
@@ -552,7 +553,7 @@ class ProtocolWriter : public SVGExportWriter {
   }
 };
 
-class ProtocolSetter : public SVGParseSetter {
+class ProtocolSetter : public SVGCustomParser {
  public:
   void handleCustomAttribute(SVGNode& node, const std::string& name,
                              const std::string& value) override {

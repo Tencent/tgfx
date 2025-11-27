@@ -71,7 +71,7 @@ float SVGLengthContext::resolve(const SVGLength& length, LengthType type) const 
       return length.value() * dpi * CMMultiplier;
     case SVGLength::Unit::MM:
       return length.value() * dpi * MMMultiplier;
-    case SVGLength::Unit::Inches:
+    case SVGLength::Unit::IN:
       return length.value() * dpi * INMultiplier;
     case SVGLength::Unit::PT:
       return length.value() * dpi * PTMultiplier;

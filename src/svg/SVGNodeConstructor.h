@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "tgfx/svg/SVGCallback.h"
+#include "tgfx/svg/SVGCustomParser.h"
 #include "tgfx/svg/SVGDOM.h"
 #include "tgfx/svg/xml/XMLDOM.h"
 
@@ -26,7 +26,7 @@ namespace tgfx {
 
 struct ConstructionContext {
   ConstructionContext(SVGIDMapper* mapper, CSSMapper* cssMapper,
-                      std::shared_ptr<SVGParseSetter> setter)
+                      std::shared_ptr<SVGCustomParser> setter)
       : parentNode(nullptr), nodeIDMapper(mapper), cssMapper(cssMapper),
         parseSetter(std::move(setter)) {
   }
@@ -38,7 +38,7 @@ struct ConstructionContext {
   SVGNode* parentNode;
   SVGIDMapper* nodeIDMapper;
   CSSMapper* cssMapper;
-  std::shared_ptr<SVGParseSetter> parseSetter;
+  std::shared_ptr<SVGCustomParser> parseSetter;
 };
 
 using AttributeSetter = std::function<bool(SVGNode&, SVGAttribute, const std::string&)>;
@@ -53,14 +53,14 @@ class SVGNodeConstructor {
                                                    const DOMNode* xmlNode);
 
   static bool SetAttribute(SVGNode& node, const std::string& name, const std::string& value,
-                           const std::shared_ptr<SVGParseSetter>& setter);
+                           const std::shared_ptr<SVGCustomParser>& setter);
 
   static void SetClassStyleAttributes(SVGNode& root, const CSSMapper& mapper);
 
  private:
   static void ParseNodeAttributes(const DOMNode* xmlNode, const std::shared_ptr<SVGNode>& svgNode,
                                   SVGIDMapper* mapper,
-                                  const std::shared_ptr<SVGParseSetter>& setter);
+                                  const std::shared_ptr<SVGCustomParser>& setter);
 
   static bool SetStyleAttributes(SVGNode& node, SVGAttribute, const std::string& stringValue);
 

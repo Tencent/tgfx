@@ -18,31 +18,11 @@
 
 #pragma once
 
-#include "tgfx/svg/node/SVGNode.h"
+#include "tgfx/core/Color.h"
+#include "tgfx/core/TileMode.h"
+#include "tgfx/svg/xml/XMLDOM.h"
 
 namespace tgfx {
-
-/**
- * Abstract callback interface for SVG parsing operations.
- * Implementations can be passed to SVGDOM::Make() to handling during parsing.
- */
-class SVGParseSetter {
- public:
-  virtual ~SVGParseSetter() = default;
-
-  /**
-   * Creates a default instance that adds all custom attributes to the SVGNode's customAttributes.
-   */
-  static std::shared_ptr<SVGParseSetter> Make();
-
-  /**
-   * Called when a custom attribute is encountered during parsing.
-   * This method is invoked for attributes that are not standard SVGNode properties,
-   * allowing custom handling logic to be implemented.
-   */
-  virtual void handleCustomAttribute(SVGNode& node, const std::string& name,
-                                     const std::string& value) = 0;
-};
 
 /**
  * Abstract callback interface for SVG filter export operations.

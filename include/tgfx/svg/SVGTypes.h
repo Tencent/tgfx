@@ -29,6 +29,10 @@
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Rect.h"
 
+#ifdef IN
+#undef IN
+#endif
+
 namespace tgfx {
 
 using SVGColorType = Color;
@@ -131,7 +135,7 @@ class SVGLength {
     PX,
     CM,
     MM,
-    Inches,
+    IN,
     PT,
     PC,
   };

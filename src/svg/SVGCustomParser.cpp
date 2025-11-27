@@ -16,11 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/svg/SVGCallback.h"
+#include "tgfx/svg/SVGCustomParser.h"
 
 namespace tgfx {
 
-class DefaultParseSetter : public SVGParseSetter {
+class DefaultParseSetter : public SVGCustomParser {
  public:
   void handleCustomAttribute(SVGNode& node, const std::string& name,
                              const std::string& value) override {
@@ -31,7 +31,7 @@ class DefaultParseSetter : public SVGParseSetter {
   }
 };
 
-std::shared_ptr<SVGParseSetter> SVGParseSetter::Make() {
+std::shared_ptr<SVGCustomParser> SVGCustomParser::Make() {
   return std::make_shared<DefaultParseSetter>();
 }
 

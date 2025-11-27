@@ -293,7 +293,7 @@ SVGNodeConstructor::InitElementFactories() {
 
 bool SVGNodeConstructor::SetAttribute(SVGNode& node, const std::string& name,
                                       const std::string& value,
-                                      const std::shared_ptr<SVGParseSetter>& setter) {
+                                      const std::shared_ptr<SVGCustomParser>& setter) {
   if (node.parseAndSetAttribute(name, value)) {
     // Handled by new code path
     return true;
@@ -312,7 +312,7 @@ bool SVGNodeConstructor::SetAttribute(SVGNode& node, const std::string& name,
 void SVGNodeConstructor::ParseNodeAttributes(const DOMNode* xmlNode,
                                              const std::shared_ptr<SVGNode>& svgNode,
                                              SVGIDMapper* mapper,
-                                             const std::shared_ptr<SVGParseSetter>& setter) {
+                                             const std::shared_ptr<SVGCustomParser>& setter) {
 
   for (const auto& attr : xmlNode->attributes) {
     auto name = attr.name;
