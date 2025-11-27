@@ -300,8 +300,8 @@ bool SVGNodeConstructor::SetAttribute(SVGNode& node, const std::string& name,
   }
   static const auto attributeParseInfo = InitAttributeParseInfo();
   if (auto iter = attributeParseInfo.find(name); iter != attributeParseInfo.end()) {
-    auto setter = iter->second.setter;
-    return setter(node, iter->second.attribute, value);
+    auto attributeSetter = iter->second.setter;
+    return attributeSetter(node, iter->second.attribute, value);
   }
   if (setter) {
     setter->handleCustomAttribute(node, name, value);

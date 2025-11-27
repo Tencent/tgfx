@@ -122,19 +122,7 @@ class SVGProperty {
 
 class SVGLength {
  public:
-  enum class Unit {
-    Unknown,
-    Number,
-    Percentage,
-    EMS,
-    EXS,
-    PX,
-    CM,
-    MM,
-    IN,
-    PT,
-    PC,
-  };
+  enum class Unit { Unknown, Number, Percentage, EMS, EXS, PX, CM, MM, IN, PT, PC };
 
   SVGLength() = default;
 

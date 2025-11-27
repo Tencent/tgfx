@@ -644,14 +644,14 @@ TGFX_TEST(SVGRenderTest, ProtocolFilterReadWrite) {
   auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(300, 300), 0, protocolWriter);
   auto canvas = exporter->getCanvas();
 
-  auto blueFilter = ImageFilter::Blur(10.f, 10.f, TileMode::Clamp);
+  auto blurFilter = ImageFilter::Blur(10.f, 10.f, TileMode::Clamp);
   auto dropShadowFilter =
       ImageFilter::DropShadow(10.f, 10.f, 20.f, 20.f, Color{0.0f, 0.0f, 0.0f, 0.5f});
   auto innerShadowFilter =
       ImageFilter::InnerShadow(10.f, 10.f, 20.f, 20.f, Color{0.0f, 0.0f, 0.0f, 0.5f});
 
   Paint paint;
-  paint.setImageFilter(blueFilter);
+  paint.setImageFilter(blurFilter);
   canvas->drawRect(Rect::MakeXYWH(0.f, 0.f, 100.f, 100.f), paint);
   paint.setImageFilter(dropShadowFilter);
   canvas->drawRect(Rect::MakeXYWH(100.f, 100.f, 100.f, 100.f), paint);
@@ -673,7 +673,7 @@ TGFX_TEST(SVGRenderTest, ProtocolFilterReadWrite) {
       auto type = Types::Get(filter.get());
       if (type == Types::ImageFilterType::Blur) {
         auto blur1 = std::static_pointer_cast<GaussianBlurImageFilter>(filter);
-        auto blur2 = std::static_pointer_cast<GaussianBlurImageFilter>(blueFilter);
+        auto blur2 = std::static_pointer_cast<GaussianBlurImageFilter>(blurFilter);
         EXPECT_EQ(blur1->blurrinessX, blur2->blurrinessX);
         EXPECT_EQ(blur1->blurrinessY, blur2->blurrinessY);
         EXPECT_EQ(blur1->tileMode, blur2->tileMode);
