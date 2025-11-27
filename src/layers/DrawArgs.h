@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "Render3DContext.h"
 #include "layers/BackgroundContext.h"
 #include "tgfx/gpu/Context.h"
 
@@ -56,8 +57,10 @@ class DrawArgs {
   // Only used while recording layer's background image.
   std::shared_ptr<BackgroundContext> blendModeBackground = nullptr;
 
-  // The depth mapping matrix applied to all layers within the 3D render context, which maps the
-  // depth of all layers to the range [-1, 1].
-  std::optional<Matrix3D> context3DDepthMatrix = std::nullopt;
+  // The 3D render context to be used during the drawing process. Note: this could be nullptr. All
+  // layers within the 3D rendering context need to maintain their respective 3D states to achieve
+  // per-pixel depth occlusion effects. These layers are composited through the Compositor and do
+  // not need to be drawn to the Canvas.
+  std::shared_ptr<Render3DContext> render3DContext = nullptr;
 };
 }  // namespace tgfx

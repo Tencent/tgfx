@@ -66,14 +66,22 @@ std::shared_ptr<OpsCompositor> DrawingManager::addOpsCompositor(
 void DrawingManager::addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTarget,
                                       PlacementArray<DrawOp> drawOps,
                                       std::optional<PMColor> clearColor) {
-  if (renderTarget == nullptr || (drawOps.empty() && !clearColor.has_value())) {
+  addOpsRenderTask(std::move(renderTarget), nullptr, std::move(drawOps), clearColor);
+}
+
+void DrawingManager::addOpsRenderTask(std::shared_ptr<RenderTargetProxy> colorTarget,
+                                      std::shared_ptr<RenderTargetProxy> depthStencilTarget,
+                                      PlacementArray<DrawOp> drawOps,
+                                      std::optional<PMColor> clearColor) {
+  if (colorTarget == nullptr || (drawOps.empty() && !clearColor.has_value())) {
     return;
   }
-  auto textureProxy = renderTarget->asTextureProxy();
-  auto task = drawingAllocator->make<OpsRenderTask>(drawingAllocator, std::move(renderTarget),
+  auto colorProxy = colorTarget->asTextureProxy();
+  auto task = drawingAllocator->make<OpsRenderTask>(drawingAllocator, std::move(colorTarget),
+                                                    std::move(depthStencilTarget),
                                                     std::move(drawOps), clearColor);
   renderTasks.emplace_back(std::move(task));
-  addGenerateMipmapsTask(std::move(textureProxy));
+  addGenerateMipmapsTask(std::move(colorProxy));
 }
 
 void DrawingManager::addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> renderTarget,

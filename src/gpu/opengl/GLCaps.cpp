@@ -170,6 +170,7 @@ bool GLCaps::isFormatRenderable(PixelFormat pixelFormat) const {
     case PixelFormat::BGRA_8888:
     case PixelFormat::ALPHA_8:
     case PixelFormat::RG_88:
+    case PixelFormat::DEPTH24_STENCIL8:
       return true;
     default:
       break;

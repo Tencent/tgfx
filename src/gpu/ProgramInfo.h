@@ -106,6 +106,14 @@ class ProgramInfo {
     cullMode = mode;
   }
 
+  bool getEnableDepthTest() const {
+    return enableDepthTest;
+  }
+
+  void setEnableDepthTest(bool enabled) {
+    enableDepthTest = enabled;
+  }
+
  private:
   RenderTarget* renderTarget = nullptr;
   GeometryProcessor* geometryProcessor = nullptr;
@@ -116,6 +124,7 @@ class ProgramInfo {
   XferProcessor* xferProcessor = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
   CullMode cullMode = CullMode::None;
+  bool enableDepthTest = false;
 
   void updateProcessorIndices();
 

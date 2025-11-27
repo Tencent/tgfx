@@ -196,9 +196,35 @@ class RenderPassDescriptor {
                                 LoadAction loadAction = LoadAction::DontCare,
                                 StoreAction storeAction = StoreAction::Store,
                                 PMColor clearValue = PMColor::Transparent(),
-                                std::shared_ptr<Texture> resolveTexture = nullptr) {
-    colorAttachments.emplace_back(std::move(texture), loadAction, storeAction, clearValue,
+                                std::shared_ptr<Texture> resolveTexture = nullptr)
+      : RenderPassDescriptor(std::move(texture), nullptr, loadAction, storeAction, clearValue,
+                             std::move(resolveTexture)) {
+  }
+
+  /**
+   * A convenience constructor that initializes a RenderPassDescriptor with a single color attachment
+   * and a optional depthstencil attachment.
+   * @param clorTexture The texture to render to.
+   * @param depthStencilTexture The depth-stencil texture to render to, or nullptr if not using
+   * depth-stencil.
+   * @param loadAction The action to perform at the start of the render pass.
+   * @param storeAction The action to perform at the end of the render pass.
+   * @param clearValue The color value to clear the attachment with if the load action is
+   * LoadAction::Clear.
+   * @param resolveTexture The texture to resolve the color attachment into. This is used for
+   * multisampled textures. If this is nullptr, the color attachment will not be resolved.
+   */
+  RenderPassDescriptor(std::shared_ptr<Texture> clorTexture,
+                       std::shared_ptr<Texture> depthStencilTexture,
+                       LoadAction loadAction = LoadAction::DontCare,
+                       StoreAction storeAction = StoreAction::Store,
+                       PMColor clearValue = PMColor::Transparent(),
+                       std::shared_ptr<Texture> resolveTexture = nullptr) {
+    colorAttachments.emplace_back(std::move(clorTexture), loadAction, storeAction, clearValue,
                                   std::move(resolveTexture));
+    if (depthStencilTexture != nullptr) {
+      depthStencilAttachment = DepthStencilAttachment(std::move(depthStencilTexture));
+    }
   }
 
   /**

@@ -387,5 +387,6 @@ class Image {
   friend class ImageShader;
   friend class Types;
   friend class Transform3DImageFilter;
+  friend class Context3DCompositor;
 };
 }  // namespace tgfx

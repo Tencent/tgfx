@@ -636,32 +636,26 @@ class Layer : public std::enable_shared_from_this<Layer> {
                  const Matrix3D* transform = nullptr);
 
   void drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
-                     const Matrix3D* transform, bool excludeContent = false,
-                     bool excludeChildren = false);
-
-  /**
-   * Draws the current layer offscreen, with both content and child layers rendered to separate
-   * offscreen textures.
-   */
-  void drawOffscreenSplitChildren(const DrawArgs& args, Canvas* canvas, float alpha,
-                                  BlendMode blendMode, const Matrix3D* transform);
+                     const Matrix3D* transform, bool excludeChildren = false);
 
   void drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha,
                     const Matrix3D* transform = nullptr);
 
   void drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha, const Matrix3D* transform,
                     const std::unordered_set<LayerStyleExtraSourceType>& styleExtraSourceTypes,
-                    bool excludeContent, bool excludeChild);
+                    bool excludeChildren);
 
-  void drawContentOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
-                            const Matrix3D* transform);
+  void drawOffscreenSeparateContentChildren(const DrawArgs& args, Canvas* canvas, float alpha,
+                                            BlendMode blendMode, const Matrix3D* transform);
+
+  void drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, float alpha,
+                               BlendMode blendMode, const Matrix3D* transform);
 
   void drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
                     const LayerStyleSource* layerStyleSource = nullptr,
                     const Layer* stopChild = nullptr,
                     const std::unordered_set<LayerStyleExtraSourceType>& styleExtraSourceTypes = {},
-                    const Matrix3D* transform = nullptr, bool excludeContent = false,
-                    bool excludeChild = false);
+                    const Matrix3D* transform = nullptr, bool excludeChildren = false);
 
   bool drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
                     const Layer* stopChild = nullptr, const Matrix3D* transform = nullptr);
@@ -723,7 +717,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::shared_ptr<Image> getOffscreenContentImage(
       const DrawArgs& args, const Canvas* canvas, bool passThroughBackground,
       std::shared_ptr<BackgroundContext> subBackgroundContext, std::optional<Rect> clipBounds,
-      Matrix* imageMatrix, bool excludeContent, bool excludeChild);
+      Matrix* imageMatrix, bool excludeChildren);
 
   /**
    * Returns the equivalent transformation matrix adapted for a custom anchor point.
@@ -739,7 +733,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
   /**
    * Calculates the 3D context depth matrix for the layer.
    * This matrix maps the depth of all sublayers within the 3D render context rooted at this layer
-   * to the [-1, 1] range.
+   * from [maxDepth, minDepth] to the [-1, 1] range.
    */
   Matrix3D calculate3DContextDepthMatrix();
 

@@ -201,6 +201,10 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
   for (const auto& sampler : _uniformHandler.getSamplers()) {
     descriptor.layout.textureSamplers.emplace_back(sampler.name(), textureBinding++);
   }
+  if (programInfo->getEnableDepthTest()) {
+    descriptor.depthStencil.depthCompare = CompareFunction::LessEqual;
+    descriptor.depthStencil.depthWriteEnabled = true;
+  }
   // Although the vertexProvider constructs the rectangle in a counterclockwise order, the model
   // uses a coordinate system with the Y-axis pointing downward, which is opposite to OpenGL's
   // default Y-axis direction (upward). Therefore, it is necessary to define the clockwise
