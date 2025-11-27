@@ -1126,10 +1126,9 @@ std::shared_ptr<Image> Layer::getOffscreenContentImage(
   if (context && passThroughBackground) {
     auto currentMatrix = canvas->getMatrix();
     auto surfaceRect = currentMatrix.mapRect(inputBounds);
-    surfaceRect.roundOut();
-    auto offscreenSurface = Surface::Make(context, static_cast<int>(surfaceRect.width()),
-                                          static_cast<int>(surfaceRect.height()), false, 1, false,
-                                          0, args.dstColorSpace);
+    auto offscreenSurface = Surface::Make(context, static_cast<int>(ceilf(surfaceRect.width())),
+                                          static_cast<int>(ceilf(surfaceRect.height())), false, 1,
+                                          false, 0, args.dstColorSpace);
     auto offscreenCanvas = offscreenSurface->getCanvas();
     offscreenCanvas->translate(-surfaceRect.left, -surfaceRect.top);
     offscreenCanvas->drawImage(canvas->getSurface()->makeImageSnapshot());
