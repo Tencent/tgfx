@@ -28,9 +28,9 @@ namespace tgfx {
  * Abstract callback interface for SVG filter export operations.
  * Implementations can be passed to SVGExporter.
  */
-class SVGExportWriter {
+class SVGCustomWriter {
  public:
-  virtual ~SVGExportWriter() = default;
+  virtual ~SVGCustomWriter() = default;
 
   /**
    * Called when exporting a BlurImageFilter to SVG.

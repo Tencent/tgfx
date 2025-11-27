@@ -31,11 +31,6 @@ class SVGCustomParser {
   virtual ~SVGCustomParser() = default;
 
   /**
-   * Creates a default instance that adds all custom attributes to the SVGNode's customAttributes.
-   */
-  static std::shared_ptr<SVGCustomParser> Make();
-
-  /**
    * Called when a custom attribute is encountered during parsing.
    * This method is invoked for attributes that are not standard SVGNode properties, allowing custom
    * handling logic to be implemented.

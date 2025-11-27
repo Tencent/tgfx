@@ -28,8 +28,8 @@
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/Typeface.h"
 #include "tgfx/svg/SVGCustomParser.h"
+#include "tgfx/svg/SVGCustomWriter.h"
 #include "tgfx/svg/SVGDOM.h"
-#include "tgfx/svg/SVGExportWriter.h"
 #include "tgfx/svg/SVGExporter.h"
 #include "tgfx/svg/node/SVGNode.h"
 #include "tgfx/svg/xml/XMLDOM.h"
@@ -523,7 +523,7 @@ TGFX_TEST(SVGRenderTest, FilterCustomAttribute) {
 // Blur: "blur:blurX,blurY,tileMode"
 // DropShadow: "dropshadow:dx,dy,blurX,blurY,r,g,b,a,shadowOnly"
 // InnerShadow: "innershadow:dx,dy,blurX,blurY,r,g,b,a,shadowOnly"
-class ProtocolWriter : public SVGExportWriter {
+class ProtocolWriter : public SVGCustomWriter {
  public:
   DOMAttribute writeBlurImageFilter(float blurrinessX, float blurrinessY,
                                     TileMode tileMode) override {

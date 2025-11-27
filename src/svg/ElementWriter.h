@@ -34,7 +34,7 @@
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/gpu/Context.h"
-#include "tgfx/svg/SVGExportWriter.h"
+#include "tgfx/svg/SVGCustomWriter.h"
 #include "tgfx/svg/SVGPathParser.h"
 #include "xml/XMLWriter.h"
 
@@ -64,7 +64,7 @@ class ElementWriter {
   void addPathAttributes(const Path& path, SVGPathParser::PathEncoding encoding);
 
   Resources addImageFilterResource(const std::shared_ptr<ImageFilter>& imageFilter, Rect bound,
-                                   const std::shared_ptr<SVGExportWriter>& exportWriter);
+                                   const std::shared_ptr<SVGCustomWriter>& exportWriter);
 
  private:
   Resources addResources(const Brush& brush, Context* context, SVGExportContext* svgContext);
@@ -105,15 +105,15 @@ class ElementWriter {
   std::string addUnsupportedGradientDef(const GradientInfo& info, const Matrix& matrix);
 
   std::string addImageFilter(const std::shared_ptr<ImageFilter>& imageFilter, Rect bound,
-                             const std::shared_ptr<SVGExportWriter>& exportWriter);
+                             const std::shared_ptr<SVGCustomWriter>& exportWriter);
   void callbackBlurImageFilter(const GaussianBlurImageFilter* filter,
-                               const std::shared_ptr<SVGExportWriter>& exportWriter,
+                               const std::shared_ptr<SVGCustomWriter>& exportWriter,
                                ElementWriter& filterElement);
   void callbackDropShadowImageFilter(const DropShadowImageFilter* filter,
-                                     const std::shared_ptr<SVGExportWriter>& exportWriter,
+                                     const std::shared_ptr<SVGCustomWriter>& exportWriter,
                                      ElementWriter& filterElement);
   void callbackInnerShadowImageFilter(const InnerShadowImageFilter* filter,
-                                      const std::shared_ptr<SVGExportWriter>& exportWriter,
+                                      const std::shared_ptr<SVGCustomWriter>& exportWriter,
                                       ElementWriter& filterElement);
   void addBlurImageFilter(const GaussianBlurImageFilter* filter);
   void addDropShadowImageFilter(const DropShadowImageFilter* filter);

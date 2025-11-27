@@ -222,7 +222,7 @@ void ElementWriter::addPathAttributes(const Path& path, SVGPathParser::PathEncod
 
 Resources ElementWriter::addImageFilterResource(
     const std::shared_ptr<ImageFilter>& imageFilter, Rect bound,
-    const std::shared_ptr<SVGExportWriter>& exportWriter) {
+    const std::shared_ptr<SVGCustomWriter>& exportWriter) {
   auto filterID = addImageFilter(imageFilter, bound, std::move(exportWriter));
   Resources resources;
   resources.filter = "url(#" + filterID + ")";
@@ -231,7 +231,7 @@ Resources ElementWriter::addImageFilterResource(
 
 std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& imageFilter,
                                           Rect bound,
-                                          const std::shared_ptr<SVGExportWriter>& exportWriter) {
+                                          const std::shared_ptr<SVGCustomWriter>& exportWriter) {
   auto type = Types::Get(imageFilter.get());
   switch (type) {
     case Types::ImageFilterType::Blur: {
@@ -297,7 +297,7 @@ std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& im
 }
 
 void ElementWriter::callbackBlurImageFilter(const GaussianBlurImageFilter* filter,
-                                            const std::shared_ptr<SVGExportWriter>& exportWriter,
+                                            const std::shared_ptr<SVGCustomWriter>& exportWriter,
                                             ElementWriter& filterElement) {
   if (!exportWriter) {
     return;
@@ -310,7 +310,7 @@ void ElementWriter::callbackBlurImageFilter(const GaussianBlurImageFilter* filte
 }
 
 void ElementWriter::callbackDropShadowImageFilter(
-    const DropShadowImageFilter* filter, const std::shared_ptr<SVGExportWriter>& exportWriter,
+    const DropShadowImageFilter* filter, const std::shared_ptr<SVGCustomWriter>& exportWriter,
     ElementWriter& filterElement) {
   if (!exportWriter) {
     return;
@@ -333,7 +333,7 @@ void ElementWriter::callbackDropShadowImageFilter(
 }
 
 void ElementWriter::callbackInnerShadowImageFilter(
-    const InnerShadowImageFilter* filter, const std::shared_ptr<SVGExportWriter>& exportWriter,
+    const InnerShadowImageFilter* filter, const std::shared_ptr<SVGCustomWriter>& exportWriter,
     ElementWriter& filterElement) {
   if (!exportWriter) {
     return;

@@ -29,7 +29,7 @@
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/gpu/Context.h"
-#include "tgfx/svg/SVGExportWriter.h"
+#include "tgfx/svg/SVGCustomWriter.h"
 #include "tgfx/svg/SVGExporter.h"
 #include "tgfx/svg/SVGPathParser.h"
 
@@ -41,7 +41,7 @@ class ElementWriter;
 class SVGExportContext : public DrawContext {
  public:
   SVGExportContext(Context* context, const Rect& viewBox, std::unique_ptr<XMLWriter> xmlWriter,
-                   uint32_t exportFlags, std::shared_ptr<SVGExportWriter> writer);
+                   uint32_t exportFlags, std::shared_ptr<SVGCustomWriter> customWriter);
   ~SVGExportContext() override = default;
 
   void setCanvas(Canvas* inputCanvas) {
@@ -122,6 +122,6 @@ class SVGExportContext : public DrawContext {
   SVGTextBuilder textBuilder = {};
   Path currentClipPath = {};
   std::unique_ptr<ElementWriter> clipGroupElement = nullptr;
-  std::shared_ptr<SVGExportWriter> writer = {};
+  std::shared_ptr<SVGCustomWriter> customWriter = {};
 };
 }  // namespace tgfx

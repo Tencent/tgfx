@@ -53,10 +53,10 @@ namespace tgfx {
 
 SVGExportContext::SVGExportContext(Context* context, const Rect& viewBox,
                                    std::unique_ptr<XMLWriter> inputXmlWriter, uint32_t exportFlags,
-                                   std::shared_ptr<SVGExportWriter> inputWriter)
+                                   std::shared_ptr<SVGCustomWriter> customWriter)
     : exportFlags(exportFlags), context(context), viewBox(viewBox),
       xmlWriter(std::move(inputXmlWriter)), resourceBucket(new ResourceStore),
-      writer(std::move(inputWriter)) {
+      customWriter(std::move(customWriter)) {
   if (viewBox.isEmpty()) {
     return;
   }
@@ -178,7 +178,7 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
     Resources resources;
     if (filter) {
       ElementWriter defs("defs", xmlWriter, resourceBucket.get());
-      resources = defs.addImageFilterResource(filter, bound, writer);
+      resources = defs.addImageFilterResource(filter, bound, customWriter);
     }
     {
       auto groupElement = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
@@ -367,7 +367,7 @@ void SVGExportContext::drawLayer(std::shared_ptr<Picture> picture,
   if (imageFilter) {
     ElementWriter defs("defs", xmlWriter, resourceBucket.get());
     auto bound = picture->getBounds();
-    resources = defs.addImageFilterResource(imageFilter, bound, writer);
+    resources = defs.addImageFilterResource(imageFilter, bound, customWriter);
   }
   {
     if (!state.clip.contains(picture->getBounds())) {

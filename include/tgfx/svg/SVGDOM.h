@@ -54,12 +54,12 @@ class SVGDOM {
    * Creates an SVGDOM object from the provided stream.
    * If textShaper is nullptr, only text with specified system fonts will render. Text without a
    * specified font or requiring fallback fonts will not render.
-   * Optional custom attribute handler. Defaults to SVGParseSetter::Make() which stores unrecognized
-   * attributes in the node's customAttributes. Can be nullptr.
+   * If customParser is nullptr, the default parser will be used. All custom attributes will be
+   * add into SVGNode's customAttributes.
    */
-  static std::shared_ptr<SVGDOM> Make(
-      Stream& stream, std::shared_ptr<TextShaper> textShaper = nullptr,
-      std::shared_ptr<SVGCustomParser> parseSetter = SVGCustomParser::Make());
+  static std::shared_ptr<SVGDOM> Make(Stream& stream,
+                                      std::shared_ptr<TextShaper> textShaper = nullptr,
+                                      std::shared_ptr<SVGCustomParser> customParser = nullptr);
 
   /**
    * Returns the root SVG node.

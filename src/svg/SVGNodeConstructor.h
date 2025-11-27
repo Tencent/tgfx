@@ -26,19 +26,19 @@ namespace tgfx {
 
 struct ConstructionContext {
   ConstructionContext(SVGIDMapper* mapper, CSSMapper* cssMapper,
-                      std::shared_ptr<SVGCustomParser> setter)
+                      std::shared_ptr<SVGCustomParser> customParser)
       : parentNode(nullptr), nodeIDMapper(mapper), cssMapper(cssMapper),
-        parseSetter(std::move(setter)) {
+        customParser(std::move(customParser)) {
   }
   ConstructionContext(const ConstructionContext& other, const std::shared_ptr<SVGNode>& newParent)
       : parentNode(newParent.get()), nodeIDMapper(other.nodeIDMapper), cssMapper(other.cssMapper),
-        parseSetter(other.parseSetter) {
+        customParser(other.customParser) {
   }
 
   SVGNode* parentNode;
   SVGIDMapper* nodeIDMapper;
   CSSMapper* cssMapper;
-  std::shared_ptr<SVGCustomParser> parseSetter;
+  std::shared_ptr<SVGCustomParser> customParser;
 };
 
 using AttributeSetter = std::function<bool(SVGNode&, SVGAttribute, const std::string&)>;
@@ -53,7 +53,7 @@ class SVGNodeConstructor {
                                                    const DOMNode* xmlNode);
 
   static bool SetAttribute(SVGNode& node, const std::string& name, const std::string& value,
-                           const std::shared_ptr<SVGCustomParser>& setter);
+                           const std::shared_ptr<SVGCustomParser>& customParser);
 
   static void SetClassStyleAttributes(SVGNode& root, const CSSMapper& mapper);
 
