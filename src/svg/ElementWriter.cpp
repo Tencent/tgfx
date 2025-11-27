@@ -220,16 +220,18 @@ void ElementWriter::addPathAttributes(const Path& path, SVGPathParser::PathEncod
   addAttribute("d", SVGPathParser::ToSVGString(path, encoding));
 }
 
-Resources ElementWriter::addImageFilterResource(const std::shared_ptr<ImageFilter>& imageFilter,
-                                                Rect bound) {
-  auto filterID = addImageFilter(imageFilter, bound);
+Resources ElementWriter::addImageFilterResource(
+    const std::shared_ptr<ImageFilter>& imageFilter, Rect bound,
+    const std::shared_ptr<SVGCustomWriter>& exportWriter) {
+  auto filterID = addImageFilter(imageFilter, bound, std::move(exportWriter));
   Resources resources;
   resources.filter = "url(#" + filterID + ")";
   return resources;
 }
 
 std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& imageFilter,
-                                          Rect bound) {
+                                          Rect bound,
+                                          const std::shared_ptr<SVGCustomWriter>& exportWriter) {
   auto type = Types::Get(imageFilter.get());
   switch (type) {
     case Types::ImageFilterType::Blur: {
@@ -243,6 +245,7 @@ std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& im
       filterElement.addAttribute("width", bound.width());
       filterElement.addAttribute("height", bound.height());
       filterElement.addAttribute("filterUnits", "userSpaceOnUse");
+      callbackBlurImageFilter(blurFilter, exportWriter, filterElement);
       addBlurImageFilter(blurFilter);
       return filterID;
     }
@@ -257,6 +260,7 @@ std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& im
       filterElement.addAttribute("width", bound.width());
       filterElement.addAttribute("height", bound.height());
       filterElement.addAttribute("filterUnits", "userSpaceOnUse");
+      callbackDropShadowImageFilter(dropShadowFilter, exportWriter, filterElement);
       addDropShadowImageFilter(dropShadowFilter);
       return filterID;
     }
@@ -271,6 +275,7 @@ std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& im
       filterElement.addAttribute("width", bound.width() + innerShadowFilter->dx);
       filterElement.addAttribute("height", bound.height() + innerShadowFilter->dy);
       filterElement.addAttribute("filterUnits", "userSpaceOnUse");
+      callbackInnerShadowImageFilter(innerShadowFilter, exportWriter, filterElement);
       addInnerShadowImageFilter(innerShadowFilter);
       return filterID;
     }
@@ -278,7 +283,7 @@ std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& im
       const auto composeFilter = static_cast<const ComposeImageFilter*>(imageFilter.get());
       std::string filterID;
       for (const auto& filterItem : composeFilter->filters) {
-        auto id = addImageFilter(filterItem, bound);
+        auto id = addImageFilter(filterItem, bound, exportWriter);
         if (!id.empty()) {
           filterID = id;
         }
@@ -288,6 +293,65 @@ std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& im
     default:
       reportUnsupportedElement("Unsupported image filter");
       return "";
+  }
+}
+
+void ElementWriter::callbackBlurImageFilter(const GaussianBlurImageFilter* filter,
+                                            const std::shared_ptr<SVGCustomWriter>& exportWriter,
+                                            ElementWriter& filterElement) {
+  if (!exportWriter) {
+    return;
+  }
+  auto attribute = exportWriter->writeBlurImageFilter(filter->blurrinessX, filter->blurrinessY,
+                                                      filter->tileMode);
+  if (!attribute.name.empty() && !attribute.value.empty()) {
+    filterElement.addAttribute(attribute.name, attribute.value);
+  }
+}
+
+void ElementWriter::callbackDropShadowImageFilter(
+    const DropShadowImageFilter* filter, const std::shared_ptr<SVGCustomWriter>& exportWriter,
+    ElementWriter& filterElement) {
+  if (!exportWriter) {
+    return;
+  }
+  float blurrinessX = 0.f;
+  float blurrinessY = 0.f;
+  if (filter->blurFilter) {
+    if (Types::Get(filter->blurFilter.get()) == Types::ImageFilterType::Blur) {
+      const auto blurFilter =
+          static_cast<const GaussianBlurImageFilter*>(filter->blurFilter.get());
+      blurrinessX = blurFilter->blurrinessX;
+      blurrinessY = blurFilter->blurrinessY;
+    }
+  }
+  auto attribute = exportWriter->writeDropShadowImageFilter(
+      filter->dx, filter->dy, blurrinessX, blurrinessY, filter->color, filter->shadowOnly);
+  if (!attribute.name.empty() && !attribute.value.empty()) {
+    filterElement.addAttribute(attribute.name, attribute.value);
+  }
+}
+
+void ElementWriter::callbackInnerShadowImageFilter(
+    const InnerShadowImageFilter* filter, const std::shared_ptr<SVGCustomWriter>& exportWriter,
+    ElementWriter& filterElement) {
+  if (!exportWriter) {
+    return;
+  }
+  float blurrinessX = 0.f;
+  float blurrinessY = 0.f;
+  if (filter->blurFilter) {
+    if (Types::Get(filter->blurFilter.get()) == Types::ImageFilterType::Blur) {
+      const auto blurFilter =
+          static_cast<const GaussianBlurImageFilter*>(filter->blurFilter.get());
+      blurrinessX = blurFilter->blurrinessX;
+      blurrinessY = blurFilter->blurrinessY;
+    }
+  }
+  auto attribute = exportWriter->writeInnerShadowImageFilter(
+      filter->dx, filter->dy, blurrinessX, blurrinessY, filter->color, filter->shadowOnly);
+  if (!attribute.name.empty() && !attribute.value.empty()) {
+    filterElement.addAttribute(attribute.name, attribute.value);
   }
 }
 

@@ -161,6 +161,7 @@ class SVGNode {
   SVG_PRES_ATTR(StopOpacity, SVGNumberType, false)
   SVG_PRES_ATTR(FloodColor, SVGColor, false)
   SVG_PRES_ATTR(FloodOpacity, SVGNumberType, false)
+  SVG_PRES_ATTR(ID, SVGStringType, false)
   SVG_PRES_ATTR(LightingColor, SVGColor, false)
 
   /**
@@ -195,14 +196,14 @@ class SVGNode {
    */
   virtual void appendChild(std::shared_ptr<SVGNode> node) = 0;
 
+  void addCustomAttribute(const std::string& name, const std::string& value);
+
   /**
-   * Returns unparsed Attributes.
+   * Returns custom attributes.
    * SVGNode only parses attributes related to presentation rendering; all other attributes are
-   * stored in unparsedAttributes.
+   * stored in customAttributes.
    */
-  const std::vector<DOMAttribute>& getUnparsedAttributes() const {
-    return unparsedAttributes;
-  }
+  const std::vector<DOMAttribute>& getCustomAttributes() const;
 
  protected:
   explicit SVGNode(SVGTag tag);
@@ -241,7 +242,7 @@ class SVGNode {
  private:
   SVGTag _tag;
   SVGPresentationAttributes presentationAttributes;
-  std::vector<DOMAttribute> unparsedAttributes;
+  std::vector<DOMAttribute> customAttributes;
 
   friend class SVGNodeConstructor;
   friend class SVGRenderContext;

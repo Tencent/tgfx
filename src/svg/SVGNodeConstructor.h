@@ -18,22 +18,27 @@
 
 #pragma once
 
+#include "tgfx/svg/SVGCustomParser.h"
 #include "tgfx/svg/SVGDOM.h"
 #include "tgfx/svg/xml/XMLDOM.h"
 
 namespace tgfx {
 
 struct ConstructionContext {
-  explicit ConstructionContext(SVGIDMapper* mapper, CSSMapper* cssMapper)
-      : parentNode(nullptr), nodeIDMapper(mapper), cssMapper(cssMapper) {
+  ConstructionContext(SVGIDMapper* mapper, CSSMapper* cssMapper,
+                      std::shared_ptr<SVGCustomParser> customParser)
+      : parentNode(nullptr), nodeIDMapper(mapper), cssMapper(cssMapper),
+        customParser(std::move(customParser)) {
   }
   ConstructionContext(const ConstructionContext& other, const std::shared_ptr<SVGNode>& newParent)
-      : parentNode(newParent.get()), nodeIDMapper(other.nodeIDMapper), cssMapper(other.cssMapper) {
+      : parentNode(newParent.get()), nodeIDMapper(other.nodeIDMapper), cssMapper(other.cssMapper),
+        customParser(other.customParser) {
   }
 
   SVGNode* parentNode;
   SVGIDMapper* nodeIDMapper;
   CSSMapper* cssMapper;
+  std::shared_ptr<SVGCustomParser> customParser;
 };
 
 using AttributeSetter = std::function<bool(SVGNode&, SVGAttribute, const std::string&)>;
@@ -47,13 +52,15 @@ class SVGNodeConstructor {
   static std::shared_ptr<SVGNode> ConstructSVGNode(const ConstructionContext& context,
                                                    const DOMNode* xmlNode);
 
-  static bool SetAttribute(SVGNode& node, const std::string& name, const std::string& value);
+  static bool SetAttribute(SVGNode& node, const std::string& name, const std::string& value,
+                           const std::shared_ptr<SVGCustomParser>& customParser);
 
   static void SetClassStyleAttributes(SVGNode& root, const CSSMapper& mapper);
 
  private:
   static void ParseNodeAttributes(const DOMNode* xmlNode, const std::shared_ptr<SVGNode>& svgNode,
-                                  SVGIDMapper* mapper);
+                                  SVGIDMapper* mapper,
+                                  const std::shared_ptr<SVGCustomParser>& setter);
 
   static bool SetStyleAttributes(SVGNode& node, SVGAttribute, const std::string& stringValue);
 
