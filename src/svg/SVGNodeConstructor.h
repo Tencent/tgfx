@@ -19,7 +19,7 @@
 #pragma once
 
 #include <utility>
-#include "tgfx/svg/SVGAttributeHandler.h"
+#include "tgfx/svg/SVGCallback.h"
 #include "tgfx/svg/SVGDOM.h"
 #include "tgfx/svg/xml/XMLDOM.h"
 
@@ -29,17 +29,17 @@ struct ConstructionContext {
   ConstructionContext(SVGIDMapper* mapper, CSSMapper* cssMapper,
                       std::shared_ptr<SVGParseSetter> setter)
       : parentNode(nullptr), nodeIDMapper(mapper), cssMapper(cssMapper),
-        attributeSetter(std::move(setter)) {
+        parseSetter(std::move(setter)) {
   }
   ConstructionContext(const ConstructionContext& other, const std::shared_ptr<SVGNode>& newParent)
       : parentNode(newParent.get()), nodeIDMapper(other.nodeIDMapper), cssMapper(other.cssMapper),
-        attributeSetter(other.attributeSetter) {
+        parseSetter(other.parseSetter) {
   }
 
   SVGNode* parentNode;
   SVGIDMapper* nodeIDMapper;
   CSSMapper* cssMapper;
-  std::shared_ptr<SVGParseSetter> attributeSetter;
+  std::shared_ptr<SVGParseSetter> parseSetter;
 };
 
 using setter = std::function<bool(SVGNode&, SVGAttribute, const std::string&)>;

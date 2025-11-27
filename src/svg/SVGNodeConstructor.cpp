@@ -294,11 +294,6 @@ SVGNodeConstructor::InitElementFactories() {
 bool SVGNodeConstructor::SetAttribute(SVGNode& node, const std::string& name,
                                       const std::string& value,
                                       const std::shared_ptr<SVGParseSetter>& setter) {
-  bool setToNode = true;
-  if (setter) {
-    setToNode = setter->setAttribute(node, name, value);
-  }
-
   if (node.parseAndSetAttribute(name, value)) {
     // Handled by new code path
     return true;
@@ -308,9 +303,8 @@ bool SVGNodeConstructor::SetAttribute(SVGNode& node, const std::string& name,
     auto setter = iter->second.setter;
     return setter(node, iter->second.attribute, value);
   }
-  if (setToNode) {
-    // save unparsed attributes
-    node.unparsedAttributes.push_back({name, value});
+  if (setter) {
+    setter->handleCustomAttribute(node, name, value);
   }
   return true;
 }
@@ -456,7 +450,7 @@ std::shared_ptr<SVGNode> SVGNodeConstructor::ConstructSVGNode(const Construction
     return nullptr;
   }
 
-  ParseNodeAttributes(xmlNode, node, context.nodeIDMapper, context.attributeSetter);
+  ParseNodeAttributes(xmlNode, node, context.nodeIDMapper, context.parseSetter);
 
   ConstructionContext localCtx(context, node);
   std::shared_ptr<DOMNode> child = xmlNode->firstChild;

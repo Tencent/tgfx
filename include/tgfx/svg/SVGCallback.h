@@ -23,47 +23,53 @@
 namespace tgfx {
 
 /**
- * Abstract callback interface for SVG parsing.
- * Pass an instance to SVGDOM::Make to customize attribute handling.
+ * Abstract callback interface for SVG parsing operations.
+ * Implementations can be passed to SVGDOM::Make() to handling during parsing.
  */
 class SVGParseSetter {
  public:
   virtual ~SVGParseSetter() = default;
 
   /**
-   * Called when setting attributes on an SVGNode during parsing.
-   * @return true to allow the attribute to be set, false to skip it.
-   * Note: Essential rendering attributes (e.g., fill) are always set regardless of the return value.
+   * Creates a default instance that adds all custom attributes to the SVGNode's customAttributes.
    */
-  virtual bool setAttribute(SVGNode& node, const std::string& name, const std::string& value) = 0;
+  static std::shared_ptr<SVGParseSetter> Make();
+
+  /**
+   * Called when a custom attribute is encountered during parsing.
+   * This method is invoked for attributes that are not standard SVGNode properties,
+   * allowing custom handling logic to be implemented.
+   */
+  virtual void handleCustomAttribute(SVGNode& node, const std::string& name,
+                                     const std::string& value) = 0;
 };
 
 /**
- * Abstract callback interface for exporting SVG filters.
- * Pass an instance to SVGExporter to customize exporting filters.
+ * Abstract callback interface for SVG filter export operations.
+ * Implementations can be passed to SVGExporter.
  */
 class SVGExportWriter {
  public:
   virtual ~SVGExportWriter() = default;
 
   /**
-   * Called when exporting a BlurImageFilter.
-   * @return A DOMAttribute to be added to the <filter> element as a custom attribute.
+   * Called when exporting a BlurImageFilter to SVG.
+   * return A DOMAttribute to be added to the <filter> element as a custom attribute.
    */
   virtual DOMAttribute writeBlurImageFilter(float blurrinessX, float blurrinessY,
                                             TileMode tileMode) = 0;
 
   /**
-   * Called when exporting a DropShadowImageFilter.
-   * @return A DOMAttribute to be added to the <filter> element as a custom attribute.
+   * Called when exporting a DropShadowImageFilter to SVG.
+   * return A DOMAttribute to be added to the <filter> element as a custom attribute.
    */
   virtual DOMAttribute writeDropShadowImageFilter(float dx, float dy, float blurrinessX,
                                                   float blurrinessY, Color color,
                                                   bool dropShadowOnly) = 0;
 
   /**
-   * Called when exporting an InnerShadowImageFilter.
-   * @return A DOMAttribute to be added to the <filter> element as a custom attribute.
+   * Called when exporting an InnerShadowImageFilter to SVG.
+   * return A DOMAttribute to be added to the <filter> element as a custom attribute.
    */
   virtual DOMAttribute writeInnerShadowImageFilter(float dx, float dy, float blurrinessX,
                                                    float blurrinessY, Color color,

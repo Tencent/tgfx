@@ -23,7 +23,7 @@
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/WriteStream.h"
 #include "tgfx/gpu/Context.h"
-#include "tgfx/svg/SVGAttributeHandler.h"
+#include "tgfx/svg/SVGCallback.h"
 
 namespace tgfx {
 class SVGExportContext;
@@ -89,6 +89,7 @@ class SVGExporter {
    * @param context The context used to convert some rendering commands into image data.
    * @param viewBox The viewBox of the SVG. Content that exceeds this area will be clipped.
    * @param exportFlags Flags for exporting SVG text.
+   * @param writer The writer used to write custom attributes.
    * @return A shared pointer to the SVG exporter object. If svgStream is nullptr, context is
    * nullptr, or viewBox is empty, nullptr is returned.
    */

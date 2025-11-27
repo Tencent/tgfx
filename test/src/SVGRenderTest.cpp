@@ -16,9 +16,6 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <memory>
-#include <unordered_map>
-#include <vector>
 #include "core/filters/DropShadowImageFilter.h"
 #include "core/filters/GaussianBlurImageFilter.h"
 #include "core/filters/InnerShadowImageFilter.h"
@@ -30,7 +27,7 @@
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/Typeface.h"
-#include "tgfx/svg/SVGAttributeHandler.h"
+#include "tgfx/svg/SVGCallback.h"
 #include "tgfx/svg/SVGDOM.h"
 #include "tgfx/svg/SVGExporter.h"
 #include "tgfx/svg/node/SVGNode.h"
@@ -421,7 +418,7 @@ TGFX_TEST(SVGRenderTest, ReferenceStyleSVG) {
   EXPECT_TRUE(Baseline::Compare(surface, "SVGTest/referenceStyle"));
 }
 
-TGFX_TEST(SVGRenderTest, SaveUndefinedAttribute) {
+TGFX_TEST(SVGRenderTest, SaveCustomAttribute) {
   std::string SVGString = R"(
     <svg width="100" height="100" copyright="Tencent" producer="TGFX">
       <rect width="100%" height="100%" fill="red" producer="TGFX"/>
@@ -435,7 +432,7 @@ TGFX_TEST(SVGRenderTest, SaveUndefinedAttribute) {
   auto rootNode = SVGDom->getRoot();
   ASSERT_TRUE(rootNode != nullptr);
   {
-    auto attribute = rootNode->getUnparsedAttributes();
+    auto attribute = rootNode->getCustomAttributes();
     EXPECT_TRUE(attribute.size() == 2);
     EXPECT_TRUE(attribute[0].name == "copyright");
     EXPECT_TRUE(attribute[0].value == "Tencent");
@@ -447,7 +444,7 @@ TGFX_TEST(SVGRenderTest, SaveUndefinedAttribute) {
   EXPECT_TRUE(children.size() == 1);
   auto rectNode = children[0];
   {
-    auto attribute = rectNode->getUnparsedAttributes();
+    auto attribute = rectNode->getCustomAttributes();
     EXPECT_TRUE(attribute.size() == 1);
     EXPECT_TRUE(attribute[0].name == "producer");
     EXPECT_TRUE(attribute[0].value == "TGFX");
@@ -480,11 +477,14 @@ TGFX_TEST(SVGRenderTest, IDAttribute) {
   EXPECT_TRUE(filterID.get().value() == "blur1");
 }
 
-TGFX_TEST(SVGRenderTest, FilterUndefinedAttribute) {
+TGFX_TEST(SVGRenderTest, FilterCustomAttribute) {
   class FilterAttributeSetter : public SVGParseSetter {
-    bool setAttribute(SVGNode& node, const std::string& name, const std::string&) override {
-      return (node.tag() == SVGTag::Svg && name == "copyright") ||
-             (node.tag() != SVGTag::Svg && name == "producer");
+    void handleCustomAttribute(SVGNode& node, const std::string& name,
+                               const std::string& value) override {
+      if ((node.tag() == SVGTag::Svg && name == "copyright") ||
+          (node.tag() != SVGTag::Svg && name == "producer")) {
+        node.addCustomAttribute(name, value);
+      }
     }
   };
 
@@ -501,7 +501,7 @@ TGFX_TEST(SVGRenderTest, FilterUndefinedAttribute) {
   auto rootNode = SVGDom->getRoot();
   ASSERT_TRUE(rootNode != nullptr);
   {
-    auto attribute = rootNode->getUnparsedAttributes();
+    auto attribute = rootNode->getCustomAttributes();
     EXPECT_TRUE(attribute.size() == 1);
     EXPECT_TRUE(attribute[0].name == "copyright");
     EXPECT_TRUE(attribute[0].value == "Tencent");
@@ -511,7 +511,7 @@ TGFX_TEST(SVGRenderTest, FilterUndefinedAttribute) {
   EXPECT_TRUE(children.size() == 1);
   auto rectNode = children[0];
   {
-    auto attribute = rectNode->getUnparsedAttributes();
+    auto attribute = rectNode->getCustomAttributes();
     EXPECT_TRUE(attribute.size() == 1);
     EXPECT_TRUE(attribute[0].name == "producer");
     EXPECT_TRUE(attribute[0].value == "TGFX");
@@ -554,20 +554,21 @@ class ProtocolWriter : public SVGExportWriter {
 
 class ProtocolSetter : public SVGParseSetter {
  public:
-  bool setAttribute(SVGNode& node, const std::string& name, const std::string& value) override {
+  void handleCustomAttribute(SVGNode& node, const std::string& name,
+                             const std::string& value) override {
     if (node.tag() != SVGTag::Filter || name != "filter-data") {
-      return true;
+      return;
     }
     auto id = node.getID();
     if (!id.isValue()) {
-      return true;
+      return;
     }
     auto idString = id.get().value();
 
     // Parse filter-data attribute
     size_t colonPos = value.find(':');
     if (colonPos == std::string::npos) {
-      return false;
+      return;
     }
 
     auto filterType = value.substr(0, colonPos);
@@ -628,7 +629,6 @@ class ProtocolSetter : public SVGParseSetter {
     if (imageFilter) {
       filterMap[idString] = imageFilter;
     }
-    return true;
   }
 
   std::unordered_map<std::string, std::shared_ptr<ImageFilter>> filterMap;

@@ -27,7 +27,7 @@
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Size.h"
 #include "tgfx/core/Surface.h"
-#include "tgfx/svg/SVGAttributeHandler.h"
+#include "tgfx/svg/SVGCallback.h"
 #include "tgfx/svg/SVGLengthContext.h"
 #include "tgfx/svg/SVGTypes.h"
 #include "tgfx/svg/node/SVGContainer.h"
@@ -37,7 +37,7 @@
 namespace tgfx {
 
 std::shared_ptr<SVGDOM> SVGDOM::Make(Stream& stream, std::shared_ptr<TextShaper> textShaper,
-                                     std::shared_ptr<SVGParseSetter> attributeSetter) {
+                                     std::shared_ptr<SVGParseSetter> parseSetter) {
   // Parse the data into an XML DOM structure
   auto xmlDom = DOM::Make(stream);
   if (!xmlDom) {
@@ -48,7 +48,7 @@ std::shared_ptr<SVGDOM> SVGDOM::Make(Stream& stream, std::shared_ptr<TextShaper>
   // SVG elements and attributes
   SVGIDMapper mapper;
   CSSMapper cssMapper;
-  ConstructionContext constructionContext(&mapper, &cssMapper, std::move(attributeSetter));
+  ConstructionContext constructionContext(&mapper, &cssMapper, std::move(parseSetter));
   auto root =
       SVGNodeConstructor::ConstructSVGNode(constructionContext, xmlDom->getRootNode().get());
   if (!root || root->tag() != SVGTag::Svg) {

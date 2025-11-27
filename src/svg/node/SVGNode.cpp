@@ -31,6 +31,7 @@
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/svg/SVGTypes.h"
+#include "tgfx/svg/xml/XMLDOM.h"
 
 namespace tgfx {
 
@@ -188,4 +189,13 @@ Matrix SVGNode::ComputeViewboxMatrix(const Rect& viewBox, const Rect& viewPort,
 
   return Matrix::MakeTrans(transform.x, transform.y) * Matrix::MakeScale(scale.x, scale.y);
 }
+
+void SVGNode::addCustomAttribute(const std::string& name, const std::string& value) {
+  customAttributes.push_back({name, value});
+}
+
+const std::vector<DOMAttribute>& SVGNode::getCustomAttributes() const {
+  return customAttributes;
+}
+
 }  // namespace tgfx
