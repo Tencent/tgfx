@@ -1141,7 +1141,9 @@ std::shared_ptr<Image> Layer::getOffscreenContentImage(
   } else {
     PictureRecorder recorder = {};
     auto offscreenCanvas = recorder.beginRecording();
-    offscreenCanvas->scale(contentScale, contentScale);
+    auto current = canvas->getMatrix();
+    offscreenCanvas->concat(current);
+    current.invert(imageMatrix);
     offscreenCanvas->clipRect(inputBounds);
     if (passThroughBackground && args.blendModeBackground) {
       Point offset = {};
@@ -1153,7 +1155,6 @@ std::shared_ptr<Image> Layer::getOffscreenContentImage(
     Point offset;
     finalImage = ToImageWithOffset(recorder.finishRecordingAsPicture(), &offset, nullptr,
                                    args.dstColorSpace);
-    imageMatrix->setScale(1.0f / contentScale, 1.0f / contentScale);
     imageMatrix->preTranslate(offset.x, offset.y);
   }
   return finalImage;
@@ -1186,7 +1187,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     return;
   }
   Paint paint = {};
-  paint.setAntiAlias(bitFields.allowsEdgeAntialiasing);
+  paint.setAntiAlias(false);
   paint.setAlpha(alpha);
   paint.setBlendMode(blendMode);
 
@@ -1231,12 +1232,14 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
 
   AutoCanvasRestore autoRestore(canvas);
   canvas->concat(imageMatrix);
-  canvas->drawImage(image, filterOffset.x, filterOffset.y, &paint);
+
+  SamplingOptions sample = SamplingOptions{FilterMode::Nearest, MipmapMode::None};
+  canvas->drawImage(image, filterOffset.x, filterOffset.y, sample, &paint);
   if (args.blendModeBackground) {
     auto blendCanvas = args.blendModeBackground->getCanvas();
     AutoCanvasRestore autoRestoreBlend(blendCanvas);
     blendCanvas->concat(imageMatrix);
-    blendCanvas->drawImage(image, filterOffset.x, filterOffset.y, &paint);
+    blendCanvas->drawImage(image, filterOffset.x, filterOffset.y, sample, &paint);
   }
   if (subBackgroundContext) {
     subBackgroundContext->drawToParent(Matrix::MakeScale(1.0f / contentScale), paint);
@@ -1244,7 +1247,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     auto backgroundCanvas = args.blurBackground->getCanvas();
     AutoCanvasRestore autoRestoreBg(backgroundCanvas);
     backgroundCanvas->concat(imageMatrix);
-    backgroundCanvas->drawImage(image, filterOffset.x, filterOffset.y, &paint);
+    backgroundCanvas->drawImage(image, filterOffset.x, filterOffset.y, sample, &paint);
   }
 
   // There is no scenario where LayerStyle's Position and ExtraSourceType are 'above' and

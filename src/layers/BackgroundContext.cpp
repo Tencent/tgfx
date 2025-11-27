@@ -186,7 +186,8 @@ void BackgroundContext::drawToParent(const Matrix& paintMatrix, const Paint& pai
   parentCanvas->resetMatrix();
   auto offset = Point::Make(0, 0);
   auto image = onGetBackgroundImage(&offset);
-  parentCanvas->drawImage(image, offset.x, offset.y, &newPaint);
+  SamplingOptions sampling = SamplingOptions{FilterMode::Nearest};
+  parentCanvas->drawImage(image, offset.x, offset.y, sampling, &newPaint);
 }
 
 std::shared_ptr<Image> BackgroundContext::getBackgroundImage(Point* offset) {
