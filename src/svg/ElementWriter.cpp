@@ -319,8 +319,7 @@ void ElementWriter::callbackDropShadowImageFilter(
   float blurrinessY = 0.f;
   if (filter->blurFilter) {
     if (Types::Get(filter->blurFilter.get()) == Types::ImageFilterType::Blur) {
-      const auto blurFilter =
-          static_cast<const GaussianBlurImageFilter*>(filter->blurFilter.get());
+      const auto blurFilter = static_cast<const GaussianBlurImageFilter*>(filter->blurFilter.get());
       blurrinessX = blurFilter->blurrinessX;
       blurrinessY = blurFilter->blurrinessY;
     }
@@ -342,8 +341,7 @@ void ElementWriter::callbackInnerShadowImageFilter(
   float blurrinessY = 0.f;
   if (filter->blurFilter) {
     if (Types::Get(filter->blurFilter.get()) == Types::ImageFilterType::Blur) {
-      const auto blurFilter =
-          static_cast<const GaussianBlurImageFilter*>(filter->blurFilter.get());
+      const auto blurFilter = static_cast<const GaussianBlurImageFilter*>(filter->blurFilter.get());
       blurrinessX = blurFilter->blurrinessX;
       blurrinessY = blurFilter->blurrinessY;
     }
