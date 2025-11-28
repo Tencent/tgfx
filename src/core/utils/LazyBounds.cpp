@@ -20,13 +20,16 @@
 
 namespace tgfx {
 void LazyBounds::update(const Rect& rect) const {
-  initOnce([this, &rect]() { bounds.store(new Rect(rect), std::memory_order_release); });
+  auto newBounds = new Rect(rect);
+  Rect* oldBounds = nullptr;
+  if (!bounds.compare_exchange_strong(oldBounds, newBounds, std::memory_order_acq_rel)) {
+    delete newBounds;
+  }
 }
 
 void LazyBounds::reset() {
   auto oldBounds = bounds.exchange(nullptr, std::memory_order_acq_rel);
   delete oldBounds;
-  initOnce.reset();
 }
 
 }  // namespace tgfx

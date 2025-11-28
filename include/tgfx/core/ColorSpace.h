@@ -18,9 +18,9 @@
 
 #pragma once
 
+#include <atomic>
 #include <memory>
 #include "tgfx/core/Data.h"
-#include "tgfx/core/Once.h"
 
 namespace tgfx {
 /**
@@ -485,7 +485,7 @@ class ColorSpace : public std::enable_shared_from_this<ColorSpace> {
 
   mutable TransferFunction _invTransferFunction;
   mutable ColorMatrix33 _fromXYZD50;
-  mutable Once _lazyDstFieldsOnce;
+  mutable std::atomic<uint8_t> _isLazyDstFieldsState = 0;
 };
 
 }  // namespace tgfx

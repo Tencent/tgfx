@@ -19,7 +19,6 @@
 #pragma once
 
 #include <atomic>
-#include "tgfx/core/Once.h"
 #include "tgfx/core/Rect.h"
 
 namespace tgfx {
@@ -53,6 +52,5 @@ class LazyBounds {
 
  private:
   mutable std::atomic<Rect*> bounds = {nullptr};
-  mutable Once initOnce;
 };
 }  // namespace tgfx
