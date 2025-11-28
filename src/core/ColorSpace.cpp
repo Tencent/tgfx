@@ -844,24 +844,26 @@ ColorSpace::ColorSpace(const TransferFunction& transferFunction, const ColorMatr
 }
 
 void ColorSpace::computeLazyDstFields() const {
-  if (!isLazyDstFieldsResolved) {
+  if (!isLazyDstFieldsResolved.load(std::memory_order_acquire)) {
+    std::lock_guard<std::mutex> autoLocker(locker);
+    if (!isLazyDstFieldsResolved.load(std::memory_order_relaxed)) {
 
-    // Invert 3x3 gamut, defaulting to sRGB if we can't.
-    if (!gfx::skcms_Matrix3x3_invert(reinterpret_cast<const gfx::skcms_Matrix3x3*>(&_toXYZD50),
-                                     reinterpret_cast<gfx::skcms_Matrix3x3*>(&_fromXYZD50))) {
-      ASSERT(gfx::skcms_Matrix3x3_invert(&gfx::skcms_sRGB_profile()->toXYZD50,
-                                         reinterpret_cast<gfx::skcms_Matrix3x3*>(&_fromXYZD50)))
+      // Invert 3x3 gamut, defaulting to sRGB if we can't.
+      if (!gfx::skcms_Matrix3x3_invert(reinterpret_cast<const gfx::skcms_Matrix3x3*>(&_toXYZD50),
+                                       reinterpret_cast<gfx::skcms_Matrix3x3*>(&_fromXYZD50))) {
+        ASSERT(gfx::skcms_Matrix3x3_invert(&gfx::skcms_sRGB_profile()->toXYZD50,
+                                           reinterpret_cast<gfx::skcms_Matrix3x3*>(&_fromXYZD50)))
+      }
+
+      // Invert transfer function, defaulting to sRGB if we can't.
+      if (!gfx::skcms_TransferFunction_invert(
+              reinterpret_cast<const gfx::skcms_TransferFunction*>(&_transferFunction),
+              reinterpret_cast<gfx::skcms_TransferFunction*>(&_invTransferFunction))) {
+        _invTransferFunction =
+            *reinterpret_cast<const TransferFunction*>(gfx::skcms_sRGB_Inverse_TransferFunction());
+      }
+      isLazyDstFieldsResolved.store(true, std::memory_order_release);
     }
-
-    // Invert transfer function, defaulting to sRGB if we can't.
-    if (!gfx::skcms_TransferFunction_invert(
-            reinterpret_cast<const gfx::skcms_TransferFunction*>(&_transferFunction),
-            reinterpret_cast<gfx::skcms_TransferFunction*>(&_invTransferFunction))) {
-      _invTransferFunction =
-          *reinterpret_cast<const TransferFunction*>(gfx::skcms_sRGB_Inverse_TransferFunction());
-    }
-
-    isLazyDstFieldsResolved = true;
   }
 }
 

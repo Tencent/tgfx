@@ -18,7 +18,9 @@
 
 #pragma once
 
+#include <atomic>
 #include <memory>
+#include <mutex>
 #include "tgfx/core/Data.h"
 
 namespace tgfx {
@@ -484,7 +486,8 @@ class ColorSpace : public std::enable_shared_from_this<ColorSpace> {
 
   mutable TransferFunction _invTransferFunction;
   mutable ColorMatrix33 _fromXYZD50;
-  mutable bool isLazyDstFieldsResolved = false;
+  mutable std::atomic<bool> isLazyDstFieldsResolved = false;
+  mutable std::mutex locker = {};
 };
 
 }  // namespace tgfx
