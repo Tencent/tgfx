@@ -1285,8 +1285,12 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
         clipBounds->roundOut();
       }
       // clipBounds may be smaller than the image bounds, so we need to pass it to makeWithFilter.
-      image = image->makeWithFilter(filter, &filterOffset,
-                                    clipBounds.has_value() ? &*clipBounds : nullptr);
+      // The filter obtained for layers within a 3D rendering context does not contain matrix
+      // transformation, while clipBounds considers matrix transformation and cannot be directly
+      // clipped. The corresponding transformation matrix is applied during compositing.
+      auto filterClipBounds =
+          args.render3DContext == nullptr && clipBounds.has_value() ? &*clipBounds : nullptr;
+      image = image->makeWithFilter(filter, &filterOffset, filterClipBounds);
     }
   }
   if (image == nullptr) {
@@ -1306,12 +1310,13 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     // rendered before drawing to canvas, while image represents the content of this layer. Its
     // top-left corner may not coincide with the layer origin, so the content offset value based on
     // layer description needs to be obtained through imageMatrix and adapted to the matrix.
-    auto imgeOrigin = Point::Make(imageMatrix.getTranslateX(), imageMatrix.getTranslateY());
+    DEBUG_ASSERT(!FloatNearlyZero(contentScale));
+    auto imgeOrigin = Point::Make(imageMatrix.getTranslateX() + filterOffset.x / contentScale,
+                                  imageMatrix.getTranslateY() + filterOffset.y / contentScale);
     auto imageTransform = anchorAdaptedMatrix(*transform, imgeOrigin);
     // The content described by the image has been scaled relative to the layer's local coordinates.
     // The matrix adaptation rule is: project first, then scale.
     if (!FloatNearlyEqual(contentScale, 1.0f)) {
-      DEBUG_ASSERT(!FloatNearlyZero(contentScale));
       auto invScaleMatrix = Matrix3D::MakeScale(1.0f / contentScale, 1.0f / contentScale, 1.0f);
       auto scaleMatrix = Matrix3D::MakeScale(contentScale, contentScale, 1.0f);
       imageTransform = scaleMatrix * imageTransform * invScaleMatrix;
@@ -1322,8 +1327,9 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     // Calculate the drawing offset in the compositor based on the final drawing area of the content
     // on the canvas.
     auto imageCanvasOrigin = imageTransform.mapRect(Rect::MakeWH(image->width(), image->height()));
-    float x = imageCanvasOrigin.left - args.render3DContext->renderRect().left;
-    float y = imageCanvasOrigin.top - args.render3DContext->renderRect().top;
+    float x = imageCanvasOrigin.left + filterOffset.x - args.render3DContext->renderRect().left;
+    float y = imageCanvasOrigin.top + filterOffset.y - args.render3DContext->renderRect().top;
+    //TODO: Clip image with clipBounds.
     args.render3DContext->compositor()->drawImage(image, imageTransform, x, y);
   }
   if (args.blendModeBackground) {
