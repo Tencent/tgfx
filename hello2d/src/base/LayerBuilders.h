@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,19 +18,24 @@
 
 #pragma once
 
-#include "base/LayerTreeDrawer.h"
+#include "hello2d/LayerBuilder.h"
 
-namespace drawers {
-#define DEFINE_LAYER_DRAWER(LayerTreeName)                                              \
-  class LayerTreeName : public drawers::LayerTreeDrawer {                               \
+namespace hello2d {
+#define DEFINE_LAYER_BUILDER(BuilderName)                                               \
+  class BuilderName : public hello2d::LayerBuilder {                                    \
    public:                                                                              \
-    LayerTreeName() : drawers::LayerTreeDrawer(#LayerTreeName) {                        \
+    BuilderName() : hello2d::LayerBuilder(#BuilderName) {                               \
     }                                                                                   \
                                                                                         \
-   protected:                                                                           \
-    std::shared_ptr<tgfx::Layer> buildLayerTree(const drawers::AppHost* host) override; \
+    std::shared_ptr<tgfx::Layer> buildLayerTree(const hello2d::AppHost* host) override; \
   }
 
-DEFINE_LAYER_DRAWER(CustomLayerTree);
+// For backward compatibility
+#define DEFINE_SAMPLE DEFINE_LAYER_BUILDER
 
-}  // namespace drawers
+DEFINE_LAYER_BUILDER(ConicGradient);
+DEFINE_LAYER_BUILDER(ImageWithMipmap);
+DEFINE_LAYER_BUILDER(ImageWithShadow);
+DEFINE_LAYER_BUILDER(RichText);
+DEFINE_LAYER_BUILDER(SimpleLayerTree);
+}  // namespace hello2d

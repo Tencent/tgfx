@@ -23,9 +23,11 @@
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/opengl/GLDevice.h"
 #include "tgfx/gpu/opengl/eagl/EAGLWindow.h"
+#include "tgfx/layers/DisplayList.h"
 
 @interface TGFXView : UIView
 
-- (void)draw:(int)index zoom:(float)zoom offset:(CGPoint)offset;
+- (bool)draw:(int)index zoom:(float)zoom offset:(CGPoint)offset;
+- (void)markDirty;
 
 @end

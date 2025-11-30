@@ -19,7 +19,7 @@
 #import "TGFXView.h"
 #import <QuartzCore/CADisplayLink.h>
 #include <cmath>
-#include "drawers/Drawer.h"
+#include "hello2d/LayerBuilder.h"
 #include "tgfx/core/Point.h"
 
 static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, const CVTimeStamp*,
@@ -31,7 +31,10 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
 
 @implementation TGFXView {
   std::shared_ptr<tgfx::CGLWindow> tgfxWindow;
-  std::unique_ptr<drawers::AppHost> appHost;
+  std::unique_ptr<hello2d::AppHost> appHost;
+  tgfx::DisplayList displayList;
+  int lastDrawIndex;
+  bool needsRedraw;
 }
 
 - (BOOL)acceptsFirstResponder {
@@ -59,10 +62,13 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   auto width = static_cast<int>(roundf(size.width));
   auto height = static_cast<int>(roundf(size.height));
   if (appHost == nullptr) {
-    appHost = std::make_unique<drawers::AppHost>();
+    appHost = std::make_unique<hello2d::AppHost>();
     NSString* imagePath = [[NSBundle mainBundle] pathForResource:@"bridge" ofType:@"jpg"];
     auto image = tgfx::Image::MakeFromFile(imagePath.UTF8String);
     appHost->addImage("bridge", image);
+    imagePath = [[NSBundle mainBundle] pathForResource:@"tgfx" ofType:@"png"];
+    image = tgfx::Image::MakeFromFile(imagePath.UTF8String);
+    appHost->addImage("TGFX", image);
     auto typeface = tgfx::Typeface::MakeFromName("PingFang SC", "");
     appHost->addTypeface("default", typeface);
     typeface = tgfx::Typeface::MakeFromName("Apple Color Emoji", "");
@@ -72,6 +78,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   auto sizeChanged = appHost->updateScreen(width, height, contentScale);
   if (sizeChanged && tgfxWindow != nullptr) {
     tgfxWindow->invalidSize();
+    needsRedraw = true;
     [self draw];
   }
 }
@@ -81,6 +88,11 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   self.drawIndex = 0;
   self.zoomScale = 1.0f;
   self.contentOffset = CGPointZero;
+  lastDrawIndex = -1;
+  needsRedraw = true;
+  displayList.setRenderMode(tgfx::RenderMode::Tiled);
+  displayList.setAllowZoomBlur(true);
+  displayList.setMaxTileCount(512);
   [self.window makeFirstResponder:self];
 
   if (@available(macOS 14, *)) {
@@ -131,43 +143,67 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
     }
   }
 }
+- (void)markDirty {
+  needsRedraw = true;
+}
 
-- (void)draw {
+- (BOOL)draw {
+  if (!needsRedraw) {
+    return false;
+  }
+
   if (self.window == nil) {
-    return;
+    return false;
   }
   if (appHost->width() <= 0 || appHost->height() <= 0) {
-    return;
+    return false;
   }
   if (tgfxWindow == nullptr) {
     tgfxWindow = tgfx::CGLWindow::MakeFrom(self);
   }
   if (tgfxWindow == nullptr) {
-    return;
+    return false;
   }
   auto device = tgfxWindow->getDevice();
   auto context = device->lockContext();
   if (context == nullptr) {
-    return;
+    return false;
   }
   auto surface = tgfxWindow->getSurface(context);
   if (surface == nullptr) {
     device->unlock();
-    return;
+    return false;
   }
-  appHost->updateZoomAndOffset(self.zoomScale,
-                               tgfx::Point(self.contentOffset.x, self.contentOffset.y));
+
+  // Switch sample when drawIndex changes
+  auto numBuilders = hello2d::GetLayerBuilderCount();
+  auto index = (self.drawIndex % numBuilders);
+  if (index != lastDrawIndex) {
+    auto layer = hello2d::BuildAndCenterLayer(index, appHost.get());
+    if (layer) {
+      displayList.root()->removeChildren();
+      displayList.root()->addChild(layer);
+    }
+    lastDrawIndex = index;
+  }
+
+  // Directly set zoom and offset on DisplayList
+  displayList.setZoomScale(self.zoomScale);
+  displayList.setContentOffset(static_cast<float>(self.contentOffset.x),
+                               static_cast<float>(self.contentOffset.y));
+
+  // Draw background and render DisplayList
   auto canvas = surface->getCanvas();
   canvas->clear();
-  auto numDrawers = drawers::Drawer::Count() - 1;
-  int index = (self.drawIndex % numDrawers) + 1;
-  auto drawer = drawers::Drawer::GetByName("GridBackground");
-  drawer->draw(canvas, appHost.get());
-  drawer = drawers::Drawer::GetByIndex(index);
-  drawer->draw(canvas, appHost.get());
+  hello2d::DrawSampleBackground(canvas, appHost.get());
+  displayList.render(surface.get(), false);
+
   context->flushAndSubmit();
   tgfxWindow->present(context);
   device->unlock();
+
+  needsRedraw = false;
+  return true;
 }
 
 @end

@@ -16,29 +16,31 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "base/Drawers.h"
+#include "base/LayerBuilders.h"
+#include "tgfx/layers/ImageLayer.h"
 
-namespace drawers {
-void ConicGradient::onDraw(tgfx::Canvas* canvas, const AppHost* host) {
+namespace hello2d {
+std::shared_ptr<tgfx::Layer> ImageWithMipmap::buildLayerTree(const AppHost* host) {
+  auto root = tgfx::Layer::Make();
   auto scale = host->density();
+  padding = 75.f * scale;
   auto width = host->width();
   auto height = host->height();
-  tgfx::Color cyan = {0.0f, 1.0f, 1.0f, 1.0f};
-  tgfx::Color magenta = {1.0f, 0.0f, 1.0f, 1.0f};
-  tgfx::Color yellow = {1.0f, 1.0f, 0.0f, 1.0f};
-  auto shader = tgfx::Shader::MakeConicGradient(tgfx::Point::Make(width / 2, height / 2), 0, 360,
-                                                {cyan, magenta, yellow, cyan}, {});
-  tgfx::Paint paint = {};
-  paint.setShader(shader);
-  auto screenSize = std::min(width, height);
-  auto size = screenSize - static_cast<int>(150 * scale);
+  auto size = std::min(width, height) - static_cast<int>(padding * 2);
   size = std::max(size, 50);
-  auto rect = tgfx::Rect::MakeXYWH((width - size) / 2, (height - size) / 2, size, size);
-  tgfx::Path path = {};
-  path.addRoundRect(rect, 20 * scale, 20 * scale);
-  canvas->translate(host->contentOffset().x, host->contentOffset().y);
-  canvas->scale(host->zoomScale(), host->zoomScale());
-  canvas->drawPath(path, paint);
+  auto image = host->getImage("bridge");
+  if (image == nullptr) {
+    return root;
+  }
+  image = image->makeMipmapped(true);
+  auto imageScale = static_cast<float>(size) / static_cast<float>(image->width());
+  auto matrix = tgfx::Matrix::MakeScale(imageScale);
+  auto imageLayer = tgfx::ImageLayer::Make();
+  imageLayer->setImage(image);
+  imageLayer->setSampling(
+      tgfx::SamplingOptions(tgfx::FilterMode::Linear, tgfx::MipmapMode::Linear));
+  imageLayer->setMatrix(matrix);
+  root->addChild(imageLayer);
+  return root;
 }
-
-}  // namespace drawers
+}  // namespace hello2d

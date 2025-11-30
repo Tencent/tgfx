@@ -23,6 +23,7 @@
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/opengl/GLDevice.h"
 #include "tgfx/gpu/opengl/cgl/CGLWindow.h"
+#include "tgfx/layers/DisplayList.h"
 
 @interface TGFXView : NSView
 
@@ -32,8 +33,9 @@
 @property(nonatomic) CVDisplayLinkRef cvDisplayLink;
 @property(nonatomic, strong) CADisplayLink* caDisplayLink;
 
-- (void)draw;
+- (bool)draw;
 - (void)startDisplayLink;
 - (void)stopDisplayLink;
+- (void)markDirty;
 
 @end
