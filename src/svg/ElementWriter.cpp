@@ -130,6 +130,7 @@ void ElementWriter::addFillAndStroke(const Brush& brush, const Stroke* stroke,
   if (brush.blendMode != BlendMode::SrcOver) {
     auto blendModeString = ToSVGBlendMode(brush.blendMode);
     if (!blendModeString.empty()) {
+      blendModeString = "mix-blend-mode:" + blendModeString;
       addAttribute("style", blendModeString);
     } else {
       reportUnsupportedElement("Unsupported blend mode");
@@ -720,8 +721,8 @@ void ElementWriter::addBlendColorFilterResources(const ModeColorFilter* modeColo
 
     {
       ElementWriter blendElement("feBlend", writer);
-      blendElement.addAttribute("in", "SourceGraphic");
-      blendElement.addAttribute("in2", "flood");
+      blendElement.addAttribute("in", "flood");
+      blendElement.addAttribute("in2", "SourceGraphic");
       blendElement.addAttribute("mode", BlendModeString);
       blendElement.addAttribute("result", "blend");
     }

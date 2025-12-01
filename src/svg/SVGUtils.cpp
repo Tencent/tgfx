@@ -133,10 +133,7 @@ std::string ToSVGBlendMode(BlendMode mode) {
   auto index = static_cast<size_t>(mode);
   DEBUG_ASSERT(index < blendModeCount);
   const auto& blendStr = blendModeMap[index];
-  if (blendStr.empty()) {
-    return "";
-  }
-  return "mix-blend-mode:" + blendStr;
+  return blendStr;
 }
 
 std::string FloatToString(float value) {
