@@ -697,7 +697,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
   bool hasValidMask() const;
 
   void updateRenderBounds(std::shared_ptr<RegionTransformer> transformer = nullptr,
-                          bool forceDirty = false);
+                          const Matrix3D* transform = nullptr, bool forceDirty = false);
 
   void checkBackgroundStyles(std::shared_ptr<RegionTransformer> transformer);
 
@@ -717,7 +717,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::shared_ptr<Image> getOffscreenContentImage(
       const DrawArgs& args, const Canvas* canvas, bool passThroughBackground,
       std::shared_ptr<BackgroundContext> subBackgroundContext, std::optional<Rect> clipBounds,
-      Matrix* imageMatrix, bool excludeChildren);
+      Matrix* imageMatrix, bool excludeChildren, const Matrix3D* transform);
 
   /**
    * Returns the equivalent transformation matrix adapted for a custom anchor point.
@@ -736,6 +736,10 @@ class Layer : public std::enable_shared_from_this<Layer> {
    * from [maxDepth, minDepth] to the [-1, 1] range.
    */
   Matrix3D calculate3DContextDepthMatrix();
+
+  bool in3DContext() const;
+
+  bool canExtend3DContext() const;
 
   struct {
     bool dirtyContent : 1;        // layer's content needs updating

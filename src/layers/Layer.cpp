@@ -1128,13 +1128,17 @@ std::shared_ptr<MaskFilter> Layer::getMaskFilter(const DrawArgs& args, float sca
 std::shared_ptr<Image> Layer::getOffscreenContentImage(
     const DrawArgs& args, const Canvas* canvas, bool passThroughBackground,
     std::shared_ptr<BackgroundContext> subBackgroundContext, std::optional<Rect> clipBounds,
-    Matrix* imageMatrix, bool excludeChildren) {
+    Matrix* imageMatrix, bool excludeChildren, const Matrix3D* transform) {
   DEBUG_ASSERT(imageMatrix);
   // Bounding box of layer content in local coordinate system.
   auto localBounds = excludeChildren ? getContentBounds() : getBounds();
   auto inputBounds = localBounds;
   std::optional<Matrix3D> contentMatrix3D;
-  if (!_matrix3DIsAffine) {
+  if (transform != nullptr) {
+    auto contentOrigin = Point::Make(localBounds.left, localBounds.top);
+    contentMatrix3D = anchorAdaptedMatrix(*transform, contentOrigin);
+    inputBounds = contentMatrix3D->mapRect(inputBounds);
+  } else if (!_matrix3DIsAffine) {
     // Calculate the effective drawing area based on the layer's actual drawing area in the Canvas
     // and the clipping region defined by clipBounds, then inversely calculate the cropping area of
     // the original image so that the cropped part can exactly fill the effective drawing area. For
@@ -1238,7 +1242,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   auto clipBounds = GetClipBounds(args.blurBackground ? args.blurBackground->getCanvas() : canvas);
   auto imageMatrix = Matrix::I();
   auto image = getOffscreenContentImage(args, canvas, passThroughBackground, subBackgroundContext,
-                                        clipBounds, &imageMatrix, excludeChildren);
+                                        clipBounds, &imageMatrix, excludeChildren, transform);
   auto invertImageMatrix = Matrix::I();
   if (image == nullptr || !imageMatrix.invert(&invertImageMatrix)) {
     return;
@@ -1327,8 +1331,10 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     // Calculate the drawing offset in the compositor based on the final drawing area of the content
     // on the canvas.
     auto imageCanvasOrigin = imageTransform.mapRect(Rect::MakeWH(image->width(), image->height()));
-    float x = imageCanvasOrigin.left + filterOffset.x - args.render3DContext->renderRect().left;
-    float y = imageCanvasOrigin.top + filterOffset.y - args.render3DContext->renderRect().top;
+    float x = imageCanvasOrigin.left + imageMatrix.getTranslateX() * contentScale + filterOffset.x -
+              args.render3DContext->renderRect().left;
+    float y = imageCanvasOrigin.top + imageMatrix.getTranslateY() * contentScale + filterOffset.y -
+              args.render3DContext->renderRect().top;
     //TODO: Clip image with clipBounds.
     args.render3DContext->compositor()->drawImage(image, imageTransform, x, y);
   }
@@ -1959,7 +1965,9 @@ bool Layer::hasValidMask() const {
   return _mask && _mask->root() == root() && _mask->bitFields.visible;
 }
 
-void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, bool forceDirty) {
+void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer,
+                               const Matrix3D* transform, bool forceDirty) {
+  auto contextTransformer = transformer;
   if (!forceDirty && !bitFields.dirtyDescendents) {
     if (maxBackgroundOutset > 0 || bitFields.hasBlendMode) {
       propagateLayerState();
@@ -1975,15 +1983,21 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
   // Ensure the 3D filter is not released during the entire function lifetime, otherwise the
   // transformer will have abnormal render bounds calculation
   auto filter3DVector = std::vector<std::shared_ptr<LayerFilter>>{};
-  if (!_layerStyles.empty() || !_filters.empty() || !_matrix3DIsAffine) {
+  if (!_layerStyles.empty() || !_filters.empty() || !_matrix3DIsAffine || transform != nullptr) {
     if (transformer) {
       contentScale = transformer->getMaxScale();
     }
     // The filter and style should calculate bounds based on the original size. The externally
     // provided Transformer already contains matrix data, which will be applied to the computed size
     // at the end, including scaling, rotation, and other transformations.
-    if (!_matrix3DIsAffine) {
+    if (transform) {
+      auto composeMatrix = _matrix3D;
+      composeMatrix.postConcat(*transform);
+      filter3DVector.push_back(Transform3DFilter::Make(composeMatrix));
+    } else if (!_matrix3DIsAffine) {
       filter3DVector.push_back(Transform3DFilter::Make(_matrix3D));
+    }
+    if (!filter3DVector.empty()) {
       transformer =
           RegionTransformer::MakeFromFilters(filter3DVector, 1.0f, std::move(transformer));
     }
@@ -2027,9 +2041,30 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     // If the sublayer's Matrix contains 3D transformations or projection transformations, then its
     // Matrix is considered as an identity matrix here, and its actual position is left to the
     // sublayer to calculate through the 3D filter method.
-    auto childAffineMatrix =
-        IsMatrix3DAffine(childMatrix) ? GetMayLossyAffineMatrix(childMatrix) : Matrix::I();
-    auto childTransformer = RegionTransformer::MakeFromMatrix(childAffineMatrix, transformer);
+    std::shared_ptr<RegionTransformer> childTransformer = nullptr;
+    std::optional<Matrix3D> childTransform = std::nullopt;
+    if (transform != nullptr) {
+      auto composeMatrix = _matrix3D;
+      composeMatrix.postConcat(*transform);
+      if (child->in3DContext()) {
+        childTransformer = contextTransformer;
+        childTransform = composeMatrix;
+      } else {
+        if (IsMatrix3DAffine(childMatrix)) {
+          composeMatrix.preConcat(childMatrix);
+        }
+        childTransformer =
+            RegionTransformer::MakeFromMatrix(GetMayLossyAffineMatrix(composeMatrix), transformer);
+      }
+    } else if (child->in3DContext()) {
+      childTransformer = contextTransformer;
+      childTransform = Matrix3D::I();
+    } else if (IsMatrix3DAffine(childMatrix)) {
+      childTransformer =
+          RegionTransformer::MakeFromMatrix(GetMayLossyAffineMatrix(childMatrix), transformer);
+    } else {
+      childTransformer = transformer;
+    }
     if (child->_scrollRect) {
       clipRect = *child->_scrollRect;
     }
@@ -2052,7 +2087,8 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
       childTransformer = RegionTransformer::MakeFromClip(*clipRect, std::move(childTransformer));
     }
     auto childForceDirty = forceDirty || child->bitFields.dirtyTransform;
-    child->updateRenderBounds(childTransformer, childForceDirty);
+    auto childTransformMatrix = childTransform.has_value() ? &*childTransform : nullptr;
+    child->updateRenderBounds(childTransformer, childTransformMatrix, childForceDirty);
     child->bitFields.dirtyTransform = false;
     if (!child->maskOwner) {
       renderBounds.join(child->renderBounds);
@@ -2235,6 +2271,34 @@ Matrix3D Layer::calculate3DContextDepthMatrix() {
   matrix.setRowColumn(2, 2, 2.0f / (minDepth - maxDepth));
   matrix.setRowColumn(2, 3, -(minDepth + maxDepth) / (minDepth - maxDepth));
   return matrix;
+}
+
+bool Layer::in3DContext() const {
+  if (parent() == nullptr) {
+    return false;
+  }
+
+  if (parent()->_transformStyle == TransformStyle::Preserve3D &&
+      static_cast<BlendMode>(parent()->bitFields.blendMode) == BlendMode::SrcOver &&
+      parent()->bitFields.passThroughBackground && !parent()->bitFields.shouldRasterize &&
+      parent()->_filters.empty() && !parent()->hasValidMask()) {
+    return true;
+  }
+  if (_transformStyle == TransformStyle::Preserve3D &&
+      parent()->_transformStyle == TransformStyle::Flat &&
+      static_cast<BlendMode>(bitFields.blendMode) == BlendMode::SrcOver &&
+      bitFields.passThroughBackground && !bitFields.shouldRasterize && _filters.empty() &&
+      !hasValidMask()) {
+    return true;
+  }
+  return false;
+}
+
+bool Layer::canExtend3DContext() const {
+  return _transformStyle == TransformStyle::Preserve3D &&
+         static_cast<BlendMode>(bitFields.blendMode) == BlendMode::SrcOver &&
+         bitFields.passThroughBackground && bitFields.shouldRasterize && _filters.empty() &&
+         hasValidMask();
 }
 
 }  // namespace tgfx
