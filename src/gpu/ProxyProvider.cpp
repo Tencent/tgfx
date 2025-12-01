@@ -37,8 +37,7 @@
 #include "tgfx/core/Shape.h"
 
 namespace tgfx {
-ProxyProvider::ProxyProvider(Context* context)
-    : context(context), vertexBlockAllocator(1 << 14, 1 << 21) {  // 16kb, 2MB
+ProxyProvider::ProxyProvider(Context* context) : context(context) {
 }
 
 std::shared_ptr<GPUBufferProxy> ProxyProvider::createIndexBufferProxy(
@@ -77,16 +76,17 @@ std::shared_ptr<VertexBufferView> ProxyProvider::createVertexBufferProxy(
   if (provider == nullptr) {
     return nullptr;
   }
-  DEBUG_ASSERT(!sharedVertexBufferFlushed);
+  auto vertexAllocator = context->drawingManager()->vertexAllocator();
+  DEBUG_ASSERT(vertexAllocator != nullptr);
   auto byteSize = provider->vertexCount() * sizeof(float);
-  auto lastBlock = vertexBlockAllocator.currentBlock();
-  auto vertices = reinterpret_cast<float*>(vertexBlockAllocator.allocate(byteSize));
+  auto lastBlock = vertexAllocator->currentBlock();
+  auto vertices = reinterpret_cast<float*>(vertexAllocator->allocate(byteSize));
   if (vertices == nullptr) {
     LOGE("ProxyProvider::createVertexBuffer() Failed to allocate memory!");
     return nullptr;
   }
   auto offset = lastBlock.second;
-  auto currentBlock = vertexBlockAllocator.currentBlock();
+  auto currentBlock = vertexAllocator->currentBlock();
   if (lastBlock.first != nullptr && lastBlock.first != currentBlock.first) {
     DEBUG_ASSERT(sharedVertexBuffer != nullptr);
     auto data = Data::MakeWithoutCopy(lastBlock.first, lastBlock.second);
@@ -114,17 +114,11 @@ std::shared_ptr<VertexBufferView> ProxyProvider::createVertexBufferProxy(
 
 void ProxyProvider::flushSharedVertexBuffer() {
   if (sharedVertexBuffer != nullptr) {
-    auto lastBlock = vertexBlockAllocator.currentBlock();
+    auto vertexAllocator = context->drawingManager()->vertexAllocator();
+    auto lastBlock = vertexAllocator->currentBlock();
     auto data = Data::MakeWithoutCopy(lastBlock.first, lastBlock.second);
     uploadSharedVertexBuffer(std::move(data));
   }
-  sharedVertexBufferFlushed = true;
-}
-
-void ProxyProvider::clearSharedVertexBuffer() {
-  maxValueTracker.addValue(vertexBlockAllocator.size());
-  vertexBlockAllocator.clear(maxValueTracker.getMaxValue());
-  sharedVertexBufferFlushed = false;
 }
 
 void ProxyProvider::assignProxyUniqueKey(std::shared_ptr<ResourceProxy> proxy,

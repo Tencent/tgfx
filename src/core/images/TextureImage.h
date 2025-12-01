@@ -84,7 +84,7 @@ class TextureImage : public Image {
  private:
   std::shared_ptr<TextureProxy> textureProxy = nullptr;
   uint32_t contextID = 0;
-  std::shared_ptr<ColorSpace> _colorSpace = ColorSpace::SRGB();
+  std::shared_ptr<ColorSpace> _colorSpace = nullptr;
 
   TextureImage(std::shared_ptr<TextureProxy> textureProxy, uint32_t contextID,
                std::shared_ptr<ColorSpace> colorSpace);

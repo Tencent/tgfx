@@ -18,34 +18,20 @@
 
 #pragma once
 
-#include "core/utils/Log.h"
-#include "layers/contents/LayerContent.h"
-
 namespace tgfx {
-class ForegroundContent : public LayerContent {
+class Brush;
+
+/**
+ * BrushModifier is an interface for modifying Brush properties before they are applied in drawing
+ * operations. It allows dynamic adjustment of attributes such as color, alpha, or filters.
+ */
+class BrushModifier {
  public:
-  ForegroundContent(std::shared_ptr<Picture> background, std::shared_ptr<Picture> foreground)
-      : background(std::move(background)), foreground(std::move(foreground)) {
-  }
+  virtual ~BrushModifier() = default;
 
-  Rect getBounds() const override;
-
-  Rect getTightBounds(const Matrix& matrix) const override;
-
-  bool hitTestPoint(float localX, float localY, bool shapeHitTest) const override;
-
-  void drawDefault(Canvas* canvas, const BrushModifier* modifier) const override;
-
-  void drawForeground(Canvas* canvas, const BrushModifier* modifier) const override;
-
-  void drawContour(Canvas*, const BrushModifier* modifier) const override;
-
-  std::shared_ptr<Picture> background = nullptr;
-  std::shared_ptr<Picture> foreground = nullptr;
-
- protected:
-  Type type() const override {
-    return Type::Foreground;
-  }
+  /**
+   * Transforms the given Brush and returns a new Brush with modifications applied.
+   */
+  virtual Brush transform(const Brush& brush) const = 0;
 };
 }  // namespace tgfx

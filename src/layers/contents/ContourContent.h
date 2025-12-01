@@ -39,15 +39,15 @@ class ContourContent : public LayerContent {
     return content->hitTestPoint(localX, localY, shapeHitTest);
   }
 
-  void drawDefault(Canvas* canvas, const FillModifier* modifier) const override {
+  void drawDefault(Canvas* canvas, const BrushModifier* modifier) const override {
     content->drawDefault(canvas, modifier);
   }
 
-  void drawForeground(Canvas* canvas, const FillModifier* modifier) const override {
+  void drawForeground(Canvas* canvas, const BrushModifier* modifier) const override {
     content->drawForeground(canvas, modifier);
   }
 
-  void drawContour(Canvas* canvas, const FillModifier* modifier) const override {
+  void drawContour(Canvas* canvas, const BrushModifier* modifier) const override {
     contour->playback(canvas, modifier);
   }
 

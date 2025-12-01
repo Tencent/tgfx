@@ -869,7 +869,11 @@ PDFIndirectReference MakeFunctionShader(PDFDocumentImpl* doc, const PDFGradientS
 
   pdfShader->insertInt("ShadingType", static_cast<int>(shadingType));
   auto ref = doc->colorSpaceRef();
-  pdfShader->insertRef("ColorSpace", ref);
+  if (ref) {
+    pdfShader->insertRef("ColorSpace", ref);
+  } else {
+    pdfShader->insertName("ColorSpace", "DeviceRGB");
+  }
 
   auto pdfFunctionShader = PDFDictionary::Make("Pattern");
   pdfFunctionShader->insertInt("PatternType", 2);

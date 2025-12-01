@@ -111,9 +111,8 @@ class Image {
    * ensure the buffer content stays unchanged for the lifetime of the returned Image. Returns
    * nullptr if the hardwareBuffer is nullptr or the hardwareBuffer contains more than one plane.
    */
-  static std::shared_ptr<Image> MakeFrom(
-      HardwareBufferRef hardwareBuffer,
-      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB());
+  static std::shared_ptr<Image> MakeFrom(HardwareBufferRef hardwareBuffer,
+                                         std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
    * Creates an Image from the given picture with the specified width, height, and matrix. The
@@ -132,9 +131,9 @@ class Image {
    * @return An Image that matches the content when the picture is drawn with the specified
    * parameters.
    */
-  static std::shared_ptr<Image> MakeFrom(
-      std::shared_ptr<Picture> picture, int width, int height, const Matrix* matrix = nullptr,
-      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB());
+  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Picture> picture, int width, int height,
+                                         const Matrix* matrix = nullptr,
+                                         std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
    * Creates an Image in the I420 format with the specified YUVData and the YUVColorSpace. Returns
@@ -162,10 +161,9 @@ class Image {
    * is returned if the format of the backendTexture is recognized and supported. Recognized formats
    * vary by GPU back-ends.
    */
-  static std::shared_ptr<Image> MakeFrom(
-      Context* context, const BackendTexture& backendTexture,
-      ImageOrigin origin = ImageOrigin::TopLeft,
-      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB());
+  static std::shared_ptr<Image> MakeFrom(Context* context, const BackendTexture& backendTexture,
+                                         ImageOrigin origin = ImageOrigin::TopLeft,
+                                         std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
    * Creates an Image from the backendTexture associated with the context, taking ownership of the
@@ -174,10 +172,9 @@ class Image {
    * returned if the format of the backendTexture is recognized and supported. Recognized formats
    * vary by GPU back-ends.
    */
-  static std::shared_ptr<Image> MakeAdopted(
-      Context* context, const BackendTexture& backendTexture,
-      ImageOrigin origin = ImageOrigin::TopLeft,
-      std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB());
+  static std::shared_ptr<Image> MakeAdopted(Context* context, const BackendTexture& backendTexture,
+                                            ImageOrigin origin = ImageOrigin::TopLeft,
+                                            std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   virtual ~Image() = default;
 

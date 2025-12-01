@@ -18,8 +18,11 @@
 
 #pragma once
 
-#include <map>
+#include <deque>
+#include <memory>
+#include <unordered_map>
 #include <vector>
+#include "gpu/DrawingBuffer.h"
 #include "gpu/OpsCompositor.h"
 #include "gpu/tasks/AtlasUploadTask.h"
 #include "gpu/tasks/OpsRenderTask.h"
@@ -29,18 +32,17 @@
 namespace tgfx {
 struct RuntimeInputTexture;
 
-struct AtlasCellData {
-  std::shared_ptr<Data> pixels = nullptr;
-  ImageInfo pixelsInfo = {};
-  Point atlasOffset = {};
-  AtlasCellData(std::shared_ptr<Data> data, const ImageInfo& info, const Point& offset)
-      : pixels(std::move(data)), pixelsInfo(info), atlasOffset(offset) {
-  }
-};
-
 class DrawingManager {
  public:
   explicit DrawingManager(Context* context);
+
+  BlockAllocator* drawingAllocator() {
+    return &getDrawingBuffer()->drawingAllocator;
+  }
+
+  BlockAllocator* vertexAllocator() {
+    return &getDrawingBuffer()->vertexAllocator;
+  }
 
   /**
    * Fills the render target using the provided fragment processor, and automatically resolves the
@@ -79,18 +81,24 @@ class DrawingManager {
                         std::shared_ptr<ImageCodec> codec);
 
   /**
-   * Flushes all recorded tasks and returns a CommandBuffer containing the GPU commands. If no tasks
-   * were recorded, returns nullptr.
+   * Flushes all pending drawing operations and returns the DrawingBuffer. Returns nullptr if there
+   * are no pending drawing operations. The returned DrawingBuffer will be automatically recycled
+   * to the pool after it's no longer referenced.
    */
-  std::shared_ptr<CommandBuffer> flush();
+  std::shared_ptr<DrawingBuffer> flush();
 
  private:
   Context* context = nullptr;
-  BlockAllocator* drawingAllocator = nullptr;
-  std::vector<PlacementPtr<ResourceTask>> resourceTasks = {};
-  std::vector<PlacementPtr<RenderTask>> renderTasks = {};
+  std::shared_ptr<DrawingBuffer> currentBuffer = nullptr;
+  std::deque<std::shared_ptr<DrawingBuffer>> bufferPool = {};
   std::list<std::shared_ptr<OpsCompositor>> compositors = {};
-  std::map<TextureProxy*, PlacementPtr<AtlasUploadTask>> atlasTasks = {};
+  std::unordered_map<TextureProxy*, AtlasUploadTask*> atlasTaskMap = {};
+
+  DrawingBuffer* getDrawingBuffer() {
+    return currentBuffer ? currentBuffer.get() : createDrawingBuffer();
+  }
+
+  DrawingBuffer* createDrawingBuffer();
 
   friend class OpsCompositor;
 };

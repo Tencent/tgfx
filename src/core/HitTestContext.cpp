@@ -34,11 +34,11 @@ static bool GetLocalPoint(const Matrix& matrix, float deviceX, float deviceY, Po
   return true;
 }
 
-void HitTestContext::drawFill(const Fill&) {
+void HitTestContext::drawFill(const Brush&) {
   hit = true;
 }
 
-void HitTestContext::drawRect(const Rect& rect, const MCState& state, const Fill&,
+void HitTestContext::drawRect(const Rect& rect, const MCState& state, const Brush&,
                               const Stroke* stroke) {
   Point local = {};
   if (!GetLocalPoint(state.matrix, deviceX, deviceY, &local)) {
@@ -69,7 +69,7 @@ void HitTestContext::drawRect(const Rect& rect, const MCState& state, const Fill
   }
 }
 
-void HitTestContext::drawRRect(const RRect& rRect, const MCState& state, const Fill&,
+void HitTestContext::drawRRect(const RRect& rRect, const MCState& state, const Brush&,
                                const Stroke* stroke) {
   Point local = {};
   if (!GetLocalPoint(state.matrix, deviceX, deviceY, &local)) {
@@ -98,7 +98,7 @@ void HitTestContext::drawRRect(const RRect& rRect, const MCState& state, const F
   }
 }
 
-void HitTestContext::drawPath(const Path& path, const MCState& state, const Fill&) {
+void HitTestContext::drawPath(const Path& path, const MCState& state, const Brush&) {
   Point local = {};
   if (!GetLocalPoint(state.matrix, deviceX, deviceY, &local)) {
     return;
@@ -118,7 +118,7 @@ void HitTestContext::drawPath(const Path& path, const MCState& state, const Fill
   }
 }
 
-void HitTestContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill&,
+void HitTestContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Brush&,
                                const Stroke* stroke) {
   DEBUG_ASSERT(shape != nullptr);
   Point local = {};
@@ -149,7 +149,7 @@ void HitTestContext::drawShape(std::shared_ptr<Shape> shape, const MCState& stat
 }
 
 void HitTestContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions&,
-                               const MCState& state, const Fill&) {
+                               const MCState& state, const Brush&) {
   // Images are always checked against their bounding box.
   Point local = {};
   if (!GetLocalPoint(state.matrix, deviceX, deviceY, &local)) {
@@ -162,7 +162,7 @@ void HitTestContext::drawImage(std::shared_ptr<Image> image, const SamplingOptio
 }
 
 void HitTestContext::drawImageRect(std::shared_ptr<Image>, const Rect&, const Rect& dstRect,
-                                   const SamplingOptions&, const MCState& state, const Fill&,
+                                   const SamplingOptions&, const MCState& state, const Brush&,
                                    SrcRectConstraint) {
   // Images are always checked against their bounding box.
   Point local = {};
@@ -175,7 +175,7 @@ void HitTestContext::drawImageRect(std::shared_ptr<Image>, const Rect&, const Re
 }
 
 void HitTestContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
-                                      const MCState& state, const Fill&, const Stroke* stroke) {
+                                      const MCState& state, const Brush&, const Stroke* stroke) {
   DEBUG_ASSERT(glyphRunList != nullptr);
   auto maxScale = state.matrix.getMaxScale();
   if (FloatNearlyZero(maxScale)) {
@@ -214,7 +214,7 @@ void HitTestContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList
 
 void HitTestContext::drawLayer(std::shared_ptr<Picture> picture,
                                std::shared_ptr<ImageFilter> imageFilter, const MCState& state,
-                               const Fill&) {
+                               const Brush&) {
   DEBUG_ASSERT(picture != nullptr);
   Point local = {};
   if (!GetLocalPoint(state.matrix, deviceX, deviceY, &local)) {

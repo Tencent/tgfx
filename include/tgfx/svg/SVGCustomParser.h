@@ -18,34 +18,25 @@
 
 #pragma once
 
-#include "core/utils/Log.h"
-#include "layers/contents/LayerContent.h"
+#include "tgfx/svg/node/SVGNode.h"
 
 namespace tgfx {
-class ForegroundContent : public LayerContent {
+
+/**
+ * Abstract callback interface for SVG parsing operations.
+ * Implementations can be passed to SVGDOM::Make() to handling during parsing.
+ */
+class SVGCustomParser {
  public:
-  ForegroundContent(std::shared_ptr<Picture> background, std::shared_ptr<Picture> foreground)
-      : background(std::move(background)), foreground(std::move(foreground)) {
-  }
+  virtual ~SVGCustomParser() = default;
 
-  Rect getBounds() const override;
-
-  Rect getTightBounds(const Matrix& matrix) const override;
-
-  bool hitTestPoint(float localX, float localY, bool shapeHitTest) const override;
-
-  void drawDefault(Canvas* canvas, const BrushModifier* modifier) const override;
-
-  void drawForeground(Canvas* canvas, const BrushModifier* modifier) const override;
-
-  void drawContour(Canvas*, const BrushModifier* modifier) const override;
-
-  std::shared_ptr<Picture> background = nullptr;
-  std::shared_ptr<Picture> foreground = nullptr;
-
- protected:
-  Type type() const override {
-    return Type::Foreground;
-  }
+  /**
+   * Called when a custom attribute is encountered during parsing.
+   * This method is invoked for attributes that are not standard SVGNode properties, allowing custom
+   * handling logic to be implemented.
+   */
+  virtual void handleCustomAttribute(SVGNode& node, const std::string& name,
+                                     const std::string& value) = 0;
 };
+
 }  // namespace tgfx

@@ -151,7 +151,11 @@ bool ConvertCMYKPixels(void* dst, const gfx::skcms_ICCProfile cmykProfile,
     default:
       return false;
   }
-  const gfx::skcms_ICCProfile dstProfile = ToSkcmsICCProfile(dstInfo.colorSpace());
+  auto dstColorSpace = dstInfo.colorSpace();
+  if (dstColorSpace == nullptr) {
+    dstColorSpace = ColorSpace::SRGB();
+  }
+  const gfx::skcms_ICCProfile dstProfile = ToSkcmsICCProfile(dstColorSpace);
   auto width = dstInfo.width();
   auto height = dstInfo.height();
   auto src = dst;
