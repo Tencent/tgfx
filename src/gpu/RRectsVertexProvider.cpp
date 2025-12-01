@@ -115,6 +115,10 @@ void RRectsVertexProvider::getVertices(float* vertices) const {
     auto viewMatrix = record->viewMatrix;
     auto rRect = record->rRect;
     auto& color = record->color;
+    PMColor dstColor;
+    if (bitFields.hasColor) {
+      dstColor = color.makeColorSpace(ColorSpace::DisplayP3());
+    }
     auto scales = viewMatrix.getAxisScales();
     rRect.scale(scales.x, scales.y);
     viewMatrix.preScale(1 / scales.x, 1 / scales.y);
@@ -175,7 +179,7 @@ void RRectsVertexProvider::getVertices(float* vertices) const {
       vertices[index++] = point.x;
       vertices[index++] = point.y;
       if (bitFields.hasColor) {
-        WriteUByte4Color(vertices, index, color);
+        WriteUByte4Color(vertices, index, dstColor);
       }
       vertices[index++] = xMaxOffset;
       vertices[index++] = yOuterOffsets[i];
@@ -189,7 +193,7 @@ void RRectsVertexProvider::getVertices(float* vertices) const {
       vertices[index++] = point.x;
       vertices[index++] = point.y;
       if (bitFields.hasColor) {
-        WriteUByte4Color(vertices, index, color);
+        WriteUByte4Color(vertices, index, dstColor);
       }
       vertices[index++] = FLOAT_NEARLY_ZERO;
       vertices[index++] = yOuterOffsets[i];
@@ -203,7 +207,7 @@ void RRectsVertexProvider::getVertices(float* vertices) const {
       vertices[index++] = point.x;
       vertices[index++] = point.y;
       if (bitFields.hasColor) {
-        WriteUByte4Color(vertices, index, color);
+        WriteUByte4Color(vertices, index, dstColor);
       }
       vertices[index++] = FLOAT_NEARLY_ZERO;
       vertices[index++] = yOuterOffsets[i];
@@ -217,7 +221,7 @@ void RRectsVertexProvider::getVertices(float* vertices) const {
       vertices[index++] = point.x;
       vertices[index++] = point.y;
       if (bitFields.hasColor) {
-        WriteUByte4Color(vertices, index, color);
+        WriteUByte4Color(vertices, index, dstColor);
       }
       vertices[index++] = xMaxOffset;
       vertices[index++] = yOuterOffsets[i];

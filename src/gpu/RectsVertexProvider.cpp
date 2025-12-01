@@ -75,6 +75,10 @@ class AARectsVertexProvider : public RectsVertexProvider {
     auto rectCount = rects.size();
     for (size_t i = 0; i < rectCount; ++i) {
       auto& record = rects[i];
+      PMColor dstColor;
+      if (bitFields.hasColor) {
+        dstColor = record->color.makeColorSpace(ColorSpace::DisplayP3());
+      }
       auto& viewMatrix = record->viewMatrix;
       auto& rect = record->rect;
       auto scale = sqrtf(viewMatrix.getScaleX() * viewMatrix.getScaleX() +
@@ -112,7 +116,7 @@ class AARectsVertexProvider : public RectsVertexProvider {
             vertices[index++] = uvQuad.point(k).y;
           }
           if (bitFields.hasColor) {
-            WriteUByte4Color(vertices, index, record->color);
+            WriteUByte4Color(vertices, index, dstColor);
           }
           if (needSubset) {
             WriteSubset(vertices, index, subset);
@@ -150,6 +154,10 @@ class NonAARectsVertexProvider : public RectsVertexProvider {
     auto rectCount = rects.size();
     for (size_t i = 0; i < rectCount; ++i) {
       auto& record = rects[i];
+      PMColor dstColor;
+      if (bitFields.hasColor) {
+        dstColor = record->color.makeColorSpace(ColorSpace::DisplayP3());
+      }
       auto& viewMatrix = record->viewMatrix;
       auto& rect = record->rect;
       auto quad = Quad::MakeFrom(rect, &viewMatrix);
@@ -167,7 +175,7 @@ class NonAARectsVertexProvider : public RectsVertexProvider {
           vertices[index++] = uvQuad.point(j - 1).y;
         }
         if (bitFields.hasColor) {
-          WriteUByte4Color(vertices, index, record->color);
+          WriteUByte4Color(vertices, index, dstColor);
         }
         if (needSubset) {
           WriteSubset(vertices, index, subset);
@@ -299,27 +307,31 @@ class AAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
       if (hasUVCoord) {
         uvQuad = Quad::MakeFrom(outUV.makeOutset(outset, outset));
       }
-      writeQuad(vertices, index, outOutsetQuad, uvQuad, record->color, outerCoverage);
+      PMColor dstColor;
+      if (bitFields.hasColor) {
+        dstColor = record->color.makeColorSpace(ColorSpace::DisplayP3());
+      }
+      writeQuad(vertices, index, outOutsetQuad, uvQuad, dstColor, outerCoverage);
       if (isBevelJoin) {
         const auto assistOutsetQuad =
             Quad::MakeFrom(outSideAssist.makeOutset(outset, outset), &viewMatrix);
         if (hasUVCoord) {
           uvQuad = Quad::MakeFrom(assistUV.makeOutset(outset, outset));
         }
-        writeQuad(vertices, index, assistOutsetQuad, uvQuad, record->color, outerCoverage);
+        writeQuad(vertices, index, assistOutsetQuad, uvQuad, dstColor, outerCoverage);
       }
       const auto outInsetQuad = Quad::MakeFrom(outSide.makeInset(inset, inset), &viewMatrix);
       if (hasUVCoord) {
         uvQuad = Quad::MakeFrom(outUV.makeInset(inset, inset));
       }
-      writeQuad(vertices, index, outInsetQuad, uvQuad, record->color, innerCoverage);
+      writeQuad(vertices, index, outInsetQuad, uvQuad, dstColor, innerCoverage);
       if (isBevelJoin) {
         const auto assistInsetQuad =
             Quad::MakeFrom(outSideAssist.makeInset(inset, inset), &viewMatrix);
         if (hasUVCoord) {
           uvQuad = Quad::MakeFrom(assistUV.makeInset(inset, inset));
         }
-        writeQuad(vertices, index, assistInsetQuad, uvQuad, record->color, innerCoverage);
+        writeQuad(vertices, index, assistInsetQuad, uvQuad, dstColor, innerCoverage);
       }
       if (!isDegenerate) {
         // Interior inset rect (toward stroke).
@@ -327,7 +339,7 @@ class AAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
         if (hasUVCoord) {
           uvQuad = Quad::MakeFrom(inUV.makeOutset(inset, inset));
         }
-        writeQuad(vertices, index, innerInsetQuad, uvQuad, record->color, innerCoverage);
+        writeQuad(vertices, index, innerInsetQuad, uvQuad, dstColor, innerCoverage);
         // Interior outset rect (away from stroke, toward center of rect).
         Rect interiorAABoundary = inSide.makeInset(interiorOutset, interiorOutset);
         float coverageBackset = 0.0f;  // Adds back coverage when the interior AA edges cross.
@@ -358,15 +370,15 @@ class AAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
           }
           uvQuad = Quad::MakeFrom(uvBoundary);
         }
-        writeQuad(vertices, index, innerAAQuad, uvQuad, record->color, interiorCoverage);
+        writeQuad(vertices, index, innerAAQuad, uvQuad, dstColor, interiorCoverage);
       } else {
         // When the interior rect has become degenerate we smoosh to a single point
         const auto innerQuad = Quad::MakeFrom(inSide, &viewMatrix);
         if (hasUVCoord) {
           uvQuad = Quad::MakeFrom(inUV);
         }
-        writeQuad(vertices, index, innerQuad, uvQuad, record->color, innerCoverage);
-        writeQuad(vertices, index, innerQuad, uvQuad, record->color, innerCoverage);
+        writeQuad(vertices, index, innerQuad, uvQuad, dstColor, innerCoverage);
+        writeQuad(vertices, index, innerQuad, uvQuad, dstColor, innerCoverage);
       }
     }
   }
@@ -476,19 +488,23 @@ class NonAAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
       if (hasUVCoord) {
         uvQuad = Quad::MakeFrom(outUV);
       }
-      writeQuad(vertices, index, outQuad, uvQuad, record->color);
+      PMColor dstColor;
+      if (bitFields.hasColor) {
+        dstColor = record->color.makeColorSpace(ColorSpace::DisplayP3());
+      }
+      writeQuad(vertices, index, outQuad, uvQuad, dstColor);
       if (lineJoin() == LineJoin::Bevel) {
         const auto assistQuad = Quad::MakeFrom(outSideAssist, &viewMatrix);
         if (hasUVCoord) {
           uvQuad = Quad::MakeFrom(assistUV);
         }
-        writeQuad(vertices, index, assistQuad, uvQuad, record->color);
+        writeQuad(vertices, index, assistQuad, uvQuad, dstColor);
       }
       const auto inQuad = Quad::MakeFrom(inSide, &viewMatrix);
       if (hasUVCoord) {
         uvQuad = Quad::MakeFrom(inUV);
       }
-      writeQuad(vertices, index, inQuad, uvQuad, record->color);
+      writeQuad(vertices, index, inQuad, uvQuad, dstColor);
     }
   }
 };
@@ -527,6 +543,10 @@ class AARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
     for (size_t i = 0; i < rects.size(); ++i) {
       const auto& stroke = strokes[i];
       const auto& record = rects[i];
+      PMColor dstColor;
+      if (bitFields.hasColor) {
+        dstColor = record->color.makeColorSpace(ColorSpace::DisplayP3());
+      }
       auto viewMatrix = record->viewMatrix;
       auto scales = viewMatrix.getAxisScales();
       auto rect = record->rect;
@@ -582,7 +602,7 @@ class AARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
             vertices[index++] = vCoords[k];
           }
           if (hasColor) {
-            WriteUByte4Color(vertices, index, record->color);
+            WriteUByte4Color(vertices, index, dstColor);
           }
         }
       }
@@ -629,7 +649,7 @@ class AARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
             vertices[index++] = uvQuad.point(k).y;
           }
           if (hasColor) {
-            WriteUByte4Color(vertices, index, record->color);
+            WriteUByte4Color(vertices, index, dstColor);
           }
         }
       }
@@ -671,6 +691,10 @@ class NonAARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
     for (size_t i = 0; i < rects.size(); ++i) {
       const auto& stroke = strokes[i];
       const auto& record = rects[i];
+      PMColor dstColor;
+      if (bitFields.hasColor) {
+        dstColor = record->color.makeColorSpace(ColorSpace::DisplayP3());
+      }
       auto viewMatrix = record->viewMatrix;
       auto scales = viewMatrix.getAxisScales();
       auto rect = record->rect;
@@ -715,7 +739,7 @@ class NonAARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
             vertices[index++] = vCoords[k];
           }
           if (hasColor) {
-            WriteUByte4Color(vertices, index, record->color);
+            WriteUByte4Color(vertices, index, dstColor);
           }
         }
       }
@@ -745,7 +769,7 @@ class NonAARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
           vertices[index++] = inUVQuad.point(k).y;
         }
         if (hasColor) {
-          WriteUByte4Color(vertices, index, record->color);
+          WriteUByte4Color(vertices, index, dstColor);
         }
       }
     }

@@ -115,8 +115,8 @@ class RectsVertexProvider : public VertexProvider {
   /**
    * Returns the first color in the provider. If no color record exists, a white color is returned.
    */
-  const PMColor& firstColor() const {
-    return rects.front()->color;
+  PMColor firstColor() const {
+    return rects.front()->color.makeColorSpace(ColorSpace::DisplayP3());
   }
 
   /**
