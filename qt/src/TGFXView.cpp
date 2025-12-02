@@ -41,7 +41,6 @@ void TGFXView::updateTransform(qreal zoomLevel, QPointF panOffset) {
   float clampedZoom = std::max(0.001f, std::min(1000.0f, static_cast<float>(zoomLevel)));
   zoom = clampedZoom;
   offset = panOffset;
-  needsRedraw = true;
   update();
 }
 
@@ -49,7 +48,6 @@ void TGFXView::onClicked() {
   currentDrawerIndex++;
   zoom = 1.0f;
   offset = QPointF(0, 0);
-  needsRedraw = true;
   update();
 }
 
@@ -64,9 +62,9 @@ QSGNode* TGFXView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
   auto pixelRatio = window()->devicePixelRatio();
   auto screenWidth = static_cast<int>(ceil(width() * pixelRatio));
   auto screenHeight = static_cast<int>(ceil(height() * pixelRatio));
-  auto sizeChanged =
-      appHost->updateScreen(screenWidth, screenHeight, static_cast<float>(pixelRatio));
-  if (sizeChanged) {
+  if (tgfxWindow->getSurface(nullptr) == nullptr ||
+      tgfxWindow->getSurface(nullptr)->width() != screenWidth ||
+      tgfxWindow->getSurface(nullptr)->height() != screenHeight) {
     tgfxWindow->invalidSize();
   }
   draw();
@@ -108,15 +106,8 @@ void TGFXView::createAppHost() {
   appHost->addTypeface("default", defaultTypeface);
   appHost->addTypeface("emoji", emojiTypeface);
 }
-void TGFXView::markDirty() {
-  needsRedraw = true;
-}
 
 bool TGFXView::draw() {
-  if (!needsRedraw) {
-    return false;
-  }
-
   auto device = tgfxWindow->getDevice();
   if (device == nullptr) {
     return false;
@@ -132,32 +123,46 @@ bool TGFXView::draw() {
   }
 
   // Switch sample when drawIndex changes
-  auto numBuilders = hello2d::GetLayerBuilderCount();
+  auto numBuilders = hello2d::LayerBuilder::Count();
   auto index = (currentDrawerIndex % numBuilders);
-  if (index != lastDrawIndex) {
-    auto layer = BuildAndCenterLayer(index, appHost.get());
-    if (layer) {
-      displayList.root()->removeChildren();
-      displayList.root()->addChild(layer);
+  if (index != lastDrawIndex || !contentLayer) {
+    auto builder = hello2d::LayerBuilder::GetByIndex(index);
+    if (builder) {
+      contentLayer = builder->buildLayerTree(appHost.get());
+      if (contentLayer) {
+        displayList.root()->removeChildren();
+        displayList.root()->addChild(contentLayer);
+      }
     }
     lastDrawIndex = index;
   }
 
-  // Directly set zoom and offset on DisplayList
-  displayList.setZoomScale(zoom);
-  displayList.setContentOffset(static_cast<float>(offset.x()), static_cast<float>(offset.y()));
+  // Calculate base scale and offset to fit 720x720 design size to window
+  static constexpr float DESIGN_SIZE = 720.0f;
+  auto scaleX = static_cast<float>(surface->width()) / DESIGN_SIZE;
+  auto scaleY = static_cast<float>(surface->height()) / DESIGN_SIZE;
+  auto baseScale = std::min(scaleX, scaleY);
+  auto scaledSize = DESIGN_SIZE * baseScale;
+  auto baseOffsetX = (static_cast<float>(surface->width()) - scaledSize) * 0.5f;
+  auto baseOffsetY = (static_cast<float>(surface->height()) - scaledSize) * 0.5f;
 
-  // Draw background and render DisplayList
+  // Apply user zoom and offset on top of the base scale/offset
+  displayList.setZoomScale(zoom * baseScale);
+  displayList.setContentOffset(baseOffsetX + static_cast<float>(offset.x()),
+                               baseOffsetY + static_cast<float>(offset.y()));
+
+  // Draw background
   auto canvas = surface->getCanvas();
   canvas->clear();
-  DrawSampleBackground(canvas, appHost.get());
+  DrawBackground(canvas, surface->width(), surface->height(), pixelRatio);
+
+  // Render DisplayList
   displayList.render(surface.get(), false);
 
   context->flushAndSubmit();
   tgfxWindow->present(context);
   device->unlock();
 
-  needsRedraw = false;
-  return true;
+  return displayList.hasContentChanged();
 }
 }  // namespace hello2d

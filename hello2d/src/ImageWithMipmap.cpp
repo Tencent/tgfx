@@ -20,14 +20,12 @@
 #include "tgfx/layers/ImageLayer.h"
 
 namespace hello2d {
-std::shared_ptr<tgfx::Layer> ImageWithMipmap::buildLayerTree(const AppHost* host) {
+std::shared_ptr<tgfx::Layer> ImageWithMipmap::onBuildLayerTree(const AppHost* host) {
   auto root = tgfx::Layer::Make();
-  auto scale = host->density();
-  padding = 75.f * scale;
-  auto width = host->width();
-  auto height = host->height();
-  auto size = std::min(width, height) - static_cast<int>(padding * 2);
-  size = std::max(size, 50);
+
+  // Fixed size: 720x720 with 50px padding, content area: 620x620
+  constexpr auto size = 620;
+
   auto image = host->getImage("bridge");
   if (image == nullptr) {
     return root;

@@ -276,10 +276,6 @@ void TGFXWindow::createAppHost() {
 }
 
 void TGFXWindow::draw() {
-  if (!needsRedraw) {
-    return;
-  }
-  
   if (!tgfxWindow) {
     tgfxWindow = tgfx::WGLWindow::MakeFrom(windowHandle);
   }
@@ -290,11 +286,10 @@ void TGFXWindow::draw() {
   GetClientRect(windowHandle, &rect);
   auto width = static_cast<int>(rect.right - rect.left);
   auto height = static_cast<int>(rect.bottom - rect.top);
-  auto pixelRatio = getPixelRatio();
-  auto sizeChanged = appHost->updateScreen(width, height, pixelRatio);
-  if (sizeChanged) {
-    tgfxWindow->invalidSize();
+  if (width <= 0 || height <= 0) {
+    return;
   }
+  auto pixelRatio = getPixelRatio();
 
   auto device = tgfxWindow->getDevice();
   if (device == nullptr) {
@@ -309,26 +304,48 @@ void TGFXWindow::draw() {
     device->unlock();
     return;
   }
-  auto canvas = surface->getCanvas();
 
-  int count = hello2d::GetSampleCount();
+  // Switch sample when drawIndex changes
+  int count = hello2d::LayerBuilder::Count();
   int index = (count > 0) ? (currentDrawerIndex % count) : 0;
-  
-  auto layer = hello2d::BuildAndCenterLayer(index, appHost.get());
-  if (layer) {
-    displayList.root()->removeChildren();
-    displayList.root()->addChild(layer);
+  if (index != lastDrawIndex || !contentLayer) {
+    auto builder = hello2d::LayerBuilder::GetByIndex(index);
+    if (builder) {
+      contentLayer = builder->buildLayerTree(appHost.get());
+      if (contentLayer) {
+        displayList.root()->removeChildren();
+        displayList.root()->addChild(contentLayer);
+      }
+    }
+    lastDrawIndex = index;
   }
-  
+
+  // Calculate base scale and offset to fit 720x720 design size to window
+  static constexpr float DESIGN_SIZE = 720.0f;
+  auto scaleX = static_cast<float>(surface->width()) / DESIGN_SIZE;
+  auto scaleY = static_cast<float>(surface->height()) / DESIGN_SIZE;
+  auto baseScale = std::min(scaleX, scaleY);
+  auto scaledSize = DESIGN_SIZE * baseScale;
+  auto baseOffsetX = (static_cast<float>(surface->width()) - scaledSize) * 0.5f;
+  auto baseOffsetY = (static_cast<float>(surface->height()) - scaledSize) * 0.5f;
+
+  // Apply user zoom and offset on top of the base scale/offset
+  auto currentZoom = displayList.zoomScale();
+  auto currentOffset = displayList.contentOffset();
+  displayList.setZoomScale(currentZoom * baseScale);
+  displayList.setContentOffset(baseOffsetX + currentOffset.x, baseOffsetY + currentOffset.y);
+
+  // Draw background
+  auto canvas = surface->getCanvas();
   canvas->clear();
-  hello2d::DrawSampleBackground(canvas, appHost.get());
+  hello2d::DrawBackground(canvas, surface->width(), surface->height(), pixelRatio);
+
+  // Render DisplayList
   displayList.render(surface.get(), false);
-  
+
   context->flushAndSubmit();
   tgfxWindow->present(context);
   device->unlock();
-  
-  needsRedraw = false;
 }
 
 void TGFXWindow::markDirty() {

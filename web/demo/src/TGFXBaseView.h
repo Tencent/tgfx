@@ -46,8 +46,8 @@ class TGFXBaseView {
   std::string canvasID = "";
   std::shared_ptr<tgfx::Window> window = nullptr;
   tgfx::DisplayList displayList = {};  // Platform layer owns DisplayList
+  std::shared_ptr<tgfx::Layer> contentLayer = nullptr;
   int lastDrawIndex = -1;
-  bool needsRedraw = true;
 };
 
 }  // namespace hello2d

@@ -21,17 +21,15 @@
 #include "hello2d/LayerBuilder.h"
 
 namespace hello2d {
-#define DEFINE_LAYER_BUILDER(BuilderName)                                               \
-  class BuilderName : public hello2d::LayerBuilder {                                    \
-   public:                                                                              \
-    BuilderName() : hello2d::LayerBuilder(#BuilderName) {                               \
-    }                                                                                   \
-                                                                                        \
-    std::shared_ptr<tgfx::Layer> buildLayerTree(const hello2d::AppHost* host) override; \
+#define DEFINE_LAYER_BUILDER(BuilderName)                                                 \
+  class BuilderName : public hello2d::LayerBuilder {                                      \
+   public:                                                                                \
+    BuilderName() : hello2d::LayerBuilder(#BuilderName) {                                 \
+    }                                                                                     \
+                                                                                          \
+   protected:                                                                             \
+    std::shared_ptr<tgfx::Layer> onBuildLayerTree(const hello2d::AppHost* host) override; \
   }
-
-// For backward compatibility
-#define DEFINE_SAMPLE DEFINE_LAYER_BUILDER
 
 DEFINE_LAYER_BUILDER(ConicGradient);
 DEFINE_LAYER_BUILDER(ImageWithMipmap);

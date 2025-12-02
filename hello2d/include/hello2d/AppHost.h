@@ -25,39 +25,13 @@
 
 namespace hello2d {
 /**
- * AppHost provides screen information and resources for building layer trees.
- * It is a pure information provider and does not manage rendering or display lists.
+ * AppHost provides resources for building layer trees.
  */
 class AppHost {
  public:
-  /**
-   * Creates an AppHost with the given width, height and density. The width and height are in
-   * pixels, and the density is the ratio of physical pixels to logical pixels.
-   */
-  explicit AppHost(int width = 1280, int height = 720, float density = 1.0f);
+  AppHost() = default;
 
   virtual ~AppHost() = default;
-
-  /**
-   * Returns the width of the screen.
-   */
-  int width() const {
-    return _width;
-  }
-
-  /**
-   * Returns the height of the screen.
-   */
-  int height() const {
-    return _height;
-  }
-
-  /**
-   * Returns the density of the screen.
-   */
-  float density() const {
-    return _density;
-  }
 
   /**
    * Returns an image with the given name.
@@ -70,13 +44,6 @@ class AppHost {
   std::shared_ptr<tgfx::Typeface> getTypeface(const std::string& name) const;
 
   /**
-   * Updates the screen size and density. The default values are 1280x720 and 1.0. The width and
-   * height are in pixels, and the density is the ratio of physical pixels to logical pixels.
-   * Returns true if the screen size or density has changed.
-   */
-  bool updateScreen(int width, int height, float density);
-
-  /**
    * Add an image for the given resource name.
    */
   void addImage(const std::string& name, std::shared_ptr<tgfx::Image> image);
@@ -87,9 +54,6 @@ class AppHost {
   void addTypeface(const std::string& name, std::shared_ptr<tgfx::Typeface> typeface);
 
  private:
-  int _width = 1280;
-  int _height = 720;
-  float _density = 1.0f;
   std::unordered_map<std::string, std::shared_ptr<tgfx::Image>> images = {};
   std::unordered_map<std::string, std::shared_ptr<tgfx::Typeface>> typefaces = {};
 };

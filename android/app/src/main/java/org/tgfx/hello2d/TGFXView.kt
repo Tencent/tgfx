@@ -85,7 +85,10 @@ open class TGFXView : TextureView, TextureView.SurfaceTextureListener {
             metrics.density
         )
 
-        draw(0, 1.0f, PointF(0f, 0f))
+        // Only draw if native initialization was successful
+        if (nativePtr != 0L) {
+            draw(0, 1.0f, PointF(0f, 0f))
+        }
     }
 
 
@@ -110,12 +113,19 @@ open class TGFXView : TextureView, TextureView.SurfaceTextureListener {
         if (::surface.isInitialized) {
             surface.release()
         }
-        nativeRelease()
+        if (nativePtr != 0L) {
+            nativeRelease()
+            nativePtr = 0L
+        }
     }
 
 
     fun draw(index: Int, zoom: Float, offset: PointF): Boolean {
-        return nativeDraw(index, zoom, offset.x, offset.y)
+        return if (nativePtr != 0L) {
+            nativeDraw(index, zoom, offset.x, offset.y)
+        } else {
+            false
+        }
     }
 
 

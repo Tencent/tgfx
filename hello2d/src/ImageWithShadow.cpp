@@ -23,16 +23,13 @@
 #include "tgfx/layers/filters/DropShadowFilter.h"
 
 namespace hello2d {
-std::shared_ptr<tgfx::Layer> ImageWithShadow::buildLayerTree(const hello2d::AppHost* host) {
+std::shared_ptr<tgfx::Layer> ImageWithShadow::onBuildLayerTree(const hello2d::AppHost* host) {
   auto root = tgfx::Layer::Make();
-  auto scale = host->density();
-  // The value 80 is the DropShadowFilter bound offset
-  padding = 75.f * scale - 80;
-  auto width = host->width();
-  auto height = host->height();
-  auto screenSize = std::min(width, height);
-  auto size = screenSize - static_cast<int>(75.f * scale * 2);
-  size = std::max(size, 50);
+
+  // Fixed size: 720x720 with 50px padding, content area: 620x620
+  // The DropShadowFilter adds 80px bound offset, so we use the full content area
+  constexpr auto size = 620;
+
   auto image = host->getImage("bridge");
   if (image == nullptr) {
     return root;

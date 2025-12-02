@@ -111,8 +111,9 @@ static std::shared_ptr<tgfx::Layer> CreateImageLayer(const AppHost* host) {
   return card;
 }
 
-std::shared_ptr<tgfx::Layer> SimpleLayerTree::buildLayerTree(const AppHost* host) {
+std::shared_ptr<tgfx::Layer> SimpleLayerTree::onBuildLayerTree(const AppHost* host) {
   auto root = tgfx::Layer::Make();
+
   // background
   for (auto& layer : CreateBackground()) {
     root->addChild(layer);
@@ -133,6 +134,7 @@ std::shared_ptr<tgfx::Layer> SimpleLayerTree::buildLayerTree(const AppHost* host
   // progress shape
   auto progressBar = CreateProgressBar();
   root->addChild(progressBar);
+
   return root;
 }
 }  // namespace hello2d

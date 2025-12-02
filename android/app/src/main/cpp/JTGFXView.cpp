@@ -25,25 +25,12 @@ static jfieldID TGFXView_nativePtr;
 void JTGFXView::updateSize() {
   auto width = ANativeWindow_getWidth(nativeWindow);
   auto height = ANativeWindow_getHeight(nativeWindow);
-  auto sizeChanged = appHost->updateScreen(width, height, appHost->density());
-  if (sizeChanged) {
+  if (width > 0 && height > 0) {
     window->invalidSize();
-    needsRedraw = true;
   }
-}
-
-void JTGFXView::markDirty() {
-  needsRedraw = true;
 }
 
 bool JTGFXView::draw(int drawIndex, float zoom, float offsetX, float offsetY) {
-  if (!needsRedraw) {
-    return false;
-  }
-
-  if (appHost->width() <= 0 || appHost->height() <= 0) {
-    return false;
-  }
   auto device = window->getDevice();
   auto context = device->lockContext();
   if (context == nullptr) {
@@ -56,33 +43,49 @@ bool JTGFXView::draw(int drawIndex, float zoom, float offsetX, float offsetY) {
   }
 
   // Switch sample when drawIndex changes
-  auto numDrawers = hello2d::GetLayerBuilderCount();
-  auto index = (drawIndex % numDrawers);
-  if (index != lastDrawIndex) {
-    auto layer = hello2d::BuildAndCenterLayer(index, appHost.get());
-    if (layer) {
-      displayList.root()->removeChildren();
-      displayList.root()->addChild(layer);
+  auto numBuilders = hello2d::LayerBuilder::Count();
+  auto index = (drawIndex % numBuilders);
+  if (index != lastDrawIndex || !contentLayer) {
+    auto builder = hello2d::LayerBuilder::GetByIndex(index);
+    if (builder) {
+      contentLayer = builder->buildLayerTree(appHost.get());
+      if (contentLayer) {
+        displayList.root()->removeChildren();
+        displayList.root()->addChild(contentLayer);
+      }
     }
     lastDrawIndex = index;
   }
 
-  // Directly set zoom and offset on DisplayList
-  displayList.setZoomScale(zoom);
-  displayList.setContentOffset(offsetX, offsetY);
+  // Calculate base scale and offset to fit 720x720 design size to window
+  static constexpr float DESIGN_SIZE = 720.0f;
+  auto scaleX = static_cast<float>(surface->width()) / DESIGN_SIZE;
+  auto scaleY = static_cast<float>(surface->height()) / DESIGN_SIZE;
+  auto baseScale = std::min(scaleX, scaleY);
+  auto scaledSize = DESIGN_SIZE * baseScale;
+  auto baseOffsetX = (static_cast<float>(surface->width()) - scaledSize) * 0.5f;
+  auto baseOffsetY = (static_cast<float>(surface->height()) - scaledSize) * 0.5f;
 
-  // Draw background and render DisplayList
+  // Apply user zoom and offset on top of the base scale/offset
+  displayList.setZoomScale(zoom * baseScale);
+  displayList.setContentOffset(baseOffsetX + offsetX, baseOffsetY + offsetY);
+
+  // Draw background
   auto canvas = surface->getCanvas();
   canvas->clear();
-  hello2d::DrawSampleBackground(canvas, appHost.get());
+  auto width = ANativeWindow_getWidth(nativeWindow);
+  auto height = ANativeWindow_getHeight(nativeWindow);
+  auto density = static_cast<float>(surface->width()) / static_cast<float>(width);
+  hello2d::DrawBackground(canvas, surface->width(), surface->height(), density);
+
+  // Render DisplayList
   displayList.render(surface.get(), false);
 
   context->flushAndSubmit();
   window->present(context);
   device->unlock();
 
-  needsRedraw = false;
-  return true;
+  return displayList.hasContentChanged();
 }
 }  // namespace hello2d
 
@@ -93,9 +96,6 @@ static hello2d::JTGFXView* GetJTGFXView(JNIEnv* env, jobject thiz) {
 
 static std::unique_ptr<hello2d::AppHost> CreateAppHost(ANativeWindow* nativeWindow, float density) {
   auto host = std::make_unique<hello2d::AppHost>();
-  auto width = ANativeWindow_getWidth(nativeWindow);
-  auto height = ANativeWindow_getHeight(nativeWindow);
-  host->updateScreen(width, height, density);
 
   static const std::string FallbackFontFileNames[] = {"/system/fonts/NotoSansCJK-Regular.ttc",
                                                       "/system/fonts/NotoSansSC-Regular.otf",
@@ -114,7 +114,10 @@ extern "C" {
 JNIEXPORT void JNICALL Java_org_tgfx_hello2d_TGFXView_nativeRelease(JNIEnv* env, jobject thiz) {
   auto jTGFXView =
       reinterpret_cast<hello2d::JTGFXView*>(env->GetLongField(thiz, hello2d::TGFXView_nativePtr));
-  delete jTGFXView;
+  if (jTGFXView != nullptr) {
+    delete jTGFXView;
+    env->SetLongField(thiz, hello2d::TGFXView_nativePtr, 0);
+  }
 }
 
 JNIEXPORT void JNICALL Java_org_tgfx_hello2d_TGFXView_00024Companion_nativeInit(JNIEnv* env,
@@ -131,48 +134,67 @@ JNIEXPORT jlong JNICALL Java_org_tgfx_hello2d_TGFXView_00024Companion_setupFromS
   }
 
   auto nativeWindow = ANativeWindow_fromSurface(env, surface);
+  if (nativeWindow == nullptr) {
+    return 0;
+  }
+
   auto window = tgfx::EGLWindow::MakeFrom(nativeWindow);
   if (window == nullptr) {
+    ANativeWindow_release(nativeWindow);
     return 0;
   }
 
   auto appHost = CreateAppHost(nativeWindow, density);
+  if (appHost == nullptr) {
+    ANativeWindow_release(nativeWindow);
+    return 0;
+  }
 
   jsize numArrays = env->GetArrayLength(imageBytesArray);
+
   for (jsize i = 0; i < numArrays; i++) {
     jbyteArray imageBytes = static_cast<jbyteArray>(env->GetObjectArrayElement(imageBytesArray, i));
+    if (imageBytes == nullptr) {
+      continue;
+    }
+
     auto bytes = env->GetByteArrayElements(imageBytes, nullptr);
     auto size = static_cast<size_t>(env->GetArrayLength(imageBytes));
     auto data = tgfx::Data::MakeWithCopy(bytes, size);
     auto image = tgfx::Image::MakeFromEncoded(data);
     env->ReleaseByteArrayElements(imageBytes, bytes, 0);
+
     if (image) {
-      appHost->addImage(i == 0 ? "bridge" : "TGFX", std::move(image));
+      const char* imageName = (i == 0) ? "bridge" : "TGFX";
+      appHost->addImage(imageName, std::move(image));
     }
   }
 
-  auto bytes = env->GetByteArrayElements(fontBytes, nullptr);
-  auto size = static_cast<size_t>(env->GetArrayLength(fontBytes));
-  auto data = tgfx::Data::MakeWithCopy(bytes, size);
-  auto typeface = tgfx::Typeface::MakeFromData(data);
-  env->ReleaseByteArrayElements(fontBytes, bytes, 0);
-  if (typeface) {
-    appHost->addTypeface("emoji", std::move(typeface));
+  if (fontBytes != nullptr) {
+    auto bytes = env->GetByteArrayElements(fontBytes, nullptr);
+    auto size = static_cast<size_t>(env->GetArrayLength(fontBytes));
+    auto data = tgfx::Data::MakeWithCopy(bytes, size);
+    auto typeface = tgfx::Typeface::MakeFromData(data);
+    env->ReleaseByteArrayElements(fontBytes, bytes, 0);
+
+    if (typeface) {
+      appHost->addTypeface("emoji", std::move(typeface));
+    }
   }
 
-  return reinterpret_cast<jlong>(
-      new hello2d::JTGFXView(nativeWindow, std::move(window), std::move(appHost)));
+  auto jTGFXView = new hello2d::JTGFXView(nativeWindow, std::move(window), std::move(appHost));
+
+  return reinterpret_cast<jlong>(jTGFXView);
 }
 
 JNIEXPORT void JNICALL Java_org_tgfx_hello2d_TGFXView_nativeDraw(JNIEnv* env, jobject thiz,
                                                                  jint drawIndex, jfloat zoom,
                                                                  jfloat offsetX, jfloat offsetY) {
-
   auto view = GetJTGFXView(env, thiz);
   if (view == nullptr) {
     return;
   }
-  view->markDirty();
+
   view->draw(drawIndex, zoom, offsetX, offsetY);
 }
 

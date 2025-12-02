@@ -20,14 +20,37 @@
 
 #include "hello2d/AppHost.h"
 #include "tgfx/core/Canvas.h"
-#include "tgfx/layers/DisplayList.h"
+#include "tgfx/layers/Layer.h"
 
 namespace hello2d {
 
-// Base class for individual layer builders (factory pattern)
+/**
+ * Base class for individual layer builders.
+ */
 class LayerBuilder {
  public:
-  explicit LayerBuilder(const std::string& name);
+  /**
+   * Returns the number of layer builders.
+   */
+  static int Count();
+
+  /**
+   * Returns the names of all layer builders.
+   */
+  static const std::vector<std::string>& Names();
+
+  /**
+   * Returns the layer builder with the given index.
+   */
+  static LayerBuilder* GetByIndex(int index);
+
+  /**
+   * Returns the layer builder with the given name.
+   */
+  static LayerBuilder* GetByName(const std::string& name);
+
+  explicit LayerBuilder(std::string name);
+
   virtual ~LayerBuilder() = default;
 
   std::string name() const {
@@ -35,55 +58,28 @@ class LayerBuilder {
   }
 
   /**
-   * Builds and returns a layer tree based on the provided AppHost information.
-   * This is a pure factory method with no side effects or state caching.
+   * Builds and returns a layer tree.
    */
-  virtual std::shared_ptr<tgfx::Layer> buildLayerTree(const hello2d::AppHost* host) = 0;
+  std::shared_ptr<tgfx::Layer> buildLayerTree(const hello2d::AppHost* host);
 
  protected:
-  float padding = 30.f;
+  /**
+   * Builds and returns the content layer tree.
+   */
+  virtual std::shared_ptr<tgfx::Layer> onBuildLayerTree(const hello2d::AppHost* host) = 0;
 
  private:
-  std::string _name = "";
+  std::string _name;
+
+  /**
+   * Applies centering and scaling transformation to the layer.
+   */
+  void applyCenteringTransform(std::shared_ptr<tgfx::Layer> layer);
 };
-
-/**
- * Returns the number of layer builders.
- */
-int GetLayerBuilderCount();
-
-/**
- * Returns the names of all layer builders.
- */
-std::vector<std::string> GetLayerBuilderNames();
-
-/**
- * Returns the layer builder with the given index.
- */
-LayerBuilder* GetLayerBuilderByIndex(int index);
-
-/**
- * Returns the layer builder with the given name.
- */
-LayerBuilder* GetLayerBuilderByName(const std::string& name);
 
 /**
  * Draws the background for samples.
  */
-void DrawSampleBackground(tgfx::Canvas* canvas, const hello2d::AppHost* host);
-
-/**
- * Helper function: Builds a layer tree and centers it within the screen.
- * This encapsulates the common logic for centering layers with padding.
- */
-std::shared_ptr<tgfx::Layer> BuildAndCenterLayer(int builderIndex, const AppHost* host);
-
-// For backward compatibility
-using Sample = LayerBuilder;
-using SampleBuilder = LayerBuilder;
-int GetSampleCount();
-std::vector<std::string> GetSampleNames();
-Sample* GetSampleByIndex(int index);
-Sample* GetSampleByName(const std::string& name);
+void DrawBackground(tgfx::Canvas* canvas, int width, int height, float density);
 
 }  // namespace hello2d

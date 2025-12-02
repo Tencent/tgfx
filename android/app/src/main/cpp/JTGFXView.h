@@ -44,7 +44,6 @@ class JTGFXView {
   }
 
   void updateSize();
-  void markDirty();
   bool draw(int index, float zoom, float x, float y);
 
  private:
@@ -52,7 +51,7 @@ class JTGFXView {
   std::shared_ptr<tgfx::Window> window;
   std::shared_ptr<hello2d::AppHost> appHost = nullptr;
   tgfx::DisplayList displayList;
+  std::shared_ptr<tgfx::Layer> contentLayer = nullptr;
   int lastDrawIndex = -1;
-  bool needsRedraw = true;
 };
 }  // namespace hello2d

@@ -21,6 +21,7 @@
 #include <cmath>
 #include "hello2d/LayerBuilder.h"
 #include "tgfx/core/Point.h"
+#include "tgfx/gpu/Recording.h"
 
 static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, const CVTimeStamp*,
                                       CVOptionFlags, CVOptionFlags*, void* userInfo) {
@@ -33,8 +34,9 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   std::shared_ptr<tgfx::CGLWindow> tgfxWindow;
   std::unique_ptr<hello2d::AppHost> appHost;
   tgfx::DisplayList displayList;
+  std::shared_ptr<tgfx::Layer> contentLayer;
   int lastDrawIndex;
-  bool needsRedraw;
+  std::unique_ptr<tgfx::Recording> lastRecording;
 }
 
 - (BOOL)acceptsFirstResponder {
@@ -58,9 +60,6 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
 }
 
 - (void)updateSize {
-  CGSize size = [self convertSizeToBacking:self.bounds.size];
-  auto width = static_cast<int>(roundf(size.width));
-  auto height = static_cast<int>(roundf(size.height));
   if (appHost == nullptr) {
     appHost = std::make_unique<hello2d::AppHost>();
     NSString* imagePath = [[NSBundle mainBundle] pathForResource:@"bridge" ofType:@"jpg"];
@@ -74,12 +73,8 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
     typeface = tgfx::Typeface::MakeFromName("Apple Color Emoji", "");
     appHost->addTypeface("emoji", typeface);
   }
-  auto contentScale = size.height / self.bounds.size.height;
-  auto sizeChanged = appHost->updateScreen(width, height, contentScale);
-  if (sizeChanged && tgfxWindow != nullptr) {
+  if (tgfxWindow != nullptr) {
     tgfxWindow->invalidSize();
-    needsRedraw = true;
-    [self draw];
   }
 }
 
@@ -89,7 +84,6 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   self.zoomScale = 1.0f;
   self.contentOffset = CGPointZero;
   lastDrawIndex = -1;
-  needsRedraw = true;
   displayList.setRenderMode(tgfx::RenderMode::Tiled);
   displayList.setAllowZoomBlur(true);
   displayList.setMaxTileCount(512);
@@ -143,19 +137,8 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
     }
   }
 }
-- (void)markDirty {
-  needsRedraw = true;
-}
-
 - (BOOL)draw {
-  if (!needsRedraw) {
-    return false;
-  }
-
   if (self.window == nil) {
-    return false;
-  }
-  if (appHost->width() <= 0 || appHost->height() <= 0) {
     return false;
   }
   if (tgfxWindow == nullptr) {
@@ -176,34 +159,58 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   }
 
   // Switch sample when drawIndex changes
-  auto numBuilders = hello2d::GetLayerBuilderCount();
+  auto numBuilders = hello2d::LayerBuilder::Count();
   auto index = (self.drawIndex % numBuilders);
-  if (index != lastDrawIndex) {
-    auto layer = hello2d::BuildAndCenterLayer(index, appHost.get());
-    if (layer) {
-      displayList.root()->removeChildren();
-      displayList.root()->addChild(layer);
+  if (index != lastDrawIndex || !contentLayer) {
+    auto builder = hello2d::LayerBuilder::GetByIndex(index);
+    if (builder) {
+      contentLayer = builder->buildLayerTree(appHost.get());
+      if (contentLayer) {
+        displayList.root()->removeChildren();
+        displayList.root()->addChild(contentLayer);
+      }
     }
     lastDrawIndex = index;
   }
 
-  // Directly set zoom and offset on DisplayList
-  displayList.setZoomScale(self.zoomScale);
-  displayList.setContentOffset(static_cast<float>(self.contentOffset.x),
-                               static_cast<float>(self.contentOffset.y));
+  // Calculate base scale and offset to fit 720x720 design size to window
+  static constexpr float DESIGN_SIZE = 720.0f;
+  auto scaleX = static_cast<float>(surface->width()) / DESIGN_SIZE;
+  auto scaleY = static_cast<float>(surface->height()) / DESIGN_SIZE;
+  auto baseScale = std::min(scaleX, scaleY);
+  auto scaledSize = DESIGN_SIZE * baseScale;
+  auto baseOffsetX = (static_cast<float>(surface->width()) - scaledSize) * 0.5f;
+  auto baseOffsetY = (static_cast<float>(surface->height()) - scaledSize) * 0.5f;
 
-  // Draw background and render DisplayList
+  // Apply user zoom and offset on top of the base scale/offset
+  auto finalZoomScale = self.zoomScale * baseScale;
+  auto finalOffsetX = baseOffsetX + static_cast<float>(self.contentOffset.x);
+  auto finalOffsetY = baseOffsetY + static_cast<float>(self.contentOffset.y);
+
+  displayList.setZoomScale(finalZoomScale);
+  displayList.setContentOffset(finalOffsetX, finalOffsetY);
+
+  // Draw background
   auto canvas = surface->getCanvas();
   canvas->clear();
-  hello2d::DrawSampleBackground(canvas, appHost.get());
+  auto backingScaleFactor = [self convertSizeToBacking:CGSizeMake(1.0, 1.0)].width;
+  hello2d::DrawBackground(canvas, surface->width(), surface->height(), backingScaleFactor);
+
+  // Render DisplayList
   displayList.render(surface.get(), false);
 
-  context->flushAndSubmit();
-  tgfxWindow->present(context);
-  device->unlock();
+  // Delayed one-frame present mode: flush + submit
+  auto recording = context->flush();
+  if (lastRecording) {
+    context->submit(std::move(lastRecording));
+    if (recording) {
+      tgfxWindow->present(context);
+    }
+  }
+  lastRecording = std::move(recording);
 
-  needsRedraw = false;
-  return true;
+  device->unlock();
+  return displayList.hasContentChanged();
 }
 
 @end

@@ -17,10 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "hello2d/LayerBuilder.h"
+#include <algorithm>
+#include <cstdio>
 #include <unordered_map>
+#include "../SimpleTextLayer.h"
 #include "GridBackground.h"
 #include "base/LayerBuilders.h"
-#include "tgfx/platform/Print.h"
 
 namespace hello2d {
 static std::vector<LayerBuilder*> layerBuilders = {
@@ -28,42 +30,40 @@ static std::vector<LayerBuilder*> layerBuilders = {
     new RichText(),      new SimpleLayerTree(),
 };
 
-static std::unordered_map<std::string, LayerBuilder*> GetLayerBuilderMap() {
-  std::unordered_map<std::string, LayerBuilder*> map;
-  map.reserve(layerBuilders.size());
-  for (const auto& builder : layerBuilders) {
-    map[builder->name()] = builder;
-  }
-  return map;
-}
-
-// LayerBuilder class implementation
-LayerBuilder::LayerBuilder(const std::string& name) : _name(name) {
-}
-
-// Global functions implementation
-int GetLayerBuilderCount() {
-  return static_cast<int>(layerBuilders.size());
-}
-
-std::vector<std::string> GetLayerBuilderNames() {
+static std::vector<std::string> GetLayerBuilderNames() {
   std::vector<std::string> names;
-  names.reserve(layerBuilders.size());
   for (const auto& builder : layerBuilders) {
     names.push_back(builder->name());
   }
   return names;
 }
 
-LayerBuilder* GetLayerBuilderByIndex(int index) {
-  if (index < 0 || index >= GetLayerBuilderCount()) {
+static std::unordered_map<std::string, LayerBuilder*> GetLayerBuilderMap() {
+  std::unordered_map<std::string, LayerBuilder*> map;
+  for (const auto& builder : layerBuilders) {
+    map[builder->name()] = builder;
+  }
+  return map;
+}
+
+int LayerBuilder::Count() {
+  return static_cast<int>(layerBuilders.size());
+}
+
+const std::vector<std::string>& LayerBuilder::Names() {
+  static auto names = GetLayerBuilderNames();
+  return names;
+}
+
+LayerBuilder* LayerBuilder::GetByIndex(int index) {
+  if (index < 0 || index >= Count()) {
     return nullptr;
   }
   return layerBuilders[static_cast<size_t>(index)];
 }
 
-LayerBuilder* GetLayerBuilderByName(const std::string& name) {
-  auto builderMap = GetLayerBuilderMap();
+LayerBuilder* LayerBuilder::GetByName(const std::string& name) {
+  static auto builderMap = GetLayerBuilderMap();
   auto it = builderMap.find(name);
   if (it == builderMap.end()) {
     return nullptr;
@@ -71,52 +71,42 @@ LayerBuilder* GetLayerBuilderByName(const std::string& name) {
   return it->second;
 }
 
-std::shared_ptr<tgfx::Layer> BuildAndCenterLayer(int builderIndex, const AppHost* host) {
-  auto builder = GetLayerBuilderByIndex(builderIndex);
-  if (!builder || !host) {
-    return nullptr;
+LayerBuilder::LayerBuilder(std::string name) : _name(std::move(name)) {
+}
+
+std::shared_ptr<tgfx::Layer> LayerBuilder::buildLayerTree(const hello2d::AppHost* host) {
+  auto layer = onBuildLayerTree(host);
+  if (!layer) {
+    return layer;
   }
 
-  auto layer = builder->buildLayerTree(host);
+  // Apply centering and scaling transformation
+  applyCenteringTransform(layer);
+  return layer;
+}
+
+void LayerBuilder::applyCenteringTransform(std::shared_ptr<tgfx::Layer> layer) {
   if (!layer) {
-    return nullptr;
+    return;
   }
 
   // Calculate centered matrix with padding
   auto bounds = layer->getBounds(nullptr, true);
   if (!bounds.isEmpty()) {
-    float padding = 30.0f;
-    float scale = std::min(static_cast<float>(host->width()) / (padding * 2 + bounds.width()),
-                           static_cast<float>(host->height()) / (padding * 2 + bounds.height()));
+    static constexpr float CONTENT_WIDTH = 620.0f;
+    static constexpr float PADDING = 50.0f;
+    auto scale = std::min(CONTENT_WIDTH / bounds.width(), CONTENT_WIDTH / bounds.height());
     tgfx::Matrix matrix = tgfx::Matrix::MakeScale(scale);
-    matrix.postTranslate((static_cast<float>(host->width()) - bounds.width() * scale) * 0.5f,
-                         (static_cast<float>(host->height()) - bounds.height() * scale) * 0.5f);
+    matrix.postTranslate((CONTENT_WIDTH - bounds.width() * scale) * 0.5f + PADDING,
+                         (CONTENT_WIDTH - bounds.height() * scale) * 0.5f + PADDING);
     layer->setMatrix(matrix);
   }
-
-  return layer;
 }
 
-void DrawSampleBackground(tgfx::Canvas* canvas, const AppHost* host) {
+void DrawBackground(tgfx::Canvas* canvas, int width, int height, float density) {
   static auto layer = GridBackgroundLayer::Make();
-  layer->setSize(host->width(), host->height(), host->density());
+  layer->setSize(width, height, density);
   layer->draw(canvas);
 }
 
-// Backward compatibility
-int GetSampleCount() {
-  return GetLayerBuilderCount();
-}
-
-std::vector<std::string> GetSampleNames() {
-  return GetLayerBuilderNames();
-}
-
-Sample* GetSampleByIndex(int index) {
-  return GetLayerBuilderByIndex(index);
-}
-
-Sample* GetSampleByName(const std::string& name) {
-  return GetLayerBuilderByName(name);
-}
 }  // namespace hello2d

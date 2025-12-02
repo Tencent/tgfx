@@ -23,7 +23,7 @@
 
 namespace tgfx {
 TGFX_TEST(Hello2DTest, Compare) {
-  hello2d::AppHost appHost(720, 720, 2.0f);
+  hello2d::AppHost appHost;
   appHost.addImage("bridge", MakeImage("resources/assets/bridge.jpg"));
   appHost.addImage("TGFX", MakeImage("resources/assets/tgfx.png"));
   appHost.addTypeface("default", MakeTypeface("resources/font/NotoSansSC-Regular.otf"));
@@ -32,33 +32,49 @@ TGFX_TEST(Hello2DTest, Compare) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, appHost.width(), appHost.height(), false, 4);
+  auto surfaceWidth = 720;
+  auto surfaceHeight = 720;
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight, false, 4);
   auto canvas = surface->getCanvas();
 
   DisplayList displayList;
   displayList.setRenderMode(RenderMode::Direct);
 
-  auto builderNames = hello2d::GetSampleNames();
+  // Calculate zoom and offset to fit 720x720 design size to window
+  static constexpr float DESIGN_SIZE = 720.0f;
+  auto scaleX = static_cast<float>(surfaceWidth) / DESIGN_SIZE;
+  auto scaleY = static_cast<float>(surfaceHeight) / DESIGN_SIZE;
+  auto scale = std::min(scaleX, scaleY);
+  auto scaledSize = DESIGN_SIZE * scale;
+  auto offsetX = (static_cast<float>(surfaceWidth) - scaledSize) * 0.5f;
+  auto offsetY = (static_cast<float>(surfaceHeight) - scaledSize) * 0.5f;
+
+  displayList.setZoomScale(scale);
+  displayList.setContentOffset(offsetX, offsetY);
+
+  auto& builderNames = hello2d::LayerBuilder::Names();
   for (size_t i = 0; i < builderNames.size(); ++i) {
     const auto& name = builderNames[i];
 
     // Build layer and add to DisplayList
-    auto layer = hello2d::BuildAndCenterLayer(static_cast<int>(i), &appHost);
-    if (layer) {
-      displayList.root()->removeChildren();
-      displayList.root()->addChild(layer);
+    auto builder = hello2d::LayerBuilder::GetByIndex(static_cast<int>(i));
+    if (builder) {
+      auto layer = builder->buildLayerTree(&appHost);
+      if (layer) {
+        displayList.root()->removeChildren();
+        displayList.root()->addChild(layer);
+      }
     }
 
     // Draw background and render DisplayList
     canvas->clear();
-    hello2d::DrawSampleBackground(canvas, &appHost);
+    hello2d::DrawBackground(canvas, surfaceWidth, surfaceHeight, 2.0f);
     displayList.render(surface.get(), false);
 
     auto key = "DrawersTest/" + name;
     auto result = Baseline::Compare(surface, key);
     if (!result) {
       ADD_FAILURE();
-      LOGI("Baseline::Compare failed for %s", key.c_str());
     }
   }
   canvas->clear();

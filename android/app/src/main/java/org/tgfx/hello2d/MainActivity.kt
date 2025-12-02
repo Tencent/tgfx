@@ -128,8 +128,12 @@ class MainActivity : ComponentActivity() {
         animator = ValueAnimator.ofFloat(0f, 1f).apply {
             duration = 1000
             addUpdateListener {
-                val needsRedraw = tgfxView.draw(drawIndex, zoomScale, contentOffset)
-                if (!needsRedraw) {
+                try {
+                    val needsRedraw = tgfxView.draw(drawIndex, zoomScale, contentOffset)
+                    if (!needsRedraw) {
+                        cancel()
+                    }
+                } catch (e: Exception) {
                     cancel()
                 }
             }

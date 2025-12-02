@@ -240,11 +240,8 @@ void SimpleTextLayer::invalidateLayout() {
   }
 }
 
-std::shared_ptr<tgfx::Layer> RichText::buildLayerTree(const AppHost* host) {
+std::shared_ptr<tgfx::Layer> RichText::onBuildLayerTree(const AppHost* host) {
   auto root = tgfx::Layer::Make();
-
-  padding = 50.f;
-  auto screenWidth = 600.f;
 
   std::vector<std::string> texts = {"HelloTGFX!", "\nTGFX",
                                     "(Tencent Graphics) is a lightweight 2D graphics \nlibrary for "
@@ -277,7 +274,8 @@ std::shared_ptr<tgfx::Layer> RichText::buildLayerTree(const AppHost* host) {
   tgfx::Color magenta = {1.0f, 0.0f, 1.0f, 1.0f};
   tgfx::Color yellow = {1.0f, 1.0f, 0.0f, 1.0f};
   auto startPoint = tgfx::Point::Make(0.0f, 0.0f);
-  auto endPoint = tgfx::Point::Make(600.f, 0.0f);
+  // Use a large value for gradient width, it will be clipped to text bounds
+  auto endPoint = tgfx::Point::Make(1000.f, 0.0f);
   auto shader = tgfx::Shader::MakeLinearGradient(startPoint, endPoint, {cyan, magenta, yellow}, {});
   paints[1].setShader(shader);
 
@@ -310,10 +308,6 @@ std::shared_ptr<tgfx::Layer> RichText::buildLayerTree(const AppHost* host) {
   auto textLayer = SimpleTextLayer::Make();
   textLayer->setElements(std::move(elements));
   textLayer->invalidateLayout();
-  auto bounds = textLayer->getBounds();
-  auto textScale = screenWidth / bounds.width();
-  tgfx::Matrix matrix = tgfx::Matrix::MakeScale(textScale, textScale);
-  textLayer->setMatrix(matrix);
 
   root->addChild(textLayer);
   return root;

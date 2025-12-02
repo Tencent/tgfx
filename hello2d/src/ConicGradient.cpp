@@ -21,16 +21,13 @@
 #include "tgfx/layers/ShapeLayer.h"
 
 namespace hello2d {
-std::shared_ptr<tgfx::Layer> ConicGradient::buildLayerTree(const AppHost* host) {
+std::shared_ptr<tgfx::Layer> ConicGradient::onBuildLayerTree(const AppHost*) {
   auto root = tgfx::Layer::Make();
   auto shapeLayer = tgfx::ShapeLayer::Make();
 
-  auto scale = host->density();
-  padding = 75.f * scale;
-  auto width = host->width();
-  auto height = host->height();
-  auto size = std::min(width, height) - static_cast<int>(padding * 2);
-  size = std::max(size, 50);
+  // Fixed size: 720x720 with 50px padding, content area: 620x620
+  constexpr auto size = 620;
+
   tgfx::Color cyan = {0.0f, 1.0f, 1.0f, 1.0f};
   tgfx::Color magenta = {1.0f, 0.0f, 1.0f, 1.0f};
   tgfx::Color yellow = {1.0f, 1.0f, 0.0f, 1.0f};
@@ -40,7 +37,7 @@ std::shared_ptr<tgfx::Layer> ConicGradient::buildLayerTree(const AppHost* host) 
   auto rect = tgfx::Rect::MakeXYWH(0, 0, size, size);
 
   tgfx::Path path = {};
-  path.addRoundRect(rect, 20 * scale, 20 * scale);
+  path.addRoundRect(rect, 20, 20);
   shapeLayer->setPath(path);
   shapeLayer->setFillStyle(conicGradient);
 

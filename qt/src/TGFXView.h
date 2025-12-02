@@ -33,7 +33,6 @@ class TGFXView : public QQuickItem {
   Q_INVOKABLE void updateTransform(qreal zoomLevel, QPointF panOffset);
   Q_INVOKABLE void onClicked();
   Q_INVOKABLE bool draw();
-  Q_INVOKABLE void markDirty();
 
  protected:
   QSGNode* updatePaintNode(QSGNode*, UpdatePaintNodeData*) override;
@@ -44,9 +43,9 @@ class TGFXView : public QQuickItem {
   std::shared_ptr<tgfx::QGLWindow> tgfxWindow = nullptr;
   std::shared_ptr<hello2d::AppHost> appHost = nullptr;
   tgfx::DisplayList displayList;
+  std::shared_ptr<tgfx::Layer> contentLayer = nullptr;
   float zoom = 1.0f;
   QPointF offset = {0, 0};
-  bool needsRedraw = true;
 
   void createAppHost();
  private Q_SLOTS:

@@ -127,7 +127,6 @@ static const float ScrollWheelZoomSensitivity = 120.0f;
 }
 
 - (void)requestDraw {
-  [self.tgfxView markDirty];
   [self.tgfxView startDisplayLink];
 }
 

@@ -37,11 +37,9 @@ void TGFXBaseView::updateSize(float devicePixelRatio) {
     int width = 0;
     int height = 0;
     emscripten_get_canvas_element_size(canvasID.c_str(), &width, &height);
-    auto sizeChanged = appHost->updateScreen(width, height, devicePixelRatio);
-    if (sizeChanged && window) {
+    if (window && (width > 0 && height > 0)) {
       window->invalidSize();
     }
-    needsRedraw = true;
   }
 }
 
@@ -50,26 +48,15 @@ void TGFXBaseView::setImagePath(const std::string& name, tgfx::NativeImageRef na
   if (image) {
     appHost->addImage(name, std::move(image));
   }
-  needsRedraw = true;
 }
 
 void TGFXBaseView::onWheelEvent() {
-  needsRedraw = true;
 }
 
 void TGFXBaseView::onClickEvent() {
-  needsRedraw = true;
 }
 
 bool TGFXBaseView::draw(int drawIndex, float zoom, float offsetX, float offsetY) {
-  if (!needsRedraw) {
-    return true;
-  }
-
-  if (appHost->width() <= 0 || appHost->height() <= 0) {
-    return true;
-  }
-
   // Initialize window if needed
   if (window == nullptr) {
     window = tgfx::WebGLWindow::MakeFrom(canvasID);
@@ -91,31 +78,49 @@ bool TGFXBaseView::draw(int drawIndex, float zoom, float offsetX, float offsetY)
   }
 
   // Switch sample when drawIndex changes
-  if (drawIndex != lastDrawIndex) {
-    auto layer = BuildAndCenterLayer(drawIndex % GetLayerBuilderCount(), appHost.get());
-    if (layer) {
-      displayList.root()->removeChildren();
-      displayList.root()->addChild(layer);
+  auto numBuilders = hello2d::LayerBuilder::Count();
+  auto index = drawIndex % numBuilders;
+  if (index != lastDrawIndex || !contentLayer) {
+    auto builder = hello2d::LayerBuilder::GetByIndex(index);
+    if (builder) {
+      contentLayer = builder->buildLayerTree(appHost.get());
+      if (contentLayer) {
+        displayList.root()->removeChildren();
+        displayList.root()->addChild(contentLayer);
+      }
     }
-    lastDrawIndex = drawIndex;
+    lastDrawIndex = index;
   }
+  // Calculate base scale and offset to fit 720x720 design size to window
+  static constexpr float DESIGN_SIZE = 720.0f;
+  auto scaleX = static_cast<float>(surface->width()) / DESIGN_SIZE;
+  auto scaleY = static_cast<float>(surface->height()) / DESIGN_SIZE;
+  auto baseScale = std::min(scaleX, scaleY);
+  auto scaledSize = DESIGN_SIZE * baseScale;
+  auto baseOffsetX = (static_cast<float>(surface->width()) - scaledSize) * 0.5f;
+  auto baseOffsetY = (static_cast<float>(surface->height()) - scaledSize) * 0.5f;
 
-  // Directly set zoom and offset on DisplayList
-  displayList.setZoomScale(zoom);
-  displayList.setContentOffset(offsetX, offsetY);
+  // Apply user zoom and offset on top of the base scale/offset.
+  displayList.setZoomScale(zoom * baseScale);
+  displayList.setContentOffset(baseOffsetX + offsetX, baseOffsetY + offsetY);
 
-  // Draw background and render DisplayList
+  // Draw background
   auto canvas = surface->getCanvas();
   canvas->clear();
-  DrawSampleBackground(canvas, appHost.get());
+  int width = 0;
+  int height = 0;
+  emscripten_get_canvas_element_size(canvasID.c_str(), &width, &height);
+  auto density = static_cast<float>(surface->width()) / static_cast<float>(width);
+  DrawBackground(canvas, surface->width(), surface->height(), density);
+
+  // Render DisplayList
   displayList.render(surface.get(), false);
 
   context->flushAndSubmit();
   window->present(context);
   device->unlock();
 
-  needsRedraw = false;
-  return true;
+  return displayList.hasContentChanged();
 }
 
 }  // namespace hello2d

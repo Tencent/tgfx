@@ -45,10 +45,12 @@ class TGFXWindow {
  private:
   HWND windowHandle = nullptr;
   int currentDrawerIndex = 0;
+  int lastDrawIndex = -1;
   double lastZoomArgument = 0.0;
   std::shared_ptr<tgfx::WGLWindow> tgfxWindow = nullptr;
   std::shared_ptr<hello2d::AppHost> appHost = nullptr;
   tgfx::DisplayList displayList;
+  std::shared_ptr<tgfx::Layer> contentLayer = nullptr;
   bool needsRedraw = true;
 
   static WNDCLASS RegisterWindowClass();

@@ -15,8 +15,8 @@ static std::shared_ptr<hello2d::AppHost> appHost = nullptr;
 static std::shared_ptr<tgfx::Window> window = nullptr;
 static std::shared_ptr<DisplayLink> displayLink = nullptr;
 static tgfx::DisplayList displayList;
+static std::shared_ptr<tgfx::Layer> contentLayer = nullptr;
 static int lastDrawIndex = -1;
-static bool needsRedraw = true;
 
 static std::shared_ptr<hello2d::AppHost> CreateAppHost();
 
@@ -54,11 +54,11 @@ static napi_value AddImageFromEncoded(napi_env env, napi_callback_info info) {
 }
 
 static bool Draw(int drawIndex, float zoom = 1.0f, float offsetX = 0.0f, float offsetY = 0.0f) {
-  if (!appHost || !needsRedraw) {
+  if (!appHost) {
     return false;
   }
 
-  if (window == nullptr || appHost->width() <= 0 || appHost->height() <= 0) {
+  if (window == nullptr) {
     return false;
   }
   auto device = window->getDevice();
@@ -73,33 +73,46 @@ static bool Draw(int drawIndex, float zoom = 1.0f, float offsetX = 0.0f, float o
   }
 
   // Switch sample when drawIndex changes
-  auto numDrawers = hello2d::GetLayerBuilderCount();
-  auto index = (drawIndex % numDrawers);
-  if (index != lastDrawIndex) {
-    auto layer = hello2d::BuildAndCenterLayer(index, appHost.get());
-    if (layer) {
-      displayList.root()->removeChildren();
-      displayList.root()->addChild(layer);
+  auto numBuilders = hello2d::LayerBuilder::Count();
+  auto index = (drawIndex % numBuilders);
+  if (index != lastDrawIndex || !contentLayer) {
+    auto builder = hello2d::LayerBuilder::GetByIndex(index);
+    if (builder) {
+      contentLayer = builder->buildLayerTree(appHost.get());
+      if (contentLayer) {
+        displayList.root()->removeChildren();
+        displayList.root()->addChild(contentLayer);
+      }
     }
     lastDrawIndex = index;
   }
 
-  // Directly set zoom and offset on DisplayList
-  displayList.setZoomScale(zoom);
-  displayList.setContentOffset(offsetX, offsetY);
+  // Calculate base scale and offset to fit 720x720 design size to window
+  static constexpr float DESIGN_SIZE = 720.0f;
+  auto scaleX = static_cast<float>(surface->width()) / DESIGN_SIZE;
+  auto scaleY = static_cast<float>(surface->height()) / DESIGN_SIZE;
+  auto baseScale = std::min(scaleX, scaleY);
+  auto scaledSize = DESIGN_SIZE * baseScale;
+  auto baseOffsetX = (static_cast<float>(surface->width()) - scaledSize) * 0.5f;
+  auto baseOffsetY = (static_cast<float>(surface->height()) - scaledSize) * 0.5f;
 
-  // Draw background and render DisplayList
+  // Apply user zoom and offset on top of the base scale/offset
+  displayList.setZoomScale(zoom * baseScale);
+  displayList.setContentOffset(baseOffsetX + offsetX, baseOffsetY + offsetY);
+
+  // Draw background
   auto canvas = surface->getCanvas();
   canvas->clear();
-  hello2d::DrawSampleBackground(canvas, appHost.get());
+  hello2d::DrawBackground(canvas, surface->width(), surface->height(), screenDensity);
+
+  // Render DisplayList
   displayList.render(surface.get(), false);
 
   context->flushAndSubmit();
   window->present(context);
   device->unlock();
 
-  needsRedraw = false;
-  return true;
+  return displayList.hasContentChanged();
 }
 
 
@@ -111,10 +124,6 @@ static napi_value UpdateDrawParams(napi_env env, napi_callback_info info) {
   napi_get_value_double(env, args[1], &zoomScale);
   napi_get_value_double(env, args[2], &contentOffsetX);
   napi_get_value_double(env, args[3], &contentOffsetY);
-
-  if (appHost) {
-    needsRedraw = true;
-  }
 
   if (displayLink) {
     displayLink->start();
@@ -180,10 +189,8 @@ static void UpdateSize(OH_NativeXComponent* component, void* nativeWindow) {
   if (appHost == nullptr) {
     appHost = CreateAppHost();
   }
-  appHost->updateScreen(static_cast<int>(width), static_cast<int>(height), screenDensity);
   if (window != nullptr) {
     window->invalidSize();
-    needsRedraw = true;
     if (displayLink) {
       displayLink->start();
     }
@@ -208,11 +215,8 @@ static void OnSurfaceCreatedCB(OH_NativeXComponent* component, void* nativeWindo
   if (window == nullptr) {
     return;
   }
-  if (appHost) {
-    needsRedraw = true;
-    if (displayLink) {
-      displayLink->start();
-    }
+  if (displayLink) {
+    displayLink->start();
   }
 }
 

@@ -167,7 +167,6 @@ static const float MaxZoom = 1000.0f;
 }
 
 - (void)requestDraw {
-  [self.tgfxView markDirty];
   [self.displayLink setPaused:NO];
 }
 

@@ -41,7 +41,7 @@ static void SaveFile(std::shared_ptr<tgfx::Data> data, const std::string& output
 
 int main() {
   auto rootPath = GetRootPath();
-  hello2d::AppHost appHost(720, 720, 2.0f);
+  hello2d::AppHost appHost;
   auto image = tgfx::Image::MakeFromFile(rootPath + "resources/assets/bridge.jpg");
   appHost.addImage("bridge", std::move(image));
   auto image2 = tgfx::Image::MakeFromFile(rootPath + "resources/assets/tgfx.png");
@@ -61,24 +61,41 @@ int main() {
     tgfx::PrintError("Failed to lock the Context!");
     return -1;
   }
-  auto surface = tgfx::Surface::Make(context, appHost.width(), appHost.height());
+  auto surfaceWidth = 720;
+  auto surfaceHeight = 720;
+  auto surface = tgfx::Surface::Make(context, surfaceWidth, surfaceHeight);
   auto canvas = surface->getCanvas();
-  
+
   tgfx::DisplayList displayList;
   displayList.setRenderMode(tgfx::RenderMode::Direct);
-  
-  auto builderNames = hello2d::GetSampleNames();
+
+  // Calculate zoom and offset to fit 720x720 design size to window
+  static constexpr float DESIGN_SIZE = 720.0f;
+  auto scaleX = static_cast<float>(surfaceWidth) / DESIGN_SIZE;
+  auto scaleY = static_cast<float>(surfaceHeight) / DESIGN_SIZE;
+  auto scale = std::min(scaleX, scaleY);
+  auto scaledSize = DESIGN_SIZE * scale;
+  auto offsetX = (static_cast<float>(surfaceWidth) - scaledSize) * 0.5f;
+  auto offsetY = (static_cast<float>(surfaceHeight) - scaledSize) * 0.5f;
+
+  displayList.setZoomScale(scale);
+  displayList.setContentOffset(offsetX, offsetY);
+
+  auto& builderNames = hello2d::LayerBuilder::Names();
   auto index = 0;
 
   for (auto& name : builderNames) {
-    auto layer = hello2d::BuildAndCenterLayer(index, &appHost);
-    if (layer) {
-      displayList.root()->removeChildren();
-      displayList.root()->addChild(layer);
+    auto builder = hello2d::LayerBuilder::GetByIndex(index);
+    if (builder) {
+      auto layer = builder->buildLayerTree(&appHost);
+      if (layer) {
+        displayList.root()->removeChildren();
+        displayList.root()->addChild(layer);
+      }
     }
-    
+
     canvas->clear();
-    hello2d::DrawSampleBackground(canvas, &appHost);
+    hello2d::DrawBackground(canvas, surfaceWidth, surfaceHeight, 2.0f);
     displayList.render(surface.get(), false);
 
     tgfx::Bitmap bitmap = {};

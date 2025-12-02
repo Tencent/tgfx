@@ -36,6 +36,5 @@
 - (bool)draw;
 - (void)startDisplayLink;
 - (void)stopDisplayLink;
-- (void)markDirty;
 
 @end
