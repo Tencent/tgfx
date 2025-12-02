@@ -47,6 +47,8 @@ class TGFXWindow {
   int currentDrawerIndex = 0;
   int lastDrawIndex = -1;
   double lastZoomArgument = 0.0;
+  float zoomScale = 1.0f;
+  tgfx::Point contentOffset = {0.0f, 0.0f};
   std::shared_ptr<tgfx::WGLWindow> tgfxWindow = nullptr;
   std::shared_ptr<hello2d::AppHost> appHost = nullptr;
   tgfx::DisplayList displayList;
@@ -61,7 +63,7 @@ class TGFXWindow {
   void centerAndShow();
   float getPixelRatio();
   void createAppHost();
-  void draw();
+  bool draw();
 
   bool isDrawing = true;
 };

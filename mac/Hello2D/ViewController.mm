@@ -63,7 +63,8 @@ static const float ScrollWheelZoomSensitivity = 120.0f;
   [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
-- (void)mouseUp:(NSEvent*)event {
+- (void)mouseDown:(NSEvent*)event {
+  // Handle mouse click to switch samples
   self.tgfxView.drawIndex++;
   self.tgfxView.zoomScale = 1.0f;
   self.tgfxView.contentOffset = CGPointZero;

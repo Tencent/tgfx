@@ -97,18 +97,33 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
       destroy();
       PostQuitMessage(0);
       break;
-    case WM_PAINT: {
-      if (isDrawing) {
-        draw();
+    case WM_SIZE:
+      if (tgfxWindow) {
+        tgfxWindow->invalidSize();
       }
+      ::InvalidateRect(windowHandle, nullptr, TRUE);
+      break;
+    case WM_PAINT: {
+      PAINTSTRUCT ps;
+      BeginPaint(hwnd, &ps);
+      if (isDrawing) {
+        bool hasContentChanged = draw();
+        // Only invalidate again if content is still changing
+        if (hasContentChanged) {
+          ::InvalidateRect(windowHandle, nullptr, TRUE);
+        }
+      }
+      EndPaint(hwnd, &ps);
       break;
     }
-    case WM_LBUTTONUP: {
+    case WM_LBUTTONDOWN: {
       int count = hello2d::LayerBuilder::Count();
       if (count > 0) {
         currentDrawerIndex = (currentDrawerIndex + 1) % count;
+        zoomScale = 1.0f;
+        contentOffset = {0.0f, 0.0f};
+        ::InvalidateRect(windowHandle, nullptr, TRUE);
       }
-      ::InvalidateRect(windowHandle, nullptr, TRUE);
       break;
     }
     case WM_MOUSEWHEEL: {
@@ -117,24 +132,19 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
       bool isCtrlPressed = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
       bool isShiftPressed = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
 
-      float curZoom = displayList.zoomScale();
-      auto offset = displayList.contentOffset();
-
       if (isCtrlPressed) {
         float zoomStep = std::exp(GET_WHEEL_DELTA_WPARAM(wparam) / WHEEL_RATIO);
-        float newZoom = std::clamp(curZoom * zoomStep, MIN_ZOOM, MAX_ZOOM);
-        offset.x = mousePoint.x - ((mousePoint.x - offset.x) / curZoom) * newZoom;
-        offset.y = mousePoint.y - ((mousePoint.y - offset.y) / curZoom) * newZoom;
-        displayList.setZoomScale(newZoom);
-        displayList.setContentOffset(offset.x, offset.y);
+        float newZoom = std::clamp(zoomScale * zoomStep, MIN_ZOOM, MAX_ZOOM);
+        contentOffset.x = mousePoint.x - ((mousePoint.x - contentOffset.x) / zoomScale) * newZoom;
+        contentOffset.y = mousePoint.y - ((mousePoint.y - contentOffset.y) / zoomScale) * newZoom;
+        zoomScale = newZoom;
       } else {
         float wheelDelta = static_cast<float>(GET_WHEEL_DELTA_WPARAM(wparam));
         if (isShiftPressed) {
-          offset.x += wheelDelta;
+          contentOffset.x += wheelDelta;
         } else {
-          offset.y -= wheelDelta;
+          contentOffset.y -= wheelDelta;
         }
-        displayList.setContentOffset(offset.x, offset.y);
       }
       ::InvalidateRect(windowHandle, nullptr, TRUE);
       break;
@@ -145,18 +155,14 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
       if (GetGestureInfo(reinterpret_cast<HGESTUREINFO>(lparam), &gestureInfo)) {
         if (gestureInfo.dwID == GID_ZOOM) {
           double currentArgument = static_cast<double>(gestureInfo.ullArguments);
-          float curZoom = displayList.zoomScale();
-          auto offset = displayList.contentOffset();
           if (lastZoomArgument != 0.0) {
             double zoomFactor = currentArgument / lastZoomArgument;
             POINT mousePoint = {GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
             ScreenToClient(hwnd, &mousePoint);
-            float newZoom =
-                std::clamp(curZoom * static_cast<float>(zoomFactor), MIN_ZOOM, MAX_ZOOM);
-            offset.x = mousePoint.x - ((mousePoint.x - offset.x) / curZoom) * newZoom;
-            offset.y = mousePoint.y - ((mousePoint.y - offset.y) / curZoom) * newZoom;
-            displayList.setZoomScale(newZoom);
-            displayList.setContentOffset(offset.x, offset.y);
+            float newZoom = std::clamp(zoomScale * static_cast<float>(zoomFactor), MIN_ZOOM, MAX_ZOOM);
+            contentOffset.x = mousePoint.x - ((mousePoint.x - contentOffset.x) / zoomScale) * newZoom;
+            contentOffset.y = mousePoint.y - ((mousePoint.y - contentOffset.y) / zoomScale) * newZoom;
+            zoomScale = newZoom;
           }
           lastZoomArgument = currentArgument;
         }
@@ -164,8 +170,8 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
           lastZoomArgument = 0.0;
         }
         CloseGestureInfoHandle(reinterpret_cast<HGESTUREINFO>(lparam));
+        ::InvalidateRect(windowHandle, nullptr, TRUE);
       }
-      ::InvalidateRect(windowHandle, nullptr, TRUE);
       break;
     }
     default:
@@ -258,6 +264,12 @@ float TGFXWindow::getPixelRatio() {
 
 void TGFXWindow::createAppHost() {
   appHost = std::make_unique<hello2d::AppHost>();
+  
+  // Initialize DisplayList with tiled rendering mode (same as other platforms)
+  displayList.setRenderMode(tgfx::RenderMode::Tiled);
+  displayList.setAllowZoomBlur(true);
+  displayList.setMaxTileCount(512);
+  
   std::filesystem::path filePath = __FILE__;
   auto rootPath = filePath.parent_path().parent_path().parent_path().string();
   auto imagePath = rootPath + R"(\resources\assets\bridge.jpg)";
@@ -272,34 +284,34 @@ void TGFXWindow::createAppHost() {
   appHost->addTypeface("emoji", typeface);
 }
 
-void TGFXWindow::draw() {
+bool TGFXWindow::draw() {
   if (!tgfxWindow) {
     tgfxWindow = tgfx::WGLWindow::MakeFrom(windowHandle);
   }
   if (tgfxWindow == nullptr) {
-    return;
+    return false;
   }
   RECT rect;
   GetClientRect(windowHandle, &rect);
   auto width = static_cast<int>(rect.right - rect.left);
   auto height = static_cast<int>(rect.bottom - rect.top);
   if (width <= 0 || height <= 0) {
-    return;
+    return false;
   }
   auto pixelRatio = getPixelRatio();
 
   auto device = tgfxWindow->getDevice();
   if (device == nullptr) {
-    return;
+    return false;
   }
   auto context = device->lockContext();
   if (context == nullptr) {
-    return;
+    return false;
   }
   auto surface = tgfxWindow->getSurface(context);
   if (surface == nullptr) {
     device->unlock();
-    return;
+    return false;
   }
 
   // Switch sample when drawIndex changes
@@ -327,10 +339,8 @@ void TGFXWindow::draw() {
   auto baseOffsetY = (static_cast<float>(surface->height()) - scaledSize) * 0.5f;
 
   // Apply user zoom and offset on top of the base scale/offset
-  auto currentZoom = displayList.zoomScale();
-  auto currentOffset = displayList.contentOffset();
-  displayList.setZoomScale(currentZoom * baseScale);
-  displayList.setContentOffset(baseOffsetX + currentOffset.x, baseOffsetY + currentOffset.y);
+  displayList.setZoomScale(zoomScale * baseScale);
+  displayList.setContentOffset(baseOffsetX + contentOffset.x, baseOffsetY + contentOffset.y);
 
   // Draw background
   auto canvas = surface->getCanvas();
@@ -343,5 +353,7 @@ void TGFXWindow::draw() {
   context->flushAndSubmit();
   tgfxWindow->present(context);
   device->unlock();
+
+  return displayList.hasContentChanged();
 }
 }  // namespace hello2d

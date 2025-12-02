@@ -26,7 +26,11 @@
 static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, const CVTimeStamp*,
                                       CVOptionFlags, CVOptionFlags*, void* userInfo) {
   TGFXView* view = (__bridge TGFXView*)userInfo;
-  [view draw];
+  dispatch_async(dispatch_get_main_queue(), ^{
+    if (![view draw]) {
+      [view stopDisplayLink];
+    }
+  });
   return kCVReturnSuccess;
 }
 
@@ -90,7 +94,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   [self.window makeFirstResponder:self];
 
   if (@available(macOS 14, *)) {
-    self.caDisplayLink = [self displayLinkWithTarget:self selector:@selector(draw)];
+    self.caDisplayLink = [self displayLinkWithTarget:self selector:@selector(displayLinkCallback:)];
   } else {
     CVDisplayLinkCreateWithActiveCGDisplays(&_cvDisplayLink);
     CVDisplayLinkSetOutputCallback(_cvDisplayLink, &OnDisplayLinkCallback, (__bridge void*)self);
@@ -102,6 +106,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
 - (void)startDisplayLink {
   if (@available(macOS 14, *)) {
     if (self.caDisplayLink) {
+      [self.caDisplayLink setPaused:NO];
       [self.caDisplayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSRunLoopCommonModes];
     }
   } else {
@@ -114,8 +119,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
 - (void)stopDisplayLink {
   if (@available(macOS 14, *)) {
     if (self.caDisplayLink) {
-      [self.caDisplayLink removeFromRunLoop:[NSRunLoop currentRunLoop]
-                                    forMode:NSRunLoopCommonModes];
+      [self.caDisplayLink setPaused:YES];
     }
   } else {
     if (self.cvDisplayLink) {
@@ -127,6 +131,8 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
 - (void)dealloc {
   if (@available(macOS 14, *)) {
     if (self.caDisplayLink) {
+      [self.caDisplayLink removeFromRunLoop:[NSRunLoop currentRunLoop]
+                                    forMode:NSRunLoopCommonModes];
       [self.caDisplayLink invalidate];
       self.caDisplayLink = nil;
     }
@@ -137,6 +143,14 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
     }
   }
 }
+- (void)displayLinkCallback:(CADisplayLink*)displayLink {
+  if (![self draw]) {
+    if (@available(macOS 14, *)) {
+      [displayLink setPaused:YES];
+    }
+  }
+}
+
 - (BOOL)draw {
   if (self.window == nil) {
     return false;
@@ -210,6 +224,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   lastRecording = std::move(recording);
 
   device->unlock();
+  
   return displayList.hasContentChanged();
 }
 
