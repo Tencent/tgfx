@@ -107,7 +107,6 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
       int count = hello2d::GetSampleCount();
       if (count > 0) {
         currentDrawerIndex = (currentDrawerIndex + 1) % count;
-        markDirty();
       }
       ::InvalidateRect(windowHandle, nullptr, TRUE);
       break;
@@ -137,7 +136,6 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
         }
         displayList.setContentOffset(offset.x, offset.y);
       }
-      markDirty();
       ::InvalidateRect(windowHandle, nullptr, TRUE);
       break;
     }
@@ -167,7 +165,6 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
         }
         CloseGestureInfoHandle(reinterpret_cast<HGESTUREINFO>(lparam));
       }
-      markDirty();
       ::InvalidateRect(windowHandle, nullptr, TRUE);
       break;
     }
@@ -346,9 +343,5 @@ void TGFXWindow::draw() {
   context->flushAndSubmit();
   tgfxWindow->present(context);
   device->unlock();
-}
-
-void TGFXWindow::markDirty() {
-  needsRedraw = true;
 }
 }  // namespace hello2d

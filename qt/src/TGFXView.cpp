@@ -154,7 +154,8 @@ bool TGFXView::draw() {
   // Draw background
   auto canvas = surface->getCanvas();
   canvas->clear();
-  DrawBackground(canvas, surface->width(), surface->height(), pixelRatio);
+  auto pixelRatio = window()->devicePixelRatio();
+  hello2d::DrawBackground(canvas, surface->width(), surface->height(), pixelRatio);
 
   // Render DisplayList
   displayList.render(surface.get(), false);

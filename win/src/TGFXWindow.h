@@ -51,7 +51,6 @@ class TGFXWindow {
   std::shared_ptr<hello2d::AppHost> appHost = nullptr;
   tgfx::DisplayList displayList;
   std::shared_ptr<tgfx::Layer> contentLayer = nullptr;
-  bool needsRedraw = true;
 
   static WNDCLASS RegisterWindowClass();
   static LRESULT CALLBACK WndProc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) noexcept;
@@ -63,7 +62,6 @@ class TGFXWindow {
   float getPixelRatio();
   void createAppHost();
   void draw();
-  void markDirty();
 
   bool isDrawing = true;
 };
