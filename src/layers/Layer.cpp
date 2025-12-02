@@ -1215,8 +1215,10 @@ void Layer::drawContentOffscreen(const DrawArgs& args, Canvas* canvas,
   }
 
   if (cacheContent) {
-    image = image->makeTextureImage(args.context);
     args.layerCache->cacheImage(this, contentScale, image, imageMatrix);
+    if (auto cache = args.layerCache->getCachedImage(this, contentScale)) {
+      image = cache->getImage();
+    }
   }
 
   if (transform != nullptr) {
@@ -1363,8 +1365,14 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
       return false;
     }
   } else {
-    contentScale = std::min(maxCacheScale,
-                            maxCacheSize / std::max(renderBounds.width(), renderBounds.height()));
+//    auto bounds = renderBounds;
+//    bounds.roundOut();
+//    contentScale = std::min(maxCacheScale,
+//                            maxCacheSize / std::max(bounds.width(), bounds.height()));
+//      auto scaledBounds = bounds;
+//      scaledBounds.scale(contentScale, contentScale);
+//      scaledBounds.roundOut();
+//      contentScale = std::min( scaledBounds.width() / bounds.width(), scaledBounds.height() / bounds.height() );
   }
   auto cacheArgs = args;
   cacheArgs.renderFlags |= RenderFlags::DisableCache;
