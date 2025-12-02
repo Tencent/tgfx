@@ -206,7 +206,7 @@ struct RGBA4f {
    * Return a new color that is the original color converted to the dst color space. If the
    * dstColorSpace is nullptr, no convert.
    */
-  RGBA4f makeColorSpace(std::shared_ptr<ColorSpace> dstColorSpace) const;
+  RGBA4f makeColorSpace(const std::shared_ptr<ColorSpace>& dstColorSpace) const;
 
   /**
    * Returns a Color premultiplied by alpha. Asserts at compile time if RGBA4f is already
@@ -234,11 +234,11 @@ struct RGBA4f {
 
 template <>
 RGBA4f<AlphaType::Unpremultiplied> RGBA4f<AlphaType::Unpremultiplied>::makeColorSpace(
-    std::shared_ptr<ColorSpace> dstColorSpace) const;
+    const std::shared_ptr<ColorSpace>& dstColorSpace) const;
 
 template <>
 RGBA4f<AlphaType::Premultiplied> RGBA4f<AlphaType::Premultiplied>::makeColorSpace(
-    std::shared_ptr<ColorSpace> dstColorSpace) const;
+    const std::shared_ptr<ColorSpace>& dstColorSpace) const;
 
 /**
  * For convenience, Color is an alias for RGBA4f<AlphaType::Unpremultiplied>.

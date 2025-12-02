@@ -31,6 +31,8 @@ gfx::skcms_ICCProfile ToSkcmsICCProfile(std::shared_ptr<ColorSpace> colorSpace);
 
 bool NeedConvertColorSpace(std::shared_ptr<ColorSpace> src, std::shared_ptr<ColorSpace> dst);
 
+bool NeedConvertColorSpace(const ColorSpace* src, const ColorSpace* dst);
+
 void ConvertColorSpaceInPlace(int width, int height, ColorType colorType, AlphaType alphaType,
                               size_t rowBytes, std::shared_ptr<ColorSpace> srcCS,
                               std::shared_ptr<ColorSpace> dstCS, void* pixels);

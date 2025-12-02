@@ -136,6 +136,13 @@ bool NeedConvertColorSpace(std::shared_ptr<ColorSpace> src, std::shared_ptr<Colo
   return !ColorSpace::Equals(src.get(), dst.get());
 }
 
+bool NeedConvertColorSpace(const ColorSpace* src, const ColorSpace* dst) {
+  if (src == nullptr || dst == nullptr) {
+    return false;
+  }
+  return src->hash() != dst->hash();
+}
+
 void ConvertColorSpaceInPlace(int width, int height, ColorType colorType, AlphaType alphaType,
                               size_t rowBytes, std::shared_ptr<ColorSpace> srcCS,
                               std::shared_ptr<ColorSpace> dstCS, void* pixels) {

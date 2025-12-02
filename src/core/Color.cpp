@@ -25,7 +25,7 @@ namespace tgfx {
 
 template <>
 RGBA4f<AlphaType::Unpremultiplied> RGBA4f<AlphaType::Unpremultiplied>::makeColorSpace(
-    std::shared_ptr<ColorSpace> dstColorSpace) const {
+    const std::shared_ptr<ColorSpace>& dstColorSpace) const {
   auto dstColor = *this;
   if (!NeedConvertColorSpace(colorSpace, dstColorSpace)) {
     return dstColor;
@@ -39,9 +39,9 @@ RGBA4f<AlphaType::Unpremultiplied> RGBA4f<AlphaType::Unpremultiplied>::makeColor
 
 template <>
 RGBA4f<AlphaType::Premultiplied> RGBA4f<AlphaType::Premultiplied>::makeColorSpace(
-    std::shared_ptr<ColorSpace> dstColorSpace) const {
+    const std::shared_ptr<ColorSpace>& dstColorSpace) const {
   auto dstColor = *this;
-  if (!NeedConvertColorSpace(colorSpace, dstColorSpace)) {
+  if (!NeedConvertColorSpace(colorSpace.get(), dstColorSpace.get())) {
     return dstColor;
   }
   ColorSpaceXformSteps steps(colorSpace.get(), AlphaType::Premultiplied, dstColorSpace.get(),

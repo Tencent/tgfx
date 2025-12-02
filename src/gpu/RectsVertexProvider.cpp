@@ -75,10 +75,11 @@ class AARectsVertexProvider : public RectsVertexProvider {
     auto rectCount = rects.size();
     for (size_t i = 0; i < rectCount; ++i) {
       auto& record = rects[i];
-      PMColor dstColor;
-      if (bitFields.hasColor) {
-        dstColor = record->color.makeColorSpace(ColorSpace::DisplayP3());
-      }
+      PMColor dstColor = record->color;
+      // if (bitFields.hasColor) {
+      //   static std::shared_ptr<ColorSpace> p3CS = ColorSpace::DisplayP3();
+      //   dstColor = record->color.makeColorSpace(p3CS);
+      // }
       auto& viewMatrix = record->viewMatrix;
       auto& rect = record->rect;
       auto scale = sqrtf(viewMatrix.getScaleX() * viewMatrix.getScaleX() +

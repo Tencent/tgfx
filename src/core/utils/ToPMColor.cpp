@@ -22,13 +22,13 @@
 
 namespace tgfx {
 
-PMColor ToPMColor(const Color& color, std::shared_ptr<ColorSpace> dstColorSpace) {
+PMColor ToPMColor(const Color& color, const std::shared_ptr<ColorSpace>& dstColorSpace) {
   if (dstColorSpace == nullptr) {
     return PMColor{color.red * color.alpha, color.green * color.alpha, color.blue * color.alpha,
                    color.alpha, color.colorSpace};
   }
 
-  if (!NeedConvertColorSpace(color.colorSpace, dstColorSpace)) {
+  if (!NeedConvertColorSpace(color.colorSpace.get(), dstColorSpace.get())) {
     return PMColor{color.red * color.alpha, color.green * color.alpha, color.blue * color.alpha,
                    color.alpha, color.colorSpace};
     ;

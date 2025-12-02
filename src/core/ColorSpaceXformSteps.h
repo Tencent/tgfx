@@ -29,17 +29,21 @@ enum class AlphaType;
 struct ColorSpaceXformSteps {
 
   struct Flags {
-    bool unPremul = false;
-    bool linearize = false;
-    bool srcOOTF = false;
-    bool gamutTransform = false;
-    bool dstOOTF = false;
-    bool encode = false;
-    bool premul = false;
+    uint8_t unPremul : 1;
+    uint8_t linearize : 1;
+    uint8_t srcOOTF : 1;
+    uint8_t gamutTransform : 1;
+    uint8_t dstOOTF : 1;
+    uint8_t encode : 1;
+    uint8_t premul : 1;
 
     constexpr uint32_t mask() const {
-      return (unPremul ? 1 : 0) | (linearize ? 2 : 0) | (gamutTransform ? 4 : 0) |
-             (encode ? 8 : 0) | (premul ? 16 : 0) | (srcOOTF ? 32 : 0) | (dstOOTF ? 64 : 0);
+      return static_cast<uint32_t>((unPremul) | (linearize << 1) | (gamutTransform << 2) |
+                                   (encode << 3) | (premul << 4) | (srcOOTF << 5) | (dstOOTF << 6));
+    }
+    constexpr Flags()
+        : unPremul(0), linearize(0), srcOOTF(0), gamutTransform(0), dstOOTF(0), encode(0),
+          premul(0) {
     }
   };
 

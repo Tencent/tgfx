@@ -124,7 +124,7 @@ void OpsCompositor::fillRect(const Rect& rect, const MCState& state, const Brush
     flushPendingOps(PendingOpType::Rect, state.clip, brush);
   }
 
-  //auto dstColor = ToPMColor(brush.color, dstColorSpace);
+  //auto dstColor = ToPMColor(brush.color, ColorSpace::DisplayP3());
   auto record = drawingAllocator()->make<RectRecord>(rect, state.matrix, brush.color.premultiply());
   pendingRects.emplace_back(std::move(record));
   if (stroke) {
