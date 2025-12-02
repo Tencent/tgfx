@@ -18,8 +18,8 @@
 
 #pragma once
 
+#include "tgfx/core/BrushModifier.h"
 #include "tgfx/core/Canvas.h"
-#include "tgfx/core/FillModifier.h"
 
 namespace tgfx {
 /**
@@ -52,17 +52,17 @@ class LayerContent {
   /**
    * Draws the default content of the layer to the specified canvas using the provided layer fill.
    */
-  virtual void drawDefault(Canvas* canvas, const FillModifier* modifier) const = 0;
+  virtual void drawDefault(Canvas* canvas, const BrushModifier* modifier) const = 0;
 
   /**
    * Draws the foreground content of the layer to the specified canvas using the provided layer fill.
    */
-  virtual void drawForeground(Canvas* canvas, const FillModifier* modifier) const = 0;
+  virtual void drawForeground(Canvas* canvas, const BrushModifier* modifier) const = 0;
 
   /**
     * Draws the contour content of the layer to the specified canvas using the provided layer fill.
     */
-  virtual void drawContour(Canvas* canvas, const FillModifier* modifier) const = 0;
+  virtual void drawContour(Canvas* canvas, const BrushModifier* modifier) const = 0;
 
  protected:
   enum class Type { Default, Foreground, Contour };

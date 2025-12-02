@@ -31,6 +31,7 @@
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/svg/SVGTypes.h"
+#include "tgfx/svg/xml/XMLDOM.h"
 
 namespace tgfx {
 
@@ -97,7 +98,7 @@ void SVGNode::setAttribute(SVGAttribute attribute, const SVGValue& value) {
 }
 
 bool SVGNode::setAttribute(const std::string& attributeName, const std::string& attributeValue) {
-  return SVGNodeConstructor::SetAttribute(*this, attributeName, attributeValue);
+  return SVGNodeConstructor::SetAttribute(*this, attributeName, attributeValue, nullptr);
 }
 
 template <typename T>
@@ -126,7 +127,7 @@ bool SVGNode::parseAndSetAttribute(const std::string& name, const std::string& v
          PARSE_AND_SET("filter", Filter) || PARSE_AND_SET("flood-color", FloodColor) ||
          PARSE_AND_SET("flood-opacity", FloodOpacity) || PARSE_AND_SET("font-family", FontFamily) ||
          PARSE_AND_SET("font-size", FontSize) || PARSE_AND_SET("font-style", FontStyle) ||
-         PARSE_AND_SET("font-weight", FontWeight) ||
+         PARSE_AND_SET("font-weight", FontWeight) || PARSE_AND_SET("id", ID) ||
          PARSE_AND_SET("lighting-color", LightingColor) || PARSE_AND_SET("mask", Mask) ||
          PARSE_AND_SET("opacity", Opacity) || PARSE_AND_SET("stop-color", StopColor) ||
          PARSE_AND_SET("stop-opacity", StopOpacity) || PARSE_AND_SET("stroke", Stroke) ||
@@ -188,4 +189,13 @@ Matrix SVGNode::ComputeViewboxMatrix(const Rect& viewBox, const Rect& viewPort,
 
   return Matrix::MakeTrans(transform.x, transform.y) * Matrix::MakeScale(scale.x, scale.y);
 }
+
+void SVGNode::addCustomAttribute(const std::string& name, const std::string& value) {
+  customAttributes.push_back({name, value});
+}
+
+const std::vector<DOMAttribute>& SVGNode::getCustomAttributes() const {
+  return customAttributes;
+}
+
 }  // namespace tgfx

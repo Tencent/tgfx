@@ -3439,4 +3439,117 @@ TGFX_TEST(LayerTest, Matrix) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D_2D_3D"));
 }
 
+TGFX_TEST(LayerTest, RasterizedContentWithMask) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 200);
+  auto displayList = std::make_unique<DisplayList>();
+
+  // Create a rasterized content layer with a mask
+  auto rootLayer = Layer::Make();
+  displayList->root()->addChild(rootLayer);
+
+  // Create a rasterized content layer with some shapes
+  auto rasterizedLayer = Layer::Make();
+  rasterizedLayer->setMatrix(Matrix::MakeTrans(50, 50));
+  rasterizedLayer->setShouldRasterize(true);
+  rootLayer->addChild(rasterizedLayer);
+
+  // Add a blue rectangle
+  auto blueRect = ShapeLayer::Make();
+  Path bluePath;
+  bluePath.addRect(Rect::MakeWH(80, 80));
+  blueRect->setPath(bluePath);
+  blueRect->setFillStyle(SolidColor::Make(Color::Blue()));
+  rasterizedLayer->addChild(blueRect);
+
+  // Add a red oval
+  auto redOval = ShapeLayer::Make();
+  redOval->setMatrix(Matrix::MakeTrans(60, 0));
+  Path ovalPath;
+  ovalPath.addOval(Rect::MakeXYWH(0, 0, 80, 80));
+  redOval->setPath(ovalPath);
+  redOval->setFillStyle(SolidColor::Make(Color::Red()));
+  rasterizedLayer->addChild(redOval);
+
+  // Create a mask for the rasterized layer
+  auto maskLayer = ShapeLayer::Make();
+  Path maskPath;
+  maskPath.addOval(Rect::MakeXYWH(-10, -10, 100, 100));
+  maskLayer->setPath(maskPath);
+  maskLayer->setFillStyle(SolidColor::Make(Color::White()));
+  rasterizedLayer->setMask(maskLayer);
+  rootLayer->addChild(maskLayer);
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/RasterizedContentWithMask"));
+}
+
+TGFX_TEST(LayerTest, DisplayListBackground) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  auto displayList = std::make_unique<DisplayList>();
+
+  // Test default background color (transparent)
+  auto defaultColor = displayList->backgroundColor();
+  EXPECT_EQ(defaultColor, Color::Transparent());
+
+  // Test setting opaque background color
+  auto opaqueColor = Color::FromRGBA(255, 0, 0, 255);
+  displayList->setBackgroundColor(opaqueColor);
+  EXPECT_EQ(displayList->backgroundColor(), opaqueColor);
+
+  // Render with opaque background
+  auto rootLayer = Layer::Make();
+  displayList->root()->addChild(rootLayer);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DisplayListBackground_OpaqueRed"));
+
+  // Test setting semi-transparent background color
+  auto semiTransparentColor = Color::FromRGBA(0, 255, 0, 128);
+  displayList->setBackgroundColor(semiTransparentColor);
+  EXPECT_EQ(displayList->backgroundColor(), semiTransparentColor);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DisplayListBackground_SemiTransparentGreen"));
+
+  // Test setting different background colors
+  auto blueColor = Color::FromRGBA(0, 0, 255, 255);
+  displayList->setBackgroundColor(blueColor);
+  EXPECT_EQ(displayList->backgroundColor(), blueColor);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DisplayListBackground_Blue"));
+
+  // Test adding layers and rendering with different background colors
+  auto shapeLayer = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeXYWH(50, 50, 100, 100));
+  shapeLayer->setPath(path);
+  shapeLayer->setFillStyle(SolidColor::Make(Color::White()));
+  rootLayer->addChild(shapeLayer);
+
+  auto whiteBackgroundColor = Color::FromRGBA(255, 255, 255, 255);
+  displayList->setBackgroundColor(whiteBackgroundColor);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DisplayListBackground_WhiteWithShape"));
+
+  // Test resetting to transparent background
+  displayList->setBackgroundColor(Color::Transparent());
+  EXPECT_EQ(displayList->backgroundColor(), Color::Transparent());
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DisplayListBackground_TransparentWithShape"));
+
+  // Test background color with different render modes
+  displayList->setBackgroundColor(Color::FromRGBA(200, 100, 50, 255));
+  displayList->setRenderMode(RenderMode::Partial);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DisplayListBackground_PartialRender"));
+
+  displayList->setRenderMode(RenderMode::Tiled);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DisplayListBackground_TiledRender"));
+}
+
 }  // namespace tgfx

@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/core/Fill.h"
+#include "tgfx/core/Brush.h"
 #include "gpu/BlendFormula.h"
 
 namespace tgfx {
@@ -34,7 +34,7 @@ static OpacityType GetOpacityType(const Color& color, const Shader* shader) {
   return OpacityType::Unknown;
 }
 
-bool Fill::isOpaque() const {
+bool Brush::isOpaque() const {
   if (maskFilter) {
     return false;
   }
@@ -44,7 +44,7 @@ bool Fill::isOpaque() const {
   return BlendModeIsOpaque(blendMode, GetOpacityType(color, shader.get()));
 }
 
-bool Fill::nothingToDraw() const {
+bool Brush::nothingToDraw() const {
   switch (blendMode) {
     case BlendMode::SrcOver:
     case BlendMode::SrcATop:
@@ -63,14 +63,14 @@ bool Fill::nothingToDraw() const {
   return false;
 }
 
-Fill Fill::makeWithMatrix(const Matrix& matrix) const {
-  auto fill = *this;
-  if (fill.shader) {
-    fill.shader = fill.shader->makeWithMatrix(matrix);
+Brush Brush::makeWithMatrix(const Matrix& matrix) const {
+  auto brush = *this;
+  if (brush.shader) {
+    brush.shader = brush.shader->makeWithMatrix(matrix);
   }
-  if (fill.maskFilter) {
-    fill.maskFilter = fill.maskFilter->makeWithMatrix(matrix);
+  if (brush.maskFilter) {
+    brush.maskFilter = brush.maskFilter->makeWithMatrix(matrix);
   }
-  return fill;
+  return brush;
 }
 }  // namespace tgfx

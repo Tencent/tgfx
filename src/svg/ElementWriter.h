@@ -28,12 +28,13 @@
 #include "core/shaders/ColorShader.h"
 #include "core/shaders/GradientShader.h"
 #include "core/shaders/ImageShader.h"
-#include "tgfx/core/Fill.h"
+#include "tgfx/core/Brush.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/gpu/Context.h"
+#include "tgfx/svg/SVGCustomWriter.h"
 #include "tgfx/svg/SVGPathParser.h"
 #include "xml/XMLWriter.h"
 
@@ -47,7 +48,7 @@ class ElementWriter {
                 ResourceStore* bucket);
   ElementWriter(const std::string& name, Context* context, SVGExportContext* svgContext,
                 XMLWriter* writer, ResourceStore* bucket, bool disableWarning, const MCState& state,
-                const Fill& fill, const Stroke* stroke = nullptr);
+                const Brush& brush, const Stroke* stroke = nullptr);
   ~ElementWriter();
 
   void addAttribute(const std::string& name, const std::string& val);
@@ -62,10 +63,11 @@ class ElementWriter {
   void addEllipseAttributes(const Rect& bound);
   void addPathAttributes(const Path& path, SVGPathParser::PathEncoding encoding);
 
-  Resources addImageFilterResource(const std::shared_ptr<ImageFilter>& imageFilter, Rect bound);
+  Resources addImageFilterResource(const std::shared_ptr<ImageFilter>& imageFilter, Rect bound,
+                                   const std::shared_ptr<SVGCustomWriter>& exportWriter);
 
  private:
-  Resources addResources(const Fill& fill, Context* context, SVGExportContext* svgContext);
+  Resources addResources(const Brush& brush, Context* context, SVGExportContext* svgContext);
 
   void addShaderResources(const std::shared_ptr<Shader>& shader, Context* context,
                           Resources* resources);
@@ -95,14 +97,24 @@ class ElementWriter {
   void addShaderMaskResources(const std::shared_ptr<Shader>& shader, const std::string& filterID,
                               Context* context);
 
-  void addFillAndStroke(const Fill& fill, const Stroke* stroke, const Resources& resources);
+  void addFillAndStroke(const Brush& brush, const Stroke* stroke, const Resources& resources);
 
   void addGradientColors(const GradientInfo& info);
   std::string addLinearGradientDef(const GradientInfo& info, const Matrix& matrix);
   std::string addRadialGradientDef(const GradientInfo& info, const Matrix& matrix);
   std::string addUnsupportedGradientDef(const GradientInfo& info, const Matrix& matrix);
 
-  std::string addImageFilter(const std::shared_ptr<ImageFilter>& imageFilter, Rect bound);
+  std::string addImageFilter(const std::shared_ptr<ImageFilter>& imageFilter, Rect bound,
+                             const std::shared_ptr<SVGCustomWriter>& exportWriter);
+  void callbackBlurImageFilter(const GaussianBlurImageFilter* filter,
+                               const std::shared_ptr<SVGCustomWriter>& exportWriter,
+                               ElementWriter& filterElement);
+  void callbackDropShadowImageFilter(const DropShadowImageFilter* filter,
+                                     const std::shared_ptr<SVGCustomWriter>& exportWriter,
+                                     ElementWriter& filterElement);
+  void callbackInnerShadowImageFilter(const InnerShadowImageFilter* filter,
+                                      const std::shared_ptr<SVGCustomWriter>& exportWriter,
+                                      ElementWriter& filterElement);
   void addBlurImageFilter(const GaussianBlurImageFilter* filter);
   void addDropShadowImageFilter(const DropShadowImageFilter* filter);
   void addInnerShadowImageFilter(const InnerShadowImageFilter* filter);

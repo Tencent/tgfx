@@ -26,6 +26,8 @@
 
 namespace tgfx {
 
+enum State : uint8_t { NotStarted, Claimed, Done };
+
 #if !defined(TGFX_CPU_BIG_ENDIAN) && !defined(TGFX_CPU_LITTLE_ENDIAN)
 #if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
 #define TGFX_CPU_BIG_ENDIAN
@@ -844,15 +846,19 @@ ColorSpace::ColorSpace(const TransferFunction& transferFunction, const ColorMatr
 }
 
 void ColorSpace::computeLazyDstFields() const {
-  if (!isLazyDstFieldsResolved) {
-
+  auto state = _isLazyDstFieldsState.load(std::memory_order_acquire);
+  if (state == Done) {
+    return;
+  }
+  if (state == NotStarted &&
+      _isLazyDstFieldsState.compare_exchange_strong(state, Claimed, std::memory_order_acquire,
+                                                    std::memory_order_acquire)) {
     // Invert 3x3 gamut, defaulting to sRGB if we can't.
     if (!gfx::skcms_Matrix3x3_invert(reinterpret_cast<const gfx::skcms_Matrix3x3*>(&_toXYZD50),
                                      reinterpret_cast<gfx::skcms_Matrix3x3*>(&_fromXYZD50))) {
       ASSERT(gfx::skcms_Matrix3x3_invert(&gfx::skcms_sRGB_profile()->toXYZD50,
                                          reinterpret_cast<gfx::skcms_Matrix3x3*>(&_fromXYZD50)))
     }
-
     // Invert transfer function, defaulting to sRGB if we can't.
     if (!gfx::skcms_TransferFunction_invert(
             reinterpret_cast<const gfx::skcms_TransferFunction*>(&_transferFunction),
@@ -860,8 +866,11 @@ void ColorSpace::computeLazyDstFields() const {
       _invTransferFunction =
           *reinterpret_cast<const TransferFunction*>(gfx::skcms_sRGB_Inverse_TransferFunction());
     }
-
-    isLazyDstFieldsResolved = true;
+    _isLazyDstFieldsState.store(Done, std::memory_order_release);
+    return;
+  }
+  while (_isLazyDstFieldsState.load(std::memory_order_acquire) != Done) {
+    // Spin wait
   }
 }
 
