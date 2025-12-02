@@ -3393,7 +3393,6 @@ TGFX_TEST(LayerTest, Matrix) {
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D_2D"));
 
-  contentLayer->setTransformStyle(TransformStyle::Preserve3D);
   imageLayer->setMatrix3D(imageMatrix3D);
   imageLayer->setShouldRasterize(true);
   EXPECT_TRUE(imageLayer->matrix().isIdentity());
@@ -3423,6 +3422,10 @@ TGFX_TEST(LayerTest, Matrix) {
   displayList->root()->addChild(shaperLayer);
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D_2D_3D"));
+
+  contentLayer->setTransformStyle(TransformStyle::Preserve3D);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D_2D_3D_Preserve3D"));
 
   {
     auto anchor = Point::Make(0.3f, 0.3f);

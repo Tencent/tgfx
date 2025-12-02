@@ -19,6 +19,29 @@
 #include "RasterizedContent.h"
 
 namespace tgfx {
+
+/**
+ * Calculates the transformation matrix to be applied when drawing the image.
+ * @param contextMatrix The transformation matrix to be applied to the drawing environment.
+ * @param imageMatrix The transformation matrix of the image relative to the environment.
+ */
+static inline Matrix3D AdaptedImageMatrix(const Matrix3D& contextMatrix,
+                                          const Matrix& imageMatrix) {
+  // ContextMatrix describes a transformation based on the layer's coordinate system, but the
+  // rasterized content is only a small sub-rectangle within the layer. We need to calculate an
+  // equivalent affine transformation matrix referenced to the local coordinate system with the
+  // top-left vertex of this sub-rectangle as the origin.
+  auto adaptedMatrix = contextMatrix;
+  auto offsetMatrix =
+      Matrix3D::MakeTranslate(imageMatrix.getTranslateX(), imageMatrix.getTranslateY(), 0);
+  auto invOffsetMatrix =
+      Matrix3D::MakeTranslate(-imageMatrix.getTranslateX(), -imageMatrix.getTranslateY(), 0);
+  auto scaleMatrix = Matrix3D::MakeScale(imageMatrix.getScaleX(), imageMatrix.getScaleY(), 1.0f);
+  auto invScaleMatrix =
+      Matrix3D::MakeScale(1.0f / imageMatrix.getScaleX(), 1.0f / imageMatrix.getScaleY(), 1.0f);
+  return invScaleMatrix * invOffsetMatrix * adaptedMatrix * offsetMatrix * scaleMatrix;
+}
+
 void RasterizedContent::draw(Canvas* canvas, bool antiAlias, float alpha,
                              const std::shared_ptr<MaskFilter>& mask, BlendMode blendMode,
                              const Matrix3D* transform) const {
@@ -37,18 +60,7 @@ void RasterizedContent::draw(Canvas* canvas, bool antiAlias, float alpha,
   if (transform == nullptr) {
     canvas->drawImage(image, &paint);
   } else {
-    // Transform describes a transformation based on the layer's coordinate system, but the
-    // rasterized content is only a small sub-rectangle within the layer. We need to calculate an
-    // equivalent affine transformation matrix referenced to the local coordinate system with the
-    // top-left vertex of this sub-rectangle as the origin.
-    auto adaptedMatrix = *transform;
-    auto offsetMatrix = Matrix3D::MakeTranslate(matrix.getTranslateX(), matrix.getTranslateY(), 0);
-    auto invOffsetMatrix =
-        Matrix3D::MakeTranslate(-matrix.getTranslateX(), -matrix.getTranslateY(), 0);
-    auto scaleMatrix = Matrix3D::MakeScale(matrix.getScaleX(), matrix.getScaleY(), 1.0f);
-    auto invScaleMatrix =
-        Matrix3D::MakeScale(1.0f / matrix.getScaleX(), 1.0f / matrix.getScaleY(), 1.0f);
-    adaptedMatrix = invScaleMatrix * invOffsetMatrix * adaptedMatrix * offsetMatrix * scaleMatrix;
+    auto adaptedMatrix = AdaptedImageMatrix(*transform, matrix);
     // Layer visibility is handled in the CPU stage, update the matrix to keep the Z-axis of
     // vertices sent to the GPU at 0.
     adaptedMatrix.setRow(2, {0, 0, 0, 0});
@@ -60,4 +72,26 @@ void RasterizedContent::draw(Canvas* canvas, bool antiAlias, float alpha,
   }
   canvas->setMatrix(oldMatrix);
 }
+
+//TODO: Allpy antiAlias、alpha、mask、blendMode
+void RasterizedContent::draw(Render3DContext& context, bool, float,
+                             const std::shared_ptr<MaskFilter>&, BlendMode,
+                             const Matrix3D* transform) const {
+  if (transform == nullptr) {
+    DEBUG_ASSERT(false);
+    return;
+  }
+
+  auto adaptedMatrix = AdaptedImageMatrix(*transform, matrix);
+  // Apply depth matrix for 3D context
+  adaptedMatrix.postConcat(context.depthMatrix());
+
+  // Calculate the drawing offset in the compositor based on the final drawing area of the content
+  auto imageMappedRect = adaptedMatrix.mapRect(Rect::MakeWH(image->width(), image->height()));
+  auto x =
+      imageMappedRect.left + matrix.getTranslateX() * _contentScale - context.renderRect().left;
+  auto y = imageMappedRect.top + matrix.getTranslateY() * _contentScale - context.renderRect().top;
+  context.compositor()->drawImage(image, adaptedMatrix, x, y);
+}
+
 }  // namespace tgfx

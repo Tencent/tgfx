@@ -286,7 +286,8 @@ void Layer::setTransformStyle(TransformStyle style) {
     return;
   }
   _transformStyle = style;
-  invalidate();
+  // Changing the transform style affects layer layout, equivalent to a transform change.
+  invalidateTransform();
 }
 
 void Layer::setVisible(bool value) {
@@ -1268,7 +1269,13 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     auto maskMatrix = Matrix::MakeScale(1.0f / contentScale, 1.0f / contentScale);
     maskFilter = maskFilter->makeWithMatrix(maskMatrix);
   }
-  cache->draw(canvas, bitFields.allowsEdgeAntialiasing, alpha, maskFilter, blendMode, transform);
+  if (args.render3DContext != nullptr) {
+    cache->draw(*args.render3DContext, bitFields.allowsEdgeAntialiasing, alpha, maskFilter,
+                blendMode, transform);
+  } else {
+    cache->draw(canvas, bitFields.allowsEdgeAntialiasing, alpha, maskFilter, blendMode, transform);
+  }
+  //TODO: Draw cache of element in 3D rendering context for background
   if (args.blendModeBackground) {
     cache->draw(args.blendModeBackground->getCanvas(), bitFields.allowsEdgeAntialiasing, alpha,
                 maskFilter, blendMode, transform);
@@ -1382,11 +1389,11 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     // Calculate the drawing offset in the compositor based on the final drawing area of the content
     // on the canvas.
     //TODO: Decimal error.
-    auto imageCanvasOrigin = imageTransform.mapRect(Rect::MakeWH(image->width(), image->height()));
-    float x = imageCanvasOrigin.left + imageMatrix.getTranslateX() * contentScale -
-              args.render3DContext->renderRect().left;
-    float y = imageCanvasOrigin.top + imageMatrix.getTranslateY() * contentScale -
-              args.render3DContext->renderRect().top;
+    auto imageMappedRect = imageTransform.mapRect(Rect::MakeWH(image->width(), image->height()));
+    auto x = imageMappedRect.left + imageMatrix.getTranslateX() * contentScale -
+             args.render3DContext->renderRect().left;
+    auto y = imageMappedRect.top + imageMatrix.getTranslateY() * contentScale -
+             args.render3DContext->renderRect().top;
     //TODO: Clip image with clipBounds.
     args.render3DContext->compositor()->drawImage(image, imageTransform, x, y);
   }

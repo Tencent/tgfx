@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "layers/Render3DContext.h"
 #include "tgfx/core/Canvas.h"
 
 namespace tgfx {
@@ -50,6 +51,10 @@ class RasterizedContent {
 
   void draw(Canvas* canvas, bool antiAlias, float alpha, const std::shared_ptr<MaskFilter>& mask,
             BlendMode blendMode = BlendMode::SrcOver, const Matrix3D* transform = nullptr) const;
+
+  void draw(Render3DContext& context, bool antiAlias, float alpha,
+            const std::shared_ptr<MaskFilter>& mask, BlendMode blendMode = BlendMode::SrcOver,
+            const Matrix3D* transform = nullptr) const;
 
  private:
   uint32_t _contextID = 0;
