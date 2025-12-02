@@ -222,6 +222,7 @@ void DisplayList::setTileSize(int tileSize) {
     return;
   }
   _tileSize = tileSize;
+  layerCache->setAtlasTileSize(tileSize);
   if (_renderMode == RenderMode::Tiled) {
     resetCaches();
   }
@@ -244,22 +245,6 @@ size_t DisplayList::layerCacheMaxSize() const {
 
 void DisplayList::setLayerCacheMaxSize(size_t maxSize) {
   layerCache->setMaxCacheSize(maxSize);
-}
-
-int DisplayList::maxCacheContentSize() const {
-  return layerCache->maxCacheContentSize();
-}
-
-void DisplayList::setMaxCacheContentSize(int maxSize) {
-  layerCache->setMaxCacheContentSize(maxSize);
-}
-
-float DisplayList::maxCacheContentScale() const {
-  return layerCache->maxCacheContentScale();
-}
-
-void DisplayList::setMaxCacheContentScale(float maxScale) {
-  layerCache->setMaxCacheContentScale(maxScale);
 }
 
 void DisplayList::showDirtyRegions(bool show) {
@@ -302,6 +287,9 @@ void DisplayList::render(Surface* surface, bool autoClear) {
     }
     return;
   }
+  if (layerCache) {
+    layerCache->advanceFrameAndPurge();
+  }
   switch (_renderMode) {
     case RenderMode::Direct:
       dirtyRegions = renderDirect(surface, autoClear);
@@ -316,6 +304,7 @@ void DisplayList::render(Surface* surface, bool autoClear) {
   if (_showDirtyRegions) {
     renderDirtyRegions(surface->getCanvas(), std::move(dirtyRegions));
   }
+  layerCache->advanceFrameAndPurge();
 }
 
 std::vector<Rect> DisplayList::renderDirect(Surface* surface, bool autoClear) const {

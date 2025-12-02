@@ -1344,12 +1344,12 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     return false;
   }
 
-  if (!args.layerCache) {
+  if (!args.layerCache || !args.layerCache->canContinueCaching()) {
     return false;
   }
 
-  auto maxCacheSize = static_cast<float>(args.layerCache->maxCacheContentSize());
-  auto maxCacheScale = args.layerCache->maxCacheContentScale();
+  auto maxCacheSize = static_cast<float>(args.layerCache->atlasTileSize());
+  auto maxCacheScale = 0.5f;
 
   auto scaledBounds = renderBounds;
   scaledBounds.scale(contentScale, contentScale);

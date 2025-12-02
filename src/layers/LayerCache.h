@@ -30,8 +30,10 @@ class Image;
 class ColorSpace;
 class Matrix;
 class Context;
+class Surface;
 
 struct CacheEntry;
+struct AtlasRegion;
 
 /**
  * LayerCache manages RasterizedContent caches for layers with LRU eviction policy.
@@ -115,55 +117,78 @@ class LayerCache {
   void setContext(Context* context);
 
   /**
-   * Sets the maximum size of rasterized layer content (in pixels) that can be cached.
-   * Layers with rasterized bounds larger than this size will not be cached.
-   * @param maxSize Maximum width or height in pixels. Default is 64 pixels.
+   * Returns the number of frames after which unused cached layers are considered expired.
+   * The default value is 120 frames. This is similar to ResourceCache's expiration mechanism.
    */
-  void setMaxCacheContentSize(int maxSize) {
-    if (maxSize < 0) {
-      maxSize = 0;
-    }
-    _maxCacheContentSize = maxSize;
+  size_t expirationFrames() const {
+    return _expirationFrames;
   }
 
   /**
-   * Returns the maximum size of rasterized layer content that can be cached.
+   * Sets the number of frames after which unused cached layers are considered expired.
+   * Cached entries that haven't been accessed for more than this many frames will be removed
+   * during the next call to advanceFrameAndPurge().
    */
-  int maxCacheContentSize() const {
-    return _maxCacheContentSize;
-  }
+  void setExpirationFrames(size_t frames);
 
   /**
-   * Sets the maximum content scale for layer caching. Layers with content scale greater than
-   * this value will not be cached to avoid excessive memory usage at high zoom levels.
-   * @param maxScale Maximum content scale. Default is 0.3.
+   * Advances the frame counter and removes expired cached entries. This should be called once per
+   * frame to maintain proper cache expiration. Entries that haven't been accessed for more than
+   * expirationFrames() frames will be removed. Also reorganizes and recycles atlas surfaces if
+   * they become too sparse with unused tiles.
    */
-  void setMaxCacheContentScale(float maxScale) {
-    if (maxScale < 0) {
-      maxScale = 0;
-    }
-    _maxCacheContentScale = maxScale;
-  }
+  void advanceFrameAndPurge();
+
+   int atlasTileSize() const;
 
   /**
-   * Returns the maximum content scale for layer caching.
+   * Sets the tile size for the atlas. This should be set to match the DisplayList's tile size
+   * to optimize cache efficiency. Default is 256 pixels. If the computed atlas size is less than
+   * tileSize, atlas caching will be disabled.
    */
-  float maxCacheContentScale() const {
-    return _maxCacheContentScale;
-  }
+  void setAtlasTileSize(int tileSize);
+
+  /**
+   * Checks if the cache can continue caching more images. Returns false if no free tiles are
+   * available in the atlas or if atlas caching is disabled. This method does not modify the cache
+   * state and assumes all images are smaller than the tile size.
+   *
+   * @return true if at least one free tile is available, false otherwise
+   */
+  bool canContinueCaching() const;
 
  private:
   Context* _context = nullptr;
   size_t _maxCacheSize = 0;
   size_t _currentCacheSize = 0;
   std::shared_ptr<ColorSpace> _colorSpace;
-  int _maxCacheContentSize = 64;
-  float _maxCacheContentScale = 0.3f;
+  size_t _expirationFrames = 120;
+  uint64_t _frameCounter = 0;
 
   std::map<const Layer*, CacheEntry> _cacheMap;
   std::list<const Layer*> _accessList;
 
+  // Atlas related members
+  static constexpr int MAX_ATLAS_SIZE = 2048;
+  int _tileSize = 256;
+  struct AtlasInfo {
+    std::shared_ptr<Surface> surface;
+    std::shared_ptr<Image> image;
+    std::vector<bool> tileMap;
+    int width = 0;
+    int height = 0;
+  };
+  std::vector<AtlasInfo> _atlases = {};
+
   void evictLRU();
+  void purgeExpiredEntries();
+  void compactAtlases();
+  void initAtlases();
+  void clearAtlases();
+  std::shared_ptr<Image> getAtlasRegionImage(size_t atlasIndex, int tileX, int tileY);
+  bool allocateAtlasTile(size_t& outAtlasIndex, int& outTileX, int& outTileY);
+  void freeAtlasTile(size_t atlasIndex, int tileX, int tileY);
+  void calculateAtlasGridSize(int& width, int& height);
 };
 
 }  // namespace tgfx
