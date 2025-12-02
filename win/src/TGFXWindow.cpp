@@ -104,7 +104,7 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
       break;
     }
     case WM_LBUTTONUP: {
-      int count = hello2d::GetSampleCount();
+      int count = hello2d::LayerBuilder::Count();
       if (count > 0) {
         currentDrawerIndex = (currentDrawerIndex + 1) % count;
       }
@@ -144,7 +144,7 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
       gestureInfo.cbSize = sizeof(GESTUREINFO);
       if (GetGestureInfo(reinterpret_cast<HGESTUREINFO>(lparam), &gestureInfo)) {
         if (gestureInfo.dwID == GID_ZOOM) {
-          double currentArgument = gestureInfo.ullArguments;
+          double currentArgument = static_cast<double>(gestureInfo.ullArguments);
           float curZoom = displayList.zoomScale();
           auto offset = displayList.contentOffset();
           if (lastZoomArgument != 0.0) {
