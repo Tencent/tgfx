@@ -25,7 +25,7 @@ namespace tgfx {
 
 template <>
 RGBA4f<AlphaType::Unpremultiplied> RGBA4f<AlphaType::Unpremultiplied>::makeColorSpace(
-    const std::shared_ptr<ColorSpace>& dstColorSpace) const {
+    const std::shared_ptr<ColorSpace>& dstColorSpace, bool addColorSpaceRef) const {
   auto dstColor = *this;
   if (!NeedConvertColorSpace(colorSpace, dstColorSpace)) {
     return dstColor;
@@ -33,13 +33,16 @@ RGBA4f<AlphaType::Unpremultiplied> RGBA4f<AlphaType::Unpremultiplied>::makeColor
   ColorSpaceXformSteps steps(colorSpace.get(), AlphaType::Unpremultiplied, dstColorSpace.get(),
                              AlphaType::Unpremultiplied);
   steps.apply(dstColor.array());
-  dstColor.colorSpace = std::move(dstColorSpace);
+  if (addColorSpaceRef) {
+    dstColor.colorSpace = dstColorSpace;
+  }
+
   return dstColor;
 }
 
 template <>
 RGBA4f<AlphaType::Premultiplied> RGBA4f<AlphaType::Premultiplied>::makeColorSpace(
-    const std::shared_ptr<ColorSpace>& dstColorSpace) const {
+    const std::shared_ptr<ColorSpace>& dstColorSpace, bool addColorSpaceRef) const {
   auto dstColor = *this;
   if (!NeedConvertColorSpace(colorSpace.get(), dstColorSpace.get())) {
     return dstColor;
@@ -47,7 +50,9 @@ RGBA4f<AlphaType::Premultiplied> RGBA4f<AlphaType::Premultiplied>::makeColorSpac
   ColorSpaceXformSteps steps(colorSpace.get(), AlphaType::Premultiplied, dstColorSpace.get(),
                              AlphaType::Premultiplied);
   steps.apply(dstColor.array());
-  dstColor.colorSpace = std::move(dstColorSpace);
+  if (addColorSpaceRef) {
+    dstColor.colorSpace = dstColorSpace;
+  }
   return dstColor;
 }
 
