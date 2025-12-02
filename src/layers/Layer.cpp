@@ -1041,11 +1041,17 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
     }
     return;
   }
-  // The matrix acts on the anchor point at the origin of the layer's local coordinate system. If
-  // the w-component of this point after transformation is less than 0, it indicates the layer is
-  // behind the viewer, so the layer subtree is hidden.
-  if (transform != nullptr && transform->mapPoint(0, 0, 0, 1).w < 0) {
-    return;
+  // If the w-component of any point in contents after transformation is less than 0, it indicates
+  // the layer is behind the viewer, so the layer subtree should be hidden.
+  if (transform != nullptr) {
+    auto bounds = getBounds();
+    auto adaptedMatrix = anchorAdaptedMatrix(*transform, {bounds.left, bounds.top});
+    if (adaptedMatrix.mapPoint(0, 0, 0, 1).w <= 0 ||
+        adaptedMatrix.mapPoint(bounds.width(), 0, 0, 1).w <= 0 ||
+        adaptedMatrix.mapPoint(0, bounds.height(), 0, 1).w <= 0 ||
+        adaptedMatrix.mapPoint(bounds.width(), bounds.height(), 0, 1).w <= 0) {
+      return;
+    }
   }
   if (drawWithCache(args, canvas, alpha, blendMode, transform)) {
     return;

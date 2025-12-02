@@ -38,6 +38,10 @@ Transform3DImageFilter::Transform3DImageFilter(const Matrix3D& matrix, bool hide
 }
 
 Rect Transform3DImageFilter::onFilterBounds(const Rect& rect, MapDirection mapDirection) const {
+  if (_matrix.isIdentity()) {
+    return rect;
+  }
+
   if (mapDirection == MapDirection::Forward) {
     auto result = _matrix.mapRect(rect);
     return result;
