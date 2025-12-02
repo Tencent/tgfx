@@ -171,24 +171,24 @@ class LayerCache {
   // Atlas related members
   static constexpr int MAX_ATLAS_SIZE = 2048;
   int _tileSize = 256;
+  size_t _usedTileCount = 0;  // Track number of used tiles for fast canContinueCaching check
+  int _atlasWidth = 0;  // Configured atlas width, 0 means not initialized
+  int _atlasHeight = 0;  // Configured atlas height, 0 means not initialized
   struct AtlasInfo {
     std::shared_ptr<Surface> surface;
-    std::shared_ptr<Image> image;
     std::vector<bool> tileMap;
-    int width = 0;
-    int height = 0;
   };
   std::vector<AtlasInfo> _atlases = {};
 
   void evictLRU();
   void purgeExpiredEntries();
   void compactAtlases();
-  void initAtlases();
+  void calculateAtlasConfiguration();
   void clearAtlases();
   std::shared_ptr<Image> getAtlasRegionImage(size_t atlasIndex, int tileX, int tileY);
-  bool allocateAtlasTile(size_t& outAtlasIndex, int& outTileX, int& outTileY);
+  bool allocateAtlasTile(size_t* outAtlasIndex, int* outTileX, int* outTileY);
   void freeAtlasTile(size_t atlasIndex, int tileX, int tileY);
-  void calculateAtlasGridSize(int& width, int& height);
+  void calculateAtlasGridSize(int* width, int* height);
 };
 
 }  // namespace tgfx

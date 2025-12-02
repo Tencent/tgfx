@@ -32,8 +32,6 @@ namespace tgfx {
 
 struct CacheEntry {
   std::shared_ptr<RasterizedContent> content;
-  float contentScale = 0.0f;
-  size_t estimatedSize = 0;
   std::list<const Layer*>::iterator accessIterator;
   uint64_t lastUsedFrame = 0;
   size_t atlasIndex = static_cast<size_t>(-1);  // -1 means not allocated in atlas
@@ -41,15 +39,13 @@ struct CacheEntry {
   int atlasTileY = -1;
 };
 
-static size_t estimateImageSize(const Image* image) {
-  if (!image) {
-    return 0;
-  }
-  return static_cast<size_t>(image->width() * image->height() * 4);
-}
-
 LayerCache::LayerCache(size_t maxCacheSize, std::shared_ptr<ColorSpace> colorSpace)
     : _maxCacheSize(maxCacheSize), _colorSpace(std::move(colorSpace)) {
+}
+
+// Calculate cache entry size for atlas tile
+inline size_t getCacheEntrySize(int tileSize) {
+  return static_cast<size_t>(tileSize * tileSize * 4);
 }
 
 LayerCache::~LayerCache() = default;
@@ -59,6 +55,7 @@ void LayerCache::setMaxCacheSize(size_t maxSize) {
     return;
   }
   _maxCacheSize = maxSize;
+  calculateAtlasConfiguration();
   evictLRU();
 }
 
@@ -81,11 +78,7 @@ RasterizedContent* LayerCache::getCachedImage(const Layer* layer, float contentS
   }
 
   auto& entry = it->second;
-  if (entry.contentScale < contentScale) {
-    return nullptr;
-  }
-
-  if (!entry.content) {
+  if (!entry.content || entry.content->contentScale() < contentScale) {
     return nullptr;
   }
 
@@ -105,49 +98,48 @@ void LayerCache::cacheImage(const Layer* layer, float contentScale, std::shared_
 
   size_t atlasIndex = static_cast<size_t>(-1);
   int tileX = -1, tileY = -1;
-  std::shared_ptr<Image> cachedImage = image;
 
   // Try to use atlas if the image size fits within a tile
-  if (image->width() <= _tileSize && image->height() <= _tileSize &&
-      allocateAtlasTile(atlasIndex, tileX, tileY)) {
-    if (atlasIndex < _atlases.size() && _atlases[atlasIndex].surface) {
-      auto canvas = _atlases[atlasIndex].surface->getCanvas();
-      float drawX = tileX * _tileSize;
-      float drawY = tileY * _tileSize;
-      canvas->save();
-      canvas->translate(drawX, drawY);
-      canvas->drawImage(image);
-      canvas->restore();
-      cachedImage = getAtlasRegionImage(atlasIndex, tileX, tileY);
-      if (!cachedImage) {
-        freeAtlasTile(atlasIndex, tileX, tileY);
-        atlasIndex = static_cast<size_t>(-1);
-        tileX = -1;
-        tileY = -1;
-        cachedImage = image;
-      }
-    }
+  if (image->width() > _tileSize || image->height() > _tileSize ||
+      !allocateAtlasTile(&atlasIndex, &tileX, &tileY)) {
+    return;
+  }
+  DEBUG_ASSERT(atlasIndex < _atlases.size() && _atlases[atlasIndex].surface);
+  auto canvas = _atlases[atlasIndex].surface->getCanvas();
+  float drawX = static_cast<float>(tileX * _tileSize);
+  float drawY = static_cast<float>(tileY * _tileSize);
+  canvas->save();
+  canvas->translate(drawX, drawY);
+  canvas->clipRect(Rect::MakeWH(_tileSize, _tileSize));
+  canvas->clear();
+  canvas->drawImage(image);
+  canvas->restore();
+  auto cachedImage = getAtlasRegionImage(atlasIndex, tileX, tileY);
+  if (!cachedImage) {
+    freeAtlasTile(atlasIndex, tileX, tileY);
+    atlasIndex = static_cast<size_t>(-1);
+    tileX = -1;
+    tileY = -1;
+    return;
   }
 
-  auto rasterizedContent =
-      std::make_shared<RasterizedContent>(0, contentScale, std::move(cachedImage), imageMatrix);
-  size_t estimatedSize = estimateImageSize(rasterizedContent->getImage().get());
+  auto rasterizedContent = std::make_shared<RasterizedContent>(_context->uniqueID(), contentScale,
+                                                               std::move(cachedImage), imageMatrix);
 
   auto existingIt = _cacheMap.find(layer);
   if (existingIt != _cacheMap.end()) {
-    _currentCacheSize -= existingIt->second.estimatedSize;
+    _currentCacheSize -= getCacheEntrySize(_tileSize);
     _accessList.erase(existingIt->second.accessIterator);
     if (existingIt->second.atlasIndex != static_cast<size_t>(-1) &&
         existingIt->second.atlasTileX >= 0 && existingIt->second.atlasTileY >= 0) {
       freeAtlasTile(existingIt->second.atlasIndex, existingIt->second.atlasTileX,
                     existingIt->second.atlasTileY);
+      --_usedTileCount;
     }
   }
 
   CacheEntry entry;
   entry.content = rasterizedContent;
-  entry.contentScale = contentScale;
-  entry.estimatedSize = estimatedSize;
   entry.lastUsedFrame = _frameCounter;
   entry.atlasIndex = atlasIndex;
   entry.atlasTileX = tileX;
@@ -156,7 +148,10 @@ void LayerCache::cacheImage(const Layer* layer, float contentScale, std::shared_
   _cacheMap[layer] = entry;
   _accessList.push_back(layer);
   _cacheMap[layer].accessIterator = std::prev(_accessList.end());
-  _currentCacheSize += estimatedSize;
+  _currentCacheSize += getCacheEntrySize(_tileSize);
+  if (atlasIndex != static_cast<size_t>(-1) && tileX >= 0 && tileY >= 0) {
+    ++_usedTileCount;
+  }
 
   evictLRU();
 }
@@ -172,11 +167,12 @@ void LayerCache::invalidateLayer(const Layer* layer) {
   }
 
   auto& entry = it->second;
-  _currentCacheSize -= entry.estimatedSize;
+  _currentCacheSize -= getCacheEntrySize(_tileSize);
   _accessList.erase(entry.accessIterator);
   if (entry.atlasIndex != static_cast<size_t>(-1) && entry.atlasTileX >= 0 &&
       entry.atlasTileY >= 0) {
     freeAtlasTile(entry.atlasIndex, entry.atlasTileX, entry.atlasTileY);
+    --_usedTileCount;
   }
   _cacheMap.erase(it);
 }
@@ -185,6 +181,7 @@ void LayerCache::clear() {
   _cacheMap.clear();
   _accessList.clear();
   _currentCacheSize = 0;
+  _usedTileCount = 0;
   clearAtlases();
 }
 
@@ -193,11 +190,12 @@ void LayerCache::evictLRU() {
     const Layer* lruLayer = _accessList.front();
     auto it = _cacheMap.find(lruLayer);
     if (it != _cacheMap.end()) {
-      _currentCacheSize -= it->second.estimatedSize;
+      _currentCacheSize -= getCacheEntrySize(_tileSize);
       _accessList.erase(it->second.accessIterator);
       if (it->second.atlasIndex != static_cast<size_t>(-1) && it->second.atlasTileX >= 0 &&
           it->second.atlasTileY >= 0) {
         freeAtlasTile(it->second.atlasIndex, it->second.atlasTileX, it->second.atlasTileY);
+        --_usedTileCount;
       }
       _cacheMap.erase(it);
     }
@@ -210,9 +208,6 @@ void LayerCache::setContext(Context* context) {
   }
   _context = context;
   clear();
-  if (context) {
-    initAtlases();
-  }
 }
 
 void LayerCache::setExpirationFrames(size_t frames) {
@@ -235,7 +230,7 @@ void LayerCache::setAtlasTileSize(int tileSize) {
   }
   _tileSize = tileSize;
   clear();
-  initAtlases();
+  calculateAtlasConfiguration();
 }
 
 void LayerCache::advanceFrameAndPurge() {
@@ -250,11 +245,12 @@ void LayerCache::purgeExpiredEntries() {
   while (it != _cacheMap.end()) {
     auto& entry = it->second;
     if (_frameCounter - entry.lastUsedFrame > _expirationFrames) {
-      _currentCacheSize -= entry.estimatedSize;
+      _currentCacheSize -= getCacheEntrySize(_tileSize);
       _accessList.erase(entry.accessIterator);
       if (entry.atlasIndex != static_cast<size_t>(-1) && entry.atlasTileX >= 0 &&
           entry.atlasTileY >= 0) {
         freeAtlasTile(entry.atlasIndex, entry.atlasTileX, entry.atlasTileY);
+        --_usedTileCount;
       }
       it = _cacheMap.erase(it);
     } else {
@@ -263,56 +259,67 @@ void LayerCache::purgeExpiredEntries() {
   }
 }
 
-void LayerCache::calculateAtlasGridSize(int& width, int& height) {
-  // Calculate nearest rectangle dimensions with at least 2 atlases
-  // such that width * height >= 2 and both dimensions are as close as possible
-  width = 1;
-  height = 2;
-  int targetAtlasCount = 2;
+void LayerCache::calculateAtlasGridSize(int* width, int* height) {
+  // Calculate atlas grid dimensions based on max cache size
+  // maxCacheSize determines how many tiles we want to support
+  // Each tile takes tileSize*tileSize*4 bytes
+  size_t maxTileCount = _maxCacheSize / getCacheEntrySize(_tileSize);
+  
   int maxDim = MAX_ATLAS_SIZE / _tileSize;
-
-  // Find optimal grid dimensions
-  for (int w = 1; w * w <= targetAtlasCount * 4; ++w) {
-    if (w > maxDim) break;
-    for (int h = 1; h * w <= targetAtlasCount * 4; ++h) {
-      if (h > maxDim) break;
-      if (w * h >= targetAtlasCount && std::abs(w - h) < std::abs(width - height)) {
-        width = w;
-        height = h;
+  maxTileCount = std::min(static_cast<size_t>(maxDim * maxDim), maxTileCount);
+  
+  // Find optimal grid dimensions (width x height) such that width * height >= maxTileCount
+  // Prefer nearly-square dimensions, try to have at least 2 atlases
+  *width = 1;
+  *height = static_cast<int>(maxTileCount);  // Initial: 1 x maxTileCount
+  
+  int bestArea = *width * *height;
+  int bestDiff = std::abs(*width - *height);
+  int bestAtlasCount = 1;  // This grid fits in 1 atlas
+  
+  // Search for dimensions closer to square
+  for (int w = 1; w <= maxDim && w * w <= maxTileCount * 2; ++w) {
+    int h = (static_cast<int>(maxTileCount) + w - 1) / w;  // Ceiling division
+    if (h <= maxDim && w * h >= static_cast<int>(maxTileCount)) {
+      int area = w * h;
+      int diff = std::abs(w - h);
+      // Count atlases needed: each atlas can hold (w*h) tiles
+      // We want at least 2 atlases if possible
+      int atlasesNeeded = (area + w * h - 1) / (w * h);
+      
+      // Prefer more atlases (for parallelism), then prefer square-ish shape
+      if (atlasesNeeded > bestAtlasCount || 
+          (atlasesNeeded == bestAtlasCount && diff < bestDiff)) {
+        *width = w;
+        *height = h;
+        bestArea = area;
+        bestDiff = diff;
+        bestAtlasCount = atlasesNeeded;
       }
     }
   }
 }
 
-void LayerCache::initAtlases() {
+void LayerCache::calculateAtlasConfiguration() {
   if (!_context || _tileSize <= 0) {
     return;
   }
 
   int gridWidth = 1, gridHeight = 1;
-  calculateAtlasGridSize(gridWidth, gridHeight);
+  calculateAtlasGridSize(&gridWidth, &gridHeight);
 
-  int atlasSize = std::min(MAX_ATLAS_SIZE, gridWidth * _tileSize);
-  if (atlasSize < _tileSize) {
-    // Atlas size is smaller than tile size, disable atlas caching
+  // Calculate atlas dimensions (can be rectangular)
+  int atlasWidth = std::min(MAX_ATLAS_SIZE, gridWidth * _tileSize);
+  int atlasHeight = std::min(MAX_ATLAS_SIZE, gridHeight * _tileSize);
+
+  // Check if both dimensions are at least tile size
+  if (atlasWidth < _tileSize || atlasHeight < _tileSize) {
     return;
   }
 
-  auto atlasCount = static_cast<size_t>(gridWidth * gridHeight);
-  _atlases.resize(atlasCount);
-
-  for (size_t i = 0; i < atlasCount; ++i) {
-    auto& atlasInfo = _atlases[i];
-    atlasInfo.width = atlasSize;
-    atlasInfo.height = atlasSize;
-    atlasInfo.surface =
-        Surface::Make(_context, atlasSize, atlasSize, true, 1, false, 0, _colorSpace);
-    if (atlasInfo.surface) {
-      atlasInfo.image = atlasInfo.surface->makeImageSnapshot();
-      int tileCountPerDim = atlasSize / _tileSize;
-      atlasInfo.tileMap.resize(static_cast<size_t>(tileCountPerDim * tileCountPerDim), false);
-    }
-  }
+  // Store atlas configuration for lazy initialization
+  _atlasWidth = atlasWidth;
+  _atlasHeight = atlasHeight;
 }
 
 void LayerCache::clearAtlases() {
@@ -324,32 +331,71 @@ std::shared_ptr<Image> LayerCache::getAtlasRegionImage(size_t atlasIndex, int ti
     return nullptr;
   }
   auto& atlasInfo = _atlases[atlasIndex];
-  if (!atlasInfo.image || tileX < 0 || tileY < 0) {
+  if (!atlasInfo.surface || tileX < 0 || tileY < 0) {
     return nullptr;
   }
-  int tileCountPerDim = atlasInfo.width / _tileSize;
-  if (tileX >= tileCountPerDim || tileY >= tileCountPerDim) {
+  int tileCountX = atlasInfo.surface->width() / _tileSize;
+  int tileCountY = atlasInfo.surface->height() / _tileSize;
+  if (tileX >= tileCountX || tileY >= tileCountY) {
     return nullptr;
   }
-  Rect regionRect = Rect::MakeXYWH(tileX * _tileSize, tileY * _tileSize, _tileSize, _tileSize);
-  return atlasInfo.image->makeSubset(regionRect);
+  // Create a fresh snapshot to get the latest content
+  auto image = atlasInfo.surface->makeImageSnapshot();
+  if (!image) {
+    return nullptr;
+  }
+  Rect regionRect =
+      Rect::MakeXYWH(static_cast<float>(tileX * _tileSize), static_cast<float>(tileY * _tileSize),
+                     static_cast<float>(_tileSize), static_cast<float>(_tileSize));
+  return image->makeSubset(regionRect);
 }
 
-bool LayerCache::allocateAtlasTile(size_t& outAtlasIndex, int& outTileX, int& outTileY) {
+bool LayerCache::allocateAtlasTile(size_t* outAtlasIndex, int* outTileX, int* outTileY) {
+  // If atlas is not configured, fail
+  if (_atlasWidth <= 0 || _atlasHeight <= 0) {
+    return false;
+  }
+
+  // First, try to find an empty slot in existing atlases
   for (size_t atlasIdx = 0; atlasIdx < _atlases.size(); ++atlasIdx) {
     auto& atlasInfo = _atlases[atlasIdx];
-    int tileCountPerDim = atlasInfo.width / _tileSize;
+    int tileCountX = atlasInfo.surface->width() / _tileSize;
     for (size_t i = 0; i < atlasInfo.tileMap.size(); ++i) {
       if (!atlasInfo.tileMap[i]) {
         atlasInfo.tileMap[i] = true;
-        outAtlasIndex = atlasIdx;
-        outTileY = static_cast<int>(i) / tileCountPerDim;
-        outTileX = static_cast<int>(i) % tileCountPerDim;
+        *outAtlasIndex = atlasIdx;
+        *outTileY = static_cast<int>(i) / tileCountX;
+        *outTileX = static_cast<int>(i) % tileCountX;
         return true;
       }
     }
   }
-  return false;
+
+  // If all existing atlases are full, create a new one
+  if (!_context) {
+    return false;
+  }
+
+  auto newSurface =
+      Surface::Make(_context, _atlasWidth, _atlasHeight, false, 1, false, 0, _colorSpace);
+  if (!newSurface) {
+    return false;
+  }
+
+  int tileCountX = _atlasWidth / _tileSize;
+  int tileCountY = _atlasHeight / _tileSize;
+  int maxTilesPerAtlas = tileCountX * tileCountY;
+
+  AtlasInfo newAtlas;
+  newAtlas.surface = std::move(newSurface);
+  newAtlas.tileMap.resize(static_cast<size_t>(maxTilesPerAtlas), false);
+  newAtlas.tileMap[0] = true;  // Allocate first tile
+
+  *outAtlasIndex = _atlases.size();
+  _atlases.push_back(std::move(newAtlas));
+  *outTileY = 0;
+  *outTileX = 0;
+  return true;
 }
 
 void LayerCache::freeAtlasTile(size_t atlasIndex, int tileX, int tileY) {
@@ -357,9 +403,10 @@ void LayerCache::freeAtlasTile(size_t atlasIndex, int tileX, int tileY) {
     return;
   }
   auto& atlasInfo = _atlases[atlasIndex];
-  int tileCountPerDim = atlasInfo.width / _tileSize;
-  if (tileX >= 0 && tileY >= 0 && tileX < tileCountPerDim && tileY < tileCountPerDim) {
-    size_t index = static_cast<size_t>(tileY * tileCountPerDim + tileX);
+  int tileCountX = atlasInfo.surface->width() / _tileSize;
+  int tileCountY = atlasInfo.surface->height() / _tileSize;
+  if (tileX >= 0 && tileY >= 0 && tileX < tileCountX && tileY < tileCountY) {
+    size_t index = static_cast<size_t>(tileY * tileCountX + tileX);
     DEBUG_ASSERT(index < atlasInfo.tileMap.size());
     atlasInfo.tileMap[index] = false;
   }
@@ -370,15 +417,9 @@ bool LayerCache::canContinueCaching() const {
     // Atlas caching is disabled
     return false;
   }
-
-  for (const auto& atlasInfo : _atlases) {
-    for (bool tileUsed : atlasInfo.tileMap) {
-      if (!tileUsed) {
-        return true;
-      }
-    }
-  }
-  return false;
+  // Calculate max tile count based on max cache size
+  size_t maxTileCount = _maxCacheSize / getCacheEntrySize(_tileSize);
+  return _usedTileCount < maxTileCount;
 }
 
 void LayerCache::compactAtlases() {
@@ -394,6 +435,15 @@ void LayerCache::compactAtlases() {
 
   for (size_t i = 0; i < _atlases.size(); ++i) {
     const auto& atlasInfo = _atlases[i];
+    
+    // Check if atlas surface is still in use (use_count > 1 means external references exist)
+    // use_count == 1 means only _atlases holds the reference
+    if (atlasInfo.surface && atlasInfo.surface.use_count() == 1) {
+      // Atlas is not used elsewhere, can be recycled
+      atlasesToRecycle.push_back(i);
+      continue;
+    }
+    
     int usedTiles = 0;
     for (bool tileUsed : atlasInfo.tileMap) {
       if (tileUsed) {
@@ -401,8 +451,9 @@ void LayerCache::compactAtlases() {
       }
     }
 
-    float usageRatio =
-        atlasInfo.tileMap.empty() ? 0.0f : static_cast<float>(usedTiles) / atlasInfo.tileMap.size();
+    float usageRatio = atlasInfo.tileMap.empty() ? 0.0f
+                                                 : static_cast<float>(usedTiles) /
+                                                       static_cast<float>(atlasInfo.tileMap.size());
 
     // Keep atlas if it has reasonable usage or is the only one left
     if (usageRatio >= COMPACT_THRESHOLD || (atlasesToKeep.empty() && i == _atlases.size() - 1)) {
@@ -453,16 +504,15 @@ void LayerCache::compactAtlases() {
     AtlasInfo newAtlas;
     if (shouldRelocate && !tilesToRelocate.empty()) {
       // Create a new atlas for relocated tiles
-      int atlasSize = _atlases[atlasesToKeep[0]].width;
-      int tileCountPerDim = atlasSize / _tileSize;
-      int maxTilesPerAtlas = tileCountPerDim * tileCountPerDim;
+      int atlasWidth = _atlases[atlasesToKeep[0]].surface->width();
+      int atlasHeight = _atlases[atlasesToKeep[0]].surface->height();
+      int tileCountX = atlasWidth / _tileSize;
+      int tileCountY = atlasHeight / _tileSize;
+      int maxTilesPerAtlas = tileCountX * tileCountY;
 
-      newAtlas.width = atlasSize;
-      newAtlas.height = atlasSize;
       newAtlas.surface =
-          Surface::Make(_context, atlasSize, atlasSize, true, 1, false, 0, _colorSpace);
+          Surface::Make(_context, atlasWidth, atlasHeight, false, 1, false, 0, _colorSpace);
       if (newAtlas.surface) {
-        newAtlas.image = newAtlas.surface->makeImageSnapshot();
         newAtlas.tileMap.resize(static_cast<size_t>(maxTilesPerAtlas), false);
 
         // Redraw tiles into the new atlas
@@ -473,15 +523,15 @@ void LayerCache::compactAtlases() {
           size_t oldAtlasIdx = oldTile.first;
           int oldTileX = oldTile.second.first;
           int oldTileY = oldTile.second.second;
-          DEBUG_ASSERT(newTileIdx >= maxTilesPerAtlas);
+          DEBUG_ASSERT(newTileIdx < maxTilesPerAtlas);
 
           // Get the old tile image
           auto oldTileImage = getAtlasRegionImage(oldAtlasIdx, oldTileX, oldTileY);
           if (oldTileImage) {
-            int newTileX = newTileIdx % tileCountPerDim;
-            int newTileY = newTileIdx / tileCountPerDim;
-            float drawX = newTileX * _tileSize;
-            float drawY = newTileY * _tileSize;
+            int newTileX = newTileIdx % tileCountX;
+            int newTileY = newTileIdx / tileCountX;
+            float drawX = static_cast<float>(newTileX * _tileSize);
+            float drawY = static_cast<float>(newTileY * _tileSize);
 
             newCanvas->save();
             newCanvas->translate(drawX, drawY);
@@ -537,15 +587,17 @@ void LayerCache::compactAtlases() {
                 atlasIdx, std::make_pair(cacheIt->second.atlasTileX, cacheIt->second.atlasTileY));
             if (relocatedTiles.find(tileKey) == relocatedTiles.end()) {
               // This tile was not relocated, remove it
-              _currentCacheSize -= cacheIt->second.estimatedSize;
+              _currentCacheSize -= getCacheEntrySize(_tileSize);
               _accessList.erase(cacheIt->second.accessIterator);
+              --_usedTileCount;
               cacheIt = _cacheMap.erase(cacheIt);
               continue;
             }
           } else {
             // In non-relocation mode, remove all tiles from recycled atlases
-            _currentCacheSize -= cacheIt->second.estimatedSize;
+            _currentCacheSize -= getCacheEntrySize(_tileSize);
             _accessList.erase(cacheIt->second.accessIterator);
+            --_usedTileCount;
             cacheIt = _cacheMap.erase(cacheIt);
             continue;
           }
