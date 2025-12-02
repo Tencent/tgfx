@@ -82,33 +82,28 @@ struct RGBA4f {
   }
 
   /**
-   * Returns color value from 8-bit component values and ColorSpace.
+   * Returns color value from 8-bit component values. Color space is sRGB.
    */
-  static RGBA4f FromRGBA(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255,
-                         std::shared_ptr<ColorSpace> colorSpace = nullptr) {
+  static RGBA4f FromRGBA(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255) {
     return {static_cast<float>(r) / 255.0f, static_cast<float>(g) / 255.0f,
-            static_cast<float>(b) / 255.0f, a == 255 ? 1.0f : static_cast<float>(a) / 255.0f,
-            std::move(colorSpace)};
+            static_cast<float>(b) / 255.0f, a == 255 ? 1.0f : static_cast<float>(a) / 255.0f};
   }
 
   /**
    * Constructs an opaque white Color.
    */
-  RGBA4f() : red(1.0f), green(1.0f), blue(1.0f), alpha(1.0f), colorSpace(nullptr) {
+  RGBA4f() : red(1.0f), green(1.0f), blue(1.0f), alpha(1.0f) {
   }
 
   /**
-   * Constructs a Color with the specified red, green, blue, alpha values and colorSpace. If the
-   * color space is nullptr, it will be treated as sRGB.
+   * Constructs a Color with the specified red, green, blue, alpha values. Color space is sRGB.
    * @param r  red component
    * @param g  green component
    * @param b  blue component
    * @param a  alpha component
-   * @param colorSpace colorSpace of this color
    */
-  RGBA4f(float r, float g, float b, float a = 1.0f,
-         std::shared_ptr<ColorSpace> colorSpace = nullptr)
-      : red(r), green(g), blue(b), alpha(a), colorSpace(std::move(colorSpace)) {
+  RGBA4f(float r, float g, float b, float a = 1.0f)
+      : red(r), green(g), blue(b), alpha(a) {
   }
 
   /**
@@ -132,18 +127,10 @@ struct RGBA4f {
   float alpha;
 
   /**
-   * ColorSpace of this Color. If the color space is nullptr, it will be treated as sRGB.
-   */
-  std::shared_ptr<ColorSpace> colorSpace = nullptr;
-
-  /**
-   * Compares Color with other, and returns true if all components are equal. For performance
-   * reasons, the comparison of internal colorspaces is done by merely checking if the pointer
-   * addresses are equal.
+   * Compares Color with other, and returns true if all components are equal.
    */
   bool operator==(const RGBA4f& other) const {
-    return alpha == other.alpha && red == other.red && green == other.green && blue == other.blue &&
-           colorSpace == other.colorSpace;
+    return alpha == other.alpha && red == other.red && green == other.green && blue == other.blue;
   }
 
   /**
@@ -199,15 +186,10 @@ struct RGBA4f {
    * Returns a Color with the alpha set to 1.0.
    */
   RGBA4f makeOpaque() const {
-    return {red, green, blue, 1.0f, colorSpace};
+    return {red, green, blue, 1.0f};
   }
 
-  /**
-   * Return a new color that is the original color converted to the dst color space. If the
-   * dstColorSpace is nullptr, no convert.
-   */
-  RGBA4f makeColorSpace(const std::shared_ptr<ColorSpace>& dstColorSpace,
-                        bool addColorSpaceRef = true) const;
+
 
   /**
    * Returns a Color premultiplied by alpha. Asserts at compile time if RGBA4f is already
@@ -215,7 +197,7 @@ struct RGBA4f {
    */
   RGBA4f<AlphaType::Premultiplied> premultiply() const {
     static_assert(AT == AlphaType::Unpremultiplied);
-    return {red * alpha, green * alpha, blue * alpha, alpha, colorSpace};
+    return {red * alpha, green * alpha, blue * alpha, alpha};
   }
 
   /**
@@ -225,21 +207,13 @@ struct RGBA4f {
   RGBA4f<AlphaType::Unpremultiplied> unpremultiply() const {
     static_assert(AT == AlphaType::Premultiplied);
     if (alpha == 0.0f) {
-      return {0, 0, 0, 0, colorSpace};
+      return {0, 0, 0, 0};
     } else {
       float invAlpha = 1 / alpha;
-      return {red * invAlpha, green * invAlpha, blue * invAlpha, alpha, colorSpace};
+      return {red * invAlpha, green * invAlpha, blue * invAlpha, alpha};
     }
   }
 };
-
-template <>
-RGBA4f<AlphaType::Unpremultiplied> RGBA4f<AlphaType::Unpremultiplied>::makeColorSpace(
-    const std::shared_ptr<ColorSpace>& dstColorSpace, bool addColorSpaceRef) const;
-
-template <>
-RGBA4f<AlphaType::Premultiplied> RGBA4f<AlphaType::Premultiplied>::makeColorSpace(
-    const std::shared_ptr<ColorSpace>& dstColorSpace, bool addColorSpaceRef) const;
 
 /**
  * For convenience, Color is an alias for RGBA4f<AlphaType::Unpremultiplied>.

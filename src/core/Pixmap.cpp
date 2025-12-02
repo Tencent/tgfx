@@ -106,7 +106,7 @@ Color Pixmap::getColor(int x, int y) const {
   if (!readPixels(dstInfo, color, x, y)) {
     return Color::Transparent();
   }
-  return Color::FromRGBA(color[0], color[1], color[2], color[3], colorSpace());
+  return Color::FromRGBA(color[0], color[1], color[2], color[3]);
 }
 
 Pixmap Pixmap::makeSubset(const Rect& subset) const {

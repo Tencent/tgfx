@@ -18,6 +18,7 @@
 
 #include "GradientShader.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/ToPMColor.h"
 #include "core/utils/Types.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ShaderCaps.h"
@@ -146,7 +147,7 @@ static PlacementPtr<FragmentProcessor> MakeGradient(const Context* context,
   auto dstColors = shader.originalColors;
 
   for (auto& color : dstColors) {
-    color = color.makeColorSpace(std::move(dstColorSpace));
+    color = ConvertColor(color, dstColorSpace);
   }
   // All gradients are colorized the same way, regardless of layout
   PlacementPtr<FragmentProcessor> colorizer =

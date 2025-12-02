@@ -100,8 +100,8 @@ PlacementPtr<FragmentProcessor> DropShadowImageFilter::getShadowFragmentProcesso
     return nullptr;
   }
   auto allocator = args.context->drawingAllocator();
-  auto dstColor = ToPMColor(color, source->colorSpace());
-  auto colorProcessor = ConstColorProcessor::Make(allocator, dstColor, InputMode::Ignore);
+  auto dstColor = ConvertColor(color, source->colorSpace());
+  auto colorProcessor = ConstColorProcessor::Make(allocator, dstColor.premultiply(), InputMode::Ignore);
   return XfermodeFragmentProcessor::MakeFromTwoProcessors(
       allocator, std::move(colorProcessor), std::move(shadowProcessor), BlendMode::SrcIn);
 }

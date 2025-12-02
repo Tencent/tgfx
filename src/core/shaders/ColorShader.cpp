@@ -48,8 +48,8 @@ bool ColorShader::isEqual(const Shader* shader) const {
 
 PlacementPtr<FragmentProcessor> ColorShader::asFragmentProcessor(
     const FPArgs& args, const Matrix*, std::shared_ptr<ColorSpace> dstColorSpace) const {
-  auto dstColor = ToPMColor(color, std::move(dstColorSpace));
-  return ConstColorProcessor::Make(args.context->drawingAllocator(), dstColor,
+  auto dstColor = ConvertColor(color, std::move(dstColorSpace));
+  return ConstColorProcessor::Make(args.context->drawingAllocator(), dstColor.premultiply(),
                                    InputMode::ModulateA);
 }
 

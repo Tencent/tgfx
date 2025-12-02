@@ -186,7 +186,7 @@ Color Surface::getColor(int x, int y) {
   if (!readPixels(info, color, x, y)) {
     return Color::Transparent();
   }
-  return Color::FromRGBA(color[0], color[1], color[2], color[3], colorSpace());
+  return Color::FromRGBA(color[0], color[1], color[2], color[3]);
 }
 
 std::shared_ptr<SurfaceReadback> Surface::asyncReadPixels(const Rect& rect) {

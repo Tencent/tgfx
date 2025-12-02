@@ -19,6 +19,7 @@
 #include "RectsVertexProvider.h"
 #include <array>
 #include "core/utils/MathExtra.h"
+#include "core/utils/ToPMColor.h"
 #include "gpu/Quad.h"
 #include "tgfx/core/Stroke.h"
 
@@ -77,8 +78,7 @@ class AARectsVertexProvider : public RectsVertexProvider {
       auto& record = rects[i];
       PMColor dstColor;
       if (bitFields.hasColor) {
-        static std::shared_ptr<ColorSpace> p3CS = ColorSpace::DisplayP3();
-        dstColor = record->color.makeColorSpace(p3CS, false);
+        dstColor = ConvertPMColor(record->color, nullptr);
       }
       auto& viewMatrix = record->viewMatrix;
       auto& rect = record->rect;
@@ -157,7 +157,7 @@ class NonAARectsVertexProvider : public RectsVertexProvider {
       auto& record = rects[i];
       PMColor dstColor;
       if (bitFields.hasColor) {
-        dstColor = record->color.makeColorSpace(ColorSpace::DisplayP3());
+        dstColor = ConvertPMColor(record->color, nullptr);
       }
       auto& viewMatrix = record->viewMatrix;
       auto& rect = record->rect;
@@ -310,7 +310,7 @@ class AAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
       }
       PMColor dstColor;
       if (bitFields.hasColor) {
-        dstColor = record->color.makeColorSpace(ColorSpace::DisplayP3());
+        dstColor = ConvertPMColor(record->color, nullptr);
       }
       writeQuad(vertices, index, outOutsetQuad, uvQuad, dstColor, outerCoverage);
       if (isBevelJoin) {
@@ -491,7 +491,7 @@ class NonAAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
       }
       PMColor dstColor;
       if (bitFields.hasColor) {
-        dstColor = record->color.makeColorSpace(ColorSpace::DisplayP3());
+        dstColor = ConvertPMColor(record->color, nullptr);
       }
       writeQuad(vertices, index, outQuad, uvQuad, dstColor);
       if (lineJoin() == LineJoin::Bevel) {
@@ -546,7 +546,7 @@ class AARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
       const auto& record = rects[i];
       PMColor dstColor;
       if (bitFields.hasColor) {
-        dstColor = record->color.makeColorSpace(ColorSpace::DisplayP3());
+        dstColor = ConvertPMColor(record->color, nullptr);
       }
       auto viewMatrix = record->viewMatrix;
       auto scales = viewMatrix.getAxisScales();
@@ -694,7 +694,7 @@ class NonAARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
       const auto& record = rects[i];
       PMColor dstColor;
       if (bitFields.hasColor) {
-        dstColor = record->color.makeColorSpace(ColorSpace::DisplayP3());
+        dstColor = ConvertPMColor(record->color, nullptr);
       }
       auto viewMatrix = record->viewMatrix;
       auto scales = viewMatrix.getAxisScales();

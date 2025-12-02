@@ -20,6 +20,7 @@
 
 #include <optional>
 #include "core/utils/BlockAllocator.h"
+#include "core/utils/ToPMColor.h"
 #include "gpu/AAType.h"
 #include "gpu/VertexProvider.h"
 #include "tgfx/core/Color.h"
@@ -116,7 +117,7 @@ class RectsVertexProvider : public VertexProvider {
    * Returns the first color in the provider. If no color record exists, a white color is returned.
    */
   PMColor firstColor() const {
-    return rects.front()->color.makeColorSpace(ColorSpace::DisplayP3());
+    return ConvertPMColor(rects.front()->color, nullptr);
   }
 
   /**

@@ -56,7 +56,7 @@ std::shared_ptr<Surface> WebGLWindow::onCreateSurface(Context* context) {
   if (isP3Supported) {
     colorSpace = ColorSpace::DisplayP3();
   }
-  colorSpace = ColorSpace::DisplayP3();
+  colorSpace = nullptr;
   return Surface::MakeFrom(context, {glInfo, width, height}, ImageOrigin::BottomLeft, 0,
                            colorSpace);
 }

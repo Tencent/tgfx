@@ -18,6 +18,7 @@
 
 #include "RRectsVertexProvider.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/ToPMColor.h"
 
 namespace tgfx {
 // We have three possible cases for geometry for a round rect.
@@ -117,7 +118,7 @@ void RRectsVertexProvider::getVertices(float* vertices) const {
     auto& color = record->color;
     PMColor dstColor;
     if (bitFields.hasColor) {
-      dstColor = color.makeColorSpace(ColorSpace::DisplayP3());
+      dstColor = ConvertPMColor(color, nullptr);
     }
     auto scales = viewMatrix.getAxisScales();
     rRect.scale(scales.x, scales.y);
