@@ -41,6 +41,7 @@ struct CacheEntry {
 
 LayerCache::LayerCache(size_t maxCacheSize, std::shared_ptr<ColorSpace> colorSpace)
     : _maxCacheSize(maxCacheSize), _colorSpace(std::move(colorSpace)) {
+  calculateAtlasConfiguration();
 }
 
 // Calculate cache entry size for atlas tile
@@ -55,8 +56,8 @@ void LayerCache::setMaxCacheSize(size_t maxSize) {
     return;
   }
   _maxCacheSize = maxSize;
+  clear();
   calculateAtlasConfiguration();
-  evictLRU();
 }
 
 size_t LayerCache::maxCacheSize() const {
@@ -297,7 +298,7 @@ void LayerCache::calculateAtlasGridSize(int* width, int* height) {
 }
 
 void LayerCache::calculateAtlasConfiguration() {
-  if (!_context || _tileSize <= 0) {
+  if (_tileSize <= 0) {
     return;
   }
 
@@ -347,7 +348,6 @@ std::shared_ptr<Image> LayerCache::getAtlasRegionImage(size_t atlasIndex, int ti
 }
 
 bool LayerCache::allocateAtlasTile(size_t* outAtlasIndex, int* outTileX, int* outTileY) {
-  // If atlas is not configured, fail
   if (_atlasWidth <= 0 || _atlasHeight <= 0) {
     return false;
   }
@@ -409,10 +409,6 @@ void LayerCache::freeAtlasTile(size_t atlasIndex, int tileX, int tileY) {
 }
 
 bool LayerCache::canContinueCaching() const {
-  if (_atlases.empty()) {
-    // Atlas caching is disabled
-    return false;
-  }
   // Calculate max tile count based on max cache size
   size_t maxTileCount = _maxCacheSize / getCacheEntrySize(_tileSize);
   return _usedTileCount < maxTileCount;
