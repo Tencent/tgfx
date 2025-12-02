@@ -222,7 +222,7 @@ int LayerCache::atlasTileSize() const {
 }
 
 void LayerCache::setAtlasTileSize(int tileSize) {
-  if (tileSize <= 0 || tileSize > 2048) {
+  if (tileSize <= 0 || tileSize > MAX_ATLAS_SIZE) {
     return;
   }
   if (_tileSize == tileSize) {
@@ -264,35 +264,31 @@ void LayerCache::calculateAtlasGridSize(int* width, int* height) {
   // maxCacheSize determines how many tiles we want to support
   // Each tile takes tileSize*tileSize*4 bytes
   size_t maxTileCount = _maxCacheSize / getCacheEntrySize(_tileSize);
-  
+
   int maxDim = MAX_ATLAS_SIZE / _tileSize;
   maxTileCount = std::min(static_cast<size_t>(maxDim * maxDim), maxTileCount);
-  
+
   // Find optimal grid dimensions (width x height) such that width * height >= maxTileCount
   // Prefer nearly-square dimensions, try to have at least 2 atlases
   *width = 1;
   *height = static_cast<int>(maxTileCount);  // Initial: 1 x maxTileCount
-  
-  int bestArea = *width * *height;
+
   int bestDiff = std::abs(*width - *height);
   int bestAtlasCount = 1;  // This grid fits in 1 atlas
-  
+
   // Search for dimensions closer to square
-  for (int w = 1; w <= maxDim && w * w <= maxTileCount * 2; ++w) {
+  for (int w = 1; w <= maxDim && static_cast<size_t>(w * w) <= maxTileCount * 2; ++w) {
     int h = (static_cast<int>(maxTileCount) + w - 1) / w;  // Ceiling division
-    if (h <= maxDim && w * h >= static_cast<int>(maxTileCount)) {
-      int area = w * h;
+    if (h <= maxDim && static_cast<size_t>(w * h) >= maxTileCount) {
       int diff = std::abs(w - h);
       // Count atlases needed: each atlas can hold (w*h) tiles
       // We want at least 2 atlases if possible
-      int atlasesNeeded = (area + w * h - 1) / (w * h);
-      
+      int atlasesNeeded = (w * h + w * h - 1) / (w * h);
+
       // Prefer more atlases (for parallelism), then prefer square-ish shape
-      if (atlasesNeeded > bestAtlasCount || 
-          (atlasesNeeded == bestAtlasCount && diff < bestDiff)) {
+      if (atlasesNeeded > bestAtlasCount || (atlasesNeeded == bestAtlasCount && diff < bestDiff)) {
         *width = w;
         *height = h;
-        bestArea = area;
         bestDiff = diff;
         bestAtlasCount = atlasesNeeded;
       }
@@ -435,7 +431,7 @@ void LayerCache::compactAtlases() {
 
   for (size_t i = 0; i < _atlases.size(); ++i) {
     const auto& atlasInfo = _atlases[i];
-    
+
     // Check if atlas surface is still in use (use_count > 1 means external references exist)
     // use_count == 1 means only _atlases holds the reference
     if (atlasInfo.surface && atlasInfo.surface.use_count() == 1) {
@@ -443,7 +439,7 @@ void LayerCache::compactAtlases() {
       atlasesToRecycle.push_back(i);
       continue;
     }
-    
+
     int usedTiles = 0;
     for (bool tileUsed : atlasInfo.tileMap) {
       if (tileUsed) {
