@@ -21,16 +21,11 @@
 #include <cmath>
 #include "hello2d/LayerBuilder.h"
 #include "tgfx/core/Point.h"
-#include "tgfx/gpu/Recording.h"
 
 static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, const CVTimeStamp*,
                                       CVOptionFlags, CVOptionFlags*, void* userInfo) {
   TGFXView* view = (__bridge TGFXView*)userInfo;
-  dispatch_async(dispatch_get_main_queue(), ^{
-    if (![view draw]) {
-      [view stopDisplayLink];
-    }
-  });
+  [view draw];
   return kCVReturnSuccess;
 }
 
@@ -40,7 +35,6 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   tgfx::DisplayList displayList;
   std::shared_ptr<tgfx::Layer> contentLayer;
   int lastDrawIndex;
-  std::unique_ptr<tgfx::Recording> lastRecording;
 }
 
 - (BOOL)acceptsFirstResponder {
@@ -76,6 +70,10 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
     appHost->addTypeface("default", typeface);
     typeface = tgfx::Typeface::MakeFromName("Apple Color Emoji", "");
     appHost->addTypeface("emoji", typeface);
+    lastDrawIndex = -1;
+    displayList.setRenderMode(tgfx::RenderMode::Tiled);
+    displayList.setAllowZoomBlur(true);
+    displayList.setMaxTileCount(512);
   }
   if (tgfxWindow != nullptr) {
     tgfxWindow->invalidSize();
@@ -84,20 +82,37 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
 
 - (void)viewDidMoveToWindow {
   [super viewDidMoveToWindow];
+  
+  if (self.window == nil) {
+    if (@available(macOS 14, *)) {
+      if (self.caDisplayLink) {
+        self.caDisplayLink.paused = YES;
+        [self.caDisplayLink invalidate];
+        self.caDisplayLink = nil;
+      }
+    } else {
+      if (self.cvDisplayLink) {
+        CVDisplayLinkStop(self.cvDisplayLink);
+        CVDisplayLinkRelease(self.cvDisplayLink);
+        _cvDisplayLink = NULL;
+      }
+    }
+    return;
+  }
+  
   self.drawIndex = 0;
   self.zoomScale = 1.0f;
   self.contentOffset = CGPointZero;
-  lastDrawIndex = -1;
-  displayList.setRenderMode(tgfx::RenderMode::Tiled);
-  displayList.setAllowZoomBlur(true);
-  displayList.setMaxTileCount(512);
   [self.window makeFirstResponder:self];
 
   if (@available(macOS 14, *)) {
     self.caDisplayLink = [self displayLinkWithTarget:self selector:@selector(displayLinkCallback:)];
+    self.caDisplayLink.paused = YES;
+    [self.caDisplayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSRunLoopCommonModes];
   } else {
     CVDisplayLinkCreateWithActiveCGDisplays(&_cvDisplayLink);
     CVDisplayLinkSetOutputCallback(_cvDisplayLink, &OnDisplayLinkCallback, (__bridge void*)self);
+    CVDisplayLinkStart(self.cvDisplayLink);
   }
 
   [self updateSize];
@@ -106,12 +121,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
 - (void)startDisplayLink {
   if (@available(macOS 14, *)) {
     if (self.caDisplayLink) {
-      [self.caDisplayLink setPaused:NO];
-      [self.caDisplayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSRunLoopCommonModes];
-    }
-  } else {
-    if (self.cvDisplayLink) {
-      CVDisplayLinkStart(self.cvDisplayLink);
+      self.caDisplayLink.paused = NO;
     }
   }
 }
@@ -119,11 +129,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
 - (void)stopDisplayLink {
   if (@available(macOS 14, *)) {
     if (self.caDisplayLink) {
-      [self.caDisplayLink setPaused:YES];
-    }
-  } else {
-    if (self.cvDisplayLink) {
-      CVDisplayLinkStop(self.cvDisplayLink);
+      self.caDisplayLink.paused = YES;
     }
   }
 }
@@ -131,8 +137,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
 - (void)dealloc {
   if (@available(macOS 14, *)) {
     if (self.caDisplayLink) {
-      [self.caDisplayLink removeFromRunLoop:[NSRunLoop currentRunLoop]
-                                    forMode:NSRunLoopCommonModes];
+      self.caDisplayLink.paused = YES;
       [self.caDisplayLink invalidate];
       self.caDisplayLink = nil;
     }
@@ -140,16 +145,18 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
     if (self.cvDisplayLink) {
       CVDisplayLinkStop(self.cvDisplayLink);
       CVDisplayLinkRelease(self.cvDisplayLink);
+      _cvDisplayLink = NULL;
     }
   }
 }
+
 - (void)displayLinkCallback:(CADisplayLink*)displayLink {
   if (![self draw]) {
-    if (@available(macOS 14, *)) {
-      [displayLink setPaused:YES];
-    }
+    displayLink.paused = YES;
   }
 }
+
+
 
 - (BOOL)draw {
   if (self.window == nil) {
@@ -172,7 +179,6 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
     return false;
   }
 
-  // Switch sample when drawIndex changes
   auto numBuilders = hello2d::LayerBuilder::Count();
   auto index = (self.drawIndex % numBuilders);
   if (index != lastDrawIndex || !contentLayer) {
@@ -187,7 +193,6 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
     lastDrawIndex = index;
   }
 
-  // Calculate base scale and offset to fit 720x720 design size to window
   static constexpr float DESIGN_SIZE = 720.0f;
   auto scaleX = static_cast<float>(surface->width()) / DESIGN_SIZE;
   auto scaleY = static_cast<float>(surface->height()) / DESIGN_SIZE;
@@ -196,36 +201,57 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   auto baseOffsetX = (static_cast<float>(surface->width()) - scaledSize) * 0.5f;
   auto baseOffsetY = (static_cast<float>(surface->height()) - scaledSize) * 0.5f;
 
-  // Apply user zoom and offset on top of the base scale/offset
-  auto finalZoomScale = self.zoomScale * baseScale;
-  auto finalOffsetX = baseOffsetX + static_cast<float>(self.contentOffset.x);
-  auto finalOffsetY = baseOffsetY + static_cast<float>(self.contentOffset.y);
+  displayList.setZoomScale(self.zoomScale * baseScale);
+  displayList.setContentOffset(baseOffsetX + static_cast<float>(self.contentOffset.x),
+                               baseOffsetY + static_cast<float>(self.contentOffset.y));
 
-  displayList.setZoomScale(finalZoomScale);
-  displayList.setContentOffset(finalOffsetX, finalOffsetY);
-
-  // Draw background
   auto canvas = surface->getCanvas();
   canvas->clear();
-  auto backingScaleFactor = [self convertSizeToBacking:CGSizeMake(1.0, 1.0)].width;
-  hello2d::DrawBackground(canvas, surface->width(), surface->height(), backingScaleFactor);
+  hello2d::DrawBackground(canvas, surface->width(), surface->height(), self.layer.contentsScale);
 
-  // Render DisplayList
   displayList.render(surface.get(), false);
 
-  // Delayed one-frame present mode: flush + submit
-  auto recording = context->flush();
-  if (lastRecording) {
-    context->submit(std::move(lastRecording));
-    if (recording) {
-      tgfxWindow->present(context);
-    }
-  }
-  lastRecording = std::move(recording);
-
+  context->flushAndSubmit();
+  tgfxWindow->present(context);
   device->unlock();
-  
+
   return displayList.hasContentChanged();
+}
+
+- (void)mouseDown:(NSEvent *)event {
+  self.drawIndex++;
+  self.zoomScale = 1.0f;
+  self.contentOffset = CGPointZero;
+  [self startDisplayLink];
+}
+
+- (void)scrollWheel:(NSEvent *)event {
+  BOOL isCommandPressed = (event.modifierFlags & NSEventModifierFlagCommand) != 0;
+  BOOL isShiftPressed = (event.modifierFlags & NSEventModifierFlagShift) != 0;
+  
+  CGSize backingSize = [self convertSizeToBacking:CGSizeMake(1.0, 1.0)];
+  CGFloat backingScale = backingSize.height;
+  
+  if (isCommandPressed) {
+    CGFloat zoomStep = std::exp(event.deltaY / 400.0f);
+    CGPoint mousePoint = [self convertPoint:event.locationInWindow fromView:nil];
+    CGPoint backingPoint = [self convertPointToBacking:mousePoint];
+    float oldZoom = self.zoomScale;
+    self.zoomScale = std::clamp(self.zoomScale * static_cast<float>(zoomStep), 0.001f, 1000.0f);
+    CGPoint offset = self.contentOffset;
+    offset.x = backingPoint.x - ((backingPoint.x - offset.x) / oldZoom) * self.zoomScale;
+    offset.y = backingPoint.y - ((backingPoint.y - offset.y) / oldZoom) * self.zoomScale;
+    self.contentOffset = offset;
+  } else {
+    CGPoint offset = self.contentOffset;
+    if (isShiftPressed) {
+      offset.x += static_cast<float>(event.deltaX * backingScale);
+    } else {
+      offset.y -= static_cast<float>(event.deltaY * backingScale);
+    }
+    self.contentOffset = offset;
+  }
+  [self startDisplayLink];
 }
 
 @end

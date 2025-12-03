@@ -59,6 +59,8 @@ bool TGFXWindow::open() {
   centerAndShow();
   ShowWindow(windowHandle, SW_SHOW);
   UpdateWindow(windowHandle);
+  // Trigger initial paint
+  ::InvalidateRect(windowHandle, nullptr, FALSE);
   return true;
 }
 
@@ -101,7 +103,7 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
       if (tgfxWindow) {
         tgfxWindow->invalidSize();
       }
-      ::InvalidateRect(windowHandle, nullptr, TRUE);
+      ::InvalidateRect(windowHandle, nullptr, FALSE);
       break;
     case WM_PAINT: {
       PAINTSTRUCT ps;
@@ -110,19 +112,19 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
         bool hasContentChanged = draw();
         // Only invalidate again if content is still changing
         if (hasContentChanged) {
-          ::InvalidateRect(windowHandle, nullptr, TRUE);
+          ::InvalidateRect(windowHandle, nullptr, FALSE);
         }
       }
       EndPaint(hwnd, &ps);
       break;
     }
-    case WM_LBUTTONDOWN: {
+    case WM_LBUTTONUP: {
       int count = hello2d::LayerBuilder::Count();
       if (count > 0) {
         currentDrawerIndex = (currentDrawerIndex + 1) % count;
         zoomScale = 1.0f;
         contentOffset = {0.0f, 0.0f};
-        ::InvalidateRect(windowHandle, nullptr, TRUE);
+        ::InvalidateRect(windowHandle, nullptr, FALSE);
       }
       break;
     }
@@ -135,8 +137,10 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
       if (isCtrlPressed) {
         float zoomStep = std::exp(GET_WHEEL_DELTA_WPARAM(wparam) / WHEEL_RATIO);
         float newZoom = std::clamp(zoomScale * zoomStep, MIN_ZOOM, MAX_ZOOM);
-        contentOffset.x = mousePoint.x - ((mousePoint.x - contentOffset.x) / zoomScale) * newZoom;
-        contentOffset.y = mousePoint.y - ((mousePoint.y - contentOffset.y) / zoomScale) * newZoom;
+        // Store old zoom for offset calculation
+        float oldZoom = zoomScale;
+        contentOffset.x = mousePoint.x - ((mousePoint.x - contentOffset.x) / oldZoom) * newZoom;
+        contentOffset.y = mousePoint.y - ((mousePoint.y - contentOffset.y) / oldZoom) * newZoom;
         zoomScale = newZoom;
       } else {
         float wheelDelta = static_cast<float>(GET_WHEEL_DELTA_WPARAM(wparam));
@@ -146,7 +150,7 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
           contentOffset.y -= wheelDelta;
         }
       }
-      ::InvalidateRect(windowHandle, nullptr, TRUE);
+      ::InvalidateRect(windowHandle, nullptr, FALSE);
       break;
     }
     case WM_GESTURE: {
@@ -160,8 +164,9 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
             POINT mousePoint = {GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
             ScreenToClient(hwnd, &mousePoint);
             float newZoom = std::clamp(zoomScale * static_cast<float>(zoomFactor), MIN_ZOOM, MAX_ZOOM);
-            contentOffset.x = mousePoint.x - ((mousePoint.x - contentOffset.x) / zoomScale) * newZoom;
-            contentOffset.y = mousePoint.y - ((mousePoint.y - contentOffset.y) / zoomScale) * newZoom;
+            float oldZoom = zoomScale;
+            contentOffset.x = mousePoint.x - ((mousePoint.x - contentOffset.x) / oldZoom) * newZoom;
+            contentOffset.y = mousePoint.y - ((mousePoint.y - contentOffset.y) / oldZoom) * newZoom;
             zoomScale = newZoom;
           }
           lastZoomArgument = currentArgument;
@@ -170,7 +175,7 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
           lastZoomArgument = 0.0;
         }
         CloseGestureInfoHandle(reinterpret_cast<HGESTUREINFO>(lparam));
-        ::InvalidateRect(windowHandle, nullptr, TRUE);
+        ::InvalidateRect(windowHandle, nullptr, FALSE);
       }
       break;
     }
@@ -339,8 +344,12 @@ bool TGFXWindow::draw() {
   auto baseOffsetY = (static_cast<float>(surface->height()) - scaledSize) * 0.5f;
 
   // Apply user zoom and offset on top of the base scale/offset
-  displayList.setZoomScale(zoomScale * baseScale);
-  displayList.setContentOffset(baseOffsetX + contentOffset.x, baseOffsetY + contentOffset.y);
+  auto finalZoomScale = zoomScale * baseScale;
+  auto finalOffsetX = baseOffsetX + contentOffset.x;
+  auto finalOffsetY = baseOffsetY + contentOffset.y;
+
+  displayList.setZoomScale(finalZoomScale);
+  displayList.setContentOffset(finalOffsetX, finalOffsetY);
 
   // Draw background
   auto canvas = surface->getCanvas();

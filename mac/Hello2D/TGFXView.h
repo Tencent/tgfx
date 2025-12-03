@@ -31,9 +31,9 @@
 @property(nonatomic) float zoomScale;
 @property(nonatomic) CGPoint contentOffset;
 @property(nonatomic) CVDisplayLinkRef cvDisplayLink;
-@property(nonatomic, strong) CADisplayLink* caDisplayLink;
+@property(nonatomic, strong) CADisplayLink* caDisplayLink API_AVAILABLE(macos(14.0));
 
-- (bool)draw;
+- (BOOL)draw;
 - (void)startDisplayLink;
 - (void)stopDisplayLink;
 
