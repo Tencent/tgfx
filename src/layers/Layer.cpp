@@ -544,7 +544,19 @@ bool Layer::replaceChild(std::shared_ptr<Layer> oldChild, std::shared_ptr<Layer>
 
 Rect Layer::getBounds(const Layer* targetCoordinateSpace, bool computeTightBounds) {
   auto matrix = getRelativeMatrix(targetCoordinateSpace);
-  return getBoundsInternal(matrix, computeTightBounds);
+  if (computeTightBounds || bitFields.dirtyDescendents) {
+    return getBoundsInternal(matrix, computeTightBounds);
+  }
+  if (!localBounds) {
+    localBounds = std::make_unique<Rect>(getBoundsInternal(Matrix3D::I(), computeTightBounds));
+  }
+  auto result = matrix.mapRect(*localBounds);
+  if (!IsMatrix3DAffine(matrix)) {
+    // while the matrix is not affine, the layer will draw with a 3D filter, so the bounds should
+    // round out.
+    result.roundOut();
+  }
+  return result;
 }
 
 Rect Layer::getBoundsInternal(const Matrix3D& coordinateMatrix, bool computeTightBounds) {
@@ -813,6 +825,7 @@ void Layer::invalidateDescendents() {
   }
   bitFields.dirtyDescendents = true;
   rasterizedContent = nullptr;
+  localBounds = nullptr;
   invalidate();
 }
 
@@ -2034,8 +2047,8 @@ void Layer::propagateLayerState() {
 }
 
 bool Layer::hasBackgroundStyle() {
-  if (!bitFields.dirtyDescendents && maxBackgroundOutset > 0) {
-    return true;
+  if (!bitFields.dirtyDescendents) {
+    return maxBackgroundOutset > 0;
   }
   for (const auto& style : _layerStyles) {
     if (style->extraSourceType() == LayerStyleExtraSourceType::Background) {
