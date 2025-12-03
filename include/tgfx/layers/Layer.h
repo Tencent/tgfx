@@ -717,8 +717,9 @@ class Layer : public std::enable_shared_from_this<Layer> {
   float _rasterizationScale = 0.0f;
   std::unique_ptr<RasterizedContent> rasterizedContent;
   std::shared_ptr<LayerContent> layerContent = nullptr;
-  Rect renderBounds = {};         // in global coordinates
-  Rect* contentBounds = nullptr;  //  in global coordinates
+  Rect renderBounds = {};                          // in global coordinates
+  Rect* contentBounds = nullptr;                   //  in global coordinates
+  std::optional<Rect> localBounds = std::nullopt;  // in local coordinates
 
   // if > 0, means the layer or any of its descendants has a background style
   float maxBackgroundOutset = 0.f;
