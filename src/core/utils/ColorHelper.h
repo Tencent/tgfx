@@ -19,5 +19,7 @@
 #pragma once
 #include "tgfx/core/Color.h"
 namespace tgfx {
-PMColor ToPMColor(const Color& color, std::shared_ptr<ColorSpace> dstColorSpace);
+PMColor ToPMColor(const Color& color, const std::shared_ptr<ColorSpace>& dstColorSpace);
+
+Color ConvertColorSpace(const Color& color, const std::shared_ptr<ColorSpace>& dstColorSpace);
 }  // namespace tgfx

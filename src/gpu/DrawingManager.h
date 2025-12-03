@@ -51,10 +51,10 @@ class DrawingManager {
   bool fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarget,
                     PlacementPtr<FragmentProcessor> processor, uint32_t renderFlags);
 
-  std::shared_ptr<OpsCompositor> addOpsCompositor(std::shared_ptr<RenderTargetProxy> renderTarget,
-                                                  uint32_t renderFlags,
-                                                  std::optional<PMColor> clearColor = std::nullopt,
-                                                  std::shared_ptr<ColorSpace> colorSpace = nullptr);
+  std::shared_ptr<OpsCompositor> addOpsCompositor(
+      std::shared_ptr<RenderTargetProxy> renderTarget, uint32_t renderFlags,
+      std::optional<PMColor> clearColor = std::nullopt,
+      const std::shared_ptr<ColorSpace>& colorSpace = nullptr);
 
   void addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTarget,
                         PlacementArray<DrawOp> drawOps, std::optional<PMColor> clearColor);

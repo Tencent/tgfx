@@ -197,9 +197,9 @@ static SamplingOptions GetSamplingOptions(const std::shared_ptr<ScalerContext>& 
 
 RenderContext::RenderContext(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags,
                              bool clearAll, Surface* surface,
-                             std::shared_ptr<ColorSpace> colorSpace)
+                             const std::shared_ptr<ColorSpace>& colorSpace)
     : renderTarget(std::move(proxy)), renderFlags(renderFlags), surface(surface),
-      _colorSpace(std::move(colorSpace)) {
+      _colorSpace(colorSpace) {
   if (clearAll) {
     auto drawingManager = renderTarget->getContext()->drawingManager();
     opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags,

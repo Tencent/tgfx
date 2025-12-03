@@ -20,11 +20,11 @@
 #include "core/PathRasterizer.h"
 #include "core/PathRef.h"
 #include "core/PathTriangulator.h"
+#include "core/utils/ColorHelper.h"
 #include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/RectToRectMatrix.h"
 #include "core/utils/ShapeUtils.h"
-#include "core/utils/ToPMColor.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ops/AtlasTextOp.h"
@@ -59,9 +59,9 @@ static bool HasDifferentViewMatrix(const std::vector<PlacementPtr<RectRecord>>& 
 
 OpsCompositor::OpsCompositor(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags,
                              std::optional<PMColor> clearColor,
-                             std::shared_ptr<ColorSpace> colorSpace)
+                             const std::shared_ptr<ColorSpace>& colorSpace)
     : context(proxy->getContext()), renderTarget(std::move(proxy)), renderFlags(renderFlags),
-      clearColor(clearColor), dstColorSpace(std::move(colorSpace)) {
+      clearColor(clearColor), dstColorSpace(colorSpace) {
   DEBUG_ASSERT(renderTarget != nullptr);
 }
 

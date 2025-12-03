@@ -81,13 +81,13 @@ class ImageGenerator {
   /**
    * Return the ColorSpace of this ImageGenerator
    */
-  std::shared_ptr<ColorSpace> colorSpace() const {
+  const std::shared_ptr<ColorSpace>& colorSpace() const {
     return _colorSpace;
   }
 
  protected:
-  ImageGenerator(int width, int height, std::shared_ptr<ColorSpace> colorSpace = nullptr)
-      : _width(width), _height(height), _colorSpace(std::move(colorSpace)) {
+  ImageGenerator(int width, int height, const std::shared_ptr<ColorSpace>& colorSpace = nullptr)
+      : _width(width), _height(height), _colorSpace(colorSpace) {
   }
 
   virtual std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const = 0;

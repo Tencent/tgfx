@@ -28,72 +28,71 @@
 namespace tgfx {
 std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, bool alphaOnly,
                                        int sampleCount, bool mipmapped, uint32_t renderFlags,
-                                       std::shared_ptr<ColorSpace> colorSpace) {
+                                       const std::shared_ptr<ColorSpace>& colorSpace) {
   return Make(context, width, height, alphaOnly ? ColorType::ALPHA_8 : ColorType::RGBA_8888,
-              sampleCount, mipmapped, renderFlags, std::move(colorSpace));
+              sampleCount, mipmapped, renderFlags, colorSpace);
 }
 
 std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, ColorType colorType,
                                        int sampleCount, bool mipmapped, uint32_t renderFlags,
-                                       std::shared_ptr<ColorSpace> colorSpace) {
+                                       const std::shared_ptr<ColorSpace>& colorSpace) {
   if (context == nullptr) {
     return nullptr;
   }
   auto pixelFormat = ColorTypeToPixelFormat(colorType);
   auto proxy = context->proxyProvider()->createRenderTargetProxy({}, width, height, pixelFormat,
                                                                  sampleCount, mipmapped);
-  return MakeFrom(std::move(proxy), renderFlags, true, std::move(colorSpace));
+  return MakeFrom(std::move(proxy), renderFlags, true, colorSpace);
 }
 
 std::shared_ptr<Surface> Surface::MakeFrom(Context* context,
                                            const BackendRenderTarget& renderTarget,
                                            ImageOrigin origin, uint32_t renderFlags,
-                                           std::shared_ptr<ColorSpace> colorSpace) {
+                                           const std::shared_ptr<ColorSpace>& colorSpace) {
   if (context == nullptr) {
     return nullptr;
   }
   auto proxy = RenderTargetProxy::MakeFrom(context, renderTarget, origin);
-  return MakeFrom(std::move(proxy), renderFlags, false, std::move(colorSpace));
+  return MakeFrom(std::move(proxy), renderFlags, false, colorSpace);
 }
 
 std::shared_ptr<Surface> Surface::MakeFrom(Context* context, const BackendTexture& backendTexture,
                                            ImageOrigin origin, int sampleCount,
                                            uint32_t renderFlags,
-                                           std::shared_ptr<ColorSpace> colorSpace) {
+                                           const std::shared_ptr<ColorSpace>& colorSpace) {
   if (context == nullptr) {
     return nullptr;
   }
   auto proxy =
       context->proxyProvider()->createRenderTargetProxy(backendTexture, sampleCount, origin);
-  return MakeFrom(std::move(proxy), renderFlags, false, std::move(colorSpace));
+  return MakeFrom(std::move(proxy), renderFlags, false, colorSpace);
 }
 
 std::shared_ptr<Surface> Surface::MakeFrom(Context* context, HardwareBufferRef hardwareBuffer,
                                            int sampleCount, uint32_t renderFlags,
-                                           std::shared_ptr<ColorSpace> colorSpace) {
+                                           const std::shared_ptr<ColorSpace>& colorSpace) {
   if (context == nullptr) {
     return nullptr;
   }
   auto proxy = context->proxyProvider()->createRenderTargetProxy(hardwareBuffer, sampleCount);
-  return MakeFrom(std::move(proxy), renderFlags, false, std::move(colorSpace));
+  return MakeFrom(std::move(proxy), renderFlags, false, colorSpace);
 }
 
 std::shared_ptr<Surface> Surface::MakeFrom(std::shared_ptr<RenderTargetProxy> renderTargetProxy,
                                            uint32_t renderFlags, bool clearAll,
-                                           std::shared_ptr<ColorSpace> colorSpace) {
+                                           const std::shared_ptr<ColorSpace>& colorSpace) {
   if (renderTargetProxy == nullptr) {
     return nullptr;
   }
   return std::shared_ptr<Surface>(
-      new Surface(std::move(renderTargetProxy), renderFlags, clearAll, std::move(colorSpace)));
+      new Surface(std::move(renderTargetProxy), renderFlags, clearAll, colorSpace));
 }
 
 Surface::Surface(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags, bool clearAll,
-                 std::shared_ptr<ColorSpace> colorSpace)
+                 const std::shared_ptr<ColorSpace>& colorSpace)
     : _uniqueID(UniqueID::Next()) {
   DEBUG_ASSERT(proxy != nullptr);
-  renderContext =
-      new RenderContext(std::move(proxy), renderFlags, clearAll, this, std::move(colorSpace));
+  renderContext = new RenderContext(std::move(proxy), renderFlags, clearAll, this, colorSpace);
 }
 
 Surface::~Surface() {
@@ -182,11 +181,11 @@ std::shared_ptr<Image> Surface::makeImageSnapshot() {
 Color Surface::getColor(int x, int y) {
   uint8_t color[4];
   auto info =
-      ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Premultiplied, 0, colorSpace());
+      ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Premultiplied, 0, ColorSpace::SRGB());
   if (!readPixels(info, color, x, y)) {
     return Color::Transparent();
   }
-  return Color::FromRGBA(color[0], color[1], color[2], color[3], colorSpace());
+  return Color::FromRGBA(color[0], color[1], color[2], color[3]);
 }
 
 std::shared_ptr<SurfaceReadback> Surface::asyncReadPixels(const Rect& rect) {
@@ -240,7 +239,7 @@ bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, in
   return true;
 }
 
-std::shared_ptr<ColorSpace> Surface::colorSpace() const {
+const std::shared_ptr<ColorSpace>& Surface::colorSpace() const {
   return renderContext->colorSpace();
 }
 

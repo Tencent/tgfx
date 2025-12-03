@@ -42,7 +42,7 @@ class DecodedImage : public PixelImage {
     return _alphaOnly;
   }
 
-  std::shared_ptr<ColorSpace> colorSpace() const override {
+  const std::shared_ptr<ColorSpace>& colorSpace() const override {
     return _colorSpace;
   }
 
@@ -64,6 +64,6 @@ class DecodedImage : public PixelImage {
 
   DecodedImage(int width, int height, bool alphaOnly,
                std::shared_ptr<DataSource<ImageBuffer>> source, bool mipmapped,
-               std::shared_ptr<ColorSpace> colorSpace = nullptr);
+               const std::shared_ptr<ColorSpace>& colorSpace = nullptr);
 };
 }  // namespace tgfx

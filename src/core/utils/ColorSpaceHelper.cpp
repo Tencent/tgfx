@@ -126,19 +126,18 @@ gfx::skcms_ICCProfile ToSkcmsICCProfile(std::shared_ptr<ColorSpace> colorSpace) 
   return profile;
 }
 
-bool NeedConvertColorSpace(std::shared_ptr<ColorSpace> src, std::shared_ptr<ColorSpace> dst) {
+bool NeedConvertColorSpace(const std::shared_ptr<ColorSpace>& src,
+                           const std::shared_ptr<ColorSpace>& dst) {
   if (dst == nullptr) {
     return false;
   }
-  if (src == nullptr) {
-    src = ColorSpace::SRGB();
-  }
-  return !ColorSpace::Equals(src.get(), dst.get());
+  ColorSpace* newSrc = src ? src.get() : ColorSpace::SRGB().get();
+  return !ColorSpace::Equals(newSrc, dst.get());
 }
 
 void ConvertColorSpaceInPlace(int width, int height, ColorType colorType, AlphaType alphaType,
-                              size_t rowBytes, std::shared_ptr<ColorSpace> srcCS,
-                              std::shared_ptr<ColorSpace> dstCS, void* pixels) {
+                              size_t rowBytes, const std::shared_ptr<ColorSpace>& srcCS,
+                              const std::shared_ptr<ColorSpace>& dstCS, void* pixels) {
   if (!NeedConvertColorSpace(srcCS, dstCS)) {
     return;
   }

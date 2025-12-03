@@ -43,7 +43,7 @@ class ImageInfo {
    */
   static ImageInfo Make(int width, int height, ColorType colorType,
                         AlphaType alphaType = AlphaType::Premultiplied, size_t rowBytes = 0,
-                        std::shared_ptr<ColorSpace> colorSpace = nullptr);
+                        const std::shared_ptr<ColorSpace>& colorSpace = nullptr);
 
   static size_t GetBytesPerPixel(ColorType colorType);
 
@@ -131,7 +131,7 @@ class ImageInfo {
   /**
    * Returns ColorSpace of this ImageInfo.
    */
-  std::shared_ptr<ColorSpace> colorSpace() const {
+  const std::shared_ptr<ColorSpace>& colorSpace() const {
     return _colorSpace;
   }
 

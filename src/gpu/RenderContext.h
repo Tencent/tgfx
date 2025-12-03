@@ -28,7 +28,7 @@ class RenderContext : public DrawContext {
  public:
   RenderContext(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags,
                 bool clearAll = false, Surface* surface = nullptr,
-                std::shared_ptr<ColorSpace> colorSpace = nullptr);
+                const std::shared_ptr<ColorSpace>& colorSpace = nullptr);
 
   Context* getContext() const {
     return renderTarget->getContext();
@@ -68,7 +68,7 @@ class RenderContext : public DrawContext {
    */
   bool flush();
 
-  std::shared_ptr<ColorSpace> colorSpace() const {
+  const std::shared_ptr<ColorSpace>& colorSpace() const {
     return _colorSpace;
   }
 

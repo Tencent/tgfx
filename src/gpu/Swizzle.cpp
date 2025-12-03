@@ -72,6 +72,6 @@ PMColor Swizzle::applyTo(const PMColor& color) const {
   k >>= 4;
   idx = static_cast<int>(k & 15);
   float outA = ComponentIdxToFloat(color, idx);
-  return {outR, outG, outB, outA, color.colorSpace};
+  return {outR, outG, outB, outA};
 }
 }  // namespace tgfx

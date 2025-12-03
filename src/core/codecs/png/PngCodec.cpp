@@ -235,7 +235,7 @@ std::shared_ptr<ImageCodec> PngCodec::MakeFromData(const std::string& filePath,
   }
   return std::shared_ptr<ImageCodec>(new PngCodec(static_cast<int>(w), static_cast<int>(h),
                                                   Orientation::TopLeft, isAlphaOnly, filePath,
-                                                  std::move(byteData), std::move(cs)));
+                                                  std::move(byteData), cs));
 }
 
 static void UpdateReadInfo(png_structp p, png_infop pi) {

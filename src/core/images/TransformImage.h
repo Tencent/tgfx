@@ -41,7 +41,7 @@ class TransformImage : public Image {
     return source->isAlphaOnly();
   }
 
-  std::shared_ptr<ColorSpace> colorSpace() const override {
+  const std::shared_ptr<ColorSpace>& colorSpace() const override {
     return source->colorSpace();
   }
 

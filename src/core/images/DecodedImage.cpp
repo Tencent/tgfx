@@ -42,9 +42,9 @@ std::shared_ptr<Image> DecodedImage::MakeFrom(std::shared_ptr<ImageGenerator> ge
 
 DecodedImage::DecodedImage(int width, int height, bool alphaOnly,
                            std::shared_ptr<DataSource<ImageBuffer>> source, bool mipmapped,
-                           std::shared_ptr<ColorSpace> colorSpace)
+                           const std::shared_ptr<ColorSpace>& colorSpace)
     : PixelImage(mipmapped), _width(width), _height(height), _alphaOnly(alphaOnly),
-      source(std::move(source)), _colorSpace(std::move(colorSpace)) {
+      source(std::move(source)), _colorSpace(colorSpace) {
 }
 
 std::shared_ptr<TextureProxy> DecodedImage::lockTextureProxy(const TPArgs& args) const {

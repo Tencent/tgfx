@@ -49,7 +49,7 @@ class Surface {
   static std::shared_ptr<Surface> Make(Context* context, int width, int height,
                                        bool alphaOnly = false, int sampleCount = 1,
                                        bool mipmapped = false, uint32_t renderFlags = 0,
-                                       std::shared_ptr<ColorSpace> colorSpace = nullptr);
+                                       const std::shared_ptr<ColorSpace>& colorSpace = nullptr);
 
   /**
    * Creates a new Surface on GPU indicated by context. Allocates memory for pixels based on the
@@ -60,7 +60,7 @@ class Surface {
   static std::shared_ptr<Surface> Make(Context* context, int width, int height, ColorType colorType,
                                        int sampleCount = 1, bool mipmapped = false,
                                        uint32_t renderFlags = 0,
-                                       std::shared_ptr<ColorSpace> colorSpace = nullptr);
+                                       const std::shared_ptr<ColorSpace>& colorSpace = nullptr);
 
   /**
    * Wraps a backend render target into Surface. The caller must ensure the renderTarget is valid
@@ -70,7 +70,7 @@ class Surface {
   static std::shared_ptr<Surface> MakeFrom(Context* context,
                                            const BackendRenderTarget& renderTarget,
                                            ImageOrigin origin, uint32_t renderFlags = 0,
-                                           std::shared_ptr<ColorSpace> colorSpace = nullptr);
+                                           const std::shared_ptr<ColorSpace>& = nullptr);
 
   /**
    * Wraps a BackendTexture into the Surface. The caller must ensure the texture is valid for the
@@ -81,7 +81,7 @@ class Surface {
   static std::shared_ptr<Surface> MakeFrom(Context* context, const BackendTexture& backendTexture,
                                            ImageOrigin origin, int sampleCount = 1,
                                            uint32_t renderFlags = 0,
-                                           std::shared_ptr<ColorSpace> colorSpace = nullptr);
+                                           const std::shared_ptr<ColorSpace>& = nullptr);
 
   /**
    * Creates a Surface from the platform-specific hardware buffer. For example, the hardware buffer
@@ -91,7 +91,7 @@ class Surface {
    */
   static std::shared_ptr<Surface> MakeFrom(Context* context, HardwareBufferRef hardwareBuffer,
                                            int sampleCount = 1, uint32_t renderFlags = 0,
-                                           std::shared_ptr<ColorSpace> colorSpace = nullptr);
+                                           const std::shared_ptr<ColorSpace>& = nullptr);
 
   virtual ~Surface();
 
@@ -189,7 +189,7 @@ class Surface {
   /**
    * Returns the colorSpace of the surface.
    */
-  std::shared_ptr<ColorSpace> colorSpace() const;
+  const std::shared_ptr<ColorSpace>& colorSpace() const;
 
  private:
   uint32_t _uniqueID = 0;
@@ -199,10 +199,10 @@ class Surface {
 
   static std::shared_ptr<Surface> MakeFrom(std::shared_ptr<RenderTargetProxy> renderTargetProxy,
                                            uint32_t renderFlags = 0, bool clearAll = false,
-                                           std::shared_ptr<ColorSpace> colorSpace = nullptr);
+                                           const std::shared_ptr<ColorSpace>& colorSpace = nullptr);
 
   Surface(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags = 0, bool clearAll = false,
-          std::shared_ptr<ColorSpace> colorSpace = nullptr);
+          const std::shared_ptr<ColorSpace>& colorSpace = nullptr);
 
   bool aboutToDraw(bool discardContent = false);
 

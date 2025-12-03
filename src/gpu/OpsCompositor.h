@@ -46,7 +46,7 @@ class OpsCompositor {
    */
   OpsCompositor(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags,
                 std::optional<PMColor> clearColor = std::nullopt,
-                std::shared_ptr<ColorSpace> colorSpace = nullptr);
+                const std::shared_ptr<ColorSpace>& colorSpace = nullptr);
 
   /**
    * Fills the given image with the given sampling options, state and fill.

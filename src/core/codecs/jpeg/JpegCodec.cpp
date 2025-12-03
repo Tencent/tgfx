@@ -133,9 +133,9 @@ std::shared_ptr<ImageCodec> JpegCodec::MakeFromData(const std::string& filePath,
   if (cinfo.image_width == 0 || cinfo.image_height == 0) {
     return nullptr;
   }
-  return std::shared_ptr<ImageCodec>(
-      new JpegCodec(static_cast<int>(cinfo.image_width), static_cast<int>(cinfo.image_height),
-                    orientation, filePath, std::move(byteData), std::move(cs)));
+  return std::shared_ptr<ImageCodec>(new JpegCodec(static_cast<int>(cinfo.image_width),
+                                                   static_cast<int>(cinfo.image_height),
+                                                   orientation, filePath, std::move(byteData), cs));
 }
 
 bool ConvertCMYKPixels(void* dst, const gfx::skcms_ICCProfile cmykProfile,
