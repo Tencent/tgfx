@@ -637,8 +637,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
                     const std::unordered_set<LayerStyleExtraSourceType>& styleExtraSourceTypes,
                     bool excludeChildren);
 
-  void drawOffscreenSeparateContentChildren(const DrawArgs& args, Canvas* canvas, float alpha,
-                                            BlendMode blendMode, const Matrix3D* transform);
+  void drawIn3DContext(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
+                       const Matrix3D* transform);
 
   void drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, float alpha,
                                BlendMode blendMode, const Matrix3D* transform);

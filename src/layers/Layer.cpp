@@ -1053,9 +1053,11 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
       return;
     }
   }
+
   if (drawWithCache(args, canvas, alpha, blendMode, transform)) {
     return;
   }
+
   if (blendMode != BlendMode::SrcOver || !bitFields.passThroughBackground ||
       (alpha < 1.0f && bitFields.allowsGroupOpacity) || bitFields.shouldRasterize ||
       (!_filters.empty() && !args.excludeEffects) || hasValidMask() ||
@@ -1066,12 +1068,11 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
              _parent->_transformStyle == TransformStyle::Flat) {
     // Enable 3D Render Context when conditions are met, rendering eligible subsequent layers as a
     // complete context.
-    DEBUG_ASSERT(args.render3DContext == nullptr);
     drawByStarting3DContext(args, canvas, alpha, blendMode, transform);
   } else if (transform != nullptr) {
     // When applying 3D transformations within 3D render context, content needs offscreen rendering
     // while environment matrix should be passed to child layers.
-    drawOffscreenSeparateContentChildren(args, canvas, alpha, blendMode, transform);
+    drawIn3DContext(args, canvas, alpha, blendMode, transform);
   } else {
     // draw directly
     drawDirectly(args, canvas, alpha);
@@ -1444,8 +1445,8 @@ void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha,
                excludeChildren);
 }
 
-void Layer::drawOffscreenSeparateContentChildren(const DrawArgs& args, Canvas* canvas, float alpha,
-                                                 BlendMode blendMode, const Matrix3D* transform) {
+void Layer::drawIn3DContext(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
+                            const Matrix3D* transform) {
   // Draw Content and Style, directly apply environment 3D matrix for offscreen drawing.
   drawOffscreen(args, canvas, alpha, blendMode, transform, true);
   // Draw child layers, offscreen rendering with environment 3D matrix and child's own matrix
@@ -1472,6 +1473,7 @@ class LayerBrushModifier : public BrushModifier {
 
 void Layer::drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, float alpha,
                                     BlendMode blendMode, const Matrix3D* transform) {
+  DEBUG_ASSERT(args.render3DContext == nullptr);
   auto context = canvas->getSurface() ? canvas->getSurface()->getContext() : nullptr;
   if (context == nullptr) {
     DEBUG_ASSERT(false);
@@ -1490,7 +1492,7 @@ void Layer::drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, float 
   auto context3DArgs = args;
   context3DArgs.render3DContext = std::make_shared<Render3DContext>(
       compositor, *validRenderRect, calculate3DContextDepthMatrix());
-  drawOffscreenSeparateContentChildren(context3DArgs, canvas, alpha, blendMode, transform);
+  drawIn3DContext(context3DArgs, canvas, alpha, blendMode, transform);
   auto context3DImage = compositor->finish();
 
   // The final texture has been scaled proportionally during generation, so draw it at its actual
@@ -1502,6 +1504,26 @@ void Layer::drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, float 
   imageMatrix.preTranslate(validRenderRect->left, validRenderRect->top);
   canvas->concat(imageMatrix);
   canvas->drawImage(context3DImage);
+
+  // Draw the context3DImage to blendModeBackground and blurBackground after drawing to canvas
+  Paint paint = {};
+  paint.setAntiAlias(bitFields.allowsEdgeAntialiasing);
+  paint.setAlpha(alpha);
+  paint.setBlendMode(blendMode);
+
+  if (args.blendModeBackground) {
+    auto blendCanvas = args.blendModeBackground->getCanvas();
+    AutoCanvasRestore autoRestoreBlend(blendCanvas);
+    blendCanvas->concat(imageMatrix);
+    blendCanvas->drawImage(context3DImage, &paint);
+  }
+
+  if (args.blurBackground) {
+    auto backgroundCanvas = args.blurBackground->getCanvas();
+    AutoCanvasRestore autoRestoreBg(backgroundCanvas);
+    backgroundCanvas->concat(imageMatrix);
+    backgroundCanvas->drawImage(context3DImage, &paint);
+  }
 }
 
 void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
