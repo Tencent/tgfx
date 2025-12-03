@@ -693,6 +693,9 @@ class Layer : public std::enable_shared_from_this<Layer> {
    */
   Matrix3D anchorAdaptedMatrix(const Matrix3D& matrix, const Point& anchor) const;
 
+
+  void invalidateCache();
+
   struct {
     bool dirtyContent : 1;        // layer's content needs updating
     bool dirtyContentBounds : 1;  // layer's content bounds needs updating

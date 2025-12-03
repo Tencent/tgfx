@@ -19,6 +19,7 @@
 #include "layers/LayerCache.h"
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include "contents/RasterizedContent.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Matrix.h"
@@ -31,6 +32,7 @@ struct CacheEntry {
   float contentScale = 0.0f;
   size_t estimatedSize = 0;
   std::list<const Layer*>::iterator accessIterator;
+  std::weak_ptr<void> lastAccessFrameToken;
 };
 
 static size_t estimateImageSize(const Image* image) {
@@ -41,6 +43,7 @@ static size_t estimateImageSize(const Image* image) {
 }
 
 LayerCache::LayerCache(size_t maxCacheSize) : _maxCacheSize(maxCacheSize) {
+  _currentFrameToken = std::make_shared<int>(0);
 }
 
 LayerCache::~LayerCache() = default;
@@ -61,6 +64,30 @@ size_t LayerCache::currentCacheSize() const {
   return _currentCacheSize;
 }
 
+size_t LayerCache::expirationFrames() const {
+  return _expirationFrames;
+}
+
+void LayerCache::setExpirationFrames(size_t frames) {
+  if (_expirationFrames == frames) {
+    return;
+  }
+  _expirationFrames = frames;
+  while (_frameTokens.size() > _expirationFrames) {
+    _frameTokens.pop_front();
+  }
+  purgeExpiredEntries();
+}
+
+void LayerCache::advanceFrame() {
+  _frameTokens.push_back(_currentFrameToken);
+  while (_frameTokens.size() > _expirationFrames) {
+    _frameTokens.pop_front();
+  }
+  _currentFrameToken = std::make_shared<int>(0);
+  purgeExpiredEntries();
+}
+
 RasterizedContent* LayerCache::getCachedImage(const Layer* layer, float contentScale) {
   if (layer == nullptr) {
     return nullptr;
@@ -79,6 +106,9 @@ RasterizedContent* LayerCache::getCachedImage(const Layer* layer, float contentS
   if (!entry.content) {
     return nullptr;
   }
+
+  // Update last access frame
+  entry.lastAccessFrameToken = _currentFrameToken;
 
   _accessList.erase(entry.accessIterator);
   _accessList.push_back(layer);
@@ -107,6 +137,7 @@ void LayerCache::cacheImage(const Layer* layer, float contentScale, std::shared_
   entry.content = rasterizedContent;
   entry.contentScale = contentScale;
   entry.estimatedSize = estimatedSize;
+  entry.lastAccessFrameToken = _currentFrameToken;
 
   _cacheMap[layer] = entry;
   _accessList.push_back(layer);
@@ -146,6 +177,24 @@ void LayerCache::evictLRU() {
       _currentCacheSize -= it->second.estimatedSize;
       _accessList.erase(it->second.accessIterator);
       _cacheMap.erase(it);
+    }
+  }
+}
+
+void LayerCache::purgeExpiredEntries() {
+  if (_expirationFrames == 0) {
+    return;
+  }
+
+  auto it = _cacheMap.begin();
+  while (it != _cacheMap.end()) {
+    auto& entry = it->second;
+    if (entry.lastAccessFrameToken.expired()) {
+      _currentCacheSize -= entry.estimatedSize;
+      _accessList.erase(entry.accessIterator);
+      it = _cacheMap.erase(it);
+    } else {
+      ++it;
     }
   }
 }

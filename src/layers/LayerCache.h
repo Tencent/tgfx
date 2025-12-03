@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <deque>
 #include <list>
 #include <map>
 #include <memory>
@@ -36,6 +37,8 @@ struct CacheEntry;
 /**
  * LayerCache manages RasterizedContent caches for layers with LRU eviction policy.
  * When the cache size exceeds the maximum limit, least recently used entries are evicted.
+ * Additionally, cache entries that haven't been accessed for more than a specified number of frames
+ * are automatically purged.
  *
  * This cache stores RasterizedContent directly (wrapping Image + Matrix).
  * Each layer can have at most one cached RasterizedContent per content scale.
@@ -73,6 +76,25 @@ class LayerCache {
    * Returns the current total size of cached content in bytes.
    */
   size_t currentCacheSize() const;
+
+  /**
+   * Returns the number of frames after which unused cache entries are considered expired.
+   * Default value is 10 frames.
+   */
+  size_t expirationFrames() const;
+
+  /**
+   * Sets the number of frames after which unused cache entries are considered expired.
+   * When advanceFrame() is called, entries that haven't been accessed within this number
+   * of frames will be automatically purged from the cache.
+   */
+  void setExpirationFrames(size_t frames);
+
+  /**
+   * Advances the frame counter and purges cache entries that have expired.
+   * This should be called once per frame/render cycle.
+   */
+  void advanceFrame();
 
   /**
    * Gets cached RasterizedContent for the specified layer if it exists and the cached content scale
@@ -132,12 +154,17 @@ class LayerCache {
  private:
   size_t _maxCacheSize = 0;
   size_t _currentCacheSize = 0;
+  size_t _expirationFrames = 100;  // Default: 10 frames before expiration
   int _maxCacheContentSize = 256.f;
+
+  std::deque<std::shared_ptr<void>> _frameTokens;
+  std::shared_ptr<void> _currentFrameToken;
 
   std::map<const Layer*, CacheEntry> _cacheMap;
   std::list<const Layer*> _accessList;
 
   void evictLRU();
+  void purgeExpiredEntries();
 };
 
 }  // namespace tgfx

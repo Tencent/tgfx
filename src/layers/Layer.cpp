@@ -391,7 +391,7 @@ void Layer::setLayerStyles(std::vector<std::shared_ptr<LayerStyle>> value) {
   for (const auto& layerStyle : _layerStyles) {
     layerStyle->attachToLayer(this);
   }
-  rasterizedContent = nullptr;
+  invalidateCache();
   invalidateTransform();
 }
 
@@ -820,7 +820,7 @@ void Layer::invalidateDescendents() {
     return;
   }
   bitFields.dirtyDescendents = true;
-  rasterizedContent = nullptr;
+  invalidateCache();
   localBounds = nullptr;
   invalidate();
 }
@@ -2003,7 +2003,7 @@ void Layer::updateBackgroundBounds(float contentScale) {
   if (backgroundChanged) {
     auto layer = this;
     while (layer && !layer->bitFields.dirtyDescendents) {
-      layer->rasterizedContent = nullptr;
+      layer->invalidateCache();
       if (layer->maskOwner) {
         break;
       }
@@ -2076,6 +2076,13 @@ Matrix3D Layer::anchorAdaptedMatrix(const Matrix3D& matrix, const Point& anchor)
   auto offsetMatrix = Matrix3D::MakeTranslate(anchor.x, anchor.y, 0);
   auto invOffsetMatrix = Matrix3D::MakeTranslate(-anchor.x, -anchor.y, 0);
   return invOffsetMatrix * matrix * offsetMatrix;
+}
+
+void Layer::invalidateCache() {
+  rasterizedContent = nullptr;
+  if (_root) {
+    _root->invalidCache(this);
+  }
 }
 
 }  // namespace tgfx

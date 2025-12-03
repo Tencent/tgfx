@@ -243,6 +243,7 @@ void DisplayList::setTileSize(int tileSize) {
     return;
   }
   _tileSize = tileSize;
+  layerCache->setMaxCacheContentSize(tileSize);
   if (_renderMode == RenderMode::Tiled) {
     resetCaches();
   }
@@ -409,6 +410,9 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
   if (!surfaceCaches.empty() && surfaceCaches.front()->getContext() != surface->getContext()) {
     resetCaches();
   }
+  layerCache->advanceFrame();
+  auto context = surface->getContext();
+  layerCache->setExpirationFrames(context->resourceCache()->expirationFrames());
   checkTileCount(surface);
   auto tileTasks = invalidateTileCaches(dirtyRegions);
   auto screenTasks = collectScreenTasks(surface, &tileTasks);
