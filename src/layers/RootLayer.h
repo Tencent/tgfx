@@ -84,9 +84,12 @@ class RootLayer : public Layer {
                  const Matrix3D* transform = nullptr) override;
 
  private:
+  explicit RootLayer(DisplayList* displayList) : displayList(displayList) {
+  }
   std::vector<Rect> dirtyRects = {};
   std::vector<float> dirtyAreas = {};
   Color _backgroundColor = Color::Transparent();
+  DisplayList* displayList = nullptr;
 
   bool mergeDirtyList(bool forceMerge);
 

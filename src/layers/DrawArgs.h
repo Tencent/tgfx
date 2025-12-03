@@ -57,9 +57,6 @@ class DrawArgs {
   bool forceDrawBackground = false;
   std::shared_ptr<ColorSpace> dstColorSpace = ColorSpace::SRGB();
 
-  // Only used while recording layer's background image.
-  std::shared_ptr<BackgroundContext> blendModeBackground = nullptr;
-
   // Layer cache for storing cached surfaces during rendering. Note: this could be nullptr.
   LayerCache* layerCache = nullptr;
 };

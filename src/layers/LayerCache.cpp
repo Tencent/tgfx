@@ -40,8 +40,7 @@ static size_t estimateImageSize(const Image* image) {
   return static_cast<size_t>(image->width() * image->height() * 4);
 }
 
-LayerCache::LayerCache(size_t maxCacheSize, std::shared_ptr<ColorSpace> colorSpace)
-    : _maxCacheSize(maxCacheSize), _colorSpace(std::move(colorSpace)) {
+LayerCache::LayerCache(size_t maxCacheSize) : _maxCacheSize(maxCacheSize) {
 }
 
 LayerCache::~LayerCache() = default;
@@ -151,12 +150,18 @@ void LayerCache::evictLRU() {
   }
 }
 
-void LayerCache::setContext(Context* context) {
-  if (_context == context) {
-    return;
+bool LayerCache::canCacheLayer(Layer* layer, float contentScale) const {
+  if (layer == nullptr) {
+    return false;
   }
-  _context = context;
-  clear();
+  auto bounds = layer->getBounds();
+  bounds.scale(contentScale, contentScale);
+  int width = static_cast<int>(ceil(bounds.width()));
+  int height = static_cast<int>(ceil(bounds.height()));
+  auto result =
+      width > 0 && height > 0 && width <= _maxCacheContentSize && height <= _maxCacheContentSize;
+  result &= static_cast<int>(_maxCacheSize - _currentCacheSize) >= width * height * 4;
+  return result;
 }
 
 }  // namespace tgfx

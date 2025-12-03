@@ -21,6 +21,7 @@
 #include "core/utils/DecomposeRects.h"
 #include "core/utils/Log.h"
 #include "layers/DrawArgs.h"
+#include "tgfx/layers/DisplayList.h"
 
 namespace tgfx {
 static float UnionArea(const Rect& rect1, const Rect& rect2) {
@@ -130,6 +131,12 @@ bool RootLayer::setBackgroundColor(const Color& color) {
   _backgroundColor = color;
   invalidateContent();
   return true;
+}
+
+void RootLayer::invalidCache(const Layer* layer) {
+  if (displayList) {
+    displayList->invalidateLayerCache(layer);
+  }
 }
 
 }  // namespace tgfx

@@ -523,6 +523,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
    * Draws the layer and all its children onto the given canvas. You can specify the alpha and blend
    * mode to control how the layer is drawn. Note: The layer is drawn in its local space without
    * applying its own matrix, alpha, blend mode, visible, scrollRect, or mask.
+   * Note: The canvas must be from a surface, otherwise the result may be incorrect.
    * @param canvas The canvas to draw the layer on.
    * @param alpha The alpha transparency value used for drawing the layer and its children.
    * @param blendMode The blend mode used to composite the layer with the existing content on the
@@ -666,6 +667,12 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   static std::shared_ptr<Picture> RecordPicture(DrawMode mode, float contentScale,
                                                 const std::function<void(Canvas*)>& drawFunction);
+
+  bool shouldPassThroughBackground(BlendMode blendMode, const Matrix3D* transform) const;
+
+  void drawContentOffscreen(const DrawArgs& args, Canvas* canvas, std::optional<Rect> clipBounds,
+                            float contentScale, BlendMode blendMode, float alpha,
+                            const Matrix3D* transform, bool cacheContent);
 
   bool drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                      const Matrix3D* transform);

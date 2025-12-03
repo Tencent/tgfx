@@ -24,6 +24,7 @@
 #include "tgfx/layers/Layer.h"
 
 namespace tgfx {
+class LayerCache;
 class RootLayer;
 class Tile;
 class TileCache;
@@ -229,9 +230,13 @@ class DisplayList {
   Color backgroundColor() const;
 
   /**
-   * Sets the background color of the root layer. 
+   * Sets the background color of the root layer.
    */
   void setBackgroundColor(const Color& color);
+
+  size_t layerMaxCacheSize() const;
+
+  void setLayerMaxCacheSize(size_t size);
 
   /**
    * Sets whether to show dirty regions during rendering. When enabled, the dirty regions will be
@@ -275,6 +280,7 @@ class DisplayList {
   std::unordered_map<int64_t, TileCache*> tileCaches = {};
   std::vector<std::shared_ptr<Tile>> emptyTiles = {};
   std::deque<std::vector<Rect>> lastDirtyRegions = {};
+  std::unique_ptr<LayerCache> layerCache = nullptr;
 
   std::vector<Rect> renderDirect(Surface* surface, bool autoClear) const;
 
@@ -329,5 +335,9 @@ class DisplayList {
                      bool autoClear) const;
 
   void updateMousePosition();
+
+  void invalidateLayerCache(const Layer* layer);
+
+  friend class RootLayer;
 };
 }  // namespace tgfx

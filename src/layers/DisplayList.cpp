@@ -269,6 +269,14 @@ void DisplayList::setBackgroundColor(const Color& color) {
   }
 }
 
+size_t DisplayList::layerMaxCacheSize() const {
+  return layerCache->maxCacheSize();
+}
+
+void DisplayList::setLayerMaxCacheSize(size_t size) {
+  layerCache->setMaxCacheSize(size);
+}
+
 void DisplayList::showDirtyRegions(bool show) {
   if (_showDirtyRegions == show) {
     return;
@@ -299,7 +307,6 @@ void DisplayList::render(Surface* surface, bool autoClear) {
     return;
   }
   RENDER_VISABLE_OBJECT(surface->getContext());
-  layerCache->setContext(surface->getContext());
   _hasContentChanged = false;
   auto dirtyRegions = _root->updateDirtyRegions();
   if (_zoomScaleInt == 0) {
@@ -952,6 +959,7 @@ void DisplayList::resetCaches() {
   surfaceCaches = {};
   totalTileCount = 0;
   emptyTiles.clear();
+  layerCache->clear();
 }
 
 void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
@@ -979,7 +987,9 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   args.blurBackground =
       _root->createBackgroundContext(context, drawRect, viewMatrix, false, args.dstColorSpace);
   args.dstColorSpace = surface->colorSpace();
-  args.layerCache = layerCache.get();
+  if (_renderMode == RenderMode::Tiled) {
+    args.layerCache = layerCache.get();
+  }
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
 }
 
@@ -995,6 +1005,12 @@ void DisplayList::updateMousePosition() {
   const auto invScaleFactor = 1.0f / (1.0f - scale);
   mousePosition = (_contentOffset - lastContentOffset * scale) * invScaleFactor;
   mousePosition -= _contentOffset;
+}
+
+void DisplayList::invalidateLayerCache(const Layer* layer) {
+  if (layerCache) {
+    layerCache->invalidateLayer(layer);
+  }
 }
 
 }  // namespace tgfx
