@@ -1303,7 +1303,7 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
 
 void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                           const Matrix3D* transform, bool excludeChildren) {
-  if (transform != nullptr) {
+  if (transform != nullptr && !args.excludeBackgroundStyle) {
     drawBackgroundLayerStyles(args, canvas, alpha, *transform);
   }
 
@@ -1404,6 +1404,8 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     //TODO: Clip image with clipBounds.
     args.render3DContext->compositor()->drawImage(image, imageTransform, x, y);
   }
+  // Any child layers within a 3D rendering context have background styles disabled, so no special
+  // background logic processing is performed for 3D rendering contexts.
   if (args.blendModeBackground) {
     auto blendCanvas = args.blendModeBackground->getCanvas();
     AutoCanvasRestore autoRestoreBlend(blendCanvas);
@@ -1431,8 +1433,10 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
 void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha,
                          const Matrix3D* transform) {
   std::unordered_set<LayerStyleExtraSourceType> styleExtraSourceTypes = {
-      LayerStyleExtraSourceType::None, LayerStyleExtraSourceType::Contour,
-      LayerStyleExtraSourceType::Background};
+      LayerStyleExtraSourceType::None, LayerStyleExtraSourceType::Contour};
+  if (!args.excludeBackgroundStyle) {
+    styleExtraSourceTypes.insert(LayerStyleExtraSourceType::Background);
+  }
   drawDirectly(args, canvas, alpha, transform, styleExtraSourceTypes, false);
 }
 
@@ -1447,11 +1451,17 @@ void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha,
 
 void Layer::drawIn3DContext(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                             const Matrix3D* transform) {
-  // Draw Content and Style, directly apply environment 3D matrix for offscreen drawing.
-  drawOffscreen(args, canvas, alpha, blendMode, transform, true);
-  // Draw child layers, offscreen rendering with environment 3D matrix and child's own matrix
-  // combined.
-  drawChildren(args, canvas, alpha, nullptr, transform);
+  if (_transformStyle == TransformStyle::Flat) {
+    // If 3D matrix cannot be passed to child layers, draw the entire layer subtree rooted at the
+    // current node offscreen, using the offscreen texture to participate in 3D drawing.
+    drawOffscreen(args, canvas, alpha, blendMode, transform);
+  } else {
+    // Draw Content and Style, directly apply environment 3D matrix for offscreen drawing.
+    drawOffscreen(args, canvas, alpha, blendMode, transform, true);
+    // Draw child layers, offscreen rendering with environment 3D matrix and child's own matrix
+    // combined.
+    drawChildren(args, canvas, alpha, nullptr, transform);
+  }
 }
 
 class LayerBrushModifier : public BrushModifier {
@@ -1492,6 +1502,7 @@ void Layer::drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, float 
   auto context3DArgs = args;
   context3DArgs.render3DContext = std::make_shared<Render3DContext>(
       compositor, *validRenderRect, calculate3DContextDepthMatrix());
+  context3DArgs.excludeBackgroundStyle = true;
   drawIn3DContext(context3DArgs, canvas, alpha, blendMode, transform);
   auto context3DImage = compositor->finish();
 
@@ -1526,6 +1537,8 @@ void Layer::drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, float 
   }
 }
 
+// Any child layers within a 3D rendering context have background styles disabled, so no special
+// background logic processing is performed for 3D rendering contexts.
 void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
                          const LayerStyleSource* layerStyleSource, const Layer* stopChild,
                          const std::unordered_set<LayerStyleExtraSourceType>& styleExtraSourceTypes,
@@ -1843,8 +1856,10 @@ void Layer::drawBackgroundImage(const DrawArgs& args, Canvas& canvas, Point* off
 void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
                             const LayerStyleSource* source, LayerStylePosition position) {
   std::unordered_set<LayerStyleExtraSourceType> extraSourceTypes = {
-      LayerStyleExtraSourceType::None, LayerStyleExtraSourceType::Contour,
-      LayerStyleExtraSourceType::Background};
+      LayerStyleExtraSourceType::None, LayerStyleExtraSourceType::Contour};
+  if (!args.excludeBackgroundStyle) {
+    extraSourceTypes.insert(LayerStyleExtraSourceType::Background);
+  }
   drawLayerStyles(args, canvas, alpha, source, position, extraSourceTypes);
 }
 

@@ -43,6 +43,8 @@ class DrawArgs {
   Context* context = nullptr;
   // Whether to exclude effects during the drawing process.
   bool excludeEffects = false;
+  // Whether to exclude background styles during the drawing process.
+  bool excludeBackgroundStyle = false;
   // Determines the draw mode of the Layer.
   DrawMode drawMode = DrawMode::Normal;
   // The rectangle area to be drawn. This is used for clipping the drawing area.
