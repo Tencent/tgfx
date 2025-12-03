@@ -68,9 +68,7 @@ class ShapeStyle : public LayerProperty {
   void setMatrix(const Matrix& value);
 
   /**
-   * Returns the shader used to render this shape style. The returned shader combines the style's
-   * color/pattern definition with its alpha, blend mode, and transformation matrix. This method
-   * is primarily used internally by the rendering system.
+   * Returns the final shader combined with the matrix.
    */
   std::shared_ptr<Shader> getShader() const;
 
