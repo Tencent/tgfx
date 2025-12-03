@@ -546,7 +546,7 @@ Rect Layer::getBounds(const Layer* targetCoordinateSpace, bool computeTightBound
   auto matrix = getRelativeMatrix(targetCoordinateSpace);
   if (!computeTightBounds && !bitFields.dirtyDescendents) {
     if (!localBounds) {
-      localBounds = getBoundsInternal(Matrix3D::I(), computeTightBounds);
+      localBounds = std::make_unique<Rect>(getBoundsInternal(Matrix3D::I(), computeTightBounds));
     }
     auto result = matrix.mapRect(*localBounds);
     if (!IsMatrix3DAffine(matrix)) {
@@ -825,7 +825,7 @@ void Layer::invalidateDescendents() {
   }
   bitFields.dirtyDescendents = true;
   rasterizedContent = nullptr;
-  localBounds = std::nullopt;
+  localBounds = nullptr;
   invalidate();
 }
 
