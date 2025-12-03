@@ -544,19 +544,19 @@ bool Layer::replaceChild(std::shared_ptr<Layer> oldChild, std::shared_ptr<Layer>
 
 Rect Layer::getBounds(const Layer* targetCoordinateSpace, bool computeTightBounds) {
   auto matrix = getRelativeMatrix(targetCoordinateSpace);
-  if (!computeTightBounds && !bitFields.dirtyDescendents) {
-    if (!localBounds) {
-      localBounds = std::make_unique<Rect>(getBoundsInternal(Matrix3D::I(), computeTightBounds));
-    }
-    auto result = matrix.mapRect(*localBounds);
-    if (!IsMatrix3DAffine(matrix)) {
-      // while the matrix is not affine, the layer will draw with a 3D filter, so the bounds should
-      // round out.
-      result.roundOut();
-    }
-    return result;
+  if (computeTightBounds || bitFields.dirtyDescendents) {
+    return getBoundsInternal(matrix, computeTightBounds);
   }
-  return getBoundsInternal(matrix, computeTightBounds);
+  if (!localBounds) {
+    localBounds = std::make_unique<Rect>(getBoundsInternal(Matrix3D::I(), computeTightBounds));
+  }
+  auto result = matrix.mapRect(*localBounds);
+  if (!IsMatrix3DAffine(matrix)) {
+    // while the matrix is not affine, the layer will draw with a 3D filter, so the bounds should
+    // round out.
+    result.roundOut();
+  }
+  return result;
 }
 
 Rect Layer::getBoundsInternal(const Matrix3D& coordinateMatrix, bool computeTightBounds) {
