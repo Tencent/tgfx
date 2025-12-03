@@ -88,11 +88,11 @@ std::shared_ptr<Texture> GLGPU::createTexture(const TextureDescriptor& descripto
     LOGE("GLGPU::createTexture() invalid texture descriptor!");
     return nullptr;
   }
-  if (descriptor.sampleCount > 1) {
-    return GLMultisampleTexture::MakeFrom(this, descriptor);
-  }
   if (descriptor.format == PixelFormat::DEPTH24_STENCIL8) {
     return GLDepthStencilTexture::MakeFrom(this, descriptor);
+  }
+  if (descriptor.sampleCount > 1) {
+    return GLMultisampleTexture::MakeFrom(this, descriptor);
   }
   if (descriptor.usage & TextureUsage::RENDER_ATTACHMENT &&
       !isFormatRenderable(descriptor.format)) {

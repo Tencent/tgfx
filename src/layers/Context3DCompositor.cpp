@@ -29,11 +29,12 @@ namespace tgfx {
 
 Context3DCompositor::Context3DCompositor(const Context& context, int width, int height)
     : width(width), height(height) {
-  targetColorProxy =
-      context.proxyProvider()->createRenderTargetProxy({}, width, height, PixelFormat::RGBA_8888);
+  // Use MSAA to solve the aliasing issue at the intersection lines of multiple layers.
+  targetColorProxy = context.proxyProvider()->createRenderTargetProxy({}, width, height,
+                                                                      PixelFormat::RGBA_8888, 4);
   DEBUG_ASSERT(targetColorProxy != nullptr);
   targetDepthStencilProxy = context.proxyProvider()->createRenderTargetProxy(
-      {}, width, height, PixelFormat::DEPTH24_STENCIL8);
+      {}, width, height, PixelFormat::DEPTH24_STENCIL8, 4);
   DEBUG_ASSERT(targetDepthStencilProxy != nullptr);
 }
 
