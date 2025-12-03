@@ -1339,7 +1339,8 @@ void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha) {
 
 void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha,
                          const std::unordered_set<LayerStyleExtraSourceType>& extraSourceTypes) {
-  auto layerStyleSource = getLayerStyleSource(args, canvas->getMatrix());
+  auto clipBounds = GetClipBounds(args.blurBackground ? args.blurBackground->getCanvas() : canvas);
+  auto layerStyleSource = getLayerStyleSource(args, canvas->getMatrix(), clipBounds);
   drawContents(args, canvas, alpha, layerStyleSource.get(), nullptr, extraSourceTypes);
 }
 
@@ -1495,7 +1496,8 @@ float Layer::drawBackgroundLayers(const DrawArgs& args, Canvas* canvas) {
   }
   // parent background -> parent layer styles (below) -> parent content -> sibling layers content
   auto currentAlpha = _parent->drawBackgroundLayers(args, canvas);
-  auto layerStyleSource = _parent->getLayerStyleSource(args, canvas->getMatrix());
+  auto clipBounds = GetClipBounds(args.blurBackground ? args.blurBackground->getCanvas() : canvas);
+  auto layerStyleSource = _parent->getLayerStyleSource(args, canvas->getMatrix(), clipBounds);
   _parent->drawContents(args, canvas, currentAlpha, layerStyleSource.get(), this);
   // If the layer's Matrix contains 3D transformations or projection transformations, since this
   // matrix has already been merged into the Canvas, clipping can be done directly through the
@@ -1517,7 +1519,8 @@ float Layer::drawBackgroundLayers(const DrawArgs& args, Canvas* canvas) {
 
 std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& args,
                                                              const Matrix& matrix,
-                                                             bool excludeContour) {
+                                                             std::optional<Rect> clipBounds,
+                                                             bool contentOnly) {
   if (_layerStyles.empty() || args.excludeEffects) {
     return nullptr;
   }
@@ -1533,6 +1536,9 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   // AlphaThresholdFilter from turning semi-transparent pixels into opaque pixels, which would cause
   // severe aliasing.
   auto contentPicture = RecordPicture(DrawMode::Contour, contentScale, [&](Canvas* canvas) {
+    if (clipBounds.has_value()) {
+      canvas->clipRect(*clipBounds);
+    }
     drawContents(drawArgs, canvas, 1.0f);
   });
   Point contentOffset = {};
@@ -1545,18 +1551,21 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   source->contentScale = contentScale;
   source->content = std::move(content);
   source->contentOffset = contentOffset;
-
+  if (contentOnly) {
+    return source;
+  }
   auto needContour =
-      excludeContour
-          ? false
-          : std::any_of(_layerStyles.begin(), _layerStyles.end(), [](const auto& layerStyle) {
-              return layerStyle->extraSourceType() == LayerStyleExtraSourceType::Contour;
-            });
+      std::any_of(_layerStyles.begin(), _layerStyles.end(), [](const auto& layerStyle) {
+        return layerStyle->extraSourceType() == LayerStyleExtraSourceType::Contour;
+      });
   if (needContour) {
     // Child effects are always excluded when drawing the layer contour.
     drawArgs.excludeEffects = true;
     drawArgs.drawMode = DrawMode::Contour;
     auto contourPicture = RecordPicture(DrawMode::Contour, contentScale, [&](Canvas* canvas) {
+      if (clipBounds.has_value()) {
+        canvas->clipRect(*clipBounds);
+      }
       drawContents(drawArgs, canvas, 1.0f);
     });
     source->contour = ToImageWithOffset(std::move(contourPicture), &source->contourOffset, nullptr,
@@ -1637,7 +1646,7 @@ void Layer::drawBackgroundImage(const DrawArgs& args, Canvas& canvas, Point* off
     }
     auto currentAlpha = drawBackgroundLayers(drawArgs, &canvas);
     // Draw the layer styles below the content, as they are part of the background.
-    auto layerStyleSource = getLayerStyleSource(drawArgs, canvas.getMatrix());
+    auto layerStyleSource = getLayerStyleSource(drawArgs, canvas.getMatrix(), std::nullopt);
     if (layerStyleSource) {
       drawLayerStyles(drawArgs, &canvas, currentAlpha, layerStyleSource.get(),
                       LayerStylePosition::Below);
@@ -1755,7 +1764,8 @@ void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
 
 void Layer::drawBackgroundLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
                                       const Matrix3D& transform) {
-  auto styleSource = getLayerStyleSource(args, canvas->getMatrix(), true);
+  auto clipBounds = GetClipBounds(args.blurBackground ? args.blurBackground->getCanvas() : canvas);
+  auto styleSource = getLayerStyleSource(args, canvas->getMatrix(), clipBounds, true);
   if (styleSource == nullptr) {
     return;
   }

@@ -616,7 +616,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
   float drawBackgroundLayers(const DrawArgs& args, Canvas* canvas);
 
   std::unique_ptr<LayerStyleSource> getLayerStyleSource(const DrawArgs& args, const Matrix& matrix,
-                                                        bool excludeContour = false);
+                                                        std::optional<Rect> clipBounds,
+                                                        bool contentOnly = false);
 
   std::shared_ptr<Image> getBackgroundImage(const DrawArgs& args, float contentScale,
                                             Point* offset);
