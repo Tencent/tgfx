@@ -572,6 +572,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   void invalidate();
 
+  Rect getBounds(const Matrix3D& coordinateMatrix, bool computeTightBounds);
+
   Rect getBoundsInternal(const Matrix3D& coordinateMatrix, bool computeTightBounds);
 
   void onAttachToRoot(RootLayer* rootLayer);
@@ -692,7 +694,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
    * @param anchor The specified anchor point.
    */
   Matrix3D anchorAdaptedMatrix(const Matrix3D& matrix, const Point& anchor) const;
-
 
   void invalidateCache();
 

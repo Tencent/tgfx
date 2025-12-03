@@ -544,14 +544,18 @@ bool Layer::replaceChild(std::shared_ptr<Layer> oldChild, std::shared_ptr<Layer>
 
 Rect Layer::getBounds(const Layer* targetCoordinateSpace, bool computeTightBounds) {
   auto matrix = getRelativeMatrix(targetCoordinateSpace);
+  return getBoundsInternal(matrix, computeTightBounds);
+}
+
+Rect Layer::getBounds(const Matrix3D& coordinateMatrix, bool computeTightBounds) {
   if (computeTightBounds || bitFields.dirtyDescendents) {
-    return getBoundsInternal(matrix, computeTightBounds);
+    return getBoundsInternal(coordinateMatrix, computeTightBounds);
   }
   if (!localBounds) {
     localBounds = std::make_unique<Rect>(getBoundsInternal(Matrix3D::I(), computeTightBounds));
   }
-  auto result = matrix.mapRect(*localBounds);
-  if (!IsMatrix3DAffine(matrix)) {
+  auto result = coordinateMatrix.mapRect(*localBounds);
+  if (!IsMatrix3DAffine(coordinateMatrix)) {
     // while the matrix is not affine, the layer will draw with a 3D filter, so the bounds should
     // round out.
     result.roundOut();
@@ -583,7 +587,7 @@ Rect Layer::getBoundsInternal(const Matrix3D& coordinateMatrix, bool computeTigh
     }
     auto childMatrix = child->getMatrixWithScrollRect();
     childMatrix.postConcat(workMatrix3D);
-    auto childBounds = child->getBoundsInternal(childMatrix, computeTightBounds);
+    auto childBounds = child->getBounds(childMatrix, computeTightBounds);
     if (child->_scrollRect) {
       auto relatvieScrollRect = childMatrix.mapRect(*child->_scrollRect);
       if (!childBounds.intersect(relatvieScrollRect)) {
@@ -593,7 +597,7 @@ Rect Layer::getBoundsInternal(const Matrix3D& coordinateMatrix, bool computeTigh
     if (child->hasValidMask()) {
       auto maskRelativeMatrix = child->_mask->getRelativeMatrix(child.get());
       maskRelativeMatrix.postConcat(childMatrix);
-      auto maskBounds = child->_mask->getBoundsInternal(maskRelativeMatrix, computeTightBounds);
+      auto maskBounds = child->_mask->getBounds(maskRelativeMatrix, computeTightBounds);
       if (!childBounds.intersect(maskBounds)) {
         continue;
       }
