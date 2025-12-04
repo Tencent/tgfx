@@ -392,9 +392,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            ohos/.cxx
-            ohos/entry/.cxx
-            ohos/entry/build
+            ohos/hello2d/.cxx
+            ohos/hello2d/build
+            ohos/.hvigor
           key: ohos-build-${{ runner.os }}-${{ hashFiles('src/**', 'include/**', 'ohos/**/*.cpp', 'ohos/**/*.h') }}
           restore-keys: |
             ohos-build-${{ runner.os }}-
