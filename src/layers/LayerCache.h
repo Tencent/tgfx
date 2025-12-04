@@ -149,8 +149,6 @@ class LayerCache {
     return _maxCacheContentSize;
   }
 
-  bool canCacheLayer( Layer* layer, float contentScale) const;
-
  private:
   size_t _maxCacheSize = 0;
   size_t _currentCacheSize = 0;

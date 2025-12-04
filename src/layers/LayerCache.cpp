@@ -21,6 +21,7 @@
 #include <cmath>
 #include <limits>
 #include "contents/RasterizedContent.h"
+#include "core/utils/Log.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/layers/Layer.h"
@@ -86,6 +87,8 @@ void LayerCache::advanceFrame() {
   }
   _currentFrameToken = std::make_shared<int>(0);
   purgeExpiredEntries();
+  LOGI("LayerCache::advanceFrame _currentCacheSize: %d _frameTokens.size: %d _expirationFrames",
+       _currentCacheSize, _frameTokens.size(), _expirationFrames);
 }
 
 RasterizedContent* LayerCache::getCachedImage(const Layer* layer, float contentScale) {
@@ -197,20 +200,6 @@ void LayerCache::purgeExpiredEntries() {
       ++it;
     }
   }
-}
-
-bool LayerCache::canCacheLayer(Layer* layer, float contentScale) const {
-  if (layer == nullptr) {
-    return false;
-  }
-  auto bounds = layer->getBounds();
-  bounds.scale(contentScale, contentScale);
-  int width = static_cast<int>(ceil(bounds.width()));
-  int height = static_cast<int>(ceil(bounds.height()));
-  auto result =
-      width > 0 && height > 0 && width <= _maxCacheContentSize && height <= _maxCacheContentSize;
-  result &= static_cast<int>(_maxCacheSize - _currentCacheSize) >= width * height * 4;
-  return result;
 }
 
 }  // namespace tgfx

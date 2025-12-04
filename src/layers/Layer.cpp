@@ -1225,18 +1225,29 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     }
     return true;
   }
-  if (args.renderFlags & RenderFlags::DisableCache) {
+  if (args.renderFlags & RenderFlags::DisableCache || contentScale > 1.0f) {
     return false;
   }
 
-  if (!args.layerCache || args.layerCache->canCacheLayer(this, contentScale)) {
+  auto maxCacheSize = static_cast<float>(args.layerCache->maxCacheContentSize());
+
+  if (!args.layerCache) {
     return false;
   }
 
+  auto bounds = getBounds();
   if (shouldPassThroughBackground(blendMode, transform) || hasBackgroundStyle()) {
     if (!args.renderRect || !args.renderRect->contains(renderBounds)) {
       return false;
     }
+  } else {
+    contentScale = std::min(1.0f, maxCacheSize / std::max(bounds.width(), bounds.height()));
+  }
+  bounds.scale(contentScale, contentScale);
+  bounds.roundOut();
+  auto cacheSize = static_cast<size_t>(bounds.width() * bounds.height() * 4);
+  if (args.layerCache->maxCacheSize() < args.layerCache->currentCacheSize() + cacheSize) {
+    return false;
   }
   auto cacheArgs = args;
   cacheArgs.renderFlags |= RenderFlags::DisableCache;
@@ -1294,7 +1305,7 @@ void Layer::drawContentOffscreen(const DrawArgs& args, Canvas* canvas,
   }
 
   if (cacheContent) {
-    image = image->makeTextureImage(args.context);
+    image = image->makeRasterized();
     args.layerCache->cacheImage(this, contentScale, image, imageMatrix);
   }
 
