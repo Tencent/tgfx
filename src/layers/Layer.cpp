@@ -1164,6 +1164,25 @@ static std::shared_ptr<Image> getBlendImage(const DrawArgs& args, const Canvas* 
   return nullptr;
 }
 
+// Applies a clip rect to the canvas, avoiding anti-aliasing artifacts that cause semi-transparent
+// edges when the scaled clip bounds are too small.
+static inline void ApplyClip(Canvas& canvas, const Rect& maxBounds, const Rect& clipBounds,
+                             float contentScale) {
+  if (contentScale < 1.0f) {
+    auto scaledBounds = clipBounds;
+    scaledBounds.scale(contentScale, contentScale);
+    if (scaledBounds.width() < 10.f || scaledBounds.height() < 10.f) {
+      DEBUG_ASSERT(!FloatNearlyZero(contentScale));
+      scaledBounds.roundOut();
+      scaledBounds.scale(1.0f / contentScale, 1.0f / contentScale);
+      scaledBounds.intersect(maxBounds);
+      canvas.clipRect(scaledBounds);
+      return;
+    }
+  }
+  canvas.clipRect(clipBounds);
+}
+
 std::shared_ptr<Image> Layer::getContentImage(const DrawArgs& contentArgs, float contentScale,
                                               const std::shared_ptr<Image>& passThroughImage,
                                               const Matrix& passThroughImageMatrix,
@@ -1171,7 +1190,8 @@ std::shared_ptr<Image> Layer::getContentImage(const DrawArgs& contentArgs, float
                                               bool excludeChildren) {
   DEBUG_ASSERT(imageMatrix);
   // Bounding box of layer content in local coordinate system.
-  auto inputBounds = excludeChildren ? getContentBounds() : getBounds();
+  auto sourceBounds = excludeChildren ? getContentBounds() : getBounds();
+  auto inputBounds = sourceBounds;
   if (clipBounds.has_value()) {
     if (!contentArgs.excludeEffects) {
       // clipBounds is in local coordinate space,  so we getImageFilter with scale 1.0f.
@@ -1217,7 +1237,7 @@ std::shared_ptr<Image> Layer::getContentImage(const DrawArgs& contentArgs, float
     PictureRecorder recorder = {};
     auto offscreenCanvas = recorder.beginRecording();
     offscreenCanvas->scale(contentScale, contentScale);
-    offscreenCanvas->clipRect(inputBounds);
+    ApplyClip(*offscreenCanvas, sourceBounds, inputBounds, contentScale);
     if (passThroughImage) {
       AutoCanvasRestore offscreenRestore(offscreenCanvas);
       offscreenCanvas->concat(passThroughImageMatrix);

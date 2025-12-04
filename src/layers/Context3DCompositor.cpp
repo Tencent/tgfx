@@ -67,11 +67,14 @@ void Context3DCompositor::drawImage(std::shared_ptr<Image> image, const Matrix3D
                  -1.f - ndcRectScaled.top + 2 * y / static_cast<float>(height));
 
   auto allocator = context->drawingAllocator();
-  auto vertexProvider = RectsVertexProvider::MakeFrom(allocator, srcModelRect, AAType::Coverage);
+  // Disable anti-aliasing for small images to avoid large semi-transparent areas when small
+  // rectangles are projected as large ones.
+  auto aaType = srcW < 10.f || srcH < 10.f ? AAType::None : AAType::Coverage;
+  auto vertexProvider = RectsVertexProvider::MakeFrom(allocator, srcModelRect, aaType);
   const Size viewportSize(static_cast<float>(width), static_cast<float>(height));
   const Rect3DDrawArgs drawArgs{matrix, ndcScale, ndcOffset, viewportSize};
   auto drawOp = Rect3DDrawOp::Make(context, std::move(vertexProvider), 0, drawArgs);
-  const SamplingArgs samplingArgs = {TileMode::Decal, TileMode::Decal, {}, SrcRectConstraint::Fast};
+  const SamplingArgs samplingArgs = {TileMode::Clamp, TileMode::Clamp, {}, SrcRectConstraint::Fast};
   TPArgs args(context, 0, false, 1.0f);
   //TODO: Avoid locking entire image.
   auto sourceTextureProxy = image->lockTextureProxy(args);
