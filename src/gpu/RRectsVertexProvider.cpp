@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RRectsVertexProvider.h"
+#include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/MathExtra.h"
 
 namespace tgfx {
@@ -53,7 +54,7 @@ namespace tgfx {
 
 PlacementPtr<RRectsVertexProvider> RRectsVertexProvider::MakeFrom(
     BlockAllocator* allocator, std::vector<PlacementPtr<RRectRecord>>&& rects, AAType aaType,
-    std::vector<PlacementPtr<Stroke>>&& strokes) {
+    std::vector<PlacementPtr<Stroke>>&& strokes, const std::shared_ptr<ColorSpace>& colorSpace) {
   if (rects.empty()) {
     return nullptr;
   }
@@ -70,11 +71,12 @@ PlacementPtr<RRectsVertexProvider> RRectsVertexProvider::MakeFrom(
   auto array = allocator->makeArray(std::move(rects));
   auto strokeArray = allocator->makeArray(std::move(strokes));
   return allocator->make<RRectsVertexProvider>(std::move(array), aaType, hasColor,
-                                               std::move(strokeArray), allocator->addReference());
+                                               std::move(strokeArray), allocator->addReference(),
+                                               colorSpace);
 }
 
-static void WriteUByte4Color(float* vertices, int& index, const PMColor& color) {
-  auto bytes = reinterpret_cast<uint8_t*>(&vertices[index++]);
+static void WriteUByte4Color(float* compressedColor, const PMColor& color) {
+  auto bytes = reinterpret_cast<uint8_t*>(compressedColor);
   bytes[0] = static_cast<uint8_t>(color.red * 255);
   bytes[1] = static_cast<uint8_t>(color.green * 255);
   bytes[2] = static_cast<uint8_t>(color.blue * 255);
@@ -87,8 +89,10 @@ static float FloatInvert(float value) {
 
 RRectsVertexProvider::RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType,
                                            bool hasColor, PlacementArray<Stroke>&& strokes,
-                                           std::shared_ptr<BlockAllocator> reference)
-    : VertexProvider(std::move(reference)), rects(std::move(rects)), strokes(std::move(strokes)) {
+                                           std::shared_ptr<BlockAllocator> reference,
+                                           const std::shared_ptr<ColorSpace>& colorSpace)
+    : VertexProvider(std::move(reference)), rects(std::move(rects)), strokes(std::move(strokes)),
+      dstColorSpace(colorSpace) {
   bitFields.aaType = static_cast<uint8_t>(aaType);
   bitFields.hasColor = hasColor;
 
@@ -96,6 +100,11 @@ RRectsVertexProvider::RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, 
     bitFields.hasStroke = true;
   } else {
     bitFields.hasStroke = false;
+  }
+  if (NeedConvertColorSpace(ColorSpace::SRGB(), dstColorSpace)) {
+    steps =
+        std::make_shared<ColorSpaceXformSteps>(ColorSpace::SRGB().get(), AlphaType::Premultiplied,
+                                               dstColorSpace.get(), AlphaType::Premultiplied);
   }
 }
 
@@ -114,8 +123,15 @@ void RRectsVertexProvider::getVertices(float* vertices) const {
   for (auto& record : rects) {
     auto viewMatrix = record->viewMatrix;
     auto rRect = record->rRect;
-    auto& color = record->color;
     auto scales = viewMatrix.getAxisScales();
+    float compressedColor = 0.f;
+    if (bitFields.hasColor) {
+      PMColor color = record->color.premultiply();
+      if (steps) {
+        steps->apply(color.array());
+      }
+      WriteUByte4Color(&compressedColor, color);
+    }
     rRect.scale(scales.x, scales.y);
     viewMatrix.preScale(1 / scales.x, 1 / scales.y);
 
@@ -175,7 +191,7 @@ void RRectsVertexProvider::getVertices(float* vertices) const {
       vertices[index++] = point.x;
       vertices[index++] = point.y;
       if (bitFields.hasColor) {
-        WriteUByte4Color(vertices, index, color);
+        vertices[index++] = compressedColor;
       }
       vertices[index++] = xMaxOffset;
       vertices[index++] = yOuterOffsets[i];
@@ -189,7 +205,7 @@ void RRectsVertexProvider::getVertices(float* vertices) const {
       vertices[index++] = point.x;
       vertices[index++] = point.y;
       if (bitFields.hasColor) {
-        WriteUByte4Color(vertices, index, color);
+        vertices[index++] = compressedColor;
       }
       vertices[index++] = FLOAT_NEARLY_ZERO;
       vertices[index++] = yOuterOffsets[i];
@@ -203,7 +219,7 @@ void RRectsVertexProvider::getVertices(float* vertices) const {
       vertices[index++] = point.x;
       vertices[index++] = point.y;
       if (bitFields.hasColor) {
-        WriteUByte4Color(vertices, index, color);
+        vertices[index++] = compressedColor;
       }
       vertices[index++] = FLOAT_NEARLY_ZERO;
       vertices[index++] = yOuterOffsets[i];
@@ -217,7 +233,7 @@ void RRectsVertexProvider::getVertices(float* vertices) const {
       vertices[index++] = point.x;
       vertices[index++] = point.y;
       if (bitFields.hasColor) {
-        WriteUByte4Color(vertices, index, color);
+        vertices[index++] = compressedColor;
       }
       vertices[index++] = xMaxOffset;
       vertices[index++] = yOuterOffsets[i];

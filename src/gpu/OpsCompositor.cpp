@@ -76,8 +76,7 @@ void OpsCompositor::fillImage(std::shared_ptr<Image> image, const SamplingOption
     pendingSampling = sampling;
     pendingConstraint = SrcRectConstraint::Fast;
   }
-  auto dstColor = ToPMColor(brush.color, dstColorSpace);
-  auto record = drawingAllocator()->make<RectRecord>(imageRect, state.matrix, dstColor);
+  auto record = drawingAllocator()->make<RectRecord>(imageRect, state.matrix, brush.color);
   pendingRects.emplace_back(std::move(record));
   pendingUVRects.emplace_back(drawingAllocator()->make<Rect>(imageRect));
 }
@@ -97,8 +96,7 @@ void OpsCompositor::fillImageRect(std::shared_ptr<Image> image, const Rect& srcR
     pendingSampling = sampling;
     pendingConstraint = constraint;
   }
-  auto dstColor = ToPMColor(brushInLocal.color, dstColorSpace);
-  auto record = drawingAllocator()->make<RectRecord>(dstRect, state.matrix, dstColor);
+  auto record = drawingAllocator()->make<RectRecord>(dstRect, state.matrix, brushInLocal.color);
   pendingRects.emplace_back(std::move(record));
   pendingUVRects.emplace_back(drawingAllocator()->make<Rect>(srcRect));
   if (!hasRectToRectDraw && srcRect != dstRect) {
@@ -122,8 +120,7 @@ void OpsCompositor::fillRect(const Rect& rect, const MCState& state, const Brush
     flushPendingOps(PendingOpType::Rect, state.clip, brush);
   }
 
-  auto dstColor = ToPMColor(brush.color, dstColorSpace);
-  auto record = drawingAllocator()->make<RectRecord>(rect, state.matrix, dstColor);
+  auto record = drawingAllocator()->make<RectRecord>(rect, state.matrix, brush.color);
   pendingRects.emplace_back(std::move(record));
   if (stroke) {
     auto strokeRecord = drawingAllocator()->make<Stroke>(*stroke);
@@ -139,8 +136,7 @@ void OpsCompositor::drawRRect(const RRect& rRect, const MCState& state, const Br
       (pendingStrokes.empty() != (stroke == nullptr))) {
     flushPendingOps(PendingOpType::RRect, state.clip, rectBrush);
   }
-  auto dstColor = ToPMColor(rectBrush.color, dstColorSpace);
-  auto record = drawingAllocator()->make<RRectRecord>(rRect, state.matrix, dstColor);
+  auto record = drawingAllocator()->make<RRectRecord>(rRect, state.matrix, rectBrush.color);
   pendingRRects.emplace_back(std::move(record));
   if (stroke) {
     auto strokeRecord = drawingAllocator()->make<Stroke>(*stroke);
@@ -386,19 +382,21 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Brush brush) 
           needLocalBounds && (hasRectToRectDraw || HasDifferentViewMatrix(pendingRects));
       auto uvRects =
           hasRectToRectDraw ? std::move(pendingUVRects) : std::vector<PlacementPtr<Rect>>();
-      auto provider = RectsVertexProvider::MakeFrom(drawingAllocator(), std::move(pendingRects),
-                                                    std::move(uvRects), aaType, needUVCoord,
-                                                    subsetMode, std::move(pendingStrokes));
+      auto provider = RectsVertexProvider::MakeFrom(
+          drawingAllocator(), std::move(pendingRects), std::move(uvRects), aaType, needUVCoord,
+          subsetMode, std::move(pendingStrokes), dstColorSpace);
       drawOp = RectDrawOp::Make(context, std::move(provider), renderFlags);
     } break;
     case PendingOpType::RRect: {
-      auto provider = RRectsVertexProvider::MakeFrom(drawingAllocator(), std::move(pendingRRects),
-                                                     aaType, std::move(pendingStrokes));
+      auto provider =
+          RRectsVertexProvider::MakeFrom(drawingAllocator(), std::move(pendingRRects), aaType,
+                                         std::move(pendingStrokes), dstColorSpace);
       drawOp = RRectDrawOp::Make(context, std::move(provider), renderFlags);
     } break;
     case PendingOpType::Atlas: {
-      auto provider = RectsVertexProvider::MakeFrom(drawingAllocator(), std::move(pendingRects), {},
-                                                    AAType::None, true, UVSubsetMode::None, {});
+      auto provider =
+          RectsVertexProvider::MakeFrom(drawingAllocator(), std::move(pendingRects), {},
+                                        AAType::None, true, UVSubsetMode::None, {}, dstColorSpace);
       drawOp = AtlasTextOp::Make(context, std::move(provider), renderFlags,
                                  std::move(pendingAtlasTexture), pendingSampling);
     } break;
@@ -728,8 +726,7 @@ void OpsCompositor::fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, co
     pendingAtlasTexture = std::move(textureProxy);
     pendingSampling = sampling;
   }
-  auto dstColor = ToPMColor(brush.color, dstColorSpace);
-  auto record = drawingAllocator()->make<RectRecord>(rect, state.matrix, dstColor);
+  auto record = drawingAllocator()->make<RectRecord>(rect, state.matrix, brush.color);
   pendingRects.emplace_back(std::move(record));
 }
 
