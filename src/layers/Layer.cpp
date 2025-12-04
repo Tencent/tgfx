@@ -1178,6 +1178,10 @@ std::shared_ptr<Image> Layer::getContentImage(const DrawArgs& contentArgs, float
     imageMatrix->preTranslate(offset.x, offset.y);
   }
 
+  if (!finalImage) {
+    return nullptr;
+  }
+
   auto filterOffset = Point::Make(0, 0);
   if (!contentArgs.excludeEffects) {
     auto filter = getImageFilter(contentScale);
