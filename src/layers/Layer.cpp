@@ -1574,7 +1574,7 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
       content->drawContour(canvas, &layerFill);
     } else {
       content->drawDefault(canvas, &layerFill);
-      if (args.blurBackground) {
+      if (args.blurBackground && bitFields.matrix3DIsAffine && !args.excludeBackgroundStyle) {
         content->drawDefault(args.blurBackground->getCanvas(), &layerFill);
       }
       if (args.blendModeBackground) {
@@ -1591,7 +1591,7 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
   }
   if (content && args.drawMode != DrawMode::Contour) {
     content->drawForeground(canvas, &layerFill);
-    if (args.blurBackground) {
+    if (args.blurBackground && bitFields.matrix3DIsAffine && !args.excludeBackgroundStyle) {
       content->drawForeground(args.blurBackground->getCanvas(), &layerFill);
     }
     if (args.blendModeBackground) {
@@ -1621,7 +1621,14 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, cons
        !bitFields.passThroughBackground || (alpha < 1.0f && bitFields.allowsGroupOpacity) ||
        bitFields.shouldRasterize || (!_filters.empty() && !args.excludeEffects) || hasValidMask() ||
        _transformStyle == TransformStyle::Flat);
-
+  // TODO: The layer content is drawn to the background environment through the Playback related
+  // interfaces of LayerContent's Picture, which currently does not support 3D transformations.
+  // Therefore, the content of 3D layers cannot be correctly drawn to the background environment.
+  // As a result, child layers cannot obtain the correct background content when applying background
+  // styles. The cost of modifying this is high, and further modifications will be needed after
+  // Canvas supports 3x3 matrices. Temporarily disable background styles for child layers of 3D
+  // layers, to be optimized later.
+  bool skipChildBackground = args.excludeBackgroundStyle || !bitFields.matrix3DIsAffine;
   for (size_t i = 0; i < _children.size(); ++i) {
     auto& child = _children[i];
     if (child.get() == stopChild) {
@@ -1634,6 +1641,7 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, cons
       continue;
     }
     auto childArgs = args;
+    childArgs.excludeBackgroundStyle = skipChildBackground;
     if (interrupt3DContext) {
       childArgs.render3DContext = nullptr;
     }
@@ -1837,8 +1845,7 @@ std::shared_ptr<Image> Layer::getBoundsBackgroundImage(const DrawArgs& args, flo
   // Calculate the transformation matrix for drawing the background image within renderBounds to
   // bounds.
   auto matrix = Matrix::MakeTrans(-renderBounds.left, -renderBounds.top);
-  matrix.postScale(bounds.width() * contentScale / renderBounds.width(),
-                   bounds.height() * contentScale / renderBounds.height());
+  matrix.postScale(bounds.width() / renderBounds.width(), bounds.height() / renderBounds.height());
   matrix.postTranslate(bounds.left, bounds.top);
   canvas->setMatrix(matrix);
 
