@@ -137,10 +137,9 @@ GradientShader::GradientShader(const std::vector<Color>& colors,
 
 // Combines the colorizer and layout with an appropriately configured primary effect based on the
 // gradient's tile mode
-static PlacementPtr<FragmentProcessor> MakeGradient(const Context* context,
-                                                    const GradientShader& shader,
-                                                    PlacementPtr<FragmentProcessor> layout,
-                                                    std::shared_ptr<ColorSpace> dstColorSpace) {
+static PlacementPtr<FragmentProcessor> MakeGradient(
+    const Context* context, const GradientShader& shader, PlacementPtr<FragmentProcessor> layout,
+    const std::shared_ptr<ColorSpace>& dstColorSpace) {
   if (layout == nullptr) {
     return nullptr;
   }

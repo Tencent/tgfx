@@ -24,20 +24,21 @@
 
 namespace tgfx {
 std::shared_ptr<Image> TextureImage::Wrap(std::shared_ptr<TextureProxy> textureProxy,
-                                          const std::shared_ptr<ColorSpace>& colorSpace) {
+                                          std::shared_ptr<ColorSpace> colorSpace) {
   if (textureProxy == nullptr) {
     return nullptr;
   }
   auto contextID = textureProxy->getContext()->uniqueID();
   auto textureImage = std::shared_ptr<TextureImage>(
-      new TextureImage(std::move(textureProxy), contextID, colorSpace));
+      new TextureImage(std::move(textureProxy), contextID, std::move(colorSpace)));
   textureImage->weakThis = textureImage;
   return textureImage;
 }
 
 TextureImage::TextureImage(std::shared_ptr<TextureProxy> textureProxy, uint32_t contextID,
-                           const std::shared_ptr<ColorSpace>& colorSpace)
-    : textureProxy(std::move(textureProxy)), contextID(contextID), _colorSpace(colorSpace) {
+                           std::shared_ptr<ColorSpace> colorSpace)
+    : textureProxy(std::move(textureProxy)), contextID(contextID),
+      _colorSpace(std::move(colorSpace)) {
 }
 
 BackendTexture TextureImage::getBackendTexture(Context* context, ImageOrigin* origin) const {

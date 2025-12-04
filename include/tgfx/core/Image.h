@@ -133,7 +133,7 @@ class Image {
    */
   static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Picture> picture, int width, int height,
                                          const Matrix* matrix = nullptr,
-                                         const std::shared_ptr<ColorSpace>& colorSpace = nullptr);
+                                         std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
    * Creates an Image in the I420 format with the specified YUVData and the YUVColorSpace. Returns
@@ -163,7 +163,7 @@ class Image {
    */
   static std::shared_ptr<Image> MakeFrom(Context* context, const BackendTexture& backendTexture,
                                          ImageOrigin origin = ImageOrigin::TopLeft,
-                                         const std::shared_ptr<ColorSpace>& colorSpace = nullptr);
+                                         std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
    * Creates an Image from the backendTexture associated with the context, taking ownership of the
@@ -172,10 +172,9 @@ class Image {
    * returned if the format of the backendTexture is recognized and supported. Recognized formats
    * vary by GPU back-ends.
    */
-  static std::shared_ptr<Image> MakeAdopted(
-      Context* context, const BackendTexture& backendTexture,
-      ImageOrigin origin = ImageOrigin::TopLeft,
-      const std::shared_ptr<ColorSpace>& colorSpace = nullptr);
+  static std::shared_ptr<Image> MakeAdopted(Context* context, const BackendTexture& backendTexture,
+                                            ImageOrigin origin = ImageOrigin::TopLeft,
+                                            std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   virtual ~Image() = default;
 

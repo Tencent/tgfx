@@ -29,7 +29,7 @@ class PictureImage : public Image {
  public:
   PictureImage(std::shared_ptr<Picture> picture, int width, int height,
                const Matrix* matrix = nullptr, bool mipmapped = false,
-               const std::shared_ptr<ColorSpace>& colorSpace = nullptr);
+               std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   ~PictureImage() override;
 

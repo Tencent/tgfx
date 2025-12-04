@@ -22,8 +22,8 @@
 namespace tgfx {
 class LumaFragmentProcessor : public FragmentProcessor {
  public:
-  static PlacementPtr<FragmentProcessor> Make(
-      BlockAllocator* allocator, const std::shared_ptr<ColorSpace>& colorSpace = nullptr);
+  static PlacementPtr<FragmentProcessor> Make(BlockAllocator* allocator,
+                                              std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   std::string name() const override {
     return "LumaFragmentProcessor";
@@ -34,7 +34,7 @@ class LumaFragmentProcessor : public FragmentProcessor {
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  LumaFragmentProcessor(const std::shared_ptr<ColorSpace>& colorSpace);
+  LumaFragmentProcessor(std::shared_ptr<ColorSpace> colorSpace);
 
   struct LumaFactor {
     /** default ITU-R Recommendation BT.709 at http://www.itu.int/rec/R-REC-BT.709/ .*/

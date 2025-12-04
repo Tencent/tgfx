@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DecodedImage.h"
+#include <utility>
 #include "BufferImage.h"
 #include "core/ImageSource.h"
 #include "gpu/ProxyProvider.h"
@@ -42,9 +43,9 @@ std::shared_ptr<Image> DecodedImage::MakeFrom(std::shared_ptr<ImageGenerator> ge
 
 DecodedImage::DecodedImage(int width, int height, bool alphaOnly,
                            std::shared_ptr<DataSource<ImageBuffer>> source, bool mipmapped,
-                           const std::shared_ptr<ColorSpace>& colorSpace)
+                           std::shared_ptr<ColorSpace> colorSpace)
     : PixelImage(mipmapped), _width(width), _height(height), _alphaOnly(alphaOnly),
-      source(std::move(source)), _colorSpace(colorSpace) {
+      source(std::move(source)), _colorSpace(std::move(colorSpace)) {
 }
 
 std::shared_ptr<TextureProxy> DecodedImage::lockTextureProxy(const TPArgs& args) const {

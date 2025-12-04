@@ -22,8 +22,8 @@
 namespace tgfx {
 class GLSLLumaFragmentProcessor : public LumaFragmentProcessor {
  public:
-  GLSLLumaFragmentProcessor(const std::shared_ptr<ColorSpace>& colorSpace = nullptr)
-      : LumaFragmentProcessor(colorSpace) {
+  GLSLLumaFragmentProcessor(std::shared_ptr<ColorSpace> colorSpace = nullptr)
+      : LumaFragmentProcessor(std::move(colorSpace)) {
   }
   void emitCode(EmitArgs& args) const override;
 

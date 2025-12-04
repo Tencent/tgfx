@@ -31,7 +31,7 @@ class TextureImage : public Image {
    * Creates an Image wraps the existing TextureProxy, returns nullptr if textureProxy is nullptr.
    */
   static std::shared_ptr<Image> Wrap(std::shared_ptr<TextureProxy> textureProxy,
-                                     const std::shared_ptr<ColorSpace>& colorSpace);
+                                     std::shared_ptr<ColorSpace> colorSpace);
 
   int width() const override {
     return textureProxy->width();
@@ -87,6 +87,6 @@ class TextureImage : public Image {
   std::shared_ptr<ColorSpace> _colorSpace = nullptr;
 
   TextureImage(std::shared_ptr<TextureProxy> textureProxy, uint32_t contextID,
-               const std::shared_ptr<ColorSpace>& colorSpace);
+               std::shared_ptr<ColorSpace> colorSpace);
 };
 }  // namespace tgfx

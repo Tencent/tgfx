@@ -38,8 +38,8 @@ void LumaFragmentProcessor::computeProcessorKey(Context*, BytesKey* bytesKey) co
   bytesKey->write(classID());
 }
 
-LumaFragmentProcessor::LumaFragmentProcessor(const std::shared_ptr<ColorSpace>& colorSpace)
-    : FragmentProcessor(ClassID()), _colorSpace(colorSpace) {
+LumaFragmentProcessor::LumaFragmentProcessor(std::shared_ptr<ColorSpace> colorSpace)
+    : FragmentProcessor(ClassID()), _colorSpace(std::move(colorSpace)) {
   ColorMatrix33 tempColorMatrix{};
   if (_colorSpace) {
     _colorSpace->toXYZD50(&tempColorMatrix);
