@@ -1250,8 +1250,7 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
   SamplingOptions options(FilterMode::Nearest, MipmapMode::None);
   imageLayer->setSampling(options);
   rootLayer->addChild(imageLayer);
-  auto imageLayerBounds = imageLayer->getBounds(nullptr, true);
-  imageLayer->getGlobalMatrix().mapRect(&imageLayerBounds);
+  auto imageLayerBounds = imageLayer->getBounds(displayList->root(), true);
   printf("imageLayerBounds: (%f, %f, %f, %f)\n", imageLayerBounds.left, imageLayerBounds.top,
          imageLayerBounds.right, imageLayerBounds.bottom);
 
@@ -1267,8 +1266,7 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
   shaperLayer->setFillStyle(fillStyle);
   shaperLayer->setMatrix(Matrix::MakeTrans(100.0f, 0.0f) * Matrix::MakeScale(2.0f, 2.0f));
   rootLayer->addChild(shaperLayer);
-  auto shaperLayerBounds = shaperLayer->getBounds(nullptr, true);
-  shaperLayer->getGlobalMatrix().mapRect(&shaperLayerBounds);
+  auto shaperLayerBounds = shaperLayer->getBounds(displayList->root(), true);
   printf("shaperLayerBounds: (%f, %f, %f, %f)\n", shaperLayerBounds.left, shaperLayerBounds.top,
          shaperLayerBounds.right, shaperLayerBounds.bottom);
 
@@ -1280,8 +1278,7 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
   tgfx::Font font(typeface, 20);
   textLayer->setFont(font);
   rootLayer->addChild(textLayer);
-  auto textLayerBounds = textLayer->getBounds(nullptr, true);
-  textLayer->getGlobalMatrix().mapRect(&textLayerBounds);
+  auto textLayerBounds = textLayer->getBounds(displayList->root(), true);
   printf("textLayerBounds: (%f, %f, %f, %f)\n", textLayerBounds.left, textLayerBounds.top,
          textLayerBounds.right, textLayerBounds.bottom);
 
@@ -1295,8 +1292,7 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
   auto fillStyle2 = SolidColor::Make(Color::FromRGBA(175, 27, 193, 255));
   shaperLayer2->setFillStyle(fillStyle2);
   rootLayer->addChild(shaperLayer2);
-  auto shaperLayer2Bounds = shaperLayer2->getBounds(nullptr, true);
-  shaperLayer2->getGlobalMatrix().mapRect(&shaperLayer2Bounds);
+  auto shaperLayer2Bounds = shaperLayer2->getBounds(displayList->root(), true);
   printf("shaperLayer2Bounds: (%f, %f, %f, %f)\n", shaperLayer2Bounds.left, shaperLayer2Bounds.top,
          shaperLayer2Bounds.right, shaperLayer2Bounds.bottom);
 
@@ -1308,8 +1304,8 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
   auto fillStyle0 = SolidColor::Make(Color::FromRGBA(130, 182, 41, 0));
   shapeLayerInvisibleFill->setFillStyle(fillStyle0);
   rootLayer->addChild(shapeLayerInvisibleFill);
-  auto shapeLayerInvisibleFillBounds = shapeLayerInvisibleFill->getBounds(nullptr, true);
-  shapeLayerInvisibleFill->getGlobalMatrix().mapRect(&shapeLayerInvisibleFillBounds);
+  auto shapeLayerInvisibleFillBounds =
+      shapeLayerInvisibleFill->getBounds(displayList->root(), true);
   printf("shapeLayerInvisibleFillBounds: (%f, %f, %f, %f)\n", shapeLayerInvisibleFillBounds.left,
          shapeLayerInvisibleFillBounds.top, shapeLayerInvisibleFillBounds.right,
          shapeLayerInvisibleFillBounds.bottom);
@@ -1323,8 +1319,8 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
       tgfx::SolidColor::Make(tgfx::Color::FromRGBA(130, 182, 41, 0)));
   rootLayer->addChild(shapeLayerInvisibleStroke);
 
-  auto shapeLayerInvisibleStrokeBounds = shapeLayerInvisibleStroke->getBounds(nullptr, true);
-  shapeLayerInvisibleStroke->getGlobalMatrix().mapRect(&shapeLayerInvisibleStrokeBounds);
+  auto shapeLayerInvisibleStrokeBounds =
+      shapeLayerInvisibleStroke->getBounds(displayList->root(), true);
   printf("shapeLayerInvisibleStrokeBounds: (%f, %f, %f, %f)\n",
          shapeLayerInvisibleStrokeBounds.left, shapeLayerInvisibleStrokeBounds.top,
          shapeLayerInvisibleStrokeBounds.right, shapeLayerInvisibleStrokeBounds.bottom);
@@ -1750,8 +1746,7 @@ TGFX_TEST(LayerTest, hitTestPointNested) {
   imageLayer->setMatrix(Matrix::MakeScale(3.0f));
   parentLayer->addChild(imageLayer);
   rootLayer->addChild(parentLayer);
-  auto imageLayerBounds = imageLayer->getBounds(nullptr, true);
-  imageLayer->getGlobalMatrix().mapRect(&imageLayerBounds);
+  auto imageLayerBounds = imageLayer->getBounds(displayList->root(), true);
   printf("imageLayerBounds: (%f, %f, %f, %f)\n", imageLayerBounds.left, imageLayerBounds.top,
          imageLayerBounds.right, imageLayerBounds.bottom);
 
@@ -1769,8 +1764,7 @@ TGFX_TEST(LayerTest, hitTestPointNested) {
   shaperLayer->setFillStyle(fillStyle);
   childLayer->addChild(shaperLayer);
   parentLayer->addChild(childLayer);
-  auto shaperLayerBounds = shaperLayer->getBounds(nullptr, true);
-  shaperLayer->getGlobalMatrix().mapRect(&shaperLayerBounds);
+  auto shaperLayerBounds = shaperLayer->getBounds(displayList->root(), true);
   printf("shaperLayerBounds: (%f, %f, %f, %f)\n", shaperLayerBounds.left, shaperLayerBounds.top,
          shaperLayerBounds.right, shaperLayerBounds.bottom);
 
@@ -1787,13 +1781,11 @@ TGFX_TEST(LayerTest, hitTestPointNested) {
   textLayer->setFont(font);
   grandsonLayer->addChild(textLayer);
   childLayer->addChild(grandsonLayer);
-  auto textLayerBounds = textLayer->getBounds(nullptr, true);
-  textLayer->getGlobalMatrix().mapRect(&textLayerBounds);
+  auto textLayerBounds = textLayer->getBounds(displayList->root(), true);
   printf("textLayerBounds: (%f, %f, %f, %f)\n", textLayerBounds.left, textLayerBounds.top,
          textLayerBounds.right, textLayerBounds.bottom);
 
-  auto rootLayerBounds = rootLayer->getBounds(nullptr, true);
-  rootLayer->getGlobalMatrix().mapRect(&rootLayerBounds);
+  auto rootLayerBounds = rootLayer->getBounds(displayList->root(), true);
   printf("rootLayerBounds: (%f, %f, %f, %f)\n", rootLayerBounds.left, rootLayerBounds.top,
          rootLayerBounds.right, rootLayerBounds.bottom);
 

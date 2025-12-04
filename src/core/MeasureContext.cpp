@@ -88,6 +88,11 @@ void MeasureContext::drawImageRect(std::shared_ptr<Image>, const Rect&, const Re
 void MeasureContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
                                       const MCState& state, const Brush&, const Stroke* stroke) {
   DEBUG_ASSERT(glyphRunList != nullptr);
+  if (computeTightBounds && stroke == nullptr) {
+    auto deviceBounds = glyphRunList->getTightBounds(&state.matrix);
+    addDeviceBounds(state.clip, deviceBounds);
+    return;
+  }
   auto localBounds =
       computeTightBounds ? glyphRunList->getTightBounds() : glyphRunList->getBounds();
   if (stroke) {
