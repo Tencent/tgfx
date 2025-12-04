@@ -193,6 +193,7 @@ Layer::Layer() {
   bitFields.allowsGroupOpacity = AllowsGroupOpacity;
   bitFields.blendMode = static_cast<uint8_t>(BlendMode::SrcOver);
   bitFields.passThroughBackground = true;
+  bitFields.matrix3DIsAffine = true;
 }
 
 void Layer::setAlpha(float value) {
