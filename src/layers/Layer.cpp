@@ -193,6 +193,7 @@ Layer::Layer() {
   bitFields.allowsGroupOpacity = AllowsGroupOpacity;
   bitFields.blendMode = static_cast<uint8_t>(BlendMode::SrcOver);
   bitFields.passThroughBackground = true;
+  bitFields.matrix3DIsAffine = true;
 }
 
 void Layer::setAlpha(float value) {
@@ -544,14 +545,18 @@ bool Layer::replaceChild(std::shared_ptr<Layer> oldChild, std::shared_ptr<Layer>
 
 Rect Layer::getBounds(const Layer* targetCoordinateSpace, bool computeTightBounds) {
   auto matrix = getRelativeMatrix(targetCoordinateSpace);
+  return getBoundsInternal(matrix, computeTightBounds);
+}
+
+Rect Layer::getBoundsInternal(const Matrix3D& coordinateMatrix, bool computeTightBounds) {
   if (computeTightBounds || bitFields.dirtyDescendents) {
-    return getBoundsInternal(matrix, computeTightBounds);
+    return computeBounds(coordinateMatrix, computeTightBounds);
   }
   if (!localBounds) {
-    localBounds = std::make_unique<Rect>(getBoundsInternal(Matrix3D::I(), computeTightBounds));
+    localBounds = std::make_unique<Rect>(computeBounds(Matrix3D::I(), computeTightBounds));
   }
-  auto result = matrix.mapRect(*localBounds);
-  if (!IsMatrix3DAffine(matrix)) {
+  auto result = coordinateMatrix.mapRect(*localBounds);
+  if (!IsMatrix3DAffine(coordinateMatrix)) {
     // while the matrix is not affine, the layer will draw with a 3D filter, so the bounds should
     // round out.
     result.roundOut();
@@ -559,7 +564,8 @@ Rect Layer::getBounds(const Layer* targetCoordinateSpace, bool computeTightBound
   return result;
 }
 
-Rect Layer::getBoundsInternal(const Matrix3D& coordinateMatrix, bool computeTightBounds) {
+Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBounds) {
+
   // If the matrix only contains 2D affine transformations, directly use the equivalent 2D
   // transformation matrix to calculate the final Bounds
   bool isCoordinateMatrixAffine = IsMatrix3DAffine(coordinateMatrix);
@@ -1171,6 +1177,10 @@ std::shared_ptr<Image> Layer::getContentImage(const DrawArgs& contentArgs, float
                                    contentArgs.dstColorSpace);
     imageMatrix->setScale(1.0f / contentScale, 1.0f / contentScale);
     imageMatrix->preTranslate(offset.x, offset.y);
+  }
+
+  if (!finalImage) {
+    return nullptr;
   }
 
   auto filterOffset = Point::Make(0, 0);
