@@ -544,18 +544,18 @@ bool Layer::replaceChild(std::shared_ptr<Layer> oldChild, std::shared_ptr<Layer>
 
 Rect Layer::getBounds(const Layer* targetCoordinateSpace, bool computeTightBounds) {
   auto matrix = getRelativeMatrix(targetCoordinateSpace);
-  return getBounds(matrix, computeTightBounds);
+  return getBoundsInternal(matrix, computeTightBounds);
 }
 
-Rect Layer::getBounds(const Matrix3D& matrix, bool computeTightBounds) {
+Rect Layer::getBoundsInternal(const Matrix3D& coordinateMatrix, bool computeTightBounds) {
   if (computeTightBounds || bitFields.dirtyDescendents) {
-    return getBoundsInternal(matrix, computeTightBounds);
+    return computeBounds(coordinateMatrix, computeTightBounds);
   }
   if (!localBounds) {
-    localBounds = std::make_unique<Rect>(getBoundsInternal(Matrix3D::I(), computeTightBounds));
+    localBounds = std::make_unique<Rect>(computeBounds(Matrix3D::I(), computeTightBounds));
   }
-  auto result = matrix.mapRect(*localBounds);
-  if (!IsMatrix3DAffine(matrix)) {
+  auto result = coordinateMatrix.mapRect(*localBounds);
+  if (!IsMatrix3DAffine(coordinateMatrix)) {
     // while the matrix is not affine, the layer will draw with a 3D filter, so the bounds should
     // round out.
     result.roundOut();
@@ -563,7 +563,8 @@ Rect Layer::getBounds(const Matrix3D& matrix, bool computeTightBounds) {
   return result;
 }
 
-Rect Layer::getBoundsInternal(const Matrix3D& coordinateMatrix, bool computeTightBounds) {
+Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBounds) {
+
   // If the matrix only contains 2D affine transformations, directly use the equivalent 2D
   // transformation matrix to calculate the final Bounds
   bool isCoordinateMatrixAffine = IsMatrix3DAffine(coordinateMatrix);
@@ -587,7 +588,7 @@ Rect Layer::getBoundsInternal(const Matrix3D& coordinateMatrix, bool computeTigh
     }
     auto childMatrix = child->getMatrixWithScrollRect();
     childMatrix.postConcat(workMatrix3D);
-    auto childBounds = child->getBounds(childMatrix, computeTightBounds);
+    auto childBounds = child->getBoundsInternal(childMatrix, computeTightBounds);
     if (child->_scrollRect) {
       auto relatvieScrollRect = childMatrix.mapRect(*child->_scrollRect);
       if (!childBounds.intersect(relatvieScrollRect)) {
@@ -597,7 +598,7 @@ Rect Layer::getBoundsInternal(const Matrix3D& coordinateMatrix, bool computeTigh
     if (child->hasValidMask()) {
       auto maskRelativeMatrix = child->_mask->getRelativeMatrix(child.get());
       maskRelativeMatrix.postConcat(childMatrix);
-      auto maskBounds = child->_mask->getBounds(maskRelativeMatrix, computeTightBounds);
+      auto maskBounds = child->_mask->getBoundsInternal(maskRelativeMatrix, computeTightBounds);
       if (!childBounds.intersect(maskBounds)) {
         continue;
       }
@@ -1176,9 +1177,7 @@ std::shared_ptr<Image> Layer::getContentImage(const DrawArgs& contentArgs, float
     imageMatrix->setScale(1.0f / contentScale, 1.0f / contentScale);
     imageMatrix->preTranslate(offset.x, offset.y);
   }
-  if (!finalImage) {
-    return nullptr;
-  }
+
   auto filterOffset = Point::Make(0, 0);
   if (!contentArgs.excludeEffects) {
     auto filter = getImageFilter(contentScale);
