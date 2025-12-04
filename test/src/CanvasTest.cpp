@@ -348,9 +348,9 @@ TGFX_TEST(CanvasTest, drawPaint) {
   Font font(typeface, 50.f);
   font.setFauxBold(true);
   auto textBlob = TextBlob::MakeFrom("TGFX", font);
-  Path path = {};
-  auto success = textBlob->getPath(&path);
-  EXPECT_TRUE(success);
+  auto textShape = Shape::MakeFrom(textBlob);
+  ASSERT_TRUE(textShape != nullptr);
+  auto path = textShape->getPath();
   path.transform(Matrix::MakeTrans(10, 100));
   canvas->clear(Color::Red());
   canvas->save();
@@ -757,9 +757,9 @@ TGFX_TEST(CanvasTest, inversePath) {
   Font font(typeface, 70.f);
   font.setFauxBold(true);
   auto textBlob = TextBlob::MakeFrom("Hello TGFX", font);
-  Path textPath = {};
-  auto success = textBlob->getPath(&textPath);
-  EXPECT_TRUE(success);
+  auto textShape = Shape::MakeFrom(textBlob);
+  ASSERT_TRUE(textShape != nullptr);
+  Path textPath = textShape->getPath();
   EXPECT_TRUE(!textPath.isEmpty());
   textPath.toggleInverseFillType();
   EXPECT_TRUE(textPath.isInverseFillType());

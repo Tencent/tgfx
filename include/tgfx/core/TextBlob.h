@@ -73,14 +73,6 @@ class TextBlob {
    */
   Rect getTightBounds(const Matrix* matrix = nullptr) const;
 
-  /**
-   * Creates a Path for the glyphs in the text blob. Since text outlines can change with different
-   * scale factors, it's best to use the final drawing matrix to compute an accurate Path.
-   * Returns true if the path was created successfully; otherwise, returns false and leaves the
-   * path unchanged.
-   */
-  bool getPath(Path* path, const Matrix* matrix = nullptr) const;
-
  private:
   std::vector<std::shared_ptr<GlyphRunList>> glyphRunLists = {};
 
