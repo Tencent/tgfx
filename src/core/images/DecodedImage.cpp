@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DecodedImage.h"
-#include <utility>
 #include "BufferImage.h"
 #include "core/ImageSource.h"
 #include "gpu/ProxyProvider.h"

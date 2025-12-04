@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <utility>
 #include "tgfx/core/ImageCodec.h"
 #include "webp/decode.h"
 #include "webp/demux.h"

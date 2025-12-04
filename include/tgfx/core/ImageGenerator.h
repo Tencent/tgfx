@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <utility>
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/ImageBuffer.h"
 
