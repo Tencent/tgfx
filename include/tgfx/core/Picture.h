@@ -19,24 +19,24 @@
 #pragma once
 
 #include <atomic>
-#include "tgfx/core/FillModifier.h"
+#include "tgfx/core/BrushModifier.h"
 #include "tgfx/core/Matrix.h"
 
 namespace tgfx {
-class Record;
+class PictureRecord;
 class Canvas;
 class DrawContext;
 class MCState;
 class Image;
-class Fill;
-class BlockData;
+class Brush;
+class BlockBuffer;
 template <typename T>
 class PlacementPtr;
 
 /**
  * The Picture class captures the drawing commands made on a Canvas, which can be replayed later.
  * The Picture object is thread-safe and immutable once created. Pictures can be created by a
- * Recorder or loaded from serialized data.
+ * PictureRecorder or loaded from serialized data.
  */
 class Picture {
  public:
@@ -87,33 +87,33 @@ class Picture {
    * recorded, each command in the Picture is sent separately to canvas. To add a single command to
    * draw the Picture to a canvas, call Canvas::drawPicture() instead.
    * @param canvas The receiver of drawing commands
-   * @param fillModifier An optional FillModifier to modify the Fill properties of drawing commands.
+   * @param brushModifier An optional BrushModifier to modify the Brush properties of drawing commands.
    */
-  void playback(Canvas* canvas, const FillModifier* fillModifier = nullptr) const;
+  void playback(Canvas* canvas, const BrushModifier* brushModifier = nullptr) const;
 
  private:
-  std::unique_ptr<BlockData> blockData;
-  std::vector<PlacementPtr<Record>> records;
+  std::unique_ptr<BlockBuffer> blockBuffer;
+  std::vector<PlacementPtr<PictureRecord>> records;
   mutable std::atomic<Rect*> bounds = {nullptr};
   size_t drawCount = 0;
   bool _hasUnboundedFill = false;
 
-  Picture(std::unique_ptr<BlockData> data, std::vector<PlacementPtr<Record>> records,
+  Picture(std::unique_ptr<BlockBuffer> buffer, std::vector<PlacementPtr<PictureRecord>> records,
           size_t drawCount);
 
   void playback(DrawContext* drawContext, const MCState& state,
-                const FillModifier* fillModifier = nullptr) const;
+                const BrushModifier* brushModifier = nullptr) const;
 
   std::shared_ptr<Image> asImage(Point* offset, const Matrix* matrix = nullptr,
                                  const ISize* clipSize = nullptr) const;
 
-  const Record* getFirstDrawRecord(MCState* state = nullptr, Fill* fill = nullptr,
-                                   bool* hasStroke = nullptr) const;
+  const PictureRecord* getFirstDrawRecord(MCState* state = nullptr, Brush* brush = nullptr,
+                                          bool* hasStroke = nullptr) const;
 
   friend class MeasureContext;
   friend class HitTestContext;
   friend class RenderContext;
-  friend class RecordingContext;
+  friend class PictureContext;
   friend class SVGExportContext;
   friend class Image;
   friend class PictureImage;

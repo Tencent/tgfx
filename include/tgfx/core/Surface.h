@@ -19,8 +19,10 @@
 #pragma once
 
 #include "tgfx/core/Canvas.h"
+#include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/RenderFlags.h"
+#include "tgfx/core/SurfaceReadback.h"
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/ImageOrigin.h"
 
@@ -42,12 +44,12 @@ class Surface {
   /**
    * Creates a new Surface on GPU indicated by context. Allocates memory for pixels based on the
    * width, height, and color type (alpha only). A Surface with MSAA enabled is returned if the
-   * sample count is greater than 1. Return nullptr if the size is invalid or the alpha-only
-   * textures are not renderable in the GPU backend.
+   * sample count is greater than 1. Return nullptr if the size is invalid.
    */
   static std::shared_ptr<Surface> Make(Context* context, int width, int height,
                                        bool alphaOnly = false, int sampleCount = 1,
-                                       bool mipmapped = false, uint32_t renderFlags = 0);
+                                       bool mipmapped = false, uint32_t renderFlags = 0,
+                                       std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
    * Creates a new Surface on GPU indicated by context. Allocates memory for pixels based on the
@@ -57,7 +59,8 @@ class Surface {
    */
   static std::shared_ptr<Surface> Make(Context* context, int width, int height, ColorType colorType,
                                        int sampleCount = 1, bool mipmapped = false,
-                                       uint32_t renderFlags = 0);
+                                       uint32_t renderFlags = 0,
+                                       std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
    * Wraps a backend render target into Surface. The caller must ensure the renderTarget is valid
@@ -66,7 +69,8 @@ class Surface {
    */
   static std::shared_ptr<Surface> MakeFrom(Context* context,
                                            const BackendRenderTarget& renderTarget,
-                                           ImageOrigin origin, uint32_t renderFlags = 0);
+                                           ImageOrigin origin, uint32_t renderFlags = 0,
+                                           std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
    * Wraps a BackendTexture into the Surface. The caller must ensure the texture is valid for the
@@ -76,7 +80,8 @@ class Surface {
    */
   static std::shared_ptr<Surface> MakeFrom(Context* context, const BackendTexture& backendTexture,
                                            ImageOrigin origin, int sampleCount = 1,
-                                           uint32_t renderFlags = 0);
+                                           uint32_t renderFlags = 0,
+                                           std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
    * Creates a Surface from the platform-specific hardware buffer. For example, the hardware buffer
@@ -85,7 +90,8 @@ class Surface {
    * context is nullptr or the hardwareBuffer is not renderable.
    */
   static std::shared_ptr<Surface> MakeFrom(Context* context, HardwareBufferRef hardwareBuffer,
-                                           int sampleCount = 1, uint32_t renderFlags = 0);
+                                           int sampleCount = 1, uint32_t renderFlags = 0,
+                                           std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   virtual ~Surface();
 
@@ -166,11 +172,24 @@ class Surface {
   Color getColor(int x, int y);
 
   /**
+   * Asynchronously copies a rect of pixels from the Surface and returns a SurfaceReadback. Use the
+   * returned SurfaceReadback to check when the pixel data is ready and to access it. Note that the
+   * pixel data respects the Surface's origin; if the origin is bottom-left, the pixel data will be
+   * vertically flipped. Returns nullptr if the rect is empty or outside the bounds of the Surface.
+   */
+  std::shared_ptr<SurfaceReadback> asyncReadPixels(const Rect& rect);
+
+  /**
    * Copies a rect of pixels to dstPixels with specified ImageInfo. Copy starts at (srcX, srcY), and
-   * does not exceed Surface (width(), height()). Pixels are copied only if pixel conversion is
-   * possible. Returns true if pixels are copied to dstPixels.
+   * does not exceed Surface (width(), height()). Pixels are always provided in top-left origin
+   * format; if the Surface's origin is bottom-left, the pixels are flipped during the copy. Pixels
+   * are copied only if pixel conversion is possible. Returns true if pixels are copied to dstPixels.
    */
   bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0, int srcY = 0);
+  /**
+   * Returns the colorSpace of the surface.
+   */
+  std::shared_ptr<ColorSpace> colorSpace() const;
 
  private:
   uint32_t _uniqueID = 0;
@@ -179,10 +198,11 @@ class Surface {
   std::shared_ptr<Image> cachedImage = nullptr;
 
   static std::shared_ptr<Surface> MakeFrom(std::shared_ptr<RenderTargetProxy> renderTargetProxy,
-                                           uint32_t renderFlags = 0, bool clearAll = false);
+                                           uint32_t renderFlags = 0, bool clearAll = false,
+                                           std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
-  Surface(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags = 0,
-          bool clearAll = false);
+  Surface(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags = 0, bool clearAll = false,
+          std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   bool aboutToDraw(bool discardContent = false);
 

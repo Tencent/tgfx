@@ -18,6 +18,7 @@
 
 #include "DropShadowImageFilter.h"
 #include "core/images/TextureImage.h"
+#include "core/utils/ToPMColor.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
@@ -44,14 +45,25 @@ DropShadowImageFilter::DropShadowImageFilter(float dx, float dy, float blurrines
       shadowOnly(shadowOnly) {
 }
 
-Rect DropShadowImageFilter::onFilterBounds(const Rect& srcRect) const {
-  auto bounds = srcRect;
-  bounds.offset(dx, dy);
-  if (blurFilter != nullptr) {
-    bounds = blurFilter->filterBounds(bounds);
+Rect DropShadowImageFilter::onFilterBounds(const Rect& rect, MapDirection mapDirection) const {
+  if (mapDirection == MapDirection::Forward) {
+    auto bounds = rect;
+    bounds.offset(dx, dy);
+    if (blurFilter != nullptr) {
+      bounds = blurFilter->filterBounds(bounds);
+    }
+    if (!shadowOnly) {
+      bounds.join(rect);
+    }
+    return bounds;
   }
+  Rect bounds = rect;
+  if (blurFilter != nullptr) {
+    bounds = blurFilter->filterBounds(bounds, mapDirection);
+  }
+  bounds.offset(-dx, -dy);
   if (!shadowOnly) {
-    bounds.join(srcRect);
+    bounds.join(rect);
   }
   return bounds;
 }
@@ -64,7 +76,7 @@ PlacementPtr<FragmentProcessor> DropShadowImageFilter::getSourceFragmentProcesso
   if (result) {
     return result;
   }
-  return ConstColorProcessor::Make(args.context->drawingBuffer(), Color::Transparent(),
+  return ConstColorProcessor::Make(args.context->drawingAllocator(), PMColor::Transparent(),
                                    InputMode::Ignore);
 }
 
@@ -78,19 +90,20 @@ PlacementPtr<FragmentProcessor> DropShadowImageFilter::getShadowFragmentProcesso
 
   PlacementPtr<FragmentProcessor> shadowProcessor;
   if (blurFilter != nullptr) {
-    shadowProcessor = blurFilter->asFragmentProcessor(std::move(source), args, sampling, constraint,
-                                                      &shadowMatrix);
+    shadowProcessor =
+        blurFilter->asFragmentProcessor(source, args, sampling, constraint, &shadowMatrix);
   } else {
-    shadowProcessor = FragmentProcessor::Make(std::move(source), args, TileMode::Decal,
-                                              TileMode::Decal, sampling, constraint, &shadowMatrix);
+    shadowProcessor = FragmentProcessor::Make(source, args, TileMode::Decal, TileMode::Decal,
+                                              sampling, constraint, &shadowMatrix);
   }
   if (shadowProcessor == nullptr) {
     return nullptr;
   }
-  auto buffer = args.context->drawingBuffer();
-  auto colorProcessor = ConstColorProcessor::Make(buffer, color.premultiply(), InputMode::Ignore);
+  auto allocator = args.context->drawingAllocator();
+  auto dstColor = ToPMColor(color, source->colorSpace());
+  auto colorProcessor = ConstColorProcessor::Make(allocator, dstColor, InputMode::Ignore);
   return XfermodeFragmentProcessor::MakeFromTwoProcessors(
-      buffer, std::move(colorProcessor), std::move(shadowProcessor), BlendMode::SrcIn);
+      allocator, std::move(colorProcessor), std::move(shadowProcessor), BlendMode::SrcIn);
 }
 
 PlacementPtr<FragmentProcessor> DropShadowImageFilter::asFragmentProcessor(
@@ -107,7 +120,7 @@ PlacementPtr<FragmentProcessor> DropShadowImageFilter::asFragmentProcessor(
     return getSourceFragmentProcessor(source, args, sampling, constraint, uvMatrix);
   }
   return XfermodeFragmentProcessor::MakeFromTwoProcessors(
-      args.context->drawingBuffer(),
+      args.context->drawingAllocator(),
       getSourceFragmentProcessor(source, args, sampling, constraint, uvMatrix),
       std::move(shadowFragment), BlendMode::SrcOver);
 }

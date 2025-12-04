@@ -18,7 +18,7 @@
 
 #include <array>
 #include <utility>
-#include "core/utils/BlockBuffer.h"
+#include "core/utils/BlockAllocator.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/RectsVertexProvider.h"
 #include "gpu/resources/Resource.h"
@@ -62,16 +62,19 @@ TGFX_TEST(ResourceCacheTest, multiThreadRecycling) {
 };
 
 #ifdef TGFX_USE_THREADS
-TGFX_TEST(ResourceCacheTest, blockBufferRefCount) {
-  BlockBuffer blockBuffer;
+TGFX_TEST(ResourceCacheTest, blockAllocatorRefCount) {
+  BlockAllocator blockAllocator;
+  // make sure vertices expire after task is done
+  float* vertices = nullptr;
   {
     auto vertexProvider =
-        RectsVertexProvider::MakeFrom(&blockBuffer, Rect::MakeWH(100, 100), AAType::Coverage);
-    std::array<float, 16> vertices;
-    auto task = std::make_shared<VertexProviderTask>(std::move(vertexProvider), vertices.data());
+        RectsVertexProvider::MakeFrom(&blockAllocator, Rect::MakeWH(100, 100), AAType::Coverage);
+    vertices = new float[vertexProvider->vertexCount()];
+    auto task = std::make_shared<VertexProviderTask>(std::move(vertexProvider), vertices);
     Task::Run(task);
   }
-  blockBuffer.clear();
+  blockAllocator.clear();
+  delete[] vertices;
 }
 #endif
 

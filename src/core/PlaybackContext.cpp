@@ -20,13 +20,13 @@
 #include "DrawContext.h"
 
 namespace tgfx {
-PlaybackContext::PlaybackContext(MCState state, const FillModifier* fillModifier)
-    : initState(std::move(state)), fillModifier(fillModifier) {
+PlaybackContext::PlaybackContext(MCState state, const BrushModifier* brushModifier)
+    : initState(std::move(state)), brushModifier(brushModifier) {
   hasInitMatrix = !initState.matrix.isIdentity();
   hasInitClip = !initState.clip.isEmpty() || !initState.clip.isInverseFillType();
   _state = initState;
-  if (fillModifier) {
-    _fill = fillModifier->transform(lastOriginalFill);
+  if (brushModifier) {
+    _brush = brushModifier->transform(lastOriginalBrush);
   }
 }
 
@@ -48,20 +48,20 @@ void PlaybackContext::setClip(const Path& clip) {
 }
 
 void PlaybackContext::setColor(const Color& color) {
-  if (fillModifier) {
-    lastOriginalFill.color = color;
-    _fill = fillModifier->transform(lastOriginalFill);
+  if (brushModifier) {
+    lastOriginalBrush.color = color;
+    _brush = brushModifier->transform(lastOriginalBrush);
   } else {
-    _fill.color = color;
+    _brush.color = color;
   }
 }
 
-void PlaybackContext::setFill(const Fill& fill) {
-  if (fillModifier) {
-    lastOriginalFill = fill;
-    _fill = fillModifier->transform(lastOriginalFill);
+void PlaybackContext::setBrush(const Brush& brush) {
+  if (brushModifier) {
+    lastOriginalBrush = brush;
+    _brush = brushModifier->transform(lastOriginalBrush);
   } else {
-    _fill = fill;
+    _brush = brush;
   }
 }
 
@@ -81,11 +81,11 @@ void PlaybackContext::setHasStroke(bool value) {
 
 void PlaybackContext::drawFill(DrawContext* context) {
   if (hasInitClip) {
-    context->drawPath(initState.clip, {}, _fill.makeWithMatrix(initState.matrix));
+    context->drawPath(initState.clip, {}, _brush.makeWithMatrix(initState.matrix));
   } else if (hasInitMatrix) {
-    context->drawFill(_fill.makeWithMatrix(initState.matrix));
+    context->drawFill(_brush.makeWithMatrix(initState.matrix));
   } else {
-    context->drawFill(_fill);
+    context->drawFill(_brush);
   }
 }
 

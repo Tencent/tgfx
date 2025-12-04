@@ -24,7 +24,7 @@
 namespace tgfx {
 class GLSLConstColorProcessor : public ConstColorProcessor {
  public:
-  GLSLConstColorProcessor(Color color, InputMode mode);
+  GLSLConstColorProcessor(PMColor color, InputMode mode);
 
   void emitCode(EmitArgs& args) const override;
 

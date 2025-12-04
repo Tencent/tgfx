@@ -20,10 +20,15 @@
 
 #include <cstdint>
 #include "tgfx/core/Color.h"
+#include "tgfx/gpu/PixelFormat.h"
 
 namespace tgfx {
 class Swizzle {
  public:
+  static Swizzle ForRead(PixelFormat pixelFormat);
+
+  static Swizzle ForWrite(PixelFormat pixelFormat);
+
   constexpr Swizzle() : Swizzle("rgba") {
   }
 
@@ -55,23 +60,28 @@ class Swizzle {
   static constexpr Swizzle RGBA() {
     return Swizzle("rgba");
   }
+
   static constexpr Swizzle AAAA() {
     return Swizzle("aaaa");
   }
+
   static constexpr Swizzle RRRR() {
     return Swizzle("rrrr");
   }
+
   static constexpr Swizzle RRRA() {
     return Swizzle("rrra");
   }
+
   static constexpr Swizzle RGRG() {
     return Swizzle("rgrg");
   }
+
   static constexpr Swizzle RARA() {
     return Swizzle("rara");
   }
 
-  Color applyTo(const Color& color) const;
+  PMColor applyTo(const PMColor& color) const;
 
  private:
   char swiz[5];

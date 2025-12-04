@@ -18,21 +18,23 @@
 
 #pragma once
 
-#include "core/utils/BlockBuffer.h"
+#include <optional>
+#include "core/utils/BlockAllocator.h"
 #include "gpu/AAType.h"
 #include "gpu/VertexProvider.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Matrix.h"
+#include "tgfx/core/Stroke.h"
 
 namespace tgfx {
 struct RectRecord {
-  RectRecord(const Rect& rect, const Matrix& viewMatrix, const Color& color = {})
+  RectRecord(const Rect& rect, const Matrix& viewMatrix, const PMColor& color = {})
       : rect(rect), viewMatrix(viewMatrix), color(color) {
   }
 
   Rect rect;
   Matrix viewMatrix;
-  Color color;
+  PMColor color;
 };
 
 enum class UVSubsetMode { None, SubsetOnly, RoundOutAndSubset };
@@ -47,17 +49,18 @@ class RectsVertexProvider : public VertexProvider {
   /**
    * Creates a new RectsVertexProvider from a single rect.
    */
-  static PlacementPtr<RectsVertexProvider> MakeFrom(BlockBuffer* buffer, const Rect& rect,
+  static PlacementPtr<RectsVertexProvider> MakeFrom(BlockAllocator* allocator, const Rect& rect,
                                                     AAType aaType);
 
   /**
    * Creates a new RectsVertexProvider from a list of rect records.
    */
-  static PlacementPtr<RectsVertexProvider> MakeFrom(BlockBuffer* buffer,
+  static PlacementPtr<RectsVertexProvider> MakeFrom(BlockAllocator* allocator,
                                                     std::vector<PlacementPtr<RectRecord>>&& rects,
                                                     std::vector<PlacementPtr<Rect>>&& uvRects,
                                                     AAType aaType, bool needUVCoord,
-                                                    UVSubsetMode subsetMode);
+                                                    UVSubsetMode subsetMode,
+                                                    std::vector<PlacementPtr<Stroke>>&& strokes);
 
   /**
    * Returns the number of rects in the provider.
@@ -88,6 +91,13 @@ class RectsVertexProvider : public VertexProvider {
   }
 
   /**
+   * Returns the line join type if stroke is enabled, nullopt otherwise.
+   */
+  std::optional<LineJoin> lineJoin() const {
+    return _lineJoin;
+  }
+
+  /**
    * Returns the first rect in the provider.
    */
   const Rect& firstRect() const {
@@ -105,7 +115,7 @@ class RectsVertexProvider : public VertexProvider {
   /**
    * Returns the first color in the provider. If no color record exists, a white color is returned.
    */
-  const Color& firstColor() const {
+  const PMColor& firstColor() const {
     return rects.front()->color;
   }
 
@@ -119,6 +129,7 @@ class RectsVertexProvider : public VertexProvider {
  protected:
   PlacementArray<RectRecord> rects = {};
   PlacementArray<Rect> uvRects = {};
+  std::optional<LineJoin> _lineJoin = std::nullopt;
   struct {
     uint8_t aaType : 2;
     bool hasUVCoord : 1;
@@ -128,6 +139,6 @@ class RectsVertexProvider : public VertexProvider {
 
   RectsVertexProvider(PlacementArray<RectRecord>&& rects, PlacementArray<Rect>&& uvRects,
                       AAType aaType, bool hasUVCoord, bool hasColor, UVSubsetMode subsetMode,
-                      std::shared_ptr<BlockBuffer> reference);
+                      std::shared_ptr<BlockAllocator> reference);
 };
 }  // namespace tgfx

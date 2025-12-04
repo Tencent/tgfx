@@ -58,7 +58,8 @@ static constexpr float ColorConversionJPEGFullRange[] = {
     1.0f, 1.0f, 1.0f, 0.0f, -0.344136f, 1.772000f, 1.402f, -0.714136f, 0.0f,
 };
 
-PlacementPtr<FragmentProcessor> TextureEffect::MakeRGBAAA(std::shared_ptr<TextureProxy> proxy,
+PlacementPtr<FragmentProcessor> TextureEffect::MakeRGBAAA(BlockAllocator* allocator,
+                                                          std::shared_ptr<TextureProxy> proxy,
                                                           const SamplingArgs& args,
                                                           const Point& alphaStart,
                                                           const Matrix* uvMatrix) {
@@ -66,9 +67,8 @@ PlacementPtr<FragmentProcessor> TextureEffect::MakeRGBAAA(std::shared_ptr<Textur
     return nullptr;
   }
   auto matrix = uvMatrix ? *uvMatrix : Matrix::I();
-  auto drawingBuffer = proxy->getContext()->drawingBuffer();
-  return drawingBuffer->make<GLSLTextureEffect>(std::move(proxy), alphaStart, args.sampling,
-                                                args.constraint, matrix, args.sampleArea);
+  return allocator->make<GLSLTextureEffect>(std::move(proxy), alphaStart, args.sampling,
+                                            args.constraint, matrix, args.sampleArea);
 }
 
 GLSLTextureEffect::GLSLTextureEffect(std::shared_ptr<TextureProxy> proxy, const Point& alphaStart,
@@ -173,7 +173,7 @@ void GLSLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
     fragBuilder->appendTextureLookup(textureSamplers[1], finalCoordName);
     fragBuilder->codeAppend(".ra;");
   }
-  if (IsLimitedYUVColorRange(yuvTexture->colorSpace())) {
+  if (IsLimitedYUVColorRange(yuvTexture->yuvColorSpace())) {
     fragBuilder->codeAppend("yuv.x -= (16.0 / 255.0);");
   }
   fragBuilder->codeAppend("yuv.yz -= vec2(0.5, 0.5);");
@@ -210,60 +210,27 @@ void GLSLTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
   auto yuvTexture = getYUVTexture();
   if (yuvTexture) {
     std::string mat3ColorConversion = "Mat3ColorConversion";
-    switch (yuvTexture->colorSpace()) {
+    switch (yuvTexture->yuvColorSpace()) {
       case YUVColorSpace::BT601_LIMITED: {
-        if (fragmentUniformData->uboSupport()) {
-          fragmentUniformData->setData(mat3ColorConversion,
-                                       AlignMat3(ColorConversion601LimitRange));
-        } else {
-          fragmentUniformData->setData(mat3ColorConversion, ColorConversion601LimitRange);
-        }
+        fragmentUniformData->setData(mat3ColorConversion, AlignMat3(ColorConversion601LimitRange));
       } break;
       case YUVColorSpace::BT601_FULL:
-        if (fragmentUniformData->uboSupport()) {
-          fragmentUniformData->setData(mat3ColorConversion, AlignMat3(ColorConversion601FullRange));
-        } else {
-          fragmentUniformData->setData(mat3ColorConversion, ColorConversion601FullRange);
-        }
+        fragmentUniformData->setData(mat3ColorConversion, AlignMat3(ColorConversion601FullRange));
         break;
       case YUVColorSpace::BT709_LIMITED:
-        if (fragmentUniformData->uboSupport()) {
-          fragmentUniformData->setData(mat3ColorConversion,
-                                       AlignMat3(ColorConversion709LimitRange));
-        } else {
-          fragmentUniformData->setData(mat3ColorConversion, ColorConversion709LimitRange);
-        }
+        fragmentUniformData->setData(mat3ColorConversion, AlignMat3(ColorConversion709LimitRange));
         break;
       case YUVColorSpace::BT709_FULL:
-        if (fragmentUniformData->uboSupport()) {
-          fragmentUniformData->setData(mat3ColorConversion, AlignMat3(ColorConversion709FullRange));
-        } else {
-          fragmentUniformData->setData(mat3ColorConversion, ColorConversion709FullRange);
-        }
+        fragmentUniformData->setData(mat3ColorConversion, AlignMat3(ColorConversion709FullRange));
         break;
       case YUVColorSpace::BT2020_LIMITED:
-        if (fragmentUniformData->uboSupport()) {
-          fragmentUniformData->setData(mat3ColorConversion,
-                                       AlignMat3(ColorConversion2020LimitRange));
-        } else {
-          fragmentUniformData->setData(mat3ColorConversion, ColorConversion2020LimitRange);
-        }
+        fragmentUniformData->setData(mat3ColorConversion, AlignMat3(ColorConversion2020LimitRange));
         break;
       case YUVColorSpace::BT2020_FULL:
-        if (fragmentUniformData->uboSupport()) {
-          fragmentUniformData->setData(mat3ColorConversion,
-                                       AlignMat3(ColorConversion2020FullRange));
-        } else {
-          fragmentUniformData->setData(mat3ColorConversion, ColorConversion2020FullRange);
-        }
+        fragmentUniformData->setData(mat3ColorConversion, AlignMat3(ColorConversion2020FullRange));
         break;
       case YUVColorSpace::JPEG_FULL:
-        if (fragmentUniformData->uboSupport()) {
-          fragmentUniformData->setData(mat3ColorConversion,
-                                       AlignMat3(ColorConversionJPEGFullRange));
-        } else {
-          fragmentUniformData->setData(mat3ColorConversion, ColorConversionJPEGFullRange);
-        }
+        fragmentUniformData->setData(mat3ColorConversion, AlignMat3(ColorConversionJPEGFullRange));
         break;
       default:
         break;
@@ -281,7 +248,7 @@ void GLSLTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
     // Normally this would just need to take 1/2 a texel off each end, but because the chroma
     // channels of YUV420 images are subsampled we may need to shrink the crop region by a whole
     // texel on each side.
-    auto inset = type == GPUTextureType::External ? 1.0f : 0.5f;
+    auto inset = type == TextureType::External ? 1.0f : 0.5f;
     subsetRect = subsetRect.makeInset(inset, inset);
     float rect[4] = {subsetRect.left, subsetRect.top, subsetRect.right, subsetRect.bottom};
     if (textureView->origin() == ImageOrigin::BottomLeft) {
@@ -290,7 +257,7 @@ void GLSLTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
       rect[3] = h - rect[3];
       std::swap(rect[1], rect[3]);
     }
-    if (type != GPUTextureType::Rectangle) {
+    if (type != TextureType::Rectangle) {
       auto lt = textureView->getTextureCoord(rect[0], rect[1]);
       auto rb = textureView->getTextureCoord(rect[2], rect[3]);
       rect[0] = lt.x;

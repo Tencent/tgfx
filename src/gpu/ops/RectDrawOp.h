@@ -43,6 +43,36 @@ class RectDrawOp : public DrawOp {
   static constexpr uint16_t IndicesPerAAQuad = 30;
 
   /**
+   * The number of indices per AA rect with miter-stroke.
+   */
+  static constexpr uint16_t IndicesPerAAMiterStrokeRect = 72;
+
+  /**
+   * The number of indices per AA rect with round-stroke.
+   */
+  static constexpr uint16_t IndicesPerAARoundStrokeRect = 96;
+
+  /**
+   * The number of indices per AA rect with bevel-stroke.
+   */
+  static constexpr uint16_t IndicesPerAABevelStrokeRect = 108;
+
+  /**
+   * The number of indices per non-AA rect with miter-stroke.
+   */
+  static constexpr uint16_t IndicesPerNonAAMiterStrokeRect = 24;
+
+  /**
+   * The number of indices per non-AA rect with round-stroke.
+   */
+  static constexpr uint16_t IndicesPerNonAARoundStrokeRect = 72;
+
+  /**
+   * The number of indices per non-AA rect with bevel-stroke.
+   */
+  static constexpr uint16_t IndicesPerNonAABevelStrokeRect = 36;
+
+  /**
    * Create a new RectDrawOp for the specified vertex provider.
    */
   static PlacementPtr<RectDrawOp> Make(Context* context, PlacementPtr<RectsVertexProvider> provider,
@@ -59,14 +89,15 @@ class RectDrawOp : public DrawOp {
 
  private:
   size_t rectCount = 0;
-  std::optional<Color> commonColor = std::nullopt;
+  std::optional<LineJoin> lineJoin = std::nullopt;
+  std::optional<PMColor> commonColor = std::nullopt;
   std::optional<Matrix> uvMatrix = std::nullopt;
   bool hasSubset = false;
   std::shared_ptr<GPUBufferProxy> indexBufferProxy = nullptr;
   std::shared_ptr<VertexBufferView> vertexBufferProxyView = nullptr;
 
-  explicit RectDrawOp(RectsVertexProvider* provider);
+  RectDrawOp(BlockAllocator* allocator, RectsVertexProvider* provider);
 
-  friend class BlockBuffer;
+  friend class BlockAllocator;
 };
 }  // namespace tgfx

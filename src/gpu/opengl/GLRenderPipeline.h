@@ -20,11 +20,11 @@
 
 #include <memory>
 #include <unordered_map>
-#include "gpu/RenderPipeline.h"
 #include "gpu/opengl/GLBuffer.h"
 #include "gpu/opengl/GLResource.h"
 #include "gpu/opengl/GLState.h"
 #include "gpu/opengl/GLTexture.h"
+#include "tgfx/gpu/RenderPipeline.h"
 
 namespace tgfx {
 struct GLAttribute {
@@ -32,12 +32,6 @@ struct GLAttribute {
   int count = 0;
   unsigned type = 0;
   bool normalized = false;
-  size_t offset = 0;
-};
-
-struct GLUniform {
-  UniformFormat format = UniformFormat::Float;
-  int location = -1;
   size_t offset = 0;
 };
 
@@ -80,20 +74,21 @@ class GLRenderPipeline : public RenderPipeline, public GLResource {
   void onRelease(GLGPU* gpu) override;
 
  private:
+  uint32_t uniqueID = 0;
   unsigned programID = 0;
   unsigned vertexArray = 0;
   std::vector<GLAttribute> attributes = {};
   size_t vertexStride = 0;
-  // only used if UBOs are not supported.
-  std::unordered_map<unsigned, std::vector<GLUniform>> uniformBlocks = {};
   std::unordered_map<unsigned, unsigned> textureUnits = {};
   uint32_t colorWriteMask = ColorWriteMask::All;
   std::unique_ptr<GLStencilState> stencilState = nullptr;
   std::unique_ptr<GLDepthState> depthState = nullptr;
   std::unique_ptr<GLBlendState> blendState = nullptr;
+  std::unique_ptr<GLCullFaceState> cullFaceState = {};
 
   bool setPipelineDescriptor(GLGPU* gpu, const RenderPipelineDescriptor& descriptor);
 
   friend class GLGPU;
+  friend class GLState;
 };
 }  // namespace tgfx

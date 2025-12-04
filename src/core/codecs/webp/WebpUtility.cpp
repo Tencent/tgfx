@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/codecs/webp/WebpUtility.h"
+#include <src/skcms_public.h>
 #include <cstdint>
 #include <cstdio>
 #include "core/utils/Log.h"
@@ -247,6 +248,7 @@ DecodeInfo WebpUtility::getDecodeInfo(const std::string& filePath) {
   webpFile._start = 12;
   auto chunkHeader = static_cast<uint8_t*>(malloc(RIFF_HEADER_SIZE));
   bool foundOrientation = false;
+  bool foundColorSpace = false;
   do {
     fseek(infile, static_cast<int>(webpFile._start), SEEK_SET);
     if ((fileLength - webpFile._start) < RIFF_HEADER_SIZE) break;
@@ -286,6 +288,25 @@ DecodeInfo WebpUtility::getDecodeInfo(const std::string& filePath) {
         }
         break;
       }
+      case MKFOURCC('I', 'C', 'C', 'P'): {
+        foundColorSpace = true;
+        fseek(infile, static_cast<int>(webpFile._start) + CHUNK_HEADER_SIZE, SEEK_SET);
+        auto profiler = static_cast<uint8_t*>(malloc(chunk_size));
+        if (fread(profiler, 1, chunk_size, infile) != chunk_size) {
+          needBreak = true;
+          break;
+        }
+        decodeInfo.colorSpace = ColorSpace::MakeFromICC(profiler, chunk_size);
+        if (decodeInfo.colorSpace == nullptr) {
+          decodeInfo.colorSpace = ColorSpace::SRGB();
+        }
+        if (chunk_size_padded <= webpFile._end - webpFile._start) {
+          Skip(&webpFile, chunk_size_padded + CHUNK_HEADER_SIZE);
+        } else {
+          needBreak = true;
+        }
+        break;
+      }
       default: {
         if (chunk_size_padded <= webpFile._end - webpFile._start) {
           Skip(&webpFile, chunk_size_padded + CHUNK_HEADER_SIZE);
@@ -296,7 +317,8 @@ DecodeInfo WebpUtility::getDecodeInfo(const std::string& filePath) {
       }
     }
     if (needBreak) break;
-  } while (!foundOrientation && (fileLength - webpFile._start) >= RIFF_HEADER_SIZE);
+  } while ((!foundColorSpace || !foundOrientation) &&
+           (fileLength - webpFile._start) >= RIFF_HEADER_SIZE);
   free(chunkHeader);
   fclose(infile);
   return decodeInfo;
@@ -335,8 +357,20 @@ DecodeInfo WebpUtility::getDecodeInfo(const void* fileBytes, size_t byteLength) 
     }
     WebPDemuxReleaseChunkIterator(&chunkIterator);
   }
+  std::shared_ptr<ColorSpace> colorSpace = nullptr;
+  {
+    WebPChunkIterator chunkIterator;
+    if (WebPDemuxGetChunk(demux, "ICCP", 1, &chunkIterator)) {
+      auto chunk = Data::MakeWithCopy(chunkIterator.chunk.bytes, chunkIterator.chunk.size);
+      colorSpace = ColorSpace::MakeFromICC(chunk->data(), chunk->size());
+    }
+    if (colorSpace == nullptr) {
+      colorSpace = ColorSpace::SRGB();
+    }
+    WebPDemuxReleaseChunkIterator(&chunkIterator);
+  }
   WebPDemuxDelete(demux);
-  return {width, height, orientation};
+  return {width, height, orientation, colorSpace};
 }
 
 }  // namespace tgfx

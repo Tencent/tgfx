@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ExternalRenderTarget.h"
-#include "gpu/GPU.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
@@ -26,7 +26,7 @@ std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
   if (context == nullptr) {
     return nullptr;
   }
-  auto texture = context->gpu()->importExternalTexture(backendRenderTarget);
+  auto texture = context->gpu()->importBackendRenderTarget(backendRenderTarget);
   if (!texture) {
     return nullptr;
   }

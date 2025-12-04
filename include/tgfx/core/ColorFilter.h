@@ -22,6 +22,7 @@
 #include <memory>
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Color.h"
+#include "tgfx/core/ColorSpace.h"
 
 namespace tgfx {
 template <typename T>
@@ -113,7 +114,8 @@ class ColorFilter {
   virtual bool isEqual(const ColorFilter* colorFilter) const = 0;
 
  private:
-  virtual PlacementPtr<FragmentProcessor> asFragmentProcessor(Context* context) const = 0;
+  virtual PlacementPtr<FragmentProcessor> asFragmentProcessor(
+      Context* context, std::shared_ptr<ColorSpace> dstColorSpace = nullptr) const = 0;
 
   friend class OpsCompositor;
   friend class ColorFilterShader;

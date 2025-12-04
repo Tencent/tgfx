@@ -19,15 +19,16 @@
 #include "GLSLDefaultGeometryProcessor.h"
 
 namespace tgfx {
-PlacementPtr<DefaultGeometryProcessor> DefaultGeometryProcessor::Make(BlockBuffer* buffer,
-                                                                      Color color, int width,
+PlacementPtr<DefaultGeometryProcessor> DefaultGeometryProcessor::Make(BlockAllocator* allocator,
+                                                                      PMColor color, int width,
                                                                       int height, AAType aa,
                                                                       const Matrix& viewMatrix,
                                                                       const Matrix& uvMatrix) {
-  return buffer->make<GLSLDefaultGeometryProcessor>(color, width, height, aa, viewMatrix, uvMatrix);
+  return allocator->make<GLSLDefaultGeometryProcessor>(color, width, height, aa, viewMatrix,
+                                                       uvMatrix);
 }
 
-GLSLDefaultGeometryProcessor::GLSLDefaultGeometryProcessor(Color color, int width, int height,
+GLSLDefaultGeometryProcessor::GLSLDefaultGeometryProcessor(PMColor color, int width, int height,
                                                            AAType aa, const Matrix& viewMatrix,
                                                            const Matrix& uvMatrix)
     : DefaultGeometryProcessor(color, width, height, aa, viewMatrix, uvMatrix) {

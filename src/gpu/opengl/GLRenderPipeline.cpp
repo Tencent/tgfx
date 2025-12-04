@@ -17,20 +17,21 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLRenderPipeline.h"
+#include "core/utils/UniqueID.h"
 #include "gpu/UniformData.h"
 #include "gpu/opengl/GLGPU.h"
 #include "gpu/opengl/GLUtil.h"
 
 namespace tgfx {
-GLRenderPipeline::GLRenderPipeline(unsigned programID) : programID(programID) {
+GLRenderPipeline::GLRenderPipeline(unsigned programID)
+    : uniqueID(UniqueID::Next()), programID(programID) {
 }
 
 void GLRenderPipeline::activate(GLGPU* gpu, bool depthReadOnly, bool stencilReadOnly,
                                 unsigned stencilReference) {
   auto state = gpu->state();
-  state->useProgram(programID);
-  auto shaderCaps = gpu->caps()->shaderCaps();
-  if (shaderCaps->frameBufferFetchSupport && shaderCaps->frameBufferFetchRequiresEnablePerSample) {
+  state->bindPipeline(this);
+  if (gpu->caps()->frameBufferFetchRequiresEnablePerSample) {
     if (blendState) {
       state->setEnabled(GL_FETCH_PER_SAMPLE_ARM, false);
     } else {
@@ -38,7 +39,6 @@ void GLRenderPipeline::activate(GLGPU* gpu, bool depthReadOnly, bool stencilRead
     }
   }
   state->setColorMask(colorWriteMask);
-
   state->setEnabled(GL_STENCIL_TEST, stencilState != nullptr);
   if (stencilState) {
     auto stencil = *stencilState;
@@ -60,93 +60,33 @@ void GLRenderPipeline::activate(GLGPU* gpu, bool depthReadOnly, bool stencilRead
   if (blendState) {
     state->setBlendState(*blendState);
   }
-  if (vertexArray > 0) {
-    state->bindVertexArray(vertexArray);
+  state->setEnabled(GL_CULL_FACE, cullFaceState != nullptr);
+  if (cullFaceState) {
+    state->setCullFaceState(*cullFaceState);
   }
 }
 
 void GLRenderPipeline::setUniformBuffer(GLGPU* gpu, unsigned binding, GLBuffer* buffer,
                                         size_t offset, size_t size) {
   DEBUG_ASSERT(gpu != nullptr);
-  if (buffer == nullptr || size == 0) {
-    return;
-  }
-  if (!(buffer->usage() & GPUBufferUsage::UNIFORM)) {
-    LOGE("GLRenderPipeline::setUniformBuffer error, buffer usage is not UNIFORM!");
-    return;
-  }
-
-  auto result = uniformBlocks.find(binding);
-  if (result == uniformBlocks.end()) {
-    LOGE("GLRenderPipeline::setUniformBuffer: binding %d not found", binding);
-    return;
-  }
-
   auto gl = gpu->functions();
-  auto& uniforms = result->second;
-  if (uniforms.empty()) {
-    unsigned ubo = buffer->bufferID();
-    if (ubo == 0) {
-      LOGE("GLRenderPipeline::setUniformBuffer error, uniform buffer id is 0");
-      return;
-    }
-    gl->bindBufferRange(GL_UNIFORM_BUFFER, binding, ubo, static_cast<int32_t>(offset),
-                        static_cast<int32_t>(size));
-  } else {
-    auto data = static_cast<uint8_t*>(buffer->map(offset, size));
-    for (auto& uniform : uniforms) {
-      auto uniformData = data + uniform.offset;
-      switch (uniform.format) {
-        case UniformFormat::Float:
-          gl->uniform1fv(uniform.location, 1, reinterpret_cast<float*>(uniformData));
-          break;
-        case UniformFormat::Float2:
-          gl->uniform2fv(uniform.location, 1, reinterpret_cast<float*>(uniformData));
-          break;
-        case UniformFormat::Float3:
-          gl->uniform3fv(uniform.location, 1, reinterpret_cast<float*>(uniformData));
-          break;
-        case UniformFormat::Float4:
-          gl->uniform4fv(uniform.location, 1, reinterpret_cast<float*>(uniformData));
-          break;
-        case UniformFormat::Float2x2:
-          gl->uniformMatrix2fv(uniform.location, 1, GL_FALSE,
-                               reinterpret_cast<float*>(uniformData));
-          break;
-        case UniformFormat::Float3x3:
-          gl->uniformMatrix3fv(uniform.location, 1, GL_FALSE,
-                               reinterpret_cast<float*>(uniformData));
-          break;
-        case UniformFormat::Float4x4:
-          gl->uniformMatrix4fv(uniform.location, 1, GL_FALSE,
-                               reinterpret_cast<float*>(uniformData));
-          break;
-        case UniformFormat::Int:
-          gl->uniform1iv(uniform.location, 1, reinterpret_cast<int*>(uniformData));
-          break;
-        case UniformFormat::Int2:
-          gl->uniform2iv(uniform.location, 1, reinterpret_cast<int*>(uniformData));
-          break;
-        case UniformFormat::Int3:
-          gl->uniform3iv(uniform.location, 1, reinterpret_cast<int*>(uniformData));
-          break;
-        case UniformFormat::Int4:
-          gl->uniform4iv(uniform.location, 1, reinterpret_cast<int*>(uniformData));
-          break;
-        case UniformFormat::Texture2DSampler:
-        case UniformFormat::TextureExternalSampler:
-        case UniformFormat::Texture2DRectSampler:
-          gl->uniform1iv(uniform.location, 1, reinterpret_cast<int*>(uniformData));
-          break;
-      }
-    }
+  if (buffer == nullptr || size == 0) {
+    gl->bindBufferRange(GL_UNIFORM_BUFFER, binding, 0, 0, 0);
+    return;
   }
+  DEBUG_ASSERT(buffer->usage() & GPUBufferUsage::UNIFORM);
+  unsigned ubo = buffer->bufferID();
+  if (ubo == 0) {
+    LOGE("GLRenderPipeline::setUniformBuffer error, uniform buffer id is 0");
+    return;
+  }
+  gl->bindBufferRange(GL_UNIFORM_BUFFER, binding, ubo, static_cast<int32_t>(offset),
+                      static_cast<int32_t>(size));
 }
 
 void GLRenderPipeline::setTexture(GLGPU* gpu, unsigned binding, GLTexture* texture,
                                   GLSampler* sampler) {
   DEBUG_ASSERT(texture != nullptr);
-  DEBUG_ASSERT(sampler != nullptr);
   auto result = textureUnits.find(binding);
   if (result == textureUnits.end()) {
     LOGE("GLRenderPipeline::setTexture: binding %d not found", binding);
@@ -154,19 +94,15 @@ void GLRenderPipeline::setTexture(GLGPU* gpu, unsigned binding, GLTexture* textu
   }
   auto state = gpu->state();
   state->bindTexture(texture, result->second);
-  texture->updateSampler(gpu, sampler);
+  if (sampler != nullptr) {
+    texture->updateSampler(gpu, sampler);
+  }
 }
 
 void GLRenderPipeline::setVertexBuffer(GLGPU* gpu, GLBuffer* vertexBuffer, size_t vertexOffset) {
+  DEBUG_ASSERT(vertexBuffer != nullptr);
+  DEBUG_ASSERT(vertexBuffer->usage() & GPUBufferUsage::VERTEX);
   auto gl = gpu->functions();
-  if (vertexBuffer == nullptr) {
-    gl->bindBuffer(GL_ARRAY_BUFFER, 0);
-    return;
-  }
-  if (!(vertexBuffer->usage() & GPUBufferUsage::VERTEX)) {
-    LOGE("GLRenderPipeline::setVertexBuffer error, buffer usage is not VERTEX!");
-    return;
-  }
   gl->bindBuffer(GL_ARRAY_BUFFER, vertexBuffer->bufferID());
   for (auto& attribute : attributes) {
     gl->vertexAttribPointer(static_cast<unsigned>(attribute.location), attribute.count,
@@ -248,6 +184,16 @@ static std::unique_ptr<GLBlendState> MakeBlendState(const PipelineColorAttachmen
   return blendState;
 }
 
+static std::unique_ptr<GLCullFaceState> MakeCullFaceState(const PrimitiveDescriptor& descriptor) {
+  if (descriptor.cullMode == CullMode::None) {
+    return nullptr;
+  }
+  auto cullFaceState = std::make_unique<GLCullFaceState>();
+  cullFaceState->cullFace = ToGLCullMode(descriptor.cullMode);
+  cullFaceState->frontFace = ToGLFrontFace(descriptor.frontFace);
+  return cullFaceState;
+}
+
 static GLStencil MakeGLStencil(const StencilDescriptor& descriptor) {
   GLStencil stencil = {};
   stencil.compare = ToGLCompareFunction(descriptor.compare);
@@ -286,16 +232,13 @@ bool GLRenderPipeline::setPipelineDescriptor(GLGPU* gpu,
                                              const RenderPipelineDescriptor& descriptor) {
   auto gl = gpu->functions();
   ClearGLError(gl);
-  auto state = gpu->state();
-  state->useProgram(programID);
-  auto caps = static_cast<const GLCaps*>(gpu->caps());
-  if (caps->vertexArrayObjectSupport) {
-    gl->genVertexArrays(1, &vertexArray);
-    if (vertexArray == 0) {
-      LOGE("GLRenderPipeline::createVertexArrays: failed to create VAO!");
-      return false;
-    }
+  gl->genVertexArrays(1, &vertexArray);
+  if (vertexArray == 0) {
+    LOGE("GLRenderPipeline::createVertexArrays: failed to create VAO!");
+    return false;
   }
+  auto state = gpu->state();
+  state->bindPipeline(this);
 
   DEBUG_ASSERT(!descriptor.vertex.attributes.empty());
   DEBUG_ASSERT(descriptor.vertex.vertexStride > 0);
@@ -316,26 +259,12 @@ bool GLRenderPipeline::setPipelineDescriptor(GLGPU* gpu,
   stencilState = MakeStencilState(descriptor.depthStencil);
   depthState = MakeDepthState(descriptor.depthStencil);
   blendState = MakeBlendState(attachment);
+  cullFaceState = MakeCullFaceState(descriptor.primitive);
 
   for (auto& entry : descriptor.layout.uniformBlocks) {
-    if (entry.uniforms.empty()) {
-      auto uniformBlockIndex = gl->getUniformBlockIndex(programID, entry.name.c_str());
-      if (uniformBlockIndex != GL_INVALID_INDEX) {
-        gl->uniformBlockBinding(programID, uniformBlockIndex, entry.binding);
-      }
-      uniformBlocks[entry.binding] = {};
-    } else {
-      std::vector<GLUniform> uniforms = {};
-      uniforms.reserve(entry.uniforms.size());
-      size_t uniformOffset = 0;
-      for (auto& uniform : entry.uniforms) {
-        auto location = gl->getUniformLocation(programID, uniform.name().c_str());
-        if (location != -1) {
-          uniforms.push_back({uniform.format(), location, uniformOffset});
-        }
-        uniformOffset += uniform.size();
-      }
-      uniformBlocks[entry.binding] = uniforms;
+    auto uniformBlockIndex = gl->getUniformBlockIndex(programID, entry.name.c_str());
+    if (uniformBlockIndex != GL_INVALID_INDEX) {
+      gl->uniformBlockBinding(programID, uniformBlockIndex, entry.binding);
     }
   }
 

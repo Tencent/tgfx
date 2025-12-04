@@ -25,19 +25,20 @@ class BackgroundContext {
  public:
   static std::shared_ptr<BackgroundContext> Make(Context* context, const Rect& drawRect,
                                                  float maxOutset, float minOutset,
-                                                 const Matrix& matrix);
+                                                 const Matrix& matrix,
+                                                 std::shared_ptr<ColorSpace> colorSpace);
 
-  Canvas* getCanvas() const {
-    return surface->getCanvas();
-  }
+  virtual ~BackgroundContext() = default;
 
-  std::shared_ptr<Image> getBackgroundImage() const;
+  virtual Canvas* getCanvas() = 0;
 
   Matrix backgroundMatrix() const {
     return imageMatrix;
   }
 
-  std::shared_ptr<BackgroundContext> createSubContext() const;
+  std::shared_ptr<Image> getBackgroundImage(Point* offset);
+
+  std::shared_ptr<BackgroundContext> createSubContext();
 
   void drawToParent(const Matrix& paintMatrix, const Paint& paint);
 
@@ -45,12 +46,19 @@ class BackgroundContext {
     return backgroundRect;
   }
 
- private:
-  BackgroundContext() = default;
-  std::shared_ptr<Surface> surface = nullptr;
+ protected:
+  virtual std::shared_ptr<Image> onGetBackgroundImage(Point* offset) = 0;
+
+  BackgroundContext(Context* context, const Matrix& matrix, const Rect& rect,
+                    std::shared_ptr<ColorSpace> colorSpace)
+      : context(context), imageMatrix(matrix), backgroundRect(rect),
+        colorSpace(std::move(colorSpace)){};
+  Context* context = nullptr;
   Matrix imageMatrix = Matrix::I();
-  const BackgroundContext* parent = nullptr;
   Rect backgroundRect = Rect::MakeEmpty();
+  std::shared_ptr<ColorSpace> colorSpace = nullptr;
+
+  BackgroundContext* parent = nullptr;
 };
 
 }  // namespace tgfx

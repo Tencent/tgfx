@@ -20,15 +20,14 @@
 
 namespace tgfx {
 PlacementPtr<EllipseGeometryProcessor> EllipseGeometryProcessor::Make(
-    BlockBuffer* buffer, int width, int height, bool stroke, bool useScale,
-    std::optional<Color> commonColor) {
-  return buffer->make<GLSLEllipseGeometryProcessor>(width, height, stroke, useScale, commonColor);
+    BlockAllocator* allocator, int width, int height, bool stroke,
+    std::optional<PMColor> commonColor) {
+  return allocator->make<GLSLEllipseGeometryProcessor>(width, height, stroke, commonColor);
 }
 
 GLSLEllipseGeometryProcessor::GLSLEllipseGeometryProcessor(int width, int height, bool stroke,
-                                                           bool useScale,
-                                                           std::optional<Color> commonColor)
-    : EllipseGeometryProcessor(width, height, stroke, useScale, commonColor) {
+                                                           std::optional<PMColor> commonColor)
+    : EllipseGeometryProcessor(width, height, stroke, commonColor) {
 }
 
 void GLSLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
@@ -39,8 +38,7 @@ void GLSLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
   // emit attributes
   varyingHandler->emitAttributes(*this);
 
-  auto offsetType = useScale ? SLType::Float3 : SLType::Float2;
-  auto ellipseOffsets = varyingHandler->addVarying("EllipseOffsets", offsetType);
+  auto ellipseOffsets = varyingHandler->addVarying("EllipseOffsets", SLType::Float2);
   vertBuilder->codeAppendf("%s = %s;", ellipseOffsets.vsOut().c_str(),
                            inEllipseOffset.name().c_str());
 
@@ -80,26 +78,10 @@ void GLSLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppendf("offset *= %s.xy;", ellipseRadii.fsIn().c_str());
   }
   fragBuilder->codeAppend("float test = dot(offset, offset) - 1.0;");
-  if (useScale) {
-    fragBuilder->codeAppendf("vec2 grad = 2.0*offset*(%s.z*%s.xy);", ellipseOffsets.fsIn().c_str(),
-                             ellipseRadii.fsIn().c_str());
-  } else {
-    fragBuilder->codeAppendf("vec2 grad = 2.0*offset*%s.xy;", ellipseRadii.fsIn().c_str());
-  }
+  fragBuilder->codeAppendf("vec2 grad = 2.0*offset*%s.xy;", ellipseRadii.fsIn().c_str());
   fragBuilder->codeAppend("float grad_dot = dot(grad, grad);");
-
-  // avoid calling inversesqrt on zero.
-  if (args.caps->floatIs32Bits) {
-    fragBuilder->codeAppend("grad_dot = max(grad_dot, 1.1755e-38);");
-  } else {
-    fragBuilder->codeAppend("grad_dot = max(grad_dot, 6.1036e-5);");
-  }
-  if (useScale) {
-    fragBuilder->codeAppendf("float invlen = %s.z*inversesqrt(grad_dot);",
-                             ellipseOffsets.fsIn().c_str());
-  } else {
-    fragBuilder->codeAppend("float invlen = inversesqrt(grad_dot);");
-  }
+  fragBuilder->codeAppend("grad_dot = max(grad_dot, 1.1755e-38);");
+  fragBuilder->codeAppend("float invlen = inversesqrt(grad_dot);");
   fragBuilder->codeAppend("float edgeAlpha = clamp(0.5-test*invlen, 0.0, 1.0);");
 
   // for inner curve
@@ -107,22 +89,9 @@ void GLSLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppendf("offset = %s.xy*%s.zw;", ellipseOffsets.fsIn().c_str(),
                              ellipseRadii.fsIn().c_str());
     fragBuilder->codeAppend("test = dot(offset, offset) - 1.0;");
-    if (useScale) {
-      fragBuilder->codeAppendf("grad = 2.0*offset*(%s.z*%s.zw);", ellipseOffsets.fsIn().c_str(),
-                               ellipseRadii.fsIn().c_str());
-    } else {
-      fragBuilder->codeAppendf("grad = 2.0*offset*%s.zw;", ellipseRadii.fsIn().c_str());
-    }
+    fragBuilder->codeAppendf("grad = 2.0*offset*%s.zw;", ellipseRadii.fsIn().c_str());
     fragBuilder->codeAppend("grad_dot = dot(grad, grad);");
-    if (!args.caps->floatIs32Bits) {
-      fragBuilder->codeAppend("grad_dot = max(grad_dot, 6.1036e-5);");
-    }
-    if (useScale) {
-      fragBuilder->codeAppendf("invlen = %s.z*inversesqrt(grad_dot);",
-                               ellipseOffsets.fsIn().c_str());
-    } else {
-      fragBuilder->codeAppend("invlen = inversesqrt(grad_dot);");
-    }
+    fragBuilder->codeAppend("invlen = inversesqrt(grad_dot);");
     fragBuilder->codeAppend("edgeAlpha *= clamp(0.5+test*invlen, 0.0, 1.0);");
   }
 

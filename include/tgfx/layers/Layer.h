@@ -19,6 +19,8 @@
 #pragma once
 
 #include <memory>
+#include <optional>
+#include <unordered_set>
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Matrix.h"
@@ -126,11 +128,23 @@ class Layer : public std::enable_shared_from_this<Layer> {
   void setBlendMode(BlendMode value);
 
   /**
+   * Returns true if the layer allows its background to pass through to sublayers. Note that layers
+   * with non-SrcOver blend modes, filters, or 3D transforms will ignore this setting and prevent
+   * background pass-through. The default value is true.
+   */
+  bool passThroughBackground() const {
+    return bitFields.passThroughBackground;
+  }
+
+  /**
+   * Sets whether the layer passes through its background to sublayers.
+   */
+  void setPassThroughBackground(bool value);
+
+  /**
    * Returns the position of the layer relative to the local coordinates of the parent layer.
    */
-  Point position() const {
-    return {_matrix.getTranslateX(), _matrix.getTranslateY()};
-  }
+  Point position() const;
 
   /**
    * Sets the position of the layer.
@@ -139,15 +153,29 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   /**
    * Returns the transformation matrix applied to the layer.
+   * If the matrix set via the setMatrix3D interface contains 3D transformations or projection
+   * transformations, this interface will return the identity matrix; you need to use the matrix3D
+   * interface to obtain the actual matrix. Otherwise, it will return the equivalent simplified
+   * affine transformation matrix.
    */
-  const Matrix& matrix() const {
-    return _matrix;
-  }
+  Matrix matrix() const;
 
   /**
    * Sets the transformation matrix applied to the layer.
    */
   void setMatrix(const Matrix& value);
+
+  /**
+   * Returns the 3D transformation matrix applied to the layer.
+   */
+  Matrix3D matrix3D() const {
+    return _matrix3D;
+  }
+
+  /**
+   * Sets the 3D transformation matrix applied to the layer.
+   */
+  void setMatrix3D(const Matrix3D& value);
 
   /**
    * Returns whether the layer is visible. The default value is true.
@@ -543,7 +571,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   void invalidate();
 
-  Rect getBoundsInternal(const Matrix& coordinateMatrix, bool computeTightBounds);
+  Rect getBoundsInternal(const Matrix3D& coordinateMatrix, bool computeTightBounds);
 
   void onAttachToRoot(RootLayer* rootLayer);
 
@@ -553,9 +581,9 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   bool doContains(const Layer* child) const;
 
-  Matrix getGlobalMatrix() const;
+  Matrix3D getGlobalMatrix() const;
 
-  Matrix getMatrixWithScrollRect() const;
+  Matrix3D getMatrixWithScrollRect() const;
 
   LayerContent* getContent();
 
@@ -566,34 +594,58 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::shared_ptr<Image> getRasterizedImage(const DrawArgs& args, float contentScale,
                                             Matrix* drawingMatrix);
 
-  void drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
+  virtual void drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
+                         const Matrix3D* transform = nullptr);
 
-  void drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
+  void drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
+                     const Matrix3D* transform);
 
   void drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha);
 
-  void drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
-                    const LayerStyleSource* layerStyleSource = nullptr,
-                    const Layer* stopChild = nullptr);
+  void drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha,
+                    const std::unordered_set<LayerStyleExtraSourceType>& styleExtraSourceTypes);
+
+  void drawContents(
+      const DrawArgs& args, Canvas* canvas, float alpha,
+      const LayerStyleSource* layerStyleSource = nullptr, const Layer* stopChild = nullptr,
+      const std::unordered_set<LayerStyleExtraSourceType>& styleExtraSourceTypes = {});
 
   bool drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
                     const Layer* stopChild = nullptr);
 
   float drawBackgroundLayers(const DrawArgs& args, Canvas* canvas);
 
-  std::unique_ptr<LayerStyleSource> getLayerStyleSource(const DrawArgs& args, const Matrix& matrix);
+  std::unique_ptr<LayerStyleSource> getLayerStyleSource(const DrawArgs& args, const Matrix& matrix,
+                                                        bool excludeContour = false);
 
   std::shared_ptr<Image> getBackgroundImage(const DrawArgs& args, float contentScale,
                                             Point* offset);
 
+  /**
+   * Gets the background image of the minimum axis-aligned bounding box after drawing the layer
+   * subtree with the current layer as the root node.
+   */
+  std::shared_ptr<Image> getBoundsBackgroundImage(const DrawArgs& args, float contentScale,
+                                                  Point* offset);
+
+  void drawBackgroundImage(const DrawArgs& args, Canvas& canvas, Point* offset);
+
   void drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
                        const LayerStyleSource* source, LayerStylePosition position);
 
+  void drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
+                       const LayerStyleSource* source, LayerStylePosition position,
+                       const std::unordered_set<LayerStyleExtraSourceType>& styleExtraSourceTypes);
+
+  void drawBackgroundLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
+                                 const Matrix3D& transform);
+
   bool getLayersUnderPointInternal(float x, float y, std::vector<std::shared_ptr<Layer>>* results);
 
-  std::shared_ptr<MaskFilter> getMaskFilter(const DrawArgs& args, float scale);
+  std::shared_ptr<MaskFilter> getMaskFilter(const DrawArgs& args, float scale,
+                                            const std::optional<Rect>& layerClipBounds);
 
-  Matrix getRelativeMatrix(const Layer* targetCoordinateSpace) const;
+  Matrix3D getRelativeMatrix(const Layer* targetCoordinateSpace) const;
 
   bool hasValidMask() const;
 
@@ -604,16 +656,35 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   void updateBackgroundBounds(float contentScale);
 
-  void propagateBackgroundStyleOutset();
+  void propagateLayerState();
 
   bool hasBackgroundStyle();
 
-  std::shared_ptr<BackgroundContext> createBackgroundContext(Context* context, const Rect& drawRect,
-                                                             const Matrix& viewMatrix,
-                                                             bool fullLayer = false) const;
+  std::shared_ptr<BackgroundContext> createBackgroundContext(
+      Context* context, const Rect& drawRect, const Matrix& viewMatrix, bool fullLayer = false,
+      std::shared_ptr<ColorSpace> colorSpace = nullptr) const;
 
   static std::shared_ptr<Picture> RecordPicture(DrawMode mode, float contentScale,
                                                 const std::function<void(Canvas*)>& drawFunction);
+
+  bool drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
+                     const Matrix3D* transform);
+
+  std::shared_ptr<Image> getContentImage(const DrawArgs& args, float contentScale,
+                                         const std::shared_ptr<Image>& passThroughImage,
+                                         const Matrix& passThroughImageMatrix,
+                                         std::optional<Rect> clipBounds, Matrix* imageMatrix);
+
+  /**
+   * Returns the equivalent transformation matrix adapted for a custom anchor point.
+   * The matrix is defined based on a local coordinate system, with the transformation anchor point
+   * being the origin of that coordinate system. This function returns an affine transformation
+   * matrix that produces the same visual effect when using any point within this coordinate system
+   * as the new origin and anchor point.
+   * @param matrix The original transformation matrix.
+   * @param anchor The specified anchor point.
+   */
+  Matrix3D anchorAdaptedMatrix(const Matrix3D& matrix, const Point& anchor) const;
 
   struct {
     bool dirtyContent : 1;        // layer's content needs updating
@@ -625,12 +696,16 @@ class Layer : public std::enable_shared_from_this<Layer> {
     bool allowsEdgeAntialiasing : 1;
     bool allowsGroupOpacity : 1;
     bool excludeChildEffectsInLayerStyle : 1;
+    bool passThroughBackground : 1;
+    bool hasBlendMode : 1;
+    bool matrix3DIsAffine : 1;  // Whether the matrix3D is equivalent to a 2D affine matrix
     uint8_t blendMode : 5;
     uint8_t maskType : 2;
   } bitFields = {};
   std::string _name;
   float _alpha = 1.0f;
-  Matrix _matrix = {};
+  // The actual transformation matrix that determines the geometric position of the layer
+  Matrix3D _matrix3D = {};
   std::shared_ptr<Layer> _mask = nullptr;
   Layer* maskOwner = nullptr;
   std::unique_ptr<Rect> _scrollRect = nullptr;
@@ -642,8 +717,9 @@ class Layer : public std::enable_shared_from_this<Layer> {
   float _rasterizationScale = 0.0f;
   std::unique_ptr<RasterizedContent> rasterizedContent;
   std::shared_ptr<LayerContent> layerContent = nullptr;
-  Rect renderBounds = {};         // in global coordinates
-  Rect* contentBounds = nullptr;  //  in global coordinates
+  Rect renderBounds = {};                       // in global coordinates
+  Rect* contentBounds = nullptr;                //  in global coordinates
+  std::unique_ptr<Rect> localBounds = nullptr;  // in local coordinates
 
   // if > 0, means the layer or any of its descendants has a background style
   float maxBackgroundOutset = 0.f;

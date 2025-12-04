@@ -18,8 +18,11 @@
 
 #include "tgfx/gpu/opengl/cgl/CGLWindow.h"
 #include <thread>
+#include "gpu/opengl/GLDefines.h"
 #include "tgfx/gpu/Backend.h"
-#include "tgfx/gpu/opengl/GLDefines.h"
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
 namespace tgfx {
 std::shared_ptr<CGLWindow> CGLWindow::MakeFrom(NSView* view, CGLContextObj sharedContext) {
@@ -40,10 +43,7 @@ CGLWindow::CGLWindow(std::shared_ptr<Device> device, NSView* view)
 
 CGLWindow::~CGLWindow() {
   auto glContext = static_cast<CGLDevice*>(device.get())->glContext;
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   [glContext setView:nil];
-#pragma clang diagnostic pop
   view = nil;
 }
 
@@ -54,10 +54,7 @@ std::shared_ptr<Surface> CGLWindow::onCreateSurface(Context* context) {
   if (size.width <= 0 || size.height <= 0) {
     return nullptr;
   }
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   [glContext setView:view];
-#pragma clang diagnostic pop
   GLFrameBufferInfo frameBuffer = {};
   frameBuffer.id = 0;
   frameBuffer.format = GL_RGBA8;
@@ -66,8 +63,10 @@ std::shared_ptr<Surface> CGLWindow::onCreateSurface(Context* context) {
   return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
 }
 
-void CGLWindow::onPresent(Context*, int64_t) {
+void CGLWindow::onPresent(Context*) {
   auto glContext = static_cast<CGLDevice*>(device.get())->glContext;
   [glContext flushBuffer];
 }
 }  // namespace tgfx
+
+#pragma clang diagnostic pop

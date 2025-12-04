@@ -110,7 +110,8 @@ class Shader {
    * color gradient is drawn from the center point to the vertices of the diamond.
    * @param center The center of the diamond for this gradient
    * @param halfDiagonal Must be positive. The half-diagonal of the diamond for this gradient.
-   * @param colors The array of colors, to be distributed between the center and edge of the circle.
+   * @param colors The array of colors in srgb gamut, can overflow 0-1, to be distributed between
+   * the center and edge of the circle.
    * @param positions Maybe empty. The relative position of each corresponding color in the color
    * array. If this is empty, the colors are distributed evenly between the start and end point.
    * If this is not empty, the values must begin with 0, end with 1.0, and intermediate values must
@@ -172,8 +173,9 @@ class Shader {
 
   std::weak_ptr<Shader> weakThis;
 
-  virtual PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
-                                                              const Matrix* uvMatrix) const = 0;
+  virtual PlacementPtr<FragmentProcessor> asFragmentProcessor(
+      const FPArgs& args, const Matrix* uvMatrix,
+      std::shared_ptr<ColorSpace> dstColorSpace = nullptr) const = 0;
   friend class OpsCompositor;
   friend class ShaderMaskFilter;
   friend class ColorFilterShader;

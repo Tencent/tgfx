@@ -19,6 +19,7 @@
 #pragma once
 
 #include "gpu/resources/TextureView.h"
+#include "tgfx/core/Rect.h"
 
 namespace tgfx {
 /**
@@ -113,15 +114,15 @@ class RenderTarget {
   virtual bool externallyOwned() const = 0;
 
   /**
-   * Returns the underlying GPUTexture that can be used for rendering. This may be the same as
+   * Returns the underlying GPU texture that can be used for rendering. This may be the same as
    * getSampleTexture(), or a different texture if MSAA is enabled on the render target.
    */
-  virtual std::shared_ptr<GPUTexture> getRenderTexture() const = 0;
+  virtual std::shared_ptr<Texture> getRenderTexture() const = 0;
 
   /**
-   * Returns the underlying GPUTexture used for sampling in shaders or reading pixels.
+   * Returns the underlying GPU texture used for sampling in shaders or reading pixels.
    */
-  virtual std::shared_ptr<GPUTexture> getSampleTexture() const = 0;
+  virtual std::shared_ptr<Texture> getSampleTexture() const = 0;
 
   /**
    * Returns a reference to the underlying texture representation of this render target, may be
@@ -137,12 +138,5 @@ class RenderTarget {
   BackendRenderTarget getBackendRenderTarget() const {
     return getRenderTexture()->getBackendRenderTarget();
   }
-
-  /**
-   * Copies a rect of pixels to dstPixels with the specified dstInfo. Copy starts at (srcX, srcY),
-   * and does not exceed (width(), height()). Pixels are copied only if pixel conversion is
-   * possible. Returns true if pixels are copied to dstPixels.
-   */
-  bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0, int srcY = 0) const;
 };
 }  // namespace tgfx

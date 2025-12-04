@@ -26,7 +26,7 @@ Canvas* LayerRecorder::getCanvas(LayerContentType contentType) {
   Canvas* canvas = nullptr;
   auto& recorder = recorders[static_cast<size_t>(contentType)];
   if (recorder == nullptr) {
-    recorder = std::make_unique<Recorder>(true);
+    recorder = std::make_unique<PictureRecorder>(true);
     canvas = recorder->beginRecording();
   } else {
     canvas = recorder->getRecordingCanvas();

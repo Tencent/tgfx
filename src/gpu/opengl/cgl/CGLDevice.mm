@@ -19,6 +19,9 @@
 #include "tgfx/gpu/opengl/cgl/CGLDevice.h"
 #include "gpu/opengl/cgl/CGLGPU.h"
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+
 namespace tgfx {
 void* GLDevice::CurrentNativeHandle() {
   return CGLGetCurrentContext();
@@ -129,3 +132,5 @@ void CGLDevice::onUnlockContext() {
   CGLReleaseContext(oldContext);
 }
 }  // namespace tgfx
+
+#pragma clang diagnostic pop

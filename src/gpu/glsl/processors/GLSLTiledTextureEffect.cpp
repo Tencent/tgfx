@@ -21,23 +21,23 @@
 #include "gpu/processors/TextureEffect.h"
 
 namespace tgfx {
-PlacementPtr<FragmentProcessor> TiledTextureEffect::Make(std::shared_ptr<TextureProxy> proxy,
+PlacementPtr<FragmentProcessor> TiledTextureEffect::Make(BlockAllocator* allocator,
+                                                         std::shared_ptr<TextureProxy> proxy,
                                                          const SamplingArgs& args,
                                                          const Matrix* uvMatrix, bool forceAsMask) {
   if (proxy == nullptr) {
     return nullptr;
   }
   if (args.tileModeX == TileMode::Clamp && args.tileModeY == TileMode::Clamp) {
-    return TextureEffect::Make(std::move(proxy), args, uvMatrix, forceAsMask);
+    return TextureEffect::Make(allocator, std::move(proxy), args, uvMatrix, forceAsMask);
   }
   auto matrix = uvMatrix ? *uvMatrix : Matrix::I();
   SamplerState samplerState(args.tileModeX, args.tileModeY, args.sampling);
   auto isAlphaOnly = proxy->isAlphaOnly();
-  auto drawingBuffer = proxy->getContext()->drawingBuffer();
-  PlacementPtr<FragmentProcessor> processor = drawingBuffer->make<GLSLTiledTextureEffect>(
+  PlacementPtr<FragmentProcessor> processor = allocator->make<GLSLTiledTextureEffect>(
       std::move(proxy), samplerState, args.constraint, matrix, args.sampleArea);
   if (forceAsMask && !isAlphaOnly) {
-    processor = FragmentProcessor::MulInputByChildAlpha(drawingBuffer, std::move(processor));
+    processor = FragmentProcessor::MulInputByChildAlpha(allocator, std::move(processor));
   }
   return processor;
 }
@@ -205,8 +205,7 @@ GLSLTiledTextureEffect::UniformNames GLSLTiledTextureEffect::initUniform(
   }
   bool unormCoordsRequiredForShaderMode = ShaderModeRequiresUnormCoord(sampling.shaderModeX) ||
                                           ShaderModeRequiresUnormCoord(sampling.shaderModeY);
-  bool sampleCoordsMustBeNormalized =
-      textureView->getTexture()->type() != GPUTextureType::Rectangle;
+  bool sampleCoordsMustBeNormalized = textureView->getTexture()->type() != TextureType::Rectangle;
   if (unormCoordsRequiredForShaderMode && sampleCoordsMustBeNormalized) {
     names.dimensionsName =
         uniformHandler->addUniform("Dimension", UniformFormat::Float2, ShaderStage::Fragment);
@@ -423,7 +422,7 @@ void GLSLTiledTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
   Sampling sampling(textureView, samplerState, subset);
   auto hasDimensionUniform = (ShaderModeRequiresUnormCoord(sampling.shaderModeX) ||
                               ShaderModeRequiresUnormCoord(sampling.shaderModeY)) &&
-                             textureView->getTexture()->type() != GPUTextureType::Rectangle;
+                             textureView->getTexture()->type() != TextureType::Rectangle;
   if (hasDimensionUniform) {
     auto dimensions = textureView->getTextureCoord(1.f, 1.f);
     fragmentUniformData->setData("Dimension", dimensions);
@@ -437,7 +436,7 @@ void GLSLTiledTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
       std::swap(rect[1], rect[3]);
     }
     auto type = textureView->getTexture()->type();
-    if (!hasDimensionUniform && type != GPUTextureType::Rectangle) {
+    if (!hasDimensionUniform && type != TextureType::Rectangle) {
       auto lt =
           textureView->getTextureCoord(static_cast<float>(rect[0]), static_cast<float>(rect[1]));
       auto rb =

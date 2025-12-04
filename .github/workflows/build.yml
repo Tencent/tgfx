@@ -5,22 +5,6 @@ on:
     branches: [ main ]
   push:
     branches: [ main ]
-  workflow_dispatch:
-    inputs:
-      job:
-        description: 'Platform to build (optional, leave empty to build all)'
-        required: false
-        default: 'all'
-        type: choice
-        options:
-          - all
-          - ios
-          - android
-          - web
-          - win
-          - linux
-          - qt
-          - ohos
 
 jobs:
   ios:
@@ -28,8 +12,6 @@ jobs:
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
-        with:
-          lfs: true
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -82,8 +64,6 @@ jobs:
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
-        with:
-          lfs: true
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -132,8 +112,6 @@ jobs:
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
-        with:
-          lfs: true
 
       - name: Get Environment Cache
         id: environment-cache
@@ -215,8 +193,6 @@ jobs:
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
-        with:
-          lfs: true
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -257,8 +233,6 @@ jobs:
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
-        with:
-          lfs: true
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -306,8 +280,6 @@ jobs:
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
-        with:
-          lfs: true
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -363,8 +335,6 @@ jobs:
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
-        with:
-          lfs: true
 
       - name: Get CLI Tools Cache
         id: cli-tools-cache
@@ -424,8 +394,8 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: third_party
-          key: third-party-openharmony-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
-          restore-keys: third-party-openharmony-
+          key: third-party-ohos-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+          restore-keys: third-party-ohos-
 
       - name: Run depsync
         run: |
@@ -449,7 +419,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: third_party
-          key: third-party-openharmony-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+          key: third-party-ohos-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
 
       - name: Job Failed
         if: ${{ failure() }}

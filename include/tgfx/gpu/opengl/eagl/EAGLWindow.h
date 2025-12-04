@@ -34,11 +34,11 @@ class EAGLWindow : public Window {
 
  protected:
   std::shared_ptr<Surface> onCreateSurface(Context* context) override;
-  void onPresent(Context* context, int64_t presentationTime) override;
+  void onPresent(Context* context) override;
 
  private:
   CAEAGLLayer* layer = nil;
-  std::unique_ptr<EAGLLayerTexture> layerTexture;
+  std::shared_ptr<EAGLLayerTexture> layerTexture;
 
   EAGLWindow(std::shared_ptr<Device> device, CAEAGLLayer* layer);
 };

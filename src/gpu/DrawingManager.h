@@ -18,26 +18,31 @@
 
 #pragma once
 
-#include <map>
+#include <deque>
+#include <memory>
+#include <unordered_map>
 #include <vector>
+#include "gpu/DrawingBuffer.h"
 #include "gpu/OpsCompositor.h"
+#include "gpu/tasks/AtlasUploadTask.h"
 #include "gpu/tasks/OpsRenderTask.h"
 #include "gpu/tasks/RenderTask.h"
 #include "gpu/tasks/ResourceTask.h"
 
 namespace tgfx {
-struct AtlasCellData {
-  std::shared_ptr<Data> pixels = nullptr;
-  ImageInfo pixelsInfo = {};
-  Point atlasOffset = {};
-  AtlasCellData(std::shared_ptr<Data> data, const ImageInfo& info, const Point& offset)
-      : pixels(std::move(data)), pixelsInfo(info), atlasOffset(offset) {
-  }
-};
+struct RuntimeInputTexture;
 
 class DrawingManager {
  public:
   explicit DrawingManager(Context* context);
+
+  BlockAllocator* drawingAllocator() {
+    return &getDrawingBuffer()->drawingAllocator;
+  }
+
+  BlockAllocator* vertexAllocator() {
+    return &getDrawingBuffer()->vertexAllocator;
+  }
 
   /**
    * Fills the render target using the provided fragment processor, and automatically resolves the
@@ -48,13 +53,14 @@ class DrawingManager {
 
   std::shared_ptr<OpsCompositor> addOpsCompositor(std::shared_ptr<RenderTargetProxy> renderTarget,
                                                   uint32_t renderFlags,
-                                                  std::optional<Color> clearColor = std::nullopt);
+                                                  std::optional<PMColor> clearColor = std::nullopt,
+                                                  std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   void addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTarget,
-                        PlacementArray<DrawOp> drawOps, std::optional<Color> clearColor);
+                        PlacementArray<DrawOp> drawOps, std::optional<PMColor> clearColor);
 
   void addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> renderTarget,
-                          std::vector<std::shared_ptr<TextureProxy>> inputs,
+                          std::vector<RuntimeInputTexture> inputs,
                           std::shared_ptr<RuntimeEffect> effect, const Point& offset);
 
   void addGenerateMipmapsTask(std::shared_ptr<TextureProxy> textureProxy);
@@ -62,30 +68,33 @@ class DrawingManager {
   void addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> source,
                                std::shared_ptr<TextureProxy> dest, int srcX = 0, int srcY = 0);
 
+  void addTransferPixelsTask(std::shared_ptr<RenderTargetProxy> source, const Rect& srcRect,
+                             std::shared_ptr<GPUBufferProxy> dest);
+
   void addResourceTask(PlacementPtr<ResourceTask> resourceTask);
 
-  void addAtlasCellCodecTask(const std::shared_ptr<TextureProxy>& textureProxy,
-                             const Point& atlasOffset, std::shared_ptr<ImageCodec> codec);
+  void addAtlasCellTask(std::shared_ptr<TextureProxy> textureProxy, const Point& atlasOffset,
+                        std::shared_ptr<ImageCodec> codec);
 
   /**
-   * Flushes all recorded tasks and returns a CommandBuffer containing the GPU commands. If no tasks
-   * were recorded, returns nullptr.
+   * Flushes all pending drawing operations and returns the DrawingBuffer. Returns nullptr if there
+   * are no pending drawing operations. The returned DrawingBuffer will be automatically recycled
+   * to the pool after it's no longer referenced.
    */
-  std::shared_ptr<CommandBuffer> flush();
+  std::shared_ptr<DrawingBuffer> flush();
 
  private:
   Context* context = nullptr;
-  BlockBuffer* drawingBuffer = nullptr;
-  std::vector<PlacementPtr<ResourceTask>> resourceTasks = {};
-  std::vector<PlacementPtr<RenderTask>> renderTasks = {};
+  std::shared_ptr<DrawingBuffer> currentBuffer = nullptr;
+  std::deque<std::shared_ptr<DrawingBuffer>> bufferPool = {};
   std::list<std::shared_ptr<OpsCompositor>> compositors = {};
-  std::vector<std::shared_ptr<Task>> atlasCellCodecTasks = {};
-  std::map<std::shared_ptr<TextureProxy>, std::vector<AtlasCellData>> atlasCellDatas = {};
-  std::map<const TextureProxy*, std::pair<HardwareBufferRef, void*>> atlasHardwareBuffers = {};
+  std::unordered_map<TextureProxy*, AtlasUploadTask*> atlasTaskMap = {};
 
-  void uploadAtlasToGPU();
+  DrawingBuffer* getDrawingBuffer() {
+    return currentBuffer ? currentBuffer.get() : createDrawingBuffer();
+  }
 
-  void resetAtlasCache();
+  DrawingBuffer* createDrawingBuffer();
 
   friend class OpsCompositor;
 };

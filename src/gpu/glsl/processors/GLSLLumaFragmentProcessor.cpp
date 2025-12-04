@@ -19,16 +19,27 @@
 #include "GLSLLumaFragmentProcessor.h"
 
 namespace tgfx {
-
-PlacementPtr<FragmentProcessor> LumaFragmentProcessor::Make(BlockBuffer* buffer) {
-  return buffer->make<GLSLLumaFragmentProcessor>();
+PlacementPtr<FragmentProcessor> LumaFragmentProcessor::Make(
+    BlockAllocator* allocator, std::shared_ptr<ColorSpace> colorSpace) {
+  return allocator->make<GLSLLumaFragmentProcessor>(std::move(colorSpace));
 }
 
 void GLSLLumaFragmentProcessor::emitCode(EmitArgs& args) const {
-  /** See ITU-R Recommendation BT.709 at http://www.itu.int/rec/R-REC-BT.709/ .*/
-  args.fragBuilder->codeAppendf("float luma = dot(%s.rgb, vec3(0.2126, 0.7152, 0.0722));\n",
-                                args.inputColor.c_str());
+  auto uniformHandler = args.uniformHandler;
+  auto kr = uniformHandler->addUniform("Kr", UniformFormat::Float, ShaderStage::Fragment);
+  auto kg = uniformHandler->addUniform("Kg", UniformFormat::Float, ShaderStage::Fragment);
+  auto kb = uniformHandler->addUniform("Kb", UniformFormat::Float, ShaderStage::Fragment);
+
+  args.fragBuilder->codeAppendf("float luma = dot(%s.rgb, vec3(%s, %s, %s));\n",
+                                args.inputColor.c_str(), kr.c_str(), kg.c_str(), kb.c_str());
   args.fragBuilder->codeAppendf("%s = vec4(luma);\n", args.outputColor.c_str());
+}
+
+void GLSLLumaFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
+                                          UniformData* fragmentUniformData) const {
+  fragmentUniformData->setData("Kr", _lumaFactor.kr);
+  fragmentUniformData->setData("Kg", _lumaFactor.kg);
+  fragmentUniformData->setData("Kb", _lumaFactor.kb);
 }
 
 }  // namespace tgfx

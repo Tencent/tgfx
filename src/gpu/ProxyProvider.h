@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "core/utils/BlockBuffer.h"
+#include "core/utils/BlockAllocator.h"
 #include "core/utils/SlidingWindowTracker.h"
 #include "gpu/AAType.h"
 #include "gpu/BackingFit.h"
@@ -56,6 +56,12 @@ class ProxyProvider {
    */
   std::shared_ptr<GPUBufferProxy> createIndexBufferProxy(std::unique_ptr<DataSource<Data>> source,
                                                          uint32_t renderFlags = 0);
+
+  /**
+   * Creates a readback GPUBufferProxy of the given size. The buffer can be used to read data back
+   * from the GPU.
+   */
+  std::shared_ptr<GPUBufferProxy> createReadbackBufferProxy(size_t size);
 
   /**
    * Creates a VertexBufferView from the given VertexProvider. The provider will be released
@@ -152,11 +158,6 @@ class ProxyProvider {
   void flushSharedVertexBuffer();
 
   /**
-   * Clears the block buffer used for shared vertex buffer.
-   */
-  void clearSharedVertexBuffer();
-
-  /**
    * Stores the given proxy in the map with the new uniqueKey.
    */
   void assignProxyUniqueKey(std::shared_ptr<ResourceProxy> proxy, const UniqueKey& uniqueKey);
@@ -164,12 +165,8 @@ class ProxyProvider {
  private:
   Context* context = nullptr;
   ResourceKeyMap<std::weak_ptr<ResourceProxy>> proxyMap = {};
-  bool sharedVertexBufferFlushed = false;
   std::shared_ptr<GPUBufferProxy> sharedVertexBuffer = nullptr;
   std::vector<std::shared_ptr<Task>> sharedVertexBufferTasks = {};
-  BlockBuffer vertexBlockBuffer = {};
-  SlidingWindowTracker maxValueTracker = {10};
-
   std::shared_ptr<GPUBufferProxy> findOrWrapGPUBufferProxy(const UniqueKey& uniqueKey);
 
   void addResourceProxy(std::shared_ptr<ResourceProxy> proxy, const UniqueKey& uniqueKey = {});

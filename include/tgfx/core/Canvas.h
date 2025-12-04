@@ -237,7 +237,7 @@ class Canvas {
    * @param y0  the y-coordinate of the start point.
    * @param x1  the x-coordinate of the end point.
    * @param y1  the y-coordinate of the end point.
-   * @param paint  stroke, blend, color, and so on, used to draw.
+   * @param paint  the paint to use for stroke, blend, color, etc.
    */
   void drawLine(float x0, float y0, float x1, float y1, const Paint& paint);
 
@@ -246,7 +246,7 @@ class Canvas {
    * Paint::style is always treated as PaintStyle::Stroke.
    * @param p0  the start point.
    * @param p1  the end point.
-   * @param paint  stroke, blend, color, and so on, used to draw.
+   * @param paint  the paint to use for stroke, blend, color, etc.
    */
   void drawLine(const Point& p0, const Point& p1, const Paint& paint) {
     drawLine(p0.x, p0.y, p1.x, p1.y, paint);
@@ -290,7 +290,7 @@ class Canvas {
    * @param rect bounds of the round rectangle to draw
    * @param radiusX axis length on x-axis of the rounded corners.
    * @param radiusY axis length on y-axis of the rounded corners.
-   * @param paint stroke, blend, color, and so on, used to draw.
+   * @param paint the paint to use for stroke, blend, color, etc.
    */
   void drawRoundRect(const Rect& rect, float radiusX, float radiusY, const Paint& paint);
 
@@ -464,21 +464,21 @@ class Canvas {
 
   explicit Canvas(DrawContext* drawContext, Surface* surface = nullptr,
                   bool optimizeMemoryForLayer = false);
-  void drawPath(const Path& path, const MCState& state, const Fill& fill,
-                const Stroke* stroke) const;
-  void drawImage(std::shared_ptr<Image> image, const Fill& fill, const SamplingOptions& sampling,
+  void drawPath(const Path& path, const MCState& state, const Brush& brush,
+                const Stroke* stroke = nullptr) const;
+  void drawImage(std::shared_ptr<Image> image, const Brush& brush, const SamplingOptions& sampling,
                  const Matrix* dstMatrix);
   void drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
-                     const SamplingOptions& sampling, const Fill& fill,
+                     const SamplingOptions& sampling, const Brush& brush,
                      SrcRectConstraint constraint = SrcRectConstraint::Fast);
-  void drawLayer(std::shared_ptr<Picture> picture, const MCState& state, const Fill& fill,
+  void drawLayer(std::shared_ptr<Picture> picture, const MCState& state, const Brush& brush,
                  std::shared_ptr<ImageFilter> imageFilter = nullptr);
-  void drawFill(const MCState& state, const Fill& fill) const;
+  void drawFill(const MCState& state, const Brush& brush) const;
   void resetStateStack();
 
   friend class Surface;
   friend class Picture;
-  friend class Recorder;
+  friend class PictureRecorder;
   friend class SVGExporter;
   friend class PDFDocumentImpl;
   friend class PDFShader;

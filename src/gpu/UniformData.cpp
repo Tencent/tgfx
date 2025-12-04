@@ -21,30 +21,20 @@
 #include "inspect/InspectorMark.h"
 
 namespace tgfx {
-UniformData::UniformData(std::vector<Uniform> uniforms, bool uboSupport)
-    : _uniforms(std::move(uniforms)), _uboSupport(uboSupport) {
+UniformData::UniformData(std::vector<Uniform> uniforms) : _uniforms(std::move(uniforms)) {
   for (const auto& uniform : _uniforms) {
     size_t size = 0;
     size_t align = 0;
-    if (_uboSupport) {
-      const auto& [entrySize, entryAlign] = EntryOf(uniform.format());
-      size = entrySize;
-      align = entryAlign;
+    const auto& [entrySize, entryAlign] = EntryOf(uniform.format());
+    size = entrySize;
+    align = entryAlign;
 
-      const size_t offset = alignCursor(align);
-      fieldMap[uniform.name()] = {uniform.name(), uniform.format(), offset, size, align};
-      cursor = offset + size;
-    } else {
-      size = uniform.size();
-      align = 1;
-
-      const size_t offset = alignCursor(align);
-      fieldMap[uniform.name()] = {uniform.name(), uniform.format(), offset, size, align};
-      cursor = offset + size;
-    }
+    const size_t offset = alignCursor(align);
+    fieldMap[uniform.name()] = {uniform.name(), uniform.format(), offset, size, align};
+    cursor = offset + size;
   }
 
-  bufferSize = alignCursor(_uboSupport ? 16 : 1);
+  bufferSize = alignCursor(16);
 }
 
 void UniformData::setBuffer(void* buffer) {

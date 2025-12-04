@@ -32,12 +32,14 @@
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/GradientType.h"
 #include "tgfx/core/ImageFilter.h"
+#include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/Size.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/TileMode.h"
+#include "utils/EffectCache.h"
 #include "utils/TestUtils.h"
 #include "utils/common.h"
 
@@ -329,6 +331,7 @@ TGFX_TEST(FilterTest, ComposeImageFilter) {
 TGFX_TEST(FilterTest, RuntimeEffect) {
   ContextScope scope;
   auto context = scope.getContext();
+  EffectCache effectCache = {};
   ASSERT_TRUE(context != nullptr);
   auto image = MakeImage("resources/assets/bridge.jpg");
   ASSERT_TRUE(image != nullptr);
@@ -339,10 +342,10 @@ TGFX_TEST(FilterTest, RuntimeEffect) {
   image = image->makeRasterized();
 
   auto effect1 = CornerPinEffect::Make(
-      {0, 0}, {static_cast<float>(image->width()), 0},
+      &effectCache, {0, 0}, {static_cast<float>(image->width()), 0},
       {static_cast<float>(image->width()), static_cast<float>(image->height())},
       {0, static_cast<float>(image->height())});
-  auto effect2 = CornerPinEffect::Make({484, 54}, {764, 80}, {764, 504}, {482, 512});
+  auto effect2 = CornerPinEffect::Make(&effectCache, {484, 54}, {764, 80}, {764, 504}, {482, 512});
   auto filter1 = ImageFilter::Runtime(std::move(effect1));
   auto filter2 = ImageFilter::Runtime(effect2);
   auto composeFilter = ImageFilter::Compose(filter1, filter2);
@@ -482,7 +485,8 @@ TGFX_TEST(FilterTest, GetFilterProperties) {
   }
 
   {
-    auto effect = CornerPinEffect::Make({484, 54}, {764, 80}, {764, 504}, {482, 512});
+    EffectCache effectCache = {};
+    auto effect = CornerPinEffect::Make(&effectCache, {484, 54}, {764, 80}, {764, 504}, {482, 512});
     auto imageFilter = ImageFilter::Runtime(std::move(effect));
     EXPECT_EQ(imageFilter->type(), ImageFilter::Type::Runtime);
   }
@@ -842,6 +846,11 @@ TGFX_TEST(FilterTest, Transform3DImageFilter) {
   Canvas* canvas = surface->getCanvas();
   auto image = MakeImage("resources/apitest/imageReplacement.jpg");
   Size imageSize(static_cast<float>(image->width()), static_cast<float>(image->height()));
+  auto anchor = Point::Make(0.5f, 0.5f);
+  auto offsetToAnchorMatrix =
+      Matrix3D::MakeTranslate(-anchor.x * imageSize.width, -anchor.y * imageSize.height, 0);
+  auto invOffsetToAnchorMatrix =
+      Matrix3D::MakeTranslate(anchor.x * imageSize.width, anchor.y * imageSize.height, 0);
 
   // Test basic drawing with css perspective type.
   {
@@ -861,7 +870,8 @@ TGFX_TEST(FilterTest, Transform3DImageFilter) {
 
     auto modelMatrix = Matrix3D::MakeRotate({0.f, 1.f, 0.f}, 45.f);
     modelMatrix.postTranslate(0.f, 0.f, -100.f);
-    auto transform = cssPerspectiveMatrix * modelMatrix;
+    auto transform =
+        invOffsetToAnchorMatrix * cssPerspectiveMatrix * modelMatrix * offsetToAnchorMatrix;
     auto cssTransform3DFilter = ImageFilter::Transform3D(transform);
     Paint paint = {};
     paint.setImageFilter(cssTransform3DFilter);
@@ -896,10 +906,17 @@ TGFX_TEST(FilterTest, Transform3DImageFilter) {
   auto perspectiveMatrix = Matrix3D::Perspective(
       standardFovYDegress, static_cast<float>(image->width()) / static_cast<float>(image->height()),
       nearZ, farZ);
-  auto modelMatrix = Matrix3D::MakeRotate({0.f, 1.f, 0.f}, 45.f);
+  auto modelMatrix = Matrix3D::MakeRotate({0.f, 0.f, 1.f}, 45.f);
+  // Rotate around the ZXY axes of the model coordinate system in sequence; the latest transformation
+  // in the model coordinate system needs to be placed at the far right of the matrix multiplication
+  // equation
+  modelMatrix.preRotate({1.f, 0.f, 0.f}, 45.f);
+  modelMatrix.preRotate({0.f, 1.f, 0.f}, 45.f);
+  // Use Z-axis translation to simulate model depth
   modelMatrix.postTranslate(0.f, 0.f, -10.f / imageSize.width);
-  auto standardTransform = standardvViewportMatrix * perspectiveMatrix * viewMatrix * modelMatrix *
-                           invStandardViewportMatrix;
+  auto standardTransform = invOffsetToAnchorMatrix * standardvViewportMatrix * perspectiveMatrix *
+                           viewMatrix * modelMatrix * invStandardViewportMatrix *
+                           offsetToAnchorMatrix;
   auto standardTransform3DFilter = ImageFilter::Transform3D(standardTransform);
 
   // Test scale drawing with standard perspective type.
@@ -923,7 +940,6 @@ TGFX_TEST(FilterTest, Transform3DImageFilter) {
 
     Paint paint = {};
     paint.setImageFilter(standardTransform3DFilter);
-    canvas->setMatrix(tgfx::Matrix::MakeRotate(45, 100, 100));
     canvas->drawImage(image, 45.f, 45.f, &paint);
 
     context->flushAndSubmit();
@@ -965,5 +981,112 @@ TGFX_TEST(FilterTest, Transform3DImageFilter) {
     EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/Transform3DImageFilterStandardClip"));
     canvas->restore();
   }
+}
+
+TGFX_TEST(FilterTest, ReverseFilterBounds) {
+  auto rect = Rect::MakeXYWH(0, 0, 100, 100);
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  EXPECT_TRUE(image != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  auto canvas = surface->getCanvas();
+  canvas->clear();
+  auto paint = Paint();
+  canvas->translate(50, 50);
+  canvas->clipRect(rect);
+  PictureRecorder recorder;
+
+  auto blurFilter = ImageFilter::Blur(10.f, 10.f);
+  auto dst = blurFilter->filterBounds(rect);
+  auto src = blurFilter->filterBounds(dst, MapDirection::Reverse);
+  EXPECT_TRUE(src == Rect::MakeXYWH(-40, -40, 180, 180));
+  auto pictureCanvas = recorder.beginRecording();
+  pictureCanvas->translate(-50, -50);
+  pictureCanvas->clipRect(src);
+  pictureCanvas->drawImage(image);
+  auto picture = recorder.finishRecordingAsPicture();
+  paint.setImageFilter(blurFilter);
+  canvas->clear();
+  canvas->drawPicture(picture, nullptr, &paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ReverseFilterBounds_Blur"));
+
+  auto dropShadowFilter = ImageFilter::DropShadowOnly(10.f, 10.f, 20.f, 20.f, Color::Black());
+  dst = dropShadowFilter->filterBounds(rect);
+  src = dropShadowFilter->filterBounds(dst, MapDirection::Reverse);
+  EXPECT_TRUE(src == Rect::MakeXYWH(-80, -80, 260, 260));
+
+  pictureCanvas = recorder.beginRecording();
+  pictureCanvas->translate(-50, -50);
+  pictureCanvas->clipRect(src);
+  pictureCanvas->drawImage(image);
+  picture = recorder.finishRecordingAsPicture();
+  paint.setImageFilter(dropShadowFilter);
+  canvas->clear();
+  canvas->drawPicture(picture, nullptr, &paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ReverseFilterBounds_dropShadowOnly"));
+
+  auto colorFilter = ColorFilter::Blend(Color::Red(), BlendMode::Multiply);
+  auto colorImageFilter = ImageFilter::ColorFilter(colorFilter);
+  dst = colorImageFilter->filterBounds(rect);
+  src = colorImageFilter->filterBounds(dst, MapDirection::Reverse);
+  EXPECT_TRUE(rect == src);
+
+  pictureCanvas = recorder.beginRecording();
+  pictureCanvas->translate(-50, -50);
+  pictureCanvas->clipRect(src);
+  pictureCanvas->drawImage(image);
+  picture = recorder.finishRecordingAsPicture();
+  paint.setImageFilter(colorImageFilter);
+  canvas->clear();
+  canvas->drawPicture(picture, nullptr, &paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ReverseFilterBounds_color"));
+
+  auto innerShadowFilter = ImageFilter::InnerShadow(-10.f, -10.f, 5.f, 5.f, Color::White());
+  dst = innerShadowFilter->filterBounds(rect);
+  src = innerShadowFilter->filterBounds(dst, MapDirection::Reverse);
+  EXPECT_TRUE(rect == src);
+
+  pictureCanvas = recorder.beginRecording();
+  pictureCanvas->translate(-50, -50);
+  pictureCanvas->clipRect(src);
+  pictureCanvas->drawImage(image);
+  picture = recorder.finishRecordingAsPicture();
+  paint.setImageFilter(innerShadowFilter);
+  canvas->clear();
+  canvas->drawPicture(picture, nullptr, &paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ReverseFilterBounds_inner"));
+
+  auto composeFilter =
+      ImageFilter::Compose({blurFilter, dropShadowFilter, innerShadowFilter, colorImageFilter});
+  dst = composeFilter->filterBounds(rect);
+  src = composeFilter->filterBounds(dst, MapDirection::Reverse);
+  EXPECT_TRUE(src == Rect::MakeXYWH(-120, -120, 340, 340));
+
+  pictureCanvas = recorder.beginRecording();
+  pictureCanvas->translate(-50, -50);
+  pictureCanvas->clipRect(src);
+  pictureCanvas->drawImage(image);
+  picture = recorder.finishRecordingAsPicture();
+  paint.setImageFilter(composeFilter);
+  canvas->clear();
+  canvas->drawPicture(picture, nullptr, &paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ReverseFilterBounds_compose"));
+
+  auto dropShadowFilter2 = ImageFilter::DropShadow(10.f, 10.f, 0, 0, Color::Black());
+  dst = dropShadowFilter2->filterBounds(rect);
+  src = dropShadowFilter2->filterBounds(dst, MapDirection::Reverse);
+  EXPECT_TRUE(src == Rect::MakeXYWH(-10.f, -10.f, 120.f, 120.f));
+
+  pictureCanvas = recorder.beginRecording();
+  pictureCanvas->translate(-50, -50);
+  pictureCanvas->clipRect(src);
+  pictureCanvas->drawImage(image);
+  picture = recorder.finishRecordingAsPicture();
+  paint.setImageFilter(dropShadowFilter2);
+  canvas->clear();
+  canvas->drawPicture(picture, nullptr, &paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ReverseFilterBounds_dropShadow"));
 }
 }  // namespace tgfx

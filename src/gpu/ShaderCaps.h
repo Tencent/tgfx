@@ -19,6 +19,7 @@
 #pragma once
 
 #include <string>
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 /**
@@ -27,22 +28,21 @@ namespace tgfx {
 class ShaderCaps {
  public:
   /**
-   * Indicates if the floating point type in the shader language is 32 bits. If false, it is
-   * typically 16 bits.
+   * Creates a new ShaderCaps instance based on the provided GPU backend.
    */
-  bool floatIs32Bits = true;
+  explicit ShaderCaps(GPU* gpu);
+
+  /**
+   * The version declaration string to be placed at the top of the shader code. For example,
+   * "#version 300 es" for OpenGL ES 3.0, or "#version 150" for OpenGL 3.2.
+   */
+  std::string versionDeclString;
 
   /**
    * Indicates if the shader language requires precision modifiers (lowp, mediump, highp) to be
    * explicitly specified for floating point types.
    */
   bool usesPrecisionModifiers = false;
-
-  /**
-   * Indicates if the shader language requires a custom output variable for fragment color instead
-   * of using the built-in "gl_FragColor".
-   */
-  bool usesCustomColorOutputName = false;
 
   /**
    * Indicates if the shader language supports framebuffer fetch, which allows reading the current
@@ -69,21 +69,9 @@ class ShaderCaps {
   std::string frameBufferFetchExtensionString;
 
   /**
-   * Indicates if the framebuffer fetch requires enabling per-sample shading. This is true for
-   * certain extensions like GL_NV_fragment_shader_barycentric.
-   */
-  bool frameBufferFetchRequiresEnablePerSample = false;
-
-  /**
    * Returns the maximum number of texture samplers that can be used in a shader.
    */
   int maxFragmentSamplers = 0;
-
-  /**
-   * Indicates if the shader language supports uniform buffer objects (UBOs) for grouping uniform
-   * variables.
-   */
-  bool uboSupport = false;
 
   /**
    * Returns the maximum size in bytes of a uniform buffer object (UBO) supported by the
@@ -95,28 +83,5 @@ class ShaderCaps {
    * Returns the required alignment in bytes for offsets within a uniform buffer object (UBO).
    */
   int uboOffsetAlignment = 1;
-
-  /**
-   * Indicates if varying variables are declared using 'in'/'out' instead of 'varying'.
-   */
-  bool varyingIsInOut = false;
-
-  /**
-   * The version declaration string to be placed at the top of the shader code. For example,
-   * "#version 300 es" for OpenGL ES 3.0, or "#version 140" for OpenGL 3.1.
-   */
-  std::string versionDeclString;
-
-  /**
-   * The name of the function used to sample textures in the shader language. This is typically
-   * "texture2D" for GLSL ES 1.0 and "texture" for GLSL ES 3.0 and later.
-   */
-  std::string textureFuncName;
-
-  /**
-   * The extension string required to enable OES_EGL_image_external support. This is typically
-   * "GL_OES_EGL_image_external" for OpenGL ES2 and "GL_OES_EGL_image_external_essl3" for OpenGL ES3.
-   */
-  std::string oesTextureExtension;
 };
 }  // namespace tgfx

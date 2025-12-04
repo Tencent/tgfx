@@ -22,7 +22,7 @@
 #include "tgfx/platform/android/Global.h"
 
 namespace tgfx {
-class GPUTexture;
+class Texture;
 
 /**
  * The SurfaceTexture class allows direct access to image data rendered into the Java Surface object
@@ -55,6 +55,10 @@ class SurfaceTexture : public ImageStream {
    */
   void notifyFrameAvailable();
 
+  std::shared_ptr<ColorSpace> colorSpace() const override {
+    return _colorSpace;
+  }
+
  protected:
   std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) override;
 
@@ -66,6 +70,7 @@ class SurfaceTexture : public ImageStream {
   Global<jobject> surface;
   Global<jobject> surfaceTexture;
   bool frameAvailable = false;
+  std::shared_ptr<ColorSpace> _colorSpace = nullptr;
 
   static void JNIInit(JNIEnv* env);
 

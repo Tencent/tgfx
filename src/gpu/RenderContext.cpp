@@ -30,6 +30,7 @@
 #include "core/images/SubsetImage.h"
 #include "core/shapes/TextShape.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/PixelFormatUtil.h"
 #include "core/utils/StrokeUtils.h"
 #include "gpu/DrawingManager.h"
 
@@ -142,11 +143,17 @@ static std::shared_ptr<ImageCodec> GetGlyphCodec(
 }
 
 static void ComputeGlyphFinalMatrix(const Rect& atlasLocation, const Matrix& stateMatrix,
-                                    float scale, const Point& position, Matrix* glyphMatrix) {
+                                    float scale, const Point& position, Matrix* glyphMatrix,
+                                    bool needsPixelAlignment) {
   glyphMatrix->postScale(scale, scale);
   glyphMatrix->postTranslate(position.x, position.y);
   glyphMatrix->postConcat(stateMatrix);
   glyphMatrix->preTranslate(-atlasLocation.x(), -atlasLocation.y());
+  if (needsPixelAlignment) {
+    // Pixel alignment for nearest-neighbor sampling to prevent texture artifacts like pixel truncation
+    (*glyphMatrix)[2] = std::round((*glyphMatrix)[2]);
+    (*glyphMatrix)[5] = std::round((*glyphMatrix)[5]);
+  }
 }
 
 static bool IsGlyphVisible(const Font& font, GlyphID glyphID, const Rect& clipBounds,
@@ -182,17 +189,21 @@ static SamplingOptions GetSamplingOptions(const std::shared_ptr<ScalerContext>& 
   if (fauxItalic || !FloatNearlyEqual(scalerContext->getBackingSize(), scalerContext->getSize())) {
     return SamplingOptions{FilterMode::Linear, MipmapMode::None};
   }
-  const auto filterMode = stateMatrix.isScaleTranslate() ? FilterMode::Nearest : FilterMode::Linear;
+  const auto isUniformScale = stateMatrix.isScaleTranslate() &&
+                              FloatNearlyEqual(stateMatrix.getScaleX(), stateMatrix.getScaleY());
+  const auto filterMode = isUniformScale ? FilterMode::Nearest : FilterMode::Linear;
   return SamplingOptions{filterMode, MipmapMode::None};
 }
 
 RenderContext::RenderContext(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags,
-                             bool clearAll, Surface* surface)
-    : renderTarget(std::move(proxy)), renderFlags(renderFlags), surface(surface) {
+                             bool clearAll, Surface* surface,
+                             std::shared_ptr<ColorSpace> colorSpace)
+    : renderTarget(std::move(proxy)), renderFlags(renderFlags), surface(surface),
+      _colorSpace(std::move(colorSpace)) {
   if (clearAll) {
     auto drawingManager = renderTarget->getContext()->drawingManager();
-    opsCompositor =
-        drawingManager->addOpsCompositor(renderTarget, renderFlags, Color::Transparent());
+    opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags,
+                                                     PMColor::Transparent(), _colorSpace);
   }
 }
 
@@ -207,28 +218,29 @@ Rect RenderContext::getClipBounds(const Path& clip) {
   return bounds;
 }
 
-void RenderContext::drawFill(const Fill& fill) {
-  if (auto compositor = getOpsCompositor(fill.isOpaque())) {
-    compositor->fillRect(renderTarget->bounds(), {}, fill);
+void RenderContext::drawFill(const Brush& brush) {
+  if (auto compositor = getOpsCompositor(brush.isOpaque())) {
+    compositor->fillRect(renderTarget->bounds(), {}, brush, nullptr);
   }
 }
 
-void RenderContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill) {
+void RenderContext::drawRect(const Rect& rect, const MCState& state, const Brush& brush,
+                             const Stroke* stroke) {
   if (auto compositor = getOpsCompositor()) {
-    compositor->fillRect(rect, state, fill);
+    compositor->fillRect(rect, state, brush, stroke);
   }
 }
 
-void RenderContext::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
+void RenderContext::drawRRect(const RRect& rRect, const MCState& state, const Brush& brush,
                               const Stroke* stroke) {
   if (auto compositor = getOpsCompositor()) {
-    compositor->drawRRect(rRect, state, fill, stroke);
+    compositor->drawRRect(rRect, state, brush, stroke);
   }
 }
 
-void RenderContext::drawPath(const Path& path, const MCState& state, const Fill& fill) {
+void RenderContext::drawPath(const Path& path, const MCState& state, const Brush& brush) {
   // Temporarily use drawShape for rendering, and perform merging in the compositor later.
-  drawShape(Shape::MakeFrom(path), state, fill, nullptr);
+  drawShape(Shape::MakeFrom(path), state, brush, nullptr);
 }
 
 static Rect ToLocalBounds(const Rect& bounds, const Matrix& viewMatrix) {
@@ -242,26 +254,26 @@ static Rect ToLocalBounds(const Rect& bounds, const Matrix& viewMatrix) {
 }
 
 void RenderContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                              const MCState& state, const Fill& fill) {
+                              const MCState& state, const Brush& brush) {
   if (auto compositor = getOpsCompositor()) {
-    compositor->fillImage(std::move(image), sampling, state, fill);
+    compositor->fillImage(std::move(image), sampling, state, brush);
   }
 }
 
-void RenderContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill,
-                              const Stroke* stroke) {
+void RenderContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
+                              const Brush& brush, const Stroke* stroke) {
   if (auto compositor = getOpsCompositor()) {
     shape = Shape::ApplyStroke(std::move(shape), stroke);
-    compositor->drawShape(std::move(shape), state, fill);
+    compositor->drawShape(std::move(shape), state, brush);
   }
 }
 
 void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect,
                                   const Rect& dstRect, const SamplingOptions& sampling,
-                                  const MCState& state, const Fill& fill,
+                                  const MCState& state, const Brush& brush,
                                   SrcRectConstraint constraint) {
   DEBUG_ASSERT(image != nullptr);
-  DEBUG_ASSERT(image->isAlphaOnly() || fill.shader == nullptr);
+  DEBUG_ASSERT(image->isAlphaOnly() || brush.shader == nullptr);
   auto compositor = getOpsCompositor();
   if (compositor == nullptr) {
     return;
@@ -275,12 +287,13 @@ void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcR
     // There is no scaling for the source image, so we can disable mipmaps to save memory.
     samplingOptions.mipmapMode = MipmapMode::None;
   }
-  compositor->fillImageRect(std::move(image), srcRect, dstRect, samplingOptions, state, fill,
+  compositor->fillImageRect(std::move(image), srcRect, dstRect, samplingOptions, state, brush,
                             constraint);
 }
 
 void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
-                                     const MCState& state, const Fill& fill, const Stroke* stroke) {
+                                     const MCState& state, const Brush& brush,
+                                     const Stroke* stroke) {
   DEBUG_ASSERT(glyphRunList != nullptr);
   if (FloatNearlyZero(state.matrix.getMaxScale())) {
     return;
@@ -308,7 +321,7 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
       continue;
     }
     GlyphRun rejectedGlyphRun = {};
-    drawGlyphsAsDirectMask(run, state, fill, stroke, localClipBounds, &rejectedGlyphRun);
+    drawGlyphsAsDirectMask(run, state, brush, stroke, localClipBounds, &rejectedGlyphRun);
     if (rejectedGlyphRun.glyphs.empty()) {
       continue;
     }
@@ -322,12 +335,12 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
 
   if (!glyphRunList->hasColor() && glyphRunList->hasOutlines()) {
     auto rejectedGlyphRunList = std::make_shared<GlyphRunList>(std::move(rejectedGlyphRuns));
-    drawGlyphsAsPath(std::move(rejectedGlyphRunList), state, fill, stroke, localClipBounds);
+    drawGlyphsAsPath(std::move(rejectedGlyphRunList), state, brush, stroke, localClipBounds);
     return;
   }
 
   for (const auto& run : rejectedGlyphRuns) {
-    drawGlyphsAsTransformedMask(run, state, fill, stroke);
+    drawGlyphsAsTransformedMask(run, state, brush, stroke);
   }
 }
 
@@ -337,8 +350,8 @@ void RenderContext::drawPicture(std::shared_ptr<Picture> picture, const MCState&
 }
 
 void RenderContext::drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<ImageFilter> filter,
-                              const MCState& state, const Fill& fill) {
-  DEBUG_ASSERT(fill.shader == nullptr);
+                              const MCState& state, const Brush& brush) {
+  DEBUG_ASSERT(brush.shader == nullptr);
   Matrix viewMatrix = {};
   Rect bounds = {};
   if (picture->hasUnboundedFill()) {
@@ -352,7 +365,7 @@ void RenderContext::drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
   viewMatrix.postTranslate(-bounds.x(), -bounds.y());
-  auto image = Image::MakeFrom(std::move(picture), width, height, &viewMatrix);
+  auto image = Image::MakeFrom(std::move(picture), width, height, &viewMatrix, colorSpace());
   if (image == nullptr) {
     return;
   }
@@ -370,7 +383,7 @@ void RenderContext::drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<
     return;
   }
   drawState.matrix.preConcat(invertMatrix);
-  drawImage(image, {}, drawState, fill.makeWithMatrix(viewMatrix));
+  drawImage(image, {}, drawState, brush.makeWithMatrix(viewMatrix));
 }
 
 bool RenderContext::flush() {
@@ -389,7 +402,8 @@ OpsCompositor* RenderContext::getOpsCompositor(bool discardContent) {
   }
   if (opsCompositor == nullptr || opsCompositor->isClosed()) {
     auto drawingManager = renderTarget->getContext()->drawingManager();
-    opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags);
+    opsCompositor =
+        drawingManager->addOpsCompositor(renderTarget, renderFlags, std::nullopt, _colorSpace);
   } else if (discardContent) {
     opsCompositor->discardAll();
   }
@@ -403,16 +417,17 @@ void RenderContext::replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRe
     DEBUG_ASSERT(oldContent->width() == renderTarget->width() &&
                  oldContent->height() == renderTarget->height());
     auto drawingManager = renderTarget->getContext()->drawingManager();
-    opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags);
-    Fill fill = {{}, BlendMode::Src, false};
+    opsCompositor =
+        drawingManager->addOpsCompositor(renderTarget, renderFlags, std::nullopt, _colorSpace);
+    Brush brush = {{}, BlendMode::Src, false};
     opsCompositor->fillImageRect(std::move(oldContent), renderTarget->bounds(),
-                                 renderTarget->bounds(), {}, MCState{}, fill,
+                                 renderTarget->bounds(), {}, MCState{}, brush,
                                  SrcRectConstraint::Fast);
   }
 }
 
 void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const MCState& state,
-                                           const Fill& fill, const Stroke* stroke,
+                                           const Brush& brush, const Stroke* stroke,
                                            const Rect& localClipBounds,
                                            GlyphRun* rejectedGlyphRun) {
   auto compositor = getOpsCompositor();
@@ -483,8 +498,8 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
         auto pageIndex = atlasLocator.pageIndex();
         auto atlasOffset =
             Point::Make(atlasLocator.getLocation().left, atlasLocator.getLocation().top);
-        drawingManager->addAtlasCellCodecTask(textureProxies[pageIndex], atlasOffset,
-                                              std::move(glyphCodec));
+        drawingManager->addAtlasCellTask(textureProxies[pageIndex], atlasOffset,
+                                         std::move(glyphCodec));
       } else {
         rejectedGlyphRun->glyphs.push_back(glyphID);
         rejectedGlyphRun->positions.push_back(glyphPosition);
@@ -503,18 +518,19 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
 
     auto glyphState = state;
     GetGlyphMatrix(font.scalerContext, glyphOffset, font.isFauxItalic(), &glyphState.matrix);
-    auto rect = atlasLocator.getLocation();
-    ComputeGlyphFinalMatrix(rect, state.matrix, inverseScale, glyphPosition, &glyphState.matrix);
-    auto sampling = GetSamplingOptions(font.scalerContext, font.isFauxItalic(), state.matrix);
+    const auto rect = atlasLocator.getLocation();
+    const auto sampling = GetSamplingOptions(font.scalerContext, font.isFauxItalic(), state.matrix);
+    ComputeGlyphFinalMatrix(rect, state.matrix, inverseScale, glyphPosition, &glyphState.matrix,
+                            sampling.minFilterMode == FilterMode::Nearest);
     compositor->fillTextAtlas(std::move(textureProxy), rect, sampling, glyphState,
-                              fill.makeWithMatrix(state.matrix));
+                              brush.makeWithMatrix(state.matrix));
   }
 }
 void RenderContext::drawGlyphsAsPath(std::shared_ptr<GlyphRunList> glyphRunList,
-                                     const MCState& state, const Fill& fill, const Stroke* stroke,
+                                     const MCState& state, const Brush& brush, const Stroke* stroke,
                                      Rect& localClipBounds) {
   Path clipPath = {};
-  if (fill.antiAlias) {
+  if (brush.antiAlias) {
     localClipBounds.outset(1.0f, 1.0f);
   }
   clipPath.addRect(localClipBounds);
@@ -523,12 +539,12 @@ void RenderContext::drawGlyphsAsPath(std::shared_ptr<GlyphRunList> glyphRunList,
 
   shape = Shape::Merge(std::move(shape), Shape::MakeFrom(std::move(clipPath)), PathOp::Intersect);
   if (auto compositor = getOpsCompositor()) {
-    compositor->drawShape(std::move(shape), state, fill);
+    compositor->drawShape(std::move(shape), state, brush);
   }
 }
 
 void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
-                                                const MCState& state, const Fill& fill,
+                                                const MCState& state, const Brush& brush,
                                                 const Stroke* stroke) {
   auto compositor = getOpsCompositor();
   if (compositor == nullptr) {
@@ -597,8 +613,7 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
       }
       auto pageIndex = atlasLocator.pageIndex();
       auto offset = Point::Make(atlasLocator.getLocation().left, atlasLocator.getLocation().top);
-      drawingManager->addAtlasCellCodecTask(textureProxies[pageIndex], offset,
-                                            std::move(glyphCodec));
+      drawingManager->addAtlasCellTask(textureProxies[pageIndex], offset, std::move(glyphCodec));
     }
     atlasManager->setPlotUseToken(plotUseUpdater, atlasLocator.plotLocator(), maskFormat,
                                   nextFlushToken);
@@ -611,10 +626,10 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
     GetGlyphMatrix(font.scalerContext, glyphOffset, font.isFauxItalic(), &glyphState.matrix);
     auto rect = atlasLocator.getLocation();
     ComputeGlyphFinalMatrix(rect, state.matrix, 1.f / (maxScale * cellScale), glyphPosition,
-                            &glyphState.matrix);
+                            &glyphState.matrix, false);
     compositor->fillTextAtlas(std::move(textureProxy), rect,
                               SamplingOptions(FilterMode::Linear, MipmapMode::None), glyphState,
-                              fill.makeWithMatrix(state.matrix));
+                              brush.makeWithMatrix(state.matrix));
   }
 }
 }  // namespace tgfx

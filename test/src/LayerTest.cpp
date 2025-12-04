@@ -18,14 +18,15 @@
 
 #include <math.h>
 #include <vector>
+#include "core/filters/ComposeImageFilter.h"
 #include "core/filters/GaussianBlurImageFilter.h"
 #include "core/shaders/GradientShader.h"
+#include "core/utils/MathExtra.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "layers/ContourContext.h"
 #include "layers/DrawArgs.h"
 #include "layers/RootLayer.h"
 #include "layers/contents/RasterizedContent.h"
-#include "tgfx/core/PathEffect.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Gradient.h"
@@ -265,7 +266,7 @@ TGFX_TEST(LayerTest, Layer_getTotalMatrix) {
   grandChild->addChild(greatGrandson);
 
   auto greatGrandsonTotalMatrix = greatGrandson->getGlobalMatrix();
-  EXPECT_EQ(greatGrandsonTotalMatrix, Matrix::MakeTrans(30, 30));
+  EXPECT_EQ(greatGrandsonTotalMatrix, Matrix3D::MakeTranslate(30, 30, 0));
 
   EXPECT_EQ(greatGrandson->matrix(), Matrix::MakeTrans(10, 10));
   EXPECT_EQ(grandChild->matrix(), Matrix::MakeTrans(10, 10));
@@ -2581,8 +2582,7 @@ TGFX_TEST(LayerTest, BottomLeftSurface) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
-  auto proxy = tgfx::RenderTargetProxy::MakeFallback(context, 200, 200, false, 1, false,
-                                                     ImageOrigin::BottomLeft);
+  auto proxy = RenderTargetProxy::Make(context, 200, 200, false, 1, false, ImageOrigin::BottomLeft);
   auto surface = Surface::MakeFrom(std::move(proxy), 0, true);
 
   // parent
@@ -3196,4 +3196,360 @@ TGFX_TEST(LayerTest, DiffFilterModeImagePattern) {
   displayList.render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DiffFilterModeImagePattern -- zoomIn"));
 }
+
+TGFX_TEST(LayerTest, TemporaryOffscreenImage) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  auto canvas = surface->getCanvas();
+  canvas->clear();
+  auto image = MakeImage("resources/apitest/image_as_mask.png");
+  EXPECT_TRUE(image != nullptr);
+  auto shapeLayer = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeWH(image->width(), image->height()));
+  shapeLayer->setPath(path);
+  auto pattern = ImagePattern::Make(image, TileMode::Decal, TileMode::Decal,
+                                    SamplingOptions(FilterMode::Linear, FilterMode::Nearest));
+  auto filter = DropShadowFilter::Make(-10, -10, 5, 5, Color::Black());
+  DisplayList displayList;
+  displayList.root()->addChild(shapeLayer);
+  shapeLayer->setFillStyle(pattern);
+  shapeLayer->setFilters({filter});
+
+  auto glassLayer = ShapeLayer::Make();
+  Path glassPath;
+  glassPath.addRRect(RRect{Rect::MakeXYWH(10, 10, 80, 80), Point::Make(40, 40)});
+  glassLayer->setPath(glassPath);
+  glassLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 255, 255, 50)));
+  glassLayer->setLayerStyles({BackgroundBlurStyle::Make(6, 6)});
+  shapeLayer->addChild(glassLayer);
+  displayList.setZoomScale(2.f);
+  displayList.setContentOffset(-50, -50);
+  displayList.render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/TemporaryOffscreenImage_pic"));
+
+  displayList.root()->addChild(glassLayer);
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/TemporaryOffscreenImage_image1"));
+
+  shapeLayer->setFilters({});
+  shapeLayer->setAlpha(0.8f);
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/TemporaryOffscreenImage_image2"));
+}
+
+TGFX_TEST(LayerTest, PassThrough_Test) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  auto canvas = surface->getCanvas();
+  canvas->clear();
+  auto shapeLayer = ShapeLayer::Make();
+  auto value = Layer::DefaultAllowsGroupOpacity();
+  Layer::SetDefaultAllowsGroupOpacity(true);
+  Path path;
+  path.addRect(Rect::MakeXYWH(-40, -40, 100, 100));
+  shapeLayer->setPath(path);
+  auto image = MakeImage("resources/apitest/image_as_mask.png");
+  EXPECT_TRUE(image != nullptr);
+  auto pattern = ImagePattern::Make(image, TileMode::Decal, TileMode::Decal,
+                                    SamplingOptions(FilterMode::Linear, FilterMode::Nearest));
+  pattern->setMatrix(Matrix::MakeTrans(-40, -40));
+  shapeLayer->setFillStyle(pattern);
+  shapeLayer->setMatrix(Matrix::MakeRotate(45, 30, 30));
+
+  auto childLayer = ShapeLayer::Make();
+  Path childPath;
+  childPath.addRect(Rect::MakeXYWH(25, 25, 50, 50));
+  childLayer->setPath(childPath);
+  childLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 0, 255, 255)));
+  childLayer->setAlpha(0.5f);
+  shapeLayer->addChild(childLayer);
+
+  auto childLayer2 = ShapeLayer::Make();
+  Path childPath2;
+  childPath2.addRect(Rect::MakeXYWH(10, 10, 30, 30));
+  childLayer2->setPath(childPath2);
+  childLayer2->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 255, 0, 255)));
+  childLayer2->setBlendMode(BlendMode::Exclusion);
+  childLayer->addChild(childLayer2);
+
+  DisplayList displayList;
+  displayList.root()->addChild(shapeLayer);
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PassThrough_Test"));
+
+  PictureRecorder recorder;
+  auto newCanvas = recorder.beginRecording();
+  newCanvas->rotate(45, 30, 30);
+  shapeLayer->draw(newCanvas);
+  auto picture = recorder.finishRecordingAsPicture();
+  canvas->clear();
+  canvas->drawPicture(picture);
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PassThrough_Test_record"));
+  Layer::SetDefaultAllowsGroupOpacity(value);
+}
+
+static Matrix3D MakePerspectiveMatrix(float farZ) {
+  auto perspectiveMatrix = Matrix3D::I();
+  constexpr float eyeDistance = 1200.f;
+  constexpr float shift = 10.f;
+  const float nearZ = eyeDistance - shift;
+  const float m22 = (2 - (farZ + nearZ) / eyeDistance) / (farZ - nearZ);
+  perspectiveMatrix.setRowColumn(2, 2, m22);
+  const float m23 = -1.f + nearZ / eyeDistance - perspectiveMatrix.getRowColumn(2, 2) * nearZ;
+  perspectiveMatrix.setRowColumn(2, 3, m23);
+  perspectiveMatrix.setRowColumn(3, 2, -1.f / eyeDistance);
+  return perspectiveMatrix;
+}
+
+TGFX_TEST(LayerTest, Matrix) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 200);
+  auto canvas = surface->getCanvas();
+  canvas->clear();
+
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Tiled);
+
+  auto backLayer = ImageLayer::Make();
+  auto backImage = MakeImage("resources/assets/HappyNewYear.png");
+  backLayer->setImage(backImage);
+  backLayer->setMatrix(Matrix::MakeScale(0.5f, 0.5f));
+  displayList->root()->addChild(backLayer);
+
+  auto contentLayer = SolidLayer::Make();
+  contentLayer->setColor(Color::FromRGBA(151, 153, 46, 255));
+  {
+    auto layerSize = Size::Make(360.f, 320.f);
+    contentLayer->setWidth(layerSize.width);
+    contentLayer->setHeight(layerSize.height);
+    auto anchor = Point::Make(0.3f, 0.3f);
+    auto offsetToAnchorMatrix =
+        Matrix3D::MakeTranslate(-anchor.x * layerSize.width, -anchor.y * layerSize.height, 0.f);
+    auto invOffsetToAnchorMatrix =
+        Matrix3D::MakeTranslate(anchor.x * layerSize.width, anchor.y * layerSize.height, 0.f);
+    auto modelMatrix = Matrix3D::MakeRotate({0.f, 1.f, 0.f}, -45.f);
+    // Choose an appropriate far plane to avoid clipping during rotation.
+    auto maxLength = static_cast<float>(std::max(layerSize.width, layerSize.height)) * 2.f;
+    auto farZ = std::min(-maxLength, -500.f);
+    auto perspectiveMatrix = MakePerspectiveMatrix(farZ);
+    auto origin = Point::Make(120, 40);
+    auto originTranslateMatrix = Matrix3D::MakeTranslate(origin.x, origin.y, 0.f);
+    auto transformMatrix = originTranslateMatrix * invOffsetToAnchorMatrix * perspectiveMatrix *
+                           modelMatrix * offsetToAnchorMatrix;
+    contentLayer->setMatrix3D(transformMatrix);
+  }
+  backLayer->addChild(contentLayer);
+
+  auto shadowFilter = DropShadowFilter::Make(-20, -20, 0, 0, Color::Green());
+  auto image = MakeImage("resources/apitest/imageReplacement.jpg");
+  auto imageLayer = ImageLayer::Make();
+  imageLayer->setImage(image);
+  imageLayer->setFilters({shadowFilter});
+  auto imageMatrix3D = Matrix3D::I();
+  {
+    auto imageSize =
+        Size::Make(static_cast<float>(image->width()), static_cast<float>(image->height()));
+    auto anchor = Point::Make(0.5f, 0.5f);
+    // The default anchor point for layer filters is the layer origin. Image layers by default align
+    // their content to the layer origin. When using the center point of the image content's
+    // normalized width and height coordinates as the anchor point, additional matrix processing is
+    // required.
+    auto offsetToAnchorMatrix =
+        Matrix3D::MakeTranslate(-anchor.x * imageSize.width, -anchor.y * imageSize.height, 0.f);
+    auto invOffsetToAnchorMatrix =
+        Matrix3D::MakeTranslate(anchor.x * imageSize.width, anchor.y * imageSize.height, 0.f);
+    // During continuous model transformations, if transforming based on the world coordinate system
+    // requires appending matrix elements on the left side of matrix multiplication (using
+    // post-prefix functions), while transforming based on the model coordinate system appends on
+    // the right side (using pre-prefix functions)
+    // The following operation order is derived to ensure alignment with CSS effects under various
+    // transformations with identical values
+    auto modelMatrix = Matrix3D::MakeScale(2.f, 2.f, 1.f);
+    constexpr float skewXDegrees = -15.f;
+    constexpr float skewYDegrees = -15.f;
+    modelMatrix.postSkewXY(tanf(DegreesToRadians(skewXDegrees)),
+                           tanf(DegreesToRadians(skewYDegrees)));
+    modelMatrix.postRotate({0.f, 0.f, 1.f}, 45.f);
+    modelMatrix.preRotate({1.f, 0.f, 0.f}, 45.f);
+    modelMatrix.preRotate({0.f, 1.f, 0.f}, 45.f);
+    modelMatrix.postTranslate(0.f, 0.f, 100.f);
+    // Choose an appropriate far plane to avoid clipping during rotation.
+    auto maxLength = static_cast<float>(std::max(image->width(), image->height())) * 2.f;
+    auto farZ = std::min(-maxLength, -500.f);
+    auto perspectiveMatrix = MakePerspectiveMatrix(farZ);
+    // The origin coordinates of the layer in the local coordinate system when no model
+    // transformation (excluding XY translation) is applied
+    auto origin = Point::Make(125, 105);
+    auto originTranslateMatrix = Matrix3D::MakeTranslate(origin.x, origin.y, 0.f);
+    imageMatrix3D = originTranslateMatrix * invOffsetToAnchorMatrix * perspectiveMatrix *
+                    modelMatrix * offsetToAnchorMatrix;
+  }
+  contentLayer->addChild(imageLayer);
+
+  imageLayer->setMatrix3D(imageMatrix3D);
+  displayList->render(surface.get());
+  EXPECT_EQ(imageLayer->getBounds(contentLayer.get()), Rect::MakeLTRB(65, 0, 298, 281));
+  EXPECT_EQ(imageLayer->getBounds(displayList->root()), Rect::MakeLTRB(99, 15, 190, 162));
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D"));
+
+  auto affineMatrix = Matrix::MakeTrans(50, 50);
+  imageLayer->setMatrix(affineMatrix);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D_2D"));
+
+  imageLayer->setMatrix3D(imageMatrix3D);
+  imageLayer->setShouldRasterize(true);
+  EXPECT_TRUE(imageLayer->matrix().isIdentity());
+  auto rect = Rect::MakeXYWH(50, 50, 200, 100);
+  Path path = {};
+  path.addRoundRect(rect, 20, 20);
+  auto shaperLayer = ShapeLayer::Make();
+  shaperLayer->setPath(path);
+  shaperLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 0, 255, 128)));
+  shaperLayer->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
+  {
+    // Verify the correctness of ShaperLayer's effect when the internal matrix is non-zero
+    auto layerSize = Size::Make(300.f, 200.f);
+    auto anchor = Point::Make(0.5f, 0.5f);
+    auto offsetToAnchorMatrix =
+        Matrix3D::MakeTranslate(-anchor.x * layerSize.width, -anchor.y * layerSize.height, 0.f);
+    auto invOffsetToAnchorMatrix =
+        Matrix3D::MakeTranslate(anchor.x * layerSize.width, anchor.y * layerSize.height, 0.f);
+    auto modelMatrix = Matrix3D::MakeRotate({0.f, 1.f, 0.f}, 45.f);
+    // Choose an appropriate far plane to avoid clipping during rotation.
+    auto maxLength = static_cast<float>(std::max(layerSize.width, layerSize.height)) * 2.f;
+    auto farZ = std::min(-maxLength, -500.f);
+    auto perspectiveMatrix = MakePerspectiveMatrix(farZ);
+    auto origin = Point::Make(0, 0);
+    auto originTranslateMatrix = Matrix3D::MakeTranslate(origin.x, origin.y, 0.f);
+    auto transformMatrix = originTranslateMatrix * invOffsetToAnchorMatrix * perspectiveMatrix *
+                           modelMatrix * offsetToAnchorMatrix;
+    shaperLayer->setMatrix3D(transformMatrix);
+  }
+  displayList->root()->addChild(shaperLayer);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D_2D_3D"));
+}
+
+TGFX_TEST(LayerTest, RasterizedContentWithMask) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 200);
+  auto displayList = std::make_unique<DisplayList>();
+
+  // Create a rasterized content layer with a mask
+  auto rootLayer = Layer::Make();
+  displayList->root()->addChild(rootLayer);
+
+  // Create a rasterized content layer with some shapes
+  auto rasterizedLayer = Layer::Make();
+  rasterizedLayer->setMatrix(Matrix::MakeTrans(50, 50));
+  rasterizedLayer->setShouldRasterize(true);
+  rootLayer->addChild(rasterizedLayer);
+
+  // Add a blue rectangle
+  auto blueRect = ShapeLayer::Make();
+  Path bluePath;
+  bluePath.addRect(Rect::MakeWH(80, 80));
+  blueRect->setPath(bluePath);
+  blueRect->setFillStyle(SolidColor::Make(Color::Blue()));
+  rasterizedLayer->addChild(blueRect);
+
+  // Add a red oval
+  auto redOval = ShapeLayer::Make();
+  redOval->setMatrix(Matrix::MakeTrans(60, 0));
+  Path ovalPath;
+  ovalPath.addOval(Rect::MakeXYWH(0, 0, 80, 80));
+  redOval->setPath(ovalPath);
+  redOval->setFillStyle(SolidColor::Make(Color::Red()));
+  rasterizedLayer->addChild(redOval);
+
+  // Create a mask for the rasterized layer
+  auto maskLayer = ShapeLayer::Make();
+  Path maskPath;
+  maskPath.addOval(Rect::MakeXYWH(-10, -10, 100, 100));
+  maskLayer->setPath(maskPath);
+  maskLayer->setFillStyle(SolidColor::Make(Color::White()));
+  rasterizedLayer->setMask(maskLayer);
+  rootLayer->addChild(maskLayer);
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/RasterizedContentWithMask"));
+}
+
+TGFX_TEST(LayerTest, DisplayListBackground) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  auto displayList = std::make_unique<DisplayList>();
+
+  // Test default background color (transparent)
+  auto defaultColor = displayList->backgroundColor();
+  EXPECT_EQ(defaultColor, Color::Transparent());
+
+  // Test setting opaque background color
+  auto opaqueColor = Color::FromRGBA(255, 0, 0, 255);
+  displayList->setBackgroundColor(opaqueColor);
+  EXPECT_EQ(displayList->backgroundColor(), opaqueColor);
+
+  // Render with opaque background
+  auto rootLayer = Layer::Make();
+  displayList->root()->addChild(rootLayer);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DisplayListBackground_OpaqueRed"));
+
+  // Test setting semi-transparent background color
+  auto semiTransparentColor = Color::FromRGBA(0, 255, 0, 128);
+  displayList->setBackgroundColor(semiTransparentColor);
+  EXPECT_EQ(displayList->backgroundColor(), semiTransparentColor);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DisplayListBackground_SemiTransparentGreen"));
+
+  // Test setting different background colors
+  auto blueColor = Color::FromRGBA(0, 0, 255, 255);
+  displayList->setBackgroundColor(blueColor);
+  EXPECT_EQ(displayList->backgroundColor(), blueColor);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DisplayListBackground_Blue"));
+
+  // Test adding layers and rendering with different background colors
+  auto shapeLayer = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeXYWH(50, 50, 100, 100));
+  shapeLayer->setPath(path);
+  shapeLayer->setFillStyle(SolidColor::Make(Color::White()));
+  rootLayer->addChild(shapeLayer);
+
+  auto whiteBackgroundColor = Color::FromRGBA(255, 255, 255, 255);
+  displayList->setBackgroundColor(whiteBackgroundColor);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DisplayListBackground_WhiteWithShape"));
+
+  // Test resetting to transparent background
+  displayList->setBackgroundColor(Color::Transparent());
+  EXPECT_EQ(displayList->backgroundColor(), Color::Transparent());
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DisplayListBackground_TransparentWithShape"));
+
+  // Test background color with different render modes
+  displayList->setBackgroundColor(Color::FromRGBA(200, 100, 50, 255));
+  displayList->setRenderMode(RenderMode::Partial);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DisplayListBackground_PartialRender"));
+
+  displayList->setRenderMode(RenderMode::Tiled);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DisplayListBackground_TiledRender"));
+}
+
 }  // namespace tgfx

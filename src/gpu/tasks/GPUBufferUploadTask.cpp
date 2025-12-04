@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GPUBufferUploadTask.h"
-#include "gpu/GPU.h"
 #include "gpu/resources/BufferResource.h"
 #include "inspect/InspectorMark.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 GPUBufferUploadTask::GPUBufferUploadTask(std::shared_ptr<ResourceProxy> proxy,
@@ -49,6 +49,6 @@ std::shared_ptr<Resource> GPUBufferUploadTask::onMakeResource(Context* context) 
   gpu->queue()->writeBuffer(gpuBuffer, 0, data->data(), data->size());
   // Free the data source immediately to reduce memory pressure.
   source = nullptr;
-  return Resource::AddToCache(context, new BufferResource(std::move(gpuBuffer)));
+  return BufferResource::Wrap(context, std::move(gpuBuffer));
 }
 }  // namespace tgfx

@@ -39,10 +39,10 @@ const std::vector<std::shared_ptr<TextureProxy>>& AtlasManager::getTextureProxie
 
 bool AtlasManager::initAtlas(MaskFormat maskFormat) {
   auto index = MaskFormatToAtlasIndex(maskFormat);
-  AtlasConfig atlasConfig(context->caps()->maxTextureSize);
+  AtlasConfig atlasConfig(context->gpu()->limits()->maxTextureDimension2D);
   if (atlases[index] == nullptr) {
     ISize atlasDimensions = atlasConfig.atlasDimensions(maskFormat);
-    ISize plotDimensions = atlasConfig.plotDimensions(maskFormat);
+    ISize plotDimensions = AtlasConfig::PlotDimensions();
     auto pixelFormat = MaskFormatToPixelFormat(maskFormat);
     atlases[index] =
         Atlas::Make(context->proxyProvider(), pixelFormat, atlasDimensions.width,
@@ -79,24 +79,29 @@ void AtlasManager::setPlotUseToken(PlotUseUpdater& plotUseUpdater, const PlotLoc
 
 void AtlasManager::preFlush() {
   for (const auto& atlas : atlases) {
-    if (atlas == nullptr) {
-      continue;
+    if (atlas) {
+      atlas->removeExpiredKeys();
     }
-    atlas->removeExpiredKeys();
   }
 }
 
 void AtlasManager::postFlush() {
   atlasTokenTracker.advanceToken();
   for (const auto& atlas : atlases) {
-    if (atlas == nullptr) {
-      continue;
+    if (atlas) {
+      atlas->compact(atlasTokenTracker.nextToken());
     }
-    atlas->compact(atlasTokenTracker.nextToken());
   }
 }
 
 AtlasToken AtlasManager::nextFlushToken() const {
   return atlasTokenTracker.nextToken();
 }
+
+void AtlasManager::releaseAll() {
+  for (auto& atlas : atlases) {
+    atlas = nullptr;
+  }
+}
+
 }  // namespace tgfx

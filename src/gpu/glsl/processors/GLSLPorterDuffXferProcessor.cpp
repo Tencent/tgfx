@@ -20,10 +20,10 @@
 #include "gpu/glsl/GLSLBlend.h"
 
 namespace tgfx {
-PlacementPtr<PorterDuffXferProcessor> PorterDuffXferProcessor::Make(BlockBuffer* buffer,
+PlacementPtr<PorterDuffXferProcessor> PorterDuffXferProcessor::Make(BlockAllocator* allocator,
                                                                     BlendMode blend,
                                                                     DstTextureInfo dstTextureInfo) {
-  return buffer->make<GLSLPorterDuffXferProcessor>(blend, std::move(dstTextureInfo));
+  return allocator->make<GLSLPorterDuffXferProcessor>(blend, std::move(dstTextureInfo));
 }
 
 GLSLPorterDuffXferProcessor::GLSLPorterDuffXferProcessor(BlendMode blend,
@@ -89,7 +89,7 @@ void GLSLPorterDuffXferProcessor::setData(UniformData* /*vertexUniformData*/,
   fragmentUniformData->setData("DstTextureUpperLeft", dstTextureInfo.offset);
   int width;
   int height;
-  if (dstTextureView->getTexture()->type() == GPUTextureType::Rectangle) {
+  if (dstTextureView->getTexture()->type() == TextureType::Rectangle) {
     width = 1;
     height = 1;
   } else {

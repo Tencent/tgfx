@@ -25,10 +25,12 @@
 #include "FTRasterTarget.h"
 #include "FTUtil.h"
 #include "core/utils/ClearPixels.h"
+#include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/GammaCorrection.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "skcms.h"
+#include "tgfx/core/Buffer.h"
 #include "tgfx/core/Pixmap.h"
 
 namespace tgfx {
@@ -56,6 +58,17 @@ static FT_Fixed FloatToFTFixed(float x) {
   x = x < MaxS32FitsInFloat ? x : MaxS32FitsInFloat;
   x = x > MinS32FitsInFloat ? x : MinS32FitsInFloat;
   return static_cast<FT_Fixed>(x * (1 << 16));
+}
+
+static gfx::skcms_PixelFormat ToPixelFormat(ColorType colorType) {
+  switch (colorType) {
+    case ColorType::ALPHA_8:
+      return gfx::skcms_PixelFormat_A_8;
+    case ColorType::BGRA_8888:
+      return gfx::skcms_PixelFormat_BGRA_8888;
+    default:
+      return gfx::skcms_PixelFormat_RGBA_8888;
+  }
 }
 
 static void RenderOutLineGlyph(FT_Face face, const ImageInfo& dstInfo, void* dstPixels) {
@@ -90,6 +103,12 @@ static void RenderOutLineGlyph(FT_Face face, const ImageInfo& dstInfo, void* dst
   bbox.yMin &= ~63;
   FT_Outline_Translate(outline, -bbox.xMin, -bbox.yMin);
   FT_Outline_Render(face->glyph->library, outline, &params);
+
+  if (NeedConvertColorSpace(ColorSpace::SRGB(), dstInfo.colorSpace())) {
+    ConvertColorSpaceInPlace(dstInfo.width(), dstInfo.height(), dstInfo.colorType(),
+                             dstInfo.alphaType(), dstInfo.rowBytes(), ColorSpace::SRGB(),
+                             dstInfo.colorSpace(), dstPixels);
+  }
 }
 
 static void ApplyEmbolden(FT_Face face, FT_GlyphSlot glyph, GlyphID glyphId, FT_Int32 glyphFlags) {
@@ -572,17 +591,6 @@ Point FTScalerContext::getVerticalOffset(GlyphID glyphID) const {
   return {-advanceX * 0.5f, metrics.capHeight};
 }
 
-static gfx::skcms_PixelFormat ToPixelFormat(ColorType colorType) {
-  switch (colorType) {
-    case ColorType::ALPHA_8:
-      return gfx::skcms_PixelFormat_A_8;
-    case ColorType::BGRA_8888:
-      return gfx::skcms_PixelFormat_BGRA_8888;
-    default:
-      return gfx::skcms_PixelFormat_RGBA_8888;
-  }
-}
-
 Rect FTScalerContext::getImageTransform(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
                                         Matrix* matrix) const {
   if (!hasColor() && stroke != nullptr) {
@@ -645,13 +653,19 @@ bool FTScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke*,
   auto srcRB = ftBitmap.pitch;
   auto srcFormat = ftBitmap.pixel_mode == FT_PIXEL_MODE_GRAY ? gfx::skcms_PixelFormat_A_8
                                                              : gfx::skcms_PixelFormat_BGRA_8888;
+  auto srcProfile = *gfx::skcms_sRGB_profile();
 
   auto dst = static_cast<uint8_t*>(dstPixels);
   auto dstRB = dstInfo.rowBytes();
   auto dstFormat = ToPixelFormat(dstInfo.colorType());
+  auto dstProfile = srcProfile;
+  if (dstInfo.colorSpace() != nullptr) {
+    dstProfile = ToSkcmsICCProfile(dstInfo.colorSpace());
+  }
   for (size_t i = 0; i < height; i++) {
-    gfx::skcms_Transform(src, srcFormat, gfx::skcms_AlphaFormat_PremulAsEncoded, nullptr, dst,
-                         dstFormat, gfx::skcms_AlphaFormat_PremulAsEncoded, nullptr, width);
+    gfx::skcms_Transform(src, srcFormat, gfx::skcms_AlphaFormat_PremulAsEncoded,
+                         gfx::skcms_sRGB_profile(), dst, dstFormat,
+                         gfx::skcms_AlphaFormat_PremulAsEncoded, &dstProfile, width);
     src += srcRB;
     dst += dstRB;
   }

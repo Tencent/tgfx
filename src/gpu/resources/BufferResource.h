@@ -18,9 +18,9 @@
 
 #pragma once
 
-#include "gpu/GPU.h"
-#include "gpu/GPUBuffer.h"
 #include "gpu/resources/Resource.h"
+#include "tgfx/gpu/GPU.h"
+#include "tgfx/gpu/GPUBuffer.h"
 
 namespace tgfx {
 /**
@@ -28,6 +28,14 @@ namespace tgfx {
  */
 class BufferResource : public Resource {
  public:
+  /**
+   * Wraps an existing GPUBuffer into a BufferResource.
+   */
+  static std::shared_ptr<BufferResource> Wrap(Context* context, std::shared_ptr<GPUBuffer> buffer,
+                                              const ScratchKey& scratchKey = {}) {
+    return Resource::AddToCache(context, new BufferResource(std::move(buffer)), scratchKey);
+  }
+
   size_t memoryUsage() const override {
     return buffer->size();
   }
@@ -51,8 +59,5 @@ class BufferResource : public Resource {
 
   explicit BufferResource(std::shared_ptr<GPUBuffer> buffer) : buffer(std::move(buffer)) {
   }
-
-  friend class GPUBufferUploadTask;
-  friend class ShapeBufferUploadTask;
 };
 }  // namespace tgfx

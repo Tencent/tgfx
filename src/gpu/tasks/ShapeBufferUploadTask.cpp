@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ShapeBufferUploadTask.h"
-#include "gpu/GPU.h"
 #include "gpu/resources/BufferResource.h"
 #include "gpu/resources/TextureView.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 ShapeBufferUploadTask::ShapeBufferUploadTask(std::shared_ptr<ResourceProxy> trianglesProxy,
@@ -47,7 +47,7 @@ std::shared_ptr<Resource> ShapeBufferUploadTask::onMakeResource(Context* context
       return nullptr;
     }
     gpu->queue()->writeBuffer(gpuBuffer, 0, triangles->data(), triangles->size());
-    vertexBuffer = Resource::AddToCache(context, new BufferResource(std::move(gpuBuffer)));
+    vertexBuffer = BufferResource::Wrap(context, std::move(gpuBuffer));
   } else {
     auto textureView = TextureView::MakeFrom(context, std::move(shapeBuffer->imageBuffer));
     if (!textureView) {

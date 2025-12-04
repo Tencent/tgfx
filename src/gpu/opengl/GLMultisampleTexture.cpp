@@ -25,31 +25,20 @@ static bool RenderbufferStorageMSAA(GLGPU* gpu, int sampleCount, PixelFormat pix
                                     int height) {
   auto gl = gpu->functions();
   ClearGLError(gl);
-  auto caps = static_cast<const GLCaps*>(gpu->caps());
-  auto format = caps->getTextureFormat(pixelFormat).sizedFormat;
-  switch (caps->msFBOType) {
-    case MSFBOType::Standard:
-      gl->renderbufferStorageMultisample(GL_RENDERBUFFER, sampleCount, format, width, height);
-      break;
-    case MSFBOType::ES_Apple:
-      gl->renderbufferStorageMultisampleAPPLE(GL_RENDERBUFFER, sampleCount, format, width, height);
-      break;
-    case MSFBOType::None:
-      LOGE("Shouldn't be here if we don't support multisampled renderbuffers.");
-      break;
-  }
+  auto format = gpu->caps()->getTextureFormat(pixelFormat).sizedFormat;
+  gl->renderbufferStorageMultisample(GL_RENDERBUFFER, sampleCount, format, width, height);
   return CheckGLError(gl);
 }
 
 std::shared_ptr<GLMultisampleTexture> GLMultisampleTexture::MakeFrom(
-    GLGPU* gpu, const GPUTextureDescriptor& descriptor) {
+    GLGPU* gpu, const TextureDescriptor& descriptor) {
   DEBUG_ASSERT(gpu != nullptr);
   DEBUG_ASSERT(descriptor.sampleCount > 1);
-  if (!(descriptor.usage & GPUTextureUsage::RENDER_ATTACHMENT)) {
+  if (!(descriptor.usage & TextureUsage::RENDER_ATTACHMENT)) {
     LOGE("GLMultisampleTexture::MakeFrom() usage does not include RENDER_ATTACHMENT!");
     return nullptr;
   }
-  if (descriptor.usage & GPUTextureUsage::TEXTURE_BINDING) {
+  if (descriptor.usage & TextureUsage::TEXTURE_BINDING) {
     LOGE("GLMultisampleTexture::MakeFrom() usage includes TEXTURE_BINDING!");
     return nullptr;
   }
@@ -57,8 +46,7 @@ std::shared_ptr<GLMultisampleTexture> GLMultisampleTexture::MakeFrom(
     LOGE("GLMultisampleTexture::MakeFrom() mipLevelCount should be 1 for multisample textures!");
     return nullptr;
   }
-  auto caps = static_cast<const GLCaps*>(gpu->caps());
-  if (!caps->isFormatRenderable(descriptor.format)) {
+  if (!gpu->isFormatRenderable(descriptor.format)) {
     LOGE("GLMultisampleTexture::MakeFrom() format is not renderable!");
     return nullptr;
   }

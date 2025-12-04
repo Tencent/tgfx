@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "gpu/CommandQueue.h"
+#include "tgfx/gpu/CommandQueue.h"
 
 namespace tgfx {
 class GLGPU;
@@ -31,17 +31,14 @@ class GLCommandQueue : public CommandQueue {
   void writeBuffer(std::shared_ptr<GPUBuffer> buffer, size_t bufferOffset, const void* data,
                    size_t size) override;
 
-  void writeTexture(std::shared_ptr<GPUTexture> texture, const Rect& rect, const void* pixels,
+  void writeTexture(std::shared_ptr<Texture> texture, const Rect& rect, const void* pixels,
                     size_t rowBytes) override;
-
-  bool readTexture(std::shared_ptr<GPUTexture> texture, const Rect& rect, void* pixels,
-                   size_t rowBytes) const override;
 
   void submit(std::shared_ptr<CommandBuffer>) override;
 
-  std::shared_ptr<GPUFence> insertFence() override;
+  std::shared_ptr<Semaphore> insertSemaphore() override;
 
-  void waitForFence(std::shared_ptr<GPUFence> fence) override;
+  void waitSemaphore(std::shared_ptr<Semaphore> semaphore) override;
 
   void waitUntilCompleted() override;
 

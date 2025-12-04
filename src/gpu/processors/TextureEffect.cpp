@@ -21,17 +21,17 @@
 #include "gpu/ProxyProvider.h"
 
 namespace tgfx {
-PlacementPtr<FragmentProcessor> TextureEffect::Make(std::shared_ptr<TextureProxy> proxy,
+PlacementPtr<FragmentProcessor> TextureEffect::Make(BlockAllocator* allocator,
+                                                    std::shared_ptr<TextureProxy> proxy,
                                                     const SamplingArgs& args,
                                                     const Matrix* uvMatrix, bool forceAsMask) {
   if (proxy == nullptr) {
     return nullptr;
   }
   auto isAlphaOnly = proxy->isAlphaOnly();
-  auto processor = MakeRGBAAA(proxy, args, {}, uvMatrix);
+  auto processor = MakeRGBAAA(allocator, proxy, args, {}, uvMatrix);
   if (forceAsMask && !isAlphaOnly) {
-    auto drawingBuffer = proxy->getContext()->drawingBuffer();
-    processor = FragmentProcessor::MulInputByChildAlpha(drawingBuffer, std::move(processor));
+    processor = FragmentProcessor::MulInputByChildAlpha(allocator, std::move(processor));
   }
   return processor;
 }
@@ -57,7 +57,7 @@ void TextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
   auto yuvTexture = getYUVTexture();
   if (yuvTexture) {
     flags |= yuvTexture->yuvFormat() == YUVFormat::I420 ? 0 : 4;
-    flags |= IsLimitedYUVColorRange(yuvTexture->colorSpace()) ? 0 : 8;
+    flags |= IsLimitedYUVColorRange(yuvTexture->yuvColorSpace()) ? 0 : 8;
   }
   flags |= needSubset() ? 16 : 0;
   flags |= constraint == SrcRectConstraint::Strict ? 32 : 0;
@@ -75,7 +75,7 @@ size_t TextureEffect::onCountTextureSamplers() const {
   return 1;
 }
 
-std::shared_ptr<GPUTexture> TextureEffect::onTextureAt(size_t index) const {
+std::shared_ptr<Texture> TextureEffect::onTextureAt(size_t index) const {
   auto textureView = getTextureView();
   if (textureView == nullptr) {
     return nullptr;

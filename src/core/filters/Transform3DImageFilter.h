@@ -30,19 +30,32 @@ namespace tgfx {
 class Transform3DImageFilter final : public ImageFilter {
  public:
   /**
-   * Creates a Transform3DImageFilter with the specified transformation matrix.
-   * The transformation matrix transforms 3D model coordinates to destination coordinates for x and
-   * y before perspective division. The z value is mapped to the [-1, 1] range before perspective
-   * division; content outside this z range will be clipped.
+   * Creates a filter that applies a perspective transformation to the input image.
+   * @param matrix The transformation matrix that maps vertices from the local coordinate system to
+   * the destination coordinate system during 3D perspective transformation. The result of
+   * multiplying this matrix with the vertex coordinates will undergo perspective division; the
+   * resulting x and y components are the final projected coordinates. The valid range for the z
+   * component is consistent with OpenGL's definition for the clipping space, which is [-1, 1]. Any
+   * content with a z component outside this range will be clipped.
+   * The default transformation anchor is at the top-left origin (0,0) of the source image,
+   * user-defined anchors are included in the matrix.
    */
-  explicit Transform3DImageFilter(const Matrix3D& matrix);
+  explicit Transform3DImageFilter(const Matrix3D& matrix, bool hideBackFace = false);
+
+  const Matrix3D& matrix() const {
+    return _matrix;
+  }
+
+  bool hideBackFace() const {
+    return _hideBackFace;
+  }
 
  private:
   Type type() const override {
     return Type::Transform3D;
   }
 
-  Rect onFilterBounds(const Rect& srcRect) const override;
+  Rect onFilterBounds(const Rect& rect, MapDirection mapDirection) const override;
 
   std::shared_ptr<TextureProxy> lockTextureProxy(std::shared_ptr<Image> source,
                                                  const Rect& renderBounds,
@@ -54,10 +67,9 @@ class Transform3DImageFilter final : public ImageFilter {
                                                       SrcRectConstraint constraint,
                                                       const Matrix* uvMatrix) const override;
 
-  /**
-   * 3D transformation matrix used to convert model coordinates to clip space.
-   */
-  Matrix3D matrix = Matrix3D::I();
+  Matrix3D _matrix = Matrix3D::I();
+
+  bool _hideBackFace = false;
 };
 
 }  // namespace tgfx

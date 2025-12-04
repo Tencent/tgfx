@@ -42,12 +42,15 @@ class NativeImageBuffer : public ImageBuffer {
     return info.isAlphaOnly();
   }
 
+  std::shared_ptr<ColorSpace> colorSpace() const override;
+
  protected:
   std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) const override;
 
  private:
   ImageInfo info = {};
   Global<jobject> bitmap = {};
+  std::shared_ptr<ColorSpace> _colorSpace = nullptr;
 
   explicit NativeImageBuffer(const ImageInfo& info) : info(info) {
   }

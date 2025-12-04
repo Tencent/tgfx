@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "core/utils/BlockBuffer.h"
+#include "core/utils/BlockAllocator.h"
 #include "core/utils/UniqueID.h"
 #include "tgfx/core/BytesKey.h"
 #include "tgfx/gpu/Context.h"

@@ -18,9 +18,9 @@
 
 #pragma once
 
-#include "gpu/GPUBuffer.h"
 #include "gpu/opengl/GLInterface.h"
 #include "gpu/opengl/GLResource.h"
+#include "tgfx/gpu/GPUBuffer.h"
 
 namespace tgfx {
 /**
@@ -33,8 +33,6 @@ class GLBuffer : public GPUBuffer, public GLResource {
    * Creates a new GLBuffer with the specified size and usage flags.
    */
   GLBuffer(std::shared_ptr<GLInterface> interface, unsigned bufferID, size_t size, uint32_t usage);
-
-  ~GLBuffer() override;
 
   /**
    * Returns the OpenGL target for the buffer based on its usage flags.
@@ -60,7 +58,6 @@ class GLBuffer : public GPUBuffer, public GLResource {
   std::shared_ptr<GLInterface> _interface = nullptr;
   unsigned _bufferID = 0;
   void* readbackFence = nullptr;
-  void* dataAddress = nullptr;
 
   void onRelease(GLGPU* gpu) override;
 };

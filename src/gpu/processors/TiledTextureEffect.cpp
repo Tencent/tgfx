@@ -79,15 +79,12 @@ TiledTextureEffect::Sampling::Sampling(const TextureView* textureView, SamplerSt
     Span shaderClamp;
     TileMode hwMode = TileMode::Clamp;
   };
-  auto caps = textureView->getContext()->caps();
-  auto canDoWrapInHW = [&](int size, TileMode tileMode) {
-    if (tileMode == TileMode::Decal && !caps->clampToBorderSupport) {
+  auto features = textureView->getContext()->gpu()->features();
+  auto canDoWrapInHW = [&](TileMode tileMode) {
+    if (tileMode == TileMode::Decal && !features->clampToBorder) {
       return false;
     }
-    if (tileMode != TileMode::Clamp && !caps->npotTextureTileSupport && !IsPow2(size)) {
-      return false;
-    }
-    if (textureView->getTexture()->type() != GPUTextureType::TwoD &&
+    if (textureView->getTexture()->type() != TextureType::TwoD &&
         !(tileMode == TileMode::Clamp || tileMode == TileMode::Decal)) {
       return false;
     }
@@ -95,7 +92,7 @@ TiledTextureEffect::Sampling::Sampling(const TextureView* textureView, SamplerSt
   };
   auto resolve = [&](int size, TileMode tileMode, Span subsetSpan, float linearFilterInset) {
     Result1D r;
-    bool canDoModeInHW = canDoWrapInHW(size, tileMode);
+    bool canDoModeInHW = canDoWrapInHW(tileMode);
     if (canDoModeInHW && subsetSpan.a <= 0 && subsetSpan.b >= static_cast<float>(size)) {
       r.hwMode = tileMode;
       return r;
@@ -164,7 +161,7 @@ size_t TiledTextureEffect::onCountTextureSamplers() const {
   return textureView ? 1 : 0;
 }
 
-std::shared_ptr<GPUTexture> TiledTextureEffect::onTextureAt(size_t) const {
+std::shared_ptr<Texture> TiledTextureEffect::onTextureAt(size_t) const {
   auto textureView = getTextureView();
   if (textureView == nullptr) {
     return nullptr;

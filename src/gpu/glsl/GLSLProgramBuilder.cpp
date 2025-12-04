@@ -18,27 +18,26 @@
 
 #include "GLSLProgramBuilder.h"
 #include <string>
-#include "gpu/GPU.h"
 #include "gpu/UniformData.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
-static std::string TypeModifierString(bool varyingIsInOut, ShaderVar::TypeModifier t,
-                                      ShaderStage stage) {
+static std::string TypeModifierString(ShaderVar::TypeModifier t, ShaderStage stage) {
   switch (t) {
-    case ShaderVar::TypeModifier::None:
-      return "";
     case ShaderVar::TypeModifier::Attribute:
-      return varyingIsInOut ? "in" : "attribute";
+      return "in";
     case ShaderVar::TypeModifier::Varying:
-      return varyingIsInOut ? (stage == ShaderStage::Vertex ? "out" : "in") : "varying";
+      return stage == ShaderStage::Vertex ? "out" : "in";
     case ShaderVar::TypeModifier::FlatVarying:
-      return varyingIsInOut ? (stage == ShaderStage::Vertex ? "flat out" : "flat in") : "varying";
+      return stage == ShaderStage::Vertex ? "flat out" : "flat in";
     case ShaderVar::TypeModifier::Uniform:
       return "uniform";
     case ShaderVar::TypeModifier::Out:
       return "out";
     case ShaderVar::TypeModifier::InOut:
       return "inout";
+    default:
+      return "";
   }
 }
 
@@ -123,11 +122,10 @@ std::string GLSLProgramBuilder::getShaderVarDeclarations(const ShaderVar& var,
                                                          ShaderStage stage) const {
   std::string ret;
   if (var.modifier() != ShaderVar::TypeModifier::None) {
-    auto varyingIsInOut = getContext()->caps()->shaderCaps()->varyingIsInOut;
-    ret += TypeModifierString(varyingIsInOut, var.modifier(), stage);
+    ret += TypeModifierString(var.modifier(), stage);
     ret += " ";
   }
-  auto shaderCaps = context->caps()->shaderCaps();
+  auto shaderCaps = context->shaderCaps();
   if (shaderCaps->usesPrecisionModifiers) {
     ret += SLTypePrecision(var.type());
     ret += " ";
@@ -151,7 +149,7 @@ std::string GLSLProgramBuilder::getUniformBlockDeclaration(
   static const std::string INDENT_STR = "    ";  // 4 spaces
   result += "layout(std140) uniform " + uniformBlockName + " {\n";
   std::string precision = "";
-  auto shaderCaps = context->caps()->shaderCaps();
+  auto shaderCaps = context->shaderCaps();
   for (const auto& uniform : uniforms) {
     const auto& var = ShaderVar(uniform);
     if (shaderCaps->usesPrecisionModifiers) {
@@ -166,11 +164,8 @@ std::string GLSLProgramBuilder::getUniformBlockDeclaration(
   return result;
 }
 
-std::shared_ptr<PipelineProgram> GLSLProgramBuilder::finalize() {
-  auto shaderCaps = context->caps()->shaderCaps();
-  if (shaderCaps->usesCustomColorOutputName) {
-    fragmentShaderBuilder()->declareCustomOutputColor();
-  }
+std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
+  fragmentShaderBuilder()->declareCustomOutputColor();
   finalizeShaders();
   auto gpu = context->gpu();
   ShaderModuleDescriptor vertexModule = {};
@@ -196,34 +191,31 @@ std::shared_ptr<PipelineProgram> GLSLProgramBuilder::finalize() {
   auto fragmentUniformData = _uniformHandler.makeUniformData(ShaderStage::Fragment);
   if (vertexUniformData) {
     BindingEntry vertexBinding = {VertexUniformBlockName, VERTEX_UBO_BINDING_POINT};
-    if (!shaderCaps->uboSupport) {
-      vertexBinding.uniforms = vertexUniformData->uniforms();
-      DEBUG_ASSERT(!vertexBinding.uniforms.empty());
-    }
     descriptor.layout.uniformBlocks.push_back(vertexBinding);
   }
   if (fragmentUniformData) {
     BindingEntry fragmentBinding = {FragmentUniformBlockName, FRAGMENT_UBO_BINDING_POINT};
-    if (!shaderCaps->uboSupport) {
-      fragmentBinding.uniforms = fragmentUniformData->uniforms();
-      DEBUG_ASSERT(!fragmentBinding.uniforms.empty());
-    }
     descriptor.layout.uniformBlocks.push_back(fragmentBinding);
   }
   int textureBinding = TEXTURE_BINDING_POINT_START;
   for (const auto& sampler : _uniformHandler.getSamplers()) {
     descriptor.layout.textureSamplers.emplace_back(sampler.name(), textureBinding++);
   }
+  // Although the vertexProvider constructs the rectangle in a counterclockwise order, the model
+  // uses a coordinate system with the Y-axis pointing downward, which is opposite to OpenGL's
+  // default Y-axis direction (upward). Therefore, it is necessary to define the clockwise
+  // direction as the front face, which is the opposite of OpenGL's default.
+  descriptor.primitive = {programInfo->getCullMode(), FrontFace::CW};
   auto pipeline = gpu->createRenderPipeline(descriptor);
   if (pipeline == nullptr) {
     return nullptr;
   }
-  return std::make_shared<PipelineProgram>(std::move(pipeline), std::move(vertexUniformData),
-                                           std::move(fragmentUniformData));
+  return std::make_shared<Program>(std::move(pipeline), std::move(vertexUniformData),
+                                   std::move(fragmentUniformData));
 }
 
 bool GLSLProgramBuilder::checkSamplerCounts() {
-  auto shaderCaps = context->caps()->shaderCaps();
+  auto shaderCaps = context->shaderCaps();
   if (numFragmentSamplers > shaderCaps->maxFragmentSamplers) {
     LOGE("Program would use too many fragment samplers.");
     return false;

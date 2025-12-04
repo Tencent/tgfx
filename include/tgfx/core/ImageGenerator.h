@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/ImageBuffer.h"
 
 namespace tgfx {
@@ -77,8 +78,16 @@ class ImageGenerator {
     return onMakeBuffer(tryHardware);
   }
 
+  /**
+   * Return the ColorSpace of this ImageGenerator
+   */
+  std::shared_ptr<ColorSpace> colorSpace() const {
+    return _colorSpace;
+  }
+
  protected:
-  ImageGenerator(int width, int height) : _width(width), _height(height) {
+  ImageGenerator(int width, int height, std::shared_ptr<ColorSpace> colorSpace = nullptr)
+      : _width(width), _height(height), _colorSpace(std::move(colorSpace)) {
   }
 
   virtual std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const = 0;
@@ -86,5 +95,6 @@ class ImageGenerator {
  private:
   int _width = 0;
   int _height = 0;
+  std::shared_ptr<ColorSpace> _colorSpace = nullptr;
 };
 }  // namespace tgfx

@@ -52,34 +52,34 @@ PlacementPtr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Image> i
 }
 
 PlacementPtr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Shader> shader,
-                                                        const FPArgs& args,
-                                                        const Matrix* uvMatrix) {
+                                                        const FPArgs& args, const Matrix* uvMatrix,
+                                                        std::shared_ptr<ColorSpace> dstColorSpace) {
   DEBUG_ASSERT(shader != nullptr);
-  return shader->asFragmentProcessor(args, uvMatrix);
+  return shader->asFragmentProcessor(args, uvMatrix, std::move(dstColorSpace));
 }
 
 PlacementPtr<FragmentProcessor> FragmentProcessor::MulChildByInputAlpha(
-    BlockBuffer* buffer, PlacementPtr<FragmentProcessor> child) {
+    BlockAllocator* allocator, PlacementPtr<FragmentProcessor> child) {
   if (child == nullptr) {
     return nullptr;
   }
-  return XfermodeFragmentProcessor::MakeFromDstProcessor(buffer, std::move(child),
+  return XfermodeFragmentProcessor::MakeFromDstProcessor(allocator, std::move(child),
                                                          BlendMode::DstIn);
 }
 
 PlacementPtr<FragmentProcessor> FragmentProcessor::MulInputByChildAlpha(
-    BlockBuffer* buffer, PlacementPtr<FragmentProcessor> child, bool inverted) {
+    BlockAllocator* allocator, PlacementPtr<FragmentProcessor> child, bool inverted) {
   if (child == nullptr) {
     return nullptr;
   }
   return XfermodeFragmentProcessor::MakeFromDstProcessor(
-      buffer, std::move(child), inverted ? BlendMode::SrcOut : BlendMode::SrcIn);
+      allocator, std::move(child), inverted ? BlendMode::SrcOut : BlendMode::SrcIn);
 }
 
-PlacementPtr<FragmentProcessor> FragmentProcessor::Compose(BlockBuffer* buffer,
+PlacementPtr<FragmentProcessor> FragmentProcessor::Compose(BlockAllocator* allocator,
                                                            PlacementPtr<FragmentProcessor> f,
                                                            PlacementPtr<FragmentProcessor> g) {
-  return ComposeFragmentProcessor::Make(buffer, std::move(f), std::move(g));
+  return ComposeFragmentProcessor::Make(allocator, std::move(f), std::move(g));
 }
 
 void FragmentProcessor::computeProcessorKey(Context* context, BytesKey* bytesKey) const {

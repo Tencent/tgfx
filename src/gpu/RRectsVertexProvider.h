@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "core/utils/BlockBuffer.h"
+#include "core/utils/BlockAllocator.h"
 #include "gpu/AAType.h"
 #include "gpu/VertexProvider.h"
 #include "tgfx/core/Color.h"
@@ -27,13 +27,13 @@
 
 namespace tgfx {
 struct RRectRecord {
-  RRectRecord(const RRect& rRect, const Matrix& viewMatrix, Color color = {})
+  RRectRecord(const RRect& rRect, const Matrix& viewMatrix, PMColor color = {})
       : rRect(rRect), viewMatrix(viewMatrix), color(color) {
   }
 
   RRect rRect;
   Matrix viewMatrix;
-  Color color;
+  PMColor color;
 };
 
 /**
@@ -44,9 +44,9 @@ class RRectsVertexProvider : public VertexProvider {
   /**
    * Creates a new RRectsVertexProvider from a list of RRect records.
    */
-  static PlacementPtr<RRectsVertexProvider> MakeFrom(BlockBuffer* blockBuffer,
+  static PlacementPtr<RRectsVertexProvider> MakeFrom(BlockAllocator* allocator,
                                                      std::vector<PlacementPtr<RRectRecord>>&& rects,
-                                                     AAType aaType, bool useScale,
+                                                     AAType aaType,
                                                      std::vector<PlacementPtr<Stroke>>&& strokes);
 
   /**
@@ -63,10 +63,6 @@ class RRectsVertexProvider : public VertexProvider {
     return static_cast<AAType>(bitFields.aaType);
   }
 
-  bool useScale() const {
-    return bitFields.useScale;
-  }
-
   /**
    * Returns true if the provider generates colors.
    */
@@ -81,7 +77,7 @@ class RRectsVertexProvider : public VertexProvider {
   /**
    * Returns the first color in the provider. If no color record exists, a white color is returned.
    */
-  const Color& firstColor() const {
+  const PMColor& firstColor() const {
     return rects.front()->color;
   }
 
@@ -94,15 +90,13 @@ class RRectsVertexProvider : public VertexProvider {
   PlacementArray<Stroke> strokes = {};
   struct {
     uint8_t aaType : 2;
-    bool useScale : 1;
     bool hasColor : 1;
     bool hasStroke : 1;
   } bitFields = {};
 
-  RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType, bool useScale,
-                       bool hasColor, PlacementArray<Stroke>&& strokes,
-                       std::shared_ptr<BlockBuffer> reference);
+  RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType, bool hasColor,
+                       PlacementArray<Stroke>&& strokes, std::shared_ptr<BlockAllocator> reference);
 
-  friend class BlockBuffer;
+  friend class BlockAllocator;
 };
 }  // namespace tgfx

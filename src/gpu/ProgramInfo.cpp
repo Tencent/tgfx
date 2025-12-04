@@ -56,9 +56,8 @@ const XferProcessor* ProgramInfo::getXferProcessor() const {
   return xferProcessor;
 }
 
-const Swizzle& ProgramInfo::getOutputSwizzle() const {
-  auto context = renderTarget->getContext();
-  return context->caps()->getWriteSwizzle(renderTarget->format());
+Swizzle ProgramInfo::getOutputSwizzle() const {
+  return Swizzle::ForWrite(renderTarget->format());
 }
 
 PipelineColorAttachment ProgramInfo::getPipelineColorAttachment() const {
@@ -123,6 +122,7 @@ std::shared_ptr<Program> ProgramInfo::getProgram() const {
   }
   programKey.write(static_cast<uint32_t>(blendMode));
   programKey.write(static_cast<uint32_t>(getOutputSwizzle().asKey()));
+  programKey.write(static_cast<uint32_t>(cullMode));
   CAPUTRE_PROGRAM_INFO(programKey, context, this);
   auto program = context->globalCache()->findProgram(programKey);
   if (program == nullptr) {
@@ -136,14 +136,14 @@ std::shared_ptr<Program> ProgramInfo::getProgram() const {
   return program;
 }
 
-std::shared_ptr<GPUBuffer> ProgramInfo::getUniformBuffer(const PipelineProgram* program,
+std::shared_ptr<GPUBuffer> ProgramInfo::getUniformBuffer(const Program* program,
                                                          size_t* vertexOffset,
                                                          size_t* fragmentOffset) const {
   DEBUG_ASSERT(renderTarget != nullptr);
 
   auto globalCache = renderTarget->getContext()->globalCache();
-  auto uboOffsetAlignment = static_cast<size_t>(
-      renderTarget->getContext()->gpu()->caps()->shaderCaps()->uboOffsetAlignment);
+  auto uboOffsetAlignment =
+      static_cast<size_t>(renderTarget->getContext()->shaderCaps()->uboOffsetAlignment);
   size_t vertexUniformBufferSize = 0;
   auto vertexUniformData = program->getUniformData(ShaderStage::Vertex);
   if (vertexUniformData != nullptr) {
@@ -180,7 +180,7 @@ std::shared_ptr<GPUBuffer> ProgramInfo::getUniformBuffer(const PipelineProgram* 
   return uniformBuffer;
 }
 
-void ProgramInfo::bindUniformBufferAndUnloadToGPU(const PipelineProgram* program,
+void ProgramInfo::bindUniformBufferAndUnloadToGPU(const Program* program,
                                                   std::shared_ptr<GPUBuffer> uniformBuffer,
                                                   RenderPass* renderPass, size_t vertexOffset,
                                                   size_t fragmentOffset) const {
@@ -219,7 +219,7 @@ static AddressMode ToAddressMode(TileMode tileMode) {
   }
 }
 
-void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, PipelineProgram* program) const {
+void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* program) const {
   DEBUG_ASSERT(renderTarget != nullptr);
   size_t vertexOffset = 0;
   size_t fragmentOffset = 0;
@@ -258,8 +258,8 @@ void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, PipelineProgram
   unsigned textureBinding = TEXTURE_BINDING_POINT_START;
   auto gpu = renderTarget->getContext()->gpu();
   for (auto& [texture, state] : samplers) {
-    GPUSamplerDescriptor descriptor(ToAddressMode(state.tileModeX), ToAddressMode(state.tileModeY),
-                                    state.minFilterMode, state.magFilterMode, state.mipmapMode);
+    SamplerDescriptor descriptor(ToAddressMode(state.tileModeX), ToAddressMode(state.tileModeY),
+                                 state.minFilterMode, state.magFilterMode, state.mipmapMode);
     auto sampler = gpu->createSampler(descriptor);
     renderPass->setTexture(textureBinding++, texture, sampler);
   }

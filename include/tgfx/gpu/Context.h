@@ -21,20 +21,22 @@
 #include <chrono>
 #include <deque>
 #include "tgfx/gpu/Backend.h"
-#include "tgfx/gpu/Caps.h"
 #include "tgfx/gpu/Device.h"
+#include "tgfx/gpu/Recording.h"
 
 namespace tgfx {
 class GlobalCache;
 class ResourceCache;
 class DrawingManager;
+class DrawingBuffer;
 class GPU;
 class ResourceProvider;
 class ProxyProvider;
-class BlockBuffer;
+class BlockAllocator;
 class SlidingWindowTracker;
 class AtlasManager;
 class CommandBuffer;
+class ShaderCaps;
 
 /**
  * Context is responsible for creating and managing GPU resources, as well as issuing drawing
@@ -64,9 +66,11 @@ class Context {
   Backend backend() const;
 
   /**
-   * Returns the capability info of the backend GPU.
+   * Returns the shader capability info of the backend GPU.
    */
-  const Caps* caps() const;
+  const ShaderCaps* shaderCaps() const {
+    return _shaderCaps;
+  }
 
   /**
    * Returns the GPU instance associated with this context.
@@ -143,27 +147,25 @@ class Context {
   bool wait(const BackendSemaphore& waitSemaphore);
 
   /**
-   * Ensures that all pending drawing operations for this context are flushed to the underlying GPU
-   * API objects. A call to Context::submit is always required to ensure work is actually sent to
-   * the GPU. If signalSemaphore is not null, a new semaphore will be created and assigned to
-   * signalSemaphore. The caller is responsible for deleting the semaphore returned in
-   * signalSemaphore. Returns false if there are no pending drawing operations and nothing was
-   * flushed to the GPU. In that case, signalSemaphore will not be initialized, and the caller
-   * should not wait on it.
+   * Flushes all pending drawing operations for this context into a Recording object and returns it.
+   * A call to Context::submit is always required to ensure work is actually sent to the GPU. If
+   * signalSemaphore is not null, a new semaphore will be created and assigned to signalSemaphore.
+   * The caller is responsible for deleting the semaphore returned in signalSemaphore. Returns
+   * nullptr if there are no pending drawing operations. In that case, signalSemaphore will not be
+   * initialized, and the caller should not wait on it.
    */
-  bool flush(BackendSemaphore* signalSemaphore = nullptr);
+  std::unique_ptr<Recording> flush(BackendSemaphore* signalSemaphore = nullptr);
 
   /**
-   * Submit outstanding work to the gpu from all previously un-submitted flushes.
-   * If the syncCpu flag is true, this function will return once the gpu has finished with all
-   * submitted work.
+   * Submit the provided recording object to the GPU for execution. The recording must have been
+   * created by this context via a call to Context::flush(). If the syncCpu flag is true, this
+   * function will return once the gpu has finished with all submitted work.
    */
-  void submit(bool syncCpu = false);
+  void submit(std::unique_ptr<Recording> recording, bool syncCpu = false);
 
   /**
    * Call to ensure all drawing to the context has been flushed and submitted to the underlying 3D
-   * API. This is equivalent to calling Context::flush() followed by Context::submit(syncCpu).
-   *
+   * API. This is equivalent to calling Context::flush() followed by Context::submit().
    * Returns false if there are no pending drawing operations and nothing was flushed to the GPU.
    */
   bool flushAndSubmit(bool syncCpu = false);
@@ -180,9 +182,7 @@ class Context {
     return _drawingManager;
   }
 
-  BlockBuffer* drawingBuffer() const {
-    return _drawingBuffer;
-  }
+  BlockAllocator* drawingAllocator() const;
 
   ProxyProvider* proxyProvider() const {
     return _proxyProvider;
@@ -193,16 +193,17 @@ class Context {
   }
 
  private:
+  std::shared_ptr<DrawingBuffer> getDrawingBuffer(const Recording* recording) const;
+
   Device* _device = nullptr;
   GPU* _gpu = nullptr;
+  ShaderCaps* _shaderCaps = nullptr;
   GlobalCache* _globalCache = nullptr;
   ResourceCache* _resourceCache = nullptr;
   DrawingManager* _drawingManager = nullptr;
   ProxyProvider* _proxyProvider = nullptr;
-  BlockBuffer* _drawingBuffer = nullptr;
-  SlidingWindowTracker* _maxValueTracker = nullptr;
   AtlasManager* _atlasManager = nullptr;
-  std::shared_ptr<CommandBuffer> commandBuffer = nullptr;
+  std::deque<std::shared_ptr<DrawingBuffer>> pendingDrawingBuffers = {};
 };
 
 }  // namespace tgfx

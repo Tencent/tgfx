@@ -23,6 +23,8 @@
 #include <unordered_map>
 #include <vector>
 #include "gpu/Uniform.h"
+#include "tgfx/core/Color.h"
+#include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/Matrix.h"
 
 namespace tgfx {
@@ -44,10 +46,23 @@ class UniformData {
    */
   template <typename T>
   std::enable_if_t<std::is_trivially_copyable_v<T> && !std::is_pointer_v<T> &&
-                       !std::is_same_v<std::decay_t<T>, Matrix>,
+                       !std::is_same_v<std::decay_t<T>, Matrix> &&
+                       !std::is_same_v<std::decay_t<T>, ColorMatrix33> &&
+                       !std::is_same_v<std::decay_t<T>, PMColor> &&
+                       !std::is_same_v<std::decay_t<T>, Color>,
                    void>
   setData(const std::string& name, const T& value) const {
     onSetData(name, &value, sizeof(value));
+  }
+
+  /**
+   * Convenience method for Color.
+   */
+  template <typename T>
+  std::enable_if_t<
+      std::is_same_v<std::decay_t<T>, PMColor> || std::is_same_v<std::decay_t<T>, Color>, void>
+  setData(const std::string& name, const T& color) const {
+    onSetData(name, color.array(), sizeof(float) * 4);
   }
 
   /**
@@ -59,25 +74,28 @@ class UniformData {
     float values[6] = {};
     matrix.get6(values);
 
-    if (_uboSupport) {
-      // clang-format off
+    // clang-format off
+    const float data[] = {
+      values[0], values[3], 0, 0,
+      values[1], values[4], 0, 0,
+      values[2], values[5], 1, 0,
+    };
+    // clang-format on
+    onSetData(name, data, sizeof(data));
+  }
+
+  template <typename T>
+  std::enable_if_t<std::is_same_v<std::decay_t<T>, ColorMatrix33>, void> setData(
+      const std::string& name, const T& matrix) const {
+
+    // clang-format off
       const float data[] = {
-        values[0], values[3], 0, 0,
-        values[1], values[4], 0, 0,
-        values[2], values[5], 1, 0,
+        matrix.values[0][0], matrix.values[1][0], matrix.values[2][0], 0,
+        matrix.values[0][1], matrix.values[1][1], matrix.values[2][1], 0,
+        matrix.values[0][2], matrix.values[1][2], matrix.values[2][2], 0,
       };
-      // clang-format on
-      onSetData(name, data, sizeof(data));
-    } else {
-      // clang-format off
-      const float data[] = {
-        values[0], values[3], 0,
-        values[1], values[4], 0,
-        values[2], values[5], 1
-      };
-      // clang-format on
-      onSetData(name, data, sizeof(data));
-    }
+    // clang-format on
+    onSetData(name, data, sizeof(data));
   }
 
   /**
@@ -101,13 +119,6 @@ class UniformData {
     return _uniforms;
   }
 
-  /**
-   * Returns true if UBO is supported in the current context.
-   */
-  bool uboSupport() const {
-    return _uboSupport;
-  }
-
  private:
   struct Field {
     std::string name = "";
@@ -128,9 +139,8 @@ class UniformData {
   std::string nameSuffix = "";
   std::unordered_map<std::string, Field> fieldMap = {};
   size_t cursor = 0;
-  bool _uboSupport = false;
 
-  explicit UniformData(std::vector<Uniform> uniforms, bool uboSupport = false);
+  explicit UniformData(std::vector<Uniform> uniforms);
 
   void onSetData(const std::string& name, const void* data, size_t size) const;
 

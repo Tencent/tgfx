@@ -56,7 +56,7 @@ class QGLWindow : public Window {
 
  protected:
   std::shared_ptr<Surface> onCreateSurface(Context* context) override;
-  void onPresent(Context* context, int64_t presentationTime) override;
+  void onPresent(Context* context) override;
   void onFreeSurface() override;
 
  private:
@@ -67,7 +67,7 @@ class QGLWindow : public Window {
   unsigned pendingTextureID = 0;
   std::shared_ptr<Surface> pendingSurface = nullptr;
   std::shared_ptr<Surface> displayingSurface = nullptr;
-  std::shared_ptr<Surface> fontSurface = nullptr;
+  std::shared_ptr<Surface> frontSurface = nullptr;
   QSGTexture* outTexture = nullptr;
   QGLDeviceCreator* deviceCreator = nullptr;
 

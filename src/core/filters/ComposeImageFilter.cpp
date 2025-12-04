@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ComposeImageFilter.h"
+#include "core/filters/Transform3DImageFilter.h"
 #include "core/images/FilterImage.h"
 
 namespace tgfx {
@@ -62,10 +63,16 @@ ComposeImageFilter::ComposeImageFilter(std::vector<std::shared_ptr<ImageFilter>>
     : filters(std::move(filters)) {
 }
 
-Rect ComposeImageFilter::onFilterBounds(const Rect& srcRect) const {
-  auto bounds = srcRect;
-  for (auto& filter : filters) {
-    bounds = filter->filterBounds(bounds);
+Rect ComposeImageFilter::onFilterBounds(const Rect& rect, MapDirection mapDirection) const {
+  auto bounds = rect;
+  if (mapDirection == MapDirection::Forward) {
+    for (auto& filter : filters) {
+      bounds = filter->filterBounds(bounds);
+    }
+    return bounds;
+  }
+  for (auto it = filters.rbegin(); it != filters.rend(); ++it) {
+    bounds = (*it)->filterBounds(bounds, mapDirection);
   }
   return bounds;
 }
@@ -77,7 +84,25 @@ PlacementPtr<FragmentProcessor> ComposeImageFilter::asFragmentProcessor(
   Point lastOffset = {};
   for (auto& filter : filters) {
     Point offset = {};
-    lastSource = FilterImage::MakeFrom(std::move(lastSource), filter, &offset);
+    if (filter->type() == Type::Transform3D) {
+      // The filter's matrix is defined with the anchor point at (0, 0) of the input image's
+      // top-left corner in the filter group. However, when rendering with a 3D filter, there is no
+      // concept of X and Y coordinates, only width and height definitions. This means it processes
+      // an image with lastOffset as the origin, and the width and height of lastSource as its
+      // dimensions. In this case, the transformation anchor point of the filter in the image
+      // coordinate system becomes -lastOffset, instead of (0, 0). The matrix needs to be
+      // recalculated based on this anchor point, and a new image filter must be constructed.
+      auto transform3DFilter = static_cast<Transform3DImageFilter*>(filter.get());
+      Matrix3D matrix = transform3DFilter->matrix();
+      auto offsetMatrix = Matrix3D::MakeTranslate(lastOffset.x, lastOffset.y, 0);
+      auto invOffsetMatrix = Matrix3D::MakeTranslate(-lastOffset.x, -lastOffset.y, 0);
+      auto adjustedMatrix3D = invOffsetMatrix * matrix * offsetMatrix;
+      auto newMatrixFilter =
+          ImageFilter::Transform3D(adjustedMatrix3D, transform3DFilter->hideBackFace());
+      lastSource = FilterImage::MakeFrom(std::move(lastSource), newMatrixFilter, &offset);
+    } else {
+      lastSource = FilterImage::MakeFrom(std::move(lastSource), filter, &offset);
+    }
     if (!lastSource) {
       return nullptr;
     }

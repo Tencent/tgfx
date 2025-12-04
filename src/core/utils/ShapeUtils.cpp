@@ -32,7 +32,7 @@ Path ShapeUtils::GetShapeRenderingPath(std::shared_ptr<Shape> shape, float resol
 }
 
 float ShapeUtils::CalculateAlphaReduceFactorIfHairline(std::shared_ptr<Shape> shape) {
-  if (shape->type() != Shape::Type::Matrix) {
+  if (!shape || shape->type() != Shape::Type::Matrix) {
     return 1.f;
   }
 

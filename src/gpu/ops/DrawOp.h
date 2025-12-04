@@ -20,7 +20,7 @@
 
 #include "gpu/AAType.h"
 #include "gpu/ProgramInfo.h"
-#include "gpu/RenderPass.h"
+#include "tgfx/gpu/RenderPass.h"
 
 namespace tgfx {
 class DrawOp {
@@ -35,6 +35,10 @@ class DrawOp {
 
   void setBlendMode(BlendMode mode) {
     blendMode = mode;
+  }
+
+  void setCullMode(CullMode mode) {
+    cullMode = mode;
   }
 
   void setXferProcessor(PlacementPtr<XferProcessor> processor) {
@@ -56,14 +60,16 @@ class DrawOp {
   void execute(RenderPass* renderPass, RenderTarget* renderTarget);
 
  protected:
+  BlockAllocator* allocator = nullptr;
   AAType aaType = AAType::None;
   Rect scissorRect = {};
   std::vector<PlacementPtr<FragmentProcessor>> colors = {};
   std::vector<PlacementPtr<FragmentProcessor>> coverages = {};
   PlacementPtr<XferProcessor> xferProcessor = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
+  CullMode cullMode = CullMode::None;
 
-  explicit DrawOp(AAType aaType) : aaType(aaType) {
+  DrawOp(BlockAllocator* allocator, AAType aaType) : allocator(allocator), aaType(aaType) {
   }
 
   virtual PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) = 0;

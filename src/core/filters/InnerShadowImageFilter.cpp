@@ -18,6 +18,7 @@
 
 #include "InnerShadowImageFilter.h"
 #include "core/images/TextureImage.h"
+#include "core/utils/ToPMColor.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
@@ -55,24 +56,24 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::getShadowFragmentProcess
 
   PlacementPtr<FragmentProcessor> invertShadowMask;
   if (blurFilter != nullptr) {
-    invertShadowMask = blurFilter->asFragmentProcessor(std::move(source), args, sampling,
-                                                       constraint, &shadowMatrix);
-  } else {
     invertShadowMask =
-        FragmentProcessor::Make(std::move(source), args, TileMode::Decal, TileMode::Decal, sampling,
-                                constraint, &shadowMatrix);
+        blurFilter->asFragmentProcessor(source, args, sampling, constraint, &shadowMatrix);
+  } else {
+    invertShadowMask = FragmentProcessor::Make(source, args, TileMode::Decal, TileMode::Decal,
+                                               sampling, constraint, &shadowMatrix);
   }
 
-  auto buffer = args.context->drawingBuffer();
+  auto allocator = args.context->drawingAllocator();
   if (invertShadowMask == nullptr) {
     invertShadowMask =
-        ConstColorProcessor::Make(buffer, Color::Transparent().premultiply(), InputMode::Ignore);
+        ConstColorProcessor::Make(allocator, PMColor::Transparent(), InputMode::Ignore);
   }
-  auto colorProcessor = ConstColorProcessor::Make(buffer, color.premultiply(), InputMode::Ignore);
+  auto dstColor = ToPMColor(color, source->colorSpace());
+  auto colorProcessor = ConstColorProcessor::Make(allocator, dstColor, InputMode::Ignore);
 
   // get shadow mask and fill it with color
   auto colorShadowProcessor = XfermodeFragmentProcessor::MakeFromTwoProcessors(
-      buffer, std::move(colorProcessor), std::move(invertShadowMask), BlendMode::SrcOut);
+      allocator, std::move(colorProcessor), std::move(invertShadowMask), BlendMode::SrcOut);
   return colorShadowProcessor;
 }
 
@@ -93,11 +94,11 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::asFragmentProcessor(
   if (imageProcessor == nullptr) {
     return nullptr;
   }
-  auto buffer = args.context->drawingBuffer();
+  auto allocator = args.context->drawingAllocator();
   auto blendMode = shadowOnly ? BlendMode::SrcIn : BlendMode::SrcATop;
 
   return XfermodeFragmentProcessor::MakeFromTwoProcessors(
-      buffer, getShadowFragmentProcessor(source, args, sampling, constraint, uvMatrix),
+      allocator, getShadowFragmentProcessor(source, args, sampling, constraint, uvMatrix),
       std::move(imageProcessor), blendMode);
 }
 

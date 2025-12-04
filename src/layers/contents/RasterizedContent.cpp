@@ -20,14 +20,41 @@
 
 namespace tgfx {
 void RasterizedContent::draw(Canvas* canvas, bool antiAlias, float alpha,
-                             BlendMode blendMode) const {
+                             const std::shared_ptr<MaskFilter>& mask, BlendMode blendMode,
+                             const Matrix3D* transform) const {
   auto oldMatrix = canvas->getMatrix();
   canvas->concat(matrix);
   Paint paint = {};
   paint.setAntiAlias(antiAlias);
   paint.setAlpha(alpha);
   paint.setBlendMode(blendMode);
-  canvas->drawImage(image, &paint);
+  if (mask) {
+    auto invertMatrix = Matrix::I();
+    if (matrix.invert(&invertMatrix)) {
+      paint.setMaskFilter(mask->makeWithMatrix(invertMatrix));
+    }
+  }
+  if (transform == nullptr) {
+    canvas->drawImage(image, &paint);
+  } else {
+    // Transform describes a transformation based on the layer's coordinate system, but the
+    // rasterized content is only a small sub-rectangle within the layer. We need to calculate an
+    // equivalent affine transformation matrix referenced to the local coordinate system with the
+    // top-left vertex of this sub-rectangle as the origin.
+    auto adaptedMatrix = *transform;
+    auto offsetMatrix = Matrix3D::MakeTranslate(matrix.getTranslateX(), matrix.getTranslateY(), 0);
+    auto invOffsetMatrix =
+        Matrix3D::MakeTranslate(-matrix.getTranslateX(), -matrix.getTranslateY(), 0);
+    auto scaleMatrix = Matrix3D::MakeScale(matrix.getScaleX(), matrix.getScaleY(), 1.0f);
+    auto invScaleMatrix =
+        Matrix3D::MakeScale(1.0f / matrix.getScaleX(), 1.0f / matrix.getScaleY(), 1.0f);
+    adaptedMatrix = invScaleMatrix * invOffsetMatrix * adaptedMatrix * offsetMatrix * scaleMatrix;
+    auto imageFilter = ImageFilter::Transform3D(adaptedMatrix);
+    auto offSet = Point();
+    auto filteredeImage = image->makeWithFilter(imageFilter, &offSet);
+    canvas->concat(Matrix::MakeTrans(offSet.x, offSet.y));
+    canvas->drawImage(filteredeImage, &paint);
+  }
   canvas->setMatrix(oldMatrix);
 }
 }  // namespace tgfx

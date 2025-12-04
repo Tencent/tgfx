@@ -34,11 +34,11 @@ class ForegroundContent : public LayerContent {
 
   bool hitTestPoint(float localX, float localY, bool shapeHitTest) const override;
 
-  void drawDefault(Canvas* canvas, const FillModifier* modifier) const override;
+  void drawDefault(Canvas* canvas, const BrushModifier* modifier) const override;
 
-  void drawForeground(Canvas* canvas, const FillModifier* modifier) const override;
+  void drawForeground(Canvas* canvas, const BrushModifier* modifier) const override;
 
-  void drawContour(Canvas*, const FillModifier* modifier) const override;
+  void drawContour(Canvas*, const BrushModifier* modifier) const override;
 
   std::shared_ptr<Picture> background = nullptr;
   std::shared_ptr<Picture> foreground = nullptr;
