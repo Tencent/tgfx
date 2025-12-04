@@ -49,7 +49,6 @@ std::shared_ptr<Surface> WebGLWindow::onCreateSurface(Context* context) {
   GLFrameBufferInfo glInfo = {};
   glInfo.id = 0;
   glInfo.format = GL_RGBA8;
-  return Surface::MakeFrom(context, {glInfo, width, height}, ImageOrigin::BottomLeft, 0,
-                             nullptr);
+  return Surface::MakeFrom(context, {glInfo, width, height}, ImageOrigin::BottomLeft, 0, nullptr);
 }
 }  // namespace tgfx
