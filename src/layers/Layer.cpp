@@ -90,7 +90,7 @@ static std::shared_ptr<Image> ToImageWithOffset(
     return nullptr;
   }
   auto bounds = imageBounds ? *imageBounds : picture->getBounds();
-  // Do not use bounds after roundOut, as it will cause blurring
+  bounds.roundOut();
   auto matrix = Matrix::MakeTrans(-bounds.x(), -bounds.y());
   auto image =
       Image::MakeFrom(std::move(picture), static_cast<int>(ceilf(bounds.width())),
