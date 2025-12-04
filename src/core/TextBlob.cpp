@@ -137,4 +137,13 @@ Rect TextBlob::getTightBounds(const Matrix* matrix) const {
   }
   return bounds;
 }
+
+bool TextBlob::hitTestPoint(float localX, float localY, const Stroke* stroke) const {
+  for (auto& runList : glyphRunLists) {
+    if (runList->hitTestPoint(localX, localY, stroke)) {
+      return true;
+    }
+  }
+  return false;
+}
 }  // namespace tgfx
