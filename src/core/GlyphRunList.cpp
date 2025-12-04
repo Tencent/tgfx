@@ -21,6 +21,7 @@
 #include "core/utils/FauxBoldScale.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/StrokeUtils.h"
 #include "tgfx/core/TextBlob.h"
 
 namespace tgfx {
@@ -160,5 +161,40 @@ bool GlyphRunList::getPath(Path* path, const Matrix* matrix) const {
   }
   *path = std::move(totalPath);
   return true;
+}
+
+bool GlyphRunList::hitTestPoint(float localX, float localY, const Stroke* stroke) const {
+  auto usePathHitTest = hasOutlines();
+  for (auto& run : _glyphRuns) {
+    auto& font = run.font;
+    auto& positions = run.positions;
+    size_t index = 0;
+    for (auto& glyphID : run.glyphs) {
+      auto& position = positions[index];
+      auto glyphLocalX = localX - position.x;
+      auto glyphLocalY = localY - position.y;
+      if (usePathHitTest) {
+        Path glyphPath = {};
+        if (font.getPath(glyphID, &glyphPath)) {
+          if (stroke) {
+            stroke->applyToPath(&glyphPath);
+          }
+          if (glyphPath.contains(glyphLocalX, glyphLocalY)) {
+            return true;
+          }
+        }
+      } else {
+        auto bounds = font.getBounds(glyphID);
+        if (stroke) {
+          ApplyStrokeToBounds(*stroke, &bounds);
+        }
+        if (bounds.contains(glyphLocalX, glyphLocalY)) {
+          return true;
+        }
+      }
+      index++;
+    }
+  }
+  return false;
 }
 }  // namespace tgfx
