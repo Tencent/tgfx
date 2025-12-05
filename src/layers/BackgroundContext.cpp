@@ -19,6 +19,7 @@
 #include "BackgroundContext.h"
 #include <utility>
 #include "core/filters/GaussianBlurImageFilter.h"
+#include "core/utils/Log.h"
 #include "tgfx/core/PictureRecorder.h"
 
 namespace tgfx {
@@ -118,33 +119,39 @@ void BackgroundContext::drawToParent(float contentScale, const Matrix& maskMatri
   auto newPaint = paint;
   auto maskFilter = newPaint.getMaskFilter();
   if (maskFilter) {
-    // Calculate child surface -> scaled layer local transformation
-    // child surface -> parent surface -> layer local -> scaled layer local
+    // The mask filter (after makeWithMatrix(maskMatrix)) expects content image coordinates.
+    // When drawing to parent, the mask filter receives child surface coordinates
+    // (because we draw the child image snapshot).
+    // We need to transform: child surface coords -> content image coords
+    //
+    // The transformation chain is:
+    // 1. child surface -> layer local: childToLayerLocal
+    // 2. layer local -> scaled layer local: Scale(contentScale)
+    // 3. scaled layer local -> content image: maskMatrix
+    //
+    // Combined: maskMatrix * Scale(contentScale) * childToLayerLocal
+
     auto inverseParentCanvasMatrix = Matrix::I();
     if (!parentCanvasMatrix.invert(&inverseParentCanvasMatrix)) {
       return;
     }
+
+    // childToLayerLocal = inverseParentCanvasMatrix * Translate(surfaceOffset)
     auto childToLayerLocal = inverseParentCanvasMatrix;
     childToLayerLocal.preTranslate(surfaceOffset.x, surfaceOffset.y);
-    auto childToScaledLayerLocal = childToLayerLocal;
-    childToScaledLayerLocal.postScale(contentScale, contentScale);
 
-    // The mask filter expects content image coordinates (via maskMatrix).
-    // Adjust it to expect child surface coordinates.
-    // maskAdjustMatrix = inverse(maskMatrix) * childToScaledLayerLocal
-    auto inverseMaskMatrix = Matrix::I();
-    if (!maskMatrix.invert(&inverseMaskMatrix)) {
-      return;
-    }
-    auto maskAdjustMatrix = inverseMaskMatrix;
-    maskAdjustMatrix.preConcat(childToScaledLayerLocal);
+    // maskAdjustMatrix = maskMatrix * Scale(contentScale) * childToLayerLocal
+    auto maskAdjustMatrix = childToLayerLocal;
+    maskAdjustMatrix.postScale(contentScale, contentScale);
+    maskAdjustMatrix.postConcat(maskMatrix);
     newPaint.setMaskFilter(maskFilter->makeWithMatrix(maskAdjustMatrix));
   }
-
   // Use setMatrix + drawImage instead of drawImage(x, y) to avoid automatic brush adjustment.
   parentCanvas->setMatrix(Matrix::MakeTrans(surfaceOffset.x, surfaceOffset.y));
   auto image = onGetBackgroundImage();
-  parentCanvas->drawImage(image, &newPaint);
+  if (image) {
+    parentCanvas->drawImage(image, &newPaint);
+  }
 }
 
 Matrix BackgroundContext::backgroundMatrix() const {
