@@ -75,12 +75,14 @@ PlacementPtr<RRectsVertexProvider> RRectsVertexProvider::MakeFrom(
                                                std::move(colorSpace));
 }
 
-static void WriteUByte4Color(float* compressedColor, const PMColor& color) {
-  auto bytes = reinterpret_cast<uint8_t*>(compressedColor);
+static float WriteUByte4Color(const PMColor& color) {
+  float compressedColor = 0.0f;
+  auto bytes = reinterpret_cast<uint8_t*>(&compressedColor);
   bytes[0] = static_cast<uint8_t>(color.red * 255);
   bytes[1] = static_cast<uint8_t>(color.green * 255);
   bytes[2] = static_cast<uint8_t>(color.blue * 255);
   bytes[3] = static_cast<uint8_t>(color.alpha * 255);
+  return compressedColor;
 }
 
 static float FloatInvert(float value) {
@@ -92,7 +94,7 @@ RRectsVertexProvider::RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, 
                                            std::shared_ptr<BlockAllocator> reference,
                                            std::shared_ptr<ColorSpace> colorSpace)
     : VertexProvider(std::move(reference)), rects(std::move(rects)), strokes(std::move(strokes)),
-      dstColorSpace(std::move(colorSpace)) {
+      _dstColorSpace(std::move(colorSpace)) {
   bitFields.aaType = static_cast<uint8_t>(aaType);
   bitFields.hasColor = hasColor;
 
@@ -100,11 +102,6 @@ RRectsVertexProvider::RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, 
     bitFields.hasStroke = true;
   } else {
     bitFields.hasStroke = false;
-  }
-  if (NeedConvertColorSpace(ColorSpace::SRGB(), dstColorSpace)) {
-    steps =
-        std::make_shared<ColorSpaceXformSteps>(ColorSpace::SRGB().get(), AlphaType::Premultiplied,
-                                               dstColorSpace.get(), AlphaType::Premultiplied);
   }
 }
 
@@ -120,6 +117,12 @@ void RRectsVertexProvider::getVertices(float* vertices) const {
   auto index = 0;
   auto aaType = static_cast<AAType>(bitFields.aaType);
   size_t currentIndex = 0;
+  std::unique_ptr<ColorSpaceXformSteps> steps = nullptr;
+  if (bitFields.hasColor && NeedConvertColorSpace(ColorSpace::SRGB(), _dstColorSpace)) {
+    steps =
+        std::make_unique<ColorSpaceXformSteps>(ColorSpace::SRGB().get(), AlphaType::Premultiplied,
+                                               _dstColorSpace.get(), AlphaType::Premultiplied);
+  }
   for (auto& record : rects) {
     auto viewMatrix = record->viewMatrix;
     auto rRect = record->rRect;
@@ -130,7 +133,7 @@ void RRectsVertexProvider::getVertices(float* vertices) const {
       if (steps) {
         steps->apply(color.array());
       }
-      WriteUByte4Color(&compressedColor, color);
+      compressedColor = WriteUByte4Color(color);
     }
     rRect.scale(scales.x, scales.y);
     viewMatrix.preScale(1 / scales.x, 1 / scales.y);

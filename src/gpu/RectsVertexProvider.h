@@ -115,12 +115,8 @@ class RectsVertexProvider : public VertexProvider {
   /**
    * Returns the first color in the provider. If no color record exists, a white color is returned.
    */
-  PMColor firstColor() const {
-    PMColor dstColor = rects.front()->color.premultiply();
-    if (steps) {
-      steps->apply(dstColor.array());
-    }
-    return dstColor;
+  const Color& firstColor() const {
+    return rects.front()->color;
   }
 
   /**
@@ -130,11 +126,14 @@ class RectsVertexProvider : public VertexProvider {
     return static_cast<UVSubsetMode>(bitFields.subsetMode) != UVSubsetMode::None;
   }
 
+  const std::shared_ptr<ColorSpace>& dstColorSpace() const {
+    return _dstColorSpace;
+  }
+
  protected:
   PlacementArray<RectRecord> rects = {};
   PlacementArray<Rect> uvRects = {};
-  std::shared_ptr<ColorSpace> dstColorSpace = nullptr;
-  std::shared_ptr<ColorSpaceXformSteps> steps = nullptr;
+  std::shared_ptr<ColorSpace> _dstColorSpace = nullptr;
   std::optional<LineJoin> _lineJoin = std::nullopt;
   struct {
     uint8_t aaType : 2;

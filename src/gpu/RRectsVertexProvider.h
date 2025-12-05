@@ -78,23 +78,22 @@ class RRectsVertexProvider : public VertexProvider {
   /**
    * Returns the first color in the provider. If no color record exists, a white color is returned.
    */
-  PMColor firstColor() const {
-    PMColor dstColor = rects.front()->color.premultiply();
-    if (steps) {
-      steps->apply(dstColor.array());
-    }
-    return dstColor;
+  const Color& firstColor() const {
+    return rects.front()->color;
   }
 
   size_t vertexCount() const override;
 
   void getVertices(float* vertices) const override;
 
+  const std::shared_ptr<ColorSpace>& dstColorSpace() const {
+    return _dstColorSpace;
+  }
+
  private:
   PlacementArray<RRectRecord> rects = {};
   PlacementArray<Stroke> strokes = {};
-  std::shared_ptr<ColorSpace> dstColorSpace = nullptr;
-  std::shared_ptr<ColorSpaceXformSteps> steps = nullptr;
+  std::shared_ptr<ColorSpace> _dstColorSpace = nullptr;
   struct {
     uint8_t aaType : 2;
     bool hasColor : 1;

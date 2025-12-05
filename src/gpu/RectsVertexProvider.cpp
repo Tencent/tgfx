@@ -25,12 +25,14 @@
 #include "tgfx/core/Stroke.h"
 
 namespace tgfx {
-inline void WriteUByte4Color(float* compressColor, const PMColor& color) {
-  auto bytes = reinterpret_cast<uint8_t*>(compressColor);
+inline float WriteUByte4Color(const PMColor& color) {
+  float compressedColor = 0.0f;
+  auto bytes = reinterpret_cast<uint8_t*>(&compressedColor);
   bytes[0] = static_cast<uint8_t>(color.red * 255);
   bytes[1] = static_cast<uint8_t>(color.green * 255);
   bytes[2] = static_cast<uint8_t>(color.blue * 255);
   bytes[3] = static_cast<uint8_t>(color.alpha * 255);
+  return compressedColor;
 }
 
 inline void ApplySubsetMode(UVSubsetMode mode, Rect* rect) {
@@ -76,6 +78,12 @@ class AARectsVertexProvider : public RectsVertexProvider {
     bool needSubset = static_cast<UVSubsetMode>(bitFields.subsetMode) != UVSubsetMode::None;
     auto hasUVRect = !uvRects.empty();
     auto rectCount = rects.size();
+    std::unique_ptr<ColorSpaceXformSteps> steps = nullptr;
+    if (bitFields.hasColor && NeedConvertColorSpace(ColorSpace::SRGB(), _dstColorSpace)) {
+      steps =
+          std::make_unique<ColorSpaceXformSteps>(ColorSpace::SRGB().get(), AlphaType::Premultiplied,
+                                                 _dstColorSpace.get(), AlphaType::Premultiplied);
+    }
     for (size_t i = 0; i < rectCount; ++i) {
       auto& record = rects[i];
       auto& viewMatrix = record->viewMatrix;
@@ -86,7 +94,7 @@ class AARectsVertexProvider : public RectsVertexProvider {
         if (steps) {
           steps->apply(color.array());
         }
-        WriteUByte4Color(&compressedColor, color);
+        compressedColor = WriteUByte4Color(color);
       }
 
       auto scale = sqrtf(viewMatrix.getScaleX() * viewMatrix.getScaleX() +
@@ -161,6 +169,12 @@ class NonAARectsVertexProvider : public RectsVertexProvider {
     bool needSubset = static_cast<UVSubsetMode>(bitFields.subsetMode) != UVSubsetMode::None;
     auto hasUVRect = !uvRects.empty();
     auto rectCount = rects.size();
+    std::unique_ptr<ColorSpaceXformSteps> steps = nullptr;
+    if (bitFields.hasColor && NeedConvertColorSpace(ColorSpace::SRGB(), _dstColorSpace)) {
+      steps =
+          std::make_unique<ColorSpaceXformSteps>(ColorSpace::SRGB().get(), AlphaType::Premultiplied,
+                                                 _dstColorSpace.get(), AlphaType::Premultiplied);
+    }
     for (size_t i = 0; i < rectCount; ++i) {
       auto& record = rects[i];
       auto& viewMatrix = record->viewMatrix;
@@ -171,7 +185,7 @@ class NonAARectsVertexProvider : public RectsVertexProvider {
         if (steps) {
           steps->apply(color.array());
         }
-        WriteUByte4Color(&compressedColor, color);
+        compressedColor = WriteUByte4Color(color);
       }
       auto quad = Quad::MakeFrom(rect, &viewMatrix);
       auto& uvRect = hasUVRect ? *uvRects[i] : rect;
@@ -248,6 +262,12 @@ class AAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
     size_t index = 0;
     const auto isBevelJoin = lineJoin() == LineJoin::Bevel;
     const auto hasUVCoord = bitFields.hasUVCoord;
+    std::unique_ptr<ColorSpaceXformSteps> steps = nullptr;
+    if (bitFields.hasColor && NeedConvertColorSpace(ColorSpace::SRGB(), _dstColorSpace)) {
+      steps =
+          std::make_unique<ColorSpaceXformSteps>(ColorSpace::SRGB().get(), AlphaType::Premultiplied,
+                                                 _dstColorSpace.get(), AlphaType::Premultiplied);
+    }
     for (size_t i = 0; i < rects.size(); ++i) {
       const auto& stroke = strokes[i];
       const auto& record = rects[i];
@@ -273,7 +293,7 @@ class AAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
         if (steps) {
           steps->apply(color.array());
         }
-        WriteUByte4Color(&compressedColor, color);
+        compressedColor = WriteUByte4Color(color);
       }
       if (hasUVCoord) {
         auto& uvRect = *uvRects[i];
@@ -450,6 +470,12 @@ class NonAAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
   void getVertices(float* vertices) const override {
     size_t index = 0;
     const auto hasUVCoord = bitFields.hasUVCoord;
+    std::unique_ptr<ColorSpaceXformSteps> steps = nullptr;
+    if (bitFields.hasColor && NeedConvertColorSpace(ColorSpace::SRGB(), _dstColorSpace)) {
+      steps =
+          std::make_unique<ColorSpaceXformSteps>(ColorSpace::SRGB().get(), AlphaType::Premultiplied,
+                                                 _dstColorSpace.get(), AlphaType::Premultiplied);
+    }
     for (size_t i = 0; i < rects.size(); ++i) {
       const auto& stroke = strokes[i];
       const auto& record = rects[i];
@@ -478,7 +504,7 @@ class NonAAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
         if (steps) {
           steps->apply(color.array());
         }
-        WriteUByte4Color(&compressedColor, color);
+        compressedColor = WriteUByte4Color(color);
       }
       if (hasUVCoord) {
         auto& uvRect = *uvRects[i];
@@ -564,6 +590,12 @@ class AARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
     const auto aaType = static_cast<AAType>(bitFields.aaType);
     const auto hasUVCoord = bitFields.hasUVCoord;
     const auto hasColor = bitFields.hasColor;
+    std::unique_ptr<ColorSpaceXformSteps> steps = nullptr;
+    if (hasColor && NeedConvertColorSpace(ColorSpace::SRGB(), _dstColorSpace)) {
+      steps =
+          std::make_unique<ColorSpaceXformSteps>(ColorSpace::SRGB().get(), AlphaType::Premultiplied,
+                                                 _dstColorSpace.get(), AlphaType::Premultiplied);
+    }
     for (size_t i = 0; i < rects.size(); ++i) {
       const auto& stroke = strokes[i];
       const auto& record = rects[i];
@@ -576,7 +608,7 @@ class AARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
         if (steps) {
           steps->apply(color.array());
         }
-        WriteUByte4Color(&compressedColor, color);
+        compressedColor = WriteUByte4Color(color);
       }
       rect.scale(scales.x, scales.y);
       viewMatrix.preScale(1.0f / scales.x, 1.0f / scales.y);
@@ -717,6 +749,12 @@ class NonAARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
     size_t index = 0;
     const auto hasUVCoord = bitFields.hasUVCoord;
     const auto hasColor = bitFields.hasColor;
+    std::unique_ptr<ColorSpaceXformSteps> steps = nullptr;
+    if (hasColor && NeedConvertColorSpace(ColorSpace::SRGB(), _dstColorSpace)) {
+      steps =
+          std::make_unique<ColorSpaceXformSteps>(ColorSpace::SRGB().get(), AlphaType::Premultiplied,
+                                                 _dstColorSpace.get(), AlphaType::Premultiplied);
+    }
     for (size_t i = 0; i < rects.size(); ++i) {
       const auto& stroke = strokes[i];
       const auto& record = rects[i];
@@ -729,7 +767,7 @@ class NonAARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
         if (steps) {
           steps->apply(color.array());
         }
-        WriteUByte4Color(&compressedColor, color);
+        compressedColor = WriteUByte4Color(color);
       }
       rect.scale(scales.x, scales.y);
       viewMatrix.preScale(1.0f / scales.x, 1.0f / scales.y);
@@ -887,15 +925,10 @@ RectsVertexProvider::RectsVertexProvider(PlacementArray<RectRecord>&& rects,
                                          std::shared_ptr<BlockAllocator> reference,
                                          std::shared_ptr<ColorSpace> colorSpace)
     : VertexProvider(std::move(reference)), rects(std::move(rects)), uvRects(std::move(uvRects)),
-      dstColorSpace(std::move(colorSpace)) {
+      _dstColorSpace(std::move(colorSpace)) {
   bitFields.aaType = static_cast<uint8_t>(aaType);
   bitFields.hasUVCoord = hasUVCoord;
   bitFields.hasColor = hasColor;
   bitFields.subsetMode = static_cast<uint8_t>(subsetMode);
-  if (NeedConvertColorSpace(ColorSpace::SRGB(), dstColorSpace)) {
-    steps =
-        std::make_shared<ColorSpaceXformSteps>(ColorSpace::SRGB().get(), AlphaType::Premultiplied,
-                                               dstColorSpace.get(), AlphaType::Premultiplied);
-  }
 }
 }  // namespace tgfx
