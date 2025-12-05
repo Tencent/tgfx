@@ -1152,8 +1152,7 @@ std::shared_ptr<Image> Layer::getContentImage(const DrawArgs& contentArgs, float
     drawDirectly(contentArgs, offscreenCanvas, 1.0f, styleExtraSourceTypes);
     Point offset;
     auto picture = recorder.finishRecordingAsPicture();
-    finalImage = ToImageWithOffset(std::move(picture), &offset, nullptr,
-                                   contentArgs.dstColorSpace);
+    finalImage = ToImageWithOffset(std::move(picture), &offset, nullptr, contentArgs.dstColorSpace);
     imageMatrix->setScale(1.0f / contentScale, 1.0f / contentScale);
     imageMatrix->preTranslate(offset.x, offset.y);
   }
@@ -1232,17 +1231,23 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     return true;
   }
 
-  if (args.renderFlags & RenderFlags::DisableCache || contentScale > 0.5f) {
+  if (args.renderFlags & RenderFlags::DisableCache || !args.layerCache) {
     return false;
   }
 
-  if (!args.layerCache) {
+  constexpr float MAX_CACHE_SCALE = 0.5f;
+  if (contentScale > MAX_CACHE_SCALE) {
     return false;
   }
 
   auto maxCacheSize = static_cast<float>(args.layerCache->maxCacheContentSize());
 
   auto bounds = getBounds();
+  bounds.scale(contentScale, contentScale);
+  bounds.roundOut();
+  if (bounds.width() > maxCacheSize || bounds.height() > maxCacheSize) {
+    return false;
+  }
 
   auto fullFill = args.renderRect && args.renderRect->contains(renderBounds);
   if (shouldPassThroughBackground(blendMode, transform) || hasBackgroundStyle()) {
@@ -1250,10 +1255,9 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
       return false;
     }
   } else {
-    contentScale = std::min(0.5f, maxCacheSize / std::max(bounds.width(), bounds.height()));
+    contentScale =
+        std::min(MAX_CACHE_SCALE, maxCacheSize / std::max(bounds.width(), bounds.height()));
   }
-  bounds.scale(contentScale, contentScale);
-  bounds.roundOut();
   auto cacheSize = static_cast<size_t>(bounds.width() * bounds.height() * 4);
   if (args.layerCache->maxCacheSize() < args.layerCache->currentCacheSize() + cacheSize) {
     return false;
@@ -1332,7 +1336,7 @@ void Layer::drawContentOffscreen(const DrawArgs& args, Canvas* canvas,
 
   // maskMatrix for adjusting mask filter in drawToParent
   Matrix maskMatrix = Matrix::I();
-  
+
   if (hasValidMask()) {
     auto maskFilter = getMaskFilter(args, contentScale, clipBounds);
     // if mask filter is nullptr while mask is valid, that means the layer is not visible.
