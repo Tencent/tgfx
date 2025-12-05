@@ -1235,9 +1235,13 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     return false;
   }
 
+  auto maxCacheSize = static_cast<float>(args.layerCache->maxCacheContentSize());
+
   auto bounds = getBounds();
+
+  auto fullFill = args.renderRect && args.renderRect->contains(renderBounds);
   if (shouldPassThroughBackground(blendMode, transform) || hasBackgroundStyle()) {
-    if (!args.renderRect || !args.renderRect->contains(renderBounds)) {
+    if (!fullFill) {
       return false;
     }
   } else {
@@ -1252,7 +1256,9 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   auto cacheArgs = args;
   cacheArgs.renderFlags |= RenderFlags::DisableCache;
   cacheArgs.renderRect = &renderBounds;
-
+  if (!fullFill && args.blurBackground) {
+    cacheArgs.blurBackground = cacheArgs.blurBackground->createSubContext(renderBounds, false);
+  }
   drawContentOffscreen(cacheArgs, canvas, std::nullopt, contentScale, blendMode, alpha, transform,
                        true);
   return true;
