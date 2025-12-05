@@ -46,7 +46,7 @@ class YUVBuffer : public ImageBuffer {
     return false;
   }
 
-  std::shared_ptr<ColorSpace> colorSpace() const override;
+  const std::shared_ptr<ColorSpace>& colorSpace() const override;
 
  protected:
   std::shared_ptr<TextureView> onMakeTexture(Context* context, bool) const override {
@@ -63,7 +63,7 @@ class YUVBuffer : public ImageBuffer {
   YUVFormat format = YUVFormat::Unknown;
 };
 
-std::shared_ptr<ColorSpace> YUVBuffer::colorSpace() const {
+const std::shared_ptr<ColorSpace>& YUVBuffer::colorSpace() const {
   return _colorSpace;
 }
 

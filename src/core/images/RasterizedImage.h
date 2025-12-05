@@ -50,7 +50,7 @@ class RasterizedImage : public Image {
     return source->hasMipmaps();
   }
 
-  std::shared_ptr<ColorSpace> colorSpace() const override {
+  const std::shared_ptr<ColorSpace>& colorSpace() const override {
     return source->colorSpace();
   }
 

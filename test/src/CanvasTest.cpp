@@ -348,9 +348,9 @@ TGFX_TEST(CanvasTest, drawPaint) {
   Font font(typeface, 50.f);
   font.setFauxBold(true);
   auto textBlob = TextBlob::MakeFrom("TGFX", font);
-  Path path = {};
-  auto success = textBlob->getPath(&path);
-  EXPECT_TRUE(success);
+  auto textShape = Shape::MakeFrom(textBlob);
+  ASSERT_TRUE(textShape != nullptr);
+  auto path = textShape->getPath();
   path.transform(Matrix::MakeTrans(10, 100));
   canvas->clear(Color::Red());
   canvas->save();
@@ -757,9 +757,9 @@ TGFX_TEST(CanvasTest, inversePath) {
   Font font(typeface, 70.f);
   font.setFauxBold(true);
   auto textBlob = TextBlob::MakeFrom("Hello TGFX", font);
-  Path textPath = {};
-  auto success = textBlob->getPath(&textPath);
-  EXPECT_TRUE(success);
+  auto textShape = Shape::MakeFrom(textBlob);
+  ASSERT_TRUE(textShape != nullptr);
+  Path textPath = textShape->getPath();
   EXPECT_TRUE(!textPath.isEmpty());
   textPath.toggleInverseFillType();
   EXPECT_TRUE(textPath.isInverseFillType());
@@ -1394,6 +1394,80 @@ TGFX_TEST(CanvasTest, Picture) {
   canvas = surface->getCanvas();
   canvas->drawImage(pathImage);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/PictureImage_Path"));
+}
+
+TGFX_TEST(CanvasTest, PictureImageShaderOptimization) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto image = MakeImage("resources/apitest/test_timestretch.png");
+  ASSERT_TRUE(image != nullptr);
+
+  // Test 1: Rect filled with ImageShader (should be optimized to asImage)
+  PictureRecorder recorder;
+  auto canvas = recorder.beginRecording();
+  auto shader = Shader::MakeImageShader(image);
+  Paint paint;
+  paint.setShader(shader);
+  auto rect = Rect::MakeWH(image->width(), image->height());
+  canvas->drawRect(rect, paint);
+  auto shaderPicture = recorder.finishRecordingAsPicture();
+  ASSERT_TRUE(shaderPicture != nullptr);
+  EXPECT_EQ(shaderPicture->drawCount, 1u);
+
+  // Should be optimized to return the original image
+  Point offset = {};
+  auto extractedImage = shaderPicture->asImage(&offset);
+  ASSERT_TRUE(extractedImage != nullptr);
+  EXPECT_TRUE(extractedImage == image);
+  EXPECT_EQ(offset.x, 0.0f);
+  EXPECT_EQ(offset.y, 0.0f);
+
+  // Test 2: Rect with ImageShader but different size (should fail optimization)
+  canvas = recorder.beginRecording();
+  paint.setShader(shader);
+  rect = Rect::MakeWH(image->width() / 2, image->height() / 2);
+  canvas->drawRect(rect, paint);
+  shaderPicture = recorder.finishRecordingAsPicture();
+  extractedImage = shaderPicture->asImage(&offset);
+  EXPECT_TRUE(extractedImage == nullptr);
+
+  // Test 3: Rect with ImageShader but non-zero origin (should fail optimization)
+  canvas = recorder.beginRecording();
+  paint.setShader(shader);
+  rect = Rect::MakeXYWH(10, 10, image->width(), image->height());
+  canvas->drawRect(rect, paint);
+  shaderPicture = recorder.finishRecordingAsPicture();
+  extractedImage = shaderPicture->asImage(&offset);
+  EXPECT_TRUE(extractedImage == nullptr);
+
+  // Test 4: Rect with ImageShader that has TileMode::Repeat (should fail optimization)
+  canvas = recorder.beginRecording();
+  shader = Shader::MakeImageShader(image, TileMode::Repeat, TileMode::Repeat);
+  paint.setShader(shader);
+  rect = Rect::MakeWH(image->width(), image->height());
+  canvas->drawRect(rect, paint);
+  shaderPicture = recorder.finishRecordingAsPicture();
+  extractedImage = shaderPicture->asImage(&offset);
+  EXPECT_TRUE(extractedImage == nullptr);
+
+  // Test 5: Rect with ImageShader and clip (should be optimized with subset)
+  canvas = recorder.beginRecording();
+  shader = Shader::MakeImageShader(image);
+  paint.setShader(shader);
+  canvas->clipRect(Rect::MakeXYWH(100, 100, image->width() - 200, image->height() - 200));
+  rect = Rect::MakeWH(image->width(), image->height());
+  canvas->drawRect(rect, paint);
+  shaderPicture = recorder.finishRecordingAsPicture();
+  auto matrix = Matrix::MakeTrans(-100, -100);
+  ISize clipSize = {image->width() - 200, image->height() - 200};
+  extractedImage = shaderPicture->asImage(&offset, &matrix, &clipSize);
+  ASSERT_TRUE(extractedImage != nullptr);
+  auto subsetImage = std::static_pointer_cast<SubsetImage>(extractedImage);
+  EXPECT_TRUE(subsetImage->source == image);
+  EXPECT_EQ(offset.x, 0.0f);
+  EXPECT_EQ(offset.y, 0.0f);
 }
 
 class ColorModifier : public BrushModifier {

@@ -108,7 +108,7 @@ jobs:
           path: android
 
   web:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
@@ -120,8 +120,8 @@ jobs:
           path: |
             web/emsdk
             web/node_modules
-          key: tgfx-environment-web-20241106
-          restore-keys: tgfx-environment-web-
+          key: tgfx-environment-web-linux-20241106
+          restore-keys: tgfx-environment-web-linux-
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -147,19 +147,17 @@ jobs:
           cd emsdk
           ./emsdk install 3.1.71
           ./emsdk activate 3.1.71
-        shell: bash
 
       - name: Run depsync
         run: |
           npm install depsync -g
           depsync
-        shell: bash
 
       - name: Build Web
         run: |
           cd web
-          emsdk/emsdk_env
-          npm run build:st:debug
+          source emsdk/emsdk_env.sh
+          npm run build:st
 
       - name: Save Environment Cache
         if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}
@@ -168,7 +166,7 @@ jobs:
           path: |
             web/emsdk
             web/node_modules
-          key: tgfx-environment-web-20241106
+          key: tgfx-environment-web-linux-20241106
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -389,6 +387,17 @@ jobs:
           restore-keys: |
             hvigor-${{ runner.os }}-
 
+      - name: Cache OHOS Build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ohos/hello2d/.cxx
+            ohos/hello2d/build
+            ohos/.hvigor
+          key: ohos-build-${{ runner.os }}-${{ hashFiles('src/**', 'include/**', 'ohos/**/*.cpp', 'ohos/**/*.h') }}
+          restore-keys: |
+            ohos-build-${{ runner.os }}-
+
       - name: Get Third-Party Cache
         id: third-party-cache
         uses: actions/cache/restore@v4
@@ -411,7 +420,6 @@ jobs:
       - name: Build Harmony
         run: |
           cd ohos
-          hvigorw clean --no-daemon -Dohos.sdk.root=$DEVECO_SDK_HOME
           hvigorw assembleHap -Dohos.sdk.root=$DEVECO_SDK_HOME -p buildMode=release --no-daemon
 
       - name: Save Third-Party Cache

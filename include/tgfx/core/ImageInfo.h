@@ -131,7 +131,7 @@ class ImageInfo {
   /**
    * Returns ColorSpace of this ImageInfo.
    */
-  std::shared_ptr<ColorSpace> colorSpace() const {
+  const std::shared_ptr<ColorSpace>& colorSpace() const {
     return _colorSpace;
   }
 

@@ -602,6 +602,23 @@ Rect Layer::getContentBounds() {
 }
 
 Rect Layer::getBoundsInternal(const Matrix3D& coordinateMatrix, bool computeTightBounds) {
+  if (computeTightBounds || bitFields.dirtyDescendents) {
+    return computeBounds(coordinateMatrix, computeTightBounds);
+  }
+  if (!localBounds) {
+    localBounds = std::make_unique<Rect>(computeBounds(Matrix3D::I(), computeTightBounds));
+  }
+  auto result = coordinateMatrix.mapRect(*localBounds);
+  if (!IsMatrix3DAffine(coordinateMatrix)) {
+    // while the matrix is not affine, the layer will draw with a 3D filter, so the bounds should
+    // round out.
+    result.roundOut();
+  }
+  return result;
+}
+
+Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBounds) {
+
   // If the matrix only contains 2D affine transformations, directly use the equivalent 2D
   // transformation matrix to calculate the final Bounds
   bool isCoordinateMatrixAffine = IsMatrix3DAffine(coordinateMatrix);
@@ -867,6 +884,7 @@ void Layer::invalidateDescendents() {
   }
   bitFields.dirtyDescendents = true;
   rasterizedContent = nullptr;
+  localBounds = nullptr;
   invalidate();
 }
 
@@ -1251,6 +1269,10 @@ std::shared_ptr<Image> Layer::getContentImage(const DrawArgs& contentArgs, float
                                    contentArgs.dstColorSpace);
     imageMatrix->setScale(1.0f / contentScale, 1.0f / contentScale);
     imageMatrix->preTranslate(offset.x, offset.y);
+  }
+
+  if (!finalImage) {
+    return nullptr;
   }
 
   auto filterOffset = Point::Make(0, 0);
@@ -2325,8 +2347,8 @@ void Layer::propagateLayerState() {
 }
 
 bool Layer::hasBackgroundStyle() {
-  if (!bitFields.dirtyDescendents && maxBackgroundOutset > 0) {
-    return true;
+  if (!bitFields.dirtyDescendents) {
+    return maxBackgroundOutset > 0;
   }
   for (const auto& style : _layerStyles) {
     if (style->extraSourceType() == LayerStyleExtraSourceType::Background) {

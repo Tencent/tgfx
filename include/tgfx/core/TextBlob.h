@@ -74,12 +74,12 @@ class TextBlob {
   Rect getTightBounds(const Matrix* matrix = nullptr) const;
 
   /**
-   * Creates a Path for the glyphs in the text blob. Since text outlines can change with different
-   * scale factors, it's best to use the final drawing matrix to compute an accurate Path.
-   * Returns true if the path was created successfully; otherwise, returns false and leaves the
-   * path unchanged.
+   * Tests if the specified point hits any glyph in this TextBlob. Each glyph is tested
+   * individually using its actual path for precise hit testing. For color glyphs (e.g., emoji),
+   * bounds are used instead since they don't have outlines. If a stroke is provided, it will be
+   * applied to the glyph path or bounds before testing.
    */
-  bool getPath(Path* path, const Matrix* matrix = nullptr) const;
+  bool hitTestPoint(float localX, float localY, const Stroke* stroke = nullptr) const;
 
  private:
   std::vector<std::shared_ptr<GlyphRunList>> glyphRunLists = {};

@@ -31,6 +31,7 @@
 #include "core/shaders/ColorShader.h"
 #include "core/shaders/ImageShader.h"
 #include "core/shaders/MatrixShader.h"
+#include "core/utils/ColorHelper.h"
 #include "core/utils/Log.h"
 #include "core/utils/PlacementPtr.h"
 #include "core/utils/ShapeUtils.h"
@@ -951,13 +952,13 @@ bool TreatAsRegularPDFBlendMode(BlendMode blendMode) {
 void PopulateGraphicStateEntryFromPaint(
     PDFDocumentImpl* document, const Matrix& matrix, const MCState& state, Rect deviceBounds,
     const Brush& brush, const Matrix& initialTransform, float textScale,
-    std::shared_ptr<ColorSpace> colorSpace, PDFGraphicStackState::Entry* entry,
+    const std::shared_ptr<ColorSpace>& colorSpace, PDFGraphicStackState::Entry* entry,
     std::unordered_set<PDFIndirectReference>* shaderResources,
     std::unordered_set<PDFIndirectReference>* graphicStateResources) {
 
   entry->matrix = state.matrix * matrix;
   auto color = brush.color;
-  color = color.makeColorSpace(std::move(colorSpace));
+  color = ConvertColorSpace(color, colorSpace);
   color.alpha = 1;
   entry->color = color;
   entry->shaderIndex = -1;
@@ -969,7 +970,7 @@ void PopulateGraphicStateEntryFromPaint(
     if (Types::Get(shader.get()) == Types::ShaderType::Color) {
       const auto colorShader = static_cast<const ColorShader*>(shader.get());
       if (colorShader->asColor(&color)) {
-        color = color.makeColorSpace(std::move(colorSpace));
+        color = ConvertColorSpace(color, colorSpace);
         color.alpha = 1;
         entry->color = color;
       }

@@ -68,7 +68,7 @@ class ImageFilter {
    * @param dy            The Y offset of the shadow.
    * @param blurrinessX   The blur radius for the shadow, along the X axis.
    * @param blurrinessY   The blur radius for the shadow, along the Y axis.
-   * @param color         The color of the drop shadow.
+   * @param color         The color of the drop shadow in sRGB gamut, may exceed 0-1.
    */
   static std::shared_ptr<ImageFilter> DropShadow(float dx, float dy, float blurrinessX,
                                                  float blurrinessY, const Color& color);
@@ -80,7 +80,7 @@ class ImageFilter {
    * @param dy            The Y offset of the shadow.
    * @param blurrinessX   The blur radius for the shadow, along the X axis.
    * @param blurrinessY   The blur radius for the shadow, along the Y axis.
-   * @param color         The color of the drop shadow.
+   * @param color         The color of the drop shadow in sRGB gamut, may exceed 0-1.
    */
   static std::shared_ptr<ImageFilter> DropShadowOnly(float dx, float dy, float blurrinessX,
                                                      float blurrinessY, const Color& color);
@@ -92,7 +92,7 @@ class ImageFilter {
    * @param dy            The Y offset of the shadow.
    * @param blurrinessX   The blur radius for the shadow, along the X axis.
    * @param blurrinessY   The blur radius for the shadow, along the Y axis.
-   * @param color         The color of the inner shadow.
+   * @param color         The color of the inner shadow in sRGB gamut, may exceed 0-1.
    */
   static std::shared_ptr<ImageFilter> InnerShadow(float dx, float dy, float blurrinessX,
                                                   float blurrinessY, const Color& color);
@@ -104,7 +104,7 @@ class ImageFilter {
    * @param dy            The Y offset of the shadow.
    * @param blurrinessX   The blur radius for the shadow, along the X axis.
    * @param blurrinessY   The blur radius for the shadow, along the Y axis.
-   * @param color         The color of the inner shadow.
+   * @param color         The color of the inner shadow in sRGB gamut, may exceed 0-1.
    */
   static std::shared_ptr<ImageFilter> InnerShadowOnly(float dx, float dy, float blurrinessX,
                                                       float blurrinessY, const Color& color);

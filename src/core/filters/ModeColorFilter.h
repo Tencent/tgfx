@@ -43,6 +43,6 @@ class ModeColorFilter : public ColorFilter {
 
  private:
   PlacementPtr<FragmentProcessor> asFragmentProcessor(
-      Context* context, std::shared_ptr<ColorSpace> dstColorSpace) const override;
+      Context* context, const std::shared_ptr<ColorSpace>& dstColorSpace) const override;
 };
 }  // namespace tgfx
