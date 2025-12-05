@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/svg/xml/XMLDOM.h"
+#include <stack>
 #include <utility>
 #include "DOMParser.h"
 #include "XMLParser.h"
@@ -29,7 +30,35 @@ DOM::DOM(std::shared_ptr<DOMNode> root) {
   _root = std::move(root);
 };
 
-DOM::~DOM() = default;
+DOM::~DOM() {
+  // Avoid recursive destruction crash on huge node counts: iteratively unlink children/siblings.
+  if (!_root) {
+    return;
+  }
+
+  std::vector<std::shared_ptr<DOMNode>> stack;
+  stack.reserve(1024);
+  stack.push_back(_root);
+
+  while (!stack.empty()) {
+    auto node = std::move(stack.back());
+    stack.pop_back();
+    if (!node) {
+      continue;
+    }
+
+    auto child = node->firstChild;
+    while (child) {
+      stack.push_back(child);
+      child = child->nextSibling;
+    }
+
+    node->firstChild.reset();
+    node->nextSibling.reset();
+  }
+
+  _root.reset();
+}
 
 std::shared_ptr<DOM> DOM::Make(Stream& stream) {
   DOMParser parser;
