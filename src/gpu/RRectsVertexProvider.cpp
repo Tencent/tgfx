@@ -75,13 +75,17 @@ PlacementPtr<RRectsVertexProvider> RRectsVertexProvider::MakeFrom(
                                                std::move(colorSpace));
 }
 
-static float WriteUByte4Color(const PMColor& color) {
+static float ToUByte4Color(const Color& color, const std::unique_ptr<ColorSpaceXformSteps>& steps) {
+  PMColor pmColor = color.premultiply();
+  if (steps) {
+    steps->apply(pmColor.array());
+  }
   float compressedColor = 0.0f;
   auto bytes = reinterpret_cast<uint8_t*>(&compressedColor);
-  bytes[0] = static_cast<uint8_t>(color.red * 255);
-  bytes[1] = static_cast<uint8_t>(color.green * 255);
-  bytes[2] = static_cast<uint8_t>(color.blue * 255);
-  bytes[3] = static_cast<uint8_t>(color.alpha * 255);
+  bytes[0] = static_cast<uint8_t>(pmColor.red * 255);
+  bytes[1] = static_cast<uint8_t>(pmColor.green * 255);
+  bytes[2] = static_cast<uint8_t>(pmColor.blue * 255);
+  bytes[3] = static_cast<uint8_t>(pmColor.alpha * 255);
   return compressedColor;
 }
 
@@ -129,11 +133,7 @@ void RRectsVertexProvider::getVertices(float* vertices) const {
     auto scales = viewMatrix.getAxisScales();
     float compressedColor = 0.f;
     if (bitFields.hasColor) {
-      PMColor color = record->color.premultiply();
-      if (steps) {
-        steps->apply(color.array());
-      }
-      compressedColor = WriteUByte4Color(color);
+      compressedColor = ToUByte4Color(record->color, steps);
     }
     rRect.scale(scales.x, scales.y);
     viewMatrix.preScale(1 / scales.x, 1 / scales.y);
