@@ -20,6 +20,7 @@
 #include <algorithm>
 #include "core/ColorSpaceXformSteps.h"
 #include "core/shaders/GradientShader.h"
+#include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "pdf/PDFDocumentImpl.h"
@@ -901,8 +902,12 @@ PDFIndirectReference PDFGradientShader::Make(PDFDocumentImpl* doc, const Gradien
   DEBUG_ASSERT(shader);
 
   PDFGradientShader::Key key = MakeKey(shader, matrix, surfaceBBox);
-  for (auto& color : key.info.colors) {
-    color = color.makeColorSpace(doc->colorSpace());
+  if (NeedConvertColorSpace(ColorSpace::SRGB(), doc->colorSpace())) {
+    ColorSpaceXformSteps steps{ColorSpace::SRGB().get(), AlphaType::Unpremultiplied,
+                               doc->colorSpace().get(), AlphaType::Unpremultiplied};
+    for (auto& color : key.info.colors) {
+      steps.apply(color.array());
+    }
   }
   bool alpha = GradientHasAlpha(key);
   return FindPDFShader(doc, std::move(key), alpha);

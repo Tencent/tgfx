@@ -182,11 +182,11 @@ std::shared_ptr<Image> Surface::makeImageSnapshot() {
 Color Surface::getColor(int x, int y) {
   uint8_t color[4];
   auto info =
-      ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Premultiplied, 0, colorSpace());
+      ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Premultiplied, 0, ColorSpace::SRGB());
   if (!readPixels(info, color, x, y)) {
     return Color::Transparent();
   }
-  return Color::FromRGBA(color[0], color[1], color[2], color[3], colorSpace());
+  return Color::FromRGBA(color[0], color[1], color[2], color[3]);
 }
 
 std::shared_ptr<SurfaceReadback> Surface::asyncReadPixels(const Rect& rect) {
@@ -240,7 +240,7 @@ bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, in
   return true;
 }
 
-std::shared_ptr<ColorSpace> Surface::colorSpace() const {
+const std::shared_ptr<ColorSpace>& Surface::colorSpace() const {
   return renderContext->colorSpace();
 }
 

@@ -16,28 +16,36 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ToPMColor.h"
+#include "ColorHelper.h"
 #include "ColorSpaceHelper.h"
 #include "core/ColorSpaceXformSteps.h"
 
 namespace tgfx {
 
-PMColor ToPMColor(const Color& color, std::shared_ptr<ColorSpace> dstColorSpace) {
+PMColor ToPMColor(const Color& color, const std::shared_ptr<ColorSpace>& dstColorSpace) {
   if (dstColorSpace == nullptr) {
     return PMColor{color.red * color.alpha, color.green * color.alpha, color.blue * color.alpha,
-                   color.alpha, color.colorSpace};
+                   color.alpha};
   }
 
-  if (!NeedConvertColorSpace(color.colorSpace, dstColorSpace)) {
+  if (!NeedConvertColorSpace(ColorSpace::SRGB(), dstColorSpace)) {
     return PMColor{color.red * color.alpha, color.green * color.alpha, color.blue * color.alpha,
-                   color.alpha, color.colorSpace};
-    ;
+                   color.alpha};
   }
-  ColorSpaceXformSteps steps(color.colorSpace.get(), AlphaType::Premultiplied, dstColorSpace.get(),
-                             AlphaType::Premultiplied);
+  ColorSpaceXformSteps steps(ColorSpace::SRGB().get(), AlphaType::Premultiplied,
+                             dstColorSpace.get(), AlphaType::Premultiplied);
   auto dstColor = color.premultiply();
   steps.apply(dstColor.array());
-  dstColor.colorSpace = std::move(dstColorSpace);
+  return dstColor;
+}
+
+Color ConvertColorSpace(const Color& color, const std::shared_ptr<ColorSpace>& dstColorSpace) {
+  Color dstColor = color;
+  if (NeedConvertColorSpace(ColorSpace::SRGB(), dstColorSpace)) {
+    ColorSpaceXformSteps steps{ColorSpace::SRGB().get(), AlphaType::Unpremultiplied,
+                               dstColorSpace.get(), AlphaType::Unpremultiplied};
+    steps.apply(dstColor.array());
+  }
   return dstColor;
 }
 }  // namespace tgfx

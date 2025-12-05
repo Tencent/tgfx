@@ -64,7 +64,7 @@ std::shared_ptr<TextureView> NativeImageBuffer::onMakeTexture(Context* context,
   return textureView;
 }
 
-std::shared_ptr<ColorSpace> NativeImageBuffer::colorSpace() const {
+const std::shared_ptr<ColorSpace>& NativeImageBuffer::colorSpace() const {
   return _colorSpace;
 }
 }  // namespace tgfx

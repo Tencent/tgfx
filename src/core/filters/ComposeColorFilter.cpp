@@ -54,7 +54,7 @@ bool ComposeColorFilter::isEqual(const ColorFilter* colorFilter) const {
 }
 
 PlacementPtr<FragmentProcessor> ComposeColorFilter::asFragmentProcessor(
-    Context* context, std::shared_ptr<ColorSpace> dstColorSpace) const {
+    Context* context, const std::shared_ptr<ColorSpace>& dstColorSpace) const {
   auto innerProcessor = inner->asFragmentProcessor(context, dstColorSpace);
   auto outerProcessor = outer->asFragmentProcessor(context, dstColorSpace);
   return FragmentProcessor::Compose(context->drawingAllocator(), std::move(innerProcessor),

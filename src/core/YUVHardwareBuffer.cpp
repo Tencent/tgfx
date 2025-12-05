@@ -88,7 +88,7 @@ YUVHardwareBuffer::~YUVHardwareBuffer() {
   nv12BufferMap.erase(hardwareBuffer);
 }
 
-std::shared_ptr<ColorSpace> YUVHardwareBuffer::colorSpace() const {
+const std::shared_ptr<ColorSpace>& YUVHardwareBuffer::colorSpace() const {
   return _colorSpace;
 }
 

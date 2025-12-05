@@ -24,31 +24,31 @@
 namespace tgfx {
 
 template <>
-RGBA4f<AlphaType::Unpremultiplied> RGBA4f<AlphaType::Unpremultiplied>::makeColorSpace(
-    std::shared_ptr<ColorSpace> dstColorSpace) const {
-  auto dstColor = *this;
-  if (!NeedConvertColorSpace(colorSpace, dstColorSpace)) {
-    return dstColor;
+RGBA4f<AlphaType::Premultiplied> RGBA4f<AlphaType::Premultiplied>::FromRGBA(
+    uint8_t r, uint8_t g, uint8_t b, uint8_t a, const std::shared_ptr<ColorSpace>& colorSpace) {
+  float srcColor[4] = {static_cast<float>(r) / 255.0f, static_cast<float>(g) / 255.0f,
+                       static_cast<float>(b) / 255.0f,
+                       a == 255 ? 1.0f : static_cast<float>(a) / 255.0f};
+  if (NeedConvertColorSpace(colorSpace, ColorSpace::SRGB())) {
+    ColorSpaceXformSteps steps{colorSpace.get(), AlphaType::Premultiplied, ColorSpace::SRGB().get(),
+                               AlphaType::Premultiplied};
+    steps.apply(srcColor);
   }
-  ColorSpaceXformSteps steps(colorSpace.get(), AlphaType::Unpremultiplied, dstColorSpace.get(),
-                             AlphaType::Unpremultiplied);
-  steps.apply(dstColor.array());
-  dstColor.colorSpace = std::move(dstColorSpace);
-  return dstColor;
+  return {srcColor[0], srcColor[1], srcColor[2], srcColor[3]};
 }
 
 template <>
-RGBA4f<AlphaType::Premultiplied> RGBA4f<AlphaType::Premultiplied>::makeColorSpace(
-    std::shared_ptr<ColorSpace> dstColorSpace) const {
-  auto dstColor = *this;
-  if (!NeedConvertColorSpace(colorSpace, dstColorSpace)) {
-    return dstColor;
+RGBA4f<AlphaType::Unpremultiplied> RGBA4f<AlphaType::Unpremultiplied>::FromRGBA(
+    uint8_t r, uint8_t g, uint8_t b, uint8_t a, const std::shared_ptr<ColorSpace>& colorSpace) {
+  float srcColor[4] = {static_cast<float>(r) / 255.0f, static_cast<float>(g) / 255.0f,
+                       static_cast<float>(b) / 255.0f,
+                       a == 255 ? 1.0f : static_cast<float>(a) / 255.0f};
+  if (NeedConvertColorSpace(colorSpace, ColorSpace::SRGB())) {
+    ColorSpaceXformSteps steps{colorSpace.get(), AlphaType::Unpremultiplied,
+                               ColorSpace::SRGB().get(), AlphaType::Unpremultiplied};
+    steps.apply(srcColor);
   }
-  ColorSpaceXformSteps steps(colorSpace.get(), AlphaType::Premultiplied, dstColorSpace.get(),
-                             AlphaType::Premultiplied);
-  steps.apply(dstColor.array());
-  dstColor.colorSpace = std::move(dstColorSpace);
-  return dstColor;
+  return {srcColor[0], srcColor[1], srcColor[2], srcColor[3]};
 }
 
 }  // namespace tgfx

@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ColorShader.h"
-#include "core/utils/ToPMColor.h"
+#include "core/utils/ColorHelper.h"
 #include "core/utils/Types.h"
 #include "gpu/processors/ConstColorProcessor.h"
 
@@ -47,8 +47,8 @@ bool ColorShader::isEqual(const Shader* shader) const {
 }
 
 PlacementPtr<FragmentProcessor> ColorShader::asFragmentProcessor(
-    const FPArgs& args, const Matrix*, std::shared_ptr<ColorSpace> dstColorSpace) const {
-  auto dstColor = ToPMColor(color, std::move(dstColorSpace));
+    const FPArgs& args, const Matrix*, const std::shared_ptr<ColorSpace>& dstColorSpace) const {
+  auto dstColor = ToPMColor(color, dstColorSpace);
   return ConstColorProcessor::Make(args.context->drawingAllocator(), dstColor,
                                    InputMode::ModulateA);
 }
