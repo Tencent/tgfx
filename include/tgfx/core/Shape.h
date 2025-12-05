@@ -43,8 +43,10 @@ class Shape {
   static std::shared_ptr<Shape> MakeFrom(Path path);
 
   /**
-   * Creates a new Shape from the given text blob. Returns nullptr if the text blob is nullptr or 
-   * if none of the glyphs in the blob can generate a path, such as when using bitmap typefaces.
+   * Creates a new Shape from the given text blob. Glyphs that can generate path outlines are
+   * extracted and merged into a single Shape. Glyphs that cannot generate paths, such as bitmap
+   * or color emoji typefaces, are skipped. Returns nullptr if the text blob is nullptr or if none
+   * of the glyphs can generate a path.
    */
   static std::shared_ptr<Shape> MakeFrom(std::shared_ptr<TextBlob> textBlob);
 
