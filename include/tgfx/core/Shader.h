@@ -40,7 +40,7 @@ class Shader {
  public:
   /**
    * Creates a shader that draws the specified color.
-   * @param color  the color in srgb gamut, can overflow 0-1.
+   * @param color  the color in sRGB gamut, may exceed 0-1.
    */
   static std::shared_ptr<Shader> MakeColorShader(Color color);
 
@@ -63,7 +63,7 @@ class Shader {
    * gradient is aligned with the line connecting the two points.
    * @param startPoint The start point for the gradient.
    * @param endPoint The end point for the gradient.
-   * @param colors The array of colors in srgb gamut, can overflow 0-1, to be distributed between
+   * @param colors The array of colors in sRGB gamut, may exceed 0-1, to be distributed between
    * the two points.
    * @param positions Maybe empty. The relative position of each corresponding color in the color
    * array. If this is empty, the colors are distributed evenly between the start and end point.
@@ -79,7 +79,7 @@ class Shader {
    * gradient is drawn from the center point to the edge of the radius.
    * @param center The center of the circle for this gradient
    * @param radius Must be positive. The radius of the circle for this gradient.
-   * @param colors The array of colors in srgb gamut, can overflow 0-1, to be distributed between
+   * @param colors The array of colors in sRGB gamut, may exceed 0-1, to be distributed between
    * the center and edge of the circle.
    * @param positions Maybe empty. The relative position of each corresponding color in the color
    * array. If this is empty, the colors are distributed evenly between the start and end point.
@@ -97,7 +97,7 @@ class Shader {
    * @param center The center of the circle for this gradient
    * @param startAngle Start of the angular range, corresponding to pos == 0.
    * @param endAngle End of the angular range, corresponding to pos == 1.
-   * @param colors The array of colors in srgb gamut, can overflow 0-1, to be distributed around the
+   * @param colors The array of colors in sRGB gamut, may exceed 0-1, to be distributed around the
    * center, within the gradient angle range.
    * @param positions Maybe empty. The relative position of each corresponding color in the color
    * array. If this is empty, the colors are distributed evenly between the start and end point.
@@ -113,7 +113,7 @@ class Shader {
    * color gradient is drawn from the center point to the vertices of the diamond.
    * @param center The center of the diamond for this gradient
    * @param halfDiagonal Must be positive. The half-diagonal of the diamond for this gradient.
-   * @param colors The array of colors in srgb gamut, can overflow 0-1, to be distributed between
+   * @param colors The array of colors in sRGB gamut, may exceed 0-1, to be distributed between
    * the center and edge of the circle.
    * @param positions Maybe empty. The relative position of each corresponding color in the color
    * array. If this is empty, the colors are distributed evenly between the start and end point.

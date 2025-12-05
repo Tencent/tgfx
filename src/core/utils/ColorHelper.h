@@ -17,9 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include "core/ColorSpaceXformSteps.h"
 #include "tgfx/core/Color.h"
 namespace tgfx {
 PMColor ToPMColor(const Color& color, const std::shared_ptr<ColorSpace>& dstColorSpace);
 
 Color ConvertColorSpace(const Color& color, const std::shared_ptr<ColorSpace>& dstColorSpace);
+
+uint32_t ToUintPMColor(const Color& color, const ColorSpaceXformSteps* steps);
 }  // namespace tgfx

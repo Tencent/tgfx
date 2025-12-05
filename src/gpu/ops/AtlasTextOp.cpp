@@ -18,6 +18,7 @@
 
 #include "AtlasTextOp.h"
 #include "RectDrawOp.h"
+#include "core/utils/ColorHelper.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
@@ -58,7 +59,7 @@ AtlasTextOp::AtlasTextOp(BlockAllocator* allocator, RectsVertexProvider* provide
     : DrawOp(allocator, provider->aaType()), rectCount(provider->rectCount()),
       textureProxy(std::move(textureProxy)), sampling(sampling) {
   if (!provider->hasColor()) {
-    commonColor = provider->firstColor();
+    commonColor = ToPMColor(provider->firstColor(), provider->dstColorSpace());
   }
 }
 

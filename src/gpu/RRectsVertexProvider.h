@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "core/ColorSpaceXformSteps.h"
 #include "core/utils/BlockAllocator.h"
 #include "gpu/AAType.h"
 #include "gpu/VertexProvider.h"
@@ -27,13 +28,13 @@
 
 namespace tgfx {
 struct RRectRecord {
-  RRectRecord(const RRect& rRect, const Matrix& viewMatrix, PMColor color = {})
+  RRectRecord(const RRect& rRect, const Matrix& viewMatrix, Color color = {})
       : rRect(rRect), viewMatrix(viewMatrix), color(color) {
   }
 
   RRect rRect;
   Matrix viewMatrix;
-  PMColor color;
+  Color color;
 };
 
 /**
@@ -44,10 +45,10 @@ class RRectsVertexProvider : public VertexProvider {
   /**
    * Creates a new RRectsVertexProvider from a list of RRect records.
    */
-  static PlacementPtr<RRectsVertexProvider> MakeFrom(BlockAllocator* allocator,
-                                                     std::vector<PlacementPtr<RRectRecord>>&& rects,
-                                                     AAType aaType,
-                                                     std::vector<PlacementPtr<Stroke>>&& strokes);
+  static PlacementPtr<RRectsVertexProvider> MakeFrom(
+      BlockAllocator* allocator, std::vector<PlacementPtr<RRectRecord>>&& rects, AAType aaType,
+      std::vector<PlacementPtr<Stroke>>&& strokes,
+      std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
    * Returns the number of round rects in the provider.
@@ -77,7 +78,7 @@ class RRectsVertexProvider : public VertexProvider {
   /**
    * Returns the first color in the provider. If no color record exists, a white color is returned.
    */
-  const PMColor& firstColor() const {
+  const Color& firstColor() const {
     return rects.front()->color;
   }
 
@@ -85,9 +86,14 @@ class RRectsVertexProvider : public VertexProvider {
 
   void getVertices(float* vertices) const override;
 
+  const std::shared_ptr<ColorSpace>& dstColorSpace() const {
+    return _dstColorSpace;
+  }
+
  private:
   PlacementArray<RRectRecord> rects = {};
   PlacementArray<Stroke> strokes = {};
+  std::shared_ptr<ColorSpace> _dstColorSpace = nullptr;
   struct {
     uint8_t aaType : 2;
     bool hasColor : 1;
@@ -95,7 +101,8 @@ class RRectsVertexProvider : public VertexProvider {
   } bitFields = {};
 
   RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType, bool hasColor,
-                       PlacementArray<Stroke>&& strokes, std::shared_ptr<BlockAllocator> reference);
+                       PlacementArray<Stroke>&& strokes, std::shared_ptr<BlockAllocator> reference,
+                       std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   friend class BlockAllocator;
 };
