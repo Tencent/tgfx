@@ -24,5 +24,5 @@ PMColor ToPMColor(const Color& color, const std::shared_ptr<ColorSpace>& dstColo
 
 Color ConvertColorSpace(const Color& color, const std::shared_ptr<ColorSpace>& dstColorSpace);
 
-float ToUByte4PMColor(const Color& color, const ColorSpaceXformSteps* steps);
+uint32_t ToUintPMColor(const Color& color, const ColorSpaceXformSteps* steps);
 }  // namespace tgfx

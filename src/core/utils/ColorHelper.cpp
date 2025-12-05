@@ -49,12 +49,12 @@ Color ConvertColorSpace(const Color& color, const std::shared_ptr<ColorSpace>& d
   return dstColor;
 }
 
-float ToUByte4PMColor(const Color& color, const ColorSpaceXformSteps* steps) {
+uint32_t ToUintPMColor(const Color& color, const ColorSpaceXformSteps* steps) {
   PMColor pmColor = color.premultiply();
   if (steps) {
     steps->apply(pmColor.array());
   }
-  float compressedColor = 0.0f;
+  uint32_t compressedColor = 0;
   auto bytes = reinterpret_cast<uint8_t*>(&compressedColor);
   bytes[0] = static_cast<uint8_t>(pmColor.red * 255);
   bytes[1] = static_cast<uint8_t>(pmColor.green * 255);

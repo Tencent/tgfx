@@ -120,7 +120,8 @@ void RRectsVertexProvider::getVertices(float* vertices) const {
     auto scales = viewMatrix.getAxisScales();
     float compressedColor = 0.f;
     if (bitFields.hasColor) {
-      compressedColor = ToUByte4PMColor(record->color, steps.get());
+      uint32_t uintColor = ToUintPMColor(record->color, steps.get());
+      compressedColor = *reinterpret_cast<float*>(&uintColor);
     }
     rRect.scale(scales.x, scales.y);
     viewMatrix.preScale(1 / scales.x, 1 / scales.y);

@@ -82,7 +82,8 @@ class AARectsVertexProvider : public RectsVertexProvider {
       auto& rect = record->rect;
       float compressedColor = 0.f;
       if (bitFields.hasColor) {
-        compressedColor = ToUByte4PMColor(record->color, steps.get());
+        uint32_t uintColor = ToUintPMColor(record->color, steps.get());
+        compressedColor = *reinterpret_cast<float*>(&uintColor);
       }
 
       auto scale = sqrtf(viewMatrix.getScaleX() * viewMatrix.getScaleX() +
@@ -169,7 +170,8 @@ class NonAARectsVertexProvider : public RectsVertexProvider {
       auto& rect = record->rect;
       float compressedColor = 0.f;
       if (bitFields.hasColor) {
-        compressedColor = ToUByte4PMColor(record->color, steps.get());
+        uint32_t uintColor = ToUintPMColor(record->color, steps.get());
+        compressedColor = *reinterpret_cast<float*>(&uintColor);
       }
       auto quad = Quad::MakeFrom(rect, &viewMatrix);
       auto& uvRect = hasUVRect ? *uvRects[i] : rect;
@@ -273,7 +275,8 @@ class AAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
       float vOffset = 0.0f;
       float compressedColor = 0.f;
       if (bitFields.hasColor) {
-        compressedColor = ToUByte4PMColor(record->color, steps.get());
+        uint32_t uintColor = ToUintPMColor(record->color, steps.get());
+        compressedColor = *reinterpret_cast<float*>(&uintColor);
       }
       if (hasUVCoord) {
         auto& uvRect = *uvRects[i];
@@ -480,7 +483,8 @@ class NonAAAngularStrokeRectsVertexProvider final : public RectsVertexProvider {
       auto vOffset = 0.0f;
       float compressedColor = 0.f;
       if (bitFields.hasColor) {
-        compressedColor = ToUByte4PMColor(record->color, steps.get());
+        uint32_t uintColor = ToUintPMColor(record->color, steps.get());
+        compressedColor = *reinterpret_cast<float*>(&uintColor);
       }
       if (hasUVCoord) {
         auto& uvRect = *uvRects[i];
@@ -580,7 +584,8 @@ class AARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
       auto rect = record->rect;
       float compressedColor = 0.f;
       if (bitFields.hasColor) {
-        compressedColor = ToUByte4PMColor(record->color, steps.get());
+        uint32_t uintColor = ToUintPMColor(record->color, steps.get());
+        compressedColor = *reinterpret_cast<float*>(&uintColor);
       }
       rect.scale(scales.x, scales.y);
       viewMatrix.preScale(1.0f / scales.x, 1.0f / scales.y);
@@ -735,7 +740,8 @@ class NonAARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
       auto rect = record->rect;
       float compressedColor = 0.f;
       if (bitFields.hasColor) {
-        compressedColor = ToUByte4PMColor(record->color, steps.get());
+        uint32_t uintColor = ToUintPMColor(record->color, steps.get());
+        compressedColor = *reinterpret_cast<float*>(&uintColor);
       }
       rect.scale(scales.x, scales.y);
       viewMatrix.preScale(1.0f / scales.x, 1.0f / scales.y);
