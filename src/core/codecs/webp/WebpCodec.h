@@ -47,9 +47,9 @@ class WebpCodec : public ImageCodec {
   std::string filePath;
 
   explicit WebpCodec(int width, int height, Orientation orientation, std::string filePath,
-                     std::shared_ptr<Data> fileData, const std::shared_ptr<ColorSpace>& colorSpace)
-      : ImageCodec(width, height, orientation, colorSpace), fileData(std::move(fileData)),
-        filePath(std::move(filePath)) {
+                     std::shared_ptr<Data> fileData, std::shared_ptr<ColorSpace> colorSpace)
+      : ImageCodec(width, height, orientation, std::move(colorSpace)),
+        fileData(std::move(fileData)), filePath(std::move(filePath)) {
   }
 };
 

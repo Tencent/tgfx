@@ -34,7 +34,7 @@ namespace tgfx {
 template <AlphaType AT>
 struct RGBA4f {
   /**
-   * Returns a fully transparent Color in srgb gamut.
+   * Returns a fully transparent Color in sRGB gamut.
    */
   static const RGBA4f& Transparent() {
     static const RGBA4f color = {0.0f, 0.0f, 0.0f, 0.0f};
@@ -50,7 +50,7 @@ struct RGBA4f {
   }
 
   /**
-   * Returns a fully opaque white Color in srgb gamut.
+   * Returns a fully opaque white Color in sRGB gamut.
    */
   static const RGBA4f& White() {
     static const RGBA4f color = {1.0f, 1.0f, 1.0f, 1.0f};
@@ -58,7 +58,7 @@ struct RGBA4f {
   }
 
   /**
-   * Returns a fully opaque red Color in srgb gamut.
+   * Returns a fully opaque red Color in sRGB gamut.
    */
   static const RGBA4f& Red() {
     static const RGBA4f color = {1.0f, 0.0f, 0.0f, 1.0f};
@@ -66,7 +66,7 @@ struct RGBA4f {
   }
 
   /**
-   * Returns a fully opaque green Color in srgb gamut.
+   * Returns a fully opaque green Color in sRGB gamut.
    */
   static const RGBA4f& Green() {
     static const RGBA4f color = {0.0f, 1.0f, 0.0f, 1.0f};
@@ -74,7 +74,7 @@ struct RGBA4f {
   }
 
   /**
-   * Returns a fully opaque blue Color in srgb gamut.
+   * Returns a fully opaque blue Color in sRGB gamut.
    */
   static const RGBA4f& Blue() {
     static const RGBA4f color = {0.0f, 0.0f, 1.0f, 1.0f};

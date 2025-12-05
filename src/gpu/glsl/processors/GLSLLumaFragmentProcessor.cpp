@@ -20,8 +20,8 @@
 
 namespace tgfx {
 PlacementPtr<FragmentProcessor> LumaFragmentProcessor::Make(
-    BlockAllocator* allocator, const std::shared_ptr<ColorSpace>& colorSpace) {
-  return allocator->make<GLSLLumaFragmentProcessor>(colorSpace);
+    BlockAllocator* allocator, std::shared_ptr<ColorSpace> colorSpace) {
+  return allocator->make<GLSLLumaFragmentProcessor>(std::move(colorSpace));
 }
 
 void GLSLLumaFragmentProcessor::emitCode(EmitArgs& args) const {

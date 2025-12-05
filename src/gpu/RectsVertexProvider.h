@@ -60,7 +60,7 @@ class RectsVertexProvider : public VertexProvider {
       BlockAllocator* allocator, std::vector<PlacementPtr<RectRecord>>&& rects,
       std::vector<PlacementPtr<Rect>>&& uvRects, AAType aaType, bool needUVCoord,
       UVSubsetMode subsetMode, std::vector<PlacementPtr<Stroke>>&& strokes,
-      const std::shared_ptr<ColorSpace>& colorSpace = nullptr);
+      std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
    * Returns the number of rects in the provider.
@@ -146,6 +146,6 @@ class RectsVertexProvider : public VertexProvider {
   RectsVertexProvider(PlacementArray<RectRecord>&& rects, PlacementArray<Rect>&& uvRects,
                       AAType aaType, bool hasUVCoord, bool hasColor, UVSubsetMode subsetMode,
                       std::shared_ptr<BlockAllocator> reference,
-                      const std::shared_ptr<ColorSpace>& colorSpace);
+                      std::shared_ptr<ColorSpace> colorSpace);
 };
 }  // namespace tgfx

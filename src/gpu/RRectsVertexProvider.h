@@ -48,7 +48,7 @@ class RRectsVertexProvider : public VertexProvider {
   static PlacementPtr<RRectsVertexProvider> MakeFrom(
       BlockAllocator* allocator, std::vector<PlacementPtr<RRectRecord>>&& rects, AAType aaType,
       std::vector<PlacementPtr<Stroke>>&& strokes,
-      const std::shared_ptr<ColorSpace>& colorSpace = nullptr);
+      std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
    * Returns the number of round rects in the provider.
@@ -103,7 +103,7 @@ class RRectsVertexProvider : public VertexProvider {
 
   RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType, bool hasColor,
                        PlacementArray<Stroke>&& strokes, std::shared_ptr<BlockAllocator> reference,
-                       const std::shared_ptr<ColorSpace>& colorSpace = nullptr);
+                       std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   friend class BlockAllocator;
 };

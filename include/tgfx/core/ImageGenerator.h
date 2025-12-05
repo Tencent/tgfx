@@ -86,8 +86,8 @@ class ImageGenerator {
   }
 
  protected:
-  ImageGenerator(int width, int height, const std::shared_ptr<ColorSpace>& colorSpace = nullptr)
-      : _width(width), _height(height), _colorSpace(colorSpace) {
+  ImageGenerator(int width, int height, std::shared_ptr<ColorSpace> colorSpace = nullptr)
+      : _width(width), _height(height), _colorSpace(std::move(colorSpace)) {
   }
 
   virtual std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const = 0;

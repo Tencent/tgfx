@@ -28,7 +28,7 @@ class RenderContext : public DrawContext {
  public:
   RenderContext(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags,
                 bool clearAll = false, Surface* surface = nullptr,
-                const std::shared_ptr<ColorSpace>& colorSpace = nullptr);
+                std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   Context* getContext() const {
     return renderTarget->getContext();

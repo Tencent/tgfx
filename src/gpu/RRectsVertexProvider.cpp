@@ -54,7 +54,7 @@ namespace tgfx {
 
 PlacementPtr<RRectsVertexProvider> RRectsVertexProvider::MakeFrom(
     BlockAllocator* allocator, std::vector<PlacementPtr<RRectRecord>>&& rects, AAType aaType,
-    std::vector<PlacementPtr<Stroke>>&& strokes, const std::shared_ptr<ColorSpace>& colorSpace) {
+    std::vector<PlacementPtr<Stroke>>&& strokes, std::shared_ptr<ColorSpace> colorSpace) {
   if (rects.empty()) {
     return nullptr;
   }
@@ -72,7 +72,7 @@ PlacementPtr<RRectsVertexProvider> RRectsVertexProvider::MakeFrom(
   auto strokeArray = allocator->makeArray(std::move(strokes));
   return allocator->make<RRectsVertexProvider>(std::move(array), aaType, hasColor,
                                                std::move(strokeArray), allocator->addReference(),
-                                               colorSpace);
+                                               std::move(colorSpace));
 }
 
 static void WriteUByte4Color(float* compressedColor, const PMColor& color) {
@@ -90,9 +90,9 @@ static float FloatInvert(float value) {
 RRectsVertexProvider::RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType,
                                            bool hasColor, PlacementArray<Stroke>&& strokes,
                                            std::shared_ptr<BlockAllocator> reference,
-                                           const std::shared_ptr<ColorSpace>& colorSpace)
+                                           std::shared_ptr<ColorSpace> colorSpace)
     : VertexProvider(std::move(reference)), rects(std::move(rects)), strokes(std::move(strokes)),
-      dstColorSpace(colorSpace) {
+      dstColorSpace(std::move(colorSpace)) {
   bitFields.aaType = static_cast<uint8_t>(aaType);
   bitFields.hasColor = hasColor;
 

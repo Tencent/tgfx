@@ -59,9 +59,9 @@ static bool HasDifferentViewMatrix(const std::vector<PlacementPtr<RectRecord>>& 
 
 OpsCompositor::OpsCompositor(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags,
                              std::optional<PMColor> clearColor,
-                             const std::shared_ptr<ColorSpace>& colorSpace)
+                             std::shared_ptr<ColorSpace> colorSpace)
     : context(proxy->getContext()), renderTarget(std::move(proxy)), renderFlags(renderFlags),
-      clearColor(clearColor), dstColorSpace(colorSpace) {
+      clearColor(clearColor), dstColorSpace(std::move(colorSpace)) {
   DEBUG_ASSERT(renderTarget != nullptr);
 }
 
