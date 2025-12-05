@@ -64,5 +64,7 @@ class DrawArgs {
   // per-pixel depth occlusion effects. These layers are composited through the Compositor and do
   // not need to be drawn to the Canvas.
   std::shared_ptr<Render3DContext> render3DContext = nullptr;
+
+  bool clipContentByCanvas = false;
 };
 }  // namespace tgfx

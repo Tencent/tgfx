@@ -65,6 +65,25 @@ static Matrix GetMayLossyAffineMatrix(const Matrix3D& matrix) {
   return affineMatrix;
 }
 
+// Applies a clip rect to the canvas, avoiding anti-aliasing artifacts that cause semi-transparent
+// edges when the scaled clip bounds are too small.
+static void ApplyClip(Canvas& canvas, const Rect& maxBounds, const Rect& clipBounds,
+                      float contentScale) {
+  if (contentScale < 1.0f) {
+    auto scaledBounds = clipBounds;
+    scaledBounds.scale(contentScale, contentScale);
+    if (scaledBounds.width() < 10.f || scaledBounds.height() < 10.f) {
+      DEBUG_ASSERT(!FloatNearlyZero(contentScale));
+      scaledBounds.roundOut();
+      scaledBounds.scale(1.0f / contentScale, 1.0f / contentScale);
+      scaledBounds.intersect(maxBounds);
+      canvas.clipRect(scaledBounds);
+      return;
+    }
+  }
+  canvas.clipRect(clipBounds);
+}
+
 std::shared_ptr<Picture> Layer::RecordPicture(DrawMode mode, float contentScale,
                                               const std::function<void(Canvas*)>& drawFunction) {
   if (drawFunction == nullptr) {
@@ -198,6 +217,7 @@ Layer::Layer() {
   bitFields.allowsGroupOpacity = AllowsGroupOpacity;
   bitFields.blendMode = static_cast<uint8_t>(BlendMode::SrcOver);
   bitFields.passThroughBackground = true;
+  bitFields.matrix3DIsAffine = true;
 }
 
 void Layer::setAlpha(float value) {
@@ -1164,25 +1184,6 @@ static std::shared_ptr<Image> getBlendImage(const DrawArgs& args, const Canvas* 
   return nullptr;
 }
 
-// Applies a clip rect to the canvas, avoiding anti-aliasing artifacts that cause semi-transparent
-// edges when the scaled clip bounds are too small.
-static inline void ApplyClip(Canvas& canvas, const Rect& maxBounds, const Rect& clipBounds,
-                             float contentScale) {
-  if (contentScale < 1.0f) {
-    auto scaledBounds = clipBounds;
-    scaledBounds.scale(contentScale, contentScale);
-    if (scaledBounds.width() < 10.f || scaledBounds.height() < 10.f) {
-      DEBUG_ASSERT(!FloatNearlyZero(contentScale));
-      scaledBounds.roundOut();
-      scaledBounds.scale(1.0f / contentScale, 1.0f / contentScale);
-      scaledBounds.intersect(maxBounds);
-      canvas.clipRect(scaledBounds);
-      return;
-    }
-  }
-  canvas.clipRect(clipBounds);
-}
-
 std::shared_ptr<Image> Layer::getContentImage(const DrawArgs& contentArgs, float contentScale,
                                               const std::shared_ptr<Image>& passThroughImage,
                                               const Matrix& passThroughImageMatrix,
@@ -1347,7 +1348,9 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     }
   }
 
-  auto clipBounds = GetClipBounds(args.blurBackground ? args.blurBackground->getCanvas() : canvas);
+  auto clipBoundsCanvas =
+      args.blurBackground && !args.clipContentByCanvas ? args.blurBackground->getCanvas() : canvas;
+  auto clipBounds = GetClipBounds(clipBoundsCanvas);
   auto contentClipBounds = clipBounds;
   if (transform != nullptr && clipBounds.has_value()) {
     auto filter = ImageFilter::Transform3D(*transform);
@@ -1621,14 +1624,17 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, cons
        !bitFields.passThroughBackground || (alpha < 1.0f && bitFields.allowsGroupOpacity) ||
        bitFields.shouldRasterize || (!_filters.empty() && !args.excludeEffects) || hasValidMask() ||
        _transformStyle == TransformStyle::Flat);
-  // TODO: The layer content is drawn to the background environment through the Playback related
-  // interfaces of LayerContent's Picture, which currently does not support 3D transformations.
-  // Therefore, the content of 3D layers cannot be correctly drawn to the background environment.
-  // As a result, child layers cannot obtain the correct background content when applying background
-  // styles. The cost of modifying this is high, and further modifications will be needed after
-  // Canvas supports 3x3 matrices. Temporarily disable background styles for child layers of 3D
-  // layers, to be optimized later.
+  // TODO: Support background styles for subsequent layers of 3D layers.
+  // The layer content is drawn to the background canvas by playing back the layer's content as a
+  // picture, which currently does not support 3D matrix. As a result, child layers cannot obtain
+  // the correct background content when applying background styles.
   bool skipChildBackground = args.excludeBackgroundStyle || !bitFields.matrix3DIsAffine;
+  // TODO: Support calculate reasonable clipping regions when obtaining content image.
+  // 3D layers cannot write 3D matrices to the background canvas, causing child layers to use the
+  // canvas instead of the background canvas for clipping region calculations. Although this results
+  // in clipping regions not considering background styles, the issue can be ignored since
+  // background styles are simultaneously disabled.
+  bool clipChildContentByCanvas = args.clipContentByCanvas || !bitFields.matrix3DIsAffine;
   for (size_t i = 0; i < _children.size(); ++i) {
     auto& child = _children[i];
     if (child.get() == stopChild) {
@@ -1642,6 +1648,7 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, cons
     }
     auto childArgs = args;
     childArgs.excludeBackgroundStyle = skipChildBackground;
+    childArgs.clipContentByCanvas = clipChildContentByCanvas;
     if (interrupt3DContext) {
       childArgs.render3DContext = nullptr;
     }

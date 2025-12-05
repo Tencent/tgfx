@@ -3388,11 +3388,19 @@ TGFX_TEST(LayerTest, Matrix) {
   EXPECT_EQ(imageLayer->getBounds(displayList->root()), Rect::MakeLTRB(102, 21, 187, 158));
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D"));
 
+  auto imageBlurLayer = SolidLayer::Make();
+  imageBlurLayer->setColor(Color::FromRGBA(235, 5, 112, 70));
+  imageBlurLayer->setWidth(170);
+  imageBlurLayer->setHeight(70);
+  imageBlurLayer->setMatrix(Matrix::MakeTrans(-30.f, 20.f));
+  imageBlurLayer->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
+  imageLayer->addChild(imageBlurLayer);
   auto affineMatrix = Matrix::MakeTrans(50, 50);
   imageLayer->setMatrix(affineMatrix);
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D_2D"));
 
+  imageBlurLayer->removeFromParent();
   imageLayer->setMatrix3D(imageMatrix3D);
   imageLayer->setShouldRasterize(true);
   EXPECT_TRUE(imageLayer->matrix().isIdentity());
