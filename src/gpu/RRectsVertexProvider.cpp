@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RRectsVertexProvider.h"
+#include "core/utils/ColorHelper.h"
 #include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/MathExtra.h"
 
@@ -73,20 +74,6 @@ PlacementPtr<RRectsVertexProvider> RRectsVertexProvider::MakeFrom(
   return allocator->make<RRectsVertexProvider>(std::move(array), aaType, hasColor,
                                                std::move(strokeArray), allocator->addReference(),
                                                std::move(colorSpace));
-}
-
-static float ToUByte4PMColor(const Color& color, const ColorSpaceXformSteps* steps) {
-  PMColor pmColor = color.premultiply();
-  if (steps) {
-    steps->apply(pmColor.array());
-  }
-  float compressedColor = 0.0f;
-  auto bytes = reinterpret_cast<uint8_t*>(&compressedColor);
-  bytes[0] = static_cast<uint8_t>(pmColor.red * 255);
-  bytes[1] = static_cast<uint8_t>(pmColor.green * 255);
-  bytes[2] = static_cast<uint8_t>(pmColor.blue * 255);
-  bytes[3] = static_cast<uint8_t>(pmColor.alpha * 255);
-  return compressedColor;
 }
 
 static float FloatInvert(float value) {

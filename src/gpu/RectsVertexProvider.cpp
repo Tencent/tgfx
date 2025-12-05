@@ -19,25 +19,13 @@
 #include "RectsVertexProvider.h"
 #include <array>
 #include "core/ColorSpaceXformSteps.h"
+#include "core/utils/ColorHelper.h"
 #include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/MathExtra.h"
 #include "gpu/Quad.h"
 #include "tgfx/core/Stroke.h"
 
 namespace tgfx {
-inline float ToUByte4PMColor(const Color& color, const ColorSpaceXformSteps* steps) {
-  PMColor pmColor = color.premultiply();
-  if (steps) {
-    steps->apply(pmColor.array());
-  }
-  float compressedColor = 0.0f;
-  auto bytes = reinterpret_cast<uint8_t*>(&compressedColor);
-  bytes[0] = static_cast<uint8_t>(pmColor.red * 255);
-  bytes[1] = static_cast<uint8_t>(pmColor.green * 255);
-  bytes[2] = static_cast<uint8_t>(pmColor.blue * 255);
-  bytes[3] = static_cast<uint8_t>(pmColor.alpha * 255);
-  return compressedColor;
-}
 
 inline void ApplySubsetMode(UVSubsetMode mode, Rect* rect) {
   if (mode == UVSubsetMode::None) {
