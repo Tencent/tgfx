@@ -1225,11 +1225,10 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     }
     return true;
   }
-  if (args.renderFlags & RenderFlags::DisableCache || contentScale > 1.0f) {
+
+  if (args.renderFlags & RenderFlags::DisableCache || contentScale > 0.5f) {
     return false;
   }
-
-  auto maxCacheSize = static_cast<float>(args.layerCache->maxCacheContentSize());
 
   if (!args.layerCache) {
     return false;
@@ -1245,7 +1244,7 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
       return false;
     }
   } else {
-    contentScale = std::min(1.0f, maxCacheSize / std::max(bounds.width(), bounds.height()));
+    contentScale = std::min(0.5f, maxCacheSize / std::max(bounds.width(), bounds.height()));
   }
   bounds.scale(contentScale, contentScale);
   bounds.roundOut();
@@ -1279,7 +1278,7 @@ void Layer::drawContentOffscreen(const DrawArgs& args, Canvas* canvas,
   if (onlyOffscreen) {
     contentArgs.blurBackground = args.blurBackground;
   } else if (args.blurBackground && hasBackgroundStyle()) {
-    contentArgs.blurBackground = args.blurBackground->createSubContext();
+    contentArgs.blurBackground = args.blurBackground->createSubContext(renderBounds, true);
   } else {
     contentArgs.blurBackground = nullptr;
   }
@@ -1617,7 +1616,7 @@ std::shared_ptr<Image> Layer::getBackgroundImage(const DrawArgs& args, float con
     return nullptr;
   }
   canvas->concat(affineGlobalToLocalMatrix);
-  drawBackgroundImage(args, *canvas, offset);
+  drawBackgroundImage(args, *canvas);
   auto backgroundPicture = recorder.finishRecordingAsPicture();
   return ToImageWithOffset(std::move(backgroundPicture), offset, &bounds, args.dstColorSpace);
 }
@@ -1642,17 +1641,17 @@ std::shared_ptr<Image> Layer::getBoundsBackgroundImage(const DrawArgs& args, flo
   matrix.postTranslate(bounds.left, bounds.top);
   canvas->setMatrix(matrix);
 
-  drawBackgroundImage(args, *canvas, offset);
+  drawBackgroundImage(args, *canvas);
   auto backgroundPicture = recorder.finishRecordingAsPicture();
   return ToImageWithOffset(std::move(backgroundPicture), offset, &bounds, args.dstColorSpace);
 }
 
-void Layer::drawBackgroundImage(const DrawArgs& args, Canvas& canvas, Point* offset) {
+void Layer::drawBackgroundImage(const DrawArgs& args, Canvas& canvas) {
   if (args.blurBackground) {
-    Point bgOffset = {};
-    auto image = args.blurBackground->getBackgroundImage(offset);
-    canvas.concat(args.blurBackground->backgroundMatrix());
-    canvas.drawImage(image, bgOffset.x, bgOffset.y);
+    auto image = args.blurBackground->getBackgroundImage();
+    auto bgMatrix = args.blurBackground->backgroundMatrix();
+    canvas.concat(bgMatrix);
+    canvas.drawImage(image);
   } else {
     auto drawArgs = args;
     drawArgs.excludeEffects = false;

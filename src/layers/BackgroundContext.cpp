@@ -17,33 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "BackgroundContext.h"
+#include <utility>
 #include "core/filters/GaussianBlurImageFilter.h"
 #include "tgfx/core/PictureRecorder.h"
 
 namespace tgfx {
-
-class PictureBackgroundContext : public BackgroundContext {
- public:
-  static std::shared_ptr<BackgroundContext> Make(const Matrix& imageMatrix, const Rect& rect,
-                                                 std::shared_ptr<ColorSpace> colorSpace) {
-    return std::shared_ptr<PictureBackgroundContext>(
-        new PictureBackgroundContext(imageMatrix, rect, std::move(colorSpace)));
-  }
-  ~PictureBackgroundContext() = default;
-  Canvas* getCanvas() override {
-    return canvas;
-  }
-  std::shared_ptr<Image> onGetBackgroundImage(Point* offset) override;
-
- private:
-  PictureBackgroundContext(const Matrix& imageMatrix, const Rect& rect,
-                           std::shared_ptr<ColorSpace> colorSpace)
-      : BackgroundContext(nullptr, imageMatrix, rect, std::move(colorSpace)) {
-    canvas = recorder.beginRecording();
-  }
-  PictureRecorder recorder;
-  Canvas* canvas = nullptr;
-};
 
 class SurfaceBackgroundContext : public BackgroundContext {
  public:
@@ -65,7 +43,7 @@ class SurfaceBackgroundContext : public BackgroundContext {
   Canvas* getCanvas() override {
     return surface->getCanvas();
   }
-  std::shared_ptr<Image> onGetBackgroundImage(Point* offset) override;
+  std::shared_ptr<Image> onGetBackgroundImage() override;
 
  private:
   SurfaceBackgroundContext(std::shared_ptr<Surface> surface, const Matrix& matrix, const Rect& rect,
@@ -76,45 +54,8 @@ class SurfaceBackgroundContext : public BackgroundContext {
   std::shared_ptr<Surface> surface = nullptr;
 };
 
-std::shared_ptr<Image> PictureBackgroundContext::onGetBackgroundImage(Point* offset) {
-  auto matrix = canvas->getMatrix();
-  auto clip = canvas->getTotalClip();
-  auto picture = recorder.finishRecordingAsPicture();
-  canvas = recorder.beginRecording();
-  // save current picture to canvas
-  canvas->drawPicture(picture);
-  canvas->resetMatrix();
-  canvas->clipPath(clip);
-  canvas->setMatrix(matrix);
-  if (picture == nullptr) {
-    return nullptr;
-  }
-  auto imageBounds = picture->getBounds();
-  imageBounds.roundOut();
-  auto pictureMatrix = Matrix::MakeTrans(-imageBounds.x(), -imageBounds.y());
-  auto image = Image::MakeFrom(std::move(picture), static_cast<int>(imageBounds.width()),
-                               static_cast<int>(imageBounds.height()), &pictureMatrix);
-  if (offset) {
-    *offset = Point::Make(imageBounds.x(), imageBounds.y());
-  }
-  return image;
-}
-
-std::shared_ptr<Image> SurfaceBackgroundContext::onGetBackgroundImage(Point* offset) {
-  if (offset) {
-    *offset = Point::Make(0, 0);
-  }
-  auto image = surface->makeImageSnapshot();
-  if (!parent) {
-    return image;
-  }
-  PictureRecorder recorder;
-  auto canvas = recorder.beginRecording();
-  canvas->drawImage(parent->getBackgroundImage(nullptr));
-  canvas->drawImage(image);
-  auto picture = recorder.finishRecordingAsPicture();
-  return Image::MakeFrom(std::move(picture), surface->width(), surface->height(), nullptr,
-                         surface->colorSpace());
+std::shared_ptr<Image> SurfaceBackgroundContext::onGetBackgroundImage() {
+  return surface->makeImageSnapshot();
 }
 
 static float MaxBlurOutset() {
@@ -132,6 +73,9 @@ std::shared_ptr<BackgroundContext> BackgroundContext::Make(Context* context, con
                                                            float maxOutset, float minOutset,
                                                            const Matrix& matrix,
                                                            std::shared_ptr<ColorSpace> colorSpace) {
+  if (!context) {
+    return nullptr;
+  }
   auto surfaceScale = 1.0f;
   auto rect = drawRect;
   rect.outset(maxOutset, maxOutset);
@@ -151,12 +95,8 @@ std::shared_ptr<BackgroundContext> BackgroundContext::Make(Context* context, con
   }
   auto backgroundRect = Rect::MakeWH(rect.width(), rect.height());
   imageMatrix.mapRect(&backgroundRect);
-  std::shared_ptr<BackgroundContext> result = nullptr;
-  if (context) {
-    result = SurfaceBackgroundContext::Make(context, imageMatrix, backgroundRect, colorSpace);
-  } else {
-    result = PictureBackgroundContext::Make(imageMatrix, backgroundRect, colorSpace);
-  }
+  std::shared_ptr<BackgroundContext> result =
+      SurfaceBackgroundContext::Make(context, imageMatrix, backgroundRect, std::move(colorSpace));
   if (!result) {
     return result;
   }
@@ -184,52 +124,123 @@ void BackgroundContext::drawToParent(const Matrix& paintMatrix, const Paint& pai
     newPaint.setMaskFilter(maskFilter->makeWithMatrix(inverseMatrix));
   }
   parentCanvas->resetMatrix();
-  auto offset = Point::Make(0, 0);
-  auto image = onGetBackgroundImage(&offset);
-  parentCanvas->drawImage(image, offset.x, offset.y, &newPaint);
+  auto image = onGetBackgroundImage();
+  // Draw child surface content at surfaceOffset in parent surface coordinates.
+  parentCanvas->drawImage(image, surfaceOffset.x, surfaceOffset.y, &newPaint);
 }
 
-std::shared_ptr<Image> BackgroundContext::getBackgroundImage(Point* offset) {
-  Point localOffset = {};
-  auto image = onGetBackgroundImage(&localOffset);
+Matrix BackgroundContext::backgroundMatrix() const {
+  return imageMatrix;
+}
+
+std::shared_ptr<Image> BackgroundContext::getBackgroundImage() {
+  auto image = onGetBackgroundImage();
+  DEBUG_ASSERT(image);
   if (!parent) {
-    if (offset) {
-      *offset = localOffset;
-    }
     return image;
   }
+
+  // Get parent's background image (in parent's surface coordinate system).
+  auto parentImage = parent->getBackgroundImage();
+
+  // surfaceOffset is the position of this child's surface in parent's surface coordinates.
+  // We need to extract the corresponding subset from parentImage.
+  int width = image->width();
+  int height = image->height();
+
+  // The subset position in parentImage is surfaceOffset (relative to parent surface origin).
+  const float& subsetX = surfaceOffset.x;
+  const float& subsetY = surfaceOffset.y;
+
+  auto subsetImage = parentImage->makeSubset(
+      Rect::MakeXYWH(subsetX, subsetY, static_cast<float>(width), static_cast<float>(height)));
+
+  if (!subsetImage) {
+    return image;
+  }
+
   PictureRecorder recorder;
   auto canvas = recorder.beginRecording();
-  auto parentOffset = Point::Make(0, 0);
-  auto parentImage = parent->getBackgroundImage(&parentOffset);
-  canvas->drawImage(parentImage, parentOffset.x, parentOffset.y);
-  canvas->drawImage(image, localOffset.x, localOffset.y);
+  canvas->drawImage(subsetImage);
+  canvas->drawImage(image);
   auto picture = recorder.finishRecordingAsPicture();
-  auto bounds = picture->getBounds();
-  auto imageMatrix = Matrix::MakeTrans(-bounds.x(), -bounds.y());
-  if (offset) {
-    *offset = Point::Make(bounds.x(), bounds.y());
+  if (!picture) {
+    return image;
   }
-  return Image::MakeFrom(std::move(picture), static_cast<int>(ceilf(bounds.width())),
-                         static_cast<int>(ceilf(bounds.height())), &imageMatrix, colorSpace);
+  return Image::MakeFrom(std::move(picture), width, height);
 }
 
-std::shared_ptr<BackgroundContext> BackgroundContext::createSubContext() {
-  std::shared_ptr<BackgroundContext> child = nullptr;
-  if (context) {
-    child = SurfaceBackgroundContext::Make(context, imageMatrix, backgroundRect, colorSpace);
-  } else {
-    child = PictureBackgroundContext::Make(imageMatrix, backgroundRect, colorSpace);
+std::shared_ptr<BackgroundContext> BackgroundContext::createSubContext(const Rect& renderBounds,
+                                                                       bool clipToBackgroundRect) {
+
+  Rect childWorldRect = renderBounds;
+  if (clipToBackgroundRect) {
+    if (!childWorldRect.intersect(backgroundRect)) {
+      return nullptr;
+    }
+  } else if (!Rect::Intersects(renderBounds, backgroundRect)) {
+    return nullptr;
   }
+
+  // Get parent canvas's current matrix.
+  auto canvas = getCanvas();
+  auto parentCanvasMatrix = canvas->getMatrix();
+
+  // Use imageMatrix inverse (world -> surface) to calculate child surface bounds.
+  // This determines the actual surface size needed.
+  Matrix baseSurfaceMatrix = Matrix::I();
+  if (!imageMatrix.invert(&baseSurfaceMatrix)) {
+    return nullptr;
+  }
+
+  // Map childWorldRect to parent surface coordinates using baseSurfaceMatrix.
+  auto childSurfaceRect = baseSurfaceMatrix.mapRect(childWorldRect);
+  childSurfaceRect.roundOut();
+
+  // surfaceOffset: position of child surface origin in parent surface coordinates.
+  auto childSurfaceOffset = Point::Make(childSurfaceRect.x(), childSurfaceRect.y());
+
+  // Build child's surfaceMatrix: world -> child surface.
+  // childSurfaceMatrix = Translate(-childSurfaceOffset) * baseSurfaceMatrix
+  auto childSurfaceMatrix = baseSurfaceMatrix;
+  childSurfaceMatrix.postTranslate(-childSurfaceOffset.x, -childSurfaceOffset.y);
+
+  // Child's imageMatrix: child surface -> world.
+  Matrix childImageMatrix = Matrix::I();
+  if (!childSurfaceMatrix.invert(&childImageMatrix)) {
+    return nullptr;
+  }
+
+  // Child's backgroundRect in world coordinates.
+  // Map child surface bounds (0, 0, w, h) through childImageMatrix.
+  auto childBackgroundRect = Rect::MakeWH(childSurfaceRect.width(), childSurfaceRect.height());
+  childImageMatrix.mapRect(&childBackgroundRect);
+
+  // Calculate child canvas matrix.
+  // childCanvasMatrix = childSurfaceMatrix * imageMatrix * parentCanvasMatrix
+  // This transforms: layer local -> parent surface -> world -> child surface
+  // = layer local -> child surface
+  auto childCanvasMatrix = childSurfaceMatrix;
+  childCanvasMatrix.preConcat(imageMatrix);
+  childCanvasMatrix.preConcat(parentCanvasMatrix);
+
+  std::shared_ptr<BackgroundContext> child =
+      SurfaceBackgroundContext::Make(context, childImageMatrix, childBackgroundRect, colorSpace);
   if (!child) {
     return nullptr;
   }
-  auto canvas = getCanvas();
+
   auto childCanvas = child->getCanvas();
   childCanvas->clear();
-  childCanvas->clipPath(canvas->getTotalClip());
-  childCanvas->setMatrix(canvas->getMatrix());
+  // Set clip to child surface bounds (0, 0, width, height).
+  auto childSurfaceBounds = Rect::MakeWH(childSurfaceRect.width(), childSurfaceRect.height());
+  childCanvas->clipRect(childSurfaceBounds);
+
+  // Use childCanvasMatrix which inherits from parentCanvasMatrix.
+  childCanvas->setMatrix(childCanvasMatrix);
+
   child->parent = this;
+  child->surfaceOffset = childSurfaceOffset;
   return child;
 }
 

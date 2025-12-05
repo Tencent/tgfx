@@ -32,13 +32,18 @@ class BackgroundContext {
 
   virtual Canvas* getCanvas() = 0;
 
-  Matrix backgroundMatrix() const {
-    return imageMatrix;
-  }
+  Matrix backgroundMatrix() const;
 
-  std::shared_ptr<Image> getBackgroundImage(Point* offset);
+  std::shared_ptr<Image> getBackgroundImage();
 
-  std::shared_ptr<BackgroundContext> createSubContext();
+  /**
+   * Creates a child context with a smaller surface that only covers the given render bounds.
+   * @param renderBounds The bounds in world coordinates.
+   * @param clipToBackgroundRect If true, clip renderBounds to backgroundRect.
+   * @return The child context, or nullptr if no intersection or creation fails.
+   */
+  std::shared_ptr<BackgroundContext> createSubContext(const Rect& renderBounds,
+                                                      bool clipToBackgroundRect);
 
   void drawToParent(const Matrix& paintMatrix, const Paint& paint);
 
@@ -47,18 +52,23 @@ class BackgroundContext {
   }
 
  protected:
-  virtual std::shared_ptr<Image> onGetBackgroundImage(Point* offset) = 0;
+  virtual std::shared_ptr<Image> onGetBackgroundImage() = 0;
 
   BackgroundContext(Context* context, const Matrix& matrix, const Rect& rect,
                     std::shared_ptr<ColorSpace> colorSpace)
       : context(context), imageMatrix(matrix), backgroundRect(rect),
         colorSpace(std::move(colorSpace)){};
   Context* context = nullptr;
+  // Surface -> world transformation matrix, used for internal calculations.
   Matrix imageMatrix = Matrix::I();
   Rect backgroundRect = Rect::MakeEmpty();
   std::shared_ptr<ColorSpace> colorSpace = nullptr;
 
   BackgroundContext* parent = nullptr;
+
+  // Offset of this context's surface origin in parent's surface coordinates.
+  // Only used when created by createSubContext(renderBounds, ...).
+  Point surfaceOffset = Point::Zero();
 };
 
 }  // namespace tgfx

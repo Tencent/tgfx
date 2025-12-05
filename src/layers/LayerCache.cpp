@@ -87,8 +87,6 @@ void LayerCache::advanceFrame() {
   }
   _currentFrameToken = std::make_shared<int>(0);
   purgeExpiredEntries();
-  LOGI("LayerCache::advanceFrame _currentCacheSize: %d _frameTokens.size: %d _expirationFrames",
-       _currentCacheSize, _frameTokens.size(), _expirationFrames);
 }
 
 RasterizedContent* LayerCache::getCachedImage(const Layer* layer, float contentScale) {
