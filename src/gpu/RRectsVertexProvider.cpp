@@ -75,7 +75,7 @@ PlacementPtr<RRectsVertexProvider> RRectsVertexProvider::MakeFrom(
                                                std::move(colorSpace));
 }
 
-static float ToUByte4Color(const Color& color, const std::unique_ptr<ColorSpaceXformSteps>& steps) {
+static float ToUByte4PMColor(const Color& color, const ColorSpaceXformSteps* steps) {
   PMColor pmColor = color.premultiply();
   if (steps) {
     steps->apply(pmColor.array());
@@ -133,7 +133,7 @@ void RRectsVertexProvider::getVertices(float* vertices) const {
     auto scales = viewMatrix.getAxisScales();
     float compressedColor = 0.f;
     if (bitFields.hasColor) {
-      compressedColor = ToUByte4Color(record->color, steps);
+      compressedColor = ToUByte4PMColor(record->color, steps.get());
     }
     rRect.scale(scales.x, scales.y);
     viewMatrix.preScale(1 / scales.x, 1 / scales.y);
