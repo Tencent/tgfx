@@ -220,6 +220,7 @@ RGBA4f<AlphaType::Unpremultiplied> RGBA4f<AlphaType::Unpremultiplied>::FromRGBA(
 
 /**
  * For convenience, Color is an alias for RGBA4f<AlphaType::Unpremultiplied>.
+ * Note: Color values are always in sRGB color space.
  */
 using Color = RGBA4f<AlphaType::Unpremultiplied>;
 

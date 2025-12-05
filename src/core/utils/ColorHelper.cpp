@@ -31,7 +31,6 @@ PMColor ToPMColor(const Color& color, const std::shared_ptr<ColorSpace>& dstColo
   if (!NeedConvertColorSpace(ColorSpace::SRGB(), dstColorSpace)) {
     return PMColor{color.red * color.alpha, color.green * color.alpha, color.blue * color.alpha,
                    color.alpha};
-    ;
   }
   ColorSpaceXformSteps steps(ColorSpace::SRGB().get(), AlphaType::Premultiplied,
                              dstColorSpace.get(), AlphaType::Premultiplied);

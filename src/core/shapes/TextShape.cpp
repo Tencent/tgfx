@@ -28,17 +28,19 @@ std::shared_ptr<Shape> Shape::MakeFrom(std::shared_ptr<TextBlob> textBlob) {
   if (glyphRunLists == nullptr) {
     return nullptr;
   }
-  std::shared_ptr<GlyphRunList> glyphRunList = nullptr;
+  std::vector<std::shared_ptr<Shape>> shapes;
   for (auto& list : *glyphRunLists) {
     if (list->hasOutlines()) {
-      glyphRunList = list;
-      break;
+      shapes.push_back(std::make_shared<TextShape>(list));
     }
   }
-  if (glyphRunList == nullptr) {
+  if (shapes.empty()) {
     return nullptr;
   }
-  return std::make_shared<TextShape>(std::move(glyphRunList));
+  if (shapes.size() == 1) {
+    return shapes[0];
+  }
+  return Shape::Merge(shapes);
 }
 
 Rect TextShape::getBounds() const {
