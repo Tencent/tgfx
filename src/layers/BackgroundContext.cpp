@@ -106,27 +106,45 @@ std::shared_ptr<BackgroundContext> BackgroundContext::Make(Context* context, con
   return result;
 }
 
-void BackgroundContext::drawToParent(const Matrix& paintMatrix, const Paint& paint) {
+void BackgroundContext::drawToParent(float contentScale, const Matrix& maskMatrix,
+                                     const Paint& paint) {
   if (!parent) {
     return;
   }
   auto parentCanvas = parent->getCanvas();
   AutoCanvasRestore autoRestore(parentCanvas);
-  auto matrix = parentCanvas->getMatrix();
-  auto inverseMatrix = Matrix::I();
-  if (!matrix.invert(&inverseMatrix)) {
-    return;
-  }
-  inverseMatrix.postConcat(paintMatrix);
+  auto parentCanvasMatrix = parentCanvas->getMatrix();
+
   auto newPaint = paint;
   auto maskFilter = newPaint.getMaskFilter();
   if (maskFilter) {
-    newPaint.setMaskFilter(maskFilter->makeWithMatrix(inverseMatrix));
+    // Calculate child surface -> scaled layer local transformation
+    // child surface -> parent surface -> layer local -> scaled layer local
+    auto inverseParentCanvasMatrix = Matrix::I();
+    if (!parentCanvasMatrix.invert(&inverseParentCanvasMatrix)) {
+      return;
+    }
+    auto childToLayerLocal = inverseParentCanvasMatrix;
+    childToLayerLocal.preTranslate(surfaceOffset.x, surfaceOffset.y);
+    auto childToScaledLayerLocal = childToLayerLocal;
+    childToScaledLayerLocal.postScale(contentScale, contentScale);
+
+    // The mask filter expects content image coordinates (via maskMatrix).
+    // Adjust it to expect child surface coordinates.
+    // maskAdjustMatrix = inverse(maskMatrix) * childToScaledLayerLocal
+    auto inverseMaskMatrix = Matrix::I();
+    if (!maskMatrix.invert(&inverseMaskMatrix)) {
+      return;
+    }
+    auto maskAdjustMatrix = inverseMaskMatrix;
+    maskAdjustMatrix.preConcat(childToScaledLayerLocal);
+    newPaint.setMaskFilter(maskFilter->makeWithMatrix(maskAdjustMatrix));
   }
-  parentCanvas->resetMatrix();
+
+  // Use setMatrix + drawImage instead of drawImage(x, y) to avoid automatic brush adjustment.
+  parentCanvas->setMatrix(Matrix::MakeTrans(surfaceOffset.x, surfaceOffset.y));
   auto image = onGetBackgroundImage();
-  // Draw child surface content at surfaceOffset in parent surface coordinates.
-  parentCanvas->drawImage(image, surfaceOffset.x, surfaceOffset.y, &newPaint);
+  parentCanvas->drawImage(image, &newPaint);
 }
 
 Matrix BackgroundContext::backgroundMatrix() const {
@@ -172,7 +190,6 @@ std::shared_ptr<Image> BackgroundContext::getBackgroundImage() {
 
 std::shared_ptr<BackgroundContext> BackgroundContext::createSubContext(const Rect& renderBounds,
                                                                        bool clipToBackgroundRect) {
-
   Rect childWorldRect = renderBounds;
   if (clipToBackgroundRect) {
     if (!childWorldRect.intersect(backgroundRect)) {
@@ -182,12 +199,10 @@ std::shared_ptr<BackgroundContext> BackgroundContext::createSubContext(const Rec
     return nullptr;
   }
 
-  // Get parent canvas's current matrix.
   auto canvas = getCanvas();
   auto parentCanvasMatrix = canvas->getMatrix();
 
   // Use imageMatrix inverse (world -> surface) to calculate child surface bounds.
-  // This determines the actual surface size needed.
   Matrix baseSurfaceMatrix = Matrix::I();
   if (!imageMatrix.invert(&baseSurfaceMatrix)) {
     return nullptr;

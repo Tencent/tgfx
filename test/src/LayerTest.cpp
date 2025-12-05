@@ -2190,6 +2190,77 @@ TGFX_TEST(LayerTest, BackgroundBlur) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/backgroundLayerBlur"));
 }
 
+/**
+ * Test background blur with group mask.
+ * Structure:
+ * Root
+ * - background (image)
+ * - group (with mask)
+ *   - blur1 (larger than group, with background blur, fill alpha=128)
+ *   - mask (same size and position as group, used as group's mask)
+ * - blur2 (with background blur, fill alpha=128)
+ */
+TGFX_TEST(LayerTest, BackgroundBlurWithGroupMask) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  auto displayList = std::make_unique<DisplayList>();
+
+  // Background image
+  auto background = ImageLayer::Make();
+  background->setName("background");
+  background->setImage(MakeImage("resources/apitest/imageReplacement.png"));
+  displayList->root()->addChild(background);
+
+  // Group layer with mask
+  auto group = Layer::Make();
+  group->setName("group");
+  group->setMatrix(Matrix::MakeTrans(30, 30));
+  displayList->root()->addChild(group);
+
+  // blur1: larger than group, with background blur
+  auto blur1 = ShapeLayer::Make();
+  blur1->setName("blur1");
+  Path blur1Path;
+  blur1Path.addRect(Rect::MakeXYWH(-20, -20, 140, 140));  // Larger than group
+  blur1->setPath(blur1Path);
+  auto blur1Fill = SolidColor::Make(Color::FromRGBA(255, 0, 0, 128));  // Red with alpha=128
+  blur1->setFillStyle(blur1Fill);
+  auto blur1Style = BackgroundBlurStyle::Make(5, 5);
+  blur1->setLayerStyles({blur1Style});
+  group->addChild(blur1);
+
+  // mask: same size and position as group
+  auto mask = ShapeLayer::Make();
+  mask->setName("mask");
+  Path maskPath;
+  maskPath.addRect(Rect::MakeWH(100, 100));  // Same as group's logical size
+  mask->setPath(maskPath);
+  auto maskFill = SolidColor::Make(Color::White());
+  mask->setFillStyle(maskFill);
+  group->addChild(mask);
+
+  // Set mask for group
+  group->setMask(mask);
+
+  // blur2: outside of group, with background blur
+  auto blur2 = ShapeLayer::Make();
+  blur2->setName("blur2");
+  blur2->setMatrix(Matrix::MakeTrans(100, 100));
+  Path blur2Path;
+  blur2Path.addRect(Rect::MakeWH(80, 80));
+  blur2->setPath(blur2Path);
+  auto blur2Fill = SolidColor::Make(Color::FromRGBA(0, 0, 255, 128));  // Blue with alpha=128
+  blur2->setFillStyle(blur2Fill);
+  auto blur2Style = BackgroundBlurStyle::Make(5, 5);
+  blur2->setLayerStyles({blur2Style});
+  displayList->root()->addChild(blur2);
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundBlurWithGroupMask"));
+}
+
 TGFX_TEST(LayerTest, MaskAlpha) {
   ContextScope scope;
   auto context = scope.getContext();

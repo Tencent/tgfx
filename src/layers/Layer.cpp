@@ -1151,7 +1151,8 @@ std::shared_ptr<Image> Layer::getContentImage(const DrawArgs& contentArgs, float
     }
     drawDirectly(contentArgs, offscreenCanvas, 1.0f, styleExtraSourceTypes);
     Point offset;
-    finalImage = ToImageWithOffset(recorder.finishRecordingAsPicture(), &offset, nullptr,
+    auto picture = recorder.finishRecordingAsPicture();
+    finalImage = ToImageWithOffset(std::move(picture), &offset, nullptr,
                                    contentArgs.dstColorSpace);
     imageMatrix->setScale(1.0f / contentScale, 1.0f / contentScale);
     imageMatrix->preTranslate(offset.x, offset.y);
@@ -1272,7 +1273,6 @@ void Layer::drawContentOffscreen(const DrawArgs& args, Canvas* canvas,
                                  std::optional<Rect> clipBounds, float contentScale,
                                  BlendMode blendMode, float alpha, const Matrix3D* transform,
                                  bool cacheContent) {
-
   if (transform != nullptr) {
     drawBackgroundLayerStyles(args, canvas, alpha, *transform);
   }
@@ -1330,13 +1330,18 @@ void Layer::drawContentOffscreen(const DrawArgs& args, Canvas* canvas,
   paint.setAlpha(alpha);
   paint.setBlendMode(blendMode);
 
+  // maskMatrix for adjusting mask filter in drawToParent
+  Matrix maskMatrix = Matrix::I();
+  
   if (hasValidMask()) {
     auto maskFilter = getMaskFilter(args, contentScale, clipBounds);
     // if mask filter is nullptr while mask is valid, that means the layer is not visible.
     if (!maskFilter) {
       return;
     }
-    auto maskMatrix = Matrix::MakeScale(1.0f / contentScale, 1.0f / contentScale);
+    // maskMatrix transforms from content image coordinates to scaled layer local coordinates.
+    // This is used both for the mask filter on canvas and for drawToParent.
+    maskMatrix = Matrix::MakeScale(1.0f / contentScale, 1.0f / contentScale);
     maskMatrix.postConcat(invertImageMatrix);
     maskFilter = maskFilter->makeWithMatrix(maskMatrix);
     paint.setMaskFilter(maskFilter);
@@ -1355,7 +1360,7 @@ void Layer::drawContentOffscreen(const DrawArgs& args, Canvas* canvas,
         auto filter = getImageFilter(contentScale);
         filter = ImageFilter::Compose(filter, paint.getImageFilter());
         paint.setImageFilter(filter);
-        contentArgs.blurBackground->drawToParent(Matrix::MakeScale(1.0f / contentScale), paint);
+        contentArgs.blurBackground->drawToParent(contentScale, maskMatrix, paint);
       }
     } else {
       auto backgroundCanvas = args.blurBackground->getCanvas();
