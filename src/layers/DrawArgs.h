@@ -19,7 +19,6 @@
 #pragma once
 
 #include "layers/BackgroundContext.h"
-#include "layers/LayerCache.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
@@ -57,7 +56,13 @@ class DrawArgs {
   bool forceDrawBackground = false;
   std::shared_ptr<ColorSpace> dstColorSpace = ColorSpace::SRGB();
 
-  // Layer cache for storing cached surfaces during rendering. Note: this could be nullptr.
-  LayerCache* layerCache = nullptr;
+  // The maximum zoom scale threshold for enabling layer cache. When maxZoomScale is 0, layer cache
+  // is disabled. When currentZoomScale <= maxZoomScale, layer cache is enabled. The ratio of
+  // maxZoomScale to currentZoomScale determines the maximum content scale for caching.
+  float maxZoomScale = 0.0f;
+
+  // The current zoom scale of the display list. Used together with maxZoomScale to calculate the
+  // maximum content scale for layer caching.
+  float currentZoomScale = 1.0f;
 };
 }  // namespace tgfx

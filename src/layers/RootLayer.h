@@ -77,19 +77,16 @@ class RootLayer : public Layer {
    */
   bool setBackgroundColor(const Color& color);
 
-  void invalidCache(const Layer* layer);
-
  protected:
   void drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                  const Matrix3D* transform = nullptr) override;
 
  private:
-  explicit RootLayer(DisplayList* displayList) : displayList(displayList) {
-  }
+  RootLayer() = default;
+
   std::vector<Rect> dirtyRects = {};
   std::vector<float> dirtyAreas = {};
   Color _backgroundColor = Color::Transparent();
-  DisplayList* displayList = nullptr;
 
   bool mergeDirtyList(bool forceMerge);
 

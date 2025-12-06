@@ -24,7 +24,6 @@
 #include "tgfx/layers/Layer.h"
 
 namespace tgfx {
-class LayerCache;
 class RootLayer;
 class Tile;
 class TileCache;
@@ -234,9 +233,26 @@ class DisplayList {
    */
   void setBackgroundColor(const Color& color);
 
-  size_t layerMaxCacheSize() const;
+  /**
+   * Returns the maximum zoom scale threshold for enabling layer cache. When this value is 0
+   * (default), layer cache is disabled. When currentZoomScale <= maxZoomScaleForCache, layer cache
+   * is enabled. The ratio of maxZoomScaleForCache to currentZoomScale determines the maximum
+   * content scale for caching.
+   */
+  float maxZoomScaleForCache() const {
+    return _maxZoomScaleForCache;
+  }
 
-  void setLayerMaxCacheSize(size_t size);
+  /**
+   * Sets the maximum zoom scale threshold for enabling layer cache. Set to 0 to disable layer
+   * cache (default). When currentZoomScale <= maxZoomScaleForCache, layer cache is enabled.
+   */
+  void setMaxZoomScaleForCache(float maxZoomScale) {
+    if (maxZoomScale < 0.0f) {
+      maxZoomScale = 0.0f;
+    }
+    _maxZoomScaleForCache = maxZoomScale;
+  }
 
   /**
    * Sets whether to show dirty regions during rendering. When enabled, the dirty regions will be
@@ -269,6 +285,7 @@ class DisplayList {
   int _maxTileCount = 0;
   bool _allowZoomBlur = false;
   int _maxTilesRefinedPerFrame = 5;
+  float _maxZoomScaleForCache = 0.0f;
   bool _showDirtyRegions = false;
   bool _hasContentChanged = false;
   bool hasZoomBlurTiles = false;
@@ -280,7 +297,6 @@ class DisplayList {
   std::unordered_map<int64_t, TileCache*> tileCaches = {};
   std::vector<std::shared_ptr<Tile>> emptyTiles = {};
   std::deque<std::vector<Rect>> lastDirtyRegions = {};
-  std::unique_ptr<LayerCache> layerCache = nullptr;
 
   std::vector<Rect> renderDirect(Surface* surface, bool autoClear) const;
 
@@ -335,9 +351,5 @@ class DisplayList {
                      bool autoClear) const;
 
   void updateMousePosition();
-
-  void invalidateLayerCache(const Layer* layer);
-
-  friend class RootLayer;
 };
 }  // namespace tgfx

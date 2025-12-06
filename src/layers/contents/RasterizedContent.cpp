@@ -17,11 +17,75 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RasterizedContent.h"
+#include "core/images/TextureImage.h"
+#include "gpu/ProxyProvider.h"
+#include "gpu/TPArgs.h"
+#include "tgfx/core/Surface.h"
 
 namespace tgfx {
+std::unique_ptr<RasterizedContent> RasterizedContent::MakeFrom(Context* context, float contentScale,
+                                                               const std::shared_ptr<Image>& image,
+                                                               const Matrix& imageMatrix,
+                                                               const UniqueKey& uniqueKey,
+                                                               uint32_t renderFlags) {
+  if (context == nullptr || image == nullptr || uniqueKey.empty()) {
+    return nullptr;
+  }
+  auto width = image->width();
+  auto height = image->height();
+  if (width <= 0 || height <= 0) {
+    return nullptr;
+  }
+  // Lock the texture proxy from the image.
+  TPArgs tpArgs(context, renderFlags, false, 1.0f);
+  auto textureProxy = image->lockTextureProxy(tpArgs);
+  if (textureProxy == nullptr) {
+    return nullptr;
+  }
+  // Assign unique key to the texture proxy for caching.
+  auto proxyProvider = context->proxyProvider();
+  proxyProvider->assignProxyUniqueKey(textureProxy, uniqueKey);
+  if (!(renderFlags & RenderFlags::DisableCache)) {
+    textureProxy->assignUniqueKey(uniqueKey);
+  }
+  return std::make_unique<RasterizedContent>(context->uniqueID(), contentScale, uniqueKey,
+                                             imageMatrix, image->colorSpace());
+}
+
+bool RasterizedContent::valid(Context* context) const {
+  if (context == nullptr || context->uniqueID() != _contextID || _uniqueKey.empty()) {
+    return false;
+  }
+  auto proxyProvider = context->proxyProvider();
+  auto textureProxy = proxyProvider->findOrWrapTextureProxy(_uniqueKey);
+  return textureProxy != nullptr;
+}
+
 void RasterizedContent::draw(Canvas* canvas, bool antiAlias, float alpha,
                              const std::shared_ptr<MaskFilter>& mask, BlendMode blendMode,
                              const Matrix3D* transform) const {
+  if (canvas == nullptr || _uniqueKey.empty()) {
+    return;
+  }
+  auto surface = canvas->getSurface();
+  if (surface == nullptr) {
+    return;
+  }
+  auto context = surface->getContext();
+  if (context == nullptr || context->uniqueID() != _contextID) {
+    return;
+  }
+  // Find the cached texture proxy by unique key.
+  auto proxyProvider = context->proxyProvider();
+  auto textureProxy = proxyProvider->findOrWrapTextureProxy(_uniqueKey);
+  if (textureProxy == nullptr) {
+    return;
+  }
+  // Create an image from the texture proxy.
+  auto image = TextureImage::Wrap(textureProxy, _colorSpace);
+  if (image == nullptr) {
+    return;
+  }
   auto oldMatrix = canvas->getMatrix();
   canvas->concat(matrix);
   Paint paint = {};

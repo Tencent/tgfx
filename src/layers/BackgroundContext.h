@@ -47,10 +47,9 @@ class BackgroundContext {
 
   /**
    * Draws the child context's content to the parent context.
-   * @param contentScale The content scale used when drawing.
    * @param paint The paint to use for drawing.
    */
-  void drawToParent(float contentScale, const Paint& paint);
+  void drawToParent(const Paint& paint);
 
   Rect getBackgroundRect() const {
     return backgroundRect;

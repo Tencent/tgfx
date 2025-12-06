@@ -24,7 +24,6 @@
 #include "gpu/ResourceCache.h"
 #include "inspect/InspectorMark.h"
 #include "layers/DrawArgs.h"
-#include "layers/LayerCache.h"
 #include "layers/RootLayer.h"
 #include "layers/TileCache.h"
 #include "tgfx/gpu/GPU.h"
@@ -160,16 +159,13 @@ static std::vector<std::pair<int, int>> GetSortedTiles(int startX, int endX, int
   return tiles;
 }
 
-DisplayList::DisplayList()
-    : _root(RootLayer::Make(this)), layerCache(std::make_unique<LayerCache>()) {
+DisplayList::DisplayList() : _root(RootLayer::Make(this)) {
   _root->_root = _root.get();
   SET_DISPLAY_LIST(this);
 }
 
 DisplayList::~DisplayList() {
   resetCaches();
-  // make sure layerCache is destroyed before _root
-  layerCache = nullptr;
 }
 
 Layer* DisplayList::root() const {
@@ -244,7 +240,6 @@ void DisplayList::setTileSize(int tileSize) {
     return;
   }
   _tileSize = tileSize;
-  layerCache->setMaxCacheContentSize(tileSize);
   if (_renderMode == RenderMode::Tiled) {
     resetCaches();
   }
@@ -269,14 +264,6 @@ void DisplayList::setBackgroundColor(const Color& color) {
   if (_root->setBackgroundColor(color)) {
     resetCaches();
   }
-}
-
-size_t DisplayList::layerMaxCacheSize() const {
-  return layerCache->maxCacheSize();
-}
-
-void DisplayList::setLayerMaxCacheSize(size_t size) {
-  layerCache->setMaxCacheSize(size);
 }
 
 void DisplayList::showDirtyRegions(bool show) {
@@ -411,9 +398,6 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
   if (!surfaceCaches.empty() && surfaceCaches.front()->getContext() != surface->getContext()) {
     resetCaches();
   }
-  layerCache->advanceFrame();
-  auto context = surface->getContext();
-  layerCache->setExpirationFrames(context->resourceCache()->expirationFrames());
   checkTileCount(surface);
   auto tileTasks = invalidateTileCaches(dirtyRegions);
   auto screenTasks = collectScreenTasks(surface, &tileTasks);
@@ -964,7 +948,6 @@ void DisplayList::resetCaches() {
   surfaceCaches = {};
   totalTileCount = 0;
   emptyTiles.clear();
-  layerCache->clear();
 }
 
 void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
@@ -993,7 +976,8 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
       _root->createBackgroundContext(context, drawRect, viewMatrix, false, args.dstColorSpace);
   args.dstColorSpace = surface->colorSpace();
   if (_renderMode == RenderMode::Tiled) {
-    args.layerCache = layerCache.get();
+    args.maxZoomScale = _maxZoomScaleForCache;
+    args.currentZoomScale = zoomScale();
   }
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
 }
@@ -1010,12 +994,6 @@ void DisplayList::updateMousePosition() {
   const auto invScaleFactor = 1.0f / (1.0f - scale);
   mousePosition = (_contentOffset - lastContentOffset * scale) * invScaleFactor;
   mousePosition -= _contentOffset;
-}
-
-void DisplayList::invalidateLayerCache(const Layer* layer) {
-  if (layerCache) {
-    layerCache->invalidateLayer(layer);
-  }
 }
 
 }  // namespace tgfx

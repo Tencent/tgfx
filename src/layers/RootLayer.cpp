@@ -32,8 +32,8 @@ static float UnionArea(const Rect& rect1, const Rect& rect2) {
   return (right - left) * (bottom - top);
 }
 
-std::shared_ptr<RootLayer> RootLayer::Make(DisplayList* displayList) {
-  return std::shared_ptr<RootLayer>(new RootLayer(displayList));
+std::shared_ptr<RootLayer> RootLayer::Make(DisplayList*) {
+  return std::shared_ptr<RootLayer>(new RootLayer());
 }
 
 RootLayer::~RootLayer() {
@@ -131,12 +131,6 @@ bool RootLayer::setBackgroundColor(const Color& color) {
   _backgroundColor = color;
   invalidateContent();
   return true;
-}
-
-void RootLayer::invalidCache(const Layer* layer) {
-  if (displayList) {
-    displayList->invalidateLayerCache(layer);
-  }
 }
 
 }  // namespace tgfx

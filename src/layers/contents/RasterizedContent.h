@@ -18,15 +18,26 @@
 
 #pragma once
 
+#include "gpu/resources/ResourceKey.h"
 #include "tgfx/core/Canvas.h"
 
 namespace tgfx {
 class RasterizedContent {
  public:
-  RasterizedContent(uint32_t contextID, float contentScale, std::shared_ptr<Image> image,
-                    const Matrix& matrix)
-      : _contextID(contextID), _contentScale(contentScale), image(std::move(image)),
-        matrix(matrix) {
+  /**
+   * Creates a RasterizedContent by rasterizing the image to a texture and caching it with the
+   * uniqueKey. The texture can be retrieved later using the uniqueKey.
+   */
+  static std::unique_ptr<RasterizedContent> MakeFrom(Context* context, float contentScale,
+                                                     const std::shared_ptr<Image>& image,
+                                                     const Matrix& imageMatrix,
+                                                     const UniqueKey& uniqueKey,
+                                                     uint32_t renderFlags = 0);
+
+  RasterizedContent(uint32_t contextID, float contentScale, const UniqueKey& uniqueKey,
+                    const Matrix& matrix, std::shared_ptr<ColorSpace> colorSpace)
+      : _contextID(contextID), _contentScale(contentScale), _uniqueKey(uniqueKey), matrix(matrix),
+        _colorSpace(std::move(colorSpace)) {
   }
 
   /**
@@ -40,13 +51,14 @@ class RasterizedContent {
     return _contentScale;
   }
 
-  std::shared_ptr<Image> getImage() const {
-    return image;
-  }
-
   Matrix getMatrix() const {
     return matrix;
   }
+
+  /**
+   * Returns true if the cached texture is still valid in the given context.
+   */
+  bool valid(Context* context) const;
 
   void draw(Canvas* canvas, bool antiAlias, float alpha, const std::shared_ptr<MaskFilter>& mask,
             BlendMode blendMode = BlendMode::SrcOver, const Matrix3D* transform = nullptr) const;
@@ -54,7 +66,8 @@ class RasterizedContent {
  private:
   uint32_t _contextID = 0;
   float _contentScale = 0.0f;
-  std::shared_ptr<Image> image = nullptr;
+  UniqueKey _uniqueKey = {};
   Matrix matrix = {};
+  std::shared_ptr<ColorSpace> _colorSpace = nullptr;
 };
 }  // namespace tgfx

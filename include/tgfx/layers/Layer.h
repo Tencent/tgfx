@@ -697,6 +697,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   void invalidateCache();
 
+  RasterizedContent* getLayerCachedContent(const DrawArgs& args, float contentScale);
+
   struct {
     bool dirtyContent : 1;        // layer's content needs updating
     bool dirtyContentBounds : 1;  // layer's content bounds needs updating
@@ -727,6 +729,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::vector<std::shared_ptr<LayerStyle>> _layerStyles = {};
   float _rasterizationScale = 0.0f;
   std::unique_ptr<RasterizedContent> rasterizedContent;
+  std::unique_ptr<RasterizedContent> layerCachedContent;
   std::shared_ptr<LayerContent> layerContent = nullptr;
   Rect renderBounds = {};                       // in global coordinates
   Rect* contentBounds = nullptr;                //  in global coordinates

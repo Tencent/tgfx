@@ -106,7 +106,7 @@ std::shared_ptr<BackgroundContext> BackgroundContext::Make(Context* context, con
   return result;
 }
 
-void BackgroundContext::drawToParent(float contentScale, const Paint& paint) {
+void BackgroundContext::drawToParent(const Paint& paint) {
   if (!parent) {
     return;
   }
@@ -116,27 +116,8 @@ void BackgroundContext::drawToParent(float contentScale, const Paint& paint) {
   auto newPaint = paint;
   auto maskFilter = newPaint.getMaskFilter();
   if (maskFilter) {
-    // The mask filter's shader has an internal matrix (affineRelativeMatrix) that transforms
-    // from scaled layer local coordinates to mask image coordinates.
-    //
-    // When we call makeWithMatrix(M), the new matrix becomes M * affineRelativeMatrix,
-    // and the actual UV transform is inverse(M * affineRelativeMatrix) = inverse(affineRelativeMatrix) * inverse(M).
-    //
-    // We need the final UV transform to be: inverse(affineRelativeMatrix) * maskAdjustMatrix,
-    // where maskAdjustMatrix transforms child surface coord to scaled layer local coord.
-    //
-    // So we need: inverse(M) = maskAdjustMatrix, i.e., M = inverse(maskAdjustMatrix).
-    //
-    // maskAdjustMatrix = Scale(contentScale) * inverse(childCanvasMatrix)
-    // inverse(maskAdjustMatrix) = childCanvasMatrix * Scale(1/contentScale)
-
     auto childCanvasMatrix = getCanvas()->getMatrix();
-
-    // Build inverse(maskAdjustMatrix) = childCanvasMatrix * Scale(1/contentScale)
-    auto inverseMaskAdjustMatrix = childCanvasMatrix;
-    inverseMaskAdjustMatrix.preScale(1.0f / contentScale, 1.0f / contentScale);
-
-    newPaint.setMaskFilter(maskFilter->makeWithMatrix(inverseMaskAdjustMatrix));
+    newPaint.setMaskFilter(maskFilter->makeWithMatrix(childCanvasMatrix));
   }
 
   // Use setMatrix + drawImage(image) to draw at surfaceOffset in parent surface.
