@@ -22,7 +22,7 @@
 #include <QQuickWindow>
 #include <QSGImageNode>
 #include <QThread>
-#include "drawers/Drawer.h"
+#include "hello2d/LayerBuilder.h"
 
 namespace hello2d {
 TGFXView::TGFXView(QQuickItem* parent) : QQuickItem(parent) {
@@ -32,6 +32,9 @@ TGFXView::TGFXView(QQuickItem* parent) : QQuickItem(parent) {
   setAcceptTouchEvents(true);
   setFocus(true);
   createAppHost();
+  displayList.setRenderMode(tgfx::RenderMode::Tiled);
+  displayList.setAllowZoomBlur(true);
+  displayList.setMaxTileCount(512);
 }
 
 void TGFXView::updateTransform(qreal zoomLevel, QPointF panOffset) {
@@ -59,12 +62,20 @@ QSGNode* TGFXView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
   auto pixelRatio = window()->devicePixelRatio();
   auto screenWidth = static_cast<int>(ceil(width() * pixelRatio));
   auto screenHeight = static_cast<int>(ceil(height() * pixelRatio));
-  auto sizeChanged =
-      appHost->updateScreen(screenWidth, screenHeight, static_cast<float>(pixelRatio));
-  if (sizeChanged) {
+  if (tgfxWindow->getSurface(nullptr) == nullptr ||
+      tgfxWindow->getSurface(nullptr)->width() != screenWidth ||
+      tgfxWindow->getSurface(nullptr)->height() != screenHeight) {
     tgfxWindow->invalidSize();
   }
-  draw();
+  
+  // Draw and check if content has changed
+  bool hasContentChanged = draw();
+  
+  // Schedule next update only if content is still changing
+  if (hasContentChanged) {
+    update();
+  }
+  
   auto node = static_cast<QSGImageNode*>(oldNode);
   auto texture = tgfxWindow->getQSGTexture();
   if (texture) {
@@ -80,18 +91,18 @@ QSGNode* TGFXView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
 
 void TGFXView::onSceneGraphInvalidated() {
   disconnect(window(), SIGNAL(sceneGraphInvalidated()), this, SLOT(onSceneGraphInvalidated()));
-  // Release the tgfxWindow on the QSG render thread or call tgfxWindow->moveToThread() to move
-  // it. Otherwise, destroying the tgfxWindow in the main thread will cause an error.
   tgfxWindow = nullptr;
 }
 
 void TGFXView::createAppHost() {
-  appHost = std::make_unique<drawers::AppHost>();
+  appHost = std::make_unique<hello2d::AppHost>();
   auto rootPath = QApplication::applicationDirPath();
   rootPath = QFileInfo(rootPath + "/../../").absolutePath();
   auto imagePath = rootPath + "/resources/assets/bridge.jpg";
   auto image = tgfx::Image::MakeFromFile(std::string(imagePath.toLocal8Bit()));
   appHost->addImage("bridge", image);
+  imagePath = rootPath + "/resources/assets/tgfx.png";
+  appHost->addImage("TGFX", tgfx::Image::MakeFromFile(std::string(imagePath.toLocal8Bit())));
 #ifdef __APPLE__
   auto defaultTypeface = tgfx::Typeface::MakeFromName("PingFang SC", "");
   auto emojiTypeface = tgfx::Typeface::MakeFromName("Apple Color Emoji", "");
@@ -104,34 +115,63 @@ void TGFXView::createAppHost() {
   appHost->addTypeface("emoji", emojiTypeface);
 }
 
-void TGFXView::draw() {
+bool TGFXView::draw() {
   auto device = tgfxWindow->getDevice();
   if (device == nullptr) {
-    return;
+    return false;
   }
   auto context = device->lockContext();
   if (context == nullptr) {
-    return;
+    return false;
   }
   auto surface = tgfxWindow->getSurface(context);
   if (surface == nullptr) {
     device->unlock();
-    return;
+    return false;
   }
-  appHost->updateZoomAndOffset(
-      zoom, tgfx::Point(static_cast<float>(offset.x()), static_cast<float>(offset.y())));
+
+  // Switch sample when drawIndex changes
+  auto numBuilders = hello2d::LayerBuilder::Count();
+  auto index = (currentDrawerIndex % numBuilders);
+  if (index != lastDrawIndex || !contentLayer) {
+    auto builder = hello2d::LayerBuilder::GetByIndex(index);
+    if (builder) {
+      contentLayer = builder->buildLayerTree(appHost.get());
+      if (contentLayer) {
+        displayList.root()->removeChildren();
+        displayList.root()->addChild(contentLayer);
+      }
+    }
+    lastDrawIndex = index;
+  }
+
+  // Calculate base scale and offset to fit 720x720 design size to window
+  static constexpr float DESIGN_SIZE = 720.0f;
+  auto scaleX = static_cast<float>(surface->width()) / DESIGN_SIZE;
+  auto scaleY = static_cast<float>(surface->height()) / DESIGN_SIZE;
+  auto baseScale = std::min(scaleX, scaleY);
+  auto scaledSize = DESIGN_SIZE * baseScale;
+  auto baseOffsetX = (static_cast<float>(surface->width()) - scaledSize) * 0.5f;
+  auto baseOffsetY = (static_cast<float>(surface->height()) - scaledSize) * 0.5f;
+
+  // Apply user zoom and offset on top of the base scale/offset
+  displayList.setZoomScale(zoom * baseScale);
+  displayList.setContentOffset(baseOffsetX + static_cast<float>(offset.x()),
+                               baseOffsetY + static_cast<float>(offset.y()));
+
+  // Draw background
   auto canvas = surface->getCanvas();
   canvas->clear();
-  canvas->save();
-  auto numDrawers = drawers::Drawer::Count() - 1;
-  auto index = (currentDrawerIndex % numDrawers) + 1;
-  auto drawer = drawers::Drawer::GetByName("GridBackground");
-  drawer->draw(canvas, appHost.get());
-  drawer = drawers::Drawer::GetByIndex(index);
-  drawer->draw(canvas, appHost.get());
-  canvas->restore();
+  auto pixelRatio = window()->devicePixelRatio();
+  hello2d::DrawBackground(canvas, surface->width(), surface->height(), pixelRatio);
+
+  // Render DisplayList
+  displayList.render(surface.get(), false);
+
   context->flushAndSubmit();
   tgfxWindow->present(context);
   device->unlock();
+
+  return displayList.hasContentChanged();
 }
 }  // namespace hello2d

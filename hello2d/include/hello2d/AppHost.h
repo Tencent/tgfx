@@ -18,49 +18,43 @@
 
 #pragma once
 
-#include "drawers/AppHost.h"
-#include "tgfx/core/Canvas.h"
+#include <unordered_map>
+#include "tgfx/core/Data.h"
+#include "tgfx/core/Image.h"
+#include "tgfx/core/Typeface.h"
 
-namespace drawers {
-class Drawer {
+namespace hello2d {
+/**
+ * AppHost provides resources for building layer trees.
+ */
+class AppHost {
  public:
-  /**
-   * Returns the number of drawers.
-   */
-  static int Count();
+  AppHost() = default;
+
+  virtual ~AppHost() = default;
 
   /**
-   * Returns the names of all drawers.
+   * Returns an image with the given name.
    */
-  static const std::vector<std::string>& Names();
+  std::shared_ptr<tgfx::Image> getImage(const std::string& name) const;
 
   /**
-   * Returns the drawer with the given index.
+   * Returns a typeface with the given name.
    */
-  static Drawer* GetByIndex(int index);
+  std::shared_ptr<tgfx::Typeface> getTypeface(const std::string& name) const;
 
   /**
-   * Returns the drawer with the given name.
+   * Add an image for the given resource name.
    */
-  static Drawer* GetByName(const std::string& name);
-
-  explicit Drawer(std::string name);
-
-  virtual ~Drawer() = default;
-
-  std::string name() const {
-    return _name;
-  }
+  void addImage(const std::string& name, std::shared_ptr<tgfx::Image> image);
 
   /**
-   * Draws the contents to the given canvas.
+   * Adds a typeface for the given resource name.
    */
-  void draw(tgfx::Canvas* canvas, const AppHost* host);
-
- protected:
-  virtual void onDraw(tgfx::Canvas* canvas, const AppHost* host) = 0;
+  void addTypeface(const std::string& name, std::shared_ptr<tgfx::Typeface> typeface);
 
  private:
-  std::string _name;
+  std::unordered_map<std::string, std::shared_ptr<tgfx::Image>> images = {};
+  std::unordered_map<std::string, std::shared_ptr<tgfx::Typeface>> typefaces = {};
 };
-}  // namespace drawers
+}  // namespace hello2d

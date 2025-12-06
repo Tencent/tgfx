@@ -19,8 +19,10 @@
 #pragma once
 
 #include <emscripten/bind.h>
-#include "drawers/Drawer.h"
+#include "hello2d/AppHost.h"
+#include "hello2d/LayerBuilder.h"
 #include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
+#include "tgfx/layers/DisplayList.h"
 
 namespace hello2d {
 
@@ -28,18 +30,24 @@ class TGFXBaseView {
  public:
   TGFXBaseView(const std::string& canvasID);
 
-  void setImage(const std::string& name, tgfx::NativeImageRef nativeImage);
+  void setImagePath(const std::string& name, tgfx::NativeImageRef nativeImage);
 
   void updateSize(float devicePixelRatio);
 
   bool draw(int drawIndex, float zoom, float offsetX, float offsetY);
 
+  void onWheelEvent();
+  void onClickEvent();
+
  protected:
-  std::shared_ptr<drawers::AppHost> appHost;
+  std::shared_ptr<hello2d::AppHost> appHost = nullptr;
 
  private:
   std::string canvasID = "";
   std::shared_ptr<tgfx::Window> window = nullptr;
+  tgfx::DisplayList displayList = {};  // Platform layer owns DisplayList
+  std::shared_ptr<tgfx::Layer> contentLayer = nullptr;
+  int lastDrawIndex = -1;
 };
 
 }  // namespace hello2d

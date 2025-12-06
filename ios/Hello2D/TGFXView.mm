@@ -18,11 +18,16 @@
 
 #import "TGFXView.h"
 #include <cmath>
-#include "drawers/Drawer.h"
+#include "hello2d/LayerBuilder.h"
+#include "tgfx/gpu/Recording.h"
 
 @implementation TGFXView {
   std::shared_ptr<tgfx::EAGLWindow> tgfxWindow;
-  std::unique_ptr<drawers::AppHost> appHost;
+  std::unique_ptr<hello2d::AppHost> appHost;
+  tgfx::DisplayList displayList;
+  std::shared_ptr<tgfx::Layer> contentLayer;
+  int lastDrawIndex;
+  std::unique_ptr<tgfx::Recording> lastRecording;
 }
 
 + (Class)layerClass {
@@ -54,59 +59,98 @@
 }
 
 - (void)updateSize {
-  auto width = static_cast<int>(roundf(self.layer.bounds.size.width * self.layer.contentsScale));
-  auto height = static_cast<int>(roundf(self.layer.bounds.size.height * self.layer.contentsScale));
   if (appHost == nullptr) {
-    appHost = std::make_unique<drawers::AppHost>();
+    appHost = std::make_unique<hello2d::AppHost>();
     NSString* imagePath = [[NSBundle mainBundle] pathForResource:@"bridge" ofType:@"jpg"];
     auto image = tgfx::Image::MakeFromFile(imagePath.UTF8String);
     appHost->addImage("bridge", image);
+    imagePath = [[NSBundle mainBundle] pathForResource:@"tgfx" ofType:@"png"];
+    image = tgfx::Image::MakeFromFile(imagePath.UTF8String);
+    appHost->addImage("TGFX", image);
     auto typeface = tgfx::Typeface::MakeFromName("PingFang SC", "");
     appHost->addTypeface("default", typeface);
     typeface = tgfx::Typeface::MakeFromName("Apple Color Emoji", "");
     appHost->addTypeface("emoji", typeface);
+    lastDrawIndex = -1;
+    displayList.setRenderMode(tgfx::RenderMode::Tiled);
+    displayList.setAllowZoomBlur(true);
+    displayList.setMaxTileCount(512);
   }
-  auto sizeChanged = appHost->updateScreen(width, height, self.layer.contentsScale);
-  if (sizeChanged && tgfxWindow != nullptr) {
+  if (tgfxWindow != nullptr) {
     tgfxWindow->invalidSize();
   }
 }
 
-- (void)draw:(int)index zoom:(float)zoom offset:(CGPoint)offset {
+- (BOOL)draw:(int)drawIndex zoom:(float)zoom offset:(CGPoint)offset {
   if (self.window == nil) {
-    return;
-  }
-  if (appHost->width() <= 0 || appHost->height() <= 0) {
-    return;
+    return false;
   }
   if (tgfxWindow == nullptr) {
     tgfxWindow = tgfx::EAGLWindow::MakeFrom((CAEAGLLayer*)[self layer]);
   }
   if (tgfxWindow == nullptr) {
-    return;
+    return false;
   }
   auto device = tgfxWindow->getDevice();
   auto context = device->lockContext();
   if (context == nullptr) {
-    return;
+    return false;
   }
   auto surface = tgfxWindow->getSurface(context);
   if (surface == nullptr) {
     device->unlock();
-    return;
+    return false;
   }
-  appHost->updateZoomAndOffset(zoom, tgfx::Point(offset.x, offset.y));
+
+  // Switch sample when drawIndex changes
+  auto numBuilders = hello2d::LayerBuilder::Count();
+  auto index = (drawIndex % numBuilders);
+  if (index != lastDrawIndex || !contentLayer) {
+    auto builder = hello2d::LayerBuilder::GetByIndex(index);
+    if (builder) {
+      contentLayer = builder->buildLayerTree(appHost.get());
+      if (contentLayer) {
+        displayList.root()->removeChildren();
+        displayList.root()->addChild(contentLayer);
+      }
+    }
+    lastDrawIndex = index;
+  }
+
+  // Calculate base scale and offset to fit 720x720 design size to window
+  static constexpr float DESIGN_SIZE = 720.0f;
+  auto scaleX = static_cast<float>(surface->width()) / DESIGN_SIZE;
+  auto scaleY = static_cast<float>(surface->height()) / DESIGN_SIZE;
+  auto baseScale = std::min(scaleX, scaleY);
+  auto scaledSize = DESIGN_SIZE * baseScale;
+  auto baseOffsetX = (static_cast<float>(surface->width()) - scaledSize) * 0.5f;
+  auto baseOffsetY = (static_cast<float>(surface->height()) - scaledSize) * 0.5f;
+
+  // Apply user zoom and offset on top of the base scale/offset
+  displayList.setZoomScale(zoom * baseScale);
+  displayList.setContentOffset(baseOffsetX + static_cast<float>(offset.x),
+                               baseOffsetY + static_cast<float>(offset.y));
+
+  // Draw background
   auto canvas = surface->getCanvas();
   canvas->clear();
-  auto numDrawers = drawers::Drawer::Count() - 1;
-  index = (index % numDrawers) + 1;
-  auto drawer = drawers::Drawer::GetByName("GridBackground");
-  drawer->draw(canvas, appHost.get());
-  drawer = drawers::Drawer::GetByIndex(index);
-  drawer->draw(canvas, appHost.get());
-  context->flushAndSubmit();
-  tgfxWindow->present(context);
+  hello2d::DrawBackground(canvas, surface->width(), surface->height(), self.layer.contentsScale);
+
+  // Render DisplayList
+  displayList.render(surface.get(), false);
+
+  // Delayed one-frame present mode: flush + submit
+  auto recording = context->flush();
+  if (lastRecording) {
+    context->submit(std::move(lastRecording));
+    if (recording) {
+      tgfxWindow->present(context);
+    }
+  }
+  lastRecording = std::move(recording);
+
   device->unlock();
+  return displayList.hasContentChanged();
 }
 
 @end

@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.13)
 #set(CMAKE_VERBOSE_MAKEFILE ON)
 project(Hello2D)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../hello2d/include)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_CXX_STANDARD 17)
@@ -9,7 +10,7 @@ if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release")
 endif ()
 
-set(TGFX_BUILD_DRAWERS ON)
+set(TGFX_BUILD_HELLO2D ON)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../ ./tgfx)
 
@@ -48,4 +49,4 @@ endif ()
 
 target_compile_options(hello2d PUBLIC ${H2D_COMPILE_OPTIONS})
 target_link_options(hello2d PUBLIC ${H2D_LINK_OPTIONS})
-target_link_libraries(hello2d tgfx-drawers tgfx ${HELLO_2D_SHARED_LIBS})
+target_link_libraries(hello2d tgfx-hello2d tgfx ${HELLO_2D_SHARED_LIBS})
