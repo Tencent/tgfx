@@ -52,8 +52,5 @@ class DrawArgs {
   // Indicates whether to force drawing the background, even if there are no background styles.
   bool forceDrawBackground = false;
   std::shared_ptr<ColorSpace> dstColorSpace = ColorSpace::SRGB();
-
-  // Only used while recording layer's background image.
-  std::shared_ptr<BackgroundContext> blendModeBackground = nullptr;
 };
 }  // namespace tgfx
