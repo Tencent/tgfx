@@ -48,12 +48,9 @@ class BackgroundContext {
   /**
    * Draws the child context's content to the parent context.
    * @param contentScale The content scale used when drawing.
-   * @param maskMatrix The matrix that transforms from content image coordinates to scaled layer
-   *                   local coordinates. This is used to adjust the mask filter for the parent
-   *                   surface coordinate system.
    * @param paint The paint to use for drawing.
    */
-  void drawToParent(float contentScale, const Matrix& maskMatrix, const Paint& paint);
+  void drawToParent(float contentScale, const Paint& paint);
 
   Rect getBackgroundRect() const {
     return backgroundRect;

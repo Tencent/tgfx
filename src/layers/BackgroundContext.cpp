@@ -19,7 +19,6 @@
 #include "BackgroundContext.h"
 #include <utility>
 #include "core/filters/GaussianBlurImageFilter.h"
-#include "core/utils/Log.h"
 #include "tgfx/core/PictureRecorder.h"
 
 namespace tgfx {
@@ -107,46 +106,40 @@ std::shared_ptr<BackgroundContext> BackgroundContext::Make(Context* context, con
   return result;
 }
 
-void BackgroundContext::drawToParent(float contentScale, const Matrix& maskMatrix,
-                                     const Paint& paint) {
+void BackgroundContext::drawToParent(float contentScale, const Paint& paint) {
   if (!parent) {
     return;
   }
   auto parentCanvas = parent->getCanvas();
   AutoCanvasRestore autoRestore(parentCanvas);
-  auto parentCanvasMatrix = parentCanvas->getMatrix();
 
   auto newPaint = paint;
   auto maskFilter = newPaint.getMaskFilter();
   if (maskFilter) {
-    // The mask filter (after makeWithMatrix(maskMatrix)) expects content image coordinates.
-    // When drawing to parent, the mask filter receives child surface coordinates
-    // (because we draw the child image snapshot).
-    // We need to transform: child surface coords -> content image coords
+    // The mask filter's shader has an internal matrix (affineRelativeMatrix) that transforms
+    // from scaled layer local coordinates to mask image coordinates.
     //
-    // The transformation chain is:
-    // 1. child surface -> layer local: childToLayerLocal
-    // 2. layer local -> scaled layer local: Scale(contentScale)
-    // 3. scaled layer local -> content image: maskMatrix
+    // When we call makeWithMatrix(M), the new matrix becomes M * affineRelativeMatrix,
+    // and the actual UV transform is inverse(M * affineRelativeMatrix) = inverse(affineRelativeMatrix) * inverse(M).
     //
-    // Combined: maskMatrix * Scale(contentScale) * childToLayerLocal
+    // We need the final UV transform to be: inverse(affineRelativeMatrix) * maskAdjustMatrix,
+    // where maskAdjustMatrix transforms child surface coord to scaled layer local coord.
+    //
+    // So we need: inverse(M) = maskAdjustMatrix, i.e., M = inverse(maskAdjustMatrix).
+    //
+    // maskAdjustMatrix = Scale(contentScale) * inverse(childCanvasMatrix)
+    // inverse(maskAdjustMatrix) = childCanvasMatrix * Scale(1/contentScale)
 
-    auto inverseParentCanvasMatrix = Matrix::I();
-    if (!parentCanvasMatrix.invert(&inverseParentCanvasMatrix)) {
-      return;
-    }
+    auto childCanvasMatrix = getCanvas()->getMatrix();
 
-    // childToLayerLocal = inverseParentCanvasMatrix * Translate(surfaceOffset)
-    auto childToLayerLocal = inverseParentCanvasMatrix;
-    childToLayerLocal.preTranslate(surfaceOffset.x, surfaceOffset.y);
+    // Build inverse(maskAdjustMatrix) = childCanvasMatrix * Scale(1/contentScale)
+    auto inverseMaskAdjustMatrix = childCanvasMatrix;
+    inverseMaskAdjustMatrix.preScale(1.0f / contentScale, 1.0f / contentScale);
 
-    // maskAdjustMatrix = maskMatrix * Scale(contentScale) * childToLayerLocal
-    auto maskAdjustMatrix = childToLayerLocal;
-    maskAdjustMatrix.postScale(contentScale, contentScale);
-    maskAdjustMatrix.postConcat(maskMatrix);
-    newPaint.setMaskFilter(maskFilter->makeWithMatrix(maskAdjustMatrix));
+    newPaint.setMaskFilter(maskFilter->makeWithMatrix(inverseMaskAdjustMatrix));
   }
-  // Use setMatrix + drawImage instead of drawImage(x, y) to avoid automatic brush adjustment.
+
+  // Use setMatrix + drawImage(image) to draw at surfaceOffset in parent surface.
   parentCanvas->setMatrix(Matrix::MakeTrans(surfaceOffset.x, surfaceOffset.y));
   auto image = onGetBackgroundImage();
   if (image) {
@@ -254,10 +247,6 @@ std::shared_ptr<BackgroundContext> BackgroundContext::createSubContext(const Rec
 
   auto childCanvas = child->getCanvas();
   childCanvas->clear();
-  // Set clip to child surface bounds (0, 0, width, height).
-  auto childSurfaceBounds = Rect::MakeWH(childSurfaceRect.width(), childSurfaceRect.height());
-  childCanvas->clipRect(childSurfaceBounds);
-
   // Use childCanvasMatrix which inherits from parentCanvasMatrix.
   childCanvas->setMatrix(childCanvasMatrix);
 

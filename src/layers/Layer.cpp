@@ -1335,36 +1335,34 @@ void Layer::drawContentOffscreen(const DrawArgs& args, Canvas* canvas,
   paint.setBlendMode(blendMode);
 
   // maskMatrix for adjusting mask filter in drawToParent
-  Matrix maskMatrix = Matrix::I();
+  std::shared_ptr<MaskFilter> maskFilter = nullptr;
 
   if (hasValidMask()) {
-    auto maskFilter = getMaskFilter(args, contentScale, clipBounds);
+    maskFilter = getMaskFilter(args, contentScale, clipBounds);
     // if mask filter is nullptr while mask is valid, that means the layer is not visible.
     if (!maskFilter) {
       return;
     }
     // maskMatrix transforms from content image coordinates to scaled layer local coordinates.
     // This is used both for the mask filter on canvas and for drawToParent.
-    maskMatrix = Matrix::MakeScale(1.0f / contentScale, 1.0f / contentScale);
+    auto maskMatrix = Matrix::MakeScale(1.0f / contentScale, 1.0f / contentScale);
     maskMatrix.postConcat(invertImageMatrix);
-    maskFilter = maskFilter->makeWithMatrix(maskMatrix);
-    paint.setMaskFilter(maskFilter);
+    paint.setMaskFilter(maskFilter->makeWithMatrix(maskMatrix));
   }
 
   if (args.blurBackground && !contentArgs.blurBackground) {
     image = image->makeRasterized();
   }
 
-  AutoCanvasRestore autoRestore(canvas);
-  canvas->concat(imageMatrix);
-  canvas->drawImage(image, &paint);
   if (args.blurBackground) {
     if (contentArgs.blurBackground) {
       if (!onlyOffscreen) {
+        auto subBackgroundPaint = paint;
         auto filter = getImageFilter(contentScale);
         filter = ImageFilter::Compose(filter, paint.getImageFilter());
-        paint.setImageFilter(filter);
-        contentArgs.blurBackground->drawToParent(contentScale, maskMatrix, paint);
+        subBackgroundPaint.setImageFilter(filter);
+        subBackgroundPaint.setMaskFilter(maskFilter);
+        contentArgs.blurBackground->drawToParent(contentScale, subBackgroundPaint);
       }
     } else {
       auto backgroundCanvas = args.blurBackground->getCanvas();
@@ -1372,6 +1370,10 @@ void Layer::drawContentOffscreen(const DrawArgs& args, Canvas* canvas,
       backgroundCanvas->concat(imageMatrix);
       backgroundCanvas->drawImage(image, &paint);
     }
+
+    AutoCanvasRestore autoRestore(canvas);
+    canvas->concat(imageMatrix);
+    canvas->drawImage(image, &paint);
   }
 
   // There is no scenario where LayerStyle's Position and ExtraSourceType are 'above' and

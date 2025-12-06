@@ -2229,6 +2229,7 @@ TGFX_TEST(LayerTest, BackgroundBlurWithGroupMask) {
   blur1->setFillStyle(blur1Fill);
   auto blur1Style = BackgroundBlurStyle::Make(5, 5);
   blur1->setLayerStyles({blur1Style});
+  blur1->setMatrix(Matrix::MakeTrans(20, 20));
   group->addChild(blur1);
 
   // mask: same size and position as group
@@ -2239,10 +2240,11 @@ TGFX_TEST(LayerTest, BackgroundBlurWithGroupMask) {
   mask->setPath(maskPath);
   auto maskFill = SolidColor::Make(Color::White());
   mask->setFillStyle(maskFill);
+  mask->setMatrix(Matrix::MakeTrans(60, 20));
   group->addChild(mask);
 
   // Set mask for group
-  group->setMask(mask);
+  blur1->setMask(mask);
 
   // blur2: outside of group, with background blur
   auto blur2 = ShapeLayer::Make();
@@ -2251,13 +2253,17 @@ TGFX_TEST(LayerTest, BackgroundBlurWithGroupMask) {
   Path blur2Path;
   blur2Path.addRect(Rect::MakeWH(80, 80));
   blur2->setPath(blur2Path);
-  auto blur2Fill = SolidColor::Make(Color::FromRGBA(0, 0, 255, 128));  // Blue with alpha=128
+  auto blur2Fill = SolidColor::Make(Color::FromRGBA(0, 0, 255, 10));  // Blue with alpha=128
   blur2->setFillStyle(blur2Fill);
   auto blur2Style = BackgroundBlurStyle::Make(5, 5);
   blur2->setLayerStyles({blur2Style});
   displayList->root()->addChild(blur2);
-
   displayList->render(surface.get());
+
+  displayList->setZoomScale(0.8f);
+  displayList->setRenderMode(RenderMode::Tiled);
+  displayList->render(surface.get());
+
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundBlurWithGroupMask"));
 }
 
