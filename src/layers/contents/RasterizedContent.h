@@ -20,6 +20,7 @@
 
 #include "gpu/resources/ResourceKey.h"
 #include "tgfx/core/Canvas.h"
+#include "tgfx/core/Image.h"
 
 namespace tgfx {
 class RasterizedContent {
@@ -27,12 +28,14 @@ class RasterizedContent {
   /**
    * Creates a RasterizedContent by rasterizing the image to a texture and caching it with the
    * uniqueKey. The texture can be retrieved later using the uniqueKey.
+   * @param cachedImage Output parameter that receives the cached texture image. The caller should
+   *                    use this image for immediate drawing to ensure the texture is created.
    */
   static std::unique_ptr<RasterizedContent> MakeFrom(Context* context, float contentScale,
-                                                     const std::shared_ptr<Image>& image,
+                                                     std::shared_ptr<Image> image,
                                                      const Matrix& imageMatrix,
                                                      const UniqueKey& uniqueKey,
-                                                     uint32_t renderFlags = 0);
+                                                     std::shared_ptr<Image>* cachedImage = nullptr);
 
   RasterizedContent(uint32_t contextID, float contentScale, const UniqueKey& uniqueKey,
                     const Matrix& matrix, std::shared_ptr<ColorSpace> colorSpace)

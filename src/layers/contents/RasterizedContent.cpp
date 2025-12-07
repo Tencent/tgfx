@@ -20,14 +20,13 @@
 #include "core/images/TextureImage.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/TPArgs.h"
-#include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
 std::unique_ptr<RasterizedContent> RasterizedContent::MakeFrom(Context* context, float contentScale,
-                                                               const std::shared_ptr<Image>& image,
+                                                               std::shared_ptr<Image> image,
                                                                const Matrix& imageMatrix,
                                                                const UniqueKey& uniqueKey,
-                                                               uint32_t renderFlags) {
+                                                               std::shared_ptr<Image>* cachedImage) {
   if (context == nullptr || image == nullptr || uniqueKey.empty()) {
     return nullptr;
   }
@@ -37,7 +36,7 @@ std::unique_ptr<RasterizedContent> RasterizedContent::MakeFrom(Context* context,
     return nullptr;
   }
   // Lock the texture proxy from the image.
-  TPArgs tpArgs(context, renderFlags, false, 1.0f);
+  TPArgs tpArgs(context, 0, false, 1.0f);
   auto textureProxy = image->lockTextureProxy(tpArgs);
   if (textureProxy == nullptr) {
     return nullptr;
@@ -45,8 +44,10 @@ std::unique_ptr<RasterizedContent> RasterizedContent::MakeFrom(Context* context,
   // Assign unique key to the texture proxy for caching.
   auto proxyProvider = context->proxyProvider();
   proxyProvider->assignProxyUniqueKey(textureProxy, uniqueKey);
-  if (!(renderFlags & RenderFlags::DisableCache)) {
-    textureProxy->assignUniqueKey(uniqueKey);
+  textureProxy->assignUniqueKey(uniqueKey);
+  // Return the cached image so the caller can use it for immediate drawing.
+  if (cachedImage != nullptr) {
+    *cachedImage = TextureImage::Wrap(std::move(textureProxy), image->colorSpace());
   }
   return std::make_unique<RasterizedContent>(context->uniqueID(), contentScale, uniqueKey,
                                              imageMatrix, image->colorSpace());
@@ -64,20 +65,18 @@ bool RasterizedContent::valid(Context* context) const {
 void RasterizedContent::draw(Context* context, Canvas* canvas, bool antiAlias, float alpha,
                              const std::shared_ptr<MaskFilter>& mask, BlendMode blendMode,
                              const Matrix3D* transform) const {
-  if (context == nullptr || canvas == nullptr || _uniqueKey.empty()) {
+  if (context == nullptr || canvas == nullptr) {
     return;
   }
   if (context->uniqueID() != _contextID) {
     return;
   }
-  // Find the cached texture proxy by unique key.
   auto proxyProvider = context->proxyProvider();
-  auto textureProxy = proxyProvider->findOrWrapTextureProxy(_uniqueKey);
-  if (textureProxy == nullptr) {
+  auto proxy = proxyProvider->findOrWrapTextureProxy(_uniqueKey);
+  if (proxy == nullptr) {
     return;
   }
-  // Create an image from the texture proxy.
-  auto image = TextureImage::Wrap(textureProxy, _colorSpace);
+  auto image = TextureImage::Wrap(proxy, _colorSpace);
   if (image == nullptr) {
     return;
   }

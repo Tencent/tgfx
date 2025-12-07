@@ -23,6 +23,7 @@
 #include "core/Matrix2D.h"
 #include "core/filters/Transform3DImageFilter.h"
 #include "core/images/PictureImage.h"
+#include "core/images/TextureImage.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "gpu/ProxyProvider.h"
@@ -965,7 +966,7 @@ RasterizedContent* Layer::getRasterizedCache(const DrawArgs& args, const Matrix&
   }
   auto textureKey = MakeLayerCacheKey(this, contentScale);
   rasterizedContent = RasterizedContent::MakeFrom(args.context, contentScale, std::move(image),
-                                                  drawingMatrix, textureKey, args.renderFlags);
+                                                  drawingMatrix, textureKey);
   return rasterizedContent.get();
 }
 
@@ -1246,6 +1247,18 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   // maxContentScale / contentScale = maxZoomScale / currentZoomScale
   auto maxContentScale = contentScale * args.maxZoomScale / args.currentZoomScale;
 
+  // Limit maxContentScale so the cached texture doesn't exceed maxTextureSize.
+  auto maxTextureSize = args.context->gpu()->limits()->maxTextureDimension2D;
+  auto layerBounds = getBounds();
+  auto maxDimension = std::max(layerBounds.width(), layerBounds.height());
+  if (maxDimension > 0) {
+    maxContentScale = std::min(maxContentScale, static_cast<float>(maxTextureSize) / maxDimension);
+  }
+  // Skip caching if maxContentScale is less than contentScale, which would cause blurry rendering.
+  if (maxContentScale < contentScale) {
+    return false;
+  }
+
   auto fullFill = args.renderRect && args.renderRect->contains(renderBounds);
   if (shouldPassThroughBackground(blendMode, transform) || hasBackgroundStyle()) {
     if (!fullFill || !FloatNearlyEqual(maxContentScale, contentScale)) {
@@ -1312,13 +1325,10 @@ void Layer::drawContentOffscreen(const DrawArgs& args, Canvas* canvas,
   }
 
   if (cacheContent && args.context) {
-    image = image->makeTextureImage(args.context);
-    if (image == nullptr) {
-      return;
-    }
     auto textureKey = MakeLayerCacheKey(this, contentScale);
-    layerCachedContent = RasterizedContent::MakeFrom(args.context, contentScale, image, imageMatrix,
-                                                     textureKey, args.renderFlags);
+    layerCachedContent =
+        RasterizedContent::MakeFrom(args.context, contentScale, std::move(image), imageMatrix,
+                                    textureKey, &image);
   }
 
   image = MakeImageWithTransform(image, transform, &imageMatrix);
