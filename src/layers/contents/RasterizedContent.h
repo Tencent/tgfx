@@ -60,8 +60,9 @@ class RasterizedContent {
    */
   bool valid(Context* context) const;
 
-  void draw(Canvas* canvas, bool antiAlias, float alpha, const std::shared_ptr<MaskFilter>& mask,
-            BlendMode blendMode = BlendMode::SrcOver, const Matrix3D* transform = nullptr) const;
+  void draw(Context* context, Canvas* canvas, bool antiAlias, float alpha,
+            const std::shared_ptr<MaskFilter>& mask, BlendMode blendMode = BlendMode::SrcOver,
+            const Matrix3D* transform = nullptr) const;
 
  private:
   uint32_t _contextID = 0;

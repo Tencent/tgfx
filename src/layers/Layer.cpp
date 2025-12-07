@@ -338,7 +338,7 @@ void Layer::setFilters(std::vector<std::shared_ptr<LayerFilter>> value) {
   for (const auto& filter : _filters) {
     filter->attachToLayer(this);
   }
-  rasterizedContent = nullptr;
+  invalidateCache();
   invalidateTransform();
 }
 
@@ -1195,7 +1195,7 @@ bool Layer::shouldPassThroughBackground(BlendMode blendMode, const Matrix3D* tra
 
 bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                           const Matrix3D* transform) {
-  if (args.drawMode != DrawMode::Normal || args.excludeEffects) {
+  if (args.drawMode != DrawMode::Normal || args.excludeEffects || args.context == nullptr) {
     return false;
   }
   std::shared_ptr<MaskFilter> maskFilter = nullptr;
@@ -1204,7 +1204,6 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   if (auto rasterizedCache = getRasterizedCache(args, canvas->getMatrix())) {
     cache = rasterizedCache;
   } else if (auto layerCache = getLayerCachedContent(args, contentScale)) {
-      LOGI("use cache");
     cache = layerCache;
     // rasterizedCache contains the background layer styles, but layer cache does not because of
     // different background logic.
@@ -1221,11 +1220,12 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
         return true;
       }
     }
-    cache->draw(canvas, bitFields.allowsEdgeAntialiasing, alpha, maskFilter, blendMode, transform);
+    cache->draw(args.context, canvas, bitFields.allowsEdgeAntialiasing, alpha, maskFilter,
+                blendMode, transform);
     if (args.blurBackground) {
       if (!hasBackgroundStyle()) {
-        cache->draw(args.blurBackground->getCanvas(), bitFields.allowsEdgeAntialiasing, alpha,
-                    maskFilter, blendMode, transform);
+        cache->draw(args.context, args.blurBackground->getCanvas(),
+                    bitFields.allowsEdgeAntialiasing, alpha, maskFilter, blendMode, transform);
       } else {
         auto backgroundArgs = args;
         backgroundArgs.drawMode = DrawMode::Background;
@@ -1237,8 +1237,8 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     return true;
   }
 
-  if (args.renderFlags & RenderFlags::DisableCache || args.maxZoomScale <= 0.0f ||
-      args.currentZoomScale > args.maxZoomScale || !args.context) {
+  if (args.renderFlags & RenderFlags::DisableCache || args.currentZoomScale > args.maxZoomScale ||
+      !args.context) {
     return false;
   }
 
@@ -1355,7 +1355,6 @@ void Layer::drawContentOffscreen(const DrawArgs& args, Canvas* canvas,
       if (!onlyOffscreen) {
         auto subBackgroundPaint = paint;
         auto filter = getImageFilter(contentScale);
-        filter = ImageFilter::Compose(filter, paint.getImageFilter());
         subBackgroundPaint.setImageFilter(filter);
         subBackgroundPaint.setMaskFilter(maskFilter);
         contentArgs.blurBackground->drawToParent(subBackgroundPaint);
@@ -2119,8 +2118,7 @@ RasterizedContent* Layer::getLayerCachedContent(const DrawArgs& args, float cont
     return nullptr;
   }
   if (!layerCachedContent->valid(args.context)) {
-      LOGI("layerCachedContent is invalid");
-      return nullptr;
+    return nullptr;
   }
   if (layerCachedContent->contentScale() < contentScale) {
     return nullptr;

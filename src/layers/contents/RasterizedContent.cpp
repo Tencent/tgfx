@@ -20,7 +20,7 @@
 #include "core/images/TextureImage.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/TPArgs.h"
-#include "tgfx/core/Surface.h"
+#include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
 std::unique_ptr<RasterizedContent> RasterizedContent::MakeFrom(Context* context, float contentScale,
@@ -61,18 +61,13 @@ bool RasterizedContent::valid(Context* context) const {
   return textureProxy != nullptr;
 }
 
-void RasterizedContent::draw(Canvas* canvas, bool antiAlias, float alpha,
+void RasterizedContent::draw(Context* context, Canvas* canvas, bool antiAlias, float alpha,
                              const std::shared_ptr<MaskFilter>& mask, BlendMode blendMode,
                              const Matrix3D* transform) const {
-  if (canvas == nullptr || _uniqueKey.empty()) {
+  if (context == nullptr || canvas == nullptr || _uniqueKey.empty()) {
     return;
   }
-  auto surface = canvas->getSurface();
-  if (surface == nullptr) {
-    return;
-  }
-  auto context = surface->getContext();
-  if (context == nullptr || context->uniqueID() != _contextID) {
+  if (context->uniqueID() != _contextID) {
     return;
   }
   // Find the cached texture proxy by unique key.
