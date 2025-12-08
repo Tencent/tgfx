@@ -323,7 +323,8 @@ void DisplayList::render(Surface* surface, bool autoClear) {
 
 std::vector<Rect> DisplayList::renderDirect(Surface* surface, bool autoClear) const {
   auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
-  drawRootLayer(surface, surfaceRect, getViewMatrix(), autoClear);
+  drawRootLayer(surface, surfaceRect, getViewMatrix(), autoClear, surface->width(),
+                surface->height());
   return {Rect::MakeEmpty()};
 }
 
@@ -379,7 +380,8 @@ std::vector<Rect> DisplayList::renderPartial(Surface* surface, bool autoClear,
   }
   auto canvas = surface->getCanvas();
   for (auto& drawRect : drawRects) {
-    drawRootLayer(partialCache.get(), drawRect, viewMatrix, true);
+    drawRootLayer(partialCache.get(), drawRect, viewMatrix, true, surface->width(),
+                  surface->height());
   }
   AutoCanvasRestore restore(canvas);
   canvas->resetMatrix();
@@ -407,7 +409,7 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
   std::vector<Rect> dirtyRects = {};
   auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
   for (auto& task : tileTasks) {
-    drawTileTask(task);
+    drawTileTask(task, surface->width(), surface->height());
     auto dirtyRect = task.tileRect();
     dirtyRect.offset(roundf(_contentOffset.x), roundf(_contentOffset.y));
     if (dirtyRect.intersect(surfaceRect)) {
@@ -857,7 +859,8 @@ int DisplayList::getMaxTileCountPerAtlas(Context* context) const {
   return (maxTextureSize / _tileSize) * (maxTextureSize / _tileSize);
 }
 
-void DisplayList::drawTileTask(const DrawTask& task) const {
+void DisplayList::drawTileTask(const DrawTask& task, int renderSurfaceWidth,
+                               int renderSurfaceHeight) const {
   auto surface = surfaceCaches[task.sourceIndex()].get();
   DEBUG_ASSERT(surface != nullptr);
   auto canvas = surface->getCanvas();
@@ -872,7 +875,7 @@ void DisplayList::drawTileTask(const DrawTask& task) const {
   viewMatrix.postTranslate(offsetX, offsetY);
   auto clipRect = tileRect;
   clipRect.offset(offsetX, offsetY);
-  drawRootLayer(surface, clipRect, viewMatrix, true);
+  drawRootLayer(surface, clipRect, viewMatrix, true, renderSurfaceWidth, renderSurfaceHeight);
 }
 
 void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* surface,
@@ -951,7 +954,8 @@ void DisplayList::resetCaches() {
 }
 
 void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
-                                bool autoClear) const {
+                                bool autoClear, int renderSurfaceWidth,
+                                int renderSurfaceHeight) const {
   DEBUG_ASSERT(surface != nullptr);
   auto canvas = surface->getCanvas();
   auto context = surface->getContext();
@@ -979,6 +983,8 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
     args.maxZoomScale = _maxZoomScaleForCache;
     args.currentZoomScale = zoomScale();
   }
+  args.renderSurfaceWidth = renderSurfaceWidth;
+  args.renderSurfaceHeight = renderSurfaceHeight;
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
 }
 

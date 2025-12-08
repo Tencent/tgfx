@@ -712,6 +712,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
     bool passThroughBackground : 1;
     bool hasBlendMode : 1;
     bool matrix3DIsAffine : 1;  // Whether the matrix3D is equivalent to a 2D affine matrix
+    bool cacheable : 1;         // whether the layer can be cached this frame
     uint8_t blendMode : 5;
     uint8_t maskType : 2;
   } bitFields = {};

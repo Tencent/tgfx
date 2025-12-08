@@ -205,6 +205,7 @@ Layer::Layer() {
   bitFields.blendMode = static_cast<uint8_t>(BlendMode::SrcOver);
   bitFields.passThroughBackground = true;
   bitFields.matrix3DIsAffine = true;
+  bitFields.cacheable = true;
 }
 
 void Layer::setAlpha(float value) {
@@ -339,8 +340,7 @@ void Layer::setFilters(std::vector<std::shared_ptr<LayerFilter>> value) {
   for (const auto& filter : _filters) {
     filter->attachToLayer(this);
   }
-  invalidateCache();
-  invalidateTransform();
+  invalidateDescendents();
 }
 
 void Layer::setMask(std::shared_ptr<Layer> value) {
@@ -403,8 +403,7 @@ void Layer::setLayerStyles(std::vector<std::shared_ptr<LayerStyle>> value) {
   for (const auto& layerStyle : _layerStyles) {
     layerStyle->attachToLayer(this);
   }
-  invalidateCache();
-  invalidateTransform();
+  invalidateDescendents();
 }
 
 void Layer::setExcludeChildEffectsInLayerStyle(bool value) {
@@ -1243,16 +1242,14 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     return false;
   }
 
-  // Calculate the maximum content scale based on the ratio of maxZoomScale to currentZoomScale.
-  // maxContentScale / contentScale = maxZoomScale / currentZoomScale
   auto maxContentScale = contentScale * args.maxZoomScale / args.currentZoomScale;
 
-  // Limit maxContentScale so the cached texture doesn't exceed maxTextureSize.
-  auto maxTextureSize = args.context->gpu()->limits()->maxTextureDimension2D;
   auto layerBounds = getBounds();
-  auto maxDimension = std::max(layerBounds.width(), layerBounds.height());
-  if (maxDimension > 0) {
-    maxContentScale = std::min(maxContentScale, static_cast<float>(maxTextureSize) / maxDimension);
+  if (args.renderSurfaceWidth > 0 && args.renderSurfaceHeight > 0 && layerBounds.width() > 0 &&
+      layerBounds.height() > 0) {
+    auto scaleByWidth = static_cast<float>(args.renderSurfaceWidth) / layerBounds.width();
+    auto scaleByHeight = static_cast<float>(args.renderSurfaceHeight) / layerBounds.height();
+    maxContentScale = std::min(maxContentScale, std::min(scaleByWidth, scaleByHeight));
   }
   // Skip caching if maxContentScale is less than contentScale, which would cause blurry rendering.
   if (maxContentScale < contentScale) {
@@ -1886,6 +1883,7 @@ bool Layer::hasValidMask() const {
 }
 
 void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, bool forceDirty) {
+  bitFields.cacheable = !bitFields.dirtyDescendents;
   if (!forceDirty && !bitFields.dirtyDescendents) {
     if (maxBackgroundOutset > 0 || bitFields.hasBlendMode) {
       propagateLayerState();
@@ -2041,6 +2039,7 @@ void Layer::updateBackgroundBounds(float contentScale) {
     auto layer = this;
     while (layer && !layer->bitFields.dirtyDescendents) {
       layer->invalidateCache();
+      layer->bitFields.cacheable = false;
       if (layer->maskOwner) {
         break;
       }

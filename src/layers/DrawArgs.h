@@ -64,5 +64,9 @@ class DrawArgs {
   // The current zoom scale of the display list. Used together with maxZoomScale to calculate the
   // maximum content scale for layer caching.
   float currentZoomScale = 1.0f;
+
+  // The size of the render surface. Used to limit the maximum cache size for layer caching.
+  int renderSurfaceWidth = 0;
+  int renderSurfaceHeight = 0;
 };
 }  // namespace tgfx
