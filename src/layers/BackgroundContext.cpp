@@ -182,28 +182,21 @@ std::shared_ptr<BackgroundContext> BackgroundContext::createSubContext(const Rec
 
   auto canvas = getCanvas();
   auto parentCanvasMatrix = canvas->getMatrix();
-
   Matrix baseSurfaceMatrix = Matrix::I();
   if (!imageMatrix.invert(&baseSurfaceMatrix)) {
     return nullptr;
   }
-
   auto childSurfaceRect = baseSurfaceMatrix.mapRect(childWorldRect);
   childSurfaceRect.roundOut();
-
   auto childSurfaceOffset = Point::Make(childSurfaceRect.x(), childSurfaceRect.y());
-
   auto childSurfaceMatrix = baseSurfaceMatrix;
   childSurfaceMatrix.postTranslate(-childSurfaceOffset.x, -childSurfaceOffset.y);
-
   Matrix childImageMatrix = Matrix::I();
   if (!childSurfaceMatrix.invert(&childImageMatrix)) {
     return nullptr;
   }
-
   auto childBackgroundRect = Rect::MakeWH(childSurfaceRect.width(), childSurfaceRect.height());
   childImageMatrix.mapRect(&childBackgroundRect);
-
   auto childCanvasMatrix = childSurfaceMatrix;
   childCanvasMatrix.preConcat(imageMatrix);
   childCanvasMatrix.preConcat(parentCanvasMatrix);
@@ -213,11 +206,9 @@ std::shared_ptr<BackgroundContext> BackgroundContext::createSubContext(const Rec
   if (!child) {
     return nullptr;
   }
-
   auto childCanvas = child->getCanvas();
   childCanvas->clear();
   childCanvas->setMatrix(childCanvasMatrix);
-
   child->parent = this;
   child->surfaceOffset = childSurfaceOffset;
   return child;
