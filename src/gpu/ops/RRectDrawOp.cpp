@@ -18,6 +18,7 @@
 
 #include "RRectDrawOp.h"
 #include "core/DataSource.h"
+#include "core/utils/ColorHelper.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/processors/EllipseGeometryProcessor.h"
@@ -47,7 +48,7 @@ PlacementPtr<RRectDrawOp> RRectDrawOp::Make(Context* context,
 RRectDrawOp::RRectDrawOp(BlockAllocator* allocator, RRectsVertexProvider* provider)
     : DrawOp(allocator, provider->aaType()), rectCount(provider->rectCount()) {
   if (!provider->hasColor()) {
-    commonColor = provider->firstColor();
+    commonColor = ToPMColor(provider->firstColor(), provider->dstColorSpace());
   }
   hasStroke = provider->hasStroke();
 }

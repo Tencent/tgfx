@@ -1285,22 +1285,16 @@ void Layer::drawContentOffscreen(const DrawArgs& args, Canvas* canvas,
   }
 
   auto contentArgs = args;
-  auto onlyOffscreen = blendMode == BlendMode::SrcOver && !hasValidMask() && alpha == 1.0 &&
-                       (_filters.empty() || args.excludeEffects) && transform == nullptr;
-  if (onlyOffscreen) {
-    contentArgs.blurBackground = args.blurBackground;
-  } else if (args.blurBackground && hasBackgroundStyle()) {
-    contentArgs.blurBackground = args.blurBackground->createSubContext(renderBounds, true);
-  } else {
-    contentArgs.blurBackground = nullptr;
-  }
+  contentArgs.blurBackground = args.blurBackground && hasBackgroundStyle()
+                                   ? args.blurBackground->createSubContext(renderBounds, true)
+                                   : nullptr;
 
   Matrix passthroughImageMatrix = Matrix::I();
   std::shared_ptr<Image> passthroughImage = nullptr;
   if (shouldPassThroughBackground(blendMode, transform)) {
     if (canvas->getSurface()) {
-      passthroughImageMatrix = canvas->getMatrix();
       passthroughImage = canvas->getSurface()->makeImageSnapshot();
+      passthroughImageMatrix = canvas->getMatrix();
     }
   }
 
@@ -1340,32 +1334,24 @@ void Layer::drawContentOffscreen(const DrawArgs& args, Canvas* canvas,
   paint.setBlendMode(blendMode);
 
   std::shared_ptr<MaskFilter> maskFilter = nullptr;
-
   if (hasValidMask()) {
     maskFilter = getMaskFilter(args, contentScale, clipBounds);
+    // if mask filter is nullptr while mask is valid, that means the layer is not visible.
     if (!maskFilter) {
       return;
     }
     paint.setMaskFilter(maskFilter->makeWithMatrix(invertImageMatrix));
   }
 
-  if (args.blurBackground && !contentArgs.blurBackground) {
-    image = image->makeRasterized();
-  }
-
   AutoCanvasRestore autoRestore(canvas);
   canvas->concat(imageMatrix);
   canvas->drawImage(image, &paint);
-
   if (args.blurBackground) {
     if (contentArgs.blurBackground) {
-      if (!onlyOffscreen) {
-        auto subBackgroundPaint = paint;
-        auto filter = getImageFilter(contentScale);
-        subBackgroundPaint.setImageFilter(filter);
-        subBackgroundPaint.setMaskFilter(maskFilter);
-        contentArgs.blurBackground->drawToParent(subBackgroundPaint);
-      }
+      auto filter = getImageFilter(contentScale);
+      paint.setImageFilter(filter);
+      paint.setMaskFilter(maskFilter);
+      contentArgs.blurBackground->drawToParent(paint);
     } else {
       auto backgroundCanvas = args.blurBackground->getCanvas();
       AutoCanvasRestore autoRestoreBg(backgroundCanvas);
@@ -1454,7 +1440,8 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
                          const Layer* stopChild) {
   int lastBackgroundLayerIndex = -1;
   if (args.forceDrawBackground) {
-    lastBackgroundLayerIndex = static_cast<int>(_children.size()) - 1;
+    // lastBackgroundLayerIndex must cover all children
+    lastBackgroundLayerIndex = static_cast<int>(_children.size());
   } else if (hasBackgroundStyle()) {
     for (int i = static_cast<int>(_children.size()) - 1; i >= 0; --i) {
       if (_children[static_cast<size_t>(i)]->hasBackgroundStyle()) {
@@ -1663,8 +1650,7 @@ std::shared_ptr<Image> Layer::getBoundsBackgroundImage(const DrawArgs& args, flo
 void Layer::drawBackgroundImage(const DrawArgs& args, Canvas& canvas) {
   if (args.blurBackground) {
     auto image = args.blurBackground->getBackgroundImage();
-    auto bgMatrix = args.blurBackground->backgroundMatrix();
-    canvas.concat(bgMatrix);
+    canvas.concat(args.blurBackground->backgroundMatrix());
     canvas.drawImage(image);
   } else {
     auto drawArgs = args;

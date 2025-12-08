@@ -16,28 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ToPMColor.h"
-#include "ColorSpaceHelper.h"
+#pragma once
 #include "core/ColorSpaceXformSteps.h"
-
+#include "tgfx/core/Color.h"
 namespace tgfx {
+PMColor ToPMColor(const Color& color, const std::shared_ptr<ColorSpace>& dstColorSpace);
 
-PMColor ToPMColor(const Color& color, std::shared_ptr<ColorSpace> dstColorSpace) {
-  if (dstColorSpace == nullptr) {
-    return PMColor{color.red * color.alpha, color.green * color.alpha, color.blue * color.alpha,
-                   color.alpha, color.colorSpace};
-  }
+Color ConvertColorSpace(const Color& color, const std::shared_ptr<ColorSpace>& dstColorSpace);
 
-  if (!NeedConvertColorSpace(color.colorSpace, dstColorSpace)) {
-    return PMColor{color.red * color.alpha, color.green * color.alpha, color.blue * color.alpha,
-                   color.alpha, color.colorSpace};
-    ;
-  }
-  ColorSpaceXformSteps steps(color.colorSpace.get(), AlphaType::Premultiplied, dstColorSpace.get(),
-                             AlphaType::Premultiplied);
-  auto dstColor = color.premultiply();
-  steps.apply(dstColor.array());
-  dstColor.colorSpace = std::move(dstColorSpace);
-  return dstColor;
-}
+uint32_t ToUintPMColor(const Color& color, const ColorSpaceXformSteps* steps);
 }  // namespace tgfx

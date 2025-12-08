@@ -189,7 +189,7 @@ class Surface {
   /**
    * Returns the colorSpace of the surface.
    */
-  std::shared_ptr<ColorSpace> colorSpace() const;
+  const std::shared_ptr<ColorSpace>& colorSpace() const;
 
  private:
   uint32_t _uniqueID = 0;

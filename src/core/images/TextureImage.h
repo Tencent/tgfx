@@ -59,7 +59,7 @@ class TextureImage : public Image {
 
   std::shared_ptr<Image> makeRasterized() const override;
 
-  std::shared_ptr<ColorSpace> colorSpace() const override {
+  const std::shared_ptr<ColorSpace>& colorSpace() const override {
     return _colorSpace;
   }
 

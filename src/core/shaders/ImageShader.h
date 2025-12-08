@@ -43,7 +43,7 @@ class ImageShader : public Shader {
 
   PlacementPtr<FragmentProcessor> asFragmentProcessor(
       const FPArgs& args, const Matrix* uvMatrix,
-      std::shared_ptr<ColorSpace> dstColorSpace) const override;
+      const std::shared_ptr<ColorSpace>& dstColorSpace) const override;
 
  private:
   ImageShader(std::shared_ptr<Image> image, TileMode tileModeX, TileMode tileModeY,
