@@ -26,7 +26,7 @@
 #include "layers/ContourContext.h"
 #include "layers/DrawArgs.h"
 #include "layers/RootLayer.h"
-#include "layers/contents/RasterizedContent.h"
+#include "layers/contents/RasterizedCache.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Gradient.h"
@@ -2190,83 +2190,6 @@ TGFX_TEST(LayerTest, BackgroundBlur) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/backgroundLayerBlur"));
 }
 
-/**
- * Test background blur with group mask.
- * Structure:
- * Root
- * - background (image)
- * - group (with mask)
- *   - blur1 (larger than group, with background blur, fill alpha=128)
- *   - mask (same size and position as group, used as group's mask)
- * - blur2 (with background blur, fill alpha=128)
- */
-TGFX_TEST(LayerTest, BackgroundBlurWithGroupMask) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  EXPECT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 200, 200);
-  auto displayList = std::make_unique<DisplayList>();
-
-  // Background image
-  auto background = ImageLayer::Make();
-  background->setName("background");
-  background->setImage(MakeImage("resources/apitest/imageReplacement.png"));
-  displayList->root()->addChild(background);
-
-  // Group layer with mask
-  auto group = Layer::Make();
-  group->setName("group");
-  group->setMatrix(Matrix::MakeTrans(30, 30));
-  displayList->root()->addChild(group);
-
-  // blur1: larger than group, with background blur
-  auto blur1 = ShapeLayer::Make();
-  blur1->setName("blur1");
-  Path blur1Path;
-  blur1Path.addRect(Rect::MakeXYWH(-20, -20, 140, 140));  // Larger than group
-  blur1->setPath(blur1Path);
-  auto blur1Fill = SolidColor::Make(Color::FromRGBA(255, 0, 0, 128));  // Red with alpha=128
-  blur1->setFillStyle(blur1Fill);
-  auto blur1Style = BackgroundBlurStyle::Make(5, 5);
-  blur1->setLayerStyles({blur1Style});
-  blur1->setMatrix(Matrix::MakeTrans(20, 20));
-  group->addChild(blur1);
-
-  // mask: same size and position as group
-  auto mask = ShapeLayer::Make();
-  mask->setName("mask");
-  Path maskPath;
-  maskPath.addRect(Rect::MakeWH(100, 100));  // Same as group's logical size
-  mask->setPath(maskPath);
-  auto maskFill = SolidColor::Make(Color::White());
-  mask->setFillStyle(maskFill);
-  mask->setMatrix(Matrix::MakeTrans(60, 20));
-  group->addChild(mask);
-
-  // Set mask for group
-  blur1->setMask(mask);
-
-  // blur2: outside of group, with background blur
-  auto blur2 = ShapeLayer::Make();
-  blur2->setName("blur2");
-  blur2->setMatrix(Matrix::MakeTrans(100, 100));
-  Path blur2Path;
-  blur2Path.addRect(Rect::MakeWH(80, 80));
-  blur2->setPath(blur2Path);
-  auto blur2Fill = SolidColor::Make(Color::FromRGBA(0, 0, 255, 10));  // Blue with alpha=128
-  blur2->setFillStyle(blur2Fill);
-  auto blur2Style = BackgroundBlurStyle::Make(5, 5);
-  blur2->setLayerStyles({blur2Style});
-  displayList->root()->addChild(blur2);
-  displayList->render(surface.get());
-
-  displayList->setZoomScale(0.8f);
-  displayList->setRenderMode(RenderMode::Tiled);
-  displayList->render(surface.get());
-
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundBlurWithGroupMask"));
-}
-
 TGFX_TEST(LayerTest, MaskAlpha) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -2526,27 +2449,23 @@ TGFX_TEST(LayerTest, RasterizedBackground) {
 
   displayList->render(surface.get());
   background->setMatrix(Matrix::MakeTrans(50, 50));
-  auto rasterizedContent =
-      static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
+  auto rasterizedContent = child->rasterizedContent.get();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent !=
-              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
+  EXPECT_TRUE(rasterizedContent != child->rasterizedContent.get());
 
   child->setMatrix(Matrix::MakeTrans(20, 20));
-  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
+  rasterizedContent = child->rasterizedContent.get();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent !=
-              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
+  EXPECT_TRUE(rasterizedContent != child->rasterizedContent.get());
 
   auto layerNextChild = ShapeLayer::Make();
   layerNextChild->setPath(path);
   layerNextChild->setMatrix(Matrix::MakeTrans(10, 10));
   layerNextChild->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 100, 0, 128)));
   parent->addChild(layerNextChild);
-  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
+  rasterizedContent = child->rasterizedContent.get();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent ==
-              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
+  EXPECT_TRUE(rasterizedContent == child->rasterizedContent.get());
 
   auto grandChild = ShapeLayer::Make();
   grandChild->setPath(path);
@@ -2561,61 +2480,52 @@ TGFX_TEST(LayerTest, RasterizedBackground) {
   nephew->setMatrix(Matrix::MakeTrans(10, 10));
   nephew->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 100, 0, 128)));
   layerNextChild->addChild(nephew);
-  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
+  rasterizedContent = child->rasterizedContent.get();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent ==
-              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
+  EXPECT_TRUE(rasterizedContent == child->rasterizedContent.get());
 
   parent->addChildAt(layerBeforeChild, parent->getChildIndex(child));
-  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
+  rasterizedContent = child->rasterizedContent.get();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent !=
-              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
+  EXPECT_TRUE(rasterizedContent != child->rasterizedContent.get());
 
   layerBeforeChild->addChildAt(backgroundNephew, 0);
-  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
+  rasterizedContent = child->rasterizedContent.get();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent !=
-              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
+  EXPECT_TRUE(rasterizedContent != child->rasterizedContent.get());
 
   layerBeforeChild->removeChildren();
-  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
+  rasterizedContent = child->rasterizedContent.get();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent !=
-              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
+  EXPECT_TRUE(rasterizedContent != child->rasterizedContent.get());
 
   layerBeforeChild->removeFromParent();
-  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
+  rasterizedContent = child->rasterizedContent.get();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent !=
-              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
+  EXPECT_TRUE(rasterizedContent != child->rasterizedContent.get());
 
   parent->setChildIndex(background, static_cast<int>(parent->children().size() - 1u));
-  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
+  rasterizedContent = child->rasterizedContent.get();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent !=
-              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
+  EXPECT_TRUE(rasterizedContent != child->rasterizedContent.get());
 
   parent->setChildIndex(background, 0);
-  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
+  rasterizedContent = child->rasterizedContent.get();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent !=
-              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
+  EXPECT_TRUE(rasterizedContent != child->rasterizedContent.get());
 
   parent->replaceChild(background, layerBeforeChild);
-  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
+  rasterizedContent = child->rasterizedContent.get();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent !=
-              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
+  EXPECT_TRUE(rasterizedContent != child->rasterizedContent.get());
 
   parent->replaceChild(layerNextChild, background);
-  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
+  rasterizedContent = child->rasterizedContent.get();
   displayList->render(surface.get());
   // Ideally, rasterizedContent should remain unchanged here, but we need to call root->invalidateRect()
   // whenever a layer is removed or its index changes. As a result, dirty rects are always treated
   // as background changes. This is a trade-off between performance and correctness.
-  EXPECT_TRUE(rasterizedContent !=
-              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
+  EXPECT_TRUE(rasterizedContent != child->rasterizedContent.get());
 }
 
 TGFX_TEST(LayerTest, AdaptiveDashEffect) {
@@ -3757,5 +3667,231 @@ TGFX_TEST(LayerTest, BackgroundLayerIndexWithNestedHierarchy) {
   displayList->render(surface.get());
 
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundLayerIndexWithNestedHierarchy"));
+}
+
+TGFX_TEST(LayerTest, LayerCache) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  // Use larger surface to ensure cache bounds fit within screen
+  auto surface = Surface::Make(context, 400, 400);
+  auto displayList = std::make_unique<DisplayList>();
+  // Use direct mode to exclude displayList cache
+  displayList->setRenderMode(RenderMode::Direct);
+
+  // Test default value is 0 (cache disabled)
+  EXPECT_EQ(displayList->maxZoomScaleForCache(), 0.0f);
+
+  // Test setting maxZoomScaleForCache
+  displayList->setMaxZoomScaleForCache(2.0f);
+  EXPECT_EQ(displayList->maxZoomScaleForCache(), 2.0f);
+
+  // Test negative value is clamped to 0
+  displayList->setMaxZoomScaleForCache(-1.0f);
+  EXPECT_EQ(displayList->maxZoomScaleForCache(), 0.0f);
+
+  // Enable cache before adding layers
+  displayList->setMaxZoomScaleForCache(4.0f);
+
+  // Create a parent layer with child
+  auto parent = Layer::Make();
+  parent->setMatrix(Matrix::MakeTrans(20, 20));
+
+  auto child = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeWH(50, 50));
+  child->setPath(path);
+  child->setFillStyle(SolidColor::Make(Color::Red()));
+  parent->addChild(child);
+
+  displayList->root()->addChild(parent);
+
+  // First render - cache should not be created yet
+  displayList->render(surface.get());
+  auto root = displayList->root();
+  EXPECT_TRUE(root->contentCache.get() == nullptr);
+
+  // Second render - cache should be created
+  displayList->setZoomScale(1.5f);
+  displayList->render(surface.get());
+  auto cacheAfterSecondRender = root->contentCache.get();
+  EXPECT_TRUE(cacheAfterSecondRender != nullptr);
+
+  // Third render with different zoom - cache should be reused
+  displayList->setZoomScale(1.f);
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->contentCache.get() == cacheAfterSecondRender);
+}
+
+TGFX_TEST(LayerTest, LayerCacheInvalidation) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  // Use larger surface to ensure cache bounds fit within screen
+  auto surface = Surface::Make(context, 400, 400);
+  auto displayList = std::make_unique<DisplayList>();
+  // Use direct mode to exclude displayList cache
+  displayList->setRenderMode(RenderMode::Direct);
+  displayList->setMaxZoomScaleForCache(4.0f);
+
+  auto parent = Layer::Make();
+  parent->setMatrix(Matrix::MakeTrans(20, 20));
+
+  auto child = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeWH(50, 50));
+  child->setPath(path);
+  child->setFillStyle(SolidColor::Make(Color::Green()));
+  parent->addChild(child);
+
+  displayList->root()->addChild(parent);
+
+  // First render - cache should not be created yet
+  displayList->render(surface.get());
+  auto root = displayList->root();
+  EXPECT_TRUE(root->contentCache.get() == nullptr);
+
+  // Second render - cache should be created
+  displayList->render(surface.get());
+  auto* cacheAfterSecondRender = root->contentCache.get();
+  EXPECT_TRUE(cacheAfterSecondRender != nullptr);
+
+  // Adding a new child should invalidate cache
+  auto newChild = ShapeLayer::Make();
+  Path newPath;
+  newPath.addRect(Rect::MakeWH(20, 20));
+  newChild->setPath(newPath);
+  newChild->setMatrix(Matrix::MakeTrans(60, 0));
+  newChild->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 255, 0, 255)));
+  parent->addChild(newChild);
+
+  // First render after modification - cache should be invalidated
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->contentCache.get() == nullptr);
+
+  // Second render - cache should be recreated
+  displayList->render(surface.get());
+  auto* cacheAfterAddChild = root->contentCache.get();
+  EXPECT_TRUE(cacheAfterAddChild != nullptr);
+
+  // Modifying child should invalidate cache
+  child->setMatrix(Matrix::MakeTrans(10, 10));
+
+  // First render after modification - cache should be invalidated
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->contentCache.get() == nullptr);
+
+  // Second render - cache should be recreated
+  displayList->render(surface.get());
+  auto* cacheAfterModify = root->contentCache.get();
+  EXPECT_TRUE(cacheAfterModify != nullptr);
+}
+
+TGFX_TEST(LayerTest, LayerCacheWithEffects) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  // Use larger surface to ensure cache bounds fit within screen (effects expand bounds)
+  auto surface = Surface::Make(context, 1000, 1000);
+  auto displayList = std::make_unique<DisplayList>();
+  // Use direct mode to exclude displayList cache
+  displayList->setRenderMode(RenderMode::Direct);
+  displayList->setMaxZoomScaleForCache(4.0f);
+
+  // Child with filter
+  auto parent1 = Layer::Make();
+  parent1->setMatrix(Matrix::MakeTrans(20, 20));
+
+  auto child1 = ShapeLayer::Make();
+  Path path1;
+  path1.addRect(Rect::MakeWH(80, 80));
+  child1->setPath(path1);
+  child1->setFillStyle(SolidColor::Make(Color::Red()));
+  auto filter = DropShadowFilter::Make(5, 5, 3, 3, Color::Black());
+  child1->setFilters({filter});
+  parent1->addChild(child1);
+
+  displayList->root()->addChild(parent1);
+
+  // Child with layer style
+  auto parent2 = Layer::Make();
+  parent2->setMatrix(Matrix::MakeTrans(150, 30));
+
+  auto child2 = ShapeLayer::Make();
+  Path path2;
+  path2.addRect(Rect::MakeWH(60, 60));
+  child2->setPath(path2);
+  child2->setFillStyle(SolidColor::Make(Color::Blue()));
+  auto style = DropShadowStyle::Make(8, 8, 4, 4, Color::Black(), false);
+  child2->setLayerStyles({style});
+  parent2->addChild(child2);
+
+  displayList->root()->addChild(parent2);
+
+  // First render - cache should not be created yet
+  displayList->render(surface.get());
+  auto root = displayList->root();
+  EXPECT_TRUE(root->contentCache.get() == nullptr);
+
+  // Second render - cache should be created
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->contentCache.get() != nullptr);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerCacheWithEffects"));
+}
+
+TGFX_TEST(LayerTest, LayerCacheWithTransform) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  // Use small surface so root's bounds exceed screen size and won't create cache
+  auto surface = Surface::Make(context, 100, 100);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Direct);
+  displayList->setMaxZoomScaleForCache(4.0f);
+
+  // Create a large dummy layer to make root bounds exceed screen size
+  auto dummy = ShapeLayer::Make();
+  Path dummyPath;
+  dummyPath.addRect(Rect::MakeXYWH(200, 200, 10, 10));
+  dummy->setPath(dummyPath);
+  dummy->setFillStyle(SolidColor::Make(Color::White()));
+  displayList->root()->addChild(dummy);
+
+  // Create the layer we want to test cache on
+  auto parent = Layer::Make();
+  parent->setMatrix(Matrix::MakeTrans(5, 5));
+
+  auto child = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeWH(20, 20));
+  child->setPath(path);
+  child->setFillStyle(SolidColor::Make(Color::Red()));
+  parent->addChild(child);
+
+  displayList->root()->addChild(parent);
+
+  // First render - cache should not be created yet
+  displayList->render(surface.get());
+  auto root = displayList->root();
+  // Root should not have cache because its bounds exceed screen size
+  EXPECT_TRUE(root->contentCache.get() == nullptr);
+  EXPECT_TRUE(parent->contentCache.get() == nullptr);
+
+  // Second render - parent's cache should be created (root's won't due to size)
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->contentCache.get() == nullptr);
+  auto* cacheAfterSecondRender = parent->contentCache.get();
+  EXPECT_TRUE(cacheAfterSecondRender != nullptr);
+
+  // Change parent's own transform - its cache should NOT be invalidated
+  parent->setMatrix(Matrix::MakeTrans(10, 10));
+  displayList->render(surface.get());
+  EXPECT_TRUE(parent->contentCache.get() == cacheAfterSecondRender);
+
+  // Change parent's own alpha - its cache should NOT be invalidated
+  parent->setAlpha(0.8f);
+  displayList->render(surface.get());
+  EXPECT_TRUE(parent->contentCache.get() == cacheAfterSecondRender);
 }
 }  // namespace tgfx

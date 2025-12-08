@@ -23,24 +23,23 @@
 #include "tgfx/core/Image.h"
 
 namespace tgfx {
-class RasterizedContent {
+class RasterizedCache {
  public:
   /**
-   * Creates a RasterizedContent by rasterizing the image to a texture and caching it with the
-   * uniqueKey. The texture can be retrieved later using the uniqueKey.
+   * Creates a RasterizedCache by rasterizing the image to a texture and caching it with an
+   * internally generated uniqueKey. The texture can be retrieved later using the uniqueKey.
    * @param cachedImage Output parameter that receives the cached texture image. The caller should
    *                    use this image for immediate drawing to ensure the texture is created.
    */
-  static std::unique_ptr<RasterizedContent> MakeFrom(Context* context, float contentScale,
-                                                     std::shared_ptr<Image> image,
-                                                     const Matrix& imageMatrix,
-                                                     const UniqueKey& uniqueKey,
-                                                     std::shared_ptr<Image>* cachedImage = nullptr);
+  static std::unique_ptr<RasterizedCache> MakeFrom(Context* context, float contentScale,
+                                                   std::shared_ptr<Image> image,
+                                                   const Matrix& imageMatrix,
+                                                   std::shared_ptr<Image>* cachedImage = nullptr);
 
-  RasterizedContent(uint32_t contextID, float contentScale, const UniqueKey& uniqueKey,
-                    const Matrix& matrix, std::shared_ptr<ColorSpace> colorSpace)
-      : _contextID(contextID), _contentScale(contentScale), _uniqueKey(uniqueKey), matrix(matrix),
-        _colorSpace(std::move(colorSpace)) {
+  RasterizedCache(uint32_t contextID, float contentScale, const Matrix& matrix,
+                  std::shared_ptr<ColorSpace> colorSpace)
+      : _contextID(contextID), _contentScale(contentScale), _uniqueKey(UniqueKey::Make()),
+        matrix(matrix), _colorSpace(std::move(colorSpace)) {
   }
 
   /**
@@ -56,6 +55,13 @@ class RasterizedContent {
 
   Matrix getMatrix() const {
     return matrix;
+  }
+
+  /**
+   * Returns the unique key used to cache the texture.
+   */
+  const UniqueKey& uniqueKey() const {
+    return _uniqueKey;
   }
 
   /**

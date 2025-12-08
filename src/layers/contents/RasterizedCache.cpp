@@ -16,18 +16,17 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "RasterizedContent.h"
+#include "RasterizedCache.h"
 #include "core/images/TextureImage.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/TPArgs.h"
 
 namespace tgfx {
-std::unique_ptr<RasterizedContent> RasterizedContent::MakeFrom(Context* context, float contentScale,
-                                                               std::shared_ptr<Image> image,
-                                                               const Matrix& imageMatrix,
-                                                               const UniqueKey& uniqueKey,
-                                                               std::shared_ptr<Image>* cachedImage) {
-  if (context == nullptr || image == nullptr || uniqueKey.empty()) {
+std::unique_ptr<RasterizedCache> RasterizedCache::MakeFrom(Context* context, float contentScale,
+                                                           std::shared_ptr<Image> image,
+                                                           const Matrix& imageMatrix,
+                                                           std::shared_ptr<Image>* cachedImage) {
+  if (context == nullptr || image == nullptr) {
     return nullptr;
   }
   auto width = image->width();
@@ -36,24 +35,25 @@ std::unique_ptr<RasterizedContent> RasterizedContent::MakeFrom(Context* context,
     return nullptr;
   }
   // Lock the texture proxy from the image.
-  TPArgs tpArgs(context, 0, false, 1.0f);
+  TPArgs tpArgs(context, 0, false, 1.0f, BackingFit::Exact);
   auto textureProxy = image->lockTextureProxy(tpArgs);
   if (textureProxy == nullptr) {
     return nullptr;
   }
+  auto cache = std::make_unique<RasterizedCache>(context->uniqueID(), contentScale, imageMatrix,
+                                                 image->colorSpace());
   // Assign unique key to the texture proxy for caching.
   auto proxyProvider = context->proxyProvider();
-  proxyProvider->assignProxyUniqueKey(textureProxy, uniqueKey);
-  textureProxy->assignUniqueKey(uniqueKey);
+  proxyProvider->assignProxyUniqueKey(textureProxy, cache->uniqueKey());
+  textureProxy->assignUniqueKey(cache->uniqueKey());
   // Return the cached image so the caller can use it for immediate drawing.
   if (cachedImage != nullptr) {
     *cachedImage = TextureImage::Wrap(std::move(textureProxy), image->colorSpace());
   }
-  return std::make_unique<RasterizedContent>(context->uniqueID(), contentScale, uniqueKey,
-                                             imageMatrix, image->colorSpace());
+  return cache;
 }
 
-bool RasterizedContent::valid(Context* context) const {
+bool RasterizedCache::valid(Context* context) const {
   if (context == nullptr || context->uniqueID() != _contextID || _uniqueKey.empty()) {
     return false;
   }
@@ -62,9 +62,9 @@ bool RasterizedContent::valid(Context* context) const {
   return textureProxy != nullptr;
 }
 
-void RasterizedContent::draw(Context* context, Canvas* canvas, bool antiAlias, float alpha,
-                             const std::shared_ptr<MaskFilter>& mask, BlendMode blendMode,
-                             const Matrix3D* transform) const {
+void RasterizedCache::draw(Context* context, Canvas* canvas, bool antiAlias, float alpha,
+                           const std::shared_ptr<MaskFilter>& mask, BlendMode blendMode,
+                           const Matrix3D* transform) const {
   if (context == nullptr || canvas == nullptr) {
     return;
   }
@@ -108,10 +108,10 @@ void RasterizedContent::draw(Context* context, Canvas* canvas, bool antiAlias, f
         Matrix3D::MakeScale(1.0f / matrix.getScaleX(), 1.0f / matrix.getScaleY(), 1.0f);
     adaptedMatrix = invScaleMatrix * invOffsetMatrix * adaptedMatrix * offsetMatrix * scaleMatrix;
     auto imageFilter = ImageFilter::Transform3D(adaptedMatrix);
-    auto offSet = Point();
-    auto filteredeImage = image->makeWithFilter(imageFilter, &offSet);
-    canvas->concat(Matrix::MakeTrans(offSet.x, offSet.y));
-    canvas->drawImage(filteredeImage, &paint);
+    auto offset = Point();
+    auto filteredImage = image->makeWithFilter(imageFilter, &offset);
+    canvas->concat(Matrix::MakeTrans(offset.x, offset.y));
+    canvas->drawImage(filteredImage, &paint);
   }
   canvas->setMatrix(oldMatrix);
 }

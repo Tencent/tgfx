@@ -21,7 +21,6 @@
 #include "core/utils/DecomposeRects.h"
 #include "core/utils/Log.h"
 #include "layers/DrawArgs.h"
-#include "tgfx/layers/DisplayList.h"
 
 namespace tgfx {
 static float UnionArea(const Rect& rect1, const Rect& rect2) {
@@ -32,7 +31,7 @@ static float UnionArea(const Rect& rect1, const Rect& rect2) {
   return (right - left) * (bottom - top);
 }
 
-std::shared_ptr<RootLayer> RootLayer::Make(DisplayList*) {
+std::shared_ptr<RootLayer> RootLayer::Make() {
   return std::shared_ptr<RootLayer>(new RootLayer());
 }
 

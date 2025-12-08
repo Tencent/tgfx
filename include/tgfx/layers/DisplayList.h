@@ -337,7 +337,7 @@ class DisplayList {
 
   int getMaxTileCountPerAtlas(Context* context) const;
 
-  void drawTileTask(const DrawTask& task, int renderSurfaceWidth, int renderSurfaceHeight) const;
+  void drawTileTask(const DrawTask& task, int screenWidth, int screenHeight) const;
 
   void drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* surface, bool autoClear) const;
 
@@ -348,7 +348,7 @@ class DisplayList {
   void resetCaches();
 
   void drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
-                     bool autoClear, int renderSurfaceWidth, int renderSurfaceHeight) const;
+                     bool autoClear, int screenWidth, int screenHeight) const;
 
   void updateMousePosition();
 };

@@ -63,7 +63,6 @@ class BackgroundContext {
       : context(context), imageMatrix(matrix), backgroundRect(rect),
         colorSpace(std::move(colorSpace)){};
   Context* context = nullptr;
-  // Surface -> world transformation matrix, used for internal calculations.
   Matrix imageMatrix = Matrix::I();
   Rect backgroundRect = Rect::MakeEmpty();
   std::shared_ptr<ColorSpace> colorSpace = nullptr;

@@ -32,7 +32,7 @@
 
 namespace tgfx {
 class LayerContent;
-class RasterizedContent;
+class RasterizedCache;
 class DisplayList;
 class DrawArgs;
 class RegionTransformer;
@@ -593,7 +593,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   std::shared_ptr<ImageFilter> getImageFilter(float contentScale);
 
-  RasterizedContent* getRasterizedCache(const DrawArgs& args, const Matrix& renderMatrix);
+  RasterizedCache* getRasterizedCache(const DrawArgs& args, const Matrix& renderMatrix);
 
   std::shared_ptr<Image> getRasterizedImage(const DrawArgs& args, float contentScale,
                                             Matrix* drawingMatrix);
@@ -698,7 +698,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   void invalidateCache();
 
-  RasterizedContent* getLayerCachedContent(const DrawArgs& args, float contentScale);
+  RasterizedCache* getContentCache(const DrawArgs& args, float contentScale);
 
   struct {
     bool dirtyContent : 1;        // layer's content needs updating
@@ -730,8 +730,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::vector<std::shared_ptr<LayerFilter>> _filters = {};
   std::vector<std::shared_ptr<LayerStyle>> _layerStyles = {};
   float _rasterizationScale = 0.0f;
-  std::unique_ptr<RasterizedContent> rasterizedContent;
-  std::unique_ptr<RasterizedContent> layerCachedContent;
+  std::unique_ptr<RasterizedCache> rasterizedContent;
+  std::unique_ptr<RasterizedCache> contentCache;
   std::shared_ptr<LayerContent> layerContent = nullptr;
   Rect renderBounds = {};                       // in global coordinates
   Rect* contentBounds = nullptr;                //  in global coordinates

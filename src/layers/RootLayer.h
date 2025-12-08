@@ -36,7 +36,7 @@ class RootLayer : public Layer {
   /**
    * Creates a new RootLayer instance.
    */
-  static std::shared_ptr<RootLayer> Make(DisplayList* displayList);
+  static std::shared_ptr<RootLayer> Make();
 
   ~RootLayer() override;
 
@@ -82,8 +82,6 @@ class RootLayer : public Layer {
                  const Matrix3D* transform = nullptr) override;
 
  private:
-  RootLayer() = default;
-
   std::vector<Rect> dirtyRects = {};
   std::vector<float> dirtyAreas = {};
   Color _backgroundColor = Color::Transparent();

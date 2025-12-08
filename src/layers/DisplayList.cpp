@@ -21,7 +21,6 @@
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/TileSortCompareFunc.h"
-#include "gpu/ResourceCache.h"
 #include "inspect/InspectorMark.h"
 #include "layers/DrawArgs.h"
 #include "layers/RootLayer.h"
@@ -159,7 +158,7 @@ static std::vector<std::pair<int, int>> GetSortedTiles(int startX, int endX, int
   return tiles;
 }
 
-DisplayList::DisplayList() : _root(RootLayer::Make(this)) {
+DisplayList::DisplayList() : _root(RootLayer::Make()) {
   _root->_root = _root.get();
   SET_DISPLAY_LIST(this);
 }
@@ -859,8 +858,7 @@ int DisplayList::getMaxTileCountPerAtlas(Context* context) const {
   return (maxTextureSize / _tileSize) * (maxTextureSize / _tileSize);
 }
 
-void DisplayList::drawTileTask(const DrawTask& task, int renderSurfaceWidth,
-                               int renderSurfaceHeight) const {
+void DisplayList::drawTileTask(const DrawTask& task, int screenWidth, int screenHeight) const {
   auto surface = surfaceCaches[task.sourceIndex()].get();
   DEBUG_ASSERT(surface != nullptr);
   auto canvas = surface->getCanvas();
@@ -875,7 +873,7 @@ void DisplayList::drawTileTask(const DrawTask& task, int renderSurfaceWidth,
   viewMatrix.postTranslate(offsetX, offsetY);
   auto clipRect = tileRect;
   clipRect.offset(offsetX, offsetY);
-  drawRootLayer(surface, clipRect, viewMatrix, true, renderSurfaceWidth, renderSurfaceHeight);
+  drawRootLayer(surface, clipRect, viewMatrix, true, screenWidth, screenHeight);
 }
 
 void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* surface,
@@ -954,8 +952,7 @@ void DisplayList::resetCaches() {
 }
 
 void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
-                                bool autoClear, int renderSurfaceWidth,
-                                int renderSurfaceHeight) const {
+                                bool autoClear, int screenWidth, int screenHeight) const {
   DEBUG_ASSERT(surface != nullptr);
   auto canvas = surface->getCanvas();
   auto context = surface->getContext();
@@ -979,12 +976,9 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   args.blurBackground =
       _root->createBackgroundContext(context, drawRect, viewMatrix, false, args.dstColorSpace);
   args.dstColorSpace = surface->colorSpace();
-  if (_renderMode == RenderMode::Tiled) {
-    args.maxZoomScale = _maxZoomScaleForCache;
-    args.currentZoomScale = zoomScale();
-  }
-  args.renderSurfaceWidth = renderSurfaceWidth;
-  args.renderSurfaceHeight = renderSurfaceHeight;
+  args.cacheScaleRatio = _maxZoomScaleForCache / zoomScale();
+  args.screenWidth = screenWidth;
+  args.screenHeight = screenHeight;
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
 }
 

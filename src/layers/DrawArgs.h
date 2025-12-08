@@ -56,17 +56,11 @@ class DrawArgs {
   bool forceDrawBackground = false;
   std::shared_ptr<ColorSpace> dstColorSpace = ColorSpace::SRGB();
 
-  // The maximum zoom scale threshold for enabling layer cache. When maxZoomScale is 0, layer cache
-  // is disabled. When currentZoomScale <= maxZoomScale, layer cache is enabled. The ratio of
-  // maxZoomScale to currentZoomScale determines the maximum content scale for caching.
-  float maxZoomScale = 0.0f;
-
-  // The current zoom scale of the display list. Used together with maxZoomScale to calculate the
-  // maximum content scale for layer caching.
-  float currentZoomScale = 1.0f;
-
-  // The size of the render surface. Used to limit the maximum cache size for layer caching.
-  int renderSurfaceWidth = 0;
-  int renderSurfaceHeight = 0;
+  // The ratio of maxZoomScaleForCache to current zoomScale, used to determine if layer caching
+  // should be enabled and the maximum content scale for caching.
+  float cacheScaleRatio = 0.0f;
+  // Used to limit the maximum cache size for layer caching.
+  int screenWidth = 0;
+  int screenHeight = 0;
 };
 }  // namespace tgfx

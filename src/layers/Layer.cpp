@@ -19,15 +19,11 @@
 #include "tgfx/layers/Layer.h"
 #include <atomic>
 #include "contents/LayerContent.h"
-#include "contents/RasterizedContent.h"
+#include "contents/RasterizedCache.h"
 #include "core/Matrix2D.h"
 #include "core/filters/Transform3DImageFilter.h"
-#include "core/images/PictureImage.h"
-#include "core/images/TextureImage.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
-#include "gpu/ProxyProvider.h"
-#include "gpu/resources/ResourceKey.h"
 #include "layers/ContourContext.h"
 #include "layers/DrawArgs.h"
 #include "layers/RegionTransformer.h"
@@ -84,14 +80,6 @@ std::shared_ptr<Picture> Layer::RecordPicture(DrawMode mode, float contentScale,
   contentCanvas->scale(contentScale, contentScale);
   drawFunction(contentCanvas);
   return recorder.finishRecordingAsPicture();
-}
-
-static UniqueKey MakeLayerCacheKey(const Layer* layer, float contentScale) {
-  auto uniqueKey = UniqueKey::Make();
-  BytesKey bytesKey = {};
-  bytesKey.write(static_cast<const void*>(layer));
-  bytesKey.write(contentScale);
-  return UniqueKey::Append(uniqueKey, bytesKey.data(), bytesKey.size());
 }
 
 static std::shared_ptr<Image> ToImageWithOffset(
@@ -205,7 +193,6 @@ Layer::Layer() {
   bitFields.blendMode = static_cast<uint8_t>(BlendMode::SrcOver);
   bitFields.passThroughBackground = true;
   bitFields.matrix3DIsAffine = true;
-  bitFields.cacheable = true;
 }
 
 void Layer::setAlpha(float value) {
@@ -340,7 +327,9 @@ void Layer::setFilters(std::vector<std::shared_ptr<LayerFilter>> value) {
   for (const auto& filter : _filters) {
     filter->attachToLayer(this);
   }
-  invalidateDescendents();
+  invalidateCache();
+  localBounds = nullptr;
+  invalidateTransform();
 }
 
 void Layer::setMask(std::shared_ptr<Layer> value) {
@@ -403,7 +392,9 @@ void Layer::setLayerStyles(std::vector<std::shared_ptr<LayerStyle>> value) {
   for (const auto& layerStyle : _layerStyles) {
     layerStyle->attachToLayer(this);
   }
-  invalidateDescendents();
+  invalidateCache();
+  localBounds = nullptr;
+  invalidateTransform();
 }
 
 void Layer::setExcludeChildEffectsInLayerStyle(bool value) {
@@ -944,7 +935,7 @@ std::shared_ptr<ImageFilter> Layer::getImageFilter(float contentScale) {
   return ImageFilter::Compose(filters);
 }
 
-RasterizedContent* Layer::getRasterizedCache(const DrawArgs& args, const Matrix& renderMatrix) {
+RasterizedCache* Layer::getRasterizedCache(const DrawArgs& args, const Matrix& renderMatrix) {
   if (!bitFields.shouldRasterize || args.context == nullptr ||
       (args.drawMode == DrawMode::Background && hasBackgroundStyle()) ||
       args.drawMode == DrawMode::Contour || args.excludeEffects) {
@@ -963,9 +954,8 @@ RasterizedContent* Layer::getRasterizedCache(const DrawArgs& args, const Matrix&
   if (image == nullptr) {
     return nullptr;
   }
-  auto textureKey = MakeLayerCacheKey(this, contentScale);
-  rasterizedContent = RasterizedContent::MakeFrom(args.context, contentScale, std::move(image),
-                                                  drawingMatrix, textureKey);
+  rasterizedContent =
+      RasterizedCache::MakeFrom(args.context, contentScale, std::move(image), drawingMatrix);
   return rasterizedContent.get();
 }
 
@@ -1030,6 +1020,9 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
   } else {
     // draw directly
     drawDirectly(args, canvas, alpha);
+  }
+  if (args.drawMode == DrawMode::Normal) {
+    bitFields.cacheable = true;
   }
 }
 
@@ -1158,8 +1151,8 @@ std::shared_ptr<Image> Layer::getContentImage(const DrawArgs& contentArgs, float
     }
     drawDirectly(contentArgs, offscreenCanvas, 1.0f, styleExtraSourceTypes);
     Point offset;
-    auto picture = recorder.finishRecordingAsPicture();
-    finalImage = ToImageWithOffset(std::move(picture), &offset, nullptr, contentArgs.dstColorSpace);
+    finalImage = ToImageWithOffset(recorder.finishRecordingAsPicture(), &offset, nullptr,
+                                   contentArgs.dstColorSpace);
     imageMatrix->setScale(1.0f / contentScale, 1.0f / contentScale);
     imageMatrix->preTranslate(offset.x, offset.y);
   }
@@ -1200,10 +1193,10 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   }
   std::shared_ptr<MaskFilter> maskFilter = nullptr;
   auto contentScale = canvas->getMatrix().getMaxScale();
-  RasterizedContent* cache = nullptr;
+  RasterizedCache* cache = nullptr;
   if (auto rasterizedCache = getRasterizedCache(args, canvas->getMatrix())) {
     cache = rasterizedCache;
-  } else if (auto layerCache = getLayerCachedContent(args, contentScale)) {
+  } else if (auto layerCache = getContentCache(args, contentScale)) {
     cache = layerCache;
     // rasterizedCache contains the background layer styles, but layer cache does not because of
     // different background logic.
@@ -1237,22 +1230,24 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     return true;
   }
 
-  if (args.renderFlags & RenderFlags::DisableCache || args.currentZoomScale > args.maxZoomScale ||
+  if (args.renderFlags & RenderFlags::DisableCache || args.cacheScaleRatio < 1.0f ||
       !args.context) {
     return false;
   }
 
-  auto maxContentScale = contentScale * args.maxZoomScale / args.currentZoomScale;
-
-  auto layerBounds = getBounds();
-  if (args.renderSurfaceWidth > 0 && args.renderSurfaceHeight > 0 && layerBounds.width() > 0 &&
-      layerBounds.height() > 0) {
-    auto scaleByWidth = static_cast<float>(args.renderSurfaceWidth) / layerBounds.width();
-    auto scaleByHeight = static_cast<float>(args.renderSurfaceHeight) / layerBounds.height();
-    maxContentScale = std::min(maxContentScale, std::min(scaleByWidth, scaleByHeight));
+  if (_children.empty() && _layerStyles.empty() && _filters.empty()) {
+    return false;
   }
-  // Skip caching if maxContentScale is less than contentScale, which would cause blurry rendering.
-  if (maxContentScale < contentScale) {
+
+  if (!bitFields.cacheable) {
+    return false;
+  }
+
+  auto maxContentScale = contentScale * args.cacheScaleRatio;
+  auto layerBounds = getBounds();
+  layerBounds.scale(maxContentScale, maxContentScale);
+  if (static_cast<int>(ceilf(layerBounds.width())) > args.screenWidth ||
+      static_cast<int>(ceilf(layerBounds.height())) > args.screenHeight) {
     return false;
   }
 
@@ -1285,9 +1280,16 @@ void Layer::drawContentOffscreen(const DrawArgs& args, Canvas* canvas,
   }
 
   auto contentArgs = args;
-  contentArgs.blurBackground = args.blurBackground && hasBackgroundStyle()
-                                   ? args.blurBackground->createSubContext(renderBounds, true)
-                                   : nullptr;
+  auto canPassThroughBlurContext = blendMode == BlendMode::SrcOver && !hasValidMask() &&
+                                   alpha == 1.0 && (_filters.empty() || args.excludeEffects) &&
+                                   transform == nullptr;
+  if (canPassThroughBlurContext) {
+    contentArgs.blurBackground = args.blurBackground;
+  } else if (args.blurBackground && hasBackgroundStyle()) {
+    contentArgs.blurBackground = args.blurBackground->createSubContext(renderBounds, true);
+  } else {
+    contentArgs.blurBackground = nullptr;
+  }
 
   Matrix passthroughImageMatrix = Matrix::I();
   std::shared_ptr<Image> passthroughImage = nullptr;
@@ -1316,16 +1318,18 @@ void Layer::drawContentOffscreen(const DrawArgs& args, Canvas* canvas,
   }
 
   if (cacheContent && args.context) {
-    auto textureKey = MakeLayerCacheKey(this, contentScale);
-    layerCachedContent =
-        RasterizedContent::MakeFrom(args.context, contentScale, std::move(image), imageMatrix,
-                                    textureKey, &image);
+    contentCache = RasterizedCache::MakeFrom(args.context, contentScale, std::move(image),
+                                             imageMatrix, &image);
   }
 
-  image = MakeImageWithTransform(image, transform, &imageMatrix);
+  image = MakeImageWithTransform(std::move(image), transform, &imageMatrix);
 
   if (image == nullptr) {
     return;
+  }
+
+  if (args.blurBackground && !contentArgs.blurBackground) {
+    image = image->makeRasterized();
   }
 
   Paint paint = {};
@@ -1336,7 +1340,6 @@ void Layer::drawContentOffscreen(const DrawArgs& args, Canvas* canvas,
   std::shared_ptr<MaskFilter> maskFilter = nullptr;
   if (hasValidMask()) {
     maskFilter = getMaskFilter(args, contentScale, clipBounds);
-    // if mask filter is nullptr while mask is valid, that means the layer is not visible.
     if (!maskFilter) {
       return;
     }
@@ -1348,10 +1351,12 @@ void Layer::drawContentOffscreen(const DrawArgs& args, Canvas* canvas,
   canvas->drawImage(image, &paint);
   if (args.blurBackground) {
     if (contentArgs.blurBackground) {
-      auto filter = getImageFilter(contentScale);
-      paint.setImageFilter(filter);
-      paint.setMaskFilter(maskFilter);
-      contentArgs.blurBackground->drawToParent(paint);
+      if (!canPassThroughBlurContext) {
+        auto filter = getImageFilter(contentScale);
+        paint.setImageFilter(filter);
+        paint.setMaskFilter(maskFilter);
+        contentArgs.blurBackground->drawToParent(paint);
+      }
     } else {
       auto backgroundCanvas = args.blurBackground->getCanvas();
       AutoCanvasRestore autoRestoreBg(backgroundCanvas);
@@ -1869,7 +1874,6 @@ bool Layer::hasValidMask() const {
 }
 
 void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, bool forceDirty) {
-  bitFields.cacheable = !bitFields.dirtyDescendents;
   if (!forceDirty && !bitFields.dirtyDescendents) {
     if (maxBackgroundOutset > 0 || bitFields.hasBlendMode) {
       propagateLayerState();
@@ -2102,23 +2106,21 @@ Matrix3D Layer::anchorAdaptedMatrix(const Matrix3D& matrix, const Point& anchor)
 
 void Layer::invalidateCache() {
   rasterizedContent = nullptr;
-  layerCachedContent = nullptr;
+  contentCache = nullptr;
+  bitFields.cacheable = false;
 }
 
-RasterizedContent* Layer::getLayerCachedContent(const DrawArgs& args, float contentScale) {
-  if (args.currentZoomScale > args.maxZoomScale || !args.context) {
+RasterizedCache* Layer::getContentCache(const DrawArgs& args, float contentScale) {
+  if (args.cacheScaleRatio < 1.0f || !args.context) {
     return nullptr;
   }
-  if (!layerCachedContent || layerCachedContent->contextID() != args.context->uniqueID()) {
+  if (!contentCache || contentCache->contextID() != args.context->uniqueID()) {
     return nullptr;
   }
-  if (!layerCachedContent->valid(args.context)) {
+  if (contentCache->contentScale() < contentScale || !contentCache->valid(args.context)) {
     return nullptr;
   }
-  if (layerCachedContent->contentScale() < contentScale) {
-    return nullptr;
-  }
-  return layerCachedContent.get();
+  return contentCache.get();
 }
 
 }  // namespace tgfx
