@@ -25,67 +25,68 @@
 
 namespace tgfx {
 /**
- * Fill specifies how the geometry of a drawing operation is filled.
+ * Brush defines the appearance attributes for rendering geometry, including color, shader,
+ * blending, and filtering options. It applies to both fill and stroke operations.
  */
-class Fill {
+class Brush {
  public:
   /**
-   * Constructs a Fill with default values.
+   * Constructs a Brush with default values.
    */
-  Fill() = default;
+  Brush() = default;
 
   /**
-   * Constructs a Fill with the specified color, blend mode, and antialiasing.
+   * Constructs a Brush with the specified color, blend mode, and antialiasing.
    */
-  Fill(const Color& color, BlendMode blendMode, bool antiAlias = true)
+  Brush(const Color& color, BlendMode blendMode, bool antiAlias = true)
       : color(color), blendMode(blendMode), antiAlias(antiAlias) {
   }
 
   /**
-   * The input color, unpremultiplied, as four floating point values. The default value is opaque
-   * white.
+   * The input color, which is unpremultiplied and in the sRGB gamut, may exceed the 0-1 range. The
+   * default value is opaque white.
    */
   Color color = {};
 
   /**
-   * The blend mode used to combine the fill with the destination pixels.
+   * The blend mode used to combine the brush color with the destination pixels.
    */
   BlendMode blendMode = BlendMode::SrcOver;
 
   /**
-   * Returns true if pixels on the active edges of Path may be drawn with partial transparency. The
+   * Specifies whether pixels on the active edges may be drawn with partial transparency. The
    * default value is true.
    */
   bool antiAlias = true;
 
   /**
-   * Optional colors used when filling a geometry if set, such as a gradient.
+   * Optional shader used to generate colors when rendering, such as gradients or image patterns.
    */
   std::shared_ptr<Shader> shader = nullptr;
 
   /**
-   * Optional mask filter used to modify the alpha channel of the fill when drawing.
+   * Optional mask filter used to modify the alpha channel when drawing.
    */
   std::shared_ptr<MaskFilter> maskFilter = nullptr;
 
   /**
-   * Optional color filter used to modify the color of the fill when drawing.
+   * Optional color filter used to modify the color when drawing.
    */
   std::shared_ptr<ColorFilter> colorFilter = nullptr;
 
   /**
-   * Returns true if the Fill is guaranteed to produce only opaque colors.
+   * Returns true if the Brush is guaranteed to produce only opaque colors.
    */
   bool isOpaque() const;
 
   /**
-   * Returns true if the Paint prevents any drawing.
+   * Returns true if the Brush prevents any drawing.
    */
   bool nothingToDraw() const;
 
   /**
-   * Returns a new Fill applying the given matrix to the shader and mask filter.
+   * Returns a new Brush with the given matrix applied to the shader and mask filter.
    */
-  Fill makeWithMatrix(const Matrix& matrix) const;
+  Brush makeWithMatrix(const Matrix& matrix) const;
 };
 }  // namespace tgfx

@@ -26,8 +26,8 @@ std::shared_ptr<ColorFilter> ColorFilter::Luma() {
 }
 
 PlacementPtr<FragmentProcessor> LumaColorFilter::asFragmentProcessor(
-    Context* context, std::shared_ptr<ColorSpace> colorSpace) const {
-  return LumaFragmentProcessor::Make(context->drawingAllocator(), std::move(colorSpace));
+    Context* context, const std::shared_ptr<ColorSpace>& colorSpace) const {
+  return LumaFragmentProcessor::Make(context->drawingAllocator(), colorSpace);
 }
 
 }  // namespace tgfx

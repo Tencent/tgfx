@@ -45,7 +45,7 @@ class ImageReaderBuffer : public ImageBuffer {
     return imageReader->checkExpired(contentVersion);
   }
 
-  std::shared_ptr<ColorSpace> colorSpace() const override {
+  const std::shared_ptr<ColorSpace>& colorSpace() const override {
     return imageReader->colorSpace();
   }
 
@@ -80,7 +80,7 @@ int ImageReader::height() const {
   return stream->height();
 }
 
-std::shared_ptr<ColorSpace> ImageReader::colorSpace() const {
+const std::shared_ptr<ColorSpace>& ImageReader::colorSpace() const {
   return stream->colorSpace();
 }
 

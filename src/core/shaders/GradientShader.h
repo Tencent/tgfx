@@ -78,7 +78,7 @@ class LinearGradientShader : public GradientShader {
  protected:
   PlacementPtr<FragmentProcessor> asFragmentProcessor(
       const FPArgs& args, const Matrix* uvMatrix,
-      std::shared_ptr<ColorSpace> dstColorSpace) const override;
+      const std::shared_ptr<ColorSpace>& dstColorSpace) const override;
 };
 
 class RadialGradientShader : public GradientShader {
@@ -91,7 +91,7 @@ class RadialGradientShader : public GradientShader {
  protected:
   PlacementPtr<FragmentProcessor> asFragmentProcessor(
       const FPArgs& args, const Matrix* uvMatrix,
-      std::shared_ptr<ColorSpace> dstColorSpace) const override;
+      const std::shared_ptr<ColorSpace>& dstColorSpace) const override;
 };
 
 class ConicGradientShader : public GradientShader {
@@ -104,7 +104,7 @@ class ConicGradientShader : public GradientShader {
  protected:
   PlacementPtr<FragmentProcessor> asFragmentProcessor(
       const FPArgs& args, const Matrix* uvMatrix,
-      std::shared_ptr<ColorSpace> dstColorSpace) const override;
+      const std::shared_ptr<ColorSpace>& dstColorSpace) const override;
 
  private:
   float bias;
@@ -121,6 +121,6 @@ class DiamondGradientShader : public GradientShader {
  protected:
   PlacementPtr<FragmentProcessor> asFragmentProcessor(
       const FPArgs& args, const Matrix* uvMatrix,
-      std::shared_ptr<ColorSpace> dstColorSpace) const override;
+      const std::shared_ptr<ColorSpace>& dstColorSpace) const override;
 };
 }  // namespace tgfx

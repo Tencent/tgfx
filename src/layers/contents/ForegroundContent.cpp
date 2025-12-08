@@ -45,17 +45,17 @@ bool ForegroundContent::hitTestPoint(float localX, float localY, bool shapeHitTe
   return false;
 }
 
-void ForegroundContent::drawDefault(Canvas* canvas, const FillModifier* modifier) const {
+void ForegroundContent::drawDefault(Canvas* canvas, const BrushModifier* modifier) const {
   if (background) {
     background->playback(canvas, modifier);
   }
 }
 
-void ForegroundContent::drawForeground(Canvas* canvas, const FillModifier* modifier) const {
+void ForegroundContent::drawForeground(Canvas* canvas, const BrushModifier* modifier) const {
   foreground->playback(canvas, modifier);
 }
 
-void ForegroundContent::drawContour(Canvas* canvas, const FillModifier* modifier) const {
+void ForegroundContent::drawContour(Canvas* canvas, const BrushModifier* modifier) const {
   if (background) {
     background->playback(canvas, modifier);
   }

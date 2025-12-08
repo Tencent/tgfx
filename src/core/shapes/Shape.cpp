@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,8 +16,24 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-#include "tgfx/core/Color.h"
+#include "tgfx/core/Shape.h"
+
 namespace tgfx {
-PMColor ToPMColor(const Color& color, std::shared_ptr<ColorSpace> dstColorSpace);
+Shape::~Shape() {
+  auto oldBounds = bounds.exchange(nullptr, std::memory_order_acq_rel);
+  delete oldBounds;
+}
+
+Rect Shape::getBounds() const {
+  if (auto cachedBounds = bounds.load(std::memory_order_acquire)) {
+    return *cachedBounds;
+  }
+  auto totalBounds = onGetBounds();
+  auto newBounds = new Rect(totalBounds);
+  Rect* oldBounds = nullptr;
+  if (!bounds.compare_exchange_strong(oldBounds, newBounds, std::memory_order_acq_rel)) {
+    delete newBounds;
+  }
+  return totalBounds;
+}
 }  // namespace tgfx

@@ -55,7 +55,7 @@ class SurfaceTexture : public ImageStream {
    */
   void notifyFrameAvailable();
 
-  std::shared_ptr<ColorSpace> colorSpace() const override {
+  const std::shared_ptr<ColorSpace>& colorSpace() const override {
     return _colorSpace;
   }
 

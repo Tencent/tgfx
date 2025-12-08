@@ -67,12 +67,15 @@ class ShapeStyle : public LayerProperty {
    */
   void setMatrix(const Matrix& value);
 
+  /**
+   * Returns the final shader combined with the matrix.
+   */
+  std::shared_ptr<Shader> getShader() const;
+
  protected:
   enum class Type { Gradient, ImagePattern, SolidColor };
 
   virtual Type getType() const = 0;
-
-  std::shared_ptr<Shader> getShader() const;
 
   /**
    * Returns the current shader that will be used to draw the shape.

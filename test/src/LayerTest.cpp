@@ -1250,8 +1250,7 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
   SamplingOptions options(FilterMode::Nearest, MipmapMode::None);
   imageLayer->setSampling(options);
   rootLayer->addChild(imageLayer);
-  auto imageLayerBounds = imageLayer->getBounds(nullptr, true);
-  imageLayer->getGlobalMatrix().mapRect(&imageLayerBounds);
+  auto imageLayerBounds = imageLayer->getBounds(displayList->root(), true);
   printf("imageLayerBounds: (%f, %f, %f, %f)\n", imageLayerBounds.left, imageLayerBounds.top,
          imageLayerBounds.right, imageLayerBounds.bottom);
 
@@ -1267,8 +1266,7 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
   shaperLayer->setFillStyle(fillStyle);
   shaperLayer->setMatrix(Matrix::MakeTrans(100.0f, 0.0f) * Matrix::MakeScale(2.0f, 2.0f));
   rootLayer->addChild(shaperLayer);
-  auto shaperLayerBounds = shaperLayer->getBounds(nullptr, true);
-  shaperLayer->getGlobalMatrix().mapRect(&shaperLayerBounds);
+  auto shaperLayerBounds = shaperLayer->getBounds(displayList->root(), true);
   printf("shaperLayerBounds: (%f, %f, %f, %f)\n", shaperLayerBounds.left, shaperLayerBounds.top,
          shaperLayerBounds.right, shaperLayerBounds.bottom);
 
@@ -1280,8 +1278,7 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
   tgfx::Font font(typeface, 20);
   textLayer->setFont(font);
   rootLayer->addChild(textLayer);
-  auto textLayerBounds = textLayer->getBounds(nullptr, true);
-  textLayer->getGlobalMatrix().mapRect(&textLayerBounds);
+  auto textLayerBounds = textLayer->getBounds(displayList->root(), true);
   printf("textLayerBounds: (%f, %f, %f, %f)\n", textLayerBounds.left, textLayerBounds.top,
          textLayerBounds.right, textLayerBounds.bottom);
 
@@ -1295,8 +1292,7 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
   auto fillStyle2 = SolidColor::Make(Color::FromRGBA(175, 27, 193, 255));
   shaperLayer2->setFillStyle(fillStyle2);
   rootLayer->addChild(shaperLayer2);
-  auto shaperLayer2Bounds = shaperLayer2->getBounds(nullptr, true);
-  shaperLayer2->getGlobalMatrix().mapRect(&shaperLayer2Bounds);
+  auto shaperLayer2Bounds = shaperLayer2->getBounds(displayList->root(), true);
   printf("shaperLayer2Bounds: (%f, %f, %f, %f)\n", shaperLayer2Bounds.left, shaperLayer2Bounds.top,
          shaperLayer2Bounds.right, shaperLayer2Bounds.bottom);
 
@@ -1308,8 +1304,8 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
   auto fillStyle0 = SolidColor::Make(Color::FromRGBA(130, 182, 41, 0));
   shapeLayerInvisibleFill->setFillStyle(fillStyle0);
   rootLayer->addChild(shapeLayerInvisibleFill);
-  auto shapeLayerInvisibleFillBounds = shapeLayerInvisibleFill->getBounds(nullptr, true);
-  shapeLayerInvisibleFill->getGlobalMatrix().mapRect(&shapeLayerInvisibleFillBounds);
+  auto shapeLayerInvisibleFillBounds =
+      shapeLayerInvisibleFill->getBounds(displayList->root(), true);
   printf("shapeLayerInvisibleFillBounds: (%f, %f, %f, %f)\n", shapeLayerInvisibleFillBounds.left,
          shapeLayerInvisibleFillBounds.top, shapeLayerInvisibleFillBounds.right,
          shapeLayerInvisibleFillBounds.bottom);
@@ -1323,8 +1319,8 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
       tgfx::SolidColor::Make(tgfx::Color::FromRGBA(130, 182, 41, 0)));
   rootLayer->addChild(shapeLayerInvisibleStroke);
 
-  auto shapeLayerInvisibleStrokeBounds = shapeLayerInvisibleStroke->getBounds(nullptr, true);
-  shapeLayerInvisibleStroke->getGlobalMatrix().mapRect(&shapeLayerInvisibleStrokeBounds);
+  auto shapeLayerInvisibleStrokeBounds =
+      shapeLayerInvisibleStroke->getBounds(displayList->root(), true);
   printf("shapeLayerInvisibleStrokeBounds: (%f, %f, %f, %f)\n",
          shapeLayerInvisibleStrokeBounds.left, shapeLayerInvisibleStrokeBounds.top,
          shapeLayerInvisibleStrokeBounds.right, shapeLayerInvisibleStrokeBounds.bottom);
@@ -1750,8 +1746,7 @@ TGFX_TEST(LayerTest, hitTestPointNested) {
   imageLayer->setMatrix(Matrix::MakeScale(3.0f));
   parentLayer->addChild(imageLayer);
   rootLayer->addChild(parentLayer);
-  auto imageLayerBounds = imageLayer->getBounds(nullptr, true);
-  imageLayer->getGlobalMatrix().mapRect(&imageLayerBounds);
+  auto imageLayerBounds = imageLayer->getBounds(displayList->root(), true);
   printf("imageLayerBounds: (%f, %f, %f, %f)\n", imageLayerBounds.left, imageLayerBounds.top,
          imageLayerBounds.right, imageLayerBounds.bottom);
 
@@ -1769,8 +1764,7 @@ TGFX_TEST(LayerTest, hitTestPointNested) {
   shaperLayer->setFillStyle(fillStyle);
   childLayer->addChild(shaperLayer);
   parentLayer->addChild(childLayer);
-  auto shaperLayerBounds = shaperLayer->getBounds(nullptr, true);
-  shaperLayer->getGlobalMatrix().mapRect(&shaperLayerBounds);
+  auto shaperLayerBounds = shaperLayer->getBounds(displayList->root(), true);
   printf("shaperLayerBounds: (%f, %f, %f, %f)\n", shaperLayerBounds.left, shaperLayerBounds.top,
          shaperLayerBounds.right, shaperLayerBounds.bottom);
 
@@ -1787,13 +1781,11 @@ TGFX_TEST(LayerTest, hitTestPointNested) {
   textLayer->setFont(font);
   grandsonLayer->addChild(textLayer);
   childLayer->addChild(grandsonLayer);
-  auto textLayerBounds = textLayer->getBounds(nullptr, true);
-  textLayer->getGlobalMatrix().mapRect(&textLayerBounds);
+  auto textLayerBounds = textLayer->getBounds(displayList->root(), true);
   printf("textLayerBounds: (%f, %f, %f, %f)\n", textLayerBounds.left, textLayerBounds.top,
          textLayerBounds.right, textLayerBounds.bottom);
 
-  auto rootLayerBounds = rootLayer->getBounds(nullptr, true);
-  rootLayer->getGlobalMatrix().mapRect(&rootLayerBounds);
+  auto rootLayerBounds = rootLayer->getBounds(displayList->root(), true);
   printf("rootLayerBounds: (%f, %f, %f, %f)\n", rootLayerBounds.left, rootLayerBounds.top,
          rootLayerBounds.right, rootLayerBounds.bottom);
 
@@ -3282,15 +3274,6 @@ TGFX_TEST(LayerTest, PassThrough_Test) {
   displayList.root()->addChild(shapeLayer);
   displayList.render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PassThrough_Test"));
-
-  PictureRecorder recorder;
-  auto newCanvas = recorder.beginRecording();
-  newCanvas->rotate(45, 30, 30);
-  shapeLayer->draw(newCanvas);
-  auto picture = recorder.finishRecordingAsPicture();
-  canvas->clear();
-  canvas->drawPicture(picture);
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PassThrough_Test_record"));
   Layer::SetDefaultAllowsGroupOpacity(value);
 }
 
@@ -3439,4 +3422,263 @@ TGFX_TEST(LayerTest, Matrix) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D_2D_3D"));
 }
 
+TGFX_TEST(LayerTest, RasterizedContentWithMask) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 200);
+  auto displayList = std::make_unique<DisplayList>();
+
+  // Create a rasterized content layer with a mask
+  auto rootLayer = Layer::Make();
+  displayList->root()->addChild(rootLayer);
+
+  // Create a rasterized content layer with some shapes
+  auto rasterizedLayer = Layer::Make();
+  rasterizedLayer->setMatrix(Matrix::MakeTrans(50, 50));
+  rasterizedLayer->setShouldRasterize(true);
+  rootLayer->addChild(rasterizedLayer);
+
+  // Add a blue rectangle
+  auto blueRect = ShapeLayer::Make();
+  Path bluePath;
+  bluePath.addRect(Rect::MakeWH(80, 80));
+  blueRect->setPath(bluePath);
+  blueRect->setFillStyle(SolidColor::Make(Color::Blue()));
+  rasterizedLayer->addChild(blueRect);
+
+  // Add a red oval
+  auto redOval = ShapeLayer::Make();
+  redOval->setMatrix(Matrix::MakeTrans(60, 0));
+  Path ovalPath;
+  ovalPath.addOval(Rect::MakeXYWH(0, 0, 80, 80));
+  redOval->setPath(ovalPath);
+  redOval->setFillStyle(SolidColor::Make(Color::Red()));
+  rasterizedLayer->addChild(redOval);
+
+  // Create a mask for the rasterized layer
+  auto maskLayer = ShapeLayer::Make();
+  Path maskPath;
+  maskPath.addOval(Rect::MakeXYWH(-10, -10, 100, 100));
+  maskLayer->setPath(maskPath);
+  maskLayer->setFillStyle(SolidColor::Make(Color::White()));
+  rasterizedLayer->setMask(maskLayer);
+  rootLayer->addChild(maskLayer);
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/RasterizedContentWithMask"));
+}
+
+TGFX_TEST(LayerTest, DisplayListBackground) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  auto displayList = std::make_unique<DisplayList>();
+
+  // Test default background color (transparent)
+  auto defaultColor = displayList->backgroundColor();
+  EXPECT_EQ(defaultColor, Color::Transparent());
+
+  // Test setting opaque background color
+  auto opaqueColor = Color::FromRGBA(255, 0, 0, 255);
+  displayList->setBackgroundColor(opaqueColor);
+  EXPECT_EQ(displayList->backgroundColor(), opaqueColor);
+
+  // Render with opaque background
+  auto rootLayer = Layer::Make();
+  displayList->root()->addChild(rootLayer);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DisplayListBackground_OpaqueRed"));
+
+  // Test setting semi-transparent background color
+  auto semiTransparentColor = Color::FromRGBA(0, 255, 0, 128);
+  displayList->setBackgroundColor(semiTransparentColor);
+  EXPECT_EQ(displayList->backgroundColor(), semiTransparentColor);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DisplayListBackground_SemiTransparentGreen"));
+
+  // Test setting different background colors
+  auto blueColor = Color::FromRGBA(0, 0, 255, 255);
+  displayList->setBackgroundColor(blueColor);
+  EXPECT_EQ(displayList->backgroundColor(), blueColor);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DisplayListBackground_Blue"));
+
+  // Test adding layers and rendering with different background colors
+  auto shapeLayer = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeXYWH(50, 50, 100, 100));
+  shapeLayer->setPath(path);
+  shapeLayer->setFillStyle(SolidColor::Make(Color::White()));
+  rootLayer->addChild(shapeLayer);
+
+  auto whiteBackgroundColor = Color::FromRGBA(255, 255, 255, 255);
+  displayList->setBackgroundColor(whiteBackgroundColor);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DisplayListBackground_WhiteWithShape"));
+
+  // Test resetting to transparent background
+  displayList->setBackgroundColor(Color::Transparent());
+  EXPECT_EQ(displayList->backgroundColor(), Color::Transparent());
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DisplayListBackground_TransparentWithShape"));
+
+  // Test background color with different render modes
+  displayList->setBackgroundColor(Color::FromRGBA(200, 100, 50, 255));
+  displayList->setRenderMode(RenderMode::Partial);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DisplayListBackground_PartialRender"));
+
+  displayList->setRenderMode(RenderMode::Tiled);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DisplayListBackground_TiledRender"));
+}
+
+/**
+ * Test background blur with group mask.
+ * Structure:
+ * Root
+ * - background (image)
+ * - group (with mask)
+ *   - blur1 (larger than group, with background blur, fill alpha=128)
+ *   - mask (same size and position as group, used as blur1's mask)
+ * - blur2 (with background blur, fill alpha=128)
+ */
+TGFX_TEST(LayerTest, BackgroundBlurWithMask) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  auto displayList = std::make_unique<DisplayList>();
+
+  // Background image
+  auto background = ImageLayer::Make();
+  background->setName("background");
+  background->setImage(MakeImage("resources/apitest/imageReplacement.png"));
+  displayList->root()->addChild(background);
+
+  // Group layer with mask
+  auto group = Layer::Make();
+  group->setName("group");
+  group->setMatrix(Matrix::MakeTrans(30, 30));
+  displayList->root()->addChild(group);
+
+  // blur1: larger than group, with background blur
+  auto blur1 = ShapeLayer::Make();
+  blur1->setName("blur1");
+  Path blur1Path;
+  blur1Path.addRect(Rect::MakeXYWH(-20, -20, 140, 140));  // Larger than group
+  blur1->setPath(blur1Path);
+  auto blur1Fill = SolidColor::Make(Color::FromRGBA(255, 0, 0, 128));  // Red with alpha=128
+  blur1->setFillStyle(blur1Fill);
+  auto blur1Style = BackgroundBlurStyle::Make(5, 5);
+  blur1->setLayerStyles({blur1Style});
+  blur1->setMatrix(Matrix::MakeTrans(20, 20));
+  group->addChild(blur1);
+
+  // mask: same size and position as group
+  auto mask = ShapeLayer::Make();
+  mask->setName("mask");
+  Path maskPath;
+  maskPath.addRect(Rect::MakeWH(100, 100));  // Same as group's logical size
+  mask->setPath(maskPath);
+  auto maskFill = SolidColor::Make(Color::White());
+  mask->setFillStyle(maskFill);
+  mask->setMatrix(Matrix::MakeTrans(60, 20));
+  group->addChild(mask);
+
+  // Set mask for group
+  blur1->setMask(mask);
+
+  // blur2: outside of group, with background blur
+  auto blur2 = ShapeLayer::Make();
+  blur2->setName("blur2");
+  blur2->setMatrix(Matrix::MakeTrans(100, 100));
+  Path blur2Path;
+  blur2Path.addRect(Rect::MakeWH(80, 80));
+  blur2->setPath(blur2Path);
+  auto blur2Fill = SolidColor::Make(Color::FromRGBA(0, 0, 255, 10));  // Blue with alpha=128
+  blur2->setFillStyle(blur2Fill);
+  auto blur2Style = BackgroundBlurStyle::Make(5, 5);
+  blur2->setLayerStyles({blur2Style});
+  displayList->root()->addChild(blur2);
+  displayList->render(surface.get());
+  displayList->setZoomScale(0.8f);
+  displayList->setRenderMode(RenderMode::Tiled);
+  displayList->render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundBlurWithMask"));
+}
+
+TGFX_TEST(LayerTest, BackgroundLayerIndexWithNestedHierarchy) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  auto surface = Surface::Make(context, 300, 300);
+  auto displayList = std::make_unique<DisplayList>();
+
+  // Structure:
+  // root
+  // ├─ p (parent)
+  // │  ├─ rect1 (shape layer)
+  // │  ├─ rect2 (shape layer)
+  // │  ├─ rect3 (shape layer)
+  // │  │  └─ rect4 (nested shape layer)
+  // |- backblur (shape layer with background blur style)
+  // └─ (other root children)
+
+  auto p = Layer::Make();
+  p->setName("p");
+  displayList->root()->addChild(p);
+
+  // Create rect1, rect2, rect3 as shape layers
+  auto rect1 = ShapeLayer::Make();
+  rect1->setName("rect1");
+  Path path1;
+  path1.addRect(Rect::MakeXYWH(10, 10, 40, 40));
+  rect1->setPath(path1);
+  rect1->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 0, 0, 255)));  // Red
+  p->addChild(rect1);
+
+  auto rect2 = ShapeLayer::Make();
+  rect2->setName("rect2");
+  Path path2;
+  path2.addRect(Rect::MakeXYWH(60, 10, 40, 40));
+  rect2->setPath(path2);
+  rect2->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 255, 0, 255)));  // Green
+  p->addChild(rect2);
+
+  auto rect3 = ShapeLayer::Make();
+  rect3->setName("rect3");
+  Path path3;
+  path3.addRect(Rect::MakeXYWH(110, 10, 40, 40));
+  rect3->setPath(path3);
+  rect3->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 0, 255, 255)));  // Blue
+  p->addChild(rect3);
+
+  // Create rect4 as child of rect3
+  auto rect4 = ShapeLayer::Make();
+  rect4->setName("rect4");
+  Path path4;
+  path4.addRect(Rect::MakeXYWH(5, 5, 20, 20));
+  rect4->setPath(path4);
+  rect4->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 255, 0, 255)));  // Yellow
+  rect3->addChild(rect4);
+
+  // Create backblur as shape layer with background blur style
+  auto backblur = ShapeLayer::Make();
+  backblur->setName("backblur");
+  Path blurPath;
+  blurPath.addRect(Rect::MakeXYWH(10, 0, 140, 50));
+  backblur->setPath(blurPath);
+  backblur->setFillStyle(SolidColor::Make(Color::FromRGBA(200, 200, 200, 100)));
+  auto blurStyle = BackgroundBlurStyle::Make(5, 5);
+  backblur->setLayerStyles({blurStyle});
+  displayList->root()->addChild(backblur);
+
+  // Render and verify no crash
+  displayList->render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundLayerIndexWithNestedHierarchy"));
+}
 }  // namespace tgfx

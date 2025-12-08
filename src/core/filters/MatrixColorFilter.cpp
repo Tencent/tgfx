@@ -47,7 +47,7 @@ bool MatrixColorFilter::isEqual(const ColorFilter* colorFilter) const {
 }
 
 PlacementPtr<FragmentProcessor> MatrixColorFilter::asFragmentProcessor(
-    Context* context, std::shared_ptr<ColorSpace>) const {
+    Context* context, const std::shared_ptr<ColorSpace>&) const {
   return ColorMatrixFragmentProcessor::Make(context->drawingAllocator(), matrix);
 }
 }  // namespace tgfx

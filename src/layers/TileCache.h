@@ -58,8 +58,12 @@ class Tile {
   /**
    * Returns the rectangle of the tile in the zoomed display list grid.
    */
-  Rect getTileRect(int tileSize) const {
-    return Rect::MakeXYWH(tileX * tileSize, tileY * tileSize, tileSize, tileSize);
+  Rect getTileRect(int tileSize, const Rect* clipRect = nullptr) const {
+    auto result = Rect::MakeXYWH(tileX * tileSize, tileY * tileSize, tileSize, tileSize);
+    if (clipRect != nullptr && !result.intersect(*clipRect)) {
+      return Rect::MakeEmpty();
+    }
+    return result;
   }
 };
 

@@ -32,7 +32,7 @@ class TextShape : public UniqueKeyShape {
       : glyphRunList(std::move(glyphRunList)) {
   }
 
-  Rect getBounds() const override;
+  Rect onGetBounds() const override;
 
  protected:
   Type type() const override {

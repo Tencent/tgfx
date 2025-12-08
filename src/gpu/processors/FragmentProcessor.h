@@ -79,9 +79,9 @@ class FragmentProcessor : public Processor {
   /**
    * Creates a fragment processor that will draw the given Shader with the given options.
    */
-  static PlacementPtr<FragmentProcessor> Make(std::shared_ptr<Shader> shader, const FPArgs& args,
-                                              const Matrix* uvMatrix = nullptr,
-                                              std::shared_ptr<ColorSpace> dstColorSpace = nullptr);
+  static PlacementPtr<FragmentProcessor> Make(
+      std::shared_ptr<Shader> shader, const FPArgs& args, const Matrix* uvMatrix = nullptr,
+      const std::shared_ptr<ColorSpace>& dstColorSpace = nullptr);
 
   /**
    *  In many instances (e.g., Shader::asFragmentProcessor() implementations) it is desirable to

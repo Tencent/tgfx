@@ -18,10 +18,12 @@
 
 #pragma once
 
+#include <atomic>
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Matrix3D.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/core/PathProvider.h"
+#include "tgfx/core/Rect.h"
 #include "tgfx/core/TextBlob.h"
 
 namespace tgfx {
@@ -43,8 +45,10 @@ class Shape {
   static std::shared_ptr<Shape> MakeFrom(Path path);
 
   /**
-   * Creates a new Shape from the given text blob. Returns nullptr if the text blob is nullptr or 
-   * if none of the glyphs in the blob can generate a path, such as when using bitmap typefaces.
+   * Creates a new Shape from the given text blob. Glyphs that can generate path outlines are
+   * extracted and merged into a single Shape. Glyphs that cannot generate paths, such as bitmap
+   * or color emoji typefaces, are skipped. Returns nullptr if the text blob is nullptr or if none
+   * of the glyphs can generate a path.
    */
   static std::shared_ptr<Shape> MakeFrom(std::shared_ptr<TextBlob> textBlob);
 
@@ -104,7 +108,7 @@ class Shape {
    */
   static std::shared_ptr<Shape> ApplyInverse(std::shared_ptr<Shape> shape);
 
-  virtual ~Shape() = default;
+  virtual ~Shape();
 
   /**
    * Returns true if the Shape contains a simple path that can be directly retrieved using getPath()
@@ -123,9 +127,9 @@ class Shape {
 
   /**
    * Returns the bounding box of the Shape. The bounds might be larger than the actual shape because
-   * the exact bounds can't be determined until the shape is computed.
+   * the exact bounds can't be determined until the shape is computed. The result is cached lazily.
    */
-  virtual Rect getBounds() const = 0;
+  Rect getBounds() const;
 
   /**
    * Returns the Shape's computed path. Note: The path is recalculated each time this method is
@@ -162,6 +166,11 @@ class Shape {
   virtual UniqueKey getUniqueKey() const = 0;
 
   /**
+   * Called by getBounds() to compute the bounding box of the Shape.
+   */
+  virtual Rect onGetBounds() const = 0;
+
+  /**
    * Called by getPath() to compute the actual path of the Shape. The resolution scale parameter
    * provides any scale applied within the Shape.
    * During rendering, complex Shapes may be simplified based on the current resolution scale to 
@@ -182,5 +191,8 @@ class Shape {
   friend class Canvas;
   friend class Types;
   friend class ShapeUtils;
+
+ private:
+  mutable std::atomic<Rect*> bounds = {nullptr};
 };
 }  // namespace tgfx

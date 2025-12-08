@@ -51,8 +51,8 @@ std::shared_ptr<Shape> Shape::ApplyStroke(std::shared_ptr<Shape> shape, const St
   return std::make_shared<MatrixShape>(std::move(shape), matrixShape->matrix);
 }
 
-Rect StrokeShape::getBounds() const {
-  auto bounds = shape->getBounds();
+Rect StrokeShape::onGetBounds() const {
+  auto bounds = shape->onGetBounds();
   ApplyStrokeToBounds(stroke, &bounds, true);
   return bounds;
 }

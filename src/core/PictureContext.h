@@ -42,46 +42,46 @@ class PictureContext : public DrawContext {
    */
   std::shared_ptr<Picture> finishRecordingAsPicture(bool shrinkToFit = true);
 
-  void drawFill(const Fill& fill) override;
+  void drawFill(const Brush& brush) override;
 
-  void drawRect(const Rect& rect, const MCState& state, const Fill& fill,
+  void drawRect(const Rect& rect, const MCState& state, const Brush& brush,
                 const Stroke* stroke) override;
 
-  void drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
+  void drawRRect(const RRect& rRect, const MCState& state, const Brush& brush,
                  const Stroke* stroke) override;
 
-  void drawPath(const Path& path, const MCState& state, const Fill& fill) override;
+  void drawPath(const Path& path, const MCState& state, const Brush& brush) override;
 
-  void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill,
+  void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Brush& brush,
                  const Stroke* stroke) override;
 
   void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                 const MCState& state, const Fill& fill) override;
+                 const MCState& state, const Brush& brush) override;
 
   void drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
-                     const SamplingOptions& sampling, const MCState& state, const Fill& fill,
+                     const SamplingOptions& sampling, const MCState& state, const Brush& brush,
                      SrcRectConstraint constraint) override;
 
   void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
-                        const Fill& fill, const Stroke* stroke) override;
+                        const Brush& brush, const Stroke* stroke) override;
 
   void drawPicture(std::shared_ptr<Picture> picture, const MCState& state) override;
 
   void drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<ImageFilter> filter,
-                 const MCState& state, const Fill& fill) override;
+                 const MCState& state, const Brush& brush) override;
 
  private:
   BlockAllocator blockAllocator = {};
   std::vector<PlacementPtr<PictureRecord>> records = {};
   size_t drawCount = 0;
   MCState lastState = {};
-  Fill lastFill = {};
+  Brush lastBrush = {};
   Stroke lastStroke = {};
   bool hasStroke = false;
 
   void recordState(const MCState& state);
-  void recordFill(const Fill& fill);
+  void recordBrush(const Brush& brush);
   void recordStroke(const Stroke& stroke);
-  void recordAll(const MCState& state, const Fill& fill, const Stroke* stroke = nullptr);
+  void recordAll(const MCState& state, const Brush& brush, const Stroke* stroke = nullptr);
 };
 }  // namespace tgfx

@@ -45,7 +45,7 @@ class ColorFilter {
 
   /**
    * Creates a new ColorFilter that applies blends between the constant color (src) and input color
-   * (dst) based on the BlendMode.
+   * (dst) based on the BlendMode. The color is in the sRGB gamut and may exceed the 0-1 range.
    */
   static std::shared_ptr<ColorFilter> Blend(Color color, BlendMode mode);
 
@@ -115,7 +115,7 @@ class ColorFilter {
 
  private:
   virtual PlacementPtr<FragmentProcessor> asFragmentProcessor(
-      Context* context, std::shared_ptr<ColorSpace> dstColorSpace = nullptr) const = 0;
+      Context* context, const std::shared_ptr<ColorSpace>& dstColorSpace = nullptr) const = 0;
 
   friend class OpsCompositor;
   friend class ColorFilterShader;

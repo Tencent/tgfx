@@ -20,8 +20,10 @@
 #include "core/HitTestContext.h"
 #include "core/MeasureContext.h"
 #include "core/PictureRecords.h"
+#include "core/shaders/ImageShader.h"
 #include "core/utils/BlockAllocator.h"
 #include "core/utils/Log.h"
+#include "core/utils/Types.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Image.h"
 #include "utils/MathExtra.h"
@@ -83,17 +85,17 @@ bool Picture::hitTestPoint(float localX, float localY, bool shapeHitTest) const 
   return false;
 }
 
-void Picture::playback(Canvas* canvas, const FillModifier* fillModifier) const {
+void Picture::playback(Canvas* canvas, const BrushModifier* brushModifier) const {
   if (canvas == nullptr) {
     return;
   }
-  playback(canvas->drawContext, *canvas->mcState, fillModifier);
+  playback(canvas->drawContext, *canvas->mcState, brushModifier);
 }
 
 void Picture::playback(DrawContext* drawContext, const MCState& state,
-                       const FillModifier* fillModifier) const {
+                       const BrushModifier* brushModifier) const {
   DEBUG_ASSERT(drawContext != nullptr);
-  PlaybackContext playbackContext(state, fillModifier);
+  PlaybackContext playbackContext(state, brushModifier);
   for (auto& record : records) {
     record->playback(drawContext, &playbackContext);
   }
@@ -127,26 +129,64 @@ std::shared_ptr<Image> Picture::asImage(Point* offset, const Matrix* matrix,
     return nullptr;
   }
   MCState state = {};
-  Fill fill = {};
+  Brush brush = {};
   bool hasStroke = false;
-  auto record = getFirstDrawRecord(&state, &fill, &hasStroke);
+  auto record = getFirstDrawRecord(&state, &brush, &hasStroke);
   if (record == nullptr || hasStroke) {
     return nullptr;
   }
-  if (record->type() != PictureRecordType::DrawImage &&
-      record->type() != PictureRecordType::DrawImageRect) {
+
+  if (brush.maskFilter || brush.colorFilter || brush.color.alpha != 1.0f) {
     return nullptr;
   }
-  auto imageRecord = static_cast<const DrawImage*>(record);
-  if (fill.maskFilter || fill.colorFilter || fill.color.alpha != 1.0f) {
-    return nullptr;
-  }
-  auto image = imageRecord->image;
-  if (image->isAlphaOnly()) {
-    if (fill.shader || fill.color != Color::White()) {
-      return nullptr;
+
+  std::shared_ptr<Image> image = nullptr;
+  SamplingOptions sampling = {};
+
+  // Check for direct DrawImage or DrawImageRect
+  if (record->type() == PictureRecordType::DrawImage ||
+      record->type() == PictureRecordType::DrawImageRect) {
+    auto imageRecord = static_cast<const DrawImage*>(record);
+    image = imageRecord->image;
+    sampling = imageRecord->sampling;
+    if (image->isAlphaOnly()) {
+      if (brush.shader || brush.color != Color::White()) {
+        return nullptr;
+      }
+    }
+    if (record->type() == PictureRecordType::DrawImageRect) {
+      image = image->makeSubset(static_cast<const DrawImageRect*>(record)->rect);
+      DEBUG_ASSERT(image != nullptr);
     }
   }
+  // Check for DrawRect with ImageShader (rect + ImageShader pattern)
+  else if (record->type() == PictureRecordType::DrawRect) {
+    if (!brush.shader || !brush.shader->isAImage()) {
+      return nullptr;
+    }
+    auto shaderType = Types::Get(brush.shader.get());
+    if (shaderType != Types::ShaderType::Image) {
+      return nullptr;
+    }
+    auto imageShader = static_cast<const ImageShader*>(brush.shader.get());
+    if (!imageShader->image || imageShader->tileModeX != TileMode::Clamp ||
+        imageShader->tileModeY != TileMode::Clamp) {
+      return nullptr;
+    }
+    auto rect = static_cast<const DrawRect*>(record)->rect;
+    // Check if rect matches image size and is at origin
+    auto imageWidth = static_cast<float>(imageShader->image->width());
+    auto imageHeight = static_cast<float>(imageShader->image->height());
+    if (rect.left != 0 || rect.top != 0 || rect.width() != imageWidth ||
+        rect.height() != imageHeight) {
+      return nullptr;
+    }
+    image = imageShader->image;
+    sampling = imageShader->sampling;
+  } else {
+    return nullptr;
+  }
+
   auto imageMatrix = state.matrix;
   if (matrix) {
     imageMatrix.postConcat(*matrix);
@@ -166,10 +206,6 @@ std::shared_ptr<Image> Picture::asImage(Point* offset, const Matrix* matrix,
     }
   } else if (!clipRect.isEmpty()) {
     subset = clipRect;
-  }
-  if (record->type() == PictureRecordType::DrawImageRect) {
-    image = image->makeSubset(static_cast<const DrawImageRect*>(record)->rect);
-    DEBUG_ASSERT(image != nullptr);
   }
   auto offsetX = imageMatrix.getTranslateX();
   auto offsetY = imageMatrix.getTranslateY();
@@ -193,7 +229,7 @@ std::shared_ptr<Image> Picture::asImage(Point* offset, const Matrix* matrix,
   return image;
 }
 
-const PictureRecord* Picture::getFirstDrawRecord(MCState* state, Fill* fill,
+const PictureRecord* Picture::getFirstDrawRecord(MCState* state, Brush* brush,
                                                  bool* hasStroke) const {
   PlaybackContext playback = {};
   PictureRecord* drawRecord = nullptr;
@@ -207,8 +243,8 @@ const PictureRecord* Picture::getFirstDrawRecord(MCState* state, Fill* fill,
   if (state) {
     *state = playback.state();
   }
-  if (fill) {
-    *fill = playback.fill();
+  if (brush) {
+    *brush = playback.brush();
   }
   if (hasStroke) {
     *hasStroke = playback.stroke() != nullptr;

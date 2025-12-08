@@ -51,11 +51,11 @@ PlacementPtr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Image> i
   return image->asFragmentProcessor(args, samplingArgs, uvMatrix);
 }
 
-PlacementPtr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Shader> shader,
-                                                        const FPArgs& args, const Matrix* uvMatrix,
-                                                        std::shared_ptr<ColorSpace> dstColorSpace) {
+PlacementPtr<FragmentProcessor> FragmentProcessor::Make(
+    std::shared_ptr<Shader> shader, const FPArgs& args, const Matrix* uvMatrix,
+    const std::shared_ptr<ColorSpace>& dstColorSpace) {
   DEBUG_ASSERT(shader != nullptr);
-  return shader->asFragmentProcessor(args, uvMatrix, std::move(dstColorSpace));
+  return shader->asFragmentProcessor(args, uvMatrix, dstColorSpace);
 }
 
 PlacementPtr<FragmentProcessor> FragmentProcessor::MulChildByInputAlpha(

@@ -33,7 +33,7 @@ class MergeShape : public UniqueKeyShape {
 
   bool isInverseFillType() const override;
 
-  Rect getBounds() const override;
+  Rect onGetBounds() const override;
 
   std::shared_ptr<Shape> first = nullptr;
   std::shared_ptr<Shape> second = nullptr;

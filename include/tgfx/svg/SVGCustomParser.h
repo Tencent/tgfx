@@ -16,28 +16,27 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ToPMColor.h"
-#include "ColorSpaceHelper.h"
-#include "core/ColorSpaceXformSteps.h"
+#pragma once
+
+#include "tgfx/svg/node/SVGNode.h"
 
 namespace tgfx {
 
-PMColor ToPMColor(const Color& color, std::shared_ptr<ColorSpace> dstColorSpace) {
-  if (dstColorSpace == nullptr) {
-    return PMColor{color.red * color.alpha, color.green * color.alpha, color.blue * color.alpha,
-                   color.alpha, color.colorSpace};
-  }
+/**
+ * Abstract callback interface for SVG parsing operations.
+ * Implementations can be passed to SVGDOM::Make() to handling during parsing.
+ */
+class SVGCustomParser {
+ public:
+  virtual ~SVGCustomParser() = default;
 
-  if (!NeedConvertColorSpace(color.colorSpace, dstColorSpace)) {
-    return PMColor{color.red * color.alpha, color.green * color.alpha, color.blue * color.alpha,
-                   color.alpha, color.colorSpace};
-    ;
-  }
-  ColorSpaceXformSteps steps(color.colorSpace.get(), AlphaType::Premultiplied, dstColorSpace.get(),
-                             AlphaType::Premultiplied);
-  auto dstColor = color.premultiply();
-  steps.apply(dstColor.array());
-  dstColor.colorSpace = std::move(dstColorSpace);
-  return dstColor;
-}
+  /**
+   * Called when a custom attribute is encountered during parsing.
+   * This method is invoked for attributes that are not standard SVGNode properties, allowing custom
+   * handling logic to be implemented.
+   */
+  virtual void handleCustomAttribute(SVGNode& node, const std::string& name,
+                                     const std::string& value) = 0;
+};
+
 }  // namespace tgfx

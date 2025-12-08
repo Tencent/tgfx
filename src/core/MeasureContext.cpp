@@ -23,10 +23,10 @@
 #include "utils/MathExtra.h"
 
 namespace tgfx {
-void MeasureContext::drawFill(const Fill&) {
+void MeasureContext::drawFill(const Brush&) {
 }
 
-void MeasureContext::drawRect(const Rect& rect, const MCState& state, const Fill&,
+void MeasureContext::drawRect(const Rect& rect, const MCState& state, const Brush&,
                               const Stroke* stroke) {
   if (stroke == nullptr) {
     addLocalBounds(state, rect);
@@ -37,7 +37,7 @@ void MeasureContext::drawRect(const Rect& rect, const MCState& state, const Fill
   addLocalBounds(state, localBounds);
 }
 
-void MeasureContext::drawRRect(const RRect& rRect, const MCState& state, const Fill&,
+void MeasureContext::drawRRect(const RRect& rRect, const MCState& state, const Brush&,
                                const Stroke* stroke) {
   auto rect = rRect.rect;
   if (stroke) {
@@ -46,7 +46,7 @@ void MeasureContext::drawRRect(const RRect& rRect, const MCState& state, const F
   addLocalBounds(state, rect, false);
 }
 
-void MeasureContext::drawPath(const Path& path, const MCState& state, const Fill&) {
+void MeasureContext::drawPath(const Path& path, const MCState& state, const Brush&) {
   if (computeTightBounds) {
     addTightBounds(path, state);
     return;
@@ -55,7 +55,7 @@ void MeasureContext::drawPath(const Path& path, const MCState& state, const Fill
   addLocalBounds(state, localBounds, path.isInverseFillType());
 }
 
-void MeasureContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill&,
+void MeasureContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Brush&,
                                const Stroke* stroke) {
   DEBUG_ASSERT(shape != nullptr);
   if (computeTightBounds) {
@@ -75,19 +75,24 @@ void MeasureContext::drawShape(std::shared_ptr<Shape> shape, const MCState& stat
 }
 
 void MeasureContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions&,
-                               const MCState& state, const Fill&) {
+                               const MCState& state, const Brush&) {
   addLocalBounds(state, Rect::MakeWH(image->width(), image->height()));
 }
 
 void MeasureContext::drawImageRect(std::shared_ptr<Image>, const Rect&, const Rect& dstRect,
-                                   const SamplingOptions&, const MCState& state, const Fill&,
+                                   const SamplingOptions&, const MCState& state, const Brush&,
                                    SrcRectConstraint) {
   addLocalBounds(state, dstRect);
 }
 
 void MeasureContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
-                                      const MCState& state, const Fill&, const Stroke* stroke) {
+                                      const MCState& state, const Brush&, const Stroke* stroke) {
   DEBUG_ASSERT(glyphRunList != nullptr);
+  if (computeTightBounds && stroke == nullptr) {
+    auto deviceBounds = glyphRunList->getTightBounds(&state.matrix);
+    addDeviceBounds(state.clip, deviceBounds);
+    return;
+  }
   auto localBounds =
       computeTightBounds ? glyphRunList->getTightBounds() : glyphRunList->getBounds();
   if (stroke) {
@@ -98,7 +103,7 @@ void MeasureContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList
 
 void MeasureContext::drawLayer(std::shared_ptr<Picture> picture,
                                std::shared_ptr<ImageFilter> imageFilter, const MCState& state,
-                               const Fill&) {
+                               const Brush&) {
   DEBUG_ASSERT(picture != nullptr);
   if (imageFilter) {
     auto localBounds = computeTightBounds ? picture->getTightBounds(nullptr) : picture->getBounds();
