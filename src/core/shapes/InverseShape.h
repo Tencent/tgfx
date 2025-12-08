@@ -31,8 +31,8 @@ class InverseShape : public UniqueKeyShape {
     return !shape->isInverseFillType();
   }
 
-  Rect getBounds() const override {
-    return shape->getBounds();
+  Rect onGetBounds() const override {
+    return shape->onGetBounds();
   }
 
  protected:
