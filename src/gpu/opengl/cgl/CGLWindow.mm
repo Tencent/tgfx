@@ -18,6 +18,7 @@
 
 #include "tgfx/gpu/opengl/cgl/CGLWindow.h"
 #include <thread>
+#include "core/utils/Log.h"
 #include "gpu/opengl/GLDefines.h"
 #include "tgfx/gpu/Backend.h"
 
