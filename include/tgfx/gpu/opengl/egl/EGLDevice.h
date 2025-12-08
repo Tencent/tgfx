@@ -41,7 +41,8 @@ class EGLDevice : public GLDevice {
    * EGLSurface, and EGLContext in this case.
    */
   static std::shared_ptr<EGLDevice> MakeFrom(EGLDisplay eglDisplay, EGLSurface eglSurface,
-                                             EGLContext eglContext, bool adopted = false);
+                                             EGLContext eglContext, bool adopted = false,
+                                             std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   ~EGLDevice() override;
 
@@ -62,6 +63,7 @@ class EGLDevice : public GLDevice {
   EGLContext oldEglContext = nullptr;
   EGLSurface oldEglReadSurface = nullptr;
   EGLSurface oldEglDrawSurface = nullptr;
+  std::shared_ptr<ColorSpace> colorSpace = nullptr;
 
   static std::shared_ptr<EGLDevice> MakeFrom(EGLNativeWindowType nativeWindow,
                                              EGLContext sharedContext = nullptr,
@@ -69,9 +71,11 @@ class EGLDevice : public GLDevice {
 
   static std::shared_ptr<EGLDevice> Wrap(EGLDisplay eglDisplay, EGLSurface eglSurface,
                                          EGLContext eglContext, EGLContext shareContext,
-                                         bool externallyOwned);
+                                         bool externallyOwned,
+                                         std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
-  EGLDevice(std::unique_ptr<GPU> gpu, void* nativeHandle);
+  EGLDevice(std::unique_ptr<GPU> gpu, void* nativeHandle,
+            std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   friend class GLDevice;
 

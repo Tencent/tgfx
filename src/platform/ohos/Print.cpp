@@ -42,4 +42,13 @@ void PrintError(const char format[], ...) {
   va_end(args);
   OH_LOG_Print(LOG_APP, LOG_ERROR, LOG_PRINT_DOMAIN, LOG_PRINT_TAG, "%{public}s", buffer);
 }
+
+void PrintWarn(const char format[], ...) {
+  char buffer[MAX_LOG_LENGTH];
+  va_list args;
+  va_start(args, format);
+  vsnprintf(buffer, MAX_LOG_LENGTH, format, args);
+  va_end(args);
+  OH_LOG_Print(LOG_APP, LOG_WARN, LOG_PRINT_DOMAIN, LOG_PRINT_TAG, "%{public}s", buffer);
+}
 }  // namespace tgfx

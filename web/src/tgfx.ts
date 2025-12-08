@@ -102,15 +102,6 @@ export const uploadToTexture = (
     }
 };
 
-export const isDisplayP3Support = ()=>{
-    const canvas = document.createElement('canvas');
-    const gl = canvas.getContext('webgl2');
-    if(!gl){
-        return false;
-    }
-    return ('drawingBufferColorSpace' in gl);
-}
-
 export const setColorSpace = (
     GL: EmscriptenGL,
     colorSpace : WindowColorSpace

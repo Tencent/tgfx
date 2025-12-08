@@ -15,12 +15,13 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-
 #include "tgfx/gpu/opengl/webgl/WebGLDevice.h"
+#include <emscripten/val.h>
 #include "core/utils/Log.h"
 #include "gpu/opengl/webgl/WebGLGPU.h"
 
 namespace tgfx {
+enum class WebNamedColorSpace { None = 0, SRGB = 1, DisplayP3 = 2 };
 
 void* GLDevice::CurrentNativeHandle() {
   return reinterpret_cast<void*>(emscripten_webgl_get_current_context());
@@ -39,7 +40,8 @@ std::shared_ptr<GLDevice> GLDevice::Make(void*) {
   return nullptr;
 }
 
-std::shared_ptr<WebGLDevice> WebGLDevice::MakeFrom(const std::string& canvasID) {
+std::shared_ptr<WebGLDevice> WebGLDevice::MakeFrom(const std::string& canvasID,
+                                                   std::shared_ptr<ColorSpace> colorSpace) {
   auto oldContext = emscripten_webgl_get_current_context();
 
   EmscriptenWebGLContextAttributes attrs;
@@ -68,6 +70,25 @@ std::shared_ptr<WebGLDevice> WebGLDevice::MakeFrom(const std::string& canvasID) 
       emscripten_webgl_make_context_current(oldContext);
     }
     return nullptr;
+  }
+  WebNamedColorSpace cs;
+  if (colorSpace == nullptr) {
+    cs = WebNamedColorSpace::None;
+  } else if (ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get())) {
+    cs = WebNamedColorSpace::SRGB;
+  } else if (ColorSpace::Equals(colorSpace.get(), ColorSpace::DisplayP3().get())) {
+    cs = WebNamedColorSpace::DisplayP3;
+  } else {
+    cs = WebNamedColorSpace::None;
+    LOGW(
+        "The current platform does not support the colorspace, which may cause color inaccuracies "
+        "on Window.");
+  }
+  if (!emscripten::val::module_property("tgfx").call<bool>(
+          "setColorSpace", emscripten::val::module_property("GL"), static_cast<int>(cs))) {
+    LOGW(
+        "The current platform does not support the colorspace, which may cause color inaccuracies "
+        "on Window.");
   }
   emscripten_webgl_make_context_current(0);
   if (oldContext) {

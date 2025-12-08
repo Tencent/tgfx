@@ -24,9 +24,6 @@
 #include "gpu/opengl/GLTexture.h"
 
 namespace tgfx {
-std::shared_ptr<ColorSpace> Window::DeviceColorSpace() {
-  return nullptr;
-}
 
 class QGLDeviceCreator : public QObject {
   Q_OBJECT
@@ -104,21 +101,35 @@ class QGLDeviceCreator : public QObject {
   }
 };
 
-std::shared_ptr<QGLWindow> QGLWindow::MakeFrom(QQuickItem* quickItem, bool singleBufferMode) {
+std::shared_ptr<QGLWindow> QGLWindow::MakeFrom(QQuickItem* quickItem, bool singleBufferMode,
+                                               std::shared_ptr<ColorSpace> colorSpace) {
   if (quickItem == nullptr) {
     return nullptr;
   }
-  auto window = std::shared_ptr<QGLWindow>(new QGLWindow(quickItem, singleBufferMode));
+  auto nativeWindow = quickItem->window();
+  auto icc = nativeWindow->format().colorSpace().iccProfile();
+  std::shared_ptr<ColorSpace> currentColorSpace =
+      ColorSpace::MakeFromICC(icc.data(), static_cast<size_t>(icc.size()));
+  if (colorSpace != nullptr &&
+      !ColorSpace::NearlyEquals(currentColorSpace.get(), colorSpace.get())) {
+    LOGW(
+        "The ColorSpace is not adapt with the current window colorSpace, which may cause color "
+        "inaccuracies on Window.");
+  }
+  auto window =
+      std::shared_ptr<QGLWindow>(new QGLWindow(quickItem, singleBufferMode, std::move(colorSpace)));
   window->weakThis = window;
   window->initDevice();
   return window;
 }
 
-QGLWindow::QGLWindow(QQuickItem* quickItem, bool singleBufferMode)
+QGLWindow::QGLWindow(QQuickItem* quickItem, bool singleBufferMode,
+                     std::shared_ptr<ColorSpace> colorSpace)
     : quickItem(quickItem), singleBufferMode(singleBufferMode) {
   if (QThread::currentThread() != QApplication::instance()->thread()) {
     renderThread = QThread::currentThread();
   }
+  this->colorSpace = std::move(colorSpace);
 }
 
 QGLWindow::~QGLWindow() {
@@ -181,10 +192,6 @@ std::shared_ptr<Surface> QGLWindow::onCreateSurface(Context* context) {
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
-  QSurfaceFormat windowFormat = nativeWindow->format();
-  auto icc = windowFormat.colorSpace().iccProfile();
-  std::shared_ptr<ColorSpace> colorSpace =
-      ColorSpace::MakeFromICC(icc.data(), static_cast<size_t>(icc.size()));
   if (!singleBufferMode) {
     frontSurface =
         Surface::Make(context, width, height, ColorType::RGBA_8888, 1, false, 0, colorSpace);

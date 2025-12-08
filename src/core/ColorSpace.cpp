@@ -820,6 +820,25 @@ bool ColorSpace::Equals(const ColorSpace* colorSpaceA, const ColorSpace* colorSp
   return false;
 }
 
+bool ColorSpace::NearlyEquals(const ColorSpace* colorSpaceA, const ColorSpace* colorSpaceB) {
+  if (ColorSpace::Equals(colorSpaceA, colorSpaceB)) {
+    return true;
+  }
+  if (colorSpaceA && colorSpaceB) {
+    auto transferFunctionA = colorSpaceA->_transferFunction;
+    auto transferFunctionB = colorSpaceB->_transferFunction;
+    auto matrixA = colorSpaceA->_toXYZD50;
+    auto matrixB = colorSpaceB->_toXYZD50;
+    if (NearlyEqual(*reinterpret_cast<gfx::skcms_TransferFunction*>(&transferFunctionA),
+                    *reinterpret_cast<gfx::skcms_TransferFunction*>(&transferFunctionB)) &&
+        NearlyEqual(*reinterpret_cast<gfx::skcms_Matrix3x3*>(&matrixA),
+                    *reinterpret_cast<gfx::skcms_Matrix3x3*>(&matrixB))) {
+      return true;
+    }
+  }
+  return false;
+}
+
 TransferFunction ColorSpace::transferFunction() const {
   return _transferFunction;
 }

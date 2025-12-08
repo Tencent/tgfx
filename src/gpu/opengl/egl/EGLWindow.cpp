@@ -35,31 +35,13 @@
 #endif
 
 namespace tgfx {
-std::shared_ptr<ColorSpace> Window::DeviceColorSpace() {
-  auto display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
-  const char* extensions = eglQueryString(display, EGL_EXTENSIONS);
-  if (extensions && strstr(extensions, "EGL_EXT_gl_colorspace_display_p3_passthrough")) {
-    return ColorSpace::DisplayP3();
-  }
-  return nullptr;
-}
 
 std::shared_ptr<EGLWindow> EGLWindow::Current() {
   auto device = std::static_pointer_cast<EGLDevice>(GLDevice::Current());
   if (device == nullptr || device->eglSurface == nullptr) {
     return nullptr;
   }
-  std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB();
-  const char* extensions = eglQueryString(device->eglDisplay, EGL_EXTENSIONS);
-  if (extensions && strstr(extensions, "EGL_KHR_gl_colorspace") != nullptr) {
-    EGLint colorSpaceValue;
-    EGLBoolean success = eglQuerySurface(device->eglDisplay, device->eglSurface,
-                                         EGL_GL_COLORSPACE_KHR, &colorSpaceValue);
-    if (success == EGL_TRUE && colorSpaceValue == EGL_GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT) {
-      colorSpace = ColorSpace::DisplayP3();
-    }
-  }
-  return std::shared_ptr<EGLWindow>(new EGLWindow(device, std::move(colorSpace)));
+  return std::shared_ptr<EGLWindow>(new EGLWindow(device, device->colorSpace));
 }
 
 std::shared_ptr<EGLWindow> EGLWindow::MakeFrom(EGLNativeWindowType nativeWindow,

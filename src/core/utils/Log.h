@@ -38,6 +38,7 @@ namespace tgfx {
 
 #define LOGI(...) ::tgfx::PrintLog(__VA_ARGS__)
 #define LOGE(...) ::tgfx::PrintError(__VA_ARGS__)
+#define LOGW(...) ::tgfx::PrintWarn(__VA_ARGS__)
 #define ASSERT(assertion) \
   if (!(assertion)) {     \
     ABORT(#assertion);    \

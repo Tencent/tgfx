@@ -25,9 +25,6 @@
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
 namespace tgfx {
-std::shared_ptr<ColorSpace> Window::DeviceColorSpace() {
-  return nullptr;
-}
 
 std::shared_ptr<CGLWindow> CGLWindow::MakeFrom(NSView* view, CGLContextObj sharedContext,
                                                std::shared_ptr<ColorSpace> colorSpace) {
@@ -37,6 +34,10 @@ std::shared_ptr<CGLWindow> CGLWindow::MakeFrom(NSView* view, CGLContextObj share
   auto device = GLDevice::Make(sharedContext);
   if (device == nullptr) {
     return nullptr;
+  }
+  if (colorSpace != nullptr && !ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get())) {
+    LOGW("The current platform does not support the colorspace, which may cause color inaccuracies "
+         "on Window.");
   }
   return std::shared_ptr<CGLWindow>(new CGLWindow(device, view, std::move(colorSpace)));
 }
