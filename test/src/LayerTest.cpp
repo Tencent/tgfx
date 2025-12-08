@@ -3535,7 +3535,6 @@ TGFX_TEST(LayerTest, DisplayListBackground) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DisplayListBackground_TiledRender"));
 }
 
-
 /**
  * Test background blur with group mask.
  * Structure:

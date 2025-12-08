@@ -41,8 +41,8 @@ std::shared_ptr<Shape> Shape::ApplyMatrix3D(std::shared_ptr<Shape> shape, const 
   return std::make_shared<Matrix3DShape>(matrixShape->shape, totalMatrix);
 }
 
-Rect Matrix3DShape::getBounds() const {
-  auto bounds = shape->getBounds();
+Rect Matrix3DShape::onGetBounds() const {
+  auto bounds = shape->onGetBounds();
   auto result = matrix.mapRect(bounds);
   return result;
 }

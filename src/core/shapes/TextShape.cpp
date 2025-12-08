@@ -43,7 +43,7 @@ std::shared_ptr<Shape> Shape::MakeFrom(std::shared_ptr<TextBlob> textBlob) {
   return Shape::Merge(shapes);
 }
 
-Rect TextShape::getBounds() const {
+Rect TextShape::onGetBounds() const {
   auto bounds = glyphRunList->getBounds();
   return bounds;
 }
