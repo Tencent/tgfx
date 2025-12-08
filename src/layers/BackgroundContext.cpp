@@ -183,39 +183,27 @@ std::shared_ptr<BackgroundContext> BackgroundContext::createSubContext(const Rec
   auto canvas = getCanvas();
   auto parentCanvasMatrix = canvas->getMatrix();
 
-  // Use imageMatrix inverse (world -> surface) to calculate child surface bounds.
   Matrix baseSurfaceMatrix = Matrix::I();
   if (!imageMatrix.invert(&baseSurfaceMatrix)) {
     return nullptr;
   }
 
-  // Map childWorldRect to parent surface coordinates using baseSurfaceMatrix.
   auto childSurfaceRect = baseSurfaceMatrix.mapRect(childWorldRect);
   childSurfaceRect.roundOut();
 
-  // surfaceOffset: position of child surface origin in parent surface coordinates.
   auto childSurfaceOffset = Point::Make(childSurfaceRect.x(), childSurfaceRect.y());
 
-  // Build child's surfaceMatrix: world -> child surface.
-  // childSurfaceMatrix = Translate(-childSurfaceOffset) * baseSurfaceMatrix
   auto childSurfaceMatrix = baseSurfaceMatrix;
   childSurfaceMatrix.postTranslate(-childSurfaceOffset.x, -childSurfaceOffset.y);
 
-  // Child's imageMatrix: child surface -> world.
   Matrix childImageMatrix = Matrix::I();
   if (!childSurfaceMatrix.invert(&childImageMatrix)) {
     return nullptr;
   }
 
-  // Child's backgroundRect in world coordinates.
-  // Map child surface bounds (0, 0, w, h) through childImageMatrix.
   auto childBackgroundRect = Rect::MakeWH(childSurfaceRect.width(), childSurfaceRect.height());
   childImageMatrix.mapRect(&childBackgroundRect);
 
-  // Calculate child canvas matrix.
-  // childCanvasMatrix = childSurfaceMatrix * imageMatrix * parentCanvasMatrix
-  // This transforms: layer local -> parent surface -> world -> child surface
-  // = layer local -> child surface
   auto childCanvasMatrix = childSurfaceMatrix;
   childCanvasMatrix.preConcat(imageMatrix);
   childCanvasMatrix.preConcat(parentCanvasMatrix);
@@ -228,7 +216,6 @@ std::shared_ptr<BackgroundContext> BackgroundContext::createSubContext(const Rec
 
   auto childCanvas = child->getCanvas();
   childCanvas->clear();
-  // Use childCanvasMatrix which inherits from parentCanvasMatrix.
   childCanvas->setMatrix(childCanvasMatrix);
 
   child->parent = this;
