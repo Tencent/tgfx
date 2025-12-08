@@ -27,15 +27,9 @@
 #endif
 #include <EGL/eglext.h>
 #include <GLES3/gl3.h>
-#include <cstring>
 #include "core/utils/USE.h"
 
-#ifndef EGL_GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT
-#define EGL_GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT -1
-#endif
-
 namespace tgfx {
-
 std::shared_ptr<EGLWindow> EGLWindow::Current() {
   auto device = std::static_pointer_cast<EGLDevice>(GLDevice::Current());
   if (device == nullptr || device->eglSurface == nullptr) {

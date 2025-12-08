@@ -24,7 +24,6 @@
 #include "gpu/opengl/GLTexture.h"
 
 namespace tgfx {
-
 class QGLDeviceCreator : public QObject {
   Q_OBJECT
  public:
