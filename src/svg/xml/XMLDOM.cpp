@@ -90,7 +90,6 @@ DOMNode::~DOMNode() {
   if (firstChild) {
     stack.emplace_back(std::move(firstChild));
   }
-
   if (nextSibling) {
     stack.emplace_back(std::move(nextSibling));
   }
