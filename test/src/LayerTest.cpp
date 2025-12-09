@@ -3514,7 +3514,7 @@ TGFX_TEST(LayerTest, Matrix) {
   displayList->render(surface.get());
   EXPECT_EQ(imageLayer->getBounds(contentLayer.get()), Rect::MakeLTRB(73, 10, 290, 272));
   EXPECT_EQ(imageLayer->getBounds(displayList->root()), Rect::MakeLTRB(102, 21, 187, 158));
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/1Matrix_3D"));
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D"));
 
   auto imageBlurLayer = SolidLayer::Make();
   imageBlurLayer->setColor(Color::FromRGBA(235, 5, 112, 70));
@@ -3526,7 +3526,7 @@ TGFX_TEST(LayerTest, Matrix) {
   auto affineMatrix = Matrix::MakeTrans(50, 50);
   imageLayer->setMatrix(affineMatrix);
   displayList->render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/1Matrix_3D_2D"));
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D_2D"));
 
   imageBlurLayer->removeFromParent();
   imageLayer->setMatrix3D(imageMatrix3D);
@@ -3557,11 +3557,11 @@ TGFX_TEST(LayerTest, Matrix) {
   }
   displayList->root()->addChild(shaperLayer);
   displayList->render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/1Matrix_3D_2D_3D"));
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D_2D_3D"));
 
   contentLayer->setTransformStyle(TransformStyle::Preserve3D);
   displayList->render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/1Matrix_3D_2D_3D_Preserve3D"));
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D_2D_3D_Preserve3D"));
 
   {
     auto anchor = Point::Make(0.3f, 0.3f);
@@ -3579,7 +3579,7 @@ TGFX_TEST(LayerTest, Matrix) {
     contentLayer->setMatrix3D(transformMatrix);
   }
   displayList->render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/1Matrix_Behind_Viewer"));
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_Behind_Viewer"));
 }
 
 TGFX_TEST(LayerTest, RasterizedContentWithMask) {
