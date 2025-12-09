@@ -523,6 +523,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
    * Draws the layer and all its children onto the given canvas. You can specify the alpha and blend
    * mode to control how the layer is drawn. Note: The layer is drawn in its local space without
    * applying its own matrix, alpha, blend mode, visible, scrollRect, or mask.
+   * Note: Using a Canvas without a Surface may cause incorrect blending when passThroughBackground
+   * is enabled.
    * @param canvas The canvas to draw the layer on.
    * @param alpha The alpha transparency value used for drawing the layer and its children.
    * @param blendMode The blend mode used to composite the layer with the existing content on the
@@ -571,7 +573,11 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   void invalidate();
 
+  Rect getBounds(const Matrix3D& matrix, bool computeTightBounds);
+
   Rect getBoundsInternal(const Matrix3D& coordinateMatrix, bool computeTightBounds);
+
+  Rect computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBounds);
 
   void onAttachToRoot(RootLayer* rootLayer);
 
@@ -628,7 +634,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::shared_ptr<Image> getBoundsBackgroundImage(const DrawArgs& args, float contentScale,
                                                   Point* offset);
 
-  void drawBackgroundImage(const DrawArgs& args, Canvas& canvas, Point* offset);
+  void drawBackgroundImage(const DrawArgs& args, Canvas& canvas);
 
   void drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
                        const LayerStyleSource* source, LayerStylePosition position);
@@ -717,8 +723,9 @@ class Layer : public std::enable_shared_from_this<Layer> {
   float _rasterizationScale = 0.0f;
   std::unique_ptr<RasterizedContent> rasterizedContent;
   std::shared_ptr<LayerContent> layerContent = nullptr;
-  Rect renderBounds = {};         // in global coordinates
-  Rect* contentBounds = nullptr;  //  in global coordinates
+  Rect renderBounds = {};                       // in global coordinates
+  Rect* contentBounds = nullptr;                //  in global coordinates
+  std::unique_ptr<Rect> localBounds = nullptr;  // in local coordinates
 
   // if > 0, means the layer or any of its descendants has a background style
   float maxBackgroundOutset = 0.f;

@@ -42,7 +42,7 @@ class DecodedImage : public PixelImage {
     return _alphaOnly;
   }
 
-  std::shared_ptr<ColorSpace> colorSpace() const override {
+  const std::shared_ptr<ColorSpace>& colorSpace() const override {
     return _colorSpace;
   }
 

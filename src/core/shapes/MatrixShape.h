@@ -36,7 +36,7 @@ class MatrixShape : public Shape {
     return shape->isInverseFillType();
   }
 
-  Rect getBounds() const override;
+  Rect onGetBounds() const override;
 
   static UniqueKey MakeUniqueKey(const UniqueKey& key, const Matrix& matrix);
 

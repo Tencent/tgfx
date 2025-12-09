@@ -52,9 +52,9 @@ bool MergeShape::isInverseFillType() const {
   }
 }
 
-Rect MergeShape::getBounds() const {
-  auto firstBounds = first->getBounds();
-  auto secondBounds = second->getBounds();
+Rect MergeShape::onGetBounds() const {
+  auto firstBounds = first->onGetBounds();
+  auto secondBounds = second->onGetBounds();
   switch (pathOp) {
     case PathOp::Difference:
       return second->isInverseFillType() ? secondBounds : firstBounds;

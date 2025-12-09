@@ -49,7 +49,7 @@ class PictureImage : public Image {
     return mipmapped;
   }
 
-  std::shared_ptr<ColorSpace> colorSpace() const override {
+  const std::shared_ptr<ColorSpace>& colorSpace() const override {
     return _colorSpace;
   }
 

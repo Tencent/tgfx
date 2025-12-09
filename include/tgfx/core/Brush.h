@@ -43,8 +43,8 @@ class Brush {
   }
 
   /**
-   * The input color, unpremultiplied, as four floating point values. The default value is opaque
-   * white.
+   * The input color, which is unpremultiplied and in the sRGB gamut, may exceed the 0-1 range. The
+   * default value is opaque white.
    */
   Color color = {};
 

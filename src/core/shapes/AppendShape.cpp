@@ -60,10 +60,10 @@ bool AppendShape::isInverseFillType() const {
   return shapes.front()->isInverseFillType();
 }
 
-Rect AppendShape::getBounds() const {
+Rect AppendShape::onGetBounds() const {
   Rect bounds = {};
   for (const auto& shape : shapes) {
-    bounds.join(shape->getBounds());
+    bounds.join(shape->onGetBounds());
   }
   return bounds;
 }

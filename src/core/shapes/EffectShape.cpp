@@ -31,8 +31,8 @@ std::shared_ptr<Shape> Shape::ApplyEffect(std::shared_ptr<Shape> shape,
   return std::make_shared<EffectShape>(std::move(shape), std::move(effect));
 }
 
-Rect EffectShape::getBounds() const {
-  auto bounds = shape->getBounds();
+Rect EffectShape::onGetBounds() const {
+  auto bounds = shape->onGetBounds();
   return effect->filterBounds(bounds);
 }
 

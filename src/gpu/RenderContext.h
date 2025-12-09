@@ -68,7 +68,7 @@ class RenderContext : public DrawContext {
    */
   bool flush();
 
-  std::shared_ptr<ColorSpace> colorSpace() const {
+  const std::shared_ptr<ColorSpace>& colorSpace() const {
     return _colorSpace;
   }
 

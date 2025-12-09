@@ -28,7 +28,7 @@ class GlyphShape : public UniqueKeyShape {
  public:
   explicit GlyphShape(Font font, GlyphID glyphID);
 
-  Rect getBounds() const override;
+  Rect onGetBounds() const override;
 
  protected:
   Type type() const override {

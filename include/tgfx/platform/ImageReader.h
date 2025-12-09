@@ -58,7 +58,7 @@ class ImageReader {
   /**
    * Returns the ColorSpace of generated image buffers.
    */
-  std::shared_ptr<ColorSpace> colorSpace() const;
+  const std::shared_ptr<ColorSpace>& colorSpace() const;
 
   /**
    * Acquires the next ImageBuffer from the ImageReader after a new image frame has been rendered

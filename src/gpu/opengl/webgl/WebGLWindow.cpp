@@ -49,15 +49,6 @@ std::shared_ptr<Surface> WebGLWindow::onCreateSurface(Context* context) {
   GLFrameBufferInfo glInfo = {};
   glInfo.id = 0;
   glInfo.format = GL_RGBA8;
-  std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB();
-
-  bool isP3Supported = emscripten::val::module_property("tgfx").call<bool>(
-      "isDisplayP3Supported", emscripten::val::module_property("GL"));
-  if (isP3Supported) {
-    colorSpace = ColorSpace::DisplayP3();
-  }
-  colorSpace = nullptr;
-  return Surface::MakeFrom(context, {glInfo, width, height}, ImageOrigin::BottomLeft, 0,
-                           colorSpace);
+  return Surface::MakeFrom(context, {glInfo, width, height}, ImageOrigin::BottomLeft, 0, nullptr);
 }
 }  // namespace tgfx

@@ -213,12 +213,14 @@ class Canvas {
   /**
    * Fills the current clip with the specified color, using BlendMode::Src. This replaces all pixels
    * within the clip with the specified color.
+   * @param color The sRGB color used for clearing. Values may exceed 0-1.
    */
   void clear(const Color& color = Color::Transparent());
 
   /**
    * Fills the current clip with the specified color. The color is blended with the destination
    * pixels using the specified blend mode.
+   * @param color The sRGB color used for drawing. Values may exceed 0-1.
    */
   void drawColor(const Color& color, BlendMode blendMode = BlendMode::SrcOver);
 
@@ -446,7 +448,8 @@ class Canvas {
    * @param atlas The image containing the sprites.
    * @param matrix The matrix transformations for the sprites in the atlas.
    * @param tex The rectangle locations of the sprites in the atlas.
-   * @param colors An array of colors for each sprite; can be nullptr.
+   * @param colors An array of sRGB colors for each sprite. Values may exceed the 0-1 range, and the
+   * array can be nullptr.
    * @param count The number of sprites to draw.
    * @param sampling The sampling options used to sample the atlas image.
    * @param paint The paint used for blending, alpha, etc.

@@ -31,7 +31,7 @@ class EffectShape : public UniqueKeyShape {
       : shape(std::move(shape)), effect(std::move(effect)) {
   }
 
-  Rect getBounds() const override;
+  Rect onGetBounds() const override;
 
  protected:
   Type type() const override {

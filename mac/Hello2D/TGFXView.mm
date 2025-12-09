@@ -84,7 +84,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
 
 - (void)viewDidMoveToWindow {
   [super viewDidMoveToWindow];
-  
+
   if (self.window == nil) {
     if (@available(macOS 14, *)) {
       if (self.caDisplayLink) {
@@ -101,7 +101,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
     }
     return;
   }
-  
+
   self.drawIndex = 0;
   self.zoomScale = 1.0f;
   self.contentOffset = CGPointZero;
@@ -157,8 +157,6 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
     displayLink.paused = YES;
   }
 }
-
-
 
 - (BOOL)draw {
   if (self.window == nil) {
@@ -247,20 +245,20 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   return displayList.hasContentChanged() || lastRecording != nullptr;
 }
 
-- (void)mouseDown:(NSEvent *)event {
+- (void)mouseDown:(NSEvent*)event {
   self.drawIndex++;
   self.zoomScale = 1.0f;
   self.contentOffset = CGPointZero;
   [self startDisplayLink];
 }
 
-- (void)scrollWheel:(NSEvent *)event {
+- (void)scrollWheel:(NSEvent*)event {
   BOOL isCommandPressed = (event.modifierFlags & NSEventModifierFlagCommand) != 0;
   BOOL isShiftPressed = (event.modifierFlags & NSEventModifierFlagShift) != 0;
-  
+
   CGSize backingSize = [self convertSizeToBacking:CGSizeMake(1.0, 1.0)];
   CGFloat backingScale = backingSize.height;
-  
+
   if (isCommandPressed) {
     CGFloat zoomStep = std::exp(event.deltaY / 400.0f);
     CGPoint mousePoint = [self convertPoint:event.locationInWindow fromView:nil];

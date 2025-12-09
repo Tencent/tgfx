@@ -42,7 +42,7 @@ class NativeImageBuffer : public ImageBuffer {
     return info.isAlphaOnly();
   }
 
-  std::shared_ptr<ColorSpace> colorSpace() const override;
+  const std::shared_ptr<ColorSpace>& colorSpace() const override;
 
  protected:
   std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) const override;

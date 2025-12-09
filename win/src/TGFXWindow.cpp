@@ -160,7 +160,8 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
             double zoomFactor = currentArgument / lastZoomArgument;
             POINT mousePoint = {GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
             ScreenToClient(hwnd, &mousePoint);
-            float newZoom = std::clamp(zoomScale * static_cast<float>(zoomFactor), MIN_ZOOM, MAX_ZOOM);
+            float newZoom =
+                std::clamp(zoomScale * static_cast<float>(zoomFactor), MIN_ZOOM, MAX_ZOOM);
             float oldZoom = zoomScale;
             contentOffset.x = mousePoint.x - ((mousePoint.x - contentOffset.x) / oldZoom) * newZoom;
             contentOffset.y = mousePoint.y - ((mousePoint.y - contentOffset.y) / oldZoom) * newZoom;
@@ -246,7 +247,7 @@ void TGFXWindow::centerAndShow() {
 }
 
 float TGFXWindow::getPixelRatio() {
-#if WINVER >= 0x0603  
+#if WINVER >= 0x0603
   HMONITOR monitor = nullptr;
   if (windowHandle != nullptr) {
     monitor = ::MonitorFromWindow(windowHandle, MONITOR_DEFAULTTONEAREST);
@@ -264,11 +265,11 @@ float TGFXWindow::getPixelRatio() {
 
 void TGFXWindow::createAppHost() {
   appHost = std::make_unique<hello2d::AppHost>();
-  
+
   displayList.setRenderMode(tgfx::RenderMode::Tiled);
   displayList.setAllowZoomBlur(true);
   displayList.setMaxTileCount(512);
-  
+
   std::filesystem::path filePath = __FILE__;
   auto rootPath = filePath.parent_path().parent_path().parent_path().string();
   auto imagePath = rootPath + R"(\resources\assets\bridge.jpg)";

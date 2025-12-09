@@ -81,7 +81,7 @@ class ImageGenerator {
   /**
    * Return the ColorSpace of this ImageGenerator
    */
-  std::shared_ptr<ColorSpace> colorSpace() const {
+  const std::shared_ptr<ColorSpace>& colorSpace() const {
     return _colorSpace;
   }
 

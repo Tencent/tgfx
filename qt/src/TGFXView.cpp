@@ -67,15 +67,15 @@ QSGNode* TGFXView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
       tgfxWindow->getSurface(nullptr)->height() != screenHeight) {
     tgfxWindow->invalidSize();
   }
-  
+
   // Draw and check if content has changed
   bool hasContentChanged = draw();
-  
+
   // Schedule next update only if content is still changing
   if (hasContentChanged) {
     update();
   }
-  
+
   auto node = static_cast<QSGImageNode*>(oldNode);
   auto texture = tgfxWindow->getQSGTexture();
   if (texture) {
