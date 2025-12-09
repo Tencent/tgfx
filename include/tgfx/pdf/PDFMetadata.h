@@ -223,13 +223,18 @@ struct PDFMetadata {
   CompressionLevel compressionLevel = CompressionLevel::Default;
 
   /**
-   * The ColorSpace to convert.
+   * The destination color space for color conversion. When set, input colors and images will be
+   * converted from their source color space to this color space before being written to the PDF.
+   * This performs actual color value transformation.
    */
   std::shared_ptr<ColorSpace> dstColorSpace = nullptr;
 
   /**
-  * The ColorSpace to assign.
-  */
+   * The color space to assign (embed as ICC Profile) without performing any color conversion.
+   * This only embeds the ICC Profile into the PDF to describe how the colors should be interpreted,
+   * but does not transform any color values. Use this when colors are already in the desired color
+   * space and you just need to tag them with the correct profile.
+   */
   std::shared_ptr<ColorSpace> assignColorSpace = nullptr;
 };
 

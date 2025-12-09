@@ -500,12 +500,8 @@ void PDFDocumentImpl::endObject() {
 
 PDFIndirectReference PDFDocumentImpl::emitColorSpace() {
   DEBUG_ASSERT(_metadata.dstColorSpace != nullptr || _metadata.assignColorSpace != nullptr);
-  std::shared_ptr<ColorSpace> writeColorSpace = nullptr;
-  if (_metadata.assignColorSpace != nullptr) {
-    writeColorSpace = _metadata.assignColorSpace;
-  } else {
-    writeColorSpace = _metadata.dstColorSpace;
-  }
+  auto writeColorSpace =
+      _metadata.assignColorSpace ? _metadata.assignColorSpace : _metadata.dstColorSpace;
   auto colorSpaceDictionary = PDFDictionary::Make();
   colorSpaceDictionary->insertInt("N", 3);
   colorSpaceDictionary->insertName("Alternate", "DeviceRGB");

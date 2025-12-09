@@ -367,7 +367,7 @@ TGFX_TEST(PDFExportTest, MD5Test) {
   EXPECT_EQ(0, std::memcmp(digest.data(), expectedDigest, 16));
 }
 
-TGFX_TEST(PDFExportTest, ColorSpaceTest) {
+TGFX_TEST(PDFExportTest, DstColorSpace) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
@@ -394,7 +394,68 @@ TGFX_TEST(PDFExportTest, ColorSpaceTest) {
   document->endPage();
   document->close();
   PDFStream->flush();
-  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/ColorSpace"));
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/DstColorSpace"));
+}
+
+TGFX_TEST(PDFExportTest, AssignColorSpace) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto PDFStream = MemoryWriteStream::Make();
+
+  PDFMetadata metadata{};
+  metadata.assignColorSpace = ColorSpace::SRGB();
+  auto document = PDFDocument::Make(PDFStream, context, metadata);
+  auto canvas = document->beginPage(256.f, 256.f);
+  canvas->drawColor(Color::FromRGBA(0, 255, 0, 255, ColorSpace::DisplayP3()));
+  document->endPage();
+  canvas = document->beginPage(256.f, 256.f);
+  canvas->drawColor(Color::FromRGBA(0, 255, 0, 255, ColorSpace::SRGB()));
+  document->endPage();
+  canvas = document->beginPage(2048.f, 2048.f);
+  auto image = MakeImage("resources/apitest/green_p3.png");
+  canvas->drawImage(image);
+  document->endPage();
+  canvas = document->beginPage(2048.f, 2048.f);
+  Paint paint{};
+  paint.setImageFilter(ImageFilter::DropShadow(500, 500, 10, 10, Color::Green()));
+  canvas->drawImage(image, &paint);
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/AssignColorSpace"));
+}
+
+TGFX_TEST(PDFExportTest, DstAssignColorSpace) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto PDFStream = MemoryWriteStream::Make();
+
+  PDFMetadata metadata{};
+  metadata.dstColorSpace = ColorSpace::DisplayP3();
+  metadata.assignColorSpace = ColorSpace::SRGB();
+  auto document = PDFDocument::Make(PDFStream, context, metadata);
+  auto canvas = document->beginPage(256.f, 256.f);
+  canvas->drawColor(Color::FromRGBA(0, 255, 0, 255, ColorSpace::DisplayP3()));
+  document->endPage();
+  canvas = document->beginPage(256.f, 256.f);
+  canvas->drawColor(Color::FromRGBA(0, 255, 0, 255, ColorSpace::SRGB()));
+  document->endPage();
+  canvas = document->beginPage(2048.f, 2048.f);
+  auto image = MakeImage("resources/apitest/green_p3.png");
+  canvas->drawImage(image);
+  document->endPage();
+  canvas = document->beginPage(2048.f, 2048.f);
+  Paint paint{};
+  paint.setImageFilter(ImageFilter::DropShadow(500, 500, 10, 10, Color::Green()));
+  canvas->drawImage(image, &paint);
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/DstAssignColorSpace"));
 }
 
 }  // namespace tgfx
