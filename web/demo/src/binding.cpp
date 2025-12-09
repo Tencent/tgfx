@@ -29,6 +29,7 @@ EMSCRIPTEN_BINDINGS(TGFXDemo) {
       .function("updateSize", &TGFXBaseView::updateSize)
       .function("onWheelEvent", &TGFXBaseView::onWheelEvent)
       .function("onClickEvent", &TGFXBaseView::onClickEvent)
+      .function("updateDrawParams", &TGFXBaseView::updateDrawParams)
       .function("draw", &TGFXBaseView::draw);
 
   class_<TGFXView, base<TGFXBaseView>>("TGFXView")

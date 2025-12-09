@@ -48,6 +48,14 @@ class TGFXView : public QQuickItem {
   std::unique_ptr<tgfx::Recording> lastRecording = nullptr;
   float zoom = 1.0f;
   QPointF offset = {0, 0};
+  // Last applied zoom/offset to DisplayList
+  float lastAppliedZoom = 1.0f;
+  QPointF lastAppliedOffset = {0, 0};
+  // Cached surface size for calculating base scale without locking device
+  int lastSurfaceWidth = 0;
+  int lastSurfaceHeight = 0;
+  // Flag to force render when size changes
+  bool sizeInvalidated = false;
 
   void createAppHost();
  private Q_SLOTS:

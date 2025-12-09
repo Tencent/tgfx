@@ -39,6 +39,13 @@ void TGFXBaseView::updateSize(float devicePixelRatio) {
     emscripten_get_canvas_element_size(canvasID.c_str(), &width, &height);
     if (window && (width > 0 && height > 0)) {
       window->invalidSize();
+      // Clear lastRecording when size changes, as it was created for the old surface size
+      lastRecording = nullptr;
+      // Reset cached surface size to force recalculation in draw()
+      lastSurfaceWidth = 0;
+      lastSurfaceHeight = 0;
+      // Mark size as invalidated to force render next frame
+      sizeInvalidated = true;
     }
   }
 }
@@ -56,26 +63,26 @@ void TGFXBaseView::onWheelEvent() {
 void TGFXBaseView::onClickEvent() {
 }
 
-bool TGFXBaseView::draw(int drawIndex, float zoom, float offsetX, float offsetY) {
-  // Initialize window if needed
-  if (window == nullptr) {
-    window = tgfx::WebGLWindow::MakeFrom(canvasID);
-  }
-  if (window == nullptr) {
-    return true;
-  }
+void TGFXBaseView::applyTransform() {
+  if (lastSurfaceWidth > 0 && lastSurfaceHeight > 0) {
+    static constexpr float DESIGN_SIZE = 720.0f;
+    auto scaleX = static_cast<float>(lastSurfaceWidth) / DESIGN_SIZE;
+    auto scaleY = static_cast<float>(lastSurfaceHeight) / DESIGN_SIZE;
+    auto baseScale = std::min(scaleX, scaleY);
+    auto scaledSize = DESIGN_SIZE * baseScale;
+    auto baseOffsetX = (static_cast<float>(lastSurfaceWidth) - scaledSize) * 0.5f;
+    auto baseOffsetY = (static_cast<float>(lastSurfaceHeight) - scaledSize) * 0.5f;
 
-  auto device = window->getDevice();
-  auto context = device->lockContext();
-  if (context == nullptr) {
-    return true;
+    displayList.setZoomScale(currentZoom * baseScale);
+    displayList.setContentOffset(baseOffsetX + currentOffsetX, baseOffsetY + currentOffsetY);
   }
+}
 
-  auto surface = window->getSurface(context);
-  if (surface == nullptr) {
-    device->unlock();
-    return true;
-  }
+void TGFXBaseView::updateDrawParams(int drawIndex, float zoom, float offsetX, float offsetY) {
+  // Cache current parameters for use when size changes
+  currentZoom = zoom;
+  currentOffsetX = offsetX;
+  currentOffsetY = offsetY;
 
   // Switch sample when drawIndex changes
   auto numBuilders = hello2d::LayerBuilder::Count();
@@ -91,38 +98,69 @@ bool TGFXBaseView::draw(int drawIndex, float zoom, float offsetX, float offsetY)
     }
     lastDrawIndex = index;
   }
-  // Calculate base scale and offset to fit 720x720 design size to window
-  static constexpr float DESIGN_SIZE = 720.0f;
-  auto scaleX = static_cast<float>(surface->width()) / DESIGN_SIZE;
-  auto scaleY = static_cast<float>(surface->height()) / DESIGN_SIZE;
-  auto baseScale = std::min(scaleX, scaleY);
-  auto scaledSize = DESIGN_SIZE * baseScale;
-  auto baseOffsetX = (static_cast<float>(surface->width()) - scaledSize) * 0.5f;
-  auto baseOffsetY = (static_cast<float>(surface->height()) - scaledSize) * 0.5f;
 
-  // Apply user zoom and offset on top of the base scale/offset.
-  displayList.setZoomScale(zoom * baseScale);
-  displayList.setContentOffset(baseOffsetX + offsetX, baseOffsetY + offsetY);
+  // Apply transform using cached surface size
+  applyTransform();
+}
 
-  // Check if content has changed before rendering
-  bool needsRender = displayList.hasContentChanged();
+bool TGFXBaseView::draw() {
+  // Initialize window if needed
+  if (window == nullptr) {
+    window = tgfx::WebGLWindow::MakeFrom(canvasID);
+  }
+  if (window == nullptr) {
+    return false;
+  }
 
-  // In delayed one-frame present mode:
-  // - If no content changed AND no last recording to submit -> skip rendering
+  // Check if content has changed at the VERY BEGINNING, before locking device
+  // If no content change AND no pending lastRecording -> skip everything
+  bool needsRender = displayList.hasContentChanged() || sizeInvalidated;
   if (!needsRender && lastRecording == nullptr) {
+    return false;
+  }
+
+  // ========== Now lock device for rendering/submitting ==========
+
+  auto device = window->getDevice();
+  auto context = device->lockContext();
+  if (context == nullptr) {
+    return false;
+  }
+
+  auto surface = window->getSurface(context);
+  if (surface == nullptr) {
     device->unlock();
     return false;
   }
 
-  // If no new content but have last recording, only submit it without new rendering
+  // Update cached surface size and recalculate transform if size changed
+  int newSurfaceWidth = surface->width();
+  int newSurfaceHeight = surface->height();
+  bool sizeChanged = (newSurfaceWidth != lastSurfaceWidth || newSurfaceHeight != lastSurfaceHeight);
+  if (sizeChanged) {
+    lastSurfaceWidth = newSurfaceWidth;
+    lastSurfaceHeight = newSurfaceHeight;
+    // Recalculate transform with new surface size
+    applyTransform();
+    needsRender = true;
+  }
+
+  // Clear sizeInvalidated flag now that we've handled size changes
+  sizeInvalidated = false;
+
+  // Track if we submitted anything this frame
+  bool didSubmit = false;
+
+  // Case 1: No content change BUT have pending lastRecording -> only submit lastRecording
   if (!needsRender) {
     context->submit(std::move(lastRecording));
     window->present(context);
+    didSubmit = true;
     device->unlock();
-    return false;
+    return didSubmit;
   }
 
-  // Draw background
+  // Case 2: Content changed -> render new content
   auto canvas = surface->getCanvas();
   canvas->clear();
   int width = 0;
@@ -134,21 +172,22 @@ bool TGFXBaseView::draw(int drawIndex, float zoom, float offsetX, float offsetY)
   // Render DisplayList
   displayList.render(surface.get(), false);
 
-  // Delayed one-frame present mode: flush + submit
+  // Delayed one-frame present mode
   auto recording = context->flush();
   if (lastRecording) {
     context->submit(std::move(lastRecording));
-    if (recording) {
-      window->present(context);
-    }
+    window->present(context);
+    didSubmit = true;
+    lastRecording = std::move(recording);
+  } else if (recording) {
+    context->submit(std::move(recording));
+    window->present(context);
+    didSubmit = true;
   }
-  lastRecording = std::move(recording);
 
   device->unlock();
 
-  // In delayed one-frame mode, if we have a pending recording, we need another frame to present it
-  // So return true to keep the render loop running
-  return displayList.hasContentChanged() || lastRecording != nullptr;
+  return didSubmit || lastRecording != nullptr;
 }
 
 }  // namespace hello2d

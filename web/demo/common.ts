@@ -23,7 +23,8 @@ export const MAX_ZOOM = 1000.0;
 
 export class TGFXBaseView {
     public updateSize: (devicePixelRatio: number) => void;
-    public draw: (drawIndex: number, zoom: number, offsetX: number, offsetY: number) => boolean;
+    public updateDrawParams: (drawIndex: number, zoom: number, offsetX: number, offsetY: number) => void;
+    public draw: () => boolean;
     public onWheelEvent: () => void;
     public onClickEvent: () => void;
 }
@@ -86,6 +87,13 @@ class GestureManager {
                 shareData.offsetX -= event.deltaX * window.devicePixelRatio;
                 shareData.offsetY -= event.deltaY * window.devicePixelRatio;
             }
+            // Update DisplayList properties when scroll event triggers change
+            shareData.tgfxBaseView.updateDrawParams(
+                shareData.drawIndex,
+                shareData.zoom,
+                shareData.offsetX,
+                shareData.offsetY
+            );
             shareData.tgfxBaseView.onWheelEvent();
         }
     }
@@ -114,6 +122,13 @@ class GestureManager {
             this.scaleY = 1.0;
             this.scaleStartZoom = shareData.zoom;
         }
+        // Update DisplayList properties when scale event triggers change
+        shareData.tgfxBaseView.updateDrawParams(
+            shareData.drawIndex,
+            shareData.zoom,
+            shareData.offsetX,
+            shareData.offsetY
+        );
         shareData.tgfxBaseView.onWheelEvent();
     }
 
@@ -191,12 +206,7 @@ function isPromise(obj: any): obj is Promise<any> {
 }
 
 function draw(shareData: ShareData): boolean {
-    return shareData.tgfxBaseView.draw(
-        shareData.drawIndex,
-        shareData.zoom,
-        shareData.offsetX,
-        shareData.offsetY
-    );
+    return shareData.tgfxBaseView.draw();
 }
 let animationLoopRunning = false;
 
@@ -214,6 +224,13 @@ export function updateSize(shareData: ShareData) {
     canvas.style.width = screenRect.width + "px";
     canvas.style.height = screenRect.height + "px";
     shareData.tgfxBaseView.updateSize(scaleFactor);
+    // Update DisplayList properties after size change
+    shareData.tgfxBaseView.updateDrawParams(
+        shareData.drawIndex,
+        shareData.zoom,
+        shareData.offsetX,
+        shareData.offsetY
+    );
     animationLoop(shareData);
 }
 
@@ -274,11 +291,18 @@ export function onClickEvent(shareData: ShareData) {
         return;
     }
     shareData.drawIndex++;
-    shareData.tgfxBaseView.onClickEvent();
     shareData.offsetX = 0;
     shareData.offsetY = 0;
     shareData.zoom = 1.0;
     gestureManager.clearState();
+    // Update DisplayList properties when click event triggers change
+    shareData.tgfxBaseView.updateDrawParams(
+        shareData.drawIndex,
+        shareData.zoom,
+        shareData.offsetX,
+        shareData.offsetY
+    );
+    shareData.tgfxBaseView.onClickEvent();
 
     const names = ['CustomLayerTree'];  
     const currentName = names[shareData.drawIndex % names.length];
