@@ -18,6 +18,7 @@
 
 #include "Context3DCompositor.h"
 #include "core/images/TextureImage.h"
+#include "core/utils/MathExtra.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/RectsVertexProvider.h"
@@ -45,7 +46,7 @@ Context3DCompositor::~Context3DCompositor() {
 }
 
 void Context3DCompositor::drawImage(std::shared_ptr<Image> image, const Matrix3D& matrix, float x,
-                                    float y) {
+                                    float y, float alpha) {
   DEBUG_ASSERT(targetColorProxy != nullptr);
   DEBUG_ASSERT(targetDepthStencilProxy != nullptr);
   auto context = targetColorProxy->getContext();
@@ -63,20 +64,19 @@ void Context3DCompositor::drawImage(std::shared_ptr<Image> image, const Matrix3D
   auto ndcRectScaled =
       Rect::MakeXYWH(srcProjectRect.left * ndcScale.x, srcProjectRect.top * ndcScale.y,
                      srcProjectRect.width() * ndcScale.x, srcProjectRect.height() * ndcScale.y);
-  Vec2 ndcOffset(-1.f - ndcRectScaled.left + 2 * x / static_cast<float>(width),
-                 -1.f - ndcRectScaled.top + 2 * y / static_cast<float>(height));
+  const Vec2 ndcOffset(-1.f - ndcRectScaled.left + 2 * x / static_cast<float>(width),
+                       -1.f - ndcRectScaled.top + 2 * y / static_cast<float>(height));
 
   auto allocator = context->drawingAllocator();
   // Disable anti-aliasing for small images to avoid large semi-transparent areas when small
   // rectangles are projected as large ones.
-  auto aaType = srcW < 10.f || srcH < 10.f ? AAType::None : AAType::Coverage;
-  auto vertexProvider = RectsVertexProvider::MakeFrom(allocator, srcModelRect, aaType);
+  auto vertexProvider = RectsVertexProvider::MakeFrom(allocator, srcModelRect, AAType::MSAA,
+                                                      PMColor(alpha, alpha, alpha, alpha));
   const Size viewportSize(static_cast<float>(width), static_cast<float>(height));
   const Rect3DDrawArgs drawArgs{matrix, ndcScale, ndcOffset, viewportSize};
   auto drawOp = Rect3DDrawOp::Make(context, std::move(vertexProvider), 0, drawArgs);
   const SamplingArgs samplingArgs = {TileMode::Clamp, TileMode::Clamp, {}, SrcRectConstraint::Fast};
-  TPArgs args(context, 0, false, 1.0f);
-  //TODO: Avoid locking entire image.
+  const TPArgs args(context, 0, false, 1.0f);
   auto sourceTextureProxy = image->lockTextureProxy(args);
   // Ensure the vertex texture sampling coordinates are in the range [0, 1]
   DEBUG_ASSERT(srcW > 0 && srcH > 0);
@@ -88,6 +88,9 @@ void Context3DCompositor::drawImage(std::shared_ptr<Image> image, const Matrix3D
       TextureEffect::Make(allocator, std::move(sourceTextureProxy), samplingArgs, &uvMatrix);
   drawOp->addColorFP(std::move(fragmentProcessor));
   drawOp->setEnableDepthTest(true);
+  // Transparent pixels should not overwrite the depth buffer, otherwise they would cause
+  // underlying pixels to become invisible.
+  drawOp->setEnableDepthWrite(FloatNearlyEqual(alpha, 1.0f));
   drawOps.emplace_back(std::move(drawOp));
 }
 

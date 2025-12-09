@@ -203,7 +203,7 @@ class RenderPassDescriptor {
 
   /**
    * A convenience constructor that initializes a RenderPassDescriptor with a single color attachment
-   * and a optional depthstencil attachment.
+   * and an optional depthstencil attachment.
    * @param clorTexture The texture to render to.
    * @param depthStencilTexture The depth-stencil texture to render to, or nullptr if not using
    * depth-stencil.

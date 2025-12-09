@@ -73,9 +73,7 @@ void RasterizedContent::draw(Canvas* canvas, bool antiAlias, float alpha,
   canvas->setMatrix(oldMatrix);
 }
 
-//TODO: Allpy antiAlias、alpha、mask、blendMode
-void RasterizedContent::draw(Render3DContext& context, bool, float,
-                             const std::shared_ptr<MaskFilter>&, BlendMode,
+void RasterizedContent::draw(Render3DContext& context, float alpha,
                              const Matrix3D* transform) const {
   if (transform == nullptr) {
     DEBUG_ASSERT(false);
@@ -91,7 +89,7 @@ void RasterizedContent::draw(Render3DContext& context, bool, float,
   auto x =
       imageMappedRect.left + matrix.getTranslateX() * _contentScale - context.renderRect().left;
   auto y = imageMappedRect.top + matrix.getTranslateY() * _contentScale - context.renderRect().top;
-  context.compositor()->drawImage(image, adaptedMatrix, x, y);
+  context.compositor()->drawImage(image, adaptedMatrix, x, y, alpha);
 }
 
 }  // namespace tgfx

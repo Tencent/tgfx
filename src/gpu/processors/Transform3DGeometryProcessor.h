@@ -35,7 +35,8 @@ class Transform3DGeometryProcessor : public GeometryProcessor {
   static PlacementPtr<Transform3DGeometryProcessor> Make(BlockAllocator* allocator, AAType aa,
                                                          const Matrix3D& matrix,
                                                          const Vec2& ndcScale,
-                                                         const Vec2& ndcOffset);
+                                                         const Vec2& ndcOffset,
+                                                         std::optional<PMColor> commonColor);
 
   std::string name() const override {
     return "Transform3DGeometryProcessor";
@@ -45,13 +46,15 @@ class Transform3DGeometryProcessor : public GeometryProcessor {
   DEFINE_PROCESSOR_CLASS_ID
 
   explicit Transform3DGeometryProcessor(AAType aa, const Matrix3D& transform, const Vec2& ndcScale,
-                                        const Vec2& ndcOffset);
+                                        const Vec2& ndcOffset, std::optional<PMColor> commonColor);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
   Attribute position = {};
-
   Attribute coverage = {};
+  // Vertex color. Only used when vertex colors differ within the rendering program. Otherwise,
+  // commonColor is used.
+  Attribute color = {};
 
   AAType aa = AAType::None;
 
@@ -68,6 +71,10 @@ class Transform3DGeometryProcessor : public GeometryProcessor {
    */
   Vec2 ndcScale = Vec2(0.f, 0.f);
   Vec2 ndcOffset = Vec2(0.f, 0.f);
+
+  // If all vertex colors within the rendering program are the same, this property stores that
+  // color; otherwise, it is empty.
+  std::optional<PMColor> commonColor = std::nullopt;
 };
 
 }  // namespace tgfx

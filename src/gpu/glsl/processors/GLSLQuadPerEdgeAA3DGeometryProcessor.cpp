@@ -26,15 +26,15 @@ static constexpr char UniformNdcOffsetName[] = "ndcOffset";
 
 PlacementPtr<Transform3DGeometryProcessor> Transform3DGeometryProcessor::Make(
     BlockAllocator* allocator, AAType aa, const Matrix3D& matrix, const Vec2& ndcScale,
-    const Vec2& ndcOffset) {
-  return allocator->make<GLSLQuadPerEdgeAA3DGeometryProcessor>(aa, matrix, ndcScale, ndcOffset);
+    const Vec2& ndcOffset, std::optional<PMColor> commonColor) {
+  return allocator->make<GLSLQuadPerEdgeAA3DGeometryProcessor>(aa, matrix, ndcScale, ndcOffset,
+                                                               commonColor);
 }
 
-GLSLQuadPerEdgeAA3DGeometryProcessor::GLSLQuadPerEdgeAA3DGeometryProcessor(AAType aa,
-                                                                           const Matrix3D& matrix,
-                                                                           const Vec2& ndcScale,
-                                                                           const Vec2& ndcOffset)
-    : Transform3DGeometryProcessor(aa, matrix, ndcScale, ndcOffset) {
+GLSLQuadPerEdgeAA3DGeometryProcessor::GLSLQuadPerEdgeAA3DGeometryProcessor(
+    AAType aa, const Matrix3D& matrix, const Vec2& ndcScale, const Vec2& ndcOffset,
+    std::optional<PMColor> commonColor)
+    : Transform3DGeometryProcessor(aa, matrix, ndcScale, ndcOffset, commonColor) {
 }
 
 void GLSLQuadPerEdgeAA3DGeometryProcessor::emitCode(EmitArgs& args) const {
@@ -56,9 +56,15 @@ void GLSLQuadPerEdgeAA3DGeometryProcessor::emitCode(EmitArgs& args) const {
   }
 
   // The default fragment processor color rendering logic requires a color uniform.
-  auto colorName =
-      uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
-  fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
+  if (commonColor.has_value()) {
+    auto colorName =
+        uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
+    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
+  } else {
+    auto colorVar = varyingHandler->addVarying("Color", SLType::Float4);
+    vertBuilder->codeAppendf("%s = %s;", colorVar.vsOut().c_str(), color.name().c_str());
+    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorVar.fsIn().c_str());
+  }
   auto transformMatrixName = uniformHandler->addUniform(
       UniformTransformMatrixName, UniformFormat::Float4x4, ShaderStage::Vertex);
   args.vertBuilder->codeAppendf("vec4 clipPoint = %s * vec4(%s, 0.0, 1.0);",
@@ -77,7 +83,9 @@ void GLSLQuadPerEdgeAA3DGeometryProcessor::setData(UniformData* vertexUniformDat
                                                    UniformData* fragmentUniformData,
                                                    FPCoordTransformIter* transformIter) const {
   setTransformDataHelper(Matrix::I(), vertexUniformData, transformIter);
-  fragmentUniformData->setData("Color", defaultColor);
+  if (commonColor.has_value()) {
+    fragmentUniformData->setData("Color", *commonColor);
+  }
   vertexUniformData->setData("transformMatrix", matrix);
   vertexUniformData->setData("ndcScale", ndcScale);
   vertexUniformData->setData("ndcOffset", ndcOffset);

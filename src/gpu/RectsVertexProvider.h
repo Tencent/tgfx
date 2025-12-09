@@ -50,7 +50,7 @@ class RectsVertexProvider : public VertexProvider {
    * Creates a new RectsVertexProvider from a single rect.
    */
   static PlacementPtr<RectsVertexProvider> MakeFrom(BlockAllocator* allocator, const Rect& rect,
-                                                    AAType aaType);
+                                                    AAType aaType, const PMColor& color = {});
 
   /**
    * Creates a new RectsVertexProvider from a list of rect records.

@@ -30,7 +30,8 @@ class Context3DCompositor {
 
   ~Context3DCompositor();
 
-  void drawImage(std::shared_ptr<Image> image, const Matrix3D& matrix, float x, float y);
+  void drawImage(std::shared_ptr<Image> image, const Matrix3D& matrix, float x, float y,
+                 float alpha);
 
   std::shared_ptr<Image> finish();
 

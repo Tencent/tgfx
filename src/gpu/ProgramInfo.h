@@ -106,12 +106,20 @@ class ProgramInfo {
     cullMode = mode;
   }
 
-  bool getEnableDepthTest() const {
-    return enableDepthTest;
+  CompareFunction getDepthCompare() const {
+    return depthCompare;
   }
 
-  void setEnableDepthTest(bool enabled) {
-    enableDepthTest = enabled;
+  void setDepthCompare(CompareFunction compare) {
+    depthCompare = compare;
+  }
+
+  bool getDepthWriteEnabled() const {
+    return depthWriteEnabled;
+  }
+
+  void setDepthWriteEnabled(bool enabled) {
+    depthWriteEnabled = enabled;
   }
 
  private:
@@ -124,7 +132,8 @@ class ProgramInfo {
   XferProcessor* xferProcessor = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
   CullMode cullMode = CullMode::None;
-  bool enableDepthTest = false;
+  CompareFunction depthCompare = CompareFunction::Always;
+  bool depthWriteEnabled = false;
 
   void updateProcessorIndices();
 

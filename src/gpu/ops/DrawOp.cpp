@@ -44,7 +44,10 @@ void DrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
   ProgramInfo programInfo(renderTarget, geometryProcessor.get(), std::move(fragmentProcessors),
                           colors.size(), xferProcessor.get(), blendMode);
   programInfo.setCullMode(cullMode);
-  programInfo.setEnableDepthTest(enableDepthTest);
+  if (enableDepthTest) {
+    programInfo.setDepthCompare(CompareFunction::LessEqual);
+    programInfo.setDepthWriteEnabled(true);
+  }
   auto program = programInfo.getProgram();
   if (program == nullptr) {
     LOGE("DrawOp::execute() Failed to get the program!");

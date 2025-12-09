@@ -95,7 +95,7 @@ PlacementPtr<GeometryProcessor> Rect3DDrawOp::onMakeGeometryProcessor(RenderTarg
     ndcOffset.y = -ndcOffset.y;
   }
   return Transform3DGeometryProcessor::Make(allocator, aaType, drawArgs.transformMatrix, ndcScale,
-                                            ndcOffset);
+                                            ndcOffset, commonColor);
 }
 
 void Rect3DDrawOp::onDraw(RenderPass* renderPass) {
