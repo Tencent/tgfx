@@ -34,7 +34,6 @@ std::unique_ptr<RasterizedCache> RasterizedCache::MakeFrom(Context* context, flo
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
-  // Lock the texture proxy from the image.
   TPArgs tpArgs(context, 0, false, 1.0f, BackingFit::Exact);
   auto textureProxy = image->lockTextureProxy(tpArgs);
   if (textureProxy == nullptr) {
@@ -42,11 +41,10 @@ std::unique_ptr<RasterizedCache> RasterizedCache::MakeFrom(Context* context, flo
   }
   auto cache = std::make_unique<RasterizedCache>(context->uniqueID(), contentScale, imageMatrix,
                                                  image->colorSpace());
-  // Assign unique key to the texture proxy for caching.
   auto proxyProvider = context->proxyProvider();
   proxyProvider->assignProxyUniqueKey(textureProxy, cache->uniqueKey());
   textureProxy->assignUniqueKey(cache->uniqueKey());
-  // Return the cached image so the caller can use it for immediate drawing.
+  // Return the cached image ensure the texture proxy is not released.
   if (cachedImage != nullptr) {
     *cachedImage = TextureImage::Wrap(std::move(textureProxy), image->colorSpace());
   }

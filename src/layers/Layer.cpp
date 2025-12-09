@@ -550,7 +550,7 @@ Rect Layer::getBounds(const Layer* targetCoordinateSpace, bool computeTightBound
 }
 
 Rect Layer::getBoundsInternal(const Matrix3D& coordinateMatrix, bool computeTightBounds) {
-  if (computeTightBounds || bitFields.dirtyDescendents) {
+  if (computeTightBounds) {
     return computeBounds(coordinateMatrix, computeTightBounds);
   }
   if (!localBounds) {
@@ -822,12 +822,12 @@ void Layer::invalidateTransform() {
 }
 
 void Layer::invalidateDescendents() {
+  localBounds = nullptr;
   if (bitFields.dirtyDescendents) {
     return;
   }
   bitFields.dirtyDescendents = true;
   invalidateCache();
-  localBounds = nullptr;
   invalidate();
 }
 
