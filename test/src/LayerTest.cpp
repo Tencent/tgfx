@@ -1665,6 +1665,109 @@ TGFX_TEST(LayerTest, hitTestPoint) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Layer_hitTestPoint"));
 }
 
+TGFX_TEST(LayerTest, HitTestPointWithStroke) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 400);
+  auto canvas = surface->getCanvas();
+  auto displayList = std::make_unique<DisplayList>();
+
+  // Test stroke hit test for ShapeLayer with Path (triangle)
+  auto pathLayer = ShapeLayer::Make();
+  Path trianglePath = {};
+  trianglePath.moveTo(100, 50);
+  trianglePath.lineTo(150, 150);
+  trianglePath.lineTo(50, 150);
+  trianglePath.close();
+  pathLayer->setPath(trianglePath);
+  pathLayer->setStrokeStyle(SolidColor::Make(Color::Red()));
+  pathLayer->setLineWidth(20.0f);
+  displayList->root()->addChild(pathLayer);
+
+  // Test stroke hit test for ShapeLayer with Rect
+  auto rectLayer = ShapeLayer::Make();
+  Path rectPath = {};
+  rectPath.addRect(Rect::MakeXYWH(200, 50, 100, 100));
+  rectLayer->setPath(rectPath);
+  rectLayer->setStrokeStyle(SolidColor::Make(Color::Green()));
+  rectLayer->setLineWidth(20.0f);
+  displayList->root()->addChild(rectLayer);
+
+  // Test stroke hit test for ShapeLayer with RRect
+  auto rRectLayer = ShapeLayer::Make();
+  Path rRectPath = {};
+  RRect rRect = {};
+  rRect.setRectXY(Rect::MakeXYWH(50, 200, 100, 100), 20.0f, 20.0f);
+  rRectPath.addRRect(rRect);
+  rRectLayer->setPath(rRectPath);
+  rRectLayer->setStrokeStyle(SolidColor::Make(Color::Blue()));
+  rRectLayer->setLineWidth(20.0f);
+  displayList->root()->addChild(rRectLayer);
+
+  // Test stroke hit test for ShapeLayer with Shape (oval)
+  auto shapeLayer = ShapeLayer::Make();
+  Path shapePath = {};
+  shapePath.addOval(Rect::MakeXYWH(200, 200, 100, 100));
+  auto shape = Shape::MakeFrom(shapePath);
+  shapeLayer->setShape(shape);
+  shapeLayer->setStrokeStyle(SolidColor::Make(Color::FromRGBA(255, 165, 0)));
+  shapeLayer->setLineWidth(20.0f);
+  displayList->root()->addChild(shapeLayer);
+
+  displayList->render(surface.get());
+
+  // Draw test points
+  auto paint = Paint();
+  paint.setColor(Color::White());
+  paint.setStyle(PaintStyle::Fill);
+
+  // Test points outside the original shape but inside the stroke area (stroke width = 20, half = 10)
+  // These points should hit the stroke but would miss without stroke consideration.
+
+  // P1: On triangle left edge stroke area - original edge is from (50,150) to (100,50)
+  Point p1 = {65.0f, 110.0f};
+  canvas->drawCircle(p1.x, p1.y, 3.0f, paint);
+  EXPECT_TRUE(pathLayer->hitTestPoint(p1.x, p1.y, true));
+
+  // P2: Further left of triangle edge, outside stroke area
+  Point p2 = {45.0f, 110.0f};
+  canvas->drawCircle(p2.x, p2.y, 3.0f, paint);
+  EXPECT_FALSE(pathLayer->hitTestPoint(p2.x, p2.y, true));
+
+  // P3: Left of rect, in stroke area (190, 100) - original rect left is at x=200
+  Point p3 = {192.0f, 100.0f};
+  canvas->drawCircle(p3.x, p3.y, 3.0f, paint);
+  EXPECT_TRUE(rectLayer->hitTestPoint(p3.x, p3.y, true));
+
+  // P4: Further left of rect, outside stroke area
+  Point p4 = {185.0f, 100.0f};
+  canvas->drawCircle(p4.x, p4.y, 3.0f, paint);
+  EXPECT_FALSE(rectLayer->hitTestPoint(p4.x, p4.y, true));
+
+  // P5: Left of rRect, in stroke area (42, 250) - original rRect left is at x=50
+  Point p5 = {42.0f, 250.0f};
+  canvas->drawCircle(p5.x, p5.y, 3.0f, paint);
+  EXPECT_TRUE(rRectLayer->hitTestPoint(p5.x, p5.y, true));
+
+  // P6: Further left of rRect, outside stroke area
+  Point p6 = {35.0f, 250.0f};
+  canvas->drawCircle(p6.x, p6.y, 3.0f, paint);
+  EXPECT_FALSE(rRectLayer->hitTestPoint(p6.x, p6.y, true));
+
+  // P7: Above oval, in stroke area (250, 192) - original oval top is at y=200
+  Point p7 = {250.0f, 192.0f};
+  canvas->drawCircle(p7.x, p7.y, 3.0f, paint);
+  EXPECT_TRUE(shapeLayer->hitTestPoint(p7.x, p7.y, true));
+
+  // P8: Further above oval, outside stroke area
+  Point p8 = {250.0f, 185.0f};
+  canvas->drawCircle(p8.x, p8.y, 3.0f, paint);
+  EXPECT_FALSE(shapeLayer->hitTestPoint(p8.x, p8.y, true));
+
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/HitTestPointWithStroke"));
+}
+
 TGFX_TEST(LayerTest, drawRRect) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -3066,74 +3169,143 @@ TGFX_TEST(LayerTest, ContourTest) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 300, 300);
-  auto baseLayer = ShapeLayer::Make();
-  Path path;
-  path.addRect(Rect::MakeXYWH(50, 50, 100, 100));
-  baseLayer->setPath(path);
-  baseLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 0, 0, 255)));
+  auto surface = Surface::Make(context, 200, 200);
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  EXPECT_TRUE(image != nullptr);
+  auto imagePattern1 = ImagePattern::Make(image, TileMode::Repeat, TileMode::Repeat);
+  auto imagePattern2 = ImagePattern::Make(image, TileMode::Clamp, TileMode::Clamp);
 
-  auto layerOutOfBase = ShapeLayer::Make();
-  Path pathOutOfBase;
-  pathOutOfBase.addRect(Rect::MakeXYWH(80, 50, 100, 80));
-  layerOutOfBase->setPath(pathOutOfBase);
-  layerOutOfBase->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 255, 0, 128)));
-  baseLayer->addChild(layerOutOfBase);
-
-  auto layerOutOfBase2 = ShapeLayer::Make();
-  layerOutOfBase2->setPath(pathOutOfBase);
-  layerOutOfBase2->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 255, 255, 128)));
-  layerOutOfBase2->setMatrix(Matrix::MakeRotate(30, 80, 90));
-  baseLayer->addChild(layerOutOfBase2);
-
-  auto rRectLayerInBase = ShapeLayer::Make();
-  Path rRectPath;
-  rRectPath.addRRect(RRect{Rect::MakeXYWH(60, 60, 40, 40), Point::Make(20, 20)});
-  rRectLayerInBase->setPath(rRectPath);
-  rRectLayerInBase->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 255, 0, 128)));
-  baseLayer->addChild(rRectLayerInBase);
-
-  auto rRectLayerOutBase = ShapeLayer::Make();
-  Path rRectPath2;
-  rRectPath2.addRRect(RRect{Rect::MakeXYWH(60, 60, 100, 100), Point::Make(20, 20)});
-  rRectLayerOutBase->setPath(rRectPath2);
-  rRectLayerOutBase->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 0, 255, 128)));
-  baseLayer->addChild(rRectLayerOutBase);
-  auto rRectLayerOutBase2 = ShapeLayer::Make();
-  rRectLayerOutBase2->setPath(rRectPath2);
-  rRectLayerOutBase2->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 0, 255, 128)));
-  baseLayer->addChild(rRectLayerOutBase2);
-
-  auto layerInBase = ShapeLayer::Make();
-  Path pathInBase;
-  pathInBase.addRect(Rect::MakeXYWH(80, 80, 30, 30));
-  layerInBase->setPath(pathInBase);
-  layerInBase->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 0, 255, 128)));
-  layerInBase->setMatrix(Matrix::MakeRotate(30, 60, 60));
-  baseLayer->addChild(layerInBase);
-
-  auto pathOutBase = ShapeLayer::Make();
-  Path pathOutBasePath;
-  pathOutBasePath.moveTo(200, 200);
-  pathOutBasePath.cubicTo(250, 70, 250, 150, 200, 150);
-  pathOutBase->setPath(pathOutBasePath);
-  pathOutBase->setLineWidth(2);
-  pathOutBase->setStrokeStyle(SolidColor::Make(Color::FromRGBA(0, 0, 0, 255)));
-  baseLayer->addChild(pathOutBase);
-
-  ContourContext contourContext;
-  Canvas contourCanvas = Canvas(&contourContext);
   DrawArgs drawArgs = DrawArgs(nullptr);
   drawArgs.drawMode = DrawMode::Contour;
-  baseLayer->drawLayer(drawArgs, &contourCanvas, 1.0, BlendMode::SrcOver);
-  auto picture = contourContext.finishRecordingAsPicture();
+  Path path = {};
 
-  EXPECT_TRUE(picture != nullptr);
-  EXPECT_TRUE(picture->drawCount == 6);
-  EXPECT_TRUE(contourContext.contourBounds.size() == 3);
+  // Case 1: Same geometry with all solid fills should dedup to 1 contour.
+  auto allSolidLayer = ShapeLayer::Make();
+  path.reset();
+  path.addRect(Rect::MakeXYWH(10, 10, 80, 80));
+  allSolidLayer->setPath(path);
+  allSolidLayer->addFillStyle(SolidColor::Make(Color::Red()));
+  allSolidLayer->addFillStyle(SolidColor::Make(Color::Blue()));
+  ContourContext allSolidContext;
+  Canvas allSolidCanvas = Canvas(&allSolidContext);
+  allSolidLayer->drawLayer(drawArgs, &allSolidCanvas, 1.0, BlendMode::SrcOver);
+  auto allSolidPicture = allSolidContext.finishRecordingAsPicture();
+  EXPECT_EQ(allSolidPicture->drawCount, 1u);
+
+  // Case 2: Same geometry with all image shader fills should collect all (no dedup).
+  auto allImageLayer = ShapeLayer::Make();
+  path.reset();
+  path.addRect(Rect::MakeXYWH(110, 10, 80, 80));
+  allImageLayer->setPath(path);
+  allImageLayer->addFillStyle(imagePattern1);
+  allImageLayer->addFillStyle(imagePattern2);
+  ContourContext allImageContext;
+  Canvas allImageCanvas = Canvas(&allImageContext);
+  allImageLayer->drawLayer(drawArgs, &allImageCanvas, 1.0, BlendMode::SrcOver);
+  auto allImagePicture = allImageContext.finishRecordingAsPicture();
+  EXPECT_EQ(allImagePicture->drawCount, 2u);
+
+  // Case 3: Same geometry with image-image-solid order should dedup to 1 contour.
+  // This exposes the bug where single-pass logic collects both image shaders first,
+  // then encounters solid and realizes group has non-image-shader, but already collected 2.
+  auto mixedFillsLayer = ShapeLayer::Make();
+  path.reset();
+  path.addRect(Rect::MakeXYWH(10, 110, 80, 80));
+  mixedFillsLayer->setPath(path);
+  mixedFillsLayer->addFillStyle(imagePattern1);
+  mixedFillsLayer->addFillStyle(imagePattern2);
+  mixedFillsLayer->addFillStyle(SolidColor::Make(Color::Green()));
+  ContourContext mixedFillsContext;
+  Canvas mixedFillsCanvas = Canvas(&mixedFillsContext);
+  mixedFillsLayer->drawLayer(drawArgs, &mixedFillsCanvas, 1.0, BlendMode::SrcOver);
+  auto mixedFillsPicture = mixedFillsContext.finishRecordingAsPicture();
+  // Should be 1 (only first collected). Buggy single-pass would return 2.
+  EXPECT_EQ(mixedFillsPicture->drawCount, 1u);
+
+  // Case 4: Multiple groups with different dedup requirements.
+  // Group 1 (image-image): collect all (2). Group 2 (solid-solid): dedup to 1.
+  auto twoGroupsLayer = ShapeLayer::Make();
+  path.reset();
+  path.addRect(Rect::MakeXYWH(110, 110, 80, 80));
+  twoGroupsLayer->setPath(path);
+  twoGroupsLayer->addFillStyle(imagePattern1);
+  twoGroupsLayer->addFillStyle(imagePattern2);
+  auto childLayer = ShapeLayer::Make();
+  path.reset();
+  path.addRRect(RRect{Rect::MakeXYWH(120, 120, 60, 60), Point::Make(10, 10)});
+  childLayer->setPath(path);
+  childLayer->addFillStyle(SolidColor::Make(Color::Red()));
+  childLayer->addFillStyle(SolidColor::Make(Color::Blue()));
+  twoGroupsLayer->addChild(childLayer);
+  ContourContext twoGroupsContext;
+  Canvas twoGroupsCanvas = Canvas(&twoGroupsContext);
+  twoGroupsLayer->drawLayer(drawArgs, &twoGroupsCanvas, 1.0, BlendMode::SrcOver);
+  auto twoGroupsPicture = twoGroupsContext.finishRecordingAsPicture();
+  // Group 1: 2 (all image shaders), Group 2: 1 (deduped) = 3 total.
+  EXPECT_EQ(twoGroupsPicture->drawCount, 3u);
+
+  // Case 5: Stroke contour test - same geometry with same stroke should dedup.
+  // ShapeLayer without fillStyle adds a transparent fill content (no stroke),
+  // so we have 1 fill contour + 1 stroke contour (deduped from 2 strokes) = 2 total.
+  auto strokeTestLayer = ShapeLayer::Make();
+  path.reset();
+  path.addRect(Rect::MakeXYWH(10, 210, 80, 80));
+  strokeTestLayer->setPath(path);
+  strokeTestLayer->setLineWidth(5.0f);
+  strokeTestLayer->addStrokeStyle(SolidColor::Make(Color::Red()));
+  strokeTestLayer->addStrokeStyle(SolidColor::Make(Color::Blue()));
+  ContourContext strokeTestContext;
+  Canvas strokeTestCanvas = Canvas(&strokeTestContext);
+  strokeTestLayer->drawLayer(drawArgs, &strokeTestCanvas, 1.0, BlendMode::SrcOver);
+  auto strokeTestPicture = strokeTestContext.finishRecordingAsPicture();
+  // 1 (transparent fill) + 1 (strokes deduped) = 2 contours.
+  EXPECT_EQ(strokeTestPicture->drawCount, 2u);
+
+  // Case 6: Different stroke width should NOT dedup.
+  // Same geometry but different lineWidth produces different stroke contours.
+  auto diffStrokeLayer = ShapeLayer::Make();
+  path.reset();
+  path.addRect(Rect::MakeXYWH(110, 210, 80, 80));
+  diffStrokeLayer->setPath(path);
+  // First child with lineWidth 3.
+  auto child1 = ShapeLayer::Make();
+  child1->setPath(path);
+  child1->setLineWidth(3.0f);
+  child1->addStrokeStyle(SolidColor::Make(Color::Red()));
+  diffStrokeLayer->addChild(child1);
+  // Second child with lineWidth 6 - different stroke, should NOT dedup.
+  auto child2 = ShapeLayer::Make();
+  child2->setPath(path);
+  child2->setLineWidth(6.0f);
+  child2->addStrokeStyle(SolidColor::Make(Color::Blue()));
+  diffStrokeLayer->addChild(child2);
+  ContourContext diffStrokeContext;
+  Canvas diffStrokeCanvas = Canvas(&diffStrokeContext);
+  diffStrokeLayer->drawLayer(drawArgs, &diffStrokeCanvas, 1.0, BlendMode::SrcOver);
+  auto diffStrokePicture = diffStrokeContext.finishRecordingAsPicture();
+  // child1: 1 (transparent fill) + 1 (stroke width 3)
+  // child2: 1 (transparent fill, deduped) + 1 (stroke width 6, different) = 3 total.
+  EXPECT_EQ(diffStrokePicture->drawCount, 3u);
+
+  // Draw all to canvas for baseline comparison.
+  auto rootLayer = ShapeLayer::Make();
+  rootLayer->addChild(allSolidLayer);
+  rootLayer->addChild(allImageLayer);
+  rootLayer->addChild(mixedFillsLayer);
+  rootLayer->addChild(twoGroupsLayer);
+  rootLayer->addChild(strokeTestLayer);
+  rootLayer->addChild(diffStrokeLayer);
+  ContourContext allContext;
+  Canvas allCanvas = Canvas(&allContext);
+  rootLayer->drawLayer(drawArgs, &allCanvas, 1.0, BlendMode::SrcOver);
+  auto allPicture = allContext.finishRecordingAsPicture();
+  // 1 + 2 + 1 + 3 + 2 + 3 = 12
+  EXPECT_EQ(allPicture->drawCount, 12u);
+
+  surface = Surface::Make(context, 200, 400);
   auto canvas = surface->getCanvas();
   canvas->clear();
-  canvas->drawPicture(picture);
+  canvas->drawPicture(allPicture);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ContourTest"));
 }
 

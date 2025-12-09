@@ -3356,4 +3356,87 @@ TGFX_TEST(CanvasTest, ColorSpace) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawRecordSRGBColorToP3UseDrawImage"));
 }
 
+TGFX_TEST(CanvasTest, TextBlobHitTestPoint) {
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  ASSERT_TRUE(typeface != nullptr);
+  auto emojiTypeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoColorEmoji.ttf"));
+  ASSERT_TRUE(emojiTypeface != nullptr);
+
+  Font font(typeface, 80.0f);
+  Font emojiFont(emojiTypeface, 80.0f);
+  ASSERT_TRUE(font.hasOutlines());
+  ASSERT_FALSE(emojiFont.hasOutlines());
+
+  // Create a TextBlob with both normal character "O" and emoji "😀"
+  auto glyphID_O = font.getGlyphID('O');
+  auto glyphID_emoji = emojiFont.getGlyphID(0x1F600);  // 😀
+  ASSERT_TRUE(glyphID_O > 0);
+  ASSERT_TRUE(glyphID_emoji > 0);
+
+  float advance_O = font.getAdvance(glyphID_O);
+  float emojiOffsetX = advance_O + 10.0f;
+  std::vector<GlyphRun> glyphRuns = {
+      GlyphRun(font, {glyphID_O}, {Point::Make(0.0f, 0.0f)}),
+      GlyphRun(emojiFont, {glyphID_emoji}, {Point::Make(emojiOffsetX, 0.0f)})};
+  auto textBlob = TextBlob::MakeFrom(std::move(glyphRuns));
+  ASSERT_TRUE(textBlob != nullptr);
+
+  // Get bounds for "O" character
+  auto bounds_O = font.getBounds(glyphID_O);
+  // Get bounds for emoji character (offset by position)
+  auto bounds_emoji = emojiFont.getBounds(glyphID_emoji);
+  bounds_emoji.offset(advance_O + 10.0f, 0);
+
+  // ========== Test "O" character (outline-based hit test) ==========
+  // Test 1: Hit on the outline of "O"
+  float onOutlineX = bounds_O.left + 5.0f;
+  float onOutlineY = bounds_O.centerY();
+  EXPECT_TRUE(textBlob->hitTestPoint(onOutlineX, onOutlineY, nullptr));
+
+  // Test 2: Miss in the center hole of "O"
+  float centerX_O = bounds_O.centerX();
+  float centerY_O = bounds_O.centerY();
+  EXPECT_FALSE(textBlob->hitTestPoint(centerX_O, centerY_O, nullptr));
+
+  // Test 3: Miss outside the "O" bounds
+  float outsideX_O = bounds_O.left - 5.0f;
+  float outsideY_O = bounds_O.centerY();
+  EXPECT_FALSE(textBlob->hitTestPoint(outsideX_O, outsideY_O, nullptr));
+
+  // Test 4: Hit outside "O" but within stroke area
+  Stroke stroke = {};
+  stroke.width = 20.0f;  // half = 10
+  EXPECT_TRUE(textBlob->hitTestPoint(outsideX_O, outsideY_O, &stroke));
+
+  // Test 5: Miss further outside "O", beyond stroke area
+  float farOutsideX_O = bounds_O.left - 15.0f;
+  EXPECT_FALSE(textBlob->hitTestPoint(farOutsideX_O, outsideY_O, &stroke));
+
+  // ========== Test emoji character (bounds-based hit test) ==========
+  // Test 6: Hit inside the emoji bounds
+  float centerX_emoji = bounds_emoji.centerX();
+  float centerY_emoji = bounds_emoji.centerY();
+  EXPECT_TRUE(textBlob->hitTestPoint(centerX_emoji, centerY_emoji, nullptr));
+
+  // Test 7: Hit on the edge of the emoji bounds
+  float edgeX_emoji = bounds_emoji.left + 1.0f;
+  float edgeY_emoji = bounds_emoji.centerY();
+  EXPECT_TRUE(textBlob->hitTestPoint(edgeX_emoji, edgeY_emoji, nullptr));
+
+  // Test 8: Miss outside the emoji bounds
+  float outsideX_emoji = bounds_emoji.left - 5.0f;
+  float outsideY_emoji = bounds_emoji.centerY();
+  EXPECT_FALSE(textBlob->hitTestPoint(outsideX_emoji, outsideY_emoji, nullptr));
+
+  // Test 9: Hit outside emoji but within stroke area
+  EXPECT_TRUE(textBlob->hitTestPoint(outsideX_emoji, outsideY_emoji, &stroke));
+
+  // Test 10: Miss further outside emoji, beyond stroke area
+  // Use a point that's clearly outside both characters
+  float farOutsideX_emoji = bounds_emoji.right + 20.0f;
+  EXPECT_FALSE(textBlob->hitTestPoint(farOutsideX_emoji, outsideY_emoji, &stroke));
+}
+
 }  // namespace tgfx
