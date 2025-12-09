@@ -344,7 +344,7 @@ Canvas* PDFDocumentImpl::onBeginPage(float width, float height) {
     // if this is the first page if the document.
     SerializeHeader(&offsetMap, _stream);
     infoDictionary = this->emit(*PDFMetadataUtils::MakeDocumentInformationDict(_metadata));
-    if (_metadata.colorSpace != nullptr) {
+    if (_metadata.dstColorSpace != nullptr || _metadata.assignColorSpace != nullptr) {
       _colorSpaceRef = emitColorSpace();
     }
     if (_metadata.PDFA) {
@@ -499,11 +499,17 @@ void PDFDocumentImpl::endObject() {
 }
 
 PDFIndirectReference PDFDocumentImpl::emitColorSpace() {
-  DEBUG_ASSERT(_metadata.colorSpace != nullptr);
+  DEBUG_ASSERT(_metadata.dstColorSpace != nullptr || _metadata.assignColorSpace != nullptr);
+  std::shared_ptr<ColorSpace> writeColorSpace = nullptr;
+  if (_metadata.assignColorSpace != nullptr) {
+    writeColorSpace = _metadata.assignColorSpace;
+  } else {
+    writeColorSpace = _metadata.dstColorSpace;
+  }
   auto colorSpaceDictionary = PDFDictionary::Make();
   colorSpaceDictionary->insertInt("N", 3);
   colorSpaceDictionary->insertName("Alternate", "DeviceRGB");
-  auto iccProfile = _metadata.colorSpace->toICCProfile();
+  auto iccProfile = writeColorSpace->toICCProfile();
   auto stream = Stream::MakeFromData(iccProfile);
   auto ref = PDFStreamOut(std::move(colorSpaceDictionary), std::move(stream), this);
   PDFArray array{};

@@ -223,9 +223,14 @@ struct PDFMetadata {
   CompressionLevel compressionLevel = CompressionLevel::Default;
 
   /**
-   * The ColorSpace of this PDF document.
+   * The ColorSpace to convert.
    */
-  std::shared_ptr<ColorSpace> colorSpace = nullptr;
+  std::shared_ptr<ColorSpace> dstColorSpace = nullptr;
+
+  /**
+  * The ColorSpace to assign.
+  */
+  std::shared_ptr<ColorSpace> assignColorSpace = nullptr;
 };
 
 }  // namespace tgfx

@@ -290,7 +290,7 @@ void PDFBitmap::SerializeImage(const std::shared_ptr<Image>& image, int /*encodi
   //TODO (YGaurora): is image opaque,encode as jpeg
   auto image2bitmap = [doc](Context* context, const std::shared_ptr<Image>& image) {
     auto surface = Surface::Make(context, image->width(), image->height(), false, 1, false, 0,
-                                 doc->colorSpace());
+                                 doc->dstColorSpace());
     auto canvas = surface->getCanvas();
     canvas->drawImage(image);
 
