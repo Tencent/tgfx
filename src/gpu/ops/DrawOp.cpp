@@ -46,7 +46,7 @@ void DrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
   programInfo.setCullMode(cullMode);
   if (enableDepthTest) {
     programInfo.setDepthCompare(CompareFunction::LessEqual);
-    programInfo.setDepthWriteEnabled(true);
+    programInfo.setDepthWriteEnabled(enableDepthWrite);
   }
   auto program = programInfo.getProgram();
   if (program == nullptr) {

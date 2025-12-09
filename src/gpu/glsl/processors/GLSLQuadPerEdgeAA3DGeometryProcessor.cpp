@@ -24,7 +24,7 @@ static constexpr char UniformTransformMatrixName[] = "transformMatrix";
 static constexpr char UniformNdcScaleName[] = "ndcScale";
 static constexpr char UniformNdcOffsetName[] = "ndcOffset";
 
-PlacementPtr<Transform3DGeometryProcessor> Transform3DGeometryProcessor::Make(
+PlacementPtr<QuadPerEdgeAA3DGeometryProcessor> QuadPerEdgeAA3DGeometryProcessor::Make(
     BlockAllocator* allocator, AAType aa, const Matrix3D& matrix, const Vec2& ndcScale,
     const Vec2& ndcOffset, std::optional<PMColor> commonColor) {
   return allocator->make<GLSLQuadPerEdgeAA3DGeometryProcessor>(aa, matrix, ndcScale, ndcOffset,
@@ -34,7 +34,7 @@ PlacementPtr<Transform3DGeometryProcessor> Transform3DGeometryProcessor::Make(
 GLSLQuadPerEdgeAA3DGeometryProcessor::GLSLQuadPerEdgeAA3DGeometryProcessor(
     AAType aa, const Matrix3D& matrix, const Vec2& ndcScale, const Vec2& ndcOffset,
     std::optional<PMColor> commonColor)
-    : Transform3DGeometryProcessor(aa, matrix, ndcScale, ndcOffset, commonColor) {
+    : QuadPerEdgeAA3DGeometryProcessor(aa, matrix, ndcScale, ndcOffset, commonColor) {
 }
 
 void GLSLQuadPerEdgeAA3DGeometryProcessor::emitCode(EmitArgs& args) const {

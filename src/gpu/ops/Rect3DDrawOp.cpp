@@ -21,7 +21,7 @@
 #include "core/utils/MathExtra.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
-#include "gpu/processors/Transform3DGeometryProcessor.h"
+#include "gpu/processors/QuadPerEdgeAA3DGeometryProcessor.h"
 #include "inspect/InspectorMark.h"
 #include "tgfx/core/RenderFlags.h"
 
@@ -95,8 +95,8 @@ PlacementPtr<GeometryProcessor> Rect3DDrawOp::onMakeGeometryProcessor(RenderTarg
     ndcScale.y = -ndcScale.y;
     ndcOffset.y = -ndcOffset.y;
   }
-  return Transform3DGeometryProcessor::Make(allocator, aaType, drawArgs.transformMatrix, ndcScale,
-                                            ndcOffset, commonColor);
+  return QuadPerEdgeAA3DGeometryProcessor::Make(allocator, aaType, drawArgs.transformMatrix,
+                                                ndcScale, ndcOffset, commonColor);
 }
 
 void Rect3DDrawOp::onDraw(RenderPass* renderPass) {

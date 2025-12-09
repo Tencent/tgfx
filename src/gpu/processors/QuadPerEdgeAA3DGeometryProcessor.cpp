@@ -16,14 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "Transform3DGeometryProcessor.h"
+#include "QuadPerEdgeAA3DGeometryProcessor.h"
 
 namespace tgfx {
 
-Transform3DGeometryProcessor::Transform3DGeometryProcessor(AAType aa, const Matrix3D& transform,
-                                                           const Vec2& ndcScale,
-                                                           const Vec2& ndcOffset,
-                                                           std::optional<PMColor> commonColor)
+QuadPerEdgeAA3DGeometryProcessor::QuadPerEdgeAA3DGeometryProcessor(
+    AAType aa, const Matrix3D& transform, const Vec2& ndcScale, const Vec2& ndcOffset,
+    std::optional<PMColor> commonColor)
     : GeometryProcessor(ClassID()), aa(aa), matrix(transform), ndcScale(ndcScale),
       ndcOffset(ndcOffset), commonColor(commonColor) {
   position = {"aPosition", VertexFormat::Float2};
@@ -36,7 +35,7 @@ Transform3DGeometryProcessor::Transform3DGeometryProcessor(AAType aa, const Matr
   setVertexAttributes(&position, 2);
 }
 
-void Transform3DGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
+void QuadPerEdgeAA3DGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
   uint32_t flags = (aa == AAType::Coverage ? 1 : 0);
   flags |= commonColor.has_value() ? 2 : 0;
   bytesKey->write(flags);

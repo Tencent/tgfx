@@ -27,26 +27,27 @@ namespace tgfx {
 /**
  * A geometry processor for rendering 3D transformed quads with optional per-edge anti-aliasing.
  */
-class Transform3DGeometryProcessor : public GeometryProcessor {
+class QuadPerEdgeAA3DGeometryProcessor : public GeometryProcessor {
  public:
   /**
-   * Creates a Transform3DGeometryProcessor instance with the specified parameters.
+   * Creates a QuadPerEdgeAA3DGeometryProcessor instance with the specified parameters.
    */
-  static PlacementPtr<Transform3DGeometryProcessor> Make(BlockAllocator* allocator, AAType aa,
-                                                         const Matrix3D& matrix,
-                                                         const Vec2& ndcScale,
-                                                         const Vec2& ndcOffset,
-                                                         std::optional<PMColor> commonColor);
+  static PlacementPtr<QuadPerEdgeAA3DGeometryProcessor> Make(BlockAllocator* allocator, AAType aa,
+                                                             const Matrix3D& matrix,
+                                                             const Vec2& ndcScale,
+                                                             const Vec2& ndcOffset,
+                                                             std::optional<PMColor> commonColor);
 
   std::string name() const override {
-    return "Transform3DGeometryProcessor";
+    return "QuadPerEdgeAA3DGeometryProcessor";
   }
 
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  explicit Transform3DGeometryProcessor(AAType aa, const Matrix3D& transform, const Vec2& ndcScale,
-                                        const Vec2& ndcOffset, std::optional<PMColor> commonColor);
+  explicit QuadPerEdgeAA3DGeometryProcessor(AAType aa, const Matrix3D& transform,
+                                            const Vec2& ndcScale, const Vec2& ndcOffset,
+                                            std::optional<PMColor> commonColor);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 

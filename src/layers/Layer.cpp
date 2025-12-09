@@ -1586,8 +1586,6 @@ class LayerBrushModifier : public BrushModifier {
   float alpha = 1.0f;
 };
 
-// Any child layers within a 3D rendering context have background styles disabled, so no special
-// background logic processing is performed for 3D rendering contexts.
 void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
                          const LayerStyleSource* layerStyleSource, const Layer* stopChild,
                          const std::unordered_set<LayerStyleExtraSourceType>& styleExtraSourceTypes,
@@ -1641,10 +1639,7 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, cons
   // continuing context propagation, interrupt the context propagation.
   const bool interrupt3DContext =
       args.render3DContext != nullptr &&
-      (static_cast<BlendMode>(bitFields.blendMode) != BlendMode::SrcOver ||
-       !bitFields.passThroughBackground || (alpha < 1.0f && bitFields.allowsGroupOpacity) ||
-       bitFields.shouldRasterize || (!_filters.empty() && !args.excludeEffects) || hasValidMask() ||
-       _transformStyle == TransformStyle::Flat);
+      (_transformStyle == TransformStyle::Flat || !canExtend3DContext());
   // TODO: Support background styles for subsequent layers of 3D layers.
   // The layer content is drawn to the background canvas by playing back the layer's content as a
   // picture, which currently does not support 3D matrix. As a result, child layers cannot obtain

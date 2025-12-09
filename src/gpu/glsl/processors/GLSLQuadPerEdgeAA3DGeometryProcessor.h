@@ -18,14 +18,14 @@
 
 #pragma once
 
-#include "gpu/processors/Transform3DGeometryProcessor.h"
+#include "gpu/processors/QuadPerEdgeAA3DGeometryProcessor.h"
 
 namespace tgfx {
 
 /**
  * The implementation of QuadPerEdgeAA3DGeometryProcessor using GLSL.
  */
-class GLSLQuadPerEdgeAA3DGeometryProcessor final : public Transform3DGeometryProcessor {
+class GLSLQuadPerEdgeAA3DGeometryProcessor final : public QuadPerEdgeAA3DGeometryProcessor {
  public:
   /**
    * Creates a GLSLQuadPerEdgeAA3DGeometryProcessor instance with the specified parameters.
