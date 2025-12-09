@@ -95,14 +95,16 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
   if (!rect.intersect(drawBounds)) {
     return nullptr;
   }
-  auto scale = args.drawScale;
   //auto clipRect = rect;
   auto offsetX = rect.left;
   auto offsetY = rect.top;
+  auto scale = args.drawScale;
   rect.scale(scale, scale);
-  offsetX -= (rect.left - std::floor(rect.left)) / scale;
-  offsetY -= (rect.top - std::floor(rect.top)) / scale;
-  rect.roundOut();
+  if (FloatNearlyEqual(scale, 1.0f)) {
+    offsetX -= (rect.left - std::floor(rect.left)) / scale;
+    offsetY -= (rect.top - std::floor(rect.top)) / scale;
+    rect.roundOut();
+  }
 
   //rect.round();
   // recalculate the scale factor to avoid the precision loss of floating point numbers
