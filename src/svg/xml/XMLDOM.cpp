@@ -94,7 +94,6 @@ DOMNode::~DOMNode() {
   if (nextSibling) {
     stack.emplace_back(std::move(nextSibling));
   }
-
   while (!stack.empty()) {
     auto node = std::move(stack.back());
     stack.pop_back();
