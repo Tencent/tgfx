@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <chrono>
 #include "core/filters/DropShadowImageFilter.h"
 #include "core/filters/GaussianBlurImageFilter.h"
 #include "core/filters/InnerShadowImageFilter.h"
@@ -707,4 +708,11 @@ TGFX_TEST(SVGRenderTest, ProtocolFilterReadWrite) {
   }
 }
 
+TGFX_TEST(SVGRenderTest, XMLParseLarge) {
+
+  auto stream = Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/4w.svg"));
+  EXPECT_TRUE(stream != nullptr);
+  auto xmlDOM = DOM::Make(*stream);
+  EXPECT_TRUE(xmlDOM != nullptr);
+}
 }  // namespace tgfx

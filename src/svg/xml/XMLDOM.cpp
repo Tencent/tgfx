@@ -80,6 +80,15 @@ std::shared_ptr<DOMNode> DOM::getRootNode() const {
   return _root;
 }
 
+DOMNode::~DOMNode() {
+  auto child = std::move(firstChild);
+  while (child) {
+    auto next = std::move(child->nextSibling);
+    child->firstChild.reset();
+    child = next;
+  }
+}
+
 std::shared_ptr<DOMNode> DOMNode::getFirstChild(const std::string& name) const {
   auto child = this->firstChild;
   if (!name.empty()) {
