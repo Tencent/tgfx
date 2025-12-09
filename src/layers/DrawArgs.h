@@ -56,11 +56,9 @@ class DrawArgs {
   bool forceDrawBackground = false;
   std::shared_ptr<ColorSpace> dstColorSpace = ColorSpace::SRGB();
 
-  // The ratio of maxZoomScaleForCache to current zoomScale, used to determine if layer caching
-  // should be enabled and the maximum content scale for caching.
-  float cacheScaleRatio = 0.0f;
-  // Used to limit the maximum cache size for layer caching.
-  int screenWidth = 0;
-  int screenHeight = 0;
+  // The maximum cache size (single edge) for layer caching. Set to 0 to disable layer cache.
+  int maxCacheSize = 0;
+  // The minimum mipmap level for layer caching. Level 0 = scale 1.0, level 1 = scale 0.5, etc.
+  int minMipmapLevel = 0;
 };
 }  // namespace tgfx

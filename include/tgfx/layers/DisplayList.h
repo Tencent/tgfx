@@ -234,24 +234,41 @@ class DisplayList {
   void setBackgroundColor(const Color& color);
 
   /**
-   * Returns the maximum zoom scale threshold for enabling layer cache. When this value is 0
-   * (default), layer cache is disabled. When currentZoomScale <= maxZoomScaleForCache, layer cache
-   * is enabled. The ratio of maxZoomScaleForCache to currentZoomScale determines the maximum
-   * content scale for caching.
+   * Returns the maximum cache size (single edge) for layer cache. When this value is 0 (default),
+   * layer cache is disabled. The cache texture size is determined by layer bounds multiplied by
+   * the snapped content scale (mipmap-style).
    */
-  float maxZoomScaleForCache() const {
-    return _maxZoomScaleForCache;
+  int maxCacheSize() const {
+    return _maxCacheSize;
   }
 
   /**
-   * Sets the maximum zoom scale threshold for enabling layer cache. Set to 0 to disable layer
-   * cache (default). When currentZoomScale <= maxZoomScaleForCache, layer cache is enabled.
+   * Sets the maximum cache size (single edge) for layer cache. Set to 0 to disable layer cache
+   * (default). The cache texture size will be limited to this value.
    */
-  void setMaxZoomScaleForCache(float maxZoomScale) {
-    if (maxZoomScale < 0.0f) {
-      maxZoomScale = 0.0f;
+  void setMaxCacheSize(int maxSize) {
+    if (maxSize < 0) {
+      maxSize = 0;
     }
-    _maxZoomScaleForCache = maxZoomScale;
+    _maxCacheSize = maxSize;
+  }
+
+  /**
+   * Returns the minimum mipmap level for layer cache. Level 0 corresponds to scale=1.0 (relative
+   * to maxCacheSize), level 1 corresponds to scale=0.5, level 2 corresponds to scale=0.25, etc.
+   * Negative levels correspond to scales greater than 1.0 (e.g., level -1 = scale 2.0).
+   * The default value is 0.
+   */
+  int minMipmapLevel() const {
+    return _minMipmapLevel;
+  }
+
+  /**
+   * Sets the minimum mipmap level for layer cache. This limits the maximum content scale that can
+   * be used for caching. Level 0 = scale 1.0, level 1 = scale 0.5, level -1 = scale 2.0, etc.
+   */
+  void setMinMipmapLevel(int level) {
+    _minMipmapLevel = level;
   }
 
   /**
@@ -285,7 +302,8 @@ class DisplayList {
   int _maxTileCount = 0;
   bool _allowZoomBlur = false;
   int _maxTilesRefinedPerFrame = 5;
-  float _maxZoomScaleForCache = 0.0f;
+  int _maxCacheSize = 0;
+  int _minMipmapLevel = 0;
   bool _showDirtyRegions = false;
   bool _hasContentChanged = false;
   bool hasZoomBlurTiles = false;
@@ -337,7 +355,7 @@ class DisplayList {
 
   int getMaxTileCountPerAtlas(Context* context) const;
 
-  void drawTileTask(const DrawTask& task, int screenWidth, int screenHeight) const;
+  void drawTileTask(const DrawTask& task) const;
 
   void drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* surface, bool autoClear) const;
 
@@ -348,7 +366,7 @@ class DisplayList {
   void resetCaches();
 
   void drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
-                     bool autoClear, int screenWidth, int screenHeight) const;
+                     bool autoClear) const;
 
   void updateMousePosition();
 };

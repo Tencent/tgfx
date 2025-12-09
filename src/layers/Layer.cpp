@@ -18,6 +18,7 @@
 
 #include "tgfx/layers/Layer.h"
 #include <atomic>
+#include <cmath>
 #include "contents/LayerContent.h"
 #include "contents/RasterizedCache.h"
 #include "core/Matrix2D.h"
@@ -1230,8 +1231,7 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     return true;
   }
 
-  if (args.renderFlags & RenderFlags::DisableCache || args.cacheScaleRatio < 1.0f ||
-      !args.context) {
+  if (args.renderFlags & RenderFlags::DisableCache || args.maxCacheSize <= 0 || !args.context) {
     return false;
   }
 
@@ -1243,23 +1243,32 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     return false;
   }
 
-  auto maxContentScale = contentScale * args.cacheScaleRatio;
   auto layerBounds = getBounds();
-  layerBounds.scale(maxContentScale, maxContentScale);
-  if (static_cast<int>(ceilf(layerBounds.width())) > args.screenWidth ||
-      static_cast<int>(ceilf(layerBounds.height())) > args.screenHeight) {
+  auto maxBoundsSize = std::max(layerBounds.width(), layerBounds.height());
+  if (FloatNearlyZero(maxBoundsSize)) {
+    return false;
+  }
+
+  auto baseScale = static_cast<float>(args.maxCacheSize) / maxBoundsSize;
+  auto ratio = contentScale / baseScale;
+  auto level = -log2f(ratio);
+  auto snappedLevel = std::max(static_cast<int>(roundf(level)), args.minMipmapLevel);
+  auto snappedScale = baseScale * powf(2.0f, -static_cast<float>(snappedLevel));
+
+  auto cacheWidth = ceilf(layerBounds.width() * snappedScale);
+  auto cacheHeight = ceilf(layerBounds.height() * snappedScale);
+  if (static_cast<int>(cacheWidth) > args.maxCacheSize ||
+      static_cast<int>(cacheHeight) > args.maxCacheSize) {
     return false;
   }
 
   auto fullFill = args.renderRect && args.renderRect->contains(renderBounds);
   if (shouldPassThroughBackground(blendMode, transform) || hasBackgroundStyle()) {
-    if (!fullFill || !FloatNearlyEqual(maxContentScale, contentScale)) {
+    if (!fullFill || !FloatNearlyEqual(snappedScale, contentScale)) {
       return false;
     }
-  } else {
-    // Use the calculated maxContentScale as the cache content scale.
-    contentScale = maxContentScale;
   }
+  contentScale = snappedScale;
   auto cacheArgs = args;
   cacheArgs.renderFlags |= RenderFlags::DisableCache;
   cacheArgs.renderRect = &renderBounds;
@@ -2111,13 +2120,26 @@ void Layer::invalidateCache() {
 }
 
 RasterizedCache* Layer::getContentCache(const DrawArgs& args, float contentScale) {
-  if (args.cacheScaleRatio < 1.0f || !args.context) {
+  if (args.maxCacheSize <= 0 || !args.context) {
     return nullptr;
   }
   if (!contentCache || contentCache->contextID() != args.context->uniqueID()) {
     return nullptr;
   }
-  if (contentCache->contentScale() < contentScale || !contentCache->valid(args.context)) {
+  if (!contentCache->valid(args.context)) {
+    return nullptr;
+  }
+  auto layerBounds = getBounds();
+  auto maxBoundsSize = std::max(layerBounds.width(), layerBounds.height());
+  if (FloatNearlyZero(maxBoundsSize)) {
+    return nullptr;
+  }
+  auto baseScale = static_cast<float>(args.maxCacheSize) / maxBoundsSize;
+  auto ratio = contentScale / baseScale;
+  auto level = -log2f(ratio);
+  auto snappedLevel = std::max(static_cast<int>(roundf(level)), args.minMipmapLevel);
+  auto snappedScale = baseScale * powf(2.0f, -static_cast<float>(snappedLevel));
+  if (!FloatNearlyEqual(contentCache->contentScale(), snappedScale)) {
     return nullptr;
   }
   return contentCache.get();
