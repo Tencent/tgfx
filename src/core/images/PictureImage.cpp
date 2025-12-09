@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PictureImage.h"
+#include "core/utils/MathExtra.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/OpsCompositor.h"
 #include "gpu/ProxyProvider.h"
@@ -94,12 +95,21 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
   if (!rect.intersect(drawBounds)) {
     return nullptr;
   }
-  auto clipRect = rect;
-  rect.scale(args.drawScale, args.drawScale);
-  rect.round();
+  // auto clipRect = rect;
+  // rect.scale(args.drawScale, args.drawScale);
+  // rect.round();
+  auto offsetX = rect.left;
+  auto offsetY = rect.top;
+  auto scale = args.drawScale;
+  rect.scale(scale, scale);
+  if (FloatNearlyEqual(scale, 1.0f)) {
+    offsetX -= (rect.left - std::floor(rect.left)) / scale;
+    offsetY -= (rect.top - std::floor(rect.top)) / scale;
+    rect.roundOut();
+  }
   // recalculate the scale factor to avoid the precision loss of floating point numbers
-  auto scaleX = rect.width() / clipRect.width();
-  auto scaleY = rect.height() / clipRect.height();
+  //auto scaleX = rect.width() / clipRect.width();
+  // auto scaleY = rect.height() / clipRect.height();
   auto mipmapped = samplingArgs.sampling.mipmapMode != MipmapMode::None && hasMipmaps();
   auto renderTarget = RenderTargetProxy::Make(args.context, static_cast<int>(rect.width()),
                                               static_cast<int>(rect.height()), isAlphaOnly(), 1,
@@ -107,8 +117,8 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  auto extraMatrix = Matrix::MakeScale(scaleX, scaleY);
-  extraMatrix.preTranslate(-clipRect.left, -clipRect.top);
+  auto extraMatrix = Matrix::MakeScale(1.0f, 1.0f);
+  extraMatrix.preTranslate(-offsetX, -offsetY);
   if (!drawPicture(renderTarget, args.renderFlags, &extraMatrix)) {
     return nullptr;
   }

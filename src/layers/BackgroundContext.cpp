@@ -124,7 +124,8 @@ void BackgroundContext::drawToParent(const Paint& paint) {
   parentCanvas->setMatrix(Matrix::MakeTrans(surfaceOffset.x, surfaceOffset.y));
   auto image = onGetBackgroundImage();
   if (image) {
-    parentCanvas->drawImage(image, &newPaint);
+    SamplingOptions sampling = SamplingOptions{FilterMode::Nearest};
+    parentCanvas->drawImage(image, 0.f, 0.f, sampling, &newPaint);
   }
 }
 

@@ -1127,8 +1127,8 @@ std::shared_ptr<Image> Layer::getContentImage(const DrawArgs& contentArgs, float
     surfaceRect.roundOut();
     surfaceRect.intersect(Rect::MakeWH(passThroughImage->width(), passThroughImage->height()));
     auto offscreenSurface = Surface::Make(context, static_cast<int>(surfaceRect.width()),
-                                          static_cast<int>(surfaceRect.height()), false, 1, false,
-                                          0, contentArgs.dstColorSpace);
+                                          static_cast<int>(surfaceRect.height()), false, 1,
+                                          false, 0, contentArgs.dstColorSpace);
     if (!offscreenSurface) {
       return nullptr;
     }
@@ -1143,7 +1143,7 @@ std::shared_ptr<Image> Layer::getContentImage(const DrawArgs& contentArgs, float
     PictureRecorder recorder = {};
     auto offscreenCanvas = recorder.beginRecording();
     offscreenCanvas->scale(contentScale, contentScale);
-    offscreenCanvas->clipRect(inputBounds);
+    //offscreenCanvas->clipRect(inputBounds);
     if (passThroughImage) {
       AutoCanvasRestore offscreenRestore(offscreenCanvas);
       offscreenCanvas->concat(passThroughImageMatrix);
@@ -1268,7 +1268,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   }
 
   Paint paint = {};
-  paint.setAntiAlias(bitFields.allowsEdgeAntialiasing);
+  paint.setAntiAlias(false);
   paint.setAlpha(alpha);
   paint.setBlendMode(blendMode);
 
@@ -1284,7 +1284,8 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
 
   AutoCanvasRestore autoRestore(canvas);
   canvas->concat(imageMatrix);
-  canvas->drawImage(image, &paint);
+  SamplingOptions sample = SamplingOptions{FilterMode::Nearest, MipmapMode::None};
+  canvas->drawImage(image, 0.f, 0.f, sample, &paint);
   if (args.blurBackground) {
     if (contentArgs.blurBackground) {
       auto filter = getImageFilter(contentScale);
@@ -1295,7 +1296,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
       auto backgroundCanvas = args.blurBackground->getCanvas();
       AutoCanvasRestore autoRestoreBg(backgroundCanvas);
       backgroundCanvas->concat(imageMatrix);
-      backgroundCanvas->drawImage(image, &paint);
+      backgroundCanvas->drawImage(image, 0.f, 0.f, sample, &paint);
     }
   }
 
