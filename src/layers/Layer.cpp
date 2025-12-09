@@ -90,6 +90,7 @@ static std::shared_ptr<Image> ToImageWithOffset(
     return nullptr;
   }
   auto bounds = imageBounds ? *imageBounds : picture->getBounds();
+  bounds.roundOut();
   // Do not use bounds after roundOut, as it will cause blurring
   auto matrix = Matrix::MakeTrans(-bounds.x(), -bounds.y());
   auto image =
@@ -1132,7 +1133,7 @@ std::shared_ptr<Image> Layer::getOffscreenContentImage(
     auto offscreenCanvas = offscreenSurface->getCanvas();
     offscreenCanvas->translate(-surfaceRect.left, -surfaceRect.top);
     offscreenCanvas->drawImage(canvas->getSurface()->makeImageSnapshot());
-    offscreenCanvas->clipPath(canvas->getTotalClip());
+    //offscreenCanvas->clipPath(canvas->getTotalClip());
     offscreenCanvas->concat(currentMatrix);
     drawDirectly(offscreenArgs, offscreenCanvas, 1.0f, styleExtraSourceTypes);
     finalImage = offscreenSurface->makeImageSnapshot();
@@ -1143,7 +1144,7 @@ std::shared_ptr<Image> Layer::getOffscreenContentImage(
     auto current = canvas->getMatrix();
     offscreenCanvas->concat(current);
     current.invert(imageMatrix);
-    offscreenCanvas->clipRect(inputBounds);
+    //offscreenCanvas->clipRect(inputBounds);
     if (passThroughBackground && args.blendModeBackground) {
       Point offset = {};
       auto image = args.blendModeBackground->getBackgroundImage(&offset);
