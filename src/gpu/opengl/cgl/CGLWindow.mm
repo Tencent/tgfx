@@ -18,6 +18,7 @@
 
 #include "tgfx/gpu/opengl/cgl/CGLWindow.h"
 #include <thread>
+#include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/Log.h"
 #include "gpu/opengl/GLDefines.h"
 #include "tgfx/gpu/Backend.h"
@@ -36,10 +37,7 @@ std::shared_ptr<CGLWindow> CGLWindow::MakeFrom(NSView* view, CGLContextObj share
   if (device == nullptr) {
     return nullptr;
   }
-  if (colorSpace != nullptr && !ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get())) {
-    LOGW("The current platform does not support the colorspace, which may cause color inaccuracies "
-         "on Window.");
-  }
+  CheckColorSpaceSupport(colorSpace);
   return std::shared_ptr<CGLWindow>(new CGLWindow(device, view, std::move(colorSpace)));
 }
 

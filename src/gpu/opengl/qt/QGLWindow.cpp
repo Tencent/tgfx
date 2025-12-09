@@ -21,6 +21,7 @@
 #include <QColorSpace>
 #include <QQuickWindow>
 #include <QThread>
+#include "core/utils/ColorSpaceHelper.h"
 #include "gpu/opengl/GLTexture.h"
 
 namespace tgfx {
@@ -111,7 +112,7 @@ std::shared_ptr<QGLWindow> QGLWindow::MakeFrom(QQuickItem* quickItem, bool singl
       ColorSpace::MakeFromICC(icc.data(), static_cast<size_t>(icc.size()));
   if (colorSpace != nullptr &&
       !ColorSpace::NearlyEquals(currentColorSpace.get(), colorSpace.get())) {
-    LOGW(
+    LOGE(
         "The ColorSpace is not adapt with the current window colorSpace, which may cause color "
         "inaccuracies on Window.");
   }

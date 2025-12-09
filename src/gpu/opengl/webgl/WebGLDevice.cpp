@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #include "tgfx/gpu/opengl/webgl/WebGLDevice.h"
 #include <emscripten/val.h>
+#include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/Log.h"
 #include "gpu/opengl/webgl/WebGLGPU.h"
 
@@ -80,16 +81,10 @@ std::shared_ptr<WebGLDevice> WebGLDevice::MakeFrom(const std::string& canvasID,
     cs = WebNamedColorSpace::DisplayP3;
   } else {
     cs = WebNamedColorSpace::None;
-    LOGW(
-        "The current platform does not support the colorspace, which may cause color inaccuracies "
-        "on Window.");
   }
-  if (!emscripten::val::module_property("tgfx").call<bool>(
-          "setColorSpace", emscripten::val::module_property("GL"), static_cast<int>(cs))) {
-    LOGW(
-        "The current platform does not support the colorspace, which may cause color inaccuracies "
-        "on Window.");
-  }
+  bool isColorSpaceSupport = emscripten::val::module_property("tgfx").call<bool>(
+      "setColorSpace", emscripten::val::module_property("GL"), static_cast<int>(cs));
+  CheckColorSpaceSupport(colorSpace, isColorSpaceSupport && cs == WebNamedColorSpace::DisplayP3);
   emscripten_webgl_make_context_current(0);
   if (oldContext) {
     emscripten_webgl_make_context_current(oldContext);

@@ -28,9 +28,4 @@ void PrintLog(const char format[], ...);
  * Writes an error message pointed by format to the log facility of native platform.
  */
 void PrintError(const char format[], ...);
-
-/**
- * Writes an warn message pointed by format to the log facility of native platform.
- */
-void PrintWarn(const char format[], ...);
 }  // namespace tgfx

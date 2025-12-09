@@ -108,13 +108,13 @@ export const setColorSpace = (
 ) => {
     const gl = GL.currentContext?.GLctx as WebGLRenderingContext;
     if ('drawingBufferColorSpace' in gl) {
-        if(colorSpace == WindowColorSpace.None || colorSpace == WindowColorSpace.SRGB){
+        if (colorSpace === WindowColorSpace.None || colorSpace === WindowColorSpace.SRGB) {
             gl.drawingBufferColorSpace = "srgb";
-        }else{
+        } else {
             gl.drawingBufferColorSpace = "display-p3";
         }
         return true;
-    } else if(colorSpace == WindowColorSpace.DisplayP3){
+    } else if (colorSpace === WindowColorSpace.DisplayP3) {
         return false;
     } else {
         return true;

@@ -445,12 +445,6 @@ class ColorSpace : public std::enable_shared_from_this<ColorSpace> {
   static bool Equals(const ColorSpace* colorSpaceA, const ColorSpace* colorSpaceB);
 
   /**
-   * If both are null, we return true. If one is null and the other is not, we return false.
-   * If both are non-null, we do a nearly equal compare with tolerance for floating point errors.
-   */
-  static bool NearlyEquals(const ColorSpace* colorSpaceA, const ColorSpace* colorSpaceB);
-
-  /**
    * Return TransferFunction of this ColorSpace.
    */
   TransferFunction transferFunction() const;

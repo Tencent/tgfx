@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/opengl/eagl/EAGLWindow.h"
+#include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/Log.h"
 #include "gpu/opengl/GLFunctions.h"
 #include "gpu/opengl/eagl/EAGLLayerTexture.h"
@@ -34,10 +35,7 @@ std::shared_ptr<EAGLWindow> EAGLWindow::MakeFrom(CAEAGLLayer* layer,
   if (device == nullptr) {
     return nullptr;
   }
-  if (colorSpace != nullptr && !ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get())) {
-    LOGW("The current platform does not support the colorspace, which may cause color inaccuracies "
-         "on Window.");
-  }
+  CheckColorSpaceSupport(colorSpace);
   return std::shared_ptr<EAGLWindow>(new EAGLWindow(device, layer, std::move(colorSpace)));
 }
 
