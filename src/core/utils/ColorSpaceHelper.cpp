@@ -186,7 +186,7 @@ bool NearlyEqual(const ColorMatrix33& u, const ColorMatrix33& v) {
   return true;
 }
 
-bool NearlyEquals(const ColorSpace* colorSpaceA, const ColorSpace* colorSpaceB) {
+bool NearlyEqual(const ColorSpace* colorSpaceA, const ColorSpace* colorSpaceB) {
   if (ColorSpace::Equals(colorSpaceA, colorSpaceB)) {
     return true;
   }
@@ -196,23 +196,11 @@ bool NearlyEquals(const ColorSpace* colorSpaceA, const ColorSpace* colorSpaceB) 
     ColorMatrix33 matrixA{};
     ColorMatrix33 matrixB{};
     colorSpaceA->toXYZD50(&matrixA);
-    colorSpaceA->toXYZD50(&matrixB);
+    colorSpaceB->toXYZD50(&matrixB);
     if (NearlyEqual(transferFunctionA, transferFunctionB) && NearlyEqual(matrixA, matrixB)) {
       return true;
     }
   }
   return false;
 }
-
-void CheckColorSpaceSupport(const std::shared_ptr<ColorSpace>& colorSpace, bool isSupported) {
-  if (colorSpace == nullptr || ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get())) {
-    return;  // nullptr 或 SRGB 不需要检测
-  }
-  if (!isSupported) {
-    LOGE(
-        "The specified ColorSpace is not supported on this platform. Rendering may have color "
-        "inaccuracies.");
-  }
-}
-
 }  // namespace tgfx

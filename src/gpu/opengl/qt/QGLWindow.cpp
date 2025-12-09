@@ -110,10 +110,8 @@ std::shared_ptr<QGLWindow> QGLWindow::MakeFrom(QQuickItem* quickItem, bool singl
   auto icc = nativeWindow->format().colorSpace().iccProfile();
   std::shared_ptr<ColorSpace> currentColorSpace =
       ColorSpace::MakeFromICC(icc.data(), static_cast<size_t>(icc.size()));
-  if (colorSpace != nullptr && !NearlyEquals(currentColorSpace.get(), colorSpace.get())) {
-    LOGE(
-        "The ColorSpace is not adapt with the current window colorSpace, which may cause color "
-        "inaccuracies on Window.");
+  if (colorSpace != nullptr && !NearlyEqual(currentColorSpace.get(), colorSpace.get())) {
+    LOGE("QGLWindow::MakeFrom() The specified ColorSpace does not match the window's ColorSpace. Rendering may have color inaccuracies.");
   }
   auto window =
       std::shared_ptr<QGLWindow>(new QGLWindow(quickItem, singleBufferMode, std::move(colorSpace)));

@@ -40,8 +40,5 @@ bool NearlyEqual(const TransferFunction& u, const TransferFunction& v);
 
 bool NearlyEqual(const ColorMatrix33& u, const ColorMatrix33& v);
 
-bool NearlyEquals(const ColorSpace* colorSpaceA, const ColorSpace* colorSpaceB);
-
-void CheckColorSpaceSupport(const std::shared_ptr<ColorSpace>& colorSpace,
-                            bool isSupported = false);
+bool NearlyEqual(const ColorSpace* colorSpaceA, const ColorSpace* colorSpaceB);
 }  // namespace tgfx

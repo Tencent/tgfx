@@ -18,7 +18,6 @@
 
 #include "tgfx/gpu/opengl/egl/EGLDevice.h"
 #include <cstring>
-#include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/Log.h"
 #include "gpu/opengl/egl/EGLGPU.h"
 #include "tgfx/gpu/opengl/egl/EGLGlobals.h"
@@ -123,7 +122,9 @@ std::shared_ptr<EGLDevice> EGLDevice::MakeFrom(EGLNativeWindowType nativeWindow,
   auto eglGlobals = EGLGlobals::Get();
 #if defined(_WIN32)
   auto eglSurface = CreateFixedSizeSurfaceForAngle(nativeWindow, eglGlobals);
-  CheckColorSpaceSupport(colorSpace);
+  if(colorSpace != nullptr && !ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get())){
+    LOGE("EGLDevice::MakeFrom() The specified ColorSpace is not supported on this platform. Rendering may have color inaccuracies.");
+  }
 #else
   std::vector<EGLint> attributes = {};
   bool isDisplayP3Supported = false;
@@ -134,7 +135,9 @@ std::shared_ptr<EGLDevice> EGLDevice::MakeFrom(EGLNativeWindowType nativeWindow,
       isDisplayP3Supported = true;
     }
   }
-  CheckColorSpaceSupport(colorSpace, isDisplayP3Supported);
+  if(colorSpace != nullptr && !ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get()) && !isDisplayP3Supported){
+    LOGE("EGLDevice::MakeFrom() The specified ColorSpace is not supported on this platform. Rendering may have color inaccuracies.");
+  }
   attributes.insert(attributes.end(), eglGlobals->windowSurfaceAttributes.begin(),
                     eglGlobals->windowSurfaceAttributes.end());
   attributes = GetValidAttributes(attributes);

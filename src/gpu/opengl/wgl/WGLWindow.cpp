@@ -18,7 +18,6 @@
 
 #include "tgfx/gpu/opengl/wgl/WGLWindow.h"
 #include <GL/GL.h>
-#include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/Log.h"
 
 namespace tgfx {
@@ -32,7 +31,9 @@ std::shared_ptr<WGLWindow> WGLWindow::MakeFrom(HWND nativeWindow, HGLRC sharedCo
   if (device == nullptr) {
     return nullptr;
   }
-  CheckColorSpaceSupport(colorSpace);
+  if(colorSpace != nullptr && !ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get())){
+    LOGE("WGLWindow::MakeFrom() The specified ColorSpace is not supported on this platform. Rendering may have color inaccuracies.");
+  }
   auto wglWindow = std::shared_ptr<WGLWindow>(new WGLWindow(device, std::move(colorSpace)));
   wglWindow->nativeWindow = nativeWindow;
   return wglWindow;

@@ -104,8 +104,11 @@ export const uploadToTexture = (
 
 export const setColorSpace = (
     GL: EmscriptenGL,
-    colorSpace : WindowColorSpace
+    colorSpace: WindowColorSpace
 ) => {
+    if (colorSpace === WindowColorSpace.Others) {
+        return false;
+    }
     const gl = GL.currentContext?.GLctx as WebGLRenderingContext;
     if ('drawingBufferColorSpace' in gl) {
         if (colorSpace === WindowColorSpace.None || colorSpace === WindowColorSpace.SRGB) {
