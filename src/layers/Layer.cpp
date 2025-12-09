@@ -19,6 +19,7 @@
 #include "tgfx/layers/Layer.h"
 #include <atomic>
 #include <complex>
+#include <queue>
 #include "contents/LayerContent.h"
 #include "contents/RasterizedContent.h"
 #include "core/Matrix2D.h"
