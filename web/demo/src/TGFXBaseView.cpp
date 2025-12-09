@@ -104,6 +104,24 @@ bool TGFXBaseView::draw(int drawIndex, float zoom, float offsetX, float offsetY)
   displayList.setZoomScale(zoom * baseScale);
   displayList.setContentOffset(baseOffsetX + offsetX, baseOffsetY + offsetY);
 
+  // Check if content has changed before rendering
+  bool needsRender = displayList.hasContentChanged();
+
+  // In delayed one-frame present mode:
+  // - If no content changed AND no last recording to submit -> skip rendering
+  if (!needsRender && lastRecording == nullptr) {
+    device->unlock();
+    return false;
+  }
+
+  // If no new content but have last recording, only submit it without new rendering
+  if (!needsRender) {
+    context->submit(std::move(lastRecording));
+    window->present(context);
+    device->unlock();
+    return false;
+  }
+
   // Draw background
   auto canvas = surface->getCanvas();
   canvas->clear();
@@ -116,11 +134,21 @@ bool TGFXBaseView::draw(int drawIndex, float zoom, float offsetX, float offsetY)
   // Render DisplayList
   displayList.render(surface.get(), false);
 
-  context->flushAndSubmit();
-  window->present(context);
+  // Delayed one-frame present mode: flush + submit
+  auto recording = context->flush();
+  if (lastRecording) {
+    context->submit(std::move(lastRecording));
+    if (recording) {
+      window->present(context);
+    }
+  }
+  lastRecording = std::move(recording);
+
   device->unlock();
 
-  return displayList.hasContentChanged();
+  // In delayed one-frame mode, if we have a pending recording, we need another frame to present it
+  // So return true to keep the render loop running
+  return displayList.hasContentChanged() || lastRecording != nullptr;
 }
 
 }  // namespace hello2d

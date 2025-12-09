@@ -61,18 +61,13 @@ class SimpleTextLayer : public tgfx::Layer {
     invalidateContent();
   }
 
-  void invalidateLayout();
-
-  const tgfx::Rect& getLayoutBounds() const {
-    return layoutBounds;
-  }
-
  protected:
   void onUpdateContent(tgfx::LayerRecorder* recorder) override;
 
  private:
+  void updateLayout();
+
   std::vector<Element> richTexts = {};
-  tgfx::Rect layoutBounds = tgfx::Rect::MakeEmpty();
 };
 
 }  // namespace hello2d

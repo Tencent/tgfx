@@ -159,6 +159,23 @@ bool TGFXView::draw() {
   displayList.setContentOffset(baseOffsetX + static_cast<float>(offset.x()),
                                baseOffsetY + static_cast<float>(offset.y()));
 
+  // Check if content has changed BEFORE rendering
+  bool hasContentChanged = displayList.hasContentChanged();
+
+  // If no new content and no pending recording, skip rendering
+  if (!hasContentChanged && lastRecording == nullptr) {
+    device->unlock();
+    return false;
+  }
+
+  // If no new content but has lastRecording, just submit it
+  if (!hasContentChanged) {
+    context->submit(std::move(lastRecording));
+    tgfxWindow->present(context);
+    device->unlock();
+    return false;
+  }
+
   // Draw background
   auto canvas = surface->getCanvas();
   canvas->clear();
@@ -168,10 +185,17 @@ bool TGFXView::draw() {
   // Render DisplayList
   displayList.render(surface.get(), false);
 
-  context->flushAndSubmit();
-  tgfxWindow->present(context);
+  // Delayed one-frame present mode
+  auto recording = context->flush();
+  if (lastRecording) {
+    context->submit(std::move(lastRecording));
+    if (recording) {
+      tgfxWindow->present(context);
+    }
+  }
+  lastRecording = std::move(recording);
   device->unlock();
 
-  return displayList.hasContentChanged();
+  return displayList.hasContentChanged() || lastRecording != nullptr;
 }
 }  // namespace hello2d

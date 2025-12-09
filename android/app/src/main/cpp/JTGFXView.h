@@ -23,6 +23,7 @@
 #include <string>
 #include "hello2d/AppHost.h"
 #include "hello2d/LayerBuilder.h"
+#include "tgfx/gpu/Recording.h"
 #include "tgfx/gpu/Window.h"
 #include "tgfx/gpu/opengl/egl/EGLWindow.h"
 #include "tgfx/layers/DisplayList.h"
@@ -52,6 +53,7 @@ class JTGFXView {
   std::shared_ptr<hello2d::AppHost> appHost = nullptr;
   tgfx::DisplayList displayList;
   std::shared_ptr<tgfx::Layer> contentLayer = nullptr;
+  std::unique_ptr<tgfx::Recording> lastRecording = nullptr;
   int lastDrawIndex = -1;
 };
 }  // namespace hello2d

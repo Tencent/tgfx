@@ -22,6 +22,7 @@
 #include "hello2d/AppHost.h"
 #include "hello2d/LayerBuilder.h"
 #include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
+#include "tgfx/gpu/Recording.h"
 #include "tgfx/layers/DisplayList.h"
 
 namespace hello2d {
@@ -48,6 +49,7 @@ class TGFXBaseView {
   tgfx::DisplayList displayList = {};  // Platform layer owns DisplayList
   std::shared_ptr<tgfx::Layer> contentLayer = nullptr;
   int lastDrawIndex = -1;
+  std::unique_ptr<tgfx::Recording> lastRecording = nullptr;
 };
 
 }  // namespace hello2d

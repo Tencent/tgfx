@@ -78,6 +78,7 @@ std::shared_ptr<SimpleTextLayer> SimpleTextLayer::Make() {
 }
 
 void SimpleTextLayer::onUpdateContent(tgfx::LayerRecorder* recorder) {
+  updateLayout();
   auto canvas = recorder->getCanvas();
 
   auto linePaint = tgfx::Paint();
@@ -103,7 +104,7 @@ void SimpleTextLayer::onUpdateContent(tgfx::LayerRecorder* recorder) {
   }
 }
 
-void SimpleTextLayer::invalidateLayout() {
+void SimpleTextLayer::updateLayout() {
   auto lineTop = 0.f;
   auto lineHeight = 0.f;
   auto baselineHeight = 0.f;
@@ -307,7 +308,6 @@ std::shared_ptr<tgfx::Layer> RichText::onBuildLayerTree(const AppHost* host) {
 
   auto textLayer = SimpleTextLayer::Make();
   textLayer->setElements(std::move(elements));
-  textLayer->invalidateLayout();
 
   root->addChild(textLayer);
   return root;

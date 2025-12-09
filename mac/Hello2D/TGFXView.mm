@@ -21,6 +21,7 @@
 #include <cmath>
 #include "hello2d/LayerBuilder.h"
 #include "tgfx/core/Point.h"
+#include "tgfx/gpu/Recording.h"
 
 static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, const CVTimeStamp*,
                                       CVOptionFlags, CVOptionFlags*, void* userInfo) {
@@ -35,6 +36,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   tgfx::DisplayList displayList;
   std::shared_ptr<tgfx::Layer> contentLayer;
   int lastDrawIndex;
+  std::unique_ptr<tgfx::Recording> lastRecording;
 }
 
 - (BOOL)acceptsFirstResponder {
@@ -205,17 +207,44 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   displayList.setContentOffset(baseOffsetX + static_cast<float>(self.contentOffset.x),
                                baseOffsetY + static_cast<float>(self.contentOffset.y));
 
+  // Check if content has changed before rendering
+  bool needsRender = displayList.hasContentChanged();
+
+  // In delayed one-frame present mode:
+  // - If no content changed AND no last recording to submit -> skip rendering
+  if (!needsRender && lastRecording == nullptr) {
+    device->unlock();
+    return false;
+  }
+
+  // If no new content but have last recording, only submit it without new rendering
+  if (!needsRender) {
+    context->submit(std::move(lastRecording));
+    tgfxWindow->present(context);
+    device->unlock();
+    return false;
+  }
+
   auto canvas = surface->getCanvas();
   canvas->clear();
   hello2d::DrawBackground(canvas, surface->width(), surface->height(), self.layer.contentsScale);
 
   displayList.render(surface.get(), false);
 
-  context->flushAndSubmit();
-  tgfxWindow->present(context);
+  // Delayed one-frame present mode: flush + submit
+  auto recording = context->flush();
+  if (lastRecording) {
+    context->submit(std::move(lastRecording));
+    if (recording) {
+      tgfxWindow->present(context);
+    }
+  }
+  lastRecording = std::move(recording);
+
   device->unlock();
 
-  return displayList.hasContentChanged();
+  // In delayed one-frame mode, if we have a pending recording, we need another frame to present it
+  return displayList.hasContentChanged() || lastRecording != nullptr;
 }
 
 - (void)mouseDown:(NSEvent *)event {

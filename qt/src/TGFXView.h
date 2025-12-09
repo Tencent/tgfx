@@ -21,6 +21,7 @@
 #include <QOpenGLContext>
 #include <QQuickItem>
 #include "hello2d/AppHost.h"
+#include "tgfx/gpu/Recording.h"
 #include "tgfx/gpu/opengl/qt/QGLWindow.h"
 #include "tgfx/layers/DisplayList.h"
 
@@ -44,6 +45,7 @@ class TGFXView : public QQuickItem {
   std::shared_ptr<hello2d::AppHost> appHost = nullptr;
   tgfx::DisplayList displayList;
   std::shared_ptr<tgfx::Layer> contentLayer = nullptr;
+  std::unique_ptr<tgfx::Recording> lastRecording = nullptr;
   float zoom = 1.0f;
   QPointF offset = {0, 0};
 

@@ -131,6 +131,24 @@
   displayList.setContentOffset(baseOffsetX + static_cast<float>(offset.x),
                                baseOffsetY + static_cast<float>(offset.y));
 
+  // Check if content has changed before rendering
+  bool needsRender = displayList.hasContentChanged();
+
+  // In delayed one-frame present mode:
+  // - If no content changed AND no last recording to submit -> skip rendering
+  if (!needsRender && lastRecording == nullptr) {
+    device->unlock();
+    return false;
+  }
+
+  // If no new content but have last recording, only submit it without new rendering
+  if (!needsRender) {
+    context->submit(std::move(lastRecording));
+    tgfxWindow->present(context);
+    device->unlock();
+    return false;
+  }
+
   // Draw background
   auto canvas = surface->getCanvas();
   canvas->clear();
@@ -150,7 +168,9 @@
   lastRecording = std::move(recording);
 
   device->unlock();
-  return displayList.hasContentChanged();
+
+  // In delayed one-frame mode, if we have a pending recording, we need another frame to present it
+  return displayList.hasContentChanged() || lastRecording != nullptr;
 }
 
 @end

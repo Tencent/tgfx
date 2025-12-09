@@ -129,7 +129,7 @@
         "tile_mode_rgbaaa": "8cb853c",
         "tile_mode_subset": "2931d737"
     },
-    "DrawersTest": {
+    "Hello2DTest": {
         "ConicGradient": "492105ac",
         "ImageWithMipmap": "492105ac",
         "ImageWithShadow": "492105ac",

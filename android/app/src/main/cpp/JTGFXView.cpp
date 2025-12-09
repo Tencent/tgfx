@@ -70,6 +70,23 @@ bool JTGFXView::draw(int drawIndex, float zoom, float offsetX, float offsetY) {
   displayList.setZoomScale(zoom * baseScale);
   displayList.setContentOffset(baseOffsetX + offsetX, baseOffsetY + offsetY);
 
+  // Check if content has changed BEFORE rendering
+  bool hasContentChanged = displayList.hasContentChanged();
+
+  // If no new content and no pending recording, skip rendering
+  if (!hasContentChanged && lastRecording == nullptr) {
+    device->unlock();
+    return false;
+  }
+
+  // If no new content but has lastRecording, just submit it
+  if (!hasContentChanged) {
+    context->submit(std::move(lastRecording));
+    window->present(context);
+    device->unlock();
+    return false;
+  }
+
   // Draw background
   auto canvas = surface->getCanvas();
   canvas->clear();
@@ -81,11 +98,18 @@ bool JTGFXView::draw(int drawIndex, float zoom, float offsetX, float offsetY) {
   // Render DisplayList
   displayList.render(surface.get(), false);
 
-  context->flushAndSubmit();
-  window->present(context);
+  // Delayed one-frame present mode
+  auto recording = context->flush();
+  if (lastRecording) {
+    context->submit(std::move(lastRecording));
+    if (recording) {
+      window->present(context);
+    }
+  }
+  lastRecording = std::move(recording);
   device->unlock();
 
-  return displayList.hasContentChanged();
+  return displayList.hasContentChanged() || lastRecording != nullptr;
 }
 }  // namespace hello2d
 

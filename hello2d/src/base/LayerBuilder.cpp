@@ -23,6 +23,7 @@
 #include "../SimpleTextLayer.h"
 #include "GridBackground.h"
 #include "base/LayerBuilders.h"
+#include "tgfx/platform/Print.h"
 
 namespace hello2d {
 static std::vector<LayerBuilder*> layerBuilders = {
@@ -75,6 +76,10 @@ LayerBuilder::LayerBuilder(std::string name) : _name(std::move(name)) {
 }
 
 std::shared_ptr<tgfx::Layer> LayerBuilder::buildLayerTree(const hello2d::AppHost* host) {
+  if (host == nullptr) {
+    tgfx::PrintError("LayerBuilder::buildLayerTree() host is nullptr!");
+    return nullptr;
+  }
   auto layer = onBuildLayerTree(host);
   if (!layer) {
     return layer;

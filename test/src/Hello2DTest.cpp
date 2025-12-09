@@ -71,7 +71,7 @@ TGFX_TEST(Hello2DTest, Compare) {
     hello2d::DrawBackground(canvas, surfaceWidth, surfaceHeight, 2.0f);
     displayList.render(surface.get(), false);
 
-    auto key = "DrawersTest/" + name;
+    auto key = "Hello2DTest/" + name;
     auto result = Baseline::Compare(surface, key);
     if (!result) {
       ADD_FAILURE();

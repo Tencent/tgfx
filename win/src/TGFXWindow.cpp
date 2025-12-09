@@ -59,7 +59,6 @@ bool TGFXWindow::open() {
   centerAndShow();
   ShowWindow(windowHandle, SW_SHOW);
   UpdateWindow(windowHandle);
-  // Trigger initial paint
   ::InvalidateRect(windowHandle, nullptr, FALSE);
   return true;
 }
@@ -110,7 +109,6 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
       BeginPaint(hwnd, &ps);
       if (isDrawing) {
         bool hasContentChanged = draw();
-        // Only invalidate again if content is still changing
         if (hasContentChanged) {
           ::InvalidateRect(windowHandle, nullptr, FALSE);
         }
@@ -137,7 +135,6 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
       if (isCtrlPressed) {
         float zoomStep = std::exp(GET_WHEEL_DELTA_WPARAM(wparam) / WHEEL_RATIO);
         float newZoom = std::clamp(zoomScale * zoomStep, MIN_ZOOM, MAX_ZOOM);
-        // Store old zoom for offset calculation
         float oldZoom = zoomScale;
         contentOffset.x = mousePoint.x - ((mousePoint.x - contentOffset.x) / oldZoom) * newZoom;
         contentOffset.y = mousePoint.y - ((mousePoint.y - contentOffset.y) / oldZoom) * newZoom;
@@ -221,11 +218,9 @@ void TGFXWindow::centerAndShow() {
   int DlgWidth = rcDlg.right - rcDlg.left;
   int DlgHeight = rcDlg.bottom - rcDlg.top;
 
-  // Find dialog's upper left based on rcCenter
   int xLeft = (rcCenter.left + rcCenter.right) / 2 - DlgWidth / 2;
   int yTop = (rcCenter.top + rcCenter.bottom) / 2 - DlgHeight / 2;
 
-  // The dialog is outside the screen, move it inside
   if (xLeft < rcArea.left) {
     if (xLeft < 0) {
       xLeft = GetSystemMetrics(SM_CXSCREEN) / 2 - DlgWidth / 2;
@@ -251,7 +246,7 @@ void TGFXWindow::centerAndShow() {
 }
 
 float TGFXWindow::getPixelRatio() {
-#if WINVER >= 0x0603  // Windows 8.1
+#if WINVER >= 0x0603  
   HMONITOR monitor = nullptr;
   if (windowHandle != nullptr) {
     monitor = ::MonitorFromWindow(windowHandle, MONITOR_DEFAULTTONEAREST);
@@ -270,7 +265,6 @@ float TGFXWindow::getPixelRatio() {
 void TGFXWindow::createAppHost() {
   appHost = std::make_unique<hello2d::AppHost>();
   
-  // Initialize DisplayList with tiled rendering mode (same as other platforms)
   displayList.setRenderMode(tgfx::RenderMode::Tiled);
   displayList.setAllowZoomBlur(true);
   displayList.setMaxTileCount(512);
@@ -319,7 +313,6 @@ bool TGFXWindow::draw() {
     return false;
   }
 
-  // Switch sample when drawIndex changes
   int count = hello2d::LayerBuilder::Count();
   int index = (count > 0) ? (currentDrawerIndex % count) : 0;
   if (index != lastDrawIndex || !contentLayer) {
@@ -334,7 +327,6 @@ bool TGFXWindow::draw() {
     lastDrawIndex = index;
   }
 
-  // Calculate base scale and offset to fit 720x720 design size to window
   static constexpr float DESIGN_SIZE = 720.0f;
   auto scaleX = static_cast<float>(surface->width()) / DESIGN_SIZE;
   auto scaleY = static_cast<float>(surface->height()) / DESIGN_SIZE;
@@ -343,7 +335,6 @@ bool TGFXWindow::draw() {
   auto baseOffsetX = (static_cast<float>(surface->width()) - scaledSize) * 0.5f;
   auto baseOffsetY = (static_cast<float>(surface->height()) - scaledSize) * 0.5f;
 
-  // Apply user zoom and offset on top of the base scale/offset
   auto finalZoomScale = zoomScale * baseScale;
   auto finalOffsetX = baseOffsetX + contentOffset.x;
   auto finalOffsetY = baseOffsetY + contentOffset.y;
@@ -351,18 +342,43 @@ bool TGFXWindow::draw() {
   displayList.setZoomScale(finalZoomScale);
   displayList.setContentOffset(finalOffsetX, finalOffsetY);
 
-  // Draw background
+  // Check if content has changed before rendering
+  bool needsRender = displayList.hasContentChanged();
+
+  // In delayed one-frame present mode:
+  // - If no content changed AND no last recording to submit -> skip rendering
+  if (!needsRender && lastRecording == nullptr) {
+    device->unlock();
+    return false;
+  }
+
+  // If no new content but have last recording, only submit it without new rendering
+  if (!needsRender) {
+    context->submit(std::move(lastRecording));
+    tgfxWindow->present(context);
+    device->unlock();
+    return false;
+  }
+
   auto canvas = surface->getCanvas();
   canvas->clear();
   hello2d::DrawBackground(canvas, surface->width(), surface->height(), pixelRatio);
 
-  // Render DisplayList
   displayList.render(surface.get(), false);
 
-  context->flushAndSubmit();
-  tgfxWindow->present(context);
+  // Delayed one-frame present mode: flush + submit
+  auto recording = context->flush();
+  if (lastRecording) {
+    context->submit(std::move(lastRecording));
+    if (recording) {
+      tgfxWindow->present(context);
+    }
+  }
+  lastRecording = std::move(recording);
+
   device->unlock();
 
-  return displayList.hasContentChanged();
+  // In delayed one-frame mode, if we have a pending recording, we need another frame to present it
+  return displayList.hasContentChanged() || lastRecording != nullptr;
 }
 }  // namespace hello2d

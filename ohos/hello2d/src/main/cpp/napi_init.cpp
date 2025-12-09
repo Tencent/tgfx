@@ -1,6 +1,7 @@
 #include "napi/native_api.h"
 #include <ace/xcomponent/native_interface_xcomponent.h>
 #include "tgfx/gpu/opengl/egl/EGLWindow.h"
+#include "tgfx/gpu/Recording.h"
 #include "hello2d/AppHost.h"
 #include "hello2d/LayerBuilder.h"
 #include "DisplayLink.h"
@@ -16,6 +17,7 @@ static std::shared_ptr<tgfx::Window> window = nullptr;
 static std::shared_ptr<DisplayLink> displayLink = nullptr;
 static tgfx::DisplayList displayList;
 static std::shared_ptr<tgfx::Layer> contentLayer = nullptr;
+static std::unique_ptr<tgfx::Recording> lastRecording = nullptr;
 static int lastDrawIndex = -1;
 
 static std::shared_ptr<hello2d::AppHost> CreateAppHost();
@@ -100,6 +102,23 @@ static bool Draw(int drawIndex, float zoom = 1.0f, float offsetX = 0.0f, float o
   displayList.setZoomScale(zoom * baseScale);
   displayList.setContentOffset(baseOffsetX + offsetX, baseOffsetY + offsetY);
 
+  // Check if content has changed BEFORE rendering
+  bool hasContentChanged = displayList.hasContentChanged();
+
+  // If no new content and no pending recording, skip rendering
+  if (!hasContentChanged && lastRecording == nullptr) {
+    device->unlock();
+    return false;
+  }
+
+  // If no new content but has lastRecording, just submit it
+  if (!hasContentChanged) {
+    context->submit(std::move(lastRecording));
+    window->present(context);
+    device->unlock();
+    return false;
+  }
+
   // Draw background
   auto canvas = surface->getCanvas();
   canvas->clear();
@@ -108,11 +127,18 @@ static bool Draw(int drawIndex, float zoom = 1.0f, float offsetX = 0.0f, float o
   // Render DisplayList
   displayList.render(surface.get(), false);
 
-  context->flushAndSubmit();
-  window->present(context);
+  // Delayed one-frame present mode
+  auto recording = context->flush();
+  if (lastRecording) {
+    context->submit(std::move(lastRecording));
+    if (recording) {
+      window->present(context);
+    }
+  }
+  lastRecording = std::move(recording);
   device->unlock();
 
-  return displayList.hasContentChanged();
+  return displayList.hasContentChanged() || lastRecording != nullptr;
 }
 
 
@@ -204,6 +230,7 @@ static void OnSurfaceChangedCB(OH_NativeXComponent* component, void* nativeWindo
 static void OnSurfaceDestroyedCB(OH_NativeXComponent*, void*) {
   window = nullptr;
   displayLink = nullptr;
+  lastRecording = nullptr;
 }
 
 static void DispatchTouchEventCB(OH_NativeXComponent*, void*) {

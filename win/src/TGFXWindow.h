@@ -31,6 +31,7 @@
 #include "hello2d/AppHost.h"
 #include "hello2d/LayerBuilder.h"
 #include "tgfx/core/Point.h"
+#include "tgfx/gpu/Recording.h"
 #include "tgfx/gpu/opengl/wgl/WGLWindow.h"
 #include "tgfx/layers/DisplayList.h"
 
@@ -53,6 +54,7 @@ class TGFXWindow {
   std::shared_ptr<hello2d::AppHost> appHost = nullptr;
   tgfx::DisplayList displayList;
   std::shared_ptr<tgfx::Layer> contentLayer = nullptr;
+  std::unique_ptr<tgfx::Recording> lastRecording = nullptr;
 
   static WNDCLASS RegisterWindowClass();
   static LRESULT CALLBACK WndProc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) noexcept;
