@@ -122,8 +122,10 @@ std::shared_ptr<EGLDevice> EGLDevice::MakeFrom(EGLNativeWindowType nativeWindow,
   auto eglGlobals = EGLGlobals::Get();
 #if defined(_WIN32)
   auto eglSurface = CreateFixedSizeSurfaceForAngle(nativeWindow, eglGlobals);
-  if(colorSpace != nullptr && !ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get())){
-    LOGE("EGLDevice::MakeFrom() The specified ColorSpace is not supported on this platform. Rendering may have color inaccuracies.");
+  if (colorSpace != nullptr && !ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get())) {
+    LOGE(
+        "EGLDevice::MakeFrom() The specified ColorSpace is not supported on this platform. "
+        "Rendering may have color inaccuracies.");
   }
 #else
   std::vector<EGLint> attributes = {};
@@ -135,8 +137,11 @@ std::shared_ptr<EGLDevice> EGLDevice::MakeFrom(EGLNativeWindowType nativeWindow,
       isDisplayP3Supported = true;
     }
   }
-  if(colorSpace != nullptr && !ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get()) && !isDisplayP3Supported){
-    LOGE("EGLDevice::MakeFrom() The specified ColorSpace is not supported on this platform. Rendering may have color inaccuracies.");
+  if (colorSpace != nullptr && !ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get()) &&
+      !isDisplayP3Supported) {
+    LOGE(
+        "EGLDevice::MakeFrom() The specified ColorSpace is not supported on this platform. "
+        "Rendering may have color inaccuracies.");
   }
   attributes.insert(attributes.end(), eglGlobals->windowSurfaceAttributes.begin(),
                     eglGlobals->windowSurfaceAttributes.end());

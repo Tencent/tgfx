@@ -36,8 +36,9 @@ std::shared_ptr<CGLWindow> CGLWindow::MakeFrom(NSView* view, CGLContextObj share
   if (device == nullptr) {
     return nullptr;
   }
-  if(colorSpace != nullptr && !ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get())){
-      LOGE("CGLWindow::MakeFrom() The specified ColorSpace is not supported on this platform. Rendering may have color inaccuracies.");
+  if (colorSpace != nullptr && !ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get())) {
+    LOGE("CGLWindow::MakeFrom() The specified ColorSpace is not supported on this platform. "
+         "Rendering may have color inaccuracies.");
   }
   return std::shared_ptr<CGLWindow>(new CGLWindow(device, view, std::move(colorSpace)));
 }

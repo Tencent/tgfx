@@ -72,7 +72,7 @@ std::shared_ptr<WebGLDevice> WebGLDevice::MakeFrom(const std::string& canvasID,
     return nullptr;
   }
   WebNamedColorSpace cs = WebNamedColorSpace::Others;
-  if(colorSpace == nullptr){
+  if (colorSpace == nullptr) {
     cs = WebNamedColorSpace::None;
   } else if (ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get())) {
     cs = WebNamedColorSpace::SRGB;
@@ -81,8 +81,10 @@ std::shared_ptr<WebGLDevice> WebGLDevice::MakeFrom(const std::string& canvasID,
   }
   bool isColorSpaceSupport = emscripten::val::module_property("tgfx").call<bool>(
       "setColorSpace", emscripten::val::module_property("GL"), static_cast<int>(cs));
-  if(!isColorSpaceSupport){
-    LOGE("WebGLDevice::MakeFrom() The specified ColorSpace is not supported on this platform. Rendering may have color inaccuracies.");
+  if (!isColorSpaceSupport) {
+    LOGE(
+        "WebGLDevice::MakeFrom() The specified ColorSpace is not supported on this platform. "
+        "Rendering may have color inaccuracies.");
   }
   emscripten_webgl_make_context_current(0);
   if (oldContext) {

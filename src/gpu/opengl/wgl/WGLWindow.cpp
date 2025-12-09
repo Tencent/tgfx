@@ -31,8 +31,10 @@ std::shared_ptr<WGLWindow> WGLWindow::MakeFrom(HWND nativeWindow, HGLRC sharedCo
   if (device == nullptr) {
     return nullptr;
   }
-  if(colorSpace != nullptr && !ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get())){
-    LOGE("WGLWindow::MakeFrom() The specified ColorSpace is not supported on this platform. Rendering may have color inaccuracies.");
+  if (colorSpace != nullptr && !ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get())) {
+    LOGE(
+        "WGLWindow::MakeFrom() The specified ColorSpace is not supported on this platform. "
+        "Rendering may have color inaccuracies.");
   }
   auto wglWindow = std::shared_ptr<WGLWindow>(new WGLWindow(device, std::move(colorSpace)));
   wglWindow->nativeWindow = nativeWindow;

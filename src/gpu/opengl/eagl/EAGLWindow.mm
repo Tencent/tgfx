@@ -34,8 +34,9 @@ std::shared_ptr<EAGLWindow> EAGLWindow::MakeFrom(CAEAGLLayer* layer,
   if (device == nullptr) {
     return nullptr;
   }
-  if(colorSpace != nullptr && !ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get())){
-      LOGE("EAGLWindow::MakeFrom() The specified ColorSpace is not supported on this platform. Rendering may have color inaccuracies.");
+  if (colorSpace != nullptr && !ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get())) {
+    LOGE("EAGLWindow::MakeFrom() The specified ColorSpace is not supported on this platform. "
+         "Rendering may have color inaccuracies.");
   }
   return std::shared_ptr<EAGLWindow>(new EAGLWindow(device, layer, std::move(colorSpace)));
 }
