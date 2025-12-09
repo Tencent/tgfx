@@ -105,7 +105,6 @@ DOMNode::~DOMNode() {
     if (node->firstChild) {
       stack.emplace_back(std::move(node->firstChild));
     }
-
     if (node->nextSibling) {
       stack.emplace_back(std::move(node->nextSibling));
     }
