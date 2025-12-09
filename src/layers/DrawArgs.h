@@ -56,15 +56,13 @@ class DrawArgs {
   bool forceDrawBackground = false;
   std::shared_ptr<ColorSpace> dstColorSpace = ColorSpace::SRGB();
 
-  // Only used while recording layer's background image.
-  std::shared_ptr<BackgroundContext> blendModeBackground = nullptr;
-
   // The 3D render context to be used during the drawing process. Note: this could be nullptr. All
   // layers within the 3D rendering context need to maintain their respective 3D states to achieve
   // per-pixel depth occlusion effects. These layers are composited through the Compositor and do
   // not need to be drawn to the Canvas.
   std::shared_ptr<Render3DContext> render3DContext = nullptr;
 
+  // Indicates whether to clip the content by the canvas.
   bool clipContentByCanvas = false;
 };
 }  // namespace tgfx

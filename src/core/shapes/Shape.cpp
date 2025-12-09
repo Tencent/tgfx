@@ -16,43 +16,24 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "tgfx/core/Matrix.h"
 #include "tgfx/core/Shape.h"
 
 namespace tgfx {
-/**
- * Shape that contains a single path.
- */
-class PathShape : public Shape {
- public:
-  explicit PathShape(Path path) : path(std::move(path)) {
+Shape::~Shape() {
+  auto oldBounds = bounds.exchange(nullptr, std::memory_order_acq_rel);
+  delete oldBounds;
+}
+
+Rect Shape::getBounds() const {
+  if (auto cachedBounds = bounds.load(std::memory_order_acquire)) {
+    return *cachedBounds;
   }
-
-  bool isSimplePath() const override {
-    return true;
+  auto totalBounds = onGetBounds();
+  auto newBounds = new Rect(totalBounds);
+  Rect* oldBounds = nullptr;
+  if (!bounds.compare_exchange_strong(oldBounds, newBounds, std::memory_order_acq_rel)) {
+    delete newBounds;
   }
-
-  bool isInverseFillType() const override {
-    return path.isInverseFillType();
-  }
-
-  Rect onGetBounds() const override {
-    return path.getBounds();
-  }
-
-  Path path = {};
-
- protected:
-  Type type() const override {
-    return Type::Path;
-  }
-
-  UniqueKey getUniqueKey() const override;
-
-  Path onGetPath(float /*resolutionScale*/) const override {
-    return path;
-  }
-};
+  return totalBounds;
+}
 }  // namespace tgfx

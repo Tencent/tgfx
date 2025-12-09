@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Rect3DDrawOp.h"
+#include "core/utils/ColorHelper.h"
 #include "core/utils/MathExtra.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
@@ -63,7 +64,7 @@ Rect3DDrawOp::Rect3DDrawOp(BlockAllocator* allocator, RectsVertexProvider* provi
     uvMatrix = matrix;
   }
   if (!provider->hasColor()) {
-    commonColor = provider->firstColor();
+    commonColor = ToPMColor(provider->firstColor(), provider->dstColorSpace());
   }
   hasSubset = provider->hasSubset();
 }

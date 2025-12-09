@@ -53,7 +53,7 @@ Path GlyphShape::onGetPath(float resolutionScale) const {
   return path;
 }
 
-Rect GlyphShape::getBounds() const {
+Rect GlyphShape::onGetBounds() const {
   return font.getBounds(glyphID);
 }
 }  // namespace tgfx

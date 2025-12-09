@@ -66,7 +66,7 @@ class Paint {
 
   /**
    * Sets alpha and RGB used when stroking and filling. The color is four floating point values,
-   * unpremultiplied. Color can overflow 0-1.
+   * unpremultiplied. Color may exceed 0-1.
    */
   void setColor(Color newColor) {
     brush.color = newColor;
@@ -238,14 +238,14 @@ class Paint {
   }
 
   /**
-   * Returns whether the geometry is filled, stroked, or filled and stroked.
+   * Returns whether the geometry is filled or stroked.
    */
   PaintStyle getStyle() const {
     return style;
   }
 
   /**
-   * Sets whether the geometry is filled, stroked, or filled and stroked.
+   * Sets whether the geometry is filled, or stroked.
    */
   void setStyle(PaintStyle newStyle) {
     style = newStyle;

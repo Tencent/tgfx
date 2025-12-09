@@ -29,7 +29,7 @@ class ProviderShape : public UniqueKeyShape {
       : provider(std::move(pathProvider)) {
   }
 
-  Rect getBounds() const override;
+  Rect onGetBounds() const override;
 
  protected:
   Type type() const override {

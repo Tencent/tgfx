@@ -70,8 +70,8 @@ void Context3DCompositor::drawImage(std::shared_ptr<Image> image, const Matrix3D
   auto allocator = context->drawingAllocator();
   // Disable anti-aliasing for small images to avoid large semi-transparent areas when small
   // rectangles are projected as large ones.
-  auto vertexProvider = RectsVertexProvider::MakeFrom(allocator, srcModelRect, AAType::MSAA,
-                                                      PMColor(alpha, alpha, alpha, alpha));
+  auto vertexProvider =
+      RectsVertexProvider::MakeFrom(allocator, srcModelRect, AAType::MSAA, Color(1, 1, 1, alpha));
   const Size viewportSize(static_cast<float>(width), static_cast<float>(height));
   const Rect3DDrawArgs drawArgs{matrix, ndcScale, ndcOffset, viewportSize};
   auto drawOp = Rect3DDrawOp::Make(context, std::move(vertexProvider), 0, drawArgs);
