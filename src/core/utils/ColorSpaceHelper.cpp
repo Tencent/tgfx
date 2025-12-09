@@ -168,7 +168,7 @@ static bool NearlyEqual(float x, float y) {
   return ::fabsf(x - y) <= Tolerance;
 }
 
-bool NearLyEqual(const TransferFunction& u, const TransferFunction& v) {
+bool NearlyEqual(const TransferFunction& u, const TransferFunction& v) {
   return NearlyEqual(u.g, v.g) && NearlyEqual(u.a, v.a) && NearlyEqual(u.b, v.b) &&
          NearlyEqual(u.c, v.c) && NearlyEqual(u.d, v.d) && NearlyEqual(u.e, v.e) &&
          NearlyEqual(u.f, v.f);
