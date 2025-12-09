@@ -20,6 +20,7 @@
 
 #include <memory>
 #include <optional>
+#include <unordered_map>
 #include <unordered_set>
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Canvas.h"
@@ -675,7 +676,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   void drawContentOffscreen(const DrawArgs& args, Canvas* canvas, std::optional<Rect> clipBounds,
                             float contentScale, BlendMode blendMode, float alpha,
-                            const Matrix3D* transform, bool cacheContent);
+                            const Matrix3D* transform, bool cacheContent, int cacheLevel = -1);
 
   bool drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                      const Matrix3D* transform);
@@ -731,7 +732,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::vector<std::shared_ptr<LayerStyle>> _layerStyles = {};
   float _rasterizationScale = 0.0f;
   std::unique_ptr<RasterizedCache> rasterizedContent;
-  std::unique_ptr<RasterizedCache> contentCache;
+  std::unordered_map<int, std::shared_ptr<RasterizedCache>> contentCaches;
   std::shared_ptr<LayerContent> layerContent = nullptr;
   Rect renderBounds = {};                       // in global coordinates
   Rect* contentBounds = nullptr;                //  in global coordinates

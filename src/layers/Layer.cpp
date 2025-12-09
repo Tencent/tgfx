@@ -1251,12 +1251,15 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
 
   auto baseScale = static_cast<float>(args.maxCacheSize) / maxBoundsSize;
   auto ratio = contentScale / baseScale;
-  auto level = -log2f(ratio);
-  auto snappedLevel = std::max(static_cast<int>(roundf(level)), args.minMipmapLevel);
-  auto snappedScale = baseScale * powf(2.0f, -static_cast<float>(snappedLevel));
+  auto level = static_cast<int>(roundf(-log2f(ratio)));
+  // If level < 0, scale is too large, don't create cache
+  if (level < 0 || level < args.minMipmapLevel) {
+    return false;
+  }
+  auto cacheScale = baseScale * powf(2.0f, -static_cast<float>(level));
 
-  auto cacheWidth = ceilf(layerBounds.width() * snappedScale);
-  auto cacheHeight = ceilf(layerBounds.height() * snappedScale);
+  auto cacheWidth = ceilf(layerBounds.width() * cacheScale);
+  auto cacheHeight = ceilf(layerBounds.height() * cacheScale);
   if (static_cast<int>(cacheWidth) > args.maxCacheSize ||
       static_cast<int>(cacheHeight) > args.maxCacheSize) {
     return false;
@@ -1264,11 +1267,11 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
 
   auto fullFill = args.renderRect && args.renderRect->contains(renderBounds);
   if (shouldPassThroughBackground(blendMode, transform) || hasBackgroundStyle()) {
-    if (!fullFill || !FloatNearlyEqual(snappedScale, contentScale)) {
+    if (!fullFill || !FloatNearlyEqual(cacheScale, contentScale)) {
       return false;
     }
   }
-  contentScale = snappedScale;
+  contentScale = cacheScale;
   auto cacheArgs = args;
   cacheArgs.renderFlags |= RenderFlags::DisableCache;
   cacheArgs.renderRect = &renderBounds;
@@ -1276,14 +1279,14 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     cacheArgs.blurBackground = cacheArgs.blurBackground->createSubContext(renderBounds, false);
   }
   drawContentOffscreen(cacheArgs, canvas, std::nullopt, contentScale, blendMode, alpha, transform,
-                       true);
+                       true, level);
   return true;
 }
 
 void Layer::drawContentOffscreen(const DrawArgs& args, Canvas* canvas,
                                  std::optional<Rect> clipBounds, float contentScale,
                                  BlendMode blendMode, float alpha, const Matrix3D* transform,
-                                 bool cacheContent) {
+                                 bool cacheContent, int cacheLevel) {
   if (transform != nullptr) {
     drawBackgroundLayerStyles(args, canvas, alpha, *transform);
   }
@@ -1326,9 +1329,9 @@ void Layer::drawContentOffscreen(const DrawArgs& args, Canvas* canvas,
     return;
   }
 
-  if (cacheContent && args.context) {
-    contentCache = RasterizedCache::MakeFrom(args.context, contentScale, std::move(image),
-                                             imageMatrix, &image);
+  if (cacheContent && args.context && cacheLevel >= 0) {
+    contentCaches[cacheLevel] = RasterizedCache::MakeFrom(args.context, contentScale,
+                                                          std::move(image), imageMatrix, &image);
   }
 
   image = MakeImageWithTransform(std::move(image), transform, &imageMatrix);
@@ -2115,18 +2118,12 @@ Matrix3D Layer::anchorAdaptedMatrix(const Matrix3D& matrix, const Point& anchor)
 
 void Layer::invalidateCache() {
   rasterizedContent = nullptr;
-  contentCache = nullptr;
+  contentCaches.clear();
   bitFields.cacheable = false;
 }
 
 RasterizedCache* Layer::getContentCache(const DrawArgs& args, float contentScale) {
   if (args.maxCacheSize <= 0 || !args.context) {
-    return nullptr;
-  }
-  if (!contentCache || contentCache->contextID() != args.context->uniqueID()) {
-    return nullptr;
-  }
-  if (!contentCache->valid(args.context)) {
     return nullptr;
   }
   auto layerBounds = getBounds();
@@ -2136,13 +2133,24 @@ RasterizedCache* Layer::getContentCache(const DrawArgs& args, float contentScale
   }
   auto baseScale = static_cast<float>(args.maxCacheSize) / maxBoundsSize;
   auto ratio = contentScale / baseScale;
-  auto level = -log2f(ratio);
-  auto snappedLevel = std::max(static_cast<int>(roundf(level)), args.minMipmapLevel);
-  auto snappedScale = baseScale * powf(2.0f, -static_cast<float>(snappedLevel));
-  if (!FloatNearlyEqual(contentCache->contentScale(), snappedScale)) {
+  auto level = static_cast<int>(roundf(-log2f(ratio)));
+  // If level < 0, scale is too large, don't use cache
+  if (level < 0 || level < args.minMipmapLevel) {
     return nullptr;
   }
-  return contentCache.get();
+  auto it = contentCaches.find(level);
+  if (it == contentCaches.end()) {
+    return nullptr;
+  }
+  auto& cache = it->second;
+  if (!cache || cache->contextID() != args.context->uniqueID()) {
+    return nullptr;
+  }
+  if (!cache->valid(args.context)) {
+    contentCaches.erase(it);
+    return nullptr;
+  }
+  return cache.get();
 }
 
 }  // namespace tgfx
