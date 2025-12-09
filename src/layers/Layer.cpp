@@ -1365,7 +1365,8 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
 void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                           const Matrix3D* transform, bool excludeChildren) {
   if (transform != nullptr && !args.excludeBackgroundStyle) {
-    // 应用3D矩阵时，背景样式和图层内容无法绘制到同一个纹理中，背景样式需要单独绘制。
+    // When applying 3D matrix, background styles and layer content cannot be drawn to the same
+    // texture, so background styles need to be drawn separately.
     drawBackgroundLayerStyles(args, canvas, alpha, *transform);
   }
 
@@ -1409,7 +1410,8 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   }
 
   if (args.render3DContext == nullptr) {
-    // 3D渲染上下文内部图层的合成器内部处理矩阵变换逻辑
+    // The compositor for layers inside a 3D rendering context handles matrix transformation
+    // logic internally.
     image = MakeImageWithTransform(image, transform, &imageMatrix);
   }
 
@@ -1555,10 +1557,12 @@ void Layer::drawIn3DContext(const DrawArgs& args, Canvas* canvas, float alpha, B
                             const Matrix3D* transform) {
   DEBUG_ASSERT(args.render3DContext != nullptr);
   if (_transformStyle == TransformStyle::Flat || !canExtend3DContext()) {
-    // 如果不能继续向子图层扩展3D渲染环境, 整棵子树离屏绘制。
+    // If the 3D rendering context cannot be extended to child layers, draw the entire subtree
+    // offscreen.
     drawOffscreen(args, canvas, alpha, blendMode, transform);
   } else {
-    // 如果能继续向子图层扩展3D渲染环境，子图层需要维持独立的3D状态，因此图层自身的内容和子图层分开绘制。
+    // If the 3D rendering context can be extended to child layers, child layers need to maintain
+    // independent 3D states, so the layer's own content and child layers are drawn separately.
     drawOffscreen(args, canvas, alpha, blendMode, transform, true);
     drawChildren(args, canvas, alpha, nullptr, transform);
   }
