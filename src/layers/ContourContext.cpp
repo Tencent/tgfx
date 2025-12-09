@@ -141,8 +141,7 @@ void ContourContext::drawLayer(std::shared_ptr<Picture> picture,
   pictureContext.drawLayer(picture, filter, state, brush);
 }
 
-void ContourContext::drawContour(const Contour& contour, const MCState& state,
-                                 const Brush& brush) {
+void ContourContext::drawContour(const Contour& contour, const MCState& state, const Brush& brush) {
   if (canAppend(contour, state, brush)) {
     appendFill(brush);
     return;

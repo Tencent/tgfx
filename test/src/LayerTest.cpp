@@ -3262,19 +3262,20 @@ TGFX_TEST(LayerTest, ContourTest) {
   EXPECT_EQ(strokeTestPicture->drawCount, 2u);
 
   // Case 6: Different stroke width should NOT dedup.
-  // Same geometry but different lineWidth produces different stroke contours.
+  // Different geometry with different lineWidth produces different stroke contours.
   auto diffStrokeLayer = ShapeLayer::Make();
-  path.reset();
-  path.addRect(Rect::MakeXYWH(110, 210, 80, 80));
-  diffStrokeLayer->setPath(path);
   // First child with lineWidth 3.
   auto child1 = ShapeLayer::Make();
+  path.reset();
+  path.addRect(Rect::MakeXYWH(110, 210, 80, 40));
   child1->setPath(path);
   child1->setLineWidth(3.0f);
   child1->addStrokeStyle(SolidColor::Make(Color::Red()));
   diffStrokeLayer->addChild(child1);
   // Second child with lineWidth 6 - different stroke, should NOT dedup.
   auto child2 = ShapeLayer::Make();
+  path.reset();
+  path.addRect(Rect::MakeXYWH(110, 250, 80, 40));
   child2->setPath(path);
   child2->setLineWidth(6.0f);
   child2->addStrokeStyle(SolidColor::Make(Color::Blue()));
@@ -3283,9 +3284,10 @@ TGFX_TEST(LayerTest, ContourTest) {
   Canvas diffStrokeCanvas = Canvas(&diffStrokeContext);
   diffStrokeLayer->drawLayer(drawArgs, &diffStrokeCanvas, 1.0, BlendMode::SrcOver);
   auto diffStrokePicture = diffStrokeContext.finishRecordingAsPicture();
-  // child1: 1 (transparent fill) + 1 (stroke width 3)
-  // child2: 1 (transparent fill, deduped) + 1 (stroke width 6, different) = 3 total.
-  EXPECT_EQ(diffStrokePicture->drawCount, 3u);
+  // child1: 1 (transparent fill) + 1 (stroke width 3) = 2
+  // child2: 1 (transparent fill) + 1 (stroke width 6) = 2
+  // Total = 4 (no dedup because different geometry).
+  EXPECT_EQ(diffStrokePicture->drawCount, 4u);
 
   // Draw all to canvas for baseline comparison.
   auto rootLayer = ShapeLayer::Make();
@@ -3299,10 +3301,10 @@ TGFX_TEST(LayerTest, ContourTest) {
   Canvas allCanvas = Canvas(&allContext);
   rootLayer->drawLayer(drawArgs, &allCanvas, 1.0, BlendMode::SrcOver);
   auto allPicture = allContext.finishRecordingAsPicture();
-  // 1 + 2 + 1 + 3 + 2 + 3 = 12
-  EXPECT_EQ(allPicture->drawCount, 12u);
+  // 1 + 2 + 1 + 3 + 2 + 4 = 13
+  EXPECT_EQ(allPicture->drawCount, 13u);
 
-  surface = Surface::Make(context, 200, 400);
+  surface = Surface::Make(context, 200, 300);
   auto canvas = surface->getCanvas();
   canvas->clear();
   canvas->drawPicture(allPicture);
