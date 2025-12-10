@@ -35,7 +35,8 @@ class EGLWindow : public Window {
    * Creates a new window from an EGL native window with specified shared context.
    */
   static std::shared_ptr<EGLWindow> MakeFrom(EGLNativeWindowType nativeWindow,
-                                             EGLContext sharedContext = nullptr);
+                                             EGLContext sharedContext = nullptr,
+                                             std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
    * Sets the presentation time for the next frame in microseconds. This is only applicable on
