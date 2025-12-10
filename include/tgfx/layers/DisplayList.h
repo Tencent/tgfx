@@ -234,42 +234,37 @@ class DisplayList {
   void setBackgroundColor(const Color& color);
 
   /**
-   * Returns the maximum cache size (single edge) for layer cache. When this value is 0 (default),
-   * layer cache is disabled. The cache texture size is determined by layer bounds multiplied by
-   * the snapped content scale (mipmap-style).
+   * Returns the maximum cache size (single edge) for sub-tree layer caching optimization.
+   * When this value is 0 (default), sub-tree layer cache is disabled.
+   *
+   * This cache optimizes zoom-out scenarios with dense on-screen content. When viewport is zoomed
+   * out to a critical level, static sub-trees are cached as images. Using a hierarchical (mipmap-style)
+   * caching strategy reduces blur artifacts while providing significant performance improvements.
    */
-  int maxCacheSize() const {
-    return _maxCacheSize;
+  int subtreeCacheMaxSize() const {
+    return _subtreeCacheMaxSize;
   }
 
   /**
-   * Sets the maximum cache size (single edge) for layer cache. Set to 0 to disable layer cache
-   * (default). The cache texture size will be limited to this value.
+   * Sets the maximum cache size (single edge) for sub-tree layer caching. Set to 0 to disable
+   * sub-tree caching (default). The cache texture size will be limited to this maximum value.
    */
-  void setMaxCacheSize(int maxSize) {
-    if (maxSize < 0) {
-      maxSize = 0;
-    }
-    _maxCacheSize = maxSize;
+  void setSubtreeCacheMaxSize(int maxSize);
+
+  /**
+   * Returns the minimum cache size (single edge) for sub-tree layer caching.
+   * The cache mipmap level is calculated based on the ratio between subtreeCacheMaxSize and
+   * minSubTreeCacheSize. The default value is 0.
+   */
+  int minSubTreeCacheSize() const {
+    return _minSubTreeCacheSize;
   }
 
   /**
-   * Returns the minimum mipmap level for layer cache. Level 0 corresponds to scale=1.0 (relative
-   * to maxCacheSize), level 1 corresponds to scale=0.5, level 2 corresponds to scale=0.25, etc.
-   * Negative levels correspond to scales greater than 1.0 (e.g., level -1 = scale 2.0).
-   * The default value is 0.
+   * Sets the minimum cache size (single edge) for sub-tree layer caching.
+   * Together with subtreeCacheMaxSize, defines the hierarchical cache levels used during zoom-out.
    */
-  int minMipmapLevel() const {
-    return _minMipmapLevel;
-  }
-
-  /**
-   * Sets the minimum mipmap level for layer cache. This limits the maximum content scale that can
-   * be used for caching. Level 0 = scale 1.0, level 1 = scale 0.5, level -1 = scale 2.0, etc.
-   */
-  void setMinMipmapLevel(int level) {
-    _minMipmapLevel = level;
-  }
+  void setMinSubTreeCacheSize(int minSize);
 
   /**
    * Sets whether to show dirty regions during rendering. When enabled, the dirty regions will be
@@ -302,8 +297,8 @@ class DisplayList {
   int _maxTileCount = 0;
   bool _allowZoomBlur = false;
   int _maxTilesRefinedPerFrame = 5;
-  int _maxCacheSize = 0;
-  int _minMipmapLevel = 0;
+  int _subtreeCacheMaxSize = 0;
+  int _minSubTreeCacheSize = 0;
   bool _showDirtyRegions = false;
   bool _hasContentChanged = false;
   bool hasZoomBlurTiles = false;

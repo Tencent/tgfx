@@ -56,9 +56,10 @@ class DrawArgs {
   bool forceDrawBackground = false;
   std::shared_ptr<ColorSpace> dstColorSpace = ColorSpace::SRGB();
 
-  // The maximum cache size (single edge) for layer caching. Set to 0 to disable layer cache.
-  int maxCacheSize = 0;
-  // The minimum mipmap level for layer caching. Level 0 = scale 1.0, level 1 = scale 0.5, etc.
-  int minMipmapLevel = 0;
+  // The maximum cache size (single edge) for sub-tree layer caching. Set to 0 to disable
+  // sub-tree layer cache.
+  int maxSubTreeCacheSize = 0;
+  // The maximum mipmap level for sub-tree layer caching.
+  int maxCacheMipmapLevel = 0;
 };
 }  // namespace tgfx

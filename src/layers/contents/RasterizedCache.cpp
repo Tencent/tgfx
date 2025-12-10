@@ -17,16 +17,36 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RasterizedCache.h"
+#include <cmath>
 #include "core/images/TextureImage.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/TPArgs.h"
 
 namespace tgfx {
-std::unique_ptr<RasterizedCache> RasterizedCache::MakeFrom(Context* context, float contentScale,
-                                                           std::shared_ptr<Image> image,
-                                                           const Matrix& imageMatrix,
-                                                           std::shared_ptr<Image>* cachedImage) {
-  if (context == nullptr || image == nullptr) {
+inline uint32_t ScaleToKey(float scale) {
+  if (scale <= 0.0f) {
+    return 0;
+  }
+  return static_cast<uint32_t>(std::roundf(scale * 1000.0f));
+}
+
+UniqueKey RasterizedCache::MakeScaleKey(float scale) const {
+  auto scaleKey = ScaleToKey(scale);
+  UniqueKey newKey = _uniqueKey;
+  return UniqueKey::Append(newKey, &scaleKey, 1);
+}
+
+std::unique_ptr<RasterizedCache> RasterizedCache::MakeFrom(Context* context) {
+  if (context == nullptr) {
+    return nullptr;
+  }
+  return std::make_unique<RasterizedCache>(context->uniqueID());
+}
+
+std::shared_ptr<Image> RasterizedCache::addScaleCache(Context* context, float contentScale,
+                                                      std::shared_ptr<Image> image,
+                                                      const Matrix& imageMatrix) {
+  if (context == nullptr || image == nullptr || context->uniqueID() != _contextID) {
     return nullptr;
   }
   auto width = image->width();
@@ -39,25 +59,33 @@ std::unique_ptr<RasterizedCache> RasterizedCache::MakeFrom(Context* context, flo
   if (textureProxy == nullptr) {
     return nullptr;
   }
-  auto cache = std::make_unique<RasterizedCache>(context->uniqueID(), contentScale, imageMatrix,
-                                                 image->colorSpace());
+
+  auto scaleUniqueKey = MakeScaleKey(contentScale);
   auto proxyProvider = context->proxyProvider();
-  proxyProvider->assignProxyUniqueKey(textureProxy, cache->uniqueKey());
-  textureProxy->assignUniqueKey(cache->uniqueKey());
-  // Return the cached image ensure the texture proxy is not released.
-  if (cachedImage != nullptr) {
-    *cachedImage = TextureImage::Wrap(std::move(textureProxy), image->colorSpace());
-  }
-  return cache;
+  proxyProvider->assignProxyUniqueKey(textureProxy, scaleUniqueKey);
+  textureProxy->assignUniqueKey(scaleUniqueKey);
+
+  auto key = ScaleToKey(contentScale);
+  _scaleMatrices[key] = imageMatrix;
+
+  return TextureImage::Wrap(std::move(textureProxy), image->colorSpace());
 }
 
-bool RasterizedCache::valid(Context* context) const {
-  if (context == nullptr || context->uniqueID() != _contextID || _uniqueKey.empty()) {
+bool RasterizedCache::valid(Context* context, float scale) const {
+  if (context == nullptr || context->uniqueID() != _contextID) {
     return false;
   }
+  if (_scaleMatrices.empty()) {
+    return false;
+  }
+  auto scaleUniqueKey = MakeScaleKey(scale);
   auto proxyProvider = context->proxyProvider();
-  auto textureProxy = proxyProvider->findOrWrapTextureProxy(_uniqueKey);
-  return textureProxy != nullptr;
+  auto textureProxy = proxyProvider->findOrWrapTextureProxy(scaleUniqueKey);
+  auto valid = textureProxy != nullptr;
+  if (!valid) {
+    _scaleMatrices.erase(ScaleToKey(scale));
+  }
+  return valid;
 }
 
 void RasterizedCache::draw(Context* context, Canvas* canvas, bool antiAlias, float alpha,
@@ -69,41 +97,48 @@ void RasterizedCache::draw(Context* context, Canvas* canvas, bool antiAlias, flo
   if (context->uniqueID() != _contextID) {
     return;
   }
+
+  float drawScale = canvas->getMatrix().getMaxScale();
+  auto key = ScaleToKey(drawScale);
+  auto it = _scaleMatrices.find(key);
+  if (it == _scaleMatrices.end()) {
+    return;
+  }
+  auto matrixPtr = &it->second;
+
+  auto scaleUniqueKey = MakeScaleKey(drawScale);
   auto proxyProvider = context->proxyProvider();
-  auto proxy = proxyProvider->findOrWrapTextureProxy(_uniqueKey);
+  auto proxy = proxyProvider->findOrWrapTextureProxy(scaleUniqueKey);
   if (proxy == nullptr) {
     return;
   }
-  auto image = TextureImage::Wrap(proxy, _colorSpace);
+  auto image = TextureImage::Wrap(proxy, nullptr);
   if (image == nullptr) {
     return;
   }
   auto oldMatrix = canvas->getMatrix();
-  canvas->concat(matrix);
+  canvas->concat(*matrixPtr);
   Paint paint = {};
   paint.setAntiAlias(antiAlias);
   paint.setAlpha(alpha);
   paint.setBlendMode(blendMode);
   if (mask) {
     auto invertMatrix = Matrix::I();
-    if (matrix.invert(&invertMatrix)) {
+    if (matrixPtr->invert(&invertMatrix)) {
       paint.setMaskFilter(mask->makeWithMatrix(invertMatrix));
     }
   }
   if (transform == nullptr) {
     canvas->drawImage(image, &paint);
   } else {
-    // Transform describes a transformation based on the layer's coordinate system, but the
-    // rasterized content is only a small sub-rectangle within the layer. We need to calculate an
-    // equivalent affine transformation matrix referenced to the local coordinate system with the
-    // top-left vertex of this sub-rectangle as the origin.
     auto adaptedMatrix = *transform;
-    auto offsetMatrix = Matrix3D::MakeTranslate(matrix.getTranslateX(), matrix.getTranslateY(), 0);
+    auto offsetMatrix =
+        Matrix3D::MakeTranslate(matrixPtr->getTranslateX(), matrixPtr->getTranslateY(), 0);
     auto invOffsetMatrix =
-        Matrix3D::MakeTranslate(-matrix.getTranslateX(), -matrix.getTranslateY(), 0);
-    auto scaleMatrix = Matrix3D::MakeScale(matrix.getScaleX(), matrix.getScaleY(), 1.0f);
+        Matrix3D::MakeTranslate(-matrixPtr->getTranslateX(), -matrixPtr->getTranslateY(), 0);
+    auto scaleMatrix = Matrix3D::MakeScale(matrixPtr->getScaleX(), matrixPtr->getScaleY(), 1.0f);
     auto invScaleMatrix =
-        Matrix3D::MakeScale(1.0f / matrix.getScaleX(), 1.0f / matrix.getScaleY(), 1.0f);
+        Matrix3D::MakeScale(1.0f / matrixPtr->getScaleX(), 1.0f / matrixPtr->getScaleY(), 1.0f);
     adaptedMatrix = invScaleMatrix * invOffsetMatrix * adaptedMatrix * offsetMatrix * scaleMatrix;
     auto imageFilter = ImageFilter::Transform3D(adaptedMatrix);
     auto offset = Point();

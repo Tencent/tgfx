@@ -3673,34 +3673,32 @@ TGFX_TEST(LayerTest, LayerCache) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
-  // Use larger surface to ensure cache bounds fit within screen
   auto surface = Surface::Make(context, 400, 400);
   auto displayList = std::make_unique<DisplayList>();
-  // Use direct mode to exclude displayList cache
   displayList->setRenderMode(RenderMode::Direct);
 
   // Test default value is 0 (cache disabled)
-  EXPECT_EQ(displayList->maxCacheSize(), 0);
+  EXPECT_EQ(displayList->subtreeCacheMaxSize(), 0);
 
-  // Test setting maxCacheSize
-  displayList->setMaxCacheSize(2048);
-  EXPECT_EQ(displayList->maxCacheSize(), 2048);
+  // Test setting subtreeCacheMaxSize
+  displayList->setSubtreeCacheMaxSize(2048);
+  EXPECT_EQ(displayList->subtreeCacheMaxSize(), 2048);
 
   // Test negative value is clamped to 0
-  displayList->setMaxCacheSize(-1);
-  EXPECT_EQ(displayList->maxCacheSize(), 0);
+  displayList->setSubtreeCacheMaxSize(-1);
+  EXPECT_EQ(displayList->subtreeCacheMaxSize(), 0);
 
-  // Test minMipmapLevel default and setting
-  EXPECT_EQ(displayList->minMipmapLevel(), 0);
-  displayList->setMinMipmapLevel(-1);
-  EXPECT_EQ(displayList->minMipmapLevel(), -1);
-  displayList->setMinMipmapLevel(0);
+  // Test minSubTreeCacheSize default (0 means no limit)
+  EXPECT_EQ(displayList->minSubTreeCacheSize(), 0);
+  displayList->setMinSubTreeCacheSize(256);
+  EXPECT_EQ(displayList->minSubTreeCacheSize(), 256);
 
-  // Enable cache before adding layers
-  displayList->setMaxCacheSize(2048);
+  // Enable cache
+  displayList->setSubtreeCacheMaxSize(2048);
 
-  // Create a parent layer with child
+  // Create a parent layer with child (cache requires children/styles/filters)
   auto parent = Layer::Make();
+  parent->setName("parent");
   parent->setMatrix(Matrix::MakeTrans(20, 20));
 
   auto child = ShapeLayer::Make();
@@ -3712,33 +3710,26 @@ TGFX_TEST(LayerTest, LayerCache) {
 
   displayList->root()->addChild(parent);
 
-  // First render - cache should not be created yet
+  // First render - marks layer as cacheable
   displayList->render(surface.get());
   auto root = displayList->root();
-  EXPECT_TRUE(root->contentCaches.empty());
+  EXPECT_TRUE(parent->bitFields.cacheable);
+  // Cache not created yet on first render
+  EXPECT_TRUE(root->subTreeCache == nullptr);
 
-  // Second render - cache should be created
-  displayList->setZoomScale(1.5f);
+  // Second render - cache should be created on root (first layer with children)
   displayList->render(surface.get());
-  EXPECT_FALSE(root->contentCaches.empty());
-
-  // Third render with different zoom - cache should be reused or new level created
-  displayList->setZoomScale(1.f);
-  displayList->render(surface.get());
-  // With multi-level cache, new level may be created
-  EXPECT_FALSE(root->contentCaches.empty());
+  EXPECT_TRUE(root->subTreeCache != nullptr);
 }
 
 TGFX_TEST(LayerTest, LayerCacheInvalidation) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
-  // Use larger surface to ensure cache bounds fit within screen
   auto surface = Surface::Make(context, 400, 400);
   auto displayList = std::make_unique<DisplayList>();
-  // Use direct mode to exclude displayList cache
   displayList->setRenderMode(RenderMode::Direct);
-  displayList->setMaxCacheSize(2048);
+  displayList->setSubtreeCacheMaxSize(2048);
 
   auto parent = Layer::Make();
   parent->setMatrix(Matrix::MakeTrans(20, 20));
@@ -3750,18 +3741,18 @@ TGFX_TEST(LayerTest, LayerCacheInvalidation) {
   child->setFillStyle(SolidColor::Make(Color::Green()));
   parent->addChild(child);
 
-  displayList->root()->addChild(parent);
-
-  // First render - cache should not be created yet
-  displayList->render(surface.get());
   auto root = displayList->root();
-  EXPECT_TRUE(root->contentCaches.empty());
+  root->addChild(parent);
 
-  // Second render - cache should be created
+  // First render - marks layer as cacheable
   displayList->render(surface.get());
-  EXPECT_FALSE(root->contentCaches.empty());
+  EXPECT_TRUE(root->bitFields.cacheable);
 
-  // Adding a new child should invalidate cache
+  // Second render - cache should be created on root
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subTreeCache != nullptr);
+
+  // Adding a new child - should invalidate root's cache
   auto newChild = ShapeLayer::Make();
   Path newPath;
   newPath.addRect(Rect::MakeWH(20, 20));
@@ -3770,38 +3761,38 @@ TGFX_TEST(LayerTest, LayerCacheInvalidation) {
   newChild->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 255, 0, 255)));
   parent->addChild(newChild);
 
-  // First render after modification - cache should be invalidated
+  // Cache should be invalidated after adding child
+  EXPECT_TRUE(root->subTreeCache == nullptr);
+  EXPECT_FALSE(root->bitFields.cacheable);
+
+  // First render after modification - marks cacheable again
   displayList->render(surface.get());
-  EXPECT_TRUE(root->contentCaches.empty());
+  EXPECT_TRUE(root->bitFields.cacheable);
 
   // Second render - cache should be recreated
   displayList->render(surface.get());
-  EXPECT_FALSE(root->contentCaches.empty());
+  EXPECT_TRUE(root->subTreeCache != nullptr);
 
-  // Modifying child should invalidate cache
+  // Modifying child transform - should invalidate cache
   child->setMatrix(Matrix::MakeTrans(10, 10));
+  EXPECT_TRUE(root->subTreeCache == nullptr);
 
-  // First render after modification - cache should be invalidated
+  // Render twice to recreate cache
   displayList->render(surface.get());
-  EXPECT_TRUE(root->contentCaches.empty());
-
-  // Second render - cache should be recreated
   displayList->render(surface.get());
-  EXPECT_FALSE(root->contentCaches.empty());
+  EXPECT_TRUE(root->subTreeCache != nullptr);
 }
 
 TGFX_TEST(LayerTest, LayerCacheWithEffects) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
-  // Use larger surface to ensure cache bounds fit within screen (effects expand bounds)
   auto surface = Surface::Make(context, 1000, 1000);
   auto displayList = std::make_unique<DisplayList>();
-  // Use direct mode to exclude displayList cache
   displayList->setRenderMode(RenderMode::Direct);
-  displayList->setMaxCacheSize(2048);
+  displayList->setSubtreeCacheMaxSize(2048);
 
-  // Child with filter
+  // Parent with child that has filter
   auto parent1 = Layer::Make();
   parent1->setMatrix(Matrix::MakeTrans(20, 20));
 
@@ -3814,9 +3805,10 @@ TGFX_TEST(LayerTest, LayerCacheWithEffects) {
   child1->setFilters({filter});
   parent1->addChild(child1);
 
-  displayList->root()->addChild(parent1);
+  auto root = displayList->root();
+  root->addChild(parent1);
 
-  // Child with layer style
+  // Parent with child that has layer style
   auto parent2 = Layer::Make();
   parent2->setMatrix(Matrix::MakeTrans(150, 30));
 
@@ -3829,16 +3821,15 @@ TGFX_TEST(LayerTest, LayerCacheWithEffects) {
   child2->setLayerStyles({style});
   parent2->addChild(child2);
 
-  displayList->root()->addChild(parent2);
+  root->addChild(parent2);
 
-  // First render - cache should not be created yet
+  // First render - marks layers as cacheable
   displayList->render(surface.get());
-  auto root = displayList->root();
-  EXPECT_TRUE(root->contentCaches.empty());
+  EXPECT_TRUE(root->bitFields.cacheable);
 
-  // Second render - cache should be created
+  // Second render - cache should be created on root
   displayList->render(surface.get());
-  EXPECT_FALSE(root->contentCaches.empty());
+  EXPECT_TRUE(root->subTreeCache != nullptr);
 
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerCacheWithEffects"));
 }
@@ -3850,9 +3841,8 @@ TGFX_TEST(LayerTest, LayerCacheWithTransform) {
   auto surface = Surface::Make(context, 400, 400);
   auto displayList = std::make_unique<DisplayList>();
   displayList->setRenderMode(RenderMode::Direct);
-  displayList->setMaxCacheSize(2048);
+  displayList->setSubtreeCacheMaxSize(2048);
 
-  // Create a parent layer with child
   auto parent = Layer::Make();
   parent->setMatrix(Matrix::MakeTrans(5, 5));
 
@@ -3866,23 +3856,77 @@ TGFX_TEST(LayerTest, LayerCacheWithTransform) {
   auto root = displayList->root();
   root->addChild(parent);
 
-  // First render - cache should not be created yet
+  // First render - marks layer as cacheable
   displayList->render(surface.get());
-  EXPECT_TRUE(root->contentCaches.empty());
+  EXPECT_TRUE(root->bitFields.cacheable);
 
-  // Second render with zoom change - root's cache should be created
+  // Second render - cache should be created on root
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subTreeCache != nullptr);
+
+  // Change zoomScale - cache should still be valid (just uses different mipmap level)
   displayList->setZoomScale(1.5f);
   displayList->render(surface.get());
-  EXPECT_FALSE(root->contentCaches.empty());
+  EXPECT_TRUE(root->subTreeCache != nullptr);
 
-  // Change parent's own transform - root's cache should be invalidated
+  // Change parent's transform - should invalidate root's cache
   parent->setMatrix(Matrix::MakeTrans(10, 10));
-  displayList->render(surface.get());
-  // Cache is invalidated in this render, will be recreated in next render
-  EXPECT_TRUE(root->contentCaches.empty());
+  EXPECT_TRUE(root->subTreeCache == nullptr);
 
-  // Another render - cache should be recreated
+  // Render twice to recreate cache
   displayList->render(surface.get());
-  EXPECT_FALSE(root->contentCaches.empty());
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subTreeCache != nullptr);
+}
+
+TGFX_TEST(LayerTest, LayerCacheContentScale) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 400);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Direct);
+  displayList->setSubtreeCacheMaxSize(2048);
+
+  auto parent = Layer::Make();
+  parent->setMatrix(Matrix::MakeTrans(10, 10));
+
+  auto child = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeWH(100, 100));
+  child->setPath(path);
+  child->setFillStyle(SolidColor::Make(Color::Blue()));
+  parent->addChild(child);
+
+  auto root = displayList->root();
+  root->addChild(parent);
+
+  // First render - marks layer as cacheable
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->bitFields.cacheable);
+
+  // Second render - cache should be created on root
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subTreeCache != nullptr);
+
+  // Render at zoom 0.5 - cache should still exist
+  displayList->setZoomScale(0.5f);
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subTreeCache != nullptr);
+
+  // Render at zoom 2.0
+  displayList->setZoomScale(2.0f);
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subTreeCache != nullptr);
+
+  // Render at zoom 1.0 again
+  displayList->setZoomScale(1.0f);
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subTreeCache != nullptr);
+
+  // Render at extreme zoom out
+  displayList->setZoomScale(0.1f);
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subTreeCache != nullptr);
 }
 }  // namespace tgfx

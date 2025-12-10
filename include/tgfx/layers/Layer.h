@@ -676,7 +676,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   void drawContentOffscreen(const DrawArgs& args, Canvas* canvas, std::optional<Rect> clipBounds,
                             float contentScale, BlendMode blendMode, float alpha,
-                            const Matrix3D* transform, bool cacheContent, int cacheLevel = -1);
+                            const Matrix3D* transform, bool cacheContent);
 
   bool drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                      const Matrix3D* transform);
@@ -699,7 +699,9 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   void invalidateCache();
 
-  RasterizedCache* getContentCache(const DrawArgs& args, float contentScale);
+  RasterizedCache* getContentCache(const DrawArgs& args, float cacheScale);
+
+  float getMipmapCacheScale(const DrawArgs& args, float contentScale);
 
   struct {
     bool dirtyContent : 1;        // layer's content needs updating
@@ -732,7 +734,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::vector<std::shared_ptr<LayerStyle>> _layerStyles = {};
   float _rasterizationScale = 0.0f;
   std::unique_ptr<RasterizedCache> rasterizedContent;
-  std::unordered_map<int, std::shared_ptr<RasterizedCache>> contentCaches;
+  std::unique_ptr<RasterizedCache> subTreeCache;
   std::shared_ptr<LayerContent> layerContent = nullptr;
   Rect renderBounds = {};                       // in global coordinates
   Rect* contentBounds = nullptr;                //  in global coordinates

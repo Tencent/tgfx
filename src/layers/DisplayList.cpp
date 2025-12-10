@@ -265,6 +265,20 @@ void DisplayList::setBackgroundColor(const Color& color) {
   }
 }
 
+void DisplayList::setSubtreeCacheMaxSize(int maxSize) {
+  if (maxSize < 0) {
+    maxSize = 0;
+  }
+  _subtreeCacheMaxSize = maxSize;
+}
+
+void DisplayList::setMinSubTreeCacheSize(int minSize) {
+  if (minSize < 0) {
+    minSize = 0;
+  }
+  _minSubTreeCacheSize = minSize;
+}
+
 void DisplayList::showDirtyRegions(bool show) {
   if (_showDirtyRegions == show) {
     return;
@@ -974,8 +988,18 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   args.blurBackground =
       _root->createBackgroundContext(context, drawRect, viewMatrix, false, args.dstColorSpace);
   args.dstColorSpace = surface->colorSpace();
-  args.maxCacheSize = _maxCacheSize;
-  args.minMipmapLevel = _minMipmapLevel;
+  args.maxSubTreeCacheSize = _subtreeCacheMaxSize;
+  if (_subtreeCacheMaxSize > 0) {
+    if (_minSubTreeCacheSize > 0 && _minSubTreeCacheSize < _subtreeCacheMaxSize) {
+      args.maxCacheMipmapLevel = static_cast<int>(floorf(log2f(
+          static_cast<float>(_subtreeCacheMaxSize) / static_cast<float>(_minSubTreeCacheSize))));
+    } else {
+      // _minSubTreeCacheSize = 0 means no limit, use a large value
+      args.maxCacheMipmapLevel = INT_MAX;
+    }
+  } else {
+    args.maxCacheMipmapLevel = 0;
+  }
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
 }
 
