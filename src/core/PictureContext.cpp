@@ -44,30 +44,13 @@ void PictureContext::clear() {
   drawCount = 0;
 }
 
-std::shared_ptr<Picture> PictureContext::finishRecordingAsPicture(bool shrinkToFit) {
+std::shared_ptr<Picture> PictureContext::finishRecordingAsPicture() {
   if (records.empty()) {
     return nullptr;
   }
-  auto lastBlock = blockAllocator.currentBlock();
   auto blockBuffer = blockAllocator.release();
   if (blockBuffer == nullptr) {
     return nullptr;
-  }
-  if (shrinkToFit) {
-    records.shrink_to_fit();
-    auto oldBlockStart = reinterpret_cast<const uint8_t*>(lastBlock.first);
-    auto oldBlockEnd = oldBlockStart + lastBlock.second;
-    auto newBlock = blockBuffer->shrinkLastBlockTo(lastBlock.second);
-    if (newBlock != oldBlockStart) {
-      for (auto it = records.rbegin(); it != records.rend(); ++it) {
-        auto pointer = reinterpret_cast<const uint8_t*>(it->get());
-        if (pointer >= oldBlockStart && pointer < oldBlockEnd) {
-          it->remap(oldBlockStart, newBlock);
-        } else {
-          break;
-        }
-      }
-    }
   }
   std::shared_ptr<Picture> picture =
       std::shared_ptr<Picture>(new Picture(std::move(blockBuffer), std::move(records), drawCount));

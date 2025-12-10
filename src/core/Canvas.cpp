@@ -69,8 +69,8 @@ static Brush GetBrushForImage(const Paint* paint, const Image* image) {
   return brush;
 }
 
-Canvas::Canvas(DrawContext* drawContext, Surface* surface, bool optimizeMemoryForLayer)
-    : drawContext(drawContext), surface(surface), optimizeMemoryForLayer(optimizeMemoryForLayer) {
+Canvas::Canvas(DrawContext* drawContext, Surface* surface)
+    : drawContext(drawContext), surface(surface) {
   mcState = std::make_unique<MCState>();
 }
 
@@ -103,7 +103,7 @@ void Canvas::restore() {
   if (layer != nullptr) {
     drawContext = layer->drawContext;
     auto layerContext = reinterpret_cast<PictureContext*>(layer->layerContext.get());
-    auto picture = layerContext->finishRecordingAsPicture(optimizeMemoryForLayer);
+    auto picture = layerContext->finishRecordingAsPicture();
     if (picture != nullptr) {
       drawLayer(std::move(picture), {}, layer->layerPaint.getBrush(),
                 layer->layerPaint.getImageFilter());
