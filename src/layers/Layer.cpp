@@ -2134,15 +2134,8 @@ float Layer::getMipmapCacheScale(const DrawArgs& args, float contentScale) {
   }
 
   auto baseScale = static_cast<float>(args.maxSubTreeCacheSize) / maxBoundsSize;
-  if (baseScale < 1.0f) {
-    // Layer is larger than maxSubTreeCacheSize, should not use cache.
-    return 0.0f;
-  }
-  // Find the mipmap level where cacheScale >= contentScale.
-  // cacheScale = baseScale / 2^level, we want the smallest cacheScale that is >= contentScale.
   auto cacheScale = baseScale;
   int level = 0;
-  // Scale down while cacheScale/2 is still >= contentScale.
   while (level < args.maxCacheMipmapLevel) {
     auto nextScale = cacheScale * 0.5f;
     if (nextScale >= contentScale) {

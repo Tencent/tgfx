@@ -52,7 +52,7 @@ class RasterizedCache {
  private:
   uint32_t _contextID = 0;
   UniqueKey _uniqueKey = {};
-  std::unordered_map<int64_t, Matrix> _scaleMatrices = {};
+  ResourceKeyMap<Matrix> _scaleMatrices = {};
 
   UniqueKey MakeScaleKey(float scale) const;
 };

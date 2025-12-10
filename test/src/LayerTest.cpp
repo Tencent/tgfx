@@ -2449,23 +2449,23 @@ TGFX_TEST(LayerTest, RasterizedBackground) {
 
   displayList->render(surface.get());
   background->setMatrix(Matrix::MakeTrans(50, 50));
-  auto rasterizedContent = child->rasterizedContent.get();
+  auto rasterizedKey = child->rasterizedContent->uniqueKey();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent != child->rasterizedContent.get());
+  EXPECT_TRUE(rasterizedKey != child->rasterizedContent->uniqueKey());
 
   child->setMatrix(Matrix::MakeTrans(20, 20));
-  rasterizedContent = child->rasterizedContent.get();
+  rasterizedKey = child->rasterizedContent->uniqueKey();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent != child->rasterizedContent.get());
+  EXPECT_TRUE(rasterizedKey != child->rasterizedContent->uniqueKey());
 
   auto layerNextChild = ShapeLayer::Make();
   layerNextChild->setPath(path);
   layerNextChild->setMatrix(Matrix::MakeTrans(10, 10));
   layerNextChild->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 100, 0, 128)));
   parent->addChild(layerNextChild);
-  rasterizedContent = child->rasterizedContent.get();
+  rasterizedKey = child->rasterizedContent->uniqueKey();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent == child->rasterizedContent.get());
+  EXPECT_TRUE(rasterizedKey == child->rasterizedContent->uniqueKey());
 
   auto grandChild = ShapeLayer::Make();
   grandChild->setPath(path);
@@ -2480,52 +2480,52 @@ TGFX_TEST(LayerTest, RasterizedBackground) {
   nephew->setMatrix(Matrix::MakeTrans(10, 10));
   nephew->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 100, 0, 128)));
   layerNextChild->addChild(nephew);
-  rasterizedContent = child->rasterizedContent.get();
+  rasterizedKey = child->rasterizedContent->uniqueKey();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent == child->rasterizedContent.get());
+  EXPECT_TRUE(rasterizedKey == child->rasterizedContent->uniqueKey());
 
   parent->addChildAt(layerBeforeChild, parent->getChildIndex(child));
-  rasterizedContent = child->rasterizedContent.get();
+  rasterizedKey = child->rasterizedContent->uniqueKey();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent != child->rasterizedContent.get());
+  EXPECT_TRUE(rasterizedKey != child->rasterizedContent->uniqueKey());
 
   layerBeforeChild->addChildAt(backgroundNephew, 0);
-  rasterizedContent = child->rasterizedContent.get();
+  rasterizedKey = child->rasterizedContent->uniqueKey();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent != child->rasterizedContent.get());
+  EXPECT_TRUE(rasterizedKey != child->rasterizedContent->uniqueKey());
 
   layerBeforeChild->removeChildren();
-  rasterizedContent = child->rasterizedContent.get();
+  rasterizedKey = child->rasterizedContent->uniqueKey();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent != child->rasterizedContent.get());
+  EXPECT_TRUE(rasterizedKey != child->rasterizedContent->uniqueKey());
 
   layerBeforeChild->removeFromParent();
-  rasterizedContent = child->rasterizedContent.get();
+  rasterizedKey = child->rasterizedContent->uniqueKey();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent != child->rasterizedContent.get());
+  EXPECT_TRUE(rasterizedKey != child->rasterizedContent->uniqueKey());
 
   parent->setChildIndex(background, static_cast<int>(parent->children().size() - 1u));
-  rasterizedContent = child->rasterizedContent.get();
+  rasterizedKey = child->rasterizedContent->uniqueKey();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent != child->rasterizedContent.get());
+  EXPECT_TRUE(rasterizedKey != child->rasterizedContent->uniqueKey());
 
   parent->setChildIndex(background, 0);
-  rasterizedContent = child->rasterizedContent.get();
+  rasterizedKey = child->rasterizedContent->uniqueKey();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent != child->rasterizedContent.get());
+  EXPECT_TRUE(rasterizedKey != child->rasterizedContent->uniqueKey());
 
   parent->replaceChild(background, layerBeforeChild);
-  rasterizedContent = child->rasterizedContent.get();
+  rasterizedKey = child->rasterizedContent->uniqueKey();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent != child->rasterizedContent.get());
+  EXPECT_TRUE(rasterizedKey != child->rasterizedContent->uniqueKey());
 
   parent->replaceChild(layerNextChild, background);
-  rasterizedContent = child->rasterizedContent.get();
+  rasterizedKey = child->rasterizedContent->uniqueKey();
   displayList->render(surface.get());
-  // Ideally, rasterizedContent should remain unchanged here, but we need to call root->invalidateRect()
+  // Ideally, rasterizedKey should remain unchanged here, but we need to call root->invalidateRect()
   // whenever a layer is removed or its index changes. As a result, dirty rects are always treated
   // as background changes. This is a trade-off between performance and correctness.
-  EXPECT_TRUE(rasterizedContent != child->rasterizedContent.get());
+  EXPECT_TRUE(rasterizedKey != child->rasterizedContent->uniqueKey());
 }
 
 TGFX_TEST(LayerTest, AdaptiveDashEffect) {
@@ -3678,22 +3678,22 @@ TGFX_TEST(LayerTest, LayerCache) {
   displayList->setRenderMode(RenderMode::Direct);
 
   // Test default value is 0 (cache disabled)
-  EXPECT_EQ(displayList->subtreeCacheMaxSize(), 0);
+  EXPECT_EQ(displayList->subTreeCacheMaxSize(), 0);
 
   // Test setting subtreeCacheMaxSize
-  displayList->setSubtreeCacheMaxSize(2048);
-  EXPECT_EQ(displayList->subtreeCacheMaxSize(), 2048);
+  displayList->setSubTreeCacheMaxSize(2048);
+  EXPECT_EQ(displayList->subTreeCacheMaxSize(), 2048);
 
   // Test negative value is clamped to 0
-  displayList->setSubtreeCacheMaxSize(-1);
-  EXPECT_EQ(displayList->subtreeCacheMaxSize(), 0);
+  displayList->setSubTreeCacheMaxSize(-1);
+  EXPECT_EQ(displayList->subTreeCacheMaxSize(), 0);
 
   EXPECT_EQ(displayList->subTreeCacheMinSize(), 64);
   displayList->setSubTreeCacheMinSize(256);
   EXPECT_EQ(displayList->subTreeCacheMinSize(), 256);
 
   // Enable cache
-  displayList->setSubtreeCacheMaxSize(2048);
+  displayList->setSubTreeCacheMaxSize(2048);
 
   // Create a parent layer with child (cache requires children/styles/filters)
   auto parent = Layer::Make();
@@ -3733,7 +3733,7 @@ TGFX_TEST(LayerTest, LayerCacheInvalidation) {
   auto surface = Surface::Make(context, 400, 400);
   auto displayList = std::make_unique<DisplayList>();
   displayList->setRenderMode(RenderMode::Direct);
-  displayList->setSubtreeCacheMaxSize(2048);
+  displayList->setSubTreeCacheMaxSize(2048);
 
   auto parent = Layer::Make();
   parent->setMatrix(Matrix::MakeTrans(20, 20));
@@ -3794,7 +3794,7 @@ TGFX_TEST(LayerTest, LayerCacheWithEffects) {
   auto surface = Surface::Make(context, 1000, 1000);
   auto displayList = std::make_unique<DisplayList>();
   displayList->setRenderMode(RenderMode::Direct);
-  displayList->setSubtreeCacheMaxSize(2048);
+  displayList->setSubTreeCacheMaxSize(2048);
 
   // Parent with child that has filter
   auto parent1 = Layer::Make();
@@ -3845,7 +3845,7 @@ TGFX_TEST(LayerTest, LayerCacheWithTransform) {
   auto surface = Surface::Make(context, 400, 400);
   auto displayList = std::make_unique<DisplayList>();
   displayList->setRenderMode(RenderMode::Direct);
-  displayList->setSubtreeCacheMaxSize(2048);
+  displayList->setSubTreeCacheMaxSize(2048);
 
   auto parent = Layer::Make();
   parent->setMatrix(Matrix::MakeTrans(5, 5));
@@ -3890,7 +3890,7 @@ TGFX_TEST(LayerTest, LayerCacheContentScale) {
   auto surface = Surface::Make(context, 400, 400);
   auto displayList = std::make_unique<DisplayList>();
   displayList->setRenderMode(RenderMode::Direct);
-  displayList->setSubtreeCacheMaxSize(2048);
+  displayList->setSubTreeCacheMaxSize(2048);
 
   auto parent = Layer::Make();
   parent->setMatrix(Matrix::MakeTrans(10, 10));

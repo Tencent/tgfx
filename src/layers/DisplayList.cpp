@@ -265,7 +265,7 @@ void DisplayList::setBackgroundColor(const Color& color) {
   }
 }
 
-void DisplayList::setSubtreeCacheMaxSize(int maxSize) {
+void DisplayList::setSubTreeCacheMaxSize(int maxSize) {
   if (maxSize < 0) {
     maxSize = 0;
   }

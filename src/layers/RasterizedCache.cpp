@@ -65,8 +65,7 @@ std::shared_ptr<Image> RasterizedCache::addScaleCache(Context* context, float co
   proxyProvider->assignProxyUniqueKey(textureProxy, scaleUniqueKey);
   textureProxy->assignUniqueKey(scaleUniqueKey);
 
-  auto key = ScaleToKey(contentScale);
-  _scaleMatrices[key] = imageMatrix;
+  _scaleMatrices[scaleUniqueKey] = imageMatrix;
 
   return TextureImage::Wrap(std::move(textureProxy), image->colorSpace());
 }
@@ -75,18 +74,17 @@ bool RasterizedCache::valid(Context* context, float scale) {
   if (context == nullptr || context->uniqueID() != _contextID) {
     return false;
   }
-  auto scaleKey = ScaleToKey(scale);
-  if (_scaleMatrices.find(scaleKey) == _scaleMatrices.end()) {
+  auto scaleUniqueKey = MakeScaleKey(scale);
+  if (_scaleMatrices.find(scaleUniqueKey) == _scaleMatrices.end()) {
     return false;
   }
-  auto scaleUniqueKey = MakeScaleKey(scale);
   auto proxyProvider = context->proxyProvider();
   auto textureProxy = proxyProvider->findOrWrapTextureProxy(scaleUniqueKey);
-  auto valid = textureProxy != nullptr;
-  if (!valid) {
-    _scaleMatrices.erase(scaleKey);
+  auto isValid = textureProxy != nullptr;
+  if (!isValid) {
+    _scaleMatrices.erase(scaleUniqueKey);
   }
-  return valid;
+  return isValid;
 }
 
 void RasterizedCache::draw(Context* context, Canvas* canvas, float cacheScale, bool antiAlias,
@@ -99,14 +97,13 @@ void RasterizedCache::draw(Context* context, Canvas* canvas, float cacheScale, b
     return;
   }
 
-  auto key = ScaleToKey(cacheScale);
-  auto it = _scaleMatrices.find(key);
+  auto scaleUniqueKey = MakeScaleKey(cacheScale);
+  auto it = _scaleMatrices.find(scaleUniqueKey);
   if (it == _scaleMatrices.end()) {
     return;
   }
   auto matrixPtr = &it->second;
 
-  auto scaleUniqueKey = MakeScaleKey(cacheScale);
   auto proxyProvider = context->proxyProvider();
   auto proxy = proxyProvider->findOrWrapTextureProxy(scaleUniqueKey);
   if (proxy == nullptr) {

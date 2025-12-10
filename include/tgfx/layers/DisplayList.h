@@ -241,7 +241,7 @@ class DisplayList {
    * out to a critical level, static sub-trees are cached as images. Using a hierarchical (mipmap-style)
    * caching strategy reduces blur artifacts while providing significant performance improvements.
    */
-  int subtreeCacheMaxSize() const {
+  int subTreeCacheMaxSize() const {
     return _subTreeCacheMaxSize;
   }
 
@@ -249,7 +249,7 @@ class DisplayList {
    * Sets the maximum cache size (single edge) for sub-tree layer caching. Set to 0 to disable
    * sub-tree caching (default). The cache texture size will be limited to this maximum value.
    */
-  void setSubtreeCacheMaxSize(int maxSize);
+  void setSubTreeCacheMaxSize(int maxSize);
 
   /**
    * Returns the minimum cache size (single edge) for sub-tree layer caching.
