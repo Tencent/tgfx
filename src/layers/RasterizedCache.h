@@ -26,11 +26,6 @@
 namespace tgfx {
 class RasterizedCache {
  public:
-  /**
-   * Creates a RasterizedCache by rasterizing the image to a texture and caching it with an
-   * internally generated uniqueKey. The texture can be retrieved later using the uniqueKey.
-   * @param context The GPU context to use for creating the texture.
-   */
   static std::unique_ptr<RasterizedCache> MakeFrom(Context* context);
 
   explicit RasterizedCache(uint32_t contextID)
@@ -45,19 +40,19 @@ class RasterizedCache {
     return _uniqueKey;
   }
 
-  bool valid(Context* context, float scale) const;
+  bool valid(Context* context, float scale);
 
   std::shared_ptr<Image> addScaleCache(Context* context, float contentScale,
                                        std::shared_ptr<Image> image, const Matrix& imageMatrix);
 
-  void draw(Context* context, Canvas* canvas, bool antiAlias, float alpha,
+  void draw(Context* context, Canvas* canvas, float cacheScale, bool antiAlias, float alpha,
             const std::shared_ptr<MaskFilter>& mask, BlendMode blendMode = BlendMode::SrcOver,
             const Matrix3D* transform = nullptr) const;
 
  private:
   uint32_t _contextID = 0;
   UniqueKey _uniqueKey = {};
-  mutable std::unordered_map<int64_t, Matrix> _scaleMatrices = {};
+  std::unordered_map<int64_t, Matrix> _scaleMatrices = {};
 
   UniqueKey MakeScaleKey(float scale) const;
 };

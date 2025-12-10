@@ -19,16 +19,16 @@
 #include "tgfx/layers/Layer.h"
 #include <atomic>
 #include <cmath>
-#include "contents/LayerContent.h"
-#include "contents/RasterizedCache.h"
 #include "core/Matrix2D.h"
 #include "core/filters/Transform3DImageFilter.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "layers/ContourContext.h"
 #include "layers/DrawArgs.h"
+#include "layers/RasterizedCache.h"
 #include "layers/RegionTransformer.h"
 #include "layers/RootLayer.h"
+#include "layers/contents/LayerContent.h"
 #include "layers/filters/Transform3DFilter.h"
 #include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Surface.h"
@@ -1193,16 +1193,20 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   }
   std::shared_ptr<MaskFilter> maskFilter = nullptr;
   auto contentScale = canvas->getMatrix().getMaxScale();
-  auto cacheScale = getMipmapCacheScale(args, contentScale);
+  auto cacheScale = contentScale;
   RasterizedCache* cache = nullptr;
   if (auto rasterizedCache = getRasterizedCache(args, canvas->getMatrix())) {
     cache = rasterizedCache;
-  } else if (auto layerCache = getContentCache(args, cacheScale)) {
-    cache = layerCache;
-    // rasterizedCache contains the background layer styles, but layer cache does not because of
-    // different background logic.
-    if (transform != nullptr) {
-      drawBackgroundLayerStyles(args, canvas, alpha, *transform);
+    cacheScale = _rasterizationScale == 0 ? contentScale : _rasterizationScale;
+  } else {
+    cacheScale = getMipmapCacheScale(args, contentScale);
+    if (auto layerCache = getContentCache(args, cacheScale)) {
+      cache = layerCache;
+      // rasterizedCache contains the background layer styles, but layer cache does not because of
+      // different background logic.
+      if (transform != nullptr) {
+        drawBackgroundLayerStyles(args, canvas, alpha, *transform);
+      }
     }
   }
   if (cache) {
@@ -1214,11 +1218,11 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
         return true;
       }
     }
-    cache->draw(args.context, canvas, bitFields.allowsEdgeAntialiasing, alpha, maskFilter,
-                blendMode, transform);
+    cache->draw(args.context, canvas, cacheScale, bitFields.allowsEdgeAntialiasing, alpha,
+                maskFilter, blendMode, transform);
     if (args.blurBackground) {
       if (!hasBackgroundStyle()) {
-        cache->draw(args.context, args.blurBackground->getCanvas(),
+        cache->draw(args.context, args.blurBackground->getCanvas(), cacheScale,
                     bitFields.allowsEdgeAntialiasing, alpha, maskFilter, blendMode, transform);
       } else {
         auto backgroundArgs = args;
@@ -1269,15 +1273,15 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   if (!fullFill && args.blurBackground) {
     cacheArgs.blurBackground = cacheArgs.blurBackground->createSubContext(renderBounds, false);
   }
-  drawContentOffscreen(cacheArgs, canvas, std::nullopt, contentScale, blendMode, alpha, transform,
-                       true);
+  drawOffscreenWithParams(cacheArgs, canvas, std::nullopt, contentScale, blendMode, alpha,
+                          transform, true);
   return true;
 }
 
-void Layer::drawContentOffscreen(const DrawArgs& args, Canvas* canvas,
-                                 std::optional<Rect> clipBounds, float contentScale,
-                                 BlendMode blendMode, float alpha, const Matrix3D* transform,
-                                 bool cacheContent) {
+void Layer::drawOffscreenWithParams(const DrawArgs& args, Canvas* canvas,
+                                    std::optional<Rect> clipBounds, float contentScale,
+                                    BlendMode blendMode, float alpha, const Matrix3D* transform,
+                                    bool cacheContent) {
   if (transform != nullptr) {
     drawBackgroundLayerStyles(args, canvas, alpha, *transform);
   }
@@ -1325,7 +1329,8 @@ void Layer::drawContentOffscreen(const DrawArgs& args, Canvas* canvas,
       subTreeCache = RasterizedCache::MakeFrom(args.context);
     }
     if (subTreeCache) {
-      subTreeCache->addScaleCache(args.context, contentScale, image, imageMatrix);
+      image =
+          subTreeCache->addScaleCache(args.context, contentScale, std::move(image), imageMatrix);
     }
   }
 
@@ -1380,8 +1385,8 @@ void Layer::drawContentOffscreen(const DrawArgs& args, Canvas* canvas,
 void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                           const Matrix3D* transform) {
   auto clipBounds = GetClipBounds(args.blurBackground ? args.blurBackground->getCanvas() : canvas);
-  drawContentOffscreen(args, canvas, clipBounds, canvas->getMatrix().getMaxScale(), blendMode,
-                       alpha, transform, false);
+  drawOffscreenWithParams(args, canvas, clipBounds, canvas->getMatrix().getMaxScale(), blendMode,
+                          alpha, transform, false);
 }
 
 void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha) {
@@ -2129,25 +2134,29 @@ float Layer::getMipmapCacheScale(const DrawArgs& args, float contentScale) {
   }
 
   auto baseScale = static_cast<float>(args.maxSubTreeCacheSize) / maxBoundsSize;
+  if (baseScale < 1.0f) {
+    // Layer is larger than maxSubTreeCacheSize, should not use cache.
+    return 0.0f;
+  }
+  // Find the mipmap level where cacheScale >= contentScale.
+  // cacheScale = baseScale / 2^level, we want the smallest cacheScale that is >= contentScale.
   auto cacheScale = baseScale;
   int level = 0;
+  // Scale down while cacheScale/2 is still >= contentScale.
   while (level < args.maxCacheMipmapLevel) {
     auto nextScale = cacheScale * 0.5f;
     if (nextScale >= contentScale) {
       cacheScale = nextScale;
       level++;
     } else {
-      return cacheScale;
+      break;
     }
   }
   return cacheScale;
 }
 
 RasterizedCache* Layer::getContentCache(const DrawArgs& args, float cacheScale) {
-  if (cacheScale <= 0.0f || !args.context) {
-    return nullptr;
-  }
-  if (!subTreeCache || subTreeCache->contextID() != args.context->uniqueID()) {
+  if (!args.context || !subTreeCache || subTreeCache->contextID() != args.context->uniqueID()) {
     return nullptr;
   }
 

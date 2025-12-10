@@ -25,8 +25,8 @@
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "layers/ContourContext.h"
 #include "layers/DrawArgs.h"
+#include "layers/RasterizedCache.h"
 #include "layers/RootLayer.h"
-#include "layers/contents/RasterizedCache.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Gradient.h"
@@ -3720,6 +3720,11 @@ TGFX_TEST(LayerTest, LayerCache) {
   // Second render - cache should be created on root (first layer with children)
   displayList->render(surface.get());
   EXPECT_TRUE(root->subTreeCache != nullptr);
+  // root bounds width/height = 50, maxBoundsSize = 50
+  // baseScale = 2048/50 = 40.96, maxCacheMipmapLevel = log2(2048/256) = 3
+  // After 3 iterations: cacheScale = 40.96 / 8 = 5.12
+  float expectedScale = 2048.0f / 50.0f / 8.0f;  // baseScale / 2^3
+  EXPECT_TRUE(root->subTreeCache->valid(context, expectedScale));
 }
 
 TGFX_TEST(LayerTest, LayerCacheInvalidation) {

@@ -71,11 +71,12 @@ std::shared_ptr<Image> RasterizedCache::addScaleCache(Context* context, float co
   return TextureImage::Wrap(std::move(textureProxy), image->colorSpace());
 }
 
-bool RasterizedCache::valid(Context* context, float scale) const {
+bool RasterizedCache::valid(Context* context, float scale) {
   if (context == nullptr || context->uniqueID() != _contextID) {
     return false;
   }
-  if (_scaleMatrices.empty()) {
+  auto scaleKey = ScaleToKey(scale);
+  if (_scaleMatrices.find(scaleKey) == _scaleMatrices.end()) {
     return false;
   }
   auto scaleUniqueKey = MakeScaleKey(scale);
@@ -83,14 +84,14 @@ bool RasterizedCache::valid(Context* context, float scale) const {
   auto textureProxy = proxyProvider->findOrWrapTextureProxy(scaleUniqueKey);
   auto valid = textureProxy != nullptr;
   if (!valid) {
-    _scaleMatrices.erase(ScaleToKey(scale));
+    _scaleMatrices.erase(scaleKey);
   }
   return valid;
 }
 
-void RasterizedCache::draw(Context* context, Canvas* canvas, bool antiAlias, float alpha,
-                           const std::shared_ptr<MaskFilter>& mask, BlendMode blendMode,
-                           const Matrix3D* transform) const {
+void RasterizedCache::draw(Context* context, Canvas* canvas, float cacheScale, bool antiAlias,
+                           float alpha, const std::shared_ptr<MaskFilter>& mask,
+                           BlendMode blendMode, const Matrix3D* transform) const {
   if (context == nullptr || canvas == nullptr) {
     return;
   }
@@ -98,15 +99,14 @@ void RasterizedCache::draw(Context* context, Canvas* canvas, bool antiAlias, flo
     return;
   }
 
-  float drawScale = canvas->getMatrix().getMaxScale();
-  auto key = ScaleToKey(drawScale);
+  auto key = ScaleToKey(cacheScale);
   auto it = _scaleMatrices.find(key);
   if (it == _scaleMatrices.end()) {
     return;
   }
   auto matrixPtr = &it->second;
 
-  auto scaleUniqueKey = MakeScaleKey(drawScale);
+  auto scaleUniqueKey = MakeScaleKey(cacheScale);
   auto proxyProvider = context->proxyProvider();
   auto proxy = proxyProvider->findOrWrapTextureProxy(scaleUniqueKey);
   if (proxy == nullptr) {

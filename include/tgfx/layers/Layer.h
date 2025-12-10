@@ -20,7 +20,6 @@
 
 #include <memory>
 #include <optional>
-#include <unordered_map>
 #include <unordered_set>
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Canvas.h"
@@ -674,9 +673,9 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   bool shouldPassThroughBackground(BlendMode blendMode, const Matrix3D* transform) const;
 
-  void drawContentOffscreen(const DrawArgs& args, Canvas* canvas, std::optional<Rect> clipBounds,
-                            float contentScale, BlendMode blendMode, float alpha,
-                            const Matrix3D* transform, bool cacheContent);
+  void drawOffscreenWithParams(const DrawArgs& args, Canvas* canvas, std::optional<Rect> clipBounds,
+                               float contentScale, BlendMode blendMode, float alpha,
+                               const Matrix3D* transform, bool cacheContent);
 
   bool drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                      const Matrix3D* transform);
