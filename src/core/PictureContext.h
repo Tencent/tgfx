@@ -35,12 +35,8 @@ class PictureContext : public DrawContext {
    * Signals that the caller is done recording and returns a Picture object that captures all the
    * drawing commands made to the context. Returns nullptr if no recording is active or no commands
    * were recorded.
-   * @param shrinkToFit If true, optimizes the Picture to use minimal memory, which may involve
-   * copying and a slight overhead. This is recommended for long-lived Pictures. If false, memory is
-   * transferred directly for better performance, making it ideal for short-lived Pictures. The
-   * default value is true.
    */
-  std::shared_ptr<Picture> finishRecordingAsPicture(bool shrinkToFit = true);
+  std::shared_ptr<Picture> finishRecordingAsPicture();
 
   void drawFill(const Brush& brush) override;
 
