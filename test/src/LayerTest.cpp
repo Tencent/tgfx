@@ -3688,10 +3688,9 @@ TGFX_TEST(LayerTest, LayerCache) {
   displayList->setSubtreeCacheMaxSize(-1);
   EXPECT_EQ(displayList->subtreeCacheMaxSize(), 0);
 
-  // Test minSubTreeCacheSize default (0 means no limit)
-  EXPECT_EQ(displayList->minSubTreeCacheSize(), 0);
-  displayList->setMinSubTreeCacheSize(256);
-  EXPECT_EQ(displayList->minSubTreeCacheSize(), 256);
+  EXPECT_EQ(displayList->subTreeCacheMinSize(), 64);
+  displayList->setSubTreeCacheMinSize(256);
+  EXPECT_EQ(displayList->subTreeCacheMinSize(), 256);
 
   // Enable cache
   displayList->setSubtreeCacheMaxSize(2048);

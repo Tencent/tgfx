@@ -242,7 +242,7 @@ class DisplayList {
    * caching strategy reduces blur artifacts while providing significant performance improvements.
    */
   int subtreeCacheMaxSize() const {
-    return _subtreeCacheMaxSize;
+    return _subTreeCacheMaxSize;
   }
 
   /**
@@ -256,15 +256,15 @@ class DisplayList {
    * The cache mipmap level is calculated based on the ratio between subtreeCacheMaxSize and
    * minSubTreeCacheSize. The default value is 0.
    */
-  int minSubTreeCacheSize() const {
-    return _minSubTreeCacheSize;
+  int subTreeCacheMinSize() const {
+    return _subTreeCacheMinSize;
   }
 
   /**
    * Sets the minimum cache size (single edge) for sub-tree layer caching.
    * Together with subtreeCacheMaxSize, defines the hierarchical cache levels used during zoom-out.
    */
-  void setMinSubTreeCacheSize(int minSize);
+  void setSubTreeCacheMinSize(int minSize);
 
   /**
    * Sets whether to show dirty regions during rendering. When enabled, the dirty regions will be
@@ -297,8 +297,8 @@ class DisplayList {
   int _maxTileCount = 0;
   bool _allowZoomBlur = false;
   int _maxTilesRefinedPerFrame = 5;
-  int _subtreeCacheMaxSize = 0;
-  int _minSubTreeCacheSize = 0;
+  int _subTreeCacheMaxSize = 0;
+  int _subTreeCacheMinSize = 64;
   bool _showDirtyRegions = false;
   bool _hasContentChanged = false;
   bool hasZoomBlurTiles = false;

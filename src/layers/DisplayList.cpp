@@ -269,14 +269,14 @@ void DisplayList::setSubtreeCacheMaxSize(int maxSize) {
   if (maxSize < 0) {
     maxSize = 0;
   }
-  _subtreeCacheMaxSize = maxSize;
+  _subTreeCacheMaxSize = maxSize;
 }
 
-void DisplayList::setMinSubTreeCacheSize(int minSize) {
-  if (minSize < 0) {
-    minSize = 0;
+void DisplayList::setSubTreeCacheMinSize(int minSize) {
+  if (minSize < 1) {
+    minSize = 1;
   }
-  _minSubTreeCacheSize = minSize;
+  _subTreeCacheMinSize = minSize;
 }
 
 void DisplayList::showDirtyRegions(bool show) {
@@ -988,15 +988,10 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   args.blurBackground =
       _root->createBackgroundContext(context, drawRect, viewMatrix, false, args.dstColorSpace);
   args.dstColorSpace = surface->colorSpace();
-  args.maxSubTreeCacheSize = _subtreeCacheMaxSize;
-  if (_subtreeCacheMaxSize > 0) {
-    if (_minSubTreeCacheSize > 0 && _minSubTreeCacheSize < _subtreeCacheMaxSize) {
-      args.maxCacheMipmapLevel = static_cast<int>(floorf(log2f(
-          static_cast<float>(_subtreeCacheMaxSize) / static_cast<float>(_minSubTreeCacheSize))));
-    } else {
-      // _minSubTreeCacheSize = 0 means no limit, use a large value
-      args.maxCacheMipmapLevel = INT_MAX;
-    }
+  args.maxSubTreeCacheSize = _subTreeCacheMaxSize;
+  if (_subTreeCacheMaxSize > 0 && _subTreeCacheMinSize < _subTreeCacheMaxSize) {
+    args.maxCacheMipmapLevel = static_cast<int>(floorf(log2f(
+        static_cast<float>(_subTreeCacheMaxSize) / static_cast<float>(_subTreeCacheMinSize))));
   } else {
     args.maxCacheMipmapLevel = 0;
   }
