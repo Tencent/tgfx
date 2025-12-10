@@ -35,10 +35,8 @@ class TGFXBaseView {
 
   void updateSize(float devicePixelRatio);
 
-  // Update DisplayList properties when parameters change (called from JS events)
   void updateDrawParams(int drawIndex, float zoom, float offsetX, float offsetY);
 
-  // Only handles rendering/submitting, no DisplayList updates
   bool draw();
 
   void onWheelEvent();
@@ -48,24 +46,20 @@ class TGFXBaseView {
   std::shared_ptr<hello2d::AppHost> appHost = nullptr;
 
  private:
-  // Recalculate and apply zoomScale/contentOffset based on current surface size
   void applyTransform();
 
   std::string canvasID = "";
   std::shared_ptr<tgfx::Window> window = nullptr;
-  tgfx::DisplayList displayList = {};  // Platform layer owns DisplayList
+  tgfx::DisplayList displayList = {};
   std::shared_ptr<tgfx::Layer> contentLayer = nullptr;
   int lastDrawIndex = -1;
   std::unique_ptr<tgfx::Recording> lastRecording = nullptr;
-  // Cached surface size for calculating base scale without locking device
   int lastSurfaceWidth = 0;
   int lastSurfaceHeight = 0;
-  // Cached draw parameters for recalculating transform when size changes
+  bool sizeInvalidated = false;
   float currentZoom = 1.0f;
   float currentOffsetX = 0.0f;
   float currentOffsetY = 0.0f;
-  // Flag to force render when size changes
-  bool sizeInvalidated = false;
 };
 
 }  // namespace hello2d

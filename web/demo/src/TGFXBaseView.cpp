@@ -26,27 +26,28 @@ namespace hello2d {
 
 TGFXBaseView::TGFXBaseView(const std::string& canvasID) : canvasID(canvasID) {
   appHost = std::make_shared<hello2d::AppHost>();
-  // Initialize DisplayList with tiled rendering mode
   displayList.setRenderMode(tgfx::RenderMode::Tiled);
   displayList.setAllowZoomBlur(true);
   displayList.setMaxTileCount(512);
 }
 
 void TGFXBaseView::updateSize(float devicePixelRatio) {
-  if (!canvasID.empty()) {
-    int width = 0;
-    int height = 0;
-    emscripten_get_canvas_element_size(canvasID.c_str(), &width, &height);
-    if (window && (width > 0 && height > 0)) {
-      window->invalidSize();
-      // Clear lastRecording when size changes, as it was created for the old surface size
-      lastRecording = nullptr;
-      // Reset cached surface size to force recalculation in draw()
-      lastSurfaceWidth = 0;
-      lastSurfaceHeight = 0;
-      // Mark size as invalidated to force render next frame
-      sizeInvalidated = true;
-    }
+  if (canvasID.empty()) {
+    return;
+  }
+  int width = 0;
+  int height = 0;
+  emscripten_get_canvas_element_size(canvasID.c_str(), &width, &height);
+  if (width <= 0 || height <= 0) {
+    return;
+  }
+  lastSurfaceWidth = static_cast<int>(width * devicePixelRatio);
+  lastSurfaceHeight = static_cast<int>(height * devicePixelRatio);
+  applyTransform();
+  if (window) {
+    window->invalidSize();
+    lastRecording = nullptr;
+    sizeInvalidated = true;
   }
 }
 
@@ -104,7 +105,6 @@ void TGFXBaseView::updateDrawParams(int drawIndex, float zoom, float offsetX, fl
 }
 
 bool TGFXBaseView::draw() {
-  // Initialize window if needed
   if (window == nullptr) {
     window = tgfx::WebGLWindow::MakeFrom(canvasID);
   }
@@ -112,14 +112,10 @@ bool TGFXBaseView::draw() {
     return false;
   }
 
-  // Check if content has changed at the VERY BEGINNING, before locking device
-  // If no content change AND no pending lastRecording -> skip everything
   bool needsRender = displayList.hasContentChanged() || sizeInvalidated;
   if (!needsRender && lastRecording == nullptr) {
     return false;
   }
-
-  // ========== Now lock device for rendering/submitting ==========
 
   auto device = window->getDevice();
   auto context = device->lockContext();
@@ -133,34 +129,15 @@ bool TGFXBaseView::draw() {
     return false;
   }
 
-  // Update cached surface size and recalculate transform if size changed
-  int newSurfaceWidth = surface->width();
-  int newSurfaceHeight = surface->height();
-  bool sizeChanged = (newSurfaceWidth != lastSurfaceWidth || newSurfaceHeight != lastSurfaceHeight);
-  if (sizeChanged) {
-    lastSurfaceWidth = newSurfaceWidth;
-    lastSurfaceHeight = newSurfaceHeight;
-    // Recalculate transform with new surface size
-    applyTransform();
-    needsRender = true;
-  }
-
-  // Clear sizeInvalidated flag now that we've handled size changes
-  sizeInvalidated = false;
-
-  // Track if we submitted anything this frame
-  bool didSubmit = false;
-
-  // Case 1: No content change BUT have pending lastRecording -> only submit lastRecording
   if (!needsRender) {
     context->submit(std::move(lastRecording));
     window->present(context);
-    didSubmit = true;
     device->unlock();
-    return didSubmit;
+    return false;
   }
 
-  // Case 2: Content changed -> render new content
+  sizeInvalidated = false;
+
   auto canvas = surface->getCanvas();
   canvas->clear();
   int width = 0;
@@ -169,25 +146,20 @@ bool TGFXBaseView::draw() {
   auto density = static_cast<float>(surface->width()) / static_cast<float>(width);
   DrawBackground(canvas, surface->width(), surface->height(), density);
 
-  // Render DisplayList
   displayList.render(surface.get(), false);
 
-  // Delayed one-frame present mode
   auto recording = context->flush();
   if (lastRecording) {
     context->submit(std::move(lastRecording));
     window->present(context);
-    didSubmit = true;
     lastRecording = std::move(recording);
   } else if (recording) {
     context->submit(std::move(recording));
     window->present(context);
-    didSubmit = true;
   }
 
   device->unlock();
-
-  return didSubmit || lastRecording != nullptr;
+  return false;
 }
 
 }  // namespace hello2d

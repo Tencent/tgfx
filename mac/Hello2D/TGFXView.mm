@@ -37,14 +37,9 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   std::shared_ptr<tgfx::Layer> contentLayer;
   int lastDrawIndex;
   std::unique_ptr<tgfx::Recording> lastRecording;
-  // Cached surface size for calculating base scale without locking device
   int lastSurfaceWidth;
   int lastSurfaceHeight;
-  // Flag to force render when size changes
   bool sizeInvalidated;
-  // Last applied zoom/offset to DisplayList
-  float lastZoomScale;
-  CGPoint lastContentOffset;
 }
 
 - (BOOL)acceptsFirstResponder {
@@ -84,19 +79,18 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
     lastSurfaceWidth = 0;
     lastSurfaceHeight = 0;
     sizeInvalidated = false;
-    lastZoomScale = 1.0f;
-    lastContentOffset = {0, 0};
     displayList.setRenderMode(tgfx::RenderMode::Tiled);
     displayList.setAllowZoomBlur(true);
     displayList.setMaxTileCount(512);
   }
+  CGSize backingSize = [self convertSizeToBacking:self.bounds.size];
+  lastSurfaceWidth = static_cast<int>(backingSize.width);
+  lastSurfaceHeight = static_cast<int>(backingSize.height);
+  [self applyTransform];
   if (tgfxWindow != nullptr) {
     tgfxWindow->invalidSize();
-    // Clear lastRecording when size changes, as it was created for the old surface size
     lastRecording = nullptr;
-    // Mark size as invalidated to force render next frame
     sizeInvalidated = true;
-    // Start display link to trigger redraw after size change
     [self startDisplayLink];
   }
 }
@@ -137,6 +131,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   }
 
   [self updateSize];
+  [self updateDisplayList];
 }
 
 - (void)startDisplayLink {
@@ -177,19 +172,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   }
 }
 
-- (BOOL)draw {
-  if (self.window == nil) {
-    return false;
-  }
-  if (tgfxWindow == nullptr) {
-    tgfxWindow = tgfx::CGLWindow::MakeFrom(self);
-  }
-  if (tgfxWindow == nullptr) {
-    return false;
-  }
-
-  // ========== All DisplayList updates BEFORE locking device ==========
-
+- (void)updateDisplayList {
   auto numBuilders = hello2d::LayerBuilder::Count();
   auto index = (self.drawIndex % numBuilders);
   if (index != lastDrawIndex || !contentLayer) {
@@ -204,37 +187,40 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
     lastDrawIndex = index;
   }
 
-  // Calculate base scale and offset using cached surface size
+  [self applyTransform];
+}
+
+- (void)applyTransform {
   if (lastSurfaceWidth > 0 && lastSurfaceHeight > 0) {
-    bool zoomChanged = (self.zoomScale != lastZoomScale);
-    bool offsetChanged = (self.contentOffset.x != lastContentOffset.x ||
-                          self.contentOffset.y != lastContentOffset.y);
-    if (zoomChanged || offsetChanged) {
-      static constexpr float DESIGN_SIZE = 720.0f;
-      auto scaleX = static_cast<float>(lastSurfaceWidth) / DESIGN_SIZE;
-      auto scaleY = static_cast<float>(lastSurfaceHeight) / DESIGN_SIZE;
-      auto baseScale = std::min(scaleX, scaleY);
-      auto scaledSize = DESIGN_SIZE * baseScale;
-      auto baseOffsetX = (static_cast<float>(lastSurfaceWidth) - scaledSize) * 0.5f;
-      auto baseOffsetY = (static_cast<float>(lastSurfaceHeight) - scaledSize) * 0.5f;
+    static constexpr float DESIGN_SIZE = 720.0f;
+    auto scaleX = static_cast<float>(lastSurfaceWidth) / DESIGN_SIZE;
+    auto scaleY = static_cast<float>(lastSurfaceHeight) / DESIGN_SIZE;
+    auto baseScale = std::min(scaleX, scaleY);
+    auto scaledSize = DESIGN_SIZE * baseScale;
+    auto baseOffsetX = (static_cast<float>(lastSurfaceWidth) - scaledSize) * 0.5f;
+    auto baseOffsetY = (static_cast<float>(lastSurfaceHeight) - scaledSize) * 0.5f;
 
-      displayList.setZoomScale(self.zoomScale * baseScale);
-      displayList.setContentOffset(baseOffsetX + static_cast<float>(self.contentOffset.x),
-                                   baseOffsetY + static_cast<float>(self.contentOffset.y));
-      lastZoomScale = self.zoomScale;
-      lastContentOffset = self.contentOffset;
-    }
+    displayList.setZoomScale(self.zoomScale * baseScale);
+    displayList.setContentOffset(baseOffsetX + static_cast<float>(self.contentOffset.x),
+                                 baseOffsetY + static_cast<float>(self.contentOffset.y));
   }
+}
 
-  // Check if content has changed AFTER setting all properties, BEFORE locking device
-  bool needsRender = displayList.hasContentChanged() || sizeInvalidated;
-
-  // If no content change AND no pending lastRecording -> skip everything, don't lock device
-  if (!needsRender && lastRecording == nullptr) {
+- (BOOL)draw {
+  if (self.window == nil) {
+    return false;
+  }
+  if (tgfxWindow == nullptr) {
+    tgfxWindow = tgfx::CGLWindow::MakeFrom(self);
+  }
+  if (tgfxWindow == nullptr) {
     return false;
   }
 
-  // ========== Now lock device for rendering/submitting ==========
+  bool needsRender = displayList.hasContentChanged() || sizeInvalidated;
+  if (!needsRender && lastRecording == nullptr) {
+    return false;
+  }
 
   auto device = tgfxWindow->getDevice();
   auto context = device->lockContext();
@@ -248,77 +234,40 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
     return false;
   }
 
-  // Update cached surface size for next frame's calculations
-  int newSurfaceWidth = surface->width();
-  int newSurfaceHeight = surface->height();
-  bool sizeChanged = (newSurfaceWidth != lastSurfaceWidth || newSurfaceHeight != lastSurfaceHeight);
-  lastSurfaceWidth = newSurfaceWidth;
-  lastSurfaceHeight = newSurfaceHeight;
-
-  // If surface size just changed, update zoomScale/contentOffset now
-  if (sizeChanged && lastSurfaceWidth > 0 && lastSurfaceHeight > 0) {
-    static constexpr float DESIGN_SIZE = 720.0f;
-    auto scaleX = static_cast<float>(lastSurfaceWidth) / DESIGN_SIZE;
-    auto scaleY = static_cast<float>(lastSurfaceHeight) / DESIGN_SIZE;
-    auto baseScale = std::min(scaleX, scaleY);
-    auto scaledSize = DESIGN_SIZE * baseScale;
-    auto baseOffsetX = (static_cast<float>(lastSurfaceWidth) - scaledSize) * 0.5f;
-    auto baseOffsetY = (static_cast<float>(lastSurfaceHeight) - scaledSize) * 0.5f;
-    displayList.setZoomScale(self.zoomScale * baseScale);
-    displayList.setContentOffset(baseOffsetX + static_cast<float>(self.contentOffset.x),
-                                 baseOffsetY + static_cast<float>(self.contentOffset.y));
-    lastZoomScale = self.zoomScale;
-    lastContentOffset = self.contentOffset;
-    needsRender = true;
-  }
-
-  // Clear sizeInvalidated flag
-  sizeInvalidated = false;
-
-  // Track if we submitted anything this frame
-  bool didSubmit = false;
-
-  // Case 1: No content change BUT have pending lastRecording -> only submit lastRecording
   if (!needsRender) {
     context->submit(std::move(lastRecording));
     tgfxWindow->present(context);
-    didSubmit = true;
     device->unlock();
-    return didSubmit;
+    return false;
   }
 
-  // Case 2: Content changed -> render new content
+  sizeInvalidated = false;
+
   auto canvas = surface->getCanvas();
   canvas->clear();
   hello2d::DrawBackground(canvas, surface->width(), surface->height(), self.layer.contentsScale);
 
   displayList.render(surface.get(), false);
 
-  // Delayed one-frame present mode
   auto recording = context->flush();
   if (lastRecording) {
-    // Normal delayed mode: submit last frame, save current for next
     context->submit(std::move(lastRecording));
     tgfxWindow->present(context);
-    didSubmit = true;
     lastRecording = std::move(recording);
   } else if (recording) {
-    // No lastRecording (first frame or after size change): submit current directly
     context->submit(std::move(recording));
     tgfxWindow->present(context);
-    didSubmit = true;
   }
 
   device->unlock();
-
-  // Return true if we submitted or have pending recording
-  return didSubmit || lastRecording != nullptr;
+  return false;
 }
 
 - (void)mouseDown:(NSEvent*)event {
   self.drawIndex++;
   self.zoomScale = 1.0f;
   self.contentOffset = CGPointZero;
+  [self updateDisplayList];
   [self startDisplayLink];
 }
 
@@ -348,6 +297,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
     }
     self.contentOffset = offset;
   }
+  [self updateDisplayList];
   [self startDisplayLink];
 }
 

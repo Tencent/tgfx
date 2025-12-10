@@ -50,18 +50,13 @@ class TGFXWindow {
   double lastZoomArgument = 0.0;
   float zoomScale = 1.0f;
   tgfx::Point contentOffset = {0.0f, 0.0f};
-  // Last applied zoom/offset to DisplayList
-  float lastAppliedZoomScale = 1.0f;
-  tgfx::Point lastAppliedContentOffset = {0.0f, 0.0f};
   std::shared_ptr<tgfx::WGLWindow> tgfxWindow = nullptr;
   std::shared_ptr<hello2d::AppHost> appHost = nullptr;
   tgfx::DisplayList displayList;
   std::shared_ptr<tgfx::Layer> contentLayer = nullptr;
   std::unique_ptr<tgfx::Recording> lastRecording = nullptr;
-  // Cached surface size for calculating base scale without locking device
   int lastSurfaceWidth = 0;
   int lastSurfaceHeight = 0;
-  // Flag to force render when size changes
   bool sizeInvalidated = false;
 
   static WNDCLASS RegisterWindowClass();
@@ -73,6 +68,8 @@ class TGFXWindow {
   void centerAndShow();
   float getPixelRatio();
   void createAppHost();
+  void updateDisplayList();
+  void applyTransform();
   bool draw();
 
   bool isDrawing = true;

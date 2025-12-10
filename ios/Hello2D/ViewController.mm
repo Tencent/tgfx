@@ -91,6 +91,9 @@ static const float MaxZoom = 1000.0f;
 
 - (void)viewDidLayoutSubviews {
   [super viewDidLayoutSubviews];
+  [self.tgfxView updateDisplayListWithDrawIndex:self.drawIndex
+                                           zoom:self.zoomScale
+                                         offset:self.contentOffset];
   [self requestDraw];
 }
 
@@ -104,6 +107,9 @@ static const float MaxZoom = 1000.0f;
   self.currentZoom = 1.0f;
   self.currentPanOffset = CGPointZero;
   self.currentPinchOffset = CGPointZero;
+  [self.tgfxView updateDisplayListWithDrawIndex:self.drawIndex
+                                           zoom:self.zoomScale
+                                         offset:self.contentOffset];
   [self requestDraw];
 }
 
@@ -123,6 +129,9 @@ static const float MaxZoom = 1000.0f;
                   self.contentOffset.y +
                       (translation.y - self.currentPanOffset.y) * self.tgfxView.contentScaleFactor);
   self.currentPanOffset = translation;
+  [self.tgfxView updateDisplayListWithDrawIndex:self.drawIndex
+                                           zoom:self.zoomScale
+                                         offset:self.contentOffset];
   [self requestDraw];
 }
 
@@ -151,6 +160,9 @@ static const float MaxZoom = 1000.0f;
   offset.y = (self.currentPinchOffset.y - self.pinchCenter.y) * scale / self.currentZoom + center.y;
   self.zoomScale = scale;
   self.contentOffset = offset;
+  [self.tgfxView updateDisplayListWithDrawIndex:self.drawIndex
+                                           zoom:self.zoomScale
+                                         offset:self.contentOffset];
   [self requestDraw];
 }
 

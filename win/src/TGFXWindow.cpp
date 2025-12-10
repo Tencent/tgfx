@@ -59,6 +59,7 @@ bool TGFXWindow::open() {
   centerAndShow();
   ShowWindow(windowHandle, SW_SHOW);
   UpdateWindow(windowHandle);
+  updateDisplayList();
   ::InvalidateRect(windowHandle, nullptr, FALSE);
   return true;
 }
@@ -98,16 +99,21 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
       destroy();
       PostQuitMessage(0);
       break;
-    case WM_SIZE:
+    case WM_SIZE: {
+      RECT rect;
+      GetClientRect(windowHandle, &rect);
+      auto pixelRatio = getPixelRatio();
+      lastSurfaceWidth = static_cast<int>((rect.right - rect.left) * pixelRatio);
+      lastSurfaceHeight = static_cast<int>((rect.bottom - rect.top) * pixelRatio);
+      applyTransform();
       if (tgfxWindow) {
         tgfxWindow->invalidSize();
-        // Clear lastRecording when size changes, as it was created for the old surface size
         lastRecording = nullptr;
-        // Mark size as invalidated to force render next frame
         sizeInvalidated = true;
       }
       ::InvalidateRect(windowHandle, nullptr, FALSE);
       break;
+    }
     case WM_PAINT: {
       PAINTSTRUCT ps;
       BeginPaint(hwnd, &ps);
@@ -126,6 +132,7 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
         currentDrawerIndex = (currentDrawerIndex + 1) % count;
         zoomScale = 1.0f;
         contentOffset = {0.0f, 0.0f};
+        updateDisplayList();
         ::InvalidateRect(windowHandle, nullptr, FALSE);
       }
       break;
@@ -151,6 +158,7 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
           contentOffset.y -= wheelDelta;
         }
       }
+      updateDisplayList();
       ::InvalidateRect(windowHandle, nullptr, FALSE);
       break;
     }
@@ -177,6 +185,7 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
           lastZoomArgument = 0.0;
         }
         CloseGestureInfoHandle(reinterpret_cast<HGESTUREINFO>(lparam));
+        updateDisplayList();
         ::InvalidateRect(windowHandle, nullptr, FALSE);
       }
       break;
@@ -288,6 +297,39 @@ void TGFXWindow::createAppHost() {
   appHost->addTypeface("emoji", typeface);
 }
 
+void TGFXWindow::updateDisplayList() {
+  int count = hello2d::LayerBuilder::Count();
+  int index = (count > 0) ? (currentDrawerIndex % count) : 0;
+  if (index != lastDrawIndex || !contentLayer) {
+    auto builder = hello2d::LayerBuilder::GetByIndex(index);
+    if (builder) {
+      contentLayer = builder->buildLayerTree(appHost.get());
+      if (contentLayer) {
+        displayList.root()->removeChildren();
+        displayList.root()->addChild(contentLayer);
+      }
+    }
+    lastDrawIndex = index;
+  }
+
+  applyTransform();
+}
+
+void TGFXWindow::applyTransform() {
+  if (lastSurfaceWidth > 0 && lastSurfaceHeight > 0) {
+    static constexpr float DESIGN_SIZE = 720.0f;
+    auto scaleX = static_cast<float>(lastSurfaceWidth) / DESIGN_SIZE;
+    auto scaleY = static_cast<float>(lastSurfaceHeight) / DESIGN_SIZE;
+    auto baseScale = std::min(scaleX, scaleY);
+    auto scaledSize = DESIGN_SIZE * baseScale;
+    auto baseOffsetX = (static_cast<float>(lastSurfaceWidth) - scaledSize) * 0.5f;
+    auto baseOffsetY = (static_cast<float>(lastSurfaceHeight) - scaledSize) * 0.5f;
+
+    displayList.setZoomScale(zoomScale * baseScale);
+    displayList.setContentOffset(baseOffsetX + contentOffset.x, baseOffsetY + contentOffset.y);
+  }
+}
+
 bool TGFXWindow::draw() {
   if (!tgfxWindow) {
     tgfxWindow = tgfx::WGLWindow::MakeFrom(windowHandle);
@@ -304,57 +346,10 @@ bool TGFXWindow::draw() {
   }
   auto pixelRatio = getPixelRatio();
 
-  // ========== All DisplayList updates BEFORE locking device ==========
-
-  int count = hello2d::LayerBuilder::Count();
-  int index = (count > 0) ? (currentDrawerIndex % count) : 0;
-  if (index != lastDrawIndex || !contentLayer) {
-    auto builder = hello2d::LayerBuilder::GetByIndex(index);
-    if (builder) {
-      contentLayer = builder->buildLayerTree(appHost.get());
-      if (contentLayer) {
-        displayList.root()->removeChildren();
-        displayList.root()->addChild(contentLayer);
-      }
-    }
-    lastDrawIndex = index;
-  }
-
-  // Calculate base scale and offset using cached surface size
-  if (lastSurfaceWidth > 0 && lastSurfaceHeight > 0) {
-    bool zoomChanged = (zoomScale != lastAppliedZoomScale);
-    bool offsetChanged =
-        (contentOffset.x != lastAppliedContentOffset.x ||
-         contentOffset.y != lastAppliedContentOffset.y);
-    if (zoomChanged || offsetChanged) {
-      static constexpr float DESIGN_SIZE = 720.0f;
-      auto scaleX = static_cast<float>(lastSurfaceWidth) / DESIGN_SIZE;
-      auto scaleY = static_cast<float>(lastSurfaceHeight) / DESIGN_SIZE;
-      auto baseScale = std::min(scaleX, scaleY);
-      auto scaledSize = DESIGN_SIZE * baseScale;
-      auto baseOffsetX = (static_cast<float>(lastSurfaceWidth) - scaledSize) * 0.5f;
-      auto baseOffsetY = (static_cast<float>(lastSurfaceHeight) - scaledSize) * 0.5f;
-
-      auto finalZoomScale = zoomScale * baseScale;
-      auto finalOffsetX = baseOffsetX + contentOffset.x;
-      auto finalOffsetY = baseOffsetY + contentOffset.y;
-
-      displayList.setZoomScale(finalZoomScale);
-      displayList.setContentOffset(finalOffsetX, finalOffsetY);
-      lastAppliedZoomScale = zoomScale;
-      lastAppliedContentOffset = contentOffset;
-    }
-  }
-
-  // Check if content has changed AFTER setting all properties, BEFORE locking device
   bool needsRender = displayList.hasContentChanged() || sizeInvalidated;
-
-  // If no content change AND no pending lastRecording -> skip everything, don't lock device
   if (!needsRender && lastRecording == nullptr) {
     return false;
   }
-
-  // ========== Now lock device for rendering/submitting ==========
 
   auto device = tgfxWindow->getDevice();
   if (device == nullptr) {
@@ -370,69 +365,32 @@ bool TGFXWindow::draw() {
     return false;
   }
 
-  // Update cached surface size for next frame's calculations
-  int newSurfaceWidth = surface->width();
-  int newSurfaceHeight = surface->height();
-  bool sizeChanged = (newSurfaceWidth != lastSurfaceWidth || newSurfaceHeight != lastSurfaceHeight);
-  lastSurfaceWidth = newSurfaceWidth;
-  lastSurfaceHeight = newSurfaceHeight;
-
-  // If surface size just changed, update zoomScale/contentOffset now
-  if (sizeChanged && lastSurfaceWidth > 0 && lastSurfaceHeight > 0) {
-    static constexpr float DESIGN_SIZE = 720.0f;
-    auto scaleX = static_cast<float>(lastSurfaceWidth) / DESIGN_SIZE;
-    auto scaleY = static_cast<float>(lastSurfaceHeight) / DESIGN_SIZE;
-    auto baseScale = std::min(scaleX, scaleY);
-    auto scaledSize = DESIGN_SIZE * baseScale;
-    auto baseOffsetX = (static_cast<float>(lastSurfaceWidth) - scaledSize) * 0.5f;
-    auto baseOffsetY = (static_cast<float>(lastSurfaceHeight) - scaledSize) * 0.5f;
-    displayList.setZoomScale(zoomScale * baseScale);
-    displayList.setContentOffset(baseOffsetX + contentOffset.x, baseOffsetY + contentOffset.y);
-    lastAppliedZoomScale = zoomScale;
-    lastAppliedContentOffset = contentOffset;
-    needsRender = true;
-  }
-
-  // Clear sizeInvalidated flag
-  sizeInvalidated = false;
-
-  // Track if we submitted anything this frame
-  bool didSubmit = false;
-
-  // Case 1: No content change BUT have pending lastRecording -> only submit lastRecording
   if (!needsRender) {
     context->submit(std::move(lastRecording));
     tgfxWindow->present(context);
-    didSubmit = true;
     device->unlock();
-    return didSubmit;
+    return false;
   }
 
-  // Case 2: Content changed -> render new content
+  sizeInvalidated = false;
+
   auto canvas = surface->getCanvas();
   canvas->clear();
   hello2d::DrawBackground(canvas, surface->width(), surface->height(), pixelRatio);
 
   displayList.render(surface.get(), false);
 
-  // Delayed one-frame present mode
   auto recording = context->flush();
   if (lastRecording) {
-    // Normal delayed mode: submit last frame, save current for next
     context->submit(std::move(lastRecording));
     tgfxWindow->present(context);
-    didSubmit = true;
     lastRecording = std::move(recording);
   } else if (recording) {
-    // No lastRecording (first frame or after size change): submit current directly
     context->submit(std::move(recording));
     tgfxWindow->present(context);
-    didSubmit = true;
   }
 
   device->unlock();
-
-  // Return true if we submitted or have pending recording
-  return didSubmit || lastRecording != nullptr;
+  return false;
 }
 }  // namespace hello2d
