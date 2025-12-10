@@ -223,18 +223,28 @@ struct PDFMetadata {
   CompressionLevel compressionLevel = CompressionLevel::Default;
 
   /**
-   * The destination color space for color conversion. When set, input colors and images will be
-   * converted from their source color space to this color space before being written to the PDF.
-   * This performs actual color value transformation.
-   */
-  std::shared_ptr<ColorSpace> dstColorSpace = nullptr;
+  * The color space used for color value conversion. When set, all color values and image pixels
+  * will be converted from their source color space to this target color space before being written
+  * to the PDF.
+  *
+  * If assignColorSpace is not set, the ICC profile of targetColorSpace will also be embedded as the
+  * document's color space.
+  */
+  std::shared_ptr<ColorSpace> targetColorSpace = nullptr;
 
   /**
-   * The color space to assign (embed as ICC Profile) without performing any color conversion.
-   * This only embeds the ICC Profile into the PDF to describe how the colors should be interpreted,
-   * but does not transform any color values. Use this when colors are already in the desired color
-   * space and you just need to tag them with the correct profile.
-   */
+  * The color space whose ICC profile will be embedded in the PDF, overriding the default color
+  * space metadata. This only affects the color space tag written to the PDF, not the actual color
+  * values.
+  *
+  * - If targetColorSpace is set: colors are first converted to targetColorSpace, then tagged with
+  *   assignColorSpace's profile.
+  * - If targetColorSpace is not set: original color values are written directly, tagged with
+  *   assignColorSpace's profile.
+  *
+  * Use this when you need to override the embedded ICC profile without affecting the color values
+  * themselves.
+  */
   std::shared_ptr<ColorSpace> assignColorSpace = nullptr;
 };
 

@@ -151,7 +151,7 @@ class PDFDocumentImpl : public PDFDocument {
   const Matrix& currentPageTransform() const;
 
   std::shared_ptr<ColorSpace> dstColorSpace() const {
-    return _metadata.dstColorSpace;
+    return _metadata.targetColorSpace;
   }
 
   PDFIndirectReference colorSpaceRef() const {

@@ -375,7 +375,7 @@ TGFX_TEST(PDFExportTest, DstColorSpace) {
   auto PDFStream = MemoryWriteStream::Make();
 
   PDFMetadata metadata{};
-  metadata.dstColorSpace = ColorSpace::DisplayP3();
+  metadata.targetColorSpace = ColorSpace::DisplayP3();
   auto document = PDFDocument::Make(PDFStream, context, metadata);
   auto canvas = document->beginPage(256.f, 256.f);
   canvas->drawColor(Color::FromRGBA(0, 255, 0, 255, ColorSpace::DisplayP3()));
@@ -435,7 +435,7 @@ TGFX_TEST(PDFExportTest, DstAssignColorSpace) {
   auto PDFStream = MemoryWriteStream::Make();
 
   PDFMetadata metadata{};
-  metadata.dstColorSpace = ColorSpace::DisplayP3();
+  metadata.targetColorSpace = ColorSpace::DisplayP3();
   metadata.assignColorSpace = ColorSpace::SRGB();
   auto document = PDFDocument::Make(PDFStream, context, metadata);
   auto canvas = document->beginPage(256.f, 256.f);
