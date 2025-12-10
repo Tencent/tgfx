@@ -188,7 +188,7 @@ std::shared_ptr<BackgroundContext> BackgroundContext::createSubContext(const Rec
     return nullptr;
   }
   auto childSurfaceRect = baseSurfaceMatrix.mapRect(childWorldRect);
-  childSurfaceRect.roundOut();
+  //childSurfaceRect.roundOut();
   auto childSurfaceOffset = Point::Make(childSurfaceRect.x(), childSurfaceRect.y());
   auto childSurfaceMatrix = baseSurfaceMatrix;
   childSurfaceMatrix.postTranslate(-childSurfaceOffset.x, -childSurfaceOffset.y);

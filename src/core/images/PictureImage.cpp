@@ -117,7 +117,7 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  auto extraMatrix = Matrix::MakeScale(1.0f, 1.0f);
+  auto extraMatrix = Matrix::MakeScale(scale, scale);
   extraMatrix.preTranslate(-offsetX, -offsetY);
   if (!drawPicture(renderTarget, args.renderFlags, &extraMatrix)) {
     return nullptr;
