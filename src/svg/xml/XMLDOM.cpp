@@ -80,6 +80,35 @@ std::shared_ptr<DOMNode> DOM::getRootNode() const {
   return _root;
 }
 
+DOMNode::~DOMNode() {
+  // Avoid recursive destruction crash on huge node counts: iteratively unlink children/siblings.
+  if (!firstChild && !nextSibling) {
+    return;
+  }
+
+  std::vector<std::shared_ptr<DOMNode>> stack;
+  if (firstChild) {
+    stack.emplace_back(std::move(firstChild));
+  }
+  if (nextSibling) {
+    stack.emplace_back(std::move(nextSibling));
+  }
+  
+  while (!stack.empty()) {
+    auto node = std::move(stack.back());
+    stack.pop_back();
+    if (!node) {
+      continue;
+    }
+    if (node->firstChild) {
+      stack.emplace_back(std::move(node->firstChild));
+    }
+    if (node->nextSibling) {
+      stack.emplace_back(std::move(node->nextSibling));
+    }
+  }
+}
+
 std::shared_ptr<DOMNode> DOMNode::getFirstChild(const std::string& name) const {
   auto child = this->firstChild;
   if (!name.empty()) {

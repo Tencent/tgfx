@@ -93,6 +93,15 @@ TGFX_TEST(SVGRenderTest, XMLParse) {
   EXPECT_EQ(copyDOM->getRootNode()->name, xmlDOM->getRootNode()->name);
 }
 
+TGFX_TEST(SVGRenderTest, XMLParseLarge) {
+  // This test verifies that a large SVG with many nodes can be parsed
+  // and that the DOM can be properly destructed without issues.
+  auto stream = Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/4w_node.svg"));
+  EXPECT_TRUE(stream != nullptr);
+  auto xmlDOM = DOM::Make(*stream);
+  EXPECT_TRUE(xmlDOM != nullptr);
+}
+
 TGFX_TEST(SVGRenderTest, PathSVG) {
   auto stream = Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/path.svg"));
   ASSERT_TRUE(stream != nullptr);
