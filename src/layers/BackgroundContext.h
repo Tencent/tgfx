@@ -36,19 +36,9 @@ class BackgroundContext {
 
   std::shared_ptr<Image> getBackgroundImage();
 
-  /**
-   * Creates a child context with a smaller surface that only covers the given render bounds.
-   * @param renderBounds The bounds in world coordinates.
-   * @param clipToBackgroundRect If true, clip renderBounds to backgroundRect.
-   * @return The child context, or nullptr if no intersection or creation fails.
-   */
   std::shared_ptr<BackgroundContext> createSubContext(const Rect& renderBounds,
                                                       bool clipToBackgroundRect);
 
-  /**
-   * Draws the child context's content to the parent context.
-   * @param paint The paint to use for drawing.
-   */
   void drawToParent(const Paint& paint);
 
   Rect getBackgroundRect() const {

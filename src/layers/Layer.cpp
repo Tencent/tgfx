@@ -1273,14 +1273,14 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   if (!fullFill && args.blurBackground) {
     cacheArgs.blurBackground = cacheArgs.blurBackground->createSubContext(renderBounds, false);
   }
-  drawOffscreenWithParams(cacheArgs, canvas, std::nullopt, contentScale, blendMode, alpha,
-                          transform, true);
+  drawOffscreenWithParams(cacheArgs, canvas, blendMode, alpha, transform, std::nullopt,
+                          contentScale, true);
   return true;
 }
 
-void Layer::drawOffscreenWithParams(const DrawArgs& args, Canvas* canvas,
-                                    std::optional<Rect> clipBounds, float contentScale,
-                                    BlendMode blendMode, float alpha, const Matrix3D* transform,
+void Layer::drawOffscreenWithParams(const DrawArgs& args, Canvas* canvas, BlendMode blendMode,
+                                    float alpha, const Matrix3D* transform,
+                                    const std::optional<Rect>& clipBounds, float contentScale,
                                     bool cacheContent) {
   if (transform != nullptr) {
     drawBackgroundLayerStyles(args, canvas, alpha, *transform);
@@ -1385,8 +1385,8 @@ void Layer::drawOffscreenWithParams(const DrawArgs& args, Canvas* canvas,
 void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                           const Matrix3D* transform) {
   auto clipBounds = GetClipBounds(args.blurBackground ? args.blurBackground->getCanvas() : canvas);
-  drawOffscreenWithParams(args, canvas, clipBounds, canvas->getMatrix().getMaxScale(), blendMode,
-                          alpha, transform, false);
+  drawOffscreenWithParams(args, canvas, blendMode, alpha, transform, clipBounds,
+                          canvas->getMatrix().getMaxScale(), false);
 }
 
 void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha) {

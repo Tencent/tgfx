@@ -254,7 +254,7 @@ class DisplayList {
   /**
    * Returns the minimum cache size (single edge) for sub-tree layer caching.
    * The cache mipmap level is calculated based on the ratio between subtreeCacheMaxSize and
-   * minSubTreeCacheSize. The default value is 0.
+   * minSubTreeCacheSize. The minimum value is 1, and the default value is 64.
    */
   int subTreeCacheMinSize() const {
     return _subTreeCacheMinSize;
