@@ -53,10 +53,11 @@ namespace tgfx {
 
 SVGExportContext::SVGExportContext(Context* context, const Rect& viewBox,
                                    std::unique_ptr<XMLWriter> inputXmlWriter, uint32_t exportFlags,
-                                   std::shared_ptr<SVGCustomWriter> customWriter)
+                                   std::shared_ptr<SVGCustomWriter> customWriter,
+                                   std::shared_ptr<ColorSpace> dstColorSpace, std::shared_ptr<ColorSpace> assignColorSpace)
     : exportFlags(exportFlags), context(context), viewBox(viewBox),
       xmlWriter(std::move(inputXmlWriter)), resourceBucket(new ResourceStore),
-      customWriter(std::move(customWriter)) {
+      customWriter(std::move(customWriter)), dstColorSpace(std::move(dstColorSpace)), assignColorSpace(std::move(assignColorSpace)) {
   if (viewBox.isEmpty()) {
     return;
   }
@@ -98,7 +99,7 @@ void SVGExportContext::drawRect(const Rect& rect, const MCState& state, const Br
   }
 
   ElementWriter rectElement("rect", context, this, xmlWriter.get(), resourceBucket.get(),
-                            exportFlags & SVGExportFlags::DisableWarnings, state, brush);
+                            exportFlags & SVGExportFlags::DisableWarnings, state, brush, nullptr, dstColorSpace, assignColorSpace);
 
   if (svg) {
     rectElement.addAttribute("x", 0);

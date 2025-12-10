@@ -722,4 +722,17 @@ TGFX_TEST(SVGExportTest, LayerShadow) {
   exporter->close();
   EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/LayerDropShadow"));
 }
+
+TGFX_TEST(SVGExportTest, DstColorSpace) {
+    ContextScope scope;
+    auto context = scope.getContext();
+    EXPECT_TRUE(context != nullptr);
+
+    auto SVGStream = MemoryWriteStream::Make();
+    auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(400, 400), 0, nullptr, ColorSpace::DisplayP3());
+    auto canvas = exporter->getCanvas();
+    canvas->drawColor(Color::Green(), BlendMode::Difference);
+    exporter->close();
+    EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/DstColorSpace"));
+}
 }  // namespace tgfx

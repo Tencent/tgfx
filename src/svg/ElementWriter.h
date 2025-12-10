@@ -48,7 +48,7 @@ class ElementWriter {
                 ResourceStore* bucket);
   ElementWriter(const std::string& name, Context* context, SVGExportContext* svgContext,
                 XMLWriter* writer, ResourceStore* bucket, bool disableWarning, const MCState& state,
-                const Brush& brush, const Stroke* stroke = nullptr);
+                const Brush& brush, const Stroke* stroke = nullptr, std::shared_ptr<ColorSpace> dstColorSpace = nullptr, std::shared_ptr<ColorSpace> assignColorSpace = nullptr);
   ~ElementWriter();
 
   void addAttribute(const std::string& name, const std::string& val);
@@ -121,9 +121,16 @@ class ElementWriter {
 
   void reportUnsupportedElement(const char* message) const;
 
+    bool writeColorCSSStyleAttribute(const std::string& attributeName, Color color, std::string* retString);
+
+    void generateWriteColorSpaceString();
+
   XMLWriter* writer = nullptr;
   ResourceStore* resourceStore = nullptr;
   bool disableWarning = false;
+    std::shared_ptr<ColorSpace> _dstColorSpace = nullptr;
+    std::shared_ptr<ColorSpace> _writeColorSpace = nullptr;
+    std::string _writeColorSpaceString;
 };
 
 }  // namespace tgfx

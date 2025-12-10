@@ -25,6 +25,7 @@
 #include "core/filters/GaussianBlurImageFilter.h"
 #include "core/filters/ShaderMaskFilter.h"
 #include "core/shaders/MatrixShader.h"
+#include "core/utils/ColorHelper.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/Types.h"
@@ -40,8 +41,9 @@
 
 namespace tgfx {
 
-Resources::Resources(const Brush& brush) {
-  paintColor = ToSVGColor(brush.color);
+Resources::Resources(const Color& color) {
+  colorValue = color;
+  paintColor = ToSVGColor(color);
 }
 
 ElementWriter::ElementWriter(const std::string& name, XMLWriter* writer) : writer(writer) {
@@ -61,8 +63,10 @@ ElementWriter::ElementWriter(const std::string& name, const std::unique_ptr<XMLW
 ElementWriter::ElementWriter(const std::string& name, Context* context,
                              SVGExportContext* svgContext, XMLWriter* writer, ResourceStore* bucket,
                              bool disableWarning, const MCState& state, const Brush& brush,
-                             const Stroke* stroke)
-    : writer(writer), resourceStore(bucket), disableWarning(disableWarning) {
+                             const Stroke* stroke, std::shared_ptr<ColorSpace> dstColorSpace, std::shared_ptr<ColorSpace> assignColorSpace)
+    : writer(writer), resourceStore(bucket), disableWarning(disableWarning), _dstColorSpace(std::move(dstColorSpace)) {
+  _writeColorSpace = assignColorSpace ? std::move(assignColorSpace) : _dstColorSpace;
+  generateWriteColorSpaceString();
   Resources resource = addResources(brush, context, svgContext);
 
   writer->startElement(name);
@@ -82,6 +86,34 @@ ElementWriter::~ElementWriter() {
 void ElementWriter::reportUnsupportedElement(const char* message) const {
   if (!disableWarning) {
     LOGE("[SVG exporting]:%s", message);
+  }
+}
+
+bool ElementWriter::writeColorCSSStyleAttribute(const std::string& attributeName, Color color, std::string* retString) {
+  if(_writeColorSpaceString.empty()) {
+    return false;
+  }
+  *retString += attributeName + ":" + ToSVGColor(color) + ";" + attributeName + ":color(" + _writeColorSpaceString + " "
+    + std::to_string(color.red) + " " + std::to_string(color.green) + " " + std::to_string(color.blue) +");";
+  return true;
+}
+
+void ElementWriter::generateWriteColorSpaceString() {
+  static std::shared_ptr<ColorSpace> srgb = ColorSpace::SRGB();
+  static std::shared_ptr<ColorSpace> displayP3 = ColorSpace::DisplayP3();
+  static std::shared_ptr<ColorSpace> a98rgb = ColorSpace::MakeRGB(NamedTransferFunction::A98RGB, NamedGamut::AdobeRGB);
+  static std::shared_ptr<ColorSpace> rec2020 = ColorSpace::MakeRGB(NamedTransferFunction::Rec2020, NamedGamut::Rec2020);
+  ColorMatrix33 matrix{};
+  NamedPrimaries::ProPhotoRGB.toXYZD50(&matrix);
+  static std::shared_ptr<ColorSpace> prophoto = ColorSpace::MakeRGB(NamedTransferFunction::ProPhotoRGB, matrix);
+  if(ColorSpace::Equals(_writeColorSpace.get(), displayP3.get())) {
+    _writeColorSpaceString = "display-p3";
+  }else if(ColorSpace::Equals(_writeColorSpace.get(), a98rgb.get())) {
+    _writeColorSpaceString = "a98-rgb";
+  }else if(ColorSpace::Equals(_writeColorSpace.get(), rec2020.get())) {
+    _writeColorSpaceString = "rec2020";
+  }else {
+    _writeColorSpaceString = std::string{};
   }
 }
 
@@ -126,15 +158,22 @@ void ElementWriter::addFillAndStroke(const Brush& brush, const Stroke* stroke,
       addAttribute("stroke-opacity", brush.color.alpha);
     }
   }
+  std::string cssStyle;
+  if(resources.paintColor.find("url") == std::string::npos) {
+    writeColorCSSStyleAttribute(stroke ? "stroke" : "fill", resources.colorValue, &cssStyle);
+  }
 
   if (brush.blendMode != BlendMode::SrcOver) {
     auto blendModeString = ToSVGBlendMode(brush.blendMode);
     if (!blendModeString.empty()) {
       blendModeString = "mix-blend-mode:" + blendModeString;
-      addAttribute("style", blendModeString);
+      cssStyle += blendModeString + ";";
     } else {
       reportUnsupportedElement("Unsupported blend mode");
     }
+  }
+  if(!cssStyle.empty()) {
+    addAttribute("style", cssStyle);
   }
 
   if (!resources.filter.empty()) {
@@ -458,7 +497,8 @@ void ElementWriter::addInnerShadowImageFilter(const InnerShadowImageFilter* filt
 
 Resources ElementWriter::addResources(const Brush& brush, Context* context,
                                       SVGExportContext* svgContext) {
-  Resources resources(brush);
+  auto color = ConvertColorSpace(brush.color, _dstColorSpace);
+  Resources resources(color);
 
   if (auto shader = brush.shader) {
     ElementWriter defs("defs", writer);
