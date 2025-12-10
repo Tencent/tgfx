@@ -95,30 +95,20 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
   if (!rect.intersect(drawBounds)) {
     return nullptr;
   }
-  // auto clipRect = rect;
-  // rect.scale(args.drawScale, args.drawScale);
-  // rect.round();
-  auto offsetX = rect.left;
-  auto offsetY = rect.top;
+
   auto scale = args.drawScale;
   rect.scale(scale, scale);
-  if (FloatNearlyEqual(scale, 1.0f)) {
-    offsetX -= (rect.left - std::floor(rect.left)) / scale;
-    offsetY -= (rect.top - std::floor(rect.top)) / scale;
-    rect.roundOut();
-  }
-  // recalculate the scale factor to avoid the precision loss of floating point numbers
-  //auto scaleX = rect.width() / clipRect.width();
-  // auto scaleY = rect.height() / clipRect.height();
+  rect.roundOut();
+
   auto mipmapped = samplingArgs.sampling.mipmapMode != MipmapMode::None && hasMipmaps();
-  auto renderTarget = RenderTargetProxy::Make(args.context, static_cast<int>(rect.width()),
-                                              static_cast<int>(rect.height()), isAlphaOnly(), 1,
+  auto renderTarget = RenderTargetProxy::Make(args.context, FloatSaturate2Int(rect.width()),
+                                              FloatSaturate2Int(rect.height()), isAlphaOnly(), 1,
                                               mipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
   if (renderTarget == nullptr) {
     return nullptr;
   }
   auto extraMatrix = Matrix::MakeScale(scale, scale);
-  extraMatrix.preTranslate(-offsetX, -offsetY);
+  extraMatrix.preTranslate(-rect.left / scale, -rect.top / scale);
   if (!drawPicture(renderTarget, args.renderFlags, &extraMatrix)) {
     return nullptr;
   }

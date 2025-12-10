@@ -90,10 +90,9 @@ static std::shared_ptr<Image> ToImageWithOffset(
     return nullptr;
   }
   auto bounds = imageBounds ? *imageBounds : picture->getBounds();
-  bounds.roundOut();
   auto matrix = Matrix::MakeTrans(-bounds.x(), -bounds.y());
-  auto image = Image::MakeFrom(std::move(picture), static_cast<int>(bounds.width()),
-                               static_cast<int>(bounds.height()), &matrix, std::move(colorSpace));
+  auto image = Image::MakeFrom(std::move(picture), FloatCeilToInt(bounds.width()),
+                               FloatCeilToInt(bounds.height()), &matrix, std::move(colorSpace));
   if (offset) {
     offset->x = bounds.left;
     offset->y = bounds.top;
@@ -1062,9 +1061,9 @@ std::shared_ptr<MaskFilter> Layer::getMaskFilter(const DrawArgs& args, float sca
     }
   }
   maskPicture = RecordPicture(maskArgs.drawMode, scale, [&](Canvas* canvas) {
-    if (maskClipBounds.has_value()) {
-      canvas->clipRect(*maskClipBounds);
-    }
+    // if (maskClipBounds.has_value()) {
+    //   canvas->clipRect(*maskClipBounds);
+    // }
     _mask->drawLayer(maskArgs, canvas, _mask->_alpha, BlendMode::SrcOver);
   });
   if (maskPicture == nullptr) {
@@ -1127,8 +1126,8 @@ std::shared_ptr<Image> Layer::getContentImage(const DrawArgs& contentArgs, float
     surfaceRect.roundOut();
     surfaceRect.intersect(Rect::MakeWH(passThroughImage->width(), passThroughImage->height()));
     auto offscreenSurface = Surface::Make(context, static_cast<int>(surfaceRect.width()),
-                                          static_cast<int>(surfaceRect.height()), false, 1,
-                                          false, 0, contentArgs.dstColorSpace);
+                                          static_cast<int>(surfaceRect.height()), false, 1, false,
+                                          0, contentArgs.dstColorSpace);
     if (!offscreenSurface) {
       return nullptr;
     }
