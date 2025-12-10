@@ -40,6 +40,7 @@ class EAGLWindow : public Window {
  private:
   CAEAGLLayer* layer = nil;
   std::shared_ptr<EAGLLayerTexture> layerTexture;
+  std::shared_ptr<ColorSpace> colorSpace;
 
   EAGLWindow(std::shared_ptr<Device> device, CAEAGLLayer* layer,
              std::shared_ptr<ColorSpace> colorSpace = nullptr);

@@ -42,7 +42,7 @@ std::shared_ptr<WGLWindow> WGLWindow::MakeFrom(HWND nativeWindow, HGLRC sharedCo
 }
 
 WGLWindow::WGLWindow(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace)
-    : Window(std::move(device), std::move(colorSpace)) {
+    : Window(std::move(device)), colorSpace(std::move(colorSpace)) {
 }
 
 std::shared_ptr<Surface> WGLWindow::onCreateSurface(Context* context) {

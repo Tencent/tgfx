@@ -71,6 +71,7 @@ class QGLWindow : public Window {
   std::shared_ptr<Surface> frontSurface = nullptr;
   QSGTexture* outTexture = nullptr;
   QGLDeviceCreator* deviceCreator = nullptr;
+  std::shared_ptr<ColorSpace> colorSpace = nullptr;
 
   explicit QGLWindow(QQuickItem* quickItem, bool singleBufferMode = false,
                      std::shared_ptr<ColorSpace> colorSpace = nullptr);

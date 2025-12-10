@@ -45,7 +45,7 @@ std::shared_ptr<CGLWindow> CGLWindow::MakeFrom(NSView* view, CGLContextObj share
 
 CGLWindow::CGLWindow(std::shared_ptr<Device> device, NSView* view,
                      std::shared_ptr<ColorSpace> colorSpace)
-    : Window(std::move(device), std::move(colorSpace)), view(view) {
+    : Window(std::move(device)), view(view), colorSpace(std::move(colorSpace)) {
   // do not retain view here, otherwise it can cause circular reference.
 }
 

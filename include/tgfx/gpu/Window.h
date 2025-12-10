@@ -63,9 +63,8 @@ class Window {
   bool sizeInvalid = false;
   std::shared_ptr<Device> device = nullptr;
   std::shared_ptr<Surface> surface = nullptr;
-  std::shared_ptr<ColorSpace> colorSpace = nullptr;
 
-  explicit Window(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace);
+  explicit Window(std::shared_ptr<Device> device);
   Window() = default;
 
   virtual void onInvalidSize();

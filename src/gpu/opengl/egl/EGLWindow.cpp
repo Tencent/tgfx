@@ -35,7 +35,7 @@ std::shared_ptr<EGLWindow> EGLWindow::Current() {
   if (device == nullptr || device->eglSurface == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<EGLWindow>(new EGLWindow(device, device->colorSpace));
+  return std::shared_ptr<EGLWindow>(new EGLWindow(device));
 }
 
 std::shared_ptr<EGLWindow> EGLWindow::MakeFrom(EGLNativeWindowType nativeWindow,
@@ -48,13 +48,12 @@ std::shared_ptr<EGLWindow> EGLWindow::MakeFrom(EGLNativeWindowType nativeWindow,
   if (device == nullptr) {
     return nullptr;
   }
-  auto eglWindow = std::shared_ptr<EGLWindow>(new EGLWindow(device, std::move(colorSpace)));
+  auto eglWindow = std::shared_ptr<EGLWindow>(new EGLWindow(device));
   eglWindow->nativeWindow = nativeWindow;
   return eglWindow;
 }
 
-EGLWindow::EGLWindow(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace)
-    : Window(std::move(device), std::move(colorSpace)) {
+EGLWindow::EGLWindow(std::shared_ptr<Device> device) : Window(std::move(device)) {
 }
 
 ISize GetNativeWindowSize(EGLNativeWindowType nativeWindow) {
@@ -111,7 +110,8 @@ std::shared_ptr<Surface> EGLWindow::onCreateSurface(Context* context) {
   frameBuffer.id = 0;
   frameBuffer.format = GL_RGBA8;
   BackendRenderTarget renderTarget = {frameBuffer, size.width, size.height};
-  return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft, 0, colorSpace);
+  return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft, 0,
+                           eglDevice->colorSpace);
 }
 
 void EGLWindow::setPresentationTime(int64_t time) {

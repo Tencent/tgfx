@@ -38,6 +38,7 @@ class CGLWindow : public Window {
 
  private:
   NSView* view = nil;
+  std::shared_ptr<ColorSpace> colorSpace = nullptr;
 
   CGLWindow(std::shared_ptr<Device> device, NSView* view,
             std::shared_ptr<ColorSpace> colorSpace = nullptr);

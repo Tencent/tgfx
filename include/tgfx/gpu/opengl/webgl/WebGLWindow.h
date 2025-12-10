@@ -38,6 +38,7 @@ class WebGLWindow : public Window {
 
  private:
   std::string canvasID;
+  std::shared_ptr<ColorSpace> colorSpace = nullptr;
 
   explicit WebGLWindow(std::shared_ptr<Device> device,
                        std::shared_ptr<ColorSpace> colorSpace = nullptr);

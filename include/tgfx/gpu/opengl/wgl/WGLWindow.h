@@ -36,6 +36,7 @@ class WGLWindow : public Window {
 
  private:
   HWND nativeWindow = nullptr;
+  std::shared_ptr<ColorSpace> colorSpace = nullptr;
 
   explicit WGLWindow(std::shared_ptr<Device> device,
                      std::shared_ptr<ColorSpace> colorSpace = nullptr);

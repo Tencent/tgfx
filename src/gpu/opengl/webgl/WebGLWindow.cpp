@@ -38,7 +38,7 @@ std::shared_ptr<WebGLWindow> WebGLWindow::MakeFrom(const std::string& canvasID,
 }
 
 WebGLWindow::WebGLWindow(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace)
-    : Window(std::move(device), std::move(colorSpace)) {
+    : Window(std::move(device)), colorSpace(std::move(colorSpace)) {
 }
 
 std::shared_ptr<Surface> WebGLWindow::onCreateSurface(Context* context) {

@@ -43,7 +43,7 @@ std::shared_ptr<EAGLWindow> EAGLWindow::MakeFrom(CAEAGLLayer* layer,
 
 EAGLWindow::EAGLWindow(std::shared_ptr<Device> device, CAEAGLLayer* layer,
                        std::shared_ptr<ColorSpace> colorSpace)
-    : Window(std::move(device), std::move(colorSpace)), layer(layer) {
+    : Window(std::move(device)), layer(layer), colorSpace(std::move(colorSpace)) {
   // do not retain layer here, otherwise it can cause circular reference.
 }
 
