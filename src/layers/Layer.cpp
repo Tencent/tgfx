@@ -92,10 +92,10 @@ static std::shared_ptr<Image> ToImageWithOffset(
     return nullptr;
   }
   auto bounds = imageBounds ? *imageBounds : picture->getBounds();
-  bounds.roundOut();
   auto matrix = Matrix::MakeTrans(-bounds.x(), -bounds.y());
-  auto image = Image::MakeFrom(std::move(picture), static_cast<int>(bounds.width()),
-                               static_cast<int>(bounds.height()), &matrix, std::move(colorSpace));
+  auto image =
+      Image::MakeFrom(std::move(picture), static_cast<int>(ceilf(bounds.width())),
+                      static_cast<int>(ceilf(bounds.height())), &matrix, std::move(colorSpace));
   if (offset) {
     offset->x = bounds.left;
     offset->y = bounds.top;
@@ -157,38 +157,22 @@ static std::shared_ptr<Image> MakeImageWithTransform(std::shared_ptr<Image> imag
   return image;
 }
 
-static void DrawCacheImage(Canvas* canvas, const std::shared_ptr<Image>& image,
-                           const Matrix& imageMatrix, const Paint& paint,
-                           const Matrix3D* transform3D) {
-  auto oldMatrix = canvas->getMatrix();
-  canvas->concat(imageMatrix);
-  Paint drawPaint = paint;
-  auto maskFilter = paint.getMaskFilter();
-  if (maskFilter) {
-    auto invertMatrix = Matrix::I();
-    if (imageMatrix.invert(&invertMatrix)) {
-      drawPaint.setMaskFilter(maskFilter->makeWithMatrix(invertMatrix));
-    }
+static int GetMipmapCacheLongEdge(int maxSize, int minSize, float contentScale,
+                                  const Rect& layerBounds) {
+  auto maxBoundsSize = std::max(layerBounds.width(), layerBounds.height());
+  auto scaleBoundsSize = static_cast<int>(ceilf(maxBoundsSize * contentScale));
+  if (scaleBoundsSize > maxSize) {
+    return scaleBoundsSize;
   }
-  if (transform3D == nullptr) {
-    canvas->drawImage(image, &drawPaint);
-  } else {
-    auto adaptedMatrix = *transform3D;
-    auto offsetMatrix =
-        Matrix3D::MakeTranslate(imageMatrix.getTranslateX(), imageMatrix.getTranslateY(), 0);
-    auto invOffsetMatrix =
-        Matrix3D::MakeTranslate(-imageMatrix.getTranslateX(), -imageMatrix.getTranslateY(), 0);
-    auto scaleMatrix = Matrix3D::MakeScale(imageMatrix.getScaleX(), imageMatrix.getScaleY(), 1.0f);
-    auto invScaleMatrix =
-        Matrix3D::MakeScale(1.0f / imageMatrix.getScaleX(), 1.0f / imageMatrix.getScaleY(), 1.0f);
-    adaptedMatrix = invScaleMatrix * invOffsetMatrix * adaptedMatrix * offsetMatrix * scaleMatrix;
-    auto imageFilter = ImageFilter::Transform3D(adaptedMatrix);
-    auto offset = Point();
-    auto filteredImage = image->makeWithFilter(imageFilter, &offset);
-    canvas->concat(Matrix::MakeTrans(offset.x, offset.y));
-    canvas->drawImage(filteredImage, &drawPaint);
+  if (minSize <= 0 || minSize >= maxSize) {
+    return maxSize;
   }
-  canvas->setMatrix(oldMatrix);
+  auto targetSize = std::max(scaleBoundsSize, minSize);
+  auto currentLongEdge = maxSize;
+  while ((currentLongEdge >> 1) >= targetSize) {
+    currentLongEdge >>= 1;
+  }
+  return currentLongEdge;
 }
 
 bool Layer::DefaultAllowsEdgeAntialiasing() {
@@ -1223,65 +1207,62 @@ bool Layer::shouldPassThroughBackground(BlendMode blendMode, const Matrix3D* tra
          bitFields.hasBlendMode && transform3D == nullptr;
 }
 
-bool Layer::shouldSkipSubTreeCache(BlendMode blendMode, const Matrix3D* transform3D) {
+bool Layer::shouldSkipSubTreeCache(int maxSubTreeCacheSize, BlendMode blendMode,
+                                   const Matrix3D* transform3D) {
+  if (subTreeCache) {
+    return false;
+  }
+  if (maxSubTreeCacheSize <= 0) {
+    return true;
+  }
   if (_children.empty() && _layerStyles.empty() && _filters.empty()) {
     return true;
   }
   if (shouldPassThroughBackground(blendMode, transform3D) || hasBackgroundStyle()) {
     return true;
   }
-  return false;
+  // Skip caching on the first render to avoid caching content that is only displayed once.
+  // The cache is created on the second render when the layer is confirmed to be reused.
+  subTreeCache = std::make_unique<SubTreeCache>();
+  return true;
 }
 
-std::optional<SubTreeCacheInfo> Layer::getSubTreeCacheInfo(const DrawArgs& args,
-                                                           float contentScale) {
-  if (!subTreeCache) {
-    return std::nullopt;
-  }
-  auto cacheScale = getMipmapCacheScale(args, contentScale);
-  auto layerBounds = getBounds();
-  auto scaledBounds = layerBounds;
-  scaledBounds.scale(cacheScale, cacheScale);
-  scaledBounds.roundOut();
-  auto cacheWidth = static_cast<int>(scaledBounds.width());
-  auto cacheHeight = static_cast<int>(scaledBounds.height());
-
-  auto cacheInfo = subTreeCache->getSubTreeCacheInfo(args.context, cacheWidth, cacheHeight);
-  if (cacheInfo.has_value()) {
-    return cacheInfo;
-  }
-
-  if (args.renderFlags & RenderFlags::DisableCache || args.maxSubTreeCacheSize <= 0) {
-    return std::nullopt;
-  }
-
-  if (cacheScale < contentScale || cacheWidth > args.maxSubTreeCacheSize ||
-      cacheHeight > args.maxSubTreeCacheSize) {
-    return std::nullopt;
-  }
-
-  auto imageMatrix = Matrix::I();
-  auto image = createSubTreeCacheImage(args, cacheScale, &imageMatrix);
-  if (image == nullptr) {
-    return std::nullopt;
-  }
-  auto textureProxy = std::static_pointer_cast<TextureImage>(image)->getTextureProxy();
-  subTreeCache->addCache(args.context, cacheWidth, cacheHeight, textureProxy, imageMatrix);
-  return SubTreeCacheInfo{std::move(image), imageMatrix};
-}
-
-std::shared_ptr<Image> Layer::createSubTreeCacheImage(const DrawArgs& args, float cacheScale,
-                                                      Matrix* imageMatrix) {
-  auto cacheArgs = args;
-  cacheArgs.renderFlags |= RenderFlags::DisableCache;
-  cacheArgs.renderRect = &renderBounds;
-  cacheArgs.blurBackground = nullptr;
-
-  auto image =
-      getContentImage(cacheArgs, cacheScale, nullptr, Matrix::I(), std::nullopt, imageMatrix);
-  if (!image) {
+std::shared_ptr<Image> Layer::createSubTreeCacheImage(const DrawArgs& args, float contentScale,
+                                                      const Rect& layerBounds,
+                                                      Matrix* drawingMatrix) {
+  DEBUG_ASSERT(drawingMatrix != nullptr);
+  if (FloatNearlyZero(contentScale)) {
     return nullptr;
   }
+
+  auto drawArgs = args;
+  drawArgs.renderFlags |= RenderFlags::DisableCache;
+  drawArgs.renderRect = nullptr;
+  drawArgs.blurBackground = nullptr;
+
+  auto picture = RecordPicture(drawArgs.drawMode, contentScale,
+                               [&](Canvas* canvas) { drawDirectly(drawArgs, canvas, 1.0f); });
+  if (!picture) {
+    return nullptr;
+  }
+  auto scaledBounds = layerBounds;
+  scaledBounds.scale(contentScale, contentScale);
+  Point offset = {};
+  auto image = ToImageWithOffset(std::move(picture), &offset, &scaledBounds, args.dstColorSpace);
+  if (image == nullptr) {
+    return nullptr;
+  }
+
+  auto filter = getImageFilter(contentScale);
+  if (filter) {
+    Point filterOffset = {};
+    image = image->makeWithFilter(std::move(filter), &filterOffset);
+    offset += filterOffset;
+  }
+
+  drawingMatrix->setScale(1.0f / contentScale, 1.0f / contentScale);
+  drawingMatrix->preTranslate(offset.x, offset.y);
+
   return image->makeTextureImage(args.context);
 }
 
@@ -1326,22 +1307,16 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
 bool Layer::drawWithSubTreeCache(const DrawArgs& args, Canvas* canvas, float alpha,
                                  BlendMode blendMode, const Matrix3D* transform3D) {
 
-  if (shouldSkipSubTreeCache(blendMode, transform3D)) {
+  if (shouldSkipSubTreeCache(args.maxSubTreeCacheSize, blendMode, transform3D)) {
     return false;
   }
-  // Skip caching on the first render to avoid caching content that is only displayed once.
-  // The cache is created on the second render when the layer is confirmed to be reused.
-  if (!subTreeCache) {
-    subTreeCache = std::make_unique<SubTreeCache>();
-    return false;
-  }
-  auto contentScale = canvas->getMatrix().getMaxScale();
-  auto cacheInfo = getSubTreeCacheInfo(args, contentScale);
-  if (!cacheInfo.has_value()) {
+  auto drawer = getSubTreeCacheDrawer(args, canvas);
+  if (!drawer) {
     return false;
   }
   Paint paint = {};
   if (hasValidMask()) {
+    auto contentScale = canvas->getMatrix().getMaxScale();
     auto clipBounds =
         GetClipBounds(args.blurBackground ? args.blurBackground->getCanvas() : canvas);
     auto maskFilter = getMaskFilter(args, contentScale, clipBounds);
@@ -1353,12 +1328,43 @@ bool Layer::drawWithSubTreeCache(const DrawArgs& args, Canvas* canvas, float alp
   paint.setAntiAlias(bitFields.allowsEdgeAntialiasing);
   paint.setAlpha(alpha);
   paint.setBlendMode(blendMode);
-  DrawCacheImage(canvas, cacheInfo->image, cacheInfo->matrix, paint, transform3D);
+  drawer->draw(canvas, paint, transform3D);
   if (args.blurBackground) {
-    DrawCacheImage(args.blurBackground->getCanvas(), cacheInfo->image, cacheInfo->matrix, paint,
-                   transform3D);
+    drawer->draw(args.blurBackground->getCanvas(), paint, transform3D);
   }
   return true;
+}
+
+std::unique_ptr<SubTreeCacheDrawer> Layer::getSubTreeCacheDrawer(const DrawArgs& args,
+                                                                 Canvas* canvas) {
+  auto layerBounds = getBounds();
+  auto contentScale = canvas->getMatrix().getMaxScale();
+  auto longEdge = GetMipmapCacheLongEdge(args.maxSubTreeCacheSize, args.minSubTreeCacheSize,
+                                         contentScale, layerBounds);
+
+  auto drawer = subTreeCache->getDrawer(args.context, longEdge);
+  if (drawer) {
+    return drawer;
+  }
+
+  if (args.renderFlags & RenderFlags::DisableCache || longEdge > args.maxSubTreeCacheSize) {
+    return nullptr;
+  }
+
+  auto maxBoundsSize = std::max(layerBounds.width(), layerBounds.height());
+  if (FloatNearlyZero(maxBoundsSize)) {
+    return nullptr;
+  }
+  auto cacheScale = static_cast<float>(longEdge) / maxBoundsSize;
+  auto imageMatrix = Matrix::I();
+  auto image = createSubTreeCacheImage(args, cacheScale, layerBounds, &imageMatrix);
+  if (image == nullptr) {
+    return nullptr;
+  }
+  auto textureProxy = std::static_pointer_cast<TextureImage>(image)->getTextureProxy();
+  DEBUG_ASSERT(longEdge == std::max(textureProxy->width(), textureProxy->height()));
+  subTreeCache->addCache(args.context, textureProxy, imageMatrix);
+  return std::make_unique<SubTreeCacheDrawer>(std::move(image), imageMatrix);
 }
 
 void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
@@ -2173,34 +2179,6 @@ Matrix3D Layer::anchorAdaptedMatrix(const Matrix3D& matrix, const Point& anchor)
 void Layer::invalidateCache() {
   rasterizedContent = nullptr;
   subTreeCache = nullptr;
-}
-
-float Layer::getMipmapCacheScale(const DrawArgs& args, float contentScale) {
-  auto layerBounds = getBounds();
-  auto maxBoundsSize = std::max(layerBounds.width(), layerBounds.height());
-  if (FloatNearlyZero(maxBoundsSize) || args.maxSubTreeCacheSize <= 0) {
-    return contentScale;
-  }
-
-  auto baseScale = static_cast<float>(args.maxSubTreeCacheSize) / maxBoundsSize;
-  auto cacheScale = baseScale;
-  int level = 0;
-  while (level < args.maxCacheMipmapLevel) {
-    auto nextScale = cacheScale * 0.5f;
-    if (nextScale >= contentScale) {
-      cacheScale = nextScale;
-      level++;
-    } else {
-      break;
-    }
-  }
-
-  // Round to integer size and recalculate scale to avoid half-pixel issues
-  auto scaledBounds = layerBounds;
-  scaledBounds.scale(cacheScale, cacheScale);
-  scaledBounds.roundOut();
-  auto scaledMaxSize = std::max(scaledBounds.width(), scaledBounds.height());
-  return scaledMaxSize / maxBoundsSize;
 }
 
 }  // namespace tgfx

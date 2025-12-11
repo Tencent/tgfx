@@ -18,18 +18,27 @@
 
 #pragma once
 
-#include <optional>
+#include <memory>
 #include <unordered_map>
 #include "gpu/resources/ResourceKey.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Image.h"
+#include "tgfx/core/Matrix3D.h"
 
 namespace tgfx {
 class TextureProxy;
 
-struct SubTreeCacheInfo {
-  std::shared_ptr<Image> image = nullptr;
-  Matrix matrix = Matrix::I();
+class SubTreeCacheDrawer {
+ public:
+  SubTreeCacheDrawer(std::shared_ptr<Image> image, const Matrix& matrix)
+      : _image(std::move(image)), _matrix(matrix) {
+  }
+
+  void draw(Canvas* canvas, const Paint& paint, const Matrix3D* transform3D) const;
+
+ private:
+  std::shared_ptr<Image> _image = nullptr;
+  Matrix _matrix = Matrix::I();
 };
 
 class SubTreeCache {
@@ -40,16 +49,15 @@ class SubTreeCache {
     return _uniqueKey;
   }
 
-  void addCache(Context* context, int imageWidth, int imageHeight,
-                std::shared_ptr<TextureProxy> textureProxy, const Matrix& imageMatrix);
+  void addCache(Context* context, std::shared_ptr<TextureProxy> textureProxy,
+                const Matrix& imageMatrix);
 
-  std::optional<SubTreeCacheInfo> getSubTreeCacheInfo(Context* context, int imageWidth,
-                                                      int imageHeight) const;
+  std::unique_ptr<SubTreeCacheDrawer> getDrawer(Context* context, int longEdge) const;
 
  private:
   UniqueKey _uniqueKey = UniqueKey::Make();
   ResourceKeyMap<Matrix> _sizeMatrices = {};
 
-  UniqueKey makeSizeKey(int width, int height) const;
+  UniqueKey makeSizeKey(int longEdge) const;
 };
 }  // namespace tgfx

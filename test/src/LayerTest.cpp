@@ -3718,19 +3718,8 @@ TGFX_TEST(LayerTest, LayerCache) {
   // Second render - cache should be filled
   displayList->render(surface.get());
   EXPECT_TRUE(root->subTreeCache != nullptr);
-  // root bounds = (20, 20, 70, 70), width=50, height=50
-  // baseScale = 2048/50 = 40.96, maxCacheMipmapLevel = log2(2048/256) = 3
-  // After 3 iterations: cacheScale = 40.96 / 8 = 5.12
-  // scaledBounds = (20*5.12, 20*5.12, 70*5.12, 70*5.12) = (102.4, 102.4, 358.4, 358.4)
-  // roundOut = (102, 102, 359, 359), width = 257, height = 257
-  // Recalculate scale to avoid half-pixel: 257 / 50 = 5.14
-  // scaledBounds = (20*5.14, 20*5.14, 70*5.14, 70*5.14) = (102.8, 102.8, 359.8, 359.8)
-  // roundOut = (102, 102, 360, 360), width = 258, height = 258
-  int expectedImageWidth = 258;
-  int expectedImageHeight = 258;
-  EXPECT_TRUE(
-      root->subTreeCache->getSubTreeCacheInfo(context, expectedImageWidth, expectedImageHeight)
-          .has_value());
+  int expectedLongEdge = 256;
+  EXPECT_TRUE(root->subTreeCache->getDrawer(context, expectedLongEdge) != nullptr);
 }
 
 TGFX_TEST(LayerTest, LayerCacheInvalidation) {

@@ -59,7 +59,7 @@ class DrawArgs {
   // The maximum cache size (single edge) for sub-tree layer caching. Set to 0 to disable
   // sub-tree layer cache.
   int maxSubTreeCacheSize = 0;
-  // The maximum mipmap level for sub-tree layer caching.
-  int maxCacheMipmapLevel = 0;
+  // The minimum cache size (single edge) for sub-tree layer caching.
+  int minSubTreeCacheSize = 64;
 };
 }  // namespace tgfx

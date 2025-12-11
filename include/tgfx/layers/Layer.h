@@ -34,6 +34,7 @@ namespace tgfx {
 class LayerContent;
 class RasterizedContent;
 class SubTreeCache;
+class SubTreeCacheDrawer;
 class DisplayList;
 class DrawArgs;
 class RegionTransformer;
@@ -675,18 +676,19 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   bool shouldPassThroughBackground(BlendMode blendMode, const Matrix3D* transform3D) const;
 
-  bool shouldSkipSubTreeCache(BlendMode blendMode, const Matrix3D* transform3D);
+  bool shouldSkipSubTreeCache(int maxSubTreeCacheSize, BlendMode blendMode,
+                              const Matrix3D* transform3D);
 
-  std::optional<SubTreeCacheInfo> getSubTreeCacheInfo(const DrawArgs& args, float contentScale);
-
-  std::shared_ptr<Image> createSubTreeCacheImage(const DrawArgs& args, float cacheScale,
-                                                 Matrix* imageMatrix);
+  std::shared_ptr<Image> createSubTreeCacheImage(const DrawArgs& args, float contentScale,
+                                                 const Rect& scaledBounds, Matrix* drawingMatrix);
 
   bool drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                      const Matrix3D* transform3D);
 
   bool drawWithSubTreeCache(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                             const Matrix3D* transform3D);
+
+  std::unique_ptr<SubTreeCacheDrawer> getSubTreeCacheDrawer(const DrawArgs& args, Canvas* canvas);
 
   std::shared_ptr<Image> getContentImage(const DrawArgs& args, float contentScale,
                                          const std::shared_ptr<Image>& passThroughImage,
@@ -705,8 +707,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
   Matrix3D anchorAdaptedMatrix(const Matrix3D& matrix, const Point& anchor) const;
 
   void invalidateCache();
-
-  float getMipmapCacheScale(const DrawArgs& args, float contentScale);
 
   struct {
     bool dirtyContent : 1;        // layer's content needs updating

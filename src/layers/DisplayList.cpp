@@ -989,12 +989,7 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
       _root->createBackgroundContext(context, drawRect, viewMatrix, false, args.dstColorSpace);
   args.dstColorSpace = surface->colorSpace();
   args.maxSubTreeCacheSize = _subTreeCacheMaxSize;
-  if (_subTreeCacheMaxSize > 0 && _subTreeCacheMinSize < _subTreeCacheMaxSize) {
-    args.maxCacheMipmapLevel = static_cast<int>(floorf(log2f(
-        static_cast<float>(_subTreeCacheMaxSize) / static_cast<float>(_subTreeCacheMinSize))));
-  } else {
-    args.maxCacheMipmapLevel = 0;
-  }
+  args.minSubTreeCacheSize = _subTreeCacheMinSize;
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
 }
 
