@@ -19,6 +19,7 @@
 #pragma once
 
 #include <emscripten/html5_webgl.h>
+#include "tgfx/core/ColorSpace.h"
 #include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace tgfx {
@@ -27,7 +28,8 @@ class WebGLDevice : public GLDevice {
   /**
    * Creates a WebGLDevice from the id of an existing HTMLCanvasElement.
    */
-  static std::shared_ptr<WebGLDevice> MakeFrom(const std::string& canvasID);
+  static std::shared_ptr<WebGLDevice> MakeFrom(const std::string& canvasID,
+                                               std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   ~WebGLDevice() override;
 

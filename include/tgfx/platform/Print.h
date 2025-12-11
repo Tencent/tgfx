@@ -25,7 +25,7 @@ namespace tgfx {
 void PrintLog(const char format[], ...);
 
 /**
-   * Writes an error message pointed by format to the log facility of native platform.
+ * Writes an error message pointed by format to the log facility of native platform.
  */
 void PrintError(const char format[], ...);
 }  // namespace tgfx

@@ -23,7 +23,8 @@
 
 namespace tgfx {
 std::shared_ptr<EAGLWindow> EAGLWindow::MakeFrom(CAEAGLLayer* layer,
-                                                 std::shared_ptr<GLDevice> device) {
+                                                 std::shared_ptr<GLDevice> device,
+                                                 std::shared_ptr<ColorSpace> colorSpace) {
   if (layer == nil) {
     return nullptr;
   }
@@ -33,11 +34,16 @@ std::shared_ptr<EAGLWindow> EAGLWindow::MakeFrom(CAEAGLLayer* layer,
   if (device == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<EAGLWindow>(new EAGLWindow(device, layer));
+  if (colorSpace != nullptr && !ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get())) {
+    LOGE("EAGLWindow::MakeFrom() The specified ColorSpace is not supported on this platform. "
+         "Rendering may have color inaccuracies.");
+  }
+  return std::shared_ptr<EAGLWindow>(new EAGLWindow(device, layer, std::move(colorSpace)));
 }
 
-EAGLWindow::EAGLWindow(std::shared_ptr<Device> device, CAEAGLLayer* layer)
-    : Window(std::move(device)), layer(layer) {
+EAGLWindow::EAGLWindow(std::shared_ptr<Device> device, CAEAGLLayer* layer,
+                       std::shared_ptr<ColorSpace> colorSpace)
+    : Window(std::move(device)), layer(layer), colorSpace(std::move(colorSpace)) {
   // do not retain layer here, otherwise it can cause circular reference.
 }
 
@@ -53,7 +59,7 @@ std::shared_ptr<Surface> EAGLWindow::onCreateSurface(Context* context) {
     return nullptr;
   }
   BackendRenderTarget renderTarget = layerTexture->getBackendRenderTarget();
-  return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
+  return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft, 0, colorSpace);
 }
 
 void EAGLWindow::onPresent(Context* context) {

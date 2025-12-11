@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,25 +18,22 @@
 
 #pragma once
 
-#include <functional>
 #include "core/DrawContext.h"
-#include "core/PictureRecords.h"
-#include "core/utils/BlockAllocator.h"
-#include "tgfx/core/Stroke.h"
 
 namespace tgfx {
-class PictureContext : public DrawContext {
+/**
+ * LayerUnrollContext is a DrawContext proxy that intercepts draw calls and merges layer brush
+ * properties (alpha, blendMode, colorFilter) into each draw command's brush. This allows a layer
+ * containing a single draw command to be "unrolled" and drawn directly without creating an
+ * offscreen buffer, improving performance by avoiding unnecessary layer allocations.
+ */
+class LayerUnrollContext : public DrawContext {
  public:
-  ~PictureContext() override;
+  LayerUnrollContext(DrawContext* drawContext, Brush layerBrush);
 
-  void clear();
-
-  /**
-   * Signals that the caller is done recording and returns a Picture object that captures all the
-   * drawing commands made to the context. Returns nullptr if no recording is active or no commands
-   * were recorded.
-   */
-  std::shared_ptr<Picture> finishRecordingAsPicture();
+  bool hasUnrolled() const {
+    return unrolled;
+  }
 
   void drawFill(const Brush& brush) override;
 
@@ -66,18 +63,12 @@ class PictureContext : public DrawContext {
   void drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<ImageFilter> filter,
                  const MCState& state, const Brush& brush) override;
 
- private:
-  BlockAllocator blockAllocator = {};
-  std::vector<PlacementPtr<PictureRecord>> records = {};
-  size_t drawCount = 0;
-  MCState lastState = {};
-  Brush lastBrush = {};
-  Stroke lastStroke = {};
-  bool hasStroke = false;
+ protected:
+  Brush mergeBrush(const Brush& brush) const;
 
-  void recordState(const MCState& state);
-  void recordBrush(const Brush& brush);
-  void recordStroke(const Stroke& stroke);
-  void recordAll(const MCState& state, const Brush& brush, const Stroke* stroke = nullptr);
+ private:
+  DrawContext* drawContext = nullptr;
+  Brush layerBrush = {};
+  bool unrolled = false;
 };
 }  // namespace tgfx

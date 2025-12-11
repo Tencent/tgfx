@@ -18,6 +18,7 @@
 
 #include "tgfx/core/Canvas.h"
 #include "core/DrawContext.h"
+#include "core/LayerUnrollContext.h"
 #include "core/PictureContext.h"
 #include "core/shapes/StrokeShape.h"
 #include "core/utils/Log.h"
@@ -69,8 +70,8 @@ static Brush GetBrushForImage(const Paint* paint, const Image* image) {
   return brush;
 }
 
-Canvas::Canvas(DrawContext* drawContext, Surface* surface, bool optimizeMemoryForLayer)
-    : drawContext(drawContext), surface(surface), optimizeMemoryForLayer(optimizeMemoryForLayer) {
+Canvas::Canvas(DrawContext* drawContext, Surface* surface)
+    : drawContext(drawContext), surface(surface) {
   mcState = std::make_unique<MCState>();
 }
 
@@ -103,7 +104,7 @@ void Canvas::restore() {
   if (layer != nullptr) {
     drawContext = layer->drawContext;
     auto layerContext = reinterpret_cast<PictureContext*>(layer->layerContext.get());
-    auto picture = layerContext->finishRecordingAsPicture(optimizeMemoryForLayer);
+    auto picture = layerContext->finishRecordingAsPicture();
     if (picture != nullptr) {
       drawLayer(std::move(picture), {}, layer->layerPaint.getBrush(),
                 layer->layerPaint.getImageFilter());
@@ -567,23 +568,6 @@ void Canvas::drawPicture(std::shared_ptr<Picture> picture, const Matrix* matrix,
   }
 }
 
-class LayerUnrollModifier : public BrushModifier {
- public:
-  explicit LayerUnrollModifier(Brush layerBrush) : layerBrush(std::move(layerBrush)) {
-  }
-
-  Brush transform(const Brush& brush) const override {
-    auto newBrush = brush;
-    newBrush.color.alpha *= layerBrush.color.alpha;
-    newBrush.blendMode = layerBrush.blendMode;
-    newBrush.colorFilter = ColorFilter::Compose(brush.colorFilter, layerBrush.colorFilter);
-    return newBrush;
-  }
-
- private:
-  Brush layerBrush = {};
-};
-
 void Canvas::drawLayer(std::shared_ptr<Picture> picture, const MCState& state, const Brush& brush,
                        std::shared_ptr<ImageFilter> imageFilter) {
   DEBUG_ASSERT(brush.shader == nullptr);
@@ -604,9 +588,11 @@ void Canvas::drawLayer(std::shared_ptr<Picture> picture, const MCState& state, c
       return;
     }
   } else if (picture->drawCount == 1 && brush.maskFilter == nullptr) {
-    LayerUnrollModifier unrollModifier(brush);
-    picture->playback(drawContext, state, &unrollModifier);
-    return;
+    LayerUnrollContext unrollContext(drawContext, brush);
+    picture->playback(&unrollContext, state);
+    if (unrollContext.hasUnrolled()) {
+      return;
+    }
   }
   drawContext->drawLayer(std::move(picture), std::move(imageFilter), state, brush);
 }
