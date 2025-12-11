@@ -40,6 +40,7 @@ class RootLayer;
 struct LayerStyleSource;
 class BackgroundContext;
 enum class DrawMode;
+struct OffscreenExtraParams;
 
 /**
  * The base class for all layers that can be placed on the display list. The layer class includes
@@ -602,7 +603,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
                          const Matrix3D* transform = nullptr);
 
   void drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
-                     const Matrix3D* transform);
+                     const Matrix3D* transform, const OffscreenExtraParams* extraParams = nullptr);
 
   void drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha);
 
@@ -672,11 +673,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
                                                 const std::function<void(Canvas*)>& drawFunction);
 
   bool shouldPassThroughBackground(BlendMode blendMode, const Matrix3D* transform) const;
-
-  void drawOffscreenWithParams(const DrawArgs& args, Canvas* canvas, BlendMode blendMode,
-                               float alpha, const Matrix3D* transform,
-                               const std::optional<Rect>& clipBounds, float contentScale,
-                               bool cacheContent);
 
   bool drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                      const Matrix3D* transform);

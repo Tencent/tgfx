@@ -46,6 +46,12 @@ struct LayerStyleSource {
   Point contourOffset = {};
 };
 
+struct OffscreenExtraParams {
+  float contentScale = 1.0f;
+  std::optional<Rect> clipBounds = std::nullopt;
+  bool cacheContent = false;
+};
+
 // Determine if the 4*4 matrix contains only 2D affine transformations, i.e., no Z-axis related
 // transformations or projection transformations
 static bool IsMatrix3DAffine(const Matrix3D& matrix) {
@@ -1236,7 +1242,7 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   }
 
   if (args.renderFlags & RenderFlags::DisableCache || args.maxSubTreeCacheSize <= 0 ||
-      !args.context) {
+      cacheScale < contentScale || !args.context) {
     return false;
   }
 
@@ -1273,15 +1279,27 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   if (!fullFill && args.blurBackground) {
     cacheArgs.blurBackground = cacheArgs.blurBackground->createSubContext(renderBounds, false);
   }
-  drawOffscreenWithParams(cacheArgs, canvas, blendMode, alpha, transform, std::nullopt,
-                          contentScale, true);
+  OffscreenExtraParams extraParams = {};
+  extraParams.clipBounds = std::nullopt;
+  extraParams.contentScale = contentScale;
+  extraParams.cacheContent = true;
+  drawOffscreen(cacheArgs, canvas, alpha, blendMode, transform, &extraParams);
   return true;
 }
 
-void Layer::drawOffscreenWithParams(const DrawArgs& args, Canvas* canvas, BlendMode blendMode,
-                                    float alpha, const Matrix3D* transform,
-                                    const std::optional<Rect>& clipBounds, float contentScale,
-                                    bool cacheContent) {
+void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
+                          const Matrix3D* transform, const OffscreenExtraParams* extraParams) {
+  std::optional<Rect> clipBounds = std::nullopt;
+  float contentScale = 1.0f;
+  bool cacheContent = false;
+  if (extraParams) {
+    clipBounds = extraParams->clipBounds;
+    contentScale = extraParams->contentScale;
+    cacheContent = extraParams->cacheContent;
+  } else {
+    clipBounds = GetClipBounds(args.blurBackground ? args.blurBackground->getCanvas() : canvas);
+    contentScale = canvas->getMatrix().getMaxScale();
+  }
   if (transform != nullptr) {
     drawBackgroundLayerStyles(args, canvas, alpha, *transform);
   }
@@ -1328,10 +1346,7 @@ void Layer::drawOffscreenWithParams(const DrawArgs& args, Canvas* canvas, BlendM
     if (!subTreeCache || subTreeCache->contextID() != args.context->uniqueID()) {
       subTreeCache = RasterizedCache::MakeFrom(args.context);
     }
-    if (subTreeCache) {
-      image =
-          subTreeCache->addScaleCache(args.context, contentScale, std::move(image), imageMatrix);
-    }
+    image = subTreeCache->addScaleCache(args.context, contentScale, std::move(image), imageMatrix);
   }
 
   image = MakeImageWithTransform(std::move(image), transform, &imageMatrix);
@@ -1380,13 +1395,6 @@ void Layer::drawOffscreenWithParams(const DrawArgs& args, Canvas* canvas, BlendM
   // There is no scenario where LayerStyle's Position and ExtraSourceType are 'above' and
   // 'background' respectively at the same time, so no special handling is needed after drawing the
   // content.
-}
-
-void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
-                          const Matrix3D* transform) {
-  auto clipBounds = GetClipBounds(args.blurBackground ? args.blurBackground->getCanvas() : canvas);
-  drawOffscreenWithParams(args, canvas, blendMode, alpha, transform, clipBounds,
-                          canvas->getMatrix().getMaxScale(), false);
 }
 
 void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha) {
@@ -2041,7 +2049,6 @@ void Layer::updateBackgroundBounds(float contentScale) {
     auto layer = this;
     while (layer && !layer->bitFields.dirtyDescendents) {
       layer->invalidateCache();
-      layer->bitFields.cacheable = false;
       if (layer->maskOwner) {
         break;
       }
