@@ -19,6 +19,7 @@
 #include "SubTreeCache.h"
 #include "core/images/TextureImage.h"
 #include "gpu/ProxyProvider.h"
+#include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/ImageFilter.h"
 
 namespace tgfx {
@@ -30,8 +31,7 @@ UniqueKey SubTreeCache::makeSizeKey(int longEdge) const {
 }
 
 void SubTreeCache::addCache(Context* context, std::shared_ptr<TextureProxy> textureProxy,
-                            const Matrix& imageMatrix,
-                            std::shared_ptr<ColorSpace> colorSpace) {
+                            const Matrix& imageMatrix) {
   if (context == nullptr || textureProxy == nullptr) {
     return;
   }
@@ -39,16 +39,17 @@ void SubTreeCache::addCache(Context* context, std::shared_ptr<TextureProxy> text
   auto proxyProvider = context->proxyProvider();
   proxyProvider->assignProxyUniqueKey(textureProxy, sizeUniqueKey);
   textureProxy->assignUniqueKey(sizeUniqueKey);
-  _sizeCacheData[sizeUniqueKey] = {imageMatrix, std::move(colorSpace)};
+  _sizeMatrices[sizeUniqueKey] = imageMatrix;
 }
 
-bool SubTreeCache::valid(Context* context, int longEdge) const {
-  if (context == nullptr) {
+bool SubTreeCache::valid(Context* context, int longEdge,
+                         const std::shared_ptr<ColorSpace>& colorSpace) const {
+  if (context == nullptr || !ColorSpace::Equals(_colorSpace.get(), colorSpace.get())) {
     return false;
   }
   auto sizeUniqueKey = makeSizeKey(longEdge);
-  auto it = _sizeCacheData.find(sizeUniqueKey);
-  if (it == _sizeCacheData.end()) {
+  auto it = _sizeMatrices.find(sizeUniqueKey);
+  if (it == _sizeMatrices.end()) {
     return false;
   }
   auto proxyProvider = context->proxyProvider();
@@ -56,13 +57,14 @@ bool SubTreeCache::valid(Context* context, int longEdge) const {
 }
 
 void SubTreeCache::draw(Context* context, int longEdge, Canvas* canvas, const Paint& paint,
-                        const Matrix3D* transform3D) const {
-  if (context == nullptr) {
+                        const Matrix3D* transform3D,
+                        const std::shared_ptr<ColorSpace>& colorSpace) const {
+  if (context == nullptr || !ColorSpace::Equals(_colorSpace.get(), colorSpace.get())) {
     return;
   }
   auto sizeUniqueKey = makeSizeKey(longEdge);
-  auto it = _sizeCacheData.find(sizeUniqueKey);
-  if (it == _sizeCacheData.end()) {
+  auto it = _sizeMatrices.find(sizeUniqueKey);
+  if (it == _sizeMatrices.end()) {
     return;
   }
   auto proxyProvider = context->proxyProvider();
@@ -70,11 +72,11 @@ void SubTreeCache::draw(Context* context, int longEdge, Canvas* canvas, const Pa
   if (proxy == nullptr) {
     return;
   }
-  auto image = TextureImage::Wrap(proxy, it->second.colorSpace);
+  auto image = TextureImage::Wrap(proxy, _colorSpace);
   if (image == nullptr) {
     return;
   }
-  const auto& matrix = it->second.imageMatrix;
+  const auto& matrix = it->second;
   auto oldMatrix = canvas->getMatrix();
   canvas->concat(matrix);
   Paint drawPaint = paint;
