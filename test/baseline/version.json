@@ -369,10 +369,10 @@
     },
     "SVGExportTest": {
         "AssignColorSpace": "0d4409dd",
-        "DrawImageRect": "6b4e5ce0",
+        "DrawImageRect": "f8344be7",
         "DstAssignColorSpace": "0d4409dd",
         "DstColorSpace": "0d4409dd",
-        "ImageMask": "6b4e5ce0",
+        "ImageMask": "f8344be7",
         "InvertPictureImageMask": "9a80633b",
         "LayerDropShadow": "a99262da",
         "PictureImageMask": "9a80633b"
