@@ -33,7 +33,6 @@ class TGFXView : public QQuickItem {
 
   Q_INVOKABLE void updateTransform(qreal zoomLevel, QPointF panOffset);
   Q_INVOKABLE void onClicked();
-  Q_INVOKABLE bool draw();
 
  protected:
   QSGNode* updatePaintNode(QSGNode*, UpdatePaintNodeData*) override;
@@ -55,6 +54,7 @@ class TGFXView : public QQuickItem {
   void createAppHost();
   void updateDisplayList();
   void applyTransform();
+  void draw();
  private Q_SLOTS:
   void onSceneGraphInvalidated();
 };

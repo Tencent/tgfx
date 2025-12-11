@@ -62,6 +62,13 @@ class LayerBuilder {
    */
   std::shared_ptr<tgfx::Layer> buildLayerTree(const hello2d::AppHost* host);
 
+  /**
+   * Applies centering and scaling transformation to the layer.
+   * This should be called whenever the window size changes to update the root layer matrix.
+   */
+  static void ApplyCenteringTransform(std::shared_ptr<tgfx::Layer> layer, float viewWidth,
+                                      float viewHeight);
+
  protected:
   /**
    * Builds and returns the content layer tree.
@@ -70,11 +77,6 @@ class LayerBuilder {
 
  private:
   std::string _name;
-
-  /**
-   * Applies centering and scaling transformation to the layer.
-   */
-  void applyCenteringTransform(std::shared_ptr<tgfx::Layer> layer);
 };
 
 /**

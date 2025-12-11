@@ -21,7 +21,6 @@ static std::unique_ptr<tgfx::Recording> lastRecording = nullptr;
 static int lastDrawIndex = -1;
 static int lastSurfaceWidth = 0;
 static int lastSurfaceHeight = 0;
-static bool sizeInvalidated = false;
 
 static std::shared_ptr<hello2d::AppHost> CreateAppHost();
 static void ApplyTransform(float zoom, float offsetX, float offsetY);
@@ -61,6 +60,9 @@ static napi_value AddImageFromEncoded(napi_env env, napi_callback_info info) {
 
 static void UpdateDisplayList(int drawIndex, float zoom = 1.0f, float offsetX = 0.0f, float offsetY = 0.0f) {
   if (!appHost) {
+    appHost = CreateAppHost();
+  }
+  if (!appHost) {
     return;
   }
 
@@ -83,16 +85,13 @@ static void UpdateDisplayList(int drawIndex, float zoom = 1.0f, float offsetX = 
 
 static void ApplyTransform(float zoom, float offsetX, float offsetY) {
   if (lastSurfaceWidth > 0 && lastSurfaceHeight > 0) {
-    static constexpr float DESIGN_SIZE = 720.0f;
-    auto scaleX = static_cast<float>(lastSurfaceWidth) / DESIGN_SIZE;
-    auto scaleY = static_cast<float>(lastSurfaceHeight) / DESIGN_SIZE;
-    auto baseScale = std::min(scaleX, scaleY);
-    auto scaledSize = DESIGN_SIZE * baseScale;
-    auto baseOffsetX = (static_cast<float>(lastSurfaceWidth) - scaledSize) * 0.5f;
-    auto baseOffsetY = (static_cast<float>(lastSurfaceHeight) - scaledSize) * 0.5f;
-
-    displayList.setZoomScale(zoom * baseScale);
-    displayList.setContentOffset(baseOffsetX + offsetX, baseOffsetY + offsetY);
+    if (contentLayer) {
+      hello2d::LayerBuilder::ApplyCenteringTransform(contentLayer,
+                                                     static_cast<float>(lastSurfaceWidth),
+                                                     static_cast<float>(lastSurfaceHeight));
+    }
+    displayList.setZoomScale(zoom);
+    displayList.setContentOffset(offsetX, offsetY);
   }
 }
 
@@ -101,8 +100,7 @@ static bool Draw(int drawIndex, float zoom = 1.0f, float offsetX = 0.0f, float o
     return false;
   }
 
-  bool needsRender = displayList.hasContentChanged() || sizeInvalidated;
-  if (!needsRender && lastRecording == nullptr) {
+  if (!displayList.hasContentChanged() && lastRecording == nullptr) {
     return false;
   }
 
@@ -118,14 +116,25 @@ static bool Draw(int drawIndex, float zoom = 1.0f, float offsetX = 0.0f, float o
     return false;
   }
 
-  if (!needsRender) {
-    context->submit(std::move(lastRecording));
-    window->present(context);
-    device->unlock();
-    return false;
+  if (surface->width() != lastSurfaceWidth || surface->height() != lastSurfaceHeight) {
+    lastSurfaceWidth = surface->width();
+    lastSurfaceHeight = surface->height();
+    ApplyTransform(zoom, offsetX, offsetY);
   }
 
-  sizeInvalidated = false;
+  bool needsRender = displayList.hasContentChanged();
+  bool submitted = false;
+
+  if (!needsRender) {
+    if (lastRecording) {
+      context->submit(std::move(lastRecording));
+      window->present(context);
+      lastRecording = nullptr;
+      submitted = true;
+    }
+    device->unlock();
+    return submitted;
+  }
 
   auto canvas = surface->getCanvas();
   canvas->clear();
@@ -134,17 +143,18 @@ static bool Draw(int drawIndex, float zoom = 1.0f, float offsetX = 0.0f, float o
   displayList.render(surface.get(), false);
 
   auto recording = context->flush();
-  if (lastRecording) {
-    context->submit(std::move(lastRecording));
-    window->present(context);
-    lastRecording = std::move(recording);
-  } else if (recording) {
+
+  // Delayed one-frame present
+  std::swap(lastRecording, recording);
+
+  if (recording) {
     context->submit(std::move(recording));
     window->present(context);
+    submitted = true;
   }
 
   device->unlock();
-  return false;
+  return submitted || (lastRecording != nullptr);
 }
 
 
@@ -232,7 +242,6 @@ static void UpdateSize(OH_NativeXComponent* component, void* nativeWindow) {
   if (window != nullptr) {
     window->invalidSize();
     lastRecording = nullptr;
-    sizeInvalidated = true;
     if (displayLink) {
       displayLink->start();
     }

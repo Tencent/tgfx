@@ -74,17 +74,13 @@ void TGFXView::updateDisplayList() {
 
 void TGFXView::applyTransform() {
   if (lastSurfaceWidth > 0 && lastSurfaceHeight > 0) {
-    static constexpr float DESIGN_SIZE = 720.0f;
-    auto scaleX = static_cast<float>(lastSurfaceWidth) / DESIGN_SIZE;
-    auto scaleY = static_cast<float>(lastSurfaceHeight) / DESIGN_SIZE;
-    auto baseScale = std::min(scaleX, scaleY);
-    auto scaledSize = DESIGN_SIZE * baseScale;
-    auto baseOffsetX = (static_cast<float>(lastSurfaceWidth) - scaledSize) * 0.5f;
-    auto baseOffsetY = (static_cast<float>(lastSurfaceHeight) - scaledSize) * 0.5f;
-
-    displayList.setZoomScale(zoom * baseScale);
-    displayList.setContentOffset(baseOffsetX + static_cast<float>(offset.x()),
-                                 baseOffsetY + static_cast<float>(offset.y()));
+    if (contentLayer) {
+      hello2d::LayerBuilder::ApplyCenteringTransform(contentLayer,
+                                                     static_cast<float>(lastSurfaceWidth),
+                                                     static_cast<float>(lastSurfaceHeight));
+    }
+    displayList.setZoomScale(zoom);
+    displayList.setContentOffset(static_cast<float>(offset.x()), static_cast<float>(offset.y()));
   }
 }
 
@@ -108,10 +104,7 @@ QSGNode* TGFXView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
     sizeInvalidated = true;
   }
 
-  bool hasContentChanged = draw();
-  if (hasContentChanged) {
-    update();
-  }
+  draw();
 
   auto node = static_cast<QSGImageNode*>(oldNode);
   auto texture = tgfxWindow->getQSGTexture();
@@ -152,54 +145,80 @@ void TGFXView::createAppHost() {
   appHost->addTypeface("emoji", emojiTypeface);
 }
 
-bool TGFXView::draw() {
-  bool needsRender = displayList.hasContentChanged() || sizeInvalidated;
-  if (!needsRender && lastRecording == nullptr) {
-    return false;
+void TGFXView::draw() {
+  if (!displayList.hasContentChanged() && lastRecording == nullptr) {
+    return;
   }
 
   auto device = tgfxWindow->getDevice();
   if (device == nullptr) {
-    return false;
+    return;
   }
   auto context = device->lockContext();
   if (context == nullptr) {
-    return false;
+    return;
   }
 
   auto surface = tgfxWindow->getSurface(context);
   if (surface == nullptr) {
     device->unlock();
-    return false;
+    return;
   }
+
+  // Sync surface size for DPI changes.
+  bool surfaceResized = sizeInvalidated;
+  sizeInvalidated = false;
+
+  if (surface->width() != lastSurfaceWidth || surface->height() != lastSurfaceHeight) {
+    lastSurfaceWidth = surface->width();
+    lastSurfaceHeight = surface->height();
+    applyTransform();
+    surfaceResized = true;
+  }
+
+  bool needsRender = displayList.hasContentChanged();
 
   if (!needsRender) {
-    context->submit(std::move(lastRecording));
-    tgfxWindow->present(context);
+    if (lastRecording) {
+      context->submit(std::move(lastRecording));
+      tgfxWindow->present(context);
+      lastRecording = nullptr;
+    }
     device->unlock();
-    return false;
+    return;
   }
-
-  sizeInvalidated = false;
 
   auto canvas = surface->getCanvas();
   canvas->clear();
-  auto pixelRatio = window()->devicePixelRatio();
+  auto pixelRatio = static_cast<float>(window()->devicePixelRatio());
   hello2d::DrawBackground(canvas, surface->width(), surface->height(), pixelRatio);
 
   displayList.render(surface.get(), false);
 
   auto recording = context->flush();
-  if (lastRecording) {
-    context->submit(std::move(lastRecording));
-    tgfxWindow->present(context);
-    lastRecording = std::move(recording);
-  } else if (recording) {
-    context->submit(std::move(recording));
-    tgfxWindow->present(context);
+
+  if (surfaceResized) {
+    // When resized, submit current frame immediately (no delay)
+    if (recording) {
+      context->submit(std::move(recording));
+      tgfxWindow->present(context);
+    }
+    // Clear lastRecording since we need to restart the delay cycle after resize
+    lastRecording = nullptr;
+  } else {
+    // Normal case: delayed one-frame present
+    std::swap(lastRecording, recording);
+
+    if (recording) {
+      context->submit(std::move(recording));
+      tgfxWindow->present(context);
+    }
   }
 
   device->unlock();
-  return false;
+
+  if (lastRecording != nullptr) {
+    update();
+  }
 }
 }  // namespace hello2d

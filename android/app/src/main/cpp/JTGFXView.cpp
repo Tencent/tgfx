@@ -26,11 +26,16 @@ void JTGFXView::updateSize() {
   auto width = ANativeWindow_getWidth(nativeWindow);
   auto height = ANativeWindow_getHeight(nativeWindow);
   if (width > 0 && height > 0) {
+    lastSurfaceWidth = width;
+    lastSurfaceHeight = height;
+    if (contentLayer) {
+      hello2d::LayerBuilder::ApplyCenteringTransform(contentLayer,
+                                                     static_cast<float>(lastSurfaceWidth),
+                                                     static_cast<float>(lastSurfaceHeight));
+    }
     window->invalidSize();
     // Clear lastRecording when size changes, as it was created for the old surface size
     lastRecording = nullptr;
-    // Mark size as invalidated to force render next frame
-    sizeInvalidated = true;
   }
 }
 
@@ -40,6 +45,7 @@ bool JTGFXView::draw(int drawIndex, float zoom, float offsetX, float offsetY) {
   // Switch sample when drawIndex changes
   auto numBuilders = hello2d::LayerBuilder::Count();
   auto index = (drawIndex % numBuilders);
+  bool layerTreeChanged = false;
   if (index != lastDrawIndex || !contentLayer) {
     auto builder = hello2d::LayerBuilder::GetByIndex(index);
     if (builder) {
@@ -47,26 +53,24 @@ bool JTGFXView::draw(int drawIndex, float zoom, float offsetX, float offsetY) {
       if (contentLayer) {
         displayList.root()->removeChildren();
         displayList.root()->addChild(contentLayer);
+        layerTreeChanged = true;
       }
     }
     lastDrawIndex = index;
   }
 
-  // Calculate base scale and offset using cached surface size
+  // Apply centering transform when layer tree changes or zoom/offset changes
   if (lastSurfaceWidth > 0 && lastSurfaceHeight > 0) {
     bool zoomChanged = (zoom != lastZoom);
     bool offsetChanged = (offsetX != lastOffsetX || offsetY != lastOffsetY);
-    if (zoomChanged || offsetChanged) {
-      static constexpr float DESIGN_SIZE = 720.0f;
-      auto scaleX = static_cast<float>(lastSurfaceWidth) / DESIGN_SIZE;
-      auto scaleY = static_cast<float>(lastSurfaceHeight) / DESIGN_SIZE;
-      auto baseScale = std::min(scaleX, scaleY);
-      auto scaledSize = DESIGN_SIZE * baseScale;
-      auto baseOffsetX = (static_cast<float>(lastSurfaceWidth) - scaledSize) * 0.5f;
-      auto baseOffsetY = (static_cast<float>(lastSurfaceHeight) - scaledSize) * 0.5f;
-
-      displayList.setZoomScale(zoom * baseScale);
-      displayList.setContentOffset(baseOffsetX + offsetX, baseOffsetY + offsetY);
+    if (layerTreeChanged || zoomChanged || offsetChanged) {
+      if (contentLayer) {
+        hello2d::LayerBuilder::ApplyCenteringTransform(contentLayer,
+                                                       static_cast<float>(lastSurfaceWidth),
+                                                       static_cast<float>(lastSurfaceHeight));
+      }
+      displayList.setZoomScale(zoom);
+      displayList.setContentOffset(offsetX, offsetY);
       lastZoom = zoom;
       lastOffsetX = offsetX;
       lastOffsetY = offsetY;
@@ -74,10 +78,8 @@ bool JTGFXView::draw(int drawIndex, float zoom, float offsetX, float offsetY) {
   }
 
   // Check if content has changed AFTER setting all properties, BEFORE locking device
-  bool needsRender = displayList.hasContentChanged() || sizeInvalidated;
-
   // If no content change AND no pending lastRecording -> skip everything, don't lock device
-  if (!needsRender && lastRecording == nullptr) {
+  if (!displayList.hasContentChanged() && lastRecording == nullptr) {
     return false;
   }
 
@@ -95,46 +97,36 @@ bool JTGFXView::draw(int drawIndex, float zoom, float offsetX, float offsetY) {
     return false;
   }
 
-  // Update cached surface size for next frame's calculations
-  int newSurfaceWidth = surface->width();
-  int newSurfaceHeight = surface->height();
-  bool sizeChanged = (newSurfaceWidth != lastSurfaceWidth || newSurfaceHeight != lastSurfaceHeight);
-  lastSurfaceWidth = newSurfaceWidth;
-  lastSurfaceHeight = newSurfaceHeight;
-
-  // If surface size just changed, update zoomScale/contentOffset now
-  if (sizeChanged && lastSurfaceWidth > 0 && lastSurfaceHeight > 0) {
-    static constexpr float DESIGN_SIZE = 720.0f;
-    auto scaleX = static_cast<float>(lastSurfaceWidth) / DESIGN_SIZE;
-    auto scaleY = static_cast<float>(lastSurfaceHeight) / DESIGN_SIZE;
-    auto baseScale = std::min(scaleX, scaleY);
-    auto scaledSize = DESIGN_SIZE * baseScale;
-    auto baseOffsetX = (static_cast<float>(lastSurfaceWidth) - scaledSize) * 0.5f;
-    auto baseOffsetY = (static_cast<float>(lastSurfaceHeight) - scaledSize) * 0.5f;
-    displayList.setZoomScale(zoom * baseScale);
-    displayList.setContentOffset(baseOffsetX + offsetX, baseOffsetY + offsetY);
+  if (surface->width() != lastSurfaceWidth || surface->height() != lastSurfaceHeight) {
+    lastSurfaceWidth = surface->width();
+    lastSurfaceHeight = surface->height();
+    // Update zoomScale/contentOffset for new size
+    if (contentLayer) {
+      hello2d::LayerBuilder::ApplyCenteringTransform(contentLayer,
+                                                     static_cast<float>(lastSurfaceWidth),
+                                                     static_cast<float>(lastSurfaceHeight));
+    }
+    displayList.setZoomScale(zoom);
+    displayList.setContentOffset(offsetX, offsetY);
     lastZoom = zoom;
     lastOffsetX = offsetX;
     lastOffsetY = offsetY;
-    needsRender = true;
   }
 
-  // Clear sizeInvalidated flag
-  sizeInvalidated = false;
+  bool needsRender = displayList.hasContentChanged();
+  bool submitted = false;
 
-  // Track if we submitted anything this frame
-  bool didSubmit = false;
-
-  // Case 1: No content change BUT have pending lastRecording -> only submit lastRecording
   if (!needsRender) {
-    context->submit(std::move(lastRecording));
-    window->present(context);
-    didSubmit = true;
+    if (lastRecording) {
+      context->submit(std::move(lastRecording));
+      window->present(context);
+      lastRecording = nullptr;
+      submitted = true;
+    }
     device->unlock();
-    return didSubmit;
+    return submitted;
   }
 
-  // Case 2: Content changed -> render new content
   auto canvas = surface->getCanvas();
   canvas->clear();
   auto width = ANativeWindow_getWidth(nativeWindow);
@@ -145,25 +137,18 @@ bool JTGFXView::draw(int drawIndex, float zoom, float offsetX, float offsetY) {
   // Render DisplayList
   displayList.render(surface.get(), false);
 
-  // Delayed one-frame present mode
   auto recording = context->flush();
-  if (lastRecording) {
-    // Normal delayed mode: submit last frame, save current for next
-    context->submit(std::move(lastRecording));
-    window->present(context);
-    didSubmit = true;
-    lastRecording = std::move(recording);
-  } else if (recording) {
-    // No lastRecording (first frame or after size change): submit current directly
+
+  // Delayed one-frame present
+  std::swap(lastRecording, recording);
+
+  if (recording) {
     context->submit(std::move(recording));
     window->present(context);
-    didSubmit = true;
   }
 
   device->unlock();
-
-  // Return true if we submitted or have pending recording
-  return didSubmit || lastRecording != nullptr;
+  return lastRecording != nullptr;
 }
 }  // namespace hello2d
 
@@ -265,15 +250,15 @@ JNIEXPORT jlong JNICALL Java_org_tgfx_hello2d_TGFXView_00024Companion_setupFromS
   return reinterpret_cast<jlong>(jTGFXView);
 }
 
-JNIEXPORT void JNICALL Java_org_tgfx_hello2d_TGFXView_nativeDraw(JNIEnv* env, jobject thiz,
+JNIEXPORT jboolean JNICALL Java_org_tgfx_hello2d_TGFXView_nativeDraw(JNIEnv* env, jobject thiz,
                                                                  jint drawIndex, jfloat zoom,
                                                                  jfloat offsetX, jfloat offsetY) {
   auto view = GetJTGFXView(env, thiz);
   if (view == nullptr) {
-    return;
+    return JNI_FALSE;
   }
 
-  view->draw(drawIndex, zoom, offsetX, offsetY);
+  return view->draw(drawIndex, zoom, offsetX, offsetY) ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT void JNICALL Java_org_tgfx_hello2d_TGFXView_updateSize(JNIEnv* env, jobject thiz) {

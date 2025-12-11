@@ -192,17 +192,14 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
 
 - (void)applyTransform {
   if (lastSurfaceWidth > 0 && lastSurfaceHeight > 0) {
-    static constexpr float DESIGN_SIZE = 720.0f;
-    auto scaleX = static_cast<float>(lastSurfaceWidth) / DESIGN_SIZE;
-    auto scaleY = static_cast<float>(lastSurfaceHeight) / DESIGN_SIZE;
-    auto baseScale = std::min(scaleX, scaleY);
-    auto scaledSize = DESIGN_SIZE * baseScale;
-    auto baseOffsetX = (static_cast<float>(lastSurfaceWidth) - scaledSize) * 0.5f;
-    auto baseOffsetY = (static_cast<float>(lastSurfaceHeight) - scaledSize) * 0.5f;
-
-    displayList.setZoomScale(self.zoomScale * baseScale);
-    displayList.setContentOffset(baseOffsetX + static_cast<float>(self.contentOffset.x),
-                                 baseOffsetY + static_cast<float>(self.contentOffset.y));
+    if (contentLayer) {
+      hello2d::LayerBuilder::ApplyCenteringTransform(contentLayer,
+                                                     static_cast<float>(lastSurfaceWidth),
+                                                     static_cast<float>(lastSurfaceHeight));
+    }
+    displayList.setZoomScale(self.zoomScale);
+    displayList.setContentOffset(static_cast<float>(self.contentOffset.x),
+                                 static_cast<float>(self.contentOffset.y));
   }
 }
 
@@ -217,8 +214,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
     return false;
   }
 
-  bool needsRender = displayList.hasContentChanged() || sizeInvalidated;
-  if (!needsRender && lastRecording == nullptr) {
+  if (!displayList.hasContentChanged() && lastRecording == nullptr) {
     return false;
   }
 
@@ -234,14 +230,30 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
     return false;
   }
 
-  if (!needsRender) {
-    context->submit(std::move(lastRecording));
-    tgfxWindow->present(context);
-    device->unlock();
-    return false;
+  // Sync surface size for DPI changes.
+  bool surfaceResized = sizeInvalidated;
+  sizeInvalidated = false;
+
+  if (surface->width() != lastSurfaceWidth || surface->height() != lastSurfaceHeight) {
+    lastSurfaceWidth = surface->width();
+    lastSurfaceHeight = surface->height();
+    [self applyTransform];
+    surfaceResized = true;
   }
 
-  sizeInvalidated = false;
+  bool needsRender = displayList.hasContentChanged();
+  bool submitted = false;
+
+  if (!needsRender) {
+    if (lastRecording) {
+      context->submit(std::move(lastRecording));
+      tgfxWindow->present(context);
+      lastRecording = nullptr;
+      submitted = true;
+    }
+    device->unlock();
+    return submitted;
+  }
 
   auto canvas = surface->getCanvas();
   canvas->clear();
@@ -250,17 +262,29 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   displayList.render(surface.get(), false);
 
   auto recording = context->flush();
-  if (lastRecording) {
-    context->submit(std::move(lastRecording));
-    tgfxWindow->present(context);
-    lastRecording = std::move(recording);
-  } else if (recording) {
-    context->submit(std::move(recording));
-    tgfxWindow->present(context);
+
+  if (surfaceResized) {
+    // When resized, submit current frame immediately (no delay)
+    if (recording) {
+      context->submit(std::move(recording));
+      tgfxWindow->present(context);
+      submitted = true;
+    }
+    // Clear lastRecording since we need to restart the delay cycle after resize
+    lastRecording = nullptr;
+  } else {
+    // Normal case: delayed one-frame present
+    std::swap(lastRecording, recording);
+
+    if (recording) {
+      context->submit(std::move(recording));
+      tgfxWindow->present(context);
+      submitted = true;
+    }
   }
 
   device->unlock();
-  return false;
+  return submitted || (lastRecording != nullptr);
 }
 
 - (void)mouseDown:(NSEvent*)event {

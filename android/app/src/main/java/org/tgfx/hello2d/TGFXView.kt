@@ -87,7 +87,10 @@ open class TGFXView : TextureView, TextureView.SurfaceTextureListener {
 
         // Only draw if native initialization was successful
         if (nativePtr != 0L) {
-            draw(0, 1.0f, PointF(0f, 0f))
+            // First draw renders content, second draw submits the delayed recording
+            if (draw(0, 1.0f, PointF(0f, 0f))) {
+                draw(0, 1.0f, PointF(0f, 0f))
+            }
         }
     }
 

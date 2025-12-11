@@ -56,7 +56,7 @@ class TGFXBaseView {
   std::unique_ptr<tgfx::Recording> lastRecording = nullptr;
   int lastSurfaceWidth = 0;
   int lastSurfaceHeight = 0;
-  bool sizeInvalidated = false;
+  bool isResizing = false;
   float currentZoom = 1.0f;
   float currentOffsetX = 0.0f;
   float currentOffsetY = 0.0f;

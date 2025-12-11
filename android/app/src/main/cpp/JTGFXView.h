@@ -62,7 +62,5 @@ class JTGFXView {
   // Cached surface size for calculating base scale without locking device
   int lastSurfaceWidth = 0;
   int lastSurfaceHeight = 0;
-  // Flag to force render when size changes
-  bool sizeInvalidated = false;
 };
 }  // namespace hello2d

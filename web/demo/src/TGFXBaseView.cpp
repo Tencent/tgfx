@@ -43,11 +43,10 @@ void TGFXBaseView::updateSize(float devicePixelRatio) {
   }
   lastSurfaceWidth = static_cast<int>(width * devicePixelRatio);
   lastSurfaceHeight = static_cast<int>(height * devicePixelRatio);
+  isResizing = true;
   applyTransform();
   if (window) {
     window->invalidSize();
-    lastRecording = nullptr;
-    sizeInvalidated = true;
   }
 }
 
@@ -66,26 +65,21 @@ void TGFXBaseView::onClickEvent() {
 
 void TGFXBaseView::applyTransform() {
   if (lastSurfaceWidth > 0 && lastSurfaceHeight > 0) {
-    static constexpr float DESIGN_SIZE = 720.0f;
-    auto scaleX = static_cast<float>(lastSurfaceWidth) / DESIGN_SIZE;
-    auto scaleY = static_cast<float>(lastSurfaceHeight) / DESIGN_SIZE;
-    auto baseScale = std::min(scaleX, scaleY);
-    auto scaledSize = DESIGN_SIZE * baseScale;
-    auto baseOffsetX = (static_cast<float>(lastSurfaceWidth) - scaledSize) * 0.5f;
-    auto baseOffsetY = (static_cast<float>(lastSurfaceHeight) - scaledSize) * 0.5f;
-
-    displayList.setZoomScale(currentZoom * baseScale);
-    displayList.setContentOffset(baseOffsetX + currentOffsetX, baseOffsetY + currentOffsetY);
+    if (contentLayer) {
+      hello2d::LayerBuilder::ApplyCenteringTransform(contentLayer,
+                                                     static_cast<float>(lastSurfaceWidth),
+                                                     static_cast<float>(lastSurfaceHeight));
+    }
+    displayList.setZoomScale(currentZoom);
+    displayList.setContentOffset(currentOffsetX, currentOffsetY);
   }
 }
 
 void TGFXBaseView::updateDrawParams(int drawIndex, float zoom, float offsetX, float offsetY) {
-  // Cache current parameters for use when size changes
   currentZoom = zoom;
   currentOffsetX = offsetX;
   currentOffsetY = offsetY;
 
-  // Switch sample when drawIndex changes
   auto numBuilders = hello2d::LayerBuilder::Count();
   auto index = drawIndex % numBuilders;
   if (index != lastDrawIndex || !contentLayer) {
@@ -100,7 +94,6 @@ void TGFXBaseView::updateDrawParams(int drawIndex, float zoom, float offsetX, fl
     lastDrawIndex = index;
   }
 
-  // Apply transform using cached surface size
   applyTransform();
 }
 
@@ -112,8 +105,7 @@ bool TGFXBaseView::draw() {
     return false;
   }
 
-  bool needsRender = displayList.hasContentChanged() || sizeInvalidated;
-  if (!needsRender && lastRecording == nullptr) {
+  if (!displayList.hasContentChanged() && lastRecording == nullptr) {
     return false;
   }
 
@@ -129,14 +121,30 @@ bool TGFXBaseView::draw() {
     return false;
   }
 
-  if (!needsRender) {
-    context->submit(std::move(lastRecording));
-    window->present(context);
-    device->unlock();
-    return false;
+  // Sync surface size for DPI changes.
+  bool surfaceResized = isResizing;
+  isResizing = false;
+
+  if (surface->width() != lastSurfaceWidth || surface->height() != lastSurfaceHeight) {
+    lastSurfaceWidth = surface->width();
+    lastSurfaceHeight = surface->height();
+    applyTransform();
+    surfaceResized = true;
   }
 
-  sizeInvalidated = false;
+  bool needsRender = displayList.hasContentChanged();
+  bool submitted = false;
+
+  if (!needsRender) {
+    if (lastRecording) {
+      context->submit(std::move(lastRecording));
+      window->present(context);
+      lastRecording = nullptr;
+      submitted = true;
+    }
+    device->unlock();
+    return submitted;
+  }
 
   auto canvas = surface->getCanvas();
   canvas->clear();
@@ -149,17 +157,30 @@ bool TGFXBaseView::draw() {
   displayList.render(surface.get(), false);
 
   auto recording = context->flush();
-  if (lastRecording) {
-    context->submit(std::move(lastRecording));
-    window->present(context);
-    lastRecording = std::move(recording);
-  } else if (recording) {
-    context->submit(std::move(recording));
-    window->present(context);
+
+  if (surfaceResized) {
+    // When resized, submit current frame immediately (no delay)
+    if (recording) {
+      context->submit(std::move(recording));
+      window->present(context);
+      submitted = true;
+    }
+    // Clear lastRecording since we need to restart the delay cycle after resize
+    lastRecording = nullptr;
+  } else {
+    // Normal case: delayed one-frame present
+    std::swap(lastRecording, recording);
+
+    if (recording) {
+      context->submit(std::move(recording));
+      window->present(context);
+      submitted = true;
+    }
   }
 
   device->unlock();
-  return false;
+
+  return submitted || (lastRecording != nullptr);
 }
 
 }  // namespace hello2d

@@ -84,26 +84,24 @@ std::shared_ptr<tgfx::Layer> LayerBuilder::buildLayerTree(const hello2d::AppHost
   if (!layer) {
     return layer;
   }
-
-  // Apply centering and scaling transformation
-  applyCenteringTransform(layer);
   return layer;
 }
 
-void LayerBuilder::applyCenteringTransform(std::shared_ptr<tgfx::Layer> layer) {
-  if (!layer) {
+void LayerBuilder::ApplyCenteringTransform(std::shared_ptr<tgfx::Layer> layer, float viewWidth,
+                                           float viewHeight) {
+  if (!layer || viewWidth <= 0 || viewHeight <= 0) {
     return;
   }
 
   // Calculate centered matrix with padding
   auto bounds = layer->getBounds(nullptr, true);
   if (!bounds.isEmpty()) {
-    static constexpr float CONTENT_WIDTH = 620.0f;
-    static constexpr float PADDING = 50.0f;
-    auto scale = std::min(CONTENT_WIDTH / bounds.width(), CONTENT_WIDTH / bounds.height());
+    static constexpr float CONTENT_SCALE = 620.0f / 720.0f;
+    auto scale =
+        std::min(viewWidth / bounds.width(), viewHeight / bounds.height()) * CONTENT_SCALE;
     tgfx::Matrix matrix = tgfx::Matrix::MakeScale(scale);
-    matrix.postTranslate((CONTENT_WIDTH - bounds.width() * scale) * 0.5f + PADDING,
-                         (CONTENT_WIDTH - bounds.height() * scale) * 0.5f + PADDING);
+    matrix.postTranslate((viewWidth - bounds.width() * scale) * 0.5f,
+                         (viewHeight - bounds.height() * scale) * 0.5f);
     layer->setMatrix(matrix);
   }
 }
