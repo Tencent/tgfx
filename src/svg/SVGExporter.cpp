@@ -29,25 +29,30 @@
 
 namespace tgfx {
 
-std::shared_ptr<SVGExporter> SVGExporter::Make(
-    const std::shared_ptr<WriteStream>& svgStream, Context* context, const Rect& viewBox,
-    uint32_t exportFlags, const std::shared_ptr<SVGCustomWriter>& customWriter,
-    std::shared_ptr<ColorSpace> dstColorSpace, std::shared_ptr<ColorSpace> assignColorSpace) {
+std::shared_ptr<SVGExporter> SVGExporter::Make(const std::shared_ptr<WriteStream>& svgStream,
+                                               Context* context, const Rect& viewBox,
+                                               uint32_t exportFlags,
+                                               const std::shared_ptr<SVGCustomWriter>& customWriter,
+                                               std::shared_ptr<ColorSpace> targetColorSpace,
+                                               std::shared_ptr<ColorSpace> assignColorSpace) {
   if (!context || !svgStream || viewBox.isEmpty()) {
     return nullptr;
   }
-  return std::shared_ptr<SVGExporter>(
-      new SVGExporter(svgStream, context, viewBox, exportFlags, customWriter, std::move(dstColorSpace), std::move(assignColorSpace)));
+  return std::shared_ptr<SVGExporter>(new SVGExporter(svgStream, context, viewBox, exportFlags,
+                                                      customWriter, std::move(targetColorSpace),
+                                                      std::move(assignColorSpace)));
 }
 
 SVGExporter::SVGExporter(const std::shared_ptr<WriteStream>& svgStream, Context* context,
                          const Rect& viewBox, uint32_t exportFlags,
                          const std::shared_ptr<SVGCustomWriter>& customWriter,
-                         std::shared_ptr<ColorSpace> dstColorSpace, std::shared_ptr<ColorSpace> assignColorSpace) {
+                         std::shared_ptr<ColorSpace> targetColorSpace,
+                         std::shared_ptr<ColorSpace> assignColorSpace) {
   auto streamWriter =
       std::make_unique<XMLStreamWriter>(svgStream, exportFlags & SVGExportFlags::DisablePrettyXML);
   drawContext =
-      new SVGExportContext(context, viewBox, std::move(streamWriter), exportFlags, customWriter, std::move(dstColorSpace), std::move(assignColorSpace));
+      new SVGExportContext(context, viewBox, std::move(streamWriter), exportFlags, customWriter,
+                           std::move(targetColorSpace), std::move(assignColorSpace));
   canvas = new Canvas(drawContext);
   drawContext->setCanvas(canvas);
 };

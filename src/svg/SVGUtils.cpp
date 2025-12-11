@@ -290,6 +290,23 @@ std::shared_ptr<Data> AsDataUri(const std::shared_ptr<Data>& encodedData) {
   return dataUri;
 }
 
+std::shared_ptr<Image> ModifyImage(const std::shared_ptr<Image>& image, Context* context,
+                                   const std::shared_ptr<ColorSpace>& dstColorSpace,
+                                   const std::shared_ptr<ColorSpace>& writeColorSpace) {
+  if (writeColorSpace == nullptr) {
+    return image;
+  }
+  auto surface =
+      Surface::Make(context, image->width(), image->height(), false, 1, false, 0, dstColorSpace);
+  auto canvas = surface->getCanvas();
+  canvas->drawImage(image);
+  Bitmap bitmap{image->width(), image->height(), false, true, writeColorSpace};
+  auto pixels = bitmap.lockPixels();
+  surface->readPixels(bitmap.info().makeColorSpace(dstColorSpace), pixels);
+  bitmap.unlockPixels();
+  return Image::MakeFrom(bitmap);
+}
+
 namespace {
 inline bool is_between(int c, int min, int max) {
   return static_cast<unsigned>(c - min) <= static_cast<unsigned>(max - min);

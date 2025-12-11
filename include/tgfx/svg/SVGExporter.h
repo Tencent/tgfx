@@ -90,18 +90,32 @@ class SVGExporter {
    * @param viewBox The viewBox of the SVG. Content that exceeds this area will be clipped.
    * @param exportFlags Flags for exporting SVG text.
    * @param customWriter The customWriter used to write custom attributes.
-   * @param dstColorSpace The destination color space used for actual color space conversion. Colors
-   * will be converted from the source color space to this color space during export.
-   * @param assignColorSpace The color space to assign to the final SVG output. This only specifies
-   * the color space metadata for colors and images written to the SVG without performing any color
-   * conversion.
+   * @param targetColorSpace The color space used for color value conversion. When set, all color
+   * values and image pixels will be converted from their source color space to this target color
+   * space before being written to the SVG.
+   *
+   * If assignColorSpace is not set, targetColorSpace will also be embedded as the document's color
+   * space.
+   *
+   * @param assignColorSpace The color space will be embedded in the SVG, overriding the default
+   * color space metadata. This only affects the color space tag written to the SVG, not the actual
+   * color values.
+   *
+   * - If targetColorSpace is set: colors are first converted to targetColorSpace, then tagged with
+   *   assignColorSpace's profile.
+   * - If targetColorSpace is not set: original color values are written directly, tagged with
+   *   assignColorSpace's profile.
+   *
+   * Use this when you need to override the embedded ICC profile without affecting the color values
+   * themselves.
    * @return A shared pointer to the SVG exporter object. If svgStream is nullptr, context is
    * nullptr, or viewBox is empty, nullptr is returned.
    */
   static std::shared_ptr<SVGExporter> Make(
       const std::shared_ptr<WriteStream>& svgStream, Context* context, const Rect& viewBox,
       uint32_t exportFlags = 0, const std::shared_ptr<SVGCustomWriter>& customWriter = nullptr,
-      std::shared_ptr<ColorSpace> dstColorSpace = nullptr, std::shared_ptr<ColorSpace> assignColorSpace = nullptr);
+      std::shared_ptr<ColorSpace> targetColorSpace = nullptr,
+      std::shared_ptr<ColorSpace> assignColorSpace = nullptr);
 
   /**
    * Destroys the SVG exporter object. If close() hasn't been called, it will be invoked 
@@ -126,7 +140,8 @@ class SVGExporter {
    */
   SVGExporter(const std::shared_ptr<WriteStream>& svgStream, Context* context, const Rect& viewBox,
               uint32_t exportFlags, const std::shared_ptr<SVGCustomWriter>& customWriter,
-              std::shared_ptr<ColorSpace> dstColorSpace, std::shared_ptr<ColorSpace> assignColorSpace);
+              std::shared_ptr<ColorSpace> targetColorSpace,
+              std::shared_ptr<ColorSpace> assignColorSpace);
 
   SVGExportContext* drawContext = nullptr;
   Canvas* canvas = nullptr;

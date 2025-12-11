@@ -54,10 +54,12 @@ namespace tgfx {
 SVGExportContext::SVGExportContext(Context* context, const Rect& viewBox,
                                    std::unique_ptr<XMLWriter> inputXmlWriter, uint32_t exportFlags,
                                    std::shared_ptr<SVGCustomWriter> customWriter,
-                                   std::shared_ptr<ColorSpace> dstColorSpace, std::shared_ptr<ColorSpace> assignColorSpace)
+                                   std::shared_ptr<ColorSpace> targetColorSpace,
+                                   std::shared_ptr<ColorSpace> assignColorSpace)
     : exportFlags(exportFlags), context(context), viewBox(viewBox),
       xmlWriter(std::move(inputXmlWriter)), resourceBucket(new ResourceStore),
-      customWriter(std::move(customWriter)), dstColorSpace(std::move(dstColorSpace)), assignColorSpace(std::move(assignColorSpace)) {
+      customWriter(std::move(customWriter)), _targetColorSpace(std::move(targetColorSpace)) {
+  _writeColorSpace = assignColorSpace ? std::move(assignColorSpace) : _targetColorSpace;
   if (viewBox.isEmpty()) {
     return;
   }
@@ -88,9 +90,10 @@ void SVGExportContext::drawRect(const Rect& rect, const MCState& state, const Br
 
   std::unique_ptr<ElementWriter> svg;
   if (RequiresViewportReset(brush)) {
-    svg = std::make_unique<ElementWriter>(
-        "svg", context, this, xmlWriter.get(), resourceBucket.get(),
-        exportFlags & SVGExportFlags::DisableWarnings, state, brush);
+    svg =
+        std::make_unique<ElementWriter>("svg", context, this, xmlWriter.get(), resourceBucket.get(),
+                                        exportFlags & SVGExportFlags::DisableWarnings, state, brush,
+                                        nullptr, _targetColorSpace, _writeColorSpace);
     svg->addRectAttributes(rect);
   }
 
@@ -99,7 +102,8 @@ void SVGExportContext::drawRect(const Rect& rect, const MCState& state, const Br
   }
 
   ElementWriter rectElement("rect", context, this, xmlWriter.get(), resourceBucket.get(),
-                            exportFlags & SVGExportFlags::DisableWarnings, state, brush, nullptr, dstColorSpace, assignColorSpace);
+                            exportFlags & SVGExportFlags::DisableWarnings, state, brush, nullptr,
+                            _targetColorSpace, _writeColorSpace);
 
   if (svg) {
     rectElement.addAttribute("x", 0);
@@ -119,17 +123,20 @@ void SVGExportContext::drawRRect(const RRect& roundRect, const MCState& state, c
   if (roundRect.isOval()) {
     if (roundRect.rect.width() == roundRect.rect.height()) {
       ElementWriter circleElement("circle", context, this, xmlWriter.get(), resourceBucket.get(),
-                                  exportFlags & SVGExportFlags::DisableWarnings, state, brush);
+                                  exportFlags & SVGExportFlags::DisableWarnings, state, brush,
+                                  nullptr, _targetColorSpace, _writeColorSpace);
       circleElement.addCircleAttributes(roundRect.rect);
       return;
     } else {
       ElementWriter ovalElement("ellipse", context, this, xmlWriter.get(), resourceBucket.get(),
-                                exportFlags & SVGExportFlags::DisableWarnings, state, brush);
+                                exportFlags & SVGExportFlags::DisableWarnings, state, brush,
+                                nullptr, _targetColorSpace, _writeColorSpace);
       ovalElement.addEllipseAttributes(roundRect.rect);
     }
   } else {
     ElementWriter rrectElement("rect", context, this, xmlWriter.get(), resourceBucket.get(),
-                               exportFlags & SVGExportFlags::DisableWarnings, state, brush);
+                               exportFlags & SVGExportFlags::DisableWarnings, state, brush, nullptr,
+                               _targetColorSpace, _writeColorSpace);
     rrectElement.addRoundRectAttributes(roundRect);
   }
 }
@@ -139,7 +146,8 @@ void SVGExportContext::drawPath(const Path& path, const MCState& state, const Br
     applyClipPath(state.clip);
   }
   ElementWriter pathElement("path", context, this, xmlWriter.get(), resourceBucket.get(),
-                            exportFlags & SVGExportFlags::DisableWarnings, state, brush);
+                            exportFlags & SVGExportFlags::DisableWarnings, state, brush, nullptr,
+                            _targetColorSpace, _writeColorSpace);
   pathElement.addPathAttributes(path, tgfx::SVGExportContext::PathEncodingType());
   if (path.getFillType() == PathFillType::EvenOdd) {
     pathElement.addAttribute("fill-rule", "evenodd");
@@ -178,7 +186,8 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
 
     Resources resources;
     if (filter) {
-      ElementWriter defs("defs", xmlWriter, resourceBucket.get());
+      ElementWriter defs("defs", xmlWriter, resourceBucket.get(), _targetColorSpace,
+                         _writeColorSpace);
       resources = defs.addImageFilterResource(filter, bound, customWriter);
     }
     {
@@ -207,7 +216,8 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
     }
     drawImage(subsetImage->source, sampling, state, brush);
   } else {
-    Bitmap bitmap = ImageExportToBitmap(context, image);
+    auto modifyImage = ModifyImage(image, context, _targetColorSpace, _writeColorSpace);
+    Bitmap bitmap = ImageExportToBitmap(context, modifyImage);
     if (!bitmap.isEmpty()) {
       exportPixmap(Pixmap(bitmap), state, brush);
     }
@@ -218,7 +228,8 @@ void SVGExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& s
                                      const Rect& dstRect, const SamplingOptions&,
                                      const MCState& state, const Brush& brush, SrcRectConstraint) {
   DEBUG_ASSERT(image != nullptr);
-  auto subsetImage = image->makeSubset(srcRect);
+  auto modifyImage = ModifyImage(image, context, _targetColorSpace, _writeColorSpace);
+  auto subsetImage = modifyImage->makeSubset(srcRect);
   if (subsetImage == nullptr) {
     return;
   }
@@ -258,7 +269,8 @@ void SVGExportContext::exportPixmap(const Pixmap& pixmap, const MCState& state,
   }
   {
     ElementWriter imageUse("use", context, this, xmlWriter.get(), resourceBucket.get(),
-                           exportFlags & SVGExportFlags::DisableWarnings, state, brush);
+                           exportFlags & SVGExportFlags::DisableWarnings, state, brush, nullptr,
+                           _targetColorSpace, _writeColorSpace);
     imageUse.addAttribute("xlink:href", "#" + imageID);
   }
 }
@@ -299,7 +311,8 @@ void SVGExportContext::exportGlyphsAsPath(const std::shared_ptr<GlyphRunList>& g
   Path path;
   if (glyphRunList->getPath(&path)) {
     ElementWriter pathElement("path", context, this, xmlWriter.get(), resourceBucket.get(),
-                              exportFlags & SVGExportFlags::DisableWarnings, state, brush, stroke);
+                              exportFlags & SVGExportFlags::DisableWarnings, state, brush, stroke,
+                              _targetColorSpace, _writeColorSpace);
     pathElement.addPathAttributes(path, tgfx::SVGExportContext::PathEncodingType());
     if (path.getFillType() == PathFillType::EvenOdd) {
       pathElement.addAttribute("fill-rule", "evenodd");
@@ -312,7 +325,8 @@ void SVGExportContext::exportGlyphsAsText(const std::shared_ptr<GlyphRunList>& g
                                           const Stroke* stroke) {
   for (const auto& glyphRun : glyphRunList->glyphRuns()) {
     ElementWriter textElement("text", context, this, xmlWriter.get(), resourceBucket.get(),
-                              exportFlags & SVGExportFlags::DisableWarnings, state, brush, stroke);
+                              exportFlags & SVGExportFlags::DisableWarnings, state, brush, stroke,
+                              _targetColorSpace, _writeColorSpace);
 
     textElement.addFontAttributes(glyphRun.font);
 
@@ -366,7 +380,8 @@ void SVGExportContext::drawLayer(std::shared_ptr<Picture> picture,
   DEBUG_ASSERT(picture != nullptr);
   Resources resources;
   if (imageFilter) {
-    ElementWriter defs("defs", xmlWriter, resourceBucket.get());
+    ElementWriter defs("defs", xmlWriter, resourceBucket.get(), _targetColorSpace,
+                       _writeColorSpace);
     auto bound = picture->getBounds();
     resources = defs.addImageFilterResource(imageFilter, bound, customWriter);
   }
@@ -454,9 +469,9 @@ Bitmap SVGExportContext::ImageExportToBitmap(Context* context,
   auto canvas = surface->getCanvas();
   canvas->drawImage(image);
 
-  Bitmap bitmap(surface->width(), surface->height(), false, true, surface->colorSpace());
+  Bitmap bitmap(surface->width(), surface->height(), false, true, image->colorSpace());
   auto pixels = bitmap.lockPixels();
-  if (surface->readPixels(bitmap.info(), pixels)) {
+  if (surface->readPixels(bitmap.info().makeColorSpace(nullptr), pixels)) {
     bitmap.unlockPixels();
     return bitmap;
   }

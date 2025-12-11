@@ -42,7 +42,8 @@ class SVGExportContext : public DrawContext {
  public:
   SVGExportContext(Context* context, const Rect& viewBox, std::unique_ptr<XMLWriter> xmlWriter,
                    uint32_t exportFlags, std::shared_ptr<SVGCustomWriter> customWriter,
-                   std::shared_ptr<ColorSpace> dstColorSpace, std::shared_ptr<ColorSpace> assignColorSpace);
+                   std::shared_ptr<ColorSpace> targetColorSpace,
+                   std::shared_ptr<ColorSpace> assignColorSpace);
   ~SVGExportContext() override = default;
 
   void setCanvas(Canvas* inputCanvas) {
@@ -124,7 +125,7 @@ class SVGExportContext : public DrawContext {
   Path currentClipPath = {};
   std::unique_ptr<ElementWriter> clipGroupElement = nullptr;
   std::shared_ptr<SVGCustomWriter> customWriter = {};
-    std::shared_ptr<ColorSpace> dstColorSpace = nullptr;
-    std::shared_ptr<ColorSpace> assignColorSpace = nullptr;
+  std::shared_ptr<ColorSpace> _targetColorSpace = nullptr;
+  std::shared_ptr<ColorSpace> _writeColorSpace = nullptr;
 };
 }  // namespace tgfx
