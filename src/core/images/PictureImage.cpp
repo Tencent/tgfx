@@ -96,8 +96,6 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
     return nullptr;
   }
 
-  const auto originalX = rect.left;
-  const auto originalY = rect.top;
   const auto scale = args.drawScale;
   rect.scale(scale, scale);
   rect.roundOut();
@@ -109,8 +107,8 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  auto extraMatrix = Matrix::MakeScale(scale, scale);
-  extraMatrix.preTranslate(-originalX, -originalY);
+  auto extraMatrix = Matrix::MakeTrans(-rect.left, -rect.top);
+  extraMatrix.preScale(scale, scale);
   if (!drawPicture(renderTarget, args.renderFlags, &extraMatrix)) {
     return nullptr;
   }
