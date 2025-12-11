@@ -1331,7 +1331,7 @@ bool Layer::drawWithSubTreeCache(const DrawArgs& args, Canvas* canvas, float alp
     }
     auto textureProxy = std::static_pointer_cast<TextureImage>(image)->getTextureProxy();
     DEBUG_ASSERT(longEdge == std::max(textureProxy->width(), textureProxy->height()));
-    subTreeCache->addCache(args.context, textureProxy, imageMatrix);
+    subTreeCache->addCache(args.context, textureProxy, imageMatrix, args.dstColorSpace);
   }
 
   Paint paint = {};

@@ -30,7 +30,8 @@ UniqueKey SubTreeCache::makeSizeKey(int longEdge) const {
 }
 
 void SubTreeCache::addCache(Context* context, std::shared_ptr<TextureProxy> textureProxy,
-                            const Matrix& imageMatrix) {
+                            const Matrix& imageMatrix,
+                            std::shared_ptr<ColorSpace> colorSpace) {
   if (context == nullptr || textureProxy == nullptr) {
     return;
   }
@@ -38,7 +39,7 @@ void SubTreeCache::addCache(Context* context, std::shared_ptr<TextureProxy> text
   auto proxyProvider = context->proxyProvider();
   proxyProvider->assignProxyUniqueKey(textureProxy, sizeUniqueKey);
   textureProxy->assignUniqueKey(sizeUniqueKey);
-  _sizeMatrices[sizeUniqueKey] = imageMatrix;
+  _sizeCacheData[sizeUniqueKey] = {imageMatrix, std::move(colorSpace)};
 }
 
 bool SubTreeCache::valid(Context* context, int longEdge) const {
@@ -46,8 +47,8 @@ bool SubTreeCache::valid(Context* context, int longEdge) const {
     return false;
   }
   auto sizeUniqueKey = makeSizeKey(longEdge);
-  auto it = _sizeMatrices.find(sizeUniqueKey);
-  if (it == _sizeMatrices.end()) {
+  auto it = _sizeCacheData.find(sizeUniqueKey);
+  if (it == _sizeCacheData.end()) {
     return false;
   }
   auto proxyProvider = context->proxyProvider();
@@ -60,8 +61,8 @@ void SubTreeCache::draw(Context* context, int longEdge, Canvas* canvas, const Pa
     return;
   }
   auto sizeUniqueKey = makeSizeKey(longEdge);
-  auto it = _sizeMatrices.find(sizeUniqueKey);
-  if (it == _sizeMatrices.end()) {
+  auto it = _sizeCacheData.find(sizeUniqueKey);
+  if (it == _sizeCacheData.end()) {
     return;
   }
   auto proxyProvider = context->proxyProvider();
@@ -69,11 +70,11 @@ void SubTreeCache::draw(Context* context, int longEdge, Canvas* canvas, const Pa
   if (proxy == nullptr) {
     return;
   }
-  auto image = TextureImage::Wrap(proxy, nullptr);
+  auto image = TextureImage::Wrap(proxy, it->second.colorSpace);
   if (image == nullptr) {
     return;
   }
-  const auto& matrix = it->second;
+  const auto& matrix = it->second.imageMatrix;
   auto oldMatrix = canvas->getMatrix();
   canvas->concat(matrix);
   Paint drawPaint = paint;

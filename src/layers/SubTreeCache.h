@@ -27,6 +27,7 @@
 
 namespace tgfx {
 class TextureProxy;
+class ColorSpace;
 
 class SubTreeCache {
  public:
@@ -37,7 +38,7 @@ class SubTreeCache {
   }
 
   void addCache(Context* context, std::shared_ptr<TextureProxy> textureProxy,
-                const Matrix& imageMatrix);
+                const Matrix& imageMatrix, std::shared_ptr<ColorSpace> colorSpace);
 
   bool valid(Context* context, int longEdge) const;
 
@@ -45,8 +46,13 @@ class SubTreeCache {
             const Matrix3D* transform3D) const;
 
  private:
+  struct CacheData {
+    Matrix imageMatrix;
+    std::shared_ptr<ColorSpace> colorSpace;
+  };
+
   UniqueKey _uniqueKey = UniqueKey::Make();
-  ResourceKeyMap<Matrix> _sizeMatrices = {};
+  ResourceKeyMap<CacheData> _sizeCacheData = {};
 
   UniqueKey makeSizeKey(int longEdge) const;
 };
