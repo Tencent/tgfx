@@ -41,7 +41,7 @@ class RootLayer;
 struct LayerStyleSource;
 class BackgroundContext;
 enum class DrawMode;
-struct OffscreenExtraParams;
+struct SubTreeCacheInfo;
 
 /**
  * The base class for all layers that can be placed on the display list. The layer class includes
@@ -604,7 +604,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
                          const Matrix3D* transform = nullptr);
 
   void drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
-                     const Matrix3D* transform, const OffscreenExtraParams* extraParams = nullptr);
+                     const Matrix3D* transform);
 
   void drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha);
 
@@ -674,6 +674,13 @@ class Layer : public std::enable_shared_from_this<Layer> {
                                                 const std::function<void(Canvas*)>& drawFunction);
 
   bool shouldPassThroughBackground(BlendMode blendMode, const Matrix3D* transform) const;
+
+  bool shouldSkipSubTreeCache(BlendMode blendMode, const Matrix3D* transform);
+
+  std::optional<SubTreeCacheInfo> getSubTreeCacheInfo(const DrawArgs& args, float contentScale);
+
+  std::shared_ptr<Image> createSubTreeCacheImage(const DrawArgs& args, float cacheScale,
+                                                 Matrix* imageMatrix);
 
   bool drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                      const Matrix3D* transform);

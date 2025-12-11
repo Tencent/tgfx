@@ -48,12 +48,6 @@ struct LayerStyleSource {
   Point contourOffset = {};
 };
 
-struct OffscreenExtraParams {
-  float contentScale = 1.0f;
-  std::optional<Rect> clipBounds = std::nullopt;
-  bool cacheContent = false;
-};
-
 // Determine if the 4*4 matrix contains only 2D affine transformations, i.e., no Z-axis related
 // transformations or projection transformations
 static bool IsMatrix3DAffine(const Matrix3D& matrix) {
@@ -1229,6 +1223,68 @@ bool Layer::shouldPassThroughBackground(BlendMode blendMode, const Matrix3D* tra
          bitFields.hasBlendMode && transform == nullptr;
 }
 
+bool Layer::shouldSkipSubTreeCache(BlendMode blendMode, const Matrix3D* transform) {
+  if (_children.empty() && _layerStyles.empty() && _filters.empty()) {
+    return true;
+  }
+  if (shouldPassThroughBackground(blendMode, transform) || hasBackgroundStyle()) {
+    return true;
+  }
+  return false;
+}
+
+std::optional<SubTreeCacheInfo> Layer::getSubTreeCacheInfo(const DrawArgs& args,
+                                                           float contentScale) {
+  if (!subTreeCache) {
+    return std::nullopt;
+  }
+  auto cacheScale = getMipmapCacheScale(args, contentScale);
+  auto layerBounds = getBounds();
+  auto scaledBounds = layerBounds;
+  scaledBounds.scale(cacheScale, cacheScale);
+  scaledBounds.roundOut();
+  auto cacheWidth = static_cast<int>(scaledBounds.width());
+  auto cacheHeight = static_cast<int>(scaledBounds.height());
+
+  auto cacheInfo = subTreeCache->getSubTreeCacheInfo(args.context, cacheWidth, cacheHeight);
+  if (cacheInfo.has_value()) {
+    return cacheInfo;
+  }
+
+  if (args.renderFlags & RenderFlags::DisableCache || args.maxSubTreeCacheSize <= 0) {
+    return std::nullopt;
+  }
+
+  if (cacheScale < contentScale || cacheWidth > args.maxSubTreeCacheSize ||
+      cacheHeight > args.maxSubTreeCacheSize) {
+    return std::nullopt;
+  }
+
+  auto imageMatrix = Matrix::I();
+  auto image = createSubTreeCacheImage(args, cacheScale, &imageMatrix);
+  if (image == nullptr) {
+    return std::nullopt;
+  }
+  auto textureProxy = std::static_pointer_cast<TextureImage>(image)->getTextureProxy();
+  subTreeCache->addCache(args.context, cacheWidth, cacheHeight, textureProxy, imageMatrix);
+  return SubTreeCacheInfo{std::move(image), imageMatrix};
+}
+
+std::shared_ptr<Image> Layer::createSubTreeCacheImage(const DrawArgs& args, float cacheScale,
+                                                      Matrix* imageMatrix) {
+  auto cacheArgs = args;
+  cacheArgs.renderFlags |= RenderFlags::DisableCache;
+  cacheArgs.renderRect = &renderBounds;
+  cacheArgs.blurBackground = nullptr;
+
+  auto image =
+      getContentImage(cacheArgs, cacheScale, nullptr, Matrix::I(), std::nullopt, imageMatrix);
+  if (!image) {
+    return nullptr;
+  }
+  return image->makeTextureImage(args.context);
+}
+
 bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                           const Matrix3D* transform) {
   if (args.drawMode != DrawMode::Normal || args.excludeEffects) {
@@ -1268,105 +1324,46 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
 
 bool Layer::drawWithSubTreeCache(const DrawArgs& args, Canvas* canvas, float alpha,
                                  BlendMode blendMode, const Matrix3D* transform) {
-  auto contentScale = canvas->getMatrix().getMaxScale();
-  auto cacheScale = getMipmapCacheScale(args, contentScale);
-  auto layerBounds = getBounds();
-  auto scaledBounds = layerBounds;
-  scaledBounds.scale(cacheScale, cacheScale);
-  scaledBounds.roundOut();
-  auto cacheWidth = static_cast<int>(scaledBounds.width());
-  auto cacheHeight = static_cast<int>(scaledBounds.height());
-  auto cacheInfo = subTreeCache && subTreeCache->contextID() == args.context->uniqueID()
-                       ? subTreeCache->getCacheImageInfo(args.context, cacheWidth, cacheHeight)
-                       : std::nullopt;
-  if (cacheInfo.has_value()) {
-    if (transform != nullptr) {
-      drawBackgroundLayerStyles(args, canvas, alpha, *transform);
-    }
-    std::optional<Rect> clipBounds = std::nullopt;
-    std::shared_ptr<MaskFilter> maskFilter = nullptr;
-    if (hasValidMask()) {
-      clipBounds = GetClipBounds(args.blurBackground ? args.blurBackground->getCanvas() : canvas);
-      maskFilter = getMaskFilter(args, contentScale, clipBounds);
-      if (maskFilter == nullptr) {
-        return true;
-      }
-    }
-    Paint paint = {};
-    paint.setAntiAlias(bitFields.allowsEdgeAntialiasing);
-    paint.setAlpha(alpha);
-    paint.setBlendMode(blendMode);
-    paint.setMaskFilter(maskFilter);
-    DrawCacheImage(canvas, cacheInfo->image, cacheInfo->matrix, paint, transform);
-    if (args.blurBackground) {
-      if (!hasBackgroundStyle()) {
-        DrawCacheImage(args.blurBackground->getCanvas(), cacheInfo->image, cacheInfo->matrix, paint,
-                       transform);
-      } else {
-        auto backgroundArgs = args;
-        backgroundArgs.drawMode = DrawMode::Background;
-        backgroundArgs.blurBackground = nullptr;
-        drawOffscreen(backgroundArgs, args.blurBackground->getCanvas(), alpha, blendMode,
-                      transform);
-      }
-    }
-    return true;
-  }
 
+  if (shouldSkipSubTreeCache(blendMode, transform)) {
+    return false;
+  }
   // Skip caching on the first render to avoid caching content that is only displayed once.
   // The cache is created on the second render when the layer is confirmed to be reused.
-  if (!subTreeCache || subTreeCache->contextID() != args.context->uniqueID()) {
-    subTreeCache = SubTreeCache::MakeFrom(args.context);
+  if (!subTreeCache) {
+    subTreeCache = std::make_unique<SubTreeCache>();
     return false;
   }
-
-  if (args.renderFlags & RenderFlags::DisableCache || args.maxSubTreeCacheSize <= 0 ||
-      cacheScale < contentScale) {
+  auto contentScale = canvas->getMatrix().getMaxScale();
+  auto cacheInfo = getSubTreeCacheInfo(args, contentScale);
+  if (!cacheInfo.has_value()) {
     return false;
   }
-
-  if (_children.empty() && _layerStyles.empty() && _filters.empty()) {
-    return false;
-  }
-
-  if (cacheWidth > args.maxSubTreeCacheSize || cacheHeight > args.maxSubTreeCacheSize) {
-    return false;
-  }
-
-  auto fullFill = args.renderRect && args.renderRect->contains(renderBounds);
-  if (shouldPassThroughBackground(blendMode, transform) || hasBackgroundStyle()) {
-    if (!fullFill || !FloatNearlyEqual(cacheScale, contentScale)) {
-      return false;
+  Paint paint = {};
+  if (hasValidMask()) {
+    auto clipBounds =
+        GetClipBounds(args.blurBackground ? args.blurBackground->getCanvas() : canvas);
+    auto maskFilter = getMaskFilter(args, contentScale, clipBounds);
+    if (maskFilter == nullptr) {
+      return true;
     }
+    paint.setMaskFilter(maskFilter);
   }
-  contentScale = cacheScale;
-  auto cacheArgs = args;
-  cacheArgs.renderFlags |= RenderFlags::DisableCache;
-  cacheArgs.renderRect = &renderBounds;
-  if (!fullFill && args.blurBackground) {
-    cacheArgs.blurBackground = cacheArgs.blurBackground->createSubContext(renderBounds, false);
+  paint.setAntiAlias(bitFields.allowsEdgeAntialiasing);
+  paint.setAlpha(alpha);
+  paint.setBlendMode(blendMode);
+  DrawCacheImage(canvas, cacheInfo->image, cacheInfo->matrix, paint, transform);
+  if (args.blurBackground) {
+    DrawCacheImage(args.blurBackground->getCanvas(), cacheInfo->image, cacheInfo->matrix, paint,
+                   transform);
   }
-  OffscreenExtraParams extraParams = {};
-  extraParams.clipBounds = std::nullopt;
-  extraParams.contentScale = contentScale;
-  extraParams.cacheContent = true;
-  drawOffscreen(cacheArgs, canvas, alpha, blendMode, transform, &extraParams);
   return true;
 }
 
 void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
-                          const Matrix3D* transform, const OffscreenExtraParams* extraParams) {
-  std::optional<Rect> clipBounds = std::nullopt;
-  float contentScale = 1.0f;
-  bool cacheContent = false;
-  if (extraParams) {
-    clipBounds = extraParams->clipBounds;
-    contentScale = extraParams->contentScale;
-    cacheContent = extraParams->cacheContent;
-  } else {
-    clipBounds = GetClipBounds(args.blurBackground ? args.blurBackground->getCanvas() : canvas);
-    contentScale = canvas->getMatrix().getMaxScale();
-  }
+                          const Matrix3D* transform) {
+  auto clipBounds = GetClipBounds(args.blurBackground ? args.blurBackground->getCanvas() : canvas);
+  auto contentScale = canvas->getMatrix().getMaxScale();
   if (transform != nullptr) {
     drawBackgroundLayerStyles(args, canvas, alpha, *transform);
   }
@@ -1407,16 +1404,6 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   auto invertImageMatrix = Matrix::I();
   if (image == nullptr || !imageMatrix.invert(&invertImageMatrix)) {
     return;
-  }
-
-  if (cacheContent && subTreeCache) {
-    auto textureImage = image->makeTextureImage(args.context);
-    if (textureImage != nullptr) {
-      auto textureProxy = std::static_pointer_cast<TextureImage>(textureImage)->getTextureProxy();
-      subTreeCache->addCache(args.context, textureImage->width(), textureImage->height(),
-                             textureProxy, imageMatrix);
-      image = std::move(textureImage);
-    }
   }
 
   image = MakeImageWithTransform(std::move(image), transform, &imageMatrix);

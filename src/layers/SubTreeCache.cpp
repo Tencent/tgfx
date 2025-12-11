@@ -28,16 +28,9 @@ UniqueKey SubTreeCache::makeSizeKey(int width, int height) const {
   return UniqueKey::Append(newKey, sizeData, 2);
 }
 
-std::unique_ptr<SubTreeCache> SubTreeCache::MakeFrom(Context* context) {
-  if (context == nullptr) {
-    return nullptr;
-  }
-  return std::make_unique<SubTreeCache>(context->uniqueID());
-}
-
 void SubTreeCache::addCache(Context* context, int imageWidth, int imageHeight,
                             std::shared_ptr<TextureProxy> textureProxy, const Matrix& imageMatrix) {
-  if (context == nullptr || textureProxy == nullptr || context->uniqueID() != _contextID) {
+  if (context == nullptr || textureProxy == nullptr) {
     return;
   }
   auto sizeUniqueKey = makeSizeKey(imageWidth, imageHeight);
@@ -47,9 +40,9 @@ void SubTreeCache::addCache(Context* context, int imageWidth, int imageHeight,
   _sizeMatrices[sizeUniqueKey] = imageMatrix;
 }
 
-std::optional<CacheImageInfo> SubTreeCache::getCacheImageInfo(Context* context, int imageWidth,
-                                                              int imageHeight) const {
-  if (context == nullptr || context->uniqueID() != _contextID) {
+std::optional<SubTreeCacheInfo> SubTreeCache::getSubTreeCacheInfo(Context* context, int imageWidth,
+                                                                  int imageHeight) const {
+  if (context == nullptr) {
     return std::nullopt;
   }
   auto sizeUniqueKey = makeSizeKey(imageWidth, imageHeight);
@@ -66,6 +59,6 @@ std::optional<CacheImageInfo> SubTreeCache::getCacheImageInfo(Context* context, 
   if (image == nullptr) {
     return std::nullopt;
   }
-  return CacheImageInfo{std::move(image), it->second};
+  return SubTreeCacheInfo{std::move(image), it->second};
 }
 }  // namespace tgfx

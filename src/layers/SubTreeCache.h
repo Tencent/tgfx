@@ -27,21 +27,14 @@
 namespace tgfx {
 class TextureProxy;
 
-struct CacheImageInfo {
+struct SubTreeCacheInfo {
   std::shared_ptr<Image> image = nullptr;
   Matrix matrix = Matrix::I();
 };
 
 class SubTreeCache {
  public:
-  static std::unique_ptr<SubTreeCache> MakeFrom(Context* context);
-
-  explicit SubTreeCache(uint32_t contextID) : _contextID(contextID), _uniqueKey(UniqueKey::Make()) {
-  }
-
-  uint32_t contextID() const {
-    return _contextID;
-  }
+  SubTreeCache() = default;
 
   const UniqueKey& uniqueKey() const {
     return _uniqueKey;
@@ -50,12 +43,11 @@ class SubTreeCache {
   void addCache(Context* context, int imageWidth, int imageHeight,
                 std::shared_ptr<TextureProxy> textureProxy, const Matrix& imageMatrix);
 
-  std::optional<CacheImageInfo> getCacheImageInfo(Context* context, int imageWidth,
-                                                  int imageHeight) const;
+  std::optional<SubTreeCacheInfo> getSubTreeCacheInfo(Context* context, int imageWidth,
+                                                      int imageHeight) const;
 
  private:
-  uint32_t _contextID = 0;
-  UniqueKey _uniqueKey = {};
+  UniqueKey _uniqueKey = UniqueKey::Make();
   ResourceKeyMap<Matrix> _sizeMatrices = {};
 
   UniqueKey makeSizeKey(int width, int height) const;

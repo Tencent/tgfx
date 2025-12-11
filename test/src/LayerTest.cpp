@@ -3729,7 +3729,7 @@ TGFX_TEST(LayerTest, LayerCache) {
   int expectedImageWidth = 258;
   int expectedImageHeight = 258;
   EXPECT_TRUE(
-      root->subTreeCache->getCacheImageInfo(context, expectedImageWidth, expectedImageHeight)
+      root->subTreeCache->getSubTreeCacheInfo(context, expectedImageWidth, expectedImageHeight)
           .has_value());
 }
 
