@@ -28,19 +28,6 @@
 namespace tgfx {
 class TextureProxy;
 
-class SubTreeCacheDrawer {
- public:
-  SubTreeCacheDrawer(std::shared_ptr<Image> image, const Matrix& matrix)
-      : _image(std::move(image)), _matrix(matrix) {
-  }
-
-  void draw(Canvas* canvas, const Paint& paint, const Matrix3D* transform3D) const;
-
- private:
-  std::shared_ptr<Image> _image = nullptr;
-  Matrix _matrix = Matrix::I();
-};
-
 class SubTreeCache {
  public:
   SubTreeCache() = default;
@@ -52,7 +39,10 @@ class SubTreeCache {
   void addCache(Context* context, std::shared_ptr<TextureProxy> textureProxy,
                 const Matrix& imageMatrix);
 
-  std::unique_ptr<SubTreeCacheDrawer> getDrawer(Context* context, int longEdge) const;
+  bool valid(Context* context, int longEdge) const;
+
+  void draw(Context* context, int longEdge, Canvas* canvas, const Paint& paint,
+            const Matrix3D* transform3D) const;
 
  private:
   UniqueKey _uniqueKey = UniqueKey::Make();

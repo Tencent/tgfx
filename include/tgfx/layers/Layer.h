@@ -34,7 +34,6 @@ namespace tgfx {
 class LayerContent;
 class RasterizedContent;
 class SubTreeCache;
-class SubTreeCacheDrawer;
 class DisplayList;
 class DrawArgs;
 class RegionTransformer;
@@ -686,8 +685,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   bool drawWithSubTreeCache(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                             const Matrix3D* transform3D);
-
-  std::unique_ptr<SubTreeCacheDrawer> getSubTreeCacheDrawer(const DrawArgs& args, Canvas* canvas);
 
   std::shared_ptr<Image> getContentImage(const DrawArgs& args, float contentScale,
                                          const std::shared_ptr<Image>& passThroughImage,

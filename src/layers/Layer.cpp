@@ -1311,13 +1311,31 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
 
 bool Layer::drawWithSubTreeCache(const DrawArgs& args, Canvas* canvas, float alpha,
                                  BlendMode blendMode, const Matrix3D* transform3D) {
-  auto drawer = getSubTreeCacheDrawer(args, canvas);
-  if (!drawer) {
-    return false;
+  auto layerBounds = getBounds();
+  auto contentScale = canvas->getMatrix().getMaxScale();
+  auto longEdge = GetMipmapCacheLongEdge(args.subTreeCacheMaxSize, contentScale, layerBounds);
+
+  if (!subTreeCache->valid(args.context, longEdge)) {
+    if (args.renderFlags & RenderFlags::DisableCache || longEdge > args.subTreeCacheMaxSize) {
+      return false;
+    }
+    auto maxBoundsSize = std::max(layerBounds.width(), layerBounds.height());
+    if (FloatNearlyZero(maxBoundsSize)) {
+      return false;
+    }
+    auto cacheScale = static_cast<float>(longEdge) / maxBoundsSize;
+    auto imageMatrix = Matrix::I();
+    auto image = createSubTreeCacheImage(args, cacheScale, layerBounds, &imageMatrix);
+    if (image == nullptr) {
+      return false;
+    }
+    auto textureProxy = std::static_pointer_cast<TextureImage>(image)->getTextureProxy();
+    DEBUG_ASSERT(longEdge == std::max(textureProxy->width(), textureProxy->height()));
+    subTreeCache->addCache(args.context, textureProxy, imageMatrix);
   }
+
   Paint paint = {};
   if (hasValidMask()) {
-    auto contentScale = canvas->getMatrix().getMaxScale();
     auto clipBounds =
         GetClipBounds(args.blurBackground ? args.blurBackground->getCanvas() : canvas);
     auto maskFilter = getMaskFilter(args, contentScale, clipBounds);
@@ -1329,42 +1347,12 @@ bool Layer::drawWithSubTreeCache(const DrawArgs& args, Canvas* canvas, float alp
   paint.setAntiAlias(bitFields.allowsEdgeAntialiasing);
   paint.setAlpha(alpha);
   paint.setBlendMode(blendMode);
-  drawer->draw(canvas, paint, transform3D);
+  subTreeCache->draw(args.context, longEdge, canvas, paint, transform3D);
   if (args.blurBackground) {
-    drawer->draw(args.blurBackground->getCanvas(), paint, transform3D);
+    subTreeCache->draw(args.context, longEdge, args.blurBackground->getCanvas(), paint,
+                       transform3D);
   }
   return true;
-}
-
-std::unique_ptr<SubTreeCacheDrawer> Layer::getSubTreeCacheDrawer(const DrawArgs& args,
-                                                                 Canvas* canvas) {
-  auto layerBounds = getBounds();
-  auto contentScale = canvas->getMatrix().getMaxScale();
-  auto longEdge = GetMipmapCacheLongEdge(args.subTreeCacheMaxSize, contentScale, layerBounds);
-
-  auto drawer = subTreeCache->getDrawer(args.context, longEdge);
-  if (drawer) {
-    return drawer;
-  }
-
-  if (args.renderFlags & RenderFlags::DisableCache || longEdge > args.subTreeCacheMaxSize) {
-    return nullptr;
-  }
-
-  auto maxBoundsSize = std::max(layerBounds.width(), layerBounds.height());
-  if (FloatNearlyZero(maxBoundsSize)) {
-    return nullptr;
-  }
-  auto cacheScale = static_cast<float>(longEdge) / maxBoundsSize;
-  auto imageMatrix = Matrix::I();
-  auto image = createSubTreeCacheImage(args, cacheScale, layerBounds, &imageMatrix);
-  if (image == nullptr) {
-    return nullptr;
-  }
-  auto textureProxy = std::static_pointer_cast<TextureImage>(image)->getTextureProxy();
-  DEBUG_ASSERT(longEdge == std::max(textureProxy->width(), textureProxy->height()));
-  subTreeCache->addCache(args.context, textureProxy, imageMatrix);
-  return std::make_unique<SubTreeCacheDrawer>(std::move(image), imageMatrix);
 }
 
 void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,

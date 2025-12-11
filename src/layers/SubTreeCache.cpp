@@ -23,39 +23,6 @@
 
 namespace tgfx {
 
-void SubTreeCacheDrawer::draw(Canvas* canvas, const Paint& paint,
-                              const Matrix3D* transform3D) const {
-  auto oldMatrix = canvas->getMatrix();
-  canvas->concat(_matrix);
-  Paint drawPaint = paint;
-  auto maskFilter = paint.getMaskFilter();
-  if (maskFilter) {
-    auto invertMatrix = Matrix::I();
-    if (_matrix.invert(&invertMatrix)) {
-      drawPaint.setMaskFilter(maskFilter->makeWithMatrix(invertMatrix));
-    }
-  }
-  if (transform3D == nullptr) {
-    canvas->drawImage(_image, &drawPaint);
-  } else {
-    auto adaptedMatrix = *transform3D;
-    auto offsetMatrix =
-        Matrix3D::MakeTranslate(_matrix.getTranslateX(), _matrix.getTranslateY(), 0);
-    auto invOffsetMatrix =
-        Matrix3D::MakeTranslate(-_matrix.getTranslateX(), -_matrix.getTranslateY(), 0);
-    auto scaleMatrix = Matrix3D::MakeScale(_matrix.getScaleX(), _matrix.getScaleY(), 1.0f);
-    auto invScaleMatrix =
-        Matrix3D::MakeScale(1.0f / _matrix.getScaleX(), 1.0f / _matrix.getScaleY(), 1.0f);
-    adaptedMatrix = invScaleMatrix * invOffsetMatrix * adaptedMatrix * offsetMatrix * scaleMatrix;
-    auto imageFilter = ImageFilter::Transform3D(adaptedMatrix);
-    auto offset = Point();
-    auto filteredImage = _image->makeWithFilter(imageFilter, &offset);
-    canvas->concat(Matrix::MakeTrans(offset.x, offset.y));
-    canvas->drawImage(filteredImage, &drawPaint);
-  }
-  canvas->setMatrix(oldMatrix);
-}
-
 UniqueKey SubTreeCache::makeSizeKey(int longEdge) const {
   uint32_t sizeData[1] = {static_cast<uint32_t>(longEdge)};
   UniqueKey newKey = _uniqueKey;
@@ -74,24 +41,66 @@ void SubTreeCache::addCache(Context* context, std::shared_ptr<TextureProxy> text
   _sizeMatrices[sizeUniqueKey] = imageMatrix;
 }
 
-std::unique_ptr<SubTreeCacheDrawer> SubTreeCache::getDrawer(Context* context, int longEdge) const {
+bool SubTreeCache::valid(Context* context, int longEdge) const {
   if (context == nullptr) {
-    return nullptr;
+    return false;
   }
   auto sizeUniqueKey = makeSizeKey(longEdge);
   auto it = _sizeMatrices.find(sizeUniqueKey);
   if (it == _sizeMatrices.end()) {
-    return nullptr;
+    return false;
+  }
+  auto proxyProvider = context->proxyProvider();
+  return proxyProvider->findOrWrapTextureProxy(sizeUniqueKey) != nullptr;
+}
+
+void SubTreeCache::draw(Context* context, int longEdge, Canvas* canvas, const Paint& paint,
+                        const Matrix3D* transform3D) const {
+  if (context == nullptr) {
+    return;
+  }
+  auto sizeUniqueKey = makeSizeKey(longEdge);
+  auto it = _sizeMatrices.find(sizeUniqueKey);
+  if (it == _sizeMatrices.end()) {
+    return;
   }
   auto proxyProvider = context->proxyProvider();
   auto proxy = proxyProvider->findOrWrapTextureProxy(sizeUniqueKey);
   if (proxy == nullptr) {
-    return nullptr;
+    return;
   }
   auto image = TextureImage::Wrap(proxy, nullptr);
   if (image == nullptr) {
-    return nullptr;
+    return;
   }
-  return std::make_unique<SubTreeCacheDrawer>(std::move(image), it->second);
+  const auto& matrix = it->second;
+  auto oldMatrix = canvas->getMatrix();
+  canvas->concat(matrix);
+  Paint drawPaint = paint;
+  auto maskFilter = paint.getMaskFilter();
+  if (maskFilter) {
+    auto invertMatrix = Matrix::I();
+    if (matrix.invert(&invertMatrix)) {
+      drawPaint.setMaskFilter(maskFilter->makeWithMatrix(invertMatrix));
+    }
+  }
+  if (transform3D == nullptr) {
+    canvas->drawImage(image, &drawPaint);
+  } else {
+    auto adaptedMatrix = *transform3D;
+    auto offsetMatrix = Matrix3D::MakeTranslate(matrix.getTranslateX(), matrix.getTranslateY(), 0);
+    auto invOffsetMatrix =
+        Matrix3D::MakeTranslate(-matrix.getTranslateX(), -matrix.getTranslateY(), 0);
+    auto scaleMatrix = Matrix3D::MakeScale(matrix.getScaleX(), matrix.getScaleY(), 1.0f);
+    auto invScaleMatrix =
+        Matrix3D::MakeScale(1.0f / matrix.getScaleX(), 1.0f / matrix.getScaleY(), 1.0f);
+    adaptedMatrix = invScaleMatrix * invOffsetMatrix * adaptedMatrix * offsetMatrix * scaleMatrix;
+    auto imageFilter = ImageFilter::Transform3D(adaptedMatrix);
+    auto offset = Point();
+    auto filteredImage = image->makeWithFilter(imageFilter, &offset);
+    canvas->concat(Matrix::MakeTrans(offset.x, offset.y));
+    canvas->drawImage(filteredImage, &drawPaint);
+  }
+  canvas->setMatrix(oldMatrix);
 }
 }  // namespace tgfx
