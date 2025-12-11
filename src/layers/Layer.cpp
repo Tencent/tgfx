@@ -157,17 +157,18 @@ static std::shared_ptr<Image> MakeImageWithTransform(std::shared_ptr<Image> imag
   return image;
 }
 
-static int GetMipmapCacheLongEdge(int maxSize, int minSize, float contentScale,
-                                  const Rect& layerBounds) {
+static constexpr int MinSubTreeCacheSize = 32;
+
+static int GetMipmapCacheLongEdge(int maxSize, float contentScale, const Rect& layerBounds) {
   auto maxBoundsSize = std::max(layerBounds.width(), layerBounds.height());
   auto scaleBoundsSize = static_cast<int>(ceilf(maxBoundsSize * contentScale));
   if (scaleBoundsSize > maxSize) {
     return scaleBoundsSize;
   }
-  if (minSize <= 0 || minSize >= maxSize) {
+  if (MinSubTreeCacheSize >= maxSize) {
     return maxSize;
   }
-  auto targetSize = std::max(scaleBoundsSize, minSize);
+  auto targetSize = std::max(scaleBoundsSize, MinSubTreeCacheSize);
   auto currentLongEdge = maxSize;
   while ((currentLongEdge >> 1) >= targetSize) {
     currentLongEdge >>= 1;
@@ -1339,8 +1340,7 @@ std::unique_ptr<SubTreeCacheDrawer> Layer::getSubTreeCacheDrawer(const DrawArgs&
                                                                  Canvas* canvas) {
   auto layerBounds = getBounds();
   auto contentScale = canvas->getMatrix().getMaxScale();
-  auto longEdge = GetMipmapCacheLongEdge(args.maxSubTreeCacheSize, args.minSubTreeCacheSize,
-                                         contentScale, layerBounds);
+  auto longEdge = GetMipmapCacheLongEdge(args.maxSubTreeCacheSize, contentScale, layerBounds);
 
   auto drawer = subTreeCache->getDrawer(args.context, longEdge);
   if (drawer) {

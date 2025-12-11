@@ -989,7 +989,6 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
       _root->createBackgroundContext(context, drawRect, viewMatrix, false, args.dstColorSpace);
   args.dstColorSpace = surface->colorSpace();
   args.maxSubTreeCacheSize = _subTreeCacheMaxSize;
-  args.minSubTreeCacheSize = _subTreeCacheMinSize;
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
 }
 
