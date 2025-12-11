@@ -24,12 +24,18 @@
 #include "tgfx/core/Image.h"
 
 namespace tgfx {
-class RasterizedCache {
- public:
-  static std::unique_ptr<RasterizedCache> MakeFrom(Context* context);
+class TextureProxy;
 
-  explicit RasterizedCache(uint32_t contextID)
-      : _contextID(contextID), _uniqueKey(UniqueKey::Make()) {
+struct CacheImageInfo {
+  std::shared_ptr<Image> image = nullptr;
+  Matrix matrix = Matrix::I();
+};
+
+class SubTreeCache {
+ public:
+  static std::unique_ptr<SubTreeCache> MakeFrom(Context* context);
+
+  explicit SubTreeCache(uint32_t contextID) : _contextID(contextID), _uniqueKey(UniqueKey::Make()) {
   }
 
   uint32_t contextID() const {
@@ -40,20 +46,17 @@ class RasterizedCache {
     return _uniqueKey;
   }
 
-  bool valid(Context* context, float scale);
+  void addCache(Context* context, int imageWidth, int imageHeight,
+                std::shared_ptr<TextureProxy> textureProxy, const Matrix& imageMatrix);
 
-  std::shared_ptr<Image> addScaleCache(Context* context, float contentScale,
-                                       std::shared_ptr<Image> image, const Matrix& imageMatrix);
-
-  void draw(Context* context, Canvas* canvas, float cacheScale, bool antiAlias, float alpha,
-            const std::shared_ptr<MaskFilter>& mask, BlendMode blendMode = BlendMode::SrcOver,
-            const Matrix3D* transform = nullptr) const;
+  std::optional<CacheImageInfo> getCacheImageInfo(Context* context, int imageWidth,
+                                                  int imageHeight) const;
 
  private:
   uint32_t _contextID = 0;
   UniqueKey _uniqueKey = {};
-  ResourceKeyMap<Matrix> _scaleMatrices = {};
+  ResourceKeyMap<Matrix> _sizeMatrices = {};
 
-  UniqueKey MakeScaleKey(float scale) const;
+  UniqueKey MakeSizeKey(int width, int height) const;
 };
 }  // namespace tgfx

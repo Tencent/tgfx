@@ -32,7 +32,8 @@
 
 namespace tgfx {
 class LayerContent;
-class RasterizedCache;
+class RasterizedContent;
+class SubTreeCache;
 class DisplayList;
 class DrawArgs;
 class RegionTransformer;
@@ -594,7 +595,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   std::shared_ptr<ImageFilter> getImageFilter(float contentScale);
 
-  RasterizedCache* getRasterizedCache(const DrawArgs& args, const Matrix& renderMatrix);
+  RasterizedContent* getRasterizedContent(const DrawArgs& args, const Matrix& renderMatrix);
 
   std::shared_ptr<Image> getRasterizedImage(const DrawArgs& args, float contentScale,
                                             Matrix* drawingMatrix);
@@ -677,6 +678,9 @@ class Layer : public std::enable_shared_from_this<Layer> {
   bool drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                      const Matrix3D* transform);
 
+  bool drawWithSubTreeCache(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
+                            const Matrix3D* transform);
+
   std::shared_ptr<Image> getContentImage(const DrawArgs& args, float contentScale,
                                          const std::shared_ptr<Image>& passThroughImage,
                                          const Matrix& passThroughImageMatrix,
@@ -695,8 +699,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   void invalidateCache();
 
-  RasterizedCache* getContentCache(const DrawArgs& args, float cacheScale);
-
   float getMipmapCacheScale(const DrawArgs& args, float contentScale);
 
   struct {
@@ -712,7 +714,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
     bool passThroughBackground : 1;
     bool hasBlendMode : 1;
     bool matrix3DIsAffine : 1;  // Whether the matrix3D is equivalent to a 2D affine matrix
-    bool cacheable : 1;         // whether the layer can be cached this frame
     uint8_t blendMode : 5;
     uint8_t maskType : 2;
   } bitFields = {};
@@ -729,8 +730,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::vector<std::shared_ptr<LayerFilter>> _filters = {};
   std::vector<std::shared_ptr<LayerStyle>> _layerStyles = {};
   float _rasterizationScale = 0.0f;
-  std::unique_ptr<RasterizedCache> rasterizedContent;
-  std::unique_ptr<RasterizedCache> subTreeCache;
+  std::unique_ptr<RasterizedContent> rasterizedContent;
+  std::unique_ptr<SubTreeCache> subTreeCache;
   std::shared_ptr<LayerContent> layerContent = nullptr;
   Rect renderBounds = {};                       // in global coordinates
   Rect* contentBounds = nullptr;                //  in global coordinates

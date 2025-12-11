@@ -21,13 +21,15 @@
 #include <cmath>
 #include "core/Matrix2D.h"
 #include "core/filters/Transform3DImageFilter.h"
+#include "core/images/TextureImage.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "layers/ContourContext.h"
 #include "layers/DrawArgs.h"
-#include "layers/RasterizedCache.h"
+#include "layers/RasterizedContent.h"
 #include "layers/RegionTransformer.h"
 #include "layers/RootLayer.h"
+#include "layers/SubTreeCache.h"
 #include "layers/contents/LayerContent.h"
 #include "layers/filters/Transform3DFilter.h"
 #include "tgfx/core/PictureRecorder.h"
@@ -159,6 +161,40 @@ static std::shared_ptr<Image> MakeImageWithTransform(std::shared_ptr<Image> imag
   image = image->makeWithFilter(imageFilter, &offset);
   imageMatrix->preTranslate(offset.x, offset.y);
   return image;
+}
+
+static void DrawCacheImage(Canvas* canvas, const std::shared_ptr<Image>& image,
+                           const Matrix& imageMatrix, const Paint& paint,
+                           const Matrix3D* transform) {
+  auto oldMatrix = canvas->getMatrix();
+  canvas->concat(imageMatrix);
+  Paint drawPaint = paint;
+  auto maskFilter = paint.getMaskFilter();
+  if (maskFilter) {
+    auto invertMatrix = Matrix::I();
+    if (imageMatrix.invert(&invertMatrix)) {
+      drawPaint.setMaskFilter(maskFilter->makeWithMatrix(invertMatrix));
+    }
+  }
+  if (transform == nullptr) {
+    canvas->drawImage(image, &drawPaint);
+  } else {
+    auto adaptedMatrix = *transform;
+    auto offsetMatrix =
+        Matrix3D::MakeTranslate(imageMatrix.getTranslateX(), imageMatrix.getTranslateY(), 0);
+    auto invOffsetMatrix =
+        Matrix3D::MakeTranslate(-imageMatrix.getTranslateX(), -imageMatrix.getTranslateY(), 0);
+    auto scaleMatrix = Matrix3D::MakeScale(imageMatrix.getScaleX(), imageMatrix.getScaleY(), 1.0f);
+    auto invScaleMatrix =
+        Matrix3D::MakeScale(1.0f / imageMatrix.getScaleX(), 1.0f / imageMatrix.getScaleY(), 1.0f);
+    adaptedMatrix = invScaleMatrix * invOffsetMatrix * adaptedMatrix * offsetMatrix * scaleMatrix;
+    auto imageFilter = ImageFilter::Transform3D(adaptedMatrix);
+    auto offset = Point();
+    auto filteredImage = image->makeWithFilter(imageFilter, &offset);
+    canvas->concat(Matrix::MakeTrans(offset.x, offset.y));
+    canvas->drawImage(filteredImage, &drawPaint);
+  }
+  canvas->setMatrix(oldMatrix);
 }
 
 bool Layer::DefaultAllowsEdgeAntialiasing() {
@@ -942,7 +978,7 @@ std::shared_ptr<ImageFilter> Layer::getImageFilter(float contentScale) {
   return ImageFilter::Compose(filters);
 }
 
-RasterizedCache* Layer::getRasterizedCache(const DrawArgs& args, const Matrix& renderMatrix) {
+RasterizedContent* Layer::getRasterizedContent(const DrawArgs& args, const Matrix& renderMatrix) {
   if (!bitFields.shouldRasterize || args.context == nullptr ||
       (args.drawMode == DrawMode::Background && hasBackgroundStyle()) ||
       args.drawMode == DrawMode::Contour || args.excludeEffects) {
@@ -950,18 +986,18 @@ RasterizedCache* Layer::getRasterizedCache(const DrawArgs& args, const Matrix& r
   }
   auto contextID = args.context->uniqueID();
   auto content = rasterizedContent.get();
-  float contentScale =
-      _rasterizationScale == 0.0f ? renderMatrix.getMaxScale() : _rasterizationScale;
-  if (content && content->contextID() == contextID && content->valid(args.context, contentScale)) {
+  if (content && content->contextID() == contextID) {
     return content;
   }
+  float contentScale =
+      _rasterizationScale == 0.0f ? renderMatrix.getMaxScale() : _rasterizationScale;
   Matrix drawingMatrix = {};
   auto image = getRasterizedImage(args, contentScale, &drawingMatrix);
   if (image == nullptr) {
     return nullptr;
   }
-  rasterizedContent = RasterizedCache::MakeFrom(args.context);
-  rasterizedContent->addScaleCache(args.context, contentScale, std::move(image), drawingMatrix);
+  rasterizedContent =
+      std::make_unique<RasterizedContent>(contextID, std::move(image), drawingMatrix);
   return rasterizedContent.get();
 }
 
@@ -1026,9 +1062,6 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
   } else {
     // draw directly
     drawDirectly(args, canvas, alpha);
-  }
-  if (args.drawMode == DrawMode::Normal) {
-    bitFields.cacheable = true;
   }
 }
 
@@ -1197,39 +1230,31 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   if (args.drawMode != DrawMode::Normal || args.excludeEffects || args.context == nullptr) {
     return false;
   }
-  std::shared_ptr<MaskFilter> maskFilter = nullptr;
-  auto contentScale = canvas->getMatrix().getMaxScale();
-  auto cacheScale = contentScale;
-  RasterizedCache* cache = nullptr;
-  if (auto rasterizedCache = getRasterizedCache(args, canvas->getMatrix())) {
-    cache = rasterizedCache;
-    cacheScale = _rasterizationScale == 0 ? contentScale : _rasterizationScale;
-  } else {
-    cacheScale = getMipmapCacheScale(args, contentScale);
-    if (auto layerCache = getContentCache(args, cacheScale)) {
-      cache = layerCache;
-      // rasterizedCache contains the background layer styles, but layer cache does not because of
-      // different background logic.
-      if (transform != nullptr) {
-        drawBackgroundLayerStyles(args, canvas, alpha, *transform);
-      }
+
+  if (auto content = getRasterizedContent(args, canvas->getMatrix())) {
+    if (transform != nullptr) {
+      drawBackgroundLayerStyles(args, canvas, alpha, *transform);
     }
-  }
-  if (cache) {
-    std::optional<Rect> clipBounds = std::nullopt;
+    std::shared_ptr<MaskFilter> maskFilter = nullptr;
     if (hasValidMask()) {
-      clipBounds = GetClipBounds(args.blurBackground ? args.blurBackground->getCanvas() : canvas);
+      auto contentScale = canvas->getMatrix().getMaxScale();
+      auto clipBounds =
+          GetClipBounds(args.blurBackground ? args.blurBackground->getCanvas() : canvas);
       maskFilter = getMaskFilter(args, contentScale, clipBounds);
       if (maskFilter == nullptr) {
         return true;
       }
     }
-    cache->draw(args.context, canvas, cacheScale, bitFields.allowsEdgeAntialiasing, alpha,
-                maskFilter, blendMode, transform);
+    Paint paint = {};
+    paint.setAntiAlias(bitFields.allowsEdgeAntialiasing);
+    paint.setAlpha(alpha);
+    paint.setBlendMode(blendMode);
+    paint.setMaskFilter(maskFilter);
+    DrawCacheImage(canvas, content->image(), content->matrix(), paint, transform);
     if (args.blurBackground) {
       if (!hasBackgroundStyle()) {
-        cache->draw(args.context, args.blurBackground->getCanvas(), cacheScale,
-                    bitFields.allowsEdgeAntialiasing, alpha, maskFilter, blendMode, transform);
+        DrawCacheImage(args.blurBackground->getCanvas(), content->image(), content->matrix(), paint,
+                       transform);
       } else {
         auto backgroundArgs = args;
         backgroundArgs.drawMode = DrawMode::Background;
@@ -1241,8 +1266,65 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     return true;
   }
 
+  return drawWithSubTreeCache(args, canvas, alpha, blendMode, transform);
+}
+
+bool Layer::drawWithSubTreeCache(const DrawArgs& args, Canvas* canvas, float alpha,
+                                 BlendMode blendMode, const Matrix3D* transform) {
+  auto contentScale = canvas->getMatrix().getMaxScale();
+  auto cacheScale = getMipmapCacheScale(args, contentScale);
+  auto layerBounds = getBounds();
+  auto scaledBounds = layerBounds;
+  scaledBounds.scale(cacheScale, cacheScale);
+  scaledBounds.roundOut();
+  auto cacheWidth = static_cast<int>(scaledBounds.width());
+  auto cacheHeight = static_cast<int>(scaledBounds.height());
+  auto cacheInfo = subTreeCache && subTreeCache->contextID() == args.context->uniqueID()
+                       ? subTreeCache->getCacheImageInfo(args.context, cacheWidth, cacheHeight)
+                       : std::nullopt;
+  if (cacheInfo.has_value()) {
+    if (transform != nullptr) {
+      drawBackgroundLayerStyles(args, canvas, alpha, *transform);
+    }
+    std::optional<Rect> clipBounds = std::nullopt;
+    std::shared_ptr<MaskFilter> maskFilter = nullptr;
+    if (hasValidMask()) {
+      clipBounds = GetClipBounds(args.blurBackground ? args.blurBackground->getCanvas() : canvas);
+      maskFilter = getMaskFilter(args, contentScale, clipBounds);
+      if (maskFilter == nullptr) {
+        return true;
+      }
+    }
+    Paint paint = {};
+    paint.setAntiAlias(bitFields.allowsEdgeAntialiasing);
+    paint.setAlpha(alpha);
+    paint.setBlendMode(blendMode);
+    paint.setMaskFilter(maskFilter);
+    DrawCacheImage(canvas, cacheInfo->image, cacheInfo->matrix, paint, transform);
+    if (args.blurBackground) {
+      if (!hasBackgroundStyle()) {
+        DrawCacheImage(args.blurBackground->getCanvas(), cacheInfo->image, cacheInfo->matrix, paint,
+                       transform);
+      } else {
+        auto backgroundArgs = args;
+        backgroundArgs.drawMode = DrawMode::Background;
+        backgroundArgs.blurBackground = nullptr;
+        drawOffscreen(backgroundArgs, args.blurBackground->getCanvas(), alpha, blendMode,
+                      transform);
+      }
+    }
+    return true;
+  }
+
+  // Skip caching on the first render to avoid caching content that is only displayed once.
+  // The cache is created on the second render when the layer is confirmed to be reused.
+  if (!subTreeCache || subTreeCache->contextID() != args.context->uniqueID()) {
+    subTreeCache = SubTreeCache::MakeFrom(args.context);
+    return false;
+  }
+
   if (args.renderFlags & RenderFlags::DisableCache || args.maxSubTreeCacheSize <= 0 ||
-      cacheScale < contentScale || !args.context) {
+      cacheScale < contentScale) {
     return false;
   }
 
@@ -1250,19 +1332,7 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     return false;
   }
 
-  if (!bitFields.cacheable) {
-    // Only layers explicitly marked as cacheable are allowed to create cache. This prevents
-    // repeatedly creating caches during the dirty-marking process, which would cause significant
-    // performance overhead. By requiring explicit opt-in for caching, we avoid unnecessary cache
-    // allocation for layers that are frequently dirtied but don't benefit from caching.
-    return false;
-  }
-
-  auto layerBounds = getBounds();
-  auto cacheWidth = ceilf(layerBounds.width() * cacheScale);
-  auto cacheHeight = ceilf(layerBounds.height() * cacheScale);
-  if (static_cast<int>(cacheWidth) > args.maxSubTreeCacheSize ||
-      static_cast<int>(cacheHeight) > args.maxSubTreeCacheSize) {
+  if (cacheWidth > args.maxSubTreeCacheSize || cacheHeight > args.maxSubTreeCacheSize) {
     return false;
   }
 
@@ -1342,11 +1412,14 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     return;
   }
 
-  if (cacheContent && args.context) {
-    if (!subTreeCache || subTreeCache->contextID() != args.context->uniqueID()) {
-      subTreeCache = RasterizedCache::MakeFrom(args.context);
+  if (cacheContent && subTreeCache) {
+    auto textureImage = image->makeTextureImage(args.context);
+    if (textureImage != nullptr) {
+      auto textureProxy = std::static_pointer_cast<TextureImage>(textureImage)->getTextureProxy();
+      subTreeCache->addCache(args.context, textureImage->width(), textureImage->height(),
+                             textureProxy, imageMatrix);
+      image = std::move(textureImage);
     }
-    image = subTreeCache->addScaleCache(args.context, contentScale, std::move(image), imageMatrix);
   }
 
   image = MakeImageWithTransform(std::move(image), transform, &imageMatrix);
@@ -2126,17 +2199,12 @@ Matrix3D Layer::anchorAdaptedMatrix(const Matrix3D& matrix, const Point& anchor)
 void Layer::invalidateCache() {
   rasterizedContent = nullptr;
   subTreeCache = nullptr;
-  bitFields.cacheable = false;
 }
 
 float Layer::getMipmapCacheScale(const DrawArgs& args, float contentScale) {
-  if (args.maxSubTreeCacheSize <= 0) {
-    return contentScale;
-  }
-
   auto layerBounds = getBounds();
   auto maxBoundsSize = std::max(layerBounds.width(), layerBounds.height());
-  if (FloatNearlyZero(maxBoundsSize)) {
+  if (FloatNearlyZero(maxBoundsSize) || args.maxSubTreeCacheSize <= 0) {
     return contentScale;
   }
 
@@ -2152,18 +2220,13 @@ float Layer::getMipmapCacheScale(const DrawArgs& args, float contentScale) {
       break;
     }
   }
-  return cacheScale;
-}
 
-RasterizedCache* Layer::getContentCache(const DrawArgs& args, float cacheScale) {
-  if (!args.context || !subTreeCache || subTreeCache->contextID() != args.context->uniqueID()) {
-    return nullptr;
-  }
-
-  if (!subTreeCache->valid(args.context, cacheScale)) {
-    return nullptr;
-  }
-  return subTreeCache.get();
+  // Round to integer size and recalculate scale to avoid half-pixel issues
+  auto scaledBounds = layerBounds;
+  scaledBounds.scale(cacheScale, cacheScale);
+  scaledBounds.roundOut();
+  auto scaledMaxSize = std::max(scaledBounds.width(), scaledBounds.height());
+  return scaledMaxSize / maxBoundsSize;
 }
 
 }  // namespace tgfx
