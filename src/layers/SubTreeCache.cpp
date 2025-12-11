@@ -22,7 +22,7 @@
 
 namespace tgfx {
 
-UniqueKey SubTreeCache::MakeSizeKey(int width, int height) const {
+UniqueKey SubTreeCache::makeSizeKey(int width, int height) const {
   uint32_t sizeData[2] = {static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
   UniqueKey newKey = _uniqueKey;
   return UniqueKey::Append(newKey, sizeData, 2);
@@ -40,7 +40,7 @@ void SubTreeCache::addCache(Context* context, int imageWidth, int imageHeight,
   if (context == nullptr || textureProxy == nullptr || context->uniqueID() != _contextID) {
     return;
   }
-  auto sizeUniqueKey = MakeSizeKey(imageWidth, imageHeight);
+  auto sizeUniqueKey = makeSizeKey(imageWidth, imageHeight);
   auto proxyProvider = context->proxyProvider();
   proxyProvider->assignProxyUniqueKey(textureProxy, sizeUniqueKey);
   textureProxy->assignUniqueKey(sizeUniqueKey);
@@ -52,7 +52,7 @@ std::optional<CacheImageInfo> SubTreeCache::getCacheImageInfo(Context* context, 
   if (context == nullptr || context->uniqueID() != _contextID) {
     return std::nullopt;
   }
-  auto sizeUniqueKey = MakeSizeKey(imageWidth, imageHeight);
+  auto sizeUniqueKey = makeSizeKey(imageWidth, imageHeight);
   auto it = _sizeMatrices.find(sizeUniqueKey);
   if (it == _sizeMatrices.end()) {
     return std::nullopt;

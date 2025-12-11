@@ -234,35 +234,33 @@ class DisplayList {
   void setBackgroundColor(const Color& color);
 
   /**
-   * Returns the maximum cache size (single edge) for sub-tree layer caching optimization.
-   * When this value is 0 (default), sub-tree layer cache is disabled.
+   * Returns the maximum cache size (longest edge) for sub-tree caching. Default is 0 (disabled).
    *
-   * This cache optimizes zoom-out scenarios with dense on-screen content. When viewport is zoomed
-   * out to a critical level, static sub-trees are cached as images. Using a hierarchical (mipmap-style)
-   * caching strategy reduces blur artifacts while providing significant performance improvements.
+   * When enabled, static sub-trees (unchanged layers and children) are cached if their rendered
+   * longest edge is smaller than maxSize. Uses mipmap-style scaling, snapping to power-of-2
+   * fractions of maxSize to reduce memory waste. Cached sub-trees skip child traversal on
+   * subsequent renders, greatly improving performance—especially in zoom-out scenarios with
+   * dense graphics.
    */
   int subTreeCacheMaxSize() const {
     return _subTreeCacheMaxSize;
   }
 
   /**
-   * Sets the maximum cache size (single edge) for sub-tree layer caching. Set to 0 to disable
-   * sub-tree caching (default). The cache texture size will be limited to this maximum value.
+   * Sets the maximum cache size (longest edge) for sub-tree caching. Set to 0 to disable (default).
    */
   void setSubTreeCacheMaxSize(int maxSize);
 
   /**
-   * Returns the minimum cache size (single edge) for sub-tree layer caching.
-   * The cache mipmap level is calculated based on the ratio between subtreeCacheMaxSize and
-   * minSubTreeCacheSize. The minimum value is 1, and the default value is 64.
+   * Returns the minimum cache size (longest edge) for sub-tree caching. Default is 64.
+   * The mipmap level is calculated from the ratio of subTreeCacheMaxSize to subTreeCacheMinSize.
    */
   int subTreeCacheMinSize() const {
     return _subTreeCacheMinSize;
   }
 
   /**
-   * Sets the minimum cache size (single edge) for sub-tree layer caching.
-   * Together with subtreeCacheMaxSize, defines the hierarchical cache levels used during zoom-out.
+   * Sets the minimum cache size (longest edge) for sub-tree caching.
    */
   void setSubTreeCacheMinSize(int minSize);
 

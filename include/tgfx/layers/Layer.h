@@ -595,7 +595,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   std::shared_ptr<ImageFilter> getImageFilter(float contentScale);
 
-  RasterizedContent* getRasterizedContent(const DrawArgs& args, const Matrix& renderMatrix);
+  RasterizedContent* getRasterizedCache(const DrawArgs& args, const Matrix& renderMatrix);
 
   std::shared_ptr<Image> getRasterizedImage(const DrawArgs& args, float contentScale,
                                             Matrix* drawingMatrix);

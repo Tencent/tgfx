@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <optional>
 #include <unordered_map>
 #include "gpu/resources/ResourceKey.h"
 #include "tgfx/core/Canvas.h"
@@ -57,6 +58,6 @@ class SubTreeCache {
   UniqueKey _uniqueKey = {};
   ResourceKeyMap<Matrix> _sizeMatrices = {};
 
-  UniqueKey MakeSizeKey(int width, int height) const;
+  UniqueKey makeSizeKey(int width, int height) const;
 };
 }  // namespace tgfx

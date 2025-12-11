@@ -26,11 +26,11 @@
 #include "core/utils/MathExtra.h"
 #include "layers/ContourContext.h"
 #include "layers/DrawArgs.h"
-#include "layers/RasterizedContent.h"
 #include "layers/RegionTransformer.h"
 #include "layers/RootLayer.h"
 #include "layers/SubTreeCache.h"
 #include "layers/contents/LayerContent.h"
+#include "layers/contents/RasterizedContent.h"
 #include "layers/filters/Transform3DFilter.h"
 #include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Surface.h"
@@ -978,7 +978,7 @@ std::shared_ptr<ImageFilter> Layer::getImageFilter(float contentScale) {
   return ImageFilter::Compose(filters);
 }
 
-RasterizedContent* Layer::getRasterizedContent(const DrawArgs& args, const Matrix& renderMatrix) {
+RasterizedContent* Layer::getRasterizedCache(const DrawArgs& args, const Matrix& renderMatrix) {
   if (!bitFields.shouldRasterize || args.context == nullptr ||
       (args.drawMode == DrawMode::Background && hasBackgroundStyle()) ||
       args.drawMode == DrawMode::Contour || args.excludeEffects) {
@@ -986,18 +986,22 @@ RasterizedContent* Layer::getRasterizedContent(const DrawArgs& args, const Matri
   }
   auto contextID = args.context->uniqueID();
   auto content = rasterizedContent.get();
-  if (content && content->contextID() == contextID) {
-    return content;
-  }
   float contentScale =
       _rasterizationScale == 0.0f ? renderMatrix.getMaxScale() : _rasterizationScale;
+  if (content && content->contextID() == contextID && content->contentScale() == contentScale) {
+    return content;
+  }
   Matrix drawingMatrix = {};
   auto image = getRasterizedImage(args, contentScale, &drawingMatrix);
   if (image == nullptr) {
     return nullptr;
   }
+  image = image->makeTextureImage(args.context);
+  if (image == nullptr) {
+    return nullptr;
+  }
   rasterizedContent =
-      std::make_unique<RasterizedContent>(contextID, std::move(image), drawingMatrix);
+      std::make_unique<RasterizedContent>(contextID, contentScale, std::move(image), drawingMatrix);
   return rasterizedContent.get();
 }
 
@@ -1227,46 +1231,39 @@ bool Layer::shouldPassThroughBackground(BlendMode blendMode, const Matrix3D* tra
 
 bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                           const Matrix3D* transform) {
-  if (args.drawMode != DrawMode::Normal || args.excludeEffects || args.context == nullptr) {
+  if (args.drawMode != DrawMode::Normal || args.excludeEffects) {
     return false;
   }
-
-  if (auto content = getRasterizedContent(args, canvas->getMatrix())) {
-    if (transform != nullptr) {
-      drawBackgroundLayerStyles(args, canvas, alpha, *transform);
-    }
-    std::shared_ptr<MaskFilter> maskFilter = nullptr;
-    if (hasValidMask()) {
-      auto contentScale = canvas->getMatrix().getMaxScale();
-      auto clipBounds =
-          GetClipBounds(args.blurBackground ? args.blurBackground->getCanvas() : canvas);
-      maskFilter = getMaskFilter(args, contentScale, clipBounds);
-      if (maskFilter == nullptr) {
-        return true;
-      }
-    }
-    Paint paint = {};
-    paint.setAntiAlias(bitFields.allowsEdgeAntialiasing);
-    paint.setAlpha(alpha);
-    paint.setBlendMode(blendMode);
-    paint.setMaskFilter(maskFilter);
-    DrawCacheImage(canvas, content->image(), content->matrix(), paint, transform);
-    if (args.blurBackground) {
-      if (!hasBackgroundStyle()) {
-        DrawCacheImage(args.blurBackground->getCanvas(), content->image(), content->matrix(), paint,
-                       transform);
-      } else {
-        auto backgroundArgs = args;
-        backgroundArgs.drawMode = DrawMode::Background;
-        backgroundArgs.blurBackground = nullptr;
-        drawOffscreen(backgroundArgs, args.blurBackground->getCanvas(), alpha, blendMode,
-                      transform);
-      }
-    }
-    return true;
+  RasterizedContent* cache = nullptr;
+  if (auto rasterizedCache = getRasterizedCache(args, canvas->getMatrix())) {
+    cache = rasterizedCache;
   }
-
-  return drawWithSubTreeCache(args, canvas, alpha, blendMode, transform);
+  if (!cache) {
+    return drawWithSubTreeCache(args, canvas, alpha, blendMode, transform);
+  }
+  std::optional<Rect> clipBounds = std::nullopt;
+  std::shared_ptr<MaskFilter> maskFilter = nullptr;
+  auto contentScale = canvas->getMatrix().getMaxScale();
+  if (hasValidMask()) {
+    clipBounds = GetClipBounds(args.blurBackground ? args.blurBackground->getCanvas() : canvas);
+    maskFilter = getMaskFilter(args, contentScale, clipBounds);
+    if (maskFilter == nullptr) {
+      return true;
+    }
+  }
+  cache->draw(canvas, bitFields.allowsEdgeAntialiasing, alpha, maskFilter, blendMode, transform);
+  if (args.blurBackground) {
+    if (!hasBackgroundStyle()) {
+      cache->draw(args.blurBackground->getCanvas(), bitFields.allowsEdgeAntialiasing, alpha,
+                  maskFilter, blendMode, transform);
+    } else {
+      auto backgroundArgs = args;
+      backgroundArgs.drawMode = DrawMode::Background;
+      backgroundArgs.blurBackground = nullptr;
+      drawOffscreen(backgroundArgs, args.blurBackground->getCanvas(), alpha, blendMode, transform);
+    }
+  }
+  return true;
 }
 
 bool Layer::drawWithSubTreeCache(const DrawArgs& args, Canvas* canvas, float alpha,

@@ -25,9 +25,9 @@
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "layers/ContourContext.h"
 #include "layers/DrawArgs.h"
-#include "layers/RasterizedContent.h"
 #include "layers/RootLayer.h"
 #include "layers/SubTreeCache.h"
+#include "layers/contents/RasterizedContent.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Gradient.h"
@@ -2450,23 +2450,23 @@ TGFX_TEST(LayerTest, RasterizedBackground) {
 
   displayList->render(surface.get());
   background->setMatrix(Matrix::MakeTrans(50, 50));
-  auto rasterizedImage = child->rasterizedContent->image();
+  auto rasterizedImage = child->rasterizedContent->getImage();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedImage != child->rasterizedContent->image());
+  EXPECT_TRUE(rasterizedImage != child->rasterizedContent->getImage());
 
   child->setMatrix(Matrix::MakeTrans(20, 20));
-  rasterizedImage = child->rasterizedContent->image();
+  rasterizedImage = child->rasterizedContent->getImage();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedImage != child->rasterizedContent->image());
+  EXPECT_TRUE(rasterizedImage != child->rasterizedContent->getImage());
 
   auto layerNextChild = ShapeLayer::Make();
   layerNextChild->setPath(path);
   layerNextChild->setMatrix(Matrix::MakeTrans(10, 10));
   layerNextChild->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 100, 0, 128)));
   parent->addChild(layerNextChild);
-  rasterizedImage = child->rasterizedContent->image();
+  rasterizedImage = child->rasterizedContent->getImage();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedImage == child->rasterizedContent->image());
+  EXPECT_TRUE(rasterizedImage == child->rasterizedContent->getImage());
 
   auto grandChild = ShapeLayer::Make();
   grandChild->setPath(path);
@@ -2481,52 +2481,52 @@ TGFX_TEST(LayerTest, RasterizedBackground) {
   nephew->setMatrix(Matrix::MakeTrans(10, 10));
   nephew->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 100, 0, 128)));
   layerNextChild->addChild(nephew);
-  rasterizedImage = child->rasterizedContent->image();
+  rasterizedImage = child->rasterizedContent->getImage();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedImage == child->rasterizedContent->image());
+  EXPECT_TRUE(rasterizedImage == child->rasterizedContent->getImage());
 
   parent->addChildAt(layerBeforeChild, parent->getChildIndex(child));
-  rasterizedImage = child->rasterizedContent->image();
+  rasterizedImage = child->rasterizedContent->getImage();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedImage != child->rasterizedContent->image());
+  EXPECT_TRUE(rasterizedImage != child->rasterizedContent->getImage());
 
   layerBeforeChild->addChildAt(backgroundNephew, 0);
-  rasterizedImage = child->rasterizedContent->image();
+  rasterizedImage = child->rasterizedContent->getImage();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedImage != child->rasterizedContent->image());
+  EXPECT_TRUE(rasterizedImage != child->rasterizedContent->getImage());
 
   layerBeforeChild->removeChildren();
-  rasterizedImage = child->rasterizedContent->image();
+  rasterizedImage = child->rasterizedContent->getImage();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedImage != child->rasterizedContent->image());
+  EXPECT_TRUE(rasterizedImage != child->rasterizedContent->getImage());
 
   layerBeforeChild->removeFromParent();
-  rasterizedImage = child->rasterizedContent->image();
+  rasterizedImage = child->rasterizedContent->getImage();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedImage != child->rasterizedContent->image());
+  EXPECT_TRUE(rasterizedImage != child->rasterizedContent->getImage());
 
   parent->setChildIndex(background, static_cast<int>(parent->children().size() - 1u));
-  rasterizedImage = child->rasterizedContent->image();
+  rasterizedImage = child->rasterizedContent->getImage();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedImage != child->rasterizedContent->image());
+  EXPECT_TRUE(rasterizedImage != child->rasterizedContent->getImage());
 
   parent->setChildIndex(background, 0);
-  rasterizedImage = child->rasterizedContent->image();
+  rasterizedImage = child->rasterizedContent->getImage();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedImage != child->rasterizedContent->image());
+  EXPECT_TRUE(rasterizedImage != child->rasterizedContent->getImage());
 
   parent->replaceChild(background, layerBeforeChild);
-  rasterizedImage = child->rasterizedContent->image();
+  rasterizedImage = child->rasterizedContent->getImage();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedImage != child->rasterizedContent->image());
+  EXPECT_TRUE(rasterizedImage != child->rasterizedContent->getImage());
 
   parent->replaceChild(layerNextChild, background);
-  rasterizedImage = child->rasterizedContent->image();
+  rasterizedImage = child->rasterizedContent->getImage();
   displayList->render(surface.get());
   // Ideally, rasterizedImage should remain unchanged here, but we need to call root->invalidateRect()
   // whenever a layer is removed or its index changes. As a result, dirty rects are always treated
   // as background changes. This is a trade-off between performance and correctness.
-  EXPECT_TRUE(rasterizedImage != child->rasterizedContent->image());
+  EXPECT_TRUE(rasterizedImage != child->rasterizedContent->getImage());
 }
 
 TGFX_TEST(LayerTest, AdaptiveDashEffect) {
