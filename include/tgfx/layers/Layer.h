@@ -601,10 +601,10 @@ class Layer : public std::enable_shared_from_this<Layer> {
                                             Matrix* drawingMatrix);
 
   virtual void drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
-                         const Matrix3D* transform = nullptr);
+                         const Matrix3D* transform3D = nullptr);
 
   void drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
-                     const Matrix3D* transform);
+                     const Matrix3D* transform3D);
 
   void drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha);
 
@@ -673,9 +673,9 @@ class Layer : public std::enable_shared_from_this<Layer> {
   static std::shared_ptr<Picture> RecordPicture(DrawMode mode, float contentScale,
                                                 const std::function<void(Canvas*)>& drawFunction);
 
-  bool shouldPassThroughBackground(BlendMode blendMode, const Matrix3D* transform) const;
+  bool shouldPassThroughBackground(BlendMode blendMode, const Matrix3D* transform3D) const;
 
-  bool shouldSkipSubTreeCache(BlendMode blendMode, const Matrix3D* transform);
+  bool shouldSkipSubTreeCache(BlendMode blendMode, const Matrix3D* transform3D);
 
   std::optional<SubTreeCacheInfo> getSubTreeCacheInfo(const DrawArgs& args, float contentScale);
 
@@ -683,10 +683,10 @@ class Layer : public std::enable_shared_from_this<Layer> {
                                                  Matrix* imageMatrix);
 
   bool drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
-                     const Matrix3D* transform);
+                     const Matrix3D* transform3D);
 
   bool drawWithSubTreeCache(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
-                            const Matrix3D* transform);
+                            const Matrix3D* transform3D);
 
   std::shared_ptr<Image> getContentImage(const DrawArgs& args, float contentScale,
                                          const std::shared_ptr<Image>& passThroughImage,

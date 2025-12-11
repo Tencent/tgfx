@@ -21,7 +21,7 @@
 namespace tgfx {
 void RasterizedContent::draw(Canvas* canvas, bool antiAlias, float alpha,
                              const std::shared_ptr<MaskFilter>& mask, BlendMode blendMode,
-                             const Matrix3D* transform) const {
+                             const Matrix3D* transform3D) const {
   auto oldMatrix = canvas->getMatrix();
   canvas->concat(matrix);
   Paint paint = {};
@@ -34,14 +34,14 @@ void RasterizedContent::draw(Canvas* canvas, bool antiAlias, float alpha,
       paint.setMaskFilter(mask->makeWithMatrix(invertMatrix));
     }
   }
-  if (transform == nullptr) {
+  if (transform3D == nullptr) {
     canvas->drawImage(image, &paint);
   } else {
     // Transform describes a transformation based on the layer's coordinate system, but the
     // rasterized content is only a small sub-rectangle within the layer. We need to calculate an
     // equivalent affine transformation matrix referenced to the local coordinate system with the
     // top-left vertex of this sub-rectangle as the origin.
-    auto adaptedMatrix = *transform;
+    auto adaptedMatrix = *transform3D;
     auto offsetMatrix = Matrix3D::MakeTranslate(matrix.getTranslateX(), matrix.getTranslateY(), 0);
     auto invOffsetMatrix =
         Matrix3D::MakeTranslate(-matrix.getTranslateX(), -matrix.getTranslateY(), 0);
