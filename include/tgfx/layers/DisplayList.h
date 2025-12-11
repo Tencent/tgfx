@@ -252,19 +252,6 @@ class DisplayList {
   void setSubTreeCacheMaxSize(int maxSize);
 
   /**
-   * Returns the minimum cache size (longest edge) for sub-tree caching. Default is 64.
-   * The mipmap level is calculated from the ratio of subTreeCacheMaxSize to subTreeCacheMinSize.
-   */
-  int subTreeCacheMinSize() const {
-    return _subTreeCacheMinSize;
-  }
-
-  /**
-   * Sets the minimum cache size (longest edge) for sub-tree caching.
-   */
-  void setSubTreeCacheMinSize(int minSize);
-
-  /**
    * Sets whether to show dirty regions during rendering. When enabled, the dirty regions will be
    * highlighted in the rendered output. This is useful for debugging to visualize which parts of
    * the display list are being updated. The default value is false.
@@ -296,7 +283,6 @@ class DisplayList {
   bool _allowZoomBlur = false;
   int _maxTilesRefinedPerFrame = 5;
   int _subTreeCacheMaxSize = 0;
-  int _subTreeCacheMinSize = 64;
   bool _showDirtyRegions = false;
   bool _hasContentChanged = false;
   bool hasZoomBlurTiles = false;

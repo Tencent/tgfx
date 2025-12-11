@@ -58,6 +58,6 @@ class DrawArgs {
 
   // The maximum cache size (single edge) for sub-tree layer caching. Set to 0 to disable
   // sub-tree layer cache.
-  int maxSubTreeCacheSize = 0;
+  int subTreeCacheMaxSize = 0;
 };
 }  // namespace tgfx

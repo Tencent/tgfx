@@ -1208,12 +1208,12 @@ bool Layer::shouldPassThroughBackground(BlendMode blendMode, const Matrix3D* tra
          bitFields.hasBlendMode && transform3D == nullptr;
 }
 
-bool Layer::shouldSkipSubTreeCache(int maxSubTreeCacheSize, BlendMode blendMode,
+bool Layer::shouldSkipSubTreeCache(int subTreeCacheMaxSize, BlendMode blendMode,
                                    const Matrix3D* transform3D) {
   if (subTreeCache) {
     return false;
   }
-  if (maxSubTreeCacheSize <= 0) {
+  if (subTreeCacheMaxSize <= 0) {
     return true;
   }
   if (_children.empty() && _layerStyles.empty() && _filters.empty()) {
@@ -1308,7 +1308,7 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
 bool Layer::drawWithSubTreeCache(const DrawArgs& args, Canvas* canvas, float alpha,
                                  BlendMode blendMode, const Matrix3D* transform3D) {
 
-  if (shouldSkipSubTreeCache(args.maxSubTreeCacheSize, blendMode, transform3D)) {
+  if (shouldSkipSubTreeCache(args.subTreeCacheMaxSize, blendMode, transform3D)) {
     return false;
   }
   auto drawer = getSubTreeCacheDrawer(args, canvas);
@@ -1340,14 +1340,14 @@ std::unique_ptr<SubTreeCacheDrawer> Layer::getSubTreeCacheDrawer(const DrawArgs&
                                                                  Canvas* canvas) {
   auto layerBounds = getBounds();
   auto contentScale = canvas->getMatrix().getMaxScale();
-  auto longEdge = GetMipmapCacheLongEdge(args.maxSubTreeCacheSize, contentScale, layerBounds);
+  auto longEdge = GetMipmapCacheLongEdge(args.subTreeCacheMaxSize, contentScale, layerBounds);
 
   auto drawer = subTreeCache->getDrawer(args.context, longEdge);
   if (drawer) {
     return drawer;
   }
 
-  if (args.renderFlags & RenderFlags::DisableCache || longEdge > args.maxSubTreeCacheSize) {
+  if (args.renderFlags & RenderFlags::DisableCache || longEdge > args.subTreeCacheMaxSize) {
     return nullptr;
   }
 

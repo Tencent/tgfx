@@ -272,13 +272,6 @@ void DisplayList::setSubTreeCacheMaxSize(int maxSize) {
   _subTreeCacheMaxSize = maxSize;
 }
 
-void DisplayList::setSubTreeCacheMinSize(int minSize) {
-  if (minSize < 1) {
-    minSize = 1;
-  }
-  _subTreeCacheMinSize = minSize;
-}
-
 void DisplayList::showDirtyRegions(bool show) {
   if (_showDirtyRegions == show) {
     return;
@@ -988,7 +981,7 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   args.blurBackground =
       _root->createBackgroundContext(context, drawRect, viewMatrix, false, args.dstColorSpace);
   args.dstColorSpace = surface->colorSpace();
-  args.maxSubTreeCacheSize = _subTreeCacheMaxSize;
+  args.subTreeCacheMaxSize = _subTreeCacheMaxSize;
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
 }
 

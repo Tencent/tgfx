@@ -3834,10 +3834,6 @@ TGFX_TEST(LayerTest, LayerCache) {
   displayList->setSubTreeCacheMaxSize(-1);
   EXPECT_EQ(displayList->subTreeCacheMaxSize(), 0);
 
-  EXPECT_EQ(displayList->subTreeCacheMinSize(), 64);
-  displayList->setSubTreeCacheMinSize(256);
-  EXPECT_EQ(displayList->subTreeCacheMinSize(), 256);
-
   // Enable cache
   displayList->setSubTreeCacheMaxSize(2048);
 
@@ -3863,7 +3859,7 @@ TGFX_TEST(LayerTest, LayerCache) {
   // Second render - cache should be filled
   displayList->render(surface.get());
   EXPECT_TRUE(root->subTreeCache != nullptr);
-  int expectedLongEdge = 256;
+  int expectedLongEdge = 64;
   EXPECT_TRUE(root->subTreeCache->getDrawer(context, expectedLongEdge) != nullptr);
 }
 
