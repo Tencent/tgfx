@@ -35,4 +35,10 @@ bool NeedConvertColorSpace(const std::shared_ptr<ColorSpace>& src,
 void ConvertColorSpaceInPlace(int width, int height, ColorType colorType, AlphaType alphaType,
                               size_t rowBytes, const std::shared_ptr<ColorSpace>& srcCS,
                               const std::shared_ptr<ColorSpace>& dstCS, void* pixels);
+
+bool NearlyEqual(const TransferFunction& u, const TransferFunction& v);
+
+bool NearlyEqual(const ColorMatrix33& u, const ColorMatrix33& v);
+
+bool NearlyEqual(const ColorSpace* colorSpaceA, const ColorSpace* colorSpaceB);
 }  // namespace tgfx

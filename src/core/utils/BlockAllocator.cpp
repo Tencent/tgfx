@@ -34,14 +34,6 @@ BlockBuffer::~BlockBuffer() {
   }
 }
 
-void* BlockBuffer::shrinkLastBlockTo(size_t newSize) {
-  auto& lastBlock = blocks.back();
-  if (auto resizedBlock = static_cast<uint8_t*>(realloc(lastBlock, newSize))) {
-    lastBlock = resizedBlock;
-  }
-  return lastBlock;
-}
-
 BlockAllocator::BlockAllocator(size_t initBlockSize, size_t maxBlockSize)
     : initBlockSize(initBlockSize), maxBlockSize(maxBlockSize) {
   DEBUG_ASSERT(initBlockSize > 0);

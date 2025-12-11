@@ -184,11 +184,11 @@ bool GlyphRunList::hitTestPoint(float localX, float localY, const Stroke* stroke
           }
         }
       } else {
-        auto bounds = font.getBounds(glyphID);
+        auto glyphBounds = font.getBounds(glyphID);
         if (stroke) {
-          ApplyStrokeToBounds(*stroke, &bounds);
+          ApplyStrokeToBounds(*stroke, &glyphBounds);
         }
-        if (bounds.contains(glyphLocalX, glyphLocalY)) {
+        if (glyphBounds.contains(glyphLocalX, glyphLocalY)) {
           return true;
         }
       }

@@ -40,11 +40,6 @@ class BlockBuffer {
 
   ~BlockBuffer();
 
-  /**
-   * Shrinks the last memory block to the specified size. Returns a pointer to the resized block.
-   */
-  void* shrinkLastBlockTo(size_t newSize);
-
  private:
   std::vector<uint8_t*> blocks = {};
 };

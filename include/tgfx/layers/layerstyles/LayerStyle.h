@@ -28,11 +28,11 @@ namespace tgfx {
  */
 enum class LayerStylePosition {
   /**
-   * The layerStyle is drawn below the layer content.
+   * The layerStyle is drawn above the layer content.
    */
   Above,
   /**
-   * The layerStyle is drawn above the layer content.
+   * The layerStyle is drawn below the layer content.
    */
   Below
 };
