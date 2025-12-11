@@ -42,7 +42,6 @@ class RootLayer;
 struct LayerStyleSource;
 class BackgroundContext;
 enum class DrawMode;
-struct SubTreeCacheInfo;
 
 /**
  * The base class for all layers that can be placed on the display list. The layer class includes
