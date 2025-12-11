@@ -675,7 +675,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   bool shouldPassThroughBackground(BlendMode blendMode, const Matrix3D* transform3D) const;
 
-  bool shouldSkipSubTreeCache(int subTreeCacheMaxSize, BlendMode blendMode,
+  bool canUseSubTreeCache(int subTreeCacheMaxSize, BlendMode blendMode,
                               const Matrix3D* transform3D);
 
   std::shared_ptr<Image> createSubTreeCacheImage(const DrawArgs& args, float contentScale,

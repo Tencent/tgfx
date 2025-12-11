@@ -37,6 +37,9 @@
 #include "tgfx/layers/ShapeLayer.h"
 
 namespace tgfx {
+// The minimum size (longest edge) for sub-tree cache. This prevents creating excessively small
+// mipmap levels that would be inefficient to cache.
+static constexpr int SUB_TREE_CACHE_MIN_SIZE = 32;
 static std::atomic_bool AllowsEdgeAntialiasing = true;
 static std::atomic_bool AllowsGroupOpacity = false;
 
@@ -157,18 +160,16 @@ static std::shared_ptr<Image> MakeImageWithTransform(std::shared_ptr<Image> imag
   return image;
 }
 
-static constexpr int MinSubTreeCacheSize = 32;
-
 static int GetMipmapCacheLongEdge(int maxSize, float contentScale, const Rect& layerBounds) {
   auto maxBoundsSize = std::max(layerBounds.width(), layerBounds.height());
   auto scaleBoundsSize = static_cast<int>(ceilf(maxBoundsSize * contentScale));
   if (scaleBoundsSize > maxSize) {
     return scaleBoundsSize;
   }
-  if (MinSubTreeCacheSize >= maxSize) {
+  if (SUB_TREE_CACHE_MIN_SIZE >= maxSize) {
     return maxSize;
   }
-  auto targetSize = std::max(scaleBoundsSize, MinSubTreeCacheSize);
+  auto targetSize = std::max(scaleBoundsSize, SUB_TREE_CACHE_MIN_SIZE);
   auto currentLongEdge = maxSize;
   while ((currentLongEdge >> 1) >= targetSize) {
     currentLongEdge >>= 1;
@@ -1208,24 +1209,24 @@ bool Layer::shouldPassThroughBackground(BlendMode blendMode, const Matrix3D* tra
          bitFields.hasBlendMode && transform3D == nullptr;
 }
 
-bool Layer::shouldSkipSubTreeCache(int subTreeCacheMaxSize, BlendMode blendMode,
-                                   const Matrix3D* transform3D) {
+bool Layer::canUseSubTreeCache(int subTreeCacheMaxSize, BlendMode blendMode,
+                               const Matrix3D* transform3D) {
   if (subTreeCache) {
-    return false;
+    return true;
   }
   if (subTreeCacheMaxSize <= 0) {
-    return true;
+    return false;
   }
   if (_children.empty() && _layerStyles.empty() && _filters.empty()) {
-    return true;
+    return false;
   }
   if (shouldPassThroughBackground(blendMode, transform3D) || hasBackgroundStyle()) {
-    return true;
+    return false;
   }
   // Skip caching on the first render to avoid caching content that is only displayed once.
   // The cache is created on the second render when the layer is confirmed to be reused.
   subTreeCache = std::make_unique<SubTreeCache>();
-  return true;
+  return false;
 }
 
 std::shared_ptr<Image> Layer::createSubTreeCacheImage(const DrawArgs& args, float contentScale,
@@ -1277,6 +1278,9 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     cache = rasterizedCache;
   }
   if (!cache) {
+    if (!canUseSubTreeCache(args.subTreeCacheMaxSize, blendMode, transform3D)) {
+      return false;
+    }
     return drawWithSubTreeCache(args, canvas, alpha, blendMode, transform3D);
   }
   std::optional<Rect> clipBounds = std::nullopt;
@@ -1307,10 +1311,6 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
 
 bool Layer::drawWithSubTreeCache(const DrawArgs& args, Canvas* canvas, float alpha,
                                  BlendMode blendMode, const Matrix3D* transform3D) {
-
-  if (shouldSkipSubTreeCache(args.subTreeCacheMaxSize, blendMode, transform3D)) {
-    return false;
-  }
   auto drawer = getSubTreeCacheDrawer(args, canvas);
   if (!drawer) {
     return false;
