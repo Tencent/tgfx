@@ -216,7 +216,7 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
     }
     drawImage(subsetImage->source, sampling, state, brush);
   } else {
-    auto modifyImage = ModifyImage(image, context, _targetColorSpace, _writeColorSpace);
+    auto modifyImage = ConvertImageColorSpace(image, context, _targetColorSpace, _writeColorSpace);
     Bitmap bitmap = ImageExportToBitmap(context, modifyImage);
     if (!bitmap.isEmpty()) {
       exportPixmap(Pixmap(bitmap), state, brush);
@@ -228,7 +228,7 @@ void SVGExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& s
                                      const Rect& dstRect, const SamplingOptions&,
                                      const MCState& state, const Brush& brush, SrcRectConstraint) {
   DEBUG_ASSERT(image != nullptr);
-  auto modifyImage = ModifyImage(image, context, _targetColorSpace, _writeColorSpace);
+  auto modifyImage = ConvertImageColorSpace(image, context, _targetColorSpace, _writeColorSpace);
   auto subsetImage = modifyImage->makeSubset(srcRect);
   if (subsetImage == nullptr) {
     return;

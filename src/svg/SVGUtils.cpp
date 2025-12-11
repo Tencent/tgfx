@@ -290,9 +290,9 @@ std::shared_ptr<Data> AsDataUri(const std::shared_ptr<Data>& encodedData) {
   return dataUri;
 }
 
-std::shared_ptr<Image> ModifyImage(const std::shared_ptr<Image>& image, Context* context,
-                                   const std::shared_ptr<ColorSpace>& dstColorSpace,
-                                   const std::shared_ptr<ColorSpace>& writeColorSpace) {
+std::shared_ptr<Image> ConvertImageColorSpace(const std::shared_ptr<Image>& image, Context* context,
+                                              const std::shared_ptr<ColorSpace>& dstColorSpace,
+                                              const std::shared_ptr<ColorSpace>& writeColorSpace) {
   if (writeColorSpace == nullptr) {
     return image;
   }

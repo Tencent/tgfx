@@ -105,8 +105,8 @@ bool ElementWriter::writeColorCSSStyleAttribute(const std::string& attributeName
     return false;
   }
   *retString += attributeName + ":" + ToSVGColor(color) + ";" + attributeName + ":color(" +
-                _writeColorSpaceString + " " + std::to_string(color.red) + " " +
-                std::to_string(color.green) + " " + std::to_string(color.blue) + ");";
+                _writeColorSpaceString + " " + FloatToString(color.red) + " " +
+                FloatToString(color.green) + " " + FloatToString(color.blue) + ");";
   return true;
 }
 
@@ -702,7 +702,7 @@ void ElementWriter::addImageShaderResources(const ImageShader* shader, const Mat
   auto image = shader->image;
   DEBUG_ASSERT(image);
 
-  image = ModifyImage(image, context, _targetColorSpace, _writeColorSpace);
+  image = ConvertImageColorSpace(image, context, _targetColorSpace, _writeColorSpace);
   std::shared_ptr<Data> dataUri = nullptr;
 
   auto data = SVGExportContext::ImageToEncodedData(image);

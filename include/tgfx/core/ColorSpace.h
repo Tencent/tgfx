@@ -163,8 +163,7 @@ namespace NamedTransferFunction {
 static constexpr TransferFunction SRGB = {
     2.4f, (float)(1 / 1.055), (float)(0.055 / 1.055), (float)(1 / 12.92), 0.04045f, 0.0f, 0.0f};
 
-static constexpr TransferFunction
- TwoDotTwo = {2.2f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+static constexpr TransferFunction TwoDotTwo = {2.2f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
 
 static constexpr TransferFunction Rec2020 = {2.22222f,   0.909672f, 0.0903276f, 0.222222f,
                                              0.0812429f, 0,         0};
