@@ -32,6 +32,7 @@
 #include "layers/contents/LayerContent.h"
 #include "layers/contents/RasterizedContent.h"
 #include "layers/filters/Transform3DFilter.h"
+#include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/layers/ShapeLayer.h"
@@ -1210,8 +1211,7 @@ bool Layer::shouldPassThroughBackground(BlendMode blendMode, const Matrix3D* tra
 }
 
 bool Layer::canUseSubTreeCache(int subTreeCacheMaxSize, BlendMode blendMode,
-                               const Matrix3D* transform3D,
-                               const std::shared_ptr<ColorSpace>& colorSpace) {
+                               const Matrix3D* transform3D) {
   if (subTreeCache) {
     return true;
   }
@@ -1226,7 +1226,7 @@ bool Layer::canUseSubTreeCache(int subTreeCacheMaxSize, BlendMode blendMode,
   }
   // Skip caching on the first render to avoid caching content that is only displayed once.
   // The cache is created on the second render when the layer is confirmed to be reused.
-  subTreeCache = std::make_unique<SubTreeCache>(colorSpace);
+  subTreeCache = std::make_unique<SubTreeCache>();
   return false;
 }
 
@@ -1279,7 +1279,7 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     cache = rasterizedCache;
   }
   if (!cache) {
-    if (!canUseSubTreeCache(args.subTreeCacheMaxSize, blendMode, transform3D, args.dstColorSpace)) {
+    if (!canUseSubTreeCache(args.subTreeCacheMaxSize, blendMode, transform3D)) {
       return false;
     }
     return drawWithSubTreeCache(args, canvas, alpha, blendMode, transform3D);
@@ -1310,24 +1310,28 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   return true;
 }
 
-bool Layer::getValidSubTreeCache(const DrawArgs& args, int longEdge, const Rect& layerBounds) {
+SubTreeCache* Layer::getValidSubTreeCache(const DrawArgs& args, int longEdge,
+                                          const Rect& layerBounds) {
+  if (subTreeCache->valid(args.context, longEdge)) {
+    return subTreeCache.get();
+  }
   if (args.renderFlags & RenderFlags::DisableCache || longEdge > args.subTreeCacheMaxSize) {
-    return false;
+    return nullptr;
   }
   auto maxBoundsSize = std::max(layerBounds.width(), layerBounds.height());
   if (FloatNearlyZero(maxBoundsSize)) {
-    return false;
+    return nullptr;
   }
   auto cacheScale = static_cast<float>(longEdge) / maxBoundsSize;
   auto imageMatrix = Matrix::I();
   auto image = createSubTreeCacheImage(args, cacheScale, layerBounds, &imageMatrix);
   if (image == nullptr) {
-    return false;
+    return nullptr;
   }
   auto textureProxy = std::static_pointer_cast<TextureImage>(image)->getTextureProxy();
   DEBUG_ASSERT(longEdge == std::max(textureProxy->width(), textureProxy->height()));
-  subTreeCache->addCache(args.context, textureProxy, imageMatrix);
-  return true;
+  subTreeCache->addCache(args.context, textureProxy, imageMatrix, args.dstColorSpace);
+  return subTreeCache.get();
 }
 
 bool Layer::drawWithSubTreeCache(const DrawArgs& args, Canvas* canvas, float alpha,
@@ -1335,13 +1339,10 @@ bool Layer::drawWithSubTreeCache(const DrawArgs& args, Canvas* canvas, float alp
   auto layerBounds = getBounds();
   auto contentScale = canvas->getMatrix().getMaxScale();
   auto longEdge = GetMipmapCacheLongEdge(args.subTreeCacheMaxSize, contentScale, layerBounds);
-
-  if (!subTreeCache->valid(args.context, longEdge, args.dstColorSpace)) {
-    if (!getValidSubTreeCache(args, longEdge, layerBounds)) {
-      return false;
-    }
+  auto cache = getValidSubTreeCache(args, longEdge, layerBounds);
+  if (cache == nullptr) {
+    return false;
   }
-
   Paint paint = {};
   if (hasValidMask()) {
     auto clipBounds =
@@ -1355,10 +1356,9 @@ bool Layer::drawWithSubTreeCache(const DrawArgs& args, Canvas* canvas, float alp
   paint.setAntiAlias(bitFields.allowsEdgeAntialiasing);
   paint.setAlpha(alpha);
   paint.setBlendMode(blendMode);
-  subTreeCache->draw(args.context, longEdge, canvas, paint, transform3D, args.dstColorSpace);
+  cache->draw(args.context, longEdge, canvas, paint, transform3D);
   if (args.blurBackground) {
-    subTreeCache->draw(args.context, longEdge, args.blurBackground->getCanvas(), paint,
-                       transform3D, args.dstColorSpace);
+    cache->draw(args.context, longEdge, args.blurBackground->getCanvas(), paint, transform3D);
   }
   return true;
 }

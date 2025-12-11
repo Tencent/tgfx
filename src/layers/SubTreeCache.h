@@ -31,27 +31,27 @@ class ColorSpace;
 
 class SubTreeCache {
  public:
-  explicit SubTreeCache(std::shared_ptr<ColorSpace> colorSpace)
-      : _colorSpace(std::move(colorSpace)) {
-  }
+  SubTreeCache() = default;
 
   const UniqueKey& uniqueKey() const {
     return _uniqueKey;
   }
 
   void addCache(Context* context, std::shared_ptr<TextureProxy> textureProxy,
-                const Matrix& imageMatrix);
+                const Matrix& imageMatrix, const std::shared_ptr<ColorSpace>& colorSpace);
 
-  bool valid(Context* context, int longEdge,
-             const std::shared_ptr<ColorSpace>& colorSpace) const;
+  bool valid(Context* context, int longEdge) const;
 
   void draw(Context* context, int longEdge, Canvas* canvas, const Paint& paint,
-            const Matrix3D* transform3D, const std::shared_ptr<ColorSpace>& colorSpace) const;
+            const Matrix3D* transform3D) const;
 
  private:
-  std::shared_ptr<ColorSpace> _colorSpace = nullptr;
+  struct CacheEntry {
+    Matrix imageMatrix = {};
+    std::shared_ptr<ColorSpace> colorSpace = nullptr;
+  };
   UniqueKey _uniqueKey = UniqueKey::Make();
-  ResourceKeyMap<Matrix> _sizeMatrices = {};
+  ResourceKeyMap<CacheEntry> _sizeMatrices = {};
 
   UniqueKey makeSizeKey(int longEdge) const;
 };

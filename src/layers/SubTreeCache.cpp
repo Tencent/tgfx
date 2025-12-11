@@ -31,7 +31,8 @@ UniqueKey SubTreeCache::makeSizeKey(int longEdge) const {
 }
 
 void SubTreeCache::addCache(Context* context, std::shared_ptr<TextureProxy> textureProxy,
-                            const Matrix& imageMatrix) {
+                            const Matrix& imageMatrix,
+                            const std::shared_ptr<ColorSpace>& colorSpace) {
   if (context == nullptr || textureProxy == nullptr) {
     return;
   }
@@ -39,12 +40,11 @@ void SubTreeCache::addCache(Context* context, std::shared_ptr<TextureProxy> text
   auto proxyProvider = context->proxyProvider();
   proxyProvider->assignProxyUniqueKey(textureProxy, sizeUniqueKey);
   textureProxy->assignUniqueKey(sizeUniqueKey);
-  _sizeMatrices[sizeUniqueKey] = imageMatrix;
+  _sizeMatrices[sizeUniqueKey] = CacheEntry{imageMatrix, colorSpace};
 }
 
-bool SubTreeCache::valid(Context* context, int longEdge,
-                         const std::shared_ptr<ColorSpace>& colorSpace) const {
-  if (context == nullptr || !ColorSpace::Equals(_colorSpace.get(), colorSpace.get())) {
+bool SubTreeCache::valid(Context* context, int longEdge) const {
+  if (context == nullptr) {
     return false;
   }
   auto sizeUniqueKey = makeSizeKey(longEdge);
@@ -57,9 +57,8 @@ bool SubTreeCache::valid(Context* context, int longEdge,
 }
 
 void SubTreeCache::draw(Context* context, int longEdge, Canvas* canvas, const Paint& paint,
-                        const Matrix3D* transform3D,
-                        const std::shared_ptr<ColorSpace>& colorSpace) const {
-  if (context == nullptr || !ColorSpace::Equals(_colorSpace.get(), colorSpace.get())) {
+                        const Matrix3D* transform3D) const {
+  if (context == nullptr) {
     return;
   }
   auto sizeUniqueKey = makeSizeKey(longEdge);
@@ -72,11 +71,11 @@ void SubTreeCache::draw(Context* context, int longEdge, Canvas* canvas, const Pa
   if (proxy == nullptr) {
     return;
   }
-  auto image = TextureImage::Wrap(proxy, _colorSpace);
+  auto image = TextureImage::Wrap(proxy, it->second.colorSpace);
   if (image == nullptr) {
     return;
   }
-  const auto& matrix = it->second;
+  const auto& matrix = it->second.imageMatrix;
   auto oldMatrix = canvas->getMatrix();
   canvas->concat(matrix);
   Paint drawPaint = paint;

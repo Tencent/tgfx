@@ -234,20 +234,23 @@ class DisplayList {
   void setBackgroundColor(const Color& color);
 
   /**
-   * Returns the maximum cache size (longest edge) for sub-tree caching. Default is 0 (disabled).
+   * Returns the maximum cache size (longest edge in pixels) for sub-tree caching. Default is 0
+   * (disabled).
    *
-   * When enabled, static sub-trees (unchanged layers and children) are cached if their rendered
-   * longest edge is smaller than maxSize. Uses mipmap-style scaling, snapping to power-of-2
-   * fractions of maxSize to reduce memory waste. Cached sub-trees skip child traversal on
-   * subsequent renders, greatly improving performance—especially in zoom-out scenarios with
-   * dense graphics.
+   * When enabled, starting from the root layer, any static sub-tree (where neither the layer nor
+   * its descendants have modified properties) whose rendered longest edge is smaller than maxSize
+   * will be cached as a texture. The cache uses a mipmap-style scaling strategy, snapping to
+   * power-of-2 fractions of maxSize (e.g., maxSize, maxSize/2, maxSize/4, ...) to minimize memory
+   * waste. Once a sub-tree is cached, subsequent renders skip child traversal entirely, greatly
+   * improving rendering performance. This optimization is particularly effective in zoom-out
+   * scenarios where dense graphics are packed into a smaller screen area.
    */
   int subTreeCacheMaxSize() const {
     return _subTreeCacheMaxSize;
   }
 
   /**
-   * Sets the maximum cache size (longest edge) for sub-tree caching. Set to 0 to disable (default).
+   * Sets the maximum cache size (longest edge in pixels) for sub-tree caching. Default is 0 (disabled).
    */
   void setSubTreeCacheMaxSize(int maxSize);
 
