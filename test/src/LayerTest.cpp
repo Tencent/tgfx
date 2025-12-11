@@ -3860,7 +3860,7 @@ TGFX_TEST(LayerTest, LayerCache) {
   displayList->render(surface.get());
   EXPECT_TRUE(root->subTreeCache != nullptr);
   int expectedLongEdge = 64;
-  EXPECT_TRUE(root->subTreeCache->valid(context, expectedLongEdge));
+  EXPECT_TRUE(root->subTreeCache->valid(context, expectedLongEdge, surface->colorSpace()));
 }
 
 TGFX_TEST(LayerTest, LayerCacheInvalidation) {

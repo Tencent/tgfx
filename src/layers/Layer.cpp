@@ -1310,6 +1310,26 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   return true;
 }
 
+bool Layer::getValidSubTreeCache(const DrawArgs& args, int longEdge, const Rect& layerBounds) {
+  if (args.renderFlags & RenderFlags::DisableCache || longEdge > args.subTreeCacheMaxSize) {
+    return false;
+  }
+  auto maxBoundsSize = std::max(layerBounds.width(), layerBounds.height());
+  if (FloatNearlyZero(maxBoundsSize)) {
+    return false;
+  }
+  auto cacheScale = static_cast<float>(longEdge) / maxBoundsSize;
+  auto imageMatrix = Matrix::I();
+  auto image = createSubTreeCacheImage(args, cacheScale, layerBounds, &imageMatrix);
+  if (image == nullptr) {
+    return false;
+  }
+  auto textureProxy = std::static_pointer_cast<TextureImage>(image)->getTextureProxy();
+  DEBUG_ASSERT(longEdge == std::max(textureProxy->width(), textureProxy->height()));
+  subTreeCache->addCache(args.context, textureProxy, imageMatrix);
+  return true;
+}
+
 bool Layer::drawWithSubTreeCache(const DrawArgs& args, Canvas* canvas, float alpha,
                                  BlendMode blendMode, const Matrix3D* transform3D) {
   auto layerBounds = getBounds();
@@ -1317,22 +1337,9 @@ bool Layer::drawWithSubTreeCache(const DrawArgs& args, Canvas* canvas, float alp
   auto longEdge = GetMipmapCacheLongEdge(args.subTreeCacheMaxSize, contentScale, layerBounds);
 
   if (!subTreeCache->valid(args.context, longEdge, args.dstColorSpace)) {
-    if (args.renderFlags & RenderFlags::DisableCache || longEdge > args.subTreeCacheMaxSize) {
+    if (!getValidSubTreeCache(args, longEdge, layerBounds)) {
       return false;
     }
-    auto maxBoundsSize = std::max(layerBounds.width(), layerBounds.height());
-    if (FloatNearlyZero(maxBoundsSize)) {
-      return false;
-    }
-    auto cacheScale = static_cast<float>(longEdge) / maxBoundsSize;
-    auto imageMatrix = Matrix::I();
-    auto image = createSubTreeCacheImage(args, cacheScale, layerBounds, &imageMatrix);
-    if (image == nullptr) {
-      return false;
-    }
-    auto textureProxy = std::static_pointer_cast<TextureImage>(image)->getTextureProxy();
-    DEBUG_ASSERT(longEdge == std::max(textureProxy->width(), textureProxy->height()));
-    subTreeCache->addCache(args.context, textureProxy, imageMatrix);
   }
 
   Paint paint = {};

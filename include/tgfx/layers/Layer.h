@@ -677,6 +677,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
   bool canUseSubTreeCache(int subTreeCacheMaxSize, BlendMode blendMode,
                           const Matrix3D* transform3D, const std::shared_ptr<ColorSpace>& colorSpace);
 
+  bool getValidSubTreeCache(const DrawArgs& args, int longEdge, const Rect& layerBounds);
+
   std::shared_ptr<Image> createSubTreeCacheImage(const DrawArgs& args, float contentScale,
                                                  const Rect& scaledBounds, Matrix* drawingMatrix);
 
