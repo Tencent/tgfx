@@ -20,14 +20,10 @@
 #include "DrawContext.h"
 
 namespace tgfx {
-PlaybackContext::PlaybackContext(MCState state, const BrushModifier* brushModifier)
-    : initState(std::move(state)), brushModifier(brushModifier) {
+PlaybackContext::PlaybackContext(MCState state) : initState(std::move(state)) {
   hasInitMatrix = !initState.matrix.isIdentity();
   hasInitClip = !initState.clip.isEmpty() || !initState.clip.isInverseFillType();
   _state = initState;
-  if (brushModifier) {
-    _brush = brushModifier->transform(lastOriginalBrush);
-  }
 }
 
 void PlaybackContext::setMatrix(const Matrix& matrix) {
@@ -48,21 +44,11 @@ void PlaybackContext::setClip(const Path& clip) {
 }
 
 void PlaybackContext::setColor(const Color& color) {
-  if (brushModifier) {
-    lastOriginalBrush.color = color;
-    _brush = brushModifier->transform(lastOriginalBrush);
-  } else {
-    _brush.color = color;
-  }
+  _brush.color = color;
 }
 
 void PlaybackContext::setBrush(const Brush& brush) {
-  if (brushModifier) {
-    lastOriginalBrush = brush;
-    _brush = brushModifier->transform(lastOriginalBrush);
-  } else {
-    _brush = brush;
-  }
+  _brush = brush;
 }
 
 void PlaybackContext::setStrokeWidth(float width) {

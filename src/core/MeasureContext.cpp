@@ -47,10 +47,6 @@ void MeasureContext::drawRRect(const RRect& rRect, const MCState& state, const B
 }
 
 void MeasureContext::drawPath(const Path& path, const MCState& state, const Brush&) {
-  if (computeTightBounds) {
-    addTightBounds(path, state);
-    return;
-  }
   auto localBounds = path.getBounds();
   addLocalBounds(state, localBounds, path.isInverseFillType());
 }
@@ -58,15 +54,6 @@ void MeasureContext::drawPath(const Path& path, const MCState& state, const Brus
 void MeasureContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Brush&,
                                const Stroke* stroke) {
   DEBUG_ASSERT(shape != nullptr);
-  if (computeTightBounds) {
-    auto path = shape->getPath();
-    if (stroke) {
-      // Measure doesn't require high-precision paths, so ignore resolution scale here.
-      stroke->applyToPath(&path);
-    }
-    addTightBounds(path, state);
-    return;
-  }
   auto localBounds = shape->getBounds();
   if (stroke) {
     ApplyStrokeToBounds(*stroke, &localBounds, true);
@@ -88,13 +75,7 @@ void MeasureContext::drawImageRect(std::shared_ptr<Image>, const Rect&, const Re
 void MeasureContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
                                       const MCState& state, const Brush&, const Stroke* stroke) {
   DEBUG_ASSERT(glyphRunList != nullptr);
-  if (computeTightBounds && stroke == nullptr) {
-    auto deviceBounds = glyphRunList->getTightBounds(&state.matrix);
-    addDeviceBounds(state.clip, deviceBounds);
-    return;
-  }
-  auto localBounds =
-      computeTightBounds ? glyphRunList->getTightBounds() : glyphRunList->getBounds();
+  auto localBounds = glyphRunList->getBounds();
   if (stroke) {
     ApplyStrokeToBounds(*stroke, &localBounds);
   }
@@ -105,32 +86,16 @@ void MeasureContext::drawLayer(std::shared_ptr<Picture> picture,
                                std::shared_ptr<ImageFilter> imageFilter, const MCState& state,
                                const Brush&) {
   DEBUG_ASSERT(picture != nullptr);
+  auto localBounds = picture->getBounds();
   if (imageFilter) {
-    auto localBounds = computeTightBounds ? picture->getTightBounds(nullptr) : picture->getBounds();
     localBounds = imageFilter->filterBounds(localBounds);
-    addLocalBounds(state, localBounds);
-  } else {
-    Rect deviceBounds = {};
-    if (computeTightBounds) {
-      deviceBounds = picture->getTightBounds(&state.matrix);
-    } else {
-      deviceBounds = picture->getBounds();
-      state.matrix.mapRect(&deviceBounds);
-    }
-    addDeviceBounds(state.clip, deviceBounds, picture->hasUnboundedFill());
   }
+  addLocalBounds(state, localBounds, picture->hasUnboundedFill());
 }
 
 void MeasureContext::drawPicture(std::shared_ptr<Picture> picture, const MCState& state) {
   DEBUG_ASSERT(picture != nullptr);
   picture->playback(this, state);
-}
-
-void MeasureContext::addTightBounds(const Path& path, const MCState& state) {
-  auto tempPath = path;
-  tempPath.transform(state.matrix);
-  auto deviceBounds = tempPath.getBounds();
-  addDeviceBounds(state.clip, deviceBounds, path.isInverseFillType());
 }
 
 void MeasureContext::addLocalBounds(const MCState& state, const Rect& localBounds, bool unbounded) {

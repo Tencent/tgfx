@@ -619,7 +619,7 @@ void PDFExportContext::drawDropShadowBeforeLayer(const std::shared_ptr<Picture>&
 void PDFExportContext::drawInnerShadowAfterLayer(const PictureRecord* record,
                                                  const InnerShadowImageFilter* innerShadowFilter,
                                                  const MCState& state) {
-  MeasureContext measureContext(true);
+  MeasureContext measureContext;
   PlaybackContext playbackContext = {};
   record->playback(&measureContext, &playbackContext);
   auto pictureBounds = measureContext.getBounds();

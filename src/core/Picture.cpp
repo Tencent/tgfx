@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Picture.h"
-#include "core/HitTestContext.h"
 #include "core/MeasureContext.h"
 #include "core/PictureRecords.h"
 #include "core/shaders/ImageShader.h"
@@ -54,7 +53,7 @@ Rect Picture::getBounds() const {
   if (auto cachedBounds = bounds.load(std::memory_order_acquire)) {
     return *cachedBounds;
   }
-  MeasureContext context(false);
+  MeasureContext context;
   MCState state(Matrix::I());
   playback(&context, state);
   auto totalBounds = context.getBounds();
@@ -66,36 +65,16 @@ Rect Picture::getBounds() const {
   return totalBounds;
 }
 
-Rect Picture::getTightBounds(const Matrix* matrix) const {
-  MeasureContext context(true);
-  MCState state(matrix ? *matrix : Matrix::I());
-  playback(&context, state);
-  return context.getBounds();
-}
-
-bool Picture::hitTestPoint(float localX, float localY, bool shapeHitTest) const {
-  PlaybackContext playbackContext = {};
-  HitTestContext hitTestContext(localX, localY, shapeHitTest);
-  for (auto& record : records) {
-    record->playback(&hitTestContext, &playbackContext);
-    if (hitTestContext.hasHit()) {
-      return true;
-    }
-  }
-  return false;
-}
-
-void Picture::playback(Canvas* canvas, const BrushModifier* brushModifier) const {
+void Picture::playback(Canvas* canvas) const {
   if (canvas == nullptr) {
     return;
   }
-  playback(canvas->drawContext, *canvas->mcState, brushModifier);
+  playback(canvas->drawContext, *canvas->mcState);
 }
 
-void Picture::playback(DrawContext* drawContext, const MCState& state,
-                       const BrushModifier* brushModifier) const {
+void Picture::playback(DrawContext* drawContext, const MCState& state) const {
   DEBUG_ASSERT(drawContext != nullptr);
-  PlaybackContext playbackContext(state, brushModifier);
+  PlaybackContext playbackContext(state);
   for (auto& record : records) {
     record->playback(drawContext, &playbackContext);
   }
