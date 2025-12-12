@@ -176,18 +176,6 @@ void TGFXView::draw() {
     surfaceResized = true;
   }
 
-  bool needsRender = displayList.hasContentChanged();
-
-  if (!needsRender) {
-    if (lastRecording) {
-      context->submit(std::move(lastRecording));
-      tgfxWindow->present(context);
-      lastRecording = nullptr;
-    }
-    device->unlock();
-    return;
-  }
-
   auto canvas = surface->getCanvas();
   canvas->clear();
   auto pixelRatio = static_cast<float>(window()->devicePixelRatio());
@@ -197,27 +185,29 @@ void TGFXView::draw() {
 
   auto recording = context->flush();
 
+  bool submitted = false;
   if (surfaceResized) {
     // When resized, submit current frame immediately (no delay)
     if (recording) {
       context->submit(std::move(recording));
       tgfxWindow->present(context);
+      submitted = true;
     }
-    // Clear lastRecording since we need to restart the delay cycle after resize
     lastRecording = nullptr;
   } else {
-    // Normal case: delayed one-frame present
+    // Delayed one-frame present
     std::swap(lastRecording, recording);
 
     if (recording) {
       context->submit(std::move(recording));
       tgfxWindow->present(context);
+      submitted = true;
     }
   }
 
   device->unlock();
 
-  if (lastRecording != nullptr) {
+  if (submitted || lastRecording != nullptr) {
     update();
   }
 }

@@ -113,20 +113,6 @@ bool JTGFXView::draw(int drawIndex, float zoom, float offsetX, float offsetY) {
     lastOffsetY = offsetY;
   }
 
-  bool needsRender = displayList.hasContentChanged();
-  bool submitted = false;
-
-  if (!needsRender) {
-    if (lastRecording) {
-      context->submit(std::move(lastRecording));
-      window->present(context);
-      lastRecording = nullptr;
-      submitted = true;
-    }
-    device->unlock();
-    return submitted;
-  }
-
   auto canvas = surface->getCanvas();
   canvas->clear();
   auto width = ANativeWindow_getWidth(nativeWindow);
@@ -134,7 +120,6 @@ bool JTGFXView::draw(int drawIndex, float zoom, float offsetX, float offsetY) {
   auto density = static_cast<float>(surface->width()) / static_cast<float>(width);
   hello2d::DrawBackground(canvas, surface->width(), surface->height(), density);
 
-  // Render DisplayList
   displayList.render(surface.get(), false);
 
   auto recording = context->flush();
@@ -142,13 +127,15 @@ bool JTGFXView::draw(int drawIndex, float zoom, float offsetX, float offsetY) {
   // Delayed one-frame present
   std::swap(lastRecording, recording);
 
+  bool submitted = false;
   if (recording) {
     context->submit(std::move(recording));
     window->present(context);
+    submitted = true;
   }
 
   device->unlock();
-  return lastRecording != nullptr;
+  return submitted || (lastRecording != nullptr);
 }
 }  // namespace hello2d
 

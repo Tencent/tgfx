@@ -158,20 +158,6 @@
     [self applyTransformWithZoom:zoom offset:offset];
   }
 
-  bool needsRender = displayList.hasContentChanged();
-  bool submitted = false;
-
-  if (!needsRender) {
-    if (lastRecording) {
-      context->submit(std::move(lastRecording));
-      tgfxWindow->present(context);
-      lastRecording = nullptr;
-      submitted = true;
-    }
-    device->unlock();
-    return submitted;
-  }
-
   auto canvas = surface->getCanvas();
   canvas->clear();
   hello2d::DrawBackground(canvas, surface->width(), surface->height(), self.layer.contentsScale);
@@ -183,6 +169,7 @@
   // Delayed one-frame present
   std::swap(lastRecording, recording);
 
+  bool submitted = false;
   if (recording) {
     context->submit(std::move(recording));
     tgfxWindow->present(context);
