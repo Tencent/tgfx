@@ -279,9 +279,7 @@ void ShapeLayer::onUpdateContent(LayerRecorder* recorder) {
       strokeShape = createStrokeShape();
     }
     for (const auto& style : _strokeStyles) {
-      auto shader = style->getShader();
-      auto alpha = style->alpha();
-      LayerPaint paint(std::move(shader), alpha, style->blendMode());
+      LayerPaint paint(style->getShader(), style->alpha(), style->blendMode());
       if (shapeBitFields.strokeOnTop) {
         paint.drawOrder = DrawOrder::AboveChildren;
       }
