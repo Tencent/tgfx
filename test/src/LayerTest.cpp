@@ -3860,7 +3860,7 @@ TGFX_TEST(LayerTest, LayerCache) {
   displayList->render(surface.get());
   EXPECT_TRUE(root->subTreeCache != nullptr);
   int expectedLongEdge = 64;
-  EXPECT_TRUE(root->subTreeCache->valid(context, expectedLongEdge));
+  EXPECT_TRUE(root->subTreeCache->hasCache(context, expectedLongEdge));
 }
 
 TGFX_TEST(LayerTest, LayerCacheInvalidation) {
@@ -3884,6 +3884,8 @@ TGFX_TEST(LayerTest, LayerCacheInvalidation) {
 
   auto root = displayList->root();
   root->addChild(parent);
+  // Disable passThroughBackground to allow caching (root layer has passThroughBackground=true by default)
+  root->setPassThroughBackground(false);
 
   // First render - staticSubTree flag is not set yet
   displayList->render(surface.get());
@@ -3962,6 +3964,8 @@ TGFX_TEST(LayerTest, LayerCacheWithEffects) {
   parent2->addChild(child2);
 
   root->addChild(parent2);
+  // Disable passThroughBackground to allow caching (root layer has passThroughBackground=true by default)
+  root->setPassThroughBackground(false);
 
   // First render - staticSubTree flag is not set yet
   displayList->render(surface.get());
@@ -3995,6 +3999,8 @@ TGFX_TEST(LayerTest, LayerCacheWithTransform) {
 
   auto root = displayList->root();
   root->addChild(parent);
+  // Disable passThroughBackground to allow caching (root layer has passThroughBackground=true by default)
+  root->setPassThroughBackground(false);
 
   // First render - staticSubTree flag is not set yet
   displayList->render(surface.get());
@@ -4043,6 +4049,8 @@ TGFX_TEST(LayerTest, LayerCacheContentScale) {
 
   auto root = displayList->root();
   root->addChild(parent);
+  // Disable passThroughBackground to allow caching (root layer has passThroughBackground=true by default)
+  root->setPassThroughBackground(false);
 
   // First render - staticSubTree flag is not set yet
   displayList->render(surface.get());
@@ -4054,7 +4062,7 @@ TGFX_TEST(LayerTest, LayerCacheContentScale) {
 
   // At zoom 1.0, longEdge should be 100
   int expectedLongEdge1_0 = 100;
-  EXPECT_TRUE(root->subTreeCache->valid(context, expectedLongEdge1_0));
+  EXPECT_TRUE(root->subTreeCache->hasCache(context, expectedLongEdge1_0));
 
   // Render at zoom 0.5 - cache should still exist
   displayList->setZoomScale(0.5f);
@@ -4063,7 +4071,7 @@ TGFX_TEST(LayerTest, LayerCacheContentScale) {
 
   // At zoom 0.5, longEdge should be 50
   int expectedLongEdge0_5 = 50;
-  EXPECT_TRUE(root->subTreeCache->valid(context, expectedLongEdge0_5));
+  EXPECT_TRUE(root->subTreeCache->hasCache(context, expectedLongEdge0_5));
 
   // Render at zoom 2.0
   displayList->setZoomScale(2.0f);
@@ -4072,7 +4080,7 @@ TGFX_TEST(LayerTest, LayerCacheContentScale) {
 
   // At zoom 2.0, longEdge should be 200
   int expectedLongEdge2_0 = 200;
-  EXPECT_TRUE(root->subTreeCache->valid(context, expectedLongEdge2_0));
+  EXPECT_TRUE(root->subTreeCache->hasCache(context, expectedLongEdge2_0));
 
   // Render at zoom 1.0 again
   displayList->setZoomScale(1.0f);
@@ -4080,7 +4088,7 @@ TGFX_TEST(LayerTest, LayerCacheContentScale) {
   EXPECT_TRUE(root->subTreeCache != nullptr);
 
   // At zoom 1.0 again, cache should still be valid for longEdge 100
-  EXPECT_TRUE(root->subTreeCache->valid(context, expectedLongEdge1_0));
+  EXPECT_TRUE(root->subTreeCache->hasCache(context, expectedLongEdge1_0));
 
   // Render at extreme zoom out
   displayList->setZoomScale(0.1f);
@@ -4089,11 +4097,11 @@ TGFX_TEST(LayerTest, LayerCacheContentScale) {
 
   // At zoom 0.1, longEdge < minLongEdge, cache should be 50
   int expectedLongEdge0_1 = 50;
-  EXPECT_TRUE(root->subTreeCache->_sizeMatrices.size() == 3);
-  EXPECT_TRUE(root->subTreeCache->valid(context, expectedLongEdge0_1));
+  EXPECT_TRUE(root->subTreeCache->cacheEntries.size() == 3);
+  EXPECT_TRUE(root->subTreeCache->hasCache(context, expectedLongEdge0_1));
 }
 
-TGFX_TEST(LayerTest, StaticSubTree) {
+TGFX_TEST(LayerTest, StaticSubtree) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);

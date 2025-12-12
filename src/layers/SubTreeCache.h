@@ -40,7 +40,7 @@ class SubTreeCache {
   void addCache(Context* context, int longEdge, std::shared_ptr<TextureProxy> textureProxy,
                 const Matrix& imageMatrix, const std::shared_ptr<ColorSpace>& colorSpace);
 
-  bool valid(Context* context, int longEdge) const;
+  bool hasCache(Context* context, int longEdge) const;
 
   void draw(Context* context, int longEdge, Canvas* canvas, const Paint& paint,
             const Matrix3D* transform3D) const;
@@ -51,7 +51,7 @@ class SubTreeCache {
     std::shared_ptr<ColorSpace> colorSpace = nullptr;
   };
   UniqueKey _uniqueKey = UniqueKey::Make();
-  ResourceKeyMap<CacheEntry> _sizeMatrices = {};
+  ResourceKeyMap<CacheEntry> cacheEntries = {};
 
   UniqueKey makeSizeKey(int longEdge) const;
 };

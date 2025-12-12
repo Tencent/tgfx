@@ -1326,7 +1326,7 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
 
 SubTreeCache* Layer::getValidSubTreeCache(const DrawArgs& args, int longEdge,
                                           const Rect& layerBounds) {
-  if (subTreeCache->valid(args.context, longEdge)) {
+  if (subTreeCache->hasCache(args.context, longEdge)) {
     return subTreeCache.get();
   }
   if (args.renderFlags & RenderFlags::DisableCache || longEdge > args.subTreeCacheMaxSize) {

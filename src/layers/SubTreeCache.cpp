@@ -31,8 +31,7 @@ UniqueKey SubTreeCache::makeSizeKey(int longEdge) const {
 }
 
 void SubTreeCache::addCache(Context* context, int longEdge,
-                            std::shared_ptr<TextureProxy> textureProxy,
-                            const Matrix& imageMatrix,
+                            std::shared_ptr<TextureProxy> textureProxy, const Matrix& imageMatrix,
                             const std::shared_ptr<ColorSpace>& colorSpace) {
   if (context == nullptr || textureProxy == nullptr) {
     return;
@@ -41,16 +40,16 @@ void SubTreeCache::addCache(Context* context, int longEdge,
   auto proxyProvider = context->proxyProvider();
   proxyProvider->assignProxyUniqueKey(textureProxy, sizeUniqueKey);
   textureProxy->assignUniqueKey(sizeUniqueKey);
-  _sizeMatrices[sizeUniqueKey] = CacheEntry{imageMatrix, colorSpace};
+  cacheEntries[sizeUniqueKey] = CacheEntry{imageMatrix, colorSpace};
 }
 
-bool SubTreeCache::valid(Context* context, int longEdge) const {
+bool SubTreeCache::hasCache(Context* context, int longEdge) const {
   if (context == nullptr) {
     return false;
   }
   auto sizeUniqueKey = makeSizeKey(longEdge);
-  auto it = _sizeMatrices.find(sizeUniqueKey);
-  if (it == _sizeMatrices.end()) {
+  auto it = cacheEntries.find(sizeUniqueKey);
+  if (it == cacheEntries.end()) {
     return false;
   }
   auto proxyProvider = context->proxyProvider();
@@ -63,8 +62,8 @@ void SubTreeCache::draw(Context* context, int longEdge, Canvas* canvas, const Pa
     return;
   }
   auto sizeUniqueKey = makeSizeKey(longEdge);
-  auto it = _sizeMatrices.find(sizeUniqueKey);
-  if (it == _sizeMatrices.end()) {
+  auto it = cacheEntries.find(sizeUniqueKey);
+  if (it == cacheEntries.end()) {
     return;
   }
   auto proxyProvider = context->proxyProvider();
