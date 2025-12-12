@@ -18,23 +18,29 @@
 
 #include "tgfx/layers/Layer.h"
 #include <atomic>
-#include "contents/LayerContent.h"
-#include "contents/RasterizedContent.h"
+#include <cmath>
 #include "core/Matrix2D.h"
 #include "core/filters/Transform3DImageFilter.h"
-#include "core/images/PictureImage.h"
+#include "core/images/TextureImage.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "layers/ContourContext.h"
 #include "layers/DrawArgs.h"
 #include "layers/RegionTransformer.h"
 #include "layers/RootLayer.h"
+#include "layers/SubtreeCache.h"
+#include "layers/contents/LayerContent.h"
+#include "layers/contents/RasterizedContent.h"
 #include "layers/filters/Transform3DFilter.h"
+#include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/layers/ShapeLayer.h"
 
 namespace tgfx {
+// The minimum size (longest edge) for subtree cache. This prevents creating excessively small
+// mipmap levels that would be inefficient to cache.
+static constexpr int SUBTREE_CACHE_MIN_SIZE = 32;
 static std::atomic_bool AllowsEdgeAntialiasing = true;
 static std::atomic_bool AllowsGroupOpacity = false;
 
@@ -85,15 +91,21 @@ std::shared_ptr<Picture> Layer::RecordPicture(DrawMode mode, float contentScale,
 
 static std::shared_ptr<Image> ToImageWithOffset(
     std::shared_ptr<Picture> picture, Point* offset, const Rect* imageBounds = nullptr,
-    std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB()) {
+    std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB(), bool roundOutBounds = true) {
   if (picture == nullptr) {
     return nullptr;
   }
   auto bounds = imageBounds ? *imageBounds : picture->getBounds();
-  bounds.roundOut();
+  if (roundOutBounds) {
+    // In off-screen rendering scenarios, the canvas matrix is applied to the picture, requiring
+    // bounds to be rounded out to keep offsets integral and avoid redundant sampling.
+    // During caching, the canvas matrix is not applied to the picture, so rounding is unnecessary.
+    bounds.roundOut();
+  }
   auto matrix = Matrix::MakeTrans(-bounds.x(), -bounds.y());
-  auto image = Image::MakeFrom(std::move(picture), static_cast<int>(bounds.width()),
-                               static_cast<int>(bounds.height()), &matrix, std::move(colorSpace));
+  auto image =
+      Image::MakeFrom(std::move(picture), static_cast<int>(ceilf(bounds.width())),
+                      static_cast<int>(ceilf(bounds.height())), &matrix, std::move(colorSpace));
   if (offset) {
     offset->x = bounds.left;
     offset->y = bounds.top;
@@ -133,13 +145,13 @@ static std::optional<Rect> GetClipBounds(const Canvas* canvas) {
 }
 
 static std::shared_ptr<Image> MakeImageWithTransform(std::shared_ptr<Image> image,
-                                                     const Matrix3D* transform,
+                                                     const Matrix3D* transform3D,
                                                      Matrix* imageMatrix) {
   DEBUG_ASSERT(imageMatrix);
-  if (transform == nullptr) {
+  if (transform3D == nullptr) {
     return image;
   }
-  auto adaptedMatrix = *transform;
+  auto adaptedMatrix = *transform3D;
   auto offsetMatrix =
       Matrix3D::MakeTranslate(imageMatrix->getTranslateX(), imageMatrix->getTranslateY(), 0);
   auto invOffsetMatrix =
@@ -153,6 +165,23 @@ static std::shared_ptr<Image> MakeImageWithTransform(std::shared_ptr<Image> imag
   image = image->makeWithFilter(imageFilter, &offset);
   imageMatrix->preTranslate(offset.x, offset.y);
   return image;
+}
+
+static int GetMipmapCacheLongEdge(int maxSize, float contentScale, const Rect& layerBounds) {
+  auto maxBoundsSize = std::max(layerBounds.width(), layerBounds.height());
+  auto scaleBoundsSize = static_cast<int>(ceilf(maxBoundsSize * contentScale));
+  if (scaleBoundsSize > maxSize) {
+    return scaleBoundsSize;
+  }
+  if (SUBTREE_CACHE_MIN_SIZE >= maxSize) {
+    return maxSize;
+  }
+  auto targetSize = std::max(scaleBoundsSize, SUBTREE_CACHE_MIN_SIZE);
+  auto currentLongEdge = maxSize;
+  while ((currentLongEdge >> 1) >= targetSize) {
+    currentLongEdge >>= 1;
+  }
+  return currentLongEdge;
 }
 
 bool Layer::DefaultAllowsEdgeAntialiasing() {
@@ -328,7 +357,7 @@ void Layer::setFilters(std::vector<std::shared_ptr<LayerFilter>> value) {
   for (const auto& filter : _filters) {
     filter->attachToLayer(this);
   }
-  rasterizedContent = nullptr;
+  invalidateSubtree();
   invalidateTransform();
 }
 
@@ -392,7 +421,7 @@ void Layer::setLayerStyles(std::vector<std::shared_ptr<LayerStyle>> value) {
   for (const auto& layerStyle : _layerStyles) {
     layerStyle->attachToLayer(this);
   }
-  rasterizedContent = nullptr;
+  invalidateSubtree();
   invalidateTransform();
 }
 
@@ -565,7 +594,6 @@ Rect Layer::getBoundsInternal(const Matrix3D& coordinateMatrix, bool computeTigh
 }
 
 Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBounds) {
-
   // If the matrix only contains 2D affine transformations, directly use the equivalent 2D
   // transformation matrix to calculate the final Bounds
   bool isCoordinateMatrixAffine = IsMatrix3DAffine(coordinateMatrix);
@@ -826,8 +854,7 @@ void Layer::invalidateDescendents() {
     return;
   }
   bitFields.dirtyDescendents = true;
-  rasterizedContent = nullptr;
-  localBounds = nullptr;
+  invalidateSubtree();
   invalidate();
 }
 
@@ -993,7 +1020,7 @@ std::shared_ptr<Image> Layer::getRasterizedImage(const DrawArgs& args, float con
 }
 
 void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
-                      const Matrix3D* transform) {
+                      const Matrix3D* transform3D) {
   DEBUG_ASSERT(canvas != nullptr);
   auto contentScale = canvas->getMatrix().getMaxScale();
   if (FloatNearlyZero(contentScale)) {
@@ -1009,17 +1036,17 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
       backgroundArgs.drawMode = DrawMode::Background;
       backgroundArgs.blurBackground = nullptr;
       backgroundArgs.renderRect = &backgroundRect;
-      drawLayer(backgroundArgs, args.blurBackground->getCanvas(), alpha, blendMode, transform);
+      drawLayer(backgroundArgs, args.blurBackground->getCanvas(), alpha, blendMode, transform3D);
     }
     return;
   }
-  if (drawWithCache(args, canvas, alpha, blendMode, transform)) {
+  if (drawWithCache(args, canvas, alpha, blendMode, transform3D)) {
     return;
   }
   if (blendMode != BlendMode::SrcOver || !bitFields.passThroughBackground ||
       (alpha < 1.0f && bitFields.allowsGroupOpacity) || bitFields.shouldRasterize ||
-      (!_filters.empty() && !args.excludeEffects) || hasValidMask() || transform != nullptr) {
-    drawOffscreen(args, canvas, alpha, blendMode, transform);
+      (!_filters.empty() && !args.excludeEffects) || hasValidMask() || transform3D != nullptr) {
+    drawOffscreen(args, canvas, alpha, blendMode, transform3D);
   } else {
     // draw directly
     drawDirectly(args, canvas, alpha);
@@ -1181,21 +1208,120 @@ std::shared_ptr<Image> Layer::getContentImage(const DrawArgs& contentArgs, float
   return finalImage;
 }
 
+bool Layer::shouldPassThroughBackground(BlendMode blendMode, const Matrix3D* transform3D) const {
+  // Pass-through background is only possible when:
+  // 1. The feature is enabled
+  if (!bitFields.passThroughBackground) {
+    return false;
+  }
+
+  // 2. Subtree has blend modes that need background information
+  if (!bitFields.hasBlendMode) {
+    return false;
+  }
+
+  // 3. No offscreen rendering is required
+  // (Offscreen rendering happens when: non-SrcOver blend mode OR has filters OR has 3D transform)
+  bool needsOffscreen = blendMode != BlendMode::SrcOver || !_filters.empty() || transform3D != nullptr;
+  if (needsOffscreen) {
+    return false;
+  }
+
+  return true;
+}
+
+bool Layer::canUseSubtreeCache(int subtreeCacheMaxSize, BlendMode blendMode,
+                               const Matrix3D* transform3D) {
+  if (subtreeCacheMaxSize <= 0) {
+    return false;
+  }
+  if (subtreeCache) {
+    // Recreate if maxSize has changed
+    if (subtreeCache->maxSize() != subtreeCacheMaxSize) {
+      subtreeCache = std::make_unique<SubtreeCache>(subtreeCacheMaxSize);
+    }
+    return true;
+  }
+  if (_children.empty() && _layerStyles.empty() && _filters.empty()) {
+    return false;
+  }
+  if (shouldPassThroughBackground(blendMode, transform3D) || hasBackgroundStyle()) {
+    return false;
+  }
+  if (!bitFields.staticSubtree) {
+    // Skip caching on the first render to avoid caching content that is only displayed once.
+    // The cache is created on the second render when the layer is confirmed to be reused.
+    return false;
+  }
+  subtreeCache = std::make_unique<SubtreeCache>(subtreeCacheMaxSize);
+  return true;
+}
+
+std::shared_ptr<Image> Layer::createSubtreeCacheImage(const DrawArgs& args, float contentScale,
+                                                      const Rect& layerBounds,
+                                                      Matrix* drawingMatrix) {
+  DEBUG_ASSERT(drawingMatrix != nullptr);
+  if (FloatNearlyZero(contentScale)) {
+    return nullptr;
+  }
+
+  auto drawArgs = args;
+  drawArgs.renderFlags |= RenderFlags::DisableCache;
+  drawArgs.renderRect = nullptr;
+  drawArgs.blurBackground = nullptr;
+
+  auto pictureBounds = layerBounds;
+  pictureBounds.scale(contentScale, contentScale);
+  auto filterBounds = pictureBounds;
+  auto filter = getImageFilter(contentScale);
+  if (filter) {
+    auto reverseBounds = filter->filterBounds(pictureBounds, MapDirection::Reverse);
+    pictureBounds.intersect(reverseBounds);
+  }
+  auto picture = RecordPicture(drawArgs.drawMode, contentScale,
+                               [&](Canvas* canvas) { drawDirectly(drawArgs, canvas, 1.0f); });
+  if (!picture) {
+    return nullptr;
+  }
+
+  Point offset = {};
+  auto image =
+      ToImageWithOffset(std::move(picture), &offset, &pictureBounds, args.dstColorSpace, false);
+  if (image == nullptr) {
+    return nullptr;
+  }
+
+  if (filter) {
+    filterBounds.offset(-offset.x, -offset.y);
+    Point filterOffset = {};
+    image = image->makeWithFilter(std::move(filter), &filterOffset, &filterBounds);
+    offset += filterOffset;
+  }
+
+  drawingMatrix->setScale(1.0f / contentScale, 1.0f / contentScale);
+  drawingMatrix->preTranslate(offset.x, offset.y);
+
+  return image->makeTextureImage(args.context);
+}
+
 bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
-                          const Matrix3D* transform) {
+                          const Matrix3D* transform3D) {
   if (args.drawMode != DrawMode::Normal || args.excludeEffects) {
     return false;
   }
-  std::shared_ptr<MaskFilter> maskFilter = nullptr;
-  auto contentScale = canvas->getMatrix().getMaxScale();
   RasterizedContent* cache = nullptr;
   if (auto rasterizedCache = getRasterizedCache(args, canvas->getMatrix())) {
     cache = rasterizedCache;
   }
   if (!cache) {
-    return false;
+    if (!canUseSubtreeCache(args.subtreeCacheMaxSize, blendMode, transform3D)) {
+      return false;
+    }
+    return drawWithSubtreeCache(args, canvas, alpha, blendMode, transform3D);
   }
   std::optional<Rect> clipBounds = std::nullopt;
+  std::shared_ptr<MaskFilter> maskFilter = nullptr;
+  auto contentScale = canvas->getMatrix().getMaxScale();
   if (hasValidMask()) {
     clipBounds = GetClipBounds(args.blurBackground ? args.blurBackground->getCanvas() : canvas);
     maskFilter = getMaskFilter(args, contentScale, clipBounds);
@@ -1203,25 +1329,78 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
       return true;
     }
   }
-  cache->draw(canvas, bitFields.allowsEdgeAntialiasing, alpha, maskFilter, blendMode, transform);
+  cache->draw(canvas, bitFields.allowsEdgeAntialiasing, alpha, maskFilter, blendMode, transform3D);
   if (args.blurBackground) {
     if (!hasBackgroundStyle()) {
       cache->draw(args.blurBackground->getCanvas(), bitFields.allowsEdgeAntialiasing, alpha,
-                  maskFilter, blendMode, transform);
+                  maskFilter, blendMode, transform3D);
     } else {
       auto backgroundArgs = args;
       backgroundArgs.drawMode = DrawMode::Background;
       backgroundArgs.blurBackground = nullptr;
-      drawOffscreen(backgroundArgs, args.blurBackground->getCanvas(), alpha, blendMode, transform);
+      drawOffscreen(backgroundArgs, args.blurBackground->getCanvas(), alpha, blendMode,
+                    transform3D);
     }
   }
   return true;
 }
 
+SubtreeCache* Layer::getValidSubtreeCache(const DrawArgs& args, int longEdge,
+                                          const Rect& layerBounds) {
+  if (subtreeCache->hasCache(args.context, longEdge)) {
+    return subtreeCache.get();
+  }
+  if (args.renderFlags & RenderFlags::DisableCache || longEdge > args.subtreeCacheMaxSize) {
+    return nullptr;
+  }
+  auto maxBoundsSize = std::max(layerBounds.width(), layerBounds.height());
+  if (FloatNearlyZero(maxBoundsSize)) {
+    return nullptr;
+  }
+  auto cacheScale = static_cast<float>(longEdge) / maxBoundsSize;
+  auto imageMatrix = Matrix::I();
+  auto image = createSubtreeCacheImage(args, cacheScale, layerBounds, &imageMatrix);
+  if (image == nullptr) {
+    return nullptr;
+  }
+  auto textureProxy = std::static_pointer_cast<TextureImage>(image)->getTextureProxy();
+  subtreeCache->addCache(args.context, longEdge, textureProxy, imageMatrix, args.dstColorSpace);
+  return subtreeCache.get();
+}
+
+bool Layer::drawWithSubtreeCache(const DrawArgs& args, Canvas* canvas, float alpha,
+                                 BlendMode blendMode, const Matrix3D* transform3D) {
+  auto layerBounds = getBounds();
+  auto contentScale = canvas->getMatrix().getMaxScale();
+  auto longEdge = GetMipmapCacheLongEdge(args.subtreeCacheMaxSize, contentScale, layerBounds);
+  auto cache = getValidSubtreeCache(args, longEdge, layerBounds);
+  if (cache == nullptr) {
+    return false;
+  }
+  Paint paint = {};
+  if (hasValidMask()) {
+    auto clipBounds =
+        GetClipBounds(args.blurBackground ? args.blurBackground->getCanvas() : canvas);
+    auto maskFilter = getMaskFilter(args, contentScale, clipBounds);
+    if (maskFilter == nullptr) {
+      return true;
+    }
+    paint.setMaskFilter(maskFilter);
+  }
+  paint.setAntiAlias(bitFields.allowsEdgeAntialiasing);
+  paint.setAlpha(alpha);
+  paint.setBlendMode(blendMode);
+  cache->draw(args.context, longEdge, canvas, paint, transform3D);
+  if (args.blurBackground) {
+    cache->draw(args.context, longEdge, args.blurBackground->getCanvas(), paint, transform3D);
+  }
+  return true;
+}
+
 void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
-                          const Matrix3D* transform) {
-  if (transform != nullptr) {
-    drawBackgroundLayerStyles(args, canvas, alpha, *transform);
+                          const Matrix3D* transform3D) {
+  if (transform3D != nullptr) {
+    drawBackgroundLayerStyles(args, canvas, alpha, *transform3D);
   }
 
   auto contentScale = canvas->getMatrix().getMaxScale();
@@ -1233,10 +1412,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
 
   Matrix passthroughImageMatrix = Matrix::I();
   std::shared_ptr<Image> passthroughImage = nullptr;
-  bool shouldPassThroughBackground = bitFields.passThroughBackground &&
-                                     blendMode == BlendMode::SrcOver && _filters.empty() &&
-                                     bitFields.hasBlendMode && transform == nullptr;
-  if (shouldPassThroughBackground) {
+  if (shouldPassThroughBackground(blendMode, transform3D)) {
     if (canvas->getSurface()) {
       passthroughImage = canvas->getSurface()->makeImageSnapshot();
       passthroughImageMatrix = canvas->getMatrix();
@@ -1245,8 +1421,8 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
 
   auto clipBounds = GetClipBounds(args.blurBackground ? args.blurBackground->getCanvas() : canvas);
   auto contentClipBounds = clipBounds;
-  if (transform != nullptr && clipBounds.has_value()) {
-    auto filter = ImageFilter::Transform3D(*transform);
+  if (transform3D != nullptr && clipBounds.has_value()) {
+    auto filter = ImageFilter::Transform3D(*transform3D);
     if (filter) {
       contentClipBounds = filter->filterBounds(*clipBounds, MapDirection::Reverse);
     }
@@ -1261,7 +1437,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     return;
   }
 
-  image = MakeImageWithTransform(image, transform, &imageMatrix);
+  image = MakeImageWithTransform(image, transform3D, &imageMatrix);
 
   if (args.blurBackground && !contentArgs.blurBackground) {
     image = image->makeRasterized();
@@ -1581,10 +1757,9 @@ std::shared_ptr<Image> Layer::getBoundsBackgroundImage(const DrawArgs& args, flo
 
 void Layer::drawBackgroundImage(const DrawArgs& args, Canvas& canvas) {
   if (args.blurBackground) {
-    Point bgOffset = {};
     auto image = args.blurBackground->getBackgroundImage();
     canvas.concat(args.blurBackground->backgroundMatrix());
-    canvas.drawImage(image, bgOffset.x, bgOffset.y);
+    canvas.drawImage(image);
   } else {
     auto drawArgs = args;
     drawArgs.excludeEffects = false;
@@ -1956,7 +2131,7 @@ void Layer::updateBackgroundBounds(float contentScale) {
   if (backgroundChanged) {
     auto layer = this;
     while (layer && !layer->bitFields.dirtyDescendents) {
-      layer->rasterizedContent = nullptr;
+      layer->invalidateCache();
       if (layer->maskOwner) {
         break;
       }
@@ -2029,6 +2204,27 @@ Matrix3D Layer::anchorAdaptedMatrix(const Matrix3D& matrix, const Point& anchor)
   auto offsetMatrix = Matrix3D::MakeTranslate(anchor.x, anchor.y, 0);
   auto invOffsetMatrix = Matrix3D::MakeTranslate(-anchor.x, -anchor.y, 0);
   return invOffsetMatrix * matrix * offsetMatrix;
+}
+
+void Layer::invalidateCache() {
+  rasterizedContent = nullptr;
+  subtreeCache = nullptr;
+}
+
+void Layer::invalidateSubtree() {
+  bitFields.staticSubtree = false;
+  invalidateCache();
+  localBounds = nullptr;
+}
+
+void Layer::updateStaticSubtreeFlags() {
+  if (bitFields.staticSubtree) {
+    return;
+  }
+  bitFields.staticSubtree = true;
+  for (const auto& child : _children) {
+    child->updateStaticSubtreeFlags();
+  }
 }
 
 }  // namespace tgfx

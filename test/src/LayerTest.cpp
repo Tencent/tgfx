@@ -26,6 +26,7 @@
 #include "layers/ContourContext.h"
 #include "layers/DrawArgs.h"
 #include "layers/RootLayer.h"
+#include "layers/SubtreeCache.h"
 #include "layers/contents/RasterizedContent.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/layers/DisplayList.h"
@@ -2552,27 +2553,23 @@ TGFX_TEST(LayerTest, RasterizedBackground) {
 
   displayList->render(surface.get());
   background->setMatrix(Matrix::MakeTrans(50, 50));
-  auto rasterizedContent =
-      static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
+  auto rasterizedImage = child->rasterizedContent->getImage();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent !=
-              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
+  EXPECT_TRUE(rasterizedImage != child->rasterizedContent->getImage());
 
   child->setMatrix(Matrix::MakeTrans(20, 20));
-  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
+  rasterizedImage = child->rasterizedContent->getImage();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent !=
-              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
+  EXPECT_TRUE(rasterizedImage != child->rasterizedContent->getImage());
 
   auto layerNextChild = ShapeLayer::Make();
   layerNextChild->setPath(path);
   layerNextChild->setMatrix(Matrix::MakeTrans(10, 10));
   layerNextChild->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 100, 0, 128)));
   parent->addChild(layerNextChild);
-  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
+  rasterizedImage = child->rasterizedContent->getImage();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent ==
-              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
+  EXPECT_TRUE(rasterizedImage == child->rasterizedContent->getImage());
 
   auto grandChild = ShapeLayer::Make();
   grandChild->setPath(path);
@@ -2587,61 +2584,52 @@ TGFX_TEST(LayerTest, RasterizedBackground) {
   nephew->setMatrix(Matrix::MakeTrans(10, 10));
   nephew->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 100, 0, 128)));
   layerNextChild->addChild(nephew);
-  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
+  rasterizedImage = child->rasterizedContent->getImage();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent ==
-              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
+  EXPECT_TRUE(rasterizedImage == child->rasterizedContent->getImage());
 
   parent->addChildAt(layerBeforeChild, parent->getChildIndex(child));
-  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
+  rasterizedImage = child->rasterizedContent->getImage();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent !=
-              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
+  EXPECT_TRUE(rasterizedImage != child->rasterizedContent->getImage());
 
   layerBeforeChild->addChildAt(backgroundNephew, 0);
-  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
+  rasterizedImage = child->rasterizedContent->getImage();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent !=
-              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
+  EXPECT_TRUE(rasterizedImage != child->rasterizedContent->getImage());
 
   layerBeforeChild->removeChildren();
-  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
+  rasterizedImage = child->rasterizedContent->getImage();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent !=
-              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
+  EXPECT_TRUE(rasterizedImage != child->rasterizedContent->getImage());
 
   layerBeforeChild->removeFromParent();
-  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
+  rasterizedImage = child->rasterizedContent->getImage();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent !=
-              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
+  EXPECT_TRUE(rasterizedImage != child->rasterizedContent->getImage());
 
   parent->setChildIndex(background, static_cast<int>(parent->children().size() - 1u));
-  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
+  rasterizedImage = child->rasterizedContent->getImage();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent !=
-              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
+  EXPECT_TRUE(rasterizedImage != child->rasterizedContent->getImage());
 
   parent->setChildIndex(background, 0);
-  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
+  rasterizedImage = child->rasterizedContent->getImage();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent !=
-              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
+  EXPECT_TRUE(rasterizedImage != child->rasterizedContent->getImage());
 
   parent->replaceChild(background, layerBeforeChild);
-  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
+  rasterizedImage = child->rasterizedContent->getImage();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent !=
-              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
+  EXPECT_TRUE(rasterizedImage != child->rasterizedContent->getImage());
 
   parent->replaceChild(layerNextChild, background);
-  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
+  rasterizedImage = child->rasterizedContent->getImage();
   displayList->render(surface.get());
-  // Ideally, rasterizedContent should remain unchanged here, but we need to call root->invalidateRect()
+  // Ideally, rasterizedImage should remain unchanged here, but we need to call root->invalidateRect()
   // whenever a layer is removed or its index changes. As a result, dirty rects are always treated
   // as background changes. This is a trade-off between performance and correctness.
-  EXPECT_TRUE(rasterizedContent !=
-              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
+  EXPECT_TRUE(rasterizedImage != child->rasterizedContent->getImage());
 }
 
 TGFX_TEST(LayerTest, AdaptiveDashEffect) {
@@ -3825,5 +3813,350 @@ TGFX_TEST(LayerTest, BackgroundLayerIndexWithNestedHierarchy) {
   displayList->render(surface.get());
 
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundLayerIndexWithNestedHierarchy"));
+}
+
+TGFX_TEST(LayerTest, LayerCache) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 400);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Direct);
+
+  // Test default value is 0 (cache disabled)
+  EXPECT_EQ(displayList->subtreeCacheMaxSize(), 0);
+
+  // Test setting subtreeCacheMaxSize
+  displayList->setSubtreeCacheMaxSize(2048);
+  EXPECT_EQ(displayList->subtreeCacheMaxSize(), 2048);
+
+  // Test negative value is clamped to 0
+  displayList->setSubtreeCacheMaxSize(-1);
+  EXPECT_EQ(displayList->subtreeCacheMaxSize(), 0);
+
+  // Enable cache
+  displayList->setSubtreeCacheMaxSize(2048);
+
+  // Create a parent layer with child (cache requires children/styles/filters)
+  auto parent = Layer::Make();
+  parent->setName("parent");
+  parent->setMatrix(Matrix::MakeTrans(20, 20));
+
+  auto child = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeWH(50, 50));
+  child->setPath(path);
+  child->setFillStyle(SolidColor::Make(Color::Red()));
+  parent->addChild(child);
+
+  displayList->root()->addChild(parent);
+  // Disable passThroughBackground to allow caching (root layer has passThroughBackground=true by default)
+  displayList->root()->setPassThroughBackground(false);
+
+  // First render - staticSubtree flag is not set yet
+  displayList->render(surface.get());
+  auto root = displayList->root();
+  EXPECT_TRUE(root->subtreeCache == nullptr);
+
+  // Second render - creates subtreeCache
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subtreeCache != nullptr);
+  int expectedLongEdge = 64;
+  EXPECT_TRUE(root->subtreeCache->hasCache(context, expectedLongEdge));
+}
+
+TGFX_TEST(LayerTest, LayerCacheInvalidation) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 400);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Direct);
+  displayList->setSubtreeCacheMaxSize(2048);
+
+  auto parent = Layer::Make();
+  parent->setMatrix(Matrix::MakeTrans(20, 20));
+
+  auto child = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeWH(50, 50));
+  child->setPath(path);
+  child->setFillStyle(SolidColor::Make(Color::Green()));
+  parent->addChild(child);
+
+  auto root = displayList->root();
+  root->addChild(parent);
+  // Disable passThroughBackground to allow caching (root layer has passThroughBackground=true by default)
+  root->setPassThroughBackground(false);
+
+  // First render - staticSubtree flag is not set yet
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subtreeCache == nullptr);
+
+  // Second render - creates subtreeCache
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subtreeCache != nullptr);
+
+  // Adding a new child - should invalidate root's cache
+  auto newChild = ShapeLayer::Make();
+  Path newPath;
+  newPath.addRect(Rect::MakeWH(20, 20));
+  newChild->setPath(newPath);
+  newChild->setMatrix(Matrix::MakeTrans(60, 0));
+  newChild->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 255, 0, 255)));
+  parent->addChild(newChild);
+
+  // Cache should be invalidated after adding child
+  EXPECT_TRUE(root->subtreeCache == nullptr);
+
+  // First render after modification - staticSubtree flag is not set yet
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subtreeCache == nullptr);
+
+  // Second render - creates subtreeCache again
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subtreeCache != nullptr);
+
+  // Modifying child transform - should invalidate cache
+  child->setMatrix(Matrix::MakeTrans(10, 10));
+  EXPECT_TRUE(root->subtreeCache == nullptr);
+
+  // Render twice to recreate cache
+  displayList->render(surface.get());
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subtreeCache != nullptr);
+}
+
+TGFX_TEST(LayerTest, LayerCacheWithEffects) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 1000, 1000);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Direct);
+  displayList->setSubtreeCacheMaxSize(2048);
+
+  // Parent with child that has filter
+  auto parent1 = Layer::Make();
+  parent1->setMatrix(Matrix::MakeTrans(20, 20));
+
+  auto child1 = ShapeLayer::Make();
+  Path path1;
+  path1.addRect(Rect::MakeWH(80, 80));
+  child1->setPath(path1);
+  child1->setFillStyle(SolidColor::Make(Color::Red()));
+  auto filter = DropShadowFilter::Make(5, 5, 3, 3, Color::Black());
+  child1->setFilters({filter});
+  parent1->addChild(child1);
+
+  auto root = displayList->root();
+  root->addChild(parent1);
+
+  // Parent with child that has layer style
+  auto parent2 = Layer::Make();
+  parent2->setMatrix(Matrix::MakeTrans(150, 30));
+
+  auto child2 = ShapeLayer::Make();
+  Path path2;
+  path2.addRect(Rect::MakeWH(60, 60));
+  child2->setPath(path2);
+  child2->setFillStyle(SolidColor::Make(Color::Blue()));
+  auto style = DropShadowStyle::Make(8, 8, 4, 4, Color::Black(), false);
+  child2->setLayerStyles({style});
+  parent2->addChild(child2);
+
+  root->addChild(parent2);
+  // Disable passThroughBackground to allow caching (root layer has passThroughBackground=true by default)
+  root->setPassThroughBackground(false);
+
+  // First render - staticSubtree flag is not set yet
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subtreeCache == nullptr);
+
+  // Second render - creates subtreeCache
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subtreeCache != nullptr);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerCacheWithEffects"));
+}
+
+TGFX_TEST(LayerTest, LayerCacheWithTransform) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 400);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Direct);
+  displayList->setSubtreeCacheMaxSize(2048);
+
+  auto parent = Layer::Make();
+  parent->setMatrix(Matrix::MakeTrans(5, 5));
+
+  auto child = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeWH(50, 50));
+  child->setPath(path);
+  child->setFillStyle(SolidColor::Make(Color::Red()));
+  parent->addChild(child);
+
+  auto root = displayList->root();
+  root->addChild(parent);
+  // Disable passThroughBackground to allow caching (root layer has passThroughBackground=true by default)
+  root->setPassThroughBackground(false);
+
+  // First render - staticSubtree flag is not set yet
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subtreeCache == nullptr);
+
+  // Second render - creates subtreeCache
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subtreeCache != nullptr);
+
+  // Change zoomScale - cache should still be valid (just uses different mipmap level)
+  displayList->setZoomScale(1.5f);
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subtreeCache != nullptr);
+
+  // Change parent's transform - should invalidate root's cache
+  parent->setMatrix(Matrix::MakeTrans(10, 10));
+  EXPECT_TRUE(root->subtreeCache == nullptr);
+
+  // First render after modification - staticSubtree flag is not set yet
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subtreeCache == nullptr);
+
+  // Second render - recreate cache
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subtreeCache != nullptr);
+}
+
+TGFX_TEST(LayerTest, LayerCacheContentScale) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 400);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Direct);
+  displayList->setSubtreeCacheMaxSize(400);
+
+  auto parent = Layer::Make();
+  parent->setMatrix(Matrix::MakeTrans(10, 10));
+
+  auto child = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeWH(100, 100));
+  child->setPath(path);
+  child->setFillStyle(SolidColor::Make(Color::Blue()));
+  parent->addChild(child);
+
+  auto root = displayList->root();
+  root->addChild(parent);
+  // Disable passThroughBackground to allow caching (root layer has passThroughBackground=true by default)
+  root->setPassThroughBackground(false);
+
+  // First render - staticSubtree flag is not set yet
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subtreeCache == nullptr);
+
+  // Second render - creates subtreeCache
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subtreeCache != nullptr);
+
+  // At zoom 1.0, longEdge should be 100
+  int expectedLongEdge1_0 = 100;
+  EXPECT_TRUE(root->subtreeCache->hasCache(context, expectedLongEdge1_0));
+
+  // Render at zoom 0.5 - cache should still exist
+  displayList->setZoomScale(0.5f);
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subtreeCache != nullptr);
+
+  // At zoom 0.5, longEdge should be 50
+  int expectedLongEdge0_5 = 50;
+  EXPECT_TRUE(root->subtreeCache->hasCache(context, expectedLongEdge0_5));
+
+  // Render at zoom 2.0
+  displayList->setZoomScale(2.0f);
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subtreeCache != nullptr);
+
+  // At zoom 2.0, longEdge should be 200
+  int expectedLongEdge2_0 = 200;
+  EXPECT_TRUE(root->subtreeCache->hasCache(context, expectedLongEdge2_0));
+
+  // Render at zoom 1.0 again
+  displayList->setZoomScale(1.0f);
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subtreeCache != nullptr);
+
+  // At zoom 1.0 again, cache should still be valid for longEdge 100
+  EXPECT_TRUE(root->subtreeCache->hasCache(context, expectedLongEdge1_0));
+
+  // Render at extreme zoom out
+  displayList->setZoomScale(0.1f);
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subtreeCache != nullptr);
+
+  // At zoom 0.1, longEdge < minLongEdge, cache should be 50
+  int expectedLongEdge0_1 = 50;
+  EXPECT_TRUE(root->subtreeCache->cacheEntries.size() == 3);
+  EXPECT_TRUE(root->subtreeCache->hasCache(context, expectedLongEdge0_1));
+}
+
+TGFX_TEST(LayerTest, StaticSubtree) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 350, 350);
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto rootLayer = Layer::Make();
+  auto childLayer = ShapeLayer::Make();
+  Path childPath;
+  childPath.addRect(Rect::MakeWH(100, 100));
+  childLayer->setPath(childPath);
+  childLayer->setFillStyle(SolidColor::Make(Color::Red()));
+  rootLayer->addChild(childLayer);
+
+  displayList->root()->addChild(rootLayer);
+  EXPECT_FALSE(rootLayer->bitFields.staticSubtree);
+  EXPECT_FALSE(childLayer->bitFields.staticSubtree);
+
+  // After first render, staticSubtree should be true
+  displayList->render(surface.get());
+  EXPECT_TRUE(rootLayer->bitFields.staticSubtree);
+  EXPECT_TRUE(childLayer->bitFields.staticSubtree);
+
+  // After adding filter, both should be false
+  auto filter = BlurFilter::Make(10.f, 10.f);
+  childLayer->setFilters({filter});
+  EXPECT_FALSE(rootLayer->bitFields.staticSubtree);
+  EXPECT_FALSE(childLayer->bitFields.staticSubtree);
+
+  // After render, both should be true again
+  displayList->render(surface.get());
+  EXPECT_TRUE(rootLayer->bitFields.staticSubtree);
+  EXPECT_TRUE(childLayer->bitFields.staticSubtree);
+
+  // After adding layer style, both should be false
+  auto style = DropShadowStyle::Make(5, 5, 0, 0, Color::Black(), false);
+  childLayer->setLayerStyles({style});
+  EXPECT_FALSE(rootLayer->bitFields.staticSubtree);
+  EXPECT_FALSE(childLayer->bitFields.staticSubtree);
+
+  // After render, both should be true again
+  displayList->render(surface.get());
+  EXPECT_TRUE(rootLayer->bitFields.staticSubtree);
+  EXPECT_TRUE(childLayer->bitFields.staticSubtree);
+
+  // After invalidating descendents, both should be false
+  rootLayer->invalidateDescendents();
+  EXPECT_FALSE(rootLayer->bitFields.staticSubtree);
+  EXPECT_TRUE(childLayer->bitFields.staticSubtree);
+
+  // After render, both should be true again
+  displayList->render(surface.get());
+  EXPECT_TRUE(rootLayer->bitFields.staticSubtree);
+  EXPECT_TRUE(childLayer->bitFields.staticSubtree);
 }
 }  // namespace tgfx
