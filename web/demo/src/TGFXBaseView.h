@@ -19,8 +19,11 @@
 #pragma once
 
 #include <emscripten/bind.h>
-#include "drawers/Drawer.h"
+#include "hello2d/AppHost.h"
+#include "hello2d/LayerBuilder.h"
+#include "tgfx/gpu/Recording.h"
 #include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
+#include "tgfx/layers/DisplayList.h"
 
 namespace hello2d {
 
@@ -28,18 +31,35 @@ class TGFXBaseView {
  public:
   TGFXBaseView(const std::string& canvasID);
 
-  void setImage(const std::string& name, tgfx::NativeImageRef nativeImage);
+  void setImagePath(const std::string& name, tgfx::NativeImageRef nativeImage);
 
   void updateSize(float devicePixelRatio);
 
-  bool draw(int drawIndex, float zoom, float offsetX, float offsetY);
+  void updateDrawParams(int drawIndex, float zoom, float offsetX, float offsetY);
+
+  bool draw();
+
+  void onWheelEvent();
+  void onClickEvent();
 
  protected:
-  std::shared_ptr<drawers::AppHost> appHost;
+  std::shared_ptr<hello2d::AppHost> appHost = nullptr;
 
  private:
+  void applyTransform();
+
   std::string canvasID = "";
   std::shared_ptr<tgfx::Window> window = nullptr;
+  tgfx::DisplayList displayList = {};
+  std::shared_ptr<tgfx::Layer> contentLayer = nullptr;
+  int lastDrawIndex = -1;
+  std::unique_ptr<tgfx::Recording> lastRecording = nullptr;
+  int lastSurfaceWidth = 0;
+  int lastSurfaceHeight = 0;
+  bool isResizing = false;
+  float currentZoom = 1.0f;
+  float currentOffsetX = 0.0f;
+  float currentOffsetY = 0.0f;
 };
 
 }  // namespace hello2d

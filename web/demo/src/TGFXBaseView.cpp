@@ -18,69 +18,156 @@
 
 #include "TGFXBaseView.h"
 #include <cmath>
-#include "drawers/Drawer.h"
+#include "hello2d/LayerBuilder.h"
 #include "tgfx/core/Point.h"
 
 using namespace emscripten;
 namespace hello2d {
 
 TGFXBaseView::TGFXBaseView(const std::string& canvasID) : canvasID(canvasID) {
-  appHost = std::make_shared<drawers::AppHost>();
+  appHost = std::make_shared<hello2d::AppHost>();
+  displayList.setRenderMode(tgfx::RenderMode::Tiled);
+  displayList.setAllowZoomBlur(true);
+  displayList.setMaxTileCount(512);
 }
 
 void TGFXBaseView::updateSize(float devicePixelRatio) {
-  if (!canvasID.empty()) {
-    int width = 0;
-    int height = 0;
-    emscripten_get_canvas_element_size(canvasID.c_str(), &width, &height);
-    auto sizeChanged = appHost->updateScreen(width, height, devicePixelRatio);
-    if (sizeChanged && window) {
-      window->invalidSize();
-    }
+  if (canvasID.empty()) {
+    return;
+  }
+  int width = 0;
+  int height = 0;
+  emscripten_get_canvas_element_size(canvasID.c_str(), &width, &height);
+  if (width <= 0 || height <= 0) {
+    return;
+  }
+  lastSurfaceWidth = static_cast<int>(width * devicePixelRatio);
+  lastSurfaceHeight = static_cast<int>(height * devicePixelRatio);
+  isResizing = true;
+  applyTransform();
+  if (window) {
+    window->invalidSize();
   }
 }
 
-void TGFXBaseView::setImage(const std::string& name, tgfx::NativeImageRef nativeImage) {
+void TGFXBaseView::setImagePath(const std::string& name, tgfx::NativeImageRef nativeImage) {
   auto image = tgfx::Image::MakeFrom(nativeImage);
   if (image) {
     appHost->addImage(name, std::move(image));
   }
 }
 
-bool TGFXBaseView::draw(int drawIndex, float zoom, float offsetX, float offsetY) {
-  if (appHost->width() <= 0 || appHost->height() <= 0) {
-    return true;
+void TGFXBaseView::onWheelEvent() {
+}
+
+void TGFXBaseView::onClickEvent() {
+}
+
+void TGFXBaseView::applyTransform() {
+  if (lastSurfaceWidth > 0 && lastSurfaceHeight > 0) {
+    if (contentLayer) {
+      hello2d::LayerBuilder::ApplyCenteringTransform(contentLayer,
+                                                     static_cast<float>(lastSurfaceWidth),
+                                                     static_cast<float>(lastSurfaceHeight));
+    }
+    displayList.setZoomScale(currentZoom);
+    displayList.setContentOffset(currentOffsetX, currentOffsetY);
   }
+}
+
+void TGFXBaseView::updateDrawParams(int drawIndex, float zoom, float offsetX, float offsetY) {
+  currentZoom = zoom;
+  currentOffsetX = offsetX;
+  currentOffsetY = offsetY;
+
+  auto numBuilders = hello2d::LayerBuilder::Count();
+  auto index = drawIndex % numBuilders;
+  if (index != lastDrawIndex || !contentLayer) {
+    auto builder = hello2d::LayerBuilder::GetByIndex(index);
+    if (builder) {
+      contentLayer = builder->buildLayerTree(appHost.get());
+      if (contentLayer) {
+        displayList.root()->removeChildren();
+        displayList.root()->addChild(contentLayer);
+      }
+    }
+    lastDrawIndex = index;
+  }
+
+  applyTransform();
+}
+
+bool TGFXBaseView::draw() {
   if (window == nullptr) {
     window = tgfx::WebGLWindow::MakeFrom(canvasID);
   }
   if (window == nullptr) {
-    return true;
+    return false;
   }
+
+  if (!displayList.hasContentChanged() && lastRecording == nullptr) {
+    return false;
+  }
+
   auto device = window->getDevice();
   auto context = device->lockContext();
   if (context == nullptr) {
-    return true;
+    return false;
   }
+
   auto surface = window->getSurface(context);
   if (surface == nullptr) {
     device->unlock();
-    return true;
+    return false;
   }
-  appHost->updateZoomAndOffset(zoom, tgfx::Point(offsetX, offsetY));
+
+  // Sync surface size for DPI changes.
+  bool surfaceResized = isResizing;
+  isResizing = false;
+
+  if (surface->width() != lastSurfaceWidth || surface->height() != lastSurfaceHeight) {
+    lastSurfaceWidth = surface->width();
+    lastSurfaceHeight = surface->height();
+    applyTransform();
+    surfaceResized = true;
+  }
+
   auto canvas = surface->getCanvas();
   canvas->clear();
-  auto numDrawers = drawers::Drawer::Count() - 1;
-  auto index = (drawIndex % numDrawers) + 1;
-  auto drawer = drawers::Drawer::GetByName("GridBackground");
-  drawer->draw(canvas, appHost.get());
-  drawer = drawers::Drawer::GetByIndex(index);
-  drawer->draw(canvas, appHost.get());
-  context->flushAndSubmit();
-  window->present(context);
+  int width = 0;
+  int height = 0;
+  emscripten_get_canvas_element_size(canvasID.c_str(), &width, &height);
+  auto density = static_cast<float>(surface->width()) / static_cast<float>(width);
+  DrawBackground(canvas, surface->width(), surface->height(), density);
+
+  displayList.render(surface.get(), false);
+
+  auto recording = context->flush();
+
+  bool submitted = false;
+  if (surfaceResized) {
+    // When resized, submit current frame immediately (no delay)
+    if (recording) {
+      context->submit(std::move(recording));
+      window->present(context);
+      submitted = true;
+    }
+    lastRecording = nullptr;
+  } else {
+    // Delayed one-frame present
+    std::swap(lastRecording, recording);
+
+    if (recording) {
+      context->submit(std::move(recording));
+      window->present(context);
+      submitted = true;
+    }
+  }
+
   device->unlock();
-  return true;
+  return submitted || (lastRecording != nullptr);
 }
+
 }  // namespace hello2d
 
 int main(int, const char*[]) {

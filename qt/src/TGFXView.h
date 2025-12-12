@@ -20,8 +20,10 @@
 
 #include <QOpenGLContext>
 #include <QQuickItem>
-#include "drawers/AppHost.h"
+#include "hello2d/AppHost.h"
+#include "tgfx/gpu/Recording.h"
 #include "tgfx/gpu/opengl/qt/QGLWindow.h"
+#include "tgfx/layers/DisplayList.h"
 
 namespace hello2d {
 class TGFXView : public QQuickItem {
@@ -37,14 +39,22 @@ class TGFXView : public QQuickItem {
 
  private:
   int currentDrawerIndex = 0;
+  int lastDrawIndex = -1;
   std::shared_ptr<tgfx::QGLWindow> tgfxWindow = nullptr;
-  std::shared_ptr<drawers::AppHost> appHost = nullptr;
+  std::shared_ptr<hello2d::AppHost> appHost = nullptr;
+  tgfx::DisplayList displayList;
+  std::shared_ptr<tgfx::Layer> contentLayer = nullptr;
+  std::unique_ptr<tgfx::Recording> lastRecording = nullptr;
   float zoom = 1.0f;
   QPointF offset = {0, 0};
+  int lastSurfaceWidth = 0;
+  int lastSurfaceHeight = 0;
+  bool sizeInvalidated = false;
 
   void createAppHost();
+  void updateDisplayList();
+  void applyTransform();
   void draw();
-
  private Q_SLOTS:
   void onSceneGraphInvalidated();
 };

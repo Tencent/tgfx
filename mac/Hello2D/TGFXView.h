@@ -23,6 +23,7 @@
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/opengl/GLDevice.h"
 #include "tgfx/gpu/opengl/cgl/CGLWindow.h"
+#include "tgfx/layers/DisplayList.h"
 
 @interface TGFXView : NSView
 
@@ -30,9 +31,9 @@
 @property(nonatomic) float zoomScale;
 @property(nonatomic) CGPoint contentOffset;
 @property(nonatomic) CVDisplayLinkRef cvDisplayLink;
-@property(nonatomic, strong) CADisplayLink* caDisplayLink;
+@property(nonatomic, strong) CADisplayLink* caDisplayLink API_AVAILABLE(macos(14.0));
 
-- (void)draw;
+- (BOOL)draw;
 - (void)startDisplayLink;
 - (void)stopDisplayLink;
 

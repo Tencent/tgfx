@@ -28,9 +28,12 @@
 #include <functional>
 #include <memory>
 #include <string>
-#include "drawers/Drawer.h"
+#include "hello2d/AppHost.h"
+#include "hello2d/LayerBuilder.h"
 #include "tgfx/core/Point.h"
+#include "tgfx/gpu/Recording.h"
 #include "tgfx/gpu/opengl/wgl/WGLWindow.h"
+#include "tgfx/layers/DisplayList.h"
 
 namespace hello2d {
 class TGFXWindow {
@@ -43,11 +46,18 @@ class TGFXWindow {
  private:
   HWND windowHandle = nullptr;
   int currentDrawerIndex = 0;
-  float zoomScale = 1.0f;
+  int lastDrawIndex = -1;
   double lastZoomArgument = 0.0;
+  float zoomScale = 1.0f;
   tgfx::Point contentOffset = {0.0f, 0.0f};
   std::shared_ptr<tgfx::WGLWindow> tgfxWindow = nullptr;
-  std::shared_ptr<drawers::AppHost> appHost = nullptr;
+  std::shared_ptr<hello2d::AppHost> appHost = nullptr;
+  tgfx::DisplayList displayList;
+  std::shared_ptr<tgfx::Layer> contentLayer = nullptr;
+  std::unique_ptr<tgfx::Recording> lastRecording = nullptr;
+  int lastSurfaceWidth = 0;
+  int lastSurfaceHeight = 0;
+  bool sizeInvalidated = false;
 
   static WNDCLASS RegisterWindowClass();
   static LRESULT CALLBACK WndProc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) noexcept;
@@ -58,7 +68,9 @@ class TGFXWindow {
   void centerAndShow();
   float getPixelRatio();
   void createAppHost();
-  void draw();
+  void updateDisplayList();
+  void applyTransform();
+  bool draw();
 
   bool isDrawing = true;
 };
