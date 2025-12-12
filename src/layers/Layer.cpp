@@ -671,8 +671,14 @@ Point Layer::localToGlobal(const Point& localPoint) const {
 bool Layer::hitTestPoint(float x, float y, bool shapeHitTest) {
   if (auto content = getContent()) {
     Point localPoint = globalToLocal(Point::Make(x, y));
-    if (content->hitTestPoint(localPoint.x, localPoint.y, shapeHitTest)) {
-      return true;
+    if (shapeHitTest) {
+      if (content->hitTestPoint(localPoint.x, localPoint.y)) {
+        return true;
+      }
+    } else {
+      if (content->getBounds().contains(localPoint.x, localPoint.y)) {
+        return true;
+      }
     }
   }
 
@@ -1386,23 +1392,6 @@ void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha,
   drawContents(args, canvas, alpha, layerStyleSource.get(), nullptr, extraSourceTypes);
 }
 
-class LayerBrushModifier : public BrushModifier {
- public:
-  LayerBrushModifier(bool antiAlias, float alpha) : antiAlias(antiAlias), alpha(alpha) {
-  }
-
-  Brush transform(const Brush& brush) const override {
-    auto newBrush = brush;
-    newBrush.color.alpha *= alpha;
-    newBrush.antiAlias = antiAlias;
-    return newBrush;
-  }
-
- private:
-  bool antiAlias = true;
-  float alpha = 1.0f;
-};
-
 void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
                          const LayerStyleSource* layerStyleSource, const Layer* stopChild,
                          const std::unordered_set<LayerStyleExtraSourceType>& extraSourceTypes) {
@@ -1410,15 +1399,16 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
     drawLayerStyles(args, canvas, alpha, layerStyleSource, LayerStylePosition::Below,
                     extraSourceTypes);
   }
-  LayerBrushModifier layerFill(bitFields.allowsEdgeAntialiasing, alpha);
   auto content = getContent();
+  bool hasForeground = false;
   if (content) {
     if (args.drawMode == DrawMode::Contour) {
-      content->drawContour(canvas, &layerFill);
+      content->drawContour(canvas, bitFields.allowsEdgeAntialiasing);
     } else {
-      content->drawDefault(canvas, &layerFill);
+      hasForeground = content->drawDefault(canvas, alpha, bitFields.allowsEdgeAntialiasing);
       if (args.blurBackground) {
-        content->drawDefault(args.blurBackground->getCanvas(), &layerFill);
+        content->drawDefault(args.blurBackground->getCanvas(), alpha,
+                             bitFields.allowsEdgeAntialiasing);
       }
     }
   }
@@ -1429,10 +1419,11 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
     drawLayerStyles(args, canvas, alpha, layerStyleSource, LayerStylePosition::Above,
                     extraSourceTypes);
   }
-  if (content && args.drawMode != DrawMode::Contour) {
-    content->drawForeground(canvas, &layerFill);
+  if (hasForeground) {
+    content->drawForeground(canvas, alpha, bitFields.allowsEdgeAntialiasing);
     if (args.blurBackground) {
-      content->drawForeground(args.blurBackground->getCanvas(), &layerFill);
+      content->drawForeground(args.blurBackground->getCanvas(), alpha,
+                              bitFields.allowsEdgeAntialiasing);
     }
   }
 }

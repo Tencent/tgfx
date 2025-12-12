@@ -252,62 +252,48 @@ ShapeLayer::~ShapeLayer() {
   }
 }
 
-static bool DrawContour(Canvas* canvas, std::shared_ptr<Shape> shape,
-                        const std::vector<Paint>& paints) {
-  if (shape == nullptr || paints.empty()) {
-    return false;
-  }
-  auto hasNonImageShader = std::any_of(paints.begin(), paints.end(), [](const Paint& paint) {
-    auto shader = paint.getShader();
-    return !shader || !shader->isAImage();
-  });
-  if (hasNonImageShader) {
-    canvas->drawShape(shape, {});
-  } else {
-    for (auto& paint : paints) {
-      canvas->drawShape(shape, paint);
-    }
-  }
-  return true;
-}
-
 void ShapeLayer::onUpdateContent(LayerRecorder* recorder) {
   if (_shape == nullptr) {
     return;
   }
-  auto fillPaints = createShapePaints(_fillStyles);
-  auto strokePaints = createShapePaints(_strokeStyles);
-  auto strokeShape = strokePaints.empty() ? nullptr : createStrokeShape();
-  auto canvas = recorder->getCanvas(LayerContentType::Default);
-  for (auto& paint : fillPaints) {
-    canvas->drawShape(_shape, paint);
-  }
-  if (shapeBitFields.strokeOnTop) {
-    canvas = recorder->getCanvas(LayerContentType::Foreground);
-  }
-  for (auto& paint : strokePaints) {
-    canvas->drawShape(strokeShape, paint);
-  }
-  canvas = recorder->getCanvas(LayerContentType::Contour);
-  if (!DrawContour(canvas, _shape, fillPaints)) {
-    // If there is not any fill paints, we still need to draw the shape as contour.
-    canvas->drawShape(_shape, {});
-  }
-  DrawContour(canvas, strokeShape, strokePaints);
-}
 
-std::vector<Paint> ShapeLayer::createShapePaints(
-    const std::vector<std::shared_ptr<ShapeStyle>>& styles) const {
-  std::vector<Paint> paintList = {};
-  paintList.reserve(styles.size());
-  for (auto& style : styles) {
-    Paint paint = {};
-    paint.setAlpha(style->alpha());
-    paint.setBlendMode(style->blendMode());
-    paint.setShader(style->getShader());
-    paintList.push_back(paint);
+  if (!_fillStyles.empty()) {
+    for (const auto& style : _fillStyles) {
+      auto shader = style->getShader();
+      auto alpha = style->alpha();
+      LayerPaint paint(std::move(shader), alpha, style->blendMode());
+      recorder->addShape(_shape, paint);
+    }
+  } else {
+    // Create a contour-only content for the shape (transparent color, no shader)
+    recorder->addShape(_shape, LayerPaint(Color::Transparent()));
   }
-  return paintList;
+
+  if (!_strokeStyles.empty()) {
+    // Check if we can use simple stroke mode (pass stroke params to LayerPaint directly).
+    auto strokeAlign = static_cast<StrokeAlign>(shapeBitFields.strokeAlign);
+    bool simpleStroke = (_strokeStart == 0 && _strokeEnd == 1) && _lineDashPattern.empty() &&
+                        strokeAlign == StrokeAlign::Center;
+    std::shared_ptr<Shape> strokeShape = nullptr;
+    if (!simpleStroke) {
+      strokeShape = createStrokeShape();
+    }
+    for (const auto& style : _strokeStyles) {
+      auto shader = style->getShader();
+      auto alpha = style->alpha();
+      LayerPaint paint(std::move(shader), alpha, style->blendMode());
+      if (shapeBitFields.strokeOnTop) {
+        paint.drawOrder = DrawOrder::AboveChildren;
+      }
+      if (simpleStroke) {
+        paint.style = PaintStyle::Stroke;
+        paint.stroke = stroke;
+        recorder->addShape(_shape, paint);
+      } else {
+        recorder->addShape(strokeShape, paint);
+      }
+    }
+  }
 }
 
 std::shared_ptr<Shape> ShapeLayer::createStrokeShape() const {
