@@ -3851,12 +3851,12 @@ TGFX_TEST(LayerTest, LayerCache) {
 
   displayList->root()->addChild(parent);
 
-  // First render - creates subTreeCache
+  // First render - staticSubTree flag is not set yet
   displayList->render(surface.get());
   auto root = displayList->root();
-  EXPECT_TRUE(root->subTreeCache != nullptr);
+  EXPECT_TRUE(root->subTreeCache == nullptr);
 
-  // Second render - cache should be filled
+  // Second render - creates subTreeCache
   displayList->render(surface.get());
   EXPECT_TRUE(root->subTreeCache != nullptr);
   int expectedLongEdge = 64;
@@ -3885,11 +3885,11 @@ TGFX_TEST(LayerTest, LayerCacheInvalidation) {
   auto root = displayList->root();
   root->addChild(parent);
 
-  // First render - creates subTreeCache
+  // First render - staticSubTree flag is not set yet
   displayList->render(surface.get());
-  EXPECT_TRUE(root->subTreeCache != nullptr);
+  EXPECT_TRUE(root->subTreeCache == nullptr);
 
-  // Second render - cache should be filled
+  // Second render - creates subTreeCache
   displayList->render(surface.get());
   EXPECT_TRUE(root->subTreeCache != nullptr);
 
@@ -3905,11 +3905,11 @@ TGFX_TEST(LayerTest, LayerCacheInvalidation) {
   // Cache should be invalidated after adding child
   EXPECT_TRUE(root->subTreeCache == nullptr);
 
-  // First render after modification - creates subTreeCache again
+  // First render after modification - staticSubTree flag is not set yet
   displayList->render(surface.get());
-  EXPECT_TRUE(root->subTreeCache != nullptr);
+  EXPECT_TRUE(root->subTreeCache == nullptr);
 
-  // Second render - cache should be filled
+  // Second render - creates subTreeCache again
   displayList->render(surface.get());
   EXPECT_TRUE(root->subTreeCache != nullptr);
 
@@ -3963,11 +3963,11 @@ TGFX_TEST(LayerTest, LayerCacheWithEffects) {
 
   root->addChild(parent2);
 
-  // First render - creates subTreeCache
+  // First render - staticSubTree flag is not set yet
   displayList->render(surface.get());
-  EXPECT_TRUE(root->subTreeCache != nullptr);
+  EXPECT_TRUE(root->subTreeCache == nullptr);
 
-  // Second render - cache should be filled
+  // Second render - creates subTreeCache
   displayList->render(surface.get());
   EXPECT_TRUE(root->subTreeCache != nullptr);
 
@@ -3996,11 +3996,11 @@ TGFX_TEST(LayerTest, LayerCacheWithTransform) {
   auto root = displayList->root();
   root->addChild(parent);
 
-  // First render - creates subTreeCache
+  // First render - staticSubTree flag is not set yet
   displayList->render(surface.get());
-  EXPECT_TRUE(root->subTreeCache != nullptr);
+  EXPECT_TRUE(root->subTreeCache == nullptr);
 
-  // Second render - cache should be filled
+  // Second render - creates subTreeCache
   displayList->render(surface.get());
   EXPECT_TRUE(root->subTreeCache != nullptr);
 
@@ -4013,8 +4013,11 @@ TGFX_TEST(LayerTest, LayerCacheWithTransform) {
   parent->setMatrix(Matrix::MakeTrans(10, 10));
   EXPECT_TRUE(root->subTreeCache == nullptr);
 
-  // Render twice to recreate cache
+  // First render after modification - staticSubTree flag is not set yet
   displayList->render(surface.get());
+  EXPECT_TRUE(root->subTreeCache == nullptr);
+
+  // Second render - recreate cache
   displayList->render(surface.get());
   EXPECT_TRUE(root->subTreeCache != nullptr);
 }
@@ -4026,7 +4029,7 @@ TGFX_TEST(LayerTest, LayerCacheContentScale) {
   auto surface = Surface::Make(context, 400, 400);
   auto displayList = std::make_unique<DisplayList>();
   displayList->setRenderMode(RenderMode::Direct);
-  displayList->setSubTreeCacheMaxSize(2048);
+  displayList->setSubTreeCacheMaxSize(400);
 
   auto parent = Layer::Make();
   parent->setMatrix(Matrix::MakeTrans(10, 10));
@@ -4041,33 +4044,53 @@ TGFX_TEST(LayerTest, LayerCacheContentScale) {
   auto root = displayList->root();
   root->addChild(parent);
 
-  // First render - creates subTreeCache
+  // First render - staticSubTree flag is not set yet
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subTreeCache == nullptr);
+
+  // Second render - creates subTreeCache
   displayList->render(surface.get());
   EXPECT_TRUE(root->subTreeCache != nullptr);
 
-  // Second render - cache should be filled
-  displayList->render(surface.get());
-  EXPECT_TRUE(root->subTreeCache != nullptr);
+  // At zoom 1.0, longEdge should be 100
+  int expectedLongEdge1_0 = 100;
+  EXPECT_TRUE(root->subTreeCache->valid(context, expectedLongEdge1_0));
 
   // Render at zoom 0.5 - cache should still exist
   displayList->setZoomScale(0.5f);
   displayList->render(surface.get());
   EXPECT_TRUE(root->subTreeCache != nullptr);
 
+  // At zoom 0.5, longEdge should be 50
+  int expectedLongEdge0_5 = 50;
+  EXPECT_TRUE(root->subTreeCache->valid(context, expectedLongEdge0_5));
+
   // Render at zoom 2.0
   displayList->setZoomScale(2.0f);
   displayList->render(surface.get());
   EXPECT_TRUE(root->subTreeCache != nullptr);
+
+  // At zoom 2.0, longEdge should be 200
+  int expectedLongEdge2_0 = 200;
+  EXPECT_TRUE(root->subTreeCache->valid(context, expectedLongEdge2_0));
 
   // Render at zoom 1.0 again
   displayList->setZoomScale(1.0f);
   displayList->render(surface.get());
   EXPECT_TRUE(root->subTreeCache != nullptr);
 
+  // At zoom 1.0 again, cache should still be valid for longEdge 100
+  EXPECT_TRUE(root->subTreeCache->valid(context, expectedLongEdge1_0));
+
   // Render at extreme zoom out
   displayList->setZoomScale(0.1f);
   displayList->render(surface.get());
   EXPECT_TRUE(root->subTreeCache != nullptr);
+
+  // At zoom 0.1, longEdge < minLongEdge, cache should be 50
+  int expectedLongEdge0_1 = 50;
+  EXPECT_TRUE(root->subTreeCache->_sizeMatrices.size() == 3);
+  EXPECT_TRUE(root->subTreeCache->valid(context, expectedLongEdge0_1));
 }
 
 TGFX_TEST(LayerTest, StaticSubTree) {
