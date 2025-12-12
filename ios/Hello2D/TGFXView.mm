@@ -83,9 +83,8 @@
   lastSurfaceWidth = static_cast<int>(self.bounds.size.width * self.contentScaleFactor);
   lastSurfaceHeight = static_cast<int>(self.bounds.size.height * self.contentScaleFactor);
   if (contentLayer && lastSurfaceWidth > 0 && lastSurfaceHeight > 0) {
-    hello2d::LayerBuilder::ApplyCenteringTransform(contentLayer,
-                                                   static_cast<float>(lastSurfaceWidth),
-                                                   static_cast<float>(lastSurfaceHeight));
+    hello2d::LayerBuilder::ApplyCenteringTransform(
+        contentLayer, static_cast<float>(lastSurfaceWidth), static_cast<float>(lastSurfaceHeight));
   }
   if (tgfxWindow != nullptr) {
     tgfxWindow->invalidSize();

@@ -97,8 +97,7 @@ void LayerBuilder::ApplyCenteringTransform(std::shared_ptr<tgfx::Layer> layer, f
   auto bounds = layer->getBounds(nullptr, true);
   if (!bounds.isEmpty()) {
     static constexpr float CONTENT_SCALE = 620.0f / 720.0f;
-    auto scale =
-        std::min(viewWidth / bounds.width(), viewHeight / bounds.height()) * CONTENT_SCALE;
+    auto scale = std::min(viewWidth / bounds.width(), viewHeight / bounds.height()) * CONTENT_SCALE;
     tgfx::Matrix matrix = tgfx::Matrix::MakeScale(scale);
     matrix.postTranslate((viewWidth - bounds.width() * scale) * 0.5f,
                          (viewHeight - bounds.height() * scale) * 0.5f);

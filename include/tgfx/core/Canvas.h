@@ -461,12 +461,10 @@ class Canvas {
  private:
   DrawContext* drawContext = nullptr;
   Surface* surface = nullptr;
-  bool optimizeMemoryForLayer = false;
   std::unique_ptr<MCState> mcState;
   std::stack<std::unique_ptr<CanvasState>> stateStack;
 
-  explicit Canvas(DrawContext* drawContext, Surface* surface = nullptr,
-                  bool optimizeMemoryForLayer = false);
+  explicit Canvas(DrawContext* drawContext, Surface* surface = nullptr);
   void drawPath(const Path& path, const MCState& state, const Brush& brush,
                 const Stroke* stroke = nullptr) const;
   void drawImage(std::shared_ptr<Image> image, const Brush& brush, const SamplingOptions& sampling,

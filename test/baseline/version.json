@@ -273,11 +273,13 @@
         "rasterize_path_texture": "c475bfb"
     },
     "PDFTest": {
-        "ColorSpace": "8d1c38fc",
+        "AssignColorSpace": "5133a852",
         "Complex": "79ce3a28",
         "DrawColor": "79ce3a28",
         "DrawShape": "79ce3a28",
         "DrawShapeStroke": "79ce3a28",
+        "DstAssignColorSpace": "5133a852",
+        "DstColorSpace": "5133a852",
         "EmojiText": "79ce3a28",
         "Empty": "79ce3a28",
         "EmptyMultiPage": "79ce3a28",

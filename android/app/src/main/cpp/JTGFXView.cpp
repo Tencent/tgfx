@@ -251,8 +251,9 @@ JNIEXPORT jlong JNICALL Java_org_tgfx_hello2d_TGFXView_00024Companion_setupFromS
 }
 
 JNIEXPORT jboolean JNICALL Java_org_tgfx_hello2d_TGFXView_nativeDraw(JNIEnv* env, jobject thiz,
-                                                                 jint drawIndex, jfloat zoom,
-                                                                 jfloat offsetX, jfloat offsetY) {
+                                                                     jint drawIndex, jfloat zoom,
+                                                                     jfloat offsetX,
+                                                                     jfloat offsetY) {
   auto view = GetJTGFXView(env, thiz);
   if (view == nullptr) {
     return JNI_FALSE;

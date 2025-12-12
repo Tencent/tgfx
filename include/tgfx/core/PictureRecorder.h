@@ -30,21 +30,6 @@ class PictureContext;
  */
 class PictureRecorder {
  public:
-  /**
-   * Constructs a PictureRecorder object. If optimizeMemory is true, the recorder will optimize the
-   * Picture generated to use minimal memory, which may involve copying and a slight overhead. This
-   * is recommended for long-lived Pictures. If false, memory is transferred directly for better
-   * performance, making it ideal for short-lived Pictures.
-   */
-  explicit PictureRecorder(bool optimizeMemory) : optimizeMemory(optimizeMemory) {
-  }
-
-  /**
-   * Constructs a PictureRecorder object with memory optimization disabled.
-   */
-  PictureRecorder() : PictureRecorder(false) {
-  }
-
   ~PictureRecorder();
 
   /**
@@ -67,7 +52,6 @@ class PictureRecorder {
   std::shared_ptr<Picture> finishRecordingAsPicture();
 
  private:
-  bool optimizeMemory = false;
   bool activelyRecording = false;
   PictureContext* pictureContext = nullptr;
   Canvas* canvas = nullptr;
