@@ -17,5 +17,27 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ContextScope.h"
+#include "core/AtlasManager.h"
 
-namespace tgfx {}  // namespace tgfx
+namespace tgfx {
+
+ContextScope::ContextScope() : device(DevicePool::Make()) {
+  if (device != nullptr) {
+    context = device->lockContext();
+    if (context) {
+      // Clearing the atlas cache to prevent interference between different text test cases.
+      // For glyphs with Linear sampling, when placed at different locations within the atlas,
+      // interpolation errors in texture coordinates can lead to slight variations in
+      // the final pixel color.
+      context->atlasManager()->releaseAll();
+    }
+  }
+}
+
+ContextScope::~ContextScope() {
+  if (context) {
+    device->unlock();
+  }
+}
+
+}  // namespace tgfx

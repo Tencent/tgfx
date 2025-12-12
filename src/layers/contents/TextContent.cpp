@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,35 +16,35 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/layers/ImageLayer.h"
+#include "TextContent.h"
 
 namespace tgfx {
-std::shared_ptr<ImageLayer> ImageLayer::Make() {
-  return std::shared_ptr<ImageLayer>(new ImageLayer());
+
+TextContent::TextContent(std::shared_ptr<TextBlob> textBlob, const LayerPaint& paint)
+    : GeometryContent(paint), textBlob(std::move(textBlob)) {
 }
 
-void ImageLayer::setSampling(const SamplingOptions& value) {
-  if (_sampling == value) {
-    return;
-  }
-  _sampling = value;
-  invalidateContent();
+Rect TextContent::onGetBounds() const {
+  return textBlob->getBounds();
 }
 
-void ImageLayer::setImage(std::shared_ptr<Image> value) {
-  if (_image == value) {
-    return;
-  }
-  _image = std::move(value);
-  invalidateContent();
+Rect TextContent::getTightBounds(const Matrix& matrix) const {
+  return textBlob->getTightBounds(&matrix);
 }
 
-void ImageLayer::onUpdateContent(LayerRecorder* recorder) {
-  if (!_image) {
-    return;
+bool TextContent::hitTestPoint(float localX, float localY) const {
+  if (color.alpha <= 0) {
+    return false;
   }
-  auto rect = Rect::MakeWH(_image->width(), _image->height());
-  auto shader = Shader::MakeImageShader(_image, TileMode::Clamp, TileMode::Clamp, _sampling);
-  recorder->addRect(rect, LayerPaint(std::move(shader)));
+  return textBlob->hitTestPoint(localX, localY, stroke.get());
 }
+
+void TextContent::onDraw(Canvas* canvas, const Paint& paint) const {
+  canvas->drawTextBlob(textBlob, 0, 0, paint);
+}
+
+bool TextContent::onHasSameGeometry(const GeometryContent* other) const {
+  return textBlob == static_cast<const TextContent*>(other)->textBlob;
+}
+
 }  // namespace tgfx

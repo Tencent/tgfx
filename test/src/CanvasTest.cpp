@@ -3085,11 +3085,11 @@ TGFX_TEST(CanvasTest, RRectBlendMode) {
 
 TGFX_TEST(CanvasTest, MatrixShapeStroke) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 200, 200);
   ASSERT_TRUE(surface != nullptr);
-  auto* canvas = surface->getCanvas();
+  auto canvas = surface->getCanvas();
 
   Paint paint;
   paint.setAntiAlias(true);
@@ -3147,11 +3147,11 @@ TGFX_TEST(CanvasTest, ScaleMatrixShader) {
   auto image = MakeImage("resources/apitest/imageReplacement.png");
   ASSERT_TRUE(image != nullptr);
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 100, 100);
   ASSERT_TRUE(surface != nullptr);
-  auto* canvas = surface->getCanvas();
+  auto canvas = surface->getCanvas();
   auto paint = Paint();
   auto shader = Shader::MakeImageShader(image);
   auto rect = Rect::MakeXYWH(25, 25, 50, 50);
@@ -3165,11 +3165,11 @@ TGFX_TEST(CanvasTest, ScaleMatrixShader) {
 
 TGFX_TEST(CanvasTest, Matrix3DShapeStroke) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 300, 300);
   ASSERT_TRUE(surface != nullptr);
-  auto* canvas = surface->getCanvas();
+  auto canvas = surface->getCanvas();
 
   auto origin = Point::Make(100, 100);
   auto originTranslateMatrix = Matrix3D::MakeTranslate(origin.x, origin.y, 0.f);
@@ -3222,11 +3222,11 @@ TGFX_TEST(CanvasTest, Matrix3DShapeStroke) {
 
 TGFX_TEST(CanvasTest, LumaFilter) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 3024, 4032);
   ASSERT_TRUE(surface != nullptr);
-  auto* canvas = surface->getCanvas();
+  auto canvas = surface->getCanvas();
   Paint paint{};
   paint.setColorFilter(ColorFilter::Luma());
   auto shader = Shader::MakeColorShader(Color::FromRGBA(125, 0, 255));

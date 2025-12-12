@@ -1763,6 +1763,43 @@ TGFX_TEST(LayerTest, HitTestPointWithStroke) {
   canvas->drawCircle(p8.x, p8.y, 3.0f, paint);
   EXPECT_FALSE(shapeLayer->hitTestPoint(p8.x, p8.y, true));
 
+  // Test points inside the original shape but not on stroke (stroke only, no fill)
+  // P9: Inside triangle center - should NOT hit (no fill, only stroke)
+  Point p9 = {100.0f, 120.0f};
+  canvas->drawCircle(p9.x, p9.y, 3.0f, paint);
+  EXPECT_FALSE(pathLayer->hitTestPoint(p9.x, p9.y, true));
+
+  // P10: Inside rect center - should NOT hit (no fill, only stroke)
+  Point p10 = {250.0f, 100.0f};
+  canvas->drawCircle(p10.x, p10.y, 3.0f, paint);
+  EXPECT_FALSE(rectLayer->hitTestPoint(p10.x, p10.y, true));
+
+  // P11: Inside rRect center - should NOT hit (no fill, only stroke)
+  Point p11 = {100.0f, 250.0f};
+  canvas->drawCircle(p11.x, p11.y, 3.0f, paint);
+  EXPECT_FALSE(rRectLayer->hitTestPoint(p11.x, p11.y, true));
+
+  // P12: Inside oval center - should NOT hit (no fill, only stroke)
+  Point p12 = {250.0f, 250.0f};
+  canvas->drawCircle(p12.x, p12.y, 3.0f, paint);
+  EXPECT_FALSE(shapeLayer->hitTestPoint(p12.x, p12.y, true));
+
+  // Test invisible (transparent) stroke - should hit in non-precise mode, miss in precise mode
+  auto invisibleStrokeLayer = ShapeLayer::Make();
+  Path invisiblePath = {};
+  invisiblePath.addRect(Rect::MakeXYWH(320, 50, 60, 60));
+  invisibleStrokeLayer->setPath(invisiblePath);
+  invisibleStrokeLayer->setStrokeStyle(SolidColor::Make(Color::Transparent()));
+  invisibleStrokeLayer->setLineWidth(20.0f);
+  displayList->root()->addChild(invisibleStrokeLayer);
+
+  // P13: On invisible stroke area - should hit in non-precise mode (bounding box)
+  Point p13 = {312.0f, 80.0f};
+  canvas->drawCircle(p13.x, p13.y, 3.0f, paint);
+  EXPECT_TRUE(invisibleStrokeLayer->hitTestPoint(p13.x, p13.y, false));
+  // P13: Same point - should NOT hit in precise mode (transparent stroke is invisible)
+  EXPECT_FALSE(invisibleStrokeLayer->hitTestPoint(p13.x, p13.y, true));
+
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/HitTestPointWithStroke"));
 }
 

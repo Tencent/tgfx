@@ -18,43 +18,31 @@
 
 #pragma once
 
-#include "core/utils/Log.h"
-#include "layers/contents/LayerContent.h"
+#include "layers/contents/GeometryContent.h"
+#include "tgfx/core/Path.h"
 
 namespace tgfx {
-class DefaultContent : public LayerContent {
+
+class RectContent : public GeometryContent {
  public:
-  explicit DefaultContent(std::shared_ptr<Picture> content) : content(std::move(content)) {
-  }
+  RectContent(const Rect& rect, const LayerPaint& paint);
 
-  Rect getBounds() const override {
-    return content->getBounds();
-  }
+  Rect getTightBounds(const Matrix& matrix) const override;
+  bool hitTestPoint(float localX, float localY) const override;
 
-  Rect getTightBounds(const Matrix& matrix) const override {
-    return content->getTightBounds(&matrix);
-  }
-
-  bool hitTestPoint(float localX, float localY, bool shapeHitTest) const override {
-    return content->hitTestPoint(localX, localY, shapeHitTest);
-  }
-
-  void drawDefault(Canvas* canvas, const BrushModifier* modifier) const override {
-    content->playback(canvas, modifier);
-  }
-
-  void drawForeground(Canvas*, const BrushModifier*) const override {
-  }
-
-  void drawContour(Canvas* canvas, const BrushModifier* modifier) const override {
-    content->playback(canvas, modifier);
-  }
-
-  std::shared_ptr<Picture> content = nullptr;
+  Rect rect = {};
 
  protected:
   Type type() const override {
-    return Type::Default;
+    return Type::Rect;
   }
+
+  Rect onGetBounds() const override;
+  void onDraw(Canvas* canvas, const Paint& paint) const override;
+  bool onHasSameGeometry(const GeometryContent* other) const override;
+
+ private:
+  Path getFilledPath() const;
 };
+
 }  // namespace tgfx

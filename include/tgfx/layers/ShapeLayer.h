@@ -317,9 +317,6 @@ class ShapeLayer : public Layer {
     uint8_t strokeAlign : 2;
   } shapeBitFields = {};
 
-  std::vector<Paint> createShapePaints(
-      const std::vector<std::shared_ptr<ShapeStyle>>& styles) const;
-
   std::shared_ptr<Shape> createStrokeShape() const;
 };
 }  // namespace tgfx
