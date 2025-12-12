@@ -30,13 +30,14 @@ UniqueKey SubTreeCache::makeSizeKey(int longEdge) const {
   return UniqueKey::Append(newKey, sizeData, 1);
 }
 
-void SubTreeCache::addCache(Context* context, std::shared_ptr<TextureProxy> textureProxy,
+void SubTreeCache::addCache(Context* context, int longEdge,
+                            std::shared_ptr<TextureProxy> textureProxy,
                             const Matrix& imageMatrix,
                             const std::shared_ptr<ColorSpace>& colorSpace) {
   if (context == nullptr || textureProxy == nullptr) {
     return;
   }
-  auto sizeUniqueKey = makeSizeKey(std::max(textureProxy->width(), textureProxy->height()));
+  auto sizeUniqueKey = makeSizeKey(longEdge);
   auto proxyProvider = context->proxyProvider();
   proxyProvider->assignProxyUniqueKey(textureProxy, sizeUniqueKey);
   textureProxy->assignUniqueKey(sizeUniqueKey);

@@ -706,6 +706,10 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   void invalidateCache();
 
+  void invalidateSubTree();
+
+  void updateStaticSubTreeFlags();
+
   struct {
     bool dirtyContent : 1;        // layer's content needs updating
     bool dirtyContentBounds : 1;  // layer's content bounds needs updating
@@ -719,6 +723,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
     bool passThroughBackground : 1;
     bool hasBlendMode : 1;
     bool matrix3DIsAffine : 1;  // Whether the matrix3D is equivalent to a 2D affine matrix
+    bool staticSubTree : 1; // Whether the sub-tree (content, children, filters, styles) is static.
     uint8_t blendMode : 5;
     uint8_t maskType : 2;
   } bitFields = {};

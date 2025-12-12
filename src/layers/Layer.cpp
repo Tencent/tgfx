@@ -91,11 +91,17 @@ std::shared_ptr<Picture> Layer::RecordPicture(DrawMode mode, float contentScale,
 
 static std::shared_ptr<Image> ToImageWithOffset(
     std::shared_ptr<Picture> picture, Point* offset, const Rect* imageBounds = nullptr,
-    std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB()) {
+    std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB(), bool roundOutBounds = true) {
   if (picture == nullptr) {
     return nullptr;
   }
   auto bounds = imageBounds ? *imageBounds : picture->getBounds();
+  if (roundOutBounds) {
+    // In off-screen rendering scenarios, the canvas matrix is applied to the picture, requiring
+    // bounds to be rounded out to keep offsets integral and avoid redundant sampling.
+    // During caching, the canvas matrix is not applied to the picture, so rounding is unnecessary.
+    bounds.roundOut();
+  }
   auto matrix = Matrix::MakeTrans(-bounds.x(), -bounds.y());
   auto image =
       Image::MakeFrom(std::move(picture), static_cast<int>(ceilf(bounds.width())),
@@ -351,8 +357,7 @@ void Layer::setFilters(std::vector<std::shared_ptr<LayerFilter>> value) {
   for (const auto& filter : _filters) {
     filter->attachToLayer(this);
   }
-  invalidateCache();
-  localBounds = nullptr;
+  invalidateSubTree();
   invalidateTransform();
 }
 
@@ -416,8 +421,7 @@ void Layer::setLayerStyles(std::vector<std::shared_ptr<LayerStyle>> value) {
   for (const auto& layerStyle : _layerStyles) {
     layerStyle->attachToLayer(this);
   }
-  invalidateCache();
-  localBounds = nullptr;
+  invalidateSubTree();
   invalidateTransform();
 }
 
@@ -850,8 +854,7 @@ void Layer::invalidateDescendents() {
     return;
   }
   bitFields.dirtyDescendents = true;
-  invalidateCache();
-  localBounds = nullptr;
+  invalidateSubTree();
   invalidate();
 }
 
@@ -1224,10 +1227,13 @@ bool Layer::canUseSubTreeCache(int subTreeCacheMaxSize, BlendMode blendMode,
   if (shouldPassThroughBackground(blendMode, transform3D) || hasBackgroundStyle()) {
     return false;
   }
-  // Skip caching on the first render to avoid caching content that is only displayed once.
-  // The cache is created on the second render when the layer is confirmed to be reused.
+  if (!bitFields.staticSubTree) {
+    // Skip caching on the first render to avoid caching content that is only displayed once.
+    // The cache is created on the second render when the layer is confirmed to be reused.
+    return false;
+  }
   subTreeCache = std::make_unique<SubTreeCache>();
-  return false;
+  return true;
 }
 
 std::shared_ptr<Image> Layer::createSubTreeCacheImage(const DrawArgs& args, float contentScale,
@@ -1243,23 +1249,31 @@ std::shared_ptr<Image> Layer::createSubTreeCacheImage(const DrawArgs& args, floa
   drawArgs.renderRect = nullptr;
   drawArgs.blurBackground = nullptr;
 
+  auto pictureBounds = layerBounds;
+  pictureBounds.scale(contentScale, contentScale);
+  auto filterBounds = pictureBounds;
+  auto filter = getImageFilter(contentScale);
+  if (filter) {
+    auto reverseBounds = filter->filterBounds(pictureBounds, MapDirection::Reverse);
+    pictureBounds.intersect(reverseBounds);
+  }
   auto picture = RecordPicture(drawArgs.drawMode, contentScale,
                                [&](Canvas* canvas) { drawDirectly(drawArgs, canvas, 1.0f); });
   if (!picture) {
     return nullptr;
   }
-  auto scaledBounds = layerBounds;
-  scaledBounds.scale(contentScale, contentScale);
+
   Point offset = {};
-  auto image = ToImageWithOffset(std::move(picture), &offset, &scaledBounds, args.dstColorSpace);
+  auto image =
+      ToImageWithOffset(std::move(picture), &offset, &pictureBounds, args.dstColorSpace, false);
   if (image == nullptr) {
     return nullptr;
   }
 
-  auto filter = getImageFilter(contentScale);
   if (filter) {
+    filterBounds.offset(-offset.x, -offset.y);
     Point filterOffset = {};
-    image = image->makeWithFilter(std::move(filter), &filterOffset);
+    image = image->makeWithFilter(std::move(filter), &filterOffset, &filterBounds);
     offset += filterOffset;
   }
 
@@ -1329,8 +1343,7 @@ SubTreeCache* Layer::getValidSubTreeCache(const DrawArgs& args, int longEdge,
     return nullptr;
   }
   auto textureProxy = std::static_pointer_cast<TextureImage>(image)->getTextureProxy();
-  DEBUG_ASSERT(longEdge == std::max(textureProxy->width(), textureProxy->height()));
-  subTreeCache->addCache(args.context, textureProxy, imageMatrix, args.dstColorSpace);
+  subTreeCache->addCache(args.context, longEdge, textureProxy, imageMatrix, args.dstColorSpace);
   return subTreeCache.get();
 }
 
@@ -2175,6 +2188,22 @@ Matrix3D Layer::anchorAdaptedMatrix(const Matrix3D& matrix, const Point& anchor)
 void Layer::invalidateCache() {
   rasterizedContent = nullptr;
   subTreeCache = nullptr;
+}
+
+void Layer::invalidateSubTree() {
+  bitFields.staticSubTree = false;
+  invalidateCache();
+  localBounds = nullptr;
+}
+
+void Layer::updateStaticSubTreeFlags() {
+  if (bitFields.staticSubTree) {
+    return;
+  }
+  bitFields.staticSubTree = true;
+  for (const auto& child : _children) {
+    child->updateStaticSubTreeFlags();
+  }
 }
 
 }  // namespace tgfx

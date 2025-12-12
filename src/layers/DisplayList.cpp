@@ -325,6 +325,7 @@ void DisplayList::render(Surface* surface, bool autoClear) {
   if (_showDirtyRegions) {
     renderDirtyRegions(surface->getCanvas(), std::move(dirtyRegions));
   }
+  _root->updateStaticSubTreeFlags();
 }
 
 std::vector<Rect> DisplayList::renderDirect(Surface* surface, bool autoClear) const {

@@ -4069,4 +4069,61 @@ TGFX_TEST(LayerTest, LayerCacheContentScale) {
   displayList->render(surface.get());
   EXPECT_TRUE(root->subTreeCache != nullptr);
 }
+
+TGFX_TEST(LayerTest, StaticSubTree) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 350, 350);
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto rootLayer = Layer::Make();
+  auto childLayer = ShapeLayer::Make();
+  Path childPath;
+  childPath.addRect(Rect::MakeWH(100, 100));
+  childLayer->setPath(childPath);
+  childLayer->setFillStyle(SolidColor::Make(Color::Red()));
+  rootLayer->addChild(childLayer);
+
+  displayList->root()->addChild(rootLayer);
+  EXPECT_FALSE(rootLayer->bitFields.staticSubTree);
+  EXPECT_FALSE(childLayer->bitFields.staticSubTree);
+
+  // After first render, staticSubTree should be true
+  displayList->render(surface.get());
+  EXPECT_TRUE(rootLayer->bitFields.staticSubTree);
+  EXPECT_TRUE(childLayer->bitFields.staticSubTree);
+
+  // After adding filter, both should be false
+  auto filter = BlurFilter::Make(10.f, 10.f);
+  childLayer->setFilters({filter});
+  EXPECT_FALSE(rootLayer->bitFields.staticSubTree);
+  EXPECT_FALSE(childLayer->bitFields.staticSubTree);
+
+  // After render, both should be true again
+  displayList->render(surface.get());
+  EXPECT_TRUE(rootLayer->bitFields.staticSubTree);
+  EXPECT_TRUE(childLayer->bitFields.staticSubTree);
+
+  // After adding layer style, both should be false
+  auto style = DropShadowStyle::Make(5, 5, 0, 0, Color::Black(), false);
+  childLayer->setLayerStyles({style});
+  EXPECT_FALSE(rootLayer->bitFields.staticSubTree);
+  EXPECT_FALSE(childLayer->bitFields.staticSubTree);
+
+  // After render, both should be true again
+  displayList->render(surface.get());
+  EXPECT_TRUE(rootLayer->bitFields.staticSubTree);
+  EXPECT_TRUE(childLayer->bitFields.staticSubTree);
+
+  // After invalidating descendents, both should be false
+  rootLayer->invalidateDescendents();
+  EXPECT_FALSE(rootLayer->bitFields.staticSubTree);
+  EXPECT_TRUE(childLayer->bitFields.staticSubTree);
+
+  // After render, both should be true again
+  displayList->render(surface.get());
+  EXPECT_TRUE(rootLayer->bitFields.staticSubTree);
+  EXPECT_TRUE(childLayer->bitFields.staticSubTree);
+}
 }  // namespace tgfx
