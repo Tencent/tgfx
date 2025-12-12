@@ -1150,7 +1150,8 @@ bool Layer::shouldPassThroughBackground(BlendMode blendMode, const Matrix3D* tra
 
   // 3. No offscreen rendering is required
   // (Offscreen rendering happens when: non-SrcOver blend mode OR has filters OR has 3D transform)
-  bool needsOffscreen = blendMode != BlendMode::SrcOver || !_filters.empty() || transform3D != nullptr;
+  bool needsOffscreen =
+      blendMode != BlendMode::SrcOver || !_filters.empty() || transform3D != nullptr;
   if (needsOffscreen) {
     return false;
   }
