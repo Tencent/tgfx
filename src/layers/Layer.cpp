@@ -28,7 +28,7 @@
 #include "layers/DrawArgs.h"
 #include "layers/RegionTransformer.h"
 #include "layers/RootLayer.h"
-#include "layers/SubtreeCache1.h"
+#include "layers/SubtreeCache.h"
 #include "layers/contents/LayerContent.h"
 #include "layers/contents/RasterizedContent.h"
 #include "layers/filters/Transform3DFilter.h"
