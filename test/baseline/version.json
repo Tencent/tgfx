@@ -401,6 +401,14 @@
         "ExtremelyThinStrokePath": "eefb7a46",
         "HairlineLayer": "eefb7a46",
         "LineRenderAsHairline": "cd6a8dff",
+        "PathStrokerComplexCurves": "9340cbb0",
+        "PathStrokerContourI": "9340cbb0",
+        "PathStrokerContourII": "9340cbb0",
+        "PathStrokerDifferentMiterLimits": "9340cbb0",
+        "PathStrokerOpenPath": "9340cbb0",
+        "PathStrokerSingleLine": "9340cbb0",
+        "PathStrokerSingleParam": "9340cbb0",
+        "PathStrokerWithMultiParams": "9340cbb0",
         "ZoomUpTinyStrokeShape": "cd6a8dff"
     },
     "SurfaceTest": {
