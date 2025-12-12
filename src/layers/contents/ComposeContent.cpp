@@ -29,7 +29,7 @@ ComposeContent::ComposeContent(std::vector<std::unique_ptr<GeometryContent>> con
 Rect ComposeContent::getBounds() const {
   auto result = Rect::MakeEmpty();
   if (!contours.empty()) {
-    for (const auto* content : contours) {
+    for (const auto& content : contours) {
       result.join(content->getBounds());
     }
   } else {
@@ -43,7 +43,7 @@ Rect ComposeContent::getBounds() const {
 Rect ComposeContent::getTightBounds(const Matrix& matrix) const {
   auto result = Rect::MakeEmpty();
   if (!contours.empty()) {
-    for (const auto* content : contours) {
+    for (const auto& content : contours) {
       result.join(content->getTightBounds(matrix));
     }
   } else {
@@ -65,7 +65,7 @@ bool ComposeContent::hitTestPoint(float localX, float localY) const {
 
 void ComposeContent::drawContour(Canvas* canvas, bool antiAlias) const {
   if (!contours.empty()) {
-    for (const auto* geometry : contours) {
+    for (const auto geometry : contours) {
       geometry->drawContour(canvas, antiAlias);
     }
   } else {
