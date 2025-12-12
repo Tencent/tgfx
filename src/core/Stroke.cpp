@@ -20,6 +20,8 @@
 #include "core/PathRef.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/StrokeUtils.h"
+#include "include/core/SkStrokeParams.h"
+#include "tgfx/core/PathStroker.h"
 
 namespace tgfx {
 using namespace pk;
@@ -61,5 +63,27 @@ bool Stroke::applyToPath(Path* path, float resolutionScale) const {
   paint.setStrokeMiter(miterLimit);
   auto& skPath = PathRef::WriteAccess(*path);
   return paint.getFillPath(skPath, &skPath, nullptr, resolutionScale);
+}
+
+bool PathStroker::StrokePathWithMultiParams(Path* path, float width,
+                                            const std::vector<PointParam>& params,
+                                            float resolutionScale) {
+  if (path == nullptr || params.empty()) {
+    return false;
+  }
+
+  std::vector<SkStrokeParams> skParams = {};
+  skParams.reserve(params.size());
+  for (const auto& param : params) {
+    skParams.emplace_back(param.miterLimit, ToSkLineCap(param.cap), ToSkLineJoin(param.join));
+  }
+
+  auto& skPath = PathRef::WriteAccess(*path);
+  SkPath result = {};
+  if (!pk::StrokePathWithMultiParams(skPath, &result, width, skParams, resolutionScale)) {
+    return false;
+  }
+  skPath = result;
+  return true;
 }
 }  // namespace tgfx
