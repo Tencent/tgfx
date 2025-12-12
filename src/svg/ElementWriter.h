@@ -44,18 +44,18 @@ class ElementWriter {
  public:
   ElementWriter(const std::string& name, XMLWriter* writer,
                 std::shared_ptr<ColorSpace> targetColorSpace = nullptr,
-                std::shared_ptr<ColorSpace> writeColorSpace = nullptr);
+                std::shared_ptr<ColorSpace> assignColorSpace = nullptr);
   ElementWriter(const std::string& name, const std::unique_ptr<XMLWriter>& writer,
                 std::shared_ptr<ColorSpace> targetColorSpace = nullptr,
-                std::shared_ptr<ColorSpace> writeColorSpace = nullptr);
+                std::shared_ptr<ColorSpace> assignColorSpace = nullptr);
   ElementWriter(const std::string& name, const std::unique_ptr<XMLWriter>& writer,
                 ResourceStore* bucket, std::shared_ptr<ColorSpace> targetColorSpace = nullptr,
-                std::shared_ptr<ColorSpace> writeColorSpace = nullptr);
+                std::shared_ptr<ColorSpace> assignColorSpace = nullptr);
   ElementWriter(const std::string& name, Context* context, SVGExportContext* svgContext,
                 XMLWriter* writer, ResourceStore* bucket, bool disableWarning, const MCState& state,
                 const Brush& brush, const Stroke* stroke = nullptr,
                 std::shared_ptr<ColorSpace> targetColorSpace = nullptr,
-                std::shared_ptr<ColorSpace> writeColorSpace = nullptr);
+                std::shared_ptr<ColorSpace> assignColorSpace = nullptr);
   ~ElementWriter();
 
   void addAttribute(const std::string& name, const std::string& val);
@@ -137,7 +137,7 @@ class ElementWriter {
   ResourceStore* resourceStore = nullptr;
   bool disableWarning = false;
   std::shared_ptr<ColorSpace> _targetColorSpace = nullptr;
-  std::shared_ptr<ColorSpace> _writeColorSpace = nullptr;
+  std::shared_ptr<ColorSpace> _assignColorSpace = nullptr;
   std::string _writeColorSpaceString;
 };
 

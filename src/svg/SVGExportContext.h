@@ -126,6 +126,6 @@ class SVGExportContext : public DrawContext {
   std::unique_ptr<ElementWriter> clipGroupElement = nullptr;
   std::shared_ptr<SVGCustomWriter> customWriter = {};
   std::shared_ptr<ColorSpace> _targetColorSpace = nullptr;
-  std::shared_ptr<ColorSpace> _writeColorSpace = nullptr;
+  std::shared_ptr<ColorSpace> _assignColorSpace = nullptr;
 };
 }  // namespace tgfx

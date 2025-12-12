@@ -49,23 +49,23 @@ Resources::Resources(const Color& color) {
 
 ElementWriter::ElementWriter(const std::string& name, XMLWriter* writer,
                              std::shared_ptr<ColorSpace> targetColorSpace,
-                             std::shared_ptr<ColorSpace> writeColorSpace)
+                             std::shared_ptr<ColorSpace> assignColorSpace)
     : writer(writer), _targetColorSpace(std::move(targetColorSpace)),
-      _writeColorSpace(std::move(writeColorSpace)) {
+      _assignColorSpace(std::move(assignColorSpace)) {
   writer->startElement(name);
 }
 
 ElementWriter::ElementWriter(const std::string& name, const std::unique_ptr<XMLWriter>& writer,
                              std::shared_ptr<ColorSpace> targetColorSpace,
-                             std::shared_ptr<ColorSpace> writeColorSpace)
-    : ElementWriter(name, writer.get(), std::move(targetColorSpace), std::move(writeColorSpace)) {
+                             std::shared_ptr<ColorSpace> assignColorSpace)
+    : ElementWriter(name, writer.get(), std::move(targetColorSpace), std::move(assignColorSpace)) {
 }
 
 ElementWriter::ElementWriter(const std::string& name, const std::unique_ptr<XMLWriter>& writer,
                              ResourceStore* bucket, std::shared_ptr<ColorSpace> targetColorSpace,
-                             std::shared_ptr<ColorSpace> writeColorSpace)
+                             std::shared_ptr<ColorSpace> assignColorSpace)
     : writer(writer.get()), resourceStore(bucket), _targetColorSpace(std::move(targetColorSpace)),
-      _writeColorSpace(std::move(writeColorSpace)) {
+      _assignColorSpace(std::move(assignColorSpace)) {
   writer->startElement(name);
 }
 
@@ -73,9 +73,10 @@ ElementWriter::ElementWriter(const std::string& name, Context* context,
                              SVGExportContext* svgContext, XMLWriter* writer, ResourceStore* bucket,
                              bool disableWarning, const MCState& state, const Brush& brush,
                              const Stroke* stroke, std::shared_ptr<ColorSpace> targetColorSpace,
-                             std::shared_ptr<ColorSpace> writeColorSpace)
+                             std::shared_ptr<ColorSpace> assignColorSpace)
     : writer(writer), resourceStore(bucket), disableWarning(disableWarning),
-      _targetColorSpace(std::move(targetColorSpace)), _writeColorSpace(std::move(writeColorSpace)) {
+      _targetColorSpace(std::move(targetColorSpace)),
+      _assignColorSpace(std::move(assignColorSpace)) {
   generateWriteColorSpaceString();
   Resources resource = addResources(brush, context, svgContext);
 
@@ -121,11 +122,12 @@ void ElementWriter::generateWriteColorSpaceString() {
   NamedPrimaries::ProPhotoRGB.toXYZD50(&matrix);
   static std::shared_ptr<ColorSpace> prophoto =
       ColorSpace::MakeRGB(NamedTransferFunction::ProPhotoRGB, matrix);
-  if (ColorSpace::Equals(_writeColorSpace.get(), displayP3.get())) {
+  auto tempColorSpace = _assignColorSpace ? _assignColorSpace : _targetColorSpace;
+  if (ColorSpace::Equals(tempColorSpace.get(), displayP3.get())) {
     _writeColorSpaceString = "display-p3";
-  } else if (ColorSpace::Equals(_writeColorSpace.get(), a98rgb.get())) {
+  } else if (ColorSpace::Equals(tempColorSpace.get(), a98rgb.get())) {
     _writeColorSpaceString = "a98-rgb";
-  } else if (ColorSpace::Equals(_writeColorSpace.get(), rec2020.get())) {
+  } else if (ColorSpace::Equals(tempColorSpace.get(), rec2020.get())) {
     _writeColorSpaceString = "rec2020";
   } else {
     _writeColorSpaceString = std::string{};
@@ -701,8 +703,7 @@ void ElementWriter::addImageShaderResources(const ImageShader* shader, const Mat
                                             Context* context, Resources* resources) {
   auto image = shader->image;
   DEBUG_ASSERT(image);
-
-  image = ConvertImageColorSpace(image, context, _targetColorSpace, _writeColorSpace);
+  image = ConvertImageColorSpace(image, context, _targetColorSpace, _assignColorSpace);
   std::shared_ptr<Data> dataUri = nullptr;
 
   auto data = SVGExportContext::ImageToEncodedData(image);
