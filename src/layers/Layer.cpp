@@ -971,14 +971,24 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
       drawWithSubtreeCache(args, canvas, alpha, blendMode, transform3D)) {
     return;
   }
-  if (blendMode != BlendMode::SrcOver || !bitFields.passThroughBackground ||
-      (alpha < 1.0f && bitFields.allowsGroupOpacity) ||
-      (!_filters.empty() && !args.excludeEffects) || hasValidMask() || transform3D != nullptr) {
-    drawOffscreen(args, canvas, alpha, blendMode, transform3D);
-  } else {
-    // draw directly
-    drawDirectly(args, canvas, alpha);
+
+  // Try to use clip path optimization for simple masks.
+  auto maskClipPath = hasValidMask() ? getMaskClipPath() : std::nullopt;
+  bool needsOffscreen = blendMode != BlendMode::SrcOver || !bitFields.passThroughBackground ||
+                        (alpha < 1.0f && bitFields.allowsGroupOpacity) ||
+                        (!_filters.empty() && !args.excludeEffects) ||
+                        (hasValidMask() && !maskClipPath.has_value()) || transform3D != nullptr;
+  if (needsOffscreen) {
+    drawOffscreen(args, canvas, alpha, blendMode, transform3D, maskClipPath);
+    return;
   }
+  if (maskClipPath.has_value()) {
+    canvas->clipPath(*maskClipPath);
+    if (args.blurBackground) {
+      args.blurBackground->getCanvas()->clipPath(*maskClipPath);
+    }
+  }
+  drawDirectly(args, canvas, alpha);
 }
 
 Matrix3D Layer::getRelativeMatrix(const Layer* targetCoordinateSpace) const {
@@ -1271,7 +1281,9 @@ bool Layer::drawWithSubtreeCache(const DrawArgs& args, Canvas* canvas, float alp
     return false;
   }
   Paint paint = {};
-  if (hasValidMask()) {
+  // Try to use clip path optimization for simple masks
+  auto maskClipPath = hasValidMask() ? getMaskClipPath() : std::nullopt;
+  if (hasValidMask() && !maskClipPath.has_value()) {
     auto clipBounds =
         GetClipBounds(args.blurBackground ? args.blurBackground->getCanvas() : canvas);
     auto maskFilter = getMaskFilter(args, contentScale, clipBounds);
@@ -1283,15 +1295,24 @@ bool Layer::drawWithSubtreeCache(const DrawArgs& args, Canvas* canvas, float alp
   paint.setAntiAlias(bitFields.allowsEdgeAntialiasing);
   paint.setAlpha(alpha);
   paint.setBlendMode(blendMode);
-  cache->draw(args.context, longEdge, canvas, paint, transform3D);
+
+  auto drawToCanvas = [&](Canvas* targetCanvas) {
+    if (maskClipPath.has_value()) {
+      targetCanvas->clipPath(*maskClipPath);
+    }
+    cache->draw(args.context, longEdge, targetCanvas, paint, transform3D);
+  };
+
+  drawToCanvas(canvas);
   if (args.blurBackground) {
-    cache->draw(args.context, longEdge, args.blurBackground->getCanvas(), paint, transform3D);
+    drawToCanvas(args.blurBackground->getCanvas());
   }
   return true;
 }
 
 void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
-                          const Matrix3D* transform3D) {
+                          const Matrix3D* transform3D,
+                          const std::optional<Path>& maskClipPath) {
   if (transform3D != nullptr) {
     drawBackgroundLayerStyles(args, canvas, alpha, *transform3D);
   }
@@ -1341,8 +1362,9 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   paint.setAlpha(alpha);
   paint.setBlendMode(blendMode);
 
+  // Use clip path if available, otherwise fall back to mask filter
   std::shared_ptr<MaskFilter> maskFilter = nullptr;
-  if (hasValidMask()) {
+  if (hasValidMask() && !maskClipPath.has_value()) {
     maskFilter = getMaskFilter(args, contentScale, clipBounds);
     // if mask filter is nullptr while mask is valid, that means the layer is not visible.
     if (!maskFilter) {
@@ -1351,20 +1373,27 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     paint.setMaskFilter(maskFilter->makeWithMatrix(invertImageMatrix));
   }
 
-  AutoCanvasRestore autoRestore(canvas);
-  canvas->concat(imageMatrix);
-  canvas->drawImage(image, &paint);
+  auto applyClipAndDraw = [&](Canvas* targetCanvas) {
+    AutoCanvasRestore autoRestore(targetCanvas);
+    if (maskClipPath.has_value()) {
+      targetCanvas->clipPath(*maskClipPath);
+    }
+    targetCanvas->concat(imageMatrix);
+    targetCanvas->drawImage(image, &paint);
+  };
+
+  applyClipAndDraw(canvas);
   if (args.blurBackground) {
-    if (contentArgs.blurBackground) {
+    if (!contentArgs.blurBackground) {
+      applyClipAndDraw(args.blurBackground->getCanvas());
+    } else {
+      if (maskClipPath.has_value()) {
+        args.blurBackground->getCanvas()->clipPath(*maskClipPath);
+      }
       auto filter = getImageFilter(contentScale);
       paint.setImageFilter(filter);
       paint.setMaskFilter(maskFilter);
       contentArgs.blurBackground->drawToParent(paint);
-    } else {
-      auto backgroundCanvas = args.blurBackground->getCanvas();
-      AutoCanvasRestore autoRestoreBg(backgroundCanvas);
-      backgroundCanvas->concat(imageMatrix);
-      backgroundCanvas->drawImage(image, &paint);
     }
   }
 
@@ -1867,6 +1896,63 @@ bool Layer::getLayersUnderPointInternal(float x, float y,
 
 bool Layer::hasValidMask() const {
   return _mask && _mask->root() == root() && _mask->bitFields.visible;
+}
+
+std::optional<Path> Layer::getClipPath(bool) const {
+  return std::nullopt;
+}
+
+std::optional<Path> Layer::getMaskClipPath() const {
+  if (!hasValidMask()) {
+    return std::nullopt;
+  }
+  // Luminance mask type requires the mask's luminance values, which needs the actual rendered
+  // mask content. Clip path optimization cannot be used for Luminance masks.
+  if (maskType() == LayerMaskType::Luminance) {
+    return std::nullopt;
+  }
+  // Check if the mask layer is a "simple" layer that can be used as a clip path.
+  // Conditions for a simple mask:
+  // 1. No children
+  // 2. No filters
+  // 3. No layer styles
+  // 4. No 3D transform
+  // 5. The mask layer itself has no mask
+  // 6. For Alpha mask type, alpha must be 1.0 (Contour mask type ignores alpha)
+  auto mask = _mask.get();
+  if (!mask->_children.empty() || !mask->_filters.empty() || !mask->_layerStyles.empty()) {
+    return std::nullopt;
+  }
+  if (!mask->bitFields.matrix3DIsAffine) {
+    return std::nullopt;
+  }
+  if (mask->_mask != nullptr) {
+    return std::nullopt;
+  }
+
+  // Get the clip path from the mask layer.
+  // For Alpha mask type, getClipPath() only returns a valid path if the mask content is fully
+  // opaque (e.g., SolidLayer with alpha=1.0, ShapeLayer with opaque fill).
+  // For Contour mask type, the path shape is used directly regardless of the fill color/alpha.
+  bool contour = maskType() == LayerMaskType::Contour;
+  // For Alpha mask type, layer alpha must be 1.0 for clip path optimization.
+  if (!contour && mask->_alpha < 1.0f) {
+    return std::nullopt;
+  }
+  auto clipPath = mask->getClipPath(contour);
+  if (!clipPath.has_value()) {
+    return std::nullopt;
+  }
+
+  // Transform the path from mask's local coordinates to this layer's coordinates
+  auto relativeMatrix = mask->getRelativeMatrix(this);
+  if (!IsMatrix3DAffine(relativeMatrix)) {
+    return std::nullopt;
+  }
+  auto affineMatrix = GetMayLossyAffineMatrix(relativeMatrix);
+  clipPath->transform(affineMatrix);
+
+  return clipPath;
 }
 
 void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, bool forceDirty) {

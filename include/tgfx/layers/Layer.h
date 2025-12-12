@@ -507,12 +507,21 @@ class Layer : public std::enable_shared_from_this<Layer> {
   void invalidateContent();
 
   /**
-   * Called when the layer’s contents needs to be updated. Subclasses should override this method to
-   * update the layer’s contents, typically by drawing on a canvas obtained from the given
+   * Called when the layer's contents needs to be updated. Subclasses should override this method to
+   * update the layer's contents, typically by drawing on a canvas obtained from the given
    * LayerRecorder.
    * @param recorder The LayerRecorder used to record the layer's contents.
    */
   virtual void onUpdateContent(LayerRecorder* recorder);
+
+  /**
+   * Returns the clip path of this layer if it can be used as a simple clip. The default
+   * implementation returns std::nullopt. Subclasses (SolidLayer, ShapeLayer) can override this
+   * to return their shape path for clip optimization.
+   * @param contour If true, only the path shape matters (for Contour mask type), alpha checks can
+   * be skipped.
+   */
+  virtual std::optional<Path> getClipPath(bool contour) const;
 
   /**
    * Attaches a property to this layer.
@@ -562,7 +571,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
                          const Matrix3D* transform3D = nullptr);
 
   void drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
-                     const Matrix3D* transform3D);
+                     const Matrix3D* transform3D,
+                     const std::optional<Path>& maskClipPath = std::nullopt);
 
   void drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha);
 
@@ -608,6 +618,13 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   std::shared_ptr<MaskFilter> getMaskFilter(const DrawArgs& args, float scale,
                                             const std::optional<Rect>& layerClipBounds);
+
+  /**
+   * Returns the clip path from the mask layer if it can be used as a simple clip instead of
+   * a MaskFilter. Returns an empty path if the mask cannot be optimized as a clip.
+   * The path is transformed to this layer's coordinate space.
+   */
+  std::optional<Path> getMaskClipPath() const;
 
   Matrix3D getRelativeMatrix(const Layer* targetCoordinateSpace) const;
 

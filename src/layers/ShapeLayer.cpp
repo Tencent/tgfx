@@ -21,6 +21,7 @@
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/PathEffect.h"
+#include "tgfx/layers/SolidColor.h"
 
 namespace tgfx {
 std::shared_ptr<ShapeLayer> ShapeLayer::Make() {
@@ -341,5 +342,40 @@ std::shared_ptr<Shape> ShapeLayer::createStrokeShape() const {
     strokeShape = Shape::Merge(std::move(strokeShape), _shape, PathOp::Difference);
   }
   return strokeShape;
+}
+
+std::optional<Path> ShapeLayer::getClipPath(bool contour) const {
+  // Only return the path if there's no stroke (we only use fill shape for clipping)
+  // and the shape is a simple path (otherwise getPath() is expensive).
+  if (_shape == nullptr || !_shape->isSimplePath() || !_strokeStyles.empty()) {
+    return std::nullopt;
+  }
+  // For Contour mask type, skip alpha checks but still reject ImagePattern
+  // (ImagePattern may have transparent regions that affect the contour).
+  if (contour) {
+    for (const auto& style : _fillStyles) {
+      if (style->getType() == ShapeStyle::Type::ImagePattern) {
+        return std::nullopt;
+      }
+    }
+    return _shape->getPath();
+  }
+  // For Alpha mask type, we need fully opaque fill content to use clip path optimization.
+  // Check if all fill styles are fully opaque SolidColors.
+  for (const auto& style : _fillStyles) {
+    if (style->alpha() < 1.0f) {
+      return std::nullopt;
+    }
+    // For Gradient and ImagePattern, we can't guarantee opacity, so don't optimize
+    if (style->getType() != ShapeStyle::Type::SolidColor) {
+      return std::nullopt;
+    }
+    // Check if the style is a SolidColor with opaque color
+    auto solidColor = static_cast<SolidColor*>(style.get());
+    if (solidColor->color().alpha < 1.0f) {
+      return std::nullopt;
+    }
+  }
+  return _shape->getPath();
 }
 }  // namespace tgfx

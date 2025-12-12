@@ -302,6 +302,8 @@ class ShapeLayer : public Layer {
 
   void onUpdateContent(LayerRecorder* recorder) override;
 
+  std::optional<Path> getClipPath(bool contour) const override;
+
  private:
   std::shared_ptr<Shape> _shape = nullptr;
   std::vector<std::shared_ptr<ShapeStyle>> _fillStyles = {};

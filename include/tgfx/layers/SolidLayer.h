@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <optional>
 #include "SolidColor.h"
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/ShapeStyle.h"
@@ -101,6 +102,8 @@ class SolidLayer : public Layer {
   SolidLayer() = default;
 
   void onUpdateContent(LayerRecorder* recorder) override;
+
+  std::optional<Path> getClipPath(bool contour) const override;
 
  private:
   Color _color = {};

@@ -81,4 +81,20 @@ void SolidLayer::onUpdateContent(LayerRecorder* recorder) {
   canvas->drawRRect(rRect, paint);
 }
 
+std::optional<Path> SolidLayer::getClipPath(bool contour) const {
+  if (_width <= 0 || _height <= 0) {
+    return std::nullopt;
+  }
+  // For Alpha mask type, we need fully opaque content to use clip path optimization.
+  // For Contour mask type, only the path shape matters, skip alpha check.
+  if (!contour && _color.alpha < 1.0f) {
+    return std::nullopt;
+  }
+  Path path = {};
+  RRect rRect = {};
+  rRect.setRectXY(Rect::MakeLTRB(0, 0, _width, _height), _radiusX, _radiusY);
+  path.addRRect(rRect);
+  return path;
+}
+
 }  // namespace tgfx
