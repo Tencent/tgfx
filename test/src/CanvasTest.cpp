@@ -1287,7 +1287,6 @@ TGFX_TEST(CanvasTest, Picture) {
 
   int width = 550;
   int height = 352;
-  auto bounds = picture->getBounds();
   auto surface = Surface::Make(context, width, height + 20);
   canvas = surface->getCanvas();
   path.reset();
@@ -1363,7 +1362,7 @@ TGFX_TEST(CanvasTest, Picture) {
   auto textBlob = TextBlob::MakeFrom("Hello TGFX~", font);
   canvas->drawTextBlob(textBlob, 0, 0, paint);
   auto textRecord = recorder.finishRecordingAsPicture();
-  bounds = textBlob->getTightBounds();
+  auto bounds = textBlob->getTightBounds();
   matrix = Matrix::MakeTrans(-bounds.left, -bounds.top);
   auto textImage = Image::MakeFrom(textRecord, static_cast<int>(bounds.width()),
                                    static_cast<int>(bounds.height()), &matrix);
