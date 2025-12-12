@@ -56,8 +56,8 @@ class DrawArgs {
   bool forceDrawBackground = false;
   std::shared_ptr<ColorSpace> dstColorSpace = ColorSpace::SRGB();
 
-  // The maximum cache size (single edge) for sub-tree layer caching. Set to 0 to disable
-  // sub-tree layer cache.
-  int subTreeCacheMaxSize = 0;
+  // The maximum cache size (single edge) for subtree layer caching. Set to 0 to disable
+  // subtree layer cache.
+  int subtreeCacheMaxSize = 0;
 };
 }  // namespace tgfx

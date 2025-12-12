@@ -29,9 +29,9 @@ namespace tgfx {
 class TextureProxy;
 class ColorSpace;
 
-class SubTreeCache {
+class SubtreeCache {
  public:
-  SubTreeCache() = default;
+  SubtreeCache() = default;
 
   const UniqueKey& uniqueKey() const {
     return _uniqueKey;

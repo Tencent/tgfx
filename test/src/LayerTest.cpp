@@ -26,7 +26,7 @@
 #include "layers/ContourContext.h"
 #include "layers/DrawArgs.h"
 #include "layers/RootLayer.h"
-#include "layers/SubTreeCache.h"
+#include "layers/SubtreeCache.h"
 #include "layers/contents/RasterizedContent.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/layers/DisplayList.h"
@@ -3824,18 +3824,18 @@ TGFX_TEST(LayerTest, LayerCache) {
   displayList->setRenderMode(RenderMode::Direct);
 
   // Test default value is 0 (cache disabled)
-  EXPECT_EQ(displayList->subTreeCacheMaxSize(), 0);
+  EXPECT_EQ(displayList->subtreeCacheMaxSize(), 0);
 
   // Test setting subtreeCacheMaxSize
-  displayList->setSubTreeCacheMaxSize(2048);
-  EXPECT_EQ(displayList->subTreeCacheMaxSize(), 2048);
+  displayList->setSubtreeCacheMaxSize(2048);
+  EXPECT_EQ(displayList->subtreeCacheMaxSize(), 2048);
 
   // Test negative value is clamped to 0
-  displayList->setSubTreeCacheMaxSize(-1);
-  EXPECT_EQ(displayList->subTreeCacheMaxSize(), 0);
+  displayList->setSubtreeCacheMaxSize(-1);
+  EXPECT_EQ(displayList->subtreeCacheMaxSize(), 0);
 
   // Enable cache
-  displayList->setSubTreeCacheMaxSize(2048);
+  displayList->setSubtreeCacheMaxSize(2048);
 
   // Create a parent layer with child (cache requires children/styles/filters)
   auto parent = Layer::Make();
@@ -3850,17 +3850,19 @@ TGFX_TEST(LayerTest, LayerCache) {
   parent->addChild(child);
 
   displayList->root()->addChild(parent);
+  // Disable passThroughBackground to allow caching (root layer has passThroughBackground=true by default)
+  displayList->root()->setPassThroughBackground(false);
 
-  // First render - staticSubTree flag is not set yet
+  // First render - staticSubtree flag is not set yet
   displayList->render(surface.get());
   auto root = displayList->root();
-  EXPECT_TRUE(root->subTreeCache == nullptr);
+  EXPECT_TRUE(root->subtreeCache == nullptr);
 
-  // Second render - creates subTreeCache
+  // Second render - creates subtreeCache
   displayList->render(surface.get());
-  EXPECT_TRUE(root->subTreeCache != nullptr);
+  EXPECT_TRUE(root->subtreeCache != nullptr);
   int expectedLongEdge = 64;
-  EXPECT_TRUE(root->subTreeCache->hasCache(context, expectedLongEdge));
+  EXPECT_TRUE(root->subtreeCache->hasCache(context, expectedLongEdge));
 }
 
 TGFX_TEST(LayerTest, LayerCacheInvalidation) {
@@ -3870,7 +3872,7 @@ TGFX_TEST(LayerTest, LayerCacheInvalidation) {
   auto surface = Surface::Make(context, 400, 400);
   auto displayList = std::make_unique<DisplayList>();
   displayList->setRenderMode(RenderMode::Direct);
-  displayList->setSubTreeCacheMaxSize(2048);
+  displayList->setSubtreeCacheMaxSize(2048);
 
   auto parent = Layer::Make();
   parent->setMatrix(Matrix::MakeTrans(20, 20));
@@ -3887,13 +3889,13 @@ TGFX_TEST(LayerTest, LayerCacheInvalidation) {
   // Disable passThroughBackground to allow caching (root layer has passThroughBackground=true by default)
   root->setPassThroughBackground(false);
 
-  // First render - staticSubTree flag is not set yet
+  // First render - staticSubtree flag is not set yet
   displayList->render(surface.get());
-  EXPECT_TRUE(root->subTreeCache == nullptr);
+  EXPECT_TRUE(root->subtreeCache == nullptr);
 
-  // Second render - creates subTreeCache
+  // Second render - creates subtreeCache
   displayList->render(surface.get());
-  EXPECT_TRUE(root->subTreeCache != nullptr);
+  EXPECT_TRUE(root->subtreeCache != nullptr);
 
   // Adding a new child - should invalidate root's cache
   auto newChild = ShapeLayer::Make();
@@ -3905,24 +3907,24 @@ TGFX_TEST(LayerTest, LayerCacheInvalidation) {
   parent->addChild(newChild);
 
   // Cache should be invalidated after adding child
-  EXPECT_TRUE(root->subTreeCache == nullptr);
+  EXPECT_TRUE(root->subtreeCache == nullptr);
 
-  // First render after modification - staticSubTree flag is not set yet
+  // First render after modification - staticSubtree flag is not set yet
   displayList->render(surface.get());
-  EXPECT_TRUE(root->subTreeCache == nullptr);
+  EXPECT_TRUE(root->subtreeCache == nullptr);
 
-  // Second render - creates subTreeCache again
+  // Second render - creates subtreeCache again
   displayList->render(surface.get());
-  EXPECT_TRUE(root->subTreeCache != nullptr);
+  EXPECT_TRUE(root->subtreeCache != nullptr);
 
   // Modifying child transform - should invalidate cache
   child->setMatrix(Matrix::MakeTrans(10, 10));
-  EXPECT_TRUE(root->subTreeCache == nullptr);
+  EXPECT_TRUE(root->subtreeCache == nullptr);
 
   // Render twice to recreate cache
   displayList->render(surface.get());
   displayList->render(surface.get());
-  EXPECT_TRUE(root->subTreeCache != nullptr);
+  EXPECT_TRUE(root->subtreeCache != nullptr);
 }
 
 TGFX_TEST(LayerTest, LayerCacheWithEffects) {
@@ -3932,7 +3934,7 @@ TGFX_TEST(LayerTest, LayerCacheWithEffects) {
   auto surface = Surface::Make(context, 1000, 1000);
   auto displayList = std::make_unique<DisplayList>();
   displayList->setRenderMode(RenderMode::Direct);
-  displayList->setSubTreeCacheMaxSize(2048);
+  displayList->setSubtreeCacheMaxSize(2048);
 
   // Parent with child that has filter
   auto parent1 = Layer::Make();
@@ -3967,13 +3969,13 @@ TGFX_TEST(LayerTest, LayerCacheWithEffects) {
   // Disable passThroughBackground to allow caching (root layer has passThroughBackground=true by default)
   root->setPassThroughBackground(false);
 
-  // First render - staticSubTree flag is not set yet
+  // First render - staticSubtree flag is not set yet
   displayList->render(surface.get());
-  EXPECT_TRUE(root->subTreeCache == nullptr);
+  EXPECT_TRUE(root->subtreeCache == nullptr);
 
-  // Second render - creates subTreeCache
+  // Second render - creates subtreeCache
   displayList->render(surface.get());
-  EXPECT_TRUE(root->subTreeCache != nullptr);
+  EXPECT_TRUE(root->subtreeCache != nullptr);
 
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerCacheWithEffects"));
 }
@@ -3985,7 +3987,7 @@ TGFX_TEST(LayerTest, LayerCacheWithTransform) {
   auto surface = Surface::Make(context, 400, 400);
   auto displayList = std::make_unique<DisplayList>();
   displayList->setRenderMode(RenderMode::Direct);
-  displayList->setSubTreeCacheMaxSize(2048);
+  displayList->setSubtreeCacheMaxSize(2048);
 
   auto parent = Layer::Make();
   parent->setMatrix(Matrix::MakeTrans(5, 5));
@@ -4002,30 +4004,30 @@ TGFX_TEST(LayerTest, LayerCacheWithTransform) {
   // Disable passThroughBackground to allow caching (root layer has passThroughBackground=true by default)
   root->setPassThroughBackground(false);
 
-  // First render - staticSubTree flag is not set yet
+  // First render - staticSubtree flag is not set yet
   displayList->render(surface.get());
-  EXPECT_TRUE(root->subTreeCache == nullptr);
+  EXPECT_TRUE(root->subtreeCache == nullptr);
 
-  // Second render - creates subTreeCache
+  // Second render - creates subtreeCache
   displayList->render(surface.get());
-  EXPECT_TRUE(root->subTreeCache != nullptr);
+  EXPECT_TRUE(root->subtreeCache != nullptr);
 
   // Change zoomScale - cache should still be valid (just uses different mipmap level)
   displayList->setZoomScale(1.5f);
   displayList->render(surface.get());
-  EXPECT_TRUE(root->subTreeCache != nullptr);
+  EXPECT_TRUE(root->subtreeCache != nullptr);
 
   // Change parent's transform - should invalidate root's cache
   parent->setMatrix(Matrix::MakeTrans(10, 10));
-  EXPECT_TRUE(root->subTreeCache == nullptr);
+  EXPECT_TRUE(root->subtreeCache == nullptr);
 
-  // First render after modification - staticSubTree flag is not set yet
+  // First render after modification - staticSubtree flag is not set yet
   displayList->render(surface.get());
-  EXPECT_TRUE(root->subTreeCache == nullptr);
+  EXPECT_TRUE(root->subtreeCache == nullptr);
 
   // Second render - recreate cache
   displayList->render(surface.get());
-  EXPECT_TRUE(root->subTreeCache != nullptr);
+  EXPECT_TRUE(root->subtreeCache != nullptr);
 }
 
 TGFX_TEST(LayerTest, LayerCacheContentScale) {
@@ -4035,7 +4037,7 @@ TGFX_TEST(LayerTest, LayerCacheContentScale) {
   auto surface = Surface::Make(context, 400, 400);
   auto displayList = std::make_unique<DisplayList>();
   displayList->setRenderMode(RenderMode::Direct);
-  displayList->setSubTreeCacheMaxSize(400);
+  displayList->setSubtreeCacheMaxSize(400);
 
   auto parent = Layer::Make();
   parent->setMatrix(Matrix::MakeTrans(10, 10));
@@ -4052,53 +4054,53 @@ TGFX_TEST(LayerTest, LayerCacheContentScale) {
   // Disable passThroughBackground to allow caching (root layer has passThroughBackground=true by default)
   root->setPassThroughBackground(false);
 
-  // First render - staticSubTree flag is not set yet
+  // First render - staticSubtree flag is not set yet
   displayList->render(surface.get());
-  EXPECT_TRUE(root->subTreeCache == nullptr);
+  EXPECT_TRUE(root->subtreeCache == nullptr);
 
-  // Second render - creates subTreeCache
+  // Second render - creates subtreeCache
   displayList->render(surface.get());
-  EXPECT_TRUE(root->subTreeCache != nullptr);
+  EXPECT_TRUE(root->subtreeCache != nullptr);
 
   // At zoom 1.0, longEdge should be 100
   int expectedLongEdge1_0 = 100;
-  EXPECT_TRUE(root->subTreeCache->hasCache(context, expectedLongEdge1_0));
+  EXPECT_TRUE(root->subtreeCache->hasCache(context, expectedLongEdge1_0));
 
   // Render at zoom 0.5 - cache should still exist
   displayList->setZoomScale(0.5f);
   displayList->render(surface.get());
-  EXPECT_TRUE(root->subTreeCache != nullptr);
+  EXPECT_TRUE(root->subtreeCache != nullptr);
 
   // At zoom 0.5, longEdge should be 50
   int expectedLongEdge0_5 = 50;
-  EXPECT_TRUE(root->subTreeCache->hasCache(context, expectedLongEdge0_5));
+  EXPECT_TRUE(root->subtreeCache->hasCache(context, expectedLongEdge0_5));
 
   // Render at zoom 2.0
   displayList->setZoomScale(2.0f);
   displayList->render(surface.get());
-  EXPECT_TRUE(root->subTreeCache != nullptr);
+  EXPECT_TRUE(root->subtreeCache != nullptr);
 
   // At zoom 2.0, longEdge should be 200
   int expectedLongEdge2_0 = 200;
-  EXPECT_TRUE(root->subTreeCache->hasCache(context, expectedLongEdge2_0));
+  EXPECT_TRUE(root->subtreeCache->hasCache(context, expectedLongEdge2_0));
 
   // Render at zoom 1.0 again
   displayList->setZoomScale(1.0f);
   displayList->render(surface.get());
-  EXPECT_TRUE(root->subTreeCache != nullptr);
+  EXPECT_TRUE(root->subtreeCache != nullptr);
 
   // At zoom 1.0 again, cache should still be valid for longEdge 100
-  EXPECT_TRUE(root->subTreeCache->hasCache(context, expectedLongEdge1_0));
+  EXPECT_TRUE(root->subtreeCache->hasCache(context, expectedLongEdge1_0));
 
   // Render at extreme zoom out
   displayList->setZoomScale(0.1f);
   displayList->render(surface.get());
-  EXPECT_TRUE(root->subTreeCache != nullptr);
+  EXPECT_TRUE(root->subtreeCache != nullptr);
 
   // At zoom 0.1, longEdge < minLongEdge, cache should be 50
   int expectedLongEdge0_1 = 50;
-  EXPECT_TRUE(root->subTreeCache->cacheEntries.size() == 3);
-  EXPECT_TRUE(root->subTreeCache->hasCache(context, expectedLongEdge0_1));
+  EXPECT_TRUE(root->subtreeCache->cacheEntries.size() == 3);
+  EXPECT_TRUE(root->subtreeCache->hasCache(context, expectedLongEdge0_1));
 }
 
 TGFX_TEST(LayerTest, StaticSubtree) {
@@ -4117,44 +4119,44 @@ TGFX_TEST(LayerTest, StaticSubtree) {
   rootLayer->addChild(childLayer);
 
   displayList->root()->addChild(rootLayer);
-  EXPECT_FALSE(rootLayer->bitFields.staticSubTree);
-  EXPECT_FALSE(childLayer->bitFields.staticSubTree);
+  EXPECT_FALSE(rootLayer->bitFields.staticSubtree);
+  EXPECT_FALSE(childLayer->bitFields.staticSubtree);
 
-  // After first render, staticSubTree should be true
+  // After first render, staticSubtree should be true
   displayList->render(surface.get());
-  EXPECT_TRUE(rootLayer->bitFields.staticSubTree);
-  EXPECT_TRUE(childLayer->bitFields.staticSubTree);
+  EXPECT_TRUE(rootLayer->bitFields.staticSubtree);
+  EXPECT_TRUE(childLayer->bitFields.staticSubtree);
 
   // After adding filter, both should be false
   auto filter = BlurFilter::Make(10.f, 10.f);
   childLayer->setFilters({filter});
-  EXPECT_FALSE(rootLayer->bitFields.staticSubTree);
-  EXPECT_FALSE(childLayer->bitFields.staticSubTree);
+  EXPECT_FALSE(rootLayer->bitFields.staticSubtree);
+  EXPECT_FALSE(childLayer->bitFields.staticSubtree);
 
   // After render, both should be true again
   displayList->render(surface.get());
-  EXPECT_TRUE(rootLayer->bitFields.staticSubTree);
-  EXPECT_TRUE(childLayer->bitFields.staticSubTree);
+  EXPECT_TRUE(rootLayer->bitFields.staticSubtree);
+  EXPECT_TRUE(childLayer->bitFields.staticSubtree);
 
   // After adding layer style, both should be false
   auto style = DropShadowStyle::Make(5, 5, 0, 0, Color::Black(), false);
   childLayer->setLayerStyles({style});
-  EXPECT_FALSE(rootLayer->bitFields.staticSubTree);
-  EXPECT_FALSE(childLayer->bitFields.staticSubTree);
+  EXPECT_FALSE(rootLayer->bitFields.staticSubtree);
+  EXPECT_FALSE(childLayer->bitFields.staticSubtree);
 
   // After render, both should be true again
   displayList->render(surface.get());
-  EXPECT_TRUE(rootLayer->bitFields.staticSubTree);
-  EXPECT_TRUE(childLayer->bitFields.staticSubTree);
+  EXPECT_TRUE(rootLayer->bitFields.staticSubtree);
+  EXPECT_TRUE(childLayer->bitFields.staticSubtree);
 
   // After invalidating descendents, both should be false
   rootLayer->invalidateDescendents();
-  EXPECT_FALSE(rootLayer->bitFields.staticSubTree);
-  EXPECT_TRUE(childLayer->bitFields.staticSubTree);
+  EXPECT_FALSE(rootLayer->bitFields.staticSubtree);
+  EXPECT_TRUE(childLayer->bitFields.staticSubtree);
 
   // After render, both should be true again
   displayList->render(surface.get());
-  EXPECT_TRUE(rootLayer->bitFields.staticSubTree);
-  EXPECT_TRUE(childLayer->bitFields.staticSubTree);
+  EXPECT_TRUE(rootLayer->bitFields.staticSubtree);
+  EXPECT_TRUE(childLayer->bitFields.staticSubtree);
 }
 }  // namespace tgfx

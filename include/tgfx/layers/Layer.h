@@ -33,7 +33,7 @@
 namespace tgfx {
 class LayerContent;
 class RasterizedContent;
-class SubTreeCache;
+class SubtreeCache;
 class DisplayList;
 class DrawArgs;
 class RegionTransformer;
@@ -674,18 +674,18 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   bool shouldPassThroughBackground(BlendMode blendMode, const Matrix3D* transform3D) const;
 
-  bool canUseSubTreeCache(int subTreeCacheMaxSize, BlendMode blendMode,
+  bool canUseSubtreeCache(int subtreeCacheMaxSize, BlendMode blendMode,
                           const Matrix3D* transform3D);
 
-  SubTreeCache* getValidSubTreeCache(const DrawArgs& args, int longEdge, const Rect& layerBounds);
+  SubtreeCache* getValidSubtreeCache(const DrawArgs& args, int longEdge, const Rect& layerBounds);
 
-  std::shared_ptr<Image> createSubTreeCacheImage(const DrawArgs& args, float contentScale,
+  std::shared_ptr<Image> createSubtreeCacheImage(const DrawArgs& args, float contentScale,
                                                  const Rect& scaledBounds, Matrix* drawingMatrix);
 
   bool drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                      const Matrix3D* transform3D);
 
-  bool drawWithSubTreeCache(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
+  bool drawWithSubtreeCache(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                             const Matrix3D* transform3D);
 
   std::shared_ptr<Image> getContentImage(const DrawArgs& args, float contentScale,
@@ -706,9 +706,9 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   void invalidateCache();
 
-  void invalidateSubTree();
+  void invalidateSubtree();
 
-  void updateStaticSubTreeFlags();
+  void updateStaticSubtreeFlags();
 
   struct {
     bool dirtyContent : 1;        // layer's content needs updating
@@ -723,7 +723,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
     bool passThroughBackground : 1;
     bool hasBlendMode : 1;
     bool matrix3DIsAffine : 1;  // Whether the matrix3D is equivalent to a 2D affine matrix
-    bool staticSubTree : 1; // Whether the sub-tree (content, children, filters, styles) is static.
+    bool staticSubtree : 1;  // Whether the subtree (content, children, filters, styles) is static.
     uint8_t blendMode : 5;
     uint8_t maskType : 2;
   } bitFields = {};
@@ -741,7 +741,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::vector<std::shared_ptr<LayerStyle>> _layerStyles = {};
   float _rasterizationScale = 0.0f;
   std::unique_ptr<RasterizedContent> rasterizedContent;
-  std::unique_ptr<SubTreeCache> subTreeCache;
+  std::unique_ptr<SubtreeCache> subtreeCache;
   std::shared_ptr<LayerContent> layerContent = nullptr;
   Rect renderBounds = {};                       // in global coordinates
   Rect* contentBounds = nullptr;                //  in global coordinates

@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "SubTreeCache.h"
+#include "SubtreeCache.h"
 #include "core/images/TextureImage.h"
 #include "gpu/ProxyProvider.h"
 #include "tgfx/core/ColorSpace.h"
@@ -24,13 +24,13 @@
 
 namespace tgfx {
 
-UniqueKey SubTreeCache::makeSizeKey(int longEdge) const {
+UniqueKey SubtreeCache::makeSizeKey(int longEdge) const {
   uint32_t sizeData[1] = {static_cast<uint32_t>(longEdge)};
   UniqueKey newKey = _uniqueKey;
   return UniqueKey::Append(newKey, sizeData, 1);
 }
 
-void SubTreeCache::addCache(Context* context, int longEdge,
+void SubtreeCache::addCache(Context* context, int longEdge,
                             std::shared_ptr<TextureProxy> textureProxy, const Matrix& imageMatrix,
                             const std::shared_ptr<ColorSpace>& colorSpace) {
   if (context == nullptr || textureProxy == nullptr) {
@@ -43,7 +43,7 @@ void SubTreeCache::addCache(Context* context, int longEdge,
   cacheEntries[sizeUniqueKey] = CacheEntry{imageMatrix, colorSpace};
 }
 
-bool SubTreeCache::hasCache(Context* context, int longEdge) const {
+bool SubtreeCache::hasCache(Context* context, int longEdge) const {
   if (context == nullptr) {
     return false;
   }
@@ -56,7 +56,7 @@ bool SubTreeCache::hasCache(Context* context, int longEdge) const {
   return proxyProvider->findOrWrapTextureProxy(sizeUniqueKey) != nullptr;
 }
 
-void SubTreeCache::draw(Context* context, int longEdge, Canvas* canvas, const Paint& paint,
+void SubtreeCache::draw(Context* context, int longEdge, Canvas* canvas, const Paint& paint,
                         const Matrix3D* transform3D) const {
   if (context == nullptr) {
     return;
