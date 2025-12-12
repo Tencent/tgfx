@@ -577,7 +577,8 @@ Rect Layer::getBoundsInternal(const Matrix3D& coordinateMatrix, bool computeTigh
   return result;
 }
 
-Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBounds) {
+Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBounds,
+                          bool excludeFilters) {
   // If the matrix only contains 2D affine transformations, directly use the equivalent 2D
   // transformation matrix to calculate the final Bounds
   bool isCoordinateMatrixAffine = IsMatrix3DAffine(coordinateMatrix);
@@ -619,7 +620,7 @@ Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBou
     bounds.join(childBounds);
   }
 
-  if (!_layerStyles.empty() || !_filters.empty()) {
+  if (!excludeFilters && (!_layerStyles.empty() || !_filters.empty())) {
     auto contentScale = workAffineMatrix.getMaxScale();
     auto layerBounds = bounds;
     for (auto& layerStyle : _layerStyles) {
@@ -1053,15 +1054,20 @@ std::shared_ptr<Image> Layer::getContentImage(const DrawArgs& contentArgs, float
                                               const Matrix& passThroughImageMatrix,
                                               std::optional<Rect> clipBounds, Matrix* imageMatrix) {
   DEBUG_ASSERT(imageMatrix);
-  auto inputBounds = getBounds();
+  // Get bounds without filters as the source content bounds
+  auto inputBounds = computeBounds(Matrix3D::I(), false, true);
+
   if (clipBounds.has_value()) {
     if (!contentArgs.excludeEffects) {
       // clipBounds is in local coordinate space,  so we getImageFilter with scale 1.0f.
       auto filter = getImageFilter(1.0f);
       if (filter) {
+        // Reverse map clipBounds without constraint, then intersect with inputBounds
+        // This allows filter to expand as needed, but clips to actual content bounds
         clipBounds = filter->filterBounds(*clipBounds, MapDirection::Reverse);
       }
     }
+    // Intersect with sourceBounds to ensure we only render available content
     if (!inputBounds.intersect(*clipBounds)) {
       return nullptr;
     }
@@ -1203,14 +1209,15 @@ std::shared_ptr<Image> Layer::createSubtreeCacheImage(const DrawArgs& args, floa
   drawArgs.renderRect = nullptr;
   drawArgs.blurBackground = nullptr;
 
-  auto pictureBounds = layerBounds;
-  pictureBounds.scale(contentScale, contentScale);
-  auto filterBounds = pictureBounds;
+  auto filterBounds = layerBounds;
+  filterBounds.scale(contentScale, contentScale);
+  auto pictureBounds = filterBounds;
   auto filter = getImageFilter(contentScale);
   if (filter) {
-    auto reverseBounds = filter->filterBounds(pictureBounds, MapDirection::Reverse);
-    pictureBounds.intersect(reverseBounds);
+    pictureBounds = computeBounds(Matrix3D::I(), false, true);
+    pictureBounds.scale(contentScale, contentScale);
   }
+
   auto picture = RecordPicture(drawArgs.drawMode, contentScale,
                                [&](Canvas* canvas) { drawDirectly(drawArgs, canvas, 1.0f); });
   if (!picture) {
