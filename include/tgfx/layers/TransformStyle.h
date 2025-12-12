@@ -18,26 +18,23 @@
 
 #pragma once
 
-#include "gpu/processors/QuadPerEdgeAA3DGeometryProcessor.h"
-
 namespace tgfx {
-
 /**
- * The implementation of QuadPerEdgeAA3DGeometryProcessor using GLSL.
+ * Defines the transform style of a layer.
  */
-class GLSLQuadPerEdgeAA3DGeometryProcessor final : public QuadPerEdgeAA3DGeometryProcessor {
- public:
+enum class TransformStyle {
   /**
-   * Creates a GLSLQuadPerEdgeAA3DGeometryProcessor instance with the specified parameters.
+   * Does not preserve the 3D state of sublayers. Sublayers with 3D transformations are directly
+   * projected onto the current layer plane. In this mode, later added layers will cover earlier
+   * added layers.
    */
-  explicit GLSLQuadPerEdgeAA3DGeometryProcessor(AAType aa, const Matrix3D& matrix,
-                                                const Vec2& ndcScale, const Vec2& ndcOffset,
-                                                std::optional<PMColor> commonColor);
+  Flat,
 
-  void emitCode(EmitArgs& args) const override;
-
-  void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData,
-               FPCoordTransformIter* transformIter) const override;
+  /**
+   * Preserves the 3D state of sublayers. In this mode, interacting sublayers will be occluded based
+   * on the actual depth of pixels, meaning opaque pixels closer to the observer will cover those
+   * farther away.
+   */
+  Preserve3D
 };
-
 }  // namespace tgfx

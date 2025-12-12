@@ -18,26 +18,29 @@
 
 #pragma once
 
-#include "gpu/processors/QuadPerEdgeAA3DGeometryProcessor.h"
+#include "core/utils/PlacementPtr.h"
+#include "gpu/ops/DrawOp.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
 
-/**
- * The implementation of QuadPerEdgeAA3DGeometryProcessor using GLSL.
- */
-class GLSLQuadPerEdgeAA3DGeometryProcessor final : public QuadPerEdgeAA3DGeometryProcessor {
+class Context3DCompositor {
  public:
-  /**
-   * Creates a GLSLQuadPerEdgeAA3DGeometryProcessor instance with the specified parameters.
-   */
-  explicit GLSLQuadPerEdgeAA3DGeometryProcessor(AAType aa, const Matrix3D& matrix,
-                                                const Vec2& ndcScale, const Vec2& ndcOffset,
-                                                std::optional<PMColor> commonColor);
+  Context3DCompositor(const Context& context, int width, int height);
 
-  void emitCode(EmitArgs& args) const override;
+  ~Context3DCompositor();
 
-  void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData,
-               FPCoordTransformIter* transformIter) const override;
+  void drawImage(std::shared_ptr<Image> image, const Matrix3D& matrix, float x, float y,
+                 float alpha);
+
+  std::shared_ptr<Image> finish();
+
+ private:
+  int width;
+  int height;
+  std::shared_ptr<RenderTargetProxy> targetColorProxy = nullptr;
+  std::shared_ptr<RenderTargetProxy> targetDepthStencilProxy = nullptr;
+  std::vector<PlacementPtr<DrawOp>> drawOps = {};
 };
 
 }  // namespace tgfx

@@ -106,6 +106,22 @@ class ProgramInfo {
     cullMode = mode;
   }
 
+  CompareFunction getDepthCompare() const {
+    return depthCompare;
+  }
+
+  void setDepthCompare(CompareFunction compare) {
+    depthCompare = compare;
+  }
+
+  bool getDepthWriteEnabled() const {
+    return depthWriteEnabled;
+  }
+
+  void setDepthWriteEnabled(bool enabled) {
+    depthWriteEnabled = enabled;
+  }
+
  private:
   RenderTarget* renderTarget = nullptr;
   GeometryProcessor* geometryProcessor = nullptr;
@@ -116,6 +132,8 @@ class ProgramInfo {
   XferProcessor* xferProcessor = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
   CullMode cullMode = CullMode::None;
+  CompareFunction depthCompare = CompareFunction::Always;
+  bool depthWriteEnabled = false;
 
   void updateProcessorIndices();
 

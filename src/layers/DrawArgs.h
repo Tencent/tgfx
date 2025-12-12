@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "Render3DContext.h"
 #include "layers/BackgroundContext.h"
 #include "tgfx/gpu/Context.h"
 
@@ -42,6 +43,8 @@ class DrawArgs {
   Context* context = nullptr;
   // Whether to exclude effects during the drawing process.
   bool excludeEffects = false;
+  // Whether to exclude background styles during the drawing process.
+  bool excludeBackgroundStyle = false;
   // Determines the draw mode of the Layer.
   DrawMode drawMode = DrawMode::Normal;
   // The rectangle area to be drawn. This is used for clipping the drawing area.
@@ -52,5 +55,14 @@ class DrawArgs {
   // Indicates whether to force drawing the background, even if there are no background styles.
   bool forceDrawBackground = false;
   std::shared_ptr<ColorSpace> dstColorSpace = ColorSpace::SRGB();
+
+  // The 3D render context to be used during the drawing process. Note: this could be nullptr. All
+  // layers within the 3D rendering context need to maintain their respective 3D states to achieve
+  // per-pixel depth occlusion effects. These layers are composited through the Compositor and do
+  // not need to be drawn to the Canvas.
+  std::shared_ptr<Render3DContext> render3DContext = nullptr;
+
+  // Indicates whether to clip the content by the canvas.
+  bool clipContentByCanvas = false;
 };
 }  // namespace tgfx

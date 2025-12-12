@@ -18,26 +18,38 @@
 
 #pragma once
 
-#include "gpu/processors/QuadPerEdgeAA3DGeometryProcessor.h"
+#include "Context3DCompositor.h"
+#include "tgfx/core/Matrix3D.h"
 
 namespace tgfx {
 
-/**
- * The implementation of QuadPerEdgeAA3DGeometryProcessor using GLSL.
- */
-class GLSLQuadPerEdgeAA3DGeometryProcessor final : public QuadPerEdgeAA3DGeometryProcessor {
+class Render3DContext {
  public:
-  /**
-   * Creates a GLSLQuadPerEdgeAA3DGeometryProcessor instance with the specified parameters.
-   */
-  explicit GLSLQuadPerEdgeAA3DGeometryProcessor(AAType aa, const Matrix3D& matrix,
-                                                const Vec2& ndcScale, const Vec2& ndcOffset,
-                                                std::optional<PMColor> commonColor);
+  explicit Render3DContext(std::shared_ptr<Context3DCompositor> compositor, const Rect& renderRect,
+                           const Matrix3D& depthMatrix)
+      : _compositor(std::move(compositor)), _renderRect(renderRect), _depthMatrix(depthMatrix) {
+  }
 
-  void emitCode(EmitArgs& args) const override;
+  std::shared_ptr<Context3DCompositor> compositor() {
+    return _compositor;
+  }
 
-  void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData,
-               FPCoordTransformIter* transformIter) const override;
+  const Rect& renderRect() const {
+    return _renderRect;
+  }
+
+  const Matrix3D& depthMatrix() const {
+    return _depthMatrix;
+  }
+
+ private:
+  std::shared_ptr<Context3DCompositor> _compositor;
+
+  Rect _renderRect;
+
+  // The depth mapping matrix applied to all layers within the 3D render context, which maps the
+  // depth of all layers to the range [-1, 1].
+  Matrix3D _depthMatrix;
 };
 
 }  // namespace tgfx

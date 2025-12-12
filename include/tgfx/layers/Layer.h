@@ -21,6 +21,7 @@
 #include <memory>
 #include <optional>
 #include <unordered_set>
+#include "TransformStyle.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Matrix.h"
@@ -176,6 +177,44 @@ class Layer : public std::enable_shared_from_this<Layer> {
    * Sets the 3D transformation matrix applied to the layer.
    */
   void setMatrix3D(const Matrix3D& value);
+
+  /**
+   * Returns the transform style of the layer. The default value is TransformStyle::Flat.
+   * TransformStyle defines the drawing behavior of child layers containing 3D transformations.
+   * The Flat type projects 3D child layers directly onto their parent layer, and all child layers
+   * are drawn in the order they were added. This means that later-added opaque child layers will
+   * completely cover earlier-added child layers. The Preserve3D type preserves the 3D state of child
+   * layers.
+   * If a layer's TransformStyle is Preserve3D and its parent layer is Flat, this layer establishes
+   * a 3D Rendering Context. If the parent layer is Preserve3D, this layer inherits the parent's 3D
+   * Rendering Context and passes it to its child layers.
+   * All child layers within a 3D Rendering Context share the coordinate space of the layer that
+   * established the context. Within this context, all layers apply depth occlusion based on their
+   * actual positions: opaque pixels in layers closer to the observer will occlude pixels in layers
+   * farther from the observer at the same position (same xy coordinates).
+   *
+   * Note: TransformStyle::Preserve3D does not support some features. When the following conditions
+   * are met, even if the layer is set to TransformStyle::Preserve3D, its drawing behavior will be
+   * TransformStyle::Flat:
+   * The prerequisite for these features to take effect is that child layers need to be projected
+   * into the local coordinate system of the current layer.
+   * 1. layerstyles is not empty
+   * The following features require the entire layer subtree of the root node to be packaged and
+   * drawn, and then the corresponding effects are applied.
+   * 2. Blend mode is set to any value other than BlendMode::SrcOver
+   * 3. passThroughBackground = false
+   * 4. allowsGroupOpacity = true
+   * 5. shouldRasterize = true
+   * 6. mask is not empty
+   */
+  TransformStyle transformStyle() const {
+    return _transformStyle;
+  }
+
+  /**
+   * Sets the transform style of the layer.
+   */
+  void setTransformStyle(TransformStyle style);
 
   /**
    * Returns whether the layer is visible. The default value is true.
@@ -573,7 +612,10 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   void invalidate();
 
-  Rect getBounds(const Matrix3D& matrix, bool computeTightBounds);
+  /**
+   * Returns the content bounds of the layer, excluding child layers.
+   */
+  Rect getContentBounds();
 
   Rect getBoundsInternal(const Matrix3D& coordinateMatrix, bool computeTightBounds);
 
@@ -604,20 +646,28 @@ class Layer : public std::enable_shared_from_this<Layer> {
                          const Matrix3D* transform = nullptr);
 
   void drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
-                     const Matrix3D* transform);
+                     const Matrix3D* transform, bool excludeChildren = false);
 
   void drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha);
 
   void drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha,
-                    const std::unordered_set<LayerStyleExtraSourceType>& styleExtraSourceTypes);
+                    const std::unordered_set<LayerStyleExtraSourceType>& styleExtraSourceTypes,
+                    bool excludeChildren);
 
-  void drawContents(
-      const DrawArgs& args, Canvas* canvas, float alpha,
-      const LayerStyleSource* layerStyleSource = nullptr, const Layer* stopChild = nullptr,
-      const std::unordered_set<LayerStyleExtraSourceType>& styleExtraSourceTypes = {});
+  void drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, float alpha,
+                               BlendMode blendMode, const Matrix3D* transform);
+
+  void drawIn3DContext(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
+                       const Matrix3D* transform);
+
+  void drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
+                    const LayerStyleSource* layerStyleSource = nullptr,
+                    const Layer* stopChild = nullptr,
+                    const std::unordered_set<LayerStyleExtraSourceType>& styleExtraSourceTypes = {},
+                    bool excludeChildren = false);
 
   bool drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
-                    const Layer* stopChild = nullptr);
+                    const Layer* stopChild = nullptr, const Matrix3D* transform = nullptr);
 
   float drawBackgroundLayers(const DrawArgs& args, Canvas* canvas);
 
@@ -655,8 +705,25 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   bool hasValidMask() const;
 
+  /**
+   * Updates the rendering bounds.
+   * When calculating rendering bounds for layers outside a 3D context, matrix transformations can
+   * be applied progressively from child layers to parent layers. However, layers inside a 3D
+   * context need to preserve their 3D state. This approach would lose depth information for these
+   * layers.
+   * They need to calculate rendering bounds based on the overall matrix state of the 3D context
+   * and the relative matrix of the layer itself to the layer that established the context.
+   * @param transformer The region transformer to be applied to the current layer.
+   * @param context3DTransformer The overall transformer of the 3D context to which the current
+   * layer belongs when it is inside a 3D context. This parameter cannot be null when the layer is
+   * inside a 3D context.
+   * @param context3DTransform The relative matrix of the current layer to the layer that
+   * established the 3D context when the current layer is inside a 3D context. This parameter
+   * cannot be null when the layer is inside a 3D context.
+   */
   void updateRenderBounds(std::shared_ptr<RegionTransformer> transformer = nullptr,
-                          bool forceDirty = false);
+                          std::shared_ptr<RegionTransformer> context3DTransformer = nullptr,
+                          const Matrix3D* context3DTransform = nullptr, bool forceDirty = false);
 
   void checkBackgroundStyles(std::shared_ptr<RegionTransformer> transformer);
 
@@ -679,7 +746,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::shared_ptr<Image> getContentImage(const DrawArgs& args, float contentScale,
                                          const std::shared_ptr<Image>& passThroughImage,
                                          const Matrix& passThroughImageMatrix,
-                                         std::optional<Rect> clipBounds, Matrix* imageMatrix);
+                                         std::optional<Rect> clipBounds, Matrix* imageMatrix,
+                                         bool excludeChildren);
 
   /**
    * Returns the equivalent transformation matrix adapted for a custom anchor point.
@@ -691,6 +759,17 @@ class Layer : public std::enable_shared_from_this<Layer> {
    * @param anchor The specified anchor point.
    */
   Matrix3D anchorAdaptedMatrix(const Matrix3D& matrix, const Point& anchor) const;
+
+  /**
+   * Calculates the 3D context depth matrix for the layer.
+   * This matrix maps the depth of all sublayers within the 3D render context rooted at this layer
+   * from [maxDepth, minDepth] to the [-1, 1] range.
+   */
+  Matrix3D calculate3DContextDepthMatrix();
+
+  bool canExtend3DContext() const;
+
+  bool in3DContext() const;
 
   struct {
     bool dirtyContent : 1;        // layer's content needs updating
@@ -712,6 +791,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
   float _alpha = 1.0f;
   // The actual transformation matrix that determines the geometric position of the layer
   Matrix3D _matrix3D = {};
+  TransformStyle _transformStyle = TransformStyle::Flat;
   std::shared_ptr<Layer> _mask = nullptr;
   Layer* maskOwner = nullptr;
   std::unique_ptr<Rect> _scrollRect = nullptr;
