@@ -31,10 +31,15 @@ class ColorSpace;
 
 class SubtreeCache {
  public:
-  SubtreeCache() = default;
+  explicit SubtreeCache(int maxSize) : _maxSize(maxSize) {
+  }
 
   const UniqueKey& uniqueKey() const {
     return _uniqueKey;
+  }
+
+  int maxSize() const {
+    return _maxSize;
   }
 
   void addCache(Context* context, int longEdge, std::shared_ptr<TextureProxy> textureProxy,
@@ -50,6 +55,7 @@ class SubtreeCache {
     Matrix imageMatrix = {};
     std::shared_ptr<ColorSpace> colorSpace = nullptr;
   };
+  int _maxSize = 0;
   UniqueKey _uniqueKey = UniqueKey::Make();
   ResourceKeyMap<CacheEntry> cacheEntries = {};
 

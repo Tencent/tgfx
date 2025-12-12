@@ -1209,17 +1209,38 @@ std::shared_ptr<Image> Layer::getContentImage(const DrawArgs& contentArgs, float
 }
 
 bool Layer::shouldPassThroughBackground(BlendMode blendMode, const Matrix3D* transform3D) const {
-  return bitFields.passThroughBackground && blendMode == BlendMode::SrcOver && _filters.empty() &&
-         bitFields.hasBlendMode && transform3D == nullptr;
+  // Pass-through background is only possible when:
+  // 1. The feature is enabled
+  if (!bitFields.passThroughBackground) {
+    return false;
+  }
+
+  // 2. Subtree has blend modes that need background information
+  if (!bitFields.hasBlendMode) {
+    return false;
+  }
+
+  // 3. No offscreen rendering is required
+  // (Offscreen rendering happens when: non-SrcOver blend mode OR has filters OR has 3D transform)
+  bool needsOffscreen = blendMode != BlendMode::SrcOver || !_filters.empty() || transform3D != nullptr;
+  if (needsOffscreen) {
+    return false;
+  }
+
+  return true;
 }
 
 bool Layer::canUseSubtreeCache(int subtreeCacheMaxSize, BlendMode blendMode,
                                const Matrix3D* transform3D) {
-  if (subtreeCache) {
-    return true;
-  }
   if (subtreeCacheMaxSize <= 0) {
     return false;
+  }
+  if (subtreeCache) {
+    // Recreate if maxSize has changed
+    if (subtreeCache->maxSize() != subtreeCacheMaxSize) {
+      subtreeCache = std::make_unique<SubtreeCache>(subtreeCacheMaxSize);
+    }
+    return true;
   }
   if (_children.empty() && _layerStyles.empty() && _filters.empty()) {
     return false;
@@ -1232,7 +1253,7 @@ bool Layer::canUseSubtreeCache(int subtreeCacheMaxSize, BlendMode blendMode,
     // The cache is created on the second render when the layer is confirmed to be reused.
     return false;
   }
-  subtreeCache = std::make_unique<SubtreeCache>();
+  subtreeCache = std::make_unique<SubtreeCache>(subtreeCacheMaxSize);
   return true;
 }
 
