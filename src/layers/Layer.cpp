@@ -90,6 +90,7 @@ static std::shared_ptr<Image> ToImageWithOffset(
     return nullptr;
   }
   auto bounds = imageBounds ? *imageBounds : picture->getBounds();
+  bounds.roundOut();
   auto matrix = Matrix::MakeTrans(-bounds.x(), -bounds.y());
   auto image = Image::MakeFrom(std::move(picture), FloatCeilToInt(bounds.width()),
                                FloatCeilToInt(bounds.height()), &matrix, std::move(colorSpace));
@@ -1092,7 +1093,8 @@ std::shared_ptr<MaskFilter> Layer::getMaskFilter(const DrawArgs& args, float sca
   return MaskFilter::MakeShader(shader);
 }
 
-std::shared_ptr<Image> Layer::getContentImage(const DrawArgs& contentArgs, float contentScale,
+std::shared_ptr<Image> Layer::getContentImage(const DrawArgs& contentArgs,
+                                              const Matrix& contentMatrix,
                                               const std::shared_ptr<Image>& passThroughImage,
                                               const Matrix& passThroughImageMatrix,
                                               std::optional<Rect> clipBounds, Matrix* imageMatrix) {
@@ -1141,7 +1143,7 @@ std::shared_ptr<Image> Layer::getContentImage(const DrawArgs& contentArgs, float
   } else {
     PictureRecorder recorder = {};
     auto offscreenCanvas = recorder.beginRecording();
-    offscreenCanvas->scale(contentScale, contentScale);
+    offscreenCanvas->setMatrix(contentMatrix);
     //offscreenCanvas->clipRect(inputBounds);
     if (passThroughImage) {
       AutoCanvasRestore offscreenRestore(offscreenCanvas);
@@ -1152,7 +1154,9 @@ std::shared_ptr<Image> Layer::getContentImage(const DrawArgs& contentArgs, float
     Point offset;
     finalImage = ToImageWithOffset(recorder.finishRecordingAsPicture(), &offset, nullptr,
                                    contentArgs.dstColorSpace);
-    imageMatrix->setScale(1.0f / contentScale, 1.0f / contentScale);
+    Matrix invertContentMatrix = {};
+    contentMatrix.invert(&invertContentMatrix);
+    *imageMatrix = invertContentMatrix;
     imageMatrix->preTranslate(offset.x, offset.y);
   }
 
@@ -1162,7 +1166,7 @@ std::shared_ptr<Image> Layer::getContentImage(const DrawArgs& contentArgs, float
 
   auto filterOffset = Point::Make(0, 0);
   if (!contentArgs.excludeEffects) {
-    auto filter = getImageFilter(contentScale);
+    auto filter = getImageFilter(contentMatrix.getMaxScale());
     if (filter) {
       std::optional<Rect> filterClipBounds = std::nullopt;
       if (clipBounds.has_value()) {
@@ -1252,8 +1256,8 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   }
 
   auto imageMatrix = Matrix::I();
-  auto image = getContentImage(contentArgs, contentScale, passthroughImage, passthroughImageMatrix,
-                               contentClipBounds, &imageMatrix);
+  auto image = getContentImage(contentArgs, canvas->getMatrix(), passthroughImage,
+                               passthroughImageMatrix, contentClipBounds, &imageMatrix);
 
   auto invertImageMatrix = Matrix::I();
   if (image == nullptr || !imageMatrix.invert(&invertImageMatrix)) {
