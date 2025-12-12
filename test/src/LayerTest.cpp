@@ -27,7 +27,6 @@
 #include "layers/DrawArgs.h"
 #include "layers/RootLayer.h"
 #include "layers/SubtreeCache.h"
-#include "layers/contents/RasterizedContent.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Gradient.h"
@@ -847,11 +846,9 @@ TGFX_TEST(LayerTest, PassthroughAndNormal) {
   displayList.root()->addChild(root);
   rect1->setBlendMode(BlendMode::SoftLight);
   rect2->setBlendMode(BlendMode::Screen);
-  root->setShouldRasterize(true);
   displayList.render(surface.get(), false);
 
   root->setMatrix(Matrix::MakeTrans(400, 50));
-  root->setShouldRasterize(false);
   displayList.setRenderMode(RenderMode::Direct);
   displayList.render(surface.get(), false);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PassThoughAndNormal"));
@@ -2467,171 +2464,6 @@ TGFX_TEST(LayerTest, ShapeStyleWithMatrix) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ShapeStyleWithMatrix"));
 }
 
-TGFX_TEST(LayerTest, RasterizedCache) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  EXPECT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 350, 350);
-  auto displayList = std::make_unique<DisplayList>();
-
-  auto rootLayer = Layer::Make();
-  rootLayer->setMatrix(Matrix::MakeTrans(30, 30));
-
-  auto imageLayer = ImageLayer::Make();
-  imageLayer->setImage(MakeImage("resources/apitest/imageReplacement.png"));
-  imageLayer->setShouldRasterize(true);
-  rootLayer->addChild(imageLayer);
-
-  auto rectLayer = ShapeLayer::Make();
-  auto style = DropShadowStyle::Make(10, 10, 0, 0, Color::Black(), false);
-  Path rect;
-  rect.addRect(Rect::MakeWH(50, 50));
-  rectLayer->setPath(rect);
-  rectLayer->setFillStyle(SolidColor::Make(Color::Red()));
-  rectLayer->setShouldRasterize(true);
-  rectLayer->setLayerStyles({style});
-  rectLayer->setMatrix(Matrix::MakeTrans(150, 0));
-  imageLayer->addChild(rectLayer);
-
-  auto blurLayer = ShapeLayer::Make();
-  Path childPath;
-  childPath.addRect(Rect::MakeWH(100, 100));
-  blurLayer->setPath(childPath);
-  auto fillStyle = SolidColor::Make(Color::FromRGBA(100, 0, 0, 128));
-  blurLayer->setFillStyle(fillStyle);
-  blurLayer->setShouldRasterize(true);
-  blurLayer->setMatrix(Matrix::MakeTrans(150, 0));
-  blurLayer->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
-  imageLayer->addChild(blurLayer);
-
-  displayList->root()->addChild(rootLayer);
-  displayList->render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/RasterizedCache"));
-}
-
-TGFX_TEST(LayerTest, RasterizedBackground) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  EXPECT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 150, 150);
-  auto displayList = std::make_unique<DisplayList>();
-  auto solidLayer = SolidLayer::Make();
-  solidLayer->setColor(Color::Blue());
-  solidLayer->setWidth(150);
-  solidLayer->setHeight(150);
-  displayList->root()->addChild(solidLayer);
-
-  auto background = ImageLayer::Make();
-  background->setImage(MakeImage("resources/apitest/imageReplacement.png"));
-  displayList->root()->addChild(background);
-
-  auto parent = Layer::Make();
-  parent->setMatrix(Matrix::MakeTrans(30, 30));
-  parent->addChild(background);
-
-  auto layerBeforeChild = ShapeLayer::Make();
-  auto path = Path();
-  path.addRect(Rect::MakeWH(50, 50));
-  layerBeforeChild->setPath(path);
-  layerBeforeChild->setFillStyle(SolidColor::Make(Color::Red()));
-
-  auto backgroundNephew = ShapeLayer::Make();
-  backgroundNephew->setPath(path);
-  backgroundNephew->setMatrix(Matrix::MakeTrans(10, 10));
-  backgroundNephew->setFillStyle(SolidColor::Make(Color::Green()));
-
-  auto child = ShapeLayer::Make();
-  Path childPath;
-  childPath.addRect(Rect::MakeWH(100, 100));
-  child->setPath(childPath);
-  auto fillStyle = SolidColor::Make(Color::FromRGBA(100, 0, 0, 128));
-  child->setFillStyle(fillStyle);
-  child->setShouldRasterize(true);
-  child->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
-  parent->addChild(child);
-  displayList->root()->addChild(parent);
-
-  displayList->render(surface.get());
-  background->setMatrix(Matrix::MakeTrans(50, 50));
-  auto rasterizedImage = child->rasterizedContent->getImage();
-  displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedImage != child->rasterizedContent->getImage());
-
-  child->setMatrix(Matrix::MakeTrans(20, 20));
-  rasterizedImage = child->rasterizedContent->getImage();
-  displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedImage != child->rasterizedContent->getImage());
-
-  auto layerNextChild = ShapeLayer::Make();
-  layerNextChild->setPath(path);
-  layerNextChild->setMatrix(Matrix::MakeTrans(10, 10));
-  layerNextChild->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 100, 0, 128)));
-  parent->addChild(layerNextChild);
-  rasterizedImage = child->rasterizedContent->getImage();
-  displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedImage == child->rasterizedContent->getImage());
-
-  auto grandChild = ShapeLayer::Make();
-  grandChild->setPath(path);
-  grandChild->setMatrix(Matrix::MakeTrans(10, 10));
-  grandChild->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 0, 100, 128)));
-  child->addChild(grandChild);
-  EXPECT_TRUE(child->rasterizedContent == nullptr);
-  displayList->render(surface.get());
-
-  auto nephew = ShapeLayer::Make();
-  nephew->setPath(path);
-  nephew->setMatrix(Matrix::MakeTrans(10, 10));
-  nephew->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 100, 0, 128)));
-  layerNextChild->addChild(nephew);
-  rasterizedImage = child->rasterizedContent->getImage();
-  displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedImage == child->rasterizedContent->getImage());
-
-  parent->addChildAt(layerBeforeChild, parent->getChildIndex(child));
-  rasterizedImage = child->rasterizedContent->getImage();
-  displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedImage != child->rasterizedContent->getImage());
-
-  layerBeforeChild->addChildAt(backgroundNephew, 0);
-  rasterizedImage = child->rasterizedContent->getImage();
-  displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedImage != child->rasterizedContent->getImage());
-
-  layerBeforeChild->removeChildren();
-  rasterizedImage = child->rasterizedContent->getImage();
-  displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedImage != child->rasterizedContent->getImage());
-
-  layerBeforeChild->removeFromParent();
-  rasterizedImage = child->rasterizedContent->getImage();
-  displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedImage != child->rasterizedContent->getImage());
-
-  parent->setChildIndex(background, static_cast<int>(parent->children().size() - 1u));
-  rasterizedImage = child->rasterizedContent->getImage();
-  displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedImage != child->rasterizedContent->getImage());
-
-  parent->setChildIndex(background, 0);
-  rasterizedImage = child->rasterizedContent->getImage();
-  displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedImage != child->rasterizedContent->getImage());
-
-  parent->replaceChild(background, layerBeforeChild);
-  rasterizedImage = child->rasterizedContent->getImage();
-  displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedImage != child->rasterizedContent->getImage());
-
-  parent->replaceChild(layerNextChild, background);
-  rasterizedImage = child->rasterizedContent->getImage();
-  displayList->render(surface.get());
-  // Ideally, rasterizedImage should remain unchanged here, but we need to call root->invalidateRect()
-  // whenever a layer is removed or its index changes. As a result, dirty rects are always treated
-  // as background changes. This is a trade-off between performance and correctness.
-  EXPECT_TRUE(rasterizedImage != child->rasterizedContent->getImage());
-}
-
 TGFX_TEST(LayerTest, AdaptiveDashEffect) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -2982,7 +2814,6 @@ TGFX_TEST(LayerTest, BackgroundBlurStyleTest) {
 
   auto layer2 = Layer::Make();
   layer2->addChild(shapeLayer1);
-  layer2->setShouldRasterize(true);
   rootLayer->addChild(layer2);
   displayList->setZoomScale(2.0f);
   displayList->setContentOffset(-50, -50);
@@ -3106,7 +2937,6 @@ TGFX_TEST(LayerTest, PartialDrawLayer) {
   layerInvisible->setWidth(100);
   layerInvisible->setHeight(100);
   layerInvisible->setMatrix(Matrix::MakeTrans(100, 100));
-  layerInvisible->setShouldRasterize(true);
   rootLayer->addChild(layerInvisible);
   auto canvas = surface->getCanvas();
   canvas->clear();
@@ -3117,7 +2947,6 @@ TGFX_TEST(LayerTest, PartialDrawLayer) {
   canvas->translate(20, 20);
   rootLayer->draw(canvas);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PartialDrawLayer"));
-  EXPECT_EQ(layerInvisible->rasterizedContent, nullptr);
   canvas->restore();
 
   canvas->clear();
@@ -3522,7 +3351,6 @@ TGFX_TEST(LayerTest, Matrix) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D_2D"));
 
   imageLayer->setMatrix3D(imageMatrix3D);
-  imageLayer->setShouldRasterize(true);
   EXPECT_TRUE(imageLayer->matrix().isIdentity());
   auto rect = Rect::MakeXYWH(50, 50, 200, 100);
   Path path = {};
@@ -3553,53 +3381,6 @@ TGFX_TEST(LayerTest, Matrix) {
   displayList->root()->addChild(shaperLayer);
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D_2D_3D"));
-}
-
-TGFX_TEST(LayerTest, RasterizedContentWithMask) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  EXPECT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 300, 200);
-  auto displayList = std::make_unique<DisplayList>();
-
-  // Create a rasterized content layer with a mask
-  auto rootLayer = Layer::Make();
-  displayList->root()->addChild(rootLayer);
-
-  // Create a rasterized content layer with some shapes
-  auto rasterizedLayer = Layer::Make();
-  rasterizedLayer->setMatrix(Matrix::MakeTrans(50, 50));
-  rasterizedLayer->setShouldRasterize(true);
-  rootLayer->addChild(rasterizedLayer);
-
-  // Add a blue rectangle
-  auto blueRect = ShapeLayer::Make();
-  Path bluePath;
-  bluePath.addRect(Rect::MakeWH(80, 80));
-  blueRect->setPath(bluePath);
-  blueRect->setFillStyle(SolidColor::Make(Color::Blue()));
-  rasterizedLayer->addChild(blueRect);
-
-  // Add a red oval
-  auto redOval = ShapeLayer::Make();
-  redOval->setMatrix(Matrix::MakeTrans(60, 0));
-  Path ovalPath;
-  ovalPath.addOval(Rect::MakeXYWH(0, 0, 80, 80));
-  redOval->setPath(ovalPath);
-  redOval->setFillStyle(SolidColor::Make(Color::Red()));
-  rasterizedLayer->addChild(redOval);
-
-  // Create a mask for the rasterized layer
-  auto maskLayer = ShapeLayer::Make();
-  Path maskPath;
-  maskPath.addOval(Rect::MakeXYWH(-10, -10, 100, 100));
-  maskLayer->setPath(maskPath);
-  maskLayer->setFillStyle(SolidColor::Make(Color::White()));
-  rasterizedLayer->setMask(maskLayer);
-  rootLayer->addChild(maskLayer);
-
-  displayList->render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/RasterizedContentWithMask"));
 }
 
 TGFX_TEST(LayerTest, DisplayListBackground) {
