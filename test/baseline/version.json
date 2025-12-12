@@ -367,8 +367,11 @@
         "RecordingWithSemaphore": "3c65b221"
     },
     "SVGExportTest": {
-        "DrawImageRect": "6b4e5ce0",
-        "ImageMask": "6b4e5ce0",
+        "AssignColorSpace": "0d4409dd",
+        "DrawImageRect": "f8344be7",
+        "DstAssignColorSpace": "0d4409dd",
+        "DstColorSpace": "0d4409dd",
+        "ImageMask": "f8344be7",
         "InvertPictureImageMask": "9a80633b",
         "LayerDropShadow": "a99262da",
         "PictureImageMask": "9a80633b"

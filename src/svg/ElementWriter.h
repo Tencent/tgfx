@@ -42,13 +42,20 @@ namespace tgfx {
 
 class ElementWriter {
  public:
-  ElementWriter(const std::string& name, XMLWriter* writer);
-  ElementWriter(const std::string& name, const std::unique_ptr<XMLWriter>& writer);
+  ElementWriter(const std::string& name, XMLWriter* writer,
+                std::shared_ptr<ColorSpace> targetColorSpace = nullptr,
+                std::shared_ptr<ColorSpace> assignColorSpace = nullptr);
   ElementWriter(const std::string& name, const std::unique_ptr<XMLWriter>& writer,
-                ResourceStore* bucket);
+                std::shared_ptr<ColorSpace> targetColorSpace = nullptr,
+                std::shared_ptr<ColorSpace> assignColorSpace = nullptr);
+  ElementWriter(const std::string& name, const std::unique_ptr<XMLWriter>& writer,
+                ResourceStore* bucket, std::shared_ptr<ColorSpace> targetColorSpace = nullptr,
+                std::shared_ptr<ColorSpace> assignColorSpace = nullptr);
   ElementWriter(const std::string& name, Context* context, SVGExportContext* svgContext,
                 XMLWriter* writer, ResourceStore* bucket, bool disableWarning, const MCState& state,
-                const Brush& brush, const Stroke* stroke = nullptr);
+                const Brush& brush, const Stroke* stroke = nullptr,
+                std::shared_ptr<ColorSpace> targetColorSpace = nullptr,
+                std::shared_ptr<ColorSpace> assignColorSpace = nullptr);
   ~ElementWriter();
 
   void addAttribute(const std::string& name, const std::string& val);
@@ -121,9 +128,17 @@ class ElementWriter {
 
   void reportUnsupportedElement(const char* message) const;
 
+  bool writeColorCSSStyleAttribute(const std::string& attributeName, Color color,
+                                   std::string* retString);
+
+  void generateWriteColorSpaceString();
+
   XMLWriter* writer = nullptr;
   ResourceStore* resourceStore = nullptr;
   bool disableWarning = false;
+  std::shared_ptr<ColorSpace> _targetColorSpace = nullptr;
+  std::shared_ptr<ColorSpace> _assignColorSpace = nullptr;
+  std::string _writeColorSpaceString;
 };
 
 }  // namespace tgfx
