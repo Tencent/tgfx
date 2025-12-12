@@ -234,25 +234,25 @@ class DisplayList {
   void setBackgroundColor(const Color& color);
 
   /**
-   * Returns the maximum cache size (longest edge in pixels) for sub-tree caching. Default is 0
+   * Returns the maximum cache size (longest edge in pixels) for subtree caching. Default is 0
    * (disabled).
    *
-   * When enabled, starting from the root layer, any static sub-tree (where neither the layer nor
+   * When enabled, starting from the root layer, any static subtree (where neither the layer nor
    * its descendants have modified properties) whose rendered longest edge is smaller than maxSize
    * will be cached as a texture. The cache uses a mipmap-style scaling strategy, snapping to
    * power-of-2 fractions of maxSize (e.g., maxSize, maxSize/2, maxSize/4, ...) to minimize memory
-   * waste. Once a sub-tree is cached, subsequent renders skip child traversal entirely, greatly
+   * waste. Once a subtree is cached, subsequent renders skip child traversal entirely, greatly
    * improving rendering performance. This optimization is particularly effective in zoom-out
    * scenarios where dense graphics are packed into a smaller screen area.
    */
-  int subTreeCacheMaxSize() const {
-    return _subTreeCacheMaxSize;
+  int subtreeCacheMaxSize() const {
+    return _subtreeCacheMaxSize;
   }
 
   /**
-   * Sets the maximum cache size (longest edge in pixels) for sub-tree caching. Default is 0 (disabled).
+   * Sets the maximum cache size (longest edge in pixels) for subtree caching. Default is 0 (disabled).
    */
-  void setSubTreeCacheMaxSize(int maxSize);
+  void setSubtreeCacheMaxSize(int maxSize);
 
   /**
    * Sets whether to show dirty regions during rendering. When enabled, the dirty regions will be
@@ -285,7 +285,7 @@ class DisplayList {
   int _maxTileCount = 0;
   bool _allowZoomBlur = false;
   int _maxTilesRefinedPerFrame = 5;
-  int _subTreeCacheMaxSize = 0;
+  int _subtreeCacheMaxSize = 0;
   bool _showDirtyRegions = false;
   bool _hasContentChanged = false;
   bool hasZoomBlurTiles = false;

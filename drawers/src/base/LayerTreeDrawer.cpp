@@ -30,7 +30,6 @@ void LayerTreeDrawer::onDraw(tgfx::Canvas* canvas, const AppHost* host) {
     displayList.setRenderMode(tgfx::RenderMode::Tiled);
     displayList.setAllowZoomBlur(true);
     displayList.setMaxTileCount(512);
-    displayList.setSubTreeCacheMaxSize(2048);
   }
   updateRootMatrix(host);
   displayList.setZoomScale(host->zoomScale());
