@@ -46,6 +46,8 @@ struct DOMNode {
   std::vector<DOMAttribute> attributes;
   DOMNodeType type;
 
+  ~DOMNode();
+
   /**
    * Get the first child object, optionally filtered by name.
    * @param name child name.

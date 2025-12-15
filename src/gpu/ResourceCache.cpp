@@ -104,13 +104,23 @@ void ResourceCache::purgeResourcesByLRU(bool scratchResourceOnly,
     if (satisfied(resource)) {
       break;
     }
-    if (!scratchResourceOnly || !resource->hasExternalReferences()) {
-      item = purgeableResources.erase(item);
-      purgeableBytes -= resource->memoryUsage();
-      removeResource(resource);
-    } else {
+    if (scratchResourceOnly && resource->hasExternalReferences()) {
       item++;
+      continue;
     }
+    // Expired UniqueKey resources with ScratchKey are downgraded to scratch resources.
+    if (!scratchResourceOnly && resource->hasExternalReferences() &&
+        !resource->scratchKey.empty()) {
+      removeUniqueKey(resource);
+      resource->lastUsedTime = currentFrameTime;
+      // Move to the end of the list to maintain LRU order.
+      item = purgeableResources.erase(item);
+      AddToList(purgeableResources, resource);
+      continue;
+    }
+    item = purgeableResources.erase(item);
+    purgeableBytes -= resource->memoryUsage();
+    removeResource(resource);
   }
 }
 

@@ -19,17 +19,20 @@
 #pragma once
 
 #include "core/DrawContext.h"
-#include "tgfx/core/Stroke.h"
 
 namespace tgfx {
-class HitTestContext : public DrawContext {
+/**
+ * LayerUnrollContext is a DrawContext proxy that intercepts draw calls and merges layer brush
+ * properties (alpha, blendMode, colorFilter) into each draw command's brush. This allows a layer
+ * containing a single draw command to be "unrolled" and drawn directly without creating an
+ * offscreen buffer, improving performance by avoiding unnecessary layer allocations.
+ */
+class LayerUnrollContext : public DrawContext {
  public:
-  HitTestContext(float deviceX, float devcieY, bool shapeHitTest)
-      : deviceX(deviceX), deviceY(devcieY), shapeHitTest(shapeHitTest) {
-  }
+  LayerUnrollContext(DrawContext* drawContext, Brush layerBrush);
 
-  bool hasHit() const {
-    return hit;
+  bool hasUnrolled() const {
+    return unrolled;
   }
 
   void drawFill(const Brush& brush) override;
@@ -60,12 +63,12 @@ class HitTestContext : public DrawContext {
   void drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<ImageFilter> filter,
                  const MCState& state, const Brush& brush) override;
 
- private:
-  float deviceX = 0;
-  float deviceY = 0;
-  bool shapeHitTest = false;
-  bool hit = false;
+ protected:
+  Brush mergeBrush(const Brush& brush) const;
 
-  bool checkClip(const Path& clip, const Point& local) const;
+ private:
+  DrawContext* drawContext = nullptr;
+  Brush layerBrush = {};
+  bool unrolled = false;
 };
 }  // namespace tgfx

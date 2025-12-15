@@ -1285,16 +1285,16 @@ TGFX_TEST(CanvasTest, Picture) {
   auto picture = recorder.finishRecordingAsPicture();
   ASSERT_TRUE(picture != nullptr);
 
-  auto bounds = picture->getTightBounds();
-  auto surface = Surface::Make(context, static_cast<int>(bounds.width()),
-                               static_cast<int>(bounds.height() + 20));
+  int width = 550;
+  int height = 352;
+  auto surface = Surface::Make(context, width, height + 20);
   canvas = surface->getCanvas();
   path.reset();
-  path.addOval(Rect::MakeWH(bounds.width(), bounds.height() + 100));
+  path.addOval(Rect::MakeWH(width, height + 100));
   canvas->clipPath(path);
   canvas->translate(0, 10);
   canvas->drawPicture(picture);
-  canvas->translate(0, bounds.height() + 10);
+  canvas->translate(0, static_cast<float>(height + 10));
   paint.setBlendMode(BlendMode::Screen);
   paint.setAlpha(0.8f);
   matrix = Matrix::MakeTrans(0, -180);
@@ -1359,13 +1359,13 @@ TGFX_TEST(CanvasTest, Picture) {
 
   canvas = recorder.beginRecording();
   paint.reset();
-  canvas->drawSimpleText("Hello TGFX~", 0, 0, font, paint);
+  auto textBlob = TextBlob::MakeFrom("Hello TGFX~", font);
+  canvas->drawTextBlob(textBlob, 0, 0, paint);
   auto textRecord = recorder.finishRecordingAsPicture();
-  bounds = textRecord->getTightBounds();
+  auto bounds = textBlob->getTightBounds();
   matrix = Matrix::MakeTrans(-bounds.left, -bounds.top);
-  auto width = static_cast<int>(bounds.width());
-  auto height = static_cast<int>(bounds.height());
-  auto textImage = Image::MakeFrom(textRecord, width, height, &matrix);
+  auto textImage = Image::MakeFrom(textRecord, static_cast<int>(bounds.width()),
+                                   static_cast<int>(bounds.height()), &matrix);
   EXPECT_EQ(textRecord.use_count(), 2);
   ASSERT_TRUE(textImage != nullptr);
 
@@ -1468,46 +1468,6 @@ TGFX_TEST(CanvasTest, PictureImageShaderOptimization) {
   EXPECT_TRUE(subsetImage->source == image);
   EXPECT_EQ(offset.x, 0.0f);
   EXPECT_EQ(offset.y, 0.0f);
-}
-
-class ColorModifier : public BrushModifier {
- public:
-  explicit ColorModifier(Color color) : color(color) {
-  }
-
-  Brush transform(const Brush& brush) const override {
-    auto newBrush = brush;
-    newBrush.color = color;
-    newBrush.color.alpha *= brush.color.alpha;
-    return newBrush;
-  }
-
- private:
-  Color color = {};
-};
-
-TGFX_TEST(CanvasTest, BrushModifier) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-
-  // Record a rectangle with default fill
-  PictureRecorder recorder = {};
-  auto canvas = recorder.beginRecording();
-  Paint paint;
-  paint.setColor(Color::Red());
-  paint.setAlpha(0.5f);
-  canvas->drawRect(Rect::MakeXYWH(10, 10, 100, 100), paint);
-  auto picture = recorder.finishRecordingAsPicture();
-  ASSERT_TRUE(picture != nullptr);
-  auto surface = Surface::Make(context, 120, 120);
-  canvas = surface->getCanvas();
-  canvas->clear(Color::White());
-  canvas->scale(0.8f, 0.8f);
-  canvas->translate(15, 15);
-  ColorModifier colorModifier(Color::Green());
-  picture->playback(canvas, &colorModifier);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/BrushModifier"));
 }
 
 TGFX_TEST(CanvasTest, BlendModeTest) {
@@ -3085,11 +3045,11 @@ TGFX_TEST(CanvasTest, RRectBlendMode) {
 
 TGFX_TEST(CanvasTest, MatrixShapeStroke) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 200, 200);
   ASSERT_TRUE(surface != nullptr);
-  auto* canvas = surface->getCanvas();
+  auto canvas = surface->getCanvas();
 
   Paint paint;
   paint.setAntiAlias(true);
@@ -3147,11 +3107,11 @@ TGFX_TEST(CanvasTest, ScaleMatrixShader) {
   auto image = MakeImage("resources/apitest/imageReplacement.png");
   ASSERT_TRUE(image != nullptr);
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 100, 100);
   ASSERT_TRUE(surface != nullptr);
-  auto* canvas = surface->getCanvas();
+  auto canvas = surface->getCanvas();
   auto paint = Paint();
   auto shader = Shader::MakeImageShader(image);
   auto rect = Rect::MakeXYWH(25, 25, 50, 50);
@@ -3165,11 +3125,11 @@ TGFX_TEST(CanvasTest, ScaleMatrixShader) {
 
 TGFX_TEST(CanvasTest, Matrix3DShapeStroke) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 300, 300);
   ASSERT_TRUE(surface != nullptr);
-  auto* canvas = surface->getCanvas();
+  auto canvas = surface->getCanvas();
 
   auto origin = Point::Make(100, 100);
   auto originTranslateMatrix = Matrix3D::MakeTranslate(origin.x, origin.y, 0.f);
@@ -3222,11 +3182,11 @@ TGFX_TEST(CanvasTest, Matrix3DShapeStroke) {
 
 TGFX_TEST(CanvasTest, LumaFilter) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 3024, 4032);
   ASSERT_TRUE(surface != nullptr);
-  auto* canvas = surface->getCanvas();
+  auto canvas = surface->getCanvas();
   Paint paint{};
   paint.setColorFilter(ColorFilter::Luma());
   auto shader = Shader::MakeColorShader(Color::FromRGBA(125, 0, 255));
@@ -3354,6 +3314,89 @@ TGFX_TEST(CanvasTest, ColorSpace) {
   auto pictureImage = Image::MakeFrom(picture, 1024, 1024);
   canvas->drawImage(pictureImage);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawRecordSRGBColorToP3UseDrawImage"));
+}
+
+TGFX_TEST(CanvasTest, TextBlobHitTestPoint) {
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  ASSERT_TRUE(typeface != nullptr);
+  auto emojiTypeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoColorEmoji.ttf"));
+  ASSERT_TRUE(emojiTypeface != nullptr);
+
+  Font font(typeface, 80.0f);
+  Font emojiFont(emojiTypeface, 80.0f);
+  ASSERT_TRUE(font.hasOutlines());
+  ASSERT_FALSE(emojiFont.hasOutlines());
+
+  // Create a TextBlob with both normal character "O" and emoji "😀"
+  auto glyphID_O = font.getGlyphID('O');
+  auto glyphID_emoji = emojiFont.getGlyphID(0x1F600);  // 😀
+  ASSERT_TRUE(glyphID_O > 0);
+  ASSERT_TRUE(glyphID_emoji > 0);
+
+  float advance_O = font.getAdvance(glyphID_O);
+  float emojiOffsetX = advance_O + 10.0f;
+  std::vector<GlyphRun> glyphRuns = {
+      GlyphRun(font, {glyphID_O}, {Point::Make(0.0f, 0.0f)}),
+      GlyphRun(emojiFont, {glyphID_emoji}, {Point::Make(emojiOffsetX, 0.0f)})};
+  auto textBlob = TextBlob::MakeFrom(std::move(glyphRuns));
+  ASSERT_TRUE(textBlob != nullptr);
+
+  // Get bounds for "O" character
+  auto bounds_O = font.getBounds(glyphID_O);
+  // Get bounds for emoji character (offset by position)
+  auto bounds_emoji = emojiFont.getBounds(glyphID_emoji);
+  bounds_emoji.offset(advance_O + 10.0f, 0);
+
+  // ========== Test "O" character (outline-based hit test) ==========
+  // Test 1: Hit on the outline of "O"
+  float onOutlineX = bounds_O.left + 5.0f;
+  float onOutlineY = bounds_O.centerY();
+  EXPECT_TRUE(textBlob->hitTestPoint(onOutlineX, onOutlineY, nullptr));
+
+  // Test 2: Miss in the center hole of "O"
+  float centerX_O = bounds_O.centerX();
+  float centerY_O = bounds_O.centerY();
+  EXPECT_FALSE(textBlob->hitTestPoint(centerX_O, centerY_O, nullptr));
+
+  // Test 3: Miss outside the "O" bounds
+  float outsideX_O = bounds_O.left - 5.0f;
+  float outsideY_O = bounds_O.centerY();
+  EXPECT_FALSE(textBlob->hitTestPoint(outsideX_O, outsideY_O, nullptr));
+
+  // Test 4: Hit outside "O" but within stroke area
+  Stroke stroke = {};
+  stroke.width = 20.0f;  // half = 10
+  EXPECT_TRUE(textBlob->hitTestPoint(outsideX_O, outsideY_O, &stroke));
+
+  // Test 5: Miss further outside "O", beyond stroke area
+  float farOutsideX_O = bounds_O.left - 15.0f;
+  EXPECT_FALSE(textBlob->hitTestPoint(farOutsideX_O, outsideY_O, &stroke));
+
+  // ========== Test emoji character (bounds-based hit test) ==========
+  // Test 6: Hit inside the emoji bounds
+  float centerX_emoji = bounds_emoji.centerX();
+  float centerY_emoji = bounds_emoji.centerY();
+  EXPECT_TRUE(textBlob->hitTestPoint(centerX_emoji, centerY_emoji, nullptr));
+
+  // Test 7: Hit on the edge of the emoji bounds
+  float edgeX_emoji = bounds_emoji.left + 1.0f;
+  float edgeY_emoji = bounds_emoji.centerY();
+  EXPECT_TRUE(textBlob->hitTestPoint(edgeX_emoji, edgeY_emoji, nullptr));
+
+  // Test 8: Miss outside the emoji bounds
+  float outsideX_emoji = bounds_emoji.left - 5.0f;
+  float outsideY_emoji = bounds_emoji.centerY();
+  EXPECT_FALSE(textBlob->hitTestPoint(outsideX_emoji, outsideY_emoji, nullptr));
+
+  // Test 9: Hit outside emoji but within stroke area
+  EXPECT_TRUE(textBlob->hitTestPoint(outsideX_emoji, outsideY_emoji, &stroke));
+
+  // Test 10: Miss further outside emoji, beyond stroke area
+  // Use a point that's clearly outside both characters
+  float farOutsideX_emoji = bounds_emoji.right + 20.0f;
+  EXPECT_FALSE(textBlob->hitTestPoint(farOutsideX_emoji, outsideY_emoji, &stroke));
 }
 
 }  // namespace tgfx

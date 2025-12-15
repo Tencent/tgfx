@@ -461,7 +461,7 @@ void FrameCapture::sendFragmentProcessor(
   }
   for (const auto& processor : fragmentProcessors) {
     FragmentProcessor::Iter fpIter(processor);
-    while (const auto* subFP = fpIter.next()) {
+    while (const auto subFP = fpIter.next()) {
       for (size_t j = 0; j < subFP->numTextureSamplers(); ++j) {
         auto texture = subFP->textureAt(j);
         auto frameCaptureTexture = FrameCaptureTexture::MakeFrom(texture, context);

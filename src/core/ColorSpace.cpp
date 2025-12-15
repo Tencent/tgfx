@@ -22,6 +22,7 @@
 #include <sstream>
 #include <vector>
 #include "Checksum.h"
+#include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/MathExtra.h"
 #include "utils/Log.h"
 
@@ -202,54 +203,20 @@ static bool IsAlmostLinear(const TransferFunction& coeffs) {
   return linearExp || linearFn;
 }
 
-static bool NearlyEqual(float x, float y) {
-  /**
-   * A note on why I chose this tolerance:  TransferFnAlmostEqual() uses a tolerance of 0.001f,
-   * which doesn't seem to be enough to distinguish between similar transfer functions, for example:
-   * gamma2.2 and sRGB.
-   *
-   * If the tolerance is 0.0f, then this we can't distinguish between two different encodings of
-   * what is clearly the same colorspace. Some experimentation with example files lead to this
-   * number:
-   */
-  static constexpr float Tolerance = 1.0f / (1 << 11);
-  return ::fabsf(x - y) <= Tolerance;
-}
-
-static bool NearlyEqual(const gfx::skcms_TransferFunction& u,
-                        const gfx::skcms_TransferFunction& v) {
-  return NearlyEqual(u.g, v.g) && NearlyEqual(u.a, v.a) && NearlyEqual(u.b, v.b) &&
-         NearlyEqual(u.c, v.c) && NearlyEqual(u.d, v.d) && NearlyEqual(u.e, v.e) &&
-         NearlyEqual(u.f, v.f);
-}
-
-static bool NearlyEqual(const gfx::skcms_Matrix3x3& u, const gfx::skcms_Matrix3x3& v) {
-  for (int r = 0; r < 3; r++) {
-    for (int c = 0; c < 3; c++) {
-      if (!NearlyEqual(u.vals[r][c], v.vals[r][c])) {
-        return false;
-      }
-    }
-  }
-  return true;
-}
-
 constexpr uint32_t CICPTranferFunctionSRGB = 1;
 constexpr uint32_t CICPTranferFunction2Dot2 = 4;
 constexpr uint32_t CICPTranferFunctionLinear = 8;
 
 static uint32_t GetCICPTranferFunction(const gfx::skcms_TransferFunction& function) {
+  auto func = reinterpret_cast<const TransferFunction*>(&function);
   if (gfx::skcms_TransferFunction_getType(&function) == gfx::skcms_TFType_sRGBish) {
-    if (NearlyEqual(function, *reinterpret_cast<const gfx::skcms_TransferFunction*>(
-                                  &NamedTransferFunction::SRGB))) {
+    if (NearlyEqual(*func, NamedTransferFunction::SRGB)) {
       return CICPTranferFunctionSRGB;
     }
-    if (NearlyEqual(function, *reinterpret_cast<const gfx::skcms_TransferFunction*>(
-                                  &NamedTransferFunction::TwoDotTwo))) {
+    if (NearlyEqual(*func, NamedTransferFunction::TwoDotTwo)) {
       return CICPTranferFunction2Dot2;
     }
-    if (NearlyEqual(function, *reinterpret_cast<const gfx::skcms_TransferFunction*>(
-                                  &NamedTransferFunction::Linear))) {
+    if (NearlyEqual(*func, NamedTransferFunction::Linear)) {
       return CICPTranferFunctionLinear;
     }
   }
@@ -261,14 +228,14 @@ constexpr uint32_t CICPPrimariesP3 = 12;
 constexpr uint32_t CICPPrimariesRec2020 = 9;
 
 static uint32_t GetCICPPrimaries(const gfx::skcms_Matrix3x3& toXYZD50) {
-  if (NearlyEqual(toXYZD50, *reinterpret_cast<const gfx::skcms_Matrix3x3*>(&NamedGamut::SRGB))) {
+  auto matrix = reinterpret_cast<const ColorMatrix33*>(&toXYZD50);
+  if (NearlyEqual(*matrix, NamedGamut::SRGB)) {
     return CICPPrimariesSRGB;
   }
-  if (NearlyEqual(toXYZD50,
-                  *reinterpret_cast<const gfx::skcms_Matrix3x3*>(&NamedGamut::DisplayP3))) {
+  if (NearlyEqual(*matrix, NamedGamut::DisplayP3)) {
     return CICPPrimariesP3;
   }
-  if (NearlyEqual(toXYZD50, *reinterpret_cast<const gfx::skcms_Matrix3x3*>(&NamedGamut::Rec2020))) {
+  if (NearlyEqual(*matrix, NamedGamut::Rec2020)) {
     return CICPPrimariesRec2020;
   }
   return 0;

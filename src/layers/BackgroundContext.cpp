@@ -180,7 +180,7 @@ std::shared_ptr<BackgroundContext> BackgroundContext::createSubContext(const Rec
   } else if (!Rect::Intersects(renderBounds, backgroundRect)) {
     return nullptr;
   }
-
+  childWorldRect.roundOut();
   auto canvas = getCanvas();
   auto parentCanvasMatrix = canvas->getMatrix();
   Matrix baseSurfaceMatrix = Matrix::I();
