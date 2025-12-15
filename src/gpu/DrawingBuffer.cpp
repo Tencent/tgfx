@@ -35,17 +35,20 @@ DrawingBuffer::DrawingBuffer(Context* context)
 std::shared_ptr<CommandBuffer> DrawingBuffer::encode() {
   DEBUG_ASSERT(!empty());
   TASK_MARK(tgfx::inspect::OpTaskType::Flush);
+  auto clock = tgfx::Clock();
   {
     TASK_MARK(tgfx::inspect::OpTaskType::ResourceTask);
     for (auto& task : resourceTasks) {
       task->execute(context);
       task = nullptr;
     }
+    clock.mark("resourceTasks");
   }
   for (auto& task : atlasTasks) {
     task->upload(context);
     task = nullptr;
   }
+  clock.mark("atlasTasks");
   auto commandEncoder = context->gpu()->createCommandEncoder();
   {
     TASK_MARK(tgfx::inspect::OpTaskType::RenderTask);
@@ -54,6 +57,9 @@ std::shared_ptr<CommandBuffer> DrawingBuffer::encode() {
       task = nullptr;
     }
   }
+  LOGI("DrawingBuffer::encode cost: %ld resourceTasks:%ld atlasTasks:%ld renderTasks:%ld",
+       clock.elapsedTime(), clock.measure("", "resourceTasks"),
+       clock.measure("resourceTasks", "atlasTasks"), clock.measure("atlasTasks", "renderTasks"));
   vertexMaxValueTracker.addValue(vertexAllocator.size());
   drawingMaxValueTracker.addValue(drawingAllocator.size());
   auto commandBuffer = commandEncoder->finish();
