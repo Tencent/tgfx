@@ -22,6 +22,8 @@ namespace tgfx {
 Shape::~Shape() {
   auto oldBounds = bounds.exchange(nullptr, std::memory_order_acq_rel);
   delete oldBounds;
+  auto oldPath = cachedPath.exchange(nullptr, std::memory_order_acq_rel);
+  delete oldPath;
 }
 
 Rect Shape::getBounds() const {
@@ -36,4 +38,35 @@ Rect Shape::getBounds() const {
   }
   return totalBounds;
 }
+
+Path Shape::getPath() const {
+  // Check if we have a cached path
+  if (auto cached = cachedPath.load(std::memory_order_acquire)) {
+    return *cached;
+  }
+
+  // For the outermost layer (PathShape), cache the path
+  // For complex shapes, still compute without caching to maintain flexibility
+  auto computedPath = getPathWithCache();
+
+  auto newPath = new Path(computedPath);
+  Path* oldPath = nullptr;
+  if (!cachedPath.compare_exchange_strong(oldPath, newPath, std::memory_order_acq_rel)) {
+    delete newPath;
+    // If cache was set by another thread, return the cached value
+    if (auto cached = cachedPath.load(std::memory_order_acquire)) {
+      return *cached;
+    }
+  }
+
+  return computedPath;
+}
+
+Path Shape::getPathWithCache() const {
+  if (auto cached = cachedPath.load(std::memory_order_acquire)) {
+    return *cached;
+  }
+  return onGetPath(1.0f);
+}
+
 }  // namespace tgfx
