@@ -24,10 +24,6 @@
 namespace tgfx {
 class MeasureContext : public DrawContext {
  public:
-  explicit MeasureContext(bool computeTightBounds = false)
-      : computeTightBounds(computeTightBounds) {
-  }
-
   Rect getBounds() const {
     return bounds;
   }
@@ -61,10 +57,7 @@ class MeasureContext : public DrawContext {
                  const MCState& state, const Brush& brush) override;
 
  private:
-  bool computeTightBounds = false;
   Rect bounds = {};
-
-  void addTightBounds(const Path& path, const MCState& state);
 
   void addLocalBounds(const MCState& state, const Rect& localBounds, bool unbounded = false);
   void addDeviceBounds(const Path& clip, const Rect& deviceBounds, bool unbounded = false);
