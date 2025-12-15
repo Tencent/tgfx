@@ -454,6 +454,46 @@ TGFX_TEST(StrokeTest, PathStrokerContourII) {
   EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/PathStrokerContourII"));
 }
 
+TGFX_TEST(StrokeTest, PathStrokerContourIII) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 512, 512);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear();
+
+  Path path = {};
+  path.moveTo(9.5, 5);
+  path.lineTo(3, 0);
+  path.lineTo(0, 3.5);
+  path.lineTo(9.5, 5);
+  path.close();
+  path.transform(Matrix::MakeScale(20.0f));
+
+  auto hairlinePath = path;
+
+  std::vector<PathStroker::PointParam> params = {};
+  params.emplace_back();
+  params.emplace_back();
+  params.emplace_back();
+  params.emplace_back();
+  EXPECT_TRUE(PathStroker::StrokePathWithMultiParams(&path, 10.0f, params, 10.0f));
+
+  Paint paint = {};
+  paint.setColor(Color::FromRGBA(0, 255, 0, 255));
+  canvas->translate(50, 50);
+  canvas->drawPath(path, paint);
+
+  Paint hairlinePaint = {};
+  hairlinePaint.setColor(Color::Red());
+  hairlinePaint.setStyle(PaintStyle::Stroke);
+  hairlinePaint.setStrokeWidth(0.0f);
+  canvas->drawPath(hairlinePath, hairlinePaint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/PathStrokerContourIII"));
+}
+
 TGFX_TEST(StrokeTest, PathStrokerDifferentMiterLimits) {
   ContextScope scope;
   auto context = scope.getContext();
