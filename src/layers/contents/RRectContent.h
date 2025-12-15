@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,35 +16,33 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/layers/ImageLayer.h"
+#pragma once
+
+#include "layers/contents/GeometryContent.h"
+#include "tgfx/core/RRect.h"
 
 namespace tgfx {
-std::shared_ptr<ImageLayer> ImageLayer::Make() {
-  return std::shared_ptr<ImageLayer>(new ImageLayer());
-}
 
-void ImageLayer::setSampling(const SamplingOptions& value) {
-  if (_sampling == value) {
-    return;
-  }
-  _sampling = value;
-  invalidateContent();
-}
+class RRectContent : public GeometryContent {
+ public:
+  RRectContent(const RRect& rRect, const LayerPaint& paint);
 
-void ImageLayer::setImage(std::shared_ptr<Image> value) {
-  if (_image == value) {
-    return;
-  }
-  _image = std::move(value);
-  invalidateContent();
-}
+  Rect getTightBounds(const Matrix& matrix) const override;
+  bool hitTestPoint(float localX, float localY) const override;
 
-void ImageLayer::onUpdateContent(LayerRecorder* recorder) {
-  if (!_image) {
-    return;
+  RRect rRect = {};
+
+ protected:
+  Type type() const override {
+    return Type::RRect;
   }
-  auto rect = Rect::MakeWH(_image->width(), _image->height());
-  auto shader = Shader::MakeImageShader(_image, TileMode::Clamp, TileMode::Clamp, _sampling);
-  recorder->addRect(rect, LayerPaint(std::move(shader)));
-}
+
+  Rect onGetBounds() const override;
+  void onDraw(Canvas* canvas, const Paint& paint) const override;
+  bool onHasSameGeometry(const GeometryContent* other) const override;
+
+ private:
+  Path getFilledPath() const;
+};
+
 }  // namespace tgfx

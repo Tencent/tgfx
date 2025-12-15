@@ -18,6 +18,8 @@
 
 #include "GridBackground.h"
 
+#include <tgfx/layers/LayerRecorder.h>
+
 namespace hello2d {
 
 std::shared_ptr<GridBackgroundLayer> GridBackgroundLayer::Make() {
@@ -32,19 +34,23 @@ void GridBackgroundLayer::setSize(int width, int height, float density) {
 }
 
 void GridBackgroundLayer::onUpdateContent(tgfx::LayerRecorder* recorder) {
-  auto canvas = recorder->getCanvas();
-  canvas->clear(tgfx::Color::White());
-  tgfx::Paint paint = {};
-  paint.setColor(tgfx::Color{0.8f, 0.8f, 0.8f, 1.f});
+  tgfx::LayerPaint backgroundPaint(tgfx::Color::White());
+  recorder->addRect(tgfx::Rect::MakeWH(static_cast<float>(_width), static_cast<float>(_height)),
+                    backgroundPaint);
+
+  tgfx::LayerPaint tilePaint(tgfx::Color{0.8f, 0.8f, 0.8f, 1.f});
   int tileSize = 8 * static_cast<int>(_density);
+  if (tileSize <= 0) {
+    tileSize = 8;
+  }
   for (int y = 0; y < _height; y += tileSize) {
     bool draw = (y / tileSize) % 2 == 1;
     for (int x = 0; x < _width; x += tileSize) {
       if (draw) {
-        auto rect =
+        recorder->addRect(
             tgfx::Rect::MakeXYWH(static_cast<float>(x), static_cast<float>(y),
-                                 static_cast<float>(tileSize), static_cast<float>(tileSize));
-        canvas->drawRect(rect, paint);
+                                  static_cast<float>(tileSize), static_cast<float>(tileSize)),
+            tilePaint);
       }
       draw = !draw;
     }

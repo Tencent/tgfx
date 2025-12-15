@@ -265,6 +265,13 @@ void DisplayList::setBackgroundColor(const Color& color) {
   }
 }
 
+void DisplayList::setSubtreeCacheMaxSize(int maxSize) {
+  if (maxSize < 0) {
+    maxSize = 0;
+  }
+  _subtreeCacheMaxSize = maxSize;
+}
+
 void DisplayList::showDirtyRegions(bool show) {
   if (_showDirtyRegions == show) {
     return;
@@ -318,6 +325,7 @@ void DisplayList::render(Surface* surface, bool autoClear) {
   if (_showDirtyRegions) {
     renderDirtyRegions(surface->getCanvas(), std::move(dirtyRegions));
   }
+  _root->updateStaticSubtreeFlags();
 }
 
 std::vector<Rect> DisplayList::renderDirect(Surface* surface, bool autoClear) const {
@@ -975,6 +983,7 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   args.blurBackground =
       _root->createBackgroundContext(context, drawRect, viewMatrix, false, args.dstColorSpace);
   args.dstColorSpace = surface->colorSpace();
+  args.subtreeCacheMaxSize = _subtreeCacheMaxSize;
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
 }
 

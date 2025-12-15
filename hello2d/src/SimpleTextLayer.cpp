@@ -20,6 +20,11 @@
 #include <tgfx/layers/Gradient.h>
 #include <tgfx/layers/ShapeLayer.h>
 #include <tgfx/layers/SolidColor.h>
+#include <tgfx/layers/LayerRecorder.h>
+#include <tgfx/core/Matrix.h>
+#include <tgfx/core/Path.h>
+#include <tgfx/core/Shader.h>
+#include <algorithm>
 #include <map>
 #include "base/LayerBuilders.h"
 #include "hello2d/AppHost.h"
@@ -27,17 +32,32 @@
 
 namespace hello2d {
 
+static tgfx::LayerPaint ToLayerPaint(const tgfx::Paint& paint) {
+  tgfx::LayerPaint layerPaint;
+  layerPaint.color = paint.getColor();
+  layerPaint.shader = paint.getShader();
+  layerPaint.blendMode = paint.getBlendMode();
+  layerPaint.style = paint.getStyle();
+  const auto* stroke = paint.getStroke();
+  if (stroke != nullptr) {
+    layerPaint.stroke = *stroke;
+  }
+  return layerPaint;
+}
+
+static bool CompareTextLine(const TextLine& a, const TextLine& b) {
+  if (a.linePosition != b.linePosition) {
+    return a.linePosition < b.linePosition;
+  }
+  return a.left < b.left;
+}
+
 static void MergeLines(std::vector<TextLine>& lines) {
   if (lines.empty()) {
     return;
   }
 
-  std::sort(lines.begin(), lines.end(), [](const TextLine& a, const TextLine& b) {
-    if (a.linePosition != b.linePosition) {
-      return a.linePosition < b.linePosition;
-    }
-    return a.left < b.left;
-  });
+  std::sort(lines.begin(), lines.end(), CompareTextLine);
 
   std::vector<TextLine> merged;
   merged.push_back(lines[0]);
@@ -78,27 +98,48 @@ std::shared_ptr<SimpleTextLayer> SimpleTextLayer::Make() {
 
 void SimpleTextLayer::onUpdateContent(tgfx::LayerRecorder* recorder) {
   updateLayout();
-  auto canvas = recorder->getCanvas();
-
   auto linePaint = tgfx::Paint();
   linePaint.setColor(tgfx::Color::Black());
   linePaint.setStyle(tgfx::PaintStyle::Stroke);
   linePaint.setStrokeWidth(1.0f);
+
+  auto lineLayerPaint = ToLayerPaint(linePaint);
+
   for (auto& richText : richTexts) {
     for (const auto& [left, right, linePosition] : richText.underline) {
-      canvas->drawLine(left, linePosition, right, linePosition, linePaint);
+      tgfx::Path linePath;
+      linePath.moveTo(left, linePosition);
+      linePath.lineTo(right, linePosition);
+      recorder->addPath(linePath, lineLayerPaint);
     }
 
     if (richText.type == Element::Type::Text) {
       for (const auto& paint : richText.paints) {
-        canvas->drawTextBlob(richText.textBlob, 0, 0, paint);
+        recorder->addTextBlob(richText.textBlob, ToLayerPaint(paint));
       }
     } else {
-      canvas->drawImageRect(richText.image, richText.imageRect);
+      if (richText.image) {
+        tgfx::Path imagePath;
+        imagePath.addRect(richText.imageRect);
+        tgfx::LayerPaint imagePaint;
+        float imgW = static_cast<float>(richText.image->width());
+        float imgH = static_cast<float>(richText.image->height());
+        if (imgW > 0.0f && imgH > 0.0f) {
+          auto scaleX = richText.imageRect.width() / imgW;
+          auto scaleY = richText.imageRect.height() / imgH;
+          tgfx::Matrix m = tgfx::Matrix::MakeScale(scaleX, scaleY);
+          m.postTranslate(richText.imageRect.left, richText.imageRect.top);
+          imagePaint.shader = tgfx::Shader::MakeImageShader(richText.image)->makeWithMatrix(m);
+        }
+        recorder->addPath(imagePath, imagePaint);
+      }
     }
 
     for (const auto& [left, right, linePosition] : richText.deleteline) {
-      canvas->drawLine(left, linePosition, right, linePosition, linePaint);
+      tgfx::Path linePath;
+      linePath.moveTo(left, linePosition);
+      linePath.lineTo(right, linePosition);
+      recorder->addPath(linePath, lineLayerPaint);
     }
   }
 }

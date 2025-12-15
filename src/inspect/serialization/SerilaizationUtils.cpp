@@ -119,14 +119,6 @@ std::string SerializeUtils::LayerStyleExtraSourceTypeToString(LayerStyleExtraSou
   return m[type];
 }
 
-std::string SerializeUtils::RecordedContentTypeToString(Types::LayerContentType type) {
-  static std::unordered_map<Types::LayerContentType, const char*> m = {
-      {Types::LayerContentType::Default, "Default"},
-      {Types::LayerContentType::Foreground, "Foreground"},
-      {Types::LayerContentType::Contour, "Contour"}};
-  return m[type];
-}
-
 void SerializeUtils::SerializeBegin(flexbuffers::Builder& fbb, tgfx::inspect::LayerTreeMessage type,
                                     size_t& mapStart, size_t& contentStart) {
   mapStart = fbb.StartMap();
