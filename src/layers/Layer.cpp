@@ -669,6 +669,9 @@ Point Layer::localToGlobal(const Point& localPoint) const {
 }
 
 bool Layer::hitTestPoint(float x, float y, bool shapeHitTest) {
+  if (!visible()) {
+    return false;
+  }
   if (auto content = getContent()) {
     Point localPoint = globalToLocal(Point::Make(x, y));
     if (shapeHitTest) {
