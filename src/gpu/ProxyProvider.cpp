@@ -174,10 +174,18 @@ std::shared_ptr<GPUShapeProxy> ProxyProvider::createGPUShapeProxy(std::shared_pt
   }
   auto shapeBounds = shape->getBounds();
   auto uniqueKey = shape->getUniqueKey();
+
+  bool shouldApplyClipBounds = true;
   if (isInverseFillType) {
-    uniqueKey =
-        AppendClipBoundsKey(uniqueKey, clipBounds.makeOffset(-shapeBounds.left, -shapeBounds.top));
+    auto clipLongestEdge = std::max(clipBounds.width(), clipBounds.height());
+    auto shapeLongestEdge = std::max(shapeBounds.width(), shapeBounds.height());
+    shouldApplyClipBounds = (clipLongestEdge >= shapeLongestEdge * 1.5f);
+    if (shouldApplyClipBounds) {
+      uniqueKey = AppendClipBoundsKey(uniqueKey,
+                                      clipBounds.makeOffset(-shapeBounds.left, -shapeBounds.top));
+    }
   }
+
   if (aaType != AAType::None) {
     // Add a 1-pixel outset to preserve antialiasing results.
     shapeBounds.outset(1.0f, 1.0f);
@@ -185,7 +193,8 @@ std::shared_ptr<GPUShapeProxy> ProxyProvider::createGPUShapeProxy(std::shared_pt
     static const auto NonAntialiasShapeType = UniqueID::Next();
     uniqueKey = UniqueKey::Append(uniqueKey, &NonAntialiasShapeType, 1);
   }
-  auto bounds = isInverseFillType ? clipBounds : shapeBounds;
+
+  auto bounds = (isInverseFillType && shouldApplyClipBounds) ? clipBounds : shapeBounds;
   drawingMatrix.preTranslate(bounds.x(), bounds.y());
   static const auto TriangleShapeType = UniqueID::Next();
   static const auto TextureShapeType = UniqueID::Next();
