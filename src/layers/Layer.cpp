@@ -1023,9 +1023,6 @@ std::shared_ptr<MaskFilter> Layer::getMaskFilter(const DrawArgs& args, float sca
     }
   }
   maskPicture = RecordPicture(maskArgs.drawMode, scale, [&](Canvas* canvas) {
-    // if (maskClipBounds.has_value()) {
-    //   canvas->clipRect(*maskClipBounds);
-    // }
     _mask->drawLayer(maskArgs, canvas, _mask->_alpha, BlendMode::SrcOver);
   });
   if (maskPicture == nullptr) {
@@ -1372,8 +1369,8 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
 
   AutoCanvasRestore autoRestore(canvas);
   canvas->concat(imageMatrix);
-  SamplingOptions sample = SamplingOptions{filterMode, MipmapMode::None};
-  canvas->drawImage(image, 0.f, 0.f, sample, &paint);
+  auto sampling = SamplingOptions{filterMode, MipmapMode::None};
+  canvas->drawImage(image, 0.f, 0.f, sampling, &paint);
   if (args.blurBackground) {
     if (contentArgs.blurBackground) {
       auto filter = getImageFilter(contentScale);
@@ -1384,7 +1381,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
       auto backgroundCanvas = args.blurBackground->getCanvas();
       AutoCanvasRestore autoRestoreBg(backgroundCanvas);
       backgroundCanvas->concat(imageMatrix);
-      backgroundCanvas->drawImage(image, 0.f, 0.f, sample, &paint);
+      backgroundCanvas->drawImage(image, 0.f, 0.f, sampling, &paint);
     }
   }
 

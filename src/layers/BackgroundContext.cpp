@@ -124,7 +124,7 @@ void BackgroundContext::drawToParent(const Paint& paint) {
   parentCanvas->setMatrix(Matrix::MakeTrans(surfaceOffset.x, surfaceOffset.y));
   auto image = onGetBackgroundImage();
   if (image) {
-    SamplingOptions sampling = SamplingOptions{FilterMode::Nearest};
+    auto sampling = SamplingOptions{FilterMode::Nearest};
     parentCanvas->drawImage(image, 0.f, 0.f, sampling, &newPaint);
   }
 }
@@ -188,7 +188,7 @@ std::shared_ptr<BackgroundContext> BackgroundContext::createSubContext(const Rec
     return nullptr;
   }
   auto childSurfaceRect = baseSurfaceMatrix.mapRect(childWorldRect);
-  //childSurfaceRect.roundOut();
+  childSurfaceRect.roundOut();
   auto childSurfaceOffset = Point::Make(childSurfaceRect.x(), childSurfaceRect.y());
   auto childSurfaceMatrix = baseSurfaceMatrix;
   childSurfaceMatrix.postTranslate(-childSurfaceOffset.x, -childSurfaceOffset.y);
