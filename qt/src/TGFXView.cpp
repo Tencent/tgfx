@@ -185,13 +185,11 @@ void TGFXView::draw() {
 
   auto recording = context->flush();
 
-  bool submitted = false;
   if (surfaceResized) {
     // When resized, submit current frame immediately (no delay)
     if (recording) {
       context->submit(std::move(recording));
       tgfxWindow->present(context);
-      submitted = true;
     }
     lastRecording = nullptr;
   } else {
@@ -201,14 +199,9 @@ void TGFXView::draw() {
     if (recording) {
       context->submit(std::move(recording));
       tgfxWindow->present(context);
-      submitted = true;
     }
   }
 
   device->unlock();
-
-  if (submitted || lastRecording != nullptr) {
-    update();
-  }
 }
 }  // namespace hello2d

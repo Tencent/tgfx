@@ -21,6 +21,7 @@ static std::unique_ptr<tgfx::Recording> lastRecording = nullptr;
 static int lastDrawIndex = -1;
 static int lastSurfaceWidth = 0;
 static int lastSurfaceHeight = 0;
+static bool sizeInvalidated = false;
 
 static std::shared_ptr<hello2d::AppHost> CreateAppHost();
 static void ApplyTransform(float zoom, float offsetX, float offsetY);
@@ -95,31 +96,36 @@ static void ApplyTransform(float zoom, float offsetX, float offsetY) {
   }
 }
 
-static bool Draw(int drawIndex, float zoom = 1.0f, float offsetX = 0.0f, float offsetY = 0.0f) {
+static void Draw(int drawIndex, float zoom = 1.0f, float offsetX = 0.0f, float offsetY = 0.0f) {
   if (!appHost || window == nullptr) {
-    return false;
+    return;
   }
 
   if (!displayList.hasContentChanged() && lastRecording == nullptr) {
-    return false;
+    return;
   }
 
   auto device = window->getDevice();
   auto context = device->lockContext();
   if (context == nullptr) {
-    return false;
+    return;
   }
 
   auto surface = window->getSurface(context);
   if (surface == nullptr) {
     device->unlock();
-    return false;
+    return;
   }
+
+  // Sync surface size for DPI changes.
+  bool surfaceResized = sizeInvalidated;
+  sizeInvalidated = false;
 
   if (surface->width() != lastSurfaceWidth || surface->height() != lastSurfaceHeight) {
     lastSurfaceWidth = surface->width();
     lastSurfaceHeight = surface->height();
     ApplyTransform(zoom, offsetX, offsetY);
+    surfaceResized = true;
   }
 
   auto canvas = surface->getCanvas();
@@ -130,18 +136,24 @@ static bool Draw(int drawIndex, float zoom = 1.0f, float offsetX = 0.0f, float o
 
   auto recording = context->flush();
 
-  // Delayed one-frame present
-  std::swap(lastRecording, recording);
+  if (surfaceResized) {
+    // When resized, submit current frame immediately (no delay)
+    if (recording) {
+      context->submit(std::move(recording));
+      window->present(context);
+    }
+    lastRecording = nullptr;
+  } else {
+    // Delayed one-frame present
+    std::swap(lastRecording, recording);
 
-  bool submitted = false;
-  if (recording) {
-    context->submit(std::move(recording));
-    window->present(context);
-    submitted = true;
+    if (recording) {
+      context->submit(std::move(recording));
+      window->present(context);
+    }
   }
 
   device->unlock();
-  return submitted || (lastRecording != nullptr);
 }
 
 
@@ -168,12 +180,8 @@ static napi_value UpdateDrawParams(napi_env env, napi_callback_info info) {
 static napi_value StartDrawLoop(napi_env, napi_callback_info) {
     if (displayLink == nullptr) {
         displayLink = std::make_shared<DisplayLink>([&]() {
-            bool needsRedraw = Draw(static_cast<int>(drawIndex), static_cast<float>(zoomScale),
+            Draw(static_cast<int>(drawIndex), static_cast<float>(zoomScale),
                  static_cast<float>(contentOffsetX), static_cast<float>(contentOffsetY));
-
-            if (!needsRedraw) {
-                displayLink->stop();
-            }
         });
     }
     displayLink->start();
@@ -229,6 +237,7 @@ static void UpdateSize(OH_NativeXComponent* component, void* nativeWindow) {
   if (window != nullptr) {
     window->invalidSize();
     lastRecording = nullptr;
+    sizeInvalidated = true;
     if (displayLink) {
       displayLink->start();
     }

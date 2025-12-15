@@ -70,7 +70,7 @@ class TGFXWindow {
   void createAppHost();
   void updateDisplayList();
   void applyTransform();
-  bool draw();
+  void draw();
 
   bool isDrawing = true;
 };

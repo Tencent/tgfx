@@ -34,12 +34,12 @@ void JTGFXView::updateSize() {
                                                      static_cast<float>(lastSurfaceHeight));
     }
     window->invalidSize();
-    // Clear lastRecording when size changes, as it was created for the old surface size
     lastRecording = nullptr;
+    sizeInvalidated = true;
   }
 }
 
-bool JTGFXView::draw(int drawIndex, float zoom, float offsetX, float offsetY) {
+void JTGFXView::draw(int drawIndex, float zoom, float offsetX, float offsetY) {
   // ========== All DisplayList updates BEFORE locking device ==========
 
   // Switch sample when drawIndex changes
@@ -78,9 +78,8 @@ bool JTGFXView::draw(int drawIndex, float zoom, float offsetX, float offsetY) {
   }
 
   // Check if content has changed AFTER setting all properties, BEFORE locking device
-  // If no content change AND no pending lastRecording -> skip everything, don't lock device
   if (!displayList.hasContentChanged() && lastRecording == nullptr) {
-    return false;
+    return;
   }
 
   // ========== Now lock device for rendering/submitting ==========
@@ -88,19 +87,22 @@ bool JTGFXView::draw(int drawIndex, float zoom, float offsetX, float offsetY) {
   auto device = window->getDevice();
   auto context = device->lockContext();
   if (context == nullptr) {
-    return false;
+    return;
   }
 
   auto surface = window->getSurface(context);
   if (surface == nullptr) {
     device->unlock();
-    return false;
+    return;
   }
+
+  // Sync surface size for DPI changes.
+  bool surfaceResized = sizeInvalidated;
+  sizeInvalidated = false;
 
   if (surface->width() != lastSurfaceWidth || surface->height() != lastSurfaceHeight) {
     lastSurfaceWidth = surface->width();
     lastSurfaceHeight = surface->height();
-    // Update zoomScale/contentOffset for new size
     if (contentLayer) {
       hello2d::LayerBuilder::ApplyCenteringTransform(contentLayer,
                                                      static_cast<float>(lastSurfaceWidth),
@@ -111,6 +113,7 @@ bool JTGFXView::draw(int drawIndex, float zoom, float offsetX, float offsetY) {
     lastZoom = zoom;
     lastOffsetX = offsetX;
     lastOffsetY = offsetY;
+    surfaceResized = true;
   }
 
   auto canvas = surface->getCanvas();
@@ -124,18 +127,24 @@ bool JTGFXView::draw(int drawIndex, float zoom, float offsetX, float offsetY) {
 
   auto recording = context->flush();
 
-  // Delayed one-frame present
-  std::swap(lastRecording, recording);
+  if (surfaceResized) {
+    // When resized, submit current frame immediately (no delay)
+    if (recording) {
+      context->submit(std::move(recording));
+      window->present(context);
+    }
+    lastRecording = nullptr;
+  } else {
+    // Delayed one-frame present
+    std::swap(lastRecording, recording);
 
-  bool submitted = false;
-  if (recording) {
-    context->submit(std::move(recording));
-    window->present(context);
-    submitted = true;
+    if (recording) {
+      context->submit(std::move(recording));
+      window->present(context);
+    }
   }
 
   device->unlock();
-  return submitted || (lastRecording != nullptr);
 }
 }  // namespace hello2d
 
@@ -195,10 +204,6 @@ JNIEXPORT jlong JNICALL Java_org_tgfx_hello2d_TGFXView_00024Companion_setupFromS
   }
 
   auto appHost = CreateAppHost(nativeWindow, density);
-  if (appHost == nullptr) {
-    ANativeWindow_release(nativeWindow);
-    return 0;
-  }
 
   jsize numArrays = env->GetArrayLength(imageBytesArray);
 
@@ -237,16 +242,16 @@ JNIEXPORT jlong JNICALL Java_org_tgfx_hello2d_TGFXView_00024Companion_setupFromS
   return reinterpret_cast<jlong>(jTGFXView);
 }
 
-JNIEXPORT jboolean JNICALL Java_org_tgfx_hello2d_TGFXView_nativeDraw(JNIEnv* env, jobject thiz,
+JNIEXPORT void JNICALL Java_org_tgfx_hello2d_TGFXView_nativeDraw(JNIEnv* env, jobject thiz,
                                                                      jint drawIndex, jfloat zoom,
                                                                      jfloat offsetX,
                                                                      jfloat offsetY) {
   auto view = GetJTGFXView(env, thiz);
   if (view == nullptr) {
-    return JNI_FALSE;
+    return;
   }
 
-  return view->draw(drawIndex, zoom, offsetX, offsetY) ? JNI_TRUE : JNI_FALSE;
+  view->draw(drawIndex, zoom, offsetX, offsetY);
 }
 
 JNIEXPORT void JNICALL Java_org_tgfx_hello2d_TGFXView_updateSize(JNIEnv* env, jobject thiz) {

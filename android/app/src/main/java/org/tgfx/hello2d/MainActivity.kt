@@ -7,9 +7,6 @@ import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import androidx.activity.ComponentActivity
-import androidx.core.view.MotionEventCompat
-import kotlin.math.max
-import kotlin.math.min
 
 
 class MainActivity : ComponentActivity() {
@@ -126,13 +123,10 @@ class MainActivity : ComponentActivity() {
         }
 
         animator = ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = 1000
+            duration = Long.MAX_VALUE
             addUpdateListener {
                 try {
-                    val needsRedraw = tgfxView.draw(drawIndex, zoomScale, contentOffset)
-                    if (!needsRedraw) {
-                        cancel()
-                    }
+                    tgfxView.draw(drawIndex, zoomScale, contentOffset)
                 } catch (e: Exception) {
                     cancel()
                 }

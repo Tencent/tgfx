@@ -118,10 +118,8 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
       PAINTSTRUCT ps;
       BeginPaint(hwnd, &ps);
       if (isDrawing) {
-        bool hasContentChanged = draw();
-        if (hasContentChanged) {
-          ::InvalidateRect(windowHandle, nullptr, FALSE);
-        }
+        draw();
+        ::InvalidateRect(windowHandle, nullptr, FALSE);
       }
       EndPaint(hwnd, &ps);
       break;
@@ -327,38 +325,38 @@ void TGFXWindow::applyTransform() {
   }
 }
 
-bool TGFXWindow::draw() {
+void TGFXWindow::draw() {
   if (!tgfxWindow) {
     tgfxWindow = tgfx::WGLWindow::MakeFrom(windowHandle);
   }
   if (tgfxWindow == nullptr) {
-    return false;
+    return;
   }
   RECT rect;
   GetClientRect(windowHandle, &rect);
   auto width = static_cast<int>(rect.right - rect.left);
   auto height = static_cast<int>(rect.bottom - rect.top);
   if (width <= 0 || height <= 0) {
-    return false;
+    return;
   }
   auto pixelRatio = getPixelRatio();
 
   if (!displayList.hasContentChanged() && lastRecording == nullptr) {
-    return false;
+    return;
   }
 
   auto device = tgfxWindow->getDevice();
   if (device == nullptr) {
-    return false;
+    return;
   }
   auto context = device->lockContext();
   if (context == nullptr) {
-    return false;
+    return;
   }
   auto surface = tgfxWindow->getSurface(context);
   if (surface == nullptr) {
     device->unlock();
-    return false;
+    return;
   }
 
   // Sync surface size for DPI changes.
@@ -380,13 +378,11 @@ bool TGFXWindow::draw() {
 
   auto recording = context->flush();
 
-  bool submitted = false;
   if (surfaceResized) {
     // When resized, submit current frame immediately (no delay)
     if (recording) {
       context->submit(std::move(recording));
       tgfxWindow->present(context);
-      submitted = true;
     }
     lastRecording = nullptr;
   } else {
@@ -396,11 +392,9 @@ bool TGFXWindow::draw() {
     if (recording) {
       context->submit(std::move(recording));
       tgfxWindow->present(context);
-      submitted = true;
     }
   }
 
   device->unlock();
-  return submitted || (lastRecording != nullptr);
 }
 }  // namespace hello2d

@@ -37,7 +37,7 @@ class TGFXBaseView {
 
   void updateDrawParams(int drawIndex, float zoom, float offsetX, float offsetY);
 
-  bool draw();
+  void draw();
 
   void onWheelEvent();
   void onClickEvent();

@@ -30,6 +30,7 @@
   std::unique_ptr<tgfx::Recording> lastRecording;
   int lastSurfaceWidth;
   int lastSurfaceHeight;
+  bool sizeInvalidated;
 }
 
 + (Class)layerClass {
@@ -76,6 +77,7 @@
     lastDrawIndex = -1;
     lastSurfaceWidth = 0;
     lastSurfaceHeight = 0;
+    sizeInvalidated = false;
     displayList.setRenderMode(tgfx::RenderMode::Tiled);
     displayList.setAllowZoomBlur(true);
     displayList.setMaxTileCount(512);
@@ -89,6 +91,7 @@
   if (tgfxWindow != nullptr) {
     tgfxWindow->invalidSize();
     lastRecording = nullptr;
+    sizeInvalidated = true;
   }
 }
 
@@ -125,37 +128,42 @@
   }
 }
 
-- (BOOL)draw:(int)drawIndex zoom:(float)zoom offset:(CGPoint)offset {
+- (void)draw:(int)drawIndex zoom:(float)zoom offset:(CGPoint)offset {
   if (self.window == nil) {
-    return false;
+    return;
   }
   if (tgfxWindow == nullptr) {
     tgfxWindow = tgfx::EAGLWindow::MakeFrom((CAEAGLLayer*)[self layer]);
   }
   if (tgfxWindow == nullptr) {
-    return false;
+    return;
   }
 
   if (!displayList.hasContentChanged() && lastRecording == nullptr) {
-    return false;
+    return;
   }
 
   auto device = tgfxWindow->getDevice();
   auto context = device->lockContext();
   if (context == nullptr) {
-    return false;
+    return;
   }
 
   auto surface = tgfxWindow->getSurface(context);
   if (surface == nullptr) {
     device->unlock();
-    return false;
+    return;
   }
+
+  // Sync surface size for DPI changes.
+  bool surfaceResized = sizeInvalidated;
+  sizeInvalidated = false;
 
   if (surface->width() != lastSurfaceWidth || surface->height() != lastSurfaceHeight) {
     lastSurfaceWidth = surface->width();
     lastSurfaceHeight = surface->height();
     [self applyTransformWithZoom:zoom offset:offset];
+    surfaceResized = true;
   }
 
   auto canvas = surface->getCanvas();
@@ -166,18 +174,24 @@
 
   auto recording = context->flush();
 
-  // Delayed one-frame present
-  std::swap(lastRecording, recording);
+  if (surfaceResized) {
+    // When resized, submit current frame immediately (no delay)
+    if (recording) {
+      context->submit(std::move(recording));
+      tgfxWindow->present(context);
+    }
+    lastRecording = nullptr;
+  } else {
+    // Delayed one-frame present
+    std::swap(lastRecording, recording);
 
-  bool submitted = false;
-  if (recording) {
-    context->submit(std::move(recording));
-    tgfxWindow->present(context);
-    submitted = true;
+    if (recording) {
+      context->submit(std::move(recording));
+      tgfxWindow->present(context);
+    }
   }
 
   device->unlock();
-  return submitted || (lastRecording != nullptr);
 }
 
 @end

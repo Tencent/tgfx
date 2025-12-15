@@ -80,11 +80,7 @@ std::shared_ptr<tgfx::Layer> LayerBuilder::buildLayerTree(const hello2d::AppHost
     tgfx::PrintError("LayerBuilder::buildLayerTree() host is nullptr!");
     return nullptr;
   }
-  auto layer = onBuildLayerTree(host);
-  if (!layer) {
-    return layer;
-  }
-  return layer;
+  return onBuildLayerTree(host);
 }
 
 void LayerBuilder::ApplyCenteringTransform(std::shared_ptr<tgfx::Layer> layer, float viewWidth,
@@ -106,7 +102,7 @@ void LayerBuilder::ApplyCenteringTransform(std::shared_ptr<tgfx::Layer> layer, f
 }
 
 void DrawBackground(tgfx::Canvas* canvas, int width, int height, float density) {
-  static auto layer = GridBackgroundLayer::Make();
+  auto layer = GridBackgroundLayer::Make();
   layer->setSize(width, height, density);
   layer->draw(canvas);
 }

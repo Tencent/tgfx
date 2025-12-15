@@ -87,10 +87,7 @@ open class TGFXView : TextureView, TextureView.SurfaceTextureListener {
 
         // Only draw if native initialization was successful
         if (nativePtr != 0L) {
-            // First draw renders content, second draw submits the delayed recording
-            if (draw(0, 1.0f, PointF(0f, 0f))) {
-                draw(0, 1.0f, PointF(0f, 0f))
-            }
+            draw(0, 1.0f, PointF(0f, 0f))
         }
     }
 
@@ -123,11 +120,9 @@ open class TGFXView : TextureView, TextureView.SurfaceTextureListener {
     }
 
 
-    fun draw(index: Int, zoom: Float, offset: PointF): Boolean {
-        return if (nativePtr != 0L) {
+    fun draw(index: Int, zoom: Float, offset: PointF) {
+        if (nativePtr != 0L) {
             nativeDraw(index, zoom, offset.x, offset.y)
-        } else {
-            false
         }
     }
 
@@ -141,7 +136,7 @@ open class TGFXView : TextureView, TextureView.SurfaceTextureListener {
         zoom: Float,
         offsetX: Float,
         offsetY: Float
-    ): Boolean
+    )
 
 
     private lateinit var surface: Surface

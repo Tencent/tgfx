@@ -173,9 +173,7 @@ static const float MaxZoom = 1000.0f;
 }
 
 - (void)update:(CADisplayLink*)displayLink {
-  if (![self.tgfxView draw:self.drawIndex zoom:self.zoomScale offset:self.contentOffset]) {
-    [displayLink setPaused:YES];
-  }
+  [self.tgfxView draw:self.drawIndex zoom:self.zoomScale offset:self.contentOffset];
 }
 
 - (void)requestDraw {

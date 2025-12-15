@@ -45,12 +45,12 @@ class JTGFXView {
   }
 
   void updateSize();
-  bool draw(int index, float zoom, float x, float y);
+  void draw(int index, float zoom, float x, float y);
 
  private:
   ANativeWindow* nativeWindow = nullptr;
   std::shared_ptr<tgfx::Window> window;
-  std::shared_ptr<hello2d::AppHost> appHost = nullptr;
+  std::unique_ptr<hello2d::AppHost> appHost = nullptr;
   tgfx::DisplayList displayList;
   std::shared_ptr<tgfx::Layer> contentLayer = nullptr;
   std::unique_ptr<tgfx::Recording> lastRecording = nullptr;
@@ -62,5 +62,6 @@ class JTGFXView {
   // Cached surface size for calculating base scale without locking device
   int lastSurfaceWidth = 0;
   int lastSurfaceHeight = 0;
+  bool sizeInvalidated = false;
 };
 }  // namespace hello2d

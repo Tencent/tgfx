@@ -26,7 +26,6 @@
 #include "tgfx/core/UTF.h"
 
 namespace hello2d {
-static auto strokeOffset = 0.f;
 
 static void MergeLines(std::vector<TextLine>& lines) {
   if (lines.empty()) {
@@ -135,7 +134,7 @@ void SimpleTextLayer::updateLayout() {
       float textUnderline = textBaseline + fontMetrics.descent;
       lineHeight = std::max(lineHeight, textHeight);
       baselineHeight = std::max(baselineHeight, textBaseline);
-      underlineHeight = std::max(underlineHeight, textUnderline + strokeOffset);
+      underlineHeight = std::max(underlineHeight, textUnderline);
       for (size_t i = 0; i < richText.text.size(); i++) {
         if (richText.text[i] == '\n') {
           baselines.push_back(lineTop + baselineHeight);

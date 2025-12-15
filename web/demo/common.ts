@@ -264,12 +264,8 @@ export function animationLoop(shareData: ShareData) {
             return;
         }
 
-        if (draw(shareData)) {
-            shareData.animationFrameId = requestAnimationFrame(frame);
-        } else {
-            animationLoopRunning = false;
-            shareData.animationFrameId = null;
-        }
+        draw(shareData);
+        shareData.animationFrameId = requestAnimationFrame(frame);
     };
     shareData.animationFrameId = requestAnimationFrame(frame);
 }

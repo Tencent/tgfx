@@ -167,9 +167,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
 }
 
 - (void)displayLinkCallback:(CADisplayLink*)displayLink {
-  if (![self draw]) {
-    displayLink.paused = YES;
-  }
+  [self draw];
 }
 
 - (void)updateDisplayList {
@@ -203,31 +201,31 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   }
 }
 
-- (BOOL)draw {
+- (void)draw {
   if (self.window == nil) {
-    return false;
+    return;
   }
   if (tgfxWindow == nullptr) {
     tgfxWindow = tgfx::CGLWindow::MakeFrom(self);
   }
   if (tgfxWindow == nullptr) {
-    return false;
+    return;
   }
 
   if (!displayList.hasContentChanged() && lastRecording == nullptr) {
-    return false;
+    return;
   }
 
   auto device = tgfxWindow->getDevice();
   auto context = device->lockContext();
   if (context == nullptr) {
-    return false;
+    return;
   }
 
   auto surface = tgfxWindow->getSurface(context);
   if (surface == nullptr) {
     device->unlock();
-    return false;
+    return;
   }
 
   // Sync surface size for DPI changes.
@@ -249,13 +247,11 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
 
   auto recording = context->flush();
 
-  bool submitted = false;
   if (surfaceResized) {
     // When resized, submit current frame immediately (no delay)
     if (recording) {
       context->submit(std::move(recording));
       tgfxWindow->present(context);
-      submitted = true;
     }
     lastRecording = nullptr;
   } else {
@@ -265,12 +261,10 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
     if (recording) {
       context->submit(std::move(recording));
       tgfxWindow->present(context);
-      submitted = true;
     }
   }
 
   device->unlock();
-  return submitted || (lastRecording != nullptr);
 }
 
 - (void)mouseDown:(NSEvent*)event {

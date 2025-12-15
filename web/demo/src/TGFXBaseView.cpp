@@ -97,28 +97,31 @@ void TGFXBaseView::updateDrawParams(int drawIndex, float zoom, float offsetX, fl
   applyTransform();
 }
 
-bool TGFXBaseView::draw() {
+void TGFXBaseView::draw() {
   if (window == nullptr) {
     window = tgfx::WebGLWindow::MakeFrom(canvasID);
   }
   if (window == nullptr) {
-    return false;
+    return;
   }
 
-  if (!displayList.hasContentChanged() && lastRecording == nullptr) {
-    return false;
+  bool hasContentChanged = displayList.hasContentChanged();
+  bool hasLastRecording = (lastRecording != nullptr);
+
+  if (!hasContentChanged && !hasLastRecording) {
+    return;
   }
 
   auto device = window->getDevice();
   auto context = device->lockContext();
   if (context == nullptr) {
-    return false;
+    return;
   }
 
   auto surface = window->getSurface(context);
   if (surface == nullptr) {
     device->unlock();
-    return false;
+    return;
   }
 
   // Sync surface size for DPI changes.
@@ -144,13 +147,11 @@ bool TGFXBaseView::draw() {
 
   auto recording = context->flush();
 
-  bool submitted = false;
   if (surfaceResized) {
     // When resized, submit current frame immediately (no delay)
     if (recording) {
       context->submit(std::move(recording));
       window->present(context);
-      submitted = true;
     }
     lastRecording = nullptr;
   } else {
@@ -160,12 +161,10 @@ bool TGFXBaseView::draw() {
     if (recording) {
       context->submit(std::move(recording));
       window->present(context);
-      submitted = true;
     }
   }
 
   device->unlock();
-  return submitted || (lastRecording != nullptr);
 }
 
 }  // namespace hello2d

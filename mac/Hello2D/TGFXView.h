@@ -33,7 +33,7 @@
 @property(nonatomic) CVDisplayLinkRef cvDisplayLink;
 @property(nonatomic, strong) CADisplayLink* caDisplayLink API_AVAILABLE(macos(14.0));
 
-- (BOOL)draw;
+- (void)draw;
 - (void)startDisplayLink;
 - (void)stopDisplayLink;
 
