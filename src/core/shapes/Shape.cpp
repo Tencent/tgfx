@@ -17,11 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Shape.h"
+#include "tgfx/core/Path.h"
 
 namespace tgfx {
 Shape::~Shape() {
   auto oldBounds = bounds.exchange(nullptr, std::memory_order_acq_rel);
   delete oldBounds;
+  auto oldPath = path.exchange(nullptr, std::memory_order_acq_rel);
+  delete oldPath;
 }
 
 Rect Shape::getBounds() const {
@@ -35,5 +38,18 @@ Rect Shape::getBounds() const {
     delete newBounds;
   }
   return totalBounds;
+}
+
+Path Shape::getPath() const {
+  if (auto cachePath = path.load(std::memory_order_acquire)) {
+    return *cachePath;
+  }
+  auto computePath = onGetPath(1.0f);
+  auto newPath = new Path(computePath);
+  Path* oldPath = nullptr;
+  if (!path.compare_exchange_strong(oldPath, newPath, std::memory_order_acq_rel)) {
+    delete newPath;
+  }
+  return computePath;
 }
 }  // namespace tgfx
