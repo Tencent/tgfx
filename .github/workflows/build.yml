@@ -425,17 +425,45 @@ jobs:
           ohpm config set registry https://ohpm.openharmony.cn/ohpm/
           ohpm install --all
 
+      - name: Setup ccache
+        run: |
+          sudo apt-get update && sudo apt-get install -y ccache
+          ccache --version
+          ccache --max-size=500M
+          ccache --zero-stats
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-ohos-${{ runner.os }}-${{ github.ref_name }}-${{ github.sha }}
+          restore-keys: |
+            ccache-ohos-${{ runner.os }}-${{ github.ref_name }}-
+            ccache-ohos-${{ runner.os }}-
+
       - name: Build Harmony
         run: |
           cd ohos
           # Only build arm64-v8a for CI to reduce build time (from ~10min to ~5min)
           # Remove x86_64 line from abiFilters array
           sed -i '/"x86_64"/d' hello2d/build-profile.json5
+          
+          # Add ccache launcher to CMake arguments in build-profile.json5
+          # This enables ccache for the OHOS NDK cross-compilation
+          sed -i 's/"arguments": "\(.*\)"/"arguments": "\1 -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache"/' hello2d/build-profile.json5
+          
+          # Verify the modification
+          grep -A5 '"arguments"' hello2d/build-profile.json5
+          
           hvigorw assembleHap \
             -Dohos.sdk.root=$DEVECO_SDK_HOME \
             -p buildMode=release \
             --parallel \
             --no-daemon
+          
+          # Show ccache statistics
+          echo "=== ccache statistics ==="
+          ccache --show-stats
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
