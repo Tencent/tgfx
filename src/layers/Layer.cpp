@@ -1015,14 +1015,12 @@ std::shared_ptr<MaskFilter> Layer::getMaskFilter(const DrawArgs& args, float sca
   auto isMatrixAffine = IsMatrix3DAffine(relativeMatrix);
   auto affineRelativeMatrix =
       isMatrixAffine ? GetMayLossyAffineMatrix(relativeMatrix) : Matrix::I();
-  auto maskClipBounds = layerClipBounds;
-  if (layerClipBounds.has_value()) {
-    auto invertedMatrix = Matrix::I();
-    if (affineRelativeMatrix.invert(&invertedMatrix)) {
-      maskClipBounds = invertedMatrix.mapRect(*layerClipBounds);
-    }
-  }
+
   maskPicture = RecordPicture(maskArgs.drawMode, scale, [&](Canvas* canvas) {
+    if (layerClipBounds.has_value()) {
+      canvas->clipRect(*layerClipBounds);
+    }
+    canvas->concat(affineRelativeMatrix);
     _mask->drawLayer(maskArgs, canvas, _mask->_alpha, BlendMode::SrcOver);
   });
   if (maskPicture == nullptr) {
@@ -1041,12 +1039,12 @@ std::shared_ptr<MaskFilter> Layer::getMaskFilter(const DrawArgs& args, float sca
   if (!isMatrixAffine) {
     maskContentImage = maskContentImage->makeWithFilter(ImageFilter::Transform3D(relativeMatrix));
   }
-  affineRelativeMatrix.preScale(1.0f / scale, 1.0f / scale);
-  affineRelativeMatrix.preTranslate(maskImageOffset.x, maskImageOffset.y);
+  auto maskMatrix = Matrix::MakeScale(1.0f / scale, 1.0f / scale);
+  maskMatrix.preTranslate(maskImageOffset.x, maskImageOffset.y);
 
   auto shader = Shader::MakeImageShader(maskContentImage, TileMode::Decal, TileMode::Decal);
   if (shader) {
-    shader = shader->makeWithMatrix(affineRelativeMatrix);
+    shader = shader->makeWithMatrix(maskMatrix);
   }
   return MaskFilter::MakeShader(shader);
 }
