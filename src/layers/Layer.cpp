@@ -783,6 +783,12 @@ Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBou
       continue;
     }
     auto childMatrix = child->getMatrixWithScrollRect();
+    // Check if child can start its own 3D context. If so, directly concatenate the matrix to
+    // preserve depth information. Otherwise, adapt the matrix to achieve the effect of projecting
+    // the child layer first, then applying the transformation.
+    if (child->_transformStyle != TransformStyle::Preserve3D || !child->canExtend3DContext()) {
+      childMatrix.setRow(2, {0, 0, 1, 0});
+    }
     childMatrix.postConcat(workMatrix3D);
     auto childBounds = child->getBoundsInternal(childMatrix, computeTightBounds);
     if (child->_scrollRect) {
