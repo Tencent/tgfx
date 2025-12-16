@@ -648,17 +648,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
   void drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                      const Matrix3D* transform, bool excludeChildren = false);
 
-  void drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha);
-
-  void drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha,
-                    const std::unordered_set<LayerStyleExtraSourceType>& styleExtraSourceTypes,
-                    bool excludeChildren);
-
-  void drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, float alpha,
-                               BlendMode blendMode, const Matrix3D* transform);
-
-  void drawIn3DContext(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
-                       const Matrix3D* transform);
+  void drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha, bool excludeChildren = false,
+                    const Matrix3D* transform = nullptr);
 
   void drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
                     const LayerStyleSource* layerStyleSource = nullptr,
@@ -668,6 +659,9 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   bool drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
                     const Layer* stopChild = nullptr, const Matrix3D* transform = nullptr);
+
+  void drawChildByStarting3DContext(Layer& child, const DrawArgs& args, Canvas* canvas, float alpha,
+                                    const Matrix3D& transform);
 
   float drawBackgroundLayers(const DrawArgs& args, Canvas* canvas);
 
@@ -748,17 +742,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
                                          const Matrix& passThroughImageMatrix,
                                          std::optional<Rect> clipBounds, Matrix* imageMatrix,
                                          bool excludeChildren);
-
-  /**
-   * Returns the equivalent transformation matrix adapted for a custom anchor point.
-   * The matrix is defined based on a local coordinate system, with the transformation anchor point
-   * being the origin of that coordinate system. This function returns an affine transformation
-   * matrix that produces the same visual effect when using any point within this coordinate system
-   * as the new origin and anchor point.
-   * @param matrix The original transformation matrix.
-   * @param anchor The specified anchor point.
-   */
-  Matrix3D anchorAdaptedMatrix(const Matrix3D& matrix, const Point& anchor) const;
 
   /**
    * Calculates the 3D context depth matrix for the layer.
