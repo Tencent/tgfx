@@ -12,17 +12,11 @@ import androidx.activity.ComponentActivity
 class MainActivity : ComponentActivity() {
 
     private lateinit var tgfxView: TGFXView
-
     private var drawIndex = 0
-
     private var zoomScale = 1.0f
-
     private var contentOffset = PointF(0f, 0f)
-
-    private lateinit var animator: ValueAnimator
-
+    private var animator: ValueAnimator? = null
     private lateinit var scaleGestureDetector: ScaleGestureDetector
-
     private lateinit var gestureDetector: GestureDetector
 
     companion object {
@@ -35,57 +29,46 @@ class MainActivity : ComponentActivity() {
         setContentView(R.layout.activity_main)
         tgfxView = findViewById<TGFXView>(R.id.tgfx_view)
         setupGesture()
-
+        animator = ValueAnimator.ofFloat(0f, 1f).apply {
+            repeatCount = ValueAnimator.INFINITE
+            addUpdateListener {
+                tgfxView.draw()
+            }
+            start()
+        }
     }
 
     override fun onPause() {
         super.onPause()
-        if (::animator.isInitialized) {
-            animator.cancel()
-        }
+        animator?.pause()
     }
-
 
     override fun onResume() {
         super.onResume()
-        requestDraw()
+        animator?.resume()
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        if (::animator.isInitialized) {
-            animator.cancel()
-        }
+        animator?.cancel()
+        animator = null
     }
-
 
     private fun setupGesture() {
         scaleGestureDetector = ScaleGestureDetector(this,
             object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
-
-
-                override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
-                    val focusX = detector.focusX
-                    val focusY = detector.focusY
-                    return true
-                }
-
                 override fun onScale(detector: ScaleGestureDetector): Boolean {
                     val oldZoom = zoomScale
                     zoomScale = (zoomScale * detector.scaleFactor).coerceIn(MIN_ZOOM, MAX_ZOOM)
-
                     contentOffset.x = detector.focusX - (detector.focusX - contentOffset.x) * zoomScale / oldZoom
                     contentOffset.y = detector.focusY - (detector.focusY - contentOffset.y) * zoomScale / oldZoom
-
-                    requestDraw()
+                    tgfxView.updateDisplayTransform(zoomScale, contentOffset)
                     return true
                 }
             })
 
         gestureDetector = GestureDetector(this,
             object : GestureDetector.SimpleOnGestureListener() {
-
-
                 override fun onScroll(
                     e1: MotionEvent?,
                     e2: MotionEvent,
@@ -94,45 +77,24 @@ class MainActivity : ComponentActivity() {
                 ): Boolean {
                     contentOffset.x -= distanceX
                     contentOffset.y -= distanceY
-                    requestDraw()
+                    tgfxView.updateDisplayTransform(zoomScale, contentOffset)
                     return true
                 }
 
-
                 override fun onSingleTapUp(e: MotionEvent): Boolean {
-                    drawIndex = (drawIndex + 1)
+                    drawIndex++
                     zoomScale = 1.0f
                     contentOffset.set(0f, 0f)
-                    requestDraw()
+                    tgfxView.updateDisplayList(drawIndex)
+                    tgfxView.updateDisplayTransform(zoomScale, contentOffset)
                     return true
                 }
             })
     }
-
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         scaleGestureDetector.onTouchEvent(event)
         gestureDetector.onTouchEvent(event)
         return true
     }
-
-
-    private fun requestDraw() {
-        if (::animator.isInitialized && animator.isRunning) {
-            return
-        }
-
-        animator = ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = Long.MAX_VALUE
-            addUpdateListener {
-                try {
-                    tgfxView.draw(drawIndex, zoomScale, contentOffset)
-                } catch (e: Exception) {
-                    cancel()
-                }
-            }
-            start()
-        }
-    }
-
 }

@@ -45,23 +45,21 @@ class JTGFXView {
   }
 
   void updateSize();
-  void draw(int index, float zoom, float x, float y);
+  void updateDisplayList(int drawIndex);
+  void updateDisplayTransform(float zoom, float offsetX, float offsetY);
+  void draw();
 
  private:
+  void applyCenteringTransform();
+
   ANativeWindow* nativeWindow = nullptr;
   std::shared_ptr<tgfx::Window> window;
   std::unique_ptr<hello2d::AppHost> appHost = nullptr;
-  tgfx::DisplayList displayList;
+  tgfx::DisplayList displayList = {};
   std::shared_ptr<tgfx::Layer> contentLayer = nullptr;
   std::unique_ptr<tgfx::Recording> lastRecording = nullptr;
-  // Cached draw parameters for recalculating transform when they change
-  float lastZoom = 1.0f;
-  float lastOffsetX = 0.0f;
-  float lastOffsetY = 0.0f;
   int lastDrawIndex = -1;
-  // Cached surface size for calculating base scale without locking device
   int lastSurfaceWidth = 0;
   int lastSurfaceHeight = 0;
-  bool sizeInvalidated = false;
 };
 }  // namespace hello2d

@@ -74,6 +74,9 @@ static const float MaxZoom = 1000.0f;
                                            selector:@selector(appWillEnterForeground:)
                                                name:UIApplicationWillEnterForegroundNotification
                                              object:nil];
+
+  [self.tgfxView updateDisplayList:self.drawIndex];
+  [self.tgfxView updateDisplayTransform:self.zoomScale offset:self.contentOffset];
 }
 
 - (void)appDidEnterBackground:(NSNotification*)notification {
@@ -82,19 +85,10 @@ static const float MaxZoom = 1000.0f;
 
 - (void)appWillEnterForeground:(NSNotification*)notification {
   [self.displayLink setPaused:NO];
-  [self requestDraw];
 }
 
 - (void)dealloc {
   [[NSNotificationCenter defaultCenter] removeObserver:self];
-}
-
-- (void)viewDidLayoutSubviews {
-  [super viewDidLayoutSubviews];
-  [self.tgfxView updateDisplayListWithDrawIndex:self.drawIndex
-                                           zoom:self.zoomScale
-                                         offset:self.contentOffset];
-  [self requestDraw];
 }
 
 - (void)tgfxViewClicked {
@@ -107,10 +101,8 @@ static const float MaxZoom = 1000.0f;
   self.currentZoom = 1.0f;
   self.currentPanOffset = CGPointZero;
   self.currentPinchOffset = CGPointZero;
-  [self.tgfxView updateDisplayListWithDrawIndex:self.drawIndex
-                                           zoom:self.zoomScale
-                                         offset:self.contentOffset];
-  [self requestDraw];
+  [self.tgfxView updateDisplayList:self.drawIndex];
+  [self.tgfxView updateDisplayTransform:self.zoomScale offset:self.contentOffset];
 }
 
 - (void)handlePan:(UIPanGestureRecognizer*)gesture {
@@ -129,10 +121,7 @@ static const float MaxZoom = 1000.0f;
                   self.contentOffset.y +
                       (translation.y - self.currentPanOffset.y) * self.tgfxView.contentScaleFactor);
   self.currentPanOffset = translation;
-  [self.tgfxView updateDisplayListWithDrawIndex:self.drawIndex
-                                           zoom:self.zoomScale
-                                         offset:self.contentOffset];
-  [self requestDraw];
+  [self.tgfxView updateDisplayTransform:self.zoomScale offset:self.contentOffset];
 }
 
 - (void)handlePinch:(UIPinchGestureRecognizer*)gesture {
@@ -160,10 +149,7 @@ static const float MaxZoom = 1000.0f;
   offset.y = (self.currentPinchOffset.y - self.pinchCenter.y) * scale / self.currentZoom + center.y;
   self.zoomScale = scale;
   self.contentOffset = offset;
-  [self.tgfxView updateDisplayListWithDrawIndex:self.drawIndex
-                                           zoom:self.zoomScale
-                                         offset:self.contentOffset];
-  [self requestDraw];
+  [self.tgfxView updateDisplayTransform:self.zoomScale offset:self.contentOffset];
 }
 
 - (BOOL)gestureRecognizer:(UIGestureRecognizer*)gestureRecognizer
@@ -173,11 +159,7 @@ static const float MaxZoom = 1000.0f;
 }
 
 - (void)update:(CADisplayLink*)displayLink {
-  [self.tgfxView draw:self.drawIndex zoom:self.zoomScale offset:self.contentOffset];
-}
-
-- (void)requestDraw {
-  [self.displayLink setPaused:NO];
+  [self.tgfxView draw];
 }
 
 @end

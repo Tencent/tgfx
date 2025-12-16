@@ -54,6 +54,8 @@ if (typeof window !== 'undefined') {
             const emojiFontUIntArray = new Uint8Array(emojiFontBuffer);
             tgfxView.registerFonts(fontUIntArray, emojiFontUIntArray);
             updateSize(shareData);
+            tgfxView.updateDisplayList(shareData.drawIndex);
+            tgfxView.updateDisplayTransform(1.0, 0, 0);
             const canvas = document.getElementById('hello2d');
             bindCanvasZoomAndPanEvents(canvas, shareData);
             animationLoop(shareData);

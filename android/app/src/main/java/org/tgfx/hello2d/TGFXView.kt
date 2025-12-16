@@ -85,9 +85,10 @@ open class TGFXView : TextureView, TextureView.SurfaceTextureListener {
             metrics.density
         )
 
-        // Only draw if native initialization was successful
+        // Only initialize if native initialization was successful
         if (nativePtr != 0L) {
-            draw(0, 1.0f, PointF(0f, 0f))
+            updateDisplayList(0)
+            updateDisplayTransform(1.0f, PointF(0f, 0f))
         }
     }
 
@@ -97,7 +98,7 @@ open class TGFXView : TextureView, TextureView.SurfaceTextureListener {
         width: Int,
         height: Int
     ) {
-        updateSize()
+        nativeUpdateSize()
     }
 
     override fun onSurfaceTextureDestroyed(surfaceTexture: SurfaceTexture): Boolean {
@@ -120,23 +121,34 @@ open class TGFXView : TextureView, TextureView.SurfaceTextureListener {
     }
 
 
-    fun draw(index: Int, zoom: Float, offset: PointF) {
+    fun updateDisplayList(drawIndex: Int) {
         if (nativePtr != 0L) {
-            nativeDraw(index, zoom, offset.x, offset.y)
+            nativeUpdateDisplayList(drawIndex)
+        }
+    }
+
+    fun updateDisplayTransform(zoom: Float, offset: PointF) {
+        if (nativePtr != 0L) {
+            nativeUpdateDisplayTransform(zoom, offset.x, offset.y)
+        }
+    }
+
+    fun draw() {
+        if (nativePtr != 0L) {
+            nativeDraw()
         }
     }
 
 
-    private external fun updateSize()
+    private external fun nativeUpdateSize()
 
     private external fun nativeRelease()
 
-    private external fun nativeDraw(
-        drawIndex: Int,
-        zoom: Float,
-        offsetX: Float,
-        offsetY: Float
-    )
+    private external fun nativeUpdateDisplayList(drawIndex: Int)
+
+    private external fun nativeUpdateDisplayTransform(zoom: Float, offsetX: Float, offsetY: Float)
+
+    private external fun nativeDraw()
 
 
     private lateinit var surface: Surface

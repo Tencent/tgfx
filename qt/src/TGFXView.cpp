@@ -42,7 +42,7 @@ void TGFXView::updateTransform(qreal zoomLevel, QPointF panOffset) {
   float clampedZoom = std::max(0.001f, std::min(1000.0f, static_cast<float>(zoomLevel)));
   zoom = clampedZoom;
   offset = panOffset;
-  updateDisplayList();
+  updateDisplayTransform();
   update();
 }
 
@@ -51,6 +51,7 @@ void TGFXView::onClicked() {
   zoom = 1.0f;
   offset = QPointF(0, 0);
   updateDisplayList();
+  updateDisplayTransform();
   update();
 }
 
@@ -64,23 +65,22 @@ void TGFXView::updateDisplayList() {
       if (contentLayer) {
         displayList.root()->removeChildren();
         displayList.root()->addChild(contentLayer);
+        applyCenteringTransform();
       }
     }
     lastDrawIndex = index;
   }
-
-  applyTransform();
 }
 
-void TGFXView::applyTransform() {
-  if (lastSurfaceWidth > 0 && lastSurfaceHeight > 0) {
-    if (contentLayer) {
-      hello2d::LayerBuilder::ApplyCenteringTransform(contentLayer,
-                                                     static_cast<float>(lastSurfaceWidth),
-                                                     static_cast<float>(lastSurfaceHeight));
-    }
-    displayList.setZoomScale(zoom);
-    displayList.setContentOffset(static_cast<float>(offset.x()), static_cast<float>(offset.y()));
+void TGFXView::updateDisplayTransform() {
+  displayList.setZoomScale(zoom);
+  displayList.setContentOffset(static_cast<float>(offset.x()), static_cast<float>(offset.y()));
+}
+
+void TGFXView::applyCenteringTransform() {
+  if (lastSurfaceWidth > 0 && lastSurfaceHeight > 0 && contentLayer) {
+    hello2d::LayerBuilder::ApplyCenteringTransform(
+        contentLayer, static_cast<float>(lastSurfaceWidth), static_cast<float>(lastSurfaceHeight));
   }
 }
 
@@ -98,7 +98,7 @@ QSGNode* TGFXView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
       tgfxWindow->getSurface(nullptr)->height() != screenHeight) {
     lastSurfaceWidth = screenWidth;
     lastSurfaceHeight = screenHeight;
-    applyTransform();
+    applyCenteringTransform();
     tgfxWindow->invalidSize();
     lastRecording = nullptr;
     sizeInvalidated = true;
@@ -168,13 +168,6 @@ void TGFXView::draw() {
   // Sync surface size for DPI changes.
   bool surfaceResized = sizeInvalidated;
   sizeInvalidated = false;
-
-  if (surface->width() != lastSurfaceWidth || surface->height() != lastSurfaceHeight) {
-    lastSurfaceWidth = surface->width();
-    lastSurfaceHeight = surface->height();
-    applyTransform();
-    surfaceResized = true;
-  }
 
   auto canvas = surface->getCanvas();
   canvas->clear();

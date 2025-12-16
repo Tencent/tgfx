@@ -31,23 +31,32 @@ TGFXBaseView::TGFXBaseView(const std::string& canvasID) : canvasID(canvasID) {
   displayList.setMaxTileCount(512);
 }
 
-void TGFXBaseView::updateSize(float devicePixelRatio) {
-  if (canvasID.empty()) {
+void TGFXBaseView::updateSize() {
+  if (window == nullptr) {
+    window = tgfx::WebGLWindow::MakeFrom(canvasID);
+  }
+  if (window == nullptr) {
     return;
   }
-  int width = 0;
-  int height = 0;
-  emscripten_get_canvas_element_size(canvasID.c_str(), &width, &height);
-  if (width <= 0 || height <= 0) {
+  window->invalidSize();
+  auto device = window->getDevice();
+  auto context = device->lockContext();
+  if (context == nullptr) {
     return;
   }
-  lastSurfaceWidth = static_cast<int>(width * devicePixelRatio);
-  lastSurfaceHeight = static_cast<int>(height * devicePixelRatio);
-  isResizing = true;
-  applyTransform();
-  if (window) {
-    window->invalidSize();
+  auto surface = window->getSurface(context);
+  if (surface == nullptr) {
+    device->unlock();
+    return;
   }
+  if (surface->width() != lastSurfaceWidth || surface->height() != lastSurfaceHeight) {
+    lastSurfaceWidth = surface->width();
+    lastSurfaceHeight = surface->height();
+    applyCenteringTransform();
+    lastRecording = nullptr;
+    sizeInvalidated = true;
+  }
+  device->unlock();
 }
 
 void TGFXBaseView::setImagePath(const std::string& name, tgfx::NativeImageRef nativeImage) {
@@ -57,29 +66,19 @@ void TGFXBaseView::setImagePath(const std::string& name, tgfx::NativeImageRef na
   }
 }
 
-void TGFXBaseView::onWheelEvent() {
-}
-
-void TGFXBaseView::onClickEvent() {
-}
-
-void TGFXBaseView::applyTransform() {
-  if (lastSurfaceWidth > 0 && lastSurfaceHeight > 0) {
-    if (contentLayer) {
-      hello2d::LayerBuilder::ApplyCenteringTransform(contentLayer,
-                                                     static_cast<float>(lastSurfaceWidth),
-                                                     static_cast<float>(lastSurfaceHeight));
-    }
-    displayList.setZoomScale(currentZoom);
-    displayList.setContentOffset(currentOffsetX, currentOffsetY);
+void TGFXBaseView::applyCenteringTransform() {
+  if (lastSurfaceWidth > 0 && lastSurfaceHeight > 0 && contentLayer) {
+    hello2d::LayerBuilder::ApplyCenteringTransform(
+        contentLayer, static_cast<float>(lastSurfaceWidth), static_cast<float>(lastSurfaceHeight));
   }
 }
 
-void TGFXBaseView::updateDrawParams(int drawIndex, float zoom, float offsetX, float offsetY) {
-  currentZoom = zoom;
-  currentOffsetX = offsetX;
-  currentOffsetY = offsetY;
+void TGFXBaseView::updateDisplayTransform(float zoom, float offsetX, float offsetY) {
+  displayList.setZoomScale(zoom);
+  displayList.setContentOffset(offsetX, offsetY);
+}
 
+void TGFXBaseView::updateDisplayList(int drawIndex) {
   auto numBuilders = hello2d::LayerBuilder::Count();
   auto index = drawIndex % numBuilders;
   if (index != lastDrawIndex || !contentLayer) {
@@ -89,12 +88,11 @@ void TGFXBaseView::updateDrawParams(int drawIndex, float zoom, float offsetX, fl
       if (contentLayer) {
         displayList.root()->removeChildren();
         displayList.root()->addChild(contentLayer);
+        applyCenteringTransform();
       }
     }
     lastDrawIndex = index;
   }
-
-  applyTransform();
 }
 
 void TGFXBaseView::draw() {
@@ -124,17 +122,6 @@ void TGFXBaseView::draw() {
     return;
   }
 
-  // Sync surface size for DPI changes.
-  bool surfaceResized = isResizing;
-  isResizing = false;
-
-  if (surface->width() != lastSurfaceWidth || surface->height() != lastSurfaceHeight) {
-    lastSurfaceWidth = surface->width();
-    lastSurfaceHeight = surface->height();
-    applyTransform();
-    surfaceResized = true;
-  }
-
   auto canvas = surface->getCanvas();
   canvas->clear();
   int width = 0;
@@ -147,15 +134,16 @@ void TGFXBaseView::draw() {
 
   auto recording = context->flush();
 
+  bool surfaceResized = sizeInvalidated;
+  sizeInvalidated = false;
+
   if (surfaceResized) {
-    // When resized, submit current frame immediately (no delay)
     if (recording) {
       context->submit(std::move(recording));
       window->present(context);
     }
     lastRecording = nullptr;
   } else {
-    // Delayed one-frame present
     std::swap(lastRecording, recording);
 
     if (recording) {

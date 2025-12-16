@@ -42,7 +42,7 @@ class TGFXView : public QQuickItem {
   int lastDrawIndex = -1;
   std::shared_ptr<tgfx::QGLWindow> tgfxWindow = nullptr;
   std::shared_ptr<hello2d::AppHost> appHost = nullptr;
-  tgfx::DisplayList displayList;
+  tgfx::DisplayList displayList = {};
   std::shared_ptr<tgfx::Layer> contentLayer = nullptr;
   std::unique_ptr<tgfx::Recording> lastRecording = nullptr;
   float zoom = 1.0f;
@@ -53,7 +53,8 @@ class TGFXView : public QQuickItem {
 
   void createAppHost();
   void updateDisplayList();
-  void applyTransform();
+  void updateDisplayTransform();
+  void applyCenteringTransform();
   void draw();
  private Q_SLOTS:
   void onSceneGraphInvalidated();

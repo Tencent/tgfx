@@ -26,11 +26,10 @@
   std::unique_ptr<hello2d::AppHost> appHost;
   tgfx::DisplayList displayList;
   std::shared_ptr<tgfx::Layer> contentLayer;
-  int lastDrawIndex;
-  std::unique_ptr<tgfx::Recording> lastRecording;
-  int lastSurfaceWidth;
-  int lastSurfaceHeight;
-  bool sizeInvalidated;
+  int lastDrawIndex = -1;
+  std::unique_ptr<tgfx::Recording> lastRecording = nullptr;
+  int lastSurfaceWidth = 0;
+  int lastSurfaceHeight = 0;
 }
 
 + (Class)layerClass {
@@ -77,25 +76,19 @@
     lastDrawIndex = -1;
     lastSurfaceWidth = 0;
     lastSurfaceHeight = 0;
-    sizeInvalidated = false;
     displayList.setRenderMode(tgfx::RenderMode::Tiled);
     displayList.setAllowZoomBlur(true);
     displayList.setMaxTileCount(512);
   }
   lastSurfaceWidth = static_cast<int>(self.bounds.size.width * self.contentScaleFactor);
   lastSurfaceHeight = static_cast<int>(self.bounds.size.height * self.contentScaleFactor);
-  if (contentLayer && lastSurfaceWidth > 0 && lastSurfaceHeight > 0) {
-    hello2d::LayerBuilder::ApplyCenteringTransform(
-        contentLayer, static_cast<float>(lastSurfaceWidth), static_cast<float>(lastSurfaceHeight));
-  }
   if (tgfxWindow != nullptr) {
     tgfxWindow->invalidSize();
     lastRecording = nullptr;
-    sizeInvalidated = true;
   }
 }
 
-- (void)updateDisplayListWithDrawIndex:(int)drawIndex zoom:(float)zoom offset:(CGPoint)offset {
+- (void)updateDisplayList:(int)drawIndex {
   if (appHost == nullptr) {
     [self updateSize];
   }
@@ -108,27 +101,26 @@
       if (contentLayer) {
         displayList.root()->removeChildren();
         displayList.root()->addChild(contentLayer);
+        [self applyCenteringTransform];
       }
     }
     lastDrawIndex = index;
   }
-
-  [self applyTransformWithZoom:zoom offset:offset];
 }
 
-- (void)applyTransformWithZoom:(float)zoom offset:(CGPoint)offset {
-  if (lastSurfaceWidth > 0 && lastSurfaceHeight > 0) {
-    if (contentLayer) {
-      hello2d::LayerBuilder::ApplyCenteringTransform(contentLayer,
-                                                     static_cast<float>(lastSurfaceWidth),
-                                                     static_cast<float>(lastSurfaceHeight));
-    }
-    displayList.setZoomScale(zoom);
-    displayList.setContentOffset(static_cast<float>(offset.x), static_cast<float>(offset.y));
+- (void)updateDisplayTransform:(float)zoom offset:(CGPoint)offset {
+  displayList.setZoomScale(zoom);
+  displayList.setContentOffset(static_cast<float>(offset.x), static_cast<float>(offset.y));
+}
+
+- (void)applyCenteringTransform {
+  if (lastSurfaceWidth > 0 && lastSurfaceHeight > 0 && contentLayer) {
+    hello2d::LayerBuilder::ApplyCenteringTransform(
+        contentLayer, static_cast<float>(lastSurfaceWidth), static_cast<float>(lastSurfaceHeight));
   }
 }
 
-- (void)draw:(int)drawIndex zoom:(float)zoom offset:(CGPoint)offset {
+- (void)draw {
   if (self.window == nil) {
     return;
   }
@@ -155,17 +147,6 @@
     return;
   }
 
-  // Sync surface size for DPI changes.
-  bool surfaceResized = sizeInvalidated;
-  sizeInvalidated = false;
-
-  if (surface->width() != lastSurfaceWidth || surface->height() != lastSurfaceHeight) {
-    lastSurfaceWidth = surface->width();
-    lastSurfaceHeight = surface->height();
-    [self applyTransformWithZoom:zoom offset:offset];
-    surfaceResized = true;
-  }
-
   auto canvas = surface->getCanvas();
   canvas->clear();
   hello2d::DrawBackground(canvas, surface->width(), surface->height(), self.layer.contentsScale);
@@ -174,21 +155,12 @@
 
   auto recording = context->flush();
 
-  if (surfaceResized) {
-    // When resized, submit current frame immediately (no delay)
-    if (recording) {
-      context->submit(std::move(recording));
-      tgfxWindow->present(context);
-    }
-    lastRecording = nullptr;
-  } else {
-    // Delayed one-frame present
-    std::swap(lastRecording, recording);
+  // Delayed one-frame present
+  std::swap(lastRecording, recording);
 
-    if (recording) {
-      context->submit(std::move(recording));
-      tgfxWindow->present(context);
-    }
+  if (recording) {
+    context->submit(std::move(recording));
+    tgfxWindow->present(context);
   }
 
   device->unlock();

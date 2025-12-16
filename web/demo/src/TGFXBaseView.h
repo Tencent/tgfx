@@ -33,20 +33,19 @@ class TGFXBaseView {
 
   void setImagePath(const std::string& name, tgfx::NativeImageRef nativeImage);
 
-  void updateSize(float devicePixelRatio);
+  void updateSize();
 
-  void updateDrawParams(int drawIndex, float zoom, float offsetX, float offsetY);
+  void updateDisplayList(int drawIndex);
+
+  void updateDisplayTransform(float zoom, float offsetX, float offsetY);
 
   void draw();
-
-  void onWheelEvent();
-  void onClickEvent();
 
  protected:
   std::shared_ptr<hello2d::AppHost> appHost = nullptr;
 
  private:
-  void applyTransform();
+  void applyCenteringTransform();
 
   std::string canvasID = "";
   std::shared_ptr<tgfx::Window> window = nullptr;
@@ -56,10 +55,7 @@ class TGFXBaseView {
   std::unique_ptr<tgfx::Recording> lastRecording = nullptr;
   int lastSurfaceWidth = 0;
   int lastSurfaceHeight = 0;
-  bool isResizing = false;
-  float currentZoom = 1.0f;
-  float currentOffsetX = 0.0f;
-  float currentOffsetY = 0.0f;
+  bool sizeInvalidated = false;
 };
 
 }  // namespace hello2d

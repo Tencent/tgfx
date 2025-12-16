@@ -22,20 +22,16 @@ export const MIN_ZOOM = 0.001;
 export const MAX_ZOOM = 1000.0;
 
 export class TGFXBaseView {
-    public updateSize: (devicePixelRatio: number) => void;
-    public updateDrawParams: (drawIndex: number, zoom: number, offsetX: number, offsetY: number) => void;
-    public draw: () => boolean;
-    public onWheelEvent: () => void;
-    public onClickEvent: () => void;
+    public updateSize: () => void;
+    public updateDisplayList: (drawIndex: number) => void;
+    public updateDisplayTransform: (zoom: number, offsetX: number, offsetY: number) => void;
+    public draw: () => void;
 }
 
 export class ShareData {
     public Hello2DModule: types.TGFX = null;
     public tgfxBaseView: TGFXBaseView = null;
     public drawIndex: number = 0;
-    public zoom: number = 1.0;
-    public offsetX: number = 0;
-    public offsetY: number = 0;
     public animationFrameId: number | null = null;
     public isPageVisible: boolean = true;
     public resized: boolean = false;
@@ -72,6 +68,10 @@ class GestureManager {
     private mouseWheelRatio = 800;
     private touchWheelRatio = 100;
 
+    public zoom = 1.0;
+    public offsetX = 0;
+    public offsetY = 0;
+
     private handleScrollEvent(
         event: WheelEvent,
         state: ScrollGestureState,
@@ -79,22 +79,15 @@ class GestureManager {
         deviceType: DeviceType = DeviceType.MOUSE,
     ) {
         if (state === ScrollGestureState.SCROLL_CHANGE){
-            this.scaleStartZoom = shareData.zoom;
+            this.scaleStartZoom = this.zoom;
             this.scaleY = 1.0;
             if (event.shiftKey && event.deltaX === 0 && event.deltaY !== 0) {
-                shareData.offsetX -= event.deltaY * window.devicePixelRatio;
+                this.offsetX -= event.deltaY * window.devicePixelRatio;
             } else {
-                shareData.offsetX -= event.deltaX * window.devicePixelRatio;
-                shareData.offsetY -= event.deltaY * window.devicePixelRatio;
+                this.offsetX -= event.deltaX * window.devicePixelRatio;
+                this.offsetY -= event.deltaY * window.devicePixelRatio;
             }
-            // Update DisplayList properties when scroll event triggers change
-            shareData.tgfxBaseView.updateDrawParams(
-                shareData.drawIndex,
-                shareData.zoom,
-                shareData.offsetX,
-                shareData.offsetY
-            );
-            shareData.tgfxBaseView.onWheelEvent();
+            shareData.tgfxBaseView.updateDisplayTransform(this.zoom, this.offsetX, this.offsetY);
         }
     }
 
@@ -107,34 +100,34 @@ class GestureManager {
     ) {
         if (state === ScaleGestureState.SCALE_START) {
             this.scaleY = 1.0;
-            this.scaleStartZoom = shareData.zoom;
+            this.scaleStartZoom = this.zoom;
         }
         if (state === ScaleGestureState.SCALE_CHANGE) {
             const rect = canvas.getBoundingClientRect();
             const pixelX = (event.clientX - rect.left) * window.devicePixelRatio;
             const pixelY = (event.clientY - rect.top) * window.devicePixelRatio;
             const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, this.scaleStartZoom * this.scaleY));
-            shareData.offsetX = (shareData.offsetX - pixelX) * (newZoom / shareData.zoom) + pixelX;
-            shareData.offsetY = (shareData.offsetY - pixelY) * (newZoom / shareData.zoom) + pixelY;
-            shareData.zoom = newZoom;
+            this.offsetX = (this.offsetX - pixelX) * (newZoom / this.zoom) + pixelX;
+            this.offsetY = (this.offsetY - pixelY) * (newZoom / this.zoom) + pixelY;
+            this.zoom = newZoom;
         }
         if (state === ScaleGestureState.SCALE_END){
             this.scaleY = 1.0;
-            this.scaleStartZoom = shareData.zoom;
+            this.scaleStartZoom = this.zoom;
         }
-        // Update DisplayList properties when scale event triggers change
-        shareData.tgfxBaseView.updateDrawParams(
-            shareData.drawIndex,
-            shareData.zoom,
-            shareData.offsetX,
-            shareData.offsetY
-        );
-        shareData.tgfxBaseView.onWheelEvent();
+        shareData.tgfxBaseView.updateDisplayTransform(this.zoom, this.offsetX, this.offsetY);
     }
 
     public clearState() {
         this.scaleY = 1.0;
         this.timer = undefined;
+    }
+
+    public resetTransform() {
+        this.zoom = 1.0;
+        this.offsetX = 0;
+        this.offsetY = 0;
+        this.clearState();
     }
 
     private resetScrollTimeout(
@@ -195,18 +188,13 @@ class GestureManager {
                 this.handleScaleEvent(event, ScaleGestureState.SCALE_CHANGE, canvas, shareData, deviceType);
             }
         }
-        animationLoop(shareData);
     }
 }
 
 const gestureManager: GestureManager = new GestureManager();
 
-function isPromise(obj: any): obj is Promise<any> {
-    return !!obj && typeof obj.then === "function";
-}
-
-function draw(shareData: ShareData): boolean {
-    return shareData.tgfxBaseView.draw();
+function draw(shareData: ShareData): void {
+    shareData.tgfxBaseView.draw();
 }
 let animationLoopRunning = false;
 
@@ -223,15 +211,7 @@ export function updateSize(shareData: ShareData) {
     canvas.height = screenRect.height * scaleFactor;
     canvas.style.width = screenRect.width + "px";
     canvas.style.height = screenRect.height + "px";
-    shareData.tgfxBaseView.updateSize(scaleFactor);
-    // Update DisplayList properties after size change
-    shareData.tgfxBaseView.updateDrawParams(
-        shareData.drawIndex,
-        shareData.zoom,
-        shareData.offsetX,
-        shareData.offsetY
-    );
-    animationLoop(shareData);
+    shareData.tgfxBaseView.updateSize();
 }
 
 export function onResizeEvent(shareData: ShareData) {
@@ -270,6 +250,30 @@ export function animationLoop(shareData: ShareData) {
     shareData.animationFrameId = requestAnimationFrame(frame);
 }
 
+function setupDevicePixelRatioListener(shareData: ShareData) {
+    const updateOnDPRChange = () => {
+        updateSize(shareData);
+        setupDevicePixelRatioListener(shareData);
+    };
+    const mediaQuery = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
+    mediaQuery.addEventListener('change', updateOnDPRChange, { once: true });
+}
+
+function setupCanvasResizeObserver(shareData: ShareData) {
+    const canvas = document.getElementById('hello2d') as HTMLCanvasElement;
+    if (!canvas) {
+        return;
+    }
+    let lastDevicePixelRatio = window.devicePixelRatio;
+    const resizeObserver = new ResizeObserver(() => {
+        if (window.devicePixelRatio !== lastDevicePixelRatio) {
+            lastDevicePixelRatio = window.devicePixelRatio;
+            updateSize(shareData);
+        }
+    });
+    resizeObserver.observe(canvas);
+}
+
 export function setupVisibilityListeners(shareData: ShareData) {
     if (typeof window !== 'undefined') {
         document.addEventListener('visibilitychange', () => handleVisibilityChange(shareData));
@@ -279,6 +283,8 @@ export function setupVisibilityListeners(shareData: ShareData) {
                 shareData.animationFrameId = null;
             }
         });
+        setupDevicePixelRatioListener(shareData);
+        setupCanvasResizeObserver(shareData);
     }
 }
 
@@ -287,22 +293,9 @@ export function onClickEvent(shareData: ShareData) {
         return;
     }
     shareData.drawIndex++;
-    shareData.offsetX = 0;
-    shareData.offsetY = 0;
-    shareData.zoom = 1.0;
-    gestureManager.clearState();
-    // Update DisplayList properties when click event triggers change
-    shareData.tgfxBaseView.updateDrawParams(
-        shareData.drawIndex,
-        shareData.zoom,
-        shareData.offsetX,
-        shareData.offsetY
-    );
-    shareData.tgfxBaseView.onClickEvent();
-
-    const names = ['CustomLayerTree'];  
-    const currentName = names[shareData.drawIndex % names.length];
-    animationLoop(shareData);
+    gestureManager.resetTransform();
+    shareData.tgfxBaseView.updateDisplayTransform(gestureManager.zoom, gestureManager.offsetX, gestureManager.offsetY);
+    shareData.tgfxBaseView.updateDisplayList(shareData.drawIndex);
 }
 
 export function loadImage(src: string): Promise<HTMLImageElement> {

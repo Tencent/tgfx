@@ -36,5 +36,7 @@
 - (void)draw;
 - (void)startDisplayLink;
 - (void)stopDisplayLink;
+- (void)updateDisplayList;
+- (void)updateDisplayTransform;
 
 @end

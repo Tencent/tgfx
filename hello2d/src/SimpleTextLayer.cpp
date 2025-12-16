@@ -17,13 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SimpleTextLayer.h"
-#include <tgfx/layers/Gradient.h>
-#include <tgfx/layers/ShapeLayer.h>
-#include <tgfx/layers/SolidColor.h>
-#include <tgfx/layers/LayerRecorder.h>
 #include <tgfx/core/Matrix.h>
 #include <tgfx/core/Path.h>
 #include <tgfx/core/Shader.h>
+#include <tgfx/layers/Gradient.h>
+#include <tgfx/layers/LayerRecorder.h>
+#include <tgfx/layers/ShapeLayer.h>
+#include <tgfx/layers/SolidColor.h>
 #include <algorithm>
 #include <map>
 #include "base/LayerBuilders.h"

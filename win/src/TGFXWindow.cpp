@@ -105,7 +105,7 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
       auto pixelRatio = getPixelRatio();
       lastSurfaceWidth = static_cast<int>((rect.right - rect.left) * pixelRatio);
       lastSurfaceHeight = static_cast<int>((rect.bottom - rect.top) * pixelRatio);
-      applyTransform();
+      applyCenteringTransform();
       if (tgfxWindow) {
         tgfxWindow->invalidSize();
         lastRecording = nullptr;
@@ -131,6 +131,7 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
         zoomScale = 1.0f;
         contentOffset = {0.0f, 0.0f};
         updateDisplayList();
+        updateDisplayTransform();
         ::InvalidateRect(windowHandle, nullptr, FALSE);
       }
       break;
@@ -156,7 +157,7 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
           contentOffset.y -= wheelDelta;
         }
       }
-      updateDisplayList();
+      updateDisplayTransform();
       ::InvalidateRect(windowHandle, nullptr, FALSE);
       break;
     }
@@ -183,7 +184,7 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
           lastZoomArgument = 0.0;
         }
         CloseGestureInfoHandle(reinterpret_cast<HGESTUREINFO>(lparam));
-        updateDisplayList();
+        updateDisplayTransform();
         ::InvalidateRect(windowHandle, nullptr, FALSE);
       }
       break;
@@ -305,23 +306,22 @@ void TGFXWindow::updateDisplayList() {
       if (contentLayer) {
         displayList.root()->removeChildren();
         displayList.root()->addChild(contentLayer);
+        applyCenteringTransform();
       }
     }
     lastDrawIndex = index;
   }
-
-  applyTransform();
 }
 
-void TGFXWindow::applyTransform() {
-  if (lastSurfaceWidth > 0 && lastSurfaceHeight > 0) {
-    if (contentLayer) {
-      hello2d::LayerBuilder::ApplyCenteringTransform(contentLayer,
-                                                     static_cast<float>(lastSurfaceWidth),
-                                                     static_cast<float>(lastSurfaceHeight));
-    }
-    displayList.setZoomScale(zoomScale);
-    displayList.setContentOffset(contentOffset.x, contentOffset.y);
+void TGFXWindow::updateDisplayTransform() {
+  displayList.setZoomScale(zoomScale);
+  displayList.setContentOffset(contentOffset.x, contentOffset.y);
+}
+
+void TGFXWindow::applyCenteringTransform() {
+  if (lastSurfaceWidth > 0 && lastSurfaceHeight > 0 && contentLayer) {
+    hello2d::LayerBuilder::ApplyCenteringTransform(
+        contentLayer, static_cast<float>(lastSurfaceWidth), static_cast<float>(lastSurfaceHeight));
   }
 }
 
@@ -362,13 +362,6 @@ void TGFXWindow::draw() {
   // Sync surface size for DPI changes.
   bool surfaceResized = sizeInvalidated;
   sizeInvalidated = false;
-
-  if (surface->width() != lastSurfaceWidth || surface->height() != lastSurfaceHeight) {
-    lastSurfaceWidth = surface->width();
-    lastSurfaceHeight = surface->height();
-    applyTransform();
-    surfaceResized = true;
-  }
 
   auto canvas = surface->getCanvas();
   canvas->clear();

@@ -28,24 +28,14 @@ void JTGFXView::updateSize() {
   if (width > 0 && height > 0) {
     lastSurfaceWidth = width;
     lastSurfaceHeight = height;
-    if (contentLayer) {
-      hello2d::LayerBuilder::ApplyCenteringTransform(contentLayer,
-                                                     static_cast<float>(lastSurfaceWidth),
-                                                     static_cast<float>(lastSurfaceHeight));
-    }
     window->invalidSize();
     lastRecording = nullptr;
-    sizeInvalidated = true;
   }
 }
 
-void JTGFXView::draw(int drawIndex, float zoom, float offsetX, float offsetY) {
-  // ========== All DisplayList updates BEFORE locking device ==========
-
-  // Switch sample when drawIndex changes
+void JTGFXView::updateDisplayList(int drawIndex) {
   auto numBuilders = hello2d::LayerBuilder::Count();
   auto index = (drawIndex % numBuilders);
-  bool layerTreeChanged = false;
   if (index != lastDrawIndex || !contentLayer) {
     auto builder = hello2d::LayerBuilder::GetByIndex(index);
     if (builder) {
@@ -53,36 +43,29 @@ void JTGFXView::draw(int drawIndex, float zoom, float offsetX, float offsetY) {
       if (contentLayer) {
         displayList.root()->removeChildren();
         displayList.root()->addChild(contentLayer);
-        layerTreeChanged = true;
+        applyCenteringTransform();
       }
     }
     lastDrawIndex = index;
   }
+}
 
-  // Apply centering transform when layer tree changes or zoom/offset changes
-  if (lastSurfaceWidth > 0 && lastSurfaceHeight > 0) {
-    bool zoomChanged = (zoom != lastZoom);
-    bool offsetChanged = (offsetX != lastOffsetX || offsetY != lastOffsetY);
-    if (layerTreeChanged || zoomChanged || offsetChanged) {
-      if (contentLayer) {
-        hello2d::LayerBuilder::ApplyCenteringTransform(contentLayer,
-                                                       static_cast<float>(lastSurfaceWidth),
-                                                       static_cast<float>(lastSurfaceHeight));
-      }
-      displayList.setZoomScale(zoom);
-      displayList.setContentOffset(offsetX, offsetY);
-      lastZoom = zoom;
-      lastOffsetX = offsetX;
-      lastOffsetY = offsetY;
-    }
+void JTGFXView::updateDisplayTransform(float zoom, float offsetX, float offsetY) {
+  displayList.setZoomScale(zoom);
+  displayList.setContentOffset(offsetX, offsetY);
+}
+
+void JTGFXView::applyCenteringTransform() {
+  if (lastSurfaceWidth > 0 && lastSurfaceHeight > 0 && contentLayer) {
+    hello2d::LayerBuilder::ApplyCenteringTransform(
+        contentLayer, static_cast<float>(lastSurfaceWidth), static_cast<float>(lastSurfaceHeight));
   }
+}
 
-  // Check if content has changed AFTER setting all properties, BEFORE locking device
+void JTGFXView::draw() {
   if (!displayList.hasContentChanged() && lastRecording == nullptr) {
     return;
   }
-
-  // ========== Now lock device for rendering/submitting ==========
 
   auto device = window->getDevice();
   auto context = device->lockContext();
@@ -96,26 +79,6 @@ void JTGFXView::draw(int drawIndex, float zoom, float offsetX, float offsetY) {
     return;
   }
 
-  // Sync surface size for DPI changes.
-  bool surfaceResized = sizeInvalidated;
-  sizeInvalidated = false;
-
-  if (surface->width() != lastSurfaceWidth || surface->height() != lastSurfaceHeight) {
-    lastSurfaceWidth = surface->width();
-    lastSurfaceHeight = surface->height();
-    if (contentLayer) {
-      hello2d::LayerBuilder::ApplyCenteringTransform(contentLayer,
-                                                     static_cast<float>(lastSurfaceWidth),
-                                                     static_cast<float>(lastSurfaceHeight));
-    }
-    displayList.setZoomScale(zoom);
-    displayList.setContentOffset(offsetX, offsetY);
-    lastZoom = zoom;
-    lastOffsetX = offsetX;
-    lastOffsetY = offsetY;
-    surfaceResized = true;
-  }
-
   auto canvas = surface->getCanvas();
   canvas->clear();
   auto width = ANativeWindow_getWidth(nativeWindow);
@@ -127,21 +90,12 @@ void JTGFXView::draw(int drawIndex, float zoom, float offsetX, float offsetY) {
 
   auto recording = context->flush();
 
-  if (surfaceResized) {
-    // When resized, submit current frame immediately (no delay)
-    if (recording) {
-      context->submit(std::move(recording));
-      window->present(context);
-    }
-    lastRecording = nullptr;
-  } else {
-    // Delayed one-frame present
-    std::swap(lastRecording, recording);
+  // Delayed one-frame present
+  std::swap(lastRecording, recording);
 
-    if (recording) {
-      context->submit(std::move(recording));
-      window->present(context);
-    }
+  if (recording) {
+    context->submit(std::move(recording));
+    window->present(context);
   }
 
   device->unlock();
@@ -242,19 +196,34 @@ JNIEXPORT jlong JNICALL Java_org_tgfx_hello2d_TGFXView_00024Companion_setupFromS
   return reinterpret_cast<jlong>(jTGFXView);
 }
 
-JNIEXPORT void JNICALL Java_org_tgfx_hello2d_TGFXView_nativeDraw(JNIEnv* env, jobject thiz,
-                                                                     jint drawIndex, jfloat zoom,
-                                                                     jfloat offsetX,
-                                                                     jfloat offsetY) {
+JNIEXPORT void JNICALL Java_org_tgfx_hello2d_TGFXView_nativeUpdateDisplayList(JNIEnv* env,
+                                                                              jobject thiz,
+                                                                              jint drawIndex) {
   auto view = GetJTGFXView(env, thiz);
   if (view == nullptr) {
     return;
   }
-
-  view->draw(drawIndex, zoom, offsetX, offsetY);
+  view->updateDisplayList(drawIndex);
 }
 
-JNIEXPORT void JNICALL Java_org_tgfx_hello2d_TGFXView_updateSize(JNIEnv* env, jobject thiz) {
+JNIEXPORT void JNICALL Java_org_tgfx_hello2d_TGFXView_nativeUpdateDisplayTransform(
+    JNIEnv* env, jobject thiz, jfloat zoom, jfloat offsetX, jfloat offsetY) {
+  auto view = GetJTGFXView(env, thiz);
+  if (view == nullptr) {
+    return;
+  }
+  view->updateDisplayTransform(zoom, offsetX, offsetY);
+}
+
+JNIEXPORT void JNICALL Java_org_tgfx_hello2d_TGFXView_nativeDraw(JNIEnv* env, jobject thiz) {
+  auto view = GetJTGFXView(env, thiz);
+  if (view == nullptr) {
+    return;
+  }
+  view->draw();
+}
+
+JNIEXPORT void JNICALL Java_org_tgfx_hello2d_TGFXView_nativeUpdateSize(JNIEnv* env, jobject thiz) {
   auto view = GetJTGFXView(env, thiz);
   if (view == nullptr) {
     return;

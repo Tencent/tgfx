@@ -35,11 +35,11 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   std::unique_ptr<hello2d::AppHost> appHost;
   tgfx::DisplayList displayList;
   std::shared_ptr<tgfx::Layer> contentLayer;
-  int lastDrawIndex;
-  std::unique_ptr<tgfx::Recording> lastRecording;
-  int lastSurfaceWidth;
-  int lastSurfaceHeight;
-  bool sizeInvalidated;
+  int lastDrawIndex = -1;
+  std::unique_ptr<tgfx::Recording> lastRecording = nullptr;
+  int lastSurfaceWidth = 0;
+  int lastSurfaceHeight = 0;
+  bool sizeInvalidated = false;
 }
 
 - (BOOL)acceptsFirstResponder {
@@ -86,12 +86,11 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   CGSize backingSize = [self convertSizeToBacking:self.bounds.size];
   lastSurfaceWidth = static_cast<int>(backingSize.width);
   lastSurfaceHeight = static_cast<int>(backingSize.height);
-  [self applyTransform];
+  [self applyCenteringTransform];
   if (tgfxWindow != nullptr) {
     tgfxWindow->invalidSize();
     lastRecording = nullptr;
     sizeInvalidated = true;
-    [self startDisplayLink];
   }
 }
 
@@ -122,7 +121,6 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
 
   if (@available(macOS 14, *)) {
     self.caDisplayLink = [self displayLinkWithTarget:self selector:@selector(displayLinkCallback:)];
-    self.caDisplayLink.paused = YES;
     [self.caDisplayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSRunLoopCommonModes];
   } else {
     CVDisplayLinkCreateWithActiveCGDisplays(&_cvDisplayLink);
@@ -131,23 +129,8 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   }
 
   [self updateSize];
+  [self updateDisplayTransform];
   [self updateDisplayList];
-}
-
-- (void)startDisplayLink {
-  if (@available(macOS 14, *)) {
-    if (self.caDisplayLink) {
-      self.caDisplayLink.paused = NO;
-    }
-  }
-}
-
-- (void)stopDisplayLink {
-  if (@available(macOS 14, *)) {
-    if (self.caDisplayLink) {
-      self.caDisplayLink.paused = YES;
-    }
-  }
 }
 
 - (void)dealloc {
@@ -180,25 +163,24 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
       if (contentLayer) {
         displayList.root()->removeChildren();
         displayList.root()->addChild(contentLayer);
+        [self applyCenteringTransform];
       }
     }
     lastDrawIndex = index;
   }
-
-  [self applyTransform];
 }
 
-- (void)applyTransform {
-  if (lastSurfaceWidth > 0 && lastSurfaceHeight > 0) {
-    if (contentLayer) {
-      hello2d::LayerBuilder::ApplyCenteringTransform(contentLayer,
-                                                     static_cast<float>(lastSurfaceWidth),
-                                                     static_cast<float>(lastSurfaceHeight));
-    }
-    displayList.setZoomScale(self.zoomScale);
-    displayList.setContentOffset(static_cast<float>(self.contentOffset.x),
-                                 static_cast<float>(self.contentOffset.y));
+- (void)applyCenteringTransform {
+  if (lastSurfaceWidth > 0 && lastSurfaceHeight > 0 && contentLayer) {
+    hello2d::LayerBuilder::ApplyCenteringTransform(
+        contentLayer, static_cast<float>(lastSurfaceWidth), static_cast<float>(lastSurfaceHeight));
   }
+}
+
+- (void)updateDisplayTransform {
+  displayList.setZoomScale(self.zoomScale);
+  displayList.setContentOffset(static_cast<float>(self.contentOffset.x),
+                               static_cast<float>(self.contentOffset.y));
 }
 
 - (void)draw {
@@ -232,13 +214,6 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   bool surfaceResized = sizeInvalidated;
   sizeInvalidated = false;
 
-  if (surface->width() != lastSurfaceWidth || surface->height() != lastSurfaceHeight) {
-    lastSurfaceWidth = surface->width();
-    lastSurfaceHeight = surface->height();
-    [self applyTransform];
-    surfaceResized = true;
-  }
-
   auto canvas = surface->getCanvas();
   canvas->clear();
   hello2d::DrawBackground(canvas, surface->width(), surface->height(), self.layer.contentsScale);
@@ -267,42 +242,78 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   device->unlock();
 }
 
+- (void)startDisplayLink {
+  if (@available(macOS 14, *)) {
+    if (self.caDisplayLink) {
+      self.caDisplayLink.paused = NO;
+    }
+  } else {
+    if (self.cvDisplayLink && !CVDisplayLinkIsRunning(self.cvDisplayLink)) {
+      CVDisplayLinkStart(self.cvDisplayLink);
+    }
+  }
+}
+
+- (void)stopDisplayLink {
+  if (@available(macOS 14, *)) {
+    if (self.caDisplayLink) {
+      self.caDisplayLink.paused = YES;
+    }
+  } else {
+    if (self.cvDisplayLink && CVDisplayLinkIsRunning(self.cvDisplayLink)) {
+      CVDisplayLinkStop(self.cvDisplayLink);
+    }
+  }
+}
+
 - (void)mouseDown:(NSEvent*)event {
   self.drawIndex++;
   self.zoomScale = 1.0f;
   self.contentOffset = CGPointZero;
+  [self updateDisplayTransform];
   [self updateDisplayList];
-  [self startDisplayLink];
 }
 
 - (void)scrollWheel:(NSEvent*)event {
   BOOL isCommandPressed = (event.modifierFlags & NSEventModifierFlagCommand) != 0;
-  BOOL isShiftPressed = (event.modifierFlags & NSEventModifierFlagShift) != 0;
-
-  CGSize backingSize = [self convertSizeToBacking:CGSizeMake(1.0, 1.0)];
-  CGFloat backingScale = backingSize.height;
 
   if (isCommandPressed) {
-    CGFloat zoomStep = std::exp(event.deltaY / 400.0f);
     CGPoint mousePoint = [self convertPoint:event.locationInWindow fromView:nil];
+    mousePoint.y = self.bounds.size.height - mousePoint.y;
     CGPoint backingPoint = [self convertPointToBacking:mousePoint];
-    float oldZoom = self.zoomScale;
-    self.zoomScale = std::clamp(self.zoomScale * static_cast<float>(zoomStep), 0.001f, 1000.0f);
-    CGPoint offset = self.contentOffset;
-    offset.x = backingPoint.x - ((backingPoint.x - offset.x) / oldZoom) * self.zoomScale;
-    offset.y = backingPoint.y - ((backingPoint.y - offset.y) / oldZoom) * self.zoomScale;
-    self.contentOffset = offset;
-  } else {
-    CGPoint offset = self.contentOffset;
-    if (isShiftPressed) {
-      offset.x += static_cast<float>(event.deltaX * backingScale);
+    float contentX = (backingPoint.x - self.contentOffset.x) / self.zoomScale;
+    float contentY = (backingPoint.y - self.contentOffset.y) / self.zoomScale;
+    if (event.hasPreciseScrollingDeltas) {
+      self.zoomScale = self.zoomScale * (1.0f + event.scrollingDeltaY / 120.0f);
     } else {
-      offset.y -= static_cast<float>(event.deltaY * backingScale);
+      self.zoomScale = self.zoomScale * std::pow(1.1f, static_cast<float>(event.scrollingDeltaY));
     }
-    self.contentOffset = offset;
+    self.zoomScale = std::clamp(self.zoomScale, 0.001f, 1000.0f);
+    self.contentOffset = CGPointMake(backingPoint.x - contentX * self.zoomScale,
+                                     backingPoint.y - contentY * self.zoomScale);
+  } else {
+    if (event.hasPreciseScrollingDeltas) {
+      self.contentOffset = CGPointMake(self.contentOffset.x + event.scrollingDeltaX,
+                                       self.contentOffset.y + event.scrollingDeltaY);
+    } else {
+      self.contentOffset = CGPointMake(self.contentOffset.x + event.scrollingDeltaX * 5,
+                                       self.contentOffset.y + event.scrollingDeltaY * 5);
+    }
   }
-  [self updateDisplayList];
-  [self startDisplayLink];
+  [self updateDisplayTransform];
+}
+
+- (void)magnifyWithEvent:(NSEvent*)event {
+  CGPoint mousePoint = [self convertPoint:event.locationInWindow fromView:nil];
+  mousePoint.y = self.bounds.size.height - mousePoint.y;
+  CGPoint backingPoint = [self convertPointToBacking:mousePoint];
+  float contentX = (backingPoint.x - self.contentOffset.x) / self.zoomScale;
+  float contentY = (backingPoint.y - self.contentOffset.y) / self.zoomScale;
+  self.zoomScale = std::clamp(self.zoomScale * (1.0f + static_cast<float>(event.magnification)),
+                              0.001f, 1000.0f);
+  self.contentOffset = CGPointMake(backingPoint.x - contentX * self.zoomScale,
+                                   backingPoint.y - contentY * self.zoomScale);
+  [self updateDisplayTransform];
 }
 
 @end

@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GridBackground.h"
-
 #include <tgfx/layers/LayerRecorder.h>
 
 namespace hello2d {
@@ -49,7 +48,7 @@ void GridBackgroundLayer::onUpdateContent(tgfx::LayerRecorder* recorder) {
       if (draw) {
         recorder->addRect(
             tgfx::Rect::MakeXYWH(static_cast<float>(x), static_cast<float>(y),
-                                  static_cast<float>(tileSize), static_cast<float>(tileSize)),
+                                 static_cast<float>(tileSize), static_cast<float>(tileSize)),
             tilePaint);
       }
       draw = !draw;

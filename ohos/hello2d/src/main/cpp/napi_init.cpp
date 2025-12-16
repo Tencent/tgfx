@@ -15,16 +15,16 @@ static double contentOffsetY = 0;
 static std::shared_ptr<hello2d::AppHost> appHost = nullptr;
 static std::shared_ptr<tgfx::Window> window = nullptr;
 static std::shared_ptr<DisplayLink> displayLink = nullptr;
-static tgfx::DisplayList displayList;
+static tgfx::DisplayList displayList = {};
 static std::shared_ptr<tgfx::Layer> contentLayer = nullptr;
 static std::unique_ptr<tgfx::Recording> lastRecording = nullptr;
 static int lastDrawIndex = -1;
 static int lastSurfaceWidth = 0;
 static int lastSurfaceHeight = 0;
-static bool sizeInvalidated = false;
 
 static std::shared_ptr<hello2d::AppHost> CreateAppHost();
-static void ApplyTransform(float zoom, float offsetX, float offsetY);
+static void ApplyCenteringTransform();
+static void UpdateDisplayTransform(float zoom, float offsetX, float offsetY);
 
 static napi_value OnUpdateDensity(napi_env env, napi_callback_info info) {
   size_t argc = 1;
@@ -59,7 +59,7 @@ static napi_value AddImageFromEncoded(napi_env env, napi_callback_info info) {
   return nullptr;
 }
 
-static void UpdateDisplayList(int drawIndex, float zoom = 1.0f, float offsetX = 0.0f, float offsetY = 0.0f) {
+static void UpdateDisplayList(int drawIndex) {
   if (!appHost) {
     appHost = CreateAppHost();
   }
@@ -76,27 +76,27 @@ static void UpdateDisplayList(int drawIndex, float zoom = 1.0f, float offsetX = 
       if (contentLayer) {
         displayList.root()->removeChildren();
         displayList.root()->addChild(contentLayer);
+        ApplyCenteringTransform();
       }
     }
     lastDrawIndex = index;
   }
-
-  ApplyTransform(zoom, offsetX, offsetY);
 }
 
-static void ApplyTransform(float zoom, float offsetX, float offsetY) {
-  if (lastSurfaceWidth > 0 && lastSurfaceHeight > 0) {
-    if (contentLayer) {
-      hello2d::LayerBuilder::ApplyCenteringTransform(contentLayer,
-                                                     static_cast<float>(lastSurfaceWidth),
-                                                     static_cast<float>(lastSurfaceHeight));
-    }
-    displayList.setZoomScale(zoom);
-    displayList.setContentOffset(offsetX, offsetY);
+static void UpdateDisplayTransform(float zoom, float offsetX, float offsetY) {
+  displayList.setZoomScale(zoom);
+  displayList.setContentOffset(offsetX, offsetY);
+}
+
+static void ApplyCenteringTransform() {
+  if (lastSurfaceWidth > 0 && lastSurfaceHeight > 0 && contentLayer) {
+    hello2d::LayerBuilder::ApplyCenteringTransform(contentLayer,
+                                                   static_cast<float>(lastSurfaceWidth),
+                                                   static_cast<float>(lastSurfaceHeight));
   }
 }
 
-static void Draw(int drawIndex, float zoom = 1.0f, float offsetX = 0.0f, float offsetY = 0.0f) {
+static void Draw() {
   if (!appHost || window == nullptr) {
     return;
   }
@@ -117,17 +117,6 @@ static void Draw(int drawIndex, float zoom = 1.0f, float offsetX = 0.0f, float o
     return;
   }
 
-  // Sync surface size for DPI changes.
-  bool surfaceResized = sizeInvalidated;
-  sizeInvalidated = false;
-
-  if (surface->width() != lastSurfaceWidth || surface->height() != lastSurfaceHeight) {
-    lastSurfaceWidth = surface->width();
-    lastSurfaceHeight = surface->height();
-    ApplyTransform(zoom, offsetX, offsetY);
-    surfaceResized = true;
-  }
-
   auto canvas = surface->getCanvas();
   canvas->clear();
   hello2d::DrawBackground(canvas, surface->width(), surface->height(), screenDensity);
@@ -136,21 +125,12 @@ static void Draw(int drawIndex, float zoom = 1.0f, float offsetX = 0.0f, float o
 
   auto recording = context->flush();
 
-  if (surfaceResized) {
-    // When resized, submit current frame immediately (no delay)
-    if (recording) {
-      context->submit(std::move(recording));
-      window->present(context);
-    }
-    lastRecording = nullptr;
-  } else {
-    // Delayed one-frame present
-    std::swap(lastRecording, recording);
+  // Delayed one-frame present
+  std::swap(lastRecording, recording);
 
-    if (recording) {
-      context->submit(std::move(recording));
-      window->present(context);
-    }
+  if (recording) {
+    context->submit(std::move(recording));
+    window->present(context);
   }
 
   device->unlock();
@@ -167,12 +147,10 @@ static napi_value UpdateDrawParams(napi_env env, napi_callback_info info) {
   napi_get_value_double(env, args[3], &contentOffsetY);
 
   // Update DisplayList when parameters change
-  UpdateDisplayList(static_cast<int>(drawIndex), static_cast<float>(zoomScale),
-                    static_cast<float>(contentOffsetX), static_cast<float>(contentOffsetY));
+  UpdateDisplayList(static_cast<int>(drawIndex));
+  UpdateDisplayTransform(static_cast<float>(zoomScale), static_cast<float>(contentOffsetX),
+                         static_cast<float>(contentOffsetY));
 
-  if (displayLink) {
-    displayLink->start();
-  }
   return nullptr;
 }
 
@@ -180,8 +158,7 @@ static napi_value UpdateDrawParams(napi_env env, napi_callback_info info) {
 static napi_value StartDrawLoop(napi_env, napi_callback_info) {
     if (displayLink == nullptr) {
         displayLink = std::make_shared<DisplayLink>([&]() {
-            Draw(static_cast<int>(drawIndex), static_cast<float>(zoomScale),
-                 static_cast<float>(contentOffsetX), static_cast<float>(contentOffsetY));
+            Draw();
         });
     }
     displayLink->start();
@@ -232,15 +209,9 @@ static void UpdateSize(OH_NativeXComponent* component, void* nativeWindow) {
   }
   lastSurfaceWidth = static_cast<int>(width);
   lastSurfaceHeight = static_cast<int>(height);
-  ApplyTransform(static_cast<float>(zoomScale), static_cast<float>(contentOffsetX),
-                 static_cast<float>(contentOffsetY));
   if (window != nullptr) {
     window->invalidSize();
     lastRecording = nullptr;
-    sizeInvalidated = true;
-    if (displayLink) {
-      displayLink->start();
-    }
   }
 }
 
@@ -263,11 +234,9 @@ static void OnSurfaceCreatedCB(OH_NativeXComponent* component, void* nativeWindo
   if (window == nullptr) {
     return;
   }
-  UpdateDisplayList(static_cast<int>(drawIndex), static_cast<float>(zoomScale),
-                    static_cast<float>(contentOffsetX), static_cast<float>(contentOffsetY));
-  if (displayLink) {
-    displayLink->start();
-  }
+  UpdateDisplayList(static_cast<int>(drawIndex));
+  UpdateDisplayTransform(static_cast<float>(zoomScale), static_cast<float>(contentOffsetX),
+                         static_cast<float>(contentOffsetY));
 }
 
 static void RegisterCallback(napi_env env, napi_value exports) {

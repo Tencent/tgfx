@@ -52,7 +52,7 @@ class TGFXWindow {
   tgfx::Point contentOffset = {0.0f, 0.0f};
   std::shared_ptr<tgfx::WGLWindow> tgfxWindow = nullptr;
   std::shared_ptr<hello2d::AppHost> appHost = nullptr;
-  tgfx::DisplayList displayList;
+  tgfx::DisplayList displayList = {};
   std::shared_ptr<tgfx::Layer> contentLayer = nullptr;
   std::unique_ptr<tgfx::Recording> lastRecording = nullptr;
   int lastSurfaceWidth = 0;
@@ -69,7 +69,8 @@ class TGFXWindow {
   float getPixelRatio();
   void createAppHost();
   void updateDisplayList();
-  void applyTransform();
+  void updateDisplayTransform();
+  void applyCenteringTransform();
   void draw();
 
   bool isDrawing = true;
