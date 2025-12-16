@@ -248,7 +248,7 @@ void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* progra
       fp = iter.next();
     }
   }
-  const auto* processor = getXferProcessor();
+  const auto processor = getXferProcessor();
   updateUniformDataSuffix(vertexUniformData, fragmentUniformData, processor);
   processor->setData(vertexUniformData, fragmentUniformData);
   updateUniformDataSuffix(vertexUniformData, fragmentUniformData, nullptr);

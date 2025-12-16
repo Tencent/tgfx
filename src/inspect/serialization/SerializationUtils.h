@@ -49,8 +49,6 @@ std::string LayerStylePositionToString(LayerStylePosition position);
 
 std::string LayerStyleExtraSourceTypeToString(LayerStyleExtraSourceType type);
 
-std::string RecordedContentTypeToString(Types::LayerContentType type);
-
 void SerializeBegin(flexbuffers::Builder& fbb, tgfx::inspect::LayerTreeMessage type,
                     size_t& mapStart, size_t& contentStart);
 

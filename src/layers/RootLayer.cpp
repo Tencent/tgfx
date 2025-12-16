@@ -116,11 +116,11 @@ std::vector<Rect> RootLayer::updateDirtyRegions() {
 }
 
 void RootLayer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
-                          const Matrix3D* transform) {
+                          const Matrix3D* transform3D) {
   auto color = _backgroundColor;
   color.alpha = color.alpha * alpha;
   canvas->drawColor(color, blendMode);
-  Layer::drawLayer(args, canvas, alpha, blendMode, transform);
+  Layer::drawLayer(args, canvas, alpha, blendMode, transform3D);
 }
 
 bool RootLayer::setBackgroundColor(const Color& color) {

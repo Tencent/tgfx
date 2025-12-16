@@ -17,9 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/opengl/egl/EGLDevice.h"
+#include <cstring>
 #include "core/utils/Log.h"
 #include "gpu/opengl/egl/EGLGPU.h"
 #include "tgfx/gpu/opengl/egl/EGLGlobals.h"
+
+#ifndef EGL_GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT
+#define EGL_GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT -1
+#endif
 
 namespace tgfx {
 static std::vector<EGLint> GetValidAttributes(const std::vector<EGLint>& attributes) {
@@ -105,17 +110,42 @@ std::shared_ptr<GLDevice> GLDevice::Make(void* sharedContext) {
 }
 
 std::shared_ptr<EGLDevice> EGLDevice::MakeFrom(EGLDisplay eglDisplay, EGLSurface eglSurface,
-                                               EGLContext eglContext, bool adopted) {
-  return EGLDevice::Wrap(eglDisplay, eglSurface, eglContext, nullptr, !adopted);
+                                               EGLContext eglContext, bool adopted,
+                                               std::shared_ptr<ColorSpace> colorSpace) {
+  return EGLDevice::Wrap(eglDisplay, eglSurface, eglContext, nullptr, !adopted,
+                         std::move(colorSpace));
 }
 
 std::shared_ptr<EGLDevice> EGLDevice::MakeFrom(EGLNativeWindowType nativeWindow,
-                                               EGLContext sharedContext) {
+                                               EGLContext sharedContext,
+                                               std::shared_ptr<ColorSpace> colorSpace) {
   auto eglGlobals = EGLGlobals::Get();
 #if defined(_WIN32)
   auto eglSurface = CreateFixedSizeSurfaceForAngle(nativeWindow, eglGlobals);
+  if (colorSpace != nullptr && !ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get())) {
+    LOGE(
+        "EGLDevice::MakeFrom() The specified ColorSpace is not supported on this platform. "
+        "Rendering may have color inaccuracies.");
+  }
 #else
-  std::vector<EGLint> attributes = GetValidAttributes(eglGlobals->windowSurfaceAttributes);
+  std::vector<EGLint> attributes = {};
+  bool isDisplayP3Supported = false;
+  if (ColorSpace::Equals(colorSpace.get(), ColorSpace::DisplayP3().get())) {
+    const char* extensions = eglQueryString(eglGlobals->display, EGL_EXTENSIONS);
+    if (extensions && strstr(extensions, "EGL_EXT_gl_colorspace_display_p3_passthrough")) {
+      attributes = {EGL_GL_COLORSPACE_KHR, EGL_GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT};
+      isDisplayP3Supported = true;
+    }
+  }
+  if (colorSpace != nullptr && !ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get()) &&
+      !isDisplayP3Supported) {
+    LOGE(
+        "EGLDevice::MakeFrom() The specified ColorSpace is not supported on this platform. "
+        "Rendering may have color inaccuracies.");
+  }
+  attributes.insert(attributes.end(), eglGlobals->windowSurfaceAttributes.begin(),
+                    eglGlobals->windowSurfaceAttributes.end());
+  attributes = GetValidAttributes(attributes);
   auto eglSurface = eglCreateWindowSurface(eglGlobals->display, eglGlobals->windowConfig,
                                            nativeWindow, attributes.data());
 #endif
@@ -128,7 +158,8 @@ std::shared_ptr<EGLDevice> EGLDevice::MakeFrom(EGLNativeWindowType nativeWindow,
     eglDestroySurface(eglGlobals->display, eglSurface);
     return nullptr;
   }
-  auto device = EGLDevice::Wrap(eglGlobals->display, eglSurface, eglContext, sharedContext, false);
+  auto device = EGLDevice::Wrap(eglGlobals->display, eglSurface, eglContext, sharedContext, false,
+                                std::move(colorSpace));
   if (device == nullptr) {
     eglDestroyContext(eglGlobals->display, eglContext);
     eglDestroySurface(eglGlobals->display, eglSurface);
@@ -138,7 +169,8 @@ std::shared_ptr<EGLDevice> EGLDevice::MakeFrom(EGLNativeWindowType nativeWindow,
 
 std::shared_ptr<EGLDevice> EGLDevice::Wrap(EGLDisplay eglDisplay, EGLSurface eglSurface,
                                            EGLContext eglContext, EGLContext shareContext,
-                                           bool externallyOwned) {
+                                           bool externallyOwned,
+                                           std::shared_ptr<ColorSpace> colorSpace) {
   auto glContext = GLDevice::Get(eglContext);
   if (glContext) {
     return std::static_pointer_cast<EGLDevice>(glContext);
@@ -165,7 +197,8 @@ std::shared_ptr<EGLDevice> EGLDevice::Wrap(EGLDisplay eglDisplay, EGLSurface egl
   auto interface = GLInterface::GetNative();
   if (interface != nullptr) {
     auto gpu = std::make_unique<EGLGPU>(std::move(interface), eglDisplay);
-    device = std::shared_ptr<EGLDevice>(new EGLDevice(std::move(gpu), eglContext));
+    device = std::shared_ptr<EGLDevice>(
+        new EGLDevice(std::move(gpu), eglContext, std::move(colorSpace)));
     device->externallyOwned = externallyOwned;
     device->eglDisplay = eglDisplay;
     device->eglSurface = eglSurface;
@@ -182,8 +215,9 @@ std::shared_ptr<EGLDevice> EGLDevice::Wrap(EGLDisplay eglDisplay, EGLSurface egl
   return device;
 }
 
-EGLDevice::EGLDevice(std::unique_ptr<GPU> gpu, void* nativeHandle)
-    : GLDevice(std::move(gpu), nativeHandle) {
+EGLDevice::EGLDevice(std::unique_ptr<GPU> gpu, void* nativeHandle,
+                     std::shared_ptr<ColorSpace> colorSpace)
+    : GLDevice(std::move(gpu), nativeHandle), colorSpace(std::move(colorSpace)) {
 }
 
 EGLDevice::~EGLDevice() {

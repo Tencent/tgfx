@@ -19,7 +19,6 @@
 #pragma once
 
 #include "core/MCState.h"
-#include "tgfx/core/BrushModifier.h"
 
 namespace tgfx {
 
@@ -27,7 +26,7 @@ class PlaybackContext {
  public:
   PlaybackContext() = default;
 
-  explicit PlaybackContext(MCState state, const BrushModifier* brushModifier = nullptr);
+  explicit PlaybackContext(MCState state);
 
   const MCState& state() const {
     return _state;
@@ -61,10 +60,8 @@ class PlaybackContext {
   MCState initState = {};
   bool hasInitMatrix = false;
   bool hasInitClip = false;
-  const BrushModifier* brushModifier = nullptr;
   MCState _state = {};
   Brush _brush = {};
-  Brush lastOriginalBrush = {};
   Stroke _stroke = {};
   bool hasStroke = false;
 };

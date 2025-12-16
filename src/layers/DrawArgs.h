@@ -43,6 +43,9 @@ class DrawArgs {
 
   // The GPU context to be used during the drawing process. Note: this could be nullptr.
   Context* context = nullptr;
+
+  uint32_t renderFlags = 0;
+
   // Whether to exclude effects during the drawing process. When set to true, all layer styles and
   // filters will be skipped, and styleSourceTypes will be ignored.
   bool excludeEffects = false;
@@ -61,6 +64,10 @@ class DrawArgs {
   // Indicates whether to force drawing the background, even if there are no background styles.
   bool forceDrawBackground = false;
   std::shared_ptr<ColorSpace> dstColorSpace = ColorSpace::SRGB();
+
+  // The maximum cache size (single edge) for subtree layer caching. Set to 0 to disable
+  // subtree layer cache.
+  int subtreeCacheMaxSize = 0;
 
   // The 3D render context to be used during the drawing process. Note: this could be nullptr. All
   // layers within the 3D rendering context need to maintain their respective 3D states to achieve

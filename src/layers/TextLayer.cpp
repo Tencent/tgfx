@@ -216,10 +216,7 @@ void TextLayer::onUpdateContent(LayerRecorder* recorder) {
   buildGlyphRunList(finalGlyphs, positions, glyphRunList);
 
   auto textBlob = TextBlob::MakeFrom(std::move(glyphRunList));
-  Paint paint = {};
-  paint.setColor(_textColor);
-  auto canvas = recorder->getCanvas();
-  canvas->drawTextBlob(textBlob, 0, 0, paint);
+  recorder->addTextBlob(std::move(textBlob), LayerPaint(_textColor));
 }
 
 std::string TextLayer::PreprocessNewLines(const std::string& text) {
