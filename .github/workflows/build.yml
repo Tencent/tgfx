@@ -7,8 +7,6 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
-
-
 jobs:
   ios:
     runs-on: macos-latest
@@ -343,7 +341,6 @@ jobs:
         with:
           path: /opt/ohos-cmd-tools
           key: ohos-cli-6.0.0.868-linux-x64
-          restore-keys: ohos-cli-
 
       - name: Install CLI Tools
         if: steps.cli-tools-cache.outputs.cache-hit != 'true'
@@ -386,20 +383,28 @@ jobs:
           path: |
             ~/.hvigor
             ~/.ohpm
-          key: hvigor-${{ runner.os }}-${{ hashFiles('**/oh-package.json5', '**/hvigorfile.ts') }}
+          key: hvigor-${{ runner.os }}-${{ hashFiles('ohos/**/oh-package.json5', 'ohos/**/hvigorfile.ts') }}
           restore-keys: |
             hvigor-${{ runner.os }}-
 
-      - name: Cache OHOS Build
+      - name: Cache Native Build
         uses: actions/cache@v4
         with:
           path: |
             ohos/hello2d/.cxx
+          key: ohos-native-${{ runner.os }}-${{ hashFiles('src/**/*.cpp', 'src/**/*.h', 'include/**/*.h', 'ohos/hello2d/src/main/cpp/**') }}
+          restore-keys: |
+            ohos-native-${{ runner.os }}-
+
+      - name: Cache Hvigor Build
+        uses: actions/cache@v4
+        with:
+          path: |
             ohos/hello2d/build
             ohos/.hvigor
-          key: ohos-build-${{ runner.os }}-${{ hashFiles('src/**', 'include/**', 'ohos/**/*.cpp', 'ohos/**/*.h') }}
+          key: ohos-hvigor-${{ runner.os }}-${{ hashFiles('ohos/**/*.ets', 'ohos/**/*.json5') }}
           restore-keys: |
-            ohos-build-${{ runner.os }}-
+            ohos-hvigor-${{ runner.os }}-
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -423,7 +428,13 @@ jobs:
       - name: Build Harmony
         run: |
           cd ohos
-          hvigorw assembleHap -Dohos.sdk.root=$DEVECO_SDK_HOME -p buildMode=release --no-daemon
+          hvigorw assembleHap \
+            -Dohos.sdk.root=$DEVECO_SDK_HOME \
+            -p buildMode=release \
+            -p incrementalBuild=true \
+            --parallel \
+            --max-workers=$(nproc) \
+            --no-daemon
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
