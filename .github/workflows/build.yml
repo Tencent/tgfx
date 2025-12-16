@@ -428,12 +428,12 @@ jobs:
       - name: Build Harmony
         run: |
           cd ohos
+          # Only build arm64-v8a for CI to reduce build time (from ~10min to ~5min)
+          sed -i 's/"arm64-v8a",\s*"x86_64"/"arm64-v8a"/g' hello2d/build-profile.json5
           hvigorw assembleHap \
             -Dohos.sdk.root=$DEVECO_SDK_HOME \
             -p buildMode=release \
-            -p incrementalBuild=true \
             --parallel \
-            --max-workers=$(nproc) \
             --no-daemon
 
       - name: Save Third-Party Cache
