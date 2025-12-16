@@ -66,14 +66,21 @@ static inline Matrix GetMayLossyAffineMatrix(const Matrix3D& matrix) {
   return affineMatrix;
 }
 
-// Applies a clip rect to the canvas, avoiding anti-aliasing artifacts that cause semi-transparent
-// edges when the scaled clip bounds are too small.
+/**
+ * Applies a clip rect to the canvas, avoiding anti-aliasing artifacts that cause semi-transparent
+ * edges when the scaled clip bounds are too small.
+ * @param maxBounds The maximum clip bounds before scaling.
+ * @param clipBounds The desired clip bounds before scaling.
+ */
 static inline void ApplyClip(Canvas& canvas, const Rect& maxBounds, const Rect& clipBounds,
                              float contentScale) {
   if (contentScale < 1.0f) {
     auto scaledBounds = clipBounds;
     scaledBounds.scale(contentScale, contentScale);
     if (scaledBounds.width() < 10.f || scaledBounds.height() < 10.f) {
+      // When the actual clip bounds are too small, fractional values in the scaled clip region
+      // trigger AARectEffect's shader coverage clipping strategy, causing layers obtained from
+      // this clip region to become semi-transparent. This situation should be avoided.
       DEBUG_ASSERT(!FloatNearlyZero(contentScale));
       scaledBounds.roundOut();
       scaledBounds.scale(1.0f / contentScale, 1.0f / contentScale);
@@ -1432,7 +1439,8 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   }
   // Starting from the root node of the DisplayList, if a layer enables a 3D rendering context,
   // background styles will be disabled for the entire subtree.
-  if (args.blurBackground && !args.excludeBackgroundStyle) {
+  if (args.blurBackground &&
+      args.styleSourceTypes.count(LayerStyleExtraSourceType::Background) > 0) {
     if (!hasBackgroundStyle()) {
       cache->draw(args.blurBackground->getCanvas(), bitFields.allowsEdgeAntialiasing, alpha,
                   maskFilter, blendMode, transform);
@@ -1448,7 +1456,8 @@ bool Layer::drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, Ble
 
 void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                           const Matrix3D* transform, bool excludeChildren) {
-  if (transform != nullptr && !args.excludeBackgroundStyle) {
+  if (transform != nullptr &&
+      args.styleSourceTypes.count(LayerStyleExtraSourceType::Background) > 0) {
     // When applying 3D matrix, background styles and layer content cannot be drawn to the same
     // texture, so background styles need to be drawn separately.
     drawBackgroundLayerStyles(args, canvas, alpha, *transform);
@@ -1563,13 +1572,7 @@ void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha, bool
   }
 
   auto layerStyleSource = getLayerStyleSource(args, canvas->getMatrix());
-  std::unordered_set<LayerStyleExtraSourceType> extraSourceTypes = {
-      LayerStyleExtraSourceType::None, LayerStyleExtraSourceType::Contour};
-  if (!args.excludeBackgroundStyle) {
-    extraSourceTypes.insert(LayerStyleExtraSourceType::Background);
-  }
-  drawContents(args, canvas, alpha, layerStyleSource.get(), nullptr, extraSourceTypes,
-               excludeChildren);
+  drawContents(args, canvas, alpha, layerStyleSource.get(), nullptr, excludeChildren);
 }
 
 class LayerBrushModifier : public BrushModifier {
@@ -1591,20 +1594,19 @@ class LayerBrushModifier : public BrushModifier {
 
 void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
                          const LayerStyleSource* layerStyleSource, const Layer* stopChild,
-                         const std::unordered_set<LayerStyleExtraSourceType>& styleExtraSourceTypes,
                          bool excludeChildren) {
   if (layerStyleSource) {
-    drawLayerStyles(args, canvas, alpha, layerStyleSource, LayerStylePosition::Below,
-                    styleExtraSourceTypes);
+    drawLayerStyles(args, canvas, alpha, layerStyleSource, LayerStylePosition::Below);
   }
   LayerBrushModifier layerFill(bitFields.allowsEdgeAntialiasing, alpha);
   auto content = getContent();
+  auto drawBackground = args.styleSourceTypes.count(LayerStyleExtraSourceType::Background) > 0;
   if (content) {
     if (args.drawMode == DrawMode::Contour) {
       content->drawContour(canvas, &layerFill);
     } else {
       content->drawDefault(canvas, &layerFill);
-      if (args.blurBackground && bitFields.matrix3DIsAffine && !args.excludeBackgroundStyle) {
+      if (args.blurBackground && bitFields.matrix3DIsAffine && drawBackground) {
         content->drawDefault(args.blurBackground->getCanvas(), &layerFill);
       }
     }
@@ -1613,12 +1615,11 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
     return;
   }
   if (layerStyleSource) {
-    drawLayerStyles(args, canvas, alpha, layerStyleSource, LayerStylePosition::Above,
-                    styleExtraSourceTypes);
+    drawLayerStyles(args, canvas, alpha, layerStyleSource, LayerStylePosition::Above);
   }
   if (content && args.drawMode != DrawMode::Contour) {
     content->drawForeground(canvas, &layerFill);
-    if (args.blurBackground && bitFields.matrix3DIsAffine && !args.excludeBackgroundStyle) {
+    if (args.blurBackground && bitFields.matrix3DIsAffine && drawBackground) {
       content->drawForeground(args.blurBackground->getCanvas(), &layerFill);
     }
   }
@@ -1645,15 +1646,20 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, cons
       args.render3DContext != nullptr &&
       (_transformStyle == TransformStyle::Flat || !canExtend3DContext());
   // TODO: Support background styles for subsequent layers of 3D layers.
-  // The layer content is drawn to the background canvas by playing back the layer's content as a
-  // picture, which currently does not support 3D matrix. As a result, child layers cannot obtain
-  // the correct background content when applying background styles.
-  bool skipChildBackground = args.excludeBackgroundStyle || !bitFields.matrix3DIsAffine;
+  // When drawing 2D layers, the matrix is written to the background canvas, but 3D layers do not.
+  // This causes incorrect results when 3D layers draw their content to the background canvas,
+  // which in turn prevents subsequent layers from obtaining correct background content. Background
+  // styles are temporarily disabled for the 3D layer's subtree (excluding the 3D layer itself).
+  bool skipChildBackground =
+      args.styleSourceTypes.count(LayerStyleExtraSourceType::Background) == 0 ||
+      !bitFields.matrix3DIsAffine;
   // TODO: Support calculate reasonable clipping regions when obtaining content image.
-  // 3D layers cannot write 3D matrices to the background canvas, causing child layers to use the
-  // canvas instead of the background canvas for clipping region calculations. Although this results
-  // in clipping regions not considering background styles, the issue can be ignored since
-  // background styles are simultaneously disabled.
+  // 3D layer matrices are not written to the background canvas (2D layers handle this when drawing
+  // children), so child layers cannot compute valid content clipping regions from the background
+  // canvas. When obtaining content clipping regions, child layers use the 3D layer's offscreen
+  // canvas, which already has accurate clipping regions set during offscreen
+  // rendering. Although this results in clipping regions not considering background styles, the
+  // issue can be ignored since background styles are simultaneously disabled.
   bool clipChildContentByCanvas = args.clipContentByCanvas || !bitFields.matrix3DIsAffine;
 
   for (size_t i = 0; i < _children.size(); ++i) {
@@ -1665,7 +1671,9 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, cons
       continue;
     }
     auto childArgs = args;
-    childArgs.excludeBackgroundStyle = skipChildBackground;
+    if (skipChildBackground) {
+      childArgs.styleSourceTypes.erase(LayerStyleExtraSourceType::Background);
+    }
     childArgs.clipContentByCanvas = clipChildContentByCanvas;
     if (interrupt3DContext) {
       childArgs.render3DContext = nullptr;
@@ -1772,7 +1780,8 @@ void Layer::drawChildByStarting3DContext(Layer& child, const DrawArgs& args, Can
   // Layers inside a 3D context need to maintain independent 3D state. This means layers drawn
   // later may become the background, making it impossible to know the final background when
   // drawing each layer. Therefore, background styles are disabled.
-  context3DArgs.excludeBackgroundStyle = true;
+  context3DArgs.styleSourceTypes = {LayerStyleExtraSourceType::None,
+                                    LayerStyleExtraSourceType::Contour};
   child.drawLayer(context3DArgs, canvas, child._alpha * alpha,
                   static_cast<BlendMode>(child.bitFields.blendMode), &transform);
   auto context3DImage = compositor->finish();
@@ -1956,17 +1965,6 @@ void Layer::drawBackgroundImage(const DrawArgs& args, Canvas& canvas) {
 
 void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
                             const LayerStyleSource* source, LayerStylePosition position) {
-  std::unordered_set<LayerStyleExtraSourceType> extraSourceTypes = {
-      LayerStyleExtraSourceType::None, LayerStyleExtraSourceType::Contour};
-  if (!args.excludeBackgroundStyle) {
-    extraSourceTypes.insert(LayerStyleExtraSourceType::Background);
-  }
-  drawLayerStyles(args, canvas, alpha, source, position, extraSourceTypes);
-}
-
-void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
-                            const LayerStyleSource* source, LayerStylePosition position,
-                            const std::unordered_set<LayerStyleExtraSourceType>& extraSourceTypes) {
   DEBUG_ASSERT(source != nullptr && !FloatNearlyZero(source->contentScale));
   auto& contour = source->contour;
   auto contourOffset = source->contourOffset - source->contentOffset;
@@ -1983,7 +1981,7 @@ void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
       args.blurBackground ? GetClipBounds(args.blurBackground->getCanvas()) : std::nullopt;
   for (const auto& layerStyle : _layerStyles) {
     if (layerStyle->position() != position ||
-        extraSourceTypes.find(layerStyle->extraSourceType()) == extraSourceTypes.end()) {
+        args.styleSourceTypes.count(layerStyle->extraSourceType()) == 0) {
       continue;
     }
     PictureRecorder recorder = {};
@@ -2103,8 +2101,9 @@ void Layer::drawBackgroundLayerStyles(const DrawArgs& args, Canvas* canvas, floa
   canvas->concat(styleMatrix);
   // When LayerStyle's ExtraSourceType is Background, its Position can only be Below, so there's no
   // need to handle the Position Above case here.
-  drawLayerStyles(args, canvas, alpha, styleSource.get(), LayerStylePosition::Below,
-                  {LayerStyleExtraSourceType::Background});
+  auto styleArgs = args;
+  styleArgs.styleSourceTypes = {LayerStyleExtraSourceType::Background};
+  drawLayerStyles(styleArgs, canvas, alpha, styleSource.get(), LayerStylePosition::Below);
 }
 
 bool Layer::getLayersUnderPointInternal(float x, float y,

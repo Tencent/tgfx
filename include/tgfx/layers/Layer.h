@@ -653,9 +653,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   void drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
                     const LayerStyleSource* layerStyleSource = nullptr,
-                    const Layer* stopChild = nullptr,
-                    const std::unordered_set<LayerStyleExtraSourceType>& styleExtraSourceTypes = {},
-                    bool excludeChildren = false);
+                    const Layer* stopChild = nullptr, bool excludeChildren = false);
 
   bool drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
                     const Layer* stopChild = nullptr, const Matrix3D* transform = nullptr);
@@ -682,10 +680,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   void drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
                        const LayerStyleSource* source, LayerStylePosition position);
-
-  void drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
-                       const LayerStyleSource* source, LayerStylePosition position,
-                       const std::unordered_set<LayerStyleExtraSourceType>& styleExtraSourceTypes);
 
   void drawBackgroundLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
                                  const Matrix3D& transform);
