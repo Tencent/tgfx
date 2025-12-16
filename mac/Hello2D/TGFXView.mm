@@ -35,11 +35,11 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   std::unique_ptr<hello2d::AppHost> appHost;
   tgfx::DisplayList displayList;
   std::shared_ptr<tgfx::Layer> contentLayer;
-  int lastDrawIndex = -1;
-  std::unique_ptr<tgfx::Recording> lastRecording = nullptr;
-  int lastSurfaceWidth = 0;
-  int lastSurfaceHeight = 0;
-  bool sizeInvalidated = false;
+  int lastDrawIndex;
+  std::unique_ptr<tgfx::Recording> lastRecording;
+  int lastSurfaceWidth;
+  int lastSurfaceHeight;
+  bool sizeInvalidated;
 }
 
 - (BOOL)acceptsFirstResponder {
@@ -172,8 +172,9 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
 
 - (void)applyCenteringTransform {
   if (lastSurfaceWidth > 0 && lastSurfaceHeight > 0 && contentLayer) {
-    hello2d::LayerBuilder::ApplyCenteringTransform(
-        contentLayer, static_cast<float>(lastSurfaceWidth), static_cast<float>(lastSurfaceHeight));
+    hello2d::LayerBuilder::ApplyCenteringTransform(contentLayer,
+                                                   static_cast<float>(lastSurfaceWidth),
+                                                   static_cast<float>(lastSurfaceHeight));
   }
 }
 

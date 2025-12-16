@@ -26,10 +26,10 @@
   std::unique_ptr<hello2d::AppHost> appHost;
   tgfx::DisplayList displayList;
   std::shared_ptr<tgfx::Layer> contentLayer;
-  int lastDrawIndex = -1;
-  std::unique_ptr<tgfx::Recording> lastRecording = nullptr;
-  int lastSurfaceWidth = 0;
-  int lastSurfaceHeight = 0;
+  int lastDrawIndex;
+  std::unique_ptr<tgfx::Recording> lastRecording;
+  int lastSurfaceWidth;
+  int lastSurfaceHeight;
 }
 
 + (Class)layerClass {
