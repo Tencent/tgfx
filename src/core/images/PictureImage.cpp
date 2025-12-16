@@ -97,6 +97,8 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
 
   const auto scale = args.drawScale;
   rect.scale(scale, scale);
+  // Use roundOut() to ensure pixel-aligned offscreen rendering with complete pixel coverage,
+  // preventing blur artifacts caused by partial pixel rendering.
   rect.roundOut();
 
   auto mipmapped = samplingArgs.sampling.mipmapMode != MipmapMode::None && hasMipmaps();
