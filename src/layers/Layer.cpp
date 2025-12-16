@@ -2479,9 +2479,8 @@ Matrix3D Layer::calculate3DContextDepthMatrix() {
 }
 
 bool Layer::canExtend3DContext() const {
-  return static_cast<BlendMode>(bitFields.blendMode) == BlendMode::SrcOver &&
-         bitFields.passThroughBackground && !bitFields.allowsGroupOpacity && _filters.empty() &&
-         _layerStyles.empty() && !hasValidMask();
+  return bitFields.passThroughBackground && _filters.empty() && _layerStyles.empty() &&
+         !hasValidMask();
 }
 
 bool Layer::in3DContext() const {
