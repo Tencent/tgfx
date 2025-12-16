@@ -1002,7 +1002,14 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
       args.blurBackground = std::move(backgroundContext);
     }
   }
-  drawLayer(args, canvas, alpha, blendMode, nullptr);
+
+  // Check if the current layer needs to start a 3D context. Since Layer::draw is called directly
+  // without going through a parent layer's drawChildren, 3D context handling must be done here.
+  if (_transformStyle == TransformStyle::Preserve3D && canExtend3DContext()) {
+    drawLayerByStarting3DContext(*this, args, canvas, alpha, blendMode, Matrix3D::I());
+  } else {
+    drawLayer(args, canvas, alpha, blendMode, nullptr);
+  }
 }
 
 void Layer::invalidateContent() {
@@ -1746,7 +1753,8 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, cons
                child->canExtend3DContext()) {
       DEBUG_ASSERT(transform == nullptr);
       // Start a 3D rendering context.
-      drawChildByStarting3DContext(*child, childArgs, canvas, alpha, childMatrix);
+      drawLayerByStarting3DContext(*child, childArgs, canvas, child->_alpha * alpha,
+                                   static_cast<BlendMode>(child->bitFields.blendMode), childMatrix);
     } else {
       // Draw elements outside the 3D context.
       DEBUG_ASSERT(transform == nullptr);
@@ -1762,34 +1770,38 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, cons
   return true;
 }
 
-void Layer::drawChildByStarting3DContext(Layer& child, const DrawArgs& args, Canvas* canvas,
-                                         float alpha, const Matrix3D& transform) {
+void Layer::drawLayerByStarting3DContext(Layer& layer, const DrawArgs& args, Canvas* canvas,
+                                         float alpha, BlendMode blendMode,
+                                         const Matrix3D& transform) {
   DEBUG_ASSERT(args.render3DContext == nullptr);
+  if (args.renderRect == nullptr) {
+    DEBUG_ASSERT(false);
+    return;
+  }
   auto context = canvas->getSurface() ? canvas->getSurface()->getContext() : nullptr;
   if (context == nullptr) {
     DEBUG_ASSERT(false);
     return;
   }
   // The processing area of the compositor is consistent with the actual effective drawing area.
-  auto validRenderRect = args.renderRect;
-  if (!validRenderRect->intersect(child.renderBounds)) {
+  auto validRenderRect = *args.renderRect;
+  if (!validRenderRect.intersect(layer.renderBounds)) {
     DEBUG_ASSERT(false);
     return;
   }
 
   auto compositor =
-      std::make_shared<Context3DCompositor>(*context, static_cast<int>(validRenderRect->width()),
-                                            static_cast<int>(validRenderRect->height()));
+      std::make_shared<Context3DCompositor>(*context, static_cast<int>(validRenderRect.width()),
+                                            static_cast<int>(validRenderRect.height()));
   auto context3DArgs = args;
   context3DArgs.render3DContext = std::make_shared<Render3DContext>(
-      compositor, *validRenderRect, child.calculate3DContextDepthMatrix());
+      compositor, validRenderRect, layer.calculate3DContextDepthMatrix());
   // Layers inside a 3D context need to maintain independent 3D state. This means layers drawn
   // later may become the background, making it impossible to know the final background when
   // drawing each layer. Therefore, background styles are disabled.
   context3DArgs.styleSourceTypes = {LayerStyleExtraSourceType::None,
                                     LayerStyleExtraSourceType::Contour};
-  child.drawLayer(context3DArgs, canvas, child._alpha * alpha,
-                  static_cast<BlendMode>(child.bitFields.blendMode), &transform);
+  layer.drawLayer(context3DArgs, canvas, alpha, blendMode, &transform);
   auto context3DImage = compositor->finish();
 
   // The final texture has been scaled proportionally during generation, so draw it at its actual
@@ -1798,13 +1810,13 @@ void Layer::drawChildByStarting3DContext(Layer& child, const DrawArgs& args, Can
   DEBUG_ASSERT(!FloatNearlyZero(contentScale));
   AutoCanvasRestore autoRestore(canvas);
   auto imageMatrix = Matrix::MakeScale(1.0f / contentScale, 1.0f / contentScale);
-  imageMatrix.preTranslate(validRenderRect->left, validRenderRect->top);
+  imageMatrix.preTranslate(validRenderRect.left, validRenderRect.top);
   canvas->concat(imageMatrix);
   canvas->drawImage(context3DImage);
 
   if (args.blurBackground) {
     Paint paint = {};
-    paint.setAntiAlias(bitFields.allowsEdgeAntialiasing);
+    paint.setAntiAlias(layer.bitFields.allowsEdgeAntialiasing);
     auto backgroundCanvas = args.blurBackground->getCanvas();
     AutoCanvasRestore autoRestoreBg(backgroundCanvas);
     backgroundCanvas->concat(imageMatrix);

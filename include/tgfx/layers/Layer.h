@@ -658,8 +658,9 @@ class Layer : public std::enable_shared_from_this<Layer> {
   bool drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
                     const Layer* stopChild = nullptr, const Matrix3D* transform = nullptr);
 
-  void drawChildByStarting3DContext(Layer& child, const DrawArgs& args, Canvas* canvas, float alpha,
-                                    const Matrix3D& transform);
+  // Draws the specified layer by starting a new 3D rendering context.
+  void drawLayerByStarting3DContext(Layer& layer, const DrawArgs& args, Canvas* canvas, float alpha,
+                                    BlendMode blendMode, const Matrix3D& transform);
 
   float drawBackgroundLayers(const DrawArgs& args, Canvas* canvas);
 
