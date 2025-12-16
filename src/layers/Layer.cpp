@@ -1182,9 +1182,6 @@ bool Layer::canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode,
     }
     return true;
   }
-  if (_children.empty() && _layerStyles.empty() && _filters.empty()) {
-    return false;
-  }
   if (shouldPassThroughBackground(blendMode, transform3D) || hasBackgroundStyle()) {
     return false;
   }
