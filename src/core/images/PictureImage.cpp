@@ -94,12 +94,11 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
   if (!rect.intersect(drawBounds)) {
     return nullptr;
   }
-  auto clipRect = rect;
-  rect.scale(args.drawScale, args.drawScale);
-  rect.round();
-  // recalculate the scale factor to avoid the precision loss of floating point numbers
-  auto scaleX = rect.width() / clipRect.width();
-  auto scaleY = rect.height() / clipRect.height();
+
+  const auto scale = args.drawScale;
+  rect.scale(scale, scale);
+  rect.roundOut();
+
   auto mipmapped = samplingArgs.sampling.mipmapMode != MipmapMode::None && hasMipmaps();
   auto renderTarget = RenderTargetProxy::Make(args.context, static_cast<int>(rect.width()),
                                               static_cast<int>(rect.height()), isAlphaOnly(), 1,
@@ -107,8 +106,8 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  auto extraMatrix = Matrix::MakeScale(scaleX, scaleY);
-  extraMatrix.preTranslate(-clipRect.left, -clipRect.top);
+  auto extraMatrix = Matrix::MakeTrans(-rect.left, -rect.top);
+  extraMatrix.preScale(scale, scale);
   if (!drawPicture(renderTarget, args.renderFlags, &extraMatrix)) {
     return nullptr;
   }
