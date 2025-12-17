@@ -340,7 +340,6 @@ jobs:
         with:
           path: /opt/ohos-cmd-tools
           key: ohos-cli-6.0.0.868-linux-x64
-          restore-keys: ohos-cli-
 
       - name: Install CLI Tools
         if: steps.cli-tools-cache.outputs.cache-hit != 'true'
@@ -383,20 +382,19 @@ jobs:
           path: |
             ~/.hvigor
             ~/.ohpm
-          key: hvigor-${{ runner.os }}-${{ hashFiles('**/oh-package.json5', '**/hvigorfile.ts') }}
+          key: hvigor-${{ runner.os }}-${{ hashFiles('ohos/**/oh-package.json5', 'ohos/**/hvigorfile.ts') }}
           restore-keys: |
             hvigor-${{ runner.os }}-
 
-      - name: Cache OHOS Build
+      - name: Cache Hvigor Build
         uses: actions/cache@v4
         with:
           path: |
-            ohos/hello2d/.cxx
             ohos/hello2d/build
             ohos/.hvigor
-          key: ohos-build-${{ runner.os }}-${{ hashFiles('src/**', 'include/**', 'ohos/**/*.cpp', 'ohos/**/*.h') }}
+          key: ohos-hvigor-${{ runner.os }}-${{ hashFiles('ohos/**/*.ets', 'ohos/**/*.json5') }}
           restore-keys: |
-            ohos-build-${{ runner.os }}-
+            ohos-hvigor-${{ runner.os }}-
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -417,10 +415,38 @@ jobs:
           ohpm config set registry https://ohpm.openharmony.cn/ohpm/
           ohpm install --all
 
+      - name: Setup ccache
+        run: |
+          sudo apt-get update && sudo apt-get install -y ccache
+          ccache --version
+          ccache --max-size=500M
+          ccache --zero-stats
+
+      - name: Restore ccache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-ohos-${{ runner.os }}-main
+          restore-keys: |
+            ccache-ohos-${{ runner.os }}-
+
       - name: Build Harmony
         run: |
           cd ohos
-          hvigorw assembleHap -Dohos.sdk.root=$DEVECO_SDK_HOME -p buildMode=release --no-daemon
+          sed -i '/"abiFilters"/,/\]/{ /"x86_64"/d }' hello2d/build-profile.json5
+          sed -i 's/"arguments": "\(.*\)"/"arguments": "\1 -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache"/' hello2d/build-profile.json5
+          hvigorw assembleHap \
+            -Dohos.sdk.root=$DEVECO_SDK_HOME \
+            -p buildMode=release \
+            --parallel \
+            --no-daemon
+
+      - name: Save ccache
+        if: github.ref == 'refs/heads/main'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-ohos-${{ runner.os }}-main
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
