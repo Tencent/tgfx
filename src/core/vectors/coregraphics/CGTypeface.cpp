@@ -357,26 +357,35 @@ static void GetGlyphMapByPlane(const uint8_t* bits, CTFontRef ctFont, std::vecto
 }
 
 const std::vector<Unichar>& CGTypeface::getGlyphToUnicodeMap() const {
+  std::lock_guard<std::mutex> autoLock(locker);
+  if (!glyphToUnicodeCache.empty()) {
+    return glyphToUnicodeCache;
+  }
+
   auto glyphCount = CTFontGetGlyphCount(ctFont);
 
   auto charSet = CTFontCopyCharacterSet(ctFont);
   if (!charSet) {
-    return GetGlyphMapByChar(ctFont, glyphCount);
+    glyphToUnicodeCache = GetGlyphMapByChar(ctFont, glyphCount);
+    return glyphToUnicodeCache;
   }
 
   auto bitmap = CFCharacterSetCreateBitmapRepresentation(nullptr, charSet);
   if (!bitmap) {
-    return {};
+    CFRelease(charSet);
+    return glyphToUnicodeCache;
   }
 
   CFIndex dataLength = CFDataGetLength(bitmap);
   if (dataLength == 0) {
-    return {};
+    CFRelease(bitmap);
+    CFRelease(charSet);
+    return glyphToUnicodeCache;
   }
 
-  std::vector<Unichar> returnMap(static_cast<size_t>(glyphCount), 0);
+  glyphToUnicodeCache.resize(static_cast<size_t>(glyphCount), 0);
   auto bits = CFDataGetBytePtr(bitmap);
-  GetGlyphMapByPlane(bits, ctFont, returnMap, 0);
+  GetGlyphMapByPlane(bits, ctFont, glyphToUnicodeCache, 0);
   /*
     A CFData object that specifies the bitmap representation of the Unicode
     character points the for the new character set. The bitmap representation could
@@ -388,16 +397,18 @@ const std::vector<Unichar>& CGTypeface::getGlyphToUnicodeMap() const {
     2). The plane index byte, in this case, contains the integer value two.
     */
 
-  if (dataLength <= PLANE_SIZE) {
-    return returnMap;
+  if (dataLength > PLANE_SIZE) {
+    auto extraPlaneCount = (dataLength - PLANE_SIZE) / (1 + PLANE_SIZE);
+    while (extraPlaneCount-- > 0) {
+      bits += PLANE_SIZE;
+      uint8_t planeIndex = *bits++;
+      GetGlyphMapByPlane(bits, ctFont, glyphToUnicodeCache, planeIndex);
+    }
   }
-  auto extraPlaneCount = (dataLength - PLANE_SIZE) / (1 + PLANE_SIZE);
-  while (extraPlaneCount-- > 0) {
-    bits += PLANE_SIZE;
-    uint8_t planeIndex = *bits++;
-    GetGlyphMapByPlane(bits, ctFont, returnMap, planeIndex);
-  }
-  return returnMap;
+
+  CFRelease(bitmap);
+  CFRelease(charSet);
+  return glyphToUnicodeCache;
 }
 #endif
 

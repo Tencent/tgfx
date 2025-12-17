@@ -82,6 +82,9 @@ class CGTypeface : public Typeface {
   bool _hasColor = false;
   bool _hasOutlines = true;
   std::shared_ptr<Data> data;
+#ifdef TGFX_USE_GLYPH_TO_UNICODE
+  mutable std::vector<Unichar> glyphToUnicodeCache = {};
+#endif
 
   friend class CGScalerContext;
 };
