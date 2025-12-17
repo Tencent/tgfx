@@ -217,6 +217,8 @@ static inline void DrawLayerImageTo3DRenderContext(const DrawArgs& args,
 
 /**
  * Checks if any vertex of the rect is behind the viewer after applying the 3D transformation.
+ * A vertex is considered behind the viewer when w <= 0, where w = 0 means the vertex is at the
+ * viewing plane (infinitely far), which is also treated as behind.
  * @param rect The rect in layer's local coordinate system.
  * @param transform The layer's transformation matrix, containing camera information.
  */
