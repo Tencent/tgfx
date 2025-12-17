@@ -125,43 +125,4 @@ void SubtreeCache::draw(Context* context, int longEdge, Canvas* canvas, const Pa
   canvas->setMatrix(oldMatrix);
 }
 
-void SubtreeCache::draw(Context* context, int longEdge, Render3DContext& render3DContext,
-                        float alpha, const Matrix3D& transform3D) const {
-  auto sizeUniqueKey = makeSizeKey(longEdge);
-  auto it = cacheEntries.find(sizeUniqueKey);
-  if (it == cacheEntries.end()) {
-    DEBUG_ASSERT(false);
-    return;
-  }
-  auto proxyProvider = context->proxyProvider();
-  auto proxy = proxyProvider->findOrWrapTextureProxy(sizeUniqueKey);
-  if (proxy == nullptr) {
-    DEBUG_ASSERT(false);
-    return;
-  }
-  auto image = TextureImage::Wrap(proxy, it->second.colorSpace);
-  if (image == nullptr) {
-    DEBUG_ASSERT(false);
-    return;
-  }
-
-  const auto& matrix = it->second.imageMatrix;
-  auto adaptedMatrix = AdaptedImageMatrix(transform3D, matrix);
-  // 3D layers within a 3D rendering context require unified depth mapping to ensure correct
-  // depth occlusion visual effects.
-  adaptedMatrix.postConcat(render3DContext.depthMatrix());
-  // Calculate the drawing offset in the compositor based on the final drawing area of the content
-  // on the displaylist.
-  auto imageMappedRect = adaptedMatrix.mapRect(Rect::MakeWH(image->width(), image->height()));
-  DEBUG_ASSERT(!FloatNearlyZero(matrix.getScaleX()));
-  DEBUG_ASSERT(!FloatNearlyZero(matrix.getScaleY()));
-  // The origin of the mapped rect in the DisplayList coordinate needs to add the origin of the
-  // image in the layer's local coordinate system.
-  auto x = imageMappedRect.left + matrix.getTranslateX() / matrix.getScaleX() -
-           render3DContext.renderRect().left;
-  auto y = imageMappedRect.top + matrix.getTranslateY() / matrix.getScaleY() -
-           render3DContext.renderRect().top;
-  render3DContext.compositor()->drawImage(image, adaptedMatrix, x, y, alpha);
-}
-
 }  // namespace tgfx

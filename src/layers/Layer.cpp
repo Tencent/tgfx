@@ -95,52 +95,17 @@ static inline void ApplyClip(Canvas& canvas, const Rect& maxBounds, const Rect& 
   canvas.clipRect(clipBounds);
 }
 
-struct ChildTransformerResult {
-  std::shared_ptr<RegionTransformer> childTransformer = nullptr;
-  std::optional<Matrix3D> childTransform3D = std::nullopt;
-  // Ensure the 3D filter is not released during the entire function lifetime.
-  std::vector<std::shared_ptr<LayerFilter>> filter3DVector = {};
-};
-
-/**
- * Computes the transformer for dirty region calculation.
- * - Layers inside 3D context: transformer + accumulated transform3D.
- * - Layers outside 3D context: transformer + child matrix.
- * Filters and styles interrupt 3D context, so non-root layers inside 3D context can ignore
- * parent filters and styles when calculating dirty regions.
- * @param childMatrix The child layer's transformation matrix.
- * @param childIn3DContext Whether the child is inside a 3D context.
- * @param transformer The transformer of the current layer. For layers inside a 3D context, this
- * is the transformer of the parent layer that established the context.
- * @param transform3D The accumulated transformation matrix from the parent layer to the layer
- * that established the 3D context. Null if not in a 3D context, or if the child layer is starting
- * a new 3D context rather than inheriting from a parent.
- */
-static inline ChildTransformerResult GetChildTransformer(
-    const Matrix3D& childMatrix, bool childIn3DContext,
-    const std::shared_ptr<RegionTransformer>& transformer, const Matrix3D* transform3D) {
-  ChildTransformerResult result = {};
-  Matrix3D matrixForTransformer = childMatrix;
-
-  if (childIn3DContext) {
-    result.childTransform3D = childMatrix;
-    if (transform3D != nullptr) {
-      // Child layers inherit the 3D context.
-      result.childTransform3D->postConcat(*transform3D);
-    }
-    matrixForTransformer = *result.childTransform3D;
+// Creates a RegionTransformer from a 3D matrix. If the matrix is affine, uses MakeFromMatrix.
+// Otherwise, creates a Transform3DFilter and uses MakeFromFilters. The filterHolder is used to
+// ensure the filter is not released during the transformer's lifetime.
+static inline std::shared_ptr<RegionTransformer> MakeTransformerFromMatrix3D(
+    const Matrix3D& matrix, std::shared_ptr<RegionTransformer> outer,
+    std::vector<std::shared_ptr<LayerFilter>>* filterHolder) {
+  if (IsMatrix3DAffine(matrix)) {
+    return RegionTransformer::MakeFromMatrix(GetMayLossyAffineMatrix(matrix), std::move(outer));
   }
-
-  if (IsMatrix3DAffine(matrixForTransformer)) {
-    result.childTransformer = RegionTransformer::MakeFromMatrix(
-        GetMayLossyAffineMatrix(matrixForTransformer), transformer);
-  } else {
-    result.filter3DVector.push_back(Transform3DFilter::Make(matrixForTransformer));
-    result.childTransformer =
-        RegionTransformer::MakeFromFilters(result.filter3DVector, 1.0f, transformer);
-  }
-
-  return result;
+  filterHolder->push_back(Transform3DFilter::Make(matrix));
+  return RegionTransformer::MakeFromFilters(*filterHolder, 1.0f, std::move(outer));
 }
 
 /**
@@ -1181,8 +1146,7 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
     DEBUG_ASSERT((transform3D != nullptr) ==
                  (_transformStyle == TransformStyle::Preserve3D && canExtend3DContext()));
     // Inside a 3D context, layers always use SrcOver blend mode and ignore allowsGroupOpacity.
-    needsOffscreen = !bitFields.passThroughBackground ||
-                     (!_filters.empty() && !args.excludeEffects) || hasValidMask();
+    needsOffscreen = !_filters.empty() || hasValidMask();
   } else if (_transformStyle == TransformStyle::Flat || !canExtend3DContext()) {
     // Direct rendering is used when starting a 3D context.
     // When unable to start a 3D context, offscreen rendering is required if draw parameters
@@ -1489,6 +1453,8 @@ SubtreeCache* Layer::getValidSubtreeCache(const DrawArgs& args, int longEdge,
 
 bool Layer::drawWithSubtreeCache(const DrawArgs& args, Canvas* canvas, float alpha,
                                  BlendMode blendMode, const Matrix3D* transform3D) {
+  // Non-leaf nodes in 3D context layer tree have caching disabled.
+  DEBUG_ASSERT(args.render3DContext == nullptr);
   auto layerBounds = getBounds();
   auto contentScale = canvas->getMatrix().getMaxScale();
   auto longEdge = GetMipmapCacheLongEdge(args.subtreeCacheMaxSize, contentScale, layerBounds);
@@ -1506,23 +1472,10 @@ bool Layer::drawWithSubtreeCache(const DrawArgs& args, Canvas* canvas, float alp
     }
     paint.setMaskFilter(maskFilter);
   }
-  if (args.render3DContext != nullptr) {
-    if (transform3D == nullptr) {
-      DEBUG_ASSERT(false);
-      return false;
-    }
-    // The 3D compositor applies MSAA anti-aliasing internally, so no additional antiAlias handling
-    // is needed. The 3D compositor for layers within a 3D rendering context does not support masks,
-    // so no additional mask handling is needed. It also does not support blend modes other than
-    // BlendMode::SrcOver, which is the default blend mode inside the compositor, so no additional
-    // blend handling is needed.
-    cache->draw(args.context, longEdge, *args.render3DContext, alpha, *transform3D);
-  } else {
-    paint.setAntiAlias(bitFields.allowsEdgeAntialiasing);
-    paint.setAlpha(alpha);
-    paint.setBlendMode(blendMode);
-    cache->draw(args.context, longEdge, canvas, paint, transform3D);
-  }
+  paint.setAntiAlias(bitFields.allowsEdgeAntialiasing);
+  paint.setAlpha(alpha);
+  paint.setBlendMode(blendMode);
+  cache->draw(args.context, longEdge, canvas, paint, transform3D);
   // Starting from the root node of the DisplayList, if a layer enables a 3D rendering context,
   // background styles will be disabled for the entire subtree.
   if (args.blurBackground &&
@@ -2250,14 +2203,22 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer,
   maxBackgroundOutset = 0;
   minBackgroundOutset = std::numeric_limits<float>::max();
   auto contentScale = 1.0f;
-  auto parentTransformer = transformer;
+  auto baseTransformer = transformer;
   if (!_layerStyles.empty() || !_filters.empty()) {
+    // Filters and styles interrupt 3D context, so non-root layers inside 3D context can ignore
+    // parent filters and styles when calculating dirty regions.
     DEBUG_ASSERT(_transformStyle == TransformStyle::Flat || !canExtend3DContext());
     if (transformer) {
       contentScale = transformer->getMaxScale();
     }
     transformer = RegionTransformer::MakeFromFilters(_filters, 1.0f, std::move(transformer));
     transformer = RegionTransformer::MakeFromStyles(_layerStyles, 1.0f, std::move(transformer));
+  }
+  // Ensure the 3D filter is not released during the entire function lifetime.
+  std::vector<std::shared_ptr<LayerFilter>> current3DFilterVector = {};
+  if (transform3D != nullptr) {
+    transformer =
+        MakeTransformerFromMatrix3D(*transform3D, baseTransformer, &current3DFilterVector);
   }
   auto content = getContent();
   if (bitFields.dirtyContentBounds || (forceDirty && content)) {
@@ -2298,10 +2259,16 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer,
     bool childIn3DContext =
         transform3D != nullptr ||
         (child->_transformStyle == TransformStyle::Preserve3D && child->canExtend3DContext());
-    auto transformerResult =
-        GetChildTransformer(childMatrix, childIn3DContext,
-                            childIn3DContext ? parentTransformer : transformer, transform3D);
-    auto& childTransformer = transformerResult.childTransformer;
+    // Layers outside 3D context apply matrix transformation in parent layer.
+    std::shared_ptr<RegionTransformer> childTransformer = nullptr;
+    // Ensure the 3D filter is not released during the entire function lifetime.
+    std::vector<std::shared_ptr<LayerFilter>> child3DFilterVector = {};
+    if (childIn3DContext) {
+      childTransformer = baseTransformer;
+    } else {
+      childTransformer =
+          MakeTransformerFromMatrix3D(childMatrix, transformer, &child3DFilterVector);
+    }
     std::optional<Rect> clipRect = std::nullopt;
     if (child->_scrollRect) {
       clipRect = *child->_scrollRect;
@@ -2325,10 +2292,16 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer,
       childTransformer = RegionTransformer::MakeFromClip(*clipRect, std::move(childTransformer));
     }
     auto childForceDirty = forceDirty || child->bitFields.dirtyTransform;
-    auto childTransform3D = transformerResult.childTransform3D.has_value()
-                                ? &*transformerResult.childTransform3D
-                                : nullptr;
-    child->updateRenderBounds(std::move(childTransformer), childTransform3D, childForceDirty);
+    std::optional<Matrix3D> childTransform3D = std::nullopt;
+    if (childIn3DContext) {
+      childTransform3D = childMatrix;
+      if (transform3D != nullptr) {
+        childTransform3D->postConcat(*transform3D);
+      }
+    }
+    child->updateRenderBounds(std::move(childTransformer),
+                              childTransform3D.has_value() ? &*childTransform3D : nullptr,
+                              childForceDirty);
     child->bitFields.dirtyTransform = false;
     if (!child->maskOwner) {
       renderBounds.join(child->renderBounds);

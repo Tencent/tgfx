@@ -51,9 +51,6 @@ class SubtreeCache {
   void draw(Context* context, int longEdge, Canvas* canvas, const Paint& paint,
             const Matrix3D* transform3D) const;
 
-  void draw(Context* context, int longEdge, Render3DContext& render3DContext, float alpha,
-            const Matrix3D& transform3D) const;
-
  private:
   struct CacheEntry {
     Matrix imageMatrix = {};
