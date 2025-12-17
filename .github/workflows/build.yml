@@ -433,10 +433,8 @@ jobs:
       - name: Build Harmony
         run: |
           cd ohos
-          sed -i '/"x86_64"/d' hello2d/build-profile.json5
+          sed -i '/"abiFilters"/,/\]/{ /"x86_64"/d }' hello2d/build-profile.json5
           sed -i 's/"arguments": "\(.*\)"/"arguments": "\1 -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache"/' hello2d/build-profile.json5
-          grep -A5 '"arguments"' hello2d/build-profile.json5
-          
           hvigorw assembleHap \
             -Dohos.sdk.root=$DEVECO_SDK_HOME \
             -p buildMode=release \
