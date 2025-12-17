@@ -28,8 +28,6 @@ class Context3DCompositor {
  public:
   Context3DCompositor(const Context& context, int width, int height);
 
-  ~Context3DCompositor();
-
   void drawImage(std::shared_ptr<Image> image, const Matrix3D& matrix, float x, float y,
                  float alpha);
 

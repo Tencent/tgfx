@@ -2439,7 +2439,7 @@ Matrix3D Layer::calculate3DContextDepthMatrix() {
   std::queue<Item> queue;
   queue.emplace(this, _matrix3D);
   while (!queue.empty()) {
-    auto [layer, matrix] = queue.front();
+    auto& [layer, matrix] = queue.front();
     queue.pop();
 
     auto contentBounds = layer->getContentBounds();
@@ -2485,11 +2485,13 @@ bool Layer::canExtend3DContext() const {
 
 bool Layer::in3DContext() const {
   if (_transformStyle == TransformStyle::Preserve3D && canExtend3DContext()) {
+    // The current layer can extend or start a 3D rendering context.
     return true;
   }
   if (parent() == nullptr) {
     return false;
   }
+  // The parent layer has started or extended a 3D rendering context.
   return parent()->_transformStyle == TransformStyle::Preserve3D && parent()->canExtend3DContext();
 }
 

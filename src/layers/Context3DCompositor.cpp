@@ -39,12 +39,6 @@ Context3DCompositor::Context3DCompositor(const Context& context, int width, int 
   DEBUG_ASSERT(targetDepthStencilProxy != nullptr);
 }
 
-Context3DCompositor::~Context3DCompositor() {
-  targetColorProxy = nullptr;
-  targetDepthStencilProxy = nullptr;
-  drawOps.clear();
-}
-
 void Context3DCompositor::drawImage(std::shared_ptr<Image> image, const Matrix3D& matrix, float x,
                                     float y, float alpha) {
   DEBUG_ASSERT(targetColorProxy != nullptr);
