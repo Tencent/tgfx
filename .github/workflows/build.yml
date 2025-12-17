@@ -432,13 +432,12 @@ jobs:
           ccache --max-size=500M
           ccache --zero-stats
 
-      - name: Cache ccache
-        uses: actions/cache@v4
+      - name: Restore ccache
+        uses: actions/cache/restore@v4
         with:
           path: ~/.cache/ccache
-          key: ccache-ohos-${{ runner.os }}-${{ github.ref_name }}-${{ github.sha }}
+          key: ccache-ohos-${{ runner.os }}-main
           restore-keys: |
-            ccache-ohos-${{ runner.os }}-${{ github.ref_name }}-
             ccache-ohos-${{ runner.os }}-
 
       - name: Build Harmony
@@ -464,6 +463,14 @@ jobs:
           # Show ccache statistics
           echo "=== ccache statistics ==="
           ccache --show-stats
+
+      # Only save ccache on main branch to avoid cache pollution from PRs
+      - name: Save ccache
+        if: github.ref == 'refs/heads/main'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-ohos-${{ runner.os }}-main
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
