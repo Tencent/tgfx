@@ -18,7 +18,10 @@
 
 #include "GlyphRenderer.h"
 #include <cstring>
+#include <mutex>
+#include <unordered_map>
 #include "JNIUtil.h"
+#include "core/utils/Log.h"
 #include "tgfx/platform/android/Global.h"
 #include "tgfx/platform/android/JNIEnvironment.h"
 
@@ -67,6 +70,10 @@ static jfieldID Rect_right = nullptr;
 static jfieldID Rect_bottom = nullptr;
 
 static bool initialized = false;
+
+// Typeface cache: fontPath -> Global<jobject>
+static std::mutex typefaceCacheMutex;
+static std::unordered_map<std::string, Global<jobject>> typefaceCache;
 
 void GlyphRenderer::JNIInit(JNIEnv* env) {
   if (env == nullptr || initialized) {
@@ -152,6 +159,33 @@ bool GlyphRenderer::IsAvailable() {
          PaintClass.get() != nullptr;
 }
 
+static jobject GetCachedTypeface(JNIEnv* env, const std::string& fontPath) {
+  if (fontPath.empty()) {
+    return nullptr;
+  }
+  std::lock_guard<std::mutex> lock(typefaceCacheMutex);
+  auto it = typefaceCache.find(fontPath);
+  if (it != typefaceCache.end()) {
+    return it->second.get();
+  }
+  jstring jPath = SafeToJString(env, fontPath);
+  if (jPath == nullptr) {
+    return nullptr;
+  }
+  jobject typeface =
+      env->CallStaticObjectMethod(TypefaceClass.get(), Typeface_createFromFile, jPath);
+  env->DeleteLocalRef(jPath);
+  if (typeface == nullptr || env->ExceptionCheck()) {
+    LOGE("GlyphRenderer::GetCachedTypeface() Failed to create Typeface from path: %s!",
+         fontPath.c_str());
+    env->ExceptionClear();
+    return nullptr;
+  }
+  typefaceCache[fontPath].reset(typeface);
+  env->DeleteLocalRef(typeface);
+  return typefaceCache[fontPath].get();
+}
+
 static jobject CreatePaint(JNIEnv* env, const std::string& fontPath, float textSize) {
   // Paint.ANTI_ALIAS_FLAG = 1
   jobject paint = env->NewObject(PaintClass.get(), Paint_Constructor, 1);
@@ -161,19 +195,9 @@ static jobject CreatePaint(JNIEnv* env, const std::string& fontPath, float textS
 
   env->CallVoidMethod(paint, Paint_setTextSize, textSize);
 
-  if (!fontPath.empty()) {
-    jstring jPath = SafeToJString(env, fontPath);
-    if (jPath != nullptr) {
-      jobject typeface =
-          env->CallStaticObjectMethod(TypefaceClass.get(), Typeface_createFromFile, jPath);
-      env->DeleteLocalRef(jPath);
-      if (typeface != nullptr && !env->ExceptionCheck()) {
-        env->CallObjectMethod(paint, Paint_setTypeface, typeface);
-        env->DeleteLocalRef(typeface);
-      } else {
-        env->ExceptionClear();
-      }
-    }
+  jobject typeface = GetCachedTypeface(env, fontPath);
+  if (typeface != nullptr) {
+    env->CallObjectMethod(paint, Paint_setTypeface, typeface);
   }
 
   return paint;
@@ -209,12 +233,14 @@ bool GlyphRenderer::RenderGlyph(const std::string& fontPath, const std::string& 
         env->CallStaticObjectMethod(BitmapClass.get(), Bitmap_createBitmap, width, height, config);
     env->DeleteLocalRef(config);
     if (bitmap == nullptr || env->ExceptionCheck()) {
+      LOGE("GlyphRenderer::RenderGlyph() Failed to create Bitmap!");
       env->ExceptionClear();
       break;
     }
 
     canvas = env->NewObject(CanvasClass.get(), Canvas_Constructor, bitmap);
     if (canvas == nullptr || env->ExceptionCheck()) {
+      LOGE("GlyphRenderer::RenderGlyph() Failed to create Canvas!");
       env->ExceptionClear();
       break;
     }
@@ -231,6 +257,7 @@ bool GlyphRenderer::RenderGlyph(const std::string& fontPath, const std::string& 
     }
     env->CallVoidMethod(canvas, Canvas_drawText, jText, offsetX, offsetY, paint);
     if (env->ExceptionCheck()) {
+      LOGE("GlyphRenderer::RenderGlyph() Failed to draw text!");
       env->ExceptionClear();
       break;
     }
@@ -244,6 +271,7 @@ bool GlyphRenderer::RenderGlyph(const std::string& fontPath, const std::string& 
 
     env->CallVoidMethod(bitmap, Bitmap_getPixels, pixelArray, 0, width, 0, 0, width, height);
     if (env->ExceptionCheck()) {
+      LOGE("GlyphRenderer::RenderGlyph() Failed to get pixels from Bitmap!");
       env->ExceptionClear();
       break;
     }
@@ -329,6 +357,7 @@ bool GlyphRenderer::MeasureText(const std::string& fontPath, const std::string& 
       jint textLength = env->GetStringLength(jText);
       env->CallVoidMethod(paint, Paint_getTextBounds, jText, 0, textLength, rect);
       if (env->ExceptionCheck()) {
+        LOGE("GlyphRenderer::MeasureText() Failed to get text bounds!");
         env->ExceptionClear();
         break;
       }
@@ -343,6 +372,7 @@ bool GlyphRenderer::MeasureText(const std::string& fontPath, const std::string& 
     if (advance != nullptr) {
       *advance = env->CallFloatMethod(paint, Paint_measureText, jText);
       if (env->ExceptionCheck()) {
+        LOGE("GlyphRenderer::MeasureText() Failed to measure text advance!");
         env->ExceptionClear();
         break;
       }
@@ -389,6 +419,7 @@ bool GlyphRenderer::GetFontMetrics(const std::string& fontPath, float textSize, 
 
     metrics = env->CallObjectMethod(paint, Paint_getFontMetrics);
     if (metrics == nullptr || env->ExceptionCheck()) {
+      LOGE("GlyphRenderer::GetFontMetrics() Failed to get font metrics!");
       env->ExceptionClear();
       break;
     }

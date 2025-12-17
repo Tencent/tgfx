@@ -63,7 +63,7 @@ class FTTypeface : public Typeface {
 
  protected:
 #ifdef TGFX_USE_GLYPH_TO_UNICODE
-  std::vector<Unichar> getGlyphToUnicodeMap() const override;
+  const std::vector<Unichar>& getGlyphToUnicodeMap() const override;
 #endif
 
 #ifdef TGFX_USE_ADVANCED_TYPEFACE_PROPERTY
@@ -76,6 +76,10 @@ class FTTypeface : public Typeface {
   uint32_t _uniqueID = 0;
   FTFontData data;
   FT_Face face = nullptr;
+  bool _isCOLRv1 = false;
+#ifdef TGFX_USE_GLYPH_TO_UNICODE
+  mutable std::vector<Unichar> glyphToUnicodeCache = {};
+#endif
 
   FTTypeface(FTFontData data, FT_Face face);
 

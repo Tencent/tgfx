@@ -159,7 +159,7 @@ class Typeface {
    * unicode. The array length is glyphsCount(). 
    * This method is only implemented when compiling the SVG or PDF export module.
    */
-  virtual std::vector<Unichar> getGlyphToUnicodeMap() const;
+  virtual const std::vector<Unichar>& getGlyphToUnicodeMap() const;
 
   virtual std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const = 0;
 

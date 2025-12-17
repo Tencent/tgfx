@@ -356,7 +356,7 @@ static void GetGlyphMapByPlane(const uint8_t* bits, CTFontRef ctFont, std::vecto
   }
 }
 
-std::vector<Unichar> CGTypeface::getGlyphToUnicodeMap() const {
+const std::vector<Unichar>& CGTypeface::getGlyphToUnicodeMap() const {
   auto glyphCount = CTFontGetGlyphCount(ctFont);
 
   auto charSet = CTFontCopyCharacterSet(ctFont);

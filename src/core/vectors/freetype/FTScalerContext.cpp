@@ -29,6 +29,7 @@
 #include "core/utils/GammaCorrection.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/USE.h"
 #include "skcms.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Pixmap.h"
@@ -165,21 +166,12 @@ static FT_Int ChooseBitmapStrike(FT_Face face, FT_F26Dot6 scaleY) {
 }
 
 #if defined(__ANDROID__) || defined(ANDROID)
-static std::string GlyphIDToUTF8(FT_Face face, GlyphID glyphID) {
-  FT_ULong charCode = 0;
-  FT_UInt gIndex = 0;
-  charCode = FT_Get_First_Char(face, &gIndex);
-  while (gIndex != 0) {
-    if (gIndex == glyphID) {
-      break;
-    }
-    charCode = FT_Get_Next_Char(face, charCode, &gIndex);
-  }
-  if (gIndex != glyphID) {
+static std::string UnicharToUTF8(Unichar unichar) {
+  if (unichar == 0) {
     return {};
   }
-
   std::string result;
+  auto charCode = static_cast<uint32_t>(unichar);
   if (charCode < 0x80) {
     result += static_cast<char>(charCode);
   } else if (charCode < 0x800) {
@@ -550,18 +542,9 @@ void FTScalerContext::getBBoxForCurrentGlyph(FT_BBox* bbox) const {
 Rect FTScalerContext::getBounds(tgfx::GlyphID glyphID, bool fauxBold, bool fauxItalic) const {
 #if defined(__ANDROID__) || defined(ANDROID)
   if (ftTypeface()->isCOLRv1() && GlyphRenderer::IsAvailable()) {
-    std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
-    auto face = ftTypeface()->face;
-    std::string text = GlyphIDToUTF8(face, glyphID);
-    if (!text.empty()) {
-      auto fontPath = ftTypeface()->fontPath();
-      float bounds[4] = {};
-      float advance = 0;
-      if (GlyphRenderer::MeasureText(fontPath, text, textSize, bounds, &advance)) {
-        float width = std::max(bounds[2] - bounds[0], advance);
-        float height = std::max(bounds[3] - bounds[1], textSize * 1.2f);
-        return Rect::MakeXYWH(bounds[0], bounds[1], width, height);
-      }
+    Rect rect = {};
+    if (MeasureCOLRv1Glyph(ftTypeface(), glyphID, textSize, &rect)) {
+      return rect;
     }
   }
 #endif
@@ -661,22 +644,12 @@ Rect FTScalerContext::getImageTransform(GlyphID glyphID, bool fauxBold, const St
   }
 #if defined(__ANDROID__) || defined(ANDROID)
   if (ftTypeface()->isCOLRv1() && GlyphRenderer::IsAvailable()) {
-    std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
-    auto face = ftTypeface()->face;
-    std::string text = GlyphIDToUTF8(face, glyphID);
-    if (!text.empty()) {
-      auto fontPath = ftTypeface()->fontPath();
-      float bounds[4] = {};
-      float advance = 0;
-      if (GlyphRenderer::MeasureText(fontPath, text, textSize, bounds, &advance)) {
-        float width = std::max(bounds[2] - bounds[0], advance);
-        float height = std::max(bounds[3] - bounds[1], textSize * 1.2f);
-        auto rect = Rect::MakeXYWH(bounds[0], bounds[1], width, height);
-        if (matrix) {
-          matrix->setTranslate(rect.x(), rect.y());
-        }
-        return rect;
+    Rect rect = {};
+    if (MeasureCOLRv1Glyph(ftTypeface(), glyphID, textSize, &rect)) {
+      if (matrix) {
+        matrix->setTranslate(rect.x(), rect.y());
       }
+      return rect;
     }
   }
 #endif
@@ -709,9 +682,7 @@ bool FTScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke*,
   bool isCOLRv1 = ftTypeface()->isCOLRv1();
 #if defined(__ANDROID__) || defined(ANDROID)
   if (isCOLRv1 && GlyphRenderer::IsAvailable()) {
-    std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
-    auto face = ftTypeface()->face;
-    std::string text = GlyphIDToUTF8(face, glyphID);
+    std::string text = FTScalerContext::GlyphIDToUTF8(ftTypeface(), glyphID);
     if (!text.empty()) {
       auto fontPath = ftTypeface()->fontPath();
       float bounds[4] = {};
@@ -731,7 +702,7 @@ bool FTScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke*,
     }
   }
 #else
-  (void)isCOLRv1;
+  USE(isCOLRv1);
 #endif
   std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
   if (!colorFont) {
@@ -819,4 +790,30 @@ bool FTScalerContext::loadOutlineGlyph(FT_Face face, GlyphID glyphID, bool fauxB
   }
   return true;
 }
+
+#if defined(__ANDROID__) || defined(ANDROID)
+bool FTScalerContext::MeasureCOLRv1Glyph(FTTypeface* typeface, GlyphID glyphID, float textSize,
+                                         Rect* rect) {
+  std::string text = FTScalerContext::GlyphIDToUTF8(typeface, glyphID);
+  if (text.empty()) {
+    return false;
+  }
+  auto fontPath = typeface->fontPath();
+  float bounds[4] = {};
+  float advance = 0;
+  if (!GlyphRenderer::MeasureText(fontPath, text, textSize, bounds, &advance)) {
+    return false;
+  }
+  float width = std::max(bounds[2] - bounds[0], advance);
+  float height = std::max(bounds[3] - bounds[1], textSize * 1.2f);
+  *rect = Rect::MakeXYWH(bounds[0], bounds[1], width, height);
+  return true;
+}
+
+std::string FTScalerContext::GlyphIDToUTF8(FTTypeface* typeface, GlyphID glyphID) {
+  auto& map = typeface->getGlyphToUnicodeMap();
+  Unichar unichar = glyphID < map.size() ? map[glyphID] : 0;
+  return UnicharToUTF8(unichar);
+}
+#endif
 }  // namespace tgfx

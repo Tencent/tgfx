@@ -71,6 +71,12 @@ class FTScalerContext : public ScalerContext {
 
   bool loadOutlineGlyph(FT_Face face, GlyphID glyphID, bool fauxBold, bool fauxItalic) const;
 
+#if defined(__ANDROID__) || defined(ANDROID)
+  static bool MeasureCOLRv1Glyph(FTTypeface* typeface, GlyphID glyphID, float textSize, Rect* rect);
+
+  static std::string GlyphIDToUTF8(FTTypeface* typeface, GlyphID glyphID);
+#endif
+
   float textScale = 1.0f;
   Point extraScale = Point::Make(1.f, 1.f);
   FT_Size ftSize = nullptr;

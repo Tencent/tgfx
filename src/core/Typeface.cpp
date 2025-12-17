@@ -69,8 +69,9 @@ class EmptyTypeface : public Typeface {
   }
 
  protected:
-  std::vector<Unichar> getGlyphToUnicodeMap() const override {
-    return {};
+  const std::vector<Unichar>& getGlyphToUnicodeMap() const override {
+    static const std::vector<Unichar> empty = {};
+    return empty;
   }
 
   AdvancedTypefaceInfo getAdvancedInfo() const override {
@@ -107,9 +108,10 @@ bool Typeface::isCustom() const {
   return false;
 }
 
-std::vector<Unichar> Typeface::getGlyphToUnicodeMap() const {
-  return {};
-};
+const std::vector<Unichar>& Typeface::getGlyphToUnicodeMap() const {
+  static const std::vector<Unichar> empty = {};
+  return empty;
+}
 
 AdvancedTypefaceInfo Typeface::getAdvancedInfo() const {
   return {};
