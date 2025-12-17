@@ -18,34 +18,32 @@
 
 #pragma once
 
-#include "core/utils/Log.h"
-#include "layers/contents/LayerContent.h"
+#include "layers/contents/GeometryContent.h"
+#include "tgfx/core/Path.h"
 
 namespace tgfx {
-class ForegroundContent : public LayerContent {
+
+class PathContent : public GeometryContent {
  public:
-  ForegroundContent(std::shared_ptr<Picture> background, std::shared_ptr<Picture> foreground)
-      : background(std::move(background)), foreground(std::move(foreground)) {
-  }
+  PathContent(Path path, const LayerPaint& paint);
 
   Rect getBounds() const override;
-
   Rect getTightBounds(const Matrix& matrix) const override;
+  bool hitTestPoint(float localX, float localY) const override;
 
-  bool hitTestPoint(float localX, float localY, bool shapeHitTest) const override;
-
-  void drawDefault(Canvas* canvas, const BrushModifier* modifier) const override;
-
-  void drawForeground(Canvas* canvas, const BrushModifier* modifier) const override;
-
-  void drawContour(Canvas*, const BrushModifier* modifier) const override;
-
-  std::shared_ptr<Picture> background = nullptr;
-  std::shared_ptr<Picture> foreground = nullptr;
+  Path path = {};
 
  protected:
   Type type() const override {
-    return Type::Foreground;
+    return Type::Path;
   }
+
+  Rect onGetBounds() const override;
+  void onDraw(Canvas* canvas, const Paint& paint) const override;
+  bool onHasSameGeometry(const GeometryContent* other) const override;
+
+ private:
+  Path getFilledPath() const;
 };
+
 }  // namespace tgfx

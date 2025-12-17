@@ -32,7 +32,7 @@
 
 namespace tgfx {
 class LayerContent;
-class RasterizedContent;
+class SubtreeCache;
 class DisplayList;
 class DrawArgs;
 class RegionTransformer;
@@ -188,41 +188,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
    * Sets the visibility of the layer.
    */
   void setVisible(bool value);
-
-  /**
-   * Indicates whether the layer is cached as a bitmap before compositing. If true, the layer is
-   * rendered as a bitmap in its local coordinate space and then composited with other content. Any
-   * filters in the filters property are rasterized and included in the bitmap, but the current
-   * alpha of the layer is not. If false, the layer is composited directly into the destination
-   * whenever possible. The layer may still be rasterized before compositing if certain features
-   * (like filters) require it. This caching can improve performance for layers with complex
-   * content. The default value is false.
-   */
-  bool shouldRasterize() const {
-    return bitFields.shouldRasterize;
-  }
-
-  /**
-   * Sets whether the layer should be rasterized.
-   */
-  void setShouldRasterize(bool value);
-
-  /**
-   * The scale factor used to rasterize the content, relative to the layer’s coordinate space. When
-   * shouldRasterize is true, this property determines how much to scale the rasterized content.
-   * A value of 1.0 means the layer is rasterized at its current size. Values greater than 1.0
-   * enlarge the content, while values less than 1.0 shrink it. If set to an invalid value (less
-   * than or equal to 0), the layer is rasterized at its drawn size, which may cause the cache to be
-   * invalidated frequently if the drawn scale changes often. The default value is 0.0.
-   */
-  float rasterizationScale() const {
-    return _rasterizationScale;
-  }
-
-  /**
-   * Sets the scale at which to rasterize content.
-   */
-  void setRasterizationScale(float value);
 
   /**
    * Returns true if the layer is allowed to perform edge antialiasing. This means the edges of
@@ -573,8 +538,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   void invalidate();
 
-  Rect getBounds(const Matrix3D& matrix, bool computeTightBounds);
-
   Rect getBoundsInternal(const Matrix3D& coordinateMatrix, bool computeTightBounds);
 
   Rect computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBounds);
@@ -595,16 +558,11 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   std::shared_ptr<ImageFilter> getImageFilter(float contentScale);
 
-  RasterizedContent* getRasterizedCache(const DrawArgs& args, const Matrix& renderMatrix);
-
-  std::shared_ptr<Image> getRasterizedImage(const DrawArgs& args, float contentScale,
-                                            Matrix* drawingMatrix);
-
   virtual void drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
-                         const Matrix3D* transform = nullptr);
+                         const Matrix3D* transform3D = nullptr);
 
   void drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
-                     const Matrix3D* transform);
+                     const Matrix3D* transform3D);
 
   void drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha);
 
@@ -673,8 +631,17 @@ class Layer : public std::enable_shared_from_this<Layer> {
   static std::shared_ptr<Picture> RecordPicture(DrawMode mode, float contentScale,
                                                 const std::function<void(Canvas*)>& drawFunction);
 
-  bool drawWithCache(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
-                     const Matrix3D* transform);
+  bool shouldPassThroughBackground(BlendMode blendMode, const Matrix3D* transform3D) const;
+
+  bool canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode, const Matrix3D* transform3D);
+
+  SubtreeCache* getValidSubtreeCache(const DrawArgs& args, int longEdge, const Rect& layerBounds);
+
+  std::shared_ptr<Image> createSubtreeCacheImage(const DrawArgs& args, float contentScale,
+                                                 const Rect& scaledBounds, Matrix* drawingMatrix);
+
+  bool drawWithSubtreeCache(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
+                            const Matrix3D* transform3D);
 
   std::shared_ptr<Image> getContentImage(const DrawArgs& args, float contentScale,
                                          const std::shared_ptr<Image>& passThroughImage,
@@ -692,19 +659,23 @@ class Layer : public std::enable_shared_from_this<Layer> {
    */
   Matrix3D anchorAdaptedMatrix(const Matrix3D& matrix, const Point& anchor) const;
 
+  void invalidateSubtree();
+
+  void updateStaticSubtreeFlags();
+
   struct {
     bool dirtyContent : 1;        // layer's content needs updating
     bool dirtyContentBounds : 1;  // layer's content bounds needs updating
     bool dirtyDescendents : 1;    // a descendant layer needs redrawing
     bool dirtyTransform : 1;      // the layer and its children need redrawing
     bool visible : 1;
-    bool shouldRasterize : 1;
     bool allowsEdgeAntialiasing : 1;
     bool allowsGroupOpacity : 1;
     bool excludeChildEffectsInLayerStyle : 1;
     bool passThroughBackground : 1;
     bool hasBlendMode : 1;
     bool matrix3DIsAffine : 1;  // Whether the matrix3D is equivalent to a 2D affine matrix
+    bool staticSubtree : 1;  // Whether the subtree (content, children, filters, styles) is static.
     uint8_t blendMode : 5;
     uint8_t maskType : 2;
   } bitFields = {};
@@ -720,8 +691,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::vector<std::shared_ptr<Layer>> _children = {};
   std::vector<std::shared_ptr<LayerFilter>> _filters = {};
   std::vector<std::shared_ptr<LayerStyle>> _layerStyles = {};
-  float _rasterizationScale = 0.0f;
-  std::unique_ptr<RasterizedContent> rasterizedContent;
+  std::unique_ptr<SubtreeCache> subtreeCache;
   std::shared_ptr<LayerContent> layerContent = nullptr;
   Rect renderBounds = {};                       // in global coordinates
   Rect* contentBounds = nullptr;                //  in global coordinates

@@ -18,20 +18,31 @@
 
 #pragma once
 
+#include "layers/contents/GeometryContent.h"
+#include "tgfx/core/Path.h"
+
 namespace tgfx {
-class Brush;
 
-/**
- * BrushModifier is an interface for modifying Brush properties before they are applied in drawing
- * operations. It allows dynamic adjustment of attributes such as color, alpha, or filters.
- */
-class BrushModifier {
+class RectContent : public GeometryContent {
  public:
-  virtual ~BrushModifier() = default;
+  RectContent(const Rect& rect, const LayerPaint& paint);
 
-  /**
-   * Transforms the given Brush and returns a new Brush with modifications applied.
-   */
-  virtual Brush transform(const Brush& brush) const = 0;
+  Rect getTightBounds(const Matrix& matrix) const override;
+  bool hitTestPoint(float localX, float localY) const override;
+
+  Rect rect = {};
+
+ protected:
+  Type type() const override {
+    return Type::Rect;
+  }
+
+  Rect onGetBounds() const override;
+  void onDraw(Canvas* canvas, const Paint& paint) const override;
+  bool onHasSameGeometry(const GeometryContent* other) const override;
+
+ private:
+  Path getFilledPath() const;
 };
+
 }  // namespace tgfx
