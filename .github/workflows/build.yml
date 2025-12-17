@@ -442,10 +442,6 @@ jobs:
             -p buildMode=release \
             --parallel \
             --no-daemon
-          
-          # Show ccache statistics
-          echo "=== ccache statistics ==="
-          ccache --show-stats
 
       - name: Save ccache
         if: github.ref == 'refs/heads/main'
