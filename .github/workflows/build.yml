@@ -442,7 +442,7 @@ jobs:
             --no-daemon
 
       - name: Save ccache
-        if: github.ref == 'refs/heads/main'
+        if: ${{ github.event_name == 'push' }}
         uses: actions/cache/save@v4
         with:
           path: ~/.cache/ccache
