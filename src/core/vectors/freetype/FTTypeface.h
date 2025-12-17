@@ -47,6 +47,8 @@ class FTTypeface : public Typeface {
 
   bool hasColor() const override;
 
+  bool isCOLRv1() const;
+
   bool hasOutlines() const override;
 
   GlyphID getGlyphID(Unichar unichar) const override;
@@ -54,6 +56,10 @@ class FTTypeface : public Typeface {
   std::unique_ptr<Stream> openStream() const override;
 
   std::shared_ptr<Data> copyTableData(FontTableTag tag) const override;
+
+  std::string fontPath() const {
+    return data.path;
+  }
 
  protected:
 #ifdef TGFX_USE_GLYPH_TO_UNICODE

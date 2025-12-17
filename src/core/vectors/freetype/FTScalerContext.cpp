@@ -33,6 +33,10 @@
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Pixmap.h"
 
+#if defined(__ANDROID__) || defined(ANDROID)
+#include "platform/android/GlyphRenderer.h"
+#endif
+
 namespace tgfx {
 //  See http://freetype.sourceforge.net/freetype2/docs/reference/ft2-bitmap_handling.html#FT_Bitmap_Embolden
 //  This value was chosen by eyeballing the result in Firefox and trying to match it.
@@ -159,6 +163,41 @@ static FT_Int ChooseBitmapStrike(FT_Face face, FT_F26Dot6 scaleY) {
   }
   return chosenStrikeIndex;
 }
+
+#if defined(__ANDROID__) || defined(ANDROID)
+static std::string GlyphIDToUTF8(FT_Face face, GlyphID glyphID) {
+  FT_ULong charCode = 0;
+  FT_UInt gIndex = 0;
+  charCode = FT_Get_First_Char(face, &gIndex);
+  while (gIndex != 0) {
+    if (gIndex == glyphID) {
+      break;
+    }
+    charCode = FT_Get_Next_Char(face, charCode, &gIndex);
+  }
+  if (gIndex != glyphID) {
+    return {};
+  }
+
+  std::string result;
+  if (charCode < 0x80) {
+    result += static_cast<char>(charCode);
+  } else if (charCode < 0x800) {
+    result += static_cast<char>(0xC0 | (charCode >> 6));
+    result += static_cast<char>(0x80 | (charCode & 0x3F));
+  } else if (charCode < 0x10000) {
+    result += static_cast<char>(0xE0 | (charCode >> 12));
+    result += static_cast<char>(0x80 | ((charCode >> 6) & 0x3F));
+    result += static_cast<char>(0x80 | (charCode & 0x3F));
+  } else {
+    result += static_cast<char>(0xF0 | (charCode >> 18));
+    result += static_cast<char>(0x80 | ((charCode >> 12) & 0x3F));
+    result += static_cast<char>(0x80 | ((charCode >> 6) & 0x3F));
+    result += static_cast<char>(0x80 | (charCode & 0x3F));
+  }
+  return result;
+}
+#endif
 
 FTScalerContext::FTScalerContext(std::shared_ptr<Typeface> typeFace, float size)
     : ScalerContext(std::move(typeFace), size), textScale(size) {
@@ -509,6 +548,23 @@ void FTScalerContext::getBBoxForCurrentGlyph(FT_BBox* bbox) const {
 }
 
 Rect FTScalerContext::getBounds(tgfx::GlyphID glyphID, bool fauxBold, bool fauxItalic) const {
+#if defined(__ANDROID__) || defined(ANDROID)
+  if (ftTypeface()->isCOLRv1() && GlyphRenderer::IsAvailable()) {
+    std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
+    auto face = ftTypeface()->face;
+    std::string text = GlyphIDToUTF8(face, glyphID);
+    if (!text.empty()) {
+      auto fontPath = ftTypeface()->fontPath();
+      float bounds[4] = {};
+      float advance = 0;
+      if (GlyphRenderer::MeasureText(fontPath, text, textSize, bounds, &advance)) {
+        float width = std::max(bounds[2] - bounds[0], advance);
+        float height = std::max(bounds[3] - bounds[1], textSize * 1.2f);
+        return Rect::MakeXYWH(bounds[0], bounds[1], width, height);
+      }
+    }
+  }
+#endif
   std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
   Rect bounds = {};
   if (setupSize(fauxItalic)) {
@@ -603,22 +659,43 @@ Rect FTScalerContext::getImageTransform(GlyphID glyphID, bool fauxBold, const St
     }
     return bounds;
   }
-
+#if defined(__ANDROID__) || defined(ANDROID)
+  if (ftTypeface()->isCOLRv1() && GlyphRenderer::IsAvailable()) {
+    std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
+    auto face = ftTypeface()->face;
+    std::string text = GlyphIDToUTF8(face, glyphID);
+    if (!text.empty()) {
+      auto fontPath = ftTypeface()->fontPath();
+      float bounds[4] = {};
+      float advance = 0;
+      if (GlyphRenderer::MeasureText(fontPath, text, textSize, bounds, &advance)) {
+        float width = std::max(bounds[2] - bounds[0], advance);
+        float height = std::max(bounds[3] - bounds[1], textSize * 1.2f);
+        auto rect = Rect::MakeXYWH(bounds[0], bounds[1], width, height);
+        if (matrix) {
+          matrix->setTranslate(rect.x(), rect.y());
+        }
+        return rect;
+      }
+    }
+  }
+#endif
   std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
   auto glyphFlags = loadGlyphFlags | static_cast<FT_Int32>(FT_LOAD_BITMAP_METRICS_ONLY);
   glyphFlags &= ~FT_LOAD_NO_BITMAP;
-  if (!loadBitmapGlyph(glyphID, glyphFlags)) {
-    return {};
+  if (loadBitmapGlyph(glyphID, glyphFlags)) {
+    auto face = ftTypeface()->face;
+    if (matrix) {
+      matrix->setTranslate(static_cast<float>(face->glyph->bitmap_left),
+                           -static_cast<float>(face->glyph->bitmap_top));
+      matrix->postScale(extraScale.x, extraScale.y);
+    }
+    return Rect::MakeXYWH(static_cast<float>(face->glyph->bitmap_left),
+                          -static_cast<float>(face->glyph->bitmap_top),
+                          static_cast<float>(face->glyph->bitmap.width),
+                          static_cast<float>(face->glyph->bitmap.rows));
   }
-  auto face = ftTypeface()->face;
-  if (matrix) {
-    matrix->setTranslate(static_cast<float>(face->glyph->bitmap_left),
-                         -static_cast<float>(face->glyph->bitmap_top));
-    matrix->postScale(extraScale.x, extraScale.y);
-  }
-  return Rect::MakeXYWH(
-      static_cast<float>(face->glyph->bitmap_left), -static_cast<float>(face->glyph->bitmap_top),
-      static_cast<float>(face->glyph->bitmap.width), static_cast<float>(face->glyph->bitmap.rows));
+  return {};
 }
 
 bool FTScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke*,
@@ -629,6 +706,33 @@ bool FTScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke*,
   // Note: In the hasColor() function, freeType has an internal lock. Placing this method later
   // would cause repeated locking and lead to a deadlock.
   bool colorFont = hasColor();
+  bool isCOLRv1 = ftTypeface()->isCOLRv1();
+#if defined(__ANDROID__) || defined(ANDROID)
+  if (isCOLRv1 && GlyphRenderer::IsAvailable()) {
+    std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
+    auto face = ftTypeface()->face;
+    std::string text = GlyphIDToUTF8(face, glyphID);
+    if (!text.empty()) {
+      auto fontPath = ftTypeface()->fontPath();
+      float bounds[4] = {};
+      if (GlyphRenderer::MeasureText(fontPath, text, textSize, bounds, nullptr)) {
+        float offsetX = -bounds[0];
+        float offsetY = -bounds[1];
+        auto srcInfo = ImageInfo::Make(dstInfo.width(), dstInfo.height(), ColorType::RGBA_8888,
+                                       AlphaType::Unpremultiplied, 0, ColorSpace::SRGB());
+        Buffer buffer{srcInfo.byteSize()};
+        Pixmap pixmap{srcInfo, buffer.data()};
+        bool ret = GlyphRenderer::RenderGlyph(
+            fontPath, text, textSize, static_cast<int>(srcInfo.width()),
+            static_cast<int>(srcInfo.height()), offsetX, offsetY, buffer.data());
+        pixmap.readPixels(dstInfo, dstPixels);
+        return ret;
+      }
+    }
+  }
+#else
+  (void)isCOLRv1;
+#endif
   std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
   if (!colorFont) {
     auto face = ftTypeface()->face;
