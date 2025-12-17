@@ -125,6 +125,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   /**
    * Sets the blend mode of the layer.
+   * Note: Layers inside a 3D Rendering Context (see transformStyle()) always use SrcOver blend
+   * mode regardless of this setting.
    */
   void setBlendMode(BlendMode value);
 
@@ -139,6 +141,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   /**
    * Sets whether the layer passes through its background to sublayers.
+   * Note: Layers that can start or extend a 3D Rendering Context (see transformStyle()) do not
+   * support pass-through background, as child layers need to maintain independent 3D states.
    */
   void setPassThroughBackground(bool value);
 
@@ -198,14 +202,11 @@ class Layer : public std::enable_shared_from_this<Layer> {
    * TransformStyle::Flat:
    * The prerequisite for these features to take effect is that child layers need to be projected
    * into the local coordinate system of the current layer.
-   * 1. layerstyles is not empty
+   * 1. layer styles is not empty.
    * The following features require the entire layer subtree of the root node to be packaged and
    * drawn, and then the corresponding effects are applied.
-   * 2. Blend mode is set to any value other than BlendMode::SrcOver
-   * 3. passThroughBackground = false
-   * 4. allowsGroupOpacity = true
-   * 5. shouldRasterize = true
-   * 6. mask is not empty
+   * 2. filters is not empty.
+   * 3. mask is not empty.
    */
   TransformStyle transformStyle() const {
     return _transformStyle;
@@ -255,6 +256,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   /**
    * Sets whether the layer is allowed to be composited as a separate group from their parent.
+   * Note: Layers inside a 3D Rendering Context (see transformStyle()) ignore this setting and
+   * always apply alpha individually to each element.
    */
   void setAllowsGroupOpacity(bool value);
 
@@ -271,6 +274,13 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   /**
    * Sets the list of layer styles applied to the layer.
+   * Note: Background-dependent layer styles (e.g., BackgroundBlurStyle) have the following
+   * limitations:
+   * 1. Layers that can start or extend a 3D Rendering Context (see transformStyle()) disable
+   *    background styles for the entire subtree, as child layers need to maintain independent 3D
+   *    states.
+   * 2. If any ancestor layer has a 3D transformation matrix set via setMatrix3D(), background
+   *    styles will not work correctly because the accurate background cannot be obtained.
    */
   void setLayerStyles(std::vector<std::shared_ptr<LayerStyle>> value);
 
@@ -601,21 +611,26 @@ class Layer : public std::enable_shared_from_this<Layer> {
                          const Matrix3D* transform3D = nullptr);
 
   void drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
-                     const Matrix3D* transform3D, bool excludeChildren = false);
+                     const Matrix3D* transform3D);
 
-  void drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha, bool excludeChildren = false,
+  void drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha,
                     const Matrix3D* transform3D = nullptr);
 
   void drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
                     const LayerStyleSource* layerStyleSource = nullptr,
-                    const Layer* stopChild = nullptr, bool excludeChildren = false);
+                    const Layer* stopChild = nullptr, const Matrix3D* transform3D = nullptr);
 
   bool drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
                     const Layer* stopChild = nullptr, const Matrix3D* transform3D = nullptr);
 
-  // Draws the specified layer by starting a new 3D rendering context.
-  void drawLayerByStarting3DContext(Layer& layer, const DrawArgs& args, Canvas* canvas, float alpha,
-                                    BlendMode blendMode, const Matrix3D& transform3D);
+  // Draws the layer by starting a new 3D rendering context.
+  void drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, float alpha,
+                               const Matrix3D& transform3D);
+
+  // Draws the layer in a 3D rendering context using an offscreen canvas and composites the result
+  // to the 3D compositor.
+  void drawIn3DContext(const DrawArgs& args, Canvas* canvas, float alpha,
+                       const Matrix3D& transform3D);
 
   float drawBackgroundLayers(const DrawArgs& args, Canvas* canvas);
 
@@ -699,8 +714,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::shared_ptr<Image> getContentImage(const DrawArgs& args, float contentScale,
                                          const std::shared_ptr<Image>& passThroughImage,
                                          const Matrix& passThroughImageMatrix,
-                                         std::optional<Rect> clipBounds, Matrix* imageMatrix,
-                                         bool excludeChildren);
+                                         std::optional<Rect> clipBounds, Matrix* imageMatrix);
 
   /**
    * Calculates the 3D context depth matrix for the layer.

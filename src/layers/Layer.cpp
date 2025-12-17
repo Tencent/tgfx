@@ -1004,7 +1004,7 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   // Check if the current layer needs to start a 3D context. Since Layer::draw is called directly
   // without going through a parent layer's drawChildren, 3D context handling must be done here.
   if (_transformStyle == TransformStyle::Preserve3D && canExtend3DContext()) {
-    drawLayerByStarting3DContext(*this, args, canvas, alpha, blendMode, Matrix3D::I());
+    drawByStarting3DContext(args, canvas, alpha, Matrix3D::I());
   } else {
     drawLayer(args, canvas, alpha, blendMode, nullptr);
   }
@@ -1184,8 +1184,12 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
 
   bool needsOffscreen = false;
   if (args.render3DContext != nullptr) {
-    // Offscreen rendering is needed when ending a 3D context.
-    needsOffscreen = _transformStyle == TransformStyle::Flat || !canExtend3DContext();
+    // Inside a 3D context, transform3D is non-null if and only if the layer can extend the context.
+    DEBUG_ASSERT((transform3D != nullptr) ==
+                 (_transformStyle == TransformStyle::Preserve3D && canExtend3DContext()));
+    // Inside a 3D context, layers always use SrcOver blend mode and ignore allowsGroupOpacity.
+    needsOffscreen = !bitFields.passThroughBackground ||
+                     (!_filters.empty() && !args.excludeEffects) || hasValidMask();
   } else if (_transformStyle == TransformStyle::Flat || !canExtend3DContext()) {
     // Direct rendering is used when starting a 3D context.
     // When unable to start a 3D context, offscreen rendering is required if draw parameters
@@ -1200,7 +1204,7 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
     drawOffscreen(args, canvas, alpha, blendMode, transform3D);
   } else {
     // Content and children are rendered independently.
-    drawDirectly(args, canvas, alpha, false, transform3D);
+    drawDirectly(args, canvas, alpha, transform3D);
   }
 }
 
@@ -1276,20 +1280,9 @@ std::shared_ptr<MaskFilter> Layer::getMaskFilter(const DrawArgs& args, float sca
 std::shared_ptr<Image> Layer::getContentImage(const DrawArgs& contentArgs, float contentScale,
                                               const std::shared_ptr<Image>& passThroughImage,
                                               const Matrix& passThroughImageMatrix,
-                                              std::optional<Rect> clipBounds, Matrix* imageMatrix,
-                                              bool excludeChildren) {
+                                              std::optional<Rect> clipBounds, Matrix* imageMatrix) {
   DEBUG_ASSERT(imageMatrix);
-  // Bounding box of layer content in local coordinate system.
-  // When excludeChildren is true, we are in a 3D context where filters and styles are disabled,
-  // so we can use the content bounds directly.
-  Rect sourceBounds = {};
-  if (excludeChildren) {
-    if (auto content = getContent()) {
-      sourceBounds = content->getBounds();
-    }
-  } else {
-    sourceBounds = getBounds();
-  }
+  auto sourceBounds = getBounds();
   auto inputBounds = sourceBounds;
   if (clipBounds.has_value()) {
     if (!contentArgs.excludeEffects) {
@@ -1320,7 +1313,7 @@ std::shared_ptr<Image> Layer::getContentImage(const DrawArgs& contentArgs, float
     offscreenCanvas->translate(-surfaceRect.left, -surfaceRect.top);
     offscreenCanvas->drawImage(passThroughImage);
     offscreenCanvas->concat(passThroughImageMatrix);
-    drawDirectly(contentArgs, offscreenCanvas, 1.0f, excludeChildren);
+    drawDirectly(contentArgs, offscreenCanvas, 1.0f);
     finalImage = offscreenSurface->makeImageSnapshot();
     offscreenCanvas->getMatrix().invert(imageMatrix);
   } else {
@@ -1333,7 +1326,7 @@ std::shared_ptr<Image> Layer::getContentImage(const DrawArgs& contentArgs, float
       offscreenCanvas->concat(passThroughImageMatrix);
       offscreenCanvas->drawImage(passThroughImage);
     }
-    drawDirectly(contentArgs, offscreenCanvas, 1.0f, excludeChildren);
+    drawDirectly(contentArgs, offscreenCanvas, 1.0f);
     Point offset;
     finalImage = ToImageWithOffset(recorder.finishRecordingAsPicture(), &offset, nullptr,
                                    contentArgs.dstColorSpace);
@@ -1385,11 +1378,23 @@ bool Layer::shouldPassThroughBackground(BlendMode blendMode, const Matrix3D* tra
     return false;
   }
 
+  // 4. Layer does not start or extend a 3D context
+  // (When starting or extending a 3D context, child layers need to maintain independent 3D states,
+  // so pass-through background is not supported)
+  if (_transformStyle == TransformStyle::Preserve3D && canExtend3DContext()) {
+    return false;
+  }
+
   return true;
 }
 
 bool Layer::canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode,
                                const Matrix3D* transform3D) {
+  // If the layer can start or extend a 3D context, child layers need to maintain independent 3D
+  // states, so subtree caching is not supported.
+  if (_transformStyle == TransformStyle::Preserve3D && canExtend3DContext()) {
+    return false;
+  }
   // The cache stores Normal mode content. Since layers with BackgroundStyle are excluded from
   // caching, the cached content can also be used for Background mode drawing.
   if (args.excludeEffects || args.drawMode == DrawMode::Contour) {
@@ -1535,7 +1540,11 @@ bool Layer::drawWithSubtreeCache(const DrawArgs& args, Canvas* canvas, float alp
 }
 
 void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
-                          const Matrix3D* transform3D, bool excludeChildren) {
+                          const Matrix3D* transform3D) {
+  // Inside a 3D context, non-final layers never require offscreen rendering. Only the final layer
+  // (which cannot extend the 3D context) may trigger offscreen rendering when conditions like
+  // filters are met.
+  DEBUG_ASSERT(args.render3DContext == nullptr || !canExtend3DContext());
   if (transform3D != nullptr &&
       args.styleSourceTypes.count(LayerStyleExtraSourceType::Background) > 0) {
     // When applying 3D matrix, background styles and layer content cannot be drawn to the same
@@ -1575,18 +1584,14 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
 
   auto imageMatrix = Matrix::I();
   auto image = getContentImage(contentArgs, contentScale, passthroughImage, passthroughImageMatrix,
-                               contentClipBounds, &imageMatrix, excludeChildren);
+                               contentClipBounds, &imageMatrix);
 
   auto invertImageMatrix = Matrix::I();
   if (image == nullptr || !imageMatrix.invert(&invertImageMatrix)) {
     return;
   }
 
-  if (args.render3DContext == nullptr) {
-    // The compositor for layers inside a 3D rendering context handles matrix transformation
-    // logic internally.
-    image = MakeImageWithTransform(image, transform3D, &imageMatrix);
-  }
+  image = MakeImageWithTransform(image, transform3D, &imageMatrix);
 
   if (args.blurBackground && !contentArgs.blurBackground) {
     image = image->makeRasterized();
@@ -1607,15 +1612,10 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     paint.setMaskFilter(maskFilter->makeWithMatrix(invertImageMatrix));
   }
 
-  if (args.render3DContext == nullptr) {
-    AutoCanvasRestore autoRestore(canvas);
-    canvas->concat(imageMatrix);
-    canvas->drawImage(image, &paint);
-  } else {
-    DrawLayerImageTo3DRenderContext(args, transform3D, image, imageMatrix, alpha);
-  }
-  // Any child layers within a 3D rendering context have background styles disabled, so no special
-  // background logic processing is performed for 3D rendering contexts.
+  AutoCanvasRestore autoRestore(canvas);
+  canvas->concat(imageMatrix);
+  canvas->drawImage(image, &paint);
+
   if (args.blurBackground) {
     if (contentArgs.blurBackground) {
       auto filter = getImageFilter(contentScale);
@@ -1635,26 +1635,15 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   // content.
 }
 
-void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha, bool excludeChildren,
-                         const Matrix3D* transform) {
-  if (args.render3DContext != nullptr) {
-    DEBUG_ASSERT(transform != nullptr);
-    // The last node in the 3D context layer tree needs offscreen rendering.
-    DEBUG_ASSERT(_transformStyle == TransformStyle::Preserve3D && canExtend3DContext());
-    // Content does not support direct 3D transformation yet, so reuse the offscreen logic to draw
-    // content only, then draw children separately.
-    drawOffscreen(args, canvas, alpha, BlendMode::SrcOver, transform, true);
-    drawChildren(args, canvas, alpha, nullptr, transform);
-    return;
-  }
-
+void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha,
+                         const Matrix3D* transform3D) {
   auto layerStyleSource = getLayerStyleSource(args, canvas->getMatrix());
-  drawContents(args, canvas, alpha, layerStyleSource.get(), nullptr, excludeChildren);
+  drawContents(args, canvas, alpha, layerStyleSource.get(), nullptr, transform3D);
 }
 
 void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
                          const LayerStyleSource* layerStyleSource, const Layer* stopChild,
-                         bool excludeChildren) {
+                         const Matrix3D* transform3D) {
   if (layerStyleSource) {
     drawLayerStyles(args, canvas, alpha, layerStyleSource, LayerStylePosition::Below);
   }
@@ -1672,7 +1661,7 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
       }
     }
   }
-  if (!excludeChildren && !drawChildren(args, canvas, alpha, stopChild)) {
+  if (!drawChildren(args, canvas, alpha, stopChild, transform3D)) {
     return;
   }
   if (layerStyleSource) {
@@ -1791,19 +1780,16 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, cons
         DEBUG_ASSERT(false);
         continue;
       }
-      // For layers in a 3D rendering context, whether drawing 2D or 3D sublayers, it is necessary
-      // to explicitly specify the 3D transformation matrix of the sublayer relative to the layer
-      // that established the 3D rendering context.
+      // For layers in a 3D rendering context, draw the child layer to an offscreen canvas and
+      // composite the result to the 3D compositor.
       auto childTransform = childMatrix;
       childTransform.postConcat(*transform);
-      child->drawLayer(childArgs, canvas, child->_alpha * alpha,
-                       static_cast<BlendMode>(child->bitFields.blendMode), &childTransform);
+      child->drawIn3DContext(childArgs, canvas, child->_alpha * alpha, childTransform);
     } else if (child->_transformStyle == TransformStyle::Preserve3D &&
                child->canExtend3DContext()) {
       DEBUG_ASSERT(transform == nullptr);
       // Start a 3D rendering context.
-      drawLayerByStarting3DContext(*child, childArgs, canvas, child->_alpha * alpha,
-                                   static_cast<BlendMode>(child->bitFields.blendMode), childMatrix);
+      child->drawByStarting3DContext(childArgs, canvas, child->_alpha * alpha, childMatrix);
     } else {
       // Draw elements outside the 3D context.
       DEBUG_ASSERT(transform == nullptr);
@@ -1819,9 +1805,8 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, cons
   return true;
 }
 
-void Layer::drawLayerByStarting3DContext(Layer& layer, const DrawArgs& args, Canvas* canvas,
-                                         float alpha, BlendMode blendMode,
-                                         const Matrix3D& transform) {
+void Layer::drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, float alpha,
+                                    const Matrix3D& transform) {
   DEBUG_ASSERT(args.render3DContext == nullptr);
   if (args.renderRect == nullptr) {
     DEBUG_ASSERT(false);
@@ -1834,7 +1819,7 @@ void Layer::drawLayerByStarting3DContext(Layer& layer, const DrawArgs& args, Can
   }
   // The processing area of the compositor is consistent with the actual effective drawing area.
   auto validRenderRect = *args.renderRect;
-  if (!validRenderRect.intersect(layer.renderBounds)) {
+  if (!validRenderRect.intersect(renderBounds)) {
     DEBUG_ASSERT(false);
     return;
   }
@@ -1844,13 +1829,13 @@ void Layer::drawLayerByStarting3DContext(Layer& layer, const DrawArgs& args, Can
                                             static_cast<int>(validRenderRect.height()));
   auto context3DArgs = args;
   context3DArgs.render3DContext = std::make_shared<Render3DContext>(
-      compositor, validRenderRect, layer.calculate3DContextDepthMatrix());
+      compositor, validRenderRect, calculate3DContextDepthMatrix());
   // Layers inside a 3D context need to maintain independent 3D state. This means layers drawn
   // later may become the background, making it impossible to know the final background when
   // drawing each layer. Therefore, background styles are disabled.
   context3DArgs.styleSourceTypes = {LayerStyleExtraSourceType::None,
                                     LayerStyleExtraSourceType::Contour};
-  layer.drawLayer(context3DArgs, canvas, alpha, blendMode, &transform);
+  drawIn3DContext(context3DArgs, canvas, alpha, transform);
   auto context3DImage = compositor->finish();
 
   // The final texture has been scaled proportionally during generation, so draw it at its actual
@@ -1865,12 +1850,50 @@ void Layer::drawLayerByStarting3DContext(Layer& layer, const DrawArgs& args, Can
 
   if (args.blurBackground) {
     Paint paint = {};
-    paint.setAntiAlias(layer.bitFields.allowsEdgeAntialiasing);
+    paint.setAntiAlias(bitFields.allowsEdgeAntialiasing);
     auto backgroundCanvas = args.blurBackground->getCanvas();
     AutoCanvasRestore autoRestoreBg(backgroundCanvas);
     backgroundCanvas->concat(imageMatrix);
     backgroundCanvas->drawImage(context3DImage, &paint);
   }
+}
+
+void Layer::drawIn3DContext(const DrawArgs& args, Canvas* canvas, float alpha,
+                            const Matrix3D& transform3D) {
+  DEBUG_ASSERT(args.render3DContext != nullptr);
+  auto contentScale = canvas->getMatrix().getMaxScale();
+  if (FloatNearlyZero(contentScale)) {
+    return;
+  }
+
+  // Use PictureRecorder to create an offscreen canvas for drawing the layer content.
+  PictureRecorder recorder = {};
+  auto offscreenCanvas = recorder.beginRecording();
+  offscreenCanvas->scale(contentScale, contentScale);
+
+  // Draw the layer content to the offscreen canvas. The render3DContext is kept so that child
+  // layers can continue to use it for 3D compositing. For the final layer in the 3D context (which
+  // cannot extend the context), the transform3D is not passed to drawLayer. The entire subtree
+  // rooted at this layer is rendered offscreen and then drawn to the canvas with the matrix applied
+  // uniformly.
+  const Matrix3D* layerTransform3D = canExtend3DContext() ? &transform3D : nullptr;
+  drawLayer(args, offscreenCanvas, 1.0f, BlendMode::SrcOver, layerTransform3D);
+
+  // Convert the recorded picture to an image.
+  Point offset = {};
+  auto image =
+      ToImageWithOffset(recorder.finishRecordingAsPicture(), &offset, nullptr, args.dstColorSpace);
+  if (image == nullptr) {
+    return;
+  }
+
+  // Calculate the image matrix that maps the scaled image back to the layer's coordinate system.
+  auto imageMatrix = Matrix::I();
+  imageMatrix.setScale(1.0f / contentScale, 1.0f / contentScale);
+  imageMatrix.preTranslate(offset.x, offset.y);
+
+  // Draw the image to the 3D compositor with the layer's transformation.
+  DrawLayerImageTo3DRenderContext(args, &transform3D, image, imageMatrix, alpha);
 }
 
 float Layer::drawBackgroundLayers(const DrawArgs& args, Canvas* canvas) {
@@ -2481,8 +2504,7 @@ Matrix3D Layer::calculate3DContextDepthMatrix() {
 }
 
 bool Layer::canExtend3DContext() const {
-  return bitFields.passThroughBackground && _filters.empty() && _layerStyles.empty() &&
-         !hasValidMask();
+  return _filters.empty() && _layerStyles.empty() && !hasValidMask();
 }
 
 bool Layer::in3DContext() const {
