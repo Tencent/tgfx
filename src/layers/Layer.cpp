@@ -97,54 +97,47 @@ static inline void ApplyClip(Canvas& canvas, const Rect& maxBounds, const Rect& 
 
 struct ChildTransformerResult {
   std::shared_ptr<RegionTransformer> childTransformer = nullptr;
-  std::shared_ptr<RegionTransformer> context3DTransformer = nullptr;
-  std::optional<Matrix3D> contextTransform = std::nullopt;
+  std::optional<Matrix3D> childTransform3D = std::nullopt;
   // Ensure the 3D filter is not released during the entire function lifetime.
   std::vector<std::shared_ptr<LayerFilter>> filter3DVector = {};
 };
 
 /**
  * Computes the transformer for dirty region calculation.
- * - Layers inside 3D context: context3DTransformer + contextTransform + child matrix.
- *   context3DTransformer is the transformer of the parent layer that starts the 3D context,
- *   contextTransform is the matrix transformation of the current layer relative to the parent
- *   layer that starts the 3D context.
- * - Layers outside 3D context: transformer + child matrix. Transformer is the transformer of the
- *   current layer.
+ * - Layers inside 3D context: transformer + accumulated transform3D.
+ * - Layers outside 3D context: transformer + child matrix.
  * Filters and styles interrupt 3D context, so non-root layers inside 3D context can ignore
  * parent filters and styles when calculating dirty regions.
+ * @param childMatrix The child layer's transformation matrix.
+ * @param childIn3DContext Whether the child is inside a 3D context.
+ * @param transformer The transformer of the current layer. For layers inside a 3D context, this
+ * is the transformer of the parent layer that established the context.
+ * @param transform3D The accumulated transformation matrix from the parent layer to the layer
+ * that established the 3D context. Null if not in a 3D context, or if the child layer is starting
+ * a new 3D context rather than inheriting from a parent.
  */
 static inline ChildTransformerResult GetChildTransformer(
     const Matrix3D& childMatrix, bool childIn3DContext,
-    const std::shared_ptr<RegionTransformer>& transformer,
-    const std::shared_ptr<RegionTransformer>& context3DTransformer,
-    const Matrix3D* context3DTransform) {
+    const std::shared_ptr<RegionTransformer>& transformer, const Matrix3D* transform3D) {
   ChildTransformerResult result = {};
-  auto baseTransformer = transformer;
   Matrix3D matrixForTransformer = childMatrix;
 
   if (childIn3DContext) {
-    if (context3DTransformer != nullptr && context3DTransform != nullptr) {
+    result.childTransform3D = childMatrix;
+    if (transform3D != nullptr) {
       // Child layers inherit the 3D context.
-      result.context3DTransformer = context3DTransformer;
-      result.contextTransform = childMatrix;
-      result.contextTransform->postConcat(*context3DTransform);
-      baseTransformer = result.context3DTransformer;
-      matrixForTransformer = *result.contextTransform;
-    } else {
-      // Child layer creates 3D context.
-      result.contextTransform = childMatrix;
-      result.context3DTransformer = transformer;
+      result.childTransform3D->postConcat(*transform3D);
     }
+    matrixForTransformer = *result.childTransform3D;
   }
 
   if (IsMatrix3DAffine(matrixForTransformer)) {
     result.childTransformer = RegionTransformer::MakeFromMatrix(
-        GetMayLossyAffineMatrix(matrixForTransformer), baseTransformer);
+        GetMayLossyAffineMatrix(matrixForTransformer), transformer);
   } else {
     result.filter3DVector.push_back(Transform3DFilter::Make(matrixForTransformer));
     result.childTransformer =
-        RegionTransformer::MakeFromFilters(result.filter3DVector, 1.0f, baseTransformer);
+        RegionTransformer::MakeFromFilters(result.filter3DVector, 1.0f, transformer);
   }
 
   return result;
@@ -2244,8 +2237,7 @@ bool Layer::hasValidMask() const {
 }
 
 void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer,
-                               std::shared_ptr<RegionTransformer> context3DTransformer,
-                               const Matrix3D* context3DTransform, bool forceDirty) {
+                               const Matrix3D* transform3D, bool forceDirty) {
   if (!forceDirty && !bitFields.dirtyDescendents) {
     if (maxBackgroundOutset > 0 || bitFields.hasBlendMode) {
       propagateLayerState();
@@ -2258,7 +2250,9 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer,
   maxBackgroundOutset = 0;
   minBackgroundOutset = std::numeric_limits<float>::max();
   auto contentScale = 1.0f;
+  auto parentTransformer = transformer;
   if (!_layerStyles.empty() || !_filters.empty()) {
+    DEBUG_ASSERT(_transformStyle == TransformStyle::Flat || !canExtend3DContext());
     if (transformer) {
       contentScale = transformer->getMaxScale();
     }
@@ -2299,13 +2293,14 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer,
     }
     auto childMatrix = child->getMatrixWithScrollRect();
     // Check if child is in 3D context:
-    // 1. Already in parent's 3D context (both context3DTransformer and context3DTransform exist).
+    // 1. Already in parent's 3D context (transform3D exists).
     // 2. Child can start its own 3D context.
     bool childIn3DContext =
-        (context3DTransformer != nullptr && context3DTransform != nullptr) ||
+        transform3D != nullptr ||
         (child->_transformStyle == TransformStyle::Preserve3D && child->canExtend3DContext());
-    auto transformerResult = GetChildTransformer(childMatrix, childIn3DContext, transformer,
-                                                 context3DTransformer, context3DTransform);
+    auto transformerResult =
+        GetChildTransformer(childMatrix, childIn3DContext,
+                            childIn3DContext ? parentTransformer : transformer, transform3D);
     auto& childTransformer = transformerResult.childTransformer;
     std::optional<Rect> clipRect = std::nullopt;
     if (child->_scrollRect) {
@@ -2330,12 +2325,10 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer,
       childTransformer = RegionTransformer::MakeFromClip(*clipRect, std::move(childTransformer));
     }
     auto childForceDirty = forceDirty || child->bitFields.dirtyTransform;
-    auto childContext3DTransform = transformerResult.contextTransform.has_value()
-                                       ? &*transformerResult.contextTransform
-                                       : nullptr;
-    child->updateRenderBounds(std::move(childTransformer),
-                              std::move(transformerResult.context3DTransformer),
-                              childContext3DTransform, childForceDirty);
+    auto childTransform3D = transformerResult.childTransform3D.has_value()
+                                ? &*transformerResult.childTransform3D
+                                : nullptr;
+    child->updateRenderBounds(std::move(childTransformer), childTransform3D, childForceDirty);
     child->bitFields.dirtyTransform = false;
     if (!child->maskOwner) {
       renderBounds.join(child->renderBounds);

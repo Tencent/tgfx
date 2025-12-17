@@ -672,17 +672,13 @@ class Layer : public std::enable_shared_from_this<Layer> {
    * layers.
    * They need to calculate rendering bounds based on the overall matrix state of the 3D context
    * and the relative matrix of the layer itself to the layer that established the context.
-   * @param transformer The region transformer to be applied to the current layer.
-   * @param context3DTransformer The overall transformer of the 3D context to which the current
-   * layer belongs when it is inside a 3D context. This parameter cannot be null when the layer is
-   * inside a 3D context.
-   * @param context3DTransform The relative matrix of the current layer to the layer that
-   * established the 3D context when the current layer is inside a 3D context. This parameter
-   * cannot be null when the layer is inside a 3D context.
+   * @param transformer The region transformer to be applied to the current layer. For layers inside
+   * a 3D context, this should be the transformer of the parent layer that established the context.
+   * @param transform3D The accumulated transformation matrix from the current layer to the layer
+   * that established the 3D context. Non-null indicates the layer is inside a 3D context.
    */
   void updateRenderBounds(std::shared_ptr<RegionTransformer> transformer = nullptr,
-                          std::shared_ptr<RegionTransformer> context3DTransformer = nullptr,
-                          const Matrix3D* context3DTransform = nullptr, bool forceDirty = false);
+                          const Matrix3D* transform3D = nullptr, bool forceDirty = false);
 
   void checkBackgroundStyles(std::shared_ptr<RegionTransformer> transformer);
 
