@@ -387,15 +387,6 @@ jobs:
           restore-keys: |
             hvigor-${{ runner.os }}-
 
-      - name: Cache Native Build
-        uses: actions/cache@v4
-        with:
-          path: |
-            ohos/hello2d/.cxx
-          key: ohos-native-${{ runner.os }}-${{ hashFiles('src/**/*.cpp', 'src/**/*.h', 'include/**/*.h', 'ohos/hello2d/src/main/cpp/**') }}
-          restore-keys: |
-            ohos-native-${{ runner.os }}-
-
       - name: Cache Hvigor Build
         uses: actions/cache@v4
         with:
@@ -443,15 +434,8 @@ jobs:
       - name: Build Harmony
         run: |
           cd ohos
-          # Only build arm64-v8a for CI to reduce build time (from ~10min to ~5min)
-          # Remove x86_64 line from abiFilters array
           sed -i '/"x86_64"/d' hello2d/build-profile.json5
-          
-          # Add ccache launcher to CMake arguments in build-profile.json5
-          # This enables ccache for the OHOS NDK cross-compilation
           sed -i 's/"arguments": "\(.*\)"/"arguments": "\1 -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache"/' hello2d/build-profile.json5
-          
-          # Verify the modification
           grep -A5 '"arguments"' hello2d/build-profile.json5
           
           hvigorw assembleHap \
@@ -464,7 +448,6 @@ jobs:
           echo "=== ccache statistics ==="
           ccache --show-stats
 
-      # Only save ccache on main branch to avoid cache pollution from PRs
       - name: Save ccache
         if: github.ref == 'refs/heads/main'
         uses: actions/cache/save@v4
