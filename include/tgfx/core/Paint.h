@@ -238,14 +238,14 @@ class Paint {
   }
 
   /**
-   * Returns whether the geometry is filled, stroked, or filled and stroked.
+   * Returns whether the geometry is filled or stroked.
    */
   PaintStyle getStyle() const {
     return style;
   }
 
   /**
-   * Sets whether the geometry is filled, stroked, or filled and stroked.
+   * Sets whether the geometry is filled, or stroked.
    */
   void setStyle(PaintStyle newStyle) {
     style = newStyle;

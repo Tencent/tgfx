@@ -902,9 +902,9 @@ PDFIndirectReference PDFGradientShader::Make(PDFDocumentImpl* doc, const Gradien
   DEBUG_ASSERT(shader);
 
   PDFGradientShader::Key key = MakeKey(shader, matrix, surfaceBBox);
-  if (NeedConvertColorSpace(ColorSpace::SRGB(), doc->colorSpace())) {
+  if (NeedConvertColorSpace(ColorSpace::SRGB(), doc->dstColorSpace())) {
     ColorSpaceXformSteps steps{ColorSpace::SRGB().get(), AlphaType::Unpremultiplied,
-                               doc->colorSpace().get(), AlphaType::Unpremultiplied};
+                               doc->dstColorSpace().get(), AlphaType::Unpremultiplied};
     for (auto& color : key.info.colors) {
       steps.apply(color.array());
     }

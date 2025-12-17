@@ -53,6 +53,10 @@ class TextureImage : public Image {
     return true;
   }
 
+  std::shared_ptr<TextureProxy> getTextureProxy() const {
+    return textureProxy;
+  }
+
   BackendTexture getBackendTexture(Context* context, ImageOrigin* origin) const override;
 
   std::shared_ptr<Image> makeTextureImage(Context* context) const override;

@@ -12,11 +12,11 @@
 namespace tgfx {
 TGFX_TEST(StrokeTest, DrawPathByHairlinePaint) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 200, 200);
   ASSERT_TRUE(surface != nullptr);
-  auto* canvas = surface->getCanvas();
+  auto canvas = surface->getCanvas();
 
   Paint paint;
   paint.setAntiAlias(true);
@@ -42,11 +42,11 @@ TGFX_TEST(StrokeTest, DrawPathByHairlinePaint) {
 
 TGFX_TEST(StrokeTest, DrawShapeByHairlinePaint) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 200, 200);
   ASSERT_TRUE(surface != nullptr);
-  auto* canvas = surface->getCanvas();
+  auto canvas = surface->getCanvas();
 
   Paint paint;
   paint.setAntiAlias(true);
@@ -112,11 +112,11 @@ TGFX_TEST(StrokeTest, HairlineLayer) {
 
 TGFX_TEST(StrokeTest, ZoomUpTinyStrokeShape) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 400, 200);
   ASSERT_TRUE(surface != nullptr);
-  auto* canvas = surface->getCanvas();
+  auto canvas = surface->getCanvas();
 
   canvas->clear(Color::Black());
   Paint paint;

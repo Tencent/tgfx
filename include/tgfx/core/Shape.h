@@ -78,7 +78,7 @@ class Shape {
 
   /**
    * Applies the specified stroke to the Shape. If the stroke is nullptr, the original Shape is
-   * returned. Returns nullptr if the Shape is nullptr or if the stroke width is zero or less. 
+   * returned. Returns nullptr if the Shape is nullptr or if the stroke width is zero or less.
    */
   static std::shared_ptr<Shape> ApplyStroke(std::shared_ptr<Shape> shape, const Stroke* stroke);
 
@@ -132,12 +132,9 @@ class Shape {
   Rect getBounds() const;
 
   /**
-   * Returns the Shape's computed path. Note: The path is recalculated each time this method is
-   * called, as it is not cached.
+   * Returns the Shape's computed path. The result is cached lazily.
    */
-  Path getPath() const {
-    return onGetPath(1.f);
-  }
+  Path getPath() const;
 
  protected:
   enum class Type {
@@ -173,8 +170,8 @@ class Shape {
   /**
    * Called by getPath() to compute the actual path of the Shape. The resolution scale parameter
    * provides any scale applied within the Shape.
-   * During rendering, complex Shapes may be simplified based on the current resolution scale to 
-   * improve performance. Extremely thin strokes may also be converted to hairline strokes for 
+   * During rendering, complex Shapes may be simplified based on the current resolution scale to
+   * improve performance. Extremely thin strokes may also be converted to hairline strokes for
    * better rendering quality.
    */
   virtual Path onGetPath(float resolutionScale) const = 0;
@@ -194,5 +191,6 @@ class Shape {
 
  private:
   mutable std::atomic<Rect*> bounds = {nullptr};
+  mutable std::atomic<Path*> path = {nullptr};
 };
 }  // namespace tgfx

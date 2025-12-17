@@ -19,30 +19,13 @@
 #pragma once
 
 #include "DevicePool.h"
-#include "core/AtlasManager.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
 class ContextScope {
  public:
-  explicit ContextScope() : device(DevicePool::Make()) {
-    if (device != nullptr) {
-      context = device->lockContext();
-      if (context) {
-        //Clearing the atlas cache to prevent interference between different text test cases.
-        //For glyphs with Linear sampling, when placed at different locations within the atlas,
-        //interpolation errors in texture coordinates can lead to slight variations in
-        //the final pixel color.
-        context->atlasManager()->releaseAll();
-      }
-    }
-  }
-
-  ~ContextScope() {
-    if (context) {
-      device->unlock();
-    }
-  }
+  ContextScope();
+  ~ContextScope();
 
   Context* getContext() const {
     return context;

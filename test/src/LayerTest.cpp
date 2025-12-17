@@ -26,7 +26,7 @@
 #include "layers/ContourContext.h"
 #include "layers/DrawArgs.h"
 #include "layers/RootLayer.h"
-#include "layers/contents/RasterizedContent.h"
+#include "layers/SubtreeCache.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Gradient.h"
@@ -846,11 +846,9 @@ TGFX_TEST(LayerTest, PassthroughAndNormal) {
   displayList.root()->addChild(root);
   rect1->setBlendMode(BlendMode::SoftLight);
   rect2->setBlendMode(BlendMode::Screen);
-  root->setShouldRasterize(true);
   displayList.render(surface.get(), false);
 
   root->setMatrix(Matrix::MakeTrans(400, 50));
-  root->setShouldRasterize(false);
   displayList.setRenderMode(RenderMode::Direct);
   displayList.render(surface.get(), false);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PassThoughAndNormal"));
@@ -1665,6 +1663,146 @@ TGFX_TEST(LayerTest, hitTestPoint) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Layer_hitTestPoint"));
 }
 
+TGFX_TEST(LayerTest, HitTestPointWithStroke) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 400);
+  auto canvas = surface->getCanvas();
+  auto displayList = std::make_unique<DisplayList>();
+
+  // Test stroke hit test for ShapeLayer with Path (triangle)
+  auto pathLayer = ShapeLayer::Make();
+  Path trianglePath = {};
+  trianglePath.moveTo(100, 50);
+  trianglePath.lineTo(150, 150);
+  trianglePath.lineTo(50, 150);
+  trianglePath.close();
+  pathLayer->setPath(trianglePath);
+  pathLayer->setStrokeStyle(SolidColor::Make(Color::Red()));
+  pathLayer->setLineWidth(20.0f);
+  displayList->root()->addChild(pathLayer);
+
+  // Test stroke hit test for ShapeLayer with Rect
+  auto rectLayer = ShapeLayer::Make();
+  Path rectPath = {};
+  rectPath.addRect(Rect::MakeXYWH(200, 50, 100, 100));
+  rectLayer->setPath(rectPath);
+  rectLayer->setStrokeStyle(SolidColor::Make(Color::Green()));
+  rectLayer->setLineWidth(20.0f);
+  displayList->root()->addChild(rectLayer);
+
+  // Test stroke hit test for ShapeLayer with RRect
+  auto rRectLayer = ShapeLayer::Make();
+  Path rRectPath = {};
+  RRect rRect = {};
+  rRect.setRectXY(Rect::MakeXYWH(50, 200, 100, 100), 20.0f, 20.0f);
+  rRectPath.addRRect(rRect);
+  rRectLayer->setPath(rRectPath);
+  rRectLayer->setStrokeStyle(SolidColor::Make(Color::Blue()));
+  rRectLayer->setLineWidth(20.0f);
+  displayList->root()->addChild(rRectLayer);
+
+  // Test stroke hit test for ShapeLayer with Shape (oval)
+  auto shapeLayer = ShapeLayer::Make();
+  Path shapePath = {};
+  shapePath.addOval(Rect::MakeXYWH(200, 200, 100, 100));
+  auto shape = Shape::MakeFrom(shapePath);
+  shapeLayer->setShape(shape);
+  shapeLayer->setStrokeStyle(SolidColor::Make(Color::FromRGBA(255, 165, 0)));
+  shapeLayer->setLineWidth(20.0f);
+  displayList->root()->addChild(shapeLayer);
+
+  displayList->render(surface.get());
+
+  // Draw test points
+  auto paint = Paint();
+  paint.setColor(Color::White());
+  paint.setStyle(PaintStyle::Fill);
+
+  // Test points outside the original shape but inside the stroke area (stroke width = 20, half = 10)
+  // These points should hit the stroke but would miss without stroke consideration.
+
+  // P1: On triangle left edge stroke area - original edge is from (50,150) to (100,50)
+  Point p1 = {65.0f, 110.0f};
+  canvas->drawCircle(p1.x, p1.y, 3.0f, paint);
+  EXPECT_TRUE(pathLayer->hitTestPoint(p1.x, p1.y, true));
+
+  // P2: Further left of triangle edge, outside stroke area
+  Point p2 = {45.0f, 110.0f};
+  canvas->drawCircle(p2.x, p2.y, 3.0f, paint);
+  EXPECT_FALSE(pathLayer->hitTestPoint(p2.x, p2.y, true));
+
+  // P3: Left of rect, in stroke area (190, 100) - original rect left is at x=200
+  Point p3 = {192.0f, 100.0f};
+  canvas->drawCircle(p3.x, p3.y, 3.0f, paint);
+  EXPECT_TRUE(rectLayer->hitTestPoint(p3.x, p3.y, true));
+
+  // P4: Further left of rect, outside stroke area
+  Point p4 = {185.0f, 100.0f};
+  canvas->drawCircle(p4.x, p4.y, 3.0f, paint);
+  EXPECT_FALSE(rectLayer->hitTestPoint(p4.x, p4.y, true));
+
+  // P5: Left of rRect, in stroke area (42, 250) - original rRect left is at x=50
+  Point p5 = {42.0f, 250.0f};
+  canvas->drawCircle(p5.x, p5.y, 3.0f, paint);
+  EXPECT_TRUE(rRectLayer->hitTestPoint(p5.x, p5.y, true));
+
+  // P6: Further left of rRect, outside stroke area
+  Point p6 = {35.0f, 250.0f};
+  canvas->drawCircle(p6.x, p6.y, 3.0f, paint);
+  EXPECT_FALSE(rRectLayer->hitTestPoint(p6.x, p6.y, true));
+
+  // P7: Above oval, in stroke area (250, 192) - original oval top is at y=200
+  Point p7 = {250.0f, 192.0f};
+  canvas->drawCircle(p7.x, p7.y, 3.0f, paint);
+  EXPECT_TRUE(shapeLayer->hitTestPoint(p7.x, p7.y, true));
+
+  // P8: Further above oval, outside stroke area
+  Point p8 = {250.0f, 185.0f};
+  canvas->drawCircle(p8.x, p8.y, 3.0f, paint);
+  EXPECT_FALSE(shapeLayer->hitTestPoint(p8.x, p8.y, true));
+
+  // Test points inside the original shape but not on stroke (stroke only, no fill)
+  // P9: Inside triangle center - should NOT hit (no fill, only stroke)
+  Point p9 = {100.0f, 120.0f};
+  canvas->drawCircle(p9.x, p9.y, 3.0f, paint);
+  EXPECT_FALSE(pathLayer->hitTestPoint(p9.x, p9.y, true));
+
+  // P10: Inside rect center - should NOT hit (no fill, only stroke)
+  Point p10 = {250.0f, 100.0f};
+  canvas->drawCircle(p10.x, p10.y, 3.0f, paint);
+  EXPECT_FALSE(rectLayer->hitTestPoint(p10.x, p10.y, true));
+
+  // P11: Inside rRect center - should NOT hit (no fill, only stroke)
+  Point p11 = {100.0f, 250.0f};
+  canvas->drawCircle(p11.x, p11.y, 3.0f, paint);
+  EXPECT_FALSE(rRectLayer->hitTestPoint(p11.x, p11.y, true));
+
+  // P12: Inside oval center - should NOT hit (no fill, only stroke)
+  Point p12 = {250.0f, 250.0f};
+  canvas->drawCircle(p12.x, p12.y, 3.0f, paint);
+  EXPECT_FALSE(shapeLayer->hitTestPoint(p12.x, p12.y, true));
+
+  // Test invisible (transparent) stroke - should hit in non-precise mode, miss in precise mode
+  auto invisibleStrokeLayer = ShapeLayer::Make();
+  Path invisiblePath = {};
+  invisiblePath.addRect(Rect::MakeXYWH(320, 50, 60, 60));
+  invisibleStrokeLayer->setPath(invisiblePath);
+  invisibleStrokeLayer->setStrokeStyle(SolidColor::Make(Color::Transparent()));
+  invisibleStrokeLayer->setLineWidth(20.0f);
+  displayList->root()->addChild(invisibleStrokeLayer);
+
+  // P13: On invisible stroke area - should hit in non-precise mode (bounding box)
+  Point p13 = {312.0f, 80.0f};
+  canvas->drawCircle(p13.x, p13.y, 3.0f, paint);
+  EXPECT_TRUE(invisibleStrokeLayer->hitTestPoint(p13.x, p13.y, false));
+  // P13: Same point - should NOT hit in precise mode (transparent stroke is invisible)
+  EXPECT_FALSE(invisibleStrokeLayer->hitTestPoint(p13.x, p13.y, true));
+
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/HitTestPointWithStroke"));
+}
+
 TGFX_TEST(LayerTest, drawRRect) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -2363,184 +2501,6 @@ TGFX_TEST(LayerTest, ShapeStyleWithMatrix) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ShapeStyleWithMatrix"));
 }
 
-TGFX_TEST(LayerTest, RasterizedCache) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  EXPECT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 350, 350);
-  auto displayList = std::make_unique<DisplayList>();
-
-  auto rootLayer = Layer::Make();
-  rootLayer->setMatrix(Matrix::MakeTrans(30, 30));
-
-  auto imageLayer = ImageLayer::Make();
-  imageLayer->setImage(MakeImage("resources/apitest/imageReplacement.png"));
-  imageLayer->setShouldRasterize(true);
-  rootLayer->addChild(imageLayer);
-
-  auto rectLayer = ShapeLayer::Make();
-  auto style = DropShadowStyle::Make(10, 10, 0, 0, Color::Black(), false);
-  Path rect;
-  rect.addRect(Rect::MakeWH(50, 50));
-  rectLayer->setPath(rect);
-  rectLayer->setFillStyle(SolidColor::Make(Color::Red()));
-  rectLayer->setShouldRasterize(true);
-  rectLayer->setLayerStyles({style});
-  rectLayer->setMatrix(Matrix::MakeTrans(150, 0));
-  imageLayer->addChild(rectLayer);
-
-  auto blurLayer = ShapeLayer::Make();
-  Path childPath;
-  childPath.addRect(Rect::MakeWH(100, 100));
-  blurLayer->setPath(childPath);
-  auto fillStyle = SolidColor::Make(Color::FromRGBA(100, 0, 0, 128));
-  blurLayer->setFillStyle(fillStyle);
-  blurLayer->setShouldRasterize(true);
-  blurLayer->setMatrix(Matrix::MakeTrans(150, 0));
-  blurLayer->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
-  imageLayer->addChild(blurLayer);
-
-  displayList->root()->addChild(rootLayer);
-  displayList->render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/RasterizedCache"));
-}
-
-TGFX_TEST(LayerTest, RasterizedBackground) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  EXPECT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 150, 150);
-  auto displayList = std::make_unique<DisplayList>();
-  auto solidLayer = SolidLayer::Make();
-  solidLayer->setColor(Color::Blue());
-  solidLayer->setWidth(150);
-  solidLayer->setHeight(150);
-  displayList->root()->addChild(solidLayer);
-
-  auto background = ImageLayer::Make();
-  background->setImage(MakeImage("resources/apitest/imageReplacement.png"));
-  displayList->root()->addChild(background);
-
-  auto parent = Layer::Make();
-  parent->setMatrix(Matrix::MakeTrans(30, 30));
-  parent->addChild(background);
-
-  auto layerBeforeChild = ShapeLayer::Make();
-  auto path = Path();
-  path.addRect(Rect::MakeWH(50, 50));
-  layerBeforeChild->setPath(path);
-  layerBeforeChild->setFillStyle(SolidColor::Make(Color::Red()));
-
-  auto backgroundNephew = ShapeLayer::Make();
-  backgroundNephew->setPath(path);
-  backgroundNephew->setMatrix(Matrix::MakeTrans(10, 10));
-  backgroundNephew->setFillStyle(SolidColor::Make(Color::Green()));
-
-  auto child = ShapeLayer::Make();
-  Path childPath;
-  childPath.addRect(Rect::MakeWH(100, 100));
-  child->setPath(childPath);
-  auto fillStyle = SolidColor::Make(Color::FromRGBA(100, 0, 0, 128));
-  child->setFillStyle(fillStyle);
-  child->setShouldRasterize(true);
-  child->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
-  parent->addChild(child);
-  displayList->root()->addChild(parent);
-
-  displayList->render(surface.get());
-  background->setMatrix(Matrix::MakeTrans(50, 50));
-  auto rasterizedContent =
-      static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
-  displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent !=
-              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
-
-  child->setMatrix(Matrix::MakeTrans(20, 20));
-  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
-  displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent !=
-              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
-
-  auto layerNextChild = ShapeLayer::Make();
-  layerNextChild->setPath(path);
-  layerNextChild->setMatrix(Matrix::MakeTrans(10, 10));
-  layerNextChild->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 100, 0, 128)));
-  parent->addChild(layerNextChild);
-  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
-  displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent ==
-              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
-
-  auto grandChild = ShapeLayer::Make();
-  grandChild->setPath(path);
-  grandChild->setMatrix(Matrix::MakeTrans(10, 10));
-  grandChild->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 0, 100, 128)));
-  child->addChild(grandChild);
-  EXPECT_TRUE(child->rasterizedContent == nullptr);
-  displayList->render(surface.get());
-
-  auto nephew = ShapeLayer::Make();
-  nephew->setPath(path);
-  nephew->setMatrix(Matrix::MakeTrans(10, 10));
-  nephew->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 100, 0, 128)));
-  layerNextChild->addChild(nephew);
-  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
-  displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent ==
-              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
-
-  parent->addChildAt(layerBeforeChild, parent->getChildIndex(child));
-  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
-  displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent !=
-              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
-
-  layerBeforeChild->addChildAt(backgroundNephew, 0);
-  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
-  displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent !=
-              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
-
-  layerBeforeChild->removeChildren();
-  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
-  displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent !=
-              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
-
-  layerBeforeChild->removeFromParent();
-  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
-  displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent !=
-              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
-
-  parent->setChildIndex(background, static_cast<int>(parent->children().size() - 1u));
-  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
-  displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent !=
-              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
-
-  parent->setChildIndex(background, 0);
-  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
-  displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent !=
-              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
-
-  parent->replaceChild(background, layerBeforeChild);
-  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
-  displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent !=
-              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
-
-  parent->replaceChild(layerNextChild, background);
-  rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
-  displayList->render(surface.get());
-  // Ideally, rasterizedContent should remain unchanged here, but we need to call root->invalidateRect()
-  // whenever a layer is removed or its index changes. As a result, dirty rects are always treated
-  // as background changes. This is a trade-off between performance and correctness.
-  EXPECT_TRUE(rasterizedContent !=
-              static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
-}
-
 TGFX_TEST(LayerTest, AdaptiveDashEffect) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -2891,7 +2851,6 @@ TGFX_TEST(LayerTest, BackgroundBlurStyleTest) {
 
   auto layer2 = Layer::Make();
   layer2->addChild(shapeLayer1);
-  layer2->setShouldRasterize(true);
   rootLayer->addChild(layer2);
   displayList->setZoomScale(2.0f);
   displayList->setContentOffset(-50, -50);
@@ -3015,7 +2974,6 @@ TGFX_TEST(LayerTest, PartialDrawLayer) {
   layerInvisible->setWidth(100);
   layerInvisible->setHeight(100);
   layerInvisible->setMatrix(Matrix::MakeTrans(100, 100));
-  layerInvisible->setShouldRasterize(true);
   rootLayer->addChild(layerInvisible);
   auto canvas = surface->getCanvas();
   canvas->clear();
@@ -3026,7 +2984,6 @@ TGFX_TEST(LayerTest, PartialDrawLayer) {
   canvas->translate(20, 20);
   rootLayer->draw(canvas);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PartialDrawLayer"));
-  EXPECT_EQ(layerInvisible->rasterizedContent, nullptr);
   canvas->restore();
 
   canvas->clear();
@@ -3066,74 +3023,116 @@ TGFX_TEST(LayerTest, ContourTest) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 300, 300);
-  auto baseLayer = ShapeLayer::Make();
-  Path path;
-  path.addRect(Rect::MakeXYWH(50, 50, 100, 100));
-  baseLayer->setPath(path);
-  baseLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 0, 0, 255)));
+  auto surface = Surface::Make(context, 200, 200);
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  EXPECT_TRUE(image != nullptr);
+  auto imagePattern1 = ImagePattern::Make(image, TileMode::Repeat, TileMode::Repeat);
+  auto imagePattern2 = ImagePattern::Make(image, TileMode::Clamp, TileMode::Clamp);
 
-  auto layerOutOfBase = ShapeLayer::Make();
-  Path pathOutOfBase;
-  pathOutOfBase.addRect(Rect::MakeXYWH(80, 50, 100, 80));
-  layerOutOfBase->setPath(pathOutOfBase);
-  layerOutOfBase->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 255, 0, 128)));
-  baseLayer->addChild(layerOutOfBase);
-
-  auto layerOutOfBase2 = ShapeLayer::Make();
-  layerOutOfBase2->setPath(pathOutOfBase);
-  layerOutOfBase2->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 255, 255, 128)));
-  layerOutOfBase2->setMatrix(Matrix::MakeRotate(30, 80, 90));
-  baseLayer->addChild(layerOutOfBase2);
-
-  auto rRectLayerInBase = ShapeLayer::Make();
-  Path rRectPath;
-  rRectPath.addRRect(RRect{Rect::MakeXYWH(60, 60, 40, 40), Point::Make(20, 20)});
-  rRectLayerInBase->setPath(rRectPath);
-  rRectLayerInBase->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 255, 0, 128)));
-  baseLayer->addChild(rRectLayerInBase);
-
-  auto rRectLayerOutBase = ShapeLayer::Make();
-  Path rRectPath2;
-  rRectPath2.addRRect(RRect{Rect::MakeXYWH(60, 60, 100, 100), Point::Make(20, 20)});
-  rRectLayerOutBase->setPath(rRectPath2);
-  rRectLayerOutBase->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 0, 255, 128)));
-  baseLayer->addChild(rRectLayerOutBase);
-  auto rRectLayerOutBase2 = ShapeLayer::Make();
-  rRectLayerOutBase2->setPath(rRectPath2);
-  rRectLayerOutBase2->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 0, 255, 128)));
-  baseLayer->addChild(rRectLayerOutBase2);
-
-  auto layerInBase = ShapeLayer::Make();
-  Path pathInBase;
-  pathInBase.addRect(Rect::MakeXYWH(80, 80, 30, 30));
-  layerInBase->setPath(pathInBase);
-  layerInBase->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 0, 255, 128)));
-  layerInBase->setMatrix(Matrix::MakeRotate(30, 60, 60));
-  baseLayer->addChild(layerInBase);
-
-  auto pathOutBase = ShapeLayer::Make();
-  Path pathOutBasePath;
-  pathOutBasePath.moveTo(200, 200);
-  pathOutBasePath.cubicTo(250, 70, 250, 150, 200, 150);
-  pathOutBase->setPath(pathOutBasePath);
-  pathOutBase->setLineWidth(2);
-  pathOutBase->setStrokeStyle(SolidColor::Make(Color::FromRGBA(0, 0, 0, 255)));
-  baseLayer->addChild(pathOutBase);
-
-  ContourContext contourContext;
-  Canvas contourCanvas = Canvas(&contourContext);
   DrawArgs drawArgs = DrawArgs(nullptr);
   drawArgs.drawMode = DrawMode::Contour;
-  baseLayer->drawLayer(drawArgs, &contourCanvas, 1.0, BlendMode::SrcOver);
-  auto picture = contourContext.finishRecordingAsPicture();
+  Path path = {};
 
-  EXPECT_TRUE(picture != nullptr);
-  EXPECT_TRUE(picture->drawCount == 6);
-  EXPECT_TRUE(contourContext.contourBounds.size() == 3);
+  // Case 1: Same geometry with all solid fills should dedup to 1 contour.
+  auto allSolidLayer = ShapeLayer::Make();
+  path.reset();
+  path.addRect(Rect::MakeXYWH(10, 10, 80, 80));
+  allSolidLayer->setPath(path);
+  allSolidLayer->addFillStyle(SolidColor::Make(Color::Red()));
+  allSolidLayer->addFillStyle(SolidColor::Make(Color::Blue()));
+  ContourContext allSolidContext;
+  Canvas allSolidCanvas = Canvas(&allSolidContext);
+  allSolidLayer->drawLayer(drawArgs, &allSolidCanvas, 1.0, BlendMode::SrcOver);
+  auto allSolidPicture = allSolidContext.finishRecordingAsPicture();
+  EXPECT_EQ(allSolidPicture->drawCount, 1u);
+
+  // Case 2: Same geometry with all image shader fills should collect all (no dedup).
+  auto allImageLayer = ShapeLayer::Make();
+  path.reset();
+  path.addRect(Rect::MakeXYWH(110, 10, 80, 80));
+  allImageLayer->setPath(path);
+  allImageLayer->addFillStyle(imagePattern1);
+  allImageLayer->addFillStyle(imagePattern2);
+  ContourContext allImageContext;
+  Canvas allImageCanvas = Canvas(&allImageContext);
+  allImageLayer->drawLayer(drawArgs, &allImageCanvas, 1.0, BlendMode::SrcOver);
+  auto allImagePicture = allImageContext.finishRecordingAsPicture();
+  EXPECT_EQ(allImagePicture->drawCount, 2u);
+
+  // Case 3: Same geometry with image-image-solid order should dedup to 1 contour.
+  // This exposes the bug where single-pass logic collects both image shaders first,
+  // then encounters solid and realizes group has non-image-shader, but already collected 2.
+  auto mixedFillsLayer = ShapeLayer::Make();
+  path.reset();
+  path.addRect(Rect::MakeXYWH(10, 110, 80, 80));
+  mixedFillsLayer->setPath(path);
+  mixedFillsLayer->addFillStyle(imagePattern1);
+  mixedFillsLayer->addFillStyle(imagePattern2);
+  mixedFillsLayer->addFillStyle(SolidColor::Make(Color::Green()));
+  ContourContext mixedFillsContext;
+  Canvas mixedFillsCanvas = Canvas(&mixedFillsContext);
+  mixedFillsLayer->drawLayer(drawArgs, &mixedFillsCanvas, 1.0, BlendMode::SrcOver);
+  auto mixedFillsPicture = mixedFillsContext.finishRecordingAsPicture();
+  // Should be 1 (only first collected). Buggy single-pass would return 2.
+  EXPECT_EQ(mixedFillsPicture->drawCount, 1u);
+
+  // Case 4: Multiple groups with different dedup requirements.
+  // Group 1 (image-image): collect all (2). Group 2 (solid-solid): dedup to 1.
+  auto twoGroupsLayer = ShapeLayer::Make();
+  path.reset();
+  path.addRect(Rect::MakeXYWH(110, 110, 80, 80));
+  twoGroupsLayer->setPath(path);
+  twoGroupsLayer->addFillStyle(imagePattern1);
+  twoGroupsLayer->addFillStyle(imagePattern2);
+  auto childLayer = ShapeLayer::Make();
+  path.reset();
+  path.addRRect(RRect{Rect::MakeXYWH(120, 120, 60, 60), Point::Make(10, 10)});
+  childLayer->setPath(path);
+  childLayer->addFillStyle(SolidColor::Make(Color::Red()));
+  childLayer->addFillStyle(SolidColor::Make(Color::Blue()));
+  twoGroupsLayer->addChild(childLayer);
+  ContourContext twoGroupsContext;
+  Canvas twoGroupsCanvas = Canvas(&twoGroupsContext);
+  twoGroupsLayer->drawLayer(drawArgs, &twoGroupsCanvas, 1.0, BlendMode::SrcOver);
+  auto twoGroupsPicture = twoGroupsContext.finishRecordingAsPicture();
+  // Group 1: 2 (all image shaders), Group 2: 1 (deduped) = 3 total.
+  EXPECT_EQ(twoGroupsPicture->drawCount, 3u);
+
+  // Case 5: Stroke contour test - same geometry with same stroke should dedup.
+  // ShapeLayer without fillStyle adds a transparent fill content (no stroke),
+  // so we have 1 fill contour + 1 stroke contour (deduped from 2 strokes) = 2 total.
+  auto strokeTestLayer = ShapeLayer::Make();
+  path.reset();
+  path.addRect(Rect::MakeXYWH(10, 210, 80, 80));
+  strokeTestLayer->setPath(path);
+  strokeTestLayer->setLineWidth(5.0f);
+  strokeTestLayer->addStrokeStyle(SolidColor::Make(Color::Red()));
+  strokeTestLayer->addStrokeStyle(SolidColor::Make(Color::Blue()));
+  ContourContext strokeTestContext;
+  Canvas strokeTestCanvas = Canvas(&strokeTestContext);
+  strokeTestLayer->drawLayer(drawArgs, &strokeTestCanvas, 1.0, BlendMode::SrcOver);
+  auto strokeTestPicture = strokeTestContext.finishRecordingAsPicture();
+  // 1 (transparent fill) + 1 (strokes deduped) = 2 contours.
+  EXPECT_EQ(strokeTestPicture->drawCount, 2u);
+
+  // Draw all to canvas for baseline comparison.
+  auto rootLayer = ShapeLayer::Make();
+  rootLayer->addChild(allSolidLayer);
+  rootLayer->addChild(allImageLayer);
+  rootLayer->addChild(mixedFillsLayer);
+  rootLayer->addChild(twoGroupsLayer);
+  rootLayer->addChild(strokeTestLayer);
+  ContourContext allContext;
+  Canvas allCanvas = Canvas(&allContext);
+  rootLayer->drawLayer(drawArgs, &allCanvas, 1.0, BlendMode::SrcOver);
+  auto allPicture = allContext.finishRecordingAsPicture();
+  // 1 + 2 + 1 + 3 + 2 = 9
+  EXPECT_EQ(allPicture->drawCount, 9u);
+
+  surface = Surface::Make(context, 200, 300);
   auto canvas = surface->getCanvas();
   canvas->clear();
-  canvas->drawPicture(picture);
+  canvas->drawPicture(allPicture);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ContourTest"));
 }
 
@@ -3389,7 +3388,6 @@ TGFX_TEST(LayerTest, Matrix) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D_2D"));
 
   imageLayer->setMatrix3D(imageMatrix3D);
-  imageLayer->setShouldRasterize(true);
   EXPECT_TRUE(imageLayer->matrix().isIdentity());
   auto rect = Rect::MakeXYWH(50, 50, 200, 100);
   Path path = {};
@@ -3420,53 +3418,6 @@ TGFX_TEST(LayerTest, Matrix) {
   displayList->root()->addChild(shaperLayer);
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D_2D_3D"));
-}
-
-TGFX_TEST(LayerTest, RasterizedContentWithMask) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  EXPECT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 300, 200);
-  auto displayList = std::make_unique<DisplayList>();
-
-  // Create a rasterized content layer with a mask
-  auto rootLayer = Layer::Make();
-  displayList->root()->addChild(rootLayer);
-
-  // Create a rasterized content layer with some shapes
-  auto rasterizedLayer = Layer::Make();
-  rasterizedLayer->setMatrix(Matrix::MakeTrans(50, 50));
-  rasterizedLayer->setShouldRasterize(true);
-  rootLayer->addChild(rasterizedLayer);
-
-  // Add a blue rectangle
-  auto blueRect = ShapeLayer::Make();
-  Path bluePath;
-  bluePath.addRect(Rect::MakeWH(80, 80));
-  blueRect->setPath(bluePath);
-  blueRect->setFillStyle(SolidColor::Make(Color::Blue()));
-  rasterizedLayer->addChild(blueRect);
-
-  // Add a red oval
-  auto redOval = ShapeLayer::Make();
-  redOval->setMatrix(Matrix::MakeTrans(60, 0));
-  Path ovalPath;
-  ovalPath.addOval(Rect::MakeXYWH(0, 0, 80, 80));
-  redOval->setPath(ovalPath);
-  redOval->setFillStyle(SolidColor::Make(Color::Red()));
-  rasterizedLayer->addChild(redOval);
-
-  // Create a mask for the rasterized layer
-  auto maskLayer = ShapeLayer::Make();
-  Path maskPath;
-  maskPath.addOval(Rect::MakeXYWH(-10, -10, 100, 100));
-  maskLayer->setPath(maskPath);
-  maskLayer->setFillStyle(SolidColor::Make(Color::White()));
-  rasterizedLayer->setMask(maskLayer);
-  rootLayer->addChild(maskLayer);
-
-  displayList->render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/RasterizedContentWithMask"));
 }
 
 TGFX_TEST(LayerTest, DisplayListBackground) {
@@ -3680,5 +3631,350 @@ TGFX_TEST(LayerTest, BackgroundLayerIndexWithNestedHierarchy) {
   displayList->render(surface.get());
 
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundLayerIndexWithNestedHierarchy"));
+}
+
+TGFX_TEST(LayerTest, LayerCache) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 400);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Direct);
+
+  // Test default value is 0 (cache disabled)
+  EXPECT_EQ(displayList->subtreeCacheMaxSize(), 0);
+
+  // Test setting subtreeCacheMaxSize
+  displayList->setSubtreeCacheMaxSize(2048);
+  EXPECT_EQ(displayList->subtreeCacheMaxSize(), 2048);
+
+  // Test negative value is clamped to 0
+  displayList->setSubtreeCacheMaxSize(-1);
+  EXPECT_EQ(displayList->subtreeCacheMaxSize(), 0);
+
+  // Enable cache
+  displayList->setSubtreeCacheMaxSize(2048);
+
+  // Create a parent layer with child (cache requires children/styles/filters)
+  auto parent = Layer::Make();
+  parent->setName("parent");
+  parent->setMatrix(Matrix::MakeTrans(20, 20));
+
+  auto child = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeWH(50, 50));
+  child->setPath(path);
+  child->setFillStyle(SolidColor::Make(Color::Red()));
+  parent->addChild(child);
+
+  displayList->root()->addChild(parent);
+  // Disable passThroughBackground to allow caching (root layer has passThroughBackground=true by default)
+  displayList->root()->setPassThroughBackground(false);
+
+  // First render - staticSubtree flag is not set yet
+  displayList->render(surface.get());
+  auto root = displayList->root();
+  EXPECT_TRUE(root->subtreeCache == nullptr);
+
+  // Second render - creates subtreeCache
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subtreeCache != nullptr);
+  int expectedLongEdge = 64;
+  EXPECT_TRUE(root->subtreeCache->hasCache(context, expectedLongEdge));
+}
+
+TGFX_TEST(LayerTest, LayerCacheInvalidation) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 400);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Direct);
+  displayList->setSubtreeCacheMaxSize(2048);
+
+  auto parent = Layer::Make();
+  parent->setMatrix(Matrix::MakeTrans(20, 20));
+
+  auto child = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeWH(50, 50));
+  child->setPath(path);
+  child->setFillStyle(SolidColor::Make(Color::Green()));
+  parent->addChild(child);
+
+  auto root = displayList->root();
+  root->addChild(parent);
+  // Disable passThroughBackground to allow caching (root layer has passThroughBackground=true by default)
+  root->setPassThroughBackground(false);
+
+  // First render - staticSubtree flag is not set yet
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subtreeCache == nullptr);
+
+  // Second render - creates subtreeCache
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subtreeCache != nullptr);
+
+  // Adding a new child - should invalidate root's cache
+  auto newChild = ShapeLayer::Make();
+  Path newPath;
+  newPath.addRect(Rect::MakeWH(20, 20));
+  newChild->setPath(newPath);
+  newChild->setMatrix(Matrix::MakeTrans(60, 0));
+  newChild->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 255, 0, 255)));
+  parent->addChild(newChild);
+
+  // Cache should be invalidated after adding child
+  EXPECT_TRUE(root->subtreeCache == nullptr);
+
+  // First render after modification - staticSubtree flag is not set yet
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subtreeCache == nullptr);
+
+  // Second render - creates subtreeCache again
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subtreeCache != nullptr);
+
+  // Modifying child transform - should invalidate cache
+  child->setMatrix(Matrix::MakeTrans(10, 10));
+  EXPECT_TRUE(root->subtreeCache == nullptr);
+
+  // Render twice to recreate cache
+  displayList->render(surface.get());
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subtreeCache != nullptr);
+}
+
+TGFX_TEST(LayerTest, LayerCacheWithEffects) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 1000, 1000);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Direct);
+  displayList->setSubtreeCacheMaxSize(2048);
+
+  // Parent with child that has filter
+  auto parent1 = Layer::Make();
+  parent1->setMatrix(Matrix::MakeTrans(20, 20));
+
+  auto child1 = ShapeLayer::Make();
+  Path path1;
+  path1.addRect(Rect::MakeWH(80, 80));
+  child1->setPath(path1);
+  child1->setFillStyle(SolidColor::Make(Color::Red()));
+  auto filter = DropShadowFilter::Make(5, 5, 3, 3, Color::Black());
+  child1->setFilters({filter});
+  parent1->addChild(child1);
+
+  auto root = displayList->root();
+  root->addChild(parent1);
+
+  // Parent with child that has layer style
+  auto parent2 = Layer::Make();
+  parent2->setMatrix(Matrix::MakeTrans(150, 30));
+
+  auto child2 = ShapeLayer::Make();
+  Path path2;
+  path2.addRect(Rect::MakeWH(60, 60));
+  child2->setPath(path2);
+  child2->setFillStyle(SolidColor::Make(Color::Blue()));
+  auto style = DropShadowStyle::Make(8, 8, 4, 4, Color::Black(), false);
+  child2->setLayerStyles({style});
+  parent2->addChild(child2);
+
+  root->addChild(parent2);
+  // Disable passThroughBackground to allow caching (root layer has passThroughBackground=true by default)
+  root->setPassThroughBackground(false);
+
+  // First render - staticSubtree flag is not set yet
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subtreeCache == nullptr);
+
+  // Second render - creates subtreeCache
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subtreeCache != nullptr);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerCacheWithEffects"));
+}
+
+TGFX_TEST(LayerTest, LayerCacheWithTransform) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 400);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Direct);
+  displayList->setSubtreeCacheMaxSize(2048);
+
+  auto parent = Layer::Make();
+  parent->setMatrix(Matrix::MakeTrans(5, 5));
+
+  auto child = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeWH(50, 50));
+  child->setPath(path);
+  child->setFillStyle(SolidColor::Make(Color::Red()));
+  parent->addChild(child);
+
+  auto root = displayList->root();
+  root->addChild(parent);
+  // Disable passThroughBackground to allow caching (root layer has passThroughBackground=true by default)
+  root->setPassThroughBackground(false);
+
+  // First render - staticSubtree flag is not set yet
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subtreeCache == nullptr);
+
+  // Second render - creates subtreeCache
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subtreeCache != nullptr);
+
+  // Change zoomScale - cache should still be valid (just uses different mipmap level)
+  displayList->setZoomScale(1.5f);
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subtreeCache != nullptr);
+
+  // Change parent's transform - should invalidate root's cache
+  parent->setMatrix(Matrix::MakeTrans(10, 10));
+  EXPECT_TRUE(root->subtreeCache == nullptr);
+
+  // First render after modification - staticSubtree flag is not set yet
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subtreeCache == nullptr);
+
+  // Second render - recreate cache
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subtreeCache != nullptr);
+}
+
+TGFX_TEST(LayerTest, LayerCacheContentScale) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 400);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Direct);
+  displayList->setSubtreeCacheMaxSize(400);
+
+  auto parent = Layer::Make();
+  parent->setMatrix(Matrix::MakeTrans(10, 10));
+
+  auto child = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeWH(100, 100));
+  child->setPath(path);
+  child->setFillStyle(SolidColor::Make(Color::Blue()));
+  parent->addChild(child);
+
+  auto root = displayList->root();
+  root->addChild(parent);
+  // Disable passThroughBackground to allow caching (root layer has passThroughBackground=true by default)
+  root->setPassThroughBackground(false);
+
+  // First render - staticSubtree flag is not set yet
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subtreeCache == nullptr);
+
+  // Second render - creates subtreeCache
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subtreeCache != nullptr);
+
+  // At zoom 1.0, longEdge should be 100
+  int expectedLongEdge1_0 = 100;
+  EXPECT_TRUE(root->subtreeCache->hasCache(context, expectedLongEdge1_0));
+
+  // Render at zoom 0.5 - cache should still exist
+  displayList->setZoomScale(0.5f);
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subtreeCache != nullptr);
+
+  // At zoom 0.5, longEdge should be 50
+  int expectedLongEdge0_5 = 50;
+  EXPECT_TRUE(root->subtreeCache->hasCache(context, expectedLongEdge0_5));
+
+  // Render at zoom 2.0
+  displayList->setZoomScale(2.0f);
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subtreeCache != nullptr);
+
+  // At zoom 2.0, longEdge should be 200
+  int expectedLongEdge2_0 = 200;
+  EXPECT_TRUE(root->subtreeCache->hasCache(context, expectedLongEdge2_0));
+
+  // Render at zoom 1.0 again
+  displayList->setZoomScale(1.0f);
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subtreeCache != nullptr);
+
+  // At zoom 1.0 again, cache should still be valid for longEdge 100
+  EXPECT_TRUE(root->subtreeCache->hasCache(context, expectedLongEdge1_0));
+
+  // Render at extreme zoom out
+  displayList->setZoomScale(0.1f);
+  displayList->render(surface.get());
+  EXPECT_TRUE(root->subtreeCache != nullptr);
+
+  // At zoom 0.1, longEdge < minLongEdge, cache should be 50
+  int expectedLongEdge0_1 = 50;
+  EXPECT_TRUE(root->subtreeCache->cacheEntries.size() == 3);
+  EXPECT_TRUE(root->subtreeCache->hasCache(context, expectedLongEdge0_1));
+}
+
+TGFX_TEST(LayerTest, StaticSubtree) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 350, 350);
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto rootLayer = Layer::Make();
+  auto childLayer = ShapeLayer::Make();
+  Path childPath;
+  childPath.addRect(Rect::MakeWH(100, 100));
+  childLayer->setPath(childPath);
+  childLayer->setFillStyle(SolidColor::Make(Color::Red()));
+  rootLayer->addChild(childLayer);
+
+  displayList->root()->addChild(rootLayer);
+  EXPECT_FALSE(rootLayer->bitFields.staticSubtree);
+  EXPECT_FALSE(childLayer->bitFields.staticSubtree);
+
+  // After first render, staticSubtree should be true
+  displayList->render(surface.get());
+  EXPECT_TRUE(rootLayer->bitFields.staticSubtree);
+  EXPECT_TRUE(childLayer->bitFields.staticSubtree);
+
+  // After adding filter, both should be false
+  auto filter = BlurFilter::Make(10.f, 10.f);
+  childLayer->setFilters({filter});
+  EXPECT_FALSE(rootLayer->bitFields.staticSubtree);
+  EXPECT_FALSE(childLayer->bitFields.staticSubtree);
+
+  // After render, both should be true again
+  displayList->render(surface.get());
+  EXPECT_TRUE(rootLayer->bitFields.staticSubtree);
+  EXPECT_TRUE(childLayer->bitFields.staticSubtree);
+
+  // After adding layer style, both should be false
+  auto style = DropShadowStyle::Make(5, 5, 0, 0, Color::Black(), false);
+  childLayer->setLayerStyles({style});
+  EXPECT_FALSE(rootLayer->bitFields.staticSubtree);
+  EXPECT_FALSE(childLayer->bitFields.staticSubtree);
+
+  // After render, both should be true again
+  displayList->render(surface.get());
+  EXPECT_TRUE(rootLayer->bitFields.staticSubtree);
+  EXPECT_TRUE(childLayer->bitFields.staticSubtree);
+
+  // After invalidating descendents, both should be false
+  rootLayer->invalidateDescendents();
+  EXPECT_FALSE(rootLayer->bitFields.staticSubtree);
+  EXPECT_TRUE(childLayer->bitFields.staticSubtree);
+
+  // After render, both should be true again
+  displayList->render(surface.get());
+  EXPECT_TRUE(rootLayer->bitFields.staticSubtree);
+  EXPECT_TRUE(childLayer->bitFields.staticSubtree);
 }
 }  // namespace tgfx

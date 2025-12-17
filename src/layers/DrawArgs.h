@@ -40,6 +40,9 @@ class DrawArgs {
 
   // The GPU context to be used during the drawing process. Note: this could be nullptr.
   Context* context = nullptr;
+
+  uint32_t renderFlags = 0;
+
   // Whether to exclude effects during the drawing process.
   bool excludeEffects = false;
   // Determines the draw mode of the Layer.
@@ -52,5 +55,9 @@ class DrawArgs {
   // Indicates whether to force drawing the background, even if there are no background styles.
   bool forceDrawBackground = false;
   std::shared_ptr<ColorSpace> dstColorSpace = ColorSpace::SRGB();
+
+  // The maximum cache size (single edge) for subtree layer caching. Set to 0 to disable
+  // subtree layer cache.
+  int subtreeCacheMaxSize = 0;
 };
 }  // namespace tgfx

@@ -80,7 +80,6 @@ void LayerSerialization::SerializeBasicLayerImpl(flexbuffers::Builder& fbb, cons
                                                  SerializeUtils::RenderableObjSerMap* rosMap) {
   SerializeUtils::SetFlexBufferMap(fbb, "type", SerializeUtils::LayerTypeToString(layer->type()));
   SerializeUtils::SetFlexBufferMap(fbb, "visible", layer->visible());
-  SerializeUtils::SetFlexBufferMap(fbb, "shouldRasterize", layer->shouldRasterize());
   SerializeUtils::SetFlexBufferMap(fbb, "allowsEdgeAntialiasing", layer->allowsEdgeAntialiasing());
   SerializeUtils::SetFlexBufferMap(fbb, "allowsGroupOpacity", layer->allowsGroupOpacity());
   SerializeUtils::SetFlexBufferMap(fbb, "excludeChildEffectsInLayerStyle",
@@ -99,8 +98,6 @@ void LayerSerialization::SerializeBasicLayerImpl(flexbuffers::Builder& fbb, cons
   auto position = layer->position();
   SerializeUtils::SetFlexBufferMap(fbb, "position", "", false, true, posID);
   SerializeUtils::FillComplexObjSerMap(position, posID, map);
-
-  SerializeUtils::SetFlexBufferMap(fbb, "rasterizationScale", layer->rasterizationScale());
 
   auto filters = layer->filters();
   auto filterSize = static_cast<unsigned int>(filters.size());

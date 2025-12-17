@@ -66,10 +66,7 @@ void CustomLayer::onUpdateContent(tgfx::LayerRecorder* recorder) {
   tgfx::GlyphRun glyphRun(_font, std::move(glyphs), std::move(positions));
   auto textBlob = tgfx::TextBlob::MakeFrom(std::move(glyphRun));
   if (textBlob != nullptr) {
-    tgfx::Paint textPaint = {};
-    textPaint.setColor(tgfx::Color::Black());
-    auto canvas = recorder->getCanvas();
-    canvas->drawTextBlob(std::move(textBlob), 0, 0, textPaint);
+    recorder->addTextBlob(textBlob, tgfx::LayerPaint(tgfx::Color::Black()));
   }
 }
 
