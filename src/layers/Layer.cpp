@@ -736,26 +736,6 @@ Rect Layer::getBounds(const Layer* targetCoordinateSpace, bool computeTightBound
   return getBoundsInternal(matrix, computeTightBounds);
 }
 
-Rect Layer::getContentBounds() {
-  Rect bounds = {};
-  if (auto content = getContent()) {
-    bounds = content->getBounds();
-  }
-
-  if (!_layerStyles.empty() || !_filters.empty()) {
-    auto layerBounds = bounds;
-    for (auto& layerStyle : _layerStyles) {
-      auto styleBounds = layerStyle->filterBounds(layerBounds, 1);
-      bounds.join(styleBounds);
-    }
-    for (auto& filter : _filters) {
-      bounds = filter->filterBounds(bounds, 1);
-    }
-  }
-
-  return bounds;
-}
-
 Rect Layer::getBoundsInternal(const Matrix3D& coordinateMatrix, bool computeTightBounds) {
   if (computeTightBounds || bitFields.dirtyDescendents) {
     return computeBounds(coordinateMatrix, computeTightBounds);
@@ -1300,7 +1280,16 @@ std::shared_ptr<Image> Layer::getContentImage(const DrawArgs& contentArgs, float
                                               bool excludeChildren) {
   DEBUG_ASSERT(imageMatrix);
   // Bounding box of layer content in local coordinate system.
-  auto sourceBounds = excludeChildren ? getContentBounds() : getBounds();
+  // When excludeChildren is true, we are in a 3D context where filters and styles are disabled,
+  // so we can use the content bounds directly.
+  Rect sourceBounds = {};
+  if (excludeChildren) {
+    if (auto content = getContent()) {
+      sourceBounds = content->getBounds();
+    }
+  } else {
+    sourceBounds = getBounds();
+  }
   auto inputBounds = sourceBounds;
   if (clipBounds.has_value()) {
     if (!contentArgs.excludeEffects) {
@@ -2444,12 +2433,23 @@ Matrix3D Layer::calculate3DContextDepthMatrix() {
     auto& [layer, matrix] = queue.front();
     queue.pop();
 
-    auto contentBounds = layer->getContentBounds();
-    if (!contentBounds.isEmpty()) {
-      auto corners = std::array<Vec3, 4>{Vec3(contentBounds.left, contentBounds.top, 0),
-                                         Vec3(contentBounds.right, contentBounds.top, 0),
-                                         Vec3(contentBounds.right, contentBounds.bottom, 0),
-                                         Vec3(contentBounds.left, contentBounds.bottom, 0)};
+    bool canExtend =
+        layer->_transformStyle == TransformStyle::Preserve3D && layer->canExtend3DContext();
+    // If the layer can extend the 3D context, use its content bounds for depth calculation.
+    // Non-terminal layers in a 3D context have filters and styles disabled, so we can use the
+    // content bounds directly. Otherwise, use the full bounds as the layer ends the 3D context.
+    Rect bounds = {};
+    if (canExtend) {
+      if (auto content = layer->getContent()) {
+        bounds = content->getBounds();
+      }
+    } else {
+      bounds = layer->getBounds();
+    }
+    if (!bounds.isEmpty()) {
+      auto corners = std::array<Vec3, 4>{
+          Vec3(bounds.left, bounds.top, 0), Vec3(bounds.right, bounds.top, 0),
+          Vec3(bounds.right, bounds.bottom, 0), Vec3(bounds.left, bounds.bottom, 0)};
       for (const auto& corner : corners) {
         auto transformedPoint = matrix.mapVec3(corner);
         minDepth = std::min(minDepth, transformedPoint.z);
@@ -2457,14 +2457,14 @@ Matrix3D Layer::calculate3DContextDepthMatrix() {
       }
     }
 
-    // If the Layer's transformStyle is Preserve3D, include child layers in the 3D rendering context.
-    if (layer->_transformStyle == TransformStyle::Preserve3D) {
-      for (auto& child : layer->_children) {
-        auto childMatrix = child->getMatrixWithScrollRect();
-        auto childCumulativeMatrix = childMatrix;
-        childCumulativeMatrix.postConcat(matrix);
-        queue.emplace(child.get(), childCumulativeMatrix);
-      }
+    if (!canExtend) {
+      continue;
+    }
+    for (auto& child : layer->_children) {
+      auto childMatrix = child->getMatrixWithScrollRect();
+      auto childCumulativeMatrix = childMatrix;
+      childCumulativeMatrix.postConcat(matrix);
+      queue.emplace(child.get(), childCumulativeMatrix);
     }
   }
 

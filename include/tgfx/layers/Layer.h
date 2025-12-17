@@ -577,11 +577,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   void invalidate();
 
-  /**
-   * Returns the content bounds of the layer, excluding child layers.
-   */
-  Rect getContentBounds();
-
   Rect getBoundsInternal(const Matrix3D& coordinateMatrix, bool computeTightBounds);
 
   Rect computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBounds);
