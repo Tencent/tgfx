@@ -19,10 +19,7 @@
 #pragma once
 
 #include <memory>
-#include <mutex>
-#include <shared_mutex>
 #include <string>
-#include <unordered_map>
 #include "ft2build.h"
 #include FT_FREETYPE_H
 #include "FTTypeface.h"
@@ -79,9 +76,6 @@ class FTScalerContext : public ScalerContext {
   bool MeasureCOLRv1Glyph(GlyphID glyphID, Rect* rect) const;
 
   std::string getGlyphUTF8(GlyphID glyphID) const;
-
-  mutable std::shared_mutex glyphUTF8CacheMutex = {};
-  mutable std::unordered_map<GlyphID, std::string> glyphUTF8Cache = {};
 #endif
 
   float textScale = 1.0f;

@@ -47,7 +47,7 @@ class FTTypeface : public Typeface {
 
   bool hasColor() const override;
 
-  bool isCOLRv1() const;
+  bool isColorVector() const;
 
   bool hasOutlines() const override;
 

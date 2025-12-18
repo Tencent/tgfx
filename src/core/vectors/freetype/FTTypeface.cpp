@@ -163,8 +163,8 @@ bool FTTypeface::hasColor() const {
   return FT_HAS_COLOR(face);
 }
 
-bool FTTypeface::isCOLRv1() const {
-  return _isCOLRv1;
+bool FTTypeface::isColorVector() const {
+  return hasColor() && hasOutlines();
 }
 
 bool FTTypeface::hasOutlines() const {

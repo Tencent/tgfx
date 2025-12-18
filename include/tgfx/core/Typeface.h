@@ -156,7 +156,7 @@ class Typeface {
  protected:
   /**
    * Gets the mapping from GlyphID to unicode. The array index is GlyphID, and the array value is
-   * unicode. The array length is glyphsCount(). 
+   * unicode. The array length is glyphsCount().
    * This method is only implemented when compiling the SVG or PDF export module.
    */
   const std::vector<Unichar>& getGlyphToUnicodeMap() const;

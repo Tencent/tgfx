@@ -33,6 +33,7 @@
 #include "skcms.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Pixmap.h"
+#include "tgfx/core/UTF.h"
 
 #if defined(__ANDROID__) || defined(ANDROID)
 #include "platform/android/GlyphRenderer.h"
@@ -164,32 +165,6 @@ static FT_Int ChooseBitmapStrike(FT_Face face, FT_F26Dot6 scaleY) {
   }
   return chosenStrikeIndex;
 }
-
-#if defined(__ANDROID__) || defined(ANDROID)
-static std::string UnicharToUTF8(Unichar unichar) {
-  if (unichar == 0) {
-    return {};
-  }
-  std::string result;
-  auto charCode = static_cast<uint32_t>(unichar);
-  if (charCode < 0x80) {
-    result += static_cast<char>(charCode);
-  } else if (charCode < 0x800) {
-    result += static_cast<char>(0xC0 | (charCode >> 6));
-    result += static_cast<char>(0x80 | (charCode & 0x3F));
-  } else if (charCode < 0x10000) {
-    result += static_cast<char>(0xE0 | (charCode >> 12));
-    result += static_cast<char>(0x80 | ((charCode >> 6) & 0x3F));
-    result += static_cast<char>(0x80 | (charCode & 0x3F));
-  } else {
-    result += static_cast<char>(0xF0 | (charCode >> 18));
-    result += static_cast<char>(0x80 | ((charCode >> 12) & 0x3F));
-    result += static_cast<char>(0x80 | ((charCode >> 6) & 0x3F));
-    result += static_cast<char>(0x80 | (charCode & 0x3F));
-  }
-  return result;
-}
-#endif
 
 FTScalerContext::FTScalerContext(std::shared_ptr<Typeface> typeFace, float size)
     : ScalerContext(std::move(typeFace), size), textScale(size) {
@@ -541,7 +516,7 @@ void FTScalerContext::getBBoxForCurrentGlyph(FT_BBox* bbox) const {
 
 Rect FTScalerContext::getBounds(tgfx::GlyphID glyphID, bool fauxBold, bool fauxItalic) const {
 #if defined(__ANDROID__) || defined(ANDROID)
-  if (ftTypeface()->isCOLRv1() && GlyphRenderer::IsAvailable()) {
+  if (ftTypeface()->isColorVector() && GlyphRenderer::IsAvailable()) {
     Rect rect = {};
     if (MeasureCOLRv1Glyph(glyphID, &rect)) {
       return rect;
@@ -643,7 +618,7 @@ Rect FTScalerContext::getImageTransform(GlyphID glyphID, bool fauxBold, const St
     return bounds;
   }
 #if defined(__ANDROID__) || defined(ANDROID)
-  if (ftTypeface()->isCOLRv1() && GlyphRenderer::IsAvailable()) {
+  if (ftTypeface()->isColorVector() && GlyphRenderer::IsAvailable()) {
     Rect rect = {};
     if (MeasureCOLRv1Glyph(glyphID, &rect)) {
       if (matrix) {
@@ -680,9 +655,9 @@ bool FTScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke*,
   // Note: In the hasColor() function, freeType has an internal lock. Placing this method later
   // would cause repeated locking and lead to a deadlock.
   bool colorFont = hasColor();
-  bool isCOLRv1 = ftTypeface()->isCOLRv1();
+  bool isColorVector = ftTypeface()->isColorVector();
 #if defined(__ANDROID__) || defined(ANDROID)
-  if (isCOLRv1 && GlyphRenderer::IsAvailable()) {
+  if (isColorVector && GlyphRenderer::IsAvailable()) {
     std::string text = getGlyphUTF8(glyphID);
     if (!text.empty()) {
       auto fontPath = ftTypeface()->fontPath();
@@ -710,7 +685,7 @@ bool FTScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke*,
     return false;
   }
 #else
-  USE(isCOLRv1);
+  USE(isColorVector);
   USE(glyphOffset);
 #endif
   std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
@@ -819,23 +794,9 @@ bool FTScalerContext::MeasureCOLRv1Glyph(GlyphID glyphID, Rect* rect) const {
 }
 
 std::string FTScalerContext::getGlyphUTF8(GlyphID glyphID) const {
-  {
-    std::shared_lock<std::shared_mutex> readLock(glyphUTF8CacheMutex);
-    auto it = glyphUTF8Cache.find(glyphID);
-    if (it != glyphUTF8Cache.end()) {
-      return it->second;
-    }
-  }
-  std::unique_lock<std::shared_mutex> writeLock(glyphUTF8CacheMutex);
-  auto it = glyphUTF8Cache.find(glyphID);
-  if (it != glyphUTF8Cache.end()) {
-    return it->second;
-  }
   auto& map = ftTypeface()->getGlyphToUnicodeMap();
   Unichar unichar = glyphID < map.size() ? map[glyphID] : 0;
-  std::string result = UnicharToUTF8(unichar);
-  glyphUTF8Cache[glyphID] = result;
-  return result;
+  return UTF::ToUTF8(unichar);
 }
 #endif
 }  // namespace tgfx
