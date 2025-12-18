@@ -1601,7 +1601,6 @@ std::shared_ptr<Image> Layer::getBackgroundImage(const DrawArgs& args, float con
   auto bounds = getBounds();
   bounds.scale(contentScale, contentScale);
   bounds.roundOut();
-  canvas->clipRect(bounds);
   canvas->scale(contentScale, contentScale);
   auto localToGlobalMatrix = getGlobalMatrix();
   // If there are 3D transformations or projection transformations from the current layer node to

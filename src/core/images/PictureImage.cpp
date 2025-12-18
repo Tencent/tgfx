@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PictureImage.h"
+#include "core/utils/MathExtra.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/OpsCompositor.h"
 #include "gpu/ProxyProvider.h"
@@ -94,13 +95,23 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
   if (!rect.intersect(drawBounds)) {
     return nullptr;
   }
-
-  const auto scale = args.drawScale;
-  rect.scale(scale, scale);
-  // Use roundOut() to ensure pixel-aligned offscreen rendering with complete pixel coverage,
-  // preventing blur artifacts caused by partial pixel rendering.
-  rect.roundOut();
-
+  auto scaleX = 1.0f;
+  auto scaleY = 1.0f;
+  auto clipRect = rect;
+  if (FloatNearlyEqual(args.drawScale, 1.0f)) {
+    // Use roundOut() to ensure pixel-aligned offscreen rendering with complete pixel coverage,
+    // preventing blur artifacts caused by partial pixel rendering.
+    rect.roundOut();
+    clipRect = rect;
+  } else {
+    rect.scale(args.drawScale, args.drawScale);
+    rect.round();
+    // Align PictureImage behavior with BufferImage and CodecImage when processing args.drawScale,
+    // which may produce different scaleX and scaleY values to ensure pixel range stays within
+    // the PictureImage bounds.
+    scaleX = rect.width() / clipRect.width();
+    scaleY = rect.height() / clipRect.height();
+  }
   auto mipmapped = samplingArgs.sampling.mipmapMode != MipmapMode::None && hasMipmaps();
   auto renderTarget = RenderTargetProxy::Make(args.context, static_cast<int>(rect.width()),
                                               static_cast<int>(rect.height()), isAlphaOnly(), 1,
@@ -108,8 +119,8 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  auto extraMatrix = Matrix::MakeTrans(-rect.left, -rect.top);
-  extraMatrix.preScale(scale, scale);
+  auto extraMatrix = Matrix::MakeScale(scaleX, scaleY);
+  extraMatrix.preTranslate(-clipRect.left, -clipRect.top);
   if (!drawPicture(renderTarget, args.renderFlags, &extraMatrix)) {
     return nullptr;
   }
