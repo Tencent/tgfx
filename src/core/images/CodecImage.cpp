@@ -19,6 +19,7 @@
 #include "CodecImage.h"
 #include "RasterizedImage.h"
 #include "core/ScaledImageGenerator.h"
+#include "core/utils/MathExtra.h"
 #include "core/utils/NextCacheScaleLevel.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/TPArgs.h"
@@ -48,8 +49,8 @@ std::shared_ptr<Image> CodecImage::onMakeScaled(int newWidth, int newHeight,
 
 std::shared_ptr<TextureProxy> CodecImage::lockTextureProxy(const TPArgs& args) const {
   auto tempGenerator = generator;
-  auto scaleWidth = static_cast<int>(roundf(static_cast<float>(width()) * args.drawScale));
-  auto scaleHeight = static_cast<int>(roundf(static_cast<float>(height()) * args.drawScale));
+  auto scaleWidth = FloatRoundToInt(static_cast<float>(width()) * args.drawScale);
+  auto scaleHeight = FloatRoundToInt(static_cast<float>(height()) * args.drawScale);
   if (scaleWidth < generator->width() && scaleHeight < generator->height()) {
     tempGenerator = ScaledImageGenerator::MakeFrom(getCodec(), scaleWidth, scaleHeight);
   }

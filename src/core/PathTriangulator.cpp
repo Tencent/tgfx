@@ -19,6 +19,7 @@
 #include "PathTriangulator.h"
 #include "PathRef.h"
 #include "pathkit.h"
+#include "utils/MathExtra.h"
 
 namespace tgfx {
 /**
@@ -42,8 +43,8 @@ static constexpr int MIN_TRIANGULATE_SIZE = 162;
 
 bool PathTriangulator::ShouldTriangulatePath(const Path& path) {
   auto bounds = path.getBounds();
-  auto width = static_cast<int>(ceilf(bounds.width()));
-  auto height = static_cast<int>(ceilf(bounds.height()));
+  auto width = FloatCeilToInt(bounds.width());
+  auto height = FloatCeilToInt(bounds.height());
   auto maxDimension = std::max(width, height);
   auto minDimension = std::min(width, height);
   if (minDimension <= 0) {
