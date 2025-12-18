@@ -1053,10 +1053,8 @@ std::shared_ptr<Image> Layer::getContentImage(const DrawArgs& contentArgs,
                                               const Matrix& contentMatrix,
                                               const std::shared_ptr<Image>& passThroughImage,
                                               const Matrix& passThroughImageMatrix,
-                                              std::optional<Rect> clipBounds, Matrix* imageMatrix,
-                                              FilterMode* filterMode) {
+                                              std::optional<Rect> clipBounds, Matrix* imageMatrix) {
   DEBUG_ASSERT(imageMatrix);
-  DEBUG_ASSERT(filterMode);
   auto inputBounds = getBounds();
   if (clipBounds.has_value()) {
     if (!contentArgs.excludeEffects) {
@@ -1110,11 +1108,9 @@ std::shared_ptr<Image> Layer::getContentImage(const DrawArgs& contentArgs,
     if (imageFilter) {
       offscreenCanvas->scale(contentScale, contentScale);
       imageMatrix->setScale(1.0f / contentScale, 1.0f / contentScale);
-      *filterMode = FilterMode::Linear;
     } else {
       offscreenCanvas->setMatrix(contentMatrix);
       contentMatrix.invert(imageMatrix);
-      *filterMode = FilterMode::Nearest;
     }
     if (passThroughImage) {
       AutoCanvasRestore offscreenRestore(offscreenCanvas);
@@ -1330,10 +1326,8 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   }
 
   auto imageMatrix = Matrix::I();
-  auto filterMode = FilterMode::Nearest;
-  auto image =
-      getContentImage(contentArgs, canvas->getMatrix(), passthroughImage, passthroughImageMatrix,
-                      contentClipBounds, &imageMatrix, &filterMode);
+  auto image = getContentImage(contentArgs, canvas->getMatrix(), passthroughImage,
+                               passthroughImageMatrix, contentClipBounds, &imageMatrix);
 
   auto invertImageMatrix = Matrix::I();
   if (image == nullptr || !imageMatrix.invert(&invertImageMatrix)) {
@@ -1364,6 +1358,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
 
   AutoCanvasRestore autoRestore(canvas);
   canvas->concat(imageMatrix);
+  auto filterMode = _filters.empty() ? FilterMode::Nearest : FilterMode::Linear;
   auto sampling = SamplingOptions{filterMode, MipmapMode::None};
   canvas->drawImage(image, 0.f, 0.f, sampling, &paint);
   if (args.blurBackground) {
