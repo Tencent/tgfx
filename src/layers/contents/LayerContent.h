@@ -18,8 +18,10 @@
 
 #pragma once
 
+#include <optional>
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Matrix.h"
+#include "tgfx/core/Path.h"
 #include "tgfx/core/Rect.h"
 
 namespace tgfx {
@@ -66,6 +68,16 @@ class LayerContent {
    * This method should only be called if drawDefault() returned true.
    */
   virtual void drawForeground(Canvas* canvas, float alpha, bool antiAlias) const = 0;
+
+  /**
+   * Returns the path that can be used as a clip path if this content is a simple filled geometry.
+   * If checkOpacity is true, returns the path only when the content is fully opaque.
+   * Returns std::nullopt if the content cannot be used as a clip path.
+   */
+  virtual std::optional<Path> asClipPath(bool checkOpacity) const {
+    (void)checkOpacity;
+    return std::nullopt;
+  }
 
  protected:
   enum class Type {

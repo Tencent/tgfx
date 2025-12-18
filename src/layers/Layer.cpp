@@ -24,6 +24,7 @@
 #include "core/images/TextureImage.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/Types.h"
 #include "layers/ContourContext.h"
 #include "layers/DrawArgs.h"
 #include "layers/RegionTransformer.h"
@@ -973,16 +974,29 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
     }
     return;
   }
+  auto maskClipPath = hasValidMask() ? getMaskClipPath() : std::nullopt;
+  AutoCanvasRestore autoRestore(maskClipPath.has_value() ? canvas : nullptr);
+  auto blurCanvas = args.blurBackground ? args.blurBackground->getCanvas() : nullptr;
+  AutoCanvasRestore blurAutoRestore(maskClipPath.has_value() ? blurCanvas : nullptr);
+  if (maskClipPath.has_value()) {
+    canvas->clipPath(*maskClipPath);
+    if (blurCanvas) {
+      blurCanvas->clipPath(*maskClipPath);
+    }
+  }
+  // Mask needs MaskFilter only when mask is valid but cannot be converted to clipPath
+  bool needsMaskFilter = hasValidMask() && !maskClipPath.has_value();
   if (canUseSubtreeCache(args, blendMode, transform3D) &&
-      drawWithSubtreeCache(args, canvas, alpha, blendMode, transform3D)) {
+      drawWithSubtreeCache(args, canvas, alpha, blendMode, transform3D, needsMaskFilter)) {
     return;
   }
-  if (blendMode != BlendMode::SrcOver || !bitFields.passThroughBackground ||
-      (alpha < 1.0f && bitFields.allowsGroupOpacity) ||
-      (!_filters.empty() && !args.excludeEffects) || hasValidMask() || transform3D != nullptr) {
-    drawOffscreen(args, canvas, alpha, blendMode, transform3D);
+  bool needsOffscreen = blendMode != BlendMode::SrcOver || !bitFields.passThroughBackground ||
+                        (alpha < 1.0f && bitFields.allowsGroupOpacity) ||
+                        (!_filters.empty() && !args.excludeEffects) || needsMaskFilter ||
+                        transform3D != nullptr;
+  if (needsOffscreen) {
+    drawOffscreen(args, canvas, alpha, blendMode, transform3D, needsMaskFilter);
   } else {
-    // draw directly
     drawDirectly(args, canvas, alpha);
   }
 }
@@ -999,6 +1013,31 @@ Matrix3D Layer::getRelativeMatrix(const Layer* targetCoordinateSpace) const {
   Matrix3D relativeMatrix = getGlobalMatrix();
   relativeMatrix.postConcat(targetLayerInverseMatrix);
   return relativeMatrix;
+}
+
+std::optional<Path> Layer::getMaskClipPath() {
+  auto maskType = static_cast<LayerMaskType>(bitFields.maskType);
+  // Only support Alpha mask type for now
+  if (maskType != LayerMaskType::Alpha) {
+    return std::nullopt;
+  }
+  if (_mask->alpha() < 1.0f) {
+    return std::nullopt;
+  }
+  auto content = _mask->getContent();
+  if (content == nullptr) {
+    return std::nullopt;
+  }
+  auto clipPath = content->asClipPath(true);
+  if (!clipPath.has_value()) {
+    return std::nullopt;
+  }
+  auto relativeMatrix = _mask->getRelativeMatrix(this);
+  if (!IsMatrix3DAffine(relativeMatrix)) {
+    return std::nullopt;
+  }
+  clipPath->transform(GetMayLossyAffineMatrix(relativeMatrix));
+  return clipPath;
 }
 
 std::shared_ptr<MaskFilter> Layer::getMaskFilter(const DrawArgs& args, float scale,
@@ -1190,6 +1229,19 @@ bool Layer::canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode,
     // The cache is created on the second render when the layer is confirmed to be reused.
     return false;
   }
+  // Skip caching for leaf nodes with basic shapes (Rect, RRect) that have no filters or layer
+  // styles, as they can be efficiently merged during rendering.
+  if (_children.empty() && _layerStyles.empty() && _filters.empty()) {
+    auto content = getContent();
+    if (content == nullptr) {
+      return false;
+    }
+    auto contentType = Types::Get(content);
+    if (contentType == Types::LayerContentType::Rect ||
+        contentType == Types::LayerContentType::RRect) {
+      return false;
+    }
+  }
   subtreeCache = std::make_unique<SubtreeCache>(args.subtreeCacheMaxSize);
   return true;
 }
@@ -1265,7 +1317,8 @@ SubtreeCache* Layer::getValidSubtreeCache(const DrawArgs& args, int longEdge,
 }
 
 bool Layer::drawWithSubtreeCache(const DrawArgs& args, Canvas* canvas, float alpha,
-                                 BlendMode blendMode, const Matrix3D* transform3D) {
+                                 BlendMode blendMode, const Matrix3D* transform3D,
+                                 bool needsMaskFilter) {
   auto layerBounds = getBounds();
   auto contentScale = canvas->getMatrix().getMaxScale();
   auto longEdge = GetMipmapCacheLongEdge(args.subtreeCacheMaxSize, contentScale, layerBounds);
@@ -1274,7 +1327,7 @@ bool Layer::drawWithSubtreeCache(const DrawArgs& args, Canvas* canvas, float alp
     return false;
   }
   Paint paint = {};
-  if (hasValidMask()) {
+  if (needsMaskFilter) {
     auto clipBounds =
         GetClipBounds(args.blurBackground ? args.blurBackground->getCanvas() : canvas);
     auto maskFilter = getMaskFilter(args, contentScale, clipBounds);
@@ -1294,7 +1347,7 @@ bool Layer::drawWithSubtreeCache(const DrawArgs& args, Canvas* canvas, float alp
 }
 
 void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
-                          const Matrix3D* transform3D) {
+                          const Matrix3D* transform3D, bool needsMaskFilter) {
   if (transform3D != nullptr) {
     drawBackgroundLayerStyles(args, canvas, alpha, *transform3D);
   }
@@ -1345,7 +1398,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   paint.setBlendMode(blendMode);
 
   std::shared_ptr<MaskFilter> maskFilter = nullptr;
-  if (hasValidMask()) {
+  if (needsMaskFilter) {
     maskFilter = getMaskFilter(args, contentScale, clipBounds);
     // if mask filter is nullptr while mask is valid, that means the layer is not visible.
     if (!maskFilter) {

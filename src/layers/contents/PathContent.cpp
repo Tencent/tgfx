@@ -67,4 +67,8 @@ bool PathContent::onHasSameGeometry(const GeometryContent* other) const {
   return path == static_cast<const PathContent*>(other)->path;
 }
 
+std::optional<Path> PathContent::onAsClipPath() const {
+  return path;
+}
+
 }  // namespace tgfx

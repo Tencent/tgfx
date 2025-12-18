@@ -40,6 +40,7 @@ class RRectContent : public GeometryContent {
   Rect onGetBounds() const override;
   void onDraw(Canvas* canvas, const Paint& paint) const override;
   bool onHasSameGeometry(const GeometryContent* other) const override;
+  std::optional<Path> onAsClipPath() const override;
 
  private:
   Path getFilledPath() const;

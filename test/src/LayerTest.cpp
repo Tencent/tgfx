@@ -3977,4 +3977,266 @@ TGFX_TEST(LayerTest, StaticSubtree) {
   EXPECT_TRUE(rootLayer->bitFields.staticSubtree);
   EXPECT_TRUE(childLayer->bitFields.staticSubtree);
 }
+
+/**
+ * Test getMaskClipPath() returns valid clip path for simple filled shapes.
+ */
+TGFX_TEST(LayerTest, MaskClipPath) {
+  auto displayList = std::make_unique<DisplayList>();
+  auto rootLayer = displayList->root();
+
+  // Test 1: SolidLayer (Rect) as mask - should return valid clip path
+  auto layer1 = Layer::Make();
+  rootLayer->addChild(layer1);
+  auto rectMask = SolidLayer::Make();
+  rectMask->setWidth(100);
+  rectMask->setHeight(80);
+  rectMask->setColor(Color::White());
+  rootLayer->addChild(rectMask);
+  layer1->setMask(rectMask);
+  layer1->setMaskType(LayerMaskType::Alpha);
+
+  auto clipPath1 = layer1->getMaskClipPath();
+  EXPECT_TRUE(clipPath1.has_value());
+  EXPECT_TRUE(clipPath1->getBounds() == Rect::MakeWH(100, 80));
+
+  // Test 2: SolidLayer (RRect) as mask - should return valid clip path
+  auto layer2 = Layer::Make();
+  rootLayer->addChild(layer2);
+  auto rrectMask = SolidLayer::Make();
+  rrectMask->setWidth(100);
+  rrectMask->setHeight(80);
+  rrectMask->setRadiusX(15);
+  rrectMask->setRadiusY(15);
+  rrectMask->setColor(Color::White());
+  rootLayer->addChild(rrectMask);
+  layer2->setMask(rrectMask);
+  layer2->setMaskType(LayerMaskType::Alpha);
+
+  auto clipPath2 = layer2->getMaskClipPath();
+  EXPECT_TRUE(clipPath2.has_value());
+  EXPECT_TRUE(clipPath2->getBounds() == Rect::MakeWH(100, 80));
+
+  // Test 3: ShapeLayer (Path) as mask - should return valid clip path
+  auto layer3 = Layer::Make();
+  rootLayer->addChild(layer3);
+  Path circlePath = {};
+  circlePath.addOval(Rect::MakeWH(80, 80));
+  auto pathMask = ShapeLayer::Make();
+  pathMask->setPath(circlePath);
+  pathMask->setFillStyle(SolidColor::Make(Color::White()));
+  rootLayer->addChild(pathMask);
+  layer3->setMask(pathMask);
+  layer3->setMaskType(LayerMaskType::Alpha);
+
+  auto clipPath3 = layer3->getMaskClipPath();
+  EXPECT_TRUE(clipPath3.has_value());
+  EXPECT_TRUE(clipPath3->getBounds() == Rect::MakeWH(80, 80));
+
+  // Test 4: Mask with matrix transformation - clip path should be transformed
+  auto layer4 = Layer::Make();
+  rootLayer->addChild(layer4);
+  auto transformedMask = SolidLayer::Make();
+  transformedMask->setWidth(100);
+  transformedMask->setHeight(80);
+  transformedMask->setColor(Color::White());
+  transformedMask->setMatrix(Matrix::MakeTrans(20, 30));
+  rootLayer->addChild(transformedMask);
+  layer4->setMask(transformedMask);
+  layer4->setMaskType(LayerMaskType::Alpha);
+
+  auto clipPath4 = layer4->getMaskClipPath();
+  EXPECT_TRUE(clipPath4.has_value());
+  EXPECT_TRUE(clipPath4->getBounds() == Rect::MakeXYWH(20, 30, 100, 80));
+
+  // Test 5: ShapeLayer with stroke - should NOT return clip path
+  auto layer5 = Layer::Make();
+  rootLayer->addChild(layer5);
+  Path strokePath = {};
+  strokePath.addRect(Rect::MakeWH(80, 80));
+  auto strokeMask = ShapeLayer::Make();
+  strokeMask->setPath(strokePath);
+  strokeMask->setStrokeStyle(SolidColor::Make(Color::White()));
+  strokeMask->setLineWidth(5);
+  rootLayer->addChild(strokeMask);
+  layer5->setMask(strokeMask);
+  layer5->setMaskType(LayerMaskType::Alpha);
+
+  auto clipPath5 = layer5->getMaskClipPath();
+  EXPECT_FALSE(clipPath5.has_value());
+
+  // Test 6: Mask with alpha < 1.0 - should NOT return clip path
+  auto layer6 = Layer::Make();
+  rootLayer->addChild(layer6);
+  auto alphaMask = SolidLayer::Make();
+  alphaMask->setWidth(100);
+  alphaMask->setHeight(80);
+  alphaMask->setColor(Color::White());
+  alphaMask->setAlpha(0.5f);
+  rootLayer->addChild(alphaMask);
+  layer6->setMask(alphaMask);
+  layer6->setMaskType(LayerMaskType::Alpha);
+
+  auto clipPath6 = layer6->getMaskClipPath();
+  EXPECT_FALSE(clipPath6.has_value());
+
+  // Test 7: Contour mask type - should NOT return clip path
+  auto layer7 = Layer::Make();
+  rootLayer->addChild(layer7);
+  auto contourMask = SolidLayer::Make();
+  contourMask->setWidth(100);
+  contourMask->setHeight(80);
+  contourMask->setColor(Color::White());
+  rootLayer->addChild(contourMask);
+  layer7->setMask(contourMask);
+  layer7->setMaskType(LayerMaskType::Contour);
+
+  auto clipPath7 = layer7->getMaskClipPath();
+  EXPECT_FALSE(clipPath7.has_value());
+
+  // Test 8: Luminance mask type - should NOT return clip path
+  auto layer8 = Layer::Make();
+  rootLayer->addChild(layer8);
+  auto lumaMask = SolidLayer::Make();
+  lumaMask->setWidth(100);
+  lumaMask->setHeight(80);
+  lumaMask->setColor(Color::White());
+  rootLayer->addChild(lumaMask);
+  layer8->setMask(lumaMask);
+  layer8->setMaskType(LayerMaskType::Luminance);
+
+  auto clipPath8 = layer8->getMaskClipPath();
+  EXPECT_FALSE(clipPath8.has_value());
+
+  // Test 9: Mask with semi-transparent fill color - should NOT return clip path
+  auto layer9 = Layer::Make();
+  rootLayer->addChild(layer9);
+  Path shapePath = {};
+  shapePath.addRect(Rect::MakeWH(80, 80));
+  auto semiTransparentMask = ShapeLayer::Make();
+  semiTransparentMask->setPath(shapePath);
+  semiTransparentMask->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 255, 255, 128)));
+  rootLayer->addChild(semiTransparentMask);
+  layer9->setMask(semiTransparentMask);
+  layer9->setMaskType(LayerMaskType::Alpha);
+
+  auto clipPath9 = layer9->getMaskClipPath();
+  EXPECT_FALSE(clipPath9.has_value());
+
+  // Test 10: No mask set - should NOT return clip path
+  auto layer10 = Layer::Make();
+  rootLayer->addChild(layer10);
+  EXPECT_FALSE(layer10->hasValidMask());
+}
+
+/**
+ * Test that simple Rect/RRect leaf nodes skip subtree caching.
+ */
+TGFX_TEST(LayerTest, SimpleShapeSkipsCache) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Direct);
+  displayList->setSubtreeCacheMaxSize(2048);
+
+  auto root = displayList->root();
+  root->setPassThroughBackground(false);
+
+  // Test 1: Simple SolidLayer (Rect) - should NOT create subtree cache
+  auto rectLayer = SolidLayer::Make();
+  rectLayer->setWidth(50);
+  rectLayer->setHeight(50);
+  rectLayer->setColor(Color::Red());
+  rectLayer->setMatrix(Matrix::MakeTrans(10, 10));
+  root->addChild(rectLayer);
+
+  // Render twice to trigger cache creation attempt
+  displayList->render(surface.get());
+  displayList->render(surface.get());
+
+  // Simple Rect layer should not have subtree cache
+  EXPECT_TRUE(rectLayer->subtreeCache == nullptr);
+
+  // Test 2: Simple SolidLayer (RRect) - should NOT create subtree cache
+  auto rrectLayer = SolidLayer::Make();
+  rrectLayer->setWidth(50);
+  rrectLayer->setHeight(50);
+  rrectLayer->setRadiusX(10);
+  rrectLayer->setRadiusY(10);
+  rrectLayer->setColor(Color::Blue());
+  rrectLayer->setMatrix(Matrix::MakeTrans(70, 10));
+  root->addChild(rrectLayer);
+
+  displayList->render(surface.get());
+  displayList->render(surface.get());
+
+  // Simple RRect layer should not have subtree cache
+  EXPECT_TRUE(rrectLayer->subtreeCache == nullptr);
+
+  // Test 3: ShapeLayer with Path (not Rect/RRect) - SHOULD create subtree cache
+  auto pathLayer = ShapeLayer::Make();
+  Path path = {};
+  path.addOval(Rect::MakeWH(50, 50));
+  pathLayer->setPath(path);
+  pathLayer->setFillStyle(SolidColor::Make(Color::Green()));
+  pathLayer->setMatrix(Matrix::MakeTrans(130, 10));
+  root->addChild(pathLayer);
+
+  displayList->render(surface.get());
+  displayList->render(surface.get());
+
+  // Path layer (not Rect/RRect) should have subtree cache
+  EXPECT_TRUE(pathLayer->subtreeCache != nullptr);
+
+  // Test 4: SolidLayer with filter - SHOULD create subtree cache
+  auto rectWithFilter = SolidLayer::Make();
+  rectWithFilter->setWidth(50);
+  rectWithFilter->setHeight(50);
+  rectWithFilter->setColor(Color::FromRGBA(255, 255, 0, 255));
+  rectWithFilter->setMatrix(Matrix::MakeTrans(10, 70));
+  rectWithFilter->setFilters({BlurFilter::Make(2, 2)});
+  root->addChild(rectWithFilter);
+
+  displayList->render(surface.get());
+  displayList->render(surface.get());
+
+  // Rect with filter should have subtree cache
+  EXPECT_TRUE(rectWithFilter->subtreeCache != nullptr);
+
+  // Test 5: SolidLayer with layer style - SHOULD create subtree cache
+  auto rectWithStyle = SolidLayer::Make();
+  rectWithStyle->setWidth(50);
+  rectWithStyle->setHeight(50);
+  rectWithStyle->setColor(Color::FromRGBA(255, 0, 255, 255));
+  rectWithStyle->setMatrix(Matrix::MakeTrans(70, 70));
+  rectWithStyle->setLayerStyles({DropShadowStyle::Make(3, 3, 2, 2, Color::Black(), false)});
+  root->addChild(rectWithStyle);
+
+  displayList->render(surface.get());
+  displayList->render(surface.get());
+
+  // Rect with layer style should have subtree cache
+  EXPECT_TRUE(rectWithStyle->subtreeCache != nullptr);
+
+  // Test 6: Layer with Rect child - SHOULD create subtree cache (not a leaf node)
+  auto parentLayer = Layer::Make();
+  parentLayer->setMatrix(Matrix::MakeTrans(130, 70));
+  auto childRect = SolidLayer::Make();
+  childRect->setWidth(50);
+  childRect->setHeight(50);
+  childRect->setColor(Color::FromRGBA(0, 255, 255, 255));
+  parentLayer->addChild(childRect);
+  root->addChild(parentLayer);
+
+  displayList->render(surface.get());
+  displayList->render(surface.get());
+
+  // Parent layer with children should have subtree cache
+  EXPECT_TRUE(parentLayer->subtreeCache != nullptr);
+  // Child rect should not have subtree cache (simple leaf)
+  EXPECT_TRUE(childRect->subtreeCache == nullptr);
+}
+
 }  // namespace tgfx

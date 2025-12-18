@@ -65,4 +65,10 @@ bool RectContent::onHasSameGeometry(const GeometryContent* other) const {
   return rect == static_cast<const RectContent*>(other)->rect;
 }
 
+std::optional<Path> RectContent::onAsClipPath() const {
+  Path path = {};
+  path.addRect(rect);
+  return path;
+}
+
 }  // namespace tgfx

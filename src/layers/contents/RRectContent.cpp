@@ -64,4 +64,10 @@ bool RRectContent::onHasSameGeometry(const GeometryContent* other) const {
   return rRect.rect == otherRRect.rect && rRect.radii == otherRRect.radii;
 }
 
+std::optional<Path> RRectContent::onAsClipPath() const {
+  Path path = {};
+  path.addRRect(rRect);
+  return path;
+}
+
 }  // namespace tgfx
