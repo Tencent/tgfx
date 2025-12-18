@@ -35,6 +35,9 @@ std::shared_ptr<ImageFilter> ImageFilter::Transform3D(const Matrix3D& matrix, bo
 
 Transform3DImageFilter::Transform3DImageFilter(const Matrix3D& matrix, bool hideBackFace)
     : _matrix(matrix), _hideBackFace(hideBackFace) {
+  // Adapt the matrix to keep the z-component of vertex coordinates unchanged, preventing rendering
+  // artifacts caused by rotated image fragments failing the depth test.
+  _matrix.setRow(2, {0, 0, 1, 0});
 }
 
 Rect Transform3DImageFilter::onFilterBounds(const Rect& rect, MapDirection mapDirection) const {

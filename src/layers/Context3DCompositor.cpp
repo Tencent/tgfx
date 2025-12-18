@@ -52,18 +52,19 @@ void Context3DCompositor::drawImage(std::shared_ptr<Image> image, const Matrix3D
   // anchors are included in the matrix.
   auto srcModelRect = Rect::MakeXYWH(0.f, 0.f, srcW, srcH);
   auto srcProjectRect = matrix.mapRect(srcModelRect);
-  // ndcScale and ndcOffset are used to scale and translate the NDC coordinates to make the image
-  // draw within the correct area.
+  // ndcScale maps vertex coordinates to the NDC coordinate system.
   const Vec2 ndcScale(2.0f / static_cast<float>(width), 2.0f / static_cast<float>(height));
   auto ndcRectScaled =
       Rect::MakeXYWH(srcProjectRect.left * ndcScale.x, srcProjectRect.top * ndcScale.y,
                      srcProjectRect.width() * ndcScale.x, srcProjectRect.height() * ndcScale.y);
+  // ndcOffset translates the top-left corner of the transformed rect in NDC space to the specified
+  // position, offset from the reference point (-1, -1) (which corresponds to the top-left corner of
+  // the target texture) by the pixel distance defined by the function parameters x and y.
   const Vec2 ndcOffset(-1.f - ndcRectScaled.left + 2 * x / static_cast<float>(width),
                        -1.f - ndcRectScaled.top + 2 * y / static_cast<float>(height));
 
   auto allocator = context->drawingAllocator();
-  // Disable anti-aliasing for small images to avoid large semi-transparent areas when small
-  // rectangles are projected as large ones.
+  // Wrap alpha as vertex color to enable semi-transparent pixel blending.
   auto vertexProvider =
       RectsVertexProvider::MakeFrom(allocator, srcModelRect, AAType::MSAA, Color(1, 1, 1, alpha));
   const Size viewportSize(static_cast<float>(width), static_cast<float>(height));

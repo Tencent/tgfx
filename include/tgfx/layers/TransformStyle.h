@@ -24,16 +24,16 @@ namespace tgfx {
  */
 enum class TransformStyle {
   /**
-   * Does not preserve the 3D state of sublayers. Sublayers with 3D transformations are directly
-   * projected onto the current layer plane. In this mode, later added layers will cover earlier
-   * added layers.
+   * Does not preserve the 3D state of the layer's content and child layers. Content and child
+   * layers with 3D transformations are directly projected onto the current layer plane. In this
+   * mode, later added layers will cover earlier added layers.
    */
   Flat,
 
   /**
-   * Preserves the 3D state of sublayers. In this mode, interacting sublayers will be occluded based
-   * on the actual depth of pixels, meaning opaque pixels closer to the observer will cover those
-   * farther away.
+   * Preserves the 3D state of the layer's content and child layers. In this mode, content and child
+   * layers will be occluded based on the actual depth of pixels, meaning opaque pixels closer to
+   * the observer will cover those farther away.
    */
   Preserve3D
 };

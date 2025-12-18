@@ -112,6 +112,11 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   /**
    * Sets the alpha transparency of the layer.
+   *
+   * Note: The blending order of semi-transparent pixels affects the final result. For semi-
+   * transparent layers, pixels at the same position (same xy) are expected to blend in ascending
+   * z-order. However, within a 3D context, layers are not guaranteed to be drawn in depth order,
+   * so blending results for semi-transparent content may be incorrect.
    */
   void setAlpha(float value);
 
@@ -142,7 +147,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
   /**
    * Sets whether the layer passes through its background to sublayers.
    * Note: Layers that can start or extend a 3D Rendering Context (see transformStyle()) do not
-   * support pass-through background, as child layers need to maintain independent 3D states.
+   * support pass-through background.
    */
   void setPassThroughBackground(bool value);
 
@@ -184,29 +189,26 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   /**
    * Returns the transform style of the layer. The default value is TransformStyle::Flat.
-   * TransformStyle defines the drawing behavior of child layers containing 3D transformations.
-   * The Flat type projects 3D child layers directly onto their parent layer, and all child layers
-   * are drawn in the order they were added. This means that later-added opaque child layers will
-   * completely cover earlier-added child layers. The Preserve3D type preserves the 3D state of child
-   * layers.
-   * If a layer's TransformStyle is Preserve3D and its parent layer is Flat, this layer establishes
-   * a 3D Rendering Context. If the parent layer is Preserve3D, this layer inherits the parent's 3D
-   * Rendering Context and passes it to its child layers.
-   * All child layers within a 3D Rendering Context share the coordinate space of the layer that
-   * established the context. Within this context, all layers apply depth occlusion based on their
-   * actual positions: opaque pixels in layers closer to the observer will occlude pixels in layers
-   * farther from the observer at the same position (same xy coordinates).
    *
-   * Note: TransformStyle::Preserve3D does not support some features. When the following conditions
-   * are met, even if the layer is set to TransformStyle::Preserve3D, its drawing behavior will be
-   * TransformStyle::Flat:
-   * The prerequisite for these features to take effect is that child layers need to be projected
-   * into the local coordinate system of the current layer.
-   * 1. layer styles is not empty.
-   * The following features require the entire layer subtree of the root node to be packaged and
-   * drawn, and then the corresponding effects are applied.
-   * 2. filters is not empty.
-   * 3. mask is not empty.
+   * TransformStyle::Flat projects content and child layers onto the layer's local space. Child
+   * layers are drawn in the order they were added, so later-added opaque layers completely cover
+   * earlier ones.
+   *
+   * TransformStyle::Preserve3D enables 3D rendering. If the parent layer is Flat, this layer
+   * establishes a new 3D Rendering Context. If the parent is also Preserve3D, this layer inherits
+   * and extends the parent's context.
+   *
+   * Within a 3D Rendering Context, all child layers share the coordinate space of the context
+   * root's parent (or the DisplayList if no parent exists). Depth occlusion is applied based on
+   * actual 3D positions: opaque pixels closer to the observer occlude those farther away at the
+   * same xy coordinates.
+   *
+   * Note: Preserve3D falls back to Flat behavior when any of the following conditions are met:
+   * 1. Layer styles is not empty.
+   * 2. Filters is not empty.
+   * 3. Mask is not empty.
+   * These features require projecting child layers into the current layer's local coordinate
+   * system, which is incompatible with 3D context preservation.
    */
   TransformStyle transformStyle() const {
     return _transformStyle;
@@ -280,7 +282,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
    *    background styles for the entire subtree, as child layers need to maintain independent 3D
    *    states.
    * 2. If any ancestor layer has a 3D transformation matrix set via setMatrix3D(), background
-   *    styles will not work correctly because the accurate background cannot be obtained.
+   *    styles are disabled because the accurate background cannot be obtained.
    */
   void setLayerStyles(std::vector<std::shared_ptr<LayerStyle>> value);
 
@@ -653,7 +655,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
                        const LayerStyleSource* source, LayerStylePosition position);
 
   void drawBackgroundLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
-                                 const Matrix3D& transform);
+                                 const Matrix3D& transform3D);
 
   bool getLayersUnderPointInternal(float x, float y, std::vector<std::shared_ptr<Layer>>* results);
 
@@ -666,16 +668,12 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   /**
    * Updates the rendering bounds.
-   * When calculating rendering bounds for layers outside a 3D context, matrix transformations can
-   * be applied progressively from child layers to parent layers. However, layers inside a 3D
-   * context need to preserve their 3D state. This approach would lose depth information for these
-   * layers.
-   * They need to calculate rendering bounds based on the overall matrix state of the 3D context
-   * and the relative matrix of the layer itself to the layer that established the context.
-   * @param transformer The region transformer to be applied to the current layer. For layers inside
-   * a 3D context, this should be the transformer of the parent layer that established the context.
+   * @param transformer For layers outside a 3D context, this defines the transformer to apply to
+   * the current layer, which already includes the layer's own matrix transformation. For layers
+   * inside a 3D Rendering Context, this is the transformer of the parent of the layer that
+   * established the context.
    * @param transform3D The accumulated transformation matrix from the current layer to the layer
-   * that established the 3D context. Non-null indicates the layer is inside a 3D context.
+   * that established the 3D Rendering Context. Non-null indicates the layer is inside a 3D context.
    */
   void updateRenderBounds(std::shared_ptr<RegionTransformer> transformer = nullptr,
                           const Matrix3D* transform3D = nullptr, bool forceDirty = false);
@@ -713,15 +711,16 @@ class Layer : public std::enable_shared_from_this<Layer> {
                                          std::optional<Rect> clipBounds, Matrix* imageMatrix);
 
   /**
-   * Calculates the 3D context depth matrix for the layer.
-   * This matrix maps the depth of all sublayers within the 3D render context rooted at this layer
-   * from [maxDepth, minDepth] to the [-1, 1] range.
+   * Calculates the depth matrix that maps the depth of all layers within the 3D Rendering Context
+   * rooted at this layer to the Normalized Device Coordinates (NDC) depth range.
+   * The mapping rule transforms the depth range [maxDepth, minDepth] to [-1, 1].
+   * Note: The DisplayList layout coordinate system has the positive Y-axis pointing outward from
+   * the screen, while the NDC coordinate system has the positive Y-axis pointing into the screen.
+   * Therefore, maxDepth maps to -1 rather than 1.
    */
   Matrix3D calculate3DContextDepthMatrix();
 
   bool canExtend3DContext() const;
-
-  bool in3DContext() const;
 
   void invalidateSubtree();
 

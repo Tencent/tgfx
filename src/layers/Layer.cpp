@@ -95,42 +95,41 @@ static inline void ApplyClip(Canvas& canvas, const Rect& maxBounds, const Rect& 
   canvas.clipRect(clipBounds);
 }
 
-// Creates a RegionTransformer from a 3D matrix. If the matrix is affine, uses MakeFromMatrix.
-// Otherwise, creates a Transform3DFilter and uses MakeFromFilters. The filterHolder is used to
-// ensure the filter is not released during the transformer's lifetime.
-static inline std::shared_ptr<RegionTransformer> MakeTransformerFromMatrix3D(
-    const Matrix3D& matrix, std::shared_ptr<RegionTransformer> outer,
+// Creates a RegionTransformer from a 3D transformation matrix.
+// If the matrix is affine, uses MakeFromMatrix. Otherwise, creates a Transform3DFilter and uses
+// MakeFromFilters. The filterHolder is used to ensure the filter is not released during the
+// transformer's lifetime.
+static inline std::shared_ptr<RegionTransformer> MakeTransformerFromTransform3D(
+    const Matrix3D& transform3D, std::shared_ptr<RegionTransformer> outer,
     std::vector<std::shared_ptr<LayerFilter>>* filterHolder) {
-  if (IsMatrix3DAffine(matrix)) {
-    return RegionTransformer::MakeFromMatrix(GetMayLossyAffineMatrix(matrix), std::move(outer));
+  if (IsMatrix3DAffine(transform3D)) {
+    return RegionTransformer::MakeFromMatrix(GetMayLossyAffineMatrix(transform3D),
+                                             std::move(outer));
   }
-  filterHolder->push_back(Transform3DFilter::Make(matrix));
+  filterHolder->push_back(Transform3DFilter::Make(transform3D));
   return RegionTransformer::MakeFromFilters(*filterHolder, 1.0f, std::move(outer));
 }
 
 /**
- * Returns the equivalent transformation matrix adapted for a custom anchor point.
- * The matrix is defined based on a local coordinate system, with the transformation anchor point
- * being the origin of that coordinate system. This function returns an affine transformation
- * matrix that produces the same visual effect when using any point within this coordinate system
- * as the new origin and anchor point.
- * @param matrix The original transformation matrix.
- * @param anchor The specified anchor point.
+ * Returns an adapted transformation matrix for a new coordinate system established at the specified
+ * point.
+ * The original matrix defines a transformation in a coordinate system with the origin (0, 0) as
+ * the anchor point. When establishing a new coordinate system at an arbitrary point within this
+ * space, this function computes the equivalent matrix that produces the same visual transformation
+ * effect in the new coordinate system.
+ * @param matrix3D The original transformation matrix defined with the origin (0, 0) as the anchor
+ * point.
+ * @param newOrigin The point at which to establish the new coordinate system as its origin.
  */
-static inline Matrix3D AnchorAdaptedMatrix(const Matrix3D& matrix, const Point& anchor) {
-  // In the new coordinate system defined with anchor as the anchor point and origin, the reference
-  // anchor point for the matrix transformation described by the layer's _matrix is located at
-  // point (-anchor.x, -anchor.y). That is, to maintain the same transformation effect, first
-  // translate the anchor point to the new coordinate origin, apply the original matrix, and then
-  // reverse translate the anchor point.
-  auto offsetMatrix = Matrix3D::MakeTranslate(anchor.x, anchor.y, 0);
-  auto invOffsetMatrix = Matrix3D::MakeTranslate(-anchor.x, -anchor.y, 0);
-  return invOffsetMatrix * matrix * offsetMatrix;
+static inline Matrix3D OriginAdaptedMatrix3D(const Matrix3D& matrix3D, const Point& newOrigin) {
+  auto offsetMatrix = Matrix3D::MakeTranslate(newOrigin.x, newOrigin.y, 0);
+  auto invOffsetMatrix = Matrix3D::MakeTranslate(-newOrigin.x, -newOrigin.y, 0);
+  return invOffsetMatrix * matrix3D * offsetMatrix;
 }
 
 /**
  * Draws a layer's snapshot image to the 3D rendering context.
- * @param layerTransform The transformation matrix to apply to the layer.
+ * @param layerTransform3D The transformation matrix to apply to the layer.
  * @param image The image to draw, which is a snapshot of a region within the layer after
  * transformation.
  * @param matrix The matrix that maps the scaled image back to the original region in the layer's
@@ -138,16 +137,16 @@ static inline Matrix3D AnchorAdaptedMatrix(const Matrix3D& matrix, const Point& 
  * @param alpha The alpha value to apply when drawing the image.
  */
 static inline void DrawLayerImageTo3DRenderContext(const DrawArgs& args,
-                                                   const Matrix3D* layerTransform,
+                                                   const Matrix3D* layerTransform3D,
                                                    const std::shared_ptr<Image>& image,
                                                    const Matrix& matrix, float alpha) {
-  if (layerTransform == nullptr || image == nullptr) {
+  if (layerTransform3D == nullptr || image == nullptr) {
     DEBUG_ASSERT(false);
     return;
   }
 
   auto sourceImageOrigin = Point::Make(matrix.getTranslateX(), matrix.getTranslateY());
-  auto imageTransform = AnchorAdaptedMatrix(*layerTransform, sourceImageOrigin);
+  auto imageTransform = OriginAdaptedMatrix3D(*layerTransform3D, sourceImageOrigin);
   auto scaleX = matrix.getScaleX();
   auto scaleY = matrix.getScaleY();
   DEBUG_ASSERT(!FloatNearlyZero(scaleX));
@@ -174,17 +173,18 @@ static inline void DrawLayerImageTo3DRenderContext(const DrawArgs& args,
 }
 
 /**
- * Checks if any vertex of the rect is behind the viewer after applying the 3D transformation.
- * A vertex is considered behind the viewer when w <= 0, where w = 0 means the vertex is at the
- * viewing plane (infinitely far), which is also treated as behind.
+ * Checks if any vertex of the rect is behind the camera after applying the 3D transformation.
+ * A vertex is considered behind the camera when w <= 0, where w = 0 means the vertex is at the
+ * camera plane (infinitely far), which is also treated as behind.
  * @param rect The rect in layer's local coordinate system.
- * @param transform The layer's transformation matrix, containing camera information.
+ * @param transform3D The layer's transformation matrix, containing camera information.
  */
-static inline bool IsTransformedLayerRectBehindViewer(const Rect& rect, const Matrix3D& transform) {
-  if (transform.mapPoint(rect.left, rect.top, 0, 1).w <= 0 ||
-      transform.mapPoint(rect.left, rect.bottom, 0, 1).w <= 0 ||
-      transform.mapPoint(rect.right, rect.top, 0, 1).w <= 0 ||
-      transform.mapPoint(rect.right, rect.bottom, 0, 1).w <= 0) {
+static inline bool IsTransformedLayerRectBehindCamera(const Rect& rect,
+                                                      const Matrix3D& transform3D) {
+  if (transform3D.mapPoint(rect.left, rect.top, 0, 1).w <= 0 ||
+      transform3D.mapPoint(rect.left, rect.bottom, 0, 1).w <= 0 ||
+      transform3D.mapPoint(rect.right, rect.top, 0, 1).w <= 0 ||
+      transform3D.mapPoint(rect.right, rect.bottom, 0, 1).w <= 0) {
     return true;
   }
   return false;
@@ -280,9 +280,6 @@ static std::shared_ptr<Image> MakeImageWithTransform(std::shared_ptr<Image> imag
   auto invScaleMatrix =
       Matrix3D::MakeScale(1.0f / imageMatrix->getScaleX(), 1.0f / imageMatrix->getScaleY(), 1.0f);
   adaptedMatrix = invScaleMatrix * invOffsetMatrix * adaptedMatrix * offsetMatrix * scaleMatrix;
-  // 3D layers not within a 3D rendering context ignore depth mapping to ensure layer depth
-  // remains 0, maintaining layer visibility.
-  adaptedMatrix.setRow(2, {0, 0, 0, 0});
   auto imageFilter = ImageFilter::Transform3D(adaptedMatrix);
   auto offset = Point();
   image = image->makeWithFilter(imageFilter, &offset);
@@ -434,7 +431,7 @@ void Layer::setTransformStyle(TransformStyle style) {
     return;
   }
   _transformStyle = style;
-  // Changing the transform style affects layer layout, equivalent to a transform change.
+  // Changing the transform style alters the meaning of the layer's transform, so invalidate it.
   invalidateTransform();
 }
 
@@ -733,10 +730,11 @@ Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBou
       continue;
     }
     auto childMatrix = child->getMatrixWithScrollRect();
-    // Check if child can start its own 3D context. If so, directly concatenate the matrix to
-    // preserve depth information. Otherwise, adapt the matrix to achieve the effect of projecting
-    // the child layer first, then applying the transformation.
-    if (child->_transformStyle != TransformStyle::Preserve3D || !child->canExtend3DContext()) {
+    // Check if the child layer is within a 3D rendering context. If not, adapt the matrix to
+    // ensure the z-component of layer rect vertex coordinates remains unchanged, so the child layer
+    // is projected onto the current layer first, then the accumulated matrix transformation is
+    // applied. If within, directly concatenate the child layer matrix to preserve its 3D state.
+    if (child->_transformStyle == TransformStyle::Flat || !child->canExtend3DContext()) {
       childMatrix.setRow(2, {0, 0, 1, 0});
     }
     childMatrix.postConcat(workMatrix3D);
@@ -1061,15 +1059,16 @@ Matrix3D Layer::getGlobalMatrix() const {
   Matrix3D matrix = {};
   auto layer = this;
   while (layer->_parent) {
-    // If the traversed layer contains 3D transformations and is within a 3D context, the matrix
-    // should be concatenated directly. Otherwise, the matrix needs to be adjusted to ensure it
-    // does not modify depth, satisfying the requirement for layer-by-layer projection.
-    if (!layer->bitFields.matrix3DIsAffine && layer->in3DContext()) {
-      matrix.postConcat(layer->getMatrixWithScrollRect());
-    } else {
+    // Check if the child layer is within a 3D rendering context. If not, adapt the matrix to
+    // ensure the z-component of layer rect vertex coordinates remains unchanged, so the child layer
+    // is projected onto the current layer first, then the accumulated matrix transformation is
+    // applied. If within, directly concatenate the child layer matrix to preserve its 3D state.
+    if (layer->_transformStyle == TransformStyle::Flat || !layer->canExtend3DContext()) {
       auto layerMatrix = layer->getMatrixWithScrollRect();
       layerMatrix.setRow(2, {0, 0, 1, 0});
       matrix.postConcat(layerMatrix);
+    } else {
+      matrix.postConcat(layer->getMatrixWithScrollRect());
     }
     layer = layer->_parent;
   }
@@ -1129,28 +1128,17 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
     return;
   }
 
-  // If the w-component of any point in contents after transformation is less than 0, it indicates
-  // the layer is behind the viewer, so the layer subtree should be hidden.
-  if (transform3D != nullptr && IsTransformedLayerRectBehindViewer(getBounds(), *transform3D)) {
-    return;
-  }
-
   if (canUseSubtreeCache(args, blendMode, transform3D) &&
       drawWithSubtreeCache(args, canvas, alpha, blendMode, transform3D)) {
     return;
   }
 
   bool needsOffscreen = false;
-  if (args.render3DContext != nullptr) {
-    // Inside a 3D context, transform3D is non-null if and only if the layer can extend the context.
-    DEBUG_ASSERT((transform3D != nullptr) ==
-                 (_transformStyle == TransformStyle::Preserve3D && canExtend3DContext()));
-    // Inside a 3D context, layers always use SrcOver blend mode and ignore allowsGroupOpacity.
-    needsOffscreen = !_filters.empty() || hasValidMask();
-  } else if (_transformStyle == TransformStyle::Flat || !canExtend3DContext()) {
-    // Direct rendering is used when starting a 3D context.
-    // When unable to start a 3D context, offscreen rendering is required if draw parameters
-    // require merged child layer rendering.
+  // For non-leaf layers in a 3D rendering context layer tree, direct rendering is always used.
+  // Offscreen constraints (filters, styles, masks) are already checked by the parent layer at call
+  // site. Group opacity, blend mode, and passThroughBackground have lower priority than enabling
+  // 3D rendering context and are ignored during drawing.
+  if (_transformStyle == TransformStyle::Flat || !canExtend3DContext()) {
     needsOffscreen = blendMode != BlendMode::SrcOver || !bitFields.passThroughBackground ||
                      (alpha < 1.0f && bitFields.allowsGroupOpacity) ||
                      (!_filters.empty() && !args.excludeEffects) || hasValidMask() ||
@@ -1347,8 +1335,8 @@ bool Layer::shouldPassThroughBackground(BlendMode blendMode, const Matrix3D* tra
 
 bool Layer::canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode,
                                const Matrix3D* transform3D) {
-  // If the layer can start or extend a 3D context, child layers need to maintain independent 3D
-  // states, so subtree caching is not supported.
+  // If the layer can start or extend a 3D rendering context, child layers need to maintain
+  // independent 3D states, so subtree caching is not supported.
   if (_transformStyle == TransformStyle::Preserve3D && canExtend3DContext()) {
     return false;
   }
@@ -1453,8 +1441,8 @@ SubtreeCache* Layer::getValidSubtreeCache(const DrawArgs& args, int longEdge,
 
 bool Layer::drawWithSubtreeCache(const DrawArgs& args, Canvas* canvas, float alpha,
                                  BlendMode blendMode, const Matrix3D* transform3D) {
-  // Non-leaf nodes in 3D context layer tree have caching disabled.
-  DEBUG_ASSERT(args.render3DContext == nullptr);
+  // Non-leaf nodes in 3D rendering context layer tree have caching disabled.
+  DEBUG_ASSERT(_transformStyle == TransformStyle::Flat || !canExtend3DContext());
   auto layerBounds = getBounds();
   auto contentScale = canvas->getMatrix().getMaxScale();
   auto longEdge = GetMipmapCacheLongEdge(args.subtreeCacheMaxSize, contentScale, layerBounds);
@@ -1476,8 +1464,6 @@ bool Layer::drawWithSubtreeCache(const DrawArgs& args, Canvas* canvas, float alp
   paint.setAlpha(alpha);
   paint.setBlendMode(blendMode);
   cache->draw(args.context, longEdge, canvas, paint, transform3D);
-  // Starting from the root node of the DisplayList, if a layer enables a 3D rendering context,
-  // background styles will be disabled for the entire subtree.
   if (args.blurBackground &&
       args.styleSourceTypes.count(LayerStyleExtraSourceType::Background) > 0) {
     cache->draw(args.context, longEdge, args.blurBackground->getCanvas(), paint, transform3D);
@@ -1487,14 +1473,11 @@ bool Layer::drawWithSubtreeCache(const DrawArgs& args, Canvas* canvas, float alp
 
 void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                           const Matrix3D* transform3D) {
-  // Inside a 3D context, non-final layers never require offscreen rendering. Only the final layer
-  // (which cannot extend the 3D context) may trigger offscreen rendering when conditions like
-  // filters are met.
-  DEBUG_ASSERT(args.render3DContext == nullptr || !canExtend3DContext());
+  // Non-leaf layers in a 3D rendering context layer tree never require offscreen rendering.
+  DEBUG_ASSERT(args.render3DContext == nullptr);
+  DEBUG_ASSERT(_transformStyle == TransformStyle::Flat || !canExtend3DContext());
   if (transform3D != nullptr &&
       args.styleSourceTypes.count(LayerStyleExtraSourceType::Background) > 0) {
-    // When applying 3D matrix, background styles and layer content cannot be drawn to the same
-    // texture, so background styles need to be drawn separately.
     drawBackgroundLayerStyles(args, canvas, alpha, *transform3D);
   }
 
@@ -1504,9 +1487,6 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   contentArgs.blurBackground = args.blurBackground && hasBackgroundStyle()
                                    ? args.blurBackground->createSubContext(renderBounds, true)
                                    : nullptr;
-  // When getting content image (offscreen rendering), we need to render to a regular texture
-  // instead of continuing to use the 3D compositor.
-  contentArgs.render3DContext = nullptr;
 
   Matrix passthroughImageMatrix = Matrix::I();
   std::shared_ptr<Image> passthroughImage = nullptr;
@@ -1561,7 +1541,6 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   AutoCanvasRestore autoRestore(canvas);
   canvas->concat(imageMatrix);
   canvas->drawImage(image, &paint);
-
   if (args.blurBackground) {
     if (contentArgs.blurBackground) {
       auto filter = getImageFilter(contentScale);
@@ -1623,7 +1602,7 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
 }
 
 bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, const Layer* stopChild,
-                         const Matrix3D* transform) {
+                         const Matrix3D* transform3D) {
   int lastBackgroundLayerIndex = -1;
   if (args.forceDrawBackground) {
     // lastBackgroundLayerIndex must cover all children
@@ -1637,26 +1616,16 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, cons
     }
   }
 
-  // If the current layer is in a 3D rendering context and no longer satisfies the conditions for
-  // continuing context propagation, interrupt the context propagation.
-  const bool interrupt3DContext =
-      args.render3DContext != nullptr &&
-      (_transformStyle == TransformStyle::Flat || !canExtend3DContext());
   // TODO: Support background styles for subsequent layers of 3D layers.
-  // When drawing 2D layers, the matrix is written to the background canvas, but 3D layers do not.
-  // This causes incorrect results when 3D layers draw their content to the background canvas,
-  // which in turn prevents subsequent layers from obtaining correct background content. Background
-  // styles are temporarily disabled for the 3D layer's subtree (excluding the 3D layer itself).
+  // 3D layer matrices are not written to the background canvas, so child layers cannot obtain
+  // correct background content. Background styles are temporarily disabled for the 3D layer's
+  // subtree (excluding the 3D layer itself).
   bool skipChildBackground =
       args.styleSourceTypes.count(LayerStyleExtraSourceType::Background) == 0 ||
       !bitFields.matrix3DIsAffine;
-  // TODO: Support calculate reasonable clipping regions when obtaining content image.
-  // 3D layer matrices are not written to the background canvas (2D layers handle this when drawing
-  // children), so child layers cannot compute valid content clipping regions from the background
-  // canvas. When obtaining content clipping regions, child layers use the 3D layer's offscreen
-  // canvas, which already has accurate clipping regions set during offscreen
-  // rendering. Although this results in clipping regions not considering background styles, the
-  // issue can be ignored since background styles are simultaneously disabled.
+  // TODO: Support calculating reasonable clipping regions when obtaining content image.
+  // Since 3D layer matrices are not written to the background canvas, child layers cannot compute
+  // valid content clipping regions from it. Use the offscreen canvas clipping regions instead.
   bool clipChildContentByCanvas = args.clipContentByCanvas || !bitFields.matrix3DIsAffine;
 
   for (size_t i = 0; i < _children.size(); ++i) {
@@ -1672,9 +1641,6 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, cons
       childArgs.styleSourceTypes.erase(LayerStyleExtraSourceType::Background);
     }
     childArgs.clipContentByCanvas = clipChildContentByCanvas;
-    if (interrupt3DContext) {
-      childArgs.render3DContext = nullptr;
-    }
     if (static_cast<int>(i) < lastBackgroundLayerIndex) {
       childArgs.forceDrawBackground = true;
     } else {
@@ -1692,7 +1658,7 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, cons
     // treat its Matrix as an identity matrix here, and let the sublayer handle its actual position
     // through 3D filter methods,
     const bool isChildMatrixAffine = IsMatrix3DAffine(childMatrix);
-    auto childAffineMatrix = (isChildMatrixAffine && transform == nullptr)
+    auto childAffineMatrix = (isChildMatrixAffine && transform3D == nullptr)
                                  ? GetMayLossyAffineMatrix(childMatrix)
                                  : Matrix::I();
     canvas->concat(childAffineMatrix);
@@ -1722,23 +1688,29 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, cons
     }
 
     if (childArgs.render3DContext != nullptr) {
-      if (transform == nullptr) {
+      if (transform3D == nullptr) {
         DEBUG_ASSERT(false);
         continue;
       }
       // For layers in a 3D rendering context, draw the child layer to an offscreen canvas and
       // composite the result to the 3D compositor.
       auto childTransform = childMatrix;
-      childTransform.postConcat(*transform);
+      childTransform.postConcat(*transform3D);
+      if (IsTransformedLayerRectBehindCamera(child->getBounds(), childTransform)) {
+        continue;
+      }
       child->drawIn3DContext(childArgs, canvas, child->_alpha * alpha, childTransform);
     } else if (child->_transformStyle == TransformStyle::Preserve3D &&
                child->canExtend3DContext()) {
-      DEBUG_ASSERT(transform == nullptr);
+      DEBUG_ASSERT(transform3D == nullptr);
+      if (IsTransformedLayerRectBehindCamera(child->getBounds(), childMatrix)) {
+        continue;
+      }
       // Start a 3D rendering context.
       child->drawByStarting3DContext(childArgs, canvas, child->_alpha * alpha, childMatrix);
     } else {
-      // Draw elements outside the 3D context.
-      DEBUG_ASSERT(transform == nullptr);
+      // Draw elements outside the 3D rendering context.
+      DEBUG_ASSERT(transform3D == nullptr);
       auto childTransform = isChildMatrixAffine ? nullptr : &childMatrix;
       child->drawLayer(childArgs, canvas, child->_alpha * alpha,
                        static_cast<BlendMode>(child->bitFields.blendMode), childTransform);
@@ -1752,7 +1724,7 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, cons
 }
 
 void Layer::drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, float alpha,
-                                    const Matrix3D& transform) {
+                                    const Matrix3D& transform3D) {
   DEBUG_ASSERT(args.render3DContext == nullptr);
   if (args.renderRect == nullptr) {
     DEBUG_ASSERT(false);
@@ -1776,12 +1748,12 @@ void Layer::drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, float 
   auto context3DArgs = args;
   context3DArgs.render3DContext = std::make_shared<Render3DContext>(
       compositor, validRenderRect, calculate3DContextDepthMatrix());
-  // Layers inside a 3D context need to maintain independent 3D state. This means layers drawn
-  // later may become the background, making it impossible to know the final background when
+  // Layers inside a 3D rendering context need to maintain independent 3D state. This means layers
+  // drawn later may become the background, making it impossible to know the final background when
   // drawing each layer. Therefore, background styles are disabled.
   context3DArgs.styleSourceTypes = {LayerStyleExtraSourceType::None,
                                     LayerStyleExtraSourceType::Contour};
-  drawIn3DContext(context3DArgs, canvas, alpha, transform);
+  drawIn3DContext(context3DArgs, canvas, alpha, transform3D);
   auto context3DImage = compositor->finish();
 
   // The final texture has been scaled proportionally during generation, so draw it at its actual
@@ -1812,20 +1784,22 @@ void Layer::drawIn3DContext(const DrawArgs& args, Canvas* canvas, float alpha,
     return;
   }
 
-  // Use PictureRecorder to create an offscreen canvas for drawing the layer content.
   PictureRecorder recorder = {};
   auto offscreenCanvas = recorder.beginRecording();
   offscreenCanvas->scale(contentScale, contentScale);
 
-  // Draw the layer content to the offscreen canvas. The render3DContext is kept so that child
-  // layers can continue to use it for 3D compositing. For the final layer in the 3D context (which
-  // cannot extend the context), the transform3D is not passed to drawLayer. The entire subtree
-  // rooted at this layer is rendered offscreen and then drawn to the canvas with the matrix applied
-  // uniformly.
-  const Matrix3D* layerTransform3D = canExtend3DContext() ? &transform3D : nullptr;
-  drawLayer(args, offscreenCanvas, 1.0f, BlendMode::SrcOver, layerTransform3D);
+  if (canExtend3DContext()) {
+    drawLayer(args, offscreenCanvas, 1.0f, BlendMode::SrcOver, &transform3D);
+  } else {
+    // If the layer cannot extend the 3D rendering context, child layers do not need to create new
+    // offscreen canvases via the context to collect content, so stop propagating the context.
+    // The transform3D is not passed to drawLayer; the entire subtree rooted at this layer is
+    // rendered offscreen and then drawn to the canvas with the matrix applied uniformly.
+    auto drawArgs = args;
+    drawArgs.render3DContext = nullptr;
+    drawLayer(drawArgs, offscreenCanvas, 1.0f, BlendMode::SrcOver, nullptr);
+  }
 
-  // Convert the recorded picture to an image.
   Point offset = {};
   auto image =
       ToImageWithOffset(recorder.finishRecordingAsPicture(), &offset, nullptr, args.dstColorSpace);
@@ -1837,8 +1811,6 @@ void Layer::drawIn3DContext(const DrawArgs& args, Canvas* canvas, float alpha,
   auto imageMatrix = Matrix::I();
   imageMatrix.setScale(1.0f / contentScale, 1.0f / contentScale);
   imageMatrix.preTranslate(offset.x, offset.y);
-
-  // Draw the image to the 3D compositor with the layer's transformation.
   DrawLayerImageTo3DRenderContext(args, &transform3D, image, imageMatrix, alpha);
 }
 
@@ -2081,7 +2053,7 @@ void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
 }
 
 void Layer::drawBackgroundLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
-                                      const Matrix3D& transform) {
+                                      const Matrix3D& transform3D) {
   auto styleSource = getLayerStyleSource(args, canvas->getMatrix(), true);
   if (styleSource == nullptr) {
     return;
@@ -2092,7 +2064,7 @@ void Layer::drawBackgroundLayerStyles(const DrawArgs& args, Canvas* canvas, floa
   // ensuring that only the actual rendering region of the layer reveals the background.
   std::shared_ptr<ImageFilter> styleSourceFilter = nullptr;
   auto bounds = getBounds();
-  auto transformedBounds = transform.mapRect(bounds);
+  auto transformedBounds = transform3D.mapRect(bounds);
   transformedBounds.roundOut();
   if (styleSource->content != nullptr) {
     // The object of styleSourceMatrix is Image. When drawing directly, Image doesn't care about
@@ -2101,12 +2073,9 @@ void Layer::drawBackgroundLayerStyles(const DrawArgs& args, Canvas* canvas, floa
     // StyleSourceMatrix acts on the content of styleSource, which is a subregion extracted from
     // within the Layer. For transformations based on the local coordinate system of this subregion,
     // anchor point adaptation is required for the matrix described based on the layer.
-    auto styleSourceMatrix = AnchorAdaptedMatrix(transform, styleSourceAnchor);
+    auto styleSourceMatrix = OriginAdaptedMatrix3D(transform3D, styleSourceAnchor);
     styleSourceMatrix.postScale(bounds.width() / transformedBounds.width(),
                                 bounds.height() / transformedBounds.height(), 1.0f);
-    // Layer visibility is handled in the CPU stage, update the matrix to keep the Z-axis of
-    // vertices sent to the GPU at 0.
-    styleSourceMatrix.setRow(2, {0, 0, 0, 0});
     auto transform3DFilter = Transform3DFilter::Make(styleSourceMatrix);
     styleSourceFilter = transform3DFilter->getImageFilter(styleSource->contentScale);
     styleSource->content = styleSource->content->makeWithFilter(styleSourceFilter);
@@ -2121,7 +2090,7 @@ void Layer::drawBackgroundLayerStyles(const DrawArgs& args, Canvas* canvas, floa
   Path styleClipPath = {};
   AutoCanvasRestore autoRestore(canvas);
   styleClipPath.addRect(bounds);
-  styleClipPath.transform3D(transform);
+  styleClipPath.transform3D(transform3D);
   // StyleClipPath is the final clipping path based on the parent node, which must be called
   // before setting the matrix, otherwise it will be affected by the matrix.
   canvas->clipPath(styleClipPath);
@@ -2205,8 +2174,8 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer,
   auto contentScale = 1.0f;
   auto baseTransformer = transformer;
   if (!_layerStyles.empty() || !_filters.empty()) {
-    // Filters and styles interrupt 3D context, so non-root layers inside 3D context can ignore
-    // parent filters and styles when calculating dirty regions.
+    // Filters and styles interrupt 3D rendering context, so non-root layers inside 3D rendering
+    // context can ignore parent filters and styles when calculating dirty regions.
     DEBUG_ASSERT(_transformStyle == TransformStyle::Flat || !canExtend3DContext());
     if (transformer) {
       contentScale = transformer->getMaxScale();
@@ -2218,7 +2187,7 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer,
   std::vector<std::shared_ptr<LayerFilter>> current3DFilterVector = {};
   if (transform3D != nullptr) {
     transformer =
-        MakeTransformerFromMatrix3D(*transform3D, baseTransformer, &current3DFilterVector);
+        MakeTransformerFromTransform3D(*transform3D, baseTransformer, &current3DFilterVector);
   }
   auto content = getContent();
   if (bitFields.dirtyContentBounds || (forceDirty && content)) {
@@ -2253,13 +2222,9 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer,
       continue;
     }
     auto childMatrix = child->getMatrixWithScrollRect();
-    // Check if child is in 3D context:
-    // 1. Already in parent's 3D context (transform3D exists).
-    // 2. Child can start its own 3D context.
     bool childIn3DContext =
         transform3D != nullptr ||
         (child->_transformStyle == TransformStyle::Preserve3D && child->canExtend3DContext());
-    // Layers outside 3D context apply matrix transformation in parent layer.
     std::shared_ptr<RegionTransformer> childTransformer = nullptr;
     // Ensure the 3D filter is not released during the entire function lifetime.
     std::vector<std::shared_ptr<LayerFilter>> child3DFilterVector = {};
@@ -2267,7 +2232,7 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer,
       childTransformer = baseTransformer;
     } else {
       childTransformer =
-          MakeTransformerFromMatrix3D(childMatrix, transformer, &child3DFilterVector);
+          MakeTransformerFromTransform3D(childMatrix, transformer, &child3DFilterVector);
     }
     std::optional<Rect> clipRect = std::nullopt;
     if (child->_scrollRect) {
@@ -2424,9 +2389,9 @@ Matrix3D Layer::calculate3DContextDepthMatrix() {
 
     bool canExtend =
         layer->_transformStyle == TransformStyle::Preserve3D && layer->canExtend3DContext();
-    // If the layer can extend the 3D context, use its content bounds for depth calculation.
-    // Non-terminal layers in a 3D context have filters and styles disabled, so we can use the
-    // content bounds directly. Otherwise, use the full bounds as the layer ends the 3D context.
+    // Non-leaf layers in a 3D rendering context have filters and styles disabled, so use content
+    // bounds directly. Leaf layers flatten the entire subtree into their own coordinate system, so
+    // use the full subtree bounds.
     Rect bounds = {};
     if (canExtend) {
       if (auto content = layer->getContent()) {
@@ -2459,8 +2424,9 @@ Matrix3D Layer::calculate3DContextDepthMatrix() {
 
   auto matrix = Matrix3D::I();
   if (FloatNearlyZero(minDepth - maxDepth)) {
-    // If depth remains unchanged, keep z unchanged.
-    matrix.setRow(2, {0, 0, 0, 0});
+    // All layers in the 3D rendering context are parallel to the z=0 plane. Adapt the matrix to
+    // keep vertex z-coordinates unchanged. Layer visibility is handled when iterating children.
+    matrix.setRow(2, {0, 0, 1, 0});
     return matrix;
   }
 
@@ -2471,18 +2437,6 @@ Matrix3D Layer::calculate3DContextDepthMatrix() {
 
 bool Layer::canExtend3DContext() const {
   return _filters.empty() && _layerStyles.empty() && !hasValidMask();
-}
-
-bool Layer::in3DContext() const {
-  if (_transformStyle == TransformStyle::Preserve3D && canExtend3DContext()) {
-    // The current layer can extend or start a 3D rendering context.
-    return true;
-  }
-  if (parent() == nullptr) {
-    return false;
-  }
-  // The parent layer has started or extended a 3D rendering context.
-  return parent()->_transformStyle == TransformStyle::Preserve3D && parent()->canExtend3DContext();
 }
 
 void Layer::invalidateSubtree() {

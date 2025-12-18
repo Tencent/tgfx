@@ -18,34 +18,11 @@
 
 #include "SubtreeCache.h"
 #include "core/images/TextureImage.h"
-#include "core/utils/MathExtra.h"
 #include "gpu/ProxyProvider.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/ImageFilter.h"
 
 namespace tgfx {
-
-/**
- * Calculates the transformation matrix to be applied when drawing the image.
- * @param contextMatrix The transformation matrix to be applied to the drawing environment.
- * @param imageMatrix The transformation matrix of the image relative to the environment.
- */
-static inline Matrix3D AdaptedImageMatrix(const Matrix3D& contextMatrix,
-                                          const Matrix& imageMatrix) {
-  // ContextMatrix describes a transformation based on the layer's coordinate system, but the
-  // rasterized content is only a small sub-rectangle within the layer. We need to calculate an
-  // equivalent affine transformation matrix referenced to the local coordinate system with the
-  // top-left vertex of this sub-rectangle as the origin.
-  auto adaptedMatrix = contextMatrix;
-  auto offsetMatrix =
-      Matrix3D::MakeTranslate(imageMatrix.getTranslateX(), imageMatrix.getTranslateY(), 0);
-  auto invOffsetMatrix =
-      Matrix3D::MakeTranslate(-imageMatrix.getTranslateX(), -imageMatrix.getTranslateY(), 0);
-  auto scaleMatrix = Matrix3D::MakeScale(imageMatrix.getScaleX(), imageMatrix.getScaleY(), 1.0f);
-  auto invScaleMatrix =
-      Matrix3D::MakeScale(1.0f / imageMatrix.getScaleX(), 1.0f / imageMatrix.getScaleY(), 1.0f);
-  return invScaleMatrix * invOffsetMatrix * adaptedMatrix * offsetMatrix * scaleMatrix;
-}
 
 UniqueKey SubtreeCache::makeSizeKey(int longEdge) const {
   uint32_t sizeData[1] = {static_cast<uint32_t>(longEdge)};
@@ -112,10 +89,14 @@ void SubtreeCache::draw(Context* context, int longEdge, Canvas* canvas, const Pa
   if (transform3D == nullptr) {
     canvas->drawImage(image, &drawPaint);
   } else {
-    auto adaptedMatrix = AdaptedImageMatrix(*transform3D, matrix);
-    // Layer visibility is handled in the CPU stage, update the matrix to keep the Z-axis of
-    // vertices sent to the GPU at 0.
-    adaptedMatrix.setRow(2, {0, 0, 0, 0});
+    auto adaptedMatrix = *transform3D;
+    auto offsetMatrix = Matrix3D::MakeTranslate(matrix.getTranslateX(), matrix.getTranslateY(), 0);
+    auto invOffsetMatrix =
+        Matrix3D::MakeTranslate(-matrix.getTranslateX(), -matrix.getTranslateY(), 0);
+    auto scaleMatrix = Matrix3D::MakeScale(matrix.getScaleX(), matrix.getScaleY(), 1.0f);
+    auto invScaleMatrix =
+        Matrix3D::MakeScale(1.0f / matrix.getScaleX(), 1.0f / matrix.getScaleY(), 1.0f);
+    adaptedMatrix = invScaleMatrix * invOffsetMatrix * adaptedMatrix * offsetMatrix * scaleMatrix;
     auto imageFilter = ImageFilter::Transform3D(adaptedMatrix);
     auto offset = Point();
     auto filteredImage = image->makeWithFilter(imageFilter, &offset);
@@ -124,5 +105,4 @@ void SubtreeCache::draw(Context* context, int longEdge, Canvas* canvas, const Pa
   }
   canvas->setMatrix(oldMatrix);
 }
-
 }  // namespace tgfx

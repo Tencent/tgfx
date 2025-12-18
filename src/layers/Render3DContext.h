@@ -47,7 +47,7 @@ class Render3DContext {
 
   Rect _renderRect;
 
-  // The depth mapping matrix applied to all layers within the 3D render context, which maps the
+  // The depth mapping matrix applied to all layers within the 3D Rendering Context, which maps the
   // depth of all layers to the range [-1, 1].
   Matrix3D _depthMatrix;
 };

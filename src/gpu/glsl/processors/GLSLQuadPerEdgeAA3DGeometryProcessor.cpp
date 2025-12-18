@@ -55,7 +55,6 @@ void GLSLQuadPerEdgeAA3DGeometryProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputCoverage.c_str());
   }
 
-  // The default fragment processor color rendering logic requires a color uniform.
   if (commonColor.has_value()) {
     auto colorName =
         uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
