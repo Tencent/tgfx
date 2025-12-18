@@ -23,6 +23,7 @@
 #include <vector>
 #include "Checksum.h"
 #include "core/utils/ColorSpaceHelper.h"
+#include "core/utils/MathExtra.h"
 #include "utils/Log.h"
 
 namespace tgfx {
@@ -339,17 +340,8 @@ static constexpr float kD50_x = 0.9642f;
 static constexpr float kD50_y = 1.0000f;
 static constexpr float kD50_z = 0.8249f;
 
-static constexpr int MaxS32FitsInFloat = 2147483520;
-static constexpr int MinS32FitsInFloat = -MaxS32FitsInFloat;
-
-static constexpr int FloatSaturate2Int(float x) {
-  x = x < MaxS32FitsInFloat ? x : MaxS32FitsInFloat;
-  x = x > MinS32FitsInFloat ? x : MinS32FitsInFloat;
-  return (int)x;
-}
-
 static int32_t FloatRoundToFixed(float x) {
-  return FloatSaturate2Int((float)floor((double)x * (1 << 16) + 0.5));
+  return FloatSaturateToInt((float)floor((double)x * (1 << 16) + 0.5));
 }
 
 struct ICCHeader {

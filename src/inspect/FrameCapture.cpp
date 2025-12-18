@@ -24,6 +24,7 @@
 #include "Protocol.h"
 #include "Socket.h"
 #include "TCPPortProvider.h"
+#include "core/utils/MathExtra.h"
 #ifdef TGFX_USE_JPEG_ENCODE
 #include "core/codecs/jpeg/JpegCodec.h"
 #elif TGFX_USE_WEBP_ENCODE
@@ -327,8 +328,8 @@ void FrameCapture::sendShapeMeshData(DrawOp* drawOp, std::shared_ptr<Shape> shap
     shapeBounds.outset(1.0f, 1.0f);
   }
   auto bounds = isInverseFillType ? clipBounds : shapeBounds;
-  auto width = static_cast<int>(ceilf(bounds.width()));
-  auto height = static_cast<int>(ceilf(bounds.height()));
+  auto width = FloatCeilToInt(bounds.width());
+  auto height = FloatCeilToInt(bounds.height());
   auto rasterizer = std::make_unique<ShapeRasterizer>(width, height, std::move(shape), aaType);
   auto shapeBuffer = rasterizer->getData();
   RectMeshInfo rectMeshData = {};

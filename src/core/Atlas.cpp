@@ -111,8 +111,7 @@ bool Atlas::activateNewPage() {
     HardwareBufferRelease(hardwareBuffer);
   }
   if (proxy == nullptr) {
-    proxy = proxyProvider->createTextureProxy(UniqueKey::Make(), textureWidth, textureHeight,
-                                              pixelFormat);
+    proxy = proxyProvider->createTextureProxy({}, textureWidth, textureHeight, pixelFormat);
   }
   if (proxy == nullptr) {
     return false;
