@@ -1017,6 +1017,10 @@ Matrix3D Layer::getRelativeMatrix(const Layer* targetCoordinateSpace) const {
 
 std::optional<Path> Layer::getMaskClipPath() {
   DEBUG_ASSERT(_mask != nullptr);
+  // Cannot convert to clip path if mask has children, filters, or layer styles.
+  if (!_mask->_children.empty() || !_mask->_filters.empty() || !_mask->_layerStyles.empty()) {
+    return std::nullopt;
+  }
   auto content = _mask->getContent();
   if (content == nullptr) {
     // Empty mask clips everything.

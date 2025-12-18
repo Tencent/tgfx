@@ -4130,6 +4130,55 @@ TGFX_TEST(LayerTest, MaskClipPath) {
   auto layer10 = Layer::Make();
   rootLayer->addChild(layer10);
   EXPECT_FALSE(layer10->hasValidMask());
+
+  // Test 11: Mask with children - should NOT return clip path
+  auto layer11 = Layer::Make();
+  rootLayer->addChild(layer11);
+  auto maskWithChild = SolidLayer::Make();
+  maskWithChild->setWidth(100);
+  maskWithChild->setHeight(80);
+  maskWithChild->setColor(Color::White());
+  auto childLayer = SolidLayer::Make();
+  childLayer->setWidth(50);
+  childLayer->setHeight(50);
+  childLayer->setColor(Color::Red());
+  maskWithChild->addChild(childLayer);
+  rootLayer->addChild(maskWithChild);
+  layer11->setMask(maskWithChild);
+  layer11->setMaskType(LayerMaskType::Alpha);
+
+  auto clipPath11 = layer11->getMaskClipPath();
+  EXPECT_FALSE(clipPath11.has_value());
+
+  // Test 12: Mask with filters - should NOT return clip path
+  auto layer12 = Layer::Make();
+  rootLayer->addChild(layer12);
+  auto maskWithFilter = SolidLayer::Make();
+  maskWithFilter->setWidth(100);
+  maskWithFilter->setHeight(80);
+  maskWithFilter->setColor(Color::White());
+  maskWithFilter->setFilters({BlurFilter::Make(5.0f, 5.0f)});
+  rootLayer->addChild(maskWithFilter);
+  layer12->setMask(maskWithFilter);
+  layer12->setMaskType(LayerMaskType::Alpha);
+
+  auto clipPath12 = layer12->getMaskClipPath();
+  EXPECT_FALSE(clipPath12.has_value());
+
+  // Test 13: Mask with layer styles - should NOT return clip path
+  auto layer13 = Layer::Make();
+  rootLayer->addChild(layer13);
+  auto maskWithStyle = SolidLayer::Make();
+  maskWithStyle->setWidth(100);
+  maskWithStyle->setHeight(80);
+  maskWithStyle->setColor(Color::White());
+  maskWithStyle->setLayerStyles({DropShadowStyle::Make(5.0f, 5.0f, 0.0f, 5.0f, Color::Black())});
+  rootLayer->addChild(maskWithStyle);
+  layer13->setMask(maskWithStyle);
+  layer13->setMaskType(LayerMaskType::Alpha);
+
+  auto clipPath13 = layer13->getMaskClipPath();
+  EXPECT_FALSE(clipPath13.has_value());
 }
 
 /**
