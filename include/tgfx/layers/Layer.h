@@ -643,7 +643,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
   bool drawWithSubtreeCache(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                             const Matrix3D* transform3D);
 
-  std::shared_ptr<Image> getContentImage(const DrawArgs& args, float contentScale,
+  std::shared_ptr<Image> getContentImage(const DrawArgs& args, const Matrix& contentMatrix,
                                          const std::shared_ptr<Image>& passThroughImage,
                                          const Matrix& passThroughImageMatrix,
                                          std::optional<Rect> clipBounds, Matrix* imageMatrix);

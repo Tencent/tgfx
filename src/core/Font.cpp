@@ -20,6 +20,7 @@
 #include "ScalerContext.h"
 #include "core/GlyphRasterizer.h"
 #include "core/PixelBuffer.h"
+#include "utils/MathExtra.h"
 
 namespace tgfx {
 Font::Font() : scalerContext(ScalerContext::MakeEmpty(0.0f)) {
@@ -128,8 +129,8 @@ std::shared_ptr<ImageCodec> Font::getImage(GlyphID glyphID, const Stroke* stroke
   if (matrix && fauxItalic) {
     matrix->postSkew(ITALIC_SKEW, 0);
   }
-  auto width = static_cast<int>(ceilf(bounds.width()));
-  auto height = static_cast<int>(ceilf(bounds.height()));
+  auto width = FloatCeilToInt(bounds.width());
+  auto height = FloatCeilToInt(bounds.height());
   return std::make_shared<GlyphRasterizer>(width, height, scalerContext, glyphID, fauxBold, stroke);
 }
 
