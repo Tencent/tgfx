@@ -27,8 +27,8 @@ EMSCRIPTEN_BINDINGS(TGFXDemo) {
   class_<TGFXBaseView>("TGFXBaseView")
       .function("setImagePath", &TGFXBaseView::setImagePath)
       .function("updateSize", &TGFXBaseView::updateSize)
-      .function("updateDisplayList", &TGFXBaseView::updateDisplayList)
-      .function("updateDisplayTransform", &TGFXBaseView::updateDisplayTransform)
+      .function("updateLayerTree", &TGFXBaseView::updateLayerTree)
+      .function("updateZoomScaleAndOffset", &TGFXBaseView::updateZoomScaleAndOffset)
       .function("draw", &TGFXBaseView::draw);
 
   class_<TGFXView, base<TGFXBaseView>>("TGFXView")

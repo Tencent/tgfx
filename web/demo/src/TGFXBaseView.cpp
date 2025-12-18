@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -73,12 +73,12 @@ void TGFXBaseView::applyCenteringTransform() {
   }
 }
 
-void TGFXBaseView::updateDisplayTransform(float zoom, float offsetX, float offsetY) {
+void TGFXBaseView::updateZoomScaleAndOffset(float zoom, float offsetX, float offsetY) {
   displayList.setZoomScale(zoom);
   displayList.setContentOffset(offsetX, offsetY);
 }
 
-void TGFXBaseView::updateDisplayList(int drawIndex) {
+void TGFXBaseView::updateLayerTree(int drawIndex) {
   auto numBuilders = hello2d::LayerBuilder::Count();
   auto index = drawIndex % numBuilders;
   if (index != lastDrawIndex || !contentLayer) {
@@ -156,6 +156,7 @@ void TGFXBaseView::draw() {
 }
 
 }  // namespace hello2d
+
 
 int main(int, const char*[]) {
   return 0;

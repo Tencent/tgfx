@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -75,8 +75,8 @@ static const float MaxZoom = 1000.0f;
                                                name:UIApplicationWillEnterForegroundNotification
                                              object:nil];
 
-  [self.tgfxView updateDisplayList:self.drawIndex];
-  [self.tgfxView updateDisplayTransform:self.zoomScale offset:self.contentOffset];
+  [self.tgfxView updateLayerTree:self.drawIndex];
+  [self.tgfxView updateZoomScaleAndOffset:self.zoomScale offset:self.contentOffset];
 }
 
 - (void)appDidEnterBackground:(NSNotification*)notification {
@@ -101,8 +101,8 @@ static const float MaxZoom = 1000.0f;
   self.currentZoom = 1.0f;
   self.currentPanOffset = CGPointZero;
   self.currentPinchOffset = CGPointZero;
-  [self.tgfxView updateDisplayList:self.drawIndex];
-  [self.tgfxView updateDisplayTransform:self.zoomScale offset:self.contentOffset];
+  [self.tgfxView updateLayerTree:self.drawIndex];
+  [self.tgfxView updateZoomScaleAndOffset:self.zoomScale offset:self.contentOffset];
 }
 
 - (void)handlePan:(UIPanGestureRecognizer*)gesture {
@@ -121,7 +121,7 @@ static const float MaxZoom = 1000.0f;
                   self.contentOffset.y +
                       (translation.y - self.currentPanOffset.y) * self.tgfxView.contentScaleFactor);
   self.currentPanOffset = translation;
-  [self.tgfxView updateDisplayTransform:self.zoomScale offset:self.contentOffset];
+  [self.tgfxView updateZoomScaleAndOffset:self.zoomScale offset:self.contentOffset];
 }
 
 - (void)handlePinch:(UIPinchGestureRecognizer*)gesture {
@@ -149,7 +149,7 @@ static const float MaxZoom = 1000.0f;
   offset.y = (self.currentPinchOffset.y - self.pinchCenter.y) * scale / self.currentZoom + center.y;
   self.zoomScale = scale;
   self.contentOffset = offset;
-  [self.tgfxView updateDisplayTransform:self.zoomScale offset:self.contentOffset];
+  [self.tgfxView updateZoomScaleAndOffset:self.zoomScale offset:self.contentOffset];
 }
 
 - (BOOL)gestureRecognizer:(UIGestureRecognizer*)gestureRecognizer

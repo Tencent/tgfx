@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -35,9 +35,9 @@ class TGFXBaseView {
 
   void updateSize();
 
-  void updateDisplayList(int drawIndex);
+  void updateLayerTree(int drawIndex);
 
-  void updateDisplayTransform(float zoom, float offsetX, float offsetY);
+  void updateZoomScaleAndOffset(float zoom, float offsetX, float offsetY);
 
   void draw();
 

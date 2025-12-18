@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -102,8 +102,7 @@ void LayerBuilder::ApplyCenteringTransform(std::shared_ptr<tgfx::Layer> layer, f
 }
 
 void DrawBackground(tgfx::Canvas* canvas, int width, int height, float density) {
-  auto layer = GridBackgroundLayer::Make();
-  layer->setSize(width, height, density);
+  auto layer = GridBackgroundLayer::Make(width, height, density);
   layer->draw(canvas);
 }
 

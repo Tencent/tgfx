@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -35,14 +35,14 @@ TGFXView::TGFXView(QQuickItem* parent) : QQuickItem(parent) {
   displayList.setRenderMode(tgfx::RenderMode::Tiled);
   displayList.setAllowZoomBlur(true);
   displayList.setMaxTileCount(512);
-  updateDisplayList();
+  updateLayerTree();
 }
 
 void TGFXView::updateTransform(qreal zoomLevel, QPointF panOffset) {
   float clampedZoom = std::max(0.001f, std::min(1000.0f, static_cast<float>(zoomLevel)));
   zoom = clampedZoom;
   offset = panOffset;
-  updateDisplayTransform();
+  updateZoomScaleAndOffset();
   update();
 }
 
@@ -50,12 +50,12 @@ void TGFXView::onClicked() {
   currentDrawerIndex++;
   zoom = 1.0f;
   offset = QPointF(0, 0);
-  updateDisplayList();
-  updateDisplayTransform();
+  updateLayerTree();
+  updateZoomScaleAndOffset();
   update();
 }
 
-void TGFXView::updateDisplayList() {
+void TGFXView::updateLayerTree() {
   auto numBuilders = hello2d::LayerBuilder::Count();
   auto index = (currentDrawerIndex % numBuilders);
   if (index != lastDrawIndex || !contentLayer) {
@@ -72,7 +72,7 @@ void TGFXView::updateDisplayList() {
   }
 }
 
-void TGFXView::updateDisplayTransform() {
+void TGFXView::updateZoomScaleAndOffset() {
   displayList.setZoomScale(zoom);
   displayList.setContentOffset(static_cast<float>(offset.x()), static_cast<float>(offset.y()));
 }
@@ -146,16 +146,17 @@ void TGFXView::createAppHost() {
 }
 
 void TGFXView::draw() {
-  if (!displayList.hasContentChanged() && lastRecording == nullptr) {
-    return;
-  }
-
   auto device = tgfxWindow->getDevice();
   if (device == nullptr) {
     return;
   }
   auto context = device->lockContext();
   if (context == nullptr) {
+    return;
+  }
+
+  if (!displayList.hasContentChanged() && lastRecording == nullptr) {
+    device->unlock();
     return;
   }
 

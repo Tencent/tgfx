@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -36,7 +36,7 @@
 - (void)draw;
 - (void)startDisplayLink;
 - (void)stopDisplayLink;
-- (void)updateDisplayList;
-- (void)updateDisplayTransform;
+- (void)updateLayerTree;
+- (void)updateZoomScaleAndOffset;
 
 @end

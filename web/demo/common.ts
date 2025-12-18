@@ -23,8 +23,8 @@ export const MAX_ZOOM = 1000.0;
 
 export class TGFXBaseView {
     public updateSize: () => void;
-    public updateDisplayList: (drawIndex: number) => void;
-    public updateDisplayTransform: (zoom: number, offsetX: number, offsetY: number) => void;
+    public updateLayerTree: (drawIndex: number) => void;
+    public updateZoomScaleAndOffset: (zoom: number, offsetX: number, offsetY: number) => void;
     public draw: () => void;
 }
 
@@ -87,7 +87,7 @@ class GestureManager {
                 this.offsetX -= event.deltaX * window.devicePixelRatio;
                 this.offsetY -= event.deltaY * window.devicePixelRatio;
             }
-            shareData.tgfxBaseView.updateDisplayTransform(this.zoom, this.offsetX, this.offsetY);
+            shareData.tgfxBaseView.updateZoomScaleAndOffset(this.zoom, this.offsetX, this.offsetY);
         }
     }
 
@@ -115,7 +115,7 @@ class GestureManager {
             this.scaleY = 1.0;
             this.scaleStartZoom = this.zoom;
         }
-        shareData.tgfxBaseView.updateDisplayTransform(this.zoom, this.offsetX, this.offsetY);
+        shareData.tgfxBaseView.updateZoomScaleAndOffset(this.zoom, this.offsetX, this.offsetY);
     }
 
     public clearState() {
@@ -294,8 +294,8 @@ export function onClickEvent(shareData: ShareData) {
     }
     shareData.drawIndex++;
     gestureManager.resetTransform();
-    shareData.tgfxBaseView.updateDisplayTransform(gestureManager.zoom, gestureManager.offsetX, gestureManager.offsetY);
-    shareData.tgfxBaseView.updateDisplayList(shareData.drawIndex);
+    shareData.tgfxBaseView.updateZoomScaleAndOffset(gestureManager.zoom, gestureManager.offsetX, gestureManager.offsetY);
+    shareData.tgfxBaseView.updateLayerTree(shareData.drawIndex);
 }
 
 export function loadImage(src: string): Promise<HTMLImageElement> {

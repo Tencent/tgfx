@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -22,6 +22,15 @@
 namespace hello2d {
 static jfieldID TGFXView_nativePtr;
 
+JTGFXView::JTGFXView(ANativeWindow* nativeWindow, std::shared_ptr<tgfx::Window> window,
+                     std::unique_ptr<hello2d::AppHost> appHost)
+    : nativeWindow(nativeWindow), window(std::move(window)), appHost(std::move(appHost)) {
+  displayList.setRenderMode(tgfx::RenderMode::Tiled);
+  displayList.setAllowZoomBlur(true);
+  displayList.setMaxTileCount(512);
+  updateSize();
+}
+
 void JTGFXView::updateSize() {
   auto width = ANativeWindow_getWidth(nativeWindow);
   auto height = ANativeWindow_getHeight(nativeWindow);
@@ -33,7 +42,7 @@ void JTGFXView::updateSize() {
   }
 }
 
-void JTGFXView::updateDisplayList(int drawIndex) {
+void JTGFXView::updateLayerTree(int drawIndex) {
   auto numBuilders = hello2d::LayerBuilder::Count();
   auto index = (drawIndex % numBuilders);
   if (index != lastDrawIndex || !contentLayer) {
@@ -50,7 +59,7 @@ void JTGFXView::updateDisplayList(int drawIndex) {
   }
 }
 
-void JTGFXView::updateDisplayTransform(float zoom, float offsetX, float offsetY) {
+void JTGFXView::updateZoomScaleAndOffset(float zoom, float offsetX, float offsetY) {
   displayList.setZoomScale(zoom);
   displayList.setContentOffset(offsetX, offsetY);
 }
@@ -174,7 +183,7 @@ JNIEXPORT jlong JNICALL Java_org_tgfx_hello2d_TGFXView_00024Companion_setupFromS
     env->ReleaseByteArrayElements(imageBytes, bytes, 0);
 
     if (image) {
-      const char* imageName = (i == 0) ? "bridge" : "TGFX";
+      auto imageName = (i == 0) ? "bridge" : "TGFX";
       appHost->addImage(imageName, std::move(image));
     }
   }
@@ -203,7 +212,7 @@ JNIEXPORT void JNICALL Java_org_tgfx_hello2d_TGFXView_nativeUpdateDisplayList(JN
   if (view == nullptr) {
     return;
   }
-  view->updateDisplayList(drawIndex);
+  view->updateLayerTree(drawIndex);
 }
 
 JNIEXPORT void JNICALL Java_org_tgfx_hello2d_TGFXView_nativeUpdateDisplayTransform(
@@ -212,7 +221,7 @@ JNIEXPORT void JNICALL Java_org_tgfx_hello2d_TGFXView_nativeUpdateDisplayTransfo
   if (view == nullptr) {
     return;
   }
-  view->updateDisplayTransform(zoom, offsetX, offsetY);
+  view->updateZoomScaleAndOffset(zoom, offsetX, offsetY);
 }
 
 JNIEXPORT void JNICALL Java_org_tgfx_hello2d_TGFXView_nativeDraw(JNIEnv* env, jobject thiz) {

@@ -62,7 +62,7 @@ class MainActivity : ComponentActivity() {
                     zoomScale = (zoomScale * detector.scaleFactor).coerceIn(MIN_ZOOM, MAX_ZOOM)
                     contentOffset.x = detector.focusX - (detector.focusX - contentOffset.x) * zoomScale / oldZoom
                     contentOffset.y = detector.focusY - (detector.focusY - contentOffset.y) * zoomScale / oldZoom
-                    tgfxView.updateDisplayTransform(zoomScale, contentOffset)
+                    tgfxView.updateZoomScaleAndOffset(zoomScale, contentOffset)
                     return true
                 }
             })
@@ -77,7 +77,7 @@ class MainActivity : ComponentActivity() {
                 ): Boolean {
                     contentOffset.x -= distanceX
                     contentOffset.y -= distanceY
-                    tgfxView.updateDisplayTransform(zoomScale, contentOffset)
+                    tgfxView.updateZoomScaleAndOffset(zoomScale, contentOffset)
                     return true
                 }
 
@@ -85,8 +85,8 @@ class MainActivity : ComponentActivity() {
                     drawIndex++
                     zoomScale = 1.0f
                     contentOffset.set(0f, 0f)
-                    tgfxView.updateDisplayList(drawIndex)
-                    tgfxView.updateDisplayTransform(zoomScale, contentOffset)
+                    tgfxView.updateLayerTree(drawIndex)
+                    tgfxView.updateZoomScaleAndOffset(zoomScale, contentOffset)
                     return true
                 }
             })

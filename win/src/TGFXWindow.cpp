@@ -3,7 +3,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -59,7 +59,7 @@ bool TGFXWindow::open() {
   centerAndShow();
   ShowWindow(windowHandle, SW_SHOW);
   UpdateWindow(windowHandle);
-  updateDisplayList();
+  updateLayerTree();
   ::InvalidateRect(windowHandle, nullptr, FALSE);
   return true;
 }
@@ -130,8 +130,8 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
         currentDrawerIndex = (currentDrawerIndex + 1) % count;
         zoomScale = 1.0f;
         contentOffset = {0.0f, 0.0f};
-        updateDisplayList();
-        updateDisplayTransform();
+        updateLayerTree();
+        updateZoomScaleAndOffset();
         ::InvalidateRect(windowHandle, nullptr, FALSE);
       }
       break;
@@ -157,7 +157,7 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
           contentOffset.y -= wheelDelta;
         }
       }
-      updateDisplayTransform();
+      updateZoomScaleAndOffset();
       ::InvalidateRect(windowHandle, nullptr, FALSE);
       break;
     }
@@ -184,7 +184,7 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
           lastZoomArgument = 0.0;
         }
         CloseGestureInfoHandle(reinterpret_cast<HGESTUREINFO>(lparam));
-        updateDisplayTransform();
+        updateZoomScaleAndOffset();
         ::InvalidateRect(windowHandle, nullptr, FALSE);
       }
       break;
@@ -296,7 +296,7 @@ void TGFXWindow::createAppHost() {
   appHost->addTypeface("emoji", typeface);
 }
 
-void TGFXWindow::updateDisplayList() {
+void TGFXWindow::updateLayerTree() {
   int count = hello2d::LayerBuilder::Count();
   int index = (count > 0) ? (currentDrawerIndex % count) : 0;
   if (index != lastDrawIndex || !contentLayer) {
@@ -313,7 +313,7 @@ void TGFXWindow::updateDisplayList() {
   }
 }
 
-void TGFXWindow::updateDisplayTransform() {
+void TGFXWindow::updateZoomScaleAndOffset() {
   displayList.setZoomScale(zoomScale);
   displayList.setContentOffset(contentOffset.x, contentOffset.y);
 }

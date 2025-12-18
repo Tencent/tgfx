@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -32,21 +32,15 @@ namespace hello2d {
 class JTGFXView {
  public:
   explicit JTGFXView(ANativeWindow* nativeWindow, std::shared_ptr<tgfx::Window> window,
-                     std::unique_ptr<hello2d::AppHost> appHost)
-      : nativeWindow(nativeWindow), window(std::move(window)), appHost(std::move(appHost)) {
-    displayList.setRenderMode(tgfx::RenderMode::Tiled);
-    displayList.setAllowZoomBlur(true);
-    displayList.setMaxTileCount(512);
-    updateSize();
-  }
+                     std::unique_ptr<hello2d::AppHost> appHost);
 
   ~JTGFXView() {
     ANativeWindow_release(nativeWindow);
   }
 
   void updateSize();
-  void updateDisplayList(int drawIndex);
-  void updateDisplayTransform(float zoom, float offsetX, float offsetY);
+  void updateLayerTree(int drawIndex);
+  void updateZoomScaleAndOffset(float zoom, float offsetX, float offsetY);
   void draw();
 
  private:

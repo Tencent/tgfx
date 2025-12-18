@@ -87,8 +87,8 @@ open class TGFXView : TextureView, TextureView.SurfaceTextureListener {
 
         // Only initialize if native initialization was successful
         if (nativePtr != 0L) {
-            updateDisplayList(0)
-            updateDisplayTransform(1.0f, PointF(0f, 0f))
+            updateLayerTree(0)
+            updateZoomScaleAndOffset(1.0f, PointF(0f, 0f))
         }
     }
 
@@ -121,13 +121,13 @@ open class TGFXView : TextureView, TextureView.SurfaceTextureListener {
     }
 
 
-    fun updateDisplayList(drawIndex: Int) {
+    fun updateLayerTree(drawIndex: Int) {
         if (nativePtr != 0L) {
             nativeUpdateDisplayList(drawIndex)
         }
     }
 
-    fun updateDisplayTransform(zoom: Float, offset: PointF) {
+    fun updateZoomScaleAndOffset(zoom: Float, offset: PointF) {
         if (nativePtr != 0L) {
             nativeUpdateDisplayTransform(zoom, offset.x, offset.y)
         }

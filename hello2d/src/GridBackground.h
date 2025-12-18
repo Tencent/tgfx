@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -23,13 +23,14 @@
 namespace hello2d {
 class GridBackgroundLayer : public tgfx::Layer {
  public:
-  static std::shared_ptr<GridBackgroundLayer> Make();
-  void setSize(int width, int height, float density);
+  static std::shared_ptr<GridBackgroundLayer> Make(int width, int height, float density);
 
  protected:
   void onUpdateContent(tgfx::LayerRecorder* recorder) override;
 
  private:
+  GridBackgroundLayer(int width, int height, float density);
+
   int _width = 0;
   int _height = 0;
   float _density = 1.f;

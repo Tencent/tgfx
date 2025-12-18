@@ -38,7 +38,7 @@ static tgfx::LayerPaint ToLayerPaint(const tgfx::Paint& paint) {
   layerPaint.shader = paint.getShader();
   layerPaint.blendMode = paint.getBlendMode();
   layerPaint.style = paint.getStyle();
-  const auto* stroke = paint.getStroke();
+  auto stroke = paint.getStroke();
   if (stroke != nullptr) {
     layerPaint.stroke = *stroke;
   }

@@ -59,7 +59,7 @@ static napi_value AddImageFromEncoded(napi_env env, napi_callback_info info) {
   return nullptr;
 }
 
-static void UpdateDisplayList(int drawIndex) {
+static void UpdateLayerTree(int drawIndex) {
   if (!appHost) {
     appHost = CreateAppHost();
   }
@@ -83,7 +83,7 @@ static void UpdateDisplayList(int drawIndex) {
   }
 }
 
-static void UpdateDisplayTransform(float zoom, float offsetX, float offsetY) {
+static void UpdateZoomScaleAndOffset(float zoom, float offsetX, float offsetY) {
   displayList.setZoomScale(zoom);
   displayList.setContentOffset(offsetX, offsetY);
 }
@@ -147,8 +147,8 @@ static napi_value UpdateDrawParams(napi_env env, napi_callback_info info) {
   napi_get_value_double(env, args[3], &contentOffsetY);
 
   // Update DisplayList when parameters change
-  UpdateDisplayList(static_cast<int>(drawIndex));
-  UpdateDisplayTransform(static_cast<float>(zoomScale), static_cast<float>(contentOffsetX),
+  UpdateLayerTree(static_cast<int>(drawIndex));
+  UpdateZoomScaleAndOffset(static_cast<float>(zoomScale), static_cast<float>(contentOffsetX),
                          static_cast<float>(contentOffsetY));
 
   return nullptr;
@@ -234,8 +234,8 @@ static void OnSurfaceCreatedCB(OH_NativeXComponent* component, void* nativeWindo
   if (window == nullptr) {
     return;
   }
-  UpdateDisplayList(static_cast<int>(drawIndex));
-  UpdateDisplayTransform(static_cast<float>(zoomScale), static_cast<float>(contentOffsetX),
+  UpdateLayerTree(static_cast<int>(drawIndex));
+  UpdateZoomScaleAndOffset(static_cast<float>(zoomScale), static_cast<float>(contentOffsetX),
                          static_cast<float>(contentOffsetY));
 }
 

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -129,8 +129,8 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   }
 
   [self updateSize];
-  [self updateDisplayTransform];
-  [self updateDisplayList];
+  [self updateZoomScaleAndOffset];
+  [self updateLayerTree];
 }
 
 - (void)dealloc {
@@ -153,7 +153,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   [self draw];
 }
 
-- (void)updateDisplayList {
+- (void)updateLayerTree {
   auto numBuilders = hello2d::LayerBuilder::Count();
   auto index = (self.drawIndex % numBuilders);
   if (index != lastDrawIndex || !contentLayer) {
@@ -178,7 +178,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   }
 }
 
-- (void)updateDisplayTransform {
+- (void)updateZoomScaleAndOffset {
   displayList.setZoomScale(self.zoomScale);
   displayList.setContentOffset(static_cast<float>(self.contentOffset.x),
                                static_cast<float>(self.contentOffset.y));
@@ -271,8 +271,8 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   self.drawIndex++;
   self.zoomScale = 1.0f;
   self.contentOffset = CGPointZero;
-  [self updateDisplayTransform];
-  [self updateDisplayList];
+  [self updateZoomScaleAndOffset];
+  [self updateLayerTree];
 }
 
 - (void)scrollWheel:(NSEvent*)event {
@@ -301,7 +301,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
                                        self.contentOffset.y + event.scrollingDeltaY * 5);
     }
   }
-  [self updateDisplayTransform];
+  [self updateZoomScaleAndOffset];
 }
 
 - (void)magnifyWithEvent:(NSEvent*)event {
@@ -314,7 +314,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
                               0.001f, 1000.0f);
   self.contentOffset = CGPointMake(backingPoint.x - contentX * self.zoomScale,
                                    backingPoint.y - contentY * self.zoomScale);
-  [self updateDisplayTransform];
+  [self updateZoomScaleAndOffset];
 }
 
 @end
