@@ -257,23 +257,6 @@ bool FTTypeface::isOpentypeFontDataStandardFormat() const {
          fontTag == opentypeCFFTag || fontTag == ttcTag;
 }
 
-#ifdef TGFX_USE_GLYPH_TO_UNICODE
-std::vector<Unichar> FTTypeface::onCreateGlyphToUnicodeMap() const {
-  auto numGlyphs = static_cast<size_t>(face->num_glyphs);
-  std::vector<Unichar> returnMap(numGlyphs, 0);
-
-  FT_UInt glyphIndex = 0;
-  auto charCode = FT_Get_First_Char(face, &glyphIndex);
-  while (glyphIndex) {
-    if (0 == returnMap[glyphIndex]) {
-      returnMap[glyphIndex] = static_cast<Unichar>(charCode);
-    }
-    charCode = FT_Get_Next_Char(face, charCode, &glyphIndex);
-  }
-  return returnMap;
-}
-#endif
-
 AdvancedTypefaceInfo FTTypeface::getAdvancedInfo() const {
   AdvancedTypefaceInfo advancedProperty;
   advancedProperty.postScriptName = FT_Get_Postscript_Name(face);
@@ -309,6 +292,23 @@ AdvancedTypefaceInfo FTTypeface::getAdvancedInfo() const {
         advancedProperty.style | AdvancedTypefaceInfo::StyleFlags::Italic);
   }
   return advancedProperty;
+}
+#endif
+
+#ifdef TGFX_USE_GLYPH_TO_UNICODE
+std::vector<Unichar> FTTypeface::onCreateGlyphToUnicodeMap() const {
+  auto numGlyphs = static_cast<size_t>(face->num_glyphs);
+  std::vector<Unichar> returnMap(numGlyphs, 0);
+
+  FT_UInt glyphIndex = 0;
+  auto charCode = FT_Get_First_Char(face, &glyphIndex);
+  while (glyphIndex) {
+    if (0 == returnMap[glyphIndex]) {
+      returnMap[glyphIndex] = static_cast<Unichar>(charCode);
+    }
+    charCode = FT_Get_Next_Char(face, charCode, &glyphIndex);
+  }
+  return returnMap;
 }
 #endif
 
