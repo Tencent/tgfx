@@ -819,6 +819,9 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
       args.blurBackground = std::move(backgroundContext);
     }
   }
+  auto blurCanvas = args.blurBackground ? args.blurBackground->getCanvas() : nullptr;
+  AutoCanvasRestore autoRestore(canvas);
+  AutoCanvasRestore blurAutoRestore(blurCanvas);
   drawLayer(args, canvas, alpha, blendMode, nullptr);
 }
 
@@ -974,11 +977,9 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
     return;
   }
   auto maskClipPath = hasValidMask() ? getMaskClipPath() : std::nullopt;
-  AutoCanvasRestore autoRestore(maskClipPath.has_value() ? canvas : nullptr);
-  auto blurCanvas = args.blurBackground ? args.blurBackground->getCanvas() : nullptr;
-  AutoCanvasRestore blurAutoRestore(maskClipPath.has_value() ? blurCanvas : nullptr);
   if (maskClipPath.has_value()) {
     canvas->clipPath(*maskClipPath);
+    auto blurCanvas = args.blurBackground ? args.blurBackground->getCanvas() : nullptr;
     if (blurCanvas) {
       blurCanvas->clipPath(*maskClipPath);
     }
@@ -1408,7 +1409,6 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     paint.setMaskFilter(maskFilter->makeWithMatrix(invertImageMatrix));
   }
 
-  AutoCanvasRestore autoRestore(canvas);
   canvas->concat(imageMatrix);
   auto filterMode =
       !args.excludeEffects && !_filters.empty() ? FilterMode::Linear : FilterMode::Nearest;
@@ -1422,7 +1422,6 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
       contentArgs.blurBackground->drawToParent(paint);
     } else {
       auto backgroundCanvas = args.blurBackground->getCanvas();
-      AutoCanvasRestore autoRestoreBg(backgroundCanvas);
       backgroundCanvas->concat(imageMatrix);
       backgroundCanvas->drawImage(image, 0.f, 0.f, sampling, &paint);
     }
@@ -1520,6 +1519,7 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
     AutoCanvasRestore autoRestore(canvas);
     auto backgroundCanvas =
         childArgs.blurBackground ? childArgs.blurBackground->getCanvas() : nullptr;
+    AutoCanvasRestore autoRestoreBg(backgroundCanvas);
     auto childMatrix = child->getMatrixWithScrollRect();
     // If the sublayer's Matrix contains 3D transformations or projection transformations, then
     // treat its Matrix as an identity matrix here, and let the sublayer handle its actual position
@@ -1548,7 +1548,6 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
       clipChildScrollRectHandler(*canvas);
     }
     if (backgroundCanvas) {
-      backgroundCanvas->save();
       backgroundCanvas->concat(childAffineMatrix);
       clipChildScrollRectHandler(*backgroundCanvas);
     }
@@ -1556,9 +1555,6 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
     auto transform = isChildMatrixAffine ? nullptr : &childMatrix;
     child->drawLayer(childArgs, canvas, child->_alpha * alpha,
                      static_cast<BlendMode>(child->bitFields.blendMode), transform);
-    if (backgroundCanvas) {
-      backgroundCanvas->restore();
-    }
   }
   return true;
 }
