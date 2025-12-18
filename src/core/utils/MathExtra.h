@@ -153,20 +153,20 @@ inline float IEEEFloatDivide(float numer, float denom) {
   return numer / denom;
 }
 
-inline int FloatSaturate2Int(float x) {
+inline int FloatSaturateToInt(float x) {
   return static_cast<int>(std::clamp(x, MinS32FitsInFloat, MaxS32FitsInFloat));
 }
 
 inline int FloatFloorToInt(float x) {
-  return FloatSaturate2Int(std::floor(x));
+  return FloatSaturateToInt(std::floor(x));
 }
 
 inline int FloatCeilToInt(float x) {
-  return FloatSaturate2Int(std::ceil(x));
+  return FloatSaturateToInt(std::ceil(x));
 }
 
 inline int FloatRoundToInt(float x) {
-  return FloatSaturate2Int(std::round(x));
+  return FloatSaturateToInt(std::round(x));
 }
 
 }  // namespace tgfx

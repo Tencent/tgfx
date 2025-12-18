@@ -113,8 +113,8 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
     scaleY = rect.height() / clipRect.height();
   }
   auto mipmapped = samplingArgs.sampling.mipmapMode != MipmapMode::None && hasMipmaps();
-  auto renderTarget = RenderTargetProxy::Make(args.context, FloatSaturate2Int(rect.width()),
-                                              FloatSaturate2Int(rect.height()), isAlphaOnly(), 1,
+  auto renderTarget = RenderTargetProxy::Make(args.context, FloatSaturateToInt(rect.width()),
+                                              FloatSaturateToInt(rect.height()), isAlphaOnly(), 1,
                                               mipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
   if (renderTarget == nullptr) {
     return nullptr;

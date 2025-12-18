@@ -1083,8 +1083,8 @@ std::shared_ptr<Image> Layer::getContentImage(const DrawArgs& contentArgs,
     auto surfaceRect = passThroughImageMatrix.mapRect(inputBounds);
     surfaceRect.roundOut();
     surfaceRect.intersect(Rect::MakeWH(passThroughImage->width(), passThroughImage->height()));
-    auto offscreenSurface = Surface::Make(context, FloatSaturate2Int(surfaceRect.width()),
-                                          FloatSaturate2Int(surfaceRect.height()), false, 1, false,
+    auto offscreenSurface = Surface::Make(context, FloatSaturateToInt(surfaceRect.width()),
+                                          FloatSaturateToInt(surfaceRect.height()), false, 1, false,
                                           0, contentArgs.dstColorSpace);
     if (!offscreenSurface) {
       return nullptr;

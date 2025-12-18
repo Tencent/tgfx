@@ -447,7 +447,7 @@ void DisplayList::checkTileCount(Surface* renderSurface) {
   }
   auto remainingTileCount = totalTileCount % maxTileCountPerAtlas;
   totalTileCount -= remainingTileCount;
-  auto width = FloatSaturate2Int(sqrtf(static_cast<float>(remainingTileCount)));
+  auto width = FloatSaturateToInt(sqrtf(static_cast<float>(remainingTileCount)));
   int height = FloatCeilToInt(static_cast<float>(remainingTileCount) / static_cast<float>(width));
   totalTileCount += width * height;
 }
@@ -779,7 +779,7 @@ std::vector<std::shared_ptr<Tile>> DisplayList::createContinuousTiles(const Surf
   if (tileCount < requestCount) {
     return {};
   }
-  int countX = FloatSaturate2Int(sqrtf(static_cast<float>(tileCount)));
+  int countX = FloatSaturateToInt(sqrtf(static_cast<float>(tileCount)));
   int countY = FloatCeilToInt(static_cast<float>(tileCount) / static_cast<float>(countX));
   if (countX < requestCountX) {
     countX = requestCountX;
@@ -823,7 +823,7 @@ bool DisplayList::createEmptyTiles(const Surface* renderSurface) {
   if (tileCount <= 0) {
     return false;
   }
-  int countX = FloatSaturate2Int(sqrtf(static_cast<float>(tileCount)));
+  int countX = FloatSaturateToInt(sqrtf(static_cast<float>(tileCount)));
   int countY = FloatCeilToInt(static_cast<float>(tileCount) / static_cast<float>(countX));
   auto surface =
       Surface::Make(context, countX * _tileSize, countY * _tileSize, ColorType::RGBA_8888, 1, false,

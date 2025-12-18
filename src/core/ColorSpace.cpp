@@ -341,7 +341,7 @@ static constexpr float kD50_y = 1.0000f;
 static constexpr float kD50_z = 0.8249f;
 
 static int32_t FloatRoundToFixed(float x) {
-  return FloatSaturate2Int((float)floor((double)x * (1 << 16) + 0.5));
+  return FloatSaturateToInt((float)floor((double)x * (1 << 16) + 0.5));
 }
 
 struct ICCHeader {
