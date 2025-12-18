@@ -1016,19 +1016,24 @@ Matrix3D Layer::getRelativeMatrix(const Layer* targetCoordinateSpace) const {
 }
 
 std::optional<Path> Layer::getMaskClipPath() {
-  auto maskType = static_cast<LayerMaskType>(bitFields.maskType);
-  // Only support Alpha mask type for now
-  if (maskType != LayerMaskType::Alpha) {
-    return std::nullopt;
-  }
-  if (_mask->alpha() < 1.0f) {
-    return std::nullopt;
-  }
+  DEBUG_ASSERT(_mask != nullptr);
   auto content = _mask->getContent();
   if (content == nullptr) {
+    // Empty mask clips everything.
+    return Path();
+  }
+  auto maskType = static_cast<LayerMaskType>(bitFields.maskType);
+  bool useContour = false;
+  if (maskType == LayerMaskType::Contour) {
+    useContour = true;
+  } else if (maskType == LayerMaskType::Alpha) {
+    if (_mask->alpha() < 1.0f) {
+      return std::nullopt;
+    }
+  } else {
     return std::nullopt;
   }
-  auto clipPath = content->asClipPath(true);
+  auto clipPath = content->asClipPath(useContour);
   if (!clipPath.has_value()) {
     return std::nullopt;
   }

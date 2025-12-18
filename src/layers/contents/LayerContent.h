@@ -71,13 +71,11 @@ class LayerContent {
 
   /**
    * Returns the path that can be used as a clip path if this content is a simple filled geometry.
-   * If checkOpacity is true, returns the path only when the content is fully opaque.
+   * If useContour is true, returns the contour path regardless of opacity. Otherwise, returns the
+   * path only when the content is fully opaque.
    * Returns std::nullopt if the content cannot be used as a clip path.
    */
-  virtual std::optional<Path> asClipPath(bool checkOpacity) const {
-    (void)checkOpacity;
-    return std::nullopt;
-  }
+  virtual std::optional<Path> asClipPath(bool useContour) const = 0;
 
  protected:
   enum class Type {

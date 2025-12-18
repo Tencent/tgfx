@@ -4049,7 +4049,7 @@ TGFX_TEST(LayerTest, MaskClipPath) {
   EXPECT_TRUE(clipPath4.has_value());
   EXPECT_TRUE(clipPath4->getBounds() == Rect::MakeXYWH(20, 30, 100, 80));
 
-  // Test 5: ShapeLayer with stroke - should NOT return clip path
+  // Test 5: ShapeLayer with stroke - should return valid clip path (stroke applied to path)
   auto layer5 = Layer::Make();
   rootLayer->addChild(layer5);
   Path strokePath = {};
@@ -4063,7 +4063,9 @@ TGFX_TEST(LayerTest, MaskClipPath) {
   layer5->setMaskType(LayerMaskType::Alpha);
 
   auto clipPath5 = layer5->getMaskClipPath();
-  EXPECT_FALSE(clipPath5.has_value());
+  EXPECT_TRUE(clipPath5.has_value());
+  // Stroke expands the bounds by half lineWidth on each side
+  EXPECT_TRUE(clipPath5->getBounds() == Rect::MakeXYWH(-2.5f, -2.5f, 85.f, 85.f));
 
   // Test 6: Mask with alpha < 1.0 - should NOT return clip path
   auto layer6 = Layer::Make();
@@ -4080,7 +4082,7 @@ TGFX_TEST(LayerTest, MaskClipPath) {
   auto clipPath6 = layer6->getMaskClipPath();
   EXPECT_FALSE(clipPath6.has_value());
 
-  // Test 7: Contour mask type - should NOT return clip path
+  // Test 7: Contour mask type - should return valid clip path
   auto layer7 = Layer::Make();
   rootLayer->addChild(layer7);
   auto contourMask = SolidLayer::Make();
@@ -4092,7 +4094,8 @@ TGFX_TEST(LayerTest, MaskClipPath) {
   layer7->setMaskType(LayerMaskType::Contour);
 
   auto clipPath7 = layer7->getMaskClipPath();
-  EXPECT_FALSE(clipPath7.has_value());
+  EXPECT_TRUE(clipPath7.has_value());
+  EXPECT_TRUE(clipPath7->getBounds() == Rect::MakeWH(100, 80));
 
   // Test 8: Luminance mask type - should NOT return clip path
   auto layer8 = Layer::Make();
