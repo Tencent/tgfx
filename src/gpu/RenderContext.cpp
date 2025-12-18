@@ -30,7 +30,6 @@
 #include "core/images/SubsetImage.h"
 #include "core/shapes/TextShape.h"
 #include "core/utils/MathExtra.h"
-#include "core/utils/PixelFormatUtil.h"
 #include "core/utils/StrokeUtils.h"
 #include "gpu/DrawingManager.h"
 
@@ -103,8 +102,8 @@ static std::shared_ptr<ImageCodec> GetGlyphCodec(
   if (!bounds.isEmpty()) {
     glyphOffset->x = bounds.left;
     glyphOffset->y = bounds.top;
-    auto width = static_cast<int>(ceilf(bounds.width()));
-    auto height = static_cast<int>(ceilf(bounds.height()));
+    auto width = FloatCeilToInt(bounds.width());
+    auto height = FloatCeilToInt(bounds.height());
     return std::make_shared<GlyphRasterizer>(width, height, scalerContext, glyphID, hasFauxBold,
                                              stroke);
   }
@@ -131,8 +130,8 @@ static std::shared_ptr<ImageCodec> GetGlyphCodec(
   shape = Shape::ApplyMatrix(std::move(shape), Matrix::MakeTrans(-bounds.x(), -bounds.y()));
   glyphOffset->x = bounds.left;
   glyphOffset->y = bounds.top;
-  auto width = static_cast<int>(ceilf(bounds.width()));
-  auto height = static_cast<int>(ceilf(bounds.height()));
+  auto width = FloatCeilToInt(bounds.width());
+  auto height = FloatCeilToInt(bounds.height());
   return PathRasterizer::MakeFrom(width, height, std::move(shape), true,
 #ifdef TGFX_USE_TEXT_GAMMA_CORRECTION
                                   true
@@ -167,7 +166,7 @@ static bool IsGlyphVisible(const Font& font, GlyphID glyphID, const Rect& clipBo
     ApplyStrokeToBounds(*stroke, &bounds);
   }
   if (maxDimension != nullptr) {
-    *maxDimension = static_cast<int>(ceilf(std::max(bounds.width(), bounds.height())));
+    *maxDimension = FloatCeilToInt(std::max(bounds.width(), bounds.height()));
   }
   bounds.scale(scale, scale);
   bounds.offset(glyphPosition.x, glyphPosition.y);
@@ -362,8 +361,8 @@ void RenderContext::drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<
   if (bounds.isEmpty()) {
     return;
   }
-  auto width = static_cast<int>(ceilf(bounds.width()));
-  auto height = static_cast<int>(ceilf(bounds.height()));
+  auto width = FloatCeilToInt(bounds.width());
+  auto height = FloatCeilToInt(bounds.height());
   viewMatrix.postTranslate(-bounds.x(), -bounds.y());
   auto image = Image::MakeFrom(std::move(picture), width, height, &viewMatrix, colorSpace());
   if (image == nullptr) {
