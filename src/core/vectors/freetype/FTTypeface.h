@@ -72,7 +72,6 @@ class FTTypeface : public Typeface {
   uint32_t _uniqueID = 0;
   FTFontData data;
   FT_Face face = nullptr;
-  bool _isCOLRv1 = false;
 
   FTTypeface(FTFontData data, FT_Face face);
 

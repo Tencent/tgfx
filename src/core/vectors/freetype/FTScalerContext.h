@@ -73,7 +73,7 @@ class FTScalerContext : public ScalerContext {
   bool loadOutlineGlyph(FT_Face face, GlyphID glyphID, bool fauxBold, bool fauxItalic) const;
 
 #if defined(__ANDROID__) || defined(ANDROID)
-  bool MeasureCOLRv1Glyph(GlyphID glyphID, Rect* rect) const;
+  bool MeasureColorVectorGlyph(GlyphID glyphID, Rect* rect) const;
 
   std::string getGlyphUTF8(GlyphID glyphID) const;
 #endif

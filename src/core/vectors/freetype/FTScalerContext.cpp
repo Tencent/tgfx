@@ -518,7 +518,7 @@ Rect FTScalerContext::getBounds(tgfx::GlyphID glyphID, bool fauxBold, bool fauxI
 #if defined(__ANDROID__) || defined(ANDROID)
   if (ftTypeface()->isColorVector() && GlyphRenderer::IsAvailable()) {
     Rect rect = {};
-    if (MeasureCOLRv1Glyph(glyphID, &rect)) {
+    if (MeasureColorVectorGlyph(glyphID, &rect)) {
       return rect;
     }
   }
@@ -620,7 +620,7 @@ Rect FTScalerContext::getImageTransform(GlyphID glyphID, bool fauxBold, const St
 #if defined(__ANDROID__) || defined(ANDROID)
   if (ftTypeface()->isColorVector() && GlyphRenderer::IsAvailable()) {
     Rect rect = {};
-    if (MeasureCOLRv1Glyph(glyphID, &rect)) {
+    if (MeasureColorVectorGlyph(glyphID, &rect)) {
       if (matrix) {
         matrix->setTranslate(rect.x(), rect.y());
       }
@@ -776,7 +776,7 @@ bool FTScalerContext::loadOutlineGlyph(FT_Face face, GlyphID glyphID, bool fauxB
 }
 
 #if defined(__ANDROID__) || defined(ANDROID)
-bool FTScalerContext::MeasureCOLRv1Glyph(GlyphID glyphID, Rect* rect) const {
+bool FTScalerContext::MeasureColorVectorGlyph(GlyphID glyphID, Rect* rect) const {
   std::string text = getGlyphUTF8(glyphID);
   if (text.empty()) {
     return false;

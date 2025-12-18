@@ -98,27 +98,8 @@ std::shared_ptr<FTTypeface> FTTypeface::Make(FTFontData data) {
   return typeface;
 }
 
-static bool CheckIsCOLRv1(FT_Face face) {
-  FT_ULong length = 0;
-  if (FT_Load_Sfnt_Table(face, FT_MAKE_TAG('C', 'O', 'L', 'R'), 0, nullptr, &length) != FT_Err_Ok) {
-    return false;
-  }
-  if (length < 2) {
-    return false;
-  }
-  uint8_t header[2] = {};
-  FT_ULong headerSize = 2;
-  if (FT_Load_Sfnt_Table(face, FT_MAKE_TAG('C', 'O', 'L', 'R'), 0, header, &headerSize) !=
-      FT_Err_Ok) {
-    return false;
-  }
-  auto version = (static_cast<uint16_t>(header[0]) << 8) | header[1];
-  return version >= 1;
-}
-
 FTTypeface::FTTypeface(FTFontData data, FT_Face face)
-    : _uniqueID(UniqueID::Next()), data(std::move(data)), face(std::move(face)),
-      _isCOLRv1(CheckIsCOLRv1(this->face)) {
+    : _uniqueID(UniqueID::Next()), data(std::move(data)), face(std::move(face)) {
 }
 
 FTTypeface::~FTTypeface() {
