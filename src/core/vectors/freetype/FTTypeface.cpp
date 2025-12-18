@@ -203,27 +203,6 @@ std::shared_ptr<Data> FTTypeface::copyTableData(FontTableTag tag) const {
   return Data::MakeAdopted(tableData, tableLength);
 }
 
-#ifdef TGFX_USE_GLYPH_TO_UNICODE
-const std::vector<Unichar>& FTTypeface::getGlyphToUnicodeMap() const {
-  std::lock_guard<std::mutex> autoLock(locker);
-  if (!glyphToUnicodeCache.empty()) {
-    return glyphToUnicodeCache;
-  }
-  auto numGlyphs = static_cast<size_t>(face->num_glyphs);
-  glyphToUnicodeCache.resize(numGlyphs, 0);
-
-  FT_UInt glyphIndex = 0;
-  auto charCode = FT_Get_First_Char(face, &glyphIndex);
-  while (glyphIndex) {
-    if (0 == glyphToUnicodeCache[glyphIndex]) {
-      glyphToUnicodeCache[glyphIndex] = static_cast<Unichar>(charCode);
-    }
-    charCode = FT_Get_Next_Char(face, charCode, &glyphIndex);
-  }
-  return glyphToUnicodeCache;
-}
-#endif
-
 #ifdef TGFX_USE_ADVANCED_TYPEFACE_PROPERTY
 namespace {
 bool CanEmbed(FT_Face face) {
@@ -277,6 +256,23 @@ bool FTTypeface::isOpentypeFontDataStandardFormat() const {
   return fontTag == windowsTrueTypeTag || fontTag == macTrueTypeTag || fontTag == postScriptTag ||
          fontTag == opentypeCFFTag || fontTag == ttcTag;
 }
+
+#ifdef TGFX_USE_GLYPH_TO_UNICODE
+std::vector<Unichar> FTTypeface::onCreateGlyphToUnicodeMap() const {
+  auto numGlyphs = static_cast<size_t>(face->num_glyphs);
+  std::vector<Unichar> returnMap(numGlyphs, 0);
+
+  FT_UInt glyphIndex = 0;
+  auto charCode = FT_Get_First_Char(face, &glyphIndex);
+  while (glyphIndex) {
+    if (0 == returnMap[glyphIndex]) {
+      returnMap[glyphIndex] = static_cast<Unichar>(charCode);
+    }
+    charCode = FT_Get_Next_Char(face, charCode, &glyphIndex);
+  }
+  return returnMap;
+}
+#endif
 
 AdvancedTypefaceInfo FTTypeface::getAdvancedInfo() const {
   AdvancedTypefaceInfo advancedProperty;

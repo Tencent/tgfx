@@ -110,7 +110,7 @@ std::string WebTypeface::getText(GlyphID glyphID) const {
 }
 
 #ifdef TGFX_USE_GLYPH_TO_UNICODE
-const std::vector<Unichar>& WebTypeface::getGlyphToUnicodeMap() const {
+std::vector<Unichar> onCreateGlyphToUnicodeMap() const {
   return GlyphsMap()[webFontFamily];
 }
 #endif

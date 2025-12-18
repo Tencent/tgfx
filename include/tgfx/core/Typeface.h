@@ -159,7 +159,7 @@ class Typeface {
    * unicode. The array length is glyphsCount(). 
    * This method is only implemented when compiling the SVG or PDF export module.
    */
-  virtual const std::vector<Unichar>& getGlyphToUnicodeMap() const;
+  const std::vector<Unichar>& getGlyphToUnicodeMap() const;
 
   virtual std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const = 0;
 
@@ -182,9 +182,13 @@ class Typeface {
 
   virtual bool onComputeBounds(Rect* bounds) const;
 
+  virtual std::vector<Unichar> onCreateGlyphToUnicodeMap() const;
+
   std::unordered_map<float, std::weak_ptr<ScalerContext>> scalerContexts = {};
   mutable Rect bounds = {};
-  mutable std::once_flag onceFlag = {};
+  mutable std::once_flag boundsOnceFlag = {};
+  mutable std::vector<Unichar> glyphToUnicodeCache = {};
+  mutable std::once_flag glyphToUnicodeOnceFlag = {};
 
   friend class Font;
   friend class ScalerContext;

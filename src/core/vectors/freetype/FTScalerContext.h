@@ -19,6 +19,10 @@
 #pragma once
 
 #include <memory>
+#include <mutex>
+#include <shared_mutex>
+#include <string>
+#include <unordered_map>
 #include "ft2build.h"
 #include FT_FREETYPE_H
 #include "FTTypeface.h"
@@ -46,7 +50,7 @@ class FTScalerContext : public ScalerContext {
                          Matrix* matrix) const override;
 
   bool readPixels(GlyphID glyphID, bool fauxBold, const Stroke* stroke, const ImageInfo& dstInfo,
-                  void* dstPixels) const override;
+                  void* dstPixels, const Point& glyphOffset) const override;
 
   float getBackingSize() const override {
     return backingSize;
@@ -72,9 +76,12 @@ class FTScalerContext : public ScalerContext {
   bool loadOutlineGlyph(FT_Face face, GlyphID glyphID, bool fauxBold, bool fauxItalic) const;
 
 #if defined(__ANDROID__) || defined(ANDROID)
-  static bool MeasureCOLRv1Glyph(FTTypeface* typeface, GlyphID glyphID, float textSize, Rect* rect);
+  bool MeasureCOLRv1Glyph(GlyphID glyphID, Rect* rect) const;
 
-  static std::string GlyphIDToUTF8(FTTypeface* typeface, GlyphID glyphID);
+  std::string getGlyphUTF8(GlyphID glyphID) const;
+
+  mutable std::shared_mutex glyphUTF8CacheMutex = {};
+  mutable std::unordered_map<GlyphID, std::string> glyphUTF8Cache = {};
 #endif
 
   float textScale = 1.0f;

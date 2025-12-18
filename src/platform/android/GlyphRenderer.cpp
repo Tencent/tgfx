@@ -18,7 +18,7 @@
 
 #include "GlyphRenderer.h"
 #include <cstring>
-#include <mutex>
+#include <shared_mutex>
 #include <unordered_map>
 #include "JNIUtil.h"
 #include "core/utils/Log.h"
@@ -72,7 +72,7 @@ static jfieldID Rect_bottom = nullptr;
 static bool initialized = false;
 
 // Typeface cache: fontPath -> Global<jobject>
-static std::mutex typefaceCacheMutex;
+static std::shared_mutex typefaceCacheMutex;
 static std::unordered_map<std::string, Global<jobject>> typefaceCache;
 
 void GlyphRenderer::JNIInit(JNIEnv* env) {
@@ -163,11 +163,24 @@ static jobject GetCachedTypeface(JNIEnv* env, const std::string& fontPath) {
   if (fontPath.empty()) {
     return nullptr;
   }
-  std::lock_guard<std::mutex> lock(typefaceCacheMutex);
+
+  // Fast path: read lock for cache lookup
+  {
+    std::shared_lock<std::shared_mutex> readLock(typefaceCacheMutex);
+    auto it = typefaceCache.find(fontPath);
+    if (it != typefaceCache.end()) {
+      return it->second.get();
+    }
+  }
+
+  // Slow path: write lock for cache insertion
+  std::unique_lock<std::shared_mutex> writeLock(typefaceCacheMutex);
+  // Double-check: another thread may have inserted it
   auto it = typefaceCache.find(fontPath);
   if (it != typefaceCache.end()) {
     return it->second.get();
   }
+
   jstring jPath = SafeToJString(env, fontPath);
   if (jPath == nullptr) {
     return nullptr;

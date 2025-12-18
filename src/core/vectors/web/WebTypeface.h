@@ -69,10 +69,6 @@ class WebTypeface : public Typeface {
   }
 
  protected:
-#ifdef TGFX_USE_GLYPH_TO_UNICODE
-  const std::vector<Unichar>& getGlyphToUnicodeMap() const override;
-#endif
-
 #ifdef TGFX_USE_ADVANCED_TYPEFACE_PROPERTY
   AdvancedTypefaceInfo getAdvancedInfo() const override;
 #endif
@@ -81,7 +77,9 @@ class WebTypeface : public Typeface {
 
  private:
   explicit WebTypeface(std::string name, std::string style);
-
+#ifdef TGFX_USE_GLYPH_TO_UNICODE
+  std::vector<Unichar> onCreateGlyphToUnicodeMap() const override;
+#endif
   uint32_t _uniqueID;
   bool _hasColor = false;
   emscripten::val scalerContextClass = emscripten::val::null();
