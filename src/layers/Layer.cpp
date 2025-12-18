@@ -1358,7 +1358,8 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
 
   AutoCanvasRestore autoRestore(canvas);
   canvas->concat(imageMatrix);
-  auto filterMode = _filters.empty() ? FilterMode::Nearest : FilterMode::Linear;
+  auto filterMode =
+      !args.excludeEffects && !_filters.empty() ? FilterMode::Linear : FilterMode::Nearest;
   auto sampling = SamplingOptions{filterMode, MipmapMode::None};
   canvas->drawImage(image, 0.f, 0.f, sampling, &paint);
   if (args.blurBackground) {
