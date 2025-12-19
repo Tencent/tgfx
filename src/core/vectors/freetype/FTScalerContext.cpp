@@ -516,7 +516,7 @@ void FTScalerContext::getBBoxForCurrentGlyph(FT_BBox* bbox) const {
 
 Rect FTScalerContext::getBounds(tgfx::GlyphID glyphID, bool fauxBold, bool fauxItalic) const {
 #if defined(__ANDROID__) || defined(ANDROID)
-  if (ftTypeface()->isColorVector() && GlyphRenderer::IsAvailable()) {
+  if (ftTypeface()->hasColor() && ftTypeface()->hasOutlines() && GlyphRenderer::IsAvailable()) {
     Rect rect = {};
     if (MeasureColorVectorGlyph(glyphID, &rect)) {
       return rect;
@@ -618,7 +618,7 @@ Rect FTScalerContext::getImageTransform(GlyphID glyphID, bool fauxBold, const St
     return bounds;
   }
 #if defined(__ANDROID__) || defined(ANDROID)
-  if (ftTypeface()->isColorVector() && GlyphRenderer::IsAvailable()) {
+  if (ftTypeface()->hasColor() && ftTypeface()->hasOutlines() && GlyphRenderer::IsAvailable()) {
     Rect rect = {};
     if (MeasureColorVectorGlyph(glyphID, &rect)) {
       if (matrix) {
@@ -655,12 +655,12 @@ bool FTScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke*,
   // Note: In the hasColor() function, freeType has an internal lock. Placing this method later
   // would cause repeated locking and lead to a deadlock.
   bool colorFont = hasColor();
-  bool isColorVector = ftTypeface()->isColorVector();
+  bool isColorVector = ftTypeface()->hasColor() && ftTypeface()->hasOutlines();
 #if defined(__ANDROID__) || defined(ANDROID)
   if (isColorVector && GlyphRenderer::IsAvailable()) {
-    std::string text = getGlyphUTF8(glyphID);
+    std::string text = ftTypeface()->getGlyphUTF8(glyphID);
     if (!text.empty()) {
-      auto fontPath = ftTypeface()->fontPath();
+      auto typeface = ftTypeface()->typeface;
       float offsetX = -glyphOffset.x;
       float offsetY = -glyphOffset.y;
       auto width = static_cast<int>(dstInfo.width());
@@ -669,13 +669,13 @@ bool FTScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke*,
                               dstInfo.alphaType() == AlphaType::Unpremultiplied &&
                               (dstInfo.colorSpace() == nullptr || dstInfo.colorSpace()->isSRGB());
       if (formatCompatible) {
-        return GlyphRenderer::RenderGlyph(fontPath, text, textSize, width, height, offsetX, offsetY,
+        return GlyphRenderer::RenderGlyph(typeface, text, textSize, width, height, offsetX, offsetY,
                                           dstPixels);
       }
       auto srcInfo = ImageInfo::Make(width, height, ColorType::RGBA_8888,
                                      AlphaType::Unpremultiplied, 0, ColorSpace::SRGB());
       Buffer buffer{srcInfo.byteSize()};
-      if (!GlyphRenderer::RenderGlyph(fontPath, text, textSize, width, height, offsetX, offsetY,
+      if (!GlyphRenderer::RenderGlyph(typeface, text, textSize, width, height, offsetX, offsetY,
                                       buffer.data())) {
         return false;
       }
@@ -777,26 +777,20 @@ bool FTScalerContext::loadOutlineGlyph(FT_Face face, GlyphID glyphID, bool fauxB
 
 #if defined(__ANDROID__) || defined(ANDROID)
 bool FTScalerContext::MeasureColorVectorGlyph(GlyphID glyphID, Rect* rect) const {
-  std::string text = getGlyphUTF8(glyphID);
+  std::string text = ftTypeface()->getGlyphUTF8(glyphID);
   if (text.empty()) {
     return false;
   }
-  auto fontPath = ftTypeface()->fontPath();
+  auto typeface = ftTypeface()->typeface;
   float bounds[4] = {};
   float advance = 0;
-  if (!GlyphRenderer::MeasureText(fontPath, text, textSize, bounds, &advance)) {
+  if (!GlyphRenderer::MeasureText(typeface, text, textSize, bounds, &advance)) {
     return false;
   }
   float width = std::max(bounds[2] - bounds[0], advance);
   float height = std::max(bounds[3] - bounds[1], textSize * 1.2f);
   *rect = Rect::MakeXYWH(bounds[0], bounds[1], width, height);
   return true;
-}
-
-std::string FTScalerContext::getGlyphUTF8(GlyphID glyphID) const {
-  auto& map = ftTypeface()->getGlyphToUnicodeMap();
-  Unichar unichar = glyphID < map.size() ? map[glyphID] : 0;
-  return UTF::ToUTF8(unichar);
 }
 #endif
 }  // namespace tgfx

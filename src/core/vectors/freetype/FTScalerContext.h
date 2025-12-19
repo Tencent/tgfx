@@ -74,8 +74,6 @@ class FTScalerContext : public ScalerContext {
 
 #if defined(__ANDROID__) || defined(ANDROID)
   bool MeasureColorVectorGlyph(GlyphID glyphID, Rect* rect) const;
-
-  std::string getGlyphUTF8(GlyphID glyphID) const;
 #endif
 
   float textScale = 1.0f;
