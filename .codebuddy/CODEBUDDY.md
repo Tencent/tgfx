@@ -90,22 +90,26 @@ node build_tgfx -p mac -x    # Create xcframework
 ### Public API (`/include/tgfx/`)
 All public headers with detailed API documentation.
 
-### Testing (`/test/`)
-- Test files: `/test/src/*Test.cpp` (Google Test framework)
+## Testing
+
+- Location: `/test/src/*Test.cpp`, based on Google Test framework
 - Test code can access all private members via compile flags (no friend class needed)
-- Baseline images: `/test/baseline/` (reference images for visual tests)
-- Test output: `/test/out/` (generated images)
 
-#### Screenshot Testing
-- Use `Baseline::Compare(pixels, key)` for comparison, key format: `{folder}/{name}` (e.g., `CanvasTest/Clip`)
-- Output: `test/out/{folder}/{name}.webp`, baseline: `{name}_base.webp` in same directory
-- Comparison mechanism: compares version numbers in `test/baseline/version.json` (repo) vs `.cache/version.json` (local). Only performs baseline comparison when versions match; mismatched versions skip comparison and return success (accepting screenshot changes)
+### Screenshot Comparison
 
-#### Updating Baselines
-- Copy `test/out/version.json` to `test/baseline/` to accept screenshot changes, **but MUST satisfy both**:
-  - Use `version.json` from a FULL run of `TGFXFullTest` (all test cases), NOT partial runs
-  - User explicitly confirms accepting all screenshot changes
-- `UpdateBaseline` or `update_baseline.sh` syncs `test/baseline/version.json` to `.cache/` and generates local baseline cache. CMake warns when version.json files mismatch and prompts manual run. **NEVER run this command automatically**
+Use `Baseline::Compare(pixels, key)` for visual regression testing:
+- **Key format**: `{TestClass}/{CaseName}`, e.g., `CanvasTest/Clip`
+- **Output**: `test/out/{TestClass}/{CaseName}.webp`
+- **Baseline**: `test/out/{TestClass}/{CaseName}_base.webp`
+- **Version control**: Compares `test/baseline/version.json` (repo) vs `.cache/version.json` (local). Only compares images when versions match; mismatched versions skip comparison and return success (allowing screenshot changes)
+
+### Updating Baselines
+
+Copy `test/out/version.json` to `test/baseline/` to accept changes. **Requirements**:
+1. Must use output from a FULL `TGFXFullTest` run (all test cases)
+2. User must explicitly confirm accepting all screenshot changes
+
+**Note**: `update_baseline.sh` syncs baseline to local cache. CMake warns on version mismatch. **NEVER run automatically**
 
 ## Key CMake Options
 
