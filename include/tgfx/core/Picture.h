@@ -19,7 +19,6 @@
 #pragma once
 
 #include <atomic>
-#include <optional>
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Path.h"
 
@@ -67,14 +66,6 @@ class Picture {
    */
   void playback(Canvas* canvas) const;
 
-  /**
-   * Attempts to extract a mask path from the picture for clip optimization. Returns the combined
-   * path if all draw commands are simple shapes (Rect/RRect/Path) with opaque solid fills or
-   * strokes. Returns std::nullopt if the picture contains complex content that cannot be
-   * represented as a simple path.
-   */
-  std::optional<Path> getMaskPath() const;
-
  private:
   std::unique_ptr<BlockBuffer> blockBuffer;
   std::vector<PlacementPtr<PictureRecord>> records;
@@ -93,6 +84,10 @@ class Picture {
   const PictureRecord* getFirstDrawRecord(MCState* state = nullptr, Brush* brush = nullptr,
                                           bool* hasStroke = nullptr) const;
 
+  bool asMaskPath(Path* path) const;
+
+  bool canConvertToMask() const;
+
   friend class MeasureContext;
   friend class RenderContext;
   friend class PictureContext;
@@ -102,5 +97,6 @@ class Picture {
   friend class Canvas;
   friend class PDFExportContext;
   friend class ContourContext;
+  friend class Layer;
 };
 }  // namespace tgfx

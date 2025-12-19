@@ -44,6 +44,11 @@ static constexpr int SUBTREE_CACHE_MIN_SIZE = 32;
 static std::atomic_bool AllowsEdgeAntialiasing = true;
 static std::atomic_bool AllowsGroupOpacity = false;
 
+struct MaskData {
+  Path clipPath = {};
+  std::shared_ptr<MaskFilter> maskFilter = nullptr;
+};
+
 struct LayerStyleSource {
   float contentScale = 1.0f;
   std::shared_ptr<Image> content = nullptr;
@@ -976,21 +981,7 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
     }
     return;
   }
-  std::optional<Path> maskClipPath = std::nullopt;
-  std::shared_ptr<MaskFilter> maskFilter = nullptr;
-  if (hasValidMask()) {
-    auto clipBounds =
-        GetClipBounds(args.blurBackground ? args.blurBackground->getCanvas() : canvas);
-    auto contentScale = canvas->getMatrix().getMaxScale();
-    std::tie(maskClipPath, maskFilter) = getMaskData(args, contentScale, clipBounds);
-  }
-  if (maskClipPath.has_value()) {
-    canvas->clipPath(*maskClipPath);
-    auto blurCanvas = args.blurBackground ? args.blurBackground->getCanvas() : nullptr;
-    if (blurCanvas) {
-      blurCanvas->clipPath(*maskClipPath);
-    }
-  }
+  auto maskFilter = prepareMask(args, canvas);
   bool needsMaskFilter = maskFilter != nullptr;
   if (canUseSubtreeCache(args, blendMode, transform3D) &&
       drawWithSubtreeCache(args, canvas, alpha, blendMode, transform3D, maskFilter)) {
@@ -1021,8 +1012,25 @@ Matrix3D Layer::getRelativeMatrix(const Layer* targetCoordinateSpace) const {
   return relativeMatrix;
 }
 
-std::pair<std::optional<Path>, std::shared_ptr<MaskFilter>> Layer::getMaskData(
-    const DrawArgs& args, float scale, const std::optional<Rect>& layerClipBounds) {
+std::shared_ptr<MaskFilter> Layer::prepareMask(const DrawArgs& args, Canvas* canvas) {
+  if (!hasValidMask()) {
+    return nullptr;
+  }
+  auto clipBounds = GetClipBounds(args.blurBackground ? args.blurBackground->getCanvas() : canvas);
+  auto contentScale = canvas->getMatrix().getMaxScale();
+  auto maskData = getMaskData(args, contentScale, clipBounds);
+  if (maskData.maskFilter == nullptr) {
+    canvas->clipPath(maskData.clipPath);
+    auto blurCanvas = args.blurBackground ? args.blurBackground->getCanvas() : nullptr;
+    if (blurCanvas) {
+      blurCanvas->clipPath(maskData.clipPath);
+    }
+  }
+  return maskData.maskFilter;
+}
+
+MaskData Layer::getMaskData(const DrawArgs& args, float scale,
+                            const std::optional<Rect>& layerClipBounds) {
   DEBUG_ASSERT(_mask != nullptr);
   auto maskType = static_cast<LayerMaskType>(bitFields.maskType);
   auto maskArgs = args;
@@ -1042,17 +1050,13 @@ std::pair<std::optional<Path>, std::shared_ptr<MaskFilter>> Layer::getMaskData(
     _mask->drawLayer(maskArgs, canvas, _mask->_alpha, BlendMode::SrcOver);
   });
   if (maskPicture == nullptr) {
-    return {Path(), nullptr};
+    return {};
   }
 
   if (isMatrixAffine && maskType != LayerMaskType::Luminance) {
-    auto maskPath = maskPicture->getMaskPath();
-    if (maskPath.has_value()) {
-      // Empty path with inverse fill type means it fills everything, no mask effect
-      if (maskPath->isEmpty() && maskPath->isInverseFillType()) {
-        return {std::nullopt, nullptr};
-      }
-      maskPath->transform(Matrix::MakeScale(1.0f / scale, 1.0f / scale));
+    Path maskPath = {};
+    if (maskPicture->asMaskPath(&maskPath)) {
+      maskPath.transform(Matrix::MakeScale(1.0f / scale, 1.0f / scale));
       return {std::move(maskPath), nullptr};
     }
   }
@@ -1061,7 +1065,7 @@ std::pair<std::optional<Path>, std::shared_ptr<MaskFilter>> Layer::getMaskData(
   auto maskContentImage =
       ToImageWithOffset(std::move(maskPicture), &maskImageOffset, nullptr, args.dstColorSpace);
   if (maskContentImage == nullptr) {
-    return {std::nullopt, nullptr};
+    return {};
   }
   if (maskType == LayerMaskType::Luminance) {
     maskContentImage =
@@ -1077,7 +1081,7 @@ std::pair<std::optional<Path>, std::shared_ptr<MaskFilter>> Layer::getMaskData(
   if (shader) {
     shader = shader->makeWithMatrix(maskMatrix);
   }
-  return {std::nullopt, MaskFilter::MakeShader(shader)};
+  return {{}, MaskFilter::MakeShader(shader)};
 }
 
 std::shared_ptr<Image> Layer::getContentImage(const DrawArgs& contentArgs,

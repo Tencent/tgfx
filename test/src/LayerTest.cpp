@@ -4166,47 +4166,6 @@ TGFX_TEST(LayerTest, MaskPathOptimization) {
   layer4->setMaskType(LayerMaskType::Luminance);
 
   displayList->render(surface.get());
-
-  // Verify pixels by reading from surface
-  Bitmap bitmap = {};
-  bitmap.allocPixels(200, 200);
-  auto pixels = bitmap.lockPixels();
-  auto result = surface->readPixels(bitmap.info(), pixels);
-  bitmap.unlockPixels();
-  EXPECT_TRUE(result);
-
-  // Helper to check if pixel has content (not transparent)
-  auto hasContent = [&](int x, int y) {
-    auto color = bitmap.getColor(x, y);
-    return color.alpha > 0.1f;
-  };
-
-  // Helper to check if pixel is transparent
-  auto isTransparent = [&](int x, int y) {
-    auto color = bitmap.getColor(x, y);
-    return color.alpha < 0.1f;
-  };
-
-  // Test 1: Rect mask at (10,10)-(50,40)
-  EXPECT_TRUE(hasContent(30, 25)) << "Test1: Center of rect mask should have content";
-  EXPECT_TRUE(isTransparent(5, 5)) << "Test1: Outside mask should be transparent";
-  EXPECT_TRUE(isTransparent(55, 25)) << "Test1: Right of mask should be transparent";
-
-  // Test 2: RRect mask at (110,10)-(150,40)
-  EXPECT_TRUE(hasContent(130, 25)) << "Test2: Center of rrect mask should have content";
-  EXPECT_TRUE(isTransparent(105, 25)) << "Test2: Left of mask should be transparent";
-
-  // Test 3: Oval mask at (10,110)-(50,150)
-  EXPECT_TRUE(hasContent(30, 130)) << "Test3: Center of oval mask should have content";
-  EXPECT_TRUE(isTransparent(12, 112)) << "Test3: Corner of oval should be transparent";
-
-  // Test 4: Rect mask at (110,110)-(150,140) with Luminance type
-  EXPECT_TRUE(hasContent(130, 125)) << "Test4: Center of luma mask should have content";
-  EXPECT_TRUE(isTransparent(105, 125)) << "Test4: Left of mask should be transparent";
-
-  // Gap between regions should be transparent
-  EXPECT_TRUE(isTransparent(80, 80)) << "Center gap should be transparent";
-
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/MaskPathOptimization"));
 }
 

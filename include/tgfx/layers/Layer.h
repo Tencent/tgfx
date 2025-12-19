@@ -38,6 +38,7 @@ class DrawArgs;
 class RegionTransformer;
 class RootLayer;
 struct LayerStyleSource;
+struct MaskData;
 class BackgroundContext;
 enum class DrawMode;
 
@@ -606,8 +607,10 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   bool getLayersUnderPointInternal(float x, float y, std::vector<std::shared_ptr<Layer>>* results);
 
-  std::pair<std::optional<Path>, std::shared_ptr<MaskFilter>> getMaskData(
-      const DrawArgs& args, float scale, const std::optional<Rect>& layerClipBounds);
+  std::shared_ptr<MaskFilter> prepareMask(const DrawArgs& args, Canvas* canvas);
+
+  MaskData getMaskData(const DrawArgs& args, float scale,
+                       const std::optional<Rect>& layerClipBounds);
 
   Matrix3D getRelativeMatrix(const Layer* targetCoordinateSpace) const;
 
