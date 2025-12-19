@@ -45,6 +45,7 @@ cmake --build . --target TGFXFullTest -- -j 12
 ```bash
 ./codeformat.sh
 ```
+Run this before every commit. Ignore any error output - the script completes formatting regardless of reported errors.
 
 ### Platform-Specific Project Generation
 ```bash
