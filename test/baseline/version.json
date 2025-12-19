@@ -128,13 +128,6 @@
         "tile_mode_rgbaaa": "8cb853c",
         "tile_mode_subset": "2931d737"
     },
-    "Hello2DTest": {
-        "ConicGradient": "492105ac",
-        "ImageWithMipmap": "492105ac",
-        "ImageWithShadow": "492105ac",
-        "RichText": "97a50bee",
-        "SimpleLayerTree": "97a50bee"
-    },
     "DstTextureTest": {
         "EmptyLocalBounds": "be94e666",
         "OutOfRenderTarget": "be94e666"
@@ -172,6 +165,13 @@
         "identityMatrix": "6b4e5ce0",
         "innerShadow": "0cfb8996",
         "shaderMaskFilter": "6b4e5ce0"
+    },
+    "Hello2DTest": {
+        "ConicGradient": "492105ac",
+        "ImageWithMipmap": "492105ac",
+        "ImageWithShadow": "cf704c3f",
+        "RichText": "97a50bee",
+        "SimpleLayerTree": "cf704c3f"
     },
     "LayerTest": {
         "AdaptiveDashEffect": "eefb7a46",
@@ -424,4 +424,3 @@
         "CustomPathTypeface": "42ecc4c7"
     }
 }
-
