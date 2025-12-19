@@ -178,7 +178,7 @@ jobject GlyphRenderer::CreateTypeface(const std::string& fontPath) {
       env->CallStaticObjectMethod(TypefaceClass.get(), Typeface_createFromFile, jPath);
   env->DeleteLocalRef(jPath);
   if (typeface == nullptr || env->ExceptionCheck()) {
-    LOGE("GlyphRenderer::GetCachedTypeface() Failed to create Typeface from path: %s!",
+    LOGE("GlyphRenderer::CreateTypeface() Failed to create Typeface from path: %s!",
          fontPath.c_str());
     env->ExceptionClear();
     return nullptr;

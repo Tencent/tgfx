@@ -491,8 +491,8 @@ static bool GenerateGlyphPath(FT_Face face, Path* path) {
 
 bool FTScalerContext::generatePath(GlyphID glyphID, bool fauxBold, bool fauxItalic,
                                    Path* path) const {
-  bool isColorVector = ftTypeface()->hasColor() && ftTypeface()->hasOutlines();
   std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
+  bool isColorVector = ftTypeface()->hasColor() && ftTypeface()->hasOutlines();
   auto face = ftTypeface()->face;
 
   // For color vector fonts (COLRv0/v1), try to get paths from all color layers.

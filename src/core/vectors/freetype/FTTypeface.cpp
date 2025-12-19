@@ -104,9 +104,12 @@ std::shared_ptr<FTTypeface> FTTypeface::Make(FTFontData data) {
 
 FTTypeface::FTTypeface(FTFontData data, FT_Face face)
     : _uniqueID(UniqueID::Next()), data(std::move(data)), face(std::move(face)) {
+  _hasColor = FT_HAS_COLOR(this->face);
+  _hasOutlines = FT_IS_SCALABLE(this->face);
 #if defined(__ANDROID__) || defined(ANDROID)
-  if (hasColor() && hasOutlines() && GlyphRenderer::IsAvailable()) {
-    typeface = GlyphRenderer::CreateTypeface(data.path);
+  if (_hasColor && _hasOutlines && GlyphRenderer::IsAvailable()) {
+    auto localTypeface = GlyphRenderer::CreateTypeface(this->data.path);
+    typeface.reset(localTypeface);
   }
 #endif
 }
@@ -149,13 +152,11 @@ int FTTypeface::unitsPerEmInternal() const {
 }
 
 bool FTTypeface::hasColor() const {
-  std::lock_guard<std::mutex> autoLock(locker);
-  return FT_HAS_COLOR(face);
+  return _hasColor;
 }
 
 bool FTTypeface::hasOutlines() const {
-  std::lock_guard<std::mutex> autoLock(locker);
-  return FT_IS_SCALABLE(face);
+  return _hasOutlines;
 }
 
 GlyphID FTTypeface::getGlyphID(Unichar unichar) const {
