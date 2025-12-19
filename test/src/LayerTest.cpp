@@ -2882,6 +2882,46 @@ TGFX_TEST(LayerTest, BackgroundBlurStyleTest) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundBlurStyleTest5"));
 }
 
+/**
+ * Test case where subBackgroundContext is larger than parent->backgroundContext.
+ * The blurLayer's blur expansion area exceeds the parent's backgroundContext bounds.
+ */
+TGFX_TEST(LayerTest, SimpleBackgroundBlur) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 300);
+  DisplayList displayList;
+
+  // solidLayer: (50,50) to (250,250)
+  auto solidLayer = SolidLayer::Make();
+  solidLayer->setColor(Color::FromRGBA(0, 100, 200, 255));
+  solidLayer->setWidth(200);
+  solidLayer->setHeight(200);
+  solidLayer->setMatrix(Matrix::MakeTrans(50, 50));
+
+  // blurLayer: (150,150) to (300,300), partially overlaps solidLayer
+  auto blurLayer = SolidLayer::Make();
+  blurLayer->setColor(Color::FromRGBA(255, 255, 255, 50));
+  blurLayer->setWidth(150);
+  blurLayer->setHeight(150);
+  blurLayer->setMatrix(Matrix::MakeTrans(150, 150));
+  blurLayer->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
+  blurLayer->setPassThroughBackground(false);
+
+  auto rootLayer = displayList.root();
+  rootLayer->addChild(solidLayer);
+  rootLayer->addChild(blurLayer);
+
+  displayList.setRenderMode(RenderMode::Tiled);
+  displayList.render(surface.get());
+
+  displayList.setZoomScale(1.5f);
+  displayList.setContentOffset(-100, -100);
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/SimpleBackgroundBlur_tiled"));
+}
+
 TGFX_TEST(LayerTest, PartialBackgroundBlur) {
   ContextScope scope;
   auto context = scope.getContext();
