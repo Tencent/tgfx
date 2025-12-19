@@ -88,7 +88,7 @@ class MaskContext : public DrawContext, public Picture::AbortCallback {
     bool hasStroke = false;
   };
 
-  void addRecord(Path path, const MCState& state, const Stroke* stroke);
+  void addPath(Path path, const MCState& state, const Stroke* stroke);
 
   std::vector<PathRecord> _records = {};
   bool _aborted = false;

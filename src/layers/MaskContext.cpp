@@ -31,31 +31,7 @@ bool MaskContext::GetMaskPath(const std::shared_ptr<Picture>& picture, Path* res
   return maskContext.finish(result);
 }
 
-static bool ApplyClipAndStroke(Path* shapePath, const MCState& state, const Stroke* stroke) {
-  auto& clip = state.clip;
-  bool clipUnbounded = clip.isEmpty() && clip.isInverseFillType();
-  if (shapePath->isInverseFillType()) {
-    return false;
-  }
-  if (!clipUnbounded && clip.isInverseFillType()) {
-    return false;
-  }
-
-  if (stroke && !stroke->applyToPath(shapePath)) {
-    return false;
-  }
-
-  shapePath->transform(state.matrix);
-  if (!clipUnbounded) {
-    Path clippedPath = clip;
-    clippedPath.addPath(*shapePath, PathOp::Intersect);
-    *shapePath = std::move(clippedPath);
-  }
-
-  return true;
-}
-
-void MaskContext::addRecord(Path path, const MCState& state, const Stroke* stroke) {
+void MaskContext::addPath(Path path, const MCState& state, const Stroke* stroke) {
   if (_aborted) {
     return;
   }
@@ -79,17 +55,14 @@ bool MaskContext::finish(Path* result) {
   }
   Path maskPath = {};
   for (auto& record : _records) {
-    bool clipUnbounded = record.state.clip.isEmpty() && record.state.clip.isInverseFillType();
-    bool shapeUnbounded = record.path.isEmpty() && record.path.isInverseFillType();
-    if (clipUnbounded && shapeUnbounded) {
-      *result = std::move(record.path);
-      return true;
-    }
     auto* stroke = record.hasStroke ? &record.stroke : nullptr;
-    if (!ApplyClipAndStroke(&record.path, record.state, stroke)) {
+    if (stroke && !stroke->applyToPath(&record.path)) {
       return false;
     }
-    maskPath.addPath(record.path);
+    record.path.transform(record.state.matrix);
+    Path clippedPath = record.state.clip;
+    clippedPath.addPath(record.path, PathOp::Intersect);
+    maskPath.addPath(clippedPath);
   }
   *result = std::move(maskPath);
   return true;
@@ -102,7 +75,7 @@ void MaskContext::drawFill(const Brush& brush) {
   }
   Path shapePath = {};
   shapePath.toggleInverseFillType();
-  addRecord(std::move(shapePath), MCState(Matrix::I()), nullptr);
+  addPath(std::move(shapePath), MCState(Matrix::I()), nullptr);
 }
 
 void MaskContext::drawRect(const Rect& rect, const MCState& state, const Brush& brush,
@@ -113,7 +86,7 @@ void MaskContext::drawRect(const Rect& rect, const MCState& state, const Brush& 
   }
   Path shapePath = {};
   shapePath.addRect(rect);
-  addRecord(std::move(shapePath), state, stroke);
+  addPath(std::move(shapePath), state, stroke);
 }
 
 void MaskContext::drawRRect(const RRect& rRect, const MCState& state, const Brush& brush,
@@ -124,7 +97,7 @@ void MaskContext::drawRRect(const RRect& rRect, const MCState& state, const Brus
   }
   Path shapePath = {};
   shapePath.addRRect(rRect);
-  addRecord(std::move(shapePath), state, stroke);
+  addPath(std::move(shapePath), state, stroke);
 }
 
 void MaskContext::drawPath(const Path& path, const MCState& state, const Brush& brush) {
@@ -132,7 +105,7 @@ void MaskContext::drawPath(const Path& path, const MCState& state, const Brush& 
     _aborted = true;
     return;
   }
-  addRecord(path, state, nullptr);
+  addPath(path, state, nullptr);
 }
 
 void MaskContext::drawShape(std::shared_ptr<Shape>, const MCState&, const Brush&, const Stroke*) {
@@ -168,7 +141,7 @@ void MaskContext::drawPicture(std::shared_ptr<Picture> picture, const MCState& s
     _aborted = true;
     return;
   }
-  addRecord(std::move(subPath), MCState(Matrix::I()), nullptr);
+  addPath(std::move(subPath), MCState(Matrix::I()), nullptr);
 }
 
 void MaskContext::drawLayer(std::shared_ptr<Picture>, std::shared_ptr<ImageFilter>, const MCState&,
