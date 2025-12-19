@@ -3496,6 +3496,7 @@ TGFX_TEST(CanvasTest, PictureMaskPath) {
   canvas = recorder.beginRecording();
   Path inversePath = {};
   inversePath.addRect(Rect::MakeWH(50.f, 50.f));
+  inversePath.addRect(Rect::MakeLTRB(10.f, 10.f, 60.f, 60.f));
   inversePath.setFillType(PathFillType::InverseWinding);
   ASSERT_TRUE(inversePath.isInverseFillType());
   canvas->drawPath(inversePath, paint);
