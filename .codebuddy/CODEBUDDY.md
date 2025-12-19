@@ -2,9 +2,7 @@
 
 This file provides guidance to CodeBuddy Code when working with code in this repository.
 
-@./rules/Coding.md
-@./rules/Commit.md
-@./rules/Review.md
+@./rules/Rules.md
 
 ## Project Overview
 
