@@ -759,7 +759,7 @@ bool FTScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke*,
   if (isColorVector && GlyphRenderer::IsAvailable()) {
     std::string text = ftTypeface()->getGlyphUTF8(glyphID);
     if (!text.empty()) {
-      auto typeface = ftTypeface()->typeface;
+      auto typeface = ftTypeface()->typeface.get();
       float offsetX = -glyphOffset.x;
       float offsetY = -glyphOffset.y;
       auto width = static_cast<int>(dstInfo.width());
@@ -880,7 +880,7 @@ bool FTScalerContext::MeasureColorVectorGlyph(GlyphID glyphID, Rect* rect) const
   if (text.empty()) {
     return false;
   }
-  auto typeface = ftTypeface()->typeface;
+  auto typeface = ftTypeface()->typeface.get();
   float bounds[4] = {};
   float advance = 0;
   if (!GlyphRenderer::MeasureText(typeface, text, textSize, bounds, &advance)) {
