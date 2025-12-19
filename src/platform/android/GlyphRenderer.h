@@ -43,10 +43,12 @@ class GlyphRenderer {
 
   /**
   * Create an Android Typeface object from font file path.
+  * @param env JNI environment pointer
   * @param fontPath Path to the font file
-  * @return Android Typeface jobject (global reference), or nullptr on failure
+  * @return Android Typeface jobject (local reference), or nullptr on failure.
+  *         Caller should convert to global reference if needed.
   */
-  static jobject CreateTypeface(const std::string& fontPath);
+  static jobject CreateTypeface(JNIEnv* env, const std::string& fontPath);
 
   /**
    * Render text to pixel buffer using Android Canvas.

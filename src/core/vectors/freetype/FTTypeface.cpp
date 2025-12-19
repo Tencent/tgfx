@@ -105,25 +105,22 @@ std::shared_ptr<FTTypeface> FTTypeface::Make(FTFontData data) {
 
 FTTypeface::FTTypeface(FTFontData data, FT_Face face)
     : _uniqueID(UniqueID::Next()), data(std::move(data)), face(std::move(face)) {
-  _hasColor = FT_HAS_COLOR(this->face);
-  _hasOutlines = FT_IS_SCALABLE(this->face);
 #if defined(__ANDROID__) || defined(ANDROID)
-  if (_hasColor && _hasOutlines && GlyphRenderer::IsAvailable()) {
-    typeface = GlyphRenderer::CreateTypeface(this->data.path);
+  if (hasColor() && hasOutlines() && GlyphRenderer::IsAvailable()) {
+    JNIEnvironment environment;
+    auto env = environment.current();
+    if (env != nullptr) {
+      auto localTypeface = GlyphRenderer::CreateTypeface(env, this->data.path);
+      if (localTypeface != nullptr) {
+        typeface = localTypeface;
+        env->DeleteLocalRef(localTypeface);
+      }
+    }
   }
 #endif
 }
 
 FTTypeface::~FTTypeface() {
-#if defined(__ANDROID__) || defined(ANDROID)
-  if (typeface != nullptr) {
-    JNIEnvironment environment;
-    auto env = environment.current();
-    if (env != nullptr) {
-      env->DeleteGlobalRef(typeface);
-    }
-  }
-#endif
   std::lock_guard<std::mutex> autoLock(FTMutex());
   FT_Done_Face(face);
 }
@@ -161,11 +158,13 @@ int FTTypeface::unitsPerEmInternal() const {
 }
 
 bool FTTypeface::hasColor() const {
-  return _hasColor;
+  std::lock_guard<std::mutex> autoLock(locker);
+  return FT_HAS_COLOR(face);
 }
 
 bool FTTypeface::hasOutlines() const {
-  return _hasOutlines;
+  std::lock_guard<std::mutex> autoLock(locker);
+  return FT_IS_SCALABLE(face);
 }
 
 GlyphID FTTypeface::getGlyphID(Unichar unichar) const {

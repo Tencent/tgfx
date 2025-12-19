@@ -492,9 +492,8 @@ static bool GenerateGlyphPath(FT_Face face, Path* path) {
 bool FTScalerContext::generatePath(GlyphID glyphID, bool fauxBold, bool fauxItalic,
                                    Path* path) const {
   std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
-  bool isColorVector = ftTypeface()->hasColor() && ftTypeface()->hasOutlines();
   auto face = ftTypeface()->face;
-
+  bool isColorVector = FT_HAS_COLOR(face) && FT_IS_SCALABLE(face);
   // For color vector fonts (COLRv0/v1), try to get paths from all color layers.
   // This loses color information but returns the correct combined path.
   if (isColorVector) {
@@ -759,7 +758,7 @@ bool FTScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke*,
   if (isColorVector && GlyphRenderer::IsAvailable()) {
     std::string text = ftTypeface()->getGlyphUTF8(glyphID);
     if (!text.empty()) {
-      auto typeface = ftTypeface()->typeface;
+      auto typeface = ftTypeface()->typeface.get();
       float offsetX = -glyphOffset.x;
       float offsetY = -glyphOffset.y;
       auto width = static_cast<int>(dstInfo.width());
@@ -880,7 +879,7 @@ bool FTScalerContext::MeasureColorVectorGlyph(GlyphID glyphID, Rect* rect) const
   if (text.empty()) {
     return false;
   }
-  auto typeface = ftTypeface()->typeface;
+  auto typeface = ftTypeface()->typeface.get();
   float bounds[4] = {};
   float advance = 0;
   if (!GlyphRenderer::MeasureText(typeface, text, textSize, bounds, &advance)) {

@@ -155,18 +155,8 @@ bool GlyphRenderer::IsAvailable() {
          PaintClass.get() != nullptr;
 }
 
-jobject GlyphRenderer::CreateTypeface(const std::string& fontPath) {
-  if (!IsAvailable()) {
-    return nullptr;
-  }
-
-  JNIEnvironment environment;
-  auto env = environment.current();
-  if (env == nullptr) {
-    return nullptr;
-  }
-
-  if (fontPath.empty()) {
+jobject GlyphRenderer::CreateTypeface(JNIEnv* env, const std::string& fontPath) {
+  if (!IsAvailable() || env == nullptr || fontPath.empty()) {
     return nullptr;
   }
 
@@ -183,11 +173,7 @@ jobject GlyphRenderer::CreateTypeface(const std::string& fontPath) {
     env->ExceptionClear();
     return nullptr;
   }
-  // Convert to global reference before returning, since the local frame will be popped
-  // when JNIEnvironment destructor is called.
-  jobject globalTypeface = env->NewGlobalRef(typeface);
-  env->DeleteLocalRef(typeface);
-  return globalTypeface;
+  return typeface;
 }
 
 static jobject CreatePaint(JNIEnv* env, jobject typeface, float textSize) {
