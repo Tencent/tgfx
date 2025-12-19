@@ -21,6 +21,7 @@
 #include <memory>
 #include <string>
 #include "ft2build.h"
+#include FT_COLOR_H
 #include FT_FREETYPE_H
 #include "FTTypeface.h"
 #include "core/PixelBuffer.h"
@@ -71,6 +72,9 @@ class FTScalerContext : public ScalerContext {
   FTTypeface* ftTypeface() const;
 
   bool loadOutlineGlyph(FT_Face face, GlyphID glyphID, bool fauxBold, bool fauxItalic) const;
+
+  void collectCOLRv1GlyphPaths(FT_Face face, const FT_OpaquePaint& opaquePaint, bool fauxBold,
+                               bool fauxItalic, Path* path) const;
 
 #if defined(__ANDROID__) || defined(ANDROID)
   bool MeasureColorVectorGlyph(GlyphID glyphID, Rect* rect) const;
