@@ -100,8 +100,7 @@ QSGNode* TGFXView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
     lastSurfaceHeight = screenHeight;
     applyCenteringTransform();
     tgfxWindow->invalidSize();
-    lastRecording = nullptr;
-    sizeInvalidated = true;
+    presentImmediately = true;
   }
 
   draw();
@@ -166,10 +165,6 @@ void TGFXView::draw() {
     return;
   }
 
-  // Sync surface size for DPI changes.
-  bool surfaceResized = sizeInvalidated;
-  sizeInvalidated = false;
-
   auto canvas = surface->getCanvas();
   canvas->clear();
   auto pixelRatio = static_cast<float>(window()->devicePixelRatio());
@@ -179,15 +174,13 @@ void TGFXView::draw() {
 
   auto recording = context->flush();
 
-  if (surfaceResized) {
-    // When resized, submit current frame immediately (no delay)
+  if (presentImmediately) {
+    presentImmediately = false;
     if (recording) {
       context->submit(std::move(recording));
       tgfxWindow->present(context);
     }
-    lastRecording = nullptr;
   } else {
-    // Delayed one-frame present
     std::swap(lastRecording, recording);
 
     if (recording) {

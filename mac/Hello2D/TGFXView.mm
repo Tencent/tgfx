@@ -39,7 +39,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   std::unique_ptr<tgfx::Recording> lastRecording;
   int lastSurfaceWidth;
   int lastSurfaceHeight;
-  bool sizeInvalidated;
+  bool presentImmediately;
 }
 
 - (BOOL)acceptsFirstResponder {
@@ -78,7 +78,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
     lastDrawIndex = -1;
     lastSurfaceWidth = 0;
     lastSurfaceHeight = 0;
-    sizeInvalidated = false;
+    presentImmediately = true;
     displayList.setRenderMode(tgfx::RenderMode::Tiled);
     displayList.setAllowZoomBlur(true);
     displayList.setMaxTileCount(512);
@@ -89,8 +89,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   [self applyCenteringTransform];
   if (tgfxWindow != nullptr) {
     tgfxWindow->invalidSize();
-    lastRecording = nullptr;
-    sizeInvalidated = true;
+    presentImmediately = true;
   }
 }
 
@@ -211,10 +210,6 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
     return;
   }
 
-  // Sync surface size for DPI changes.
-  bool surfaceResized = sizeInvalidated;
-  sizeInvalidated = false;
-
   auto canvas = surface->getCanvas();
   canvas->clear();
   hello2d::DrawBackground(canvas, surface->width(), surface->height(), self.layer.contentsScale);
@@ -223,15 +218,13 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
 
   auto recording = context->flush();
 
-  if (surfaceResized) {
-    // When resized, submit current frame immediately (no delay)
+  if (presentImmediately) {
+    presentImmediately = false;
     if (recording) {
       context->submit(std::move(recording));
       tgfxWindow->present(context);
     }
-    lastRecording = nullptr;
   } else {
-    // Delayed one-frame present
     std::swap(lastRecording, recording);
 
     if (recording) {

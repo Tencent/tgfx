@@ -49,7 +49,7 @@ class TGFXView : public QQuickItem {
   QPointF offset = {0, 0};
   int lastSurfaceWidth = 0;
   int lastSurfaceHeight = 0;
-  bool sizeInvalidated = false;
+  bool presentImmediately = true;
 
   void createAppHost();
   void updateLayerTree();

@@ -53,8 +53,7 @@ void TGFXBaseView::updateSize() {
     lastSurfaceWidth = surface->width();
     lastSurfaceHeight = surface->height();
     applyCenteringTransform();
-    lastRecording = nullptr;
-    sizeInvalidated = true;
+    presentImmediately = true;
   }
   device->unlock();
 }
@@ -134,15 +133,12 @@ void TGFXBaseView::draw() {
 
   auto recording = context->flush();
 
-  bool surfaceResized = sizeInvalidated;
-  sizeInvalidated = false;
-
-  if (surfaceResized) {
+  if (presentImmediately) {
+    presentImmediately = false;
     if (recording) {
       context->submit(std::move(recording));
       window->present(context);
     }
-    lastRecording = nullptr;
   } else {
     std::swap(lastRecording, recording);
 

@@ -55,7 +55,7 @@ class TGFXBaseView {
   std::unique_ptr<tgfx::Recording> lastRecording = nullptr;
   int lastSurfaceWidth = 0;
   int lastSurfaceHeight = 0;
-  bool sizeInvalidated = false;
+  bool presentImmediately = true;
 };
 
 }  // namespace hello2d

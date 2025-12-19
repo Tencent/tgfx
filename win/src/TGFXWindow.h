@@ -57,7 +57,7 @@ class TGFXWindow {
   std::unique_ptr<tgfx::Recording> lastRecording = nullptr;
   int lastSurfaceWidth = 0;
   int lastSurfaceHeight = 0;
-  bool sizeInvalidated = false;
+  bool presentImmediately = true;
 
   static WNDCLASS RegisterWindowClass();
   static LRESULT CALLBACK WndProc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) noexcept;

@@ -108,8 +108,7 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
       applyCenteringTransform();
       if (tgfxWindow) {
         tgfxWindow->invalidSize();
-        lastRecording = nullptr;
-        sizeInvalidated = true;
+        presentImmediately = true;
       }
       ::InvalidateRect(windowHandle, nullptr, FALSE);
       break;
@@ -359,10 +358,6 @@ void TGFXWindow::draw() {
     return;
   }
 
-  // Sync surface size for DPI changes.
-  bool surfaceResized = sizeInvalidated;
-  sizeInvalidated = false;
-
   auto canvas = surface->getCanvas();
   canvas->clear();
   hello2d::DrawBackground(canvas, surface->width(), surface->height(), pixelRatio);
@@ -371,15 +366,13 @@ void TGFXWindow::draw() {
 
   auto recording = context->flush();
 
-  if (surfaceResized) {
-    // When resized, submit current frame immediately (no delay)
+  if (presentImmediately) {
+    presentImmediately = false;
     if (recording) {
       context->submit(std::move(recording));
       tgfxWindow->present(context);
     }
-    lastRecording = nullptr;
   } else {
-    // Delayed one-frame present
     std::swap(lastRecording, recording);
 
     if (recording) {
