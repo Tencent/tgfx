@@ -19,14 +19,14 @@
 #pragma once
 
 #include "tgfx/core/Image.h"
-#include "tgfx/layers/ShapeStyle.h"
+#include "tgfx/layers/ColorSource.h"
 
 namespace tgfx {
 /**
  * ImagePattern describes a pattern based on an image, which can be drawn on a shape layer. The
  * image can be repeated in both the x and y directions, and you can specify the sampling options.
  */
-class ImagePattern : public ShapeStyle {
+class ImagePattern : public ColorSource {
  public:
   /**
     * Creates a new ImagePattern with the given image, tile modes, and sampling options.

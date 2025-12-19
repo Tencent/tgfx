@@ -16,10 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/layers/ShapeStyle.h"
+#include "tgfx/layers/ColorSource.h"
 
 namespace tgfx {
-void ShapeStyle::setAlpha(float value) {
+void ColorSource::setAlpha(float value) {
   if (_alpha == value) {
     return;
   }
@@ -27,7 +27,7 @@ void ShapeStyle::setAlpha(float value) {
   invalidateContent();
 }
 
-void ShapeStyle::setBlendMode(BlendMode value) {
+void ColorSource::setBlendMode(BlendMode value) {
   if (_blendMode == value) {
     return;
   }
@@ -35,7 +35,7 @@ void ShapeStyle::setBlendMode(BlendMode value) {
   invalidateContent();
 }
 
-void ShapeStyle::setMatrix(const Matrix& value) {
+void ColorSource::setMatrix(const Matrix& value) {
   if (_matrix == value) {
     return;
   }
@@ -43,7 +43,7 @@ void ShapeStyle::setMatrix(const Matrix& value) {
   invalidateContent();
 }
 
-std::shared_ptr<Shader> ShapeStyle::getShader() const {
+std::shared_ptr<Shader> ColorSource::getShader() const {
   auto shader = onGetShader();
   if (!shader) {
     return nullptr;
