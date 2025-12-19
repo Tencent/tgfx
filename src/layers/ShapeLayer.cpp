@@ -51,7 +51,7 @@ void ShapeLayer::setShape(std::shared_ptr<Shape> value) {
   invalidateContent();
 }
 
-void ShapeLayer::setFillStyles(std::vector<std::shared_ptr<ShapeStyle>> fills) {
+void ShapeLayer::setFillStyles(std::vector<std::shared_ptr<ColorSource>> fills) {
   if (_fillStyles.size() == fills.size() &&
       std::equal(_fillStyles.begin(), _fillStyles.end(), fills.begin())) {
     return;
@@ -77,7 +77,7 @@ void ShapeLayer::removeFillStyles() {
   invalidateContent();
 }
 
-void ShapeLayer::setFillStyle(std::shared_ptr<ShapeStyle> fillStyle) {
+void ShapeLayer::setFillStyle(std::shared_ptr<ColorSource> fillStyle) {
   if (fillStyle == nullptr) {
     removeFillStyles();
   } else {
@@ -85,7 +85,7 @@ void ShapeLayer::setFillStyle(std::shared_ptr<ShapeStyle> fillStyle) {
   }
 }
 
-void ShapeLayer::addFillStyle(std::shared_ptr<ShapeStyle> fillStyle) {
+void ShapeLayer::addFillStyle(std::shared_ptr<ColorSource> fillStyle) {
   if (fillStyle == nullptr) {
     return;
   }
@@ -94,7 +94,7 @@ void ShapeLayer::addFillStyle(std::shared_ptr<ShapeStyle> fillStyle) {
   invalidateContent();
 }
 
-void ShapeLayer::setStrokeStyles(std::vector<std::shared_ptr<ShapeStyle>> strokes) {
+void ShapeLayer::setStrokeStyles(std::vector<std::shared_ptr<ColorSource>> strokes) {
   if (_strokeStyles.size() == strokes.size() &&
       std::equal(_strokeStyles.begin(), _strokeStyles.end(), strokes.begin())) {
     return;
@@ -120,7 +120,7 @@ void ShapeLayer::removeStrokeStyles() {
   invalidateContent();
 }
 
-void ShapeLayer::setStrokeStyle(std::shared_ptr<ShapeStyle> stroke) {
+void ShapeLayer::setStrokeStyle(std::shared_ptr<ColorSource> stroke) {
   if (stroke == nullptr) {
     removeStrokeStyles();
   } else {
@@ -128,7 +128,7 @@ void ShapeLayer::setStrokeStyle(std::shared_ptr<ShapeStyle> stroke) {
   }
 }
 
-void ShapeLayer::addStrokeStyle(std::shared_ptr<ShapeStyle> strokeStyle) {
+void ShapeLayer::addStrokeStyle(std::shared_ptr<ColorSource> strokeStyle) {
   if (strokeStyle == nullptr) {
     return;
   }

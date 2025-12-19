@@ -19,8 +19,8 @@
 #pragma once
 
 #include "tgfx/core/Shape.h"
+#include "tgfx/layers/ColorSource.h"
 #include "tgfx/layers/Layer.h"
-#include "tgfx/layers/ShapeStyle.h"
 
 namespace tgfx {
 /**
@@ -88,14 +88,14 @@ class ShapeLayer : public Layer {
    * the stroke styles on top of the filled shape. If the fill styles list is empty, the shape will
    * not be filled. By default, the fill styles list is empty.
    */
-  const std::vector<std::shared_ptr<ShapeStyle>>& fillStyles() const {
+  const std::vector<std::shared_ptr<ColorSource>>& fillStyles() const {
     return _fillStyles;
   }
 
   /**
    * Replaces the current list of fill styles with the given list.
    */
-  void setFillStyles(std::vector<std::shared_ptr<ShapeStyle>> fills);
+  void setFillStyles(std::vector<std::shared_ptr<ColorSource>> fills);
 
   /**
    * Removes all fill styles from the shape layer.
@@ -105,12 +105,12 @@ class ShapeLayer : public Layer {
   /**
    * Replace the current list of fill styles with the given fill style.
    */
-  void setFillStyle(std::shared_ptr<ShapeStyle> fillStyle);
+  void setFillStyle(std::shared_ptr<ColorSource> fillStyle);
 
   /**
    * Adds a fill style to the end of the existing fill styles.
    */
-  void addFillStyle(std::shared_ptr<ShapeStyle> fillStyle);
+  void addFillStyle(std::shared_ptr<ColorSource> fillStyle);
 
   /**
    * Returns the list of stroke styles used to stroke the shape's path. Each style can be a solid
@@ -118,14 +118,14 @@ class ShapeLayer : public Layer {
    * after the fill styles. If the stroke styles list is empty, the shape will not be stroked. By
    * default, the stroke styles list is empty.
    */
-  const std::vector<std::shared_ptr<ShapeStyle>>& strokeStyles() const {
+  const std::vector<std::shared_ptr<ColorSource>>& strokeStyles() const {
     return _strokeStyles;
   }
 
   /**
    * Replaces the current list of stroke styles with the given list.
    */
-  void setStrokeStyles(std::vector<std::shared_ptr<ShapeStyle>> strokes);
+  void setStrokeStyles(std::vector<std::shared_ptr<ColorSource>> strokes);
 
   /**
    * Removes all stroke styles from the shape layer.
@@ -135,12 +135,12 @@ class ShapeLayer : public Layer {
   /**
    * Replace the current list of stroke styles with the given stroke style.
    */
-  void setStrokeStyle(std::shared_ptr<ShapeStyle> stroke);
+  void setStrokeStyle(std::shared_ptr<ColorSource> stroke);
 
   /**
    * Adds a stroke style to the end of the existing stroke styles.
    */
-  void addStrokeStyle(std::shared_ptr<ShapeStyle> strokeStyle);
+  void addStrokeStyle(std::shared_ptr<ColorSource> strokeStyle);
 
   /**
    * Returns the line cap style for the shape's path. The default line cap style is Butt.
@@ -155,19 +155,19 @@ class ShapeLayer : public Layer {
   void setLineCap(LineCap cap);
 
   /**
-   * Returns the line join style for the shape’s path. The default line join style is Miter.
+   * Returns the line join style for the shape's path. The default line join style is Miter.
    */
   LineJoin lineJoin() const {
     return stroke.join;
   }
 
   /**
-   * Sets the line join style for the shape’s path.
+   * Sets the line join style for the shape's path.
    */
   void setLineJoin(LineJoin join);
 
   /**
-   * Returns miter limit used when stroking the shape’s path. If the current line join style is set
+   * Returns miter limit used when stroking the shape's path. If the current line join style is set
    * to LineJoin::Miter, the miter limit determines whether the lines should be joined with a bevel
    * instead of a miter. The length of the miter is divided by the line width. If the result is
    * greater than the miter limit, the path is drawn with a bevel. The default miter limit is 4.0.
@@ -177,24 +177,24 @@ class ShapeLayer : public Layer {
   }
 
   /**
-   * Sets the miter limit for the shape’s path.
+   * Sets the miter limit for the shape's path.
    */
   void setMiterLimit(float limit);
 
   /**
-   * Returns the line width of the shape’s path.
+   * Returns the line width of the shape's path.
    */
   float lineWidth() const {
     return stroke.width;
   }
 
   /**
-   * Sets the line width of the shape’s path.
+   * Sets the line width of the shape's path.
    */
   void setLineWidth(float width);
 
   /**
-   * Returns the dash pattern applied to the shape’s path when stroked. The dash pattern is
+   * Returns the dash pattern applied to the shape's path when stroked. The dash pattern is
    * specified as an array of float numbers that specify the lengths of the painted segments and
    * unpainted segments, respectively, of the dash pattern.
    * For example, passing an array with the values [2,3] sets a dash pattern that alternates between
@@ -208,12 +208,12 @@ class ShapeLayer : public Layer {
   }
 
   /**
-   * Sets the dash pattern applied to the shape’s path when stroked.
+   * Sets the dash pattern applied to the shape's path when stroked.
    */
   void setLineDashPattern(const std::vector<float>& pattern);
 
   /**
-   * Returns the dash phase applied to the shape’s path when stroked. Line dash phase specifies how
+   * Returns the dash phase applied to the shape's path when stroked. Line dash phase specifies how
    * far into the dash pattern the line starts. The default dash phase is 0.
    */
   float lineDashPhase() const {
@@ -221,7 +221,7 @@ class ShapeLayer : public Layer {
   }
 
   /**
-   * Sets the dash phase applied to the shape’s path when stroked.
+   * Sets the dash phase applied to the shape's path when stroked.
    */
   void setLineDashPhase(float phase);
 
@@ -275,14 +275,14 @@ class ShapeLayer : public Layer {
   void setStrokeEnd(float end);
 
   /**
-   * Returns the stroke alignment applied to the shape’s path when stroked. The default stroke alignment is Center.
+   * Returns the stroke alignment applied to the shape's path when stroked. The default stroke alignment is Center.
    */
   StrokeAlign strokeAlign() const {
     return static_cast<StrokeAlign>(shapeBitFields.strokeAlign);
   }
 
   /**
-   * Sets the stroke alignment applied to the shape’s path when stroked.
+   * Sets the stroke alignment applied to the shape's path when stroked.
    */
   void setStrokeAlign(StrokeAlign align);
 
@@ -304,8 +304,8 @@ class ShapeLayer : public Layer {
 
  private:
   std::shared_ptr<Shape> _shape = nullptr;
-  std::vector<std::shared_ptr<ShapeStyle>> _fillStyles = {};
-  std::vector<std::shared_ptr<ShapeStyle>> _strokeStyles = {};
+  std::vector<std::shared_ptr<ColorSource>> _fillStyles = {};
+  std::vector<std::shared_ptr<ColorSource>> _strokeStyles = {};
   Stroke stroke = {};
   std::vector<float> _lineDashPattern = {};
   float _lineDashPhase = 0.0f;
