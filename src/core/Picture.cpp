@@ -273,8 +273,14 @@ bool Picture::canConvertToMask() const {
       case PictureRecordType::DrawRect:
       case PictureRecordType::DrawRRect:
       case PictureRecordType::DrawPath:
-      case PictureRecordType::DrawPicture:
         break;
+      case PictureRecordType::DrawPicture: {
+        auto& picture = static_cast<const DrawPicture*>(record.get())->picture;
+        if (!picture->canConvertToMask()) {
+          return false;
+        }
+        break;
+      }
       default:
         return false;
     }
