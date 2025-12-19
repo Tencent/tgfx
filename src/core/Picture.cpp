@@ -66,17 +66,21 @@ Rect Picture::getBounds() const {
   return totalBounds;
 }
 
-void Picture::playback(Canvas* canvas) const {
+void Picture::playback(Canvas* canvas, AbortCallback* callback) const {
   if (canvas == nullptr) {
     return;
   }
-  playback(canvas->drawContext, *canvas->mcState);
+  playback(canvas->drawContext, *canvas->mcState, callback);
 }
 
-void Picture::playback(DrawContext* drawContext, const MCState& state) const {
+void Picture::playback(DrawContext* drawContext, const MCState& state,
+                       AbortCallback* callback) const {
   DEBUG_ASSERT(drawContext != nullptr);
   PlaybackContext playbackContext(state);
   for (auto& record : records) {
+    if (callback && callback->abort()) {
+      break;
+    }
     record->playback(drawContext, &playbackContext);
   }
 }
@@ -230,128 +234,6 @@ const PictureRecord* Picture::getFirstDrawRecord(MCState* state, Brush* brush,
     *hasStroke = playback.stroke() != nullptr;
   }
   return drawRecord;
-}
-
-static bool ApplyClipAndStroke(Path* shapePath, const MCState& state, const Stroke* stroke) {
-  auto& clip = state.clip;
-  bool clipUnbounded = clip.isEmpty() && clip.isInverseFillType();
-  if (shapePath->isInverseFillType()) {
-    return false;
-  }
-  if (!clipUnbounded && clip.isInverseFillType()) {
-    return false;
-  }
-
-  if (stroke && !stroke->applyToPath(shapePath)) {
-    return false;
-  }
-
-  shapePath->transform(state.matrix);
-  if (!clipUnbounded) {
-    Path clippedPath = clip;
-    clippedPath.addPath(*shapePath, PathOp::Intersect);
-    *shapePath = std::move(clippedPath);
-  }
-
-  return true;
-}
-
-bool Picture::canConvertToMask() const {
-  PlaybackContext playback = {};
-  for (auto& record : records) {
-    switch (record->type()) {
-      case PictureRecordType::SetMatrix:
-      case PictureRecordType::SetClip:
-      case PictureRecordType::SetColor:
-      case PictureRecordType::SetFill:
-      case PictureRecordType::SetStrokeWidth:
-      case PictureRecordType::SetStroke:
-      case PictureRecordType::SetHasStroke:
-        record->playback(nullptr, &playback);
-        continue;
-      case PictureRecordType::DrawFill:
-      case PictureRecordType::DrawRect:
-      case PictureRecordType::DrawRRect:
-      case PictureRecordType::DrawPath:
-        break;
-      case PictureRecordType::DrawPicture: {
-        auto& picture = static_cast<const DrawPicture*>(record.get())->picture;
-        if (!picture->canConvertToMask()) {
-          return false;
-        }
-        break;
-      }
-      default:
-        return false;
-    }
-
-    auto& brush = playback.brush();
-    if (brush.nothingToDraw()) {
-      continue;
-    }
-    if (!brush.isOpaque()) {
-      return false;
-    }
-  }
-  return true;
-}
-
-bool Picture::asMaskPath(Path* path) const {
-  if (path == nullptr || !canConvertToMask()) {
-    return false;
-  }
-  Path result = {};
-  PlaybackContext playback = {};
-  for (auto& record : records) {
-    Path shapePath = {};
-    switch (record->type()) {
-      case PictureRecordType::DrawFill:
-        shapePath = playback.state().clip;
-        break;
-      case PictureRecordType::DrawRect:
-        shapePath.addRect(static_cast<const DrawRect*>(record.get())->rect);
-        break;
-      case PictureRecordType::DrawRRect:
-        shapePath.addRRect(static_cast<const DrawRRect*>(record.get())->rRect);
-        break;
-      case PictureRecordType::DrawPath:
-        shapePath = static_cast<const DrawPath*>(record.get())->path;
-        break;
-      case PictureRecordType::DrawPicture: {
-        if (playback.brush().nothingToDraw()) {
-          continue;
-        }
-        auto& picture = static_cast<const DrawPicture*>(record.get())->picture;
-        if (!picture->asMaskPath(&shapePath)) {
-          return false;
-        }
-        break;
-      }
-      default:
-        record->playback(nullptr, &playback);
-        continue;
-    }
-    if (playback.brush().nothingToDraw()) {
-      continue;
-    }
-    auto& state = playback.state();
-    auto& clip = state.clip;
-    if (clip.isEmpty() && !clip.isInverseFillType()) {
-      continue;
-    }
-    bool clipUnbounded = clip.isEmpty() && clip.isInverseFillType();
-    bool shapeUnbounded = shapePath.isEmpty() && shapePath.isInverseFillType();
-    if (clipUnbounded && shapeUnbounded) {
-      *path = std::move(shapePath);
-      return true;
-    }
-    if (!ApplyClipAndStroke(&shapePath, state, playback.stroke())) {
-      return false;
-    }
-    result.addPath(shapePath);
-  }
-  *path = std::move(result);
-  return true;
 }
 
 }  // namespace tgfx

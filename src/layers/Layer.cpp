@@ -19,6 +19,7 @@
 #include "tgfx/layers/Layer.h"
 #include <atomic>
 #include <cmath>
+#include "core/MCState.h"
 #include "core/Matrix2D.h"
 #include "core/filters/Transform3DImageFilter.h"
 #include "core/images/TextureImage.h"
@@ -27,6 +28,7 @@
 #include "core/utils/Types.h"
 #include "layers/ContourContext.h"
 #include "layers/DrawArgs.h"
+#include "layers/MaskContext.h"
 #include "layers/RegionTransformer.h"
 #include "layers/RootLayer.h"
 #include "layers/SubtreeCache.h"
@@ -1055,7 +1057,7 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
 
   if (isMatrixAffine && maskType != LayerMaskType::Luminance) {
     Path maskPath = {};
-    if (maskPicture->asMaskPath(&maskPath)) {
+    if (MaskContext::GetMaskPath(maskPicture, &maskPath)) {
       maskPath.transform(Matrix::MakeScale(1.0f / scale, 1.0f / scale));
       return {std::move(maskPath), nullptr};
     }
