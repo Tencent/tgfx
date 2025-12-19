@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "JNIInit.h"
+#include "GlyphRenderer.h"
 #include "HandlerThread.h"
 #include "NativeCodec.h"
 #include "platform/android/SurfaceTexture.h"
@@ -38,6 +39,7 @@ void JNIInit::Run() {
   HandlerThread::JNIInit(env);
   SurfaceTexture::JNIInit(env);
   AndroidBitmap::JNIInit(env);
+  GlyphRenderer::JNIInit(env);
   env->ExceptionClear();
 }
 }  // namespace tgfx

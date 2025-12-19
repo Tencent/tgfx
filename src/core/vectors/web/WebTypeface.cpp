@@ -110,13 +110,13 @@ std::string WebTypeface::getText(GlyphID glyphID) const {
 }
 
 #ifdef TGFX_USE_GLYPH_TO_UNICODE
-std::vector<Unichar> WebTypeface::getGlyphToUnicodeMap() const {
+std::vector<Unichar> WebTypeface::onCreateGlyphToUnicodeMap() const {
   return GlyphsMap()[webFontFamily];
 }
 #endif
 
 #ifdef TGFX_USE_GLYPH_TO_UNICODE
-AdvancedTypefaceInfo getAdvancedProperty() const {
+AdvancedTypefaceInfo WebTypeface::getAdvancedProperty() const {
   return AdvancedTypefaceProperty{.postScriptName = webFontFamily,
                                   .type = AdvancedTypefaceProperty::FontType::Other,
                                   .flags = static_cast<AdvancedTypefaceProperty::FontFlags>(

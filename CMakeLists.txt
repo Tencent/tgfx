@@ -264,8 +264,9 @@ if (TGFX_USE_PNG)
     list(APPEND TGFX_INCLUDES third_party/out/libpng/${INCLUDE_ENTRY})
 endif ()
 
-if (TGFX_BUILD_SVG OR TGFX_BUILD_PDF)
+if (TGFX_BUILD_SVG OR TGFX_BUILD_PDF OR ANDROID)
     # SVG and PDF exports require glyphs to be convertible back to Unicode.
+    # Android also needs this for COLRv1 emoji rendering via native API.
     list(APPEND TGFX_DEFINES TGFX_USE_GLYPH_TO_UNICODE)
     if (TGFX_BUILD_PDF)
         list(APPEND TGFX_DEFINES TGFX_USE_ADVANCED_TYPEFACE_PROPERTY)

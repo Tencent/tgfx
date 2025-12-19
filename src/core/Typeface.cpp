@@ -69,10 +69,6 @@ class EmptyTypeface : public Typeface {
   }
 
  protected:
-  std::vector<Unichar> getGlyphToUnicodeMap() const override {
-    return {};
-  }
-
   AdvancedTypefaceInfo getAdvancedInfo() const override {
     return {};
   }
@@ -107,9 +103,11 @@ bool Typeface::isCustom() const {
   return false;
 }
 
-std::vector<Unichar> Typeface::getGlyphToUnicodeMap() const {
-  return {};
-};
+const std::vector<Unichar>& Typeface::getGlyphToUnicodeMap() const {
+  std::call_once(glyphToUnicodeOnceFlag,
+                 [this] { glyphToUnicodeCache = onCreateGlyphToUnicodeMap(); });
+  return glyphToUnicodeCache;
+}
 
 AdvancedTypefaceInfo Typeface::getAdvancedInfo() const {
   return {};
@@ -136,7 +134,7 @@ std::shared_ptr<ScalerContext> Typeface::getScalerContext(float size) {
 }
 
 Rect Typeface::getBounds() const {
-  std::call_once(onceFlag, [this] {
+  std::call_once(boundsOnceFlag, [this] {
     if (!onComputeBounds(&bounds)) {
       bounds.setEmpty();
     }
@@ -164,5 +162,9 @@ bool Typeface::onComputeBounds(Rect* bounds) const {
   bounds->setLTRB(metrics.xMin * InvTextSize, metrics.top * InvTextSize, metrics.xMax * InvTextSize,
                   metrics.bottom * InvTextSize);
   return true;
+}
+
+std::vector<Unichar> Typeface::onCreateGlyphToUnicodeMap() const {
+  return {};
 }
 }  // namespace tgfx

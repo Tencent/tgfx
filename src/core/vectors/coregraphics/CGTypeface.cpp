@@ -356,7 +356,7 @@ static void GetGlyphMapByPlane(const uint8_t* bits, CTFontRef ctFont, std::vecto
   }
 }
 
-std::vector<Unichar> CGTypeface::getGlyphToUnicodeMap() const {
+std::vector<Unichar> CGTypeface::onCreateGlyphToUnicodeMap() const {
   auto glyphCount = CTFontGetGlyphCount(ctFont);
 
   auto charSet = CTFontCopyCharacterSet(ctFont);
@@ -387,7 +387,6 @@ std::vector<Unichar> CGTypeface::getGlyphToUnicodeMap() const {
     size of 16385 bytes (8KiB for BMP, 1 byte index, and a 8KiB bitmap for Plane
     2). The plane index byte, in this case, contains the integer value two.
     */
-
   if (dataLength <= PLANE_SIZE) {
     return returnMap;
   }
