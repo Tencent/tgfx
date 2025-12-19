@@ -20,6 +20,7 @@
 
 #include "core/ScalerContext.h"
 #include "tgfx/core/ImageCodec.h"
+#include "tgfx/core/Point.h"
 
 namespace tgfx {
 /**
@@ -28,7 +29,7 @@ namespace tgfx {
 class GlyphRasterizer : public ImageCodec {
  public:
   GlyphRasterizer(int width, int height, std::shared_ptr<ScalerContext> scalerContext,
-                  GlyphID glyphID, bool fauxBold, const Stroke* stroke);
+                  GlyphID glyphID, bool fauxBold, const Stroke* stroke, const Point& glyphOffset);
 
   ~GlyphRasterizer() override;
 
@@ -45,5 +46,6 @@ class GlyphRasterizer : public ImageCodec {
   GlyphID glyphID = 0;
   bool fauxBold = false;
   Stroke* stroke = nullptr;
+  Point glyphOffset = {};
 };
 }  // namespace tgfx

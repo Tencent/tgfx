@@ -100,7 +100,7 @@ class PathUserScalerContext final : public UserScalerContext {
   }
 
   bool readPixels(GlyphID glyphID, bool fauxBold, const Stroke* stroke, const ImageInfo& dstInfo,
-                  void* dstPixels) const override {
+                  void* dstPixels, const Point&) const override {
     if (dstInfo.isEmpty() || dstPixels == nullptr || dstInfo.colorType() != ColorType::ALPHA_8) {
       return false;
     }
