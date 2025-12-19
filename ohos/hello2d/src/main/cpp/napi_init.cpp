@@ -1,20 +1,30 @@
 #include "napi/native_api.h"
 #include <ace/xcomponent/native_interface_xcomponent.h>
 #include "tgfx/gpu/opengl/egl/EGLWindow.h"
-#include "drawers/AppHost.h"
-#include "drawers/Drawer.h"
+#include "tgfx/gpu/Recording.h"
+#include "hello2d/AppHost.h"
+#include "hello2d/LayerBuilder.h"
 #include "DisplayLink.h"
+#include "tgfx/layers/DisplayList.h"
 
 static float screenDensity = 1.0f;
 static double drawIndex = 0;
 static double zoomScale = 1;
 static double contentOffsetX = 0;
 static double contentOffsetY = 0;
-static std::shared_ptr<drawers::AppHost> appHost = nullptr;
+static std::shared_ptr<hello2d::AppHost> appHost = nullptr;
 static std::shared_ptr<tgfx::Window> window = nullptr;
 static std::shared_ptr<DisplayLink> displayLink = nullptr;
+static tgfx::DisplayList displayList = {};
+static std::shared_ptr<tgfx::Layer> contentLayer = nullptr;
+static std::unique_ptr<tgfx::Recording> lastRecording = nullptr;
+static int lastDrawIndex = -1;
+static int lastSurfaceWidth = 0;
+static int lastSurfaceHeight = 0;
 
-static std::shared_ptr<drawers::AppHost> CreateAppHost();
+static std::shared_ptr<hello2d::AppHost> CreateAppHost();
+static void ApplyCenteringTransform();
+static void UpdateDisplayTransform(float zoom, float offsetX, float offsetY);
 
 static napi_value OnUpdateDensity(napi_env env, napi_callback_info info) {
   size_t argc = 1;
@@ -25,6 +35,7 @@ static napi_value OnUpdateDensity(napi_env env, napi_callback_info info) {
   screenDensity = static_cast<float>(value);
   return nullptr;
 }
+
 
 static napi_value AddImageFromEncoded(napi_env env, napi_callback_info info) {
   size_t argc = 2;
@@ -48,36 +59,83 @@ static napi_value AddImageFromEncoded(napi_env env, napi_callback_info info) {
   return nullptr;
 }
 
-static void Draw(int index, float zoom = 1.0f, float offsetX = 0.0f, float offsetY = 0.0f) {
-  if (window == nullptr || appHost == nullptr || appHost->width() <= 0 || appHost->height() <= 0) {
+static void UpdateLayerTree(int drawIndex) {
+  if (!appHost) {
+    appHost = CreateAppHost();
+  }
+  if (!appHost) {
     return;
   }
+
+  auto numBuilders = hello2d::LayerBuilder::Count();
+  auto index = (drawIndex % numBuilders);
+  if (index != lastDrawIndex || !contentLayer) {
+    auto builder = hello2d::LayerBuilder::GetByIndex(index);
+    if (builder) {
+      contentLayer = builder->buildLayerTree(appHost.get());
+      if (contentLayer) {
+        displayList.root()->removeChildren();
+        displayList.root()->addChild(contentLayer);
+        ApplyCenteringTransform();
+      }
+    }
+    lastDrawIndex = index;
+  }
+}
+
+static void UpdateZoomScaleAndOffset(float zoom, float offsetX, float offsetY) {
+  displayList.setZoomScale(zoom);
+  displayList.setContentOffset(offsetX, offsetY);
+}
+
+static void ApplyCenteringTransform() {
+  if (lastSurfaceWidth > 0 && lastSurfaceHeight > 0 && contentLayer) {
+    hello2d::LayerBuilder::ApplyCenteringTransform(contentLayer,
+                                                   static_cast<float>(lastSurfaceWidth),
+                                                   static_cast<float>(lastSurfaceHeight));
+  }
+}
+
+static void Draw() {
+  if (!appHost || window == nullptr) {
+    return;
+  }
+
+  if (!displayList.hasContentChanged() && lastRecording == nullptr) {
+    return;
+  }
+
   auto device = window->getDevice();
   auto context = device->lockContext();
   if (context == nullptr) {
-    printf("Fail to lock context from the Device.\n");
     return;
   }
+
   auto surface = window->getSurface(context);
   if (surface == nullptr) {
     device->unlock();
     return;
   }
-  appHost->updateZoomAndOffset(zoom, tgfx::Point(offsetX, offsetY));
+
   auto canvas = surface->getCanvas();
   canvas->clear();
-  canvas->save();
-  auto numDrawers = drawers::Drawer::Count() - 1;
-  index = (index % numDrawers) + 1;
-  auto drawer = drawers::Drawer::GetByName("GridBackground");
-  drawer->draw(canvas, appHost.get());
-  drawer = drawers::Drawer::GetByIndex(index);
-  drawer->draw(canvas, appHost.get());
-  canvas->restore();
-  context->flushAndSubmit();
-  window->present(context);
+  hello2d::DrawBackground(canvas, surface->width(), surface->height(), screenDensity);
+
+  displayList.render(surface.get(), false);
+
+  auto recording = context->flush();
+
+  // Delayed one-frame present
+  std::swap(lastRecording, recording);
+
+  if (recording) {
+    context->submit(std::move(recording));
+    window->present(context);
+  }
+
   device->unlock();
 }
+
 
 static napi_value UpdateDrawParams(napi_env env, napi_callback_info info) {
   size_t argc = 4;
@@ -87,19 +145,26 @@ static napi_value UpdateDrawParams(napi_env env, napi_callback_info info) {
   napi_get_value_double(env, args[1], &zoomScale);
   napi_get_value_double(env, args[2], &contentOffsetX);
   napi_get_value_double(env, args[3], &contentOffsetY);
+
+  // Update DisplayList when parameters change
+  UpdateLayerTree(static_cast<int>(drawIndex));
+  UpdateZoomScaleAndOffset(static_cast<float>(zoomScale), static_cast<float>(contentOffsetX),
+                         static_cast<float>(contentOffsetY));
+
   return nullptr;
 }
+
 
 static napi_value StartDrawLoop(napi_env, napi_callback_info) {
     if (displayLink == nullptr) {
         displayLink = std::make_shared<DisplayLink>([&]() {
-            Draw(static_cast<int>(drawIndex), static_cast<float>(zoomScale),
-                 static_cast<float>(contentOffsetX), static_cast<float>(contentOffsetY));
+            Draw();
         });
     }
     displayLink->start();
     return nullptr;
 }
+
 
 static napi_value StopDrawLoop(napi_env, napi_callback_info) {
     if (displayLink != nullptr) {
@@ -108,8 +173,12 @@ static napi_value StopDrawLoop(napi_env, napi_callback_info) {
     return nullptr;
 }
 
-static std::shared_ptr<drawers::AppHost> CreateAppHost() {
-  auto appHost = std::make_shared<drawers::AppHost>();
+
+static std::shared_ptr<hello2d::AppHost> CreateAppHost() {
+  auto appHost = std::make_shared<hello2d::AppHost>();
+  displayList.setRenderMode(tgfx::RenderMode::Tiled);
+  displayList.setAllowZoomBlur(true);
+  displayList.setMaxTileCount(512);
   static const std::string FallbackFontFileNames[] = {"/system/fonts/HarmonyOS_Sans.ttf",
                                                       "/system/fonts/HarmonyOS_Sans_SC.ttf",
                                                       "/system/fonts/HarmonyOS_Sans_TC.ttf"};
@@ -127,6 +196,7 @@ static std::shared_ptr<drawers::AppHost> CreateAppHost() {
   return appHost;
 }
 
+
 static void UpdateSize(OH_NativeXComponent* component, void* nativeWindow) {
   uint64_t width;
   uint64_t height;
@@ -137,7 +207,8 @@ static void UpdateSize(OH_NativeXComponent* component, void* nativeWindow) {
   if (appHost == nullptr) {
     appHost = CreateAppHost();
   }
-  appHost->updateScreen(static_cast<int>(width), static_cast<int>(height), screenDensity);
+  lastSurfaceWidth = static_cast<int>(width);
+  lastSurfaceHeight = static_cast<int>(height);
   if (window != nullptr) {
     window->invalidSize();
   }
@@ -150,6 +221,7 @@ static void OnSurfaceChangedCB(OH_NativeXComponent* component, void* nativeWindo
 static void OnSurfaceDestroyedCB(OH_NativeXComponent*, void*) {
   window = nullptr;
   displayLink = nullptr;
+  lastRecording = nullptr;
 }
 
 static void DispatchTouchEventCB(OH_NativeXComponent*, void*) {
@@ -159,10 +231,11 @@ static void OnSurfaceCreatedCB(OH_NativeXComponent* component, void* nativeWindo
   UpdateSize(component, nativeWindow);
   window = tgfx::EGLWindow::MakeFrom(reinterpret_cast<EGLNativeWindowType>(nativeWindow));
   if (window == nullptr) {
-    printf("OnSurfaceCreatedCB() Invalid surface specified.\n");
     return;
   }
-  Draw(0);
+  UpdateLayerTree(static_cast<int>(drawIndex));
+  UpdateZoomScaleAndOffset(static_cast<float>(zoomScale), static_cast<float>(contentOffsetX),
+                         static_cast<float>(contentOffsetY));
 }
 
 static void RegisterCallback(napi_env env, napi_value exports) {

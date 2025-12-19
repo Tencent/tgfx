@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,13 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "drawers/AppHost.h"
+#include "hello2d/AppHost.h"
 #include "tgfx/platform/Print.h"
 
-namespace drawers {
-AppHost::AppHost(int width, int height, float density)
-    : _width(width), _height(height), _density(density) {
-}
+namespace hello2d {
 
 std::shared_ptr<tgfx::Image> AppHost::getImage(const std::string& name) const {
   auto result = images.find(name);
@@ -38,33 +35,6 @@ std::shared_ptr<tgfx::Typeface> AppHost::getTypeface(const std::string& name) co
     return result->second;
   }
   return nullptr;
-}
-
-bool AppHost::updateScreen(int width, int height, float density) {
-  if (width <= 0 || height <= 0) {
-    tgfx::PrintError("AppHost::updateScreen() width or height is invalid!");
-    return false;
-  }
-  if (density < 1.0) {
-    tgfx::PrintError("AppHost::updateScreen() density is invalid!");
-    return false;
-  }
-  if (width == _width && height == _height && density == _density) {
-    return false;
-  }
-  _width = width;
-  _height = height;
-  _density = density;
-  return true;
-}
-
-bool AppHost::updateZoomAndOffset(float zoomScale, const tgfx::Point& contentOffset) {
-  if (zoomScale == _zoomScale && contentOffset == _contentOffset) {
-    return false;
-  }
-  _zoomScale = zoomScale;
-  _contentOffset = contentOffset;
-  return true;
 }
 
 void AppHost::addImage(const std::string& name, std::shared_ptr<tgfx::Image> image) {
@@ -98,4 +68,5 @@ void AppHost::addTypeface(const std::string& name, std::shared_ptr<tgfx::Typefac
   }
   typefaces[name] = std::move(typeface);
 }
-}  // namespace drawers
+
+}  // namespace hello2d
