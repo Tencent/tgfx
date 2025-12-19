@@ -18,6 +18,7 @@
 
 #include "MaskContext.h"
 #include "core/MCState.h"
+#include "tgfx/core/Canvas.h"
 
 namespace tgfx {
 
@@ -26,7 +27,8 @@ bool MaskContext::GetMaskPath(const std::shared_ptr<Picture>& picture, Path* res
     return false;
   }
   MaskContext maskContext;
-  picture->playback(&maskContext, MCState(Matrix::I()), &maskContext);
+  Canvas canvas(&maskContext);
+  picture->playback(&canvas, &maskContext);
   return maskContext.finish(result);
 }
 
@@ -161,7 +163,10 @@ void MaskContext::drawPicture(std::shared_ptr<Picture> picture, const MCState& s
     return;
   }
   MaskContext subContext;
-  picture->playback(&subContext, state, &subContext);
+  Canvas canvas(&subContext);
+  canvas.setMatrix(state.matrix);
+  canvas.clipPath(state.clip);
+  picture->playback(&canvas, &subContext);
   Path subPath = {};
   if (!subContext.finish(&subPath)) {
     _aborted = true;

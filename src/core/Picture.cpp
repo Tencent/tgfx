@@ -28,7 +28,6 @@
 #include "utils/MathExtra.h"
 
 namespace tgfx {
-
 Picture::Picture(std::unique_ptr<BlockBuffer> buffer,
                  std::vector<PlacementPtr<PictureRecord>> recordList, size_t drawCount)
     : blockBuffer(std::move(buffer)), records(std::move(recordList)), drawCount(drawCount) {
