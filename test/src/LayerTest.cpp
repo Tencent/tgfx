@@ -3977,4 +3977,196 @@ TGFX_TEST(LayerTest, StaticSubtree) {
   EXPECT_TRUE(rootLayer->bitFields.staticSubtree);
   EXPECT_TRUE(childLayer->bitFields.staticSubtree);
 }
+
+/**
+ * Test that simple Rect/RRect leaf nodes skip subtree caching.
+ */
+TGFX_TEST(LayerTest, SimpleShapeSkipsCache) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Direct);
+  displayList->setSubtreeCacheMaxSize(2048);
+
+  auto root = displayList->root();
+  root->setPassThroughBackground(false);
+
+  // Test 1: Simple SolidLayer (Rect) - should NOT create subtree cache
+  auto rectLayer = SolidLayer::Make();
+  rectLayer->setWidth(50);
+  rectLayer->setHeight(50);
+  rectLayer->setColor(Color::Red());
+  rectLayer->setMatrix(Matrix::MakeTrans(10, 10));
+  root->addChild(rectLayer);
+
+  // Render twice to trigger cache creation attempt
+  displayList->render(surface.get());
+  displayList->render(surface.get());
+
+  // Simple Rect layer should not have subtree cache
+  EXPECT_TRUE(rectLayer->subtreeCache == nullptr);
+
+  // Test 2: Simple SolidLayer (RRect) - should NOT create subtree cache
+  auto rrectLayer = SolidLayer::Make();
+  rrectLayer->setWidth(50);
+  rrectLayer->setHeight(50);
+  rrectLayer->setRadiusX(10);
+  rrectLayer->setRadiusY(10);
+  rrectLayer->setColor(Color::Blue());
+  rrectLayer->setMatrix(Matrix::MakeTrans(70, 10));
+  root->addChild(rrectLayer);
+
+  displayList->render(surface.get());
+  displayList->render(surface.get());
+
+  // Simple RRect layer should not have subtree cache
+  EXPECT_TRUE(rrectLayer->subtreeCache == nullptr);
+
+  // Test 3: ShapeLayer with Path (not Rect/RRect) - SHOULD create subtree cache
+  auto pathLayer = ShapeLayer::Make();
+  Path path = {};
+  path.addOval(Rect::MakeWH(50, 50));
+  pathLayer->setPath(path);
+  pathLayer->setFillStyle(SolidColor::Make(Color::Green()));
+  pathLayer->setMatrix(Matrix::MakeTrans(130, 10));
+  root->addChild(pathLayer);
+
+  displayList->render(surface.get());
+  displayList->render(surface.get());
+
+  // Path layer (not Rect/RRect) should have subtree cache
+  EXPECT_TRUE(pathLayer->subtreeCache != nullptr);
+
+  // Test 4: SolidLayer with filter - SHOULD create subtree cache
+  auto rectWithFilter = SolidLayer::Make();
+  rectWithFilter->setWidth(50);
+  rectWithFilter->setHeight(50);
+  rectWithFilter->setColor(Color::FromRGBA(255, 255, 0, 255));
+  rectWithFilter->setMatrix(Matrix::MakeTrans(10, 70));
+  rectWithFilter->setFilters({BlurFilter::Make(2, 2)});
+  root->addChild(rectWithFilter);
+
+  displayList->render(surface.get());
+  displayList->render(surface.get());
+
+  // Rect with filter should have subtree cache
+  EXPECT_TRUE(rectWithFilter->subtreeCache != nullptr);
+
+  // Test 5: SolidLayer with layer style - SHOULD create subtree cache
+  auto rectWithStyle = SolidLayer::Make();
+  rectWithStyle->setWidth(50);
+  rectWithStyle->setHeight(50);
+  rectWithStyle->setColor(Color::FromRGBA(255, 0, 255, 255));
+  rectWithStyle->setMatrix(Matrix::MakeTrans(70, 70));
+  rectWithStyle->setLayerStyles({DropShadowStyle::Make(3, 3, 2, 2, Color::Black(), false)});
+  root->addChild(rectWithStyle);
+
+  displayList->render(surface.get());
+  displayList->render(surface.get());
+
+  // Rect with layer style should have subtree cache
+  EXPECT_TRUE(rectWithStyle->subtreeCache != nullptr);
+
+  // Test 6: Layer with Rect child - SHOULD create subtree cache (not a leaf node)
+  auto parentLayer = Layer::Make();
+  parentLayer->setMatrix(Matrix::MakeTrans(130, 70));
+  auto childRect = SolidLayer::Make();
+  childRect->setWidth(50);
+  childRect->setHeight(50);
+  childRect->setColor(Color::FromRGBA(0, 255, 255, 255));
+  parentLayer->addChild(childRect);
+  root->addChild(parentLayer);
+
+  displayList->render(surface.get());
+  displayList->render(surface.get());
+
+  // Parent layer with children should have subtree cache
+  EXPECT_TRUE(parentLayer->subtreeCache != nullptr);
+  // Child rect should not have subtree cache (simple leaf)
+  EXPECT_TRUE(childRect->subtreeCache == nullptr);
+}
+
+TGFX_TEST(LayerTest, MaskPathOptimization) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  auto displayList = std::make_unique<DisplayList>();
+  auto rootLayer = displayList->root();
+
+  // Image is 110x110, after 0.5 scale it's 55x55
+  // We position each image and its mask to create a 2x2 grid
+
+  // Test 1: SolidLayer (Rect) as mask with Alpha type
+  // Image at (0,0)-(55,55), mask at (10,10)-(50,40)
+  auto layer1 = ImageLayer::Make();
+  layer1->setImage(MakeImage("resources/apitest/imageReplacement.png"));
+  layer1->setMatrix(Matrix::MakeScale(0.5f));
+  rootLayer->addChild(layer1);
+
+  auto rectMask = SolidLayer::Make();
+  rectMask->setWidth(40.f);
+  rectMask->setHeight(30.f);
+  rectMask->setMatrix(Matrix::MakeTrans(10.f, 10.f));
+  rectMask->setColor(Color::White());
+  rootLayer->addChild(rectMask);
+  layer1->setMask(rectMask);
+  layer1->setMaskType(LayerMaskType::Alpha);
+
+  // Test 2: SolidLayer (RRect) as mask with Contour type
+  // Image at (100,0)-(155,55), mask at (110,10)-(150,40)
+  auto layer2 = ImageLayer::Make();
+  layer2->setImage(MakeImage("resources/apitest/imageReplacement.png"));
+  layer2->setMatrix(Matrix::MakeTrans(100.f, 0.f) * Matrix::MakeScale(0.5f));
+  rootLayer->addChild(layer2);
+
+  auto rrectMask = SolidLayer::Make();
+  rrectMask->setWidth(40.f);
+  rrectMask->setHeight(30.f);
+  rrectMask->setRadiusX(8.f);
+  rrectMask->setRadiusY(8.f);
+  rrectMask->setMatrix(Matrix::MakeTrans(110.f, 10.f));
+  rrectMask->setColor(Color::White());
+  rootLayer->addChild(rrectMask);
+  layer2->setMask(rrectMask);
+  layer2->setMaskType(LayerMaskType::Contour);
+
+  // Test 3: ShapeLayer (Path) as mask with Alpha type
+  // Image at (0,100)-(55,155), mask is oval at (10,110)-(50,150)
+  auto layer3 = ImageLayer::Make();
+  layer3->setImage(MakeImage("resources/apitest/imageReplacement.png"));
+  layer3->setMatrix(Matrix::MakeTrans(0.f, 100.f) * Matrix::MakeScale(0.5f));
+  rootLayer->addChild(layer3);
+
+  Path ovalPath = {};
+  ovalPath.addOval(Rect::MakeXYWH(10.f, 110.f, 40.f, 40.f));
+  auto pathMask = ShapeLayer::Make();
+  pathMask->setPath(ovalPath);
+  pathMask->setFillStyle(SolidColor::Make(Color::White()));
+  rootLayer->addChild(pathMask);
+  layer3->setMask(pathMask);
+  layer3->setMaskType(LayerMaskType::Alpha);
+
+  // Test 4: Luminance mask - should NOT use path optimization
+  // Image at (100,100)-(155,155), mask at (110,110)-(150,140)
+  auto layer4 = ImageLayer::Make();
+  layer4->setImage(MakeImage("resources/apitest/imageReplacement.png"));
+  layer4->setMatrix(Matrix::MakeTrans(100.f, 100.f) * Matrix::MakeScale(0.5f));
+  rootLayer->addChild(layer4);
+
+  auto lumaMask = SolidLayer::Make();
+  lumaMask->setWidth(40.f);
+  lumaMask->setHeight(30.f);
+  lumaMask->setMatrix(Matrix::MakeTrans(110.f, 110.f));
+  lumaMask->setColor(Color::White());
+  rootLayer->addChild(lumaMask);
+  layer4->setMask(lumaMask);
+  layer4->setMaskType(LayerMaskType::Luminance);
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/MaskPathOptimization"));
+}
+
 }  // namespace tgfx

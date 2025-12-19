@@ -65,17 +65,21 @@ Rect Picture::getBounds() const {
   return totalBounds;
 }
 
-void Picture::playback(Canvas* canvas) const {
+void Picture::playback(Canvas* canvas, AbortCallback* callback) const {
   if (canvas == nullptr) {
     return;
   }
-  playback(canvas->drawContext, *canvas->mcState);
+  playback(canvas->drawContext, *canvas->mcState, callback);
 }
 
-void Picture::playback(DrawContext* drawContext, const MCState& state) const {
+void Picture::playback(DrawContext* drawContext, const MCState& state,
+                       AbortCallback* callback) const {
   DEBUG_ASSERT(drawContext != nullptr);
   PlaybackContext playbackContext(state);
   for (auto& record : records) {
+    if (callback && callback->abort()) {
+      break;
+    }
     record->playback(drawContext, &playbackContext);
   }
 }
