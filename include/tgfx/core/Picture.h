@@ -20,7 +20,6 @@
 
 #include <atomic>
 #include "tgfx/core/Matrix.h"
-#include "tgfx/core/Path.h"
 
 namespace tgfx {
 class PictureRecord;
