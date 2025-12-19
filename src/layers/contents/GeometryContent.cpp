@@ -103,24 +103,4 @@ bool GeometryContent::hasSameGeometry(const GeometryContent* other) const {
   return onHasSameGeometry(other);
 }
 
-std::optional<Path> GeometryContent::asClipPath(bool useContour) const {
-  if (color.alpha == 0.0f) {
-    // Fully transparent, skip this path.
-    return Path();
-  }
-  if (shader != nullptr && shader->isAImage()) {
-    return std::nullopt;
-  }
-  if (!useContour) {
-    if (color.alpha < 1.0f || (shader != nullptr && !shader->isOpaque())) {
-      return std::nullopt;
-    }
-  }
-  auto clipPath = onAsClipPath();
-  if (clipPath.has_value() && stroke != nullptr) {
-    stroke->applyToPath(&(*clipPath));
-  }
-  return clipPath;
-}
-
 }  // namespace tgfx

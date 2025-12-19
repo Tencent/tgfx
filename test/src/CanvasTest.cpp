@@ -3399,4 +3399,163 @@ TGFX_TEST(CanvasTest, TextBlobHitTestPoint) {
   EXPECT_FALSE(textBlob->hitTestPoint(farOutsideX_emoji, outsideY_emoji, &stroke));
 }
 
+TGFX_TEST(CanvasTest, PictureMaskPath) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+
+  // Test 1: Simple rect - should return valid mask path
+  PictureRecorder recorder = {};
+  auto canvas = recorder.beginRecording();
+  Paint paint = {};
+  paint.setColor(Color::White());
+  canvas->drawRect(Rect::MakeXYWH(10.f, 20.f, 80.f, 60.f), paint);
+  auto picture = recorder.finishRecordingAsPicture();
+  ASSERT_TRUE(picture != nullptr);
+
+  auto maskPath = picture->getMaskPath();
+  EXPECT_TRUE(maskPath.has_value());
+  EXPECT_EQ(maskPath->getBounds(), Rect::MakeXYWH(10.f, 20.f, 80.f, 60.f));
+
+  // Test 2: RRect - should return valid mask path
+  canvas = recorder.beginRecording();
+  RRect rrect = {};
+  rrect.setRectXY(Rect::MakeWH(100.f, 80.f), 10.f, 10.f);
+  canvas->drawRRect(rrect, paint);
+  picture = recorder.finishRecordingAsPicture();
+  maskPath = picture->getMaskPath();
+  EXPECT_TRUE(maskPath.has_value());
+  EXPECT_EQ(maskPath->getBounds(), Rect::MakeWH(100.f, 80.f));
+
+  // Test 3: Path - should return valid mask path
+  canvas = recorder.beginRecording();
+  Path circlePath = {};
+  circlePath.addOval(Rect::MakeWH(80.f, 80.f));
+  canvas->drawPath(circlePath, paint);
+  picture = recorder.finishRecordingAsPicture();
+  maskPath = picture->getMaskPath();
+  EXPECT_TRUE(maskPath.has_value());
+  EXPECT_EQ(maskPath->getBounds(), Rect::MakeWH(80.f, 80.f));
+
+  // Test 4: With matrix transformation
+  canvas = recorder.beginRecording();
+  canvas->translate(20.f, 30.f);
+  canvas->drawRect(Rect::MakeWH(50.f, 40.f), paint);
+  picture = recorder.finishRecordingAsPicture();
+  maskPath = picture->getMaskPath();
+  EXPECT_TRUE(maskPath.has_value());
+  EXPECT_EQ(maskPath->getBounds(), Rect::MakeXYWH(20.f, 30.f, 50.f, 40.f));
+
+  // Test 5: With clip - path should be clipped
+  canvas = recorder.beginRecording();
+  canvas->clipRect(Rect::MakeWH(60.f, 60.f));
+  canvas->drawRect(Rect::MakeWH(100.f, 100.f), paint);
+  picture = recorder.finishRecordingAsPicture();
+  maskPath = picture->getMaskPath();
+  EXPECT_TRUE(maskPath.has_value());
+  EXPECT_EQ(maskPath->getBounds(), Rect::MakeWH(60.f, 60.f));
+
+  // Test 6: Semi-transparent color - should NOT return mask path
+  canvas = recorder.beginRecording();
+  paint.setAlpha(0.5f);
+  canvas->drawRect(Rect::MakeWH(100.f, 100.f), paint);
+  picture = recorder.finishRecordingAsPicture();
+  maskPath = picture->getMaskPath();
+  EXPECT_FALSE(maskPath.has_value());
+  paint.setAlpha(1.0f);
+
+  // Test 7: With color filter - should NOT return mask path
+  canvas = recorder.beginRecording();
+  paint.setColorFilter(ColorFilter::Blend(Color::Red(), BlendMode::Multiply));
+  canvas->drawRect(Rect::MakeWH(100.f, 100.f), paint);
+  picture = recorder.finishRecordingAsPicture();
+  maskPath = picture->getMaskPath();
+  EXPECT_FALSE(maskPath.has_value());
+  paint.setColorFilter(nullptr);
+
+  // Test 8: With mask filter - should NOT return mask path
+  canvas = recorder.beginRecording();
+  auto maskShader = Shader::MakeColorShader(Color::White());
+  paint.setMaskFilter(MaskFilter::MakeShader(maskShader));
+  canvas->drawRect(Rect::MakeWH(100.f, 100.f), paint);
+  picture = recorder.finishRecordingAsPicture();
+  maskPath = picture->getMaskPath();
+  EXPECT_FALSE(maskPath.has_value());
+  paint.setMaskFilter(nullptr);
+
+  // Test 9: Draw image - should NOT return mask path
+  canvas = recorder.beginRecording();
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  canvas->drawImage(image);
+  picture = recorder.finishRecordingAsPicture();
+  maskPath = picture->getMaskPath();
+  EXPECT_FALSE(maskPath.has_value());
+
+  // Test 10: Inverse fill path - should NOT return mask path
+  canvas = recorder.beginRecording();
+  Path inversePath = {};
+  inversePath.addRect(Rect::MakeWH(50.f, 50.f));
+  inversePath.setFillType(PathFillType::InverseWinding);
+  ASSERT_TRUE(inversePath.isInverseFillType());
+  canvas->drawPath(inversePath, paint);
+  picture = recorder.finishRecordingAsPicture();
+  maskPath = picture->getMaskPath();
+  EXPECT_FALSE(maskPath.has_value());
+
+  // Test 11: Multiple draws - should combine paths
+  canvas = recorder.beginRecording();
+  canvas->drawRect(Rect::MakeXYWH(0.f, 0.f, 50.f, 50.f), paint);
+  canvas->drawRect(Rect::MakeXYWH(60.f, 60.f, 50.f, 50.f), paint);
+  picture = recorder.finishRecordingAsPicture();
+  maskPath = picture->getMaskPath();
+  EXPECT_TRUE(maskPath.has_value());
+  EXPECT_EQ(maskPath->getBounds(), Rect::MakeWH(110.f, 110.f));
+
+  // Test 12: Fully transparent draw - should be skipped
+  canvas = recorder.beginRecording();
+  paint.setAlpha(0.0f);
+  canvas->drawRect(Rect::MakeWH(100.f, 100.f), paint);
+  paint.setAlpha(1.0f);
+  canvas->drawRect(Rect::MakeXYWH(50.f, 50.f, 30.f, 30.f), paint);
+  picture = recorder.finishRecordingAsPicture();
+  maskPath = picture->getMaskPath();
+  EXPECT_TRUE(maskPath.has_value());
+  EXPECT_EQ(maskPath->getBounds(), Rect::MakeXYWH(50.f, 50.f, 30.f, 30.f));
+
+  // Test 13: With stroke
+  canvas = recorder.beginRecording();
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStroke(Stroke(10.0f));
+  canvas->drawRect(Rect::MakeWH(80.f, 80.f), paint);
+  picture = recorder.finishRecordingAsPicture();
+  maskPath = picture->getMaskPath();
+  EXPECT_TRUE(maskPath.has_value());
+  EXPECT_EQ(maskPath->getBounds(), Rect::MakeXYWH(-5, -5, 90, 90));
+
+  // Verify by reading pixels - draw the mask path and check pixel coverage
+  paint.reset();
+  paint.setColor(Color::Red());
+  surface->getCanvas()->clear();
+  surface->getCanvas()->drawPath(*maskPath, paint);
+
+  Bitmap bitmap = {};
+  bitmap.allocPixels(200, 200);
+  auto pixels = bitmap.lockPixels();
+  ASSERT_TRUE(surface->readPixels(bitmap.info(), pixels));
+  bitmap.unlockPixels();
+
+  // Check that pixel at (2, 2) is red (inside the stroke area, near top-left corner)
+  auto colorStroke = bitmap.getColor(2, 2);
+  EXPECT_EQ(colorStroke, Color::Red());
+
+  // Check that pixel at (40, 40) is transparent (inside the rect, outside the stroke area)
+  auto colorCenter = bitmap.getColor(40, 40);
+  EXPECT_EQ(colorCenter, Color::Transparent());
+
+  // Check that pixel at (100, 100) is transparent (outside the stroke bounds)
+  auto colorOutside = bitmap.getColor(100, 100);
+  EXPECT_EQ(colorOutside, Color::Transparent());
+}
+
 }  // namespace tgfx

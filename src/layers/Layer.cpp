@@ -976,7 +976,14 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
     }
     return;
   }
-  auto maskClipPath = hasValidMask() ? getMaskClipPath() : std::nullopt;
+  std::optional<Path> maskClipPath = std::nullopt;
+  std::shared_ptr<MaskFilter> maskFilter = nullptr;
+  if (hasValidMask()) {
+    auto clipBounds =
+        GetClipBounds(args.blurBackground ? args.blurBackground->getCanvas() : canvas);
+    auto contentScale = canvas->getMatrix().getMaxScale();
+    std::tie(maskClipPath, maskFilter) = getMaskData(args, contentScale, clipBounds);
+  }
   if (maskClipPath.has_value()) {
     canvas->clipPath(*maskClipPath);
     auto blurCanvas = args.blurBackground ? args.blurBackground->getCanvas() : nullptr;
@@ -984,10 +991,9 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
       blurCanvas->clipPath(*maskClipPath);
     }
   }
-  // Mask needs MaskFilter only when mask is valid but cannot be converted to clipPath
-  bool needsMaskFilter = hasValidMask() && !maskClipPath.has_value();
+  bool needsMaskFilter = maskFilter != nullptr;
   if (canUseSubtreeCache(args, blendMode, transform3D) &&
-      drawWithSubtreeCache(args, canvas, alpha, blendMode, transform3D, needsMaskFilter)) {
+      drawWithSubtreeCache(args, canvas, alpha, blendMode, transform3D, maskFilter)) {
     return;
   }
   bool needsOffscreen = blendMode != BlendMode::SrcOver || !bitFields.passThroughBackground ||
@@ -995,7 +1001,7 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
                         (!_filters.empty() && !args.excludeEffects) || needsMaskFilter ||
                         transform3D != nullptr;
   if (needsOffscreen) {
-    drawOffscreen(args, canvas, alpha, blendMode, transform3D, needsMaskFilter);
+    drawOffscreen(args, canvas, alpha, blendMode, transform3D, maskFilter);
   } else {
     drawDirectly(args, canvas, alpha);
   }
@@ -1015,56 +1021,20 @@ Matrix3D Layer::getRelativeMatrix(const Layer* targetCoordinateSpace) const {
   return relativeMatrix;
 }
 
-std::optional<Path> Layer::getMaskClipPath() {
+std::pair<std::optional<Path>, std::shared_ptr<MaskFilter>> Layer::getMaskData(
+    const DrawArgs& args, float scale, const std::optional<Rect>& layerClipBounds) {
   DEBUG_ASSERT(_mask != nullptr);
-  // Cannot convert to clip path if mask has children, filters, or layer styles.
-  if (!_mask->_children.empty() || !_mask->_filters.empty() || !_mask->_layerStyles.empty()) {
-    return std::nullopt;
-  }
-  auto content = _mask->getContent();
-  if (content == nullptr) {
-    // Empty mask clips everything.
-    return Path();
-  }
   auto maskType = static_cast<LayerMaskType>(bitFields.maskType);
-  bool useContour = false;
-  if (maskType == LayerMaskType::Contour) {
-    useContour = true;
-  } else if (maskType == LayerMaskType::Alpha) {
-    if (_mask->alpha() < 1.0f) {
-      return std::nullopt;
-    }
-  } else {
-    return std::nullopt;
-  }
-  auto clipPath = content->asClipPath(useContour);
-  if (!clipPath.has_value()) {
-    return std::nullopt;
-  }
-  auto relativeMatrix = _mask->getRelativeMatrix(this);
-  if (!IsMatrix3DAffine(relativeMatrix)) {
-    return std::nullopt;
-  }
-  clipPath->transform(GetMayLossyAffineMatrix(relativeMatrix));
-  return clipPath;
-}
-
-std::shared_ptr<MaskFilter> Layer::getMaskFilter(const DrawArgs& args, float scale,
-                                                 const std::optional<Rect>& layerClipBounds) {
   auto maskArgs = args;
-  auto maskType = static_cast<LayerMaskType>(bitFields.maskType);
   maskArgs.drawMode = maskType != LayerMaskType::Contour ? DrawMode::Normal : DrawMode::Contour;
   maskArgs.blurBackground = nullptr;
-  std::shared_ptr<Picture> maskPicture = nullptr;
+
   auto relativeMatrix = _mask->getRelativeMatrix(this);
-  // When the mask's transformation matrix does not contain 3D and projection transformations,
-  // affineRelativeMatrix is an equivalent matrix. Otherwise, directly use the identity matrix to
-  // draw the mask content, and this 3D matrix will be applied through a filter during drawing
   auto isMatrixAffine = IsMatrix3DAffine(relativeMatrix);
   auto affineRelativeMatrix =
       isMatrixAffine ? GetMayLossyAffineMatrix(relativeMatrix) : Matrix::I();
 
-  maskPicture = RecordPicture(maskArgs.drawMode, scale, [&](Canvas* canvas) {
+  auto maskPicture = RecordPicture(maskArgs.drawMode, scale, [&](Canvas* canvas) {
     if (layerClipBounds.has_value()) {
       canvas->clipRect(*layerClipBounds);
     }
@@ -1072,13 +1042,26 @@ std::shared_ptr<MaskFilter> Layer::getMaskFilter(const DrawArgs& args, float sca
     _mask->drawLayer(maskArgs, canvas, _mask->_alpha, BlendMode::SrcOver);
   });
   if (maskPicture == nullptr) {
-    return nullptr;
+    return {Path(), nullptr};
   }
+
+  if (isMatrixAffine && maskType != LayerMaskType::Luminance) {
+    auto maskPath = maskPicture->getMaskPath();
+    if (maskPath.has_value()) {
+      // Empty path with inverse fill type means it fills everything, no mask effect
+      if (maskPath->isEmpty() && maskPath->isInverseFillType()) {
+        return {std::nullopt, nullptr};
+      }
+      maskPath->transform(Matrix::MakeScale(1.0f / scale, 1.0f / scale));
+      return {std::move(maskPath), nullptr};
+    }
+  }
+
   Point maskImageOffset = {};
   auto maskContentImage =
       ToImageWithOffset(std::move(maskPicture), &maskImageOffset, nullptr, args.dstColorSpace);
   if (maskContentImage == nullptr) {
-    return nullptr;
+    return {std::nullopt, nullptr};
   }
   if (maskType == LayerMaskType::Luminance) {
     maskContentImage =
@@ -1094,7 +1077,7 @@ std::shared_ptr<MaskFilter> Layer::getMaskFilter(const DrawArgs& args, float sca
   if (shader) {
     shader = shader->makeWithMatrix(maskMatrix);
   }
-  return MaskFilter::MakeShader(shader);
+  return {std::nullopt, MaskFilter::MakeShader(shader)};
 }
 
 std::shared_ptr<Image> Layer::getContentImage(const DrawArgs& contentArgs,
@@ -1330,7 +1313,7 @@ SubtreeCache* Layer::getValidSubtreeCache(const DrawArgs& args, int longEdge,
 
 bool Layer::drawWithSubtreeCache(const DrawArgs& args, Canvas* canvas, float alpha,
                                  BlendMode blendMode, const Matrix3D* transform3D,
-                                 bool needsMaskFilter) {
+                                 const std::shared_ptr<MaskFilter>& maskFilter) {
   auto layerBounds = getBounds();
   auto contentScale = canvas->getMatrix().getMaxScale();
   auto longEdge = GetMipmapCacheLongEdge(args.subtreeCacheMaxSize, contentScale, layerBounds);
@@ -1339,13 +1322,7 @@ bool Layer::drawWithSubtreeCache(const DrawArgs& args, Canvas* canvas, float alp
     return false;
   }
   Paint paint = {};
-  if (needsMaskFilter) {
-    auto clipBounds =
-        GetClipBounds(args.blurBackground ? args.blurBackground->getCanvas() : canvas);
-    auto maskFilter = getMaskFilter(args, contentScale, clipBounds);
-    if (maskFilter == nullptr) {
-      return true;
-    }
+  if (maskFilter) {
     paint.setMaskFilter(maskFilter);
   }
   paint.setAntiAlias(bitFields.allowsEdgeAntialiasing);
@@ -1359,7 +1336,8 @@ bool Layer::drawWithSubtreeCache(const DrawArgs& args, Canvas* canvas, float alp
 }
 
 void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
-                          const Matrix3D* transform3D, bool needsMaskFilter) {
+                          const Matrix3D* transform3D,
+                          const std::shared_ptr<MaskFilter>& maskFilter) {
   if (transform3D != nullptr) {
     drawBackgroundLayerStyles(args, canvas, alpha, *transform3D);
   }
@@ -1407,14 +1385,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   paint.setAlpha(alpha);
   paint.setBlendMode(blendMode);
 
-  auto contentScale = canvas->getMatrix().getMaxScale();
-  std::shared_ptr<MaskFilter> maskFilter = nullptr;
-  if (needsMaskFilter) {
-    maskFilter = getMaskFilter(args, contentScale, clipBounds);
-    // if mask filter is nullptr while mask is valid, that means the layer is not visible.
-    if (!maskFilter) {
-      return;
-    }
+  if (maskFilter) {
     paint.setMaskFilter(maskFilter->makeWithMatrix(invertImageMatrix));
   }
 
@@ -1425,6 +1396,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   canvas->drawImage(image, 0.f, 0.f, sampling, &paint);
   if (args.blurBackground) {
     if (contentArgs.blurBackground) {
+      auto contentScale = canvas->getMatrix().getMaxScale();
       auto filter = getImageFilter(contentScale);
       paint.setImageFilter(filter);
       paint.setMaskFilter(maskFilter);

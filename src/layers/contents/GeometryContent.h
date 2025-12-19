@@ -36,7 +36,6 @@ class GeometryContent : public LayerContent {
   void drawContour(Canvas* canvas, bool antiAlias) const override;
   bool drawDefault(Canvas* canvas, float alpha, bool antiAlias) const override;
   void drawForeground(Canvas* canvas, float alpha, bool antiAlias) const override;
-  std::optional<Path> asClipPath(bool useContour) const override;
 
   /**
    * Returns true if this content has the same geometry as the other content.
@@ -52,7 +51,6 @@ class GeometryContent : public LayerContent {
   virtual Rect onGetBounds() const = 0;
   virtual void onDraw(Canvas* canvas, const Paint& paint) const = 0;
   virtual bool onHasSameGeometry(const GeometryContent* other) const = 0;
-  virtual std::optional<Path> onAsClipPath() const = 0;
 };
 
 }  // namespace tgfx

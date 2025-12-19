@@ -40,7 +40,6 @@ class ComposeContent : public LayerContent {
   void drawContour(Canvas* canvas, bool antiAlias) const override;
   bool drawDefault(Canvas* canvas, float alpha, bool antiAlias) const override;
   void drawForeground(Canvas* canvas, float alpha, bool antiAlias) const override;
-  std::optional<Path> asClipPath(bool useContour) const override;
 
  protected:
   Type type() const override {

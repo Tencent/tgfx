@@ -3979,209 +3979,6 @@ TGFX_TEST(LayerTest, StaticSubtree) {
 }
 
 /**
- * Test getMaskClipPath() returns valid clip path for simple filled shapes.
- */
-TGFX_TEST(LayerTest, MaskClipPath) {
-  auto displayList = std::make_unique<DisplayList>();
-  auto rootLayer = displayList->root();
-
-  // Test 1: SolidLayer (Rect) as mask - should return valid clip path
-  auto layer1 = Layer::Make();
-  rootLayer->addChild(layer1);
-  auto rectMask = SolidLayer::Make();
-  rectMask->setWidth(100);
-  rectMask->setHeight(80);
-  rectMask->setColor(Color::White());
-  rootLayer->addChild(rectMask);
-  layer1->setMask(rectMask);
-  layer1->setMaskType(LayerMaskType::Alpha);
-
-  auto clipPath1 = layer1->getMaskClipPath();
-  EXPECT_TRUE(clipPath1.has_value());
-  EXPECT_TRUE(clipPath1->getBounds() == Rect::MakeWH(100, 80));
-
-  // Test 2: SolidLayer (RRect) as mask - should return valid clip path
-  auto layer2 = Layer::Make();
-  rootLayer->addChild(layer2);
-  auto rrectMask = SolidLayer::Make();
-  rrectMask->setWidth(100);
-  rrectMask->setHeight(80);
-  rrectMask->setRadiusX(15);
-  rrectMask->setRadiusY(15);
-  rrectMask->setColor(Color::White());
-  rootLayer->addChild(rrectMask);
-  layer2->setMask(rrectMask);
-  layer2->setMaskType(LayerMaskType::Alpha);
-
-  auto clipPath2 = layer2->getMaskClipPath();
-  EXPECT_TRUE(clipPath2.has_value());
-  EXPECT_TRUE(clipPath2->getBounds() == Rect::MakeWH(100, 80));
-
-  // Test 3: ShapeLayer (Path) as mask - should return valid clip path
-  auto layer3 = Layer::Make();
-  rootLayer->addChild(layer3);
-  Path circlePath = {};
-  circlePath.addOval(Rect::MakeWH(80, 80));
-  auto pathMask = ShapeLayer::Make();
-  pathMask->setPath(circlePath);
-  pathMask->setFillStyle(SolidColor::Make(Color::White()));
-  rootLayer->addChild(pathMask);
-  layer3->setMask(pathMask);
-  layer3->setMaskType(LayerMaskType::Alpha);
-
-  auto clipPath3 = layer3->getMaskClipPath();
-  EXPECT_TRUE(clipPath3.has_value());
-  EXPECT_TRUE(clipPath3->getBounds() == Rect::MakeWH(80, 80));
-
-  // Test 4: Mask with matrix transformation - clip path should be transformed
-  auto layer4 = Layer::Make();
-  rootLayer->addChild(layer4);
-  auto transformedMask = SolidLayer::Make();
-  transformedMask->setWidth(100);
-  transformedMask->setHeight(80);
-  transformedMask->setColor(Color::White());
-  transformedMask->setMatrix(Matrix::MakeTrans(20, 30));
-  rootLayer->addChild(transformedMask);
-  layer4->setMask(transformedMask);
-  layer4->setMaskType(LayerMaskType::Alpha);
-
-  auto clipPath4 = layer4->getMaskClipPath();
-  EXPECT_TRUE(clipPath4.has_value());
-  EXPECT_TRUE(clipPath4->getBounds() == Rect::MakeXYWH(20, 30, 100, 80));
-
-  // Test 5: ShapeLayer with stroke - should return valid clip path (stroke applied to path)
-  auto layer5 = Layer::Make();
-  rootLayer->addChild(layer5);
-  Path strokePath = {};
-  strokePath.addRect(Rect::MakeWH(80, 80));
-  auto strokeMask = ShapeLayer::Make();
-  strokeMask->setPath(strokePath);
-  strokeMask->setStrokeStyle(SolidColor::Make(Color::White()));
-  strokeMask->setLineWidth(5);
-  rootLayer->addChild(strokeMask);
-  layer5->setMask(strokeMask);
-  layer5->setMaskType(LayerMaskType::Alpha);
-
-  auto clipPath5 = layer5->getMaskClipPath();
-  EXPECT_TRUE(clipPath5.has_value());
-  // Stroke expands the bounds by half lineWidth on each side
-  EXPECT_TRUE(clipPath5->getBounds() == Rect::MakeXYWH(-2.5f, -2.5f, 85.f, 85.f));
-
-  // Test 6: Mask with alpha < 1.0 - should NOT return clip path
-  auto layer6 = Layer::Make();
-  rootLayer->addChild(layer6);
-  auto alphaMask = SolidLayer::Make();
-  alphaMask->setWidth(100);
-  alphaMask->setHeight(80);
-  alphaMask->setColor(Color::White());
-  alphaMask->setAlpha(0.5f);
-  rootLayer->addChild(alphaMask);
-  layer6->setMask(alphaMask);
-  layer6->setMaskType(LayerMaskType::Alpha);
-
-  auto clipPath6 = layer6->getMaskClipPath();
-  EXPECT_FALSE(clipPath6.has_value());
-
-  // Test 7: Contour mask type - should return valid clip path
-  auto layer7 = Layer::Make();
-  rootLayer->addChild(layer7);
-  auto contourMask = SolidLayer::Make();
-  contourMask->setWidth(100);
-  contourMask->setHeight(80);
-  contourMask->setColor(Color::White());
-  rootLayer->addChild(contourMask);
-  layer7->setMask(contourMask);
-  layer7->setMaskType(LayerMaskType::Contour);
-
-  auto clipPath7 = layer7->getMaskClipPath();
-  EXPECT_TRUE(clipPath7.has_value());
-  EXPECT_TRUE(clipPath7->getBounds() == Rect::MakeWH(100, 80));
-
-  // Test 8: Luminance mask type - should NOT return clip path
-  auto layer8 = Layer::Make();
-  rootLayer->addChild(layer8);
-  auto lumaMask = SolidLayer::Make();
-  lumaMask->setWidth(100);
-  lumaMask->setHeight(80);
-  lumaMask->setColor(Color::White());
-  rootLayer->addChild(lumaMask);
-  layer8->setMask(lumaMask);
-  layer8->setMaskType(LayerMaskType::Luminance);
-
-  auto clipPath8 = layer8->getMaskClipPath();
-  EXPECT_FALSE(clipPath8.has_value());
-
-  // Test 9: Mask with semi-transparent fill color - should NOT return clip path
-  auto layer9 = Layer::Make();
-  rootLayer->addChild(layer9);
-  Path shapePath = {};
-  shapePath.addRect(Rect::MakeWH(80, 80));
-  auto semiTransparentMask = ShapeLayer::Make();
-  semiTransparentMask->setPath(shapePath);
-  semiTransparentMask->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 255, 255, 128)));
-  rootLayer->addChild(semiTransparentMask);
-  layer9->setMask(semiTransparentMask);
-  layer9->setMaskType(LayerMaskType::Alpha);
-
-  auto clipPath9 = layer9->getMaskClipPath();
-  EXPECT_FALSE(clipPath9.has_value());
-
-  // Test 10: No mask set - should NOT return clip path
-  auto layer10 = Layer::Make();
-  rootLayer->addChild(layer10);
-  EXPECT_FALSE(layer10->hasValidMask());
-
-  // Test 11: Mask with children - should NOT return clip path
-  auto layer11 = Layer::Make();
-  rootLayer->addChild(layer11);
-  auto maskWithChild = SolidLayer::Make();
-  maskWithChild->setWidth(100);
-  maskWithChild->setHeight(80);
-  maskWithChild->setColor(Color::White());
-  auto childLayer = SolidLayer::Make();
-  childLayer->setWidth(50);
-  childLayer->setHeight(50);
-  childLayer->setColor(Color::Red());
-  maskWithChild->addChild(childLayer);
-  rootLayer->addChild(maskWithChild);
-  layer11->setMask(maskWithChild);
-  layer11->setMaskType(LayerMaskType::Alpha);
-
-  auto clipPath11 = layer11->getMaskClipPath();
-  EXPECT_FALSE(clipPath11.has_value());
-
-  // Test 12: Mask with filters - should NOT return clip path
-  auto layer12 = Layer::Make();
-  rootLayer->addChild(layer12);
-  auto maskWithFilter = SolidLayer::Make();
-  maskWithFilter->setWidth(100);
-  maskWithFilter->setHeight(80);
-  maskWithFilter->setColor(Color::White());
-  maskWithFilter->setFilters({BlurFilter::Make(5.0f, 5.0f)});
-  rootLayer->addChild(maskWithFilter);
-  layer12->setMask(maskWithFilter);
-  layer12->setMaskType(LayerMaskType::Alpha);
-
-  auto clipPath12 = layer12->getMaskClipPath();
-  EXPECT_FALSE(clipPath12.has_value());
-
-  // Test 13: Mask with layer styles - should NOT return clip path
-  auto layer13 = Layer::Make();
-  rootLayer->addChild(layer13);
-  auto maskWithStyle = SolidLayer::Make();
-  maskWithStyle->setWidth(100);
-  maskWithStyle->setHeight(80);
-  maskWithStyle->setColor(Color::White());
-  maskWithStyle->setLayerStyles({DropShadowStyle::Make(5.0f, 5.0f, 0.0f, 5.0f, Color::Black())});
-  rootLayer->addChild(maskWithStyle);
-  layer13->setMask(maskWithStyle);
-  layer13->setMaskType(LayerMaskType::Alpha);
-
-  auto clipPath13 = layer13->getMaskClipPath();
-  EXPECT_FALSE(clipPath13.has_value());
-}
-
-/**
  * Test that simple Rect/RRect leaf nodes skip subtree caching.
  */
 TGFX_TEST(LayerTest, SimpleShapeSkipsCache) {
@@ -4289,6 +4086,128 @@ TGFX_TEST(LayerTest, SimpleShapeSkipsCache) {
   EXPECT_TRUE(parentLayer->subtreeCache != nullptr);
   // Child rect should not have subtree cache (simple leaf)
   EXPECT_TRUE(childRect->subtreeCache == nullptr);
+}
+
+TGFX_TEST(LayerTest, MaskPathOptimization) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  auto displayList = std::make_unique<DisplayList>();
+  auto rootLayer = displayList->root();
+
+  // Image is 110x110, after 0.5 scale it's 55x55
+  // We position each image and its mask to create a 2x2 grid
+
+  // Test 1: SolidLayer (Rect) as mask with Alpha type
+  // Image at (0,0)-(55,55), mask at (10,10)-(50,40)
+  auto layer1 = ImageLayer::Make();
+  layer1->setImage(MakeImage("resources/apitest/imageReplacement.png"));
+  layer1->setMatrix(Matrix::MakeScale(0.5f));
+  rootLayer->addChild(layer1);
+
+  auto rectMask = SolidLayer::Make();
+  rectMask->setWidth(40.f);
+  rectMask->setHeight(30.f);
+  rectMask->setMatrix(Matrix::MakeTrans(10.f, 10.f));
+  rectMask->setColor(Color::White());
+  rootLayer->addChild(rectMask);
+  layer1->setMask(rectMask);
+  layer1->setMaskType(LayerMaskType::Alpha);
+
+  // Test 2: SolidLayer (RRect) as mask with Contour type
+  // Image at (100,0)-(155,55), mask at (110,10)-(150,40)
+  auto layer2 = ImageLayer::Make();
+  layer2->setImage(MakeImage("resources/apitest/imageReplacement.png"));
+  layer2->setMatrix(Matrix::MakeTrans(100.f, 0.f) * Matrix::MakeScale(0.5f));
+  rootLayer->addChild(layer2);
+
+  auto rrectMask = SolidLayer::Make();
+  rrectMask->setWidth(40.f);
+  rrectMask->setHeight(30.f);
+  rrectMask->setRadiusX(8.f);
+  rrectMask->setRadiusY(8.f);
+  rrectMask->setMatrix(Matrix::MakeTrans(110.f, 10.f));
+  rrectMask->setColor(Color::White());
+  rootLayer->addChild(rrectMask);
+  layer2->setMask(rrectMask);
+  layer2->setMaskType(LayerMaskType::Contour);
+
+  // Test 3: ShapeLayer (Path) as mask with Alpha type
+  // Image at (0,100)-(55,155), mask is oval at (10,110)-(50,150)
+  auto layer3 = ImageLayer::Make();
+  layer3->setImage(MakeImage("resources/apitest/imageReplacement.png"));
+  layer3->setMatrix(Matrix::MakeTrans(0.f, 100.f) * Matrix::MakeScale(0.5f));
+  rootLayer->addChild(layer3);
+
+  Path ovalPath = {};
+  ovalPath.addOval(Rect::MakeXYWH(10.f, 110.f, 40.f, 40.f));
+  auto pathMask = ShapeLayer::Make();
+  pathMask->setPath(ovalPath);
+  pathMask->setFillStyle(SolidColor::Make(Color::White()));
+  rootLayer->addChild(pathMask);
+  layer3->setMask(pathMask);
+  layer3->setMaskType(LayerMaskType::Alpha);
+
+  // Test 4: Luminance mask - should NOT use path optimization
+  // Image at (100,100)-(155,155), mask at (110,110)-(150,140)
+  auto layer4 = ImageLayer::Make();
+  layer4->setImage(MakeImage("resources/apitest/imageReplacement.png"));
+  layer4->setMatrix(Matrix::MakeTrans(100.f, 100.f) * Matrix::MakeScale(0.5f));
+  rootLayer->addChild(layer4);
+
+  auto lumaMask = SolidLayer::Make();
+  lumaMask->setWidth(40.f);
+  lumaMask->setHeight(30.f);
+  lumaMask->setMatrix(Matrix::MakeTrans(110.f, 110.f));
+  lumaMask->setColor(Color::White());
+  rootLayer->addChild(lumaMask);
+  layer4->setMask(lumaMask);
+  layer4->setMaskType(LayerMaskType::Luminance);
+
+  displayList->render(surface.get());
+
+  // Verify pixels by reading from surface
+  Bitmap bitmap = {};
+  bitmap.allocPixels(200, 200);
+  auto pixels = bitmap.lockPixels();
+  auto result = surface->readPixels(bitmap.info(), pixels);
+  bitmap.unlockPixels();
+  EXPECT_TRUE(result);
+
+  // Helper to check if pixel has content (not transparent)
+  auto hasContent = [&](int x, int y) {
+    auto color = bitmap.getColor(x, y);
+    return color.alpha > 0.1f;
+  };
+
+  // Helper to check if pixel is transparent
+  auto isTransparent = [&](int x, int y) {
+    auto color = bitmap.getColor(x, y);
+    return color.alpha < 0.1f;
+  };
+
+  // Test 1: Rect mask at (10,10)-(50,40)
+  EXPECT_TRUE(hasContent(30, 25)) << "Test1: Center of rect mask should have content";
+  EXPECT_TRUE(isTransparent(5, 5)) << "Test1: Outside mask should be transparent";
+  EXPECT_TRUE(isTransparent(55, 25)) << "Test1: Right of mask should be transparent";
+
+  // Test 2: RRect mask at (110,10)-(150,40)
+  EXPECT_TRUE(hasContent(130, 25)) << "Test2: Center of rrect mask should have content";
+  EXPECT_TRUE(isTransparent(105, 25)) << "Test2: Left of mask should be transparent";
+
+  // Test 3: Oval mask at (10,110)-(50,150)
+  EXPECT_TRUE(hasContent(30, 130)) << "Test3: Center of oval mask should have content";
+  EXPECT_TRUE(isTransparent(12, 112)) << "Test3: Corner of oval should be transparent";
+
+  // Test 4: Rect mask at (110,110)-(150,140) with Luminance type
+  EXPECT_TRUE(hasContent(130, 125)) << "Test4: Center of luma mask should have content";
+  EXPECT_TRUE(isTransparent(105, 125)) << "Test4: Left of mask should be transparent";
+
+  // Gap between regions should be transparent
+  EXPECT_TRUE(isTransparent(80, 80)) << "Center gap should be transparent";
+
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/MaskPathOptimization"));
 }
 
 }  // namespace tgfx

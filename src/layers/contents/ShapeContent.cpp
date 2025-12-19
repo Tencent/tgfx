@@ -67,9 +67,4 @@ bool ShapeContent::onHasSameGeometry(const GeometryContent* other) const {
   return shape == static_cast<const ShapeContent*>(other)->shape;
 }
 
-std::optional<Path> ShapeContent::onAsClipPath() const {
-  // Returns nullopt because shape->getPath() may have high computational cost.
-  return std::nullopt;
-}
-
 }  // namespace tgfx

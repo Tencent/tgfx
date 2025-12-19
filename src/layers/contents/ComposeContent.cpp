@@ -88,26 +88,4 @@ void ComposeContent::drawForeground(Canvas* canvas, float alpha, bool antiAlias)
   }
 }
 
-std::optional<Path> ComposeContent::asClipPath(bool useContour) const {
-  Path result;
-  if (useContour && !contours.empty()) {
-    for (const auto& content : contours) {
-      auto clipPath = content->asClipPath(useContour);
-      if (!clipPath.has_value()) {
-        return std::nullopt;
-      }
-      result.addPath(*clipPath);
-    }
-    return result;
-  }
-  for (const auto& content : contents) {
-    auto clipPath = content->asClipPath(useContour);
-    if (!clipPath.has_value()) {
-      return std::nullopt;
-    }
-    result.addPath(*clipPath);
-  }
-  return result;
-}
-
 }  // namespace tgfx

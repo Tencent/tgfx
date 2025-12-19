@@ -562,7 +562,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
                          const Matrix3D* transform3D = nullptr);
 
   void drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
-                     const Matrix3D* transform3D, bool needsMaskFilter);
+                     const Matrix3D* transform3D, const std::shared_ptr<MaskFilter>& maskFilter);
 
   void drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha);
 
@@ -606,10 +606,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   bool getLayersUnderPointInternal(float x, float y, std::vector<std::shared_ptr<Layer>>* results);
 
-  std::shared_ptr<MaskFilter> getMaskFilter(const DrawArgs& args, float scale,
-                                            const std::optional<Rect>& layerClipBounds);
-
-  std::optional<Path> getMaskClipPath();
+  std::pair<std::optional<Path>, std::shared_ptr<MaskFilter>> getMaskData(
+      const DrawArgs& args, float scale, const std::optional<Rect>& layerClipBounds);
 
   Matrix3D getRelativeMatrix(const Layer* targetCoordinateSpace) const;
 
@@ -643,7 +641,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
                                                  const Rect& scaledBounds, Matrix* drawingMatrix);
 
   bool drawWithSubtreeCache(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
-                            const Matrix3D* transform3D, bool needsMaskFilter);
+                            const Matrix3D* transform3D,
+                            const std::shared_ptr<MaskFilter>& maskFilter);
 
   std::shared_ptr<Image> getContentImage(const DrawArgs& args, const Matrix& contentMatrix,
                                          const std::shared_ptr<Image>& passThroughImage,

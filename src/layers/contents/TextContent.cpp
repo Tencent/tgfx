@@ -47,9 +47,4 @@ bool TextContent::onHasSameGeometry(const GeometryContent* other) const {
   return textBlob == static_cast<const TextContent*>(other)->textBlob;
 }
 
-std::optional<Path> TextContent::onAsClipPath() const {
-  // Returns nullopt because GlyphRunList::getPath() may have high computational cost.
-  return std::nullopt;
-}
-
 }  // namespace tgfx

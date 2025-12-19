@@ -134,7 +134,7 @@
         "GridBackground": "2ae64df",
         "ImageWithMipmap": "da590da",
         "ImageWithShadow": "c26ff3d9",
-        "SimpleLayerTreeDrawer": "13200a21",
+        "SimpleLayerTreeDrawer": "af282892",
         "SimpleText": "c4c06bec"
     },
     "DstTextureTest": {
@@ -180,12 +180,12 @@
         "BackgroundBlurStyleTest1": "a58c5c7f",
         "BackgroundBlurStyleTest2": "ba7ed034",
         "BackgroundBlurStyleTest3": "a58c5c7f",
-        "BackgroundBlurStyleTest4": "13200a21",
-        "BackgroundBlurStyleTest5": "13200a21",
-        "BackgroundBlurWithMask": "13200a21",
+        "BackgroundBlurStyleTest4": "ba7ed034",
+        "BackgroundBlurStyleTest5": "ba7ed034",
+        "BackgroundBlurWithMask": "ba7ed034",
         "BackgroundLayerIndexWithNestedHierarchy": "ae1bbaec",
         "BottomLeftSurface": "cd6a8dff",
-        "ChildMask": "13200a21",
+        "ChildMask": "af282892",
         "ContourTest": "73b8d873",
         "DiffFilterModeImagePattern -- zoomIn": "ac049958",
         "DiffFilterModeImagePattern -- zoomOut": "ac049958",
@@ -264,7 +264,7 @@
         "imageLayer": "e5103ae6",
         "imageMask": "af282892",
         "innerShadow": "ba7ed034",
-        "shapeMask": "80073c00",
+        "shapeMask": "af282892",
         "textMask": "af282892"
     },
     "MaskTest": {

@@ -231,4 +231,89 @@ const PictureRecord* Picture::getFirstDrawRecord(MCState* state, Brush* brush,
   return drawRecord;
 }
 
+std::optional<Path> Picture::getMaskPath() const {
+  Path result = {};
+  PlaybackContext playback = {};
+
+  for (auto& record : records) {
+    auto recordType = record->type();
+    if (recordType < PictureRecordType::DrawFill) {
+      record->playback(nullptr, &playback);
+      continue;
+    }
+
+    auto& state = playback.state();
+    auto& clip = state.clip;
+    // Empty clip with non-inverse fill type means nothing will be drawn
+    if (clip.isEmpty() && !clip.isInverseFillType()) {
+      continue;
+    }
+
+    auto& brush = playback.brush();
+    if (brush.maskFilter || brush.colorFilter) {
+      return std::nullopt;
+    }
+    if (brush.shader) {
+      if (brush.shader->isAImage() || !brush.shader->isOpaque()) {
+        return std::nullopt;
+      }
+    } else if (brush.color.alpha == 0.0f) {
+      continue;
+    } else if (brush.color.alpha < 1.0f) {
+      return std::nullopt;
+    }
+
+    Path shapePath = {};
+    switch (recordType) {
+      case PictureRecordType::DrawFill:
+        shapePath = clip;
+        break;
+      case PictureRecordType::DrawRect:
+        shapePath.addRect(static_cast<const DrawRect*>(record.get())->rect);
+        break;
+      case PictureRecordType::DrawRRect:
+        shapePath.addRRect(static_cast<const DrawRRect*>(record.get())->rRect);
+        break;
+      case PictureRecordType::DrawPath:
+        shapePath = static_cast<const DrawPath*>(record.get())->path;
+        break;
+      default:
+        return std::nullopt;
+    }
+
+    bool clipUnbounded = clip.isEmpty() && clip.isInverseFillType();
+    bool shapeUnbounded = shapePath.isEmpty() && shapePath.isInverseFillType();
+    if (clipUnbounded && shapeUnbounded) {
+      return shapePath;
+    }
+    // If shape has inverse fill type but is not unbounded, we can't handle it
+    if (shapePath.isInverseFillType()) {
+      return std::nullopt;
+    }
+
+    if (recordType != PictureRecordType::DrawFill) {
+      shapePath.transform(state.matrix);
+      // Only intersect with clip if clip is bounded (not infinite)
+      if (!clipUnbounded) {
+        // If clip has inverse fill type but is not unbounded, we can't handle it
+        if (clip.isInverseFillType()) {
+          return std::nullopt;
+        }
+        Path clippedPath = clip;
+        clippedPath.addPath(shapePath, PathOp::Intersect);
+        shapePath = std::move(clippedPath);
+      }
+    }
+
+    auto* stroke = playback.stroke();
+    if (stroke && !stroke->applyToPath(&shapePath)) {
+      return std::nullopt;
+    }
+
+    result.addPath(shapePath);
+  }
+
+  return result;
+}
+
 }  // namespace tgfx
