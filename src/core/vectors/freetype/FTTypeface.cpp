@@ -18,6 +18,7 @@
 
 #if defined(__ANDROID__) || defined(ANDROID)
 #include "platform/android/GlyphRenderer.h"
+#include "tgfx/platform/android/JNIEnvironment.h"
 #endif
 #include "FTLibrary.h"
 #include "FTTypeface.h"
@@ -108,13 +109,21 @@ FTTypeface::FTTypeface(FTFontData data, FT_Face face)
   _hasOutlines = FT_IS_SCALABLE(this->face);
 #if defined(__ANDROID__) || defined(ANDROID)
   if (_hasColor && _hasOutlines && GlyphRenderer::IsAvailable()) {
-    auto localTypeface = GlyphRenderer::CreateTypeface(this->data.path);
-    typeface.reset(localTypeface);
+    typeface = GlyphRenderer::CreateTypeface(this->data.path);
   }
 #endif
 }
 
 FTTypeface::~FTTypeface() {
+#if defined(__ANDROID__) || defined(ANDROID)
+  if (typeface != nullptr) {
+    JNIEnvironment environment;
+    auto env = environment.current();
+    if (env != nullptr) {
+      env->DeleteGlobalRef(typeface);
+    }
+  }
+#endif
   std::lock_guard<std::mutex> autoLock(FTMutex());
   FT_Done_Face(face);
 }

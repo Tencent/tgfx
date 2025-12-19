@@ -183,7 +183,11 @@ jobject GlyphRenderer::CreateTypeface(const std::string& fontPath) {
     env->ExceptionClear();
     return nullptr;
   }
-  return typeface;
+  // Convert to global reference before returning, since the local frame will be popped
+  // when JNIEnvironment destructor is called.
+  jobject globalTypeface = env->NewGlobalRef(typeface);
+  env->DeleteLocalRef(typeface);
+  return globalTypeface;
 }
 
 static jobject CreatePaint(JNIEnv* env, jobject typeface, float textSize) {

@@ -19,7 +19,7 @@
 #pragma once
 
 #if defined(__ANDROID__) || defined(ANDROID)
-#include "tgfx/platform/android/Global.h"
+#include <jni.h>
 #endif
 #include <mutex>
 #include "ft2build.h"
@@ -73,7 +73,7 @@ class FTTypeface : public Typeface {
   bool _hasOutlines = false;
 
 #if defined(__ANDROID__) || defined(ANDROID)
-  Global<jobject> typeface;
+  jobject typeface = nullptr;
 #endif
 
   FTTypeface(FTFontData data, FT_Face face);
