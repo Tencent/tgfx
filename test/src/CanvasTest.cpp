@@ -3491,7 +3491,7 @@ TGFX_TEST(CanvasTest, PictureMaskPath) {
   picture = recorder.finishRecordingAsPicture();
   EXPECT_FALSE(getMaskPath(picture, &maskPath));
 
-  // Test 10: Inverse fill path - should NOT return mask path
+  // Test 10: Inverse fill path - should return mask path
   canvas = recorder.beginRecording();
   Path inversePath = {};
   inversePath.addRect(Rect::MakeWH(50.f, 50.f));
@@ -3500,7 +3500,7 @@ TGFX_TEST(CanvasTest, PictureMaskPath) {
   ASSERT_TRUE(inversePath.isInverseFillType());
   canvas->drawPath(inversePath, paint);
   picture = recorder.finishRecordingAsPicture();
-  EXPECT_FALSE(getMaskPath(picture, &maskPath));
+  EXPECT_TRUE(getMaskPath(picture, &maskPath));
 
   // Test 11: Multiple draws - should combine paths
   canvas = recorder.beginRecording();
