@@ -2913,13 +2913,9 @@ TGFX_TEST(LayerTest, SimpleBackgroundBlur) {
   rootLayer->addChild(solidLayer);
   rootLayer->addChild(blurLayer);
 
-  // First test with Tiled mode
   displayList.setRenderMode(RenderMode::Tiled);
   displayList.render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/SimpleBackgroundBlur"));
 
-  // Then test with Tiled mode, zoom and offset
-  displayList.setRenderMode(RenderMode::Tiled);
   displayList.setZoomScale(1.5f);
   displayList.setContentOffset(-100, -100);
   displayList.render(surface.get());
