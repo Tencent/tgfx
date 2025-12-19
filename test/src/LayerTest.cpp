@@ -521,7 +521,7 @@ TGFX_TEST(LayerTest, shapeLayer) {
     path.addRect(rect);
     shapeLayer->setPath(path);
     shapeLayer->removeFillStyles();
-    std::shared_ptr<ShapeStyle> fillStyle = nullptr;
+    std::shared_ptr<ColorSource> fillStyle = nullptr;
     switch (i) {
       case 0:
         fillStyle = Gradient::MakeLinear({rect.left, rect.top}, {rect.right, rect.top},
