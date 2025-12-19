@@ -983,7 +983,10 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
     }
     return;
   }
-  auto maskFilter = prepareMask(args, canvas);
+  std::shared_ptr<MaskFilter> maskFilter = nullptr;
+  if (!prepareMask(args, canvas, &maskFilter)) {
+    return;
+  }
   bool needsMaskFilter = maskFilter != nullptr;
   if (canUseSubtreeCache(args, blendMode, transform3D) &&
       drawWithSubtreeCache(args, canvas, alpha, blendMode, transform3D, maskFilter)) {
@@ -1014,21 +1017,29 @@ Matrix3D Layer::getRelativeMatrix(const Layer* targetCoordinateSpace) const {
   return relativeMatrix;
 }
 
-std::shared_ptr<MaskFilter> Layer::prepareMask(const DrawArgs& args, Canvas* canvas) {
+bool Layer::prepareMask(const DrawArgs& args, Canvas* canvas,
+                        std::shared_ptr<MaskFilter>* maskFilter) {
   if (!hasValidMask()) {
-    return nullptr;
+    return true;
   }
   auto clipBounds = GetClipBounds(args.blurBackground ? args.blurBackground->getCanvas() : canvas);
   auto contentScale = canvas->getMatrix().getMaxScale();
   auto maskData = getMaskData(args, contentScale, clipBounds);
   if (maskData.maskFilter == nullptr) {
+    if (maskData.clipPath.isEmpty() && !maskData.clipPath.isInverseFillType()) {
+      return false;
+    }
     canvas->clipPath(maskData.clipPath);
     auto blurCanvas = args.blurBackground ? args.blurBackground->getCanvas() : nullptr;
     if (blurCanvas) {
       blurCanvas->clipPath(maskData.clipPath);
     }
+    return true;
   }
-  return maskData.maskFilter;
+  if (maskFilter) {
+    *maskFilter = maskData.maskFilter;
+  }
+  return true;
 }
 
 MaskData Layer::getMaskData(const DrawArgs& args, float scale,

@@ -27,8 +27,7 @@ bool MaskContext::GetMaskPath(const std::shared_ptr<Picture>& picture, Path* res
     return false;
   }
   MaskContext maskContext;
-  Canvas canvas(&maskContext);
-  picture->playback(&canvas, &maskContext);
+  picture->playback(&maskContext, MCState(Matrix::I()), &maskContext);
   return maskContext.finish(result);
 }
 
@@ -163,10 +162,7 @@ void MaskContext::drawPicture(std::shared_ptr<Picture> picture, const MCState& s
     return;
   }
   MaskContext subContext;
-  Canvas canvas(&subContext);
-  canvas.setMatrix(state.matrix);
-  canvas.clipPath(state.clip);
-  picture->playback(&canvas, &subContext);
+  picture->playback(&subContext, state, &subContext);
   Path subPath = {};
   if (!subContext.finish(&subPath)) {
     _aborted = true;

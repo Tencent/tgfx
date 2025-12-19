@@ -607,7 +607,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   bool getLayersUnderPointInternal(float x, float y, std::vector<std::shared_ptr<Layer>>* results);
 
-  std::shared_ptr<MaskFilter> prepareMask(const DrawArgs& args, Canvas* canvas);
+  bool prepareMask(const DrawArgs& args, Canvas* canvas, std::shared_ptr<MaskFilter>* maskFilter);
 
   MaskData getMaskData(const DrawArgs& args, float scale,
                        const std::optional<Rect>& layerClipBounds);
