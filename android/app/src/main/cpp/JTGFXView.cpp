@@ -38,7 +38,6 @@ void JTGFXView::updateSize() {
     lastSurfaceWidth = width;
     lastSurfaceHeight = height;
     window->invalidSize();
-    lastRecording = nullptr;
   }
 }
 

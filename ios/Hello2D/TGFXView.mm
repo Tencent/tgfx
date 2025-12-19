@@ -84,7 +84,6 @@
   lastSurfaceHeight = static_cast<int>(self.bounds.size.height * self.contentScaleFactor);
   if (tgfxWindow != nullptr) {
     tgfxWindow->invalidSize();
-    lastRecording = nullptr;
   }
 }
 

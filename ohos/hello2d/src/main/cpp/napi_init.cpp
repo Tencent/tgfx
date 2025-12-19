@@ -211,7 +211,6 @@ static void UpdateSize(OH_NativeXComponent* component, void* nativeWindow) {
   lastSurfaceHeight = static_cast<int>(height);
   if (window != nullptr) {
     window->invalidSize();
-    lastRecording = nullptr;
   }
 }
 
