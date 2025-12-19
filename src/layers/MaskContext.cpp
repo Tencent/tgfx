@@ -55,8 +55,7 @@ bool MaskContext::finish(Path* result) {
   }
   Path maskPath = {};
   for (auto& record : _records) {
-    auto* stroke = record.hasStroke ? &record.stroke : nullptr;
-    if (stroke && !stroke->applyToPath(&record.path)) {
+    if (record.hasStroke && !record.stroke.applyToPath(&record.path)) {
       return false;
     }
     record.path.transform(record.state.matrix);
