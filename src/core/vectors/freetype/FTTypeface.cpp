@@ -110,11 +110,7 @@ FTTypeface::FTTypeface(FTFontData data, FT_Face face)
     JNIEnvironment environment;
     auto env = environment.current();
     if (env != nullptr) {
-      auto localTypeface = GlyphRenderer::CreateTypeface(env, this->data.path);
-      if (localTypeface != nullptr) {
-        typeface = localTypeface;
-        env->DeleteLocalRef(localTypeface);
-      }
+      typeface = GlyphRenderer::CreateTypeface(env, this->data.path);
     }
   }
 #endif
