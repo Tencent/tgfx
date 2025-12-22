@@ -1109,8 +1109,7 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
 }
 
 std::shared_ptr<Image> Layer::getContentImage(
-    const DrawArgs& contentArgs, const Matrix& contentMatrix,
-    const std::optional<Rect>& clipBounds,
+    const DrawArgs& contentArgs, const Matrix& contentMatrix, const std::optional<Rect>& clipBounds,
     const std::unordered_set<LayerStyleExtraSourceType>& extraSourceTypes, Matrix* imageMatrix) {
   DEBUG_ASSERT(imageMatrix);
   auto inputBounds = computeContentBounds(clipBounds, contentArgs.excludeEffects);
@@ -1403,7 +1402,14 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   image = MakeImageWithTransform(image, transform3D, &imageMatrix);
 
   if (args.blurBackground && !contentArgs.blurBackground) {
-    image = image->makeRasterized();
+    auto canvasScale = canvas->getMatrix().getMaxScale();
+    auto backgroundScale = args.blurBackground->getCanvas()->getMatrix().getMaxScale();
+    // When canvasScale equals backgroundScale, most pixels at the same resolution are valuable,
+    // so rasterization is meaningful. Otherwise, skip rasterization to avoid generating oversized
+    // textures.
+    if (FloatNearlyEqual(canvasScale, backgroundScale)) {
+      image = image->makeRasterized();
+    }
   }
 
   Paint paint = {};

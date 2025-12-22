@@ -3311,7 +3311,7 @@ TGFX_TEST(LayerTest, TemporaryOffscreenImage) {
   glassPath.addRRect(RRect{Rect::MakeXYWH(10, 10, 80, 80), Point::Make(40, 40)});
   glassLayer->setPath(glassPath);
   glassLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 255, 255, 50)));
-  glassLayer->setLayerStyles({BackgroundBlurStyle::Make(6, 6)});
+  glassLayer->setLayerStyles({BackgroundBlurStyle::Make(5, 5)});
   shapeLayer->addChild(glassLayer);
   displayList.setZoomScale(2.f);
   displayList.setContentOffset(-50, -50);
