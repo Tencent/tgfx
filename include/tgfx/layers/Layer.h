@@ -655,7 +655,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
       const DrawArgs& args, Canvas* canvas, std::optional<Rect> clipBounds,
       const std::unordered_set<LayerStyleExtraSourceType>& extraSourceTypes, Matrix* imageMatrix);
 
-  std::optional<Rect> computeContentBounds(std::optional<Rect> clipBounds, bool excludeEffects);
+  std::optional<Rect> computeContentBounds(const std::optional<Rect>& clipBounds,
+                                           bool excludeEffects);
 
   /**
    * Returns the equivalent transformation matrix adapted for a custom anchor point.

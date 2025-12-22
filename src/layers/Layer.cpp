@@ -77,7 +77,7 @@ static Matrix GetMayLossyAffineMatrix(const Matrix3D& matrix) {
   return affineMatrix;
 }
 
-static std::optional<Rect> MapClipBoundsToContent(std::optional<Rect> clipBounds,
+static std::optional<Rect> MapClipBoundsToContent(const std::optional<Rect>& clipBounds,
                                                   const Matrix3D* transform3D) {
   if (transform3D != nullptr && clipBounds.has_value()) {
     auto filter = ImageFilter::Transform3D(*transform3D);
@@ -1438,17 +1438,18 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   // content.
 }
 
-std::optional<Rect> Layer::computeContentBounds(std::optional<Rect> clipBounds,
+std::optional<Rect> Layer::computeContentBounds(const std::optional<Rect>& clipBounds,
                                                 bool excludeEffects) {
   auto inputBounds = getBounds();
   if (clipBounds.has_value()) {
+    auto mappedClipBounds = *clipBounds;
     if (!excludeEffects) {
       auto filter = getImageFilter(1.0f);
       if (filter) {
-        clipBounds = filter->filterBounds(*clipBounds, MapDirection::Reverse);
+        mappedClipBounds = filter->filterBounds(mappedClipBounds, MapDirection::Reverse);
       }
     }
-    if (!inputBounds.intersect(*clipBounds)) {
+    if (!inputBounds.intersect(mappedClipBounds)) {
       return std::nullopt;
     }
   }
