@@ -23,14 +23,14 @@
 
 namespace tgfx {
 /**
- * ShapeStyle specifies the source color(s) for what is being drawn in a shape layer. There are
- * three types of ShapeStyle: SolidColor, Gradient, and ImagePattern. Note: All ShapeStyle objects
+ * ColorSource specifies the source color(s) for what is being drawn in a shape layer. There are
+ * three types of ColorSource: SolidColor, Gradient, and ImagePattern. Note: All ColorSource objects
  * are not thread-safe and should only be accessed from a single thread.
  */
-class ShapeStyle : public LayerProperty {
+class ColorSource : public LayerProperty {
  public:
   /**
-   * Returns the alpha transparency value of the shape style. Valid values are 0 (fully transparent)
+   * Returns the alpha transparency value of the color source. Valid values are 0 (fully transparent)
    * to 1 (fully opaque). The default value is 1.
    */
   float alpha() const {
@@ -38,12 +38,12 @@ class ShapeStyle : public LayerProperty {
   }
 
   /**
-   * Sets the alpha transparency of the shape style.
+   * Sets the alpha transparency of the color source.
    */
   void setAlpha(float value);
 
   /**
-   * Returns the blend mode used to composite the shape style with the content below it. The default
+   * Returns the blend mode used to composite the color source with the content below it. The default
    * value is BlendMode::SrcOver.
    */
   BlendMode blendMode() const {
@@ -51,19 +51,19 @@ class ShapeStyle : public LayerProperty {
   }
 
   /**
-   * Sets the blend mode of the shape style.
+   * Sets the blend mode of the color source.
    */
   void setBlendMode(BlendMode value);
 
   /**
-   * Returns the transformation matrix applied to the ShapeStyle.
+   * Returns the transformation matrix applied to the ColorSource.
    */
   const Matrix& matrix() const {
     return _matrix;
   }
 
   /**
-   * Sets the transformation matrix applied to the ShapeStyle.
+   * Sets the transformation matrix applied to the ColorSource.
    */
   void setMatrix(const Matrix& value);
 

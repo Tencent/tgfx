@@ -128,6 +128,7 @@ std::shared_ptr<tgfx::Layer> SimpleLayerTree::onBuildLayerTree(const AppHost* ho
   textLayer->setMatrix(tgfx::Matrix::MakeTrans(48, 550));
   tgfx::Font font(host->getTypeface("default"), 18);
   textLayer->setFont(font);
+  textLayer->setTextColor(tgfx::Color::Black());
   root->addChild(textLayer);
 
   // progress shape

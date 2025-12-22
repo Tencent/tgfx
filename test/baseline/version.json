@@ -128,6 +128,7 @@
         "tile_mode_rgbaaa": "8cb853c",
         "tile_mode_subset": "2931d737"
     },
+<<<<<<< HEAD
     "Hello2DTest": {
         "ConicGradient": "492105ac",
         "ImageWithMipmap": "492105ac",
@@ -135,6 +136,8 @@
         "RichText": "97a50bee",
         "SimpleLayerTree": "97a50bee"
     },
+=======
+>>>>>>> origin/main
     "DstTextureTest": {
         "EmptyLocalBounds": "be94e666",
         "OutOfRenderTarget": "be94e666"
@@ -173,17 +176,24 @@
         "innerShadow": "0cfb8996",
         "shaderMaskFilter": "6b4e5ce0"
     },
+    "Hello2DTest": {
+        "ConicGradient": "492105ac",
+        "ImageWithMipmap": "492105ac",
+        "ImageWithShadow": "cf704c3f",
+        "RichText": "97a50bee",
+        "SimpleLayerTree": "cf704c3f"
+    },
     "LayerTest": {
         "AdaptiveDashEffect": "eefb7a46",
         "BackgroundBlurStyleTest1": "a58c5c7f",
         "BackgroundBlurStyleTest2": "ba7ed034",
         "BackgroundBlurStyleTest3": "a58c5c7f",
-        "BackgroundBlurStyleTest4": "ba7ed034",
-        "BackgroundBlurStyleTest5": "ba7ed034",
-        "BackgroundBlurWithMask": "ba7ed034",
+        "BackgroundBlurStyleTest4": "46644213",
+        "BackgroundBlurStyleTest5": "46644213",
+        "BackgroundBlurWithMask": "46644213",
         "BackgroundLayerIndexWithNestedHierarchy": "ae1bbaec",
         "BottomLeftSurface": "cd6a8dff",
-        "ChildMask": "af282892",
+        "ChildMask": "9ec4b486",
         "ContourTest": "73b8d873",
         "DiffFilterModeImagePattern -- zoomIn": "ac049958",
         "DiffFilterModeImagePattern -- zoomOut": "ac049958",
@@ -226,9 +236,10 @@
         "Layer_hitTestPoint": "cd6a8dff",
         "Layer_hitTestPointNested": "4d602959",
         "MaskAlpha": "3dbeed5",
+        "MaskPathOptimization": "46644213",
         "Matrix_3D": "ba7ed034",
         "Matrix_3D_2D": "af282892",
-        "Matrix_3D_2D_3D": "ba7ed034",
+        "Matrix_3D_2D_3D": "9ec4b486",
         "ModeColorFilter": "ba7ed034",
         "NotRectBackgroundBlur": "a8b299ea",
         "PartialBackgroundBlur": "ee2cc771",
@@ -238,13 +249,16 @@
         "PartialDrawLayer_shapeLayer": "af282892",
         "PartialInnerShadow": "9a05dc38",
         "PassThoughAndNormal": "43cd416",
+        "PassThroughWithBackgroundBlur": "9ec4b486",
+        "PassThroughWithBackgroundBlur_clipped": "9ec4b486",
         "PassThrough_Test": "af282892",
         "ShapeStyleWithMatrix": "0cfb8996",
+        "SimpleBackgroundBlur_tiled": "9ec4b486",
         "StrokeOnTop_Off": "80c523ee",
         "StrokeOnTop_On": "80c523ee",
-        "TemporaryOffscreenImage_image1": "af282892",
-        "TemporaryOffscreenImage_image2": "af282892",
-        "TemporaryOffscreenImage_pic": "af282892",
+        "TemporaryOffscreenImage_image1": "9ec4b486",
+        "TemporaryOffscreenImage_image2": "50fdeb23",
+        "TemporaryOffscreenImage_pic": "50fdeb23",
         "ZoomAndOffset": "6b4e5ce0",
         "backgroundLayerBlur": "70a5ca7f",
         "draw_shape": "eefb7a46",
@@ -262,7 +276,7 @@
         "imageLayer": "e5103ae6",
         "imageMask": "af282892",
         "innerShadow": "ba7ed034",
-        "shapeMask": "af282892",
+        "shapeMask": "46644213",
         "textMask": "af282892"
     },
     "MaskTest": {

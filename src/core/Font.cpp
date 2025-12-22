@@ -131,7 +131,9 @@ std::shared_ptr<ImageCodec> Font::getImage(GlyphID glyphID, const Stroke* stroke
   }
   auto width = FloatCeilToInt(bounds.width());
   auto height = FloatCeilToInt(bounds.height());
-  return std::make_shared<GlyphRasterizer>(width, height, scalerContext, glyphID, fauxBold, stroke);
+  Point glyphOffset = {bounds.left, bounds.top};
+  return std::make_shared<GlyphRasterizer>(width, height, scalerContext, glyphID, fauxBold, stroke,
+                                           glyphOffset);
 }
 
 bool Font::operator==(const Font& font) const {
