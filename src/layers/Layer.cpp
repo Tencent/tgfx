@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/Layer.h"
+#include <algorithm>
 #include <atomic>
 #include <cmath>
 #include "core/MCState.h"
@@ -1110,7 +1111,7 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
 
 std::shared_ptr<Image> Layer::getContentImage(
     const DrawArgs& contentArgs, const Matrix& contentMatrix, const std::optional<Rect>& clipBounds,
-    const std::unordered_set<LayerStyleExtraSourceType>& extraSourceTypes, Matrix* imageMatrix) {
+    const std::vector<LayerStyleExtraSourceType>& extraSourceTypes, Matrix* imageMatrix) {
   DEBUG_ASSERT(imageMatrix);
   auto inputBounds = computeContentBounds(clipBounds, contentArgs.excludeEffects);
   if (!inputBounds.has_value()) {
@@ -1166,7 +1167,7 @@ std::shared_ptr<Image> Layer::getContentImage(
 
 std::shared_ptr<Image> Layer::getPassThroughContentImage(
     const DrawArgs& args, Canvas* canvas, const std::optional<Rect>& clipBounds,
-    const std::unordered_set<LayerStyleExtraSourceType>& extraSourceTypes, Matrix* imageMatrix) {
+    const std::vector<LayerStyleExtraSourceType>& extraSourceTypes, Matrix* imageMatrix) {
   DEBUG_ASSERT(imageMatrix);
   DEBUG_ASSERT(args.context);
   auto surface = canvas->getSurface();
@@ -1362,12 +1363,12 @@ bool Layer::drawWithSubtreeCache(const DrawArgs& args, Canvas* canvas, float alp
 void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                           const Matrix3D* transform3D,
                           const std::shared_ptr<MaskFilter>& maskFilter) {
-  std::unordered_set extraSourceTypes = {LayerStyleExtraSourceType::None,
-                                         LayerStyleExtraSourceType::Contour};
+  std::vector<LayerStyleExtraSourceType> extraSourceTypes = {LayerStyleExtraSourceType::None,
+                                                             LayerStyleExtraSourceType::Contour};
   if (transform3D != nullptr) {
     drawBackgroundLayerStyles(args, canvas, alpha, *transform3D);
   } else {
-    extraSourceTypes.insert(LayerStyleExtraSourceType::Background);
+    extraSourceTypes.push_back(LayerStyleExtraSourceType::Background);
   }
 
   auto imageMatrix = Matrix::I();
@@ -1464,21 +1465,21 @@ std::optional<Rect> Layer::computeContentBounds(const std::optional<Rect>& clipB
 }
 
 void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha) {
-  std::unordered_set<LayerStyleExtraSourceType> styleExtraSourceTypes = {
+  std::vector<LayerStyleExtraSourceType> styleExtraSourceTypes = {
       LayerStyleExtraSourceType::None, LayerStyleExtraSourceType::Contour,
       LayerStyleExtraSourceType::Background};
   drawDirectly(args, canvas, alpha, styleExtraSourceTypes);
 }
 
 void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha,
-                         const std::unordered_set<LayerStyleExtraSourceType>& extraSourceTypes) {
+                         const std::vector<LayerStyleExtraSourceType>& extraSourceTypes) {
   auto layerStyleSource = getLayerStyleSource(args, canvas->getMatrix());
   drawContents(args, canvas, alpha, layerStyleSource.get(), nullptr, extraSourceTypes);
 }
 
 void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
                          const LayerStyleSource* layerStyleSource, const Layer* stopChild,
-                         const std::unordered_set<LayerStyleExtraSourceType>& extraSourceTypes) {
+                         const std::vector<LayerStyleExtraSourceType>& extraSourceTypes) {
   if (layerStyleSource) {
     drawLayerStyles(args, canvas, alpha, layerStyleSource, LayerStylePosition::Below,
                     extraSourceTypes);
@@ -1746,15 +1747,15 @@ void Layer::drawBackgroundImage(const DrawArgs& args, Canvas& canvas) {
 
 void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
                             const LayerStyleSource* source, LayerStylePosition position) {
-  std::unordered_set<LayerStyleExtraSourceType> extraSourceTypes = {
-      LayerStyleExtraSourceType::None, LayerStyleExtraSourceType::Contour,
-      LayerStyleExtraSourceType::Background};
+  std::vector<LayerStyleExtraSourceType> extraSourceTypes = {LayerStyleExtraSourceType::None,
+                                                             LayerStyleExtraSourceType::Contour,
+                                                             LayerStyleExtraSourceType::Background};
   drawLayerStyles(args, canvas, alpha, source, position, extraSourceTypes);
 }
 
 void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
                             const LayerStyleSource* source, LayerStylePosition position,
-                            const std::unordered_set<LayerStyleExtraSourceType>& extraSourceTypes) {
+                            const std::vector<LayerStyleExtraSourceType>& extraSourceTypes) {
   DEBUG_ASSERT(source != nullptr && !FloatNearlyZero(source->contentScale));
   auto& contour = source->contour;
   auto contourOffset = source->contourOffset - source->contentOffset;
@@ -1763,7 +1764,8 @@ void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
       args.blurBackground ? GetClipBounds(args.blurBackground->getCanvas()) : std::nullopt;
   for (const auto& layerStyle : _layerStyles) {
     if (layerStyle->position() != position ||
-        extraSourceTypes.find(layerStyle->extraSourceType()) == extraSourceTypes.end()) {
+        std::find(extraSourceTypes.begin(), extraSourceTypes.end(), layerStyle->extraSourceType()) ==
+            extraSourceTypes.end()) {
       continue;
     }
     PictureRecorder recorder = {};
