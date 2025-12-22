@@ -568,12 +568,12 @@ class Layer : public std::enable_shared_from_this<Layer> {
   void drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha);
 
   void drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha,
-                    const std::unordered_set<LayerStyleExtraSourceType>& styleExtraSourceTypes);
+                    const std::vector<LayerStyleExtraSourceType>& styleExtraSourceTypes);
 
-  void drawContents(
-      const DrawArgs& args, Canvas* canvas, float alpha,
-      const LayerStyleSource* layerStyleSource = nullptr, const Layer* stopChild = nullptr,
-      const std::unordered_set<LayerStyleExtraSourceType>& styleExtraSourceTypes = {});
+  void drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
+                    const LayerStyleSource* layerStyleSource = nullptr,
+                    const Layer* stopChild = nullptr,
+                    const std::vector<LayerStyleExtraSourceType>& styleExtraSourceTypes = {});
 
   bool drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
                     const Layer* stopChild = nullptr);
@@ -600,7 +600,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   void drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
                        const LayerStyleSource* source, LayerStylePosition position,
-                       const std::unordered_set<LayerStyleExtraSourceType>& styleExtraSourceTypes);
+                       const std::vector<LayerStyleExtraSourceType>& styleExtraSourceTypes);
 
   void drawBackgroundLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
                                  const Matrix3D& transform);
@@ -647,10 +647,16 @@ class Layer : public std::enable_shared_from_this<Layer> {
                             const Matrix3D* transform3D,
                             const std::shared_ptr<MaskFilter>& maskFilter);
 
-  std::shared_ptr<Image> getContentImage(const DrawArgs& args, const Matrix& contentMatrix,
-                                         const std::shared_ptr<Image>& passThroughImage,
-                                         const Matrix& passThroughImageMatrix,
-                                         std::optional<Rect> clipBounds, Matrix* imageMatrix);
+  std::shared_ptr<Image> getContentImage(
+      const DrawArgs& args, const Matrix& contentMatrix, const std::optional<Rect>& clipBounds,
+      const std::vector<LayerStyleExtraSourceType>& extraSourceTypes, Matrix* imageMatrix);
+
+  std::shared_ptr<Image> getPassThroughContentImage(
+      const DrawArgs& args, Canvas* canvas, const std::optional<Rect>& clipBounds,
+      const std::vector<LayerStyleExtraSourceType>& extraSourceTypes, Matrix* imageMatrix);
+
+  std::optional<Rect> computeContentBounds(const std::optional<Rect>& clipBounds,
+                                           bool excludeEffects);
 
   /**
    * Returns the equivalent transformation matrix adapted for a custom anchor point.

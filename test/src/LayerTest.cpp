@@ -2922,6 +2922,63 @@ TGFX_TEST(LayerTest, SimpleBackgroundBlur) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/SimpleBackgroundBlur_tiled"));
 }
 
+/**
+ * Test PassThrough mode with BackgroundBlurStyle.
+ * In pass-through mode, the image drawn to canvas contains the blended background,
+ * while the image drawn to backgroundCanvas should be the layer content without background blending.
+ */
+TGFX_TEST(LayerTest, PassThroughWithBackgroundBlur) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 300);
+  Layer::SetDefaultAllowsGroupOpacity(true);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->showDirtyRegions(false);
+
+  // Create full screen blue background
+  auto backgroundLayer = SolidLayer::Make();
+  backgroundLayer->setColor(Color::FromRGBA(0, 100, 200, 255));
+  backgroundLayer->setWidth(300);
+  backgroundLayer->setHeight(300);
+
+  // Create a container layer with alpha to trigger offscreen rendering
+  auto containerLayer = Layer::Make();
+  containerLayer->setAlpha(0.9f);
+
+  // Create a child layer with blend mode that triggers pass-through
+  auto childLayer = ShapeLayer::Make();
+  Path childPath;
+  childPath.addRect(Rect::MakeXYWH(75, 75, 150, 150));
+  childLayer->setPath(childPath);
+  childLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 0, 0, 200)));
+  childLayer->setBlendMode(BlendMode::Exclusion);
+  containerLayer->addChild(childLayer);
+
+  // Create a layer with BackgroundBlurStyle, drawn after the container
+  auto blurLayer = SolidLayer::Make();
+  blurLayer->setColor(Color::FromRGBA(255, 255, 255, 50));
+  blurLayer->setWidth(100);
+  blurLayer->setHeight(100);
+  blurLayer->setMatrix(Matrix::MakeTrans(150, 60));
+  blurLayer->setLayerStyles({BackgroundBlurStyle::Make(5, 5)});
+
+  auto rootLayer = displayList->root();
+  rootLayer->addChild(backgroundLayer);
+  rootLayer->addChild(containerLayer);
+  rootLayer->addChild(blurLayer);
+
+  displayList->setRenderMode(RenderMode::Tiled);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PassThroughWithBackgroundBlur"));
+
+  // Test with tiled render mode
+  displayList->setZoomScale(1.5f);
+  displayList->setContentOffset(-100, -100);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PassThroughWithBackgroundBlur_clipped"));
+}
+
 TGFX_TEST(LayerTest, PartialBackgroundBlur) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -3254,7 +3311,7 @@ TGFX_TEST(LayerTest, TemporaryOffscreenImage) {
   glassPath.addRRect(RRect{Rect::MakeXYWH(10, 10, 80, 80), Point::Make(40, 40)});
   glassLayer->setPath(glassPath);
   glassLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 255, 255, 50)));
-  glassLayer->setLayerStyles({BackgroundBlurStyle::Make(6, 6)});
+  glassLayer->setLayerStyles({BackgroundBlurStyle::Make(5, 5)});
   shapeLayer->addChild(glassLayer);
   displayList.setZoomScale(2.f);
   displayList.setContentOffset(-50, -50);
