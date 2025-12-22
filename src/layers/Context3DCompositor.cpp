@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Context3DCompositor.h"
+#include <algorithm>
 #include "core/images/TextureImage.h"
 #include "core/utils/MathExtra.h"
 #include "gpu/DrawingManager.h"
@@ -93,6 +94,11 @@ std::shared_ptr<Image> Context3DCompositor::finish() {
   auto context = targetColorProxy->getContext();
   DEBUG_ASSERT(context != nullptr);
 
+  // TODO: Fix semi-transparent pixel blending issues.
+  // The layer tree traversal collects draw operations in post-order (children before parent).
+  // Reverse the order so that parent layers are drawn first, ensuring correct depth buffer writes
+  // for proper occlusion when child layers overlap with parent content.
+  std::reverse(drawOps.begin(), drawOps.end());
   auto opArray = context->drawingAllocator()->makeArray(std::move(drawOps));
   context->drawingManager()->addOpsRenderTask(targetColorProxy, targetDepthStencilProxy,
                                               std::move(opArray), PMColor::Transparent());

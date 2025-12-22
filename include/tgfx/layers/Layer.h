@@ -626,8 +626,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
                     const Layer* stopChild = nullptr, const Matrix3D* transform3D = nullptr);
 
   // Draws the layer by starting a new 3D rendering context.
-  void drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, float alpha,
-                               const Matrix3D& transform3D);
+  void drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, float alpha);
 
   // Draws the layer in a 3D rendering context using an offscreen canvas and composites the result
   // to the 3D compositor.

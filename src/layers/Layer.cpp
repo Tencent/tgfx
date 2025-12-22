@@ -692,7 +692,11 @@ Rect Layer::getBounds(const Layer* targetCoordinateSpace, bool computeTightBound
 }
 
 Rect Layer::getBoundsInternal(const Matrix3D& coordinateMatrix, bool computeTightBounds) {
-  if (computeTightBounds || bitFields.dirtyDescendents) {
+  // Non-leaf nodes in a 3D rendering context layer tree must preserve the 3D state of their
+  // sublayers, and cannot reuse the localBounds cache that has been flattened to the layer's local
+  // coordinate system.
+  if (computeTightBounds || bitFields.dirtyDescendents ||
+      (_transformStyle == TransformStyle::Preserve3D && canExtend3DContext())) {
     return computeBounds(coordinateMatrix, computeTightBounds);
   }
   if (!localBounds) {
@@ -700,27 +704,34 @@ Rect Layer::getBoundsInternal(const Matrix3D& coordinateMatrix, bool computeTigh
   }
   auto result = coordinateMatrix.mapRect(*localBounds);
   if (!IsMatrix3DAffine(coordinateMatrix)) {
-    // while the matrix is not affine, the layer will draw with a 3D filter, so the bounds should
-    // round out.
+    // When the matrix is not affine, the layer will draw with a 3D filter, so the bounds should
+    // be rounded out.
     result.roundOut();
   }
   return result;
 }
 
 Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBounds) {
-  // If the matrix only contains 2D affine transformations, directly use the equivalent 2D
-  // transformation matrix to calculate the final Bounds
+  bool canStart3DContext = _transformStyle == TransformStyle::Preserve3D && canExtend3DContext();
+  // Layers that can start or extend a 3D rendering context do not support computeTightBounds.
+  DEBUG_ASSERT(!canStart3DContext || !computeTightBounds);
   bool isCoordinateMatrixAffine = IsMatrix3DAffine(coordinateMatrix);
-  auto workAffineMatrix =
+  auto affineMatrix =
       isCoordinateMatrixAffine ? GetMayLossyAffineMatrix(coordinateMatrix) : Matrix::I();
-  auto workMatrix3D = isCoordinateMatrixAffine ? Matrix3D(workAffineMatrix) : coordinateMatrix;
 
   Rect bounds = {};
   if (auto content = getContent()) {
     if (computeTightBounds) {
-      bounds.join(content->getTightBounds(workAffineMatrix));
+      // Compute tight bounds and handle coordinate transformation.
+      auto tightBounds = content->getTightBounds(affineMatrix);
+      if (!isCoordinateMatrixAffine) {
+        tightBounds = coordinateMatrix.mapRect(tightBounds);
+        tightBounds.roundOut();
+      }
+      bounds.join(tightBounds);
     } else {
-      bounds.join(workAffineMatrix.mapRect(content->getBounds()));
+      // Apply coordinateMatrix directly to compute the bounds.
+      bounds.join(coordinateMatrix.mapRect(content->getBounds()));
     }
   }
 
@@ -734,10 +745,10 @@ Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBou
     // ensure the z-component of layer rect vertex coordinates remains unchanged, so the child layer
     // is projected onto the current layer first, then the accumulated matrix transformation is
     // applied. If within, directly concatenate the child layer matrix to preserve its 3D state.
-    if (child->_transformStyle == TransformStyle::Flat || !child->canExtend3DContext()) {
+    if (_transformStyle == TransformStyle::Flat || !canExtend3DContext()) {
       childMatrix.setRow(2, {0, 0, 1, 0});
     }
-    childMatrix.postConcat(workMatrix3D);
+    childMatrix.postConcat(coordinateMatrix);
     auto childBounds = child->getBoundsInternal(childMatrix, computeTightBounds);
     if (child->_scrollRect) {
       auto relatvieScrollRect = childMatrix.mapRect(*child->_scrollRect);
@@ -757,7 +768,9 @@ Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBou
   }
 
   if (!_layerStyles.empty() || !_filters.empty()) {
-    auto contentScale = workAffineMatrix.getMaxScale();
+    // Filters and styles disable 3D context ability, so this block is unreachable for 3D context.
+    DEBUG_ASSERT(!canStart3DContext);
+    auto contentScale = affineMatrix.getMaxScale();
     auto layerBounds = bounds;
     for (auto& layerStyle : _layerStyles) {
       auto styleBounds = layerStyle->filterBounds(layerBounds, contentScale);
@@ -768,15 +781,6 @@ Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBou
     }
   }
 
-  if (isCoordinateMatrixAffine) {
-    return bounds;
-  }
-
-  // If the matrix contains Z-axis transformations and projection transformations, first calculate
-  // the Bounds using the identity matrix, then apply the 3D transformation to the result.
-  // Otherwise, use the equivalent affine transformation matrix to calculate the Bounds.
-  bounds = coordinateMatrix.mapRect(bounds);
-  bounds.roundOut();
   return bounds;
 }
 
@@ -960,7 +964,7 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   // Check if the current layer needs to start a 3D context. Since Layer::draw is called directly
   // without going through a parent layer's drawChildren, 3D context handling must be done here.
   if (_transformStyle == TransformStyle::Preserve3D && canExtend3DContext()) {
-    drawByStarting3DContext(args, canvas, alpha, Matrix3D::I());
+    drawByStarting3DContext(args, canvas, alpha);
   } else {
     drawLayer(args, canvas, alpha, blendMode, nullptr);
   }
@@ -1554,10 +1558,6 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
       backgroundCanvas->drawImage(image, &paint);
     }
   }
-
-  // There is no scenario where LayerStyle's Position and ExtraSourceType are 'above' and
-  // 'background' respectively at the same time, so no special handling is needed after drawing the
-  // content.
 }
 
 void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha,
@@ -1658,9 +1658,10 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, cons
     // treat its Matrix as an identity matrix here, and let the sublayer handle its actual position
     // through 3D filter methods,
     const bool isChildMatrixAffine = IsMatrix3DAffine(childMatrix);
-    auto childAffineMatrix = (isChildMatrixAffine && transform3D == nullptr)
-                                 ? GetMayLossyAffineMatrix(childMatrix)
-                                 : Matrix::I();
+    auto childAffineMatrix =
+        (isChildMatrixAffine && (_transformStyle == TransformStyle::Flat || !canExtend3DContext()))
+            ? GetMayLossyAffineMatrix(childMatrix)
+            : Matrix::I();
     canvas->concat(childAffineMatrix);
     auto clipChildScrollRectHandler = [&](Canvas& clipCanvas) {
       if (child->_scrollRect) {
@@ -1707,7 +1708,7 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, cons
         continue;
       }
       // Start a 3D rendering context.
-      child->drawByStarting3DContext(childArgs, canvas, child->_alpha * alpha, childMatrix);
+      child->drawByStarting3DContext(childArgs, canvas, child->_alpha * alpha);
     } else {
       // Draw elements outside the 3D rendering context.
       DEBUG_ASSERT(transform3D == nullptr);
@@ -1723,8 +1724,7 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, cons
   return true;
 }
 
-void Layer::drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, float alpha,
-                                    const Matrix3D& transform3D) {
+void Layer::drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, float alpha) {
   DEBUG_ASSERT(args.render3DContext == nullptr);
   if (args.renderRect == nullptr) {
     DEBUG_ASSERT(false);
@@ -1735,12 +1735,24 @@ void Layer::drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, float 
     DEBUG_ASSERT(false);
     return;
   }
+
   // The processing area of the compositor is consistent with the actual effective drawing area.
-  auto validRenderRect = *args.renderRect;
-  if (!validRenderRect.intersect(renderBounds)) {
+  auto clipBoundsCanvas =
+      args.blurBackground && !args.clipContentByCanvas ? args.blurBackground->getCanvas() : canvas;
+  // The clip bounds may be slightly larger than the dirty region.
+  auto clipBounds = GetClipBounds(clipBoundsCanvas);
+  if (!clipBounds.has_value()) {
     DEBUG_ASSERT(false);
     return;
   }
+  auto validRenderRect = *clipBounds;
+  validRenderRect.intersect(getBounds(_parent));
+  // validRenderRect is in DisplayList coordinate system. Apply canvas scale to adapt to pixel
+  // coordinates, avoiding excessive scaling when rendering to offscreen texture which would affect
+  // the final visual quality.
+  auto maxScale = canvas->getMatrix().getMaxScale();
+  validRenderRect.scale(maxScale, maxScale);
+  validRenderRect.roundOut();
 
   auto compositor =
       std::make_shared<Context3DCompositor>(*context, static_cast<int>(validRenderRect.width()),
@@ -1753,7 +1765,7 @@ void Layer::drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, float 
   // drawing each layer. Therefore, background styles are disabled.
   context3DArgs.styleSourceTypes = {LayerStyleExtraSourceType::None,
                                     LayerStyleExtraSourceType::Contour};
-  drawIn3DContext(context3DArgs, canvas, alpha, transform3D);
+  drawIn3DContext(context3DArgs, canvas, alpha, getMatrixWithScrollRect());
   auto context3DImage = compositor->finish();
 
   // The final texture has been scaled proportionally during generation, so draw it at its actual
@@ -1788,7 +1800,7 @@ void Layer::drawIn3DContext(const DrawArgs& args, Canvas* canvas, float alpha,
   auto offscreenCanvas = recorder.beginRecording();
   offscreenCanvas->scale(contentScale, contentScale);
 
-  if (canExtend3DContext()) {
+  if (transformStyle() == TransformStyle::Preserve3D && canExtend3DContext()) {
     drawLayer(args, offscreenCanvas, 1.0f, BlendMode::SrcOver, &transform3D);
   } else {
     // If the layer cannot extend the 3D rendering context, child layers do not need to create new
@@ -2173,6 +2185,12 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer,
   minBackgroundOutset = std::numeric_limits<float>::max();
   auto contentScale = 1.0f;
   auto baseTransformer = transformer;
+  // Ensure the 3D filter is not released during the entire function lifetime.
+  std::vector<std::shared_ptr<LayerFilter>> current3DFilterVector = {};
+  if (transform3D != nullptr) {
+    transformer = MakeTransformerFromTransform3D(*transform3D, std::move(transformer),
+                                                 &current3DFilterVector);
+  }
   if (!_layerStyles.empty() || !_filters.empty()) {
     // Filters and styles interrupt 3D rendering context, so non-root layers inside 3D rendering
     // context can ignore parent filters and styles when calculating dirty regions.
@@ -2182,12 +2200,6 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer,
     }
     transformer = RegionTransformer::MakeFromFilters(_filters, 1.0f, std::move(transformer));
     transformer = RegionTransformer::MakeFromStyles(_layerStyles, 1.0f, std::move(transformer));
-  }
-  // Ensure the 3D filter is not released during the entire function lifetime.
-  std::vector<std::shared_ptr<LayerFilter>> current3DFilterVector = {};
-  if (transform3D != nullptr) {
-    transformer =
-        MakeTransformerFromTransform3D(*transform3D, baseTransformer, &current3DFilterVector);
   }
   auto content = getContent();
   if (bitFields.dirtyContentBounds || (forceDirty && content)) {
