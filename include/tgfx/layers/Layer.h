@@ -648,11 +648,11 @@ class Layer : public std::enable_shared_from_this<Layer> {
                             const std::shared_ptr<MaskFilter>& maskFilter);
 
   std::shared_ptr<Image> getContentImage(
-      const DrawArgs& args, const Matrix& contentMatrix, std::optional<Rect> clipBounds,
+      const DrawArgs& args, const Matrix& contentMatrix, const std::optional<Rect>& clipBounds,
       const std::unordered_set<LayerStyleExtraSourceType>& extraSourceTypes, Matrix* imageMatrix);
 
   std::shared_ptr<Image> getPassThroughContentImage(
-      const DrawArgs& args, Canvas* canvas, std::optional<Rect> clipBounds,
+      const DrawArgs& args, Canvas* canvas, const std::optional<Rect>& clipBounds,
       const std::unordered_set<LayerStyleExtraSourceType>& extraSourceTypes, Matrix* imageMatrix);
 
   std::optional<Rect> computeContentBounds(const std::optional<Rect>& clipBounds,

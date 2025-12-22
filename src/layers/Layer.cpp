@@ -1109,7 +1109,8 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
 }
 
 std::shared_ptr<Image> Layer::getContentImage(
-    const DrawArgs& contentArgs, const Matrix& contentMatrix, std::optional<Rect> clipBounds,
+    const DrawArgs& contentArgs, const Matrix& contentMatrix,
+    const std::optional<Rect>& clipBounds,
     const std::unordered_set<LayerStyleExtraSourceType>& extraSourceTypes, Matrix* imageMatrix) {
   DEBUG_ASSERT(imageMatrix);
   auto inputBounds = computeContentBounds(clipBounds, contentArgs.excludeEffects);
@@ -1165,7 +1166,7 @@ std::shared_ptr<Image> Layer::getContentImage(
 }
 
 std::shared_ptr<Image> Layer::getPassThroughContentImage(
-    const DrawArgs& args, Canvas* canvas, std::optional<Rect> clipBounds,
+    const DrawArgs& args, Canvas* canvas, const std::optional<Rect>& clipBounds,
     const std::unordered_set<LayerStyleExtraSourceType>& extraSourceTypes, Matrix* imageMatrix) {
   DEBUG_ASSERT(imageMatrix);
   DEBUG_ASSERT(args.context);
