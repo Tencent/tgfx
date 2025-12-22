@@ -128,16 +128,6 @@
         "tile_mode_rgbaaa": "8cb853c",
         "tile_mode_subset": "2931d737"
     },
-<<<<<<< HEAD
-    "Hello2DTest": {
-        "ConicGradient": "492105ac",
-        "ImageWithMipmap": "492105ac",
-        "ImageWithShadow": "492105ac",
-        "RichText": "97a50bee",
-        "SimpleLayerTree": "97a50bee"
-    },
-=======
->>>>>>> origin/main
     "DstTextureTest": {
         "EmptyLocalBounds": "be94e666",
         "OutOfRenderTarget": "be94e666"
@@ -437,4 +427,3 @@
         "CustomPathTypeface": "42ecc4c7"
     }
 }
-
