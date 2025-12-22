@@ -647,10 +647,15 @@ class Layer : public std::enable_shared_from_this<Layer> {
                             const Matrix3D* transform3D,
                             const std::shared_ptr<MaskFilter>& maskFilter);
 
-  std::shared_ptr<Image> getContentImage(const DrawArgs& args, const Matrix& contentMatrix,
-                                         const std::shared_ptr<Image>& passThroughImage,
-                                         const Matrix& passThroughImageMatrix,
-                                         std::optional<Rect> clipBounds, Matrix* imageMatrix);
+  std::shared_ptr<Image> getContentImage(
+      const DrawArgs& args, const Matrix& contentMatrix, std::optional<Rect> clipBounds,
+      const std::unordered_set<LayerStyleExtraSourceType>& extraSourceTypes, Matrix* imageMatrix);
+
+  std::shared_ptr<Image> getPassThroughContentImage(
+      const DrawArgs& args, Canvas* canvas, std::optional<Rect> clipBounds,
+      const std::unordered_set<LayerStyleExtraSourceType>& extraSourceTypes, Matrix* imageMatrix);
+
+  std::optional<Rect> computeContentBounds(std::optional<Rect> clipBounds, bool excludeEffects);
 
   /**
    * Returns the equivalent transformation matrix adapted for a custom anchor point.
