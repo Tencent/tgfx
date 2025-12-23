@@ -194,34 +194,6 @@ void ShapeLayer::setLineDashAdaptive(bool adaptive) {
   invalidateContent();
 }
 
-void ShapeLayer::setStrokeStart(float start) {
-  if (start < 0) {
-    start = 0;
-  }
-  if (start > 1.0f) {
-    start = 1.0f;
-  }
-  if (_strokeStart == start) {
-    return;
-  }
-  _strokeStart = start;
-  invalidateContent();
-}
-
-void ShapeLayer::setStrokeEnd(float end) {
-  if (end < 0) {
-    end = 0;
-  }
-  if (end > 1.0f) {
-    end = 1.0f;
-  }
-  if (_strokeEnd == end) {
-    return;
-  }
-  _strokeEnd = end;
-  invalidateContent();
-}
-
 void ShapeLayer::setStrokeAlign(StrokeAlign align) {
   auto alignment = static_cast<uint8_t>(align);
   if (shapeBitFields.strokeAlign == alignment) {
@@ -272,8 +244,7 @@ void ShapeLayer::onUpdateContent(LayerRecorder* recorder) {
   if (!_strokeStyles.empty()) {
     // Check if we can use simple stroke mode (pass stroke params to LayerPaint directly).
     auto strokeAlign = static_cast<StrokeAlign>(shapeBitFields.strokeAlign);
-    bool simpleStroke = (_strokeStart == 0 && _strokeEnd == 1) && _lineDashPattern.empty() &&
-                        strokeAlign == StrokeAlign::Center;
+    bool simpleStroke = _lineDashPattern.empty() && strokeAlign == StrokeAlign::Center;
     std::shared_ptr<Shape> strokeShape = nullptr;
     if (!simpleStroke) {
       strokeShape = createStrokeShape();
@@ -296,10 +267,6 @@ void ShapeLayer::onUpdateContent(LayerRecorder* recorder) {
 
 std::shared_ptr<Shape> ShapeLayer::createStrokeShape() const {
   auto strokeShape = _shape;
-  if ((_strokeStart != 0 || _strokeEnd != 1)) {
-    auto pathEffect = PathEffect::MakeTrim(_strokeStart, _strokeEnd);
-    strokeShape = Shape::ApplyEffect(std::move(strokeShape), std::move(pathEffect));
-  }
   auto strokeAlign = static_cast<StrokeAlign>(shapeBitFields.strokeAlign);
   auto tempStroke = stroke;
   if (strokeAlign != StrokeAlign::Center) {
