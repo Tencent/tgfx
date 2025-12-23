@@ -56,7 +56,7 @@ class EAGLDevice : public GLDevice {
   friend class EAGLWindow;
   friend class EAGLHardwareTexture;
 
-  friend void ApplicationWillResignActive();
-  friend void ApplicationDidBecomeActive();
+  friend void ApplicationDidEnterBackground();
+  friend void ApplicationWillEnterForeground();
 };
 }  // namespace tgfx

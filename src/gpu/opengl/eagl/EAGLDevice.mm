@@ -27,7 +27,7 @@ static std::vector<EAGLDevice*> deviceList = {};
 static std::vector<EAGLDevice*> delayPurgeList = {};
 static std::atomic_bool appInBackground = {true};
 
-void ApplicationWillResignActive() {
+void ApplicationDidEnterBackground() {
   // Set applicationInBackground to true first to ensure that no new GL operation is generated
   // during the callback process.
   appInBackground = true;
@@ -37,7 +37,7 @@ void ApplicationWillResignActive() {
   }
 }
 
-void ApplicationDidBecomeActive() {
+void ApplicationWillEnterForeground() {
   appInBackground = false;
   std::vector<EAGLDevice*> delayList = {};
   deviceLocker.lock();
@@ -216,23 +216,23 @@ void EAGLDevice::finish() {
 @end
 
 @implementation TGFXAppMonitor
-+ (void)applicationWillResignActive:(NSNotification*)notification {
-  tgfx::ApplicationWillResignActive();
++ (void)applicationDidEnterBackground:(NSNotification*)notification {
+  tgfx::ApplicationDidEnterBackground();
 }
 
-+ (void)applicationDidBecomeActive:(NSNotification*)notification {
-  tgfx::ApplicationDidBecomeActive();
++ (void)applicationWillEnterForeground:(NSNotification*)notification {
+  tgfx::ApplicationWillEnterForeground();
 }
 @end
 
 static bool RegisterNotifications() {
   [[NSNotificationCenter defaultCenter] addObserver:[TGFXAppMonitor class]
-                                           selector:@selector(applicationWillResignActive:)
-                                               name:UIApplicationWillResignActiveNotification
+                                           selector:@selector(applicationDidEnterBackground:)
+                                               name:UIApplicationDidEnterBackgroundNotification
                                              object:nil];
   [[NSNotificationCenter defaultCenter] addObserver:[TGFXAppMonitor class]
-                                           selector:@selector(applicationDidBecomeActive:)
-                                               name:UIApplicationDidBecomeActiveNotification
+                                           selector:@selector(applicationWillEnterForeground:)
+                                               name:UIApplicationWillEnterForegroundNotification
                                              object:nil];
   return true;
 }
