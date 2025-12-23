@@ -27,6 +27,7 @@
 #include "layers/DrawArgs.h"
 #include "layers/RootLayer.h"
 #include "layers/SubtreeCache.h"
+#include "layers/TileCache.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Gradient.h"
@@ -4264,6 +4265,62 @@ TGFX_TEST(LayerTest, MaskPathOptimization) {
 
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/MaskPathOptimization"));
+}
+
+TGFX_TEST(LayerTest, TileClearWhenAllLayersRemoved) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto surface = Surface::Make(context, 256, 256);
+
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Tiled);
+  displayList->setTileSize(128);
+  displayList->setBackgroundColor(Color::White());
+
+  auto rootLayer = displayList->root();
+
+  auto blueRect = ShapeLayer::Make();
+  Path bluePath = {};
+  bluePath.addRect(Rect::MakeXYWH(0, 0, 256, 256));
+  blueRect->setPath(bluePath);
+  blueRect->setFillStyle(SolidColor::Make(Color::Blue()));
+  rootLayer->addChild(blueRect);
+  displayList->render(surface.get());
+
+  EXPECT_EQ(displayList->tileCaches.size(), 1u);
+  auto result = displayList->tileCaches.find(1000);
+  EXPECT_TRUE(result != displayList->tileCaches.end());
+  EXPECT_EQ(result->second->tileMap.size(), 4u);
+
+  blueRect->removeFromParent();
+  displayList->render(surface.get());
+
+  EXPECT_TRUE(displayList->tileCaches.empty());
+
+  // Test 1: Add a layer that only covers part of tile(0,0)
+  // Red rectangle at (20,20) with size 60x60, only covers (20,20)-(80,80) in tile(0,0)
+  auto smallRect = ShapeLayer::Make();
+  Path smallPath = {};
+  smallPath.addRect(Rect::MakeXYWH(20, 20, 60, 60));
+  smallRect->setPath(smallPath);
+  smallRect->setFillStyle(SolidColor::Make(Color::Red()));
+  rootLayer->addChild(smallRect);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/TileClear_PartialTile"));
+
+  // Test 2: Add another layer in a different tile that doesn't dirty the partial tile,
+  // but the entire partial tile should still be displayed correctly
+  // Green rectangle at (150,150) with size 50x50, only in tile(1,1)
+  auto greenRect = ShapeLayer::Make();
+  Path greenPath = {};
+  greenPath.addRect(Rect::MakeXYWH(150, 150, 50, 50));
+  greenRect->setPath(greenPath);
+  greenRect->setFillStyle(SolidColor::Make(Color::Green()));
+  rootLayer->addChild(greenRect);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/TileClear_PartialTileWithNewLayer"));
 }
 
 }  // namespace tgfx
