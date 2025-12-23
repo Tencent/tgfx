@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "SimpleLayerTree.h"
+#include "base/LayerBuilders.h"
 #include "tgfx/layers/Gradient.h"
 #include "tgfx/layers/ImageLayer.h"
 #include "tgfx/layers/ShapeLayer.h"
@@ -24,7 +24,7 @@
 #include "tgfx/layers/TextLayer.h"
 #include "tgfx/layers/filters/DropShadowFilter.h"
 
-namespace drawers {
+namespace hello2d {
 
 static std::shared_ptr<tgfx::Layer> CreateProgressBar() {
   auto progressBar = tgfx::Layer::Make();
@@ -58,13 +58,17 @@ static std::shared_ptr<tgfx::Layer> CreateProgressBar() {
   return progressBar;
 }
 
-static std::shared_ptr<tgfx::Layer> CreateBackground() {
+static std::vector<std::shared_ptr<tgfx::Layer>> CreateBackground() {
+  std::vector<std::shared_ptr<tgfx::Layer>> layers;
+  layers.reserve(4);
+
   auto background = tgfx::ShapeLayer::Make();
   tgfx::Rect displayRect = tgfx::Rect::MakeWH(375, 812);
   auto backPath = tgfx::Path();
   backPath.addRoundRect(displayRect, 40, 40);
   background->setFillStyle(tgfx::SolidColor::Make(tgfx::Color::FromRGBA(72, 154, 209)));
   background->setPath(backPath);
+  layers.push_back(background);
 
   auto backgroundGradient = tgfx::ShapeLayer::Make();
   auto gradient = tgfx::Gradient::MakeLinear(
@@ -76,8 +80,9 @@ static std::shared_ptr<tgfx::Layer> CreateBackground() {
   backgroundGradient->setFillStyle(gradient);
   backgroundGradient->setPath(gradientPath);
   backgroundGradient->setAlpha(0.2f);
-  background->addChild(backgroundGradient);
-  return background;
+  layers.push_back(backgroundGradient);
+
+  return layers;
 }
 
 static std::shared_ptr<tgfx::Layer> CreateImageLayer(const AppHost* host) {
@@ -106,10 +111,13 @@ static std::shared_ptr<tgfx::Layer> CreateImageLayer(const AppHost* host) {
   return card;
 }
 
-std::shared_ptr<tgfx::Layer> SimpleLayerTree::buildLayerTree(const AppHost* host) {
+std::shared_ptr<tgfx::Layer> SimpleLayerTree::onBuildLayerTree(const AppHost* host) {
   auto root = tgfx::Layer::Make();
+
   // background
-  root->addChild(CreateBackground());
+  for (auto& layer : CreateBackground()) {
+    root->addChild(layer);
+  }
 
   // image
   root->addChild(CreateImageLayer(host));
@@ -125,6 +133,7 @@ std::shared_ptr<tgfx::Layer> SimpleLayerTree::buildLayerTree(const AppHost* host
   // progress shape
   auto progressBar = CreateProgressBar();
   root->addChild(progressBar);
+
   return root;
 }
-}  // namespace drawers
+}  // namespace hello2d

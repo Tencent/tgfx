@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,29 +16,33 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "base/Drawers.h"
+#include "base/LayerBuilders.h"
+#include "tgfx/layers/Gradient.h"
+#include "tgfx/layers/ShapeLayer.h"
 
-namespace drawers {
-void ConicGradient::onDraw(tgfx::Canvas* canvas, const AppHost* host) {
-  auto scale = host->density();
-  auto width = host->width();
-  auto height = host->height();
+namespace hello2d {
+std::shared_ptr<tgfx::Layer> ConicGradient::onBuildLayerTree(const AppHost*) {
+  auto root = tgfx::Layer::Make();
+  auto shapeLayer = tgfx::ShapeLayer::Make();
+
+  // Fixed size: 720x720 with 50px padding, content area: 620x620
+  constexpr auto size = 620;
+
   tgfx::Color cyan = {0.0f, 1.0f, 1.0f, 1.0f};
   tgfx::Color magenta = {1.0f, 0.0f, 1.0f, 1.0f};
   tgfx::Color yellow = {1.0f, 1.0f, 0.0f, 1.0f};
-  auto shader = tgfx::Shader::MakeConicGradient(tgfx::Point::Make(width / 2, height / 2), 0, 360,
-                                                {cyan, magenta, yellow, cyan}, {});
-  tgfx::Paint paint = {};
-  paint.setShader(shader);
-  auto screenSize = std::min(width, height);
-  auto size = screenSize - static_cast<int>(150 * scale);
-  size = std::max(size, 50);
-  auto rect = tgfx::Rect::MakeXYWH((width - size) / 2, (height - size) / 2, size, size);
+
+  auto conicGradient = tgfx::Gradient::MakeConic(tgfx::Point::Make(size / 2, size / 2), 0, 360,
+                                                 {cyan, magenta, yellow, cyan}, {});
+  auto rect = tgfx::Rect::MakeXYWH(0, 0, size, size);
+
   tgfx::Path path = {};
-  path.addRoundRect(rect, 20 * scale, 20 * scale);
-  canvas->translate(host->contentOffset().x, host->contentOffset().y);
-  canvas->scale(host->zoomScale(), host->zoomScale());
-  canvas->drawPath(path, paint);
+  path.addRoundRect(rect, 20, 20);
+  shapeLayer->setPath(path);
+  shapeLayer->setFillStyle(conicGradient);
+
+  root->addChild(shapeLayer);
+  return root;
 }
 
-}  // namespace drawers
+}  // namespace hello2d

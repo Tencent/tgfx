@@ -1,8 +1,9 @@
+// win/src/TGFXWindow.cpp
 /////////////////////////////////////////////////////////////////////////////////////////////////
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,11 +18,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TGFXWindow.h"
+#include <algorithm>
 #include <cmath>
 #include <filesystem>
 #if WINVER >= 0x0603  // Windows 8.1
 #include <shellscalingapi.h>
 #endif
+#include "hello2d/AppHost.h"
+#include "hello2d/LayerBuilder.h"
 
 namespace hello2d {
 static constexpr LPCWSTR ClassName = L"TGFXWindow";
@@ -55,6 +59,8 @@ bool TGFXWindow::open() {
   centerAndShow();
   ShowWindow(windowHandle, SW_SHOW);
   UpdateWindow(windowHandle);
+  updateLayerTree();
+  ::InvalidateRect(windowHandle, nullptr, FALSE);
   return true;
 }
 
@@ -93,17 +99,40 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
       destroy();
       PostQuitMessage(0);
       break;
-    case WM_PAINT: {
-      if (isDrawing) {
-        draw();
+    case WM_SIZE: {
+      RECT rect;
+      GetClientRect(windowHandle, &rect);
+      auto pixelRatio = getPixelRatio();
+      lastSurfaceWidth = static_cast<int>((rect.right - rect.left) * pixelRatio);
+      lastSurfaceHeight = static_cast<int>((rect.bottom - rect.top) * pixelRatio);
+      applyCenteringTransform();
+      if (tgfxWindow) {
+        tgfxWindow->invalidSize();
+        presentImmediately = true;
       }
+      ::InvalidateRect(windowHandle, nullptr, FALSE);
       break;
     }
-    case WM_LBUTTONDOWN: {
-      currentDrawerIndex++;
-      zoomScale = 1.0f;
-      contentOffset = {0.0f, 0.0f};
-      ::InvalidateRect(windowHandle, nullptr, TRUE);
+    case WM_PAINT: {
+      PAINTSTRUCT ps;
+      BeginPaint(hwnd, &ps);
+      if (isDrawing) {
+        draw();
+        ::InvalidateRect(windowHandle, nullptr, FALSE);
+      }
+      EndPaint(hwnd, &ps);
+      break;
+    }
+    case WM_LBUTTONUP: {
+      int count = hello2d::LayerBuilder::Count();
+      if (count > 0) {
+        currentDrawerIndex = (currentDrawerIndex + 1) % count;
+        zoomScale = 1.0f;
+        contentOffset = {0.0f, 0.0f};
+        updateLayerTree();
+        updateZoomScaleAndOffset();
+        ::InvalidateRect(windowHandle, nullptr, FALSE);
+      }
       break;
     }
     case WM_MOUSEWHEEL: {
@@ -111,11 +140,13 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
       ScreenToClient(hwnd, &mousePoint);
       bool isCtrlPressed = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
       bool isShiftPressed = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
+
       if (isCtrlPressed) {
         float zoomStep = std::exp(GET_WHEEL_DELTA_WPARAM(wparam) / WHEEL_RATIO);
         float newZoom = std::clamp(zoomScale * zoomStep, MIN_ZOOM, MAX_ZOOM);
-        contentOffset.x = mousePoint.x - ((mousePoint.x - contentOffset.x) / zoomScale) * newZoom;
-        contentOffset.y = mousePoint.y - ((mousePoint.y - contentOffset.y) / zoomScale) * newZoom;
+        float oldZoom = zoomScale;
+        contentOffset.x = mousePoint.x - ((mousePoint.x - contentOffset.x) / oldZoom) * newZoom;
+        contentOffset.y = mousePoint.y - ((mousePoint.y - contentOffset.y) / oldZoom) * newZoom;
         zoomScale = newZoom;
       } else {
         float wheelDelta = static_cast<float>(GET_WHEEL_DELTA_WPARAM(wparam));
@@ -125,7 +156,8 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
           contentOffset.y -= wheelDelta;
         }
       }
-      ::InvalidateRect(windowHandle, nullptr, TRUE);
+      updateZoomScaleAndOffset();
+      ::InvalidateRect(windowHandle, nullptr, FALSE);
       break;
     }
     case WM_GESTURE: {
@@ -133,19 +165,17 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
       gestureInfo.cbSize = sizeof(GESTUREINFO);
       if (GetGestureInfo(reinterpret_cast<HGESTUREINFO>(lparam), &gestureInfo)) {
         if (gestureInfo.dwID == GID_ZOOM) {
-          double currentArgument = gestureInfo.ullArguments;
+          double currentArgument = static_cast<double>(gestureInfo.ullArguments);
           if (lastZoomArgument != 0.0) {
             double zoomFactor = currentArgument / lastZoomArgument;
             POINT mousePoint = {GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
             ScreenToClient(hwnd, &mousePoint);
             float newZoom =
                 std::clamp(zoomScale * static_cast<float>(zoomFactor), MIN_ZOOM, MAX_ZOOM);
-            contentOffset.x =
-                mousePoint.x - ((mousePoint.x - contentOffset.x) / zoomScale) * newZoom;
-            contentOffset.y =
-                mousePoint.y - ((mousePoint.y - contentOffset.y) / zoomScale) * newZoom;
+            float oldZoom = zoomScale;
+            contentOffset.x = mousePoint.x - ((mousePoint.x - contentOffset.x) / oldZoom) * newZoom;
+            contentOffset.y = mousePoint.y - ((mousePoint.y - contentOffset.y) / oldZoom) * newZoom;
             zoomScale = newZoom;
-            ::InvalidateRect(windowHandle, nullptr, TRUE);
           }
           lastZoomArgument = currentArgument;
         }
@@ -153,6 +183,8 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
           lastZoomArgument = 0.0;
         }
         CloseGestureInfoHandle(reinterpret_cast<HGESTUREINFO>(lparam));
+        updateZoomScaleAndOffset();
+        ::InvalidateRect(windowHandle, nullptr, FALSE);
       }
       break;
     }
@@ -198,11 +230,9 @@ void TGFXWindow::centerAndShow() {
   int DlgWidth = rcDlg.right - rcDlg.left;
   int DlgHeight = rcDlg.bottom - rcDlg.top;
 
-  // Find dialog's upper left based on rcCenter
   int xLeft = (rcCenter.left + rcCenter.right) / 2 - DlgWidth / 2;
   int yTop = (rcCenter.top + rcCenter.bottom) / 2 - DlgHeight / 2;
 
-  // The dialog is outside the screen, move it inside
   if (xLeft < rcArea.left) {
     if (xLeft < 0) {
       xLeft = GetSystemMetrics(SM_CXSCREEN) / 2 - DlgWidth / 2;
@@ -228,7 +258,7 @@ void TGFXWindow::centerAndShow() {
 }
 
 float TGFXWindow::getPixelRatio() {
-#if WINVER >= 0x0603  // Windows 8.1
+#if WINVER >= 0x0603
   HMONITOR monitor = nullptr;
   if (windowHandle != nullptr) {
     monitor = ::MonitorFromWindow(windowHandle, MONITOR_DEFAULTTONEAREST);
@@ -245,17 +275,53 @@ float TGFXWindow::getPixelRatio() {
 }
 
 void TGFXWindow::createAppHost() {
-  appHost = std::make_unique<drawers::AppHost>();
+  appHost = std::make_unique<hello2d::AppHost>();
+
+  displayList.setRenderMode(tgfx::RenderMode::Tiled);
+  displayList.setAllowZoomBlur(true);
+  displayList.setMaxTileCount(512);
+
   std::filesystem::path filePath = __FILE__;
   auto rootPath = filePath.parent_path().parent_path().parent_path().string();
   auto imagePath = rootPath + R"(\resources\assets\bridge.jpg)";
   auto image = tgfx::Image::MakeFromFile(imagePath);
   appHost->addImage("bridge", image);
+  imagePath = rootPath + R"(\resources\assets\tgfx.png)";
+  appHost->addImage("TGFX", tgfx::Image::MakeFromFile(imagePath));
   auto typeface = tgfx::Typeface::MakeFromName("Microsoft YaHei", "");
   appHost->addTypeface("default", typeface);
   auto emojiPath = rootPath + R"(\resources\font\NotoColorEmoji.ttf)";
   typeface = tgfx::Typeface::MakeFromPath(emojiPath);
   appHost->addTypeface("emoji", typeface);
+}
+
+void TGFXWindow::updateLayerTree() {
+  int count = hello2d::LayerBuilder::Count();
+  int index = (count > 0) ? (currentDrawerIndex % count) : 0;
+  if (index != lastDrawIndex || !contentLayer) {
+    auto builder = hello2d::LayerBuilder::GetByIndex(index);
+    if (builder) {
+      contentLayer = builder->buildLayerTree(appHost.get());
+      if (contentLayer) {
+        displayList.root()->removeChildren();
+        displayList.root()->addChild(contentLayer);
+        applyCenteringTransform();
+      }
+    }
+    lastDrawIndex = index;
+  }
+}
+
+void TGFXWindow::updateZoomScaleAndOffset() {
+  displayList.setZoomScale(zoomScale);
+  displayList.setContentOffset(contentOffset.x, contentOffset.y);
+}
+
+void TGFXWindow::applyCenteringTransform() {
+  if (lastSurfaceWidth > 0 && lastSurfaceHeight > 0 && contentLayer) {
+    hello2d::LayerBuilder::ApplyCenteringTransform(
+        contentLayer, static_cast<float>(lastSurfaceWidth), static_cast<float>(lastSurfaceHeight));
+  }
 }
 
 void TGFXWindow::draw() {
@@ -269,11 +335,15 @@ void TGFXWindow::draw() {
   GetClientRect(windowHandle, &rect);
   auto width = static_cast<int>(rect.right - rect.left);
   auto height = static_cast<int>(rect.bottom - rect.top);
-  auto pixelRatio = getPixelRatio();
-  auto sizeChanged = appHost->updateScreen(width, height, pixelRatio);
-  if (sizeChanged) {
-    tgfxWindow->invalidSize();
+  if (width <= 0 || height <= 0) {
+    return;
   }
+  auto pixelRatio = getPixelRatio();
+
+  if (!displayList.hasContentChanged() && lastRecording == nullptr) {
+    return;
+  }
+
   auto device = tgfxWindow->getDevice();
   if (device == nullptr) {
     return;
@@ -287,19 +357,30 @@ void TGFXWindow::draw() {
     device->unlock();
     return;
   }
-  appHost->updateZoomAndOffset(zoomScale, contentOffset);
+
   auto canvas = surface->getCanvas();
   canvas->clear();
-  canvas->save();
-  auto numDrawers = drawers::Drawer::Count() - 1;
-  auto index = (currentDrawerIndex % numDrawers) + 1;
-  auto drawer = drawers::Drawer::GetByName("GridBackground");
-  drawer->draw(canvas, appHost.get());
-  drawer = drawers::Drawer::GetByIndex(index);
-  drawer->draw(canvas, appHost.get());
-  canvas->restore();
-  context->flushAndSubmit();
-  tgfxWindow->present(context);
+  hello2d::DrawBackground(canvas, surface->width(), surface->height(), pixelRatio);
+
+  displayList.render(surface.get(), false);
+
+  auto recording = context->flush();
+
+  if (presentImmediately) {
+    presentImmediately = false;
+    if (recording) {
+      context->submit(std::move(recording));
+      tgfxWindow->present(context);
+    }
+  } else {
+    std::swap(lastRecording, recording);
+
+    if (recording) {
+      context->submit(std::move(recording));
+      tgfxWindow->present(context);
+    }
+  }
+
   device->unlock();
 }
 }  // namespace hello2d

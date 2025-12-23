@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -27,6 +28,8 @@ static constexpr float M_PI_F = static_cast<float>(M_PI);
 static constexpr float M_PI_2_F = static_cast<float>(M_PI_2);
 static constexpr float FLOAT_NEARLY_ZERO = 1.0f / (1 << 12);
 static constexpr float FLOAT_SQRT2 = 1.41421356f;
+static constexpr float MaxS32FitsInFloat = 2147483520.f;
+static constexpr float MinS32FitsInFloat = -MaxS32FitsInFloat;
 
 // Helper to see a float as its bit pattern (w/o aliasing warnings)
 inline uint32_t Float2Bits(float value) {
@@ -148,6 +151,22 @@ inline bool IsInteger(float f) {
 TGFX_ATTRIBUTE(no_sanitize("float-divide-by-zero"))
 inline float IEEEFloatDivide(float numer, float denom) {
   return numer / denom;
+}
+
+inline int FloatSaturateToInt(float x) {
+  return static_cast<int>(std::clamp(x, MinS32FitsInFloat, MaxS32FitsInFloat));
+}
+
+inline int FloatFloorToInt(float x) {
+  return FloatSaturateToInt(std::floor(x));
+}
+
+inline int FloatCeilToInt(float x) {
+  return FloatSaturateToInt(std::ceil(x));
+}
+
+inline int FloatRoundToInt(float x) {
+  return FloatSaturateToInt(std::round(x));
 }
 
 }  // namespace tgfx

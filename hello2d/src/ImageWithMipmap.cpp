@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,28 +16,29 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "base/Drawers.h"
+#include "base/LayerBuilders.h"
+#include "tgfx/layers/ImageLayer.h"
 
-namespace drawers {
-void ImageWithMipmap::onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) {
-  auto scale = host->density();
-  auto width = host->width();
-  auto height = host->height();
-  auto screenSize = std::min(width, height);
-  auto size = screenSize - static_cast<int>(150 * scale);
-  size = std::max(size, 50);
+namespace hello2d {
+std::shared_ptr<tgfx::Layer> ImageWithMipmap::onBuildLayerTree(const AppHost* host) {
+  auto root = tgfx::Layer::Make();
+
+  // Fixed size: 720x720 with 50px padding, content area: 620x620
+  constexpr auto size = 620;
+
   auto image = host->getImage("bridge");
   if (image == nullptr) {
-    return;
+    return root;
   }
   image = image->makeMipmapped(true);
   auto imageScale = static_cast<float>(size) / static_cast<float>(image->width());
   auto matrix = tgfx::Matrix::MakeScale(imageScale);
-  matrix.postTranslate(static_cast<float>(width - size) / 2, static_cast<float>(height - size) / 2);
-  matrix.postScale(host->zoomScale(), host->zoomScale());
-  matrix.postTranslate(host->contentOffset().x, host->contentOffset().y);
-  canvas->concat(matrix);
-  tgfx::SamplingOptions sampling(tgfx::FilterMode::Linear, tgfx::MipmapMode::Linear);
-  canvas->drawImage(image, sampling);
+  auto imageLayer = tgfx::ImageLayer::Make();
+  imageLayer->setImage(image);
+  imageLayer->setSampling(
+      tgfx::SamplingOptions(tgfx::FilterMode::Linear, tgfx::MipmapMode::Linear));
+  imageLayer->setMatrix(matrix);
+  root->addChild(imageLayer);
+  return root;
 }
-}  // namespace drawers
+}  // namespace hello2d
