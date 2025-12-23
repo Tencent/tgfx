@@ -239,42 +239,6 @@ class ShapeLayer : public Layer {
   void setLineDashAdaptive(bool adaptive);
 
   /**
-   * Returns the relative location at which to begin stroking the path. The value of this property
-   * must be in the range 0.0 to 1.0. The default value of this property is 0.0. Combined with the
-   * strokeEnd property, this property defines the subregion of the path to stroke. The value in
-   * this property indicates the relative point along the path at which to begin stroking while the
-   * strokeEnd property defines the end point. A value of 0.0 represents the beginning of the path
-   * while a value of 1.0 represents the end of the path. Values in between are interpreted linearly
-   * along the path length.
-   */
-  float strokeStart() const {
-    return _strokeStart;
-  }
-
-  /**
-   * Sets the relative location at which to begin stroking the path.
-   */
-  void setStrokeStart(float start);
-
-  /**
-   * Returns the relative location at which to stop stroking the path. The value of this property
-   * must be in the range 0.0 to 1.0. The default value of this property is 1.0. Combined with the
-   * strokeStart property, this property defines the subregion of the path to stroke. The value in
-   * this property indicates the relative point along the path at which to stop stroking while the
-   * strokeStart property defines the starting point. A value of 0.0 represents the beginning of the
-   * path while a value of 1.0 represents the end of the path. Values in between are interpreted
-   * linearly along the path length.
-   */
-  float strokeEnd() const {
-    return _strokeEnd;
-  }
-
-  /**
-   * Sets the relative location at which to stop stroking the path.
-   */
-  void setStrokeEnd(float end);
-
-  /**
    * Returns the stroke alignment applied to the shape's path when stroked. The default stroke alignment is Center.
    */
   StrokeAlign strokeAlign() const {
@@ -309,8 +273,6 @@ class ShapeLayer : public Layer {
   Stroke stroke = {};
   std::vector<float> _lineDashPattern = {};
   float _lineDashPhase = 0.0f;
-  float _strokeStart = 0.0f;
-  float _strokeEnd = 1.0f;
   struct {
     bool strokeOnTop : 1;
     bool lineDashAdaptive : 1;
