@@ -38,7 +38,7 @@ class PathShape : public Shape {
     return path.isInverseFillType();
   }
 
-  Rect getBounds() const override {
+  Rect onGetBounds() const override {
     return path.getBounds();
   }
 

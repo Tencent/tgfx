@@ -18,6 +18,7 @@
 
 #include "DropShadowImageFilter.h"
 #include "core/images/TextureImage.h"
+#include "core/utils/ColorHelper.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
@@ -75,7 +76,7 @@ PlacementPtr<FragmentProcessor> DropShadowImageFilter::getSourceFragmentProcesso
   if (result) {
     return result;
   }
-  return ConstColorProcessor::Make(args.context->drawingBuffer(), Color::Transparent(),
+  return ConstColorProcessor::Make(args.context->drawingAllocator(), PMColor::Transparent(),
                                    InputMode::Ignore);
 }
 
@@ -98,13 +99,11 @@ PlacementPtr<FragmentProcessor> DropShadowImageFilter::getShadowFragmentProcesso
   if (shadowProcessor == nullptr) {
     return nullptr;
   }
-  auto buffer = args.context->drawingBuffer();
-  auto dstColor = ColorSpaceXformSteps::ConvertColorSpace(
-      ColorSpace::MakeSRGB(), AlphaType::Unpremultiplied, source->colorSpace(),
-      AlphaType::Premultiplied, color);
-  auto colorProcessor = ConstColorProcessor::Make(buffer, dstColor, InputMode::Ignore);
+  auto allocator = args.context->drawingAllocator();
+  auto dstColor = ToPMColor(color, source->colorSpace());
+  auto colorProcessor = ConstColorProcessor::Make(allocator, dstColor, InputMode::Ignore);
   return XfermodeFragmentProcessor::MakeFromTwoProcessors(
-      buffer, std::move(colorProcessor), std::move(shadowProcessor), BlendMode::SrcIn);
+      allocator, std::move(colorProcessor), std::move(shadowProcessor), BlendMode::SrcIn);
 }
 
 PlacementPtr<FragmentProcessor> DropShadowImageFilter::asFragmentProcessor(
@@ -121,7 +120,7 @@ PlacementPtr<FragmentProcessor> DropShadowImageFilter::asFragmentProcessor(
     return getSourceFragmentProcessor(source, args, sampling, constraint, uvMatrix);
   }
   return XfermodeFragmentProcessor::MakeFromTwoProcessors(
-      args.context->drawingBuffer(),
+      args.context->drawingAllocator(),
       getSourceFragmentProcessor(source, args, sampling, constraint, uvMatrix),
       std::move(shadowFragment), BlendMode::SrcOver);
 }

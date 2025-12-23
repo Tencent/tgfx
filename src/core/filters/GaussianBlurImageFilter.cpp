@@ -60,7 +60,7 @@ static void Blur1D(PlacementPtr<FragmentProcessor> source,
   auto context = renderTarget->getContext();
   auto drawingManager = context->drawingManager();
   auto processor = GaussianBlur1DFragmentProcessor::Make(
-      context->drawingBuffer(), std::move(source), sigma, direction, stepLength, MAX_BLUR_SIGMA);
+      context->drawingAllocator(), std::move(source), sigma, direction, stepLength, MAX_BLUR_SIGMA);
   drawingManager->fillRTWithFP(std::move(renderTarget), std::move(processor), renderFlags);
 }
 
@@ -132,12 +132,14 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
     return nullptr;
   }
 
+  auto allocator = args.context->drawingAllocator();
   if (blur2D) {
     Blur1D(std::move(sourceFragment), renderTarget, sigmaX, GaussianBlurDirection::Horizontal, 1.0f,
            args.renderFlags);
 
     SamplingArgs samplingArgs = {tileMode, tileMode, {}, SrcRectConstraint::Fast};
-    sourceFragment = TiledTextureEffect::Make(renderTarget->asTextureProxy(), samplingArgs);
+    sourceFragment =
+        TiledTextureEffect::Make(allocator, renderTarget->asTextureProxy(), samplingArgs);
     const bool finalBlurTargetMipmapped = (args.mipmapped && !needExtraTransform);
     renderTarget = RenderTargetProxy::Make(
         args.context, static_cast<int>(blurDstWidth), static_cast<int>(blurDstHeight), isAlphaOnly,
@@ -164,7 +166,8 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
                                          clipBounds.height() * blurDstScaleY / dstDrawHeight);
   finalUVMatrix.postTranslate((clipBounds.left - srcSampleBounds.left) * blurDstScaleX,
                               (clipBounds.top - srcSampleBounds.top) * blurDstScaleY);
-  auto finalProcessor = TextureEffect::Make(renderTarget->asTextureProxy(), {}, &finalUVMatrix);
+  auto finalProcessor =
+      TextureEffect::Make(allocator, renderTarget->asTextureProxy(), {}, &finalUVMatrix);
   renderTarget = RenderTargetProxy::Make(args.context, static_cast<int>(dstDrawWidth),
                                          static_cast<int>(dstDrawHeight), isAlphaOnly, 1,
                                          args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
@@ -216,7 +219,8 @@ PlacementPtr<FragmentProcessor> GaussianBlurImageFilter::getSourceFragmentProces
     return nullptr;
   }
   context->drawingManager()->fillRTWithFP(renderTarget, std::move(fp), renderFlags);
-  return TiledTextureEffect::Make(renderTarget->asTextureProxy(), samplingArgs);
+  auto allocator = context->drawingAllocator();
+  return TiledTextureEffect::Make(allocator, renderTarget->asTextureProxy(), samplingArgs);
 }
 
 }  // namespace tgfx

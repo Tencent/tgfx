@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "core/MCState.h"
 #include "core/PathRef.h"
 #include "core/PictureRecords.h"
 #include "core/images/CodecImage.h"
@@ -33,6 +34,7 @@
 #include "gpu/ops/RectDrawOp.h"
 #include "gpu/resources/TextureView.h"
 #include "gtest/gtest.h"
+#include "layers/MaskContext.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Color.h"
@@ -129,9 +131,9 @@ TGFX_TEST(CanvasTest, DiscardContent) {
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
   surface->renderContext->flush();
-  auto drawingManager = context->drawingManager();
-  ASSERT_TRUE(drawingManager->renderTasks.size() == 1);
-  auto task = static_cast<OpsRenderTask*>(drawingManager->renderTasks.front().get());
+  auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+  ASSERT_TRUE(drawingBuffer->renderTasks.size() == 1);
+  auto task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.front().get());
   EXPECT_TRUE(task->drawOps.size() == 0);
 
   Paint paint;
@@ -140,8 +142,8 @@ TGFX_TEST(CanvasTest, DiscardContent) {
   paint.setBlendMode(BlendMode::Src);
   canvas->drawRect(Rect::MakeWH(width, height), paint);
   surface->renderContext->flush();
-  ASSERT_TRUE(drawingManager->renderTasks.size() == 2);
-  task = static_cast<OpsRenderTask*>(drawingManager->renderTasks.back().get());
+  ASSERT_TRUE(drawingBuffer->renderTasks.size() == 2);
+  task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
   EXPECT_TRUE(task->drawOps.size() == 0);
 
   paint.setColor(Color{0.8f, 0.8f, 0.8f, 1.f});
@@ -152,8 +154,8 @@ TGFX_TEST(CanvasTest, DiscardContent) {
       {Color{0.f, 1.f, 0.f, 1.f}, Color{0.f, 0.f, 0.f, 1.f}}, {}));
   canvas->drawPaint(paint);
   surface->renderContext->flush();
-  ASSERT_TRUE(drawingManager->renderTasks.size() == 3);
-  task = static_cast<OpsRenderTask*>(drawingManager->renderTasks.back().get());
+  ASSERT_TRUE(drawingBuffer->renderTasks.size() == 3);
+  task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
   EXPECT_TRUE(task->drawOps.size() == 1);
   context->flushAndSubmit();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DiscardContent"));
@@ -187,9 +189,9 @@ TGFX_TEST(CanvasTest, merge_draw_call_rect) {
     }
   }
   surface->renderContext->flush();
-  auto drawingManager = context->drawingManager();
-  EXPECT_TRUE(drawingManager->renderTasks.size() == 1);
-  auto task = static_cast<OpsRenderTask*>(drawingManager->renderTasks.front().get());
+  auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+  EXPECT_TRUE(drawingBuffer->renderTasks.size() == 1);
+  auto task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.front().get());
   ASSERT_TRUE(task->drawOps.size() == 1);
   EXPECT_EQ(static_cast<RectDrawOp*>(task->drawOps.back().get())->rectCount, drawCallCount);
   context->flushAndSubmit();
@@ -227,9 +229,9 @@ TGFX_TEST(CanvasTest, merge_draw_call_rrect) {
     }
   }
   surface->renderContext->flush();
-  auto drawingManager = context->drawingManager();
-  EXPECT_TRUE(drawingManager->renderTasks.size() == 1);
-  auto task = static_cast<OpsRenderTask*>(drawingManager->renderTasks.front().get());
+  auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+  EXPECT_TRUE(drawingBuffer->renderTasks.size() == 1);
+  auto task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.front().get());
   ASSERT_TRUE(task->drawOps.size() == 1);
   EXPECT_EQ(static_cast<RRectDrawOp*>(task->drawOps.back().get())->rectCount, drawCallCount);
   context->flushAndSubmit();
@@ -348,9 +350,9 @@ TGFX_TEST(CanvasTest, drawPaint) {
   Font font(typeface, 50.f);
   font.setFauxBold(true);
   auto textBlob = TextBlob::MakeFrom("TGFX", font);
-  Path path = {};
-  auto success = textBlob->getPath(&path);
-  EXPECT_TRUE(success);
+  auto textShape = Shape::MakeFrom(textBlob);
+  ASSERT_TRUE(textShape != nullptr);
+  auto path = textShape->getPath();
   path.transform(Matrix::MakeTrans(10, 100));
   canvas->clear(Color::Red());
   canvas->save();
@@ -757,9 +759,9 @@ TGFX_TEST(CanvasTest, inversePath) {
   Font font(typeface, 70.f);
   font.setFauxBold(true);
   auto textBlob = TextBlob::MakeFrom("Hello TGFX", font);
-  Path textPath = {};
-  auto success = textBlob->getPath(&textPath);
-  EXPECT_TRUE(success);
+  auto textShape = Shape::MakeFrom(textBlob);
+  ASSERT_TRUE(textShape != nullptr);
+  Path textPath = textShape->getPath();
   EXPECT_TRUE(!textPath.isEmpty());
   textPath.toggleInverseFillType();
   EXPECT_TRUE(textPath.isInverseFillType());
@@ -1285,16 +1287,16 @@ TGFX_TEST(CanvasTest, Picture) {
   auto picture = recorder.finishRecordingAsPicture();
   ASSERT_TRUE(picture != nullptr);
 
-  auto bounds = picture->getTightBounds();
-  auto surface = Surface::Make(context, static_cast<int>(bounds.width()),
-                               static_cast<int>(bounds.height() + 20));
+  int width = 550;
+  int height = 352;
+  auto surface = Surface::Make(context, width, height + 20);
   canvas = surface->getCanvas();
   path.reset();
-  path.addOval(Rect::MakeWH(bounds.width(), bounds.height() + 100));
+  path.addOval(Rect::MakeWH(width, height + 100));
   canvas->clipPath(path);
   canvas->translate(0, 10);
   canvas->drawPicture(picture);
-  canvas->translate(0, bounds.height() + 10);
+  canvas->translate(0, static_cast<float>(height + 10));
   paint.setBlendMode(BlendMode::Screen);
   paint.setAlpha(0.8f);
   matrix = Matrix::MakeTrans(0, -180);
@@ -1359,13 +1361,13 @@ TGFX_TEST(CanvasTest, Picture) {
 
   canvas = recorder.beginRecording();
   paint.reset();
-  canvas->drawSimpleText("Hello TGFX~", 0, 0, font, paint);
+  auto textBlob = TextBlob::MakeFrom("Hello TGFX~", font);
+  canvas->drawTextBlob(textBlob, 0, 0, paint);
   auto textRecord = recorder.finishRecordingAsPicture();
-  bounds = textRecord->getTightBounds();
+  auto bounds = textBlob->getTightBounds();
   matrix = Matrix::MakeTrans(-bounds.left, -bounds.top);
-  auto width = static_cast<int>(bounds.width());
-  auto height = static_cast<int>(bounds.height());
-  auto textImage = Image::MakeFrom(textRecord, width, height, &matrix);
+  auto textImage = Image::MakeFrom(textRecord, static_cast<int>(bounds.width()),
+                                   static_cast<int>(bounds.height()), &matrix);
   EXPECT_EQ(textRecord.use_count(), 2);
   ASSERT_TRUE(textImage != nullptr);
 
@@ -1396,44 +1398,78 @@ TGFX_TEST(CanvasTest, Picture) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/PictureImage_Path"));
 }
 
-class ColorModifier : public FillModifier {
- public:
-  explicit ColorModifier(Color color) : color(color) {
-  }
-
-  Fill transform(const Fill& fill) const override {
-    auto newFill = fill;
-    newFill.color = color;
-    newFill.color.alpha *= fill.color.alpha;
-    return newFill;
-  }
-
- private:
-  Color color = {};
-};
-
-TGFX_TEST(CanvasTest, FillModifier) {
+TGFX_TEST(CanvasTest, PictureImageShaderOptimization) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
-  // Record a rectangle with default fill
-  PictureRecorder recorder = {};
+  auto image = MakeImage("resources/apitest/test_timestretch.png");
+  ASSERT_TRUE(image != nullptr);
+
+  // Test 1: Rect filled with ImageShader (should be optimized to asImage)
+  PictureRecorder recorder;
   auto canvas = recorder.beginRecording();
+  auto shader = Shader::MakeImageShader(image);
   Paint paint;
-  paint.setColor(Color::Red());
-  paint.setAlpha(0.5f);
-  canvas->drawRect(Rect::MakeXYWH(10, 10, 100, 100), paint);
-  auto picture = recorder.finishRecordingAsPicture();
-  ASSERT_TRUE(picture != nullptr);
-  auto surface = Surface::Make(context, 120, 120);
-  canvas = surface->getCanvas();
-  canvas->clear(Color::White());
-  canvas->scale(0.8f, 0.8f);
-  canvas->translate(15, 15);
-  ColorModifier colorModifier(Color::Green());
-  picture->playback(canvas, &colorModifier);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/FillModifier"));
+  paint.setShader(shader);
+  auto rect = Rect::MakeWH(image->width(), image->height());
+  canvas->drawRect(rect, paint);
+  auto shaderPicture = recorder.finishRecordingAsPicture();
+  ASSERT_TRUE(shaderPicture != nullptr);
+  EXPECT_EQ(shaderPicture->drawCount, 1u);
+
+  // Should be optimized to return the original image
+  Point offset = {};
+  auto extractedImage = shaderPicture->asImage(&offset);
+  ASSERT_TRUE(extractedImage != nullptr);
+  EXPECT_TRUE(extractedImage == image);
+  EXPECT_EQ(offset.x, 0.0f);
+  EXPECT_EQ(offset.y, 0.0f);
+
+  // Test 2: Rect with ImageShader but different size (should fail optimization)
+  canvas = recorder.beginRecording();
+  paint.setShader(shader);
+  rect = Rect::MakeWH(image->width() / 2, image->height() / 2);
+  canvas->drawRect(rect, paint);
+  shaderPicture = recorder.finishRecordingAsPicture();
+  extractedImage = shaderPicture->asImage(&offset);
+  EXPECT_TRUE(extractedImage == nullptr);
+
+  // Test 3: Rect with ImageShader but non-zero origin (should fail optimization)
+  canvas = recorder.beginRecording();
+  paint.setShader(shader);
+  rect = Rect::MakeXYWH(10, 10, image->width(), image->height());
+  canvas->drawRect(rect, paint);
+  shaderPicture = recorder.finishRecordingAsPicture();
+  extractedImage = shaderPicture->asImage(&offset);
+  EXPECT_TRUE(extractedImage == nullptr);
+
+  // Test 4: Rect with ImageShader that has TileMode::Repeat (should fail optimization)
+  canvas = recorder.beginRecording();
+  shader = Shader::MakeImageShader(image, TileMode::Repeat, TileMode::Repeat);
+  paint.setShader(shader);
+  rect = Rect::MakeWH(image->width(), image->height());
+  canvas->drawRect(rect, paint);
+  shaderPicture = recorder.finishRecordingAsPicture();
+  extractedImage = shaderPicture->asImage(&offset);
+  EXPECT_TRUE(extractedImage == nullptr);
+
+  // Test 5: Rect with ImageShader and clip (should be optimized with subset)
+  canvas = recorder.beginRecording();
+  shader = Shader::MakeImageShader(image);
+  paint.setShader(shader);
+  canvas->clipRect(Rect::MakeXYWH(100, 100, image->width() - 200, image->height() - 200));
+  rect = Rect::MakeWH(image->width(), image->height());
+  canvas->drawRect(rect, paint);
+  shaderPicture = recorder.finishRecordingAsPicture();
+  auto matrix = Matrix::MakeTrans(-100, -100);
+  ISize clipSize = {image->width() - 200, image->height() - 200};
+  extractedImage = shaderPicture->asImage(&offset, &matrix, &clipSize);
+  ASSERT_TRUE(extractedImage != nullptr);
+  auto subsetImage = std::static_pointer_cast<SubsetImage>(extractedImage);
+  EXPECT_TRUE(subsetImage->source == image);
+  EXPECT_EQ(offset.x, 0.0f);
+  EXPECT_EQ(offset.y, 0.0f);
 }
 
 TGFX_TEST(CanvasTest, BlendModeTest) {
@@ -2455,6 +2491,9 @@ TGFX_TEST(CanvasTest, emojiTextStrokeBlending) {
   auto serifTypeface =
       Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
   ASSERT_TRUE(serifTypeface != nullptr);
+  auto emojiTypeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoColorEmoji.ttf"));
+  ASSERT_TRUE(emojiTypeface != nullptr);
 
   ContextScope scope;
   auto context = scope.getContext();
@@ -2494,7 +2533,7 @@ TGFX_TEST(CanvasTest, emojiTextStrokeBlending) {
     float y = 80 + i * 80;
 
     // Process emoji text using TextShaper
-    auto emojiPositionedGlyphs = TextShaper::Shape(emojiText, serifTypeface);
+    auto emojiPositionedGlyphs = TextShaper::Shape(emojiText, emojiTypeface);
     struct TextRun {
       std::vector<GlyphID> ids;
       std::vector<Point> positions;
@@ -2518,22 +2557,12 @@ TGFX_TEST(CanvasTest, emojiTextStrokeBlending) {
       emojiX += emojiRun->font.getAdvance(glyphID);
     }
 
-    // Draw emoji with stroke and fill
-    Paint emojiStrokePaint;
-    emojiStrokePaint.setColor(Color::White());
-    emojiStrokePaint.setStyle(PaintStyle::Stroke);
-    emojiStrokePaint.setStrokeWidth(3.0f);
-    emojiStrokePaint.setBlendMode(blendMode);
-
-    Paint emojiFillPaint;
-    emojiFillPaint.setColor(Color::FromRGBA(255, 200, 100, 200));
-    emojiFillPaint.setBlendMode(blendMode);
+    Paint emojiPaint;
+    emojiPaint.setBlendMode(blendMode);
 
     for (const auto& textRun : emojiTextRuns) {
       canvas->drawGlyphs(textRun.ids.data(), textRun.positions.data(), textRun.ids.size(),
-                         textRun.font, emojiStrokePaint);
-      canvas->drawGlyphs(textRun.ids.data(), textRun.positions.data(), textRun.ids.size(),
-                         textRun.font, emojiFillPaint);
+                         textRun.font, emojiPaint);
     }
 
     // Process normal text using TextShaper
@@ -2583,6 +2612,9 @@ TGFX_TEST(CanvasTest, textEmojiOverlayBlendModes) {
   auto serifTypeface =
       Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
   ASSERT_TRUE(serifTypeface != nullptr);
+  auto emojiTypeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoColorEmoji.ttf"));
+  ASSERT_TRUE(emojiTypeface != nullptr);
 
   ContextScope scope;
   auto context = scope.getContext();
@@ -2674,7 +2706,7 @@ TGFX_TEST(CanvasTest, textEmojiOverlayBlendModes) {
     }
 
     // Then overlay emoji with different blend modes
-    auto emojiPositionedGlyphs = TextShaper::Shape(emojiText, serifTypeface);
+    auto emojiPositionedGlyphs = TextShaper::Shape(emojiText, emojiTypeface);
     std::vector<TextRun> emojiTextRuns;
     TextRun* emojiRun = nullptr;
     auto emojiCount = emojiPositionedGlyphs.glyphCount();
@@ -3015,11 +3047,11 @@ TGFX_TEST(CanvasTest, RRectBlendMode) {
 
 TGFX_TEST(CanvasTest, MatrixShapeStroke) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 200, 200);
   ASSERT_TRUE(surface != nullptr);
-  auto* canvas = surface->getCanvas();
+  auto canvas = surface->getCanvas();
 
   Paint paint;
   paint.setAntiAlias(true);
@@ -3077,11 +3109,11 @@ TGFX_TEST(CanvasTest, ScaleMatrixShader) {
   auto image = MakeImage("resources/apitest/imageReplacement.png");
   ASSERT_TRUE(image != nullptr);
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 100, 100);
   ASSERT_TRUE(surface != nullptr);
-  auto* canvas = surface->getCanvas();
+  auto canvas = surface->getCanvas();
   auto paint = Paint();
   auto shader = Shader::MakeImageShader(image);
   auto rect = Rect::MakeXYWH(25, 25, 50, 50);
@@ -3095,11 +3127,11 @@ TGFX_TEST(CanvasTest, ScaleMatrixShader) {
 
 TGFX_TEST(CanvasTest, Matrix3DShapeStroke) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 300, 300);
   ASSERT_TRUE(surface != nullptr);
-  auto* canvas = surface->getCanvas();
+  auto canvas = surface->getCanvas();
 
   auto origin = Point::Make(100, 100);
   auto originTranslateMatrix = Matrix3D::MakeTranslate(origin.x, origin.y, 0.f);
@@ -3152,11 +3184,11 @@ TGFX_TEST(CanvasTest, Matrix3DShapeStroke) {
 
 TGFX_TEST(CanvasTest, LumaFilter) {
   ContextScope scope;
-  auto* context = scope.getContext();
+  auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 3024, 4032);
   ASSERT_TRUE(surface != nullptr);
-  auto* canvas = surface->getCanvas();
+  auto canvas = surface->getCanvas();
   Paint paint{};
   paint.setColorFilter(ColorFilter::Luma());
   auto shader = Shader::MakeColorShader(Color::FromRGBA(125, 0, 255));
@@ -3184,8 +3216,8 @@ TGFX_TEST(CanvasTest, ConvertColorSpace) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 1024, 1024, false, 1, false, 0,
-                               ColorSpace::MakeSRGB()->makeColorSpin());
+  auto surface =
+      Surface::Make(context, 1024, 1024, false, 1, false, 0, ColorSpace::SRGB()->makeColorSpin());
   auto canvas = surface->getCanvas();
   const TransferFunction tfs[] = {
       NamedTransferFunction::SRGB,
@@ -3217,14 +3249,9 @@ TGFX_TEST(CanvasTest, ColorSpace) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface =
-      Surface::Make(context, 1024, 1024, false, 1, false, 0,
-                    ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3));
+  auto surface = Surface::Make(context, 1024, 1024, false, 1, false, 0, ColorSpace::DisplayP3());
   auto canvas = surface->getCanvas();
-  canvas->drawColor(
-      Color::FromRGBA(0, 255, 0, 255,
-                      ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3)),
-      BlendMode::SrcOver);
+  canvas->drawColor(Color::FromRGBA(0, 255, 0, 255, ColorSpace::DisplayP3()), BlendMode::SrcOver);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawP3ColorToP3"));
   canvas->clear();
   Paint paint;
@@ -3289,6 +3316,240 @@ TGFX_TEST(CanvasTest, ColorSpace) {
   auto pictureImage = Image::MakeFrom(picture, 1024, 1024);
   canvas->drawImage(pictureImage);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawRecordSRGBColorToP3UseDrawImage"));
+}
+
+TGFX_TEST(CanvasTest, TextBlobHitTestPoint) {
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  ASSERT_TRUE(typeface != nullptr);
+  auto emojiTypeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoColorEmoji.ttf"));
+  ASSERT_TRUE(emojiTypeface != nullptr);
+
+  Font font(typeface, 80.0f);
+  Font emojiFont(emojiTypeface, 80.0f);
+  ASSERT_TRUE(font.hasOutlines());
+  ASSERT_FALSE(emojiFont.hasOutlines());
+
+  // Create a TextBlob with both normal character "O" and emoji "😀"
+  auto glyphID_O = font.getGlyphID('O');
+  auto glyphID_emoji = emojiFont.getGlyphID(0x1F600);  // 😀
+  ASSERT_TRUE(glyphID_O > 0);
+  ASSERT_TRUE(glyphID_emoji > 0);
+
+  float advance_O = font.getAdvance(glyphID_O);
+  float emojiOffsetX = advance_O + 10.0f;
+  std::vector<GlyphRun> glyphRuns = {
+      GlyphRun(font, {glyphID_O}, {Point::Make(0.0f, 0.0f)}),
+      GlyphRun(emojiFont, {glyphID_emoji}, {Point::Make(emojiOffsetX, 0.0f)})};
+  auto textBlob = TextBlob::MakeFrom(std::move(glyphRuns));
+  ASSERT_TRUE(textBlob != nullptr);
+
+  // Get bounds for "O" character
+  auto bounds_O = font.getBounds(glyphID_O);
+  // Get bounds for emoji character (offset by position)
+  auto bounds_emoji = emojiFont.getBounds(glyphID_emoji);
+  bounds_emoji.offset(advance_O + 10.0f, 0);
+
+  // ========== Test "O" character (outline-based hit test) ==========
+  // Test 1: Hit on the outline of "O"
+  float onOutlineX = bounds_O.left + 5.0f;
+  float onOutlineY = bounds_O.centerY();
+  EXPECT_TRUE(textBlob->hitTestPoint(onOutlineX, onOutlineY, nullptr));
+
+  // Test 2: Miss in the center hole of "O"
+  float centerX_O = bounds_O.centerX();
+  float centerY_O = bounds_O.centerY();
+  EXPECT_FALSE(textBlob->hitTestPoint(centerX_O, centerY_O, nullptr));
+
+  // Test 3: Miss outside the "O" bounds
+  float outsideX_O = bounds_O.left - 5.0f;
+  float outsideY_O = bounds_O.centerY();
+  EXPECT_FALSE(textBlob->hitTestPoint(outsideX_O, outsideY_O, nullptr));
+
+  // Test 4: Hit outside "O" but within stroke area
+  Stroke stroke = {};
+  stroke.width = 20.0f;  // half = 10
+  EXPECT_TRUE(textBlob->hitTestPoint(outsideX_O, outsideY_O, &stroke));
+
+  // Test 5: Miss further outside "O", beyond stroke area
+  float farOutsideX_O = bounds_O.left - 15.0f;
+  EXPECT_FALSE(textBlob->hitTestPoint(farOutsideX_O, outsideY_O, &stroke));
+
+  // ========== Test emoji character (bounds-based hit test) ==========
+  // Test 6: Hit inside the emoji bounds
+  float centerX_emoji = bounds_emoji.centerX();
+  float centerY_emoji = bounds_emoji.centerY();
+  EXPECT_TRUE(textBlob->hitTestPoint(centerX_emoji, centerY_emoji, nullptr));
+
+  // Test 7: Hit on the edge of the emoji bounds
+  float edgeX_emoji = bounds_emoji.left + 1.0f;
+  float edgeY_emoji = bounds_emoji.centerY();
+  EXPECT_TRUE(textBlob->hitTestPoint(edgeX_emoji, edgeY_emoji, nullptr));
+
+  // Test 8: Miss outside the emoji bounds
+  float outsideX_emoji = bounds_emoji.left - 5.0f;
+  float outsideY_emoji = bounds_emoji.centerY();
+  EXPECT_FALSE(textBlob->hitTestPoint(outsideX_emoji, outsideY_emoji, nullptr));
+
+  // Test 9: Hit outside emoji but within stroke area
+  EXPECT_TRUE(textBlob->hitTestPoint(outsideX_emoji, outsideY_emoji, &stroke));
+
+  // Test 10: Miss further outside emoji, beyond stroke area
+  // Use a point that's clearly outside both characters
+  float farOutsideX_emoji = bounds_emoji.right + 20.0f;
+  EXPECT_FALSE(textBlob->hitTestPoint(farOutsideX_emoji, outsideY_emoji, &stroke));
+}
+
+TGFX_TEST(CanvasTest, PictureMaskPath) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+
+  // Helper lambda to extract mask path from picture
+  auto getMaskPath = [](const std::shared_ptr<Picture>& picture, Path* maskPath) -> bool {
+    return MaskContext::GetMaskPath(picture, maskPath);
+  };
+
+  // Test 1: Simple rect - should return valid mask path
+  PictureRecorder recorder = {};
+  auto canvas = recorder.beginRecording();
+  Paint paint = {};
+  paint.setColor(Color::White());
+  canvas->drawRect(Rect::MakeXYWH(10.f, 20.f, 80.f, 60.f), paint);
+  auto picture = recorder.finishRecordingAsPicture();
+  ASSERT_TRUE(picture != nullptr);
+
+  Path maskPath = {};
+  EXPECT_TRUE(getMaskPath(picture, &maskPath));
+  EXPECT_EQ(maskPath.getBounds(), Rect::MakeXYWH(10.f, 20.f, 80.f, 60.f));
+
+  // Test 2: RRect - should return valid mask path
+  canvas = recorder.beginRecording();
+  RRect rrect = {};
+  rrect.setRectXY(Rect::MakeWH(100.f, 80.f), 10.f, 10.f);
+  canvas->drawRRect(rrect, paint);
+  picture = recorder.finishRecordingAsPicture();
+  EXPECT_TRUE(getMaskPath(picture, &maskPath));
+  EXPECT_EQ(maskPath.getBounds(), Rect::MakeWH(100.f, 80.f));
+
+  // Test 3: Path - should return valid mask path
+  canvas = recorder.beginRecording();
+  Path circlePath = {};
+  circlePath.addOval(Rect::MakeWH(80.f, 80.f));
+  canvas->drawPath(circlePath, paint);
+  picture = recorder.finishRecordingAsPicture();
+  EXPECT_TRUE(getMaskPath(picture, &maskPath));
+  EXPECT_EQ(maskPath.getBounds(), Rect::MakeWH(80.f, 80.f));
+
+  // Test 4: With matrix transformation
+  canvas = recorder.beginRecording();
+  canvas->translate(20.f, 30.f);
+  canvas->drawRect(Rect::MakeWH(50.f, 40.f), paint);
+  picture = recorder.finishRecordingAsPicture();
+  EXPECT_TRUE(getMaskPath(picture, &maskPath));
+  EXPECT_EQ(maskPath.getBounds(), Rect::MakeXYWH(20.f, 30.f, 50.f, 40.f));
+
+  // Test 5: With clip - path should be clipped
+  canvas = recorder.beginRecording();
+  canvas->clipRect(Rect::MakeWH(60.f, 60.f));
+  canvas->drawRect(Rect::MakeWH(100.f, 100.f), paint);
+  picture = recorder.finishRecordingAsPicture();
+  EXPECT_TRUE(getMaskPath(picture, &maskPath));
+  EXPECT_EQ(maskPath.getBounds(), Rect::MakeWH(60.f, 60.f));
+
+  // Test 6: Semi-transparent color - should NOT return mask path
+  canvas = recorder.beginRecording();
+  paint.setAlpha(0.5f);
+  canvas->drawRect(Rect::MakeWH(100.f, 100.f), paint);
+  picture = recorder.finishRecordingAsPicture();
+  EXPECT_FALSE(getMaskPath(picture, &maskPath));
+  paint.setAlpha(1.0f);
+
+  // Test 7: With color filter - should NOT return mask path
+  canvas = recorder.beginRecording();
+  paint.setColorFilter(ColorFilter::Blend(Color::Red(), BlendMode::Multiply));
+  canvas->drawRect(Rect::MakeWH(100.f, 100.f), paint);
+  picture = recorder.finishRecordingAsPicture();
+  EXPECT_FALSE(getMaskPath(picture, &maskPath));
+  paint.setColorFilter(nullptr);
+
+  // Test 8: With mask filter - should NOT return mask path
+  canvas = recorder.beginRecording();
+  auto maskShader = Shader::MakeColorShader(Color::White());
+  paint.setMaskFilter(MaskFilter::MakeShader(maskShader));
+  canvas->drawRect(Rect::MakeWH(100.f, 100.f), paint);
+  picture = recorder.finishRecordingAsPicture();
+  EXPECT_FALSE(getMaskPath(picture, &maskPath));
+  paint.setMaskFilter(nullptr);
+
+  // Test 9: Draw image - should NOT return mask path
+  canvas = recorder.beginRecording();
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  canvas->drawImage(image);
+  picture = recorder.finishRecordingAsPicture();
+  EXPECT_FALSE(getMaskPath(picture, &maskPath));
+
+  // Test 10: Inverse fill path - should return mask path
+  canvas = recorder.beginRecording();
+  Path inversePath = {};
+  inversePath.addRect(Rect::MakeWH(50.f, 50.f));
+  inversePath.addRect(Rect::MakeLTRB(10.f, 10.f, 60.f, 60.f));
+  inversePath.setFillType(PathFillType::InverseWinding);
+  ASSERT_TRUE(inversePath.isInverseFillType());
+  canvas->drawPath(inversePath, paint);
+  picture = recorder.finishRecordingAsPicture();
+  EXPECT_TRUE(getMaskPath(picture, &maskPath));
+
+  // Test 11: Multiple draws - should combine paths
+  canvas = recorder.beginRecording();
+  canvas->drawRect(Rect::MakeXYWH(0.f, 0.f, 50.f, 50.f), paint);
+  canvas->drawRect(Rect::MakeXYWH(60.f, 60.f, 50.f, 50.f), paint);
+  picture = recorder.finishRecordingAsPicture();
+  EXPECT_TRUE(getMaskPath(picture, &maskPath));
+  EXPECT_EQ(maskPath.getBounds(), Rect::MakeWH(110.f, 110.f));
+
+  // Test 12: Transparent draw - should abort
+  canvas = recorder.beginRecording();
+  paint.setAlpha(0.5f);
+  canvas->drawRect(Rect::MakeWH(100.f, 100.f), paint);
+  picture = recorder.finishRecordingAsPicture();
+  EXPECT_FALSE(getMaskPath(picture, &maskPath));
+
+  // Test 13: With stroke
+  paint.setAlpha(1.0f);
+  canvas = recorder.beginRecording();
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStroke(Stroke(10.0f));
+  canvas->drawRect(Rect::MakeWH(80.f, 80.f), paint);
+  picture = recorder.finishRecordingAsPicture();
+  EXPECT_TRUE(getMaskPath(picture, &maskPath));
+  EXPECT_EQ(maskPath.getBounds(), Rect::MakeXYWH(-5, -5, 90, 90));
+
+  // Verify by reading pixels - draw the mask path and check pixel coverage
+  paint.reset();
+  paint.setColor(Color::Red());
+  surface->getCanvas()->clear();
+  surface->getCanvas()->drawPath(maskPath, paint);
+
+  Bitmap bitmap = {};
+  bitmap.allocPixels(200, 200);
+  auto pixels = bitmap.lockPixels();
+  ASSERT_TRUE(surface->readPixels(bitmap.info(), pixels));
+  bitmap.unlockPixels();
+
+  // Check that pixel at (2, 2) is red (inside the stroke area, near top-left corner)
+  auto colorStroke = bitmap.getColor(2, 2);
+  EXPECT_EQ(colorStroke, Color::Red());
+
+  // Check that pixel at (40, 40) is transparent (inside the rect, outside the stroke area)
+  auto colorCenter = bitmap.getColor(40, 40);
+  EXPECT_EQ(colorCenter, Color::Transparent());
+
+  // Check that pixel at (100, 100) is transparent (outside the stroke bounds)
+  auto colorOutside = bitmap.getColor(100, 100);
+  EXPECT_EQ(colorOutside, Color::Transparent());
 }
 
 }  // namespace tgfx

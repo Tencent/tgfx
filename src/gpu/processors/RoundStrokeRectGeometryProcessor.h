@@ -25,8 +25,9 @@
 namespace tgfx {
 class RoundStrokeRectGeometryProcessor : public GeometryProcessor {
  public:
-  static PlacementPtr<RoundStrokeRectGeometryProcessor> Make(BlockBuffer* buffer, AAType aaType,
-                                                             std::optional<Color> commonColor,
+  static PlacementPtr<RoundStrokeRectGeometryProcessor> Make(BlockAllocator* allocator,
+                                                             AAType aaType,
+                                                             std::optional<PMColor> commonColor,
                                                              std::optional<Matrix> uvMatrix);
 
   std::string name() const override {
@@ -35,7 +36,7 @@ class RoundStrokeRectGeometryProcessor : public GeometryProcessor {
 
  protected:
   DEFINE_PROCESSOR_CLASS_ID
-  RoundStrokeRectGeometryProcessor(AAType aa, std::optional<Color> commonColor,
+  RoundStrokeRectGeometryProcessor(AAType aa, std::optional<PMColor> commonColor,
                                    std::optional<Matrix> uvMatrix);
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
@@ -47,7 +48,7 @@ class RoundStrokeRectGeometryProcessor : public GeometryProcessor {
   Attribute inColor;
 
   AAType aaType = AAType::None;
-  std::optional<Color> commonColor = std::nullopt;
+  std::optional<PMColor> commonColor = std::nullopt;
   std::optional<Matrix> uvMatrix = std::nullopt;
 };
 }  // namespace tgfx

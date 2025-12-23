@@ -20,12 +20,13 @@
 
 namespace tgfx {
 PlacementPtr<EllipseGeometryProcessor> EllipseGeometryProcessor::Make(
-    BlockBuffer* buffer, int width, int height, bool stroke, std::optional<Color> commonColor) {
-  return buffer->make<GLSLEllipseGeometryProcessor>(width, height, stroke, commonColor);
+    BlockAllocator* allocator, int width, int height, bool stroke,
+    std::optional<PMColor> commonColor) {
+  return allocator->make<GLSLEllipseGeometryProcessor>(width, height, stroke, commonColor);
 }
 
 GLSLEllipseGeometryProcessor::GLSLEllipseGeometryProcessor(int width, int height, bool stroke,
-                                                           std::optional<Color> commonColor)
+                                                           std::optional<PMColor> commonColor)
     : EllipseGeometryProcessor(width, height, stroke, commonColor) {
 }
 

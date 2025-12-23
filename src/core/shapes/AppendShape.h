@@ -31,7 +31,7 @@ class AppendShape : public UniqueKeyShape {
 
   bool isInverseFillType() const override;
 
-  Rect getBounds() const override;
+  Rect onGetBounds() const override;
 
  protected:
   Type type() const override {

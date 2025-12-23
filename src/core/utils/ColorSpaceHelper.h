@@ -29,9 +29,16 @@ std::shared_ptr<ColorSpace> AndroidDataSpaceToColorSpace(int standard, int trans
 
 gfx::skcms_ICCProfile ToSkcmsICCProfile(std::shared_ptr<ColorSpace> colorSpace);
 
-bool NeedConvertColorSpace(std::shared_ptr<ColorSpace> src, std::shared_ptr<ColorSpace> dst);
+bool NeedConvertColorSpace(const std::shared_ptr<ColorSpace>& src,
+                           const std::shared_ptr<ColorSpace>& dst);
 
 void ConvertColorSpaceInPlace(int width, int height, ColorType colorType, AlphaType alphaType,
-                              size_t rowBytes, std::shared_ptr<ColorSpace> srcCS,
-                              std::shared_ptr<ColorSpace> dstCS, void* pixels);
+                              size_t rowBytes, const std::shared_ptr<ColorSpace>& srcCS,
+                              const std::shared_ptr<ColorSpace>& dstCS, void* pixels);
+
+bool NearlyEqual(const TransferFunction& u, const TransferFunction& v);
+
+bool NearlyEqual(const ColorMatrix33& u, const ColorMatrix33& v);
+
+bool NearlyEqual(const ColorSpace* colorSpaceA, const ColorSpace* colorSpaceB);
 }  // namespace tgfx

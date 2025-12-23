@@ -40,7 +40,10 @@ class CGLDevice : public GLDevice {
   void onUnlockContext() override;
 
  private:
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   NSOpenGLContext* glContext = nil;
+#pragma clang diagnostic pop
   CGLContextObj oldContext = nil;
 
   static std::shared_ptr<CGLDevice> Wrap(CGLContextObj cglContext, bool externallyOwned);

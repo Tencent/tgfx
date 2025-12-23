@@ -24,6 +24,7 @@
 #include "Protocol.h"
 #include "Socket.h"
 #include "TCPPortProvider.h"
+#include "core/utils/MathExtra.h"
 #ifdef TGFX_USE_JPEG_ENCODE
 #include "core/codecs/jpeg/JpegCodec.h"
 #elif TGFX_USE_WEBP_ENCODE
@@ -100,7 +101,7 @@ void FrameCapture::sendAttributeData(const char* name, const std::optional<Matri
   sendAttributeData(name, value);
 }
 
-void FrameCapture::sendAttributeData(const char* name, const Color& color) {
+void FrameCapture::sendAttributeData(const char* name, const PMColor& color) {
   auto r = static_cast<uint8_t>(color.red * 255.f);
   auto g = static_cast<uint8_t>(color.green * 255.f);
   auto b = static_cast<uint8_t>(color.blue * 255.f);
@@ -109,8 +110,8 @@ void FrameCapture::sendAttributeData(const char* name, const Color& color) {
   sendAttributeData(name, value, FrameCaptureMessageType::ValueDataColor);
 }
 
-void FrameCapture::sendAttributeData(const char* name, const std::optional<Color>& color) {
-  auto value = Color::FromRGBA(255, 255, 255, 255);
+void FrameCapture::sendAttributeData(const char* name, const std::optional<PMColor>& color) {
+  auto value = PMColor::FromRGBA(255, 255, 255, 255);
   if (color.has_value()) {
     value = color.value();
   }
@@ -327,8 +328,8 @@ void FrameCapture::sendShapeMeshData(DrawOp* drawOp, std::shared_ptr<Shape> shap
     shapeBounds.outset(1.0f, 1.0f);
   }
   auto bounds = isInverseFillType ? clipBounds : shapeBounds;
-  auto width = static_cast<int>(ceilf(bounds.width()));
-  auto height = static_cast<int>(ceilf(bounds.height()));
+  auto width = FloatCeilToInt(bounds.width());
+  auto height = FloatCeilToInt(bounds.height());
   auto rasterizer = std::make_unique<ShapeRasterizer>(width, height, std::move(shape), aaType);
   auto shapeBuffer = rasterizer->getData();
   RectMeshInfo rectMeshData = {};
@@ -460,7 +461,7 @@ void FrameCapture::sendFragmentProcessor(
   }
   for (const auto& processor : fragmentProcessors) {
     FragmentProcessor::Iter fpIter(processor);
-    while (const auto* subFP = fpIter.next()) {
+    while (const auto subFP = fpIter.next()) {
       for (size_t j = 0; j < subFP->numTextureSamplers(); ++j) {
         auto texture = subFP->textureAt(j);
         auto frameCaptureTexture = FrameCaptureTexture::MakeFrom(texture, context);

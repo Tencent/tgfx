@@ -18,7 +18,7 @@
 
 #include "tgfx/gpu/Context.h"
 #include "core/AtlasManager.h"
-#include "core/utils/BlockBuffer.h"
+#include "core/utils/BlockAllocator.h"
 #include "core/utils/Log.h"
 #include "core/utils/SlidingWindowTracker.h"
 #include "gpu/DrawingManager.h"
@@ -30,17 +30,13 @@
 #include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
+
 Context::Context(Device* device, GPU* gpu) : _device(device), _gpu(gpu) {
-  // We set the maxBlockSize to 2MB because allocating blocks that are too large can cause memory
-  // fragmentation and slow down allocation. It may also increase the application's memory usage due
-  // to pre-allocation optimizations on some platforms.
-  _drawingBuffer = new BlockBuffer(1 << 14, 1 << 21);  // 16kb, 2MB
   _shaderCaps = new ShaderCaps(gpu);
   _globalCache = new GlobalCache(this);
   _resourceCache = new ResourceCache(this);
   _drawingManager = new DrawingManager(this);
   _proxyProvider = new ProxyProvider(this);
-  _maxValueTracker = new SlidingWindowTracker(10);
   _atlasManager = new AtlasManager(this);
 }
 
@@ -50,13 +46,15 @@ Context::~Context() {
   delete _globalCache;
   delete _proxyProvider;
   delete _resourceCache;
-  delete _drawingBuffer;
-  delete _maxValueTracker;
   delete _shaderCaps;
 }
 
 Backend Context::backend() const {
   return _gpu->info()->backend;
+}
+
+BlockAllocator* Context::drawingAllocator() const {
+  return _drawingManager->drawingAllocator();
 }
 
 bool Context::wait(const BackendSemaphore& waitSemaphore) {
@@ -68,12 +66,11 @@ bool Context::wait(const BackendSemaphore& waitSemaphore) {
   return true;
 }
 
-bool Context::flush(BackendSemaphore* signalSemaphore) {
-  _resourceCache->processUnreferencedResources();
+std::unique_ptr<Recording> Context::flush(BackendSemaphore* signalSemaphore) {
   _atlasManager->preFlush();
-  commandBuffer = _drawingManager->flush();
-  if (commandBuffer == nullptr) {
-    return false;
+  auto drawingBuffer = _drawingManager->flush();
+  if (drawingBuffer == nullptr) {
+    return nullptr;
   }
   if (signalSemaphore != nullptr) {
     auto semaphore = gpu()->queue()->insertSemaphore();
@@ -83,19 +80,45 @@ bool Context::flush(BackendSemaphore* signalSemaphore) {
   }
   _atlasManager->postFlush();
   _proxyProvider->purgeExpiredProxies();
-  _resourceCache->advanceFrameAndPurge();
-  _maxValueTracker->addValue(_drawingBuffer->size());
-  _drawingBuffer->clear(_maxValueTracker->getMaxValue());
-
-  globalCache()->resetUniformBuffer();
-
-  return true;
+  pendingDrawingBuffers.push_back(drawingBuffer);
+  return std::unique_ptr<Recording>(
+      new Recording(uniqueID(), drawingBuffer->uniqueID(), drawingBuffer->generation()));
 }
 
-void Context::submit(bool syncCpu) {
+std::shared_ptr<DrawingBuffer> Context::getDrawingBuffer(const Recording* recording) const {
+  if (recording == nullptr) {
+    return nullptr;
+  }
+  if (recording->contextID != uniqueID()) {
+    LOGE(
+        "Context::getDrawingBuffer() Recording was created by a different Context and cannot be "
+        "submitted.");
+    return nullptr;
+  }
+  for (const auto& drawingBuffer : pendingDrawingBuffers) {
+    if (drawingBuffer->uniqueID() == recording->drawingBufferID &&
+        drawingBuffer->generation() == recording->generation) {
+      return drawingBuffer;
+    }
+  }
+  return nullptr;
+}
+
+void Context::submit(std::unique_ptr<Recording> recording, bool syncCpu) {
+  _resourceCache->processUnreferencedResources();
   auto queue = gpu()->queue();
-  if (commandBuffer) {
-    queue->submit(std::move(commandBuffer));
+  auto targetBuffer = getDrawingBuffer(recording.get());
+  if (targetBuffer != nullptr) {
+    while (!pendingDrawingBuffers.empty()) {
+      auto drawingBuffer = pendingDrawingBuffers.front();
+      auto commandBuffer = drawingBuffer->encode();
+      _resourceCache->advanceFrameAndPurge();
+      queue->submit(std::move(commandBuffer));
+      pendingDrawingBuffers.pop_front();
+      if (drawingBuffer == targetBuffer) {
+        break;
+      }
+    }
   }
   if (syncCpu) {
     queue->waitUntilCompleted();
@@ -103,11 +126,12 @@ void Context::submit(bool syncCpu) {
 }
 
 bool Context::flushAndSubmit(bool syncCpu) {
-  auto result = flush();
-  if (result || syncCpu) {
-    submit(syncCpu);
+  auto recording = flush();
+  bool hasRecording = recording != nullptr;
+  if (recording || syncCpu) {
+    submit(std::move(recording), syncCpu);
   }
-  return result;
+  return hasRecording;
 }
 
 size_t Context::memoryUsage() const {

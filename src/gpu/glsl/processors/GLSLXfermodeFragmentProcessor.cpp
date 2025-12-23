@@ -22,20 +22,20 @@
 
 namespace tgfx {
 PlacementPtr<FragmentProcessor> XfermodeFragmentProcessor::MakeFromTwoProcessors(
-    BlockBuffer* buffer, PlacementPtr<FragmentProcessor> src, PlacementPtr<FragmentProcessor> dst,
-    BlendMode mode) {
+    BlockAllocator* allocator, PlacementPtr<FragmentProcessor> src,
+    PlacementPtr<FragmentProcessor> dst, BlendMode mode) {
   if (src == nullptr && dst == nullptr) {
     return nullptr;
   }
   switch (mode) {
     case BlendMode::Clear:
-      return ConstColorProcessor::Make(buffer, Color::Transparent(), InputMode::Ignore);
+      return ConstColorProcessor::Make(allocator, PMColor::Transparent(), InputMode::Ignore);
     case BlendMode::Src:
       return src;
     case BlendMode::Dst:
       return dst;
     default:
-      return buffer->make<GLSLXfermodeFragmentProcessor>(std::move(src), std::move(dst), mode);
+      return allocator->make<GLSLXfermodeFragmentProcessor>(std::move(src), std::move(dst), mode);
   }
 }
 

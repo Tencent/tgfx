@@ -19,21 +19,13 @@
 #pragma once
 
 #include "DevicePool.h"
+#include "tgfx/gpu/Context.h"
 
 namespace tgfx {
 class ContextScope {
  public:
-  explicit ContextScope() : device(DevicePool::Make()) {
-    if (device != nullptr) {
-      context = device->lockContext();
-    }
-  }
-
-  ~ContextScope() {
-    if (context) {
-      device->unlock();
-    }
-  }
+  ContextScope();
+  ~ContextScope();
 
   Context* getContext() const {
     return context;

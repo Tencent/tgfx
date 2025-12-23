@@ -51,7 +51,7 @@ void ShapeLayer::setShape(std::shared_ptr<Shape> value) {
   invalidateContent();
 }
 
-void ShapeLayer::setFillStyles(std::vector<std::shared_ptr<ShapeStyle>> fills) {
+void ShapeLayer::setFillStyles(std::vector<std::shared_ptr<ColorSource>> fills) {
   if (_fillStyles.size() == fills.size() &&
       std::equal(_fillStyles.begin(), _fillStyles.end(), fills.begin())) {
     return;
@@ -77,7 +77,7 @@ void ShapeLayer::removeFillStyles() {
   invalidateContent();
 }
 
-void ShapeLayer::setFillStyle(std::shared_ptr<ShapeStyle> fillStyle) {
+void ShapeLayer::setFillStyle(std::shared_ptr<ColorSource> fillStyle) {
   if (fillStyle == nullptr) {
     removeFillStyles();
   } else {
@@ -85,7 +85,7 @@ void ShapeLayer::setFillStyle(std::shared_ptr<ShapeStyle> fillStyle) {
   }
 }
 
-void ShapeLayer::addFillStyle(std::shared_ptr<ShapeStyle> fillStyle) {
+void ShapeLayer::addFillStyle(std::shared_ptr<ColorSource> fillStyle) {
   if (fillStyle == nullptr) {
     return;
   }
@@ -94,7 +94,7 @@ void ShapeLayer::addFillStyle(std::shared_ptr<ShapeStyle> fillStyle) {
   invalidateContent();
 }
 
-void ShapeLayer::setStrokeStyles(std::vector<std::shared_ptr<ShapeStyle>> strokes) {
+void ShapeLayer::setStrokeStyles(std::vector<std::shared_ptr<ColorSource>> strokes) {
   if (_strokeStyles.size() == strokes.size() &&
       std::equal(_strokeStyles.begin(), _strokeStyles.end(), strokes.begin())) {
     return;
@@ -120,7 +120,7 @@ void ShapeLayer::removeStrokeStyles() {
   invalidateContent();
 }
 
-void ShapeLayer::setStrokeStyle(std::shared_ptr<ShapeStyle> stroke) {
+void ShapeLayer::setStrokeStyle(std::shared_ptr<ColorSource> stroke) {
   if (stroke == nullptr) {
     removeStrokeStyles();
   } else {
@@ -128,7 +128,7 @@ void ShapeLayer::setStrokeStyle(std::shared_ptr<ShapeStyle> stroke) {
   }
 }
 
-void ShapeLayer::addStrokeStyle(std::shared_ptr<ShapeStyle> strokeStyle) {
+void ShapeLayer::addStrokeStyle(std::shared_ptr<ColorSource> strokeStyle) {
   if (strokeStyle == nullptr) {
     return;
   }
@@ -194,34 +194,6 @@ void ShapeLayer::setLineDashAdaptive(bool adaptive) {
   invalidateContent();
 }
 
-void ShapeLayer::setStrokeStart(float start) {
-  if (start < 0) {
-    start = 0;
-  }
-  if (start > 1.0f) {
-    start = 1.0f;
-  }
-  if (_strokeStart == start) {
-    return;
-  }
-  _strokeStart = start;
-  invalidateContent();
-}
-
-void ShapeLayer::setStrokeEnd(float end) {
-  if (end < 0) {
-    end = 0;
-  }
-  if (end > 1.0f) {
-    end = 1.0f;
-  }
-  if (_strokeEnd == end) {
-    return;
-  }
-  _strokeEnd = end;
-  invalidateContent();
-}
-
 void ShapeLayer::setStrokeAlign(StrokeAlign align) {
   auto alignment = static_cast<uint8_t>(align);
   if (shapeBitFields.strokeAlign == alignment) {
@@ -252,70 +224,49 @@ ShapeLayer::~ShapeLayer() {
   }
 }
 
-static bool DrawContour(Canvas* canvas, std::shared_ptr<Shape> shape,
-                        const std::vector<Paint>& paints) {
-  if (shape == nullptr || paints.empty()) {
-    return false;
-  }
-  auto hasNonImageShader = std::any_of(paints.begin(), paints.end(), [](const Paint& paint) {
-    auto shader = paint.getShader();
-    return !shader || !shader->isAImage();
-  });
-  if (hasNonImageShader) {
-    canvas->drawShape(shape, {});
-  } else {
-    for (auto& paint : paints) {
-      canvas->drawShape(shape, paint);
-    }
-  }
-  return true;
-}
-
 void ShapeLayer::onUpdateContent(LayerRecorder* recorder) {
   if (_shape == nullptr) {
     return;
   }
-  auto fillPaints = createShapePaints(_fillStyles);
-  auto strokePaints = createShapePaints(_strokeStyles);
-  auto strokeShape = strokePaints.empty() ? nullptr : createStrokeShape();
-  auto canvas = recorder->getCanvas(LayerContentType::Default);
-  for (auto& paint : fillPaints) {
-    canvas->drawShape(_shape, paint);
-  }
-  if (shapeBitFields.strokeOnTop) {
-    canvas = recorder->getCanvas(LayerContentType::Foreground);
-  }
-  for (auto& paint : strokePaints) {
-    canvas->drawShape(strokeShape, paint);
-  }
-  canvas = recorder->getCanvas(LayerContentType::Contour);
-  if (!DrawContour(canvas, _shape, fillPaints)) {
-    // If there is not any fill paints, we still need to draw the shape as contour.
-    canvas->drawShape(_shape, {});
-  }
-  DrawContour(canvas, strokeShape, strokePaints);
-}
 
-std::vector<Paint> ShapeLayer::createShapePaints(
-    const std::vector<std::shared_ptr<ShapeStyle>>& styles) const {
-  std::vector<Paint> paintList = {};
-  paintList.reserve(styles.size());
-  for (auto& style : styles) {
-    Paint paint = {};
-    paint.setAlpha(style->alpha());
-    paint.setBlendMode(style->blendMode());
-    paint.setShader(style->getShader());
-    paintList.push_back(paint);
+  if (!_fillStyles.empty()) {
+    for (const auto& style : _fillStyles) {
+      auto shader = style->getShader();
+      auto alpha = style->alpha();
+      LayerPaint paint(std::move(shader), alpha, style->blendMode());
+      recorder->addShape(_shape, paint);
+    }
+  } else {
+    // Create a contour-only content for the shape (transparent color, no shader)
+    recorder->addShape(_shape, LayerPaint(Color::Transparent()));
   }
-  return paintList;
+
+  if (!_strokeStyles.empty()) {
+    // Check if we can use simple stroke mode (pass stroke params to LayerPaint directly).
+    auto strokeAlign = static_cast<StrokeAlign>(shapeBitFields.strokeAlign);
+    bool simpleStroke = _lineDashPattern.empty() && strokeAlign == StrokeAlign::Center;
+    std::shared_ptr<Shape> strokeShape = nullptr;
+    if (!simpleStroke) {
+      strokeShape = createStrokeShape();
+    }
+    for (const auto& style : _strokeStyles) {
+      LayerPaint paint(style->getShader(), style->alpha(), style->blendMode());
+      if (shapeBitFields.strokeOnTop) {
+        paint.drawOrder = DrawOrder::AboveChildren;
+      }
+      if (simpleStroke) {
+        paint.style = PaintStyle::Stroke;
+        paint.stroke = stroke;
+        recorder->addShape(_shape, paint);
+      } else {
+        recorder->addShape(strokeShape, paint);
+      }
+    }
+  }
 }
 
 std::shared_ptr<Shape> ShapeLayer::createStrokeShape() const {
   auto strokeShape = _shape;
-  if ((_strokeStart != 0 || _strokeEnd != 1)) {
-    auto pathEffect = PathEffect::MakeTrim(_strokeStart, _strokeEnd);
-    strokeShape = Shape::ApplyEffect(std::move(strokeShape), std::move(pathEffect));
-  }
   auto strokeAlign = static_cast<StrokeAlign>(shapeBitFields.strokeAlign);
   auto tempStroke = stroke;
   if (strokeAlign != StrokeAlign::Center) {

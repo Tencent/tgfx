@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RectDrawOp.h"
+#include "core/utils/ColorHelper.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/Quad.h"
@@ -32,7 +33,8 @@ PlacementPtr<RectDrawOp> RectDrawOp::Make(Context* context,
   if (provider == nullptr) {
     return nullptr;
   }
-  auto drawOp = context->drawingBuffer()->make<RectDrawOp>(provider.get());
+  auto allocator = context->drawingAllocator();
+  auto drawOp = allocator->make<RectDrawOp>(allocator, provider.get());
   CAPUTRE_RECT_MESH(drawOp.get(), provider.get());
   if (provider->aaType() == AAType::Coverage || provider->rectCount() > 1 || provider->lineJoin()) {
     drawOp->indexBufferProxy = context->globalCache()->getRectIndexBuffer(
@@ -47,15 +49,16 @@ PlacementPtr<RectDrawOp> RectDrawOp::Make(Context* context,
   return drawOp;
 }
 
-RectDrawOp::RectDrawOp(RectsVertexProvider* provider)
-    : DrawOp(provider->aaType()), rectCount(provider->rectCount()), lineJoin(provider->lineJoin()) {
+RectDrawOp::RectDrawOp(BlockAllocator* allocator, RectsVertexProvider* provider)
+    : DrawOp(allocator, provider->aaType()), rectCount(provider->rectCount()),
+      lineJoin(provider->lineJoin()) {
   if (!provider->hasUVCoord()) {
     auto matrix = provider->firstMatrix();
     matrix.invert(&matrix);
     uvMatrix = matrix;
   }
   if (!provider->hasColor()) {
-    commonColor = provider->firstColor();
+    commonColor = ToPMColor(provider->firstColor(), provider->dstColorSpace());
   }
   hasSubset = provider->hasSubset();
 }
@@ -66,11 +69,10 @@ PlacementPtr<GeometryProcessor> RectDrawOp::onMakeGeometryProcessor(RenderTarget
   ATTRIBUTE_NAME("uvMatrix", uvMatrix);
   ATTRIBUTE_NAME("hasSubset", hasSubset);
   ATTRIBUTE_NAME("hasStroke", lineJoin.has_value());
-  auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
   if (lineJoin == LineJoin::Round) {
-    return RoundStrokeRectGeometryProcessor::Make(drawingBuffer, aaType, commonColor, uvMatrix);
+    return RoundStrokeRectGeometryProcessor::Make(allocator, aaType, commonColor, uvMatrix);
   }
-  return QuadPerEdgeAAGeometryProcessor::Make(drawingBuffer, renderTarget->width(),
+  return QuadPerEdgeAAGeometryProcessor::Make(allocator, renderTarget->width(),
                                               renderTarget->height(), aaType, commonColor, uvMatrix,
                                               hasSubset);
 }

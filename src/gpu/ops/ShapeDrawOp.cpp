@@ -28,23 +28,22 @@
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
-PlacementPtr<ShapeDrawOp> ShapeDrawOp::Make(std::shared_ptr<GPUShapeProxy> shapeProxy, Color color,
-                                            const Matrix& uvMatrix, AAType aaType) {
+PlacementPtr<ShapeDrawOp> ShapeDrawOp::Make(std::shared_ptr<GPUShapeProxy> shapeProxy,
+                                            PMColor color, const Matrix& uvMatrix, AAType aaType) {
   if (shapeProxy == nullptr) {
     return nullptr;
   }
-  auto drawingBuffer = shapeProxy->getContext()->drawingBuffer();
-  return drawingBuffer->make<ShapeDrawOp>(std::move(shapeProxy), color, uvMatrix, aaType);
+  auto allocator = shapeProxy->getContext()->drawingAllocator();
+  return allocator->make<ShapeDrawOp>(allocator, std::move(shapeProxy), color, uvMatrix, aaType);
 }
 
-ShapeDrawOp::ShapeDrawOp(std::shared_ptr<GPUShapeProxy> proxy, Color color, const Matrix& uvMatrix,
-                         AAType aaType)
-    : DrawOp(aaType), shapeProxy(std::move(proxy)), color(color), uvMatrix(uvMatrix) {
+ShapeDrawOp::ShapeDrawOp(BlockAllocator* allocator, std::shared_ptr<GPUShapeProxy> proxy,
+                         PMColor color, const Matrix& uvMatrix, AAType aaType)
+    : DrawOp(allocator, aaType), shapeProxy(std::move(proxy)), color(color), uvMatrix(uvMatrix) {
   auto context = shapeProxy->getContext();
   if (auto textureProxy = shapeProxy->getTextureProxy()) {
     auto maskRect = Rect::MakeWH(textureProxy->width(), textureProxy->height());
-    auto maskVertexProvider =
-        RectsVertexProvider::MakeFrom(context->drawingBuffer(), maskRect, AAType::None);
+    auto maskVertexProvider = RectsVertexProvider::MakeFrom(allocator, maskRect, AAType::None);
     maskBufferProxy = context->proxyProvider()->createVertexBufferProxy(
         std::move(maskVertexProvider), RenderFlags::DisableAsyncTask);
   }
@@ -75,14 +74,13 @@ PlacementPtr<GeometryProcessor> ShapeDrawOp::onMakeGeometryProcessor(RenderTarge
     static SamplingArgs args(TileMode::Clamp, TileMode::Clamp,
                              SamplingOptions(FilterMode::Nearest, MipmapMode::None),
                              SrcRectConstraint::Fast);
-    auto maskFP = TextureEffect::Make(std::move(textureProxy), args, &maskMatrix, true);
+    auto maskFP = TextureEffect::Make(allocator, std::move(textureProxy), args, &maskMatrix, true);
     if (maskFP == nullptr) {
       return nullptr;
     }
     addCoverageFP(std::move(maskFP));
   }
-  auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
-  return DefaultGeometryProcessor::Make(drawingBuffer, color, renderTarget->width(),
+  return DefaultGeometryProcessor::Make(allocator, color, renderTarget->width(),
                                         renderTarget->height(), aa, viewMatrix, realUVMatrix);
 }
 

@@ -25,15 +25,12 @@ namespace tgfx {
 class GLSLAtlasTextGeometryProcessor : public AtlasTextGeometryProcessor {
  public:
   GLSLAtlasTextGeometryProcessor(std::shared_ptr<TextureProxy> textureProxy, AAType aa,
-                                 std::optional<Color> commonColor, const SamplingOptions& sampling);
+                                 std::optional<PMColor> commonColor,
+                                 const SamplingOptions& sampling);
   void emitCode(EmitArgs&) const override;
 
   void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData,
                FPCoordTransformIter* coordTransformIter) const override;
-
-  SamplerState onSamplerStateAt(size_t) const override {
-    return samplerState;
-  }
 
  private:
   std::string atlasSizeUniformName = "atlasSizeInv";

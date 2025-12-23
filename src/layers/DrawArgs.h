@@ -33,13 +33,16 @@ class DrawArgs {
   DrawArgs() = default;
 
   DrawArgs(Context* context, bool excludeEffects = false, DrawMode drawMode = DrawMode::Normal,
-           std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB())
+           std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB())
       : context(context), excludeEffects(excludeEffects), drawMode(drawMode),
         dstColorSpace(std::move(colorSpace)) {
   }
 
   // The GPU context to be used during the drawing process. Note: this could be nullptr.
   Context* context = nullptr;
+
+  uint32_t renderFlags = 0;
+
   // Whether to exclude effects during the drawing process.
   bool excludeEffects = false;
   // Determines the draw mode of the Layer.
@@ -51,9 +54,10 @@ class DrawArgs {
   std::shared_ptr<BackgroundContext> blurBackground = nullptr;
   // Indicates whether to force drawing the background, even if there are no background styles.
   bool forceDrawBackground = false;
-  std::shared_ptr<ColorSpace> dstColorSpace = ColorSpace::MakeSRGB();
+  std::shared_ptr<ColorSpace> dstColorSpace = ColorSpace::SRGB();
 
-  // Only used while recording layer's background image.
-  std::shared_ptr<BackgroundContext> blendModeBackground = nullptr;
+  // The maximum cache size (single edge) for subtree layer caching. Set to 0 to disable
+  // subtree layer cache.
+  int subtreeCacheMaxSize = 0;
 };
 }  // namespace tgfx

@@ -21,7 +21,8 @@
 #include "core/utils/Log.h"
 
 namespace tgfx {
-std::shared_ptr<WGLWindow> WGLWindow::MakeFrom(HWND nativeWindow, HGLRC sharedContext) {
+std::shared_ptr<WGLWindow> WGLWindow::MakeFrom(HWND nativeWindow, HGLRC sharedContext,
+                                               std::shared_ptr<ColorSpace> colorSpace) {
   if (nativeWindow == nullptr) {
     return nullptr;
   }
@@ -30,12 +31,18 @@ std::shared_ptr<WGLWindow> WGLWindow::MakeFrom(HWND nativeWindow, HGLRC sharedCo
   if (device == nullptr) {
     return nullptr;
   }
-  auto wglWindow = std::shared_ptr<WGLWindow>(new WGLWindow(device));
+  if (colorSpace != nullptr && !ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get())) {
+    LOGE(
+        "WGLWindow::MakeFrom() The specified ColorSpace is not supported on this platform. "
+        "Rendering may have color inaccuracies.");
+  }
+  auto wglWindow = std::shared_ptr<WGLWindow>(new WGLWindow(device, std::move(colorSpace)));
   wglWindow->nativeWindow = nativeWindow;
   return wglWindow;
 }
 
-WGLWindow::WGLWindow(std::shared_ptr<Device> device) : Window(std::move(device)) {
+WGLWindow::WGLWindow(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace)
+    : Window(std::move(device)), colorSpace(std::move(colorSpace)) {
 }
 
 std::shared_ptr<Surface> WGLWindow::onCreateSurface(Context* context) {
@@ -52,7 +59,7 @@ std::shared_ptr<Surface> WGLWindow::onCreateSurface(Context* context) {
 
   GLFrameBufferInfo frameBuffer = {0, GL_RGBA8};
   BackendRenderTarget renderTarget = {frameBuffer, size.width, size.height};
-  return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
+  return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft, 0, colorSpace);
 }
 
 void WGLWindow::onPresent(Context*) {

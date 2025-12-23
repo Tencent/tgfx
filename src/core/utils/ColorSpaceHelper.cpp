@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ColorSpaceHelper.h"
+#include <cmath>
+#include "Log.h"
 
 namespace tgfx {
 static constexpr int32_t STANDARD_ADOBE_RGB = 0x000b0000;
@@ -113,38 +115,92 @@ std::shared_ptr<ColorSpace> AndroidDataSpaceToColorSpace(int standard, int trans
 }
 
 gfx::skcms_ICCProfile ToSkcmsICCProfile(std::shared_ptr<ColorSpace> colorSpace) {
-  if (colorSpace) {
-    gfx::skcms_ICCProfile profile;
-    gfx::skcms_Init(&profile);
-    auto transferFunction = colorSpace->transferFunction();
-    gfx::skcms_SetTransferFunction(
-        &profile, reinterpret_cast<gfx::skcms_TransferFunction*>(&transferFunction));
-    ColorMatrix33 xyzd50{};
-    colorSpace->toXYZD50(&xyzd50);
-    skcms_SetXYZD50(&profile, reinterpret_cast<gfx::skcms_Matrix3x3*>(&xyzd50));
-    return profile;
-  }
-  return {};
+  DEBUG_ASSERT(colorSpace != nullptr);
+  gfx::skcms_ICCProfile profile;
+  gfx::skcms_Init(&profile);
+  auto transferFunction = colorSpace->transferFunction();
+  gfx::skcms_SetTransferFunction(&profile,
+                                 reinterpret_cast<gfx::skcms_TransferFunction*>(&transferFunction));
+  ColorMatrix33 xyzd50{};
+  colorSpace->toXYZD50(&xyzd50);
+  skcms_SetXYZD50(&profile, reinterpret_cast<gfx::skcms_Matrix3x3*>(&xyzd50));
+  return profile;
 }
 
-bool NeedConvertColorSpace(std::shared_ptr<ColorSpace> src, std::shared_ptr<ColorSpace> dst) {
+bool NeedConvertColorSpace(const std::shared_ptr<ColorSpace>& src,
+                           const std::shared_ptr<ColorSpace>& dst) {
   if (dst == nullptr) {
-    return true;
+    return false;
   }
-  if (src == nullptr) {
-    src = ColorSpace::MakeSRGB();
-  }
-  return ColorSpace::Equals(src.get(), dst.get());
+  ColorSpace* newSrc = src ? src.get() : ColorSpace::SRGB().get();
+  return !ColorSpace::Equals(newSrc, dst.get());
 }
 
 void ConvertColorSpaceInPlace(int width, int height, ColorType colorType, AlphaType alphaType,
-                              size_t rowBytes, std::shared_ptr<ColorSpace> srcCS,
-                              std::shared_ptr<ColorSpace> dstCS, void* pixels) {
-  if (NeedConvertColorSpace(srcCS, dstCS)) {
+                              size_t rowBytes, const std::shared_ptr<ColorSpace>& srcCS,
+                              const std::shared_ptr<ColorSpace>& dstCS, void* pixels) {
+  if (!NeedConvertColorSpace(srcCS, dstCS)) {
     return;
   }
   auto srcImageInfo = ImageInfo::Make(width, height, colorType, alphaType, rowBytes, srcCS);
   auto dstImageInfo = srcImageInfo.makeColorSpace(dstCS);
   CopyPixels(srcImageInfo, pixels, dstImageInfo, pixels);
+}
+
+gfx::skcms_TransferFunction ToSkcmsTransferFunction(const TransferFunction& tf) {
+  return {tf.g, tf.a, tf.b, tf.c, tf.d, tf.e, tf.f};
+}
+
+TransferFunction ToTransferFunction(const gfx::skcms_TransferFunction& tf) {
+  return {tf.g, tf.a, tf.b, tf.c, tf.d, tf.e, tf.f};
+}
+
+static bool NearlyEqual(float x, float y) {
+  /**
+   * A note on why I chose this tolerance:  TransferFnAlmostEqual() uses a tolerance of 0.001f,
+   * which doesn't seem to be enough to distinguish between similar transfer functions, for example:
+   * gamma2.2 and sRGB.
+   *
+   * If the tolerance is 0.0f, then this we can't distinguish between two different encodings of
+   * what is clearly the same colorspace. Some experimentation with example files lead to this
+   * number:
+   */
+  static constexpr float Tolerance = 1.0f / (1 << 11);
+  return ::fabsf(x - y) <= Tolerance;
+}
+
+bool NearlyEqual(const TransferFunction& u, const TransferFunction& v) {
+  return NearlyEqual(u.g, v.g) && NearlyEqual(u.a, v.a) && NearlyEqual(u.b, v.b) &&
+         NearlyEqual(u.c, v.c) && NearlyEqual(u.d, v.d) && NearlyEqual(u.e, v.e) &&
+         NearlyEqual(u.f, v.f);
+}
+
+bool NearlyEqual(const ColorMatrix33& u, const ColorMatrix33& v) {
+  for (int r = 0; r < 3; r++) {
+    for (int c = 0; c < 3; c++) {
+      if (!NearlyEqual(u.values[r][c], v.values[r][c])) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+bool NearlyEqual(const ColorSpace* colorSpaceA, const ColorSpace* colorSpaceB) {
+  if (ColorSpace::Equals(colorSpaceA, colorSpaceB)) {
+    return true;
+  }
+  if (colorSpaceA && colorSpaceB) {
+    auto transferFunctionA = colorSpaceA->transferFunction();
+    auto transferFunctionB = colorSpaceB->transferFunction();
+    ColorMatrix33 matrixA{};
+    ColorMatrix33 matrixB{};
+    colorSpaceA->toXYZD50(&matrixA);
+    colorSpaceB->toXYZD50(&matrixB);
+    if (NearlyEqual(transferFunctionA, transferFunctionB) && NearlyEqual(matrixA, matrixB)) {
+      return true;
+    }
+  }
+  return false;
 }
 }  // namespace tgfx

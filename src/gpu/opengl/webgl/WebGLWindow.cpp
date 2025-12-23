@@ -22,20 +22,23 @@
 #include "gpu/opengl/GLDefines.h"
 
 namespace tgfx {
-std::shared_ptr<WebGLWindow> WebGLWindow::MakeFrom(const std::string& canvasID) {
+
+std::shared_ptr<WebGLWindow> WebGLWindow::MakeFrom(const std::string& canvasID,
+                                                   std::shared_ptr<ColorSpace> colorSpace) {
   if (canvasID.empty()) {
     return nullptr;
   }
-  auto device = WebGLDevice::MakeFrom(canvasID);
+  auto device = WebGLDevice::MakeFrom(canvasID, colorSpace);
   if (device == nullptr) {
     return nullptr;
   }
-  auto window = std::shared_ptr<WebGLWindow>(new WebGLWindow(device));
+  auto window = std::shared_ptr<WebGLWindow>(new WebGLWindow(device, std::move(colorSpace)));
   window->canvasID = canvasID;
   return window;
 }
 
-WebGLWindow::WebGLWindow(std::shared_ptr<Device> device) : Window(std::move(device)) {
+WebGLWindow::WebGLWindow(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace)
+    : Window(std::move(device)), colorSpace(std::move(colorSpace)) {
 }
 
 std::shared_ptr<Surface> WebGLWindow::onCreateSurface(Context* context) {
@@ -49,13 +52,6 @@ std::shared_ptr<Surface> WebGLWindow::onCreateSurface(Context* context) {
   GLFrameBufferInfo glInfo = {};
   glInfo.id = 0;
   glInfo.format = GL_RGBA8;
-  std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB();
-
-  bool isP3Supported = emscripten::val::module_property("tgfx").call<bool>(
-      "isDisplayP3Supported", emscripten::val::module_property("GL"));
-  if (isP3Supported) {
-    colorSpace = ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3);
-  }
   return Surface::MakeFrom(context, {glInfo, width, height}, ImageOrigin::BottomLeft, 0,
                            colorSpace);
 }

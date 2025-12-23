@@ -21,8 +21,8 @@
 #include "core/MCState.h"
 #include "gpu/ops/RRectDrawOp.h"
 #include "gpu/ops/RectDrawOp.h"
+#include "tgfx/core/Brush.h"
 #include "tgfx/core/Canvas.h"
-#include "tgfx/core/Fill.h"
 #include "tgfx/core/Shape.h"
 
 namespace tgfx {
@@ -45,42 +45,43 @@ class OpsCompositor {
    * Creates an OpsCompositor with the given render target proxy, render flags and render queue.
    */
   OpsCompositor(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags,
-                std::optional<Color> clearColor = std::nullopt,
+                std::optional<PMColor> clearColor = std::nullopt,
                 std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
    * Fills the given image with the given sampling options, state and fill.
    */
   void fillImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                 const MCState& state, const Fill& fill);
+                 const MCState& state, const Brush& brush);
   /**
    * Fills the given rect with the image, using the given source rect, destination rect, sampling
    * options, state and fill.
    */
   void fillImageRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
-                     const SamplingOptions& sampling, const MCState& state, const Fill& fill,
+                     const SamplingOptions& sampling, const MCState& state, const Brush& brush,
                      SrcRectConstraint constraint);
 
   /**
    * Fills the given rect with the given state, fill and optional stroke.
    */
-  void fillRect(const Rect& rect, const MCState& state, const Fill& fill, const Stroke* stroke);
+  void fillRect(const Rect& rect, const MCState& state, const Brush& brush, const Stroke* stroke);
 
   /**
    * Draw the given rrect with the given state, fill and optional stroke.
    */
-  void drawRRect(const RRect& rRect, const MCState& state, const Fill& fill, const Stroke* stroke);
+  void drawRRect(const RRect& rRect, const MCState& state, const Brush& brush,
+                 const Stroke* stroke);
 
   /**
    * Fills the given shape with the given state and fill.
    */
-  void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill);
+  void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Brush& brush);
 
   /**
    * Fills the given rect with the given atlas textureProxy, sampling options, state and fill.
    */
   void fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, const Rect& rect,
-                     const SamplingOptions& sampling, const MCState& state, const Fill& fill);
+                     const SamplingOptions& sampling, const MCState& state, const Brush& brush);
 
   /**
    * Discard all pending operations.
@@ -110,7 +111,7 @@ class OpsCompositor {
   bool hasRectToRectDraw = false;
   PendingOpType pendingType = PendingOpType::Unknown;
   Path pendingClip = {};
-  Fill pendingFill = {};
+  Brush pendingBrush = {};
   std::shared_ptr<Image> pendingImage = nullptr;
   SrcRectConstraint pendingConstraint = SrcRectConstraint::Fast;
   SamplingOptions pendingSampling = {};
@@ -119,28 +120,28 @@ class OpsCompositor {
   std::vector<PlacementPtr<Rect>> pendingUVRects = {};
   std::vector<PlacementPtr<RRectRecord>> pendingRRects = {};
   std::vector<PlacementPtr<Stroke>> pendingStrokes = {};
-  std::optional<Color> clearColor = std::nullopt;
+  std::optional<PMColor> clearColor = std::nullopt;
   std::vector<PlacementPtr<DrawOp>> drawOps = {};
   std::shared_ptr<ColorSpace> dstColorSpace = nullptr;
 
-  static bool CompareFill(const Fill& a, const Fill& b);
+  static bool CompareBrush(const Brush& a, const Brush& b);
 
-  BlockBuffer* drawingBuffer() const {
-    return context->drawingBuffer();
+  BlockAllocator* drawingAllocator() const {
+    return context->drawingAllocator();
   }
 
   ProxyProvider* proxyProvider() const {
     return context->proxyProvider();
   }
 
-  bool drawAsClear(const Rect& rect, const MCState& state, const Fill& fill);
-  bool canAppend(PendingOpType type, const Path& clip, const Fill& fill) const;
+  bool drawAsClear(const Rect& rect, const MCState& state, const Brush& brush);
+  bool canAppend(PendingOpType type, const Path& clip, const Brush& brush) const;
   void flushPendingOps(PendingOpType currentType = PendingOpType::Unknown, Path currentClip = {},
-                       Fill currentFill = {});
+                       Brush currentBrush = {});
   void resetPendingOps(PendingOpType currentType = PendingOpType::Unknown, Path currentClip = {},
-                       Fill currentFill = {});
-  AAType getAAType(const Fill& fill) const;
-  std::pair<bool, bool> needComputeBounds(const Fill& fill, bool hasCoverage,
+                       Brush currentBrush = {});
+  AAType getAAType(const Brush& brush) const;
+  std::pair<bool, bool> needComputeBounds(const Brush& brush, bool hasCoverage,
                                           bool hasImageFill = false);
   Rect getClipBounds(const Path& clip);
   std::shared_ptr<TextureProxy> getClipTexture(const Path& clip, AAType aaType);
@@ -148,7 +149,7 @@ class OpsCompositor {
   std::pair<PlacementPtr<FragmentProcessor>, bool> getClipMaskFP(const Path& clip, AAType aaType,
                                                                  Rect* scissorRect);
   DstTextureInfo makeDstTextureInfo(const Rect& deviceBounds, AAType aaType);
-  void addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const Fill& fill,
+  void addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const Brush& brush,
                  const std::optional<Rect>& localBounds, const std::optional<Rect>& deviceBounds,
                  float drawScale);
 

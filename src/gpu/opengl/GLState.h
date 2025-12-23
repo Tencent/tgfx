@@ -64,6 +64,11 @@ struct GLBlendState {
   unsigned alphaOp = INVALID_VALUE;
 };
 
+struct GLCullFaceState {
+  unsigned frontFace = INVALID_VALUE;
+  unsigned cullFace = INVALID_VALUE;
+};
+
 /**
  * GLState is used to cache and manage the OpenGL state to minimize redundant state changes.
  */
@@ -77,7 +82,7 @@ class GLState {
 
   void setViewport(int x, int y, int width, int height);
 
-  void setClearColor(Color color);
+  void setClearColor(PMColor color);
 
   void setColorMask(uint32_t colorMask);
 
@@ -86,6 +91,8 @@ class GLState {
   void setDepthState(const GLDepthState& state);
 
   void setBlendState(const GLBlendState& state);
+
+  void setCullFaceState(const GLCullFaceState& state);
 
   void bindTexture(GLTexture* texture, unsigned textureUnit = 0);
 
@@ -101,7 +108,7 @@ class GLState {
   std::vector<uint32_t> textureUnits = {};
   std::array<int, 4> scissorRect = {0, 0, 0, 0};
   std::array<int, 4> viewport = {0, 0, 0, 0};
-  std::optional<Color> clearColor = std::nullopt;
+  std::optional<PMColor> clearColor = std::nullopt;
   uint32_t activePipeline = 0;
   unsigned activeTextureUint = INVALID_VALUE;
   unsigned readFramebuffer = INVALID_VALUE;
@@ -110,5 +117,6 @@ class GLState {
   GLStencilState stencilState = {};
   GLDepthState depthState = {};
   GLBlendState blendState = {};
+  GLCullFaceState cullFaceState = {};
 };
 }  // namespace tgfx

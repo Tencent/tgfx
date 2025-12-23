@@ -19,7 +19,8 @@
 #pragma once
 
 #include <optional>
-#include "core/utils/BlockBuffer.h"
+#include "core/ColorSpaceXformSteps.h"
+#include "core/utils/BlockAllocator.h"
 #include "gpu/AAType.h"
 #include "gpu/VertexProvider.h"
 #include "tgfx/core/Color.h"
@@ -49,18 +50,17 @@ class RectsVertexProvider : public VertexProvider {
   /**
    * Creates a new RectsVertexProvider from a single rect.
    */
-  static PlacementPtr<RectsVertexProvider> MakeFrom(BlockBuffer* buffer, const Rect& rect,
+  static PlacementPtr<RectsVertexProvider> MakeFrom(BlockAllocator* allocator, const Rect& rect,
                                                     AAType aaType);
 
   /**
    * Creates a new RectsVertexProvider from a list of rect records.
    */
-  static PlacementPtr<RectsVertexProvider> MakeFrom(BlockBuffer* buffer,
-                                                    std::vector<PlacementPtr<RectRecord>>&& rects,
-                                                    std::vector<PlacementPtr<Rect>>&& uvRects,
-                                                    AAType aaType, bool needUVCoord,
-                                                    UVSubsetMode subsetMode,
-                                                    std::vector<PlacementPtr<Stroke>>&& strokes);
+  static PlacementPtr<RectsVertexProvider> MakeFrom(
+      BlockAllocator* allocator, std::vector<PlacementPtr<RectRecord>>&& rects,
+      std::vector<PlacementPtr<Rect>>&& uvRects, AAType aaType, bool needUVCoord,
+      UVSubsetMode subsetMode, std::vector<PlacementPtr<Stroke>>&& strokes,
+      std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
    * Returns the number of rects in the provider.
@@ -126,9 +126,14 @@ class RectsVertexProvider : public VertexProvider {
     return static_cast<UVSubsetMode>(bitFields.subsetMode) != UVSubsetMode::None;
   }
 
+  const std::shared_ptr<ColorSpace>& dstColorSpace() const {
+    return _dstColorSpace;
+  }
+
  protected:
   PlacementArray<RectRecord> rects = {};
   PlacementArray<Rect> uvRects = {};
+  std::shared_ptr<ColorSpace> _dstColorSpace = nullptr;
   std::optional<LineJoin> _lineJoin = std::nullopt;
   struct {
     uint8_t aaType : 2;
@@ -139,6 +144,7 @@ class RectsVertexProvider : public VertexProvider {
 
   RectsVertexProvider(PlacementArray<RectRecord>&& rects, PlacementArray<Rect>&& uvRects,
                       AAType aaType, bool hasUVCoord, bool hasColor, UVSubsetMode subsetMode,
-                      std::shared_ptr<BlockBuffer> reference);
+                      std::shared_ptr<BlockAllocator> reference,
+                      std::shared_ptr<ColorSpace> colorSpace);
 };
 }  // namespace tgfx

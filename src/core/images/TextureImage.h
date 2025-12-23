@@ -53,13 +53,17 @@ class TextureImage : public Image {
     return true;
   }
 
+  std::shared_ptr<TextureProxy> getTextureProxy() const {
+    return textureProxy;
+  }
+
   BackendTexture getBackendTexture(Context* context, ImageOrigin* origin) const override;
 
   std::shared_ptr<Image> makeTextureImage(Context* context) const override;
 
   std::shared_ptr<Image> makeRasterized() const override;
 
-  std::shared_ptr<ColorSpace> colorSpace() const override {
+  const std::shared_ptr<ColorSpace>& colorSpace() const override {
     return _colorSpace;
   }
 
@@ -84,7 +88,7 @@ class TextureImage : public Image {
  private:
   std::shared_ptr<TextureProxy> textureProxy = nullptr;
   uint32_t contextID = 0;
-  std::shared_ptr<ColorSpace> _colorSpace = ColorSpace::MakeSRGB();
+  std::shared_ptr<ColorSpace> _colorSpace = nullptr;
 
   TextureImage(std::shared_ptr<TextureProxy> textureProxy, uint32_t contextID,
                std::shared_ptr<ColorSpace> colorSpace);

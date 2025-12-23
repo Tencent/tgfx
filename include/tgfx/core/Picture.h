@@ -19,7 +19,6 @@
 #pragma once
 
 #include <atomic>
-#include "tgfx/core/FillModifier.h"
 #include "tgfx/core/Matrix.h"
 
 namespace tgfx {
@@ -28,8 +27,8 @@ class Canvas;
 class DrawContext;
 class MCState;
 class Image;
-class Fill;
-class BlockData;
+class Brush;
+class BlockBuffer;
 template <typename T>
 class PlacementPtr;
 
@@ -40,6 +39,21 @@ class PlacementPtr;
  */
 class Picture {
  public:
+  /**
+   * AbortCallback is an abstract class that allows interrupting the playback of a Picture.
+   * Subclasses can override the abort() method to determine whether to stop playback.
+   */
+  class AbortCallback {
+   public:
+    virtual ~AbortCallback() = default;
+
+    /**
+     * Called before each drawing command during playback. If this returns true, the playback will
+     * be aborted immediately.
+     */
+    virtual bool abort() = 0;
+  };
+
   ~Picture();
 
   /**
@@ -52,66 +66,42 @@ class Picture {
   }
 
   /**
-   * Returns the conservative bounding box of the Picture. Compared to getTightBounds, it may be
-   * larger than actual bounds but is faster to compute. Note that the bounds only include the
-   * combined geometry of each drawing command, but some commands may draw outside these bounds.
-   * Use the hasUnboundedFill() method to check for this.
+   * Returns the bounding box of the Picture. Note that the bounds only include the combined
+   * geometry of each drawing command, but some commands may draw outside these bounds. Use the
+   * hasUnboundedFill() method to check for this.
    */
   Rect getBounds() const;
-
-  /**
-   * Returns the tight bounding box of the Picture when drawn with the given Matrix. Since the Picture
-   * may contain glyph drawing commands whose outlines can change with different scale factors,
-   * it's best to use the final drawing matrix to calculate the bounds for accuracy.
-   * Note that the bounds only include the combined geometry of each drawing command, but some
-   * commands may draw outside these bounds. Use the hasUnboundedFill() method to check for this.
-   * @param matrix The Matrix to apply to the bounds of each drawing command. If null, the identity
-   * matrix is used.
-   */
-  Rect getTightBounds(const Matrix* matrix = nullptr) const;
-
-  /**
-   * Checks whether any drawing commands in the Picture overlap or intersect with the specified
-   * point (localX, localY).
-   * @param localX The x-coordinate in the Picture's local coordinate space.
-   * @param localY The y-coordinate in the Picture's local coordinate space.
-   * @param shapeHitTest If true, checks the actual shape of each drawing command; if false, checks
-   * only their bounding boxes. Images in the Picture are always checked using their bounding box.
-   * @return True if any drawing command in the Picture overlaps or intersects with the point;
-   * false otherwise.
-   */
-  bool hitTestPoint(float localX, float localY, bool shapeHitTest = false) const;
 
   /**
    * Replays the drawing commands on the specified canvas. In the case that the commands are
    * recorded, each command in the Picture is sent separately to canvas. To add a single command to
    * draw the Picture to a canvas, call Canvas::drawPicture() instead.
-   * @param canvas The receiver of drawing commands
-   * @param fillModifier An optional FillModifier to modify the Fill properties of drawing commands.
+   * @param canvas The receiver of drawing commands.
+   * @param callback Optional callback that can abort playback. If callback->abort() returns true,
+   *                 playback stops immediately.
    */
-  void playback(Canvas* canvas, const FillModifier* fillModifier = nullptr) const;
+  void playback(Canvas* canvas, AbortCallback* callback = nullptr) const;
 
  private:
-  std::unique_ptr<BlockData> blockData;
+  std::unique_ptr<BlockBuffer> blockBuffer;
   std::vector<PlacementPtr<PictureRecord>> records;
   mutable std::atomic<Rect*> bounds = {nullptr};
   size_t drawCount = 0;
   bool _hasUnboundedFill = false;
 
-  Picture(std::unique_ptr<BlockData> data, std::vector<PlacementPtr<PictureRecord>> records,
+  Picture(std::unique_ptr<BlockBuffer> buffer, std::vector<PlacementPtr<PictureRecord>> records,
           size_t drawCount);
 
   void playback(DrawContext* drawContext, const MCState& state,
-                const FillModifier* fillModifier = nullptr) const;
+                AbortCallback* callback = nullptr) const;
 
   std::shared_ptr<Image> asImage(Point* offset, const Matrix* matrix = nullptr,
                                  const ISize* clipSize = nullptr) const;
 
-  const PictureRecord* getFirstDrawRecord(MCState* state = nullptr, Fill* fill = nullptr,
+  const PictureRecord* getFirstDrawRecord(MCState* state = nullptr, Brush* brush = nullptr,
                                           bool* hasStroke = nullptr) const;
 
   friend class MeasureContext;
-  friend class HitTestContext;
   friend class RenderContext;
   friend class PictureContext;
   friend class SVGExportContext;
@@ -120,5 +110,6 @@ class Picture {
   friend class Canvas;
   friend class PDFExportContext;
   friend class ContourContext;
+  friend class MaskContext;
 };
 }  // namespace tgfx

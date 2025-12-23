@@ -86,6 +86,7 @@ PlacementPtr<FragmentProcessor> TextureImage::asFragmentProcessor(const FPArgs& 
   if (args.context == nullptr || args.context->uniqueID() != contextID) {
     return nullptr;
   }
-  return TiledTextureEffect::Make(textureProxy, samplingArgs, uvMatrix, isAlphaOnly());
+  auto allocator = args.context->drawingAllocator();
+  return TiledTextureEffect::Make(allocator, textureProxy, samplingArgs, uvMatrix, isAlphaOnly());
 }
 }  // namespace tgfx

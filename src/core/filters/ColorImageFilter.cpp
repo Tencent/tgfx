@@ -39,10 +39,10 @@ PlacementPtr<FragmentProcessor> ColorImageFilter::asFragmentProcessor(
   if (imageProcessor == nullptr) {
     return nullptr;
   }
-  auto drawingBuffer = args.context->drawingBuffer();
+  auto allocator = args.context->drawingAllocator();
   auto processor = ComposeFragmentProcessor::Make(
-      drawingBuffer, std::move(imageProcessor),
+      allocator, std::move(imageProcessor),
       filter->asFragmentProcessor(args.context, source->colorSpace()));
-  return FragmentProcessor::MulChildByInputAlpha(drawingBuffer, std::move(processor));
+  return FragmentProcessor::MulChildByInputAlpha(allocator, std::move(processor));
 }
 }  // namespace tgfx

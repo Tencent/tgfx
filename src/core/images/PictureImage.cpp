@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PictureImage.h"
+#include "core/utils/MathExtra.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/OpsCompositor.h"
 #include "gpu/ProxyProvider.h"
@@ -94,15 +95,26 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
   if (!rect.intersect(drawBounds)) {
     return nullptr;
   }
+  auto scaleX = 1.0f;
+  auto scaleY = 1.0f;
   auto clipRect = rect;
-  rect.scale(args.drawScale, args.drawScale);
-  rect.round();
-  // recalculate the scale factor to avoid the precision loss of floating point numbers
-  auto scaleX = rect.width() / clipRect.width();
-  auto scaleY = rect.height() / clipRect.height();
+  if (FloatNearlyEqual(args.drawScale, 1.0f)) {
+    // Use roundOut() to ensure pixel-aligned offscreen rendering with complete pixel coverage,
+    // preventing blur artifacts caused by partial pixel rendering.
+    rect.roundOut();
+    clipRect = rect;
+  } else {
+    rect.scale(args.drawScale, args.drawScale);
+    rect.round();
+    // Align PictureImage behavior with BufferImage and CodecImage when processing args.drawScale,
+    // which may produce different scaleX and scaleY values to ensure pixel range stays within
+    // the PictureImage bounds.
+    scaleX = rect.width() / clipRect.width();
+    scaleY = rect.height() / clipRect.height();
+  }
   auto mipmapped = samplingArgs.sampling.mipmapMode != MipmapMode::None && hasMipmaps();
-  auto renderTarget = RenderTargetProxy::Make(args.context, static_cast<int>(rect.width()),
-                                              static_cast<int>(rect.height()), isAlphaOnly(), 1,
+  auto renderTarget = RenderTargetProxy::Make(args.context, FloatSaturateToInt(rect.width()),
+                                              FloatSaturateToInt(rect.height()), isAlphaOnly(), 1,
                                               mipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
   if (renderTarget == nullptr) {
     return nullptr;
@@ -120,16 +132,17 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
   if (samplingArgs.sampleArea) {
     newSamplingArgs.sampleArea = extraMatrix.mapRect(*samplingArgs.sampleArea);
   }
-  return TiledTextureEffect::Make(renderTarget->asTextureProxy(), newSamplingArgs, &finalUVMatrix,
-                                  isAlphaOnly());
+  auto allocator = args.context->drawingAllocator();
+  return TiledTextureEffect::Make(allocator, renderTarget->asTextureProxy(), newSamplingArgs,
+                                  &finalUVMatrix, isAlphaOnly());
 }
 
 std::shared_ptr<TextureProxy> PictureImage::lockTextureProxy(const TPArgs& args) const {
   auto textureWidth = _width;
   auto textureHeight = _height;
   if (args.drawScale < 1.0f) {
-    textureWidth = static_cast<int>(roundf(static_cast<float>(_width) * args.drawScale));
-    textureHeight = static_cast<int>(roundf(static_cast<float>(_height) * args.drawScale));
+    textureWidth = FloatRoundToInt(static_cast<float>(_width) * args.drawScale);
+    textureHeight = FloatRoundToInt(static_cast<float>(_height) * args.drawScale);
   }
   auto renderTarget = RenderTargetProxy::Make(args.context, textureWidth, textureHeight,
                                               isAlphaOnly(), 1, hasMipmaps() && args.mipmapped,

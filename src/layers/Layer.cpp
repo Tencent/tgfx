@@ -17,23 +17,40 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/Layer.h"
+#include <algorithm>
 #include <atomic>
-#include "contents/LayerContent.h"
-#include "contents/RasterizedContent.h"
-#include "core/images/PictureImage.h"
+#include <cmath>
+#include "core/MCState.h"
+#include "core/Matrix2D.h"
+#include "core/filters/Transform3DImageFilter.h"
+#include "core/images/TextureImage.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/Types.h"
 #include "layers/ContourContext.h"
 #include "layers/DrawArgs.h"
+#include "layers/MaskContext.h"
 #include "layers/RegionTransformer.h"
 #include "layers/RootLayer.h"
+#include "layers/SubtreeCache.h"
+#include "layers/contents/LayerContent.h"
+#include "layers/filters/Transform3DFilter.h"
+#include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/layers/ShapeLayer.h"
 
 namespace tgfx {
+// The minimum size (longest edge) for subtree cache. This prevents creating excessively small
+// mipmap levels that would be inefficient to cache.
+static constexpr int SUBTREE_CACHE_MIN_SIZE = 32;
 static std::atomic_bool AllowsEdgeAntialiasing = true;
 static std::atomic_bool AllowsGroupOpacity = false;
+
+struct MaskData {
+  Path clipPath = {};
+  std::shared_ptr<MaskFilter> maskFilter = nullptr;
+};
 
 struct LayerStyleSource {
   float contentScale = 1.0f;
@@ -42,6 +59,35 @@ struct LayerStyleSource {
   std::shared_ptr<Image> contour = nullptr;
   Point contourOffset = {};
 };
+
+// Determine if the 4*4 matrix contains only 2D affine transformations, i.e., no Z-axis related
+// transformations or projection transformations
+static bool IsMatrix3DAffine(const Matrix3D& matrix) {
+  return FloatNearlyZero(matrix.getRowColumn(0, 2)) && FloatNearlyZero(matrix.getRowColumn(1, 2)) &&
+         matrix.getRow(2) == Vec4(0, 0, 1, 0) && matrix.getRow(3) == Vec4(0, 0, 0, 1);
+}
+
+// When a 4x4 matrix does not contain Z-axis related transformations and projection transformations,
+// this function returns an equivalent 2D affine transformation. Otherwise, the return value will
+// lose information about Z-axis related transformations and projection transformations.
+static Matrix GetMayLossyAffineMatrix(const Matrix3D& matrix) {
+  auto affineMatrix = Matrix::I();
+  affineMatrix.setAll(matrix.getRowColumn(0, 0), matrix.getRowColumn(0, 1),
+                      matrix.getRowColumn(0, 3), matrix.getRowColumn(1, 0),
+                      matrix.getRowColumn(1, 1), matrix.getRowColumn(1, 3));
+  return affineMatrix;
+}
+
+static std::optional<Rect> MapClipBoundsToContent(const std::optional<Rect>& clipBounds,
+                                                  const Matrix3D* transform3D) {
+  if (transform3D != nullptr && clipBounds.has_value()) {
+    auto filter = ImageFilter::Transform3D(*transform3D);
+    if (filter) {
+      return filter->filterBounds(*clipBounds, MapDirection::Reverse);
+    }
+  }
+  return clipBounds;
+}
 
 std::shared_ptr<Picture> Layer::RecordPicture(DrawMode mode, float contentScale,
                                               const std::function<void(Canvas*)>& drawFunction) {
@@ -64,15 +110,20 @@ std::shared_ptr<Picture> Layer::RecordPicture(DrawMode mode, float contentScale,
 
 static std::shared_ptr<Image> ToImageWithOffset(
     std::shared_ptr<Picture> picture, Point* offset, const Rect* imageBounds = nullptr,
-    std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB()) {
+    std::shared_ptr<ColorSpace> colorSpace = ColorSpace::SRGB(), bool roundOutBounds = true) {
   if (picture == nullptr) {
     return nullptr;
   }
   auto bounds = imageBounds ? *imageBounds : picture->getBounds();
-  bounds.roundOut();
+  if (roundOutBounds) {
+    // In off-screen rendering scenarios, the canvas matrix is applied to the picture, requiring
+    // bounds to be rounded out to keep offsets integral and avoid redundant sampling.
+    // During caching, the canvas matrix is not applied to the picture, so rounding is unnecessary.
+    bounds.roundOut();
+  }
   auto matrix = Matrix::MakeTrans(-bounds.x(), -bounds.y());
-  auto image = Image::MakeFrom(std::move(picture), static_cast<int>(bounds.width()),
-                               static_cast<int>(bounds.height()), &matrix, std::move(colorSpace));
+  auto image = Image::MakeFrom(std::move(picture), FloatCeilToInt(bounds.width()),
+                               FloatCeilToInt(bounds.height()), &matrix, std::move(colorSpace));
   if (offset) {
     offset->x = bounds.left;
     offset->y = bounds.top;
@@ -109,6 +160,46 @@ static std::optional<Rect> GetClipBounds(const Canvas* canvas) {
   clipRect = invert.mapRect(clipRect);
   clipRect.roundOut();
   return clipRect;
+}
+
+static std::shared_ptr<Image> MakeImageWithTransform(std::shared_ptr<Image> image,
+                                                     const Matrix3D* transform3D,
+                                                     Matrix* imageMatrix) {
+  DEBUG_ASSERT(imageMatrix);
+  if (transform3D == nullptr) {
+    return image;
+  }
+  auto adaptedMatrix = *transform3D;
+  auto offsetMatrix =
+      Matrix3D::MakeTranslate(imageMatrix->getTranslateX(), imageMatrix->getTranslateY(), 0);
+  auto invOffsetMatrix =
+      Matrix3D::MakeTranslate(-imageMatrix->getTranslateX(), -imageMatrix->getTranslateY(), 0);
+  auto scaleMatrix = Matrix3D::MakeScale(imageMatrix->getScaleX(), imageMatrix->getScaleY(), 1.0f);
+  auto invScaleMatrix =
+      Matrix3D::MakeScale(1.0f / imageMatrix->getScaleX(), 1.0f / imageMatrix->getScaleY(), 1.0f);
+  adaptedMatrix = invScaleMatrix * invOffsetMatrix * adaptedMatrix * offsetMatrix * scaleMatrix;
+  auto imageFilter = ImageFilter::Transform3D(adaptedMatrix);
+  auto offset = Point();
+  image = image->makeWithFilter(imageFilter, &offset);
+  imageMatrix->preTranslate(offset.x, offset.y);
+  return image;
+}
+
+static int GetMipmapCacheLongEdge(int maxSize, float contentScale, const Rect& layerBounds) {
+  auto maxBoundsSize = std::max(layerBounds.width(), layerBounds.height());
+  auto scaleBoundsSize = FloatRoundToInt(maxBoundsSize * contentScale);
+  if (scaleBoundsSize > maxSize) {
+    return scaleBoundsSize;
+  }
+  if (SUBTREE_CACHE_MIN_SIZE >= maxSize) {
+    return maxSize;
+  }
+  auto targetSize = std::max(scaleBoundsSize, SUBTREE_CACHE_MIN_SIZE);
+  auto currentLongEdge = maxSize;
+  while ((currentLongEdge >> 1) >= targetSize) {
+    currentLongEdge >>= 1;
+  }
+  return currentLongEdge;
 }
 
 bool Layer::DefaultAllowsEdgeAntialiasing() {
@@ -149,6 +240,7 @@ Layer::Layer() {
   bitFields.allowsGroupOpacity = AllowsGroupOpacity;
   bitFields.blendMode = static_cast<uint8_t>(BlendMode::SrcOver);
   bitFields.passThroughBackground = true;
+  bitFields.matrix3DIsAffine = true;
 }
 
 void Layer::setAlpha(float value) {
@@ -176,20 +268,59 @@ void Layer::setPassThroughBackground(bool value) {
   invalidateTransform();
 }
 
-void Layer::setPosition(const Point& value) {
-  if (_matrix.getTranslateX() == value.x && _matrix.getTranslateY() == value.y) {
-    return;
+Point Layer::position() const {
+  if (bitFields.matrix3DIsAffine) {
+    return {_matrix3D.getRowColumn(0, 3), _matrix3D.getRowColumn(1, 3)};
   }
-  _matrix.setTranslateX(value.x);
-  _matrix.setTranslateY(value.y);
+
+  auto result = matrix3D().mapVec3(Vec3(0, 0, 0));
+  return {result.x, result.y};
+}
+
+void Layer::setPosition(const Point& value) {
+  if (bitFields.matrix3DIsAffine) {
+    if (_matrix3D.getTranslateX() == value.x && _matrix3D.getTranslateY() == value.y) {
+      return;
+    }
+    _matrix3D.setRowColumn(0, 3, value.x);
+    _matrix3D.setRowColumn(1, 3, value.y);
+  } else {
+    auto curPos = _matrix3D.mapVec3(Vec3(0, 0, 0));
+    if (FloatNearlyEqual(curPos.x, value.x) && FloatNearlyEqual(curPos.y, value.y)) {
+      return;
+    }
+    _matrix3D.postTranslate(value.x - curPos.x, value.y - curPos.y, 0);
+  }
   invalidateTransform();
 }
 
+Matrix Layer::matrix() const {
+  auto affineMatrix = Matrix::I();
+  if (!bitFields.matrix3DIsAffine) {
+    return Matrix::I();
+  }
+  affineMatrix.setAll(_matrix3D.getRowColumn(0, 0), _matrix3D.getRowColumn(0, 1),
+                      _matrix3D.getRowColumn(0, 3), _matrix3D.getRowColumn(1, 0),
+                      _matrix3D.getRowColumn(1, 1), _matrix3D.getRowColumn(1, 3));
+  return affineMatrix;
+}
+
 void Layer::setMatrix(const Matrix& value) {
-  if (_matrix == value) {
+  const Matrix3D value3D(value);
+  if (value3D == _matrix3D) {
     return;
   }
-  _matrix = value;
+  _matrix3D = value3D;
+  bitFields.matrix3DIsAffine = true;
+  invalidateTransform();
+}
+
+void Layer::setMatrix3D(const Matrix3D& value) {
+  if (value == _matrix3D) {
+    return;
+  }
+  _matrix3D = value;
+  bitFields.matrix3DIsAffine = IsMatrix3DAffine(value);
   invalidateTransform();
 }
 
@@ -199,21 +330,6 @@ void Layer::setVisible(bool value) {
   }
   bitFields.visible = value;
   invalidateTransform();
-}
-
-void Layer::setShouldRasterize(bool value) {
-  if (bitFields.shouldRasterize == value) {
-    return;
-  }
-  bitFields.shouldRasterize = value;
-  invalidateTransform();
-}
-
-void Layer::setRasterizationScale(float value) {
-  if (value < 0) {
-    value = 0;
-  }
-  _rasterizationScale = value;
 }
 
 void Layer::setAllowsEdgeAntialiasing(bool value) {
@@ -244,7 +360,7 @@ void Layer::setFilters(std::vector<std::shared_ptr<LayerFilter>> value) {
   for (const auto& filter : _filters) {
     filter->attachToLayer(this);
   }
-  rasterizedContent = nullptr;
+  invalidateSubtree();
   invalidateTransform();
 }
 
@@ -308,7 +424,7 @@ void Layer::setLayerStyles(std::vector<std::shared_ptr<LayerStyle>> value) {
   for (const auto& layerStyle : _layerStyles) {
     layerStyle->attachToLayer(this);
   }
-  rasterizedContent = nullptr;
+  invalidateSubtree();
   invalidateTransform();
 }
 
@@ -464,22 +580,46 @@ Rect Layer::getBounds(const Layer* targetCoordinateSpace, bool computeTightBound
   return getBoundsInternal(matrix, computeTightBounds);
 }
 
-Rect Layer::getBoundsInternal(const Matrix& coordinateMatrix, bool computeTightBounds) {
+Rect Layer::getBoundsInternal(const Matrix3D& coordinateMatrix, bool computeTightBounds) {
+  if (computeTightBounds || bitFields.dirtyDescendents) {
+    return computeBounds(coordinateMatrix, computeTightBounds);
+  }
+  if (!localBounds) {
+    localBounds = std::make_unique<Rect>(computeBounds(Matrix3D::I(), computeTightBounds));
+  }
+  auto result = coordinateMatrix.mapRect(*localBounds);
+  if (!IsMatrix3DAffine(coordinateMatrix)) {
+    // while the matrix is not affine, the layer will draw with a 3D filter, so the bounds should
+    // round out.
+    result.roundOut();
+  }
+  return result;
+}
+
+Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBounds) {
+  // If the matrix only contains 2D affine transformations, directly use the equivalent 2D
+  // transformation matrix to calculate the final Bounds
+  bool isCoordinateMatrixAffine = IsMatrix3DAffine(coordinateMatrix);
+  auto workAffineMatrix =
+      isCoordinateMatrixAffine ? GetMayLossyAffineMatrix(coordinateMatrix) : Matrix::I();
+  auto workMatrix3D = isCoordinateMatrixAffine ? Matrix3D(workAffineMatrix) : coordinateMatrix;
+
   Rect bounds = {};
   if (auto content = getContent()) {
     if (computeTightBounds) {
-      bounds.join(content->getTightBounds(coordinateMatrix));
+      bounds.join(content->getTightBounds(workAffineMatrix));
     } else {
-      bounds.join(coordinateMatrix.mapRect(content->getBounds()));
+      bounds.join(workAffineMatrix.mapRect(content->getBounds()));
     }
   }
+
   for (const auto& child : _children) {
     // Alpha does not need to be checked; alpha == 0 is still valid.
     if (!child->visible() || child->maskOwner) {
       continue;
     }
     auto childMatrix = child->getMatrixWithScrollRect();
-    childMatrix.postConcat(coordinateMatrix);
+    childMatrix.postConcat(workMatrix3D);
     auto childBounds = child->getBoundsInternal(childMatrix, computeTightBounds);
     if (child->_scrollRect) {
       auto relatvieScrollRect = childMatrix.mapRect(*child->_scrollRect);
@@ -499,7 +639,7 @@ Rect Layer::getBoundsInternal(const Matrix& coordinateMatrix, bool computeTightB
   }
 
   if (!_layerStyles.empty() || !_filters.empty()) {
-    auto contentScale = coordinateMatrix.getMaxScale();
+    auto contentScale = workAffineMatrix.getMaxScale();
     auto layerBounds = bounds;
     for (auto& layerStyle : _layerStyles) {
       auto styleBounds = layerStyle->filterBounds(layerBounds, contentScale);
@@ -509,28 +649,55 @@ Rect Layer::getBoundsInternal(const Matrix& coordinateMatrix, bool computeTightB
       bounds = filter->filterBounds(bounds, contentScale);
     }
   }
+
+  if (isCoordinateMatrixAffine) {
+    return bounds;
+  }
+
+  // If the matrix contains Z-axis transformations and projection transformations, first calculate
+  // the Bounds using the identity matrix, then apply the 3D transformation to the result.
+  // Otherwise, use the equivalent affine transformation matrix to calculate the Bounds.
+  bounds = coordinateMatrix.mapRect(bounds);
+  bounds.roundOut();
   return bounds;
 }
 
 Point Layer::globalToLocal(const Point& globalPoint) const {
   auto globalMatrix = getGlobalMatrix();
-  Matrix inverseMatrix = {};
-  if (!globalMatrix.invert(&inverseMatrix)) {
+  // All vertices inside the rect have an initial z-coordinate of 0, so the third column of the 4x4
+  // matrix does not affect the final transformation result and can be ignored. Additionally, since
+  // we do not care about the final projected z-axis coordinate, the third row can also be ignored.
+  // Therefore, the 4x4 matrix can be simplified to a 3x3 matrix.
+  float values[16] = {};
+  globalMatrix.getColumnMajor(values);
+  auto matrix2D = Matrix2D::MakeAll(values[0], values[1], values[3], values[4], values[5],
+                                    values[7], values[12], values[13], values[15]);
+  Matrix2D inversedMatrix;
+  if (!matrix2D.invert(&inversedMatrix)) {
+    DEBUG_ASSERT(false);
     return Point::Make(0, 0);
   }
-  return inverseMatrix.mapXY(globalPoint.x, globalPoint.y);
+  auto result = inversedMatrix.mapVec2({globalPoint.x, globalPoint.y});
+  return {result.x, result.y};
 }
 
 Point Layer::localToGlobal(const Point& localPoint) const {
   auto globalMatrix = getGlobalMatrix();
-  return globalMatrix.mapXY(localPoint.x, localPoint.y);
+  auto result = globalMatrix.mapVec3({localPoint.x, localPoint.y, 0});
+  return {result.x, result.y};
 }
 
 bool Layer::hitTestPoint(float x, float y, bool shapeHitTest) {
   if (auto content = getContent()) {
     Point localPoint = globalToLocal(Point::Make(x, y));
-    if (content->hitTestPoint(localPoint.x, localPoint.y, shapeHitTest)) {
-      return true;
+    if (shapeHitTest) {
+      if (content->hitTestPoint(localPoint.x, localPoint.y)) {
+        return true;
+      }
+    } else {
+      if (content->getBounds().contains(localPoint.x, localPoint.y)) {
+        return true;
+      }
     }
   }
 
@@ -590,7 +757,7 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
     return;
   }
   auto localToGlobalMatrix = getGlobalMatrix();
-  auto globalToLocalMatrix = Matrix::I();
+  auto globalToLocalMatrix = Matrix3D::I();
   bool canInvert = localToGlobalMatrix.invert(&globalToLocalMatrix);
 
   Rect renderRect = {};
@@ -606,29 +773,63 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
     if (!(surface->renderFlags() & RenderFlags::DisableCache)) {
       args.context = context;
     }
-  } else if (bitFields.hasBlendMode) {
-    auto scale = canvas->getMatrix().getMaxScale();
-    args.blendModeBackground =
-        BackgroundContext::Make(nullptr, Rect::MakeEmpty(), 0, 0, Matrix::MakeScale(scale, scale));
   }
 
   if (context && canInvert && hasBackgroundStyle()) {
     auto scale = canvas->getMatrix().getMaxScale();
     auto backgroundRect = clippedBounds;
     backgroundRect.scale(scale, scale);
-    auto backgroundMatrix = globalToLocalMatrix;
+    auto backgroundMatrix = Matrix::I();
+    if (IsMatrix3DAffine(globalToLocalMatrix)) {
+      // If the transformation from the current layer node to the root node only contains 2D affine
+      // transformations, then draw the real layer background and calculate the accurate
+      // transformation matrix of the background image in the layer's local coordinate system
+      backgroundMatrix = GetMayLossyAffineMatrix(globalToLocalMatrix);
+    } else {
+      // Otherwise, it's impossible to draw an accurate background. Only the background image
+      // corresponding to the minimum bounding rectangle of the layer node subtree after drawing can
+      // be drawn, and this rectangle is stretched to fill the layer area. Based on this, Calculate
+      // the transformation matrix for drawing the background image within renderBounds to bounds.
+      DEBUG_ASSERT(!FloatNearlyZero(renderRect.width()) && !FloatNearlyZero(renderRect.height()));
+      backgroundMatrix = Matrix::MakeTrans(-renderRect.left, -renderRect.top);
+      backgroundMatrix.postScale(bounds.width() / renderRect.width(),
+                                 bounds.height() / renderRect.height());
+      backgroundMatrix.postTranslate(bounds.left, bounds.top);
+    }
     backgroundMatrix.postScale(scale, scale);
-    if (auto backgroundContext = createBackgroundContext(context, backgroundRect, backgroundMatrix,
-                                                         bounds == clippedBounds)) {
+    if (auto backgroundContext =
+            createBackgroundContext(context, backgroundRect, backgroundMatrix,
+                                    bounds == clippedBounds, surface->colorSpace())) {
       auto backgroundCanvas = backgroundContext->getCanvas();
       auto actualMatrix = backgroundCanvas->getMatrix();
-      // Since the background recorder starts from the current layer, we need to pre-concatenate
-      // localToGlobalMatrix to the background canvas matrix to ensure the coordinate space is
-      // correct.
-      actualMatrix.preConcat(localToGlobalMatrix);
+      bool isLocalToGlobalAffine = IsMatrix3DAffine(localToGlobalMatrix);
+      if (isLocalToGlobalAffine) {
+        // The current layer node to the root node only contains 2D affine transformations, need to
+        // superimpose the transformation matrix that maps layer coordinates to the actual drawing
+        // area.
+        // Since the background recorder starts from the current layer, we need to pre-concatenate
+        // localToGlobalMatrix to the background canvas matrix to ensure the coordinate space is
+        // correct.
+        actualMatrix.preConcat(GetMayLossyAffineMatrix(localToGlobalMatrix));
+      } else {
+        // Otherwise, need to superimpose the transformation matrix that maps the bounds to the
+        // actual drawing area renderRect.
+        DEBUG_ASSERT(!FloatNearlyZero(bounds.width()) && !FloatNearlyZero(bounds.height()));
+        auto toBackgroundMatrix = Matrix::MakeTrans(-bounds.left, -bounds.top);
+        toBackgroundMatrix.postScale(renderRect.width() / bounds.width(),
+                                     renderRect.height() / bounds.height());
+        toBackgroundMatrix.postTranslate(renderRect.left, renderRect.top);
+        actualMatrix.preConcat(toBackgroundMatrix);
+      }
       backgroundCanvas->setMatrix(actualMatrix);
       Point offset = {};
-      if (auto image = getBackgroundImage(args, scale, &offset)) {
+      // If there are 3D transformations or projection transformations from the current layer node
+      // to the root node, it's impossible to obtain an accurate background image and stretch it
+      // into a rectangle. In this case, obtain the background image corresponding to the minimum
+      // bounding rectangle of the current layer subtree after drawing.
+      auto image = isLocalToGlobalAffine ? getBackgroundImage(args, scale, &offset)
+                                         : getBoundsBackgroundImage(args, scale, &offset);
+      if (image != nullptr) {
         AutoCanvasRestore autoRestore(backgroundCanvas);
         actualMatrix.preScale(1.0f / scale, 1.0f / scale);
         backgroundCanvas->setMatrix(actualMatrix);
@@ -637,7 +838,10 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
       args.blurBackground = std::move(backgroundContext);
     }
   }
-  drawLayer(args, canvas, alpha, blendMode);
+  auto blurCanvas = args.blurBackground ? args.blurBackground->getCanvas() : nullptr;
+  AutoCanvasRestore autoRestore(canvas);
+  AutoCanvasRestore blurAutoRestore(blurCanvas);
+  drawLayer(args, canvas, alpha, blendMode, nullptr);
 }
 
 void Layer::invalidateContent() {
@@ -662,7 +866,7 @@ void Layer::invalidateDescendents() {
     return;
   }
   bitFields.dirtyDescendents = true;
-  rasterizedContent = nullptr;
+  invalidateSubtree();
   invalidate();
 }
 
@@ -726,11 +930,11 @@ bool Layer::doContains(const Layer* child) const {
   return false;
 }
 
-Matrix Layer::getGlobalMatrix() const {
+Matrix3D Layer::getGlobalMatrix() const {
   // The global matrix transforms the layer's local coordinate space to the coordinate space of its
   // top-level parent layer. This means the top-level parent layer's own matrix is not included in
   // the global matrix.
-  Matrix matrix = {};
+  Matrix3D matrix = {};
   auto layer = this;
   while (layer->_parent) {
     matrix.postConcat(layer->getMatrixWithScrollRect());
@@ -739,10 +943,10 @@ Matrix Layer::getGlobalMatrix() const {
   return matrix;
 }
 
-Matrix Layer::getMatrixWithScrollRect() const {
-  auto matrix = _matrix;
+Matrix3D Layer::getMatrixWithScrollRect() const {
+  auto matrix = _matrix3D;
   if (_scrollRect) {
-    matrix.preTranslate(-_scrollRect->left, -_scrollRect->top);
+    matrix.preTranslate(-_scrollRect->left, -_scrollRect->top, 0);
   }
   return matrix;
 }
@@ -770,65 +974,13 @@ std::shared_ptr<ImageFilter> Layer::getImageFilter(float contentScale) {
   return ImageFilter::Compose(filters);
 }
 
-RasterizedContent* Layer::getRasterizedCache(const DrawArgs& args, const Matrix& renderMatrix) {
-  if (!bitFields.shouldRasterize || args.context == nullptr ||
-      (args.drawMode == DrawMode::Background && hasBackgroundStyle()) ||
-      args.drawMode == DrawMode::Contour || args.excludeEffects) {
-    return nullptr;
-  }
-  auto contextID = args.context->uniqueID();
-  auto content = rasterizedContent.get();
-  float contentScale =
-      _rasterizationScale == 0.0f ? renderMatrix.getMaxScale() : _rasterizationScale;
-  if (content && content->contextID() == contextID && content->contentScale() == contentScale) {
-    return content;
-  }
-  Matrix drawingMatrix = {};
-  auto image = getRasterizedImage(args, contentScale, &drawingMatrix);
-  if (image == nullptr) {
-    return nullptr;
-  }
-  image = image->makeTextureImage(args.context);
-  if (image == nullptr) {
-    return nullptr;
-  }
-  rasterizedContent =
-      std::make_unique<RasterizedContent>(contextID, contentScale, std::move(image), drawingMatrix);
-  return rasterizedContent.get();
-}
-
-std::shared_ptr<Image> Layer::getRasterizedImage(const DrawArgs& args, float contentScale,
-                                                 Matrix* drawingMatrix) {
-  DEBUG_ASSERT(drawingMatrix != nullptr);
-  if (FloatNearlyZero(contentScale)) {
-    return nullptr;
-  }
-  auto drawArgs = args;
-  drawArgs.renderRect = nullptr;
-  drawArgs.blurBackground = nullptr;
-  auto picture = RecordPicture(drawArgs.drawMode, contentScale,
-                               [&](Canvas* canvas) { drawDirectly(drawArgs, canvas, 1.0f); });
-  if (!picture) {
-    return nullptr;
-  }
-  Point offset = {};
-  auto image = ToImageWithOffset(std::move(picture), &offset, nullptr, args.dstColorSpace);
-  if (image == nullptr) {
-    return nullptr;
-  }
-  auto filter = getImageFilter(contentScale);
-  if (filter) {
-    Point filterOffset = {};
-    image = image->makeWithFilter(std::move(filter), &filterOffset);
-    offset += filterOffset;
-  }
-  drawingMatrix->setScale(1.0f / contentScale, 1.0f / contentScale);
-  drawingMatrix->preTranslate(offset.x, offset.y);
-  return image;
-}
-
-void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode) {
+void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
+                      const Matrix3D* transform3D) {
   DEBUG_ASSERT(canvas != nullptr);
+  auto contentScale = canvas->getMatrix().getMaxScale();
+  if (FloatNearlyZero(contentScale)) {
+    return;
+  }
   if (args.renderRect && !Rect::Intersects(*args.renderRect, renderBounds)) {
     if (args.blurBackground) {
       auto backgroundRect = args.blurBackground->getBackgroundRect();
@@ -839,271 +991,509 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
       backgroundArgs.drawMode = DrawMode::Background;
       backgroundArgs.blurBackground = nullptr;
       backgroundArgs.renderRect = &backgroundRect;
-      drawLayer(backgroundArgs, args.blurBackground->getCanvas(), alpha, blendMode);
+      drawLayer(backgroundArgs, args.blurBackground->getCanvas(), alpha, blendMode, transform3D);
     }
     return;
   }
-  if (auto rasterizedCache = getRasterizedCache(args, canvas->getMatrix())) {
-    rasterizedCache->draw(canvas, bitFields.allowsEdgeAntialiasing, alpha, blendMode);
-    if (args.blurBackground) {
-      if (hasBackgroundStyle()) {
-        auto backgroundArgs = args;
-        backgroundArgs.drawMode = DrawMode::Background;
-        backgroundArgs.blurBackground = nullptr;
-        drawOffscreen(backgroundArgs, args.blurBackground->getCanvas(), alpha, blendMode);
-      } else {
-        rasterizedCache->draw(args.blurBackground->getCanvas(), bitFields.allowsEdgeAntialiasing,
-                              alpha, blendMode);
-      }
-    }
-  } else if (blendMode != BlendMode::SrcOver || !bitFields.passThroughBackground ||
-             (alpha < 1.0f && bitFields.allowsGroupOpacity) || bitFields.shouldRasterize ||
-             (!_filters.empty() && !args.excludeEffects) || hasValidMask()) {
-    drawOffscreen(args, canvas, alpha, blendMode);
+  std::shared_ptr<MaskFilter> maskFilter = nullptr;
+  if (!prepareMask(args, canvas, &maskFilter)) {
+    return;
+  }
+  bool needsMaskFilter = maskFilter != nullptr;
+  if (canUseSubtreeCache(args, blendMode, transform3D) &&
+      drawWithSubtreeCache(args, canvas, alpha, blendMode, transform3D, maskFilter)) {
+    return;
+  }
+  bool needsOffscreen = blendMode != BlendMode::SrcOver || !bitFields.passThroughBackground ||
+                        (alpha < 1.0f && bitFields.allowsGroupOpacity) ||
+                        (!_filters.empty() && !args.excludeEffects) || needsMaskFilter ||
+                        transform3D != nullptr;
+  if (needsOffscreen) {
+    drawOffscreen(args, canvas, alpha, blendMode, transform3D, maskFilter);
   } else {
-    // draw directly
     drawDirectly(args, canvas, alpha);
   }
 }
 
-Matrix Layer::getRelativeMatrix(const Layer* targetCoordinateSpace) const {
+Matrix3D Layer::getRelativeMatrix(const Layer* targetCoordinateSpace) const {
   if (targetCoordinateSpace == nullptr || targetCoordinateSpace == this) {
     return {};
   }
   auto targetLayerMatrix = targetCoordinateSpace->getGlobalMatrix();
-  Matrix targetLayerInverseMatrix = {};
+  Matrix3D targetLayerInverseMatrix = {};
   if (!targetLayerMatrix.invert(&targetLayerInverseMatrix)) {
     return {};
   }
-  Matrix relativeMatrix = getGlobalMatrix();
+  Matrix3D relativeMatrix = getGlobalMatrix();
   relativeMatrix.postConcat(targetLayerInverseMatrix);
   return relativeMatrix;
 }
 
-std::shared_ptr<MaskFilter> Layer::getMaskFilter(const DrawArgs& args, float scale,
-                                                 const std::optional<Rect>& layerClipBounds) {
-  auto maskArgs = args;
+bool Layer::prepareMask(const DrawArgs& args, Canvas* canvas,
+                        std::shared_ptr<MaskFilter>* maskFilter) {
+  if (!hasValidMask()) {
+    return true;
+  }
+  auto clipBounds = GetClipBounds(args.blurBackground ? args.blurBackground->getCanvas() : canvas);
+  auto contentScale = canvas->getMatrix().getMaxScale();
+  auto maskData = getMaskData(args, contentScale, clipBounds);
+  if (maskData.maskFilter == nullptr) {
+    if (maskData.clipPath.isEmpty() && !maskData.clipPath.isInverseFillType()) {
+      return false;
+    }
+    canvas->clipPath(maskData.clipPath);
+    auto blurCanvas = args.blurBackground ? args.blurBackground->getCanvas() : nullptr;
+    if (blurCanvas) {
+      blurCanvas->clipPath(maskData.clipPath);
+    }
+    return true;
+  }
+  if (maskFilter) {
+    *maskFilter = maskData.maskFilter;
+  }
+  return true;
+}
+
+MaskData Layer::getMaskData(const DrawArgs& args, float scale,
+                            const std::optional<Rect>& layerClipBounds) {
+  DEBUG_ASSERT(_mask != nullptr);
   auto maskType = static_cast<LayerMaskType>(bitFields.maskType);
+  auto maskArgs = args;
   maskArgs.drawMode = maskType != LayerMaskType::Contour ? DrawMode::Normal : DrawMode::Contour;
   maskArgs.blurBackground = nullptr;
-  std::shared_ptr<Picture> maskPicture = nullptr;
+
   auto relativeMatrix = _mask->getRelativeMatrix(this);
-  auto maskClipBounds = layerClipBounds;
-  if (layerClipBounds.has_value()) {
-    auto invertedMatrix = Matrix::I();
-    if (relativeMatrix.invert(&invertedMatrix)) {
-      maskClipBounds = invertedMatrix.mapRect(*layerClipBounds);
+  auto isMatrixAffine = IsMatrix3DAffine(relativeMatrix);
+  auto affineRelativeMatrix =
+      isMatrixAffine ? GetMayLossyAffineMatrix(relativeMatrix) : Matrix::I();
+
+  auto maskPicture = RecordPicture(maskArgs.drawMode, scale, [&](Canvas* canvas) {
+    if (layerClipBounds.has_value()) {
+      canvas->clipRect(*layerClipBounds);
     }
-  }
-  maskPicture = RecordPicture(maskArgs.drawMode, scale, [&](Canvas* canvas) {
-    if (maskClipBounds.has_value()) {
-      canvas->clipRect(*maskClipBounds);
-    }
+    canvas->concat(affineRelativeMatrix);
     _mask->drawLayer(maskArgs, canvas, _mask->_alpha, BlendMode::SrcOver);
   });
   if (maskPicture == nullptr) {
-    return nullptr;
+    return {};
   }
+
+  if (isMatrixAffine && maskType != LayerMaskType::Luminance) {
+    Path maskPath = {};
+    if (MaskContext::GetMaskPath(maskPicture, &maskPath)) {
+      maskPath.transform(Matrix::MakeScale(1.0f / scale, 1.0f / scale));
+      return {std::move(maskPath), nullptr};
+    }
+  }
+
   Point maskImageOffset = {};
   auto maskContentImage =
       ToImageWithOffset(std::move(maskPicture), &maskImageOffset, nullptr, args.dstColorSpace);
   if (maskContentImage == nullptr) {
-    return nullptr;
+    return {};
   }
   if (maskType == LayerMaskType::Luminance) {
     maskContentImage =
         maskContentImage->makeWithFilter(ImageFilter::ColorFilter(ColorFilter::Luma()));
   }
-  relativeMatrix.preScale(1.0f / scale, 1.0f / scale);
-  relativeMatrix.preTranslate(maskImageOffset.x, maskImageOffset.y);
-  relativeMatrix.postScale(scale, scale);
+  if (!isMatrixAffine) {
+    maskContentImage = maskContentImage->makeWithFilter(ImageFilter::Transform3D(relativeMatrix));
+  }
+  auto maskMatrix = Matrix::MakeScale(1.0f / scale, 1.0f / scale);
+  maskMatrix.preTranslate(maskImageOffset.x, maskImageOffset.y);
 
   auto shader = Shader::MakeImageShader(maskContentImage, TileMode::Decal, TileMode::Decal);
   if (shader) {
-    shader = shader->makeWithMatrix(relativeMatrix);
+    shader = shader->makeWithMatrix(maskMatrix);
   }
-  return MaskFilter::MakeShader(shader);
+  return {{}, MaskFilter::MakeShader(shader)};
 }
 
-std::shared_ptr<Image> Layer::getOffscreenContentImage(
-    const DrawArgs& args, const Canvas* canvas, bool passThroughBackground,
-    std::shared_ptr<BackgroundContext> subBackgroundContext, std::optional<Rect> clipBounds,
-    Matrix* imageMatrix) {
+std::shared_ptr<Image> Layer::getContentImage(
+    const DrawArgs& contentArgs, const Matrix& contentMatrix, const std::optional<Rect>& clipBounds,
+    const std::vector<LayerStyleExtraSourceType>& extraSourceTypes, Matrix* imageMatrix) {
   DEBUG_ASSERT(imageMatrix);
-  auto inputBounds = getBounds();
-  if (clipBounds.has_value()) {
-    if (!inputBounds.intersect(*clipBounds)) {
-      return nullptr;
-    }
-  }
-  if (!args.excludeEffects) {
-    // clipBounds is in local coordinate space,  so we getImageFilter with scale 1.0f.
-    auto filter = getImageFilter(1.0f);
-    if (filter) {
-      inputBounds = filter->filterBounds(inputBounds, MapDirection::Reverse);
-    }
+  auto inputBounds = computeContentBounds(clipBounds, contentArgs.excludeEffects);
+  if (!inputBounds.has_value()) {
+    return nullptr;
   }
 
-  auto offscreenArgs = args;
-  auto contentScale = canvas->getMatrix().getMaxScale();
-  offscreenArgs.blurBackground = std::move(subBackgroundContext);
-  if (!canvas->getSurface() && passThroughBackground) {
-    offscreenArgs.blendModeBackground =
-        BackgroundContext::Make(nullptr, renderBounds, 0, 0, Matrix::MakeScale(contentScale));
-  }
+  auto imageFilter =
+      contentArgs.excludeEffects ? nullptr : getImageFilter(contentMatrix.getMaxScale());
 
-  std::shared_ptr<Image> finalImage = nullptr;
-  auto context = canvas->getSurface() ? canvas->getSurface()->getContext() : nullptr;
-  if (context && passThroughBackground) {
-    auto currentMatrix = canvas->getMatrix();
-    auto surfaceRect = currentMatrix.mapRect(inputBounds);
-    surfaceRect.roundOut();
-    auto offscreenSurface = Surface::Make(context, static_cast<int>(surfaceRect.width()),
-                                          static_cast<int>(surfaceRect.height()), false, 1, false,
-                                          0, args.dstColorSpace);
-    auto offscreenCanvas = offscreenSurface->getCanvas();
-    offscreenCanvas->translate(-surfaceRect.left, -surfaceRect.top);
-    offscreenCanvas->drawImage(canvas->getSurface()->makeImageSnapshot());
-    offscreenCanvas->clipPath(canvas->getTotalClip());
-    offscreenCanvas->concat(currentMatrix);
-    drawDirectly(offscreenArgs, offscreenCanvas, 1.0f);
-    finalImage = offscreenSurface->makeImageSnapshot();
-    offscreenCanvas->getMatrix().invert(imageMatrix);
-  } else {
+  if (!imageFilter) {
     PictureRecorder recorder = {};
     auto offscreenCanvas = recorder.beginRecording();
-    offscreenCanvas->scale(contentScale, contentScale);
-    offscreenCanvas->clipRect(inputBounds);
-    if (passThroughBackground && args.blendModeBackground) {
-      Point offset = {};
-      auto image = args.blendModeBackground->getBackgroundImage(&offset);
-      offscreenCanvas->concat(args.blendModeBackground->backgroundMatrix());
-      offscreenCanvas->drawImage(image, offset.x, offset.y);
+    offscreenCanvas->setMatrix(contentMatrix);
+    drawDirectly(contentArgs, offscreenCanvas, 1.0f, extraSourceTypes);
+    Point offset = {};
+    auto finalImage = ToImageWithOffset(recorder.finishRecordingAsPicture(), &offset, nullptr,
+                                        contentArgs.dstColorSpace);
+    if (!finalImage) {
+      return nullptr;
     }
-    drawDirectly(offscreenArgs, offscreenCanvas, 1.0f);
-    Point offset;
-    finalImage = ToImageWithOffset(recorder.finishRecordingAsPicture(), &offset, nullptr,
-                                   args.dstColorSpace);
-    imageMatrix->setScale(1.0f / contentScale, 1.0f / contentScale);
+    contentMatrix.invert(imageMatrix);
     imageMatrix->preTranslate(offset.x, offset.y);
+    return finalImage;
   }
+
+  auto contentScale = contentMatrix.getMaxScale();
+  PictureRecorder recorder = {};
+  auto offscreenCanvas = recorder.beginRecording();
+  offscreenCanvas->scale(contentScale, contentScale);
+  drawDirectly(contentArgs, offscreenCanvas, 1.0f, extraSourceTypes);
+  Point offset = {};
+  auto finalImage = ToImageWithOffset(recorder.finishRecordingAsPicture(), &offset, nullptr,
+                                      contentArgs.dstColorSpace);
+  if (!finalImage) {
+    return nullptr;
+  }
+  imageMatrix->setScale(1.0f / contentScale, 1.0f / contentScale);
+  imageMatrix->preTranslate(offset.x, offset.y);
+
+  std::optional<Rect> filterClipBounds = std::nullopt;
+  if (clipBounds.has_value()) {
+    auto invertMatrix = Matrix::I();
+    imageMatrix->invert(&invertMatrix);
+    filterClipBounds = invertMatrix.mapRect(*clipBounds);
+    filterClipBounds->roundOut();
+  }
+  Point filterOffset = {};
+  finalImage = finalImage->makeWithFilter(
+      imageFilter, &filterOffset, filterClipBounds.has_value() ? &*filterClipBounds : nullptr);
+  imageMatrix->preTranslate(filterOffset.x, filterOffset.y);
   return finalImage;
 }
 
-void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode) {
-  auto contentScale = canvas->getMatrix().getMaxScale();
-  if (FloatNearlyZero(contentScale)) {
-    return;
+std::shared_ptr<Image> Layer::getPassThroughContentImage(
+    const DrawArgs& args, Canvas* canvas, const std::optional<Rect>& clipBounds,
+    const std::vector<LayerStyleExtraSourceType>& extraSourceTypes, Matrix* imageMatrix) {
+  DEBUG_ASSERT(imageMatrix);
+  DEBUG_ASSERT(args.context);
+  auto surface = canvas->getSurface();
+  DEBUG_ASSERT(surface);
+  auto passThroughImage = surface->makeImageSnapshot();
+  DEBUG_ASSERT(passThroughImage);
+  auto passThroughImageMatrix = canvas->getMatrix();
+
+  auto inputBounds = computeContentBounds(clipBounds, true);
+  if (!inputBounds.has_value()) {
+    return nullptr;
   }
-  auto subBackgroundContext = args.blurBackground && hasBackgroundStyle()
-                                  ? args.blurBackground->createSubContext()
-                                  : nullptr;
-  auto passThroughBackground = bitFields.passThroughBackground && blendMode == BlendMode::SrcOver &&
-                               _filters.empty() && bitFields.hasBlendMode == true;
-  // canvas of background clip bounds will be more large than canvas clip bounds.
-  auto clipBounds = GetClipBounds(args.blurBackground ? args.blurBackground->getCanvas() : canvas);
+
+  auto context = args.context;
+  auto surfaceRect = passThroughImageMatrix.mapRect(*inputBounds);
+  surfaceRect.roundOut();
+  surfaceRect.intersect(Rect::MakeWH(passThroughImage->width(), passThroughImage->height()));
+  auto offscreenSurface =
+      Surface::Make(context, static_cast<int>(surfaceRect.width()),
+                    static_cast<int>(surfaceRect.height()), false, 1, false, 0, args.dstColorSpace);
+  if (!offscreenSurface) {
+    return nullptr;
+  }
+  auto offscreenCanvas = offscreenSurface->getCanvas();
+  offscreenCanvas->translate(-surfaceRect.left, -surfaceRect.top);
+  offscreenCanvas->drawImage(passThroughImage);
+  offscreenCanvas->concat(passThroughImageMatrix);
+  drawDirectly(args, offscreenCanvas, 1.0f, extraSourceTypes);
+  auto finalImage = offscreenSurface->makeImageSnapshot();
+  offscreenCanvas->getMatrix().invert(imageMatrix);
+  return finalImage;
+}
+
+bool Layer::shouldPassThroughBackground(BlendMode blendMode, const Matrix3D* transform3D) const {
+  // Pass-through background is only possible when:
+  // 1. The feature is enabled
+  if (!bitFields.passThroughBackground) {
+    return false;
+  }
+
+  // 2. Subtree has blend modes that need background information
+  if (!bitFields.hasBlendMode) {
+    return false;
+  }
+
+  // 3. No offscreen rendering is required
+  // (Offscreen rendering happens when: non-SrcOver blend mode OR has filters OR has 3D transform)
+  bool needsOffscreen =
+      blendMode != BlendMode::SrcOver || !_filters.empty() || transform3D != nullptr;
+  if (needsOffscreen) {
+    return false;
+  }
+
+  return true;
+}
+
+bool Layer::canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode,
+                               const Matrix3D* transform3D) {
+  // The cache stores Normal mode content. Since layers with BackgroundStyle are excluded from
+  // caching, the cached content can also be used for Background mode drawing.
+  if (args.excludeEffects || args.drawMode == DrawMode::Contour) {
+    return false;
+  }
+  if (args.subtreeCacheMaxSize <= 0) {
+    return false;
+  }
+  if (subtreeCache) {
+    // Recreate if maxSize has changed
+    if (subtreeCache->maxSize() != args.subtreeCacheMaxSize) {
+      subtreeCache = std::make_unique<SubtreeCache>(args.subtreeCacheMaxSize);
+    }
+    return true;
+  }
+  if (shouldPassThroughBackground(blendMode, transform3D) || hasBackgroundStyle()) {
+    return false;
+  }
+  if (!bitFields.staticSubtree) {
+    // Skip caching on the first render to avoid caching content that is only displayed once.
+    // The cache is created on the second render when the layer is confirmed to be reused.
+    return false;
+  }
+  // Skip caching for leaf nodes with basic shapes (Rect, RRect) that have no filters or layer
+  // styles, as they can be efficiently merged during rendering.
+  if (_children.empty() && _layerStyles.empty() && _filters.empty()) {
+    auto content = getContent();
+    if (content == nullptr) {
+      return false;
+    }
+    auto contentType = Types::Get(content);
+    if (contentType == Types::LayerContentType::Rect ||
+        contentType == Types::LayerContentType::RRect) {
+      return false;
+    }
+  }
+  subtreeCache = std::make_unique<SubtreeCache>(args.subtreeCacheMaxSize);
+  return true;
+}
+
+std::shared_ptr<Image> Layer::createSubtreeCacheImage(const DrawArgs& args, float contentScale,
+                                                      const Rect& layerBounds,
+                                                      Matrix* drawingMatrix) {
+  DEBUG_ASSERT(drawingMatrix != nullptr);
+  if (FloatNearlyZero(contentScale)) {
+    return nullptr;
+  }
+
+  auto drawArgs = args;
+  drawArgs.renderFlags |= RenderFlags::DisableCache;
+  drawArgs.renderRect = nullptr;
+  drawArgs.blurBackground = nullptr;
+
+  auto pictureBounds = layerBounds;
+  pictureBounds.scale(contentScale, contentScale);
+  auto filterBounds = pictureBounds;
+  auto filter = getImageFilter(contentScale);
+  if (filter) {
+    auto reverseBounds = filter->filterBounds(pictureBounds, MapDirection::Reverse);
+    pictureBounds.intersect(reverseBounds);
+  }
+  auto picture = RecordPicture(drawArgs.drawMode, contentScale,
+                               [&](Canvas* canvas) { drawDirectly(drawArgs, canvas, 1.0f); });
+  if (!picture) {
+    return nullptr;
+  }
+
+  Point offset = {};
+  auto image =
+      ToImageWithOffset(std::move(picture), &offset, &pictureBounds, args.dstColorSpace, false);
+  if (image == nullptr) {
+    return nullptr;
+  }
+
+  if (filter) {
+    filterBounds.offset(-offset.x, -offset.y);
+    Point filterOffset = {};
+    image = image->makeWithFilter(std::move(filter), &filterOffset, &filterBounds);
+    offset += filterOffset;
+  }
+
+  drawingMatrix->setScale(1.0f / contentScale, 1.0f / contentScale);
+  drawingMatrix->preTranslate(offset.x, offset.y);
+
+  return image->makeTextureImage(args.context);
+}
+
+SubtreeCache* Layer::getValidSubtreeCache(const DrawArgs& args, int longEdge,
+                                          const Rect& layerBounds) {
+  if (subtreeCache->hasCache(args.context, longEdge)) {
+    return subtreeCache.get();
+  }
+  if (args.renderFlags & RenderFlags::DisableCache || longEdge > args.subtreeCacheMaxSize) {
+    return nullptr;
+  }
+  auto maxBoundsSize = std::max(layerBounds.width(), layerBounds.height());
+  if (FloatNearlyZero(maxBoundsSize)) {
+    return nullptr;
+  }
+  auto cacheScale = static_cast<float>(longEdge) / maxBoundsSize;
   auto imageMatrix = Matrix::I();
-  auto image = getOffscreenContentImage(args, canvas, passThroughBackground, subBackgroundContext,
-                                        clipBounds, &imageMatrix);
+  auto image = createSubtreeCacheImage(args, cacheScale, layerBounds, &imageMatrix);
+  if (image == nullptr) {
+    return nullptr;
+  }
+  auto textureProxy = std::static_pointer_cast<TextureImage>(image)->getTextureProxy();
+  subtreeCache->addCache(args.context, longEdge, textureProxy, imageMatrix, args.dstColorSpace);
+  return subtreeCache.get();
+}
+
+bool Layer::drawWithSubtreeCache(const DrawArgs& args, Canvas* canvas, float alpha,
+                                 BlendMode blendMode, const Matrix3D* transform3D,
+                                 const std::shared_ptr<MaskFilter>& maskFilter) {
+  auto layerBounds = getBounds();
+  auto contentScale = canvas->getMatrix().getMaxScale();
+  auto longEdge = GetMipmapCacheLongEdge(args.subtreeCacheMaxSize, contentScale, layerBounds);
+  auto cache = getValidSubtreeCache(args, longEdge, layerBounds);
+  if (cache == nullptr) {
+    return false;
+  }
+  Paint paint = {};
+  if (maskFilter) {
+    paint.setMaskFilter(maskFilter);
+  }
+  paint.setAntiAlias(bitFields.allowsEdgeAntialiasing);
+  paint.setAlpha(alpha);
+  paint.setBlendMode(blendMode);
+  cache->draw(args.context, longEdge, canvas, paint, transform3D);
+  if (args.blurBackground) {
+    cache->draw(args.context, longEdge, args.blurBackground->getCanvas(), paint, transform3D);
+  }
+  return true;
+}
+
+void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
+                          const Matrix3D* transform3D,
+                          const std::shared_ptr<MaskFilter>& maskFilter) {
+  std::vector<LayerStyleExtraSourceType> extraSourceTypes = {LayerStyleExtraSourceType::None,
+                                                             LayerStyleExtraSourceType::Contour};
+  if (transform3D != nullptr) {
+    drawBackgroundLayerStyles(args, canvas, alpha, *transform3D);
+  } else {
+    extraSourceTypes.push_back(LayerStyleExtraSourceType::Background);
+  }
+
+  auto imageMatrix = Matrix::I();
+  std::shared_ptr<Image> image = nullptr;
+  auto clipBounds = GetClipBounds(args.blurBackground ? args.blurBackground->getCanvas() : canvas);
+  auto contentArgs = args;
+
+  if (shouldPassThroughBackground(blendMode, transform3D) && canvas->getSurface()) {
+    // In pass-through mode, the image drawn to canvas contains the blended background, while
+    // the image drawn to backgroundCanvas should be the layer content without background blending.
+    // Use canvas's clipBounds instead of blurBackground's for pass-through rendering.
+    auto canvasClipBounds = args.blurBackground ? GetClipBounds(canvas) : clipBounds;
+    auto contentClipBounds = MapClipBoundsToContent(canvasClipBounds, transform3D);
+    contentArgs.blurBackground =
+        args.blurBackground ? args.blurBackground->createSubContext(renderBounds, true) : nullptr;
+    image =
+        getPassThroughContentImage(args, canvas, contentClipBounds, extraSourceTypes, &imageMatrix);
+  } else {
+    auto contentClipBounds = MapClipBoundsToContent(clipBounds, transform3D);
+    contentArgs.blurBackground = args.blurBackground && hasBackgroundStyle()
+                                     ? args.blurBackground->createSubContext(renderBounds, true)
+                                     : nullptr;
+    image = getContentImage(contentArgs, canvas->getMatrix(), contentClipBounds, extraSourceTypes,
+                            &imageMatrix);
+  }
+
   auto invertImageMatrix = Matrix::I();
   if (image == nullptr || !imageMatrix.invert(&invertImageMatrix)) {
     return;
   }
+
+  image = MakeImageWithTransform(image, transform3D, &imageMatrix);
+
+  if (args.blurBackground && !contentArgs.blurBackground) {
+    auto canvasScale = canvas->getMatrix().getMaxScale();
+    auto backgroundScale = args.blurBackground->getCanvas()->getMatrix().getMaxScale();
+    // When canvasScale equals backgroundScale, most pixels at the same resolution are valuable,
+    // so rasterization is meaningful. Otherwise, skip rasterization to avoid generating oversized
+    // textures.
+    if (FloatNearlyEqual(canvasScale, backgroundScale)) {
+      image = image->makeRasterized();
+    }
+  }
+
   Paint paint = {};
-  paint.setAntiAlias(bitFields.allowsEdgeAntialiasing);
+  paint.setAntiAlias(false);
   paint.setAlpha(alpha);
   paint.setBlendMode(blendMode);
 
-  if (hasValidMask()) {
-    auto maskFilter = getMaskFilter(args, contentScale, clipBounds);
-    // if mask filter is nullptr while mask is valid, that means the layer is not visible.
-    if (!maskFilter) {
-      return;
-    }
-    auto maskMatrix = Matrix::MakeScale(1.0f / contentScale, 1.0f / contentScale);
-    maskMatrix.postConcat(invertImageMatrix);
-    maskFilter = maskFilter->makeWithMatrix(maskMatrix);
-    paint.setMaskFilter(maskFilter);
+  if (maskFilter) {
+    paint.setMaskFilter(maskFilter->makeWithMatrix(invertImageMatrix));
   }
 
-  auto filterOffset = Point::Make(0, 0);
-  if (!args.excludeEffects) {
-    auto filter = getImageFilter(contentScale);
-    if (filter) {
-      if (clipBounds.has_value()) {
-        clipBounds = invertImageMatrix.mapRect(*clipBounds);
-        clipBounds->roundOut();
-      }
-      // clipBounds may be smaller than the image bounds, so we need to pass it to makeWithFilter.
-      image = image->makeWithFilter(filter, &filterOffset,
-                                    clipBounds.has_value() ? &*clipBounds : nullptr);
-    }
-  }
-  if (image == nullptr) {
-    return;
-  }
-  if (args.blurBackground && !subBackgroundContext) {
-    image = image->makeRasterized();
-  }
-
-  AutoCanvasRestore autoRestore(canvas);
   canvas->concat(imageMatrix);
-  canvas->drawImage(image, filterOffset.x, filterOffset.y, &paint);
-  if (args.blendModeBackground) {
-    auto blendCanvas = args.blendModeBackground->getCanvas();
-    AutoCanvasRestore autoRestoreBlend(blendCanvas);
-    blendCanvas->concat(imageMatrix);
-    blendCanvas->drawImage(image, filterOffset.x, filterOffset.y, &paint);
+  auto filterMode =
+      !args.excludeEffects && !_filters.empty() ? FilterMode::Linear : FilterMode::Nearest;
+  auto sampling = SamplingOptions{filterMode, MipmapMode::None};
+  canvas->drawImage(image, 0.f, 0.f, sampling, &paint);
+  if (args.blurBackground) {
+    if (contentArgs.blurBackground) {
+      auto contentScale = canvas->getMatrix().getMaxScale();
+      auto filter = getImageFilter(contentScale);
+      paint.setImageFilter(filter);
+      paint.setMaskFilter(maskFilter);
+      contentArgs.blurBackground->drawToParent(paint);
+    } else {
+      auto backgroundCanvas = args.blurBackground->getCanvas();
+      backgroundCanvas->concat(imageMatrix);
+      backgroundCanvas->drawImage(image, 0.f, 0.f, sampling, &paint);
+    }
   }
-  if (subBackgroundContext) {
-    subBackgroundContext->drawToParent(Matrix::MakeScale(1.0f / contentScale), paint);
-  } else if (args.blurBackground) {
-    auto backgroundCanvas = args.blurBackground->getCanvas();
-    AutoCanvasRestore autoRestoreBg(backgroundCanvas);
-    backgroundCanvas->concat(imageMatrix);
-    backgroundCanvas->drawImage(image, filterOffset.x, filterOffset.y, &paint);
+
+  // There is no scenario where LayerStyle's Position and ExtraSourceType are 'above' and
+  // 'background' respectively at the same time, so no special handling is needed after drawing the
+  // content.
+}
+
+std::optional<Rect> Layer::computeContentBounds(const std::optional<Rect>& clipBounds,
+                                                bool excludeEffects) {
+  auto inputBounds = getBounds();
+  if (clipBounds.has_value()) {
+    auto mappedClipBounds = *clipBounds;
+    if (!excludeEffects) {
+      auto filter = getImageFilter(1.0f);
+      if (filter) {
+        mappedClipBounds = filter->filterBounds(mappedClipBounds, MapDirection::Reverse);
+      }
+    }
+    if (!inputBounds.intersect(mappedClipBounds)) {
+      return std::nullopt;
+    }
   }
+  return inputBounds;
 }
 
 void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha) {
-  auto layerStyleSource = getLayerStyleSource(args, canvas->getMatrix());
-  drawContents(args, canvas, alpha, layerStyleSource.get());
+  std::vector<LayerStyleExtraSourceType> styleExtraSourceTypes = {
+      LayerStyleExtraSourceType::None, LayerStyleExtraSourceType::Contour,
+      LayerStyleExtraSourceType::Background};
+  drawDirectly(args, canvas, alpha, styleExtraSourceTypes);
 }
 
-class LayerFill : public FillModifier {
- public:
-  LayerFill(bool antiAlias, float alpha) : antiAlias(antiAlias), alpha(alpha) {
-  }
-
-  Fill transform(const Fill& fill) const override {
-    auto newFill = fill;
-    newFill.color.alpha *= alpha;
-    newFill.antiAlias = antiAlias;
-    return newFill;
-  }
-
- private:
-  bool antiAlias = true;
-  float alpha = 1.0f;
-};
+void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha,
+                         const std::vector<LayerStyleExtraSourceType>& extraSourceTypes) {
+  auto layerStyleSource = getLayerStyleSource(args, canvas->getMatrix());
+  drawContents(args, canvas, alpha, layerStyleSource.get(), nullptr, extraSourceTypes);
+}
 
 void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
-                         const LayerStyleSource* layerStyleSource, const Layer* stopChild) {
+                         const LayerStyleSource* layerStyleSource, const Layer* stopChild,
+                         const std::vector<LayerStyleExtraSourceType>& extraSourceTypes) {
   if (layerStyleSource) {
-    drawLayerStyles(args, canvas, alpha, layerStyleSource, LayerStylePosition::Below);
+    drawLayerStyles(args, canvas, alpha, layerStyleSource, LayerStylePosition::Below,
+                    extraSourceTypes);
   }
-  LayerFill layerFill(bitFields.allowsEdgeAntialiasing, alpha);
   auto content = getContent();
+  bool hasForeground = false;
   if (content) {
     if (args.drawMode == DrawMode::Contour) {
-      content->drawContour(canvas, &layerFill);
+      content->drawContour(canvas, bitFields.allowsEdgeAntialiasing);
     } else {
-      content->drawDefault(canvas, &layerFill);
+      hasForeground = content->drawDefault(canvas, alpha, bitFields.allowsEdgeAntialiasing);
       if (args.blurBackground) {
-        content->drawDefault(args.blurBackground->getCanvas(), &layerFill);
-      }
-      if (args.blendModeBackground) {
-        content->drawDefault(args.blendModeBackground->getCanvas(), &layerFill);
+        content->drawDefault(args.blurBackground->getCanvas(), alpha,
+                             bitFields.allowsEdgeAntialiasing);
       }
     }
   }
@@ -1111,15 +1501,14 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
     return;
   }
   if (layerStyleSource) {
-    drawLayerStyles(args, canvas, alpha, layerStyleSource, LayerStylePosition::Above);
+    drawLayerStyles(args, canvas, alpha, layerStyleSource, LayerStylePosition::Above,
+                    extraSourceTypes);
   }
-  if (content && args.drawMode != DrawMode::Contour) {
-    content->drawForeground(canvas, &layerFill);
+  if (hasForeground) {
+    content->drawForeground(canvas, alpha, bitFields.allowsEdgeAntialiasing);
     if (args.blurBackground) {
-      content->drawForeground(args.blurBackground->getCanvas(), &layerFill);
-    }
-    if (args.blendModeBackground) {
-      content->drawForeground(args.blendModeBackground->getCanvas(), &layerFill);
+      content->drawForeground(args.blurBackground->getCanvas(), alpha,
+                              bitFields.allowsEdgeAntialiasing);
     }
   }
 }
@@ -1128,7 +1517,8 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
                          const Layer* stopChild) {
   int lastBackgroundLayerIndex = -1;
   if (args.forceDrawBackground) {
-    lastBackgroundLayerIndex = static_cast<int>(_children.size()) - 1;
+    // lastBackgroundLayerIndex must cover all children
+    lastBackgroundLayerIndex = static_cast<int>(_children.size());
   } else if (hasBackgroundStyle()) {
     for (int i = static_cast<int>(_children.size()) - 1; i >= 0; --i) {
       if (_children[static_cast<size_t>(i)]->hasBackgroundStyle()) {
@@ -1161,34 +1551,42 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
     AutoCanvasRestore autoRestore(canvas);
     auto backgroundCanvas =
         childArgs.blurBackground ? childArgs.blurBackground->getCanvas() : nullptr;
-    auto blendCanvas = args.blendModeBackground ? args.blendModeBackground->getCanvas() : nullptr;
-    canvas->concat(child->getMatrixWithScrollRect());
+    AutoCanvasRestore autoRestoreBg(backgroundCanvas);
+    auto childMatrix = child->getMatrixWithScrollRect();
+    // If the sublayer's Matrix contains 3D transformations or projection transformations, then
+    // treat its Matrix as an identity matrix here, and let the sublayer handle its actual position
+    // through 3D filter methods,
+    const bool isChildMatrixAffine = IsMatrix3DAffine(childMatrix);
+    auto childAffineMatrix =
+        isChildMatrixAffine ? GetMayLossyAffineMatrix(childMatrix) : Matrix::I();
+    canvas->concat(childAffineMatrix);
+    auto clipChildScrollRectHandler = [&](Canvas& clipCanvas) {
+      if (child->_scrollRect) {
+        // If the sublayer's Matrix contains 3D transformations or projection transformations, then
+        // because this matrix has been merged into the Canvas, it can be directly completed through
+        // the clipping rectangle. Otherwise, the canvas will not contain this matrix information,
+        // and clipping needs to be done by transforming the Path.
+        if (isChildMatrixAffine) {
+          clipCanvas.clipRect(*child->_scrollRect);
+        } else {
+          auto path = Path();
+          path.addRect(*(child->_scrollRect));
+          path.transform3D(childMatrix);
+          clipCanvas.clipPath(path);
+        }
+      }
+    };
     if (child->_scrollRect) {
-      canvas->clipRect(*child->_scrollRect);
+      clipChildScrollRectHandler(*canvas);
     }
     if (backgroundCanvas) {
-      backgroundCanvas->save();
-      backgroundCanvas->concat(child->getMatrixWithScrollRect());
-      if (child->_scrollRect) {
-        backgroundCanvas->clipRect(*child->_scrollRect);
-      }
-    }
-    if (blendCanvas) {
-      blendCanvas->save();
-      blendCanvas->concat(child->getMatrixWithScrollRect());
-      if (child->_scrollRect) {
-        blendCanvas->clipRect(*child->_scrollRect);
-      }
-    }
-    child->drawLayer(childArgs, canvas, child->_alpha * alpha,
-                     static_cast<BlendMode>(child->bitFields.blendMode));
-    if (backgroundCanvas) {
-      backgroundCanvas->restore();
+      backgroundCanvas->concat(childAffineMatrix);
+      clipChildScrollRectHandler(*backgroundCanvas);
     }
 
-    if (blendCanvas) {
-      blendCanvas->restore();
-    }
+    auto transform = isChildMatrixAffine ? nullptr : &childMatrix;
+    child->drawLayer(childArgs, canvas, child->_alpha * alpha,
+                     static_cast<BlendMode>(child->bitFields.blendMode), transform);
   }
   return true;
 }
@@ -1201,15 +1599,27 @@ float Layer::drawBackgroundLayers(const DrawArgs& args, Canvas* canvas) {
   auto currentAlpha = _parent->drawBackgroundLayers(args, canvas);
   auto layerStyleSource = _parent->getLayerStyleSource(args, canvas->getMatrix());
   _parent->drawContents(args, canvas, currentAlpha, layerStyleSource.get(), this);
-  canvas->concat(getMatrixWithScrollRect());
-  if (_scrollRect) {
-    canvas->clipRect(*_scrollRect);
+  // If the layer's Matrix contains 3D transformations or projection transformations, since this
+  // matrix has already been merged into the Canvas, clipping can be done directly through the
+  // clipping rectangle. Otherwise, the canvas does not carry this matrix information, and clipping
+  // needs to be performed by transforming the Path.
+  if (bitFields.matrix3DIsAffine) {
+    canvas->concat(GetMayLossyAffineMatrix(getMatrixWithScrollRect()));
+    if (_scrollRect) {
+      canvas->clipRect(*_scrollRect);
+    }
+  } else if (_scrollRect) {
+    auto path = Path();
+    path.addRect(*_scrollRect);
+    path.transform3D(getMatrixWithScrollRect());
+    canvas->clipPath(path);
   }
   return currentAlpha * _alpha;
 }
 
 std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& args,
-                                                             const Matrix& matrix) {
+                                                             const Matrix& matrix,
+                                                             bool excludeContour) {
   if (_layerStyles.empty() || args.excludeEffects) {
     return nullptr;
   }
@@ -1239,9 +1649,11 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   source->contentOffset = contentOffset;
 
   auto needContour =
-      std::any_of(_layerStyles.begin(), _layerStyles.end(), [](const auto& layerStyle) {
-        return layerStyle->extraSourceType() == LayerStyleExtraSourceType::Contour;
-      });
+      excludeContour
+          ? false
+          : std::any_of(_layerStyles.begin(), _layerStyles.end(), [](const auto& layerStyle) {
+              return layerStyle->extraSourceType() == LayerStyleExtraSourceType::Contour;
+            });
   if (needContour) {
     // Child effects are always excluded when drawing the layer contour.
     drawArgs.excludeEffects = true;
@@ -1265,19 +1677,54 @@ std::shared_ptr<Image> Layer::getBackgroundImage(const DrawArgs& args, float con
   auto bounds = getBounds();
   bounds.scale(contentScale, contentScale);
   bounds.roundOut();
-  canvas->clipRect(bounds);
   canvas->scale(contentScale, contentScale);
-  auto globalMatrix = getGlobalMatrix();
-  Matrix invertMatrix = {};
-  if (!globalMatrix.invert(&invertMatrix)) {
+  auto localToGlobalMatrix = getGlobalMatrix();
+  // If there are 3D transformations or projection transformations from the current layer node to
+  // the root node, making it impossible to obtain an accurate background image and stretch it into
+  // a rectangle, please use the getBoundsBackgroundImage interface to get the background image
+  // corresponding to the minimum bounding rectangle of the current layer subtree after drawing.
+  DEBUG_ASSERT(IsMatrix3DAffine(localToGlobalMatrix));
+  auto affiineLocalToGlobalMatrix = GetMayLossyAffineMatrix(localToGlobalMatrix);
+  Matrix affineGlobalToLocalMatrix = {};
+  if (!affiineLocalToGlobalMatrix.invert(&affineGlobalToLocalMatrix)) {
     return nullptr;
   }
-  canvas->concat(invertMatrix);
+  canvas->concat(affineGlobalToLocalMatrix);
+  drawBackgroundImage(args, *canvas);
+  auto backgroundPicture = recorder.finishRecordingAsPicture();
+  return ToImageWithOffset(std::move(backgroundPicture), offset, &bounds, args.dstColorSpace);
+}
+
+std::shared_ptr<Image> Layer::getBoundsBackgroundImage(const DrawArgs& args, float contentScale,
+                                                       Point* offset) {
+  if (args.drawMode == DrawMode::Background) {
+    return nullptr;
+  }
+
+  PictureRecorder recorder = {};
+  auto canvas = recorder.beginRecording();
+  auto bounds = getBounds();
+  bounds.scale(contentScale, contentScale);
+  bounds.roundOut();
+  canvas->clipRect(bounds);
+  // Calculate the transformation matrix for drawing the background image within renderBounds to
+  // bounds.
+  auto matrix = Matrix::MakeTrans(-renderBounds.left, -renderBounds.top);
+  matrix.postScale(bounds.width() * contentScale / renderBounds.width(),
+                   bounds.height() * contentScale / renderBounds.height());
+  matrix.postTranslate(bounds.left, bounds.top);
+  canvas->setMatrix(matrix);
+
+  drawBackgroundImage(args, *canvas);
+  auto backgroundPicture = recorder.finishRecordingAsPicture();
+  return ToImageWithOffset(std::move(backgroundPicture), offset, &bounds, args.dstColorSpace);
+}
+
+void Layer::drawBackgroundImage(const DrawArgs& args, Canvas& canvas) {
   if (args.blurBackground) {
-    Point bgOffset = {};
-    auto image = args.blurBackground->getBackgroundImage(offset);
-    canvas->concat(args.blurBackground->backgroundMatrix());
-    canvas->drawImage(image, bgOffset.x, bgOffset.y);
+    auto image = args.blurBackground->getBackgroundImage();
+    canvas.concat(args.blurBackground->backgroundMatrix());
+    canvas.drawImage(image);
   } else {
     auto drawArgs = args;
     drawArgs.excludeEffects = false;
@@ -1288,41 +1735,37 @@ std::shared_ptr<Image> Layer::getBackgroundImage(const DrawArgs& args, float con
       backgroundRect.intersect(*args.renderRect);
       drawArgs.renderRect = &backgroundRect;
     }
-    auto currentAlpha = drawBackgroundLayers(drawArgs, canvas);
+    auto currentAlpha = drawBackgroundLayers(drawArgs, &canvas);
     // Draw the layer styles below the content, as they are part of the background.
-    auto layerStyleSource = getLayerStyleSource(drawArgs, canvas->getMatrix());
+    auto layerStyleSource = getLayerStyleSource(drawArgs, canvas.getMatrix());
     if (layerStyleSource) {
-      drawLayerStyles(drawArgs, canvas, currentAlpha, layerStyleSource.get(),
+      drawLayerStyles(drawArgs, &canvas, currentAlpha, layerStyleSource.get(),
                       LayerStylePosition::Below);
     }
   }
-  auto backgroundPicture = recorder.finishRecordingAsPicture();
-  return ToImageWithOffset(std::move(backgroundPicture), offset, &bounds, args.dstColorSpace);
 }
 
 void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
                             const LayerStyleSource* source, LayerStylePosition position) {
+  std::vector<LayerStyleExtraSourceType> extraSourceTypes = {LayerStyleExtraSourceType::None,
+                                                             LayerStyleExtraSourceType::Contour,
+                                                             LayerStyleExtraSourceType::Background};
+  drawLayerStyles(args, canvas, alpha, source, position, extraSourceTypes);
+}
+
+void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
+                            const LayerStyleSource* source, LayerStylePosition position,
+                            const std::vector<LayerStyleExtraSourceType>& extraSourceTypes) {
   DEBUG_ASSERT(source != nullptr && !FloatNearlyZero(source->contentScale));
   auto& contour = source->contour;
   auto contourOffset = source->contourOffset - source->contentOffset;
   auto backgroundCanvas = args.blurBackground ? args.blurBackground->getCanvas() : nullptr;
-  auto blendModeCanvas = args.blendModeBackground ? args.blendModeBackground->getCanvas() : nullptr;
-  auto matrix = Matrix::MakeScale(1.f / source->contentScale, 1.f / source->contentScale);
-  matrix.preTranslate(source->contentOffset.x, source->contentOffset.y);
-  AutoCanvasRestore autoRestore(canvas);
-  canvas->concat(matrix);
-  if (backgroundCanvas) {
-    backgroundCanvas->save();
-    backgroundCanvas->concat(matrix);
-  }
-  if (blendModeCanvas) {
-    blendModeCanvas->save();
-    blendModeCanvas->concat(matrix);
-  }
   auto clipBounds =
       args.blurBackground ? GetClipBounds(args.blurBackground->getCanvas()) : std::nullopt;
   for (const auto& layerStyle : _layerStyles) {
-    if (layerStyle->position() != position) {
+    if (layerStyle->position() != position ||
+        std::find(extraSourceTypes.begin(), extraSourceTypes.end(), layerStyle->extraSourceType()) ==
+            extraSourceTypes.end()) {
       continue;
     }
     PictureRecorder recorder = {};
@@ -1330,13 +1773,23 @@ void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
     if (clipBounds.has_value()) {
       pictureCanvas->clipRect(*clipBounds);
     }
+    auto matrix = Matrix::MakeScale(1.f / source->contentScale, 1.f / source->contentScale);
+    matrix.preTranslate(source->contentOffset.x, source->contentOffset.y);
+    pictureCanvas->concat(matrix);
     switch (layerStyle->extraSourceType()) {
       case LayerStyleExtraSourceType::None:
         layerStyle->draw(pictureCanvas, source->content, source->contentScale, alpha);
         break;
       case LayerStyleExtraSourceType::Background: {
         Point backgroundOffset = {};
-        auto background = getBackgroundImage(args, source->contentScale, &backgroundOffset);
+        // If there are no 3D transformations or projection transformations from the current layer
+        // node to the root node, the accurate background image can be obtained; otherwise, only the
+        // background image corresponding to the minimum axis-aligned bounding rectangle after
+        // projection can be obtained.
+        auto background =
+            IsMatrix3DAffine(getGlobalMatrix())
+                ? getBackgroundImage(args, source->contentScale, &backgroundOffset)
+                : getBoundsBackgroundImage(args, source->contentScale, &backgroundOffset);
         if (background != nullptr) {
           backgroundOffset = backgroundOffset - source->contentOffset;
           layerStyle->drawWithExtraSource(pictureCanvas, source->content, source->contentScale,
@@ -1358,15 +1811,9 @@ void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
     if (!backgroundCanvas ||
         layerStyle->extraSourceType() == LayerStyleExtraSourceType::Background) {
       canvas->drawPicture(picture);
-      if (blendModeCanvas) {
-        blendModeCanvas->drawPicture(picture);
-      }
     } else if (!clipBounds.has_value()) {
       canvas->drawPicture(picture);
       backgroundCanvas->drawPicture(picture);
-      if (blendModeCanvas) {
-        blendModeCanvas->drawPicture(picture);
-      }
     } else {
       Point offset = {};
       auto image = ToImageWithOffset(std::move(picture), &offset, nullptr, args.dstColorSpace);
@@ -1378,17 +1825,65 @@ void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
       paint.setBlendMode(layerStyle->blendMode());
       canvas->drawImage(image, offset.x, offset.y, &paint);
       backgroundCanvas->drawImage(image, offset.x, offset.y, &paint);
-      if (blendModeCanvas) {
-        blendModeCanvas->drawImage(image, offset.x, offset.y, &paint);
-      }
     }
   }
-  if (backgroundCanvas) {
-    backgroundCanvas->restore();
+}
+
+void Layer::drawBackgroundLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
+                                      const Matrix3D& transform) {
+  auto styleSource = getLayerStyleSource(args, canvas->getMatrix(), true);
+  if (styleSource == nullptr) {
+    return;
   }
-  if (blendModeCanvas) {
-    blendModeCanvas->restore();
+
+  // Apply an equivalent transformation to the content of StyleSource so that when used as a mask
+  // for background processing, it can accurately coincide with the actual content rendering area,
+  // ensuring that only the actual rendering region of the layer reveals the background.
+  std::shared_ptr<ImageFilter> styleSourceFilter = nullptr;
+  auto bounds = getBounds();
+  auto transformedBounds = transform.mapRect(bounds);
+  transformedBounds.roundOut();
+  if (styleSource->content != nullptr) {
+    // The object of styleSourceMatrix is Image. When drawing directly, Image doesn't care about
+    // actual translation, so it can be ignored when constructing the matrix here.
+    auto styleSourceAnchor = Point::Make(bounds.left, bounds.top);
+    // StyleSourceMatrix acts on the content of styleSource, which is a subregion extracted from
+    // within the Layer. For transformations based on the local coordinate system of this subregion,
+    // anchor point adaptation is required for the matrix described based on the layer.
+    auto styleSourceMatrix = anchorAdaptedMatrix(transform, styleSourceAnchor);
+    styleSourceMatrix.postScale(bounds.width() / transformedBounds.width(),
+                                bounds.height() / transformedBounds.height(), 1.0f);
+    auto transform3DFilter = Transform3DFilter::Make(styleSourceMatrix);
+    styleSourceFilter = transform3DFilter->getImageFilter(styleSource->contentScale);
+    styleSource->content = styleSource->content->makeWithFilter(styleSourceFilter);
   }
+
+  // When rendering offscreen, if the layer contains 3D transformations, since it's impossible to
+  // accurately stretch and fill the background into a rectangular texture and then apply the 3D
+  // matrix, we can only independently draw the background area. Then, by setting the effective
+  // clipping area through the layer contour, we ensure that only the strictly projected background
+  // area is correctly drawn.
+  Matrix styleMatrix = {};
+  Path styleClipPath = {};
+  AutoCanvasRestore autoRestore(canvas);
+  styleClipPath.addRect(bounds);
+  styleClipPath.transform3D(transform);
+  // StyleClipPath is the final clipping path based on the parent node, which must be called
+  // before setting the matrix, otherwise it will be affected by the matrix.
+  canvas->clipPath(styleClipPath);
+  // The material sources for layer styles are all filled into the bounds. When drawing the
+  // styles, it's necessary to calculate the transformation matrix that maps the bounds to the
+  // actual drawing area transformedBounds.
+  DEBUG_ASSERT(!FloatNearlyZero(bounds.width() * bounds.height()));
+  styleMatrix = Matrix::MakeTrans(-bounds.left, -bounds.top);
+  styleMatrix.postScale(transformedBounds.width() / bounds.width(),
+                        transformedBounds.height() / bounds.height());
+  styleMatrix.postTranslate(transformedBounds.left, transformedBounds.top);
+  canvas->concat(styleMatrix);
+  // When LayerStyle's ExtraSourceType is Background, its Position can only be Below, so there's no
+  // need to handle the Position Above case here.
+  drawLayerStyles(args, canvas, alpha, styleSource.get(), LayerStylePosition::Below,
+                  {LayerStyleExtraSourceType::Background});
 }
 
 bool Layer::getLayersUnderPointInternal(float x, float y,
@@ -1452,14 +1947,23 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
   maxBackgroundOutset = 0;
   minBackgroundOutset = std::numeric_limits<float>::max();
   auto contentScale = 1.0f;
-  if (!_layerStyles.empty() || !_filters.empty()) {
+  // Ensure the 3D filter is not released during the entire function lifetime, otherwise the
+  // transformer will have abnormal render bounds calculation
+  auto filter3DVector = std::vector<std::shared_ptr<LayerFilter>>{};
+  if (!_layerStyles.empty() || !_filters.empty() || !bitFields.matrix3DIsAffine) {
     if (transformer) {
       contentScale = transformer->getMaxScale();
     }
-    transformer =
-        RegionTransformer::MakeFromFilters(_filters, contentScale, std::move(transformer));
-    transformer =
-        RegionTransformer::MakeFromStyles(_layerStyles, contentScale, std::move(transformer));
+    // The filter and style should calculate bounds based on the original size. The externally
+    // provided Transformer already contains matrix data, which will be applied to the computed size
+    // at the end, including scaling, rotation, and other transformations.
+    if (!bitFields.matrix3DIsAffine) {
+      filter3DVector.push_back(Transform3DFilter::Make(_matrix3D));
+      transformer =
+          RegionTransformer::MakeFromFilters(filter3DVector, 1.0f, std::move(transformer));
+    }
+    transformer = RegionTransformer::MakeFromFilters(_filters, 1.0f, std::move(transformer));
+    transformer = RegionTransformer::MakeFromStyles(_layerStyles, 1.0f, std::move(transformer));
   }
   auto content = getContent();
   if (bitFields.dirtyContentBounds || (forceDirty && content)) {
@@ -1494,8 +1998,13 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
       continue;
     }
     auto childMatrix = child->getMatrixWithScrollRect();
-    auto childTransformer = RegionTransformer::MakeFromMatrix(childMatrix, transformer);
     std::optional<Rect> clipRect = std::nullopt;
+    // If the sublayer's Matrix contains 3D transformations or projection transformations, then its
+    // Matrix is considered as an identity matrix here, and its actual position is left to the
+    // sublayer to calculate through the 3D filter method.
+    auto childAffineMatrix =
+        IsMatrix3DAffine(childMatrix) ? GetMayLossyAffineMatrix(childMatrix) : Matrix::I();
+    auto childTransformer = RegionTransformer::MakeFromMatrix(childAffineMatrix, transformer);
     if (child->_scrollRect) {
       clipRect = *child->_scrollRect;
     }
@@ -1551,36 +2060,25 @@ void Layer::checkBackgroundStyles(std::shared_ptr<RegionTransformer> transformer
       continue;
     }
     auto childMatrix = child->getMatrixWithScrollRect();
-    auto childTransformer = RegionTransformer::MakeFromMatrix(childMatrix, transformer);
+    // When marking the dirty region for 3D layer background styles, the influence range of layer
+    // styles acts on the final projected Bounds, which has already applied 3D matrix transformation,
+    // so the identity matrix can be directly used here.
+    auto affineChildMatrix =
+        IsMatrix3DAffine(childMatrix) ? GetMayLossyAffineMatrix(childMatrix) : Matrix::I();
+    auto childTransformer = RegionTransformer::MakeFromMatrix(affineChildMatrix, transformer);
     child->checkBackgroundStyles(childTransformer);
   }
   updateBackgroundBounds(transformer ? transformer->getMaxScale() : 1.0f);
 }
 
 void Layer::updateBackgroundBounds(float contentScale) {
-  auto backgroundChanged = false;
   for (auto& style : _layerStyles) {
-    if (style->extraSourceType() != LayerStyleExtraSourceType::Background) {
-      continue;
-    }
-    if (_root->invalidateBackground(renderBounds, style.get(), contentScale)) {
-      backgroundChanged = true;
+    if (style->extraSourceType() == LayerStyleExtraSourceType::Background) {
+      _root->invalidateBackground(renderBounds, style.get(), contentScale);
     }
   }
-  if (!backgroundChanged && bitFields.hasBlendMode) {
-    if (_root->invalidateBackground(renderBounds, nullptr, contentScale)) {
-      backgroundChanged = true;
-    }
-  }
-  if (backgroundChanged) {
-    auto layer = this;
-    while (layer && !layer->bitFields.dirtyDescendents) {
-      layer->rasterizedContent = nullptr;
-      if (layer->maskOwner) {
-        break;
-      }
-      layer = layer->_parent;
-    }
+  if (bitFields.hasBlendMode) {
+    _root->invalidateBackground(renderBounds, nullptr, contentScale);
   }
 }
 
@@ -1609,8 +2107,8 @@ void Layer::propagateLayerState() {
 }
 
 bool Layer::hasBackgroundStyle() {
-  if (!bitFields.dirtyDescendents && maxBackgroundOutset > 0) {
-    return true;
+  if (!bitFields.dirtyDescendents) {
+    return maxBackgroundOutset > 0;
   }
   for (const auto& style : _layerStyles) {
     if (style->extraSourceType() == LayerStyleExtraSourceType::Background) {
@@ -1625,19 +2123,45 @@ bool Layer::hasBackgroundStyle() {
   return false;
 }
 
-std::shared_ptr<BackgroundContext> Layer::createBackgroundContext(Context* context,
-                                                                  const Rect& drawRect,
-                                                                  const Matrix& viewMatrix,
-                                                                  bool fullLayer) const {
+std::shared_ptr<BackgroundContext> Layer::createBackgroundContext(
+    Context* context, const Rect& drawRect, const Matrix& viewMatrix, bool fullLayer,
+    std::shared_ptr<ColorSpace> colorSpace) const {
   if (maxBackgroundOutset <= 0.0f) {
     return nullptr;
   }
   if (fullLayer) {
-    return BackgroundContext::Make(context, drawRect, 0, 0, viewMatrix);
+    return BackgroundContext::Make(context, drawRect, 0, 0, viewMatrix, colorSpace);
   }
   auto scale = viewMatrix.getMaxScale();
   return BackgroundContext::Make(context, drawRect, maxBackgroundOutset * scale,
-                                 minBackgroundOutset * scale, viewMatrix);
+                                 minBackgroundOutset * scale, viewMatrix, colorSpace);
+}
+
+Matrix3D Layer::anchorAdaptedMatrix(const Matrix3D& matrix, const Point& anchor) const {
+  // In the new coordinate system defined with anchor as the anchor point and origin, the reference
+  // anchor point for the matrix transformation described by the layer's _matrix is located at
+  // point (-anchor.x, -anchor.y). That is, to maintain the same transformation effect, first
+  // translate the anchor point to the new coordinate origin, apply the original matrix, and then
+  // reverse translate the anchor point.
+  auto offsetMatrix = Matrix3D::MakeTranslate(anchor.x, anchor.y, 0);
+  auto invOffsetMatrix = Matrix3D::MakeTranslate(-anchor.x, -anchor.y, 0);
+  return invOffsetMatrix * matrix * offsetMatrix;
+}
+
+void Layer::invalidateSubtree() {
+  bitFields.staticSubtree = false;
+  subtreeCache = nullptr;
+  localBounds = nullptr;
+}
+
+void Layer::updateStaticSubtreeFlags() {
+  if (bitFields.staticSubtree) {
+    return;
+  }
+  bitFields.staticSubtree = true;
+  for (const auto& child : _children) {
+    child->updateStaticSubtreeFlags();
+  }
 }
 
 }  // namespace tgfx

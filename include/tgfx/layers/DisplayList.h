@@ -222,6 +222,39 @@ class DisplayList {
   }
 
   /**
+   * Returns the background color of the root layer. The background is an infinite rectangle that
+   * covers the entire display area and is drawn using the SrcOver blend mode.
+   * The default value is transparent.
+   */
+  Color backgroundColor() const;
+
+  /**
+   * Sets the background color of the root layer.
+   */
+  void setBackgroundColor(const Color& color);
+
+  /**
+   * Returns the maximum cache size (longest edge in pixels) for subtree caching. Default is 0
+   * (disabled).
+   *
+   * When enabled, starting from the root layer, any static subtree (where neither the layer nor
+   * its descendants have modified properties) whose rendered longest edge is smaller than maxSize
+   * will be cached as a texture. The cache uses a mipmap-style scaling strategy, snapping to
+   * power-of-2 fractions of maxSize (e.g., maxSize, maxSize/2, maxSize/4, ...) to minimize memory
+   * waste. Once a subtree is cached, subsequent renders skip child traversal entirely, greatly
+   * improving rendering performance. This optimization is particularly effective in zoom-out
+   * scenarios where dense graphics are packed into a smaller screen area.
+   */
+  int subtreeCacheMaxSize() const {
+    return _subtreeCacheMaxSize;
+  }
+
+  /**
+   * Sets the maximum cache size (longest edge in pixels) for subtree caching. Default is 0 (disabled).
+   */
+  void setSubtreeCacheMaxSize(int maxSize);
+
+  /**
    * Sets whether to show dirty regions during rendering. When enabled, the dirty regions will be
    * highlighted in the rendered output. This is useful for debugging to visualize which parts of
    * the display list are being updated. The default value is false.
@@ -252,6 +285,7 @@ class DisplayList {
   int _maxTileCount = 0;
   bool _allowZoomBlur = false;
   int _maxTilesRefinedPerFrame = 5;
+  int _subtreeCacheMaxSize = 0;
   bool _showDirtyRegions = false;
   bool _hasContentChanged = false;
   bool hasZoomBlurTiles = false;
@@ -315,6 +349,7 @@ class DisplayList {
 
   void drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
                      bool autoClear) const;
+
   void updateMousePosition();
 };
 }  // namespace tgfx

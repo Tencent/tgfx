@@ -26,61 +26,59 @@ namespace tgfx {
 class PendingContourAutoReset {
  public:
   PendingContourAutoReset(ContourContext* context, const ContourContext::Contour& contour,
-                          MCState state, Fill fill, const Stroke* stroke)
-      : context(context), contour(contour), state(std::move(state)), fill(std::move(fill)),
-        stroke(stroke) {
+                          MCState state, Brush brush)
+      : context(context), contour(contour), state(std::move(state)), brush(std::move(brush)) {
   }
 
   ~PendingContourAutoReset() {
-    context->resetPendingContour(contour, state, fill, stroke);
+    context->resetPendingContour(contour, state, brush);
   }
 
  private:
   ContourContext* context = nullptr;
   ContourContext::Contour contour;
   MCState state;
-  Fill fill;
-  const Stroke* stroke = nullptr;
+  Brush brush;
 };
 
 ContourContext::ContourContext() {
   contourBounds.reserve(3);
 }
 
-void ContourContext::drawFill(const Fill& fill) {
+void ContourContext::drawFill(const Brush& brush) {
   static Contour FillContour = Contour(Contour::Type::Fill);
-  drawContour(FillContour, {}, fill);
+  drawContour(FillContour, {}, brush);
 }
 
-void ContourContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill,
+void ContourContext::drawRect(const Rect& rect, const MCState& state, const Brush& brush,
                               const Stroke* stroke) {
-  drawContour(Contour(rect), state, fill, stroke);
+  drawContour(Contour(rect, stroke), state, brush);
 }
 
-void ContourContext::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
+void ContourContext::drawRRect(const RRect& rRect, const MCState& state, const Brush& brush,
                                const Stroke* stroke) {
-  drawContour(Contour(rRect), state, fill, stroke);
+  drawContour(Contour(rRect, stroke), state, brush);
 }
 
-void ContourContext::drawPath(const Path& path, const MCState& state, const Fill& fill) {
-  drawContour(Contour(path), state, fill);
+void ContourContext::drawPath(const Path& path, const MCState& state, const Brush& brush) {
+  drawContour(Contour(path), state, brush);
 }
 
-void ContourContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill,
-                               const Stroke* stroke) {
-  drawContour(Contour(std::move(shape)), state, fill, stroke);
+void ContourContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
+                               const Brush& brush, const Stroke* stroke) {
+  drawContour(Contour(std::move(shape), stroke), state, brush);
 }
 
 void ContourContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                               const MCState& state, const Fill& fill) {
-  auto newFill = fill;
-  newFill.shader = Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp, sampling);
-  drawRect(Rect::MakeWH(image->width(), image->height()), state, newFill, nullptr);
+                               const MCState& state, const Brush& brush) {
+  auto newBrush = brush;
+  newBrush.shader = Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp, sampling);
+  drawRect(Rect::MakeWH(image->width(), image->height()), state, newBrush, nullptr);
 }
 
 void ContourContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect,
                                    const Rect& dstRect, const SamplingOptions& sampling,
-                                   const MCState& state, const Fill& fill,
+                                   const MCState& state, const Brush& brush,
                                    SrcRectConstraint constraint) {
   if (constraint != SrcRectConstraint::Strict) {
     auto newState = state;
@@ -89,20 +87,20 @@ void ContourContext::drawImageRect(std::shared_ptr<Image> image, const Rect& src
     path.addRect(dstRect);
     path.transform(state.matrix);
     newState.clip.addPath(path);
-    auto newFill = fill;
-    newFill.shader = Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp, sampling);
-    drawRect(dstRect, newState, newFill, nullptr);
+    auto newBrush = brush;
+    newBrush.shader = Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp, sampling);
+    drawRect(dstRect, newState, newBrush, nullptr);
     return;
   }
   auto bounds = state.matrix.mapRect(dstRect);
   if (containContourBound(bounds)) {
     return;
   }
-  pictureContext.drawImageRect(image, srcRect, dstRect, sampling, state, fill, constraint);
+  pictureContext.drawImageRect(image, srcRect, dstRect, sampling, state, brush, constraint);
 }
 
 void ContourContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
-                                      const MCState& state, const Fill& fill,
+                                      const MCState& state, const Brush& brush,
                                       const Stroke* stroke) {
   auto bounds = glyphRunList->getBounds();
   if (stroke) {
@@ -112,7 +110,7 @@ void ContourContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList
   if (containContourBound(bounds)) {
     return;
   }
-  pictureContext.drawGlyphRunList(glyphRunList, state, fill, stroke);
+  pictureContext.drawGlyphRunList(glyphRunList, state, brush, stroke);
 }
 
 void ContourContext::drawPicture(std::shared_ptr<Picture> picture, const MCState& state) {
@@ -121,11 +119,11 @@ void ContourContext::drawPicture(std::shared_ptr<Picture> picture, const MCState
 
 void ContourContext::drawLayer(std::shared_ptr<Picture> picture,
                                std::shared_ptr<ImageFilter> filter, const MCState& state,
-                               const Fill& fill) {
-  if (fill.nothingToDraw()) {
+                               const Brush& brush) {
+  if (brush.nothingToDraw()) {
     return;
   }
-  if (!filter && !fill.maskFilter) {
+  if (!filter && !brush.maskFilter) {
     drawPicture(picture, state);
     return;
   }
@@ -140,16 +138,15 @@ void ContourContext::drawLayer(std::shared_ptr<Picture> picture,
     }
   }
   flushPendingContour();
-  pictureContext.drawLayer(picture, filter, state, fill);
+  pictureContext.drawLayer(picture, filter, state, brush);
 }
 
-void ContourContext::drawContour(const Contour& contour, const MCState& state, const Fill& fill,
-                                 const Stroke* stroke) {
-  if (canAppend(contour, state, fill, stroke)) {
-    appendFill(fill, stroke);
+void ContourContext::drawContour(const Contour& contour, const MCState& state, const Brush& brush) {
+  if (canAppend(contour, state, brush)) {
+    appendFill(brush);
     return;
   }
-  flushPendingContour(contour, state, fill, stroke);
+  flushPendingContour(contour, state, brush);
 }
 
 bool ContourContext::containContourBound(const Rect& bounds) {
@@ -212,15 +209,11 @@ std::shared_ptr<Picture> ContourContext::finishRecordingAsPicture() {
   return pictureContext.finishRecordingAsPicture();
 }
 
-bool ContourContext::canAppend(const Contour& contour, const MCState& state, const Fill& fill,
-                               const Stroke* stroke) {
+bool ContourContext::canAppend(const Contour& contour, const MCState& state, const Brush& brush) {
   if (state.clip != pendingState.clip || state.matrix != pendingState.matrix) {
     return false;
   }
-  if (pendingFills.empty() || fill.maskFilter != pendingFills.back().maskFilter) {
-    return false;
-  }
-  if (pendingStrokes.empty() != (stroke == nullptr)) {
+  if (pendingBrushes.empty() || brush.maskFilter != pendingBrushes.back().maskFilter) {
     return false;
   }
   return contour == pendingContour;
@@ -237,36 +230,29 @@ Rect GetGlobalBounds(const MCState& state, const Rect& localBounds) {
 }
 
 void ContourContext::flushPendingContour(const Contour& contour, const MCState& state,
-                                         const Fill& fill, const Stroke* stroke) {
-  PendingContourAutoReset autoReset(this, contour, state, fill, stroke);
+                                         const Brush& brush) {
+  PendingContourAutoReset autoReset(this, contour, state, brush);
   if (pendingContour.type == Contour::Type::None) {
     return;
   }
-  Rect outset = Rect::MakeEmpty();
-  for (auto pendingStroke : pendingStrokes) {
-    auto rect = Rect::MakeEmpty();
-    ApplyStrokeToBounds(*pendingStroke, &rect);
-    if (rect.right > outset.right) {
-      outset = rect;
-    }
-  }
   Rect localBounds = pendingContour.getBounds();
-  localBounds.outset(outset.right, outset.top);
+  if (pendingContour.hasStroke) {
+    ApplyStrokeToBounds(pendingContour.stroke, &localBounds);
+  }
   auto globalBounds = GetGlobalBounds(pendingState, localBounds);
   bool fillIsFull = false;
   if (containContourBound(globalBounds) && !pendingContour.isInverseFillType()) {
     return;
   }
-  for (size_t i = 0; i < pendingFills.size(); i++) {
-    auto& pendingFill = pendingFills[i];
-    const Stroke* pendingStroke = pendingStrokes.size() > i ? pendingStrokes[i] : nullptr;
+  for (auto& pendingBrush : pendingBrushes) {
     fillIsFull =
-        fillIsFull || ((pendingFill.shader == nullptr || !pendingFill.shader->isAImage()) &&
-                       !pendingFill.maskFilter);
-    pendingContour.draw(pictureContext, pendingState, pendingFill, pendingStroke);
+        fillIsFull || ((pendingBrush.shader == nullptr || !pendingBrush.shader->isAImage()) &&
+                       !pendingBrush.maskFilter);
+    pendingContour.draw(pictureContext, pendingState, pendingBrush);
   }
   if (fillIsFull && pendingState.matrix.rectStaysRect() &&
-      pendingContour.type < Contour::Type::Path && !pendingContour.isInverseFillType()) {
+      pendingContour.type < Contour::Type::Path && !pendingContour.isInverseFillType() &&
+      !pendingContour.hasStroke) {
     if (pendingContour.type == Contour::Type::Rect) {
       mergeContourBound(globalBounds);
     } else if (pendingContour.type == Contour::Type::RRect) {
@@ -279,40 +265,32 @@ void ContourContext::flushPendingContour(const Contour& contour, const MCState& 
   }
 }
 
-Fill GetContourFill(const Fill& fill) {
+Brush GetContourBrush(const Brush& brush) {
   Color color;
-  if (fill.shader && !fill.shader->asColor(&color)) {
-    auto contourFill = fill;
-    contourFill.colorFilter = ColorFilter::AlphaThreshold(OPAQUE_THRESHOLD);
-    return contourFill;
+  if (brush.shader && !brush.shader->asColor(&color)) {
+    auto contourBrush = brush;
+    contourBrush.colorFilter = ColorFilter::AlphaThreshold(OPAQUE_THRESHOLD);
+    return contourBrush;
   }
   // Src + coverage AA may cause edge artifacts, use SrcOver instead.
-  auto contourFill = Fill(Color::White(), BlendMode::SrcOver, fill.antiAlias);
-  contourFill.maskFilter = fill.maskFilter;
-  return contourFill;
+  auto contourBrush = Brush(Color::White(), BlendMode::SrcOver, brush.antiAlias);
+  contourBrush.maskFilter = brush.maskFilter;
+  return contourBrush;
 }
 
-void ContourContext::appendFill(const Fill& fill, const Stroke* stroke) {
-  auto& pendingShader = pendingFills.back().shader;
+void ContourContext::appendFill(const Brush& brush) {
+  auto& pendingShader = pendingBrushes.back().shader;
   if (pendingShader == nullptr) {
     return;
   }
-  pendingFills.emplace_back(GetContourFill(fill));
-  if (stroke) {
-    pendingStrokes.emplace_back(stroke);
-  }
+  pendingBrushes.emplace_back(GetContourBrush(brush));
 }
 
 void ContourContext::resetPendingContour(const Contour& contour, const MCState& state,
-                                         const Fill& fill, const Stroke* stroke) {
+                                         const Brush& brush) {
   pendingContour = contour;
   pendingState = state;
-  pendingFills = {GetContourFill(fill)};
-  if (stroke) {
-    pendingStrokes = {stroke};
-  } else {
-    pendingStrokes.clear();
-  }
+  pendingBrushes = {GetContourBrush(brush)};
 }
 
 bool ContourContext::Contour::isInverseFillType() const {
@@ -348,27 +326,28 @@ Rect ContourContext::Contour::getBounds() const {
   return Rect::MakeEmpty();
 }
 
-void ContourContext::Contour::draw(PictureContext& context, const MCState& state, const Fill& fill,
-                                   const Stroke* stroke) const {
+void ContourContext::Contour::draw(PictureContext& context, const MCState& state,
+                                   const Brush& brush) const {
+  const Stroke* strokePtr = hasStroke ? &stroke : nullptr;
   switch (type) {
     case Type::Fill: {
-      context.drawFill(fill);
+      context.drawFill(brush);
       break;
     }
     case Type::Rect: {
-      context.drawRect(rect, state, fill, stroke);
+      context.drawRect(rect, state, brush, strokePtr);
       break;
     }
     case Type::RRect: {
-      context.drawRRect(rRect, state, fill, stroke);
+      context.drawRRect(rRect, state, brush, strokePtr);
       break;
     }
     case Type::Path: {
-      context.drawPath(path, state, fill);
+      context.drawPath(path, state, brush);
       break;
     }
     case Type::Shape: {
-      context.drawShape(shape, state, fill, stroke);
+      context.drawShape(shape, state, brush, strokePtr);
       break;
     }
     default:
@@ -377,7 +356,10 @@ void ContourContext::Contour::draw(PictureContext& context, const MCState& state
 }
 
 bool ContourContext::Contour::operator==(const Contour& other) const {
-  if (type != other.type) {
+  if (type != other.type || hasStroke != other.hasStroke) {
+    return false;
+  }
+  if (hasStroke && stroke != other.stroke) {
     return false;
   }
   switch (type) {
@@ -408,6 +390,8 @@ ContourContext::Contour& ContourContext::Contour::operator=(const Contour& other
       break;
   }
   type = other.type;
+  hasStroke = other.hasStroke;
+  stroke = other.stroke;
   switch (type) {
     case Type::Rect:
       new (&rect) Rect(other.rect);

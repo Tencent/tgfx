@@ -88,6 +88,14 @@ class GlyphRunList {
    */
   bool getPath(Path* path, const Matrix* matrix = nullptr) const;
 
+  /**
+   * Tests if the specified point hits any glyph in this run list. Each glyph is tested
+   * individually using its actual path for precise hit testing. For color glyphs (e.g., emoji),
+   * bounds are used instead since they don't have outlines. If a stroke is provided, it will be
+   * applied to the glyph path or bounds before testing.
+   */
+  bool hitTestPoint(float localX, float localY, const Stroke* stroke = nullptr) const;
+
  private:
   std::vector<GlyphRun> _glyphRuns = {};
   LazyBounds bounds = {};

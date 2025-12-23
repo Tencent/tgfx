@@ -17,23 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/processors/LumaFragmentProcessor.h"
+#include "core/utils/ColorSpaceHelper.h"
 namespace tgfx {
-static bool NearlyEqual(float x, float y) {
-  static constexpr float Tolerance = 1.0f / (1 << 11);
-  return ::fabsf(x - y) <= Tolerance;
-}
-
-static bool NearlyEqual(const ColorMatrix33& u, const ColorMatrix33& v) {
-  for (int r = 0; r < 3; r++) {
-    for (int c = 0; c < 3; c++) {
-      if (!NearlyEqual(u.values[r][c], v.values[r][c])) {
-        return false;
-      }
-    }
-  }
-  return true;
-}
-
 void LumaFragmentProcessor::computeProcessorKey(Context*, BytesKey* bytesKey) const {
   bytesKey->write(classID());
 }
@@ -41,7 +26,9 @@ void LumaFragmentProcessor::computeProcessorKey(Context*, BytesKey* bytesKey) co
 LumaFragmentProcessor::LumaFragmentProcessor(std::shared_ptr<ColorSpace> colorSpace)
     : FragmentProcessor(ClassID()), _colorSpace(std::move(colorSpace)) {
   ColorMatrix33 tempColorMatrix{};
-  _colorSpace->toXYZD50(&tempColorMatrix);
+  if (_colorSpace) {
+    _colorSpace->toXYZD50(&tempColorMatrix);
+  }
   _lumaFactor = AcquireLumaFactorFromColorSpace(tempColorMatrix);
 }
 

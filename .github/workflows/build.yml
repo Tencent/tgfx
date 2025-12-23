@@ -108,7 +108,7 @@ jobs:
           path: android
 
   web:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
@@ -120,8 +120,8 @@ jobs:
           path: |
             web/emsdk
             web/node_modules
-          key: tgfx-environment-web-20241106
-          restore-keys: tgfx-environment-web-
+          key: tgfx-environment-web-linux-20241106
+          restore-keys: tgfx-environment-web-linux-
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -147,19 +147,17 @@ jobs:
           cd emsdk
           ./emsdk install 3.1.71
           ./emsdk activate 3.1.71
-        shell: bash
 
       - name: Run depsync
         run: |
           npm install depsync -g
           depsync
-        shell: bash
 
       - name: Build Web
         run: |
           cd web
-          emsdk/emsdk_env
-          npm run build:st:debug
+          source emsdk/emsdk_env.sh
+          npm run build:st
 
       - name: Save Environment Cache
         if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}
@@ -168,7 +166,7 @@ jobs:
           path: |
             web/emsdk
             web/node_modules
-          key: tgfx-environment-web-20241106
+          key: tgfx-environment-web-linux-20241106
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -341,13 +339,12 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: /opt/ohos-cmd-tools
-          key: ohos-cli-5.0.9.310-linux-x64
-          restore-keys: ohos-cli-
+          key: ohos-cli-6.0.0.868-linux-x64
 
       - name: Install CLI Tools
         if: steps.cli-tools-cache.outputs.cache-hit != 'true'
         run: |
-          TOOLS_URL="https://github.com/libpag/ohos-sdk/releases/download/5.0.9/commandline-tools-linux-x64-5.0.9.310.zip"
+          TOOLS_URL="https://github.com/libpag/ohos-sdk/releases/download/6.0.0.868/commandline-tools-linux-x64-6.0.0.868.zip"
           curl -L -o /tmp/cmdtools.zip "$TOOLS_URL"
           unzip -q /tmp/cmdtools.zip -d /tmp
           sudo mv /tmp/command-line-tools /opt/ohos-cmd-tools
@@ -357,7 +354,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: /opt/ohos-cmd-tools
-          key: ohos-cli-5.0.9.310-linux-x64
+          key: ohos-cli-6.0.0.868-linux-x64
 
       - name: Configure Environment
         run: |
@@ -385,9 +382,19 @@ jobs:
           path: |
             ~/.hvigor
             ~/.ohpm
-          key: hvigor-${{ runner.os }}-${{ hashFiles('**/oh-package.json5', '**/hvigorfile.ts') }}
+          key: hvigor-${{ runner.os }}-${{ hashFiles('ohos/**/oh-package.json5', 'ohos/**/hvigorfile.ts') }}
           restore-keys: |
             hvigor-${{ runner.os }}-
+
+      - name: Cache Hvigor Build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ohos/hello2d/build
+            ohos/.hvigor
+          key: ohos-hvigor-${{ runner.os }}-${{ hashFiles('ohos/**/*.ets', 'ohos/**/*.json5') }}
+          restore-keys: |
+            ohos-hvigor-${{ runner.os }}-
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -408,11 +415,38 @@ jobs:
           ohpm config set registry https://ohpm.openharmony.cn/ohpm/
           ohpm install --all
 
+      - name: Setup ccache
+        run: |
+          sudo apt-get update && sudo apt-get install -y ccache
+          ccache --version
+          ccache --max-size=500M
+          ccache --zero-stats
+
+      - name: Restore ccache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-ohos-${{ runner.os }}-main
+          restore-keys: |
+            ccache-ohos-${{ runner.os }}-
+
       - name: Build Harmony
         run: |
           cd ohos
-          hvigorw clean --no-daemon -Dohos.sdk.root=$DEVECO_SDK_HOME
-          hvigorw assembleHap -Dohos.sdk.root=$DEVECO_SDK_HOME -p buildMode=release --no-daemon
+          sed -i '/"abiFilters"/,/\]/{ /"x86_64"/d }' hello2d/build-profile.json5
+          sed -i 's/"arguments": "\(.*\)"/"arguments": "\1 -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache"/' hello2d/build-profile.json5
+          hvigorw assembleHap \
+            -Dohos.sdk.root=$DEVECO_SDK_HOME \
+            -p buildMode=release \
+            --parallel \
+            --no-daemon
+
+      - name: Save ccache
+        if: ${{ github.event_name == 'push' }}
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-ohos-${{ runner.os }}-main
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}

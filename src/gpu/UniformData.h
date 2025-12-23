@@ -23,6 +23,7 @@
 #include <unordered_map>
 #include <vector>
 #include "gpu/Uniform.h"
+#include "tgfx/core/Color.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/Matrix.h"
 

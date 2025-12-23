@@ -25,28 +25,28 @@ class BackgroundContext {
  public:
   static std::shared_ptr<BackgroundContext> Make(Context* context, const Rect& drawRect,
                                                  float maxOutset, float minOutset,
-                                                 const Matrix& matrix);
+                                                 const Matrix& matrix,
+                                                 std::shared_ptr<ColorSpace> colorSpace);
 
   virtual ~BackgroundContext() = default;
 
   virtual Canvas* getCanvas() = 0;
 
-  Matrix backgroundMatrix() const {
-    return imageMatrix;
-  }
+  Matrix backgroundMatrix() const;
 
-  std::shared_ptr<Image> getBackgroundImage(Point* offset);
+  std::shared_ptr<Image> getBackgroundImage();
 
-  std::shared_ptr<BackgroundContext> createSubContext();
+  std::shared_ptr<BackgroundContext> createSubContext(const Rect& renderBounds,
+                                                      bool clipToBackgroundRect);
 
-  void drawToParent(const Matrix& paintMatrix, const Paint& paint);
+  void drawToParent(const Paint& paint);
 
   Rect getBackgroundRect() const {
     return backgroundRect;
   }
 
  protected:
-  virtual std::shared_ptr<Image> onGetBackgroundImage(Point* offset) = 0;
+  virtual std::shared_ptr<Image> onGetBackgroundImage() = 0;
 
   BackgroundContext(Context* context, const Matrix& matrix, const Rect& rect,
                     std::shared_ptr<ColorSpace> colorSpace)
@@ -58,6 +58,10 @@ class BackgroundContext {
   std::shared_ptr<ColorSpace> colorSpace = nullptr;
 
   BackgroundContext* parent = nullptr;
+
+  // Offset of this context's surface origin in parent's surface coordinates.
+  // Only used when created by createSubContext(renderBounds, ...).
+  Point surfaceOffset = Point::Zero();
 };
 
 }  // namespace tgfx

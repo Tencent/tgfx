@@ -122,6 +122,7 @@ std::shared_ptr<Program> ProgramInfo::getProgram() const {
   }
   programKey.write(static_cast<uint32_t>(blendMode));
   programKey.write(static_cast<uint32_t>(getOutputSwizzle().asKey()));
+  programKey.write(static_cast<uint32_t>(cullMode));
   CAPUTRE_PROGRAM_INFO(programKey, context, this);
   auto program = context->globalCache()->findProgram(programKey);
   if (program == nullptr) {
@@ -245,7 +246,7 @@ void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* progra
       fp = iter.next();
     }
   }
-  const auto* processor = getXferProcessor();
+  const auto processor = getXferProcessor();
   updateUniformDataSuffix(vertexUniformData, fragmentUniformData, processor);
   processor->setData(vertexUniformData, fragmentUniformData);
   updateUniformDataSuffix(vertexUniformData, fragmentUniformData, nullptr);

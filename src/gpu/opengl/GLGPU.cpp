@@ -292,6 +292,7 @@ std::shared_ptr<RenderPipeline> GLGPU::createRenderPipeline(
   gl->attachShader(programID, vertexModule->shader());
   gl->attachShader(programID, fragmentModule->shader());
   gl->linkProgram(programID);
+#if defined(DEBUG) || !defined(TGFX_BUILD_FOR_WEB)
   int success;
   gl->getProgramiv(programID, GL_LINK_STATUS, &success);
   if (!success) {
@@ -301,6 +302,7 @@ std::shared_ptr<RenderPipeline> GLGPU::createRenderPipeline(
     programID = 0;
     LOGE("GLGPU::createRenderPipeline() Could not link program: %s", infoLog);
   }
+#endif
   auto pipeline = makeResource<GLRenderPipeline>(programID);
   if (!pipeline->setPipelineDescriptor(this, descriptor)) {
     return nullptr;

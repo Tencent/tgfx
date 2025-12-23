@@ -71,7 +71,7 @@ void GLState::setViewport(int x, int y, int width, int height) {
   viewport[3] = height;
 }
 
-void GLState::setClearColor(Color color) {
+void GLState::setClearColor(PMColor color) {
   if (clearColor.has_value() && *clearColor == color) {
     return;
   }
@@ -153,6 +153,21 @@ void GLState::setBlendState(const GLBlendState& state) {
     gl->blendEquationSeparate(state.colorOp, state.alphaOp);
   }
   blendState = state;
+}
+
+void GLState::setCullFaceState(const GLCullFaceState& state) {
+  if (state.cullFace == cullFaceState.cullFace && state.frontFace == cullFaceState.frontFace) {
+    return;
+  }
+
+  auto gl = interface->functions();
+  if (state.frontFace != cullFaceState.frontFace) {
+    gl->frontFace(state.frontFace);
+  }
+  if (state.cullFace != cullFaceState.cullFace) {
+    gl->cullFace(state.cullFace);
+  }
+  cullFaceState = state;
 }
 
 void GLState::bindTexture(GLTexture* texture, unsigned textureUnit) {

@@ -25,6 +25,8 @@
 #include "core/filters/GaussianBlurImageFilter.h"
 #include "core/filters/ShaderMaskFilter.h"
 #include "core/shaders/MatrixShader.h"
+#include "core/utils/ColorHelper.h"
+#include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/Types.h"
@@ -40,34 +42,47 @@
 
 namespace tgfx {
 
-Resources::Resources(const Fill& fill) {
-  paintColor = ToSVGColor(fill.color);
+Resources::Resources(const Color& color) {
+  colorValue = color;
+  paintColor = ToSVGColor(color);
 }
 
-ElementWriter::ElementWriter(const std::string& name, XMLWriter* writer) : writer(writer) {
+ElementWriter::ElementWriter(const std::string& name, XMLWriter* writer,
+                             std::shared_ptr<ColorSpace> targetColorSpace,
+                             std::shared_ptr<ColorSpace> assignColorSpace)
+    : writer(writer), _targetColorSpace(std::move(targetColorSpace)),
+      _assignColorSpace(std::move(assignColorSpace)) {
   writer->startElement(name);
 }
 
-ElementWriter::ElementWriter(const std::string& name, const std::unique_ptr<XMLWriter>& writer)
-    : ElementWriter(name, writer.get()) {
+ElementWriter::ElementWriter(const std::string& name, const std::unique_ptr<XMLWriter>& writer,
+                             std::shared_ptr<ColorSpace> targetColorSpace,
+                             std::shared_ptr<ColorSpace> assignColorSpace)
+    : ElementWriter(name, writer.get(), std::move(targetColorSpace), std::move(assignColorSpace)) {
 }
 
 ElementWriter::ElementWriter(const std::string& name, const std::unique_ptr<XMLWriter>& writer,
-                             ResourceStore* bucket)
-    : writer(writer.get()), resourceStore(bucket) {
+                             ResourceStore* bucket, std::shared_ptr<ColorSpace> targetColorSpace,
+                             std::shared_ptr<ColorSpace> assignColorSpace)
+    : writer(writer.get()), resourceStore(bucket), _targetColorSpace(std::move(targetColorSpace)),
+      _assignColorSpace(std::move(assignColorSpace)) {
   writer->startElement(name);
 }
 
 ElementWriter::ElementWriter(const std::string& name, Context* context,
                              SVGExportContext* svgContext, XMLWriter* writer, ResourceStore* bucket,
-                             bool disableWarning, const MCState& state, const Fill& fill,
-                             const Stroke* stroke)
-    : writer(writer), resourceStore(bucket), disableWarning(disableWarning) {
-  Resources resource = addResources(fill, context, svgContext);
+                             bool disableWarning, const MCState& state, const Brush& brush,
+                             const Stroke* stroke, std::shared_ptr<ColorSpace> targetColorSpace,
+                             std::shared_ptr<ColorSpace> assignColorSpace)
+    : writer(writer), resourceStore(bucket), disableWarning(disableWarning),
+      _targetColorSpace(std::move(targetColorSpace)),
+      _assignColorSpace(std::move(assignColorSpace)) {
+  generateWriteColorSpaceString();
+  Resources resource = addResources(brush, context, svgContext);
 
   writer->startElement(name);
 
-  addFillAndStroke(fill, stroke, resource);
+  addFillAndStroke(brush, stroke, resource);
 
   if (!state.matrix.isIdentity()) {
     addAttribute("transform", ToSVGTransform(state.matrix));
@@ -85,15 +100,49 @@ void ElementWriter::reportUnsupportedElement(const char* message) const {
   }
 }
 
-void ElementWriter::addFillAndStroke(const Fill& fill, const Stroke* stroke,
+bool ElementWriter::writeColorCSSStyleAttribute(const std::string& attributeName, Color color,
+                                                std::string* retString) {
+  if (_writeColorSpaceString.empty()) {
+    return false;
+  }
+  *retString += attributeName + ":" + ToSVGColor(color) + ";" + attributeName + ":color(" +
+                _writeColorSpaceString + " " + FloatToString(color.red) + " " +
+                FloatToString(color.green) + " " + FloatToString(color.blue) + ");";
+  return true;
+}
+
+void ElementWriter::generateWriteColorSpaceString() {
+  static std::shared_ptr<ColorSpace> srgb = ColorSpace::SRGB();
+  static std::shared_ptr<ColorSpace> displayP3 = ColorSpace::DisplayP3();
+  static std::shared_ptr<ColorSpace> a98rgb =
+      ColorSpace::MakeRGB(NamedTransferFunction::A98RGB, NamedGamut::AdobeRGB);
+  static std::shared_ptr<ColorSpace> rec2020 =
+      ColorSpace::MakeRGB(NamedTransferFunction::Rec2020, NamedGamut::Rec2020);
+  ColorMatrix33 matrix{};
+  NamedPrimaries::ProPhotoRGB.toXYZD50(&matrix);
+  static std::shared_ptr<ColorSpace> prophoto =
+      ColorSpace::MakeRGB(NamedTransferFunction::ProPhotoRGB, matrix);
+  auto tempColorSpace = _assignColorSpace ? _assignColorSpace : _targetColorSpace;
+  if (ColorSpace::Equals(tempColorSpace.get(), displayP3.get())) {
+    _writeColorSpaceString = "display-p3";
+  } else if (ColorSpace::Equals(tempColorSpace.get(), a98rgb.get())) {
+    _writeColorSpaceString = "a98-rgb";
+  } else if (ColorSpace::Equals(tempColorSpace.get(), rec2020.get())) {
+    _writeColorSpaceString = "rec2020";
+  } else {
+    _writeColorSpaceString = std::string{};
+  }
+}
+
+void ElementWriter::addFillAndStroke(const Brush& brush, const Stroke* stroke,
                                      const Resources& resources) {
   if (!stroke) {  //fill draw
     static const std::string defaultFill = "black";
     if (resources.paintColor != defaultFill) {
       addAttribute("fill", resources.paintColor);
     }
-    if (!fill.isOpaque()) {
-      addAttribute("fill-opacity", fill.color.alpha);
+    if (!brush.isOpaque()) {
+      addAttribute("fill-opacity", brush.color.alpha);
     }
   } else {  //stroke draw
     addAttribute("fill", "none");
@@ -122,18 +171,26 @@ void ElementWriter::addFillAndStroke(const Fill& fill, const Stroke* stroke,
       addAttribute("stroke-miterlimit", stroke->miterLimit);
     }
 
-    if (!fill.isOpaque()) {
-      addAttribute("stroke-opacity", fill.color.alpha);
+    if (!brush.isOpaque()) {
+      addAttribute("stroke-opacity", brush.color.alpha);
     }
   }
+  std::string cssStyle;
+  if (resources.paintColor.find("url") == std::string::npos) {
+    writeColorCSSStyleAttribute(stroke ? "stroke" : "fill", resources.colorValue, &cssStyle);
+  }
 
-  if (fill.blendMode != BlendMode::SrcOver) {
-    auto blendModeString = ToSVGBlendMode(fill.blendMode);
+  if (brush.blendMode != BlendMode::SrcOver) {
+    auto blendModeString = ToSVGBlendMode(brush.blendMode);
     if (!blendModeString.empty()) {
-      addAttribute("style", blendModeString);
+      blendModeString = "mix-blend-mode:" + blendModeString;
+      cssStyle += blendModeString + ";";
     } else {
       reportUnsupportedElement("Unsupported blend mode");
     }
+  }
+  if (!cssStyle.empty()) {
+    addAttribute("style", cssStyle);
   }
 
   if (!resources.filter.empty()) {
@@ -220,16 +277,18 @@ void ElementWriter::addPathAttributes(const Path& path, SVGPathParser::PathEncod
   addAttribute("d", SVGPathParser::ToSVGString(path, encoding));
 }
 
-Resources ElementWriter::addImageFilterResource(const std::shared_ptr<ImageFilter>& imageFilter,
-                                                Rect bound) {
-  auto filterID = addImageFilter(imageFilter, bound);
+Resources ElementWriter::addImageFilterResource(
+    const std::shared_ptr<ImageFilter>& imageFilter, Rect bound,
+    const std::shared_ptr<SVGCustomWriter>& exportWriter) {
+  auto filterID = addImageFilter(imageFilter, bound, std::move(exportWriter));
   Resources resources;
   resources.filter = "url(#" + filterID + ")";
   return resources;
 }
 
 std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& imageFilter,
-                                          Rect bound) {
+                                          Rect bound,
+                                          const std::shared_ptr<SVGCustomWriter>& exportWriter) {
   auto type = Types::Get(imageFilter.get());
   switch (type) {
     case Types::ImageFilterType::Blur: {
@@ -243,6 +302,7 @@ std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& im
       filterElement.addAttribute("width", bound.width());
       filterElement.addAttribute("height", bound.height());
       filterElement.addAttribute("filterUnits", "userSpaceOnUse");
+      callbackBlurImageFilter(blurFilter, exportWriter, filterElement);
       addBlurImageFilter(blurFilter);
       return filterID;
     }
@@ -257,6 +317,7 @@ std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& im
       filterElement.addAttribute("width", bound.width());
       filterElement.addAttribute("height", bound.height());
       filterElement.addAttribute("filterUnits", "userSpaceOnUse");
+      callbackDropShadowImageFilter(dropShadowFilter, exportWriter, filterElement);
       addDropShadowImageFilter(dropShadowFilter);
       return filterID;
     }
@@ -271,6 +332,7 @@ std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& im
       filterElement.addAttribute("width", bound.width() + innerShadowFilter->dx);
       filterElement.addAttribute("height", bound.height() + innerShadowFilter->dy);
       filterElement.addAttribute("filterUnits", "userSpaceOnUse");
+      callbackInnerShadowImageFilter(innerShadowFilter, exportWriter, filterElement);
       addInnerShadowImageFilter(innerShadowFilter);
       return filterID;
     }
@@ -278,7 +340,7 @@ std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& im
       const auto composeFilter = static_cast<const ComposeImageFilter*>(imageFilter.get());
       std::string filterID;
       for (const auto& filterItem : composeFilter->filters) {
-        auto id = addImageFilter(filterItem, bound);
+        auto id = addImageFilter(filterItem, bound, exportWriter);
         if (!id.empty()) {
           filterID = id;
         }
@@ -288,6 +350,63 @@ std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& im
     default:
       reportUnsupportedElement("Unsupported image filter");
       return "";
+  }
+}
+
+void ElementWriter::callbackBlurImageFilter(const GaussianBlurImageFilter* filter,
+                                            const std::shared_ptr<SVGCustomWriter>& exportWriter,
+                                            ElementWriter& filterElement) {
+  if (!exportWriter) {
+    return;
+  }
+  auto attribute = exportWriter->writeBlurImageFilter(filter->blurrinessX, filter->blurrinessY,
+                                                      filter->tileMode);
+  if (!attribute.name.empty() && !attribute.value.empty()) {
+    filterElement.addAttribute(attribute.name, attribute.value);
+  }
+}
+
+void ElementWriter::callbackDropShadowImageFilter(
+    const DropShadowImageFilter* filter, const std::shared_ptr<SVGCustomWriter>& exportWriter,
+    ElementWriter& filterElement) {
+  if (!exportWriter) {
+    return;
+  }
+  float blurrinessX = 0.f;
+  float blurrinessY = 0.f;
+  if (filter->blurFilter) {
+    if (Types::Get(filter->blurFilter.get()) == Types::ImageFilterType::Blur) {
+      const auto blurFilter = static_cast<const GaussianBlurImageFilter*>(filter->blurFilter.get());
+      blurrinessX = blurFilter->blurrinessX;
+      blurrinessY = blurFilter->blurrinessY;
+    }
+  }
+  auto attribute = exportWriter->writeDropShadowImageFilter(
+      filter->dx, filter->dy, blurrinessX, blurrinessY, filter->color, filter->shadowOnly);
+  if (!attribute.name.empty() && !attribute.value.empty()) {
+    filterElement.addAttribute(attribute.name, attribute.value);
+  }
+}
+
+void ElementWriter::callbackInnerShadowImageFilter(
+    const InnerShadowImageFilter* filter, const std::shared_ptr<SVGCustomWriter>& exportWriter,
+    ElementWriter& filterElement) {
+  if (!exportWriter) {
+    return;
+  }
+  float blurrinessX = 0.f;
+  float blurrinessY = 0.f;
+  if (filter->blurFilter) {
+    if (Types::Get(filter->blurFilter.get()) == Types::ImageFilterType::Blur) {
+      const auto blurFilter = static_cast<const GaussianBlurImageFilter*>(filter->blurFilter.get());
+      blurrinessX = blurFilter->blurrinessX;
+      blurrinessY = blurFilter->blurrinessY;
+    }
+  }
+  auto attribute = exportWriter->writeInnerShadowImageFilter(
+      filter->dx, filter->dy, blurrinessX, blurrinessY, filter->color, filter->shadowOnly);
+  if (!attribute.name.empty() && !attribute.value.empty()) {
+    filterElement.addAttribute(attribute.name, attribute.value);
   }
 }
 
@@ -321,6 +440,7 @@ void ElementWriter::addDropShadowImageFilter(const DropShadowImageFilter* filter
     ElementWriter colorMatrixElement("feColorMatrix", writer);
     colorMatrixElement.addAttribute("type", "matrix");
     auto color = filter->color;
+    color = ConvertColorSpace(color, _targetColorSpace);
     colorMatrixElement.addAttribute("values", "0 0 0 0 " + FloatToString(color.red) + " 0 0 0 0 " +
                                                   FloatToString(color.green) + " 0 0 0 0 " +
                                                   FloatToString(color.blue) + " 0 0 0 " +
@@ -381,6 +501,7 @@ void ElementWriter::addInnerShadowImageFilter(const InnerShadowImageFilter* filt
     ElementWriter colorMatrixElement("feColorMatrix", writer);
     colorMatrixElement.addAttribute("type", "matrix");
     auto color = filter->color;
+    color = ConvertColorSpace(color, _targetColorSpace);
     colorMatrixElement.addAttribute("values", "0 0 0 0 " + FloatToString(color.red) + " 0 0 0 0 " +
                                                   FloatToString(color.green) + " 0 0 0 0 " +
                                                   FloatToString(color.blue) + " 0 0 0 " +
@@ -393,16 +514,17 @@ void ElementWriter::addInnerShadowImageFilter(const InnerShadowImageFilter* filt
   }
 }
 
-Resources ElementWriter::addResources(const Fill& fill, Context* context,
+Resources ElementWriter::addResources(const Brush& brush, Context* context,
                                       SVGExportContext* svgContext) {
-  Resources resources(fill);
+  auto color = ConvertColorSpace(brush.color, _targetColorSpace);
+  Resources resources(color);
 
-  if (auto shader = fill.shader) {
+  if (auto shader = brush.shader) {
     ElementWriter defs("defs", writer);
     addShaderResources(shader, context, &resources);
   }
 
-  if (auto colorFilter = fill.colorFilter) {
+  if (auto colorFilter = brush.colorFilter) {
     auto type = Types::Get(colorFilter.get());
     switch (type) {
       case Types::ColorFilterType::Blend:
@@ -419,7 +541,7 @@ Resources ElementWriter::addResources(const Fill& fill, Context* context,
     }
   }
 
-  if (auto maskFilter = fill.maskFilter) {
+  if (auto maskFilter = brush.maskFilter) {
     addMaskResources(maskFilter, &resources, context, svgContext);
   }
 
@@ -466,7 +588,9 @@ void ElementWriter::addShaderResources(const std::shared_ptr<Shader>& shader, Co
 void ElementWriter::addColorShaderResources(const ColorShader* shader, Resources* resources) {
   Color color;
   if (shader->asColor(&color)) {
+    color = ConvertColorSpace(color, _targetColorSpace);
     resources->paintColor = ToSVGColor(color);
+    resources->colorValue = color;
   }
 }
 
@@ -488,14 +612,25 @@ void ElementWriter::addGradientShaderResources(const GradientShader* shader, con
 
 void ElementWriter::addGradientColors(const GradientInfo& info) {
   DEBUG_ASSERT(info.colors.size() >= 2);
+  std::unique_ptr<ColorSpaceXformSteps> steps = nullptr;
+  if (NeedConvertColorSpace(ColorSpace::SRGB(), _targetColorSpace)) {
+    steps =
+        std::make_unique<ColorSpaceXformSteps>(ColorSpace::SRGB().get(), AlphaType::Unpremultiplied,
+                                               _targetColorSpace.get(), AlphaType::Unpremultiplied);
+  }
   for (uint32_t i = 0; i < info.colors.size(); ++i) {
     auto color = info.colors[i];
+    if (steps) {
+      steps->apply(color.array());
+    }
     auto colorStr = ToSVGColor(color);
-
     ElementWriter stop("stop", writer);
     stop.addAttribute("offset", info.positions[i]);
     stop.addAttribute("stop-color", colorStr);
-
+    std::string cssStyle;
+    if (writeColorCSSStyleAttribute("stop-color", color, &cssStyle)) {
+      stop.addAttribute("style", cssStyle);
+    }
     if (!color.isOpaque()) {
       stop.addAttribute("stop-opacity", color.alpha);
     }
@@ -568,7 +703,7 @@ void ElementWriter::addImageShaderResources(const ImageShader* shader, const Mat
                                             Context* context, Resources* resources) {
   auto image = shader->image;
   DEBUG_ASSERT(image);
-
+  image = ConvertImageColorSpace(image, context, _targetColorSpace, _assignColorSpace);
   std::shared_ptr<Data> dataUri = nullptr;
 
   auto data = SVGExportContext::ImageToEncodedData(image);
@@ -651,15 +786,20 @@ void ElementWriter::addBlendColorFilterResources(const ModeColorFilter* modeColo
     {
       // first flood with filter color
       ElementWriter floodElement("feFlood", writer);
-      floodElement.addAttribute("flood-color", ToSVGColor(modeColorFilter->color));
+      auto color = ConvertColorSpace(modeColorFilter->color, _targetColorSpace);
+      floodElement.addAttribute("flood-color", ToSVGColor(color));
       floodElement.addAttribute("flood-opacity", modeColorFilter->color.alpha);
       floodElement.addAttribute("result", "flood");
+      std::string cssStyle;
+      if (writeColorCSSStyleAttribute("flood-color", color, &cssStyle)) {
+        floodElement.addAttribute("style", cssStyle);
+      }
     }
 
     {
       ElementWriter blendElement("feBlend", writer);
-      blendElement.addAttribute("in", "SourceGraphic");
-      blendElement.addAttribute("in2", "flood");
+      blendElement.addAttribute("in", "flood");
+      blendElement.addAttribute("in2", "SourceGraphic");
       blendElement.addAttribute("mode", BlendModeString);
       blendElement.addAttribute("result", "blend");
     }
@@ -843,6 +983,12 @@ void ElementWriter::addShaderMaskResources(const std::shared_ptr<Shader>& shader
 
   writer->startElement("rect");
   addAttribute("fill", resources.paintColor);
+  if (resources.paintColor.find("url") == std::string::npos) {
+    std::string cssStyle;
+    if (writeColorCSSStyleAttribute("fill", resources.colorValue, &cssStyle)) {
+      addAttribute("style", cssStyle);
+    }
+  }
   if (!filterID.empty()) {
     writer->addAttribute("filter", filterID);
   }

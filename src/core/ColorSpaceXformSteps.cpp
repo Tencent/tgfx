@@ -70,7 +70,7 @@ ColorSpaceXformSteps::ColorSpaceXformSteps(const ColorSpace* src, AlphaType srcA
   // We have some options about what to do with null src or dst here.
   // This pair seems to be the most consistent with legacy expectations.
   if (!src) {
-    src = ColorSpace::MakeSRGB().get();
+    src = ColorSpace::SRGB().get();
   }
   if (!dst) {
     dst = src;
@@ -282,24 +282,5 @@ uint32_t ColorSpaceXformSteps::XFormKey(const ColorSpaceXformSteps* xform) {
         << 16);
   }
   return key;
-}
-
-Color ColorSpaceXformSteps::ConvertColorSpace(std::shared_ptr<ColorSpace> src, AlphaType srcAT,
-                                              std::shared_ptr<ColorSpace> dst, AlphaType dstAT,
-                                              const Color& srcColor) {
-  auto dstColor = srcColor;
-  if (srcAT == AlphaType::Premultiplied && dstAT == AlphaType::Unpremultiplied) {
-    dstColor = dstColor.unpremultiply();
-    srcAT = AlphaType::Unpremultiplied;
-  } else if (srcAT == AlphaType::Unpremultiplied && dstAT == AlphaType::Premultiplied) {
-    dstColor = dstColor.premultiply();
-    srcAT = AlphaType::Premultiplied;
-  }
-  if (NeedConvertColorSpace(src, dst) && srcAT == dstAT) {
-    return dstColor;
-  }
-  ColorSpaceXformSteps steps(src.get(), srcAT, dst.get(), dstAT);
-  steps.apply(dstColor.array());
-  return dstColor;
 }
 }  // namespace tgfx

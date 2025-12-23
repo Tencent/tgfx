@@ -20,11 +20,11 @@
 
 namespace tgfx {
 PlacementPtr<DeviceSpaceTextureEffect> DeviceSpaceTextureEffect::Make(
-    BlockBuffer* buffer, std::shared_ptr<TextureProxy> textureProxy, const Matrix& uvMatrix) {
+    BlockAllocator* allocator, std::shared_ptr<TextureProxy> textureProxy, const Matrix& uvMatrix) {
   if (textureProxy == nullptr) {
     return nullptr;
   }
-  return buffer->make<GLSLDeviceSpaceTextureEffect>(std::move(textureProxy), uvMatrix);
+  return allocator->make<GLSLDeviceSpaceTextureEffect>(std::move(textureProxy), uvMatrix);
 }
 
 GLSLDeviceSpaceTextureEffect::GLSLDeviceSpaceTextureEffect(

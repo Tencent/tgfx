@@ -111,8 +111,7 @@ bool Atlas::activateNewPage() {
     HardwareBufferRelease(hardwareBuffer);
   }
   if (proxy == nullptr) {
-    proxy = proxyProvider->createTextureProxy(UniqueKey::Make(), textureWidth, textureHeight,
-                                              pixelFormat);
+    proxy = proxyProvider->createTextureProxy({}, textureWidth, textureHeight, pixelFormat);
   }
   if (proxy == nullptr) {
     return false;
@@ -283,21 +282,18 @@ void Atlas::removeExpiredKeys() {
 }
 
 AtlasConfig::AtlasConfig(int maxTextureSize) {
-  RGBADimensions.set(std::min(MaxTextureSize, maxTextureSize),
-                     std::min(MaxTextureSize, maxTextureSize));
+  A8Dimensions.set(std::min(MaxAtlasSize, maxTextureSize), std::min(MaxAtlasSize, maxTextureSize));
 }
 
 ISize AtlasConfig::atlasDimensions(MaskFormat maskFormat) const {
   if (maskFormat == MaskFormat::A8) {
-    return RGBADimensions;
+    return A8Dimensions;
   }
-  return {RGBADimensions.width, RGBADimensions.height / 2};
+  return {A8Dimensions.width, A8Dimensions.height / 2};
 }
 
-ISize AtlasConfig::plotDimensions(MaskFormat maskFormat) const {
-  auto atlasDimensions = this->atlasDimensions(maskFormat);
-  auto plotWidth = atlasDimensions.width >= MaxTextureSize ? 512 : 256;
-  auto plotHeight = atlasDimensions.height >= MaxTextureSize ? 512 : 256;
-  return {plotWidth, plotHeight};
+ISize AtlasConfig::PlotDimensions() {
+  static ISize dimensions{PlotSize, PlotSize};
+  return dimensions;
 }
 }  // namespace tgfx

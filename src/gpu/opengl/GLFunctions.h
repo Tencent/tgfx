@@ -64,6 +64,7 @@ using GLCopyTexSubImage2D = void GL_FUNCTION_TYPE(unsigned target, int level, in
                                                   int yoffset, int x, int y, int width, int height);
 using GLCreateProgram = unsigned GL_FUNCTION_TYPE();
 using GLCreateShader = unsigned GL_FUNCTION_TYPE(unsigned type);
+using GLCullFace = void GL_FUNCTION_TYPE(unsigned mode);
 using GLDeleteBuffers = void GL_FUNCTION_TYPE(int n, const unsigned* buffers);
 using GLDeleteFramebuffers = void GL_FUNCTION_TYPE(int n, const unsigned* framebuffers);
 using GLDeleteProgram = void GL_FUNCTION_TYPE(unsigned program);
@@ -89,6 +90,7 @@ using GLFramebufferRenderbuffer = void GL_FUNCTION_TYPE(unsigned target, unsigne
 using GLFramebufferTexture2D = void GL_FUNCTION_TYPE(unsigned target, unsigned attachment,
                                                      unsigned textarget, unsigned texture,
                                                      int level);
+using GLFrontFace = void GL_FUNCTION_TYPE(unsigned mode);
 using GLGenBuffers = void GL_FUNCTION_TYPE(int n, unsigned* buffers);
 using GLGenVertexArrays = void GL_FUNCTION_TYPE(int n, unsigned* vertexArrays);
 using GLGenFramebuffers = void GL_FUNCTION_TYPE(int n, unsigned* framebuffers);
@@ -199,6 +201,7 @@ class GLFunctions {
   GLCopyTexSubImage2D* copyTexSubImage2D = nullptr;
   GLCreateProgram* createProgram = nullptr;
   GLCreateShader* createShader = nullptr;
+  GLCullFace* cullFace = nullptr;
   GLDeleteBuffers* deleteBuffers = nullptr;
   GLDeleteFramebuffers* deleteFramebuffers = nullptr;
   GLDeleteProgram* deleteProgram = nullptr;
@@ -219,6 +222,7 @@ class GLFunctions {
   GLFlush* flush = nullptr;
   GLFramebufferRenderbuffer* framebufferRenderbuffer = nullptr;
   GLFramebufferTexture2D* framebufferTexture2D = nullptr;
+  GLFrontFace* frontFace = nullptr;
   GLGenBuffers* genBuffers = nullptr;
   GLGenFramebuffers* genFramebuffers = nullptr;
   GLGenerateMipmap* generateMipmap = nullptr;

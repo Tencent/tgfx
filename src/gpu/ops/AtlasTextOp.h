@@ -48,15 +48,15 @@ class AtlasTextOp final : public DrawOp {
 
  private:
   size_t rectCount = 0;
-  std::optional<Color> commonColor = std::nullopt;
+  std::optional<PMColor> commonColor = std::nullopt;
   std::shared_ptr<GPUBufferProxy> indexBufferProxy = nullptr;
   std::shared_ptr<VertexBufferView> vertexBufferProxyView = {};
   std::shared_ptr<TextureProxy> textureProxy = nullptr;
   SamplingOptions sampling{FilterMode::Nearest, MipmapMode::None};
 
-  explicit AtlasTextOp(RectsVertexProvider* provider, std::shared_ptr<TextureProxy> textureProxy,
-                       const SamplingOptions& sampling);
+  AtlasTextOp(BlockAllocator* allocator, RectsVertexProvider* provider,
+              std::shared_ptr<TextureProxy> textureProxy, const SamplingOptions& sampling);
 
-  friend class BlockBuffer;
+  friend class BlockAllocator;
 };
 }  // namespace tgfx

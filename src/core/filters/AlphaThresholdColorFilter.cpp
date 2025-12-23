@@ -37,8 +37,8 @@ bool AlphaThresholdColorFilter::isEqual(const ColorFilter* colorFilter) const {
 }
 
 PlacementPtr<FragmentProcessor> AlphaThresholdColorFilter::asFragmentProcessor(
-    Context* context, std::shared_ptr<ColorSpace>) const {
-  return AlphaThresholdFragmentProcessor::Make(context->drawingBuffer(), threshold);
+    Context* context, const std::shared_ptr<ColorSpace>&) const {
+  return AlphaThresholdFragmentProcessor::Make(context->drawingAllocator(), threshold);
 }
 
 }  // namespace tgfx

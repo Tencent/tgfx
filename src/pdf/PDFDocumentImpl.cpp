@@ -344,7 +344,9 @@ Canvas* PDFDocumentImpl::onBeginPage(float width, float height) {
     // if this is the first page if the document.
     SerializeHeader(&offsetMap, _stream);
     infoDictionary = this->emit(*PDFMetadataUtils::MakeDocumentInformationDict(_metadata));
-    _colorSpaceRef = emitColorSpace();
+    if (_metadata.targetColorSpace != nullptr || _metadata.assignColorSpace != nullptr) {
+      _colorSpaceRef = emitColorSpace();
+    }
     if (_metadata.PDFA) {
       documentUUID = PDFMetadataUtils::CreateUUID(_metadata);
       // We use the same UUID for Document ID and Instance ID since this
@@ -381,9 +383,11 @@ void PDFDocumentImpl::onEndPage() {
   auto pageContent = drawContext->getContent();
 
   auto resourceDict = drawContext->makeResourceDict();
-  auto colorSpaceDic = PDFDictionary::Make();
-  colorSpaceDic->insertRef("CS", _colorSpaceRef);
-  resourceDict->insertObject("ColorSpace", std::move(colorSpaceDic));
+  if (_colorSpaceRef) {
+    auto colorSpaceDic = PDFDictionary::Make();
+    colorSpaceDic->insertRef("CS", _colorSpaceRef);
+    resourceDict->insertObject("ColorSpace", std::move(colorSpaceDic));
+  }
   DEBUG_ASSERT(!pageRefs.empty());
 
   page->insertObject("Resources", std::move(resourceDict));
@@ -495,10 +499,13 @@ void PDFDocumentImpl::endObject() {
 }
 
 PDFIndirectReference PDFDocumentImpl::emitColorSpace() {
+  DEBUG_ASSERT(_metadata.targetColorSpace != nullptr || _metadata.assignColorSpace != nullptr);
+  auto writeColorSpace =
+      _metadata.assignColorSpace ? _metadata.assignColorSpace : _metadata.targetColorSpace;
   auto colorSpaceDictionary = PDFDictionary::Make();
   colorSpaceDictionary->insertInt("N", 3);
   colorSpaceDictionary->insertName("Alternate", "DeviceRGB");
-  auto iccProfile = _metadata.colorSpace->toICCProfile();
+  auto iccProfile = writeColorSpace->toICCProfile();
   auto stream = Stream::MakeFromData(iccProfile);
   auto ref = PDFStreamOut(std::move(colorSpaceDictionary), std::move(stream), this);
   PDFArray array{};

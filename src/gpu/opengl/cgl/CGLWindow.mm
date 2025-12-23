@@ -18,11 +18,17 @@
 
 #include "tgfx/gpu/opengl/cgl/CGLWindow.h"
 #include <thread>
+#include "core/utils/Log.h"
 #include "gpu/opengl/GLDefines.h"
 #include "tgfx/gpu/Backend.h"
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+
 namespace tgfx {
-std::shared_ptr<CGLWindow> CGLWindow::MakeFrom(NSView* view, CGLContextObj sharedContext) {
+
+std::shared_ptr<CGLWindow> CGLWindow::MakeFrom(NSView* view, CGLContextObj sharedContext,
+                                               std::shared_ptr<ColorSpace> colorSpace) {
   if (view == nil) {
     return nullptr;
   }
@@ -30,20 +36,26 @@ std::shared_ptr<CGLWindow> CGLWindow::MakeFrom(NSView* view, CGLContextObj share
   if (device == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<CGLWindow>(new CGLWindow(device, view));
+  if (colorSpace != nullptr && !ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get())) {
+    if (ColorSpace::Equals(colorSpace.get(), ColorSpace::DisplayP3().get())) {
+      view.window.colorSpace = [NSColorSpace displayP3ColorSpace];
+    } else {
+      LOGE("CGLWindow::MakeFrom() The specified ColorSpace is not supported on this platform. "
+           "Rendering may have color inaccuracies.");
+    }
+  }
+  return std::shared_ptr<CGLWindow>(new CGLWindow(device, view, std::move(colorSpace)));
 }
 
-CGLWindow::CGLWindow(std::shared_ptr<Device> device, NSView* view)
-    : Window(std::move(device)), view(view) {
+CGLWindow::CGLWindow(std::shared_ptr<Device> device, NSView* view,
+                     std::shared_ptr<ColorSpace> colorSpace)
+    : Window(std::move(device)), view(view), colorSpace(std::move(colorSpace)) {
   // do not retain view here, otherwise it can cause circular reference.
 }
 
 CGLWindow::~CGLWindow() {
   auto glContext = static_cast<CGLDevice*>(device.get())->glContext;
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   [glContext setView:nil];
-#pragma clang diagnostic pop
   view = nil;
 }
 
@@ -54,16 +66,13 @@ std::shared_ptr<Surface> CGLWindow::onCreateSurface(Context* context) {
   if (size.width <= 0 || size.height <= 0) {
     return nullptr;
   }
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   [glContext setView:view];
-#pragma clang diagnostic pop
   GLFrameBufferInfo frameBuffer = {};
   frameBuffer.id = 0;
   frameBuffer.format = GL_RGBA8;
   BackendRenderTarget renderTarget(frameBuffer, static_cast<int>(size.width),
                                    static_cast<int>(size.height));
-  return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
+  return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft, 0, colorSpace);
 }
 
 void CGLWindow::onPresent(Context*) {
@@ -71,3 +80,5 @@ void CGLWindow::onPresent(Context*) {
   [glContext flushBuffer];
 }
 }  // namespace tgfx
+
+#pragma clang diagnostic pop

@@ -48,8 +48,8 @@ std::shared_ptr<Shape> Shape::ApplyMatrix(std::shared_ptr<Shape> shape, const Ma
   return std::make_shared<MatrixShape>(matrixShape->shape, totalMatrix);
 }
 
-Rect MatrixShape::getBounds() const {
-  auto bounds = shape->getBounds();
+Rect MatrixShape::onGetBounds() const {
+  auto bounds = shape->onGetBounds();
   matrix.mapRect(&bounds);
   return bounds;
 }

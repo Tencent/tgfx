@@ -68,7 +68,7 @@ class ImageFilter {
    * @param dy            The Y offset of the shadow.
    * @param blurrinessX   The blur radius for the shadow, along the X axis.
    * @param blurrinessY   The blur radius for the shadow, along the Y axis.
-   * @param color         The color of the drop shadow in srgb gamut, can overflow 0-1.
+   * @param color         The color of the drop shadow in sRGB gamut, may exceed 0-1.
    */
   static std::shared_ptr<ImageFilter> DropShadow(float dx, float dy, float blurrinessX,
                                                  float blurrinessY, const Color& color);
@@ -80,7 +80,7 @@ class ImageFilter {
    * @param dy            The Y offset of the shadow.
    * @param blurrinessX   The blur radius for the shadow, along the X axis.
    * @param blurrinessY   The blur radius for the shadow, along the Y axis.
-   * @param color         The color of the drop shadow in srgb gamut, can overflow 0-1.
+   * @param color         The color of the drop shadow in sRGB gamut, may exceed 0-1.
    */
   static std::shared_ptr<ImageFilter> DropShadowOnly(float dx, float dy, float blurrinessX,
                                                      float blurrinessY, const Color& color);
@@ -92,7 +92,7 @@ class ImageFilter {
    * @param dy            The Y offset of the shadow.
    * @param blurrinessX   The blur radius for the shadow, along the X axis.
    * @param blurrinessY   The blur radius for the shadow, along the Y axis.
-   * @param color         The color of the inner shadow in srgb gamut, can overflow 0-1.
+   * @param color         The color of the inner shadow in sRGB gamut, may exceed 0-1.
    */
   static std::shared_ptr<ImageFilter> InnerShadow(float dx, float dy, float blurrinessX,
                                                   float blurrinessY, const Color& color);
@@ -104,7 +104,7 @@ class ImageFilter {
    * @param dy            The Y offset of the shadow.
    * @param blurrinessX   The blur radius for the shadow, along the X axis.
    * @param blurrinessY   The blur radius for the shadow, along the Y axis.
-   * @param color         The color of the inner shadow in srgb gamut, can overflow 0-1.
+   * @param color         The color of the inner shadow in sRGB gamut, may exceed 0-1.
    */
   static std::shared_ptr<ImageFilter> InnerShadowOnly(float dx, float dy, float blurrinessX,
                                                       float blurrinessY, const Color& color);
@@ -130,8 +130,14 @@ class ImageFilter {
    * content with a z component outside this range will be clipped.
    * The default transformation anchor is at the top-left origin (0,0) of the source image,
    * user-defined anchors are included in the matrix.
+   * @param hideBackFace Controls whether to hide the back face of the content after the 3D
+   * transformation. The default value is false, which means both the front and back faces are drawn.
+   * When the image model is first created, the front face is oriented toward the user by default.
+   * After applying certain 3D transformations, such as rotating 180 degrees around the X axis, the
+   * back face of the layer may face the user.
    */
-  static std::shared_ptr<ImageFilter> Transform3D(const Matrix3D& matrix);
+  static std::shared_ptr<ImageFilter> Transform3D(const Matrix3D& matrix,
+                                                  bool hideBackFace = false);
 
   virtual ~ImageFilter() = default;
 

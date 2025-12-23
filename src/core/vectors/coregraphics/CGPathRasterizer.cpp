@@ -21,6 +21,7 @@
 #include "core/PixelBuffer.h"
 #include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/GammaCorrection.h"
+#include "core/utils/MathExtra.h"
 #include "platform/apple/BitmapContextUtil.h"
 #include "tgfx/core/PathTypes.h"
 
@@ -143,8 +144,8 @@ bool CGPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, si
   if (!bounds.intersect(clipBounds)) {
     return false;
   }
-  auto width = static_cast<int>(ceilf(bounds.width()));
-  auto height = static_cast<int>(ceilf(bounds.height()));
+  auto width = FloatCeilToInt(bounds.width());
+  auto height = FloatCeilToInt(bounds.height());
   auto tempBuffer = PixelBuffer::Make(width, height, true, false);
   if (tempBuffer == nullptr) {
     CGContextRelease(cgContext);
@@ -167,7 +168,7 @@ bool CGPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, si
   CGContextDrawImage(cgContext, rect, image);
   CGContextRelease(cgContext);
   CGImageRelease(image);
-  if (!NeedConvertColorSpace(colorSpace(), dstColorSpace)) {
+  if (NeedConvertColorSpace(colorSpace(), dstColorSpace)) {
     ConvertColorSpaceInPlace(ImageGenerator::width(), ImageGenerator::height(), colorType,
                              alphaType, dstRowBytes, colorSpace(), dstColorSpace, dstPixels);
   }

@@ -79,9 +79,9 @@ class FragmentProcessor : public Processor {
   /**
    * Creates a fragment processor that will draw the given Shader with the given options.
    */
-  static PlacementPtr<FragmentProcessor> Make(std::shared_ptr<Shader> shader, const FPArgs& args,
-                                              const Matrix* uvMatrix = nullptr,
-                                              std::shared_ptr<ColorSpace> dstColorSpace = nullptr);
+  static PlacementPtr<FragmentProcessor> Make(
+      std::shared_ptr<Shader> shader, const FPArgs& args, const Matrix* uvMatrix = nullptr,
+      const std::shared_ptr<ColorSpace>& dstColorSpace = nullptr);
 
   /**
    *  In many instances (e.g., Shader::asFragmentProcessor() implementations) it is desirable to
@@ -92,14 +92,14 @@ class FragmentProcessor : public Processor {
    *  parent's input alpha. The passed in FP will not receive an input color.
    */
   static PlacementPtr<FragmentProcessor> MulChildByInputAlpha(
-      BlockBuffer* buffer, PlacementPtr<FragmentProcessor> child);
+      BlockAllocator* allocator, PlacementPtr<FragmentProcessor> child);
 
   /**
    * Returns the input color, modulated by the child's alpha. The passed in FP will not receive an
    * input color.
    * @param inverted false: output = input * child.a; true: output = input * (1 - child.a)
    */
-  static PlacementPtr<FragmentProcessor> MulInputByChildAlpha(BlockBuffer* buffer,
+  static PlacementPtr<FragmentProcessor> MulInputByChildAlpha(BlockAllocator* allocator,
                                                               PlacementPtr<FragmentProcessor> child,
                                                               bool inverted = false);
 
@@ -108,7 +108,7 @@ class FragmentProcessor : public Processor {
    * This is equivalent to running them in series (`g`, then `f`). This is not the same as
    * transfer-mode composition; there is no blending step.
    */
-  static PlacementPtr<FragmentProcessor> Compose(BlockBuffer* buffer,
+  static PlacementPtr<FragmentProcessor> Compose(BlockAllocator* allocator,
                                                  PlacementPtr<FragmentProcessor> f,
                                                  PlacementPtr<FragmentProcessor> g);
 

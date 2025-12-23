@@ -55,7 +55,7 @@ class SurfaceTexture : public ImageStream {
    */
   void notifyFrameAvailable();
 
-  std::shared_ptr<ColorSpace> colorSpace() const override {
+  const std::shared_ptr<ColorSpace>& colorSpace() const override {
     return _colorSpace;
   }
 
@@ -70,7 +70,7 @@ class SurfaceTexture : public ImageStream {
   Global<jobject> surface;
   Global<jobject> surfaceTexture;
   bool frameAvailable = false;
-  std::shared_ptr<ColorSpace> _colorSpace = ColorSpace::MakeSRGB();
+  std::shared_ptr<ColorSpace> _colorSpace = nullptr;
 
   static void JNIInit(JNIEnv* env);
 

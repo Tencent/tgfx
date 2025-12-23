@@ -279,7 +279,7 @@ TGFX_TEST(SVGExportTest, BlendMode) {
       "<?xml version=\"1.0\" encoding=\"utf-8\" ?><svg xmlns=\"http://www.w3.org/2000/svg\" "
       "xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"200\" height=\"200\"><rect "
       "fill=\"#FFF\" width=\"100\" height=\"100\"/><rect fill=\"#F00\" fill-opacity=\"1\" "
-      "style=\"mix-blend-mode:difference\" x=\"50\" y=\"50\" width=\"100\" height=\"100\"/></svg>";
+      "style=\"mix-blend-mode:difference;\" x=\"50\" y=\"50\" width=\"100\" height=\"100\"/></svg>";
 
   ContextScope scope;
   auto context = scope.getContext();
@@ -721,5 +721,119 @@ TGFX_TEST(SVGExportTest, LayerShadow) {
 
   exporter->close();
   EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/LayerDropShadow"));
+}
+
+TGFX_TEST(SVGExportTest, DstColorSpace) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  image = image->makeScaled(400, 400);
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(2048, 2048), 0, nullptr,
+                                    ColorSpace::DisplayP3());
+  auto canvas = exporter->getCanvas();
+  Paint paint;
+  paint.setColor(Color::Green());
+  canvas->drawRect(Rect::MakeXYWH(20, 20, 100, 100), paint);
+  RRect rrect;
+  rrect.setOval(Rect::MakeXYWH(140, 20, 100, 100));
+  canvas->drawRRect(rrect, paint);
+  canvas->drawImageRect(image, Rect::MakeXYWH(260, 20, 100, 100), {}, &paint);
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+  Font font(typeface, 50.f);
+  canvas->drawSimpleText("TGFX", 400, 80, font, paint);
+  paint.setShader(Shader::MakeColorShader(Color::Red()));
+  canvas->drawRect(Rect::MakeXYWH(580, 20, 100, 100), paint);
+  paint.setShader(Shader::MakeLinearGradient({720, 20}, {820, 20}, {Color::Green(), Color::Red()}));
+  canvas->drawRect(Rect::MakeXYWH(720, 20, 100, 100), paint);
+  paint.setShader(Shader::MakeRadialGradient({70, 190}, 50, {Color::Green(), Color::Red()}));
+  canvas->drawRect(Rect::MakeXYWH(20, 140, 100, 100), paint);
+  paint.setShader(Shader::MakeRadialGradient({190, 190}, 50, {Color::Green(), Color::Red()}));
+  paint.setColorFilter(ColorFilter::Blend(Color::White(), BlendMode::Difference));
+  canvas->drawRect(Rect::MakeXYWH(140, 140, 100, 100), paint);
+  paint.setImageFilter(ImageFilter::DropShadow(10, 10, 10, 10, Color::Green()));
+  canvas->drawRect(Rect::MakeXYWH(260, 140, 100, 100), paint);
+  paint.setImageFilter(ImageFilter::InnerShadow(10, 10, 10, 10, Color::Green()));
+  canvas->drawRect(Rect::MakeXYWH(400, 140, 100, 100), paint);
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/DstColorSpace"));
+}
+
+TGFX_TEST(SVGExportTest, AssignColorSpace) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  image = image->makeScaled(400, 400);
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(2048, 2048), 0, nullptr,
+                                    nullptr, ColorSpace::SRGB());
+  auto canvas = exporter->getCanvas();
+  Paint paint;
+  paint.setColor(Color::Green());
+  canvas->drawRect(Rect::MakeXYWH(20, 20, 100, 100), paint);
+  RRect rrect;
+  rrect.setOval(Rect::MakeXYWH(140, 20, 100, 100));
+  canvas->drawRRect(rrect, paint);
+  canvas->drawImageRect(image, Rect::MakeXYWH(260, 20, 100, 100), {}, &paint);
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+  Font font(typeface, 50.f);
+  canvas->drawSimpleText("TGFX", 400, 80, font, paint);
+  paint.setShader(Shader::MakeColorShader(Color::Red()));
+  canvas->drawRect(Rect::MakeXYWH(580, 20, 100, 100), paint);
+  paint.setShader(Shader::MakeLinearGradient({720, 20}, {820, 20}, {Color::Green(), Color::Red()}));
+  canvas->drawRect(Rect::MakeXYWH(720, 20, 100, 100), paint);
+  paint.setShader(Shader::MakeRadialGradient({70, 190}, 50, {Color::Green(), Color::Red()}));
+  canvas->drawRect(Rect::MakeXYWH(20, 140, 100, 100), paint);
+  paint.setShader(Shader::MakeRadialGradient({190, 190}, 50, {Color::Green(), Color::Red()}));
+  paint.setColorFilter(ColorFilter::Blend(Color::White(), BlendMode::Difference));
+  canvas->drawRect(Rect::MakeXYWH(140, 140, 100, 100), paint);
+  paint.setImageFilter(ImageFilter::DropShadow(10, 10, 10, 10, Color::Green()));
+  canvas->drawRect(Rect::MakeXYWH(260, 140, 100, 100), paint);
+  paint.setImageFilter(ImageFilter::InnerShadow(10, 10, 10, 10, Color::Green()));
+  canvas->drawRect(Rect::MakeXYWH(400, 140, 100, 100), paint);
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/AssignColorSpace"));
+}
+
+TGFX_TEST(SVGExportTest, DstAssignColorSpace) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  image = image->makeScaled(400, 400);
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(2048, 2048), 0, nullptr,
+                                    ColorSpace::DisplayP3(), ColorSpace::SRGB());
+  auto canvas = exporter->getCanvas();
+  Paint paint;
+  paint.setColor(Color::Green());
+  canvas->drawRect(Rect::MakeXYWH(20, 20, 100, 100), paint);
+  RRect rrect;
+  rrect.setOval(Rect::MakeXYWH(140, 20, 100, 100));
+  canvas->drawRRect(rrect, paint);
+  canvas->drawImageRect(image, Rect::MakeXYWH(260, 20, 100, 100), {}, &paint);
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+  Font font(typeface, 50.f);
+  canvas->drawSimpleText("TGFX", 400, 80, font, paint);
+  paint.setShader(Shader::MakeColorShader(Color::Red()));
+  canvas->drawRect(Rect::MakeXYWH(580, 20, 100, 100), paint);
+  paint.setShader(Shader::MakeLinearGradient({720, 20}, {820, 20}, {Color::Green(), Color::Red()}));
+  canvas->drawRect(Rect::MakeXYWH(720, 20, 100, 100), paint);
+  paint.setShader(Shader::MakeRadialGradient({70, 190}, 50, {Color::Green(), Color::Red()}));
+  canvas->drawRect(Rect::MakeXYWH(20, 140, 100, 100), paint);
+  paint.setShader(Shader::MakeRadialGradient({190, 190}, 50, {Color::Green(), Color::Red()}));
+  paint.setColorFilter(ColorFilter::Blend(Color::White(), BlendMode::Difference));
+  canvas->drawRect(Rect::MakeXYWH(140, 140, 100, 100), paint);
+  paint.setImageFilter(ImageFilter::DropShadow(10, 10, 10, 10, Color::Green()));
+  canvas->drawRect(Rect::MakeXYWH(260, 140, 100, 100), paint);
+  paint.setImageFilter(ImageFilter::InnerShadow(10, 10, 10, 10, Color::Green()));
+  canvas->drawRect(Rect::MakeXYWH(400, 140, 100, 100), paint);
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/DstAssignColorSpace"));
 }
 }  // namespace tgfx

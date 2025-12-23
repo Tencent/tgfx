@@ -19,6 +19,7 @@
 #pragma once
 #include "core/DrawContext.h"
 #include "core/PictureContext.h"
+#include "tgfx/core/Brush.h"
 
 namespace tgfx {
 class ContourContext : public DrawContext {
@@ -27,33 +28,33 @@ class ContourContext : public DrawContext {
 
   ~ContourContext() override = default;
 
-  void drawFill(const Fill& fill) override;
+  void drawFill(const Brush& brush) override;
 
-  void drawRect(const Rect& rect, const MCState& state, const Fill& fill,
+  void drawRect(const Rect& rect, const MCState& state, const Brush& brush,
                 const Stroke* stroke) override;
 
-  void drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
+  void drawRRect(const RRect& rRect, const MCState& state, const Brush& brush,
                  const Stroke* stroke) override;
 
-  void drawPath(const Path& path, const MCState& state, const Fill& fill) override;
+  void drawPath(const Path& path, const MCState& state, const Brush& brush) override;
 
-  void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill,
+  void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Brush& brush,
                  const Stroke* stroke) override;
 
   void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                 const MCState& state, const Fill& fill) override;
+                 const MCState& state, const Brush& brush) override;
 
   void drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
-                     const SamplingOptions& sampling, const MCState& state, const Fill& fill,
+                     const SamplingOptions& sampling, const MCState& state, const Brush& brush,
                      SrcRectConstraint constraint) override;
 
   void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
-                        const Fill& fill, const Stroke* stroke) override;
+                        const Brush& brush, const Stroke* stroke) override;
 
   void drawPicture(std::shared_ptr<Picture> picture, const MCState& state) override;
 
   void drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<ImageFilter> filter,
-                 const MCState& state, const Fill& fill) override;
+                 const MCState& state, const Brush& brush) override;
 
   std::shared_ptr<Picture> finishRecordingAsPicture();
 
@@ -66,13 +67,25 @@ class ContourContext : public DrawContext {
     explicit Contour(Type t) : shape(nullptr), type(t) {
       DEBUG_ASSERT(t == Type::None || t == Type::Fill);
     }
-    explicit Contour(const Rect& r) : rect(r), type(Type::Rect) {
+    Contour(const Rect& r, const Stroke* s) : rect(r), type(Type::Rect) {
+      if (s) {
+        stroke = *s;
+        hasStroke = true;
+      }
     }
-    explicit Contour(const RRect& rr) : rRect(rr), type(Type::RRect) {
+    Contour(const RRect& rr, const Stroke* s) : rRect(rr), type(Type::RRect) {
+      if (s) {
+        stroke = *s;
+        hasStroke = true;
+      }
     }
     explicit Contour(const Path& p) : path(p), type(Type::Path) {
     }
-    explicit Contour(std::shared_ptr<Shape> s) : shape(std::move(s)), type(Type::Shape) {
+    Contour(std::shared_ptr<Shape> s, const Stroke* stk) : shape(std::move(s)), type(Type::Shape) {
+      if (stk) {
+        stroke = *stk;
+        hasStroke = true;
+      }
     }
 
     Contour(const Contour& other) {
@@ -95,10 +108,12 @@ class ContourContext : public DrawContext {
     };
 
     Type type = Type::None;
+    Stroke stroke = {};
+    bool hasStroke = false;
+
     bool isInverseFillType() const;
     Rect getBounds() const;
-    void draw(PictureContext& context, const MCState& state, const Fill& fill,
-              const Stroke* stroke) const;
+    void draw(PictureContext& context, const MCState& state, const Brush& brush) const;
     bool operator==(const Contour& other) const;
     bool operator!=(const Contour& other) const {
       return !(*this == other);
@@ -106,28 +121,24 @@ class ContourContext : public DrawContext {
     Contour& operator=(const Contour& other);
   };
 
-  void drawContour(const Contour& contour, const MCState& state, const Fill& fill,
-                   const Stroke* stroke = nullptr);
+  void drawContour(const Contour& contour, const MCState& state, const Brush& brush);
 
   bool containContourBound(const Rect& bounds);
 
   void mergeContourBound(const Rect& bounds);
 
-  bool canAppend(const Contour& contour, const MCState& state, const Fill& fill,
-                 const Stroke* stroke = nullptr);
+  bool canAppend(const Contour& contour, const MCState& state, const Brush& brush);
 
-  void appendFill(const Fill& fill, const Stroke* stroke = nullptr);
+  void appendFill(const Brush& brush);
 
   void flushPendingContour(const Contour& contour = {}, const MCState& state = {},
-                           const Fill& fill = {}, const Stroke* stroke = nullptr);
+                           const Brush& brush = {});
 
-  void resetPendingContour(const Contour& contour, const MCState& state, const Fill& fill,
-                           const Stroke* stroke);
+  void resetPendingContour(const Contour& contour, const MCState& state, const Brush& brush);
   Contour pendingContour = {};
 
   MCState pendingState = {};
-  std::vector<Fill> pendingFills = {};
-  std::vector<const Stroke*> pendingStrokes = {};
+  std::vector<Brush> pendingBrushes = {};
 
   std::vector<Rect> contourBounds = {};
   PictureContext pictureContext = {};
