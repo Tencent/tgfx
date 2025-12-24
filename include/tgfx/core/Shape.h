@@ -23,6 +23,7 @@
 #include "tgfx/core/Matrix3D.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/core/PathProvider.h"
+#include "tgfx/core/PathTypes.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/TextBlob.h"
 
@@ -103,10 +104,11 @@ class Shape {
                                             std::shared_ptr<PathEffect> effect);
 
   /**
-   * Creates a new Shape by applying the inverse fill type to the given Shape. Returns nullptr if
-   * the shape is nullptr.
+   * Creates a new Shape by applying the specified fill type to the given Shape. If the shape
+   * already has the specified fill type, the original shape is returned. Returns nullptr if the
+   * shape is nullptr.
    */
-  static std::shared_ptr<Shape> ApplyInverse(std::shared_ptr<Shape> shape);
+  static std::shared_ptr<Shape> ApplyFillType(std::shared_ptr<Shape> shape, PathFillType fillType);
 
   virtual ~Shape();
 
@@ -119,11 +121,16 @@ class Shape {
   }
 
   /**
-   * Returns true if the PathFillType of the computed path is InverseWinding or InverseEvenOdd.
+   * Returns the PathFillType of the Shape.
    */
-  virtual bool isInverseFillType() const {
-    return false;
+  virtual PathFillType fillType() const {
+    return PathFillType::Winding;
   }
+
+  /**
+   * Returns true if the PathFillType is InverseWinding or InverseEvenOdd.
+   */
+  bool isInverseFillType() const;
 
   /**
    * Returns the bounding box of the Shape. The bounds might be larger than the actual shape because
@@ -141,7 +148,7 @@ class Shape {
     Append,
     Effect,
     Text,
-    Inverse,
+    FillType,
     Matrix,
     Merge,
     Path,
@@ -180,7 +187,7 @@ class Shape {
   friend class StrokeShape;
   friend class MatrixShape;
   friend class Matrix3DShape;
-  friend class InverseShape;
+  friend class FillTypeShape;
   friend class MergeShape;
   friend class EffectShape;
   friend class ShapeDrawOp;

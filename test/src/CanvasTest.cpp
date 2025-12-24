@@ -956,7 +956,7 @@ TGFX_TEST(CanvasTest, inverseFillType) {
   shape = Shape::ApplyStroke(firstShape, &stroke);
   EXPECT_FALSE(shape->isInverseFillType());
 
-  firstShape = Shape::ApplyInverse(firstShape);
+  firstShape = Shape::ApplyFillType(firstShape, PathFillType::InverseWinding);
   EXPECT_TRUE(firstShape->isInverseFillType());
   shape = Shape::Merge(firstShape, secondShape, PathOp::Append);
   EXPECT_TRUE(shape->isInverseFillType());
@@ -975,6 +975,77 @@ TGFX_TEST(CanvasTest, inverseFillType) {
   EXPECT_TRUE(shape->isInverseFillType());
   shape = Shape::ApplyStroke(firstShape, &stroke);
   EXPECT_TRUE(shape->isInverseFillType());
+}
+
+TGFX_TEST(CanvasTest, MergeShapeFillType) {
+  // MergeShape always produces EvenOdd fill type regardless of input fill types.
+  Path rectPath;
+  rectPath.addRect(Rect::MakeXYWH(0, 0, 100, 100));
+  Path ovalPath;
+  ovalPath.addOval(Rect::MakeXYWH(50, 50, 100, 100));
+
+  // Winding + Winding -> EvenOdd
+  auto shape1 = Shape::MakeFrom(rectPath);
+  auto shape2 = Shape::MakeFrom(ovalPath);
+  EXPECT_EQ(shape1->fillType(), PathFillType::Winding);
+  EXPECT_EQ(shape2->fillType(), PathFillType::Winding);
+
+  auto merged = Shape::Merge(shape1, shape2, PathOp::Union);
+  EXPECT_EQ(merged->fillType(), PathFillType::EvenOdd);
+  merged = Shape::Merge(shape1, shape2, PathOp::Intersect);
+  EXPECT_EQ(merged->fillType(), PathFillType::EvenOdd);
+  merged = Shape::Merge(shape1, shape2, PathOp::Difference);
+  EXPECT_EQ(merged->fillType(), PathFillType::EvenOdd);
+  merged = Shape::Merge(shape1, shape2, PathOp::XOR);
+  EXPECT_EQ(merged->fillType(), PathFillType::EvenOdd);
+
+  // InverseWinding + Winding
+  auto inverseShape1 = Shape::ApplyFillType(shape1, PathFillType::InverseWinding);
+  EXPECT_EQ(inverseShape1->fillType(), PathFillType::InverseWinding);
+
+  merged = Shape::Merge(inverseShape1, shape2, PathOp::Union);
+  EXPECT_EQ(merged->fillType(), PathFillType::InverseEvenOdd);
+  merged = Shape::Merge(inverseShape1, shape2, PathOp::Intersect);
+  EXPECT_EQ(merged->fillType(), PathFillType::EvenOdd);
+  merged = Shape::Merge(inverseShape1, shape2, PathOp::Difference);
+  EXPECT_EQ(merged->fillType(), PathFillType::InverseEvenOdd);
+  merged = Shape::Merge(inverseShape1, shape2, PathOp::XOR);
+  EXPECT_EQ(merged->fillType(), PathFillType::InverseEvenOdd);
+
+  // Winding + InverseWinding
+  auto inverseShape2 = Shape::ApplyFillType(shape2, PathFillType::InverseWinding);
+  merged = Shape::Merge(shape1, inverseShape2, PathOp::Union);
+  EXPECT_EQ(merged->fillType(), PathFillType::InverseEvenOdd);
+  merged = Shape::Merge(shape1, inverseShape2, PathOp::Intersect);
+  EXPECT_EQ(merged->fillType(), PathFillType::EvenOdd);
+  merged = Shape::Merge(shape1, inverseShape2, PathOp::Difference);
+  EXPECT_EQ(merged->fillType(), PathFillType::EvenOdd);
+  merged = Shape::Merge(shape1, inverseShape2, PathOp::XOR);
+  EXPECT_EQ(merged->fillType(), PathFillType::InverseEvenOdd);
+
+  // InverseWinding + InverseWinding
+  merged = Shape::Merge(inverseShape1, inverseShape2, PathOp::Union);
+  EXPECT_EQ(merged->fillType(), PathFillType::InverseEvenOdd);
+  merged = Shape::Merge(inverseShape1, inverseShape2, PathOp::Intersect);
+  EXPECT_EQ(merged->fillType(), PathFillType::InverseEvenOdd);
+  merged = Shape::Merge(inverseShape1, inverseShape2, PathOp::Difference);
+  EXPECT_EQ(merged->fillType(), PathFillType::EvenOdd);
+  merged = Shape::Merge(inverseShape1, inverseShape2, PathOp::XOR);
+  EXPECT_EQ(merged->fillType(), PathFillType::EvenOdd);
+
+  // EvenOdd inputs
+  auto evenOddShape = Shape::ApplyFillType(shape1, PathFillType::EvenOdd);
+  EXPECT_EQ(evenOddShape->fillType(), PathFillType::EvenOdd);
+  merged = Shape::Merge(evenOddShape, shape2, PathOp::Union);
+  EXPECT_EQ(merged->fillType(), PathFillType::EvenOdd);
+
+  // Append preserves first shape's fillType
+  merged = Shape::Merge(shape1, shape2, PathOp::Append);
+  EXPECT_EQ(merged->fillType(), PathFillType::Winding);
+  merged = Shape::Merge(inverseShape1, shape2, PathOp::Append);
+  EXPECT_EQ(merged->fillType(), PathFillType::InverseWinding);
+  merged = Shape::Merge(evenOddShape, shape2, PathOp::Append);
+  EXPECT_EQ(merged->fillType(), PathFillType::EvenOdd);
 }
 
 TGFX_TEST(CanvasTest, image) {

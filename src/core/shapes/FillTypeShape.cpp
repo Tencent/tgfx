@@ -16,35 +16,30 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "core/shapes/UniqueKeyShape.h"
-#include "tgfx/core/Matrix.h"
+#include "FillTypeShape.h"
+#include "core/shapes/PathShape.h"
 
 namespace tgfx {
-class InverseShape : public UniqueKeyShape {
- public:
-  explicit InverseShape(std::shared_ptr<Shape> shape) : shape(std::move(shape)) {
+
+std::shared_ptr<Shape> Shape::ApplyFillType(std::shared_ptr<Shape> shape, PathFillType fillType) {
+  if (shape == nullptr || shape->fillType() == fillType) {
+    return shape;
   }
-
-  bool isInverseFillType() const override {
-    return !shape->isInverseFillType();
+  if (shape->type() == Type::Path) {
+    auto path = std::static_pointer_cast<PathShape>(shape)->path;
+    path.setFillType(fillType);
+    return std::make_shared<PathShape>(std::move(path));
   }
-
-  Rect onGetBounds() const override {
-    return shape->onGetBounds();
+  if (shape->type() == Type::FillType) {
+    auto fillTypeShape = std::static_pointer_cast<FillTypeShape>(shape);
+    return std::make_shared<FillTypeShape>(fillTypeShape->shape, fillType);
   }
+  return std::make_shared<FillTypeShape>(std::move(shape), fillType);
+}
 
- protected:
-  Type type() const override {
-    return Type::Inverse;
-  }
-
-  Path onGetPath(float resolutionScale) const override;
-
- private:
-  std::shared_ptr<Shape> shape = nullptr;
-
-  friend class Shape;
-};
+Path FillTypeShape::onGetPath(float resolutionScale) const {
+  auto path = shape->onGetPath(resolutionScale);
+  path.setFillType(_fillType);
+  return path;
+}
 }  // namespace tgfx
