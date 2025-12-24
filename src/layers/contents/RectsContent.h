@@ -18,30 +18,31 @@
 
 #pragma once
 
+#include <vector>
 #include "layers/contents/GeometryContent.h"
-#include "tgfx/core/TextBlob.h"
 
 namespace tgfx {
 
-class TextContent : public GeometryContent {
+class RectsContent : public GeometryContent {
  public:
-  TextContent(std::shared_ptr<TextBlob> textBlob, float x, float y, const LayerPaint& paint);
+  RectsContent(std::vector<Rect> rects, const LayerPaint& paint);
 
   Rect getTightBounds(const Matrix& matrix) const override;
   bool hitTestPoint(float localX, float localY) const override;
 
-  std::shared_ptr<TextBlob> textBlob = nullptr;
-  float x = 0.0f;
-  float y = 0.0f;
+  std::vector<Rect> rects = {};
 
  protected:
   Type type() const override {
-    return Type::Text;
+    return Type::Rects;
   }
 
   Rect onGetBounds() const override;
   void onDraw(Canvas* canvas, const Paint& paint) const override;
   bool onHasSameGeometry(const GeometryContent* other) const override;
+
+ private:
+  Path getFilledPath() const;
 };
 
 }  // namespace tgfx
