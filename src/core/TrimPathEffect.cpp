@@ -23,35 +23,53 @@
 namespace tgfx {
 using namespace pk;
 
-std::shared_ptr<PathEffect> PathEffect::MakeTrim(float startT, float stopT) {
-  if (isnan(startT) || isnan(stopT)) {
+std::shared_ptr<PathEffect> PathEffect::MakeTrim(float startT, float stopT, bool inverted) {
+  if (std::isnan(startT) || std::isnan(stopT)) {
     return nullptr;
   }
-  if (startT <= 0 && stopT >= 1) {
+  // Return nullptr if the result would be the full path (no trimming needed)
+  if (!inverted && startT <= 0.f && stopT >= 1.f) {
     return nullptr;
   }
+  // Clamp to [0, 1] range
   startT = std::max(0.f, std::min(startT, 1.f));
   stopT = std::max(0.f, std::min(stopT, 1.f));
-  return std::shared_ptr<PathEffect>(new TrimPathEffect(startT, stopT));
+  // Inverted mode with startT >= stopT means full path
+  if (inverted && startT >= stopT) {
+    return nullptr;
+  }
+  return std::shared_ptr<PathEffect>(new TrimPathEffect(startT, stopT, inverted));
 }
 
 bool TrimPathEffect::filterPath(Path* path) const {
   if (path == nullptr) {
     return false;
   }
-  if (startT >= stopT) {
+  // Normal mode with startT >= stopT results in empty path
+  if (!inverted && startT >= stopT) {
     path->reset();
     return true;
   }
   auto fillType = path->getFillType();
   auto pathMeasure = PathMeasure::MakeFrom(*path);
   auto length = pathMeasure->getLength();
-  auto start = startT * length;
-  auto end = stopT * length;
   Path tempPath = {};
-  if (!pathMeasure->getSegment(start, end, &tempPath)) {
-    return false;
+
+  if (!inverted) {
+    // Normal mode: return segment [startT, stopT]
+    auto start = startT * length;
+    auto end = stopT * length;
+    pathMeasure->getSegment(start, end, &tempPath);
+  } else {
+    // Inverted mode: return segments [0, startT] + [stopT, 1]
+    if (startT > 0.f) {
+      pathMeasure->getSegment(0.f, startT * length, &tempPath);
+    }
+    if (stopT < 1.f) {
+      pathMeasure->getSegment(stopT * length, length, &tempPath);
+    }
   }
+
   tempPath.setFillType(fillType);
   *path = std::move(tempPath);
   return true;
