@@ -28,6 +28,10 @@ class GlyphShape : public UniqueKeyShape {
  public:
   explicit GlyphShape(Font font, GlyphID glyphID);
 
+  PathFillType fillType() const override {
+    return PathFillType::Winding;
+  }
+
   Rect onGetBounds() const override;
 
  protected:

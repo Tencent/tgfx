@@ -123,9 +123,7 @@ class Shape {
   /**
    * Returns the PathFillType of the Shape.
    */
-  virtual PathFillType fillType() const {
-    return PathFillType::Winding;
-  }
+  virtual PathFillType fillType() const = 0;
 
   /**
    * Returns true if the PathFillType is InverseWinding or InverseEvenOdd.
