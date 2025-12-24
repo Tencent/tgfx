@@ -20,6 +20,9 @@
 #include "gpu/opengl/GLCaps.h"
 #include "gpu/opengl/GLUtil.h"
 #include "tgfx/gpu/opengl/GLDevice.h"
+#include "tgfx/layers/DisplayList.h"
+#include "tgfx/layers/SolidLayer.h"
+#include "tgfx/platform/HardwareBuffer.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
@@ -72,5 +75,37 @@ TGFX_TEST(SurfaceTest, ImageSnapshot) {
   compareCanvas->clear();
   compareCanvas->drawImage(snapshotImage);
   EXPECT_TRUE(Baseline::Compare(compareSurface, "SurfaceTest/ImageSnapshot2"));
+}
+
+TGFX_TEST(SurfaceTest, HardwareBuffer) {
+  if (!HardwareBufferAvailable()) {
+    GTEST_SKIP();
+    return;
+  }
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto width = 200;
+  auto height = 200;
+  auto hardwareBuffer = HardwareBufferAllocate(width, height, false);
+  ASSERT_TRUE(hardwareBuffer != nullptr);
+
+  auto surface = Surface::MakeFrom(context, hardwareBuffer, 1, 0, ColorSpace::SRGB());
+  ASSERT_TRUE(surface != nullptr);
+
+  auto canvas = surface->getCanvas();
+  canvas->drawColor(Color::Red());
+  surface = Surface::MakeFrom(context, hardwareBuffer, 1, 0, ColorSpace::DisplayP3());
+  canvas = surface->getCanvas();
+  DisplayList list{};
+  auto layer = SolidLayer::Make();
+  layer->setWidth(100);
+  layer->setHeight(100);
+  layer->setColor(Color::FromRGBA(255, 0, 0, 255, ColorSpace::DisplayP3()));
+  list.root()->addChild(layer);
+  list.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "SurfaceTest/HardwareBuffer"));
+
 }
 }  // namespace tgfx

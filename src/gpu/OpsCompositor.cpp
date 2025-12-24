@@ -464,6 +464,8 @@ bool OpsCompositor::drawAsClear(const Rect& rect, const MCState& state, const Br
   auto format = renderTarget->format();
   auto writeSwizzle = Swizzle::ForWrite(format);
   auto dstColor = ToPMColor(brush.color, dstColorSpace);
+  LOGI("OpsCompositor::drawAsClear() src color: (%f, %f, %f, %f)", brush.color.red, brush.color.green, brush.color.blue, brush.color.alpha);
+  LOGI("OpsCompositor::drawAsClear() dst color: (%f, %f, %f, %f)", dstColor.red, dstColor.green, dstColor.blue, dstColor.alpha);
   clearColor = writeSwizzle.applyTo(dstColor);
   return true;
 }

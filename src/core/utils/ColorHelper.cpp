@@ -18,6 +18,7 @@
 
 #include "ColorHelper.h"
 #include "ColorSpaceHelper.h"
+#include "Log.h"
 #include "core/ColorSpaceXformSteps.h"
 
 namespace tgfx {
@@ -50,10 +51,12 @@ Color ConvertColorSpace(const Color& color, const std::shared_ptr<ColorSpace>& d
 }
 
 uint32_t ToUintPMColor(const Color& color, const ColorSpaceXformSteps* steps) {
+  LOGI("ToUintPMColor() src color: (%f, %f, %f, %f)", color.red, color.green, color.blue, color.alpha);
   PMColor pmColor = color.premultiply();
   if (steps) {
     steps->apply(pmColor.array());
   }
+  LOGI("ToUintPMColor() dst color: (%f, %f, %f, %f)", pmColor.red, pmColor.green, pmColor.blue, pmColor.alpha);
   uint32_t compressedColor = 0;
   auto bytes = reinterpret_cast<uint8_t*>(&compressedColor);
   bytes[0] = static_cast<uint8_t>(pmColor.red * 255);
