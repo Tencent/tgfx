@@ -34,8 +34,8 @@ class PathShape : public Shape {
     return true;
   }
 
-  bool isInverseFillType() const override {
-    return path.isInverseFillType();
+  PathFillType fillType() const override {
+    return path.getFillType();
   }
 
   Rect onGetBounds() const override {

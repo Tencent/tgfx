@@ -43,6 +43,7 @@ bool TrimPathEffect::filterPath(Path* path) const {
     path->reset();
     return true;
   }
+  auto fillType = path->getFillType();
   auto pathMeasure = PathMeasure::MakeFrom(*path);
   auto length = pathMeasure->getLength();
   auto start = startT * length;
@@ -51,6 +52,7 @@ bool TrimPathEffect::filterPath(Path* path) const {
   if (!pathMeasure->getSegment(start, end, &tempPath)) {
     return false;
   }
+  tempPath.setFillType(fillType);
   *path = std::move(tempPath);
   return true;
 }

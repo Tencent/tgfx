@@ -33,8 +33,8 @@ class StrokeShape : public Shape {
       : shape(std::move(shape)), stroke(stroke) {
   }
 
-  bool isInverseFillType() const override {
-    return shape->isInverseFillType();
+  PathFillType fillType() const override {
+    return shape->fillType();
   }
 
   Rect onGetBounds() const override;

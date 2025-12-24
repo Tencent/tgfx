@@ -86,6 +86,9 @@ PathFillType Path::getFillType() const {
 }
 
 void Path::setFillType(PathFillType fillType) {
+  if (getFillType() == fillType) {
+    return;
+  }
   SkPathFillType type;
   switch (fillType) {
     case PathFillType::EvenOdd:

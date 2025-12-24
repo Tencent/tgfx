@@ -31,7 +31,7 @@ class MergeShape : public UniqueKeyShape {
       : first(std::move(first)), second(std::move(second)), pathOp(pathOp) {
   }
 
-  bool isInverseFillType() const override;
+  PathFillType fillType() const override;
 
   Rect onGetBounds() const override;
 
