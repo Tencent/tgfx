@@ -1048,6 +1048,39 @@ TGFX_TEST(CanvasTest, MergeShapeFillType) {
   EXPECT_EQ(merged->fillType(), PathFillType::EvenOdd);
 }
 
+TGFX_TEST(CanvasTest, ReverseShape) {
+  Path path;
+  path.moveTo(0, 0);
+  path.lineTo(100, 0);
+  path.lineTo(100, 100);
+  path.close();
+
+  auto shape = Shape::MakeFrom(path);
+  ASSERT_TRUE(shape != nullptr);
+  EXPECT_EQ(shape->fillType(), PathFillType::Winding);
+
+  // Apply reverse
+  auto reversedShape = Shape::ApplyReverse(shape);
+  ASSERT_TRUE(reversedShape != nullptr);
+  EXPECT_EQ(reversedShape->fillType(), PathFillType::Winding);
+  EXPECT_EQ(reversedShape->getBounds(), shape->getBounds());
+
+  // Reverse with inverse fill type
+  auto inverseShape = Shape::ApplyFillType(shape, PathFillType::InverseWinding);
+  auto reversedInverse = Shape::ApplyReverse(inverseShape);
+  EXPECT_EQ(reversedInverse->fillType(), PathFillType::InverseWinding);
+
+  // Double reverse on ReverseShape should return the inner shape
+  auto matrixShape = Shape::ApplyMatrix(shape, Matrix::MakeTrans(10, 10));
+  auto reversedMatrix = Shape::ApplyReverse(matrixShape);
+  auto doubleReversed = Shape::ApplyReverse(reversedMatrix);
+  EXPECT_EQ(doubleReversed, matrixShape);
+
+  // Reverse nullptr should return nullptr
+  auto nullReversed = Shape::ApplyReverse(nullptr);
+  EXPECT_EQ(nullReversed, nullptr);
+}
+
 TGFX_TEST(CanvasTest, image) {
   ContextScope scope;
   auto context = scope.getContext();

@@ -110,6 +110,12 @@ class Shape {
    */
   static std::shared_ptr<Shape> ApplyFillType(std::shared_ptr<Shape> shape, PathFillType fillType);
 
+  /**
+   * Creates a new Shape by reversing the path direction of the given Shape. Returns nullptr if the
+   * shape is nullptr.
+   */
+  static std::shared_ptr<Shape> ApplyReverse(std::shared_ptr<Shape> shape);
+
   virtual ~Shape();
 
   /**
@@ -150,6 +156,7 @@ class Shape {
     Matrix,
     Merge,
     Path,
+    Reverse,
     Stroke,
     Provider,
     Glyph,
@@ -186,6 +193,7 @@ class Shape {
   friend class MatrixShape;
   friend class Matrix3DShape;
   friend class FillTypeShape;
+  friend class ReverseShape;
   friend class MergeShape;
   friend class EffectShape;
   friend class ShapeDrawOp;
