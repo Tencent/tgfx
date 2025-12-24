@@ -970,7 +970,7 @@ TGFX_TEST(CanvasTest, inverseFillType) {
   EXPECT_FALSE(shape->isInverseFillType());
 
   shape = Shape::ApplyEffect(firstShape, pathEffect);
-  EXPECT_FALSE(shape->isInverseFillType());
+  EXPECT_TRUE(shape->isInverseFillType());
   shape = Shape::ApplyMatrix(firstShape, Matrix::MakeScale(2.0f));
   EXPECT_TRUE(shape->isInverseFillType());
   shape = Shape::ApplyStroke(firstShape, &stroke);
