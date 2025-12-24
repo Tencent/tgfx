@@ -1869,6 +1869,69 @@ TGFX_TEST(CanvasTest, AdaptiveDashEffect) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/AdaptiveDashEffect"));
 }
 
+TGFX_TEST(CanvasTest, TrimPathEffect) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 400);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  Paint paint = {};
+  paint.setColor(Color::Blue());
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStroke(Stroke(4));
+
+  // Test normal trim [0.25, 0.75]
+  Path path1 = {};
+  path1.addRect(50, 50, 150, 150);
+  auto trimEffect = PathEffect::MakeTrim(0.25f, 0.75f);
+  EXPECT_TRUE(trimEffect != nullptr);
+  trimEffect->filterPath(&path1);
+  canvas->drawPath(path1, paint);
+
+  // Test inverted trim: complement of [0.25, 0.75] = [0, 0.25] + [0.75, 1]
+  paint.setColor(Color::Red());
+  Path path2 = {};
+  path2.addRect(200, 50, 300, 150);
+  auto invertedEffect = PathEffect::MakeTrim(0.25f, 0.75f, true);
+  EXPECT_TRUE(invertedEffect != nullptr);
+  invertedEffect->filterPath(&path2);
+  canvas->drawPath(path2, paint);
+
+  // Test edge cases
+  // Full path (no trim needed) should return nullptr
+  EXPECT_TRUE(PathEffect::MakeTrim(0.0f, 1.0f) == nullptr);
+  EXPECT_TRUE(PathEffect::MakeTrim(-0.5f, 1.5f) == nullptr);
+
+  // Inverted with startT >= stopT (full path) should return nullptr
+  EXPECT_TRUE(PathEffect::MakeTrim(0.5f, 0.5f, true) == nullptr);
+  EXPECT_TRUE(PathEffect::MakeTrim(0.7f, 0.3f, true) == nullptr);
+
+  // NaN should return nullptr
+  EXPECT_TRUE(PathEffect::MakeTrim(NAN, 0.5f) == nullptr);
+  EXPECT_TRUE(PathEffect::MakeTrim(0.5f, NAN) == nullptr);
+
+  // Normal mode with startT >= stopT results in empty path
+  paint.setColor(Color::Green());
+  Path path3 = {};
+  path3.addRect(50, 200, 150, 300);
+  auto emptyEffect = PathEffect::MakeTrim(0.7f, 0.3f);
+  EXPECT_TRUE(emptyEffect != nullptr);
+  emptyEffect->filterPath(&path3);
+  EXPECT_TRUE(path3.isEmpty());
+
+  // Test with oval
+  paint.setColor(Color::FromRGBA(128, 0, 128));
+  Path path4 = {};
+  path4.addOval(Rect::MakeXYWH(200, 200, 100, 100));
+  auto ovalTrim = PathEffect::MakeTrim(0.0f, 0.5f);
+  ovalTrim->filterPath(&path4);
+  canvas->drawPath(path4, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/TrimPathEffect"));
+}
+
 TGFX_TEST(CanvasTest, BlendFormula) {
   ContextScope scope;
   auto context = scope.getContext();
