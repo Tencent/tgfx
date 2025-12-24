@@ -19,36 +19,5 @@
 #include "tgfx/layers/ColorSource.h"
 
 namespace tgfx {
-void ColorSource::setAlpha(float value) {
-  if (_alpha == value) {
-    return;
-  }
-  _alpha = value;
-  invalidateContent();
-}
-
-void ColorSource::setBlendMode(BlendMode value) {
-  if (_blendMode == value) {
-    return;
-  }
-  _blendMode = value;
-  invalidateContent();
-}
-
-void ColorSource::setMatrix(const Matrix& value) {
-  if (_matrix == value) {
-    return;
-  }
-  _matrix = value;
-  invalidateContent();
-}
-
-std::shared_ptr<Shader> ColorSource::getShader() const {
-  auto shader = onGetShader();
-  if (!shader) {
-    return nullptr;
-  }
-  return shader->makeWithMatrix(_matrix);
-}
-
+// ColorSource is now a pure interface, no implementation needed.
 }  // namespace tgfx
