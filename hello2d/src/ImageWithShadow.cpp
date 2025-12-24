@@ -19,7 +19,7 @@
 #include "base/LayerBuilders.h"
 #include "tgfx/layers/ImageLayer.h"
 #include "tgfx/layers/ShapeLayer.h"
-#include "tgfx/layers/SolidColor.h"
+#include "tgfx/layers/ShapeStyle.h"
 #include "tgfx/layers/filters/DropShadowFilter.h"
 
 namespace hello2d {
@@ -42,7 +42,7 @@ std::shared_ptr<tgfx::Layer> ImageWithShadow::onBuildLayerTree(const hello2d::Ap
       tgfx::Matrix::MakeScale(static_cast<float>(size) / static_cast<float>(image->width()));
   matrix.postTranslate(80, 80);
   auto maskLayer = tgfx::ShapeLayer::Make();
-  maskLayer->setFillStyle(tgfx::SolidColor::Make());
+  maskLayer->setFillStyle(tgfx::ShapeStyle::Make(tgfx::Color::White()));
   auto maskPath = tgfx::Path();
   maskPath.addOval(tgfx::Rect::MakeWH(image->width(), image->height()));
   maskLayer->setPath(maskPath);
