@@ -545,8 +545,10 @@ void Path::transform3D(const Matrix3D& matrix) {
 
 void Path::reverse() {
   auto& path = writableRef()->path;
+  auto fillType = path.getFillType();
   SkPath tempPath;
   tempPath.reverseAddPath(path);
+  tempPath.setFillType(fillType);
   path = tempPath;
 }
 
