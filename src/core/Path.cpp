@@ -86,6 +86,9 @@ PathFillType Path::getFillType() const {
 }
 
 void Path::setFillType(PathFillType fillType) {
+  if (getFillType() == fillType) {
+    return;
+  }
   SkPathFillType type;
   switch (fillType) {
     case PathFillType::EvenOdd:
@@ -542,8 +545,10 @@ void Path::transform3D(const Matrix3D& matrix) {
 
 void Path::reverse() {
   auto& path = writableRef()->path;
+  auto fillType = path.getFillType();
   SkPath tempPath;
   tempPath.reverseAddPath(path);
+  tempPath.setFillType(fillType);
   path = tempPath;
 }
 

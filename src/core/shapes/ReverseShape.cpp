@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,35 +16,30 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "core/shapes/UniqueKeyShape.h"
-#include "tgfx/core/Matrix.h"
+#include "ReverseShape.h"
+#include "core/shapes/PathShape.h"
 
 namespace tgfx {
-class InverseShape : public UniqueKeyShape {
- public:
-  explicit InverseShape(std::shared_ptr<Shape> shape) : shape(std::move(shape)) {
+
+std::shared_ptr<Shape> Shape::ApplyReverse(std::shared_ptr<Shape> shape) {
+  if (shape == nullptr) {
+    return nullptr;
   }
-
-  bool isInverseFillType() const override {
-    return !shape->isInverseFillType();
+  if (shape->type() == Type::Path) {
+    auto path = std::static_pointer_cast<PathShape>(shape)->path;
+    path.reverse();
+    return std::make_shared<PathShape>(std::move(path));
   }
-
-  Rect onGetBounds() const override {
-    return shape->onGetBounds();
+  if (shape->type() == Type::Reverse) {
+    auto reverseShape = std::static_pointer_cast<ReverseShape>(shape);
+    return reverseShape->shape;
   }
+  return std::make_shared<ReverseShape>(std::move(shape));
+}
 
- protected:
-  Type type() const override {
-    return Type::Inverse;
-  }
-
-  Path onGetPath(float resolutionScale) const override;
-
- private:
-  std::shared_ptr<Shape> shape = nullptr;
-
-  friend class Shape;
-};
+Path ReverseShape::onGetPath(float resolutionScale) const {
+  auto path = shape->onGetPath(resolutionScale);
+  path.reverse();
+  return path;
+}
 }  // namespace tgfx

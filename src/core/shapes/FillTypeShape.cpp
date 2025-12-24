@@ -16,34 +16,30 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "core/shapes/UniqueKeyShape.h"
-#include "tgfx/core/Matrix.h"
+#include "FillTypeShape.h"
+#include "core/shapes/PathShape.h"
 
 namespace tgfx {
-/**
- * Shape that merges multiple shapes together.
- */
-class MergeShape : public UniqueKeyShape {
- public:
-  MergeShape(std::shared_ptr<Shape> first, std::shared_ptr<Shape> second, PathOp pathOp)
-      : first(std::move(first)), second(std::move(second)), pathOp(pathOp) {
+
+std::shared_ptr<Shape> Shape::ApplyFillType(std::shared_ptr<Shape> shape, PathFillType fillType) {
+  if (shape == nullptr || shape->fillType() == fillType) {
+    return shape;
   }
-
-  PathFillType fillType() const override;
-
-  Rect onGetBounds() const override;
-
-  std::shared_ptr<Shape> first = nullptr;
-  std::shared_ptr<Shape> second = nullptr;
-  PathOp pathOp = PathOp::Append;
-
- protected:
-  Type type() const override {
-    return Type::Merge;
+  if (shape->type() == Type::Path) {
+    auto path = std::static_pointer_cast<PathShape>(shape)->path;
+    path.setFillType(fillType);
+    return std::make_shared<PathShape>(std::move(path));
   }
+  if (shape->type() == Type::FillType) {
+    auto fillTypeShape = std::static_pointer_cast<FillTypeShape>(shape);
+    return std::make_shared<FillTypeShape>(fillTypeShape->shape, fillType);
+  }
+  return std::make_shared<FillTypeShape>(std::move(shape), fillType);
+}
 
-  Path onGetPath(float resolutionScale) const override;
-};
+Path FillTypeShape::onGetPath(float resolutionScale) const {
+  auto path = shape->onGetPath(resolutionScale);
+  path.setFillType(_fillType);
+  return path;
+}
 }  // namespace tgfx
