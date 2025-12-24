@@ -34,8 +34,20 @@ ImagePattern::ImagePattern(std::shared_ptr<Image> image, TileMode tileModeX, Til
     : _image(std::move(image)), _tileModeX(tileModeX), _tileModeY(tileModeY), _sampling(sampling) {
 }
 
-std::shared_ptr<Shader> ImagePattern::onGetShader() const {
-  return Shader::MakeImageShader(_image, _tileModeX, _tileModeY, _sampling);
+void ImagePattern::setMatrix(const Matrix& matrix) {
+  if (_matrix == matrix) {
+    return;
+  }
+  _matrix = matrix;
+  invalidateContent();
+}
+
+std::shared_ptr<Shader> ImagePattern::getShader() const {
+  auto shader = Shader::MakeImageShader(_image, _tileModeX, _tileModeY, _sampling);
+  if (shader == nullptr || _matrix.isIdentity()) {
+    return shader;
+  }
+  return shader->makeWithMatrix(_matrix);
 }
 
 }  // namespace tgfx

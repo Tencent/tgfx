@@ -31,7 +31,7 @@
 #include "tgfx/core/WriteStream.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ShapeLayer.h"
-#include "tgfx/layers/SolidColor.h"
+#include "tgfx/layers/ShapeStyle.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
 #include "tgfx/layers/layerstyles/InnerShadowStyle.h"
 #include "tgfx/svg/SVGExporter.h"
@@ -704,7 +704,7 @@ TGFX_TEST(SVGExportTest, LayerShadow) {
   Path rect;
   rect.addRect(Rect::MakeWH(50, 50));
   dropShadowLayer->setPath(rect);
-  dropShadowLayer->setFillStyle(SolidColor::Make(Color::Red()));
+  dropShadowLayer->setFillStyle(ShapeStyle::Make(Color::Red()));
   dropShadowLayer->setLayerStyles({dropShadowStyle});
   rootLayer->addChild(dropShadowLayer);
 
@@ -712,7 +712,7 @@ TGFX_TEST(SVGExportTest, LayerShadow) {
   auto innerShadowStyle = InnerShadowStyle::Make(10, 10, 10, 10, Color::White());
   innerShadowLayer->setMatrix(Matrix::MakeTrans(200, 0));
   innerShadowLayer->setPath(rect);
-  innerShadowLayer->setFillStyle(SolidColor::Make(Color::Red()));
+  innerShadowLayer->setFillStyle(ShapeStyle::Make(Color::Red()));
   innerShadowLayer->setLayerStyles({innerShadowStyle});
   rootLayer->addChild(innerShadowLayer);
 

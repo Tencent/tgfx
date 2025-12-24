@@ -17,10 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "base/LayerBuilders.h"
-#include "tgfx/layers/Gradient.h"
+#include "tgfx/core/Shader.h"
 #include "tgfx/layers/ImageLayer.h"
 #include "tgfx/layers/ShapeLayer.h"
-#include "tgfx/layers/SolidColor.h"
+#include "tgfx/layers/ShapeStyle.h"
 #include "tgfx/layers/TextLayer.h"
 #include "tgfx/layers/filters/DropShadowFilter.h"
 
@@ -34,7 +34,7 @@ static std::shared_ptr<tgfx::Layer> CreateProgressBar() {
   auto backLinePath = tgfx::Path();
   backLinePath.lineTo(327, 0);
   backLineLayer->setPath(backLinePath);
-  backLineLayer->setStrokeStyle(tgfx::SolidColor::Make(tgfx::Color::FromRGBA(143, 195, 228)));
+  backLineLayer->setStrokeStyle(tgfx::ShapeStyle::Make(tgfx::Color::FromRGBA(143, 195, 228)));
   backLineLayer->setLineWidth(6);
   backLineLayer->setAlpha(0.1f);
   progressBar->addChild(backLineLayer);
@@ -43,14 +43,14 @@ static std::shared_ptr<tgfx::Layer> CreateProgressBar() {
   auto frontLinePath = tgfx::Path();
   frontLinePath.lineTo(222, 0);
   frontLineLayer->setPath(frontLinePath);
-  frontLineLayer->setStrokeStyle(tgfx::SolidColor::Make(tgfx::Color::FromRGBA(167, 223, 246)));
+  frontLineLayer->setStrokeStyle(tgfx::ShapeStyle::Make(tgfx::Color::FromRGBA(167, 223, 246)));
   frontLineLayer->setLineWidth(6);
   progressBar->addChild(frontLineLayer);
 
   auto circleLayer = tgfx::ShapeLayer::Make();
   auto circlePath = tgfx::Path();
   circlePath.addOval(tgfx::Rect::MakeWH(22, 22));
-  circleLayer->setFillStyle(tgfx::SolidColor::Make(tgfx::Color::FromRGBA(192, 221, 241)));
+  circleLayer->setFillStyle(tgfx::ShapeStyle::Make(tgfx::Color::FromRGBA(192, 221, 241)));
   circleLayer->setPath(circlePath);
   circleLayer->setMatrix(tgfx::Matrix::MakeTrans(211, -11));
   progressBar->addChild(circleLayer);
@@ -66,18 +66,18 @@ static std::vector<std::shared_ptr<tgfx::Layer>> CreateBackground() {
   tgfx::Rect displayRect = tgfx::Rect::MakeWH(375, 812);
   auto backPath = tgfx::Path();
   backPath.addRoundRect(displayRect, 40, 40);
-  background->setFillStyle(tgfx::SolidColor::Make(tgfx::Color::FromRGBA(72, 154, 209)));
+  background->setFillStyle(tgfx::ShapeStyle::Make(tgfx::Color::FromRGBA(72, 154, 209)));
   background->setPath(backPath);
   layers.push_back(background);
 
   auto backgroundGradient = tgfx::ShapeLayer::Make();
-  auto gradient = tgfx::Gradient::MakeLinear(
+  auto gradientShader = tgfx::Shader::MakeLinearGradient(
       {0, 0}, {0, 430},
-      {tgfx::Color::FromRGBA(233, 0, 100), tgfx::Color::FromRGBA(134, 93, 255, 0)});
+      {tgfx::Color::FromRGBA(233, 0, 100), tgfx::Color::FromRGBA(134, 93, 255, 0)}, {});
   auto gradientPath = tgfx::Path();
   gradientPath.addRect(tgfx::Rect::MakeXYWH(0, 0, 375, 430));
   gradientPath.addPath(backPath, tgfx::PathOp::Intersect);
-  backgroundGradient->setFillStyle(gradient);
+  backgroundGradient->setFillStyle(tgfx::ShapeStyle::Make(gradientShader));
   backgroundGradient->setPath(gradientPath);
   backgroundGradient->setAlpha(0.2f);
   layers.push_back(backgroundGradient);
@@ -96,7 +96,7 @@ static std::shared_ptr<tgfx::Layer> CreateImageLayer(const AppHost* host) {
   imageLayer->setImage(image);
   auto imageScale = static_cast<float>(std::min(327.0 / image->width(), 344.0 / image->height()));
   auto maskLayer = tgfx::ShapeLayer::Make();
-  maskLayer->setFillStyle(tgfx::SolidColor::Make());
+  maskLayer->setFillStyle(tgfx::ShapeStyle::Make(tgfx::Color::White()));
   auto maskPath = tgfx::Path();
   auto radius = 20.f / imageScale;
   maskPath.addRoundRect(tgfx::Rect::MakeWH(image->width(), image->height()), radius, radius);

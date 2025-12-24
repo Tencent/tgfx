@@ -4,7 +4,7 @@
 #include "tgfx/core/Stroke.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ShapeLayer.h"
-#include "tgfx/layers/SolidColor.h"
+#include "tgfx/layers/ShapeStyle.h"
 #include "tgfx/svg/SVGPathParser.h"
 #include "utils/TestUtils.h"
 #include "utils/TextShaper.h"
@@ -83,7 +83,7 @@ TGFX_TEST(StrokeTest, HairlineLayer) {
   path1.addRect(-10, -10, 10, 10);
   auto shapeLayer1 = ShapeLayer::Make();
   shapeLayer1->setPath(path1);
-  auto strokeStyle = SolidColor::Make(Color::Red());
+  auto strokeStyle = ShapeStyle::Make(Color::Red());
   shapeLayer1->setLineWidth(0.0f);
   shapeLayer1->setStrokeStyle(strokeStyle);
   shapeLayer1->setLineDashAdaptive(true);
@@ -189,7 +189,7 @@ TGFX_TEST(StrokeTest, ExtremelyThinStrokeLayer) {
   shape = Shape::ApplyEffect(shape, PathEffect::MakeCorner(50));
   shapeLayer->setShape(shape);
   shapeLayer->setLineWidth(1.0f);
-  auto strokeStyle = SolidColor::Make(Color::Red());
+  auto strokeStyle = ShapeStyle::Make(Color::Red());
   shapeLayer->setStrokeStyle(strokeStyle);
   auto matrix = Matrix::MakeTrans(100, 100);
   matrix.preScale(0.4f, 0.4f);
@@ -258,7 +258,7 @@ TGFX_TEST(StrokeTest, SquareCapDashStrokeAsSolidStroke) {
   path1.addRect(-70, -70, 70, 70);
   auto shapeLayer1 = ShapeLayer::Make();
   shapeLayer1->setPath(path1);
-  auto strokeStyle = SolidColor::Make(Color::Red());
+  auto strokeStyle = ShapeStyle::Make(Color::Red());
   shapeLayer1->setLineWidth(2.0f);
   shapeLayer1->setStrokeStyle(strokeStyle);
   shapeLayer1->setLineDashAdaptive(true);
