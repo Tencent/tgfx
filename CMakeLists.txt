@@ -323,11 +323,10 @@ file(GLOB_RECURSE EGL_PLATFORM_FILES src/gpu/opengl/egl/*.*)
 if (TGFX_USE_QT)
     set(CMAKE_AUTOMOC ON)
     # need to set the CMAKE_PREFIX_PATH to local QT installation path, for example :
-    # set(CMAKE_PREFIX_PATH /Users/username/Qt/6.6.1/macos/lib/cmake)
-    find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core)
-    find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets OpenGL Quick)
-    list(APPEND TGFX_SHARED_LIBS Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::OpenGL
-            Qt${QT_VERSION_MAJOR}::Quick)
+    #set(CMAKE_PREFIX_PATH /Users/yuelei/Qt6.0.0/6.0.0/clang_64/lib/cmake)
+    find_package(Qt6 REQUIRED COMPONENTS Core Widgets OpenGL Quick)
+    list(APPEND TGFX_SHARED_LIBS Qt6::Widgets Qt6::OpenGL
+            Qt6::Quick)
 
     file(GLOB_RECURSE GPU_PLATFORM_FILES src/gpu/opengl/qt/*.*)
     list(APPEND TGFX_FILES ${GPU_PLATFORM_FILES})
