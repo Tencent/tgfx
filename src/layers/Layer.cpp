@@ -1078,13 +1078,16 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
     return {};
   }
 
-  if (isMatrixAffine && maskType != LayerMaskType::Luminance) {
-    Path maskPath = {};
-    if (MaskContext::GetMaskPath(maskPicture, &maskPath)) {
-      maskPath.transform(Matrix::MakeScale(1.0f / scale, 1.0f / scale));
-      return {std::move(maskPath), nullptr};
-    }
-  }
+  // TODO:
+  // The mask path gets clipped by layerClipBounds, causing incorrect masking in some tiles.
+  // Temporarily disabled until the issue is fixed.
+  // if (isMatrixAffine && maskType != LayerMaskType::Luminance) {
+  //   Path maskPath = {};
+  //   if (MaskContext::GetMaskPath(maskPicture, &maskPath)) {
+  //     maskPath.transform(Matrix::MakeScale(1.0f / scale, 1.0f / scale));
+  //     return {std::move(maskPath), nullptr};
+  //   }
+  // }
 
   Point maskImageOffset = {};
   auto maskContentImage =
@@ -1125,6 +1128,7 @@ std::shared_ptr<Image> Layer::getContentImage(
     PictureRecorder recorder = {};
     auto offscreenCanvas = recorder.beginRecording();
     offscreenCanvas->setMatrix(contentMatrix);
+    offscreenCanvas->clipRect(*inputBounds);
     drawDirectly(contentArgs, offscreenCanvas, 1.0f, extraSourceTypes);
     Point offset = {};
     auto finalImage = ToImageWithOffset(recorder.finishRecordingAsPicture(), &offset, nullptr,
@@ -1141,6 +1145,7 @@ std::shared_ptr<Image> Layer::getContentImage(
   PictureRecorder recorder = {};
   auto offscreenCanvas = recorder.beginRecording();
   offscreenCanvas->scale(contentScale, contentScale);
+  offscreenCanvas->clipRect(*inputBounds);
   drawDirectly(contentArgs, offscreenCanvas, 1.0f, extraSourceTypes);
   Point offset = {};
   auto finalImage = ToImageWithOffset(recorder.finishRecordingAsPicture(), &offset, nullptr,
@@ -1461,6 +1466,7 @@ std::optional<Rect> Layer::computeContentBounds(const std::optional<Rect>& clipB
       return std::nullopt;
     }
   }
+  inputBounds.roundOut();
   return inputBounds;
 }
 
