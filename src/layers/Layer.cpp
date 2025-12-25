@@ -1131,9 +1131,10 @@ std::shared_ptr<Image> Layer::getContentImage(
     mappedBounds.roundOut();
     offscreenCanvas->clipRect(mappedBounds);
     offscreenCanvas->setMatrix(contentMatrix);
+    offscreenCanvas->clipRect(*inputBounds);
     drawDirectly(contentArgs, offscreenCanvas, 1.0f, extraSourceTypes);
     Point offset = {};
-    auto finalImage = ToImageWithOffset(recorder.finishRecordingAsPicture(), &offset, nullptr,
+    auto finalImage = ToImageWithOffset(recorder.finishRecordingAsPicture(), &offset, &*inputBounds,
                                         contentArgs.dstColorSpace);
     if (!finalImage) {
       return nullptr;
@@ -1151,9 +1152,10 @@ std::shared_ptr<Image> Layer::getContentImage(
   mappedBounds.roundOut();
   offscreenCanvas->clipRect(mappedBounds);
   offscreenCanvas->scale(contentScale, contentScale);
+  offscreenCanvas->clipRect(*inputBounds);
   drawDirectly(contentArgs, offscreenCanvas, 1.0f, extraSourceTypes);
   Point offset = {};
-  auto finalImage = ToImageWithOffset(recorder.finishRecordingAsPicture(), &offset, nullptr,
+  auto finalImage = ToImageWithOffset(recorder.finishRecordingAsPicture(), &offset, &*inputBounds,
                                       contentArgs.dstColorSpace);
   if (!finalImage) {
     return nullptr;
@@ -1775,8 +1777,8 @@ void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
       args.blurBackground ? GetClipBounds(args.blurBackground->getCanvas()) : std::nullopt;
   for (const auto& layerStyle : _layerStyles) {
     if (layerStyle->position() != position ||
-        std::find(extraSourceTypes.begin(), extraSourceTypes.end(), layerStyle->extraSourceType()) ==
-            extraSourceTypes.end()) {
+        std::find(extraSourceTypes.begin(), extraSourceTypes.end(),
+                  layerStyle->extraSourceType()) == extraSourceTypes.end()) {
       continue;
     }
     PictureRecorder recorder = {};
