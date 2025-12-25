@@ -19,8 +19,8 @@
 #pragma once
 
 #include "SolidColor.h"
+#include "tgfx/layers/ColorSource.h"
 #include "tgfx/layers/Layer.h"
-#include "tgfx/layers/ShapeStyle.h"
 
 namespace tgfx {
 /**

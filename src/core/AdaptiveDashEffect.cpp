@@ -165,6 +165,7 @@ bool AdaptiveDashEffect::filterPath(Path* path) const {
     return true;
   }
 
+  auto fillType = path->getFillType();
   SkPath resultPath;
   const int patternCount = static_cast<int>(_intervals.size());
   float totalDashCount = 0;
@@ -230,6 +231,7 @@ bool AdaptiveDashEffect::filterPath(Path* path) const {
   }
 
   PathRef::WriteAccess(*path) = resultPath;
+  path->setFillType(fillType);
   return true;
 }
 

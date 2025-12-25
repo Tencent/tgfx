@@ -355,15 +355,11 @@ void ContourContext::Contour::draw(PictureContext& context, const MCState& state
   }
 }
 
-static bool StrokeEquals(const Stroke& a, const Stroke& b) {
-  return a.width == b.width && a.cap == b.cap && a.join == b.join && a.miterLimit == b.miterLimit;
-}
-
 bool ContourContext::Contour::operator==(const Contour& other) const {
   if (type != other.type || hasStroke != other.hasStroke) {
     return false;
   }
-  if (hasStroke && !StrokeEquals(stroke, other.stroke)) {
+  if (hasStroke && stroke != other.stroke) {
     return false;
   }
   switch (type) {

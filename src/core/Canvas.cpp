@@ -307,36 +307,6 @@ void Canvas::drawPath(const Path& path, const Paint& paint) {
 
 // Checks if the line is axis-aligned and not a hairline stroke, allowing it to be converted to a
 // rect.
-static bool StrokeLineIsRect(const Stroke& stroke, const Point line[2], Rect* rect) {
-  if (stroke.cap == LineCap::Round || IsHairlineStroke(stroke)) {
-    return false;
-  }
-  // check if the line is axis-aligned
-  if (line[0].x != line[1].x && line[0].y != line[1].y) {
-    return false;
-  }
-  // use the stroke width and line cap to convert the line to a rect
-  auto left = std::min(line[0].x, line[1].x);
-  auto top = std::min(line[0].y, line[1].y);
-  auto right = std::max(line[0].x, line[1].x);
-  auto bottom = std::max(line[0].y, line[1].y);
-  auto halfWidth = stroke.width / 2.0f;
-  if (stroke.cap == LineCap::Square) {
-    if (rect) {
-      rect->setLTRB(left - halfWidth, top - halfWidth, right + halfWidth, bottom + halfWidth);
-    }
-    return true;
-  }
-  if (rect) {
-    if (left == right) {
-      rect->setLTRB(left - halfWidth, top, right + halfWidth, bottom);
-    } else {
-      rect->setLTRB(left, top - halfWidth, right, bottom + halfWidth);
-    }
-  }
-  return true;
-}
-
 void Canvas::drawPath(const Path& path, const MCState& state, const Brush& brush,
                       const Stroke* stroke) const {
   DEBUG_ASSERT(!path.isEmpty());
@@ -347,7 +317,7 @@ void Canvas::drawPath(const Path& path, const MCState& state, const Brush& brush
       // a line has no fill to draw.
       return;
     }
-    if (StrokeLineIsRect(*stroke, line, &rect)) {
+    if (StrokeLineToRect(*stroke, line, &rect)) {
       drawContext->drawRect(rect, state, brush, nullptr);
       return;
     }

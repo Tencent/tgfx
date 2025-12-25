@@ -19,6 +19,7 @@
 #include "TaskGroup.h"
 #include <cmath>
 #include <cstdlib>
+#include "MathExtra.h"
 #include "core/utils/Log.h"
 
 #ifdef __APPLE__
@@ -75,8 +76,7 @@ void OnAppExit() {
 }
 
 TaskGroup::TaskGroup() : maxThreads(GetMaxThreads()) {
-  lowPriorityThreads =
-      static_cast<int>(roundf(static_cast<float>(maxThreads) * LOW_PRIORITY_THREAD_RATIO));
+  lowPriorityThreads = FloatRoundToInt(static_cast<float>(maxThreads) * LOW_PRIORITY_THREAD_RATIO);
   if (lowPriorityThreads < 1) {
     lowPriorityThreads = 1;
   }

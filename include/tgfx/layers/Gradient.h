@@ -22,7 +22,7 @@
 #include "tgfx/core/Color.h"
 #include "tgfx/core/GradientType.h"
 #include "tgfx/core/Point.h"
-#include "tgfx/layers/ShapeStyle.h"
+#include "tgfx/layers/ColorSource.h"
 
 namespace tgfx {
 class LinearGradient;
@@ -33,10 +33,10 @@ class DiamondGradient;
 /**
  * The base class for all gradient types that can be drawn on a shape layer.
  */
-class Gradient : public ShapeStyle {
+class Gradient : public ColorSource {
  public:
   /**
-   * Creates a shape style that generates a linear gradient between the two specified points. The
+   * Creates a color source that generates a linear gradient between the two specified points. The
    * color gradient is aligned with the line connecting the two points.
    * @param startPoint The start point for the gradient.
    * @param endPoint The end point for the gradient.
@@ -51,7 +51,7 @@ class Gradient : public ShapeStyle {
                                                     const std::vector<float>& positions = {});
 
   /**
-   * Returns a shape style that generates a radial gradient given the center and radius. The color
+   * Returns a color source that generates a radial gradient given the center and radius. The color
    * gradient is drawn from the center point to the edge of the radius.
    * @param center The center of the circle for this gradient
    * @param radius Must be positive. The radius of the circle for this gradient.
@@ -66,7 +66,7 @@ class Gradient : public ShapeStyle {
                                                     const std::vector<float>& positions = {});
 
   /**
-   * Returns a shape style that generates a conic gradient given a center point and an angular
+   * Returns a color source that generates a conic gradient given a center point and an angular
    * range. The color gradient is drawn from the start angle to the end angle, wrapping around the
    * center point.
    * @param center The center of the circle for this gradient
@@ -84,7 +84,7 @@ class Gradient : public ShapeStyle {
                                                   const std::vector<float>& positions = {});
 
   /**
-   * Returns a shape style that generates a diamond gradient given a center point and half-diagonal
+   * Returns a color source that generates a diamond gradient given a center point and half-diagonal
    * length. The color gradient is drawn from the center point to the vertices of the diamond.
    * @param center The center of the diamond
    * @param halfDiagonal Must be positive. The half-length between two opposite vertices of the
@@ -130,17 +130,36 @@ class Gradient : public ShapeStyle {
    */
   void setPositions(std::vector<float> positions);
 
+  /**
+   * Returns the transformation matrix applied to the gradient.
+   */
+  const Matrix& matrix() const {
+    return _matrix;
+  }
+
+  /**
+   * Sets the transformation matrix applied to the gradient.
+   */
+  void setMatrix(const Matrix& matrix);
+
+  std::shared_ptr<Shader> getShader() const override;
+
  protected:
   Type getType() const override {
     return Type::Gradient;
   }
 
-  std::vector<Color> _colors;
-  std::vector<float> _positions;
+  virtual std::shared_ptr<Shader> onCreateShader() const = 0;
+
+  std::vector<Color> _colors = {};
+  std::vector<float> _positions = {};
 
   Gradient(const std::vector<Color>& colors, const std::vector<float>& positions)
       : _colors(colors), _positions(positions) {
   }
+
+ private:
+  Matrix _matrix = {};
 };
 
 /**
@@ -153,7 +172,7 @@ class LinearGradient : public Gradient {
   }
 
   /**
-   * Returns the start point of the gradient when drawn in the layer’s coordinate space. The start
+   * Returns the start point of the gradient when drawn in the layer's coordinate space. The start
    * point corresponds to the first stop of the gradient.
    */
   const Point& startPoint() const {
@@ -161,12 +180,12 @@ class LinearGradient : public Gradient {
   }
 
   /**
-   * Sets the start point of the gradient when drawn in the layer’s coordinate space.
+   * Sets the start point of the gradient when drawn in the layer's coordinate space.
    */
   void setStartPoint(const Point& startPoint);
 
   /**
-   * Returns the end point of the gradient when drawn in the layer’s coordinate space. The end point
+   * Returns the end point of the gradient when drawn in the layer's coordinate space. The end point
    * corresponds to the last stop of the gradient.
    */
   const Point& endPoint() const {
@@ -174,12 +193,12 @@ class LinearGradient : public Gradient {
   }
 
   /**
-   * Sets the end point of the gradient when drawn in the layer’s coordinate space.
+   * Sets the end point of the gradient when drawn in the layer's coordinate space.
    */
   void setEndPoint(const Point& endPoint);
 
  protected:
-  std::shared_ptr<Shader> onGetShader() const override;
+  std::shared_ptr<Shader> onCreateShader() const override;
 
  private:
   Point _startPoint = {};
@@ -229,7 +248,7 @@ class RadialGradient : public Gradient {
   void setRadius(float radius);
 
  protected:
-  std::shared_ptr<Shader> onGetShader() const override;
+  std::shared_ptr<Shader> onCreateShader() const override;
 
  private:
   Point _center = {};
@@ -291,7 +310,7 @@ class ConicGradient : public Gradient {
   void setEndAngle(float endAngle);
 
  protected:
-  std::shared_ptr<Shader> onGetShader() const override;
+  std::shared_ptr<Shader> onCreateShader() const override;
 
  private:
   Point _center = {};
@@ -342,7 +361,7 @@ class DiamondGradient : public Gradient {
   void setHalfDiagonal(float halfDiagonal);
 
  protected:
-  std::shared_ptr<Shader> onGetShader() const override;
+  std::shared_ptr<Shader> onCreateShader() const override;
 
  private:
   Point _center = {};

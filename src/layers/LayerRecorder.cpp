@@ -17,47 +17,228 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/LayerRecorder.h"
-#include "layers/contents/ContourContent.h"
-#include "layers/contents/DefaultContent.h"
-#include "layers/contents/ForegroundContent.h"
+#include "core/utils/StrokeUtils.h"
+#include "layers/contents/ComposeContent.h"
+#include "layers/contents/GeometryContent.h"
+#include "layers/contents/PathContent.h"
+#include "layers/contents/RRectContent.h"
+#include "layers/contents/RRectsContent.h"
+#include "layers/contents/RectContent.h"
+#include "layers/contents/RectsContent.h"
+#include "layers/contents/ShapeContent.h"
+#include "layers/contents/TextContent.h"
 
 namespace tgfx {
-Canvas* LayerRecorder::getCanvas(LayerContentType contentType) {
-  Canvas* canvas = nullptr;
-  auto& recorder = recorders[static_cast<size_t>(contentType)];
-  if (recorder == nullptr) {
-    recorder = std::make_unique<PictureRecorder>();
-    canvas = recorder->beginRecording();
-  } else {
-    canvas = recorder->getRecordingCanvas();
+
+LayerRecorder::LayerRecorder() = default;
+
+LayerRecorder::~LayerRecorder() = default;
+
+void LayerRecorder::addRect(const Rect& rect, const LayerPaint& paint) {
+  if (rect.isEmpty()) {
+    return;
   }
-  return canvas;
+  if (!canAppend(PendingType::Rect, paint)) {
+    flushPending(PendingType::Rect, paint);
+  }
+  pendingRects.push_back(rect);
+}
+
+void LayerRecorder::addRRect(const RRect& rRect, const LayerPaint& paint) {
+  if (rRect.rect.isEmpty()) {
+    return;
+  }
+  if (rRect.isRect()) {
+    addRect(rRect.rect, paint);
+    return;
+  }
+  if (!canAppend(PendingType::RRect, paint)) {
+    flushPending(PendingType::RRect, paint);
+  }
+  pendingRRects.push_back(rRect);
+}
+
+void LayerRecorder::addPath(const Path& path, const LayerPaint& paint) {
+  if (path.isEmpty()) {
+    return;
+  }
+  Point line[2] = {};
+  if (path.isLine(line)) {
+    if (paint.style != PaintStyle::Stroke) {
+      // A line cannot be filled.
+      return;
+    }
+    Rect rect = {};
+    if (StrokeLineToRect(paint.stroke, line, &rect)) {
+      LayerPaint fillPaint = paint;
+      fillPaint.style = PaintStyle::Fill;
+      addRect(rect, fillPaint);
+      return;
+    }
+  }
+  Rect rect = {};
+  if (path.isRect(&rect)) {
+    addRect(rect, paint);
+    return;
+  }
+  RRect rRect = {};
+  if (path.isRRect(&rRect)) {
+    addRRect(rRect, paint);
+    return;
+  }
+  if (canAppend(PendingType::Shape, paint)) {
+    pendingShape = Shape::Merge(std::move(pendingShape), Shape::MakeFrom(path));
+  } else {
+    flushPending(PendingType::Shape, paint);
+    pendingShape = Shape::MakeFrom(path);
+  }
+}
+
+void LayerRecorder::addShape(std::shared_ptr<Shape> shape, const LayerPaint& paint) {
+  if (shape == nullptr) {
+    return;
+  }
+  if (shape->isSimplePath()) {
+    addPath(shape->getPath(), paint);
+    return;
+  }
+  if (canAppend(PendingType::Shape, paint)) {
+    pendingShape = Shape::Merge(std::move(pendingShape), std::move(shape));
+  } else {
+    flushPending(PendingType::Shape, paint);
+    pendingShape = std::move(shape);
+  }
+}
+
+void LayerRecorder::addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerPaint& paint,
+                                float x, float y) {
+  if (textBlob == nullptr) {
+    return;
+  }
+  flushPending();
+  auto& list = paint.drawOrder == DrawOrder::AboveChildren ? foregrounds : contents;
+  list.push_back(std::make_unique<TextContent>(std::move(textBlob), x, y, paint));
+}
+
+bool LayerRecorder::canAppend(PendingType type, const LayerPaint& paint) const {
+  if (pendingType != type) {
+    return false;
+  }
+  if (pendingPaint.drawOrder != paint.drawOrder || pendingPaint.style != paint.style ||
+      pendingPaint.blendMode != paint.blendMode) {
+    return false;
+  }
+  if (pendingPaint.color != paint.color) {
+    return false;
+  }
+  if (pendingPaint.shader != paint.shader) {
+    return false;
+  }
+  if (pendingPaint.style == PaintStyle::Stroke) {
+    if (pendingPaint.stroke.width != paint.stroke.width ||
+        pendingPaint.stroke.cap != paint.stroke.cap ||
+        pendingPaint.stroke.join != paint.stroke.join ||
+        pendingPaint.stroke.miterLimit != paint.stroke.miterLimit) {
+      return false;
+    }
+  }
+  return true;
+}
+
+void LayerRecorder::flushPending(PendingType newType, const LayerPaint& newPaint) {
+  if (pendingType != PendingType::None) {
+    auto& list = pendingPaint.drawOrder == DrawOrder::AboveChildren ? foregrounds : contents;
+    switch (pendingType) {
+      case PendingType::Rect:
+        if (pendingRects.size() == 1) {
+          list.push_back(std::make_unique<RectContent>(pendingRects[0], pendingPaint));
+        } else {
+          list.push_back(std::make_unique<RectsContent>(std::move(pendingRects), pendingPaint));
+        }
+        pendingRects = {};
+        break;
+      case PendingType::RRect:
+        if (pendingRRects.size() == 1) {
+          list.push_back(std::make_unique<RRectContent>(pendingRRects[0], pendingPaint));
+        } else {
+          list.push_back(std::make_unique<RRectsContent>(std::move(pendingRRects), pendingPaint));
+        }
+        pendingRRects = {};
+        break;
+      case PendingType::Shape:
+        if (pendingShape->isSimplePath()) {
+          list.push_back(
+              std::make_unique<PathContent>(pendingShape->getPath(), pendingPaint));
+        } else {
+          list.push_back(std::make_unique<ShapeContent>(std::move(pendingShape), pendingPaint));
+        }
+        pendingShape = nullptr;
+        break;
+      default:
+        break;
+    }
+  }
+  pendingType = newType;
+  pendingPaint = newPaint;
 }
 
 std::unique_ptr<LayerContent> LayerRecorder::finishRecording() {
-  std::shared_ptr<Picture> defaultContent = nullptr;
-  if (auto& defaultRecorder = recorders[static_cast<size_t>(LayerContentType::Default)]) {
-    defaultContent = defaultRecorder->finishRecordingAsPicture();
+  flushPending();
+
+  if (contents.empty() && foregrounds.empty()) {
+    return nullptr;
   }
-  std::shared_ptr<Picture> foreground = nullptr;
-  if (auto& foregroundRecorder = recorders[static_cast<size_t>(LayerContentType::Foreground)]) {
-    foreground = foregroundRecorder->finishRecordingAsPicture();
+
+  if (contents.size() == 1 && foregrounds.empty()) {
+    return std::move(contents[0]);
   }
-  std::shared_ptr<Picture> contour = nullptr;
-  if (auto& contourRecorder = recorders[static_cast<size_t>(LayerContentType::Contour)]) {
-    contour = contourRecorder->finishRecordingAsPicture();
+
+  // Merge contents and foregrounds.
+  auto foregroundStartIndex = contents.size();
+  std::vector<std::unique_ptr<GeometryContent>> allContents = {};
+  allContents.reserve(contents.size() + foregrounds.size());
+  for (auto& content : contents) {
+    allContents.push_back(std::move(content));
   }
-  std::unique_ptr<LayerContent> layerContent = nullptr;
-  if (foreground) {
-    layerContent =
-        std::make_unique<ForegroundContent>(std::move(defaultContent), std::move(foreground));
-  } else if (defaultContent) {
-    layerContent = std::make_unique<DefaultContent>(std::move(defaultContent));
+  for (auto& content : foregrounds) {
+    allContents.push_back(std::move(content));
   }
-  if (contour && layerContent) {
-    layerContent = std::make_unique<ContourContent>(std::move(layerContent), std::move(contour));
+
+  // Phase 1: Group by geometry.
+  std::vector<std::vector<GeometryContent*>> groups = {};
+  for (const auto& content : allContents) {
+    if (groups.empty() || !groups.back()[0]->hasSameGeometry(content.get())) {
+      groups.push_back({content.get()});
+    } else {
+      groups.back().push_back(content.get());
+    }
   }
-  return layerContent;
+
+  // Phase 2: Collect contours from groups.
+  std::vector<GeometryContent*> contours = {};
+  bool needContours = false;
+  for (const auto& group : groups) {
+    auto nonImageContent = std::find_if(group.begin(), group.end(), [](auto content) {
+      return content->shader == nullptr || !content->shader->isAImage();
+    });
+    if (nonImageContent == group.end()) {
+      // All image shaders, collect all.
+      for (auto content : group) {
+        contours.push_back(content);
+      }
+    } else {
+      contours.push_back(*nonImageContent);
+      if (group.size() > 1) {
+        needContours = true;
+      }
+    }
+  }
+  if (!needContours) {
+    contours.clear();
+  }
+
+  return std::make_unique<ComposeContent>(std::move(allContents), foregroundStartIndex,
+                                          std::move(contours));
 }
 
 }  // namespace tgfx

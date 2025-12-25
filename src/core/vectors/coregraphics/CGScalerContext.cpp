@@ -346,7 +346,7 @@ Rect CGScalerContext::getImageTransform(GlyphID glyphID, bool fauxBold, const St
 }
 
 bool CGScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
-                                 const ImageInfo& dstInfo, void* dstPixels) const {
+                                 const ImageInfo& dstInfo, void* dstPixels, const Point&) const {
   if (dstInfo.isEmpty() || dstPixels == nullptr) {
     return false;
   }

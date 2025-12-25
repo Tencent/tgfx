@@ -48,7 +48,8 @@ class EmptyScalerContext : public ScalerContext {
     return {};
   }
 
-  bool readPixels(GlyphID, bool, const Stroke*, const ImageInfo&, void*) const override {
+  bool readPixels(GlyphID, bool, const Stroke*, const ImageInfo&, void*,
+                  const Point&) const override {
     return false;
   }
 };

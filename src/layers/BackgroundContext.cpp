@@ -147,20 +147,25 @@ std::shared_ptr<Image> BackgroundContext::getBackgroundImage() {
   int width = image->width();
   int height = image->height();
 
-  // The subset position in parentImage is surfaceOffset (relative to parent surface origin).
-  const float& subsetX = surfaceOffset.x;
-  const float& subsetY = surfaceOffset.y;
+  auto subsetRect = Rect::MakeXYWH(surfaceOffset.x, surfaceOffset.y, static_cast<float>(width),
+                                   static_cast<float>(height));
+  auto parentBounds = Rect::MakeWH(parentImage->width(), parentImage->height());
+  auto validRect = subsetRect;
+  if (!validRect.intersect(parentBounds)) {
+    return image;
+  }
 
-  auto subsetImage = parentImage->makeSubset(
-      Rect::MakeXYWH(subsetX, subsetY, static_cast<float>(width), static_cast<float>(height)));
+  auto childOffsetX = validRect.left - subsetRect.left;
+  auto childOffsetY = validRect.top - subsetRect.top;
 
+  auto subsetImage = parentImage->makeSubset(validRect);
   if (!subsetImage) {
     return image;
   }
 
   PictureRecorder recorder;
   auto canvas = recorder.beginRecording();
-  canvas->drawImage(subsetImage);
+  canvas->drawImage(subsetImage, childOffsetX, childOffsetY);
   canvas->drawImage(image);
   auto picture = recorder.finishRecordingAsPicture();
   if (!picture) {
@@ -179,7 +184,7 @@ std::shared_ptr<BackgroundContext> BackgroundContext::createSubContext(const Rec
   } else if (!Rect::Intersects(renderBounds, backgroundRect)) {
     return nullptr;
   }
-
+  childWorldRect.roundOut();
   auto canvas = getCanvas();
   auto parentCanvasMatrix = canvas->getMatrix();
   Matrix baseSurfaceMatrix = Matrix::I();

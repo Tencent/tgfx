@@ -79,7 +79,7 @@ class RootLayer : public Layer {
 
  protected:
   void drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
-                 const Matrix3D* transform = nullptr) override;
+                 const Matrix3D* transform3D = nullptr) override;
 
  private:
   std::vector<Rect> dirtyRects = {};

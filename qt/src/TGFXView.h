@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -20,8 +20,10 @@
 
 #include <QOpenGLContext>
 #include <QQuickItem>
-#include "drawers/AppHost.h"
+#include "hello2d/AppHost.h"
+#include "tgfx/gpu/Recording.h"
 #include "tgfx/gpu/opengl/qt/QGLWindow.h"
+#include "tgfx/layers/DisplayList.h"
 
 namespace hello2d {
 class TGFXView : public QQuickItem {
@@ -37,14 +39,23 @@ class TGFXView : public QQuickItem {
 
  private:
   int currentDrawerIndex = 0;
+  int lastDrawIndex = -1;
   std::shared_ptr<tgfx::QGLWindow> tgfxWindow = nullptr;
-  std::shared_ptr<drawers::AppHost> appHost = nullptr;
+  std::shared_ptr<hello2d::AppHost> appHost = nullptr;
+  tgfx::DisplayList displayList = {};
+  std::shared_ptr<tgfx::Layer> contentLayer = nullptr;
+  std::unique_ptr<tgfx::Recording> lastRecording = nullptr;
   float zoom = 1.0f;
   QPointF offset = {0, 0};
+  int lastSurfaceWidth = 0;
+  int lastSurfaceHeight = 0;
+  bool presentImmediately = true;
 
   void createAppHost();
+  void updateLayerTree();
+  void updateZoomScaleAndOffset();
+  void applyCenteringTransform();
   void draw();
-
  private Q_SLOTS:
   void onSceneGraphInvalidated();
 };
