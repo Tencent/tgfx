@@ -21,28 +21,29 @@
 #include "core/shapes/UniqueKeyShape.h"
 
 namespace tgfx {
-/**
- * Shape that contains a Font and GlyphID.
- */
-class GlyphShape : public UniqueKeyShape {
+class ReverseShape : public UniqueKeyShape {
  public:
-  explicit GlyphShape(Font font, GlyphID glyphID);
-
-  PathFillType fillType() const override {
-    return PathFillType::Winding;
+  explicit ReverseShape(std::shared_ptr<Shape> shape) : shape(std::move(shape)) {
   }
 
-  Rect onGetBounds() const override;
+  PathFillType fillType() const override {
+    return shape->fillType();
+  }
+
+  Rect onGetBounds() const override {
+    return shape->onGetBounds();
+  }
 
  protected:
   Type type() const override {
-    return Type::Glyph;
+    return Type::Reverse;
   }
 
   Path onGetPath(float resolutionScale) const override;
 
  private:
-  Font font;
-  GlyphID glyphID = 0;
+  std::shared_ptr<Shape> shape = nullptr;
+
+  friend class Shape;
 };
 }  // namespace tgfx

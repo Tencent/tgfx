@@ -956,7 +956,7 @@ TGFX_TEST(CanvasTest, inverseFillType) {
   shape = Shape::ApplyStroke(firstShape, &stroke);
   EXPECT_FALSE(shape->isInverseFillType());
 
-  firstShape = Shape::ApplyInverse(firstShape);
+  firstShape = Shape::ApplyFillType(firstShape, PathFillType::InverseWinding);
   EXPECT_TRUE(firstShape->isInverseFillType());
   shape = Shape::Merge(firstShape, secondShape, PathOp::Append);
   EXPECT_TRUE(shape->isInverseFillType());
@@ -970,11 +970,115 @@ TGFX_TEST(CanvasTest, inverseFillType) {
   EXPECT_FALSE(shape->isInverseFillType());
 
   shape = Shape::ApplyEffect(firstShape, pathEffect);
-  EXPECT_FALSE(shape->isInverseFillType());
+  EXPECT_TRUE(shape->isInverseFillType());
   shape = Shape::ApplyMatrix(firstShape, Matrix::MakeScale(2.0f));
   EXPECT_TRUE(shape->isInverseFillType());
   shape = Shape::ApplyStroke(firstShape, &stroke);
   EXPECT_TRUE(shape->isInverseFillType());
+}
+
+TGFX_TEST(CanvasTest, MergeShapeFillType) {
+  // MergeShape always produces EvenOdd fill type regardless of input fill types.
+  Path rectPath;
+  rectPath.addRect(Rect::MakeXYWH(0, 0, 100, 100));
+  Path ovalPath;
+  ovalPath.addOval(Rect::MakeXYWH(50, 50, 100, 100));
+
+  // Winding + Winding -> EvenOdd
+  auto shape1 = Shape::MakeFrom(rectPath);
+  auto shape2 = Shape::MakeFrom(ovalPath);
+  EXPECT_EQ(shape1->fillType(), PathFillType::Winding);
+  EXPECT_EQ(shape2->fillType(), PathFillType::Winding);
+
+  auto merged = Shape::Merge(shape1, shape2, PathOp::Union);
+  EXPECT_EQ(merged->fillType(), PathFillType::EvenOdd);
+  merged = Shape::Merge(shape1, shape2, PathOp::Intersect);
+  EXPECT_EQ(merged->fillType(), PathFillType::EvenOdd);
+  merged = Shape::Merge(shape1, shape2, PathOp::Difference);
+  EXPECT_EQ(merged->fillType(), PathFillType::EvenOdd);
+  merged = Shape::Merge(shape1, shape2, PathOp::XOR);
+  EXPECT_EQ(merged->fillType(), PathFillType::EvenOdd);
+
+  // InverseWinding + Winding
+  auto inverseShape1 = Shape::ApplyFillType(shape1, PathFillType::InverseWinding);
+  EXPECT_EQ(inverseShape1->fillType(), PathFillType::InverseWinding);
+
+  merged = Shape::Merge(inverseShape1, shape2, PathOp::Union);
+  EXPECT_EQ(merged->fillType(), PathFillType::InverseEvenOdd);
+  merged = Shape::Merge(inverseShape1, shape2, PathOp::Intersect);
+  EXPECT_EQ(merged->fillType(), PathFillType::EvenOdd);
+  merged = Shape::Merge(inverseShape1, shape2, PathOp::Difference);
+  EXPECT_EQ(merged->fillType(), PathFillType::InverseEvenOdd);
+  merged = Shape::Merge(inverseShape1, shape2, PathOp::XOR);
+  EXPECT_EQ(merged->fillType(), PathFillType::InverseEvenOdd);
+
+  // Winding + InverseWinding
+  auto inverseShape2 = Shape::ApplyFillType(shape2, PathFillType::InverseWinding);
+  merged = Shape::Merge(shape1, inverseShape2, PathOp::Union);
+  EXPECT_EQ(merged->fillType(), PathFillType::InverseEvenOdd);
+  merged = Shape::Merge(shape1, inverseShape2, PathOp::Intersect);
+  EXPECT_EQ(merged->fillType(), PathFillType::EvenOdd);
+  merged = Shape::Merge(shape1, inverseShape2, PathOp::Difference);
+  EXPECT_EQ(merged->fillType(), PathFillType::EvenOdd);
+  merged = Shape::Merge(shape1, inverseShape2, PathOp::XOR);
+  EXPECT_EQ(merged->fillType(), PathFillType::InverseEvenOdd);
+
+  // InverseWinding + InverseWinding
+  merged = Shape::Merge(inverseShape1, inverseShape2, PathOp::Union);
+  EXPECT_EQ(merged->fillType(), PathFillType::InverseEvenOdd);
+  merged = Shape::Merge(inverseShape1, inverseShape2, PathOp::Intersect);
+  EXPECT_EQ(merged->fillType(), PathFillType::InverseEvenOdd);
+  merged = Shape::Merge(inverseShape1, inverseShape2, PathOp::Difference);
+  EXPECT_EQ(merged->fillType(), PathFillType::EvenOdd);
+  merged = Shape::Merge(inverseShape1, inverseShape2, PathOp::XOR);
+  EXPECT_EQ(merged->fillType(), PathFillType::EvenOdd);
+
+  // EvenOdd inputs
+  auto evenOddShape = Shape::ApplyFillType(shape1, PathFillType::EvenOdd);
+  EXPECT_EQ(evenOddShape->fillType(), PathFillType::EvenOdd);
+  merged = Shape::Merge(evenOddShape, shape2, PathOp::Union);
+  EXPECT_EQ(merged->fillType(), PathFillType::EvenOdd);
+
+  // Append preserves first shape's fillType
+  merged = Shape::Merge(shape1, shape2, PathOp::Append);
+  EXPECT_EQ(merged->fillType(), PathFillType::Winding);
+  merged = Shape::Merge(inverseShape1, shape2, PathOp::Append);
+  EXPECT_EQ(merged->fillType(), PathFillType::InverseWinding);
+  merged = Shape::Merge(evenOddShape, shape2, PathOp::Append);
+  EXPECT_EQ(merged->fillType(), PathFillType::EvenOdd);
+}
+
+TGFX_TEST(CanvasTest, ReverseShape) {
+  Path path;
+  path.moveTo(0, 0);
+  path.lineTo(100, 0);
+  path.lineTo(100, 100);
+  path.close();
+
+  auto shape = Shape::MakeFrom(path);
+  ASSERT_TRUE(shape != nullptr);
+  EXPECT_EQ(shape->fillType(), PathFillType::Winding);
+
+  // Apply reverse
+  auto reversedShape = Shape::ApplyReverse(shape);
+  ASSERT_TRUE(reversedShape != nullptr);
+  EXPECT_EQ(reversedShape->fillType(), PathFillType::Winding);
+  EXPECT_EQ(reversedShape->getBounds(), shape->getBounds());
+
+  // Reverse with inverse fill type
+  auto inverseShape = Shape::ApplyFillType(shape, PathFillType::InverseWinding);
+  auto reversedInverse = Shape::ApplyReverse(inverseShape);
+  EXPECT_EQ(reversedInverse->fillType(), PathFillType::InverseWinding);
+
+  // Double reverse on ReverseShape should return the inner shape
+  auto matrixShape = Shape::ApplyMatrix(shape, Matrix::MakeTrans(10, 10));
+  auto reversedMatrix = Shape::ApplyReverse(matrixShape);
+  auto doubleReversed = Shape::ApplyReverse(reversedMatrix);
+  EXPECT_EQ(doubleReversed, matrixShape);
+
+  // Reverse nullptr should return nullptr
+  auto nullReversed = Shape::ApplyReverse(nullptr);
+  EXPECT_EQ(nullReversed, nullptr);
 }
 
 TGFX_TEST(CanvasTest, image) {
@@ -1763,6 +1867,69 @@ TGFX_TEST(CanvasTest, AdaptiveDashEffect) {
   effect->filterPath(&path);
   canvas->drawPath(path, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/AdaptiveDashEffect"));
+}
+
+TGFX_TEST(CanvasTest, TrimPathEffect) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 400);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  Paint paint = {};
+  paint.setColor(Color::Blue());
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStroke(Stroke(4));
+
+  // Test normal trim [0.25, 0.75]
+  Path path1 = {};
+  path1.addRect(50, 50, 150, 150);
+  auto trimEffect = PathEffect::MakeTrim(0.25f, 0.75f);
+  EXPECT_TRUE(trimEffect != nullptr);
+  trimEffect->filterPath(&path1);
+  canvas->drawPath(path1, paint);
+
+  // Test inverted trim: complement of [0.25, 0.75] = [0, 0.25] + [0.75, 1]
+  paint.setColor(Color::Red());
+  Path path2 = {};
+  path2.addRect(200, 50, 300, 150);
+  auto invertedEffect = PathEffect::MakeTrim(0.25f, 0.75f, true);
+  EXPECT_TRUE(invertedEffect != nullptr);
+  invertedEffect->filterPath(&path2);
+  canvas->drawPath(path2, paint);
+
+  // Test edge cases
+  // Full path (no trim needed) should return nullptr
+  EXPECT_TRUE(PathEffect::MakeTrim(0.0f, 1.0f) == nullptr);
+  EXPECT_TRUE(PathEffect::MakeTrim(-0.5f, 1.5f) == nullptr);
+
+  // Inverted with startT >= stopT (full path) should return nullptr
+  EXPECT_TRUE(PathEffect::MakeTrim(0.5f, 0.5f, true) == nullptr);
+  EXPECT_TRUE(PathEffect::MakeTrim(0.7f, 0.3f, true) == nullptr);
+
+  // NaN should return nullptr
+  EXPECT_TRUE(PathEffect::MakeTrim(NAN, 0.5f) == nullptr);
+  EXPECT_TRUE(PathEffect::MakeTrim(0.5f, NAN) == nullptr);
+
+  // Normal mode with startT >= stopT results in empty path
+  paint.setColor(Color::Green());
+  Path path3 = {};
+  path3.addRect(50, 200, 150, 300);
+  auto emptyEffect = PathEffect::MakeTrim(0.7f, 0.3f);
+  EXPECT_TRUE(emptyEffect != nullptr);
+  emptyEffect->filterPath(&path3);
+  EXPECT_TRUE(path3.isEmpty());
+
+  // Test with oval
+  paint.setColor(Color::FromRGBA(128, 0, 128));
+  Path path4 = {};
+  path4.addOval(Rect::MakeXYWH(200, 200, 100, 100));
+  auto ovalTrim = PathEffect::MakeTrim(0.0f, 0.5f);
+  ovalTrim->filterPath(&path4);
+  canvas->drawPath(path4, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/TrimPathEffect"));
 }
 
 TGFX_TEST(CanvasTest, BlendFormula) {

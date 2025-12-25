@@ -16,35 +16,22 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "core/shapes/UniqueKeyShape.h"
-#include "tgfx/core/Matrix.h"
+#include "tgfx/layers/ShapeStyle.h"
 
 namespace tgfx {
-class InverseShape : public UniqueKeyShape {
- public:
-  explicit InverseShape(std::shared_ptr<Shape> shape) : shape(std::move(shape)) {
+
+std::shared_ptr<ShapeStyle> ShapeStyle::Make(const Color& color, BlendMode blendMode) {
+  return std::shared_ptr<ShapeStyle>(new ShapeStyle(color, nullptr, blendMode));
+}
+
+std::shared_ptr<ShapeStyle> ShapeStyle::Make(std::shared_ptr<Shader> shader, float alpha,
+                                             BlendMode blendMode) {
+  if (shader == nullptr) {
+    return nullptr;
   }
+  Color color = Color::White();
+  color.alpha = alpha;
+  return std::shared_ptr<ShapeStyle>(new ShapeStyle(color, std::move(shader), blendMode));
+}
 
-  bool isInverseFillType() const override {
-    return !shape->isInverseFillType();
-  }
-
-  Rect onGetBounds() const override {
-    return shape->onGetBounds();
-  }
-
- protected:
-  Type type() const override {
-    return Type::Inverse;
-  }
-
-  Path onGetPath(float resolutionScale) const override;
-
- private:
-  std::shared_ptr<Shape> shape = nullptr;
-
-  friend class Shape;
-};
 }  // namespace tgfx

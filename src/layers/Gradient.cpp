@@ -65,6 +65,22 @@ void Gradient::setPositions(std::vector<float> positions) {
   invalidateContent();
 }
 
+void Gradient::setMatrix(const Matrix& matrix) {
+  if (_matrix == matrix) {
+    return;
+  }
+  _matrix = matrix;
+  invalidateContent();
+}
+
+std::shared_ptr<Shader> Gradient::getShader() const {
+  auto shader = onCreateShader();
+  if (shader == nullptr || _matrix.isIdentity()) {
+    return shader;
+  }
+  return shader->makeWithMatrix(_matrix);
+}
+
 void LinearGradient::setEndPoint(const Point& endPoint) {
   if (_endPoint == endPoint) {
     return;
@@ -81,7 +97,7 @@ void LinearGradient::setStartPoint(const Point& startPoint) {
   invalidateContent();
 }
 
-std::shared_ptr<Shader> LinearGradient::onGetShader() const {
+std::shared_ptr<Shader> LinearGradient::onCreateShader() const {
   return Shader::MakeLinearGradient(_startPoint, _endPoint, _colors, _positions);
 }
 
@@ -101,7 +117,7 @@ void RadialGradient::setRadius(float radius) {
   invalidateContent();
 }
 
-std::shared_ptr<Shader> RadialGradient::onGetShader() const {
+std::shared_ptr<Shader> RadialGradient::onCreateShader() const {
   return Shader::MakeRadialGradient(_center, _radius, _colors, _positions);
 }
 
@@ -129,7 +145,7 @@ void ConicGradient::setEndAngle(float endAngle) {
   invalidateContent();
 }
 
-std::shared_ptr<Shader> ConicGradient::onGetShader() const {
+std::shared_ptr<Shader> ConicGradient::onCreateShader() const {
   return Shader::MakeConicGradient(_center, _startAngle, _endAngle, _colors, _positions);
 }
 
@@ -149,7 +165,7 @@ void DiamondGradient::setHalfDiagonal(float halfDiagonal) {
   invalidateContent();
 }
 
-std::shared_ptr<Shader> DiamondGradient::onGetShader() const {
+std::shared_ptr<Shader> DiamondGradient::onCreateShader() const {
   return Shader::MakeDiamondGradient(_center, _halfDiagonal, _colors, _positions);
 }
 

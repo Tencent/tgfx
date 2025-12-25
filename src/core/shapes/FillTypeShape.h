@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -21,28 +21,31 @@
 #include "core/shapes/UniqueKeyShape.h"
 
 namespace tgfx {
-/**
- * Shape that contains a Font and GlyphID.
- */
-class GlyphShape : public UniqueKeyShape {
+class FillTypeShape : public UniqueKeyShape {
  public:
-  explicit GlyphShape(Font font, GlyphID glyphID);
-
-  PathFillType fillType() const override {
-    return PathFillType::Winding;
+  FillTypeShape(std::shared_ptr<Shape> shape, PathFillType fillType)
+      : shape(std::move(shape)), _fillType(fillType) {
   }
 
-  Rect onGetBounds() const override;
+  PathFillType fillType() const override {
+    return _fillType;
+  }
+
+  Rect onGetBounds() const override {
+    return shape->onGetBounds();
+  }
 
  protected:
   Type type() const override {
-    return Type::Glyph;
+    return Type::FillType;
   }
 
   Path onGetPath(float resolutionScale) const override;
 
  private:
-  Font font;
-  GlyphID glyphID = 0;
+  std::shared_ptr<Shape> shape = nullptr;
+  PathFillType _fillType = PathFillType::Winding;
+
+  friend class Shape;
 };
 }  // namespace tgfx

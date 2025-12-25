@@ -19,8 +19,8 @@
 #pragma once
 
 #include "tgfx/core/Shape.h"
-#include "tgfx/layers/ColorSource.h"
 #include "tgfx/layers/Layer.h"
+#include "tgfx/layers/ShapeStyle.h"
 
 namespace tgfx {
 /**
@@ -54,8 +54,6 @@ class ShapeLayer : public Layer {
    */
   static std::shared_ptr<ShapeLayer> Make();
 
-  ~ShapeLayer() override;
-
   LayerType type() const override {
     return LayerType::Shape;
   }
@@ -83,19 +81,19 @@ class ShapeLayer : public Layer {
   void setShape(std::shared_ptr<Shape> shape);
 
   /**
-   * Returns the list of fill styles used to fill the shape's path. Each style can be a solid color,
-   * gradient, or image pattern. The fill styles are drawn in the order they are added, followed by
-   * the stroke styles on top of the filled shape. If the fill styles list is empty, the shape will
-   * not be filled. By default, the fill styles list is empty.
+   * Returns the list of fill styles used to fill the shape's path. Each style contains a shader,
+   * alpha, and blend mode. The fill styles are drawn in the order they are added, followed by the
+   * stroke styles on top of the filled shape. If the fill styles list is empty, the shape will not
+   * be filled. By default, the fill styles list is empty.
    */
-  const std::vector<std::shared_ptr<ColorSource>>& fillStyles() const {
+  const std::vector<std::shared_ptr<ShapeStyle>>& fillStyles() const {
     return _fillStyles;
   }
 
   /**
    * Replaces the current list of fill styles with the given list.
    */
-  void setFillStyles(std::vector<std::shared_ptr<ColorSource>> fills);
+  void setFillStyles(std::vector<std::shared_ptr<ShapeStyle>> fills);
 
   /**
    * Removes all fill styles from the shape layer.
@@ -105,27 +103,27 @@ class ShapeLayer : public Layer {
   /**
    * Replace the current list of fill styles with the given fill style.
    */
-  void setFillStyle(std::shared_ptr<ColorSource> fillStyle);
+  void setFillStyle(std::shared_ptr<ShapeStyle> fillStyle);
 
   /**
    * Adds a fill style to the end of the existing fill styles.
    */
-  void addFillStyle(std::shared_ptr<ColorSource> fillStyle);
+  void addFillStyle(std::shared_ptr<ShapeStyle> fillStyle);
 
   /**
-   * Returns the list of stroke styles used to stroke the shape's path. Each style can be a solid
-   * color, gradient, or image pattern. The stroke styles are drawn in the order they are added,
-   * after the fill styles. If the stroke styles list is empty, the shape will not be stroked. By
-   * default, the stroke styles list is empty.
+   * Returns the list of stroke styles used to stroke the shape's path. Each style contains a
+   * shader, alpha, and blend mode. The stroke styles are drawn in the order they are added, after
+   * the fill styles. If the stroke styles list is empty, the shape will not be stroked. By default,
+   * the stroke styles list is empty.
    */
-  const std::vector<std::shared_ptr<ColorSource>>& strokeStyles() const {
+  const std::vector<std::shared_ptr<ShapeStyle>>& strokeStyles() const {
     return _strokeStyles;
   }
 
   /**
    * Replaces the current list of stroke styles with the given list.
    */
-  void setStrokeStyles(std::vector<std::shared_ptr<ColorSource>> strokes);
+  void setStrokeStyles(std::vector<std::shared_ptr<ShapeStyle>> strokes);
 
   /**
    * Removes all stroke styles from the shape layer.
@@ -135,12 +133,12 @@ class ShapeLayer : public Layer {
   /**
    * Replace the current list of stroke styles with the given stroke style.
    */
-  void setStrokeStyle(std::shared_ptr<ColorSource> stroke);
+  void setStrokeStyle(std::shared_ptr<ShapeStyle> stroke);
 
   /**
    * Adds a stroke style to the end of the existing stroke styles.
    */
-  void addStrokeStyle(std::shared_ptr<ColorSource> strokeStyle);
+  void addStrokeStyle(std::shared_ptr<ShapeStyle> strokeStyle);
 
   /**
    * Returns the line cap style for the shape's path. The default line cap style is Butt.
@@ -268,8 +266,8 @@ class ShapeLayer : public Layer {
 
  private:
   std::shared_ptr<Shape> _shape = nullptr;
-  std::vector<std::shared_ptr<ColorSource>> _fillStyles = {};
-  std::vector<std::shared_ptr<ColorSource>> _strokeStyles = {};
+  std::vector<std::shared_ptr<ShapeStyle>> _fillStyles = {};
+  std::vector<std::shared_ptr<ShapeStyle>> _strokeStyles = {};
   Stroke stroke = {};
   std::vector<float> _lineDashPattern = {};
   float _lineDashPhase = 0.0f;

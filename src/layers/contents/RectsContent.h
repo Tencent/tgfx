@@ -18,31 +18,31 @@
 
 #pragma once
 
-#include "core/shapes/UniqueKeyShape.h"
+#include <vector>
+#include "layers/contents/GeometryContent.h"
 
 namespace tgfx {
-/**
- * Shape that contains a Font and GlyphID.
- */
-class GlyphShape : public UniqueKeyShape {
+
+class RectsContent : public GeometryContent {
  public:
-  explicit GlyphShape(Font font, GlyphID glyphID);
+  RectsContent(std::vector<Rect> rects, const LayerPaint& paint);
 
-  PathFillType fillType() const override {
-    return PathFillType::Winding;
-  }
+  Rect getTightBounds(const Matrix& matrix) const override;
+  bool hitTestPoint(float localX, float localY) const override;
 
-  Rect onGetBounds() const override;
+  std::vector<Rect> rects = {};
 
  protected:
   Type type() const override {
-    return Type::Glyph;
+    return Type::Rects;
   }
 
-  Path onGetPath(float resolutionScale) const override;
+  Rect onGetBounds() const override;
+  void onDraw(Canvas* canvas, const Paint& paint) const override;
+  bool onHasSameGeometry(const GeometryContent* other) const override;
 
  private:
-  Font font;
-  GlyphID glyphID = 0;
+  Path getFilledPath() const;
 };
+
 }  // namespace tgfx

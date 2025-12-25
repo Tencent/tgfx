@@ -1,4 +1,5 @@
 #include "StrokeUtils.h"
+#include <algorithm>
 #include <cmath>
 #include "core/utils/MathExtra.h"
 
@@ -50,6 +51,34 @@ std::vector<float> SimplifyLineDashPattern(const std::vector<float>& pattern,
     }
   }
   return simplifiedDashes;
+}
+
+bool StrokeLineToRect(const Stroke& stroke, const Point line[2], Rect* rect) {
+  if (stroke.cap == LineCap::Round || IsHairlineStroke(stroke)) {
+    return false;
+  }
+  if (line[0].x != line[1].x && line[0].y != line[1].y) {
+    return false;
+  }
+  auto left = std::min(line[0].x, line[1].x);
+  auto top = std::min(line[0].y, line[1].y);
+  auto right = std::max(line[0].x, line[1].x);
+  auto bottom = std::max(line[0].y, line[1].y);
+  auto halfWidth = stroke.width / 2.0f;
+  if (stroke.cap == LineCap::Square) {
+    if (rect) {
+      rect->setLTRB(left - halfWidth, top - halfWidth, right + halfWidth, bottom + halfWidth);
+    }
+    return true;
+  }
+  if (rect) {
+    if (left == right) {
+      rect->setLTRB(left - halfWidth, top, right + halfWidth, bottom);
+    } else {
+      rect->setLTRB(left, top - halfWidth, right, bottom + halfWidth);
+    }
+  }
+  return true;
 }
 
 }  // namespace tgfx
