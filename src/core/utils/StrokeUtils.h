@@ -39,6 +39,12 @@ bool IsHairlineStroke(const Stroke& stroke);
 bool TreatStrokeAsHairline(const Stroke& stroke, const Matrix& matrix);
 
 /**
+ * Calculates the alpha adjustment factor for hairline rendering.
+ * Returns the scaled stroke width if it's less than 1.0, otherwise returns 1.0.
+ */
+float GetHairlineAlphaFactor(const Stroke& stroke, const Matrix& matrix);
+
+/**
  * Simplifies the line dash pattern by removing segments that are too small.
  * Returns an empty vector if the pattern can be treated as a solid stroke
  * (i.e., when all gaps are small enough that square caps will connect).

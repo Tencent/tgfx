@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ProxyProvider.h"
+#include "core/ShapeBezierTriangulator.h"
 #include "core/ShapeRasterizer.h"
 #include "core/shapes/MatrixShape.h"
 #include "core/utils/HardwareBufferUtil.h"
@@ -29,6 +30,7 @@
 #include "gpu/proxies/HardwareRenderTargetProxy.h"
 #include "gpu/proxies/TextureRenderTargetProxy.h"
 #include "gpu/tasks/GPUBufferUploadTask.h"
+#include "gpu/tasks/HairlineBufferUploadTask.h"
 #include "gpu/tasks/ReadbackBufferCreateTask.h"
 #include "gpu/tasks/ShapeBufferUploadTask.h"
 #include "gpu/tasks/TextureUploadTask.h"
@@ -208,9 +210,7 @@ std::shared_ptr<GPUShapeProxy> ProxyProvider::createGPUShapeProxy(std::shared_pt
 #ifdef TGFX_USE_THREADS
   if (!(renderFlags & RenderFlags::DisableAsyncTask) && rasterizer->asyncSupport()) {
     dataSource = DataSource<ShapeBuffer>::Async(std::move(rasterizer));
-  } else {
-    dataSource = std::move(rasterizer);
-  }
+  } else
 #else
   dataSource = std::move(rasterizer);
 #endif
@@ -229,6 +229,48 @@ std::shared_ptr<GPUShapeProxy> ProxyProvider::createGPUShapeProxy(std::shared_pt
   }
   context->drawingManager()->addResourceTask(std::move(task));
   return std::make_shared<GPUShapeProxy>(drawingMatrix, triangleProxy, textureProxy);
+}
+
+std::shared_ptr<GPUHairlineProxy> ProxyProvider::createGPUHairlineProxy(
+    std::shared_ptr<Shape> shape, AAType aaType, const Matrix& /*viewMatrix*/,
+    const Rect& /*&clipBounds*/, float /*capLength*/, uint32_t renderFlags [[maybe_unused]]) {
+  // Create HairlineRasterizer
+  auto rasterizer = std::make_unique<ShapeBezierTriangulator>(shape, aaType);
+
+  std::unique_ptr<DataSource<HairlineBuffer>> dataSource = nullptr;
+
+#ifdef TGFX_USE_THREADS
+  // if (!(renderFlags & RenderFlags::DisableAsyncTask)) {
+  //   // Generate vertex data asynchronously
+  //   dataSource = DataSource<HairlineBuffer>::Async(std::move(rasterizer));
+  // } else
+  {
+    dataSource = std::move(rasterizer);
+  }
+#else
+  dataSource = std::move(rasterizer);
+#endif
+
+  // Create four GPUBufferProxies: line vertices, line indices, quad vertices, quad indices
+  auto lineVertexProxy = std::shared_ptr<GPUBufferProxy>(new GPUBufferProxy());
+  auto lineIndexProxy = std::shared_ptr<GPUBufferProxy>(new GPUBufferProxy());
+  auto quadVertexProxy = std::shared_ptr<GPUBufferProxy>(new GPUBufferProxy());
+  auto quadIndexProxy = std::shared_ptr<GPUBufferProxy>(new GPUBufferProxy());
+
+  addResourceProxy(lineVertexProxy);
+  addResourceProxy(lineIndexProxy);
+  addResourceProxy(quadVertexProxy);
+  addResourceProxy(quadIndexProxy);
+
+  // Create upload task
+  auto task = context->drawingAllocator()->make<HairlineBufferUploadTask>(
+      lineVertexProxy, lineIndexProxy, quadVertexProxy, quadIndexProxy, std::move(dataSource));
+
+  context->drawingManager()->addResourceTask(std::move(task));
+
+  // Return the wrapped proxy
+  return std::make_shared<GPUHairlineProxy>(lineVertexProxy, lineIndexProxy, quadVertexProxy,
+                                            quadIndexProxy);
 }
 
 std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxyByImageSource(

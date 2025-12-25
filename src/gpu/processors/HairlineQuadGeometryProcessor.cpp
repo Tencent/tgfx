@@ -16,20 +16,24 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "HairlineQuadGeometryProcessor.h"
+#include "tgfx/core/Color.h"
 
-#include <memory>
-#include "tgfx/core/Path.h"
-#include "tgfx/core/Shape.h"
 namespace tgfx {
 
-class ShapeUtils {
- public:
-  /**
-   * Returns the Shape adjusted for the current resolution scale.
-   * Used during rendering to decide whether to simplify the Path or apply hairline stroking,
-   * depending on the resolution scale.
-   */
-  static Path GetShapeRenderingPath(std::shared_ptr<Shape> shape, float resolutionScale);
-};
+HairlineQuadGeometryProcessor::HairlineQuadGeometryProcessor(const PMColor& color,
+                                                             const Matrix& viewMatrix,
+                                                             std::optional<Matrix> uvMatrix,
+                                                             uint8_t coverage)
+    : GeometryProcessor(ClassID()), color(color), viewMatrix(viewMatrix), uvMatrix(uvMatrix),
+      coverage(coverage) {
+  position = {"aPosition", VertexFormat::Float2};
+  hairQuadEdge = {"hairQuadEdge", VertexFormat::Float4};
+  setVertexAttributes(&position, 3);
+}
+
+void HairlineQuadGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
+  bytesKey->write(static_cast<uint32_t>(coverage != 0xFF ? 1 : 0));
+}
+
 }  // namespace tgfx

@@ -16,20 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "tgfx/core/Point.h"
+#include "core/utils/PointUtils.h"
 
-#include <memory>
-#include "tgfx/core/Path.h"
-#include "tgfx/core/Shape.h"
 namespace tgfx {
 
-class ShapeUtils {
- public:
-  /**
-   * Returns the Shape adjusted for the current resolution scale.
-   * Used during rendering to decide whether to simplify the Path or apply hairline stroking,
-   * depending on the resolution scale.
-   */
-  static Path GetShapeRenderingPath(std::shared_ptr<Shape> shape, float resolutionScale);
-};
+bool Point::normalize() {
+  return PointUtils::SetLength(*this, 1.f);
+}
+
 }  // namespace tgfx

@@ -18,18 +18,38 @@
 
 #pragma once
 
-#include <memory>
-#include "tgfx/core/Path.h"
-#include "tgfx/core/Shape.h"
+#include "core/utils/Log.h"
+#include "tgfx/core/Point.h"
+
 namespace tgfx {
 
-class ShapeUtils {
+class PointUtils {
  public:
-  /**
-   * Returns the Shape adjusted for the current resolution scale.
-   * Used during rendering to decide whether to simplify the Path or apply hairline stroking,
-   * depending on the resolution scale.
-   */
-  static Path GetShapeRenderingPath(std::shared_ptr<Shape> shape, float resolutionScale);
+  enum class Side {
+    Left = -1,
+    On = 0,
+    Right = 1,
+  };
+
+  static float LengthSquared(const Point& p) {
+    return (p.x * p.x) + (p.y * p.y);
+  }
+
+  static float DistanceSquared(const Point& a, const Point& b) {
+    float dx = a.x - b.x;
+    float dy = a.y - b.y;
+    return (dx * dx) + (dy * dy);
+  }
+
+  static float DistanceToLineBetweenSquared(const Point& point, const Point& linePointA,
+                                            const Point& linePointB, Side* side = nullptr);
+
+  static bool SetLength(Point& point, float length);
+
+  static Point MakeOrthogonal(const Point& vec, Side side = Side::Left) {
+    DEBUG_ASSERT((side == Side::Right || side == Side::Left));
+    return (side == Side::Right) ? Point::Make(-vec.y, vec.x) : Point::Make(vec.y, -vec.x);
+  }
 };
+
 }  // namespace tgfx

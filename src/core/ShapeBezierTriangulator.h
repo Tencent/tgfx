@@ -18,18 +18,34 @@
 
 #pragma once
 
-#include <memory>
-#include "tgfx/core/Path.h"
+#include "core/DataSource.h"
+#include "gpu/AAType.h"
 #include "tgfx/core/Shape.h"
+
 namespace tgfx {
 
-class ShapeUtils {
- public:
-  /**
-   * Returns the Shape adjusted for the current resolution scale.
-   * Used during rendering to decide whether to simplify the Path or apply hairline stroking,
-   * depending on the resolution scale.
-   */
-  static Path GetShapeRenderingPath(std::shared_ptr<Shape> shape, float resolutionScale);
+struct HairlineBuffer {
+  HairlineBuffer(std::shared_ptr<Data> lineVertices, std::shared_ptr<Data> lineIndices,
+                 std::shared_ptr<Data> quadVertices, std::shared_ptr<Data> quadIndices)
+      : lineVertices(std::move(lineVertices)), lineIndices(std::move(lineIndices)),
+        quadVertices(std::move(quadVertices)), quadIndices(std::move(quadIndices)) {
+  }
+
+  std::shared_ptr<Data> lineVertices = nullptr;
+  std::shared_ptr<Data> lineIndices = nullptr;
+  std::shared_ptr<Data> quadVertices = nullptr;
+  std::shared_ptr<Data> quadIndices = nullptr;
 };
+
+class ShapeBezierTriangulator : public DataSource<HairlineBuffer> {
+ public:
+  ShapeBezierTriangulator(std::shared_ptr<Shape> shape, AAType aaType);
+
+  std::shared_ptr<HairlineBuffer> getData() const override;
+
+ private:
+  std::shared_ptr<Shape> shape = nullptr;
+  AAType aaType = AAType::None;
+};
+
 }  // namespace tgfx

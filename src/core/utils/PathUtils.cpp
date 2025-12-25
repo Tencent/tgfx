@@ -24,6 +24,7 @@
 #include <vector>
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/PointUtils.h"
 #include "tgfx/core/Point.h"
 
 namespace tgfx {
@@ -268,8 +269,7 @@ void ConvertNoninflectCubicToQuads(const Point p[4], float toleranceSqd, std::ve
   auto c0 = p[0] + ab;
   auto c1 = p[3] + dc;
 
-  float distanceSqd =
-      sublevel > MAX_SUBDIVS ? 0 : std::powf(c0.x - c1.x, 2) + std::powf(c0.y - c1.y, 2);
+  float distanceSqd = sublevel > MAX_SUBDIVS ? 0 : PointUtils::DistanceSquared(c0, c1);
   if (distanceSqd < toleranceSqd) {
     Point newC;
     if (preserveFirstTangent == preserveLastTangent) {
@@ -297,6 +297,10 @@ void ConvertNoninflectCubicToQuads(const Point p[4], float toleranceSqd, std::ve
   ConvertNoninflectCubicToQuads(choppedPoints + 3, toleranceSqd, quads, sublevel + 1, false,
                                 preserveLastTangent);
 }
+
+inline Point interp(const Point& v0, const Point& v1, float t) {
+  return v0 + (v1 - v0) * t;
+}
 }  // namespace
 
 std::vector<Point> PathUtils::ConvertCubicToQuads(const Point cubicPoints[4], float tolerance) {
@@ -315,4 +319,171 @@ std::vector<Point> PathUtils::ConvertCubicToQuads(const Point cubicPoints[4], fl
   }
   return convertQuads;
 }
+
+void PathUtils::ChopQuadAt(const Point src[3], Point dst[5], float t) {
+  DEBUG_ASSERT((t > 0.f && t < 1.f));
+
+  auto p0 = src[0];
+  auto p1 = src[1];
+  auto p2 = src[2];
+
+  auto p01 = interp(p0, p1, t);
+  auto p12 = interp(p1, p2, t);
+
+  dst[0] = p0;
+  dst[1] = p01;
+  dst[2] = interp(p01, p12, t);
+  dst[3] = p12;
+  dst[4] = p2;
+}
+
+float PathUtils::FindQuadMaxCurvature(const Point src[3]) {
+  float Ax = src[1].x - src[0].x;
+  float Ay = src[1].y - src[0].y;
+  float Bx = src[0].x - src[1].x - src[1].x + src[2].x;
+  float By = src[0].y - src[1].y - src[1].y + src[2].y;
+
+  float numer = -((Ax * Bx) + (Ay * By));
+  float denom = (Bx * Bx) + (By * By);
+  if (denom < 0) {
+    numer = -numer;
+    denom = -denom;
+  }
+  if (numer <= 0) {
+    return 0;
+  }
+  if (numer >= denom) {  // Also catches denom=0.
+    return 1;
+  }
+  float t = numer / denom;
+  DEBUG_ASSERT(((0 <= t && t < 1) || std::isnan(t)));
+  return t;
+}
+
+int PathUtils::ChopQuadAtMaxCurvature(const Point src[3], Point dst[5]) {
+  float t = FindQuadMaxCurvature(src);
+  if (t > 0 && t < 1) {
+    ChopQuadAt(src, dst, t);
+    return 2;
+  } else {
+    memcpy(dst, src, 3 * sizeof(Point));
+    return 1;
+  }
+}
+
+QuadUVMatrix::QuadUVMatrix(const Point controlPoints[3]) {
+  this->set(controlPoints);
+}
+
+void QuadUVMatrix::set(const Point controlPoints[3]) {
+  // We want M such that M * xy_pt = uv_pt
+  // We know M * control_pts = [0  1/2 1]
+  //                           [0  0   1]
+  //                           [1  1   1]
+  // And control_pts = [x0 x1 x2]
+  //                   [y0 y1 y2]
+  //                   [1  1  1 ]
+  // We invert the control pt matrix and post concat to both sides to get M.
+  // Using the known form of the control point matrix and the result, we can
+  // optimize and improve precision.
+
+  double x0 = controlPoints[0].x;
+  double y0 = controlPoints[0].y;
+  double x1 = controlPoints[1].x;
+  double y1 = controlPoints[1].y;
+  double x2 = controlPoints[2].x;
+  double y2 = controlPoints[2].y;
+
+  // pre-calculate some adjugate matrix factors for determinant
+  double a2 = (x1 * y2) - (x2 * y1);
+  double a5 = (x2 * y0) - (x0 * y2);
+  double a8 = (x0 * y1) - (x1 * y0);
+  double det = a2 + a5 + a8;
+
+  if (!std::isfinite(det) ||
+      FloatNearlyZero(static_cast<float>(det), FLOAT_NEARLY_ZERO * FLOAT_NEARLY_ZERO)) {
+    // The quad is degenerate. Hopefully this is rare. Find the pts that are
+    // farthest apart to compute a line (unless it is really a pt).
+    auto maxD = PointUtils::DistanceSquared(controlPoints[0], controlPoints[1]);
+    int maxEdge = 0;
+    auto d = PointUtils::DistanceSquared(controlPoints[1], controlPoints[2]);
+    if (d > maxD) {
+      maxD = d;
+      maxEdge = 1;
+    }
+    d = PointUtils::DistanceSquared(controlPoints[2], controlPoints[0]);
+    if (d > maxD) {
+      maxD = d;
+      maxEdge = 2;
+    }
+    // We could have a tolerance here, not sure if it would improve anything
+    if (maxD > 0) {
+      // Set the matrix to give (u = 0, v = distance_to_line)
+      auto lineVec = controlPoints[(maxEdge + 1) % 3] - controlPoints[maxEdge];
+      // when looking from the point 0 down the line we want positive
+      // distances to be to the left. This matches the non-degenerate
+      // case.
+      lineVec = PointUtils::MakeOrthogonal(lineVec, PointUtils::Side::Left);
+      // first row
+      matrix[0] = 0;
+      matrix[1] = 0;
+      matrix[2] = 0;
+      // second row
+      matrix[3] = lineVec.x;
+      matrix[4] = lineVec.y;
+      matrix[5] = -Point::DotProduct(lineVec, controlPoints[maxEdge]);
+    } else {
+      // It's a point. It should cover zero area. Just set the matrix such
+      // that (u, v) will always be far away from the quad.
+      matrix[0] = 0;
+      matrix[1] = 0;
+      matrix[2] = 100.f;
+      matrix[3] = 0;
+      matrix[4] = 0;
+      matrix[5] = 100.f;
+    }
+  } else {
+    double scale = 1.0 / det;
+
+    // compute adjugate matrix
+    double a3;
+    double a4;
+    double a6;
+    double a7;
+    a3 = y2 - y0;
+    a4 = x0 - x2;
+
+    a6 = y0 - y1;
+    a7 = x1 - x0;
+
+    // this performs the uv_pts*adjugate(control_pts) multiply,
+    // then does the scale by 1/det afterwards to improve precision
+    matrix[0] = static_cast<float>((0.5 * a3 + a6) * scale);
+    matrix[1] = static_cast<float>((0.5 * a4 + a7) * scale);
+    matrix[2] = static_cast<float>((0.5 * a5 + a8) * scale);
+    matrix[3] = static_cast<float>(a6 * scale);
+    matrix[4] = static_cast<float>(a7 * scale);
+    matrix[5] = static_cast<float>(a8 * scale);
+  }
+}
+
+void QuadUVMatrix::apply(void* vertices, int vertexCount, size_t stride, size_t uvOffset) const {
+  auto* xyPtr = static_cast<char*>(vertices);
+  auto* uvPtr = static_cast<char*>(vertices) + uvOffset;
+  float sx = matrix[0];
+  float kx = matrix[1];
+  float tx = matrix[2];
+  float ky = matrix[3];
+  float sy = matrix[4];
+  float ty = matrix[5];
+  for (int i = 0; i < vertexCount; ++i) {
+    auto* xy = reinterpret_cast<const Point*>(xyPtr);
+    auto* uv = reinterpret_cast<Point*>(uvPtr);
+    uv->x = sx * xy->x + kx * xy->y + tx;
+    uv->y = ky * xy->x + sy * xy->y + ty;
+    xyPtr += stride;
+    uvPtr += stride;
+  }
+}
+
 }  // namespace tgfx

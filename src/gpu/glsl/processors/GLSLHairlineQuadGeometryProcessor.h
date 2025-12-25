@@ -18,18 +18,21 @@
 
 #pragma once
 
-#include <memory>
-#include "tgfx/core/Path.h"
-#include "tgfx/core/Shape.h"
+#include "gpu/processors/HairlineQuadGeometryProcessor.h"
+#include "tgfx/core/Color.h"
+
 namespace tgfx {
 
-class ShapeUtils {
+class GLSLHairlineQuadGeometryProcessor : public HairlineQuadGeometryProcessor {
  public:
-  /**
-   * Returns the Shape adjusted for the current resolution scale.
-   * Used during rendering to decide whether to simplify the Path or apply hairline stroking,
-   * depending on the resolution scale.
-   */
-  static Path GetShapeRenderingPath(std::shared_ptr<Shape> shape, float resolutionScale);
+  GLSLHairlineQuadGeometryProcessor(const PMColor& color, const Matrix& viewMatrix,
+                                    std::optional<Matrix> uvMatrix, uint8_t coverage);
+
+  void emitCode(EmitArgs& args) const override;
+
+ private:
+  void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData,
+               FPCoordTransformIter* coordTransformIter) const override;
 };
+
 }  // namespace tgfx
