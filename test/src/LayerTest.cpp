@@ -4320,6 +4320,52 @@ TGFX_TEST(LayerTest, TileClearWhenAllLayersRemoved) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/TileClear_PartialTileWithNewLayer"));
 }
 
+/**
+ * Test that overlapping layers with intersecting dirty regions don't cause duplicate tile recycling.
+ * When two layers overlap and both are modified, their dirty regions may cover the same tiles.
+ * The tile should only be recycled once, not multiple times.
+ */
+TGFX_TEST(LayerTest, OverlappingDirtyRegions) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto surface = Surface::Make(context, 256, 256);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Tiled);
+  displayList->setTileSize(128);
+  displayList->setBackgroundColor(Color::White());
+
+  auto rootLayer = displayList->root();
+
+  auto redRect = ShapeLayer::Make();
+  Path redPath = {};
+  redPath.addRect(Rect::MakeXYWH(20, 20, 100, 100));
+  redRect->setPath(redPath);
+  redRect->setFillStyle(ShapeStyle::Make(Color::Red()));
+  rootLayer->addChild(redRect);
+
+  auto blueRect = ShapeLayer::Make();
+  Path bluePath = {};
+  bluePath.addRect(Rect::MakeXYWH(95, 95, 100, 100));
+  blueRect->setPath(bluePath);
+  blueRect->setFillStyle(ShapeStyle::Make(Color::Blue()));
+  rootLayer->addChild(blueRect);
+
+  displayList->render(surface.get());
+  EXPECT_EQ(displayList->tileCaches.size(), 1u);
+
+  redRect->removeFromParent();
+  blueRect->removeFromParent();
+
+  displayList->render(surface.get());
+
+  EXPECT_EQ(displayList->tileCaches.size(), 0lu);
+
+  auto emptyTilesAfter = displayList->emptyTiles.size();
+  EXPECT_EQ(9lu, emptyTilesAfter);
+}
+
 TGFX_TEST(LayerTest, LayerRecorder) {
   ContextScope scope;
   auto context = scope.getContext();
