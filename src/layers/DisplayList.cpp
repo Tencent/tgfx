@@ -503,8 +503,9 @@ void DisplayList::recycleCurrentTileTasks(const std::vector<DrawTask>& tileTasks
   auto tileCache = result->second;
   for (auto& task : tileTasks) {
     for (auto& tile : task.getTiles()) {
-      tileCache->removeTile(tile->tileX, tile->tileY);
-      emptyTiles.push_back(tile);
+      if (tileCache->removeTile(tile->tileX, tile->tileY)) {
+        emptyTiles.push_back(tile);
+      }
     }
   }
   if (tileCache->empty()) {
