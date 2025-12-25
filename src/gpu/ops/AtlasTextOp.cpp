@@ -59,9 +59,9 @@ AtlasTextOp::AtlasTextOp(BlockAllocator* allocator, RectsVertexProvider* provide
     : DrawOp(allocator, provider->aaType()), rectCount(provider->rectCount()),
       textureProxy(std::move(textureProxy)), sampling(sampling) {
   if (!provider->hasColor()) {
-    LOGI("AtlasTextOp() src color: (%f, %f, %f, %f)", provider->firstColor().red, provider->firstColor().green, provider->firstColor().blue, provider->firstColor().alpha);
+    //LOGI("AtlasTextOp() src color: (%f, %f, %f, %f)", provider->firstColor().red, provider->firstColor().green, provider->firstColor().blue, provider->firstColor().alpha);
     commonColor = ToPMColor(provider->firstColor(), provider->dstColorSpace());
-    LOGI("AtlasTextOp() dst color: (%f, %f, %f, %f)", commonColor->red, commonColor->green, commonColor->blue, commonColor->alpha);
+    //LOGI("AtlasTextOp() dst color: (%f, %f, %f, %f)", commonColor->red, commonColor->green, commonColor->blue, commonColor->alpha);
   }
 }
 
