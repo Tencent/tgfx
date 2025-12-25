@@ -59,8 +59,8 @@ RectDrawOp::RectDrawOp(BlockAllocator* allocator, RectsVertexProvider* provider)
   }
   if (!provider->hasColor()) {
     commonColor = ToPMColor(provider->firstColor(), provider->dstColorSpace());
-    LOGI("AtlasTextOp() src color: (%f, %f, %f, %f)", provider->firstColor().red, provider->firstColor().green, provider->firstColor().blue, provider->firstColor().alpha);
-    LOGI("AtlasTextOp() dst color: (%f, %f, %f, %f)", commonColor->red, commonColor->green, commonColor->blue, commonColor->alpha);
+    LOGI("RectDrawOp() src color: (%f, %f, %f, %f)", provider->firstColor().red, provider->firstColor().green, provider->firstColor().blue, provider->firstColor().alpha);
+    LOGI("RectDrawOp() dst color: (%f, %f, %f, %f)", commonColor->red, commonColor->green, commonColor->blue, commonColor->alpha);
   }
   hasSubset = provider->hasSubset();
 }
