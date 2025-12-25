@@ -28,10 +28,16 @@
 #include "layers/RootLayer.h"
 #include "layers/SubtreeCache.h"
 #include "layers/TileCache.h"
+#include "layers/contents/ComposeContent.h"
+#include "layers/contents/RectsContent.h"
+#include "layers/contents/RRectsContent.h"
+#include "layers/contents/TextContent.h"
 #include "tgfx/core/Shape.h"
+#include "tgfx/core/TextBlob.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ImageLayer.h"
 #include "tgfx/layers/Layer.h"
+#include "tgfx/layers/LayerRecorder.h"
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/SolidLayer.h"
 #include "tgfx/layers/TextLayer.h"
@@ -4312,6 +4318,211 @@ TGFX_TEST(LayerTest, TileClearWhenAllLayersRemoved) {
   rootLayer->addChild(greenRect);
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/TileClear_PartialTileWithNewLayer"));
+}
+
+TGFX_TEST(LayerTest, LayerRecorder) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  LayerPaint redPaint = {};
+  redPaint.color = Color::Red();
+
+  LayerPaint bluePaint = {};
+  bluePaint.color = Color::Blue();
+
+  LayerPaint strokePaint = {};
+  strokePaint.color = Color::Red();
+  strokePaint.style = PaintStyle::Stroke;
+  strokePaint.stroke.width = 5.0f;
+
+  // Test 1: Multiple rects with same paint should merge into RectsContent
+  {
+    auto surface = Surface::Make(context, 200, 150);
+    LayerRecorder recorder = {};
+    recorder.addRect(Rect::MakeXYWH(10, 10, 50, 50), redPaint);
+    recorder.addRect(Rect::MakeXYWH(70, 10, 50, 50), redPaint);
+    recorder.addRect(Rect::MakeXYWH(130, 10, 50, 50), redPaint);
+    recorder.addRect(Rect::MakeXYWH(10, 70, 50, 50), bluePaint);
+    auto content = recorder.finishRecording();
+    ASSERT_TRUE(content != nullptr);
+    // Should be ComposeContent with 2 items: RectsContent (3 rects) + RectContent (1 rect)
+    EXPECT_EQ(content->type(), LayerContent::Type::Compose);
+    auto composeContent = static_cast<ComposeContent*>(content.get());
+    EXPECT_EQ(composeContent->contents.size(), 2u);
+    EXPECT_EQ(composeContent->contents[0]->type(), LayerContent::Type::Rects);
+    auto rectsContent = static_cast<RectsContent*>(composeContent->contents[0].get());
+    EXPECT_EQ(rectsContent->rects.size(), 3u);
+    EXPECT_EQ(composeContent->contents[1]->type(), LayerContent::Type::Rect);
+    content->drawDefault(surface->getCanvas(), 1.0f, true);
+    EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerRecorder_MultipleRects"));
+  }
+
+  // Test 2: Multiple rrects with same paint should merge into RRectsContent
+  {
+    auto surface = Surface::Make(context, 200, 150);
+    LayerRecorder recorder = {};
+    RRect rRect1 = {};
+    rRect1.setRectXY(Rect::MakeXYWH(10, 10, 50, 50), 10, 10);
+    RRect rRect2 = {};
+    rRect2.setRectXY(Rect::MakeXYWH(70, 10, 50, 50), 10, 10);
+    RRect rRect3 = {};
+    rRect3.setRectXY(Rect::MakeXYWH(130, 10, 50, 50), 10, 10);
+    RRect rRect4 = {};
+    rRect4.setRectXY(Rect::MakeXYWH(10, 70, 50, 50), 10, 10);
+    recorder.addRRect(rRect1, redPaint);
+    recorder.addRRect(rRect2, redPaint);
+    recorder.addRRect(rRect3, redPaint);
+    recorder.addRRect(rRect4, bluePaint);
+    auto content = recorder.finishRecording();
+    ASSERT_TRUE(content != nullptr);
+    // Should be ComposeContent with 2 items: RRectsContent (3 rrects) + RRectContent (1 rrect)
+    EXPECT_EQ(content->type(), LayerContent::Type::Compose);
+    auto composeContent = static_cast<ComposeContent*>(content.get());
+    EXPECT_EQ(composeContent->contents.size(), 2u);
+    EXPECT_EQ(composeContent->contents[0]->type(), LayerContent::Type::RRects);
+    auto rrectsContent = static_cast<RRectsContent*>(composeContent->contents[0].get());
+    EXPECT_EQ(rrectsContent->rRects.size(), 3u);
+    EXPECT_EQ(composeContent->contents[1]->type(), LayerContent::Type::RRect);
+    content->drawDefault(surface->getCanvas(), 1.0f, true);
+    EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerRecorder_MultipleRRects"));
+  }
+
+  // Test 3: Multiple paths with same paint should merge into single Shape
+  {
+    auto surface = Surface::Make(context, 200, 150);
+    LayerRecorder recorder = {};
+    Path path1 = {};
+    path1.addOval(Rect::MakeXYWH(10, 10, 50, 50));
+    Path path2 = {};
+    path2.addOval(Rect::MakeXYWH(70, 10, 50, 50));
+    Path path3 = {};
+    path3.addOval(Rect::MakeXYWH(130, 10, 50, 50));
+    Path path4 = {};
+    path4.addOval(Rect::MakeXYWH(10, 70, 50, 50));
+    recorder.addPath(path1, redPaint);
+    recorder.addPath(path2, redPaint);
+    recorder.addPath(path3, redPaint);
+    recorder.addPath(path4, bluePaint);
+    auto content = recorder.finishRecording();
+    ASSERT_TRUE(content != nullptr);
+    // Should be ComposeContent with 2 items: ShapeContent (merged paths) + PathContent
+    EXPECT_EQ(content->type(), LayerContent::Type::Compose);
+    auto composeContent = static_cast<ComposeContent*>(content.get());
+    EXPECT_EQ(composeContent->contents.size(), 2u);
+    EXPECT_EQ(composeContent->contents[0]->type(), LayerContent::Type::Shape);
+    EXPECT_EQ(composeContent->contents[1]->type(), LayerContent::Type::Path);
+    content->drawDefault(surface->getCanvas(), 1.0f, true);
+    EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerRecorder_MultiplePaths"));
+  }
+
+  // Test 4: Mixed shapes with same paint should create separate contents
+  {
+    auto surface = Surface::Make(context, 200, 100);
+    LayerRecorder recorder = {};
+    recorder.addRect(Rect::MakeXYWH(10, 10, 50, 50), redPaint);
+    RRect rRect = {};
+    rRect.setRectXY(Rect::MakeXYWH(70, 10, 50, 50), 10, 10);
+    recorder.addRRect(rRect, redPaint);
+    Path path = {};
+    path.addOval(Rect::MakeXYWH(130, 10, 50, 50));
+    recorder.addPath(path, redPaint);
+    auto content = recorder.finishRecording();
+    ASSERT_TRUE(content != nullptr);
+    // Should be ComposeContent with 3 items: RectContent + RRectContent + PathContent
+    EXPECT_EQ(content->type(), LayerContent::Type::Compose);
+    auto composeContent = static_cast<ComposeContent*>(content.get());
+    EXPECT_EQ(composeContent->contents.size(), 3u);
+    EXPECT_EQ(composeContent->contents[0]->type(), LayerContent::Type::Rect);
+    EXPECT_EQ(composeContent->contents[1]->type(), LayerContent::Type::RRect);
+    EXPECT_EQ(composeContent->contents[2]->type(), LayerContent::Type::Path);
+    content->drawDefault(surface->getCanvas(), 1.0f, true);
+    EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerRecorder_MixedShapes"));
+  }
+
+  // Test 5: TextBlob with x, y offset
+  {
+    auto surface = Surface::Make(context, 200, 150);
+    LayerRecorder recorder = {};
+    auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+    ASSERT_TRUE(typeface != nullptr);
+    auto font = Font(typeface, 24);
+    auto textBlob = TextBlob::MakeFrom("Hello", font);
+    recorder.addTextBlob(textBlob, redPaint, 50, 100);
+    auto content = recorder.finishRecording();
+    ASSERT_TRUE(content != nullptr);
+    // Should be single TextContent
+    EXPECT_EQ(content->type(), LayerContent::Type::Text);
+    auto textContent = static_cast<TextContent*>(content.get());
+    EXPECT_EQ(textContent->x, 50.0f);
+    EXPECT_EQ(textContent->y, 100.0f);
+    content->drawDefault(surface->getCanvas(), 1.0f, true);
+    EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerRecorder_TextBlobWithOffset"));
+  }
+
+  // Test 6: Line path with fill should be ignored
+  {
+    auto surface = Surface::Make(context, 200, 150);
+    LayerRecorder recorder = {};
+    Path linePath = {};
+    linePath.moveTo(10, 10);
+    linePath.lineTo(100, 100);
+    recorder.addPath(linePath, redPaint);  // Fill style, should be ignored
+    recorder.addRect(Rect::MakeXYWH(10, 70, 50, 50), bluePaint);
+    auto content = recorder.finishRecording();
+    ASSERT_TRUE(content != nullptr);
+    // Should be single RectContent (line path ignored)
+    EXPECT_EQ(content->type(), LayerContent::Type::Rect);
+    content->drawDefault(surface->getCanvas(), 1.0f, true);
+    EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerRecorder_LinePathFill"));
+  }
+
+  // Test 7: Line path with stroke should be converted to rect
+  {
+    auto surface = Surface::Make(context, 200, 100);
+    LayerRecorder recorder = {};
+    Path linePath = {};
+    linePath.moveTo(10, 50);
+    linePath.lineTo(190, 50);
+    recorder.addPath(linePath, strokePaint);
+    auto content = recorder.finishRecording();
+    ASSERT_TRUE(content != nullptr);
+    // Should be single RectContent (line converted to rect)
+    EXPECT_EQ(content->type(), LayerContent::Type::Rect);
+    content->drawDefault(surface->getCanvas(), 1.0f, true);
+    EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerRecorder_LinePathStroke"));
+  }
+
+  // Test 8: Single rect should be RectContent, not RectsContent
+  {
+    LayerRecorder recorder = {};
+    recorder.addRect(Rect::MakeXYWH(10, 10, 50, 50), redPaint);
+    auto content = recorder.finishRecording();
+    ASSERT_TRUE(content != nullptr);
+    EXPECT_EQ(content->type(), LayerContent::Type::Rect);
+  }
+
+  // Test 9: Single rrect should be RRectContent, not RRectsContent
+  {
+    LayerRecorder recorder = {};
+    RRect rRect = {};
+    rRect.setRectXY(Rect::MakeXYWH(10, 10, 50, 50), 10, 10);
+    recorder.addRRect(rRect, redPaint);
+    auto content = recorder.finishRecording();
+    ASSERT_TRUE(content != nullptr);
+    EXPECT_EQ(content->type(), LayerContent::Type::RRect);
+  }
+
+  // Test 10: RRect with zero radius should be converted to Rect
+  {
+    LayerRecorder recorder = {};
+    RRect rRect = {};
+    rRect.setRectXY(Rect::MakeXYWH(10, 10, 50, 50), 0, 0);
+    recorder.addRRect(rRect, redPaint);
+    auto content = recorder.finishRecording();
+    ASSERT_TRUE(content != nullptr);
+    EXPECT_EQ(content->type(), LayerContent::Type::Rect);
+  }
 }
 
 }  // namespace tgfx
