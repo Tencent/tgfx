@@ -17,94 +17,171 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Context3DCompositor.h"
-#include <algorithm>
-#include "core/images/TextureImage.h"
+#include "layers/BspTree.h"
 #include "core/utils/MathExtra.h"
+#include "core/images/TextureImage.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/RectsVertexProvider.h"
 #include "gpu/TPArgs.h"
 #include "gpu/ops/Rect3DDrawOp.h"
+#include "gpu/ops/ShapeDrawOp.h"
+#include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/TextureEffect.h"
 
 namespace tgfx {
 
-Context3DCompositor::Context3DCompositor(const Context& context, int width, int height)
-    : width(width), height(height) {
-  // Use MSAA to solve the aliasing issue at the intersection lines of multiple layers.
-  targetColorProxy = context.proxyProvider()->createRenderTargetProxy({}, width, height,
-                                                                      PixelFormat::RGBA_8888, 4);
-  DEBUG_ASSERT(targetColorProxy != nullptr);
-  targetDepthStencilProxy = context.proxyProvider()->createRenderTargetProxy(
-      {}, width, height, PixelFormat::DEPTH24_STENCIL8, 4);
-  DEBUG_ASSERT(targetDepthStencilProxy != nullptr);
+static inline AAType GetAAType(int sampleCount, bool antiAlias) {
+  if (sampleCount > 1) {
+    return AAType::MSAA;
+  }
+  if (antiAlias) {
+    return AAType::Coverage;
+  }
+  return AAType::None;
 }
 
-void Context3DCompositor::drawImage(std::shared_ptr<Image> image, const Matrix3D& matrix, float x,
-                                    float y, float alpha) {
-  DEBUG_ASSERT(targetColorProxy != nullptr);
-  DEBUG_ASSERT(targetDepthStencilProxy != nullptr);
-  auto context = targetColorProxy->getContext();
-  DEBUG_ASSERT(context != nullptr);
+Context3DCompositor::Context3DCompositor(const Context& context, int width, int height)
+    : _width(width), _height(height) {
+  _targetColorProxy =
+      context.proxyProvider()->createRenderTargetProxy({}, width, height, PixelFormat::RGBA_8888);
+  DEBUG_ASSERT(_targetColorProxy != nullptr);
+}
 
+void Context3DCompositor::addImage(std::shared_ptr<Image> image, const Matrix3D& matrix,
+                                   float alpha, bool antiAlias) {
+  auto polygon =
+      std::make_unique<DrawPolygon3D>(std::move(image), matrix, _nextOrderIndex++, alpha, antiAlias);
+  _polygons.push_back(std::move(polygon));
+}
+
+void Context3DCompositor::drawPolygon(const DrawPolygon3D* polygon) {
+  DEBUG_ASSERT(_targetColorProxy != nullptr);
+  auto context = _targetColorProxy->getContext();
+  DEBUG_ASSERT(context != nullptr);
+  auto aaType = GetAAType(_targetColorProxy->sampleCount(), polygon->antiAlias());
+  const auto& image = polygon->image();
   auto srcW = static_cast<float>(image->width());
   auto srcH = static_cast<float>(image->height());
-  // The default transformation anchor is at the top-left origin (0,0) of the image; user-defined
-  // anchors are included in the matrix.
   auto srcModelRect = Rect::MakeXYWH(0.f, 0.f, srcW, srcH);
-  auto srcProjectRect = matrix.mapRect(srcModelRect);
-  // ndcScale maps vertex coordinates to the NDC coordinate system.
-  const Vec2 ndcScale(2.0f / static_cast<float>(width), 2.0f / static_cast<float>(height));
-  auto ndcRectScaled =
-      Rect::MakeXYWH(srcProjectRect.left * ndcScale.x, srcProjectRect.top * ndcScale.y,
-                     srcProjectRect.width() * ndcScale.x, srcProjectRect.height() * ndcScale.y);
-  // ndcOffset translates the top-left corner of the transformed rect in NDC space to the specified
-  // position, offset from the reference point (-1, -1) (which corresponds to the top-left corner of
-  // the target texture) by the pixel distance defined by the function parameters x and y.
-  const Vec2 ndcOffset(-1.f - ndcRectScaled.left + 2 * x / static_cast<float>(width),
-                       -1.f - ndcRectScaled.top + 2 * y / static_cast<float>(height));
 
+  // Flatten z-axis to keep vertices at their original depth, preventing clipping space culling.
+  auto matrix = polygon->matrix();
+  matrix.setRow(2, {0, 0, 1, 0});
+  auto widthF = static_cast<float>(_width);
+  auto heightF = static_cast<float>(_height);
+  // Map projected vertex coordinates from render target texture space to NDC space.
+  const Vec2 ndcScale(2.0f / widthF, 2.0f / heightF);
+  const Vec2 ndcOffset(-1.f, -1.f);
   auto allocator = context->drawingAllocator();
   // Wrap alpha as vertex color to enable semi-transparent pixel blending.
-  auto vertexProvider =
-      RectsVertexProvider::MakeFrom(allocator, srcModelRect, AAType::MSAA, Color(1, 1, 1, alpha));
-  const Size viewportSize(static_cast<float>(width), static_cast<float>(height));
+  auto vertexProvider = RectsVertexProvider::MakeFrom(allocator, srcModelRect, aaType,
+                                                      Color(1, 1, 1, polygon->alpha()));
+  const Size viewportSize(static_cast<float>(_width), static_cast<float>(_height));
   const Rect3DDrawArgs drawArgs{matrix, ndcScale, ndcOffset, viewportSize};
   auto drawOp = Rect3DDrawOp::Make(context, std::move(vertexProvider), 0, drawArgs);
+
   const SamplingArgs samplingArgs = {TileMode::Clamp, TileMode::Clamp, {}, SrcRectConstraint::Fast};
   const TPArgs args(context, 0, false, 1.0f);
   auto sourceTextureProxy = image->lockTextureProxy(args);
-  // Ensure the vertex texture sampling coordinates are in the range [0, 1]
-  DEBUG_ASSERT(srcW > 0 && srcH > 0);
-  // The Size obtained from Source is the original size, while the texture size generated by Source
+  // Ensure the vertex texture sampling coordinates are in the range [0, 1].
+  // The size obtained from Image is the original size, while the texture size generated by Image
   // is the size after applying DrawScale. Texture sampling requires corresponding scaling.
+  DEBUG_ASSERT(srcW > 0 && srcH > 0);
   auto uvMatrix = Matrix::MakeScale(static_cast<float>(sourceTextureProxy->width()) / srcW,
                                     static_cast<float>(sourceTextureProxy->height()) / srcH);
   auto fragmentProcessor =
       TextureEffect::Make(allocator, std::move(sourceTextureProxy), samplingArgs, &uvMatrix);
   drawOp->addColorFP(std::move(fragmentProcessor));
-  drawOp->setEnableDepthTest(true);
-  // Transparent pixels should not overwrite the depth buffer, otherwise they would cause
-  // underlying pixels to become invisible.
-  drawOp->setEnableDepthWrite(FloatNearlyEqual(alpha, 1.0f));
-  drawOps.emplace_back(std::move(drawOp));
+
+  // TODO: Draw clipped polygon vertices directly to avoid rasterizing pixels outside the clip region.
+  if (polygon->isSplit()) {
+    auto clipPath = buildClipPath(polygon->points());
+    auto [clipMask, scissorRect] = getClipMaskFP(context, clipPath);
+    if (clipMask) {
+      drawOp->addCoverageFP(std::move(clipMask));
+    }
+    drawOp->setScissorRect(scissorRect);
+  }
+
+  _drawOps.emplace_back(std::move(drawOp));
+}
+
+Path Context3DCompositor::buildClipPath(const std::vector<Vec3>& points) {
+  Path path;
+  if (points.empty()) {
+    return path;
+  }
+  path.moveTo(points[0].x, points[0].y);
+  for (size_t i = 1; i < points.size(); i++) {
+    path.lineTo(points[i].x, points[i].y);
+  }
+  path.close();
+  return path;
+}
+
+std::shared_ptr<TextureProxy> Context3DCompositor::getClipTexture(Context* context,
+                                                                  const Path& clipPath) {
+  auto bounds = clipPath.getBounds();
+  if (bounds.isEmpty()) {
+    return nullptr;
+  }
+  auto width = FloatCeilToInt(bounds.width());
+  auto height = FloatCeilToInt(bounds.height());
+  auto rasterizeMatrix = Matrix::MakeTrans(-bounds.left, -bounds.top);
+
+  auto shape = Shape::MakeFrom(clipPath);
+  shape = Shape::ApplyMatrix(std::move(shape), rasterizeMatrix);
+  auto clipBounds = Rect::MakeWH(width, height);
+  auto shapeProxy = context->proxyProvider()->createGPUShapeProxy(shape, AAType::MSAA, clipBounds, 0);
+
+  auto uvMatrix = Matrix::MakeTrans(bounds.left, bounds.top);
+  auto drawOp = ShapeDrawOp::Make(std::move(shapeProxy), {}, uvMatrix, AAType::MSAA);
+
+  auto clipRenderTarget = RenderTargetProxy::Make(context, width, height, true, 1, false,
+                                                  ImageOrigin::TopLeft, BackingFit::Approx);
+  if (clipRenderTarget == nullptr) {
+    return nullptr;
+  }
+  auto clipTexture = clipRenderTarget->asTextureProxy();
+  auto opList = context->drawingAllocator()->makeArray<DrawOp>(&drawOp, 1);
+  context->drawingManager()->addOpsRenderTask(std::move(clipRenderTarget), std::move(opList),
+                                              PMColor::Transparent());
+  return clipTexture;
+}
+
+std::pair<PlacementPtr<FragmentProcessor>, Rect> Context3DCompositor::getClipMaskFP(
+    Context* context, const Path& clipPath) {
+  auto clipBounds = clipPath.getBounds();
+  Rect scissorRect = clipBounds;
+  scissorRect.roundOut();
+
+  auto textureProxy = getClipTexture(context, clipPath);
+  if (textureProxy == nullptr) {
+    return {nullptr, scissorRect};
+  }
+
+  auto uvMatrix = Matrix::MakeTrans(-clipBounds.left, -clipBounds.top);
+  auto allocator = context->drawingAllocator();
+  auto processor = DeviceSpaceTextureEffect::Make(allocator, std::move(textureProxy), uvMatrix);
+  auto clipMask = FragmentProcessor::MulInputByChildAlpha(allocator, std::move(processor));
+  return {std::move(clipMask), scissorRect};
 }
 
 std::shared_ptr<Image> Context3DCompositor::finish() {
-  auto context = targetColorProxy->getContext();
+  auto context = _targetColorProxy->getContext();
   DEBUG_ASSERT(context != nullptr);
 
-  // TODO: Fix semi-transparent pixel blending issues.
-  // The layer tree traversal collects draw operations in post-order (children before parent).
-  // Reverse the order so that parent layers are drawn first, ensuring correct depth buffer writes
-  // for proper occlusion when child layers overlap with parent content.
-  std::reverse(drawOps.begin(), drawOps.end());
-  auto opArray = context->drawingAllocator()->makeArray(std::move(drawOps));
-  context->drawingManager()->addOpsRenderTask(targetColorProxy, targetDepthStencilProxy,
-                                              std::move(opArray), PMColor::Transparent());
-  auto image = TextureImage::Wrap(targetColorProxy->asTextureProxy(), ColorSpace::SRGB());
-  targetColorProxy = nullptr;
-  targetDepthStencilProxy = nullptr;
+  if (!_polygons.empty()) {
+    BspTree bspTree(std::move(_polygons));
+    bspTree.traverseBackToFront([this](const DrawPolygon3D* polygon) { drawPolygon(polygon); });
+  }
+
+  auto opArray = context->drawingAllocator()->makeArray(std::move(_drawOps));
+  context->drawingManager()->addOpsRenderTask(_targetColorProxy, std::move(opArray),
+                                              PMColor::Transparent());
+  auto image = TextureImage::Wrap(_targetColorProxy->asTextureProxy(), ColorSpace::SRGB());
+  _targetColorProxy = nullptr;
   return image;
 }
 

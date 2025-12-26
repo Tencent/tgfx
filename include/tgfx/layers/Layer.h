@@ -113,11 +113,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   /**
    * Sets the alpha transparency of the layer.
-   *
-   * Note: The blending order of semi-transparent pixels affects the final result. For semi-
-   * transparent layers, pixels at the same position (same xy) are expected to blend in ascending
-   * z-order. However, within a 3D context, layers are not guaranteed to be drawn in depth order,
-   * so blending results for semi-transparent content may be incorrect.
    */
   void setAlpha(float value);
 
@@ -718,16 +713,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   std::optional<Rect> computeContentBounds(const std::optional<Rect>& clipBounds,
                                            bool excludeEffects);
-
-  /**
-   * Calculates the depth matrix that maps the depth of all layers within the 3D Rendering Context
-   * rooted at this layer to the Normalized Device Coordinates (NDC) depth range.
-   * The mapping rule transforms the depth range [maxDepth, minDepth] to [-1, 1].
-   * Note: The DisplayList layout coordinate system has the positive Y-axis pointing outward from
-   * the screen, while the NDC coordinate system has the positive Y-axis pointing into the screen.
-   * Therefore, maxDepth maps to -1 rather than 1.
-   */
-  Matrix3D calculate3DContextDepthMatrix();
 
   bool canExtend3DContext() const;
 

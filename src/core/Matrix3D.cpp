@@ -255,9 +255,11 @@ void Matrix3D::preTranslate(float tx, float ty, float tz) {
 }
 
 void Matrix3D::postTranslate(float tx, float ty, float tz) {
-  values[12] += tx;
-  values[13] += ty;
-  values[14] += tz;
+  Vec4 t = {tx, ty, tz, 0};
+  setColumn(0, getCol(0) + t * values[3]);
+  setColumn(1, getCol(1) + t * values[7]);
+  setColumn(2, getCol(2) + t * values[11]);
+  setColumn(3, getCol(3) + t * values[15]);
 }
 
 void Matrix3D::postSkew(float kxy, float kxz, float kyx, float kyz, float kzx, float kzy) {
@@ -319,12 +321,17 @@ void Matrix3D::mapRect(Rect* rect) const {
   *rect = mapRect(*rect);
 }
 
-Vec3 Matrix3D::mapVec3(const Vec3& v) const {
-  auto r = this->mapPoint(v.x, v.y, v.z, 1.f);
+Vec3 Matrix3D::mapPoint(const Vec3& point) const {
+  auto r = mapHomogeneous(point.x, point.y, point.z, 1.f);
   return {IEEEFloatDivide(r.x, r.w), IEEEFloatDivide(r.y, r.w), IEEEFloatDivide(r.z, r.w)};
 }
 
-Vec4 Matrix3D::mapPoint(float x, float y, float z, float w) const {
+Vec3 Matrix3D::mapVector(const Vec3& vector) const {
+  auto r = mapHomogeneous(vector.x, vector.y, vector.z, 0.f);
+  return {r.x, r.y, r.z};
+}
+
+Vec4 Matrix3D::mapHomogeneous(float x, float y, float z, float w) const {
   auto c0 = getCol(0);
   auto c1 = getCol(1);
   auto c2 = getCol(2);

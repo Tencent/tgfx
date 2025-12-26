@@ -150,7 +150,8 @@ static inline Matrix3D OriginAdaptedMatrix3D(const Matrix3D& matrix3D, const Poi
 static inline void DrawLayerImageTo3DRenderContext(const DrawArgs& args,
                                                    const Matrix3D* layerTransform3D,
                                                    const std::shared_ptr<Image>& image,
-                                                   const Matrix& matrix, float alpha) {
+                                                   const Matrix& matrix, float alpha,
+                                                   bool antiAlias) {
   if (layerTransform3D == nullptr || image == nullptr) {
     DEBUG_ASSERT(false);
     return;
@@ -168,19 +169,12 @@ static inline void DrawLayerImageTo3DRenderContext(const DrawArgs& args,
     auto scaleMatrix = Matrix3D::MakeScale(1.0f / scaleX, 1.0f / scaleY, 1.0f);
     imageTransform = scaleMatrix * imageTransform * invScaleMatrix;
   }
-  // 3D layers within a 3D rendering context require unified depth mapping to ensure correct
-  // depth occlusion visual effects.
-  imageTransform.postConcat(args.render3DContext->depthMatrix());
-  // Calculate the drawing offset in the compositor based on the final drawing area of the content
-  // on the canvas.
-  auto imageMappedRect = imageTransform.mapRect(Rect::MakeWH(image->width(), image->height()));
-  // The origin of the mapped rect in the DisplayList coordinate needs to add the origin of the
-  // image in the layer's local coordinate system.
-  auto x = imageMappedRect.left + matrix.getTranslateX() / scaleX -
-           args.render3DContext->renderRect().left;
-  auto y = imageMappedRect.top + matrix.getTranslateY() / scaleY -
-           args.render3DContext->renderRect().top;
-  args.render3DContext->compositor()->drawImage(image, imageTransform, x, y, alpha);
+
+  // imageTransform is in image coordinate space. Dividing by scale converts the translation to
+  // DisplayList coordinate space, then subtracting renderRect offset converts to compositor space.
+  imageTransform.postTranslate(matrix.getTranslateX() / scaleX - args.render3DContext->renderRect().left,
+                               matrix.getTranslateY() / scaleY - args.render3DContext->renderRect().top, 0);
+  args.render3DContext->compositor()->addImage(image, imageTransform, alpha, antiAlias);
 }
 
 /**
@@ -192,10 +186,10 @@ static inline void DrawLayerImageTo3DRenderContext(const DrawArgs& args,
  */
 static inline bool IsTransformedLayerRectBehindCamera(const Rect& rect,
                                                       const Matrix3D& transform3D) {
-  if (transform3D.mapPoint(rect.left, rect.top, 0, 1).w <= 0 ||
-      transform3D.mapPoint(rect.left, rect.bottom, 0, 1).w <= 0 ||
-      transform3D.mapPoint(rect.right, rect.top, 0, 1).w <= 0 ||
-      transform3D.mapPoint(rect.right, rect.bottom, 0, 1).w <= 0) {
+  if (transform3D.mapHomogeneous(rect.left, rect.top, 0, 1).w <= 0 ||
+      transform3D.mapHomogeneous(rect.left, rect.bottom, 0, 1).w <= 0 ||
+      transform3D.mapHomogeneous(rect.right, rect.top, 0, 1).w <= 0 ||
+      transform3D.mapHomogeneous(rect.right, rect.bottom, 0, 1).w <= 0) {
     return true;
   }
   return false;
@@ -396,7 +390,7 @@ Point Layer::position() const {
     return {_matrix3D.getRowColumn(0, 3), _matrix3D.getRowColumn(1, 3)};
   }
 
-  auto result = matrix3D().mapVec3(Vec3(0, 0, 0));
+  auto result = matrix3D().mapPoint(Vec3(0, 0, 0));
   return {result.x, result.y};
 }
 
@@ -408,7 +402,7 @@ void Layer::setPosition(const Point& value) {
     _matrix3D.setRowColumn(0, 3, value.x);
     _matrix3D.setRowColumn(1, 3, value.y);
   } else {
-    auto curPos = _matrix3D.mapVec3(Vec3(0, 0, 0));
+    auto curPos = _matrix3D.mapPoint(Vec3(0, 0, 0));
     if (FloatNearlyEqual(curPos.x, value.x) && FloatNearlyEqual(curPos.y, value.y)) {
       return;
     }
@@ -826,7 +820,7 @@ Point Layer::globalToLocal(const Point& globalPoint) const {
 
 Point Layer::localToGlobal(const Point& localPoint) const {
   auto globalMatrix = getGlobalMatrix();
-  auto result = globalMatrix.mapVec3({localPoint.x, localPoint.y, 0});
+  auto result = globalMatrix.mapPoint({localPoint.x, localPoint.y, 0});
   return {result.x, result.y};
 }
 
@@ -1854,8 +1848,7 @@ void Layer::drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, float 
       std::make_shared<Context3DCompositor>(*context, static_cast<int>(validRenderRect.width()),
                                             static_cast<int>(validRenderRect.height()));
   auto context3DArgs = args;
-  context3DArgs.render3DContext = std::make_shared<Render3DContext>(
-      compositor, validRenderRect, calculate3DContextDepthMatrix());
+  context3DArgs.render3DContext = std::make_shared<Render3DContext>(compositor, validRenderRect);
   // Layers inside a 3D rendering context need to maintain independent 3D state. This means layers
   // drawn later may become the background, making it impossible to know the final background when
   // drawing each layer. Therefore, background styles are disabled.
@@ -1919,7 +1912,8 @@ void Layer::drawIn3DContext(const DrawArgs& args, Canvas* canvas, float alpha,
   auto imageMatrix = Matrix::I();
   imageMatrix.setScale(1.0f / contentScale, 1.0f / contentScale);
   imageMatrix.preTranslate(offset.x, offset.y);
-  DrawLayerImageTo3DRenderContext(args, &transform3D, image, imageMatrix, alpha);
+  DrawLayerImageTo3DRenderContext(args, &transform3D, image, imageMatrix, alpha,
+                                  bitFields.allowsEdgeAntialiasing);
 }
 
 float Layer::drawBackgroundLayers(const DrawArgs& args, Canvas* canvas) {
@@ -2473,65 +2467,6 @@ std::shared_ptr<BackgroundContext> Layer::createBackgroundContext(
   auto scale = viewMatrix.getMaxScale();
   return BackgroundContext::Make(context, drawRect, maxBackgroundOutset * scale,
                                  minBackgroundOutset * scale, viewMatrix, colorSpace);
-}
-
-Matrix3D Layer::calculate3DContextDepthMatrix() {
-  auto minDepth = std::numeric_limits<float>::max();
-  auto maxDepth = -std::numeric_limits<float>::max();
-
-  using Item = std::tuple<Layer*, Matrix3D>;
-  std::queue<Item> queue;
-  queue.emplace(this, _matrix3D);
-  while (!queue.empty()) {
-    auto& [layer, matrix] = queue.front();
-    queue.pop();
-
-    bool canExtend =
-        layer->_transformStyle == TransformStyle::Preserve3D && layer->canExtend3DContext();
-    // Non-leaf layers in a 3D rendering context have filters and styles disabled, so use content
-    // bounds directly. Leaf layers flatten the entire subtree into their own coordinate system, so
-    // use the full subtree bounds.
-    Rect bounds = {};
-    if (canExtend) {
-      if (auto content = layer->getContent()) {
-        bounds = content->getBounds();
-      }
-    } else {
-      bounds = layer->getBounds();
-    }
-    if (!bounds.isEmpty()) {
-      auto corners = std::array<Vec3, 4>{
-          Vec3(bounds.left, bounds.top, 0), Vec3(bounds.right, bounds.top, 0),
-          Vec3(bounds.right, bounds.bottom, 0), Vec3(bounds.left, bounds.bottom, 0)};
-      for (const auto& corner : corners) {
-        auto transformedPoint = matrix.mapVec3(corner);
-        minDepth = std::min(minDepth, transformedPoint.z);
-        maxDepth = std::max(maxDepth, transformedPoint.z);
-      }
-    }
-
-    if (!canExtend) {
-      continue;
-    }
-    for (auto& child : layer->_children) {
-      auto childMatrix = child->getMatrixWithScrollRect();
-      auto childCumulativeMatrix = childMatrix;
-      childCumulativeMatrix.postConcat(matrix);
-      queue.emplace(child.get(), childCumulativeMatrix);
-    }
-  }
-
-  auto matrix = Matrix3D::I();
-  if (FloatNearlyZero(minDepth - maxDepth)) {
-    // All layers in the 3D rendering context are parallel to the z=0 plane. Adapt the matrix to
-    // keep vertex z-coordinates unchanged. Layer visibility is handled when iterating children.
-    matrix.setRow(2, {0, 0, 1, 0});
-    return matrix;
-  }
-
-  matrix.setRowColumn(2, 2, 2.0f / (minDepth - maxDepth));
-  matrix.setRowColumn(2, 3, -(minDepth + maxDepth) / (minDepth - maxDepth));
-  return matrix;
 }
 
 bool Layer::canExtend3DContext() const {

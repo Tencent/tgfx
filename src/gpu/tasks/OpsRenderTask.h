@@ -27,23 +27,14 @@ class OpsRenderTask : public RenderTask {
  public:
   OpsRenderTask(BlockAllocator* allocator, std::shared_ptr<RenderTargetProxy> renderTargetProxy,
                 PlacementArray<DrawOp>&& drawOps, std::optional<PMColor> clearColor)
-      : OpsRenderTask(allocator, std::move(renderTargetProxy), nullptr, std::move(drawOps),
-                      clearColor) {
-  }
-
-  OpsRenderTask(BlockAllocator* allocator, std::shared_ptr<RenderTargetProxy> renderTargetProxy,
-                std::shared_ptr<RenderTargetProxy> depthStencilProxy,
-                PlacementArray<DrawOp>&& drawOps, std::optional<PMColor> clearColor)
       : RenderTask(allocator), renderTargetProxy(std::move(renderTargetProxy)),
-        depthStencilProxy(std::move(depthStencilProxy)), drawOps(std::move(drawOps)),
-        clearColor(clearColor) {
+        drawOps(std::move(drawOps)), clearColor(clearColor) {
   }
 
   void execute(CommandEncoder* encoder) override;
 
  private:
   std::shared_ptr<RenderTargetProxy> renderTargetProxy = nullptr;
-  std::shared_ptr<RenderTargetProxy> depthStencilProxy = nullptr;
   PlacementArray<DrawOp> drawOps = {};
   std::optional<PMColor> clearColor = std::nullopt;
 };

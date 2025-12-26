@@ -265,16 +265,24 @@ class Matrix3D {
 
   /**
    * Maps a 3D point using this matrix.
+   * The point is treated as (x, y, z, 1) in homogeneous coordinates.
    * The returned result is the coordinate after perspective division.
    */
-  Vec3 mapVec3(const Vec3& v) const;
+  Vec3 mapPoint(const Vec3& point) const;
 
   /**
-   * Maps a 4D point (x, y, z, w) using this matrix.
+   * Maps a 3D vector using this matrix.
+   * The vector is treated as (x, y, z, 0) in homogeneous coordinates, so translation does not
+   * affect the result.
+   */
+  Vec3 mapVector(const Vec3& vector) const;
+
+  /**
+   * Maps a 4D homogeneous coordinate (x, y, z, w) using this matrix.
    * If the current matrix contains a perspective transformation, the returned Vec4 is not
    * perspective-divided; i.e., the w component of the result may not be 1.
    */
-  Vec4 mapPoint(float x, float y, float z, float w) const;
+  Vec4 mapHomogeneous(float x, float y, float z, float w) const;
 
   /**
    * Returns true if the matrix is an identity matrix.
@@ -358,7 +366,7 @@ class Matrix3D {
   }
 
   Vec4 operator*(const Vec4& v) const {
-    return this->mapPoint(v.x, v.y, v.z, v.w);
+    return this->mapHomogeneous(v.x, v.y, v.z, v.w);
   }
 
   float values[16] = {.0f};

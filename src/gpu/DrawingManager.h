@@ -59,10 +59,6 @@ class DrawingManager {
   void addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTarget,
                         PlacementArray<DrawOp> drawOps, std::optional<PMColor> clearColor);
 
-  void addOpsRenderTask(std::shared_ptr<RenderTargetProxy> colorTarget,
-                        std::shared_ptr<RenderTargetProxy> depthStencilTarget,
-                        PlacementArray<DrawOp> drawOps, std::optional<PMColor> clearColor);
-
   void addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> renderTarget,
                           std::vector<RuntimeInputTexture> inputs,
                           std::shared_ptr<RuntimeEffect> effect, const Point& offset);

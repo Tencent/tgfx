@@ -41,14 +41,6 @@ class DrawOp {
     cullMode = mode;
   }
 
-  void setEnableDepthTest(bool enabled) {
-    enableDepthTest = enabled;
-  }
-
-  void setEnableDepthWrite(bool enabled) {
-    enableDepthWrite = enabled;
-  }
-
   void setXferProcessor(PlacementPtr<XferProcessor> processor) {
     xferProcessor = std::move(processor);
   }
@@ -76,8 +68,6 @@ class DrawOp {
   PlacementPtr<XferProcessor> xferProcessor = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
   CullMode cullMode = CullMode::None;
-  bool enableDepthTest = false;
-  bool enableDepthWrite = false;
 
   DrawOp(BlockAllocator* allocator, AAType aaType) : allocator(allocator), aaType(aaType) {
   }

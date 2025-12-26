@@ -19,15 +19,13 @@
 #pragma once
 
 #include "Context3DCompositor.h"
-#include "tgfx/core/Matrix3D.h"
 
 namespace tgfx {
 
 class Render3DContext {
  public:
-  explicit Render3DContext(std::shared_ptr<Context3DCompositor> compositor, const Rect& renderRect,
-                           const Matrix3D& depthMatrix)
-      : _compositor(std::move(compositor)), _renderRect(renderRect), _depthMatrix(depthMatrix) {
+  explicit Render3DContext(std::shared_ptr<Context3DCompositor> compositor, const Rect& renderRect)
+      : _compositor(std::move(compositor)), _renderRect(renderRect) {
   }
 
   std::shared_ptr<Context3DCompositor> compositor() {
@@ -38,18 +36,9 @@ class Render3DContext {
     return _renderRect;
   }
 
-  const Matrix3D& depthMatrix() const {
-    return _depthMatrix;
-  }
-
  private:
-  std::shared_ptr<Context3DCompositor> _compositor;
-
-  Rect _renderRect;
-
-  // The depth mapping matrix applied to all layers within the 3D Rendering Context, which maps the
-  // depth of all layers to the range [-1, 1].
-  Matrix3D _depthMatrix;
+  std::shared_ptr<Context3DCompositor> _compositor = nullptr;
+  Rect _renderRect = {};
 };
 
 }  // namespace tgfx
