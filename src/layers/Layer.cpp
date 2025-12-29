@@ -1070,7 +1070,11 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
 
   auto maskPicture = RecordPicture(maskArgs.drawMode, scale, [&](Canvas* canvas) {
     if (layerClipBounds.has_value()) {
-      canvas->clipRect(*layerClipBounds);
+      auto scaledClipBounds = *layerClipBounds;
+      scaledClipBounds.scale(scale, scale);
+      scaledClipBounds.roundOut();
+      scaledClipBounds.scale(1.0f / scale, 1.0f / scale);
+      canvas->clipRect(scaledClipBounds);
     }
     canvas->concat(affineRelativeMatrix);
     _mask->drawLayer(maskArgs, canvas, _mask->_alpha, BlendMode::SrcOver);

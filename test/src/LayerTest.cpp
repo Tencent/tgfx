@@ -4571,4 +4571,63 @@ TGFX_TEST(LayerTest, LayerRecorder) {
   }
 }
 
+/**
+ * Test RoundRect mask layer with tiled rendering mode.
+ * This verifies that clipRect coordinate space is correct in offscreen rendering.
+ */
+TGFX_TEST(LayerTest, RoundRectMaskWithTiledRender) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 600, 600);
+  DisplayList displayList;
+
+  // Create a white background layer
+  auto backgroundLayer = ShapeLayer::Make();
+  Path backgroundPath;
+  backgroundPath.addRect(Rect::MakeXYWH(0, 0, 300, 300));
+  backgroundLayer->setPath(backgroundPath);
+  backgroundLayer->setFillStyle(ShapeStyle::Make(Color::White()));
+
+  // Create a rect shape layer as the content to be masked
+  auto contentLayer = ShapeLayer::Make();
+  Path contentPath;
+  contentPath.addRect(Rect::MakeXYWH(0, 0, 250, 250));
+  contentLayer->setPath(contentPath);
+  contentLayer->setFillStyle(ShapeStyle::Make(Color::Blue()));
+  contentLayer->setMatrix(Matrix::MakeTrans(10, 10));
+
+  // Create a round rect mask layer
+  auto maskLayer = ShapeLayer::Make();
+  Path maskPath;
+  maskPath.addRoundRect(Rect::MakeXYWH(20, 20, 200, 200), 30, 30);
+  maskLayer->setPath(maskPath);
+  maskLayer->setFillStyle(ShapeStyle::Make(Color::White()));
+
+  // Apply mask to content layer
+  contentLayer->setMask(maskLayer);
+
+  // Create a container layer with 3D matrix
+  auto rootLayer = Layer::Make();
+  rootLayer->addChild(backgroundLayer);
+  rootLayer->addChild(contentLayer);
+  rootLayer->addChild(maskLayer);
+
+  // Apply 3D matrix to container layer
+  Matrix3D matrix3D = Matrix3D::MakeScale(3.39277792f, 3.39277792f, 1.0f);
+  matrix3D.postTranslate(187.083313f, 82.083313f, 0.0f);
+  rootLayer->setMatrix3D(matrix3D);
+
+  displayList.root()->addChild(rootLayer);
+
+  // Render with tiled mode
+  displayList.setRenderMode(RenderMode::Tiled);
+  displayList.render(surface.get());
+  displayList.setZoomScale(1.603f);
+  displayList.setAllowZoomBlur(false);
+  displayList.setContentOffset(-200.179016f, -221.704529f);
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/RoundRectMaskWithTiledRender"));
+}
+
 }  // namespace tgfx
