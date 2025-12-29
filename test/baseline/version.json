@@ -250,6 +250,7 @@
         "PassThroughWithBackgroundBlur": "9ec4b486",
         "PassThroughWithBackgroundBlur_clipped": "7fa7fcb8",
         "PassThrough_Test": "7fa7fcb8",
+        "RoundRectMaskWithTiledRender": "ad2db090",
         "ShapeStyleWithMatrix": "0cfb8996",
         "SimpleBackgroundBlur_tiled": "9ec4b486",
         "StrokeOnTop_Off": "80c523ee",
