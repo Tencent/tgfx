@@ -56,8 +56,8 @@ std::shared_ptr<Shape> AppendShape::MakeFrom(std::shared_ptr<Shape> first,
   return std::shared_ptr<AppendShape>(new AppendShape(std::move(shapes)));
 }
 
-bool AppendShape::isInverseFillType() const {
-  return shapes.front()->isInverseFillType();
+PathFillType AppendShape::fillType() const {
+  return shapes.front()->fillType();
 }
 
 Rect AppendShape::onGetBounds() const {

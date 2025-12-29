@@ -27,6 +27,11 @@ Shape::~Shape() {
   delete oldPath;
 }
 
+bool Shape::isInverseFillType() const {
+  auto type = fillType();
+  return type == PathFillType::InverseWinding || type == PathFillType::InverseEvenOdd;
+}
+
 Rect Shape::getBounds() const {
   if (auto cachedBounds = bounds.load(std::memory_order_acquire)) {
     return *cachedBounds;

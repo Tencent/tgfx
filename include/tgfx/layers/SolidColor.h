@@ -20,13 +20,13 @@
 
 #include <memory>
 #include "tgfx/core/Color.h"
-#include "tgfx/layers/ShapeStyle.h"
+#include "tgfx/layers/ColorSource.h"
 
 namespace tgfx {
 /**
  * SolidColor represents a solid color that can be drawn on a shape layer.
  */
-class SolidColor : public ShapeStyle {
+class SolidColor : public ColorSource {
  public:
   /**
    * Creates a new SolidColor with the given color.
@@ -45,19 +45,18 @@ class SolidColor : public ShapeStyle {
    */
   void setColor(const Color& color);
 
+  std::shared_ptr<Shader> getShader() const override;
+
  protected:
   Type getType() const override {
     return Type::SolidColor;
   }
 
-  std::shared_ptr<Shader> onGetShader() const override;
-
  private:
   explicit SolidColor(const Color& color) : _color(color) {
   }
 
- private:
-  Color _color;
+  Color _color = {};
 
   friend class SolidLayer;
 };

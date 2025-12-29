@@ -56,10 +56,10 @@ uint32_t ToUintPMColor(const Color& color, const ColorSpaceXformSteps* steps) {
   }
   uint32_t compressedColor = 0;
   auto bytes = reinterpret_cast<uint8_t*>(&compressedColor);
-  bytes[0] = static_cast<uint8_t>(pmColor.red * 255);
-  bytes[1] = static_cast<uint8_t>(pmColor.green * 255);
-  bytes[2] = static_cast<uint8_t>(pmColor.blue * 255);
-  bytes[3] = static_cast<uint8_t>(pmColor.alpha * 255);
+  bytes[0] = static_cast<uint8_t>(std::clamp(pmColor.red * 255.0f, 0.0f, 255.0f));
+  bytes[1] = static_cast<uint8_t>(std::clamp(pmColor.green * 255.0f, 0.0f, 255.0f));
+  bytes[2] = static_cast<uint8_t>(std::clamp(pmColor.blue * 255.0f, 0.0f, 255.0f));
+  bytes[3] = static_cast<uint8_t>(std::clamp(pmColor.alpha * 255.0f, 0.0f, 255.0f));
   return compressedColor;
 }
 }  // namespace tgfx

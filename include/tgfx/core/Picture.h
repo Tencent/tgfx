@@ -39,6 +39,21 @@ class PlacementPtr;
  */
 class Picture {
  public:
+  /**
+   * AbortCallback is an abstract class that allows interrupting the playback of a Picture.
+   * Subclasses can override the abort() method to determine whether to stop playback.
+   */
+  class AbortCallback {
+   public:
+    virtual ~AbortCallback() = default;
+
+    /**
+     * Called before each drawing command during playback. If this returns true, the playback will
+     * be aborted immediately.
+     */
+    virtual bool abort() = 0;
+  };
+
   ~Picture();
 
   /**
@@ -62,8 +77,10 @@ class Picture {
    * recorded, each command in the Picture is sent separately to canvas. To add a single command to
    * draw the Picture to a canvas, call Canvas::drawPicture() instead.
    * @param canvas The receiver of drawing commands.
+   * @param callback Optional callback that can abort playback. If callback->abort() returns true,
+   *                 playback stops immediately.
    */
-  void playback(Canvas* canvas) const;
+  void playback(Canvas* canvas, AbortCallback* callback = nullptr) const;
 
  private:
   std::unique_ptr<BlockBuffer> blockBuffer;
@@ -75,7 +92,8 @@ class Picture {
   Picture(std::unique_ptr<BlockBuffer> buffer, std::vector<PlacementPtr<PictureRecord>> records,
           size_t drawCount);
 
-  void playback(DrawContext* drawContext, const MCState& state) const;
+  void playback(DrawContext* drawContext, const MCState& state,
+                AbortCallback* callback = nullptr) const;
 
   std::shared_ptr<Image> asImage(Point* offset, const Matrix* matrix = nullptr,
                                  const ISize* clipSize = nullptr) const;
@@ -92,5 +110,6 @@ class Picture {
   friend class Canvas;
   friend class PDFExportContext;
   friend class ContourContext;
+  friend class MaskContext;
 };
 }  // namespace tgfx

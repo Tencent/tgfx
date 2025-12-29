@@ -28,11 +28,11 @@ enum class LayerType {
    */
   Layer,
   /**
-   * A layer displaying an image.
+   * A layer displaying a simple image.
    */
   Image,
   /**
-   * A layer displaying a shape.
+   * A layer displaying a simple shape.
    */
   Shape,
   /**

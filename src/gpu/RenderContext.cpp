@@ -118,7 +118,7 @@ static std::shared_ptr<ImageCodec> GetGlyphCodec(
     auto width = FloatCeilToInt(bounds.width());
     auto height = FloatCeilToInt(bounds.height());
     return std::make_shared<GlyphRasterizer>(width, height, scalerContext, glyphID, hasFauxBold,
-                                             stroke);
+                                             stroke, *glyphOffset);
   }
 
   std::shared_ptr<Shape> shape = nullptr;
