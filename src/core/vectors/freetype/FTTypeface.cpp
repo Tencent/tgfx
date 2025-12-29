@@ -105,6 +105,8 @@ std::shared_ptr<FTTypeface> FTTypeface::Make(FTFontData data) {
 
 FTTypeface::FTTypeface(FTFontData data, FT_Face face)
     : _uniqueID(UniqueID::Next()), data(std::move(data)), face(std::move(face)) {
+  _hasColor = FT_HAS_COLOR(this->face);
+  _hasOutlines = FT_IS_SCALABLE(this->face);
 #if defined(__ANDROID__) || defined(ANDROID)
   if (hasColor() && hasOutlines() && GlyphRenderer::IsAvailable()) {
     JNIEnvironment environment;
@@ -114,8 +116,6 @@ FTTypeface::FTTypeface(FTFontData data, FT_Face face)
     }
   }
 #endif
-  _hasColor = FT_HAS_COLOR(face);
-  _hasOutlines = FT_IS_SCALABLE(face);
 }
 
 FTTypeface::~FTTypeface() {

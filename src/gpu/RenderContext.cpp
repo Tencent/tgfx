@@ -173,7 +173,7 @@ static void ComputeGlyphFinalMatrix(const Rect& atlasLocation, const Matrix& sta
 }
 
 static Rect GetGlyphBounds(const Font& font, bool isCustom, GlyphID glyphID) {
-  if (isCustom) {
+  if (isCustom || font.hasColor()) {
     return font.getBounds(glyphID);
   }
   auto bounds = font.getTypeface()->getBounds();
@@ -191,7 +191,7 @@ static bool IsGlyphVisible(const Font& font, bool isCustom, GlyphID glyphID, con
   if (stroke != nullptr) {
     ApplyStrokeToBounds(*stroke, &bounds);
   }
-  if (isCustom && maxDimension) {
+  if ((isCustom || font.hasColor()) && maxDimension) {
     *maxDimension = FloatCeilToInt(std::max(bounds.width(), bounds.height()));
   }
   bounds.scale(scale, scale);
