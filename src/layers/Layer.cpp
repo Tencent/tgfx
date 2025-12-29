@@ -1060,6 +1060,7 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
   auto maskType = static_cast<LayerMaskType>(bitFields.maskType);
   auto maskArgs = args;
   maskArgs.drawMode = maskType != LayerMaskType::Contour ? DrawMode::Normal : DrawMode::Contour;
+  maskArgs.excludeEffects |= maskType == LayerMaskType::Contour;
   maskArgs.blurBackground = nullptr;
 
   auto relativeMatrix = _mask->getRelativeMatrix(this);
@@ -1127,8 +1128,10 @@ std::shared_ptr<Image> Layer::getContentImage(
   if (!imageFilter) {
     PictureRecorder recorder = {};
     auto offscreenCanvas = recorder.beginRecording();
+    auto mappedBounds = contentMatrix.mapRect(*inputBounds);
+    mappedBounds.roundOut();
+    offscreenCanvas->clipRect(mappedBounds);
     offscreenCanvas->setMatrix(contentMatrix);
-    offscreenCanvas->clipRect(*inputBounds);
     drawDirectly(contentArgs, offscreenCanvas, 1.0f, extraSourceTypes);
     Point offset = {};
     auto finalImage = ToImageWithOffset(recorder.finishRecordingAsPicture(), &offset, nullptr,
@@ -1144,8 +1147,11 @@ std::shared_ptr<Image> Layer::getContentImage(
   auto contentScale = contentMatrix.getMaxScale();
   PictureRecorder recorder = {};
   auto offscreenCanvas = recorder.beginRecording();
+  auto mappedBounds = *inputBounds;
+  mappedBounds.scale(contentScale, contentScale);
+  mappedBounds.roundOut();
+  offscreenCanvas->clipRect(mappedBounds);
   offscreenCanvas->scale(contentScale, contentScale);
-  offscreenCanvas->clipRect(*inputBounds);
   drawDirectly(contentArgs, offscreenCanvas, 1.0f, extraSourceTypes);
   Point offset = {};
   auto finalImage = ToImageWithOffset(recorder.finishRecordingAsPicture(), &offset, nullptr,
