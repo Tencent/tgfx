@@ -45,9 +45,13 @@ class FTTypeface : public Typeface {
 
   int unitsPerEm() const override;
 
-  bool hasColor() const override;
+  bool hasColor() const override {
+    return _hasColor;
+  }
 
-  bool hasOutlines() const override;
+  bool hasOutlines() const override {
+    return _hasOutlines;
+  }
 
   GlyphID getGlyphID(Unichar unichar) const override;
 
@@ -70,6 +74,8 @@ class FTTypeface : public Typeface {
   uint32_t _uniqueID = 0;
   FTFontData data;
   FT_Face face = nullptr;
+  bool _hasColor = false;
+  bool _hasOutlines = true;
 
   FTTypeface(FTFontData data, FT_Face face);
 

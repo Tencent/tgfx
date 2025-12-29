@@ -29,6 +29,7 @@
 #include "core/UserTypeface.h"
 #include "core/images/SubsetImage.h"
 #include "core/shapes/TextShape.h"
+#include "core/utils/FauxBoldScale.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/StrokeUtils.h"
 #include "gpu/DrawingManager.h"
@@ -92,14 +93,26 @@ static float FindMaxGlyphDimension(const Font& font, const std::vector<GlyphID>&
 
 static std::shared_ptr<ImageCodec> GetGlyphCodec(
     const Font& font, const std::shared_ptr<ScalerContext>& scalerContext, GlyphID glyphID,
-    const Stroke* stroke, Point* glyphOffset) {
+    const Stroke* stroke, Point* glyphOffset, bool* continueIfFailed = nullptr) {
+  auto setContinueValue = [continueIfFailed](bool value) {
+    if (continueIfFailed) {
+      *continueIfFailed = value;
+    }
+  };
+
+  setContinueValue(false);
   if (glyphID == 0) {
     return nullptr;
   }
 
   auto hasFauxBold = !font.hasColor() && font.isFauxBold();
   auto bounds = scalerContext->getImageTransform(glyphID, hasFauxBold, stroke, nullptr);
+  //bounds.isEmpty may be caused by unsupported stroke or bold operations.
   if (!bounds.isEmpty()) {
+    if (std::max(bounds.width(), bounds.height()) > Atlas::MaxCellSize) {
+      setContinueValue(true);
+      return nullptr;
+    }
     glyphOffset->x = bounds.left;
     glyphOffset->y = bounds.top;
     auto width = FloatCeilToInt(bounds.width());
@@ -119,13 +132,17 @@ static std::shared_ptr<ImageCodec> GetGlyphCodec(
   if (shape == nullptr) {
     return nullptr;
   }
+  if (stroke) {
+    ApplyStrokeToBounds(*stroke, &bounds);
+    shape = Shape::ApplyStroke(std::move(shape), stroke);
+  }
   bounds = shape->getBounds();
   if (bounds.isEmpty()) {
     return nullptr;
   }
-  if (stroke) {
-    ApplyStrokeToBounds(*stroke, &bounds);
-    shape = Shape::ApplyStroke(std::move(shape), stroke);
+  if (std::max(bounds.width(), bounds.height()) > Atlas::MaxCellSize) {
+    setContinueValue(true);
+    return nullptr;
   }
   shape = Shape::ApplyMatrix(std::move(shape), Matrix::MakeTrans(-bounds.x(), -bounds.y()));
   glyphOffset->x = bounds.left;
@@ -155,21 +172,31 @@ static void ComputeGlyphFinalMatrix(const Rect& atlasLocation, const Matrix& sta
   }
 }
 
-static bool IsGlyphVisible(const Font& font, GlyphID glyphID, const Rect& clipBounds,
+static Rect GetGlyphBounds(const Font& font, bool isCustom, GlyphID glyphID) {
+  if (isCustom) {
+    return font.getBounds(glyphID);
+  }
+  auto bounds = font.getTypeface()->getBounds();
+  bounds.scale(font.getSize(), font.getSize());
+  return bounds;
+}
+
+static bool IsGlyphVisible(const Font& font, bool isCustom, GlyphID glyphID, const Rect& clipBounds,
                            const Stroke* stroke, float scale, const Point& glyphPosition,
                            int* maxDimension) {
-  auto bounds = font.getBounds(glyphID);
+  auto bounds = GetGlyphBounds(font, isCustom, glyphID);
   if (bounds.isEmpty()) {
     return false;
   }
   if (stroke != nullptr) {
     ApplyStrokeToBounds(*stroke, &bounds);
   }
-  if (maxDimension != nullptr) {
+  if (isCustom && maxDimension) {
     *maxDimension = FloatCeilToInt(std::max(bounds.width(), bounds.height()));
   }
   bounds.scale(scale, scale);
   bounds.offset(glyphPosition.x, glyphPosition.y);
+
   return Rect::Intersects(bounds, clipBounds);
 }
 
@@ -456,11 +483,12 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
   auto nextFlushToken = atlasManager->nextFlushToken();
   size_t index = 0;
 
+  //static int clr = 0;
   for (auto& glyphID : sourceGlyphRun.glyphs) {
     auto glyphPosition = sourceGlyphRun.positions[index++];
     int maxDimension = 0;
-    if (!IsGlyphVisible(font, glyphID, localClipBounds, scaledStroke.get(), inverseScale,
-                        glyphPosition, &maxDimension)) {
+    if (!IsGlyphVisible(font, font.getTypeface()->isCustom(), glyphID, localClipBounds,
+                        scaledStroke.get(), inverseScale, glyphPosition, &maxDimension)) {
       continue;
     }
 
@@ -480,11 +508,14 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
     if (atlasManager->getCellLocator(maskFormat, glyphKey, glyphLocator)) {
       glyphOffset = glyphLocator.offset;
     } else {
-      auto glyphCodec =
-          GetGlyphCodec(font, font.scalerContext, glyphID, scaledStroke.get(), &glyphOffset);
+      bool continueIfFailed = false;
+      auto glyphCodec = GetGlyphCodec(font, font.scalerContext, glyphID, scaledStroke.get(),
+                                      &glyphOffset, &continueIfFailed);
       if (glyphCodec == nullptr) {
-        rejectedGlyphRun->glyphs.push_back(glyphID);
-        rejectedGlyphRun->positions.push_back(glyphPosition);
+        if (continueIfFailed) {
+          rejectedGlyphRun->glyphs.push_back(glyphID);
+          rejectedGlyphRun->positions.push_back(glyphPosition);
+        }
         continue;
       }
 
