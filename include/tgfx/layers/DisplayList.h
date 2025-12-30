@@ -313,6 +313,8 @@ class DisplayList {
   void invalidateCurrentTileCache(const TileCache* tileCache, const std::vector<Rect>& dirtyRegions,
                                   std::vector<DrawTask>* tileTasks) const;
 
+  void recycleCurrentTileTasks(const std::vector<DrawTask>& tileTasks);
+
   std::vector<DrawTask> collectScreenTasks(const Surface* surface,
                                            std::vector<DrawTask>* tileTasks);
 

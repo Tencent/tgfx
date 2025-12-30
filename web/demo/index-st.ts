@@ -42,6 +42,19 @@ if (typeof window !== 'undefined') {
             shareData.tgfxBaseView = tgfxView;
             var image = await loadImage("http://localhost:8081/../../resources/assets/bridge.jpg");
             tgfxView.setImage("bridge",image);
+            image = await loadImage("http://localhost:8081/../../resources/assets/tgfx.png");
+            tgfxView.setImage("TGFX",image);
+
+            var font = new FontFace('default', "url(../../resources/font/NotoSansSC-Regular.otf)");
+            font.load().then((loadedFont) => {
+                document.fonts.add(loadedFont);
+            })
+            var emojiFont = new FontFace('emoji', "url(../../resources/font/NotoColorEmoji.ttf)");
+            emojiFont.load().then((loadedFont) => {
+                document.fonts.add(loadedFont);
+            })
+            tgfxView.registerFonts();
+
             updateSize(shareData);
             const canvas = document.getElementById('hello2d');
             bindCanvasZoomAndPanEvents(canvas, shareData);

@@ -18,7 +18,7 @@
 
 #include "GlyphRenderer.h"
 #include <cstring>
-#include <mutex>
+#include <shared_mutex>
 #include <unordered_map>
 #include "JNIUtil.h"
 #include "core/utils/Log.h"
@@ -70,10 +70,6 @@ static jfieldID Rect_right = nullptr;
 static jfieldID Rect_bottom = nullptr;
 
 static bool initialized = false;
-
-// Typeface cache: fontPath -> Global<jobject>
-static std::mutex typefaceCacheMutex;
-static std::unordered_map<std::string, Global<jobject>> typefaceCache;
 
 void GlyphRenderer::JNIInit(JNIEnv* env) {
   if (env == nullptr || initialized) {
@@ -159,15 +155,11 @@ bool GlyphRenderer::IsAvailable() {
          PaintClass.get() != nullptr;
 }
 
-static jobject GetCachedTypeface(JNIEnv* env, const std::string& fontPath) {
-  if (fontPath.empty()) {
+jobject GlyphRenderer::CreateTypeface(JNIEnv* env, const std::string& fontPath) {
+  if (!IsAvailable() || env == nullptr || fontPath.empty()) {
     return nullptr;
   }
-  std::lock_guard<std::mutex> lock(typefaceCacheMutex);
-  auto it = typefaceCache.find(fontPath);
-  if (it != typefaceCache.end()) {
-    return it->second.get();
-  }
+
   jstring jPath = SafeToJString(env, fontPath);
   if (jPath == nullptr) {
     return nullptr;
@@ -176,35 +168,29 @@ static jobject GetCachedTypeface(JNIEnv* env, const std::string& fontPath) {
       env->CallStaticObjectMethod(TypefaceClass.get(), Typeface_createFromFile, jPath);
   env->DeleteLocalRef(jPath);
   if (typeface == nullptr || env->ExceptionCheck()) {
-    LOGE("GlyphRenderer::GetCachedTypeface() Failed to create Typeface from path: %s!",
+    LOGE("GlyphRenderer::CreateTypeface() Failed to create Typeface from path: %s!",
          fontPath.c_str());
     env->ExceptionClear();
     return nullptr;
   }
-  typefaceCache[fontPath].reset(typeface);
-  env->DeleteLocalRef(typeface);
-  return typefaceCache[fontPath].get();
+  return typeface;
 }
 
-static jobject CreatePaint(JNIEnv* env, const std::string& fontPath, float textSize) {
+static jobject CreatePaint(JNIEnv* env, jobject typeface, float textSize) {
   // Paint.ANTI_ALIAS_FLAG = 1
   jobject paint = env->NewObject(PaintClass.get(), Paint_Constructor, 1);
   if (paint == nullptr) {
     return nullptr;
   }
-
   env->CallVoidMethod(paint, Paint_setTextSize, textSize);
-
-  jobject typeface = GetCachedTypeface(env, fontPath);
   if (typeface != nullptr) {
     env->CallObjectMethod(paint, Paint_setTypeface, typeface);
   }
-
   return paint;
 }
 
-bool GlyphRenderer::RenderGlyph(const std::string& fontPath, const std::string& text,
-                                float textSize, int width, int height, float offsetX, float offsetY,
+bool GlyphRenderer::RenderGlyph(jobject typeface, const std::string& text, float textSize,
+                                int width, int height, float offsetX, float offsetY,
                                 void* dstPixels) {
   if (!IsAvailable() || dstPixels == nullptr || width <= 0 || height <= 0 || text.empty()) {
     return false;
@@ -245,7 +231,7 @@ bool GlyphRenderer::RenderGlyph(const std::string& fontPath, const std::string& 
       break;
     }
 
-    paint = CreatePaint(env, fontPath, textSize);
+    paint = CreatePaint(env, typeface, textSize);
     if (paint == nullptr) {
       break;
     }
@@ -319,8 +305,8 @@ bool GlyphRenderer::RenderGlyph(const std::string& fontPath, const std::string& 
   return success;
 }
 
-bool GlyphRenderer::MeasureText(const std::string& fontPath, const std::string& text,
-                                float textSize, float* bounds, float* advance) {
+bool GlyphRenderer::MeasureText(jobject typeface, const std::string& text, float textSize,
+                                float* bounds, float* advance) {
   if (!IsAvailable() || text.empty()) {
     return false;
   }
@@ -337,7 +323,7 @@ bool GlyphRenderer::MeasureText(const std::string& fontPath, const std::string& 
   jstring jText = nullptr;
 
   do {
-    paint = CreatePaint(env, fontPath, textSize);
+    paint = CreatePaint(env, typeface, textSize);
     if (paint == nullptr) {
       break;
     }
@@ -395,8 +381,8 @@ bool GlyphRenderer::MeasureText(const std::string& fontPath, const std::string& 
   return success;
 }
 
-bool GlyphRenderer::GetFontMetrics(const std::string& fontPath, float textSize, float* ascent,
-                                   float* descent, float* leading) {
+bool GlyphRenderer::GetFontMetrics(jobject typeface, float textSize, float* ascent, float* descent,
+                                   float* leading) {
   if (!IsAvailable()) {
     return false;
   }
@@ -412,7 +398,7 @@ bool GlyphRenderer::GetFontMetrics(const std::string& fontPath, float textSize, 
   jobject metrics = nullptr;
 
   do {
-    paint = CreatePaint(env, fontPath, textSize);
+    paint = CreatePaint(env, typeface, textSize);
     if (paint == nullptr) {
       break;
     }

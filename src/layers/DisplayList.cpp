@@ -69,6 +69,10 @@ class DrawTask {
     return _tileRect;
   }
 
+  const std::vector<std::shared_ptr<Tile>>& getTiles() const {
+    return tiles;
+  }
+
  private:
   // Hold strong references to tiles to ensure they aren't reused by TileCache.
   std::vector<std::shared_ptr<Tile>> tiles = {};
@@ -403,13 +407,16 @@ std::vector<Rect> DisplayList::renderPartial(Surface* surface, bool autoClear,
 
 std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
                                            const std::vector<Rect>& dirtyRegions) {
-  if (!surfaceCaches.empty() && surfaceCaches.front()->getContext() != surface->getContext()) {
+  if (!surfaceCaches.empty() && (surfaceCaches.front()->getContext() != surface->getContext() ||
+                                 !ColorSpace::Equals(surfaceCaches.front()->colorSpace().get(),
+                                                     surface->colorSpace().get()))) {
     resetCaches();
   }
   checkTileCount(surface);
   auto tileTasks = invalidateTileCaches(dirtyRegions);
   auto screenTasks = collectScreenTasks(surface, &tileTasks);
   if (screenTasks.empty()) {
+    recycleCurrentTileTasks(tileTasks);
     return renderDirect(surface, autoClear);
   }
   std::vector<Rect> dirtyRects = {};
@@ -428,11 +435,12 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
 
 void DisplayList::checkTileCount(Surface* renderSurface) {
   DEBUG_ASSERT(renderSurface != nullptr);
-  auto tileCountX =
-      ceilf(static_cast<float>(renderSurface->width()) / static_cast<float>(_tileSize));
-  auto tileCountY =
-      ceilf(static_cast<float>(renderSurface->height()) / static_cast<float>(_tileSize));
-  auto minTileCount = static_cast<int>(tileCountX + 1) * static_cast<int>(tileCountY + 1);
+  const auto tileSizeFloat = static_cast<float>(_tileSize);
+  const auto tileCountX =
+      FloatCeilToInt(static_cast<float>(renderSurface->width()) / tileSizeFloat);
+  const auto tileCountY =
+      FloatCeilToInt(static_cast<float>(renderSurface->height()) / tileSizeFloat);
+  auto minTileCount = (tileCountX + 1) * (tileCountY + 1);
   if (totalTileCount > 0) {
     if (totalTileCount >= minTileCount) {
       return;
@@ -446,9 +454,8 @@ void DisplayList::checkTileCount(Surface* renderSurface) {
   }
   auto remainingTileCount = totalTileCount % maxTileCountPerAtlas;
   totalTileCount -= remainingTileCount;
-  int width = static_cast<int>(sqrtf(static_cast<float>(remainingTileCount)));
-  int height =
-      static_cast<int>(ceilf(static_cast<float>(remainingTileCount) / static_cast<float>(width)));
+  auto width = FloatSaturateToInt(sqrtf(static_cast<float>(remainingTileCount)));
+  int height = FloatCeilToInt(static_cast<float>(remainingTileCount) / static_cast<float>(width));
   totalTileCount += width * height;
 }
 
@@ -484,6 +491,29 @@ std::vector<DrawTask> DisplayList::invalidateTileCaches(const std::vector<Rect>&
     }
   }
   return tileTasks;
+}
+
+void DisplayList::recycleCurrentTileTasks(const std::vector<DrawTask>& tileTasks) {
+  if (tileTasks.empty()) {
+    return;
+  }
+  auto result = tileCaches.find(_zoomScaleInt);
+  DEBUG_ASSERT(result != tileCaches.end());
+  if (result == tileCaches.end()) {
+    return;
+  }
+  auto tileCache = result->second;
+  for (auto& task : tileTasks) {
+    for (auto& tile : task.getTiles()) {
+      if (tileCache->removeTile(tile->tileX, tile->tileY)) {
+        emptyTiles.push_back(tile);
+      }
+    }
+  }
+  if (tileCache->empty()) {
+    delete tileCache;
+    tileCaches.erase(result);
+  }
 }
 
 void DisplayList::invalidateCurrentTileCache(const TileCache* tileCache,
@@ -537,10 +567,11 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
   if (!renderRect.intersect(renderBounds)) {
     return {};
   }
-  int startX = static_cast<int>(floorf(renderRect.left / static_cast<float>(_tileSize)));
-  int startY = static_cast<int>(floorf(renderRect.top / static_cast<float>(_tileSize)));
-  int endX = static_cast<int>(ceilf(renderRect.right / static_cast<float>(_tileSize)));
-  int endY = static_cast<int>(ceilf(renderRect.bottom / static_cast<float>(_tileSize)));
+  const auto tileSizeFloat = static_cast<float>(_tileSize);
+  const auto startX = FloatFloorToInt(renderRect.left / tileSizeFloat);
+  const auto startY = FloatFloorToInt(renderRect.top / tileSizeFloat);
+  const auto endX = FloatCeilToInt(renderRect.right / tileSizeFloat);
+  const auto endY = FloatCeilToInt(renderRect.bottom / tileSizeFloat);
 
   if (startX >= endX || startY >= endY) {
     return {};
@@ -778,14 +809,14 @@ std::vector<std::shared_ptr<Tile>> DisplayList::createContinuousTiles(const Surf
   if (tileCount < requestCount) {
     return {};
   }
-  int countX = static_cast<int>(sqrtf(static_cast<float>(tileCount)));
-  int countY = static_cast<int>(ceilf(static_cast<float>(tileCount) / static_cast<float>(countX)));
+  int countX = FloatSaturateToInt(sqrtf(static_cast<float>(tileCount)));
+  int countY = FloatCeilToInt(static_cast<float>(tileCount) / static_cast<float>(countX));
   if (countX < requestCountX) {
     countX = requestCountX;
-    countY = static_cast<int>(ceilf(static_cast<float>(tileCount) / static_cast<float>(countX)));
+    countY = FloatCeilToInt(static_cast<float>(tileCount) / static_cast<float>(countX));
   } else if (countY < requestCountY) {
     countY = requestCountY;
-    countX = static_cast<int>(ceilf(static_cast<float>(tileCount) / static_cast<float>(countY)));
+    countX = FloatCeilToInt(static_cast<float>(tileCount) / static_cast<float>(countY));
   }
   auto surface =
       Surface::Make(context, countX * _tileSize, countY * _tileSize, ColorType::RGBA_8888, 1, false,
@@ -822,8 +853,8 @@ bool DisplayList::createEmptyTiles(const Surface* renderSurface) {
   if (tileCount <= 0) {
     return false;
   }
-  int countX = static_cast<int>(sqrtf(static_cast<float>(tileCount)));
-  int countY = static_cast<int>(ceilf(static_cast<float>(tileCount) / static_cast<float>(countX)));
+  int countX = FloatSaturateToInt(sqrtf(static_cast<float>(tileCount)));
+  int countY = FloatCeilToInt(static_cast<float>(tileCount) / static_cast<float>(countX));
   auto surface =
       Surface::Make(context, countX * _tileSize, countY * _tileSize, ColorType::RGBA_8888, 1, false,
                     renderSurface->renderFlags(), renderSurface->colorSpace());

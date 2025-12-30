@@ -54,8 +54,6 @@ class ShapeLayer : public Layer {
    */
   static std::shared_ptr<ShapeLayer> Make();
 
-  ~ShapeLayer() override;
-
   LayerType type() const override {
     return LayerType::Shape;
   }
@@ -83,10 +81,10 @@ class ShapeLayer : public Layer {
   void setShape(std::shared_ptr<Shape> shape);
 
   /**
-   * Returns the list of fill styles used to fill the shape's path. Each style can be a solid color,
-   * gradient, or image pattern. The fill styles are drawn in the order they are added, followed by
-   * the stroke styles on top of the filled shape. If the fill styles list is empty, the shape will
-   * not be filled. By default, the fill styles list is empty.
+   * Returns the list of fill styles used to fill the shape's path. Each style contains a shader,
+   * alpha, and blend mode. The fill styles are drawn in the order they are added, followed by the
+   * stroke styles on top of the filled shape. If the fill styles list is empty, the shape will not
+   * be filled. By default, the fill styles list is empty.
    */
   const std::vector<std::shared_ptr<ShapeStyle>>& fillStyles() const {
     return _fillStyles;
@@ -113,10 +111,10 @@ class ShapeLayer : public Layer {
   void addFillStyle(std::shared_ptr<ShapeStyle> fillStyle);
 
   /**
-   * Returns the list of stroke styles used to stroke the shape's path. Each style can be a solid
-   * color, gradient, or image pattern. The stroke styles are drawn in the order they are added,
-   * after the fill styles. If the stroke styles list is empty, the shape will not be stroked. By
-   * default, the stroke styles list is empty.
+   * Returns the list of stroke styles used to stroke the shape's path. Each style contains a
+   * shader, alpha, and blend mode. The stroke styles are drawn in the order they are added, after
+   * the fill styles. If the stroke styles list is empty, the shape will not be stroked. By default,
+   * the stroke styles list is empty.
    */
   const std::vector<std::shared_ptr<ShapeStyle>>& strokeStyles() const {
     return _strokeStyles;
@@ -155,19 +153,19 @@ class ShapeLayer : public Layer {
   void setLineCap(LineCap cap);
 
   /**
-   * Returns the line join style for the shape’s path. The default line join style is Miter.
+   * Returns the line join style for the shape's path. The default line join style is Miter.
    */
   LineJoin lineJoin() const {
     return stroke.join;
   }
 
   /**
-   * Sets the line join style for the shape’s path.
+   * Sets the line join style for the shape's path.
    */
   void setLineJoin(LineJoin join);
 
   /**
-   * Returns miter limit used when stroking the shape’s path. If the current line join style is set
+   * Returns miter limit used when stroking the shape's path. If the current line join style is set
    * to LineJoin::Miter, the miter limit determines whether the lines should be joined with a bevel
    * instead of a miter. The length of the miter is divided by the line width. If the result is
    * greater than the miter limit, the path is drawn with a bevel. The default miter limit is 4.0.
@@ -177,24 +175,24 @@ class ShapeLayer : public Layer {
   }
 
   /**
-   * Sets the miter limit for the shape’s path.
+   * Sets the miter limit for the shape's path.
    */
   void setMiterLimit(float limit);
 
   /**
-   * Returns the line width of the shape’s path.
+   * Returns the line width of the shape's path.
    */
   float lineWidth() const {
     return stroke.width;
   }
 
   /**
-   * Sets the line width of the shape’s path.
+   * Sets the line width of the shape's path.
    */
   void setLineWidth(float width);
 
   /**
-   * Returns the dash pattern applied to the shape’s path when stroked. The dash pattern is
+   * Returns the dash pattern applied to the shape's path when stroked. The dash pattern is
    * specified as an array of float numbers that specify the lengths of the painted segments and
    * unpainted segments, respectively, of the dash pattern.
    * For example, passing an array with the values [2,3] sets a dash pattern that alternates between
@@ -208,12 +206,12 @@ class ShapeLayer : public Layer {
   }
 
   /**
-   * Sets the dash pattern applied to the shape’s path when stroked.
+   * Sets the dash pattern applied to the shape's path when stroked.
    */
   void setLineDashPattern(const std::vector<float>& pattern);
 
   /**
-   * Returns the dash phase applied to the shape’s path when stroked. Line dash phase specifies how
+   * Returns the dash phase applied to the shape's path when stroked. Line dash phase specifies how
    * far into the dash pattern the line starts. The default dash phase is 0.
    */
   float lineDashPhase() const {
@@ -221,7 +219,7 @@ class ShapeLayer : public Layer {
   }
 
   /**
-   * Sets the dash phase applied to the shape’s path when stroked.
+   * Sets the dash phase applied to the shape's path when stroked.
    */
   void setLineDashPhase(float phase);
 
@@ -239,50 +237,14 @@ class ShapeLayer : public Layer {
   void setLineDashAdaptive(bool adaptive);
 
   /**
-   * Returns the relative location at which to begin stroking the path. The value of this property
-   * must be in the range 0.0 to 1.0. The default value of this property is 0.0. Combined with the
-   * strokeEnd property, this property defines the subregion of the path to stroke. The value in
-   * this property indicates the relative point along the path at which to begin stroking while the
-   * strokeEnd property defines the end point. A value of 0.0 represents the beginning of the path
-   * while a value of 1.0 represents the end of the path. Values in between are interpreted linearly
-   * along the path length.
-   */
-  float strokeStart() const {
-    return _strokeStart;
-  }
-
-  /**
-   * Sets the relative location at which to begin stroking the path.
-   */
-  void setStrokeStart(float start);
-
-  /**
-   * Returns the relative location at which to stop stroking the path. The value of this property
-   * must be in the range 0.0 to 1.0. The default value of this property is 1.0. Combined with the
-   * strokeStart property, this property defines the subregion of the path to stroke. The value in
-   * this property indicates the relative point along the path at which to stop stroking while the
-   * strokeStart property defines the starting point. A value of 0.0 represents the beginning of the
-   * path while a value of 1.0 represents the end of the path. Values in between are interpreted
-   * linearly along the path length.
-   */
-  float strokeEnd() const {
-    return _strokeEnd;
-  }
-
-  /**
-   * Sets the relative location at which to stop stroking the path.
-   */
-  void setStrokeEnd(float end);
-
-  /**
-   * Returns the stroke alignment applied to the shape’s path when stroked. The default stroke alignment is Center.
+   * Returns the stroke alignment applied to the shape's path when stroked. The default stroke alignment is Center.
    */
   StrokeAlign strokeAlign() const {
     return static_cast<StrokeAlign>(shapeBitFields.strokeAlign);
   }
 
   /**
-   * Sets the stroke alignment applied to the shape’s path when stroked.
+   * Sets the stroke alignment applied to the shape's path when stroked.
    */
   void setStrokeAlign(StrokeAlign align);
 
@@ -309,8 +271,6 @@ class ShapeLayer : public Layer {
   Stroke stroke = {};
   std::vector<float> _lineDashPattern = {};
   float _lineDashPhase = 0.0f;
-  float _strokeStart = 0.0f;
-  float _strokeEnd = 1.0f;
   struct {
     bool strokeOnTop : 1;
     bool lineDashAdaptive : 1;

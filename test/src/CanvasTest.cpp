@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "core/MCState.h"
 #include "core/PathRef.h"
 #include "core/PictureRecords.h"
 #include "core/images/CodecImage.h"
@@ -33,6 +34,7 @@
 #include "gpu/ops/RectDrawOp.h"
 #include "gpu/resources/TextureView.h"
 #include "gtest/gtest.h"
+#include "layers/MaskContext.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Color.h"
@@ -954,7 +956,7 @@ TGFX_TEST(CanvasTest, inverseFillType) {
   shape = Shape::ApplyStroke(firstShape, &stroke);
   EXPECT_FALSE(shape->isInverseFillType());
 
-  firstShape = Shape::ApplyInverse(firstShape);
+  firstShape = Shape::ApplyFillType(firstShape, PathFillType::InverseWinding);
   EXPECT_TRUE(firstShape->isInverseFillType());
   shape = Shape::Merge(firstShape, secondShape, PathOp::Append);
   EXPECT_TRUE(shape->isInverseFillType());
@@ -968,11 +970,115 @@ TGFX_TEST(CanvasTest, inverseFillType) {
   EXPECT_FALSE(shape->isInverseFillType());
 
   shape = Shape::ApplyEffect(firstShape, pathEffect);
-  EXPECT_FALSE(shape->isInverseFillType());
+  EXPECT_TRUE(shape->isInverseFillType());
   shape = Shape::ApplyMatrix(firstShape, Matrix::MakeScale(2.0f));
   EXPECT_TRUE(shape->isInverseFillType());
   shape = Shape::ApplyStroke(firstShape, &stroke);
   EXPECT_TRUE(shape->isInverseFillType());
+}
+
+TGFX_TEST(CanvasTest, MergeShapeFillType) {
+  // MergeShape always produces EvenOdd fill type regardless of input fill types.
+  Path rectPath;
+  rectPath.addRect(Rect::MakeXYWH(0, 0, 100, 100));
+  Path ovalPath;
+  ovalPath.addOval(Rect::MakeXYWH(50, 50, 100, 100));
+
+  // Winding + Winding -> EvenOdd
+  auto shape1 = Shape::MakeFrom(rectPath);
+  auto shape2 = Shape::MakeFrom(ovalPath);
+  EXPECT_EQ(shape1->fillType(), PathFillType::Winding);
+  EXPECT_EQ(shape2->fillType(), PathFillType::Winding);
+
+  auto merged = Shape::Merge(shape1, shape2, PathOp::Union);
+  EXPECT_EQ(merged->fillType(), PathFillType::EvenOdd);
+  merged = Shape::Merge(shape1, shape2, PathOp::Intersect);
+  EXPECT_EQ(merged->fillType(), PathFillType::EvenOdd);
+  merged = Shape::Merge(shape1, shape2, PathOp::Difference);
+  EXPECT_EQ(merged->fillType(), PathFillType::EvenOdd);
+  merged = Shape::Merge(shape1, shape2, PathOp::XOR);
+  EXPECT_EQ(merged->fillType(), PathFillType::EvenOdd);
+
+  // InverseWinding + Winding
+  auto inverseShape1 = Shape::ApplyFillType(shape1, PathFillType::InverseWinding);
+  EXPECT_EQ(inverseShape1->fillType(), PathFillType::InverseWinding);
+
+  merged = Shape::Merge(inverseShape1, shape2, PathOp::Union);
+  EXPECT_EQ(merged->fillType(), PathFillType::InverseEvenOdd);
+  merged = Shape::Merge(inverseShape1, shape2, PathOp::Intersect);
+  EXPECT_EQ(merged->fillType(), PathFillType::EvenOdd);
+  merged = Shape::Merge(inverseShape1, shape2, PathOp::Difference);
+  EXPECT_EQ(merged->fillType(), PathFillType::InverseEvenOdd);
+  merged = Shape::Merge(inverseShape1, shape2, PathOp::XOR);
+  EXPECT_EQ(merged->fillType(), PathFillType::InverseEvenOdd);
+
+  // Winding + InverseWinding
+  auto inverseShape2 = Shape::ApplyFillType(shape2, PathFillType::InverseWinding);
+  merged = Shape::Merge(shape1, inverseShape2, PathOp::Union);
+  EXPECT_EQ(merged->fillType(), PathFillType::InverseEvenOdd);
+  merged = Shape::Merge(shape1, inverseShape2, PathOp::Intersect);
+  EXPECT_EQ(merged->fillType(), PathFillType::EvenOdd);
+  merged = Shape::Merge(shape1, inverseShape2, PathOp::Difference);
+  EXPECT_EQ(merged->fillType(), PathFillType::EvenOdd);
+  merged = Shape::Merge(shape1, inverseShape2, PathOp::XOR);
+  EXPECT_EQ(merged->fillType(), PathFillType::InverseEvenOdd);
+
+  // InverseWinding + InverseWinding
+  merged = Shape::Merge(inverseShape1, inverseShape2, PathOp::Union);
+  EXPECT_EQ(merged->fillType(), PathFillType::InverseEvenOdd);
+  merged = Shape::Merge(inverseShape1, inverseShape2, PathOp::Intersect);
+  EXPECT_EQ(merged->fillType(), PathFillType::InverseEvenOdd);
+  merged = Shape::Merge(inverseShape1, inverseShape2, PathOp::Difference);
+  EXPECT_EQ(merged->fillType(), PathFillType::EvenOdd);
+  merged = Shape::Merge(inverseShape1, inverseShape2, PathOp::XOR);
+  EXPECT_EQ(merged->fillType(), PathFillType::EvenOdd);
+
+  // EvenOdd inputs
+  auto evenOddShape = Shape::ApplyFillType(shape1, PathFillType::EvenOdd);
+  EXPECT_EQ(evenOddShape->fillType(), PathFillType::EvenOdd);
+  merged = Shape::Merge(evenOddShape, shape2, PathOp::Union);
+  EXPECT_EQ(merged->fillType(), PathFillType::EvenOdd);
+
+  // Append preserves first shape's fillType
+  merged = Shape::Merge(shape1, shape2, PathOp::Append);
+  EXPECT_EQ(merged->fillType(), PathFillType::Winding);
+  merged = Shape::Merge(inverseShape1, shape2, PathOp::Append);
+  EXPECT_EQ(merged->fillType(), PathFillType::InverseWinding);
+  merged = Shape::Merge(evenOddShape, shape2, PathOp::Append);
+  EXPECT_EQ(merged->fillType(), PathFillType::EvenOdd);
+}
+
+TGFX_TEST(CanvasTest, ReverseShape) {
+  Path path;
+  path.moveTo(0, 0);
+  path.lineTo(100, 0);
+  path.lineTo(100, 100);
+  path.close();
+
+  auto shape = Shape::MakeFrom(path);
+  ASSERT_TRUE(shape != nullptr);
+  EXPECT_EQ(shape->fillType(), PathFillType::Winding);
+
+  // Apply reverse
+  auto reversedShape = Shape::ApplyReverse(shape);
+  ASSERT_TRUE(reversedShape != nullptr);
+  EXPECT_EQ(reversedShape->fillType(), PathFillType::Winding);
+  EXPECT_EQ(reversedShape->getBounds(), shape->getBounds());
+
+  // Reverse with inverse fill type
+  auto inverseShape = Shape::ApplyFillType(shape, PathFillType::InverseWinding);
+  auto reversedInverse = Shape::ApplyReverse(inverseShape);
+  EXPECT_EQ(reversedInverse->fillType(), PathFillType::InverseWinding);
+
+  // Double reverse on ReverseShape should return the inner shape
+  auto matrixShape = Shape::ApplyMatrix(shape, Matrix::MakeTrans(10, 10));
+  auto reversedMatrix = Shape::ApplyReverse(matrixShape);
+  auto doubleReversed = Shape::ApplyReverse(reversedMatrix);
+  EXPECT_EQ(doubleReversed, matrixShape);
+
+  // Reverse nullptr should return nullptr
+  auto nullReversed = Shape::ApplyReverse(nullptr);
+  EXPECT_EQ(nullReversed, nullptr);
 }
 
 TGFX_TEST(CanvasTest, image) {
@@ -1761,6 +1867,69 @@ TGFX_TEST(CanvasTest, AdaptiveDashEffect) {
   effect->filterPath(&path);
   canvas->drawPath(path, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/AdaptiveDashEffect"));
+}
+
+TGFX_TEST(CanvasTest, TrimPathEffect) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 400);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  Paint paint = {};
+  paint.setColor(Color::Blue());
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStroke(Stroke(4));
+
+  // Test normal trim [0.25, 0.75]
+  Path path1 = {};
+  path1.addRect(50, 50, 150, 150);
+  auto trimEffect = PathEffect::MakeTrim(0.25f, 0.75f);
+  EXPECT_TRUE(trimEffect != nullptr);
+  trimEffect->filterPath(&path1);
+  canvas->drawPath(path1, paint);
+
+  // Test inverted trim: complement of [0.25, 0.75] = [0, 0.25] + [0.75, 1]
+  paint.setColor(Color::Red());
+  Path path2 = {};
+  path2.addRect(200, 50, 300, 150);
+  auto invertedEffect = PathEffect::MakeTrim(0.25f, 0.75f, true);
+  EXPECT_TRUE(invertedEffect != nullptr);
+  invertedEffect->filterPath(&path2);
+  canvas->drawPath(path2, paint);
+
+  // Test edge cases
+  // Full path (no trim needed) should return nullptr
+  EXPECT_TRUE(PathEffect::MakeTrim(0.0f, 1.0f) == nullptr);
+  EXPECT_TRUE(PathEffect::MakeTrim(-0.5f, 1.5f) == nullptr);
+
+  // Inverted with startT >= stopT (full path) should return nullptr
+  EXPECT_TRUE(PathEffect::MakeTrim(0.5f, 0.5f, true) == nullptr);
+  EXPECT_TRUE(PathEffect::MakeTrim(0.7f, 0.3f, true) == nullptr);
+
+  // NaN should return nullptr
+  EXPECT_TRUE(PathEffect::MakeTrim(NAN, 0.5f) == nullptr);
+  EXPECT_TRUE(PathEffect::MakeTrim(0.5f, NAN) == nullptr);
+
+  // Normal mode with startT >= stopT results in empty path
+  paint.setColor(Color::Green());
+  Path path3 = {};
+  path3.addRect(50, 200, 150, 300);
+  auto emptyEffect = PathEffect::MakeTrim(0.7f, 0.3f);
+  EXPECT_TRUE(emptyEffect != nullptr);
+  emptyEffect->filterPath(&path3);
+  EXPECT_TRUE(path3.isEmpty());
+
+  // Test with oval
+  paint.setColor(Color::FromRGBA(128, 0, 128));
+  Path path4 = {};
+  path4.addOval(Rect::MakeXYWH(200, 200, 100, 100));
+  auto ovalTrim = PathEffect::MakeTrim(0.0f, 0.5f);
+  ovalTrim->filterPath(&path4);
+  canvas->drawPath(path4, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/TrimPathEffect"));
 }
 
 TGFX_TEST(CanvasTest, BlendFormula) {
@@ -3397,6 +3566,157 @@ TGFX_TEST(CanvasTest, TextBlobHitTestPoint) {
   // Use a point that's clearly outside both characters
   float farOutsideX_emoji = bounds_emoji.right + 20.0f;
   EXPECT_FALSE(textBlob->hitTestPoint(farOutsideX_emoji, outsideY_emoji, &stroke));
+}
+
+TGFX_TEST(CanvasTest, PictureMaskPath) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+
+  // Helper lambda to extract mask path from picture
+  auto getMaskPath = [](const std::shared_ptr<Picture>& picture, Path* maskPath) -> bool {
+    return MaskContext::GetMaskPath(picture, maskPath);
+  };
+
+  // Test 1: Simple rect - should return valid mask path
+  PictureRecorder recorder = {};
+  auto canvas = recorder.beginRecording();
+  Paint paint = {};
+  paint.setColor(Color::White());
+  canvas->drawRect(Rect::MakeXYWH(10.f, 20.f, 80.f, 60.f), paint);
+  auto picture = recorder.finishRecordingAsPicture();
+  ASSERT_TRUE(picture != nullptr);
+
+  Path maskPath = {};
+  EXPECT_TRUE(getMaskPath(picture, &maskPath));
+  EXPECT_EQ(maskPath.getBounds(), Rect::MakeXYWH(10.f, 20.f, 80.f, 60.f));
+
+  // Test 2: RRect - should return valid mask path
+  canvas = recorder.beginRecording();
+  RRect rrect = {};
+  rrect.setRectXY(Rect::MakeWH(100.f, 80.f), 10.f, 10.f);
+  canvas->drawRRect(rrect, paint);
+  picture = recorder.finishRecordingAsPicture();
+  EXPECT_TRUE(getMaskPath(picture, &maskPath));
+  EXPECT_EQ(maskPath.getBounds(), Rect::MakeWH(100.f, 80.f));
+
+  // Test 3: Path - should return valid mask path
+  canvas = recorder.beginRecording();
+  Path circlePath = {};
+  circlePath.addOval(Rect::MakeWH(80.f, 80.f));
+  canvas->drawPath(circlePath, paint);
+  picture = recorder.finishRecordingAsPicture();
+  EXPECT_TRUE(getMaskPath(picture, &maskPath));
+  EXPECT_EQ(maskPath.getBounds(), Rect::MakeWH(80.f, 80.f));
+
+  // Test 4: With matrix transformation
+  canvas = recorder.beginRecording();
+  canvas->translate(20.f, 30.f);
+  canvas->drawRect(Rect::MakeWH(50.f, 40.f), paint);
+  picture = recorder.finishRecordingAsPicture();
+  EXPECT_TRUE(getMaskPath(picture, &maskPath));
+  EXPECT_EQ(maskPath.getBounds(), Rect::MakeXYWH(20.f, 30.f, 50.f, 40.f));
+
+  // Test 5: With clip - path should be clipped
+  canvas = recorder.beginRecording();
+  canvas->clipRect(Rect::MakeWH(60.f, 60.f));
+  canvas->drawRect(Rect::MakeWH(100.f, 100.f), paint);
+  picture = recorder.finishRecordingAsPicture();
+  EXPECT_TRUE(getMaskPath(picture, &maskPath));
+  EXPECT_EQ(maskPath.getBounds(), Rect::MakeWH(60.f, 60.f));
+
+  // Test 6: Semi-transparent color - should NOT return mask path
+  canvas = recorder.beginRecording();
+  paint.setAlpha(0.5f);
+  canvas->drawRect(Rect::MakeWH(100.f, 100.f), paint);
+  picture = recorder.finishRecordingAsPicture();
+  EXPECT_FALSE(getMaskPath(picture, &maskPath));
+  paint.setAlpha(1.0f);
+
+  // Test 7: With color filter - should NOT return mask path
+  canvas = recorder.beginRecording();
+  paint.setColorFilter(ColorFilter::Blend(Color::Red(), BlendMode::Multiply));
+  canvas->drawRect(Rect::MakeWH(100.f, 100.f), paint);
+  picture = recorder.finishRecordingAsPicture();
+  EXPECT_FALSE(getMaskPath(picture, &maskPath));
+  paint.setColorFilter(nullptr);
+
+  // Test 8: With mask filter - should NOT return mask path
+  canvas = recorder.beginRecording();
+  auto maskShader = Shader::MakeColorShader(Color::White());
+  paint.setMaskFilter(MaskFilter::MakeShader(maskShader));
+  canvas->drawRect(Rect::MakeWH(100.f, 100.f), paint);
+  picture = recorder.finishRecordingAsPicture();
+  EXPECT_FALSE(getMaskPath(picture, &maskPath));
+  paint.setMaskFilter(nullptr);
+
+  // Test 9: Draw image - should NOT return mask path
+  canvas = recorder.beginRecording();
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  canvas->drawImage(image);
+  picture = recorder.finishRecordingAsPicture();
+  EXPECT_FALSE(getMaskPath(picture, &maskPath));
+
+  // Test 10: Inverse fill path - should return mask path
+  canvas = recorder.beginRecording();
+  Path inversePath = {};
+  inversePath.addRect(Rect::MakeWH(50.f, 50.f));
+  inversePath.addRect(Rect::MakeLTRB(10.f, 10.f, 60.f, 60.f));
+  inversePath.setFillType(PathFillType::InverseWinding);
+  ASSERT_TRUE(inversePath.isInverseFillType());
+  canvas->drawPath(inversePath, paint);
+  picture = recorder.finishRecordingAsPicture();
+  EXPECT_TRUE(getMaskPath(picture, &maskPath));
+
+  // Test 11: Multiple draws - should combine paths
+  canvas = recorder.beginRecording();
+  canvas->drawRect(Rect::MakeXYWH(0.f, 0.f, 50.f, 50.f), paint);
+  canvas->drawRect(Rect::MakeXYWH(60.f, 60.f, 50.f, 50.f), paint);
+  picture = recorder.finishRecordingAsPicture();
+  EXPECT_TRUE(getMaskPath(picture, &maskPath));
+  EXPECT_EQ(maskPath.getBounds(), Rect::MakeWH(110.f, 110.f));
+
+  // Test 12: Transparent draw - should abort
+  canvas = recorder.beginRecording();
+  paint.setAlpha(0.5f);
+  canvas->drawRect(Rect::MakeWH(100.f, 100.f), paint);
+  picture = recorder.finishRecordingAsPicture();
+  EXPECT_FALSE(getMaskPath(picture, &maskPath));
+
+  // Test 13: With stroke
+  paint.setAlpha(1.0f);
+  canvas = recorder.beginRecording();
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStroke(Stroke(10.0f));
+  canvas->drawRect(Rect::MakeWH(80.f, 80.f), paint);
+  picture = recorder.finishRecordingAsPicture();
+  EXPECT_TRUE(getMaskPath(picture, &maskPath));
+  EXPECT_EQ(maskPath.getBounds(), Rect::MakeXYWH(-5, -5, 90, 90));
+
+  // Verify by reading pixels - draw the mask path and check pixel coverage
+  paint.reset();
+  paint.setColor(Color::Red());
+  surface->getCanvas()->clear();
+  surface->getCanvas()->drawPath(maskPath, paint);
+
+  Bitmap bitmap = {};
+  bitmap.allocPixels(200, 200);
+  auto pixels = bitmap.lockPixels();
+  ASSERT_TRUE(surface->readPixels(bitmap.info(), pixels));
+  bitmap.unlockPixels();
+
+  // Check that pixel at (2, 2) is red (inside the stroke area, near top-left corner)
+  auto colorStroke = bitmap.getColor(2, 2);
+  EXPECT_EQ(colorStroke, Color::Red());
+
+  // Check that pixel at (40, 40) is transparent (inside the rect, outside the stroke area)
+  auto colorCenter = bitmap.getColor(40, 40);
+  EXPECT_EQ(colorCenter, Color::Transparent());
+
+  // Check that pixel at (100, 100) is transparent (outside the stroke bounds)
+  auto colorOutside = bitmap.getColor(100, 100);
+  EXPECT_EQ(colorOutside, Color::Transparent());
 }
 
 }  // namespace tgfx

@@ -42,8 +42,17 @@ class GlyphRenderer {
   static bool IsAvailable();
 
   /**
+  * Create an Android Typeface object from font file path.
+  * @param env JNI environment pointer
+  * @param fontPath Path to the font file
+  * @return Android Typeface jobject (local reference), or nullptr on failure.
+  *         Caller should convert to global reference if needed.
+  */
+  static jobject CreateTypeface(JNIEnv* env, const std::string& fontPath);
+
+  /**
    * Render text to pixel buffer using Android Canvas.
-   * @param fontPath Path to the font file, empty for system default
+   * @param typeface Android Typeface object
    * @param text The text to render (UTF-8 encoded)
    * @param textSize Font size in pixels
    * @param width Bitmap width
@@ -53,31 +62,31 @@ class GlyphRenderer {
    * @param dstPixels Destination pixel buffer (RGBA_8888 format)
    * @return true on success
    */
-  static bool RenderGlyph(const std::string& fontPath, const std::string& text, float textSize,
-                          int width, int height, float offsetX, float offsetY, void* dstPixels);
+  static bool RenderGlyph(jobject typeface, const std::string& text, float textSize, int width,
+                          int height, float offsetX, float offsetY, void* dstPixels);
 
   /**
    * Measure text bounds using Android Paint.
-   * @param fontPath Path to the font file, empty for system default
+   * @param typeface Android Typeface object
    * @param text The text to measure (UTF-8 encoded)
    * @param textSize Font size in pixels
    * @param bounds Output: [left, top, right, bottom]
    * @param advance Output: horizontal advance width
    * @return true on success
    */
-  static bool MeasureText(const std::string& fontPath, const std::string& text, float textSize,
-                          float* bounds, float* advance);
+  static bool MeasureText(jobject typeface, const std::string& text, float textSize, float* bounds,
+                          float* advance);
 
   /**
    * Get font metrics using Android Paint.
-   * @param fontPath Path to the font file, empty for system default
+   * @param typeface Android Typeface object
    * @param textSize Font size in pixels
    * @param ascent Output: ascent (negative value, distance above baseline)
    * @param descent Output: descent (positive value, distance below baseline)
    * @param leading Output: leading (line spacing)
    * @return true on success
    */
-  static bool GetFontMetrics(const std::string& fontPath, float textSize, float* ascent,
-                             float* descent, float* leading);
+  static bool GetFontMetrics(jobject typeface, float textSize, float* ascent, float* descent,
+                             float* leading);
 };
 }  // namespace tgfx

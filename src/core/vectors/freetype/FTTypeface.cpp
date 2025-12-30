@@ -16,8 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "FTTypeface.h"
+#if defined(__ANDROID__) || defined(ANDROID)
+#include "platform/android/GlyphRenderer.h"
+#include "tgfx/platform/android/JNIEnvironment.h"
+#endif
 #include "FTLibrary.h"
+#include "FTTypeface.h"
 #include "core/AdvancedTypefaceInfo.h"
 #include "core/utils/FontTableTag.h"
 #include "tgfx/core/Stream.h"
@@ -29,6 +33,7 @@
 #include "FTScalerContext.h"
 #include "SystemFont.h"
 #include "core/utils/UniqueID.h"
+#include "tgfx/core/UTF.h"
 
 namespace tgfx {
 std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string& fontFamily,
@@ -98,27 +103,17 @@ std::shared_ptr<FTTypeface> FTTypeface::Make(FTFontData data) {
   return typeface;
 }
 
-static bool CheckIsCOLRv1(FT_Face face) {
-  FT_ULong length = 0;
-  if (FT_Load_Sfnt_Table(face, FT_MAKE_TAG('C', 'O', 'L', 'R'), 0, nullptr, &length) != FT_Err_Ok) {
-    return false;
-  }
-  if (length < 2) {
-    return false;
-  }
-  uint8_t header[2] = {};
-  FT_ULong headerSize = 2;
-  if (FT_Load_Sfnt_Table(face, FT_MAKE_TAG('C', 'O', 'L', 'R'), 0, header, &headerSize) !=
-      FT_Err_Ok) {
-    return false;
-  }
-  auto version = (static_cast<uint16_t>(header[0]) << 8) | header[1];
-  return version >= 1;
-}
-
 FTTypeface::FTTypeface(FTFontData data, FT_Face face)
-    : _uniqueID(UniqueID::Next()), data(std::move(data)), face(std::move(face)),
-      _isCOLRv1(CheckIsCOLRv1(this->face)) {
+    : _uniqueID(UniqueID::Next()), data(std::move(data)), face(std::move(face)) {
+#if defined(__ANDROID__) || defined(ANDROID)
+  if (hasColor() && hasOutlines() && GlyphRenderer::IsAvailable()) {
+    JNIEnvironment environment;
+    auto env = environment.current();
+    if (env != nullptr) {
+      typeface = GlyphRenderer::CreateTypeface(env, this->data.path);
+    }
+  }
+#endif
 }
 
 FTTypeface::~FTTypeface() {
@@ -163,10 +158,6 @@ bool FTTypeface::hasColor() const {
   return FT_HAS_COLOR(face);
 }
 
-bool FTTypeface::isCOLRv1() const {
-  return _isCOLRv1;
-}
-
 bool FTTypeface::hasOutlines() const {
   std::lock_guard<std::mutex> autoLock(locker);
   return FT_IS_SCALABLE(face);
@@ -202,27 +193,6 @@ std::shared_ptr<Data> FTTypeface::copyTableData(FontTableTag tag) const {
   }
   return Data::MakeAdopted(tableData, tableLength);
 }
-
-#ifdef TGFX_USE_GLYPH_TO_UNICODE
-const std::vector<Unichar>& FTTypeface::getGlyphToUnicodeMap() const {
-  std::lock_guard<std::mutex> autoLock(locker);
-  if (!glyphToUnicodeCache.empty()) {
-    return glyphToUnicodeCache;
-  }
-  auto numGlyphs = static_cast<size_t>(face->num_glyphs);
-  glyphToUnicodeCache.resize(numGlyphs, 0);
-
-  FT_UInt glyphIndex = 0;
-  auto charCode = FT_Get_First_Char(face, &glyphIndex);
-  while (glyphIndex) {
-    if (0 == glyphToUnicodeCache[glyphIndex]) {
-      glyphToUnicodeCache[glyphIndex] = static_cast<Unichar>(charCode);
-    }
-    charCode = FT_Get_Next_Char(face, charCode, &glyphIndex);
-  }
-  return glyphToUnicodeCache;
-}
-#endif
 
 #ifdef TGFX_USE_ADVANCED_TYPEFACE_PROPERTY
 namespace {
@@ -313,6 +283,29 @@ AdvancedTypefaceInfo FTTypeface::getAdvancedInfo() const {
         advancedProperty.style | AdvancedTypefaceInfo::StyleFlags::Italic);
   }
   return advancedProperty;
+}
+#endif
+
+#ifdef TGFX_USE_GLYPH_TO_UNICODE
+std::vector<Unichar> FTTypeface::onCreateGlyphToUnicodeMap() const {
+  auto numGlyphs = static_cast<size_t>(face->num_glyphs);
+  std::vector<Unichar> returnMap(numGlyphs, 0);
+
+  FT_UInt glyphIndex = 0;
+  auto charCode = FT_Get_First_Char(face, &glyphIndex);
+  while (glyphIndex) {
+    if (0 == returnMap[glyphIndex]) {
+      returnMap[glyphIndex] = static_cast<Unichar>(charCode);
+    }
+    charCode = FT_Get_Next_Char(face, charCode, &glyphIndex);
+  }
+  return returnMap;
+}
+
+std::string FTTypeface::getGlyphUTF8(GlyphID glyphID) const {
+  auto& map = getGlyphToUnicodeMap();
+  Unichar unichar = glyphID < map.size() ? map[glyphID] : 0;
+  return UTF::ToUTF8(unichar);
 }
 #endif
 

@@ -64,10 +64,6 @@ class CGTypeface : public Typeface {
   static std::string StringFromCFString(CFStringRef src);
 
  protected:
-#ifdef TGFX_USE_GLYPH_TO_UNICODE
-  const std::vector<Unichar>& getGlyphToUnicodeMap() const override;
-#endif
-
 #ifdef TGFX_USE_ADVANCED_TYPEFACE_PROPERTY
   AdvancedTypefaceInfo getAdvancedInfo() const override;
 #endif
@@ -82,8 +78,9 @@ class CGTypeface : public Typeface {
   bool _hasColor = false;
   bool _hasOutlines = true;
   std::shared_ptr<Data> data;
+
 #ifdef TGFX_USE_GLYPH_TO_UNICODE
-  mutable std::vector<Unichar> glyphToUnicodeCache = {};
+  std::vector<Unichar> onCreateGlyphToUnicodeMap() const override;
 #endif
 
   friend class CGScalerContext;

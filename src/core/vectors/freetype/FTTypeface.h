@@ -18,6 +18,9 @@
 
 #pragma once
 
+#if defined(__ANDROID__) || defined(ANDROID)
+#include "tgfx/platform/android/Global.h"
+#endif
 #include <mutex>
 #include "ft2build.h"
 #include "tgfx/core/Stream.h"
@@ -47,8 +50,6 @@ class FTTypeface : public Typeface {
 
   bool hasColor() const override;
 
-  bool isCOLRv1() const;
-
   bool hasOutlines() const override;
 
   GlyphID getGlyphID(Unichar unichar) const override;
@@ -57,15 +58,7 @@ class FTTypeface : public Typeface {
 
   std::shared_ptr<Data> copyTableData(FontTableTag tag) const override;
 
-  std::string fontPath() const {
-    return data.path;
-  }
-
  protected:
-#ifdef TGFX_USE_GLYPH_TO_UNICODE
-  const std::vector<Unichar>& getGlyphToUnicodeMap() const override;
-#endif
-
 #ifdef TGFX_USE_ADVANCED_TYPEFACE_PROPERTY
   AdvancedTypefaceInfo getAdvancedInfo() const override;
 #endif
@@ -76,9 +69,9 @@ class FTTypeface : public Typeface {
   uint32_t _uniqueID = 0;
   FTFontData data;
   FT_Face face = nullptr;
-  bool _isCOLRv1 = false;
-#ifdef TGFX_USE_GLYPH_TO_UNICODE
-  mutable std::vector<Unichar> glyphToUnicodeCache = {};
+
+#if defined(__ANDROID__) || defined(ANDROID)
+  Global<jobject> typeface;
 #endif
 
   FTTypeface(FTFontData data, FT_Face face);
@@ -87,6 +80,12 @@ class FTTypeface : public Typeface {
 
 #ifdef TGFX_USE_ADVANCED_TYPEFACE_PROPERTY
   bool isOpentypeFontDataStandardFormat() const;
+#endif
+
+#ifdef TGFX_USE_GLYPH_TO_UNICODE
+  std::vector<Unichar> onCreateGlyphToUnicodeMap() const override;
+
+  std::string getGlyphUTF8(GlyphID glyphID) const;
 #endif
 
   friend class FTScalerContext;
