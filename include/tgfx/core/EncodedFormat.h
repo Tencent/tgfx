@@ -23,6 +23,6 @@ namespace tgfx {
 /**
  *  Describes the known formats a Pixmap can be encoded into.
  */
-enum class EncodedFormat { JPEG, PNG, WEBP, HEIC };
+enum class EncodedFormat { JPEG, PNG, WEBP };
 
 }  // namespace tgfx

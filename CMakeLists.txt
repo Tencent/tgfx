@@ -497,8 +497,6 @@ elseif (WIN32)
     list(APPEND TGFX_STATIC_LIBS ${DWrite_LIB})
     find_library(WindowsCodecs_LIB windowscodecs)
     list(APPEND TGFX_STATIC_LIBS ${WindowsCodecs_LIB})
-    find_library(Shlwapi_LIB Shlwapi)
-    list(APPEND TGFX_STATIC_LIBS ${Shlwapi_LIB})
     find_library(Ole32_LIB Ole32)
     list(APPEND TGFX_STATIC_LIBS ${Ole32_LIB})
 

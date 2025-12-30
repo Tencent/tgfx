@@ -30,8 +30,4 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data>) {
 std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(NativeImageRef) {
   return nullptr;
 }
-
-std::shared_ptr<Data> ImageCodec::EncodeHEICWithNativeCodec(const Pixmap&, int) {
-  return nullptr;
-}
 }  // namespace tgfx

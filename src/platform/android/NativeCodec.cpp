@@ -18,11 +18,9 @@
 
 #include "NativeCodec.h"
 #include <android/bitmap.h>
-#include <cstdio>
 #include "NativeImageBuffer.h"
 #include "core/utils/Log.h"
 #include "platform/android/AHardwareBufferFunctions.h"
-#include "tgfx/core/Buffer.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/platform/android/AndroidBitmap.h"
 
@@ -51,7 +49,6 @@ static jmethodID ExifInterfaceClass_getAttributeInt;
 static Global<jclass> BitmapClass;
 static jmethodID Bitmap_copy;
 static jmethodID Bitmap_getConfig;
-static jmethodID Bitmap_createBitmap;
 static Global<jclass> BitmapConfigClass;
 static jmethodID BitmapConfig_equals;
 static jfieldID BitmapConfig_ALPHA_8;
@@ -121,9 +118,6 @@ void NativeCodec::JNIInit(JNIEnv* env) {
                                  "(Landroid/graphics/Bitmap$Config;Z)Landroid/graphics/Bitmap;");
   Bitmap_getConfig =
       env->GetMethodID(BitmapClass.get(), "getConfig", "()Landroid/graphics/Bitmap$Config;");
-  Bitmap_createBitmap =
-      env->GetStaticMethodID(BitmapClass.get(), "createBitmap",
-                             "(IILandroid/graphics/Bitmap$Config;)Landroid/graphics/Bitmap;");
   BitmapConfigClass = env->FindClass("android/graphics/Bitmap$Config");
   BitmapConfig_equals =
       env->GetMethodID(BitmapConfigClass.get(), "equals", "(Ljava/lang/Object;)Z");
@@ -417,200 +411,5 @@ jobject NativeCodec::decodeBitmap(JNIEnv* env, ColorType colorType, AlphaType al
     return nullptr;
   }
   return bitmap;
-}
-
-std::shared_ptr<Data> ImageCodec::EncodeHEICWithNativeCodec(const Pixmap& pixmap, int quality) {
-  if (pixmap.isEmpty()) {
-    return nullptr;
-  }
-  JNIEnvironment environment;
-  auto env = environment.current();
-  if (env == nullptr) {
-    return nullptr;
-  }
-
-  // Try to use AndroidX HeifWriter first (requires app to add androidx.heifwriter dependency)
-  auto HeifWriterBuilderClass = env->FindClass("androidx/heifwriter/HeifWriter$Builder");
-  if (env->ExceptionCheck()) {
-    env->ExceptionClear();
-    HeifWriterBuilderClass = nullptr;
-  }
-
-  if (HeifWriterBuilderClass == nullptr) {
-    LOGI("HeifWriter not available, HEIC encoding not supported on Android");
-    return nullptr;
-  }
-
-  auto width = pixmap.info().width();
-  auto height = pixmap.info().height();
-
-  // Create temp file for output
-  auto FileClass = env->FindClass("java/io/File");
-  auto File_createTempFile = env->GetStaticMethodID(
-      FileClass, "createTempFile", "(Ljava/lang/String;Ljava/lang/String;)Ljava/io/File;");
-  auto File_getAbsolutePath =
-      env->GetMethodID(FileClass, "getAbsolutePath", "()Ljava/lang/String;");
-  auto File_delete = env->GetMethodID(FileClass, "delete", "()Z");
-
-  auto prefixStr = env->NewStringUTF("heic_output");
-  auto suffixStr = env->NewStringUTF(".heic");
-  auto tempFile = env->CallStaticObjectMethod(FileClass, File_createTempFile, prefixStr, suffixStr);
-  if (tempFile == nullptr || env->ExceptionCheck()) {
-    env->ExceptionClear();
-    return nullptr;
-  }
-  auto tempFilePathJStr =
-      static_cast<jstring>(env->CallObjectMethod(tempFile, File_getAbsolutePath));
-  const char* pathChars = env->GetStringUTFChars(tempFilePathJStr, nullptr);
-  std::string tempFilePath = pathChars;
-  env->ReleaseStringUTFChars(tempFilePathJStr, pathChars);
-
-  // HeifWriter.Builder(path, width, height, INPUT_MODE_BITMAP)
-  // INPUT_MODE_BITMAP = 2
-  auto Builder_init =
-      env->GetMethodID(HeifWriterBuilderClass, "<init>", "(Ljava/lang/String;III)V");
-  auto Builder_setQuality = env->GetMethodID(HeifWriterBuilderClass, "setQuality",
-                                             "(I)Landroidx/heifwriter/HeifWriter$Builder;");
-  auto Builder_setMaxImages = env->GetMethodID(HeifWriterBuilderClass, "setMaxImages",
-                                               "(I)Landroidx/heifwriter/HeifWriter$Builder;");
-  auto Builder_build =
-      env->GetMethodID(HeifWriterBuilderClass, "build", "()Landroidx/heifwriter/HeifWriter;");
-
-  auto builder = env->NewObject(HeifWriterBuilderClass, Builder_init,
-                                env->NewStringUTF(tempFilePath.c_str()), width, height, 2);
-  if (builder == nullptr || env->ExceptionCheck()) {
-    env->ExceptionClear();
-    env->CallBooleanMethod(tempFile, File_delete);
-    return nullptr;
-  }
-
-  env->CallObjectMethod(builder, Builder_setQuality, quality);
-  env->CallObjectMethod(builder, Builder_setMaxImages, 1);
-
-  // Note: HeifWriter does not support setting color space. It always outputs sRGB.
-  // Non-sRGB color spaces (like Display P3) will be converted to sRGB during encoding.
-
-  auto HeifWriterClass = env->FindClass("androidx/heifwriter/HeifWriter");
-  auto HeifWriter_start = env->GetMethodID(HeifWriterClass, "start", "()V");
-  auto HeifWriter_addBitmap =
-      env->GetMethodID(HeifWriterClass, "addBitmap", "(Landroid/graphics/Bitmap;)V");
-  auto HeifWriter_stop = env->GetMethodID(HeifWriterClass, "stop", "(J)V");
-  auto HeifWriter_close = env->GetMethodID(HeifWriterClass, "close", "()V");
-
-  auto heifWriter = env->CallObjectMethod(builder, Builder_build);
-  if (heifWriter == nullptr || env->ExceptionCheck()) {
-    env->ExceptionClear();
-    env->CallBooleanMethod(tempFile, File_delete);
-    return nullptr;
-  }
-
-  // Create Bitmap from pixmap
-  auto srcInfo = pixmap.info();
-  Buffer tempBuffer = {};
-  const void* pixels = pixmap.pixels();
-  // HeifWriter only supports sRGB, convert color space and color type if necessary
-  auto dstColorSpace = ColorSpace::SRGB();
-  auto needsConversion = srcInfo.colorType() != ColorType::RGBA_8888 ||
-                         !ColorSpace::Equals(srcInfo.colorSpace().get(), dstColorSpace.get());
-  auto info = srcInfo;
-  if (needsConversion) {
-    info = ImageInfo::Make(srcInfo.width(), srcInfo.height(), ColorType::RGBA_8888,
-                           srcInfo.alphaType(), 0, dstColorSpace);
-    tempBuffer.alloc(info.byteSize());
-    if (!pixmap.readPixels(info, tempBuffer.data())) {
-      env->CallVoidMethod(heifWriter, HeifWriter_close);
-      env->CallBooleanMethod(tempFile, File_delete);
-      return nullptr;
-    }
-    pixels = tempBuffer.data();
-  }
-
-  // Bitmap.Config.ARGB_8888
-  auto BitmapConfigClass = env->FindClass("android/graphics/Bitmap$Config");
-  auto ARGB_8888_field =
-      env->GetStaticFieldID(BitmapConfigClass, "ARGB_8888", "Landroid/graphics/Bitmap$Config;");
-  auto argb8888Config = env->GetStaticObjectField(BitmapConfigClass, ARGB_8888_field);
-
-  // Create Bitmap without ColorSpace (HeifWriter handles color space metadata)
-  auto bitmap = env->CallStaticObjectMethod(BitmapClass.get(), Bitmap_createBitmap, width, height,
-                                            argb8888Config);
-  if (bitmap == nullptr || env->ExceptionCheck()) {
-    env->ExceptionClear();
-    env->CallVoidMethod(heifWriter, HeifWriter_close);
-    env->CallBooleanMethod(tempFile, File_delete);
-    return nullptr;
-  }
-
-  // Copy pixels to bitmap using copyPixelsFromBuffer
-  auto ByteBufferClass = env->FindClass("java/nio/ByteBuffer");
-  auto ByteBuffer_wrap =
-      env->GetStaticMethodID(ByteBufferClass, "wrap", "([B)Ljava/nio/ByteBuffer;");
-  auto Bitmap_copyPixelsFromBuffer =
-      env->GetMethodID(BitmapClass.get(), "copyPixelsFromBuffer", "(Ljava/nio/Buffer;)V");
-
-  auto byteSize = static_cast<jsize>(info.byteSize());
-  auto byteArray = env->NewByteArray(byteSize);
-  env->SetByteArrayRegion(byteArray, 0, byteSize, static_cast<const jbyte*>(pixels));
-  auto byteBuffer = env->CallStaticObjectMethod(ByteBufferClass, ByteBuffer_wrap, byteArray);
-  env->CallVoidMethod(bitmap, Bitmap_copyPixelsFromBuffer, byteBuffer);
-
-  if (env->ExceptionCheck()) {
-    env->ExceptionClear();
-    env->CallVoidMethod(heifWriter, HeifWriter_close);
-    env->CallBooleanMethod(tempFile, File_delete);
-    return nullptr;
-  }
-
-  // Encode using HeifWriter
-  env->CallVoidMethod(heifWriter, HeifWriter_start);
-  if (env->ExceptionCheck()) {
-    env->ExceptionClear();
-    env->CallVoidMethod(heifWriter, HeifWriter_close);
-    env->CallBooleanMethod(tempFile, File_delete);
-    return nullptr;
-  }
-
-  env->CallVoidMethod(heifWriter, HeifWriter_addBitmap, bitmap);
-  if (env->ExceptionCheck()) {
-    env->ExceptionClear();
-    env->CallVoidMethod(heifWriter, HeifWriter_close);
-    env->CallBooleanMethod(tempFile, File_delete);
-    return nullptr;
-  }
-
-  // stop(0) means wait indefinitely
-  env->CallVoidMethod(heifWriter, HeifWriter_stop, 0LL);
-  if (env->ExceptionCheck()) {
-    env->ExceptionClear();
-    env->CallVoidMethod(heifWriter, HeifWriter_close);
-    env->CallBooleanMethod(tempFile, File_delete);
-    return nullptr;
-  }
-
-  env->CallVoidMethod(heifWriter, HeifWriter_close);
-
-  // Read the output file
-  std::shared_ptr<Data> result = nullptr;
-  FILE* file = fopen(tempFilePath.c_str(), "rb");
-  if (file != nullptr) {
-    fseek(file, 0, SEEK_END);
-    auto fileSize = ftell(file);
-    fseek(file, 0, SEEK_SET);
-    if (fileSize > 0) {
-      auto fileSizeU = static_cast<size_t>(fileSize);
-      Buffer fileBuffer = {};
-      fileBuffer.alloc(fileSizeU);
-      auto readSize = fread(fileBuffer.data(), 1, fileSizeU, file);
-      if (readSize == fileSizeU) {
-        result = Data::MakeWithCopy(fileBuffer.data(), fileSizeU);
-      }
-    }
-    fclose(file);
-  }
-
-  // Delete temporary file
-  env->CallBooleanMethod(tempFile, File_delete);
-
-  return result;
 }
 }  // namespace tgfx

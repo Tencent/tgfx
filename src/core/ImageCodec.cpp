@@ -147,9 +147,6 @@ std::shared_ptr<Data> ImageCodec::Encode(const Pixmap& pixmap, EncodedFormat for
     return PngCodec::Encode(pixmap, quality);
   }
 #endif
-  if (format == EncodedFormat::HEIC) {
-    return EncodeHEICWithNativeCodec(pixmap, quality);
-  }
   return nullptr;
 }
 
