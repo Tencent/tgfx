@@ -597,19 +597,18 @@ Rect Layer::getBoundsInternal(const Matrix3D& coordinateMatrix, bool computeTigh
 }
 
 Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBounds) {
-  // If the matrix only contains 2D affine transformations, directly use the equivalent 2D
-  // transformation matrix to calculate the final Bounds
-  bool isCoordinateMatrixAffine = IsMatrix3DAffine(coordinateMatrix);
-  auto workAffineMatrix =
-      isCoordinateMatrixAffine ? GetMayLossyAffineMatrix(coordinateMatrix) : Matrix::I();
-  auto workMatrix3D = isCoordinateMatrixAffine ? Matrix3D(workAffineMatrix) : coordinateMatrix;
+  bool isAffine = IsMatrix3DAffine(coordinateMatrix);
+  bool hasEffects = !_layerStyles.empty() || !_filters.empty();
+  // When has effects or non-affine, compute in local coordinates first, then apply matrix at end.
+  bool applyMatrixAtEnd = hasEffects || !isAffine;
+  auto contentMatrix = applyMatrixAtEnd ? Matrix::I() : GetMayLossyAffineMatrix(coordinateMatrix);
 
   Rect bounds = {};
   if (auto content = getContent()) {
     if (computeTightBounds) {
-      bounds.join(content->getTightBounds(workAffineMatrix));
+      bounds.join(content->getTightBounds(contentMatrix));
     } else {
-      bounds.join(workAffineMatrix.mapRect(content->getBounds()));
+      bounds.join(contentMatrix.mapRect(content->getBounds()));
     }
   }
 
@@ -619,7 +618,7 @@ Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBou
       continue;
     }
     auto childMatrix = child->getMatrixWithScrollRect();
-    childMatrix.postConcat(workMatrix3D);
+    childMatrix.postConcat(Matrix3D(contentMatrix));
     auto childBounds = child->getBoundsInternal(childMatrix, computeTightBounds);
     if (child->_scrollRect) {
       auto relatvieScrollRect = childMatrix.mapRect(*child->_scrollRect);
@@ -638,27 +637,23 @@ Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBou
     bounds.join(childBounds);
   }
 
-  if (!_layerStyles.empty() || !_filters.empty()) {
-    auto contentScale = workAffineMatrix.getMaxScale();
+  if (hasEffects) {
     auto layerBounds = bounds;
     for (auto& layerStyle : _layerStyles) {
-      auto styleBounds = layerStyle->filterBounds(layerBounds, contentScale);
+      auto styleBounds = layerStyle->filterBounds(layerBounds, 1.0f);
       bounds.join(styleBounds);
     }
     for (auto& filter : _filters) {
-      bounds = filter->filterBounds(bounds, contentScale);
+      bounds = filter->filterBounds(bounds, 1.0f);
     }
   }
 
-  if (isCoordinateMatrixAffine) {
-    return bounds;
+  if (applyMatrixAtEnd) {
+    bounds = coordinateMatrix.mapRect(bounds);
+    if (!isAffine) {
+      bounds.roundOut();
+    }
   }
-
-  // If the matrix contains Z-axis transformations and projection transformations, first calculate
-  // the Bounds using the identity matrix, then apply the 3D transformation to the result.
-  // Otherwise, use the equivalent affine transformation matrix to calculate the Bounds.
-  bounds = coordinateMatrix.mapRect(bounds);
-  bounds.roundOut();
   return bounds;
 }
 
