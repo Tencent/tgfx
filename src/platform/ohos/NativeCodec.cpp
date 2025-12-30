@@ -76,6 +76,10 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data> im
   return result;
 }
 
+std::shared_ptr<Data> ImageCodec::EncodeHEICWithNativeCodec(const Pixmap&, int) {
+  return nullptr;
+}
+
 bool NativeCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
                                std::shared_ptr<ColorSpace> dstColorSpace, void* dstPixels) const {
   auto image = CreateImageSource();

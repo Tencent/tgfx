@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "BitmapContextUtil.h"
+#include "tgfx/core/ColorSpace.h"
 
 namespace tgfx {
 static uint32_t GetBitmapInfo(AlphaType alphaType, ColorType colorType) {
@@ -41,6 +42,36 @@ static uint32_t GetBitmapInfo(AlphaType alphaType, ColorType colorType) {
   return static_cast<uint32_t>(bitmapInfo) | static_cast<uint32_t>(alphaInfo);
 }
 
+static CGColorSpaceRef CreateCGColorSpace(const std::shared_ptr<ColorSpace>& colorSpace) {
+  if (colorSpace == nullptr) {
+    return CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+  }
+  auto iccData = colorSpace->toICCProfile();
+  if (iccData == nullptr) {
+    return CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+  }
+  CFDataRef cfData =
+      CFDataCreate(kCFAllocatorDefault, reinterpret_cast<const UInt8*>(iccData->data()),
+                   static_cast<CFIndex>(iccData->size()));
+  if (cfData == nullptr) {
+    return CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+  }
+  CGColorSpaceRef cgColorSpace = nullptr;
+  if (@available(iOS 10.0, macOS 10.12, *)) {
+    cgColorSpace = CGColorSpaceCreateWithICCData(cfData);
+  } else {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    cgColorSpace = CGColorSpaceCreateWithICCProfile(cfData);
+#pragma clang diagnostic pop
+  }
+  CFRelease(cfData);
+  if (cgColorSpace == nullptr) {
+    return CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+  }
+  return cgColorSpace;
+}
+
 CGContextRef CreateBitmapContext(const ImageInfo& info, void* pixels) {
   if (pixels == nullptr) {
     return nullptr;
@@ -49,9 +80,8 @@ CGContextRef CreateBitmapContext(const ImageInfo& info, void* pixels) {
   if (bitmapInfo == 0) {
     return nullptr;
   }
-  CGColorSpaceRef colorspace = info.colorType() == ColorType::ALPHA_8
-                                   ? nullptr
-                                   : CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+  CGColorSpaceRef colorspace =
+      info.colorType() == ColorType::ALPHA_8 ? nullptr : CreateCGColorSpace(info.colorSpace());
   auto cgContext = CGBitmapContextCreate(pixels, static_cast<size_t>(info.width()),
                                          static_cast<size_t>(info.height()), 8, info.rowBytes(),
                                          colorspace, bitmapInfo);

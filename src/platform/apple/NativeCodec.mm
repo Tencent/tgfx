@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "NativeCodec.h"
+#import <ImageIO/ImageIO.h>
 #include "BitmapContextUtil.h"
 #include "core/utils/ColorSpaceHelper.h"
 #include "tgfx/core/Buffer.h"
@@ -54,6 +55,68 @@ static ISize GetImageSize(CGImageSourceRef imageSource, CGImagePropertyOrientati
     CFRelease(imageProperties);
   }
   return {width, height};
+}
+
+std::shared_ptr<Data> ImageCodec::EncodeHEICWithNativeCodec(const Pixmap& pixmap, int quality) {
+  if (pixmap.isEmpty()) {
+    return nullptr;
+  }
+  auto srcInfo = pixmap.info();
+  Buffer tempBuffer = {};
+  const void* pixels = pixmap.pixels();
+  auto info = srcInfo;
+  if (srcInfo.colorType() != ColorType::RGBA_8888 && srcInfo.colorType() != ColorType::BGRA_8888) {
+    info = srcInfo.makeColorType(ColorType::RGBA_8888);
+    tempBuffer.alloc(info.byteSize());
+    if (!pixmap.readPixels(info, tempBuffer.data())) {
+      return nullptr;
+    }
+    pixels = tempBuffer.data();
+  }
+  auto context = CreateBitmapContext(info, const_cast<void*>(pixels));
+  if (context == nullptr) {
+    return nullptr;
+  }
+  CGImageRef cgImage = CGBitmapContextCreateImage(context);
+  CGContextRelease(context);
+  if (cgImage == nullptr) {
+    return nullptr;
+  }
+  CFMutableDataRef cfData = CFDataCreateMutable(kCFAllocatorDefault, 0);
+  if (cfData == nullptr) {
+    CGImageRelease(cgImage);
+    return nullptr;
+  }
+  CGImageDestinationRef destination =
+      CGImageDestinationCreateWithData(cfData, CFSTR("public.heic"), 1, nullptr);
+  if (destination == nullptr) {
+    CFRelease(cfData);
+    CGImageRelease(cgImage);
+    return nullptr;
+  }
+  float compressionQuality = static_cast<float>(quality) / 100.0f;
+  CFStringRef keys[] = {kCGImageDestinationLossyCompressionQuality};
+  CFNumberRef qualityValue =
+      CFNumberCreate(kCFAllocatorDefault, kCFNumberFloatType, &compressionQuality);
+  CFTypeRef values[] = {qualityValue};
+  CFDictionaryRef options =
+      CFDictionaryCreate(kCFAllocatorDefault, reinterpret_cast<const void**>(keys),
+                         reinterpret_cast<const void**>(values), 1, &kCFTypeDictionaryKeyCallBacks,
+                         &kCFTypeDictionaryValueCallBacks);
+  CGImageDestinationAddImage(destination, cgImage, options);
+  bool success = CGImageDestinationFinalize(destination);
+  CFRelease(options);
+  CFRelease(qualityValue);
+  CFRelease(destination);
+  CGImageRelease(cgImage);
+  if (!success) {
+    CFRelease(cfData);
+    return nullptr;
+  }
+  auto data =
+      Data::MakeWithCopy(CFDataGetBytePtr(cfData), static_cast<size_t>(CFDataGetLength(cfData)));
+  CFRelease(cfData);
+  return data;
 }
 
 std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string& filePath) {

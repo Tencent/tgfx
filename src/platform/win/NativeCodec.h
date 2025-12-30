@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,11 +18,30 @@
 
 #pragma once
 
+#include <wincodec.h>
+#include "tgfx/core/ImageCodec.h"
+
 namespace tgfx {
+class NativeCodec : public ImageCodec {
+ public:
+  ~NativeCodec() override;
 
-/**
- *  Describes the known formats a Pixmap can be encoded into.
- */
-enum class EncodedFormat { JPEG, PNG, WEBP, HEIC };
+ protected:
+  bool onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
+                    std::shared_ptr<ColorSpace> dstColorSpace, void* dstPixels) const override;
 
+ private:
+  std::string imagePath = {};
+  std::shared_ptr<Data> imageBytes = nullptr;
+
+  NativeCodec(int width, int height, Orientation orientation,
+              std::shared_ptr<ColorSpace> colorSpace)
+      : ImageCodec(width, height, orientation, std::move(colorSpace)) {
+  }
+
+  bool decodePixels(IWICBitmapSource* source, ColorType colorType, AlphaType alphaType,
+                    size_t dstRowBytes, void* dstPixels) const;
+
+  friend class ImageCodec;
+};
 }  // namespace tgfx

@@ -72,6 +72,10 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(NativeImageRef nativeImage) {
   return std::shared_ptr<NativeCodec>(new NativeCodec(width, height, std::move(nativeImage)));
 }
 
+std::shared_ptr<Data> ImageCodec::EncodeHEICWithNativeCodec(const Pixmap&, int) {
+  return nullptr;
+}
+
 NativeCodec::NativeCodec(int width, int height, std::shared_ptr<Data> imageBytes)
     : ImageCodec(width, height), imageBytes(std::move(imageBytes)) {
 }

@@ -122,6 +122,11 @@ class ImageCodec : public ImageGenerator {
    */
   static std::shared_ptr<ImageCodec> MakeNativeCodec(std::shared_ptr<Data> imageBytes);
 
+  /**
+   * Encodes a Pixmap to HEIC format image data.
+   */
+  static std::shared_ptr<Data> EncodeHEICWithNativeCodec(const Pixmap& pixmap, int quality);
+
   friend class Pixmap;
   friend class SVGExportContext;
   friend class PDFBitmap;
