@@ -201,6 +201,10 @@ void ShapeLayer::onUpdateContent(LayerRecorder* recorder) {
     return;
   }
 
+  if (_fillStyles.empty() && _strokeStyles.empty()) {
+    return;
+  }
+
   if (!_fillStyles.empty()) {
     for (const auto& style : _fillStyles) {
       LayerPaint paint(style->color(), style->blendMode());
