@@ -549,11 +549,12 @@ std::shared_ptr<TextureProxy> OpsCompositor::getClipTexture(const Path& clip, AA
     return clipTexture;
   }
   auto bounds = getClipBounds(clip);
+  bounds.roundOut();
   if (bounds.isEmpty()) {
     return nullptr;
   }
-  auto width = FloatCeilToInt(bounds.width());
-  auto height = FloatCeilToInt(bounds.height());
+  auto width = static_cast<int>(bounds.width());
+  auto height = static_cast<int>(bounds.height());
   auto rasterizeMatrix = Matrix::MakeTrans(-bounds.left, -bounds.top);
   if (PathTriangulator::ShouldTriangulatePath(clip)) {
     auto clipBounds = Rect::MakeWH(width, height);
@@ -600,11 +601,15 @@ std::pair<PlacementPtr<FragmentProcessor>, bool> OpsCompositor::getClipMaskFP(co
     return {nullptr, false};
   }
   auto clipBounds = getClipBounds(clip);
-  *scissorRect = clipBounds;
+  // Round out clipBounds for scissorRect since hardware requires integer bounds.
+  // Use the same roundedBounds for uvMatrix to match getClipTexture's rasterizeMatrix.
+  auto roundedBounds = clipBounds;
+  roundedBounds.roundOut();
+  *scissorRect = roundedBounds;
   FlipYIfNeeded(scissorRect, renderTarget.get());
-  scissorRect->roundOut();
   auto textureProxy = getClipTexture(clip, aaType);
-  auto uvMatrix = Matrix::MakeTrans(-clipBounds.left, -clipBounds.top);
+  // Use roundedBounds for uvMatrix to match getClipTexture's rasterizeMatrix.
+  auto uvMatrix = Matrix::MakeTrans(-roundedBounds.left, -roundedBounds.top);
   if (renderTarget->origin() == ImageOrigin::BottomLeft) {
     uvMatrix.preConcat(renderTarget->getOriginTransform());
   }

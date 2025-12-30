@@ -1131,7 +1131,6 @@ std::shared_ptr<Image> Layer::getContentImage(
     mappedBounds.roundOut();
     offscreenCanvas->clipRect(mappedBounds);
     offscreenCanvas->setMatrix(contentMatrix);
-    offscreenCanvas->clipRect(*inputBounds);
     drawDirectly(contentArgs, offscreenCanvas, 1.0f, extraSourceTypes);
     Point offset = {};
     auto finalImage = ToImageWithOffset(recorder.finishRecordingAsPicture(), &offset, nullptr,
@@ -1152,7 +1151,6 @@ std::shared_ptr<Image> Layer::getContentImage(
   mappedBounds.roundOut();
   offscreenCanvas->clipRect(mappedBounds);
   offscreenCanvas->scale(contentScale, contentScale);
-  offscreenCanvas->clipRect(*inputBounds);
   drawDirectly(contentArgs, offscreenCanvas, 1.0f, extraSourceTypes);
   Point offset = {};
   auto finalImage = ToImageWithOffset(recorder.finishRecordingAsPicture(), &offset, nullptr,
