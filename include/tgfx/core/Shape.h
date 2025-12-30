@@ -23,6 +23,7 @@
 #include "tgfx/core/Matrix3D.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/core/PathProvider.h"
+#include "tgfx/core/PathTypes.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/TextBlob.h"
 
@@ -78,7 +79,7 @@ class Shape {
 
   /**
    * Applies the specified stroke to the Shape. If the stroke is nullptr, the original Shape is
-   * returned. Returns nullptr if the Shape is nullptr or if the stroke width is zero or less. 
+   * returned. Returns nullptr if the Shape is nullptr or if the stroke width is zero or less.
    */
   static std::shared_ptr<Shape> ApplyStroke(std::shared_ptr<Shape> shape, const Stroke* stroke);
 
@@ -103,10 +104,17 @@ class Shape {
                                             std::shared_ptr<PathEffect> effect);
 
   /**
-   * Creates a new Shape by applying the inverse fill type to the given Shape. Returns nullptr if
-   * the shape is nullptr.
+   * Creates a new Shape by applying the specified fill type to the given Shape. If the shape
+   * already has the specified fill type, the original shape is returned. Returns nullptr if the
+   * shape is nullptr.
    */
-  static std::shared_ptr<Shape> ApplyInverse(std::shared_ptr<Shape> shape);
+  static std::shared_ptr<Shape> ApplyFillType(std::shared_ptr<Shape> shape, PathFillType fillType);
+
+  /**
+   * Creates a new Shape by reversing the path direction of the given Shape. Returns nullptr if the
+   * shape is nullptr.
+   */
+  static std::shared_ptr<Shape> ApplyReverse(std::shared_ptr<Shape> shape);
 
   virtual ~Shape();
 
@@ -119,11 +127,14 @@ class Shape {
   }
 
   /**
-   * Returns true if the PathFillType of the computed path is InverseWinding or InverseEvenOdd.
+   * Returns the PathFillType of the Shape.
    */
-  virtual bool isInverseFillType() const {
-    return false;
-  }
+  virtual PathFillType fillType() const = 0;
+
+  /**
+   * Returns true if the PathFillType is InverseWinding or InverseEvenOdd.
+   */
+  bool isInverseFillType() const;
 
   /**
    * Returns the bounding box of the Shape. The bounds might be larger than the actual shape because
@@ -132,22 +143,20 @@ class Shape {
   Rect getBounds() const;
 
   /**
-   * Returns the Shape's computed path. Note: The path is recalculated each time this method is
-   * called, as it is not cached.
+   * Returns the Shape's computed path. The result is cached lazily.
    */
-  Path getPath() const {
-    return onGetPath(1.f);
-  }
+  Path getPath() const;
 
  protected:
   enum class Type {
     Append,
     Effect,
     Text,
-    Inverse,
+    FillType,
     Matrix,
     Merge,
     Path,
+    Reverse,
     Stroke,
     Provider,
     Glyph,
@@ -173,8 +182,8 @@ class Shape {
   /**
    * Called by getPath() to compute the actual path of the Shape. The resolution scale parameter
    * provides any scale applied within the Shape.
-   * During rendering, complex Shapes may be simplified based on the current resolution scale to 
-   * improve performance. Extremely thin strokes may also be converted to hairline strokes for 
+   * During rendering, complex Shapes may be simplified based on the current resolution scale to
+   * improve performance. Extremely thin strokes may also be converted to hairline strokes for
    * better rendering quality.
    */
   virtual Path onGetPath(float resolutionScale) const = 0;
@@ -183,7 +192,8 @@ class Shape {
   friend class StrokeShape;
   friend class MatrixShape;
   friend class Matrix3DShape;
-  friend class InverseShape;
+  friend class FillTypeShape;
+  friend class ReverseShape;
   friend class MergeShape;
   friend class EffectShape;
   friend class ShapeDrawOp;
@@ -194,5 +204,6 @@ class Shape {
 
  private:
   mutable std::atomic<Rect*> bounds = {nullptr};
+  mutable std::atomic<Path*> path = {nullptr};
 };
 }  // namespace tgfx

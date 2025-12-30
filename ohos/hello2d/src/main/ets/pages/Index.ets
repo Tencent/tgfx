@@ -1,6 +1,5 @@
 import hello2d from 'libhello2d.so';
 import display from '@ohos.display';
-import { hilog } from '@kit.PerformanceAnalysisKit';
 
 @Entry
 @Component

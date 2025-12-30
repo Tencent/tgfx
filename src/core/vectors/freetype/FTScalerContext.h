@@ -19,7 +19,9 @@
 #pragma once
 
 #include <memory>
+#include <string>
 #include "ft2build.h"
+#include FT_COLOR_H
 #include FT_FREETYPE_H
 #include "FTTypeface.h"
 #include "core/PixelBuffer.h"
@@ -46,7 +48,7 @@ class FTScalerContext : public ScalerContext {
                          Matrix* matrix) const override;
 
   bool readPixels(GlyphID glyphID, bool fauxBold, const Stroke* stroke, const ImageInfo& dstInfo,
-                  void* dstPixels) const override;
+                  void* dstPixels, const Point& glyphOffset) const override;
 
   float getBackingSize() const override {
     return backingSize;
@@ -70,6 +72,13 @@ class FTScalerContext : public ScalerContext {
   FTTypeface* ftTypeface() const;
 
   bool loadOutlineGlyph(FT_Face face, GlyphID glyphID, bool fauxBold, bool fauxItalic) const;
+
+  void collectCOLRv1GlyphPaths(FT_Face face, const FT_OpaquePaint& opaquePaint, bool fauxBold,
+                               bool fauxItalic, Path* path) const;
+
+#if defined(__ANDROID__) || defined(ANDROID)
+  bool MeasureColorVectorGlyph(GlyphID glyphID, Rect* rect) const;
+#endif
 
   float textScale = 1.0f;
   Point extraScale = Point::Make(1.f, 1.f);

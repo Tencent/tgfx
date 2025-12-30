@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "tgfx/core/Point.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Stroke.h"
 
@@ -44,5 +45,11 @@ bool TreatStrokeAsHairline(const Stroke& stroke, const Matrix& matrix);
  * (i.e., when all gaps are small enough that square caps will connect).
  */
 std::vector<float> SimplifyLineDashPattern(const std::vector<float>& pattern, const Stroke& stroke);
+
+/**
+ * Converts a stroked axis-aligned line to a filled rectangle. Returns true if the conversion is
+ * possible (non-round cap, non-hairline, axis-aligned line), and writes the result to rect.
+ */
+bool StrokeLineToRect(const Stroke& stroke, const Point line[2], Rect* rect);
 
 }  // namespace tgfx
