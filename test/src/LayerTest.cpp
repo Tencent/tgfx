@@ -4630,4 +4630,48 @@ TGFX_TEST(LayerTest, RoundRectMaskWithTiledRender) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/RoundRectMaskWithTiledRender"));
 }
 
+TGFX_TEST(LayerTest, ShapeLayerContourWithDropShadow) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto back = SolidLayer::Make();
+  back->setColor(Color::White());
+  back->setWidth(200);
+  back->setHeight(200);
+  displayList->root()->addChild(back);
+
+  // Parent layer with rect fill and drop shadow
+  auto parent = ShapeLayer::Make();
+  parent->setMatrix(Matrix::MakeTrans(50, 50));
+  Path parentPath;
+  parentPath.addRect(Rect::MakeWH(100, 100));
+  parent->setPath(parentPath);
+  parent->setFillStyle(ShapeStyle::Make(Color::Blue()));
+  auto dropShadow = DropShadowStyle::Make(8, 8, 5, 5, Color::Black(), false);
+  parent->setLayerStyles({dropShadow});
+
+  // Child ShapeLayer with only stroke style (no fill style)
+  // This tests that the contour-only content is correctly generated for layer styles.
+  auto child = ShapeLayer::Make();
+  child->setMatrix(Matrix::MakeTrans(30, 30));
+  Path childPath;
+  childPath.addRoundRect(Rect::MakeWH(80, 80), 15, 15);
+  child->setPath(childPath);
+  child->setStrokeStyle(ShapeStyle::Make(Color::Red()));
+  child->setLineWidth(4.0f);
+
+  parent->addChild(child);
+  back->addChild(parent);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ShapeLayerContourWithDropShadow"));
+
+  // Test with no fill and no stroke - child should be transparent, shadow only shows parent
+  child->removeStrokeStyles();
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ShapeLayerNoStyleWithDropShadow"));
+}
+
 }  // namespace tgfx
