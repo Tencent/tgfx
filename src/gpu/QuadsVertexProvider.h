@@ -40,8 +40,9 @@ class QuadsVertexProvider : public VertexProvider {
   /**
    * Creates a QuadsVertexProvider from a list of quad records.
    */
-  static PlacementPtr<QuadsVertexProvider> MakeFrom(
-      BlockAllocator* allocator, std::vector<PlacementPtr<QuadRecord>>&& quads, AAType aaType);
+  static PlacementPtr<QuadsVertexProvider> MakeFrom(BlockAllocator* allocator,
+                                                    std::vector<PlacementPtr<QuadRecord>>&& quads,
+                                                    AAType aaType);
 
   /**
    * Returns the number of quads in the provider.

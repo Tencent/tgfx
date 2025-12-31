@@ -80,14 +80,8 @@ DrawPolygon3D::DrawPolygon3D(std::shared_ptr<Image> image, const Matrix3D& matri
 DrawPolygon3D::DrawPolygon3D(std::shared_ptr<Image> image, const Matrix3D& matrix,
                              std::vector<Vec3> points, const Vec3& normal, int orderIndex,
                              float alpha, bool antiAlias)
-    : _points(std::move(points)),
-      _normal(normal),
-      _orderIndex(orderIndex),
-      _isSplit(true),
-      _alpha(alpha),
-      _antiAlias(antiAlias),
-      _image(std::move(image)),
-      _matrix(matrix) {
+    : _points(std::move(points)), _normal(normal), _orderIndex(orderIndex), _isSplit(true),
+      _alpha(alpha), _antiAlias(antiAlias), _image(std::move(image)), _matrix(matrix) {
 }
 
 // Computes the normal by averaging cross products of opposite vertex pairs from the first vertex.
@@ -232,14 +226,14 @@ std::vector<QuadCW> DrawPolygon3D::toQuads() const {
 
   if (n == 3) {
     // Triangle: degenerate to quad (p2 == p3)
-    quads.push_back(QuadCW(toLocal(_points[0]), toLocal(_points[1]), toLocal(_points[2]),
-                           toLocal(_points[2])));
+    quads.push_back(
+        QuadCW(toLocal(_points[0]), toLocal(_points[1]), toLocal(_points[2]), toLocal(_points[2])));
     return quads;
   }
   if (n == 4) {
     // Quadrilateral: direct mapping
-    quads.push_back(QuadCW(toLocal(_points[0]), toLocal(_points[1]), toLocal(_points[2]),
-                           toLocal(_points[3])));
+    quads.push_back(
+        QuadCW(toLocal(_points[0]), toLocal(_points[1]), toLocal(_points[2]), toLocal(_points[3])));
     return quads;
   }
   // n > 4: Fan decomposition into quads, each quad covers two triangles when possible.

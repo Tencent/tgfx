@@ -35,9 +35,9 @@ namespace tgfx {
 static constexpr float kAAEpsilon = 0.01f;
 
 // Flags indicating the edges of a rectangle.
-static constexpr unsigned RECT_EDGE_LEFT   = 0b1000;
-static constexpr unsigned RECT_EDGE_TOP    = 0b0001;
-static constexpr unsigned RECT_EDGE_RIGHT  = 0b0010;
+static constexpr unsigned RECT_EDGE_LEFT = 0b1000;
+static constexpr unsigned RECT_EDGE_TOP = 0b0001;
+static constexpr unsigned RECT_EDGE_RIGHT = 0b0010;
 static constexpr unsigned RECT_EDGE_BOTTOM = 0b0100;
 
 static inline AAType GetAAType(int sampleCount, bool antiAlias) {
@@ -131,8 +131,8 @@ Context3DCompositor::Context3DCompositor(const Context& context, int width, int 
 
 void Context3DCompositor::addImage(std::shared_ptr<Image> image, const Matrix3D& matrix,
                                    float alpha, bool antiAlias) {
-  auto polygon =
-      std::make_unique<DrawPolygon3D>(std::move(image), matrix, _nextOrderIndex++, alpha, antiAlias);
+  auto polygon = std::make_unique<DrawPolygon3D>(std::move(image), matrix, _nextOrderIndex++, alpha,
+                                                 antiAlias);
   _polygons.push_back(std::move(polygon));
 }
 

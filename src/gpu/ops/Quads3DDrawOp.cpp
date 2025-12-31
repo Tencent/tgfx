@@ -42,9 +42,8 @@ PlacementPtr<Quads3DDrawOp> Quads3DDrawOp::Make(Context* context,
   auto allocator = context->drawingAllocator();
   auto drawOp = allocator->make<Quads3DDrawOp>(allocator, provider.get(), drawArgs);
   if (provider->aaType() == AAType::Coverage || provider->quadCount() > 1) {
-    drawOp->indexBufferProxy =
-        context->globalCache()->getRectIndexBuffer(provider->aaType() == AAType::Coverage,
-                                                     std::nullopt);
+    drawOp->indexBufferProxy = context->globalCache()->getRectIndexBuffer(
+        provider->aaType() == AAType::Coverage, std::nullopt);
   }
   if (provider->quadCount() <= 1) {
     // If we only have one quad, it is not worth the async task overhead.

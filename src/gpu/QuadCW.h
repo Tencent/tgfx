@@ -44,7 +44,8 @@ class QuadCW {
   constexpr QuadCW() = default;
 
   constexpr QuadCW(const Point& p0, const Point& p1, const Point& p2, const Point& p3)
-      : points{p0, p1, p2, p3} {}
+      : points{p0, p1, p2, p3} {
+  }
 
   const Point& point(size_t i) const {
     DEBUG_ASSERT(i < 4);

@@ -225,9 +225,7 @@ PlacementPtr<QuadsVertexProvider> QuadsVertexProvider::MakeFrom(
 
 QuadsVertexProvider::QuadsVertexProvider(PlacementArray<QuadRecord>&& quads, AAType aaType,
                                          bool hasColor, std::shared_ptr<BlockAllocator> reference)
-    : VertexProvider(std::move(reference)),
-      quads(std::move(quads)),
-      _aaType(aaType),
+    : VertexProvider(std::move(reference)), quads(std::move(quads)), _aaType(aaType),
       _hasColor(hasColor) {
 }
 

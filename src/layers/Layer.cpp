@@ -172,8 +172,9 @@ static inline void DrawLayerImageTo3DRenderContext(const DrawArgs& args,
 
   // imageTransform is in image coordinate space. Dividing by scale converts the translation to
   // DisplayList coordinate space, then subtracting renderRect offset converts to compositor space.
-  imageTransform.postTranslate(matrix.getTranslateX() / scaleX - args.render3DContext->renderRect().left,
-                               matrix.getTranslateY() / scaleY - args.render3DContext->renderRect().top, 0);
+  imageTransform.postTranslate(
+      matrix.getTranslateX() / scaleX - args.render3DContext->renderRect().left,
+      matrix.getTranslateY() / scaleY - args.render3DContext->renderRect().top, 0);
   args.render3DContext->compositor()->addImage(image, imageTransform, alpha, antiAlias);
 }
 
@@ -1817,8 +1818,7 @@ void Layer::drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, float 
     DEBUG_ASSERT(false);
     return;
   }
-  auto context = canvas->getSurface() ? canvas->getSurface()->getContext() : nullptr;
-  if (context == nullptr) {
+  if (args.context == nullptr) {
     DEBUG_ASSERT(false);
     return;
   }
@@ -1841,9 +1841,9 @@ void Layer::drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, float 
   validRenderRect.scale(maxScale, maxScale);
   validRenderRect.roundOut();
 
-  auto compositor =
-      std::make_shared<Context3DCompositor>(*context, static_cast<int>(validRenderRect.width()),
-                                            static_cast<int>(validRenderRect.height()));
+  auto compositor = std::make_shared<Context3DCompositor>(
+      *args.context, static_cast<int>(validRenderRect.width()),
+      static_cast<int>(validRenderRect.height()));
   auto context3DArgs = args;
   context3DArgs.render3DContext = std::make_shared<Render3DContext>(compositor, validRenderRect);
   // Layers inside a 3D rendering context need to maintain independent 3D state. This means layers

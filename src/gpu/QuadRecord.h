@@ -41,7 +41,8 @@ struct QuadRecord {
   QuadRecord() = default;
 
   QuadRecord(const QuadCW& quad, unsigned aaFlags, const Color& color = {})
-      : quad(quad), aaFlags(aaFlags), color(color) {}
+      : quad(quad), aaFlags(aaFlags), color(color) {
+  }
 
   /**
    * Four vertices in clockwise order.
