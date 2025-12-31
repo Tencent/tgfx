@@ -407,7 +407,9 @@ std::vector<Rect> DisplayList::renderPartial(Surface* surface, bool autoClear,
 
 std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
                                            const std::vector<Rect>& dirtyRegions) {
-  if (!surfaceCaches.empty() && surfaceCaches.front()->getContext() != surface->getContext()) {
+  if (!surfaceCaches.empty() && (surfaceCaches.front()->getContext() != surface->getContext() ||
+                                 !ColorSpace::Equals(surfaceCaches.front()->colorSpace().get(),
+                                                     surface->colorSpace().get()))) {
     resetCaches();
   }
   checkTileCount(surface);
@@ -503,8 +505,9 @@ void DisplayList::recycleCurrentTileTasks(const std::vector<DrawTask>& tileTasks
   auto tileCache = result->second;
   for (auto& task : tileTasks) {
     for (auto& tile : task.getTiles()) {
-      tileCache->removeTile(tile->tileX, tile->tileY);
-      emptyTiles.push_back(tile);
+      if (tileCache->removeTile(tile->tileX, tile->tileY)) {
+        emptyTiles.push_back(tile);
+      }
     }
   }
   if (tileCache->empty()) {

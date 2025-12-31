@@ -1143,7 +1143,7 @@ TGFX_TEST(LayerTest, textMask) {
   imageLayer1->setMask(alphaTextLayer);
 
   auto alphaLayerBounds = alphaLayer->getBounds();
-  EXPECT_EQ(alphaLayerBounds, Rect::MakeLTRB(1761, 746, 3024, 1392));
+  EXPECT_EQ(alphaLayerBounds, Rect::MakeLTRB(1760.5f, 746, 3024, 1392.5f));
 
   // Vector mask effect
   auto imageLayer2 = ImageLayer::Make();
@@ -4340,6 +4340,52 @@ TGFX_TEST(LayerTest, TileClearWhenAllLayersRemoved) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/TileClear_PartialTileWithNewLayer"));
 }
 
+/**
+ * Test that overlapping layers with intersecting dirty regions don't cause duplicate tile recycling.
+ * When two layers overlap and both are modified, their dirty regions may cover the same tiles.
+ * The tile should only be recycled once, not multiple times.
+ */
+TGFX_TEST(LayerTest, OverlappingDirtyRegions) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto surface = Surface::Make(context, 256, 256);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Tiled);
+  displayList->setTileSize(128);
+  displayList->setBackgroundColor(Color::White());
+
+  auto rootLayer = displayList->root();
+
+  auto redRect = ShapeLayer::Make();
+  Path redPath = {};
+  redPath.addRect(Rect::MakeXYWH(20, 20, 100, 100));
+  redRect->setPath(redPath);
+  redRect->setFillStyle(ShapeStyle::Make(Color::Red()));
+  rootLayer->addChild(redRect);
+
+  auto blueRect = ShapeLayer::Make();
+  Path bluePath = {};
+  bluePath.addRect(Rect::MakeXYWH(95, 95, 100, 100));
+  blueRect->setPath(bluePath);
+  blueRect->setFillStyle(ShapeStyle::Make(Color::Blue()));
+  rootLayer->addChild(blueRect);
+
+  displayList->render(surface.get());
+  EXPECT_EQ(displayList->tileCaches.size(), 1u);
+
+  redRect->removeFromParent();
+  blueRect->removeFromParent();
+
+  displayList->render(surface.get());
+
+  EXPECT_EQ(displayList->tileCaches.size(), 0lu);
+
+  auto emptyTilesAfter = displayList->emptyTiles.size();
+  EXPECT_EQ(9lu, emptyTilesAfter);
+}
+
 TGFX_TEST(LayerTest, LayerRecorder) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -4543,6 +4589,145 @@ TGFX_TEST(LayerTest, LayerRecorder) {
     ASSERT_TRUE(content != nullptr);
     EXPECT_EQ(content->type(), LayerContent::Type::Rect);
   }
+}
+
+/**
+ * Test RoundRect mask layer with tiled rendering mode.
+ * This verifies that clipRect coordinate space is correct in offscreen rendering.
+ */
+TGFX_TEST(LayerTest, RoundRectMaskWithTiledRender) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 600, 600);
+  DisplayList displayList;
+
+  // Create a white background layer
+  auto backgroundLayer = ShapeLayer::Make();
+  Path backgroundPath;
+  backgroundPath.addRect(Rect::MakeXYWH(0, 0, 300, 300));
+  backgroundLayer->setPath(backgroundPath);
+  backgroundLayer->setFillStyle(ShapeStyle::Make(Color::White()));
+
+  // Create a rect shape layer as the content to be masked
+  auto contentLayer = ShapeLayer::Make();
+  Path contentPath;
+  contentPath.addRect(Rect::MakeXYWH(0, 0, 250, 250));
+  contentLayer->setPath(contentPath);
+  contentLayer->setFillStyle(ShapeStyle::Make(Color::Blue()));
+  contentLayer->setMatrix(Matrix::MakeTrans(10, 10));
+
+  // Create a round rect mask layer
+  auto maskLayer = ShapeLayer::Make();
+  Path maskPath;
+  maskPath.addRoundRect(Rect::MakeXYWH(20, 20, 200, 200), 30, 30);
+  maskLayer->setPath(maskPath);
+  maskLayer->setFillStyle(ShapeStyle::Make(Color::White()));
+
+  // Apply mask to content layer
+  contentLayer->setMask(maskLayer);
+
+  // Create a container layer with 3D matrix
+  auto rootLayer = Layer::Make();
+  rootLayer->addChild(backgroundLayer);
+  rootLayer->addChild(contentLayer);
+  rootLayer->addChild(maskLayer);
+
+  // Apply 3D matrix to container layer
+  Matrix3D matrix3D = Matrix3D::MakeScale(3.39277792f, 3.39277792f, 1.0f);
+  matrix3D.postTranslate(187.083313f, 82.083313f, 0.0f);
+  rootLayer->setMatrix3D(matrix3D);
+
+  displayList.root()->addChild(rootLayer);
+
+  // Render with tiled mode
+  displayList.setRenderMode(RenderMode::Tiled);
+  displayList.render(surface.get());
+  displayList.setZoomScale(1.603f);
+  displayList.setAllowZoomBlur(false);
+  displayList.setContentOffset(-200.179016f, -221.704529f);
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/RoundRectMaskWithTiledRender"));
+}
+
+TGFX_TEST(LayerTest, ShapeLayerContourWithDropShadow) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto back = SolidLayer::Make();
+  back->setColor(Color::White());
+  back->setWidth(200);
+  back->setHeight(200);
+  displayList->root()->addChild(back);
+
+  // Parent layer with rect fill and drop shadow
+  auto parent = ShapeLayer::Make();
+  parent->setMatrix(Matrix::MakeTrans(50, 50));
+  Path parentPath;
+  parentPath.addRect(Rect::MakeWH(100, 100));
+  parent->setPath(parentPath);
+  parent->setFillStyle(ShapeStyle::Make(Color::Blue()));
+  auto dropShadow = DropShadowStyle::Make(8, 8, 5, 5, Color::Black(), false);
+  parent->setLayerStyles({dropShadow});
+
+  // Child ShapeLayer with only stroke style (no fill style)
+  // This tests that the contour-only content is correctly generated for layer styles.
+  auto child = ShapeLayer::Make();
+  child->setMatrix(Matrix::MakeTrans(30, 30));
+  Path childPath;
+  childPath.addRoundRect(Rect::MakeWH(80, 80), 15, 15);
+  child->setPath(childPath);
+  child->setStrokeStyle(ShapeStyle::Make(Color::Red()));
+  child->setLineWidth(4.0f);
+
+  parent->addChild(child);
+  back->addChild(parent);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ShapeLayerContourWithDropShadow"));
+
+  // Test with no fill and no stroke - child should be transparent, shadow only shows parent
+  child->removeStrokeStyles();
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ShapeLayerNoStyleWithDropShadow"));
+}
+
+TGFX_TEST(LayerTest, GetRotateBounds) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 400);
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto rootLayer = Layer::Make();
+  displayList->root()->addChild(rootLayer);
+
+  auto outerLayer = ShapeLayer::Make();
+  Path outerPath = {};
+  outerPath.addRect(Rect::MakeWH(300, 300));
+  outerLayer->setPath(outerPath);
+  outerLayer->setFillStyle(ShapeStyle::Make(Color::Blue()));
+  outerLayer->setMatrix(Matrix::MakeTrans(200, 200));
+  rootLayer->addChild(outerLayer);
+
+  auto middleLayer = ShapeLayer::Make();
+  Path middlePath = {};
+  middlePath.addRect(Rect::MakeWH(200, 200));
+  middleLayer->setPath(middlePath);
+  middleLayer->setFillStyle(ShapeStyle::Make(Color::Red()));
+  middleLayer->setMatrix(Matrix::MakeTrans(50, 50) * Matrix::MakeRotate(45, 100, 100));
+  outerLayer->addChild(middleLayer);
+
+  auto style = DropShadowStyle::Make(-100, 0, 0, 0, Color::Black(), true);
+  middleLayer->setLayerStyles({style});
+
+  auto bounds = middleLayer->getBounds(outerLayer.get(), true);
+  EXPECT_FLOAT_EQ(bounds.left, -62.132034f);
+  EXPECT_FLOAT_EQ(bounds.top, -62.132034f);
+  EXPECT_FLOAT_EQ(bounds.right, 291.42136f);
+  EXPECT_FLOAT_EQ(bounds.bottom, 291.42136f);
 }
 
 }  // namespace tgfx

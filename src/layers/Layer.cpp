@@ -731,23 +731,32 @@ Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBou
   bool canStart3DContext = _transformStyle == TransformStyle::Preserve3D && canExtend3DContext();
   // Layers that can start or extend a 3D rendering context do not support computeTightBounds.
   DEBUG_ASSERT(!canStart3DContext || !computeTightBounds);
-  bool isCoordinateMatrixAffine = IsMatrix3DAffine(coordinateMatrix);
-  auto affineMatrix =
-      isCoordinateMatrixAffine ? GetMayLossyAffineMatrix(coordinateMatrix) : Matrix::I();
+  bool hasEffects = !_layerStyles.empty() || !_filters.empty();
+  // When starting a 3D context, the matrix must be passed down to preserve 3D state.
+  // Otherwise, when has effects, compute in local coordinates first, then apply matrix at end.
+  bool applyMatrixAtEnd = !canStart3DContext && hasEffects;
+  auto contentMatrix =
+      applyMatrixAtEnd ? Matrix::I() : GetMayLossyAffineMatrix(coordinateMatrix);
 
   Rect bounds = {};
   if (auto content = getContent()) {
-    if (computeTightBounds) {
-      // Compute tight bounds and handle coordinate transformation.
-      auto tightBounds = content->getTightBounds(affineMatrix);
-      if (!isCoordinateMatrixAffine) {
-        tightBounds = coordinateMatrix.mapRect(tightBounds);
-        tightBounds.roundOut();
+    if (applyMatrixAtEnd) {
+      if (computeTightBounds) {
+        bounds.join(content->getTightBounds(Matrix::I()));
+      } else {
+        bounds.join(content->getBounds());
       }
-      bounds.join(tightBounds);
     } else {
-      // Apply coordinateMatrix directly to compute the bounds.
-      bounds.join(coordinateMatrix.mapRect(content->getBounds()));
+      if (computeTightBounds) {
+        auto tightBounds = content->getTightBounds(contentMatrix);
+        if (!IsMatrix3DAffine(coordinateMatrix)) {
+          tightBounds = coordinateMatrix.mapRect(tightBounds);
+          tightBounds.roundOut();
+        }
+        bounds.join(tightBounds);
+      } else {
+        bounds.join(coordinateMatrix.mapRect(content->getBounds()));
+      }
     }
   }
 
@@ -764,7 +773,7 @@ Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBou
     if (_transformStyle == TransformStyle::Flat || !canExtend3DContext()) {
       childMatrix.setRow(2, {0, 0, 1, 0});
     }
-    childMatrix.postConcat(coordinateMatrix);
+    childMatrix.postConcat(applyMatrixAtEnd ? Matrix3D() : coordinateMatrix);
     auto childBounds = child->getBoundsInternal(childMatrix, computeTightBounds);
     if (child->_scrollRect) {
       auto relatvieScrollRect = childMatrix.mapRect(*child->_scrollRect);
@@ -783,20 +792,25 @@ Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBou
     bounds.join(childBounds);
   }
 
-  if (!_layerStyles.empty() || !_filters.empty()) {
+  if (hasEffects) {
     // Filters and styles disable 3D context ability, so this block is unreachable for 3D context.
     DEBUG_ASSERT(!canStart3DContext);
-    auto contentScale = affineMatrix.getMaxScale();
     auto layerBounds = bounds;
     for (auto& layerStyle : _layerStyles) {
-      auto styleBounds = layerStyle->filterBounds(layerBounds, contentScale);
+      auto styleBounds = layerStyle->filterBounds(layerBounds, 1.0f);
       bounds.join(styleBounds);
     }
     for (auto& filter : _filters) {
-      bounds = filter->filterBounds(bounds, contentScale);
+      bounds = filter->filterBounds(bounds, 1.0f);
     }
   }
 
+  if (applyMatrixAtEnd) {
+    bounds = coordinateMatrix.mapRect(bounds);
+    if (!IsMatrix3DAffine(coordinateMatrix)) {
+      bounds.roundOut();
+    }
+  }
   return bounds;
 }
 
@@ -1222,6 +1236,7 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
   auto maskType = static_cast<LayerMaskType>(bitFields.maskType);
   auto maskArgs = args;
   maskArgs.drawMode = maskType != LayerMaskType::Contour ? DrawMode::Normal : DrawMode::Contour;
+  maskArgs.excludeEffects |= maskType == LayerMaskType::Contour;
   maskArgs.blurBackground = nullptr;
   // Mask content should be rendered to a regular texture, not to 3D compositor.
   maskArgs.render3DContext = nullptr;
@@ -1233,7 +1248,11 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
 
   auto maskPicture = RecordPicture(maskArgs.drawMode, scale, [&](Canvas* canvas) {
     if (layerClipBounds.has_value()) {
-      canvas->clipRect(*layerClipBounds);
+      auto scaledClipBounds = *layerClipBounds;
+      scaledClipBounds.scale(scale, scale);
+      scaledClipBounds.roundOut();
+      scaledClipBounds.scale(1.0f / scale, 1.0f / scale);
+      canvas->clipRect(scaledClipBounds);
     }
     canvas->concat(affineRelativeMatrix);
     _mask->drawLayer(maskArgs, canvas, _mask->_alpha, BlendMode::SrcOver);
@@ -1292,8 +1311,10 @@ std::shared_ptr<Image> Layer::getContentImage(const DrawArgs& contentArgs,
   if (!imageFilter) {
     PictureRecorder recorder = {};
     auto offscreenCanvas = recorder.beginRecording();
+    auto mappedBounds = contentMatrix.mapRect(*inputBounds);
+    mappedBounds.roundOut();
+    offscreenCanvas->clipRect(mappedBounds);
     offscreenCanvas->setMatrix(contentMatrix);
-    offscreenCanvas->clipRect(*inputBounds);
     drawDirectly(contentArgs, offscreenCanvas, 1.0f);
     Point offset = {};
     auto finalImage = ToImageWithOffset(recorder.finishRecordingAsPicture(), &offset, nullptr,
@@ -1309,8 +1330,11 @@ std::shared_ptr<Image> Layer::getContentImage(const DrawArgs& contentArgs,
   auto contentScale = contentMatrix.getMaxScale();
   PictureRecorder recorder = {};
   auto offscreenCanvas = recorder.beginRecording();
+  auto mappedBounds = *inputBounds;
+  mappedBounds.scale(contentScale, contentScale);
+  mappedBounds.roundOut();
+  offscreenCanvas->clipRect(mappedBounds);
   offscreenCanvas->scale(contentScale, contentScale);
-  offscreenCanvas->clipRect(*inputBounds);
   drawDirectly(contentArgs, offscreenCanvas, 1.0f);
   Point offset = {};
   auto finalImage = ToImageWithOffset(recorder.finishRecordingAsPicture(), &offset, nullptr,
