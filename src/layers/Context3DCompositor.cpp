@@ -17,19 +17,28 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Context3DCompositor.h"
-#include "layers/BspTree.h"
-#include "core/utils/MathExtra.h"
+#include <cmath>
 #include "core/images/TextureImage.h"
+#include "core/utils/MathExtra.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
-#include "gpu/RectsVertexProvider.h"
+#include "gpu/QuadRecord.h"
+#include "gpu/QuadsVertexProvider.h"
 #include "gpu/TPArgs.h"
-#include "gpu/ops/Rect3DDrawOp.h"
-#include "gpu/ops/ShapeDrawOp.h"
-#include "gpu/processors/DeviceSpaceTextureEffect.h"
+#include "gpu/ops/Quads3DDrawOp.h"
 #include "gpu/processors/TextureEffect.h"
+#include "layers/BspTree.h"
 
 namespace tgfx {
+
+// Tolerance for determining if a vertex lies on the original rectangle's edge.
+static constexpr float kAAEpsilon = 0.01f;
+
+// Flags indicating the edges of a rectangle.
+static constexpr unsigned RECT_EDGE_LEFT   = 0b1000;
+static constexpr unsigned RECT_EDGE_TOP    = 0b0001;
+static constexpr unsigned RECT_EDGE_RIGHT  = 0b0010;
+static constexpr unsigned RECT_EDGE_BOTTOM = 0b0100;
 
 static inline AAType GetAAType(int sampleCount, bool antiAlias) {
   if (sampleCount > 1) {
@@ -39,6 +48,78 @@ static inline AAType GetAAType(int sampleCount, bool antiAlias) {
     return AAType::Coverage;
   }
   return AAType::None;
+}
+
+// Determines which edges of the rect this point lies on.
+static unsigned DeterminePointOnRectEdge(const Point& point, const Rect& rect) {
+  unsigned edges = 0;
+  if (std::abs(point.x - rect.left) < kAAEpsilon) {
+    edges |= RECT_EDGE_LEFT;
+  }
+  if (std::abs(point.x - rect.right) < kAAEpsilon) {
+    edges |= RECT_EDGE_RIGHT;
+  }
+  if (std::abs(point.y - rect.top) < kAAEpsilon) {
+    edges |= RECT_EDGE_TOP;
+  }
+  if (std::abs(point.y - rect.bottom) < kAAEpsilon) {
+    edges |= RECT_EDGE_BOTTOM;
+  }
+  return edges;
+}
+
+// Returns true if both endpoints of a quad edge lie on the same edge of the original rectangle,
+// indicating that this edge is an exterior edge of the original rectangle.
+static bool IsExteriorEdge(unsigned cornerAEdge, unsigned cornerBEdge) {
+  return (cornerAEdge & cornerBEdge) != 0;
+}
+
+// Computes per-edge AA flags for a quad. An edge needs AA if both endpoints lie on the same
+// edge of the original rect (i.e., it's an exterior edge, not a BSP split edge).
+static unsigned GetQuadAAFlags(const QuadCW& quad, const Rect& rect) {
+  const unsigned p0 = DeterminePointOnRectEdge(quad.point(0), rect);
+  const unsigned p1 = DeterminePointOnRectEdge(quad.point(1), rect);
+  const unsigned p2 = DeterminePointOnRectEdge(quad.point(2), rect);
+  const unsigned p3 = DeterminePointOnRectEdge(quad.point(3), rect);
+
+  unsigned aaFlags = QUAD_AA_FLAG_NONE;
+  if (IsExteriorEdge(p0, p1)) {
+    aaFlags |= QUAD_AA_FLAG_EDGE_01;
+  }
+  if (IsExteriorEdge(p1, p2)) {
+    aaFlags |= QUAD_AA_FLAG_EDGE_12;
+  }
+  if (IsExteriorEdge(p2, p3)) {
+    aaFlags |= QUAD_AA_FLAG_EDGE_23;
+  }
+  if (IsExteriorEdge(p3, p0)) {
+    aaFlags |= QUAD_AA_FLAG_EDGE_30;
+  }
+  return aaFlags;
+}
+
+// Returns the quad to draw and its AA flags based on whether it's a sub-quad or the original rect.
+static std::pair<QuadCW, unsigned> GetQuadAndAAFlags(const Rect& originalRect, AAType aaType,
+                                                     const QuadCW* subQuad) {
+  QuadCW quad;
+  unsigned aaFlags = QUAD_AA_FLAG_NONE;
+
+  if (subQuad != nullptr) {
+    quad = *subQuad;
+    if (aaType == AAType::Coverage) {
+      aaFlags = GetQuadAAFlags(quad, originalRect);
+    }
+  } else {
+    quad = QuadCW(Point::Make(originalRect.left, originalRect.top),
+                  Point::Make(originalRect.right, originalRect.top),
+                  Point::Make(originalRect.right, originalRect.bottom),
+                  Point::Make(originalRect.left, originalRect.bottom));
+    if (aaType == AAType::Coverage) {
+      aaFlags = QUAD_AA_FLAG_ALL;
+    }
+  }
+
+  return {quad, aaFlags};
 }
 
 Context3DCompositor::Context3DCompositor(const Context& context, int width, int height)
@@ -56,6 +137,15 @@ void Context3DCompositor::addImage(std::shared_ptr<Image> image, const Matrix3D&
 }
 
 void Context3DCompositor::drawPolygon(const DrawPolygon3D* polygon) {
+  if (!polygon->isSplit()) {
+    drawQuads(polygon, {});
+  } else {
+    drawQuads(polygon, polygon->toQuads());
+  }
+}
+
+void Context3DCompositor::drawQuads(const DrawPolygon3D* polygon,
+                                    const std::vector<QuadCW>& subQuads) {
   DEBUG_ASSERT(_targetColorProxy != nullptr);
   auto context = _targetColorProxy->getContext();
   DEBUG_ASSERT(context != nullptr);
@@ -63,7 +153,21 @@ void Context3DCompositor::drawPolygon(const DrawPolygon3D* polygon) {
   const auto& image = polygon->image();
   auto srcW = static_cast<float>(image->width());
   auto srcH = static_cast<float>(image->height());
-  auto srcModelRect = Rect::MakeXYWH(0.f, 0.f, srcW, srcH);
+  Rect originalRect = Rect::MakeWH(srcW, srcH);
+
+  auto allocator = context->drawingAllocator();
+  // Wrap alpha as vertex color to enable semi-transparent pixel blending.
+  Color vertexColor(1, 1, 1, polygon->alpha());
+  std::vector<PlacementPtr<QuadRecord>> quadRecords;
+  if (subQuads.empty()) {
+    auto [quad, aaFlags] = GetQuadAndAAFlags(originalRect, aaType, nullptr);
+    quadRecords.push_back(allocator->make<QuadRecord>(quad, aaFlags, vertexColor));
+  } else {
+    for (const auto& subQuad : subQuads) {
+      auto [quad, aaFlags] = GetQuadAndAAFlags(originalRect, aaType, &subQuad);
+      quadRecords.push_back(allocator->make<QuadRecord>(quad, aaFlags, vertexColor));
+    }
+  }
 
   // Flatten z-axis to keep vertices at their original depth, preventing clipping space culling.
   auto matrix = polygon->matrix();
@@ -73,13 +177,10 @@ void Context3DCompositor::drawPolygon(const DrawPolygon3D* polygon) {
   // Map projected vertex coordinates from render target texture space to NDC space.
   const Vec2 ndcScale(2.0f / widthF, 2.0f / heightF);
   const Vec2 ndcOffset(-1.f, -1.f);
-  auto allocator = context->drawingAllocator();
-  // Wrap alpha as vertex color to enable semi-transparent pixel blending.
-  auto vertexProvider = RectsVertexProvider::MakeFrom(allocator, srcModelRect, aaType,
-                                                      Color(1, 1, 1, polygon->alpha()));
+  auto vertexProvider = QuadsVertexProvider::MakeFrom(allocator, std::move(quadRecords), aaType);
   const Size viewportSize(static_cast<float>(_width), static_cast<float>(_height));
-  const Rect3DDrawArgs drawArgs{matrix, ndcScale, ndcOffset, viewportSize};
-  auto drawOp = Rect3DDrawOp::Make(context, std::move(vertexProvider), 0, drawArgs);
+  const Quads3DDrawArgs drawArgs{matrix, ndcScale, ndcOffset, viewportSize};
+  auto drawOp = Quads3DDrawOp::Make(context, std::move(vertexProvider), 0, drawArgs);
 
   const SamplingArgs samplingArgs = {TileMode::Clamp, TileMode::Clamp, {}, SrcRectConstraint::Fast};
   const TPArgs args(context, 0, false, 1.0f);
@@ -93,79 +194,7 @@ void Context3DCompositor::drawPolygon(const DrawPolygon3D* polygon) {
   auto fragmentProcessor =
       TextureEffect::Make(allocator, std::move(sourceTextureProxy), samplingArgs, &uvMatrix);
   drawOp->addColorFP(std::move(fragmentProcessor));
-
-  // TODO: Draw clipped polygon vertices directly to avoid rasterizing pixels outside the clip region.
-  if (polygon->isSplit()) {
-    auto clipPath = buildClipPath(polygon->points());
-    auto [clipMask, scissorRect] = getClipMaskFP(context, clipPath);
-    if (clipMask) {
-      drawOp->addCoverageFP(std::move(clipMask));
-    }
-    drawOp->setScissorRect(scissorRect);
-  }
-
   _drawOps.emplace_back(std::move(drawOp));
-}
-
-Path Context3DCompositor::buildClipPath(const std::vector<Vec3>& points) {
-  Path path;
-  if (points.empty()) {
-    return path;
-  }
-  path.moveTo(points[0].x, points[0].y);
-  for (size_t i = 1; i < points.size(); i++) {
-    path.lineTo(points[i].x, points[i].y);
-  }
-  path.close();
-  return path;
-}
-
-std::shared_ptr<TextureProxy> Context3DCompositor::getClipTexture(Context* context,
-                                                                  const Path& clipPath) {
-  auto bounds = clipPath.getBounds();
-  if (bounds.isEmpty()) {
-    return nullptr;
-  }
-  auto width = FloatCeilToInt(bounds.width());
-  auto height = FloatCeilToInt(bounds.height());
-  auto rasterizeMatrix = Matrix::MakeTrans(-bounds.left, -bounds.top);
-
-  auto shape = Shape::MakeFrom(clipPath);
-  shape = Shape::ApplyMatrix(std::move(shape), rasterizeMatrix);
-  auto clipBounds = Rect::MakeWH(width, height);
-  auto shapeProxy = context->proxyProvider()->createGPUShapeProxy(shape, AAType::MSAA, clipBounds, 0);
-
-  auto uvMatrix = Matrix::MakeTrans(bounds.left, bounds.top);
-  auto drawOp = ShapeDrawOp::Make(std::move(shapeProxy), {}, uvMatrix, AAType::MSAA);
-
-  auto clipRenderTarget = RenderTargetProxy::Make(context, width, height, true, 1, false,
-                                                  ImageOrigin::TopLeft, BackingFit::Approx);
-  if (clipRenderTarget == nullptr) {
-    return nullptr;
-  }
-  auto clipTexture = clipRenderTarget->asTextureProxy();
-  auto opList = context->drawingAllocator()->makeArray<DrawOp>(&drawOp, 1);
-  context->drawingManager()->addOpsRenderTask(std::move(clipRenderTarget), std::move(opList),
-                                              PMColor::Transparent());
-  return clipTexture;
-}
-
-std::pair<PlacementPtr<FragmentProcessor>, Rect> Context3DCompositor::getClipMaskFP(
-    Context* context, const Path& clipPath) {
-  auto clipBounds = clipPath.getBounds();
-  Rect scissorRect = clipBounds;
-  scissorRect.roundOut();
-
-  auto textureProxy = getClipTexture(context, clipPath);
-  if (textureProxy == nullptr) {
-    return {nullptr, scissorRect};
-  }
-
-  auto uvMatrix = Matrix::MakeTrans(-clipBounds.left, -clipBounds.top);
-  auto allocator = context->drawingAllocator();
-  auto processor = DeviceSpaceTextureEffect::Make(allocator, std::move(textureProxy), uvMatrix);
-  auto clipMask = FragmentProcessor::MulInputByChildAlpha(allocator, std::move(processor));
-  return {std::move(clipMask), scissorRect};
 }
 
 std::shared_ptr<Image> Context3DCompositor::finish() {

@@ -211,4 +211,53 @@ bool DrawPolygon3D::isFacingPositiveZ() const {
   return _normal.z > 0.0f;
 }
 
+std::vector<QuadCW> DrawPolygon3D::toQuads() const {
+  std::vector<QuadCW> quads;
+  size_t n = _points.size();
+  if (n < 3) {
+    DEBUG_ASSERT(false);
+    return quads;
+  }
+  // Convert target space points back to local space
+  Matrix3D inverseMatrix;
+  if (!_matrix.invert(&inverseMatrix)) {
+    DEBUG_ASSERT(false);
+    return quads;
+  }
+
+  auto toLocal = [&inverseMatrix](const Vec3& targetPoint) -> Point {
+    auto local = inverseMatrix.mapPoint(targetPoint);
+    return Point::Make(local.x, local.y);
+  };
+
+  if (n == 3) {
+    // Triangle: degenerate to quad (p2 == p3)
+    quads.push_back(QuadCW(toLocal(_points[0]), toLocal(_points[1]), toLocal(_points[2]),
+                           toLocal(_points[2])));
+    return quads;
+  }
+  if (n == 4) {
+    // Quadrilateral: direct mapping
+    quads.push_back(QuadCW(toLocal(_points[0]), toLocal(_points[1]), toLocal(_points[2]),
+                           toLocal(_points[3])));
+    return quads;
+  }
+  // n > 4: Fan decomposition into quads, each quad covers two triangles when possible.
+  for (size_t i = 1; i + 2 < n; i += 2) {
+    const Point p0 = toLocal(_points[0]);
+    const Point p1 = toLocal(_points[i]);
+    const Point p2 = toLocal(_points[i + 1]);
+    const Point p3 = (i + 2 < n) ? toLocal(_points[i + 2]) : p2;
+    quads.push_back(QuadCW(p0, p1, p2, p3));
+  }
+  // Handle remaining triangle if odd number of triangles.
+  if ((n - 2) % 2 == 1) {
+    const Point p0 = toLocal(_points[0]);
+    const Point p1 = toLocal(_points[n - 2]);
+    const Point p2 = toLocal(_points[n - 1]);
+    quads.push_back(QuadCW(p0, p1, p2, p2));
+  }
+  return quads;
+}
+
 }  // namespace tgfx

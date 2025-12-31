@@ -32,7 +32,7 @@ QuadPerEdgeAA3DGeometryProcessor::QuadPerEdgeAA3DGeometryProcessor(
   if (!commonColor.has_value()) {
     color = {"inColor", VertexFormat::UByte4Normalized};
   }
-  setVertexAttributes(&position, 2);
+  setVertexAttributes(&position, 3);
 }
 
 void QuadPerEdgeAA3DGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {

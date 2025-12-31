@@ -19,12 +19,10 @@
 #pragma once
 
 #include <deque>
-#include "layers/DrawPolygon3D.h"
 #include "core/utils/PlacementPtr.h"
 #include "gpu/ops/DrawOp.h"
-#include "gpu/processors/FragmentProcessor.h"
 #include "gpu/proxies/RenderTargetProxy.h"
-#include "tgfx/core/Path.h"
+#include "layers/DrawPolygon3D.h"
 
 namespace tgfx {
 
@@ -53,10 +51,7 @@ class Context3DCompositor {
 
  private:
   void drawPolygon(const DrawPolygon3D* polygon);
-  Path buildClipPath(const std::vector<Vec3>& points);
-  std::shared_ptr<TextureProxy> getClipTexture(Context* context, const Path& clipPath);
-  std::pair<PlacementPtr<FragmentProcessor>, Rect> getClipMaskFP(Context* context,
-                                                                 const Path& clipPath);
+  void drawQuads(const DrawPolygon3D* polygon, const std::vector<QuadCW>& subQuads);
 
   int _width = 0;
   int _height = 0;

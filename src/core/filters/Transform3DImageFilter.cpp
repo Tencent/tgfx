@@ -21,8 +21,9 @@
 #include "core/utils/MathExtra.h"
 #include "core/utils/PlacementPtr.h"
 #include "gpu/DrawingManager.h"
+#include "gpu/QuadsVertexProvider.h"
 #include "gpu/TPArgs.h"
-#include "gpu/ops/Rect3DDrawOp.h"
+#include "gpu/ops/Quads3DDrawOp.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "tgfx/core/Matrix3D.h"
@@ -112,12 +113,13 @@ std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
 
   auto drawingManager = args.context->drawingManager();
   auto allocator = args.context->drawingAllocator();
-  auto vertexProvider = RectsVertexProvider::MakeFrom(allocator, srcModelRect, AAType::Coverage);
+  auto vertexProvider = QuadsVertexProvider::MakeFrom(allocator, srcModelRect, AAType::Coverage);
+
   const Size viewportSize(static_cast<float>(renderTarget->width()),
                           static_cast<float>(renderTarget->height()));
-  const Rect3DDrawArgs drawArgs{_matrix, ndcScale, ndcOffset, viewportSize};
+  const Quads3DDrawArgs drawArgs{_matrix, ndcScale, ndcOffset, viewportSize};
   auto drawOp =
-      Rect3DDrawOp::Make(args.context, std::move(vertexProvider), args.renderFlags, drawArgs);
+      Quads3DDrawOp::Make(args.context, std::move(vertexProvider), args.renderFlags, drawArgs);
   const SamplingArgs samplingArgs = {TileMode::Decal, TileMode::Decal, {}, SrcRectConstraint::Fast};
   // Ensure the vertex texture sampling coordinates are in the range [0, 1]
   DEBUG_ASSERT(srcW > 0 && srcH > 0);
