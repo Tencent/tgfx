@@ -23,8 +23,8 @@
 
 namespace tgfx {
 
-std::shared_ptr<WebGLWindow> WebGLWindow::MakeFrom(const std::string& canvasID,
-                                                   std::shared_ptr<ColorSpace> colorSpace) {
+std::shared_ptr<Window> WebGLWindow::MakeFrom(const std::string& canvasID,
+                                              std::shared_ptr<ColorSpace> colorSpace) {
   if (canvasID.empty()) {
     return nullptr;
   }

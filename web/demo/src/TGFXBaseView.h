@@ -23,6 +23,7 @@
 #include "hello2d/LayerBuilder.h"
 #include "tgfx/gpu/Recording.h"
 #include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
+#include "tgfx/gpu/webgpu/WebGPUWindow.h"
 #include "tgfx/layers/DisplayList.h"
 
 namespace hello2d {

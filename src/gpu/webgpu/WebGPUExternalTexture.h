@@ -18,29 +18,19 @@
 
 #pragma once
 
-#include "WebGLDevice.h"
-#include "tgfx/gpu/Window.h"
+#include "gpu/webgpu/WebGPUTexture.h"
 
 namespace tgfx {
-class WebGLWindow : public Window {
+class WebGPUExternalTexture : public WebGPUTexture {
  public:
-  /**
-   * Creates a new window from a canvas.
-   */
-  static std::shared_ptr<Window> MakeFrom(const std::string& canvasID,
-                                          std::shared_ptr<ColorSpace> colorSpace = nullptr);
-
- protected:
-  std::shared_ptr<Surface> onCreateSurface(Context* context) override;
-
-  void onPresent(Context*) override {
+  WebGPUExternalTexture(const TextureDescriptor& descriptor, wgpu::Texture texture)
+      : WebGPUTexture(descriptor, texture) {
   }
 
- private:
-  std::string canvasID;
-  std::shared_ptr<ColorSpace> colorSpace = nullptr;
-
-  explicit WebGLWindow(std::shared_ptr<Device> device,
-                       std::shared_ptr<ColorSpace> colorSpace = nullptr);
+  ~WebGPUExternalTexture() override {
+    // External textures are not owned by TGFX, so we do not destroy them.
+    // Reset the internal texture to prevent the base class destructor from destroying it.
+    _texture = nullptr;
+  }
 };
 }  // namespace tgfx

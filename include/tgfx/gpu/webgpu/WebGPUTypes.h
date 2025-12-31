@@ -18,29 +18,21 @@
 
 #pragma once
 
-#include "WebGLDevice.h"
-#include "tgfx/gpu/Window.h"
-
 namespace tgfx {
-class WebGLWindow : public Window {
- public:
+/**
+ * Types for interacting with WebGPU textures created externally to TGFX. Holds the wgpu::Texture as
+ * a const void*.
+ */
+struct WebGPUTextureInfo {
   /**
-   * Creates a new window from a canvas.
+   * Pointer to wgpu::Texture.
    */
-  static std::shared_ptr<Window> MakeFrom(const std::string& canvasID,
-                                          std::shared_ptr<ColorSpace> colorSpace = nullptr);
+  const void* texture = nullptr;
 
- protected:
-  std::shared_ptr<Surface> onCreateSurface(Context* context) override;
-
-  void onPresent(Context*) override {
-  }
-
- private:
-  std::string canvasID;
-  std::shared_ptr<ColorSpace> colorSpace = nullptr;
-
-  explicit WebGLWindow(std::shared_ptr<Device> device,
-                       std::shared_ptr<ColorSpace> colorSpace = nullptr);
+  /**
+   * The texture format value (wgpu::TextureFormat). Required because the public API cannot depend
+   * on WebGPU headers.
+   */
+  unsigned format = 0;
 };
 }  // namespace tgfx

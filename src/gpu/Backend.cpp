@@ -42,6 +42,28 @@ static PixelFormat GLSizeFormatToPixelFormat(unsigned sizeFormat) {
   return PixelFormat::RGBA_8888;
 }
 
+// WebGPU texture format values from wgpu::TextureFormat enum
+static constexpr unsigned WEBGPU_FORMAT_R8_UNORM = 0x00000001;
+static constexpr unsigned WEBGPU_FORMAT_RG8_UNORM = 0x00000008;
+static constexpr unsigned WEBGPU_FORMAT_RGBA8_UNORM = 0x00000012;
+static constexpr unsigned WEBGPU_FORMAT_BGRA8_UNORM = 0x00000017;
+
+static PixelFormat WebGPUFormatToPixelFormat(unsigned format) {
+  switch (format) {
+    case WEBGPU_FORMAT_R8_UNORM:
+      return PixelFormat::ALPHA_8;
+    case WEBGPU_FORMAT_RG8_UNORM:
+      return PixelFormat::RG_88;
+    case WEBGPU_FORMAT_RGBA8_UNORM:
+      return PixelFormat::RGBA_8888;
+    case WEBGPU_FORMAT_BGRA8_UNORM:
+      return PixelFormat::BGRA_8888;
+    default:
+      break;
+  }
+  return PixelFormat::Unknown;
+}
+
 BackendTexture& BackendTexture::operator=(const BackendTexture& that) {
   if (!that.isValid()) {
     _width = _height = 0;
@@ -56,6 +78,9 @@ BackendTexture& BackendTexture::operator=(const BackendTexture& that) {
       break;
     case Backend::Metal:
       mtlInfo = that.mtlInfo;
+      break;
+    case Backend::WebGPU:
+      webGPUInfo = that.webGPUInfo;
       break;
     default:
       break;
@@ -73,6 +98,8 @@ PixelFormat BackendTexture::format() const {
     case Backend::Metal:
       //TODO: Add Metal format mapping.
       return PixelFormat::RGBA_8888;
+    case Backend::WebGPU:
+      return WebGPUFormatToPixelFormat(webGPUInfo.format);
     default:
       break;
   }
@@ -95,6 +122,14 @@ bool BackendTexture::getMtlTextureInfo(MtlTextureInfo* mtlTextureInfo) const {
   return true;
 }
 
+bool BackendTexture::getWebGPUTextureInfo(WebGPUTextureInfo* webGPUTextureInfo) const {
+  if (!isValid() || _backend != Backend::WebGPU) {
+    return false;
+  }
+  *webGPUTextureInfo = webGPUInfo;
+  return true;
+}
+
 BackendRenderTarget& BackendRenderTarget::operator=(const BackendRenderTarget& that) {
   if (!that.isValid()) {
     _width = _height = 0;
@@ -109,6 +144,9 @@ BackendRenderTarget& BackendRenderTarget::operator=(const BackendRenderTarget& t
       break;
     case Backend::Metal:
       mtlInfo = that.mtlInfo;
+      break;
+    case Backend::WebGPU:
+      webGPUInfo = that.webGPUInfo;
       break;
     default:
       break;
@@ -126,6 +164,8 @@ PixelFormat BackendRenderTarget::format() const {
     case Backend::Metal:
       //TODO: Add Metal format mapping.
       return PixelFormat::RGBA_8888;
+    case Backend::WebGPU:
+      return WebGPUFormatToPixelFormat(webGPUInfo.format);
     default:
       break;
   }
@@ -145,6 +185,14 @@ bool BackendRenderTarget::getMtlTextureInfo(MtlTextureInfo* mtlTextureInfo) cons
     return false;
   }
   *mtlTextureInfo = mtlInfo;
+  return true;
+}
+
+bool BackendRenderTarget::getWebGPUTextureInfo(WebGPUTextureInfo* webGPUTextureInfo) const {
+  if (!isValid() || _backend != Backend::WebGPU) {
+    return false;
+  }
+  *webGPUTextureInfo = webGPUInfo;
   return true;
 }
 

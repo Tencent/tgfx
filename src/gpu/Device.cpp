@@ -24,7 +24,6 @@
 
 namespace tgfx {
 Device::Device(std::unique_ptr<GPU> gpu) : _gpu(gpu.release()), _uniqueID(UniqueID::Next()) {
-  DEBUG_ASSERT(_gpu != nullptr);
 }
 
 Device::~Device() {
@@ -34,6 +33,10 @@ Device::~Device() {
 
 Context* Device::lockContext() {
   locker.lock();
+  if (_gpu == nullptr) {
+    locker.unlock();
+    return nullptr;
+  }
   contextLocked = onLockContext();
   if (!contextLocked) {
     locker.unlock();
@@ -58,6 +61,12 @@ bool Device::onLockContext() {
 }
 
 void Device::onUnlockContext() {
+}
+
+void Device::setGPU(std::unique_ptr<GPU> gpu) {
+  if (_gpu == nullptr) {
+    _gpu = gpu.release();
+  }
 }
 
 }  // namespace tgfx

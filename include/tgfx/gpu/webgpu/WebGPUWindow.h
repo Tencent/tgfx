@@ -1,13 +1,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 //
-//  Tencent is pleased to support the open source community by making tgfx available.
+//  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
-//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
-//  in compliance with the License. You may obtain a copy of the License at
+//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+//  except in compliance with the License. You may obtain a copy of the License at
 //
-//      https://opensource.org/licenses/BSD-3-Clause
+//      http://www.apache.org/licenses/LICENSE-2.0
 //
 //  unless required by applicable law or agreed to in writing, software distributed under the
 //  license is distributed on an "as is" basis, without warranties or conditions of any kind,
@@ -15,14 +15,12 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-
 #pragma once
 
-#include "WebGLDevice.h"
+#include "WebGPUDevice.h"
 #include "tgfx/gpu/Window.h"
-
 namespace tgfx {
-class WebGLWindow : public Window {
+class WebGPUWindow : public Window {
  public:
   /**
    * Creates a new window from a canvas.
@@ -40,7 +38,7 @@ class WebGLWindow : public Window {
   std::string canvasID;
   std::shared_ptr<ColorSpace> colorSpace = nullptr;
 
-  explicit WebGLWindow(std::shared_ptr<Device> device,
-                       std::shared_ptr<ColorSpace> colorSpace = nullptr);
+  explicit WebGPUWindow(std::shared_ptr<Device> device,
+                        std::shared_ptr<ColorSpace> colorSpace = nullptr);
 };
 }  // namespace tgfx

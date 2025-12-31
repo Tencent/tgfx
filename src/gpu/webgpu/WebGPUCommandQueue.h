@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,29 +18,31 @@
 
 #pragma once
 
-#include "WebGLDevice.h"
-#include "tgfx/gpu/Window.h"
+#include "tgfx/gpu/CommandQueue.h"
 
 namespace tgfx {
-class WebGLWindow : public Window {
+
+class WebGPUGPU;
+
+class WebGPUCommandQueue : public CommandQueue {
  public:
-  /**
-   * Creates a new window from a canvas.
-   */
-  static std::shared_ptr<Window> MakeFrom(const std::string& canvasID,
-                                          std::shared_ptr<ColorSpace> colorSpace = nullptr);
+  explicit WebGPUCommandQueue(WebGPUGPU* gpu);
 
- protected:
-  std::shared_ptr<Surface> onCreateSurface(Context* context) override;
+  void writeBuffer(std::shared_ptr<GPUBuffer> buffer, size_t bufferOffset, const void* data,
+                   size_t size) override;
 
-  void onPresent(Context*) override {
-  }
+  void writeTexture(std::shared_ptr<Texture> texture, const Rect& rect, const void* pixels,
+                    size_t rowBytes) override;
+
+  void submit(std::shared_ptr<CommandBuffer> commandBuffer) override;
+
+  std::shared_ptr<Semaphore> insertSemaphore() override;
+
+  void waitSemaphore(std::shared_ptr<Semaphore> semaphore) override;
+
+  void waitUntilCompleted() override;
 
  private:
-  std::string canvasID;
-  std::shared_ptr<ColorSpace> colorSpace = nullptr;
-
-  explicit WebGLWindow(std::shared_ptr<Device> device,
-                       std::shared_ptr<ColorSpace> colorSpace = nullptr);
+  WebGPUGPU* gpu = nullptr;
 };
 }  // namespace tgfx

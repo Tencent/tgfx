@@ -143,4 +143,9 @@ export const getBytesFromPath = async (module: TGFX, path: string) => {
     return new Uint8Array(buffer);
 };
 
+export const isWebGPUSupported = (): boolean => {
+    return !!navigator.gpu;
+    // return false;
+};
+
 export {getCanvas2D as createCanvas2D};

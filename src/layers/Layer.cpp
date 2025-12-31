@@ -1770,8 +1770,8 @@ void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
       args.blurBackground ? GetClipBounds(args.blurBackground->getCanvas()) : std::nullopt;
   for (const auto& layerStyle : _layerStyles) {
     if (layerStyle->position() != position ||
-        std::find(extraSourceTypes.begin(), extraSourceTypes.end(), layerStyle->extraSourceType()) ==
-            extraSourceTypes.end()) {
+        std::find(extraSourceTypes.begin(), extraSourceTypes.end(),
+                  layerStyle->extraSourceType()) == extraSourceTypes.end()) {
       continue;
     }
     PictureRecorder recorder = {};

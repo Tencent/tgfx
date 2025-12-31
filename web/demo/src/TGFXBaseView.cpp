@@ -33,7 +33,7 @@ TGFXBaseView::TGFXBaseView(const std::string& canvasID) : canvasID(canvasID) {
 
 void TGFXBaseView::updateSize() {
   if (window == nullptr) {
-    window = tgfx::WebGLWindow::MakeFrom(canvasID);
+    window = tgfx::WebGPUWindow::MakeFrom(canvasID);
   }
   if (window == nullptr) {
     return;
@@ -152,7 +152,6 @@ void TGFXBaseView::draw() {
 }
 
 }  // namespace hello2d
-
 
 int main(int, const char*[]) {
   return 0;

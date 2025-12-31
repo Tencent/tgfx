@@ -69,4 +69,8 @@ export const uploadToTexture = (
   gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
 };
 
+export const isWebGPUSupported = (): boolean => {
+  return false;
+};
+
 export { getSourceSize, isAndroidMiniprogram, getCanvas2D as createCanvas2D, releaseCanvas2D as releaseNativeImage };

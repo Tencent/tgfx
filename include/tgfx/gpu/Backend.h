@@ -21,6 +21,7 @@
 #include "tgfx/gpu/PixelFormat.h"
 #include "tgfx/gpu/metal/MtlTypes.h"
 #include "tgfx/gpu/opengl/GLTypes.h"
+#include "tgfx/gpu/webgpu/WebGPUTypes.h"
 
 namespace tgfx {
 /**
@@ -51,6 +52,16 @@ class BackendTexture {
    */
   BackendTexture(const MtlTextureInfo& mtlInfo, int width, int height)
       : _backend(Backend::Metal), _width(width), _height(height), mtlInfo(mtlInfo) {
+  }
+
+  /**
+   * Creates a WebGPU backend texture.
+   * @param webGPUInfo The WebGPU texture info containing the wgpu::Texture pointer and format.
+   * @param width The width of the texture.
+   * @param height The height of the texture.
+   */
+  BackendTexture(const WebGPUTextureInfo& webGPUInfo, int width, int height)
+      : _backend(Backend::WebGPU), _width(width), _height(height), webGPUInfo(webGPUInfo) {
   }
 
   BackendTexture(const BackendTexture& that) {
@@ -104,6 +115,12 @@ class BackendTexture {
    */
   bool getMtlTextureInfo(MtlTextureInfo* mtlTextureInfo) const;
 
+  /**
+   * If the backend API is WebGPU, copies a snapshot of the WebGPUTextureInfo struct into the passed
+   * in pointer and returns true. Otherwise, returns false if the backend API is not WebGPU.
+   */
+  bool getWebGPUTextureInfo(WebGPUTextureInfo* webGPUTextureInfo) const;
+
  private:
   Backend _backend = Backend::Unknown;
   int _width = 0;
@@ -112,6 +129,7 @@ class BackendTexture {
   union {
     GLTextureInfo glInfo;
     MtlTextureInfo mtlInfo;
+    WebGPUTextureInfo webGPUInfo;
   };
 };
 
@@ -138,6 +156,16 @@ class BackendRenderTarget {
    */
   BackendRenderTarget(const MtlTextureInfo& mtlInfo, int width, int height)
       : _backend(Backend::Metal), _width(width), _height(height), mtlInfo(mtlInfo) {
+  }
+
+  /**
+   * Creates a WebGPU backend render target.
+   * @param webGPUInfo The WebGPU texture info containing the wgpu::Texture pointer and format.
+   * @param width The width of the render target.
+   * @param height The height of the render target.
+   */
+  BackendRenderTarget(const WebGPUTextureInfo& webGPUInfo, int width, int height)
+      : _backend(Backend::WebGPU), _width(width), _height(height), webGPUInfo(webGPUInfo) {
   }
 
   BackendRenderTarget(const BackendRenderTarget& that) {
@@ -191,6 +219,12 @@ class BackendRenderTarget {
    */
   bool getMtlTextureInfo(MtlTextureInfo* mtlTextureInfo) const;
 
+  /**
+   * If the backend API is WebGPU, copies a snapshot of the WebGPUTextureInfo struct into the passed
+   * in pointer and returns true. Otherwise, returns false if the backend API is not WebGPU.
+   */
+  bool getWebGPUTextureInfo(WebGPUTextureInfo* webGPUTextureInfo) const;
+
  private:
   Backend _backend = Backend::Unknown;
   int _width = 0;
@@ -198,6 +232,7 @@ class BackendRenderTarget {
   union {
     GLFrameBufferInfo glInfo;
     MtlTextureInfo mtlInfo;
+    WebGPUTextureInfo webGPUInfo;
   };
 };
 

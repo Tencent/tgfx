@@ -63,6 +63,12 @@ class Device {
   virtual bool onLockContext();
   virtual void onUnlockContext();
 
+  /**
+   * Sets the GPU instance for this device. Can only be called once when _gpu is nullptr.
+   * This is useful for platforms where the GPU initialization is asynchronous.
+   */
+  void setGPU(std::unique_ptr<GPU> gpu);
+
  private:
   uint32_t _uniqueID = 0;
   bool contextLocked = false;

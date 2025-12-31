@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,29 +18,21 @@
 
 #pragma once
 
-#include "WebGLDevice.h"
-#include "tgfx/gpu/Window.h"
+#include <webgpu/webgpu_cpp.h>
+#include "tgfx/gpu/ShaderModule.h"
 
 namespace tgfx {
-class WebGLWindow : public Window {
+class WebGPUShaderModule : public ShaderModule {
  public:
-  /**
-   * Creates a new window from a canvas.
-   */
-  static std::shared_ptr<Window> MakeFrom(const std::string& canvasID,
-                                          std::shared_ptr<ColorSpace> colorSpace = nullptr);
+  explicit WebGPUShaderModule(wgpu::ShaderModule shaderModule)
+      : _shaderModule(std::move(shaderModule)) {
+  }
 
- protected:
-  std::shared_ptr<Surface> onCreateSurface(Context* context) override;
-
-  void onPresent(Context*) override {
+  wgpu::ShaderModule wgpuShaderModule() const {
+    return _shaderModule;
   }
 
  private:
-  std::string canvasID;
-  std::shared_ptr<ColorSpace> colorSpace = nullptr;
-
-  explicit WebGLWindow(std::shared_ptr<Device> device,
-                       std::shared_ptr<ColorSpace> colorSpace = nullptr);
+  wgpu::ShaderModule _shaderModule = nullptr;
 };
 }  // namespace tgfx
