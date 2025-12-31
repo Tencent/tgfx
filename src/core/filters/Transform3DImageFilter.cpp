@@ -61,8 +61,9 @@ Rect Transform3DImageFilter::onFilterBounds(const Rect& rect, MapDirection mapDi
                                     values[7], values[12], values[13], values[15]);
   Matrix2D inversedMatrix;
   if (!matrix2D.invert(&inversedMatrix)) {
-    DEBUG_ASSERT(false);
-    return rect;
+    // The matrix is singular, meaning the 2D plane projects to a line or point (e.g., rotating 90
+    // degrees around the X-axis). In this case, there is no visible content to draw.
+    return Rect::MakeEmpty();
   }
   auto result = inversedMatrix.mapRect(rect);
   return result;
