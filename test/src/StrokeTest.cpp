@@ -298,6 +298,34 @@ TGFX_TEST(StrokeTest, SquareCapDashStrokeAsSolidStroke) {
   EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/DashStrokeAsSolidStroke"));
 }
 
+TGFX_TEST(StrokeTest, HairlineWithDropShadow) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 400);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  Paint paint;
+  paint.setColor(Color::Red());
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStrokeWidth(0.0f);
+
+  // Add drop shadow effect
+  Color shadowColor = {0.2f, 0.2f, 1.0f, 1.0f};
+  auto shadowEffect = ImageFilter::DropShadow(0.0f, 0.0f, 2.0f, 3.0f, shadowColor);
+  paint.setImageFilter(shadowEffect);
+
+  // Draw horizontal and vertical hairlines with shadow
+  canvas->drawLine(50, 100, 350, 100, paint);  // horizontal line
+  canvas->drawLine(200, 50, 200, 350, paint);  // vertical line
+
+  // Draw diagonal hairline for comparison
+  canvas->drawLine(50, 50, 350, 350, paint);  // diagonal line
+
+  EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/HairlineWithDropShadow"));
+}
+
 TGFX_TEST(StrokeTest, PathStrokerWithMultiParams) {
   ContextScope scope;
   auto context = scope.getContext();
