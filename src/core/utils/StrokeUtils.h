@@ -26,7 +26,8 @@ namespace tgfx {
 /**
  * Applies the stroke options to the given bounds.
  */
-void ApplyStrokeToBounds(const Stroke& stroke, Rect* bounds, bool applyMiterLimit = false);
+void ApplyStrokeToBounds(const Stroke& stroke, Rect* bounds, const Matrix& matrix = Matrix::I(),
+                         bool applyMiterLimit = false);
 
 /**
  * Returns true if the stroke is a hairline (width <= 0).

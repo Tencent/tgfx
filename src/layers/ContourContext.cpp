@@ -104,7 +104,7 @@ void ContourContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList
                                       const Stroke* stroke) {
   auto bounds = glyphRunList->getBounds();
   if (stroke) {
-    ApplyStrokeToBounds(*stroke, &bounds);
+    ApplyStrokeToBounds(*stroke, &bounds, state.matrix);
   }
   bounds = state.matrix.mapRect(bounds);
   if (containContourBound(bounds)) {
@@ -237,7 +237,7 @@ void ContourContext::flushPendingContour(const Contour& contour, const MCState& 
   }
   Rect localBounds = pendingContour.getBounds();
   if (pendingContour.hasStroke) {
-    ApplyStrokeToBounds(pendingContour.stroke, &localBounds);
+    ApplyStrokeToBounds(pendingContour.stroke, &localBounds, pendingState.matrix);
   }
   auto globalBounds = GetGlobalBounds(pendingState, localBounds);
   bool fillIsFull = false;

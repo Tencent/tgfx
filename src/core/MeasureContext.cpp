@@ -33,7 +33,7 @@ void MeasureContext::drawRect(const Rect& rect, const MCState& state, const Brus
     return;
   }
   auto localBounds = rect;
-  ApplyStrokeToBounds(*stroke, &localBounds);
+  ApplyStrokeToBounds(*stroke, &localBounds, state.matrix);
   addLocalBounds(state, localBounds);
 }
 
@@ -41,7 +41,7 @@ void MeasureContext::drawRRect(const RRect& rRect, const MCState& state, const B
                                const Stroke* stroke) {
   auto rect = rRect.rect;
   if (stroke) {
-    ApplyStrokeToBounds(*stroke, &rect);
+    ApplyStrokeToBounds(*stroke, &rect, state.matrix);
   }
   addLocalBounds(state, rect, false);
 }
@@ -56,7 +56,7 @@ void MeasureContext::drawShape(std::shared_ptr<Shape> shape, const MCState& stat
   DEBUG_ASSERT(shape != nullptr);
   auto localBounds = shape->getBounds();
   if (stroke) {
-    ApplyStrokeToBounds(*stroke, &localBounds, true);
+    ApplyStrokeToBounds(*stroke, &localBounds, state.matrix, true);
   }
   addLocalBounds(state, localBounds, shape->isInverseFillType());
 }
@@ -77,7 +77,7 @@ void MeasureContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList
   DEBUG_ASSERT(glyphRunList != nullptr);
   auto localBounds = glyphRunList->getBounds();
   if (stroke) {
-    ApplyStrokeToBounds(*stroke, &localBounds);
+    ApplyStrokeToBounds(*stroke, &localBounds, state.matrix);
   }
   addLocalBounds(state, localBounds);
 }

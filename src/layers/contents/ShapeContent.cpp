@@ -33,7 +33,7 @@ Rect ShapeContent::getBounds() const {
   auto result = onGetBounds();
   if (stroke) {
     // Shape may contain sharp corners, so we need to apply miter limit to the bounds.
-    ApplyStrokeToBounds(*stroke, &result, true);
+    ApplyStrokeToBounds(*stroke, &result, Matrix::I(), true);
   }
   return result;
 }

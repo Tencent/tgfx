@@ -299,7 +299,7 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
   }
   auto bounds = glyphRunList->getBounds();
   if (stroke) {
-    ApplyStrokeToBounds(*stroke, &bounds);
+    ApplyStrokeToBounds(*stroke, &bounds, state.matrix);
   }
   state.matrix.mapRect(&bounds);  // To device space
   auto clipBounds = getClipBounds(state.clip);
