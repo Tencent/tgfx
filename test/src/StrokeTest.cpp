@@ -777,7 +777,7 @@ TGFX_TEST(StrokeTest, StrokeDashMultiParamsBasic) {
 
   std::vector<float> intervals = {100.f, 100.f};
   EXPECT_TRUE(PathStroker::StrokeDashPathWithMultiParams(&path, 10.0f, params, defaultParam,
-                                                         intervals, 2, 50, 1.0f));
+                                                         intervals.data(), 2, 50, 1.0f));
   // EXPECT_TRUE(PathStroker::StrokePathWithMultiParams(&path, 10.0f, params, 1.0f));
 
   canvas->drawPath(path, paint);
@@ -813,7 +813,7 @@ TGFX_TEST(StrokeTest, StrokeDashMultiParamsClosedCurve) {
 
   std::vector<float> intervals = {20.f, 20.f};
   EXPECT_TRUE(PathStroker::StrokeDashPathWithMultiParams(&path, 6.0f, params, defaultParam,
-                                                         intervals, 2, 10, 1.0f));
+                                                         intervals.data(), 2, 10, 1.0f));
 
   canvas->drawPath(path, paint);
 
@@ -859,7 +859,7 @@ TGFX_TEST(StrokeTest, StrokeDashMultiParamsComparison) {
   PathStroker::PointParam defaultParam(LineCap::Round);
   std::vector<float> intervals = {20.f, 20.f};
   EXPECT_TRUE(PathStroker::StrokeDashPathWithMultiParams(&pathRight, 4.0f, params, defaultParam,
-                                                         intervals, 2, 10, 1.0f));
+                                                         intervals.data(), 2, 10, 1.0f));
   canvas->drawPath(pathRight, paint);
   canvas->restore();
 

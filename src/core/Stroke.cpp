@@ -91,14 +91,14 @@ bool PathStroker::StrokePathWithMultiParams(Path* path, float width,
 bool PathStroker::StrokeDashPathWithMultiParams(Path* path, float width,
                                                 const std::vector<PointParam>& params,
                                                 const PointParam& defaultParam,
-                                                const std::vector<float>& intervals, int count,
-                                                float phase, float resolutionScale) {
-  if (path == nullptr || intervals.empty() || count <= 0) {
+                                                const float intervals[], int count, float phase,
+                                                float resolutionScale) {
+  if (path == nullptr || intervals == nullptr || count <= 0) {
     return false;
   }
 
   // Create AdaptiveDashEffect to process the path
-  AdaptiveDashEffect dashEffect(intervals.data(), count, phase);
+  AdaptiveDashEffect dashEffect(intervals, count, phase);
 
   // Apply dash effect and get parameter mapping
   AdaptiveDashEffect::PointParamMapping outputMapping = {};
