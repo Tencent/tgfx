@@ -78,6 +78,12 @@ class PathStroker {
   static bool StrokePathWithMultiParams(Path* path, float width,
                                         const std::vector<PointParam>& params,
                                         float resolutionScale = 1.0f);
+
+  static bool StrokeDashPathWithMultiParams(Path* path, float width,
+                                            const std::vector<PointParam>& params,
+                                            const PointParam& defaultParam,
+                                            const std::vector<float>& intervals, int count,
+                                            float phase, float resolutionScale = 1.0f);
 };
 
 }  // namespace tgfx

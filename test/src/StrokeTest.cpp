@@ -720,4 +720,122 @@ TGFX_TEST(StrokeTest, PathStrokerComplexCurves) {
   EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/PathStrokerComplexCurves"));
 }
 
+TGFX_TEST(StrokeTest, StrokeDashMultiParamsBasic) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 300);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  Paint paint;
+  paint.setColor(Color::Black());
+
+  // Create a path with mixed line and curve segments
+  Path path;
+  path.moveTo(50, 150);
+  path.lineTo(150, 50);
+  path.lineTo(250, 150);
+  path.lineTo(350, 50);
+
+  // Set different join styles for corner vertices
+  std::vector<PathStroker::PointParam> params;
+  params.emplace_back(LineJoin::Miter);
+  params.emplace_back(LineJoin::Round);
+  params.emplace_back(LineJoin::Bevel);
+  params.emplace_back(LineJoin::Miter);
+
+  PathStroker::PointParam defaultParam(LineCap::Round);
+
+  std::vector<float> intervals = {100.f, 100.f};
+  EXPECT_TRUE(PathStroker::StrokeDashPathWithMultiParams(&path, 10.0f, params, defaultParam,
+                                                         intervals, 2, 50, 1.0f));
+  // EXPECT_TRUE(PathStroker::StrokePathWithMultiParams(&path, 10.0f, params, 1.0f));
+
+  canvas->drawPath(path, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/StrokeDashMultiParamsBasic"));
+}
+
+TGFX_TEST(StrokeTest, StrokeDashMultiParamsClosedCurve) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 400);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  Paint paint;
+  paint.setColor(Color::FromRGBA(255, 0, 0));
+
+  // Create a closed curve path with cubic curves
+  Path path;
+  path.moveTo(200, 50);
+  path.cubicTo(300, 100, 300, 200, 200, 250);
+  path.cubicTo(100, 200, 100, 100, 200, 50);
+  path.close();
+
+  // Set different join styles for corner vertices
+  std::vector<PathStroker::PointParam> params;
+  params.emplace_back(LineJoin::Miter);
+  params.emplace_back(LineJoin::Round);
+  params.emplace_back(LineJoin::Bevel);
+
+  PathStroker::PointParam defaultParam(LineCap::Round);
+
+  std::vector<float> intervals = {20.f, 20.f};
+  EXPECT_TRUE(PathStroker::StrokeDashPathWithMultiParams(&path, 6.0f, params, defaultParam,
+                                                         intervals, 2, 10, 1.0f));
+
+  canvas->drawPath(path, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/StrokeDashMultiParamsClosedCurve"));
+}
+
+TGFX_TEST(StrokeTest, StrokeDashMultiParamsComparison) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 600, 300);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  Paint paint;
+  paint.setColor(Color::Black());
+
+  // Create a wave path using quadratic curves
+  Path path;
+  path.moveTo(30, 150);
+  path.quadTo(60, 80, 90, 150);
+  path.quadTo(120, 220, 150, 150);
+  path.quadTo(180, 80, 210, 150);
+  path.quadTo(240, 220, 270, 150);
+
+  // Set alternating join styles for wave peaks/valleys
+  std::vector<PathStroker::PointParam> params;
+  params.emplace_back(LineJoin::Round);
+  params.emplace_back(LineJoin::Bevel);
+  params.emplace_back(LineJoin::Round);
+  params.emplace_back(LineJoin::Bevel);
+  params.emplace_back(LineJoin::Round);
+
+  // Left side: multi-params stroke without dash
+  auto pathLeft = path;
+  EXPECT_TRUE(PathStroker::StrokePathWithMultiParams(&pathLeft, 4.0f, params, 1.0f));
+  canvas->drawPath(pathLeft, paint);
+
+  // Right side: multi-params stroke with dash
+  canvas->save();
+  canvas->translate(300, 0);
+  auto pathRight = path;
+  PathStroker::PointParam defaultParam(LineCap::Round);
+  std::vector<float> intervals = {20.f, 20.f};
+  EXPECT_TRUE(PathStroker::StrokeDashPathWithMultiParams(&pathRight, 4.0f, params, defaultParam,
+                                                         intervals, 2, 10, 1.0f));
+  canvas->drawPath(pathRight, paint);
+  canvas->restore();
+
+  EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/StrokeDashMultiParamsComparison"));
+}
+
 }  // namespace tgfx

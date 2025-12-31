@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/PathEffect.h"
+#include "tgfx/core/PathStroker.h"
 
 namespace tgfx {
 class AdaptiveDashEffect : public PathEffect {
@@ -25,9 +26,17 @@ class AdaptiveDashEffect : public PathEffect {
   // Reference Skia's implementation to prevent excessive memory usage when dashing very long paths.
   static constexpr float MaxDashCount = 1000000;
 
+  struct PointParamMapping {
+    std::vector<PathStroker::PointParam> vertexParams = {};
+    PathStroker::PointParam defaultParam = {};
+  };
+
   AdaptiveDashEffect(const float intervals[], int count, float phase);
 
   bool filterPath(Path* path) const override;
+
+  bool onFilterPath(Path* path, const std::vector<PathStroker::PointParam>* inputParams,
+                    PointParamMapping* outputMapping) const;
 
  private:
   std::vector<float> _intervals;

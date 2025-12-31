@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "AdaptiveDashEffect.h"
+#include <cstddef>
 #include "PathRef.h"
 #include "utils/MathExtra.h"
 
@@ -30,21 +31,40 @@ inline bool IsEven(int x) {
   return !(x & 1);
 }
 
+// Get PointParam for a vertex index
+inline PathStroker::PointParam GetParamForVertex(
+    int vertexIndex, const std::vector<PathStroker::PointParam>* inputParams,
+    const PathStroker::PointParam& defaultParam) {
+  if (!inputParams || inputParams->empty() || vertexIndex < 0) {
+    return defaultParam;
+  }
+  // Cycle through params if fewer than vertices
+  size_t paramIndex = static_cast<size_t>(vertexIndex) % inputParams->size();
+  return (*inputParams)[paramIndex];
+}
+
 // Structure to hold path segment information
+struct SegmentInfo {
+  std::unique_ptr<SkPathMeasure> measure = nullptr;
+  int startVertexIndex = -1;
+  int endVertexIndex = -1;
+};
+
 struct Contour {
-  std::vector<std::unique_ptr<SkPathMeasure>> segments;
+  std::vector<SegmentInfo> segments;
   bool isClosed = false;
   float length = 0.f;
 };
 
 // Build contours from path
-std::vector<Contour> BuildContours(const Path& path) {
+std::vector<Contour> BuildContours(const Path& path, bool trackVertices = false) {
   std::vector<Contour> contours;
   bool hasMoveTo = false;
   auto skPath = PathRef::ReadAccess(path);
   SkPoint pts[4];
   SkPath::Verb verb;
   SkPath::Iter iter(skPath, false);
+  int vertexIndex = 0;
 
   while ((verb = iter.next(pts)) != SkPath::kDone_Verb) {
     Contour contour;
@@ -101,7 +121,9 @@ std::vector<Contour> BuildContours(const Path& path) {
       auto measure = std::make_unique<SkPathMeasure>(segmentPath, false);
       if (measure->getLength() > 0) {
         contour.length += measure->getLength();
-        contour.segments.push_back(std::move(measure));
+        SegmentInfo segInfo;
+        segInfo.measure = std::move(measure);
+        contour.segments.push_back(std::move(segInfo));
       }
     } while ((verb = iter.next(pts)) != SkPath::kDone_Verb);
 
@@ -115,7 +137,23 @@ std::vector<Contour> BuildContours(const Path& path) {
         auto measure = std::make_unique<SkPathMeasure>(closingSegment, false);
         if (measure->getLength() > 0) {
           contour.length += measure->getLength();
-          contour.segments.push_back(std::move(measure));
+          SegmentInfo segInfo;
+          segInfo.measure = std::move(measure);
+          contour.segments.push_back(std::move(segInfo));
+        }
+      }
+    }
+
+    // Set segment vertex indices
+    if (trackVertices) {
+      auto contourBeginVertexIndex = vertexIndex;
+      for (size_t i = 0; i < contour.segments.size(); ++i) {
+        contour.segments[i].startVertexIndex = vertexIndex;
+        if (i == contour.segments.size() - 1 && isClosed) {
+          contour.segments[i].endVertexIndex = contourBeginVertexIndex;
+          ++vertexIndex;
+        } else {
+          contour.segments[i].endVertexIndex = ++vertexIndex;
         }
       }
     }
@@ -150,23 +188,37 @@ AdaptiveDashEffect::AdaptiveDashEffect(const float intervals[], int count, float
 }
 
 bool AdaptiveDashEffect::filterPath(Path* path) const {
+  return onFilterPath(path, nullptr, nullptr);
+}
+
+bool AdaptiveDashEffect::onFilterPath(Path* path,
+                                      const std::vector<PathStroker::PointParam>* inputParams,
+                                      PointParamMapping* outputMapping) const {
   if (!path || path->isEmpty()) {
     return false;
   }
 
   if (intervalLength == 0) {
     path->reset();
+    if (outputMapping) {
+      outputMapping->vertexParams.clear();
+    }
     return true;
   }
 
-  const auto contours = BuildContours(*path);
+  const bool trackVertices = (inputParams != nullptr && outputMapping != nullptr);
+  const auto contours = BuildContours(*path, trackVertices);
   if (contours.empty()) {
     path->reset();
+    if (outputMapping) {
+      outputMapping->vertexParams.clear();
+    }
     return true;
   }
 
   auto fillType = path->getFillType();
   SkPath resultPath;
+  std::vector<PathStroker::PointParam> outputParams;
   const int patternCount = static_cast<int>(_intervals.size());
   float totalDashCount = 0;
 
@@ -174,20 +226,29 @@ bool AdaptiveDashEffect::filterPath(Path* path) const {
     bool skipFirstSegment = contour.isClosed;
     bool deferFirstSegment = false;
     float deferredLength = 0;
+    int deferredEndVertexIndex = -1;
     bool needMoveTo = true;
 
-    for (const auto& segment : contour.segments) {
-      const float segmentLength = segment->getLength();
+    for (const auto& segInfo : contour.segments) {
+      const float segmentLength = segInfo.measure->getLength();
       // Apply ULP-based length comparison to ensure dash generation on tiny contours
       if (FloatNearlyZero(segmentLength) ||
           AreWithinUlps(contour.length - segmentLength, contour.length,
                         ADAPTIVE_DASH_SEGMENT_EPSILON)) {
         // skip the small segments in case some bugs after paths merge.
         if (!needMoveTo) {
-          segment->getSegment(0, segmentLength, &resultPath, false);
+          segInfo.measure->getSegment(0, segmentLength, &resultPath, false);
+          if (trackVertices) {
+            outputParams.push_back(GetParamForVertex(segInfo.endVertexIndex, inputParams,
+                                                     outputMapping->defaultParam));
+          }
         } else {
-          segment->getSegment(segmentLength, segmentLength, &resultPath, true);
+          segInfo.measure->getSegment(segmentLength, segmentLength, &resultPath, true);
           needMoveTo = false;
+          if (trackVertices) {
+            outputParams.push_back(GetParamForVertex(segInfo.endVertexIndex, inputParams,
+                                                     outputMapping->defaultParam));
+          }
         }
         skipFirstSegment = false;
         continue;
@@ -208,11 +269,37 @@ bool AdaptiveDashEffect::filterPath(Path* path) const {
         const float dashLength = _intervals[static_cast<size_t>(patternIndex)] * scale;
 
         if (IsEven(patternIndex) && currentPos + dashLength > 0) {
+          const float dashStart = std::max(currentPos, 0.0f);
+          const float dashEnd = std::min(currentPos + dashLength, segmentLength);
+
           if (currentPos < 0 && skipFirstSegment) {
             deferFirstSegment = true;
             deferredLength = dashLength + currentPos;
+            deferredEndVertexIndex = segInfo.endVertexIndex;
           } else {
-            segment->getSegment(currentPos, currentPos + dashLength, &resultPath, needMoveTo);
+            segInfo.measure->getSegment(dashStart, dashEnd, &resultPath, needMoveTo);
+
+            if (trackVertices) {
+              // Add param for dash start point (moveTo)
+              if (needMoveTo) {
+                bool isStartOriginal = FloatNearlyZero(dashStart);
+                if (isStartOriginal) {
+                  outputParams.push_back(GetParamForVertex(segInfo.startVertexIndex, inputParams,
+                                                           outputMapping->defaultParam));
+                } else {
+                  outputParams.push_back(outputMapping->defaultParam);
+                }
+              }
+
+              // Add param for dash end point
+              bool isEndOriginal = FloatNearlyZero(dashEnd - segmentLength);
+              if (isEndOriginal) {
+                outputParams.push_back(GetParamForVertex(segInfo.endVertexIndex, inputParams,
+                                                         outputMapping->defaultParam));
+              } else {
+                outputParams.push_back(outputMapping->defaultParam);
+              }
+            }
           }
         }
 
@@ -226,12 +313,26 @@ bool AdaptiveDashEffect::filterPath(Path* path) const {
     }
 
     if (deferFirstSegment) {
-      contour.segments.front()->getSegment(0, deferredLength, &resultPath, false);
+      contour.segments.front().measure->getSegment(0, deferredLength, &resultPath, false);
+      if (trackVertices) {
+        bool isEndOriginal =
+            FloatNearlyZero(deferredLength - contour.segments.front().measure->getLength());
+        if (isEndOriginal) {
+          outputParams.push_back(
+              GetParamForVertex(deferredEndVertexIndex, inputParams, outputMapping->defaultParam));
+        } else {
+          outputParams.push_back(outputMapping->defaultParam);
+        }
+      }
     }
   }
 
   PathRef::WriteAccess(*path) = resultPath;
   path->setFillType(fillType);
+
+  if (outputMapping) {
+    outputMapping->vertexParams = std::move(outputParams);
+  }
   return true;
 }
 

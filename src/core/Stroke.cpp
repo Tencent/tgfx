@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Stroke.h"
+#include "AdaptiveDashEffect.h"
 #include "core/PathRef.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/StrokeUtils.h"
@@ -85,5 +86,28 @@ bool PathStroker::StrokePathWithMultiParams(Path* path, float width,
   }
   skPath = result;
   return true;
+}
+
+bool PathStroker::StrokeDashPathWithMultiParams(Path* path, float width,
+                                                const std::vector<PointParam>& params,
+                                                const PointParam& defaultParam,
+                                                const std::vector<float>& intervals, int count,
+                                                float phase, float resolutionScale) {
+  if (path == nullptr || intervals.empty() || count <= 0) {
+    return false;
+  }
+
+  // Create AdaptiveDashEffect to process the path
+  AdaptiveDashEffect dashEffect(intervals.data(), count, phase);
+
+  // Apply dash effect and get parameter mapping
+  AdaptiveDashEffect::PointParamMapping outputMapping = {};
+  outputMapping.defaultParam = defaultParam;
+  if (!dashEffect.onFilterPath(path, &params, &outputMapping)) {
+    return false;
+  }
+
+  // Apply stroke with the mapped parameters
+  return StrokePathWithMultiParams(path, width, outputMapping.vertexParams, resolutionScale);
 }
 }  // namespace tgfx
