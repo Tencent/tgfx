@@ -1086,12 +1086,9 @@ Matrix3D Layer::getGlobalMatrix() const {
     // is projected onto the current layer first, then the accumulated matrix transformation is
     // applied. If within, directly concatenate the child layer matrix to preserve its 3D state.
     if (layer->_transformStyle == TransformStyle::Flat || !layer->canExtend3DContext()) {
-      auto layerMatrix = layer->getMatrixWithScrollRect();
-      layerMatrix.setRow(2, {0, 0, 1, 0});
-      matrix.postConcat(layerMatrix);
-    } else {
-      matrix.postConcat(layer->getMatrixWithScrollRect());
+      matrix.setRow(2, {0, 0, 1, 0});
     }
+    matrix.postConcat(layer->getMatrixWithScrollRect());
     layer = layer->_parent;
   }
   return matrix;
