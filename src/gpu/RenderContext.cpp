@@ -163,7 +163,7 @@ static bool IsGlyphVisible(const Font& font, GlyphID glyphID, const Rect& clipBo
     return false;
   }
   if (stroke != nullptr) {
-    ApplyStrokeToBounds(*stroke, &bounds);
+    ApplyStrokeToBounds(*stroke, &bounds, Matrix::MakeScale(scale));
   }
   if (maxDimension != nullptr) {
     *maxDimension = FloatCeilToInt(std::max(bounds.width(), bounds.height()));
