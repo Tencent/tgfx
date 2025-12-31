@@ -727,6 +727,26 @@ Rect Layer::getBoundsInternal(const Matrix3D& coordinateMatrix, bool computeTigh
   return result;
 }
 
+static Rect ComputeContentBounds(const LayerContent& content, const Matrix3D& coordinateMatrix,
+                                 bool applyMatrixAtEnd, bool computeTightBounds) {
+  if (applyMatrixAtEnd) {
+    if (computeTightBounds) {
+      return content.getTightBounds(Matrix::I());
+    }
+    return content.getBounds();
+  }
+  if (computeTightBounds) {
+    if (IsMatrix3DAffine(coordinateMatrix)) {
+      return content.getTightBounds(GetMayLossyAffineMatrix(coordinateMatrix));
+    }
+    auto tightBounds = content.getTightBounds(Matrix::I());
+    tightBounds = coordinateMatrix.mapRect(tightBounds);
+    tightBounds.roundOut();
+    return tightBounds;
+  }
+  return coordinateMatrix.mapRect(content.getBounds());
+}
+
 Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBounds) {
   bool canStart3DContext = _transformStyle == TransformStyle::Preserve3D && canExtend3DContext();
   // Layers that can start or extend a 3D rendering context do not support computeTightBounds.
@@ -735,29 +755,11 @@ Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBou
   // When starting a 3D context, the matrix must be passed down to preserve 3D state.
   // Otherwise, when has effects, compute in local coordinates first, then apply matrix at end.
   bool applyMatrixAtEnd = !canStart3DContext && hasEffects;
-  auto contentMatrix =
-      applyMatrixAtEnd ? Matrix::I() : GetMayLossyAffineMatrix(coordinateMatrix);
 
   Rect bounds = {};
   if (auto content = getContent()) {
-    if (applyMatrixAtEnd) {
-      if (computeTightBounds) {
-        bounds.join(content->getTightBounds(Matrix::I()));
-      } else {
-        bounds.join(content->getBounds());
-      }
-    } else {
-      if (computeTightBounds) {
-        auto tightBounds = content->getTightBounds(contentMatrix);
-        if (!IsMatrix3DAffine(coordinateMatrix)) {
-          tightBounds = coordinateMatrix.mapRect(tightBounds);
-          tightBounds.roundOut();
-        }
-        bounds.join(tightBounds);
-      } else {
-        bounds.join(coordinateMatrix.mapRect(content->getBounds()));
-      }
-    }
+    bounds.join(
+        ComputeContentBounds(*content, coordinateMatrix, applyMatrixAtEnd, computeTightBounds));
   }
 
   for (const auto& child : _children) {
@@ -773,7 +775,7 @@ Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBou
     if (_transformStyle == TransformStyle::Flat || !canExtend3DContext()) {
       childMatrix.setRow(2, {0, 0, 1, 0});
     }
-    childMatrix.postConcat(applyMatrixAtEnd ? Matrix3D() : coordinateMatrix);
+    childMatrix.postConcat(applyMatrixAtEnd ? Matrix3D::I() : coordinateMatrix);
     auto childBounds = child->getBoundsInternal(childMatrix, computeTightBounds);
     if (child->_scrollRect) {
       auto relatvieScrollRect = childMatrix.mapRect(*child->_scrollRect);
