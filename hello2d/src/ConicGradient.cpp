@@ -33,9 +33,8 @@ std::shared_ptr<tgfx::Layer> ConicGradient::onBuildLayerTree(const AppHost*) {
   tgfx::Color magenta = {1.0f, 0.0f, 1.0f, 1.0f};
   tgfx::Color yellow = {1.0f, 1.0f, 0.0f, 1.0f};
 
-  auto conicShader =
-      tgfx::Shader::MakeConicGradient(tgfx::Point::Make(size / 2, size / 2), 0, 360,
-                                      {cyan, magenta, yellow, cyan}, {});
+  auto conicShader = tgfx::Shader::MakeConicGradient(tgfx::Point::Make(size / 2, size / 2), 0, 360,
+                                                     {cyan, magenta, yellow, cyan}, {});
   auto rect = tgfx::Rect::MakeXYWH(0, 0, size, size);
 
   tgfx::Path path = {};

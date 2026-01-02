@@ -16,38 +16,37 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "Rect3DDrawOp.h"
+#include "Quads3DDrawOp.h"
 #include "core/utils/ColorHelper.h"
 #include "core/utils/MathExtra.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
-#include "gpu/processors/Transform3DGeometryProcessor.h"
+#include "gpu/processors/QuadPerEdgeAA3DGeometryProcessor.h"
 #include "inspect/InspectorMark.h"
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
 
-// The maximum number of vertices per non-AA quad.
+// The maximum number of indices per non-AA quad.
 static constexpr uint32_t IndicesPerNonAAQuad = 6;
-// The maximum number of vertices per AA quad.
+// The maximum number of indices per AA quad.
 static constexpr uint32_t IndicesPerAAQuad = 30;
 
-PlacementPtr<Rect3DDrawOp> Rect3DDrawOp::Make(Context* context,
-                                              PlacementPtr<RectsVertexProvider> provider,
-                                              uint32_t renderFlags,
-                                              const Rect3DDrawArgs& drawArgs) {
+PlacementPtr<Quads3DDrawOp> Quads3DDrawOp::Make(Context* context,
+                                                PlacementPtr<QuadsVertexProvider> provider,
+                                                uint32_t renderFlags,
+                                                const Quads3DDrawArgs& drawArgs) {
   if (provider == nullptr) {
     return nullptr;
   }
   auto allocator = context->drawingAllocator();
-  auto drawOp = allocator->make<Rect3DDrawOp>(allocator, provider.get(), drawArgs);
-  CAPUTRE_RECT_MESH(drawOp.get(), provider.get());
-  if (provider->aaType() == AAType::Coverage || provider->rectCount() > 1 || provider->lineJoin()) {
+  auto drawOp = allocator->make<Quads3DDrawOp>(allocator, provider.get(), drawArgs);
+  if (provider->aaType() == AAType::Coverage || provider->quadCount() > 1) {
     drawOp->indexBufferProxy = context->globalCache()->getRectIndexBuffer(
-        provider->aaType() == AAType::Coverage, provider->lineJoin());
+        provider->aaType() == AAType::Coverage, std::nullopt);
   }
-  if (provider->rectCount() <= 1) {
-    // If we only have one rect, it is not worth the async task overhead.
+  if (provider->quadCount() <= 1) {
+    // If we only have one quad, it is not worth the async task overhead.
     renderFlags |= RenderFlags::DisableAsyncTask;
   }
   drawOp->vertexBufferProxyView =
@@ -55,25 +54,17 @@ PlacementPtr<Rect3DDrawOp> Rect3DDrawOp::Make(Context* context,
   return drawOp;
 }
 
-Rect3DDrawOp::Rect3DDrawOp(BlockAllocator* allocator, RectsVertexProvider* provider,
-                           const Rect3DDrawArgs& drawArgs)
-    : DrawOp(allocator, provider->aaType()), drawArgs(drawArgs), rectCount(provider->rectCount()) {
-  if (!provider->hasUVCoord()) {
-    auto matrix = provider->firstMatrix();
-    matrix.invert(&matrix);
-    uvMatrix = matrix;
-  }
+Quads3DDrawOp::Quads3DDrawOp(BlockAllocator* allocator, QuadsVertexProvider* provider,
+                             const Quads3DDrawArgs& drawArgs)
+    : DrawOp(allocator, provider->aaType()), drawArgs(drawArgs), quadCount(provider->quadCount()) {
   if (!provider->hasColor()) {
-    commonColor = ToPMColor(provider->firstColor(), provider->dstColorSpace());
+    commonColor = ToPMColor(provider->firstColor(), nullptr);
   }
-  hasSubset = provider->hasSubset();
 }
 
-PlacementPtr<GeometryProcessor> Rect3DDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {
-  ATTRIBUTE_NAME("rectCount", static_cast<int>(rectCount));
+PlacementPtr<GeometryProcessor> Quads3DDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {
+  ATTRIBUTE_NAME("quadCount", static_cast<int>(quadCount));
   ATTRIBUTE_NAME("commonColor", commonColor);
-  ATTRIBUTE_NAME("uvMatrix", uvMatrix);
-  ATTRIBUTE_NAME("hasSubset", hasSubset);
   // The actual size of the rendered texture is larger than the valid size, while the current
   // NDC coordinates were calculated based on the valid size, so they need to be adjusted
   // accordingly.
@@ -95,11 +86,11 @@ PlacementPtr<GeometryProcessor> Rect3DDrawOp::onMakeGeometryProcessor(RenderTarg
     ndcScale.y = -ndcScale.y;
     ndcOffset.y = -ndcOffset.y;
   }
-  return Transform3DGeometryProcessor::Make(allocator, aaType, drawArgs.transformMatrix, ndcScale,
-                                            ndcOffset);
+  return QuadPerEdgeAA3DGeometryProcessor::Make(allocator, aaType, drawArgs.transformMatrix,
+                                                ndcScale, ndcOffset, commonColor);
 }
 
-void Rect3DDrawOp::onDraw(RenderPass* renderPass) {
+void Quads3DDrawOp::onDraw(RenderPass* renderPass) {
   std::shared_ptr<BufferResource> indexBuffer = nullptr;
   if (indexBufferProxy) {
     indexBuffer = indexBufferProxy->getBuffer();
@@ -115,7 +106,7 @@ void Rect3DDrawOp::onDraw(RenderPass* renderPass) {
   renderPass->setIndexBuffer(indexBuffer ? indexBuffer->gpuBuffer() : nullptr);
   if (indexBuffer != nullptr) {
     auto numIndicesPerQuad = aaType == AAType::Coverage ? IndicesPerAAQuad : IndicesPerNonAAQuad;
-    renderPass->drawIndexed(PrimitiveType::Triangles, 0, rectCount * numIndicesPerQuad);
+    renderPass->drawIndexed(PrimitiveType::Triangles, 0, quadCount * numIndicesPerQuad);
   } else {
     renderPass->draw(PrimitiveType::TriangleStrip, 0, 4);
   }

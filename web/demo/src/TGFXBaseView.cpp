@@ -153,7 +153,6 @@ void TGFXBaseView::draw() {
 
 }  // namespace hello2d
 
-
 int main(int, const char*[]) {
   return 0;
 }

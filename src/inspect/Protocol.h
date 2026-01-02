@@ -95,15 +95,15 @@ enum class OpTaskType : uint8_t {
   RRectDrawOp,
   ShapeDrawOp,
   AtlasTextOp,
-  Rect3DDrawOp,
+  Quads3DDrawOp,
   DstTextureCopyOp,
   ResolveOp,
   OpTaskTypeSize,
 };
 
 static std::unordered_map<uint8_t, OpTaskType> DrawOpTypeToOpTaskType = {
-    {0, OpTaskType::RectDrawOp},  {1, OpTaskType::RRectDrawOp},  {2, OpTaskType::ShapeDrawOp},
-    {3, OpTaskType::AtlasTextOp}, {4, OpTaskType::Rect3DDrawOp},
+    {0, OpTaskType::RectDrawOp},  {1, OpTaskType::RRectDrawOp},   {2, OpTaskType::ShapeDrawOp},
+    {3, OpTaskType::AtlasTextOp}, {4, OpTaskType::Quads3DDrawOp},
 };
 
 enum class CustomEnumType : uint8_t {
