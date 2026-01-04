@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ReverseShape.h"
+#include "core/shapes/MatrixShape.h"
 #include "core/shapes/PathShape.h"
 
 namespace tgfx {
@@ -33,6 +34,13 @@ std::shared_ptr<Shape> Shape::ApplyReverse(std::shared_ptr<Shape> shape) {
   if (shape->type() == Type::Reverse) {
     auto reverseShape = std::static_pointer_cast<ReverseShape>(shape);
     return reverseShape->shape;
+  }
+  // Apply reverse to the inner shape of MatrixShape, so that the outer matrix can be used to
+  // do some optimization.
+  if (shape->type() == Type::Matrix) {
+    auto matrixShape = std::static_pointer_cast<MatrixShape>(shape);
+    auto innerShape = ApplyReverse(matrixShape->shape);
+    return std::make_shared<MatrixShape>(std::move(innerShape), matrixShape->matrix);
   }
   return std::make_shared<ReverseShape>(std::move(shape));
 }
