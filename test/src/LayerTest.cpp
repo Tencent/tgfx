@@ -4458,9 +4458,11 @@ TGFX_TEST(LayerTest, LayerRecorder) {
     // Should be ComposeContent with 2 items: ShapeContent (merged paths) + PathContent
     EXPECT_EQ(content->type(), LayerContent::Type::Compose);
     auto composeContent = static_cast<ComposeContent*>(content.get());
-    EXPECT_EQ(composeContent->contents.size(), 2u);
-    EXPECT_EQ(composeContent->contents[0]->type(), LayerContent::Type::Shape);
+    ASSERT_TRUE(composeContent->contents.size() == 4u);
+    EXPECT_EQ(composeContent->contents[0]->type(), LayerContent::Type::Path);
     EXPECT_EQ(composeContent->contents[1]->type(), LayerContent::Type::Path);
+    EXPECT_EQ(composeContent->contents[2]->type(), LayerContent::Type::Path);
+    EXPECT_EQ(composeContent->contents[3]->type(), LayerContent::Type::Path);
     content->drawDefault(surface->getCanvas(), 1.0f, true);
     EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerRecorder_MultiplePaths"));
   }
