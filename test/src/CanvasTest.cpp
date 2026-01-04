@@ -1046,6 +1046,15 @@ TGFX_TEST(CanvasTest, MergeShapeFillType) {
   EXPECT_EQ(merged->fillType(), PathFillType::InverseWinding);
   merged = Shape::Merge(evenOddShape, shape2, PathOp::Append);
   EXPECT_EQ(merged->fillType(), PathFillType::EvenOdd);
+
+  // ApplyFillType on MatrixShape should apply fill type to inner shape and keep matrix outside
+  auto matrix = Matrix::MakeTrans(10, 20);
+  auto matrixShape = Shape::ApplyMatrix(shape1, matrix);
+  auto fillTypeMatrixShape = Shape::ApplyFillType(matrixShape, PathFillType::EvenOdd);
+  ASSERT_TRUE(fillTypeMatrixShape != nullptr);
+  EXPECT_EQ(fillTypeMatrixShape->type(), Shape::Type::Matrix);
+  EXPECT_EQ(fillTypeMatrixShape->fillType(), PathFillType::EvenOdd);
+  EXPECT_EQ(fillTypeMatrixShape->getBounds(), matrixShape->getBounds());
 }
 
 TGFX_TEST(CanvasTest, ReverseShape) {
@@ -1078,6 +1087,14 @@ TGFX_TEST(CanvasTest, ReverseShape) {
   // Reverse nullptr should return nullptr
   auto nullReversed = Shape::ApplyReverse(nullptr);
   EXPECT_EQ(nullReversed, nullptr);
+
+  // ApplyReverse on MatrixShape should apply reverse to inner shape and keep matrix outside
+  auto matrix = Matrix::MakeTrans(10, 20);
+  auto matrixShape = Shape::ApplyMatrix(shape, matrix);
+  auto reversedMatrixShape = Shape::ApplyReverse(matrixShape);
+  ASSERT_TRUE(reversedMatrixShape != nullptr);
+  EXPECT_EQ(reversedMatrixShape->type(), Shape::Type::Matrix);
+  EXPECT_EQ(reversedMatrixShape->getBounds(), matrixShape->getBounds());
 }
 
 TGFX_TEST(CanvasTest, image) {
