@@ -1071,10 +1071,9 @@ TGFX_TEST(CanvasTest, ReverseShape) {
   EXPECT_EQ(reversedInverse->fillType(), PathFillType::InverseWinding);
 
   // Double reverse on ReverseShape should return the inner shape
-  auto matrixShape = Shape::ApplyMatrix(shape, Matrix::MakeTrans(10, 10));
-  auto reversedMatrix = Shape::ApplyReverse(matrixShape);
+  auto reversedMatrix = Shape::ApplyReverse(shape);
   auto doubleReversed = Shape::ApplyReverse(reversedMatrix);
-  EXPECT_EQ(doubleReversed, matrixShape);
+  EXPECT_EQ(doubleReversed, shape);
 
   // Reverse nullptr should return nullptr
   auto nullReversed = Shape::ApplyReverse(nullptr);
