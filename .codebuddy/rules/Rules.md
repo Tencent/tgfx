@@ -27,6 +27,10 @@ provider:
 
 ## Git 工作流
 
+### 暂存区保护
+- 禁止自动添加或取消用户的 git 暂存区文件，除非用户明确要求提交或发起 PR
+- 其他情况需修改暂存区时，必须先获得用户确认
+
 ### 分支命名
 - 格式：`feature/{username}_模块名` 或 `bugfix/{username}_模块名`
 - 模块名用下划线连接，最多两个单词，如 `feature/domchen_layer_content`
