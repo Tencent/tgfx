@@ -23,18 +23,21 @@
 namespace tgfx {
 /**
  * PathMeasure calculates the length of a Path and cuts child segments from it.
+ * Note: PathMeasure operates on one contour at a time. Use nextContour() to iterate through
+ * multiple contours in a path.
  */
 class PathMeasure {
  public:
   /**
-   * Initialize the PathMeasure with the specified path.
+   * Initialize the PathMeasure with the specified path. The PathMeasure will start at the first
+   * contour.
    */
   static std::unique_ptr<PathMeasure> MakeFrom(const Path& path);
 
   virtual ~PathMeasure() = default;
 
   /**
-   * Return the total length of the the path.
+   * Return the total length of the current contour, or 0 if no path is associated.
    */
   virtual float getLength() = 0;
 
@@ -54,8 +57,14 @@ class PathMeasure {
   virtual bool getPosTan(float distance, Point* position, Point* tangent) = 0;
 
   /**
-   * Returns true if the current contour is closed().
+   * Returns true if the current contour is closed.
    */
   virtual bool isClosed() = 0;
+
+  /**
+   * Move to the next contour in the path. Return true if one exists, or false if we're done with
+   * the path.
+   */
+  virtual bool nextContour() = 0;
 };
 }  // namespace tgfx

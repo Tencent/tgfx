@@ -1889,61 +1889,193 @@ TGFX_TEST(CanvasTest, TrimPathEffect) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 400, 400);
+  auto surface = Surface::Make(context, 500, 540);
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
 
   Paint paint = {};
-  paint.setColor(Color::Blue());
   paint.setStyle(PaintStyle::Stroke);
-  paint.setStroke(Stroke(4));
+  paint.setStroke(Stroke(8));
 
-  // Test normal trim [0.25, 0.75]
-  Path path1 = {};
-  path1.addRect(50, 50, 150, 150);
-  auto trimEffect = PathEffect::MakeTrim(0.25f, 0.75f);
-  EXPECT_TRUE(trimEffect != nullptr);
-  trimEffect->filterPath(&path1);
-  canvas->drawPath(path1, paint);
-
-  // Test inverted trim: complement of [0.25, 0.75] = [0, 0.25] + [0.75, 1]
-  paint.setColor(Color::Red());
-  Path path2 = {};
-  path2.addRect(200, 50, 300, 150);
-  auto invertedEffect = PathEffect::MakeTrim(0.25f, 0.75f, true);
-  EXPECT_TRUE(invertedEffect != nullptr);
-  invertedEffect->filterPath(&path2);
-  canvas->drawPath(path2, paint);
-
-  // Test edge cases
-  // Full path (no trim needed) should return nullptr
-  EXPECT_TRUE(PathEffect::MakeTrim(0.0f, 1.0f) == nullptr);
-  EXPECT_TRUE(PathEffect::MakeTrim(-0.5f, 1.5f) == nullptr);
-
-  // Inverted with startT >= stopT (full path) should return nullptr
-  EXPECT_TRUE(PathEffect::MakeTrim(0.5f, 0.5f, true) == nullptr);
-  EXPECT_TRUE(PathEffect::MakeTrim(0.7f, 0.3f, true) == nullptr);
-
-  // NaN should return nullptr
+  // ========== MakeTrim returns nullptr cases ==========
+  // NaN values
   EXPECT_TRUE(PathEffect::MakeTrim(NAN, 0.5f) == nullptr);
   EXPECT_TRUE(PathEffect::MakeTrim(0.5f, NAN) == nullptr);
+  EXPECT_TRUE(PathEffect::MakeTrim(NAN, NAN) == nullptr);
 
-  // Normal mode with startT >= stopT results in empty path
+  // Full path coverage (end - start >= 1.0 in forward direction)
+  EXPECT_TRUE(PathEffect::MakeTrim(0.0f, 1.0f) == nullptr);
+  EXPECT_TRUE(PathEffect::MakeTrim(0.0f, 1.5f) == nullptr);
+  EXPECT_TRUE(PathEffect::MakeTrim(-0.5f, 0.5f) == nullptr);
+  EXPECT_TRUE(PathEffect::MakeTrim(0.25f, 1.25f) == nullptr);  // exactly 1.0 difference
+  // Reversed full coverage still needs processing to reverse the path
+  EXPECT_TRUE(PathEffect::MakeTrim(1.0f, 0.0f) != nullptr);
+  EXPECT_TRUE(PathEffect::MakeTrim(0.5f, -0.5f) != nullptr);
+
+  // ========== start == end: empty path ==========
+  Path emptyPath = {};
+  emptyPath.addRect(0, 0, 100, 100);
+  auto emptyEffect = PathEffect::MakeTrim(0.5f, 0.5f);
+  EXPECT_TRUE(emptyEffect != nullptr);
+  emptyEffect->filterPath(&emptyPath);
+  EXPECT_TRUE(emptyPath.isEmpty());
+
+  // ========== Normal trim [start, end] where start < end ==========
+  // Row 1: Normal forward trim on rect
+  paint.setColor(Color::Blue());
+  Path path1 = {};
+  path1.addRect(20, 20, 120, 120);
+  auto trim1 = PathEffect::MakeTrim(0.0f, 0.5f);
+  trim1->filterPath(&path1);
+  canvas->drawPath(path1, paint);
+
+  paint.setColor(Color::Red());
+  Path path2 = {};
+  path2.addRect(140, 20, 240, 120);
+  auto trim2 = PathEffect::MakeTrim(0.25f, 0.75f);
+  trim2->filterPath(&path2);
+  canvas->drawPath(path2, paint);
+
   paint.setColor(Color::Green());
   Path path3 = {};
-  path3.addRect(50, 200, 150, 300);
-  auto emptyEffect = PathEffect::MakeTrim(0.7f, 0.3f);
-  EXPECT_TRUE(emptyEffect != nullptr);
-  emptyEffect->filterPath(&path3);
-  EXPECT_TRUE(path3.isEmpty());
+  path3.addRect(260, 20, 360, 120);
+  auto trim3 = PathEffect::MakeTrim(0.5f, 1.0f);
+  trim3->filterPath(&path3);
+  canvas->drawPath(path3, paint);
 
-  // Test with oval
-  paint.setColor(Color::FromRGBA(128, 0, 128));
+  // ========== Reversed trim (end < start): triggers 1-x + reverse ==========
+  // Row 2: Reversed trim - path direction is reversed
+  paint.setColor(Color::FromRGBA(255, 128, 0));
   Path path4 = {};
-  path4.addOval(Rect::MakeXYWH(200, 200, 100, 100));
-  auto ovalTrim = PathEffect::MakeTrim(0.0f, 0.5f);
-  ovalTrim->filterPath(&path4);
+  path4.addRect(20, 140, 120, 240);
+  auto trim4 = PathEffect::MakeTrim(0.5f, 0.0f);
+  trim4->filterPath(&path4);
   canvas->drawPath(path4, paint);
+
+  paint.setColor(Color::FromRGBA(128, 0, 255));
+  Path path5 = {};
+  path5.addRect(140, 140, 240, 240);
+  auto trim5 = PathEffect::MakeTrim(0.75f, 0.25f);
+  trim5->filterPath(&path5);
+  canvas->drawPath(path5, paint);
+
+  paint.setColor(Color::FromRGBA(0, 128, 128));
+  Path path6 = {};
+  path6.addRect(260, 140, 360, 240);
+  auto trim6 = PathEffect::MakeTrim(1.0f, 0.5f);
+  trim6->filterPath(&path6);
+  canvas->drawPath(path6, paint);
+
+  // ========== Values outside [0,1] requiring normalization ==========
+  // Row 3: Out-of-range values
+  paint.setColor(Color::FromRGBA(255, 0, 128));
+  Path path7 = {};
+  path7.addRect(20, 260, 120, 360);
+  auto trim7 = PathEffect::MakeTrim(1.25f, 1.75f);  // same as [0.25, 0.75]
+  trim7->filterPath(&path7);
+  canvas->drawPath(path7, paint);
+
+  paint.setColor(Color::FromRGBA(128, 128, 0));
+  Path path8 = {};
+  path8.addRect(140, 260, 240, 360);
+  auto trim8 = PathEffect::MakeTrim(-0.25f, 0.25f);  // same as [0.75, 1] + [0, 0.25]
+  trim8->filterPath(&path8);
+  canvas->drawPath(path8, paint);
+
+  // ========== WrapAround with seamless connection on closed path ==========
+  // Row 3: Closed oval with wrap-around (forward)
+  paint.setColor(Color::FromRGBA(0, 128, 255));
+  Path path9 = {};
+  path9.addOval(Rect::MakeXYWH(260, 260, 100, 100));
+  auto trim9 = PathEffect::MakeTrim(0.75f, 1.25f);  // wraps around start point
+  trim9->filterPath(&path9);
+  canvas->drawPath(path9, paint);
+
+  // Row 3: Closed rect with wrap-around reversed (tests seamless connection in reverse)
+  // Reversed wrap-around: start=0.25, end=0.75 reversed becomes [0.25, 0.75] on reversed path
+  // With wrap-around offset, should produce seamless connection
+  paint.setColor(Color::FromRGBA(255, 64, 192));
+  Path path9b = {};
+  path9b.addRect(380, 260, 480, 360);
+  auto trim9b = PathEffect::MakeTrim(0.25f, -0.25f);  // reversed with wrap-around
+  trim9b->filterPath(&path9b);
+  canvas->drawPath(path9b, paint);
+
+  // ========== Multiple contours ==========
+  // Row 4: Path with multiple contours (forward)
+  paint.setColor(Color::FromRGBA(64, 64, 64));
+  Path multiPath = {};
+  multiPath.addRect(20, 380, 80, 440);
+  multiPath.addRect(100, 380, 160, 440);
+  auto trimMulti = PathEffect::MakeTrim(0.0f, 0.5f);
+  trimMulti->filterPath(&multiPath);
+  canvas->drawPath(multiPath, paint);
+
+  paint.setColor(Color::FromRGBA(192, 64, 64));
+  Path multiPath2 = {};
+  multiPath2.addRect(180, 380, 240, 440);
+  multiPath2.addRect(260, 380, 320, 440);
+  auto trimMulti2 = PathEffect::MakeTrim(0.25f, 0.75f);
+  trimMulti2->filterPath(&multiPath2);
+  canvas->drawPath(multiPath2, paint);
+
+  // ========== Multiple contours with reversed trim ==========
+  // Row 4: Path with multiple contours (reversed)
+  paint.setColor(Color::FromRGBA(64, 192, 64));
+  Path multiPathRev = {};
+  multiPathRev.addRect(340, 380, 400, 440);
+  multiPathRev.addRect(420, 380, 480, 440);
+  auto trimMultiRev =
+      PathEffect::MakeTrim(0.5f, 0.0f);  // reversed: same range as [0, 0.5] but reversed
+  trimMultiRev->filterPath(&multiPathRev);
+  canvas->drawPath(multiPathRev, paint);
+
+  // ========== Verify multi-contour reversal order with stacked trims ==========
+  // Row 5: Use two stacked trims to verify contour order is reversed
+  // First trim reverses the path, second trim cuts to show only the beginning
+  // If contour order is correctly reversed, the second contour (right rect) should appear first
+  paint.setColor(Color::FromRGBA(255, 0, 0));
+  Path stackedPath1 = {};
+  stackedPath1.addRect(20, 460, 80, 520);    // First contour: left rect (perimeter = 180)
+  stackedPath1.addRect(100, 460, 220, 520);  // Second contour: right rect (perimeter = 360)
+  // Total length = 540, first contour is 33.3%, second is 66.7%
+  // Reverse with trim(0.999, 0.001): reverses order, second contour becomes first
+  auto reverseEffect = PathEffect::MakeTrim(1.0f, 0.0f);
+  ASSERT_TRUE(reverseEffect != nullptr);
+  reverseEffect->filterPath(&stackedPath1);
+  // Now trim to keep only first 25% - should show part of the originally-second (now-first) contour
+  auto cutEffect = PathEffect::MakeTrim(0.0f, 0.75f);
+  cutEffect->filterPath(&stackedPath1);
+  canvas->drawPath(stackedPath1, paint);
+
+  // For comparison: same path without reversal, trim first 25%
+  // Should show part of the originally-first (left) contour
+  paint.setColor(Color::FromRGBA(0, 0, 255));
+  Path stackedPath2 = {};
+  stackedPath2.addRect(240, 460, 300, 520);  // First contour: left rect
+  stackedPath2.addRect(320, 460, 440, 520);  // Second contour: right rect
+  auto cutOnlyEffect = PathEffect::MakeTrim(0.0f, 0.75f);
+  cutOnlyEffect->filterPath(&stackedPath2);
+  canvas->drawPath(stackedPath2, paint);
+
+  // ========== Zero length path ==========
+  Path zeroPath = {};
+  zeroPath.moveTo(0, 0);
+  auto zeroEffect = PathEffect::MakeTrim(0.0f, 0.5f);
+  zeroEffect->filterPath(&zeroPath);
+  EXPECT_TRUE(zeroPath.isEmpty());
+
+  // ========== filterPath with nullptr ==========
+  auto nullEffect = PathEffect::MakeTrim(0.0f, 0.5f);
+  EXPECT_FALSE(nullEffect->filterPath(nullptr));
+
+  // ========== Preserve fill type ==========
+  Path fillTypePath = {};
+  fillTypePath.addRect(0, 0, 100, 100);
+  fillTypePath.setFillType(PathFillType::EvenOdd);
+  auto fillTypeEffect = PathEffect::MakeTrim(0.0f, 0.5f);
+  fillTypeEffect->filterPath(&fillTypePath);
+  EXPECT_EQ(fillTypePath.getFillType(), PathFillType::EvenOdd);
 
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/TrimPathEffect"));
 }
