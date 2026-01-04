@@ -1,5 +1,5 @@
 ---
-description:
+description: 
 alwaysApply: true
 enabled: true
 updatedAt: 2025-12-10T02:46:38.121Z
@@ -25,6 +25,24 @@ provider:
 - 函数内代码不加行注释，除非只看代码无法理解设计意图
 - 未明确的规范，模仿项目已有风格
 
+## 代码审查
+- 代码和注释是否符合项目规范，不要检查文件末尾换行符问题
+- 实现是否符合预期，边界条件是否处理
+- 是否存在重复代码或可合并的相似逻辑
+- 是否有性能瓶颈或线程安全问题
+- 是否符合接口的用法意图和最佳实践
+- 公开接口变更要重点关注必要性
+- 结合关联代码评估整体设计合理性，考虑是否需扩大重构范围
+
+## 编译验证
+
+修改代码后，使用以下命令验证编译。必须传递 `-DTGFX_BUILD_TESTS=ON` 以启用所有模块（layers、svg、pdf 等）。
+
+```bash
+cmake -DTGFX_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug -B cmake-build-debug
+cmake --build cmake-build-debug --target TGFXFullTest -- -j 12
+```
+
 ## Git 工作流
 
 ### 暂存区保护
@@ -38,39 +56,3 @@ provider:
 ### Commit 信息
 - 120 字符内的英语概括，以英文句号结尾，中间无其他标点
 - 侧重描述用户可感知的变化：公开接口调整、性能优化等
-
-### 发起 Github PR
-- 评审本地变更代码，确认无问题后准备 PR 信息
-- 输出以下内容供确认：
-  - **分支名称**：格式同分支命名规则
-  - **PR 标题**：英语，格式同 commit 信息要求
-  - **PR 描述**：中文简要说明变更内容
-- 确认后创建分支、推送代码、并严格按照确认过的标题和描述执行 `gh pr create` 发起 PR，禁止修改任何内容或添加额外格式
-- 对已发起的 PR 补充提交时，使用正常追加提交，禁止 force push 覆盖
-
-## 代码审查
-
-### 审查要点
-- 代码和注释是否符合项目规范，不要检查文件末尾换行符问题
-- 实现是否符合预期，边界条件是否处理
-- 是否存在重复代码或可合并的相似逻辑
-- 是否有性能瓶颈或线程安全问题
-- 是否符合接口的用法意图和最佳实践
-- 公开接口变更要重点关注必要性
-- 结合关联代码评估整体设计合理性，考虑是否需扩大重构范围
-
-### Github PR Review 流程
-- 用 `gh` 命令获取 PR 变更和评论，结合本地代码理解上下文
-- 输出变更总结
-- 输出优化的 PR 标题，使其更符合作为 commit 信息的要求
-- 验证已有评论是否真正修复（重点关注我提过的评论）
-- 新问题或未解决问题带序号汇总，经我确认后添加中文行级评论
-
-### Github PR 行级评论
-- 仅允许行级评论，禁止 `gh pr comment`
-- 使用 `gh api` 配合 `--input -` 和 heredoc 传递 JSON
-```bash
-gh api repos/{owner}/{repo}/pulls/{pr}/reviews --input - <<'EOF'
-{"commit_id":"HEAD_SHA","event":"COMMENT","comments":[{"path":"文件路径","line":行号,"side":"RIGHT","body":"内容"}]}
-EOF
-```
