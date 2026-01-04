@@ -309,7 +309,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Brush brush) 
   std::optional<float> drawScale = std::nullopt;
   bool hasCoverage = pendingBrush.maskFilter != nullptr || !pendingClip.isEmpty() ||
                      pendingClip.isInverseFillType();
-  bool hasImageFill = pendingType == PendingOpType::Image || pendingType == PendingOpType::Atlas;
+  bool hasImageFill = pendingType == PendingOpType::Image;
   auto [needLocalBounds, needDeviceBounds] =
       needComputeBounds(pendingBrush, hasCoverage, hasImageFill);
   auto aaType = getAAType(pendingBrush);

@@ -202,6 +202,17 @@ class PlotUseUpdater {
   std::vector<uint32_t> plotAlreadyUpdated = {};
 };
 
+struct AtlasCell {
+  MaskFormat maskFormat = MaskFormat::A8;
+  uint16_t width = 0;
+  uint16_t height = 0;
+};
+
+struct AtlasGlyph {
+  Point offset = {};  // The cell's offset for render
+  AtlasLocator atlasLocator;
+};
+
 class Plot {
  public:
   static constexpr int CellPadding = 1;
@@ -229,7 +240,7 @@ class Plot {
     return _pixelOffset;
   }
 
-  bool addRect(int with, int height, AtlasLocator& atlasLocator);
+  bool addRect(int with, int height, AtlasLocator* atlasLocator);
 
   void resetRects();
 

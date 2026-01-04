@@ -19,8 +19,6 @@
 #pragma once
 
 #include <memory>
-#include <set>
-#include "core/AtlasCell.h"
 #include "core/AtlasTypes.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/proxies/TextureProxy.h"
@@ -35,9 +33,9 @@ class Atlas {
                                      int height, int plotWidth, int plotHeight,
                                      AtlasGenerationCounter* generationCounter);
 
-  bool addToAtlas(const AtlasCell& cell, AtlasToken nextFlushToken, AtlasLocator& atlasLocator);
+  bool addToAtlas(const AtlasCell& cell, AtlasToken nextFlushToken, AtlasLocator* atlasLocator);
 
-  bool getCellLocator(const BytesKey& cellKey, AtlasCellLocator& cellLocator) const;
+  bool hasID(const PlotLocator& plotLocator) const;
 
   const std::vector<std::shared_ptr<TextureProxy>>& getTextureProxies() const {
     return textureProxies;
@@ -48,8 +46,6 @@ class Atlas {
   //To ensure the atlas does not evict a given entry, the client must set the use token
   void setLastUseToken(const PlotLocator& plotLocator, AtlasToken token);
 
-  void removeExpiredKeys();
-
  private:
   Atlas(ProxyProvider* proxyProvider, PixelFormat pixelFormat, int width, int height, int plotWidth,
         int plotHeight, AtlasGenerationCounter* generationCounter);
@@ -58,7 +54,7 @@ class Atlas {
 
   bool activateNewPage();
 
-  bool addToPage(const AtlasCell& cell, size_t pageIndex, AtlasLocator& atlasLocator);
+  bool addToPage(const AtlasCell& cell, size_t pageIndex, AtlasLocator* atlasLocator);
 
   void evictionPlot(Plot* plot);
 
@@ -81,9 +77,6 @@ class Atlas {
   int textureHeight = 2048;
   int plotWidth = 512;
   int plotHeight = 512;
-
-  BytesKeyMap<AtlasCellLocator> cellLocators;
-  std::set<BytesKey> expiredKeys;
 };
 
 class AtlasConfig {
