@@ -189,7 +189,7 @@ static bool IsGlyphVisible(const Font& font, bool isCustom, GlyphID glyphID, con
     return false;
   }
   if (stroke != nullptr) {
-    ApplyStrokeToBounds(*stroke, &bounds);
+    ApplyStrokeToBounds(*stroke, &bounds, Matrix::MakeScale(scale));
   }
   if ((isCustom || font.hasColor()) && maxDimension) {
     *maxDimension = FloatCeilToInt(std::max(bounds.width(), bounds.height()));
@@ -326,7 +326,7 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
   }
   auto bounds = glyphRunList->getBounds();
   if (stroke) {
-    ApplyStrokeToBounds(*stroke, &bounds);
+    ApplyStrokeToBounds(*stroke, &bounds, state.matrix);
   }
   state.matrix.mapRect(&bounds);  // To device space
   auto clipBounds = getClipBounds(state.clip);

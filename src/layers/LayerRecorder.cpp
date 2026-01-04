@@ -86,12 +86,8 @@ void LayerRecorder::addPath(const Path& path, const LayerPaint& paint) {
     addRRect(rRect, paint);
     return;
   }
-  if (canAppend(PendingType::Shape, paint)) {
-    pendingShape = Shape::Merge(std::move(pendingShape), Shape::MakeFrom(path));
-  } else {
-    flushPending(PendingType::Shape, paint);
-    pendingShape = Shape::MakeFrom(path);
-  }
+  flushPending(PendingType::Shape, paint);
+  pendingShape = Shape::MakeFrom(path);
 }
 
 void LayerRecorder::addShape(std::shared_ptr<Shape> shape, const LayerPaint& paint) {
@@ -102,12 +98,8 @@ void LayerRecorder::addShape(std::shared_ptr<Shape> shape, const LayerPaint& pai
     addPath(shape->getPath(), paint);
     return;
   }
-  if (canAppend(PendingType::Shape, paint)) {
-    pendingShape = Shape::Merge(std::move(pendingShape), std::move(shape));
-  } else {
-    flushPending(PendingType::Shape, paint);
-    pendingShape = std::move(shape);
-  }
+  flushPending(PendingType::Shape, paint);
+  pendingShape = std::move(shape);
 }
 
 void LayerRecorder::addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerPaint& paint,
