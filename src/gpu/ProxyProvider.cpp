@@ -186,6 +186,7 @@ std::shared_ptr<GPUShapeProxy> ProxyProvider::createGPUShapeProxy(std::shared_pt
     uniqueKey = UniqueKey::Append(uniqueKey, &NonAntialiasShapeType, 1);
   }
   auto bounds = isInverseFillType ? clipBounds : shapeBounds;
+  bounds.roundOut();
   drawingMatrix.preTranslate(bounds.x(), bounds.y());
   static const auto TriangleShapeType = UniqueID::Next();
   static const auto TextureShapeType = UniqueID::Next();
@@ -200,8 +201,8 @@ std::shared_ptr<GPUShapeProxy> ProxyProvider::createGPUShapeProxy(std::shared_pt
     return std::make_shared<GPUShapeProxy>(drawingMatrix, std::move(triangleProxy),
                                            std::move(textureProxy));
   }
-  auto width = FloatCeilToInt(bounds.width());
-  auto height = FloatCeilToInt(bounds.height());
+  auto width = FloatSaturateToInt(bounds.width());
+  auto height = FloatSaturateToInt(bounds.height());
   shape = Shape::ApplyMatrix(shape, Matrix::MakeTrans(-bounds.x(), -bounds.y()));
   auto rasterizer = std::make_unique<ShapeRasterizer>(width, height, std::move(shape), aaType);
   std::unique_ptr<DataSource<ShapeBuffer>> dataSource = nullptr;
