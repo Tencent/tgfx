@@ -736,8 +736,7 @@ TGFX_TEST(SVGRenderTest, DisplayP3Render) {
 }
 
 TGFX_TEST(SVGRenderTest, WideGamutColorSpaces) {
-  auto stream =
-      Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/widegamut.svg"));
+  auto stream = Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/widegamut.svg"));
   ASSERT_TRUE(stream != nullptr);
   auto SVGDom = SVGDOM::Make(*stream);
   auto rootNode = SVGDom->getRoot();
@@ -748,7 +747,7 @@ TGFX_TEST(SVGRenderTest, WideGamutColorSpaces) {
   ASSERT_TRUE(context != nullptr);
   auto size = SVGDom->getContainerSize();
   auto surface = Surface::Make(context, static_cast<int>(size.width), static_cast<int>(size.height),
-                               false, 1, false, 0, ColorSpace::SRGB());
+                               false, 1, false, 0, ColorSpace::DisplayP3());
   auto canvas = surface->getCanvas();
 
   SVGDom->render(canvas);

@@ -409,7 +409,8 @@
         "referenceStyle": "543054b5",
         "text": "c4c06bec",
         "textEmoji": "9bfe8c34",
-        "textFont": "c4c06bec"
+        "textFont": "c4c06bec",
+        "widegamut": "cca78c27"
     },
     "StrokeTest": {
         "DashStrokeAsSolidStroke": "eefb7a46",
