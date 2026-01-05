@@ -164,7 +164,8 @@ void VectorGroup::apply(VectorContext* context) {
   VectorContext groupContext = {};
 
   for (const auto& element : _elements) {
-    if (element && element->enabled()) {
+    DEBUG_ASSERT(element != nullptr);
+    if (element->enabled()) {
       element->apply(&groupContext);
     }
   }
