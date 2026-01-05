@@ -87,14 +87,14 @@ static float FindMaxGlyphDimension(const Font& font, const std::vector<GlyphID>&
 
 static std::shared_ptr<ImageCodec> GetGlyphCodec(
     const Font& font, const std::shared_ptr<ScalerContext>& scalerContext, GlyphID glyphID,
-    const Stroke* stroke, Point* glyphOffset, bool* continueIfFailed = nullptr) {
-  auto setContinueValue = [continueIfFailed](bool value) {
-    if (continueIfFailed) {
-      *continueIfFailed = value;
+    const Stroke* stroke, Point* glyphOffset, bool* shouldRetry = nullptr) {
+  auto setRetryValue = [shouldRetry](bool value) {
+  if (shouldRetry) {
+      *shouldRetry = value;
     }
   };
 
-  setContinueValue(false);
+  setRetryValue(false);
   if (glyphID == 0) {
     return nullptr;
   }
@@ -104,7 +104,7 @@ static std::shared_ptr<ImageCodec> GetGlyphCodec(
   //bounds.isEmpty may be caused by unsupported stroke or bold operations.
   if (!bounds.isEmpty()) {
     if (std::max(bounds.width(), bounds.height()) > Atlas::MaxCellSize) {
-      setContinueValue(true);
+      setRetryValue(true);
       return nullptr;
     }
     glyphOffset->x = bounds.left;
@@ -135,7 +135,7 @@ static std::shared_ptr<ImageCodec> GetGlyphCodec(
     return nullptr;
   }
   if (std::max(bounds.width(), bounds.height()) > Atlas::MaxCellSize) {
-    setContinueValue(true);
+    setRetryValue(true);
     return nullptr;
   }
   shape = Shape::ApplyMatrix(std::move(shape), Matrix::MakeTrans(-bounds.x(), -bounds.y()));
@@ -197,19 +197,18 @@ static bool IsGlyphVisible(const Font& font, bool isCustom, GlyphID glyphID, con
   return Rect::Intersects(bounds, clipBounds);
 }
 
-static void GetGlyphMatrix(const std::shared_ptr<ScalerContext>& scalerContext,
-                           const Point& glyphOffset, bool fauxItalic, Matrix* glyphMatrix) {
+static void GetGlyphMatrix(float glyphRenderScale, const Point& glyphOffset, bool fauxItalic,
+                           Matrix* glyphMatrix) {
   glyphMatrix->setTranslate(glyphOffset.x, glyphOffset.y);
-  auto scale = scalerContext->getSize() / scalerContext->getBackingSize();
-  glyphMatrix->postScale(scale, scale);
+  glyphMatrix->postScale(glyphRenderScale, glyphRenderScale);
   if (fauxItalic) {
     glyphMatrix->postSkew(ITALIC_SKEW, 0);
   }
 }
 
-static SamplingOptions GetSamplingOptions(const std::shared_ptr<ScalerContext>& scalerContext,
-                                          bool fauxItalic, const Matrix& stateMatrix) {
-  if (fauxItalic || !FloatNearlyEqual(scalerContext->getBackingSize(), scalerContext->getSize())) {
+static SamplingOptions GetSamplingOptions(float glyphRenderScale, bool fauxItalic,
+                                          const Matrix& stateMatrix) {
+  if (fauxItalic || !FloatNearlyEqual(glyphRenderScale, 1.0f)) {
     return SamplingOptions{FilterMode::Linear, MipmapMode::None};
   }
   const auto isUniformScale = stateMatrix.isScaleTranslate() &&
@@ -487,6 +486,10 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
   auto drawingManager = getContext()->drawingManager();
   const auto nextFlushToken = atlasManager->nextFlushToken();
   auto strike = getContext()->atlasStrikeCache()->findOrCreateStrike(strikeKey);
+  DEBUG_ASSERT(strike != nullptr);
+  const auto atlasBrush = brush.makeWithMatrix(state.matrix);
+  const auto glyphRenderScale = font.scalerContext->getSize() / font.scalerContext->getBackingSize();
+  const auto sampling = GetSamplingOptions(glyphRenderScale, font.isFauxItalic(), state.matrix);
   size_t index = 0;
 
   for (auto& glyphID : sourceGlyphRun.glyphs) {
@@ -511,11 +514,11 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
     if (atlasManager->hasGlyph(maskFormat, atlasGlyph)) {
       glyphOffset = atlasGlyph->offset;
     } else {
-      bool continueIfFailed = false;
+      bool shouldRetry = false;
       auto glyphCodec = GetGlyphCodec(font, font.scalerContext, glyphID, scaledStroke.get(),
-                                      &glyphOffset, &continueIfFailed);
+                                      &glyphOffset, &shouldRetry);
       if (glyphCodec == nullptr) {
-        if (continueIfFailed) {
+        if (shouldRetry) {
           rejectedGlyphRun->glyphs.push_back(glyphID);
           rejectedGlyphRun->positions.push_back(glyphPosition);
         }
@@ -528,9 +531,9 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
 
       if (atlasManager->addCellToAtlas(atlasCell, nextFlushToken, &atlasLocator)) {
         auto pageIndex = atlasLocator.pageIndex();
-        auto atlasOffset =
-            Point::Make(atlasLocator.getLocation().left, atlasLocator.getLocation().top);
-        drawingManager->addAtlasCellTask(textureProxies[pageIndex], atlasOffset,
+        const auto& atlasRect = atlasLocator.getLocation();
+        drawingManager->addAtlasCellTask(textureProxies[pageIndex],
+                                         Point::Make(atlasRect.x(), atlasRect.y()),
                                          std::move(glyphCodec));
       } else {
         rejectedGlyphRun->glyphs.push_back(glyphID);
@@ -549,13 +552,12 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
     }
 
     auto glyphState = state;
-    GetGlyphMatrix(font.scalerContext, glyphOffset, font.isFauxItalic(), &glyphState.matrix);
-    const auto rect = atlasLocator.getLocation();
-    const auto sampling = GetSamplingOptions(font.scalerContext, font.isFauxItalic(), state.matrix);
+    GetGlyphMatrix(glyphRenderScale, glyphOffset, font.isFauxItalic(), &glyphState.matrix);
+    auto& rect = atlasLocator.getLocation();
     ComputeGlyphFinalMatrix(rect, state.matrix, inverseScale, glyphPosition, &glyphState.matrix,
                             sampling.minFilterMode == FilterMode::Nearest);
     compositor->fillTextAtlas(std::move(textureProxy), rect, sampling, glyphState,
-                              brush.makeWithMatrix(state.matrix));
+                              atlasBrush);
   }
 }
 void RenderContext::drawGlyphsAsPath(std::shared_ptr<GlyphRunList> glyphRunList,
@@ -619,6 +621,8 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
   auto nextFlushToken = atlasManager->nextFlushToken();
   auto drawingManager = getContext()->drawingManager();
   auto strike = getContext()->atlasStrikeCache()->findOrCreateStrike(strikeKey);
+  const auto atlasBrush = brush.makeWithMatrix(state.matrix);
+  const auto glyphRenderScale = font.scalerContext->getSize() / font.scalerContext->getBackingSize();
   size_t index = 0;
 
   for (auto& glyphID : sourceGlyphRun.glyphs) {
@@ -646,8 +650,10 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
         continue;
       }
       auto pageIndex = atlasLocator.pageIndex();
-      auto offset = Point::Make(atlasLocator.getLocation().left, atlasLocator.getLocation().top);
-      drawingManager->addAtlasCellTask(textureProxies[pageIndex], offset, std::move(glyphCodec));
+      const auto& atlasRect = atlasLocator.getLocation();
+      drawingManager->addAtlasCellTask(textureProxies[pageIndex],
+                                       Point::Make(atlasRect.x(), atlasRect.y()),
+                                       std::move(glyphCodec));
     }
     atlasManager->setPlotUseToken(plotUseUpdater, atlasLocator.plotLocator(), maskFormat,
                                   nextFlushToken);
@@ -657,13 +663,13 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
     }
 
     auto glyphState = state;
-    GetGlyphMatrix(font.scalerContext, glyphOffset, font.isFauxItalic(), &glyphState.matrix);
+    GetGlyphMatrix(glyphRenderScale, glyphOffset, font.isFauxItalic(), &glyphState.matrix);
     auto rect = atlasLocator.getLocation();
     ComputeGlyphFinalMatrix(rect, state.matrix, 1.f / (maxScale * cellScale), glyphPosition,
                             &glyphState.matrix, false);
     compositor->fillTextAtlas(std::move(textureProxy), rect,
                               SamplingOptions(FilterMode::Linear, MipmapMode::None), glyphState,
-                              brush.makeWithMatrix(state.matrix));
+                              atlasBrush);
   }
 }
 }  // namespace tgfx
