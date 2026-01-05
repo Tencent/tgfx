@@ -30,13 +30,17 @@ using Microsoft::WRL::ComPtr;
 
 namespace tgfx {
 
-static ComPtr<IWICImagingFactory> GetWICFactory() {
-  static ComPtr<IWICImagingFactory> factory = nullptr;
-  if (factory == nullptr) {
-    CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-    CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER,
-                     IID_PPV_ARGS(&factory));
+static ComPtr<IWICImagingFactory> InitWICFactory() {
+  ComPtr<IWICImagingFactory> factory = nullptr;
+  HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+  if (SUCCEEDED(hr) || hr == RPC_E_CHANGED_MODE) {
+    CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&factory));
   }
+  return factory;
+}
+
+static ComPtr<IWICImagingFactory> GetWICFactory() {
+  static ComPtr<IWICImagingFactory> factory = InitWICFactory();
   return factory;
 }
 
