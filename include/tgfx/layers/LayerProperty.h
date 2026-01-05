@@ -58,7 +58,7 @@ class LayerProperty {
    */
   void replaceChildProperty(LayerProperty* oldChild, LayerProperty* newChild);
 
-  std::vector<Layer*> owners;
+  std::vector<Layer*> owners = {};
 
   friend class Layer;
 };

@@ -34,6 +34,9 @@ static void AddCurveToPath(Path* path, float centerX, float centerY, float angle
 static void ConvertStarToPath(Path* path, float centerX, float centerY, float points,
                               float rotation, float innerRadius, float outerRadius,
                               float innerRoundness, float outerRoundness, bool reversed) {
+  if (points <= 0.0f) {
+    return;
+  }
   float direction = reversed ? -1.0f : 1.0f;
   auto angleStep = static_cast<float>(M_PI) / points;
   auto currentAngle = (rotation - 90.0f) * static_cast<float>(M_PI) / 180.0f;
@@ -93,6 +96,9 @@ static void ConvertStarToPath(Path* path, float centerX, float centerY, float po
 
 static void ConvertPolygonToPath(Path* path, float centerX, float centerY, float points,
                                  float rotation, float radius, float roundness, bool reversed) {
+  if (points <= 0.0f) {
+    return;
+  }
   auto numPoints = static_cast<int>(floorf(points));
   float direction = reversed ? -1.0f : 1.0f;
   auto angleStep = static_cast<float>(M_PI) * 2.0f / static_cast<float>(numPoints);

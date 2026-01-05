@@ -26,6 +26,14 @@ std::shared_ptr<VectorLayer> VectorLayer::Make() {
   return std::shared_ptr<VectorLayer>(new VectorLayer());
 }
 
+VectorLayer::~VectorLayer() {
+  for (const auto& element : _contents) {
+    if (element) {
+      detachProperty(element.get());
+    }
+  }
+}
+
 void VectorLayer::setContents(std::vector<std::shared_ptr<VectorElement>> value) {
   for (const auto& element : _contents) {
     if (element) {

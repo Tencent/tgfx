@@ -39,6 +39,8 @@ class VectorLayer : public Layer {
    */
   static std::shared_ptr<VectorLayer> Make();
 
+  ~VectorLayer() override;
+
   LayerType type() const override {
     return LayerType::Vector;
   }
