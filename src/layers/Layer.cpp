@@ -2252,13 +2252,13 @@ bool Layer::hasValidMask() const {
   return _mask && _mask->root() == root() && _mask->bitFields.visible;
 }
 
-void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer,
-                               const Matrix3D* transform3D, bool forceDirty) {
+void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> contextTransformer,
+                               const Matrix3D* localToContext3D, bool forceDirty) {
   if (!forceDirty && !bitFields.dirtyDescendents) {
     if (maxBackgroundOutset > 0 || bitFields.hasBlendMode) {
       propagateLayerState();
       if (_root->hasDirtyRegions()) {
-        checkBackgroundStyles(transformer);
+        checkBackgroundStyles(contextTransformer);
       }
     }
     return;
@@ -2266,12 +2266,13 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer,
   maxBackgroundOutset = 0;
   minBackgroundOutset = std::numeric_limits<float>::max();
   auto contentScale = 1.0f;
-  auto baseTransformer = transformer;
+  auto baseTransformer = contextTransformer;
   // Ensure the 3D filter is not released during the entire function lifetime.
   std::vector<std::shared_ptr<LayerFilter>> current3DFilterVector = {};
-  if (transform3D != nullptr) {
-    transformer = MakeTransformerFromTransform3D(*transform3D, std::move(transformer),
-                                                 &current3DFilterVector);
+  if (localToContext3D != nullptr) {
+    contextTransformer = MakeTransformerFromTransform3D(*localToContext3D,
+                                                        std::move(contextTransformer),
+                                                        &current3DFilterVector);
   }
   if (!_layerStyles.empty() || !_filters.empty()) {
     // Filters and styles interrupt 3D rendering context, so non-root layers inside 3D rendering

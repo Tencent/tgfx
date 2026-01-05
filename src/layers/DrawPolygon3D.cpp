@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cmath>
 #include "core/utils/Log.h"
+#include "core/utils/MathExtra.h"
 
 namespace tgfx {
 
@@ -94,7 +95,7 @@ void DrawPolygon3D::constructNormal() {
   }
 
   float length = newNormal.length();
-  if (length != 0.0f && length != 1.0f) {
+  if (!FloatNearlyZero(length) && !FloatNearlyEqual(length, 1.0f)) {
     newNormal = newNormal * (1.0f / length);
   }
   _normal = newNormal;
