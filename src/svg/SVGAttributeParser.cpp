@@ -402,8 +402,7 @@ bool SVGAttributeParser::parseColorFunctionToken(Color* c) {
         if (this->parseExpectedStringToken("display-p3")) {
           srcColorSpace = ColorSpace::DisplayP3();
         } else if (this->parseExpectedStringToken("a98-rgb")) {
-          srcColorSpace =
-              ColorSpace::MakeRGB(NamedTransferFunction::A98RGB, NamedGamut::AdobeRGB);
+          srcColorSpace = ColorSpace::MakeRGB(NamedTransferFunction::A98RGB, NamedGamut::AdobeRGB);
         } else if (this->parseExpectedStringToken("rec2020")) {
           srcColorSpace = ColorSpace::MakeRGB(NamedTransferFunction::Rec2020, NamedGamut::Rec2020);
         } else {

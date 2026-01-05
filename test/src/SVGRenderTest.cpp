@@ -727,8 +727,8 @@ TGFX_TEST(SVGRenderTest, DisplayP3Render) {
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto size = SVGDom->getContainerSize();
-  auto surface =
-      Surface::Make(context, static_cast<int>(size.width), static_cast<int>(size.height), false, 1, false, 0, ColorSpace::DisplayP3());
+  auto surface = Surface::Make(context, static_cast<int>(size.width), static_cast<int>(size.height),
+                               false, 1, false, 0, ColorSpace::DisplayP3());
   auto canvas = surface->getCanvas();
 
   SVGDom->render(canvas);
