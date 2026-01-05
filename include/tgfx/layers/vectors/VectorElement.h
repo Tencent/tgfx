@@ -18,30 +18,60 @@
 
 #pragma once
 
-#include "tgfx/core/Shader.h"
 #include "tgfx/layers/LayerProperty.h"
 
 namespace tgfx {
+
+struct VectorContext;
+
 /**
- * ColorSource specifies the source color(s) for what is being drawn in a shape layer. There are
- * three types of ColorSource: SolidColor, Gradient, and ImagePattern. Note: All ColorSource objects
- * are not thread-safe and should only be accessed from a single thread.
+ * VectorElement is the base class for all vector elements in a shape layer. It includes shapes
+ * (rect, ellipse, path, etc.), modifiers (fill, stroke, trim path, etc.), and groups.
  */
-class ColorSource : public LayerProperty {
+class VectorElement : public LayerProperty {
  public:
   /**
-   * Returns the shader that generates colors for drawing.
+   * Returns whether this element is enabled for rendering.
    */
-  virtual std::shared_ptr<Shader> getShader() const = 0;
+  bool enabled() const {
+    return _enabled;
+  }
+
+  /**
+   * Sets whether this element is enabled for rendering.
+   */
+  void setEnabled(bool value);
 
  protected:
-  enum class Type { Gradient, ImagePattern, SolidColor };
+  enum class Type {
+    Rectangle,
+    Ellipse,
+    Polystar,
+    ShapePath,
+    FillStyle,
+    StrokeStyle,
+    TrimPath,
+    RoundCorner,
+    MergePath,
+    Repeater,
+    VectorGroup
+  };
 
-  virtual Type getType() const = 0;
+  VectorElement() = default;
+
+  virtual Type type() const = 0;
+
+  /**
+   * Applies this element's effect to the given context. Geometry elements add paths,
+   * modifiers transform paths, and styles render the accumulated paths.
+   */
+  virtual void apply(VectorContext* context) = 0;
 
  private:
-  friend class Types;
-  friend class FillStyle;
-  friend class StrokeStyle;
+  bool _enabled = true;
+
+  friend class VectorLayer;
+  friend class VectorGroup;
 };
+
 }  // namespace tgfx

@@ -16,46 +16,50 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/layers/LayerProperty.h"
-#include "tgfx/layers/Layer.h"
+#include "tgfx/layers/vectors/Ellipse.h"
+#include "VectorContext.h"
 
 namespace tgfx {
 
-void LayerProperty::invalidateContent() {
-  for (const auto& owner : owners) {
-    owner->invalidateContent();
+void Ellipse::setPosition(const Point& value) {
+  if (_position == value) {
+    return;
   }
+  _position = value;
+  _cachedShape = nullptr;
+  invalidateContent();
 }
 
-void LayerProperty::invalidateTransform() {
-  for (const auto& owner : owners) {
-    owner->invalidateTransform();
+void Ellipse::setSize(const Point& value) {
+  if (_size == value) {
+    return;
   }
+  _size = value;
+  _cachedShape = nullptr;
+  invalidateContent();
 }
 
-void LayerProperty::attachToLayer(Layer* layer) {
-  owners.push_back(layer);
+void Ellipse::setReversed(bool value) {
+  if (_reversed == value) {
+    return;
+  }
+  _reversed = value;
+  _cachedShape = nullptr;
+  invalidateContent();
 }
 
-void LayerProperty::detachFromLayer(Layer* layer) {
-  for (auto it = owners.begin(); it != owners.end(); ++it) {
-    if (*it == layer) {
-      owners.erase(it);
-      break;
-    }
+void Ellipse::apply(VectorContext* context) {
+  if (_cachedShape == nullptr) {
+    auto halfWidth = _size.x * 0.5f;
+    auto halfHeight = _size.y * 0.5f;
+    auto rect =
+        Rect::MakeXYWH(_position.x - halfWidth, _position.y - halfHeight, _size.x, _size.y);
+    Path path;
+    path.addOval(rect, _reversed);
+    _cachedShape = Shape::MakeFrom(path);
   }
-}
-
-void LayerProperty::replaceChildProperty(LayerProperty* oldChild, LayerProperty* newChild) {
-  if (oldChild) {
-    for (const auto& owner : owners) {
-      oldChild->detachFromLayer(owner);
-    }
-  }
-  if (newChild) {
-    for (const auto& owner : owners) {
-      newChild->attachToLayer(owner);
-    }
+  if (_cachedShape) {
+    context->addShape(_cachedShape);
   }
 }
 

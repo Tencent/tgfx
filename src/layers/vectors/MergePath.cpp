@@ -16,36 +16,38 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "tgfx/layers/vectors/MergePath.h"
+#include "VectorContext.h"
 
 namespace tgfx {
-/**
- * Defines the types of a layer.
- */
-enum class LayerType {
-  /**
-   * The type for a generic layer. May be used as a container for other child layers.
-   */
-  Layer,
-  /**
-   * A layer displaying a simple image.
-   */
-  Image,
-  /**
-   * A layer displaying a simple shape.
-   */
-  Shape,
-  /**
-   * A layer displaying a simple text.
-   */
-  Text,
-  /**
-   * A layer that fills its bounds with a solid color.
-   */
-  Solid,
-  /**
-   * A layer displaying vector elements (shapes, text, images) with fill/stroke styles and modifiers.
-   */
-  Vector
-};
+
+void MergePath::setPathOp(PathOp value) {
+  if (_pathOp == value) {
+    return;
+  }
+  _pathOp = value;
+  invalidateContent();
+}
+
+void MergePath::apply(VectorContext* context) {
+  if (context->shapes.empty()) {
+    return;
+  }
+
+  std::shared_ptr<Shape> mergedShape = nullptr;
+  for (size_t i = 0; i < context->shapes.size(); i++) {
+    auto& shape = context->shapes[i];
+    if (shape) {
+      auto shapeWithMatrix = Shape::ApplyMatrix(shape, context->matrices[i]);
+      mergedShape = Shape::Merge(mergedShape, shapeWithMatrix, _pathOp);
+    }
+  }
+  context->shapes.clear();
+  context->matrices.clear();
+  context->painters.clear();
+  if (mergedShape) {
+    context->addShape(std::move(mergedShape));
+  }
+}
+
 }  // namespace tgfx

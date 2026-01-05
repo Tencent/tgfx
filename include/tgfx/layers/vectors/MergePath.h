@@ -18,34 +18,39 @@
 
 #pragma once
 
+#include "tgfx/core/Path.h"
+#include "tgfx/layers/vectors/VectorElement.h"
+
 namespace tgfx {
+
 /**
- * Defines the types of a layer.
+ * MergePath merges multiple paths in the same group into one.
  */
-enum class LayerType {
+class MergePath : public VectorElement {
+ public:
+  MergePath() = default;
+
   /**
-   * The type for a generic layer. May be used as a container for other child layers.
+   * Returns the operation used to merge paths.
    */
-  Layer,
+  PathOp pathOp() const {
+    return _pathOp;
+  }
+
   /**
-   * A layer displaying a simple image.
+   * Sets the operation used to merge paths.
    */
-  Image,
-  /**
-   * A layer displaying a simple shape.
-   */
-  Shape,
-  /**
-   * A layer displaying a simple text.
-   */
-  Text,
-  /**
-   * A layer that fills its bounds with a solid color.
-   */
-  Solid,
-  /**
-   * A layer displaying vector elements (shapes, text, images) with fill/stroke styles and modifiers.
-   */
-  Vector
+  void setPathOp(PathOp value);
+
+ protected:
+  Type type() const override {
+    return Type::MergePath;
+  }
+
+  void apply(VectorContext* context) override;
+
+ private:
+  PathOp _pathOp = PathOp::Append;
 };
+
 }  // namespace tgfx

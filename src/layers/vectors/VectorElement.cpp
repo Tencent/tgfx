@@ -16,36 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "tgfx/layers/vectors/VectorElement.h"
 
 namespace tgfx {
-/**
- * Defines the types of a layer.
- */
-enum class LayerType {
-  /**
-   * The type for a generic layer. May be used as a container for other child layers.
-   */
-  Layer,
-  /**
-   * A layer displaying a simple image.
-   */
-  Image,
-  /**
-   * A layer displaying a simple shape.
-   */
-  Shape,
-  /**
-   * A layer displaying a simple text.
-   */
-  Text,
-  /**
-   * A layer that fills its bounds with a solid color.
-   */
-  Solid,
-  /**
-   * A layer displaying vector elements (shapes, text, images) with fill/stroke styles and modifiers.
-   */
-  Vector
-};
+
+void VectorElement::setEnabled(bool value) {
+  if (_enabled == value) {
+    return;
+  }
+  _enabled = value;
+  invalidateContent();
+}
+
 }  // namespace tgfx

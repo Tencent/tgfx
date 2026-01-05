@@ -32,6 +32,16 @@ class LayerProperty {
 
  protected:
   /**
+   * Called when this property is attached to a layer.
+   */
+  virtual void attachToLayer(Layer* layer);
+
+  /**
+   * Called when this property is detached from a layer.
+   */
+  virtual void detachFromLayer(Layer* layer);
+
+  /**
    *  Called when the property is invalidated. This method will notify the layer that the content
    *  of the layer should be invalidated.
    */
@@ -43,12 +53,12 @@ class LayerProperty {
    */
   void invalidateTransform();
 
- private:
-  void attachToLayer(Layer* layer);
+  /**
+   *  Replaces a child property with a new one, handling owner attach/detach.
+   */
+  void replaceChildProperty(LayerProperty* oldChild, LayerProperty* newChild);
 
-  void detachFromLayer(Layer* layer);
-
-  std::vector<std::weak_ptr<Layer>> owners;
+  std::vector<Layer*> owners;
 
   friend class Layer;
 };

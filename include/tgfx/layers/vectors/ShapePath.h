@@ -18,34 +18,54 @@
 
 #pragma once
 
+#include "tgfx/core/Path.h"
+#include "tgfx/core/Shape.h"
+#include "tgfx/layers/vectors/VectorElement.h"
+
 namespace tgfx {
+
 /**
- * Defines the types of a layer.
+ * ShapePath represents a custom path shape.
  */
-enum class LayerType {
+class ShapePath : public VectorElement {
+ public:
+  ShapePath() = default;
+
   /**
-   * The type for a generic layer. May be used as a container for other child layers.
+   * Returns the path that defines the shape.
    */
-  Layer,
+  const Path& path() const {
+    return _path;
+  }
+
   /**
-   * A layer displaying a simple image.
+   * Sets the path that defines the shape.
    */
-  Image,
+  void setPath(Path value);
+
   /**
-   * A layer displaying a simple shape.
+   * Returns whether the path direction is reversed (counter-clockwise).
    */
-  Shape,
+  bool reversed() const {
+    return _reversed;
+  }
+
   /**
-   * A layer displaying a simple text.
+   * Sets whether the path direction is reversed.
    */
-  Text,
-  /**
-   * A layer that fills its bounds with a solid color.
-   */
-  Solid,
-  /**
-   * A layer displaying vector elements (shapes, text, images) with fill/stroke styles and modifiers.
-   */
-  Vector
+  void setReversed(bool value);
+
+ protected:
+  Type type() const override {
+    return Type::ShapePath;
+  }
+
+  void apply(VectorContext* context) override;
+
+ private:
+  Path _path = {};
+  bool _reversed = false;
+  std::shared_ptr<Shape> _cachedShape = nullptr;
 };
+
 }  // namespace tgfx

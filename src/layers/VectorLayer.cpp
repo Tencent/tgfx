@@ -16,46 +16,44 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/layers/LayerProperty.h"
-#include "tgfx/layers/Layer.h"
+#include "tgfx/layers/VectorLayer.h"
+#include "tgfx/layers/LayerRecorder.h"
+#include "vectors/VectorContext.h"
 
 namespace tgfx {
 
-void LayerProperty::invalidateContent() {
-  for (const auto& owner : owners) {
-    owner->invalidateContent();
-  }
+std::shared_ptr<VectorLayer> VectorLayer::Make() {
+  return std::shared_ptr<VectorLayer>(new VectorLayer());
 }
 
-void LayerProperty::invalidateTransform() {
-  for (const auto& owner : owners) {
-    owner->invalidateTransform();
-  }
-}
-
-void LayerProperty::attachToLayer(Layer* layer) {
-  owners.push_back(layer);
-}
-
-void LayerProperty::detachFromLayer(Layer* layer) {
-  for (auto it = owners.begin(); it != owners.end(); ++it) {
-    if (*it == layer) {
-      owners.erase(it);
-      break;
+void VectorLayer::setContents(std::vector<std::shared_ptr<VectorElement>> value) {
+  for (const auto& element : _contents) {
+    if (element) {
+      detachProperty(element.get());
     }
   }
-}
-
-void LayerProperty::replaceChildProperty(LayerProperty* oldChild, LayerProperty* newChild) {
-  if (oldChild) {
-    for (const auto& owner : owners) {
-      oldChild->detachFromLayer(owner);
+  _contents = std::move(value);
+  for (const auto& element : _contents) {
+    if (element) {
+      attachProperty(element.get());
     }
   }
-  if (newChild) {
-    for (const auto& owner : owners) {
-      newChild->attachToLayer(owner);
+  invalidateContent();
+}
+
+void VectorLayer::onUpdateContent(LayerRecorder* recorder) {
+  if (_contents.empty()) {
+    return;
+  }
+  VectorContext context = {};
+  for (const auto& element : _contents) {
+    if (element && element->enabled()) {
+      element->apply(&context);
     }
+  }
+  // Render all painters
+  for (const auto& painter : context.painters) {
+    painter->draw(recorder, context.shapes);
   }
 }
 

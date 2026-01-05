@@ -18,34 +18,42 @@
 
 #pragma once
 
+#include <vector>
+#include "tgfx/core/Path.h"
+#include "tgfx/core/PathEffect.h"
+#include "tgfx/layers/vectors/VectorElement.h"
+
 namespace tgfx {
+
 /**
- * Defines the types of a layer.
+ * RoundCorner rounds the corners of paths in the same group.
  */
-enum class LayerType {
+class RoundCorner : public VectorElement {
+ public:
+  RoundCorner() = default;
+
   /**
-   * The type for a generic layer. May be used as a container for other child layers.
+   * Returns the radius of the rounded corners.
    */
-  Layer,
+  float radius() const {
+    return _radius;
+  }
+
   /**
-   * A layer displaying a simple image.
+   * Sets the radius of the rounded corners.
    */
-  Image,
-  /**
-   * A layer displaying a simple shape.
-   */
-  Shape,
-  /**
-   * A layer displaying a simple text.
-   */
-  Text,
-  /**
-   * A layer that fills its bounds with a solid color.
-   */
-  Solid,
-  /**
-   * A layer displaying vector elements (shapes, text, images) with fill/stroke styles and modifiers.
-   */
-  Vector
+  void setRadius(float value);
+
+ protected:
+  Type type() const override {
+    return Type::RoundCorner;
+  }
+
+  void apply(VectorContext* context) override;
+
+ private:
+  float _radius = 0.0f;
+  std::shared_ptr<PathEffect> _cachedEffect = nullptr;
 };
+
 }  // namespace tgfx
