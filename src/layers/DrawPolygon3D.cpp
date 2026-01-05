@@ -25,8 +25,6 @@ namespace tgfx {
 
 // Distance tolerance for determining which side of a plane a point lies on.
 static constexpr float SplitThreshold = 0.05f;
-// Tolerance for checking if the normal vector has unit length.
-static constexpr float NormalizedThreshold = 0.001f;
 
 static Vec3 InterpolatePoint(const Vec3& from, const Vec3& to, float delta) {
   return Vec3(from.x + (to.x - from.x) * delta, from.y + (to.y - from.y) * delta,
@@ -109,7 +107,8 @@ float DrawPolygon3D::signedDistanceTo(const Vec3& point) const {
 void DrawPolygon3D::splitAnother(std::unique_ptr<DrawPolygon3D> polygon,
                                  std::unique_ptr<DrawPolygon3D>* front,
                                  std::unique_ptr<DrawPolygon3D>* back, bool* isCoplanar) const {
-  DEBUG_ASSERT(std::abs(_normal.lengthSquared() - 1.0f) <= NormalizedThreshold);
+  // Tolerance for checking if the normal vector has unit length.
+  DEBUG_ASSERT(std::abs(_normal.lengthSquared() - 1.0f) <= 0.001f);
 
   const size_t numPoints = polygon->_points.size();
   std::vector<float> vertexDistance(numPoints);
