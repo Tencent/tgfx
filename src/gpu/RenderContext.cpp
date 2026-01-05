@@ -89,7 +89,7 @@ static std::shared_ptr<ImageCodec> GetGlyphCodec(
     const Font& font, const std::shared_ptr<ScalerContext>& scalerContext, GlyphID glyphID,
     const Stroke* stroke, Point* glyphOffset, bool* shouldRetry = nullptr) {
   auto setRetryValue = [shouldRetry](bool value) {
-  if (shouldRetry) {
+    if (shouldRetry) {
       *shouldRetry = value;
     }
   };
@@ -488,7 +488,8 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
   auto strike = getContext()->atlasStrikeCache()->findOrCreateStrike(strikeKey);
   DEBUG_ASSERT(strike != nullptr);
   const auto atlasBrush = brush.makeWithMatrix(state.matrix);
-  const auto glyphRenderScale = font.scalerContext->getSize() / font.scalerContext->getBackingSize();
+  const auto glyphRenderScale =
+      font.scalerContext->getSize() / font.scalerContext->getBackingSize();
   const auto sampling = GetSamplingOptions(glyphRenderScale, font.isFauxItalic(), state.matrix);
   size_t index = 0;
 
@@ -556,8 +557,7 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
     auto& rect = atlasLocator.getLocation();
     ComputeGlyphFinalMatrix(rect, state.matrix, inverseScale, glyphPosition, &glyphState.matrix,
                             sampling.minFilterMode == FilterMode::Nearest);
-    compositor->fillTextAtlas(std::move(textureProxy), rect, sampling, glyphState,
-                              atlasBrush);
+    compositor->fillTextAtlas(std::move(textureProxy), rect, sampling, glyphState, atlasBrush);
   }
 }
 void RenderContext::drawGlyphsAsPath(std::shared_ptr<GlyphRunList> glyphRunList,
@@ -622,7 +622,8 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
   auto drawingManager = getContext()->drawingManager();
   auto strike = getContext()->atlasStrikeCache()->findOrCreateStrike(strikeKey);
   const auto atlasBrush = brush.makeWithMatrix(state.matrix);
-  const auto glyphRenderScale = font.scalerContext->getSize() / font.scalerContext->getBackingSize();
+  const auto glyphRenderScale =
+      font.scalerContext->getSize() / font.scalerContext->getBackingSize();
   size_t index = 0;
 
   for (auto& glyphID : sourceGlyphRun.glyphs) {
