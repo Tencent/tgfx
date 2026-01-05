@@ -1226,14 +1226,9 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
   auto affineRelativeMatrix =
       isMatrixAffine ? GetMayLossyAffineMatrix(relativeMatrix) : Matrix::I();
 
+  // Note: RecordPicture does not use layerClipBounds here. Using clipBounds may cause PathOp
+  // errors when extracting maskPath from the picture, resulting in incorrect clip regions.
   auto maskPicture = RecordPicture(maskArgs.drawMode, scale, [&](Canvas* canvas) {
-    if (layerClipBounds.has_value()) {
-      auto scaledClipBounds = *layerClipBounds;
-      scaledClipBounds.scale(scale, scale);
-      scaledClipBounds.roundOut();
-      scaledClipBounds.scale(1.0f / scale, 1.0f / scale);
-      canvas->clipRect(scaledClipBounds);
-    }
     canvas->concat(affineRelativeMatrix);
     _mask->drawLayer(maskArgs, canvas, _mask->_alpha, BlendMode::SrcOver);
   });
@@ -1241,20 +1236,25 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
     return {};
   }
 
-  // TODO:
-  // The mask path gets clipped by layerClipBounds, causing incorrect masking in some tiles.
-  // Temporarily disabled until the issue is fixed.
-  // if (isMatrixAffine && maskType != LayerMaskType::Luminance) {
-  //   Path maskPath = {};
-  //   if (MaskContext::GetMaskPath(maskPicture, &maskPath)) {
-  //     maskPath.transform(Matrix::MakeScale(1.0f / scale, 1.0f / scale));
-  //     return {std::move(maskPath), nullptr};
-  //   }
-  // }
+  if (isMatrixAffine && maskType != LayerMaskType::Luminance) {
+    Path maskPath = {};
+    if (MaskContext::GetMaskPath(maskPicture, &maskPath)) {
+      maskPath.transform(Matrix::MakeScale(1.0f / scale, 1.0f / scale));
+      return {std::move(maskPath), nullptr};
+    }
+  }
 
+  Rect maskBounds = maskPicture->getBounds();
+  if (layerClipBounds.has_value()) {
+    auto scaledClipBounds = *layerClipBounds;
+    scaledClipBounds.scale(scale, scale);
+    if (!maskBounds.intersect(scaledClipBounds)) {
+      return {};
+    }
+  }
   Point maskImageOffset = {};
   auto maskContentImage =
-      ToImageWithOffset(std::move(maskPicture), &maskImageOffset, nullptr, args.dstColorSpace);
+      ToImageWithOffset(std::move(maskPicture), &maskImageOffset, &maskBounds, args.dstColorSpace);
   if (maskContentImage == nullptr) {
     return {};
   }

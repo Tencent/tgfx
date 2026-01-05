@@ -27,9 +27,12 @@ std::shared_ptr<ReturnQueue> ReturnQueue::Make() {
 }
 
 void ReturnQueue::NotifyReferenceReachedZero(ReturnNode* node) {
-  DEBUG_ASSERT(node->unreferencedQueue != nullptr);
-  node->unreferencedQueue->queue.enqueue(node);
-  node->unreferencedQueue = nullptr;
+  // Move unreferencedQueue to a local variable before enqueue. Once enqueued, the node may be
+  // immediately dequeued and deleted by another thread, causing a data race if we access the node's
+  // unreferencedQueue member afterwards.
+  auto unreferencedQueue = std::move(node->unreferencedQueue);
+  DEBUG_ASSERT(unreferencedQueue != nullptr);
+  unreferencedQueue->queue.enqueue(node);
 }
 
 ReturnQueue::~ReturnQueue() {

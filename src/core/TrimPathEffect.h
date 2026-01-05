@@ -23,15 +23,13 @@
 namespace tgfx {
 class TrimPathEffect : public PathEffect {
  public:
-  TrimPathEffect(float startT, float stopT, bool inverted)
-      : startT(startT), stopT(stopT), inverted(inverted) {
+  TrimPathEffect(float start, float end) : start(start), end(end) {
   }
 
   bool filterPath(Path* path) const override;
 
  private:
-  float startT = 0.0f;
-  float stopT = 1.0f;
-  bool inverted = false;
+  float start = 0.0f;
+  float end = 1.0f;
 };
 }  // namespace tgfx
