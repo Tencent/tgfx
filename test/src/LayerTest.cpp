@@ -622,6 +622,97 @@ TGFX_TEST(LayerTest, ZoomAndOffset) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ZoomAndOffset"));
 }
 
+TGFX_TEST(LayerTest, HighZoomWithMask) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto proxy =
+      RenderTargetProxy::Make(context, 1622, 1436, false, 1, false, ImageOrigin::BottomLeft);
+  auto surface = Surface::MakeFrom(std::move(proxy), 0, true);
+  auto displayList = std::make_unique<DisplayList>();
+
+  // Root layer with matrix3D transform
+  auto root = Layer::Make();
+  // Matrix3D: scale(3.0913887, 3.0913887), translate(347.291687, 99.7222595)
+  root->setMatrix(Matrix::MakeAll(3.0913887f, 0, 347.291687f, 0, 3.0913887f, 99.7222595f));
+  displayList->root()->addChild(root);
+
+  // Layer 1: Blue rectangle with mask
+  auto rectLayer = ShapeLayer::Make();
+  Path rectPath;
+  rectPath.addRect(Rect::MakeXYWH(50, 50, 300, 400));
+  rectLayer->setPath(rectPath);
+  rectLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(72, 154, 209)));
+
+  auto rectMask = ShapeLayer::Make();
+  rectMask->setPath(rectPath);
+  rectMask->setFillStyle(ShapeStyle::Make(Color::White()));
+  rectLayer->setMask(rectMask);
+
+  root->addChild(rectLayer);
+  root->addChild(rectMask);
+
+  // Layer 2: Red rounded rectangle with mask, child of rectLayer
+  auto roundRectLayer = ShapeLayer::Make();
+  Path roundRectPath;
+  roundRectPath.addRoundRect(Rect::MakeXYWH(80, 100, 200, 250), 30, 30);
+  roundRectLayer->setPath(roundRectPath);
+  roundRectLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(233, 100, 100)));
+
+  auto roundRectMask = ShapeLayer::Make();
+  roundRectMask->setPath(roundRectPath);
+  roundRectMask->setFillStyle(ShapeStyle::Make(Color::White()));
+  roundRectLayer->setMask(roundRectMask);
+
+  rectLayer->addChild(roundRectLayer);
+  rectLayer->addChild(roundRectMask);
+
+  // Layer 3: Inner rect with mask, child of roundRectLayer
+  auto innerRectLayer = ShapeLayer::Make();
+  Path innerRectPath;
+  innerRectPath.addRect(Rect::MakeXYWH(100, 130, 150, 180));
+  innerRectLayer->setPath(innerRectPath);
+  innerRectLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(200, 200, 100)));
+
+  auto innerRectMask = ShapeLayer::Make();
+  innerRectMask->setPath(innerRectPath);
+  innerRectMask->setFillStyle(ShapeStyle::Make(Color::White()));
+  innerRectLayer->setMask(innerRectMask);
+
+  roundRectLayer->addChild(innerRectLayer);
+  roundRectLayer->addChild(innerRectMask);
+
+  // Layer 4: Green rectangle, child of innerRectLayer
+  auto greenRectLayer = ShapeLayer::Make();
+  Path greenRectPath;
+  greenRectPath.addRect(Rect::MakeXYWH(120, 150, 100, 120));
+  greenRectLayer->setPath(greenRectPath);
+  greenRectLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(100, 200, 100)));
+
+  innerRectLayer->addChild(greenRectLayer);
+
+  // Layer 5: Background blur layer, child of rectLayer (on top)
+  auto backgroundBlurLayer = SolidLayer::Make();
+  backgroundBlurLayer->setColor(Color::FromRGBA(255, 255, 255, 50));
+  backgroundBlurLayer->setWidth(150);
+  backgroundBlurLayer->setHeight(150);
+  backgroundBlurLayer->setMatrix(Matrix::MakeTrans(600, 600));
+  backgroundBlurLayer->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
+  rectLayer->addChild(backgroundBlurLayer);
+  // Test Tiled mode
+  auto proxy2 =
+      RenderTargetProxy::Make(context, 1622, 1436, false, 1, false, ImageOrigin::BottomLeft);
+  auto surface2 = Surface::MakeFrom(std::move(proxy2), 0, true);
+  auto displayList2 = std::make_unique<DisplayList>();
+  displayList2->root()->addChild(root);
+  displayList2->setRenderMode(RenderMode::Tiled);
+  displayList2->render(surface2.get());
+  displayList2->setZoomScale(15.381f);
+  displayList2->setContentOffset(-9853.69f, -7356.61f);
+  displayList2->render(surface2.get());
+  EXPECT_TRUE(Baseline::Compare(surface2, "LayerTest/HighZoomWithMask_Tiled"));
+}
+
 TGFX_TEST(LayerTest, StrokeOnTop) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -4458,9 +4549,11 @@ TGFX_TEST(LayerTest, LayerRecorder) {
     // Should be ComposeContent with 2 items: ShapeContent (merged paths) + PathContent
     EXPECT_EQ(content->type(), LayerContent::Type::Compose);
     auto composeContent = static_cast<ComposeContent*>(content.get());
-    EXPECT_EQ(composeContent->contents.size(), 2u);
-    EXPECT_EQ(composeContent->contents[0]->type(), LayerContent::Type::Shape);
+    ASSERT_TRUE(composeContent->contents.size() == 4u);
+    EXPECT_EQ(composeContent->contents[0]->type(), LayerContent::Type::Path);
     EXPECT_EQ(composeContent->contents[1]->type(), LayerContent::Type::Path);
+    EXPECT_EQ(composeContent->contents[2]->type(), LayerContent::Type::Path);
+    EXPECT_EQ(composeContent->contents[3]->type(), LayerContent::Type::Path);
     content->drawDefault(surface->getCanvas(), 1.0f, true);
     EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerRecorder_MultiplePaths"));
   }

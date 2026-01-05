@@ -552,8 +552,9 @@ std::shared_ptr<TextureProxy> OpsCompositor::getClipTexture(const Path& clip, AA
   if (bounds.isEmpty()) {
     return nullptr;
   }
-  auto width = FloatCeilToInt(bounds.width());
-  auto height = FloatCeilToInt(bounds.height());
+  bounds.roundOut();
+  auto width = FloatSaturateToInt(bounds.width());
+  auto height = FloatSaturateToInt(bounds.height());
   auto rasterizeMatrix = Matrix::MakeTrans(-bounds.left, -bounds.top);
   if (PathTriangulator::ShouldTriangulatePath(clip)) {
     auto clipBounds = Rect::MakeWH(width, height);
@@ -600,9 +601,9 @@ std::pair<PlacementPtr<FragmentProcessor>, bool> OpsCompositor::getClipMaskFP(co
     return {nullptr, false};
   }
   auto clipBounds = getClipBounds(clip);
+  clipBounds.roundOut();
   *scissorRect = clipBounds;
   FlipYIfNeeded(scissorRect, renderTarget.get());
-  scissorRect->roundOut();
   auto textureProxy = getClipTexture(clip, aaType);
   auto uvMatrix = Matrix::MakeTrans(-clipBounds.left, -clipBounds.top);
   if (renderTarget->origin() == ImageOrigin::BottomLeft) {

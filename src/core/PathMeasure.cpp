@@ -62,6 +62,10 @@ class PkPathMeasure : public PathMeasure {
     return pathMeasure->isClosed();
   }
 
+  bool nextContour() override {
+    return pathMeasure->nextContour();
+  }
+
  private:
   SkPathMeasure* pathMeasure = nullptr;
 };
