@@ -40,6 +40,11 @@ static size_t PrevIndex(size_t i, size_t count) {
   return (i + count - 1) % count;
 }
 
+static Point ProjectPoint(const Matrix3D& matrix, const Vec3& point) {
+  auto result = matrix.mapPoint(point);
+  return Point::Make(result.x, result.y);
+}
+
 static void CollectSplitPoints(const std::vector<Vec3>& points, const Vec3& startIntersection,
                                const Vec3& endIntersection, size_t beginIndex, size_t endIndex,
                                std::vector<Vec3>* result) {
@@ -212,44 +217,38 @@ std::vector<QuadCW> DrawPolygon3D::toQuads() const {
     DEBUG_ASSERT(false);
     return quads;
   }
-  // Convert target space points back to local space
   Matrix3D inverseMatrix;
   if (!_matrix.invert(&inverseMatrix)) {
     DEBUG_ASSERT(false);
     return quads;
   }
 
-  auto toLocal = [&inverseMatrix](const Vec3& targetPoint) -> Point {
-    auto local = inverseMatrix.mapPoint(targetPoint);
-    return Point::Make(local.x, local.y);
-  };
+  // Project all 3D points to 2D local space
+  std::vector<Point> localPoints;
+  localPoints.reserve(n);
+  for (const auto& point : _points) {
+    localPoints.push_back(ProjectPoint(inverseMatrix, point));
+  }
 
   if (n == 3) {
     // Triangle: degenerate to quad (p2 == p3)
-    quads.push_back(
-        QuadCW(toLocal(_points[0]), toLocal(_points[1]), toLocal(_points[2]), toLocal(_points[2])));
+    quads.push_back(QuadCW(localPoints[0], localPoints[1], localPoints[2], localPoints[2]));
     return quads;
   }
   if (n == 4) {
     // Quadrilateral: direct mapping
-    quads.push_back(
-        QuadCW(toLocal(_points[0]), toLocal(_points[1]), toLocal(_points[2]), toLocal(_points[3])));
+    quads.push_back(QuadCW(localPoints[0], localPoints[1], localPoints[2], localPoints[3]));
     return quads;
   }
   // n > 4: Fan decomposition into quads, each quad covers two triangles when possible.
   for (size_t i = 1; i + 2 < n; i += 2) {
-    const Point p0 = toLocal(_points[0]);
-    const Point p1 = toLocal(_points[i]);
-    const Point p2 = toLocal(_points[i + 1]);
-    const Point p3 = (i + 2 < n) ? toLocal(_points[i + 2]) : p2;
-    quads.push_back(QuadCW(p0, p1, p2, p3));
+    auto p3 = (i + 2 < n) ? localPoints[i + 2] : localPoints[i + 1];
+    quads.push_back(QuadCW(localPoints[0], localPoints[i], localPoints[i + 1], p3));
   }
   // Handle remaining triangle if odd number of triangles.
   if ((n - 2) % 2 == 1) {
-    const Point p0 = toLocal(_points[0]);
-    const Point p1 = toLocal(_points[n - 2]);
-    const Point p2 = toLocal(_points[n - 1]);
-    quads.push_back(QuadCW(p0, p1, p2, p2));
+    quads.push_back(
+        QuadCW(localPoints[0], localPoints[n - 2], localPoints[n - 1], localPoints[n - 1]));
   }
   return quads;
 }

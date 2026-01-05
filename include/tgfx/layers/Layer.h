@@ -21,13 +21,13 @@
 #include <memory>
 #include <optional>
 #include <unordered_set>
-#include "tgfx/layers/TransformStyle.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/layers/LayerMaskType.h"
 #include "tgfx/layers/LayerRecorder.h"
 #include "tgfx/layers/LayerType.h"
+#include "tgfx/layers/TransformStyle.h"
 #include "tgfx/layers/filters/LayerFilter.h"
 #include "tgfx/layers/layerstyles/LayerStyle.h"
 

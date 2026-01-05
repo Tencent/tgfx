@@ -2270,9 +2270,8 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> contextTransfo
   // Ensure the 3D filter is not released during the entire function lifetime.
   std::vector<std::shared_ptr<LayerFilter>> current3DFilterVector = {};
   if (localToContext3D != nullptr) {
-    contextTransformer = MakeTransformerFromTransform3D(*localToContext3D,
-                                                        std::move(contextTransformer),
-                                                        &current3DFilterVector);
+    contextTransformer = MakeTransformerFromTransform3D(
+        *localToContext3D, std::move(contextTransformer), &current3DFilterVector);
   }
   if (!_layerStyles.empty() || !_filters.empty()) {
     // Filters and styles interrupt 3D rendering context, so non-root layers inside 3D rendering

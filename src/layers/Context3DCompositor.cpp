@@ -213,6 +213,7 @@ std::shared_ptr<Image> Context3DCompositor::finish() {
 
   if (!_polygons.empty()) {
     BspTree bspTree(std::move(_polygons));
+    _polygons.clear();
     bspTree.traverseBackToFront([this](const DrawPolygon3D* polygon) { drawPolygon(polygon); });
   }
 
