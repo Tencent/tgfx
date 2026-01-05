@@ -51,12 +51,17 @@ void VectorGroup::setElements(std::vector<std::shared_ptr<VectorElement>> value)
       DEBUG_ASSERT(element != nullptr);
       element->detachFromLayer(owner);
     }
-    for (const auto& element : value) {
-      DEBUG_ASSERT(element != nullptr);
+  }
+  _elements.clear();
+  for (auto& element : value) {
+    if (element == nullptr) {
+      continue;
+    }
+    for (const auto& owner : owners) {
       element->attachToLayer(owner);
     }
+    _elements.push_back(std::move(element));
   }
-  _elements = std::move(value);
   invalidateContent();
 }
 

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/VectorLayer.h"
+#include "core/utils/Log.h"
 #include "tgfx/layers/LayerRecorder.h"
 #include "vectors/VectorContext.h"
 
@@ -28,23 +29,23 @@ std::shared_ptr<VectorLayer> VectorLayer::Make() {
 
 VectorLayer::~VectorLayer() {
   for (const auto& element : _contents) {
-    if (element) {
-      detachProperty(element.get());
-    }
+    DEBUG_ASSERT(element != nullptr);
+    detachProperty(element.get());
   }
 }
 
 void VectorLayer::setContents(std::vector<std::shared_ptr<VectorElement>> value) {
   for (const auto& element : _contents) {
-    if (element) {
-      detachProperty(element.get());
-    }
+    DEBUG_ASSERT(element != nullptr);
+    detachProperty(element.get());
   }
-  _contents = std::move(value);
-  for (const auto& element : _contents) {
-    if (element) {
-      attachProperty(element.get());
+  _contents.clear();
+  for (auto& element : value) {
+    if (element == nullptr) {
+      continue;
     }
+    attachProperty(element.get());
+    _contents.push_back(std::move(element));
   }
   invalidateContent();
 }
@@ -55,7 +56,8 @@ void VectorLayer::onUpdateContent(LayerRecorder* recorder) {
   }
   VectorContext context = {};
   for (const auto& element : _contents) {
-    if (element && element->enabled()) {
+    DEBUG_ASSERT(element != nullptr);
+    if (element->enabled()) {
       element->apply(&context);
     }
   }

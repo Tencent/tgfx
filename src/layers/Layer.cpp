@@ -354,11 +354,16 @@ void Layer::setFilters(std::vector<std::shared_ptr<LayerFilter>> value) {
     return;
   }
   for (const auto& filter : _filters) {
+    DEBUG_ASSERT(filter != nullptr);
     filter->detachFromLayer(this);
   }
-  _filters = std::move(value);
-  for (const auto& filter : _filters) {
+  _filters.clear();
+  for (auto& filter : value) {
+    if (filter == nullptr) {
+      continue;
+    }
     filter->attachToLayer(this);
+    _filters.push_back(std::move(filter));
   }
   invalidateSubtree();
   invalidateTransform();
@@ -418,11 +423,16 @@ void Layer::setLayerStyles(std::vector<std::shared_ptr<LayerStyle>> value) {
     return;
   }
   for (const auto& layerStyle : _layerStyles) {
+    DEBUG_ASSERT(layerStyle != nullptr);
     layerStyle->detachFromLayer(this);
   }
-  _layerStyles = std::move(value);
-  for (const auto& layerStyle : _layerStyles) {
+  _layerStyles.clear();
+  for (auto& layerStyle : value) {
+    if (layerStyle == nullptr) {
+      continue;
+    }
     layerStyle->attachToLayer(this);
+    _layerStyles.push_back(std::move(layerStyle));
   }
   invalidateSubtree();
   invalidateTransform();
