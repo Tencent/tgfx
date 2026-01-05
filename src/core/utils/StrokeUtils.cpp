@@ -5,11 +5,13 @@
 
 namespace tgfx {
 
-void ApplyStrokeToBounds(const Stroke& stroke, Rect* bounds, bool applyMiterLimit) {
+void ApplyStrokeToBounds(const Stroke& stroke, Rect* bounds, const Matrix& matrix,
+                         bool applyMiterLimit) {
   if (bounds == nullptr) {
     return;
   }
-  auto expand = stroke.width * 0.5f;
+  auto width = TreatStrokeAsHairline(stroke, matrix) ? 1.0f : stroke.width;
+  auto expand = width * 0.5f;
   if (applyMiterLimit && stroke.join == LineJoin::Miter) {
     expand *= stroke.miterLimit;
   }

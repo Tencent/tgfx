@@ -24,9 +24,14 @@
 
 namespace tgfx {
 /**
- * Applies the stroke options to the given bounds.
+ * Applies the stroke options to the given bounds. 
+ * The matrix parameter is used to determine the final rendering scale. If the stroke width becomes
+ * less than 1 pixel after applying the matrix, it will be rendered as a hairline (1 pixel width),
+ * so the bounds expansion is calculated based on a width of 1 pixel instead of the actual stroke
+ * width.
  */
-void ApplyStrokeToBounds(const Stroke& stroke, Rect* bounds, bool applyMiterLimit = false);
+void ApplyStrokeToBounds(const Stroke& stroke, Rect* bounds, const Matrix& matrix = Matrix::I(),
+                         bool applyMiterLimit = false);
 
 /**
  * Returns true if the stroke is a hairline (width <= 0).

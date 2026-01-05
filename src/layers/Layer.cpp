@@ -597,19 +597,18 @@ Rect Layer::getBoundsInternal(const Matrix3D& coordinateMatrix, bool computeTigh
 }
 
 Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBounds) {
-  // If the matrix only contains 2D affine transformations, directly use the equivalent 2D
-  // transformation matrix to calculate the final Bounds
-  bool isCoordinateMatrixAffine = IsMatrix3DAffine(coordinateMatrix);
-  auto workAffineMatrix =
-      isCoordinateMatrixAffine ? GetMayLossyAffineMatrix(coordinateMatrix) : Matrix::I();
-  auto workMatrix3D = isCoordinateMatrixAffine ? Matrix3D(workAffineMatrix) : coordinateMatrix;
+  bool isAffine = IsMatrix3DAffine(coordinateMatrix);
+  bool hasEffects = !_layerStyles.empty() || !_filters.empty();
+  // When has effects or non-affine, compute in local coordinates first, then apply matrix at end.
+  bool applyMatrixAtEnd = hasEffects || !isAffine;
+  auto contentMatrix = applyMatrixAtEnd ? Matrix::I() : GetMayLossyAffineMatrix(coordinateMatrix);
 
   Rect bounds = {};
   if (auto content = getContent()) {
     if (computeTightBounds) {
-      bounds.join(content->getTightBounds(workAffineMatrix));
+      bounds.join(content->getTightBounds(contentMatrix));
     } else {
-      bounds.join(workAffineMatrix.mapRect(content->getBounds()));
+      bounds.join(contentMatrix.mapRect(content->getBounds()));
     }
   }
 
@@ -619,7 +618,7 @@ Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBou
       continue;
     }
     auto childMatrix = child->getMatrixWithScrollRect();
-    childMatrix.postConcat(workMatrix3D);
+    childMatrix.postConcat(Matrix3D(contentMatrix));
     auto childBounds = child->getBoundsInternal(childMatrix, computeTightBounds);
     if (child->_scrollRect) {
       auto relatvieScrollRect = childMatrix.mapRect(*child->_scrollRect);
@@ -638,27 +637,23 @@ Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBou
     bounds.join(childBounds);
   }
 
-  if (!_layerStyles.empty() || !_filters.empty()) {
-    auto contentScale = workAffineMatrix.getMaxScale();
+  if (hasEffects) {
     auto layerBounds = bounds;
     for (auto& layerStyle : _layerStyles) {
-      auto styleBounds = layerStyle->filterBounds(layerBounds, contentScale);
+      auto styleBounds = layerStyle->filterBounds(layerBounds, 1.0f);
       bounds.join(styleBounds);
     }
     for (auto& filter : _filters) {
-      bounds = filter->filterBounds(bounds, contentScale);
+      bounds = filter->filterBounds(bounds, 1.0f);
     }
   }
 
-  if (isCoordinateMatrixAffine) {
-    return bounds;
+  if (applyMatrixAtEnd) {
+    bounds = coordinateMatrix.mapRect(bounds);
+    if (!isAffine) {
+      bounds.roundOut();
+    }
   }
-
-  // If the matrix contains Z-axis transformations and projection transformations, first calculate
-  // the Bounds using the identity matrix, then apply the 3D transformation to the result.
-  // Otherwise, use the equivalent affine transformation matrix to calculate the Bounds.
-  bounds = coordinateMatrix.mapRect(bounds);
-  bounds.roundOut();
   return bounds;
 }
 
@@ -1068,14 +1063,9 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
   auto affineRelativeMatrix =
       isMatrixAffine ? GetMayLossyAffineMatrix(relativeMatrix) : Matrix::I();
 
+  // Note: RecordPicture does not use layerClipBounds here. Using clipBounds may cause PathOp
+  // errors when extracting maskPath from the picture, resulting in incorrect clip regions.
   auto maskPicture = RecordPicture(maskArgs.drawMode, scale, [&](Canvas* canvas) {
-    if (layerClipBounds.has_value()) {
-      auto scaledClipBounds = *layerClipBounds;
-      scaledClipBounds.scale(scale, scale);
-      scaledClipBounds.roundOut();
-      scaledClipBounds.scale(1.0f / scale, 1.0f / scale);
-      canvas->clipRect(scaledClipBounds);
-    }
     canvas->concat(affineRelativeMatrix);
     _mask->drawLayer(maskArgs, canvas, _mask->_alpha, BlendMode::SrcOver);
   });
@@ -1083,20 +1073,25 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
     return {};
   }
 
-  // TODO:
-  // The mask path gets clipped by layerClipBounds, causing incorrect masking in some tiles.
-  // Temporarily disabled until the issue is fixed.
-  // if (isMatrixAffine && maskType != LayerMaskType::Luminance) {
-  //   Path maskPath = {};
-  //   if (MaskContext::GetMaskPath(maskPicture, &maskPath)) {
-  //     maskPath.transform(Matrix::MakeScale(1.0f / scale, 1.0f / scale));
-  //     return {std::move(maskPath), nullptr};
-  //   }
-  // }
+  if (isMatrixAffine && maskType != LayerMaskType::Luminance) {
+    Path maskPath = {};
+    if (MaskContext::GetMaskPath(maskPicture, &maskPath)) {
+      maskPath.transform(Matrix::MakeScale(1.0f / scale, 1.0f / scale));
+      return {std::move(maskPath), nullptr};
+    }
+  }
 
+  Rect maskBounds = maskPicture->getBounds();
+  if (layerClipBounds.has_value()) {
+    auto scaledClipBounds = *layerClipBounds;
+    scaledClipBounds.scale(scale, scale);
+    if (!maskBounds.intersect(scaledClipBounds)) {
+      return {};
+    }
+  }
   Point maskImageOffset = {};
   auto maskContentImage =
-      ToImageWithOffset(std::move(maskPicture), &maskImageOffset, nullptr, args.dstColorSpace);
+      ToImageWithOffset(std::move(maskPicture), &maskImageOffset, &maskBounds, args.dstColorSpace);
   if (maskContentImage == nullptr) {
     return {};
   }
@@ -1780,8 +1775,8 @@ void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
       args.blurBackground ? GetClipBounds(args.blurBackground->getCanvas()) : std::nullopt;
   for (const auto& layerStyle : _layerStyles) {
     if (layerStyle->position() != position ||
-        std::find(extraSourceTypes.begin(), extraSourceTypes.end(), layerStyle->extraSourceType()) ==
-            extraSourceTypes.end()) {
+        std::find(extraSourceTypes.begin(), extraSourceTypes.end(),
+                  layerStyle->extraSourceType()) == extraSourceTypes.end()) {
       continue;
     }
     PictureRecorder recorder = {};

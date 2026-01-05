@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "FillTypeShape.h"
+#include "core/shapes/MatrixShape.h"
 #include "core/shapes/PathShape.h"
 
 namespace tgfx {
@@ -33,6 +34,13 @@ std::shared_ptr<Shape> Shape::ApplyFillType(std::shared_ptr<Shape> shape, PathFi
   if (shape->type() == Type::FillType) {
     auto fillTypeShape = std::static_pointer_cast<FillTypeShape>(shape);
     return std::make_shared<FillTypeShape>(fillTypeShape->shape, fillType);
+  }
+  // Apply fill type to the inner shape of MatrixShape, so that the outer matrix can be used to
+  // do some optimization.
+  if (shape->type() == Type::Matrix) {
+    auto matrixShape = std::static_pointer_cast<MatrixShape>(shape);
+    auto innerShape = ApplyFillType(matrixShape->shape, fillType);
+    return std::make_shared<MatrixShape>(std::move(innerShape), matrixShape->matrix);
   }
   return std::make_shared<FillTypeShape>(std::move(shape), fillType);
 }
