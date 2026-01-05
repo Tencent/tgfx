@@ -159,8 +159,7 @@ void LayerRecorder::flushPending(PendingType newType, const LayerPaint& newPaint
         break;
       case PendingType::Shape:
         if (pendingShape->isSimplePath()) {
-          list.push_back(
-              std::make_unique<PathContent>(pendingShape->getPath(), pendingPaint));
+          list.push_back(std::make_unique<PathContent>(pendingShape->getPath(), pendingPaint));
         } else {
           list.push_back(std::make_unique<ShapeContent>(std::move(pendingShape), pendingPaint));
         }
