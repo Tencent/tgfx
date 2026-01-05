@@ -716,4 +716,42 @@ TGFX_TEST(SVGRenderTest, ProtocolFilterReadWrite) {
   }
 }
 
+TGFX_TEST(SVGRenderTest, DisplayP3Render) {
+  auto stream = Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/displayp3.svg"));
+  ASSERT_TRUE(stream != nullptr);
+  auto SVGDom = SVGDOM::Make(*stream);
+  auto rootNode = SVGDom->getRoot();
+  ASSERT_TRUE(rootNode != nullptr);
+
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto size = SVGDom->getContainerSize();
+  auto surface = Surface::Make(context, static_cast<int>(size.width), static_cast<int>(size.height),
+                               false, 1, false, 0, ColorSpace::DisplayP3());
+  auto canvas = surface->getCanvas();
+
+  SVGDom->render(canvas);
+  EXPECT_TRUE(Baseline::Compare(surface, "SVGTest/p3"));
+}
+
+TGFX_TEST(SVGRenderTest, WideGamutColorSpaces) {
+  auto stream = Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/widegamut.svg"));
+  ASSERT_TRUE(stream != nullptr);
+  auto SVGDom = SVGDOM::Make(*stream);
+  auto rootNode = SVGDom->getRoot();
+  ASSERT_TRUE(rootNode != nullptr);
+
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto size = SVGDom->getContainerSize();
+  auto surface = Surface::Make(context, static_cast<int>(size.width), static_cast<int>(size.height),
+                               false, 1, false, 0, ColorSpace::DisplayP3());
+  auto canvas = surface->getCanvas();
+
+  SVGDom->render(canvas);
+  EXPECT_TRUE(Baseline::Compare(surface, "SVGTest/widegamut"));
+}
+
 }  // namespace tgfx

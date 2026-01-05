@@ -398,17 +398,19 @@
         "complex3": "543054b5",
         "complex4": "880d5a6c",
         "complex5": "880d5a6c",
-        "complex6": "543054b5",
-        "complex7": "543054b5",
+        "complex6": "cd158924",
+        "complex7": "cd158924",
         "jpg_image": "b1db872",
         "mask": "da364e8",
+        "p3": "cd158924",
         "path": "543054b5",
         "png_image": "b1db872",
         "radialGradient": "b1db872",
         "referenceStyle": "543054b5",
         "text": "c4c06bec",
         "textEmoji": "9bfe8c34",
-        "textFont": "c4c06bec"
+        "textFont": "c4c06bec",
+        "widegamut": "cd158924"
     },
     "StrokeTest": {
         "DashStrokeAsSolidStroke": "eefb7a46",
