@@ -161,8 +161,7 @@ void Repeater::apply(VectorContext* context) {
       for (auto& painter : context->painters) {
         painter->offsetShapeIndex(copyShapes.size());
       }
-      context->shapes.insert(context->shapes.begin(),
-                             std::make_move_iterator(copyShapes.begin()),
+      context->shapes.insert(context->shapes.begin(), std::make_move_iterator(copyShapes.begin()),
                              std::make_move_iterator(copyShapes.end()));
       context->matrices.insert(context->matrices.begin(),
                                std::make_move_iterator(copyMatrices.begin()),

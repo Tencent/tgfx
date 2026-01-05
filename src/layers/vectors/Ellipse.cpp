@@ -52,8 +52,7 @@ void Ellipse::apply(VectorContext* context) {
   if (_cachedShape == nullptr) {
     auto halfWidth = _size.x * 0.5f;
     auto halfHeight = _size.y * 0.5f;
-    auto rect =
-        Rect::MakeXYWH(_position.x - halfWidth, _position.y - halfHeight, _size.x, _size.y);
+    auto rect = Rect::MakeXYWH(_position.x - halfWidth, _position.y - halfHeight, _size.x, _size.y);
     Path path;
     path.addOval(rect, _reversed);
     _cachedShape = Shape::MakeFrom(path);
