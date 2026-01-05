@@ -1,5 +1,5 @@
 ---
-description: 运行测试、编写测试、更新截图基准时
+description: 当需要运行测试、编写测试用例、或涉及截图对比/更新基准时
 alwaysApply: false
 ---
 
