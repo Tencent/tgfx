@@ -48,18 +48,18 @@ class PathEffect {
   static std::shared_ptr<PathEffect> MakeCorner(float radius);
 
   /**
-   * Creates a path effect that returns a subset of the input path based on the given startT and
-   * stopT values. The trim values apply to the entire path, so if it contains several contours,
-   * all of them are included in the calculation. The startT and stopT values must be in the range
-   * of 0 to 1 (inclusive). If they are outside this range, they will be clamped to the nearest
-   * valid value. Returns nullptr if either value is NaN, or if the result would be the full path
-   * (no trimming needed).
-   * @param startT The starting "t" value for the segment.
-   * @param stopT The ending "t" value for the segment.
-   * @param inverted If false (default), returns the subset [startT, stopT]. If true, returns the
-   * complement [0, startT] + [stopT, 1].
+   * Creates a path effect that extracts a segment from the input path. The segment is defined by
+   * start and end positions, where 0 represents the beginning and 1 represents the end of the path.
+   * Values outside [0, 1] are allowed and will wrap around cyclically. If the path contains multiple
+   * contours, all of them are included in the length calculation. When end < start, the resulting
+   * path will be reversed. If the range crosses the start point of a closed contour, the result
+   * remains seamlessly connected without a gap.
+   * @param start The starting position of the segment.
+   * @param end The ending position of the segment.
+   * @return Returns nullptr if start or end is NaN, or if the result would be the full path (no
+   * trimming needed).
    */
-  static std::shared_ptr<PathEffect> MakeTrim(float startT, float stopT, bool inverted = false);
+  static std::shared_ptr<PathEffect> MakeTrim(float start, float end);
 
   virtual ~PathEffect() = default;
 
