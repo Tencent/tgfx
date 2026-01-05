@@ -24,10 +24,12 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include "core/ColorSpaceXformSteps.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "svg/SVGUtils.h"
 #include "tgfx/core/Color.h"
+#include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/Typeface.h"
 #include "tgfx/core/UTF.h"
 #include "tgfx/svg/SVGTypes.h"
@@ -388,9 +390,54 @@ bool SVGAttributeParser::parseRGBAColorToken(Color* c) {
       c);
 }
 
+// https://www.w3.org/TR/css-color-4/#color-function
+// Parses color(<colorspace> r g b) format.
+// Supported colorspaces: display-p3, a98-rgb, rec2020
+// Colors are converted to sRGB for storage.
+bool SVGAttributeParser::parseColorFunctionToken(Color* c) {
+  return this->parseParenthesized(
+      "color",
+      [this](Color* c) -> bool {
+        std::shared_ptr<ColorSpace> srcColorSpace = nullptr;
+        if (this->parseExpectedStringToken("display-p3")) {
+          srcColorSpace = ColorSpace::DisplayP3();
+        } else if (this->parseExpectedStringToken("a98-rgb")) {
+          srcColorSpace =
+              ColorSpace::MakeRGB(NamedTransferFunction::A98RGB, NamedGamut::AdobeRGB);
+        } else if (this->parseExpectedStringToken("rec2020")) {
+          srcColorSpace = ColorSpace::MakeRGB(NamedTransferFunction::Rec2020, NamedGamut::Rec2020);
+        } else {
+          return false;
+        }
+        this->parseWSToken();
+        float r = 0.0f;
+        float g = 0.0f;
+        float b = 0.0f;
+        if (!this->parseScalarToken(&r)) {
+          return false;
+        }
+        this->parseWSToken();
+        if (!this->parseScalarToken(&g)) {
+          return false;
+        }
+        this->parseWSToken();
+        if (!this->parseScalarToken(&b)) {
+          return false;
+        }
+        float rgba[4] = {r, g, b, 1.0f};
+        ColorSpaceXformSteps steps(srcColorSpace.get(), AlphaType::Unpremultiplied,
+                                   ColorSpace::SRGB().get(), AlphaType::Unpremultiplied);
+        steps.apply(rgba);
+        *c = Color{rgba[0], rgba[1], rgba[2], rgba[3]};
+        return true;
+      },
+      c);
+}
+
 bool SVGAttributeParser::parseColorToken(Color* c) {
   return this->parseHexColorToken(c) || this->parseNamedColorToken(c) ||
-         this->parseRGBAColorToken(c) || this->parseRGBColorToken(c);
+         this->parseRGBAColorToken(c) || this->parseRGBColorToken(c) ||
+         this->parseColorFunctionToken(c);
 }
 
 bool SVGAttributeParser::parseSVGColorType(SVGColorType* color) {
