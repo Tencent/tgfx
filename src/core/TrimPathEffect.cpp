@@ -18,6 +18,7 @@
 
 #include "TrimPathEffect.h"
 #include <cmath>
+#include "core/utils/MathExtra.h"
 #include "tgfx/core/PathMeasure.h"
 
 namespace tgfx {
@@ -153,7 +154,8 @@ bool TrimPathEffect::filterPath(Path* path) const {
         Path segmentPath = {};
         pathMeasure->getSegment(localStart, localEnd, &segmentPath);
         // If extracting entire closed contour, preserve the closed state
-        if (localStart == 0.f && localEnd == contourLength && pathMeasure->isClosed()) {
+        if (FloatNearlyZero(localStart) && FloatNearlyEqual(localEnd, contourLength) &&
+            pathMeasure->isClosed()) {
           segmentPath.close();
         }
         extractedPaths.push_back(std::move(segmentPath));

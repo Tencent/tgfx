@@ -1992,8 +1992,8 @@ TGFX_TEST(CanvasTest, TrimPathEffect) {
   canvas->drawPath(path9, paint);
 
   // Row 3: Closed rect with wrap-around reversed (tests seamless connection in reverse)
-  // Reversed wrap-around: start=0.25, end=0.75 reversed becomes [0.25, 0.75] on reversed path
-  // With wrap-around offset, should produce seamless connection
+  // MakeTrim(0.25, -0.25) normalizes to [0.75, 1.0] + [0.0, 0.25] then reversed
+  // With wrap-around on the reversed path, should produce seamless connection
   paint.setColor(Color::FromRGBA(255, 64, 192));
   Path path9b = {};
   path9b.addRect(380, 260, 480, 360);
