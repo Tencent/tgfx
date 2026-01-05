@@ -96,11 +96,9 @@ std::shared_ptr<RenderTarget> RenderTarget::Make(Context* context, int width, in
     renderTarget->_origin = origin;
     return renderTarget;
   }
-  uint32_t usage = TextureUsage::RENDER_ATTACHMENT;
-  if (format != PixelFormat::DEPTH24_STENCIL8) {
-    usage |= TextureUsage::TEXTURE_BINDING;
-  }
-  TextureDescriptor descriptor = {width, height, format, mipmapped, 1, usage};
+  TextureDescriptor descriptor = {
+      width,     height, format,
+      mipmapped, 1,      TextureUsage::TEXTURE_BINDING | TextureUsage::RENDER_ATTACHMENT};
   auto texture = gpu->createTexture(descriptor);
   if (texture == nullptr) {
     return nullptr;

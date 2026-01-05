@@ -70,7 +70,10 @@ class BspTree {
  private:
   void buildTree(BspNode* node, std::deque<std::unique_ptr<DrawPolygon3D>>* polygons);
 
-  // Traverses polygons back-to-front along the screen Z-axis (positive Z points towards the camera).
+  /**
+   * Traverses polygons back-to-front along the screen Z-axis (positive Z points towards the
+   * camera).
+   */
   template <typename Action>
   void traverseNode(Action& action, const BspNode* node) const {
     if (node->data->isFacingPositiveZ()) {

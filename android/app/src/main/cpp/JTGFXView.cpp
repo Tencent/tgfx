@@ -90,8 +90,7 @@ void JTGFXView::draw() {
   auto canvas = surface->getCanvas();
   canvas->clear();
   auto width = ANativeWindow_getWidth(nativeWindow);
-  auto density =
-      width > 0 ? static_cast<float>(surface->width()) / static_cast<float>(width) : 1.0f;
+  auto density = width > 0 ? static_cast<float>(surface->width()) / static_cast<float>(width) : 1.0f;
   hello2d::DrawBackground(canvas, surface->width(), surface->height(), density);
 
   displayList.render(surface.get(), false);

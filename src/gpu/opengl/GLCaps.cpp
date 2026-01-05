@@ -170,7 +170,6 @@ bool GLCaps::isFormatRenderable(PixelFormat pixelFormat) const {
     case PixelFormat::BGRA_8888:
     case PixelFormat::ALPHA_8:
     case PixelFormat::RG_88:
-    case PixelFormat::DEPTH24_STENCIL8:
       return true;
     default:
       break;
@@ -263,7 +262,7 @@ void GLCaps::initFormatMap(const GLInfo& info) {
       info.hasExtension("GL_EXT_texture_format_BGRA8888")) {
     pixelFormatMap[PixelFormat::BGRA_8888].format.internalFormatTexImage = GL_RGBA;
   }
-  initSampleCount(info);
+  initColorSampleCount(info);
 }
 
 static bool UsesInternalformatQuery(GLStandard standard, const GLInfo& glInterface,
@@ -273,10 +272,9 @@ static bool UsesInternalformatQuery(GLStandard standard, const GLInfo& glInterfa
          standard == GLStandard::GLES;
 }
 
-void GLCaps::initSampleCount(const GLInfo& info) {
+void GLCaps::initColorSampleCount(const GLInfo& info) {
   std::vector<PixelFormat> pixelFormats = {PixelFormat::RGBA_8888, PixelFormat::ALPHA_8,
-                                           PixelFormat::BGRA_8888, PixelFormat::RG_88,
-                                           PixelFormat::DEPTH24_STENCIL8};
+                                           PixelFormat::BGRA_8888, PixelFormat::RG_88};
   for (auto pixelFormat : pixelFormats) {
     if (vendor == GLVendor::Intel) {
       // We disable MSAA across the board for Intel GPUs for performance reasons.

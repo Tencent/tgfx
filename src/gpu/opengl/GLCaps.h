@@ -109,7 +109,7 @@ class GLCaps {
   std::unordered_map<PixelFormat, ConfigInfo, EnumHasher> pixelFormatMap = {};
 
   void initFormatMap(const GLInfo& info);
-  void initSampleCount(const GLInfo& info);
+  void initColorSampleCount(const GLInfo& info);
   void initGLSupport(const GLInfo& info);
   void initGLESSupport(const GLInfo& info);
   void initWebGLSupport(const GLInfo& info);

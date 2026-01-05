@@ -822,12 +822,11 @@ class NonAARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
 };
 
 PlacementPtr<RectsVertexProvider> RectsVertexProvider::MakeFrom(BlockAllocator* allocator,
-                                                                const Rect& rect, AAType aaType,
-                                                                const Color& color) {
+                                                                const Rect& rect, AAType aaType) {
   if (rect.isEmpty()) {
     return nullptr;
   }
-  auto record = allocator->make<RectRecord>(rect, Matrix::I(), color);
+  auto record = allocator->make<RectRecord>(rect, Matrix::I());
   auto rects = allocator->makeArray<RectRecord>(&record, 1);
   auto uvRects = allocator->makeArray<Rect>(0);
   if (aaType == AAType::Coverage) {

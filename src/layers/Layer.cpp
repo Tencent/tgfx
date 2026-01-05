@@ -61,16 +61,20 @@ struct LayerStyleSource {
   Point contourOffset = {};
 };
 
-// Determine if the 4*4 matrix contains only 2D affine transformations, i.e., no Z-axis related
-// transformations or projection transformations
+/**
+ * Determines if the 4x4 matrix contains only 2D affine transformations, i.e., no Z-axis related
+ * transformations or projection transformations.
+ */
 static inline bool IsMatrix3DAffine(const Matrix3D& matrix) {
   return FloatNearlyZero(matrix.getRowColumn(0, 2)) && FloatNearlyZero(matrix.getRowColumn(1, 2)) &&
          matrix.getRow(2) == Vec4(0, 0, 1, 0) && matrix.getRow(3) == Vec4(0, 0, 0, 1);
 }
 
-// When a 4x4 matrix does not contain Z-axis related transformations and projection transformations,
-// this function returns an equivalent 2D affine transformation. Otherwise, the return value will
-// lose information about Z-axis related transformations and projection transformations.
+/**
+ * When a 4x4 matrix does not contain Z-axis related transformations and projection transformations,
+ * this function returns an equivalent 2D affine transformation. Otherwise, the return value will
+ * lose information about Z-axis related transformations and projection transformations.
+ */
 static inline Matrix GetMayLossyAffineMatrix(const Matrix3D& matrix) {
   auto affineMatrix = Matrix::I();
   affineMatrix.setAll(matrix.getRowColumn(0, 0), matrix.getRowColumn(0, 1),
@@ -80,36 +84,10 @@ static inline Matrix GetMayLossyAffineMatrix(const Matrix3D& matrix) {
 }
 
 /**
- * Applies a clip rect to the canvas, avoiding anti-aliasing artifacts that cause semi-transparent
- * edges when the scaled clip bounds are too small.
- * TODO: Adapt this function to clip offscreenCanvas in getContentImage.
- * @param maxBounds The maximum clip bounds before scaling.
- * @param clipBounds The desired clip bounds before scaling.
+ * Creates a RegionTransformer from a 3D transformation matrix. If the matrix is affine, uses
+ * MakeFromMatrix. Otherwise, creates a Transform3DFilter and uses MakeFromFilters. The
+ * filterHolder is used to ensure the filter is not released during the transformer's lifetime.
  */
-// static inline void ApplyClip(Canvas& canvas, const Rect& maxBounds, const Rect& clipBounds,
-//                              float contentScale) {
-//   if (contentScale < 1.0f) {
-//     auto scaledBounds = clipBounds;
-//     scaledBounds.scale(contentScale, contentScale);
-//     if (scaledBounds.width() < 10.f || scaledBounds.height() < 10.f) {
-//       // When the actual clip bounds are too small, fractional values in the scaled clip region
-//       // trigger AARectEffect's shader coverage clipping strategy, causing layers obtained from
-//       // this clip region to become semi-transparent. This situation should be avoided.
-//       DEBUG_ASSERT(!FloatNearlyZero(contentScale));
-//       scaledBounds.roundOut();
-//       scaledBounds.scale(1.0f / contentScale, 1.0f / contentScale);
-//       scaledBounds.intersect(maxBounds);
-//       canvas.clipRect(scaledBounds);
-//       return;
-//     }
-//   }
-//   canvas.clipRect(clipBounds);
-// }
-
-// Creates a RegionTransformer from a 3D transformation matrix.
-// If the matrix is affine, uses MakeFromMatrix. Otherwise, creates a Transform3DFilter and uses
-// MakeFromFilters. The filterHolder is used to ensure the filter is not released during the
-// transformer's lifetime.
 static inline std::shared_ptr<RegionTransformer> MakeTransformerFromTransform3D(
     const Matrix3D& transform3D, std::shared_ptr<RegionTransformer> outer,
     std::vector<std::shared_ptr<LayerFilter>>* filterHolder) {

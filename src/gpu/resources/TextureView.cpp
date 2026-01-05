@@ -32,7 +32,7 @@ bool TextureView::CheckSizeAndFormat(Context* context, int width, int height, Pi
     return false;
   }
   if (format != PixelFormat::ALPHA_8 && format != PixelFormat::RGBA_8888 &&
-      format != PixelFormat::BGRA_8888 && format != PixelFormat::DEPTH24_STENCIL8) {
+      format != PixelFormat::BGRA_8888) {
     return false;
   }
   auto maxTextureSize = context->gpu()->limits()->maxTextureDimension2D;

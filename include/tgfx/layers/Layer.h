@@ -142,8 +142,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   /**
    * Sets whether the layer passes through its background to sublayers.
-   * Note: Layers that can start or extend a 3D Rendering Context (see transformStyle()) do not
-   * support pass-through background.
+   * Note: Layers that can start or extend a 3D Rendering Context (see transformStyle()) always
+   * disable pass-through background regardless of this setting.
    */
   void setPassThroughBackground(bool value);
 
@@ -254,8 +254,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   /**
    * Sets whether the layer is allowed to be composited as a separate group from their parent.
-   * Note: Layers inside a 3D Rendering Context (see transformStyle()) ignore this setting and
-   * always apply alpha individually to each element.
+   * Note: Layers inside a 3D Rendering Context (see transformStyle()) always apply alpha
+   * individually to each element regardless of this setting.
    */
   void setAllowsGroupOpacity(bool value);
 
@@ -274,11 +274,12 @@ class Layer : public std::enable_shared_from_this<Layer> {
    * Sets the list of layer styles applied to the layer.
    * Note: Background-dependent layer styles (e.g., BackgroundBlurStyle) have the following
    * limitations:
-   * 1. Layers that can start or extend a 3D Rendering Context (see transformStyle()) disable
-   *    background styles for the entire subtree, as child layers need to maintain independent 3D
-   *    states.
-   * 2. If any ancestor layer has a 3D transformation matrix set via setMatrix3D(), background
-   *    styles are disabled because the accurate background cannot be obtained.
+   * 1. Layers that start a 3D Rendering Context (see transformStyle()) disable background styles
+   *    for the entire subtree rooted at that layer. The 3D Rendering Context uses a different
+   *    rendering strategy that has not yet fully adapted background layer drawing.
+   * 2. Layers with a 3D or projection transformation disable background styles for all descendant
+   *    layers (excluding the layer itself), because descendants cannot correctly obtain the
+   *    background.
    */
   void setLayerStyles(std::vector<std::shared_ptr<LayerStyle>> value);
 
@@ -621,11 +622,12 @@ class Layer : public std::enable_shared_from_this<Layer> {
   bool drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
                     const Layer* stopChild = nullptr, const Matrix3D* transform3D = nullptr);
 
-  // Draws the layer by starting a new 3D rendering context.
   void drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, float alpha);
 
-  // Draws the layer in a 3D rendering context using an offscreen canvas and composites the result
-  // to the 3D compositor.
+  /**
+   * Draws the layer in a 3D rendering context using an offscreen canvas and composites the result
+   * to the 3D compositor.
+   */
   void drawIn3DContext(const DrawArgs& args, Canvas* canvas, float alpha,
                        const Matrix3D& transform3D);
 

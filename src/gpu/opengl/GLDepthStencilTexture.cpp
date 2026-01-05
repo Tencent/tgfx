@@ -47,13 +47,8 @@ std::shared_ptr<GLDepthStencilTexture> GLDepthStencilTexture::MakeFrom(
     return nullptr;
   }
   gl->bindRenderbuffer(GL_RENDERBUFFER, renderBufferID);
-  if (descriptor.sampleCount > 1) {
-    gl->renderbufferStorageMultisample(GL_RENDERBUFFER, descriptor.sampleCount, GL_DEPTH24_STENCIL8,
-                                       descriptor.width, descriptor.height);
-  } else {
-    gl->renderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, descriptor.width,
-                            descriptor.height);
-  }
+  gl->renderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, descriptor.width,
+                          descriptor.height);
   if (!CheckGLError(gl)) {
     gl->deleteRenderbuffers(1, &renderBufferID);
     return nullptr;

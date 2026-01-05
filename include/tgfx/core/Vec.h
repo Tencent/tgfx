@@ -173,7 +173,7 @@ struct Vec3 {
   }
 
   /**
-   * Returns the squared length of the vector, avoiding the sqrt computation.
+   * Returns the squared length of the vector.
    */
   float lengthSquared() const {
     return Dot(*this, *this);

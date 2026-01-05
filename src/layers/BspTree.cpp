@@ -37,8 +37,11 @@ BspTree::BspTree(std::deque<std::unique_ptr<DrawPolygon3D>> polygons) {
 
 BspTree::~BspTree() = default;
 
-// Recursively partitions polygons by the node's plane into front/back lists, then builds subtrees.
-// Complexity: O(n log n) average case, O(n * 2^n) worst case when every split intersects all remaining polygons.
+/**
+ * Recursively partitions polygons by the node's plane into front/back lists, then builds subtrees.
+ * Complexity: O(n log n) average case, O(n * 2^n) worst case when every split intersects all
+ * remaining polygons.
+ */
 void BspTree::buildTree(BspNode* node, std::deque<std::unique_ptr<DrawPolygon3D>>* polygons) {
   std::deque<std::unique_ptr<DrawPolygon3D>> frontList;
   std::deque<std::unique_ptr<DrawPolygon3D>> backList;
