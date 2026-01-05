@@ -22,11 +22,11 @@
 #include "tgfx/core/Brush.h"
 
 namespace tgfx {
-class ContourContext : public DrawContext {
+class OpaqueContext : public DrawContext {
  public:
-  ContourContext();
+  OpaqueContext();
 
-  ~ContourContext() override = default;
+  ~OpaqueContext() override = default;
 
   void drawFill(const Brush& brush) override;
 
@@ -59,40 +59,41 @@ class ContourContext : public DrawContext {
   std::shared_ptr<Picture> finishRecordingAsPicture();
 
  private:
-  struct Contour {
+  struct OpaqueShape {
     enum class Type { None, Fill, Rect, RRect, Path, Shape };
 
-    Contour() : shape(nullptr) {
+    OpaqueShape() : shape(nullptr) {
     }
-    explicit Contour(Type t) : shape(nullptr), type(t) {
+    explicit OpaqueShape(Type t) : shape(nullptr), type(t) {
       DEBUG_ASSERT(t == Type::None || t == Type::Fill);
     }
-    Contour(const Rect& r, const Stroke* s) : rect(r), type(Type::Rect) {
+    OpaqueShape(const Rect& r, const Stroke* s) : rect(r), type(Type::Rect) {
       if (s) {
         stroke = *s;
         hasStroke = true;
       }
     }
-    Contour(const RRect& rr, const Stroke* s) : rRect(rr), type(Type::RRect) {
+    OpaqueShape(const RRect& rr, const Stroke* s) : rRect(rr), type(Type::RRect) {
       if (s) {
         stroke = *s;
         hasStroke = true;
       }
     }
-    explicit Contour(const Path& p) : path(p), type(Type::Path) {
+    explicit OpaqueShape(const Path& p) : path(p), type(Type::Path) {
     }
-    Contour(std::shared_ptr<Shape> s, const Stroke* stk) : shape(std::move(s)), type(Type::Shape) {
+    OpaqueShape(std::shared_ptr<Shape> s, const Stroke* stk)
+        : shape(std::move(s)), type(Type::Shape) {
       if (stk) {
         stroke = *stk;
         hasStroke = true;
       }
     }
 
-    Contour(const Contour& other) {
+    OpaqueShape(const OpaqueShape& other) {
       *this = other;
     }
 
-    ~Contour() {
+    ~OpaqueShape() {
       if (type == Type::Path) {
         path.~Path();
       } else if (type == Type::Shape) {
@@ -114,35 +115,35 @@ class ContourContext : public DrawContext {
     bool isInverseFillType() const;
     Rect getBounds() const;
     void draw(PictureContext& context, const MCState& state, const Brush& brush) const;
-    bool operator==(const Contour& other) const;
-    bool operator!=(const Contour& other) const {
+    bool operator==(const OpaqueShape& other) const;
+    bool operator!=(const OpaqueShape& other) const {
       return !(*this == other);
     }
-    Contour& operator=(const Contour& other);
+    OpaqueShape& operator=(const OpaqueShape& other);
   };
 
-  void drawContour(const Contour& contour, const MCState& state, const Brush& brush);
+  void drawOpaqueShape(const OpaqueShape& opaqueShape, const MCState& state, const Brush& brush);
 
-  bool containContourBound(const Rect& bounds);
+  bool containOpaqueBound(const Rect& bounds);
 
-  void mergeContourBound(const Rect& bounds);
+  void mergeOpaqueBound(const Rect& bounds);
 
-  bool canAppend(const Contour& contour, const MCState& state, const Brush& brush);
+  bool canAppend(const OpaqueShape& opaqueShape, const MCState& state, const Brush& brush);
 
   void appendFill(const Brush& brush);
 
-  void flushPendingContour(const Contour& contour = {}, const MCState& state = {},
-                           const Brush& brush = {});
+  void flushPendingShape(const OpaqueShape& opaqueShape = {}, const MCState& state = {},
+                         const Brush& brush = {});
 
-  void resetPendingContour(const Contour& contour, const MCState& state, const Brush& brush);
-  Contour pendingContour = {};
+  void resetPendingShape(const OpaqueShape& opaqueShape, const MCState& state, const Brush& brush);
+  OpaqueShape pendingShape = {};
 
   MCState pendingState = {};
   std::vector<Brush> pendingBrushes = {};
 
-  std::vector<Rect> contourBounds = {};
+  std::vector<Rect> opaqueBounds = {};
   PictureContext pictureContext = {};
 
-  friend class PendingContourAutoReset;
+  friend class PendingShapeAutoReset;
 };
 }  // namespace tgfx

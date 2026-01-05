@@ -26,6 +26,19 @@ RRectContent::RRectContent(const RRect& rRect, const LayerPaint& paint)
     : GeometryContent(paint), rRect(rRect) {
 }
 
+std::optional<Rect> RRectContent::getContourOpaqueRect() const {
+  if (stroke || (shader && shader->isAImage())) {
+    return std::nullopt;
+  }
+  // Inset by radii to get the inner opaque rectangle.
+  auto innerRect = rRect.rect;
+  innerRect.inset(rRect.radii.x, rRect.radii.y);
+  if (!innerRect.isSorted()) {
+    return std::nullopt;
+  }
+  return innerRect;
+}
+
 Rect RRectContent::onGetBounds() const {
   return rRect.rect;
 }

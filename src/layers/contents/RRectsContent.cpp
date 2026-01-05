@@ -26,6 +26,24 @@ RRectsContent::RRectsContent(std::vector<RRect> rRects, const LayerPaint& paint)
     : GeometryContent(paint), rRects(std::move(rRects)) {
 }
 
+std::optional<Rect> RRectsContent::getContourOpaqueRect() const {
+  if (rRects.empty() || stroke || (shader && shader->isAImage())) {
+    return std::nullopt;
+  }
+  std::optional<Rect> result = std::nullopt;
+  for (const auto& rRect : rRects) {
+    auto innerRect = rRect.rect;
+    innerRect.inset(rRect.radii.x, rRect.radii.y);
+    if (!innerRect.isSorted()) {
+      continue;
+    }
+    if (!result || innerRect.area() > result->area()) {
+      result = innerRect;
+    }
+  }
+  return result;
+}
+
 Rect RRectsContent::onGetBounds() const {
   auto bounds = rRects[0].rect;
   for (size_t i = 1; i < rRects.size(); ++i) {

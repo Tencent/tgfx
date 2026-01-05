@@ -23,7 +23,6 @@
 #include "core/shaders/GradientShader.h"
 #include "core/utils/MathExtra.h"
 #include "gpu/proxies/RenderTargetProxy.h"
-#include "layers/ContourContext.h"
 #include "layers/DrawArgs.h"
 #include "layers/RootLayer.h"
 #include "layers/SubtreeCache.h"
@@ -3216,7 +3215,6 @@ TGFX_TEST(LayerTest, ContourTest) {
   auto imageStyle2 = ShapeStyle::Make(imageShader2);
 
   DrawArgs drawArgs = DrawArgs(nullptr);
-  drawArgs.drawMode = DrawMode::Contour;
   Path path = {};
 
   // Case 1: Same geometry with all solid fills should dedup to 1 contour.
@@ -3226,10 +3224,9 @@ TGFX_TEST(LayerTest, ContourTest) {
   allSolidLayer->setPath(path);
   allSolidLayer->addFillStyle(ShapeStyle::Make(Color::Red()));
   allSolidLayer->addFillStyle(ShapeStyle::Make(Color::Blue()));
-  ContourContext allSolidContext;
-  Canvas allSolidCanvas = Canvas(&allSolidContext);
-  allSolidLayer->drawLayer(drawArgs, &allSolidCanvas, 1.0, BlendMode::SrcOver);
-  auto allSolidPicture = allSolidContext.finishRecordingAsPicture();
+  auto allSolidPicture = Layer::RecordOpaquePicture(1.0f, [&](Canvas* canvas) {
+    allSolidLayer->drawContour(drawArgs, canvas);
+  });
   EXPECT_EQ(allSolidPicture->drawCount, 1u);
 
   // Case 2: Same geometry with all image shader fills should collect all (no dedup).
@@ -3239,10 +3236,9 @@ TGFX_TEST(LayerTest, ContourTest) {
   allImageLayer->setPath(path);
   allImageLayer->addFillStyle(imageStyle1);
   allImageLayer->addFillStyle(imageStyle2);
-  ContourContext allImageContext;
-  Canvas allImageCanvas = Canvas(&allImageContext);
-  allImageLayer->drawLayer(drawArgs, &allImageCanvas, 1.0, BlendMode::SrcOver);
-  auto allImagePicture = allImageContext.finishRecordingAsPicture();
+  auto allImagePicture = Layer::RecordOpaquePicture(1.0f, [&](Canvas* canvas) {
+    allImageLayer->drawContour(drawArgs, canvas);
+  });
   EXPECT_EQ(allImagePicture->drawCount, 2u);
 
   // Case 3: Same geometry with image-image-solid order should dedup to 1 contour.
@@ -3255,10 +3251,9 @@ TGFX_TEST(LayerTest, ContourTest) {
   mixedFillsLayer->addFillStyle(imageStyle1);
   mixedFillsLayer->addFillStyle(imageStyle2);
   mixedFillsLayer->addFillStyle(ShapeStyle::Make(Color::Green()));
-  ContourContext mixedFillsContext;
-  Canvas mixedFillsCanvas = Canvas(&mixedFillsContext);
-  mixedFillsLayer->drawLayer(drawArgs, &mixedFillsCanvas, 1.0, BlendMode::SrcOver);
-  auto mixedFillsPicture = mixedFillsContext.finishRecordingAsPicture();
+  auto mixedFillsPicture = Layer::RecordOpaquePicture(1.0f, [&](Canvas* canvas) {
+    mixedFillsLayer->drawContour(drawArgs, canvas);
+  });
   // Should be 1 (only first collected). Buggy single-pass would return 2.
   EXPECT_EQ(mixedFillsPicture->drawCount, 1u);
 
@@ -3277,10 +3272,9 @@ TGFX_TEST(LayerTest, ContourTest) {
   childLayer->addFillStyle(ShapeStyle::Make(Color::Red()));
   childLayer->addFillStyle(ShapeStyle::Make(Color::Blue()));
   twoGroupsLayer->addChild(childLayer);
-  ContourContext twoGroupsContext;
-  Canvas twoGroupsCanvas = Canvas(&twoGroupsContext);
-  twoGroupsLayer->drawLayer(drawArgs, &twoGroupsCanvas, 1.0, BlendMode::SrcOver);
-  auto twoGroupsPicture = twoGroupsContext.finishRecordingAsPicture();
+  auto twoGroupsPicture = Layer::RecordOpaquePicture(1.0f, [&](Canvas* canvas) {
+    twoGroupsLayer->drawContour(drawArgs, canvas);
+  });
   // Group 1: 2 (all image shaders), Group 2: 1 (deduped) = 3 total.
   EXPECT_EQ(twoGroupsPicture->drawCount, 3u);
 
@@ -3294,10 +3288,9 @@ TGFX_TEST(LayerTest, ContourTest) {
   strokeTestLayer->setLineWidth(5.0f);
   strokeTestLayer->addStrokeStyle(ShapeStyle::Make(Color::Red()));
   strokeTestLayer->addStrokeStyle(ShapeStyle::Make(Color::Blue()));
-  ContourContext strokeTestContext;
-  Canvas strokeTestCanvas = Canvas(&strokeTestContext);
-  strokeTestLayer->drawLayer(drawArgs, &strokeTestCanvas, 1.0, BlendMode::SrcOver);
-  auto strokeTestPicture = strokeTestContext.finishRecordingAsPicture();
+  auto strokeTestPicture = Layer::RecordOpaquePicture(1.0f, [&](Canvas* canvas) {
+    strokeTestLayer->drawContour(drawArgs, canvas);
+  });
   // 1 (transparent fill) + 1 (strokes deduped) = 2 contours.
   EXPECT_EQ(strokeTestPicture->drawCount, 2u);
 
@@ -3308,10 +3301,9 @@ TGFX_TEST(LayerTest, ContourTest) {
   rootLayer->addChild(mixedFillsLayer);
   rootLayer->addChild(twoGroupsLayer);
   rootLayer->addChild(strokeTestLayer);
-  ContourContext allContext;
-  Canvas allCanvas = Canvas(&allContext);
-  rootLayer->drawLayer(drawArgs, &allCanvas, 1.0, BlendMode::SrcOver);
-  auto allPicture = allContext.finishRecordingAsPicture();
+  auto allPicture = Layer::RecordOpaquePicture(1.0f, [&](Canvas* canvas) {
+    rootLayer->drawContour(drawArgs, canvas);
+  });
   // 1 + 2 + 1 + 3 + 2 = 9
   EXPECT_EQ(allPicture->drawCount, 9u);
 

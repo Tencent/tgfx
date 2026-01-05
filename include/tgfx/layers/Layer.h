@@ -578,6 +578,16 @@ class Layer : public std::enable_shared_from_this<Layer> {
   bool drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
                     const Layer* stopChild = nullptr);
 
+  /**
+   * Draws the contour of the layer's subtree (content and children).
+   * Mask is applied by parent, not self.
+   * @param args The draw arguments containing render bounds for culling.
+   * @param canvas The canvas to draw on.
+   * @param opaqueBounds Optional output for tracking opaque regions during drawing.
+   * @return true if the subtree contour is identical to normal mode drawing.
+   */
+  bool drawContour(const DrawArgs& args, Canvas* canvas, std::vector<Rect>* opaqueBounds = nullptr);
+
   float drawBackgroundLayers(const DrawArgs& args, Canvas* canvas);
 
   std::unique_ptr<LayerStyleSource> getLayerStyleSource(const DrawArgs& args, const Matrix& matrix,
@@ -631,8 +641,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
       Context* context, const Rect& drawRect, const Matrix& viewMatrix, bool fullLayer = false,
       std::shared_ptr<ColorSpace> colorSpace = nullptr) const;
 
-  static std::shared_ptr<Picture> RecordPicture(DrawMode mode, float contentScale,
-                                                const std::function<void(Canvas*)>& drawFunction);
+  static std::shared_ptr<Picture> RecordOpaquePicture(
+      float contentScale, const std::function<void(Canvas*)>& drawFunction);
 
   bool shouldPassThroughBackground(BlendMode blendMode, const Matrix3D* transform3D) const;
 

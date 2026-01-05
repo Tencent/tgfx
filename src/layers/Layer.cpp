@@ -27,9 +27,10 @@
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/Types.h"
-#include "layers/ContourContext.h"
 #include "layers/DrawArgs.h"
 #include "layers/MaskContext.h"
+#include "layers/OpaqueBoundsHelper.h"
+#include "layers/OpaqueContext.h"
 #include "layers/RegionTransformer.h"
 #include "layers/RootLayer.h"
 #include "layers/SubtreeCache.h"
@@ -89,23 +90,28 @@ static std::optional<Rect> MapClipBoundsToContent(const std::optional<Rect>& cli
   return clipBounds;
 }
 
-std::shared_ptr<Picture> Layer::RecordPicture(DrawMode mode, float contentScale,
+static std::shared_ptr<Picture> RecordPicture(float contentScale,
                                               const std::function<void(Canvas*)>& drawFunction) {
   if (drawFunction == nullptr) {
     return nullptr;
-  }
-  if (mode == DrawMode::Contour) {
-    ContourContext contourContext;
-    auto contentCanvas = Canvas(&contourContext);
-    contentCanvas.scale(contentScale, contentScale);
-    drawFunction(&contentCanvas);
-    return contourContext.finishRecordingAsPicture();
   }
   PictureRecorder recorder = {};
   auto contentCanvas = recorder.beginRecording();
   contentCanvas->scale(contentScale, contentScale);
   drawFunction(contentCanvas);
   return recorder.finishRecordingAsPicture();
+}
+
+std::shared_ptr<Picture> Layer::RecordOpaquePicture(
+    float contentScale, const std::function<void(Canvas*)>& drawFunction) {
+  if (drawFunction == nullptr) {
+    return nullptr;
+  }
+  OpaqueContext opaqueContext;
+  auto contentCanvas = Canvas(&opaqueContext);
+  contentCanvas.scale(contentScale, contentScale);
+  drawFunction(&contentCanvas);
+  return opaqueContext.finishRecordingAsPicture();
 }
 
 static std::shared_ptr<Image> ToImageWithOffset(
@@ -1054,7 +1060,6 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
   DEBUG_ASSERT(_mask != nullptr);
   auto maskType = static_cast<LayerMaskType>(bitFields.maskType);
   auto maskArgs = args;
-  maskArgs.drawMode = maskType != LayerMaskType::Contour ? DrawMode::Normal : DrawMode::Contour;
   maskArgs.excludeEffects |= maskType == LayerMaskType::Contour;
   maskArgs.blurBackground = nullptr;
 
@@ -1065,10 +1070,18 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
 
   // Note: RecordPicture does not use layerClipBounds here. Using clipBounds may cause PathOp
   // errors when extracting maskPath from the picture, resulting in incorrect clip regions.
-  auto maskPicture = RecordPicture(maskArgs.drawMode, scale, [&](Canvas* canvas) {
-    canvas->concat(affineRelativeMatrix);
-    _mask->drawLayer(maskArgs, canvas, _mask->_alpha, BlendMode::SrcOver);
-  });
+  std::shared_ptr<Picture> maskPicture = nullptr;
+  if (maskType == LayerMaskType::Contour) {
+    maskPicture = RecordOpaquePicture(scale, [&](Canvas* canvas) {
+      canvas->concat(affineRelativeMatrix);
+      _mask->drawContour(maskArgs, canvas);
+    });
+  } else {
+    maskPicture = RecordPicture(scale, [&](Canvas* canvas) {
+      canvas->concat(affineRelativeMatrix);
+      _mask->drawLayer(maskArgs, canvas, _mask->_alpha, BlendMode::SrcOver);
+    });
+  }
   if (maskPicture == nullptr) {
     return {};
   }
@@ -1238,7 +1251,7 @@ bool Layer::canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode,
                                const Matrix3D* transform3D) {
   // The cache stores Normal mode content. Since layers with BackgroundStyle are excluded from
   // caching, the cached content can also be used for Background mode drawing.
-  if (args.excludeEffects || args.drawMode == DrawMode::Contour) {
+  if (args.excludeEffects) {
     return false;
   }
   if (args.subtreeCacheMaxSize <= 0) {
@@ -1297,7 +1310,7 @@ std::shared_ptr<Image> Layer::createSubtreeCacheImage(const DrawArgs& args, floa
     auto reverseBounds = filter->filterBounds(pictureBounds, MapDirection::Reverse);
     pictureBounds.intersect(reverseBounds);
   }
-  auto picture = RecordPicture(drawArgs.drawMode, contentScale,
+  auto picture = RecordPicture(contentScale,
                                [&](Canvas* canvas) { drawDirectly(drawArgs, canvas, 1.0f); });
   if (!picture) {
     return nullptr;
@@ -1498,14 +1511,10 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
   auto content = getContent();
   bool hasForeground = false;
   if (content) {
-    if (args.drawMode == DrawMode::Contour) {
-      content->drawContour(canvas, bitFields.allowsEdgeAntialiasing);
-    } else {
-      hasForeground = content->drawDefault(canvas, alpha, bitFields.allowsEdgeAntialiasing);
-      if (args.blurBackground) {
-        content->drawDefault(args.blurBackground->getCanvas(), alpha,
-                             bitFields.allowsEdgeAntialiasing);
-      }
+    hasForeground = content->drawDefault(canvas, alpha, bitFields.allowsEdgeAntialiasing);
+    if (args.blurBackground) {
+      content->drawDefault(args.blurBackground->getCanvas(), alpha,
+                           bitFields.allowsEdgeAntialiasing);
     }
   }
   if (!drawChildren(args, canvas, alpha, stopChild)) {
@@ -1570,6 +1579,7 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
     const bool isChildMatrixAffine = IsMatrix3DAffine(childMatrix);
     auto childAffineMatrix =
         isChildMatrixAffine ? GetMayLossyAffineMatrix(childMatrix) : Matrix::I();
+
     canvas->concat(childAffineMatrix);
     auto clipChildScrollRectHandler = [&](Canvas& clipCanvas) {
       if (child->_scrollRect) {
@@ -1600,6 +1610,118 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
                      static_cast<BlendMode>(child->bitFields.blendMode), transform);
   }
   return true;
+}
+
+bool Layer::drawContour(const DrawArgs& args, Canvas* canvas, std::vector<Rect>* opaqueBounds) {
+  std::vector<Rect> localOpaqueBounds = {};
+  if (opaqueBounds == nullptr) {
+    localOpaqueBounds.reserve(3);
+    opaqueBounds = &localOpaqueBounds;
+  }
+  bool isIdentical = true;
+
+  // Draw self content
+  auto content = getContent();
+  if (content) {
+    auto contentBounds = content->getBounds();
+    auto globalBounds = canvas->getMatrix().mapRect(contentBounds);
+    if (!OpaqueBoundsHelper::Contains(*opaqueBounds, globalBounds)) {
+      content->drawContour(canvas, bitFields.allowsEdgeAntialiasing);
+      isIdentical = content->contourEqualsOpaqueContent();
+      auto opaqueRect = content->getContourOpaqueRect();
+      if (opaqueRect && canvas->getMatrix().rectStaysRect()) {
+        auto mappedOpaqueRect = canvas->getMatrix().mapRect(*opaqueRect);
+        OpaqueBoundsHelper::Merge(*opaqueBounds, mappedOpaqueRect);
+      }
+    }
+  }
+
+  // Iterate children
+  for (size_t i = 0; i < _children.size(); ++i) {
+    auto& child = _children[i];
+    if (child->maskOwner) {
+      continue;
+    }
+    if (!child->visible() || child->_alpha <= 0) {
+      continue;
+    }
+
+    auto childMatrix = child->getMatrixWithScrollRect();
+    const bool isChildMatrixAffine = IsMatrix3DAffine(childMatrix);
+    auto childAffineMatrix =
+        isChildMatrixAffine ? GetMayLossyAffineMatrix(childMatrix) : Matrix::I();
+
+    // renderRect culling
+    if (args.renderRect && !Rect::Intersects(*args.renderRect, child->renderBounds)) {
+      continue;
+    }
+
+    // opaqueBounds culling - skip child if fully contained within existing opaque bounds
+    if (isChildMatrixAffine) {
+      auto childBounds = child->getBounds();
+      auto currentMatrix = canvas->getMatrix();
+      currentMatrix.preConcat(childAffineMatrix);
+      auto mappedChildBounds = currentMatrix.mapRect(childBounds);
+      if (OpaqueBoundsHelper::Contains(*opaqueBounds, mappedChildBounds)) {
+        continue;
+      }
+    }
+
+    AutoCanvasRestore autoRestore(canvas);
+    canvas->concat(childAffineMatrix);
+
+    // Apply scrollRect clipping
+    if (child->_scrollRect) {
+      if (isChildMatrixAffine) {
+        canvas->clipRect(*child->_scrollRect);
+      } else {
+        auto path = Path();
+        path.addRect(*(child->_scrollRect));
+        path.transform3D(childMatrix);
+        canvas->clipPath(path);
+      }
+    }
+
+    // Parent applies mask for child
+    std::shared_ptr<MaskFilter> maskFilter = nullptr;
+    if (child->hasValidMask()) {
+      auto contentScale = canvas->getMatrix().getMaxScale();
+      auto clipBounds = GetClipBounds(canvas);
+      auto maskData = child->getMaskData(args, contentScale, clipBounds);
+      if (maskData.maskFilter == nullptr) {
+        if (maskData.clipPath.isEmpty() && !maskData.clipPath.isInverseFillType()) {
+          // Mask completely clips, skip this child
+          continue;
+        }
+        canvas->clipPath(maskData.clipPath);
+      } else {
+        maskFilter = maskData.maskFilter;
+      }
+    }
+
+    // Check layer's own properties
+    bool childIdentical =
+        args.excludeEffects || (child->_filters.empty() && child->_layerStyles.empty());
+
+    if (maskFilter) {
+      // Draw child contour to offscreen and apply maskFilter
+      PictureRecorder recorder = {};
+      auto offscreen = recorder.beginRecording();
+      childIdentical = childIdentical && child->drawContour(args, offscreen, opaqueBounds);
+      auto childPicture = recorder.finishRecordingAsPicture();
+      if (childPicture) {
+        Paint paint = {};
+        paint.setMaskFilter(maskFilter);
+        canvas->drawPicture(childPicture, nullptr, &paint);
+      }
+    } else {
+      // Recursively draw child's contour
+      childIdentical = child->drawContour(args, canvas, opaqueBounds) && childIdentical;
+    }
+    isIdentical = isIdentical && childIdentical;
+  }
+
+  return isIdentical;
 }
 
 float Layer::drawBackgroundLayers(const DrawArgs& args, Canvas* canvas) {
@@ -1639,25 +1761,12 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
     return nullptr;
   }
 
+  auto source = std::make_unique<LayerStyleSource>();
+  source->contentScale = contentScale;
+
   DrawArgs drawArgs = args;
   drawArgs.blurBackground = nullptr;
   drawArgs.excludeEffects = bitFields.excludeChildEffectsInLayerStyle;
-  // Use Mode::Contour to record the contour of the content, to prevent the subsequent use of
-  // AlphaThresholdFilter from turning semi-transparent pixels into opaque pixels, which would cause
-  // severe aliasing.
-  auto contentPicture = RecordPicture(DrawMode::Contour, contentScale, [&](Canvas* canvas) {
-    drawContents(drawArgs, canvas, 1.0f);
-  });
-  Point contentOffset = {};
-  auto content =
-      ToImageWithOffset(std::move(contentPicture), &contentOffset, nullptr, args.dstColorSpace);
-  if (content == nullptr) {
-    return nullptr;
-  }
-  auto source = std::make_unique<LayerStyleSource>();
-  source->contentScale = contentScale;
-  source->content = std::move(content);
-  source->contentOffset = contentOffset;
 
   auto needContour =
       excludeContour
@@ -1665,16 +1774,40 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
           : std::any_of(_layerStyles.begin(), _layerStyles.end(), [](const auto& layerStyle) {
               return layerStyle->extraSourceType() == LayerStyleExtraSourceType::Contour;
             });
+
+  bool contourIdentical = false;
   if (needContour) {
     // Child effects are always excluded when drawing the layer contour.
-    drawArgs.excludeEffects = true;
-    drawArgs.drawMode = DrawMode::Contour;
-    auto contourPicture = RecordPicture(DrawMode::Contour, contentScale, [&](Canvas* canvas) {
-      drawContents(drawArgs, canvas, 1.0f);
+    DrawArgs contourArgs = drawArgs;
+    contourArgs.excludeEffects = true;
+    auto contourPicture = RecordOpaquePicture(contentScale, [&](Canvas* canvas) {
+      contourIdentical = drawContour(contourArgs, canvas);
     });
     source->contour = ToImageWithOffset(std::move(contourPicture), &source->contourOffset, nullptr,
-                                        drawArgs.dstColorSpace);
+                                        args.dstColorSpace);
+    if (source->contour == nullptr) {
+      return nullptr;
+    }
   }
+
+  if (contourIdentical) {
+    // Contour is identical to normal mode, reuse contour image as content
+    source->content = source->contour;
+    source->contentOffset = source->contourOffset;
+  } else {
+    // Use OpaqueContext to record the contour of the content, to prevent the subsequent use of
+    // AlphaThresholdFilter from turning semi-transparent pixels into opaque pixels, which would
+    // cause severe aliasing.
+    auto contentPicture = RecordOpaquePicture(contentScale, [&](Canvas* canvas) {
+      drawContents(drawArgs, canvas, 1.0f, nullptr, nullptr, {});
+    });
+    source->content = ToImageWithOffset(std::move(contentPicture), &source->contentOffset, nullptr,
+                                        args.dstColorSpace);
+    if (source->content == nullptr) {
+      return nullptr;
+    }
+  }
+
   return source;
 }
 

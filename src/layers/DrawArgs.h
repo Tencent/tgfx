@@ -23,7 +23,7 @@
 
 namespace tgfx {
 
-enum class DrawMode { Normal, Contour, Background };
+enum class DrawMode { Normal, Background };
 
 /**
  * DrawArgs represents the arguments passed to the draw method of a Layer.

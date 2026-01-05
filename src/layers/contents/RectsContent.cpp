@@ -25,6 +25,19 @@ RectsContent::RectsContent(std::vector<Rect> rects, const LayerPaint& paint)
     : GeometryContent(paint), rects(std::move(rects)) {
 }
 
+std::optional<Rect> RectsContent::getContourOpaqueRect() const {
+  if (rects.empty() || stroke || (shader && shader->isAImage())) {
+    return std::nullopt;
+  }
+  auto result = rects[0];
+  for (size_t i = 1; i < rects.size(); ++i) {
+    if (rects[i].area() > result.area()) {
+      result = rects[i];
+    }
+  }
+  return result;
+}
+
 Rect RectsContent::onGetBounds() const {
   auto bounds = rects[0];
   for (size_t i = 1; i < rects.size(); ++i) {

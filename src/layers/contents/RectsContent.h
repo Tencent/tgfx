@@ -29,6 +29,7 @@ class RectsContent : public GeometryContent {
 
   Rect getTightBounds(const Matrix& matrix) const override;
   bool hitTestPoint(float localX, float localY) const override;
+  std::optional<Rect> getContourOpaqueRect() const override;
 
   std::vector<Rect> rects = {};
 
