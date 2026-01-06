@@ -493,7 +493,7 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
   const auto sampling = GetSamplingOptions(glyphRenderScale, font.isFauxItalic(), state.matrix);
   size_t index = 0;
 
-  for (auto& glyphID : sourceGlyphRun.glyphs) {
+  for (auto glyphID : sourceGlyphRun.glyphs) {
     auto glyphPosition = sourceGlyphRun.positions[index++];
     int maxDimension = 0;
     if (!IsGlyphVisible(font, typeface->isCustom(), glyphID, localClipBounds, scaledStroke.get(),
@@ -504,6 +504,10 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
     if (maxDimension >= Atlas::MaxCellSize) {
       rejectedGlyphRun->glyphs.push_back(glyphID);
       rejectedGlyphRun->positions.push_back(glyphPosition);
+      continue;
+    }
+
+    if (strike->isEmptyGlyph(glyphID)) {
       continue;
     }
 
@@ -522,6 +526,8 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
         if (shouldRetry) {
           rejectedGlyphRun->glyphs.push_back(glyphID);
           rejectedGlyphRun->positions.push_back(glyphPosition);
+        } else {
+          strike->markEmptyGlyph(glyphID);
         }
         continue;
       }
@@ -626,7 +632,11 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
       font.scalerContext->getSize() / font.scalerContext->getBackingSize();
   size_t index = 0;
 
-  for (auto& glyphID : sourceGlyphRun.glyphs) {
+  for (auto glyphID : sourceGlyphRun.glyphs) {
+    if (strike->isEmptyGlyph(glyphID)) {
+      index++;
+      continue;
+    }
     auto glyphPosition = sourceGlyphRun.positions[index++];
     auto& textureProxies = atlasManager->getTextureProxies(maskFormat);
     Point glyphOffset = {};
@@ -640,6 +650,7 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
       auto glyphCodec =
           GetGlyphCodec(font, font.scalerContext, glyphID, scaledStroke.get(), &glyphOffset);
       if (glyphCodec == nullptr) {
+        strike->markEmptyGlyph(glyphID);
         continue;
       }
 

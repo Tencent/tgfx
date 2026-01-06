@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <set>
 #include "core/utils/BlockAllocator.h"
 #include "tgfx/core/BytesKey.h"
 #include "tgfx/core/Typeface.h"
@@ -38,10 +39,29 @@ class AtlasStrike {
     return key;
   };
 
+  /**
+   * Returns true if the glyph has no visible content (e.g., space, newline).
+   */
+  bool isEmptyGlyph(GlyphID glyphID) const {
+    return emptyGlyphs.find(glyphID) != emptyGlyphs.end();
+  }
+
+  /**
+   * Marks a glyph as empty to avoid repeated lookups.
+   */
+  void markEmptyGlyph(GlyphID glyphID) {
+    emptyGlyphs.insert(glyphID);
+  }
+
  private:
   const BytesKey key;
   BlockAllocator allocator{512};
   std::unordered_map<GlyphID, AtlasGlyph*> glyphMap;
+  // Cache for glyphs with no visible content to avoid repeated font queries.
+  // Uses std::set instead of std::unordered_set because the dataset is very small
+  // (typically 1-5 elements like space, tab, newline), making red-black tree's
+  // direct integer comparison faster than hash table overhead for high-frequency lookups.
+  std::set<GlyphID> emptyGlyphs;
 
   friend class AtlasStrikeCache;
 };
