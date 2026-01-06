@@ -20,14 +20,11 @@
 #include <cmath>
 #include "VectorContext.h"
 #include "core/utils/Log.h"
+#include "core/utils/MathExtra.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/layers/Layer.h"
 
 namespace tgfx {
-
-static float DegreesToRadians(float degrees) {
-  return degrees * static_cast<float>(M_PI) / 180.0f;
-}
 
 static void ApplySkew(Matrix* matrix, float skew, float skewAxis) {
   if (skew == 0.0f && skewAxis == 0.0f) {

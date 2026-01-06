@@ -142,6 +142,8 @@ void Repeater::apply(VectorContext* context) {
 
     std::vector<std::shared_ptr<Shape>> copyShapes = {};
     std::vector<Matrix> copyMatrices = {};
+    copyShapes.reserve(originalShapes.size());
+    copyMatrices.reserve(originalShapes.size());
     for (size_t j = 0; j < originalShapes.size(); j++) {
       copyShapes.push_back(originalShapes[j]);
       auto matrix = originalMatrices[j];
@@ -149,6 +151,7 @@ void Repeater::apply(VectorContext* context) {
       copyMatrices.push_back(matrix);
     }
     std::vector<std::unique_ptr<Painter>> copyPainters = {};
+    copyPainters.reserve(originalPainters.size());
     for (const auto& painter : originalPainters) {
       auto copyPainter = painter->clone();
       copyPainter->applyTransform(repeatMatrix, copyAlpha);

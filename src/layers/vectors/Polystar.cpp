@@ -19,6 +19,7 @@
 #include "tgfx/layers/vectors/Polystar.h"
 #include <cmath>
 #include "VectorContext.h"
+#include "core/utils/MathExtra.h"
 
 namespace tgfx {
 
@@ -39,7 +40,7 @@ static void ConvertStarToPath(Path* path, float centerX, float centerY, float po
   }
   float direction = reversed ? -1.0f : 1.0f;
   auto angleStep = static_cast<float>(M_PI) / points;
-  auto currentAngle = (rotation - 90.0f) * static_cast<float>(M_PI) / 180.0f;
+  auto currentAngle = DegreesToRadians(rotation - 90.0f);
   auto numPoints = static_cast<int>(ceilf(points)) * 2;
   auto decimalPart = points - floorf(points);
   int decimalIndex = -2;
@@ -102,7 +103,7 @@ static void ConvertPolygonToPath(Path* path, float centerX, float centerY, float
   auto numPoints = static_cast<int>(floorf(points));
   float direction = reversed ? -1.0f : 1.0f;
   auto angleStep = static_cast<float>(M_PI) * 2.0f / static_cast<float>(numPoints);
-  auto currentAngle = (rotation - 90.0f) * static_cast<float>(M_PI) / 180.0f;
+  auto currentAngle = DegreesToRadians(rotation - 90.0f);
 
   auto firstDx = radius * cosf(currentAngle);
   auto firstDy = radius * sinf(currentAngle);
