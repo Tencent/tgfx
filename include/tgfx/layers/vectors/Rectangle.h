@@ -32,16 +32,16 @@ class Rectangle : public VectorElement {
   Rectangle() = default;
 
   /**
-   * Returns the position of the rectangle center.
+   * Returns the center point of the rectangle.
    */
-  const Point& position() const {
-    return _position;
+  const Point& center() const {
+    return _center;
   }
 
   /**
-   * Sets the position of the rectangle center.
+   * Sets the center point of the rectangle.
    */
-  void setPosition(const Point& value);
+  void setCenter(const Point& value);
 
   /**
    * Returns the size of the rectangle.
@@ -87,7 +87,7 @@ class Rectangle : public VectorElement {
   void apply(VectorContext* context) override;
 
  private:
-  Point _position = Point::Zero();
+  Point _center = Point::Zero();
   Point _size = Point::Zero();
   float _roundness = 0.0f;
   bool _reversed = false;
