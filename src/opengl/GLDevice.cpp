@@ -30,13 +30,16 @@ std::shared_ptr<GLDevice> GLDevice::MakeWithFallback() {
     return device;
   }
 #ifndef TGFX_BUILD_FOR_WEB
-  for (auto& item : deviceMap) {
-    device = std::static_pointer_cast<GLDevice>(item.second->weakThis.lock());
-    if (device != nullptr && !device->externallyOwned) {
-      LOGE(
-          "GLDevice::MakeWithFallback(): Failed to create a new GLDevice! Fall back to the "
-          "existing one.");
-      return device;
+  {
+    std::lock_guard<std::mutex> autoLock(deviceMapLocker);
+    for (auto& item : deviceMap) {
+      device = std::static_pointer_cast<GLDevice>(item.second->weakThis.lock());
+      if (device != nullptr && !device->externallyOwned) {
+        LOGE(
+            "GLDevice::MakeWithFallback(): Failed to create a new GLDevice! Fall back to the "
+            "existing one.");
+        return device;
+      }
     }
   }
 #endif
