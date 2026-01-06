@@ -3555,8 +3555,12 @@ TGFX_TEST(LayerTest, Matrix) {
 
   imageLayer->setMatrix3D(imageMatrix3D);
   displayList->render(surface.get());
-  EXPECT_EQ(imageLayer->getBounds(contentLayer.get()), Rect::MakeLTRB(73, 10, 290, 272));
-  EXPECT_EQ(imageLayer->getBounds(displayList->root()), Rect::MakeLTRB(102, 21, 187, 158));
+  auto imageToContentBounds = imageLayer->getBounds(contentLayer.get());
+  imageToContentBounds.roundOut();
+  EXPECT_EQ(imageToContentBounds, Rect::MakeLTRB(73, 10, 290, 272));
+  auto imageToDisplayListBounds = imageLayer->getBounds(displayList->root());
+  imageToDisplayListBounds.roundOut();
+  EXPECT_EQ(imageToDisplayListBounds, Rect::MakeLTRB(102, 21, 187, 158));
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D"));
 
   auto imageBlurLayer = SolidLayer::Make();
@@ -3602,8 +3606,12 @@ TGFX_TEST(LayerTest, Matrix) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D_2D_3D"));
 
   contentLayer->setTransformStyle(TransformStyle::Preserve3D);
-  EXPECT_EQ(imageLayer->getBounds(contentLayer.get()), Rect::MakeLTRB(-51, 10, 333, 279));
-  EXPECT_EQ(imageLayer->getBounds(displayList->root()), Rect::MakeLTRB(62, 21, 206, 159));
+  imageToContentBounds = imageLayer->getBounds(contentLayer.get());
+  imageToContentBounds.roundOut();
+  EXPECT_EQ(imageToContentBounds, Rect::MakeLTRB(-51, 10, 333, 279));
+  imageToDisplayListBounds = imageLayer->getBounds(displayList->root());
+  imageToDisplayListBounds.roundOut();
+  EXPECT_EQ(imageToDisplayListBounds, Rect::MakeLTRB(62, 21, 206, 159));
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D_2D_3D_Preserve3D"));
 

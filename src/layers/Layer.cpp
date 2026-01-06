@@ -696,43 +696,30 @@ Rect Layer::getBoundsInternal(const Matrix3D& coordinateMatrix, bool computeTigh
   if (!localBounds) {
     localBounds = std::make_unique<Rect>(computeBounds(Matrix3D::I(), computeTightBounds));
   }
-  auto result = coordinateMatrix.mapRect(*localBounds);
-  if (!IsMatrix3DAffine(coordinateMatrix)) {
-    // When the matrix is not affine, the layer will draw with a 3D filter, so the bounds should
-    // be rounded out.
-    result.roundOut();
-  }
-  return result;
+  return coordinateMatrix.mapRect(*localBounds);
 }
 
 static Rect ComputeContentBounds(const LayerContent& content, const Matrix3D& coordinateMatrix,
                                  bool applyMatrixAtEnd, bool computeTightBounds) {
-  if (applyMatrixAtEnd) {
-    if (computeTightBounds) {
-      return content.getTightBounds(Matrix::I());
-    }
-    return content.getBounds();
+  auto contentMatrix = applyMatrixAtEnd ? Matrix3D::I() : coordinateMatrix;
+  if (!computeTightBounds) {
+    return contentMatrix.mapRect(content.getBounds());
   }
-  if (computeTightBounds) {
-    if (IsMatrix3DAffine(coordinateMatrix)) {
-      return content.getTightBounds(GetMayLossyAffineMatrix(coordinateMatrix));
-    }
-    auto tightBounds = content.getTightBounds(Matrix::I());
-    tightBounds = coordinateMatrix.mapRect(tightBounds);
-    tightBounds.roundOut();
-    return tightBounds;
+
+  if (IsMatrix3DAffine(contentMatrix)) {
+    return content.getTightBounds(GetMayLossyAffineMatrix(contentMatrix));
   }
-  return coordinateMatrix.mapRect(content.getBounds());
+  auto bounds = content.getTightBounds(Matrix::I());
+  return contentMatrix.mapRect(bounds);
 }
 
 Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBounds) {
   bool canStart3DContext = _transformStyle == TransformStyle::Preserve3D && canExtend3DContext();
-  // Layers that can start or extend a 3D rendering context do not support computeTightBounds.
-  DEBUG_ASSERT(!canStart3DContext || !computeTightBounds);
   bool hasEffects = !_layerStyles.empty() || !_filters.empty();
   // When starting a 3D context, the matrix must be passed down to preserve 3D state.
   // Otherwise, when has effects, compute in local coordinates first, then apply matrix at end.
-  bool applyMatrixAtEnd = !canStart3DContext && hasEffects;
+  bool isAffine = IsMatrix3DAffine(coordinateMatrix);
+  bool applyMatrixAtEnd = !canStart3DContext && (hasEffects || !isAffine);
 
   Rect bounds = {};
   if (auto content = getContent()) {
@@ -756,8 +743,8 @@ Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBou
     childMatrix.postConcat(applyMatrixAtEnd ? Matrix3D::I() : coordinateMatrix);
     auto childBounds = child->getBoundsInternal(childMatrix, computeTightBounds);
     if (child->_scrollRect) {
-      auto relatvieScrollRect = childMatrix.mapRect(*child->_scrollRect);
-      if (!childBounds.intersect(relatvieScrollRect)) {
+      auto relativeScrollRect = childMatrix.mapRect(*child->_scrollRect);
+      if (!childBounds.intersect(relativeScrollRect)) {
         continue;
       }
     }
@@ -787,9 +774,6 @@ Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBou
 
   if (applyMatrixAtEnd) {
     bounds = coordinateMatrix.mapRect(bounds);
-    if (!IsMatrix3DAffine(coordinateMatrix)) {
-      bounds.roundOut();
-    }
   }
   return bounds;
 }

@@ -307,7 +307,9 @@ Matrix3D Matrix3D::Perspective(float fovyDegress, float aspect, float nearZ, flo
 }
 
 Rect Matrix3D::mapRect(const Rect& src) const {
-  if (hasPerspective()) {
+  if (isIdentity()) {
+    return src;
+  } else if (hasPerspective()) {
     return MapRectPerspective(src, values);
   } else {
     return MapRectAffine(src, values);
