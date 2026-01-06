@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include <unordered_set>
+#include <vector>
 #include "Render3DContext.h"
 #include "layers/BackgroundContext.h"
 #include "tgfx/gpu/Context.h"
@@ -52,9 +52,9 @@ class DrawArgs {
   bool excludeEffects = false;
   // Specifies which layer style types to draw based on their extra source type.
   // Note: This field is only effective when excludeEffects is false.
-  std::unordered_set<LayerStyleExtraSourceType> styleSourceTypes = {
-      LayerStyleExtraSourceType::None, LayerStyleExtraSourceType::Contour,
-      LayerStyleExtraSourceType::Background};
+  std::vector<LayerStyleExtraSourceType> styleSourceTypes = {LayerStyleExtraSourceType::None,
+                                                             LayerStyleExtraSourceType::Contour,
+                                                             LayerStyleExtraSourceType::Background};
   // Determines the draw mode of the Layer.
   DrawMode drawMode = DrawMode::Normal;
   // The rectangle area to be drawn. This is used for clipping the drawing area.

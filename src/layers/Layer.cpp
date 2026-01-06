@@ -42,6 +42,12 @@
 #include "tgfx/layers/ShapeLayer.h"
 
 namespace tgfx {
+
+static bool HasStyleSource(const std::vector<LayerStyleExtraSourceType>& types,
+                           LayerStyleExtraSourceType type) {
+  return std::find(types.begin(), types.end(), type) != types.end();
+}
+
 // The minimum size (longest edge) for subtree cache. This prevents creating excessively small
 // mipmap levels that would be inefficient to cache.
 static constexpr int SUBTREE_CACHE_MIN_SIZE = 32;
@@ -1526,8 +1532,7 @@ bool Layer::drawWithSubtreeCache(const DrawArgs& args, Canvas* canvas, float alp
   paint.setAlpha(alpha);
   paint.setBlendMode(blendMode);
   cache->draw(args.context, longEdge, canvas, paint, transform3D);
-  if (args.blurBackground &&
-      args.styleSourceTypes.count(LayerStyleExtraSourceType::Background) > 0) {
+  if (args.blurBackground && HasStyleSource(args.styleSourceTypes, LayerStyleExtraSourceType::Background)) {
     cache->draw(args.context, longEdge, args.blurBackground->getCanvas(), paint, transform3D);
   }
   return true;
@@ -1539,8 +1544,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   // Non-leaf layers in a 3D rendering context layer tree never require offscreen rendering.
   DEBUG_ASSERT(args.render3DContext == nullptr);
   DEBUG_ASSERT(!canPreserve3D());
-  if (transform3D != nullptr &&
-      args.styleSourceTypes.count(LayerStyleExtraSourceType::Background) > 0) {
+  if (transform3D != nullptr && HasStyleSource(args.styleSourceTypes, LayerStyleExtraSourceType::Background)) {
     drawBackgroundLayerStyles(args, canvas, alpha, *transform3D);
   }
 
@@ -1647,7 +1651,7 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
     drawLayerStyles(args, canvas, alpha, layerStyleSource, LayerStylePosition::Below);
   }
   auto content = getContent();
-  auto drawBackground = args.styleSourceTypes.count(LayerStyleExtraSourceType::Background) > 0;
+  auto drawBackground = HasStyleSource(args.styleSourceTypes, LayerStyleExtraSourceType::Background);
   bool hasForeground = false;
   if (content) {
     if (args.drawMode == DrawMode::Contour) {
@@ -1695,7 +1699,7 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, cons
   // correct background content. Background styles are temporarily disabled for the 3D layer's
   // subtree (excluding the 3D layer itself).
   bool skipChildBackground =
-      args.styleSourceTypes.count(LayerStyleExtraSourceType::Background) == 0 ||
+      !HasStyleSource(args.styleSourceTypes, LayerStyleExtraSourceType::Background) ||
       !bitFields.matrix3DIsAffine;
   // TODO: Support calculating reasonable clipping regions when obtaining content image.
   // Since 3D layer matrices are not written to the background canvas, child layers cannot compute
@@ -1712,7 +1716,9 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, cons
     }
     auto childArgs = args;
     if (skipChildBackground) {
-      childArgs.styleSourceTypes.erase(LayerStyleExtraSourceType::Background);
+      auto& types = childArgs.styleSourceTypes;
+      types.erase(std::remove(types.begin(), types.end(), LayerStyleExtraSourceType::Background),
+                  types.end());
     }
     childArgs.clipContentByCanvas = clipChildContentByCanvas;
     if (static_cast<int>(i) < lastBackgroundLayerIndex) {
@@ -2062,7 +2068,7 @@ void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
       args.blurBackground ? GetClipBounds(args.blurBackground->getCanvas()) : std::nullopt;
   for (const auto& layerStyle : _layerStyles) {
     if (layerStyle->position() != position ||
-        args.styleSourceTypes.count(layerStyle->extraSourceType()) == 0) {
+        !HasStyleSource(args.styleSourceTypes, layerStyle->extraSourceType())) {
       continue;
     }
     PictureRecorder recorder = {};
