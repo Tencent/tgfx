@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,36 +16,29 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "Painter.h"
+#include "tgfx/layers/LayerRecorder.h"
 
 namespace tgfx {
-/**
- * Defines the types of a layer.
- */
-enum class LayerType {
-  /**
-   * The type for a generic layer. May be used as a container for other child layers.
-   */
-  Layer,
-  /**
-   * A layer displaying a simple image.
-   */
-  Image,
-  /**
-   * A layer displaying a simple shape.
-   */
-  Shape,
-  /**
-   * A layer displaying a simple text.
-   */
-  Text,
-  /**
-   * A layer that fills its bounds with a solid color.
-   */
-  Solid,
-  /**
-   * A layer displaying vector elements (shapes, text, images) with fill/stroke styles and modifiers.
-   */
-  Vector
-};
+
+void Painter::applyTransform(const Matrix& groupMatrix, float groupAlpha) {
+  matrix.postConcat(groupMatrix);
+  alpha *= groupAlpha;
+}
+
+void Painter::offsetShapeIndex(size_t offset) {
+  startIndex += offset;
+}
+
+void Painter::draw(LayerRecorder* recorder, const std::vector<std::shared_ptr<Shape>>& shapes) {
+  for (size_t i = 0; i < matrices.size(); i++) {
+    auto& shape = shapes[startIndex + i];
+    if (shape == nullptr) {
+      continue;
+    }
+    auto finalShape = Shape::ApplyMatrix(shape, matrices[i]);
+    onDraw(recorder, std::move(finalShape));
+  }
+}
+
 }  // namespace tgfx

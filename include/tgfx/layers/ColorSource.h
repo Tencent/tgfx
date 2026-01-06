@@ -41,5 +41,7 @@ class ColorSource : public LayerProperty {
 
  private:
   friend class Types;
+  friend class FillStyle;
+  friend class StrokeStyle;
 };
 }  // namespace tgfx
