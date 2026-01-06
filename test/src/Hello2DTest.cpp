@@ -40,18 +40,6 @@ TGFX_TEST(Hello2DTest, Compare) {
   DisplayList displayList;
   displayList.setRenderMode(RenderMode::Direct);
 
-  // Calculate zoom and offset to fit 720x720 design size to window
-  static constexpr float DESIGN_SIZE = 720.0f;
-  auto scaleX = static_cast<float>(surfaceWidth) / DESIGN_SIZE;
-  auto scaleY = static_cast<float>(surfaceHeight) / DESIGN_SIZE;
-  auto scale = std::min(scaleX, scaleY);
-  auto scaledSize = DESIGN_SIZE * scale;
-  auto offsetX = (static_cast<float>(surfaceWidth) - scaledSize) * 0.5f;
-  auto offsetY = (static_cast<float>(surfaceHeight) - scaledSize) * 0.5f;
-
-  displayList.setZoomScale(scale);
-  displayList.setContentOffset(offsetX, offsetY);
-
   auto& builderNames = hello2d::LayerBuilder::Names();
   for (size_t i = 0; i < builderNames.size(); ++i) {
     const auto& name = builderNames[i];
@@ -63,6 +51,8 @@ TGFX_TEST(Hello2DTest, Compare) {
       if (layer) {
         displayList.root()->removeChildren();
         displayList.root()->addChild(layer);
+        hello2d::LayerBuilder::ApplyCenteringTransform(layer, static_cast<float>(surfaceWidth),
+                                                       static_cast<float>(surfaceHeight));
       }
     }
 
@@ -74,7 +64,7 @@ TGFX_TEST(Hello2DTest, Compare) {
     auto key = "Hello2DTest/" + name;
     auto result = Baseline::Compare(surface, key);
     if (!result) {
-      ADD_FAILURE();
+      ADD_FAILURE() << "Baseline comparison failed for key: " << key;
     }
   }
   canvas->clear();
