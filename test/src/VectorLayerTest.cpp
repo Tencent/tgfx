@@ -983,8 +983,8 @@ TGFX_TEST(VectorLayerTest, ComplexComposition) {
   repeater->setAnchorPoint({0, 0});
 
   auto trim = std::make_shared<TrimPath>();
-  trim->setStart(0.4f);
-  trim->setEnd(0.75f);
+  trim->setStart(0.48f);
+  trim->setEnd(0.83f);
 
   auto stroke = MakeStrokeStyle(Color::FromRGBA(0, 100, 200, 255), 6.0f);
   stroke->setLineCap(LineCap::Round);
