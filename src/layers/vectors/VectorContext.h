@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,34 +18,37 @@
 
 #pragma once
 
+#include <vector>
+#include "Painter.h"
+#include "tgfx/core/Matrix.h"
+#include "tgfx/core/Shape.h"
+
 namespace tgfx {
+
 /**
- * Defines the types of a layer.
+ * VectorContext holds the rendering state while traversing vector elements.
+ * This is an internal structure used by VectorLayer and VectorElement subclasses.
  */
-enum class LayerType {
+struct VectorContext {
   /**
-   * The type for a generic layer. May be used as a container for other child layers.
+   * Adds a shape with an identity matrix to the list.
    */
-  Layer,
+  void addShape(std::shared_ptr<Shape> shape);
+
   /**
-   * A layer displaying a simple image.
+   * Shape list that can be modified by path modifiers.
    */
-  Image,
+  std::vector<std::shared_ptr<Shape>> shapes = {};
+
   /**
-   * A layer displaying a simple shape.
+   * Matrix list corresponding to each shape.
    */
-  Shape,
+  std::vector<Matrix> matrices = {};
+
   /**
-   * A layer displaying a simple text.
+   * Accumulated painters from style elements.
    */
-  Text,
-  /**
-   * A layer that fills its bounds with a solid color.
-   */
-  Solid,
-  /**
-   * A layer displaying vector elements (shapes, text, images) with fill/stroke styles and modifiers.
-   */
-  Vector
+  std::vector<std::unique_ptr<Painter>> painters = {};
 };
+
 }  // namespace tgfx

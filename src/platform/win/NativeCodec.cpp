@@ -34,7 +34,8 @@ static ComPtr<IWICImagingFactory> InitWICFactory() {
   ComPtr<IWICImagingFactory> factory = nullptr;
   HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
   if (SUCCEEDED(hr) || hr == RPC_E_CHANGED_MODE) {
-    CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&factory));
+    CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER,
+                     IID_PPV_ARGS(&factory));
   }
   return factory;
 }

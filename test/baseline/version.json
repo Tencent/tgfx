@@ -442,5 +442,33 @@
     "TypefaceTest": {
         "CustomImageTypeface": "de8199b2",
         "CustomPathTypeface": "42ecc4c7"
+    },
+    "VectorLayerTest": {
+        "BasicShapes": "4a74f6aa",
+        "ChainedModifiers": "4a74f6aa",
+        "ComplexComposition": "4a74f6aa",
+        "FillRule": "4a74f6aa",
+        "MergePath": "4a74f6aa",
+        "MergePathClearsPainters": "4a74f6aa",
+        "MergePathOps": "4a74f6aa",
+        "ModifiersAfterStyles": "4a74f6aa",
+        "MultipleFillsAndStrokes": "4a74f6aa",
+        "NestedGroups": "4a74f6aa",
+        "PolystarRotation": "4a74f6aa",
+        "Repeater": "4a74f6aa",
+        "RepeaterEdgeCases": "4a74f6aa",
+        "RepeaterTransform": "4a74f6aa",
+        "RepeaterWithScale": "4a74f6aa",
+        "RoundCorner": "4a74f6aa",
+        "RoundCornerWithScale": "4a74f6aa",
+        "StrokeDashWithTrim": "4a74f6aa",
+        "StrokeJoinCap": "4a74f6aa",
+        "StrokeNestedScale": "4a74f6aa",
+        "TrimPath": "4a74f6aa",
+        "TrimPathOffset": "4a74f6aa",
+        "TrimPathReversed": "4a74f6aa",
+        "TrimPathReversedWrapAround": "4a74f6aa",
+        "TrimPathWithScale": "4a74f6aa",
+        "VectorGroupTransform": "4a74f6aa"
     }
 }

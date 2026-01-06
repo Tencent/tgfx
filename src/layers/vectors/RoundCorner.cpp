@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,36 +16,31 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "tgfx/layers/vectors/RoundCorner.h"
+#include "VectorContext.h"
+#include "tgfx/core/PathEffect.h"
 
 namespace tgfx {
-/**
- * Defines the types of a layer.
- */
-enum class LayerType {
-  /**
-   * The type for a generic layer. May be used as a container for other child layers.
-   */
-  Layer,
-  /**
-   * A layer displaying a simple image.
-   */
-  Image,
-  /**
-   * A layer displaying a simple shape.
-   */
-  Shape,
-  /**
-   * A layer displaying a simple text.
-   */
-  Text,
-  /**
-   * A layer that fills its bounds with a solid color.
-   */
-  Solid,
-  /**
-   * A layer displaying vector elements (shapes, text, images) with fill/stroke styles and modifiers.
-   */
-  Vector
-};
+
+void RoundCorner::setRadius(float value) {
+  if (_radius == value) {
+    return;
+  }
+  _radius = value;
+  _cachedEffect = nullptr;
+  invalidateContent();
+}
+
+void RoundCorner::apply(VectorContext* context) {
+  if (_cachedEffect == nullptr) {
+    _cachedEffect = PathEffect::MakeCorner(_radius);
+  }
+  if (_cachedEffect == nullptr) {
+    return;
+  }
+  for (auto& shape : context->shapes) {
+    shape = Shape::ApplyEffect(shape, _cachedEffect);
+  }
+}
+
 }  // namespace tgfx
