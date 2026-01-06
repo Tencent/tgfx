@@ -130,17 +130,36 @@ class Gradient : public ColorSource {
    */
   void setPositions(std::vector<float> positions);
 
+  /**
+   * Returns the transformation matrix applied to the gradient.
+   */
+  const Matrix& matrix() const {
+    return _matrix;
+  }
+
+  /**
+   * Sets the transformation matrix applied to the gradient.
+   */
+  void setMatrix(const Matrix& matrix);
+
+  std::shared_ptr<Shader> getShader() const override;
+
  protected:
   Type getType() const override {
     return Type::Gradient;
   }
 
-  std::vector<Color> _colors;
-  std::vector<float> _positions;
+  virtual std::shared_ptr<Shader> onCreateShader() const = 0;
+
+  std::vector<Color> _colors = {};
+  std::vector<float> _positions = {};
 
   Gradient(const std::vector<Color>& colors, const std::vector<float>& positions)
       : _colors(colors), _positions(positions) {
   }
+
+ private:
+  Matrix _matrix = {};
 };
 
 /**
@@ -179,7 +198,7 @@ class LinearGradient : public Gradient {
   void setEndPoint(const Point& endPoint);
 
  protected:
-  std::shared_ptr<Shader> onGetShader() const override;
+  std::shared_ptr<Shader> onCreateShader() const override;
 
  private:
   Point _startPoint = {};
@@ -229,7 +248,7 @@ class RadialGradient : public Gradient {
   void setRadius(float radius);
 
  protected:
-  std::shared_ptr<Shader> onGetShader() const override;
+  std::shared_ptr<Shader> onCreateShader() const override;
 
  private:
   Point _center = {};
@@ -291,7 +310,7 @@ class ConicGradient : public Gradient {
   void setEndAngle(float endAngle);
 
  protected:
-  std::shared_ptr<Shader> onGetShader() const override;
+  std::shared_ptr<Shader> onCreateShader() const override;
 
  private:
   Point _center = {};
@@ -342,7 +361,7 @@ class DiamondGradient : public Gradient {
   void setHalfDiagonal(float halfDiagonal);
 
  protected:
-  std::shared_ptr<Shader> onGetShader() const override;
+  std::shared_ptr<Shader> onCreateShader() const override;
 
  private:
   Point _center = {};

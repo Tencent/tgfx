@@ -224,7 +224,12 @@ std::shared_ptr<Layer> Layer::Make() {
 
 Layer::~Layer() {
   for (const auto& filter : _filters) {
+    DEBUG_ASSERT(filter != nullptr);
     filter->detachFromLayer(this);
+  }
+  for (const auto& layerStyle : _layerStyles) {
+    DEBUG_ASSERT(layerStyle != nullptr);
+    layerStyle->detachFromLayer(this);
   }
   if (_mask) {
     _mask->maskOwner = nullptr;
@@ -348,17 +353,22 @@ void Layer::setAllowsGroupOpacity(bool value) {
   invalidateTransform();
 }
 
-void Layer::setFilters(std::vector<std::shared_ptr<LayerFilter>> value) {
+void Layer::setFilters(const std::vector<std::shared_ptr<LayerFilter>>& value) {
   if (_filters.size() == value.size() &&
       std::equal(_filters.begin(), _filters.end(), value.begin())) {
     return;
   }
   for (const auto& filter : _filters) {
+    DEBUG_ASSERT(filter != nullptr);
     filter->detachFromLayer(this);
   }
-  _filters = std::move(value);
-  for (const auto& filter : _filters) {
+  _filters.clear();
+  for (const auto& filter : value) {
+    if (filter == nullptr) {
+      continue;
+    }
     filter->attachToLayer(this);
+    _filters.push_back(filter);
   }
   invalidateSubtree();
   invalidateTransform();
@@ -412,17 +422,22 @@ Layer* Layer::root() const {
   return _root;
 }
 
-void Layer::setLayerStyles(std::vector<std::shared_ptr<LayerStyle>> value) {
+void Layer::setLayerStyles(const std::vector<std::shared_ptr<LayerStyle>>& value) {
   if (_layerStyles.size() == value.size() &&
       std::equal(_layerStyles.begin(), _layerStyles.end(), value.begin())) {
     return;
   }
   for (const auto& layerStyle : _layerStyles) {
+    DEBUG_ASSERT(layerStyle != nullptr);
     layerStyle->detachFromLayer(this);
   }
-  _layerStyles = std::move(value);
-  for (const auto& layerStyle : _layerStyles) {
+  _layerStyles.clear();
+  for (const auto& layerStyle : value) {
+    if (layerStyle == nullptr) {
+      continue;
+    }
     layerStyle->attachToLayer(this);
+    _layerStyles.push_back(layerStyle);
   }
   invalidateSubtree();
   invalidateTransform();
@@ -597,19 +612,18 @@ Rect Layer::getBoundsInternal(const Matrix3D& coordinateMatrix, bool computeTigh
 }
 
 Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBounds) {
-  // If the matrix only contains 2D affine transformations, directly use the equivalent 2D
-  // transformation matrix to calculate the final Bounds
-  bool isCoordinateMatrixAffine = IsMatrix3DAffine(coordinateMatrix);
-  auto workAffineMatrix =
-      isCoordinateMatrixAffine ? GetMayLossyAffineMatrix(coordinateMatrix) : Matrix::I();
-  auto workMatrix3D = isCoordinateMatrixAffine ? Matrix3D(workAffineMatrix) : coordinateMatrix;
+  bool isAffine = IsMatrix3DAffine(coordinateMatrix);
+  bool hasEffects = !_layerStyles.empty() || !_filters.empty();
+  // When has effects or non-affine, compute in local coordinates first, then apply matrix at end.
+  bool applyMatrixAtEnd = hasEffects || !isAffine;
+  auto contentMatrix = applyMatrixAtEnd ? Matrix::I() : GetMayLossyAffineMatrix(coordinateMatrix);
 
   Rect bounds = {};
   if (auto content = getContent()) {
     if (computeTightBounds) {
-      bounds.join(content->getTightBounds(workAffineMatrix));
+      bounds.join(content->getTightBounds(contentMatrix));
     } else {
-      bounds.join(workAffineMatrix.mapRect(content->getBounds()));
+      bounds.join(contentMatrix.mapRect(content->getBounds()));
     }
   }
 
@@ -619,7 +633,7 @@ Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBou
       continue;
     }
     auto childMatrix = child->getMatrixWithScrollRect();
-    childMatrix.postConcat(workMatrix3D);
+    childMatrix.postConcat(Matrix3D(contentMatrix));
     auto childBounds = child->getBoundsInternal(childMatrix, computeTightBounds);
     if (child->_scrollRect) {
       auto relatvieScrollRect = childMatrix.mapRect(*child->_scrollRect);
@@ -638,27 +652,25 @@ Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBou
     bounds.join(childBounds);
   }
 
-  if (!_layerStyles.empty() || !_filters.empty()) {
-    auto contentScale = workAffineMatrix.getMaxScale();
+  if (hasEffects) {
     auto layerBounds = bounds;
     for (auto& layerStyle : _layerStyles) {
-      auto styleBounds = layerStyle->filterBounds(layerBounds, contentScale);
+      DEBUG_ASSERT(layerStyle != nullptr);
+      auto styleBounds = layerStyle->filterBounds(layerBounds, 1.0f);
       bounds.join(styleBounds);
     }
     for (auto& filter : _filters) {
-      bounds = filter->filterBounds(bounds, contentScale);
+      DEBUG_ASSERT(filter != nullptr);
+      bounds = filter->filterBounds(bounds, 1.0f);
     }
   }
 
-  if (isCoordinateMatrixAffine) {
-    return bounds;
+  if (applyMatrixAtEnd) {
+    bounds = coordinateMatrix.mapRect(bounds);
+    if (!isAffine) {
+      bounds.roundOut();
+    }
   }
-
-  // If the matrix contains Z-axis transformations and projection transformations, first calculate
-  // the Bounds using the identity matrix, then apply the 3D transformation to the result.
-  // Otherwise, use the equivalent affine transformation matrix to calculate the Bounds.
-  bounds = coordinateMatrix.mapRect(bounds);
-  bounds.roundOut();
   return bounds;
 }
 
@@ -967,6 +979,7 @@ std::shared_ptr<ImageFilter> Layer::getImageFilter(float contentScale) {
   }
   std::vector<std::shared_ptr<ImageFilter>> filters;
   for (const auto& layerFilter : _filters) {
+    DEBUG_ASSERT(layerFilter != nullptr);
     if (auto filter = layerFilter->getImageFilter(contentScale)) {
       filters.push_back(filter);
     }
@@ -1060,6 +1073,7 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
   auto maskType = static_cast<LayerMaskType>(bitFields.maskType);
   auto maskArgs = args;
   maskArgs.drawMode = maskType != LayerMaskType::Contour ? DrawMode::Normal : DrawMode::Contour;
+  maskArgs.excludeEffects |= maskType == LayerMaskType::Contour;
   maskArgs.blurBackground = nullptr;
 
   auto relativeMatrix = _mask->getRelativeMatrix(this);
@@ -1067,10 +1081,9 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
   auto affineRelativeMatrix =
       isMatrixAffine ? GetMayLossyAffineMatrix(relativeMatrix) : Matrix::I();
 
+  // Note: RecordPicture does not use layerClipBounds here. Using clipBounds may cause PathOp
+  // errors when extracting maskPath from the picture, resulting in incorrect clip regions.
   auto maskPicture = RecordPicture(maskArgs.drawMode, scale, [&](Canvas* canvas) {
-    if (layerClipBounds.has_value()) {
-      canvas->clipRect(*layerClipBounds);
-    }
     canvas->concat(affineRelativeMatrix);
     _mask->drawLayer(maskArgs, canvas, _mask->_alpha, BlendMode::SrcOver);
   });
@@ -1086,9 +1099,17 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
     }
   }
 
+  Rect maskBounds = maskPicture->getBounds();
+  if (layerClipBounds.has_value()) {
+    auto scaledClipBounds = *layerClipBounds;
+    scaledClipBounds.scale(scale, scale);
+    if (!maskBounds.intersect(scaledClipBounds)) {
+      return {};
+    }
+  }
   Point maskImageOffset = {};
   auto maskContentImage =
-      ToImageWithOffset(std::move(maskPicture), &maskImageOffset, nullptr, args.dstColorSpace);
+      ToImageWithOffset(std::move(maskPicture), &maskImageOffset, &maskBounds, args.dstColorSpace);
   if (maskContentImage == nullptr) {
     return {};
   }
@@ -1124,6 +1145,9 @@ std::shared_ptr<Image> Layer::getContentImage(
   if (!imageFilter) {
     PictureRecorder recorder = {};
     auto offscreenCanvas = recorder.beginRecording();
+    auto mappedBounds = contentMatrix.mapRect(*inputBounds);
+    mappedBounds.roundOut();
+    offscreenCanvas->clipRect(mappedBounds);
     offscreenCanvas->setMatrix(contentMatrix);
     drawDirectly(contentArgs, offscreenCanvas, 1.0f, extraSourceTypes);
     Point offset = {};
@@ -1140,6 +1164,10 @@ std::shared_ptr<Image> Layer::getContentImage(
   auto contentScale = contentMatrix.getMaxScale();
   PictureRecorder recorder = {};
   auto offscreenCanvas = recorder.beginRecording();
+  auto mappedBounds = *inputBounds;
+  mappedBounds.scale(contentScale, contentScale);
+  mappedBounds.roundOut();
+  offscreenCanvas->clipRect(mappedBounds);
   offscreenCanvas->scale(contentScale, contentScale);
   drawDirectly(contentArgs, offscreenCanvas, 1.0f, extraSourceTypes);
   Point offset = {};
@@ -1461,6 +1489,7 @@ std::optional<Rect> Layer::computeContentBounds(const std::optional<Rect>& clipB
       return std::nullopt;
     }
   }
+  inputBounds.roundOut();
   return inputBounds;
 }
 
@@ -1763,9 +1792,10 @@ void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
   auto clipBounds =
       args.blurBackground ? GetClipBounds(args.blurBackground->getCanvas()) : std::nullopt;
   for (const auto& layerStyle : _layerStyles) {
+    DEBUG_ASSERT(layerStyle != nullptr);
     if (layerStyle->position() != position ||
-        std::find(extraSourceTypes.begin(), extraSourceTypes.end(), layerStyle->extraSourceType()) ==
-            extraSourceTypes.end()) {
+        std::find(extraSourceTypes.begin(), extraSourceTypes.end(),
+                  layerStyle->extraSourceType()) == extraSourceTypes.end()) {
       continue;
     }
     PictureRecorder recorder = {};
@@ -2035,6 +2065,7 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
   }
   auto backOutset = 0.f;
   for (auto& style : _layerStyles) {
+    DEBUG_ASSERT(style != nullptr);
     if (style->extraSourceType() != LayerStyleExtraSourceType::Background) {
       continue;
     }
@@ -2073,6 +2104,7 @@ void Layer::checkBackgroundStyles(std::shared_ptr<RegionTransformer> transformer
 
 void Layer::updateBackgroundBounds(float contentScale) {
   for (auto& style : _layerStyles) {
+    DEBUG_ASSERT(style != nullptr);
     if (style->extraSourceType() == LayerStyleExtraSourceType::Background) {
       _root->invalidateBackground(renderBounds, style.get(), contentScale);
     }
@@ -2111,6 +2143,7 @@ bool Layer::hasBackgroundStyle() {
     return maxBackgroundOutset > 0;
   }
   for (const auto& style : _layerStyles) {
+    DEBUG_ASSERT(style != nullptr);
     if (style->extraSourceType() == LayerStyleExtraSourceType::Background) {
       return true;
     }

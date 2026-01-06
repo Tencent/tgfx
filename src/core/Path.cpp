@@ -86,6 +86,9 @@ PathFillType Path::getFillType() const {
 }
 
 void Path::setFillType(PathFillType fillType) {
+  if (getFillType() == fillType) {
+    return;
+  }
   SkPathFillType type;
   switch (fillType) {
     case PathFillType::EvenOdd:
@@ -483,11 +486,12 @@ void Path::addRRect(const RRect& rRect, bool reversed, unsigned int startIndex) 
 void Path::addPath(const Path& src, PathOp op) {
   auto& path = writableRef()->path;
   const auto& newPath = src.pathRef->path;
-  if (op == PathOp::Append) {
+  if (op == PathOp::Append || op == PathOp::Extend) {
     if (path.isEmpty()) {
       path = newPath;
     } else {
-      path.addPath(newPath);
+      auto mode = op == PathOp::Extend ? SkPath::kExtend_AddPathMode : SkPath::kAppend_AddPathMode;
+      path.addPath(newPath, mode);
     }
     return;
   }
@@ -542,8 +546,10 @@ void Path::transform3D(const Matrix3D& matrix) {
 
 void Path::reverse() {
   auto& path = writableRef()->path;
+  auto fillType = path.getFillType();
   SkPath tempPath;
   tempPath.reverseAddPath(path);
+  tempPath.setFillType(fillType);
   path = tempPath;
 }
 

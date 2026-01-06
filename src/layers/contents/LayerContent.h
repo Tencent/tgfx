@@ -75,6 +75,8 @@ class LayerContent {
     Shape,
     Text,
     Compose,
+    Rects,
+    RRects,
   };
 
   /**

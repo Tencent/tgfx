@@ -70,12 +70,31 @@ class LayerRecorder {
    * Adds a text blob with the specified paint.
    * @param textBlob The text blob.
    * @param paint The paint style for the text.
+   * @param x The x offset of the text blob.
+   * @param y The y offset of the text blob.
    */
-  void addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerPaint& paint);
+  void addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerPaint& paint, float x = 0,
+                   float y = 0);
 
  private:
+  enum class PendingType {
+    None,
+    Rect,
+    RRect,
+    Shape,
+  };
+
   std::vector<std::unique_ptr<GeometryContent>> contents;
   std::vector<std::unique_ptr<GeometryContent>> foregrounds;
+
+  PendingType pendingType = PendingType::None;
+  LayerPaint pendingPaint = {};
+  std::vector<Rect> pendingRects = {};
+  std::vector<RRect> pendingRRects = {};
+  std::shared_ptr<Shape> pendingShape = nullptr;
+
+  bool canAppend(PendingType type, const LayerPaint& paint) const;
+  void flushPending(PendingType newType = PendingType::None, const LayerPaint& newPaint = {});
 
   std::unique_ptr<LayerContent> finishRecording();
 

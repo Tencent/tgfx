@@ -9,7 +9,7 @@
 #include "tgfx/core/Stroke.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ShapeLayer.h"
-#include "tgfx/layers/SolidColor.h"
+#include "tgfx/layers/ShapeStyle.h"
 #include "tgfx/svg/SVGPathParser.h"
 #include "utils/TestUtils.h"
 #include "utils/TextShaper.h"
@@ -88,7 +88,7 @@ TGFX_TEST(StrokeTest, HairlineLayer) {
   path1.addRect(-10, -10, 10, 10);
   auto shapeLayer1 = ShapeLayer::Make();
   shapeLayer1->setPath(path1);
-  auto strokeStyle = SolidColor::Make(Color::Red());
+  auto strokeStyle = ShapeStyle::Make(Color::Red());
   shapeLayer1->setLineWidth(0.0f);
   shapeLayer1->setStrokeStyle(strokeStyle);
   shapeLayer1->setLineDashAdaptive(true);
@@ -194,7 +194,7 @@ TGFX_TEST(StrokeTest, ExtremelyThinStrokeLayer) {
   shape = Shape::ApplyEffect(shape, PathEffect::MakeCorner(50));
   shapeLayer->setShape(shape);
   shapeLayer->setLineWidth(1.0f);
-  auto strokeStyle = SolidColor::Make(Color::Red());
+  auto strokeStyle = ShapeStyle::Make(Color::Red());
   shapeLayer->setStrokeStyle(strokeStyle);
   auto matrix = Matrix::MakeTrans(100, 100);
   matrix.preScale(0.4f, 0.4f);
@@ -263,7 +263,7 @@ TGFX_TEST(StrokeTest, SquareCapDashStrokeAsSolidStroke) {
   path1.addRect(-70, -70, 70, 70);
   auto shapeLayer1 = ShapeLayer::Make();
   shapeLayer1->setPath(path1);
-  auto strokeStyle = SolidColor::Make(Color::Red());
+  auto strokeStyle = ShapeStyle::Make(Color::Red());
   shapeLayer1->setLineWidth(2.0f);
   shapeLayer1->setStrokeStyle(strokeStyle);
   shapeLayer1->setLineDashAdaptive(true);
@@ -300,6 +300,34 @@ TGFX_TEST(StrokeTest, SquareCapDashStrokeAsSolidStroke) {
   displayList.root()->addChild(shapeLayer2);
   displayList.render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/DashStrokeAsSolidStroke"));
+}
+
+TGFX_TEST(StrokeTest, HairlineWithDropShadow) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 400);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  Paint paint;
+  paint.setColor(Color::Red());
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStrokeWidth(0.0f);
+
+  // Add drop shadow effect
+  Color shadowColor = {0.2f, 0.2f, 1.0f, 1.0f};
+  auto shadowEffect = ImageFilter::DropShadow(0.0f, 0.0f, 2.0f, 3.0f, shadowColor);
+  paint.setImageFilter(shadowEffect);
+
+  // Draw horizontal and vertical hairlines with shadow
+  canvas->drawLine(50, 100, 350, 100, paint);  // horizontal line
+  canvas->drawLine(200, 50, 200, 350, paint);  // vertical line
+
+  // Draw diagonal hairline for comparison
+  canvas->drawLine(50, 50, 350, 350, paint);  // diagonal line
+
+  EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/HairlineWithDropShadow"));
 }
 
 static void DrawCubicPath(tgfx::Canvas* canvas, const Point points[4]) {

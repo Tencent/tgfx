@@ -19,7 +19,6 @@
 #include "ProxyProvider.h"
 #include "core/ShapeBezierTriangulator.h"
 #include "core/ShapeRasterizer.h"
-#include "core/shapes/MatrixShape.h"
 #include "core/utils/HardwareBufferUtil.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/USE.h"
@@ -162,18 +161,7 @@ std::shared_ptr<GPUShapeProxy> ProxyProvider::createGPUShapeProxy(std::shared_pt
   if (shape == nullptr) {
     return nullptr;
   }
-  Matrix drawingMatrix = {};
   auto isInverseFillType = shape->isInverseFillType();
-  if (shape->type() == Shape::Type::Matrix && !isInverseFillType) {
-    auto matrixShape = std::static_pointer_cast<MatrixShape>(shape);
-    auto scales = matrixShape->matrix.getAxisScales();
-    if (scales.x == scales.y) {
-      DEBUG_ASSERT(scales.x != 0);
-      drawingMatrix = matrixShape->matrix;
-      drawingMatrix.preScale(1.0f / scales.x, 1.0f / scales.x);
-      shape = Shape::ApplyMatrix(matrixShape->shape, Matrix::MakeScale(scales.x));
-    }
-  }
   auto shapeBounds = shape->getBounds();
   auto uniqueKey = shape->getUniqueKey();
   if (isInverseFillType) {
@@ -188,7 +176,8 @@ std::shared_ptr<GPUShapeProxy> ProxyProvider::createGPUShapeProxy(std::shared_pt
     uniqueKey = UniqueKey::Append(uniqueKey, &NonAntialiasShapeType, 1);
   }
   auto bounds = isInverseFillType ? clipBounds : shapeBounds;
-  drawingMatrix.preTranslate(bounds.x(), bounds.y());
+  bounds.roundOut();
+  auto drawingMatrix = Matrix::MakeTrans(bounds.x(), bounds.y());
   static const auto TriangleShapeType = UniqueID::Next();
   static const auto TextureShapeType = UniqueID::Next();
   auto triangleKey = UniqueKey::Append(uniqueKey, &TriangleShapeType, 1);
@@ -202,8 +191,8 @@ std::shared_ptr<GPUShapeProxy> ProxyProvider::createGPUShapeProxy(std::shared_pt
     return std::make_shared<GPUShapeProxy>(drawingMatrix, std::move(triangleProxy),
                                            std::move(textureProxy));
   }
-  auto width = FloatCeilToInt(bounds.width());
-  auto height = FloatCeilToInt(bounds.height());
+  auto width = FloatSaturateToInt(bounds.width());
+  auto height = FloatSaturateToInt(bounds.height());
   shape = Shape::ApplyMatrix(shape, Matrix::MakeTrans(-bounds.x(), -bounds.y()));
   auto rasterizer = std::make_unique<ShapeRasterizer>(width, height, std::move(shape), aaType);
   std::unique_ptr<DataSource<ShapeBuffer>> dataSource = nullptr;

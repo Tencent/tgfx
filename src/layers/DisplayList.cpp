@@ -69,6 +69,10 @@ class DrawTask {
     return _tileRect;
   }
 
+  const std::vector<std::shared_ptr<Tile>>& getTiles() const {
+    return tiles;
+  }
+
  private:
   // Hold strong references to tiles to ensure they aren't reused by TileCache.
   std::vector<std::shared_ptr<Tile>> tiles = {};
@@ -403,13 +407,16 @@ std::vector<Rect> DisplayList::renderPartial(Surface* surface, bool autoClear,
 
 std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
                                            const std::vector<Rect>& dirtyRegions) {
-  if (!surfaceCaches.empty() && surfaceCaches.front()->getContext() != surface->getContext()) {
+  if (!surfaceCaches.empty() && (surfaceCaches.front()->getContext() != surface->getContext() ||
+                                 !ColorSpace::Equals(surfaceCaches.front()->colorSpace().get(),
+                                                     surface->colorSpace().get()))) {
     resetCaches();
   }
   checkTileCount(surface);
   auto tileTasks = invalidateTileCaches(dirtyRegions);
   auto screenTasks = collectScreenTasks(surface, &tileTasks);
   if (screenTasks.empty()) {
+    recycleCurrentTileTasks(tileTasks);
     return renderDirect(surface, autoClear);
   }
   std::vector<Rect> dirtyRects = {};
@@ -484,6 +491,29 @@ std::vector<DrawTask> DisplayList::invalidateTileCaches(const std::vector<Rect>&
     }
   }
   return tileTasks;
+}
+
+void DisplayList::recycleCurrentTileTasks(const std::vector<DrawTask>& tileTasks) {
+  if (tileTasks.empty()) {
+    return;
+  }
+  auto result = tileCaches.find(_zoomScaleInt);
+  DEBUG_ASSERT(result != tileCaches.end());
+  if (result == tileCaches.end()) {
+    return;
+  }
+  auto tileCache = result->second;
+  for (auto& task : tileTasks) {
+    for (auto& tile : task.getTiles()) {
+      if (tileCache->removeTile(tile->tileX, tile->tileY)) {
+        emptyTiles.push_back(tile);
+      }
+    }
+  }
+  if (tileCache->empty()) {
+    delete tileCache;
+    tileCaches.erase(result);
+  }
 }
 
 void DisplayList::invalidateCurrentTileCache(const TileCache* tileCache,

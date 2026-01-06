@@ -27,12 +27,17 @@
 #include "layers/DrawArgs.h"
 #include "layers/RootLayer.h"
 #include "layers/SubtreeCache.h"
+#include "layers/TileCache.h"
+#include "layers/contents/ComposeContent.h"
+#include "layers/contents/RRectsContent.h"
+#include "layers/contents/RectsContent.h"
+#include "layers/contents/TextContent.h"
 #include "tgfx/core/Shape.h"
+#include "tgfx/core/TextBlob.h"
 #include "tgfx/layers/DisplayList.h"
-#include "tgfx/layers/Gradient.h"
 #include "tgfx/layers/ImageLayer.h"
-#include "tgfx/layers/ImagePattern.h"
 #include "tgfx/layers/Layer.h"
+#include "tgfx/layers/LayerRecorder.h"
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/SolidLayer.h"
 #include "tgfx/layers/TextLayer.h"
@@ -371,8 +376,8 @@ TGFX_TEST(LayerTest, getTightBounds) {
   Path path = {};
   path.addRect(rect);
   rectShape->setPath(path);
-  rectShape->setFillStyle(SolidColor::Make(Color::Red()));
-  auto strokeStyle = SolidColor::Make(Color::Black());
+  rectShape->setFillStyle(ShapeStyle::Make(Color::Red()));
+  auto strokeStyle = ShapeStyle::Make(Color::Black());
   rectShape->setStrokeStyle(strokeStyle);
   rectShape->setLineWidth(10);
   rectShape->setStrokeAlign(StrokeAlign::Outside);
@@ -387,7 +392,7 @@ TGFX_TEST(LayerTest, getTightBounds) {
   linePath.lineTo(50, 20);
   linePath.lineTo(20, -20);
   lineShape->setPath(linePath);
-  lineShape->setStrokeStyle(SolidColor::Make(Color::Red()));
+  lineShape->setStrokeStyle(ShapeStyle::Make(Color::Red()));
   auto matrix = Matrix::MakeRotate(50);
   matrix.postConcat(Matrix::MakeTrans(150, 20));
   lineShape->setMatrix(matrix);
@@ -399,7 +404,7 @@ TGFX_TEST(LayerTest, getTightBounds) {
   linePath2.lineTo(50, 20);
   linePath2.lineTo(20, -20);
   lineShapeChild->setPath(linePath2);
-  lineShapeChild->setStrokeStyle(SolidColor::Make(Color::Red()));
+  lineShapeChild->setStrokeStyle(ShapeStyle::Make(Color::Red()));
   matrix = Matrix::MakeTrans(100, 20);
   lineShapeChild->setMatrix(matrix);
   lineShape->addChild(lineShapeChild);
@@ -413,7 +418,7 @@ TGFX_TEST(LayerTest, getTightBounds) {
   Path lineBoundsRect = {};
   lineBoundsRect.addRect(bounds);
   lineBoundsShape->setPath(lineBoundsRect);
-  lineBoundsShape->setStrokeStyle(SolidColor::Make(Color::Green()));
+  lineBoundsShape->setStrokeStyle(ShapeStyle::Make(Color::Green()));
   root->addChild(lineBoundsShape);
 
   ContextScope scope;
@@ -521,37 +526,33 @@ TGFX_TEST(LayerTest, shapeLayer) {
     path.addRect(rect);
     shapeLayer->setPath(path);
     shapeLayer->removeFillStyles();
-    std::shared_ptr<ColorSource> fillStyle = nullptr;
+    std::shared_ptr<Shader> shader = nullptr;
+    std::vector<Color> colors = {{0.f, 0.f, 1.f, 1.f}, {0.f, 1.f, 0.f, 1.f}};
     switch (i) {
       case 0:
-        fillStyle = Gradient::MakeLinear({rect.left, rect.top}, {rect.right, rect.top},
-                                         {{0.f, 0.f, 1.f, 1.f}, {0.f, 1.f, 0.f, 1.f}});
+        shader = Shader::MakeLinearGradient({rect.left, rect.top}, {rect.right, rect.top}, colors);
         break;
       case 1:
-        fillStyle = Gradient::MakeRadial({rect.centerX(), rect.centerY()}, rect.width() / 2.0f,
-                                         {{0.f, 0.f, 1.f, 1.f}, {0.f, 1.f, 0.f, 1.f}});
+        shader = Shader::MakeRadialGradient({rect.centerX(), rect.centerY()}, rect.width() / 2.0f,
+                                            colors);
         break;
       case 2:
-        fillStyle = ImagePattern::Make(MakeImage("resources/apitest/imageReplacement.png"),
-                                       TileMode::Repeat, TileMode::Mirror);
-        std::static_pointer_cast<ImagePattern>(fillStyle)->setMatrix(
-            Matrix::MakeTrans(-25, rect.top - 70));
+        shader = Shader::MakeImageShader(MakeImage("resources/apitest/imageReplacement.png"),
+                                         TileMode::Repeat, TileMode::Mirror);
+        shader = shader->makeWithMatrix(Matrix::MakeTrans(-25, rect.top - 70));
         break;
       default:
         break;
     }
-    fillStyle->setAlpha(0.8f);
-    shapeLayer->addFillStyle(fillStyle);
+    shapeLayer->addFillStyle(ShapeStyle::Make(shader, 0.8f));
 
     // stroke style
     shapeLayer->setLineWidth(10.0f);
     shapeLayer->setLineCap(LineCap::Butt);
     shapeLayer->setLineJoin(LineJoin::Miter);
-    auto strokeStyle = SolidColor::Make(Color::Red());
+    auto strokeStyle = ShapeStyle::Make(Color::Red());
     shapeLayer->setStrokeStyle(strokeStyle);
-    strokeStyle = SolidColor::Make(Color::Green());
-    strokeStyle->setAlpha(0.5f);
-    strokeStyle->setBlendMode(BlendMode::Lighten);
+    strokeStyle = ShapeStyle::Make(Color{0.0f, 1.0f, 0.0f, 0.5f}, BlendMode::Lighten);
     shapeLayer->addStrokeStyle(strokeStyle);
     if (i != 2) {
       std::vector<float> dashPattern = {10.0f, 10.0f};
@@ -621,6 +622,97 @@ TGFX_TEST(LayerTest, ZoomAndOffset) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ZoomAndOffset"));
 }
 
+TGFX_TEST(LayerTest, HighZoomWithMask) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto proxy =
+      RenderTargetProxy::Make(context, 1622, 1436, false, 1, false, ImageOrigin::BottomLeft);
+  auto surface = Surface::MakeFrom(std::move(proxy), 0, true);
+  auto displayList = std::make_unique<DisplayList>();
+
+  // Root layer with matrix3D transform
+  auto root = Layer::Make();
+  // Matrix3D: scale(3.0913887, 3.0913887), translate(347.291687, 99.7222595)
+  root->setMatrix(Matrix::MakeAll(3.0913887f, 0, 347.291687f, 0, 3.0913887f, 99.7222595f));
+  displayList->root()->addChild(root);
+
+  // Layer 1: Blue rectangle with mask
+  auto rectLayer = ShapeLayer::Make();
+  Path rectPath;
+  rectPath.addRect(Rect::MakeXYWH(50, 50, 300, 400));
+  rectLayer->setPath(rectPath);
+  rectLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(72, 154, 209)));
+
+  auto rectMask = ShapeLayer::Make();
+  rectMask->setPath(rectPath);
+  rectMask->setFillStyle(ShapeStyle::Make(Color::White()));
+  rectLayer->setMask(rectMask);
+
+  root->addChild(rectLayer);
+  root->addChild(rectMask);
+
+  // Layer 2: Red rounded rectangle with mask, child of rectLayer
+  auto roundRectLayer = ShapeLayer::Make();
+  Path roundRectPath;
+  roundRectPath.addRoundRect(Rect::MakeXYWH(80, 100, 200, 250), 30, 30);
+  roundRectLayer->setPath(roundRectPath);
+  roundRectLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(233, 100, 100)));
+
+  auto roundRectMask = ShapeLayer::Make();
+  roundRectMask->setPath(roundRectPath);
+  roundRectMask->setFillStyle(ShapeStyle::Make(Color::White()));
+  roundRectLayer->setMask(roundRectMask);
+
+  rectLayer->addChild(roundRectLayer);
+  rectLayer->addChild(roundRectMask);
+
+  // Layer 3: Inner rect with mask, child of roundRectLayer
+  auto innerRectLayer = ShapeLayer::Make();
+  Path innerRectPath;
+  innerRectPath.addRect(Rect::MakeXYWH(100, 130, 150, 180));
+  innerRectLayer->setPath(innerRectPath);
+  innerRectLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(200, 200, 100)));
+
+  auto innerRectMask = ShapeLayer::Make();
+  innerRectMask->setPath(innerRectPath);
+  innerRectMask->setFillStyle(ShapeStyle::Make(Color::White()));
+  innerRectLayer->setMask(innerRectMask);
+
+  roundRectLayer->addChild(innerRectLayer);
+  roundRectLayer->addChild(innerRectMask);
+
+  // Layer 4: Green rectangle, child of innerRectLayer
+  auto greenRectLayer = ShapeLayer::Make();
+  Path greenRectPath;
+  greenRectPath.addRect(Rect::MakeXYWH(120, 150, 100, 120));
+  greenRectLayer->setPath(greenRectPath);
+  greenRectLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(100, 200, 100)));
+
+  innerRectLayer->addChild(greenRectLayer);
+
+  // Layer 5: Background blur layer, child of rectLayer (on top)
+  auto backgroundBlurLayer = SolidLayer::Make();
+  backgroundBlurLayer->setColor(Color::FromRGBA(255, 255, 255, 50));
+  backgroundBlurLayer->setWidth(150);
+  backgroundBlurLayer->setHeight(150);
+  backgroundBlurLayer->setMatrix(Matrix::MakeTrans(600, 600));
+  backgroundBlurLayer->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
+  rectLayer->addChild(backgroundBlurLayer);
+  // Test Tiled mode
+  auto proxy2 =
+      RenderTargetProxy::Make(context, 1622, 1436, false, 1, false, ImageOrigin::BottomLeft);
+  auto surface2 = Surface::MakeFrom(std::move(proxy2), 0, true);
+  auto displayList2 = std::make_unique<DisplayList>();
+  displayList2->root()->addChild(root);
+  displayList2->setRenderMode(RenderMode::Tiled);
+  displayList2->render(surface2.get());
+  displayList2->setZoomScale(15.381f);
+  displayList2->setContentOffset(-9853.69f, -7356.61f);
+  displayList2->render(surface2.get());
+  EXPECT_TRUE(Baseline::Compare(surface2, "LayerTest/HighZoomWithMask_Tiled"));
+}
+
 TGFX_TEST(LayerTest, StrokeOnTop) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -633,9 +725,8 @@ TGFX_TEST(LayerTest, StrokeOnTop) {
   Path path = {};
   path.addRect(Rect::MakeXYWH(20, 20, 150, 150));
   shapeLayer->setPath(path);
-  shapeLayer->setFillStyle(SolidColor::Make(Color::Red()));
-  auto strokeColor = SolidColor::Make(Color::Green());
-  strokeColor->setAlpha(0.5f);
+  shapeLayer->setFillStyle(ShapeStyle::Make(Color::Red()));
+  auto strokeColor = ShapeStyle::Make(Color{0.0f, 1.0f, 0.0f, 0.5f});
   shapeLayer->setStrokeStyle(strokeColor);
   shapeLayer->setLineWidth(16);
   auto innerShadow = InnerShadowStyle::Make(30, 30, 0, 0, Color::FromRGBA(100, 0, 0, 128));
@@ -836,11 +927,11 @@ TGFX_TEST(LayerTest, PassthroughAndNormal) {
   rect.addRect(0, 0, 200, 200);
   auto rect1 = ShapeLayer::Make();
   rect1->setPath(rect);
-  rect1->setFillStyle(SolidColor::Make(Color::FromRGBA(123, 77, 77)));
+  rect1->setFillStyle(ShapeStyle::Make(Color::FromRGBA(123, 77, 77)));
   auto rect2 = ShapeLayer::Make();
   rect2->setPath(rect);
   rect2->setMatrix(Matrix::MakeTrans(100, 100));
-  rect2->setFillStyle(SolidColor::Make(Color::FromRGBA(219, 32, 32)));
+  rect2->setFillStyle(ShapeStyle::Make(Color::FromRGBA(219, 32, 32)));
   root->addChild(rect1);
   root->addChild(rect2);
   displayList.root()->addChild(root);
@@ -1008,8 +1099,8 @@ TGFX_TEST(LayerTest, shapeMask) {
 
   auto shaperLayer = ShapeLayer::Make();
   shaperLayer->setPath(path);
-  auto radialFilleStyle =
-      Gradient::MakeRadial({500, 500}, 500, {{1.f, 0.f, 0.f, 1.f}, {0.f, 1.f, 0.f, 1.f}});
+  auto radialFilleStyle = ShapeStyle::Make(
+      Shader::MakeRadialGradient({500, 500}, 500, {{1.f, 0.f, 0.f, 1.f}, {0.f, 1.f, 0.f, 1.f}}));
   shaperLayer->setFillStyle(radialFilleStyle);
   shaperLayer->setAlpha(0.5f);
   layer->addChild(shaperLayer);
@@ -1027,7 +1118,7 @@ TGFX_TEST(LayerTest, shapeMask) {
 
   auto alphaShaperLayer = ShapeLayer::Make();
   alphaShaperLayer->setPath(path);
-  auto filleStyle = SolidColor::Make(Color::Red());
+  auto filleStyle = ShapeStyle::Make(Color::Red());
   alphaShaperLayer->setFillStyle(filleStyle);
   alphaShaperLayer->setAlpha(0.5f);
   layer->addChild(alphaShaperLayer);
@@ -1050,7 +1141,7 @@ TGFX_TEST(LayerTest, shapeMask) {
   auto vectorShaperLayer = ShapeLayer::Make();
   vectorShaperLayer->setPath(path);
   // make a fill style with alpha
-  auto vectorFillStyle = SolidColor::Make(Color::FromRGBA(0, 0, 255, 128));
+  auto vectorFillStyle = ShapeStyle::Make(Color::FromRGBA(0, 0, 255, 128));
   vectorShaperLayer->setFillStyle(vectorFillStyle);
   layer->addChild(vectorShaperLayer);
   Matrix vectorMaskMatrix =
@@ -1143,7 +1234,7 @@ TGFX_TEST(LayerTest, textMask) {
   imageLayer1->setMask(alphaTextLayer);
 
   auto alphaLayerBounds = alphaLayer->getBounds();
-  EXPECT_EQ(alphaLayerBounds, Rect::MakeLTRB(1761, 746, 3024, 1392));
+  EXPECT_EQ(alphaLayerBounds, Rect::MakeLTRB(1760.5f, 746, 3024, 1392.5f));
 
   // Vector mask effect
   auto imageLayer2 = ImageLayer::Make();
@@ -1203,7 +1294,7 @@ TGFX_TEST(LayerTest, HasContentChanged) {
   Path path;
   path.addRect(Rect::MakeXYWH(0, 0, 100, 100));
   shapeLayer->setPath(path);
-  shapeLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 0, 0)));
+  shapeLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 0, 0)));
   displayList.root()->addChild(shapeLayer);
   EXPECT_TRUE(displayList.hasContentChanged());
   displayList.render(surface.get());
@@ -1260,7 +1351,7 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
   path.lineTo(50, 125);
   path.close();
   shaperLayer->setPath(path);
-  auto fillStyle = SolidColor::Make(Color::FromRGBA(255, 0, 0, 127));
+  auto fillStyle = ShapeStyle::Make(Color::FromRGBA(255, 0, 0, 127));
   shaperLayer->setFillStyle(fillStyle);
   shaperLayer->setMatrix(Matrix::MakeTrans(100.0f, 0.0f) * Matrix::MakeScale(2.0f, 2.0f));
   rootLayer->addChild(shaperLayer);
@@ -1287,7 +1378,7 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
   Path path2 = {};
   path2.addRect(rect2);
   shaperLayer2->setPath(path2);
-  auto fillStyle2 = SolidColor::Make(Color::FromRGBA(175, 27, 193, 255));
+  auto fillStyle2 = ShapeStyle::Make(Color::FromRGBA(175, 27, 193, 255));
   shaperLayer2->setFillStyle(fillStyle2);
   rootLayer->addChild(shaperLayer2);
   auto shaperLayer2Bounds = shaperLayer2->getBounds(displayList->root(), true);
@@ -1299,7 +1390,7 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
   rectPath1.addRect({100, 300, 200, 375});
   shapeLayerInvisibleFill->setPath(rectPath1);
   shapeLayerInvisibleFill->setName("shapeLayerInvisibleFill");
-  auto fillStyle0 = SolidColor::Make(Color::FromRGBA(130, 182, 41, 0));
+  auto fillStyle0 = ShapeStyle::Make(Color::FromRGBA(130, 182, 41, 0));
   shapeLayerInvisibleFill->setFillStyle(fillStyle0);
   rootLayer->addChild(shapeLayerInvisibleFill);
   auto shapeLayerInvisibleFillBounds =
@@ -1314,7 +1405,7 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
   shapeLayerInvisibleStroke->setPath(rectPath2);
   shapeLayerInvisibleStroke->setName("shapeLayerInvisibleStroke");
   shapeLayerInvisibleStroke->addStrokeStyle(
-      tgfx::SolidColor::Make(tgfx::Color::FromRGBA(130, 182, 41, 0)));
+      tgfx::ShapeStyle::Make(tgfx::Color::FromRGBA(130, 182, 41, 0)));
   rootLayer->addChild(shapeLayerInvisibleStroke);
 
   auto shapeLayerInvisibleStrokeBounds =
@@ -1526,7 +1617,7 @@ TGFX_TEST(LayerTest, hitTestPoint) {
   path1.lineTo(50, 125);
   path1.close();
   shaperLayer1->setPath(path1);
-  auto fillStyle1 = SolidColor::Make(Color::FromRGBA(255, 0, 0, 127));
+  auto fillStyle1 = ShapeStyle::Make(Color::FromRGBA(255, 0, 0, 127));
   shaperLayer1->setFillStyle(fillStyle1);
   shaperLayer1->setMatrix(Matrix::MakeTrans(100.0f, 50.0f));
   rootLayer->addChild(shaperLayer1);
@@ -1542,7 +1633,7 @@ TGFX_TEST(LayerTest, hitTestPoint) {
   path2.addOval(rect);
   path2.close();
   shaperLayer2->setPath(path2);
-  auto fillStyle2 = SolidColor::Make(Color::FromRGBA(127, 255, 0, 127));
+  auto fillStyle2 = ShapeStyle::Make(Color::FromRGBA(127, 255, 0, 127));
   shaperLayer2->setFillStyle(fillStyle2);
   rootLayer->addChild(shaperLayer2);
   auto shaperLayer2Bounds = shaperLayer2->getBounds();
@@ -1679,7 +1770,7 @@ TGFX_TEST(LayerTest, HitTestPointWithStroke) {
   trianglePath.lineTo(50, 150);
   trianglePath.close();
   pathLayer->setPath(trianglePath);
-  pathLayer->setStrokeStyle(SolidColor::Make(Color::Red()));
+  pathLayer->setStrokeStyle(ShapeStyle::Make(Color::Red()));
   pathLayer->setLineWidth(20.0f);
   displayList->root()->addChild(pathLayer);
 
@@ -1688,7 +1779,7 @@ TGFX_TEST(LayerTest, HitTestPointWithStroke) {
   Path rectPath = {};
   rectPath.addRect(Rect::MakeXYWH(200, 50, 100, 100));
   rectLayer->setPath(rectPath);
-  rectLayer->setStrokeStyle(SolidColor::Make(Color::Green()));
+  rectLayer->setStrokeStyle(ShapeStyle::Make(Color::Green()));
   rectLayer->setLineWidth(20.0f);
   displayList->root()->addChild(rectLayer);
 
@@ -1699,7 +1790,7 @@ TGFX_TEST(LayerTest, HitTestPointWithStroke) {
   rRect.setRectXY(Rect::MakeXYWH(50, 200, 100, 100), 20.0f, 20.0f);
   rRectPath.addRRect(rRect);
   rRectLayer->setPath(rRectPath);
-  rRectLayer->setStrokeStyle(SolidColor::Make(Color::Blue()));
+  rRectLayer->setStrokeStyle(ShapeStyle::Make(Color::Blue()));
   rRectLayer->setLineWidth(20.0f);
   displayList->root()->addChild(rRectLayer);
 
@@ -1709,7 +1800,7 @@ TGFX_TEST(LayerTest, HitTestPointWithStroke) {
   shapePath.addOval(Rect::MakeXYWH(200, 200, 100, 100));
   auto shape = Shape::MakeFrom(shapePath);
   shapeLayer->setShape(shape);
-  shapeLayer->setStrokeStyle(SolidColor::Make(Color::FromRGBA(255, 165, 0)));
+  shapeLayer->setStrokeStyle(ShapeStyle::Make(Color::FromRGBA(255, 165, 0)));
   shapeLayer->setLineWidth(20.0f);
   displayList->root()->addChild(shapeLayer);
 
@@ -1789,7 +1880,7 @@ TGFX_TEST(LayerTest, HitTestPointWithStroke) {
   Path invisiblePath = {};
   invisiblePath.addRect(Rect::MakeXYWH(320, 50, 60, 60));
   invisibleStrokeLayer->setPath(invisiblePath);
-  invisibleStrokeLayer->setStrokeStyle(SolidColor::Make(Color::Transparent()));
+  invisibleStrokeLayer->setStrokeStyle(ShapeStyle::Make(Color::Transparent()));
   invisibleStrokeLayer->setLineWidth(20.0f);
   displayList->root()->addChild(invisibleStrokeLayer);
 
@@ -1898,7 +1989,7 @@ TGFX_TEST(LayerTest, hitTestPointNested) {
   path.addRect(rect);
   path.close();
   shaperLayer->setPath(path);
-  auto fillStyle = SolidColor::Make(Color::FromRGBA(127, 255, 0, 127));
+  auto fillStyle = ShapeStyle::Make(Color::FromRGBA(127, 255, 0, 127));
   shaperLayer->setFillStyle(fillStyle);
   childLayer->addChild(shaperLayer);
   parentLayer->addChild(childLayer);
@@ -2130,7 +2221,7 @@ TGFX_TEST(LayerTest, DropShadowStyle) {
   Path path;
   path.addRect(Rect::MakeWH(100, 100));
   layer->setPath(path);
-  auto fillStyle = SolidColor::Make(Color::FromRGBA(100, 0, 0, 128));
+  auto fillStyle = ShapeStyle::Make(Color::FromRGBA(100, 0, 0, 128));
   layer->setFillStyle(fillStyle);
   layer->setLineWidth(2.0f);
   layer->setBlendMode(BlendMode::Lighten);
@@ -2155,7 +2246,7 @@ TGFX_TEST(LayerTest, DropShadowStyle) {
 
   layer->setBlendMode(BlendMode::Multiply);
   layer->setFillStyle(nullptr);
-  layer->setStrokeStyle(SolidColor::Make(Color::FromRGBA(100, 0, 0, 128)));
+  layer->setStrokeStyle(ShapeStyle::Make(Color::FromRGBA(100, 0, 0, 128)));
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DropShadowStyle-stroke-behindLayer"));
 
@@ -2188,7 +2279,7 @@ TGFX_TEST(LayerTest, InnerShadowStyle) {
   path2.transform(Matrix::MakeTrans(20, 20));
   path.addPath(path2, PathOp::Difference);
   layer->setPath(path);
-  auto fillStyle = SolidColor::Make(Color::FromRGBA(100, 0, 0, 128));
+  auto fillStyle = ShapeStyle::Make(Color::FromRGBA(100, 0, 0, 128));
   layer->setFillStyle(fillStyle);
   auto style = InnerShadowStyle::Make(10, 10, 0, 0, Color::Black());
   layer->setLayerStyles({style});
@@ -2208,7 +2299,7 @@ TGFX_TEST(LayerTest, Filters) {
   Path path;
   path.addRect(Rect::MakeWH(100, 100));
   layer->setPath(path);
-  auto fillStyle = SolidColor::Make(Color::FromRGBA(100, 0, 0, 128));
+  auto fillStyle = ShapeStyle::Make(Color::FromRGBA(100, 0, 0, 128));
   layer->setFillStyle(fillStyle);
   auto filter = BlurFilter::Make(5, 5);
   auto filter2 = DropShadowFilter::Make(10, 10, 0, 0, Color::Black());
@@ -2235,7 +2326,7 @@ TGFX_TEST(LayerTest, MaskOnwer) {
   Path path = {};
   path.addRect(Rect::MakeWH(1, 1));
   mask->setPath(path);
-  mask->setFillStyle(SolidColor::Make());
+  mask->setFillStyle(ShapeStyle::Make(Color::White()));
 
   displayList->root()->addChild(layer);
   layer->addChild(layer2);
@@ -2283,7 +2374,7 @@ TGFX_TEST(LayerTest, BackgroundBlur) {
   Path path;
   path.addRect(Rect::MakeWH(100, 100));
   layer->setPath(path);
-  auto strokeStyle = SolidColor::Make(Color::FromRGBA(100, 0, 0, 100));
+  auto strokeStyle = ShapeStyle::Make(Color::FromRGBA(100, 0, 0, 100));
   layer->setStrokeStyle(strokeStyle);
   layer->setLineWidth(10);
   layer->setStrokeOnTop(true);
@@ -2304,7 +2395,7 @@ TGFX_TEST(LayerTest, BackgroundBlur) {
   silbing->setMatrix(Matrix::MakeTrans(-10, 0));
   auto newBackgroundBlur = BackgroundBlurStyle::Make(3, 3);
   silbing->setLayerStyles({dropShadow, newBackgroundBlur});
-  silbing->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 0, 100, 100)));
+  silbing->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 100, 100)));
   layer->addChild(silbing);
 
   auto clipLayer = Layer::Make();
@@ -2316,7 +2407,7 @@ TGFX_TEST(LayerTest, BackgroundBlur) {
 
   child->setPath(rect);
   child->setMatrix(Matrix::MakeScale(0.5, 0.5));
-  auto fillStyle2 = SolidColor::Make(Color::FromRGBA(0, 100, 0, 100));
+  auto fillStyle2 = ShapeStyle::Make(Color::FromRGBA(0, 100, 0, 100));
   child->setFillStyle(fillStyle2);
   auto backgroundBlur = BackgroundBlurStyle::Make(5, 5);
   child->setLayerStyles({backgroundBlur});
@@ -2338,14 +2429,13 @@ TGFX_TEST(LayerTest, MaskAlpha) {
 
   auto layer = ShapeLayer::Make();
   layer->setPath(path);
-  auto layer_style = tgfx::SolidColor::Make({0.0f, 1.0f, 0.0f, 1.0f});
+  auto layer_style = tgfx::ShapeStyle::Make({0.0f, 1.0f, 0.0f, 1.0f});
   layer->setFillStyle(layer_style);
 
   auto mask = ShapeLayer::Make();
   mask->setPath(path);
   mask->setMatrix(Matrix::MakeTrans(50, 50));
-  auto mask_style = tgfx::SolidColor::Make({1.0f, 0.0f, 0.0f, 1.0f});
-  mask_style->setAlpha(0);
+  auto mask_style = tgfx::ShapeStyle::Make({1.0f, 0.0f, 0.0f, 0.0f});
   mask->setFillStyle(mask_style);
 
   layer->setMask(mask);
@@ -2374,7 +2464,7 @@ TGFX_TEST(LayerTest, ChildMask) {
   auto layer_matrix = Matrix::MakeRotate(45);
   layer_matrix.postConcat(init_trans);
   layer->setMatrix(layer_matrix);
-  auto layer_style = SolidColor::Make(Color::Red());
+  auto layer_style = ShapeStyle::Make(Color::Red());
   layer->setFillStyle(layer_style);
 
   auto layer2 = ShapeLayer::Make();
@@ -2382,7 +2472,7 @@ TGFX_TEST(LayerTest, ChildMask) {
   auto layer2_matrix = Matrix::MakeTrans(100, 0);
   layer2_matrix.postConcat(init_trans);
   layer2->setMatrix(layer2_matrix);
-  auto layer2_style = SolidColor::Make(Color::Green());
+  auto layer2_style = ShapeStyle::Make(Color::Green());
   layer2->setFillStyle(layer2_style);
 
   auto mask = ShapeLayer::Make();
@@ -2390,7 +2480,7 @@ TGFX_TEST(LayerTest, ChildMask) {
   auto mask_matrix = Matrix::MakeTrans(50, 50);
   mask_matrix.postConcat(init_trans);
   mask->setMatrix(mask_matrix);
-  auto mask_style = SolidColor::Make(Color::Blue());
+  auto mask_style = ShapeStyle::Make(Color::Blue());
   mask->setFillStyle(mask_style);
 
   group->addChild(layer);
@@ -2420,12 +2510,12 @@ TGFX_TEST(LayerTest, InvalidMask) {
   path.addRect(Rect::MakeWH(10, 10));
   auto shapeLayer = ShapeLayer::Make();
   shapeLayer->setPath(path);
-  auto fillStyle = SolidColor::Make(Color::Red());
+  auto fillStyle = ShapeStyle::Make(Color::Red());
   shapeLayer->setFillStyle(fillStyle);
 
   auto maskLayer = ShapeLayer::Make();
   maskLayer->setPath(path);
-  auto maskFillStyle = SolidColor::Make(Color::FromRGBA(0, 0, 0, 128));
+  auto maskFillStyle = ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 128));
   maskLayer->setFillStyle(maskFillStyle);
   maskLayer->setVisible(false);
 
@@ -2449,9 +2539,8 @@ TGFX_TEST(LayerTest, LargeScale) {
   Path path = {};
   path.addRect(Rect::MakeWH(10000, 10000));
   auto image = MakeImage("resources/apitest/imageReplacement.png");
-  auto imagePattern = ImagePattern::Make(image);
-  imagePattern->setMatrix(Matrix::MakeTrans(-20, -20));
-  shapeLayer->setFillStyle(imagePattern);
+  auto imageShader = Shader::MakeImageShader(image)->makeWithMatrix(Matrix::MakeTrans(-20, -20));
+  shapeLayer->setFillStyle(ShapeStyle::Make(imageShader));
   shapeLayer->setPath(path);
   list.root()->addChild(shapeLayer);
 
@@ -2473,25 +2562,22 @@ TGFX_TEST(LayerTest, ShapeStyleWithMatrix) {
   auto layer = ShapeLayer::Make();
   layer->setPath(path);
   auto matrix = Matrix::MakeScale(0.5f, 1.f);
-  auto layerStyle =
-      Gradient::MakeDiamond(Point::Make(100, 50), 50, {Color::Red(), Color::Blue()}, {0, 1});
-  layerStyle->setMatrix(matrix);
-  layer->setFillStyle(layerStyle);
+  auto layerShader =
+      Shader::MakeDiamondGradient(Point::Make(100, 50), 50, {Color::Red(), Color::Blue()}, {0, 1});
+  layer->setFillStyle(ShapeStyle::Make(layerShader->makeWithMatrix(matrix)));
   list.root()->addChild(layer);
 
   auto layer2 = ShapeLayer::Make();
   layer2->setPath(path);
-  auto imageStyle = ImagePattern::Make(MakeImage("resources/apitest/imageReplacement.png"),
-                                       TileMode::Decal, TileMode::Decal);
-  imageStyle->setMatrix(matrix);
-  layer2->setFillStyle(imageStyle);
+  auto imageShader = Shader::MakeImageShader(MakeImage("resources/apitest/imageReplacement.png"),
+                                             TileMode::Decal, TileMode::Decal);
+  layer2->setFillStyle(ShapeStyle::Make(imageShader->makeWithMatrix(matrix)));
   layer2->setMatrix(Matrix::MakeTrans(100, 0));
   list.root()->addChild(layer2);
 
   auto layer3 = ShapeLayer::Make();
   layer3->setPath(path);
-  auto solidStyle = SolidColor::Make(Color::Red());
-  solidStyle->setMatrix(matrix);
+  auto solidStyle = ShapeStyle::Make(Color::Red());
   layer3->setFillStyle(solidStyle);
   layer3->setMatrix(Matrix::MakeTrans(200, 0));
   list.root()->addChild(layer3);
@@ -2518,7 +2604,7 @@ TGFX_TEST(LayerTest, AdaptiveDashEffect) {
   std::vector<float> dashList = {10.f, 10.f};
   auto shapeLayer = ShapeLayer::Make();
   shapeLayer->setPath(path);
-  auto strokeStyle = SolidColor::Make(Color::FromRGBA(100, 0, 0));
+  auto strokeStyle = ShapeStyle::Make(Color::FromRGBA(100, 0, 0));
   shapeLayer->setLineWidth(1);
   shapeLayer->setStrokeStyle(strokeStyle);
   shapeLayer->setLineDashAdaptive(true);
@@ -2547,7 +2633,7 @@ TGFX_TEST(LayerTest, BottomLeftSurface) {
   tgfx::Path childPath;
   childPath.addRect(childFrame);
   childLayer->setPath(childPath);
-  childLayer->setFillStyles({tgfx::SolidColor::Make(tgfx::Color::Red())});
+  childLayer->setFillStyles({tgfx::ShapeStyle::Make(tgfx::Color::Red())});
 
   // contents
   auto contentsLayer = tgfx::Layer::Make();
@@ -2576,7 +2662,7 @@ TGFX_TEST(LayerTest, DirtyRegionTest) {
   displayList->root()->addChild(rootLayer);
 
   auto shapeLayer1 = ShapeLayer::Make();
-  shapeLayer1->setStrokeStyle(SolidColor::Make(Color::Black()));
+  shapeLayer1->setStrokeStyle(ShapeStyle::Make(Color::Black()));
   auto path1 = Path();
   path1.addRect(Rect::MakeXYWH(40, 40, 100, 140));
   shapeLayer1->setPath(path1);
@@ -2585,7 +2671,7 @@ TGFX_TEST(LayerTest, DirtyRegionTest) {
   shapeLayer1->getGlobalMatrix().mapRect(&bounds1);
 
   auto shapeLayer2 = ShapeLayer::Make();
-  shapeLayer2->setStrokeStyle(SolidColor::Make(Color::Black()));
+  shapeLayer2->setStrokeStyle(ShapeStyle::Make(Color::Black()));
   auto path2 = Path();
   path2.addRect(Rect::MakeXYWH(120, 20, 60, 220));
   shapeLayer2->setPath(path2);
@@ -2594,7 +2680,7 @@ TGFX_TEST(LayerTest, DirtyRegionTest) {
   shapeLayer2->getGlobalMatrix().mapRect(&bounds2);
 
   auto shapeLayer3 = ShapeLayer::Make();
-  shapeLayer3->setStrokeStyle(SolidColor::Make(Color::Black()));
+  shapeLayer3->setStrokeStyle(ShapeStyle::Make(Color::Black()));
   auto path3 = Path();
   path3.addRect(Rect::MakeXYWH(60, 80, 40, 60));
   shapeLayer3->setPath(path3);
@@ -2603,7 +2689,7 @@ TGFX_TEST(LayerTest, DirtyRegionTest) {
   shapeLayer3->getGlobalMatrix().mapRect(&bounds3);
 
   auto shapeLayer4 = ShapeLayer::Make();
-  shapeLayer4->setStrokeStyle(SolidColor::Make(Color::Black()));
+  shapeLayer4->setStrokeStyle(ShapeStyle::Make(Color::Black()));
   auto path4 = Path();
   path4.addRect(Rect::MakeXYWH(800, 40, 80, 100));
   shapeLayer4->setPath(path4);
@@ -2612,7 +2698,7 @@ TGFX_TEST(LayerTest, DirtyRegionTest) {
   shapeLayer4->getGlobalMatrix().mapRect(&bounds4);
 
   auto shapeLayer5 = ShapeLayer::Make();
-  shapeLayer5->setStrokeStyle(SolidColor::Make(Color::Black()));
+  shapeLayer5->setStrokeStyle(ShapeStyle::Make(Color::Black()));
   auto path5 = Path();
   path5.addRect(Rect::MakeXYWH(840, 110, 120, 130));
   shapeLayer5->setPath(path5);
@@ -2621,7 +2707,7 @@ TGFX_TEST(LayerTest, DirtyRegionTest) {
   shapeLayer5->getGlobalMatrix().mapRect(&bounds5);
 
   auto shapeLayer6 = ShapeLayer::Make();
-  shapeLayer6->setStrokeStyle(SolidColor::Make(Color::Black()));
+  shapeLayer6->setStrokeStyle(ShapeStyle::Make(Color::Black()));
   auto path6 = Path();
   path6.addRect(Rect::MakeXYWH(80, 460, 120, 180));
   shapeLayer6->setPath(path6);
@@ -2630,7 +2716,7 @@ TGFX_TEST(LayerTest, DirtyRegionTest) {
   shapeLayer6->getGlobalMatrix().mapRect(&bounds6);
 
   auto shapeLayer7 = ShapeLayer::Make();
-  shapeLayer7->setStrokeStyle(SolidColor::Make(Color::Black()));
+  shapeLayer7->setStrokeStyle(ShapeStyle::Make(Color::Black()));
   auto path7 = Path();
   path7.addRect(Rect::MakeXYWH(20, 600, 240, 100));
   shapeLayer7->setPath(path7);
@@ -2639,7 +2725,7 @@ TGFX_TEST(LayerTest, DirtyRegionTest) {
   shapeLayer7->getGlobalMatrix().mapRect(&bounds7);
 
   auto shapeLayer8 = ShapeLayer::Make();
-  shapeLayer8->setStrokeStyle(SolidColor::Make(Color::Black()));
+  shapeLayer8->setStrokeStyle(ShapeStyle::Make(Color::Black()));
   auto path8 = Path();
   path8.addRect(Rect::MakeXYWH(300, 500, 100, 140));
   shapeLayer8->setPath(path8);
@@ -2648,7 +2734,7 @@ TGFX_TEST(LayerTest, DirtyRegionTest) {
   shapeLayer8->getGlobalMatrix().mapRect(&bounds8);
 
   auto shapeLayer9 = ShapeLayer::Make();
-  shapeLayer9->setStrokeStyle(SolidColor::Make(Color::Black()));
+  shapeLayer9->setStrokeStyle(ShapeStyle::Make(Color::Black()));
   auto path9 = Path();
   path9.addRect(Rect::MakeXYWH(220, 460, 140, 50));
   shapeLayer9->setPath(path9);
@@ -2657,7 +2743,7 @@ TGFX_TEST(LayerTest, DirtyRegionTest) {
   shapeLayer9->getGlobalMatrix().mapRect(&bounds9);
 
   auto shapeLayer10 = ShapeLayer::Make();
-  shapeLayer10->setStrokeStyle(SolidColor::Make(Color::Black()));
+  shapeLayer10->setStrokeStyle(ShapeStyle::Make(Color::Black()));
   auto path10 = Path();
   path10.addRect(Rect::MakeXYWH(820, 420, 140, 200));
   shapeLayer10->setPath(path10);
@@ -2666,7 +2752,7 @@ TGFX_TEST(LayerTest, DirtyRegionTest) {
   shapeLayer10->getGlobalMatrix().mapRect(&bounds10);
 
   auto shapeLayer11 = ShapeLayer::Make();
-  shapeLayer11->setStrokeStyle(SolidColor::Make(Color::Black()));
+  shapeLayer11->setStrokeStyle(ShapeStyle::Make(Color::Black()));
   auto path11 = Path();
   path11.addRect(Rect::MakeXYWH(850, 540, 80, 40));
   shapeLayer11->setPath(path11);
@@ -2806,7 +2892,7 @@ TGFX_TEST(LayerTest, LayerVisible) {
   auto path = Path();
   path.addRect(Rect::MakeXYWH(0, 0, 100, 100));
   layer->setPath(path);
-  layer->setFillStyle(SolidColor::Make(Color::Red()));
+  layer->setFillStyle(ShapeStyle::Make(Color::Red()));
   layer->setVisible(true);
   rootLayer->addChild(layer);
   displayList->render(surface.get());
@@ -2830,7 +2916,7 @@ TGFX_TEST(LayerTest, BackgroundBlurStyleTest) {
   auto rootLayer = Layer::Make();
   displayList->root()->addChild(rootLayer);
   auto shapeLayer1 = ShapeLayer::Make();
-  shapeLayer1->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 0, 0, 2)));
+  shapeLayer1->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 2)));
   auto path1 = Path();
   path1.addRect(Rect::MakeXYWH(40.5f, 40.5f, 80.f, 80.f));
   shapeLayer1->setPath(path1);
@@ -2845,8 +2931,8 @@ TGFX_TEST(LayerTest, BackgroundBlurStyleTest) {
   auto path2 = Path();
   path2.addRect(Rect::MakeXYWH(50, 20, 100, 100));
   shapeLayer2->setPath(path2);
-  shapeLayer2->setFillStyle(
-      Gradient::MakeLinear({50, 20}, {150, 120}, {{0.f, 0.f, 1.f, 1.f}, {0.f, 1.f, 0.f, 1.f}}));
+  shapeLayer2->setFillStyle(ShapeStyle::Make(Shader::MakeLinearGradient(
+      {50, 20}, {150, 120}, {{0.f, 0.f, 1.f, 1.f}, {0.f, 1.f, 0.f, 1.f}})));
   rootLayer->addChildAt(shapeLayer2, 0);
 
   auto layer2 = Layer::Make();
@@ -2868,7 +2954,7 @@ TGFX_TEST(LayerTest, BackgroundBlurStyleTest) {
   auto maskPath = Path();
   maskPath.addRect(Rect::MakeXYWH(80, 80, 200, 200));
   maskLayer->setPath(maskPath);
-  maskLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 0, 0, 255)));
+  maskLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 255)));
   imageLayer->setMask(maskLayer);
   rootLayer->addChild(maskLayer);
   displayList->render(surface.get());
@@ -2951,7 +3037,7 @@ TGFX_TEST(LayerTest, PassThroughWithBackgroundBlur) {
   Path childPath;
   childPath.addRect(Rect::MakeXYWH(75, 75, 150, 150));
   childLayer->setPath(childPath);
-  childLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 0, 0, 200)));
+  childLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 0, 0, 200)));
   childLayer->setBlendMode(BlendMode::Exclusion);
   containerLayer->addChild(childLayer);
 
@@ -2991,7 +3077,8 @@ TGFX_TEST(LayerTest, PartialBackgroundBlur) {
   Path backgroundPath;
   backgroundPath.addRect(Rect::MakeXYWH(0, 0, 300, 300));
   background->setPath(backgroundPath);
-  background->addFillStyle(Gradient::MakeRadial({150, 150}, 360, {Color::Red(), Color::Blue()}));
+  background->addFillStyle(
+      ShapeStyle::Make(Shader::MakeRadialGradient({150, 150}, 360, {Color::Red(), Color::Blue()})));
   rootLayer->addChild(background);
   auto solidLayer = SolidLayer::Make();
   solidLayer->setColor(Color::FromRGBA(0, 0, 0, 50));
@@ -3031,7 +3118,7 @@ TGFX_TEST(LayerTest, PartialInnerShadow) {
   Path path;
   path.addRect(Rect::MakeXYWH(0, 0, 100, 100));
   shapeLayer->setPath(path);
-  shapeLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 255, 255, 255)));
+  shapeLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 255)));
   shapeLayer->setLineWidth(1.0f);
   rootLayer->addChild(shapeLayer);
 
@@ -3063,7 +3150,7 @@ TGFX_TEST(LayerTest, PartialDrawLayer) {
   Path path;
   path.addRect(Rect::MakeXYWH(0, 0, 100, 100));
   shapeLayer->setPath(path);
-  shapeLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 255, 255, 50)));
+  shapeLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 50)));
   shapeLayer->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
   rootLayer->addChild(shapeLayer);
   auto layerInvisible = SolidLayer::Make();
@@ -3104,7 +3191,7 @@ TGFX_TEST(LayerTest, DropShadowDirtyRect) {
   Path path;
   path.addRect(Rect::MakeXYWH(0, 0, 100, 100));
   shapeLayer->setPath(path);
-  shapeLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 0, 0, 255)));
+  shapeLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 0, 0, 255)));
   shapeLayer->setLayerStyles({DropShadowStyle::Make(10, 10, 0, 0, Color::Black())});
   rootLayer->addChild(shapeLayer);
   shapeLayer->setMatrix(Matrix::MakeRotate(-120));
@@ -3123,8 +3210,10 @@ TGFX_TEST(LayerTest, ContourTest) {
   auto surface = Surface::Make(context, 200, 200);
   auto image = MakeImage("resources/apitest/imageReplacement.png");
   EXPECT_TRUE(image != nullptr);
-  auto imagePattern1 = ImagePattern::Make(image, TileMode::Repeat, TileMode::Repeat);
-  auto imagePattern2 = ImagePattern::Make(image, TileMode::Clamp, TileMode::Clamp);
+  auto imageShader1 = Shader::MakeImageShader(image, TileMode::Repeat, TileMode::Repeat);
+  auto imageShader2 = Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp);
+  auto imageStyle1 = ShapeStyle::Make(imageShader1);
+  auto imageStyle2 = ShapeStyle::Make(imageShader2);
 
   DrawArgs drawArgs = DrawArgs(nullptr);
   drawArgs.drawMode = DrawMode::Contour;
@@ -3135,8 +3224,8 @@ TGFX_TEST(LayerTest, ContourTest) {
   path.reset();
   path.addRect(Rect::MakeXYWH(10, 10, 80, 80));
   allSolidLayer->setPath(path);
-  allSolidLayer->addFillStyle(SolidColor::Make(Color::Red()));
-  allSolidLayer->addFillStyle(SolidColor::Make(Color::Blue()));
+  allSolidLayer->addFillStyle(ShapeStyle::Make(Color::Red()));
+  allSolidLayer->addFillStyle(ShapeStyle::Make(Color::Blue()));
   ContourContext allSolidContext;
   Canvas allSolidCanvas = Canvas(&allSolidContext);
   allSolidLayer->drawLayer(drawArgs, &allSolidCanvas, 1.0, BlendMode::SrcOver);
@@ -3148,8 +3237,8 @@ TGFX_TEST(LayerTest, ContourTest) {
   path.reset();
   path.addRect(Rect::MakeXYWH(110, 10, 80, 80));
   allImageLayer->setPath(path);
-  allImageLayer->addFillStyle(imagePattern1);
-  allImageLayer->addFillStyle(imagePattern2);
+  allImageLayer->addFillStyle(imageStyle1);
+  allImageLayer->addFillStyle(imageStyle2);
   ContourContext allImageContext;
   Canvas allImageCanvas = Canvas(&allImageContext);
   allImageLayer->drawLayer(drawArgs, &allImageCanvas, 1.0, BlendMode::SrcOver);
@@ -3163,9 +3252,9 @@ TGFX_TEST(LayerTest, ContourTest) {
   path.reset();
   path.addRect(Rect::MakeXYWH(10, 110, 80, 80));
   mixedFillsLayer->setPath(path);
-  mixedFillsLayer->addFillStyle(imagePattern1);
-  mixedFillsLayer->addFillStyle(imagePattern2);
-  mixedFillsLayer->addFillStyle(SolidColor::Make(Color::Green()));
+  mixedFillsLayer->addFillStyle(imageStyle1);
+  mixedFillsLayer->addFillStyle(imageStyle2);
+  mixedFillsLayer->addFillStyle(ShapeStyle::Make(Color::Green()));
   ContourContext mixedFillsContext;
   Canvas mixedFillsCanvas = Canvas(&mixedFillsContext);
   mixedFillsLayer->drawLayer(drawArgs, &mixedFillsCanvas, 1.0, BlendMode::SrcOver);
@@ -3179,14 +3268,14 @@ TGFX_TEST(LayerTest, ContourTest) {
   path.reset();
   path.addRect(Rect::MakeXYWH(110, 110, 80, 80));
   twoGroupsLayer->setPath(path);
-  twoGroupsLayer->addFillStyle(imagePattern1);
-  twoGroupsLayer->addFillStyle(imagePattern2);
+  twoGroupsLayer->addFillStyle(imageStyle1);
+  twoGroupsLayer->addFillStyle(imageStyle2);
   auto childLayer = ShapeLayer::Make();
   path.reset();
   path.addRRect(RRect{Rect::MakeXYWH(120, 120, 60, 60), Point::Make(10, 10)});
   childLayer->setPath(path);
-  childLayer->addFillStyle(SolidColor::Make(Color::Red()));
-  childLayer->addFillStyle(SolidColor::Make(Color::Blue()));
+  childLayer->addFillStyle(ShapeStyle::Make(Color::Red()));
+  childLayer->addFillStyle(ShapeStyle::Make(Color::Blue()));
   twoGroupsLayer->addChild(childLayer);
   ContourContext twoGroupsContext;
   Canvas twoGroupsCanvas = Canvas(&twoGroupsContext);
@@ -3203,8 +3292,8 @@ TGFX_TEST(LayerTest, ContourTest) {
   path.addRect(Rect::MakeXYWH(10, 210, 80, 80));
   strokeTestLayer->setPath(path);
   strokeTestLayer->setLineWidth(5.0f);
-  strokeTestLayer->addStrokeStyle(SolidColor::Make(Color::Red()));
-  strokeTestLayer->addStrokeStyle(SolidColor::Make(Color::Blue()));
+  strokeTestLayer->addStrokeStyle(ShapeStyle::Make(Color::Red()));
+  strokeTestLayer->addStrokeStyle(ShapeStyle::Make(Color::Blue()));
   ContourContext strokeTestContext;
   Canvas strokeTestCanvas = Canvas(&strokeTestContext);
   strokeTestLayer->drawLayer(drawArgs, &strokeTestCanvas, 1.0, BlendMode::SrcOver);
@@ -3245,14 +3334,14 @@ TGFX_TEST(LayerTest, NotRectBackgroundBlur) {
   backgroundPath.addRect(Rect::MakeXYWH(0, 0, 200, 200));
   backgroundLayer->setPath(backgroundPath);
   backgroundLayer->addFillStyle(
-      Gradient::MakeRadial({100, 100}, 100, {Color::Red(), Color::Blue()}));
+      ShapeStyle::Make(Shader::MakeRadialGradient({100, 100}, 100, {Color::Red(), Color::Blue()})));
   DisplayList displayList;
   displayList.root()->addChild(backgroundLayer);
   auto layer = ShapeLayer::Make();
   Path path;
   path.addOval(Rect::MakeXYWH(50, 50, 100, 100));
   layer->setPath(path);
-  layer->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 0, 0, 10)));
+  layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 0, 0, 10)));
   layer->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
   displayList.root()->addChild(layer);
   layer->draw(canvas);
@@ -3272,11 +3361,12 @@ TGFX_TEST(LayerTest, DiffFilterModeImagePattern) {
   Path path;
   path.addRect(Rect::MakeWH(image->width(), image->height()));
   shapeLayer->setPath(path);
-  auto pattern = ImagePattern::Make(image, TileMode::Decal, TileMode::Decal,
-                                    SamplingOptions(FilterMode::Linear, FilterMode::Nearest));
+  auto imageShader =
+      Shader::MakeImageShader(image, TileMode::Decal, TileMode::Decal,
+                              SamplingOptions(FilterMode::Linear, FilterMode::Nearest));
   DisplayList displayList;
   displayList.root()->addChild(shapeLayer);
-  shapeLayer->setFillStyle(pattern);
+  shapeLayer->setFillStyle(ShapeStyle::Make(imageShader));
   displayList.setZoomScale(0.3f);
   displayList.render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DiffFilterModeImagePattern -- zoomOut"));
@@ -3298,19 +3388,20 @@ TGFX_TEST(LayerTest, TemporaryOffscreenImage) {
   Path path;
   path.addRect(Rect::MakeWH(image->width(), image->height()));
   shapeLayer->setPath(path);
-  auto pattern = ImagePattern::Make(image, TileMode::Decal, TileMode::Decal,
-                                    SamplingOptions(FilterMode::Linear, FilterMode::Nearest));
+  auto imageShader =
+      Shader::MakeImageShader(image, TileMode::Decal, TileMode::Decal,
+                              SamplingOptions(FilterMode::Linear, FilterMode::Nearest));
   auto filter = DropShadowFilter::Make(-10, -10, 5, 5, Color::Black());
   DisplayList displayList;
   displayList.root()->addChild(shapeLayer);
-  shapeLayer->setFillStyle(pattern);
+  shapeLayer->setFillStyle(ShapeStyle::Make(imageShader));
   shapeLayer->setFilters({filter});
 
   auto glassLayer = ShapeLayer::Make();
   Path glassPath;
   glassPath.addRRect(RRect{Rect::MakeXYWH(10, 10, 80, 80), Point::Make(40, 40)});
   glassLayer->setPath(glassPath);
-  glassLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 255, 255, 50)));
+  glassLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 50)));
   glassLayer->setLayerStyles({BackgroundBlurStyle::Make(5, 5)});
   shapeLayer->addChild(glassLayer);
   displayList.setZoomScale(2.f);
@@ -3344,17 +3435,18 @@ TGFX_TEST(LayerTest, PassThrough_Test) {
   shapeLayer->setPath(path);
   auto image = MakeImage("resources/apitest/image_as_mask.png");
   EXPECT_TRUE(image != nullptr);
-  auto pattern = ImagePattern::Make(image, TileMode::Decal, TileMode::Decal,
-                                    SamplingOptions(FilterMode::Linear, FilterMode::Nearest));
-  pattern->setMatrix(Matrix::MakeTrans(-40, -40));
-  shapeLayer->setFillStyle(pattern);
+  auto imageShader =
+      Shader::MakeImageShader(image, TileMode::Decal, TileMode::Decal,
+                              SamplingOptions(FilterMode::Linear, FilterMode::Nearest));
+  shapeLayer->setFillStyle(
+      ShapeStyle::Make(imageShader->makeWithMatrix(Matrix::MakeTrans(-40, -40))));
   shapeLayer->setMatrix(Matrix::MakeRotate(45, 30, 30));
 
   auto childLayer = ShapeLayer::Make();
   Path childPath;
   childPath.addRect(Rect::MakeXYWH(25, 25, 50, 50));
   childLayer->setPath(childPath);
-  childLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 0, 255, 255)));
+  childLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 255, 255)));
   childLayer->setAlpha(0.5f);
   shapeLayer->addChild(childLayer);
 
@@ -3362,7 +3454,7 @@ TGFX_TEST(LayerTest, PassThrough_Test) {
   Path childPath2;
   childPath2.addRect(Rect::MakeXYWH(10, 10, 30, 30));
   childLayer2->setPath(childPath2);
-  childLayer2->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 255, 0, 255)));
+  childLayer2->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 255, 0, 255)));
   childLayer2->setBlendMode(BlendMode::Exclusion);
   childLayer->addChild(childLayer2);
 
@@ -3491,7 +3583,7 @@ TGFX_TEST(LayerTest, Matrix) {
   path.addRoundRect(rect, 20, 20);
   auto shaperLayer = ShapeLayer::Make();
   shaperLayer->setPath(path);
-  shaperLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 0, 255, 128)));
+  shaperLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 255, 128)));
   shaperLayer->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
   {
     // Verify the correctness of ShaperLayer's effect when the internal matrix is non-zero
@@ -3558,7 +3650,7 @@ TGFX_TEST(LayerTest, DisplayListBackground) {
   Path path;
   path.addRect(Rect::MakeXYWH(50, 50, 100, 100));
   shapeLayer->setPath(path);
-  shapeLayer->setFillStyle(SolidColor::Make(Color::White()));
+  shapeLayer->setFillStyle(ShapeStyle::Make(Color::White()));
   rootLayer->addChild(shapeLayer);
 
   auto whiteBackgroundColor = Color::FromRGBA(255, 255, 255, 255);
@@ -3618,7 +3710,7 @@ TGFX_TEST(LayerTest, BackgroundBlurWithMask) {
   Path blur1Path;
   blur1Path.addRect(Rect::MakeXYWH(-20, -20, 140, 140));  // Larger than group
   blur1->setPath(blur1Path);
-  auto blur1Fill = SolidColor::Make(Color::FromRGBA(255, 0, 0, 128));  // Red with alpha=128
+  auto blur1Fill = ShapeStyle::Make(Color::FromRGBA(255, 0, 0, 128));  // Red with alpha=128
   blur1->setFillStyle(blur1Fill);
   auto blur1Style = BackgroundBlurStyle::Make(5, 5);
   blur1->setLayerStyles({blur1Style});
@@ -3631,7 +3723,7 @@ TGFX_TEST(LayerTest, BackgroundBlurWithMask) {
   Path maskPath;
   maskPath.addRect(Rect::MakeWH(100, 100));  // Same as group's logical size
   mask->setPath(maskPath);
-  auto maskFill = SolidColor::Make(Color::White());
+  auto maskFill = ShapeStyle::Make(Color::White());
   mask->setFillStyle(maskFill);
   mask->setMatrix(Matrix::MakeTrans(60, 20));
   group->addChild(mask);
@@ -3646,7 +3738,7 @@ TGFX_TEST(LayerTest, BackgroundBlurWithMask) {
   Path blur2Path;
   blur2Path.addRect(Rect::MakeWH(80, 80));
   blur2->setPath(blur2Path);
-  auto blur2Fill = SolidColor::Make(Color::FromRGBA(0, 0, 255, 10));  // Blue with alpha=128
+  auto blur2Fill = ShapeStyle::Make(Color::FromRGBA(0, 0, 255, 10));  // Blue with alpha=128
   blur2->setFillStyle(blur2Fill);
   auto blur2Style = BackgroundBlurStyle::Make(5, 5);
   blur2->setLayerStyles({blur2Style});
@@ -3685,7 +3777,7 @@ TGFX_TEST(LayerTest, BackgroundLayerIndexWithNestedHierarchy) {
   Path path1;
   path1.addRect(Rect::MakeXYWH(10, 10, 40, 40));
   rect1->setPath(path1);
-  rect1->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 0, 0, 255)));  // Red
+  rect1->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 0, 0, 255)));  // Red
   p->addChild(rect1);
 
   auto rect2 = ShapeLayer::Make();
@@ -3693,7 +3785,7 @@ TGFX_TEST(LayerTest, BackgroundLayerIndexWithNestedHierarchy) {
   Path path2;
   path2.addRect(Rect::MakeXYWH(60, 10, 40, 40));
   rect2->setPath(path2);
-  rect2->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 255, 0, 255)));  // Green
+  rect2->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 255, 0, 255)));  // Green
   p->addChild(rect2);
 
   auto rect3 = ShapeLayer::Make();
@@ -3701,7 +3793,7 @@ TGFX_TEST(LayerTest, BackgroundLayerIndexWithNestedHierarchy) {
   Path path3;
   path3.addRect(Rect::MakeXYWH(110, 10, 40, 40));
   rect3->setPath(path3);
-  rect3->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 0, 255, 255)));  // Blue
+  rect3->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 255, 255)));  // Blue
   p->addChild(rect3);
 
   // Create rect4 as child of rect3
@@ -3710,7 +3802,7 @@ TGFX_TEST(LayerTest, BackgroundLayerIndexWithNestedHierarchy) {
   Path path4;
   path4.addRect(Rect::MakeXYWH(5, 5, 20, 20));
   rect4->setPath(path4);
-  rect4->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 255, 0, 255)));  // Yellow
+  rect4->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 0, 255)));  // Yellow
   rect3->addChild(rect4);
 
   // Create backblur as shape layer with background blur style
@@ -3719,7 +3811,7 @@ TGFX_TEST(LayerTest, BackgroundLayerIndexWithNestedHierarchy) {
   Path blurPath;
   blurPath.addRect(Rect::MakeXYWH(10, 0, 140, 50));
   backblur->setPath(blurPath);
-  backblur->setFillStyle(SolidColor::Make(Color::FromRGBA(200, 200, 200, 100)));
+  backblur->setFillStyle(ShapeStyle::Make(Color::FromRGBA(200, 200, 200, 100)));
   auto blurStyle = BackgroundBlurStyle::Make(5, 5);
   backblur->setLayerStyles({blurStyle});
   displayList->root()->addChild(backblur);
@@ -3761,7 +3853,7 @@ TGFX_TEST(LayerTest, LayerCache) {
   Path path;
   path.addRect(Rect::MakeWH(50, 50));
   child->setPath(path);
-  child->setFillStyle(SolidColor::Make(Color::Red()));
+  child->setFillStyle(ShapeStyle::Make(Color::Red()));
   parent->addChild(child);
 
   displayList->root()->addChild(parent);
@@ -3796,7 +3888,7 @@ TGFX_TEST(LayerTest, LayerCacheInvalidation) {
   Path path;
   path.addRect(Rect::MakeWH(50, 50));
   child->setPath(path);
-  child->setFillStyle(SolidColor::Make(Color::Green()));
+  child->setFillStyle(ShapeStyle::Make(Color::Green()));
   parent->addChild(child);
 
   auto root = displayList->root();
@@ -3818,7 +3910,7 @@ TGFX_TEST(LayerTest, LayerCacheInvalidation) {
   newPath.addRect(Rect::MakeWH(20, 20));
   newChild->setPath(newPath);
   newChild->setMatrix(Matrix::MakeTrans(60, 0));
-  newChild->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 255, 0, 255)));
+  newChild->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 0, 255)));
   parent->addChild(newChild);
 
   // Cache should be invalidated after adding child
@@ -3859,7 +3951,7 @@ TGFX_TEST(LayerTest, LayerCacheWithEffects) {
   Path path1;
   path1.addRect(Rect::MakeWH(80, 80));
   child1->setPath(path1);
-  child1->setFillStyle(SolidColor::Make(Color::Red()));
+  child1->setFillStyle(ShapeStyle::Make(Color::Red()));
   auto filter = DropShadowFilter::Make(5, 5, 3, 3, Color::Black());
   child1->setFilters({filter});
   parent1->addChild(child1);
@@ -3875,7 +3967,7 @@ TGFX_TEST(LayerTest, LayerCacheWithEffects) {
   Path path2;
   path2.addRect(Rect::MakeWH(60, 60));
   child2->setPath(path2);
-  child2->setFillStyle(SolidColor::Make(Color::Blue()));
+  child2->setFillStyle(ShapeStyle::Make(Color::Blue()));
   auto style = DropShadowStyle::Make(8, 8, 4, 4, Color::Black(), false);
   child2->setLayerStyles({style});
   parent2->addChild(child2);
@@ -3911,7 +4003,7 @@ TGFX_TEST(LayerTest, LayerCacheWithTransform) {
   Path path;
   path.addRect(Rect::MakeWH(50, 50));
   child->setPath(path);
-  child->setFillStyle(SolidColor::Make(Color::Red()));
+  child->setFillStyle(ShapeStyle::Make(Color::Red()));
   parent->addChild(child);
 
   auto root = displayList->root();
@@ -3961,7 +4053,7 @@ TGFX_TEST(LayerTest, LayerCacheContentScale) {
   Path path;
   path.addRect(Rect::MakeWH(100, 100));
   child->setPath(path);
-  child->setFillStyle(SolidColor::Make(Color::Blue()));
+  child->setFillStyle(ShapeStyle::Make(Color::Blue()));
   parent->addChild(child);
 
   auto root = displayList->root();
@@ -4030,7 +4122,7 @@ TGFX_TEST(LayerTest, StaticSubtree) {
   Path childPath;
   childPath.addRect(Rect::MakeWH(100, 100));
   childLayer->setPath(childPath);
-  childLayer->setFillStyle(SolidColor::Make(Color::Red()));
+  childLayer->setFillStyle(ShapeStyle::Make(Color::Red()));
   rootLayer->addChild(childLayer);
 
   displayList->root()->addChild(rootLayer);
@@ -4126,7 +4218,7 @@ TGFX_TEST(LayerTest, SimpleShapeSkipsCache) {
   Path path = {};
   path.addOval(Rect::MakeWH(50, 50));
   pathLayer->setPath(path);
-  pathLayer->setFillStyle(SolidColor::Make(Color::Green()));
+  pathLayer->setFillStyle(ShapeStyle::Make(Color::Green()));
   pathLayer->setMatrix(Matrix::MakeTrans(130, 10));
   root->addChild(pathLayer);
 
@@ -4241,7 +4333,7 @@ TGFX_TEST(LayerTest, MaskPathOptimization) {
   ovalPath.addOval(Rect::MakeXYWH(10.f, 110.f, 40.f, 40.f));
   auto pathMask = ShapeLayer::Make();
   pathMask->setPath(ovalPath);
-  pathMask->setFillStyle(SolidColor::Make(Color::White()));
+  pathMask->setFillStyle(ShapeStyle::Make(Color::White()));
   rootLayer->addChild(pathMask);
   layer3->setMask(pathMask);
   layer3->setMaskType(LayerMaskType::Alpha);
@@ -4264,6 +4356,454 @@ TGFX_TEST(LayerTest, MaskPathOptimization) {
 
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/MaskPathOptimization"));
+}
+
+TGFX_TEST(LayerTest, TileClearWhenAllLayersRemoved) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto surface = Surface::Make(context, 256, 256);
+
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Tiled);
+  displayList->setTileSize(128);
+  displayList->setBackgroundColor(Color::White());
+
+  auto rootLayer = displayList->root();
+
+  auto blueRect = ShapeLayer::Make();
+  Path bluePath = {};
+  bluePath.addRect(Rect::MakeXYWH(0, 0, 256, 256));
+  blueRect->setPath(bluePath);
+  blueRect->setFillStyle(ShapeStyle::Make(Color::Blue()));
+  rootLayer->addChild(blueRect);
+  displayList->render(surface.get());
+
+  EXPECT_EQ(displayList->tileCaches.size(), 1u);
+  auto result = displayList->tileCaches.find(1000);
+  EXPECT_TRUE(result != displayList->tileCaches.end());
+  EXPECT_EQ(result->second->tileMap.size(), 4u);
+
+  blueRect->removeFromParent();
+  displayList->render(surface.get());
+
+  EXPECT_TRUE(displayList->tileCaches.empty());
+
+  // Test 1: Add a layer that only covers part of tile(0,0)
+  // Red rectangle at (20,20) with size 60x60, only covers (20,20)-(80,80) in tile(0,0)
+  auto smallRect = ShapeLayer::Make();
+  Path smallPath = {};
+  smallPath.addRect(Rect::MakeXYWH(20, 20, 60, 60));
+  smallRect->setPath(smallPath);
+  smallRect->setFillStyle(ShapeStyle::Make(Color::Red()));
+  rootLayer->addChild(smallRect);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/TileClear_PartialTile"));
+
+  // Test 2: Add another layer in a different tile that doesn't dirty the partial tile,
+  // but the entire partial tile should still be displayed correctly
+  // Green rectangle at (150,150) with size 50x50, only in tile(1,1)
+  auto greenRect = ShapeLayer::Make();
+  Path greenPath = {};
+  greenPath.addRect(Rect::MakeXYWH(150, 150, 50, 50));
+  greenRect->setPath(greenPath);
+  greenRect->setFillStyle(ShapeStyle::Make(Color::Green()));
+  rootLayer->addChild(greenRect);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/TileClear_PartialTileWithNewLayer"));
+}
+
+/**
+ * Test that overlapping layers with intersecting dirty regions don't cause duplicate tile recycling.
+ * When two layers overlap and both are modified, their dirty regions may cover the same tiles.
+ * The tile should only be recycled once, not multiple times.
+ */
+TGFX_TEST(LayerTest, OverlappingDirtyRegions) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto surface = Surface::Make(context, 256, 256);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Tiled);
+  displayList->setTileSize(128);
+  displayList->setBackgroundColor(Color::White());
+
+  auto rootLayer = displayList->root();
+
+  auto redRect = ShapeLayer::Make();
+  Path redPath = {};
+  redPath.addRect(Rect::MakeXYWH(20, 20, 100, 100));
+  redRect->setPath(redPath);
+  redRect->setFillStyle(ShapeStyle::Make(Color::Red()));
+  rootLayer->addChild(redRect);
+
+  auto blueRect = ShapeLayer::Make();
+  Path bluePath = {};
+  bluePath.addRect(Rect::MakeXYWH(95, 95, 100, 100));
+  blueRect->setPath(bluePath);
+  blueRect->setFillStyle(ShapeStyle::Make(Color::Blue()));
+  rootLayer->addChild(blueRect);
+
+  displayList->render(surface.get());
+  EXPECT_EQ(displayList->tileCaches.size(), 1u);
+
+  redRect->removeFromParent();
+  blueRect->removeFromParent();
+
+  displayList->render(surface.get());
+
+  EXPECT_EQ(displayList->tileCaches.size(), 0lu);
+
+  auto emptyTilesAfter = displayList->emptyTiles.size();
+  EXPECT_EQ(9lu, emptyTilesAfter);
+}
+
+TGFX_TEST(LayerTest, LayerRecorder) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  LayerPaint redPaint = {};
+  redPaint.color = Color::Red();
+
+  LayerPaint bluePaint = {};
+  bluePaint.color = Color::Blue();
+
+  LayerPaint strokePaint = {};
+  strokePaint.color = Color::Red();
+  strokePaint.style = PaintStyle::Stroke;
+  strokePaint.stroke.width = 5.0f;
+
+  // Test 1: Multiple rects with same paint should merge into RectsContent
+  {
+    auto surface = Surface::Make(context, 200, 150);
+    LayerRecorder recorder = {};
+    recorder.addRect(Rect::MakeXYWH(10, 10, 50, 50), redPaint);
+    recorder.addRect(Rect::MakeXYWH(70, 10, 50, 50), redPaint);
+    recorder.addRect(Rect::MakeXYWH(130, 10, 50, 50), redPaint);
+    recorder.addRect(Rect::MakeXYWH(10, 70, 50, 50), bluePaint);
+    auto content = recorder.finishRecording();
+    ASSERT_TRUE(content != nullptr);
+    // Should be ComposeContent with 2 items: RectsContent (3 rects) + RectContent (1 rect)
+    EXPECT_EQ(content->type(), LayerContent::Type::Compose);
+    auto composeContent = static_cast<ComposeContent*>(content.get());
+    EXPECT_EQ(composeContent->contents.size(), 2u);
+    EXPECT_EQ(composeContent->contents[0]->type(), LayerContent::Type::Rects);
+    auto rectsContent = static_cast<RectsContent*>(composeContent->contents[0].get());
+    EXPECT_EQ(rectsContent->rects.size(), 3u);
+    EXPECT_EQ(composeContent->contents[1]->type(), LayerContent::Type::Rect);
+    content->drawDefault(surface->getCanvas(), 1.0f, true);
+    EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerRecorder_MultipleRects"));
+  }
+
+  // Test 2: Multiple rrects with same paint should merge into RRectsContent
+  {
+    auto surface = Surface::Make(context, 200, 150);
+    LayerRecorder recorder = {};
+    RRect rRect1 = {};
+    rRect1.setRectXY(Rect::MakeXYWH(10, 10, 50, 50), 10, 10);
+    RRect rRect2 = {};
+    rRect2.setRectXY(Rect::MakeXYWH(70, 10, 50, 50), 10, 10);
+    RRect rRect3 = {};
+    rRect3.setRectXY(Rect::MakeXYWH(130, 10, 50, 50), 10, 10);
+    RRect rRect4 = {};
+    rRect4.setRectXY(Rect::MakeXYWH(10, 70, 50, 50), 10, 10);
+    recorder.addRRect(rRect1, redPaint);
+    recorder.addRRect(rRect2, redPaint);
+    recorder.addRRect(rRect3, redPaint);
+    recorder.addRRect(rRect4, bluePaint);
+    auto content = recorder.finishRecording();
+    ASSERT_TRUE(content != nullptr);
+    // Should be ComposeContent with 2 items: RRectsContent (3 rrects) + RRectContent (1 rrect)
+    EXPECT_EQ(content->type(), LayerContent::Type::Compose);
+    auto composeContent = static_cast<ComposeContent*>(content.get());
+    EXPECT_EQ(composeContent->contents.size(), 2u);
+    EXPECT_EQ(composeContent->contents[0]->type(), LayerContent::Type::RRects);
+    auto rrectsContent = static_cast<RRectsContent*>(composeContent->contents[0].get());
+    EXPECT_EQ(rrectsContent->rRects.size(), 3u);
+    EXPECT_EQ(composeContent->contents[1]->type(), LayerContent::Type::RRect);
+    content->drawDefault(surface->getCanvas(), 1.0f, true);
+    EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerRecorder_MultipleRRects"));
+  }
+
+  // Test 3: Multiple paths with same paint should merge into single Shape
+  {
+    auto surface = Surface::Make(context, 200, 150);
+    LayerRecorder recorder = {};
+    Path path1 = {};
+    path1.addOval(Rect::MakeXYWH(10, 10, 50, 50));
+    Path path2 = {};
+    path2.addOval(Rect::MakeXYWH(70, 10, 50, 50));
+    Path path3 = {};
+    path3.addOval(Rect::MakeXYWH(130, 10, 50, 50));
+    Path path4 = {};
+    path4.addOval(Rect::MakeXYWH(10, 70, 50, 50));
+    recorder.addPath(path1, redPaint);
+    recorder.addPath(path2, redPaint);
+    recorder.addPath(path3, redPaint);
+    recorder.addPath(path4, bluePaint);
+    auto content = recorder.finishRecording();
+    ASSERT_TRUE(content != nullptr);
+    // Should be ComposeContent with 2 items: ShapeContent (merged paths) + PathContent
+    EXPECT_EQ(content->type(), LayerContent::Type::Compose);
+    auto composeContent = static_cast<ComposeContent*>(content.get());
+    ASSERT_TRUE(composeContent->contents.size() == 4u);
+    EXPECT_EQ(composeContent->contents[0]->type(), LayerContent::Type::Path);
+    EXPECT_EQ(composeContent->contents[1]->type(), LayerContent::Type::Path);
+    EXPECT_EQ(composeContent->contents[2]->type(), LayerContent::Type::Path);
+    EXPECT_EQ(composeContent->contents[3]->type(), LayerContent::Type::Path);
+    content->drawDefault(surface->getCanvas(), 1.0f, true);
+    EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerRecorder_MultiplePaths"));
+  }
+
+  // Test 4: Mixed shapes with same paint should create separate contents
+  {
+    auto surface = Surface::Make(context, 200, 100);
+    LayerRecorder recorder = {};
+    recorder.addRect(Rect::MakeXYWH(10, 10, 50, 50), redPaint);
+    RRect rRect = {};
+    rRect.setRectXY(Rect::MakeXYWH(70, 10, 50, 50), 10, 10);
+    recorder.addRRect(rRect, redPaint);
+    Path path = {};
+    path.addOval(Rect::MakeXYWH(130, 10, 50, 50));
+    recorder.addPath(path, redPaint);
+    auto content = recorder.finishRecording();
+    ASSERT_TRUE(content != nullptr);
+    // Should be ComposeContent with 3 items: RectContent + RRectContent + PathContent
+    EXPECT_EQ(content->type(), LayerContent::Type::Compose);
+    auto composeContent = static_cast<ComposeContent*>(content.get());
+    EXPECT_EQ(composeContent->contents.size(), 3u);
+    EXPECT_EQ(composeContent->contents[0]->type(), LayerContent::Type::Rect);
+    EXPECT_EQ(composeContent->contents[1]->type(), LayerContent::Type::RRect);
+    EXPECT_EQ(composeContent->contents[2]->type(), LayerContent::Type::Path);
+    content->drawDefault(surface->getCanvas(), 1.0f, true);
+    EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerRecorder_MixedShapes"));
+  }
+
+  // Test 5: TextBlob with x, y offset
+  {
+    auto surface = Surface::Make(context, 200, 150);
+    LayerRecorder recorder = {};
+    auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+    ASSERT_TRUE(typeface != nullptr);
+    auto font = Font(typeface, 24);
+    auto textBlob = TextBlob::MakeFrom("Hello", font);
+    recorder.addTextBlob(textBlob, redPaint, 50, 100);
+    auto content = recorder.finishRecording();
+    ASSERT_TRUE(content != nullptr);
+    // Should be single TextContent
+    EXPECT_EQ(content->type(), LayerContent::Type::Text);
+    auto textContent = static_cast<TextContent*>(content.get());
+    EXPECT_EQ(textContent->x, 50.0f);
+    EXPECT_EQ(textContent->y, 100.0f);
+    content->drawDefault(surface->getCanvas(), 1.0f, true);
+    EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerRecorder_TextBlobWithOffset"));
+  }
+
+  // Test 6: Line path with fill should be ignored
+  {
+    auto surface = Surface::Make(context, 200, 150);
+    LayerRecorder recorder = {};
+    Path linePath = {};
+    linePath.moveTo(10, 10);
+    linePath.lineTo(100, 100);
+    recorder.addPath(linePath, redPaint);  // Fill style, should be ignored
+    recorder.addRect(Rect::MakeXYWH(10, 70, 50, 50), bluePaint);
+    auto content = recorder.finishRecording();
+    ASSERT_TRUE(content != nullptr);
+    // Should be single RectContent (line path ignored)
+    EXPECT_EQ(content->type(), LayerContent::Type::Rect);
+    content->drawDefault(surface->getCanvas(), 1.0f, true);
+    EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerRecorder_LinePathFill"));
+  }
+
+  // Test 7: Line path with stroke should be converted to rect
+  {
+    auto surface = Surface::Make(context, 200, 100);
+    LayerRecorder recorder = {};
+    Path linePath = {};
+    linePath.moveTo(10, 50);
+    linePath.lineTo(190, 50);
+    recorder.addPath(linePath, strokePaint);
+    auto content = recorder.finishRecording();
+    ASSERT_TRUE(content != nullptr);
+    // Should be single RectContent (line converted to rect)
+    EXPECT_EQ(content->type(), LayerContent::Type::Rect);
+    content->drawDefault(surface->getCanvas(), 1.0f, true);
+    EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerRecorder_LinePathStroke"));
+  }
+
+  // Test 8: Single rect should be RectContent, not RectsContent
+  {
+    LayerRecorder recorder = {};
+    recorder.addRect(Rect::MakeXYWH(10, 10, 50, 50), redPaint);
+    auto content = recorder.finishRecording();
+    ASSERT_TRUE(content != nullptr);
+    EXPECT_EQ(content->type(), LayerContent::Type::Rect);
+  }
+
+  // Test 9: Single rrect should be RRectContent, not RRectsContent
+  {
+    LayerRecorder recorder = {};
+    RRect rRect = {};
+    rRect.setRectXY(Rect::MakeXYWH(10, 10, 50, 50), 10, 10);
+    recorder.addRRect(rRect, redPaint);
+    auto content = recorder.finishRecording();
+    ASSERT_TRUE(content != nullptr);
+    EXPECT_EQ(content->type(), LayerContent::Type::RRect);
+  }
+
+  // Test 10: RRect with zero radius should be converted to Rect
+  {
+    LayerRecorder recorder = {};
+    RRect rRect = {};
+    rRect.setRectXY(Rect::MakeXYWH(10, 10, 50, 50), 0, 0);
+    recorder.addRRect(rRect, redPaint);
+    auto content = recorder.finishRecording();
+    ASSERT_TRUE(content != nullptr);
+    EXPECT_EQ(content->type(), LayerContent::Type::Rect);
+  }
+}
+
+/**
+ * Test RoundRect mask layer with tiled rendering mode.
+ * This verifies that clipRect coordinate space is correct in offscreen rendering.
+ */
+TGFX_TEST(LayerTest, RoundRectMaskWithTiledRender) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 600, 600);
+  DisplayList displayList;
+
+  // Create a white background layer
+  auto backgroundLayer = ShapeLayer::Make();
+  Path backgroundPath;
+  backgroundPath.addRect(Rect::MakeXYWH(0, 0, 300, 300));
+  backgroundLayer->setPath(backgroundPath);
+  backgroundLayer->setFillStyle(ShapeStyle::Make(Color::White()));
+
+  // Create a rect shape layer as the content to be masked
+  auto contentLayer = ShapeLayer::Make();
+  Path contentPath;
+  contentPath.addRect(Rect::MakeXYWH(0, 0, 250, 250));
+  contentLayer->setPath(contentPath);
+  contentLayer->setFillStyle(ShapeStyle::Make(Color::Blue()));
+  contentLayer->setMatrix(Matrix::MakeTrans(10, 10));
+
+  // Create a round rect mask layer
+  auto maskLayer = ShapeLayer::Make();
+  Path maskPath;
+  maskPath.addRoundRect(Rect::MakeXYWH(20, 20, 200, 200), 30, 30);
+  maskLayer->setPath(maskPath);
+  maskLayer->setFillStyle(ShapeStyle::Make(Color::White()));
+
+  // Apply mask to content layer
+  contentLayer->setMask(maskLayer);
+
+  // Create a container layer with 3D matrix
+  auto rootLayer = Layer::Make();
+  rootLayer->addChild(backgroundLayer);
+  rootLayer->addChild(contentLayer);
+  rootLayer->addChild(maskLayer);
+
+  // Apply 3D matrix to container layer
+  Matrix3D matrix3D = Matrix3D::MakeScale(3.39277792f, 3.39277792f, 1.0f);
+  matrix3D.postTranslate(187.083313f, 82.083313f, 0.0f);
+  rootLayer->setMatrix3D(matrix3D);
+
+  displayList.root()->addChild(rootLayer);
+
+  // Render with tiled mode
+  displayList.setRenderMode(RenderMode::Tiled);
+  displayList.render(surface.get());
+  displayList.setZoomScale(1.603f);
+  displayList.setAllowZoomBlur(false);
+  displayList.setContentOffset(-200.179016f, -221.704529f);
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/RoundRectMaskWithTiledRender"));
+}
+
+TGFX_TEST(LayerTest, ShapeLayerContourWithDropShadow) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto back = SolidLayer::Make();
+  back->setColor(Color::White());
+  back->setWidth(200);
+  back->setHeight(200);
+  displayList->root()->addChild(back);
+
+  // Parent layer with rect fill and drop shadow
+  auto parent = ShapeLayer::Make();
+  parent->setMatrix(Matrix::MakeTrans(50, 50));
+  Path parentPath;
+  parentPath.addRect(Rect::MakeWH(100, 100));
+  parent->setPath(parentPath);
+  parent->setFillStyle(ShapeStyle::Make(Color::Blue()));
+  auto dropShadow = DropShadowStyle::Make(8, 8, 5, 5, Color::Black(), false);
+  parent->setLayerStyles({dropShadow});
+
+  // Child ShapeLayer with only stroke style (no fill style)
+  // This tests that the contour-only content is correctly generated for layer styles.
+  auto child = ShapeLayer::Make();
+  child->setMatrix(Matrix::MakeTrans(30, 30));
+  Path childPath;
+  childPath.addRoundRect(Rect::MakeWH(80, 80), 15, 15);
+  child->setPath(childPath);
+  child->setStrokeStyle(ShapeStyle::Make(Color::Red()));
+  child->setLineWidth(4.0f);
+
+  parent->addChild(child);
+  back->addChild(parent);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ShapeLayerContourWithDropShadow"));
+
+  // Test with no fill and no stroke - child should be transparent, shadow only shows parent
+  child->removeStrokeStyles();
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ShapeLayerNoStyleWithDropShadow"));
+}
+
+TGFX_TEST(LayerTest, GetRotateBounds) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 400);
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto rootLayer = Layer::Make();
+  displayList->root()->addChild(rootLayer);
+
+  auto outerLayer = ShapeLayer::Make();
+  Path outerPath = {};
+  outerPath.addRect(Rect::MakeWH(300, 300));
+  outerLayer->setPath(outerPath);
+  outerLayer->setFillStyle(ShapeStyle::Make(Color::Blue()));
+  outerLayer->setMatrix(Matrix::MakeTrans(200, 200));
+  rootLayer->addChild(outerLayer);
+
+  auto middleLayer = ShapeLayer::Make();
+  Path middlePath = {};
+  middlePath.addRect(Rect::MakeWH(200, 200));
+  middleLayer->setPath(middlePath);
+  middleLayer->setFillStyle(ShapeStyle::Make(Color::Red()));
+  middleLayer->setMatrix(Matrix::MakeTrans(50, 50) * Matrix::MakeRotate(45, 100, 100));
+  outerLayer->addChild(middleLayer);
+
+  auto style = DropShadowStyle::Make(-100, 0, 0, 0, Color::Black(), true);
+  middleLayer->setLayerStyles({style});
+
+  auto bounds = middleLayer->getBounds(outerLayer.get(), true);
+  EXPECT_FLOAT_EQ(bounds.left, -62.132034f);
+  EXPECT_FLOAT_EQ(bounds.top, -62.132034f);
+  EXPECT_FLOAT_EQ(bounds.right, 291.42136f);
+  EXPECT_FLOAT_EQ(bounds.bottom, 291.42136f);
 }
 
 }  // namespace tgfx

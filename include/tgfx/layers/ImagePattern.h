@@ -57,18 +57,31 @@ class ImagePattern : public ColorSource {
     return _sampling;
   }
 
+  /**
+   * Returns the transformation matrix applied to the image pattern.
+   */
+  const Matrix& matrix() const {
+    return _matrix;
+  }
+
+  /**
+   * Sets the transformation matrix applied to the image pattern.
+   */
+  void setMatrix(const Matrix& matrix);
+
+  std::shared_ptr<Shader> getShader() const override;
+
  protected:
   Type getType() const override {
     return Type::ImagePattern;
   }
-
-  std::shared_ptr<Shader> onGetShader() const override;
 
  private:
   std::shared_ptr<Image> _image = nullptr;
   TileMode _tileModeX = TileMode::Clamp;
   TileMode _tileModeY = TileMode::Clamp;
   SamplingOptions _sampling = {};
+  Matrix _matrix = {};
 
   ImagePattern(std::shared_ptr<Image> image, TileMode tileModeX, TileMode tileModeY,
                const SamplingOptions& sampling);

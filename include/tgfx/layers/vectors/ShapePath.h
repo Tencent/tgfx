@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,33 +18,54 @@
 
 #pragma once
 
-#include "core/shapes/UniqueKeyShape.h"
-#include "tgfx/core/Matrix.h"
+#include "tgfx/core/Path.h"
+#include "tgfx/core/Shape.h"
+#include "tgfx/layers/vectors/VectorElement.h"
 
 namespace tgfx {
-class InverseShape : public UniqueKeyShape {
+
+/**
+ * ShapePath represents a custom path shape.
+ */
+class ShapePath : public VectorElement {
  public:
-  explicit InverseShape(std::shared_ptr<Shape> shape) : shape(std::move(shape)) {
+  ShapePath() = default;
+
+  /**
+   * Returns the path that defines the shape.
+   */
+  const Path& path() const {
+    return _path;
   }
 
-  bool isInverseFillType() const override {
-    return !shape->isInverseFillType();
+  /**
+   * Sets the path that defines the shape.
+   */
+  void setPath(Path value);
+
+  /**
+   * Returns whether the path direction is reversed (counter-clockwise).
+   */
+  bool reversed() const {
+    return _reversed;
   }
 
-  Rect onGetBounds() const override {
-    return shape->onGetBounds();
-  }
+  /**
+   * Sets whether the path direction is reversed.
+   */
+  void setReversed(bool value);
 
  protected:
   Type type() const override {
-    return Type::Inverse;
+    return Type::ShapePath;
   }
 
-  Path onGetPath(float resolutionScale) const override;
+  void apply(VectorContext* context) override;
 
  private:
-  std::shared_ptr<Shape> shape = nullptr;
-
-  friend class Shape;
+  Path _path = {};
+  bool _reversed = false;
+  std::shared_ptr<Shape> _cachedShape = nullptr;
 };
+
 }  // namespace tgfx

@@ -18,14 +18,20 @@
 
 #pragma once
 
+#include "tgfx/core/Point.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Stroke.h"
 
 namespace tgfx {
 /**
- * Applies the stroke options to the given bounds.
+ * Applies the stroke options to the given bounds. 
+ * The matrix parameter is used to determine the final rendering scale. If the stroke width becomes
+ * less than 1 pixel after applying the matrix, it will be rendered as a hairline (1 pixel width),
+ * so the bounds expansion is calculated based on a width of 1 pixel instead of the actual stroke
+ * width.
  */
-void ApplyStrokeToBounds(const Stroke& stroke, Rect* bounds, bool applyMiterLimit = false);
+void ApplyStrokeToBounds(const Stroke& stroke, Rect* bounds, const Matrix& matrix = Matrix::I(),
+                         bool applyMiterLimit = false);
 
 /**
  * Returns true if the stroke is a hairline (width <= 0).
@@ -50,5 +56,11 @@ float GetHairlineAlphaFactor(const Stroke& stroke, const Matrix& matrix);
  * (i.e., when all gaps are small enough that square caps will connect).
  */
 std::vector<float> SimplifyLineDashPattern(const std::vector<float>& pattern, const Stroke& stroke);
+
+/**
+ * Converts a stroked axis-aligned line to a filled rectangle. Returns true if the conversion is
+ * possible (non-round cap, non-hairline, axis-aligned line), and writes the result to rect.
+ */
+bool StrokeLineToRect(const Stroke& stroke, const Point line[2], Rect* rect);
 
 }  // namespace tgfx

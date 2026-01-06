@@ -42,6 +42,10 @@ enum class LayerType {
   /**
    * A layer that fills its bounds with a solid color.
    */
-  Solid
+  Solid,
+  /**
+   * A layer displaying vector elements (shapes, text, images) with fill/stroke styles and modifiers.
+   */
+  Vector
 };
 }  // namespace tgfx

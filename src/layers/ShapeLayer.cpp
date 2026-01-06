@@ -21,6 +21,7 @@
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/PathEffect.h"
+#include "tgfx/layers/LayerPaint.h"
 
 namespace tgfx {
 std::shared_ptr<ShapeLayer> ShapeLayer::Make() {
@@ -51,18 +52,12 @@ void ShapeLayer::setShape(std::shared_ptr<Shape> value) {
   invalidateContent();
 }
 
-void ShapeLayer::setFillStyles(std::vector<std::shared_ptr<ColorSource>> fills) {
+void ShapeLayer::setFillStyles(std::vector<std::shared_ptr<ShapeStyle>> fills) {
   if (_fillStyles.size() == fills.size() &&
       std::equal(_fillStyles.begin(), _fillStyles.end(), fills.begin())) {
     return;
   }
-  for (auto& style : _fillStyles) {
-    detachProperty(style.get());
-  }
   _fillStyles = std::move(fills);
-  for (auto& style : _fillStyles) {
-    attachProperty(style.get());
-  }
   invalidateContent();
 }
 
@@ -70,14 +65,11 @@ void ShapeLayer::removeFillStyles() {
   if (_fillStyles.empty()) {
     return;
   }
-  for (const auto& style : _fillStyles) {
-    detachProperty(style.get());
-  }
   _fillStyles = {};
   invalidateContent();
 }
 
-void ShapeLayer::setFillStyle(std::shared_ptr<ColorSource> fillStyle) {
+void ShapeLayer::setFillStyle(std::shared_ptr<ShapeStyle> fillStyle) {
   if (fillStyle == nullptr) {
     removeFillStyles();
   } else {
@@ -85,27 +77,20 @@ void ShapeLayer::setFillStyle(std::shared_ptr<ColorSource> fillStyle) {
   }
 }
 
-void ShapeLayer::addFillStyle(std::shared_ptr<ColorSource> fillStyle) {
+void ShapeLayer::addFillStyle(std::shared_ptr<ShapeStyle> fillStyle) {
   if (fillStyle == nullptr) {
     return;
   }
-  attachProperty(fillStyle.get());
   _fillStyles.push_back(std::move(fillStyle));
   invalidateContent();
 }
 
-void ShapeLayer::setStrokeStyles(std::vector<std::shared_ptr<ColorSource>> strokes) {
+void ShapeLayer::setStrokeStyles(std::vector<std::shared_ptr<ShapeStyle>> strokes) {
   if (_strokeStyles.size() == strokes.size() &&
       std::equal(_strokeStyles.begin(), _strokeStyles.end(), strokes.begin())) {
     return;
   }
-  for (const auto& style : _strokeStyles) {
-    detachProperty(style.get());
-  }
   _strokeStyles = std::move(strokes);
-  for (const auto& style : _strokeStyles) {
-    attachProperty(style.get());
-  }
   invalidateContent();
 }
 
@@ -113,14 +98,11 @@ void ShapeLayer::removeStrokeStyles() {
   if (_strokeStyles.empty()) {
     return;
   }
-  for (const auto& style : _strokeStyles) {
-    detachProperty(style.get());
-  }
   _strokeStyles = {};
   invalidateContent();
 }
 
-void ShapeLayer::setStrokeStyle(std::shared_ptr<ColorSource> stroke) {
+void ShapeLayer::setStrokeStyle(std::shared_ptr<ShapeStyle> stroke) {
   if (stroke == nullptr) {
     removeStrokeStyles();
   } else {
@@ -128,11 +110,10 @@ void ShapeLayer::setStrokeStyle(std::shared_ptr<ColorSource> stroke) {
   }
 }
 
-void ShapeLayer::addStrokeStyle(std::shared_ptr<ColorSource> strokeStyle) {
+void ShapeLayer::addStrokeStyle(std::shared_ptr<ShapeStyle> strokeStyle) {
   if (strokeStyle == nullptr) {
     return;
   }
-  attachProperty(strokeStyle.get());
   _strokeStyles.push_back(std::move(strokeStyle));
   invalidateContent();
 }
@@ -215,25 +196,19 @@ ShapeLayer::ShapeLayer() {
   memset(&shapeBitFields, 0, sizeof(shapeBitFields));
 }
 
-ShapeLayer::~ShapeLayer() {
-  for (auto& style : _fillStyles) {
-    detachProperty(style.get());
-  }
-  for (auto& style : _strokeStyles) {
-    detachProperty(style.get());
-  }
-}
-
 void ShapeLayer::onUpdateContent(LayerRecorder* recorder) {
   if (_shape == nullptr) {
     return;
   }
 
+  if (_fillStyles.empty() && _strokeStyles.empty()) {
+    return;
+  }
+
   if (!_fillStyles.empty()) {
     for (const auto& style : _fillStyles) {
-      auto shader = style->getShader();
-      auto alpha = style->alpha();
-      LayerPaint paint(std::move(shader), alpha, style->blendMode());
+      LayerPaint paint(style->color(), style->blendMode());
+      paint.shader = style->shader();
       recorder->addShape(_shape, paint);
     }
   } else {
@@ -250,7 +225,8 @@ void ShapeLayer::onUpdateContent(LayerRecorder* recorder) {
       strokeShape = createStrokeShape();
     }
     for (const auto& style : _strokeStyles) {
-      LayerPaint paint(style->getShader(), style->alpha(), style->blendMode());
+      LayerPaint paint(style->color(), style->blendMode());
+      paint.shader = style->shader();
       if (shapeBitFields.strokeOnTop) {
         paint.drawOrder = DrawOrder::AboveChildren;
       }

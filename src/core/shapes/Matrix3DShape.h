@@ -33,8 +33,8 @@ class Matrix3DShape : public Shape {
       : shape(std::move(shape)), matrix(matrix) {
   }
 
-  bool isInverseFillType() const override {
-    return shape->isInverseFillType();
+  PathFillType fillType() const override {
+    return shape->fillType();
   }
 
   Rect onGetBounds() const override;

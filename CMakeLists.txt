@@ -323,11 +323,13 @@ file(GLOB_RECURSE EGL_PLATFORM_FILES src/gpu/opengl/egl/*.*)
 if (TGFX_USE_QT)
     set(CMAKE_AUTOMOC ON)
     # need to set the CMAKE_PREFIX_PATH to local QT installation path, for example :
-    # set(CMAKE_PREFIX_PATH /Users/username/Qt/6.6.1/macos/lib/cmake)
-    find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core)
-    find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets OpenGL Quick)
-    list(APPEND TGFX_SHARED_LIBS Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::OpenGL
-            Qt${QT_VERSION_MAJOR}::Quick)
+    #set(CMAKE_PREFIX_PATH /Users/username/Qt/6.6.1/macos/lib/cmake)
+    find_package(Qt6 REQUIRED COMPONENTS Core Widgets OpenGL Quick)
+    if (Qt6_VERSION VERSION_LESS "6.2")
+        message(FATAL_ERROR "Qt6 version 6.2 or higher is required. Found: ${Qt6_VERSION}")
+    endif ()
+    list(APPEND TGFX_SHARED_LIBS Qt6::Widgets Qt6::OpenGL
+            Qt6::Quick)
 
     file(GLOB_RECURSE GPU_PLATFORM_FILES src/gpu/opengl/qt/*.*)
     list(APPEND TGFX_FILES ${GPU_PLATFORM_FILES})
@@ -493,8 +495,12 @@ elseif (WIN32)
     list(APPEND TGFX_STATIC_LIBS ${ws2_32_LIB})
     find_library(DWrite_LIB DWrite)
     list(APPEND TGFX_STATIC_LIBS ${DWrite_LIB})
+    find_library(WindowsCodecs_LIB windowscodecs)
+    list(APPEND TGFX_STATIC_LIBS ${WindowsCodecs_LIB})
+    find_library(Ole32_LIB Ole32)
+    list(APPEND TGFX_STATIC_LIBS ${Ole32_LIB})
 
-    file(GLOB_RECURSE PLATFORM_FILES src/platform/mock/*.*)
+    file(GLOB_RECURSE PLATFORM_FILES src/platform/win/*.*)
     list(APPEND TGFX_FILES ${PLATFORM_FILES})
 
     if (TGFX_USE_NATIVE_GL)

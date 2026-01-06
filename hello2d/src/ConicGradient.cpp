@@ -17,8 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "base/LayerBuilders.h"
-#include "tgfx/layers/Gradient.h"
+#include "tgfx/core/Shader.h"
 #include "tgfx/layers/ShapeLayer.h"
+#include "tgfx/layers/ShapeStyle.h"
 
 namespace hello2d {
 std::shared_ptr<tgfx::Layer> ConicGradient::onBuildLayerTree(const AppHost*) {
@@ -32,14 +33,14 @@ std::shared_ptr<tgfx::Layer> ConicGradient::onBuildLayerTree(const AppHost*) {
   tgfx::Color magenta = {1.0f, 0.0f, 1.0f, 1.0f};
   tgfx::Color yellow = {1.0f, 1.0f, 0.0f, 1.0f};
 
-  auto conicGradient = tgfx::Gradient::MakeConic(tgfx::Point::Make(size / 2, size / 2), 0, 360,
-                                                 {cyan, magenta, yellow, cyan}, {});
+  auto conicShader = tgfx::Shader::MakeConicGradient(tgfx::Point::Make(size / 2, size / 2), 0, 360,
+                                                     {cyan, magenta, yellow, cyan}, {});
   auto rect = tgfx::Rect::MakeXYWH(0, 0, size, size);
 
   tgfx::Path path = {};
   path.addRoundRect(rect, 20, 20);
   shapeLayer->setPath(path);
-  shapeLayer->setFillStyle(conicGradient);
+  shapeLayer->setFillStyle(tgfx::ShapeStyle::Make(conicShader));
 
   root->addChild(shapeLayer);
   return root;

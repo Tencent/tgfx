@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,39 +16,39 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/layers/ColorSource.h"
+#pragma once
+
+#include <vector>
+#include "Painter.h"
+#include "tgfx/core/Matrix.h"
+#include "tgfx/core/Shape.h"
 
 namespace tgfx {
-void ColorSource::setAlpha(float value) {
-  if (_alpha == value) {
-    return;
-  }
-  _alpha = value;
-  invalidateContent();
-}
 
-void ColorSource::setBlendMode(BlendMode value) {
-  if (_blendMode == value) {
-    return;
-  }
-  _blendMode = value;
-  invalidateContent();
-}
+/**
+ * VectorContext holds the rendering state while traversing vector elements.
+ * This is an internal structure used by VectorLayer and VectorElement subclasses.
+ */
+struct VectorContext {
+  /**
+   * Adds a shape with an identity matrix to the list.
+   */
+  void addShape(std::shared_ptr<Shape> shape);
 
-void ColorSource::setMatrix(const Matrix& value) {
-  if (_matrix == value) {
-    return;
-  }
-  _matrix = value;
-  invalidateContent();
-}
+  /**
+   * Shape list that can be modified by path modifiers.
+   */
+  std::vector<std::shared_ptr<Shape>> shapes = {};
 
-std::shared_ptr<Shader> ColorSource::getShader() const {
-  auto shader = onGetShader();
-  if (!shader) {
-    return nullptr;
-  }
-  return shader->makeWithMatrix(_matrix);
-}
+  /**
+   * Matrix list corresponding to each shape.
+   */
+  std::vector<Matrix> matrices = {};
+
+  /**
+   * Accumulated painters from style elements.
+   */
+  std::vector<std::unique_ptr<Painter>> painters = {};
+};
 
 }  // namespace tgfx

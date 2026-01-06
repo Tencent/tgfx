@@ -45,19 +45,18 @@ class SolidColor : public ColorSource {
    */
   void setColor(const Color& color);
 
+  std::shared_ptr<Shader> getShader() const override;
+
  protected:
   Type getType() const override {
     return Type::SolidColor;
   }
 
-  std::shared_ptr<Shader> onGetShader() const override;
-
  private:
   explicit SolidColor(const Color& color) : _color(color) {
   }
 
- private:
-  Color _color;
+  Color _color = {};
 
   friend class SolidLayer;
 };
