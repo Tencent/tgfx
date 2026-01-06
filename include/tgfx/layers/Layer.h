@@ -234,7 +234,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
   /**
    * Sets the list of layer styles applied to the layer.
    */
-  void setLayerStyles(std::vector<std::shared_ptr<LayerStyle>> value);
+  void setLayerStyles(const std::vector<std::shared_ptr<LayerStyle>>& value);
 
   /**
    * Whether to exclude child effects in the layer style. If true, child layer
@@ -264,7 +264,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
   /**
    * Sets the list of filters applied to the layer.
    */
-  void setFilters(std::vector<std::shared_ptr<LayerFilter>> value);
+  void setFilters(const std::vector<std::shared_ptr<LayerFilter>>& value);
 
   /**
    * Returns the layer used as a mask for the calling layer. For masking to work (allowing scaling

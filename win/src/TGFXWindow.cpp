@@ -59,6 +59,11 @@ bool TGFXWindow::open() {
   centerAndShow();
   ShowWindow(windowHandle, SW_SHOW);
   UpdateWindow(windowHandle);
+  RECT rect = {};
+  GetClientRect(windowHandle, &rect);
+  lastSurfaceWidth = static_cast<int>(rect.right - rect.left);
+  lastSurfaceHeight = static_cast<int>(rect.bottom - rect.top);
+  updateZoomScaleAndOffset();
   updateLayerTree();
   ::InvalidateRect(windowHandle, nullptr, FALSE);
   return true;
@@ -102,9 +107,8 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
     case WM_SIZE: {
       RECT rect;
       GetClientRect(windowHandle, &rect);
-      auto pixelRatio = getPixelRatio();
-      lastSurfaceWidth = static_cast<int>((rect.right - rect.left) * pixelRatio);
-      lastSurfaceHeight = static_cast<int>((rect.bottom - rect.top) * pixelRatio);
+      lastSurfaceWidth = static_cast<int>(rect.right - rect.left);
+      lastSurfaceHeight = static_cast<int>(rect.bottom - rect.top);
       applyCenteringTransform();
       if (tgfxWindow) {
         tgfxWindow->invalidSize();
@@ -138,6 +142,8 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
     case WM_MOUSEWHEEL: {
       POINT mousePoint = {GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
       ScreenToClient(hwnd, &mousePoint);
+      float pixelX = static_cast<float>(mousePoint.x);
+      float pixelY = static_cast<float>(mousePoint.y);
       bool isCtrlPressed = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
       bool isShiftPressed = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
 
@@ -145,8 +151,8 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
         float zoomStep = std::exp(GET_WHEEL_DELTA_WPARAM(wparam) / WHEEL_RATIO);
         float newZoom = std::clamp(zoomScale * zoomStep, MIN_ZOOM, MAX_ZOOM);
         float oldZoom = zoomScale;
-        contentOffset.x = mousePoint.x - ((mousePoint.x - contentOffset.x) / oldZoom) * newZoom;
-        contentOffset.y = mousePoint.y - ((mousePoint.y - contentOffset.y) / oldZoom) * newZoom;
+        contentOffset.x = pixelX - ((pixelX - contentOffset.x) / oldZoom) * newZoom;
+        contentOffset.y = pixelY - ((pixelY - contentOffset.y) / oldZoom) * newZoom;
         zoomScale = newZoom;
       } else {
         float wheelDelta = static_cast<float>(GET_WHEEL_DELTA_WPARAM(wparam));
@@ -170,11 +176,13 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
             double zoomFactor = currentArgument / lastZoomArgument;
             POINT mousePoint = {GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
             ScreenToClient(hwnd, &mousePoint);
+            float pixelX = static_cast<float>(mousePoint.x);
+            float pixelY = static_cast<float>(mousePoint.y);
             float newZoom =
                 std::clamp(zoomScale * static_cast<float>(zoomFactor), MIN_ZOOM, MAX_ZOOM);
             float oldZoom = zoomScale;
-            contentOffset.x = mousePoint.x - ((mousePoint.x - contentOffset.x) / oldZoom) * newZoom;
-            contentOffset.y = mousePoint.y - ((mousePoint.y - contentOffset.y) / oldZoom) * newZoom;
+            contentOffset.x = pixelX - ((pixelX - contentOffset.x) / oldZoom) * newZoom;
+            contentOffset.y = pixelY - ((pixelY - contentOffset.y) / oldZoom) * newZoom;
             zoomScale = newZoom;
           }
           lastZoomArgument = currentArgument;

@@ -497,8 +497,12 @@ elseif (WIN32)
     list(APPEND TGFX_STATIC_LIBS ${ws2_32_LIB})
     find_library(DWrite_LIB DWrite)
     list(APPEND TGFX_STATIC_LIBS ${DWrite_LIB})
+    find_library(WindowsCodecs_LIB windowscodecs)
+    list(APPEND TGFX_STATIC_LIBS ${WindowsCodecs_LIB})
+    find_library(Ole32_LIB Ole32)
+    list(APPEND TGFX_STATIC_LIBS ${Ole32_LIB})
 
-    file(GLOB_RECURSE PLATFORM_FILES src/platform/mock/*.*)
+    file(GLOB_RECURSE PLATFORM_FILES src/platform/win/*.*)
     list(APPEND TGFX_FILES ${PLATFORM_FILES})
 
     if (TGFX_USE_NATIVE_GL)

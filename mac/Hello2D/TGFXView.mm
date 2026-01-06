@@ -171,9 +171,8 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
 
 - (void)applyCenteringTransform {
   if (lastSurfaceWidth > 0 && lastSurfaceHeight > 0 && contentLayer) {
-    hello2d::LayerBuilder::ApplyCenteringTransform(contentLayer,
-                                                   static_cast<float>(lastSurfaceWidth),
-                                                   static_cast<float>(lastSurfaceHeight));
+    hello2d::LayerBuilder::ApplyCenteringTransform(
+        contentLayer, static_cast<float>(lastSurfaceWidth), static_cast<float>(lastSurfaceHeight));
   }
 }
 

@@ -33,7 +33,7 @@ Rect PathContent::getBounds() const {
   auto bounds = onGetBounds();
   if (stroke) {
     // Path may contain sharp corners, so we need to apply miter limit to the bounds.
-    ApplyStrokeToBounds(*stroke, &bounds, true);
+    ApplyStrokeToBounds(*stroke, &bounds, Matrix::I(), true);
   }
   return bounds;
 }

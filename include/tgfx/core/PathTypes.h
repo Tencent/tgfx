@@ -53,6 +53,10 @@ enum class PathOp {
    */
   Append,
   /**
+   * Appended with a line connecting the end of the destination to the start of the source.
+   */
+  Extend,
+  /**
    * Subtract the op path from the destination path.
    */
   Difference,
