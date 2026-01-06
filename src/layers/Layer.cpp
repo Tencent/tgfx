@@ -689,8 +689,7 @@ Rect Layer::getBoundsInternal(const Matrix3D& coordinateMatrix, bool computeTigh
   // Non-leaf nodes in a 3D rendering context layer tree must preserve the 3D state of their
   // sublayers, and cannot reuse the localBounds cache that has been flattened to the layer's local
   // coordinate system.
-  if (computeTightBounds || bitFields.dirtyDescendents ||
-      (_transformStyle == TransformStyle::Preserve3D && canExtend3DContext())) {
+  if (computeTightBounds || bitFields.dirtyDescendents || canPreserve3D()) {
     return computeBounds(coordinateMatrix, computeTightBounds);
   }
   if (!localBounds) {
@@ -714,12 +713,12 @@ static Rect ComputeContentBounds(const LayerContent& content, const Matrix3D& co
 }
 
 Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBounds) {
-  bool canStart3DContext = _transformStyle == TransformStyle::Preserve3D && canExtend3DContext();
+  auto canPreserve3D = this->canPreserve3D();
   bool hasEffects = !_layerStyles.empty() || !_filters.empty();
-  // When starting a 3D context, the matrix must be passed down to preserve 3D state.
+  // When preserving 3D, the matrix must be passed down to preserve 3D state.
   // Otherwise, when has effects, compute in local coordinates first, then apply matrix at end.
   bool isAffine = IsMatrix3DAffine(coordinateMatrix);
-  bool applyMatrixAtEnd = !canStart3DContext && (hasEffects || !isAffine);
+  bool applyMatrixAtEnd = !canPreserve3D && (hasEffects || !isAffine);
 
   Rect bounds = {};
   if (auto content = getContent()) {
@@ -733,11 +732,7 @@ Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBou
       continue;
     }
     auto childMatrix = child->getMatrixWithScrollRect();
-    // Check if the child layer is within a 3D rendering context. If not, adapt the matrix to
-    // ensure the z-component of layer rect vertex coordinates remains unchanged, so the child layer
-    // is projected onto the current layer first, then the accumulated matrix transformation is
-    // applied. If within, directly concatenate the child layer matrix to preserve its 3D state.
-    if (_transformStyle == TransformStyle::Flat || !canExtend3DContext()) {
+    if (!canPreserve3D) {
       childMatrix.setRow(2, {0, 0, 1, 0});
     }
     childMatrix.postConcat(applyMatrixAtEnd ? Matrix3D::I() : coordinateMatrix);
@@ -761,7 +756,7 @@ Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBou
 
   if (hasEffects) {
     // Filters and styles disable 3D context ability, so this block is unreachable for 3D context.
-    DEBUG_ASSERT(!canStart3DContext);
+    DEBUG_ASSERT(!canPreserve3D);
     auto layerBounds = bounds;
     for (auto& layerStyle : _layerStyles) {
       auto styleBounds = layerStyle->filterBounds(layerBounds, 1.0f);
@@ -960,7 +955,7 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
 
   // Check if the current layer needs to start a 3D context. Since Layer::draw is called directly
   // without going through a parent layer's drawChildren, 3D context handling must be done here.
-  if (_transformStyle == TransformStyle::Preserve3D && canExtend3DContext()) {
+  if (canPreserve3D()) {
     drawByStarting3DContext(args, canvas, alpha);
   } else {
     drawLayer(args, canvas, alpha, blendMode, nullptr);
@@ -1064,7 +1059,7 @@ Matrix3D Layer::getGlobalMatrix() const {
     // ensure the z-component of layer rect vertex coordinates remains unchanged, so the child layer
     // is projected onto the current layer first, then the accumulated matrix transformation is
     // applied. If within, directly concatenate the child layer matrix to preserve its 3D state.
-    if (layer->_transformStyle == TransformStyle::Flat || !layer->canExtend3DContext()) {
+    if (!layer->canPreserve3D()) {
       matrix.setRow(2, {0, 0, 1, 0});
     }
     matrix.postConcat(layer->getMatrixWithScrollRect());
@@ -1140,7 +1135,7 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
   // Offscreen constraints (filters, styles, masks) are already checked by the parent layer at call
   // site. Group opacity, blend mode, and passThroughBackground have lower priority than enabling
   // 3D rendering context and are ignored during drawing.
-  if (_transformStyle == TransformStyle::Flat || !canExtend3DContext()) {
+  if (!canPreserve3D()) {
     needsOffscreen = blendMode != BlendMode::SrcOver || !bitFields.passThroughBackground ||
                      (alpha < 1.0f && bitFields.allowsGroupOpacity) ||
                      (!_filters.empty() && !args.excludeEffects) || needsMaskFilter ||
@@ -1197,13 +1192,12 @@ bool Layer::prepareMask(const DrawArgs& args, Canvas* canvas,
 MaskData Layer::getMaskData(const DrawArgs& args, float scale,
                             const std::optional<Rect>& layerClipBounds) {
   DEBUG_ASSERT(_mask != nullptr);
+  DEBUG_ASSERT(args.render3DContext == nullptr);
   auto maskType = static_cast<LayerMaskType>(bitFields.maskType);
   auto maskArgs = args;
   maskArgs.drawMode = maskType != LayerMaskType::Contour ? DrawMode::Normal : DrawMode::Contour;
   maskArgs.excludeEffects |= maskType == LayerMaskType::Contour;
   maskArgs.blurBackground = nullptr;
-  // Mask content should be rendered to a regular texture, not to 3D compositor.
-  maskArgs.render3DContext = nullptr;
 
   auto relativeMatrix = _mask->getRelativeMatrix(this);
   auto isMatrixAffine = IsMatrix3DAffine(relativeMatrix);
@@ -1214,7 +1208,11 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
   // errors when extracting maskPath from the picture, resulting in incorrect clip regions.
   auto maskPicture = RecordPicture(maskArgs.drawMode, scale, [&](Canvas* canvas) {
     canvas->concat(affineRelativeMatrix);
-    _mask->drawLayer(maskArgs, canvas, _mask->_alpha, BlendMode::SrcOver);
+    if (_mask->canPreserve3D()) {
+      _mask->drawByStarting3DContext(maskArgs, canvas, _mask->_alpha);
+    } else {
+      _mask->drawLayer(maskArgs, canvas, _mask->_alpha, BlendMode::SrcOver);
+    }
   });
   if (maskPicture == nullptr) {
     return {};
@@ -1382,7 +1380,7 @@ bool Layer::shouldPassThroughBackground(BlendMode blendMode, const Matrix3D* tra
   // 4. Layer does not start or extend a 3D context
   // (When starting or extending a 3D context, child layers need to maintain independent 3D states,
   // so pass-through background is not supported)
-  if (_transformStyle == TransformStyle::Preserve3D && canExtend3DContext()) {
+  if (canPreserve3D()) {
     return false;
   }
 
@@ -1393,7 +1391,7 @@ bool Layer::canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode,
                                const Matrix3D* transform3D) {
   // If the layer can start or extend a 3D rendering context, child layers need to maintain
   // independent 3D states, so subtree caching is not supported.
-  if (_transformStyle == TransformStyle::Preserve3D && canExtend3DContext()) {
+  if (canPreserve3D()) {
     return false;
   }
   // The cache stores Normal mode content. Since layers with BackgroundStyle are excluded from
@@ -1512,7 +1510,7 @@ bool Layer::drawWithSubtreeCache(const DrawArgs& args, Canvas* canvas, float alp
                                  BlendMode blendMode, const Matrix3D* transform3D,
                                  const std::shared_ptr<MaskFilter>& maskFilter) {
   // Non-leaf nodes in 3D rendering context layer tree have caching disabled.
-  DEBUG_ASSERT(_transformStyle == TransformStyle::Flat || !canExtend3DContext());
+  DEBUG_ASSERT(!canPreserve3D());
   auto layerBounds = getBounds();
   auto contentScale = canvas->getMatrix().getMaxScale();
   auto longEdge = GetMipmapCacheLongEdge(args.subtreeCacheMaxSize, contentScale, layerBounds);
@@ -1540,7 +1538,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
                           const std::shared_ptr<MaskFilter>& maskFilter) {
   // Non-leaf layers in a 3D rendering context layer tree never require offscreen rendering.
   DEBUG_ASSERT(args.render3DContext == nullptr);
-  DEBUG_ASSERT(_transformStyle == TransformStyle::Flat || !canExtend3DContext());
+  DEBUG_ASSERT(!canPreserve3D());
   if (transform3D != nullptr &&
       args.styleSourceTypes.count(LayerStyleExtraSourceType::Background) > 0) {
     drawBackgroundLayerStyles(args, canvas, alpha, *transform3D);
@@ -1735,10 +1733,9 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, cons
     // treat its Matrix as an identity matrix here, and let the sublayer handle its actual position
     // through 3D filter methods,
     const bool isChildMatrixAffine = IsMatrix3DAffine(childMatrix);
-    auto childAffineMatrix =
-        (isChildMatrixAffine && (_transformStyle == TransformStyle::Flat || !canExtend3DContext()))
-            ? GetMayLossyAffineMatrix(childMatrix)
-            : Matrix::I();
+    auto childAffineMatrix = (isChildMatrixAffine && !canPreserve3D())
+                                 ? GetMayLossyAffineMatrix(childMatrix)
+                                 : Matrix::I();
     canvas->concat(childAffineMatrix);
     auto clipChildScrollRectHandler = [&](Canvas& clipCanvas) {
       if (child->_scrollRect) {
@@ -1777,8 +1774,7 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, cons
         continue;
       }
       child->drawIn3DContext(childArgs, canvas, child->_alpha * alpha, childTransform);
-    } else if (child->_transformStyle == TransformStyle::Preserve3D &&
-               child->canExtend3DContext()) {
+    } else if (child->canPreserve3D()) {
       DEBUG_ASSERT(transform3D == nullptr);
       if (IsTransformedLayerRectBehindCamera(child->getBounds(), childMatrix)) {
         continue;
@@ -1874,7 +1870,7 @@ void Layer::drawIn3DContext(const DrawArgs& args, Canvas* canvas, float alpha,
   auto offscreenCanvas = recorder.beginRecording();
   offscreenCanvas->scale(contentScale, contentScale);
 
-  if (transformStyle() == TransformStyle::Preserve3D && canExtend3DContext()) {
+  if (canPreserve3D()) {
     drawLayer(args, offscreenCanvas, 1.0f, BlendMode::SrcOver, &transform3D);
   } else {
     // If the layer cannot extend the 3D rendering context, child layers do not need to create new
@@ -2260,7 +2256,7 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> contextTransfo
   if (!_layerStyles.empty() || !_filters.empty()) {
     // Filters and styles interrupt 3D rendering context, so non-root layers inside 3D rendering
     // context can ignore parent filters and styles when calculating dirty regions.
-    DEBUG_ASSERT(_transformStyle == TransformStyle::Flat || !canExtend3DContext());
+    DEBUG_ASSERT(!canPreserve3D());
     if (contextTransformer) {
       contentScale = contextTransformer->getMaxScale();
     }
@@ -2302,9 +2298,7 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> contextTransfo
       continue;
     }
     auto childMatrix = child->getMatrixWithScrollRect();
-    bool childIn3DContext =
-        localToContext3D != nullptr ||
-        (child->_transformStyle == TransformStyle::Preserve3D && child->canExtend3DContext());
+    bool childIn3DContext = localToContext3D != nullptr || child->canPreserve3D();
     std::shared_ptr<RegionTransformer> childTransformer = nullptr;
     // Ensure the 3D filter is not released during the entire function lifetime.
     std::vector<std::shared_ptr<LayerFilter>> child3DFilterVector = {};
@@ -2456,8 +2450,9 @@ std::shared_ptr<BackgroundContext> Layer::createBackgroundContext(
                                  minBackgroundOutset * scale, viewMatrix, colorSpace);
 }
 
-bool Layer::canExtend3DContext() const {
-  return _filters.empty() && _layerStyles.empty() && !hasValidMask();
+bool Layer::canPreserve3D() const {
+  return _transformStyle == TransformStyle::Preserve3D && _filters.empty() &&
+         _layerStyles.empty() && !hasValidMask();
 }
 
 void Layer::invalidateSubtree() {

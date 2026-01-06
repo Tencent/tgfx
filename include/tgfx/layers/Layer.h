@@ -717,7 +717,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::optional<Rect> computeContentBounds(const std::optional<Rect>& clipBounds,
                                            bool excludeEffects);
 
-  bool canExtend3DContext() const;
+  bool canPreserve3D() const;
 
   void invalidateSubtree();
 
