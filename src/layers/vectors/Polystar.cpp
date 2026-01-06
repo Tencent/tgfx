@@ -137,10 +137,10 @@ static void ConvertPolygonToPath(Path* path, float centerX, float centerY, float
 
 class PolystarPathProvider final : public PathProvider {
  public:
-  PolystarPathProvider(Point position, PolystarType polystarType, float points, float rotation,
+  PolystarPathProvider(Point center, PolystarType polystarType, float pointCount, float rotation,
                        float outerRadius, float outerRoundness, float innerRadius,
                        float innerRoundness, bool reversed)
-      : _position(position), _polystarType(polystarType), _points(points), _rotation(rotation),
+      : _center(center), _polystarType(polystarType), _pointCount(pointCount), _rotation(rotation),
         _outerRadius(outerRadius), _outerRoundness(outerRoundness), _innerRadius(innerRadius),
         _innerRoundness(innerRoundness), _reversed(reversed) {
   }
@@ -148,10 +148,10 @@ class PolystarPathProvider final : public PathProvider {
   Path getPath() const override {
     Path path;
     if (_polystarType == PolystarType::Star) {
-      ConvertStarToPath(&path, _position.x, _position.y, _points, _rotation, _innerRadius,
+      ConvertStarToPath(&path, _center.x, _center.y, _pointCount, _rotation, _innerRadius,
                         _outerRadius, _innerRoundness, _outerRoundness, _reversed);
     } else {
-      ConvertPolygonToPath(&path, _position.x, _position.y, _points, _rotation, _outerRadius,
+      ConvertPolygonToPath(&path, _center.x, _center.y, _pointCount, _rotation, _outerRadius,
                            _outerRoundness, _reversed);
     }
     return path;
@@ -159,13 +159,13 @@ class PolystarPathProvider final : public PathProvider {
 
   Rect getBounds() const override {
     auto radius = _outerRadius;
-    return Rect::MakeXYWH(_position.x - radius, _position.y - radius, radius * 2, radius * 2);
+    return Rect::MakeXYWH(_center.x - radius, _center.y - radius, radius * 2, radius * 2);
   }
 
  private:
-  Point _position = Point::Zero();
+  Point _center = Point::Zero();
   PolystarType _polystarType = PolystarType::Star;
-  float _points = 5.0f;
+  float _pointCount = 5.0f;
   float _rotation = 0.0f;
   float _outerRadius = 100.0f;
   float _outerRoundness = 0.0f;
@@ -174,11 +174,11 @@ class PolystarPathProvider final : public PathProvider {
   bool _reversed = false;
 };
 
-void Polystar::setPosition(const Point& value) {
-  if (_position == value) {
+void Polystar::setCenter(const Point& value) {
+  if (_center == value) {
     return;
   }
-  _position = value;
+  _center = value;
   _cachedShape = nullptr;
   invalidateContent();
 }
@@ -192,11 +192,11 @@ void Polystar::setPolystarType(PolystarType value) {
   invalidateContent();
 }
 
-void Polystar::setPoints(float value) {
-  if (_points == value) {
+void Polystar::setPointCount(float value) {
+  if (_pointCount == value) {
     return;
   }
-  _points = value;
+  _pointCount = value;
   _cachedShape = nullptr;
   invalidateContent();
 }
@@ -258,7 +258,7 @@ void Polystar::setReversed(bool value) {
 void Polystar::apply(VectorContext* context) {
   if (_cachedShape == nullptr) {
     auto pathProvider = std::make_shared<PolystarPathProvider>(
-        _position, _polystarType, _points, _rotation, _outerRadius, _outerRoundness, _innerRadius,
+        _center, _polystarType, _pointCount, _rotation, _outerRadius, _outerRoundness, _innerRadius,
         _innerRoundness, _reversed);
     _cachedShape = Shape::MakeFrom(std::move(pathProvider));
   }
