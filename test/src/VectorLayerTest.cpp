@@ -67,7 +67,7 @@ TGFX_TEST(VectorLayerTest, BasicShapes) {
   // Group 1: Rectangle with red fill and roundness
   auto group1 = std::make_shared<VectorGroup>();
   auto rect = std::make_shared<Rectangle>();
-  rect->setPosition({130, 130});
+  rect->setCenter({130, 130});
   rect->setSize({160, 160});
   rect->setRoundness(20);
   auto redFill = MakeFillStyle(Color::Red());
@@ -76,7 +76,7 @@ TGFX_TEST(VectorLayerTest, BasicShapes) {
   // Group 2: Ellipse with blue stroke
   auto group2 = std::make_shared<VectorGroup>();
   auto ellipse = std::make_shared<Ellipse>();
-  ellipse->setPosition({330, 130});
+  ellipse->setCenter({330, 130});
   ellipse->setSize({160, 120});
   auto blueStroke = MakeStrokeStyle(Color::Blue(), 8.0f);
   group2->setElements({ellipse, blueStroke});
@@ -98,9 +98,9 @@ TGFX_TEST(VectorLayerTest, BasicShapes) {
   // Group 4: Star with yellow fill and roundness
   auto group4 = std::make_shared<VectorGroup>();
   auto star = std::make_shared<Polystar>();
-  star->setPosition({130, 330});
+  star->setCenter({130, 330});
   star->setPolystarType(PolystarType::Star);
-  star->setPoints(5);
+  star->setPointCount(5);
   star->setOuterRadius(80);
   star->setInnerRadius(40);
   star->setOuterRoundness(0.5f);
@@ -111,9 +111,9 @@ TGFX_TEST(VectorLayerTest, BasicShapes) {
   // Group 5: Six-pointed star without roundness for comparison
   auto group5 = std::make_shared<VectorGroup>();
   auto starSharp = std::make_shared<Polystar>();
-  starSharp->setPosition({310, 330});
+  starSharp->setCenter({310, 330});
   starSharp->setPolystarType(PolystarType::Star);
-  starSharp->setPoints(6);
+  starSharp->setPointCount(6);
   starSharp->setOuterRadius(80);
   starSharp->setInnerRadius(40);
   auto orangeFill = MakeFillStyle(Color::FromRGBA(255, 128, 0, 255));
@@ -122,9 +122,9 @@ TGFX_TEST(VectorLayerTest, BasicShapes) {
   // Group 6: Hexagon with purple stroke and roundness
   auto group6 = std::make_shared<VectorGroup>();
   auto polygon = std::make_shared<Polystar>();
-  polygon->setPosition({530, 330});
+  polygon->setCenter({530, 330});
   polygon->setPolystarType(PolystarType::Polygon);
-  polygon->setPoints(6);
+  polygon->setPointCount(6);
   polygon->setOuterRadius(80);
   polygon->setOuterRoundness(0.5f);
   auto purpleStroke = MakeStrokeStyle(Color::FromRGBA(128, 0, 128, 255), 6.0f);
@@ -161,7 +161,7 @@ TGFX_TEST(VectorLayerTest, TrimPath) {
   rect1->setSize({100, 200});
 
   auto ellipse1 = std::make_shared<Ellipse>();
-  ellipse1->setPosition({110, 0});
+  ellipse1->setCenter({110, 0});
   ellipse1->setSize({100, 200});
 
   auto trim1 = std::make_shared<TrimPath>();
@@ -180,7 +180,7 @@ TGFX_TEST(VectorLayerTest, TrimPath) {
   rect2->setSize({100, 200});
 
   auto ellipse2 = std::make_shared<Ellipse>();
-  ellipse2->setPosition({110, 0});
+  ellipse2->setCenter({110, 0});
   ellipse2->setSize({100, 200});
 
   auto trim2 = std::make_shared<TrimPath>();
@@ -318,7 +318,7 @@ TGFX_TEST(VectorLayerTest, MergePath) {
   rect1a->setSize({160, 160});
 
   auto rect1b = std::make_shared<Rectangle>();
-  rect1b->setPosition({60, 40});
+  rect1b->setCenter({60, 40});
   rect1b->setSize({160, 160});
 
   auto fill1 = MakeFillStyle(Color::FromRGBA(255, 0, 0, 128));
@@ -332,7 +332,7 @@ TGFX_TEST(VectorLayerTest, MergePath) {
   rect2a->setSize({160, 160});
 
   auto rect2b = std::make_shared<Rectangle>();
-  rect2b->setPosition({60, 40});
+  rect2b->setCenter({60, 40});
   rect2b->setSize({160, 160});
 
   auto merge = std::make_shared<MergePath>();
@@ -365,7 +365,7 @@ TGFX_TEST(VectorLayerTest, MergePathClearsPainters) {
   auto vectorLayer = VectorLayer::Make();
 
   auto rect = std::make_shared<Rectangle>();
-  rect->setPosition({150, 150});
+  rect->setCenter({150, 150});
   rect->setSize({200, 200});
 
   // This fill should be cleared by MergePath
@@ -663,7 +663,7 @@ TGFX_TEST(VectorLayerTest, MultipleFillsAndStrokes) {
   auto vectorLayer = VectorLayer::Make();
 
   auto rect = std::make_shared<Rectangle>();
-  rect->setPosition({180, 180});
+  rect->setCenter({180, 180});
   rect->setSize({240, 240});
 
   // First fill (bottom)
@@ -930,11 +930,11 @@ TGFX_TEST(VectorLayerTest, TrimPathReversedWrapAround) {
   group4->setPosition({448, 80});
 
   auto rect4a = std::make_shared<Rectangle>();
-  rect4a->setPosition({-30, 0});
+  rect4a->setCenter({-30, 0});
   rect4a->setSize({60, 120});
 
   auto rect4b = std::make_shared<Rectangle>();
-  rect4b->setPosition({30, 0});
+  rect4b->setCenter({30, 0});
   rect4b->setSize({60, 120});
 
   auto trim4 = std::make_shared<TrimPath>();
@@ -1312,7 +1312,7 @@ TGFX_TEST(VectorLayerTest, MergePathOps) {
     rect->setSize({80, 80});
 
     auto ellipse = std::make_shared<Ellipse>();
-    ellipse->setPosition({40, 0});
+    ellipse->setCenter({40, 0});
     ellipse->setSize({80, 80});
 
     return std::make_tuple(group, rect, ellipse);
@@ -1568,7 +1568,7 @@ TGFX_TEST(VectorLayerTest, PolystarRotation) {
 
   auto star1 = std::make_shared<Polystar>();
   star1->setPolystarType(PolystarType::Star);
-  star1->setPoints(5);
+  star1->setPointCount(5);
   star1->setOuterRadius(60);
   star1->setInnerRadius(30);
   star1->setRotation(0.0f);
@@ -1582,7 +1582,7 @@ TGFX_TEST(VectorLayerTest, PolystarRotation) {
 
   auto star2 = std::make_shared<Polystar>();
   star2->setPolystarType(PolystarType::Star);
-  star2->setPoints(5);
+  star2->setPointCount(5);
   star2->setOuterRadius(60);
   star2->setInnerRadius(30);
   star2->setRotation(-90.0f);  // Rotate to point up
@@ -1596,7 +1596,7 @@ TGFX_TEST(VectorLayerTest, PolystarRotation) {
 
   auto polygon3 = std::make_shared<Polystar>();
   polygon3->setPolystarType(PolystarType::Polygon);
-  polygon3->setPoints(6);
+  polygon3->setPointCount(6);
   polygon3->setOuterRadius(60);
   polygon3->setRotation(30.0f);  // Rotate hexagon
 

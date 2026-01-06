@@ -21,11 +21,11 @@
 
 namespace tgfx {
 
-void Rectangle::setPosition(const Point& value) {
-  if (_position == value) {
+void Rectangle::setCenter(const Point& value) {
+  if (_center == value) {
     return;
   }
-  _position = value;
+  _center = value;
   _cachedShape = nullptr;
   invalidateContent();
 }
@@ -68,7 +68,7 @@ void Rectangle::apply(VectorContext* context) {
     if (radius > halfHeight) {
       radius = halfHeight;
     }
-    auto rect = Rect::MakeXYWH(_position.x - halfWidth, _position.y - halfHeight, _size.x, _size.y);
+    auto rect = Rect::MakeXYWH(_center.x - halfWidth, _center.y - halfHeight, _size.x, _size.y);
     Path path;
     path.addRoundRect(rect, radius, radius, _reversed, 2);
     _cachedShape = Shape::MakeFrom(path);
