@@ -138,6 +138,7 @@ GLCaps::GLCaps(const GLInfo& info) {
       break;
     case GLStandard::WebGL:
       if (version < GL_VER(2, 0)) {
+        ::tgfx::PrintError("WebGL version: %d", version);
         ABORT("Fatal error: WebGL versions below 2.0 are not supported!");
       }
       initWebGLSupport(info);
