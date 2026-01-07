@@ -20,7 +20,7 @@
 
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/PathTypes.h"
-#include "tgfx/layers/ColorSource.h"
+#include "tgfx/layers/vectors/ColorSource.h"
 #include "tgfx/layers/vectors/VectorElement.h"
 
 namespace tgfx {

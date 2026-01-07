@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/layers/SolidColor.h"
+#include "tgfx/layers/vectors/SolidColor.h"
 
 namespace tgfx {
 std::shared_ptr<SolidColor> SolidColor::Make(const Color& color) {
