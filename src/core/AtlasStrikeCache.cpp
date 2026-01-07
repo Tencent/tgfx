@@ -20,30 +20,90 @@
 #include "AtlasTypes.h"
 
 namespace tgfx {
-AtlasStrike::AtlasStrike(const BytesKey& key) : key(key) {
+AtlasStrike::AtlasStrike(AtlasStrikeCache* strikeCache, const BytesKey& key)
+    : strikeCache(strikeCache), key(key) {
+
 }
 
 AtlasGlyph* AtlasStrike::getGlyph(GlyphID glyphID) {
   if (const auto iter = glyphMap.find(glyphID); iter != glyphMap.end()) {
     return iter->second;
   }
+
   auto* memory = allocator.allocate(sizeof(AtlasGlyph));
   auto* glyph = new (memory) AtlasGlyph();
   glyphMap.emplace(glyphID, glyph);
+  memoryUsed += sizeof(AtlasGlyph);
+  strikeCache->totalMemoryUsed += sizeof(AtlasGlyph);
   return glyph;
 }
 
 void AtlasStrikeCache::releaseAll() {
   strikes.clear();
+  lruList.clear();
+  lruMap.clear();
+  totalMemoryUsed = 0;
 }
 
 std::shared_ptr<AtlasStrike> AtlasStrikeCache::findOrCreateStrike(const BytesKey& key) {
-  if (const auto iter = strikes.find(key); iter != strikes.end()) {
-    return iter->second;
+  auto strike = findStrikeOrNull(key);
+  if (strike == nullptr) {
+    strike = createStrike(key);
   }
-  auto strike = std::make_shared<AtlasStrike>(key);
-  strikes.emplace(key, strike);
+  purgeIfNeeded();
   return strike;
 }
 
+void AtlasStrikeCache::markStrikeAsRecentlyUsed(const BytesKey& key) {
+  auto iter = lruMap.find(key);
+  if (iter == lruMap.end()) {
+    return;
+  }
+  lruList.splice(lruList.begin(), lruList, iter->second);
+}
+
+void AtlasStrikeCache::purgeOldestStrike() {
+  if (lruList.empty()) {
+    return;
+  }
+  const auto& strike = lruList.back();
+  const auto& key = strike->getKey();
+  totalMemoryUsed -= strike->memoryUsed;
+  strikes.erase(key);
+  lruMap.erase(key);
+  lruList.pop_back();
+}
+
+void AtlasStrikeCache::purgeIfNeeded() {
+  if (totalMemoryUsed < MemorySizeLimit && strikes.size() < StrikeCountLimit) {
+    return;
+  }
+
+  const auto bytesNeeded = totalMemoryUsed >= MemorySizeLimit ? MemorySizeLimit >> 2 : 0;
+  const auto countNeeded = strikes.size() >= StrikeCountLimit ? StrikeCountLimit >> 2 : 0;
+  size_t bytesFreed = 0;
+  size_t countFreed = 0;
+  while (!lruList.empty() && (bytesFreed < bytesNeeded || countFreed < countNeeded)) {
+    const auto& strike = lruList.back();
+    bytesFreed += strike->memoryUsed;
+    countFreed++;
+    purgeOldestStrike();
+  }
+}
+
+std::shared_ptr<AtlasStrike> AtlasStrikeCache::findStrikeOrNull(const BytesKey& key) {
+  if (const auto iter = strikes.find(key); iter != strikes.end()) {
+    markStrikeAsRecentlyUsed(key);
+    return iter->second;
+  }
+  return nullptr;
+}
+
+std::shared_ptr<AtlasStrike> AtlasStrikeCache::createStrike(const BytesKey& key) {
+  auto strike = std::make_shared<AtlasStrike>(this, key);
+  strikes.emplace(key, strike);
+  lruList.push_front(strike);
+  lruMap.emplace(key, lruList.begin());
+  return strike;
+}
 }  // namespace tgfx
