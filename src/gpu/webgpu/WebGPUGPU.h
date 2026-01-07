@@ -28,7 +28,12 @@ class WebGPUCommandQueue;
 
 class WebGPUGPU : public GPU {
  public:
-  WebGPUGPU(wgpu::Adapter adapter, wgpu::Device device, std::shared_ptr<WebGPUCaps> caps);
+  WebGPUGPU(wgpu::Instance instance, wgpu::Adapter adapter, wgpu::Device device,
+            std::shared_ptr<WebGPUCaps> caps);
+
+  wgpu::Instance wgpuInstance() const {
+    return _instance;
+  }
 
   wgpu::Adapter wgpuAdapter() const {
     return _adapter;
@@ -105,6 +110,7 @@ class WebGPUGPU : public GPU {
 
  private:
   void initMipmapResources();
+  wgpu::Instance _instance = nullptr;
   wgpu::Adapter _adapter = nullptr;
   wgpu::Device _device = nullptr;
   wgpu::Queue _queue = nullptr;

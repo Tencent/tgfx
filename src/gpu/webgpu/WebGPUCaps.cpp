@@ -56,8 +56,16 @@ WebGPUCaps::WebGPUCaps(const wgpu::Adapter& adapter, const wgpu::Device& device)
   wgpu::AdapterInfo adapterInfo = {};
   adapter.GetInfo(&adapterInfo);
   _info.vendor = ToStdString(adapterInfo.vendor);
+  // Use architecture as fallback when device is empty (common in browser WebGPU).
   _info.renderer = ToStdString(adapterInfo.device);
+  if (_info.renderer.empty()) {
+    _info.renderer = ToStdString(adapterInfo.architecture);
+  }
+  // Construct version string when description is empty (common in browser WebGPU).
   _info.version = ToStdString(adapterInfo.description);
+  if (_info.version.empty() && !_info.vendor.empty()) {
+    _info.version = "WebGPU (" + _info.vendor + ")";
+  }
 
   auto featureCount = adapter.EnumerateFeatures(nullptr);
   if (featureCount > 0) {

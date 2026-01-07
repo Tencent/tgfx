@@ -30,16 +30,53 @@ namespace tgfx {
 class WebGPUDevice : public Device {
  public:
   /**
-   * Creates a WebGLDevice from the id of an existing HTMLCanvasElement.
+   * Creates a WebGPUDevice from the id of an existing HTMLCanvasElement. Note that the WebGPU
+   * device initialization is asynchronous. The returned device may not be ready immediately.
+   * Calling lockContext() before the device is ready will return nullptr.
+   * @param canvasID The id of the HTMLCanvasElement, e.g. "#canvas".
+   * @param colorSpace The color space for rendering. If nullptr, defaults to sRGB.
+   * @return A shared pointer to the WebGPUDevice, or nullptr if canvasID is empty.
    */
   static std::shared_ptr<WebGPUDevice> MakeFrom(const std::string& canvasID,
                                                 std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
+  /**
+   * Returns the wgpu::Surface associated with the canvas. Returns nullptr if the surface has not
+   * been configured yet.
+   */
+  wgpu::Surface wgpuSurface() const {
+    return surface;
+  }
+
+  /**
+   * Returns the texture format of the surface.
+   */
+  wgpu::TextureFormat surfaceFormat() const {
+    return textureFormat;
+  }
+
+  /**
+   * Configures the surface with the given size. This should be called when the canvas size
+   * changes. Returns true if the surface was reconfigured, false if the size is unchanged.
+   * @param width The width of the surface in pixels.
+   * @param height The height of the surface in pixels.
+   */
+  bool configureSurface(int width, int height);
+
+ protected:
+  bool onLockContext() override;
+  void onUnlockContext() override;
+
  private:
-  WebGPUDevice();
+  explicit WebGPUDevice(const std::string& canvasID);
 
   void requestAdapter();
 
+  std::string canvasID;
+  int surfaceWidth = 0;
+  int surfaceHeight = 0;
   wgpu::Instance instance = nullptr;
+  wgpu::Surface surface = nullptr;
+  wgpu::TextureFormat textureFormat = wgpu::TextureFormat::BGRA8Unorm;
 };
 }  // namespace tgfx

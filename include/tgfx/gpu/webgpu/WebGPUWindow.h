@@ -31,8 +31,7 @@ class WebGPUWindow : public Window {
  protected:
   std::shared_ptr<Surface> onCreateSurface(Context* context) override;
 
-  void onPresent(Context*) override {
-  }
+  void onPresent(Context* context) override;
 
  private:
   std::string canvasID;

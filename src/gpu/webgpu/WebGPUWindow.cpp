@@ -19,6 +19,7 @@
 #include "tgfx/gpu/webgpu/WebGPUWindow.h"
 #include <emscripten.h>
 #include "core/utils/Log.h"
+#include "gpu/webgpu/WebGPUGPU.h"
 #include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
 
 namespace tgfx {
@@ -47,9 +48,51 @@ WebGPUWindow::WebGPUWindow(std::shared_ptr<Device> device, std::shared_ptr<Color
     : Window(std::move(device)), colorSpace(std::move(colorSpace)) {
 }
 
-std::shared_ptr<Surface> WebGPUWindow::onCreateSurface(Context* /*context*/) {
+std::shared_ptr<Surface> WebGPUWindow::onCreateSurface(Context* context) {
+  auto webgpuDevice = std::static_pointer_cast<WebGPUDevice>(device);
+  auto wgpuSurface = webgpuDevice->wgpuSurface();
+  if (wgpuSurface == nullptr) {
+    return nullptr;
+  }
 
-  return nullptr;
+  // Get canvas size and configure surface if size changed
+  int width = 0;
+  int height = 0;
+  emscripten_get_canvas_element_size(canvasID.c_str(), &width, &height);
+  if (width <= 0 || height <= 0) {
+    LOGE("WebGPUWindow::onCreateSurface() invalid canvas size: %dx%d", width, height);
+    return nullptr;
+  }
+  webgpuDevice->configureSurface(width, height);
+
+  // Get current texture from surface
+  wgpu::SurfaceTexture surfaceTexture = {};
+  wgpuSurface.GetCurrentTexture(&surfaceTexture);
+  if (surfaceTexture.status != wgpu::SurfaceGetCurrentTextureStatus::Success) {
+    LOGE("WebGPUWindow::onCreateSurface() failed to get current texture, status: %d",
+         static_cast<int>(surfaceTexture.status));
+    return nullptr;
+  }
+  if (surfaceTexture.texture == nullptr) {
+    LOGE("WebGPUWindow::onCreateSurface() surface texture is null");
+    return nullptr;
+  }
+
+  // Wrap texture into BackendRenderTarget
+  WebGPUTextureInfo textureInfo = {};
+  textureInfo.texture = surfaceTexture.texture.Get();
+  textureInfo.format = static_cast<unsigned>(webgpuDevice->surfaceFormat());
+
+  BackendRenderTarget renderTarget(textureInfo, width, height);
+  return Surface::MakeFrom(context, renderTarget, ImageOrigin::TopLeft, 0, colorSpace);
+}
+
+void WebGPUWindow::onPresent(Context*) {
+  auto webgpuDevice = std::static_pointer_cast<WebGPUDevice>(device);
+  auto wgpuSurface = webgpuDevice->wgpuSurface();
+  if (wgpuSurface != nullptr) {
+    wgpuSurface.Present();
+  }
 }
 
 }  // namespace tgfx

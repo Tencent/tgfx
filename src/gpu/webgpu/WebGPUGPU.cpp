@@ -46,8 +46,10 @@ static wgpu::BufferUsage GetWebGPUBufferUsage(uint32_t usage) {
   return wgpuUsage;
 }
 
-WebGPUGPU::WebGPUGPU(wgpu::Adapter adapter, wgpu::Device device, std::shared_ptr<WebGPUCaps> caps)
-    : _adapter(adapter), _device(device), _queue(device.GetQueue()), webGPUCaps(std::move(caps)) {
+WebGPUGPU::WebGPUGPU(wgpu::Instance instance, wgpu::Adapter adapter, wgpu::Device device,
+                     std::shared_ptr<WebGPUCaps> caps)
+    : _instance(instance), _adapter(adapter), _device(device), _queue(device.GetQueue()),
+      webGPUCaps(std::move(caps)) {
   commandQueue = std::make_unique<WebGPUCommandQueue>(this);
 }
 
