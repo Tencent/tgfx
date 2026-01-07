@@ -68,8 +68,6 @@ class AtlasStrike {
 
 class AtlasStrikeCache {
  public:
-  ~AtlasStrikeCache();
-
   std::shared_ptr<AtlasStrike> findOrCreateStrike(const BytesKey& key);
 
   void releaseAll();

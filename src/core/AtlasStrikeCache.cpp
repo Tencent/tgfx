@@ -33,10 +33,6 @@ AtlasGlyph* AtlasStrike::getGlyph(GlyphID glyphID) {
   return glyph;
 }
 
-AtlasStrikeCache::~AtlasStrikeCache() {
-  releaseAll();
-}
-
 void AtlasStrikeCache::releaseAll() {
   strikes.clear();
 }
