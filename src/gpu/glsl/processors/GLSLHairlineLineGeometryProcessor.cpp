@@ -17,20 +17,23 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLHairlineLineGeometryProcessor.h"
+#include "gpu/AAType.h"
 
 namespace tgfx {
 
 PlacementPtr<HairlineLineGeometryProcessor> HairlineLineGeometryProcessor::Make(
     BlockAllocator* allocator, const PMColor& color, const Matrix& viewMatrix,
-    std::optional<Matrix> uvMatrix, uint8_t coverage) {
-  return allocator->make<GLSLHairlineLineGeometryProcessor>(color, viewMatrix, uvMatrix, coverage);
+    std::optional<Matrix> uvMatrix, float coverage, AAType aaType) {
+  return allocator->make<GLSLHairlineLineGeometryProcessor>(color, viewMatrix, uvMatrix, coverage,
+                                                            aaType);
 }
 
 GLSLHairlineLineGeometryProcessor::GLSLHairlineLineGeometryProcessor(const PMColor& color,
                                                                      const Matrix& viewMatrix,
                                                                      std::optional<Matrix> uvMatrix,
-                                                                     uint8_t coverage)
-    : HairlineLineGeometryProcessor(color, viewMatrix, uvMatrix, coverage) {
+                                                                     float coverage,
+                                                                     AAType aaType)
+    : HairlineLineGeometryProcessor(color, viewMatrix, uvMatrix, coverage, aaType) {
 }
 
 void GLSLHairlineLineGeometryProcessor::emitCode(EmitArgs& args) const {
@@ -44,11 +47,12 @@ void GLSLHairlineLineGeometryProcessor::emitCode(EmitArgs& args) const {
 
   auto matrixName =
       uniformHandler->addUniform("Matrix", UniformFormat::Float3x3, ShaderStage::Vertex);
-  std::string positionName = "position";
+  std::string positionName = "transformedPosition";
   vertBuilder->codeAppendf("vec2 %s = (%s * vec3(%s, 1.0)).xy;", positionName.c_str(),
                            matrixName.c_str(), position.name().c_str());
 
-  emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(position));
+  emitTransforms(args, vertBuilder, varyingHandler, uniformHandler,
+                 ShaderVar(positionName, SLType::Float2));
   // Pass edge distance to fragment shader for anti-aliasing
   auto edgeVarying = varyingHandler->addVarying("EdgeDistance", SLType::Float);
   vertBuilder->codeAppendf("%s = %s;", edgeVarying.vsOut().c_str(), edgeDistance.name().c_str());
@@ -56,21 +60,19 @@ void GLSLHairlineLineGeometryProcessor::emitCode(EmitArgs& args) const {
   // Fragment shader: calculate anti-aliasing based on edge distance
   fragBuilder->codeAppendf("float edgeAlpha = abs(%s);", edgeVarying.fsIn().c_str());
   fragBuilder->codeAppend("edgeAlpha = clamp(edgeAlpha, 0.0, 1.0);");
-  // if AAtype is none
-  // fragBuilder->codeAppend("edgeAlpha = edgeAlpha > 0.5 ? 1.0 : 0.0;");
+  if (aaType != AAType::Coverage) {
+    // Non-coverage anti-aliasing
+    fragBuilder->codeAppend("edgeAlpha = edgeAlpha >= 0.5 ? 1.0 : 0.0;");
+  }
 
   auto colorName =
       uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
   fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
+  auto coverageScale =
+      uniformHandler->addUniform("Coverage", UniformFormat::Float, ShaderStage::Fragment);
+  fragBuilder->codeAppendf("%s = vec4(%s * edgeAlpha);", args.outputCoverage.c_str(),
+                           coverageScale.c_str());
 
-  if (coverage != 0xFF) {
-    auto coverageScale =
-        uniformHandler->addUniform("Coverage", UniformFormat::Float, ShaderStage::Fragment);
-    fragBuilder->codeAppendf("%s = vec4(%s * edgeAlpha);", args.outputCoverage.c_str(),
-                             coverageScale.c_str());
-  } else {
-    fragBuilder->codeAppendf("%s = vec4(edgeAlpha);", args.outputCoverage.c_str());
-  }
   // Emit vertex position
   vertBuilder->emitNormalizedPosition(positionName);
 }
@@ -83,9 +85,7 @@ void GLSLHairlineLineGeometryProcessor::setData(UniformData* vertexUniformData,
   }
   fragmentUniformData->setData("Color", color);
   vertexUniformData->setData("Matrix", viewMatrix);
-  if (coverage != 0xFF) {
-    fragmentUniformData->setData("Coverage", static_cast<float>(coverage) / 255.0f);
-  }
+  fragmentUniformData->setData("Coverage", coverage);
 }
 
 }  // namespace tgfx

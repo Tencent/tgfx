@@ -19,7 +19,6 @@
 #pragma once
 
 #include "core/DataSource.h"
-#include "gpu/AAType.h"
 #include "tgfx/core/Shape.h"
 
 namespace tgfx {
@@ -39,13 +38,13 @@ struct HairlineBuffer {
 
 class ShapeBezierTriangulator : public DataSource<HairlineBuffer> {
  public:
-  ShapeBezierTriangulator(std::shared_ptr<Shape> shape, AAType aaType);
+  ShapeBezierTriangulator(std::shared_ptr<Shape> shape, bool hasCap);
 
   std::shared_ptr<HairlineBuffer> getData() const override;
 
  private:
   std::shared_ptr<Shape> shape = nullptr;
-  AAType aaType = AAType::None;
+  bool hasCap = false;
 };
 
 }  // namespace tgfx

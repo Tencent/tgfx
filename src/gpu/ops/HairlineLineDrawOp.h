@@ -19,7 +19,7 @@
 #pragma once
 
 #include "gpu/ops/DrawOp.h"
-#include "gpu/proxies/GPUBufferProxy.h"
+#include "gpu/proxies/GPUHairlineProxy.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Matrix.h"
 
@@ -27,9 +27,9 @@ namespace tgfx {
 
 class HairlineLineDrawOp final : public DrawOp {
  public:
-  static PlacementPtr<HairlineLineDrawOp> Make(std::shared_ptr<GPUBufferProxy> lineVertexBuffer,
-                                               std::shared_ptr<GPUBufferProxy> lineIndexBuffer,
-                                               PMColor color, const Matrix& uvMatrix);
+  static PlacementPtr<HairlineLineDrawOp> Make(std::shared_ptr<GPUHairlineProxy> hairlineProxy,
+                                               PMColor color, const Matrix& uvMatrix, float coverage,
+                                               AAType aaType);
 
  protected:
   PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
@@ -41,14 +41,13 @@ class HairlineLineDrawOp final : public DrawOp {
   }
 
  private:
-  HairlineLineDrawOp(BlockAllocator* allocator, std::shared_ptr<GPUBufferProxy> vertexBuffer,
-                     std::shared_ptr<GPUBufferProxy> indexBuffer, PMColor color,
-                     const Matrix& uvMatrix);
+  HairlineLineDrawOp(BlockAllocator* allocator, std::shared_ptr<GPUHairlineProxy> hairlineProxy,
+                     PMColor color, const Matrix& uvMatrix, float coverage, AAType aaType);
 
-  std::shared_ptr<GPUBufferProxy> lineVertexBuffer;
-  std::shared_ptr<GPUBufferProxy> lineIndexBuffer;
+  std::shared_ptr<GPUHairlineProxy> hairlineProxy;
   PMColor color;
   Matrix uvMatrix;
+  float coverage = 1.0f;
 
   friend class BlockAllocator;
 };

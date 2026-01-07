@@ -23,32 +23,38 @@
 namespace tgfx {
 
 PlacementPtr<HairlineLineDrawOp> HairlineLineDrawOp::Make(
-    std::shared_ptr<GPUBufferProxy> lineVertexBuffer,
-    std::shared_ptr<GPUBufferProxy> lineIndexBuffer, PMColor color, const Matrix& uvMatrix) {
-  if (lineVertexBuffer == nullptr || lineIndexBuffer == nullptr) {
+    std::shared_ptr<GPUHairlineProxy> hairlineProxy, PMColor color, const Matrix& uvMatrix,
+    float coverage, AAType aaType) {
+  if (hairlineProxy == nullptr) {
     return nullptr;
   }
 
-  auto allocator = lineVertexBuffer->getContext()->drawingAllocator();
-  return allocator->make<HairlineLineDrawOp>(allocator, std::move(lineVertexBuffer),
-                                             std::move(lineIndexBuffer), color, uvMatrix);
+  auto allocator = hairlineProxy->getContext()->drawingAllocator();
+  return allocator->make<HairlineLineDrawOp>(allocator, std::move(hairlineProxy), color, uvMatrix,
+                                             coverage, aaType);
 }
 
 HairlineLineDrawOp::HairlineLineDrawOp(BlockAllocator* allocator,
-                                       std::shared_ptr<GPUBufferProxy> vertexBuffer,
-                                       std::shared_ptr<GPUBufferProxy> indexBuffer, PMColor color,
-                                       const Matrix& uvMatrix)
-    : DrawOp(allocator, AAType::Coverage), lineVertexBuffer(std::move(vertexBuffer)),
-      lineIndexBuffer(std::move(indexBuffer)), color(color), uvMatrix(uvMatrix) {
+                                       std::shared_ptr<GPUHairlineProxy> hairlineProxy,
+                                       PMColor color, const Matrix& uvMatrix, float coverage,
+                                       AAType aaType)
+    : DrawOp(allocator, aaType), hairlineProxy(std::move(hairlineProxy)), color(color),
+      uvMatrix(uvMatrix), coverage(coverage) {
 }
 
 PlacementPtr<GeometryProcessor> HairlineLineDrawOp::onMakeGeometryProcessor(
     RenderTarget* /*renderTarget*/) {
-  return HairlineLineGeometryProcessor::Make(allocator, color, Matrix::I(), uvMatrix,
-                                             static_cast<uint8_t>(0xFF));
+  auto viewMatrix = hairlineProxy->getDrawingMatrix();
+  auto realUVMatrix = uvMatrix;
+  realUVMatrix.preConcat(viewMatrix);
+  return HairlineLineGeometryProcessor::Make(allocator, color, viewMatrix, realUVMatrix, coverage,
+                                             aaType);
 }
 
 void HairlineLineDrawOp::onDraw(RenderPass* renderPass) {
+  auto lineVertexBuffer = hairlineProxy->getLineVertexBufferProxy();
+  auto lineIndexBuffer = hairlineProxy->getLineIndexBufferProxy();
+
   if (lineVertexBuffer == nullptr || lineIndexBuffer == nullptr) {
     return;
   }

@@ -25,6 +25,7 @@
 #include "core/utils/MathExtra.h"
 #include "core/utils/RectToRectMatrix.h"
 #include "core/utils/ShapeUtils.h"
+#include "core/utils/StrokeUtils.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ops/AtlasTextOp.h"
@@ -205,7 +206,7 @@ void OpsCompositor::drawShape(std::shared_ptr<Shape> shape, const MCState& state
 }
 
 void OpsCompositor::drawHairlineShape(std::shared_ptr<Shape> shape, const MCState& state,
-                                      const Brush& brush) {
+                                      const Brush& brush, const Stroke* stroke) {
   DEBUG_ASSERT(shape != nullptr);
   flushPendingOps();
   Matrix uvMatrix = {};
@@ -215,6 +216,7 @@ void OpsCompositor::drawHairlineShape(std::shared_ptr<Shape> shape, const MCStat
   std::optional<Rect> localBounds = std::nullopt;
   std::optional<Rect> deviceBounds = std::nullopt;
   float drawScale = 1.0f;
+
   auto [needLocalBounds, needDeviceBounds] = needComputeBounds(brush, true);
   auto& clip = state.clip;
   auto clipBounds = getClipBounds(clip);
@@ -231,20 +233,17 @@ void OpsCompositor::drawHairlineShape(std::shared_ptr<Shape> shape, const MCStat
     deviceBounds = shape->getBounds();
   }
 
+  bool hasCap = stroke != nullptr && (stroke->cap == LineCap::Round || stroke->cap == LineCap::Square);
   auto aaType = getAAType(brush);
   auto dstColor = ToPMColor(brush.color, dstColorSpace);
-  auto hairlineProxy =
-      proxyProvider()->createGPUHairlineProxy(shape, aaType, uvMatrix, clipBounds, renderFlags);
+  auto hairlineProxy = proxyProvider()->createGPUHairlineProxy(shape, hasCap, renderFlags);
   if (hairlineProxy == nullptr) {
     return;
   }
-  auto lineDrawOp =
-      HairlineLineDrawOp::Make(hairlineProxy->getLineVertexBufferProxy(),
-                               hairlineProxy->getLineIndexBufferProxy(), dstColor, uvMatrix);
+  auto coverage = GetHairlineAlphaFactor(*stroke, state.matrix);
+  auto lineDrawOp = HairlineLineDrawOp::Make(hairlineProxy, dstColor, uvMatrix, coverage, aaType);
   addDrawOp(std::move(lineDrawOp), clip, brush, localBounds, deviceBounds, drawScale);
-  auto quadDrawOp =
-      HairlineQuadDrawOp::Make(hairlineProxy->getQuadVertexBufferProxy(),
-                               hairlineProxy->getQuadIndexBufferProxy(), dstColor, uvMatrix);
+  auto quadDrawOp = HairlineQuadDrawOp::Make(hairlineProxy, dstColor, uvMatrix, coverage, aaType);
   addDrawOp(std::move(quadDrawOp), clip, brush, localBounds, deviceBounds, drawScale);
 }
 

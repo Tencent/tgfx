@@ -19,22 +19,21 @@
 #include "GLSLHairlineQuadGeometryProcessor.h"
 #include "tgfx/core/Color.h"
 
-// Enable this macro to use solid color fill for testing triangle rendering.
-// #define HAIRLINE_QUAD_DEBUG_SOLID_FILL
-
 namespace tgfx {
 
 PlacementPtr<HairlineQuadGeometryProcessor> HairlineQuadGeometryProcessor::Make(
     BlockAllocator* allocator, const PMColor& color, const Matrix& viewMatrix,
-    std::optional<Matrix> uvMatrix, uint8_t coverage) {
-  return allocator->make<GLSLHairlineQuadGeometryProcessor>(color, viewMatrix, uvMatrix, coverage);
+    std::optional<Matrix> uvMatrix, float coverage, AAType aaType) {
+  return allocator->make<GLSLHairlineQuadGeometryProcessor>(color, viewMatrix, uvMatrix, coverage,
+                                                            aaType);
 }
 
 GLSLHairlineQuadGeometryProcessor::GLSLHairlineQuadGeometryProcessor(const PMColor& color,
                                                                      const Matrix& viewMatrix,
                                                                      std::optional<Matrix> uvMatrix,
-                                                                     uint8_t coverage)
-    : HairlineQuadGeometryProcessor(color, viewMatrix, uvMatrix, coverage) {
+                                                                     float coverage,
+                                                                     AAType aaType)
+    : HairlineQuadGeometryProcessor(color, viewMatrix, uvMatrix, coverage, aaType) {
 }
 
 void GLSLHairlineQuadGeometryProcessor::emitCode(EmitArgs& args) const {
@@ -48,26 +47,12 @@ void GLSLHairlineQuadGeometryProcessor::emitCode(EmitArgs& args) const {
 
   auto matrixName =
       args.uniformHandler->addUniform("Matrix", UniformFormat::Float3x3, ShaderStage::Vertex);
-  std::string positionName = "position";
+  std::string positionName = "transformedPosition";
   vertBuilder->codeAppendf("vec2 %s = (%s * vec3(%s, 1.0)).xy;", positionName.c_str(),
                            matrixName.c_str(), position.name().c_str());
-  emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(position));
+  emitTransforms(args, vertBuilder, varyingHandler, uniformHandler,
+                 ShaderVar(positionName, SLType::Float2));
 
-#ifdef HAIRLINE_QUAD_DEBUG_SOLID_FILL
-  // Debug mode: Solid color fill without bezier curve calculation
-  auto colorName =
-      args.uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
-  fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
-
-  if (coverage != 0xFF) {
-    auto coverageScale =
-        uniformHandler->addUniform("Coverage", UniformFormat::Float, ShaderStage::Fragment);
-    fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(), coverageScale.c_str());
-  } else {
-    fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputCoverage.c_str());
-  }
-#else
-  // Production mode: Calculate edge alpha based on quadratic bezier distance field
   auto edgeVarying = varyingHandler->addVarying("HairQuadEdge", SLType::Float4);
   vertBuilder->codeAppendf("%s = %s;", edgeVarying.vsOut().c_str(), hairQuadEdge.name().c_str());
 
@@ -82,24 +67,19 @@ void GLSLHairlineQuadGeometryProcessor::emitCode(EmitArgs& args) const {
                            edgeVarying.fsIn().c_str(), edgeVarying.fsIn().c_str());
   fragBuilder->codeAppend("edgeAlpha = sqrt(edgeAlpha * edgeAlpha / dot(gF, gF));");
   fragBuilder->codeAppend("edgeAlpha = max(1.0 - edgeAlpha, 0.0);");
-  // if AAtype is none
-  // fragBuilder->codeAppend("edgeAlpha = edgeAlpha > 0.5 ? 1.0 : 0.0;");
+  if (aaType != AAType::Coverage) {
+    fragBuilder->codeAppend("edgeAlpha = edgeAlpha >= 0.5 ? 1.0 : 0.0;");
+  }
 
   auto colorName =
       args.uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
   fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
+  auto coverageScale =
+      uniformHandler->addUniform("Coverage", UniformFormat::Float, ShaderStage::Fragment);
+  fragBuilder->codeAppendf("%s = vec4(%s * edgeAlpha);", args.outputCoverage.c_str(),
+                           coverageScale.c_str());
 
-  if (coverage != 0xFF) {
-    auto coverageScale =
-        uniformHandler->addUniform("Coverage", UniformFormat::Float, ShaderStage::Fragment);
-    fragBuilder->codeAppendf("%s = vec4(%s * edgeAlpha);", args.outputCoverage.c_str(),
-                             coverageScale.c_str());
-  } else {
-    fragBuilder->codeAppendf("%s = vec4(edgeAlpha);", args.outputCoverage.c_str());
-  }
-#endif
-
-  vertBuilder->emitNormalizedPosition(position.name());
+  vertBuilder->emitNormalizedPosition(positionName);
 }
 
 void GLSLHairlineQuadGeometryProcessor::setData(UniformData* vertexUniformData,
@@ -110,9 +90,7 @@ void GLSLHairlineQuadGeometryProcessor::setData(UniformData* vertexUniformData,
   }
   fragmentUniformData->setData("Color", color);
   vertexUniformData->setData("Matrix", viewMatrix);
-  if (coverage != 0xFF) {
-    fragmentUniformData->setData("Coverage", static_cast<float>(coverage) / 255.0f);
-  }
+  fragmentUniformData->setData("Coverage", coverage);
 }
 
 }  // namespace tgfx

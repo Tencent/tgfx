@@ -80,7 +80,8 @@ class OpsCompositor {
   /**
    * Draws the given shape with hairline rendering.
    */
-  void drawHairlineShape(std::shared_ptr<Shape> shape, const MCState& state, const Brush& brush);
+  void drawHairlineShape(std::shared_ptr<Shape> shape, const MCState& state, const Brush& brush,
+                         const Stroke* stroke);
 
   /**
    * Fills the given rect with the given atlas textureProxy, sampling options, state and fill.

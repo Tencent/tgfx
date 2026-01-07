@@ -26,7 +26,7 @@ namespace tgfx {
 class GLSLHairlineQuadGeometryProcessor : public HairlineQuadGeometryProcessor {
  public:
   GLSLHairlineQuadGeometryProcessor(const PMColor& color, const Matrix& viewMatrix,
-                                    std::optional<Matrix> uvMatrix, uint8_t coverage);
+                                    std::optional<Matrix> uvMatrix, float coverage, AAType aaType);
 
   void emitCode(EmitArgs& args) const override;
 

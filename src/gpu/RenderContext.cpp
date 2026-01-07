@@ -263,9 +263,7 @@ void RenderContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state
                               const Brush& brush, const Stroke* stroke) {
   if (auto compositor = getOpsCompositor()) {
     if (stroke != nullptr && TreatStrokeAsHairline(*stroke, state.matrix)) {
-      auto adjustedBrush = brush;
-      adjustedBrush.color.alpha *= GetHairlineAlphaFactor(*stroke, state.matrix);
-      compositor->drawHairlineShape(std::move(shape), state, adjustedBrush);
+      compositor->drawHairlineShape(std::move(shape), state, brush, stroke);
       return;
     }
     shape = Shape::ApplyStroke(std::move(shape), stroke);

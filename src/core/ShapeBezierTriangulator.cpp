@@ -20,7 +20,6 @@
 #include <cstddef>
 #include "core/utils/PathUtils.h"
 #include "core/utils/PointUtils.h"
-#include "gpu/AAType.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Point.h"
@@ -30,8 +29,10 @@ namespace tgfx {
 
 namespace {
 
+// One pixel length for hairline cap expansion.
+constexpr float PIXEL_LENGTH = 1.0f;
 // Half pixel offset for AA edge rendering.
-constexpr float HALF_PIXEL_INSET = 0.5f;
+constexpr float HALF_PIXEL_LENGTH = PIXEL_LENGTH * 0.5f;
 
 struct LineVertex {
   Point pos;
@@ -344,33 +345,25 @@ uint32_t GatherLinesAndQuads(const Path& path, const Matrix& matrix, const Rect&
   return totalQuadCount;
 }
 
-/** Normalizes and coverts an uint8_t to a float. [0, 255] -> [0.0, 1.0] */
-inline float NormalizeByteToFloat(uint8_t value) {
-  constexpr float ONE_OVER_255 = 1.f / 255.f;
-  return value * ONE_OVER_255;
-}
-
-void AddLine(const Point p[2], uint8_t coverage, LineVertex** vert) {
+void AddLine(const Point p[2], LineVertex** vert) {
   const auto a = p[0];
   const auto b = p[1];
 
   auto ortho = Point::Zero();
   auto vec = b - a;
   float lengthSqd = PointUtils::LengthSquared(vec);
-  if (PointUtils::SetLength(vec, HALF_PIXEL_INSET)) {
+  if (PointUtils::SetLength(vec, HALF_PIXEL_LENGTH)) {
     // Create a vector orthogonal to 'vec' and of unit length
     ortho.x = 2.0f * vec.y;
     ortho.y = -2.0f * vec.x;
-
-    float floatCoverage = NormalizeByteToFloat(coverage);
 
     if (lengthSqd >= 1.0f) {
       // Relative to points a and b:
       // The inner vertices are inset half a pixel along the line a,b
       (*vert)[0].pos = a + vec;
-      (*vert)[0].coverage = floatCoverage;
+      (*vert)[0].coverage = 1.0f;
       (*vert)[1].pos = b - vec;
-      (*vert)[1].coverage = floatCoverage;
+      (*vert)[1].coverage = 1.0f;
     } else {
       // The inner vertices are inset a distance of length(a,b) from the outer edge of
       // geometry. For the "a" inset this is the same as insetting from b by half a pixel.
@@ -379,9 +372,9 @@ void AddLine(const Point p[2], uint8_t coverage, LineVertex** vert) {
       // inside of a pixel.
       float length = std::sqrt(lengthSqd);
       (*vert)[0].pos = b - vec;
-      (*vert)[0].coverage = floatCoverage * length;
+      (*vert)[0].coverage = length;
       (*vert)[1].pos = a + vec;
-      (*vert)[1].coverage = floatCoverage * length;
+      (*vert)[1].coverage = length;
     }
     // Relative to points a and b:
     // The outer vertices are outset half a pixel along the line a,b and then a whole pixel
@@ -413,7 +406,7 @@ Point IntersectLines(const Point& pointA, const Point& normA, const Point& point
   wInv = 1.0f / wInv;
   if (!std::isfinite(wInv)) {
     // lines are parallel, pick the point in between
-    result = (pointA + pointB) * HALF_PIXEL_INSET;
+    result = (pointA + pointB) * HALF_PIXEL_LENGTH;
     result += normA;
   } else {
     result.x = normA.y * lineBW - lineAW * normB.y;
@@ -531,31 +524,26 @@ void AddQuad(const Point points[3], int subdiv, BezierVertex** vert) {
 
 }  // namespace
 
-ShapeBezierTriangulator::ShapeBezierTriangulator(std::shared_ptr<Shape> shape, AAType aaType)
-    : shape(std::move(shape)), aaType(aaType) {
+ShapeBezierTriangulator::ShapeBezierTriangulator(std::shared_ptr<Shape> shape, bool hasCap)
+    : shape(std::move(shape)), hasCap(hasCap) {
 }
 
 std::shared_ptr<HairlineBuffer> ShapeBezierTriangulator::getData() const {
-  Matrix viewMatrix = Matrix::I();
-  Rect clipBounds = shape->getBounds();
-  float capLength = 1.0f;
-  uint8_t coverage = aaType == AAType::Coverage ? 255 : 0;
-
-  ////////////////////////////////////////////////////////////////////////////
-
   auto path = shape->getPath();
+
   // reserve space for performance
   std::vector<Point> lines;
   lines.reserve(128);
   std::vector<Point> quads;
   quads.reserve(128);
   std::vector<int> quadSubdivs;
-
-  auto quadCount =
-      GatherLinesAndQuads(path, viewMatrix, clipBounds, capLength, lines, quads, quadSubdivs);
+  // The algorithm supports matrix scaling and clipping of invisible parts. This temporary tradeoff is
+  // made to maximize buffer reuse.
+  float capLength = hasCap ? PIXEL_LENGTH : 0.0f;
+  auto quadCount = GatherLinesAndQuads(path, Matrix::I(), path.getBounds(), capLength, lines, quads,
+                                       quadSubdivs);
 
   auto lineCount = lines.size() / 2;
-
   constexpr int MAX_LINES = INT32_MAX / LINE_NUM_VERTICES;
   constexpr int MAX_QUADS = INT32_MAX / QUAD_NUM_VERTICES;
   if (lineCount > MAX_LINES || quadCount > MAX_QUADS) {
@@ -569,7 +557,7 @@ std::shared_ptr<HairlineBuffer> ShapeBezierTriangulator::getData() const {
     std::vector<LineVertex> lineVerts(lineCount * LINE_NUM_VERTICES);
     LineVertex* vertPtr = lineVerts.data();
     for (size_t i = 0; i < lineCount; ++i) {
-      AddLine(&lines[2 * i], coverage, &vertPtr);
+      AddLine(&lines[2 * i], &vertPtr);
     }
     lineVerticesData = Data::MakeWithCopy(lineVerts.data(), lineVerts.size() * sizeof(LineVertex));
     lineIndicesData = Data::MakeWithCopy(lineIndices.data(), lineIndices.size() * sizeof(uint32_t));

@@ -19,6 +19,7 @@
 #pragma once
 
 #include "gpu/proxies/GPUBufferProxy.h"
+#include "tgfx/core/Matrix.h"
 
 namespace tgfx {
 
@@ -27,11 +28,13 @@ namespace tgfx {
  */
 class GPUHairlineProxy {
  public:
-  GPUHairlineProxy(std::shared_ptr<GPUBufferProxy> lineVertexBuffer,
+  GPUHairlineProxy(const Matrix& drawingMatrix,
+                   std::shared_ptr<GPUBufferProxy> lineVertexBuffer,
                    std::shared_ptr<GPUBufferProxy> lineIndexBuffer,
                    std::shared_ptr<GPUBufferProxy> quadVertexBuffer,
                    std::shared_ptr<GPUBufferProxy> quadIndexBuffer)
-      : lineVertexProxy(std::move(lineVertexBuffer)),
+      : drawingMatrix(drawingMatrix),
+        lineVertexProxy(std::move(lineVertexBuffer)),
         lineIndexProxy(std::move(lineIndexBuffer)),
         quadVertexProxy(std::move(quadVertexBuffer)),
         quadIndexProxy(std::move(quadIndexBuffer)) {
@@ -53,11 +56,16 @@ class GPUHairlineProxy {
     return quadIndexProxy;
   }
 
+  const Matrix& getDrawingMatrix() const {
+    return drawingMatrix;
+  }
+
   Context* getContext() const {
     return lineVertexProxy ? lineVertexProxy->context : nullptr;
   }
 
  private:
+  Matrix drawingMatrix;
   std::shared_ptr<GPUBufferProxy> lineVertexProxy;
   std::shared_ptr<GPUBufferProxy> lineIndexProxy;
   std::shared_ptr<GPUBufferProxy> quadVertexProxy;

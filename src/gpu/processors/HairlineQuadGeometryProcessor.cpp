@@ -24,16 +24,17 @@ namespace tgfx {
 HairlineQuadGeometryProcessor::HairlineQuadGeometryProcessor(const PMColor& color,
                                                              const Matrix& viewMatrix,
                                                              std::optional<Matrix> uvMatrix,
-                                                             uint8_t coverage)
+                                                             float coverage, AAType aaType)
     : GeometryProcessor(ClassID()), color(color), viewMatrix(viewMatrix), uvMatrix(uvMatrix),
-      coverage(coverage) {
+      coverage(coverage), aaType(aaType) {
   position = {"aPosition", VertexFormat::Float2};
   hairQuadEdge = {"hairQuadEdge", VertexFormat::Float4};
   setVertexAttributes(&position, 3);
 }
 
 void HairlineQuadGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
-  bytesKey->write(static_cast<uint32_t>(coverage != 0xFF ? 1 : 0));
+  uint32_t flags = aaType == AAType::Coverage ? 1 : 0;
+  bytesKey->write(flags);
 }
 
 }  // namespace tgfx

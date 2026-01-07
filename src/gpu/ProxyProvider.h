@@ -84,8 +84,7 @@ class ProxyProvider {
    * in a background thread and uploaded to the GPU.
    */
   std::shared_ptr<GPUHairlineProxy> createGPUHairlineProxy(std::shared_ptr<Shape> shape,
-                                                           AAType aaType, const Matrix& viewMatrix,
-                                                           const Rect& clipBounds, float capLength,
+                                                           bool hasCap,
                                                            uint32_t renderFlags = 0);
 
   /*

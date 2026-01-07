@@ -21,6 +21,7 @@
 #include <optional>
 #include <string>
 #include "GeometryProcessor.h"
+#include "gpu/AAType.h"
 #include "tgfx/core/BytesKey.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Matrix.h"
@@ -34,7 +35,7 @@ class HairlineQuadGeometryProcessor : public GeometryProcessor {
                                                           const PMColor& color,
                                                           const Matrix& viewMatrix,
                                                           std::optional<Matrix> uvMatrix,
-                                                          uint8_t coverage);
+                                                          float coverage, AAType aaType);
 
   std::string name() const override {
     return "HairlineQuadGeometryProcessor";
@@ -44,14 +45,15 @@ class HairlineQuadGeometryProcessor : public GeometryProcessor {
   DEFINE_PROCESSOR_CLASS_ID
 
   HairlineQuadGeometryProcessor(const PMColor& color, const Matrix& viewMatrix,
-                                std::optional<Matrix> uvMatrix, uint8_t coverage);
+                                std::optional<Matrix> uvMatrix, float coverage, AAType aaType);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
   PMColor color;
   Matrix viewMatrix;
   std::optional<Matrix> uvMatrix;
-  uint8_t coverage;
+  float coverage = 1.0f;
+  AAType aaType = AAType::None;
 
   Attribute position;
   Attribute hairQuadEdge;
