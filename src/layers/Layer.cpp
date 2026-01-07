@@ -48,6 +48,11 @@ static bool HasStyleSource(const std::vector<LayerStyleExtraSourceType>& types,
   return std::find(types.begin(), types.end(), type) != types.end();
 }
 
+static void RemoveStyleSource(std::vector<LayerStyleExtraSourceType>& types,
+                              LayerStyleExtraSourceType type) {
+  types.erase(std::remove(types.begin(), types.end(), type), types.end());
+}
+
 // The minimum size (longest edge) for subtree cache. This prevents creating excessively small
 // mipmap levels that would be inefficient to cache.
 static constexpr int SUBTREE_CACHE_MIN_SIZE = 32;
@@ -1532,7 +1537,8 @@ bool Layer::drawWithSubtreeCache(const DrawArgs& args, Canvas* canvas, float alp
   paint.setAlpha(alpha);
   paint.setBlendMode(blendMode);
   cache->draw(args.context, longEdge, canvas, paint, transform3D);
-  if (args.blurBackground && HasStyleSource(args.styleSourceTypes, LayerStyleExtraSourceType::Background)) {
+  if (args.blurBackground &&
+      HasStyleSource(args.styleSourceTypes, LayerStyleExtraSourceType::Background)) {
     cache->draw(args.context, longEdge, args.blurBackground->getCanvas(), paint, transform3D);
   }
   return true;
@@ -1544,7 +1550,10 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   // Non-leaf layers in a 3D rendering context layer tree never require offscreen rendering.
   DEBUG_ASSERT(args.render3DContext == nullptr);
   DEBUG_ASSERT(!canPreserve3D());
-  if (transform3D != nullptr && HasStyleSource(args.styleSourceTypes, LayerStyleExtraSourceType::Background)) {
+  auto drawBackground =
+      transform3D != nullptr &&
+      HasStyleSource(args.styleSourceTypes, LayerStyleExtraSourceType::Background);
+  if (drawBackground) {
     drawBackgroundLayerStyles(args, canvas, alpha, *transform3D);
   }
 
@@ -1554,6 +1563,9 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
       args.blurBackground && !args.clipContentByCanvas ? args.blurBackground->getCanvas() : canvas;
   auto clipBounds = GetClipBounds(clipBoundsCanvas);
   auto contentArgs = args;
+  if (drawBackground) {
+    RemoveStyleSource(contentArgs.styleSourceTypes, LayerStyleExtraSourceType::Background);
+  }
 
   if (shouldPassThroughBackground(blendMode, transform3D) && canvas->getSurface()) {
     // In pass-through mode, the image drawn to canvas contains the blended background, while
@@ -1651,7 +1663,8 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
     drawLayerStyles(args, canvas, alpha, layerStyleSource, LayerStylePosition::Below);
   }
   auto content = getContent();
-  auto drawBackground = HasStyleSource(args.styleSourceTypes, LayerStyleExtraSourceType::Background);
+  auto drawBackground =
+      HasStyleSource(args.styleSourceTypes, LayerStyleExtraSourceType::Background);
   bool hasForeground = false;
   if (content) {
     if (args.drawMode == DrawMode::Contour) {
@@ -1716,9 +1729,7 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, cons
     }
     auto childArgs = args;
     if (skipChildBackground) {
-      auto& types = childArgs.styleSourceTypes;
-      types.erase(std::remove(types.begin(), types.end(), LayerStyleExtraSourceType::Background),
-                  types.end());
+      RemoveStyleSource(childArgs.styleSourceTypes, LayerStyleExtraSourceType::Background);
     }
     childArgs.clipContentByCanvas = clipChildContentByCanvas;
     if (static_cast<int>(i) < lastBackgroundLayerIndex) {
