@@ -20,37 +20,43 @@
 
 namespace tgfx {
 
-TextContent::TextContent(std::shared_ptr<TextBlob> textBlob, float x, float y,
+TextContent::TextContent(std::shared_ptr<TextBlob> textBlob, const Matrix& matrix,
                          const LayerPaint& paint)
-    : GeometryContent(paint), textBlob(std::move(textBlob)), x(x), y(y) {
+    : GeometryContent(paint), textBlob(std::move(textBlob)), textMatrix(matrix) {
 }
 
 Rect TextContent::onGetBounds() const {
-  auto bounds = textBlob->getBounds();
-  bounds.offset(x, y);
-  return bounds;
+  return textMatrix.mapRect(textBlob->getBounds());
 }
 
 Rect TextContent::getTightBounds(const Matrix& matrix) const {
-  auto offsetMatrix = Matrix::MakeTrans(x, y);
-  offsetMatrix.postConcat(matrix);
-  return textBlob->getTightBounds(&offsetMatrix);
+  auto combinedMatrix = textMatrix;
+  combinedMatrix.postConcat(matrix);
+  return textBlob->getTightBounds(&combinedMatrix);
 }
 
 bool TextContent::hitTestPoint(float localX, float localY) const {
   if (color.alpha <= 0) {
     return false;
   }
-  return textBlob->hitTestPoint(localX - x, localY - y, stroke.get());
+  Matrix inverse = Matrix::I();
+  if (!textMatrix.invert(&inverse)) {
+    return false;
+  }
+  auto localPoint = inverse.mapXY(localX, localY);
+  return textBlob->hitTestPoint(localPoint.x, localPoint.y, stroke.get());
 }
 
 void TextContent::onDraw(Canvas* canvas, const Paint& paint) const {
-  canvas->drawTextBlob(textBlob, x, y, paint);
+  auto oldMatrix = canvas->getMatrix();
+  canvas->concat(textMatrix);
+  canvas->drawTextBlob(textBlob, 0, 0, paint);
+  canvas->setMatrix(oldMatrix);
 }
 
 bool TextContent::onHasSameGeometry(const GeometryContent* other) const {
   auto* otherText = static_cast<const TextContent*>(other);
-  return textBlob == otherText->textBlob && x == otherText->x && y == otherText->y;
+  return textBlob == otherText->textBlob && textMatrix == otherText->textMatrix;
 }
 
 }  // namespace tgfx

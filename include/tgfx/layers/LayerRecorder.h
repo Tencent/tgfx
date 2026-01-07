@@ -76,6 +76,15 @@ class LayerRecorder {
   void addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerPaint& paint, float x = 0,
                    float y = 0);
 
+  /**
+   * Adds a text blob with the specified paint and transformation matrix.
+   * @param textBlob The text blob.
+   * @param paint The paint style for the text.
+   * @param matrix The transformation matrix to apply to the text.
+   */
+  void addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerPaint& paint,
+                   const Matrix& matrix);
+
  private:
   enum class PendingType {
     None,

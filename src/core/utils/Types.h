@@ -24,8 +24,8 @@
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/MaskFilter.h"
 #include "tgfx/core/Shader.h"
-#include "tgfx/layers/ColorSource.h"
 #include "tgfx/layers/filters/LayerFilter.h"
+#include "tgfx/layers/vectors/ColorSource.h"
 
 namespace tgfx {
 class Types {

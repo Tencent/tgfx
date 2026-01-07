@@ -12,21 +12,14 @@ alwaysApply: true
 - 重构时审查关联代码合理性，顺带清理冗余，不考虑向后兼容
 
 ## 代码规范
+- 新增文件必须包含版权声明，年份使用当前年份（如 `Copyright (C) 2026 Tencent`）
 - 驼峰命名法：大写开头（类静态方法、全局函数/变量）、小写开头（成员方法/变量、局部变量）、全大写下划线（静态常量）
 - 变量命名避免缩写，简短且语义明确
 - 变量声明时一律赋初始值（即使是 `={}`），智能指针初始值使用 nullptr。
 - 避免 lambda 表达式，改用显式方法或函数
+- 禁止使用 `dynamic_cast` 和 C++ 异常（`throw`/`try`/`catch`）
 - CPP 文件里的函数实现顺序与头文件中定义的顺序尽可能一致
 - `include/` 目录 API 需详细注释含参数描述，其他公开方法一段话描述主要功能，私有方法不加注释
 - 函数内代码不加行注释，除非只看代码无法理解设计意图
 - 未明确的规范，模仿项目已有风格
-
-## 编译验证
-
-修改代码后，使用以下命令验证编译。必须传递 `-DTGFX_BUILD_TESTS=ON` 以启用所有模块（layers、svg、pdf 等）。
-
-```bash
-cmake -DTGFX_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug -B cmake-build-debug
-cmake --build cmake-build-debug --target TGFXFullTest -- -j 12
-```
 

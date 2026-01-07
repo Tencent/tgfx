@@ -17,18 +17,18 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SimpleTextLayer.h"
-#include <tgfx/core/Matrix.h>
-#include <tgfx/core/Path.h>
-#include <tgfx/core/Shader.h>
-#include <tgfx/layers/Gradient.h>
-#include <tgfx/layers/LayerRecorder.h>
-#include <tgfx/layers/ShapeLayer.h>
-#include <tgfx/layers/SolidColor.h>
 #include <algorithm>
 #include <map>
 #include "base/LayerBuilders.h"
 #include "hello2d/AppHost.h"
+#include "tgfx/core/Matrix.h"
+#include "tgfx/core/Path.h"
+#include "tgfx/core/Shader.h"
 #include "tgfx/core/UTF.h"
+#include "tgfx/layers/LayerRecorder.h"
+#include "tgfx/layers/ShapeLayer.h"
+#include "tgfx/layers/vectors/Gradient.h"
+#include "tgfx/layers/vectors/SolidColor.h"
 
 namespace hello2d {
 
@@ -260,8 +260,9 @@ void SimpleTextLayer::updateLayout() {
       tgfx::GlyphRun glyphRun(font, std::move(glyphs), std::move(positions));
       richText.textBlob = tgfx::TextBlob::MakeFrom(std::move(glyphRun));
     } else if (richText.type == Element::Type::Image) {
-      richText.imageRect = tgfx::Rect::MakeXYWH(xOffset, baselines[lineIndex] - richText.height,
-                                                richText.width, richText.height);
+      auto descent = underlines[lineIndex] - baselines[lineIndex];
+      auto imageTop = baselines[lineIndex] - richText.height + descent * 0.5f;
+      richText.imageRect = tgfx::Rect::MakeXYWH(xOffset, imageTop, richText.width, richText.height);
       if (!richText.underlineIndex.empty()) {
         auto left = xOffset;
         richText.underline.push_back({left, left + richText.width, underlines[lineIndex]});
@@ -299,7 +300,8 @@ std::shared_ptr<tgfx::Layer> RichText::onBuildLayerTree(const AppHost* host) {
   font.setFauxBold(true);
   fonts.push_back(font);
   font = tgfx::Font(typeface, 15);
-  font.setFauxBold(false);
+  fonts.push_back(font);
+  font = tgfx::Font(typeface, 15);
   font.setFauxItalic(true);
   fonts.push_back(font);
   typeface = host->getTypeface("emoji");
@@ -320,7 +322,7 @@ std::shared_ptr<tgfx::Layer> RichText::onBuildLayerTree(const AppHost* host) {
   auto shader = tgfx::Shader::MakeLinearGradient(startPoint, endPoint, {cyan, magenta, yellow}, {});
   paints[1].setShader(shader);
 
-  std::vector<Element> elements(5);
+  std::vector<Element> elements(8);
   elements[0].type = Element::Type::Image;
   auto image = host->getImage("TGFX");
   image = image->makeMipmapped(true);
@@ -333,18 +335,35 @@ std::shared_ptr<tgfx::Layer> RichText::onBuildLayerTree(const AppHost* host) {
   elements[1].text = texts[0];
   elements[1].font = fonts[0];
   elements[1].paints = {paints[0], paints[1]};
+  tgfx::Paint strokePaint = {};
+  strokePaint.setColor(tgfx::Color::White());
+  strokePaint.setStyle(tgfx::PaintStyle::Stroke);
+  strokePaint.setStrokeWidth(3);
+  tgfx::Paint fillPaint = {};
+  fillPaint.setColor(tgfx::Color::Black());
+  fillPaint.setStyle(tgfx::PaintStyle::Fill);
+
   elements[2].text = texts[1];
   elements[2].font = fonts[1];
-  elements[2].paints = {paints[0], paints[1]};
-  elements[2].underlineIndex = FindFirstOccurrence(texts[1], "TGFX");
-  elements[3].text = texts[2];
+  elements[2].paints = {strokePaint, fillPaint};
+  elements[3].text = " (";
   elements[3].font = fonts[2];
-  elements[3].paints = {paints[0], paints[1]};
-  elements[3].underlineIndex = FindFirstOccurrence(texts[2], "(Tencent Graphics)");
-  elements[3].deletelineIndex = FindFirstOccurrence(texts[2], "video");
-  elements[4].text = texts[3];
+  elements[3].paints = {strokePaint, fillPaint};
+  elements[4].text = "Tencent Graphics";
   elements[4].font = fonts[3];
-  elements[4].paints = {{}};
+  elements[4].paints = {strokePaint, fillPaint};
+  elements[4].underlineIndex = {{0, 15}};
+  elements[5].text = ") ";
+  elements[5].font = fonts[2];
+  elements[5].paints = {strokePaint, fillPaint};
+  elements[6].text =
+      " is a lightweight 2D graphics \nlibrary for rendering text, shapes,video and images.\n";
+  elements[6].font = fonts[2];
+  elements[6].paints = {strokePaint, fillPaint};
+  elements[6].deletelineIndex = FindFirstOccurrence(elements[6].text, "video");
+  elements[7].text = texts[3];
+  elements[7].font = fonts[4];
+  elements[7].paints = {{}};
 
   auto textLayer = SimpleTextLayer::Make();
   textLayer->setElements(std::move(elements));

@@ -1,6 +1,6 @@
 ---
 description: 当用户发送Github PR链接、要求审查代码、或需要提交代码、发起PR时
-alwaysApply: false
+alwaysApply: true
 ---
 
 ## 代码审查要点
@@ -33,7 +33,7 @@ alwaysApply: false
    - **分支名称**：格式同上述分支命名规范
    - **PR 标题**：英语，格式同上述 Commit 信息要求
    - **PR 描述**：中文简要说明变更内容
-4. 确认后创建分支、推送代码、执行 `gh pr create`，**逐字复制确认过的标题和描述，禁止添加任何格式或内容**
+4. 确认后创建分支、推送代码、并使用上面的PR标题和PR描述内容执行 `gh pr create`，**禁止再重新写PR描述**
 5. 补充提交使用正常追加，禁止 force push
 
 ## Review PR 流程

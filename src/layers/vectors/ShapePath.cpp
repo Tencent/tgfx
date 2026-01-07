@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,22 +16,41 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/layers/SolidColor.h"
+#include "tgfx/layers/vectors/ShapePath.h"
+#include "VectorContext.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
-std::shared_ptr<SolidColor> SolidColor::Make(const Color& color) {
-  return std::shared_ptr<SolidColor>(new SolidColor(color));
-}
 
-void SolidColor::setColor(const Color& color) {
-  if (_color == color) {
+void ShapePath::setPath(Path value) {
+  if (_path == value) {
     return;
   }
-  _color = color;
+  _path = std::move(value);
+  _cachedShape = nullptr;
   invalidateContent();
 }
 
-std::shared_ptr<Shader> SolidColor::getShader() const {
-  return Shader::MakeColorShader(_color);
+void ShapePath::setReversed(bool value) {
+  if (_reversed == value) {
+    return;
+  }
+  _reversed = value;
+  _cachedShape = nullptr;
+  invalidateContent();
 }
+
+void ShapePath::apply(VectorContext* context) {
+  DEBUG_ASSERT(context != nullptr);
+  if (_cachedShape == nullptr) {
+    _cachedShape = Shape::MakeFrom(_path);
+    if (_reversed) {
+      _cachedShape = Shape::ApplyReverse(_cachedShape);
+    }
+  }
+  if (_cachedShape) {
+    context->addShape(_cachedShape);
+  }
+}
+
 }  // namespace tgfx
