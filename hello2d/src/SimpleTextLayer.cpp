@@ -17,18 +17,18 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SimpleTextLayer.h"
-#include <tgfx/core/Matrix.h>
-#include <tgfx/core/Path.h>
-#include <tgfx/core/Shader.h>
-#include <tgfx/layers/Gradient.h>
-#include <tgfx/layers/LayerRecorder.h>
-#include <tgfx/layers/ShapeLayer.h>
-#include <tgfx/layers/SolidColor.h>
 #include <algorithm>
 #include <map>
 #include "base/LayerBuilders.h"
 #include "hello2d/AppHost.h"
+#include "tgfx/core/Matrix.h"
+#include "tgfx/core/Path.h"
+#include "tgfx/core/Shader.h"
 #include "tgfx/core/UTF.h"
+#include "tgfx/layers/LayerRecorder.h"
+#include "tgfx/layers/ShapeLayer.h"
+#include "tgfx/layers/vectors/Gradient.h"
+#include "tgfx/layers/vectors/SolidColor.h"
 
 namespace hello2d {
 
