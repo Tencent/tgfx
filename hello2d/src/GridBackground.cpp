@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GridBackground.h"
-#include <tgfx/layers/LayerRecorder.h>
+#include "tgfx/layers/LayerRecorder.h"
 
 namespace hello2d {
 

@@ -22,7 +22,7 @@
 #include "tgfx/core/Color.h"
 #include "tgfx/core/GradientType.h"
 #include "tgfx/core/Point.h"
-#include "tgfx/layers/ColorSource.h"
+#include "tgfx/layers/vectors/ColorSource.h"
 
 namespace tgfx {
 class LinearGradient;

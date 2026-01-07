@@ -22,7 +22,7 @@
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/core/Stroke.h"
-#include "tgfx/layers/ColorSource.h"
+#include "tgfx/layers/vectors/ColorSource.h"
 #include "tgfx/layers/vectors/VectorElement.h"
 
 namespace tgfx {
