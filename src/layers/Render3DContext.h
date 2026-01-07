@@ -19,6 +19,7 @@
 #pragma once
 
 #include "Context3DCompositor.h"
+#include "tgfx/core/Matrix3D.h"
 
 namespace tgfx {
 
@@ -36,9 +37,18 @@ class Render3DContext {
     return _renderRect;
   }
 
+  const Matrix3D& transform() const {
+    return _transform;
+  }
+
+  void setTransform(const Matrix3D& transform) {
+    _transform = transform;
+  }
+
  private:
   std::shared_ptr<Context3DCompositor> _compositor = nullptr;
   Rect _renderRect = {};
+  Matrix3D _transform = {};
 };
 
 }  // namespace tgfx

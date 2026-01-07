@@ -612,15 +612,14 @@ class Layer : public std::enable_shared_from_this<Layer> {
   void drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                      const Matrix3D* transform3D, const std::shared_ptr<MaskFilter>& maskFilter);
 
-  void drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha,
-                    const Matrix3D* transform3D = nullptr);
+  void drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha);
 
   void drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
                     const LayerStyleSource* layerStyleSource = nullptr,
-                    const Layer* stopChild = nullptr, const Matrix3D* transform3D = nullptr);
+                    const Layer* stopChild = nullptr);
 
   bool drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
-                    const Layer* stopChild = nullptr, const Matrix3D* transform3D = nullptr);
+                    const Layer* stopChild = nullptr);
 
   void drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, float alpha);
 
@@ -628,8 +627,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
    * Draws the layer in a 3D rendering context using an offscreen canvas and composites the result
    * to the 3D compositor.
    */
-  void drawIn3DContext(const DrawArgs& args, Canvas* canvas, float alpha,
-                       const Matrix3D& transform3D);
+  void drawIn3DContext(const DrawArgs& args, Canvas* canvas, float alpha);
 
   float drawBackgroundLayers(const DrawArgs& args, Canvas* canvas);
 

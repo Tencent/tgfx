@@ -1157,7 +1157,7 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
     drawOffscreen(args, canvas, alpha, blendMode, transform3D, maskFilter);
   } else {
     // Content and children are rendered independently.
-    drawDirectly(args, canvas, alpha, transform3D);
+    drawDirectly(args, canvas, alpha);
   }
 }
 
@@ -1565,6 +1565,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   auto contentArgs = args;
   if (drawBackground) {
     RemoveStyleSource(contentArgs.styleSourceTypes, LayerStyleExtraSourceType::Background);
+    contentArgs.blurBackground = nullptr;
   }
 
   if (shouldPassThroughBackground(blendMode, transform3D) && canvas->getSurface()) {
@@ -1650,34 +1651,30 @@ std::optional<Rect> Layer::computeContentBounds(const std::optional<Rect>& clipB
   return inputBounds;
 }
 
-void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha,
-                         const Matrix3D* transform3D) {
+void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha) {
   auto layerStyleSource = getLayerStyleSource(args, canvas->getMatrix());
-  drawContents(args, canvas, alpha, layerStyleSource.get(), nullptr, transform3D);
+  drawContents(args, canvas, alpha, layerStyleSource.get());
 }
 
 void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
-                         const LayerStyleSource* layerStyleSource, const Layer* stopChild,
-                         const Matrix3D* transform3D) {
+                         const LayerStyleSource* layerStyleSource, const Layer* stopChild) {
   if (layerStyleSource) {
     drawLayerStyles(args, canvas, alpha, layerStyleSource, LayerStylePosition::Below);
   }
   auto content = getContent();
-  auto drawBackground =
-      HasStyleSource(args.styleSourceTypes, LayerStyleExtraSourceType::Background);
   bool hasForeground = false;
   if (content) {
     if (args.drawMode == DrawMode::Contour) {
       content->drawContour(canvas, bitFields.allowsEdgeAntialiasing);
     } else {
       hasForeground = content->drawDefault(canvas, alpha, bitFields.allowsEdgeAntialiasing);
-      if (args.blurBackground && bitFields.matrix3DIsAffine && drawBackground) {
+      if (args.blurBackground) {
         content->drawDefault(args.blurBackground->getCanvas(), alpha,
                              bitFields.allowsEdgeAntialiasing);
       }
     }
   }
-  if (!drawChildren(args, canvas, alpha, stopChild, transform3D)) {
+  if (!drawChildren(args, canvas, alpha, stopChild)) {
     return;
   }
   if (layerStyleSource) {
@@ -1685,15 +1682,15 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
   }
   if (hasForeground) {
     content->drawForeground(canvas, alpha, bitFields.allowsEdgeAntialiasing);
-    if (args.blurBackground && bitFields.matrix3DIsAffine && drawBackground) {
+    if (args.blurBackground) {
       content->drawForeground(args.blurBackground->getCanvas(), alpha,
                               bitFields.allowsEdgeAntialiasing);
     }
   }
 }
 
-bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, const Layer* stopChild,
-                         const Matrix3D* transform3D) {
+bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
+                         const Layer* stopChild) {
   int lastBackgroundLayerIndex = -1;
   if (args.forceDrawBackground) {
     // lastBackgroundLayerIndex must cover all children
@@ -1730,6 +1727,7 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, cons
     auto childArgs = args;
     if (skipChildBackground) {
       RemoveStyleSource(childArgs.styleSourceTypes, LayerStyleExtraSourceType::Background);
+      childArgs.blurBackground = nullptr;
     }
     childArgs.clipContentByCanvas = clipChildContentByCanvas;
     if (static_cast<int>(i) < lastBackgroundLayerIndex) {
@@ -1779,20 +1777,17 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, cons
     }
 
     if (childArgs.render3DContext != nullptr) {
-      if (transform3D == nullptr) {
-        DEBUG_ASSERT(false);
-        continue;
-      }
       // For layers in a 3D rendering context, draw the child layer to an offscreen canvas and
       // composite the result to the 3D compositor.
+      auto& currentTransform = childArgs.render3DContext->transform();
       auto childTransform = childMatrix;
-      childTransform.postConcat(*transform3D);
+      childTransform.postConcat(currentTransform);
       if (IsTransformedLayerRectBehindCamera(child->getBounds(), childTransform)) {
         continue;
       }
-      child->drawIn3DContext(childArgs, canvas, child->_alpha * alpha, childTransform);
+      childArgs.render3DContext->setTransform(childTransform);
+      child->drawIn3DContext(childArgs, canvas, child->_alpha * alpha);
     } else if (child->canPreserve3D()) {
-      DEBUG_ASSERT(transform3D == nullptr);
       if (IsTransformedLayerRectBehindCamera(child->getBounds(), childMatrix)) {
         continue;
       }
@@ -1800,7 +1795,6 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, cons
       child->drawByStarting3DContext(childArgs, canvas, child->_alpha * alpha);
     } else {
       // Draw elements outside the 3D rendering context.
-      DEBUG_ASSERT(transform3D == nullptr);
       auto childTransform = isChildMatrixAffine ? nullptr : &childMatrix;
       child->drawLayer(childArgs, canvas, child->_alpha * alpha,
                        static_cast<BlendMode>(child->bitFields.blendMode), childTransform);
@@ -1847,12 +1841,13 @@ void Layer::drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, float 
       static_cast<int>(validRenderRect.height()));
   auto context3DArgs = args;
   context3DArgs.render3DContext = std::make_shared<Render3DContext>(compositor, validRenderRect);
+  context3DArgs.render3DContext->setTransform(getMatrixWithScrollRect());
   // Layers inside a 3D rendering context need to maintain independent 3D state. This means layers
   // drawn later may become the background, making it impossible to know the final background when
   // drawing each layer. Therefore, background styles are disabled.
   context3DArgs.styleSourceTypes = {LayerStyleExtraSourceType::None,
                                     LayerStyleExtraSourceType::Contour};
-  drawIn3DContext(context3DArgs, canvas, alpha, getMatrixWithScrollRect());
+  drawIn3DContext(context3DArgs, canvas, alpha);
   auto context3DImage = compositor->finish();
 
   // The final texture has been scaled proportionally during generation, so draw it at its actual
@@ -1875,28 +1870,28 @@ void Layer::drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, float 
   }
 }
 
-void Layer::drawIn3DContext(const DrawArgs& args, Canvas* canvas, float alpha,
-                            const Matrix3D& transform3D) {
+void Layer::drawIn3DContext(const DrawArgs& args, Canvas* canvas, float alpha) {
   DEBUG_ASSERT(args.render3DContext != nullptr);
   auto contentScale = canvas->getMatrix().getMaxScale();
   if (FloatNearlyZero(contentScale)) {
     return;
   }
+  // Save the current layer's transform before drawLayer, as child layers may modify it.
+  auto transform3D = args.render3DContext->transform();
 
   PictureRecorder recorder = {};
   auto offscreenCanvas = recorder.beginRecording();
   offscreenCanvas->scale(contentScale, contentScale);
 
   if (canPreserve3D()) {
-    drawLayer(args, offscreenCanvas, 1.0f, BlendMode::SrcOver, &transform3D);
+    drawLayer(args, offscreenCanvas, 1.0f, BlendMode::SrcOver);
   } else {
-    // If the layer cannot extend the 3D rendering context, child layers do not need to create new
-    // offscreen canvases via the context to collect content, so stop propagating the context.
-    // The transform3D is not passed to drawLayer; the entire subtree rooted at this layer is
-    // rendered offscreen and then drawn to the canvas with the matrix applied uniformly.
+    // When the layer cannot preserve 3D context, clear render3DContext to prevent child layers
+    // from participating in 3D compositing. The entire subtree is rendered as a flat image and
+    // composited with this layer's 3D transform applied uniformly.
     auto drawArgs = args;
     drawArgs.render3DContext = nullptr;
-    drawLayer(drawArgs, offscreenCanvas, 1.0f, BlendMode::SrcOver, nullptr);
+    drawLayer(drawArgs, offscreenCanvas, 1.0f, BlendMode::SrcOver);
   }
 
   Point offset = {};
