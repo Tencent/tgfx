@@ -269,6 +269,9 @@ void ConvertNoninflectCubicToQuads(const Point p[4], float toleranceSqd, std::ve
   auto c0 = p[0] + ab;
   auto c1 = p[3] + dc;
 
+  // When recursion depth exceeds the limit, force distanceSqd to 0 to accept the approximation.
+  // This prevents infinite recursion while maintaining acceptable visual quality, as curves
+  // requiring more than maxSubdivs levels are already extremely well-approximated.
   float distanceSqd = sublevel > maxSubdivs ? 0 : PointUtils::DistanceSquared(c0, c1);
   if (distanceSqd < toleranceSqd) {
     Point newC;

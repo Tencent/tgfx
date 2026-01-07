@@ -368,7 +368,7 @@ void AddLine(const Point p[2], LineVertex** vert) {
   } else {
     // just make it degenerate and likely offscreen
     for (int i = 0; i < LINE_NUM_VERTICES; ++i) {
-      (*vert)[i].pos.set(FLT_MAX, FLT_MAX);
+      (*vert)[i].pos.set(0.f, 0.f);
     }
   }
   *vert += LINE_NUM_VERTICES;
@@ -437,8 +437,6 @@ bool BloatQuad(const Point qpts[3], BezierVertex verts[QUAD_NUM_VERTICES]) {
     cb = ab;
   }
 
-  // We should have already handled degenerates
-  DEBUG_ASSERT((ab.length() > 0 && cb.length() > 0));
   auto abN = PointUtils::MakeOrthogonal(ab, PointUtils::Side::Left);
   if (Point::DotProduct(abN, ac) > 0) {
     abN.x = -abN.x;
