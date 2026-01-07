@@ -42,6 +42,9 @@ std::shared_ptr<GLDevice> GLDevice::Make(void*) {
 
 std::shared_ptr<WebGLDevice> WebGLDevice::MakeFrom(const std::string& canvasID,
                                                    std::shared_ptr<ColorSpace> colorSpace) {
+  static int i = 0;
+  i++;
+  LOGI("WebGLDevice::MakeFrom call num: %d", i);
   auto oldContext = emscripten_webgl_get_current_context();
 
   EmscriptenWebGLContextAttributes attrs;
@@ -56,6 +59,7 @@ std::shared_ptr<WebGLDevice> WebGLDevice::MakeFrom(const std::string& canvasID,
   auto context = emscripten_webgl_create_context(canvasID.c_str(), &attrs);
   if (context == 0) {
     // fallback to WebGL 1.0
+    LOGI("WebGLDevice::MakeFrom fallback to WebGL 1.0");
     attrs.majorVersion = 1;
     context = emscripten_webgl_create_context(canvasID.c_str(), &attrs);
     if (context == 0) {
