@@ -38,6 +38,7 @@ class DisplayList;
 class DrawArgs;
 class RegionTransformer;
 class RootLayer;
+class Render3DContext;
 struct LayerStyleSource;
 struct MaskData;
 class BackgroundContext;
@@ -621,13 +622,14 @@ class Layer : public std::enable_shared_from_this<Layer> {
   bool drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
                     const Layer* stopChild = nullptr);
 
-  void drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, float alpha);
+  void drawByStarting3DContext(const DrawArgs& args, Canvas* canvas);
 
-  /**
-   * Draws the layer in a 3D rendering context using an offscreen canvas and composites the result
-   * to the 3D compositor.
-   */
-  void drawIn3DContext(const DrawArgs& args, Canvas* canvas, float alpha);
+  std::optional<DrawArgs> createChildArgs(const DrawArgs& args, Canvas* canvas, Layer* child,
+                                          bool skipBackground, bool clipContentByCanvas,
+                                          int childIndex, int lastBackgroundIndex);
+
+  void drawChild(const DrawArgs& args, Canvas* canvas, Layer* child, float alpha,
+                 const Matrix3D& transform3D, Render3DContext* context3D, bool started3DContext);
 
   float drawBackgroundLayers(const DrawArgs& args, Canvas* canvas);
 
