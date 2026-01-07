@@ -168,11 +168,11 @@
         "shaderMaskFilter": "6b4e5ce0"
     },
     "Hello2DTest": {
-        "ConicGradient": "492105ac",
-        "ImageWithMipmap": "492105ac",
-        "ImageWithShadow": "543054b5",
-        "RichText": "97a50bee",
-        "SimpleLayerTree": "543054b5"
+        "ConicGradient": "4e98c910",
+        "ImageWithMipmap": "4e98c910",
+        "ImageWithShadow": "4e98c910",
+        "RichText": "d8e4b387",
+        "SimpleLayerTree": "4e98c910"
     },
     "LayerTest": {
         "AdaptiveDashEffect": "eefb7a46",

@@ -46,16 +46,16 @@ class Polystar : public VectorElement {
   Polystar() = default;
 
   /**
-   * Returns the position of the polystar center.
+   * Returns the center point of the polystar.
    */
-  const Point& position() const {
-    return _position;
+  const Point& center() const {
+    return _center;
   }
 
   /**
-   * Sets the position of the polystar center.
+   * Sets the center point of the polystar.
    */
-  void setPosition(const Point& value);
+  void setCenter(const Point& value);
 
   /**
    * Returns whether this is a star or a polygon.
@@ -72,14 +72,14 @@ class Polystar : public VectorElement {
   /**
    * Returns the number of points (vertices) in the polygon or star.
    */
-  float points() const {
-    return _points;
+  float pointCount() const {
+    return _pointCount;
   }
 
   /**
    * Sets the number of points (vertices) in the polygon or star.
    */
-  void setPoints(float value);
+  void setPointCount(float value);
 
   /**
    * Returns the rotation of the shape in degrees.
@@ -161,9 +161,9 @@ class Polystar : public VectorElement {
   void apply(VectorContext* context) override;
 
  private:
-  Point _position = Point::Zero();
+  Point _center = Point::Zero();
   PolystarType _polystarType = PolystarType::Star;
-  float _points = 5.0f;
+  float _pointCount = 5.0f;
   float _rotation = 0.0f;
   float _outerRadius = 100.0f;
   float _outerRoundness = 0.0f;
