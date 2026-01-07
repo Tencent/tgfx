@@ -259,17 +259,17 @@ void ConvertNoninflectCubicToQuads(const Point p[4], float toleranceSqd, std::ve
     dc = p[1] - p[3];
   }
 
-  constexpr float LENGTH_SCALE = 3.f * 1.f / 2.f;
-  constexpr int MAX_SUBDIVS = 10.f;
+  constexpr float lengthScale = 3.f * 1.f / 2.f;
+  constexpr int maxSubdivs = 10;
 
-  ab *= LENGTH_SCALE;
-  dc *= LENGTH_SCALE;
+  ab *= lengthScale;
+  dc *= lengthScale;
 
   // c0 and c1 are extrapolations along vectors ab and dc.
   auto c0 = p[0] + ab;
   auto c1 = p[3] + dc;
 
-  float distanceSqd = sublevel > MAX_SUBDIVS ? 0 : PointUtils::DistanceSquared(c0, c1);
+  float distanceSqd = sublevel > maxSubdivs ? 0 : PointUtils::DistanceSquared(c0, c1);
   if (distanceSqd < toleranceSqd) {
     Point newC;
     if (preserveFirstTangent == preserveLastTangent) {

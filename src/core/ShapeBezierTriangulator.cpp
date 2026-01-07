@@ -133,30 +133,32 @@ std::vector<uint32_t> GetLinesIndexBuffer(size_t numLines) {
 // Takes 178th time of logf on Z600 / VC2010
 int GetFloatExp(float x) {
   static_assert(sizeof(int) == sizeof(float));
-  const int* iptr = reinterpret_cast<const int*>(&x);
-  return (((*iptr) & 0x7f800000) >> 23) - 127;
+  int bits;
+  std::memcpy(&bits, &x, sizeof(float));
+  return ((bits & 0x7f800000) >> 23) - 127;
 }
 
-// returns 0 if quad/conic is degenerate or close to it in this case approx the path with lines
-// otherwise returns 1
-int IsDegenQuadOrConic(const Point p[3], float* distanceSquared) {
+// Returns true if quad/conic is degenerate or close to it (should be approximated with lines).
+// Returns false if the quad/conic is valid and should be rendered as a curve.
+// If valid, distanceSquared is set to the squared distance from control point to the line.
+bool IsDegenQuadOrConic(const Point p[3], float* distanceSquared) {
   constexpr float DegenerateToLineTol = PathUtils::DefaultTolerance;
   constexpr float DegenerateToLineTolSqd = DegenerateToLineTol * DegenerateToLineTol;
 
   if (PointUtils::DistanceSquared(p[0], p[1]) < DegenerateToLineTolSqd ||
       PointUtils::DistanceSquared(p[1], p[2]) < DegenerateToLineTolSqd) {
-    return 1;
+    return true;
   }
 
   *distanceSquared = PointUtils::DistanceToLineBetweenSquared(p[1], p[0], p[2]);
   if (*distanceSquared < DegenerateToLineTolSqd) {
-    return 1;
+    return true;
   }
 
   if (PointUtils::DistanceToLineBetweenSquared(p[2], p[1], p[0]) < DegenerateToLineTolSqd) {
-    return 1;
+    return true;
   }
-  return 0;
+  return false;
 }
 
 // we subdivide the quads to avoid huge overfill
@@ -190,7 +192,6 @@ int NumQuadSubdivs(const Point points[3]) {
 
 struct PathDecomposerContext {
   const Matrix& matrix;
-  const Rect& devClipBounds;
   float capLength;
   std::vector<Point>& lines;
   std::vector<Point>& quads;
@@ -202,31 +203,25 @@ struct PathDecomposerContext {
 };
 
 void AddChoppedQuad(PathDecomposerContext& ctx, const Point devPts[3], bool isContourStart) {
-  Rect bounds;
-  bounds.setBounds(devPts, 3);
-  bounds.outset(1.f, 1.f);
-  bounds.roundOut();
-  if (Rect::Intersects(ctx.devClipBounds, bounds)) {
-    int subdiv = NumQuadSubdivs(devPts);
-    DEBUG_ASSERT(subdiv >= -1);
-    if (-1 == subdiv) {
-      auto index = ctx.lines.size();
-      ctx.lines.push_back(devPts[0]);
-      ctx.lines.push_back(devPts[1]);
-      ctx.lines.push_back(devPts[1]);
-      ctx.lines.push_back(devPts[2]);
-      if (isContourStart && ctx.lines[index] == ctx.lines[index + 1] &&
-          ctx.lines[index + 2] == ctx.lines[index + 3]) {
-        ctx.seenZeroLengthVerb = true;
-        ctx.zeroVerbPt = ctx.lines[0];
-      }
-    } else {
-      ctx.quads.push_back(devPts[0]);
-      ctx.quads.push_back(devPts[1]);
-      ctx.quads.push_back(devPts[2]);
-      ctx.quadSubdivCnts.push_back(subdiv);
-      ctx.totalQuadCount += 1 << subdiv;
+  int subdiv = NumQuadSubdivs(devPts);
+  DEBUG_ASSERT(subdiv >= -1);
+  if (-1 == subdiv) {
+    auto index = ctx.lines.size();
+    ctx.lines.push_back(devPts[0]);
+    ctx.lines.push_back(devPts[1]);
+    ctx.lines.push_back(devPts[1]);
+    ctx.lines.push_back(devPts[2]);
+    if (isContourStart && ctx.lines[index] == ctx.lines[index + 1] &&
+        ctx.lines[index + 2] == ctx.lines[index + 3]) {
+      ctx.seenZeroLengthVerb = true;
+      ctx.zeroVerbPt = ctx.lines[0];
     }
+  } else {
+    ctx.quads.push_back(devPts[0]);
+    ctx.quads.push_back(devPts[1]);
+    ctx.quads.push_back(devPts[2]);
+    ctx.quadSubdivCnts.push_back(subdiv);
+    ctx.totalQuadCount += 1 << subdiv;
   }
 }
 
@@ -239,8 +234,6 @@ void AddSrcChoppedQuad(PathDecomposerContext& ctx, const Point srcSpaceQuadPts[3
 
 void ProcessPathVerb(PathVerb verb, const Point points[4], void* userData) {
   auto* ctx = static_cast<PathDecomposerContext*>(userData);
-  Rect bounds;
-
   switch (verb) {
     case PathVerb::Move: {
       if (ctx->seenZeroLengthVerb && ctx->verbsInContour == 1 && ctx->capLength > 0) {
@@ -254,16 +247,11 @@ void ProcessPathVerb(PathVerb verb, const Point points[4], void* userData) {
     case PathVerb::Line: {
       Point devPoints[2];
       ctx->matrix.mapPoints(devPoints, points, 2);
-      bounds.setBounds(devPoints, 2);
-      bounds.outset(1.f, 1.f);
-      bounds.roundOut();
-      if (Rect::Intersects(ctx->devClipBounds, bounds)) {
-        ctx->lines.push_back(devPoints[0]);
-        ctx->lines.push_back(devPoints[1]);
-        if (ctx->verbsInContour == 0 && devPoints[0] == devPoints[1]) {
-          ctx->seenZeroLengthVerb = true;
-          ctx->zeroVerbPt = devPoints[0];
-        }
+      ctx->lines.push_back(devPoints[0]);
+      ctx->lines.push_back(devPoints[1]);
+      if (ctx->verbsInContour == 0 && devPoints[0] == devPoints[1]) {
+        ctx->seenZeroLengthVerb = true;
+        ctx->zeroVerbPt = devPoints[0];
       }
       ctx->verbsInContour++;
       break;
@@ -280,14 +268,9 @@ void ProcessPathVerb(PathVerb verb, const Point points[4], void* userData) {
     case PathVerb::Cubic: {
       Point devPts[4];
       ctx->matrix.mapPoints(devPts, points, 4);
-      bounds.setBounds(devPts, 4);
-      bounds.outset(1.f, 1.f);
-      bounds.roundOut();
-      if (Rect::Intersects(ctx->devClipBounds, bounds)) {
-        auto quadPoints = PathUtils::ConvertCubicToQuads(devPts, 1.f);
-        for (uint32_t i = 0; i < quadPoints.size(); i += 3) {
-          AddChoppedQuad(*ctx, &quadPoints[i], !ctx->verbsInContour && 0 == i);
-        }
+      auto quadPoints = PathUtils::ConvertCubicToQuads(devPts, 1.f);
+      for (uint32_t i = 0; i < quadPoints.size(); i += 3) {
+        AddChoppedQuad(*ctx, &quadPoints[i], !ctx->verbsInContour && 0 == i);
       }
       ctx->verbsInContour++;
       break;
@@ -301,13 +284,8 @@ void ProcessPathVerb(PathVerb verb, const Point points[4], void* userData) {
           Point devPts[2];
           ctx->matrix.mapPoints(devPts, points, 1);
           devPts[1] = devPts[0];
-          bounds.setBounds(devPts, 2);
-          bounds.outset(1.f, 1.f);
-          bounds.roundOut();
-          if (Rect::Intersects(ctx->devClipBounds, bounds)) {
-            ctx->lines.emplace_back(devPts[0].x - ctx->capLength, devPts[0].y);
-            ctx->lines.emplace_back(devPts[1].x - ctx->capLength, devPts[1].y);
-          }
+          ctx->lines.emplace_back(devPts[0].x - ctx->capLength, devPts[0].y);
+          ctx->lines.emplace_back(devPts[1].x - ctx->capLength, devPts[1].y);
         }
       }
       break;
@@ -324,17 +302,17 @@ void ProcessPathVerb(PathVerb verb, const Point points[4], void* userData) {
  * subdivide large quads to reduce over-fill. This subdivision has to be
  * performed before applying the perspective matrix.
  */
-uint32_t GatherLinesAndQuads(const Path& path, const Matrix& matrix, const Rect& devClipBounds,
-                             float capLength, std::vector<Point>& lines, std::vector<Point>& quads,
+uint32_t GatherLinesAndQuads(const Path& path, const Matrix& matrix, float capLength,
+                             std::vector<Point>& lines, std::vector<Point>& quads,
                              std::vector<int>& quadSubdivCnts) {
   uint32_t totalQuadCount = 0;
   int verbsInContour = 0;
   bool seenZeroLengthVerb = false;
   Point zeroVerbPt;
 
-  PathDecomposerContext ctx = {
-      matrix,         devClipBounds,  capLength,          lines,     quads, quadSubdivCnts,
-      totalQuadCount, verbsInContour, seenZeroLengthVerb, zeroVerbPt};
+  PathDecomposerContext ctx = {matrix,         capLength,          lines,
+                               quads,          quadSubdivCnts,     totalQuadCount,
+                               verbsInContour, seenZeroLengthVerb, zeroVerbPt};
 
   path.decompose(ProcessPathVerb, &ctx);
 
@@ -406,8 +384,7 @@ Point IntersectLines(const Point& pointA, const Point& normA, const Point& point
   wInv = 1.0f / wInv;
   if (!std::isfinite(wInv)) {
     // lines are parallel, pick the point in between
-    result = (pointA + pointB) * HALF_PIXEL_LENGTH;
-    result += normA;
+    result = (pointA + pointB) * 0.5f;
   } else {
     result.x = normA.y * lineBW - lineAW * normB.y;
     result.x *= wInv;
@@ -503,7 +480,7 @@ void AddQuad(const Point points[3], int subdiv, BezierVertex** vert) {
     // * chop the quad using pts 2,3,4 as the input
     // * write out verts using pts 0,1,2
     // * now 2,3,4 is the remainder of the curve, chop again until all subdivisions are done
-    float h = 1.f / stepCount;
+    float h = 1.f / static_cast<float>(stepCount);
     PathUtils::ChopQuadAt(&choppedQuadPoints[2], choppedQuadPoints, h);
 
     if (BloatQuad(choppedQuadPoints, outVerts)) {
@@ -537,11 +514,8 @@ std::shared_ptr<HairlineBuffer> ShapeBezierTriangulator::getData() const {
   std::vector<Point> quads;
   quads.reserve(128);
   std::vector<int> quadSubdivs;
-  // The algorithm supports matrix scaling and clipping of invisible parts. This temporary tradeoff is
-  // made to maximize buffer reuse.
   float capLength = hasCap ? PIXEL_LENGTH : 0.0f;
-  auto quadCount = GatherLinesAndQuads(path, Matrix::I(), path.getBounds(), capLength, lines, quads,
-                                       quadSubdivs);
+  auto quadCount = GatherLinesAndQuads(path, Matrix::I(), capLength, lines, quads, quadSubdivs);
 
   auto lineCount = lines.size() / 2;
   constexpr int MAX_LINES = INT32_MAX / LINE_NUM_VERTICES;
