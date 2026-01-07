@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,32 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "layers/contents/GeometryContent.h"
-#include "tgfx/core/Matrix.h"
-#include "tgfx/core/TextBlob.h"
+#include "Geometry.h"
 
 namespace tgfx {
 
-class TextContent : public GeometryContent {
- public:
-  TextContent(std::shared_ptr<TextBlob> textBlob, const Matrix& matrix, const LayerPaint& paint);
-
-  Rect getTightBounds(const Matrix& matrix) const override;
-  bool hitTestPoint(float localX, float localY) const override;
-
-  std::shared_ptr<TextBlob> textBlob = nullptr;
-  Matrix textMatrix = Matrix::I();
-
- protected:
-  Type type() const override {
-    return Type::Text;
+std::shared_ptr<Shape> TextGeometry::getShape() {
+  if (textBlob == nullptr) {
+    return nullptr;
   }
-
-  Rect onGetBounds() const override;
-  void onDraw(Canvas* canvas, const Paint& paint) const override;
-  bool onHasSameGeometry(const GeometryContent* other) const override;
-};
+  if (cachedShape == nullptr) {
+    cachedShape = Shape::MakeFrom(textBlob);
+  }
+  return cachedShape;
+}
 
 }  // namespace tgfx

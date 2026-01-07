@@ -24,8 +24,30 @@ void VectorContext::addShape(std::shared_ptr<Shape> shape) {
   if (shape == nullptr) {
     return;
   }
-  shapes.push_back(std::move(shape));
+  geometries.push_back(std::make_unique<ShapeGeometry>(std::move(shape)));
   matrices.push_back(Matrix::I());
+}
+
+void VectorContext::addTextBlob(std::shared_ptr<TextBlob> blob, const Point& position) {
+  if (blob == nullptr) {
+    return;
+  }
+  geometries.push_back(std::make_unique<TextGeometry>(std::move(blob)));
+  matrices.push_back(Matrix::MakeTrans(position.x, position.y));
+}
+
+std::vector<ShapeGeometry*> VectorContext::getShapeGeometries() {
+  std::vector<ShapeGeometry*> result = {};
+  for (auto& geometry : geometries) {
+    if (geometry->type() == GeometryType::Shape) {
+      result.push_back(static_cast<ShapeGeometry*>(geometry.get()));
+    } else {
+      auto shapeGeometry = std::make_unique<ShapeGeometry>(geometry->getShape());
+      result.push_back(shapeGeometry.get());
+      geometry = std::move(shapeGeometry);
+    }
+  }
+  return result;
 }
 
 }  // namespace tgfx

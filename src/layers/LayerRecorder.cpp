@@ -104,12 +104,17 @@ void LayerRecorder::addShape(std::shared_ptr<Shape> shape, const LayerPaint& pai
 
 void LayerRecorder::addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerPaint& paint,
                                 float x, float y) {
+  addTextBlob(std::move(textBlob), paint, Matrix::MakeTrans(x, y));
+}
+
+void LayerRecorder::addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerPaint& paint,
+                                const Matrix& matrix) {
   if (textBlob == nullptr) {
     return;
   }
   flushPending();
   auto& list = paint.drawOrder == DrawOrder::AboveChildren ? foregrounds : contents;
-  list.push_back(std::make_unique<TextContent>(std::move(textBlob), x, y, paint));
+  list.push_back(std::make_unique<TextContent>(std::move(textBlob), matrix, paint));
 }
 
 bool LayerRecorder::canAppend(PendingType type, const LayerPaint& paint) const {

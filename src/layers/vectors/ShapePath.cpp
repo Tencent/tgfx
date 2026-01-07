@@ -18,6 +18,7 @@
 
 #include "tgfx/layers/vectors/ShapePath.h"
 #include "VectorContext.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
 
@@ -40,6 +41,7 @@ void ShapePath::setReversed(bool value) {
 }
 
 void ShapePath::apply(VectorContext* context) {
+  DEBUG_ASSERT(context != nullptr);
   if (_cachedShape == nullptr) {
     _cachedShape = Shape::MakeFrom(_path);
     if (_reversed) {

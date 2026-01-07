@@ -18,6 +18,7 @@
 
 #include "tgfx/layers/vectors/TrimPath.h"
 #include "VectorContext.h"
+#include "core/utils/Log.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/core/PathMeasure.h"
 
@@ -69,15 +70,16 @@ static void ApplyTrimIndividually(VectorContext* context, float start, float end
   start -= shift;
   end -= shift;
 
-  auto shapeCount = context->shapes.size();
+  auto geometries = context->getShapeGeometries();
+  auto shapeCount = geometries.size();
 
   // Calculate total length (in reversed order if needed)
   float totalLength = 0;
   std::vector<float> lengths(shapeCount);
   for (size_t i = 0; i < shapeCount; i++) {
     auto index = reversed ? (shapeCount - 1 - i) : i;
-    auto& shape = context->shapes[index];
-    if (!shape) {
+    auto& shape = geometries[index]->shape;
+    if (shape == nullptr) {
       continue;
     }
     auto path = shape->getPath();
@@ -148,16 +150,17 @@ static void ApplyTrimIndividually(VectorContext* context, float start, float end
       }
     }
 
+    auto geometry = geometries[index];
     if (hasSegment) {
-      auto& shape = context->shapes[index];
+      auto shape = geometry->shape;
       // When reversed, we need to reverse each shape's path before trimming
       if (reversed) {
         shape = Shape::ApplyReverse(shape);
       }
       auto trimEffect = PathEffect::MakeTrim(localStart, localEnd);
-      context->shapes[index] = Shape::ApplyEffect(shape, trimEffect);
+      geometry->shape = Shape::ApplyEffect(shape, trimEffect);
     } else {
-      context->shapes[index] = nullptr;
+      geometry->shape = nullptr;
     }
 
     addedLength += shapeLength;
@@ -165,7 +168,8 @@ static void ApplyTrimIndividually(VectorContext* context, float start, float end
 }
 
 void TrimPath::apply(VectorContext* context) {
-  if (context == nullptr || context->shapes.empty()) {
+  DEBUG_ASSERT(context != nullptr);
+  if (context->geometries.empty()) {
     return;
   }
 
@@ -174,9 +178,10 @@ void TrimPath::apply(VectorContext* context) {
   auto end = _end + offset;
 
   if (_trimType == TrimPathType::Simultaneously) {
+    auto geometries = context->getShapeGeometries();
     auto trimEffect = PathEffect::MakeTrim(start, end);
-    for (auto& shape : context->shapes) {
-      shape = Shape::ApplyEffect(shape, trimEffect);
+    for (auto& geometry : geometries) {
+      geometry->shape = Shape::ApplyEffect(geometry->shape, trimEffect);
     }
   } else {
     ApplyTrimIndividually(context, start, end);

@@ -18,6 +18,7 @@
 
 #include "tgfx/layers/vectors/RoundCorner.h"
 #include "VectorContext.h"
+#include "core/utils/Log.h"
 #include "tgfx/core/PathEffect.h"
 
 namespace tgfx {
@@ -32,14 +33,19 @@ void RoundCorner::setRadius(float value) {
 }
 
 void RoundCorner::apply(VectorContext* context) {
+  DEBUG_ASSERT(context != nullptr);
+  if (context->geometries.empty()) {
+    return;
+  }
   if (_cachedEffect == nullptr) {
     _cachedEffect = PathEffect::MakeCorner(_radius);
   }
   if (_cachedEffect == nullptr) {
     return;
   }
-  for (auto& shape : context->shapes) {
-    shape = Shape::ApplyEffect(shape, _cachedEffect);
+  auto geometries = context->getShapeGeometries();
+  for (auto& geometry : geometries) {
+    geometry->shape = Shape::ApplyEffect(geometry->shape, _cachedEffect);
   }
 }
 
