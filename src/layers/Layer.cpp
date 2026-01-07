@@ -1782,15 +1782,9 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
       auto& currentTransform = childArgs.render3DContext->transform();
       auto childTransform = childMatrix;
       childTransform.postConcat(currentTransform);
-      if (IsTransformedLayerRectBehindCamera(child->getBounds(), childTransform)) {
-        continue;
-      }
       childArgs.render3DContext->setTransform(childTransform);
       child->drawIn3DContext(childArgs, canvas, child->_alpha * alpha);
     } else if (child->canPreserve3D()) {
-      if (IsTransformedLayerRectBehindCamera(child->getBounds(), childMatrix)) {
-        continue;
-      }
       // Start a 3D rendering context.
       child->drawByStarting3DContext(childArgs, canvas, child->_alpha * alpha);
     } else {
@@ -2278,6 +2272,7 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> contextTransfo
         RegionTransformer::MakeFromStyles(_layerStyles, 1.0f, std::move(contextTransformer));
   }
   auto content = getContent();
+  bool behindCamera = false;
   if (bitFields.dirtyContentBounds || (forceDirty && content)) {
     if (contentBounds) {
       _root->invalidateRect(*contentBounds);
@@ -2286,10 +2281,20 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> contextTransfo
     }
     if (content) {
       *contentBounds = content->getBounds();
-      if (contextTransformer) {
-        contextTransformer->transform(contentBounds);
+      // Check if the layer is behind the camera in 3D context or has 3D transform.
+      if (localToContext3D != nullptr) {
+        behindCamera = IsTransformedLayerRectBehindCamera(*contentBounds, *localToContext3D);
+      } else if (!bitFields.matrix3DIsAffine) {
+        behindCamera = IsTransformedLayerRectBehindCamera(*contentBounds, _matrix3D);
       }
-      _root->invalidateRect(*contentBounds);
+      if (!behindCamera) {
+        if (contextTransformer) {
+          contextTransformer->transform(contentBounds);
+        }
+        _root->invalidateRect(*contentBounds);
+      } else {
+        contentBounds->setEmpty();
+      }
     } else {
       contentBounds->setEmpty();
     }
@@ -2359,13 +2364,15 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> contextTransfo
     }
   }
   auto backOutset = 0.f;
-  for (auto& style : _layerStyles) {
-    if (style->extraSourceType() != LayerStyleExtraSourceType::Background) {
-      continue;
+  if (!behindCamera) {
+    for (auto& style : _layerStyles) {
+      if (style->extraSourceType() != LayerStyleExtraSourceType::Background) {
+        continue;
+      }
+      auto outset = style->filterBackground(Rect::MakeEmpty(), contentScale);
+      backOutset = std::max(backOutset, outset.right);
+      backOutset = std::max(backOutset, outset.bottom);
     }
-    auto outset = style->filterBackground(Rect::MakeEmpty(), contentScale);
-    backOutset = std::max(backOutset, outset.right);
-    backOutset = std::max(backOutset, outset.bottom);
   }
   if (backOutset > 0) {
     maxBackgroundOutset = std::max(backOutset, maxBackgroundOutset);
