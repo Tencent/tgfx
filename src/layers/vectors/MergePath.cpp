@@ -18,6 +18,7 @@
 
 #include "tgfx/layers/vectors/MergePath.h"
 #include "VectorContext.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
 
@@ -30,21 +31,26 @@ void MergePath::setPathOp(PathOp value) {
 }
 
 void MergePath::apply(VectorContext* context) {
-  if (context->shapes.empty()) {
+  DEBUG_ASSERT(context != nullptr);
+  if (context->geometries.empty()) {
     return;
   }
+  auto geometries = context->getShapeGeometries();
 
   std::shared_ptr<Shape> mergedShape = nullptr;
-  for (size_t i = 0; i < context->shapes.size(); i++) {
-    auto& shape = context->shapes[i];
-    if (shape) {
-      auto shapeWithMatrix = Shape::ApplyMatrix(shape, context->matrices[i]);
-      mergedShape = Shape::Merge(mergedShape, shapeWithMatrix, _pathOp);
+  for (size_t i = 0; i < geometries.size(); i++) {
+    auto& shape = geometries[i]->shape;
+    if (shape == nullptr) {
+      continue;
     }
+    auto shapeWithMatrix = Shape::ApplyMatrix(shape, context->matrices[i]);
+    mergedShape = Shape::Merge(mergedShape, shapeWithMatrix, _pathOp);
   }
-  context->shapes.clear();
+
+  context->geometries.clear();
   context->matrices.clear();
   context->painters.clear();
+
   if (mergedShape) {
     context->addShape(std::move(mergedShape));
   }

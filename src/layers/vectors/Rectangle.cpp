@@ -18,6 +18,7 @@
 
 #include "tgfx/layers/vectors/Rectangle.h"
 #include "VectorContext.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
 
@@ -58,6 +59,7 @@ void Rectangle::setReversed(bool value) {
 }
 
 void Rectangle::apply(VectorContext* context) {
+  DEBUG_ASSERT(context != nullptr);
   if (_cachedShape == nullptr) {
     auto halfWidth = _size.x * 0.5f;
     auto halfHeight = _size.y * 0.5f;

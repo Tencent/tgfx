@@ -19,7 +19,7 @@
 #include "tgfx/layers/vectors/FillStyle.h"
 #include "Painter.h"
 #include "VectorContext.h"
-#include "tgfx/core/Shape.h"
+#include "core/utils/Log.h"
 #include "tgfx/layers/LayerPaint.h"
 #include "tgfx/layers/LayerRecorder.h"
 
@@ -34,15 +34,30 @@ class FillPainter : public Painter {
   }
 
  protected:
-  void onDraw(LayerRecorder* recorder, std::shared_ptr<Shape> shape) override {
+  void onDraw(LayerRecorder* recorder, Geometry* geometry, const Matrix& innerMatrix) override {
+    auto finalMatrix = innerMatrix;
+    finalMatrix.postConcat(matrix);
+    LayerPaint paint(shader, alpha, blendMode);
+
+    // Prefer drawing TextBlob directly for better rendering quality
+    auto textBlob = geometry->getTextBlob();
+    if (textBlob) {
+      recorder->addTextBlob(textBlob, paint, finalMatrix);
+      return;
+    }
+
+    // Fall back to Shape for ShapeGeometry or converted TextGeometry
+    auto shape = geometry->getShape();
+    if (shape == nullptr) {
+      return;
+    }
     // Only apply fillRule if the shape's current fillType is the default (Winding).
     // This preserves fillType set by PathOp (e.g., MergePath with XOR produces EvenOdd).
     if (shape->fillType() == PathFillType::Winding) {
       shape = Shape::ApplyFillType(shape, fillRule);
     }
-    shape = Shape::ApplyMatrix(shape, matrix);
-    LayerPaint paint(shader, alpha, blendMode);
-    recorder->addShape(shape, paint);
+    shape = Shape::ApplyMatrix(shape, finalMatrix);
+    recorder->addShape(std::move(shape), paint);
   }
 };
 
@@ -94,7 +109,8 @@ void FillStyle::detachFromLayer(Layer* layer) {
 }
 
 void FillStyle::apply(VectorContext* context) {
-  if (_colorSource == nullptr || context->shapes.empty()) {
+  DEBUG_ASSERT(context != nullptr);
+  if (_colorSource == nullptr || context->geometries.empty()) {
     return;
   }
   auto shader = _colorSource->getShader();

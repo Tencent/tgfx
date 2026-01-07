@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/DisplayList.h"
+#include "tgfx/layers/Gradient.h"
+#include "tgfx/layers/ImagePattern.h"
 #include "tgfx/layers/SolidColor.h"
 #include "tgfx/layers/VectorLayer.h"
 #include "tgfx/layers/vectors/Ellipse.h"
@@ -28,6 +30,7 @@
 #include "tgfx/layers/vectors/RoundCorner.h"
 #include "tgfx/layers/vectors/ShapePath.h"
 #include "tgfx/layers/vectors/StrokeStyle.h"
+#include "tgfx/layers/vectors/TextSpan.h"
 #include "tgfx/layers/vectors/TrimPath.h"
 #include "tgfx/layers/vectors/VectorGroup.h"
 #include "utils/TestUtils.h"
@@ -1747,6 +1750,671 @@ TGFX_TEST(VectorLayerTest, StrokeJoinCap) {
   displayList->render(surface.get());
 
   EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/StrokeJoinCap"));
+}
+
+// ==================== Text Rendering Tests ====================
+
+static std::shared_ptr<Typeface> GetTestTypeface() {
+  return MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+}
+
+static std::shared_ptr<Typeface> GetEmojiTypeface() {
+  return MakeTypeface("resources/font/NotoColorEmoji.ttf");
+}
+
+/**
+ * Test basic TextSpan rendering with different positions.
+ */
+TGFX_TEST(VectorLayerTest, TextSpanBasic) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 291, 240);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto displayList = std::make_unique<DisplayList>();
+  auto vectorLayer = VectorLayer::Make();
+
+  auto typeface = GetTestTypeface();
+  if (typeface == nullptr) {
+    return;
+  }
+  Font font(typeface, 36.0f);
+
+  // TextSpan 1: Basic text at origin
+  auto textSpan1 = std::make_shared<TextSpan>();
+  auto blob1 = TextBlob::MakeFrom("Hello TGFX", font);
+  textSpan1->setTextBlob(blob1);
+  textSpan1->setPosition({50, 80});
+
+  // TextSpan 2: Text at different position
+  auto textSpan2 = std::make_shared<TextSpan>();
+  auto blob2 = TextBlob::MakeFrom("Vector Text", font);
+  textSpan2->setTextBlob(blob2);
+  textSpan2->setPosition({50, 140});
+
+  // TextSpan 3: Smaller font
+  Font smallFont(typeface, 24.0f);
+  auto textSpan3 = std::make_shared<TextSpan>();
+  auto blob3 = TextBlob::MakeFrom("Small Text", smallFont);
+  textSpan3->setTextBlob(blob3);
+  textSpan3->setPosition({50, 190});
+
+  auto fill = MakeFillStyle(Color::Black());
+  vectorLayer->setContents({textSpan1, textSpan2, textSpan3, fill});
+
+  displayList->root()->addChild(vectorLayer);
+  displayList->render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/TextSpanBasic"));
+}
+
+/**
+ * Test TextSpan with VectorGroup transformations.
+ */
+TGFX_TEST(VectorLayerTest, TextSpanWithGroup) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 494, 226);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto displayList = std::make_unique<DisplayList>();
+  auto vectorLayer = VectorLayer::Make();
+
+  auto typeface = GetTestTypeface();
+  if (typeface == nullptr) {
+    return;
+  }
+  Font font(typeface, 32.0f);
+
+  // Group 1: Rotated text
+  auto group1 = std::make_shared<VectorGroup>();
+  group1->setPosition({50, 76});
+  group1->setRotation(15.0f);
+
+  auto textSpan1 = std::make_shared<TextSpan>();
+  auto blob1 = TextBlob::MakeFrom("Rotated", font);
+  textSpan1->setTextBlob(blob1);
+
+  auto fill1 = MakeFillStyle(Color::Red());
+  group1->setElements({textSpan1, fill1});
+
+  // Group 2: Scaled text
+  auto group2 = std::make_shared<VectorGroup>();
+  group2->setPosition({250, 76});
+  group2->setScale({2.0f, 1.0f});
+
+  auto textSpan2 = std::make_shared<TextSpan>();
+  auto blob2 = TextBlob::MakeFrom("Scaled", font);
+  textSpan2->setTextBlob(blob2);
+
+  auto fill2 = MakeFillStyle(Color::Blue());
+  group2->setElements({textSpan2, fill2});
+
+  // Group 3: Skewed text with alpha
+  auto group3 = std::make_shared<VectorGroup>();
+  group3->setPosition({50, 176});
+  group3->setSkew(20.0f);
+  group3->setAlpha(0.6f);
+
+  auto textSpan3 = std::make_shared<TextSpan>();
+  auto blob3 = TextBlob::MakeFrom("Skewed", font);
+  textSpan3->setTextBlob(blob3);
+
+  auto fill3 = MakeFillStyle(Color::Green());
+  group3->setElements({textSpan3, fill3});
+
+  vectorLayer->setContents({group1, group2, group3});
+
+  displayList->root()->addChild(vectorLayer);
+  displayList->render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/TextSpanWithGroup"));
+}
+
+/**
+ * Test TextSpan with fill and stroke styles.
+ */
+TGFX_TEST(VectorLayerTest, TextSpanStyles) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 340, 210);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto displayList = std::make_unique<DisplayList>();
+  auto vectorLayer = VectorLayer::Make();
+
+  auto typeface = GetTestTypeface();
+  if (typeface == nullptr) {
+    return;
+  }
+  Font font(typeface, 48.0f);
+  font.setFauxBold(true);
+
+  // Group 1: Fill only
+  auto group1 = std::make_shared<VectorGroup>();
+  group1->setPosition({46, 60});
+
+  auto textSpan1 = std::make_shared<TextSpan>();
+  auto blob1 = TextBlob::MakeFrom("Fill", font);
+  textSpan1->setTextBlob(blob1);
+
+  auto fill1 = MakeFillStyle(Color::Red());
+  group1->setElements({textSpan1, fill1});
+
+  // Group 2: Stroke only
+  auto group2 = std::make_shared<VectorGroup>();
+  group2->setPosition({141, 60});
+
+  auto textSpan2 = std::make_shared<TextSpan>();
+  auto blob2 = TextBlob::MakeFrom("Stroke", font);
+  textSpan2->setTextBlob(blob2);
+
+  auto stroke2 = MakeStrokeStyle(Color::Blue(), 2.0f);
+  group2->setElements({textSpan2, stroke2});
+
+  // Group 3: Fill and stroke
+  auto group3 = std::make_shared<VectorGroup>();
+  group3->setPosition({46, 120});
+
+  auto textSpan3 = std::make_shared<TextSpan>();
+  auto blob3 = TextBlob::MakeFrom("Fill+Stroke", font);
+  textSpan3->setTextBlob(blob3);
+
+  auto fill3 = MakeFillStyle(Color::FromRGBA(255, 200, 0, 255));
+  auto stroke3 = MakeStrokeStyle(Color::FromRGBA(200, 100, 0, 255), 2.0f);
+  group3->setElements({textSpan3, fill3, stroke3});
+
+  // Group 4: Dash stroke
+  auto group4 = std::make_shared<VectorGroup>();
+  group4->setPosition({46, 180});
+
+  auto textSpan4 = std::make_shared<TextSpan>();
+  auto blob4 = TextBlob::MakeFrom("Dash", font);
+  textSpan4->setTextBlob(blob4);
+
+  auto stroke4 = MakeStrokeStyle(Color::Green(), 2.0f);
+  stroke4->setDashes({8.0f, 4.0f});
+  group4->setElements({textSpan4, stroke4});
+
+  vectorLayer->setContents({group1, group2, group3, group4});
+
+  displayList->root()->addChild(vectorLayer);
+  displayList->render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/TextSpanStyles"));
+}
+
+/**
+ * Test TextSpan with path modifiers (RoundCorner, MergePath).
+ * Text is converted to shape when path modifiers are applied.
+ */
+TGFX_TEST(VectorLayerTest, TextSpanWithPathModifiers) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 399, 222);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto displayList = std::make_unique<DisplayList>();
+  auto vectorLayer = VectorLayer::Make();
+
+  auto typeface = GetTestTypeface();
+  if (typeface == nullptr) {
+    return;
+  }
+  Font font(typeface, 48.0f);
+  font.setFauxBold(true);
+
+  // Group 1: Text with RoundCorner
+  auto group1 = std::make_shared<VectorGroup>();
+  group1->setPosition({50, 91});
+
+  auto textSpan1 = std::make_shared<TextSpan>();
+  auto blob1 = TextBlob::MakeFrom("Round", font);
+  textSpan1->setTextBlob(blob1);
+
+  auto roundCorner = std::make_shared<RoundCorner>();
+  roundCorner->setRadius(5.0f);
+
+  auto fill1 = MakeFillStyle(Color::Blue());
+  group1->setElements({textSpan1, roundCorner, fill1});
+
+  // Group 2: Text with MergePath (text with emoji, emoji should be discarded after merge)
+  auto group2 = std::make_shared<VectorGroup>();
+  group2->setPosition({50, 171});
+
+  auto textSpan2a = std::make_shared<TextSpan>();
+  auto blob2a = TextBlob::MakeFrom("AB🐼", font);
+  textSpan2a->setTextBlob(blob2a);
+
+  auto textSpan2b = std::make_shared<TextSpan>();
+  auto blob2b = TextBlob::MakeFrom("CD🎉", font);
+  textSpan2b->setTextBlob(blob2b);
+  textSpan2b->setPosition({100, 0});
+
+  auto mergePath = std::make_shared<MergePath>();
+  mergePath->setPathOp(PathOp::Union);
+
+  auto fill2 = MakeFillStyle(Color::Red());
+  group2->setElements({textSpan2a, textSpan2b, mergePath, fill2});
+
+  // Group 3: Text with TrimPath
+  auto group3 = std::make_shared<VectorGroup>();
+  group3->setPosition({250, 171});
+
+  auto textSpan3 = std::make_shared<TextSpan>();
+  auto blob3 = TextBlob::MakeFrom("Trim", font);
+  textSpan3->setTextBlob(blob3);
+
+  auto trimPath = std::make_shared<TrimPath>();
+  trimPath->setStart(0.2f);
+  trimPath->setEnd(0.8f);
+
+  auto stroke3 = MakeStrokeStyle(Color::Black(), 2.0f);
+  group3->setElements({textSpan3, trimPath, stroke3});
+
+  vectorLayer->setContents({group1, group2, group3});
+
+  displayList->root()->addChild(vectorLayer);
+  displayList->render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/TextSpanWithPathModifiers"));
+}
+
+/**
+ * Test TextSpan edge cases: empty blob, disabled span, nested groups.
+ */
+TGFX_TEST(VectorLayerTest, TextSpanEdgeCases) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 368, 204);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto displayList = std::make_unique<DisplayList>();
+  auto vectorLayer = VectorLayer::Make();
+
+  auto typeface = GetTestTypeface();
+  if (typeface == nullptr) {
+    return;
+  }
+  Font font(typeface, 32.0f);
+
+  // Group 1: Empty TextBlob (should render nothing)
+  auto group1 = std::make_shared<VectorGroup>();
+  group1->setPosition({47, 26});
+
+  auto emptySpan = std::make_shared<TextSpan>();
+  // textBlob is nullptr by default
+
+  auto fill1 = MakeFillStyle(Color::Red());
+  group1->setElements({emptySpan, fill1});
+
+  // Group 2: Disabled TextSpan (should not render)
+  auto group2 = std::make_shared<VectorGroup>();
+  group2->setPosition({47, 76});
+
+  auto disabledSpan = std::make_shared<TextSpan>();
+  auto blob2 = TextBlob::MakeFrom("Disabled", font);
+  disabledSpan->setTextBlob(blob2);
+  disabledSpan->setEnabled(false);
+
+  // This text should render (enabled by default)
+  auto enabledSpan = std::make_shared<TextSpan>();
+  auto blob2b = TextBlob::MakeFrom("Enabled", font);
+  enabledSpan->setTextBlob(blob2b);
+  enabledSpan->setPosition({150, 0});
+
+  auto fill2 = MakeFillStyle(Color::Blue());
+  group2->setElements({disabledSpan, enabledSpan, fill2});
+
+  // Group 3: Nested groups with text (transform accumulation)
+  auto outerGroup = std::make_shared<VectorGroup>();
+  outerGroup->setPosition({47, 136});
+  outerGroup->setScale({1.0f, 1.0f});
+
+  auto innerGroup = std::make_shared<VectorGroup>();
+  innerGroup->setRotation(10.0f);
+
+  auto nestedSpan = std::make_shared<TextSpan>();
+  auto blob3 = TextBlob::MakeFrom("Nested", font);
+  nestedSpan->setTextBlob(blob3);
+
+  auto fill3 = MakeFillStyle(Color::Green());
+  innerGroup->setElements({nestedSpan, fill3});
+  outerGroup->setElements({innerGroup});
+
+  vectorLayer->setContents({group1, group2, outerGroup});
+
+  displayList->root()->addChild(vectorLayer);
+  displayList->render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/TextSpanEdgeCases"));
+}
+
+/**
+ * Test TextSpan with Repeater modifier.
+ */
+TGFX_TEST(VectorLayerTest, TextSpanWithRepeater) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 386, 218);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto displayList = std::make_unique<DisplayList>();
+  auto vectorLayer = VectorLayer::Make();
+
+  auto typeface = GetTestTypeface();
+  if (typeface == nullptr) {
+    return;
+  }
+  Font font(typeface, 24.0f);
+
+  // Text with Repeater
+  auto group = std::make_shared<VectorGroup>();
+  group->setPosition({50, 68});
+
+  auto textSpan = std::make_shared<TextSpan>();
+  auto blob = TextBlob::MakeFrom("ABC", font);
+  textSpan->setTextBlob(blob);
+
+  auto repeater = std::make_shared<Repeater>();
+  repeater->setCopies(5);
+  repeater->setPosition({60, 25});
+  repeater->setStartAlpha(1.0f);
+  repeater->setEndAlpha(0.3f);
+
+  auto fill = MakeFillStyle(Color::Blue());
+  group->setElements({textSpan, fill, repeater});
+
+  vectorLayer->setContents({group});
+
+  displayList->root()->addChild(vectorLayer);
+  displayList->render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/TextSpanWithRepeater"));
+}
+
+/**
+ * Test TextSpan with emoji characters.
+ * Emoji are rendered as images, not paths, so they should display correctly with fill.
+ * When path modifiers (TrimPath, MergePath, RoundCorner) are applied, emoji will be lost
+ * since they don't have path outlines.
+ */
+TGFX_TEST(VectorLayerTest, TextSpanEmoji) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 372, 318);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto displayList = std::make_unique<DisplayList>();
+  auto vectorLayer = VectorLayer::Make();
+
+  auto textTypeface = GetTestTypeface();
+  auto emojiTypeface = GetEmojiTypeface();
+  if (textTypeface == nullptr || emojiTypeface == nullptr) {
+    return;
+  }
+
+  Font textFont(textTypeface, 32.0f);
+  Font emojiFont(emojiTypeface, 32.0f);
+
+  // Group 1: Mixed text and emoji with fill
+  auto group1 = std::make_shared<VectorGroup>();
+  group1->setPosition({50, 80});
+
+  auto textSpan1 = std::make_shared<TextSpan>();
+  auto blob1 = TextBlob::MakeFrom("Hello ", textFont);
+  textSpan1->setTextBlob(blob1);
+
+  auto emojiSpan1 = std::make_shared<TextSpan>();
+  auto emojiBlob1 = TextBlob::MakeFrom("🎨🌈", emojiFont);
+  emojiSpan1->setTextBlob(emojiBlob1);
+  emojiSpan1->setPosition({85, 0});
+
+  auto textSpan1b = std::make_shared<TextSpan>();
+  auto blob1b = TextBlob::MakeFrom(" World", textFont);
+  textSpan1b->setTextBlob(blob1b);
+  textSpan1b->setPosition({165, 0});
+
+  auto fill1 = MakeFillStyle(Color::Black());
+  group1->setElements({textSpan1, emojiSpan1, textSpan1b, fill1});
+
+  // Group 2: Emoji with stroke (emoji won't show stroke, but text will)
+  auto group2 = std::make_shared<VectorGroup>();
+  group2->setPosition({50, 150});
+
+  auto textSpan2 = std::make_shared<TextSpan>();
+  auto blob2 = TextBlob::MakeFrom("Stroke: ", textFont);
+  textSpan2->setTextBlob(blob2);
+
+  auto emojiSpan2 = std::make_shared<TextSpan>();
+  auto emojiBlob2 = TextBlob::MakeFrom("🚀🎭", emojiFont);
+  emojiSpan2->setTextBlob(emojiBlob2);
+  emojiSpan2->setPosition({114, 0});
+
+  auto stroke2 = MakeStrokeStyle(Color::Blue(), 1.0f);
+  auto fill2 = MakeFillStyle(Color::Red());
+  group2->setElements({textSpan2, emojiSpan2, fill2, stroke2});
+
+  // Group 3: Emoji with TrimPath (emoji will be lost, only text path remains)
+  auto group3 = std::make_shared<VectorGroup>();
+  group3->setPosition({50, 200});
+
+  auto textSpan3 = std::make_shared<TextSpan>();
+  auto blob3 = TextBlob::MakeFrom("Trim: ", textFont);
+  textSpan3->setTextBlob(blob3);
+
+  auto emojiSpan3 = std::make_shared<TextSpan>();
+  auto emojiBlob3 = TextBlob::MakeFrom("🎪🎉", emojiFont);
+  emojiSpan3->setTextBlob(emojiBlob3);
+  emojiSpan3->setPosition({86, 0});
+
+  auto trim3 = std::make_shared<TrimPath>();
+  trim3->setStart(0.0f);
+  trim3->setEnd(0.6f);
+
+  auto stroke3 = MakeStrokeStyle(Color::Green(), 2.0f);
+  group3->setElements({textSpan3, emojiSpan3, trim3, stroke3});
+
+  // Group 4: Pure emoji row
+  auto group4 = std::make_shared<VectorGroup>();
+  group4->setPosition({50, 260});
+
+  auto emojiSpan4 = std::make_shared<TextSpan>();
+  auto emojiBlob4 = TextBlob::MakeFrom("😀🤩🥳🎊🎁", emojiFont);
+  emojiSpan4->setTextBlob(emojiBlob4);
+
+  auto fill4 = MakeFillStyle(Color::Black());
+  group4->setElements({emojiSpan4, fill4});
+
+  vectorLayer->setContents({group1, group2, group3, group4});
+
+  displayList->root()->addChild(vectorLayer);
+  displayList->render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/TextSpanEmoji"));
+}
+
+/**
+ * Test comprehensive rich text demonstrating various text styles in a coherent paragraph:
+ * gradient title, bold/italic, subscript/superscript, strikethrough, underline, inline image.
+ */
+TGFX_TEST(VectorLayerTest, RichText) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto surface = Surface::Make(context, 842, 318);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto displayList = std::make_unique<DisplayList>();
+  auto vectorLayer = VectorLayer::Make();
+
+  auto typeface = GetTestTypeface();
+  auto emojiTypeface = GetEmojiTypeface();
+  if (typeface == nullptr) {
+    return;
+  }
+
+  Font titleFont(typeface, 64);
+  titleFont.setFauxBold(true);
+  Font normalFont(typeface, 44);
+  Font subscriptFont(typeface, 28);
+  Font boldFont(typeface, 44);
+  boldFont.setFauxBold(true);
+  Font italicFont(typeface, 44);
+  italicFont.setFauxItalic(true);
+
+  auto inlineImage = MakeImage("resources/assets/tgfx.png");
+  ASSERT_TRUE(inlineImage != nullptr);
+
+  // === Row 1: [image] "TGFX Rich Text Demo" ===
+  auto imageRect = std::make_shared<Rectangle>();
+  imageRect->setCenter({82, 82});
+  imageRect->setSize({64, 64});
+
+  auto imageFill = std::make_shared<FillStyle>();
+  SamplingOptions nearestSampling(FilterMode::Nearest, MipmapMode::None);
+  auto imagePattern =
+      ImagePattern::Make(inlineImage, TileMode::Clamp, TileMode::Clamp, nearestSampling);
+  Matrix imageMatrix = Matrix::MakeScale(0.125f);
+  imageMatrix.postTranslate(50, 50);
+  imagePattern->setMatrix(imageMatrix);
+  imageFill->setColorSource(imagePattern);
+
+  auto imageGroup = std::make_shared<VectorGroup>();
+  imageGroup->setElements({imageRect, imageFill});
+
+  auto row1 = std::make_shared<VectorGroup>();
+  row1->setPosition({127, 107});
+
+  auto tgfxSpan = std::make_shared<TextSpan>();
+  tgfxSpan->setTextBlob(TextBlob::MakeFrom("TGFX", titleFont));
+
+  auto titleGradient = Gradient::MakeLinear(
+      {0, 0}, {155, 0}, {Color::FromRGBA(255, 0, 0, 255), Color::FromRGBA(0, 0, 255, 255)});
+  auto tgfxFill = std::make_shared<FillStyle>();
+  tgfxFill->setColorSource(titleGradient);
+  auto tgfxGroup = std::make_shared<VectorGroup>();
+  tgfxGroup->setElements({tgfxSpan, tgfxFill});
+
+  auto demoSpan = std::make_shared<TextSpan>();
+  demoSpan->setTextBlob(TextBlob::MakeFrom(" Rich Text Demo", titleFont));
+  demoSpan->setPosition({155, 0});
+  auto blackFill = MakeFillStyle(Color::Black());
+  auto demoGroup = std::make_shared<VectorGroup>();
+  demoGroup->setElements({demoSpan, blackFill});
+
+  row1->setElements({tgfxGroup, demoGroup});
+
+  // === Row 2: "Supports bold italic 描边 and E=mc²" ===
+  auto row2 = std::make_shared<VectorGroup>();
+  row2->setPosition({50, 183});
+
+  // "Supports " - black
+  auto supportsSpan = std::make_shared<TextSpan>();
+  supportsSpan->setTextBlob(TextBlob::MakeFrom("Supports ", normalFont));
+
+  // "bold" - blue
+  auto boldSpan = std::make_shared<TextSpan>();
+  boldSpan->setTextBlob(TextBlob::MakeFrom("bold", boldFont));
+  boldSpan->setPosition({199, 0});
+
+  auto blueFill = MakeFillStyle(Color::Blue());
+  auto boldGroup = std::make_shared<VectorGroup>();
+  boldGroup->setElements({boldSpan, blueFill});
+
+  // "italic" - red
+  auto italicSpan = std::make_shared<TextSpan>();
+  italicSpan->setTextBlob(TextBlob::MakeFrom("italic", italicFont));
+  italicSpan->setPosition({303, 0});
+
+  auto redFill = MakeFillStyle(Color::Red());
+  auto italicGroup = std::make_shared<VectorGroup>();
+  italicGroup->setElements({italicSpan, redFill});
+
+  // "描边" - black fill + green stroke
+  auto strokeSpan = std::make_shared<TextSpan>();
+  strokeSpan->setTextBlob(TextBlob::MakeFrom("描边", normalFont));
+  strokeSpan->setPosition({414, 0});
+
+  auto greenStroke = MakeStrokeStyle(Color::Green(), 2.0f);
+  auto strokeGroup = std::make_shared<VectorGroup>();
+  strokeGroup->setElements({strokeSpan, blackFill, greenStroke});
+
+  // " and E=mc" - black
+  auto andSpan = std::make_shared<TextSpan>();
+  andSpan->setTextBlob(TextBlob::MakeFrom(" and E=mc", normalFont));
+  andSpan->setPosition({502, 0});
+
+  // "2" superscript - black
+  auto superscriptSpan = std::make_shared<TextSpan>();
+  superscriptSpan->setTextBlob(TextBlob::MakeFrom("2", subscriptFont));
+  superscriptSpan->setPosition({714, -16});
+
+  row2->setElements(
+      {supportsSpan, andSpan, superscriptSpan, blackFill, boldGroup, italicGroup, strokeGroup});
+
+  // === Row 3: "Visit tgfx.org for more information ℹ️" ===
+  auto row3 = std::make_shared<VectorGroup>();
+  row3->setPosition({50, 250});
+
+  // "Visit " - black
+  auto visitSpan = std::make_shared<TextSpan>();
+  visitSpan->setTextBlob(TextBlob::MakeFrom("Visit ", normalFont));
+
+  // "tgfx.org" - blue link with underline
+  auto linkSpan = std::make_shared<TextSpan>();
+  linkSpan->setTextBlob(TextBlob::MakeFrom("tgfx.org", normalFont));
+  linkSpan->setPosition({97, 0});
+
+  auto underline = std::make_shared<Rectangle>();
+  underline->setCenter({177, 16});
+  underline->setSize({159, 3});
+
+  auto linkGroup = std::make_shared<VectorGroup>();
+  linkGroup->setElements({linkSpan, underline, blueFill});
+
+  // " for more information " - black
+  auto infoSpan = std::make_shared<TextSpan>();
+  infoSpan->setTextBlob(TextBlob::MakeFrom(" for more information ", normalFont));
+  infoSpan->setPosition({256, 0});
+
+  // emoji
+  std::shared_ptr<TextSpan> emojiSpan = nullptr;
+  if (emojiTypeface != nullptr) {
+    Font emojiFont(emojiTypeface, 32);
+    emojiSpan = std::make_shared<TextSpan>();
+    emojiSpan->setTextBlob(TextBlob::MakeFrom("\u2139", emojiFont));
+    emojiSpan->setPosition({702, -3});
+  }
+
+  if (emojiSpan) {
+    row3->setElements({visitSpan, infoSpan, emojiSpan, blackFill, linkGroup});
+  } else {
+    row3->setElements({visitSpan, infoSpan, blackFill, linkGroup});
+  }
+
+  vectorLayer->setContents({imageGroup, row1, row2, row3});
+
+  displayList->root()->addChild(vectorLayer);
+  displayList->render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/RichText"));
 }
 
 }  // namespace tgfx
