@@ -42,9 +42,6 @@ local.properties
 !**/.idea/fileTemplates/
 !**/.idea/misc.xml
 
-# CodeBuddy
-/.codebuddy/commands/User_*
-
 /third_party
 /vendor_tools
 /out
