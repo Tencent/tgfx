@@ -339,7 +339,9 @@ static std::shared_ptr<Render3DContext> Create3DContext(const DrawArgs& args, Ca
     return nullptr;
   }
   auto validRenderRect = *clipBounds;
-  validRenderRect.intersect(bounds);
+  if (!validRenderRect.intersect(bounds)) {
+    return nullptr;
+  }
   // validRenderRect is in DisplayList coordinate system. Apply canvas scale to adapt to pixel
   // coordinates, avoiding excessive scaling when rendering to offscreen texture which would affect
   // the final visual quality.
@@ -871,11 +873,12 @@ Rect Layer::getBoundsInternal(const Matrix3D& coordinateMatrix, bool computeTigh
   return coordinateMatrix.mapRect(*localBounds);
 }
 
-static Rect ComputeContentBounds(const LayerContent& content, const Matrix3D& coordinateMatrix,
-                                 bool applyMatrixAtEnd, bool computeTightBounds) {
+static Rect ComputeContentBounds(const LayerContent& content, const Rect& contentBounds,
+                                 const Matrix3D& coordinateMatrix, bool applyMatrixAtEnd,
+                                 bool computeTightBounds) {
   auto contentMatrix = applyMatrixAtEnd ? Matrix3D::I() : coordinateMatrix;
   if (!computeTightBounds) {
-    return contentMatrix.mapRect(content.getBounds());
+    return contentMatrix.mapRect(contentBounds);
   }
 
   if (IsMatrix3DAffine(contentMatrix)) {
@@ -895,8 +898,13 @@ Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBou
 
   Rect bounds = {};
   if (auto content = getContent()) {
-    bounds.join(
-        ComputeContentBounds(*content, coordinateMatrix, applyMatrixAtEnd, computeTightBounds));
+    auto contentBounds = content->getBounds();
+    bool behindCamera =
+        !isAffine && IsTransformedLayerRectBehindCamera(contentBounds, coordinateMatrix);
+    if (!behindCamera) {
+      bounds.join(ComputeContentBounds(*content, contentBounds, coordinateMatrix, applyMatrixAtEnd,
+                                       computeTightBounds));
+    }
   }
 
   for (const auto& child : _children) {
@@ -943,6 +951,9 @@ Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBou
   }
 
   if (applyMatrixAtEnd) {
+    if (!isAffine && IsTransformedLayerRectBehindCamera(bounds, coordinateMatrix)) {
+      return {};
+    }
     bounds = coordinateMatrix.mapRect(bounds);
   }
   return bounds;
@@ -1988,7 +1999,11 @@ std::optional<DrawArgs> Layer::createChildArgs(const DrawArgs& args, Canvas* can
   //   The entire subtree is rendered as a flat image with this layer's 3D transform applied.
   auto childCanPreserve3D = child->canPreserve3D();
   if (!args.render3DContext && childCanPreserve3D) {
-    childArgs.render3DContext = Create3DContext(childArgs, canvas, child->getBounds(this));
+    auto childBounds = child->getBounds(this);
+    if (childBounds.isEmpty()) {
+      return std::nullopt;
+    }
+    childArgs.render3DContext = Create3DContext(childArgs, canvas, childBounds);
     if (childArgs.render3DContext == nullptr) {
       return std::nullopt;
     }
