@@ -427,7 +427,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
    * Replaces all children of this layer with the specified list of layers. This method efficiently
    * handles the transition by only detaching removed children and attaching newly added ones,
    * while preserving existing children that remain in the list. Uses LIS algorithm to minimize
-   * dirty area during reordering.
+   * dirty area during reordering. Duplicate layers will only be added once (first occurrence is
+   * kept). Invalid layers (nullptr, circular references, root layers) are silently skipped.
    * @param children The new list of child layers.
    */
   void setChildren(const std::vector<std::shared_ptr<Layer>>& children);
