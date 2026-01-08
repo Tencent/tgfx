@@ -4805,4 +4805,316 @@ TGFX_TEST(LayerTest, GetRotateBounds) {
   EXPECT_FLOAT_EQ(bounds.bottom, 291.42136f);
 }
 
+TGFX_TEST(LayerTest, SetChildrenOptimization) {
+  // Test the LIS algorithm optimization in setChildren method
+  // This test verifies that the dirty marking optimization works correctly
+  // for various layer reordering scenarios
+
+  auto parent = Layer::Make();
+
+  // Create test layers with names for easier tracking
+  auto layerA = Layer::Make();
+  layerA->setName("A");
+  auto layerB = Layer::Make();
+  layerB->setName("B");
+  auto layerC = Layer::Make();
+  layerC->setName("C");
+  auto layerD = Layer::Make();
+  layerD->setName("D");
+  auto layerE = Layer::Make();
+  layerE->setName("E");
+
+  // Test Case 1: Simple reordering - should preserve some layers
+  std::vector<std::shared_ptr<Layer>> initialOrder = {layerA, layerB, layerC, layerD, layerE};
+  parent->setChildren(initialOrder);
+
+  // Verify initial setup
+  EXPECT_EQ(parent->children().size(), 5u);
+  EXPECT_EQ(parent->children()[0], layerA);
+  EXPECT_EQ(parent->children()[1], layerB);
+  EXPECT_EQ(parent->children()[2], layerC);
+  EXPECT_EQ(parent->children()[3], layerD);
+  EXPECT_EQ(parent->children()[4], layerE);
+
+  // Test Case 2: Reverse order - LIS optimization should minimize dirty layers
+  std::vector<std::shared_ptr<Layer>> reverseOrder = {layerE, layerD, layerC, layerB, layerA};
+  parent->setChildren(reverseOrder);
+
+  // Verify new order
+  EXPECT_EQ(parent->children().size(), 5u);
+  EXPECT_EQ(parent->children()[0], layerE);
+  EXPECT_EQ(parent->children()[1], layerD);
+  EXPECT_EQ(parent->children()[2], layerC);
+  EXPECT_EQ(parent->children()[3], layerB);
+  EXPECT_EQ(parent->children()[4], layerA);
+
+  // Test Case 3: Partial reordering - some layers maintain relative order
+  std::vector<std::shared_ptr<Layer>> partialReorder = {layerB, layerD, layerA, layerE, layerC};
+  parent->setChildren(partialReorder);
+
+  // Verify partial reorder
+  EXPECT_EQ(parent->children().size(), 5u);
+  EXPECT_EQ(parent->children()[0], layerB);
+  EXPECT_EQ(parent->children()[1], layerD);
+  EXPECT_EQ(parent->children()[2], layerA);
+  EXPECT_EQ(parent->children()[3], layerE);
+  EXPECT_EQ(parent->children()[4], layerC);
+
+  // Test Case 4: Single element move - minimal dirty area expected
+  std::vector<std::shared_ptr<Layer>> singleMove = {layerA, layerC, layerD, layerE, layerB};
+  parent->setChildren(singleMove);
+
+  // Verify single move (B moved from position 0 to position 4)
+  EXPECT_EQ(parent->children().size(), 5u);
+  EXPECT_EQ(parent->children()[0], layerA);
+  EXPECT_EQ(parent->children()[1], layerC);
+  EXPECT_EQ(parent->children()[2], layerD);
+  EXPECT_EQ(parent->children()[3], layerE);
+  EXPECT_EQ(parent->children()[4], layerB);
+
+  // Test Case 5: Add and remove layers simultaneously
+  auto layerF = Layer::Make();
+  layerF->setName("F");
+  auto layerG = Layer::Make();
+  layerG->setName("G");
+
+  std::vector<std::shared_ptr<Layer>> addRemove = {layerF, layerB, layerG, layerC};
+  parent->setChildren(addRemove);
+
+  // Verify add/remove operation
+  EXPECT_EQ(parent->children().size(), 4u);
+  EXPECT_EQ(parent->children()[0], layerF);
+  EXPECT_EQ(parent->children()[1], layerB);
+  EXPECT_EQ(parent->children()[2], layerG);
+  EXPECT_EQ(parent->children()[3], layerC);
+
+  // Verify removed layers are properly detached
+  EXPECT_EQ(layerA->parent(), nullptr);
+  EXPECT_EQ(layerD->parent(), nullptr);
+  EXPECT_EQ(layerE->parent(), nullptr);
+
+  // Verify new layers are properly attached
+  EXPECT_EQ(layerF->parent(), parent.get());
+  EXPECT_EQ(layerG->parent(), parent.get());
+
+  // Test Case 6: Empty to non-empty
+  auto emptyParent = Layer::Make();
+  std::vector<std::shared_ptr<Layer>> fromEmpty = {layerA, layerB};
+  emptyParent->setChildren(fromEmpty);
+
+  EXPECT_EQ(emptyParent->children().size(), 2u);
+  EXPECT_EQ(layerA->parent(), emptyParent.get());
+  EXPECT_EQ(layerB->parent(), emptyParent.get());
+
+  // Test Case 7: Non-empty to empty
+  std::vector<std::shared_ptr<Layer>> toEmpty = {};
+  emptyParent->setChildren(toEmpty);
+
+  EXPECT_EQ(emptyParent->children().size(), 0u);
+  EXPECT_EQ(layerA->parent(), nullptr);
+  EXPECT_EQ(layerB->parent(), nullptr);
+
+  // Test Case 8: Duplicate layers (should be handled gracefully)
+  std::vector<std::shared_ptr<Layer>> withDuplicates = {layerA, layerB, layerA, layerC};
+  parent->setChildren(withDuplicates);
+
+  // Should only add each layer once, keeping first occurrence
+  EXPECT_EQ(parent->children().size(), 3u);
+  EXPECT_EQ(parent->children()[0], layerA);
+  EXPECT_EQ(parent->children()[1], layerB);
+  EXPECT_EQ(parent->children()[2], layerC);
+
+  // Test Case 9: Circular reference prevention
+  auto childLayer = Layer::Make();
+  auto grandChildLayer = Layer::Make();
+
+  parent->addChild(childLayer);
+  childLayer->addChild(grandChildLayer);
+
+  // Try to add parent as child of grandchild (should be prevented)
+  std::vector<std::shared_ptr<Layer>> circular = {parent};
+  grandChildLayer->setChildren(circular);
+
+  // The circular reference should be prevented, grandchild should remain empty
+  EXPECT_EQ(grandChildLayer->children().size(), 0u);
+
+  // Test Case 10: Root layer as child (should be prevented)
+  auto rootLayer = RootLayer::Make();
+  rootLayer->_root = rootLayer.get();
+
+  std::vector<std::shared_ptr<Layer>> withRoot = {layerA, rootLayer, layerB};
+  parent->setChildren(withRoot);
+
+  // Root layer should be rejected, only layerA and layerB should be added
+  EXPECT_EQ(parent->children().size(), 2u);
+  EXPECT_EQ(parent->children()[0], layerA);
+  EXPECT_EQ(parent->children()[1], layerB);
+  EXPECT_FALSE(parent->contains(rootLayer));
+
+  // Test Case 11: Self as child (should be prevented)
+  std::vector<std::shared_ptr<Layer>> selfAsChild = {layerA, parent, layerB};
+  parent->setChildren(selfAsChild);
+
+  EXPECT_EQ(parent->children().size(), 2u);
+  EXPECT_EQ(parent->children()[0], layerA);
+  EXPECT_EQ(parent->children()[1], layerB);
+
+  // Test Case 12: nullptr handling
+  std::vector<std::shared_ptr<Layer>> withNullptr = {nullptr, layerA, nullptr, layerB, nullptr};
+  parent->setChildren(withNullptr);
+
+  EXPECT_EQ(parent->children().size(), 2u);
+  EXPECT_EQ(parent->children()[0], layerA);
+  EXPECT_EQ(parent->children()[1], layerB);
+
+  // Test Case 13: Same content repeated call (should be no-op)
+  std::vector<std::shared_ptr<Layer>> sameContent = {layerA, layerB};
+  parent->setChildren(sameContent);
+  auto childrenBefore = parent->children();
+  parent->setChildren(sameContent);
+  auto childrenAfter = parent->children();
+
+  EXPECT_EQ(childrenBefore, childrenAfter);
+
+  // Test Case 14: Steal child from another parent
+  auto parentB = Layer::Make();
+  auto layerX = Layer::Make();
+  layerX->setName("X");
+  parentB->addChild(layerX);
+
+  EXPECT_EQ(layerX->parent(), parentB.get());
+
+  std::vector<std::shared_ptr<Layer>> stealChild = {layerA, layerX, layerB};
+  parent->setChildren(stealChild);
+
+  EXPECT_EQ(layerX->parent(), parent.get());
+  EXPECT_FALSE(parentB->contains(layerX));
+  EXPECT_EQ(parent->children().size(), 3u);
+  EXPECT_EQ(parent->children()[0], layerA);
+  EXPECT_EQ(parent->children()[1], layerX);
+  EXPECT_EQ(parent->children()[2], layerB);
+}
+
+TGFX_TEST(LayerTest, SetChildrenLISValidation) {
+  // Test that the LIS algorithm correctly identifies which layers need to be marked dirty
+  // by verifying that layers maintaining relative order are not unnecessarily invalidated
+
+  auto displayList = std::make_unique<DisplayList>();
+  auto root = static_cast<RootLayer*>(displayList->root());
+
+  auto layerA = Layer::Make();
+  layerA->setName("A");
+  auto layerB = Layer::Make();
+  layerB->setName("B");
+  auto layerC = Layer::Make();
+  layerC->setName("C");
+  auto layerD = Layer::Make();
+  layerD->setName("D");
+
+  // Initial setup: [A, B, C, D]
+  std::vector<std::shared_ptr<Layer>> initial = {layerA, layerB, layerC, layerD};
+  root->setChildren(initial);
+  root->updateDirtyRegions();
+
+  // Scenario 1: Move D to front -> [D, A, B, C]
+  // LIS of old positions in new order: A(0), B(1), C(2) maintain relative order
+  // Only D should be marked dirty
+  std::vector<std::shared_ptr<Layer>> moveDToFront = {layerD, layerA, layerB, layerC};
+  root->setChildren(moveDToFront);
+
+  EXPECT_EQ(root->children().size(), 4u);
+  EXPECT_EQ(root->children()[0], layerD);
+  EXPECT_EQ(root->children()[1], layerA);
+  EXPECT_EQ(root->children()[2], layerB);
+  EXPECT_EQ(root->children()[3], layerC);
+  EXPECT_TRUE(layerD->bitFields.dirtyTransform);
+  EXPECT_FALSE(layerA->bitFields.dirtyTransform);
+  EXPECT_FALSE(layerB->bitFields.dirtyTransform);
+  EXPECT_FALSE(layerC->bitFields.dirtyTransform);
+
+  root->updateDirtyRegions();
+
+  // Scenario 2: [D, A, B, C] -> [D, B, C, A]
+  // Old positions in new order: D(0), B(2), C(3), A(1)
+  // LIS: D(0), B(2), C(3) maintain relative order
+  // Only A should be marked dirty
+  std::vector<std::shared_ptr<Layer>> scenario2 = {layerD, layerB, layerC, layerA};
+  root->setChildren(scenario2);
+
+  EXPECT_EQ(root->children().size(), 4u);
+  EXPECT_EQ(root->children()[0], layerD);
+  EXPECT_EQ(root->children()[1], layerB);
+  EXPECT_EQ(root->children()[2], layerC);
+  EXPECT_EQ(root->children()[3], layerA);
+  EXPECT_FALSE(layerD->bitFields.dirtyTransform);
+  EXPECT_FALSE(layerB->bitFields.dirtyTransform);
+  EXPECT_FALSE(layerC->bitFields.dirtyTransform);
+  EXPECT_TRUE(layerA->bitFields.dirtyTransform);
+
+  root->updateDirtyRegions();
+
+  // Scenario 3: [D, B, C, A] -> [A, C, B, D]
+  // Old positions in new order: A(3), C(2), B(1), D(0)
+  // This is a decreasing sequence, LIS length is 1, so 3 layers should be dirty
+  // One of A, C, B, D will be in LIS (the algorithm picks one), others are dirty
+  std::vector<std::shared_ptr<Layer>> scenario3 = {layerA, layerC, layerB, layerD};
+  root->setChildren(scenario3);
+
+  EXPECT_EQ(root->children().size(), 4u);
+  EXPECT_EQ(root->children()[0], layerA);
+  EXPECT_EQ(root->children()[1], layerC);
+  EXPECT_EQ(root->children()[2], layerB);
+  EXPECT_EQ(root->children()[3], layerD);
+  int dirtyCount = 0;
+  if (layerA->bitFields.dirtyTransform) {
+    dirtyCount++;
+  }
+  if (layerC->bitFields.dirtyTransform) {
+    dirtyCount++;
+  }
+  if (layerB->bitFields.dirtyTransform) {
+    dirtyCount++;
+  }
+  if (layerD->bitFields.dirtyTransform) {
+    dirtyCount++;
+  }
+  EXPECT_EQ(dirtyCount, 3);
+
+  root->updateDirtyRegions();
+
+  // Scenario 4: No change - should be a no-op, no layers dirty
+  std::vector<std::shared_ptr<Layer>> noChange = {layerA, layerC, layerB, layerD};
+  root->setChildren(noChange);
+
+  EXPECT_EQ(root->children().size(), 4u);
+  EXPECT_EQ(root->children()[0], layerA);
+  EXPECT_EQ(root->children()[1], layerC);
+  EXPECT_EQ(root->children()[2], layerB);
+  EXPECT_EQ(root->children()[3], layerD);
+  EXPECT_FALSE(layerA->bitFields.dirtyTransform);
+  EXPECT_FALSE(layerC->bitFields.dirtyTransform);
+  EXPECT_FALSE(layerB->bitFields.dirtyTransform);
+  EXPECT_FALSE(layerD->bitFields.dirtyTransform);
+
+  // Scenario 5: Single element - edge case
+  auto displayList2 = std::make_unique<DisplayList>();
+  auto singleParent = static_cast<RootLayer*>(displayList2->root());
+  auto singleLayer = Layer::Make();
+  singleLayer->setName("Single");
+
+  std::vector<std::shared_ptr<Layer>> single = {singleLayer};
+  singleParent->setChildren(single);
+
+  EXPECT_EQ(singleParent->children().size(), 1u);
+  EXPECT_EQ(singleParent->children()[0], singleLayer);
+  EXPECT_TRUE(singleLayer->bitFields.dirtyTransform);
+
+  singleParent->updateDirtyRegions();
+
+  // Reorder with same single element - no change, not dirty
+  singleParent->setChildren(single);
+  EXPECT_EQ(singleParent->children().size(), 1u);
+  EXPECT_FALSE(singleLayer->bitFields.dirtyTransform);
+}
+
 }  // namespace tgfx
