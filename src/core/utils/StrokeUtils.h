@@ -58,14 +58,4 @@ std::vector<float> SimplifyLineDashPattern(const std::vector<float>& pattern, co
  */
 bool StrokeLineToRect(const Stroke& stroke, const Point line[2], Rect* rect);
 
-/**
- * Converts LineCap to Skia's SkPaint::Cap.
- */
-pk::SkPaint::Cap ToSkLineCap(LineCap cap);
-
-/**
- * Converts LineJoin to Skia's SkPaint::Join.
- */
-pk::SkPaint::Join ToSkLineJoin(LineJoin join);
-
 }  // namespace tgfx

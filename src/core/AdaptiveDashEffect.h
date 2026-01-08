@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/PathEffect.h"
-#include "tgfx/core/PathStroker.h"
+#include "tgfx/core/Stroke.h"
 
 namespace tgfx {
 class AdaptiveDashEffect : public PathEffect {
@@ -27,8 +27,8 @@ class AdaptiveDashEffect : public PathEffect {
   static constexpr float MaxDashCount = 1000000;
 
   struct PointParamMapping {
-    std::vector<PathStroker::PointParam> vertexParams = {};
-    PathStroker::PointParam defaultParam = {};
+    std::vector<PartialStroke> vertexParams = {};
+    PartialStroke defaultParam = {};
   };
 
   AdaptiveDashEffect(const float intervals[], int count, float phase);
@@ -36,13 +36,13 @@ class AdaptiveDashEffect : public PathEffect {
   bool filterPath(Path* path) const override;
 
  private:
-  bool onFilterPath(Path* path, const std::vector<PathStroker::PointParam>* inputParams,
+  bool onFilterPath(Path* path, const std::vector<PartialStroke>* inputParams,
                     PointParamMapping* outputMapping) const;
 
   std::vector<float> _intervals;
   float _phase = 0;
   float intervalLength = 0;
 
-  friend class PathStroker;
+  friend class Stroke;
 };
 }  // namespace tgfx

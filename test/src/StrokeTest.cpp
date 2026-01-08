@@ -1,6 +1,5 @@
 #include "core/utils/StrokeUtils.h"
 #include "gtest/gtest.h"
-#include "tgfx/core/PathStroker.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/layers/DisplayList.h"
@@ -330,10 +329,10 @@ TGFX_TEST(StrokeTest, PathStrokerEmptyParams) {
   Path path = {};
   path.addRect(Rect::MakeXYWH(0, 0, 100, 100));
 
-  std::vector<PathStroker::PointParam> emptyParams = {};
-  EXPECT_FALSE(PathStroker::StrokePathWithMultiParams(&path, 5.0f, emptyParams, 1.0f));
+  std::vector<PartialStroke> emptyParams = {};
+  EXPECT_FALSE(Stroke::StrokePathPerVertex(&path, 5.0f, emptyParams, 1.0f));
 
-  EXPECT_FALSE(PathStroker::StrokePathWithMultiParams(nullptr, 5.0f, emptyParams, 1.0f));
+  EXPECT_FALSE(Stroke::StrokePathPerVertex(nullptr, 5.0f, emptyParams, 1.0f));
 }
 
 TGFX_TEST(StrokeTest, PathStrokerSingleParam) {
@@ -353,9 +352,9 @@ TGFX_TEST(StrokeTest, PathStrokerSingleParam) {
 
   auto hairlinePath = path;
 
-  std::vector<PathStroker::PointParam> params = {};
+  std::vector<PartialStroke> params = {};
   params.emplace_back(LineCap::Square, LineJoin::Round);
-  EXPECT_TRUE(PathStroker::StrokePathWithMultiParams(&path, 10.0f, params, 1.0f));
+  EXPECT_TRUE(Stroke::StrokePathPerVertex(&path, 10.0f, params, 1.0f));
 
   Paint paint = {};
   paint.setColor(Color::FromRGBA(0, 255, 0, 255));
@@ -390,11 +389,11 @@ TGFX_TEST(StrokeTest, PathStrokerSingleLine) {
 
   auto hairlineLine1 = line1;
 
-  std::vector<PathStroker::PointParam> params1 = {};
+  std::vector<PartialStroke> params1 = {};
   params1.emplace_back(LineCap::Butt);
   params1.emplace_back(LineCap::Round);
 
-  EXPECT_TRUE(PathStroker::StrokePathWithMultiParams(&line1, 15.0f, params1, 1.0f));
+  EXPECT_TRUE(Stroke::StrokePathPerVertex(&line1, 15.0f, params1, 1.0f));
 
   Paint paint = {};
   paint.setColor(Color::FromRGBA(255, 0, 0, 255));
@@ -408,10 +407,10 @@ TGFX_TEST(StrokeTest, PathStrokerSingleLine) {
 
   auto hairlineLine2 = line2;
 
-  std::vector<PathStroker::PointParam> params2 = {};
+  std::vector<PartialStroke> params2 = {};
   params2.emplace_back(LineCap::Round);
 
-  EXPECT_TRUE(PathStroker::StrokePathWithMultiParams(&line2, 15.0f, params2, 1.0f));
+  EXPECT_TRUE(Stroke::StrokePathPerVertex(&line2, 15.0f, params2, 1.0f));
   paint.setColor(Color::FromRGBA(0, 255, 0, 255));
   canvas->drawPath(line2, paint);
   canvas->drawPath(hairlineLine2, hairlinePaint);
@@ -423,10 +422,10 @@ TGFX_TEST(StrokeTest, PathStrokerSingleLine) {
 
   auto hairlineLine3 = line3;
 
-  std::vector<PathStroker::PointParam> params3 = {};
+  std::vector<PartialStroke> params3 = {};
   params3.emplace_back(LineCap::Square);
 
-  EXPECT_TRUE(PathStroker::StrokePathWithMultiParams(&line3, 15.0f, params3, 1.0f));
+  EXPECT_TRUE(Stroke::StrokePathPerVertex(&line3, 15.0f, params3, 1.0f));
   paint.setColor(Color::FromRGBA(0, 0, 255, 255));
   canvas->drawPath(line3, paint);
   canvas->drawPath(hairlineLine3, hairlinePaint);
@@ -452,14 +451,14 @@ TGFX_TEST(StrokeTest, PathStrokerWithMultiParams) {
 
   auto hairlinePath = path;
 
-  std::vector<PathStroker::PointParam> params = {};
+  std::vector<PartialStroke> params = {};
   params.emplace_back(LineCap::Square);
   params.emplace_back(LineJoin::Round);
   params.emplace_back(LineJoin::Bevel);
   params.emplace_back(LineJoin::Miter);
   params.emplace_back(LineCap::Round);
 
-  EXPECT_TRUE(PathStroker::StrokePathWithMultiParams(&path, 10.0f, params, 1.0f));
+  EXPECT_TRUE(Stroke::StrokePathPerVertex(&path, 10.0f, params, 1.0f));
 
   Paint paint = {};
   paint.setColor(Color::White());
@@ -490,12 +489,12 @@ TGFX_TEST(StrokeTest, PathStrokerDifferentMiterLimits) {
 
   auto hairlinePath1 = path1;
 
-  std::vector<PathStroker::PointParam> lowMiterParams = {};
+  std::vector<PartialStroke> lowMiterParams = {};
   lowMiterParams.emplace_back(LineCap::Butt, LineJoin::Miter, 1.0f);
   lowMiterParams.emplace_back(LineCap::Butt, LineJoin::Miter, 1.0f);
   lowMiterParams.emplace_back(LineCap::Butt, LineJoin::Miter, 1.0f);
 
-  EXPECT_TRUE(PathStroker::StrokePathWithMultiParams(&path1, 15.0f, lowMiterParams, 1.0f));
+  EXPECT_TRUE(Stroke::StrokePathPerVertex(&path1, 15.0f, lowMiterParams, 1.0f));
 
   Paint paint = {};
   paint.setColor(Color::FromRGBA(255, 255, 0, 255));
@@ -515,12 +514,12 @@ TGFX_TEST(StrokeTest, PathStrokerDifferentMiterLimits) {
 
   auto hairlinePath2 = path2;
 
-  std::vector<PathStroker::PointParam> highMiterParams = {};
+  std::vector<PartialStroke> highMiterParams = {};
   highMiterParams.emplace_back(LineCap::Butt, LineJoin::Miter, 10.0f);
   highMiterParams.emplace_back(LineCap::Butt, LineJoin::Miter, 10.0f);
   highMiterParams.emplace_back(LineCap::Butt, LineJoin::Miter, 10.0f);
 
-  EXPECT_TRUE(PathStroker::StrokePathWithMultiParams(&path2, 15.0f, highMiterParams, 1.0f));
+  EXPECT_TRUE(Stroke::StrokePathPerVertex(&path2, 15.0f, highMiterParams, 1.0f));
   canvas->drawPath(path2, paint);
   canvas->drawPath(hairlinePath2, hairlinePaint);
 
@@ -543,12 +542,12 @@ TGFX_TEST(StrokeTest, PathStrokerOpenPath) {
 
   auto hairlinePath1 = path1;
 
-  std::vector<PathStroker::PointParam> params1 = {};
+  std::vector<PartialStroke> params1 = {};
   params1.emplace_back(LineCap::Butt, LineJoin::Round);
   params1.emplace_back(LineCap::Round, LineJoin::Miter);
   params1.emplace_back(LineCap::Square, LineJoin::Bevel);
 
-  EXPECT_TRUE(PathStroker::StrokePathWithMultiParams(&path1, 8.0f, params1, 1.0f));
+  EXPECT_TRUE(Stroke::StrokePathPerVertex(&path1, 8.0f, params1, 1.0f));
 
   Paint paint = {};
   paint.setColor(Color::FromRGBA(255, 100, 100, 255));
@@ -568,11 +567,11 @@ TGFX_TEST(StrokeTest, PathStrokerOpenPath) {
 
   auto hairlinePath2 = path2;
 
-  std::vector<PathStroker::PointParam> params2 = {};
+  std::vector<PartialStroke> params2 = {};
   params2.emplace_back(LineCap::Round, LineJoin::Round, 6.0f);
   params2.emplace_back(LineCap::Square, LineJoin::Miter, 6.0f);
 
-  EXPECT_TRUE(PathStroker::StrokePathWithMultiParams(&path2, 10.0f, params2, 1.0f));
+  EXPECT_TRUE(Stroke::StrokePathPerVertex(&path2, 10.0f, params2, 1.0f));
   paint.setColor(Color::FromRGBA(100, 255, 100, 255));
   canvas->drawPath(path2, paint);
   canvas->drawPath(hairlinePath2, hairlinePaint);
@@ -584,11 +583,11 @@ TGFX_TEST(StrokeTest, PathStrokerOpenPath) {
 
   auto hairlinePath3 = path3;
 
-  std::vector<PathStroker::PointParam> params3 = {};
+  std::vector<PartialStroke> params3 = {};
   params3.emplace_back(LineCap::Square, LineJoin::Bevel);
   params3.emplace_back(LineCap::Round, LineJoin::Round, 8.0f);
 
-  EXPECT_TRUE(PathStroker::StrokePathWithMultiParams(&path3, 6.0f, params3, 1.0f));
+  EXPECT_TRUE(Stroke::StrokePathPerVertex(&path3, 6.0f, params3, 1.0f));
   paint.setColor(Color::FromRGBA(100, 100, 255, 255));
   canvas->drawPath(path3, paint);
   canvas->drawPath(hairlinePath3, hairlinePaint);
@@ -623,11 +622,11 @@ TGFX_TEST(StrokeTest, PathStrokerContours) {
 
     auto hairlinePath = path;
 
-    std::vector<PathStroker::PointParam> params = {};
+    std::vector<PartialStroke> params = {};
     params.emplace_back(LineJoin::Round);
     params.emplace_back(LineJoin::Miter);
     params.emplace_back(LineJoin::Bevel);
-    EXPECT_TRUE(PathStroker::StrokePathWithMultiParams(&path, 10.0f, params, 1.0f));
+    EXPECT_TRUE(Stroke::StrokePathPerVertex(&path, 10.0f, params, 1.0f));
 
     canvas->save();
     canvas->translate(0, -200);
@@ -646,10 +645,10 @@ TGFX_TEST(StrokeTest, PathStrokerContours) {
 
     auto hairlinePath = path;
 
-    std::vector<PathStroker::PointParam> params = {};
+    std::vector<PartialStroke> params = {};
     params.emplace_back(LineJoin::Round);
     params.emplace_back(LineJoin::Bevel);
-    EXPECT_TRUE(PathStroker::StrokePathWithMultiParams(&path, 10.0f, params, 1.0f));
+    EXPECT_TRUE(Stroke::StrokePathPerVertex(&path, 10.0f, params, 1.0f));
 
     canvas->save();
     canvas->translate(400, -200);
@@ -670,12 +669,12 @@ TGFX_TEST(StrokeTest, PathStrokerContours) {
 
     auto hairlinePath = path;
 
-    std::vector<PathStroker::PointParam> params = {};
+    std::vector<PartialStroke> params = {};
     params.emplace_back();
     params.emplace_back();
     params.emplace_back();
     params.emplace_back();
-    EXPECT_TRUE(PathStroker::StrokePathWithMultiParams(&path, 10.0f, params, 10.0f));
+    EXPECT_TRUE(Stroke::StrokePathPerVertex(&path, 10.0f, params, 10.0f));
 
     canvas->save();
     canvas->translate(100, 200);
@@ -705,14 +704,14 @@ TGFX_TEST(StrokeTest, PathStrokerComplexCurves) {
 
   auto hairlinePath = path;
 
-  std::vector<PathStroker::PointParam> params = {};
+  std::vector<PartialStroke> params = {};
   params.emplace_back(LineCap::Butt, LineJoin::Miter, 2.0f);
   params.emplace_back(LineCap::Round, LineJoin::Round);
   params.emplace_back(LineCap::Square, LineJoin::Bevel, 6.0f);
   params.emplace_back(LineCap::Round, LineJoin::Miter, 8.0f);
   params.emplace_back(LineCap::Butt, LineJoin::Bevel);
 
-  EXPECT_TRUE(PathStroker::StrokePathWithMultiParams(&path, 12.0f, params, 1.0f));
+  EXPECT_TRUE(Stroke::StrokePathPerVertex(&path, 12.0f, params, 1.0f));
 
   Paint paint = {};
   paint.setColor(Color::White());
@@ -746,18 +745,17 @@ TGFX_TEST(StrokeTest, PathStrokerDashMultiParamsBasic) {
   path.lineTo(350, 50);
 
   // Set different join styles for corner vertices
-  std::vector<PathStroker::PointParam> params;
+  std::vector<PartialStroke> params;
   params.emplace_back(LineJoin::Miter);
   params.emplace_back(LineJoin::Round);
   params.emplace_back(LineJoin::Bevel);
   params.emplace_back(LineJoin::Miter);
 
-  PathStroker::PointParam defaultParam(LineCap::Round);
+  PartialStroke defaultParam(LineCap::Round);
 
   std::vector<float> intervals = {100.f, 100.f};
-  EXPECT_TRUE(PathStroker::StrokeDashPathWithMultiParams(&path, 10.0f, params, defaultParam,
-                                                         intervals.data(), 2, 50, 1.0f));
-  // EXPECT_TRUE(PathStroker::StrokePathWithMultiParams(&path, 10.0f, params, 1.0f));
+  EXPECT_TRUE(Stroke::StrokeDashPathPerVertex(&path, 10.0f, params, defaultParam,
+                                              intervals.data(), 2, 50, 1.0f));
 
   canvas->drawPath(path, paint);
 
@@ -783,16 +781,16 @@ TGFX_TEST(StrokeTest, PathStrokerDashMultiParamsClosedCurve) {
   path.close();
 
   // Set different join styles for corner vertices
-  std::vector<PathStroker::PointParam> params;
+  std::vector<PartialStroke> params;
   params.emplace_back(LineJoin::Miter);
   params.emplace_back(LineJoin::Round);
   params.emplace_back(LineJoin::Bevel);
 
-  PathStroker::PointParam defaultParam(LineCap::Round);
+  PartialStroke defaultParam(LineCap::Round);
 
   std::vector<float> intervals = {20.f, 20.f};
-  EXPECT_TRUE(PathStroker::StrokeDashPathWithMultiParams(&path, 6.0f, params, defaultParam,
-                                                         intervals.data(), 2, 10, 1.0f));
+  EXPECT_TRUE(Stroke::StrokeDashPathPerVertex(&path, 6.0f, params, defaultParam,
+                                              intervals.data(), 2, 10, 1.0f));
 
   canvas->drawPath(path, paint);
 
@@ -819,26 +817,26 @@ TGFX_TEST(StrokeTest, PathStrokerDashMultiParamsComparison) {
   path.quadTo(240, 220, 270, 150);
 
   // Set alternating join styles for wave peaks/valleys
-  std::vector<PathStroker::PointParam> params;
+  std::vector<PartialStroke> params;
   params.emplace_back(LineJoin::Round);
   params.emplace_back(LineJoin::Bevel);
   params.emplace_back(LineJoin::Round);
   params.emplace_back(LineJoin::Bevel);
   params.emplace_back(LineJoin::Round);
 
-  // Left side: multi-params stroke without dash
+  // Left side: per-vertex stroke without dash
   auto pathLeft = path;
-  EXPECT_TRUE(PathStroker::StrokePathWithMultiParams(&pathLeft, 4.0f, params, 1.0f));
+  EXPECT_TRUE(Stroke::StrokePathPerVertex(&pathLeft, 4.0f, params, 1.0f));
   canvas->drawPath(pathLeft, paint);
 
-  // Right side: multi-params stroke with dash
+  // Right side: per-vertex stroke with dash
   canvas->save();
   canvas->translate(300, 0);
   auto pathRight = path;
-  PathStroker::PointParam defaultParam(LineCap::Round);
+  PartialStroke defaultParam(LineCap::Round);
   std::vector<float> intervals = {20.f, 20.f};
-  EXPECT_TRUE(PathStroker::StrokeDashPathWithMultiParams(&pathRight, 4.0f, params, defaultParam,
-                                                         intervals.data(), 2, 10, 1.0f));
+  EXPECT_TRUE(Stroke::StrokeDashPathPerVertex(&pathRight, 4.0f, params, defaultParam,
+                                              intervals.data(), 2, 10, 1.0f));
   canvas->drawPath(pathRight, paint);
   canvas->restore();
 

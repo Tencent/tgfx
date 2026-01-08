@@ -30,10 +30,9 @@ inline bool IsEven(int x) {
   return !(x & 1);
 }
 
-// Get PointParam for a vertex index
-inline PathStroker::PointParam GetParamForVertex(
-    int vertexIndex, const std::vector<PathStroker::PointParam>* inputParams,
-    const PathStroker::PointParam& defaultParam) {
+// Get PartialStroke for a vertex index
+inline PartialStroke GetParamForVertex(int vertexIndex, const std::vector<PartialStroke>* inputParams,
+                                       const PartialStroke& defaultParam) {
   if (!inputParams || inputParams->empty() || vertexIndex < 0) {
     return defaultParam;
   }
@@ -190,8 +189,7 @@ bool AdaptiveDashEffect::filterPath(Path* path) const {
   return onFilterPath(path, nullptr, nullptr);
 }
 
-bool AdaptiveDashEffect::onFilterPath(Path* path,
-                                      const std::vector<PathStroker::PointParam>* inputParams,
+bool AdaptiveDashEffect::onFilterPath(Path* path, const std::vector<PartialStroke>* inputParams,
                                       PointParamMapping* outputMapping) const {
   if (!path || path->isEmpty()) {
     return false;
@@ -217,7 +215,7 @@ bool AdaptiveDashEffect::onFilterPath(Path* path,
 
   auto fillType = path->getFillType();
   SkPath resultPath;
-  std::vector<PathStroker::PointParam> outputParams;
+  std::vector<PartialStroke> outputParams;
   const int patternCount = static_cast<int>(_intervals.size());
   float totalDashCount = 0;
 
