@@ -59,10 +59,10 @@ class AtlasStrike {
   BytesKey key = {};
   BlockAllocator allocator{512};
   std::unordered_map<GlyphID, AtlasGlyph*> glyphMap = {};
-   // Cache for glyphs with no visible content to avoid repeated font queries.
-   // Uses std::set instead of std::unordered_set because the dataset is very small
-   // (typically 1-5 elements like space, tab, newline), making red-black tree's
-   // direct integer comparison faster than hash table overhead for high-frequency lookups.
+  // Cache for glyphs with no visible content to avoid repeated font queries.
+  // Uses std::set instead of std::unordered_set because the dataset is very small
+  // (typically 1-5 elements like space, tab, newline), making red-black tree's
+  // direct integer comparison faster than hash table overhead for high-frequency lookups.
   std::set<GlyphID> emptyGlyphs = {};
   size_t memoryUsed = 0;
 

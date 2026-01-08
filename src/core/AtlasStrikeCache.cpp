@@ -22,7 +22,6 @@
 namespace tgfx {
 AtlasStrike::AtlasStrike(AtlasStrikeCache* strikeCache, const BytesKey& key)
     : strikeCache(strikeCache), key(key) {
-
 }
 
 AtlasGlyph* AtlasStrike::getGlyph(GlyphID glyphID) {
@@ -92,7 +91,7 @@ void AtlasStrikeCache::purgeIfNeeded() {
 }
 
 std::shared_ptr<AtlasStrike> AtlasStrikeCache::findStrikeOrNull(const BytesKey& key) {
-  if (const auto iter = strikes.find(key); iter != strikes.end()) {
+  if (auto iter = strikes.find(key); iter != strikes.end()) {
     markStrikeAsRecentlyUsed(key);
     return iter->second;
   }
