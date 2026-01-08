@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "tgfx/core/Matrix3D.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/layers/filters/LayerFilter.h"
 #include "tgfx/layers/layerstyles/LayerStyle.h"
@@ -54,6 +55,13 @@ class RegionTransformer {
   static std::shared_ptr<RegionTransformer> MakeFromMatrix(
       const Matrix& matrix, std::shared_ptr<RegionTransformer> outer = nullptr);
 
+  /**
+   * Creates a RegionTransformer that applies the given 3D matrix transformation to the given
+   * rectangle.
+   */
+  static std::shared_ptr<RegionTransformer> MakeFromMatrix3D(
+      const Matrix3D& matrix, std::shared_ptr<RegionTransformer> outer = nullptr);
+
   explicit RegionTransformer(std::shared_ptr<RegionTransformer> outer);
 
   virtual ~RegionTransformer() = default;
@@ -65,6 +73,12 @@ class RegionTransformer {
 
   float getMaxScale() const;
 
+  /**
+   * Returns the accumulated matrix from consecutive Matrix3DRegionTransformers.
+   * Returns nullopt if this transformer is not a Matrix3DRegionTransformer.
+   */
+  std::optional<Matrix3D> getConsecutiveMatrix3D() const;
+
  protected:
   virtual void onTransform(Rect* bounds) const = 0;
 
@@ -73,6 +87,10 @@ class RegionTransformer {
   }
 
   virtual bool isMatrix() const {
+    return false;
+  }
+
+  virtual bool isMatrix3D() const {
     return false;
   }
 

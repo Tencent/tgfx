@@ -98,6 +98,24 @@ class MatrixRegionTransformer : public RegionTransformer {
   }
 };
 
+class Matrix3DRegionTransformer : public RegionTransformer {
+ public:
+  Matrix3DRegionTransformer(const Matrix3D& matrix, std::shared_ptr<RegionTransformer> outer)
+      : RegionTransformer(std::move(outer)), matrix(matrix) {
+  }
+
+  Matrix3D matrix;
+
+ protected:
+  void onTransform(Rect* bounds) const override {
+    *bounds = matrix.mapRect(*bounds);
+  }
+
+  bool isMatrix3D() const override {
+    return true;
+  }
+};
+
 std::shared_ptr<RegionTransformer> RegionTransformer::MakeFromClip(
     const Rect& clipRect, std::shared_ptr<RegionTransformer> outer) {
   if (!outer || !outer->isClip()) {
@@ -142,6 +160,20 @@ std::shared_ptr<RegionTransformer> RegionTransformer::MakeFromMatrix(
   return std::make_shared<MatrixRegionTransformer>(combineMatrix, outer->outer);
 }
 
+std::shared_ptr<RegionTransformer> RegionTransformer::MakeFromMatrix3D(
+    const Matrix3D& matrix, std::shared_ptr<RegionTransformer> outer) {
+  if (matrix == Matrix3D::I()) {
+    return outer;
+  }
+  if (!outer || !outer->isMatrix3D()) {
+    return std::make_shared<Matrix3DRegionTransformer>(matrix, std::move(outer));
+  }
+
+  auto combineMatrix = matrix;
+  combineMatrix.postConcat(static_cast<Matrix3DRegionTransformer*>(outer.get())->matrix);
+  return std::make_shared<Matrix3DRegionTransformer>(combineMatrix, outer->outer);
+}
+
 RegionTransformer::RegionTransformer(std::shared_ptr<RegionTransformer> outer)
     : outer(std::move(outer)) {
 }
@@ -168,6 +200,19 @@ void RegionTransformer::getTotalMatrix(Matrix* matrix) const {
   if (outer) {
     outer->getTotalMatrix(matrix);
   }
+}
+
+std::optional<Matrix3D> RegionTransformer::getConsecutiveMatrix3D() const {
+  if (!isMatrix3D()) {
+    return std::nullopt;
+  }
+  auto result = static_cast<const Matrix3DRegionTransformer*>(this)->matrix;
+  auto current = outer;
+  while (current && current->isMatrix3D()) {
+    result.postConcat(static_cast<const Matrix3DRegionTransformer*>(current.get())->matrix);
+    current = current->outer;
+  }
+  return result;
 }
 
 }  // namespace tgfx

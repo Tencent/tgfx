@@ -666,17 +666,11 @@ class Layer : public std::enable_shared_from_this<Layer> {
   bool hasValidMask() const;
 
   /**
-   * Updates the rendering bounds.
-   * @param contextTransformer For layers outside a 3D context, this defines the transformer to
-   * apply to the current layer, which already includes the layer's own matrix transformation. For
-   * layers inside a 3D Rendering Context, this is the transformer of the parent of the layer that
-   * established the context.
-   * @param localToContext3D The accumulated transformation matrix from the current layer to the
-   * layer that established the 3D Rendering Context. Non-null indicates the layer is inside a 3D
-   * context.
+   * Updates the rendering bounds of this layer and its descendants.
+   * @param transformer The transformer to apply to the layer's content bounds.
    */
-  void updateRenderBounds(std::shared_ptr<RegionTransformer> contextTransformer = nullptr,
-                          const Matrix3D* localToContext3D = nullptr, bool forceDirty = false);
+  void updateRenderBounds(std::shared_ptr<RegionTransformer> transformer = nullptr,
+                          bool forceDirty = false);
 
   void checkBackgroundStyles(std::shared_ptr<RegionTransformer> transformer);
 

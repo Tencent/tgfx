@@ -2232,13 +2232,12 @@ bool Layer::hasValidMask() const {
   return _mask && _mask->root() == root() && _mask->bitFields.visible;
 }
 
-void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> contextTransformer,
-                               const Matrix3D* localToContext3D, bool forceDirty) {
+void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, bool forceDirty) {
   if (!forceDirty && !bitFields.dirtyDescendents) {
     if (maxBackgroundOutset > 0 || bitFields.hasBlendMode) {
       propagateLayerState();
       if (_root->hasDirtyRegions()) {
-        checkBackgroundStyles(contextTransformer);
+        checkBackgroundStyles(transformer);
       }
     }
     return;
@@ -2246,24 +2245,15 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> contextTransfo
   maxBackgroundOutset = 0;
   minBackgroundOutset = std::numeric_limits<float>::max();
   auto contentScale = 1.0f;
-  auto baseTransformer = contextTransformer;
-  // Ensure the 3D filter is not released during the entire function lifetime.
-  std::vector<std::shared_ptr<LayerFilter>> current3DFilterVector = {};
-  if (localToContext3D != nullptr) {
-    contextTransformer = MakeTransformerFromTransform3D(
-        *localToContext3D, std::move(contextTransformer), &current3DFilterVector);
-  }
   if (!_layerStyles.empty() || !_filters.empty()) {
     // Filters and styles interrupt 3D rendering context, so non-root layers inside 3D rendering
     // context can ignore parent filters and styles when calculating dirty regions.
     DEBUG_ASSERT(!canPreserve3D());
-    if (contextTransformer) {
-      contentScale = contextTransformer->getMaxScale();
+    if (transformer) {
+      contentScale = transformer->getMaxScale();
     }
-    contextTransformer =
-        RegionTransformer::MakeFromFilters(_filters, 1.0f, std::move(contextTransformer));
-    contextTransformer =
-        RegionTransformer::MakeFromStyles(_layerStyles, 1.0f, std::move(contextTransformer));
+    transformer = RegionTransformer::MakeFromFilters(_filters, 1.0f, std::move(transformer));
+    transformer = RegionTransformer::MakeFromStyles(_layerStyles, 1.0f, std::move(transformer));
   }
   auto content = getContent();
   bool behindCamera = false;
@@ -2276,14 +2266,15 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> contextTransfo
     if (content) {
       *contentBounds = content->getBounds();
       // Check if the layer is behind the camera in 3D context or has 3D transform.
-      if (localToContext3D != nullptr) {
-        behindCamera = IsTransformedLayerRectBehindCamera(*contentBounds, *localToContext3D);
+      auto consecutiveMatrix3D = transformer ? transformer->getConsecutiveMatrix3D() : std::nullopt;
+      if (consecutiveMatrix3D.has_value()) {
+        behindCamera = IsTransformedLayerRectBehindCamera(*contentBounds, *consecutiveMatrix3D);
       } else if (!bitFields.matrix3DIsAffine) {
         behindCamera = IsTransformedLayerRectBehindCamera(*contentBounds, _matrix3D);
       }
       if (!behindCamera) {
-        if (contextTransformer) {
-          contextTransformer->transform(contentBounds);
+        if (transformer) {
+          transformer->transform(contentBounds);
         }
         _root->invalidateRect(*contentBounds);
       } else {
@@ -2309,15 +2300,20 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> contextTransfo
       continue;
     }
     auto childMatrix = child->getMatrixWithScrollRect();
-    bool childIn3DContext = localToContext3D != nullptr || child->canPreserve3D();
     std::shared_ptr<RegionTransformer> childTransformer = nullptr;
     // Ensure the 3D filter is not released during the entire function lifetime.
     std::vector<std::shared_ptr<LayerFilter>> child3DFilterVector = {};
-    if (childIn3DContext) {
-      childTransformer = baseTransformer;
-    } else {
+    if (canPreserve3D() || child->canPreserve3D()) {
+      // Child is inside a 3D rendering context.
+      childTransformer = RegionTransformer::MakeFromMatrix3D(childMatrix, transformer);
+    } else if (IsMatrix3DAffine(childMatrix)) {
+      // Child is a 2D layer outside 3D context.
       childTransformer =
-          MakeTransformerFromTransform3D(childMatrix, contextTransformer, &child3DFilterVector);
+          RegionTransformer::MakeFromMatrix(GetMayLossyAffineMatrix(childMatrix), transformer);
+    } else {
+      // Child has 3D transform but is outside 3D context.
+      childTransformer =
+          MakeTransformerFromTransform3D(childMatrix, transformer, &child3DFilterVector);
     }
     std::optional<Rect> clipRect = std::nullopt;
     if (child->_scrollRect) {
@@ -2342,16 +2338,7 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> contextTransfo
       childTransformer = RegionTransformer::MakeFromClip(*clipRect, std::move(childTransformer));
     }
     auto childForceDirty = forceDirty || child->bitFields.dirtyTransform;
-    std::optional<Matrix3D> childLocalToContext3D = std::nullopt;
-    if (childIn3DContext) {
-      childLocalToContext3D = childMatrix;
-      if (localToContext3D != nullptr) {
-        childLocalToContext3D->postConcat(*localToContext3D);
-      }
-    }
-    child->updateRenderBounds(std::move(childTransformer),
-                              childLocalToContext3D.has_value() ? &*childLocalToContext3D : nullptr,
-                              childForceDirty);
+    child->updateRenderBounds(std::move(childTransformer), childForceDirty);
     child->bitFields.dirtyTransform = false;
     if (!child->maskOwner) {
       renderBounds.join(child->renderBounds);
@@ -2468,7 +2455,7 @@ std::shared_ptr<BackgroundContext> Layer::createBackgroundContext(
 
 bool Layer::canPreserve3D() const {
   return _transformStyle == TransformStyle::Preserve3D && _filters.empty() &&
-         _layerStyles.empty() && !hasValidMask();
+         _layerStyles.empty() && !hasValidMask() && _scrollRect == nullptr;
 }
 
 void Layer::invalidateSubtree() {
