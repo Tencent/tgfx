@@ -675,10 +675,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   bool hasValidMask() const;
 
-  /**
-   * Updates the rendering bounds of this layer and its descendants.
-   * @param transformer The transformer to apply to the layer's content bounds.
-   */
   void updateRenderBounds(std::shared_ptr<RegionTransformer> transformer = nullptr,
                           bool forceDirty = false);
 
