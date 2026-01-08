@@ -20,6 +20,7 @@
 #include "core/MeasureContext.h"
 #include "core/PictureRecords.h"
 #include "core/shaders/ImageShader.h"
+#include "core/utils/AtomicCache.h"
 #include "core/utils/BlockAllocator.h"
 #include "core/utils/Log.h"
 #include "core/utils/Types.h"
@@ -45,23 +46,18 @@ Picture::Picture(std::unique_ptr<BlockBuffer> buffer,
 Picture::~Picture() {
   // Make sure the records are cleared before the block data is destroyed.
   records.clear();
-  auto oldBounds = bounds.exchange(nullptr, std::memory_order_acq_rel);
-  delete oldBounds;
+  AtomicCacheReset(bounds);
 }
 
 Rect Picture::getBounds() const {
-  if (auto cachedBounds = bounds.load(std::memory_order_acquire)) {
+  if (auto cachedBounds = AtomicCacheGet(bounds)) {
     return *cachedBounds;
   }
   MeasureContext context;
   MCState state(Matrix::I());
   playback(&context, state);
   auto totalBounds = context.getBounds();
-  auto newBounds = new Rect(totalBounds);
-  Rect* oldBounds = nullptr;
-  if (!bounds.compare_exchange_strong(oldBounds, newBounds, std::memory_order_acq_rel)) {
-    delete newBounds;
-  }
+  AtomicCacheSet(bounds, &totalBounds);
   return totalBounds;
 }
 

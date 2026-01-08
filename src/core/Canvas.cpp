@@ -493,10 +493,11 @@ void Canvas::drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t 
     return;
   }
   SaveLayerForImageFilter(paint.getImageFilter());
-  GlyphRun glyphRun(font, {glyphs, glyphs + glyphCount}, {positions, positions + glyphCount});
-  auto glyphRunList = std::make_shared<GlyphRunList>(std::move(glyphRun));
-  drawContext->drawGlyphRunList(std::move(glyphRunList), *mcState, paint.getBrush(),
-                                paint.getStroke());
+  auto textBlob = TextBlob::MakeFrom(glyphs, positions, glyphCount, font);
+  if (textBlob == nullptr) {
+    return;
+  }
+  drawContext->drawTextBlob(std::move(textBlob), *mcState, paint.getBrush(), paint.getStroke());
 }
 
 void Canvas::drawTextBlob(std::shared_ptr<TextBlob> textBlob, float x, float y,
@@ -507,10 +508,7 @@ void Canvas::drawTextBlob(std::shared_ptr<TextBlob> textBlob, float x, float y,
   SaveLayerForImageFilter(paint.getImageFilter());
   auto state = *mcState;
   state.matrix.preTranslate(x, y);
-  auto stroke = paint.getStroke();
-  for (auto& glyphRunList : textBlob->glyphRunLists) {
-    drawContext->drawGlyphRunList(glyphRunList, state, paint.getBrush(), stroke);
-  }
+  drawContext->drawTextBlob(std::move(textBlob), state, paint.getBrush(), paint.getStroke());
 }
 
 void Canvas::drawPicture(std::shared_ptr<Picture> picture) {

@@ -382,10 +382,9 @@ bool NeedsNewFont(PDFFont* font, GlyphID glyphID, AdvancedTypefaceInfo::FontType
 }
 }  // namespace
 
-void PDFExportContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
-                                        const MCState& state, const Brush& brush,
-                                        const Stroke* stroke) {
-  for (const auto& glyphRun : glyphRunList->glyphRuns()) {
+void PDFExportContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const MCState& state,
+                                    const Brush& brush, const Stroke* stroke) {
+  for (const auto& glyphRun : textBlob->glyphRuns()) {
     onDrawGlyphRun(glyphRun, state, brush, stroke);
   }
 }

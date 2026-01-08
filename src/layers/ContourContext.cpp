@@ -99,10 +99,9 @@ void ContourContext::drawImageRect(std::shared_ptr<Image> image, const Rect& src
   pictureContext.drawImageRect(image, srcRect, dstRect, sampling, state, brush, constraint);
 }
 
-void ContourContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
-                                      const MCState& state, const Brush& brush,
-                                      const Stroke* stroke) {
-  auto bounds = glyphRunList->getBounds();
+void ContourContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const MCState& state,
+                                  const Brush& brush, const Stroke* stroke) {
+  auto bounds = textBlob->getBounds();
   if (stroke) {
     ApplyStrokeToBounds(*stroke, &bounds, state.matrix);
   }
@@ -110,7 +109,7 @@ void ContourContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList
   if (containContourBound(bounds)) {
     return;
   }
-  pictureContext.drawGlyphRunList(glyphRunList, state, brush, stroke);
+  pictureContext.drawTextBlob(textBlob, state, brush, stroke);
 }
 
 void ContourContext::drawPicture(std::shared_ptr<Picture> picture, const MCState& state) {

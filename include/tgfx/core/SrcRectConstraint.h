@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,20 +16,22 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "LazyBounds.h"
+#pragma once
 
 namespace tgfx {
-void LazyBounds::update(const Rect& rect) const {
-  auto newBounds = new Rect(rect);
-  Rect* oldBounds = nullptr;
-  if (!bounds.compare_exchange_strong(oldBounds, newBounds, std::memory_order_acq_rel)) {
-    delete newBounds;
-  }
-}
-
-void LazyBounds::reset() {
-  auto oldBounds = bounds.exchange(nullptr, std::memory_order_acq_rel);
-  delete oldBounds;
-}
-
+/**
+ * SrcRectConstraint controls the behavior at the edge of source rect, provided to drawImageRect()
+ * when there is any filtering. If Strict is set, then extra code is used to ensure it never samples
+ * outside the src-rect. Strict disables the use of mipmaps.
+ */
+enum class SrcRectConstraint {
+  /**
+   * sample only inside bounds; slower
+   */
+  Strict,
+  /**
+   * sample outside bounds; faster
+   */
+  Fast,
+};
 }  // namespace tgfx

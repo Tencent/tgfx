@@ -290,14 +290,13 @@ void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcR
                             constraint);
 }
 
-void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
-                                     const MCState& state, const Brush& brush,
-                                     const Stroke* stroke) {
-  DEBUG_ASSERT(glyphRunList != nullptr);
+void RenderContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const MCState& state,
+                                 const Brush& brush, const Stroke* stroke) {
+  DEBUG_ASSERT(textBlob != nullptr);
   if (FloatNearlyZero(state.matrix.getMaxScale())) {
     return;
   }
-  auto bounds = glyphRunList->getBounds();
+  auto bounds = textBlob->getBounds();
   if (stroke) {
     ApplyStrokeToBounds(*stroke, &bounds, state.matrix);
   }
@@ -313,8 +312,8 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
   }
   inverseMatrix.mapRect(&localClipBounds);
 
-  std::vector<GlyphRun> rejectedGlyphRuns = {};
-  const auto& glyphRuns = glyphRunList->glyphRuns();
+  std::vector<GlyphRun> pathRuns = {};
+  const auto& glyphRuns = textBlob->glyphRuns();
   for (const auto& run : glyphRuns) {
     if (run.font.getTypeface() == nullptr) {
       continue;
@@ -325,21 +324,15 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
       continue;
     }
     rejectedGlyphRun.font = run.font;
-    rejectedGlyphRuns.emplace_back(std::move(rejectedGlyphRun));
+    if (!run.font.hasColor() && run.font.hasOutlines()) {
+      pathRuns.push_back(std::move(rejectedGlyphRun));
+    } else {
+      drawGlyphsAsTransformedMask(rejectedGlyphRun, state, brush, stroke);
+    }
   }
-
-  if (rejectedGlyphRuns.empty()) {
-    return;
-  }
-
-  if (!glyphRunList->hasColor() && glyphRunList->hasOutlines()) {
-    auto rejectedGlyphRunList = std::make_shared<GlyphRunList>(std::move(rejectedGlyphRuns));
-    drawGlyphsAsPath(std::move(rejectedGlyphRunList), state, brush, stroke, localClipBounds);
-    return;
-  }
-
-  for (const auto& run : rejectedGlyphRuns) {
-    drawGlyphsAsTransformedMask(run, state, brush, stroke);
+  if (!pathRuns.empty()) {
+    auto pathTextBlob = TextBlob::MakeFrom(std::move(pathRuns));
+    drawTextBlobAsPath(std::move(pathTextBlob), state, brush, stroke, localClipBounds);
   }
 }
 
@@ -528,17 +521,20 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
                               brush.makeWithMatrix(state.matrix));
   }
 }
-void RenderContext::drawGlyphsAsPath(std::shared_ptr<GlyphRunList> glyphRunList,
-                                     const MCState& state, const Brush& brush, const Stroke* stroke,
-                                     Rect& localClipBounds) {
+
+void RenderContext::drawTextBlobAsPath(std::shared_ptr<TextBlob> textBlob, const MCState& state,
+                                       const Brush& brush, const Stroke* stroke,
+                                       Rect& localClipBounds) {
+  // The textBlob passed here already contains only outline runs, so we can directly create
+  // TextShape without filtering again.
+  std::shared_ptr<Shape> shape = std::make_shared<TextShape>(std::move(textBlob));
+  shape = Shape::ApplyStroke(std::move(shape), stroke);
+
   Path clipPath = {};
   if (brush.antiAlias) {
     localClipBounds.outset(1.0f, 1.0f);
   }
   clipPath.addRect(localClipBounds);
-  std::shared_ptr<Shape> shape = std::make_shared<TextShape>(std::move(glyphRunList));
-  shape = Shape::ApplyStroke(std::move(shape), stroke);
-
   shape = Shape::Merge(std::move(shape), Shape::MakeFrom(std::move(clipPath)), PathOp::Intersect);
   if (auto compositor = getOpsCompositor()) {
     compositor->drawShape(std::move(shape), state, brush);

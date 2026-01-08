@@ -29,7 +29,7 @@ namespace tgfx {
  * MaskContext is a DrawContext implementation that records drawable shapes and generates a combined
  * Path on finish. It also implements Picture::AbortCallback to abort playback when unsupported
  * operations are encountered. It only supports simple filled shapes (Rect, RRect, Path) with opaque
- * brushes. For unsupported operations (Image, GlyphRunList, etc.), it sets an abort flag.
+ * brushes. For unsupported operations (Image, TextBlob, etc.), it sets an abort flag.
  */
 class MaskContext : public DrawContext, public Picture::AbortCallback {
  public:
@@ -72,8 +72,8 @@ class MaskContext : public DrawContext, public Picture::AbortCallback {
                      const SamplingOptions& sampling, const MCState& state, const Brush& brush,
                      SrcRectConstraint constraint) override;
 
-  void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
-                        const Brush& brush, const Stroke* stroke) override;
+  void drawTextBlob(std::shared_ptr<TextBlob> textBlob, const MCState& state, const Brush& brush,
+                    const Stroke* stroke) override;
 
   void drawPicture(std::shared_ptr<Picture> picture, const MCState& state) override;
 
