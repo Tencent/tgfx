@@ -326,46 +326,6 @@ TGFX_TEST(StrokeTest, HairlineWithDropShadow) {
   EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/HairlineWithDropShadow"));
 }
 
-TGFX_TEST(StrokeTest, PathStrokerWithMultiParams) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 300, 150);
-  ASSERT_TRUE(surface != nullptr);
-  auto canvas = surface->getCanvas();
-  canvas->clear();
-
-  Path path = {};
-  path.moveTo(50, 50);
-  path.lineTo(100, 100);
-  path.lineTo(150, 50);
-  path.lineTo(200, 100);
-  path.lineTo(250, 50);
-
-  auto hairlinePath = path;
-
-  std::vector<PathStroker::PointParam> params = {};
-  params.emplace_back(LineCap::Square);
-  params.emplace_back(LineJoin::Round);
-  params.emplace_back(LineJoin::Bevel);
-  params.emplace_back(LineJoin::Miter);
-  params.emplace_back(LineCap::Round);
-
-  EXPECT_TRUE(PathStroker::StrokePathWithMultiParams(&path, 10.0f, params, 1.0f));
-
-  Paint paint = {};
-  paint.setColor(Color::White());
-  canvas->drawPath(path, paint);
-
-  Paint hairlinePaint = {};
-  hairlinePaint.setColor(Color::Red());
-  hairlinePaint.setStyle(PaintStyle::Stroke);
-  hairlinePaint.setStrokeWidth(0.0f);
-  canvas->drawPath(hairlinePath, hairlinePaint);
-
-  EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/PathStrokerWithMultiParams"));
-}
-
 TGFX_TEST(StrokeTest, PathStrokerEmptyParams) {
   Path path = {};
   path.addRect(Rect::MakeXYWH(0, 0, 100, 100));
@@ -410,32 +370,99 @@ TGFX_TEST(StrokeTest, PathStrokerSingleParam) {
   EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/PathStrokerSingleParam"));
 }
 
-TGFX_TEST(StrokeTest, PathStrokerContourI) {
+TGFX_TEST(StrokeTest, PathStrokerSingleLine) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 512, 512);
+  auto surface = Surface::Make(context, 300, 300);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear();
+
+  Paint hairlinePaint = {};
+  hairlinePaint.setColor(Color::Red());
+  hairlinePaint.setStyle(PaintStyle::Stroke);
+  hairlinePaint.setStrokeWidth(0.0f);
+
+  Path line1 = {};
+  line1.moveTo(50, 50);
+  line1.lineTo(250, 50);
+
+  auto hairlineLine1 = line1;
+
+  std::vector<PathStroker::PointParam> params1 = {};
+  params1.emplace_back(LineCap::Butt);
+  params1.emplace_back(LineCap::Round);
+
+  EXPECT_TRUE(PathStroker::StrokePathWithMultiParams(&line1, 15.0f, params1, 1.0f));
+
+  Paint paint = {};
+  paint.setColor(Color::FromRGBA(255, 0, 0, 255));
+  canvas->drawPath(line1, paint);
+  canvas->drawPath(hairlineLine1, hairlinePaint);
+
+  canvas->translate(0, 80);
+  Path line2 = {};
+  line2.moveTo(50, 50);
+  line2.lineTo(250, 50);
+
+  auto hairlineLine2 = line2;
+
+  std::vector<PathStroker::PointParam> params2 = {};
+  params2.emplace_back(LineCap::Round);
+
+  EXPECT_TRUE(PathStroker::StrokePathWithMultiParams(&line2, 15.0f, params2, 1.0f));
+  paint.setColor(Color::FromRGBA(0, 255, 0, 255));
+  canvas->drawPath(line2, paint);
+  canvas->drawPath(hairlineLine2, hairlinePaint);
+
+  canvas->translate(0, 80);
+  Path line3 = {};
+  line3.moveTo(50, 50);
+  line3.lineTo(250, 50);
+
+  auto hairlineLine3 = line3;
+
+  std::vector<PathStroker::PointParam> params3 = {};
+  params3.emplace_back(LineCap::Square);
+
+  EXPECT_TRUE(PathStroker::StrokePathWithMultiParams(&line3, 15.0f, params3, 1.0f));
+  paint.setColor(Color::FromRGBA(0, 0, 255, 255));
+  canvas->drawPath(line3, paint);
+  canvas->drawPath(hairlineLine3, hairlinePaint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/PathStrokerSingleLine"));
+}
+
+TGFX_TEST(StrokeTest, PathStrokerWithMultiParams) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 150);
   ASSERT_TRUE(surface != nullptr);
   auto canvas = surface->getCanvas();
   canvas->clear();
 
   Path path = {};
-  path.moveTo(25, 100);
-  path.cubicTo(50, 80, 100, 80, 125, 100);
-  path.cubicTo(100, 120, 50, 120, 25, 100);
-  path.close();
-  path.transform(Matrix::MakeScale(3.0f));
+  path.moveTo(50, 50);
+  path.lineTo(100, 100);
+  path.lineTo(150, 50);
+  path.lineTo(200, 100);
+  path.lineTo(250, 50);
 
   auto hairlinePath = path;
 
   std::vector<PathStroker::PointParam> params = {};
+  params.emplace_back(LineCap::Square);
   params.emplace_back(LineJoin::Round);
+  params.emplace_back(LineJoin::Bevel);
   params.emplace_back(LineJoin::Miter);
-  params.emplace_back(LineJoin::Bevel);
+  params.emplace_back(LineCap::Round);
+
   EXPECT_TRUE(PathStroker::StrokePathWithMultiParams(&path, 10.0f, params, 1.0f));
 
   Paint paint = {};
-  paint.setColor(Color::FromRGBA(0, 255, 0, 255));
+  paint.setColor(Color::White());
   canvas->drawPath(path, paint);
 
   Paint hairlinePaint = {};
@@ -444,82 +471,7 @@ TGFX_TEST(StrokeTest, PathStrokerContourI) {
   hairlinePaint.setStrokeWidth(0.0f);
   canvas->drawPath(hairlinePath, hairlinePaint);
 
-  EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/PathStrokerContourI"));
-}
-
-TGFX_TEST(StrokeTest, PathStrokerContourII) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 512, 512);
-  ASSERT_TRUE(surface != nullptr);
-  auto canvas = surface->getCanvas();
-  canvas->clear();
-
-  Path path = {};
-  path.moveTo(25, 100);
-  path.cubicTo(50, 80, 100, 80, 125, 100);
-  path.close();
-  path.transform(Matrix::MakeScale(3.0f));
-
-  auto hairlinePath = path;
-
-  std::vector<PathStroker::PointParam> params = {};
-  params.emplace_back(LineJoin::Round);
-  params.emplace_back(LineJoin::Bevel);
-  EXPECT_TRUE(PathStroker::StrokePathWithMultiParams(&path, 10.0f, params, 1.0f));
-
-  Paint paint = {};
-  paint.setColor(Color::FromRGBA(0, 255, 0, 255));
-  canvas->drawPath(path, paint);
-
-  Paint hairlinePaint = {};
-  hairlinePaint.setColor(Color::Red());
-  hairlinePaint.setStyle(PaintStyle::Stroke);
-  hairlinePaint.setStrokeWidth(0.0f);
-  canvas->drawPath(hairlinePath, hairlinePaint);
-
-  EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/PathStrokerContourII"));
-}
-
-TGFX_TEST(StrokeTest, PathStrokerContourIII) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 512, 512);
-  ASSERT_TRUE(surface != nullptr);
-  auto canvas = surface->getCanvas();
-  canvas->clear();
-
-  Path path = {};
-  path.moveTo(9.5, 5);
-  path.lineTo(3, 0);
-  path.lineTo(0, 3.5);
-  path.lineTo(9.5, 5);
-  path.close();
-  path.transform(Matrix::MakeScale(20.0f));
-
-  auto hairlinePath = path;
-
-  std::vector<PathStroker::PointParam> params = {};
-  params.emplace_back();
-  params.emplace_back();
-  params.emplace_back();
-  params.emplace_back();
-  EXPECT_TRUE(PathStroker::StrokePathWithMultiParams(&path, 10.0f, params, 10.0f));
-
-  Paint paint = {};
-  paint.setColor(Color::FromRGBA(0, 255, 0, 255));
-  canvas->translate(50, 50);
-  canvas->drawPath(path, paint);
-
-  Paint hairlinePaint = {};
-  hairlinePaint.setColor(Color::Red());
-  hairlinePaint.setStyle(PaintStyle::Stroke);
-  hairlinePaint.setStrokeWidth(0.0f);
-  canvas->drawPath(hairlinePath, hairlinePaint);
-
-  EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/PathStrokerContourIII"));
+  EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/PathStrokerWithMultiParams"));
 }
 
 TGFX_TEST(StrokeTest, PathStrokerDifferentMiterLimits) {
@@ -644,68 +596,95 @@ TGFX_TEST(StrokeTest, PathStrokerOpenPath) {
   EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/PathStrokerOpenPath"));
 }
 
-TGFX_TEST(StrokeTest, PathStrokerSingleLine) {
+TGFX_TEST(StrokeTest, PathStrokerContours) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 300, 300);
+  auto surface = Surface::Make(context, 1024, 512);
   ASSERT_TRUE(surface != nullptr);
   auto canvas = surface->getCanvas();
   canvas->clear();
 
+  Paint paint = {};
+  paint.setColor(Color::FromRGBA(0, 255, 0, 255));
   Paint hairlinePaint = {};
   hairlinePaint.setColor(Color::Red());
   hairlinePaint.setStyle(PaintStyle::Stroke);
   hairlinePaint.setStrokeWidth(0.0f);
 
-  Path line1 = {};
-  line1.moveTo(50, 50);
-  line1.lineTo(250, 50);
+  // Test 1: Double cubic bezier curve (ContourI)
+  {
+    Path path = {};
+    path.moveTo(25, 100);
+    path.cubicTo(50, 80, 100, 80, 125, 100);
+    path.cubicTo(100, 120, 50, 120, 25, 100);
+    path.close();
+    path.transform(Matrix::MakeScale(3.0f));
 
-  auto hairlineLine1 = line1;
+    auto hairlinePath = path;
 
-  std::vector<PathStroker::PointParam> params1 = {};
-  params1.emplace_back(LineCap::Butt);
-  params1.emplace_back(LineCap::Round);
+    std::vector<PathStroker::PointParam> params = {};
+    params.emplace_back(LineJoin::Round);
+    params.emplace_back(LineJoin::Miter);
+    params.emplace_back(LineJoin::Bevel);
+    EXPECT_TRUE(PathStroker::StrokePathWithMultiParams(&path, 10.0f, params, 1.0f));
 
-  EXPECT_TRUE(PathStroker::StrokePathWithMultiParams(&line1, 15.0f, params1, 1.0f));
+    canvas->save();
+    canvas->translate(0, -200);
+    canvas->drawPath(path, paint);
+    canvas->drawPath(hairlinePath, hairlinePaint);
+    canvas->restore();
+  }
 
-  Paint paint = {};
-  paint.setColor(Color::FromRGBA(255, 0, 0, 255));
-  canvas->drawPath(line1, paint);
-  canvas->drawPath(hairlineLine1, hairlinePaint);
+  // Test 2: Single cubic bezier curve (ContourII)
+  {
+    Path path = {};
+    path.moveTo(25, 100);
+    path.cubicTo(50, 80, 100, 80, 125, 100);
+    path.close();
+    path.transform(Matrix::MakeScale(3.0f));
 
-  canvas->translate(0, 80);
-  Path line2 = {};
-  line2.moveTo(50, 50);
-  line2.lineTo(250, 50);
+    auto hairlinePath = path;
 
-  auto hairlineLine2 = line2;
+    std::vector<PathStroker::PointParam> params = {};
+    params.emplace_back(LineJoin::Round);
+    params.emplace_back(LineJoin::Bevel);
+    EXPECT_TRUE(PathStroker::StrokePathWithMultiParams(&path, 10.0f, params, 1.0f));
 
-  std::vector<PathStroker::PointParam> params2 = {};
-  params2.emplace_back(LineCap::Round);
+    canvas->save();
+    canvas->translate(400, -200);
+    canvas->drawPath(path, paint);
+    canvas->drawPath(hairlinePath, hairlinePaint);
+    canvas->restore();
+  }
 
-  EXPECT_TRUE(PathStroker::StrokePathWithMultiParams(&line2, 15.0f, params2, 1.0f));
-  paint.setColor(Color::FromRGBA(0, 255, 0, 255));
-  canvas->drawPath(line2, paint);
-  canvas->drawPath(hairlineLine2, hairlinePaint);
+  // Test 3: Triangle with line segments (ContourIII)
+  {
+    Path path = {};
+    path.moveTo(9.5, 5);
+    path.lineTo(3, 0);
+    path.lineTo(0, 3.5);
+    path.lineTo(9.5, 5);
+    path.close();
+    path.transform(Matrix::MakeScale(20.0f));
 
-  canvas->translate(0, 80);
-  Path line3 = {};
-  line3.moveTo(50, 50);
-  line3.lineTo(250, 50);
+    auto hairlinePath = path;
 
-  auto hairlineLine3 = line3;
+    std::vector<PathStroker::PointParam> params = {};
+    params.emplace_back();
+    params.emplace_back();
+    params.emplace_back();
+    params.emplace_back();
+    EXPECT_TRUE(PathStroker::StrokePathWithMultiParams(&path, 10.0f, params, 10.0f));
 
-  std::vector<PathStroker::PointParam> params3 = {};
-  params3.emplace_back(LineCap::Square);
+    canvas->save();
+    canvas->translate(100, 200);
+    canvas->drawPath(path, paint);
+    canvas->drawPath(hairlinePath, hairlinePaint);
+    canvas->restore();
+  }
 
-  EXPECT_TRUE(PathStroker::StrokePathWithMultiParams(&line3, 15.0f, params3, 1.0f));
-  paint.setColor(Color::FromRGBA(0, 0, 255, 255));
-  canvas->drawPath(line3, paint);
-  canvas->drawPath(hairlineLine3, hairlinePaint);
-
-  EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/PathStrokerSingleLine"));
+  EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/PathStrokerContours"));
 }
 
 TGFX_TEST(StrokeTest, PathStrokerComplexCurves) {
@@ -752,7 +731,7 @@ TGFX_TEST(StrokeTest, StrokeDashMultiParamsBasic) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 400, 300);
+  auto surface = Surface::Make(context, 400, 200);
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
 
@@ -789,7 +768,7 @@ TGFX_TEST(StrokeTest, StrokeDashMultiParamsClosedCurve) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 400, 400);
+  auto surface = Surface::Make(context, 400, 300);
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
 
