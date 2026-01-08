@@ -193,7 +193,6 @@ static bool IsGlyphVisible(const Font& font, bool isCustom, GlyphID glyphID, con
   }
   bounds.scale(scale, scale);
   bounds.offset(glyphPosition.x, glyphPosition.y);
-
   return Rect::Intersects(bounds, clipBounds);
 }
 
@@ -469,6 +468,7 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
 
   const auto maskFormat = GetMaskFormat(font);
   auto typeface = font.getTypeface();
+  const auto isCustom = typeface->isCustom();
   std::unique_ptr<Stroke> scaledStroke = nullptr;
   if (!font.hasColor() && stroke != nullptr) {
     scaledStroke = std::make_unique<Stroke>(*stroke);
@@ -476,7 +476,7 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
   }
 
   BytesKey strikeKey;
-  const auto typefaceID = GetTypefaceID(typeface.get(), typeface->isCustom());
+  const auto typefaceID = GetTypefaceID(typeface.get(), isCustom);
   const auto backingSize = font.scalerContext->getBackingSize();
   ComputeStrikeKey(typefaceID, backingSize, font.isFauxBold(), scaledStroke.get(), &strikeKey);
 
@@ -496,7 +496,7 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
   for (auto glyphID : sourceGlyphRun.glyphs) {
     auto glyphPosition = sourceGlyphRun.positions[index++];
     int maxDimension = 0;
-    if (!IsGlyphVisible(font, typeface->isCustom(), glyphID, localClipBounds, scaledStroke.get(),
+    if (!IsGlyphVisible(font, isCustom, glyphID, localClipBounds, scaledStroke.get(),
                         inverseScale, glyphPosition, &maxDimension)) {
       continue;
     }
@@ -507,7 +507,7 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
       continue;
     }
 
-    if (strike->isEmptyGlyph(glyphID)) {
+    if (!isCustom && strike->isEmptyGlyph(glyphID)) {
       continue;
     }
 
@@ -616,8 +616,9 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
 
   auto maskFormat = GetMaskFormat(font);
   auto typeface = font.getTypeface();
+  const auto isCustom = typeface->isCustom();
   BytesKey strikeKey;
-  const auto typefaceID = GetTypefaceID(typeface.get(), typeface->isCustom());
+  const auto typefaceID = GetTypefaceID(typeface.get(), isCustom);
   const auto backingSize = font.scalerContext->getBackingSize();
   ComputeStrikeKey(typefaceID, backingSize, font.isFauxBold(), scaledStroke.get(), &strikeKey);
 
@@ -633,7 +634,7 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
   size_t index = 0;
 
   for (auto glyphID : sourceGlyphRun.glyphs) {
-    if (strike->isEmptyGlyph(glyphID)) {
+    if (!isCustom && strike->isEmptyGlyph(glyphID)) {
       index++;
       continue;
     }
