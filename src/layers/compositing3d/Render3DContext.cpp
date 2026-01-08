@@ -50,8 +50,8 @@ static std::shared_ptr<Image> PictureToImage(std::shared_ptr<Picture> picture, P
   auto bounds = picture->getBounds();
   bounds.roundOut();
   auto matrix = Matrix::MakeTrans(-bounds.x(), -bounds.y());
-  auto image = Image::MakeFrom(std::move(picture), FloatCeilToInt(bounds.width()),
-                               FloatCeilToInt(bounds.height()), &matrix, std::move(colorSpace));
+  auto image = Image::MakeFrom(std::move(picture), static_cast<int>(bounds.width()),
+                               static_cast<int>(bounds.height()), &matrix, std::move(colorSpace));
   if (offset) {
     offset->x = bounds.left;
     offset->y = bounds.top;
