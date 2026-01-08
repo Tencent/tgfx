@@ -20,7 +20,8 @@
 #include <algorithm>
 #include <atomic>
 #include <cmath>
-#include <queue>
+#include <unordered_map>
+#include <unordered_set>
 #include "core/MCState.h"
 #include "core/Matrix2D.h"
 #include "core/filters/Transform3DImageFilter.h"
@@ -154,6 +155,55 @@ static std::optional<Rect> MapClipBoundsToContent(const std::optional<Rect>& cli
     }
   }
   return clipBounds;
+}
+
+// Computes which layers need to be marked dirty during children reordering.
+// Uses LIS (Longest Increasing Subsequence) algorithm to minimize dirty area
+// by identifying layers that maintain their relative order.
+static void ComputeDirtyNodesForReordering(const std::vector<Layer*>& retainedChildren,
+                                           const std::vector<size_t>& newPositions,
+                                           std::vector<Layer*>* nodesToMarkDirty) {
+  size_t n = retainedChildren.size();
+  if (n == 0) {
+    return;
+  }
+
+  std::vector<size_t> lis;
+  std::vector<size_t> predecessors(n, SIZE_MAX);
+  std::vector<size_t> lisIndices;
+
+  for (size_t i = 0; i < n; ++i) {
+    size_t pos = newPositions[i];
+    auto it = std::lower_bound(lis.begin(), lis.end(), pos);
+    size_t insertPos = static_cast<size_t>(it - lis.begin());
+
+    if (it == lis.end()) {
+      lis.push_back(pos);
+      lisIndices.push_back(i);
+    } else {
+      *it = pos;
+      lisIndices[insertPos] = i;
+    }
+
+    if (insertPos > 0) {
+      predecessors[i] = lisIndices[insertPos - 1];
+    }
+  }
+
+  std::vector<bool> inLIS(n, false);
+  if (!lisIndices.empty()) {
+    size_t current = lisIndices.back();
+    while (current != SIZE_MAX) {
+      inLIS[current] = true;
+      current = predecessors[current];
+    }
+  }
+
+  for (size_t i = 0; i < n; ++i) {
+    if (!inLIS[i]) {
+      nodesToMarkDirty->push_back(retainedChildren[i]);
+    }
+  }
 }
 
 std::shared_ptr<Picture> Layer::RecordPicture(DrawMode mode, float contentScale,
@@ -710,6 +760,83 @@ bool Layer::setChildIndex(std::shared_ptr<Layer> child, int index) {
   child->invalidateTransform();
   invalidateDescendents();
   return true;
+}
+
+void Layer::setChildren(const std::vector<std::shared_ptr<Layer>>& children) {
+  std::vector<std::shared_ptr<Layer>> validChildren;
+  std::unordered_map<Layer*, size_t> newIndexMap;
+
+  for (const auto& child : children) {
+    if (child == nullptr || newIndexMap.find(child.get()) != newIndexMap.end()) {
+      continue;
+    }
+    if (child.get() == this) {
+      LOGE("setChildren() The child is the same as the parent.");
+      continue;
+    }
+    if (child->doContains(this)) {
+      LOGE("setChildren() The child is already a parent of the parent.");
+      continue;
+    }
+    if (child->_root == child.get()) {
+      LOGE("A root layer cannot be added as a child to another layer.");
+      continue;
+    }
+    newIndexMap[child.get()] = validChildren.size();
+    validChildren.push_back(child);
+  }
+
+  if (_children == validChildren) {
+    return;
+  }
+
+  auto oldChildren = _children;
+  std::vector<Layer*> nodesToMarkDirty;
+  std::vector<Layer*> retainedChildren;
+  std::vector<size_t> newPositions;
+  std::unordered_set<Layer*> oldChildrenSet;
+
+  for (const auto& child : oldChildren) {
+    auto* ptr = child.get();
+    oldChildrenSet.insert(ptr);
+    auto it = newIndexMap.find(ptr);
+    if (it == newIndexMap.end()) {
+      nodesToMarkDirty.push_back(ptr);
+      ptr->_parent = nullptr;
+      ptr->onDetachFromRoot();
+      if (_root) {
+        _root->invalidateRect(ptr->renderBounds);
+        ptr->renderBounds = {};
+      }
+    } else {
+      retainedChildren.push_back(ptr);
+      newPositions.push_back(it->second);
+    }
+  }
+
+  ComputeDirtyNodesForReordering(retainedChildren, newPositions, &nodesToMarkDirty);
+
+  std::vector<Layer*> addedChildren;
+  for (const auto& child : validChildren) {
+    if (oldChildrenSet.find(child.get()) == oldChildrenSet.end()) {
+      child->removeFromParent();
+      addedChildren.push_back(child.get());
+    }
+  }
+
+  _children = std::move(validChildren);
+
+  for (auto* child : addedChildren) {
+    nodesToMarkDirty.push_back(child);
+    child->_parent = this;
+    child->onAttachToRoot(_root);
+  }
+
+  for (auto* dirtyNode : nodesToMarkDirty) {
+    dirtyNode->invalidateTransform();
+  }
+
+  invalidateDescendents();
 }
 
 bool Layer::replaceChild(std::shared_ptr<Layer> oldChild, std::shared_ptr<Layer> newChild) {
