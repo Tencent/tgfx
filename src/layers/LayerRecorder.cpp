@@ -86,12 +86,8 @@ void LayerRecorder::addPath(const Path& path, const LayerPaint& paint) {
     addRRect(rRect, paint);
     return;
   }
-  if (canAppend(PendingType::Shape, paint)) {
-    pendingShape = Shape::Merge(std::move(pendingShape), Shape::MakeFrom(path));
-  } else {
-    flushPending(PendingType::Shape, paint);
-    pendingShape = Shape::MakeFrom(path);
-  }
+  flushPending(PendingType::Shape, paint);
+  pendingShape = Shape::MakeFrom(path);
 }
 
 void LayerRecorder::addShape(std::shared_ptr<Shape> shape, const LayerPaint& paint) {
@@ -102,22 +98,23 @@ void LayerRecorder::addShape(std::shared_ptr<Shape> shape, const LayerPaint& pai
     addPath(shape->getPath(), paint);
     return;
   }
-  if (canAppend(PendingType::Shape, paint)) {
-    pendingShape = Shape::Merge(std::move(pendingShape), std::move(shape));
-  } else {
-    flushPending(PendingType::Shape, paint);
-    pendingShape = std::move(shape);
-  }
+  flushPending(PendingType::Shape, paint);
+  pendingShape = std::move(shape);
 }
 
 void LayerRecorder::addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerPaint& paint,
                                 float x, float y) {
+  addTextBlob(std::move(textBlob), paint, Matrix::MakeTrans(x, y));
+}
+
+void LayerRecorder::addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerPaint& paint,
+                                const Matrix& matrix) {
   if (textBlob == nullptr) {
     return;
   }
   flushPending();
   auto& list = paint.drawOrder == DrawOrder::AboveChildren ? foregrounds : contents;
-  list.push_back(std::make_unique<TextContent>(std::move(textBlob), x, y, paint));
+  list.push_back(std::make_unique<TextContent>(std::move(textBlob), matrix, paint));
 }
 
 bool LayerRecorder::canAppend(PendingType type, const LayerPaint& paint) const {
@@ -167,8 +164,7 @@ void LayerRecorder::flushPending(PendingType newType, const LayerPaint& newPaint
         break;
       case PendingType::Shape:
         if (pendingShape->isSimplePath()) {
-          list.push_back(
-              std::make_unique<PathContent>(pendingShape->getPath(), pendingPaint));
+          list.push_back(std::make_unique<PathContent>(pendingShape->getPath(), pendingPaint));
         } else {
           list.push_back(std::make_unique<ShapeContent>(std::move(pendingShape), pendingPaint));
         }

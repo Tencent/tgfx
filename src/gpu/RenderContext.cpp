@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RenderContext.h"
-#include <tgfx/core/Surface.h>
 #include "core/Atlas.h"
 #include "core/AtlasCell.h"
 #include "core/AtlasManager.h"
@@ -32,6 +31,7 @@
 #include "core/utils/MathExtra.h"
 #include "core/utils/StrokeUtils.h"
 #include "gpu/DrawingManager.h"
+#include "tgfx/core/Surface.h"
 
 namespace tgfx {
 static uint32_t GetTypefaceID(const Typeface* typeface, bool isCustom) {
@@ -361,8 +361,11 @@ void RenderContext::drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<
   if (bounds.isEmpty()) {
     return;
   }
-  auto width = FloatCeilToInt(bounds.width());
-  auto height = FloatCeilToInt(bounds.height());
+  // Use roundOut() to snap bounds to integer pixel boundaries, ensuring both the texture size and
+  // the viewMatrix offset are pixel-aligned, which prevents anti-aliasing artifacts at edges.
+  bounds.roundOut();
+  auto width = FloatSaturateToInt(bounds.width());
+  auto height = FloatSaturateToInt(bounds.height());
   viewMatrix.postTranslate(-bounds.x(), -bounds.y());
   auto image = Image::MakeFrom(std::move(picture), width, height, &viewMatrix, colorSpace());
   if (image == nullptr) {

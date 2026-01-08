@@ -18,9 +18,8 @@
 
 #pragma once
 
-#include "SolidColor.h"
-#include "tgfx/layers/ColorSource.h"
 #include "tgfx/layers/Layer.h"
+#include "tgfx/layers/vectors/SolidColor.h"
 
 namespace tgfx {
 /**
