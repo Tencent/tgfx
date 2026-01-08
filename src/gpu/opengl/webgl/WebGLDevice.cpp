@@ -59,11 +59,11 @@ std::shared_ptr<WebGLDevice> WebGLDevice::MakeFrom(const std::string& canvasID,
   auto context = emscripten_webgl_create_context(canvasID.c_str(), &attrs);
   if (context == 0) {
     // fallback to WebGL 1.0
-    ::tgfx::PrintError("WebGLDevice::MakeFrom call num: %d", i);
+    ::tgfx::PrintError("fallback to WebGL 1.0");
     attrs.majorVersion = 1;
     context = emscripten_webgl_create_context(canvasID.c_str(), &attrs);
     if (context == 0) {
-      ::tgfx::PrintError("WebGLDevice::MakeFrom call num: %d", i);
+      ::tgfx::PrintError("context create failed.");
       return nullptr;
     }
   }
