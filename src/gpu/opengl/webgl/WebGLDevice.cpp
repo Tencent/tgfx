@@ -60,7 +60,7 @@ std::shared_ptr<WebGLDevice> WebGLDevice::MakeFrom(const std::string& canvasID,
   if (context == 0) {
     // fallback to WebGL 1.0
     ::tgfx::PrintError("fallback to WebGL 1.0");
-#pragma clang diagnostic push
+      #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdollar-in-identifier-extension"
     EM_ASM({
     var selector = UTF8ToString($0);
@@ -70,10 +70,19 @@ std::shared_ptr<WebGLDevice> WebGLDevice::MakeFrom(const std::string& canvasID,
     if (canvas) {
       console.error("[WebGL Debug] canvas size:", canvas.width, "x", canvas.height);
       console.error("[WebGL Debug] WebGL2 support:", !!window.WebGL2RenderingContext);
+      // 检查是否已有上下文
+      console.error("[WebGL Debug] _webgl_context_handle:", canvas._webgl_context_handle);
+      console.error("[WebGL Debug] __webglContext:", canvas.__webglContext);
+      // 检查 Emscripten GL 模块状态
+      if (typeof Module !== 'undefined' && Module.GL) {
+        console.error("[WebGL Debug] GL.contexts:", Object.keys(Module.GL.contexts));
+      }
       // 尝试直接用 JS 创建，看浏览器报什么错
       try {
-        var gl = canvas.getContext("webgl2");
-        console.error("[WebGL Debug] JS webgl2 context:", !!gl);
+        var gl2 = canvas.getContext("webgl2");
+        var gl1 = canvas.getContext("webgl");
+        var ctx2d = canvas.getContext("2d");
+        console.error("[WebGL Debug] webgl2:", !!gl2, "webgl:", !!gl1, "2d:", !!ctx2d);
       } catch(e) {
         console.error("[WebGL Debug] JS error:", e.message);
       }
