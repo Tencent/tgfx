@@ -126,13 +126,13 @@ static std::shared_ptr<ImageCodec> GetGlyphCodec(
   if (shape == nullptr) {
     return nullptr;
   }
-  if (stroke) {
-    ApplyStrokeToBounds(*stroke, &bounds);
-    shape = Shape::ApplyStroke(std::move(shape), stroke);
-  }
   bounds = shape->getBounds();
   if (bounds.isEmpty()) {
     return nullptr;
+  }
+  if (stroke) {
+    ApplyStrokeToBounds(*stroke, &bounds);
+    shape = Shape::ApplyStroke(std::move(shape), stroke);
   }
   if (std::max(bounds.width(), bounds.height()) > Atlas::MaxCellSize) {
     setRetryValue(true);
