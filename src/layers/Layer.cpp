@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <unordered_map>
 #include "core/MCState.h"
 #include "core/Matrix2D.h"
 #include "core/filters/Transform3DImageFilter.h"
@@ -87,6 +88,49 @@ static std::optional<Rect> MapClipBoundsToContent(const std::optional<Rect>& cli
     }
   }
   return clipBounds;
+}
+
+// Computes which layers need to be marked dirty during children reordering.
+// Uses LIS (Longest Increasing Subsequence) algorithm to minimize dirty area
+// by identifying layers that maintain their relative order.
+static void ComputeDirtyNodesForReordering(const std::vector<Layer*>& commonOld,
+                                           const std::vector<size_t>& newPositions,
+                                           std::vector<Layer*>* nodesToMarkDirty) {
+  if (commonOld.empty()) {
+    return;
+  }
+
+  std::vector<size_t> lis;
+  std::vector<size_t> lisIndices;
+
+  for (size_t i = 0; i < newPositions.size(); ++i) {
+    size_t pos = newPositions[i];
+    auto it = std::lower_bound(lis.begin(), lis.end(), pos);
+    size_t insertPos = static_cast<size_t>(it - lis.begin());
+
+    if (it == lis.end()) {
+      lis.push_back(pos);
+      lisIndices.push_back(i);
+    } else {
+      *it = pos;
+      if (insertPos < lisIndices.size()) {
+        lisIndices[insertPos] = i;
+      }
+    }
+  }
+
+  std::vector<bool> inLIS(commonOld.size(), false);
+  for (size_t idx : lisIndices) {
+    if (idx < inLIS.size()) {
+      inLIS[idx] = true;
+    }
+  }
+
+  for (size_t i = 0; i < commonOld.size(); ++i) {
+    if (!inLIS[i]) {
+      nodesToMarkDirty->push_back(commonOld[i]);
+    }
+  }
 }
 
 std::shared_ptr<Picture> Layer::RecordPicture(DrawMode mode, float contentScale,
@@ -588,6 +632,66 @@ bool Layer::replaceChild(std::shared_ptr<Layer> oldChild, std::shared_ptr<Layer>
   oldChild->removeFromParent();
   invalidateDescendents();
   return true;
+}
+
+void Layer::setChildren(const std::vector<std::shared_ptr<Layer>>& children) {
+  std::vector<std::shared_ptr<Layer>> validChildren;
+  std::unordered_map<Layer*, size_t> newIndexMap;
+  for (const auto& child : children) {
+    if (child != nullptr) {
+      newIndexMap[child.get()] = validChildren.size();
+      validChildren.push_back(child);
+    }
+  }
+
+  if (_children == validChildren) {
+    return;
+  }
+
+  auto oldChildren = _children;
+  std::vector<Layer*> nodesToMarkDirty;
+  std::vector<Layer*> retainedChildren;
+  std::vector<size_t> newPositions;
+  std::unordered_map<Layer*, size_t> oldIndexMap;
+
+  for (size_t i = 0; i < oldChildren.size(); ++i) {
+    auto* child = oldChildren[i].get();
+    oldIndexMap[child] = i;
+    auto it = newIndexMap.find(child);
+    if (it == newIndexMap.end()) {
+      // Child is being removed
+      nodesToMarkDirty.push_back(child);
+      child->_parent = nullptr;
+      child->onDetachFromRoot();
+      if (_root) {
+        _root->invalidateRect(child->renderBounds);
+        child->renderBounds = {};
+      }
+    } else {
+      // Child is retained
+      retainedChildren.push_back(child);
+      newPositions.push_back(it->second);
+    }
+  }
+
+  ComputeDirtyNodesForReordering(retainedChildren, newPositions, &nodesToMarkDirty);
+
+  _children = std::move(validChildren);
+
+  for (const auto& child : _children) {
+    if (oldIndexMap.find(child.get()) == oldIndexMap.end()) {
+      nodesToMarkDirty.push_back(child.get());
+      child->removeFromParent();
+      child->_parent = this;
+      child->onAttachToRoot(_root);
+    }
+  }
+
+  for (Layer* dirtyNode : nodesToMarkDirty) {
+    dirtyNode->invalidateTransform();
+  }
+
+  invalidateDescendents();
 }
 
 Rect Layer::getBounds(const Layer* targetCoordinateSpace, bool computeTightBounds) {

@@ -424,6 +424,15 @@ class Layer : public std::enable_shared_from_this<Layer> {
   bool setChildIndex(std::shared_ptr<Layer> child, int index);
 
   /**
+   * Replaces all children of this layer with the specified list of layers. This method efficiently
+   * handles the transition by only detaching removed children and attaching newly added ones,
+   * while preserving existing children that remain in the list. Uses LIS algorithm to minimize
+   * dirty area during reordering.
+   * @param children The new list of child layers.
+   */
+  void setChildren(const std::vector<std::shared_ptr<Layer>>& children);
+
+  /**
    * Replaces the specified child layer of the calling layer with a different layer.
    * @param oldChild The layer to be replaced.
    * @param newChild The layer with which to replace oldLayer.
