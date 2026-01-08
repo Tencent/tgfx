@@ -44,6 +44,7 @@ static void ComputeStrikeKey(uint32_t typefaceID, float backingSize, bool isBold
   key->write(typefaceID);
   key->write(backingSize);
   if (!stroke) {
+    key->write(static_cast<uint32_t>(isBold));
     return;
   }
   key->write(stroke->width);
@@ -478,7 +479,8 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
   BytesKey strikeKey;
   const auto typefaceID = GetTypefaceID(typeface.get(), isCustom);
   const auto backingSize = font.scalerContext->getBackingSize();
-  ComputeStrikeKey(typefaceID, backingSize, font.isFauxBold(), scaledStroke.get(), &strikeKey);
+  const auto isBold = !font.hasColor() && font.isFauxBold();
+  ComputeStrikeKey(typefaceID, backingSize, isBold, scaledStroke.get(), &strikeKey);
 
   AtlasCell atlasCell{maskFormat};
   PlotUseUpdater plotUseUpdater;
@@ -620,7 +622,8 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
   BytesKey strikeKey;
   const auto typefaceID = GetTypefaceID(typeface.get(), isCustom);
   const auto backingSize = font.scalerContext->getBackingSize();
-  ComputeStrikeKey(typefaceID, backingSize, font.isFauxBold(), scaledStroke.get(), &strikeKey);
+  const auto isBold = !font.hasColor() && font.isFauxBold();
+  ComputeStrikeKey(typefaceID, backingSize, isBold, scaledStroke.get(), &strikeKey);
 
   AtlasCell atlasCell{maskFormat};
   PlotUseUpdater plotUseUpdater;
