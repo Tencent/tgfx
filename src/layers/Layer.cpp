@@ -2444,7 +2444,7 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     if (canPreserve3D() || child->canPreserve3D()) {
       // Child is inside a 3D rendering context.
       childTransformer = RegionTransformer::MakeFromMatrix3D(childMatrix, transformer);
-    } else if (IsMatrix3DAffine(childMatrix)) {
+    } else if (child->bitFields.matrix3DIsAffine) {
       // Child is a 2D layer outside 3D context.
       childTransformer =
           RegionTransformer::MakeFromMatrix(GetMayLossyAffineMatrix(childMatrix), transformer);
