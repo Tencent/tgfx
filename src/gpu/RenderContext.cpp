@@ -678,7 +678,7 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
     auto glyphState = state;
     GetGlyphMatrix(glyphRenderScale, glyphOffset, font.isFauxItalic(), &glyphState.matrix);
     auto rect = atlasLocator.getLocation();
-    ComputeGlyphFinalMatrix(rect, state.matrix, 1.f / (maxScale * cellScale), glyphPosition,
+    ComputeGlyphFinalMatrix(rect, state.matrix, 1.0f / (maxScale * cellScale), glyphPosition,
                             &glyphState.matrix, false);
     compositor->fillTextAtlas(std::move(textureProxy), rect,
                               SamplingOptions(FilterMode::Linear, MipmapMode::None), glyphState,
