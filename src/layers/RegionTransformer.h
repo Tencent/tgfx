@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <optional>
 #include "tgfx/core/Matrix3D.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/layers/filters/LayerFilter.h"
