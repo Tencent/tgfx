@@ -727,7 +727,7 @@ TGFX_TEST(StrokeTest, PathStrokerComplexCurves) {
   EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/PathStrokerComplexCurves"));
 }
 
-TGFX_TEST(StrokeTest, StrokeDashMultiParamsBasic) {
+TGFX_TEST(StrokeTest, PathStrokerDashMultiParamsBasic) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
@@ -761,10 +761,10 @@ TGFX_TEST(StrokeTest, StrokeDashMultiParamsBasic) {
 
   canvas->drawPath(path, paint);
 
-  EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/StrokeDashMultiParamsBasic"));
+  EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/PathStrokerDashMultiParamsBasic"));
 }
 
-TGFX_TEST(StrokeTest, StrokeDashMultiParamsClosedCurve) {
+TGFX_TEST(StrokeTest, PathStrokerDashMultiParamsClosedCurve) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
@@ -796,10 +796,10 @@ TGFX_TEST(StrokeTest, StrokeDashMultiParamsClosedCurve) {
 
   canvas->drawPath(path, paint);
 
-  EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/StrokeDashMultiParamsClosedCurve"));
+  EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/PathStrokerDashMultiParamsClosedCurve"));
 }
 
-TGFX_TEST(StrokeTest, StrokeDashMultiParamsComparison) {
+TGFX_TEST(StrokeTest, PathStrokerDashMultiParamsComparison) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
@@ -842,7 +842,7 @@ TGFX_TEST(StrokeTest, StrokeDashMultiParamsComparison) {
   canvas->drawPath(pathRight, paint);
   canvas->restore();
 
-  EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/StrokeDashMultiParamsComparison"));
+  EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/PathStrokerDashMultiParamsComparison"));
 }
 
 }  // namespace tgfx

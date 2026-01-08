@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cmath>
 #include "core/utils/MathExtra.h"
+#include "include/core/SkPaint.h"
 
 namespace tgfx {
 
@@ -81,6 +82,28 @@ bool StrokeLineToRect(const Stroke& stroke, const Point line[2], Rect* rect) {
     }
   }
   return true;
+}
+
+pk::SkPaint::Cap ToSkLineCap(LineCap cap) {
+  switch (cap) {
+    case LineCap::Round:
+      return pk::SkPaint::kRound_Cap;
+    case LineCap::Square:
+      return pk::SkPaint::kSquare_Cap;
+    default:
+      return pk::SkPaint::kButt_Cap;
+  }
+}
+
+pk::SkPaint::Join ToSkLineJoin(LineJoin join) {
+  switch (join) {
+    case LineJoin::Round:
+      return pk::SkPaint::kRound_Join;
+    case LineJoin::Bevel:
+      return pk::SkPaint::kBevel_Join;
+    default:
+      return pk::SkPaint::kMiter_Join;
+  }
 }
 
 }  // namespace tgfx

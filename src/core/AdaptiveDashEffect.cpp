@@ -235,7 +235,7 @@ bool AdaptiveDashEffect::onFilterPath(Path* path,
       if (FloatNearlyZero(segmentLength) ||
           AreWithinUlps(contour.length - segmentLength, contour.length,
                         ADAPTIVE_DASH_SEGMENT_EPSILON)) {
-        // skip the small segments in case some bugs after paths merge.
+        // Skip small segments to avoid potential issues after path merging.
         if (!needMoveTo) {
           segInfo.measure->getSegment(0, segmentLength, &resultPath, false);
           if (trackVertices) {

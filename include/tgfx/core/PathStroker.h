@@ -79,6 +79,16 @@ class PathStroker {
                                         const std::vector<PointParam>& params,
                                         float resolutionScale = 1.0f);
 
+  /**
+   * Applies dash effect and stroke with multiple parameters to a path. This method combines
+   * dash pattern application with per-point stroke parameter control.
+   *
+   * Notes:
+   * 1. The dash effect is applied first, creating new path segments
+   * 2. Original stroke parameters are intelligently mapped to dash segments based on position
+   * 3. Segments that fall between original points use the defaultParam
+   * 4. The final stroke uses the mapped parameters for each dash segment
+   */
   static bool StrokeDashPathWithMultiParams(Path* path, float width,
                                             const std::vector<PointParam>& params,
                                             const PointParam& defaultParam,

@@ -18,9 +18,14 @@
 
 #pragma once
 
+#include "core/PathRef.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Stroke.h"
+
+namespace pk {
+class SkPaint;
+}
 
 namespace tgfx {
 /**
@@ -56,5 +61,15 @@ std::vector<float> SimplifyLineDashPattern(const std::vector<float>& pattern, co
  * possible (non-round cap, non-hairline, axis-aligned line), and writes the result to rect.
  */
 bool StrokeLineToRect(const Stroke& stroke, const Point line[2], Rect* rect);
+
+/**
+ * Converts LineCap to Skia's SkPaint::Cap.
+ */
+pk::SkPaint::Cap ToSkLineCap(LineCap cap);
+
+/**
+ * Converts LineJoin to Skia's SkPaint::Join.
+ */
+pk::SkPaint::Join ToSkLineJoin(LineJoin join);
 
 }  // namespace tgfx

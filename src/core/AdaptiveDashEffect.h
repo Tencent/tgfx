@@ -35,12 +35,14 @@ class AdaptiveDashEffect : public PathEffect {
 
   bool filterPath(Path* path) const override;
 
+ private:
   bool onFilterPath(Path* path, const std::vector<PathStroker::PointParam>* inputParams,
                     PointParamMapping* outputMapping) const;
 
- private:
   std::vector<float> _intervals;
   float _phase = 0;
   float intervalLength = 0;
+
+  friend class PathStroker;
 };
 }  // namespace tgfx

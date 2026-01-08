@@ -17,37 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Stroke.h"
-#include "AdaptiveDashEffect.h"
 #include "core/PathRef.h"
-#include "core/utils/MathExtra.h"
 #include "core/utils/StrokeUtils.h"
-#include "include/core/SkStrokeParams.h"
-#include "tgfx/core/PathStroker.h"
 
 namespace tgfx {
 using namespace pk;
-
-static SkPaint::Cap ToSkLineCap(LineCap cap) {
-  switch (cap) {
-    case LineCap::Round:
-      return SkPaint::kRound_Cap;
-    case LineCap::Square:
-      return SkPaint::kSquare_Cap;
-    default:
-      return SkPaint::kButt_Cap;
-  }
-}
-
-static SkPaint::Join ToSkLineJoin(LineJoin join) {
-  switch (join) {
-    case LineJoin::Round:
-      return SkPaint::kRound_Join;
-    case LineJoin::Bevel:
-      return SkPaint::kBevel_Join;
-    default:
-      return SkPaint::kMiter_Join;
-  }
-}
 
 bool Stroke::applyToPath(Path* path, float resolutionScale) const {
   if (path == nullptr) {
@@ -66,48 +40,4 @@ bool Stroke::applyToPath(Path* path, float resolutionScale) const {
   return paint.getFillPath(skPath, &skPath, nullptr, resolutionScale);
 }
 
-bool PathStroker::StrokePathWithMultiParams(Path* path, float width,
-                                            const std::vector<PointParam>& params,
-                                            float resolutionScale) {
-  if (path == nullptr || params.empty()) {
-    return false;
-  }
-
-  std::vector<SkStrokeParams> skParams = {};
-  skParams.reserve(params.size());
-  for (const auto& param : params) {
-    skParams.emplace_back(param.miterLimit, ToSkLineCap(param.cap), ToSkLineJoin(param.join));
-  }
-
-  auto& skPath = PathRef::WriteAccess(*path);
-  SkPath result = {};
-  if (!pk::StrokePathWithMultiParams(skPath, &result, width, skParams, resolutionScale)) {
-    return false;
-  }
-  skPath = result;
-  return true;
-}
-
-bool PathStroker::StrokeDashPathWithMultiParams(Path* path, float width,
-                                                const std::vector<PointParam>& params,
-                                                const PointParam& defaultParam,
-                                                const float intervals[], int count, float phase,
-                                                float resolutionScale) {
-  if (path == nullptr || intervals == nullptr || count <= 0) {
-    return false;
-  }
-
-  // Create AdaptiveDashEffect to process the path
-  AdaptiveDashEffect dashEffect(intervals, count, phase);
-
-  // Apply dash effect and get parameter mapping
-  AdaptiveDashEffect::PointParamMapping outputMapping = {};
-  outputMapping.defaultParam = defaultParam;
-  if (!dashEffect.onFilterPath(path, &params, &outputMapping)) {
-    return false;
-  }
-
-  // Apply stroke with the mapped parameters
-  return StrokePathWithMultiParams(path, width, outputMapping.vertexParams, resolutionScale);
-}
 }  // namespace tgfx
