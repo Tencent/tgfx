@@ -60,6 +60,26 @@ std::shared_ptr<WebGLDevice> WebGLDevice::MakeFrom(const std::string& canvasID,
   if (context == 0) {
     // fallback to WebGL 1.0
     ::tgfx::PrintError("fallback to WebGL 1.0");
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdollar-in-identifier-extension"
+    EM_ASM({
+    var selector = UTF8ToString($0);
+    var canvas = document.querySelector(selector);
+    console.error("[WebGL Debug] selector:", selector);
+    console.error("[WebGL Debug] canvas found:", !!canvas);
+    if (canvas) {
+      console.error("[WebGL Debug] canvas size:", canvas.width, "x", canvas.height);
+      console.error("[WebGL Debug] WebGL2 support:", !!window.WebGL2RenderingContext);
+      // 尝试直接用 JS 创建，看浏览器报什么错
+      try {
+        var gl = canvas.getContext("webgl2");
+        console.error("[WebGL Debug] JS webgl2 context:", !!gl);
+      } catch(e) {
+        console.error("[WebGL Debug] JS error:", e.message);
+      }
+    }
+  }, canvasID.c_str());
+#pragma clang diagnostic pop
     attrs.majorVersion = 1;
     context = emscripten_webgl_create_context(canvasID.c_str(), &attrs);
     if (context == 0) {
