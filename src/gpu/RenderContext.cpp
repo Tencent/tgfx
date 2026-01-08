@@ -39,8 +39,8 @@ static uint32_t GetTypefaceID(const Typeface* typeface, bool isCustom) {
   return isCustom ? static_cast<const UserTypeface*>(typeface)->builderID() : typeface->uniqueID();
 }
 
-static void ComputeStrikeKey(uint32_t typefaceID, float backingSize, bool isBold, const Stroke* stroke,
-                             BytesKey* key) {
+static void ComputeStrikeKey(uint32_t typefaceID, float backingSize, bool isBold,
+                             const Stroke* stroke, BytesKey* key) {
   key->write(typefaceID);
   key->write(backingSize);
   if (!stroke) {
@@ -496,8 +496,8 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
   for (auto glyphID : sourceGlyphRun.glyphs) {
     auto glyphPosition = sourceGlyphRun.positions[index++];
     int maxDimension = 0;
-    if (!IsGlyphVisible(font, isCustom, glyphID, localClipBounds, scaledStroke.get(),
-                        inverseScale, glyphPosition, &maxDimension)) {
+    if (!IsGlyphVisible(font, isCustom, glyphID, localClipBounds, scaledStroke.get(), inverseScale,
+                        glyphPosition, &maxDimension)) {
       continue;
     }
 
