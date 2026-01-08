@@ -35,6 +35,20 @@ class Context3DCompositor {
   Context3DCompositor(const Context& context, int width, int height);
 
   /**
+   * Returns the width of the compositor in pixels.
+   */
+  int width() const {
+    return _width;
+  }
+
+  /**
+   * Returns the height of the compositor in pixels.
+   */
+  int height() const {
+    return _height;
+  }
+
+  /**
    * Adds an image with 3D transformation for compositing.
    * @param image The source image to draw.
    * @param matrix The 3D transformation matrix applied to the image.

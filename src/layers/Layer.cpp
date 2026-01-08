@@ -281,8 +281,7 @@ static std::shared_ptr<Render3DContext> Create3DContext(const DrawArgs& args, Ca
   }
 
   // The processing area of the compositor is consistent with the actual effective drawing area.
-  auto clipBoundsCanvas =
-      args.blurBackground && !args.clipContentByCanvas ? args.blurBackground->getCanvas() : canvas;
+  auto clipBoundsCanvas = args.blurBackground ? args.blurBackground->getCanvas() : canvas;
   // The clip bounds may be slightly larger than the dirty region.
   auto clipBounds = GetClipBounds(clipBoundsCanvas);
   if (!clipBounds.has_value()) {
@@ -1598,8 +1597,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
 
   auto imageMatrix = Matrix::I();
   std::shared_ptr<Image> image = nullptr;
-  auto clipBoundsCanvas =
-      args.blurBackground && !args.clipContentByCanvas ? args.blurBackground->getCanvas() : canvas;
+  auto clipBoundsCanvas = args.blurBackground ? args.blurBackground->getCanvas() : canvas;
   auto clipBounds = GetClipBounds(clipBoundsCanvas);
   auto contentArgs = args;
   if (drawBackground) {
@@ -1750,10 +1748,6 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
   bool skipChildBackground =
       !HasStyleSource(args.styleSourceTypes, LayerStyleExtraSourceType::Background) ||
       !bitFields.matrix3DIsAffine;
-  // TODO: Support calculating reasonable clipping regions when obtaining content image.
-  // Since 3D layer matrices are not written to the background canvas, child layers cannot compute
-  // valid content clipping regions from it. Use the offscreen canvas clipping regions instead.
-  bool clipChildContentByCanvas = args.clipContentByCanvas || !bitFields.matrix3DIsAffine;
 
   for (size_t i = 0; i < _children.size(); ++i) {
     auto& child = _children[i];
@@ -1763,9 +1757,8 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
     if (child->maskOwner || !child->visible() || child->_alpha <= 0) {
       continue;
     }
-    auto childArgsOpt =
-        createChildArgs(args, canvas, child.get(), skipChildBackground, clipChildContentByCanvas,
-                        static_cast<int>(i), lastBackgroundLayerIndex);
+    auto childArgsOpt = createChildArgs(args, canvas, child.get(), skipChildBackground,
+                                        static_cast<int>(i), lastBackgroundLayerIndex);
     if (!childArgsOpt.has_value()) {
       continue;
     }
@@ -1845,14 +1838,13 @@ void Layer::drawByStarting3DContext(const DrawArgs& args, Canvas* canvas) {
 }
 
 std::optional<DrawArgs> Layer::createChildArgs(const DrawArgs& args, Canvas* canvas, Layer* child,
-                                               bool skipBackground, bool clipContentByCanvas,
-                                               int childIndex, int lastBackgroundIndex) {
+                                               bool skipBackground, int childIndex,
+                                               int lastBackgroundIndex) {
   auto childArgs = args;
   if (skipBackground) {
     RemoveStyleSource(childArgs.styleSourceTypes, LayerStyleExtraSourceType::Background);
     childArgs.blurBackground = nullptr;
   }
-  childArgs.clipContentByCanvas = clipContentByCanvas;
   if (childIndex < lastBackgroundIndex) {
     childArgs.forceDrawBackground = true;
   } else {
