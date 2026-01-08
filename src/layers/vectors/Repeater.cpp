@@ -19,7 +19,7 @@
 #include "tgfx/layers/vectors/Repeater.h"
 #include <cmath>
 #include "VectorContext.h"
-#include "tgfx/core/Shape.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
 
@@ -110,24 +110,25 @@ static float Interpolate(float start, float end, float t) {
 }
 
 void Repeater::apply(VectorContext* context) {
-  if (context->shapes.empty() && context->painters.empty()) {
+  DEBUG_ASSERT(context != nullptr);
+  if (context->geometries.empty() && context->painters.empty()) {
     return;
   }
   if (_copies < 0.0f) {
     return;
   }
   if (_copies == 0.0f) {
-    context->shapes.clear();
+    context->geometries.clear();
     context->matrices.clear();
     context->painters.clear();
     return;
   }
 
   auto maxCount = static_cast<int>(ceilf(_copies));
-  std::vector<std::shared_ptr<Shape>> originalShapes = std::move(context->shapes);
+  std::vector<std::unique_ptr<Geometry>> originalGeometries = std::move(context->geometries);
   std::vector<Matrix> originalMatrices = std::move(context->matrices);
   std::vector<std::unique_ptr<Painter>> originalPainters = std::move(context->painters);
-  context->shapes.clear();
+  context->geometries.clear();
   context->matrices.clear();
   context->painters.clear();
 
@@ -140,12 +141,12 @@ void Repeater::apply(VectorContext* context) {
       copyAlpha *= _copies - static_cast<float>(i);
     }
 
-    std::vector<std::shared_ptr<Shape>> copyShapes = {};
+    std::vector<std::unique_ptr<Geometry>> copyGeometries = {};
     std::vector<Matrix> copyMatrices = {};
-    copyShapes.reserve(originalShapes.size());
-    copyMatrices.reserve(originalShapes.size());
-    for (size_t j = 0; j < originalShapes.size(); j++) {
-      copyShapes.push_back(originalShapes[j]);
+    copyGeometries.reserve(originalGeometries.size());
+    copyMatrices.reserve(originalGeometries.size());
+    for (size_t j = 0; j < originalGeometries.size(); j++) {
+      copyGeometries.push_back(originalGeometries[j]->clone());
       auto matrix = originalMatrices[j];
       matrix.postConcat(repeatMatrix);
       copyMatrices.push_back(matrix);
@@ -162,10 +163,11 @@ void Repeater::apply(VectorContext* context) {
       // BelowOriginal: copies are below original, so original (last) is on top
       // Insert new copies at the beginning so they are drawn first (below)
       for (auto& painter : context->painters) {
-        painter->offsetShapeIndex(copyShapes.size());
+        painter->offsetGeometryIndex(copyGeometries.size());
       }
-      context->shapes.insert(context->shapes.begin(), std::make_move_iterator(copyShapes.begin()),
-                             std::make_move_iterator(copyShapes.end()));
+      context->geometries.insert(context->geometries.begin(),
+                                 std::make_move_iterator(copyGeometries.begin()),
+                                 std::make_move_iterator(copyGeometries.end()));
       context->matrices.insert(context->matrices.begin(),
                                std::make_move_iterator(copyMatrices.begin()),
                                std::make_move_iterator(copyMatrices.end()));
@@ -175,12 +177,13 @@ void Repeater::apply(VectorContext* context) {
     } else {
       // AboveOriginal: copies are above original, so original (first) is below
       // Insert new copies at the end so they are drawn last (on top)
-      auto painterStartIndex = context->shapes.size();
+      auto painterStartIndex = context->geometries.size();
       for (auto& painter : copyPainters) {
-        painter->offsetShapeIndex(painterStartIndex);
+        painter->offsetGeometryIndex(painterStartIndex);
       }
-      context->shapes.insert(context->shapes.end(), std::make_move_iterator(copyShapes.begin()),
-                             std::make_move_iterator(copyShapes.end()));
+      context->geometries.insert(context->geometries.end(),
+                                 std::make_move_iterator(copyGeometries.begin()),
+                                 std::make_move_iterator(copyGeometries.end()));
       context->matrices.insert(context->matrices.end(),
                                std::make_move_iterator(copyMatrices.begin()),
                                std::make_move_iterator(copyMatrices.end()));

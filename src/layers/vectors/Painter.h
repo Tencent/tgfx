@@ -19,10 +19,10 @@
 #pragma once
 
 #include <vector>
+#include "Geometry.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Shader.h"
-#include "tgfx/core/Shape.h"
 
 namespace tgfx {
 
@@ -41,14 +41,14 @@ class Painter {
   void applyTransform(const Matrix& groupMatrix, float groupAlpha);
 
   /**
-   * Offsets the shape indices by the given amount.
+   * Offsets the geometry indices by the given amount.
    */
-  void offsetShapeIndex(size_t offset);
+  void offsetGeometryIndex(size_t offset);
 
   /**
-   * Draws the content of this painter to the given recorder.
+   * Draws the geometries to the given recorder.
    */
-  void draw(LayerRecorder* recorder, const std::vector<std::shared_ptr<Shape>>& shapes);
+  void draw(LayerRecorder* recorder, const std::vector<std::unique_ptr<Geometry>>& geometries);
 
   /**
    * Creates a copy of this painter.
@@ -64,10 +64,10 @@ class Painter {
 
  protected:
   /**
-   * Called for each shape during draw. Subclasses should apply their specific styles
-   * and return the final shape and paint to be drawn.
+   * Called for each geometry during draw. The innerMatrix is the matrix captured when the
+   * painter was created, which should be applied before stroke and before the outer matrix.
    */
-  virtual void onDraw(LayerRecorder* recorder, std::shared_ptr<Shape> shape) = 0;
+  virtual void onDraw(LayerRecorder* recorder, Geometry* geometry, const Matrix& innerMatrix) = 0;
 };
 
 }  // namespace tgfx

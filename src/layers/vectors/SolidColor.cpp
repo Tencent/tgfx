@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,13 +16,22 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "SerializationUtils.h"
-#include "tgfx/core/Data.h"
+#include "tgfx/layers/vectors/SolidColor.h"
 
 namespace tgfx {
-namespace MatrixSerialization {
-std::shared_ptr<Data> Serialize(const Matrix* matrix);
-};
+std::shared_ptr<SolidColor> SolidColor::Make(const Color& color) {
+  return std::shared_ptr<SolidColor>(new SolidColor(color));
+}
+
+void SolidColor::setColor(const Color& color) {
+  if (_color == color) {
+    return;
+  }
+  _color = color;
+  invalidateContent();
+}
+
+std::shared_ptr<Shader> SolidColor::getShader() const {
+  return Shader::MakeColorShader(_color);
+}
 }  // namespace tgfx

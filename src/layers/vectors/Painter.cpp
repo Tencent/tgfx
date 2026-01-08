@@ -26,18 +26,22 @@ void Painter::applyTransform(const Matrix& groupMatrix, float groupAlpha) {
   alpha *= groupAlpha;
 }
 
-void Painter::offsetShapeIndex(size_t offset) {
+void Painter::offsetGeometryIndex(size_t offset) {
   startIndex += offset;
 }
 
-void Painter::draw(LayerRecorder* recorder, const std::vector<std::shared_ptr<Shape>>& shapes) {
+void Painter::draw(LayerRecorder* recorder,
+                   const std::vector<std::unique_ptr<Geometry>>& geometries) {
   for (size_t i = 0; i < matrices.size(); i++) {
-    auto& shape = shapes[startIndex + i];
-    if (shape == nullptr) {
+    auto index = startIndex + i;
+    if (index >= geometries.size()) {
+      break;
+    }
+    auto& geometry = geometries[index];
+    if (geometry == nullptr) {
       continue;
     }
-    auto finalShape = Shape::ApplyMatrix(shape, matrices[i]);
-    onDraw(recorder, std::move(finalShape));
+    onDraw(recorder, geometry.get(), matrices[i]);
   }
 }
 

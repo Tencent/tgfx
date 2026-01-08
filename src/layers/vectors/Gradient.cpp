@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/layers/Gradient.h"
+#include "tgfx/layers/vectors/Gradient.h"
 #include "tgfx/layers/Layer.h"
 
 namespace tgfx {

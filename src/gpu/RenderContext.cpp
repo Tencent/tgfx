@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RenderContext.h"
-#include <tgfx/core/Surface.h>
 #include "core/Atlas.h"
 #include "core/AtlasManager.h"
 #include "core/AtlasStrikeCache.h"
@@ -33,6 +32,7 @@
 #include "core/utils/MathExtra.h"
 #include "core/utils/StrokeUtils.h"
 #include "gpu/DrawingManager.h"
+#include "tgfx/core/Surface.h"
 
 namespace tgfx {
 static uint32_t GetTypefaceID(const Typeface* typeface, bool isCustom) {

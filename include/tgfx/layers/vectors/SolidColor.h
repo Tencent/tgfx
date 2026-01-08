@@ -20,7 +20,7 @@
 
 #include <memory>
 #include "tgfx/core/Color.h"
-#include "tgfx/layers/ColorSource.h"
+#include "tgfx/layers/vectors/ColorSource.h"
 
 namespace tgfx {
 /**

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,13 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "SerializationUtils.h"
-#include "tgfx/core/Data.h"
+#include "Geometry.h"
 
 namespace tgfx {
-namespace MatrixSerialization {
-std::shared_ptr<Data> Serialize(const Matrix* matrix);
-};
+
+std::shared_ptr<Shape> TextGeometry::getShape() {
+  if (textBlob == nullptr) {
+    return nullptr;
+  }
+  if (cachedShape == nullptr) {
+    cachedShape = Shape::MakeFrom(textBlob);
+  }
+  return cachedShape;
+}
+
 }  // namespace tgfx

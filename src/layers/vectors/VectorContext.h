@@ -18,10 +18,10 @@
 
 #pragma once
 
+#include <memory>
 #include <vector>
+#include "Geometry.h"
 #include "Painter.h"
-#include "tgfx/core/Matrix.h"
-#include "tgfx/core/Shape.h"
 
 namespace tgfx {
 
@@ -31,17 +31,29 @@ namespace tgfx {
  */
 struct VectorContext {
   /**
-   * Adds a shape with an identity matrix to the list.
+   * Adds a shape geometry with an identity matrix to the list.
    */
   void addShape(std::shared_ptr<Shape> shape);
 
   /**
-   * Shape list that can be modified by path modifiers.
+   * Adds a text geometry with an identity matrix to the list.
    */
-  std::vector<std::shared_ptr<Shape>> shapes = {};
+  void addTextBlob(std::shared_ptr<TextBlob> blob, const Point& position);
 
   /**
-   * Matrix list corresponding to each shape.
+   * Converts all geometries to ShapeGeometry and returns them. Non-convertible geometries are
+   * removed. After this call, the geometries list contains only ShapeGeometry instances.
+   */
+  std::vector<ShapeGeometry*> getShapeGeometries();
+
+  /**
+   * Geometry list that can be modified by modifiers.
+   */
+  std::vector<std::unique_ptr<Geometry>> geometries = {};
+
+  /**
+   * Matrix list corresponding to each geometry. Path modifiers only modify geometries,
+   * not matrices. This allows stroke to be applied before outer group transforms.
    */
   std::vector<Matrix> matrices = {};
 

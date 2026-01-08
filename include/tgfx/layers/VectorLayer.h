@@ -25,11 +25,11 @@
 namespace tgfx {
 
 /**
- * VectorLayer renders a tree of VectorElements, designed for creating animated vector graphics.
- * It provides a unified way to describe shapes with fill/stroke styles and various transformations.
- * The element tree is processed in order: geometry elements (shapes) provide paths,
- * styles (FillStyle/StrokeStyle) render the accumulated content, and modifiers
- * (TrimPath, RoundCorner, MergePath, Repeater) transform the paths before rendering. Each element
+ * VectorLayer provides a unified way to describe shapes, text, and images with fill/stroke styles
+ * and various transformations. The element tree is processed in order: geometry elements (shapes,
+ * text) provide paths and glyphs, modifiers transform these accumulated geometries, and styles
+ * (FillStyle/StrokeStyle) render them. Path modifiers (TrimPath, RoundCorner, MergePath, Repeater)
+ * operate on paths, while text modifiers apply per-character transforms and styles. Each element
  * exposes animatable properties, making VectorLayer ideal for building complex motion graphics.
  */
 class VectorLayer : public Layer {

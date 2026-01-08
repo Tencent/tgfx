@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,22 +16,34 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/layers/SolidColor.h"
+#include "tgfx/layers/vectors/TextSpan.h"
+#include "VectorContext.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
-std::shared_ptr<SolidColor> SolidColor::Make(const Color& color) {
-  return std::shared_ptr<SolidColor>(new SolidColor(color));
-}
 
-void SolidColor::setColor(const Color& color) {
-  if (_color == color) {
+void TextSpan::setTextBlob(std::shared_ptr<TextBlob> value) {
+  if (_textBlob == value) {
     return;
   }
-  _color = color;
+  _textBlob = std::move(value);
   invalidateContent();
 }
 
-std::shared_ptr<Shader> SolidColor::getShader() const {
-  return Shader::MakeColorShader(_color);
+void TextSpan::setPosition(const Point& value) {
+  if (_position == value) {
+    return;
+  }
+  _position = value;
+  invalidateContent();
 }
+
+void TextSpan::apply(VectorContext* context) {
+  DEBUG_ASSERT(context != nullptr);
+  if (_textBlob == nullptr) {
+    return;
+  }
+  context->addTextBlob(_textBlob, _position);
+}
+
 }  // namespace tgfx

@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "AtlasManager.h"
-#include <tgfx/core/Size.h>
 #include "core/utils/PixelFormatUtil.h"
+#include "tgfx/core/Size.h"
 
 namespace tgfx {
 static int MaskFormatToAtlasIndex(MaskFormat format) {

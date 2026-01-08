@@ -19,9 +19,9 @@
 #include "tgfx/layers/vectors/StrokeStyle.h"
 #include "Painter.h"
 #include "VectorContext.h"
+#include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "tgfx/core/PathEffect.h"
-#include "tgfx/core/Shape.h"
 #include "tgfx/layers/LayerPaint.h"
 #include "tgfx/layers/LayerRecorder.h"
 
@@ -50,25 +50,58 @@ class StrokePainter : public Painter {
   }
 
  protected:
-  void onDraw(LayerRecorder* recorder, std::shared_ptr<Shape> shape) override {
+  void onDraw(LayerRecorder* recorder, Geometry* geometry, const Matrix& innerMatrix) override {
+    LayerPaint paint(shader, alpha, blendMode);
+    auto scales = matrix.getAxisScales();
+    bool uniformScale = FloatNearlyEqual(scales.x, scales.y);
+
+    // For TextBlob with uniform scale and no dash effect, draw text directly
+    auto textBlob = geometry->getTextBlob();
+    if (textBlob && uniformScale && pathEffect == nullptr) {
+      auto finalMatrix = innerMatrix;
+      finalMatrix.postConcat(matrix);
+      paint.style = PaintStyle::Stroke;
+      paint.stroke = stroke;
+      paint.stroke.width *= scales.x;
+      recorder->addTextBlob(textBlob, paint, finalMatrix);
+      return;
+    }
+
+    // Fall back to Shape: for ShapeGeometry, non-uniform scale, or dash effect
+    auto shape = geometry->getShape();
+    if (shape == nullptr) {
+      return;
+    }
+
+    // Apply inner matrix before dash effect, unless it's translation-only
+    auto outerMatrix = matrix;
+    if (innerMatrix.isTranslate()) {
+      // Merge translation into outer matrix
+      outerMatrix.preTranslate(innerMatrix.getTranslateX(), innerMatrix.getTranslateY());
+    } else {
+      shape = Shape::ApplyMatrix(shape, innerMatrix);
+    }
+
+    // Apply dash effect if present
     if (pathEffect) {
       shape = Shape::ApplyEffect(shape, pathEffect);
     }
 
-    LayerPaint paint(shader, alpha, blendMode);
-    auto scales = matrix.getAxisScales();
-    if (FloatNearlyEqual(scales.x, scales.y)) {
-      shape = Shape::ApplyMatrix(shape, matrix);
+    if (uniformScale) {
+      // Uniform scale: apply outer matrix to shape, scale stroke width
+      shape = Shape::ApplyMatrix(shape, outerMatrix);
       paint.style = PaintStyle::Stroke;
       paint.stroke = stroke;
       paint.stroke.width *= scales.x;
     } else {
+      // Non-uniform scale: apply stroke first, then outer matrix
       shape = Shape::ApplyStroke(shape, &stroke);
-      shape = Shape::ApplyMatrix(shape, matrix);
-      paint.style = PaintStyle::Fill;
+      if (shape == nullptr) {
+        return;
+      }
+      shape = Shape::ApplyMatrix(shape, outerMatrix);
     }
-
-    recorder->addShape(shape, paint);
+    recorder->addShape(std::move(shape), paint);
   }
 };
 
@@ -162,7 +195,8 @@ void StrokeStyle::detachFromLayer(Layer* layer) {
 }
 
 void StrokeStyle::apply(VectorContext* context) {
-  if (_colorSource == nullptr || _stroke.width <= 0.0f || context->shapes.empty()) {
+  DEBUG_ASSERT(context != nullptr);
+  if (_colorSource == nullptr || _stroke.width <= 0.0f || context->geometries.empty()) {
     return;
   }
   auto shader = _colorSource->getShader();

@@ -19,7 +19,7 @@
 #pragma once
 
 #include "tgfx/core/Image.h"
-#include "tgfx/layers/ColorSource.h"
+#include "tgfx/layers/vectors/ColorSource.h"
 
 namespace tgfx {
 /**
