@@ -423,14 +423,14 @@
         "LineRenderAsHairline": "cd6a8dff",
         "PathStrokerComplexCurves": "9340cbb0",
         "PathStrokerContours": "15364ae0",
+        "PathStrokerDashMultiParamsBasic": "682535eb",
+        "PathStrokerDashMultiParamsClosedCurve": "682535eb",
+        "PathStrokerDashMultiParamsComparison": "682535eb",
         "PathStrokerDifferentMiterLimits": "9340cbb0",
         "PathStrokerOpenPath": "9340cbb0",
         "PathStrokerSingleLine": "9340cbb0",
         "PathStrokerSingleParam": "9340cbb0",
         "PathStrokerWithMultiParams": "9340cbb0",
-        "StrokeDashMultiParamsBasic": "15364ae0",
-        "StrokeDashMultiParamsClosedCurve": "15364ae0",
-        "StrokeDashMultiParamsComparison": "15364ae0",
         "ZoomUpTinyStrokeShape": "cd6a8dff"
     },
     "SurfaceTest": {
