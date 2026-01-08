@@ -296,6 +296,10 @@ RRectOp::RRectOp(Color color, const RRect& rRect, const Matrix& viewMatrix,
 }
 
 bool RRectOp::onCombineIfPossible(Op* op) {
+  if (rRectPaints.size() >= MaxNumRRects) {
+    return false;
+  }
+
   if (!DrawOp::onCombineIfPossible(op)) {
     return false;
   }

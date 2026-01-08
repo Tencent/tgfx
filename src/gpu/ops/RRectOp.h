@@ -28,6 +28,11 @@ class RRectOp : public DrawOp {
  public:
   DEFINE_OP_CLASS_ID
 
+  /**
+   * The maximum number of round rects that can be drawn in a single draw call.
+   */
+  static constexpr uint16_t MaxNumRRects = 1024;
+
   static std::unique_ptr<RRectOp> Make(Color color, const RRect& rRect, const Matrix& viewMatrix);
 
   void prepare(Context* context) override;

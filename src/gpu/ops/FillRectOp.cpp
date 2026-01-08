@@ -154,6 +154,10 @@ bool FillRectOp::canAdd(size_t count) const {
 }
 
 bool FillRectOp::onCombineIfPossible(Op* op) {
+  if (rectPaints.size() >= MaxNumRects) {
+    return false;
+  }
+
   auto* that = static_cast<FillRectOp*>(op);
   if (hasColor != that->hasColor || !canAdd(that->rectPaints.size()) ||
       !DrawOp::onCombineIfPossible(op)) {
