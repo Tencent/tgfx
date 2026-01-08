@@ -19,7 +19,7 @@
 #pragma once
 
 #include <vector>
-#include "Render3DContext.h"
+#include "compositing3d/Render3DContext.h"
 #include "layers/BackgroundContext.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/layers/layerstyles/LayerStyle.h"

@@ -19,7 +19,7 @@
 #pragma once
 
 #include <stack>
-#include "layers/Context3DCompositor.h"
+#include "Context3DCompositor.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/Matrix3D.h"
 #include "tgfx/core/PictureRecorder.h"

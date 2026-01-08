@@ -16,10 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "layers/Render3DContext.h"
+#include "Render3DContext.h"
+#include "Context3DCompositor.h"
 #include "core/Matrix2D.h"
 #include "core/utils/MathExtra.h"
-#include "layers/Context3DCompositor.h"
 #include "tgfx/core/Image.h"
 
 namespace tgfx {

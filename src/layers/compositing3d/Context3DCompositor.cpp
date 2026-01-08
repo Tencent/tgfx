@@ -18,6 +18,7 @@
 
 #include "Context3DCompositor.h"
 #include <cmath>
+#include "BspTree.h"
 #include "core/images/TextureImage.h"
 #include "core/utils/MathExtra.h"
 #include "gpu/DrawingManager.h"
@@ -27,7 +28,6 @@
 #include "gpu/TPArgs.h"
 #include "gpu/ops/Quads3DDrawOp.h"
 #include "gpu/processors/TextureEffect.h"
-#include "layers/BspTree.h"
 
 namespace tgfx {
 
