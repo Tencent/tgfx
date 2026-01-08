@@ -2,7 +2,6 @@
 #include <algorithm>
 #include <cmath>
 #include "core/utils/MathExtra.h"
-#include "include/core/SkPaint.h"
 
 namespace tgfx {
 

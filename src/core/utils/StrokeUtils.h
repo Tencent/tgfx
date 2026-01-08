@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "core/PathRef.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Stroke.h"
