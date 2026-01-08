@@ -23,10 +23,6 @@
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Stroke.h"
 
-namespace pk {
-class SkPaint;
-}
-
 namespace tgfx {
 /**
  * Applies the stroke options to the given bounds. 
