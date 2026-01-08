@@ -21,6 +21,7 @@
 #include <atomic>
 #include <cmath>
 #include <unordered_map>
+#include <unordered_set>
 #include "core/MCState.h"
 #include "core/Matrix2D.h"
 #include "core/filters/Transform3DImageFilter.h"
@@ -100,10 +101,12 @@ static void ComputeDirtyNodesForReordering(const std::vector<Layer*>& commonOld,
     return;
   }
 
+  size_t n = newPositions.size();
   std::vector<size_t> lis;
+  std::vector<size_t> predecessors(n, SIZE_MAX);
   std::vector<size_t> lisIndices;
 
-  for (size_t i = 0; i < newPositions.size(); ++i) {
+  for (size_t i = 0; i < n; ++i) {
     size_t pos = newPositions[i];
     auto it = std::lower_bound(lis.begin(), lis.end(), pos);
     size_t insertPos = static_cast<size_t>(it - lis.begin());
@@ -113,16 +116,21 @@ static void ComputeDirtyNodesForReordering(const std::vector<Layer*>& commonOld,
       lisIndices.push_back(i);
     } else {
       *it = pos;
-      if (insertPos < lisIndices.size()) {
-        lisIndices[insertPos] = i;
-      }
+      lisIndices[insertPos] = i;
+    }
+
+    if (insertPos > 0) {
+      predecessors[i] = lisIndices[insertPos - 1];
     }
   }
 
-  std::vector<bool> inLIS(commonOld.size(), false);
-  for (size_t idx : lisIndices) {
-    if (idx < inLIS.size()) {
-      inLIS[idx] = true;
+  // Reconstruct the LIS by backtracking
+  std::vector<bool> inLIS(n, false);
+  if (!lisIndices.empty()) {
+    size_t current = lisIndices.back();
+    while (current != SIZE_MAX) {
+      inLIS[current] = true;
+      current = predecessors[current];
     }
   }
 
@@ -620,27 +628,28 @@ bool Layer::setChildIndex(std::shared_ptr<Layer> child, int index) {
   return true;
 }
 
-bool Layer::replaceChild(std::shared_ptr<Layer> oldChild, std::shared_ptr<Layer> newChild) {
-  auto index = getChildIndex(oldChild);
-  if (index < 0) {
-    LOGE("The supplied layer must be a child layer of the caller.");
-    return false;
-  }
-  if (!addChildAt(newChild, index)) {
-    return false;
-  }
-  oldChild->removeFromParent();
-  invalidateDescendents();
-  return true;
-}
-
 void Layer::setChildren(const std::vector<std::shared_ptr<Layer>>& children) {
   std::vector<std::shared_ptr<Layer>> validChildren;
   std::unordered_map<Layer*, size_t> newIndexMap;
+  std::unordered_set<Layer*> seenChildren;
+  
   for (const auto& child : children) {
-    if (child != nullptr) {
+    if (child != nullptr && seenChildren.find(child.get()) == seenChildren.end()) {
+      // Check for circular references and invalid conditions
+      if (child.get() == this) {
+        LOGE("setChildren() The child is the same as the parent.");
+        continue;
+      } else if (child->doContains(this)) {
+        LOGE("setChildren() The child is already a parent of the parent.");
+        continue;
+      } else if (child->_root == child.get()) {
+        LOGE("A root layer cannot be added as a child to another layer.");
+        continue;
+      }
+      
       newIndexMap[child.get()] = validChildren.size();
       validChildren.push_back(child);
+      seenChildren.insert(child.get());
     }
   }
 
@@ -676,12 +685,19 @@ void Layer::setChildren(const std::vector<std::shared_ptr<Layer>>& children) {
 
   ComputeDirtyNodesForReordering(retainedChildren, newPositions, &nodesToMarkDirty);
 
+  // Remove newly added children from their current parents before updating _children
+  for (const auto& child : validChildren) {
+    if (oldIndexMap.find(child.get()) == oldIndexMap.end()) {
+      child->removeFromParent();
+    }
+  }
+
   _children = std::move(validChildren);
 
+  // Attach newly added children
   for (const auto& child : _children) {
     if (oldIndexMap.find(child.get()) == oldIndexMap.end()) {
       nodesToMarkDirty.push_back(child.get());
-      child->removeFromParent();
       child->_parent = this;
       child->onAttachToRoot(_root);
     }
@@ -692,6 +708,20 @@ void Layer::setChildren(const std::vector<std::shared_ptr<Layer>>& children) {
   }
 
   invalidateDescendents();
+}
+
+bool Layer::replaceChild(std::shared_ptr<Layer> oldChild, std::shared_ptr<Layer> newChild) {
+  auto index = getChildIndex(oldChild);
+  if (index < 0) {
+    LOGE("The supplied layer must be a child layer of the caller.");
+    return false;
+  }
+  if (!addChildAt(newChild, index)) {
+    return false;
+  }
+  oldChild->removeFromParent();
+  invalidateDescendents();
+  return true;
 }
 
 Rect Layer::getBounds(const Layer* targetCoordinateSpace, bool computeTightBounds) {

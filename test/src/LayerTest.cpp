@@ -4918,8 +4918,8 @@ TGFX_TEST(LayerTest, SetChildrenOptimization) {
   std::vector<std::shared_ptr<Layer>> withDuplicates = {layerA, layerB, layerA, layerC};
   parent->setChildren(withDuplicates);
 
-  // Should only add each layer once, but the current implementation may add duplicates
-  // This tests the actual behavior rather than the ideal behavior
+  // Should only add each layer once
+  EXPECT_EQ(parent->children().size(), 3u);
   EXPECT_TRUE(parent->contains(layerA));
   EXPECT_TRUE(parent->contains(layerB));
   EXPECT_TRUE(parent->contains(layerC));
@@ -4935,8 +4935,21 @@ TGFX_TEST(LayerTest, SetChildrenOptimization) {
   std::vector<std::shared_ptr<Layer>> circular = {parent};
   grandChildLayer->setChildren(circular);
 
-  // The current implementation may allow this, so we test the actual behavior
-  // In a real scenario, this should be prevented to avoid infinite loops
+  // The circular reference should be prevented, grandchild should remain empty
+  EXPECT_EQ(grandChildLayer->children().size(), 0u);
+  
+  // Test Case 10: Root layer as child (should be prevented)
+  auto rootLayer = RootLayer::Make();
+  rootLayer->_root = rootLayer.get(); // Set as root layer
+  
+  std::vector<std::shared_ptr<Layer>> withRoot = {layerA, rootLayer, layerB};
+  parent->setChildren(withRoot);
+  
+  // Root layer should be rejected, only layerA and layerB should be added
+  EXPECT_EQ(parent->children().size(), 2u);
+  EXPECT_TRUE(parent->contains(layerA));
+  EXPECT_TRUE(parent->contains(layerB));
+  EXPECT_FALSE(parent->contains(rootLayer));
 }
 
 }  // namespace tgfx
