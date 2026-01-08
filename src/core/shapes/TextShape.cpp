@@ -41,10 +41,14 @@ std::shared_ptr<Shape> Shape::MakeFrom(std::shared_ptr<TextBlob> textBlob) {
     return std::make_shared<TextShape>(std::move(textBlob));
   }
   std::vector<GlyphRun> filteredRuns = {};
+  filteredRuns.reserve(outlineRuns.size());
   for (const auto* run : outlineRuns) {
     filteredRuns.push_back(*run);
   }
   auto outlineBlob = TextBlob::MakeFrom(std::move(filteredRuns));
+  if (outlineBlob == nullptr) {
+    return nullptr;
+  }
   return std::make_shared<TextShape>(std::move(outlineBlob));
 }
 

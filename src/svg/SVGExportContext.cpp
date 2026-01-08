@@ -287,7 +287,7 @@ void SVGExportContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const MC
     applyClipPath(state.clip);
   }
   for (const auto& glyphRun : glyphRuns) {
-    auto typeface = glyphRun.font.getTypeface().get();
+    auto typeface = glyphRun.font.getTypeface();
     if (typeface == nullptr) {
       continue;
     }

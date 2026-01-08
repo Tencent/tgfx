@@ -314,6 +314,7 @@ void RenderContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const MCSta
 
   std::vector<GlyphRun> pathRuns = {};
   const auto& glyphRuns = textBlob->glyphRuns();
+  pathRuns.reserve(glyphRuns.size());
   for (const auto& run : glyphRuns) {
     if (run.font.getTypeface() == nullptr) {
       continue;
@@ -332,6 +333,9 @@ void RenderContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const MCSta
   }
   if (!pathRuns.empty()) {
     auto pathTextBlob = TextBlob::MakeFrom(std::move(pathRuns));
+    if (pathTextBlob == nullptr) {
+      return;
+    }
     drawTextBlobAsPath(std::move(pathTextBlob), state, brush, stroke, localClipBounds);
   }
 }
