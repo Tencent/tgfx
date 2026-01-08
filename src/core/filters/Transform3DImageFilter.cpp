@@ -30,15 +30,19 @@
 
 namespace tgfx {
 
+static bool IsRectBehindCamera(const Rect& rect, const Matrix3D& matrix) {
+  return matrix.mapHomogeneous(rect.left, rect.top, 0, 1).w <= 0 ||
+         matrix.mapHomogeneous(rect.left, rect.bottom, 0, 1).w <= 0 ||
+         matrix.mapHomogeneous(rect.right, rect.top, 0, 1).w <= 0 ||
+         matrix.mapHomogeneous(rect.right, rect.bottom, 0, 1).w <= 0;
+}
+
 std::shared_ptr<ImageFilter> ImageFilter::Transform3D(const Matrix3D& matrix, bool hideBackFace) {
   return std::make_shared<Transform3DImageFilter>(matrix, hideBackFace);
 }
 
 Transform3DImageFilter::Transform3DImageFilter(const Matrix3D& matrix, bool hideBackFace)
     : _matrix(matrix), _hideBackFace(hideBackFace) {
-  // Adapt the matrix to keep the z-component of vertex coordinates unchanged, preventing rendering
-  // artifacts caused by rotated image fragments failing the depth test.
-  _matrix.setRow(2, {0, 0, 1, 0});
 }
 
 Rect Transform3DImageFilter::onFilterBounds(const Rect& rect, MapDirection mapDirection) const {
@@ -46,9 +50,15 @@ Rect Transform3DImageFilter::onFilterBounds(const Rect& rect, MapDirection mapDi
     return rect;
   }
 
+  // Adapt the matrix to keep the z-component of vertex coordinates unchanged.
+  auto drawMatrix = _matrix;
+  drawMatrix.setRow(2, {0, 0, 1, 0});
+  if (IsRectBehindCamera(rect, _matrix)) {
+    return Rect::MakeEmpty();
+  }
+
   if (mapDirection == MapDirection::Forward) {
-    auto result = _matrix.mapRect(rect);
-    return result;
+    return drawMatrix.mapRect(rect);
   }
 
   // All vertices inside the rect have an initial z-coordinate of 0, so the third column of the 4x4
@@ -56,7 +66,7 @@ Rect Transform3DImageFilter::onFilterBounds(const Rect& rect, MapDirection mapDi
   // we do not care about the final projected z-axis coordinate, the third row can also be ignored.
   // Therefore, the 4x4 matrix can be simplified to a 3x3 matrix.
   float values[16] = {};
-  _matrix.getColumnMajor(values);
+  drawMatrix.getColumnMajor(values);
   auto matrix2D = Matrix2D::MakeAll(values[0], values[1], values[3], values[4], values[5],
                                     values[7], values[12], values[13], values[15]);
   Matrix2D inversedMatrix;
@@ -71,6 +81,17 @@ Rect Transform3DImageFilter::onFilterBounds(const Rect& rect, MapDirection mapDi
 
 std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
     std::shared_ptr<Image> source, const Rect& renderBounds, const TPArgs& args) const {
+  auto srcW = static_cast<float>(source->width());
+  auto srcH = static_cast<float>(source->height());
+  auto srcModelRect = Rect::MakeXYWH(0.f, 0.f, srcW, srcH);
+  if (IsRectBehindCamera(srcModelRect, _matrix)) {
+    return nullptr;
+  }
+
+  // Adapt the matrix to keep the z-component of vertex coordinates unchanged, preventing rendering
+  // artifacts caused by rotated image fragments failing the depth test.
+  auto drawMatrix = _matrix;
+  drawMatrix.setRow(2, {0, 0, 1, 0});
   float dstDrawWidth = renderBounds.width();
   float dstDrawHeight = renderBounds.height();
   DEBUG_ASSERT(args.drawScale > 0.f);
@@ -86,14 +107,11 @@ std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
       source->isAlphaOnly(), 1, args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
   auto sourceTextureProxy = source->lockTextureProxy(args);
 
-  auto srcW = static_cast<float>(source->width());
-  auto srcH = static_cast<float>(source->height());
   // The default transformation anchor is at the top-left origin (0,0) of the image; user-defined
   // anchors are included in the matrix.
-  auto srcModelRect = Rect::MakeXYWH(0.f, 0.f, srcW, srcH);
   // SrcProjectRect is the result of projecting srcRect onto the canvas. RenderBounds describes a
   // subregion that needs to be drawn within it.
-  auto srcProjectRect = _matrix.mapRect(srcModelRect);
+  auto srcProjectRect = drawMatrix.mapRect(srcModelRect);
   // ndcScale and ndcOffset are used to scale and translate the NDC coordinates to ensure that only
   // the content within RenderBounds is drawn to the render target. This clips regions beyond the
   // clip space.
@@ -118,7 +136,7 @@ std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
 
   const Size viewportSize(static_cast<float>(renderTarget->width()),
                           static_cast<float>(renderTarget->height()));
-  const Quads3DDrawArgs drawArgs{_matrix, ndcScale, ndcOffset, viewportSize};
+  const Quads3DDrawArgs drawArgs{drawMatrix, ndcScale, ndcOffset, viewportSize};
   auto drawOp =
       Quads3DDrawOp::Make(args.context, std::move(vertexProvider), args.renderFlags, drawArgs);
   const SamplingArgs samplingArgs = {TileMode::Decal, TileMode::Decal, {}, SrcRectConstraint::Fast};
