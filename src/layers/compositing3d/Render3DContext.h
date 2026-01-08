@@ -29,9 +29,13 @@ namespace tgfx {
 class BackgroundContext;
 
 struct Render3DContextState {
-  PictureRecorder recorder = {};
+  Render3DContextState(const Matrix3D& transform, bool antialiasing)
+      : transform(transform), antialiasing(antialiasing) {
+  }
+
   Matrix3D transform = {};
   bool antialiasing = true;
+  PictureRecorder recorder = {};
 };
 
 /**

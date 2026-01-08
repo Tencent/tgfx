@@ -63,9 +63,7 @@ Canvas* Render3DContext::beginRecording(const Matrix3D& childTransform, bool ant
   auto baseTransform = _stateStack.empty() ? Matrix3D::I() : _stateStack.top().transform;
   auto newTransform = childTransform;
   newTransform.postConcat(baseTransform);
-  _stateStack.push({});
-  _stateStack.top().transform = newTransform;
-  _stateStack.top().antialiasing = antialiasing;
+  _stateStack.emplace(newTransform, antialiasing);
   auto canvas = _stateStack.top().recorder.beginRecording();
 
   DEBUG_ASSERT(!FloatNearlyZero(_contentScale));
