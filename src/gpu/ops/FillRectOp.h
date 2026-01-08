@@ -28,6 +28,11 @@ class FillRectOp : public DrawOp {
  public:
   DEFINE_OP_CLASS_ID
 
+  /**
+   * The maximum number of rects that can be drawn in a single draw call.
+   */
+  static constexpr uint16_t MaxNumRects = 2048;
+
   static std::unique_ptr<FillRectOp> Make(std::optional<Color> color, const Rect& rect,
                                           const Matrix& viewMatrix,
                                           const Matrix* localMatrix = nullptr);
