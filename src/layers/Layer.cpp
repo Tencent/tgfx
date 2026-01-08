@@ -1943,10 +1943,6 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
         args.render3DContext ? args.render3DContext.get() : childArgs.render3DContext.get();
     bool started3DContext = !args.render3DContext && childArgs.render3DContext != nullptr;
     drawChild(childArgs, canvas, child.get(), alpha, childTransform3D, context3D, started3DContext);
-
-    if (backgroundCanvas) {
-      backgroundCanvas->restore();
-    }
   }
   return true;
 }
