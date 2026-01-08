@@ -72,10 +72,10 @@ void MeasureContext::drawImageRect(std::shared_ptr<Image>, const Rect&, const Re
   addLocalBounds(state, dstRect);
 }
 
-void MeasureContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
-                                      const MCState& state, const Brush&, const Stroke* stroke) {
-  DEBUG_ASSERT(glyphRunList != nullptr);
-  auto localBounds = glyphRunList->getBounds();
+void MeasureContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const MCState& state,
+                                  const Brush&, const Stroke* stroke) {
+  DEBUG_ASSERT(textBlob != nullptr);
+  auto localBounds = textBlob->getBounds();
   if (stroke) {
     ApplyStrokeToBounds(*stroke, &localBounds, state.matrix);
   }

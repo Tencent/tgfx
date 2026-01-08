@@ -20,15 +20,15 @@
 
 #include <stack>
 #include "core/CanvasState.h"
-#include "core/GlyphRunList.h"
 #include "tgfx/core/Brush.h"
-#include "tgfx/core/Canvas.h"
 #include "tgfx/core/Picture.h"
 #include "tgfx/core/Shape.h"
+#include "tgfx/core/SrcRectConstraint.h"
 #include "tgfx/core/Stroke.h"
 
 namespace tgfx {
 class Surface;
+class TextBlob;
 
 /**
  * DrawContext is an abstract class that provides drawing APIs for rendering graphics primitives.
@@ -79,10 +79,10 @@ class DrawContext {
                              const Brush& brush, SrcRectConstraint constraint) = 0;
 
   /**
-   * Draws a GlyphRunList with the specified MCState, Brush, and optional Stroke.
+   * Draws a TextBlob with the specified MCState, Brush, and optional Stroke.
    */
-  virtual void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
-                                const Brush& brush, const Stroke* stroke) = 0;
+  virtual void drawTextBlob(std::shared_ptr<TextBlob> textBlob, const MCState& state,
+                            const Brush& brush, const Stroke* stroke) = 0;
 
   /**
    * Draws a Picture with the specified MCState.

@@ -38,7 +38,7 @@ enum class PictureRecordType {
   DrawImage,
   DrawImageRect,
   DrawImageRectToRect,
-  DrawGlyphRunList,
+  DrawTextBlob,
   DrawPicture,
   DrawLayer
 };
@@ -201,7 +201,7 @@ class DrawRect : public PictureRecord {
     context->drawRect(rect, playback->state(), playback->brush(), playback->stroke());
   }
 
-  Rect rect;
+  Rect rect = {};
 };
 
 class DrawRRect : public PictureRecord {
@@ -217,7 +217,7 @@ class DrawRRect : public PictureRecord {
     context->drawRRect(rRect, playback->state(), playback->brush(), playback->stroke());
   }
 
-  RRect rRect;
+  RRect rRect = {};
 };
 
 class DrawPath : public PictureRecord {
@@ -237,7 +237,7 @@ class DrawPath : public PictureRecord {
     context->drawPath(path, playback->state(), playback->brush());
   }
 
-  Path path;
+  Path path = {};
 };
 
 class DrawShape : public PictureRecord {
@@ -257,7 +257,7 @@ class DrawShape : public PictureRecord {
     context->drawShape(shape, playback->state(), playback->brush(), playback->stroke());
   }
 
-  std::shared_ptr<Shape> shape;
+  std::shared_ptr<Shape> shape = nullptr;
 };
 
 class DrawImage : public PictureRecord {
@@ -274,8 +274,8 @@ class DrawImage : public PictureRecord {
     context->drawImage(image, sampling, playback->state(), playback->brush());
   }
 
-  std::shared_ptr<Image> image;
-  SamplingOptions sampling;
+  std::shared_ptr<Image> image = nullptr;
+  SamplingOptions sampling = {};
 };
 
 class DrawImageRect : public DrawImage {
@@ -314,25 +314,23 @@ class DrawImageRectToRect : public DrawImageRect {
                            constraint);
   }
 
-  Rect dstRect;
+  Rect dstRect = {};
 };
 
-class DrawGlyphRunList : public PictureRecord {
+class DrawTextBlob : public PictureRecord {
  public:
-  explicit DrawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList)
-      : glyphRunList(std::move(glyphRunList)) {
+  explicit DrawTextBlob(std::shared_ptr<TextBlob> textBlob) : textBlob(std::move(textBlob)) {
   }
 
   PictureRecordType type() const override {
-    return PictureRecordType::DrawGlyphRunList;
+    return PictureRecordType::DrawTextBlob;
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawGlyphRunList(glyphRunList, playback->state(), playback->brush(),
-                              playback->stroke());
+    context->drawTextBlob(textBlob, playback->state(), playback->brush(), playback->stroke());
   }
 
-  std::shared_ptr<GlyphRunList> glyphRunList;
+  std::shared_ptr<TextBlob> textBlob = nullptr;
 };
 
 class DrawPicture : public PictureRecord {
@@ -352,7 +350,7 @@ class DrawPicture : public PictureRecord {
     context->drawPicture(picture, playback->state());
   }
 
-  std::shared_ptr<Picture> picture;
+  std::shared_ptr<Picture> picture = nullptr;
 };
 
 class DrawLayer : public PictureRecord {
@@ -373,7 +371,7 @@ class DrawLayer : public PictureRecord {
     context->drawLayer(picture, filter, playback->state(), playback->brush());
   }
 
-  std::shared_ptr<Picture> picture;
-  std::shared_ptr<ImageFilter> filter;
+  std::shared_ptr<Picture> picture = nullptr;
+  std::shared_ptr<ImageFilter> filter = nullptr;
 };
 }  // namespace tgfx

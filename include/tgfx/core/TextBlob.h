@@ -21,8 +21,6 @@
 #include "tgfx/core/GlyphRun.h"
 
 namespace tgfx {
-class GlyphRunList;
-
 /**
  * TextBlob combines multiple text runs into an immutable container. Each text run consists of
  * glyphs, positions, and font.
@@ -31,7 +29,7 @@ class TextBlob {
  public:
   /**
    * Creates a new TextBlob from the given text. The text must be in utf-8 encoding. This function
-   * uses the default character-to-glyph mapping from the Typeface in font. It doesn’t perform
+   * uses the default character-to-glyph mapping from the Typeface in font. It doesn't perform
    * typeface fallback for characters not found in the Typeface. Glyphs are positioned based on
    * their default advances. Returns nullptr if the text is empty or fails to map any characters to
    * glyphs.
@@ -57,7 +55,7 @@ class TextBlob {
    */
   static std::shared_ptr<TextBlob> MakeFrom(std::vector<GlyphRun> glyphRuns);
 
-  virtual ~TextBlob() = default;
+  ~TextBlob();
 
   /**
    * Returns a conservative bounding box for the TextBlob that is guaranteed to contain all glyphs.
@@ -81,15 +79,20 @@ class TextBlob {
    */
   bool hitTestPoint(float localX, float localY, const Stroke* stroke = nullptr) const;
 
- private:
-  std::vector<std::shared_ptr<GlyphRunList>> glyphRunLists = {};
-
-  explicit TextBlob(std::vector<std::shared_ptr<GlyphRunList>> runLists)
-      : glyphRunLists(std::move(runLists)) {
+  /**
+   * Returns the glyph runs that make up this TextBlob.
+   */
+  const std::vector<GlyphRun>& glyphRuns() const {
+    return _glyphRuns;
   }
 
-  friend class Canvas;
-  friend class GlyphRunList;
-  friend class Mask;
+ private:
+  std::vector<GlyphRun> _glyphRuns = {};
+  mutable std::atomic<Rect*> bounds = {nullptr};
+
+  explicit TextBlob(std::vector<GlyphRun> glyphRuns) : _glyphRuns(std::move(glyphRuns)) {
+  }
+
+  Rect computeBounds() const;
 };
 }  // namespace tgfx

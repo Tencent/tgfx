@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -19,38 +19,34 @@
 #pragma once
 
 #include <atomic>
-#include "tgfx/core/Rect.h"
 
 namespace tgfx {
 /**
- * LazyBounds is a thread-safe cache for storing bounding box.
+ * Returns the cached value from the atomic pointer. Returns nullptr if no value is cached.
  */
-class LazyBounds {
- public:
-  ~LazyBounds() {
-    reset();
+template <typename T>
+const T* AtomicCacheGet(const std::atomic<T*>& cache) {
+  return cache.load(std::memory_order_acquire);
+}
+
+/**
+ * Sets the value to the atomic cache. If the cache already has a value, the new value is deleted.
+ */
+template <typename T>
+void AtomicCacheSet(std::atomic<T*>& cache, const T* value) {
+  auto newValue = new T(*value);
+  T* oldValue = nullptr;
+  if (!cache.compare_exchange_strong(oldValue, newValue, std::memory_order_acq_rel)) {
+    delete newValue;
   }
+}
 
-  /**
-   * Returns the cached bounding box. This method is thread-safe as long as there is no concurrent
-   * reset() call.
-   */
-  const Rect* get() const {
-    return bounds.load(std::memory_order_acquire);
-  }
-
-  /**
-   * Sets the bounding box to the cache. This method is thread-safe as long as there is no
-   * concurrent reset() call.
-   */
-  void update(const Rect& rect) const;
-
-  /**
-   * Resets the cached bounding box to its empty state. This method is not thread-safe.
-   */
-  void reset();
-
- private:
-  mutable std::atomic<Rect*> bounds = {nullptr};
-};
+/**
+ * Clears the atomic cache and deletes the old value.
+ */
+template <typename T>
+void AtomicCacheReset(std::atomic<T*>& cache) {
+  auto oldValue = cache.exchange(nullptr, std::memory_order_acq_rel);
+  delete oldValue;
+}
 }  // namespace tgfx

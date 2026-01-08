@@ -54,8 +54,8 @@ class RenderContext : public DrawContext {
                      const SamplingOptions& sampling, const MCState& state, const Brush& brush,
                      SrcRectConstraint constraint) override;
 
-  void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
-                        const Brush& brush, const Stroke* stroke) override;
+  void drawTextBlob(std::shared_ptr<TextBlob> textBlob, const MCState& state, const Brush& brush,
+                    const Stroke* stroke) override;
 
   void drawPicture(std::shared_ptr<Picture> picture, const MCState& state) override;
 
@@ -77,8 +77,8 @@ class RenderContext : public DrawContext {
                               const Brush& brush, const Stroke* stroke, const Rect& localClipBounds,
                               GlyphRun* rejectedGlyphRun);
 
-  void drawGlyphsAsPath(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
-                        const Brush& brush, const Stroke* stroke, Rect& localClipBounds);
+  void drawTextBlobAsPath(std::shared_ptr<TextBlob> textBlob, const MCState& state,
+                          const Brush& brush, const Stroke* stroke, Rect& localClipBounds);
 
   void drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun, const MCState& state,
                                    const Brush& brush, const Stroke* stroke);
