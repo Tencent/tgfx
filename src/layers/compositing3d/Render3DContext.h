@@ -18,15 +18,18 @@
 
 #pragma once
 
+#include <memory>
 #include <stack>
-#include "Context3DCompositor.h"
+#include "tgfx/core/Canvas.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/Matrix3D.h"
 #include "tgfx/core/PictureRecorder.h"
+#include "tgfx/core/Point.h"
 
 namespace tgfx {
 
 class BackgroundContext;
+class Context3DCompositor;
 
 struct Render3DContextState {
   Render3DContextState(const Matrix3D& transform, bool antialiasing)
@@ -54,37 +57,9 @@ class Render3DContext {
    */
   Render3DContext(std::shared_ptr<Context3DCompositor> compositor, const Point& offset,
                   float contentScale, std::shared_ptr<ColorSpace> colorSpace,
-                  BackgroundContext* backgroundContext)
+                  std::shared_ptr<BackgroundContext> backgroundContext)
       : _compositor(std::move(compositor)), _offset(offset), _contentScale(contentScale),
-        _colorSpace(std::move(colorSpace)), _backgroundContext(backgroundContext) {
-  }
-
-  /**
-   * Returns the compositor used to combine 3D layer images.
-   */
-  const std::shared_ptr<Context3DCompositor>& compositor() const {
-    return _compositor;
-  }
-
-  /**
-   * Returns the offset of the 3D context in the target canvas coordinate space.
-   */
-  const Point& offset() const {
-    return _offset;
-  }
-
-  /**
-   * Returns the scale factor applied to the content.
-   */
-  float contentScale() const {
-    return _contentScale;
-  }
-
-  /**
-   * Returns the background context for blur effects, or nullptr if not available.
-   */
-  BackgroundContext* backgroundContext() const {
-    return _backgroundContext;
+        _colorSpace(std::move(colorSpace)), _backgroundContext(std::move(backgroundContext)) {
   }
 
   /**
@@ -100,13 +75,20 @@ class Render3DContext {
    */
   void endRecording();
 
+  /**
+   * Finishes the 3D rendering and draws the result to the target canvas.
+   * @param canvas The target canvas to draw the composited result on.
+   * @param antialiasing Whether to enable antialiasing when drawing to background context.
+   */
+  void finishAndDrawTo(Canvas* canvas, bool antialiasing);
+
  private:
   std::shared_ptr<Context3DCompositor> _compositor = nullptr;
   Point _offset = {};
   float _contentScale = 1.0f;
 
   std::shared_ptr<ColorSpace> _colorSpace = nullptr;
-  BackgroundContext* _backgroundContext = nullptr;
+  std::shared_ptr<BackgroundContext> _backgroundContext = nullptr;
   std::stack<Render3DContextState> _stateStack = {};
 };
 

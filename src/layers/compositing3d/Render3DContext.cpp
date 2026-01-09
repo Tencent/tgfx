@@ -20,7 +20,10 @@
 #include "Context3DCompositor.h"
 #include "core/Matrix2D.h"
 #include "core/utils/MathExtra.h"
+#include "layers/BackgroundContext.h"
+#include "tgfx/core/Canvas.h"
 #include "tgfx/core/Image.h"
+#include "tgfx/core/Paint.h"
 
 namespace tgfx {
 
@@ -108,6 +111,26 @@ void Render3DContext::endRecording() {
   }
   imageTransform.postTranslate(pictureOffset.x - _offset.x, pictureOffset.y - _offset.y, 0);
   _compositor->addImage(image, imageTransform, 1.0f, antialiasing);
+}
+
+void Render3DContext::finishAndDrawTo(Canvas* canvas, bool antialiasing) {
+  auto context3DImage = _compositor->finish();
+  // The final texture has been scaled proportionally during generation, so draw it at its actual
+  // size on the canvas.
+  AutoCanvasRestore autoRestore(canvas);
+  auto imageMatrix = Matrix::MakeScale(1.0f / _contentScale, 1.0f / _contentScale);
+  imageMatrix.preTranslate(_offset.x, _offset.y);
+  canvas->concat(imageMatrix);
+  canvas->drawImage(context3DImage);
+
+  if (_backgroundContext) {
+    Paint paint = {};
+    paint.setAntiAlias(antialiasing);
+    auto backgroundCanvas = _backgroundContext->getCanvas();
+    AutoCanvasRestore autoRestoreBg(backgroundCanvas);
+    backgroundCanvas->concat(imageMatrix);
+    backgroundCanvas->drawImage(context3DImage, &paint);
+  }
 }
 
 }  // namespace tgfx

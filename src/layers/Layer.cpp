@@ -22,6 +22,7 @@
 #include <cmath>
 #include <unordered_map>
 #include <unordered_set>
+#include "compositing3d/Context3DCompositor.h"
 #include "core/MCState.h"
 #include "core/Matrix2D.h"
 #include "core/filters/Transform3DImageFilter.h"
@@ -354,31 +355,7 @@ static std::shared_ptr<Render3DContext> Create3DContext(const DrawArgs& args, Ca
       static_cast<int>(validRenderRect.height()));
   auto offset = Point::Make(validRenderRect.left, validRenderRect.top);
   return std::make_shared<Render3DContext>(std::move(compositor), offset, contentScale,
-                                           args.dstColorSpace, args.blurBackground.get());
-}
-
-/**
- * Finishes a 3D rendering context and draws the composited result to the target canvas.
- */
-static void Finish3DContext(Render3DContext* context, Canvas* canvas, bool antialiasing) {
-  auto context3DImage = context->compositor()->finish();
-  // The final texture has been scaled proportionally during generation, so draw it at its actual
-  // size on the canvas.
-  auto contentScale = context->contentScale();
-  AutoCanvasRestore autoRestore(canvas);
-  auto imageMatrix = Matrix::MakeScale(1.0f / contentScale, 1.0f / contentScale);
-  imageMatrix.preTranslate(context->offset().x, context->offset().y);
-  canvas->concat(imageMatrix);
-  canvas->drawImage(context3DImage);
-
-  if (auto backgroundContext = context->backgroundContext()) {
-    Paint paint = {};
-    paint.setAntiAlias(antialiasing);
-    auto backgroundCanvas = backgroundContext->getCanvas();
-    AutoCanvasRestore autoRestoreBg(backgroundCanvas);
-    backgroundCanvas->concat(imageMatrix);
-    backgroundCanvas->drawImage(context3DImage, &paint);
-  }
+                                           args.dstColorSpace, args.blurBackground);
 }
 
 bool Layer::DefaultAllowsEdgeAntialiasing() {
@@ -1968,7 +1945,7 @@ void Layer::drawByStarting3DContext(const DrawArgs& args, Canvas* canvas) {
       newContext->beginRecording(getMatrixWithScrollRect(), bitFields.allowsEdgeAntialiasing);
   drawLayer(contextArgs, offscreenCanvas, _alpha, BlendMode::SrcOver);
   newContext->endRecording();
-  Finish3DContext(newContext.get(), canvas, bitFields.allowsEdgeAntialiasing);
+  newContext->finishAndDrawTo(canvas, bitFields.allowsEdgeAntialiasing);
 }
 
 std::optional<DrawArgs> Layer::createChildArgs(const DrawArgs& args, Canvas* canvas, Layer* child,
@@ -2030,7 +2007,7 @@ void Layer::drawChild(const DrawArgs& args, Canvas* canvas, Layer* child, float 
   child->drawLayer(args, offscreenCanvas, child->_alpha * alpha, BlendMode::SrcOver, nullptr);
   context3D->endRecording();
   if (started3DContext) {
-    Finish3DContext(context3D, canvas, child->bitFields.allowsEdgeAntialiasing);
+    context3D->finishAndDrawTo(canvas, child->bitFields.allowsEdgeAntialiasing);
   }
 }
 
