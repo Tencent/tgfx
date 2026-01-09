@@ -18,7 +18,7 @@
 
 #include "Render3DContext.h"
 #include "Context3DCompositor.h"
-#include "core/Matrix2D.h"
+#include "core/Matrix3DUtils.h"
 #include "core/utils/MathExtra.h"
 #include "layers/BackgroundContext.h"
 #include "tgfx/core/Canvas.h"
@@ -26,24 +26,6 @@
 #include "tgfx/core/Paint.h"
 
 namespace tgfx {
-
-static Matrix3D OriginAdaptedMatrix3D(const Matrix3D& matrix3D, const Point& newOrigin) {
-  auto offsetMatrix = Matrix3D::MakeTranslate(newOrigin.x, newOrigin.y, 0);
-  auto invOffsetMatrix = Matrix3D::MakeTranslate(-newOrigin.x, -newOrigin.y, 0);
-  return invOffsetMatrix * matrix3D * offsetMatrix;
-}
-
-static Rect InverseMapRect(const Rect& rect, const Matrix3D& matrix) {
-  float values[16] = {};
-  matrix.getColumnMajor(values);
-  auto matrix2D = Matrix2D::MakeAll(values[0], values[1], values[3], values[4], values[5],
-                                    values[7], values[12], values[13], values[15]);
-  Matrix2D inversedMatrix;
-  if (!matrix2D.invert(&inversedMatrix)) {
-    return Rect::MakeEmpty();
-  }
-  return inversedMatrix.mapRect(rect);
-}
 
 static std::shared_ptr<Image> PictureToImage(std::shared_ptr<Picture> picture, Point* offset,
                                              std::shared_ptr<ColorSpace> colorSpace) {
@@ -76,7 +58,7 @@ Canvas* Render3DContext::beginRecording(const Matrix3D& childTransform, bool ant
   auto contextBounds = Rect::MakeXYWH(_offset.x * invScale, _offset.y * invScale,
                                       static_cast<float>(_compositor->width()) * invScale,
                                       static_cast<float>(_compositor->height()) * invScale);
-  auto localClipRect = InverseMapRect(contextBounds, newTransform);
+  auto localClipRect = Matrix3DUtils::InverseMapRect(contextBounds, newTransform);
   if (!localClipRect.isEmpty()) {
     canvas->clipRect(localClipRect);
   }
@@ -103,7 +85,7 @@ void Render3DContext::endRecording() {
   DEBUG_ASSERT(!FloatNearlyZero(_contentScale));
   auto invScale = 1.0f / _contentScale;
   auto imageOrigin = Point::Make(pictureOffset.x * invScale, pictureOffset.y * invScale);
-  auto imageTransform = OriginAdaptedMatrix3D(layerTransform, imageOrigin);
+  auto imageTransform = Matrix3DUtils::OriginAdaptedMatrix3D(layerTransform, imageOrigin);
   if (!FloatNearlyEqual(invScale, 1.0f)) {
     auto invScaleMatrix = Matrix3D::MakeScale(invScale, invScale, 1.0f);
     auto scaleMatrix = Matrix3D::MakeScale(_contentScale, _contentScale, 1.0f);

@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <memory>
 #include <optional>
 #include "tgfx/core/Matrix3D.h"
 #include "tgfx/core/Rect.h"
@@ -25,6 +26,24 @@
 #include "tgfx/layers/layerstyles/LayerStyle.h"
 
 namespace tgfx {
+
+/**
+ * Defines how Matrix3DRegionTransformer should combine with outer Matrix3DRegionTransformer.
+ */
+enum class Matrix3DCombineMode {
+  /**
+   * Allow combining with outer Matrix3DRegionTransformer.
+   * Used for layers inside 3D context to maintain 3D state.
+   */
+  Combinable,
+
+  /**
+   * Do not combine with outer Matrix3DRegionTransformer.
+   * Used for 3D layers outside 3D context to avoid incorrect merging.
+   */
+  Isolated
+};
+
 /**
  * The RegionTransformer class is used to transform a rectangle region.
  */
@@ -59,9 +78,13 @@ class RegionTransformer {
   /**
    * Creates a RegionTransformer that applies the given 3D matrix transformation to the given
    * rectangle.
+   * @param matrix The 3D transformation matrix to apply.
+   * @param outer The outer RegionTransformer to chain with.
+   * @param combineMode Controls whether this transformer can combine with outer Matrix3D transformers.
    */
   static std::shared_ptr<RegionTransformer> MakeFromMatrix3D(
-      const Matrix3D& matrix, std::shared_ptr<RegionTransformer> outer = nullptr);
+      const Matrix3D& matrix, std::shared_ptr<RegionTransformer> outer = nullptr,
+      Matrix3DCombineMode combineMode = Matrix3DCombineMode::Combinable);
 
   explicit RegionTransformer(std::shared_ptr<RegionTransformer> outer);
 

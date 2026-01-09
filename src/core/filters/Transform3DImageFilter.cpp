@@ -18,6 +18,7 @@
 
 #include "Transform3DImageFilter.h"
 #include "core/Matrix2D.h"
+#include "core/Matrix3DUtils.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/PlacementPtr.h"
 #include "gpu/DrawingManager.h"
@@ -29,13 +30,6 @@
 #include "tgfx/core/Matrix3D.h"
 
 namespace tgfx {
-
-static bool IsRectBehindCamera(const Rect& rect, const Matrix3D& matrix) {
-  return matrix.mapHomogeneous(rect.left, rect.top, 0, 1).w <= 0 ||
-         matrix.mapHomogeneous(rect.left, rect.bottom, 0, 1).w <= 0 ||
-         matrix.mapHomogeneous(rect.right, rect.top, 0, 1).w <= 0 ||
-         matrix.mapHomogeneous(rect.right, rect.bottom, 0, 1).w <= 0;
-}
 
 std::shared_ptr<ImageFilter> ImageFilter::Transform3D(const Matrix3D& matrix, bool hideBackFace) {
   return std::make_shared<Transform3DImageFilter>(matrix, hideBackFace);
@@ -53,7 +47,7 @@ Rect Transform3DImageFilter::onFilterBounds(const Rect& rect, MapDirection mapDi
   // Adapt the matrix to keep the z-component of vertex coordinates unchanged.
   auto drawMatrix = _matrix;
   drawMatrix.setRow(2, {0, 0, 1, 0});
-  if (IsRectBehindCamera(rect, _matrix)) {
+  if (Matrix3DUtils::IsRectBehindCamera(rect, _matrix)) {
     return Rect::MakeEmpty();
   }
 
@@ -84,7 +78,7 @@ std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
   auto srcW = static_cast<float>(source->width());
   auto srcH = static_cast<float>(source->height());
   auto srcModelRect = Rect::MakeXYWH(0.f, 0.f, srcW, srcH);
-  if (IsRectBehindCamera(srcModelRect, _matrix)) {
+  if (Matrix3DUtils::IsRectBehindCamera(srcModelRect, _matrix)) {
     return nullptr;
   }
 

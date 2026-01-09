@@ -25,6 +25,7 @@
 #include "compositing3d/Context3DCompositor.h"
 #include "core/MCState.h"
 #include "core/Matrix2D.h"
+#include "core/Matrix3DUtils.h"
 #include "core/filters/Transform3DImageFilter.h"
 #include "core/images/TextureImage.h"
 #include "core/utils/Log.h"
@@ -73,79 +74,6 @@ struct LayerStyleSource {
   std::shared_ptr<Image> contour = nullptr;
   Point contourOffset = {};
 };
-
-/**
- * Determines if the 4x4 matrix contains only 2D affine transformations, i.e., no Z-axis related
- * transformations or projection transformations.
- */
-static inline bool IsMatrix3DAffine(const Matrix3D& matrix) {
-  return FloatNearlyZero(matrix.getRowColumn(0, 2)) && FloatNearlyZero(matrix.getRowColumn(1, 2)) &&
-         matrix.getRow(2) == Vec4(0, 0, 1, 0) && matrix.getRow(3) == Vec4(0, 0, 0, 1);
-}
-
-/**
- * When a 4x4 matrix does not contain Z-axis related transformations and projection transformations,
- * this function returns an equivalent 2D affine transformation. Otherwise, the return value will
- * lose information about Z-axis related transformations and projection transformations.
- */
-static inline Matrix GetMayLossyAffineMatrix(const Matrix3D& matrix) {
-  auto affineMatrix = Matrix::I();
-  affineMatrix.setAll(matrix.getRowColumn(0, 0), matrix.getRowColumn(0, 1),
-                      matrix.getRowColumn(0, 3), matrix.getRowColumn(1, 0),
-                      matrix.getRowColumn(1, 1), matrix.getRowColumn(1, 3));
-  return affineMatrix;
-}
-
-/**
- * Creates a RegionTransformer from a 3D transformation matrix. If the matrix is affine, uses
- * MakeFromMatrix. Otherwise, creates a Transform3DFilter and uses MakeFromFilters. The
- * filterHolder is used to ensure the filter is not released during the transformer's lifetime.
- */
-static inline std::shared_ptr<RegionTransformer> MakeTransformerFromTransform3D(
-    const Matrix3D& transform3D, std::shared_ptr<RegionTransformer> outer,
-    std::vector<std::shared_ptr<LayerFilter>>* filterHolder) {
-  if (IsMatrix3DAffine(transform3D)) {
-    return RegionTransformer::MakeFromMatrix(GetMayLossyAffineMatrix(transform3D),
-                                             std::move(outer));
-  }
-  filterHolder->push_back(Transform3DFilter::Make(transform3D));
-  return RegionTransformer::MakeFromFilters(*filterHolder, 1.0f, std::move(outer));
-}
-
-/**
- * Returns an adapted transformation matrix for a new coordinate system established at the specified
- * point.
- * The original matrix defines a transformation in a coordinate system with the origin (0, 0) as
- * the anchor point. When establishing a new coordinate system at an arbitrary point within this
- * space, this function computes the equivalent matrix that produces the same visual transformation
- * effect in the new coordinate system.
- * @param matrix3D The original transformation matrix defined with the origin (0, 0) as the anchor
- * point.
- * @param newOrigin The point at which to establish the new coordinate system as its origin.
- */
-static inline Matrix3D OriginAdaptedMatrix3D(const Matrix3D& matrix3D, const Point& newOrigin) {
-  auto offsetMatrix = Matrix3D::MakeTranslate(newOrigin.x, newOrigin.y, 0);
-  auto invOffsetMatrix = Matrix3D::MakeTranslate(-newOrigin.x, -newOrigin.y, 0);
-  return invOffsetMatrix * matrix3D * offsetMatrix;
-}
-
-/**
- * Checks if any vertex of the rect is behind the camera after applying the 3D transformation.
- * A vertex is considered behind the camera when w <= 0, where w = 0 means the vertex is at the
- * camera plane (infinitely far), which is also treated as behind.
- * @param rect The rect in layer's local coordinate system.
- * @param transform3D The layer's transformation matrix, containing camera information.
- */
-static inline bool IsTransformedLayerRectBehindCamera(const Rect& rect,
-                                                      const Matrix3D& transform3D) {
-  if (transform3D.mapHomogeneous(rect.left, rect.top, 0, 1).w <= 0 ||
-      transform3D.mapHomogeneous(rect.left, rect.bottom, 0, 1).w <= 0 ||
-      transform3D.mapHomogeneous(rect.right, rect.top, 0, 1).w <= 0 ||
-      transform3D.mapHomogeneous(rect.right, rect.bottom, 0, 1).w <= 0) {
-    return true;
-  }
-  return false;
-}
 
 static std::optional<Rect> MapClipBoundsToContent(const std::optional<Rect>& clipBounds,
                                                   const Matrix3D* transform3D) {
@@ -481,7 +409,7 @@ void Layer::setMatrix3D(const Matrix3D& value) {
     return;
   }
   _matrix3D = value;
-  bitFields.matrix3DIsAffine = IsMatrix3DAffine(value);
+  bitFields.matrix3DIsAffine = Matrix3DUtils::IsMatrix3DAffine(value);
   invalidateTransform();
 }
 
@@ -858,8 +786,8 @@ static Rect ComputeContentBounds(const LayerContent& content, const Rect& conten
     return contentMatrix.mapRect(contentBounds);
   }
 
-  if (IsMatrix3DAffine(contentMatrix)) {
-    return content.getTightBounds(GetMayLossyAffineMatrix(contentMatrix));
+  if (Matrix3DUtils::IsMatrix3DAffine(contentMatrix)) {
+    return content.getTightBounds(Matrix3DUtils::GetMayLossyAffineMatrix(contentMatrix));
   }
   auto bounds = content.getTightBounds(Matrix::I());
   return contentMatrix.mapRect(bounds);
@@ -870,14 +798,14 @@ Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBou
   bool hasEffects = !_layerStyles.empty() || !_filters.empty();
   // When preserving 3D, the matrix must be passed down to preserve 3D state.
   // Otherwise, when has effects, compute in local coordinates first, then apply matrix at end.
-  bool isAffine = IsMatrix3DAffine(coordinateMatrix);
+  bool isAffine = Matrix3DUtils::IsMatrix3DAffine(coordinateMatrix);
   bool applyMatrixAtEnd = !canPreserve3D && (hasEffects || !isAffine);
 
   Rect bounds = {};
   if (auto content = getContent()) {
     auto contentBounds = content->getBounds();
     bool behindCamera =
-        !isAffine && IsTransformedLayerRectBehindCamera(contentBounds, coordinateMatrix);
+        !isAffine && Matrix3DUtils::IsRectBehindCamera(contentBounds, coordinateMatrix);
     if (!behindCamera) {
       bounds.join(ComputeContentBounds(*content, contentBounds, coordinateMatrix, applyMatrixAtEnd,
                                        computeTightBounds));
@@ -928,7 +856,7 @@ Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBou
   }
 
   if (applyMatrixAtEnd) {
-    if (!isAffine && IsTransformedLayerRectBehindCamera(bounds, coordinateMatrix)) {
+    if (!isAffine && Matrix3DUtils::IsRectBehindCamera(bounds, coordinateMatrix)) {
       return {};
     }
     bounds = coordinateMatrix.mapRect(bounds);
@@ -1054,11 +982,11 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
     auto backgroundRect = clippedBounds;
     backgroundRect.scale(scale, scale);
     auto backgroundMatrix = Matrix::I();
-    if (IsMatrix3DAffine(globalToLocalMatrix)) {
+    if (Matrix3DUtils::IsMatrix3DAffine(globalToLocalMatrix)) {
       // If the transformation from the current layer node to the root node only contains 2D affine
       // transformations, then draw the real layer background and calculate the accurate
       // transformation matrix of the background image in the layer's local coordinate system
-      backgroundMatrix = GetMayLossyAffineMatrix(globalToLocalMatrix);
+      backgroundMatrix = Matrix3DUtils::GetMayLossyAffineMatrix(globalToLocalMatrix);
     } else {
       // Otherwise, it's impossible to draw an accurate background. Only the background image
       // corresponding to the minimum bounding rectangle of the layer node subtree after drawing can
@@ -1076,7 +1004,7 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
                                     bounds == clippedBounds, surface->colorSpace())) {
       auto backgroundCanvas = backgroundContext->getCanvas();
       auto actualMatrix = backgroundCanvas->getMatrix();
-      bool isLocalToGlobalAffine = IsMatrix3DAffine(localToGlobalMatrix);
+      bool isLocalToGlobalAffine = Matrix3DUtils::IsMatrix3DAffine(localToGlobalMatrix);
       if (isLocalToGlobalAffine) {
         // The current layer node to the root node only contains 2D affine transformations, need to
         // superimpose the transformation matrix that maps layer coordinates to the actual drawing
@@ -1084,7 +1012,7 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
         // Since the background recorder starts from the current layer, we need to pre-concatenate
         // localToGlobalMatrix to the background canvas matrix to ensure the coordinate space is
         // correct.
-        actualMatrix.preConcat(GetMayLossyAffineMatrix(localToGlobalMatrix));
+        actualMatrix.preConcat(Matrix3DUtils::GetMayLossyAffineMatrix(localToGlobalMatrix));
       } else {
         // Otherwise, need to superimpose the transformation matrix that maps the bounds to the
         // actual drawing area renderRect.
@@ -1364,9 +1292,9 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
   maskArgs.blurBackground = nullptr;
 
   auto relativeMatrix = _mask->getRelativeMatrix(this);
-  auto isMatrixAffine = IsMatrix3DAffine(relativeMatrix);
+  auto isMatrixAffine = Matrix3DUtils::IsMatrix3DAffine(relativeMatrix);
   auto affineRelativeMatrix =
-      isMatrixAffine ? GetMayLossyAffineMatrix(relativeMatrix) : Matrix::I();
+      isMatrixAffine ? Matrix3DUtils::GetMayLossyAffineMatrix(relativeMatrix) : Matrix::I();
 
   // Note: RecordPicture does not use layerClipBounds here. Using clipBounds may cause PathOp
   // errors when extracting maskPath from the picture, resulting in incorrect clip regions.
@@ -1887,9 +1815,9 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
     // If the sublayer's Matrix contains 3D transformations or projection transformations, then
     // treat its Matrix as an identity matrix here, and let the sublayer handle its actual position
     // through 3D filter methods,
-    const bool isChildMatrixAffine = IsMatrix3DAffine(childTransform3D);
+    const bool isChildMatrixAffine = Matrix3DUtils::IsMatrix3DAffine(childTransform3D);
     auto childAffineMatrix = (isChildMatrixAffine && !canPreserve3D())
-                                 ? GetMayLossyAffineMatrix(childTransform3D)
+                                 ? Matrix3DUtils::GetMayLossyAffineMatrix(childTransform3D)
                                  : Matrix::I();
     canvas->concat(childAffineMatrix);
     auto clipChildScrollRectHandler = [&](Canvas& clipCanvas) {
@@ -1997,7 +1925,8 @@ void Layer::drawChild(const DrawArgs& args, Canvas* canvas, Layer* child, float 
                       bool started3DContext) {
   if (!context3D) {
     // Child is completely outside any 3D context, draw normally.
-    const Matrix3D* transform = IsMatrix3DAffine(transform3D) ? nullptr : &transform3D;
+    const Matrix3D* transform =
+        Matrix3DUtils::IsMatrix3DAffine(transform3D) ? nullptr : &transform3D;
     auto blendMode = static_cast<BlendMode>(child->bitFields.blendMode);
     child->drawLayer(args, canvas, child->_alpha * alpha, blendMode, transform);
     return;
@@ -2024,7 +1953,7 @@ float Layer::drawBackgroundLayers(const DrawArgs& args, Canvas* canvas) {
   // clipping rectangle. Otherwise, the canvas does not carry this matrix information, and clipping
   // needs to be performed by transforming the Path.
   if (bitFields.matrix3DIsAffine) {
-    canvas->concat(GetMayLossyAffineMatrix(getMatrixWithScrollRect()));
+    canvas->concat(Matrix3DUtils::GetMayLossyAffineMatrix(getMatrixWithScrollRect()));
     if (_scrollRect) {
       canvas->clipRect(*_scrollRect);
     }
@@ -2105,8 +2034,8 @@ std::shared_ptr<Image> Layer::getBackgroundImage(const DrawArgs& args, float con
   // the root node, making it impossible to obtain an accurate background image and stretch it into
   // a rectangle, please use the getBoundsBackgroundImage interface to get the background image
   // corresponding to the minimum bounding rectangle of the current layer subtree after drawing.
-  DEBUG_ASSERT(IsMatrix3DAffine(localToGlobalMatrix));
-  auto affiineLocalToGlobalMatrix = GetMayLossyAffineMatrix(localToGlobalMatrix);
+  DEBUG_ASSERT(Matrix3DUtils::IsMatrix3DAffine(localToGlobalMatrix));
+  auto affiineLocalToGlobalMatrix = Matrix3DUtils::GetMayLossyAffineMatrix(localToGlobalMatrix);
   Matrix affineGlobalToLocalMatrix = {};
   if (!affiineLocalToGlobalMatrix.invert(&affineGlobalToLocalMatrix)) {
     return nullptr;
@@ -2199,7 +2128,7 @@ void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
         // background image corresponding to the minimum axis-aligned bounding rectangle after
         // projection can be obtained.
         auto background =
-            IsMatrix3DAffine(getGlobalMatrix())
+            Matrix3DUtils::IsMatrix3DAffine(getGlobalMatrix())
                 ? getBackgroundImage(args, source->contentScale, &backgroundOffset)
                 : getBoundsBackgroundImage(args, source->contentScale, &backgroundOffset);
         if (background != nullptr) {
@@ -2262,7 +2191,7 @@ void Layer::drawBackgroundLayerStyles(const DrawArgs& args, Canvas* canvas, floa
     // StyleSourceMatrix acts on the content of styleSource, which is a subregion extracted from
     // within the Layer. For transformations based on the local coordinate system of this subregion,
     // anchor point adaptation is required for the matrix described based on the layer.
-    auto styleSourceMatrix = OriginAdaptedMatrix3D(transform3D, styleSourceAnchor);
+    auto styleSourceMatrix = Matrix3DUtils::OriginAdaptedMatrix3D(transform3D, styleSourceAnchor);
     styleSourceMatrix.postScale(bounds.width() / transformedBounds.width(),
                                 bounds.height() / transformedBounds.height(), 1.0f);
     auto transform3DFilter = Transform3DFilter::Make(styleSourceMatrix);
@@ -2379,22 +2308,10 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     }
     if (content) {
       *contentBounds = content->getBounds();
-      // Check if the layer is behind the camera in 3D context or has 3D transform.
-      auto consecutiveMatrix3D = transformer ? transformer->getConsecutiveMatrix3D() : std::nullopt;
-      bool behindCamera = false;
-      if (consecutiveMatrix3D.has_value()) {
-        behindCamera = IsTransformedLayerRectBehindCamera(*contentBounds, *consecutiveMatrix3D);
-      } else if (!bitFields.matrix3DIsAffine) {
-        behindCamera = IsTransformedLayerRectBehindCamera(*contentBounds, _matrix3D);
+      if (transformer) {
+        transformer->transform(contentBounds);
       }
-      if (behindCamera) {
-        contentBounds->setEmpty();
-      } else {
-        if (transformer) {
-          transformer->transform(contentBounds);
-        }
-        _root->invalidateRect(*contentBounds);
-      }
+      _root->invalidateRect(*contentBounds);
     } else {
       contentBounds->setEmpty();
     }
@@ -2416,19 +2333,18 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     }
     auto childMatrix = child->getMatrixWithScrollRect();
     std::shared_ptr<RegionTransformer> childTransformer = nullptr;
-    // Ensure the 3D filter is not released during the entire function lifetime.
-    std::vector<std::shared_ptr<LayerFilter>> child3DFilterVector = {};
     if (canPreserve3D() || child->canPreserve3D()) {
-      // Child is inside a 3D rendering context.
-      childTransformer = RegionTransformer::MakeFromMatrix3D(childMatrix, transformer);
+      // Child is inside a 3D rendering context - allow combining matrices.
+      childTransformer = RegionTransformer::MakeFromMatrix3D(childMatrix, transformer,
+                                                             Matrix3DCombineMode::Combinable);
     } else if (child->bitFields.matrix3DIsAffine) {
       // Child is a 2D layer outside 3D context.
-      childTransformer =
-          RegionTransformer::MakeFromMatrix(GetMayLossyAffineMatrix(childMatrix), transformer);
+      childTransformer = RegionTransformer::MakeFromMatrix(
+          Matrix3DUtils::GetMayLossyAffineMatrix(childMatrix), transformer);
     } else {
-      // Child has 3D transform but is outside 3D context.
-      childTransformer =
-          MakeTransformerFromTransform3D(childMatrix, transformer, &child3DFilterVector);
+      // Child has 3D transform but is outside 3D context - don't combine matrices.
+      childTransformer = RegionTransformer::MakeFromMatrix3D(childMatrix, transformer,
+                                                             Matrix3DCombineMode::Isolated);
     }
     std::optional<Rect> clipRect = std::nullopt;
     if (child->_scrollRect) {
@@ -2492,8 +2408,9 @@ void Layer::checkBackgroundStyles(std::shared_ptr<RegionTransformer> transformer
     // When marking the dirty region for 3D layer background styles, the influence range of layer
     // styles acts on the final projected Bounds, which has already applied 3D matrix transformation,
     // so the identity matrix can be directly used here.
-    auto affineChildMatrix =
-        IsMatrix3DAffine(childMatrix) ? GetMayLossyAffineMatrix(childMatrix) : Matrix::I();
+    auto affineChildMatrix = Matrix3DUtils::IsMatrix3DAffine(childMatrix)
+                                 ? Matrix3DUtils::GetMayLossyAffineMatrix(childMatrix)
+                                 : Matrix::I();
     auto childTransformer = RegionTransformer::MakeFromMatrix(affineChildMatrix, transformer);
     child->checkBackgroundStyles(childTransformer);
   }

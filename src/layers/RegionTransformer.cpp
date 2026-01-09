@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RegionTransformer.h"
+#include "core/Matrix3DUtils.h"
 #include "core/utils/Log.h"
 
 namespace tgfx {
@@ -100,14 +101,26 @@ class MatrixRegionTransformer : public RegionTransformer {
 
 class Matrix3DRegionTransformer : public RegionTransformer {
  public:
-  Matrix3DRegionTransformer(const Matrix3D& matrix, std::shared_ptr<RegionTransformer> outer)
-      : RegionTransformer(std::move(outer)), matrix(matrix) {
+  Matrix3DRegionTransformer(const Matrix3D& matrix, std::shared_ptr<RegionTransformer> outer,
+                            Matrix3DCombineMode combineMode = Matrix3DCombineMode::Combinable)
+      : RegionTransformer(std::move(outer)), matrix(matrix), combineMode(combineMode) {
   }
 
   Matrix3D matrix;
+  Matrix3DCombineMode combineMode;
+
+  bool canCombineWith(const Matrix3DRegionTransformer* other) const {
+    return combineMode == Matrix3DCombineMode::Combinable &&
+           other->combineMode == Matrix3DCombineMode::Combinable;
+  }
 
  protected:
   void onTransform(Rect* bounds) const override {
+    // Check if the rect is behind the camera before applying 3D transformation
+    if (Matrix3DUtils::IsRectBehindCamera(*bounds, matrix)) {
+      bounds->setEmpty();
+      return;
+    }
     *bounds = matrix.mapRect(*bounds);
   }
 
@@ -161,17 +174,27 @@ std::shared_ptr<RegionTransformer> RegionTransformer::MakeFromMatrix(
 }
 
 std::shared_ptr<RegionTransformer> RegionTransformer::MakeFromMatrix3D(
-    const Matrix3D& matrix, std::shared_ptr<RegionTransformer> outer) {
+    const Matrix3D& matrix, std::shared_ptr<RegionTransformer> outer,
+    Matrix3DCombineMode combineMode) {
   if (matrix == Matrix3D::I()) {
     return outer;
   }
+
   if (!outer || !outer->isMatrix3D()) {
-    return std::make_shared<Matrix3DRegionTransformer>(matrix, std::move(outer));
+    return std::make_shared<Matrix3DRegionTransformer>(matrix, std::move(outer), combineMode);
   }
 
-  auto combineMatrix = matrix;
-  combineMatrix.postConcat(static_cast<Matrix3DRegionTransformer*>(outer.get())->matrix);
-  return std::make_shared<Matrix3DRegionTransformer>(combineMatrix, outer->outer);
+  auto outerMatrix3D = static_cast<Matrix3DRegionTransformer*>(outer.get());
+  // Only combine if both allow combining
+  if (combineMode == Matrix3DCombineMode::Combinable &&
+      outerMatrix3D->canCombineWith(outerMatrix3D)) {
+    auto combineMatrix = matrix;
+    combineMatrix.postConcat(outerMatrix3D->matrix);
+    return std::make_shared<Matrix3DRegionTransformer>(combineMatrix, outer->outer, combineMode);
+  }
+
+  // Don't combine, create new transformer
+  return std::make_shared<Matrix3DRegionTransformer>(matrix, std::move(outer), combineMode);
 }
 
 RegionTransformer::RegionTransformer(std::shared_ptr<RegionTransformer> outer)
