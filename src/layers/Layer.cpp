@@ -45,6 +45,14 @@
 
 namespace tgfx {
 
+// The minimum size (longest edge) for subtree cache. This prevents creating excessively small
+// mipmap levels that would be inefficient to cache.
+static constexpr int SUBTREE_CACHE_MIN_SIZE = 32;
+static std::atomic_bool AllowsEdgeAntialiasing = true;
+static std::atomic_bool AllowsGroupOpacity = false;
+static const std::vector<LayerStyleExtraSourceType> StyleSourceTypesFor3DContext = {
+    LayerStyleExtraSourceType::None, LayerStyleExtraSourceType::Contour};
+
 static bool HasStyleSource(const std::vector<LayerStyleExtraSourceType>& types,
                            LayerStyleExtraSourceType type) {
   return std::find(types.begin(), types.end(), type) != types.end();
@@ -55,13 +63,27 @@ static void RemoveStyleSource(std::vector<LayerStyleExtraSourceType>& types,
   types.erase(std::remove(types.begin(), types.end(), type), types.end());
 }
 
-// The minimum size (longest edge) for subtree cache. This prevents creating excessively small
-// mipmap levels that would be inefficient to cache.
-static constexpr int SUBTREE_CACHE_MIN_SIZE = 32;
-static std::atomic_bool AllowsEdgeAntialiasing = true;
-static std::atomic_bool AllowsGroupOpacity = false;
-static const std::vector<LayerStyleExtraSourceType> StyleSourceTypesFor3DContext = {
-    LayerStyleExtraSourceType::None, LayerStyleExtraSourceType::Contour};
+/**
+ * Clips the canvas using the scroll rect. If the sublayer's Matrix contains 3D transformations or
+ * projection transformations, because this matrix has been merged into the Canvas, it can be
+ * directly completed through the clipping rectangle. Otherwise, the canvas will not contain this
+ * matrix information, and clipping needs to be done by transforming the Path.
+ */
+static void ClipScrollRect(Canvas* canvas, const Rect* scrollRect, const Matrix3D& transform,
+                           bool isAffine) {
+  if (scrollRect == nullptr) {
+    return;
+  }
+
+  if (isAffine) {
+    canvas->clipRect(*scrollRect);
+  } else {
+    Path path;
+    path.addRect(*scrollRect);
+    path.transform3D(transform);
+    canvas->clipPath(path);
+  }
+}
 
 struct MaskData {
   Path clipPath = {};
@@ -1827,28 +1849,11 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
                                  ? Matrix3DUtils::GetMayLossyAffineMatrix(childTransform3D)
                                  : Matrix::I();
     canvas->concat(childAffineMatrix);
-    auto clipChildScrollRectHandler = [&](Canvas& clipCanvas) {
-      if (child->_scrollRect) {
-        // If the sublayer's Matrix contains 3D transformations or projection transformations, then
-        // because this matrix has been merged into the Canvas, it can be directly completed through
-        // the clipping rectangle. Otherwise, the canvas will not contain this matrix information,
-        // and clipping needs to be done by transforming the Path.
-        if (isChildMatrixAffine) {
-          clipCanvas.clipRect(*child->_scrollRect);
-        } else {
-          auto path = Path();
-          path.addRect(*(child->_scrollRect));
-          path.transform3D(childTransform3D);
-          clipCanvas.clipPath(path);
-        }
-      }
-    };
-    if (child->_scrollRect) {
-      clipChildScrollRectHandler(*canvas);
-    }
+    ClipScrollRect(canvas, child->_scrollRect.get(), childTransform3D, isChildMatrixAffine);
     if (backgroundCanvas) {
       backgroundCanvas->concat(childAffineMatrix);
-      clipChildScrollRectHandler(*backgroundCanvas);
+      ClipScrollRect(backgroundCanvas, child->_scrollRect.get(), childTransform3D,
+                     isChildMatrixAffine);
     }
 
     auto context3D =
