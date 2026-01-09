@@ -70,40 +70,34 @@ class BspTree {
  private:
   void buildTree(BspNode* node, std::deque<std::unique_ptr<DrawPolygon3D>>* polygons);
 
-  /**
-   * Traverses polygons back-to-front along the screen Z-axis (positive Z points towards the
-   * camera).
-   */
+  template <typename Action>
+  void visitNode(Action& action, const BspNode* node, const BspNode* firstChild,
+                 const BspNode* secondChild,
+                 const std::vector<std::unique_ptr<DrawPolygon3D>>& firstCoplanars,
+                 const std::vector<std::unique_ptr<DrawPolygon3D>>& secondCoplanars) const {
+    if (firstChild) {
+      traverseNode(action, firstChild);
+    }
+    for (const auto& polygon : firstCoplanars) {
+      action(polygon.get());
+    }
+    action(node->data.get());
+    for (const auto& polygon : secondCoplanars) {
+      action(polygon.get());
+    }
+    if (secondChild) {
+      traverseNode(action, secondChild);
+    }
+  }
+
   template <typename Action>
   void traverseNode(Action& action, const BspNode* node) const {
     if (node->data->isFacingPositiveZ()) {
-      if (node->backChild) {
-        traverseNode(action, node->backChild.get());
-      }
-      for (const auto& p : node->coplanarsBack) {
-        action(p.get());
-      }
-      action(node->data.get());
-      for (const auto& p : node->coplanarsFront) {
-        action(p.get());
-      }
-      if (node->frontChild) {
-        traverseNode(action, node->frontChild.get());
-      }
+      visitNode(action, node, node->backChild.get(), node->frontChild.get(), node->coplanarsBack,
+                node->coplanarsFront);
     } else {
-      if (node->frontChild) {
-        traverseNode(action, node->frontChild.get());
-      }
-      for (const auto& p : node->coplanarsFront) {
-        action(p.get());
-      }
-      action(node->data.get());
-      for (const auto& p : node->coplanarsBack) {
-        action(p.get());
-      }
-      if (node->backChild) {
-        traverseNode(action, node->backChild.get());
-      }
+      visitNode(action, node, node->frontChild.get(), node->backChild.get(), node->coplanarsFront,
+                node->coplanarsBack);
     }
   }
 
