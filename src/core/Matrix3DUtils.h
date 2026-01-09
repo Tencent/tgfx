@@ -65,6 +65,15 @@ class Matrix3DUtils {
    * Inverse maps a rect through the matrix. Returns an empty rect if the matrix is not invertible.
    */
   static Rect InverseMapRect(const Rect& rect, const Matrix3D& matrix);
+
+  /**
+   * Adjusts a 3D transformation matrix so that the projection result can be correctly scaled.
+   * This ensures the visual effect of "project first, then scale" rather than "scale first, then
+   * project", which would cause incorrect perspective effects.
+   * @param matrix The original 3D transformation matrix.
+   * @param scale The scale factor to apply to the projection result.
+   */
+  static Matrix3D ScaleAdaptedMatrix3D(const Matrix3D& matrix, float scale);
 };
 
 }  // namespace tgfx

@@ -86,11 +86,7 @@ void Render3DContext::endRecording() {
   auto invScale = 1.0f / _contentScale;
   auto imageOrigin = Point::Make(pictureOffset.x * invScale, pictureOffset.y * invScale);
   auto imageTransform = Matrix3DUtils::OriginAdaptedMatrix3D(layerTransform, imageOrigin);
-  if (!FloatNearlyEqual(invScale, 1.0f)) {
-    auto invScaleMatrix = Matrix3D::MakeScale(invScale, invScale, 1.0f);
-    auto scaleMatrix = Matrix3D::MakeScale(_contentScale, _contentScale, 1.0f);
-    imageTransform = scaleMatrix * imageTransform * invScaleMatrix;
-  }
+  imageTransform = Matrix3DUtils::ScaleAdaptedMatrix3D(imageTransform, _contentScale);
   imageTransform.postTranslate(pictureOffset.x - _offset.x, pictureOffset.y - _offset.y, 0);
   _compositor->addImage(image, imageTransform, 1.0f, antialiasing);
 }

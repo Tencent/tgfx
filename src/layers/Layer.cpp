@@ -38,7 +38,6 @@
 #include "layers/RootLayer.h"
 #include "layers/SubtreeCache.h"
 #include "layers/contents/LayerContent.h"
-#include "layers/filters/Transform3DFilter.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Surface.h"
@@ -2194,8 +2193,9 @@ void Layer::drawBackgroundLayerStyles(const DrawArgs& args, Canvas* canvas, floa
     auto styleSourceMatrix = Matrix3DUtils::OriginAdaptedMatrix3D(transform3D, styleSourceAnchor);
     styleSourceMatrix.postScale(bounds.width() / transformedBounds.width(),
                                 bounds.height() / transformedBounds.height(), 1.0f);
-    auto transform3DFilter = Transform3DFilter::Make(styleSourceMatrix);
-    styleSourceFilter = transform3DFilter->getImageFilter(styleSource->contentScale);
+    styleSourceMatrix =
+        Matrix3DUtils::ScaleAdaptedMatrix3D(styleSourceMatrix, styleSource->contentScale);
+    styleSourceFilter = std::make_shared<Transform3DImageFilter>(styleSourceMatrix);
     styleSource->content = styleSource->content->makeWithFilter(styleSourceFilter);
   }
 

@@ -60,4 +60,14 @@ Rect Matrix3DUtils::InverseMapRect(const Rect& rect, const Matrix3D& matrix) {
   return inversedMatrix.mapRect(rect);
 }
 
+Matrix3D Matrix3DUtils::ScaleAdaptedMatrix3D(const Matrix3D& matrix, float scale) {
+  if (FloatNearlyEqual(scale, 1.0f)) {
+    return matrix;
+  }
+  auto invScale = 1.0f / scale;
+  auto invScaleMatrix = Matrix3D::MakeScale(invScale, invScale, 1.0f);
+  auto scaleMatrix = Matrix3D::MakeScale(scale, scale, 1.0f);
+  return scaleMatrix * matrix * invScaleMatrix;
+}
+
 }  // namespace tgfx
