@@ -2394,7 +2394,6 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     transformer = RegionTransformer::MakeFromStyles(_layerStyles, 1.0f, std::move(transformer));
   }
   auto content = getContent();
-  bool behindCamera = false;
   if (bitFields.dirtyContentBounds || (forceDirty && content)) {
     if (contentBounds) {
       _root->invalidateRect(*contentBounds);
@@ -2405,18 +2404,19 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
       *contentBounds = content->getBounds();
       // Check if the layer is behind the camera in 3D context or has 3D transform.
       auto consecutiveMatrix3D = transformer ? transformer->getConsecutiveMatrix3D() : std::nullopt;
+      bool behindCamera = false;
       if (consecutiveMatrix3D.has_value()) {
         behindCamera = IsTransformedLayerRectBehindCamera(*contentBounds, *consecutiveMatrix3D);
       } else if (!bitFields.matrix3DIsAffine) {
         behindCamera = IsTransformedLayerRectBehindCamera(*contentBounds, _matrix3D);
       }
-      if (!behindCamera) {
+      if (behindCamera) {
+        contentBounds->setEmpty();
+      } else {
         if (transformer) {
           transformer->transform(contentBounds);
         }
         _root->invalidateRect(*contentBounds);
-      } else {
-        contentBounds->setEmpty();
       }
     } else {
       contentBounds->setEmpty();
@@ -2483,7 +2483,7 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     }
   }
   auto backOutset = 0.f;
-  if (!behindCamera) {
+  if (!renderBounds.isEmpty()) {
     for (auto& style : _layerStyles) {
       DEBUG_ASSERT(style != nullptr);
       if (style->extraSourceType() != LayerStyleExtraSourceType::Background) {
