@@ -60,6 +60,8 @@ static void RemoveStyleSource(std::vector<LayerStyleExtraSourceType>& types,
 static constexpr int SUBTREE_CACHE_MIN_SIZE = 32;
 static std::atomic_bool AllowsEdgeAntialiasing = true;
 static std::atomic_bool AllowsGroupOpacity = false;
+static const std::vector<LayerStyleExtraSourceType> StyleSourceTypesFor3DContext = {
+    LayerStyleExtraSourceType::None, LayerStyleExtraSourceType::Contour};
 
 struct MaskData {
   Path clipPath = {};
@@ -1871,8 +1873,7 @@ void Layer::drawByStarting3DContext(const DrawArgs& args, Canvas* canvas) {
   // Layers inside a 3D rendering context need to maintain independent 3D state. This means layers
   // drawn later may become the background, making it impossible to know the final background when
   // drawing each layer. Therefore, background styles are disabled.
-  contextArgs.styleSourceTypes = {LayerStyleExtraSourceType::None,
-                                  LayerStyleExtraSourceType::Contour};
+  contextArgs.styleSourceTypes = StyleSourceTypesFor3DContext;
 
   auto offscreenCanvas =
       newContext->beginRecording(getMatrixWithScrollRect(), bitFields.allowsEdgeAntialiasing);
@@ -1916,8 +1917,7 @@ std::optional<DrawArgs> Layer::createChildArgs(const DrawArgs& args, Canvas* can
     // Layers inside a 3D rendering context need to maintain independent 3D state. This means
     // layers drawn later may become the background, making it impossible to know the final
     // background when drawing each layer. Therefore, background styles are disabled.
-    childArgs.styleSourceTypes = {LayerStyleExtraSourceType::None,
-                                  LayerStyleExtraSourceType::Contour};
+    childArgs.styleSourceTypes = StyleSourceTypesFor3DContext;
     childArgs.blurBackground = nullptr;
   } else if (args.render3DContext && !childCanPreserve3D) {
     childArgs.render3DContext = nullptr;
