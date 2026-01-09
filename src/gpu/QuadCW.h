@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,26 +18,42 @@
 
 #pragma once
 
-#include "gpu/processors/QuadPerEdgeAA3DGeometryProcessor.h"
+#include "core/utils/Log.h"
+#include "tgfx/core/Point.h"
 
 namespace tgfx {
 
 /**
- * The implementation of QuadPerEdgeAA3DGeometryProcessor using GLSL.
+ * QuadCW represents a quadrilateral with vertices in clockwise order.
+ * Used for logical quad operations where edge connectivity matters.
+ *
+ * Vertex layout (clockwise):
+ *   p0 -----> p1
+ *   ^          |
+ *   |          v
+ *   p3 <----- p2
+ *
+ * Edge definitions (matching QUAD_AA_FLAG_EDGE_*):
+ *   EDGE_01: p0 -> p1
+ *   EDGE_12: p1 -> p2
+ *   EDGE_23: p2 -> p3
+ *   EDGE_30: p3 -> p0
  */
-class GLSLQuadPerEdgeAA3DGeometryProcessor final : public QuadPerEdgeAA3DGeometryProcessor {
+class QuadCW {
  public:
-  /**
-   * Creates a GLSLQuadPerEdgeAA3DGeometryProcessor instance with the specified parameters.
-   */
-  explicit GLSLQuadPerEdgeAA3DGeometryProcessor(AAType aa, const Matrix3D& matrix,
-                                                const Vec2& ndcScale, const Vec2& ndcOffset,
-                                                std::optional<PMColor> commonColor);
+  constexpr QuadCW() = default;
 
-  void emitCode(EmitArgs& args) const override;
+  constexpr QuadCW(const Point& p0, const Point& p1, const Point& p2, const Point& p3)
+      : points{p0, p1, p2, p3} {
+  }
 
-  void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData,
-               FPCoordTransformIter* transformIter) const override;
+  const Point& point(size_t i) const {
+    DEBUG_ASSERT(i < 4);
+    return points[i];
+  }
+
+ private:
+  Point points[4] = {};
 };
 
 }  // namespace tgfx

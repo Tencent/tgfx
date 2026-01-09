@@ -1950,15 +1950,9 @@ TGFX_TEST(LayerTest, PassThrough_Test) {
   Layer::SetDefaultAllowsGroupOpacity(value);
 }
 
-static Matrix3D MakePerspectiveMatrix(float farZ) {
+static inline Matrix3D MakePerspectiveMatrix() {
   auto perspectiveMatrix = Matrix3D::I();
   constexpr float eyeDistance = 1200.f;
-  constexpr float shift = 10.f;
-  const float nearZ = eyeDistance - shift;
-  const float m22 = (2 - (farZ + nearZ) / eyeDistance) / (farZ - nearZ);
-  perspectiveMatrix.setRowColumn(2, 2, m22);
-  const float m23 = -1.f + nearZ / eyeDistance - perspectiveMatrix.getRowColumn(2, 2) * nearZ;
-  perspectiveMatrix.setRowColumn(2, 3, m23);
   perspectiveMatrix.setRowColumn(3, 2, -1.f / eyeDistance);
   return perspectiveMatrix;
 }
@@ -1982,20 +1976,17 @@ TGFX_TEST(LayerTest, Matrix) {
 
   auto contentLayer = SolidLayer::Make();
   contentLayer->setColor(Color::FromRGBA(151, 153, 46, 255));
+  auto contentLayerSize = Size::Make(360.f, 320.f);
+  contentLayer->setWidth(contentLayerSize.width);
+  contentLayer->setHeight(contentLayerSize.height);
   {
-    auto layerSize = Size::Make(360.f, 320.f);
-    contentLayer->setWidth(layerSize.width);
-    contentLayer->setHeight(layerSize.height);
     auto anchor = Point::Make(0.3f, 0.3f);
-    auto offsetToAnchorMatrix =
-        Matrix3D::MakeTranslate(-anchor.x * layerSize.width, -anchor.y * layerSize.height, 0.f);
-    auto invOffsetToAnchorMatrix =
-        Matrix3D::MakeTranslate(anchor.x * layerSize.width, anchor.y * layerSize.height, 0.f);
+    auto offsetToAnchorMatrix = Matrix3D::MakeTranslate(-anchor.x * contentLayerSize.width,
+                                                        -anchor.y * contentLayerSize.height, 0.f);
+    auto invOffsetToAnchorMatrix = Matrix3D::MakeTranslate(anchor.x * contentLayerSize.width,
+                                                           anchor.y * contentLayerSize.height, 0.f);
     auto modelMatrix = Matrix3D::MakeRotate({0.f, 1.f, 0.f}, -45.f);
-    // Choose an appropriate far plane to avoid clipping during rotation.
-    auto maxLength = static_cast<float>(std::max(layerSize.width, layerSize.height)) * 2.f;
-    auto farZ = std::min(-maxLength, -500.f);
-    auto perspectiveMatrix = MakePerspectiveMatrix(farZ);
+    auto perspectiveMatrix = MakePerspectiveMatrix();
     auto origin = Point::Make(120, 40);
     auto originTranslateMatrix = Matrix3D::MakeTranslate(origin.x, origin.y, 0.f);
     auto transformMatrix = originTranslateMatrix * invOffsetToAnchorMatrix * perspectiveMatrix *
@@ -2036,11 +2027,8 @@ TGFX_TEST(LayerTest, Matrix) {
     modelMatrix.postRotate({0.f, 0.f, 1.f}, 45.f);
     modelMatrix.preRotate({1.f, 0.f, 0.f}, 45.f);
     modelMatrix.preRotate({0.f, 1.f, 0.f}, 45.f);
-    modelMatrix.postTranslate(0.f, 0.f, 100.f);
-    // Choose an appropriate far plane to avoid clipping during rotation.
-    auto maxLength = static_cast<float>(std::max(image->width(), image->height())) * 2.f;
-    auto farZ = std::min(-maxLength, -500.f);
-    auto perspectiveMatrix = MakePerspectiveMatrix(farZ);
+    modelMatrix.postTranslate(0.f, 0.f, 20.f);
+    auto perspectiveMatrix = MakePerspectiveMatrix();
     // The origin coordinates of the layer in the local coordinate system when no model
     // transformation (excluding XY translation) is applied
     auto origin = Point::Make(125, 105);
@@ -2052,15 +2040,27 @@ TGFX_TEST(LayerTest, Matrix) {
 
   imageLayer->setMatrix3D(imageMatrix3D);
   displayList->render(surface.get());
-  EXPECT_EQ(imageLayer->getBounds(contentLayer.get()), Rect::MakeLTRB(65, 0, 298, 281));
-  EXPECT_EQ(imageLayer->getBounds(displayList->root()), Rect::MakeLTRB(99, 15, 190, 162));
+  auto imageToContentBounds = imageLayer->getBounds(contentLayer.get());
+  imageToContentBounds.roundOut();
+  EXPECT_EQ(imageToContentBounds, Rect::MakeLTRB(73, 10, 290, 272));
+  auto imageToDisplayListBounds = imageLayer->getBounds(displayList->root());
+  imageToDisplayListBounds.roundOut();
+  EXPECT_EQ(imageToDisplayListBounds, Rect::MakeLTRB(102, 21, 187, 158));
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D"));
 
+  auto imageBlurLayer = SolidLayer::Make();
+  imageBlurLayer->setColor(Color::FromRGBA(235, 5, 112, 70));
+  imageBlurLayer->setWidth(170);
+  imageBlurLayer->setHeight(70);
+  imageBlurLayer->setMatrix(Matrix::MakeTrans(-30.f, 20.f));
+  imageBlurLayer->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
+  imageLayer->addChild(imageBlurLayer);
   auto affineMatrix = Matrix::MakeTrans(50, 50);
   imageLayer->setMatrix(affineMatrix);
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D_2D"));
 
+  imageBlurLayer->removeFromParent();
   imageLayer->setMatrix3D(imageMatrix3D);
   EXPECT_TRUE(imageLayer->matrix().isIdentity());
   auto rect = Rect::MakeXYWH(50, 50, 200, 100);
@@ -2079,10 +2079,7 @@ TGFX_TEST(LayerTest, Matrix) {
     auto invOffsetToAnchorMatrix =
         Matrix3D::MakeTranslate(anchor.x * layerSize.width, anchor.y * layerSize.height, 0.f);
     auto modelMatrix = Matrix3D::MakeRotate({0.f, 1.f, 0.f}, 45.f);
-    // Choose an appropriate far plane to avoid clipping during rotation.
-    auto maxLength = static_cast<float>(std::max(layerSize.width, layerSize.height)) * 2.f;
-    auto farZ = std::min(-maxLength, -500.f);
-    auto perspectiveMatrix = MakePerspectiveMatrix(farZ);
+    auto perspectiveMatrix = MakePerspectiveMatrix();
     auto origin = Point::Make(0, 0);
     auto originTranslateMatrix = Matrix3D::MakeTranslate(origin.x, origin.y, 0.f);
     auto transformMatrix = originTranslateMatrix * invOffsetToAnchorMatrix * perspectiveMatrix *
@@ -2092,6 +2089,34 @@ TGFX_TEST(LayerTest, Matrix) {
   displayList->root()->addChild(shaperLayer);
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D_2D_3D"));
+
+  contentLayer->setPreserve3D(true);
+  imageToContentBounds = imageLayer->getBounds(contentLayer.get());
+  imageToContentBounds.roundOut();
+  EXPECT_EQ(imageToContentBounds, Rect::MakeLTRB(-51, 10, 333, 279));
+  imageToDisplayListBounds = imageLayer->getBounds(displayList->root());
+  imageToDisplayListBounds.roundOut();
+  EXPECT_EQ(imageToDisplayListBounds, Rect::MakeLTRB(62, 21, 206, 159));
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D_2D_3D_Preserve3D"));
+
+  {
+    auto anchor = Point::Make(0.3f, 0.3f);
+    auto offsetToAnchorMatrix = Matrix3D::MakeTranslate(-anchor.x * contentLayerSize.width,
+                                                        -anchor.y * contentLayerSize.height, 0.f);
+    auto invOffsetToAnchorMatrix = Matrix3D::MakeTranslate(anchor.x * contentLayerSize.width,
+                                                           anchor.y * contentLayerSize.height, 0.f);
+    auto modelMatrix = Matrix3D::MakeRotate({0.f, 1.f, 0.f}, -45.f);
+    modelMatrix.postTranslate(0.f, 0.f, 1200.f);
+    auto perspectiveMatrix = MakePerspectiveMatrix();
+    auto origin = Point::Make(120, 40);
+    auto originTranslateMatrix = Matrix3D::MakeTranslate(origin.x, origin.y, 0.f);
+    auto transformMatrix = originTranslateMatrix * invOffsetToAnchorMatrix * perspectiveMatrix *
+                           modelMatrix * offsetToAnchorMatrix;
+    contentLayer->setMatrix3D(transformMatrix);
+  }
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_Behind_Viewer"));
 }
 
 TGFX_TEST(LayerTest, DisplayListBackground) {

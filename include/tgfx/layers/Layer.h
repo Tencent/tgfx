@@ -37,6 +37,7 @@ class DisplayList;
 class DrawArgs;
 class RegionTransformer;
 class RootLayer;
+class Render3DContext;
 struct LayerStyleSource;
 struct MaskData;
 class BackgroundContext;
@@ -125,6 +126,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   /**
    * Sets the blend mode of the layer.
+   * Note: Layers inside a 3D Rendering Context (see preserve3D()) always use SrcOver blend mode
+   * regardless of this setting.
    */
   void setBlendMode(BlendMode value);
 
@@ -139,6 +142,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   /**
    * Sets whether the layer passes through its background to sublayers.
+   * Note: Layers that can start or extend a 3D Rendering Context (see preserve3D()) always disable
+   * pass-through background regardless of this setting.
    */
   void setPassThroughBackground(bool value);
 
@@ -179,6 +184,39 @@ class Layer : public std::enable_shared_from_this<Layer> {
   void setMatrix3D(const Matrix3D& value);
 
   /**
+   * Returns whether the layer preserves the 3D state of its content and child layers. The default
+   * value is false.
+   *
+   * When false, content and child layers are projected onto the layer's local space. Child layers
+   * are drawn in the order they were added, so later-added opaque layers completely cover earlier
+   * ones.
+   *
+   * When true, 3D rendering is enabled. If the parent layer has preserve3D disabled, this layer
+   * establishes a new 3D Rendering Context. If the parent also has preserve3D enabled, this layer
+   * inherits and extends the parent's context.
+   *
+   * Within a 3D Rendering Context, all child layers share the coordinate space of the context
+   * root's parent (or the DisplayList if no parent exists). Depth occlusion is applied based on
+   * actual 3D positions: opaque pixels closer to the observer occlude those farther away at the
+   * same xy coordinates.
+   *
+   * Note: preserve3D falls back to false behavior when any of the following conditions are met:
+   * 1. Layer styles is not empty.
+   * 2. Filters is not empty.
+   * 3. Mask is not empty.
+   * These features require projecting child layers into the current layer's local coordinate
+   * system, which is incompatible with 3D context preservation.
+   */
+  bool preserve3D() const {
+    return _preserve3D;
+  }
+
+  /**
+   * Sets whether the layer preserves the 3D state of its content and child layers.
+   */
+  void setPreserve3D(bool value);
+
+  /**
    * Returns whether the layer is visible. The default value is true.
    */
   bool visible() const {
@@ -217,6 +255,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   /**
    * Sets whether the layer is allowed to be composited as a separate group from their parent.
+   * Note: Layers inside a 3D Rendering Context (see preserve3D()) always apply alpha individually
+   * to each element regardless of this setting.
    */
   void setAllowsGroupOpacity(bool value);
 
@@ -233,6 +273,14 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   /**
    * Sets the list of layer styles applied to the layer.
+   * Note: Background-dependent layer styles (e.g., BackgroundBlurStyle) have the following
+   * limitations:
+   * 1. Layers that start a 3D Rendering Context (see preserve3D()) disable background styles for
+   *    the entire subtree rooted at that layer. The 3D Rendering Context uses a different rendering
+   *    strategy that has not yet fully adapted background layer drawing.
+   * 2. Layers with a 3D or projection transformation disable background styles for all descendant
+   *    layers (excluding the layer itself), because descendants cannot correctly obtain the
+   *    background.
    */
   void setLayerStyles(const std::vector<std::shared_ptr<LayerStyle>>& value);
 
@@ -577,16 +625,21 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   void drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha);
 
-  void drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha,
-                    const std::vector<LayerStyleExtraSourceType>& styleExtraSourceTypes);
-
   void drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
                     const LayerStyleSource* layerStyleSource = nullptr,
-                    const Layer* stopChild = nullptr,
-                    const std::vector<LayerStyleExtraSourceType>& styleExtraSourceTypes = {});
+                    const Layer* stopChild = nullptr);
 
   bool drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
                     const Layer* stopChild = nullptr);
+
+  void drawByStarting3DContext(const DrawArgs& args, Canvas* canvas);
+
+  std::optional<DrawArgs> createChildArgs(const DrawArgs& args, Canvas* canvas, Layer* child,
+                                          bool skipBackground, int childIndex,
+                                          int lastBackgroundIndex);
+
+  void drawChild(const DrawArgs& args, Canvas* canvas, Layer* child, float alpha,
+                 const Matrix3D& transform3D, Render3DContext* context3D, bool started3DContext);
 
   float drawBackgroundLayers(const DrawArgs& args, Canvas* canvas);
 
@@ -598,7 +651,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   /**
    * Gets the background image of the minimum axis-aligned bounding box after drawing the layer
-   * subtree with the current layer as the root node.
+   * subtree with the current layer as the root node
    */
   std::shared_ptr<Image> getBoundsBackgroundImage(const DrawArgs& args, float contentScale,
                                                   Point* offset);
@@ -608,12 +661,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
   void drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
                        const LayerStyleSource* source, LayerStylePosition position);
 
-  void drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
-                       const LayerStyleSource* source, LayerStylePosition position,
-                       const std::vector<LayerStyleExtraSourceType>& styleExtraSourceTypes);
-
   void drawBackgroundLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
-                                 const Matrix3D& transform);
+                                 const Matrix3D& transform3D);
 
   bool getLayersUnderPointInternal(float x, float y, std::vector<std::shared_ptr<Layer>>* results);
 
@@ -657,27 +706,18 @@ class Layer : public std::enable_shared_from_this<Layer> {
                             const Matrix3D* transform3D,
                             const std::shared_ptr<MaskFilter>& maskFilter);
 
-  std::shared_ptr<Image> getContentImage(
-      const DrawArgs& args, const Matrix& contentMatrix, const std::optional<Rect>& clipBounds,
-      const std::vector<LayerStyleExtraSourceType>& extraSourceTypes, Matrix* imageMatrix);
+  std::shared_ptr<Image> getContentImage(const DrawArgs& args, const Matrix& contentMatrix,
+                                         const std::optional<Rect>& clipBounds,
+                                         Matrix* imageMatrix);
 
-  std::shared_ptr<Image> getPassThroughContentImage(
-      const DrawArgs& args, Canvas* canvas, const std::optional<Rect>& clipBounds,
-      const std::vector<LayerStyleExtraSourceType>& extraSourceTypes, Matrix* imageMatrix);
+  std::shared_ptr<Image> getPassThroughContentImage(const DrawArgs& args, Canvas* canvas,
+                                                    const std::optional<Rect>& clipBounds,
+                                                    Matrix* imageMatrix);
 
   std::optional<Rect> computeContentBounds(const std::optional<Rect>& clipBounds,
                                            bool excludeEffects);
 
-  /**
-   * Returns the equivalent transformation matrix adapted for a custom anchor point.
-   * The matrix is defined based on a local coordinate system, with the transformation anchor point
-   * being the origin of that coordinate system. This function returns an affine transformation
-   * matrix that produces the same visual effect when using any point within this coordinate system
-   * as the new origin and anchor point.
-   * @param matrix The original transformation matrix.
-   * @param anchor The specified anchor point.
-   */
-  Matrix3D anchorAdaptedMatrix(const Matrix3D& matrix, const Point& anchor) const;
+  bool canPreserve3D() const;
 
   void invalidateSubtree();
 
@@ -703,6 +743,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
   float _alpha = 1.0f;
   // The actual transformation matrix that determines the geometric position of the layer
   Matrix3D _matrix3D = {};
+  bool _preserve3D = false;
   std::shared_ptr<Layer> _mask = nullptr;
   Layer* maskOwner = nullptr;
   std::unique_ptr<Rect> _scrollRect = nullptr;

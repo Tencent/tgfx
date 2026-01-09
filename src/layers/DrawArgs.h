@@ -18,8 +18,11 @@
 
 #pragma once
 
+#include <vector>
+#include "compositing3d/Render3DContext.h"
 #include "layers/BackgroundContext.h"
 #include "tgfx/gpu/Context.h"
+#include "tgfx/layers/layerstyles/LayerStyle.h"
 
 namespace tgfx {
 
@@ -44,7 +47,14 @@ class DrawArgs {
   uint32_t renderFlags = 0;
 
   // Whether to exclude effects during the drawing process.
+  // Note: When set to true, all layer styles and filters will be skipped, and styleSourceTypes
+  // will be ignored.
   bool excludeEffects = false;
+  // Specifies which layer style types to draw based on their extra source type.
+  // Note: This field is only effective when excludeEffects is false.
+  std::vector<LayerStyleExtraSourceType> styleSourceTypes = {LayerStyleExtraSourceType::None,
+                                                             LayerStyleExtraSourceType::Contour,
+                                                             LayerStyleExtraSourceType::Background};
   // Determines the draw mode of the Layer.
   DrawMode drawMode = DrawMode::Normal;
   // The rectangle area to be drawn. This is used for clipping the drawing area.
@@ -59,5 +69,11 @@ class DrawArgs {
   // The maximum cache size (single edge) for subtree layer caching. Set to 0 to disable
   // subtree layer cache.
   int subtreeCacheMaxSize = 0;
+
+  // The 3D render context to be used during the drawing process.
+  // Note: this could be nullptr. All layers within the 3D rendering context need to maintain their
+  // respective 3D states to achieve per-pixel depth occlusion effects. These layers are composited
+  // through the Compositor and do not need to be drawn to the Canvas.
+  std::shared_ptr<Render3DContext> render3DContext = nullptr;
 };
 }  // namespace tgfx

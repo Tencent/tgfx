@@ -27,31 +27,35 @@ namespace tgfx {
 /**
  * A geometry processor for rendering 3D transformed quads with optional per-edge anti-aliasing.
  */
-class Transform3DGeometryProcessor : public GeometryProcessor {
+class QuadPerEdgeAA3DGeometryProcessor : public GeometryProcessor {
  public:
   /**
-   * Creates a Transform3DGeometryProcessor instance with the specified parameters.
+   * Creates a QuadPerEdgeAA3DGeometryProcessor instance with the specified parameters.
    */
-  static PlacementPtr<Transform3DGeometryProcessor> Make(BlockAllocator* allocator, AAType aa,
-                                                         const Matrix3D& matrix,
-                                                         const Vec2& ndcScale,
-                                                         const Vec2& ndcOffset);
+  static PlacementPtr<QuadPerEdgeAA3DGeometryProcessor> Make(BlockAllocator* allocator, AAType aa,
+                                                             const Matrix3D& matrix,
+                                                             const Vec2& ndcScale,
+                                                             const Vec2& ndcOffset,
+                                                             std::optional<PMColor> commonColor);
 
   std::string name() const override {
-    return "Transform3DGeometryProcessor";
+    return "QuadPerEdgeAA3DGeometryProcessor";
   }
 
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  explicit Transform3DGeometryProcessor(AAType aa, const Matrix3D& transform, const Vec2& ndcScale,
-                                        const Vec2& ndcOffset);
+  explicit QuadPerEdgeAA3DGeometryProcessor(AAType aa, const Matrix3D& transform,
+                                            const Vec2& ndcScale, const Vec2& ndcOffset,
+                                            std::optional<PMColor> commonColor);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
   Attribute position = {};
-
   Attribute coverage = {};
+  // Vertex color. Only used when vertex colors differ within the rendering program. Otherwise,
+  // commonColor is used.
+  Attribute color = {};
 
   AAType aa = AAType::None;
 
@@ -68,6 +72,10 @@ class Transform3DGeometryProcessor : public GeometryProcessor {
    */
   Vec2 ndcScale = Vec2(0.f, 0.f);
   Vec2 ndcOffset = Vec2(0.f, 0.f);
+
+  // If all vertex colors within the rendering program are the same, this property stores that
+  // color; otherwise, it is empty.
+  std::optional<PMColor> commonColor = std::nullopt;
 };
 
 }  // namespace tgfx
