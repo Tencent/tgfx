@@ -35,7 +35,7 @@ class Atlas {
 
   bool addToAtlas(const AtlasCell& cell, AtlasToken nextFlushToken, AtlasLocator* atlasLocator);
 
-  bool hasID(const PlotLocator& plotLocator) const;
+  bool hasCell(const PlotLocator& plotLocator) const;
 
   const std::vector<std::shared_ptr<TextureProxy>>& getTextureProxies() const {
     return textureProxies;

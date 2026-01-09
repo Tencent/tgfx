@@ -88,14 +88,7 @@ static float FindMaxGlyphDimension(const Font& font, const std::vector<GlyphID>&
 
 static std::shared_ptr<ImageCodec> GetGlyphCodec(
     const Font& font, const std::shared_ptr<ScalerContext>& scalerContext, GlyphID glyphID,
-    const Stroke* stroke, Point* glyphOffset, bool* shouldRetry = nullptr) {
-  auto setRetryValue = [shouldRetry](bool value) {
-    if (shouldRetry) {
-      *shouldRetry = value;
-    }
-  };
-
-  setRetryValue(false);
+    const Stroke* stroke, Point* glyphOffset, bool* isEmptyGlyph, bool* shouldRetry = nullptr) {
   if (glyphID == 0) {
     return nullptr;
   }
@@ -105,7 +98,9 @@ static std::shared_ptr<ImageCodec> GetGlyphCodec(
   //bounds.isEmpty may be caused by unsupported stroke or bold operations.
   if (!bounds.isEmpty()) {
     if (std::max(bounds.width(), bounds.height()) > Atlas::MaxCellSize) {
-      setRetryValue(true);
+      if (shouldRetry) {
+        *shouldRetry = true;
+      }
       return nullptr;
     }
     glyphOffset->x = bounds.left;
@@ -129,6 +124,7 @@ static std::shared_ptr<ImageCodec> GetGlyphCodec(
   }
   bounds = shape->getBounds();
   if (bounds.isEmpty()) {
+    *isEmptyGlyph = true;
     return nullptr;
   }
   if (stroke) {
@@ -136,7 +132,9 @@ static std::shared_ptr<ImageCodec> GetGlyphCodec(
     shape = Shape::ApplyStroke(std::move(shape), stroke);
   }
   if (std::max(bounds.width(), bounds.height()) > Atlas::MaxCellSize) {
-    setRetryValue(true);
+    if (shouldRetry) {
+      *shouldRetry = true;
+    }
     return nullptr;
   }
   shape = Shape::ApplyMatrix(std::move(shape), Matrix::MakeTrans(-bounds.x(), -bounds.y()));
@@ -522,13 +520,15 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
       glyphOffset = atlasGlyph->offset;
     } else {
       bool shouldRetry = false;
+      bool isEmptyGlyph = false;
       auto glyphCodec = GetGlyphCodec(font, font.scalerContext, glyphID, scaledStroke.get(),
-                                      &glyphOffset, &shouldRetry);
+                                      &glyphOffset, &isEmptyGlyph, &shouldRetry);
       if (glyphCodec == nullptr) {
         if (shouldRetry) {
           rejectedGlyphRun->glyphs.push_back(glyphID);
           rejectedGlyphRun->positions.push_back(glyphPosition);
-        } else {
+        }
+        if (isEmptyGlyph) {
           strike->markEmptyGlyph(glyphID);
         }
         continue;
@@ -651,9 +651,10 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
     if (atlasManager->hasGlyph(maskFormat, atlasGlyph)) {
       glyphOffset = atlasGlyph->offset;
     } else {
-      auto glyphCodec =
-          GetGlyphCodec(font, font.scalerContext, glyphID, scaledStroke.get(), &glyphOffset);
-      if (glyphCodec == nullptr) {
+      bool isEmptyGlyph = false;
+      auto glyphCodec = GetGlyphCodec(font, font.scalerContext, glyphID, scaledStroke.get(),
+                                      &glyphOffset, &isEmptyGlyph);
+      if (glyphCodec == nullptr && isEmptyGlyph) {
         strike->markEmptyGlyph(glyphID);
         continue;
       }

@@ -118,7 +118,7 @@ bool Atlas::activateNewPage() {
   return true;
 }
 
-bool Atlas::hasID(const PlotLocator& plotLocator) const {
+bool Atlas::hasCell(const PlotLocator& plotLocator) const {
   if (!plotLocator.isValid()) {
     return false;
   }

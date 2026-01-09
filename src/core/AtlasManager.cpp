@@ -67,7 +67,7 @@ bool AtlasManager::addCellToAtlas(const AtlasCell& cell, AtlasToken nextFlushTok
 }
 
 bool AtlasManager::hasGlyph(MaskFormat maskFormat, const AtlasGlyph* glyph) const {
-  return this->getAtlas(maskFormat)->hasID(glyph->atlasLocator.plotLocator());
+  return this->getAtlas(maskFormat)->hasCell(glyph->atlasLocator.plotLocator());
 }
 
 void AtlasManager::setPlotUseToken(PlotUseUpdater& plotUseUpdater, const PlotLocator& plotLocator,
