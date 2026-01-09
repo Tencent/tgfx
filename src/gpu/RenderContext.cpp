@@ -165,10 +165,7 @@ static void ComputeGlyphFinalMatrix(const Rect& atlasLocation, const Matrix& sta
   }
 }
 
-static Rect GetGlyphBounds(const Font& font, bool isCustom, GlyphID glyphID) {
-  if (isCustom) {
-    return font.getBounds(glyphID);
-  }
+static Rect GetGlyphBounds(const Font& font, GlyphID glyphID) {
   auto bounds = font.getTypeface()->getBounds();
   if (!bounds.isEmpty()) {
     bounds.scale(font.getSize(), font.getSize());
@@ -177,18 +174,14 @@ static Rect GetGlyphBounds(const Font& font, bool isCustom, GlyphID glyphID) {
   return font.getBounds(glyphID);
 }
 
-static bool IsGlyphVisible(const Font& font, bool isCustom, GlyphID glyphID, const Rect& clipBounds,
-                           const Stroke* stroke, float scale, const Point& glyphPosition,
-                           int* maxDimension) {
-  auto bounds = GetGlyphBounds(font, isCustom, glyphID);
+static bool IsGlyphVisible(const Font& font, GlyphID glyphID, const Rect& clipBounds,
+                           const Stroke* stroke, float scale, const Point& glyphPosition) {
+  auto bounds = GetGlyphBounds(font, glyphID);
   if (bounds.isEmpty()) {
     return false;
   }
   if (stroke != nullptr) {
     ApplyStrokeToBounds(*stroke, &bounds, Matrix::MakeScale(scale));
-  }
-  if ((isCustom || font.hasColor()) && maxDimension) {
-    *maxDimension = FloatCeilToInt(std::max(bounds.width(), bounds.height()));
   }
   bounds.scale(scale, scale);
   bounds.offset(glyphPosition.x, glyphPosition.y);
@@ -467,7 +460,6 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
 
   const auto maskFormat = GetMaskFormat(font);
   auto typeface = font.getTypeface();
-  const auto isCustom = typeface->isCustom();
   std::unique_ptr<Stroke> scaledStroke = nullptr;
   if (!font.hasColor() && stroke != nullptr) {
     scaledStroke = std::make_unique<Stroke>(*stroke);
@@ -475,7 +467,7 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
   }
 
   BytesKey strikeKey;
-  const auto typefaceID = GetTypefaceID(typeface.get(), isCustom);
+  const auto typefaceID = GetTypefaceID(typeface.get(), typeface->isCustom());
   const auto backingSize = font.scalerContext->getBackingSize();
   const auto isBold = !font.hasColor() && font.isFauxBold();
   ComputeStrikeKey(typefaceID, backingSize, isBold, scaledStroke.get(), &strikeKey);
@@ -495,19 +487,12 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
 
   for (auto glyphID : sourceGlyphRun.glyphs) {
     auto glyphPosition = sourceGlyphRun.positions[index++];
-    int maxDimension = 0;
-    if (!IsGlyphVisible(font, isCustom, glyphID, localClipBounds, scaledStroke.get(), inverseScale,
-                        glyphPosition, &maxDimension)) {
+    if (!IsGlyphVisible(font, glyphID, localClipBounds, scaledStroke.get(), inverseScale,
+                        glyphPosition)) {
       continue;
     }
 
-    if (maxDimension >= Atlas::MaxCellSize) {
-      rejectedGlyphRun->glyphs.push_back(glyphID);
-      rejectedGlyphRun->positions.push_back(glyphPosition);
-      continue;
-    }
-
-    if (!isCustom && strike->isEmptyGlyph(glyphID)) {
+    if (strike->isEmptyGlyph(glyphID)) {
       continue;
     }
 
@@ -618,9 +603,8 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
 
   auto maskFormat = GetMaskFormat(font);
   auto typeface = font.getTypeface();
-  const auto isCustom = typeface->isCustom();
   BytesKey strikeKey;
-  const auto typefaceID = GetTypefaceID(typeface.get(), isCustom);
+  const auto typefaceID = GetTypefaceID(typeface.get(), typeface->isCustom());
   const auto backingSize = font.scalerContext->getBackingSize();
   const auto isBold = !font.hasColor() && font.isFauxBold();
   ComputeStrikeKey(typefaceID, backingSize, isBold, scaledStroke.get(), &strikeKey);
@@ -637,7 +621,7 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
   size_t index = 0;
 
   for (auto glyphID : sourceGlyphRun.glyphs) {
-    if (!isCustom && strike->isEmptyGlyph(glyphID)) {
+    if (strike->isEmptyGlyph(glyphID)) {
       index++;
       continue;
     }
