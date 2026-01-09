@@ -654,8 +654,10 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
       bool isEmptyGlyph = false;
       auto glyphCodec = GetGlyphCodec(font, font.scalerContext, glyphID, scaledStroke.get(),
                                       &glyphOffset, &isEmptyGlyph);
-      if (glyphCodec == nullptr && isEmptyGlyph) {
-        strike->markEmptyGlyph(glyphID);
+      if (glyphCodec == nullptr) {
+        if (isEmptyGlyph) {
+          strike->markEmptyGlyph(glyphID);
+        }
         continue;
       }
 
