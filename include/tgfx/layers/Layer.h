@@ -27,7 +27,6 @@
 #include "tgfx/layers/LayerMaskType.h"
 #include "tgfx/layers/LayerRecorder.h"
 #include "tgfx/layers/LayerType.h"
-#include "tgfx/layers/TransformStyle.h"
 #include "tgfx/layers/filters/LayerFilter.h"
 #include "tgfx/layers/layerstyles/LayerStyle.h"
 
@@ -127,8 +126,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   /**
    * Sets the blend mode of the layer.
-   * Note: Layers inside a 3D Rendering Context (see transformStyle()) always use SrcOver blend
-   * mode regardless of this setting.
+   * Note: Layers inside a 3D Rendering Context (see preserve3D()) always use SrcOver blend mode
+   * regardless of this setting.
    */
   void setBlendMode(BlendMode value);
 
@@ -143,8 +142,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   /**
    * Sets whether the layer passes through its background to sublayers.
-   * Note: Layers that can start or extend a 3D Rendering Context (see transformStyle()) always
-   * disable pass-through background regardless of this setting.
+   * Note: Layers that can start or extend a 3D Rendering Context (see preserve3D()) always disable
+   * pass-through background regardless of this setting.
    */
   void setPassThroughBackground(bool value);
 
@@ -185,36 +184,37 @@ class Layer : public std::enable_shared_from_this<Layer> {
   void setMatrix3D(const Matrix3D& value);
 
   /**
-   * Returns the transform style of the layer. The default value is TransformStyle::Flat.
+   * Returns whether the layer preserves the 3D state of its content and child layers. The default
+   * value is false.
    *
-   * TransformStyle::Flat projects content and child layers onto the layer's local space. Child
-   * layers are drawn in the order they were added, so later-added opaque layers completely cover
-   * earlier ones.
+   * When false, content and child layers are projected onto the layer's local space. Child layers
+   * are drawn in the order they were added, so later-added opaque layers completely cover earlier
+   * ones.
    *
-   * TransformStyle::Preserve3D enables 3D rendering. If the parent layer is Flat, this layer
-   * establishes a new 3D Rendering Context. If the parent is also Preserve3D, this layer inherits
-   * and extends the parent's context.
+   * When true, 3D rendering is enabled. If the parent layer has preserve3D disabled, this layer
+   * establishes a new 3D Rendering Context. If the parent also has preserve3D enabled, this layer
+   * inherits and extends the parent's context.
    *
    * Within a 3D Rendering Context, all child layers share the coordinate space of the context
    * root's parent (or the DisplayList if no parent exists). Depth occlusion is applied based on
    * actual 3D positions: opaque pixels closer to the observer occlude those farther away at the
    * same xy coordinates.
    *
-   * Note: Preserve3D falls back to Flat behavior when any of the following conditions are met:
+   * Note: preserve3D falls back to false behavior when any of the following conditions are met:
    * 1. Layer styles is not empty.
    * 2. Filters is not empty.
    * 3. Mask is not empty.
    * These features require projecting child layers into the current layer's local coordinate
    * system, which is incompatible with 3D context preservation.
    */
-  TransformStyle transformStyle() const {
-    return _transformStyle;
+  bool preserve3D() const {
+    return _preserve3D;
   }
 
   /**
-   * Sets the transform style of the layer.
+   * Sets whether the layer preserves the 3D state of its content and child layers.
    */
-  void setTransformStyle(TransformStyle style);
+  void setPreserve3D(bool value);
 
   /**
    * Returns whether the layer is visible. The default value is true.
@@ -255,8 +255,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   /**
    * Sets whether the layer is allowed to be composited as a separate group from their parent.
-   * Note: Layers inside a 3D Rendering Context (see transformStyle()) always apply alpha
-   * individually to each element regardless of this setting.
+   * Note: Layers inside a 3D Rendering Context (see preserve3D()) always apply alpha individually
+   * to each element regardless of this setting.
    */
   void setAllowsGroupOpacity(bool value);
 
@@ -275,9 +275,9 @@ class Layer : public std::enable_shared_from_this<Layer> {
    * Sets the list of layer styles applied to the layer.
    * Note: Background-dependent layer styles (e.g., BackgroundBlurStyle) have the following
    * limitations:
-   * 1. Layers that start a 3D Rendering Context (see transformStyle()) disable background styles
-   *    for the entire subtree rooted at that layer. The 3D Rendering Context uses a different
-   *    rendering strategy that has not yet fully adapted background layer drawing.
+   * 1. Layers that start a 3D Rendering Context (see preserve3D()) disable background styles for
+   *    the entire subtree rooted at that layer. The 3D Rendering Context uses a different rendering
+   *    strategy that has not yet fully adapted background layer drawing.
    * 2. Layers with a 3D or projection transformation disable background styles for all descendant
    *    layers (excluding the layer itself), because descendants cannot correctly obtain the
    *    background.
@@ -651,7 +651,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   /**
    * Gets the background image of the minimum axis-aligned bounding box after drawing the layer
-   * subtree with the current layer as the root node.
+   * subtree with the current layer as the root node
    */
   std::shared_ptr<Image> getBoundsBackgroundImage(const DrawArgs& args, float contentScale,
                                                   Point* offset);
@@ -743,7 +743,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
   float _alpha = 1.0f;
   // The actual transformation matrix that determines the geometric position of the layer
   Matrix3D _matrix3D = {};
-  TransformStyle _transformStyle = TransformStyle::Flat;
+  bool _preserve3D = false;
   std::shared_ptr<Layer> _mask = nullptr;
   Layer* maskOwner = nullptr;
   std::unique_ptr<Rect> _scrollRect = nullptr;

@@ -418,12 +418,12 @@ void Layer::setMatrix3D(const Matrix3D& value) {
   invalidateTransform();
 }
 
-void Layer::setTransformStyle(TransformStyle style) {
-  if (_transformStyle == style) {
+void Layer::setPreserve3D(bool value) {
+  if (_preserve3D == value) {
     return;
   }
-  _transformStyle = style;
-  // Changing the transform style alters the meaning of the layer's transform, so invalidate it.
+  _preserve3D = value;
+  // Changing preserve3D alters the meaning of the layer's transform, so invalidate it.
   invalidateTransform();
 }
 
@@ -2492,8 +2492,8 @@ std::shared_ptr<BackgroundContext> Layer::createBackgroundContext(
 }
 
 bool Layer::canPreserve3D() const {
-  return _transformStyle == TransformStyle::Preserve3D && _filters.empty() &&
-         _layerStyles.empty() && !hasValidMask() && _scrollRect == nullptr;
+  return _preserve3D && _filters.empty() && _layerStyles.empty() && !hasValidMask() &&
+         _scrollRect == nullptr;
 }
 
 void Layer::invalidateSubtree() {

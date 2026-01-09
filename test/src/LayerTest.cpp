@@ -3605,7 +3605,7 @@ TGFX_TEST(LayerTest, Matrix) {
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Matrix_3D_2D_3D"));
 
-  contentLayer->setTransformStyle(TransformStyle::Preserve3D);
+  contentLayer->setPreserve3D(true);
   imageToContentBounds = imageLayer->getBounds(contentLayer.get());
   imageToContentBounds.roundOut();
   EXPECT_EQ(imageToContentBounds, Rect::MakeLTRB(-51, 10, 333, 279));
