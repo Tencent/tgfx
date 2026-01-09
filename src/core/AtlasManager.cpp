@@ -39,17 +39,18 @@ const std::vector<std::shared_ptr<TextureProxy>>& AtlasManager::getTextureProxie
 
 bool AtlasManager::initAtlas(MaskFormat maskFormat) {
   auto index = MaskFormatToAtlasIndex(maskFormat);
+  if (atlases[index] != nullptr) {
+    return true;
+  }
   AtlasConfig atlasConfig(context->gpu()->limits()->maxTextureDimension2D);
+  ISize atlasDimensions = atlasConfig.atlasDimensions(maskFormat);
+  ISize plotDimensions = AtlasConfig::PlotDimensions();
+  auto pixelFormat = MaskFormatToPixelFormat(maskFormat);
+  atlases[index] =
+      Atlas::Make(context->proxyProvider(), pixelFormat, atlasDimensions.width,
+                  atlasDimensions.height, plotDimensions.width, plotDimensions.height, this);
   if (atlases[index] == nullptr) {
-    ISize atlasDimensions = atlasConfig.atlasDimensions(maskFormat);
-    ISize plotDimensions = AtlasConfig::PlotDimensions();
-    auto pixelFormat = MaskFormatToPixelFormat(maskFormat);
-    atlases[index] =
-        Atlas::Make(context->proxyProvider(), pixelFormat, atlasDimensions.width,
-                    atlasDimensions.height, plotDimensions.width, plotDimensions.height, this);
-    if (atlases[index] == nullptr) {
-      return false;
-    }
+    return false;
   }
   return true;
 }
@@ -61,27 +62,18 @@ Atlas* AtlasManager::getAtlas(MaskFormat maskFormat) const {
 }
 
 bool AtlasManager::addCellToAtlas(const AtlasCell& cell, AtlasToken nextFlushToken,
-                                  AtlasLocator& atlasLocator) const {
+                                  AtlasLocator* atlasLocator) const {
   return getAtlas(cell.maskFormat)->addToAtlas(cell, nextFlushToken, atlasLocator);
 }
 
-bool AtlasManager::getCellLocator(MaskFormat maskFormat, const BytesKey& key,
-                                  AtlasCellLocator& locator) const {
-  return this->getAtlas(maskFormat)->getCellLocator(key, locator);
+bool AtlasManager::hasGlyph(MaskFormat maskFormat, const AtlasGlyph* glyph) const {
+  return this->getAtlas(maskFormat)->hasCell(glyph->atlasLocator.plotLocator());
 }
 
 void AtlasManager::setPlotUseToken(PlotUseUpdater& plotUseUpdater, const PlotLocator& plotLocator,
                                    MaskFormat maskFormat, AtlasToken useToken) const {
   if (plotUseUpdater.add(plotLocator)) {
     getAtlas(maskFormat)->setLastUseToken(plotLocator, useToken);
-  }
-}
-
-void AtlasManager::preFlush() {
-  for (const auto& atlas : atlases) {
-    if (atlas) {
-      atlas->removeExpiredKeys();
-    }
   }
 }
 

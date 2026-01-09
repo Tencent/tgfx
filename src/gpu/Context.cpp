@@ -18,6 +18,7 @@
 
 #include "tgfx/gpu/Context.h"
 #include "core/AtlasManager.h"
+#include "core/AtlasStrikeCache.h"
 #include "core/utils/BlockAllocator.h"
 #include "core/utils/Log.h"
 #include "core/utils/SlidingWindowTracker.h"
@@ -38,6 +39,7 @@ Context::Context(Device* device, GPU* gpu) : _device(device), _gpu(gpu) {
   _drawingManager = new DrawingManager(this);
   _proxyProvider = new ProxyProvider(this);
   _atlasManager = new AtlasManager(this);
+  _atlasStrikeCache = new AtlasStrikeCache();
 }
 
 Context::~Context() {
@@ -47,6 +49,7 @@ Context::~Context() {
   delete _proxyProvider;
   delete _resourceCache;
   delete _shaderCaps;
+  delete _atlasStrikeCache;
 }
 
 Backend Context::backend() const {

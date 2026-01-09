@@ -33,7 +33,7 @@ static constexpr int MaskFormatCount = static_cast<int>(MaskFormat::Last) + 1;
  */
 class AtlasGenerationCounter {
  public:
-  constexpr static uint64_t kInvalidGeneration = 0;
+  constexpr static uint64_t InvalidGeneration = 0;
 
   uint64_t next() {
     return generation++;
@@ -121,11 +121,11 @@ class PlotLocator {
     DEBUG_ASSERT(generation < static_cast<uint64_t>(1) << 48);
   }
 
-  PlotLocator() : _genID(AtlasGenerationCounter::kInvalidGeneration), _plotIndex(0), _pageIndex(0) {
+  PlotLocator() : _genID(AtlasGenerationCounter::InvalidGeneration), _plotIndex(0), _pageIndex(0) {
   }
 
   bool isValid() const {
-    return _genID != AtlasGenerationCounter::kInvalidGeneration || _plotIndex != 0 ||
+    return _genID != AtlasGenerationCounter::InvalidGeneration || _plotIndex != 0 ||
            _pageIndex != 0;
   }
 
@@ -202,6 +202,17 @@ class PlotUseUpdater {
   std::vector<uint32_t> plotAlreadyUpdated = {};
 };
 
+struct AtlasCell {
+  MaskFormat maskFormat = MaskFormat::A8;
+  uint16_t width = 0;
+  uint16_t height = 0;
+};
+
+struct AtlasGlyph {
+  Point offset = {};  // The cell's offset for render
+  AtlasLocator atlasLocator;
+};
+
 class Plot {
  public:
   static constexpr int CellPadding = 1;
@@ -229,7 +240,7 @@ class Plot {
     return _pixelOffset;
   }
 
-  bool addRect(int with, int height, AtlasLocator& atlasLocator);
+  bool addRect(int with, int height, AtlasLocator* atlasLocator);
 
   void resetRects();
 
