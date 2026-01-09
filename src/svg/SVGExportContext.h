@@ -70,8 +70,8 @@ class SVGExportContext : public DrawContext {
                      const SamplingOptions& sampling, const MCState& state, const Brush& brush,
                      SrcRectConstraint constraint) override;
 
-  void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
-                        const Brush& brush, const Stroke* stroke) override;
+  void drawTextBlob(std::shared_ptr<TextBlob> textBlob, const MCState& state, const Brush& brush,
+                    const Stroke* stroke) override;
 
   void drawPicture(std::shared_ptr<Picture> picture, const MCState& state) override;
 
@@ -101,14 +101,13 @@ class SVGExportContext : public DrawContext {
 
   void exportPixmap(const Pixmap& pixmap, const MCState& state, const Brush& brush);
 
-  void exportGlyphsAsPath(const std::shared_ptr<GlyphRunList>& glyphRunList, const MCState& state,
-                          const Brush& brush, const Stroke* stroke);
+  void exportGlyphRunAsPath(const GlyphRun& glyphRun, const MCState& state, const Brush& brush,
+                            const Stroke* stroke);
 
-  void exportGlyphsAsText(const std::shared_ptr<GlyphRunList>& glyphRunList, const MCState& state,
-                          const Brush& brush, const Stroke* stroke);
+  void exportGlyphRunAsText(const GlyphRun& glyphRun, const MCState& state, const Brush& brush,
+                            const Stroke* stroke);
 
-  void exportGlyphsAsImage(const std::shared_ptr<GlyphRunList>& glyphRunList, const MCState& state,
-                           const Brush& brush);
+  void exportGlyphRunAsImage(const GlyphRun& glyphRun, const MCState& state, const Brush& brush);
 
   void applyClipPath(const Path& clipPath);
 

@@ -16,6 +16,7 @@ cmake --build cmake-build-debug --target TGFXFullTest
 - 测试用例位于 `test/src/`，基于 Google Test 框架
 - 测试代码可通过编译参数访问所有 private 成员，无需 friend class
 - 运行测试：按上述编译验证步骤构建并执行 `TGFXFullTest`
+- 测试命令返回非零退出码表示测试失败，这是正常行为，不要重复执行同一命令
 
 ## 截图测试
 - 使用 `Baseline::Compare(pixels, key)` 比较截图，key 格式为 `{folder}/{name}`，例如 `CanvasTest/Clip`

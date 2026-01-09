@@ -21,6 +21,7 @@
 #include <include/core/SkRect.h>
 #include <memory>
 #include "core/PathRef.h"
+#include "core/utils/AtomicCache.h"
 #include "core/utils/MathExtra.h"
 
 namespace tgfx {
@@ -597,7 +598,7 @@ PathRef* Path::writableRef() {
   } else {
     // There only one reference to this PathRef, so we can safely reset the uniqueKey and bounds.
     pathRef->uniqueKey.reset();
-    pathRef->bounds.reset();
+    AtomicCacheReset(pathRef->bounds);
   }
   return pathRef.get();
 }

@@ -3716,6 +3716,72 @@ TGFX_TEST(CanvasTest, TextBlobHitTestPoint) {
   EXPECT_FALSE(textBlob->hitTestPoint(farOutsideX_emoji, outsideY_emoji, &stroke));
 }
 
+TGFX_TEST(CanvasTest, ShapeMakeFromMixedTextBlob) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 100);
+  auto canvas = surface->getCanvas();
+
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  ASSERT_TRUE(typeface != nullptr);
+  auto emojiTypeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoColorEmoji.ttf"));
+  ASSERT_TRUE(emojiTypeface != nullptr);
+
+  Font font(typeface, 60.0f);
+  Font emojiFont(emojiTypeface, 60.0f);
+  ASSERT_TRUE(font.hasOutlines());
+  ASSERT_FALSE(emojiFont.hasOutlines());
+
+  // Create a TextBlob with outline characters surrounding an emoji: "AB😀CD"
+  auto glyphID_A = font.getGlyphID('A');
+  auto glyphID_B = font.getGlyphID('B');
+  auto glyphID_C = font.getGlyphID('C');
+  auto glyphID_D = font.getGlyphID('D');
+  auto glyphID_emoji = emojiFont.getGlyphID(0x1F600);
+  ASSERT_TRUE(glyphID_A > 0);
+  ASSERT_TRUE(glyphID_B > 0);
+  ASSERT_TRUE(glyphID_C > 0);
+  ASSERT_TRUE(glyphID_D > 0);
+  ASSERT_TRUE(glyphID_emoji > 0);
+
+  float advance_A = font.getAdvance(glyphID_A);
+  float advance_B = font.getAdvance(glyphID_B);
+  float advance_emoji = emojiFont.getAdvance(glyphID_emoji);
+  float advance_C = font.getAdvance(glyphID_C);
+
+  float x = 10.0f;
+  float y = 70.0f;
+  std::vector<GlyphRun> glyphRuns = {
+      GlyphRun(font, {glyphID_A}, {Point::Make(x, 0.0f)}),
+      GlyphRun(font, {glyphID_B}, {Point::Make(x + advance_A, 0.0f)}),
+      GlyphRun(emojiFont, {glyphID_emoji}, {Point::Make(x + advance_A + advance_B, 0.0f)}),
+      GlyphRun(font, {glyphID_C}, {Point::Make(x + advance_A + advance_B + advance_emoji, 0.0f)}),
+      GlyphRun(font, {glyphID_D},
+               {Point::Make(x + advance_A + advance_B + advance_emoji + advance_C, 0.0f)})};
+  auto textBlob = TextBlob::MakeFrom(std::move(glyphRuns));
+  ASSERT_TRUE(textBlob != nullptr);
+
+  // Shape::MakeFrom should succeed with mixed TextBlob, extracting only outline runs
+  auto shape = Shape::MakeFrom(textBlob);
+  ASSERT_TRUE(shape != nullptr);
+
+  // The shape should contain all outline glyphs (A, B, C, D) but not the emoji
+  auto path = shape->getPath();
+  EXPECT_FALSE(path.isEmpty());
+
+  // Draw the shape path
+  canvas->clear(Color::White());
+  Paint paint = {};
+  paint.setColor(Color::Black());
+  path.transform(Matrix::MakeTrans(0, y));
+  canvas->drawPath(path, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ShapeMakeFromMixedTextBlob"));
+}
+
 TGFX_TEST(CanvasTest, PictureMaskPath) {
   ContextScope scope;
   auto context = scope.getContext();

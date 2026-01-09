@@ -69,6 +69,7 @@
         "RotateImageRect": "2aca634f",
         "ScaleMatrixShader": "00bc6d75",
         "ScaleTest": "eefb7a46",
+        "ShapeMakeFromMixedTextBlob": "de90c79c",
         "SingleImageRect1": "4edccb64",
         "SingleImageRectWithMipmap": "4edccb64",
         "StrokeShape": "fa6d7439",
