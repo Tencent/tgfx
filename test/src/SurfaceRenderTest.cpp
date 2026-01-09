@@ -23,16 +23,74 @@
 #include "core/shapes/ProviderShape.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/RenderContext.h"
+#include "gpu/opengl/GLCaps.h"
+#include "gpu/opengl/GLUtil.h"
 #include "gpu/resources/TextureView.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Surface.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
 #include "tgfx/platform/ImageReader.h"
 #include "utils/TestUtils.h"
 #include "utils/common.h"
 
 namespace tgfx {
-TGFX_TEST(DstTextureTest, EmptyLocalBounds) {
+
+// ==================== Surface Tests ====================
+
+TGFX_TEST(SurfaceRenderTest, ImageSnapshot) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto width = 200;
+  auto height = 200;
+  auto texture = context->gpu()->createTexture({width, height, PixelFormat::RGBA_8888});
+  ASSERT_TRUE(texture != nullptr);
+  auto surface =
+      Surface::MakeFrom(context, texture->getBackendTexture(), ImageOrigin::BottomLeft, 4);
+  ASSERT_TRUE(surface != nullptr);
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(image != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear();
+  canvas->drawImage(image);
+  auto snapshotImage = surface->makeImageSnapshot();
+  auto snapshotImage2 = surface->makeImageSnapshot();
+  EXPECT_TRUE(snapshotImage == snapshotImage2);
+  auto compareSurface = Surface::Make(context, width, height);
+  auto compareCanvas = compareSurface->getCanvas();
+  compareCanvas->drawImage(snapshotImage);
+  EXPECT_TRUE(Baseline::Compare(compareSurface, "SurfaceRenderTest/ImageSnapshot1"));
+  canvas->drawImage(image, 100, 100);
+  EXPECT_TRUE(Baseline::Compare(surface, "SurfaceRenderTest/ImageSnapshot_Surface1"));
+  compareCanvas->clear();
+  compareCanvas->drawImage(snapshotImage);
+  EXPECT_TRUE(Baseline::Compare(compareSurface, "SurfaceRenderTest/ImageSnapshot1"));
+
+  surface = Surface::Make(context, width, height, false, 4);
+  canvas = surface->getCanvas();
+  snapshotImage = surface->makeImageSnapshot();
+  auto renderTargetProxy = surface->renderContext->renderTarget;
+  snapshotImage = nullptr;
+  canvas->drawImage(image);
+  context->flushAndSubmit();
+  EXPECT_TRUE(renderTargetProxy == surface->renderContext->renderTarget);
+  snapshotImage = surface->makeImageSnapshot();
+  snapshotImage2 = surface->makeImageSnapshot();
+  EXPECT_TRUE(snapshotImage == snapshotImage2);
+  compareCanvas->clear();
+  compareCanvas->drawImage(snapshotImage);
+  EXPECT_TRUE(Baseline::Compare(compareSurface, "SurfaceRenderTest/ImageSnapshot2"));
+  canvas->drawImage(image, 100, 100);
+  EXPECT_TRUE(Baseline::Compare(surface, "SurfaceRenderTest/ImageSnapshot_Surface2"));
+  compareCanvas->clear();
+  compareCanvas->drawImage(snapshotImage);
+  EXPECT_TRUE(Baseline::Compare(compareSurface, "SurfaceRenderTest/ImageSnapshot2"));
+}
+
+// ==================== Dst Texture Tests ====================
+
+TGFX_TEST(SurfaceRenderTest, EmptyLocalBounds) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -60,10 +118,10 @@ TGFX_TEST(DstTextureTest, EmptyLocalBounds) {
   drawPath.transform(matrix);
   paint.setBlendMode(BlendMode::SoftLight);
   canvas->drawPath(drawPath, paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "DstTextureTest/EmptyLocalBounds"));
+  EXPECT_TRUE(Baseline::Compare(surface, "SurfaceRenderTest/EmptyLocalBounds"));
 }
 
-TGFX_TEST(DstTextureTest, OutOfRenderTarget) {
+TGFX_TEST(SurfaceRenderTest, OutOfRenderTarget) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -91,7 +149,7 @@ TGFX_TEST(DstTextureTest, OutOfRenderTarget) {
   drawPath.transform(matrix);
   paint.setBlendMode(BlendMode::SoftLight);
   canvas->drawPath(drawPath, paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "DstTextureTest/OutOfRenderTarget"));
+  EXPECT_TRUE(Baseline::Compare(surface, "SurfaceRenderTest/OutOfRenderTarget"));
 }
 
 }  // namespace tgfx

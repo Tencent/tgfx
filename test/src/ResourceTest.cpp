@@ -18,7 +18,10 @@
 
 #include <array>
 #include <utility>
+#include <vector>
+#include "base/TGFXTest.h"
 #include "core/utils/BlockAllocator.h"
+#include "core/utils/TaskGroup.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/RectsVertexProvider.h"
 #include "gpu/resources/Resource.h"
@@ -27,6 +30,26 @@
 #include "utils/TestUtils.h"
 
 namespace tgfx {
+
+// ==================== Task Tests ====================
+
+TGFX_TEST(ResourceTest, TaskRelease) {
+  Task::ReleaseThreads();
+  auto group = TaskGroup::GetInstance();
+  std::thread* thead = nullptr;
+  group->threads->try_dequeue(thead);
+  EXPECT_EQ(thead, nullptr);
+  EXPECT_EQ(group->waitingThreads, 0);
+  EXPECT_EQ(group->totalThreads, 0);
+  for (auto& queue : group->priorityQueues) {
+    std::shared_ptr<Task> task = nullptr;
+    queue->try_dequeue(task);
+    EXPECT_EQ(task, nullptr);
+  }
+}
+
+// ==================== Resource Cache Tests ====================
+
 class TestResource : public Resource {
  public:
   static std::shared_ptr<const TestResource> Make(Context* context, uint32_t id) {
@@ -42,7 +65,7 @@ class TestResource : public Resource {
   }
 };
 
-TGFX_TEST(ResourceCacheTest, multiThreadRecycling) {
+TGFX_TEST(ResourceTest, MultiThreadRecycling) {
   auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
   tgfx::Task::Run([device] {
@@ -62,7 +85,7 @@ TGFX_TEST(ResourceCacheTest, multiThreadRecycling) {
 };
 
 #ifdef TGFX_USE_THREADS
-TGFX_TEST(ResourceCacheTest, blockAllocatorRefCount) {
+TGFX_TEST(ResourceTest, BlockAllocatorRefCount) {
   BlockAllocator blockAllocator;
   // make sure vertices expire after task is done
   float* vertices = nullptr;

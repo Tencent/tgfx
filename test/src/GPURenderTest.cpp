@@ -16,11 +16,42 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <memory>
+#include <vector>
 #include "gpu/opengl/GLCaps.h"
 #include "gpu/opengl/GLUtil.h"
+#include "tgfx/gpu/GPU.h"
+#include "tgfx/gpu/RenderPass.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
+
+// ==================== GPU Tests ====================
+
+TGFX_TEST(GPURenderTest, DepthRenderPassTest) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/test_timestretch.png");
+  ASSERT_TRUE(image != nullptr);
+  TextureDescriptor depthTextureDesc(110, 110, PixelFormat::DEPTH24_STENCIL8, false, 1,
+                                     TextureUsage::RENDER_ATTACHMENT);
+  auto depthTexture = context->gpu()->createTexture(depthTextureDesc);
+  ASSERT_TRUE(depthTexture != nullptr);
+  TextureDescriptor renderTextureDesc(
+      110, 110, PixelFormat::RGBA_8888, false, 1,
+      TextureUsage::RENDER_ATTACHMENT | TextureUsage::TEXTURE_BINDING);
+  auto renderTexture = context->gpu()->createTexture(renderTextureDesc);
+  ASSERT_TRUE(renderTexture != nullptr);
+  RenderPassDescriptor renderPassDescriptor(renderTexture);
+  renderPassDescriptor.depthStencilAttachment.texture = depthTexture;
+  auto commandEncoder = context->gpu()->createCommandEncoder();
+  ASSERT_TRUE(commandEncoder != nullptr);
+  auto renderPass = commandEncoder->beginRenderPass(renderPassDescriptor);
+  ASSERT_TRUE(renderPass != nullptr);
+}
+
+// ==================== GL Utility Tests ====================
 
 static size_t vendorIndex = 0;
 
@@ -71,7 +102,7 @@ void glGetShaderPrecisionFormatMock(unsigned, unsigned, int* range, int* precisi
   *precision = 32;
 }
 
-TGFX_TEST(GLUtilTest, Version) {
+TGFX_TEST(GPURenderTest, GLVersion) {
   auto glVersion = GetGLVersion(nullptr);
   EXPECT_EQ(glVersion.majorVersion, -1);
   EXPECT_EQ(glVersion.minorVersion, -1);
@@ -95,7 +126,7 @@ TGFX_TEST(GLUtilTest, Version) {
   EXPECT_EQ(glVersion.minorVersion, 0);
 }
 
-TGFX_TEST(GLUtilTest, Caps) {
+TGFX_TEST(GPURenderTest, GLCaps) {
   {
     GLInfo info(glGetStringMock, nullptr, getIntegervMock, glGetInternalformativMock,
                 glGetShaderPrecisionFormatMock);
@@ -118,4 +149,5 @@ TGFX_TEST(GLUtilTest, Caps) {
     }
   }
 }
+
 }  // namespace tgfx
