@@ -613,6 +613,310 @@ TGFX_TEST(CanvasTest, BlendModeTest) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/blendMode"));
 }
 
+TGFX_TEST(CanvasTest, Path_addArc) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  auto canvas = surface->getCanvas();
+  Paint paint;
+  paint.setColor(Color::FromRGBA(255, 0, 0, 255));
+  for (int i = 1; i <= 8; ++i) {
+    canvas->clear();
+    Path path;
+    path.addArc(Rect::MakeXYWH(50, 50, 100, 100), 0, static_cast<float>(45 * i));
+    path.close();
+    canvas->drawPath(path, paint);
+    EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/Path_addArc" + std::to_string(i)));
+  }
+  for (int i = 1; i <= 8; ++i) {
+    canvas->clear();
+    Path path;
+    path.addArc(Rect::MakeXYWH(50, 50, 100, 100), -90.f, -static_cast<float>(45 * i));
+    path.close();
+    canvas->drawPath(path, paint);
+    EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/Path_addArc_reversed" + std::to_string(i)));
+  }
+}
+
+TGFX_TEST(CanvasTest, Path_complex) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 400);
+  auto canvas = surface->getCanvas();
+  canvas->translate(200, 200);
+  Path path;
+  auto rect = Rect::MakeLTRB(-167.200867f, -100.890869f, 167.200867f, 100.890869f);
+  path.addRect(rect);
+  auto strokeMatrix = Matrix::MakeAll(0.528697968f, 0, -9.44108581f, 0, 0.422670752f, -9.34423828f);
+  path.transform(strokeMatrix);
+  float dashList[] = {10.f, 17.f, 10.f, 10.f, 17.f, 10.f};
+  auto pathEffect = PathEffect::MakeDash(dashList, 6, 0);
+  pathEffect->filterPath(&path);
+  auto stroke = Stroke();
+  stroke.width = 8;
+  stroke.cap = LineCap::Round;
+  stroke.join = LineJoin::Miter;
+  stroke.miterLimit = 4;
+  stroke.applyToPath(&path);
+
+  Matrix invertMatrix = {};
+  strokeMatrix.invert(&invertMatrix);
+  path.transform(invertMatrix);
+  path.setFillType(PathFillType::Winding);
+  auto shader = Shader::MakeColorShader(Color::Black());
+  auto paint = Paint();
+  paint.setShader(shader);
+
+  canvas->scale(0.5f, 0.5f);
+  canvas->drawPath(path, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/Path_complex"));
+}
+
+TGFX_TEST(CanvasTest, DrawPathProvider) {
+  class DrawPathProvider : public PathProvider {
+   public:
+    explicit DrawPathProvider(const std::vector<Point>& pts) : points(pts) {
+    }
+
+    Path getPath() const override {
+      if (points.size() < 2) {
+        return {};
+      }
+
+      Path path = {};
+      path.moveTo(points[0]);
+      for (size_t i = 1; i < points.size(); ++i) {
+        path.lineTo(points[i]);
+      }
+      path.close();
+      return path;
+    }
+
+    Rect getBounds() const override {
+      if (points.size() < 2) {
+        return {};
+      }
+
+      float minX = points[0].x;
+      float minY = points[0].y;
+      float maxX = points[0].x;
+      float maxY = points[0].y;
+      for (const auto& point : points) {
+        minX = std::min(minX, point.x);
+        minY = std::min(minY, point.y);
+        maxX = std::max(maxX, point.x);
+        maxY = std::max(maxY, point.y);
+      }
+      return Rect::MakeXYWH(minX, minY, maxX - minX, maxX - minX);
+    }
+
+   private:
+    std::vector<Point> points = {};
+  };
+
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 400);
+  auto canvas = surface->getCanvas();
+
+  Paint paint;
+  std::vector<Point> pts1 = {{50, 50}, {150, 50}, {150, 150}, {50, 150}};
+  auto shape1 = Shape::MakeFrom(std::make_shared<DrawPathProvider>(pts1));
+  paint.setColor(Color::Red());
+  paint.setStyle(PaintStyle::Stroke);
+  canvas->drawShape(shape1, paint);
+
+  std::vector<Point> pts2 = {{300, 0}, {360, 180}, {210, 60}, {390, 60}, {240, 180}};
+  auto shape2 = Shape::MakeFrom(std::make_shared<DrawPathProvider>(pts2));
+  paint.setColor(Color::Green());
+  paint.setStyle(PaintStyle::Fill);
+  canvas->drawShape(shape2, paint);
+
+  std::vector<Point> pts3 = {{50, 250},  {250, 250}, {250, 240}, {275, 255},
+                             {250, 270}, {250, 260}, {50, 260}};
+  auto shape3 = Shape::MakeFrom(std::make_shared<DrawPathProvider>(pts3));
+  paint.setColor(Color::Blue());
+  paint.setStyle(PaintStyle::Fill);
+  canvas->drawShape(shape3, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DrawPathProvider"));
+}
+
+TGFX_TEST(CanvasTest, StrokeShape) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 200);
+  auto canvas = surface->getCanvas();
+  Paint paint = {};
+  paint.setColor(Color::Black());
+  auto path = Path();
+  path.addRect(Rect::MakeXYWH(10, 10, 50, 50));
+  auto shape = Shape::MakeFrom(path);
+  Matrix matrix = Matrix::MakeScale(2.0, 2.0);
+  shape = Shape::ApplyMatrix(shape, matrix);
+  Stroke stroke(10);
+  shape = Shape::ApplyStroke(shape, &stroke);
+  canvas->drawShape(shape, paint);
+  shape = Shape::ApplyMatrix(shape, Matrix::MakeScale(0.2f, 0.6f));
+  canvas->translate(150, 0);
+  canvas->drawShape(shape, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/StrokeShape"));
+
+  surface = Surface::Make(context, 200, 200);
+  canvas = surface->getCanvas();
+  path.reset();
+  path.moveTo(70.0f, 190.0f);
+  path.lineTo(100.0f, 74.0f);
+  path.lineTo(130.0f, 190.0f);
+  stroke.width = 15;
+  stroke.miterLimit = 4.0f;
+  stroke.join = LineJoin::Miter;
+  shape = Shape::MakeFrom(path);
+  shape = Shape::ApplyStroke(shape, &stroke);
+  auto bounds = shape->getBounds();
+  canvas->clipRect(bounds);
+  stroke.applyToPath(&path);
+  EXPECT_EQ(bounds.top, 44.0f);
+  canvas->drawShape(shape, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/StrokeShape_miter"));
+}
+
+TGFX_TEST(CanvasTest, ClipAll) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 20, 20);
+  auto canvas = surface->getCanvas();
+  canvas->clipRect(Rect::MakeXYWH(0, 0, 0, 0));
+  Paint paint = {};
+  paint.setColor(Color::Black());
+  auto path = Path();
+  path.addRect(Rect::MakeXYWH(5, 5, 10, 10));
+  canvas->drawPath(path, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ClipAll"));
+}
+
+TGFX_TEST(CanvasTest, RevertRect) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 10, 10);
+  auto canvas = surface->getCanvas();
+  Path path = {};
+  path.addRect(5, 5, 2, 3);
+  Paint paint = {};
+  canvas->drawPath(path, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/RevertRect"));
+}
+
+TGFX_TEST(CanvasTest, AdaptiveDashEffect) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 500, 500);
+  auto canvas = surface->getCanvas();
+  canvas->clear();
+  canvas->drawColor(Color::White());
+  Paint paint = {};
+  Stroke stroke(2);
+  paint.setStroke(stroke);
+  paint.setColor(Color::Black());
+  paint.setStyle(PaintStyle::Stroke);
+  Path path = {};
+  path.addRect(50, 50, 250, 150);
+  path.addOval(Rect::MakeXYWH(50, 200, 200, 50));
+  path.moveTo(50, 300);
+  path.cubicTo(100, 300, 100, 350, 150, 350);
+  path.quadTo(200, 350, 200, 300);
+  float dashList[] = {40.f, 50.f};
+  auto effect = PathEffect::MakeDash(dashList, 2, 20, true);
+  effect->filterPath(&path);
+  canvas->drawPath(path, paint);
+
+  // Test large path dash effect - should apply dash correctly, not draw as continuous line
+  Path largePath = {};
+  RRect rRect;
+  rRect.rect = Rect::MakeXYWH(10, 10, 432, 400);
+  rRect.radii = Point(6, 6);
+  largePath.addRRect(rRect);
+  float largeDashList[] = {2.f, 2.f};
+  auto largeEffect = PathEffect::MakeDash(largeDashList, 2, 0.0f, true);
+  largeEffect->filterPath(&largePath);
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStrokeWidth(2.0f);
+  canvas->drawPath(largePath, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/AdaptiveDashEffect"));
+}
+
+TGFX_TEST(CanvasTest, TrimPathEffect) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 400);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  Paint paint = {};
+  paint.setColor(Color::Blue());
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStroke(Stroke(4));
+
+  // Test normal trim [0.25, 0.75]
+  Path path1 = {};
+  path1.addRect(50, 50, 150, 150);
+  auto trimEffect = PathEffect::MakeTrim(0.25f, 0.75f);
+  EXPECT_TRUE(trimEffect != nullptr);
+  trimEffect->filterPath(&path1);
+  canvas->drawPath(path1, paint);
+
+  // Test inverted trim: complement of [0.25, 0.75] = [0, 0.25] + [0.75, 1]
+  paint.setColor(Color::Red());
+  Path path2 = {};
+  path2.addRect(200, 50, 300, 150);
+  auto invertedEffect = PathEffect::MakeTrim(0.25f, 0.75f, true);
+  EXPECT_TRUE(invertedEffect != nullptr);
+  invertedEffect->filterPath(&path2);
+  canvas->drawPath(path2, paint);
+
+  // Test edge cases
+  // Full path (no trim needed) should return nullptr
+  EXPECT_TRUE(PathEffect::MakeTrim(0.0f, 1.0f) == nullptr);
+  EXPECT_TRUE(PathEffect::MakeTrim(-0.5f, 1.5f) == nullptr);
+
+  // Inverted with startT >= stopT (full path) should return nullptr
+  EXPECT_TRUE(PathEffect::MakeTrim(0.5f, 0.5f, true) == nullptr);
+  EXPECT_TRUE(PathEffect::MakeTrim(0.7f, 0.3f, true) == nullptr);
+
+  // NaN should return nullptr
+  EXPECT_TRUE(PathEffect::MakeTrim(NAN, 0.5f) == nullptr);
+  EXPECT_TRUE(PathEffect::MakeTrim(0.5f, NAN) == nullptr);
+
+  // Normal mode with startT >= stopT results in empty path
+  paint.setColor(Color::Green());
+  Path path3 = {};
+  path3.addRect(50, 200, 150, 300);
+  auto emptyEffect = PathEffect::MakeTrim(0.7f, 0.3f);
+  EXPECT_TRUE(emptyEffect != nullptr);
+  emptyEffect->filterPath(&path3);
+  EXPECT_TRUE(path3.isEmpty());
+
+  // Test with oval
+  paint.setColor(Color::FromRGBA(128, 0, 128));
+  Path path4 = {};
+  path4.addOval(Rect::MakeXYWH(200, 200, 100, 100));
+  auto ovalTrim = PathEffect::MakeTrim(0.0f, 0.5f);
+  ovalTrim->filterPath(&path4);
+  canvas->drawPath(path4, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/TrimPathEffect"));
+}
+
 TGFX_TEST(CanvasTest, BlendFormula) {
   ContextScope scope;
   auto context = scope.getContext();
