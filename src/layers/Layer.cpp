@@ -274,8 +274,14 @@ static std::shared_ptr<Render3DContext> Create3DContext(const DrawArgs& args, Ca
   // coordinates, avoiding excessive scaling when rendering to offscreen texture which would affect
   // the final visual quality.
   auto contentScale = canvas->getMatrix().getMaxScale();
+  if (contentScale <= 0.0f) {
+    return nullptr;
+  }
   validRenderRect.scale(contentScale, contentScale);
   validRenderRect.roundOut();
+  if (validRenderRect.isEmpty()) {
+    return nullptr;
+  }
 
   auto compositor = std::make_shared<Context3DCompositor>(
       *args.context, static_cast<int>(validRenderRect.width()),
