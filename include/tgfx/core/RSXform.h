@@ -37,7 +37,7 @@ struct RSXform {
    * @param tx x translation
    * @param ty y translation
    */
-  static RSXform Make(float scos, float ssin, float tx, float ty) {
+  static constexpr RSXform Make(float scos, float ssin, float tx, float ty) {
     return {scos, ssin, tx, ty};
   }
 
@@ -54,6 +54,18 @@ struct RSXform {
   static RSXform MakeFromRadians(float scale, float radians, float tx, float ty, float ax,
                                  float ay);
 
+  /**
+   * Creates a default RSXform set to identity transformation.
+   */
+  constexpr RSXform() = default;
+
+  /**
+   * Creates an RSXform with the specified values.
+   */
+  constexpr RSXform(float scos, float ssin, float tx, float ty)
+      : scos(scos), ssin(ssin), tx(tx), ty(ty) {
+  }
+
   float scos = 1.0f;  ///< scale * cos(angle)
   float ssin = 0.0f;  ///< scale * sin(angle)
   float tx = 0.0f;    ///< x translation
@@ -63,21 +75,21 @@ struct RSXform {
    * Returns true if the transformation keeps rectangles axis-aligned (no rotation or 90-degree
    * rotation).
    */
-  bool rectStaysRect() const {
+  constexpr bool rectStaysRect() const {
     return scos == 0 || ssin == 0;
   }
 
   /**
    * Returns true if this RSXform is equal to the other.
    */
-  bool operator==(const RSXform& other) const {
+  constexpr bool operator==(const RSXform& other) const {
     return scos == other.scos && ssin == other.ssin && tx == other.tx && ty == other.ty;
   }
 
   /**
    * Returns true if this RSXform is not equal to the other.
    */
-  bool operator!=(const RSXform& other) const {
+  constexpr bool operator!=(const RSXform& other) const {
     return !(*this == other);
   }
 };
