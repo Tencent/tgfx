@@ -51,6 +51,7 @@ Matrix GlyphRun::getMatrix(size_t index) const {
       return Matrix::MakeAll(p[0], p[1], p[2], p[3], p[4], p[5]);
     }
   }
+  // All enum cases are handled above; this is unreachable but silences compiler warnings.
   return Matrix::I();
 }
 

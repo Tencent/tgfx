@@ -86,5 +86,19 @@ struct RSXform {
     tx = tX;
     ty = tY;
   }
+
+  /**
+   * Returns true if this RSXform is equal to the other.
+   */
+  bool operator==(const RSXform& other) const {
+    return scos == other.scos && ssin == other.ssin && tx == other.tx && ty == other.ty;
+  }
+
+  /**
+   * Returns true if this RSXform is not equal to the other.
+   */
+  bool operator!=(const RSXform& other) const {
+    return !(*this == other);
+  }
 };
 }  // namespace tgfx

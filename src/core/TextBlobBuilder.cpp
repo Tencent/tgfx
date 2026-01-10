@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/TextBlobBuilder.h"
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include "core/RunRecord.h"
@@ -96,7 +97,7 @@ bool TextBlobBuilder::tryMerge(const Font& font, GlyphPositioning positioning, s
       return false;
     }
   }
-  if (run->glyphCount + count < run->glyphCount) {
+  if (count > UINT32_MAX - run->glyphCount) {
     return false;
   }
   size_t oldSize = run->storageSize();
