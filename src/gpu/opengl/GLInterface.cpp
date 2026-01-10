@@ -130,6 +130,10 @@ std::shared_ptr<GLInterface> GLInterface::MakeNativeInterface(const GLProcGetter
   functions->drawArrays = reinterpret_cast<GLDrawArrays*>(getter->getProcAddress("glDrawArrays"));
   functions->drawElements =
       reinterpret_cast<GLDrawElements*>(getter->getProcAddress("glDrawElements"));
+  functions->drawArraysInstanced =
+      reinterpret_cast<GLDrawArraysInstanced*>(getter->getProcAddress("glDrawArraysInstanced"));
+  functions->drawElementsInstanced =
+      reinterpret_cast<GLDrawElementsInstanced*>(getter->getProcAddress("glDrawElementsInstanced"));
   functions->enable = reinterpret_cast<GLEnable*>(getter->getProcAddress("glEnable"));
   functions->enableVertexAttribArray = reinterpret_cast<GLEnableVertexAttribArray*>(
       getter->getProcAddress("glEnableVertexAttribArray"));
@@ -216,6 +220,8 @@ std::shared_ptr<GLInterface> GLInterface::MakeNativeInterface(const GLProcGetter
   functions->useProgram = reinterpret_cast<GLUseProgram*>(getter->getProcAddress("glUseProgram"));
   functions->vertexAttribPointer =
       reinterpret_cast<GLVertexAttribPointer*>(getter->getProcAddress("glVertexAttribPointer"));
+  functions->vertexAttribDivisor =
+      reinterpret_cast<GLVertexAttribDivisor*>(getter->getProcAddress("glVertexAttribDivisor"));
   functions->viewport = reinterpret_cast<GLViewport*>(getter->getProcAddress("glViewport"));
   functions->clientWaitSync =
       reinterpret_cast<GLClientWaitSync*>(getter->getProcAddress("glClientWaitSync"));

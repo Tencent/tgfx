@@ -291,6 +291,13 @@ class RenderPass {
   virtual void setVertexBuffer(std::shared_ptr<GPUBuffer> buffer, size_t offset = 0) = 0;
 
   /**
+   * Sets or unsets the current instance buffer with an optional offset. The instance buffer
+   * contains per-instance data that is used in instanced rendering. Attributes with divisor > 0
+   * will read from this buffer.
+   */
+  virtual void setInstanceBuffer(std::shared_ptr<GPUBuffer> buffer, size_t offset = 0) = 0;
+
+  /**
    * Sets the current index buffer with its format.
    */
   virtual void setIndexBuffer(std::shared_ptr<GPUBuffer> buffer,
@@ -313,6 +320,21 @@ class RenderPass {
    * buffer provided by setVertexBuffer().
    */
   virtual void drawIndexed(PrimitiveType primitiveType, size_t baseIndex, size_t indexCount) = 0;
+
+  /**
+   * Draws primitives multiple times based on the vertex buffer provided by setVertexBuffer() and
+   * the instance buffer provided by setInstanceBuffer().
+   */
+  virtual void drawInstanced(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount,
+                             size_t instanceCount) = 0;
+
+  /**
+   * Draws indexed primitives multiple times based on the index buffer provided by setIndexBuffer(),
+   * the vertex buffer provided by setVertexBuffer(), and the instance buffer provided by
+   * setInstanceBuffer().
+   */
+  virtual void drawIndexedInstanced(PrimitiveType primitiveType, size_t baseIndex,
+                                    size_t indexCount, size_t instanceCount) = 0;
 
   /**
    * Completes the current render pass. After calling this method, no further commands can be added

@@ -33,6 +33,7 @@ struct GLAttribute {
   unsigned type = 0;
   bool normalized = false;
   size_t offset = 0;
+  int divisor = 0;  // 0 = per-vertex, >0 = per-instance
 };
 
 /**
@@ -66,6 +67,12 @@ class GLRenderPipeline : public RenderPipeline, public GLResource {
   void setVertexBuffer(GLGPU* gpu, GLBuffer* vertexBuffer, size_t vertexOffset);
 
   /**
+   * Binds the instance buffer to be used in subsequent instanced draw calls. The instanceOffset is
+   * the offset into the buffer where the instance data begins.
+   */
+  void setInstanceBuffer(GLGPU* gpu, GLBuffer* instanceBuffer, size_t instanceOffset);
+
+  /**
    * Sets the stencil reference value for stencil testing.
    */
   void setStencilReference(GLGPU* gpu, unsigned reference);
@@ -78,7 +85,9 @@ class GLRenderPipeline : public RenderPipeline, public GLResource {
   unsigned programID = 0;
   unsigned vertexArray = 0;
   std::vector<GLAttribute> attributes = {};
+  std::vector<GLAttribute> instanceAttributes = {};
   size_t vertexStride = 0;
+  size_t instanceStride = 0;
   std::unordered_map<unsigned, unsigned> textureUnits = {};
   uint32_t colorWriteMask = ColorWriteMask::All;
   std::unique_ptr<GLStencilState> stencilState = nullptr;

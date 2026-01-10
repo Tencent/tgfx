@@ -79,6 +79,10 @@ using GLDisable = void GL_FUNCTION_TYPE(unsigned cap);
 using GLDrawArrays = void GL_FUNCTION_TYPE(unsigned mode, int first, int count);
 using GLDrawElements = void GL_FUNCTION_TYPE(unsigned mode, int count, unsigned type,
                                              const void* indices);
+using GLDrawArraysInstanced = void GL_FUNCTION_TYPE(unsigned mode, int first, int count,
+                                                    int instancecount);
+using GLDrawElementsInstanced = void GL_FUNCTION_TYPE(unsigned mode, int count, unsigned type,
+                                                      const void* indices, int instancecount);
 using GLEnable = void GL_FUNCTION_TYPE(unsigned cap);
 using GLEnableVertexAttribArray = void GL_FUNCTION_TYPE(unsigned index);
 using GLFenceSync = void* GL_FUNCTION_TYPE(unsigned condition, unsigned flags);
@@ -159,6 +163,7 @@ using GLUseProgram = void GL_FUNCTION_TYPE(unsigned program);
 using GLVertexAttribPointer = void GL_FUNCTION_TYPE(unsigned indx, int size, unsigned type,
                                                     unsigned char normalized, int stride,
                                                     const void* ptr);
+using GLVertexAttribDivisor = void GL_FUNCTION_TYPE(unsigned index, int divisor);
 using GLViewport = void GL_FUNCTION_TYPE(int x, int y, int width, int height);
 
 #if defined(__EMSCRIPTEN__)
@@ -215,6 +220,8 @@ class GLFunctions {
   GLDisable* disable = nullptr;
   GLDrawArrays* drawArrays = nullptr;
   GLDrawElements* drawElements = nullptr;
+  GLDrawArraysInstanced* drawArraysInstanced = nullptr;
+  GLDrawElementsInstanced* drawElementsInstanced = nullptr;
   GLEnable* enable = nullptr;
   GLEnableVertexAttribArray* enableVertexAttribArray = nullptr;
   GLFenceSync* fenceSync = nullptr;
@@ -267,6 +274,7 @@ class GLFunctions {
   GLUniform1i* uniform1i = nullptr;
   GLUseProgram* useProgram = nullptr;
   GLVertexAttribPointer* vertexAttribPointer = nullptr;
+  GLVertexAttribDivisor* vertexAttribDivisor = nullptr;
   GLViewport* viewport = nullptr;
   GLClientWaitSync* clientWaitSync = nullptr;
   GLWaitSync* waitSync = nullptr;

@@ -61,6 +61,8 @@ class GLRenderPass : public RenderPass {
 
   void setVertexBuffer(std::shared_ptr<GPUBuffer> buffer, size_t offset) override;
 
+  void setInstanceBuffer(std::shared_ptr<GPUBuffer> buffer, size_t offset) override;
+
   void setIndexBuffer(std::shared_ptr<GPUBuffer> buffer, IndexFormat format) override;
 
   void setStencilReference(uint32_t reference) override;
@@ -68,6 +70,12 @@ class GLRenderPass : public RenderPass {
   void draw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount) override;
 
   void drawIndexed(PrimitiveType primitiveType, size_t baseIndex, size_t indexCount) override;
+
+  void drawInstanced(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount,
+                     size_t instanceCount) override;
+
+  void drawIndexedInstanced(PrimitiveType primitiveType, size_t baseIndex, size_t indexCount,
+                            size_t instanceCount) override;
 
  protected:
   void onEnd() override;
@@ -79,6 +87,8 @@ class GLRenderPass : public RenderPass {
   std::vector<PendingTexture> pendingTextures = {};
   std::shared_ptr<GLBuffer> pendingVertexBuffer = nullptr;
   size_t pendingVertexOffset = 0;
+  std::shared_ptr<GLBuffer> pendingInstanceBuffer = nullptr;
+  size_t pendingInstanceOffset = 0;
   std::shared_ptr<GLBuffer> pendingIndexBuffer = nullptr;
   IndexFormat indexFormat = IndexFormat::UInt16;
   uint32_t stencilReference = 0;

@@ -52,9 +52,12 @@ class Attribute {
   Attribute() = default;
 
   /**
-   * Creates an attribute with the specified name and format.
+   * Creates an attribute with the specified name, format, and divisor. The divisor determines
+   * whether the attribute is per-vertex (divisor=0) or per-instance (divisor>0). For per-instance
+   * attributes, the value advances once per instance rather than once per vertex.
    */
-  Attribute(std::string name, VertexFormat format) : _name(std::move(name)), _format(format) {
+  Attribute(std::string name, VertexFormat format, int divisor = 0)
+      : _name(std::move(name)), _format(format), _divisor(divisor) {
   }
 
   /**
@@ -83,8 +86,16 @@ class Attribute {
    */
   size_t size() const;
 
+  /**
+   * Returns the attribute divisor. 0 means per-vertex attribute, >0 means per-instance attribute.
+   */
+  int divisor() const {
+    return _divisor;
+  }
+
  private:
   std::string _name = {};
   VertexFormat _format = VertexFormat::Float;
+  int _divisor = 0;  // 0 = per-vertex, >0 = per-instance
 };
 }  // namespace tgfx

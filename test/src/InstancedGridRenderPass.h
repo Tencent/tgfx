@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,23 +16,30 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/gpu/RenderPipeline.h"
+#pragma once
+
+#include "tgfx/gpu/Attribute.h"
+#include "tgfx/gpu/CommandEncoder.h"
 
 namespace tgfx {
-VertexDescriptor::VertexDescriptor(std::vector<Attribute> attribs, size_t stride,
-                                   std::vector<Attribute> instanceAttribs,
-                                   size_t instanceStrideValue)
-    : attributes(std::move(attribs)), vertexStride(stride),
-      instanceAttributes(std::move(instanceAttribs)), instanceStride(instanceStrideValue) {
-  if (vertexStride == 0) {
-    for (auto& attribute : attributes) {
-      vertexStride += attribute.size();
-    }
-  }
-  if (instanceStride == 0 && !instanceAttributes.empty()) {
-    for (auto& attribute : instanceAttributes) {
-      instanceStride += attribute.size();
-    }
-  }
-}
+class InstancedGridRenderPass {
+ public:
+  static constexpr float GRID_SIZE = 20.0f;
+  static constexpr float GRID_SPACING = 8.0f;
+
+  static std::shared_ptr<InstancedGridRenderPass> Make(int rows, int columns);
+
+  bool onDraw(CommandEncoder* encoder, std::shared_ptr<Texture> renderTexture) const;
+
+ private:
+  InstancedGridRenderPass(int rows, int columns);
+
+ private:
+  int rows;
+  int columns;
+  Attribute position;
+  Attribute offset;
+  Attribute color;
+  std::shared_ptr<RenderPipeline> createPipeline(GPU* gpu) const;
+};
 }  // namespace tgfx

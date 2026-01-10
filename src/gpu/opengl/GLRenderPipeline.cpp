@@ -112,6 +112,25 @@ void GLRenderPipeline::setVertexBuffer(GLGPU* gpu, GLBuffer* vertexBuffer, size_
   }
 }
 
+void GLRenderPipeline::setInstanceBuffer(GLGPU* gpu, GLBuffer* instanceBuffer,
+                                         size_t instanceOffset) {
+  DEBUG_ASSERT(instanceBuffer != nullptr);
+  DEBUG_ASSERT(instanceBuffer->usage() & GPUBufferUsage::VERTEX);
+  auto gl = gpu->functions();
+  if (instanceStride == 0) {
+    LOGE("GLRenderPipeline::setInstanceBuffer: instanceStride is 0, no instance attributes found!");
+    return;
+  }
+  gl->bindBuffer(GL_ARRAY_BUFFER, instanceBuffer->bufferID());
+  for (auto& attribute : instanceAttributes) {
+    gl->vertexAttribPointer(static_cast<unsigned>(attribute.location), attribute.count,
+                            attribute.type, attribute.normalized, static_cast<int>(instanceStride),
+                            reinterpret_cast<void*>(attribute.offset + instanceOffset));
+    gl->enableVertexAttribArray(static_cast<unsigned>(attribute.location));
+    gl->vertexAttribDivisor(static_cast<unsigned>(attribute.location), attribute.divisor);
+  }
+}
+
 void GLRenderPipeline::setStencilReference(GLGPU* gpu, unsigned reference) {
   if (stencilState == nullptr) {
     return;
@@ -132,42 +151,42 @@ void GLRenderPipeline::onRelease(GLGPU* gpu) {
   }
 }
 
-static GLAttribute MakeGLAttribute(VertexFormat format, int location, size_t offset) {
+static GLAttribute MakeGLAttribute(VertexFormat format, int location, size_t offset, int divisor) {
   switch (format) {
     case VertexFormat::Float:
-      return {location, 1, GL_FLOAT, false, offset};
+      return {location, 1, GL_FLOAT, false, offset, divisor};
     case VertexFormat::Float2:
-      return {location, 2, GL_FLOAT, false, offset};
+      return {location, 2, GL_FLOAT, false, offset, divisor};
     case VertexFormat::Float3:
-      return {location, 3, GL_FLOAT, false, offset};
+      return {location, 3, GL_FLOAT, false, offset, divisor};
     case VertexFormat::Float4:
-      return {location, 4, GL_FLOAT, false, offset};
+      return {location, 4, GL_FLOAT, false, offset, divisor};
     case VertexFormat::Half:
-      return {location, 1, GL_HALF_FLOAT, false, offset};
+      return {location, 1, GL_HALF_FLOAT, false, offset, divisor};
     case VertexFormat::Half2:
-      return {location, 2, GL_HALF_FLOAT, false, offset};
+      return {location, 2, GL_HALF_FLOAT, false, offset, divisor};
     case VertexFormat::Half3:
-      return {location, 3, GL_HALF_FLOAT, false, offset};
+      return {location, 3, GL_HALF_FLOAT, false, offset, divisor};
     case VertexFormat::Half4:
-      return {location, 4, GL_HALF_FLOAT, false, offset};
+      return {location, 4, GL_HALF_FLOAT, false, offset, divisor};
     case VertexFormat::Int:
-      return {location, 1, GL_INT, false, offset};
+      return {location, 1, GL_INT, false, offset, divisor};
     case VertexFormat::Int2:
-      return {location, 2, GL_INT, false, offset};
+      return {location, 2, GL_INT, false, offset, divisor};
     case VertexFormat::Int3:
-      return {location, 3, GL_INT, false, offset};
+      return {location, 3, GL_INT, false, offset, divisor};
     case VertexFormat::Int4:
-      return {location, 4, GL_INT, false, offset};
+      return {location, 4, GL_INT, false, offset, divisor};
     case VertexFormat::UByteNormalized:
-      return {location, 1, GL_UNSIGNED_BYTE, true, offset};
+      return {location, 1, GL_UNSIGNED_BYTE, true, offset, divisor};
     case VertexFormat::UByte2Normalized:
-      return {location, 2, GL_UNSIGNED_BYTE, true, offset};
+      return {location, 2, GL_UNSIGNED_BYTE, true, offset, divisor};
     case VertexFormat::UByte3Normalized:
-      return {location, 3, GL_UNSIGNED_BYTE, true, offset};
+      return {location, 3, GL_UNSIGNED_BYTE, true, offset, divisor};
     case VertexFormat::UByte4Normalized:
-      return {location, 4, GL_UNSIGNED_BYTE, true, offset};
+      return {location, 4, GL_UNSIGNED_BYTE, true, offset, divisor};
   }
-  return {location, 0, 0, false, offset};
+  return {location, 0, 0, false, offset, divisor};
 }
 
 static std::unique_ptr<GLBlendState> MakeBlendState(const PipelineColorAttachment& attachment) {
@@ -247,11 +266,27 @@ bool GLRenderPipeline::setPipelineDescriptor(GLGPU* gpu,
   for (const auto& attribute : descriptor.vertex.attributes) {
     auto location = gl->getAttribLocation(programID, attribute.name().c_str());
     if (location != -1) {
-      attributes.push_back(MakeGLAttribute(attribute.format(), location, vertexOffset));
+      attributes.push_back(
+          MakeGLAttribute(attribute.format(), location, vertexOffset, attribute.divisor()));
     }
     vertexOffset += attribute.size();
   }
   vertexStride = descriptor.vertex.vertexStride;
+
+  if (!descriptor.vertex.instanceAttributes.empty()) {
+    DEBUG_ASSERT(descriptor.vertex.instanceStride > 0);
+    size_t vertexOffset = 0;
+    instanceAttributes.reserve(descriptor.vertex.instanceAttributes.size());
+    for (const auto& attribute : descriptor.vertex.instanceAttributes) {
+      auto location = gl->getAttribLocation(programID, attribute.name().c_str());
+      if (location != -1) {
+        instanceAttributes.push_back(
+            MakeGLAttribute(attribute.format(), location, vertexOffset, attribute.divisor()));
+      }
+      vertexOffset += attribute.size();
+    }
+    instanceStride = descriptor.vertex.instanceStride;
+  }
 
   DEBUG_ASSERT(descriptor.fragment.colorAttachments.size() == 1);
   auto& attachment = descriptor.fragment.colorAttachments[0];

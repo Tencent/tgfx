@@ -122,10 +122,16 @@ class VertexDescriptor {
   VertexDescriptor() = default;
 
   /**
-   * Creates a vertex descriptor with the specified attributes and vertex stride.
-   * If vertexStride is 0, it will be calculated as the sum of the sizes of all attributes.
+   * Creates a vertex descriptor with the specified attributes and vertex stride. The attributes
+   * parameter contains per-vertex attributes (divisor=0). The vertexStride is the number of bytes
+   * between consecutive vertices. If vertexStride is 0, it will be calculated as the sum of the
+   * sizes of all vertex attributes. The instanceAttributes parameter contains per-instance
+   * attributes (divisor>0) and defaults to empty. The instanceStride is the number of bytes
+   * between consecutive instances. If instanceStride is 0, it will be calculated as the sum of
+   * the sizes of all instance attributes.
    */
-  VertexDescriptor(std::vector<Attribute> attributes, size_t vertexStride = 0);
+  VertexDescriptor(std::vector<Attribute> attributes, size_t vertexStride = 0,
+                   std::vector<Attribute> instanceAttributes = {}, size_t instanceStride = 0);
 
   /**
    * A ShaderModule object containing the vertex shader code.
@@ -147,6 +153,18 @@ class VertexDescriptor {
    * The number of bytes between the first byte of two consecutive vertices in a buffer.
    */
   size_t vertexStride = 0;
+
+  /**
+   * An array of state data that describes how instance attribute data is stored in memory and is
+   * mapped to arguments for a vertex shader function. These are per-instance attributes (divisor>0).
+   */
+  std::vector<Attribute> instanceAttributes = {};
+
+  /**
+   * The number of bytes between the first byte of two consecutive instances in a buffer.
+   * If instanceStride is 0, it will be calculated as the sum of the sizes of all instance attributes.
+   */
+  size_t instanceStride = 0;
 };
 
 /**

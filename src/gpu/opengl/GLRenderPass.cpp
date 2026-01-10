@@ -134,6 +134,20 @@ void GLRenderPass::setVertexBuffer(std::shared_ptr<GPUBuffer> buffer, size_t off
   pendingVertexOffset = offset;
 }
 
+void GLRenderPass::setInstanceBuffer(std::shared_ptr<GPUBuffer> buffer, size_t offset) {
+  if (buffer == nullptr) {
+    auto gl = _gpu->functions();
+    gl->bindBuffer(GL_ARRAY_BUFFER, 0);
+    return;
+  }
+  if (!(buffer->usage() & GPUBufferUsage::VERTEX)) {
+    LOGE("GLRenderPass::setInstanceBuffer(), buffer usage is not VERTEX!");
+    return;
+  }
+  pendingInstanceBuffer = std::static_pointer_cast<GLBuffer>(buffer);
+  pendingInstanceOffset = offset;
+}
+
 void GLRenderPass::setIndexBuffer(std::shared_ptr<GPUBuffer> buffer, IndexFormat format) {
   if (buffer == nullptr) {
     auto gl = _gpu->functions();
@@ -204,6 +218,38 @@ void GLRenderPass::drawIndexed(PrimitiveType primitiveType, size_t baseIndex, si
                    indexType, reinterpret_cast<void*>(baseIndex * indexSize));
 }
 
+void GLRenderPass::drawInstanced(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount,
+                                 size_t instanceCount) {
+  if (!flushPendingBindings()) {
+    return;
+  }
+  auto gl = _gpu->functions();
+  if (gl->drawArraysInstanced == nullptr) {
+    LOGE("GLRenderPass::drawInstanced: drawArraysInstanced is not supported!");
+    return;
+  }
+  gl->drawArraysInstanced(PrimitiveTypes[static_cast<int>(primitiveType)],
+                          static_cast<int>(baseVertex), static_cast<int>(vertexCount),
+                          static_cast<int>(instanceCount));
+}
+
+void GLRenderPass::drawIndexedInstanced(PrimitiveType primitiveType, size_t baseIndex,
+                                        size_t indexCount, size_t instanceCount) {
+  if (!flushPendingBindings()) {
+    return;
+  }
+  auto gl = _gpu->functions();
+  if (gl->drawElementsInstanced == nullptr) {
+    LOGE("GLRenderPass::drawIndexedInstanced: drawElementsInstanced is not supported!");
+    return;
+  }
+  unsigned indexType = (indexFormat == IndexFormat::UInt16) ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
+  size_t indexSize = (indexFormat == IndexFormat::UInt16) ? sizeof(uint16_t) : sizeof(uint32_t);
+  gl->drawElementsInstanced(
+      PrimitiveTypes[static_cast<int>(primitiveType)], static_cast<int>(indexCount), indexType,
+      reinterpret_cast<void*>(baseIndex * indexSize), static_cast<int>(instanceCount));
+}
+
 void GLRenderPass::bindFramebuffer() {
   DEBUG_ASSERT(!descriptor.colorAttachments.empty());
   auto& colorAttachment = descriptor.colorAttachments[0];
@@ -247,6 +293,10 @@ bool GLRenderPass::flushPendingBindings() {
   if (pendingVertexBuffer) {
     renderPipeline->setVertexBuffer(_gpu, pendingVertexBuffer.get(), pendingVertexOffset);
     pendingVertexBuffer = nullptr;
+  }
+  if (pendingInstanceBuffer) {
+    renderPipeline->setInstanceBuffer(_gpu, pendingInstanceBuffer.get(), pendingInstanceOffset);
+    pendingInstanceBuffer = nullptr;
   }
   if (pendingIndexBuffer) {
     gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, pendingIndexBuffer->bufferID());
