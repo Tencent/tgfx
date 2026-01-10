@@ -35,7 +35,17 @@ TextBlobBuilder::TextBlobBuilder() = default;
 
 TextBlobBuilder::~TextBlobBuilder() {
   freeStorage();
+}
+
+void TextBlobBuilder::reset() {
+  storage = nullptr;
+  storageSize = 0;
+  storageUsed = 0;
+  runCount = 0;
+  lastRunOffset = 0;
+  currentBuffer = {};
   delete userBounds;
+  userBounds = nullptr;
 }
 
 void TextBlobBuilder::freeStorage() {
@@ -49,15 +59,8 @@ void TextBlobBuilder::freeStorage() {
       ptr += runSize;
     }
     free(storage);
-    storage = nullptr;
   }
-  storageSize = 0;
-  storageUsed = 0;
-  runCount = 0;
-  lastRunOffset = 0;
-  currentBuffer = {};
-  delete userBounds;
-  userBounds = nullptr;
+  reset();
 }
 
 void TextBlobBuilder::reserve(size_t size) {
@@ -84,7 +87,7 @@ RunRecord* TextBlobBuilder::lastRun() {
 }
 
 bool TextBlobBuilder::tryMerge(const Font& font, GlyphPositioning positioning, size_t count,
-                               Point offset) {
+                               float y) {
   if (runCount == 0) {
     return false;
   }
@@ -93,7 +96,7 @@ bool TextBlobBuilder::tryMerge(const Font& font, GlyphPositioning positioning, s
     return false;
   }
   if (positioning == GlyphPositioning::Horizontal) {
-    if (run->offset.y != offset.y) {
+    if (run->y != y) {
       return false;
     }
   }
@@ -115,20 +118,19 @@ bool TextBlobBuilder::tryMerge(const Font& font, GlyphPositioning positioning, s
 }
 
 const TextBlobBuilder::RunBuffer& TextBlobBuilder::allocRun(const Font& font, size_t glyphCount,
-                                                            GlyphPositioning positioning,
-                                                            Point offset) {
+                                                            GlyphPositioning positioning, float y) {
   if (glyphCount == 0) {
     currentBuffer = {};
     return currentBuffer;
   }
-  if (tryMerge(font, positioning, glyphCount, offset)) {
+  if (tryMerge(font, positioning, glyphCount, y)) {
     return currentBuffer;
   }
   size_t runSize = RunRecord::StorageSize(glyphCount, positioning);
   reserve(runSize);
   lastRunOffset = storageUsed;
   auto* run = new (storage + storageUsed)
-      RunRecord{font, positioning, static_cast<uint32_t>(glyphCount), offset, 0};
+      RunRecord{font, positioning, static_cast<uint32_t>(glyphCount), y, 0};
   storageUsed += runSize;
   runCount++;
   currentBuffer.glyphs = run->glyphBuffer();
@@ -138,22 +140,22 @@ const TextBlobBuilder::RunBuffer& TextBlobBuilder::allocRun(const Font& font, si
 
 const TextBlobBuilder::RunBuffer& TextBlobBuilder::allocRunPosH(const Font& font, size_t glyphCount,
                                                                 float y) {
-  return allocRun(font, glyphCount, GlyphPositioning::Horizontal, Point::Make(0.0f, y));
+  return allocRun(font, glyphCount, GlyphPositioning::Horizontal, y);
 }
 
 const TextBlobBuilder::RunBuffer& TextBlobBuilder::allocRunPos(const Font& font,
                                                                size_t glyphCount) {
-  return allocRun(font, glyphCount, GlyphPositioning::Point, {});
+  return allocRun(font, glyphCount, GlyphPositioning::Point, 0.0f);
 }
 
 const TextBlobBuilder::RunBuffer& TextBlobBuilder::allocRunRSXform(const Font& font,
                                                                    size_t glyphCount) {
-  return allocRun(font, glyphCount, GlyphPositioning::RSXform, {});
+  return allocRun(font, glyphCount, GlyphPositioning::RSXform, 0.0f);
 }
 
 const TextBlobBuilder::RunBuffer& TextBlobBuilder::allocRunMatrix(const Font& font,
                                                                   size_t glyphCount) {
-  return allocRun(font, glyphCount, GlyphPositioning::Matrix, {});
+  return allocRun(font, glyphCount, GlyphPositioning::Matrix, 0.0f);
 }
 
 void TextBlobBuilder::setBounds(const Rect& bounds) {
@@ -184,14 +186,7 @@ std::shared_ptr<TextBlob> TextBlobBuilder::build() {
     TextBlob::operator delete(p);
   });
 
-  storage = nullptr;
-  storageSize = 0;
-  storageUsed = 0;
-  runCount = 0;
-  lastRunOffset = 0;
-  currentBuffer = {};
-  delete userBounds;
-  userBounds = nullptr;
+  reset();
 
   return result;
 }

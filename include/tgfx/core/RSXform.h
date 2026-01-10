@@ -68,26 +68,6 @@ struct RSXform {
   }
 
   /**
-   * Sets this RSXform to the identity transformation.
-   */
-  void setIdentity() {
-    scos = 1.0f;
-    ssin = 0.0f;
-    tx = 0.0f;
-    ty = 0.0f;
-  }
-
-  /**
-   * Sets this RSXform to the specified values.
-   */
-  void set(float sCos, float sSin, float tX, float tY) {
-    scos = sCos;
-    ssin = sSin;
-    tx = tX;
-    ty = tY;
-  }
-
-  /**
    * Returns true if this RSXform is equal to the other.
    */
   bool operator==(const RSXform& other) const {

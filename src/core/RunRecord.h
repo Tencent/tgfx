@@ -32,7 +32,7 @@ struct RunRecord {
   Font font;
   GlyphPositioning positioning = GlyphPositioning::Point;
   uint32_t glyphCount = 0;
-  Point offset = {};
+  float y = 0.0f;  // Only used for Horizontal positioning
   uint8_t flags = 0;
 
   static constexpr uint8_t kLast_Flag = 0x01;

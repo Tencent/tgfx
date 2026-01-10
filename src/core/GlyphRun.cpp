@@ -28,14 +28,14 @@ GlyphRun GlyphRun::From(const RunRecord* record) {
   run._runSize = record->glyphCount;
   run.glyphs = record->glyphBuffer();
   run.positions = record->posBuffer();
-  run.offset = record->offset;
+  run._y = record->y;
   return run;
 }
 
 Matrix GlyphRun::getMatrix(size_t index) const {
   switch (positioning) {
     case GlyphPositioning::Horizontal:
-      return Matrix::MakeTrans(positions[index], offset.y);
+      return Matrix::MakeTrans(positions[index], _y);
     case GlyphPositioning::Point: {
       auto point = reinterpret_cast<const Point*>(positions)[index];
       return Matrix::MakeTrans(point.x, point.y);
