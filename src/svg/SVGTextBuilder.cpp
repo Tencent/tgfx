@@ -29,7 +29,8 @@
 namespace tgfx {
 
 SVGTextBuilder::UnicharsInfo SVGTextBuilder::glyphToUnicharsInfo(const GlyphRun& glyphRun) {
-  auto unicodeChars = converter.glyphsToUnichars(glyphRun.font, glyphRun.glyphs);
+  std::vector<GlyphID> glyphIDs(glyphRun.glyphs, glyphRun.glyphs + glyphRun.runSize());
+  auto unicodeChars = converter.glyphsToUnichars(glyphRun.font, glyphIDs);
   if (unicodeChars.empty()) {
     return {};
   }
@@ -44,7 +45,8 @@ SVGTextBuilder::UnicharsInfo SVGTextBuilder::glyphToUnicharsInfo(const GlyphRun&
 
   for (uint32_t i = 0; i < unicodeChars.size(); i++) {
     auto c = unicodeChars[i];
-    auto position = glyphRun.positions[i];
+    auto matrix = glyphRun.getMatrix(i);
+    auto position = Point::Make(matrix.getTranslateX(), matrix.getTranslateY());
     bool discardPos = false;
     bool isWhitespace = false;
 

@@ -257,8 +257,8 @@ void SimpleTextLayer::updateLayout() {
         }
         index++;
       }
-      tgfx::GlyphRun glyphRun(font, std::move(glyphs), std::move(positions));
-      richText.textBlob = tgfx::TextBlob::MakeFrom(std::move(glyphRun));
+      richText.textBlob =
+          tgfx::TextBlob::MakeFrom(glyphs.data(), positions.data(), glyphs.size(), font);
     } else if (richText.type == Element::Type::Image) {
       auto descent = underlines[lineIndex] - baselines[lineIndex];
       auto imageTop = baselines[lineIndex] - richText.height + descent * 0.5f;

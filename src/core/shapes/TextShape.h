@@ -19,7 +19,6 @@
 #pragma once
 
 #include "core/shapes/UniqueKeyShape.h"
-#include "tgfx/core/Matrix.h"
 #include "tgfx/core/TextBlob.h"
 
 namespace tgfx {

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,28 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <string>
-#include "core/GlyphRun.h"
-#include "core/utils/GlyphConverter.h"
-#include "tgfx/core/Typeface.h"
+#include "tgfx/core/RSXform.h"
+#include <cmath>
 
 namespace tgfx {
-class SVGTextBuilder {
- public:
-  struct UnicharsInfo {
-    std::string text;
-    std::string posX;
-    std::string posY;
-  };
 
-  SVGTextBuilder() = default;
-  ~SVGTextBuilder() = default;
+RSXform RSXform::MakeFromRadians(float scale, float radians, float tx, float ty, float ax,
+                                 float ay) {
+  const float s = std::sin(radians) * scale;
+  const float c = std::cos(radians) * scale;
+  return Make(c, s, tx + -c * ax + s * ay, ty + -s * ax - c * ay);
+}
 
-  UnicharsInfo glyphToUnicharsInfo(const GlyphRun& glyphRun);
-
- private:
-  GlyphConverter converter;
-};
 }  // namespace tgfx

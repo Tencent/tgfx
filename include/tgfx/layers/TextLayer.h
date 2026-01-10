@@ -25,6 +25,7 @@
 namespace tgfx {
 class GlyphInfo;
 class GlyphLine;
+class TextBlob;
 
 /**
  * A layer that provides simple layout and rendering of a plain text.
@@ -158,8 +159,8 @@ class TextLayer : public Layer {
                             float emptyAdvance,
                             std::vector<std::shared_ptr<GlyphInfo>>& finalGlyphInfos,
                             std::vector<Point>& positions) const;
-  void buildGlyphRunList(const std::vector<std::shared_ptr<GlyphInfo>>& finalGlyphs,
-                         const std::vector<Point>& positions,
-                         std::vector<GlyphRun>& glyphRunList) const;
+  std::shared_ptr<TextBlob> buildTextBlob(
+      const std::vector<std::shared_ptr<GlyphInfo>>& finalGlyphs,
+      const std::vector<Point>& positions) const;
 };
 }  // namespace tgfx
