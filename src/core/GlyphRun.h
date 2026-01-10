@@ -60,7 +60,7 @@ struct GlyphRun {
 
  private:
   size_t _runSize = 0;
-  float _y = 0.0f;  // Only used for Horizontal positioning
+  float offsetY = 0.0f;  // Only used for Horizontal positioning
   friend struct RunRecord;
 };
 

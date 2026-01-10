@@ -75,21 +75,41 @@ struct RSXform {
    * Returns true if the transformation keeps rectangles axis-aligned (no rotation or 90-degree
    * rotation).
    */
-  constexpr bool rectStaysRect() const {
+  bool rectStaysRect() const {
     return scos == 0 || ssin == 0;
+  }
+
+  /**
+   * Sets this RSXform to the identity transformation.
+   */
+  void setIdentity() {
+    scos = 1.0f;
+    ssin = 0.0f;
+    tx = 0.0f;
+    ty = 0.0f;
+  }
+
+  /**
+   * Sets this RSXform to the specified values.
+   */
+  void set(float sCos, float sSin, float tX, float tY) {
+    scos = sCos;
+    ssin = sSin;
+    tx = tX;
+    ty = tY;
   }
 
   /**
    * Returns true if this RSXform is equal to the other.
    */
-  constexpr bool operator==(const RSXform& other) const {
+  bool operator==(const RSXform& other) const {
     return scos == other.scos && ssin == other.ssin && tx == other.tx && ty == other.ty;
   }
 
   /**
    * Returns true if this RSXform is not equal to the other.
    */
-  constexpr bool operator!=(const RSXform& other) const {
+  bool operator!=(const RSXform& other) const {
     return !(*this == other);
   }
 };
