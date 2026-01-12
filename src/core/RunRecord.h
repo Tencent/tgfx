@@ -35,7 +35,7 @@ struct RunRecord {
   float y = 0.0f;  // Only used for Horizontal positioning
   uint8_t flags = 0;
 
-  static constexpr uint8_t kLast_Flag = 0x01;
+  static constexpr uint8_t LAST_FLAG = 0x01;
 
   static size_t StorageSize(size_t count, GlyphPositioning pos);
 
@@ -48,11 +48,11 @@ struct RunRecord {
   size_t storageSize() const;
 
   bool isLast() const {
-    return (flags & kLast_Flag) != 0;
+    return (flags & LAST_FLAG) != 0;
   }
 
   void setLast() {
-    flags |= kLast_Flag;
+    flags |= LAST_FLAG;
   }
 
   const RunRecord* next() const;
