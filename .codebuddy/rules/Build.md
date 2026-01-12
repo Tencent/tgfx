@@ -18,6 +18,7 @@ cmake --build cmake-build-debug --target TGFXFullTest
 - 测试代码可通过编译参数访问所有 private 成员，无需 friend class
 - 运行测试：按上述编译验证步骤构建并执行 `TGFXFullTest`
 - 测试命令返回非零退出码表示测试失败，这是正常行为，不要重复执行同一命令
+- 测试用例构造时，所有字号、坐标、矩阵等数值尽可能使用整数，避免小数点，以确保清晰度
 
 ## 截图测试
 

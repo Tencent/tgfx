@@ -168,19 +168,15 @@ void VectorGroup::apply(VectorContext* context) {
     }
   }
 
-  // Merge geometries and matrices
-  auto geometryOffset = context->geometries.size();
-  for (size_t i = 0; i < groupContext.geometries.size(); i++) {
-    context->geometries.push_back(std::move(groupContext.geometries[i]));
-    auto matrix = groupContext.matrices[i];
-    matrix.postConcat(groupMatrix);
-    context->matrices.push_back(matrix);
+  // Merge geometries with group transform
+  for (auto& geometry : groupContext.geometries) {
+    geometry->matrix.postConcat(groupMatrix);
+    context->geometries.push_back(std::move(geometry));
   }
 
-  // Merge painters with index offset and transform
+  // Merge painters with alpha
   for (auto& painter : groupContext.painters) {
-    painter->offsetGeometryIndex(geometryOffset);
-    painter->applyTransform(groupMatrix, _alpha);
+    painter->applyAlpha(_alpha);
     context->painters.push_back(std::move(painter));
   }
 }
