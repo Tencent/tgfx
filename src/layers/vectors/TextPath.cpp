@@ -25,14 +25,6 @@
 
 namespace tgfx {
 
-void TextPath::setDirection(TextDirection value) {
-  if (_direction == value) {
-    return;
-  }
-  _direction = value;
-  invalidateContent();
-}
-
 void TextPath::setPath(Path value) {
   if (_path == value) {
     return;
@@ -192,7 +184,8 @@ void TextPath::apply(VectorContext* context) {
       }
 
       if (isClosed && (centerPosition < 0.0f || centerPosition > pathLength)) {
-        centerPosition = std::fmod(centerPosition + pathLength, pathLength);
+        centerPosition =
+            std::fmod(std::fmod(centerPosition, pathLength) + pathLength, pathLength);
       }
 
       Point position = {};

@@ -65,24 +65,31 @@ class Geometry {
     return textBlob != nullptr || !glyphs.empty();
   }
 
+  /**
+   * The transformation matrix applied to this geometry.
+   */
   Matrix matrix = Matrix::I();
+
+  /**
+   * The shape content, used for path-based geometries.
+   */
   std::shared_ptr<Shape> shape = nullptr;
+
+  /**
+   * The text blob content, used for text-based geometries.
+   */
   std::shared_ptr<TextBlob> textBlob = nullptr;
+
+  /**
+   * Individual glyphs with per-glyph transformations, expanded from textBlob for modification.
+   */
   std::vector<Glyph> glyphs = {};
 
  private:
   friend class VectorContext;
 
-  /**
-   * Expands textBlob into individual glyphs for modification.
-   */
   void expandToGlyphs();
-
-  /**
-   * Converts text content to shape and clears text data.
-   */
   void convertToShape();
-
   std::shared_ptr<TextBlob> buildTextBlob();
 };
 

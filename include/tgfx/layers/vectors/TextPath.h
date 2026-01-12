@@ -24,20 +24,6 @@
 namespace tgfx {
 
 /**
- * Defines the text direction for text layout.
- */
-enum class TextDirection {
-  /**
-   * Text flows horizontally from left to right.
-   */
-  Horizontal,
-  /**
-   * Text flows vertically from top to bottom.
-   */
-  Vertical
-};
-
-/**
  * Defines text alignment on a path.
  */
 enum class TextPathAlign {
@@ -61,18 +47,6 @@ enum class TextPathAlign {
  */
 class TextPath : public VectorElement {
  public:
-  /**
-   * Returns the text direction for layout. Affects how characters are oriented.
-   */
-  TextDirection direction() const {
-    return _direction;
-  }
-
-  /**
-   * Sets the text direction for layout.
-   */
-  void setDirection(TextDirection value);
-
   /**
    * Returns the path that text follows.
    */
@@ -111,8 +85,8 @@ class TextPath : public VectorElement {
   void setFirstMargin(float value);
 
   /**
-   * Returns the margin from the path end in pixels. Negative values offset text backward from the
-   * path end (shrinking the available region).
+   * Returns the margin from the path end in pixels. Negative values shrink the available region
+   * from the end, while positive values extend beyond the path end.
    */
   float lastMargin() const {
     return _lastMargin;
@@ -148,8 +122,8 @@ class TextPath : public VectorElement {
   void setReversed(bool value);
 
   /**
-   * Returns whether to force text to fit within the available path region. When enabled, text is
-   * scaled or spaced to fit within the bounds defined by firstMargin and lastMargin.
+   * Returns whether to force text to fit within the available path region. When enabled, letter
+   * spacing is adjusted to fit text within the bounds defined by firstMargin and lastMargin.
    */
   bool forceAlignment() const {
     return _forceAlignment;
@@ -168,7 +142,6 @@ class TextPath : public VectorElement {
   void apply(VectorContext* context) override;
 
  private:
-  TextDirection _direction = TextDirection::Horizontal;
   Path _path = {};
   TextPathAlign _align = TextPathAlign::Start;
   float _firstMargin = 0.0f;
