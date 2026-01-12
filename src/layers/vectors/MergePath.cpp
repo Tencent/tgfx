@@ -38,17 +38,15 @@ void MergePath::apply(VectorContext* context) {
   auto geometries = context->getShapeGeometries();
 
   std::shared_ptr<Shape> mergedShape = nullptr;
-  for (size_t i = 0; i < geometries.size(); i++) {
-    auto& shape = geometries[i]->shape;
-    if (shape == nullptr) {
+  for (auto* geometry : geometries) {
+    if (geometry->shape == nullptr) {
       continue;
     }
-    auto shapeWithMatrix = Shape::ApplyMatrix(shape, context->matrices[i]);
+    auto shapeWithMatrix = Shape::ApplyMatrix(geometry->shape, geometry->matrix);
     mergedShape = Shape::Merge(mergedShape, shapeWithMatrix, _pathOp);
   }
 
   context->geometries.clear();
-  context->matrices.clear();
   context->painters.clear();
 
   if (mergedShape) {

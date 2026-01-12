@@ -22,7 +22,7 @@
 
 namespace tgfx {
 
-struct VectorContext;
+class VectorContext;
 
 /**
  * VectorElement is the base class for all vector elements in a shape layer. It includes shapes

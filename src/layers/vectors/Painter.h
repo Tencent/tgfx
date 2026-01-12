@@ -21,7 +21,6 @@
 #include <vector>
 #include "Geometry.h"
 #include "tgfx/core/BlendMode.h"
-#include "tgfx/core/Matrix.h"
 #include "tgfx/core/Shader.h"
 
 namespace tgfx {
@@ -36,19 +35,16 @@ class Painter {
   virtual ~Painter() = default;
 
   /**
-   * Applies a transformation matrix and alpha multiplier to this painter.
+   * Applies an alpha multiplier to this painter.
    */
-  void applyTransform(const Matrix& groupMatrix, float groupAlpha);
-
-  /**
-   * Offsets the geometry indices by the given amount.
-   */
-  void offsetGeometryIndex(size_t offset);
+  void applyAlpha(float groupAlpha) {
+    alpha *= groupAlpha;
+  }
 
   /**
    * Draws the geometries to the given recorder.
    */
-  void draw(LayerRecorder* recorder, const std::vector<std::unique_ptr<Geometry>>& geometries);
+  virtual void draw(LayerRecorder* recorder) = 0;
 
   /**
    * Creates a copy of this painter.
@@ -58,16 +54,7 @@ class Painter {
   std::shared_ptr<Shader> shader = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
   float alpha = 1.0f;
-  Matrix matrix = Matrix::I();
-  size_t startIndex = 0;
-  std::vector<Matrix> matrices = {};
-
- protected:
-  /**
-   * Called for each geometry during draw. The innerMatrix is the matrix captured when the
-   * painter was created, which should be applied before stroke and before the outer matrix.
-   */
-  virtual void onDraw(LayerRecorder* recorder, Geometry* geometry, const Matrix& innerMatrix) = 0;
+  std::vector<Geometry*> geometries = {};
 };
 
 }  // namespace tgfx
