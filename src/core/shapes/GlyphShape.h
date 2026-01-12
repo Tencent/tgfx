@@ -18,13 +18,13 @@
 
 #pragma once
 
-#include "core/shapes/UniqueKeyShape.h"
+#include "tgfx/core/Shape.h"
 
 namespace tgfx {
 /**
  * Shape that contains a Font and GlyphID.
  */
-class GlyphShape : public UniqueKeyShape {
+class GlyphShape : public Shape {
  public:
   explicit GlyphShape(Font font, GlyphID glyphID);
 
@@ -38,6 +38,8 @@ class GlyphShape : public UniqueKeyShape {
   Type type() const override {
     return Type::Glyph;
   }
+
+  UniqueKey getUniqueKey() const override;
 
   Path onGetPath(float resolutionScale) const override;
 

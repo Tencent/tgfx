@@ -18,12 +18,20 @@
 
 #pragma once
 
-#include "tgfx/core/GlyphRun.h"
+#include <memory>
+#include <vector>
+#include "tgfx/core/Font.h"
+#include "tgfx/core/RSXform.h"
 
 namespace tgfx {
+class TextBlobBuilder;
+class GlyphRunList;
+struct RunRecord;
+
 /**
  * TextBlob combines multiple text runs into an immutable container. Each text run consists of
- * glyphs, positions, and font.
+ * glyphs, positions, and font. The object and run data are stored in a single contiguous memory
+ * block for efficiency.
  */
 class TextBlob {
  public:
@@ -44,16 +52,27 @@ class TextBlob {
                                             size_t glyphCount, const Font& font);
 
   /**
-   * Creates a new TextBlob from a single glyph run. Returns nullptr if the glyph run is empty or
-   * has mismatched glyph and position counts.
+   * Creates a new TextBlob with horizontal positioning. Each glyph has an x position, and all
+   * glyphs share the same y offset. Returns nullptr if the glyphCount is 0.
+   * @param glyphIDs Array of glyph IDs.
+   * @param xPositions Array of x positions, one per glyph.
+   * @param glyphCount Number of glyphs.
+   * @param y Shared y position for all glyphs.
+   * @param font The font for rendering.
    */
-  static std::shared_ptr<TextBlob> MakeFrom(GlyphRun glyphRun);
+  static std::shared_ptr<TextBlob> MakeFromPosH(const GlyphID glyphIDs[], const float xPositions[],
+                                                size_t glyphCount, float y, const Font& font);
 
   /**
-   * Creates a new TextBlob from the given glyph runs. Returns nullptr if glyphRuns is empty or if
-   * any of the glyph runs are invalid (i.e., have mismatched glyph and position counts).
+   * Creates a new TextBlob with RSXform positioning. Each glyph has a rotation, scale, and
+   * translation. Returns nullptr if the glyphCount is 0.
+   * @param glyphIDs Array of glyph IDs.
+   * @param xforms Array of RSXform values, one per glyph.
+   * @param glyphCount Number of glyphs.
+   * @param font The font for rendering.
    */
-  static std::shared_ptr<TextBlob> MakeFrom(std::vector<GlyphRun> glyphRuns);
+  static std::shared_ptr<TextBlob> MakeFromRSXform(const GlyphID glyphIDs[], const RSXform xforms[],
+                                                   size_t glyphCount, const Font& font);
 
   ~TextBlob();
 
@@ -79,20 +98,20 @@ class TextBlob {
    */
   bool hitTestPoint(float localX, float localY, const Stroke* stroke = nullptr) const;
 
-  /**
-   * Returns the glyph runs that make up this TextBlob.
-   */
-  const std::vector<GlyphRun>& glyphRuns() const {
-    return _glyphRuns;
-  }
-
  private:
-  std::vector<GlyphRun> _glyphRuns = {};
+  size_t runCount = 0;
   mutable std::atomic<Rect*> bounds = {nullptr};
 
-  explicit TextBlob(std::vector<GlyphRun> glyphRuns) : _glyphRuns(std::move(glyphRuns)) {
-  }
+  explicit TextBlob(size_t runCount);
+  TextBlob(size_t runCount, const Rect& bounds);
 
+  void operator delete(void* p);
+  void* operator new(size_t, void* p);
+
+  const RunRecord* firstRun() const;
   Rect computeBounds() const;
+
+  friend class TextBlobBuilder;
+  friend class GlyphRunList;
 };
 }  // namespace tgfx

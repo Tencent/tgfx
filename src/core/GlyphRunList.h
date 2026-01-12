@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,38 +18,47 @@
 
 #pragma once
 
-#include "tgfx/core/Font.h"
+#include "core/GlyphRun.h"
 
 namespace tgfx {
-/**
- * GlyphRun represents a sequence of glyphs from a single font, along with their positions.
- */
-struct GlyphRun {
-  /**
-   * Constructs an empty GlyphRun.
-   */
-  GlyphRun() = default;
 
-  /**
-   * Constructs a GlyphRun using a font, a list of glyph IDs, and their positions.
-   */
-  GlyphRun(Font font, std::vector<GlyphID> glyphIDs, std::vector<Point> positions)
-      : font(std::move(font)), glyphs(std::move(glyphIDs)), positions(std::move(positions)) {
+class TextBlob;
+struct RunRecord;
+
+// A lightweight list class for iterating over GlyphRuns without allocating a vector.
+class GlyphRunList {
+ public:
+  class Iterator {
+   public:
+    Iterator(const RunRecord* record, size_t remaining) : current(record), remaining(remaining) {
+    }
+
+    GlyphRun operator*() const;
+
+    Iterator& operator++();
+
+    bool operator!=(const Iterator& other) const {
+      return remaining != other.remaining;
+    }
+
+   private:
+    const RunRecord* current = nullptr;
+    size_t remaining = 0;
+  };
+
+  explicit GlyphRunList(const TextBlob* blob) : blob(blob) {
   }
 
-  /**
-   * Returns the Font used to render the glyphs in this run.
-   */
-  Font font = {};
+  Iterator begin() const;
 
-  /**
-   * Returns the sequence of glyph IDs in this run.
-   */
-  std::vector<GlyphID> glyphs = {};
+  Iterator end() const {
+    return Iterator(nullptr, 0);
+  }
 
-  /**
-   * Returns the sequence of positions for each glyph in this run.
-   */
-  std::vector<Point> positions = {};
+  bool empty() const;
+
+ private:
+  const TextBlob* blob = nullptr;
 };
+
 }  // namespace tgfx
