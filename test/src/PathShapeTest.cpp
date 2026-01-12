@@ -734,6 +734,20 @@ TGFX_TEST(PathShapeTest, AdaptiveDashEffect) {
   auto effect = PathEffect::MakeDash(dashList, 2, 20, true);
   effect->filterPath(&path);
   canvas->drawPath(path, paint);
+
+  // Test large path dash effect - should apply dash correctly, not draw as continuous line
+  Path largePath = {};
+  RRect rRect;
+  rRect.rect = Rect::MakeXYWH(10, 10, 432, 400);
+  rRect.radii = Point(6, 6);
+  largePath.addRRect(rRect);
+  float largeDashList[] = {2.f, 2.f};
+  auto largeEffect = PathEffect::MakeDash(largeDashList, 2, 0.0f, true);
+  largeEffect->filterPath(&largePath);
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStrokeWidth(2.0f);
+  canvas->drawPath(largePath, paint);
+
   EXPECT_TRUE(Baseline::Compare(surface, "PathShapeTest/AdaptiveDashEffect"));
 }
 
