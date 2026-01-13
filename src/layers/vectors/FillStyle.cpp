@@ -33,31 +33,26 @@ class FillPainter : public Painter {
     return std::make_unique<FillPainter>(*this);
   }
 
- protected:
-  void onDraw(LayerRecorder* recorder, Geometry* geometry, const Matrix& innerMatrix) override {
-    auto finalMatrix = innerMatrix;
-    finalMatrix.postConcat(matrix);
-    LayerPaint paint(shader, alpha, blendMode);
+  void draw(LayerRecorder* recorder) override {
+    for (auto* geometry : geometries) {
+      LayerPaint paint(shader, alpha, blendMode);
 
-    // Prefer drawing TextBlob directly for better rendering quality
-    auto textBlob = geometry->getTextBlob();
-    if (textBlob) {
-      recorder->addTextBlob(textBlob, paint, finalMatrix);
-      return;
-    }
+      auto textBlob = geometry->getTextBlob();
+      if (textBlob) {
+        recorder->addTextBlob(textBlob, paint, geometry->matrix);
+        continue;
+      }
 
-    // Fall back to Shape for ShapeGeometry or converted TextGeometry
-    auto shape = geometry->getShape();
-    if (shape == nullptr) {
-      return;
+      auto shape = geometry->getShape();
+      if (shape == nullptr) {
+        continue;
+      }
+      if (shape->fillType() == PathFillType::Winding) {
+        shape = Shape::ApplyFillType(shape, fillRule);
+      }
+      shape = Shape::ApplyMatrix(shape, geometry->matrix);
+      recorder->addShape(std::move(shape), paint);
     }
-    // Only apply fillRule if the shape's current fillType is the default (Winding).
-    // This preserves fillType set by PathOp (e.g., MergePath with XOR produces EvenOdd).
-    if (shape->fillType() == PathFillType::Winding) {
-      shape = Shape::ApplyFillType(shape, fillRule);
-    }
-    shape = Shape::ApplyMatrix(shape, finalMatrix);
-    recorder->addShape(std::move(shape), paint);
   }
 };
 
@@ -123,8 +118,10 @@ void FillStyle::apply(VectorContext* context) {
   painter->blendMode = _blendMode;
   painter->alpha = _alpha;
   painter->fillRule = _fillRule;
-  painter->startIndex = 0;
-  painter->matrices = context->matrices;
+  painter->geometries.reserve(context->geometries.size());
+  for (auto& geometry : context->geometries) {
+    painter->geometries.push_back(geometry.get());
+  }
   context->painters.push_back(std::move(painter));
 }
 

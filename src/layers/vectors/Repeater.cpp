@@ -18,6 +18,7 @@
 
 #include "tgfx/layers/vectors/Repeater.h"
 #include <cmath>
+#include <unordered_map>
 #include "VectorContext.h"
 #include "core/utils/Log.h"
 
@@ -119,20 +120,23 @@ void Repeater::apply(VectorContext* context) {
   }
   if (_copies == 0.0f) {
     context->geometries.clear();
-    context->matrices.clear();
     context->painters.clear();
     return;
   }
 
   auto maxCount = static_cast<int>(ceilf(_copies));
   std::vector<std::unique_ptr<Geometry>> originalGeometries = std::move(context->geometries);
-  std::vector<Matrix> originalMatrices = std::move(context->matrices);
   std::vector<std::unique_ptr<Painter>> originalPainters = std::move(context->painters);
   context->geometries.clear();
-  context->matrices.clear();
   context->painters.clear();
+  context->geometries.reserve(originalGeometries.size() * static_cast<size_t>(maxCount));
+  context->painters.reserve(originalPainters.size() * static_cast<size_t>(maxCount));
 
-  for (int i = 0; i < maxCount; i++) {
+  auto startIndex = _order == RepeaterOrder::BelowOriginal ? maxCount - 1 : 0;
+  auto endIndex = _order == RepeaterOrder::BelowOriginal ? -1 : maxCount;
+  auto step = _order == RepeaterOrder::BelowOriginal ? -1 : 1;
+
+  for (int i = startIndex; i != endIndex; i += step) {
     auto progress = static_cast<float>(i) + _offset;
     auto repeatMatrix = getMatrix(progress);
     auto alphaT = progress / static_cast<float>(maxCount);
@@ -141,55 +145,24 @@ void Repeater::apply(VectorContext* context) {
       copyAlpha *= _copies - static_cast<float>(i);
     }
 
-    std::vector<std::unique_ptr<Geometry>> copyGeometries = {};
-    std::vector<Matrix> copyMatrices = {};
-    copyGeometries.reserve(originalGeometries.size());
-    copyMatrices.reserve(originalGeometries.size());
-    for (size_t j = 0; j < originalGeometries.size(); j++) {
-      copyGeometries.push_back(originalGeometries[j]->clone());
-      auto matrix = originalMatrices[j];
-      matrix.postConcat(repeatMatrix);
-      copyMatrices.push_back(matrix);
-    }
-    std::vector<std::unique_ptr<Painter>> copyPainters = {};
-    copyPainters.reserve(originalPainters.size());
-    for (const auto& painter : originalPainters) {
-      auto copyPainter = painter->clone();
-      copyPainter->applyTransform(repeatMatrix, copyAlpha);
-      copyPainters.push_back(std::move(copyPainter));
+    std::unordered_map<Geometry*, Geometry*> geometryMap = {};
+    for (auto& geometry : originalGeometries) {
+      auto cloned = geometry->clone();
+      cloned->matrix.postConcat(repeatMatrix);
+      geometryMap[geometry.get()] = cloned.get();
+      context->geometries.push_back(std::move(cloned));
     }
 
-    if (_order == RepeaterOrder::BelowOriginal) {
-      // BelowOriginal: copies are below original, so original (last) is on top
-      // Insert new copies at the beginning so they are drawn first (below)
-      for (auto& painter : context->painters) {
-        painter->offsetGeometryIndex(copyGeometries.size());
+    for (const auto& painter : originalPainters) {
+      auto copyPainter = painter->clone();
+      for (auto& geom : copyPainter->geometries) {
+        auto it = geometryMap.find(geom);
+        if (it != geometryMap.end()) {
+          geom = it->second;
+        }
       }
-      context->geometries.insert(context->geometries.begin(),
-                                 std::make_move_iterator(copyGeometries.begin()),
-                                 std::make_move_iterator(copyGeometries.end()));
-      context->matrices.insert(context->matrices.begin(),
-                               std::make_move_iterator(copyMatrices.begin()),
-                               std::make_move_iterator(copyMatrices.end()));
-      context->painters.insert(context->painters.begin(),
-                               std::make_move_iterator(copyPainters.begin()),
-                               std::make_move_iterator(copyPainters.end()));
-    } else {
-      // AboveOriginal: copies are above original, so original (first) is below
-      // Insert new copies at the end so they are drawn last (on top)
-      auto painterStartIndex = context->geometries.size();
-      for (auto& painter : copyPainters) {
-        painter->offsetGeometryIndex(painterStartIndex);
-      }
-      context->geometries.insert(context->geometries.end(),
-                                 std::make_move_iterator(copyGeometries.begin()),
-                                 std::make_move_iterator(copyGeometries.end()));
-      context->matrices.insert(context->matrices.end(),
-                               std::make_move_iterator(copyMatrices.begin()),
-                               std::make_move_iterator(copyMatrices.end()));
-      context->painters.insert(context->painters.end(),
-                               std::make_move_iterator(copyPainters.begin()),
-                               std::make_move_iterator(copyPainters.end()));
+      copyPainter->applyAlpha(copyAlpha);
+      context->painters.push_back(std::move(copyPainter));
     }
   }
 }

@@ -490,6 +490,8 @@
         "StrokeDashWithTrim": "4a74f6aa",
         "StrokeJoinCap": "4a74f6aa",
         "StrokeNestedScale": "4a74f6aa",
+        "TextPath": "9020d7e2",
+        "TextPathWithTrimPath": "9020d7e2",
         "TextSpanBasic": "48b78e36",
         "TextSpanEdgeCases": "48b78e36",
         "TextSpanEmoji": "48b78e36",
