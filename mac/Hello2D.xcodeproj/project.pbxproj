@@ -18,6 +18,7 @@
 		F2B5D47B2B0484E8000A1CEC /* ViewController.mm in Sources */ = {isa = PBXBuildFile; fileRef = F2B5D4792B0484E8000A1CEC /* ViewController.mm */; };
 		F2B5D47C2B0484E8000A1CEC /* WindowController.mm in Sources */ = {isa = PBXBuildFile; fileRef = F2B5D47A2B0484E8000A1CEC /* WindowController.mm */; };
 		F2F2CEFC2B0B5C510092BD3B /* tgfx-hello2d.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F2F2CEFB2B0B5C510092BD3B /* tgfx-hello2d.a */; };
+		F5FE165B2EFB7FA40000E9F9 /* imageReplacement.jpg in Resources */ = {isa = PBXBuildFile; fileRef = F5FE165A2EFB7FA40000E9F9 /* imageReplacement.jpg */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -39,6 +40,7 @@
 		F2B5D4792B0484E8000A1CEC /* ViewController.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ViewController.mm; sourceTree = "<group>"; };
 		F2B5D47A2B0484E8000A1CEC /* WindowController.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = WindowController.mm; sourceTree = "<group>"; };
 		F2F2CEFB2B0B5C510092BD3B /* tgfx-hello2d.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = "tgfx-hello2d.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		F5FE165A2EFB7FA40000E9F9 /* imageReplacement.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; name = imageReplacement.jpg; path = ../../resources/apitest/imageReplacement.jpg; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -76,6 +78,7 @@
 			children = (
 				E105D3942E4098B800F4831B /* tgfx.png */,
 				F201BD762B0472B40020C0FA /* bridge.jpg */,
+				F5FE165A2EFB7FA40000E9F9 /* imageReplacement.jpg */,
 				857B02A62455D81100E533CF /* AppDelegate.h */,
 				857B02A72455D81100E533CF /* AppDelegate.m */,
 				F201BD732B0471C00020C0FA /* TGFXView.h */,
@@ -162,6 +165,7 @@
 			files = (
 				E105D3952E4098B800F4831B /* tgfx.png in Resources */,
 				F201BD772B0472B40020C0FA /* bridge.jpg in Resources */,
+				F5FE165B2EFB7FA40000E9F9 /* imageReplacement.jpg in Resources */,
 				857B02AD2455D81200E533CF /* Assets.xcassets in Resources */,
 				857B02B02455D81200E533CF /* Main.storyboard in Resources */,
 			);

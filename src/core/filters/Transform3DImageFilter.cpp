@@ -69,8 +69,7 @@ Rect Transform3DImageFilter::onFilterBounds(const Rect& rect, MapDirection mapDi
     // degrees around the X-axis). In this case, there is no visible content to draw.
     return Rect::MakeEmpty();
   }
-  auto result = inversedMatrix.mapRect(rect);
-  return result;
+  return inversedMatrix.mapRect(rect);
 }
 
 std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(
