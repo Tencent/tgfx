@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <optional>
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Rect.h"
@@ -53,6 +54,22 @@ class LayerContent {
    * Draws the contour of the content to the specified canvas.
    */
   virtual void drawContour(Canvas* canvas, bool antiAlias) const = 0;
+
+  /**
+   * Returns the opaque rectangle bounds of this content's contour if it is a simple opaque
+   * rectangle fill. Returns std::nullopt if the content is not an opaque rectangle (e.g., has
+   * stroke, has image shader, has transparency, or is a complex shape).
+   */
+  virtual std::optional<Rect> getContourOpaqueRect() const {
+    return std::nullopt;
+  }
+
+  /**
+   * Returns true if the contour drawing result equals the opaque content drawing result.
+   */
+  virtual bool contourEqualsOpaqueContent() const {
+    return false;
+  }
 
   /**
    * Draws the default content of the layer (content below children) to the specified canvas.

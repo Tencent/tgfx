@@ -33,6 +33,7 @@ class GeometryContent : public LayerContent {
   explicit GeometryContent(const LayerPaint& paint);
 
   Rect getBounds() const override;
+  bool contourEqualsOpaqueContent() const override;
   void drawContour(Canvas* canvas, bool antiAlias) const override;
   bool drawDefault(Canvas* canvas, float alpha, bool antiAlias) const override;
   void drawForeground(Canvas* canvas, float alpha, bool antiAlias) const override;

@@ -25,6 +25,13 @@ RectContent::RectContent(const Rect& rect, const LayerPaint& paint)
     : GeometryContent(paint), rect(rect) {
 }
 
+std::optional<Rect> RectContent::getContourOpaqueRect() const {
+  if (stroke || (shader && shader->isAImage())) {
+    return std::nullopt;
+  }
+  return rect;
+}
+
 Rect RectContent::onGetBounds() const {
   return rect;
 }

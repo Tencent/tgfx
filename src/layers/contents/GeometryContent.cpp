@@ -59,6 +59,16 @@ Rect GeometryContent::getBounds() const {
   return bounds;
 }
 
+bool GeometryContent::contourEqualsOpaqueContent() const {
+  if (color.alpha <= 0) {
+    return false;
+  }
+  if (shader) {
+    return shader->isOpaque();
+  }
+  return true;
+}
+
 bool GeometryContent::drawDefault(Canvas* canvas, float contentAlpha, bool antiAlias) const {
   if (color.alpha <= 0) {
     return false;

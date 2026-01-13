@@ -27,6 +27,7 @@ class RectContent : public GeometryContent {
  public:
   RectContent(const Rect& rect, const LayerPaint& paint);
 
+  std::optional<Rect> getContourOpaqueRect() const override;
   Rect getTightBounds(const Matrix& matrix) const override;
   bool hitTestPoint(float localX, float localY) const override;
 

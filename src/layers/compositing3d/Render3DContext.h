@@ -18,34 +18,18 @@
 
 #pragma once
 
-#include <memory>
-#include <stack>
-#include "tgfx/core/Canvas.h"
-#include "tgfx/core/ColorSpace.h"
-#include "tgfx/core/Matrix3D.h"
-#include "tgfx/core/PictureRecorder.h"
-#include "tgfx/core/Point.h"
+#include "Base3DContext.h"
 
 namespace tgfx {
 
 class BackgroundContext;
 class Context3DCompositor;
 
-struct Render3DContextState {
-  Render3DContextState(const Matrix3D& transform, bool antialiasing)
-      : transform(transform), antialiasing(antialiasing) {
-  }
-
-  Matrix3D transform = {};
-  bool antialiasing = true;
-  PictureRecorder recorder = {};
-};
-
 /**
  * Manages the rendering state for layers in a 3D context, handling recording, transformation
  * accumulation, and compositing of layer content with perspective effects.
  */
-class Render3DContext {
+class Render3DContext : public Base3DContext {
  public:
   /**
    * Creates a new Render3DContext.
@@ -57,39 +41,19 @@ class Render3DContext {
    */
   Render3DContext(std::shared_ptr<Context3DCompositor> compositor, const Point& offset,
                   float contentScale, std::shared_ptr<ColorSpace> colorSpace,
-                  std::shared_ptr<BackgroundContext> backgroundContext)
-      : _compositor(std::move(compositor)), _offset(offset), _contentScale(contentScale),
-        _colorSpace(std::move(colorSpace)), _backgroundContext(std::move(backgroundContext)) {
-  }
+                  std::shared_ptr<BackgroundContext> backgroundContext);
 
-  /**
-   * Begins recording a new layer with the specified transform and antialiasing setting.
-   * @param childTransform The 3D transform to apply to the layer content.
-   * @param antialiasing Whether to enable edge antialiasing for this layer.
-   * @return A canvas to draw the layer content on.
-   */
-  Canvas* beginRecording(const Matrix3D& childTransform, bool antialiasing);
+  void finishAndDrawTo(Canvas* canvas, bool antialiasing) override;
 
-  /**
-   * Ends recording the current layer and adds it to the compositor.
-   */
-  void endRecording();
-
-  /**
-   * Finishes the 3D rendering and draws the result to the target canvas.
-   * @param canvas The target canvas to draw the composited result on.
-   * @param antialiasing Whether to enable antialiasing when drawing to background context.
-   */
-  void finishAndDrawTo(Canvas* canvas, bool antialiasing);
+ protected:
+  void onBeginRecording(Canvas* canvas, const Matrix3D& transform) override;
+  void onEndRecording(std::shared_ptr<Image> image, const Matrix3D& transform,
+                      const Point& pictureOffset, bool antialiasing) override;
 
  private:
   std::shared_ptr<Context3DCompositor> _compositor = nullptr;
   Point _offset = {};
-  float _contentScale = 1.0f;
-
-  std::shared_ptr<ColorSpace> _colorSpace = nullptr;
   std::shared_ptr<BackgroundContext> _backgroundContext = nullptr;
-  std::stack<Render3DContextState> _stateStack = {};
 };
 
 }  // namespace tgfx

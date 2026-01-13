@@ -23,7 +23,6 @@
 #include "core/shaders/GradientShader.h"
 #include "core/utils/MathExtra.h"
 #include "gpu/proxies/RenderTargetProxy.h"
-#include "layers/ContourContext.h"
 #include "layers/DrawArgs.h"
 #include "layers/RootLayer.h"
 #include "layers/SubtreeCache.h"
@@ -1727,7 +1726,6 @@ TGFX_TEST(LayerTest, ContourTest) {
   auto imageStyle2 = ShapeStyle::Make(imageShader2);
 
   DrawArgs drawArgs = DrawArgs(nullptr);
-  drawArgs.drawMode = DrawMode::Contour;
   Path path = {};
 
   // Case 1: Same geometry with all solid fills should dedup to 1 contour.
@@ -1737,10 +1735,8 @@ TGFX_TEST(LayerTest, ContourTest) {
   allSolidLayer->setPath(path);
   allSolidLayer->addFillStyle(ShapeStyle::Make(Color::Red()));
   allSolidLayer->addFillStyle(ShapeStyle::Make(Color::Blue()));
-  ContourContext allSolidContext;
-  Canvas allSolidCanvas = Canvas(&allSolidContext);
-  allSolidLayer->drawLayer(drawArgs, &allSolidCanvas, 1.0, BlendMode::SrcOver);
-  auto allSolidPicture = allSolidContext.finishRecordingAsPicture();
+  auto allSolidPicture = Layer::RecordOpaquePicture(
+      1.0f, [&](Canvas* canvas) { allSolidLayer->drawContour(drawArgs, canvas); });
   EXPECT_EQ(allSolidPicture->drawCount, 1u);
 
   // Case 2: Same geometry with all image shader fills should collect all (no dedup).
@@ -1750,10 +1746,8 @@ TGFX_TEST(LayerTest, ContourTest) {
   allImageLayer->setPath(path);
   allImageLayer->addFillStyle(imageStyle1);
   allImageLayer->addFillStyle(imageStyle2);
-  ContourContext allImageContext;
-  Canvas allImageCanvas = Canvas(&allImageContext);
-  allImageLayer->drawLayer(drawArgs, &allImageCanvas, 1.0, BlendMode::SrcOver);
-  auto allImagePicture = allImageContext.finishRecordingAsPicture();
+  auto allImagePicture = Layer::RecordOpaquePicture(
+      1.0f, [&](Canvas* canvas) { allImageLayer->drawContour(drawArgs, canvas); });
   EXPECT_EQ(allImagePicture->drawCount, 2u);
 
   // Case 3: Same geometry with image-image-solid order should dedup to 1 contour.
@@ -1766,10 +1760,8 @@ TGFX_TEST(LayerTest, ContourTest) {
   mixedFillsLayer->addFillStyle(imageStyle1);
   mixedFillsLayer->addFillStyle(imageStyle2);
   mixedFillsLayer->addFillStyle(ShapeStyle::Make(Color::Green()));
-  ContourContext mixedFillsContext;
-  Canvas mixedFillsCanvas = Canvas(&mixedFillsContext);
-  mixedFillsLayer->drawLayer(drawArgs, &mixedFillsCanvas, 1.0, BlendMode::SrcOver);
-  auto mixedFillsPicture = mixedFillsContext.finishRecordingAsPicture();
+  auto mixedFillsPicture = Layer::RecordOpaquePicture(
+      1.0f, [&](Canvas* canvas) { mixedFillsLayer->drawContour(drawArgs, canvas); });
   // Should be 1 (only first collected). Buggy single-pass would return 2.
   EXPECT_EQ(mixedFillsPicture->drawCount, 1u);
 
@@ -1788,10 +1780,8 @@ TGFX_TEST(LayerTest, ContourTest) {
   childLayer->addFillStyle(ShapeStyle::Make(Color::Red()));
   childLayer->addFillStyle(ShapeStyle::Make(Color::Blue()));
   twoGroupsLayer->addChild(childLayer);
-  ContourContext twoGroupsContext;
-  Canvas twoGroupsCanvas = Canvas(&twoGroupsContext);
-  twoGroupsLayer->drawLayer(drawArgs, &twoGroupsCanvas, 1.0, BlendMode::SrcOver);
-  auto twoGroupsPicture = twoGroupsContext.finishRecordingAsPicture();
+  auto twoGroupsPicture = Layer::RecordOpaquePicture(
+      1.0f, [&](Canvas* canvas) { twoGroupsLayer->drawContour(drawArgs, canvas); });
   // Group 1: 2 (all image shaders), Group 2: 1 (deduped) = 3 total.
   EXPECT_EQ(twoGroupsPicture->drawCount, 3u);
 
@@ -1805,10 +1795,8 @@ TGFX_TEST(LayerTest, ContourTest) {
   strokeTestLayer->setLineWidth(5.0f);
   strokeTestLayer->addStrokeStyle(ShapeStyle::Make(Color::Red()));
   strokeTestLayer->addStrokeStyle(ShapeStyle::Make(Color::Blue()));
-  ContourContext strokeTestContext;
-  Canvas strokeTestCanvas = Canvas(&strokeTestContext);
-  strokeTestLayer->drawLayer(drawArgs, &strokeTestCanvas, 1.0, BlendMode::SrcOver);
-  auto strokeTestPicture = strokeTestContext.finishRecordingAsPicture();
+  auto strokeTestPicture = Layer::RecordOpaquePicture(
+      1.0f, [&](Canvas* canvas) { strokeTestLayer->drawContour(drawArgs, canvas); });
   // 1 (transparent fill) + 1 (strokes deduped) = 2 contours.
   EXPECT_EQ(strokeTestPicture->drawCount, 2u);
 
@@ -1819,10 +1807,8 @@ TGFX_TEST(LayerTest, ContourTest) {
   rootLayer->addChild(mixedFillsLayer);
   rootLayer->addChild(twoGroupsLayer);
   rootLayer->addChild(strokeTestLayer);
-  ContourContext allContext;
-  Canvas allCanvas = Canvas(&allContext);
-  rootLayer->drawLayer(drawArgs, &allCanvas, 1.0, BlendMode::SrcOver);
-  auto allPicture = allContext.finishRecordingAsPicture();
+  auto allPicture = Layer::RecordOpaquePicture(
+      1.0f, [&](Canvas* canvas) { rootLayer->drawContour(drawArgs, canvas); });
   // 1 + 2 + 1 + 3 + 2 = 9
   EXPECT_EQ(allPicture->drawCount, 9u);
 
@@ -2737,6 +2723,279 @@ TGFX_TEST(LayerTest, SetChildrenLISValidation) {
   singleParent->setChildren(single);
   EXPECT_EQ(singleParent->children().size(), 1u);
   EXPECT_FALSE(singleLayer->bitFields.dirtyTransform);
+}
+
+TGFX_TEST(LayerTest, Contour3DContextPictureOffset) {
+  // This test verifies that Contour3DContext correctly handles pictureOffset in 3D rendering.
+  // When a layer has non-zero origin bounds (e.g., bounds not starting from (0,0)), the
+  // pictureOffset should be applied to ensure correct positioning after 3D transform.
+  //
+  // Setup: Create a shape at offset position with DropShadowStyle, apply 3D transform with
+  // preserve3D. Compare contour rendering (used by shadow) with normal rendering to verify
+  // the offset is handled correctly in both modes.
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 300);
+  auto displayList = std::make_unique<DisplayList>();
+
+  // Create a container layer with preserve3D to enable 3D context
+  auto containerLayer = Layer::Make();
+  containerLayer->setPreserve3D(true);
+  displayList->root()->addChild(containerLayer);
+
+  // Create a shape layer at an offset position (bounds don't start from origin)
+  // This offset is key to triggering the pictureOffset issue
+  auto shapeLayer = ShapeLayer::Make();
+  Path path = {};
+  // Shape positioned at (100, 80), not at origin - this creates non-zero pictureOffset
+  path.addRoundRect(Rect::MakeXYWH(100, 80, 150, 100), 15, 15);
+  shapeLayer->setPath(path);
+  shapeLayer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(80, 150, 220, 255)));
+
+  // Add DropShadowStyle - this triggers contour rendering for shadow generation
+  auto dropShadow = DropShadowStyle::Make(15, 15, 8, 0, Color::FromRGBA(0, 0, 0, 180));
+  shapeLayer->setLayerStyles({dropShadow});
+
+  // Apply 3D transform with rotation to make offset issues visible
+  auto layerSize = Size::Make(150.f, 100.f);
+  auto anchor = Point::Make(0.5f, 0.5f);
+  auto anchorX = 100 + anchor.x * layerSize.width;  // Center of the shape
+  auto anchorY = 80 + anchor.y * layerSize.height;
+  auto offsetToAnchorMatrix = Matrix3D::MakeTranslate(-anchorX, -anchorY, 0.f);
+  auto invOffsetToAnchorMatrix = Matrix3D::MakeTranslate(anchorX, anchorY, 0.f);
+  auto modelMatrix = Matrix3D::MakeRotate({0.f, 1.f, 0.f}, 30.f);  // Y-axis rotation
+  auto perspectiveMatrix = Matrix3D::I();
+  constexpr float eyeDistance = 1200.f;
+  perspectiveMatrix.setRowColumn(3, 2, -1.f / eyeDistance);
+  auto transformMatrix =
+      invOffsetToAnchorMatrix * perspectiveMatrix * modelMatrix * offsetToAnchorMatrix;
+  shapeLayer->setMatrix3D(transformMatrix);
+
+  containerLayer->addChild(shapeLayer);
+
+  // Render with shadow (contour mode will be used for shadow generation)
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Contour3DContextPictureOffset"));
+
+  // Test with different offset positions to ensure consistent behavior
+  auto shapeLayer2 = ShapeLayer::Make();
+  Path path2 = {};
+  // Even larger offset to make any positioning errors more obvious
+  path2.addRoundRect(Rect::MakeXYWH(200, 150, 120, 80), 10, 10);
+  shapeLayer2->setPath(path2);
+  shapeLayer2->setFillStyle(ShapeStyle::Make(Color::FromRGBA(220, 100, 80, 255)));
+  auto dropShadow2 = DropShadowStyle::Make(-10, 20, 5, 0, Color::FromRGBA(0, 0, 0, 150));
+  shapeLayer2->setLayerStyles({dropShadow2});
+
+  // Apply different 3D rotation
+  auto anchorX2 = 200 + 0.5f * 120;
+  auto anchorY2 = 150 + 0.5f * 80;
+  auto offsetToAnchor2 = Matrix3D::MakeTranslate(-anchorX2, -anchorY2, 0.f);
+  auto invOffsetToAnchor2 = Matrix3D::MakeTranslate(anchorX2, anchorY2, 0.f);
+  auto modelMatrix2 = Matrix3D::MakeRotate({1.f, 0.f, 0.f}, -25.f);  // X-axis rotation
+  auto transformMatrix2 = invOffsetToAnchor2 * perspectiveMatrix * modelMatrix2 * offsetToAnchor2;
+  shapeLayer2->setMatrix3D(transformMatrix2);
+
+  containerLayer->addChild(shapeLayer2);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Contour3DContextPictureOffset_Multiple"));
+}
+
+TGFX_TEST(LayerTest, NestedPreserve3DContour) {
+  // Test nested preserve3D layers with layer styles that trigger contour rendering.
+  // This verifies the 3D context is correctly created and managed across nested layers.
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 300);
+  auto displayList = std::make_unique<DisplayList>();
+
+  // Root preserve3D container
+  auto rootContainer = Layer::Make();
+  rootContainer->setPreserve3D(true);
+  displayList->root()->addChild(rootContainer);
+
+  // First level child with preserve3D
+  auto level1 = Layer::Make();
+  level1->setPreserve3D(true);
+  level1->setMatrix(Matrix::MakeTrans(50, 30));
+  rootContainer->addChild(level1);
+
+  // Shape in level1 with drop shadow
+  auto shape1 = ShapeLayer::Make();
+  Path path1 = {};
+  path1.addRoundRect(Rect::MakeXYWH(0, 0, 100, 80), 10, 10);
+  shape1->setPath(path1);
+  shape1->setFillStyle(ShapeStyle::Make(Color::FromRGBA(80, 180, 120, 255)));
+  shape1->setLayerStyles({DropShadowStyle::Make(8, 8, 5, 0, Color::FromRGBA(0, 0, 0, 150))});
+
+  // Apply 3D rotation
+  auto rotate1 = Matrix3D::MakeRotate({0, 1, 0}, 25);
+  auto perspective = Matrix3D::I();
+  perspective.setRowColumn(3, 2, -1.0f / 1000);
+  auto anchor1 = Matrix3D::MakeTranslate(-50, -40, 0);
+  auto invAnchor1 = Matrix3D::MakeTranslate(50, 40, 0);
+  shape1->setMatrix3D(invAnchor1 * perspective * rotate1 * anchor1);
+  level1->addChild(shape1);
+
+  // Second level child with preserve3D
+  auto level2 = Layer::Make();
+  level2->setPreserve3D(true);
+  level2->setMatrix(Matrix::MakeTrans(200, 100));
+  rootContainer->addChild(level2);
+
+  // Shape in level2 with inner shadow
+  auto shape2 = ShapeLayer::Make();
+  Path path2 = {};
+  path2.addOval(Rect::MakeXYWH(0, 0, 120, 90));
+  shape2->setPath(path2);
+  shape2->setFillStyle(ShapeStyle::Make(Color::FromRGBA(200, 100, 80, 255)));
+  shape2->setLayerStyles({InnerShadowStyle::Make(-5, -5, 8, 0, Color::FromRGBA(0, 0, 0, 180))});
+
+  // Apply different 3D rotation
+  auto rotate2 = Matrix3D::MakeRotate({1, 0, 0}, -20);
+  auto anchor2 = Matrix3D::MakeTranslate(-60, -45, 0);
+  auto invAnchor2 = Matrix3D::MakeTranslate(60, 45, 0);
+  shape2->setMatrix3D(invAnchor2 * perspective * rotate2 * anchor2);
+  level2->addChild(shape2);
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/NestedPreserve3DContour"));
+}
+
+TGFX_TEST(LayerTest, ContourMatchesContentOptimization) {
+  // Test that allChildrenContourMatch is correctly calculated in getLayerStyleSource.
+  // When all children have contourMatchesContent=true, content can reuse contour image.
+  // When any child has contourMatchesContent=false, content must be drawn separately.
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 300);
+  auto displayList = std::make_unique<DisplayList>();
+
+  // Container 1: All children are contourMatchesContent (no filters/styles)
+  // This container has layerStyle, so its own contourMatchesContent=false,
+  // but all children have contourMatchesContent=true, so allChildrenContourMatch=true
+  auto container1 = Layer::Make();
+  container1->setLayerStyles({DropShadowStyle::Make(6, 6, 4, 0, Color::FromRGBA(0, 0, 0, 120))});
+  displayList->root()->addChild(container1);
+
+  // Simple shape without any styles - contourMatchesContent = true
+  auto simpleShape1 = ShapeLayer::Make();
+  Path path1 = {};
+  path1.addRect(Rect::MakeXYWH(20, 20, 80, 60));
+  simpleShape1->setPath(path1);
+  simpleShape1->setFillStyle(ShapeStyle::Make(Color::FromRGBA(100, 180, 100, 255)));
+  container1->addChild(simpleShape1);
+
+  // Another simple shape without styles - contourMatchesContent = true
+  auto simpleShape2 = ShapeLayer::Make();
+  Path path2 = {};
+  path2.addRoundRect(Rect::MakeXYWH(120, 30, 70, 50), 8, 8);
+  simpleShape2->setPath(path2);
+  simpleShape2->setFillStyle(ShapeStyle::Make(Color::FromRGBA(100, 150, 200, 255)));
+  container1->addChild(simpleShape2);
+
+  // Container 2: Has child with contourMatchesContent=false (has drop shadow)
+  // This container has layerStyle, and one child also has layerStyle,
+  // so allChildrenContourMatch=false
+  auto container2 = Layer::Make();
+  container2->setMatrix(Matrix::MakeTrans(0, 140));
+  container2->setLayerStyles({DropShadowStyle::Make(6, 6, 4, 0, Color::FromRGBA(0, 0, 0, 120))});
+  displayList->root()->addChild(container2);
+
+  // Shape with drop shadow - contourMatchesContent = false
+  auto styledShape = ShapeLayer::Make();
+  Path path3 = {};
+  path3.addRoundRect(Rect::MakeXYWH(20, 20, 80, 60), 10, 10);
+  styledShape->setPath(path3);
+  styledShape->setFillStyle(ShapeStyle::Make(Color::FromRGBA(200, 100, 80, 255)));
+  styledShape->setLayerStyles({DropShadowStyle::Make(8, 8, 5, 0, Color::FromRGBA(0, 0, 0, 150))});
+  container2->addChild(styledShape);
+
+  // Simple shape in same container - contourMatchesContent = true
+  auto simpleShape3 = ShapeLayer::Make();
+  Path path4 = {};
+  path4.addOval(Rect::MakeXYWH(130, 25, 60, 50));
+  simpleShape3->setPath(path4);
+  simpleShape3->setFillStyle(ShapeStyle::Make(Color::FromRGBA(180, 180, 80, 255)));
+  container2->addChild(simpleShape3);
+
+  displayList->render(surface.get());
+
+  // Verify bitFields after render (render triggers updateLayerState)
+  // container1 has layerStyle so contourMatchesContent=false,
+  // but all children have contourMatchesContent=true
+  EXPECT_FALSE(container1->bitFields.contourMatchesContent);
+  EXPECT_TRUE(simpleShape1->bitFields.contourMatchesContent);
+  EXPECT_TRUE(simpleShape2->bitFields.contourMatchesContent);
+
+  // container2 has layerStyle so contourMatchesContent=false,
+  // styledShape has layerStyle so contourMatchesContent=false
+  EXPECT_FALSE(container2->bitFields.contourMatchesContent);
+  EXPECT_FALSE(styledShape->bitFields.contourMatchesContent);
+  EXPECT_TRUE(simpleShape3->bitFields.contourMatchesContent);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ContourMatchesContentOptimization"));
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ContourMatchesContentOptimization"));
+}
+
+TGFX_TEST(LayerTest, ContourMaskWithPreserve3D) {
+  // Test preserve3D with mask layer and contour rendering.
+  // This verifies that mask clipping works correctly with 3D transformed contour.
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 300);
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto containerLayer = Layer::Make();
+  containerLayer->setPreserve3D(true);
+  displayList->root()->addChild(containerLayer);
+
+  // Create a mask layer (circular mask) with 3D transform
+  auto maskLayer = ShapeLayer::Make();
+  Path maskPath = {};
+  maskPath.addOval(Rect::MakeXYWH(80, 60, 200, 150));
+  maskLayer->setPath(maskPath);
+  maskLayer->setFillStyle(ShapeStyle::Make(Color::White()));
+  maskLayer->setPreserve3D(true);
+
+  // Apply 3D transform to mask
+  auto perspective = Matrix3D::I();
+  perspective.setRowColumn(3, 2, -1.0f / 800);
+  auto maskRotate = Matrix3D::MakeRotate({1, 0, 0}, -15);
+  auto maskAnchor = Matrix3D::MakeTranslate(-180, -135, 0);
+  auto maskInvAnchor = Matrix3D::MakeTranslate(180, 135, 0);
+  maskLayer->setMatrix3D(maskInvAnchor * perspective * maskRotate * maskAnchor);
+
+  // Create a shape with drop shadow that will be masked
+  auto contentShape = ShapeLayer::Make();
+  Path contentPath = {};
+  contentPath.addRoundRect(Rect::MakeXYWH(50, 40, 250, 180), 20, 20);
+  contentShape->setPath(contentPath);
+  contentShape->setFillStyle(ShapeStyle::Make(Color::FromRGBA(100, 180, 220, 255)));
+  contentShape->setLayerStyles(
+      {DropShadowStyle::Make(12, 12, 10, 0, Color::FromRGBA(0, 0, 0, 180))});
+
+  // Apply 3D transform to content
+  auto rotate = Matrix3D::MakeRotate({0, 1, 0}, 20);
+  auto anchor = Matrix3D::MakeTranslate(-175, -130, 0);
+  auto invAnchor = Matrix3D::MakeTranslate(175, 130, 0);
+  contentShape->setMatrix3D(invAnchor * perspective * rotate * anchor);
+
+  // Set mask
+  contentShape->setMask(maskLayer);
+
+  containerLayer->addChild(contentShape);
+
+  displayList->root()->addChild(maskLayer);
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ContourMaskWithPreserve3D"));
 }
 
 }  // namespace tgfx

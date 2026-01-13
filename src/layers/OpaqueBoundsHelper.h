@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,34 +17,21 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
 #include <vector>
-#include "layers/contents/GeometryContent.h"
-#include "tgfx/core/RRect.h"
+#include "tgfx/core/Rect.h"
 
 namespace tgfx {
 
-class RRectsContent : public GeometryContent {
+class OpaqueBoundsHelper {
  public:
-  RRectsContent(std::vector<RRect> rRects, const LayerPaint& paint);
+  // Check if bounds is fully contained within any of the opaque bounds.
+  static bool Contains(const std::vector<Rect>& opaqueBounds, const Rect& bounds);
 
-  Rect getTightBounds(const Matrix& matrix) const override;
-  bool hitTestPoint(float localX, float localY) const override;
-  std::optional<Rect> getContourOpaqueRect() const override;
-
-  std::vector<RRect> rRects = {};
-
- protected:
-  Type type() const override {
-    return Type::RRects;
-  }
-
-  Rect onGetBounds() const override;
-  void onDraw(Canvas* canvas, const Paint& paint) const override;
-  bool onHasSameGeometry(const GeometryContent* other) const override;
+  // Merge a new opaque bounds into the collection, maintaining at most 3 bounds sorted by area.
+  static void Merge(std::vector<Rect>& opaqueBounds, const Rect& bounds);
 
  private:
-  Path getFilledPath() const;
+  static Rect GetMaxOverlapRect(const Rect& rect1, const Rect& rect2);
 };
 
 }  // namespace tgfx

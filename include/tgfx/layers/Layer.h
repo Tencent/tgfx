@@ -37,7 +37,7 @@ class DisplayList;
 class DrawArgs;
 class RegionTransformer;
 class RootLayer;
-class Render3DContext;
+class Base3DContext;
 struct LayerStyleSource;
 struct MaskData;
 class BackgroundContext;
@@ -632,14 +632,21 @@ class Layer : public std::enable_shared_from_this<Layer> {
   bool drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
                     const Layer* stopChild = nullptr);
 
+  /**
+   * Draws the contour of the layer and its children. When applyMask is true, the layer's own mask
+   * is applied before drawing.
+   */
+  void drawContour(const DrawArgs& args, Canvas* canvas, const Matrix3D* transform3D = nullptr,
+                   bool applyMask = true);
+
+  void drawContourInternal(const DrawArgs& args, Canvas* canvas, const Matrix3D* transform3D,
+                           bool applyMask);
+
   void drawByStarting3DContext(const DrawArgs& args, Canvas* canvas);
 
-  std::optional<DrawArgs> createChildArgs(const DrawArgs& args, Canvas* canvas, Layer* child,
-                                          bool skipBackground, int childIndex,
-                                          int lastBackgroundIndex);
+  std::optional<DrawArgs> createChildArgs(const DrawArgs& args, Canvas* canvas, Layer* child);
 
-  void drawChild(const DrawArgs& args, Canvas* canvas, Layer* child, float alpha,
-                 const Matrix3D& transform3D, Render3DContext* context3D, bool started3DContext);
+  void drawChild(const DrawArgs& childArgs, Canvas* canvas, Layer* child, float alpha);
 
   float drawBackgroundLayers(const DrawArgs& args, Canvas* canvas);
 
@@ -690,8 +697,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
       Context* context, const Rect& drawRect, const Matrix& viewMatrix, bool fullLayer = false,
       std::shared_ptr<ColorSpace> colorSpace = nullptr) const;
 
-  static std::shared_ptr<Picture> RecordPicture(DrawMode mode, float contentScale,
-                                                const std::function<void(Canvas*)>& drawFunction);
+  static std::shared_ptr<Picture> RecordOpaquePicture(
+      float contentScale, const std::function<void(Canvas*)>& drawFunction);
 
   bool shouldPassThroughBackground(BlendMode blendMode, const Matrix3D* transform3D) const;
 
@@ -736,6 +743,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
     bool hasBlendMode : 1;
     bool matrix3DIsAffine : 1;  // Whether the matrix3D is equivalent to a 2D affine matrix
     bool staticSubtree : 1;  // Whether the subtree (content, children, filters, styles) is static.
+    bool contourMatchesContent : 1;  // Whether the contour drawing result is identical to content.
     uint8_t blendMode : 5;
     uint8_t maskType : 2;
   } bitFields = {};

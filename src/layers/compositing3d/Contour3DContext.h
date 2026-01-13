@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -19,32 +19,35 @@
 #pragma once
 
 #include <vector>
-#include "layers/contents/GeometryContent.h"
-#include "tgfx/core/RRect.h"
+#include "Base3DContext.h"
 
 namespace tgfx {
 
-class RRectsContent : public GeometryContent {
+struct ContourImageEntry {
+  std::shared_ptr<Image> image = nullptr;
+  Matrix3D transform = {};
+};
+
+/**
+ * Simplified 3D context for contour rendering. Unlike Render3DContext, this class does not
+ * perform complex depth sorting or clipping. It simply applies 3D transforms to each layer
+ * and draws them in order.
+ */
+class Contour3DContext : public Base3DContext {
  public:
-  RRectsContent(std::vector<RRect> rRects, const LayerPaint& paint);
-
-  Rect getTightBounds(const Matrix& matrix) const override;
-  bool hitTestPoint(float localX, float localY) const override;
-  std::optional<Rect> getContourOpaqueRect() const override;
-
-  std::vector<RRect> rRects = {};
-
- protected:
-  Type type() const override {
-    return Type::RRects;
+  Contour3DContext(float contentScale, std::shared_ptr<ColorSpace> colorSpace)
+      : Base3DContext(contentScale, std::move(colorSpace)) {
   }
 
-  Rect onGetBounds() const override;
-  void onDraw(Canvas* canvas, const Paint& paint) const override;
-  bool onHasSameGeometry(const GeometryContent* other) const override;
+  void finishAndDrawTo(Canvas* canvas, bool antialiasing) override;
+
+ protected:
+  void onBeginRecording(Canvas* canvas, const Matrix3D& transform) override;
+  void onEndRecording(std::shared_ptr<Image> image, const Matrix3D& transform,
+                      const Point& pictureOffset, bool antialiasing) override;
 
  private:
-  Path getFilledPath() const;
+  std::vector<ContourImageEntry> _contourImages = {};
 };
 
 }  // namespace tgfx

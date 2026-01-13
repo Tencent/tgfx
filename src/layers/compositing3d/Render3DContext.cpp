@@ -22,73 +22,36 @@
 #include "core/utils/MathExtra.h"
 #include "layers/BackgroundContext.h"
 #include "tgfx/core/Canvas.h"
-#include "tgfx/core/Image.h"
 #include "tgfx/core/Paint.h"
 
 namespace tgfx {
 
-static std::shared_ptr<Image> PictureToImage(std::shared_ptr<Picture> picture, Point* offset,
-                                             std::shared_ptr<ColorSpace> colorSpace) {
-  if (picture == nullptr) {
-    return nullptr;
-  }
-  auto bounds = picture->getBounds();
-  bounds.roundOut();
-  auto matrix = Matrix::MakeTrans(-bounds.x(), -bounds.y());
-  auto image = Image::MakeFrom(std::move(picture), static_cast<int>(bounds.width()),
-                               static_cast<int>(bounds.height()), &matrix, std::move(colorSpace));
-  if (offset) {
-    offset->x = bounds.left;
-    offset->y = bounds.top;
-  }
-  return image;
+Render3DContext::Render3DContext(std::shared_ptr<Context3DCompositor> compositor,
+                                 const Point& offset, float contentScale,
+                                 std::shared_ptr<ColorSpace> colorSpace,
+                                 std::shared_ptr<BackgroundContext> backgroundContext)
+    : Base3DContext(contentScale, std::move(colorSpace)), _compositor(std::move(compositor)),
+      _offset(offset), _backgroundContext(std::move(backgroundContext)) {
 }
 
-Canvas* Render3DContext::beginRecording(const Matrix3D& childTransform, bool antialiasing) {
-  auto baseTransform = _stateStack.empty() ? Matrix3D::I() : _stateStack.top().transform;
-  auto newTransform = childTransform;
-  newTransform.postConcat(baseTransform);
-  _stateStack.emplace(newTransform, antialiasing);
-  auto canvas = _stateStack.top().recorder.beginRecording();
-
-  DEBUG_ASSERT(!FloatNearlyZero(_contentScale));
+void Render3DContext::onBeginRecording(Canvas* canvas, const Matrix3D& transform) {
   auto invScale = 1.0f / _contentScale;
-  // The bounds of the 3D rendering context, inverse-mapped through newTransform
+  // The bounds of the 3D rendering context, inverse-mapped through transform
   // to get the clip rect in local layer coordinate space.
   auto contextBounds = Rect::MakeXYWH(_offset.x * invScale, _offset.y * invScale,
                                       static_cast<float>(_compositor->width()) * invScale,
                                       static_cast<float>(_compositor->height()) * invScale);
-  auto localClipRect = Matrix3DUtils::InverseMapRect(contextBounds, newTransform);
+  auto localClipRect = Matrix3DUtils::InverseMapRect(contextBounds, transform);
   if (!localClipRect.isEmpty()) {
     canvas->clipRect(localClipRect);
   }
-  canvas->scale(_contentScale, _contentScale);
-  return canvas;
 }
 
-void Render3DContext::endRecording() {
-  if (_stateStack.empty()) {
-    return;
-  }
-  auto& state = _stateStack.top();
-  auto picture = state.recorder.finishRecordingAsPicture();
-  auto layerTransform = state.transform;
-  auto antialiasing = state.antialiasing;
-  _stateStack.pop();
-
-  Point pictureOffset = {};
-  auto image = PictureToImage(std::move(picture), &pictureOffset, _colorSpace);
-  if (image == nullptr) {
-    return;
-  }
-
-  DEBUG_ASSERT(!FloatNearlyZero(_contentScale));
-  auto invScale = 1.0f / _contentScale;
-  auto imageOrigin = Point::Make(pictureOffset.x * invScale, pictureOffset.y * invScale);
-  auto imageTransform = Matrix3DUtils::OriginAdaptedMatrix3D(layerTransform, imageOrigin);
-  imageTransform = Matrix3DUtils::ScaleAdaptedMatrix3D(imageTransform, _contentScale);
+void Render3DContext::onEndRecording(std::shared_ptr<Image> image, const Matrix3D& transform,
+                                     const Point& pictureOffset, bool antialiasing) {
+  auto imageTransform = transform;
   imageTransform.postTranslate(pictureOffset.x - _offset.x, pictureOffset.y - _offset.y, 0);
-  _compositor->addImage(image, imageTransform, 1.0f, antialiasing);
+  _compositor->addImage(std::move(image), imageTransform, 1.0f, antialiasing);
 }
 
 void Render3DContext::finishAndDrawTo(Canvas* canvas, bool antialiasing) {
