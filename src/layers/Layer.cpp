@@ -1878,6 +1878,13 @@ void Layer::drawContourInternal(const DrawArgs& args, Canvas* canvas, const Matr
     }
   }
 
+  // Update contourMatchesContent flag: set to false if this layer has filters or layerStyles
+  if (args.contourMatchesContent && *args.contourMatchesContent) {
+    if (!args.excludeEffects && (!_filters.empty() || !_layerStyles.empty())) {
+      *args.contourMatchesContent = false;
+    }
+  }
+
   // Apply self mask if needed
   std::shared_ptr<MaskFilter> maskFilter = nullptr;
   if (applyMask && hasValidMask()) {
@@ -1923,6 +1930,12 @@ void Layer::drawContourInternal(const DrawArgs& args, Canvas* canvas, const Matr
   auto content = getContent();
   if (content != nullptr) {
     content->drawContour(canvas, bitFields.allowsEdgeAntialiasing);
+    // Update contourMatchesContent flag based on content
+    if (args.contourMatchesContent && *args.contourMatchesContent) {
+      if (!content->contourEqualsOpaqueContent()) {
+        *args.contourMatchesContent = false;
+      }
+    }
     // Merge opaque bounds only when not in 3D context (coordinate system differs)
     if (args.render3DContext == nullptr && args.opaqueBounds != nullptr) {
       auto opaqueRect = content->getContourOpaqueRect();
@@ -2112,18 +2125,16 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
               return layerStyle->extraSourceType() == LayerStyleExtraSourceType::Contour;
             });
 
-  // Check if all children have contourMatchesContent=true, meaning their contour and content are
-  // identical. When true, we can reuse the contour image as content image.
-  auto allChildrenContourMatch =
-      std::find_if(_children.begin(), _children.end(), [](const std::shared_ptr<Layer>& child) {
-        return !child->bitFields.contourMatchesContent;
-      }) == _children.end();
-
-  if (needContour || allChildrenContourMatch) {
+  // Draw contour and check if all drawn content's contour matches its opaque content.
+  // When true, we can reuse the contour image as content image.
+  bool allContourMatch = false;
+  if (needContour) {
     // Child effects are always excluded when drawing the layer contour.
     DrawArgs contourArgs = drawArgs;
     contourArgs.excludeEffects = true;
     contourArgs.drawMode = DrawMode::Contour;
+    allContourMatch = true;
+    contourArgs.contourMatchesContent = &allContourMatch;
     auto contourPicture = RecordOpaquePicture(
         contentScale, [&](Canvas* canvas) { drawContour(contourArgs, canvas, nullptr, false); });
     auto contourImage = ToImageWithOffset(std::move(contourPicture), &source->contourOffset,
@@ -2134,15 +2145,15 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
     if (needContour) {
       source->contour = contourImage;
     }
-    if (allChildrenContourMatch) {
-      // Contour is identical to content for all children, reuse contour image as content
+    if (allContourMatch) {
+      // Contour is identical to content for all drawn children, reuse contour image as content
       source->content = contourImage;
       source->contentOffset = source->contourOffset;
     }
   }
 
-  // Need to draw content separately when any child's contour differs from content
-  if (!allChildrenContourMatch) {
+  // Need to draw content separately when any drawn child's contour differs from content
+  if (!allContourMatch) {
     // Use OpaqueContext to record the contour of the content, to prevent the subsequent use of
     // AlphaThresholdFilter from turning semi-transparent pixels into opaque pixels, which would
     // cause severe aliasing.
@@ -2534,12 +2545,6 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
   if (bitFields.blendMode != static_cast<uint8_t>(BlendMode::SrcOver)) {
     bitFields.hasBlendMode = true;
   }
-  // Calculate contourMatchesContent for this layer only (parent propagation in propagateLayerState)
-  bool contourMatchesContent = _filters.empty() && _layerStyles.empty();
-  if (contourMatchesContent && content && !content->contourEqualsOpaqueContent()) {
-    contourMatchesContent = false;
-  }
-  bitFields.contourMatchesContent = contourMatchesContent;
   propagateLayerState();
   bitFields.dirtyDescendents = false;
 }
@@ -2589,11 +2594,6 @@ void Layer::propagateLayerState() {
     // Only propagate hasBlendMode if this layer actually has a blend mode
     if (bitFields.hasBlendMode && !layer->bitFields.hasBlendMode) {
       layer->bitFields.hasBlendMode = true;
-      change = true;
-    }
-    // Propagate contourMatchesContent=false to parent
-    if (!bitFields.contourMatchesContent && layer->bitFields.contourMatchesContent) {
-      layer->bitFields.contourMatchesContent = false;
       change = true;
     }
     if (!change) {

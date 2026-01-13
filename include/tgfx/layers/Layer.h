@@ -743,7 +743,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
     bool hasBlendMode : 1;
     bool matrix3DIsAffine : 1;  // Whether the matrix3D is equivalent to a 2D affine matrix
     bool staticSubtree : 1;  // Whether the subtree (content, children, filters, styles) is static.
-    bool contourMatchesContent : 1;  // Whether the contour drawing result is identical to content.
     uint8_t blendMode : 5;
     uint8_t maskType : 2;
   } bitFields = {};

@@ -202,7 +202,7 @@ void OpaqueContext::flushPendingShape(const OpaqueShape& opaqueShape, const MCSt
   }
   for (auto& pendingBrush : pendingBrushes) {
     fillIsFull =
-        fillIsFull || ((pendingBrush.shader == nullptr || !pendingBrush.shader->isAImage()) &&
+        fillIsFull || ((pendingBrush.shader == nullptr || pendingBrush.shader->isOpaque()) &&
                        !pendingBrush.maskFilter);
     pendingShape.draw(pictureContext, pendingState, pendingBrush);
   }

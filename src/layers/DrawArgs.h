@@ -79,5 +79,13 @@ class DrawArgs {
   // Opaque bounds for contour drawing optimization. Only used when drawMode is Contour.
   // Layers fully covered by opaque bounds can be skipped during contour drawing.
   std::vector<Rect>* opaqueBounds = nullptr;
+
+  // Output flag for contour drawing. When drawMode is Contour, this flag tracks whether
+  // all actually drawn content's contour matches its opaque content.
+  // - Caller initializes to true before top-level drawContour call
+  // - Set to false when any drawn layer has filters/layerStyles, or content's
+  //   contourEqualsOpaqueContent() returns false
+  // - Layers skipped due to opaque bounds coverage do not affect this flag
+  bool* contourMatchesContent = nullptr;
 };
 }  // namespace tgfx

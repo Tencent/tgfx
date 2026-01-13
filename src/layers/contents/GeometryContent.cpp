@@ -63,7 +63,7 @@ bool GeometryContent::contourEqualsOpaqueContent() const {
   if (color.alpha <= 0) {
     return false;
   }
-  if (shader) {
+  if (shader && !shader->isAImage()) {
     return shader->isOpaque();
   }
   return true;
