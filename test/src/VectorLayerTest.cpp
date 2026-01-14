@@ -3726,7 +3726,7 @@ TGFX_TEST(VectorLayerTest, TextModifier) {
 /**
  * Test TextSelector base class properties:
  * Column 1: SelectorMode (Add, Subtract, Intersect, Min, Max, Difference)
- * Column 2: Amount variations (1.0, 0.5, 0.0, -0.5, 1.5) + Edge cases (ThreeSels)
+ * Column 2: Weight variations (1.0, 0.5, 0.0, -0.5, 1.5) + Edge cases (ThreeSels)
  */
 TGFX_TEST(VectorLayerTest, TextSelector) {
   ContextScope scope;
@@ -3785,14 +3785,14 @@ TGFX_TEST(VectorLayerTest, TextSelector) {
     textSpan->setTextBlob(TextBlob::MakeFrom(modes[i].second, font));
 
     // Each string has 8-10 chars
-    // Selector1: first 60% with Square shape, amount=0.6
+    // Selector1: first 60% with Square shape, weight=0.6
     auto selector1 = std::make_shared<RangeSelector>();
     selector1->setShape(SelectorShape::Square);
     selector1->setStart(0.0f);
     selector1->setEnd(0.6f);
     selector1->setWeight(0.6f);
 
-    // Selector2: last 60% with Square shape, amount=0.4, overlapping 20% in middle
+    // Selector2: last 60% with Square shape, weight=0.4, overlapping 20% in middle
     auto selector2 = std::make_shared<RangeSelector>();
     selector2->setShape(SelectorShape::Square);
     selector2->setStart(0.4f);
@@ -3808,14 +3808,14 @@ TGFX_TEST(VectorLayerTest, TextSelector) {
     groups.push_back(group);
   }
 
-  // ==================== Column 2: Amount variations ====================
-  std::vector<std::pair<float, std::string>> amounts = {{1.0f, "Amount 1.0"},
-                                                        {0.5f, "Amount 0.5"},
-                                                        {0.0f, "Amount 0.0"},
-                                                        {-0.5f, "Amount -0.5"},
-                                                        {1.5f, "Amount 1.5"}};
+  // ==================== Column 2: Weight variations ====================
+  std::vector<std::pair<float, std::string>> weights = {{1.0f, "Weight 1.0"},
+                                                        {0.5f, "Weight 0.5"},
+                                                        {0.0f, "Weight 0.0"},
+                                                        {-0.5f, "Weight -0.5"},
+                                                        {1.5f, "Weight 1.5"}};
 
-  for (size_t i = 0; i < amounts.size(); i++) {
+  for (size_t i = 0; i < weights.size(); i++) {
     float y = 84 + rowHeight * static_cast<float>(i);
 
     // Baseline reference line
@@ -3826,11 +3826,11 @@ TGFX_TEST(VectorLayerTest, TextSelector) {
     auto group = std::make_shared<VectorGroup>();
     group->setPosition({col2X, y});
     auto textSpan = std::make_shared<TextSpan>();
-    textSpan->setTextBlob(TextBlob::MakeFrom(amounts[i].second, font));
+    textSpan->setTextBlob(TextBlob::MakeFrom(weights[i].second, font));
 
     auto selector = std::make_shared<RangeSelector>();
     selector->setShape(SelectorShape::Triangle);
-    selector->setWeight(amounts[i].first);
+    selector->setWeight(weights[i].first);
 
     auto modifier = std::make_shared<TextModifier>();
     modifier->setSelectors({selector});
@@ -3853,14 +3853,14 @@ TGFX_TEST(VectorLayerTest, TextSelector) {
     auto textSpan = std::make_shared<TextSpan>();
     textSpan->setTextBlob(TextBlob::MakeFrom("ThreeSels", font));
 
-    // Selector1: [0, 0.4], amount=0.5
+    // Selector1: [0, 0.4], weight=0.5
     auto selector1 = std::make_shared<RangeSelector>();
     selector1->setShape(SelectorShape::Square);
     selector1->setStart(0.0f);
     selector1->setEnd(0.4f);
     selector1->setWeight(0.5f);
 
-    // Selector2: [0.3, 0.7], amount=0.5, Add
+    // Selector2: [0.3, 0.7], weight=0.5, Add
     auto selector2 = std::make_shared<RangeSelector>();
     selector2->setShape(SelectorShape::Square);
     selector2->setStart(0.3f);
@@ -3868,7 +3868,7 @@ TGFX_TEST(VectorLayerTest, TextSelector) {
     selector2->setWeight(0.5f);
     selector2->setMode(SelectorMode::Add);
 
-    // Selector3: [0.6, 1.0], amount=0.5, Add
+    // Selector3: [0.6, 1.0], weight=0.5, Add
     auto selector3 = std::make_shared<RangeSelector>();
     selector3->setShape(SelectorShape::Square);
     selector3->setStart(0.6f);
