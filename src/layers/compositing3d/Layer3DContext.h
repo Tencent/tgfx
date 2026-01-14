@@ -49,12 +49,12 @@ struct TransformState {
 class Layer3DContext {
  public:
   static std::shared_ptr<Layer3DContext> Make(bool contourMode, Context* context,
-                                              const Rect& renderRect, const Point& offset,
-                                              float contentScale,
+                                              const Rect& renderRect, float contentScale,
                                               std::shared_ptr<ColorSpace> colorSpace,
                                               std::shared_ptr<BackgroundContext> backgroundContext);
 
-  Layer3DContext(float contentScale, std::shared_ptr<ColorSpace> colorSpace);
+  Layer3DContext(const Rect& renderRect, float contentScale,
+                 std::shared_ptr<ColorSpace> colorSpace);
   virtual ~Layer3DContext() = default;
 
   /**
@@ -93,6 +93,7 @@ class Layer3DContext {
   virtual void onImageReady(std::shared_ptr<Image> image, const Matrix3D& imageTransform,
                             const Point& pictureOffset, bool antialiasing) = 0;
 
+  Rect _renderRect = {};
   float _contentScale = 1.0f;
   std::shared_ptr<ColorSpace> _colorSpace = nullptr;
   std::stack<TransformState> _transformStack = {};
