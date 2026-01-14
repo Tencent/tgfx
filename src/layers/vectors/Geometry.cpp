@@ -23,6 +23,16 @@
 
 namespace tgfx {
 
+bool GlyphStyle::operator==(const GlyphStyle& other) const {
+  return fillColor == other.fillColor && strokeColor == other.strokeColor &&
+         strokeWidth == other.strokeWidth && strokeWidthFactor == other.strokeWidthFactor &&
+         alpha == other.alpha;
+}
+
+bool GlyphStyle::operator!=(const GlyphStyle& other) const {
+  return !(*this == other);
+}
+
 std::unique_ptr<Geometry> Geometry::clone() const {
   auto cloned = std::make_unique<Geometry>();
   cloned->matrix = matrix;
@@ -32,16 +42,12 @@ std::unique_ptr<Geometry> Geometry::clone() const {
   return cloned;
 }
 
-std::shared_ptr<TextBlob> Geometry::getTextBlob() {
-  if (!glyphs.empty() && textBlob == nullptr) {
-    textBlob = buildTextBlob();
-  }
-  return textBlob;
-}
-
 std::shared_ptr<Shape> Geometry::getShape() {
   if (shape == nullptr) {
-    auto blob = getTextBlob();
+    auto blob = textBlob;
+    if (blob == nullptr && !glyphs.empty()) {
+      blob = buildTextBlob();
+    }
     if (blob != nullptr) {
       shape = Shape::MakeFrom(blob);
     }
@@ -49,12 +55,16 @@ std::shared_ptr<Shape> Geometry::getShape() {
   return shape;
 }
 
+const std::vector<StyledGlyphRun>& Geometry::getGlyphRuns() {
+  if (glyphRuns.empty()) {
+    buildGlyphRuns();
+  }
+  return glyphRuns;
+}
+
 void Geometry::convertToShape() {
   DEBUG_ASSERT(hasText());
-  auto blob = getTextBlob();
-  if (blob != nullptr) {
-    shape = Shape::MakeFrom(blob);
-  }
+  getShape();
   textBlob = nullptr;
   glyphs.clear();
 }
@@ -122,6 +132,48 @@ std::shared_ptr<TextBlob> Geometry::buildTextBlob() {
   FlushGlyphRun(&builder, currentFont, &glyphIDs, &glyphMatrices);
 
   return builder.build();
+}
+
+void Geometry::buildGlyphRuns() {
+  glyphRuns.clear();
+  if (glyphs.empty()) {
+    if (textBlob) {
+      glyphRuns.push_back({textBlob, {}});
+    }
+    return;
+  }
+
+  auto builder = std::make_unique<TextBlobBuilder>();
+  auto currentFont = glyphs[0].font;
+  auto currentStyle = glyphs[0].style;
+  std::vector<GlyphID> glyphIDs = {};
+  std::vector<Matrix> glyphMatrices = {};
+  glyphIDs.reserve(glyphs.size());
+  glyphMatrices.reserve(glyphs.size());
+
+  for (const auto& glyph : glyphs) {
+    if (glyph.style != currentStyle) {
+      FlushGlyphRun(builder.get(), currentFont, &glyphIDs, &glyphMatrices);
+      auto blob = builder->build();
+      if (blob) {
+        glyphRuns.push_back({std::move(blob), currentStyle});
+      }
+      builder = std::make_unique<TextBlobBuilder>();
+      currentFont = glyph.font;
+      currentStyle = glyph.style;
+    } else if (glyph.font != currentFont) {
+      FlushGlyphRun(builder.get(), currentFont, &glyphIDs, &glyphMatrices);
+      currentFont = glyph.font;
+    }
+    glyphIDs.push_back(glyph.glyphID);
+    glyphMatrices.push_back(glyph.matrix);
+  }
+
+  FlushGlyphRun(builder.get(), currentFont, &glyphIDs, &glyphMatrices);
+  auto blob = builder->build();
+  if (blob) {
+    glyphRuns.push_back({std::move(blob), currentStyle});
+  }
 }
 
 }  // namespace tgfx

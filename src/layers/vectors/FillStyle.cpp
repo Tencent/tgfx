@@ -35,11 +35,10 @@ class FillPainter : public Painter {
 
   void draw(LayerRecorder* recorder) override {
     for (auto* geometry : geometries) {
-      LayerPaint paint(shader, alpha, blendMode);
-
-      auto textBlob = geometry->getTextBlob();
-      if (textBlob) {
-        recorder->addTextBlob(textBlob, paint, geometry->matrix);
+      if (geometry->hasText()) {
+        for (const auto& run : geometry->getGlyphRuns()) {
+          drawGlyphRun(recorder, geometry->matrix, run);
+        }
         continue;
       }
 
@@ -51,7 +50,27 @@ class FillPainter : public Painter {
         shape = Shape::ApplyFillType(shape, fillRule);
       }
       shape = Shape::ApplyMatrix(shape, geometry->matrix);
+      LayerPaint paint(shader, alpha, blendMode);
       recorder->addShape(std::move(shape), paint);
+    }
+  }
+
+ private:
+  void drawGlyphRun(LayerRecorder* recorder, const Matrix& geometryMatrix,
+                    const StyledGlyphRun& run) {
+    float blendFactor = run.style.fillColor.alpha;
+
+    if (blendFactor < 1.0f) {
+      LayerPaint paint(shader, alpha * run.style.alpha, blendMode);
+      recorder->addTextBlob(run.textBlob, paint, geometryMatrix);
+    }
+
+    if (blendFactor > 0.0f) {
+      const auto& fillColor = run.style.fillColor;
+      auto overlayColor = Color{fillColor.red, fillColor.green, fillColor.blue, blendFactor};
+      auto colorShader = Shader::MakeColorShader(overlayColor);
+      LayerPaint paint(colorShader, alpha * run.style.alpha, BlendMode::SrcOver);
+      recorder->addTextBlob(run.textBlob, paint, geometryMatrix);
     }
   }
 };

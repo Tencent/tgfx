@@ -43,8 +43,8 @@ void SVGRoot::renderNode(const SVGRenderContext& context, const SVGIRI& iri) con
 
 bool SVGRoot::onPrepareToRender(SVGRenderContext* context) const {
   // x/y are ignored for outermost svg elements
-  const auto x = type == Type::kInner ? X : SVGLength(0);
-  const auto y = type == Type::kInner ? Y : SVGLength(0);
+  const auto x = type == Type::Inner ? X : SVGLength(0);
+  const auto y = type == Type::Inner ? Y : SVGLength(0);
 
   auto viewPortRect = context->lengthContext().resolveRect(x, y, Width, Height);
   auto contentMatrix = Matrix::MakeTrans(viewPortRect.x(), viewPortRect.y());
@@ -88,7 +88,7 @@ Size SVGRoot::intrinsicSize(const SVGLengthContext& lengthContext) const {
 }
 
 void SVGRoot::onSetAttribute(SVGAttribute attr, const SVGValue& v) {
-  if (type != Type::kInner && type != Type::kRoot) return;
+  if (type != Type::Inner && type != Type::Root) return;
   switch (attr) {
     case SVGAttribute::X:
       if (const auto x = v.as<SVGLengthValue>()) {

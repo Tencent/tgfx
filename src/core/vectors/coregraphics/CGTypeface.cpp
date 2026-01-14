@@ -41,10 +41,10 @@ template <typename CFRef>
 using UniqueCFRef = std::unique_ptr<std::remove_pointer_t<CFRef>, CFReleaseDeleter<CFRef>>;
 
 std::string CGTypeface::StringFromCFString(CFStringRef src) {
-  static const CFIndex kCStringSize = 128;
-  char temporaryCString[kCStringSize];
-  bzero(temporaryCString, kCStringSize);
-  CFStringGetCString(src, temporaryCString, kCStringSize, kCFStringEncodingUTF8);
+  static const CFIndex CSTRING_SIZE = 128;
+  char temporaryCString[CSTRING_SIZE];
+  bzero(temporaryCString, CSTRING_SIZE);
+  CFStringGetCString(src, temporaryCString, CSTRING_SIZE, kCFStringEncodingUTF8);
   return {temporaryCString};
 }
 
