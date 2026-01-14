@@ -116,12 +116,13 @@ class StrokePainter : public Painter {
 
  private:
   void drawShape(LayerRecorder* recorder, std::shared_ptr<Shape> shape, const Matrix& innerMatrix,
-                 Matrix outerMatrix, const Point& scales, bool uniformScale) {
+                 const Matrix& outerMatrix, const Point& scales, bool uniformScale) {
     if (shape == nullptr) {
       return;
     }
+    Matrix finalOuter = outerMatrix;
     if (innerMatrix.isTranslate()) {
-      outerMatrix.preTranslate(innerMatrix.getTranslateX(), innerMatrix.getTranslateY());
+      finalOuter.preTranslate(innerMatrix.getTranslateX(), innerMatrix.getTranslateY());
     } else {
       shape = Shape::ApplyMatrix(shape, innerMatrix);
     }
@@ -129,7 +130,7 @@ class StrokePainter : public Painter {
       shape = Shape::ApplyEffect(shape, pathEffect);
     }
     if (uniformScale) {
-      shape = Shape::ApplyMatrix(shape, outerMatrix);
+      shape = Shape::ApplyMatrix(shape, finalOuter);
       LayerPaint paint(shader, alpha, blendMode);
       paint.style = PaintStyle::Stroke;
       paint.stroke = stroke;
@@ -140,7 +141,7 @@ class StrokePainter : public Painter {
       if (shape == nullptr) {
         return;
       }
-      shape = Shape::ApplyMatrix(shape, outerMatrix);
+      shape = Shape::ApplyMatrix(shape, finalOuter);
       LayerPaint paint(shader, alpha, blendMode);
       recorder->addShape(std::move(shape), paint);
     }
