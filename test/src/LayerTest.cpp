@@ -1740,7 +1740,8 @@ TGFX_TEST(LayerTest, ContourTest) {
   allSolidLayer->addFillStyle(ShapeStyle::Make(Color::Blue()));
   ContourContext allSolidContext;
   auto allSolidCanvas = allSolidContext.beginRecording();
-  allSolidLayer->drawLayer(drawArgs, allSolidCanvas, 1.0, BlendMode::SrcOver);
+  drawArgs.contourContext = &allSolidContext;
+  allSolidLayer->drawContour(drawArgs, allSolidCanvas);
   auto allSolidPicture = allSolidContext.finishRecordingAsPicture();
   EXPECT_EQ(allSolidPicture->drawCount, 1u);
 
@@ -1753,7 +1754,8 @@ TGFX_TEST(LayerTest, ContourTest) {
   allImageLayer->addFillStyle(imageStyle2);
   ContourContext allImageContext;
   auto allImageCanvas = allImageContext.beginRecording();
-  allImageLayer->drawLayer(drawArgs, allImageCanvas, 1.0, BlendMode::SrcOver);
+  drawArgs.contourContext = &allImageContext;
+  allImageLayer->drawContour(drawArgs, allImageCanvas);
   auto allImagePicture = allImageContext.finishRecordingAsPicture();
   EXPECT_EQ(allImagePicture->drawCount, 2u);
 
@@ -1769,7 +1771,8 @@ TGFX_TEST(LayerTest, ContourTest) {
   mixedFillsLayer->addFillStyle(ShapeStyle::Make(Color::Green()));
   ContourContext mixedFillsContext;
   auto mixedFillsCanvas = mixedFillsContext.beginRecording();
-  mixedFillsLayer->drawLayer(drawArgs, mixedFillsCanvas, 1.0, BlendMode::SrcOver);
+  drawArgs.contourContext = &mixedFillsContext;
+  mixedFillsLayer->drawContour(drawArgs, mixedFillsCanvas);
   auto mixedFillsPicture = mixedFillsContext.finishRecordingAsPicture();
   // Should be 1 (only first collected). Buggy single-pass would return 2.
   EXPECT_EQ(mixedFillsPicture->drawCount, 1u);
@@ -1791,7 +1794,8 @@ TGFX_TEST(LayerTest, ContourTest) {
   twoGroupsLayer->addChild(childLayer);
   ContourContext twoGroupsContext;
   auto twoGroupsCanvas = twoGroupsContext.beginRecording();
-  twoGroupsLayer->drawLayer(drawArgs, twoGroupsCanvas, 1.0, BlendMode::SrcOver);
+  drawArgs.contourContext = &twoGroupsContext;
+  twoGroupsLayer->drawContour(drawArgs, twoGroupsCanvas);
   auto twoGroupsPicture = twoGroupsContext.finishRecordingAsPicture();
   // Group 1: 2 (all image shaders), Group 2: 1 (deduped) = 3 total.
   EXPECT_EQ(twoGroupsPicture->drawCount, 3u);
@@ -1808,7 +1812,8 @@ TGFX_TEST(LayerTest, ContourTest) {
   strokeTestLayer->addStrokeStyle(ShapeStyle::Make(Color::Blue()));
   ContourContext strokeTestContext;
   auto strokeTestCanvas = strokeTestContext.beginRecording();
-  strokeTestLayer->drawLayer(drawArgs, strokeTestCanvas, 1.0, BlendMode::SrcOver);
+  drawArgs.contourContext = &strokeTestContext;
+  strokeTestLayer->drawContour(drawArgs, strokeTestCanvas);
   auto strokeTestPicture = strokeTestContext.finishRecordingAsPicture();
   // 1 (transparent fill) + 1 (strokes deduped) = 2 contours.
   EXPECT_EQ(strokeTestPicture->drawCount, 2u);
@@ -1822,7 +1827,8 @@ TGFX_TEST(LayerTest, ContourTest) {
   rootLayer->addChild(strokeTestLayer);
   ContourContext allContext;
   auto allCanvas = allContext.beginRecording();
-  rootLayer->drawLayer(drawArgs, allCanvas, 1.0, BlendMode::SrcOver);
+  drawArgs.contourContext = &allContext;
+  rootLayer->drawContour(drawArgs, allCanvas);
   auto allPicture = allContext.finishRecordingAsPicture();
   // 1 + 2 + 1 + 3 + 2 = 9
   EXPECT_EQ(allPicture->drawCount, 9u);
@@ -1832,6 +1838,157 @@ TGFX_TEST(LayerTest, ContourTest) {
   canvas->clear();
   canvas->drawPicture(allPicture);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ContourTest"));
+}
+
+TGFX_TEST(LayerTest, ContourMatchesContent) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  DrawArgs drawArgs = DrawArgs(nullptr);
+  drawArgs.drawMode = DrawMode::Contour;
+  Path path = {};
+  path.addRect(Rect::MakeXYWH(10, 10, 80, 80));
+
+  // Case 1: Opaque solid fill should match content.
+  auto opaqueLayer = ShapeLayer::Make();
+  opaqueLayer->setPath(path);
+  opaqueLayer->addFillStyle(ShapeStyle::Make(Color::Red()));
+  ContourContext opaqueContext;
+  auto opaqueCanvas = opaqueContext.beginRecording();
+  drawArgs.contourContext = &opaqueContext;
+  bool opaqueMatch = true;
+  drawArgs.contourMatchesContent = &opaqueMatch;
+  opaqueLayer->drawContour(drawArgs, opaqueCanvas);
+  opaqueContext.finishRecordingAsPicture();
+  EXPECT_TRUE(opaqueMatch);
+
+  // Case 2: Transparent fill (alpha = 0) should not match content.
+  auto transparentLayer = ShapeLayer::Make();
+  transparentLayer->setPath(path);
+  transparentLayer->addFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 0, 0, 0)));
+  ContourContext transparentContext;
+  auto transparentCanvas = transparentContext.beginRecording();
+  drawArgs.contourContext = &transparentContext;
+  bool transparentMatch = true;
+  drawArgs.contourMatchesContent = &transparentMatch;
+  transparentLayer->drawContour(drawArgs, transparentCanvas);
+  transparentContext.finishRecordingAsPicture();
+  EXPECT_FALSE(transparentMatch);
+
+  // Case 3: Image shader fill should match content.
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  auto imageShader = Shader::MakeImageShader(image, TileMode::Repeat, TileMode::Repeat);
+  auto imageLayer = ShapeLayer::Make();
+  imageLayer->setPath(path);
+  imageLayer->addFillStyle(ShapeStyle::Make(imageShader));
+  ContourContext imageContext;
+  auto imageCanvas = imageContext.beginRecording();
+  drawArgs.contourContext = &imageContext;
+  bool imageMatch = true;
+  drawArgs.contourMatchesContent = &imageMatch;
+  imageLayer->drawContour(drawArgs, imageCanvas);
+  imageContext.finishRecordingAsPicture();
+  EXPECT_TRUE(imageMatch);
+
+  // Case 4: Layer with filter should not match content.
+  auto filterLayer = ShapeLayer::Make();
+  filterLayer->setPath(path);
+  filterLayer->addFillStyle(ShapeStyle::Make(Color::Red()));
+  filterLayer->setFilters({BlurFilter::Make(5, 5)});
+  ContourContext filterContext;
+  auto filterCanvas = filterContext.beginRecording();
+  drawArgs.contourContext = &filterContext;
+  bool filterMatch = true;
+  drawArgs.contourMatchesContent = &filterMatch;
+  filterLayer->drawContour(drawArgs, filterCanvas);
+  filterContext.finishRecordingAsPicture();
+  EXPECT_FALSE(filterMatch);
+
+  // Case 5: Layer with layerStyle should not match content.
+  auto styleLayer = ShapeLayer::Make();
+  styleLayer->setPath(path);
+  styleLayer->addFillStyle(ShapeStyle::Make(Color::Red()));
+  styleLayer->setLayerStyles({DropShadowStyle::Make(5, 5, 0, 5, Color::Black())});
+  ContourContext styleContext;
+  auto styleCanvas = styleContext.beginRecording();
+  drawArgs.contourContext = &styleContext;
+  bool styleMatch = true;
+  drawArgs.contourMatchesContent = &styleMatch;
+  styleLayer->drawContour(drawArgs, styleCanvas);
+  styleContext.finishRecordingAsPicture();
+  EXPECT_FALSE(styleMatch);
+
+  // Case 6: Gradient shader should check isOpaque().
+  auto gradientShader = Shader::MakeLinearGradient(Point::Make(0, 0), Point::Make(100, 100),
+                                                   {Color::Red(), Color::Blue()}, {0.0f, 1.0f});
+  auto gradientLayer = ShapeLayer::Make();
+  gradientLayer->setPath(path);
+  gradientLayer->addFillStyle(ShapeStyle::Make(gradientShader));
+  ContourContext gradientContext;
+  auto gradientCanvas = gradientContext.beginRecording();
+  drawArgs.contourContext = &gradientContext;
+  bool gradientMatch = true;
+  drawArgs.contourMatchesContent = &gradientMatch;
+  gradientLayer->drawContour(drawArgs, gradientCanvas);
+  gradientContext.finishRecordingAsPicture();
+  // Gradient with opaque colors should match.
+  EXPECT_TRUE(gradientMatch);
+}
+
+TGFX_TEST(LayerTest, ContourContainsOpaqueBounds) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  DrawArgs drawArgs = DrawArgs(nullptr);
+  drawArgs.drawMode = DrawMode::Contour;
+  Path path = {};
+
+  // Create a parent layer with opaque fill covering children.
+  auto parentLayer = ShapeLayer::Make();
+  path.addRect(Rect::MakeXYWH(0, 0, 200, 200));
+  parentLayer->setPath(path);
+  parentLayer->addFillStyle(ShapeStyle::Make(Color::Red()));
+
+  // Child layer completely covered by parent's opaque bounds should be skipped.
+  auto childLayer = ShapeLayer::Make();
+  path.reset();
+  path.addRect(Rect::MakeXYWH(50, 50, 100, 100));
+  childLayer->setPath(path);
+  childLayer->addFillStyle(ShapeStyle::Make(Color::Blue()));
+  parentLayer->addChild(childLayer);
+
+  ContourContext contourContext;
+  auto canvas = contourContext.beginRecording();
+  drawArgs.contourContext = &contourContext;
+  parentLayer->drawContour(drawArgs, canvas);
+  auto picture = contourContext.finishRecordingAsPicture();
+  // Parent contour drawn, child skipped due to containsOpaqueBounds optimization.
+  // Only 1 draw call for parent.
+  EXPECT_EQ(picture->drawCount, 1u);
+
+  // Now test with child not covered (partially outside).
+  auto parentLayer2 = ShapeLayer::Make();
+  path.reset();
+  path.addRect(Rect::MakeXYWH(0, 0, 100, 100));
+  parentLayer2->setPath(path);
+  parentLayer2->addFillStyle(ShapeStyle::Make(Color::Red()));
+
+  auto childLayer2 = ShapeLayer::Make();
+  path.reset();
+  path.addRect(Rect::MakeXYWH(50, 50, 100, 100));
+  childLayer2->setPath(path);
+  childLayer2->addFillStyle(ShapeStyle::Make(Color::Blue()));
+  parentLayer2->addChild(childLayer2);
+
+  ContourContext contourContext2;
+  auto canvas2 = contourContext2.beginRecording();
+  drawArgs.contourContext = &contourContext2;
+  parentLayer2->drawContour(drawArgs, canvas2);
+  auto picture2 = contourContext2.finishRecordingAsPicture();
+  // Both parent and child contours should be drawn.
+  EXPECT_EQ(picture2->drawCount, 2u);
 }
 
 TGFX_TEST(LayerTest, DiffFilterModeImagePattern) {

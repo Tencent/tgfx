@@ -60,6 +60,8 @@ class ContourContext : public DrawContext {
 
   std::shared_ptr<Picture> finishRecordingAsPicture();
 
+  bool containsOpaqueBounds(const Rect& bounds) const;
+
  private:
   struct Contour {
     enum class Type { None, Fill, Rect, RRect, Path, Shape };
@@ -125,7 +127,7 @@ class ContourContext : public DrawContext {
 
   void drawContour(const Contour& contour, const MCState& state, const Brush& brush);
 
-  bool containContourBound(const Rect& bounds);
+  bool containContourBound(const Rect& bounds) const;
 
   void mergeContourBound(const Rect& bounds);
 

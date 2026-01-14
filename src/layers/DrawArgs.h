@@ -26,6 +26,8 @@
 
 namespace tgfx {
 
+class ContourContext;
+
 enum class DrawMode { Normal, Contour, Background };
 
 /**
@@ -75,5 +77,12 @@ class DrawArgs {
   // respective 3D states to achieve per-pixel depth occlusion effects. These layers are composited
   // through the Compositor and do not need to be drawn to the Canvas.
   std::shared_ptr<Layer3DContext> render3DContext = nullptr;
+
+  // The contour context when drawing in Contour mode. Note: this could be nullptr.
+  ContourContext* contourContext = nullptr;
+
+  // Output parameter: indicates whether the contour drawing result matches the opaque content.
+  // Set to false if filters, layer styles, or non-opaque content are present.
+  bool* contourMatchesContent = nullptr;
 };
 }  // namespace tgfx

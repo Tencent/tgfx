@@ -37,6 +37,7 @@ class DisplayList;
 class DrawArgs;
 class RegionTransformer;
 class RootLayer;
+class ContourContext;
 struct LayerStyleSource;
 struct MaskData;
 class BackgroundContext;
@@ -628,6 +629,9 @@ class Layer : public std::enable_shared_from_this<Layer> {
                     const LayerStyleSource* layerStyleSource = nullptr,
                     const Layer* stopChild = nullptr);
 
+  void drawContour(const DrawArgs& args, Canvas* canvas, bool applyMask = true,
+                   const Matrix3D* transform3D = nullptr);
+
   bool drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
                     const Layer* stopChild = nullptr);
 
@@ -668,6 +672,12 @@ class Layer : public std::enable_shared_from_this<Layer> {
   MaskData getMaskData(const DrawArgs& args, float scale,
                        const std::optional<Rect>& layerClipBounds);
 
+  std::shared_ptr<Picture> getMaskPicture(DrawArgs& maskArgs, float scale,
+                                          const Matrix& affineRelativeMatrix);
+
+  std::shared_ptr<Image> getContourImage(const DrawArgs& args, float contentScale,
+                                         Point* offset = nullptr);
+
   Matrix3D getRelativeMatrix(const Layer* targetCoordinateSpace) const;
 
   bool hasValidMask() const;
@@ -686,9 +696,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::shared_ptr<BackgroundContext> createBackgroundContext(
       Context* context, const Rect& drawRect, const Matrix& viewMatrix, bool fullLayer = false,
       std::shared_ptr<ColorSpace> colorSpace = nullptr) const;
-
-  static std::shared_ptr<Picture> RecordPicture(DrawMode mode, float contentScale,
-                                                const std::function<void(Canvas*)>& drawFunction);
 
   bool shouldPassThroughBackground(BlendMode blendMode, const Matrix3D* transform3D) const;
 

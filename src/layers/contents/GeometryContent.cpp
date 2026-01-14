@@ -92,6 +92,16 @@ void GeometryContent::drawContour(Canvas* canvas, bool antiAlias) const {
   onDraw(canvas, paint);
 }
 
+bool GeometryContent::contourEqualsOpaqueContent() const {
+  if (color.alpha <= 0) {
+    return false;
+  }
+  if (shader && !shader->isAImage()) {
+    return shader->isOpaque();
+  }
+  return true;
+}
+
 void GeometryContent::drawForeground(Canvas*, float, bool) const {
 }
 
