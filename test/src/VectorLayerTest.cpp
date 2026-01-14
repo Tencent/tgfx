@@ -30,7 +30,9 @@
 #include "tgfx/layers/vectors/ShapePath.h"
 #include "tgfx/layers/vectors/SolidColor.h"
 #include "tgfx/layers/vectors/StrokeStyle.h"
+#include "tgfx/layers/vectors/TextModifier.h"
 #include "tgfx/layers/vectors/TextPath.h"
+#include "tgfx/layers/vectors/TextSelector.h"
 #include "tgfx/layers/vectors/TextSpan.h"
 #include "tgfx/layers/vectors/TrimPath.h"
 #include "tgfx/layers/vectors/VectorGroup.h"
@@ -3325,6 +3327,573 @@ TGFX_TEST(VectorLayerTest, TextPathWithTrimPath) {
   canvas->restore();
 
   EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/TextPathWithTrimPath"));
+}
+
+// ==================== TextModifier and TextSelector Tests ====================
+
+/**
+ * Test TextModifier and RangeSelector functionality in a grid layout:
+ * Column 1: Transform properties (Position, Scale, Rotation, Alpha, Skew, AnchorPoint)
+ * Column 2: Style overrides (FillColor, StrokeColor, StrokeWidth, Fill+Stroke, MultiSpan, MultiMod)
+ * Column 3: Shape comparison (Square, RampUp, RampDown, Triangle, Round, Smooth)
+ * Column 4: RangeSelector properties (EaseLow, EaseHigh, EaseBoth, Unit, NegOffset, Reversed)
+ * Column 5: Edge cases (Random, Empty, StartEnd, SubFirst)
+ */
+TGFX_TEST(VectorLayerTest, TextModifier) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 1100, 520);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto displayList = std::make_unique<DisplayList>();
+  auto vectorLayer = VectorLayer::Make();
+
+  auto typeface = GetTestTypeface();
+  if (typeface == nullptr) {
+    return;
+  }
+  Font font(typeface, 28);
+  Font boldFont(typeface, 28);
+  boldFont.setFauxBold(true);
+
+  std::vector<std::shared_ptr<VectorGroup>> groups = {};
+
+  // ==================== Column 1: Transform properties ====================
+  float col1X = 50;
+  float rowHeight = 75;
+
+  // Row 1: Position
+  auto group1 = std::make_shared<VectorGroup>();
+  group1->setPosition({col1X, 86});
+  auto textSpan1 = std::make_shared<TextSpan>();
+  textSpan1->setTextBlob(TextBlob::MakeFrom("Position", font));
+  auto selector1 = std::make_shared<RangeSelector>();
+  selector1->setShape(SelectorShape::RampUp);
+  auto modifier1 = std::make_shared<TextModifier>();
+  modifier1->setSelectors({selector1});
+  modifier1->setPosition({0, -20});
+  group1->setElements({textSpan1, modifier1, MakeFillStyle(Color::Blue())});
+  groups.push_back(group1);
+
+  // Row 2: Scale (non-uniform)
+  auto group2 = std::make_shared<VectorGroup>();
+  group2->setPosition({col1X, 86 + rowHeight});
+  auto textSpan2 = std::make_shared<TextSpan>();
+  textSpan2->setTextBlob(TextBlob::MakeFrom("Scale", font));
+  auto selector2 = std::make_shared<RangeSelector>();
+  selector2->setShape(SelectorShape::Triangle);
+  auto modifier2 = std::make_shared<TextModifier>();
+  modifier2->setSelectors({selector2});
+  modifier2->setScale({2.0f, 0.5f});
+  group2->setElements({textSpan2, modifier2, MakeFillStyle(Color::Red())});
+  groups.push_back(group2);
+
+  // Row 3: Rotation
+  auto group3 = std::make_shared<VectorGroup>();
+  group3->setPosition({col1X, 86 + rowHeight * 2});
+  auto textSpan3 = std::make_shared<TextSpan>();
+  textSpan3->setTextBlob(TextBlob::MakeFrom("Rotation", font));
+  auto selector3 = std::make_shared<RangeSelector>();
+  selector3->setShape(SelectorShape::Square);
+  auto modifier3 = std::make_shared<TextModifier>();
+  modifier3->setSelectors({selector3});
+  modifier3->setRotation(45);
+  group3->setElements({textSpan3, modifier3, MakeFillStyle(Color::Green())});
+  groups.push_back(group3);
+
+  // Row 4: Alpha (intermediate value 0.5)
+  auto group4 = std::make_shared<VectorGroup>();
+  group4->setPosition({col1X, 86 + rowHeight * 3});
+  auto textSpan4 = std::make_shared<TextSpan>();
+  textSpan4->setTextBlob(TextBlob::MakeFrom("Alpha", font));
+  auto selector4 = std::make_shared<RangeSelector>();
+  selector4->setShape(SelectorShape::RampDown);
+  auto modifier4 = std::make_shared<TextModifier>();
+  modifier4->setSelectors({selector4});
+  modifier4->setAlpha(0.5f);
+  group4->setElements({textSpan4, modifier4, MakeFillStyle(Color::Black())});
+  groups.push_back(group4);
+
+  // Row 5: Skew
+  auto group5 = std::make_shared<VectorGroup>();
+  group5->setPosition({col1X, 86 + rowHeight * 4});
+  auto textSpan5 = std::make_shared<TextSpan>();
+  textSpan5->setTextBlob(TextBlob::MakeFrom("Skew", font));
+  auto selector5 = std::make_shared<RangeSelector>();
+  selector5->setShape(SelectorShape::Triangle);
+  auto modifier5 = std::make_shared<TextModifier>();
+  modifier5->setSelectors({selector5});
+  modifier5->setSkew(30);
+  modifier5->setSkewAxis(45);
+  group5->setElements({textSpan5, modifier5, MakeFillStyle(Color::FromRGBA(128, 0, 128, 255))});
+  groups.push_back(group5);
+
+  // Row 6: AnchorPoint
+  auto group6 = std::make_shared<VectorGroup>();
+  group6->setPosition({col1X, 86 + rowHeight * 5});
+  auto textSpan6 = std::make_shared<TextSpan>();
+  textSpan6->setTextBlob(TextBlob::MakeFrom("AnchorPoint", font));
+  auto selector6 = std::make_shared<RangeSelector>();
+  selector6->setShape(SelectorShape::RampUp);
+  auto modifier6 = std::make_shared<TextModifier>();
+  modifier6->setSelectors({selector6});
+  modifier6->setAnchorPoint({0, 15});
+  modifier6->setRotation(30);
+  group6->setElements({textSpan6, modifier6, MakeFillStyle(Color::FromRGBA(255, 128, 0, 255))});
+  groups.push_back(group6);
+
+  // ==================== Column 2: Style overrides ====================
+  float col2X = 244;
+
+  // Row 1: FillColor
+  auto group7 = std::make_shared<VectorGroup>();
+  group7->setPosition({col2X, 86});
+  auto textSpan7 = std::make_shared<TextSpan>();
+  textSpan7->setTextBlob(TextBlob::MakeFrom("FillColor", boldFont));
+  auto selector7 = std::make_shared<RangeSelector>();
+  selector7->setShape(SelectorShape::RampDown);
+  auto modifier7 = std::make_shared<TextModifier>();
+  modifier7->setSelectors({selector7});
+  modifier7->setFillColor(Color::Red());
+  group7->setElements({textSpan7, modifier7, MakeFillStyle(Color::Blue())});
+  groups.push_back(group7);
+
+  // Row 2: StrokeColor
+  auto group8 = std::make_shared<VectorGroup>();
+  group8->setPosition({col2X, 86 + rowHeight});
+  auto textSpan8 = std::make_shared<TextSpan>();
+  textSpan8->setTextBlob(TextBlob::MakeFrom("StrokeColor", boldFont));
+  auto selector8 = std::make_shared<RangeSelector>();
+  selector8->setShape(SelectorShape::Triangle);
+  auto modifier8 = std::make_shared<TextModifier>();
+  modifier8->setSelectors({selector8});
+  modifier8->setStrokeColor(Color::Red());
+  group8->setElements({textSpan8, modifier8, MakeStrokeStyle(Color::Blue(), 2)});
+  groups.push_back(group8);
+
+  // Row 3: StrokeWidth
+  auto group9 = std::make_shared<VectorGroup>();
+  group9->setPosition({col2X, 86 + rowHeight * 2});
+  auto textSpan9 = std::make_shared<TextSpan>();
+  textSpan9->setTextBlob(TextBlob::MakeFrom("StrokeWidth", boldFont));
+  auto selector9 = std::make_shared<RangeSelector>();
+  selector9->setShape(SelectorShape::RampUp);
+  auto modifier9 = std::make_shared<TextModifier>();
+  modifier9->setSelectors({selector9});
+  modifier9->setStrokeWidth(6);
+  group9->setElements({textSpan9, modifier9, MakeStrokeStyle(Color::Green(), 1)});
+  groups.push_back(group9);
+
+  // Row 4: Fill+Stroke
+  auto group10 = std::make_shared<VectorGroup>();
+  group10->setPosition({col2X, 86 + rowHeight * 3});
+  auto textSpan10 = std::make_shared<TextSpan>();
+  textSpan10->setTextBlob(TextBlob::MakeFrom("Fill+Stroke", boldFont));
+  auto selector10 = std::make_shared<RangeSelector>();
+  selector10->setShape(SelectorShape::RampUp);
+  auto modifier10 = std::make_shared<TextModifier>();
+  modifier10->setSelectors({selector10});
+  modifier10->setFillColor(Color::Red());
+  modifier10->setStrokeColor(Color::Green());
+  group10->setElements({textSpan10, modifier10, MakeFillStyle(Color::Blue()),
+                        MakeStrokeStyle(Color(0.5f, 0.5f, 0.5f), 2)});
+  groups.push_back(group10);
+
+  // Row 5: MultiSpan
+  auto group11 = std::make_shared<VectorGroup>();
+  group11->setPosition({col2X, 86 + rowHeight * 4});
+  auto textSpanA = std::make_shared<TextSpan>();
+  textSpanA->setTextBlob(TextBlob::MakeFrom("AB", font));
+  auto textSpanB = std::make_shared<TextSpan>();
+  textSpanB->setTextBlob(TextBlob::MakeFrom("CD", font));
+  textSpanB->setPosition({55, 0});
+  auto textSpanC = std::make_shared<TextSpan>();
+  textSpanC->setTextBlob(TextBlob::MakeFrom("EF", font));
+  textSpanC->setPosition({110, 0});
+  auto selector11 = std::make_shared<RangeSelector>();
+  selector11->setShape(SelectorShape::RampUp);
+  auto modifier11 = std::make_shared<TextModifier>();
+  modifier11->setSelectors({selector11});
+  modifier11->setPosition({0, -20});
+  modifier11->setFillColor(Color::Red());
+  group11->setElements({textSpanA, textSpanB, textSpanC, modifier11, MakeFillStyle(Color::Blue())});
+  groups.push_back(group11);
+
+  // Row 6: Multiple Modifiers stacking
+  auto group12 = std::make_shared<VectorGroup>();
+  group12->setPosition({col2X, 86 + rowHeight * 5});
+  auto textSpan12 = std::make_shared<TextSpan>();
+  textSpan12->setTextBlob(TextBlob::MakeFrom("MultiMod", font));
+  auto selectorA = std::make_shared<RangeSelector>();
+  selectorA->setStart(0.0f);
+  selectorA->setEnd(0.5f);
+  auto modifierA = std::make_shared<TextModifier>();
+  modifierA->setSelectors({selectorA});
+  modifierA->setPosition({0, -10});
+  auto selectorB = std::make_shared<RangeSelector>();
+  selectorB->setStart(0.5f);
+  selectorB->setEnd(1.0f);
+  auto modifierB = std::make_shared<TextModifier>();
+  modifierB->setSelectors({selectorB});
+  modifierB->setRotation(15);
+  group12->setElements(
+      {textSpan12, modifierA, modifierB, MakeFillStyle(Color::FromRGBA(128, 0, 128, 255))});
+  groups.push_back(group12);
+
+  // ==================== Column 3: Shape comparison ====================
+  float col3X = 470;
+  std::vector<std::pair<SelectorShape, std::string>> shapes = {
+      {SelectorShape::Square, "Square"},     {SelectorShape::RampUp, "RampUp"},
+      {SelectorShape::RampDown, "RampDown"}, {SelectorShape::Triangle, "Triangle"},
+      {SelectorShape::Round, "Round"},       {SelectorShape::Smooth, "Smooth"}};
+
+  for (size_t i = 0; i < shapes.size(); i++) {
+    auto group = std::make_shared<VectorGroup>();
+    group->setPosition({col3X, 86 + rowHeight * static_cast<float>(i)});
+    auto textSpan = std::make_shared<TextSpan>();
+    textSpan->setTextBlob(TextBlob::MakeFrom(shapes[i].second, font));
+    auto selector = std::make_shared<RangeSelector>();
+    selector->setShape(shapes[i].first);
+    auto modifier = std::make_shared<TextModifier>();
+    modifier->setSelectors({selector});
+    modifier->setPosition({0, -15});
+    group->setElements({textSpan, modifier, MakeFillStyle(Color::Blue())});
+    groups.push_back(group);
+  }
+
+  // ==================== Column 4: RangeSelector properties ====================
+  float col4X = 680;
+
+  // Row 1: EaseLow (Triangle + EaseLow)
+  auto groupEL = std::make_shared<VectorGroup>();
+  groupEL->setPosition({col4X, 86});
+  auto textSpanEL = std::make_shared<TextSpan>();
+  textSpanEL->setTextBlob(TextBlob::MakeFrom("EaseLow", font));
+  auto selectorEL = std::make_shared<RangeSelector>();
+  selectorEL->setShape(SelectorShape::Triangle);
+  selectorEL->setEaseLow(0.8f);
+  auto modifierEL = std::make_shared<TextModifier>();
+  modifierEL->setSelectors({selectorEL});
+  modifierEL->setPosition({0, -15});
+  groupEL->setElements({textSpanEL, modifierEL, MakeFillStyle(Color::Blue())});
+  groups.push_back(groupEL);
+
+  // Row 2: EaseHigh (Triangle + EaseHigh)
+  auto groupEH = std::make_shared<VectorGroup>();
+  groupEH->setPosition({col4X, 86 + rowHeight});
+  auto textSpanEH = std::make_shared<TextSpan>();
+  textSpanEH->setTextBlob(TextBlob::MakeFrom("EaseHigh", font));
+  auto selectorEH = std::make_shared<RangeSelector>();
+  selectorEH->setShape(SelectorShape::Triangle);
+  selectorEH->setEaseHigh(0.8f);
+  auto modifierEH = std::make_shared<TextModifier>();
+  modifierEH->setSelectors({selectorEH});
+  modifierEH->setPosition({0, -15});
+  groupEH->setElements({textSpanEH, modifierEH, MakeFillStyle(Color::Red())});
+  groups.push_back(groupEH);
+
+  // Row 3: EaseBoth (Triangle + EaseHigh + EaseLow)
+  auto groupEB = std::make_shared<VectorGroup>();
+  groupEB->setPosition({col4X, 86 + rowHeight * 2});
+  auto textSpanEB = std::make_shared<TextSpan>();
+  textSpanEB->setTextBlob(TextBlob::MakeFrom("EaseBoth", font));
+  auto selectorEB = std::make_shared<RangeSelector>();
+  selectorEB->setShape(SelectorShape::Triangle);
+  selectorEB->setEaseHigh(0.6f);
+  selectorEB->setEaseLow(0.6f);
+  auto modifierEB = std::make_shared<TextModifier>();
+  modifierEB->setSelectors({selectorEB});
+  modifierEB->setPosition({0, -15});
+  groupEB->setElements({textSpanEB, modifierEB, MakeFillStyle(Color::Green())});
+  groups.push_back(groupEB);
+
+  // Row 4: Unit (Index)
+  auto groupUnit = std::make_shared<VectorGroup>();
+  groupUnit->setPosition({col4X, 86 + rowHeight * 3});
+  auto textSpanUnit = std::make_shared<TextSpan>();
+  textSpanUnit->setTextBlob(TextBlob::MakeFrom("ABCDEFGH", font));
+  auto selectorUnit = std::make_shared<RangeSelector>();
+  selectorUnit->setUnit(SelectorUnit::Index);
+  selectorUnit->setStart(2);
+  selectorUnit->setEnd(6);
+  auto modifierUnit = std::make_shared<TextModifier>();
+  modifierUnit->setSelectors({selectorUnit});
+  modifierUnit->setFillColor(Color::Red());
+  groupUnit->setElements({textSpanUnit, modifierUnit, MakeFillStyle(Color::Blue())});
+  groups.push_back(groupUnit);
+
+  // Row 5: Negative Offset
+  auto groupOff = std::make_shared<VectorGroup>();
+  groupOff->setPosition({col4X, 86 + rowHeight * 4});
+  auto textSpanOff = std::make_shared<TextSpan>();
+  textSpanOff->setTextBlob(TextBlob::MakeFrom("NegOffset", font));
+  auto selectorOff = std::make_shared<RangeSelector>();
+  selectorOff->setStart(0.5f);
+  selectorOff->setEnd(1.0f);
+  selectorOff->setOffset(-0.3f);
+  auto modifierOff = std::make_shared<TextModifier>();
+  modifierOff->setSelectors({selectorOff});
+  modifierOff->setFillColor(Color::Green());
+  groupOff->setElements({textSpanOff, modifierOff, MakeFillStyle(Color::Blue())});
+  groups.push_back(groupOff);
+
+  // Row 6: Reversed (Start > End)
+  auto groupRev = std::make_shared<VectorGroup>();
+  groupRev->setPosition({col4X, 86 + rowHeight * 5});
+  auto textSpanRev = std::make_shared<TextSpan>();
+  textSpanRev->setTextBlob(TextBlob::MakeFrom("Reversed", font));
+  auto selectorRev = std::make_shared<RangeSelector>();
+  selectorRev->setStart(0.7f);
+  selectorRev->setEnd(0.3f);
+  auto modifierRev = std::make_shared<TextModifier>();
+  modifierRev->setSelectors({selectorRev});
+  modifierRev->setFillColor(Color::FromRGBA(255, 128, 0, 255));
+  groupRev->setElements({textSpanRev, modifierRev, MakeFillStyle(Color::Blue())});
+  groups.push_back(groupRev);
+
+  // ==================== Column 5: Edge cases ====================
+  float col5X = 910;
+
+  // Row 1: Random
+  auto groupRnd = std::make_shared<VectorGroup>();
+  groupRnd->setPosition({col5X, 86});
+  auto textSpanRnd = std::make_shared<TextSpan>();
+  textSpanRnd->setTextBlob(TextBlob::MakeFrom("Random", font));
+  auto selectorRnd = std::make_shared<RangeSelector>();
+  selectorRnd->setShape(SelectorShape::RampUp);
+  selectorRnd->setRandomizeOrder(true);
+  selectorRnd->setRandomSeed(12345);
+  auto modifierRnd = std::make_shared<TextModifier>();
+  modifierRnd->setSelectors({selectorRnd});
+  modifierRnd->setPosition({0, -12});
+  groupRnd->setElements(
+      {textSpanRnd, modifierRnd, MakeFillStyle(Color::FromRGBA(128, 0, 128, 255))});
+  groups.push_back(groupRnd);
+
+  // Row 2: Empty selector
+  auto groupEmpty = std::make_shared<VectorGroup>();
+  groupEmpty->setPosition({col5X, 86 + rowHeight});
+  auto textSpanEmpty = std::make_shared<TextSpan>();
+  textSpanEmpty->setTextBlob(TextBlob::MakeFrom("Empty", font));
+  auto modifierEmpty = std::make_shared<TextModifier>();
+  modifierEmpty->setPosition({0, -10});
+  groupEmpty->setElements({textSpanEmpty, modifierEmpty, MakeFillStyle(Color::Black())});
+  groups.push_back(groupEmpty);
+
+  // Row 3: Start == End boundary
+  auto groupSE = std::make_shared<VectorGroup>();
+  groupSE->setPosition({col5X, 86 + rowHeight * 2});
+  auto textSpanSE = std::make_shared<TextSpan>();
+  textSpanSE->setTextBlob(TextBlob::MakeFrom("StartEnd", font));
+  auto selectorSE = std::make_shared<RangeSelector>();
+  selectorSE->setStart(0.5f);
+  selectorSE->setEnd(0.5f);
+  auto modifierSE = std::make_shared<TextModifier>();
+  modifierSE->setSelectors({selectorSE});
+  modifierSE->setFillColor(Color::Red());
+  groupSE->setElements({textSpanSE, modifierSE, MakeFillStyle(Color::Black())});
+  groups.push_back(groupSE);
+
+  // Row 4: First selector uses Subtract mode
+  auto groupSub = std::make_shared<VectorGroup>();
+  groupSub->setPosition({col5X, 86 + rowHeight * 3});
+  auto textSpanSub = std::make_shared<TextSpan>();
+  textSpanSub->setTextBlob(TextBlob::MakeFrom("SubFirst", font));
+  auto selectorSub = std::make_shared<RangeSelector>();
+  selectorSub->setMode(SelectorMode::Subtract);
+  selectorSub->setShape(SelectorShape::Triangle);
+  auto modifierSub = std::make_shared<TextModifier>();
+  modifierSub->setSelectors({selectorSub});
+  modifierSub->setPosition({0, -15});
+  groupSub->setElements(
+      {textSpanSub, modifierSub, MakeFillStyle(Color::FromRGBA(255, 128, 0, 255))});
+  groups.push_back(groupSub);
+
+  std::vector<std::shared_ptr<VectorElement>> contents = {};
+  for (const auto& group : groups) {
+    contents.push_back(group);
+  }
+  vectorLayer->setContents(contents);
+
+  displayList->root()->addChild(vectorLayer);
+  displayList->render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/TextModifier"));
+}
+
+/**
+ * Test TextSelector base class properties:
+ * Column 1: SelectorMode (Add, Subtract, Intersect, Min, Max, Difference)
+ * Column 2: Amount variations (1.0, 0.5, 0.0, -0.5, 1.5) + Edge cases (ThreeSels)
+ */
+TGFX_TEST(VectorLayerTest, TextSelector) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 435, 460);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto displayList = std::make_unique<DisplayList>();
+  auto vectorLayer = VectorLayer::Make();
+
+  auto typeface = GetTestTypeface();
+  if (typeface == nullptr) {
+    return;
+  }
+  Font font(typeface, 22);
+
+  std::vector<std::shared_ptr<VectorGroup>> groups = {};
+  float rowHeight = 65;
+  float col1X = 50;
+  float col2X = 270;
+
+  // Helper to create a baseline reference line
+  auto makeBaseline = [](float width) {
+    auto group = std::make_shared<VectorGroup>();
+    Path linePath = {};
+    linePath.moveTo(0, 0);
+    linePath.lineTo(width, 0);
+    auto shapePath = std::make_shared<ShapePath>();
+    shapePath->setPath(linePath);
+    auto stroke = std::make_shared<StrokeStyle>();
+    stroke->setColorSource(SolidColor::Make(Color{0.8f, 0.8f, 0.8f}));
+    stroke->setStrokeWidth(1);
+    group->setElements({shapePath, stroke});
+    return group;
+  };
+
+  // ==================== Column 1: Modes with two overlapping selectors ====================
+  std::vector<std::pair<SelectorMode, std::string>> modes = {
+      {SelectorMode::Add, "Add-Mode"},        {SelectorMode::Subtract, "Subtract"},
+      {SelectorMode::Intersect, "Intersect"}, {SelectorMode::Min, "Min-Mode"},
+      {SelectorMode::Max, "Max-Mode"},        {SelectorMode::Difference, "Difference"}};
+
+  for (size_t i = 0; i < modes.size(); i++) {
+    float y = 84 + rowHeight * static_cast<float>(i);
+
+    // Baseline reference line
+    auto baseline = makeBaseline(105);
+    baseline->setPosition({col1X, y});
+    groups.push_back(baseline);
+
+    auto group = std::make_shared<VectorGroup>();
+    group->setPosition({col1X, y});
+    auto textSpan = std::make_shared<TextSpan>();
+    textSpan->setTextBlob(TextBlob::MakeFrom(modes[i].second, font));
+
+    // Each string has 8-10 chars
+    // Selector1: first 60% with Square shape, amount=0.6
+    auto selector1 = std::make_shared<RangeSelector>();
+    selector1->setShape(SelectorShape::Square);
+    selector1->setStart(0.0f);
+    selector1->setEnd(0.6f);
+    selector1->setAmount(0.6f);
+
+    // Selector2: last 60% with Square shape, amount=0.4, overlapping 20% in middle
+    auto selector2 = std::make_shared<RangeSelector>();
+    selector2->setShape(SelectorShape::Square);
+    selector2->setStart(0.4f);
+    selector2->setEnd(1.0f);
+    selector2->setAmount(0.4f);
+    selector2->setMode(modes[i].first);
+
+    auto modifier = std::make_shared<TextModifier>();
+    modifier->setSelectors({selector1, selector2});
+    modifier->setPosition({0, -20});
+
+    group->setElements({textSpan, modifier, MakeFillStyle(Color::Blue())});
+    groups.push_back(group);
+  }
+
+  // ==================== Column 2: Amount variations ====================
+  std::vector<std::pair<float, std::string>> amounts = {{1.0f, "Amount 1.0"},
+                                                        {0.5f, "Amount 0.5"},
+                                                        {0.0f, "Amount 0.0"},
+                                                        {-0.5f, "Amount -0.5"},
+                                                        {1.5f, "Amount 1.5"}};
+
+  for (size_t i = 0; i < amounts.size(); i++) {
+    float y = 84 + rowHeight * static_cast<float>(i);
+
+    // Baseline reference line
+    auto baseline = makeBaseline(130);
+    baseline->setPosition({col2X, y});
+    groups.push_back(baseline);
+
+    auto group = std::make_shared<VectorGroup>();
+    group->setPosition({col2X, y});
+    auto textSpan = std::make_shared<TextSpan>();
+    textSpan->setTextBlob(TextBlob::MakeFrom(amounts[i].second, font));
+
+    auto selector = std::make_shared<RangeSelector>();
+    selector->setShape(SelectorShape::Triangle);
+    selector->setAmount(amounts[i].first);
+
+    auto modifier = std::make_shared<TextModifier>();
+    modifier->setSelectors({selector});
+    modifier->setPosition({0, -20});
+
+    group->setElements({textSpan, modifier, MakeFillStyle(Color::Red())});
+    groups.push_back(group);
+  }
+
+  // ==================== Column 2 Row 6: Edge cases ====================
+  // Row 6: Three selectors combination
+  {
+    float y = 84 + rowHeight * 5;
+    auto baseline = makeBaseline(130);
+    baseline->setPosition({col2X, y});
+    groups.push_back(baseline);
+
+    auto group = std::make_shared<VectorGroup>();
+    group->setPosition({col2X, y});
+    auto textSpan = std::make_shared<TextSpan>();
+    textSpan->setTextBlob(TextBlob::MakeFrom("ThreeSels", font));
+
+    // Selector1: [0, 0.4], amount=0.5
+    auto selector1 = std::make_shared<RangeSelector>();
+    selector1->setShape(SelectorShape::Square);
+    selector1->setStart(0.0f);
+    selector1->setEnd(0.4f);
+    selector1->setAmount(0.5f);
+
+    // Selector2: [0.3, 0.7], amount=0.5, Add
+    auto selector2 = std::make_shared<RangeSelector>();
+    selector2->setShape(SelectorShape::Square);
+    selector2->setStart(0.3f);
+    selector2->setEnd(0.7f);
+    selector2->setAmount(0.5f);
+    selector2->setMode(SelectorMode::Add);
+
+    // Selector3: [0.6, 1.0], amount=0.5, Add
+    auto selector3 = std::make_shared<RangeSelector>();
+    selector3->setShape(SelectorShape::Square);
+    selector3->setStart(0.6f);
+    selector3->setEnd(1.0f);
+    selector3->setAmount(0.5f);
+    selector3->setMode(SelectorMode::Add);
+
+    auto modifier = std::make_shared<TextModifier>();
+    modifier->setSelectors({selector1, selector2, selector3});
+    modifier->setPosition({0, -20});
+
+    group->setElements({textSpan, modifier, MakeFillStyle(Color::Green())});
+    groups.push_back(group);
+  }
+
+  std::vector<std::shared_ptr<VectorElement>> contents = {};
+  for (const auto& group : groups) {
+    contents.push_back(group);
+  }
+  vectorLayer->setContents(contents);
+
+  displayList->root()->addChild(vectorLayer);
+  displayList->render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/TextSelector"));
 }
 
 }  // namespace tgfx

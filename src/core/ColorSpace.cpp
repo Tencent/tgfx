@@ -336,9 +336,9 @@ enum ParaCurveType {
 /**
  * The D50 illuminant.
  */
-static constexpr float kD50_x = 0.9642f;
-static constexpr float kD50_y = 1.0000f;
-static constexpr float kD50_z = 0.8249f;
+static constexpr float D50_X = 0.9642f;
+static constexpr float D50_Y = 1.0000f;
+static constexpr float D50_Z = 0.8249f;
 
 static int32_t FloatRoundToFixed(float x) {
   return FloatSaturateToInt((float)floor((double)x * (1 << 16) + 0.5));
@@ -394,11 +394,11 @@ struct ICCHeader {
 
   // D50 standard illuminant (X, Y, Z)
   uint32_t illuminant_X =
-      SWAP_UINT32_TO_BIG_ENDIAN(static_cast<uint32_t>(FloatRoundToFixed(kD50_x)));
+      SWAP_UINT32_TO_BIG_ENDIAN(static_cast<uint32_t>(FloatRoundToFixed(D50_X)));
   uint32_t illuminant_Y =
-      SWAP_UINT32_TO_BIG_ENDIAN(static_cast<uint32_t>(FloatRoundToFixed(kD50_y)));
+      SWAP_UINT32_TO_BIG_ENDIAN(static_cast<uint32_t>(FloatRoundToFixed(D50_Y)));
   uint32_t illuminant_Z =
-      SWAP_UINT32_TO_BIG_ENDIAN(static_cast<uint32_t>(FloatRoundToFixed(kD50_z)));
+      SWAP_UINT32_TO_BIG_ENDIAN(static_cast<uint32_t>(FloatRoundToFixed(D50_Z)));
 
   // Profile creator (ignored)
   uint32_t creator = 0;
@@ -512,7 +512,7 @@ static std::shared_ptr<Data> WriteICCProfile(const gfx::skcms_ICCProfile* profil
     tags.emplace_back(TagBXYZ, WriteXYZTag(m.vals[0][2], m.vals[1][2], m.vals[2][2]));
   }
   // Compute white point tag (must be D50)
-  tags.emplace_back(TagWTPT, WriteXYZTag(kD50_x, kD50_y, kD50_z));
+  tags.emplace_back(TagWTPT, WriteXYZTag(D50_X, D50_Y, D50_Z));
 
   // Compute transfer curves.
   if (profile->has_trc) {
