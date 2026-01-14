@@ -31,6 +31,7 @@ std::shared_ptr<Layer3DContext> Layer3DContext::Make(
     float contentScale, std::shared_ptr<ColorSpace> colorSpace,
     std::shared_ptr<BackgroundContext> backgroundContext) {
   if (contourMode) {
+    DEBUG_ASSERT(backgroundContext == nullptr);
     return std::make_shared<Contour3DContext>(contentScale, std::move(colorSpace));
   }
   auto compositor = std::make_shared<Context3DCompositor>(

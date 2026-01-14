@@ -1812,6 +1812,14 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
     }
   }
 
+  // TODO: Support background styles for subsequent layers of 3D layers.
+  // 3D layer matrices are not written to the background canvas, so child layers cannot obtain
+  // correct background content. Background styles are temporarily disabled for the 3D layer's
+  // subtree (excluding the 3D layer itself).
+  bool skipBackground =
+      !HasStyleSource(args.styleSourceTypes, LayerStyleExtraSourceType::Background) ||
+      !bitFields.matrix3DIsAffine;
+
   for (size_t i = 0; i < _children.size(); ++i) {
     auto& child = _children[i];
     if (child.get() == stopChild) {
@@ -1820,11 +1828,11 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
     if (child->maskOwner || !child->visible() || child->_alpha <= 0) {
       continue;
     }
-    auto childArgsOpt = createChildArgs(args, canvas, child.get());
+    auto childArgsOpt = createChildArgs(args, canvas, child.get(), skipBackground);
     if (!childArgsOpt.has_value()) {
       continue;
     }
-    auto childArgs = std::move(*childArgsOpt);
+    auto& childArgs = *childArgsOpt;
     auto childIndex = static_cast<int>(i);
     if (childIndex < lastBackgroundLayerIndex) {
       childArgs.forceDrawBackground = true;
@@ -1834,7 +1842,7 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
         childArgs.blurBackground = nullptr;
       }
     }
-    drawChild(std::move(childArgs), canvas, child.get(), alpha);
+    drawChild(childArgs, canvas, child.get(), alpha);
   }
   return true;
 }
@@ -1862,15 +1870,9 @@ void Layer::drawByStarting3DContext(const DrawArgs& args, Canvas* canvas) {
   newContext->finishAndDrawTo(canvas, bitFields.allowsEdgeAntialiasing);
 }
 
-std::optional<DrawArgs> Layer::createChildArgs(const DrawArgs& args, Canvas* canvas, Layer* child) {
+std::optional<DrawArgs> Layer::createChildArgs(const DrawArgs& args, Canvas* canvas, Layer* child,
+                                               bool skipBackground) {
   auto childArgs = args;
-  // TODO: Support background styles for subsequent layers of 3D layers.
-  // 3D layer matrices are not written to the background canvas, so child layers cannot obtain
-  // correct background content. Background styles are temporarily disabled for the 3D layer's
-  // subtree (excluding the 3D layer itself).
-  bool skipBackground =
-      !HasStyleSource(args.styleSourceTypes, LayerStyleExtraSourceType::Background) ||
-      !bitFields.matrix3DIsAffine;
   if (skipBackground) {
     RemoveStyleSource(childArgs.styleSourceTypes, LayerStyleExtraSourceType::Background);
     childArgs.blurBackground = nullptr;

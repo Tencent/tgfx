@@ -633,7 +633,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   void drawByStarting3DContext(const DrawArgs& args, Canvas* canvas);
 
-  std::optional<DrawArgs> createChildArgs(const DrawArgs& args, Canvas* canvas, Layer* child);
+  std::optional<DrawArgs> createChildArgs(const DrawArgs& args, Canvas* canvas, Layer* child,
+                                          bool skipBackground);
 
   void drawChild(const DrawArgs& childArgs, Canvas* canvas, Layer* child, float alpha);
 

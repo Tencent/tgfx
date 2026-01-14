@@ -46,13 +46,11 @@ ContourContext::ContourContext() {
   contourBounds.reserve(3);
 }
 
-ContourContext::~ContourContext() {
-  delete canvas;
-}
+ContourContext::~ContourContext() = default;
 
 Canvas* ContourContext::beginRecording() {
   if (canvas == nullptr) {
-    canvas = new Canvas(this);
+    canvas = std::unique_ptr<Canvas>(new Canvas(this));
   } else {
     canvas->resetStateStack();
   }
@@ -61,7 +59,7 @@ Canvas* ContourContext::beginRecording() {
   pendingBrushes.clear();
   contourBounds.clear();
   pictureContext.clear();
-  return canvas;
+  return canvas.get();
 }
 
 void ContourContext::drawFill(const Brush& brush) {

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include <memory>
 #include "core/DrawContext.h"
 #include "core/PictureContext.h"
 #include "tgfx/core/Brush.h"
@@ -143,7 +144,7 @@ class ContourContext : public DrawContext {
 
   std::vector<Rect> contourBounds = {};
   PictureContext pictureContext = {};
-  Canvas* canvas = nullptr;
+  std::unique_ptr<Canvas> canvas = nullptr;
 
   friend class PendingContourAutoReset;
 };
