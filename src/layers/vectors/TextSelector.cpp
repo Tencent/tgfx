@@ -20,8 +20,8 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <cstdlib>
 #include <numeric>
+#include <random>
 
 namespace tgfx {
 
@@ -280,17 +280,16 @@ static size_t GetFirstCharRandomIndex(size_t textCount) {
 }
 
 // Generate a deterministic pseudo-random index mapping using sort-based shuffle.
-// This matches libpag's implementation for compatibility with PAG files.
 static std::vector<size_t> BuildRandomIndices(size_t totalCount, uint16_t seed) {
-  std::srand(seed);
-  std::vector<std::pair<int, size_t>> randList = {};
+  std::mt19937 rng(seed);
+  std::vector<std::pair<uint32_t, size_t>> randList = {};
   randList.reserve(totalCount);
   for (size_t i = 0; i < totalCount; i++) {
-    randList.emplace_back(std::rand(), i);
+    randList.emplace_back(rng(), i);
   }
 
   std::sort(randList.begin(), randList.end(),
-            [](const std::pair<int, size_t>& a, const std::pair<int, size_t>& b) {
+            [](const std::pair<uint32_t, size_t>& a, const std::pair<uint32_t, size_t>& b) {
               return a.first < b.first;
             });
 
