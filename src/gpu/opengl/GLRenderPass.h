@@ -39,6 +39,12 @@ struct PendingTexture {
   std::shared_ptr<GLSampler> sampler = nullptr;
 };
 
+struct PendingVertexBuffer {
+  unsigned slot = 0;
+  std::shared_ptr<GLBuffer> buffer = nullptr;
+  size_t offset = 0;
+};
+
 class GLRenderPass : public RenderPass {
  public:
   GLRenderPass(GLGPU* gpu, RenderPassDescriptor descriptor);
@@ -59,15 +65,17 @@ class GLRenderPass : public RenderPass {
   void setTexture(unsigned binding, std::shared_ptr<Texture> texture,
                   std::shared_ptr<Sampler> sampler) override;
 
-  void setVertexBuffer(std::shared_ptr<GPUBuffer> buffer, size_t offset) override;
+  void setVertexBuffer(unsigned slot, std::shared_ptr<GPUBuffer> buffer, size_t offset) override;
 
   void setIndexBuffer(std::shared_ptr<GPUBuffer> buffer, IndexFormat format) override;
 
   void setStencilReference(uint32_t reference) override;
 
-  void draw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount) override;
+  void draw(PrimitiveType primitiveType, size_t vertexCount, size_t instanceCount,
+            size_t firstVertex, size_t firstInstance) override;
 
-  void drawIndexed(PrimitiveType primitiveType, size_t baseIndex, size_t indexCount) override;
+  void drawIndexed(PrimitiveType primitiveType, size_t indexCount, size_t instanceCount,
+                   size_t firstIndex, size_t baseVertex, size_t firstInstance) override;
 
  protected:
   void onEnd() override;
@@ -77,8 +85,7 @@ class GLRenderPass : public RenderPass {
   std::shared_ptr<GLRenderPipeline> renderPipeline = nullptr;
   std::vector<PendingUniformBuffer> pendingUniformBuffers = {};
   std::vector<PendingTexture> pendingTextures = {};
-  std::shared_ptr<GLBuffer> pendingVertexBuffer = nullptr;
-  size_t pendingVertexOffset = 0;
+  std::vector<PendingVertexBuffer> pendingVertexBuffers = {};
   std::shared_ptr<GLBuffer> pendingIndexBuffer = nullptr;
   IndexFormat indexFormat = IndexFormat::UInt16;
   uint32_t stencilReference = 0;

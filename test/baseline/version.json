@@ -507,5 +507,8 @@
         "TrimPathReversedWrapAround": "4a74f6aa",
         "TrimPathWithScale": "4a74f6aa",
         "VectorGroupTransform": "4a74f6aa"
+    },
+    "GPURenderTest": {
+        "instanced_grid_rendering": "62f124a1"
     }
 }

@@ -110,13 +110,13 @@ void RectDrawOp::onDraw(RenderPass* renderPass) {
   if (vertexBuffer == nullptr) {
     return;
   }
-  renderPass->setVertexBuffer(vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
+  renderPass->setVertexBuffer(0, vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
   renderPass->setIndexBuffer(indexBuffer ? indexBuffer->gpuBuffer() : nullptr);
   if (indexBuffer != nullptr) {
     const auto numIndicesPerQuad = GetNumIndicesPerQuad(aaType, lineJoin);
-    renderPass->drawIndexed(PrimitiveType::Triangles, 0, rectCount * numIndicesPerQuad);
+    renderPass->drawIndexed(PrimitiveType::Triangles, rectCount * numIndicesPerQuad);
   } else {
-    renderPass->draw(PrimitiveType::TriangleStrip, 0, 4);
+    renderPass->draw(PrimitiveType::TriangleStrip, 4);
   }
 }
 }  // namespace tgfx

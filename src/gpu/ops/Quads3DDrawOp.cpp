@@ -102,13 +102,13 @@ void Quads3DDrawOp::onDraw(RenderPass* renderPass) {
   if (vertexBuffer == nullptr) {
     return;
   }
-  renderPass->setVertexBuffer(vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
+  renderPass->setVertexBuffer(0, vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
   renderPass->setIndexBuffer(indexBuffer ? indexBuffer->gpuBuffer() : nullptr);
   if (indexBuffer != nullptr) {
     auto numIndicesPerQuad = aaType == AAType::Coverage ? IndicesPerAAQuad : IndicesPerNonAAQuad;
-    renderPass->drawIndexed(PrimitiveType::Triangles, 0, quadCount * numIndicesPerQuad);
+    renderPass->drawIndexed(PrimitiveType::Triangles, quadCount * numIndicesPerQuad);
   } else {
-    renderPass->draw(PrimitiveType::TriangleStrip, 0, 4);
+    renderPass->draw(PrimitiveType::TriangleStrip, 4);
   }
 }
 
