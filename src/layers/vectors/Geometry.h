@@ -20,6 +20,7 @@
 
 #include <memory>
 #include <vector>
+#include "tgfx/core/Color.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Shape.h"
@@ -28,12 +29,37 @@
 namespace tgfx {
 
 /**
- * Glyph stores information for a single glyph with its transformation.
+ * GlyphStyle holds the style properties for text rendering.
+ * The alpha channel of colors serves as the blend factor.
+ * A blend factor of 0 means no override (use original style), 1 means full override.
+ */
+struct GlyphStyle {
+  Color fillColor = Color::Transparent();
+  Color strokeColor = Color::Transparent();
+  float strokeWidth = 0.0f;
+  float strokeWidthFactor = 0.0f;
+  float alpha = 1.0f;
+
+  bool operator==(const GlyphStyle& other) const;
+  bool operator!=(const GlyphStyle& other) const;
+};
+
+/**
+ * Glyph stores information for a single glyph with its transformation and style overrides.
  */
 struct Glyph {
   GlyphID glyphID = 0;
   Font font = {};
   Matrix matrix = Matrix::I();
+  GlyphStyle style = {};
+};
+
+/**
+ * StyledGlyphRun represents a group of consecutive glyphs with the same style.
+ */
+struct StyledGlyphRun {
+  std::shared_ptr<TextBlob> textBlob = nullptr;
+  GlyphStyle style = {};
 };
 
 /**
@@ -48,15 +74,16 @@ class Geometry {
   std::unique_ptr<Geometry> clone() const;
 
   /**
-   * Returns the TextBlob. If glyphs are present, rebuilds and caches TextBlob from them.
-   * Returns nullptr if this is a pure shape geometry.
-   */
-  std::shared_ptr<TextBlob> getTextBlob();
-
-  /**
    * Returns the Shape representation. Converts from TextBlob if needed and caches the result.
    */
   std::shared_ptr<Shape> getShape();
+
+  /**
+   * Returns glyph runs grouped by consecutive glyphs with the same style.
+   * Each run contains a TextBlob and shared style properties.
+   * If no glyphs exist but textBlob is present, returns a single run with the original textBlob.
+   */
+  const std::vector<StyledGlyphRun>& getGlyphRuns();
 
   /**
    * Returns true if this geometry contains text content (textBlob or glyphs).
@@ -91,6 +118,9 @@ class Geometry {
   void expandToGlyphs();
   void convertToShape();
   std::shared_ptr<TextBlob> buildTextBlob();
+  void buildGlyphRuns();
+
+  std::vector<StyledGlyphRun> glyphRuns = {};
 };
 
 }  // namespace tgfx
