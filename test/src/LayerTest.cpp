@@ -2746,13 +2746,12 @@ TGFX_TEST(LayerTest, Layer3DContextAPI) {
   ASSERT_TRUE(context != nullptr);
 
   auto renderRect = Rect::MakeWH(200, 200);
-  auto offset = Point::Zero();
   float contentScale = 1.0f;
   auto colorSpace = ColorSpace::SRGB();
 
   // Test Render3DContext creation (contourMode = false)
   auto render3DContext =
-      Layer3DContext::Make(false, context, renderRect, offset, contentScale, colorSpace, nullptr);
+      Layer3DContext::Make(false, context, renderRect, contentScale, colorSpace, nullptr);
   ASSERT_TRUE(render3DContext != nullptr);
   EXPECT_TRUE(render3DContext->isFinished());
 
@@ -2772,7 +2771,7 @@ TGFX_TEST(LayerTest, Layer3DContextAPI) {
 
   // Test Contour3DContext creation (contourMode = true)
   auto contour3DContext =
-      Layer3DContext::Make(true, context, renderRect, offset, contentScale, colorSpace, nullptr);
+      Layer3DContext::Make(true, context, renderRect, contentScale, colorSpace, nullptr);
   ASSERT_TRUE(contour3DContext != nullptr);
   EXPECT_TRUE(contour3DContext->isFinished());
 

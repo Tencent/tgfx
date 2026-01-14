@@ -37,7 +37,8 @@ struct ContourImageEntry {
  */
 class Contour3DContext : public Layer3DContext {
  public:
-  Contour3DContext(float contentScale, std::shared_ptr<ColorSpace> colorSpace);
+  Contour3DContext(const Rect& renderRect, float contentScale,
+                   std::shared_ptr<ColorSpace> colorSpace);
 
   void finishAndDrawTo(Canvas* canvas, bool antialiasing) override;
 

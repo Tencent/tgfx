@@ -308,9 +308,8 @@ static std::shared_ptr<Layer3DContext> Create3DContext(const DrawArgs& args, Can
     return nullptr;
   }
 
-  auto offset = Point::Make(validRenderRect.left, validRenderRect.top);
   bool contourMode = args.drawMode == DrawMode::Contour;
-  return Layer3DContext::Make(contourMode, args.context, validRenderRect, offset, contentScale,
+  return Layer3DContext::Make(contourMode, args.context, validRenderRect, contentScale,
                               args.dstColorSpace, args.blurBackground);
 }
 
