@@ -20,6 +20,7 @@
 #include "core/utils/RectToRectMatrix.h"
 #include "core/utils/StrokeUtils.h"
 #include "layers/OpaqueThreshold.h"
+#include "tgfx/core/Canvas.h"
 
 namespace tgfx {
 
@@ -43,6 +44,24 @@ class PendingContourAutoReset {
 
 ContourContext::ContourContext() {
   contourBounds.reserve(3);
+}
+
+ContourContext::~ContourContext() {
+  delete canvas;
+}
+
+Canvas* ContourContext::beginRecording() {
+  if (canvas == nullptr) {
+    canvas = new Canvas(this);
+  } else {
+    canvas->resetStateStack();
+  }
+  pendingContour = {};
+  pendingState = {};
+  pendingBrushes.clear();
+  contourBounds.clear();
+  pictureContext.clear();
+  return canvas;
 }
 
 void ContourContext::drawFill(const Brush& brush) {

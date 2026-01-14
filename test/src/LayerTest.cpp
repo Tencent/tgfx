@@ -28,6 +28,7 @@
 #include "layers/RootLayer.h"
 #include "layers/SubtreeCache.h"
 #include "layers/TileCache.h"
+#include "layers/compositing3d/Layer3DContext.h"
 #include "layers/contents/ComposeContent.h"
 #include "layers/contents/RRectsContent.h"
 #include "layers/contents/RectsContent.h"
@@ -1738,8 +1739,8 @@ TGFX_TEST(LayerTest, ContourTest) {
   allSolidLayer->addFillStyle(ShapeStyle::Make(Color::Red()));
   allSolidLayer->addFillStyle(ShapeStyle::Make(Color::Blue()));
   ContourContext allSolidContext;
-  Canvas allSolidCanvas = Canvas(&allSolidContext);
-  allSolidLayer->drawLayer(drawArgs, &allSolidCanvas, 1.0, BlendMode::SrcOver);
+  auto allSolidCanvas = allSolidContext.beginRecording();
+  allSolidLayer->drawLayer(drawArgs, allSolidCanvas, 1.0, BlendMode::SrcOver);
   auto allSolidPicture = allSolidContext.finishRecordingAsPicture();
   EXPECT_EQ(allSolidPicture->drawCount, 1u);
 
@@ -1751,8 +1752,8 @@ TGFX_TEST(LayerTest, ContourTest) {
   allImageLayer->addFillStyle(imageStyle1);
   allImageLayer->addFillStyle(imageStyle2);
   ContourContext allImageContext;
-  Canvas allImageCanvas = Canvas(&allImageContext);
-  allImageLayer->drawLayer(drawArgs, &allImageCanvas, 1.0, BlendMode::SrcOver);
+  auto allImageCanvas = allImageContext.beginRecording();
+  allImageLayer->drawLayer(drawArgs, allImageCanvas, 1.0, BlendMode::SrcOver);
   auto allImagePicture = allImageContext.finishRecordingAsPicture();
   EXPECT_EQ(allImagePicture->drawCount, 2u);
 
@@ -1767,8 +1768,8 @@ TGFX_TEST(LayerTest, ContourTest) {
   mixedFillsLayer->addFillStyle(imageStyle2);
   mixedFillsLayer->addFillStyle(ShapeStyle::Make(Color::Green()));
   ContourContext mixedFillsContext;
-  Canvas mixedFillsCanvas = Canvas(&mixedFillsContext);
-  mixedFillsLayer->drawLayer(drawArgs, &mixedFillsCanvas, 1.0, BlendMode::SrcOver);
+  auto mixedFillsCanvas = mixedFillsContext.beginRecording();
+  mixedFillsLayer->drawLayer(drawArgs, mixedFillsCanvas, 1.0, BlendMode::SrcOver);
   auto mixedFillsPicture = mixedFillsContext.finishRecordingAsPicture();
   // Should be 1 (only first collected). Buggy single-pass would return 2.
   EXPECT_EQ(mixedFillsPicture->drawCount, 1u);
@@ -1789,8 +1790,8 @@ TGFX_TEST(LayerTest, ContourTest) {
   childLayer->addFillStyle(ShapeStyle::Make(Color::Blue()));
   twoGroupsLayer->addChild(childLayer);
   ContourContext twoGroupsContext;
-  Canvas twoGroupsCanvas = Canvas(&twoGroupsContext);
-  twoGroupsLayer->drawLayer(drawArgs, &twoGroupsCanvas, 1.0, BlendMode::SrcOver);
+  auto twoGroupsCanvas = twoGroupsContext.beginRecording();
+  twoGroupsLayer->drawLayer(drawArgs, twoGroupsCanvas, 1.0, BlendMode::SrcOver);
   auto twoGroupsPicture = twoGroupsContext.finishRecordingAsPicture();
   // Group 1: 2 (all image shaders), Group 2: 1 (deduped) = 3 total.
   EXPECT_EQ(twoGroupsPicture->drawCount, 3u);
@@ -1806,8 +1807,8 @@ TGFX_TEST(LayerTest, ContourTest) {
   strokeTestLayer->addStrokeStyle(ShapeStyle::Make(Color::Red()));
   strokeTestLayer->addStrokeStyle(ShapeStyle::Make(Color::Blue()));
   ContourContext strokeTestContext;
-  Canvas strokeTestCanvas = Canvas(&strokeTestContext);
-  strokeTestLayer->drawLayer(drawArgs, &strokeTestCanvas, 1.0, BlendMode::SrcOver);
+  auto strokeTestCanvas = strokeTestContext.beginRecording();
+  strokeTestLayer->drawLayer(drawArgs, strokeTestCanvas, 1.0, BlendMode::SrcOver);
   auto strokeTestPicture = strokeTestContext.finishRecordingAsPicture();
   // 1 (transparent fill) + 1 (strokes deduped) = 2 contours.
   EXPECT_EQ(strokeTestPicture->drawCount, 2u);
@@ -1820,8 +1821,8 @@ TGFX_TEST(LayerTest, ContourTest) {
   rootLayer->addChild(twoGroupsLayer);
   rootLayer->addChild(strokeTestLayer);
   ContourContext allContext;
-  Canvas allCanvas = Canvas(&allContext);
-  rootLayer->drawLayer(drawArgs, &allCanvas, 1.0, BlendMode::SrcOver);
+  auto allCanvas = allContext.beginRecording();
+  rootLayer->drawLayer(drawArgs, allCanvas, 1.0, BlendMode::SrcOver);
   auto allPicture = allContext.finishRecordingAsPicture();
   // 1 + 2 + 1 + 3 + 2 = 9
   EXPECT_EQ(allPicture->drawCount, 9u);
@@ -2737,6 +2738,198 @@ TGFX_TEST(LayerTest, SetChildrenLISValidation) {
   singleParent->setChildren(single);
   EXPECT_EQ(singleParent->children().size(), 1u);
   EXPECT_FALSE(singleLayer->bitFields.dirtyTransform);
+}
+
+TGFX_TEST(LayerTest, Layer3DContextAPI) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto renderRect = Rect::MakeWH(200, 200);
+  auto offset = Point::Zero();
+  float contentScale = 1.0f;
+  auto colorSpace = ColorSpace::SRGB();
+
+  // Test Render3DContext creation (contourMode = false)
+  auto render3DContext =
+      Layer3DContext::Make(false, context, renderRect, offset, contentScale, colorSpace, nullptr);
+  ASSERT_TRUE(render3DContext != nullptr);
+  EXPECT_TRUE(render3DContext->isFinished());
+
+  // Test beginRecording/endRecording cycle
+  auto rotateMatrix = Matrix3D::MakeRotate({0, 1, 0}, 30);
+  auto recordCanvas = render3DContext->beginRecording(rotateMatrix, true);
+  ASSERT_TRUE(recordCanvas != nullptr);
+  EXPECT_FALSE(render3DContext->isFinished());
+
+  // Draw something
+  Paint paint = {};
+  paint.setColor(Color::Red());
+  recordCanvas->drawRect(Rect::MakeXYWH(20, 20, 60, 60), paint);
+
+  render3DContext->endRecording();
+  EXPECT_TRUE(render3DContext->isFinished());
+
+  // Test Contour3DContext creation (contourMode = true)
+  auto contour3DContext =
+      Layer3DContext::Make(true, context, renderRect, offset, contentScale, colorSpace, nullptr);
+  ASSERT_TRUE(contour3DContext != nullptr);
+  EXPECT_TRUE(contour3DContext->isFinished());
+
+  // Test nested recording (simulates nested preserve3D layers)
+  auto transform1 = Matrix3D::MakeRotate({0, 1, 0}, 20);
+  auto canvas1 = contour3DContext->beginRecording(transform1, true);
+  EXPECT_FALSE(contour3DContext->isFinished());
+  paint.setColor(Color::Blue());
+  canvas1->drawRect(Rect::MakeXYWH(10, 10, 80, 80), paint);
+
+  // Nested recording - tests recorder stack isolation
+  auto transform2 = Matrix3D::MakeRotate({1, 0, 0}, 30);
+  auto canvas2 = contour3DContext->beginRecording(transform2, true);
+  ASSERT_TRUE(canvas2 != nullptr);
+  EXPECT_NE(canvas1, canvas2);
+  EXPECT_FALSE(contour3DContext->isFinished());
+  paint.setColor(Color::Green());
+  canvas2->drawRect(Rect::MakeXYWH(30, 30, 40, 40), paint);
+
+  // End inner recording first
+  contour3DContext->endRecording();
+  EXPECT_FALSE(contour3DContext->isFinished());
+
+  // End outer recording
+  contour3DContext->endRecording();
+  EXPECT_TRUE(contour3DContext->isFinished());
+}
+
+TGFX_TEST(LayerTest, Preserve3DNestedLayers) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+
+  auto displayList = std::make_unique<DisplayList>();
+
+  // Create parent layer with preserve3D
+  auto parentLayer = SolidLayer::Make();
+  parentLayer->setColor(Color::FromRGBA(200, 200, 200, 255));
+  parentLayer->setWidth(180);
+  parentLayer->setHeight(180);
+  parentLayer->setMatrix(Matrix::MakeTrans(10, 10));
+  parentLayer->setPreserve3D(true);
+
+  // Create first child with 3D transform using perspective
+  auto child1 = SolidLayer::Make();
+  child1->setColor(Color::Red());
+  child1->setWidth(60);
+  child1->setHeight(60);
+  {
+    auto size = Size::Make(60, 60);
+    auto anchor = Point::Make(0.5f, 0.5f);
+    auto offsetToAnchor =
+        Matrix3D::MakeTranslate(-anchor.x * size.width, -anchor.y * size.height, 0);
+    auto invOffsetToAnchor =
+        Matrix3D::MakeTranslate(anchor.x * size.width, anchor.y * size.height, 0);
+    auto rotate = Matrix3D::MakeRotate({0, 1, 0}, 30);
+    auto perspective = Matrix3D::I();
+    perspective.setRowColumn(3, 2, -1.0f / 500.0f);
+    auto origin = Matrix3D::MakeTranslate(30, 30, 0);
+    child1->setMatrix3D(origin * invOffsetToAnchor * perspective * rotate * offsetToAnchor);
+  }
+
+  // Create second child with different 3D transform
+  auto child2 = SolidLayer::Make();
+  child2->setColor(Color::Blue());
+  child2->setWidth(60);
+  child2->setHeight(60);
+  {
+    auto size = Size::Make(60, 60);
+    auto anchor = Point::Make(0.5f, 0.5f);
+    auto offsetToAnchor =
+        Matrix3D::MakeTranslate(-anchor.x * size.width, -anchor.y * size.height, 0);
+    auto invOffsetToAnchor =
+        Matrix3D::MakeTranslate(anchor.x * size.width, anchor.y * size.height, 0);
+    auto rotate = Matrix3D::MakeRotate({0, 1, 0}, -30);
+    auto perspective = Matrix3D::I();
+    perspective.setRowColumn(3, 2, -1.0f / 500.0f);
+    auto origin = Matrix3D::MakeTranslate(100, 100, 0);
+    child2->setMatrix3D(origin * invOffsetToAnchor * perspective * rotate * offsetToAnchor);
+  }
+
+  parentLayer->addChild(child1);
+  parentLayer->addChild(child2);
+  displayList->root()->addChild(parentLayer);
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Preserve3DNestedLayers"));
+}
+
+TGFX_TEST(LayerTest, Contour3DWithDropShadow) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 300);
+
+  auto displayList = std::make_unique<DisplayList>();
+
+  // Create parent layer with preserve3D and drop shadow (showBehindLayer = false)
+  // Parent is semi-transparent so we can see shadow through it
+  auto parentLayer = SolidLayer::Make();
+  parentLayer->setColor(Color::FromRGBA(200, 200, 200, 100));
+  parentLayer->setWidth(150);
+  parentLayer->setHeight(150);
+  parentLayer->setMatrix(Matrix::MakeTrans(75, 75));
+  parentLayer->setPreserve3D(true);
+
+  auto dropShadow = DropShadowStyle::Make(10, 10, 8, 8, Color::FromRGBA(0, 0, 0, 200));
+  dropShadow->setShowBehindLayer(false);
+  parentLayer->setLayerStyles({dropShadow});
+
+  // Create first child with 3D transform - positioned to extend outside parent
+  auto child1 = SolidLayer::Make();
+  child1->setColor(Color::FromRGBA(255, 0, 0, 200));
+  child1->setWidth(80);
+  child1->setHeight(80);
+  {
+    auto size = Size::Make(80, 80);
+    auto anchor = Point::Make(0.5f, 0.5f);
+    auto offsetToAnchor =
+        Matrix3D::MakeTranslate(-anchor.x * size.width, -anchor.y * size.height, 0);
+    auto invOffsetToAnchor =
+        Matrix3D::MakeTranslate(anchor.x * size.width, anchor.y * size.height, 0);
+    auto rotate = Matrix3D::MakeRotate({0, 1, 0}, 40);
+    auto perspective = Matrix3D::I();
+    perspective.setRowColumn(3, 2, -1.0f / 300.0f);
+    // Position at top-left, extending outside parent
+    auto origin = Matrix3D::MakeTranslate(-20, -20, 0);
+    child1->setMatrix3D(origin * invOffsetToAnchor * perspective * rotate * offsetToAnchor);
+  }
+
+  // Create second child with different 3D transform - positioned to extend outside parent
+  auto child2 = SolidLayer::Make();
+  child2->setColor(Color::FromRGBA(0, 0, 255, 200));
+  child2->setWidth(80);
+  child2->setHeight(80);
+  {
+    auto size = Size::Make(80, 80);
+    auto anchor = Point::Make(0.5f, 0.5f);
+    auto offsetToAnchor =
+        Matrix3D::MakeTranslate(-anchor.x * size.width, -anchor.y * size.height, 0);
+    auto invOffsetToAnchor =
+        Matrix3D::MakeTranslate(anchor.x * size.width, anchor.y * size.height, 0);
+    auto rotate = Matrix3D::MakeRotate({0, 1, 0}, -40);
+    auto perspective = Matrix3D::I();
+    perspective.setRowColumn(3, 2, -1.0f / 300.0f);
+    // Position at bottom-right, extending outside parent
+    auto origin = Matrix3D::MakeTranslate(90, 90, 0);
+    child2->setMatrix3D(origin * invOffsetToAnchor * perspective * rotate * offsetToAnchor);
+  }
+
+  parentLayer->addChild(child1);
+  parentLayer->addChild(child2);
+  displayList->root()->addChild(parentLayer);
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Contour3DWithDropShadow"));
 }
 
 }  // namespace tgfx

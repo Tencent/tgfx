@@ -25,8 +25,9 @@ namespace tgfx {
 class ContourContext : public DrawContext {
  public:
   ContourContext();
+  ~ContourContext() override;
 
-  ~ContourContext() override = default;
+  Canvas* beginRecording();
 
   void drawFill(const Brush& brush) override;
 
@@ -142,6 +143,7 @@ class ContourContext : public DrawContext {
 
   std::vector<Rect> contourBounds = {};
   PictureContext pictureContext = {};
+  Canvas* canvas = nullptr;
 
   friend class PendingContourAutoReset;
 };
