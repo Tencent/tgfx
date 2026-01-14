@@ -1,5 +1,5 @@
 ---
-description: 代码审查 - 支持在线 PR 审查和本地变更审查 (project)
+description: 代码审查 - 支持在线 PR 审查和本地变更审查
 ---
 
 # Code Review

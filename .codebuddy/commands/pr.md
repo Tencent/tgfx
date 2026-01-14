@@ -1,5 +1,5 @@
 ---
-description: 发起 PR - 格式化代码并提交 PR (project)
+description: 发起 PR - 格式化代码并提交 PR
 ---
 
 # 发起 PR 流程
