@@ -57,8 +57,11 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string& fileP
     return nullptr;
   }
   auto result = NativeCodec::Make(imageSource);
-  result->imagePath = filePath;
   OH_ImageSourceNative_Release(imageSource);
+  if (result == nullptr) {
+    return nullptr;
+  }
+  result->imagePath = filePath;
   return result;
 }
 
@@ -71,8 +74,11 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data> im
     return nullptr;
   }
   auto result = NativeCodec::Make(imageSource);
-  result->imageBytes = imageBytes;
   OH_ImageSourceNative_Release(imageSource);
+  if (result == nullptr) {
+    return nullptr;
+  }
+  result->imageBytes = imageBytes;
   return result;
 }
 
@@ -82,9 +88,9 @@ bool NativeCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t 
   if (!image) {
     return false;
   }
-  OH_DecodingOptions* options;
+  OH_DecodingOptions* options = nullptr;
   auto errorCode = OH_DecodingOptions_Create(&options);
-  if (errorCode != Image_ErrorCode::IMAGE_SUCCESS) {
+  if (errorCode != Image_ErrorCode::IMAGE_SUCCESS || options == nullptr) {
     LOGE("NativeCodec::readPixels() Failed to Create Decode Option");
     OH_ImageSourceNative_Release(image);
     return false;
@@ -93,7 +99,8 @@ bool NativeCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t 
   // decode
   OH_PixelmapNative* pixelmap = nullptr;
   errorCode = OH_ImageSourceNative_CreatePixelmap(image, options, &pixelmap);
-  if (errorCode != IMAGE_SUCCESS) {
+  OH_DecodingOptions_Release(options);
+  if (errorCode != IMAGE_SUCCESS || pixelmap == nullptr) {
     OH_ImageSourceNative_Release(image);
     LOGE("NativeCodec::readPixels() Failed to Decode Image");
     return false;
