@@ -133,9 +133,9 @@ static bool DoubleNearlyEqual(double a, double b, double tolerance) {
   return std::abs(a - b) <= tolerance;
 }
 
-// Triangle shape factor calculation with easeHigh/easeLow bezier curve support.
+// Triangle shape factor calculation with easeOut/easeIn bezier curve support.
 static float CalculateTriangleFactor(float textStart, float textEnd, float rangeStart,
-                                     float rangeEnd, float easeHigh, float easeLow) {
+                                     float rangeEnd, float easeOut, float easeIn) {
   if (rangeStart >= rangeEnd) {
     return 0.0f;
   }
@@ -151,10 +151,10 @@ static float CalculateTriangleFactor(float textStart, float textEnd, float range
   double x1 = x <= rangeCenter ? rangeStart : rangeEnd;
   double y1 = 0;
   double step = rangeCenter - x1;
-  double x2 = easeLow >= 0 ? x1 + easeLow * step : x1;
-  double y2 = easeLow >= 0 ? 0 : -easeLow;
-  double x3 = easeHigh >= 0 ? rangeCenter - easeHigh * step : rangeCenter;
-  double y3 = easeHigh >= 0 ? 1 : 1 + easeHigh;
+  double x2 = easeIn >= 0 ? x1 + easeIn * step : x1;
+  double y2 = easeIn >= 0 ? 0 : -easeIn;
+  double x3 = easeOut >= 0 ? rangeCenter - easeOut * step : rangeCenter;
+  double y3 = easeOut >= 0 ? 1 : 1 + easeOut;
   double x4 = rangeCenter;
   double y4 = 1;
 
@@ -350,11 +350,11 @@ void TextSelector::setMode(SelectorMode value) {
   invalidateContent();
 }
 
-void TextSelector::setAmount(float value) {
-  if (_amount == value) {
+void TextSelector::setWeight(float value) {
+  if (_weight == value) {
     return;
   }
-  _amount = value;
+  _weight = value;
   invalidateContent();
 }
 
@@ -400,19 +400,19 @@ void RangeSelector::setShape(SelectorShape value) {
   invalidateContent();
 }
 
-void RangeSelector::setEaseHigh(float value) {
-  if (_easeHigh == value) {
+void RangeSelector::setEaseOut(float value) {
+  if (_easeOut == value) {
     return;
   }
-  _easeHigh = value;
+  _easeOut = value;
   invalidateContent();
 }
 
-void RangeSelector::setEaseLow(float value) {
-  if (_easeLow == value) {
+void RangeSelector::setEaseIn(float value) {
+  if (_easeIn == value) {
     return;
   }
-  _easeLow = value;
+  _easeIn = value;
   invalidateContent();
 }
 
@@ -469,8 +469,7 @@ float RangeSelector::calculateFactor(size_t index, size_t totalCount) const {
       factor = CalculateRampDownFactor(textStart, textEnd, rangeStart, rangeEnd);
       break;
     case SelectorShape::Triangle:
-      factor =
-          CalculateTriangleFactor(textStart, textEnd, rangeStart, rangeEnd, _easeHigh, _easeLow);
+      factor = CalculateTriangleFactor(textStart, textEnd, rangeStart, rangeEnd, _easeOut, _easeIn);
       break;
     case SelectorShape::Round:
       factor = CalculateRoundFactor(textStart, textEnd, rangeStart, rangeEnd);
@@ -484,7 +483,7 @@ float RangeSelector::calculateFactor(size_t index, size_t totalCount) const {
   }
 
   factor = std::clamp(factor, 0.0f, 1.0f);
-  factor *= amount();
+  factor *= weight();
   return factor;
 }
 

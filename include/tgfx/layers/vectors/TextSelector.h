@@ -29,11 +29,11 @@ namespace tgfx {
  */
 enum class SelectorUnit {
   /**
-   * The range values are character indices.
+   * The range values are character indices (0 to totalCount).
    */
   Index,
   /**
-   * The range values are percentages (0.0-1.0).
+   * The range values are normalized percentages (0.0 to 1.0).
    */
   Percentage
 };
@@ -134,23 +134,23 @@ class TextSelector : public LayerProperty {
   void setMode(SelectorMode value);
 
   /**
-   * Returns the amount of influence this selector has (0.0 to 1.0).
+   * Returns the weight of influence this selector has (0.0 to 1.0).
    */
-  float amount() const {
-    return _amount;
+  float weight() const {
+    return _weight;
   }
 
   /**
-   * Sets the amount of influence this selector has.
+   * Sets the weight of influence this selector has.
    */
-  void setAmount(float value);
+  void setWeight(float value);
 
  protected:
   TextSelector() = default;
 
  private:
   SelectorMode _mode = SelectorMode::Add;
-  float _amount = 1.0f;
+  float _weight = 1.0f;
 
   friend class TextModifier;
 };
@@ -225,28 +225,28 @@ class RangeSelector : public TextSelector {
   void setShape(SelectorShape value);
 
   /**
-   * Returns the ease applied to the high end of the selection (0.0 to 1.0).
+   * Returns the ease-out value applied when the selection factor approaches 1.0 (0.0 to 1.0).
    */
-  float easeHigh() const {
-    return _easeHigh;
+  float easeOut() const {
+    return _easeOut;
   }
 
   /**
-   * Sets the ease applied to the high end of the selection.
+   * Sets the ease-out value applied when the selection factor approaches 1.0.
    */
-  void setEaseHigh(float value);
+  void setEaseOut(float value);
 
   /**
-   * Returns the ease applied to the low end of the selection (0.0 to 1.0).
+   * Returns the ease-in value applied when the selection factor starts from 0.0 (0.0 to 1.0).
    */
-  float easeLow() const {
-    return _easeLow;
+  float easeIn() const {
+    return _easeIn;
   }
 
   /**
-   * Sets the ease applied to the low end of the selection.
+   * Sets the ease-in value applied when the selection factor starts from 0.0.
    */
-  void setEaseLow(float value);
+  void setEaseIn(float value);
 
   /**
    * Returns whether to randomize the order of character selection.
@@ -278,8 +278,8 @@ class RangeSelector : public TextSelector {
   float _offset = 0.0f;
   SelectorUnit _unit = SelectorUnit::Percentage;
   SelectorShape _shape = SelectorShape::Square;
-  float _easeHigh = 0.0f;
-  float _easeLow = 0.0f;
+  float _easeOut = 0.0f;
+  float _easeIn = 0.0f;
   bool _randomizeOrder = false;
   uint16_t _randomSeed = 0;
 };

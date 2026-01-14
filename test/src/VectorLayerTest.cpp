@@ -3336,7 +3336,7 @@ TGFX_TEST(VectorLayerTest, TextPathWithTrimPath) {
  * Column 1: Transform properties (Position, Scale, Rotation, Alpha, Skew, AnchorPoint)
  * Column 2: Style overrides (FillColor, StrokeColor, StrokeWidth, Fill+Stroke, MultiSpan, MultiMod)
  * Column 3: Shape comparison (Square, RampUp, RampDown, Triangle, Round, Smooth)
- * Column 4: RangeSelector properties (EaseLow, EaseHigh, EaseBoth, Unit, NegOffset, Reversed)
+ * Column 4: RangeSelector properties (EaseIn, EaseOut, EaseBoth, Unit, NegOffset, Reversed)
  * Column 5: Edge cases (Random, Empty, StartEnd, SubFirst)
  */
 TGFX_TEST(VectorLayerTest, TextModifier) {
@@ -3566,43 +3566,43 @@ TGFX_TEST(VectorLayerTest, TextModifier) {
   // ==================== Column 4: RangeSelector properties ====================
   float col4X = 680;
 
-  // Row 1: EaseLow (Triangle + EaseLow)
+  // Row 1: EaseIn (Triangle + EaseIn)
   auto groupEL = std::make_shared<VectorGroup>();
   groupEL->setPosition({col4X, 86});
   auto textSpanEL = std::make_shared<TextSpan>();
-  textSpanEL->setTextBlob(TextBlob::MakeFrom("EaseLow", font));
+  textSpanEL->setTextBlob(TextBlob::MakeFrom("EaseIn", font));
   auto selectorEL = std::make_shared<RangeSelector>();
   selectorEL->setShape(SelectorShape::Triangle);
-  selectorEL->setEaseLow(0.8f);
+  selectorEL->setEaseIn(0.8f);
   auto modifierEL = std::make_shared<TextModifier>();
   modifierEL->setSelectors({selectorEL});
   modifierEL->setPosition({0, -15});
   groupEL->setElements({textSpanEL, modifierEL, MakeFillStyle(Color::Blue())});
   groups.push_back(groupEL);
 
-  // Row 2: EaseHigh (Triangle + EaseHigh)
+  // Row 2: EaseOut (Triangle + EaseOut)
   auto groupEH = std::make_shared<VectorGroup>();
   groupEH->setPosition({col4X, 86 + rowHeight});
   auto textSpanEH = std::make_shared<TextSpan>();
-  textSpanEH->setTextBlob(TextBlob::MakeFrom("EaseHigh", font));
+  textSpanEH->setTextBlob(TextBlob::MakeFrom("EaseOut", font));
   auto selectorEH = std::make_shared<RangeSelector>();
   selectorEH->setShape(SelectorShape::Triangle);
-  selectorEH->setEaseHigh(0.8f);
+  selectorEH->setEaseOut(0.8f);
   auto modifierEH = std::make_shared<TextModifier>();
   modifierEH->setSelectors({selectorEH});
   modifierEH->setPosition({0, -15});
   groupEH->setElements({textSpanEH, modifierEH, MakeFillStyle(Color::Red())});
   groups.push_back(groupEH);
 
-  // Row 3: EaseBoth (Triangle + EaseHigh + EaseLow)
+  // Row 3: EaseBoth (Triangle + EaseOut + EaseIn)
   auto groupEB = std::make_shared<VectorGroup>();
   groupEB->setPosition({col4X, 86 + rowHeight * 2});
   auto textSpanEB = std::make_shared<TextSpan>();
   textSpanEB->setTextBlob(TextBlob::MakeFrom("EaseBoth", font));
   auto selectorEB = std::make_shared<RangeSelector>();
   selectorEB->setShape(SelectorShape::Triangle);
-  selectorEB->setEaseHigh(0.6f);
-  selectorEB->setEaseLow(0.6f);
+  selectorEB->setEaseOut(0.6f);
+  selectorEB->setEaseIn(0.6f);
   auto modifierEB = std::make_shared<TextModifier>();
   modifierEB->setSelectors({selectorEB});
   modifierEB->setPosition({0, -15});
@@ -3790,14 +3790,14 @@ TGFX_TEST(VectorLayerTest, TextSelector) {
     selector1->setShape(SelectorShape::Square);
     selector1->setStart(0.0f);
     selector1->setEnd(0.6f);
-    selector1->setAmount(0.6f);
+    selector1->setWeight(0.6f);
 
     // Selector2: last 60% with Square shape, amount=0.4, overlapping 20% in middle
     auto selector2 = std::make_shared<RangeSelector>();
     selector2->setShape(SelectorShape::Square);
     selector2->setStart(0.4f);
     selector2->setEnd(1.0f);
-    selector2->setAmount(0.4f);
+    selector2->setWeight(0.4f);
     selector2->setMode(modes[i].first);
 
     auto modifier = std::make_shared<TextModifier>();
@@ -3830,7 +3830,7 @@ TGFX_TEST(VectorLayerTest, TextSelector) {
 
     auto selector = std::make_shared<RangeSelector>();
     selector->setShape(SelectorShape::Triangle);
-    selector->setAmount(amounts[i].first);
+    selector->setWeight(amounts[i].first);
 
     auto modifier = std::make_shared<TextModifier>();
     modifier->setSelectors({selector});
@@ -3858,14 +3858,14 @@ TGFX_TEST(VectorLayerTest, TextSelector) {
     selector1->setShape(SelectorShape::Square);
     selector1->setStart(0.0f);
     selector1->setEnd(0.4f);
-    selector1->setAmount(0.5f);
+    selector1->setWeight(0.5f);
 
     // Selector2: [0.3, 0.7], amount=0.5, Add
     auto selector2 = std::make_shared<RangeSelector>();
     selector2->setShape(SelectorShape::Square);
     selector2->setStart(0.3f);
     selector2->setEnd(0.7f);
-    selector2->setAmount(0.5f);
+    selector2->setWeight(0.5f);
     selector2->setMode(SelectorMode::Add);
 
     // Selector3: [0.6, 1.0], amount=0.5, Add
@@ -3873,7 +3873,7 @@ TGFX_TEST(VectorLayerTest, TextSelector) {
     selector3->setShape(SelectorShape::Square);
     selector3->setStart(0.6f);
     selector3->setEnd(1.0f);
-    selector3->setAmount(0.5f);
+    selector3->setWeight(0.5f);
     selector3->setMode(SelectorMode::Add);
 
     auto modifier = std::make_shared<TextModifier>();
