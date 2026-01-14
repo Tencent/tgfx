@@ -33,7 +33,7 @@ static inline tgfx::Matrix3D MakePerspectiveMatrix() {
   return perspectiveMatrix;
 }
 
-static inline std::shared_ptr<tgfx::Layer> Create3DBackLayer(const tgfx::Point& origin) {
+static inline std::shared_ptr<tgfx::Layer> CreateBackLayer(const tgfx::Point& origin) {
   auto layer = tgfx::ShapeLayer::Make();
   auto rect = tgfx::Rect::MakeWH(600, 400);
   tgfx::Path path = {};
@@ -48,7 +48,7 @@ static inline std::shared_ptr<tgfx::Layer> Create3DBackLayer(const tgfx::Point& 
   return layer;
 }
 
-static inline std::shared_ptr<tgfx::Layer> Create3DContainerLayer(const tgfx::Point& origin) {
+static inline std::shared_ptr<tgfx::Layer> CreateContainerLayer(const tgfx::Point& origin) {
   auto layer = tgfx::SolidLayer::Make();
   layer->setColor(tgfx::Color::FromRGBA(151, 153, 46, 255));
   auto layerSize = tgfx::Size::Make(360.f, 320.f);
@@ -72,9 +72,9 @@ static inline float DegreesToRadians(float degrees) {
   return degrees * (static_cast<float>(M_PI) / 180.0f);
 }
 
-static inline std::shared_ptr<tgfx::Layer> Create3DLayer(const AppHost* host,
-                                                         const tgfx::Point& origin) {
-  auto image = host->getImage("imageReplacement");
+static inline std::shared_ptr<tgfx::Layer> CreateImageLayer(const AppHost* host,
+                                                            const tgfx::Point& origin) {
+  auto image = host->getImage("bridge");
   if (!image) {
     return nullptr;
   }
@@ -85,7 +85,7 @@ static inline std::shared_ptr<tgfx::Layer> Create3DLayer(const AppHost* host,
   imageLayer->setFilters({shadowFilter});
   auto imageSize =
       tgfx::Size::Make(static_cast<float>(image->width()), static_cast<float>(image->height()));
-  auto anchor = tgfx::Point::Make(0.5f, 0.5f);
+  auto anchor = tgfx::Point::Make(0.05f, 0.05f);
   auto offsetToAnchorMatrix =
       tgfx::Matrix3D::MakeTranslate(-anchor.x * imageSize.width, -anchor.y * imageSize.height, 0.f);
   auto invOffsetToAnchorMatrix =
@@ -99,6 +99,7 @@ static inline std::shared_ptr<tgfx::Layer> Create3DLayer(const AppHost* host,
   modelMatrix.preRotate({1.f, 0.f, 0.f}, 45.f);
   modelMatrix.preRotate({0.f, 1.f, 0.f}, 45.f);
   modelMatrix.postTranslate(0.f, 0.f, 20.f);
+  modelMatrix.preScale(0.07f, 0.07f, 1.0f);
   auto perspectiveMatrix = MakePerspectiveMatrix();
   auto originTranslateMatrix = tgfx::Matrix3D::MakeTranslate(origin.x, origin.y, 0.f);
   auto imageMatrix3D = originTranslateMatrix * invOffsetToAnchorMatrix * perspectiveMatrix *
@@ -111,19 +112,19 @@ std::shared_ptr<tgfx::Layer> Layer3DTree::onBuildLayerTree(const AppHost* host) 
   auto root = tgfx::Layer::Make();
 
   // Flat 3D Container
-  auto flat3DLayer = Create3DLayer(host, {125, 105});
-  auto flat3DContainerLayer = Create3DContainerLayer({120, 40});
+  auto flat3DLayer = CreateImageLayer(host, {125, -50});
+  auto flat3DContainerLayer = CreateContainerLayer({120, 40});
   flat3DContainerLayer->addChild(flat3DLayer);
-  auto flat3DBackLayer = Create3DBackLayer({0, 0});
+  auto flat3DBackLayer = CreateBackLayer({0, 0});
   flat3DBackLayer->addChild(flat3DContainerLayer);
   root->addChild(flat3DBackLayer);
 
   // Preserve 3D Container
-  auto preserve3DLayer = Create3DLayer(host, {125, 105});
-  auto preserve3DContainerLayer = Create3DContainerLayer({120, 40});
+  auto preserve3DLayer = CreateImageLayer(host, {125, -50});
+  auto preserve3DContainerLayer = CreateContainerLayer({120, 40});
   preserve3DContainerLayer->setPreserve3D(true);
   preserve3DContainerLayer->addChild(preserve3DLayer);
-  auto preserve3DBackLayer = Create3DBackLayer({0, 300});
+  auto preserve3DBackLayer = CreateBackLayer({0, 300});
   preserve3DBackLayer->addChild(preserve3DContainerLayer);
   root->addChild(preserve3DBackLayer);
 

@@ -71,9 +71,6 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
     imagePath = [[NSBundle mainBundle] pathForResource:@"tgfx" ofType:@"png"];
     image = tgfx::Image::MakeFromFile(imagePath.UTF8String);
     appHost->addImage("TGFX", image);
-    imagePath = [[NSBundle mainBundle] pathForResource:@"imageReplacement" ofType:@"jpg"];
-    image = tgfx::Image::MakeFromFile(imagePath.UTF8String);
-    appHost->addImage("imageReplacement", image);
     auto typeface = tgfx::Typeface::MakeFromName("PingFang SC", "");
     appHost->addTypeface("default", typeface);
     typeface = tgfx::Typeface::MakeFromName("Apple Color Emoji", "");

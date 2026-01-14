@@ -227,6 +227,20 @@ const Matrix3D& Matrix3D::I() {
   return identity;
 }
 
+void Matrix3D::preScale(float sx, float sy, float sz) {
+  if (sx == 1 && sy == 1 && sz == 1) {
+    return;
+  }
+
+  auto c0 = getCol(0);
+  auto c1 = getCol(1);
+  auto c2 = getCol(2);
+
+  setColumn(0, c0 * sx);
+  setColumn(1, c1 * sy);
+  setColumn(2, c2 * sz);
+}
+
 void Matrix3D::postScale(float sx, float sy, float sz) {
   if (sx == 1 && sy == 1 && sz == 1) {
     return;
@@ -382,20 +396,6 @@ void Matrix3D::setConcat(const Matrix3D& a, const Matrix3D& b) {
   setColumn(1, m1);
   setColumn(2, m2);
   setColumn(3, m3);
-}
-
-void Matrix3D::preScale(float sx, float sy, float sz) {
-  if (sx == 1 && sy == 1 && sz == 1) {
-    return;
-  }
-
-  auto c0 = getCol(0);
-  auto c1 = getCol(1);
-  auto c2 = getCol(2);
-
-  setColumn(0, c0 * sx);
-  setColumn(1, c1 * sy);
-  setColumn(2, c2 * sz);
 }
 
 Matrix3D Matrix3D::transpose() const {
