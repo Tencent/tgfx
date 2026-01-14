@@ -51,6 +51,7 @@ Canvas* Render3DContext::beginRecording(const Matrix3D& childTransform, bool ant
   _stateStack.emplace(newTransform, antialiasing);
   auto canvas = _stateStack.top().recorder.beginRecording();
 
+  canvas->scale(_contentScale, _contentScale);
   DEBUG_ASSERT(!FloatNearlyZero(_contentScale));
   auto invScale = 1.0f / _contentScale;
   // The bounds of the 3D rendering context, inverse-mapped through newTransform
@@ -62,7 +63,6 @@ Canvas* Render3DContext::beginRecording(const Matrix3D& childTransform, bool ant
   if (!localClipRect.isEmpty()) {
     canvas->clipRect(localClipRect);
   }
-  canvas->scale(_contentScale, _contentScale);
   return canvas;
 }
 
