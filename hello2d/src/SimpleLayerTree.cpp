@@ -169,7 +169,6 @@ static inline std::shared_ptr<tgfx::Layer> Create3DLayer(const AppHost* host,
   auto imageLayer = tgfx::ImageLayer::Make();
   imageLayer->setImage(image);
   imageLayer->setFilters({shadowFilter});
-  auto imageMatrix3D = tgfx::Matrix3D::I();
   auto imageSize =
       tgfx::Size::Make(static_cast<float>(image->width()), static_cast<float>(image->height()));
   auto anchor = tgfx::Point::Make(0.5f, 0.5f);
@@ -188,8 +187,8 @@ static inline std::shared_ptr<tgfx::Layer> Create3DLayer(const AppHost* host,
   modelMatrix.postTranslate(0.f, 0.f, 20.f);
   auto perspectiveMatrix = MakePerspectiveMatrix();
   auto originTranslateMatrix = tgfx::Matrix3D::MakeTranslate(origin.x, origin.y, 0.f);
-  imageMatrix3D = originTranslateMatrix * invOffsetToAnchorMatrix * perspectiveMatrix *
-                  modelMatrix * offsetToAnchorMatrix;
+  auto imageMatrix3D = originTranslateMatrix * invOffsetToAnchorMatrix * perspectiveMatrix *
+                       modelMatrix * offsetToAnchorMatrix;
   imageLayer->setMatrix3D(imageMatrix3D);
   return imageLayer;
 }
