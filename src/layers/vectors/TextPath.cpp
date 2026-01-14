@@ -184,8 +184,7 @@ void TextPath::apply(VectorContext* context) {
       }
 
       if (isClosed && (centerPosition < 0.0f || centerPosition > pathLength)) {
-        centerPosition =
-            std::fmod(std::fmod(centerPosition, pathLength) + pathLength, pathLength);
+        centerPosition = std::fmod(std::fmod(centerPosition, pathLength) + pathLength, pathLength);
       }
 
       Point position = {};

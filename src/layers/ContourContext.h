@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include <memory>
 #include "core/DrawContext.h"
 #include "core/PictureContext.h"
 #include "tgfx/core/Brush.h"
@@ -25,8 +26,9 @@ namespace tgfx {
 class ContourContext : public DrawContext {
  public:
   ContourContext();
+  ~ContourContext() override;
 
-  ~ContourContext() override = default;
+  Canvas* beginRecording();
 
   void drawFill(const Brush& brush) override;
 
@@ -142,6 +144,7 @@ class ContourContext : public DrawContext {
 
   std::vector<Rect> contourBounds = {};
   PictureContext pictureContext = {};
+  std::unique_ptr<Canvas> canvas = nullptr;
 
   friend class PendingContourAutoReset;
 };
