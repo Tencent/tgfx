@@ -199,6 +199,7 @@
     "LayerTest": {
         "AdaptiveDashEffect": "eefb7a46",
         "BottomLeftSurface": "543054b5",
+        "Contour3DWithDropShadow": "0b31d462",
         "ContourTest": "73b8d873",
         "DiffFilterModeImagePattern -- zoomIn": "ac049958",
         "DiffFilterModeImagePattern -- zoomOut": "ac049958",
@@ -235,6 +236,7 @@
         "PartialDrawLayer_shapeLayer": "af282892",
         "PassThoughAndNormal": "43cd416",
         "PassThrough_Test": "7fa7fcb8",
+        "Preserve3DNestedLayers": "0b31d462",
         "ShapeStyleWithMatrix": "0cfb8996",
         "StrokeOnTop_Off": "80c523ee",
         "StrokeOnTop_On": "80c523ee",

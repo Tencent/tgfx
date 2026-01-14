@@ -19,23 +19,25 @@
 #pragma once
 
 #include <stack>
+#include <vector>
 #include "Layer3DContext.h"
-#include "tgfx/core/PictureRecorder.h"
+#include "layers/ContourContext.h"
 
 namespace tgfx {
 
-class BackgroundContext;
-class Context3DCompositor;
+struct ContourImageEntry {
+  std::shared_ptr<Image> image = nullptr;
+  Matrix3D transform = {};
+};
 
 /**
- * Manages the rendering state for layers in a 3D context, handling recording, transformation
- * accumulation, and compositing of layer content with perspective effects.
+ * Simplified 3D context for contour rendering. Unlike Render3DContext, this class does not
+ * perform complex depth sorting or clipping. It simply applies 3D transforms to each layer
+ * and draws them in order.
  */
-class Render3DContext : public Layer3DContext {
+class Contour3DContext : public Layer3DContext {
  public:
-  Render3DContext(std::shared_ptr<Context3DCompositor> compositor, const Point& offset,
-                  float contentScale, std::shared_ptr<ColorSpace> colorSpace,
-                  std::shared_ptr<BackgroundContext> backgroundContext);
+  Contour3DContext(float contentScale, std::shared_ptr<ColorSpace> colorSpace);
 
   void finishAndDrawTo(Canvas* canvas, bool antialiasing) override;
 
@@ -46,10 +48,8 @@ class Render3DContext : public Layer3DContext {
                     const Point& pictureOffset, bool antialiasing) override;
 
  private:
-  std::shared_ptr<Context3DCompositor> _compositor = nullptr;
-  Point _offset = {};
-  std::shared_ptr<BackgroundContext> _backgroundContext = nullptr;
-  std::stack<PictureRecorder> _recorderStack = {};
+  std::stack<ContourContext> _contourStack = {};
+  std::vector<ContourImageEntry> _contourImages = {};
 };
 
 }  // namespace tgfx

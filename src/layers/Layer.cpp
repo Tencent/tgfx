@@ -23,6 +23,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include "compositing3d/Context3DCompositor.h"
+#include "compositing3d/Layer3DContext.h"
 #include "core/MCState.h"
 #include "core/Matrix2D.h"
 #include "core/Matrix3DUtils.h"
@@ -165,9 +166,9 @@ std::shared_ptr<Picture> Layer::RecordPicture(DrawMode mode, float contentScale,
   }
   if (mode == DrawMode::Contour) {
     ContourContext contourContext;
-    auto contentCanvas = Canvas(&contourContext);
-    contentCanvas.scale(contentScale, contentScale);
-    drawFunction(&contentCanvas);
+    auto contentCanvas = contourContext.beginRecording();
+    contentCanvas->scale(contentScale, contentScale);
+    drawFunction(contentCanvas);
     return contourContext.finishRecordingAsPicture();
   }
   PictureRecorder recorder = {};
@@ -275,8 +276,8 @@ static int GetMipmapCacheLongEdge(int maxSize, float contentScale, const Rect& l
  * Creates a 3D rendering context for compositing layers with 3D transformations.
  * @param bounds The bounding rectangle of the 3D context in DisplayList coordinates.
  */
-static std::shared_ptr<Render3DContext> Create3DContext(const DrawArgs& args, Canvas* canvas,
-                                                        const Rect& bounds) {
+static std::shared_ptr<Layer3DContext> Create3DContext(const DrawArgs& args, Canvas* canvas,
+                                                       const Rect& bounds) {
   if (args.renderRect == nullptr || args.context == nullptr) {
     DEBUG_ASSERT(false);
     return nullptr;
@@ -307,12 +308,10 @@ static std::shared_ptr<Render3DContext> Create3DContext(const DrawArgs& args, Ca
     return nullptr;
   }
 
-  auto compositor = std::make_shared<Context3DCompositor>(
-      *args.context, static_cast<int>(validRenderRect.width()),
-      static_cast<int>(validRenderRect.height()));
   auto offset = Point::Make(validRenderRect.left, validRenderRect.top);
-  return std::make_shared<Render3DContext>(std::move(compositor), offset, contentScale,
-                                           args.dstColorSpace, args.blurBackground);
+  bool contourMode = args.drawMode == DrawMode::Contour;
+  return Layer3DContext::Make(contourMode, args.context, validRenderRect, offset, contentScale,
+                              args.dstColorSpace, args.blurBackground);
 }
 
 bool Layer::DefaultAllowsEdgeAntialiasing() {
@@ -1817,7 +1816,7 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
   // 3D layer matrices are not written to the background canvas, so child layers cannot obtain
   // correct background content. Background styles are temporarily disabled for the 3D layer's
   // subtree (excluding the 3D layer itself).
-  bool skipChildBackground =
+  bool skipBackground =
       !HasStyleSource(args.styleSourceTypes, LayerStyleExtraSourceType::Background) ||
       !bitFields.matrix3DIsAffine;
 
@@ -1829,37 +1828,21 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
     if (child->maskOwner || !child->visible() || child->_alpha <= 0) {
       continue;
     }
-    auto childArgsOpt = createChildArgs(args, canvas, child.get(), skipChildBackground,
-                                        static_cast<int>(i), lastBackgroundLayerIndex);
+    auto childArgsOpt = createChildArgs(args, canvas, child.get(), skipBackground);
     if (!childArgsOpt.has_value()) {
       continue;
     }
-    auto childArgs = std::move(*childArgsOpt);
-
-    AutoCanvasRestore autoRestore(canvas);
-    auto backgroundCanvas =
-        childArgs.blurBackground ? childArgs.blurBackground->getCanvas() : nullptr;
-    AutoCanvasRestore autoRestoreBg(backgroundCanvas);
-    auto childTransform3D = child->getMatrixWithScrollRect();
-    // If the sublayer's Matrix contains 3D transformations or projection transformations, then
-    // treat its Matrix as an identity matrix here, and let the sublayer handle its actual position
-    // through 3D filter methods,
-    const bool isChildMatrixAffine = Matrix3DUtils::IsMatrix3DAffine(childTransform3D);
-    auto childAffineMatrix = (isChildMatrixAffine && !canPreserve3D())
-                                 ? Matrix3DUtils::GetMayLossyAffineMatrix(childTransform3D)
-                                 : Matrix::I();
-    canvas->concat(childAffineMatrix);
-    ClipScrollRect(canvas, child->_scrollRect.get(), childTransform3D, isChildMatrixAffine);
-    if (backgroundCanvas) {
-      backgroundCanvas->concat(childAffineMatrix);
-      ClipScrollRect(backgroundCanvas, child->_scrollRect.get(), childTransform3D,
-                     isChildMatrixAffine);
+    auto& childArgs = *childArgsOpt;
+    auto childIndex = static_cast<int>(i);
+    if (childIndex < lastBackgroundLayerIndex) {
+      childArgs.forceDrawBackground = true;
+    } else {
+      childArgs.forceDrawBackground = false;
+      if (childIndex > lastBackgroundLayerIndex) {
+        childArgs.blurBackground = nullptr;
+      }
     }
-
-    auto context3D =
-        args.render3DContext ? args.render3DContext.get() : childArgs.render3DContext.get();
-    bool started3DContext = !args.render3DContext && childArgs.render3DContext != nullptr;
-    drawChild(childArgs, canvas, child.get(), alpha, childTransform3D, context3D, started3DContext);
+    drawChild(childArgs, canvas, child.get(), alpha);
   }
   return true;
 }
@@ -1888,20 +1871,11 @@ void Layer::drawByStarting3DContext(const DrawArgs& args, Canvas* canvas) {
 }
 
 std::optional<DrawArgs> Layer::createChildArgs(const DrawArgs& args, Canvas* canvas, Layer* child,
-                                               bool skipBackground, int childIndex,
-                                               int lastBackgroundIndex) {
+                                               bool skipBackground) {
   auto childArgs = args;
   if (skipBackground) {
     RemoveStyleSource(childArgs.styleSourceTypes, LayerStyleExtraSourceType::Background);
     childArgs.blurBackground = nullptr;
-  }
-  if (childIndex < lastBackgroundIndex) {
-    childArgs.forceDrawBackground = true;
-  } else {
-    childArgs.forceDrawBackground = false;
-    if (childIndex > lastBackgroundIndex) {
-      childArgs.blurBackground = nullptr;
-    }
   }
   // Handle 3D context state transitions:
   // - If parent has no 3D context and child can preserve 3D, child becomes the root of a new 3D
@@ -1924,29 +1898,56 @@ std::optional<DrawArgs> Layer::createChildArgs(const DrawArgs& args, Canvas* can
     // background when drawing each layer. Therefore, background styles are disabled.
     childArgs.styleSourceTypes = StyleSourceTypesFor3DContext;
     childArgs.blurBackground = nullptr;
-  } else if (args.render3DContext && !childCanPreserve3D) {
-    childArgs.render3DContext = nullptr;
   }
   return childArgs;
 }
 
-void Layer::drawChild(const DrawArgs& args, Canvas* canvas, Layer* child, float alpha,
-                      const Matrix3D& transform3D, Render3DContext* context3D,
-                      bool started3DContext) {
-  if (!context3D) {
-    // Child is completely outside any 3D context, draw normally.
-    const Matrix3D* transform =
-        Matrix3DUtils::IsMatrix3DAffine(transform3D) ? nullptr : &transform3D;
-    auto blendMode = static_cast<BlendMode>(child->bitFields.blendMode);
-    child->drawLayer(args, canvas, child->_alpha * alpha, blendMode, transform);
-    return;
+void Layer::drawChild(const DrawArgs& childArgs, Canvas* canvas, Layer* child, float alpha) {
+  AutoCanvasRestore autoRestore(canvas);
+  auto backgroundCanvas =
+      childArgs.blurBackground ? childArgs.blurBackground->getCanvas() : nullptr;
+  AutoCanvasRestore autoRestoreBg(backgroundCanvas);
+
+  auto childTransform3D = child->getMatrixWithScrollRect();
+  // If the sublayer's Matrix contains 3D transformations or projection transformations, then
+  // treat its Matrix as an identity matrix here, and let the sublayer handle its actual position
+  // through 3D filter methods.
+  const bool isChildMatrixAffine = Matrix3DUtils::IsMatrix3DAffine(childTransform3D);
+  auto childAffineMatrix = (isChildMatrixAffine && !canPreserve3D())
+                               ? Matrix3DUtils::GetMayLossyAffineMatrix(childTransform3D)
+                               : Matrix::I();
+  canvas->concat(childAffineMatrix);
+  ClipScrollRect(canvas, child->_scrollRect.get(), childTransform3D, isChildMatrixAffine);
+  if (backgroundCanvas) {
+    backgroundCanvas->concat(childAffineMatrix);
+    ClipScrollRect(backgroundCanvas, child->_scrollRect.get(), childTransform3D,
+                   isChildMatrixAffine);
   }
-  auto offscreenCanvas =
-      context3D->beginRecording(transform3D, child->bitFields.allowsEdgeAntialiasing);
-  child->drawLayer(args, offscreenCanvas, child->_alpha * alpha, BlendMode::SrcOver, nullptr);
-  context3D->endRecording();
-  if (started3DContext) {
-    context3D->finishAndDrawTo(canvas, child->bitFields.allowsEdgeAntialiasing);
+
+  auto context3D = childArgs.render3DContext.get();
+  Canvas* targetCanvas = canvas;
+  if (context3D) {
+    targetCanvas =
+        context3D->beginRecording(childTransform3D, child->bitFields.allowsEdgeAntialiasing);
+  }
+
+  // Prepare args for child's drawLayer. If child cannot preserve 3D but has a 3D context, clear it
+  // so that child's internal rendering (e.g., drawOffscreen) doesn't see it. The child is still
+  // recorded into the 3D context via beginRecording/endRecording above.
+  auto drawArgs = childArgs;
+  if (context3D && !child->canPreserve3D()) {
+    drawArgs.render3DContext = nullptr;
+  }
+
+  const Matrix3D* transform = (!context3D && !isChildMatrixAffine) ? &childTransform3D : nullptr;
+  auto blendMode = static_cast<BlendMode>(child->bitFields.blendMode);
+  child->drawLayer(drawArgs, targetCanvas, child->_alpha * alpha, blendMode, transform);
+
+  if (context3D) {
+    context3D->endRecording();
+    if (context3D->isFinished()) {
+      context3D->finishAndDrawTo(canvas, child->bitFields.allowsEdgeAntialiasing);
+    }
   }
 }
 
