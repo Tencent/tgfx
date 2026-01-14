@@ -49,8 +49,8 @@ std::shared_ptr<Picture> Render3DContext::onFinishRecording() {
 void Render3DContext::onImageReady(std::shared_ptr<Image> image, const Matrix3D& imageTransform,
                                    const Point& pictureOffset, bool antialiasing) {
   auto finalTransform = imageTransform;
-  finalTransform.postTranslate(pictureOffset.x - _renderRect.left, pictureOffset.y - _renderRect.top,
-                               0);
+  finalTransform.postTranslate(pictureOffset.x - _renderRect.left,
+                               pictureOffset.y - _renderRect.top, 0);
   _compositor->addImage(std::move(image), finalTransform, 1.0f, antialiasing);
 }
 
