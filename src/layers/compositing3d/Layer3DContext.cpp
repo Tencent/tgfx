@@ -76,8 +76,8 @@ Canvas* Layer3DContext::beginRecording(const Matrix3D& childTransform, bool anti
   _transformStack.emplace(newTransform, antialiasing);
 
   auto canvas = onBeginRecording();
-  canvas->scale(_contentScale, _contentScale);
   DEBUG_ASSERT(!FloatNearlyZero(_contentScale));
+  canvas->scale(_contentScale, _contentScale);
   auto invScale = 1.0f / _contentScale;
   auto contextBounds =
       Rect::MakeXYWH(_renderRect.x() * invScale, _renderRect.y() * invScale,
