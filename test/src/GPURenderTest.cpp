@@ -52,7 +52,7 @@ TGFX_TEST(GPURenderTest, DepthRenderPassTest) {
   ASSERT_TRUE(renderPass != nullptr);
 }
 
-TGFX_TEST(GPURenderTest, InstancedGridRenderingTest) {
+TGFX_TEST(GPURenderTest, InstancedGridRender) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -91,7 +91,7 @@ TGFX_TEST(GPURenderTest, InstancedGridRenderingTest) {
   ASSERT_TRUE(surface != nullptr);
 
   // Also compare with baseline
-  EXPECT_TRUE(Baseline::Compare(surface, "GPURenderTest/instanced_grid_rendering"));
+  EXPECT_TRUE(Baseline::Compare(surface, "GPURenderTest/InstancedGridRender"));
 }
 
 // ==================== GL Utility Tests ====================

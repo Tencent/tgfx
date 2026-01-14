@@ -511,6 +511,6 @@
         "VectorGroupTransform": "4a74f6aa"
     },
     "GPURenderTest": {
-        "instanced_grid_rendering": "62f124a1"
+        "InstancedGridRender": "62f124a1"
     }
 }
