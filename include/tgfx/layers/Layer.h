@@ -629,7 +629,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
                     const LayerStyleSource* layerStyleSource = nullptr,
                     const Layer* stopChild = nullptr);
 
-  void drawContour(const DrawArgs& args, Canvas* canvas, bool applyMask = true,
+  void drawContour(const DrawArgs& args, Canvas* canvas, bool contentOnly = false,
                    const Matrix3D* transform3D = nullptr);
 
   bool drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
@@ -672,7 +672,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
   MaskData getMaskData(const DrawArgs& args, float scale,
                        const std::optional<Rect>& layerClipBounds);
 
-  std::shared_ptr<Picture> getMaskPicture(DrawArgs& maskArgs, float scale,
+  std::shared_ptr<Picture> getMaskPicture(const DrawArgs& args, DrawMode maskDrawMode, float scale,
                                           const Matrix& affineRelativeMatrix);
 
   std::shared_ptr<Image> getContourImage(const DrawArgs& args, float contentScale,

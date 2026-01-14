@@ -1315,10 +1315,14 @@ bool Layer::prepareMask(const DrawArgs& args, Canvas* canvas,
   return true;
 }
 
-std::shared_ptr<Picture> Layer::getMaskPicture(DrawArgs& maskArgs, float scale,
-                                               const Matrix& affineRelativeMatrix) {
+std::shared_ptr<Picture> Layer::getMaskPicture(const DrawArgs& args, DrawMode maskDrawMode,
+                                               float scale, const Matrix& affineRelativeMatrix) {
   // Note: Does not use layerClipBounds here. Using clipBounds may cause PathOp errors when
   // extracting maskPath from the picture, resulting in incorrect clip regions.
+  DrawArgs maskArgs = args;
+  maskArgs.drawMode = maskDrawMode;
+  maskArgs.excludeEffects |= maskDrawMode == DrawMode::Contour;
+  maskArgs.blurBackground = nullptr;
   auto drawMask = [&](Canvas* canvas) {
     canvas->concat(affineRelativeMatrix);
     if (_mask->canPreserve3D()) {
@@ -1342,17 +1346,14 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
   DEBUG_ASSERT(_mask != nullptr);
   DEBUG_ASSERT(args.render3DContext == nullptr);
   auto maskType = static_cast<LayerMaskType>(bitFields.maskType);
-  auto maskArgs = args;
-  maskArgs.drawMode = maskType != LayerMaskType::Contour ? DrawMode::Normal : DrawMode::Contour;
-  maskArgs.excludeEffects |= maskType == LayerMaskType::Contour;
-  maskArgs.blurBackground = nullptr;
+  auto maskDrawMode = maskType != LayerMaskType::Contour ? DrawMode::Normal : DrawMode::Contour;
 
   auto relativeMatrix = _mask->getRelativeMatrix(this);
   auto isMatrixAffine = Matrix3DUtils::IsMatrix3DAffine(relativeMatrix);
   auto affineRelativeMatrix =
       isMatrixAffine ? Matrix3DUtils::GetMayLossyAffineMatrix(relativeMatrix) : Matrix::I();
 
-  auto maskPicture = getMaskPicture(maskArgs, scale, affineRelativeMatrix);
+  auto maskPicture = getMaskPicture(args, maskDrawMode, scale, affineRelativeMatrix);
   if (maskPicture == nullptr) {
     return {};
   }
@@ -1404,8 +1405,8 @@ std::shared_ptr<Image> Layer::getContourImage(const DrawArgs& args, float conten
   }
   DrawArgs drawArgs = args;
   drawArgs.drawMode = DrawMode::Contour;
-  auto picture = RecordContourPicture(
-      contentScale, drawArgs, [&](Canvas* canvas) { drawContour(drawArgs, canvas, false); });
+  auto picture = RecordContourPicture(contentScale, drawArgs,
+                                      [&](Canvas* canvas) { drawContour(drawArgs, canvas, true); });
   auto imageOffset = Point::Zero();
   auto image = ToImageWithOffset(std::move(picture), &imageOffset, nullptr, args.dstColorSpace);
   if (offset) {
@@ -1830,17 +1831,26 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
   }
 }
 
-void Layer::drawContour(const DrawArgs& args, Canvas* canvas, bool applyMask,
+void Layer::drawContour(const DrawArgs& args, Canvas* canvas, bool contentOnly,
                         const Matrix3D* transform3D) {
   auto contourContext = args.contourContext;
   // Check if this layer is completely covered by opaque bounds
-  auto globalBounds = canvas->getMatrix().mapRect(getBounds());
+  auto bounds = getBounds();
+  Rect globalBounds = {};
+  if (transform3D) {
+    auto combinedMatrix = Matrix3D(canvas->getMatrix()) * (*transform3D);
+    globalBounds = combinedMatrix.mapRect(bounds);
+  } else {
+    globalBounds = canvas->getMatrix().mapRect(bounds);
+  }
   if (contourContext && contourContext->containsOpaqueBounds(globalBounds)) {
     return;
   }
 
-  // Update contourMatchesContent flag
-  if (args.contourMatchesContent != nullptr && *args.contourMatchesContent) {
+  // Update contourMatchesContent flag for child layers only (contentOnly=false means called from
+  // drawChild). The entry layer's effects are already handled by getLayerStyleSource.
+  if (!contentOnly && args.contourMatchesContent != nullptr && *args.contourMatchesContent &&
+      !args.excludeEffects) {
     if (!_filters.empty() || !_layerStyles.empty()) {
       *args.contourMatchesContent = false;
     }
@@ -1848,7 +1858,7 @@ void Layer::drawContour(const DrawArgs& args, Canvas* canvas, bool applyMask,
 
   // Apply self mask if needed
   std::shared_ptr<MaskFilter> maskFilter = nullptr;
-  if (applyMask && hasValidMask()) {
+  if (!contentOnly && hasValidMask()) {
     auto contentScale = canvas->getMatrix().getMaxScale();
     auto clipBounds = GetClipBounds(canvas);
     auto maskData = getMaskData(args, contentScale, clipBounds);
@@ -1880,6 +1890,7 @@ void Layer::drawContour(const DrawArgs& args, Canvas* canvas, bool applyMask,
         if (maskFilter) {
           paint.setMaskFilter(maskFilter->makeWithMatrix(invertImageMatrix));
         }
+        AutoCanvasRestore restore(canvas);
         canvas->concat(imageMatrix);
         canvas->drawImage(std::move(image), 0, 0, &paint);
       }
@@ -2058,7 +2069,7 @@ void Layer::drawChild(const DrawArgs& childArgs, Canvas* canvas, Layer* child, f
 
   const Matrix3D* transform = (!context3D && !isChildMatrixAffine) ? &childTransform3D : nullptr;
   if (drawArgs.drawMode == DrawMode::Contour) {
-    child->drawContour(drawArgs, targetCanvas, true, transform);
+    child->drawContour(drawArgs, targetCanvas, false, transform);
   } else {
     auto blendMode = static_cast<BlendMode>(child->bitFields.blendMode);
     child->drawLayer(drawArgs, targetCanvas, child->_alpha * alpha, blendMode, transform);
@@ -2129,9 +2140,7 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   // When true, we can reuse the contour image as content image.
   bool allContourMatch = false;
   if (needContour) {
-    // Child effects are always excluded when drawing the layer contour.
     DrawArgs contourArgs = drawArgs;
-    contourArgs.excludeEffects = true;
     allContourMatch = true;
     contourArgs.contourMatchesContent = &allContourMatch;
     source->contour = getContourImage(contourArgs, contentScale, &source->contourOffset);

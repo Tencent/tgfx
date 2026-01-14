@@ -78,11 +78,13 @@ class DrawArgs {
   // through the Compositor and do not need to be drawn to the Canvas.
   std::shared_ptr<Layer3DContext> render3DContext = nullptr;
 
-  // The contour context when drawing in Contour mode. Note: this could be nullptr.
+  // The contour context when drawing in Contour mode. May be cleared when switching canvas
+  // (e.g., entering 3D context). Note: this could be nullptr.
   ContourContext* contourContext = nullptr;
 
-  // Output parameter: indicates whether the contour drawing result matches the opaque content.
-  // Set to false if filters, layer styles, or non-opaque content are present.
+  // [Output] Accumulated flag indicating whether all contour drawing results match opaque content.
+  // Set to false if any layer has filters, layer styles, or non-opaque content.
+  // This pointer persists across contourContext switches to track the global state.
   bool* contourMatchesContent = nullptr;
 };
 }  // namespace tgfx

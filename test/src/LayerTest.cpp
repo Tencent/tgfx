@@ -1991,6 +1991,77 @@ TGFX_TEST(LayerTest, ContourContainsOpaqueBounds) {
   EXPECT_EQ(picture2->drawCount, 2u);
 }
 
+TGFX_TEST(LayerTest, GetContourImage) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+
+  // Create a shape layer with a rectangle.
+  auto shapeLayer = ShapeLayer::Make();
+  Path path = {};
+  path.addRect(Rect::MakeXYWH(10, 10, 80, 80));
+  shapeLayer->setPath(path);
+  shapeLayer->addFillStyle(ShapeStyle::Make(Color::Red()));
+
+  // Get contour image.
+  DrawArgs drawArgs = DrawArgs(context);
+  Point offset = {};
+  auto contourImage = shapeLayer->getContourImage(drawArgs, 1.0f, &offset);
+  EXPECT_TRUE(contourImage != nullptr);
+  EXPECT_EQ(offset.x, 10.0f);
+  EXPECT_EQ(offset.y, 10.0f);
+  EXPECT_EQ(contourImage->width(), 80);
+  EXPECT_EQ(contourImage->height(), 80);
+
+  // Draw the contour image to verify.
+  auto canvas = surface->getCanvas();
+  canvas->clear();
+  canvas->drawImage(contourImage, offset.x, offset.y);
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GetContourImage"));
+}
+
+TGFX_TEST(LayerTest, ContourWithMask) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+
+  DrawArgs drawArgs = DrawArgs(nullptr);
+  drawArgs.drawMode = DrawMode::Contour;
+  Path path = {};
+
+  // Create a shape layer with mask.
+  auto shapeLayer = ShapeLayer::Make();
+  path.addRect(Rect::MakeXYWH(10, 10, 100, 100));
+  shapeLayer->setPath(path);
+  shapeLayer->addFillStyle(ShapeStyle::Make(Color::Red()));
+
+  // Create a mask layer (circle).
+  auto maskLayer = ShapeLayer::Make();
+  path.reset();
+  path.addOval(Rect::MakeXYWH(30, 30, 60, 60));
+  maskLayer->setPath(path);
+  maskLayer->addFillStyle(ShapeStyle::Make(Color::White()));
+  shapeLayer->setMask(maskLayer);
+  shapeLayer->setMaskType(LayerMaskType::Contour);
+
+  ContourContext contourContext;
+  auto canvas = contourContext.beginRecording();
+  drawArgs.contourContext = &contourContext;
+  shapeLayer->drawContour(drawArgs, canvas);
+  auto picture = contourContext.finishRecordingAsPicture();
+  // The mask clips the shape, so we should have 1 contour (the masked shape).
+  EXPECT_EQ(picture->drawCount, 1u);
+
+  // Draw to surface for visual verification.
+  surface = Surface::Make(context, 200, 200);
+  auto drawCanvas = surface->getCanvas();
+  drawCanvas->clear();
+  drawCanvas->drawPicture(picture);
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ContourWithMask"));
+}
+
 TGFX_TEST(LayerTest, DiffFilterModeImagePattern) {
   ContextScope scope;
   auto context = scope.getContext();
