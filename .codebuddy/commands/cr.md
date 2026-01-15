@@ -69,19 +69,26 @@ git status && git diff && git diff --cached
 
 ### Worktree 模式
 
+先判断当前分支是否为 PR 分支：
 ```bash
-# 获取 PR 基准分支
-BASE_BRANCH=$(gh pr view {pr_number} --json baseRefName -q '.baseRefName')
+PR_BRANCH=$(gh pr view {pr_number} --json headRefName -q '.headRefName')
+CURRENT_BRANCH=$(git branch --show-current)
+[ "$PR_BRANCH" = "$CURRENT_BRANCH" ]
+```
 
-# 创建隔离环境
+**若当前分支就是 PR 分支**，直接在当前目录操作，跳过 worktree 创建。
+
+**若当前分支不是 PR 分支**，创建隔离环境：
+```bash
 git fetch origin pull/{pr_number}/head:pr-{pr_number}
 git worktree add /tmp/pr-review-{pr_number} pr-{pr_number}
-
-# 在 worktree 目录下获取变更
 cd /tmp/pr-review-{pr_number}
-git diff origin/${BASE_BRANCH}...HEAD
+```
 
-# 查看已有评论
+获取变更内容：
+```bash
+BASE_BRANCH=$(gh pr view {pr_number} --json baseRefName -q '.baseRefName')
+git diff origin/${BASE_BRANCH}...HEAD
 gh pr view {pr_number} --comments
 ```
 
@@ -123,19 +130,13 @@ gh pr view {pr_number} --comments
 
 **若有问题**：按以下流程处理。
 
-### 判断处理方式
+判断代码归属（Worktree / 在线模式）：`[ "$(gh pr view {pr_number} --json author -q '.author.login')" = "$(gh api user -q '.login')" ]`
 
-| 模式 | 条件 | 处理方式         |
-|------|------|--------------|
-| 本地模式 | - | 询问修复         |
-| Worktree 模式 | 自己的 PR | 优化标题 + 询问修复 + 推送 + 清理 |
-| Worktree 模式 | 别人的 PR | 优化标题 + 询问评论 + 清理 |
-| 在线模式 | - | 优化标题 + 询问评论  |
-
-判断是否为自己的 PR：
-```bash
-[ "$(gh pr view {pr_number} --json author -q '.author.login')" = "$(gh api user -q '.login')" ]
-```
+| 模式 | 自己的代码 | 别人的代码 |
+|------|----------|----------|
+| 本地模式 | 询问修复 | - |
+| Worktree 模式 | 优化标题 + 询问修复 + 推送 + 清理 | 优化标题 + 询问评论 + 清理 |
+| 在线模式 | 优化标题 + 询问评论 | 优化标题 + 询问评论 |
 
 ### 优化标题
 
@@ -168,7 +169,9 @@ EOF
 
 ### 清理（仅 Worktree 模式）
 
-所有操作完成后，自动清理临时环境并输出提示：
+若当前分支就是 PR 分支（未创建 worktree），则跳过清理步骤。
+
+若创建了 worktree，自动清理临时环境并输出提示：
 
 ```bash
 cd - # 返回原目录
