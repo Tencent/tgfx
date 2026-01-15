@@ -25,10 +25,13 @@ void ScalePixelsAlpha(const ImageInfo& info, void* pixels, float alphaScale) {
     return;
   }
   auto buffer = static_cast<unsigned char*>(pixels);
-  for (size_t y = 0; y < static_cast<size_t>(info.height()); ++y) {
-    for (size_t x = 0; x < static_cast<size_t>(info.width()); ++x) {
-      auto& alpha = buffer[(y * info.rowBytes()) + x];
-      alpha = static_cast<unsigned char>(std::lroundf(alpha * alphaScale));
+  auto width = static_cast<size_t>(info.width());
+  auto height = static_cast<size_t>(info.height());
+  auto rowBytes = info.rowBytes();
+  for (size_t y = 0; y < height; ++y) {
+    auto* row = buffer + y * rowBytes;
+    for (size_t x = 0; x < width; ++x) {
+      row[x] = static_cast<unsigned char>(std::lroundf(row[x] * alphaScale));
     }
   }
 }

@@ -89,12 +89,15 @@ bool WebPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, s
     return false;
   }
   auto result = ReadPixelsFromCanvasImage(imageData, targetInfo, dstPixels);
+  if (!result) {
+    return false;
+  }
   auto alphaScale = ShapeUtils::CalculateAlphaReduceFactorIfHairline(shape);
   ScalePixelsAlpha(targetInfo, dstPixels, alphaScale);
   if (NeedConvertColorSpace(colorSpace(), dstColorSpace)) {
     ConvertColorSpaceInPlace(width(), height(), colorType, alphaType, dstRowBytes, colorSpace(),
                              dstColorSpace, dstPixels);
   }
-  return result;
+  return true;
 }
 }  // namespace tgfx
