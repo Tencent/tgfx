@@ -59,6 +59,7 @@ struct Glyph {
  */
 struct StyledGlyphRun {
   std::shared_ptr<TextBlob> textBlob = nullptr;
+  Matrix matrix = Matrix::I();
   GlyphStyle style = {};
 };
 
@@ -68,6 +69,11 @@ struct StyledGlyphRun {
  */
 class Geometry {
  public:
+  struct TextBlobResult {
+    std::shared_ptr<TextBlob> blob = nullptr;
+    Matrix commonMatrix = Matrix::I();
+  };
+
   /**
    * Creates a copy of this geometry including all fields.
    */
@@ -75,13 +81,16 @@ class Geometry {
 
   /**
    * Returns the Shape representation. Converts from TextBlob if needed and caches the result.
+   * If glyphs have a common transformation matrix, it will be extracted and combined with the
+   * geometry's matrix field.
    */
   std::shared_ptr<Shape> getShape();
 
   /**
    * Returns glyph runs grouped by consecutive glyphs with the same style.
-   * Each run contains a TextBlob and shared style properties.
-   * If no glyphs exist but textBlob is present, returns a single run with the original textBlob.
+   * Each run contains a TextBlob with optimized positioning and a shared matrix for common
+   * transformations. If no glyphs exist but textBlob is present, returns a single run with the
+   * original textBlob.
    */
   const std::vector<StyledGlyphRun>& getGlyphRuns();
 
@@ -117,7 +126,8 @@ class Geometry {
 
   void expandToGlyphs();
   void convertToShape();
-  std::shared_ptr<TextBlob> buildTextBlob();
+
+  TextBlobResult buildTextBlob(const std::vector<Glyph>& inputGlyphs);
   void buildGlyphRuns();
 
   std::vector<StyledGlyphRun> glyphRuns = {};
