@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextShape.h"
+#include "core/GlyphRun.h"
+#include "core/GlyphRunList.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "tgfx/core/Matrix.h"
@@ -27,29 +29,12 @@ std::shared_ptr<Shape> Shape::MakeFrom(std::shared_ptr<TextBlob> textBlob) {
   if (textBlob == nullptr) {
     return nullptr;
   }
-  const auto& glyphRuns = textBlob->glyphRuns();
-  std::vector<const GlyphRun*> outlineRuns = {};
-  for (const auto& run : glyphRuns) {
+  for (const auto& run : GlyphRunList(textBlob.get())) {
     if (run.font.hasOutlines()) {
-      outlineRuns.push_back(&run);
+      return std::make_shared<TextShape>(std::move(textBlob));
     }
   }
-  if (outlineRuns.empty()) {
-    return nullptr;
-  }
-  if (outlineRuns.size() == glyphRuns.size()) {
-    return std::make_shared<TextShape>(std::move(textBlob));
-  }
-  std::vector<GlyphRun> filteredRuns = {};
-  filteredRuns.reserve(outlineRuns.size());
-  for (const auto* run : outlineRuns) {
-    filteredRuns.push_back(*run);
-  }
-  auto outlineBlob = TextBlob::MakeFrom(std::move(filteredRuns));
-  if (outlineBlob == nullptr) {
-    return nullptr;
-  }
-  return std::make_shared<TextShape>(std::move(outlineBlob));
+  return nullptr;
 }
 
 Rect TextShape::onGetBounds() const {
@@ -63,20 +48,20 @@ Path TextShape::onGetPath(float resolutionScale) const {
   auto hasScale = !FloatNearlyEqual(resolutionScale, 1.0f);
   auto matrix = Matrix::MakeScale(resolutionScale, resolutionScale);
   Path totalPath = {};
-  for (const auto& run : textBlob->glyphRuns()) {
+  for (const auto& run : GlyphRunList(textBlob.get())) {
+    if (!run.font.hasOutlines()) {
+      continue;
+    }
     auto font = run.font;
     if (hasScale) {
-      // Scale the glyphs before measuring to prevent precision loss with small font sizes.
       font = font.makeWithSize(resolutionScale * font.getSize());
     }
-    auto& positions = run.positions;
-    size_t index = 0;
-    for (auto& glyphID : run.glyphs) {
+    for (size_t index = 0; index < run.runSize(); index++) {
+      auto glyphID = run.glyphs[index];
       Path glyphPath = {};
       if (font.getPath(glyphID, &glyphPath)) {
-        auto& position = positions[index];
-        auto glyphMatrix = Matrix::MakeScale(1.0f / resolutionScale, 1.0f / resolutionScale);
-        glyphMatrix.postTranslate(position.x, position.y);
+        auto glyphMatrix = run.getMatrix(index);
+        glyphMatrix.preScale(1.0f / resolutionScale, 1.0f / resolutionScale);
         glyphMatrix.postConcat(matrix);
         glyphPath.transform(glyphMatrix);
         totalPath.addPath(glyphPath);
@@ -84,7 +69,6 @@ Path TextShape::onGetPath(float resolutionScale) const {
         LOGE("TextShape::getPath() Failed to get path for glyph!");
         return {};
       }
-      index++;
     }
   }
   auto inverseMatrix = Matrix::MakeScale(1.f / resolutionScale, 1.f / resolutionScale);

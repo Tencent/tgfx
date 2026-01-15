@@ -66,7 +66,7 @@ struct WebpFile {
   size_t _riff_end;
 };
 
-static const uint32_t kBitMask[VP8L_MAX_NUM_BIT_READ + 1] = {
+static const uint32_t BIT_MASK[VP8L_MAX_NUM_BIT_READ + 1] = {
     0,        0x000001, 0x000003, 0x000007, 0x00000f, 0x00001f, 0x00003f, 0x00007f, 0x0000ff,
     0x0001ff, 0x0003ff, 0x0007ff, 0x000fff, 0x001fff, 0x003fff, 0x007fff, 0x00ffff, 0x01ffff,
     0x03ffff, 0x07ffff, 0x0fffff, 0x1fffff, 0x3fffff, 0x7fffff, 0xffffff};
@@ -149,7 +149,7 @@ static uint32_t VP8LReadBits(VP8LBitReader* const br, int n_bits) {
   ASSERT(n_bits >= 0);
   // Flag an error if end_of_stream or n_bits is more than allowed limit.
   if (!br->eos_ && n_bits <= VP8L_MAX_NUM_BIT_READ) {
-    const uint32_t val = VP8LPrefetchBits(br) & kBitMask[n_bits];
+    const uint32_t val = VP8LPrefetchBits(br) & BIT_MASK[n_bits];
     const int new_bits = br->bit_pos_ + n_bits;
     br->bit_pos_ = new_bits;
     ShiftBytes(br);

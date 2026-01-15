@@ -55,6 +55,14 @@ class LayerContent {
   virtual void drawContour(Canvas* canvas, bool antiAlias) const = 0;
 
   /**
+   * Returns true if the contour drawing result equals the opaque content drawing result.
+   * This is true when the content is visible and has no non-opaque non-image shader.
+   */
+  virtual bool contourEqualsOpaqueContent() const {
+    return false;
+  }
+
+  /**
    * Draws the default content of the layer (content below children) to the specified canvas.
    * Returns true if the content has foreground graphics that should be drawn above children
    * by calling drawForeground().

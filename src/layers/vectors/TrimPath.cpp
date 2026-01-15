@@ -56,7 +56,7 @@ void TrimPath::setTrimType(TrimPathType value) {
   invalidateContent();
 }
 
-static void ApplyTrimIndividually(VectorContext* context, float start, float end) {
+static void ApplyTrimIndividually(std::vector<Geometry*>& geometries, float start, float end) {
   // Determine if reversed (end < start)
   bool reversed = end < start;
   if (reversed) {
@@ -70,7 +70,6 @@ static void ApplyTrimIndividually(VectorContext* context, float start, float end
   start -= shift;
   end -= shift;
 
-  auto geometries = context->getShapeGeometries();
   auto shapeCount = geometries.size();
 
   // Calculate total length (in reversed order if needed)
@@ -78,11 +77,11 @@ static void ApplyTrimIndividually(VectorContext* context, float start, float end
   std::vector<float> lengths(shapeCount);
   for (size_t i = 0; i < shapeCount; i++) {
     auto index = reversed ? (shapeCount - 1 - i) : i;
-    auto& shape = geometries[index]->shape;
-    if (shape == nullptr) {
+    auto* geometry = geometries[index];
+    if (geometry->shape == nullptr) {
       continue;
     }
-    auto path = shape->getPath();
+    auto path = geometry->shape->getPath();
     auto pathMeasure = PathMeasure::MakeFrom(path);
     float length = 0;
     do {
@@ -150,7 +149,7 @@ static void ApplyTrimIndividually(VectorContext* context, float start, float end
       }
     }
 
-    auto geometry = geometries[index];
+    auto* geometry = geometries[index];
     if (hasSegment) {
       auto shape = geometry->shape;
       // When reversed, we need to reverse each shape's path before trimming
@@ -172,19 +171,19 @@ void TrimPath::apply(VectorContext* context) {
   if (context->geometries.empty()) {
     return;
   }
+  auto geometries = context->getShapeGeometries();
 
   auto offset = _offset / 360.0f;
   auto start = _start + offset;
   auto end = _end + offset;
 
   if (_trimType == TrimPathType::Simultaneously) {
-    auto geometries = context->getShapeGeometries();
     auto trimEffect = PathEffect::MakeTrim(start, end);
-    for (auto& geometry : geometries) {
+    for (auto* geometry : geometries) {
       geometry->shape = Shape::ApplyEffect(geometry->shape, trimEffect);
     }
   } else {
-    ApplyTrimIndividually(context, start, end);
+    ApplyTrimIndividually(geometries, start, end);
   }
 }
 

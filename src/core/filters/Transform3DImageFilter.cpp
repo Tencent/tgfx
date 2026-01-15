@@ -46,9 +46,6 @@ Rect Transform3DImageFilter::onFilterBounds(const Rect& rect, MapDirection mapDi
   // Adapt the matrix to keep the z-component of vertex coordinates unchanged.
   auto drawMatrix = _matrix;
   drawMatrix.setRow(2, {0, 0, 1, 0});
-  if (Matrix3DUtils::IsRectBehindCamera(rect, _matrix)) {
-    return Rect::MakeEmpty();
-  }
 
   if (mapDirection == MapDirection::Forward) {
     return drawMatrix.mapRect(rect);

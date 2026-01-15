@@ -16,33 +16,49 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "Painter.h"
-#include "tgfx/layers/LayerRecorder.h"
+#pragma once
+
+#include "core/GlyphRun.h"
 
 namespace tgfx {
 
-void Painter::applyTransform(const Matrix& groupMatrix, float groupAlpha) {
-  matrix.postConcat(groupMatrix);
-  alpha *= groupAlpha;
-}
+class TextBlob;
+struct RunRecord;
 
-void Painter::offsetGeometryIndex(size_t offset) {
-  startIndex += offset;
-}
+// A lightweight list class for iterating over GlyphRuns without allocating a vector.
+class GlyphRunList {
+ public:
+  class Iterator {
+   public:
+    Iterator(const RunRecord* record, size_t remaining) : current(record), remaining(remaining) {
+    }
 
-void Painter::draw(LayerRecorder* recorder,
-                   const std::vector<std::unique_ptr<Geometry>>& geometries) {
-  for (size_t i = 0; i < matrices.size(); i++) {
-    auto index = startIndex + i;
-    if (index >= geometries.size()) {
-      break;
+    GlyphRun operator*() const;
+
+    Iterator& operator++();
+
+    bool operator!=(const Iterator& other) const {
+      return remaining != other.remaining;
     }
-    auto& geometry = geometries[index];
-    if (geometry == nullptr) {
-      continue;
-    }
-    onDraw(recorder, geometry.get(), matrices[i]);
+
+   private:
+    const RunRecord* current = nullptr;
+    size_t remaining = 0;
+  };
+
+  explicit GlyphRunList(const TextBlob* blob) : blob(blob) {
   }
-}
+
+  Iterator begin() const;
+
+  Iterator end() const {
+    return Iterator(nullptr, 0);
+  }
+
+  bool empty() const;
+
+ private:
+  const TextBlob* blob = nullptr;
+};
 
 }  // namespace tgfx

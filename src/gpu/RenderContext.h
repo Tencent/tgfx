@@ -20,10 +20,12 @@
 
 #include <optional>
 #include "core/DrawContext.h"
+#include "core/GlyphRun.h"
 #include "gpu/OpsCompositor.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
+
 class RenderContext : public DrawContext {
  public:
   RenderContext(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags,
@@ -73,14 +75,20 @@ class RenderContext : public DrawContext {
   }
 
  private:
+  /**
+   * Draws glyphs using direct mask rendering. Glyphs that fail to render (too large for atlas,
+   * etc.) are recorded in rejectedIndices if provided.
+   */
   void drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const MCState& state,
                               const Brush& brush, const Stroke* stroke, const Rect& localClipBounds,
-                              GlyphRun* rejectedGlyphRun);
+                              std::vector<size_t>* rejectedIndices);
 
-  void drawTextBlobAsPath(std::shared_ptr<TextBlob> textBlob, const MCState& state,
-                          const Brush& brush, const Stroke* stroke, Rect& localClipBounds);
+  void drawGlyphAsPath(const Font& font, GlyphID glyphID, const Matrix& glyphMatrix,
+                       const MCState& state, const Brush& brush, const Stroke* stroke,
+                       Rect& localClipBounds);
 
-  void drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun, const MCState& state,
+  void drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
+                                   const std::vector<size_t>& glyphIndices, const MCState& state,
                                    const Brush& brush, const Stroke* stroke);
 
   std::shared_ptr<RenderTargetProxy> renderTarget = nullptr;

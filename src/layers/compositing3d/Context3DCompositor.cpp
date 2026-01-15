@@ -31,7 +31,7 @@
 namespace tgfx {
 
 // Tolerance for determining if a vertex lies on the original rectangle's edge.
-static constexpr float kAAEpsilon = 0.01f;
+static constexpr float AA_EPSILON = 0.01f;
 
 // Flags indicating the edges of a rectangle.
 static constexpr unsigned RECT_EDGE_LEFT = 0b1000;
@@ -54,16 +54,16 @@ static inline AAType GetAAType(int sampleCount, bool antiAlias) {
  */
 static unsigned DeterminePointOnRectEdge(const Point& point, const Rect& rect) {
   unsigned edges = 0;
-  if (std::abs(point.x - rect.left) < kAAEpsilon) {
+  if (std::abs(point.x - rect.left) < AA_EPSILON) {
     edges |= RECT_EDGE_LEFT;
   }
-  if (std::abs(point.x - rect.right) < kAAEpsilon) {
+  if (std::abs(point.x - rect.right) < AA_EPSILON) {
     edges |= RECT_EDGE_RIGHT;
   }
-  if (std::abs(point.y - rect.top) < kAAEpsilon) {
+  if (std::abs(point.y - rect.top) < AA_EPSILON) {
     edges |= RECT_EDGE_TOP;
   }
-  if (std::abs(point.y - rect.bottom) < kAAEpsilon) {
+  if (std::abs(point.y - rect.bottom) < AA_EPSILON) {
     edges |= RECT_EDGE_BOTTOM;
   }
   return edges;

@@ -70,14 +70,15 @@ class TrimPath : public VectorElement {
   void setEnd(float value);
 
   /**
-   * Returns the offset of the trim range in degrees.
+   * Returns the offset of the trim range. The value is in degrees, where 360 degrees equals a full
+   * cycle of the path length. For example, 180 degrees shifts the trim range by half the path.
    */
   float offset() const {
     return _offset;
   }
 
   /**
-   * Sets the offset of the trim range in degrees.
+   * Sets the offset of the trim range. The value is in degrees.
    */
   void setOffset(float value);
 

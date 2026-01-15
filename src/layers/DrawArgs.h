@@ -19,14 +19,15 @@
 #pragma once
 
 #include <vector>
-#include "compositing3d/Render3DContext.h"
 #include "layers/BackgroundContext.h"
+#include "layers/compositing3d/Layer3DContext.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/layers/layerstyles/LayerStyle.h"
 
 namespace tgfx {
+class ContourContext;
 
-enum class DrawMode { Normal, Contour, Background };
+enum class DrawMode { Normal, Background };
 
 /**
  * DrawArgs represents the arguments passed to the draw method of a Layer.
@@ -74,6 +75,9 @@ class DrawArgs {
   // Note: this could be nullptr. All layers within the 3D rendering context need to maintain their
   // respective 3D states to achieve per-pixel depth occlusion effects. These layers are composited
   // through the Compositor and do not need to be drawn to the Canvas.
-  std::shared_ptr<Render3DContext> render3DContext = nullptr;
+  std::shared_ptr<Layer3DContext> render3DContext = nullptr;
+
+  // The contour context to be used during contour drawing. Note: this could be nullptr.
+  ContourContext* contourContext = nullptr;
 };
 }  // namespace tgfx

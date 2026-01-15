@@ -168,6 +168,11 @@ class Matrix3D {
   }
 
   /**
+   * Pre-concatenates a scale to this matrix. M' = M * S.
+   */
+  void preScale(float sx, float sy, float sz);
+
+  /**
    * Post-concatenates a scale to this matrix. M' = S * M.
    */
   void postScale(float sx, float sy, float sz);
@@ -320,11 +325,6 @@ class Matrix3D {
    * Concatenates two matrices and stores the result in this matrix. M' = a * b.
    */
   void setConcat(const Matrix3D& a, const Matrix3D& b);
-
-  /**
-   * Pre-concatenates a scale to this matrix. M' = M * S.
-   */
-  void preScale(float sx, float sy, float sz);
 
   /**
    * Returns the transpose of the current matrix.

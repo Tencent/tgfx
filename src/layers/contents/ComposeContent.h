@@ -38,6 +38,7 @@ class ComposeContent : public LayerContent {
   Rect getTightBounds(const Matrix& matrix) const override;
   bool hitTestPoint(float localX, float localY) const override;
   void drawContour(Canvas* canvas, bool antiAlias) const override;
+  bool contourEqualsOpaqueContent() const override;
   bool drawDefault(Canvas* canvas, float alpha, bool antiAlias) const override;
   void drawForeground(Canvas* canvas, float alpha, bool antiAlias) const override;
 

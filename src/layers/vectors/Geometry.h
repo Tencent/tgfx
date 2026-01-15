@@ -19,99 +19,118 @@
 #pragma once
 
 #include <memory>
+#include <vector>
+#include "tgfx/core/Color.h"
+#include "tgfx/core/Font.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/core/TextBlob.h"
 
 namespace tgfx {
 
-enum class GeometryType {
-  Shape,
-  Text,
+/**
+ * GlyphStyle holds the style properties for text rendering.
+ * The alpha channel of colors serves as the blend factor.
+ * A blend factor of 0 means no override (use original style), 1 means full override.
+ */
+struct GlyphStyle {
+  Color fillColor = Color::Transparent();
+  Color strokeColor = Color::Transparent();
+  float strokeWidth = 0.0f;
+  float strokeWidthFactor = 0.0f;
+  float alpha = 1.0f;
+
+  bool operator==(const GlyphStyle& other) const;
+  bool operator!=(const GlyphStyle& other) const;
 };
 
 /**
- * Geometry is the base class for drawable elements in VectorLayer.
+ * Glyph stores information for a single glyph with its transformation and style overrides.
+ */
+struct Glyph {
+  GlyphID glyphID = 0;
+  Font font = {};
+  Matrix matrix = Matrix::I();
+  GlyphStyle style = {};
+};
+
+/**
+ * StyledGlyphRun represents a group of consecutive glyphs with the same style.
+ */
+struct StyledGlyphRun {
+  std::shared_ptr<TextBlob> textBlob = nullptr;
+  Matrix matrix = Matrix::I();
+  GlyphStyle style = {};
+};
+
+/**
+ * Geometry represents a drawable element in VectorLayer. It can hold a Shape, TextBlob, or
+ * individual Glyphs. The content is lazily converted between formats as needed.
  */
 class Geometry {
  public:
-  virtual ~Geometry() = default;
+  struct TextBlobResult {
+    std::shared_ptr<TextBlob> blob = nullptr;
+    Matrix commonMatrix = Matrix::I();
+  };
 
   /**
-   * Returns the type of this geometry.
+   * Creates a copy of this geometry including all fields.
    */
-  virtual GeometryType type() const = 0;
+  std::unique_ptr<Geometry> clone() const;
 
   /**
-   * Creates a copy of this geometry.
+   * Returns the Shape representation. Converts from TextBlob if needed and caches the result.
+   * If glyphs have a common transformation matrix, it will be extracted and combined with the
+   * geometry's matrix field.
    */
-  virtual std::unique_ptr<Geometry> clone() const = 0;
+  std::shared_ptr<Shape> getShape();
 
   /**
-   * Returns the TextBlob if this geometry contains text, or nullptr otherwise.
+   * Returns glyph runs grouped by consecutive glyphs with the same style.
+   * Each run contains a TextBlob with optimized positioning and a shared matrix for common
+   * transformations. If no glyphs exist but textBlob is present, returns a single run with the
+   * original textBlob.
    */
-  virtual std::shared_ptr<TextBlob> getTextBlob() = 0;
+  const std::vector<StyledGlyphRun>& getGlyphRuns();
 
   /**
-   * Returns the Shape representation of this geometry. For ShapeGeometry, returns the internal
-   * shape directly. For TextGeometry, this triggers a conversion from TextBlob to Shape.
+   * Returns true if this geometry contains text content (textBlob or glyphs).
    */
-  virtual std::shared_ptr<Shape> getShape() = 0;
-};
-
-/**
- * ShapeGeometry wraps a Shape for rendering.
- */
-class ShapeGeometry : public Geometry {
- public:
-  explicit ShapeGeometry(std::shared_ptr<Shape> shape) : shape(std::move(shape)) {
+  bool hasText() const {
+    return textBlob != nullptr || !glyphs.empty();
   }
 
-  GeometryType type() const override {
-    return GeometryType::Shape;
-  }
+  /**
+   * The transformation matrix applied to this geometry.
+   */
+  Matrix matrix = Matrix::I();
 
-  std::unique_ptr<Geometry> clone() const override {
-    return std::make_unique<ShapeGeometry>(shape);
-  }
-
-  std::shared_ptr<TextBlob> getTextBlob() override {
-    return nullptr;
-  }
-
-  std::shared_ptr<Shape> getShape() override {
-    return shape;
-  }
-
+  /**
+   * The shape content, used for path-based geometries.
+   */
   std::shared_ptr<Shape> shape = nullptr;
-};
 
-/**
- * TextGeometry wraps a TextBlob for rendering.
- */
-class TextGeometry : public Geometry {
- public:
-  explicit TextGeometry(std::shared_ptr<TextBlob> textBlob) : textBlob(std::move(textBlob)) {
-  }
-
-  GeometryType type() const override {
-    return GeometryType::Text;
-  }
-
-  std::unique_ptr<Geometry> clone() const override {
-    return std::make_unique<TextGeometry>(textBlob);
-  }
-
-  std::shared_ptr<TextBlob> getTextBlob() override {
-    return textBlob;
-  }
-
-  std::shared_ptr<Shape> getShape() override;
-
+  /**
+   * The text blob content, used for text-based geometries.
+   */
   std::shared_ptr<TextBlob> textBlob = nullptr;
 
+  /**
+   * Individual glyphs with per-glyph transformations, expanded from textBlob for modification.
+   */
+  std::vector<Glyph> glyphs = {};
+
  private:
-  std::shared_ptr<Shape> cachedShape = nullptr;
+  friend class VectorContext;
+
+  void expandToGlyphs();
+  void convertToShape();
+
+  TextBlobResult buildTextBlob(const std::vector<Glyph>& inputGlyphs);
+  void buildGlyphRuns();
+
+  std::vector<StyledGlyphRun> glyphRuns = {};
 };
 
 }  // namespace tgfx

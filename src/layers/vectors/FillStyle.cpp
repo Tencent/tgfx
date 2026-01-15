@@ -33,31 +33,47 @@ class FillPainter : public Painter {
     return std::make_unique<FillPainter>(*this);
   }
 
- protected:
-  void onDraw(LayerRecorder* recorder, Geometry* geometry, const Matrix& innerMatrix) override {
-    auto finalMatrix = innerMatrix;
-    finalMatrix.postConcat(matrix);
-    LayerPaint paint(shader, alpha, blendMode);
+  void draw(LayerRecorder* recorder) override {
+    for (auto* geometry : geometries) {
+      if (geometry->hasText()) {
+        for (const auto& run : geometry->getGlyphRuns()) {
+          auto runMatrix = run.matrix;
+          runMatrix.postConcat(geometry->matrix);
+          drawGlyphRun(recorder, runMatrix, run);
+        }
+        continue;
+      }
 
-    // Prefer drawing TextBlob directly for better rendering quality
-    auto textBlob = geometry->getTextBlob();
-    if (textBlob) {
-      recorder->addTextBlob(textBlob, paint, finalMatrix);
-      return;
+      auto shape = geometry->getShape();
+      if (shape == nullptr) {
+        continue;
+      }
+      if (shape->fillType() == PathFillType::Winding) {
+        shape = Shape::ApplyFillType(shape, fillRule);
+      }
+      shape = Shape::ApplyMatrix(shape, geometry->matrix);
+      LayerPaint paint(shader, alpha, blendMode);
+      recorder->addShape(std::move(shape), paint);
+    }
+  }
+
+ private:
+  void drawGlyphRun(LayerRecorder* recorder, const Matrix& geometryMatrix,
+                    const StyledGlyphRun& run) {
+    float blendFactor = run.style.fillColor.alpha;
+
+    if (blendFactor < 1.0f) {
+      LayerPaint paint(shader, alpha * run.style.alpha, blendMode);
+      recorder->addTextBlob(run.textBlob, paint, geometryMatrix);
     }
 
-    // Fall back to Shape for ShapeGeometry or converted TextGeometry
-    auto shape = geometry->getShape();
-    if (shape == nullptr) {
-      return;
+    if (blendFactor > 0.0f) {
+      const auto& fillColor = run.style.fillColor;
+      auto overlayColor = Color{fillColor.red, fillColor.green, fillColor.blue, blendFactor};
+      auto colorShader = Shader::MakeColorShader(overlayColor);
+      LayerPaint paint(colorShader, alpha * run.style.alpha, BlendMode::SrcOver);
+      recorder->addTextBlob(run.textBlob, paint, geometryMatrix);
     }
-    // Only apply fillRule if the shape's current fillType is the default (Winding).
-    // This preserves fillType set by PathOp (e.g., MergePath with XOR produces EvenOdd).
-    if (shape->fillType() == PathFillType::Winding) {
-      shape = Shape::ApplyFillType(shape, fillRule);
-    }
-    shape = Shape::ApplyMatrix(shape, finalMatrix);
-    recorder->addShape(std::move(shape), paint);
   }
 };
 
@@ -123,8 +139,10 @@ void FillStyle::apply(VectorContext* context) {
   painter->blendMode = _blendMode;
   painter->alpha = _alpha;
   painter->fillRule = _fillRule;
-  painter->startIndex = 0;
-  painter->matrices = context->matrices;
+  painter->geometries.reserve(context->geometries.size());
+  for (auto& geometry : context->geometries) {
+    painter->geometries.push_back(geometry.get());
+  }
   context->painters.push_back(std::move(painter));
 }
 

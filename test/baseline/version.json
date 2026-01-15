@@ -13,7 +13,8 @@
         "PartialBackgroundBlur_partial": "bf48e614",
         "PassThroughWithBackgroundBlur": "bf48e614",
         "PassThroughWithBackgroundBlur_clipped": "bf48e614",
-        "SimpleBackgroundBlur_tiled": "bf48e614",
+        "ScaledInnerShadowWithBackgroundBlur": "cfc16445",
+        "SimpleBackgroundBlur_tiled": "cfc16445",
         "backgroundLayerBlur": "bf48e614"
     },
     "CanvasTest": {
@@ -112,6 +113,7 @@
         "ConicGradient": "4e98c910",
         "ImageWithMipmap": "4e98c910",
         "ImageWithShadow": "4e98c910",
+        "Layer3DTree": "5982141a",
         "RichText": "d8e4b387",
         "SimpleLayerTree": "4e98c910"
     },
@@ -199,7 +201,9 @@
     "LayerTest": {
         "AdaptiveDashEffect": "eefb7a46",
         "BottomLeftSurface": "543054b5",
+        "Contour3DWithDropShadow": "0207d531",
         "ContourTest": "73b8d873",
+        "ContourWithMask": "8db244c7",
         "DiffFilterModeImagePattern -- zoomIn": "ac049958",
         "DiffFilterModeImagePattern -- zoomOut": "ac049958",
         "DisplayListBackground_Blue": "a99262da",
@@ -209,6 +213,7 @@
         "DisplayListBackground_TiledRender": "a99262da",
         "DisplayListBackground_TransparentWithShape": "a99262da",
         "DisplayListBackground_WhiteWithShape": "a99262da",
+        "GetContourImage": "8db244c7",
         "HasContentChanged_Offset": "bedeb932",
         "HasContentChanged_Org": "bedeb932",
         "HasContentChanged_Zoom": "bedeb932",
@@ -235,6 +240,7 @@
         "PartialDrawLayer_shapeLayer": "af282892",
         "PassThoughAndNormal": "43cd416",
         "PassThrough_Test": "7fa7fcb8",
+        "Preserve3DNestedLayers": "0b31d462",
         "ShapeStyleWithMatrix": "0cfb8996",
         "StrokeOnTop_Off": "80c523ee",
         "StrokeOnTop_On": "80c523ee",
@@ -270,7 +276,7 @@
         "SimpleText": "79ce3a28"
     },
     "PathShapeTest": {
-        "AdaptiveDashEffect": "bf48e614",
+        "AdaptiveDashEffect": "0448e0fe",
         "ClipAll": "bf48e614",
         "CloseQuadShape": "bf48e614",
         "CloseQuadShapeCorner": "bf48e614",
@@ -423,6 +429,7 @@
         "ExtremelyThinStrokeLayer": "543054b5",
         "ExtremelyThinStrokePath": "543054b5",
         "HairlineLayer": "eefb7a46",
+        "HairlineStrokeText": "9a10662a",
         "HairlineWithDropShadow": "61b44005",
         "LineRenderAsHairline": "cd6a8dff",
         "ZoomUpTinyStrokeShape": "cd6a8dff"
@@ -447,6 +454,10 @@
     },
     "TextRenderTest": {
         "ShapeMakeFromMixedTextBlob": "bf48e614",
+        "TextBlobMixedPositioning": "484bda47",
+        "TextBlobPositioningRender": "484bda47",
+        "TextBlobWithStroke": "484bda47",
+        "TextBlobWithTransform": "484bda47",
         "complexEmojiTextBlending": "bf48e614",
         "emojiTextStrokeBlending": "bf48e614",
         "textEmojiMixedBlendModes": "bf48e614",
@@ -486,6 +497,10 @@
         "StrokeDashWithTrim": "4a74f6aa",
         "StrokeJoinCap": "4a74f6aa",
         "StrokeNestedScale": "4a74f6aa",
+        "TextModifier": "ec49a65b",
+        "TextPath": "ec49a65b",
+        "TextPathWithTrimPath": "9020d7e2",
+        "TextSelector": "ec49a65b",
         "TextSpanBasic": "48b78e36",
         "TextSpanEdgeCases": "48b78e36",
         "TextSpanEmoji": "48b78e36",

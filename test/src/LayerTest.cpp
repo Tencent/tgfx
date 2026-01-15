@@ -28,6 +28,7 @@
 #include "layers/RootLayer.h"
 #include "layers/SubtreeCache.h"
 #include "layers/TileCache.h"
+#include "layers/compositing3d/Layer3DContext.h"
 #include "layers/contents/ComposeContent.h"
 #include "layers/contents/RRectsContent.h"
 #include "layers/contents/RectsContent.h"
@@ -1727,7 +1728,6 @@ TGFX_TEST(LayerTest, ContourTest) {
   auto imageStyle2 = ShapeStyle::Make(imageShader2);
 
   DrawArgs drawArgs = DrawArgs(nullptr);
-  drawArgs.drawMode = DrawMode::Contour;
   Path path = {};
 
   // Case 1: Same geometry with all solid fills should dedup to 1 contour.
@@ -1738,8 +1738,8 @@ TGFX_TEST(LayerTest, ContourTest) {
   allSolidLayer->addFillStyle(ShapeStyle::Make(Color::Red()));
   allSolidLayer->addFillStyle(ShapeStyle::Make(Color::Blue()));
   ContourContext allSolidContext;
-  Canvas allSolidCanvas = Canvas(&allSolidContext);
-  allSolidLayer->drawLayer(drawArgs, &allSolidCanvas, 1.0, BlendMode::SrcOver);
+  auto allSolidCanvas = allSolidContext.beginRecording();
+  allSolidLayer->drawContour(drawArgs, allSolidCanvas, 1.0f, BlendMode::SrcOver);
   auto allSolidPicture = allSolidContext.finishRecordingAsPicture();
   EXPECT_EQ(allSolidPicture->drawCount, 1u);
 
@@ -1751,8 +1751,8 @@ TGFX_TEST(LayerTest, ContourTest) {
   allImageLayer->addFillStyle(imageStyle1);
   allImageLayer->addFillStyle(imageStyle2);
   ContourContext allImageContext;
-  Canvas allImageCanvas = Canvas(&allImageContext);
-  allImageLayer->drawLayer(drawArgs, &allImageCanvas, 1.0, BlendMode::SrcOver);
+  auto allImageCanvas = allImageContext.beginRecording();
+  allImageLayer->drawContour(drawArgs, allImageCanvas, 1.0f, BlendMode::SrcOver);
   auto allImagePicture = allImageContext.finishRecordingAsPicture();
   EXPECT_EQ(allImagePicture->drawCount, 2u);
 
@@ -1767,8 +1767,8 @@ TGFX_TEST(LayerTest, ContourTest) {
   mixedFillsLayer->addFillStyle(imageStyle2);
   mixedFillsLayer->addFillStyle(ShapeStyle::Make(Color::Green()));
   ContourContext mixedFillsContext;
-  Canvas mixedFillsCanvas = Canvas(&mixedFillsContext);
-  mixedFillsLayer->drawLayer(drawArgs, &mixedFillsCanvas, 1.0, BlendMode::SrcOver);
+  auto mixedFillsCanvas = mixedFillsContext.beginRecording();
+  mixedFillsLayer->drawContour(drawArgs, mixedFillsCanvas, 1.0f, BlendMode::SrcOver);
   auto mixedFillsPicture = mixedFillsContext.finishRecordingAsPicture();
   // Should be 1 (only first collected). Buggy single-pass would return 2.
   EXPECT_EQ(mixedFillsPicture->drawCount, 1u);
@@ -1789,8 +1789,8 @@ TGFX_TEST(LayerTest, ContourTest) {
   childLayer->addFillStyle(ShapeStyle::Make(Color::Blue()));
   twoGroupsLayer->addChild(childLayer);
   ContourContext twoGroupsContext;
-  Canvas twoGroupsCanvas = Canvas(&twoGroupsContext);
-  twoGroupsLayer->drawLayer(drawArgs, &twoGroupsCanvas, 1.0, BlendMode::SrcOver);
+  auto twoGroupsCanvas = twoGroupsContext.beginRecording();
+  twoGroupsLayer->drawContour(drawArgs, twoGroupsCanvas, 1.0f, BlendMode::SrcOver);
   auto twoGroupsPicture = twoGroupsContext.finishRecordingAsPicture();
   // Group 1: 2 (all image shaders), Group 2: 1 (deduped) = 3 total.
   EXPECT_EQ(twoGroupsPicture->drawCount, 3u);
@@ -1806,8 +1806,8 @@ TGFX_TEST(LayerTest, ContourTest) {
   strokeTestLayer->addStrokeStyle(ShapeStyle::Make(Color::Red()));
   strokeTestLayer->addStrokeStyle(ShapeStyle::Make(Color::Blue()));
   ContourContext strokeTestContext;
-  Canvas strokeTestCanvas = Canvas(&strokeTestContext);
-  strokeTestLayer->drawLayer(drawArgs, &strokeTestCanvas, 1.0, BlendMode::SrcOver);
+  auto strokeTestCanvas = strokeTestContext.beginRecording();
+  strokeTestLayer->drawContour(drawArgs, strokeTestCanvas, 1.0f, BlendMode::SrcOver);
   auto strokeTestPicture = strokeTestContext.finishRecordingAsPicture();
   // 1 (transparent fill) + 1 (strokes deduped) = 2 contours.
   EXPECT_EQ(strokeTestPicture->drawCount, 2u);
@@ -1820,8 +1820,8 @@ TGFX_TEST(LayerTest, ContourTest) {
   rootLayer->addChild(twoGroupsLayer);
   rootLayer->addChild(strokeTestLayer);
   ContourContext allContext;
-  Canvas allCanvas = Canvas(&allContext);
-  rootLayer->drawLayer(drawArgs, &allCanvas, 1.0, BlendMode::SrcOver);
+  auto allCanvas = allContext.beginRecording();
+  rootLayer->drawContour(drawArgs, allCanvas, 1.0f, BlendMode::SrcOver);
   auto allPicture = allContext.finishRecordingAsPicture();
   // 1 + 2 + 1 + 3 + 2 = 9
   EXPECT_EQ(allPicture->drawCount, 9u);
@@ -1831,6 +1831,213 @@ TGFX_TEST(LayerTest, ContourTest) {
   canvas->clear();
   canvas->drawPicture(allPicture);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ContourTest"));
+}
+
+TGFX_TEST(LayerTest, ContourMatchesContent) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  DrawArgs drawArgs = DrawArgs(nullptr);
+  Path path = {};
+  path.addRect(Rect::MakeXYWH(10, 10, 80, 80));
+
+  // Case 1: Opaque solid fill should match content.
+  auto opaqueLayer = ShapeLayer::Make();
+  opaqueLayer->setPath(path);
+  opaqueLayer->addFillStyle(ShapeStyle::Make(Color::Red()));
+  ContourContext opaqueContext;
+  auto opaqueCanvas = opaqueContext.beginRecording();
+  bool opaqueMatch = opaqueLayer->drawContour(drawArgs, opaqueCanvas, 1.0f, BlendMode::SrcOver);
+  opaqueContext.finishRecordingAsPicture();
+  EXPECT_TRUE(opaqueMatch);
+
+  // Case 2: Transparent fill (alpha = 0) should not match content.
+  auto transparentLayer = ShapeLayer::Make();
+  transparentLayer->setPath(path);
+  transparentLayer->addFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 0, 0, 0)));
+  ContourContext transparentContext;
+  auto transparentCanvas = transparentContext.beginRecording();
+  bool transparentMatch =
+      transparentLayer->drawContour(drawArgs, transparentCanvas, 1.0f, BlendMode::SrcOver);
+  transparentContext.finishRecordingAsPicture();
+  EXPECT_FALSE(transparentMatch);
+
+  // Case 3: Image shader fill should match content.
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  auto imageShader = Shader::MakeImageShader(image, TileMode::Repeat, TileMode::Repeat);
+  auto imageLayer = ShapeLayer::Make();
+  imageLayer->setPath(path);
+  imageLayer->addFillStyle(ShapeStyle::Make(imageShader));
+  ContourContext imageContext;
+  auto imageCanvas = imageContext.beginRecording();
+  bool imageMatch = imageLayer->drawContour(drawArgs, imageCanvas, 1.0f, BlendMode::SrcOver);
+  imageContext.finishRecordingAsPicture();
+  EXPECT_TRUE(imageMatch);
+
+  // Case 4: Layer with filter should not match content (child layer check).
+  auto parentLayer = Layer::Make();
+  auto filterLayer = ShapeLayer::Make();
+  filterLayer->setPath(path);
+  filterLayer->addFillStyle(ShapeStyle::Make(Color::Red()));
+  filterLayer->setFilters({BlurFilter::Make(5, 5)});
+  parentLayer->addChild(filterLayer);
+  ContourContext filterContext;
+  auto filterCanvas = filterContext.beginRecording();
+  bool filterMatch = parentLayer->drawContour(drawArgs, filterCanvas, 1.0f, BlendMode::SrcOver);
+  filterContext.finishRecordingAsPicture();
+  EXPECT_FALSE(filterMatch);
+
+  // Case 5: Layer with layerStyle should not match content (child layer check).
+  auto parentLayer2 = Layer::Make();
+  auto styleLayer = ShapeLayer::Make();
+  styleLayer->setPath(path);
+  styleLayer->addFillStyle(ShapeStyle::Make(Color::Red()));
+  styleLayer->setLayerStyles({DropShadowStyle::Make(5, 5, 0, 5, Color::Black())});
+  parentLayer2->addChild(styleLayer);
+  ContourContext styleContext;
+  auto styleCanvas = styleContext.beginRecording();
+  bool styleMatch = parentLayer2->drawContour(drawArgs, styleCanvas, 1.0f, BlendMode::SrcOver);
+  styleContext.finishRecordingAsPicture();
+  EXPECT_FALSE(styleMatch);
+
+  // Case 6: Gradient shader should check isOpaque().
+  auto gradientShader = Shader::MakeLinearGradient(Point::Make(0, 0), Point::Make(100, 100),
+                                                   {Color::Red(), Color::Blue()}, {0.0f, 1.0f});
+  auto gradientLayer = ShapeLayer::Make();
+  gradientLayer->setPath(path);
+  gradientLayer->addFillStyle(ShapeStyle::Make(gradientShader));
+  ContourContext gradientContext;
+  auto gradientCanvas = gradientContext.beginRecording();
+  bool gradientMatch =
+      gradientLayer->drawContour(drawArgs, gradientCanvas, 1.0f, BlendMode::SrcOver);
+  gradientContext.finishRecordingAsPicture();
+  // Gradient with opaque colors should match.
+  EXPECT_TRUE(gradientMatch);
+}
+
+TGFX_TEST(LayerTest, ContourContainsOpaqueBounds) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  DrawArgs drawArgs = DrawArgs(nullptr);
+  Path path = {};
+
+  // Create a parent layer with opaque fill covering children.
+  auto parentLayer = ShapeLayer::Make();
+  path.addRect(Rect::MakeXYWH(0, 0, 200, 200));
+  parentLayer->setPath(path);
+  parentLayer->addFillStyle(ShapeStyle::Make(Color::Red()));
+
+  // Child layer completely covered by parent's opaque bounds should be skipped.
+  auto childLayer = ShapeLayer::Make();
+  path.reset();
+  path.addRect(Rect::MakeXYWH(50, 50, 100, 100));
+  childLayer->setPath(path);
+  childLayer->addFillStyle(ShapeStyle::Make(Color::Blue()));
+  parentLayer->addChild(childLayer);
+
+  ContourContext contourContext;
+  auto canvas = contourContext.beginRecording();
+  parentLayer->drawContour(drawArgs, canvas, 1.0f, BlendMode::SrcOver);
+  auto picture = contourContext.finishRecordingAsPicture();
+  // Parent contour drawn, child skipped due to containsOpaqueBounds optimization.
+  // Only 1 draw call for parent.
+  EXPECT_EQ(picture->drawCount, 1u);
+
+  // Now test with child not covered (partially outside).
+  auto parentLayer2 = ShapeLayer::Make();
+  path.reset();
+  path.addRect(Rect::MakeXYWH(0, 0, 100, 100));
+  parentLayer2->setPath(path);
+  parentLayer2->addFillStyle(ShapeStyle::Make(Color::Red()));
+
+  auto childLayer2 = ShapeLayer::Make();
+  path.reset();
+  path.addRect(Rect::MakeXYWH(50, 50, 100, 100));
+  childLayer2->setPath(path);
+  childLayer2->addFillStyle(ShapeStyle::Make(Color::Blue()));
+  parentLayer2->addChild(childLayer2);
+
+  ContourContext contourContext2;
+  auto canvas2 = contourContext2.beginRecording();
+  parentLayer2->drawContour(drawArgs, canvas2, 1.0f, BlendMode::SrcOver);
+  auto picture2 = contourContext2.finishRecordingAsPicture();
+  // Both parent and child contours should be drawn.
+  EXPECT_EQ(picture2->drawCount, 2u);
+}
+
+TGFX_TEST(LayerTest, GetContourImage) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+
+  // Create a shape layer with a rectangle.
+  auto shapeLayer = ShapeLayer::Make();
+  Path path = {};
+  path.addRect(Rect::MakeXYWH(10, 10, 80, 80));
+  shapeLayer->setPath(path);
+  shapeLayer->addFillStyle(ShapeStyle::Make(Color::Red()));
+
+  // Get contour image.
+  DrawArgs drawArgs = DrawArgs(context);
+  Point offset = {};
+  bool contourMatchesContent = false;
+  auto contourImage =
+      shapeLayer->getContentContourImage(drawArgs, 1.0f, &offset, &contourMatchesContent);
+  EXPECT_TRUE(contourImage != nullptr);
+  EXPECT_EQ(offset.x, 10.0f);
+  EXPECT_EQ(offset.y, 10.0f);
+  EXPECT_EQ(contourImage->width(), 80);
+  EXPECT_EQ(contourImage->height(), 80);
+  EXPECT_TRUE(contourMatchesContent);
+
+  // Draw the contour image to verify.
+  auto canvas = surface->getCanvas();
+  canvas->clear();
+  canvas->drawImage(contourImage, offset.x, offset.y);
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GetContourImage"));
+}
+
+TGFX_TEST(LayerTest, ContourWithMask) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+
+  DrawArgs drawArgs = DrawArgs(nullptr);
+  Path path = {};
+
+  // Create a shape layer with mask.
+  auto shapeLayer = ShapeLayer::Make();
+  path.addRect(Rect::MakeXYWH(10, 10, 100, 100));
+  shapeLayer->setPath(path);
+  shapeLayer->addFillStyle(ShapeStyle::Make(Color::Red()));
+
+  // Create a mask layer (circle).
+  auto maskLayer = ShapeLayer::Make();
+  path.reset();
+  path.addOval(Rect::MakeXYWH(30, 30, 60, 60));
+  maskLayer->setPath(path);
+  maskLayer->addFillStyle(ShapeStyle::Make(Color::White()));
+  shapeLayer->setMask(maskLayer);
+  shapeLayer->setMaskType(LayerMaskType::Contour);
+
+  ContourContext contourContext;
+  auto canvas = contourContext.beginRecording();
+  shapeLayer->drawContour(drawArgs, canvas, 1.0f, BlendMode::SrcOver);
+  auto picture = contourContext.finishRecordingAsPicture();
+  // The mask clips the shape, so we should have 1 contour (the masked shape).
+  EXPECT_EQ(picture->drawCount, 1u);
+
+  // Draw to surface for visual verification.
+  surface = Surface::Make(context, 200, 200);
+  auto drawCanvas = surface->getCanvas();
+  drawCanvas->clear();
+  drawCanvas->drawPicture(picture);
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ContourWithMask"));
 }
 
 TGFX_TEST(LayerTest, DiffFilterModeImagePattern) {
@@ -2737,6 +2944,197 @@ TGFX_TEST(LayerTest, SetChildrenLISValidation) {
   singleParent->setChildren(single);
   EXPECT_EQ(singleParent->children().size(), 1u);
   EXPECT_FALSE(singleLayer->bitFields.dirtyTransform);
+}
+
+TGFX_TEST(LayerTest, Layer3DContextAPI) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto renderRect = Rect::MakeWH(200, 200);
+  float contentScale = 1.0f;
+  auto colorSpace = ColorSpace::SRGB();
+
+  // Test Render3DContext creation (contourMode = false)
+  auto render3DContext =
+      Layer3DContext::Make(false, context, renderRect, contentScale, colorSpace, nullptr);
+  ASSERT_TRUE(render3DContext != nullptr);
+  EXPECT_TRUE(render3DContext->isFinished());
+
+  // Test beginRecording/endRecording cycle
+  auto rotateMatrix = Matrix3D::MakeRotate({0, 1, 0}, 30);
+  auto recordCanvas = render3DContext->beginRecording(rotateMatrix, true);
+  ASSERT_TRUE(recordCanvas != nullptr);
+  EXPECT_FALSE(render3DContext->isFinished());
+
+  // Draw something
+  Paint paint = {};
+  paint.setColor(Color::Red());
+  recordCanvas->drawRect(Rect::MakeXYWH(20, 20, 60, 60), paint);
+
+  render3DContext->endRecording();
+  EXPECT_TRUE(render3DContext->isFinished());
+
+  // Test Contour3DContext creation (contourMode = true)
+  auto contour3DContext =
+      Layer3DContext::Make(true, context, renderRect, contentScale, colorSpace, nullptr);
+  ASSERT_TRUE(contour3DContext != nullptr);
+  EXPECT_TRUE(contour3DContext->isFinished());
+
+  // Test nested recording (simulates nested preserve3D layers)
+  auto transform1 = Matrix3D::MakeRotate({0, 1, 0}, 20);
+  auto canvas1 = contour3DContext->beginRecording(transform1, true);
+  EXPECT_FALSE(contour3DContext->isFinished());
+  paint.setColor(Color::Blue());
+  canvas1->drawRect(Rect::MakeXYWH(10, 10, 80, 80), paint);
+
+  // Nested recording - tests recorder stack isolation
+  auto transform2 = Matrix3D::MakeRotate({1, 0, 0}, 30);
+  auto canvas2 = contour3DContext->beginRecording(transform2, true);
+  ASSERT_TRUE(canvas2 != nullptr);
+  EXPECT_NE(canvas1, canvas2);
+  EXPECT_FALSE(contour3DContext->isFinished());
+  paint.setColor(Color::Green());
+  canvas2->drawRect(Rect::MakeXYWH(30, 30, 40, 40), paint);
+
+  // End inner recording first
+  contour3DContext->endRecording();
+  EXPECT_FALSE(contour3DContext->isFinished());
+
+  // End outer recording
+  contour3DContext->endRecording();
+  EXPECT_TRUE(contour3DContext->isFinished());
+}
+
+TGFX_TEST(LayerTest, Preserve3DNestedLayers) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+
+  auto displayList = std::make_unique<DisplayList>();
+
+  // Create parent layer with preserve3D
+  auto parentLayer = SolidLayer::Make();
+  parentLayer->setColor(Color::FromRGBA(200, 200, 200, 255));
+  parentLayer->setWidth(180);
+  parentLayer->setHeight(180);
+  parentLayer->setMatrix(Matrix::MakeTrans(10, 10));
+  parentLayer->setPreserve3D(true);
+
+  // Create first child with 3D transform using perspective
+  auto child1 = SolidLayer::Make();
+  child1->setColor(Color::Red());
+  child1->setWidth(60);
+  child1->setHeight(60);
+  {
+    auto size = Size::Make(60, 60);
+    auto anchor = Point::Make(0.5f, 0.5f);
+    auto offsetToAnchor =
+        Matrix3D::MakeTranslate(-anchor.x * size.width, -anchor.y * size.height, 0);
+    auto invOffsetToAnchor =
+        Matrix3D::MakeTranslate(anchor.x * size.width, anchor.y * size.height, 0);
+    auto rotate = Matrix3D::MakeRotate({0, 1, 0}, 30);
+    auto perspective = Matrix3D::I();
+    perspective.setRowColumn(3, 2, -1.0f / 500.0f);
+    auto origin = Matrix3D::MakeTranslate(30, 30, 0);
+    child1->setMatrix3D(origin * invOffsetToAnchor * perspective * rotate * offsetToAnchor);
+  }
+
+  // Create second child with different 3D transform
+  auto child2 = SolidLayer::Make();
+  child2->setColor(Color::Blue());
+  child2->setWidth(60);
+  child2->setHeight(60);
+  {
+    auto size = Size::Make(60, 60);
+    auto anchor = Point::Make(0.5f, 0.5f);
+    auto offsetToAnchor =
+        Matrix3D::MakeTranslate(-anchor.x * size.width, -anchor.y * size.height, 0);
+    auto invOffsetToAnchor =
+        Matrix3D::MakeTranslate(anchor.x * size.width, anchor.y * size.height, 0);
+    auto rotate = Matrix3D::MakeRotate({0, 1, 0}, -30);
+    auto perspective = Matrix3D::I();
+    perspective.setRowColumn(3, 2, -1.0f / 500.0f);
+    auto origin = Matrix3D::MakeTranslate(100, 100, 0);
+    child2->setMatrix3D(origin * invOffsetToAnchor * perspective * rotate * offsetToAnchor);
+  }
+
+  parentLayer->addChild(child1);
+  parentLayer->addChild(child2);
+  displayList->root()->addChild(parentLayer);
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Preserve3DNestedLayers"));
+}
+
+TGFX_TEST(LayerTest, Contour3DWithDropShadow) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 300);
+
+  auto displayList = std::make_unique<DisplayList>();
+
+  // Create parent layer with preserve3D and drop shadow (showBehindLayer = false)
+  // Parent is semi-transparent so we can see shadow through it
+  auto parentLayer = SolidLayer::Make();
+  parentLayer->setColor(Color::FromRGBA(200, 200, 200, 100));
+  parentLayer->setWidth(150);
+  parentLayer->setHeight(150);
+  parentLayer->setMatrix(Matrix::MakeTrans(75, 75));
+
+  auto dropShadow = DropShadowStyle::Make(10, 10, 8, 8, Color::FromRGBA(0, 0, 0, 200));
+  dropShadow->setShowBehindLayer(false);
+  parentLayer->setLayerStyles({dropShadow});
+
+  // Create first child with 3D transform - positioned to extend outside parent
+  auto child1 = SolidLayer::Make();
+  child1->setColor(Color::FromRGBA(255, 0, 0, 200));
+  child1->setWidth(80);
+  child1->setHeight(80);
+  child1->setPreserve3D(true);
+  {
+    auto size = Size::Make(80, 80);
+    auto anchor = Point::Make(0.5f, 0.5f);
+    auto offsetToAnchor =
+        Matrix3D::MakeTranslate(-anchor.x * size.width, -anchor.y * size.height, 0);
+    auto invOffsetToAnchor =
+        Matrix3D::MakeTranslate(anchor.x * size.width, anchor.y * size.height, 0);
+    auto rotate = Matrix3D::MakeRotate({0, 1, 0}, 40);
+    auto perspective = Matrix3D::I();
+    perspective.setRowColumn(3, 2, -1.0f / 300.0f);
+    // Position at top-left, extending outside parent
+    auto origin = Matrix3D::MakeTranslate(-20, -20, 0);
+    child1->setMatrix3D(origin * invOffsetToAnchor * perspective * rotate * offsetToAnchor);
+  }
+
+  // Create second child with different 3D transform - positioned to extend outside parent
+  auto child2 = SolidLayer::Make();
+  child2->setColor(Color::FromRGBA(0, 0, 255, 200));
+  child2->setWidth(80);
+  child2->setHeight(80);
+  {
+    auto size = Size::Make(80, 80);
+    auto anchor = Point::Make(0.5f, 0.5f);
+    auto offsetToAnchor =
+        Matrix3D::MakeTranslate(-anchor.x * size.width, -anchor.y * size.height, 0);
+    auto invOffsetToAnchor =
+        Matrix3D::MakeTranslate(anchor.x * size.width, anchor.y * size.height, 0);
+    auto rotate = Matrix3D::MakeRotate({0, 1, 0}, -40);
+    auto perspective = Matrix3D::I();
+    perspective.setRowColumn(3, 2, -1.0f / 300.0f);
+    // Position at bottom-right, extending outside parent
+    auto origin = Matrix3D::MakeTranslate(90, 90, 0);
+    child2->setMatrix3D(origin * invOffsetToAnchor * perspective * rotate * offsetToAnchor);
+  }
+
+  parentLayer->addChild(child1);
+  parentLayer->addChild(child2);
+  displayList->root()->addChild(parentLayer);
+
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Contour3DWithDropShadow"));
 }
 
 }  // namespace tgfx

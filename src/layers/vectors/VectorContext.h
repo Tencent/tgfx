@@ -27,35 +27,36 @@ namespace tgfx {
 
 /**
  * VectorContext holds the rendering state while traversing vector elements.
- * This is an internal structure used by VectorLayer and VectorElement subclasses.
+ * This is an internal class used by VectorLayer and VectorElement subclasses.
  */
-struct VectorContext {
+class VectorContext {
+ public:
   /**
-   * Adds a shape geometry with an identity matrix to the list.
+   * Adds a shape geometry to the list.
    */
   void addShape(std::shared_ptr<Shape> shape);
 
   /**
-   * Adds a text geometry with an identity matrix to the list.
+   * Adds a text geometry with the given position to the list.
    */
   void addTextBlob(std::shared_ptr<TextBlob> blob, const Point& position);
 
   /**
-   * Converts all geometries to ShapeGeometry and returns them. Non-convertible geometries are
-   * removed. After this call, the geometries list contains only ShapeGeometry instances.
+   * Converts all geometries to shape mode and returns the geometry list.
+   * Text and glyph content is converted to Shape. Call this before applying path modifiers.
    */
-  std::vector<ShapeGeometry*> getShapeGeometries();
+  std::vector<Geometry*> getShapeGeometries();
 
   /**
-   * Geometry list that can be modified by modifiers.
+   * Expands text geometries to glyph mode and returns geometries that have text content.
+   * Pure shape geometries are not included. Call this before applying text modifiers.
+   */
+  std::vector<Geometry*> getGlyphGeometries();
+
+  /**
+   * Geometry list with ownership.
    */
   std::vector<std::unique_ptr<Geometry>> geometries = {};
-
-  /**
-   * Matrix list corresponding to each geometry. Path modifiers only modify geometries,
-   * not matrices. This allows stroke to be applied before outer group transforms.
-   */
-  std::vector<Matrix> matrices = {};
 
   /**
    * Accumulated painters from style elements.
