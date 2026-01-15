@@ -146,7 +146,7 @@ TGFX_TEST(VectorLayerTest, BasicShapes) {
 }
 
 /**
- * Test TrimPath: both Simultaneously and Individually modes.
+ * Test TrimPath: both Separate and Continuous modes.
  * TrimPath should affect the innermost shapes before styles are applied.
  */
 TGFX_TEST(VectorLayerTest, TrimPath) {
@@ -160,7 +160,7 @@ TGFX_TEST(VectorLayerTest, TrimPath) {
   auto displayList = std::make_unique<DisplayList>();
   auto vectorLayer = VectorLayer::Make();
 
-  // Group 1: TrimPath Simultaneously (each shape trimmed independently with same params)
+  // Group 1: TrimPath Separate (each shape trimmed separately with same params)
   auto group1 = std::make_shared<VectorGroup>();
   group1->setPosition({100, 154});
 
@@ -174,12 +174,12 @@ TGFX_TEST(VectorLayerTest, TrimPath) {
   auto trim1 = std::make_shared<TrimPath>();
   trim1->setStart(0.0f);
   trim1->setEnd(0.5f);
-  trim1->setTrimType(TrimPathType::Simultaneously);
+  trim1->setTrimType(TrimPathType::Separate);
 
   auto stroke1 = MakeStrokeStyle(Color::Red(), 8.0f);
   group1->setElements({rect1, ellipse1, trim1, stroke1});
 
-  // Group 2: TrimPath Individually (all shapes combined into one path, trimmed sequentially)
+  // Group 2: TrimPath Continuous (all shapes combined into one path, trimmed as one)
   auto group2 = std::make_shared<VectorGroup>();
   group2->setPosition({360, 154});
 
@@ -193,7 +193,7 @@ TGFX_TEST(VectorLayerTest, TrimPath) {
   auto trim2 = std::make_shared<TrimPath>();
   trim2->setStart(0.25f);
   trim2->setEnd(0.75f);
-  trim2->setTrimType(TrimPathType::Individually);
+  trim2->setTrimType(TrimPathType::Continuous);
 
   auto stroke2 = MakeStrokeStyle(Color::Blue(), 8.0f);
   group2->setElements({rect2, ellipse2, trim2, stroke2});
@@ -834,7 +834,7 @@ TGFX_TEST(VectorLayerTest, TrimPathOffset) {
   auto trim3b = std::make_shared<TrimPath>();
   trim3b->setStart(0.2f);
   trim3b->setEnd(1.0f);
-  trim3b->setTrimType(TrimPathType::Individually);
+  trim3b->setTrimType(TrimPathType::Continuous);
 
   auto stroke3 = MakeStrokeStyle(Color::Green(), 12.0f);
 
@@ -931,7 +931,7 @@ TGFX_TEST(VectorLayerTest, TrimPathReversedWrapAround) {
 
   group3->setElements({rect3, trim3, stroke3});
 
-  // Group 4: Reversed trim Individually mode with multiple shapes
+  // Group 4: Reversed trim Continuous mode with multiple shapes
   // Tests that reversed trim works correctly when trimming multiple shapes as one
   auto group4 = std::make_shared<VectorGroup>();
   group4->setPosition({448, 80});
@@ -947,7 +947,7 @@ TGFX_TEST(VectorLayerTest, TrimPathReversedWrapAround) {
   auto trim4 = std::make_shared<TrimPath>();
   trim4->setStart(0.7f);
   trim4->setEnd(0.3f);
-  trim4->setTrimType(TrimPathType::Individually);
+  trim4->setTrimType(TrimPathType::Continuous);
 
   auto stroke4 = MakeStrokeStyle(Color::FromRGBA(255, 128, 0, 255), 8.0f);
 
@@ -3261,7 +3261,7 @@ TGFX_TEST(VectorLayerTest, TextPathWithTrimPath) {
 
   // Group 1: TextPath then TrimPath
   // Text is first laid out along the path (glyphs positioned on curve),
-  // then TrimPath trims each glyph shape (Simultaneously mode)
+  // then TrimPath trims each glyph shape (Separate mode)
   auto group1 = std::make_shared<VectorGroup>();
   group1->setPosition({28, 110});
 
@@ -3276,7 +3276,7 @@ TGFX_TEST(VectorLayerTest, TextPathWithTrimPath) {
   auto trim1 = std::make_shared<TrimPath>();
   trim1->setStart(0.0f);
   trim1->setEnd(0.95f);
-  trim1->setTrimType(TrimPathType::Simultaneously);
+  trim1->setTrimType(TrimPathType::Separate);
 
   auto fill1 = MakeFillStyle(Color::Blue());
   group1->setElements({textSpan1, textPath1, trim1, fill1});
@@ -3295,7 +3295,7 @@ TGFX_TEST(VectorLayerTest, TextPathWithTrimPath) {
   auto trim2 = std::make_shared<TrimPath>();
   trim2->setStart(0.05f);
   trim2->setEnd(1.0f);
-  trim2->setTrimType(TrimPathType::Simultaneously);
+  trim2->setTrimType(TrimPathType::Separate);
 
   auto textPath2 = std::make_shared<TextPath>();
   textPath2->setPath(curvePath);
