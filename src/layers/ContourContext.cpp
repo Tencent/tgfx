@@ -165,7 +165,7 @@ void ContourContext::drawContour(const Contour& contour, const MCState& state, c
   flushPendingContour(contour, state, brush);
 }
 
-bool ContourContext::containContourBound(const Rect& bounds) {
+bool ContourContext::containContourBound(const Rect& bounds) const {
   return bounds.isEmpty() || std::any_of(contourBounds.begin(), contourBounds.end(),
                                          [&](const Rect& rect) { return rect.contains(bounds); });
 }
@@ -223,6 +223,10 @@ void ContourContext::mergeContourBound(const Rect& bounds) {
 std::shared_ptr<Picture> ContourContext::finishRecordingAsPicture() {
   flushPendingContour();
   return pictureContext.finishRecordingAsPicture();
+}
+
+bool ContourContext::containsOpaqueBounds(const Rect& bounds) const {
+  return containContourBound(bounds);
 }
 
 bool ContourContext::canAppend(const Contour& contour, const MCState& state, const Brush& brush) {

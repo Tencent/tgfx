@@ -3896,4 +3896,183 @@ TGFX_TEST(VectorLayerTest, TextSelector) {
   EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/TextSelector"));
 }
 
+/**
+ * Test StrokeStyle with strokeAlign property for inside and outside stroke alignment.
+ * Tests rectangle, ellipse, text, and dash pattern combinations.
+ */
+TGFX_TEST(VectorLayerTest, StrokeAlign) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto displayList = std::make_unique<DisplayList>();
+  auto vectorLayer = VectorLayer::Make();
+
+  auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+  ASSERT_TRUE(typeface != nullptr);
+  Font font(typeface, 60);
+
+  // Reference stroke for comparison (1px black center stroke)
+  auto refStroke = std::make_shared<StrokeStyle>();
+  refStroke->setColorSource(SolidColor::Make(Color::Black()));
+  refStroke->setStrokeWidth(1);
+
+  // Row 1: Rectangle with Center/Inside/Outside stroke
+  auto rectGroup1 = std::make_shared<VectorGroup>();
+  auto rect1 = std::make_shared<Rectangle>();
+  rect1->setSize({100, 100});
+  auto rectFill1 = MakeFillStyle(Color::FromRGBA(200, 200, 200, 255));
+  auto rectStroke1 = std::make_shared<StrokeStyle>();
+  rectStroke1->setColorSource(SolidColor::Make(Color::Red()));
+  rectStroke1->setStrokeWidth(16);
+  rectStroke1->setStrokeAlign(StrokeAlign::Center);
+  rectGroup1->setElements({rect1, rectFill1, rectStroke1, refStroke});
+
+  auto rectGroup2 = std::make_shared<VectorGroup>();
+  rectGroup2->setPosition({150, 0});
+  auto rect2 = std::make_shared<Rectangle>();
+  rect2->setSize({100, 100});
+  auto rectFill2 = MakeFillStyle(Color::FromRGBA(200, 200, 200, 255));
+  auto rectStroke2 = std::make_shared<StrokeStyle>();
+  rectStroke2->setColorSource(SolidColor::Make(Color::Green()));
+  rectStroke2->setStrokeWidth(16);
+  rectStroke2->setStrokeAlign(StrokeAlign::Inside);
+  rectGroup2->setElements({rect2, rectFill2, rectStroke2, refStroke});
+
+  auto rectGroup3 = std::make_shared<VectorGroup>();
+  rectGroup3->setPosition({300, 0});
+  auto rect3 = std::make_shared<Rectangle>();
+  rect3->setSize({100, 100});
+  auto rectFill3 = MakeFillStyle(Color::FromRGBA(200, 200, 200, 255));
+  auto rectStroke3 = std::make_shared<StrokeStyle>();
+  rectStroke3->setColorSource(SolidColor::Make(Color::Blue()));
+  rectStroke3->setStrokeWidth(16);
+  rectStroke3->setStrokeAlign(StrokeAlign::Outside);
+  rectGroup3->setElements({rect3, rectFill3, rectStroke3, refStroke});
+
+  // Row 2: Ellipse with Center/Inside/Outside stroke
+  auto ellipseGroup1 = std::make_shared<VectorGroup>();
+  ellipseGroup1->setPosition({0, 130});
+  auto ellipse1 = std::make_shared<Ellipse>();
+  ellipse1->setSize({100, 70});
+  auto ellipseFill1 = MakeFillStyle(Color::FromRGBA(200, 200, 200, 255));
+  auto ellipseStroke1 = std::make_shared<StrokeStyle>();
+  ellipseStroke1->setColorSource(SolidColor::Make(Color::Red()));
+  ellipseStroke1->setStrokeWidth(12);
+  ellipseStroke1->setStrokeAlign(StrokeAlign::Center);
+  ellipseGroup1->setElements({ellipse1, ellipseFill1, ellipseStroke1, refStroke});
+
+  auto ellipseGroup2 = std::make_shared<VectorGroup>();
+  ellipseGroup2->setPosition({150, 130});
+  auto ellipse2 = std::make_shared<Ellipse>();
+  ellipse2->setSize({100, 70});
+  auto ellipseFill2 = MakeFillStyle(Color::FromRGBA(200, 200, 200, 255));
+  auto ellipseStroke2 = std::make_shared<StrokeStyle>();
+  ellipseStroke2->setColorSource(SolidColor::Make(Color::Green()));
+  ellipseStroke2->setStrokeWidth(12);
+  ellipseStroke2->setStrokeAlign(StrokeAlign::Inside);
+  ellipseGroup2->setElements({ellipse2, ellipseFill2, ellipseStroke2, refStroke});
+
+  auto ellipseGroup3 = std::make_shared<VectorGroup>();
+  ellipseGroup3->setPosition({300, 130});
+  auto ellipse3 = std::make_shared<Ellipse>();
+  ellipse3->setSize({100, 70});
+  auto ellipseFill3 = MakeFillStyle(Color::FromRGBA(200, 200, 200, 255));
+  auto ellipseStroke3 = std::make_shared<StrokeStyle>();
+  ellipseStroke3->setColorSource(SolidColor::Make(Color::Blue()));
+  ellipseStroke3->setStrokeWidth(12);
+  ellipseStroke3->setStrokeAlign(StrokeAlign::Outside);
+  ellipseGroup3->setElements({ellipse3, ellipseFill3, ellipseStroke3, refStroke});
+
+  // Row 3: Text with Center/Inside/Outside stroke
+  auto textGroup1 = std::make_shared<VectorGroup>();
+  textGroup1->setPosition({-20, 230});
+  auto textSpan1 = std::make_shared<TextSpan>();
+  textSpan1->setTextBlob(TextBlob::MakeFrom("Aa", font));
+  auto textFill1 = MakeFillStyle(Color::FromRGBA(200, 200, 200, 255));
+  auto textStroke1 = std::make_shared<StrokeStyle>();
+  textStroke1->setColorSource(SolidColor::Make(Color::Red()));
+  textStroke1->setStrokeWidth(4);
+  textStroke1->setStrokeAlign(StrokeAlign::Center);
+  textGroup1->setElements({textSpan1, textFill1, textStroke1, refStroke});
+
+  auto textGroup2 = std::make_shared<VectorGroup>();
+  textGroup2->setPosition({130, 230});
+  auto textSpan2 = std::make_shared<TextSpan>();
+  textSpan2->setTextBlob(TextBlob::MakeFrom("Aa", font));
+  auto textFill2 = MakeFillStyle(Color::FromRGBA(200, 200, 200, 255));
+  auto textStroke2 = std::make_shared<StrokeStyle>();
+  textStroke2->setColorSource(SolidColor::Make(Color::Green()));
+  textStroke2->setStrokeWidth(4);
+  textStroke2->setStrokeAlign(StrokeAlign::Inside);
+  textGroup2->setElements({textSpan2, textFill2, textStroke2, refStroke});
+
+  auto textGroup3 = std::make_shared<VectorGroup>();
+  textGroup3->setPosition({280, 230});
+  auto textSpan3 = std::make_shared<TextSpan>();
+  textSpan3->setTextBlob(TextBlob::MakeFrom("Aa", font));
+  auto textFill3 = MakeFillStyle(Color::FromRGBA(200, 200, 200, 255));
+  auto textStroke3 = std::make_shared<StrokeStyle>();
+  textStroke3->setColorSource(SolidColor::Make(Color::Blue()));
+  textStroke3->setStrokeWidth(4);
+  textStroke3->setStrokeAlign(StrokeAlign::Outside);
+  textGroup3->setElements({textSpan3, textFill3, textStroke3, refStroke});
+
+  // Row 4: Rectangle with dash and Center/Inside/Outside stroke
+  auto dashGroup1 = std::make_shared<VectorGroup>();
+  dashGroup1->setPosition({0, 310});
+  auto dashRect1 = std::make_shared<Rectangle>();
+  dashRect1->setSize({100, 100});
+  auto dashFill1 = MakeFillStyle(Color::FromRGBA(200, 200, 200, 255));
+  auto dashStroke1 = std::make_shared<StrokeStyle>();
+  dashStroke1->setColorSource(SolidColor::Make(Color::Red()));
+  dashStroke1->setStrokeWidth(12);
+  dashStroke1->setDashes({16, 8});
+  dashStroke1->setStrokeAlign(StrokeAlign::Center);
+  dashGroup1->setElements({dashRect1, dashFill1, dashStroke1, refStroke});
+
+  auto dashGroup2 = std::make_shared<VectorGroup>();
+  dashGroup2->setPosition({150, 310});
+  auto dashRect2 = std::make_shared<Rectangle>();
+  dashRect2->setSize({100, 100});
+  auto dashFill2 = MakeFillStyle(Color::FromRGBA(200, 200, 200, 255));
+  auto dashStroke2 = std::make_shared<StrokeStyle>();
+  dashStroke2->setColorSource(SolidColor::Make(Color::Green()));
+  dashStroke2->setStrokeWidth(12);
+  dashStroke2->setDashes({16, 8});
+  dashStroke2->setStrokeAlign(StrokeAlign::Inside);
+  dashGroup2->setElements({dashRect2, dashFill2, dashStroke2, refStroke});
+
+  auto dashGroup3 = std::make_shared<VectorGroup>();
+  dashGroup3->setPosition({300, 310});
+  auto dashRect3 = std::make_shared<Rectangle>();
+  dashRect3->setSize({100, 100});
+  auto dashFill3 = MakeFillStyle(Color::FromRGBA(200, 200, 200, 255));
+  auto dashStroke3 = std::make_shared<StrokeStyle>();
+  dashStroke3->setColorSource(SolidColor::Make(Color::Blue()));
+  dashStroke3->setStrokeWidth(12);
+  dashStroke3->setDashes({16, 8});
+  dashStroke3->setStrokeAlign(StrokeAlign::Outside);
+  dashGroup3->setElements({dashRect3, dashFill3, dashStroke3, refStroke});
+
+  vectorLayer->setContents({rectGroup1, rectGroup2, rectGroup3, ellipseGroup1, ellipseGroup2,
+                            ellipseGroup3, textGroup1, textGroup2, textGroup3, dashGroup1,
+                            dashGroup2, dashGroup3});
+
+  displayList->root()->addChild(vectorLayer);
+
+  // Get tight bounds and create surface with 50px padding on all sides
+  auto bounds = vectorLayer->getBounds(nullptr, true);
+  vectorLayer->setMatrix(Matrix::MakeTrans(50 - bounds.left, 50 - bounds.top));
+  auto width = static_cast<int>(std::ceil(bounds.width() + 100));
+  auto height = static_cast<int>(std::ceil(bounds.height() + 100));
+
+  auto surface = Surface::Make(context, width, height);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+  displayList->render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/StrokeAlign"));
+}
+
 }  // namespace tgfx

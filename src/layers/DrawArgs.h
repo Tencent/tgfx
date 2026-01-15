@@ -25,8 +25,9 @@
 #include "tgfx/layers/layerstyles/LayerStyle.h"
 
 namespace tgfx {
+class ContourContext;
 
-enum class DrawMode { Normal, Contour, Background };
+enum class DrawMode { Normal, Background };
 
 /**
  * DrawArgs represents the arguments passed to the draw method of a Layer.
@@ -75,5 +76,8 @@ class DrawArgs {
   // respective 3D states to achieve per-pixel depth occlusion effects. These layers are composited
   // through the Compositor and do not need to be drawn to the Canvas.
   std::shared_ptr<Layer3DContext> render3DContext = nullptr;
+
+  // The contour context to be used during contour drawing. Note: this could be nullptr.
+  ContourContext* contourContext = nullptr;
 };
 }  // namespace tgfx

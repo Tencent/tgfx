@@ -75,6 +75,15 @@ void ComposeContent::drawContour(Canvas* canvas, bool antiAlias) const {
   }
 }
 
+bool ComposeContent::contourEqualsOpaqueContent() const {
+  for (const auto& content : contents) {
+    if (!content->contourEqualsOpaqueContent()) {
+      return false;
+    }
+  }
+  return true;
+}
+
 bool ComposeContent::drawDefault(Canvas* canvas, float alpha, bool antiAlias) const {
   for (size_t i = 0; i < foregroundStartIndex; ++i) {
     contents[i]->drawDefault(canvas, alpha, antiAlias);

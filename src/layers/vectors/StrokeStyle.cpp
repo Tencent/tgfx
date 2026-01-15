@@ -84,6 +84,8 @@ class StrokePainter : public Painter {
   Stroke stroke = {};
   std::shared_ptr<PathEffect> pathEffect = nullptr;
   std::vector<Matrix> innerMatrices = {};
+  StrokeAlign strokeAlign = StrokeAlign::Center;
+  std::vector<std::shared_ptr<Shape>> originalShapes = {};
 
   std::unique_ptr<Painter> clone() const override {
     return std::make_unique<StrokePainter>(*this);
@@ -95,56 +97,96 @@ class StrokePainter : public Painter {
       const auto& innerMatrix = innerMatrices[i];
 
       Matrix invertedInner = Matrix::I();
-      bool canInvert = innerMatrix.invert(&invertedInner);
-      auto outerMatrix = canInvert ? geometry->matrix * invertedInner : Matrix::I();
+      Matrix outerMatrix = Matrix::I();
+      if (innerMatrix.invert(&invertedInner)) {
+        outerMatrix = invertedInner;
+        outerMatrix.postConcat(geometry->matrix);
+      }
       auto scales = outerMatrix.getAxisScales();
       bool uniformScale = FloatNearlyEqual(scales.x, scales.y);
+      bool needsBooleanOp = strokeAlign != StrokeAlign::Center;
 
       if (geometry->hasText()) {
         for (const auto& run : geometry->getGlyphRuns()) {
-          if (uniformScale && pathEffect == nullptr) {
-            drawGlyphRunAsTextBlob(recorder, run, geometry->matrix, scales.x);
+          auto runMatrix = run.matrix;
+          runMatrix.postConcat(geometry->matrix);
+          if (uniformScale && pathEffect == nullptr && !needsBooleanOp) {
+            drawGlyphRunAsTextBlob(recorder, run, runMatrix, scales.x);
           } else {
-            drawGlyphRunAsShape(recorder, run, innerMatrix, outerMatrix, scales, uniformScale);
+            auto runInnerMatrix = run.matrix;
+            runInnerMatrix.postConcat(innerMatrix);
+            drawGlyphRunAsShape(recorder, run, runInnerMatrix, outerMatrix, scales, uniformScale,
+                                needsBooleanOp);
           }
         }
       } else {
-        drawShape(recorder, geometry->getShape(), innerMatrix, outerMatrix, scales, uniformScale);
+        auto originalShape = needsBooleanOp ? originalShapes[i] : nullptr;
+        drawShape(recorder, geometry->getShape(), std::move(originalShape), innerMatrix,
+                  outerMatrix, scales, uniformScale, needsBooleanOp);
       }
     }
   }
 
  private:
-  void drawShape(LayerRecorder* recorder, std::shared_ptr<Shape> shape, const Matrix& innerMatrix,
-                 const Matrix& outerMatrix, const Point& scales, bool uniformScale) {
-    if (shape == nullptr) {
-      return;
-    }
-    Matrix finalOuter = outerMatrix;
+  std::shared_ptr<Shape> prepareShape(std::shared_ptr<Shape> shape, const Matrix& innerMatrix,
+                                      Matrix* finalOuter) {
     if (innerMatrix.isTranslate()) {
-      finalOuter.preTranslate(innerMatrix.getTranslateX(), innerMatrix.getTranslateY());
+      finalOuter->preTranslate(innerMatrix.getTranslateX(), innerMatrix.getTranslateY());
     } else {
       shape = Shape::ApplyMatrix(shape, innerMatrix);
     }
     if (pathEffect) {
       shape = Shape::ApplyEffect(shape, pathEffect);
     }
-    if (uniformScale) {
+    return shape;
+  }
+
+  std::shared_ptr<Shape> applyStrokeAndAlign(std::shared_ptr<Shape> shape,
+                                             std::shared_ptr<Shape> originalShape,
+                                             const Stroke& strokeToApply) {
+    Stroke tempStroke = strokeToApply;
+    tempStroke.width *= 2;
+    shape = Shape::ApplyStroke(shape, &tempStroke);
+    if (shape == nullptr) {
+      return nullptr;
+    }
+    if (strokeAlign == StrokeAlign::Inside) {
+      return Shape::Merge(std::move(shape), std::move(originalShape), PathOp::Intersect);
+    }
+    return Shape::Merge(std::move(shape), std::move(originalShape), PathOp::Difference);
+  }
+
+  void drawShape(LayerRecorder* recorder, std::shared_ptr<Shape> shape,
+                 std::shared_ptr<Shape> originalShape, const Matrix& innerMatrix,
+                 const Matrix& outerMatrix, const Point& scales, bool uniformScale,
+                 bool needsBooleanOp) {
+    if (shape == nullptr) {
+      return;
+    }
+    Matrix finalOuter = outerMatrix;
+    shape = prepareShape(std::move(shape), innerMatrix, &finalOuter);
+    LayerPaint paint(shader, alpha, blendMode);
+
+    if (needsBooleanOp) {
+      auto transformedOriginal = Shape::ApplyMatrix(originalShape, innerMatrix);
+      shape = applyStrokeAndAlign(std::move(shape), std::move(transformedOriginal), stroke);
+      if (shape == nullptr) {
+        return;
+      }
       shape = Shape::ApplyMatrix(shape, finalOuter);
-      LayerPaint paint(shader, alpha, blendMode);
+    } else if (uniformScale) {
+      shape = Shape::ApplyMatrix(shape, finalOuter);
       paint.style = PaintStyle::Stroke;
       paint.stroke = stroke;
       paint.stroke.width *= scales.x;
-      recorder->addShape(std::move(shape), paint);
     } else {
       shape = Shape::ApplyStroke(shape, &stroke);
       if (shape == nullptr) {
         return;
       }
       shape = Shape::ApplyMatrix(shape, finalOuter);
-      LayerPaint paint(shader, alpha, blendMode);
-      recorder->addShape(std::move(shape), paint);
     }
+    recorder->addShape(std::move(shape), paint);
   }
 
   void drawGlyphRunAsTextBlob(LayerRecorder* recorder, const StyledGlyphRun& run,
@@ -166,47 +208,49 @@ class StrokePainter : public Painter {
 
   void drawGlyphRunAsShape(LayerRecorder* recorder, const StyledGlyphRun& run,
                            const Matrix& innerMatrix, const Matrix& outerMatrix,
-                           const Point& scales, bool uniformScale) {
+                           const Point& scales, bool uniformScale, bool needsBooleanOp) {
     auto shape = Shape::MakeFrom(run.textBlob);
     if (shape == nullptr) {
       return;
     }
-    if (!innerMatrix.isTranslate()) {
-      shape = Shape::ApplyMatrix(shape, innerMatrix);
-    }
-    if (pathEffect) {
-      shape = Shape::ApplyEffect(shape, pathEffect);
-    }
-
+    Matrix finalOuter = outerMatrix;
+    shape = prepareShape(std::move(shape), innerMatrix, &finalOuter);
     Stroke runStroke = stroke;
     runStroke.width = BlendStrokeWidth(stroke.width, run.style);
     auto paints = MakeBlendPaints(shader, alpha, blendMode, run.style);
 
-    if (uniformScale) {
-      shape = Shape::ApplyMatrix(shape, outerMatrix);
-      runStroke.width *= scales.x;
-      for (const auto& info : paints) {
-        if (info.shader == nullptr) {
-          continue;
-        }
-        LayerPaint paint(info.shader, info.alpha, info.blendMode);
-        paint.style = PaintStyle::Stroke;
-        paint.stroke = runStroke;
-        recorder->addShape(shape, paint);
-      }
-    } else {
-      shape = Shape::ApplyStroke(shape, &runStroke);
-      if (shape == nullptr) {
+    std::shared_ptr<Shape> finalShape = nullptr;
+    LayerPaint basePaint = {};
+
+    if (needsBooleanOp) {
+      auto originalTextShape = Shape::MakeFrom(run.textBlob);
+      originalTextShape = Shape::ApplyMatrix(originalTextShape, innerMatrix);
+      finalShape = applyStrokeAndAlign(shape, std::move(originalTextShape), runStroke);
+      if (finalShape == nullptr) {
         return;
       }
-      shape = Shape::ApplyMatrix(shape, outerMatrix);
-      for (const auto& info : paints) {
-        if (info.shader == nullptr) {
-          continue;
-        }
-        LayerPaint paint(info.shader, info.alpha, info.blendMode);
-        recorder->addShape(shape, paint);
+      finalShape = Shape::ApplyMatrix(finalShape, finalOuter);
+    } else if (uniformScale) {
+      finalShape = Shape::ApplyMatrix(shape, finalOuter);
+      basePaint.style = PaintStyle::Stroke;
+      basePaint.stroke = runStroke;
+      basePaint.stroke.width *= scales.x;
+    } else {
+      finalShape = Shape::ApplyStroke(shape, &runStroke);
+      if (finalShape == nullptr) {
+        return;
       }
+      finalShape = Shape::ApplyMatrix(finalShape, finalOuter);
+    }
+
+    for (const auto& info : paints) {
+      if (info.shader == nullptr) {
+        continue;
+      }
+      LayerPaint paint(info.shader, info.alpha, info.blendMode);
+      paint.style = basePaint.style;
+      paint.stroke = basePaint.stroke;
+      recorder->addShape(finalShape, paint);
     }
   }
 };
@@ -286,6 +330,14 @@ void StrokeStyle::setDashOffset(float value) {
   invalidateContent();
 }
 
+void StrokeStyle::setStrokeAlign(StrokeAlign value) {
+  if (_strokeAlign == value) {
+    return;
+  }
+  _strokeAlign = value;
+  invalidateContent();
+}
+
 void StrokeStyle::attachToLayer(Layer* layer) {
   VectorElement::attachToLayer(layer);
   if (_colorSource) {
@@ -316,11 +368,19 @@ void StrokeStyle::apply(VectorContext* context) {
   painter->alpha = _alpha;
   painter->geometries.reserve(context->geometries.size());
   painter->innerMatrices.reserve(context->geometries.size());
+  bool needsOriginalShapes = _strokeAlign != StrokeAlign::Center;
+  if (needsOriginalShapes) {
+    painter->originalShapes.reserve(context->geometries.size());
+  }
   for (auto& geometry : context->geometries) {
     painter->geometries.push_back(geometry.get());
     painter->innerMatrices.push_back(geometry->matrix);
+    if (needsOriginalShapes) {
+      painter->originalShapes.push_back(geometry->getShape());
+    }
   }
   painter->stroke = _stroke;
+  painter->strokeAlign = _strokeAlign;
   if (_cachedDashEffect == nullptr && !_dashes.empty()) {
     _cachedDashEffect = CreateDashEffect(_dashes, _dashOffset);
   }
