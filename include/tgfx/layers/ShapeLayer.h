@@ -21,26 +21,9 @@
 #include "tgfx/core/Shape.h"
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/ShapeStyle.h"
+#include "tgfx/layers/StrokeAlign.h"
 
 namespace tgfx {
-/**
- * The alignment of the stroke relative to the boundaries of the shape.
- */
-enum class StrokeAlign {
-  /**
-  * Draw a stroke centered along the shape boundary.
-  */
-  Center,
-  /**
-  * Draw a stroke inside the shape boundary.
-  */
-  Inside,
-  /**
-  * Draw a stroke outside the shape boundary.
-  */
-  Outside
-};
-
 /**
  * ShapeLayer is a layer that draws a shape. Each shape layer has a path that defines the shape's
  * geometry and a list of fill and stroke styles that determine how the shape is rendered. The fill
