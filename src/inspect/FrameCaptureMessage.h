@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <tgfx/gpu/PixelFormat.h>
 #include <cstdint>
+#include "tgfx/gpu/PixelFormat.h"
 
 namespace tgfx::inspect {
 enum class FrameCaptureMessageType : uint8_t {

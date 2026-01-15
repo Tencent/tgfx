@@ -173,6 +173,13 @@ struct Vec3 {
   }
 
   /**
+   * Returns the squared length of the vector.
+   */
+  float lengthSquared() const {
+    return Dot(*this, *this);
+  }
+
+  /**
    * Returns a pointer to the vector's immutable data.
    */
   const float* ptr() const {

@@ -26,6 +26,7 @@
 #include "tgfx/core/Picture.h"
 #include "tgfx/core/SamplingOptions.h"
 #include "tgfx/core/Shape.h"
+#include "tgfx/core/SrcRectConstraint.h"
 #include "tgfx/core/TextBlob.h"
 #include "tgfx/svg/SVGExporter.h"
 
@@ -34,22 +35,6 @@ class Surface;
 class DrawContext;
 class MCState;
 class CanvasState;
-
-/**
- * SrcRectConstraint controls the behavior at the edge of source rect, provided to drawImageRect()
- * when there is any filtering. If Strict is set, then extra code is used to ensure it never samples
- * outside the src-rect. Strict disables the use of mipmaps.
-*/
-enum class SrcRectConstraint {
-  /**
-   * sample only inside bounds; slower
-   */
-  Strict,
-  /**
-   * sample outside bounds; faster
-   */
-  Fast,
-};
 
 /**
  * Canvas provides an interface for drawing, including how the drawing is clipped and transformed.
@@ -485,7 +470,7 @@ class Canvas {
   friend class PDFShader;
   friend class PDFExportContext;
   friend class PDFFont;
-  friend class Layer;
+  friend class ContourContext;
 };
 
 /**

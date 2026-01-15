@@ -25,6 +25,7 @@ using namespace pk;
 namespace tgfx {
 
 #define ADAPTIVE_DASH_SEGMENT_EPSILON 120000
+#define ADAPTIVE_DASH_MIN_DASHABLE_LENGTH 0.1f
 
 inline bool IsEven(int x) {
   return !(x & 1);
@@ -178,10 +179,12 @@ bool AdaptiveDashEffect::filterPath(Path* path) const {
 
     for (const auto& segment : contour.segments) {
       const float segmentLength = segment->getLength();
-      // Apply ULP-based length comparison to ensure dash generation on tiny contours
-      if (FloatNearlyZero(segmentLength) ||
-          AreWithinUlps(contour.length - segmentLength, contour.length,
-                        ADAPTIVE_DASH_SEGMENT_EPSILON)) {
+      bool isTinySegment = segmentLength < ADAPTIVE_DASH_MIN_DASHABLE_LENGTH;
+      bool isNearlyFullContour = FloatNearlyZero(segmentLength) ||
+                                 AreWithinUlps(contour.length - segmentLength, contour.length,
+                                               ADAPTIVE_DASH_SEGMENT_EPSILON);
+
+      if (isTinySegment && isNearlyFullContour) {
         // skip the small segments in case some bugs after paths merge.
         if (!needMoveTo) {
           segment->getSegment(0, segmentLength, &resultPath, false);

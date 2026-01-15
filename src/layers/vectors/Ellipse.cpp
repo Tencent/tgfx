@@ -18,14 +18,15 @@
 
 #include "tgfx/layers/vectors/Ellipse.h"
 #include "VectorContext.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
 
-void Ellipse::setPosition(const Point& value) {
-  if (_position == value) {
+void Ellipse::setCenter(const Point& value) {
+  if (_center == value) {
     return;
   }
-  _position = value;
+  _center = value;
   _cachedShape = nullptr;
   invalidateContent();
 }
@@ -49,10 +50,11 @@ void Ellipse::setReversed(bool value) {
 }
 
 void Ellipse::apply(VectorContext* context) {
+  DEBUG_ASSERT(context != nullptr);
   if (_cachedShape == nullptr) {
     auto halfWidth = _size.x * 0.5f;
     auto halfHeight = _size.y * 0.5f;
-    auto rect = Rect::MakeXYWH(_position.x - halfWidth, _position.y - halfHeight, _size.x, _size.y);
+    auto rect = Rect::MakeXYWH(_center.x - halfWidth, _center.y - halfHeight, _size.x, _size.y);
     Path path;
     path.addOval(rect, _reversed);
     _cachedShape = Shape::MakeFrom(path);

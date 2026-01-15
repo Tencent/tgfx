@@ -123,8 +123,8 @@ void MaskContext::drawImageRect(std::shared_ptr<Image>, const Rect&, const Rect&
   _aborted = true;
 }
 
-void MaskContext::drawGlyphRunList(std::shared_ptr<GlyphRunList>, const MCState&, const Brush&,
-                                   const Stroke*) {
+void MaskContext::drawTextBlob(std::shared_ptr<TextBlob>, const MCState&, const Brush&,
+                               const Stroke*) {
   // Avoid getting path directly due to performance concerns.
   _aborted = true;
 }

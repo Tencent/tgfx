@@ -149,12 +149,11 @@ void PictureContext::drawImageRect(std::shared_ptr<Image> image, const Rect& src
   drawCount++;
 }
 
-void PictureContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
-                                      const MCState& state, const Brush& brush,
-                                      const Stroke* stroke) {
-  DEBUG_ASSERT(glyphRunList != nullptr);
+void PictureContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const MCState& state,
+                                  const Brush& brush, const Stroke* stroke) {
+  DEBUG_ASSERT(textBlob != nullptr);
   recordAll(state, brush, stroke);
-  auto record = blockAllocator.make<DrawGlyphRunList>(std::move(glyphRunList));
+  auto record = blockAllocator.make<DrawTextBlob>(std::move(textBlob));
   records.emplace_back(std::move(record));
   drawCount++;
 }

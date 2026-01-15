@@ -131,10 +131,10 @@ PDFIndirectReference generate_page_tree(PDFDocumentImpl* doc,
 
     static std::vector<PageTreeNode> Layer(std::vector<PageTreeNode> vec, PDFDocumentImpl* doc) {
       std::vector<PageTreeNode> result;
-      static constexpr size_t kMaxNodeSize = 8;
+      static constexpr size_t MAX_NODE_SIZE = 8;
       const size_t n = vec.size();
       DEBUG_ASSERT(n >= 1);
-      const size_t result_len = ((n - 1) / kMaxNodeSize) + 1;
+      const size_t result_len = ((n - 1) / MAX_NODE_SIZE) + 1;
       DEBUG_ASSERT(result_len >= 1);
       DEBUG_ASSERT((n == 1 || result_len < n));
       result.reserve(result_len);
@@ -147,7 +147,7 @@ PDFIndirectReference generate_page_tree(PDFDocumentImpl* doc,
         PDFIndirectReference parent = doc->reserveRef();
         auto kids_list = MakePDFArray();
         int descendantCount = 0;
-        for (size_t j = 0; j < kMaxNodeSize && index < n; ++j) {
+        for (size_t j = 0; j < MAX_NODE_SIZE && index < n; ++j) {
           PageTreeNode& node = vec[index++];
           node.fNode->insertRef("Parent", parent);
           kids_list->appendRef(doc->emit(*node.fNode, node.fReservedRef));

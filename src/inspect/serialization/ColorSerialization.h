@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include <tgfx/core/Data.h>
 #include "SerializationUtils.h"
+#include "tgfx/core/Data.h"
 
 namespace tgfx {
 namespace ColorSerialization {

@@ -30,7 +30,7 @@ class DrawOp {
     RRectDrawOp,
     ShapeDrawOp,
     AtlasTextOp,
-    Rect3DDrawOp,
+    Quads3DDrawOp,
     HairlineLineDrawOp,
     HairlineQuadDrawOp,
   };

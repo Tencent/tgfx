@@ -18,32 +18,45 @@
 
 #pragma once
 
+#include <memory>
 #include <vector>
+#include "Geometry.h"
 #include "Painter.h"
-#include "tgfx/core/Matrix.h"
-#include "tgfx/core/Shape.h"
 
 namespace tgfx {
 
 /**
  * VectorContext holds the rendering state while traversing vector elements.
- * This is an internal structure used by VectorLayer and VectorElement subclasses.
+ * This is an internal class used by VectorLayer and VectorElement subclasses.
  */
-struct VectorContext {
+class VectorContext {
+ public:
   /**
-   * Adds a shape with an identity matrix to the list.
+   * Adds a shape geometry to the list.
    */
   void addShape(std::shared_ptr<Shape> shape);
 
   /**
-   * Shape list that can be modified by path modifiers.
+   * Adds a text geometry with the given position to the list.
    */
-  std::vector<std::shared_ptr<Shape>> shapes = {};
+  void addTextBlob(std::shared_ptr<TextBlob> blob, const Point& position);
 
   /**
-   * Matrix list corresponding to each shape.
+   * Converts all geometries to shape mode and returns the geometry list.
+   * Text and glyph content is converted to Shape. Call this before applying path modifiers.
    */
-  std::vector<Matrix> matrices = {};
+  std::vector<Geometry*> getShapeGeometries();
+
+  /**
+   * Expands text geometries to glyph mode and returns geometries that have text content.
+   * Pure shape geometries are not included. Call this before applying text modifiers.
+   */
+  std::vector<Geometry*> getGlyphGeometries();
+
+  /**
+   * Geometry list with ownership.
+   */
+  std::vector<std::unique_ptr<Geometry>> geometries = {};
 
   /**
    * Accumulated painters from style elements.

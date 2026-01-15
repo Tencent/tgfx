@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "core/utils/LazyBounds.h"
+#include <atomic>
 #include "gpu/resources/ResourceKey.h"
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wfloat-conversion"
@@ -43,11 +43,13 @@ class PathRef {
   explicit PathRef(const pk::SkPath& path) : path(path) {
   }
 
+  ~PathRef();
+
   Rect getBounds();
 
  private:
   LazyUniqueKey uniqueKey = {};
-  LazyBounds bounds = {};
+  std::atomic<Rect*> bounds = {nullptr};
   pk::SkPath path = {};
 
   friend bool operator==(const Path& a, const Path& b);

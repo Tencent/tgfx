@@ -17,49 +17,62 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextShape.h"
+#include "core/GlyphRun.h"
 #include "core/GlyphRunList.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "tgfx/core/Matrix.h"
 
 namespace tgfx {
+
 std::shared_ptr<Shape> Shape::MakeFrom(std::shared_ptr<TextBlob> textBlob) {
-  auto glyphRunLists = GlyphRunList::Unwrap(textBlob.get());
-  if (glyphRunLists == nullptr) {
+  if (textBlob == nullptr) {
     return nullptr;
   }
-  std::vector<std::shared_ptr<Shape>> shapes;
-  for (auto& list : *glyphRunLists) {
-    if (list->hasOutlines()) {
-      shapes.push_back(std::make_shared<TextShape>(list));
+  for (const auto& run : GlyphRunList(textBlob.get())) {
+    if (run.font.hasOutlines()) {
+      return std::make_shared<TextShape>(std::move(textBlob));
     }
   }
-  if (shapes.empty()) {
-    return nullptr;
-  }
-  if (shapes.size() == 1) {
-    return shapes[0];
-  }
-  return Shape::Merge(shapes);
+  return nullptr;
 }
 
 Rect TextShape::onGetBounds() const {
-  auto bounds = glyphRunList->getBounds();
-  return bounds;
+  return textBlob->getBounds();
 }
 
 Path TextShape::onGetPath(float resolutionScale) const {
   if (FloatNearlyZero(resolutionScale)) {
     return {};
   }
-  Path path = {};
+  auto hasScale = !FloatNearlyEqual(resolutionScale, 1.0f);
   auto matrix = Matrix::MakeScale(resolutionScale, resolutionScale);
-  if (!glyphRunList->getPath(&path, &matrix)) {
-    LOGE("TextShape::getPath() Failed to get path from GlyphRunList!");
-    return {};
+  Path totalPath = {};
+  for (const auto& run : GlyphRunList(textBlob.get())) {
+    if (!run.font.hasOutlines()) {
+      continue;
+    }
+    auto font = run.font;
+    if (hasScale) {
+      font = font.makeWithSize(resolutionScale * font.getSize());
+    }
+    for (size_t index = 0; index < run.runSize(); index++) {
+      auto glyphID = run.glyphs[index];
+      Path glyphPath = {};
+      if (font.getPath(glyphID, &glyphPath)) {
+        auto glyphMatrix = run.getMatrix(index);
+        glyphMatrix.preScale(1.0f / resolutionScale, 1.0f / resolutionScale);
+        glyphMatrix.postConcat(matrix);
+        glyphPath.transform(glyphMatrix);
+        totalPath.addPath(glyphPath);
+      } else {
+        LOGE("TextShape::getPath() Failed to get path for glyph!");
+        return {};
+      }
+    }
   }
   auto inverseMatrix = Matrix::MakeScale(1.f / resolutionScale, 1.f / resolutionScale);
-  path.transform(inverseMatrix);
-  return path;
+  totalPath.transform(inverseMatrix);
+  return totalPath;
 }
 }  // namespace tgfx

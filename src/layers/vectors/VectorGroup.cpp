@@ -156,6 +156,7 @@ Matrix VectorGroup::getMatrix() {
 }
 
 void VectorGroup::apply(VectorContext* context) {
+  DEBUG_ASSERT(context != nullptr);
   auto groupMatrix = getMatrix();
 
   VectorContext groupContext = {};
@@ -167,19 +168,15 @@ void VectorGroup::apply(VectorContext* context) {
     }
   }
 
-  // Merge shapes and matrices
-  auto shapeOffset = context->shapes.size();
-  for (size_t i = 0; i < groupContext.shapes.size(); i++) {
-    auto matrix = groupContext.matrices[i];
-    matrix.postConcat(groupMatrix);
-    context->shapes.push_back(std::move(groupContext.shapes[i]));
-    context->matrices.push_back(matrix);
+  // Merge geometries with group transform
+  for (auto& geometry : groupContext.geometries) {
+    geometry->matrix.postConcat(groupMatrix);
+    context->geometries.push_back(std::move(geometry));
   }
 
-  // Merge painters with index offset
+  // Merge painters with alpha
   for (auto& painter : groupContext.painters) {
-    painter->offsetShapeIndex(shapeOffset);
-    painter->applyTransform(groupMatrix, _alpha);
+    painter->applyAlpha(_alpha);
     context->painters.push_back(std::move(painter));
   }
 }

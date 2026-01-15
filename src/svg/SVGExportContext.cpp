@@ -20,6 +20,8 @@
 #include <utility>
 #include "ElementWriter.h"
 #include "SVGUtils.h"
+#include "core/GlyphRunList.h"
+#include "core/RunRecord.h"
 #include "core/images/CodecImage.h"
 #include "core/images/FilterImage.h"
 #include "core/images/PictureImage.h"
@@ -275,97 +277,106 @@ void SVGExportContext::exportPixmap(const Pixmap& pixmap, const MCState& state,
   }
 }
 
-void SVGExportContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
-                                        const MCState& state, const Brush& brush,
-                                        const Stroke* stroke) {
-  DEBUG_ASSERT(glyphRunList != nullptr);
-  auto typeface = glyphRunList->glyphRuns()[0].font.getTypeface().get();
-  if (typeface == nullptr) {
+void SVGExportContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const MCState& state,
+                                    const Brush& brush, const Stroke* stroke) {
+  DEBUG_ASSERT(textBlob != nullptr);
+  GlyphRunList glyphRuns(textBlob.get());
+  if (glyphRuns.empty()) {
     return;
   }
-  // If the font needs to be converted to a path but lacks outlines (e.g., emoji font, web font),
-  // it cannot be converted.
-  auto deviceBounds = state.matrix.mapRect(glyphRunList->getBounds());
+  auto deviceBounds = state.matrix.mapRect(textBlob->getBounds());
   if (!state.clip.contains(deviceBounds)) {
     applyClipPath(state.clip);
   }
-  if (!typeface->isCustom()) {
-    if (glyphRunList->hasOutlines() && !glyphRunList->hasColor() &&
-        exportFlags & SVGExportFlags::ConvertTextToPaths) {
-      exportGlyphsAsPath(glyphRunList, state, brush, stroke);
+  for (const auto& glyphRun : glyphRuns) {
+    auto typeface = glyphRun.font.getTypeface();
+    if (typeface == nullptr) {
+      continue;
+    }
+    // RSXform/Matrix positioning requires path export since SVG <text> cannot represent per-glyph
+    // rotation/scale.
+    if (!typeface->isCustom()) {
+      if (glyphRun.hasComplexTransform() ||
+          (glyphRun.font.hasOutlines() && !glyphRun.font.hasColor() &&
+           exportFlags & SVGExportFlags::ConvertTextToPaths)) {
+        exportGlyphRunAsPath(glyphRun, state, brush, stroke);
+      } else {
+        exportGlyphRunAsText(glyphRun, state, brush, stroke);
+      }
     } else {
-      exportGlyphsAsText(glyphRunList, state, brush, stroke);
-    }
-  } else {
-    if (glyphRunList->hasColor()) {
-      exportGlyphsAsImage(glyphRunList, state, brush);
-    } else {
-      exportGlyphsAsPath(glyphRunList, state, brush, stroke);
+      if (glyphRun.font.hasColor()) {
+        exportGlyphRunAsImage(glyphRun, state, brush);
+      } else {
+        exportGlyphRunAsPath(glyphRun, state, brush, stroke);
+      }
     }
   }
 }
 
-void SVGExportContext::exportGlyphsAsPath(const std::shared_ptr<GlyphRunList>& glyphRunList,
-                                          const MCState& state, const Brush& brush,
-                                          const Stroke* stroke) {
-  Path path;
-  if (glyphRunList->getPath(&path)) {
-    ElementWriter pathElement("path", context, this, xmlWriter.get(), resourceBucket.get(),
-                              exportFlags & SVGExportFlags::DisableWarnings, state, brush, stroke,
-                              _targetColorSpace, _assignColorSpace);
-    pathElement.addPathAttributes(path, tgfx::SVGExportContext::PathEncodingType());
-    if (path.getFillType() == PathFillType::EvenOdd) {
-      pathElement.addAttribute("fill-rule", "evenodd");
+void SVGExportContext::exportGlyphRunAsPath(const GlyphRun& glyphRun, const MCState& state,
+                                            const Brush& brush, const Stroke* stroke) {
+  Path path = {};
+  auto& font = glyphRun.font;
+  size_t glyphCount = glyphRun.runSize();
+  for (size_t index = 0; index < glyphCount; ++index) {
+    auto glyphID = glyphRun.glyphs[index];
+    Path glyphPath = {};
+    if (font.getPath(glyphID, &glyphPath)) {
+      auto glyphMatrix = glyphRun.getMatrix(index);
+      glyphPath.transform(glyphMatrix);
+      path.addPath(glyphPath);
     }
   }
-}
-
-void SVGExportContext::exportGlyphsAsText(const std::shared_ptr<GlyphRunList>& glyphRunList,
-                                          const MCState& state, const Brush& brush,
-                                          const Stroke* stroke) {
-  for (const auto& glyphRun : glyphRunList->glyphRuns()) {
-    ElementWriter textElement("text", context, this, xmlWriter.get(), resourceBucket.get(),
-                              exportFlags & SVGExportFlags::DisableWarnings, state, brush, stroke,
-                              _targetColorSpace, _assignColorSpace);
-
-    textElement.addFontAttributes(glyphRun.font);
-
-    auto unicharInfo = textBuilder.glyphToUnicharsInfo(glyphRun);
-    textElement.addAttribute("x", unicharInfo.posX);
-    textElement.addAttribute("y", unicharInfo.posY);
-    textElement.addText(unicharInfo.text);
+  if (path.isEmpty()) {
+    return;
+  }
+  ElementWriter pathElement("path", context, this, xmlWriter.get(), resourceBucket.get(),
+                            exportFlags & SVGExportFlags::DisableWarnings, state, brush, stroke,
+                            _targetColorSpace, _assignColorSpace);
+  pathElement.addPathAttributes(path, tgfx::SVGExportContext::PathEncodingType());
+  if (path.getFillType() == PathFillType::EvenOdd) {
+    pathElement.addAttribute("fill-rule", "evenodd");
   }
 }
 
-void SVGExportContext::exportGlyphsAsImage(const std::shared_ptr<GlyphRunList>& glyphRunList,
-                                           const MCState& state, const Brush& brush) {
-  auto viewMatrix = state.matrix;
-  auto scale = viewMatrix.getMaxScale();
+void SVGExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const MCState& state,
+                                            const Brush& brush, const Stroke* stroke) {
+  ElementWriter textElement("text", context, this, xmlWriter.get(), resourceBucket.get(),
+                            exportFlags & SVGExportFlags::DisableWarnings, state, brush, stroke,
+                            _targetColorSpace, _assignColorSpace);
+
+  textElement.addFontAttributes(glyphRun.font);
+
+  auto unicharInfo = textBuilder.glyphToUnicharsInfo(glyphRun);
+  textElement.addAttribute("x", unicharInfo.posX);
+  textElement.addAttribute("y", unicharInfo.posY);
+  textElement.addText(unicharInfo.text);
+}
+
+void SVGExportContext::exportGlyphRunAsImage(const GlyphRun& glyphRun, const MCState& state,
+                                             const Brush& brush) {
+  auto scale = state.matrix.getMaxScale();
   if (FloatNearlyZero(scale)) {
     return;
   }
-  viewMatrix.preScale(1.0f / scale, 1.0f / scale);
-  for (const auto& glyphRun : glyphRunList->glyphRuns()) {
-    auto font = glyphRun.font;
-    font = font.makeWithSize(scale * font.getSize());
-    const auto& glyphIDs = glyphRun.glyphs;
-    auto glyphCount = glyphIDs.size();
-    const auto& positions = glyphRun.positions;
+  auto font = glyphRun.font;
+  font = font.makeWithSize(scale * font.getSize());
+  size_t glyphCount = glyphRun.runSize();
+  for (size_t i = 0; i < glyphCount; ++i) {
+    auto glyphID = glyphRun.glyphs[i];
+    auto glyphMatrix = glyphRun.getMatrix(i);
     auto glyphState = state;
-    for (size_t i = 0; i < glyphCount; ++i) {
-      const auto& glyphID = glyphIDs[i];
-      const auto& position = positions[i];
-      auto glyphCodec = font.getImage(glyphID, nullptr, &glyphState.matrix);
-      auto glyphImage = Image::MakeFrom(glyphCodec);
-      if (glyphImage == nullptr) {
-        continue;
-      }
-      glyphState.matrix.postTranslate(position.x * scale, position.y * scale);
-      glyphState.matrix.postConcat(viewMatrix);
-      auto rect = Rect::MakeWH(glyphImage->width(), glyphImage->height());
-      drawImageRect(std::move(glyphImage), rect, rect, {}, glyphState, brush,
-                    SrcRectConstraint::Fast);
+    auto glyphCodec = font.getImage(glyphID, nullptr, &glyphState.matrix);
+    auto glyphImage = Image::MakeFrom(glyphCodec);
+    if (glyphImage == nullptr) {
+      continue;
     }
+    glyphState.matrix.postScale(1.0f / scale, 1.0f / scale);
+    glyphState.matrix.postConcat(glyphMatrix);
+    glyphState.matrix.postConcat(state.matrix);
+    auto rect = Rect::MakeWH(glyphImage->width(), glyphImage->height());
+    drawImageRect(std::move(glyphImage), rect, rect, {}, glyphState, brush,
+                  SrcRectConstraint::Fast);
   }
 }
 

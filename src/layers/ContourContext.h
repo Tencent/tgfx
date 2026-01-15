@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include <memory>
 #include "core/DrawContext.h"
 #include "core/PictureContext.h"
 #include "tgfx/core/Brush.h"
@@ -25,8 +26,9 @@ namespace tgfx {
 class ContourContext : public DrawContext {
  public:
   ContourContext();
+  ~ContourContext() override;
 
-  ~ContourContext() override = default;
+  Canvas* beginRecording();
 
   void drawFill(const Brush& brush) override;
 
@@ -48,8 +50,8 @@ class ContourContext : public DrawContext {
                      const SamplingOptions& sampling, const MCState& state, const Brush& brush,
                      SrcRectConstraint constraint) override;
 
-  void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
-                        const Brush& brush, const Stroke* stroke) override;
+  void drawTextBlob(std::shared_ptr<TextBlob> textBlob, const MCState& state, const Brush& brush,
+                    const Stroke* stroke) override;
 
   void drawPicture(std::shared_ptr<Picture> picture, const MCState& state) override;
 
@@ -57,6 +59,8 @@ class ContourContext : public DrawContext {
                  const MCState& state, const Brush& brush) override;
 
   std::shared_ptr<Picture> finishRecordingAsPicture();
+
+  bool containsOpaqueBounds(const Rect& bounds) const;
 
  private:
   struct Contour {
@@ -123,7 +127,7 @@ class ContourContext : public DrawContext {
 
   void drawContour(const Contour& contour, const MCState& state, const Brush& brush);
 
-  bool containContourBound(const Rect& bounds);
+  bool containContourBound(const Rect& bounds) const;
 
   void mergeContourBound(const Rect& bounds);
 
@@ -142,6 +146,7 @@ class ContourContext : public DrawContext {
 
   std::vector<Rect> contourBounds = {};
   PictureContext pictureContext = {};
+  std::unique_ptr<Canvas> canvas = nullptr;
 
   friend class PendingContourAutoReset;
 };

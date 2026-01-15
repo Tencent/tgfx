@@ -17,6 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ShapeUtils.h"
+#include "core/shapes/MatrixShape.h"
+#include "core/shapes/StrokeShape.h"
+#include "core/utils/StrokeUtils.h"
+#include "tgfx/core/Matrix.h"
 #include "tgfx/core/Shape.h"
 
 namespace tgfx {
@@ -28,4 +32,25 @@ Path ShapeUtils::GetShapeRenderingPath(std::shared_ptr<Shape> shape, float resol
   return shape->onGetPath(resolutionScale);
 }
 
+float ShapeUtils::CalculateAlphaReduceFactorIfHairline(std::shared_ptr<Shape> shape) {
+  if (!shape) {
+    return 1.f;
+  }
+
+  std::shared_ptr<StrokeShape> strokeShape = nullptr;
+  auto matrix = Matrix::I();
+  if (shape->type() == Shape::Type::Matrix) {
+    auto matrixShape = std::static_pointer_cast<MatrixShape>(shape);
+    if (matrixShape->shape->type() == Shape::Type::Stroke) {
+      strokeShape = std::static_pointer_cast<StrokeShape>(matrixShape->shape);
+      matrix = matrixShape->matrix;
+    }
+  } else if (shape->type() == Shape::Type::Stroke) {
+    strokeShape = std::static_pointer_cast<StrokeShape>(shape);
+  }
+  if (!strokeShape) {
+    return 1.f;
+  }
+  return GetHairlineAlphaFactor(strokeShape->stroke, matrix);
+}
 }  // namespace tgfx
