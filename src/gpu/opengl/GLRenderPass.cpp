@@ -189,6 +189,7 @@ void GLRenderPass::draw(PrimitiveType primitiveType, uint32_t vertexCount, uint3
   }
   // Requires OpenGL 4.2+ or ES 3.2+, not implemented in the OpenGL backend.
   DEBUG_ASSERT(firstInstance == 0);
+  (void)firstInstance;
   auto gl = _gpu->functions();
   if (instanceCount <= 1) {
     gl->drawArrays(PrimitiveTypes[static_cast<int>(primitiveType)], static_cast<int>(firstVertex),
@@ -209,6 +210,8 @@ void GLRenderPass::drawIndexed(PrimitiveType primitiveType, uint32_t indexCount,
   // Requires OpenGL 4.2+ or ES 3.2+, not implemented in the OpenGL backend.
   DEBUG_ASSERT(baseVertex == 0);
   DEBUG_ASSERT(firstInstance == 0);
+  (void)baseVertex;
+  (void)firstInstance;
   auto gl = _gpu->functions();
   unsigned indexType = (indexFormat == IndexFormat::UInt16) ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
   size_t indexSize = (indexFormat == IndexFormat::UInt16) ? sizeof(uint16_t) : sizeof(uint32_t);
