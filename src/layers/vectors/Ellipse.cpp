@@ -31,11 +31,11 @@ void Ellipse::setCenter(const Point& value) {
   invalidateContent();
 }
 
-void Ellipse::setSize(const Point& value) {
-  if (_size == value) {
+void Ellipse::setSize(const Size& value) {
+  if (_size.x == value.width && _size.y == value.height) {
     return;
   }
-  _size = value;
+  _size = {value.width, value.height};
   _cachedShape = nullptr;
   invalidateContent();
 }
