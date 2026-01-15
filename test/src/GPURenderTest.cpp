@@ -59,8 +59,8 @@ TGFX_TEST(GPURenderTest, InstancedGridRender) {
   auto gpu = context->gpu();
 
   // Create render texture
-  constexpr int rows = 100;
-  constexpr int columns = 100;
+  constexpr uint32_t rows = 100;
+  constexpr uint32_t columns = 100;
   const int width =
       static_cast<int>(InstancedGridRenderPass::GRID_SIZE * static_cast<float>(columns) +
                        InstancedGridRenderPass::GRID_SPACING * static_cast<float>(columns - 1));

@@ -27,15 +27,15 @@ class InstancedGridRenderPass {
   static constexpr float GRID_SIZE = 20.0f;
   static constexpr float GRID_SPACING = 8.0f;
 
-  static std::shared_ptr<InstancedGridRenderPass> Make(int rows, int columns);
+  static std::shared_ptr<InstancedGridRenderPass> Make(uint32_t rows, uint32_t columns);
 
   bool onDraw(CommandEncoder* encoder, std::shared_ptr<Texture> renderTexture) const;
 
  private:
-  InstancedGridRenderPass(int rows, int columns);
+  InstancedGridRenderPass(uint32_t rows, uint32_t columns);
 
-  int rows;
-  int columns;
+  uint32_t rows;
+  uint32_t columns;
   Attribute position;
   Attribute offset;
   Attribute color;

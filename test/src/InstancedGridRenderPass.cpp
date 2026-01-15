@@ -74,11 +74,12 @@ static std::string GetFinalShaderCode(const char* codeSnippet, bool isDesktop) {
   return std::string("#version 300 es\n\n") + codeSnippet;
 }
 
-std::shared_ptr<InstancedGridRenderPass> InstancedGridRenderPass::Make(int rows, int columns) {
+std::shared_ptr<InstancedGridRenderPass> InstancedGridRenderPass::Make(uint32_t rows,
+                                                                       uint32_t columns) {
   return std::make_shared<InstancedGridRenderPass>(rows, columns);
 }
 
-InstancedGridRenderPass::InstancedGridRenderPass(int rows, int columns)
+InstancedGridRenderPass::InstancedGridRenderPass(uint32_t rows, uint32_t columns)
     : rows(rows), columns(columns) {
   position = {"inPosition", VertexFormat::Float2};
   offset = {"inOffset", VertexFormat::Float2};
@@ -179,7 +180,7 @@ bool InstancedGridRenderPass::onDraw(CommandEncoder* encoder,
   memcpy(vertexData, quadVertices, vertexBufferSize);
   vertexBuffer->unmap();
 
-  auto gridCount = static_cast<size_t>(rows * columns);
+  auto gridCount = rows * columns;
   auto instanceBufferSize = sizeof(InstanceData) * gridCount;
   auto instanceBuffer = gpu->createBuffer(instanceBufferSize, GPUBufferUsage::VERTEX);
   if (instanceBuffer == nullptr) {
@@ -190,8 +191,8 @@ bool InstancedGridRenderPass::onDraw(CommandEncoder* encoder,
     return false;
   }
   constexpr float offset = (GRID_SIZE + GRID_SPACING);
-  for (int row = 0; row < rows; row++) {
-    for (int col = 0; col < columns; col++) {
+  for (uint32_t row = 0; row < rows; row++) {
+    for (uint32_t col = 0; col < columns; col++) {
       instanceData->tx = offset * static_cast<float>(col);
       instanceData->ty = offset * static_cast<float>(row);
       instanceData->r = static_cast<float>(row) / static_cast<float>(rows);

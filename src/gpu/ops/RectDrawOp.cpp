@@ -114,7 +114,8 @@ void RectDrawOp::onDraw(RenderPass* renderPass) {
   renderPass->setIndexBuffer(indexBuffer ? indexBuffer->gpuBuffer() : nullptr);
   if (indexBuffer != nullptr) {
     const auto numIndicesPerQuad = GetNumIndicesPerQuad(aaType, lineJoin);
-    renderPass->drawIndexed(PrimitiveType::Triangles, rectCount * numIndicesPerQuad);
+    renderPass->drawIndexed(PrimitiveType::Triangles,
+                            static_cast<uint32_t>(rectCount * numIndicesPerQuad));
   } else {
     renderPass->draw(PrimitiveType::TriangleStrip, 4);
   }

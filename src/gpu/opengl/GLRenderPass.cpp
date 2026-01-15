@@ -182,13 +182,13 @@ void GLRenderPass::onEnd() {
 
 static constexpr unsigned PrimitiveTypes[] = {GL_TRIANGLES, GL_TRIANGLE_STRIP};
 
-void GLRenderPass::draw(PrimitiveType primitiveType, size_t vertexCount, size_t instanceCount,
-                        size_t firstVertex, size_t firstInstance) {
+void GLRenderPass::draw(PrimitiveType primitiveType, uint32_t vertexCount, uint32_t instanceCount,
+                        uint32_t firstVertex, uint32_t firstInstance) {
   if (!flushPendingBindings()) {
     return;
   }
   // Requires OpenGL 4.2+ or ES 3.2+, not implemented in the OpenGL backend.
-  (void)firstInstance;
+  DEBUG_ASSERT(firstInstance == 0);
   auto gl = _gpu->functions();
   if (instanceCount <= 1) {
     gl->drawArrays(PrimitiveTypes[static_cast<int>(primitiveType)], static_cast<int>(firstVertex),
@@ -200,14 +200,15 @@ void GLRenderPass::draw(PrimitiveType primitiveType, size_t vertexCount, size_t 
   }
 }
 
-void GLRenderPass::drawIndexed(PrimitiveType primitiveType, size_t indexCount, size_t instanceCount,
-                               size_t firstIndex, size_t baseVertex, size_t firstInstance) {
+void GLRenderPass::drawIndexed(PrimitiveType primitiveType, uint32_t indexCount,
+                               uint32_t instanceCount, uint32_t firstIndex, int32_t baseVertex,
+                               uint32_t firstInstance) {
   if (!flushPendingBindings()) {
     return;
   }
   // Requires OpenGL 4.2+ or ES 3.2+, not implemented in the OpenGL backend.
-  (void)baseVertex;
-  (void)firstInstance;
+  DEBUG_ASSERT(baseVertex == 0);
+  DEBUG_ASSERT(firstInstance == 0);
   auto gl = _gpu->functions();
   unsigned indexType = (indexFormat == IndexFormat::UInt16) ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
   size_t indexSize = (indexFormat == IndexFormat::UInt16) ? sizeof(uint16_t) : sizeof(uint32_t);

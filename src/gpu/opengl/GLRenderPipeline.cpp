@@ -100,6 +100,7 @@ void GLRenderPipeline::setTexture(GLGPU* gpu, unsigned binding, GLTexture* textu
 }
 
 void GLRenderPipeline::setVertexBuffer(GLGPU* gpu, unsigned slot, GLBuffer* buffer, size_t offset) {
+  DEBUG_ASSERT(slot < bufferLayouts.size());
   if (slot >= bufferLayouts.size()) {
     LOGE("GLRenderPipeline::setVertexBuffer: slot %u out of range (max %zu)", slot,
          bufferLayouts.size());

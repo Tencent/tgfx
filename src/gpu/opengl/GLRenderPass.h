@@ -71,11 +71,11 @@ class GLRenderPass : public RenderPass {
 
   void setStencilReference(uint32_t reference) override;
 
-  void draw(PrimitiveType primitiveType, size_t vertexCount, size_t instanceCount,
-            size_t firstVertex, size_t firstInstance) override;
+  void draw(PrimitiveType primitiveType, uint32_t vertexCount, uint32_t instanceCount,
+            uint32_t firstVertex, uint32_t firstInstance) override;
 
-  void drawIndexed(PrimitiveType primitiveType, size_t indexCount, size_t instanceCount,
-                   size_t firstIndex, size_t baseVertex, size_t firstInstance) override;
+  void drawIndexed(PrimitiveType primitiveType, uint32_t indexCount, uint32_t instanceCount,
+                   uint32_t firstIndex, int32_t baseVertex, uint32_t firstInstance) override;
 
  protected:
   void onEnd() override;

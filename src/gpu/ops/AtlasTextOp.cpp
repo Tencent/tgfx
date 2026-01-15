@@ -90,7 +90,8 @@ void AtlasTextOp::onDraw(RenderPass* renderPass) {
     } else {
       numIndicesPerQuad = RectDrawOp::IndicesPerNonAAQuad;
     }
-    renderPass->drawIndexed(PrimitiveType::Triangles, rectCount * numIndicesPerQuad);
+    renderPass->drawIndexed(PrimitiveType::Triangles,
+                            static_cast<uint32_t>(rectCount * numIndicesPerQuad));
   } else {
     renderPass->draw(PrimitiveType::TriangleStrip, 4);
   }
