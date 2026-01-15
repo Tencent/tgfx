@@ -30,7 +30,7 @@ bool operator==(const Matrix& a, const Matrix& b) {
   const float* ma = a.values;
   const float* mb = b.values;
   return ma[0] == mb[0] && ma[1] == mb[1] && ma[2] == mb[2] && ma[3] == mb[3] && ma[4] == mb[4] &&
-         ma[5] == mb[5];
+         ma[5] == mb[5] && ma[6] == mb[6] && ma[7] == mb[7] && ma[8] == mb[8];
 }
 
 Matrix operator*(const Matrix& a, const Matrix& b) {
@@ -46,13 +46,24 @@ void Matrix::setAll(float sx, float kx, float tx, float ky, float sy, float ty) 
   values[SKEW_Y] = ky;
   values[SCALE_Y] = sy;
   values[TRANS_Y] = ty;
+  values[PERSP_0] = 0;
+  values[PERSP_1] = 0;
+  values[PERSP_2] = 1;
   this->setTypeMask(UnknownMask);
 }
 
-void Matrix::get9(float buffer[9]) const {
-  memcpy(buffer, values, 6 * sizeof(float));
-  buffer[6] = buffer[7] = 0.0f;
-  buffer[8] = 1.0f;
+void Matrix::setAll(float sx, float kx, float tx, float ky, float sy, float ty, float p0, float p1,
+                    float p2) {
+  values[SCALE_X] = sx;
+  values[SKEW_X] = kx;
+  values[TRANS_X] = tx;
+  values[SKEW_Y] = ky;
+  values[SCALE_Y] = sy;
+  values[TRANS_Y] = ty;
+  values[PERSP_0] = p0;
+  values[PERSP_1] = p1;
+  values[PERSP_2] = p2;
+  this->setTypeMask(UnknownMask);
 }
 
 void Matrix::setTranslate(float tx, float ty) {
@@ -62,6 +73,8 @@ void Matrix::setTranslate(float tx, float ty) {
 
     values[SCALE_X] = values[SCALE_Y] = 1;
     values[SKEW_X] = values[SKEW_Y] = 0;
+    values[PERSP_0] = values[PERSP_1] = 0;
+    values[PERSP_2] = 1;
     this->setTypeMask(TranslateMask | RectStayRectMask);
   } else {
     this->reset();
@@ -106,6 +119,8 @@ void Matrix::setScale(float sx, float sy) {
     values[SCALE_X] = sx;
     values[SCALE_Y] = sy;
     values[TRANS_X] = values[TRANS_Y] = values[SKEW_X] = values[SKEW_Y] = 0;
+    values[PERSP_0] = values[PERSP_1] = 0;
+    values[PERSP_2] = 1;
     this->setTypeMask(ScaleMask | rectMask);
   }
 }
@@ -163,6 +178,8 @@ void Matrix::setSinCos(float sinV, float cosV, float px, float py) {
   values[SKEW_Y] = sinV;
   values[SCALE_Y] = cosV;
   values[TRANS_Y] = sdot(-sinV, px, oneMinusCosV, py);
+  values[PERSP_0] = values[PERSP_1] = 0;
+  values[PERSP_2] = 1;
   this->setTypeMask(UnknownMask);
 }
 
@@ -173,6 +190,8 @@ void Matrix::setSinCos(float sinV, float cosV) {
   values[SKEW_Y] = sinV;
   values[SCALE_Y] = cosV;
   values[TRANS_Y] = 0;
+  values[PERSP_0] = values[PERSP_1] = 0;
+  values[PERSP_2] = 1;
   this->setTypeMask(UnknownMask);
 }
 
@@ -217,6 +236,8 @@ void Matrix::setSkew(float kx, float ky, float px, float py) {
   values[SKEW_Y] = ky;
   values[SCALE_Y] = 1;
   values[TRANS_Y] = -ky * px;
+  values[PERSP_0] = values[PERSP_1] = 0;
+  values[PERSP_2] = 1;
   this->setTypeMask(UnknownMask);
 }
 
@@ -227,6 +248,8 @@ void Matrix::setSkew(float kx, float ky) {
   values[SKEW_Y] = ky;
   values[SCALE_Y] = 1;
   values[TRANS_Y] = 0;
+  values[PERSP_0] = values[PERSP_1] = 0;
+  values[PERSP_2] = 1;
   this->setTypeMask(UnknownMask);
 }
 
@@ -255,25 +278,41 @@ void Matrix::postSkew(float kx, float ky) {
 }
 
 static bool OnlyScaleAndTranslate(unsigned mask) {
-  return 0 == (mask & Matrix::AffineMask);
+  return 0 == (mask & (Matrix::AffineMask | Matrix::PerspectiveMask));
+}
+
+static bool HasPerspective(unsigned mask) {
+  return (mask & Matrix::PerspectiveMask) != 0;
 }
 
 void Matrix::setConcat(const Matrix& first, const Matrix& second) {
+  if (first.isTriviallyIdentity()) {
+    *this = second;
+    return;
+  }
+  if (second.isTriviallyIdentity()) {
+    *this = first;
+    return;
+  }
+
   auto& matrixA = first.values;
   auto& matrixB = second.values;
   TypeMask aType = first.getType();
   TypeMask bType = second.getType();
+  // If either matrix has perspective, do full 3x3 multiply
+  if (HasPerspective(aType) || HasPerspective(bType)) {
+    ConcatMatrix(first, second, *this);
+    return;
+  }
+
+  // No perspective, use optimized affine path
   auto sx = matrixB[SCALE_X] * matrixA[SCALE_X];
   auto kx = 0.0f;
   auto ky = 0.0f;
   auto sy = matrixB[SCALE_Y] * matrixA[SCALE_Y];
   auto tx = matrixB[TRANS_X] * matrixA[SCALE_X] + matrixA[TRANS_X];
   auto ty = matrixB[TRANS_Y] * matrixA[SCALE_Y] + matrixA[TRANS_Y];
-  if (first.isTriviallyIdentity()) {
-    *this = second;
-  } else if (second.isTriviallyIdentity()) {
-    *this = first;
-  } else if (OnlyScaleAndTranslate(aType | bType)) {
+  if (OnlyScaleAndTranslate(aType | bType)) {
     this->setScaleTranslate(sx, sy, tx, ty);
   } else {
     sx += matrixB[SKEW_Y] * matrixA[SKEW_X];
@@ -316,6 +355,12 @@ uint8_t Matrix::computeTypeMask() const {
   if (values[TRANS_X] != 0 || values[TRANS_Y] != 0) {
     mask |= TranslateMask;
   }
+  if (values[PERSP_0] != 0 || values[PERSP_1] != 0 || values[PERSP_2] != 1) {
+    // Perspective projection non-linearly transforms coordinates, producing both scaling and
+    // shearing effects - rectangles become trapezoids with non-uniform size changes.
+    return static_cast<uint8_t>(mask | PerspectiveMask | AffineMask | ScaleMask);
+  }
+
   int m00 = ScalarAs2sCompliment(values[SCALE_X]);
   int m01 = ScalarAs2sCompliment(values[SKEW_X]);
   int m10 = ScalarAs2sCompliment(values[SKEW_Y]);
@@ -358,6 +403,46 @@ void Matrix::IdentityPoints(const Matrix&, Point dst[], const Point src[], int c
   }
 }
 
+// Computes (a*b - c*d) * scale.
+static inline float CrossDiffScale(float a, float b, float c, float d, float scale) {
+  return (a * b - c * d) * scale;
+}
+
+float Matrix::CalcDeterminant(const Matrix& matrix, bool isPerspective) {
+  auto& m = matrix.values;
+  if (isPerspective) {
+    return m[SCALE_X] * CrossDiffScale(m[SCALE_Y], m[PERSP_2], m[TRANS_Y], m[PERSP_1], 1) +
+           m[SKEW_X] * CrossDiffScale(m[TRANS_Y], m[PERSP_0], m[SKEW_Y], m[PERSP_2], 1) +
+           m[TRANS_X] * CrossDiffScale(m[SKEW_Y], m[PERSP_1], m[SCALE_Y], m[PERSP_0], 1);
+  }
+  return CrossDiffScale(m[SCALE_X], m[SCALE_Y], m[SKEW_X], m[SKEW_Y], 1);
+}
+
+void Matrix::ComputeInverse(Matrix& dst, const Matrix& src, float invDet, bool isPerspective) {
+  // dst and src may be the same matrix, so compute all values first before assigning.
+  auto& m = src.values;
+  if (isPerspective) {
+    auto sx = CrossDiffScale(m[SCALE_Y], m[PERSP_2], m[TRANS_Y], m[PERSP_1], invDet);
+    auto kx = CrossDiffScale(m[TRANS_X], m[PERSP_1], m[SKEW_X], m[PERSP_2], invDet);
+    auto tx = CrossDiffScale(m[SKEW_X], m[TRANS_Y], m[TRANS_X], m[SCALE_Y], invDet);
+    auto ky = CrossDiffScale(m[TRANS_Y], m[PERSP_0], m[SKEW_Y], m[PERSP_2], invDet);
+    auto sy = CrossDiffScale(m[SCALE_X], m[PERSP_2], m[TRANS_X], m[PERSP_0], invDet);
+    auto ty = CrossDiffScale(m[TRANS_X], m[SKEW_Y], m[SCALE_X], m[TRANS_Y], invDet);
+    auto p0 = CrossDiffScale(m[SKEW_Y], m[PERSP_1], m[SCALE_Y], m[PERSP_0], invDet);
+    auto p1 = CrossDiffScale(m[SKEW_X], m[PERSP_0], m[SCALE_X], m[PERSP_1], invDet);
+    auto p2 = CrossDiffScale(m[SCALE_X], m[SCALE_Y], m[SKEW_X], m[SKEW_Y], invDet);
+    dst.setAll(sx, kx, tx, ky, sy, ty, p0, p1, p2);
+  } else {
+    auto sx = m[SCALE_Y] * invDet;
+    auto kx = -m[SKEW_X] * invDet;
+    auto ky = -m[SKEW_Y] * invDet;
+    auto sy = m[SCALE_X] * invDet;
+    auto tx = CrossDiffScale(m[SKEW_X], m[TRANS_Y], m[SCALE_Y], m[TRANS_X], invDet);
+    auto ty = CrossDiffScale(m[SKEW_Y], m[TRANS_X], m[SCALE_X], m[TRANS_Y], invDet);
+    dst.setAll(sx, kx, tx, ky, sy, ty);
+  }
+}
+
 bool Matrix::invertNonIdentity(Matrix* inverse) const {
   TypeMask mask = this->getType();
   // Optimized invert for only scale and/or translation matrices.
@@ -376,6 +461,8 @@ bool Matrix::invertNonIdentity(Matrix* inverse) const {
         inverse->values[SCALE_Y] = invSY;
         inverse->values[TRANS_X] = invTX;
         inverse->values[TRANS_Y] = invTY;
+        inverse->values[PERSP_0] = inverse->values[PERSP_1] = 0;
+        inverse->values[PERSP_2] = 1;
         inverse->setTypeMask(mask | RectStayRectMask);
       }
       return true;
@@ -385,19 +472,13 @@ bool Matrix::invertNonIdentity(Matrix* inverse) const {
     }
     return true;
   }
-  float determinant = values[SCALE_X] * values[SCALE_Y] - values[SKEW_X] * values[SKEW_Y];
+  const bool isPerspective = (mask & PerspectiveMask) != 0;
+  float determinant = CalcDeterminant(*this, isPerspective);
   if (FloatNearlyZero(determinant, FLOAT_NEARLY_ZERO * FLOAT_NEARLY_ZERO * FLOAT_NEARLY_ZERO)) {
     return false;
   }
-  determinant = 1 / determinant;
-  auto sx = values[SCALE_Y] * determinant;
-  auto ky = -values[SKEW_Y] * determinant;
-  auto kx = -values[SKEW_X] * determinant;
-  auto sy = values[SCALE_X] * determinant;
-  auto tx = -(sx * values[TRANS_X] + kx * values[TRANS_Y]);
-  auto ty = -(ky * values[TRANS_X] + sy * values[TRANS_Y]);
   if (inverse) {
-    inverse->setAll(sx, kx, tx, ky, sy, ty);
+    ComputeInverse(*inverse, *this, 1.0f / determinant, isPerspective);
     inverse->setTypeMask(typeMask);
   }
   return true;
@@ -499,7 +580,7 @@ bool Matrix::hasNonIdentityScale() const {
 }
 
 bool Matrix::isFinite() const {
-  return FloatsAreFinite(values, 6);
+  return FloatsAreFinite(values, 9);
 }
 
 const Matrix& Matrix::I() {
@@ -509,5 +590,7 @@ const Matrix& Matrix::I() {
 
 const Matrix::MapPtsProc Matrix::MapPtsProcs[] = {
     Matrix::IdentityPoints, Matrix::TransPoints,  Matrix::ScalePoints,  Matrix::ScalePoints,
-    Matrix::AffinePoints,   Matrix::AffinePoints, Matrix::AffinePoints, Matrix::AffinePoints};
+    Matrix::AffinePoints,   Matrix::AffinePoints, Matrix::AffinePoints, Matrix::AffinePoints,
+    Matrix::PerspPoints,    Matrix::PerspPoints,  Matrix::PerspPoints,  Matrix::PerspPoints,
+    Matrix::PerspPoints,    Matrix::PerspPoints,  Matrix::PerspPoints,  Matrix::PerspPoints};
 }  // namespace tgfx

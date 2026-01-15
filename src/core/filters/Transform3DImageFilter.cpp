@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Transform3DImageFilter.h"
-#include "core/Matrix2D.h"
 #include "core/Matrix3DUtils.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/PlacementPtr.h"
@@ -59,18 +58,14 @@ Rect Transform3DImageFilter::onFilterBounds(const Rect& rect, MapDirection mapDi
   // matrix does not affect the final transformation result and can be ignored. Additionally, since
   // we do not care about the final projected z-axis coordinate, the third row can also be ignored.
   // Therefore, the 4x4 matrix can be simplified to a 3x3 matrix.
-  float values[16] = {};
-  drawMatrix.getColumnMajor(values);
-  auto matrix2D = Matrix2D::MakeAll(values[0], values[1], values[3], values[4], values[5],
-                                    values[7], values[12], values[13], values[15]);
-  Matrix2D inversedMatrix;
+  auto matrix2D = Matrix3DUtils::GetMayLossyMatrix(drawMatrix);
+  Matrix inversedMatrix;
   if (!matrix2D.invert(&inversedMatrix)) {
     // The matrix is singular, meaning the 2D plane projects to a line or point (e.g., rotating 90
     // degrees around the X-axis). In this case, there is no visible content to draw.
     return Rect::MakeEmpty();
   }
-  auto result = inversedMatrix.mapRect(rect);
-  return result;
+  return inversedMatrix.mapRect(rect);
 }
 
 std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(

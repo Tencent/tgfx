@@ -130,6 +130,64 @@ void AffinePointsHWYImpl(const Matrix& m, Point* dst, const Point* src, int coun
   }
 }
 
+void PerspPointsHWYImpl(const Matrix& m, Point* dst, const Point* src, int count) {
+  if (count <= 0) {
+    return;
+  }
+
+  float sx = m.getScaleX();
+  float sy = m.getScaleY();
+  float kx = m.getSkewX();
+  float ky = m.getSkewY();
+  float tx = m.getTranslateX();
+  float ty = m.getTranslateY();
+  float p0 = m.getPerspX();
+  float p1 = m.getPerspY();
+  float p2 = m.get(8);
+  const hn::Full128<float> d;
+  auto scaleSimd = hn::Dup128VecFromValues(d, sx, sy, sx, sy);
+  auto skewSimd = hn::Dup128VecFromValues(d, kx, ky, kx, ky);
+  auto transSimd = hn::Dup128VecFromValues(d, tx, ty, tx, ty);
+  auto perspSimd = hn::Dup128VecFromValues(d, p0, p1, p0, p1);
+  auto perspSwzSimd = hn::Dup128VecFromValues(d, p1, p0, p1, p0);
+  auto p2Simd = hn::Set(d, p2);
+  std::size_t size = static_cast<size_t>(count);
+  std::size_t vecSize = size - size % 2;
+  for (std::size_t i = 0; i < vecSize; i += 2) {
+    auto srcSimd = hn::LoadU(d, reinterpret_cast<const float*>(&src[i]));
+    auto swzSimd = hn::Reverse2(d, srcSimd);
+    auto xyPrime = hn::MulAdd(srcSimd, scaleSimd, hn::MulAdd(swzSimd, skewSimd, transSimd));
+    auto wSimd = hn::MulAdd(srcSimd, perspSimd, hn::MulAdd(swzSimd, perspSwzSimd, p2Simd));
+    auto res = hn::Div(xyPrime, wSimd);
+    hn::StoreU(res, d, reinterpret_cast<float*>(&dst[i]));
+  }
+  for (std::size_t i = vecSize; i < size; i++) {
+    float x = src[i].x;
+    float y = src[i].y;
+    float w = x * p0 + y * p1 + p2;
+    if (w != 0) {
+      w = 1.0f / w;
+    }
+    dst[i].x = (x * sx + y * kx + tx) * w;
+    dst[i].y = (x * ky + y * sy + ty) * w;
+  }
+}
+
+void ConcatMatrixHWYImpl(const Matrix& first, const Matrix& second, Matrix& dst) {
+  const hn::Full128<float> d;
+  auto col0 = hn::Dup128VecFromValues(d, second[0], second[3], second[6], 0.0f);
+  auto col1 = hn::Dup128VecFromValues(d, second[1], second[4], second[7], 0.0f);
+  auto col2 = hn::Dup128VecFromValues(d, second[2], second[5], second[8], 0.0f);
+  float result[9];
+  for (int i = 0; i < 3; i++) {
+    auto row = hn::Dup128VecFromValues(d, first[i * 3], first[i * 3 + 1], first[i * 3 + 2], 0.0f);
+    result[i * 3 + 0] = hn::ReduceSum(d, hn::Mul(row, col0));
+    result[i * 3 + 1] = hn::ReduceSum(d, hn::Mul(row, col1));
+    result[i * 3 + 2] = hn::ReduceSum(d, hn::Mul(row, col2));
+  }
+  dst.set9(result);
+}
+
 void MapRectHWYImpl(const Matrix& m, Rect* dst, const Rect& src) {
   if (m.getType() <= Matrix::TranslateMask) {
     float tx = m.getTranslateX();
@@ -168,6 +226,7 @@ void MapRectHWYImpl(const Matrix& m, Rect* dst, const Rect& src) {
     dst->setBounds(quad, 4);
   }
 }
+
 }  // namespace HWY_NAMESPACE
 }  // namespace tgfx
 HWY_AFTER_NAMESPACE();
@@ -177,21 +236,31 @@ namespace tgfx {
 HWY_EXPORT(TransPointsHWYImpl);
 HWY_EXPORT(ScalePointsHWYImpl);
 HWY_EXPORT(AffinePointsHWYImpl);
+HWY_EXPORT(PerspPointsHWYImpl);
 HWY_EXPORT(MapRectHWYImpl);
+HWY_EXPORT(ConcatMatrixHWYImpl);
 void Matrix::TransPoints(const Matrix& m, Point* dst, const Point* src, int count) {
-  return HWY_DYNAMIC_DISPATCH(TransPointsHWYImpl)(m, dst, src, count);
+  HWY_DYNAMIC_DISPATCH(TransPointsHWYImpl)(m, dst, src, count);
 }
 
 void Matrix::ScalePoints(const Matrix& m, Point dst[], const Point src[], int count) {
-  return HWY_DYNAMIC_DISPATCH(ScalePointsHWYImpl)(m, dst, src, count);
+  HWY_DYNAMIC_DISPATCH(ScalePointsHWYImpl)(m, dst, src, count);
 }
 
 void Matrix::AffinePoints(const Matrix& m, Point dst[], const Point src[], int count) {
-  return HWY_DYNAMIC_DISPATCH(AffinePointsHWYImpl)(m, dst, src, count);
+  HWY_DYNAMIC_DISPATCH(AffinePointsHWYImpl)(m, dst, src, count);
+}
+
+void Matrix::PerspPoints(const Matrix& m, Point dst[], const Point src[], int count) {
+  HWY_DYNAMIC_DISPATCH(PerspPointsHWYImpl)(m, dst, src, count);
 }
 
 void Matrix::mapRect(Rect* dst, const Rect& src) const {
-  return HWY_DYNAMIC_DISPATCH(MapRectHWYImpl)(*this, dst, src);
+  HWY_DYNAMIC_DISPATCH(MapRectHWYImpl)(*this, dst, src);
+}
+
+void Matrix::ConcatMatrix(const Matrix& first, const Matrix& second, Matrix& dst) {
+  HWY_DYNAMIC_DISPATCH(ConcatMatrixHWYImpl)(first, second, dst);
 }
 }  // namespace tgfx
 #endif
