@@ -339,7 +339,6 @@ TGFX_TEST(StrokeTest, HairlineStrokeText) {
 
   // Clear background
   canvas->clear(Color::White());
-  // canvas->scale(0.1875f, 0.1875f);
 
   // Create font
   auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
@@ -354,9 +353,6 @@ TGFX_TEST(StrokeTest, HairlineStrokeText) {
   Paint fillPaint;
   fillPaint.setStyle(PaintStyle::Fill);
   fillPaint.setColor(Color::Blue());
-
-  printf("[TextStrokeTest] Drawing text with stroke only\n");
-  printf("[TextStrokeTest] strokeWidth=%f\n", strokePaint.getStrokeWidth());
 
   // Draw text with stroke only
   strokePaint.setStrokeWidth(2.0f);
