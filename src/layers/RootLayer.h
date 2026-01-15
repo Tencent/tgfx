@@ -78,7 +78,7 @@ class RootLayer : public Layer {
   bool setBackgroundColor(const Color& color);
 
  protected:
-  void drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
+  bool drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                  const Matrix3D* transform3D = nullptr) override;
 
  private:

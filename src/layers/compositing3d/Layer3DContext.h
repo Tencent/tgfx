@@ -32,6 +32,7 @@ namespace tgfx {
 
 class BackgroundContext;
 class Context;
+class ContourContext;
 
 struct TransformState {
   TransformState(const Matrix3D& transform, bool antialiasing)
@@ -74,6 +75,14 @@ class Layer3DContext {
    * Returns true if all layers have been recorded and the context is ready to finish.
    */
   bool isFinished() const;
+
+  /**
+   * Returns the current ContourContext for contour rendering, or nullptr for normal rendering.
+   * Must be called after beginRecording.
+   */
+  virtual ContourContext* currentContourContext() {
+    return nullptr;
+  }
 
   /**
    * Finishes the 3D rendering and draws the result to the target canvas.

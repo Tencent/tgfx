@@ -617,7 +617,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   std::shared_ptr<ImageFilter> getImageFilter(float contentScale);
 
-  virtual void drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
+  virtual bool drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                          const Matrix3D* transform3D = nullptr);
 
   void drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
@@ -629,18 +629,26 @@ class Layer : public std::enable_shared_from_this<Layer> {
                     const LayerStyleSource* layerStyleSource = nullptr,
                     const Layer* stopChild = nullptr);
 
-  void drawContour(const DrawArgs& args, Canvas* canvas, bool contentOnly = false,
+  bool drawContour(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                    const Matrix3D* transform3D = nullptr);
+
+  bool drawContourInternal(const DrawArgs& args, Canvas* canvas, const Matrix3D* transform3D,
+                           bool contentOnly);
 
   bool drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
                     const Layer* stopChild = nullptr);
 
-  void drawByStarting3DContext(const DrawArgs& args, Canvas* canvas);
+  using LayerDrawFunc = bool (Layer::*)(const DrawArgs&, Canvas*, float, BlendMode,
+                                        const Matrix3D*);
+
+  void drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, LayerDrawFunc drawFunc,
+                               float alpha, BlendMode blendMode);
 
   std::optional<DrawArgs> createChildArgs(const DrawArgs& args, Canvas* canvas, Layer* child,
                                           bool skipBackground);
 
-  void drawChild(const DrawArgs& childArgs, Canvas* canvas, Layer* child, float alpha);
+  bool drawChild(const DrawArgs& childArgs, Canvas* canvas, Layer* child, float alpha,
+                 LayerDrawFunc drawFunc);
 
   float drawBackgroundLayers(const DrawArgs& args, Canvas* canvas);
 
@@ -672,11 +680,11 @@ class Layer : public std::enable_shared_from_this<Layer> {
   MaskData getMaskData(const DrawArgs& args, float scale,
                        const std::optional<Rect>& layerClipBounds);
 
-  std::shared_ptr<Picture> getMaskPicture(const DrawArgs& args, DrawMode maskDrawMode, float scale,
+  std::shared_ptr<Picture> getMaskPicture(const DrawArgs& args, bool isContourMode, float scale,
                                           const Matrix& affineRelativeMatrix);
 
-  std::shared_ptr<Image> getContourImage(const DrawArgs& args, float contentScale,
-                                         Point* offset = nullptr);
+  std::shared_ptr<Image> getContentContourImage(const DrawArgs& args, float contentScale,
+                                                Point* offset, bool* contourMatchesContent);
 
   Matrix3D getRelativeMatrix(const Layer* targetCoordinateSpace) const;
 
