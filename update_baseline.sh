@@ -29,26 +29,13 @@
   mkdir ${BUILD_DIR}
   cd ${BUILD_DIR}
 
-  if [ -f "./CMakeCache.txt" ]; then
-    TEXT=$(cat ./CMakeCache.txt)
-    TEXT=${TEXT#*CMAKE_COMMAND:INTERNAL=}
-    for line in ${TEXT}; do
-      CMAKE_COMMAND=$line
-      break
-    done
-  fi
-  if [ ! -f "$CMAKE_COMMAND" ]; then
-    CMAKE_COMMAND="cmake"
-  fi
-  echo $CMAKE_COMMAND
-
   if [[ "$1" == "USE_SWIFTSHADER" ]]; then
-    $CMAKE_COMMAND -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DTGFX_USE_SWIFTSHADER=ON -DTGFX_SKIP_GENERATE_BASELINE_IMAGES=ON -DTGFX_BUILD_TESTS=ON -DTGFX_SKIP_BASELINE_CHECK=ON -DCMAKE_BUILD_TYPE=Debug ../
+    cmake -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DTGFX_USE_SWIFTSHADER=ON -DTGFX_SKIP_GENERATE_BASELINE_IMAGES=ON -DTGFX_BUILD_TESTS=ON -DTGFX_SKIP_BASELINE_CHECK=ON -DCMAKE_BUILD_TYPE=Debug ../
   else
-    $CMAKE_COMMAND  -DTGFX_BUILD_TESTS=ON -DTGFX_SKIP_BASELINE_CHECK=ON -DCMAKE_BUILD_TYPE=Debug ../
+    cmake  -DTGFX_BUILD_TESTS=ON -DTGFX_SKIP_BASELINE_CHECK=ON -DCMAKE_BUILD_TYPE=Debug ../
   fi
 
-  $CMAKE_COMMAND --build . --target UpdateBaseline -- -j 12
+  cmake --build . --target UpdateBaseline -- -j 12
   ./UpdateBaseline
 
   if test $? -eq 0; then
