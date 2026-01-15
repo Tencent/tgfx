@@ -13,7 +13,8 @@
         "PartialBackgroundBlur_partial": "bf48e614",
         "PassThroughWithBackgroundBlur": "bf48e614",
         "PassThroughWithBackgroundBlur_clipped": "bf48e614",
-        "SimpleBackgroundBlur_tiled": "bf48e614",
+        "ScaledInnerShadowWithBackgroundBlur": "cfc16445",
+        "SimpleBackgroundBlur_tiled": "cfc16445",
         "backgroundLayerBlur": "bf48e614"
     },
     "CanvasTest": {
