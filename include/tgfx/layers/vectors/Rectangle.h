@@ -48,7 +48,7 @@ class Rectangle : public VectorElement {
    * Returns the size of the rectangle.
    */
   Size size() const {
-    return {_size.x, _size.y};
+    return _size;
   }
 
   /**
@@ -89,7 +89,7 @@ class Rectangle : public VectorElement {
 
  private:
   Point _center = Point::Zero();
-  Point _size = {};
+  Size _size = {};
   float _roundness = 0.0f;
   bool _reversed = false;
   std::shared_ptr<Shape> _cachedShape = nullptr;

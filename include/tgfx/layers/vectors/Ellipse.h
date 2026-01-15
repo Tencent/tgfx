@@ -48,7 +48,7 @@ class Ellipse : public VectorElement {
    * Returns the size of the ellipse (width and height of the bounding box).
    */
   Size size() const {
-    return {_size.x, _size.y};
+    return _size;
   }
 
   /**
@@ -77,7 +77,7 @@ class Ellipse : public VectorElement {
 
  private:
   Point _center = Point::Zero();
-  Point _size = {};
+  Size _size = {};
   bool _reversed = false;
   std::shared_ptr<Shape> _cachedShape = nullptr;
 };
