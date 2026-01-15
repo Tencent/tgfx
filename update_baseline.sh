@@ -1,4 +1,9 @@
 #!/bin/sh
+
+# Update local baseline cache from remote changes.
+# Run this after pulling main branch that contains baseline changes from others.
+# Without updating the cache, affected tests will be skipped, leading to inaccurate results.
+
 {
   CACHE_VERSION_FILE=./test/baseline/.cache/version.json
   if [ -f "$CACHE_VERSION_FILE" ]; then
