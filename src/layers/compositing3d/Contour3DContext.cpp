@@ -22,8 +22,9 @@
 
 namespace tgfx {
 
-Contour3DContext::Contour3DContext(float contentScale, std::shared_ptr<ColorSpace> colorSpace)
-    : Layer3DContext(contentScale, std::move(colorSpace)) {
+Contour3DContext::Contour3DContext(const Rect& renderRect, float contentScale,
+                                   std::shared_ptr<ColorSpace> colorSpace)
+    : Layer3DContext(renderRect, contentScale, std::move(colorSpace)) {
 }
 
 Canvas* Contour3DContext::onBeginRecording() {

@@ -47,9 +47,6 @@ Rect Transform3DImageFilter::onFilterBounds(const Rect& rect, MapDirection mapDi
   // Adapt the matrix to keep the z-component of vertex coordinates unchanged.
   auto drawMatrix = _matrix;
   drawMatrix.setRow(2, {0, 0, 1, 0});
-  if (Matrix3DUtils::IsRectBehindCamera(rect, _matrix)) {
-    return Rect::MakeEmpty();
-  }
 
   if (mapDirection == MapDirection::Forward) {
     return drawMatrix.mapRect(rect);
@@ -69,8 +66,7 @@ Rect Transform3DImageFilter::onFilterBounds(const Rect& rect, MapDirection mapDi
     // degrees around the X-axis). In this case, there is no visible content to draw.
     return Rect::MakeEmpty();
   }
-  auto result = inversedMatrix.mapRect(rect);
-  return result;
+  return inversedMatrix.mapRect(rect);
 }
 
 std::shared_ptr<TextureProxy> Transform3DImageFilter::lockTextureProxy(

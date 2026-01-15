@@ -18,7 +18,6 @@
 
 #include "Render3DContext.h"
 #include "Context3DCompositor.h"
-#include "core/Matrix3DUtils.h"
 #include "layers/BackgroundContext.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Paint.h"
@@ -26,26 +25,16 @@
 namespace tgfx {
 
 Render3DContext::Render3DContext(std::shared_ptr<Context3DCompositor> compositor,
-                                 const Point& offset, float contentScale,
+                                 const Rect& renderRect, float contentScale,
                                  std::shared_ptr<ColorSpace> colorSpace,
                                  std::shared_ptr<BackgroundContext> backgroundContext)
-    : Layer3DContext(contentScale, std::move(colorSpace)), _compositor(std::move(compositor)),
-      _offset(offset), _backgroundContext(std::move(backgroundContext)) {
+    : Layer3DContext(renderRect, contentScale, std::move(colorSpace)),
+      _compositor(std::move(compositor)), _backgroundContext(std::move(backgroundContext)) {
 }
 
 Canvas* Render3DContext::onBeginRecording() {
   _recorderStack.emplace();
-  auto canvas = _recorderStack.top().beginRecording();
-
-  auto invScale = 1.0f / _contentScale;
-  auto contextBounds = Rect::MakeXYWH(_offset.x * invScale, _offset.y * invScale,
-                                      static_cast<float>(_compositor->width()) * invScale,
-                                      static_cast<float>(_compositor->height()) * invScale);
-  auto localClipRect = Matrix3DUtils::InverseMapRect(contextBounds, currentTransform());
-  if (!localClipRect.isEmpty()) {
-    canvas->clipRect(localClipRect);
-  }
-  return canvas;
+  return _recorderStack.top().beginRecording();
 }
 
 std::shared_ptr<Picture> Render3DContext::onFinishRecording() {
@@ -60,7 +49,8 @@ std::shared_ptr<Picture> Render3DContext::onFinishRecording() {
 void Render3DContext::onImageReady(std::shared_ptr<Image> image, const Matrix3D& imageTransform,
                                    const Point& pictureOffset, bool antialiasing) {
   auto finalTransform = imageTransform;
-  finalTransform.postTranslate(pictureOffset.x - _offset.x, pictureOffset.y - _offset.y, 0);
+  finalTransform.postTranslate(pictureOffset.x - _renderRect.left,
+                               pictureOffset.y - _renderRect.top, 0);
   _compositor->addImage(std::move(image), finalTransform, 1.0f, antialiasing);
 }
 
@@ -68,7 +58,7 @@ void Render3DContext::finishAndDrawTo(Canvas* canvas, bool antialiasing) {
   auto context3DImage = _compositor->finish();
   AutoCanvasRestore autoRestore(canvas);
   auto imageMatrix = Matrix::MakeScale(1.0f / _contentScale, 1.0f / _contentScale);
-  imageMatrix.preTranslate(_offset.x, _offset.y);
+  imageMatrix.preTranslate(_renderRect.left, _renderRect.top);
   canvas->concat(imageMatrix);
   canvas->drawImage(context3DImage);
 

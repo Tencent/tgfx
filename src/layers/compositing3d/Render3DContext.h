@@ -33,7 +33,7 @@ class Context3DCompositor;
  */
 class Render3DContext : public Layer3DContext {
  public:
-  Render3DContext(std::shared_ptr<Context3DCompositor> compositor, const Point& offset,
+  Render3DContext(std::shared_ptr<Context3DCompositor> compositor, const Rect& renderRect,
                   float contentScale, std::shared_ptr<ColorSpace> colorSpace,
                   std::shared_ptr<BackgroundContext> backgroundContext);
 
@@ -47,7 +47,6 @@ class Render3DContext : public Layer3DContext {
 
  private:
   std::shared_ptr<Context3DCompositor> _compositor = nullptr;
-  Point _offset = {};
   std::shared_ptr<BackgroundContext> _backgroundContext = nullptr;
   std::stack<PictureRecorder> _recorderStack = {};
 };

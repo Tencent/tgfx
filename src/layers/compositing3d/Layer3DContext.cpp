@@ -27,21 +27,21 @@
 namespace tgfx {
 
 std::shared_ptr<Layer3DContext> Layer3DContext::Make(
-    bool contourMode, Context* context, const Rect& renderRect, const Point& offset,
-    float contentScale, std::shared_ptr<ColorSpace> colorSpace,
-    std::shared_ptr<BackgroundContext> backgroundContext) {
+    bool contourMode, Context* context, const Rect& renderRect, float contentScale,
+    std::shared_ptr<ColorSpace> colorSpace, std::shared_ptr<BackgroundContext> backgroundContext) {
   if (contourMode) {
     DEBUG_ASSERT(backgroundContext == nullptr);
-    return std::make_shared<Contour3DContext>(contentScale, std::move(colorSpace));
+    return std::make_shared<Contour3DContext>(renderRect, contentScale, std::move(colorSpace));
   }
   auto compositor = std::make_shared<Context3DCompositor>(
       *context, static_cast<int>(renderRect.width()), static_cast<int>(renderRect.height()));
-  return std::make_shared<Render3DContext>(std::move(compositor), offset, contentScale,
+  return std::make_shared<Render3DContext>(std::move(compositor), renderRect, contentScale,
                                            std::move(colorSpace), std::move(backgroundContext));
 }
 
-Layer3DContext::Layer3DContext(float contentScale, std::shared_ptr<ColorSpace> colorSpace)
-    : _contentScale(contentScale), _colorSpace(std::move(colorSpace)) {
+Layer3DContext::Layer3DContext(const Rect& renderRect, float contentScale,
+                               std::shared_ptr<ColorSpace> colorSpace)
+    : _renderRect(renderRect), _contentScale(contentScale), _colorSpace(std::move(colorSpace)) {
 }
 
 std::shared_ptr<Image> Layer3DContext::PictureToImage(std::shared_ptr<Picture> picture,
@@ -78,6 +78,14 @@ Canvas* Layer3DContext::beginRecording(const Matrix3D& childTransform, bool anti
   auto canvas = onBeginRecording();
   DEBUG_ASSERT(!FloatNearlyZero(_contentScale));
   canvas->scale(_contentScale, _contentScale);
+  auto invScale = 1.0f / _contentScale;
+  auto contextBounds =
+      Rect::MakeXYWH(_renderRect.x() * invScale, _renderRect.y() * invScale,
+                     _renderRect.width() * invScale, _renderRect.height() * invScale);
+  auto localClipRect = Matrix3DUtils::InverseMapRect(contextBounds, newTransform);
+  if (!localClipRect.isEmpty()) {
+    canvas->clipRect(localClipRect);
+  }
   return canvas;
 }
 
