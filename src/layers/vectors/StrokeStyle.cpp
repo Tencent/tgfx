@@ -186,10 +186,6 @@ class StrokePainter : public Painter {
     }
     Matrix finalOuter = outerMatrix;
     shape = prepareShape(std::move(shape), innerMatrix, &finalOuter);
-    if (shape == nullptr) {
-      return;
-    }
-
     Stroke runStroke = stroke;
     runStroke.width = BlendStrokeWidth(stroke.width, run.style);
     auto paints = MakeBlendPaints(shader, alpha, blendMode, run.style);
