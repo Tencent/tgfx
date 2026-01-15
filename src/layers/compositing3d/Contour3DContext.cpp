@@ -27,6 +27,10 @@ Contour3DContext::Contour3DContext(const Rect& renderRect, float contentScale,
     : Layer3DContext(renderRect, contentScale, std::move(colorSpace)) {
 }
 
+ContourContext* Contour3DContext::currentContourContext() {
+  return _contourStack.empty() ? nullptr : &_contourStack.top();
+}
+
 Canvas* Contour3DContext::onBeginRecording() {
   _contourStack.emplace();
   return _contourStack.top().beginRecording();

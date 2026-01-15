@@ -200,8 +200,9 @@
     "LayerTest": {
         "AdaptiveDashEffect": "eefb7a46",
         "BottomLeftSurface": "543054b5",
-        "Contour3DWithDropShadow": "0b31d462",
+        "Contour3DWithDropShadow": "0207d531",
         "ContourTest": "73b8d873",
+        "ContourWithMask": "8db244c7",
         "DiffFilterModeImagePattern -- zoomIn": "ac049958",
         "DiffFilterModeImagePattern -- zoomOut": "ac049958",
         "DisplayListBackground_Blue": "a99262da",
@@ -211,6 +212,7 @@
         "DisplayListBackground_TiledRender": "a99262da",
         "DisplayListBackground_TransparentWithShape": "a99262da",
         "DisplayListBackground_WhiteWithShape": "a99262da",
+        "GetContourImage": "8db244c7",
         "HasContentChanged_Offset": "bedeb932",
         "HasContentChanged_Org": "bedeb932",
         "HasContentChanged_Zoom": "bedeb932",

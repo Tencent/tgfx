@@ -40,6 +40,7 @@ class Contour3DContext : public Layer3DContext {
   Contour3DContext(const Rect& renderRect, float contentScale,
                    std::shared_ptr<ColorSpace> colorSpace);
 
+  ContourContext* currentContourContext() override;
   void finishAndDrawTo(Canvas* canvas, bool antialiasing) override;
 
  protected:
