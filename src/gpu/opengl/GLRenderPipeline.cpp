@@ -111,13 +111,10 @@ void GLRenderPipeline::setVertexBuffer(GLGPU* gpu, unsigned slot, GLBuffer* buff
   auto gl = gpu->functions();
   gl->bindBuffer(GL_ARRAY_BUFFER, buffer->bufferID());
   const auto& layout = bufferLayouts[slot];
-  const auto divisor = (layout.stepMode == VertexStepMode::Instance) ? 1 : 0;
   for (auto& attribute : layout.attributes) {
     gl->vertexAttribPointer(static_cast<unsigned>(attribute.location), attribute.count,
                             attribute.type, attribute.normalized, static_cast<int>(layout.stride),
                             reinterpret_cast<void*>(attribute.offset + offset));
-    gl->enableVertexAttribArray(static_cast<unsigned>(attribute.location));
-    gl->vertexAttribDivisor(static_cast<unsigned>(attribute.location), divisor);
   }
 }
 
@@ -258,11 +255,14 @@ bool GLRenderPipeline::setPipelineDescriptor(GLGPU* gpu,
     glLayout.stepMode = layout.stepMode;
     size_t attributeOffset = 0;
     glLayout.attributes.reserve(layout.attributes.size());
+    int divisor = (layout.stepMode == VertexStepMode::Instance) ? 1 : 0;
     for (const auto& attribute : layout.attributes) {
       auto location = gl->getAttribLocation(programID, attribute.name().c_str());
       if (location != -1) {
         glLayout.attributes.push_back(
             MakeGLAttribute(attribute.format(), location, attributeOffset));
+        gl->enableVertexAttribArray(static_cast<unsigned>(location));
+        gl->vertexAttribDivisor(static_cast<unsigned>(location), divisor);
       }
       attributeOffset += attribute.size();
     }
