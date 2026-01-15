@@ -1,5 +1,6 @@
 #include "core/utils/StrokeUtils.h"
 #include "gtest/gtest.h"
+#include "tgfx/core/Paint.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/layers/DisplayList.h"
@@ -323,6 +324,59 @@ TGFX_TEST(StrokeTest, HairlineWithDropShadow) {
   canvas->drawLine(50, 50, 350, 350, paint);  // diagonal line
 
   EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/HairlineWithDropShadow"));
+}
+
+TGFX_TEST(StrokeTest, HairlineStrokeText) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+
+  // Create surface
+  auto surface = Surface::Make(context, 150, 300);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+
+  // Clear background
+  canvas->clear(Color::White());
+
+  // Create font
+  auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+  ASSERT_TRUE(typeface != nullptr);
+  Font font(typeface, 12);
+
+  // Create stroke paint only
+  Paint strokePaint;
+  strokePaint.setStyle(PaintStyle::Stroke);
+  strokePaint.setColor(Color::Red());
+
+  Paint fillPaint;
+  fillPaint.setStyle(PaintStyle::Fill);
+  fillPaint.setColor(Color::Blue());
+
+  // Draw text with stroke only
+  strokePaint.setStrokeWidth(2.0f);
+  canvas->drawSimpleText("Width 2.0", 50, 100, font, fillPaint);
+  canvas->drawSimpleText("Width 2.0", 50, 100, font, strokePaint);
+
+  // Test with different stroke widths
+  strokePaint.setStrokeWidth(1.0f);
+  canvas->drawSimpleText("Width 1.0", 50, 150, font, fillPaint);
+  canvas->drawSimpleText("Width 1.0", 50, 150, font, strokePaint);
+
+  strokePaint.setStrokeWidth(0.5f);
+  canvas->drawSimpleText("Width 0.5", 50, 200, font, fillPaint);
+  canvas->drawSimpleText("Width 0.5", 50, 200, font, strokePaint);
+
+  // Test with very small stroke width
+  strokePaint.setStrokeWidth(0.2f);
+  canvas->drawSimpleText("Width 0.2", 50, 250, font, fillPaint);
+  canvas->drawSimpleText("Width 0.2", 50, 250, font, strokePaint);
+
+  context->flush();
+  // Compare with baseline
+  EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/HairlineStrokeText"));
+  device->unlock();
 }
 
 }  // namespace tgfx
