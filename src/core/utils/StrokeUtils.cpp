@@ -39,10 +39,7 @@ float GetHairlineAlphaFactor(const Stroke& stroke, const Matrix& matrix) {
     return 1.0f;
   }
   auto scaledStrokeWidth = stroke.width * matrix.getMaxScale();
-  if (scaledStrokeWidth < 1.0f) {
-    return scaledStrokeWidth;
-  }
-  return 1.0f;
+  return std::clamp(scaledStrokeWidth, 0.f, 1.f);
 }
 
 std::vector<float> SimplifyLineDashPattern(const std::vector<float>& pattern,

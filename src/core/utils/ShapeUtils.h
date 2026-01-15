@@ -31,5 +31,7 @@ class ShapeUtils {
    * depending on the resolution scale.
    */
   static Path GetShapeRenderingPath(std::shared_ptr<Shape> shape, float resolutionScale);
+
+  static float CalculateAlphaReduceFactorIfHairline(std::shared_ptr<Shape> shape);
 };
 }  // namespace tgfx
