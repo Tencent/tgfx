@@ -22,6 +22,8 @@
 #include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/GammaCorrection.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/ScalePixelsAlpha.h"
+#include "core/utils/ShapeUtils.h"
 #include "platform/apple/BitmapContextUtil.h"
 #include "tgfx/core/PathTypes.h"
 
@@ -168,6 +170,8 @@ bool CGPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, si
   CGContextDrawImage(cgContext, rect, image);
   CGContextRelease(cgContext);
   CGImageRelease(image);
+  auto alphaScale = ShapeUtils::CalculateAlphaReduceFactorIfHairline(shape);
+  ScalePixelsAlpha(targetInfo, dstPixels, alphaScale);
   if (NeedConvertColorSpace(colorSpace(), dstColorSpace)) {
     ConvertColorSpaceInPlace(ImageGenerator::width(), ImageGenerator::height(), colorType,
                              alphaType, dstRowBytes, colorSpace(), dstColorSpace, dstPixels);

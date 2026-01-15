@@ -1,0 +1,53 @@
+Checks: >
+  -*,
+  abseil-*,
+  bugprone-*,
+  google-*,
+  misc-*,
+  modernize-*,
+  performance-*,
+  portability-*,
+  readability-*,
+  -google-readability-braces-around-statements,
+  -google-readability-namespace-comments,
+  -google-runtime-references,
+  -misc-non-private-member-variables-in-classes,
+  -misc-const-correctness,
+  -misc-include-cleaner,
+  -misc-use-internal-linkage,
+  -modernize-return-braced-init-list,
+  -modernize-use-trailing-return-type,
+  -modernize-concat-nested-namespaces,
+  -modernize-use-nodiscard,
+  -modernize-avoid-c-arrays,
+  -performance-move-const-arg,
+  -performance-avoid-endl,
+  -performance-enum-size,
+  -performance-unnecessary-copy-initialization,
+  -readability-braces-around-statements,
+  -readability-identifier-length,
+  -readability-magic-numbers,
+  -readability-named-parameter,
+  -readability-redundant-declaration,
+  -readability-avoid-return-with-void-value,
+  -readability-function-cognitive-complexity,
+  -readability-uppercase-literal-suffix,
+  -readability-implicit-bool-conversion,
+  -readability-else-after-return,
+  -readability-qualified-auto,
+  -readability-convert-member-functions-to-static,
+  -bugprone-narrowing-conversions,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-inc-dec-in-conditions,
+  -bugprone-implicit-widening-of-multiplication-result,
+  -bugprone-unchecked-optional-access,
+  -bugprone-unused-local-non-trivial-variable,
+  -bugprone-unused-return-value
+
+# Turn all the warnings from the checks above into errors.
+WarningsAsErrors: "*"
+
+CheckOptions:
+  - { key: readability-identifier-naming.NamespaceCase,          value: aNy_CasE}
+  - { key: readability-identifier-naming.ParameterCase,          value: camelCase}
+  - { key: readability-identifier-naming.ClassMemberCase,        value: camelCase}

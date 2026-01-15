@@ -20,6 +20,8 @@
 #include <emscripten/val.h>
 #include "ReadPixelsFromCanvasImage.h"
 #include "core/utils/ColorSpaceHelper.h"
+#include "core/utils/ScalePixelsAlpha.h"
+#include "core/utils/ShapeUtils.h"
 #include "tgfx/core/Buffer.h"
 
 using namespace emscripten;
@@ -87,6 +89,8 @@ bool WebPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, s
     return false;
   }
   auto result = ReadPixelsFromCanvasImage(imageData, targetInfo, dstPixels);
+  auto alphaScale = ShapeUtils::CalculateAlphaReduceFactorIfHairline(shape);
+  ScalePixelsAlpha(targetInfo, dstPixels, alphaScale);
   if (NeedConvertColorSpace(colorSpace(), dstColorSpace)) {
     ConvertColorSpaceInPlace(width(), height(), colorType, alphaType, dstRowBytes, colorSpace(),
                              dstColorSpace, dstPixels);
