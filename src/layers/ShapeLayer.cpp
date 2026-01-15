@@ -228,7 +228,7 @@ void ShapeLayer::onUpdateContent(LayerRecorder* recorder) {
       LayerPaint paint(style->color(), style->blendMode());
       paint.shader = style->shader();
       if (shapeBitFields.strokeOnTop) {
-        paint.drawOrder = DrawOrder::AboveChildren;
+        paint.drawPosition = DrawPosition::AboveChildren;
       }
       if (simpleStroke) {
         paint.style = PaintStyle::Stroke;

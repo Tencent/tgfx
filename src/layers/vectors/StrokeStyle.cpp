@@ -23,7 +23,6 @@
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "tgfx/core/PathEffect.h"
-#include "tgfx/layers/LayerPaint.h"
 #include "tgfx/layers/LayerRecorder.h"
 
 namespace tgfx {
@@ -186,6 +185,7 @@ class StrokePainter : public Painter {
       }
       shape = Shape::ApplyMatrix(shape, finalOuter);
     }
+    paint.drawPosition = drawPosition;
     recorder->addShape(std::move(shape), paint);
   }
 
@@ -202,6 +202,7 @@ class StrokePainter : public Painter {
       LayerPaint paint(info.shader, info.alpha, info.blendMode);
       paint.style = PaintStyle::Stroke;
       paint.stroke = runStroke;
+      paint.drawPosition = drawPosition;
       recorder->addTextBlob(run.textBlob, paint, matrix);
     }
   }
@@ -250,6 +251,7 @@ class StrokePainter : public Painter {
       LayerPaint paint(info.shader, info.alpha, info.blendMode);
       paint.style = basePaint.style;
       paint.stroke = basePaint.stroke;
+      paint.drawPosition = drawPosition;
       recorder->addShape(finalShape, paint);
     }
   }
@@ -338,6 +340,14 @@ void StrokeStyle::setStrokeAlign(StrokeAlign value) {
   invalidateContent();
 }
 
+void StrokeStyle::setDrawPosition(DrawPosition value) {
+  if (_drawPosition == value) {
+    return;
+  }
+  _drawPosition = value;
+  invalidateContent();
+}
+
 void StrokeStyle::attachToLayer(Layer* layer) {
   VectorElement::attachToLayer(layer);
   if (_colorSource) {
@@ -366,6 +376,7 @@ void StrokeStyle::apply(VectorContext* context) {
   painter->shader = std::move(shader);
   painter->blendMode = _blendMode;
   painter->alpha = _alpha;
+  painter->drawPosition = _drawPosition;
   painter->geometries.reserve(context->geometries.size());
   painter->innerMatrices.reserve(context->geometries.size());
   bool needsOriginalShapes = _strokeAlign != StrokeAlign::Center;
