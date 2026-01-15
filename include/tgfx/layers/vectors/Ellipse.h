@@ -47,7 +47,7 @@ class Ellipse : public VectorElement {
   /**
    * Returns the size of the ellipse (width and height of the bounding box).
    */
-  Size size() const {
+  const Size& size() const {
     return _size;
   }
 

@@ -47,7 +47,7 @@ class Rectangle : public VectorElement {
   /**
    * Returns the size of the rectangle.
    */
-  Size size() const {
+  const Size& size() const {
     return _size;
   }
 
