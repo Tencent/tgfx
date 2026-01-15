@@ -95,17 +95,24 @@ class StrokePainter : public Painter {
       const auto& innerMatrix = innerMatrices[i];
 
       Matrix invertedInner = Matrix::I();
-      bool canInvert = innerMatrix.invert(&invertedInner);
-      auto outerMatrix = canInvert ? geometry->matrix * invertedInner : Matrix::I();
+      Matrix outerMatrix = Matrix::I();
+      if (innerMatrix.invert(&invertedInner)) {
+        outerMatrix = invertedInner;
+        outerMatrix.postConcat(geometry->matrix);
+      }
       auto scales = outerMatrix.getAxisScales();
       bool uniformScale = FloatNearlyEqual(scales.x, scales.y);
 
       if (geometry->hasText()) {
         for (const auto& run : geometry->getGlyphRuns()) {
+          auto runMatrix = run.matrix;
+          runMatrix.postConcat(geometry->matrix);
           if (uniformScale && pathEffect == nullptr) {
-            drawGlyphRunAsTextBlob(recorder, run, geometry->matrix, scales.x);
+            drawGlyphRunAsTextBlob(recorder, run, runMatrix, scales.x);
           } else {
-            drawGlyphRunAsShape(recorder, run, innerMatrix, outerMatrix, scales, uniformScale);
+            auto runInnerMatrix = run.matrix;
+            runInnerMatrix.postConcat(innerMatrix);
+            drawGlyphRunAsShape(recorder, run, runInnerMatrix, outerMatrix, scales, uniformScale);
           }
         }
       } else {
@@ -115,20 +122,26 @@ class StrokePainter : public Painter {
   }
 
  private:
-  void drawShape(LayerRecorder* recorder, std::shared_ptr<Shape> shape, const Matrix& innerMatrix,
-                 const Matrix& outerMatrix, const Point& scales, bool uniformScale) {
-    if (shape == nullptr) {
-      return;
-    }
-    Matrix finalOuter = outerMatrix;
+  std::shared_ptr<Shape> prepareShape(std::shared_ptr<Shape> shape, const Matrix& innerMatrix,
+                                      Matrix* finalOuter) {
     if (innerMatrix.isTranslate()) {
-      finalOuter.preTranslate(innerMatrix.getTranslateX(), innerMatrix.getTranslateY());
+      finalOuter->preTranslate(innerMatrix.getTranslateX(), innerMatrix.getTranslateY());
     } else {
       shape = Shape::ApplyMatrix(shape, innerMatrix);
     }
     if (pathEffect) {
       shape = Shape::ApplyEffect(shape, pathEffect);
     }
+    return shape;
+  }
+
+  void drawShape(LayerRecorder* recorder, std::shared_ptr<Shape> shape, const Matrix& innerMatrix,
+                 const Matrix& outerMatrix, const Point& scales, bool uniformScale) {
+    if (shape == nullptr) {
+      return;
+    }
+    Matrix finalOuter = outerMatrix;
+    shape = prepareShape(std::move(shape), innerMatrix, &finalOuter);
     if (uniformScale) {
       shape = Shape::ApplyMatrix(shape, finalOuter);
       LayerPaint paint(shader, alpha, blendMode);
@@ -171,19 +184,14 @@ class StrokePainter : public Painter {
     if (shape == nullptr) {
       return;
     }
-    if (!innerMatrix.isTranslate()) {
-      shape = Shape::ApplyMatrix(shape, innerMatrix);
-    }
-    if (pathEffect) {
-      shape = Shape::ApplyEffect(shape, pathEffect);
-    }
-
+    Matrix finalOuter = outerMatrix;
+    shape = prepareShape(std::move(shape), innerMatrix, &finalOuter);
     Stroke runStroke = stroke;
     runStroke.width = BlendStrokeWidth(stroke.width, run.style);
     auto paints = MakeBlendPaints(shader, alpha, blendMode, run.style);
 
     if (uniformScale) {
-      shape = Shape::ApplyMatrix(shape, outerMatrix);
+      shape = Shape::ApplyMatrix(shape, finalOuter);
       runStroke.width *= scales.x;
       for (const auto& info : paints) {
         if (info.shader == nullptr) {
@@ -199,7 +207,7 @@ class StrokePainter : public Painter {
       if (shape == nullptr) {
         return;
       }
-      shape = Shape::ApplyMatrix(shape, outerMatrix);
+      shape = Shape::ApplyMatrix(shape, finalOuter);
       for (const auto& info : paints) {
         if (info.shader == nullptr) {
           continue;
