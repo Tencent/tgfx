@@ -13,7 +13,8 @@
         "PartialBackgroundBlur_partial": "bf48e614",
         "PassThroughWithBackgroundBlur": "bf48e614",
         "PassThroughWithBackgroundBlur_clipped": "bf48e614",
-        "SimpleBackgroundBlur_tiled": "bf48e614",
+        "ScaledInnerShadowWithBackgroundBlur": "cfc16445",
+        "SimpleBackgroundBlur_tiled": "cfc16445",
         "backgroundLayerBlur": "bf48e614"
     },
     "CanvasTest": {
@@ -496,10 +497,10 @@
         "StrokeDashWithTrim": "4a74f6aa",
         "StrokeJoinCap": "4a74f6aa",
         "StrokeNestedScale": "4a74f6aa",
-        "TextModifier": "0b31d462",
-        "TextPath": "9020d7e2",
+        "TextModifier": "ec49a65b",
+        "TextPath": "ec49a65b",
         "TextPathWithTrimPath": "9020d7e2",
-        "TextSelector": "0b31d462",
+        "TextSelector": "ec49a65b",
         "TextSpanBasic": "48b78e36",
         "TextSpanEdgeCases": "48b78e36",
         "TextSpanEmoji": "48b78e36",

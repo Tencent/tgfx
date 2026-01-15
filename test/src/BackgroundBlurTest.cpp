@@ -23,6 +23,7 @@
 #include "tgfx/layers/filters/BlurFilter.h"
 #include "tgfx/layers/layerstyles/BackgroundBlurStyle.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
+#include "tgfx/layers/layerstyles/InnerShadowStyle.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
@@ -473,6 +474,41 @@ TGFX_TEST(BackgroundBlurTest, BackgroundLayerIndexWithNestedHierarchy) {
 
   EXPECT_TRUE(
       Baseline::Compare(surface, "BackgroundBlurTest/BackgroundLayerIndexWithNestedHierarchy"));
+}
+
+TGFX_TEST(BackgroundBlurTest, ScaledInnerShadowWithBackgroundBlur) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 300);
+  auto displayList = std::make_unique<DisplayList>();
+
+  // Background layer
+  auto background = ShapeLayer::Make();
+  Path backgroundPath;
+  backgroundPath.addRect(Rect::MakeWH(300, 300));
+  background->setPath(backgroundPath);
+  background->setFillStyle(ShapeStyle::Make(
+      Shader::MakeLinearGradient({0, 0}, {300, 300}, {Color::Red(), Color::Blue()})));
+  displayList->root()->addChild(background);
+
+  // Layer with InnerShadow and BackgroundBlur
+  auto layer = ShapeLayer::Make();
+  layer->setMatrix(Matrix::MakeTrans(50, 50));
+  Path path;
+  path.addRoundRect(Rect::MakeWH(100, 100), 10, 10);
+  layer->setPath(path);
+  layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 200)));
+  auto innerShadow = InnerShadowStyle::Make(5, 5, 5, 5, Color::FromRGBA(0, 0, 0, 128));
+  auto backgroundBlur = BackgroundBlurStyle::Make(5, 5);
+  layer->setLayerStyles({backgroundBlur, innerShadow});
+  displayList->root()->addChild(layer);
+
+  // Render with 20x scale to test rasterization quality
+  displayList->setZoomScale(20);
+  displayList->setContentOffset(-1000, -1000);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "BackgroundBlurTest/ScaledInnerShadowWithBackgroundBlur"));
 }
 
 }  // namespace tgfx

@@ -64,6 +64,19 @@ static void RemoveStyleSource(std::vector<LayerStyleExtraSourceType>& types,
   types.erase(std::remove(types.begin(), types.end(), type), types.end());
 }
 
+// When canvasScale equals backgroundScale, most pixels at the same resolution are valuable,
+// so rasterization is meaningful. Otherwise, skip rasterization to avoid generating oversized
+// textures.
+static bool ShouldRasterizeForBackground(Canvas* canvas,
+                                         const std::shared_ptr<BackgroundContext>& blurBackground) {
+  if (blurBackground == nullptr) {
+    return false;
+  }
+  auto canvasScale = canvas->getMatrix().getMaxScale();
+  auto backgroundScale = blurBackground->getCanvas()->getMatrix().getMaxScale();
+  return FloatNearlyEqual(canvasScale, backgroundScale);
+}
+
 /**
  * Clips the canvas using the scroll rect. If the sublayer's Matrix contains 3D transformations or
  * projection transformations, because this matrix has been merged into the Canvas, it can be
@@ -1748,12 +1761,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   image = MakeImageWithTransform(image, transform3D, &imageMatrix);
 
   if (args.blurBackground && !contentArgs.blurBackground) {
-    auto canvasScale = canvas->getMatrix().getMaxScale();
-    auto backgroundScale = args.blurBackground->getCanvas()->getMatrix().getMaxScale();
-    // When canvasScale equals backgroundScale, most pixels at the same resolution are valuable,
-    // so rasterization is meaningful. Otherwise, skip rasterization to avoid generating oversized
-    // textures.
-    if (FloatNearlyEqual(canvasScale, backgroundScale)) {
+    if (ShouldRasterizeForBackground(canvas, args.blurBackground)) {
       image = image->makeRasterized();
     }
   }
@@ -2265,6 +2273,16 @@ void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
   auto& contour = source->contour;
   auto contourOffset = source->contourOffset - source->contentOffset;
   auto backgroundCanvas = args.blurBackground ? args.blurBackground->getCanvas() : nullptr;
+  // Apply the content transform matrix to canvas instead of pictureCanvas to avoid blurry results
+  // when scaled up, since picture recording at a smaller scale loses resolution.
+  AutoCanvasRestore restoreCanvas(canvas);
+  AutoCanvasRestore restoreBackground(backgroundCanvas);
+  auto matrix = Matrix::MakeScale(1.f / source->contentScale, 1.f / source->contentScale);
+  matrix.preTranslate(source->contentOffset.x, source->contentOffset.y);
+  canvas->concat(matrix);
+  if (backgroundCanvas) {
+    backgroundCanvas->concat(matrix);
+  }
   auto clipBounds =
       args.blurBackground ? GetClipBounds(args.blurBackground->getCanvas()) : std::nullopt;
   for (const auto& layerStyle : _layerStyles) {
@@ -2278,9 +2296,6 @@ void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
     if (clipBounds.has_value()) {
       pictureCanvas->clipRect(*clipBounds);
     }
-    auto matrix = Matrix::MakeScale(1.f / source->contentScale, 1.f / source->contentScale);
-    matrix.preTranslate(source->contentOffset.x, source->contentOffset.y);
-    pictureCanvas->concat(matrix);
     switch (layerStyle->extraSourceType()) {
       case LayerStyleExtraSourceType::None:
         layerStyle->draw(pictureCanvas, source->content, source->contentScale, alpha);
@@ -2316,7 +2331,8 @@ void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
     if (!backgroundCanvas ||
         layerStyle->extraSourceType() == LayerStyleExtraSourceType::Background) {
       canvas->drawPicture(picture);
-    } else if (!clipBounds.has_value()) {
+    } else if (!clipBounds.has_value() ||
+               !ShouldRasterizeForBackground(canvas, args.blurBackground)) {
       canvas->drawPicture(picture);
       backgroundCanvas->drawPicture(picture);
     } else {

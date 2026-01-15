@@ -37,7 +37,9 @@ class FillPainter : public Painter {
     for (auto* geometry : geometries) {
       if (geometry->hasText()) {
         for (const auto& run : geometry->getGlyphRuns()) {
-          drawGlyphRun(recorder, geometry->matrix, run);
+          auto runMatrix = run.matrix;
+          runMatrix.postConcat(geometry->matrix);
+          drawGlyphRun(recorder, runMatrix, run);
         }
         continue;
       }
