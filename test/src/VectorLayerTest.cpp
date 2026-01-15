@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/DisplayList.h"
+#include "tgfx/layers/SolidLayer.h"
 #include "tgfx/layers/VectorLayer.h"
 #include "tgfx/layers/vectors/Ellipse.h"
 #include "tgfx/layers/vectors/FillStyle.h"
@@ -4073,6 +4074,102 @@ TGFX_TEST(VectorLayerTest, StrokeAlign) {
   displayList->render(surface.get());
 
   EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/StrokeAlign"));
+}
+
+/**
+ * Test DrawPosition: FillStyle and StrokeStyle can be drawn above or below children.
+ */
+TGFX_TEST(VectorLayerTest, DrawPosition) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto displayList = std::make_unique<DisplayList>();
+  auto container = Layer::Make();
+
+  // Test 1: Fill with BelowChildren (default) - child layer should be on top
+  auto vectorLayer1 = VectorLayer::Make();
+  auto rect1 = std::make_shared<Rectangle>();
+  rect1->setSize({80, 80});
+  rect1->setCenter({40, 40});
+  auto fill1 = MakeFillStyle(Color::Red());
+  // fill1->drawPosition() is BelowChildren by default
+  vectorLayer1->setContents({rect1, fill1});
+
+  // Add a child layer on top
+  auto childLayer1 = SolidLayer::Make();
+  childLayer1->setColor(Color::Blue());
+  childLayer1->setWidth(40);
+  childLayer1->setHeight(40);
+  childLayer1->setPosition({20, 20});
+  vectorLayer1->addChild(childLayer1);
+
+  // Test 2: Fill with AboveChildren - fill should be on top of child layer
+  auto vectorLayer2 = VectorLayer::Make();
+  vectorLayer2->setPosition({120, 0});
+  auto rect2 = std::make_shared<Rectangle>();
+  rect2->setSize({80, 80});
+  rect2->setCenter({40, 40});
+  auto fill2 = MakeFillStyle(Color::Red());
+  fill2->setDrawPosition(DrawPosition::AboveChildren);
+  vectorLayer2->setContents({rect2, fill2});
+
+  auto childLayer2 = SolidLayer::Make();
+  childLayer2->setColor(Color::Blue());
+  childLayer2->setWidth(40);
+  childLayer2->setHeight(40);
+  childLayer2->setPosition({20, 20});
+  vectorLayer2->addChild(childLayer2);
+
+  // Test 3: Stroke with BelowChildren (default)
+  auto vectorLayer3 = VectorLayer::Make();
+  vectorLayer3->setPosition({240, 0});
+  auto rect3 = std::make_shared<Rectangle>();
+  rect3->setSize({60, 60});
+  rect3->setCenter({40, 40});
+  auto stroke3 = MakeStrokeStyle(Color::Green(), 20);
+  // stroke3->drawPosition() is BelowChildren by default
+  vectorLayer3->setContents({rect3, stroke3});
+
+  auto childLayer3 = SolidLayer::Make();
+  childLayer3->setColor(Color::Blue());
+  childLayer3->setWidth(50);
+  childLayer3->setHeight(50);
+  childLayer3->setPosition({15, 15});
+  vectorLayer3->addChild(childLayer3);
+
+  // Test 4: Stroke with AboveChildren - stroke should be on top of child layer
+  auto vectorLayer4 = VectorLayer::Make();
+  vectorLayer4->setPosition({360, 0});
+  auto rect4 = std::make_shared<Rectangle>();
+  rect4->setSize({60, 60});
+  rect4->setCenter({40, 40});
+  auto stroke4 = MakeStrokeStyle(Color::Green(), 20);
+  stroke4->setDrawPosition(DrawPosition::AboveChildren);
+  vectorLayer4->setContents({rect4, stroke4});
+
+  auto childLayer4 = SolidLayer::Make();
+  childLayer4->setColor(Color::Blue());
+  childLayer4->setWidth(50);
+  childLayer4->setHeight(50);
+  childLayer4->setPosition({15, 15});
+  vectorLayer4->addChild(childLayer4);
+
+  container->setChildren({vectorLayer1, vectorLayer2, vectorLayer3, vectorLayer4});
+  displayList->root()->addChild(container);
+
+  // Get tight bounds and create surface with 50px padding on all sides
+  auto bounds = container->getBounds(nullptr, true);
+  container->setMatrix(Matrix::MakeTrans(50 - bounds.left, 50 - bounds.top));
+  auto width = static_cast<int>(std::ceil(bounds.width() + 100));
+  auto height = static_cast<int>(std::ceil(bounds.height() + 100));
+
+  auto surface = Surface::Make(context, width, height);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+  displayList->render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/DrawPosition"));
 }
 
 }  // namespace tgfx

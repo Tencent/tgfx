@@ -22,6 +22,7 @@
 #include "Geometry.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Shader.h"
+#include "tgfx/layers/LayerPaint.h"
 
 namespace tgfx {
 
@@ -54,6 +55,7 @@ class Painter {
   std::shared_ptr<Shader> shader = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
   float alpha = 1.0f;
+  DrawPosition drawPosition = DrawPosition::BelowChildren;
   std::vector<Geometry*> geometries = {};
 };
 

@@ -20,7 +20,6 @@
 #include "Painter.h"
 #include "VectorContext.h"
 #include "core/utils/Log.h"
-#include "tgfx/layers/LayerPaint.h"
 #include "tgfx/layers/LayerRecorder.h"
 
 namespace tgfx {
@@ -53,6 +52,7 @@ class FillPainter : public Painter {
       }
       shape = Shape::ApplyMatrix(shape, geometry->matrix);
       LayerPaint paint(shader, alpha, blendMode);
+      paint.drawPosition = drawPosition;
       recorder->addShape(std::move(shape), paint);
     }
   }
@@ -64,6 +64,7 @@ class FillPainter : public Painter {
 
     if (blendFactor < 1.0f) {
       LayerPaint paint(shader, alpha * run.style.alpha, blendMode);
+      paint.drawPosition = drawPosition;
       recorder->addTextBlob(run.textBlob, paint, geometryMatrix);
     }
 
@@ -72,6 +73,7 @@ class FillPainter : public Painter {
       auto overlayColor = Color{fillColor.red, fillColor.green, fillColor.blue, blendFactor};
       auto colorShader = Shader::MakeColorShader(overlayColor);
       LayerPaint paint(colorShader, alpha * run.style.alpha, BlendMode::SrcOver);
+      paint.drawPosition = drawPosition;
       recorder->addTextBlob(run.textBlob, paint, geometryMatrix);
     }
   }
@@ -110,6 +112,14 @@ void FillStyle::setFillRule(PathFillType value) {
   invalidateContent();
 }
 
+void FillStyle::setDrawPosition(DrawPosition value) {
+  if (_drawPosition == value) {
+    return;
+  }
+  _drawPosition = value;
+  invalidateContent();
+}
+
 void FillStyle::attachToLayer(Layer* layer) {
   VectorElement::attachToLayer(layer);
   if (_colorSource) {
@@ -139,6 +149,7 @@ void FillStyle::apply(VectorContext* context) {
   painter->blendMode = _blendMode;
   painter->alpha = _alpha;
   painter->fillRule = _fillRule;
+  painter->drawPosition = _drawPosition;
   painter->geometries.reserve(context->geometries.size());
   for (auto& geometry : context->geometries) {
     painter->geometries.push_back(geometry.get());
