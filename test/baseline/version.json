@@ -109,6 +109,9 @@
         "innerShadow": "0cfb8996",
         "shaderMaskFilter": "6b4e5ce0"
     },
+    "GPURenderTest": {
+        "InstancedGridRender": "62f124a1"
+    },
     "Hello2DTest": {
         "ConicGradient": "4e98c910",
         "ImageWithMipmap": "4e98c910",
@@ -406,7 +409,7 @@
         "complex1": "f38f0012",
         "complex2": "543054b5",
         "complex3": "543054b5",
-        "complex4": "880d5a6c",
+        "complex4": "5ff7fdca",
         "complex5": "880d5a6c",
         "complex6": "cd158924",
         "complex7": "cd158924",
@@ -425,18 +428,18 @@
     "StrokeTest": {
         "ConvertCubicToQuads": "779da4bd",
         "DashStrokeAsSolidStroke": "eefb7a46",
-        "DrawPathByHairlinePaint": "543054b5",
-        "DrawShapeByHairlinePaint": "543054b5",
-        "ExtremelyThinStrokeLayer": "543054b5",
-        "ExtremelyThinStrokePath": "543054b5",
-        "ExtremelyThinStrokePathIdentityMatrix": "559f3925",
+        "DrawPathByHairlinePaint": "5ff7fdca",
+        "DrawShapeByHairlinePaint": "5ff7fdca",
+        "ExtremelyThinStrokeLayer": "5ff7fdca",
+        "ExtremelyThinStrokePath": "5ff7fdca",
+        "ExtremelyThinStrokePathIdentityMatrix": "5ff7fdca",
         "HairlineBasicRendering": "779da4bd",
         "HairlineCanvasTransformations": "779da4bd",
         "HairlineClipping": "779da4bd",
         "HairlineComplexPathRendering": "779da4bd",
-        "HairlineLayer": "eefb7a46",
+        "HairlineLayer": "5ff7fdca",
         "HairlineStrokeText": "2318e38a",
-        "HairlineWithDropShadow": "61b44005",
+        "HairlineWithDropShadow": "5ff7fdca",
         "LineRenderAsHairline": "779da4bd",
         "ZoomUpTinyStrokeShape": "cd6a8dff"
     },
@@ -522,8 +525,5 @@
         "TrimPathReversedWrapAround": "4a74f6aa",
         "TrimPathWithScale": "4a74f6aa",
         "VectorGroupTransform": "4a74f6aa"
-    },
-    "GPURenderTest": {
-        "InstancedGridRender": "62f124a1"
     }
 }
