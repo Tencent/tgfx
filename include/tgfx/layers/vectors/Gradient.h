@@ -99,8 +99,7 @@ class Gradient : public ColorSource {
                                                       const std::vector<float>& positions = {});
 
   /**
-   * Returns the gradient type. Possible values are GradientType::Linear, GradientType::Radial, and
-   * GradientType::Conic.
+   * Returns the gradient type.
    */
   virtual GradientType type() const = 0;
 

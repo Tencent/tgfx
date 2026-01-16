@@ -31,7 +31,7 @@ void Rectangle::setCenter(const Point& value) {
   invalidateContent();
 }
 
-void Rectangle::setSize(const Point& value) {
+void Rectangle::setSize(const Size& value) {
   if (_size == value) {
     return;
   }
@@ -61,8 +61,8 @@ void Rectangle::setReversed(bool value) {
 void Rectangle::apply(VectorContext* context) {
   DEBUG_ASSERT(context != nullptr);
   if (_cachedShape == nullptr) {
-    auto halfWidth = _size.x * 0.5f;
-    auto halfHeight = _size.y * 0.5f;
+    auto halfWidth = _size.width * 0.5f;
+    auto halfHeight = _size.height * 0.5f;
     auto radius = _roundness;
     if (radius > halfWidth) {
       radius = halfWidth;
@@ -70,7 +70,8 @@ void Rectangle::apply(VectorContext* context) {
     if (radius > halfHeight) {
       radius = halfHeight;
     }
-    auto rect = Rect::MakeXYWH(_center.x - halfWidth, _center.y - halfHeight, _size.x, _size.y);
+    auto rect =
+        Rect::MakeXYWH(_center.x - halfWidth, _center.y - halfHeight, _size.width, _size.height);
     Path path;
     path.addRoundRect(rect, radius, radius, _reversed, 2);
     _cachedShape = Shape::MakeFrom(path);

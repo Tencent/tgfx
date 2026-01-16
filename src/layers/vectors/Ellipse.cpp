@@ -31,7 +31,7 @@ void Ellipse::setCenter(const Point& value) {
   invalidateContent();
 }
 
-void Ellipse::setSize(const Point& value) {
+void Ellipse::setSize(const Size& value) {
   if (_size == value) {
     return;
   }
@@ -52,9 +52,10 @@ void Ellipse::setReversed(bool value) {
 void Ellipse::apply(VectorContext* context) {
   DEBUG_ASSERT(context != nullptr);
   if (_cachedShape == nullptr) {
-    auto halfWidth = _size.x * 0.5f;
-    auto halfHeight = _size.y * 0.5f;
-    auto rect = Rect::MakeXYWH(_center.x - halfWidth, _center.y - halfHeight, _size.x, _size.y);
+    auto halfWidth = _size.width * 0.5f;
+    auto halfHeight = _size.height * 0.5f;
+    auto rect =
+        Rect::MakeXYWH(_center.x - halfWidth, _center.y - halfHeight, _size.width, _size.height);
     Path path;
     path.addOval(rect, _reversed);
     _cachedShape = Shape::MakeFrom(path);

@@ -134,14 +134,14 @@ class TextSelector : public LayerProperty {
   void setMode(SelectorMode value);
 
   /**
-   * Returns the weight of influence this selector has (0.0 to 1.0).
+   * Returns the weight multiplier for this selector's influence.
    */
   float weight() const {
     return _weight;
   }
 
   /**
-   * Sets the weight of influence this selector has.
+   * Sets the weight multiplier for this selector's influence.
    */
   void setWeight(float value);
 
