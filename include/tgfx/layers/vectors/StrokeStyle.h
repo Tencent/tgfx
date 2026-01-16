@@ -159,17 +159,17 @@ class StrokeStyle : public VectorElement {
   void setStrokeAlign(StrokeAlign value);
 
   /**
-   * Returns the draw position of the stroke relative to the layer's children. The default value is
-   * DrawPosition::BelowChildren.
+   * Returns the placement of the stroke relative to the layer's children. The default value is
+   * LayerPlacement::Background.
    */
-  DrawPosition drawPosition() const {
-    return _drawPosition;
+  LayerPlacement placement() const {
+    return _placement;
   }
 
   /**
-   * Sets the draw position of the stroke relative to the layer's children.
+   * Sets the placement of the stroke relative to the layer's children.
    */
-  void setDrawPosition(DrawPosition value);
+  void setPlacement(LayerPlacement value);
 
  protected:
   Type type() const override {
@@ -190,7 +190,7 @@ class StrokeStyle : public VectorElement {
   std::vector<float> _dashes = {};
   float _dashOffset = 0.0f;
   StrokeAlign _strokeAlign = StrokeAlign::Center;
-  DrawPosition _drawPosition = DrawPosition::BelowChildren;
+  LayerPlacement _placement = LayerPlacement::Background;
   std::shared_ptr<PathEffect> _cachedDashEffect = nullptr;
 };
 

@@ -185,7 +185,7 @@ class StrokePainter : public Painter {
       }
       shape = Shape::ApplyMatrix(shape, finalOuter);
     }
-    paint.drawPosition = drawPosition;
+    paint.placement = placement;
     recorder->addShape(std::move(shape), paint);
   }
 
@@ -202,7 +202,7 @@ class StrokePainter : public Painter {
       LayerPaint paint(info.shader, info.alpha, info.blendMode);
       paint.style = PaintStyle::Stroke;
       paint.stroke = runStroke;
-      paint.drawPosition = drawPosition;
+      paint.placement = placement;
       recorder->addTextBlob(run.textBlob, paint, matrix);
     }
   }
@@ -251,7 +251,7 @@ class StrokePainter : public Painter {
       LayerPaint paint(info.shader, info.alpha, info.blendMode);
       paint.style = basePaint.style;
       paint.stroke = basePaint.stroke;
-      paint.drawPosition = drawPosition;
+      paint.placement = placement;
       recorder->addShape(finalShape, paint);
     }
   }
@@ -340,11 +340,11 @@ void StrokeStyle::setStrokeAlign(StrokeAlign value) {
   invalidateContent();
 }
 
-void StrokeStyle::setDrawPosition(DrawPosition value) {
-  if (_drawPosition == value) {
+void StrokeStyle::setPlacement(LayerPlacement value) {
+  if (_placement == value) {
     return;
   }
-  _drawPosition = value;
+  _placement = value;
   invalidateContent();
 }
 
@@ -376,7 +376,7 @@ void StrokeStyle::apply(VectorContext* context) {
   painter->shader = std::move(shader);
   painter->blendMode = _blendMode;
   painter->alpha = _alpha;
-  painter->drawPosition = _drawPosition;
+  painter->placement = _placement;
   painter->geometries.reserve(context->geometries.size());
   painter->innerMatrices.reserve(context->geometries.size());
   bool needsOriginalShapes = _strokeAlign != StrokeAlign::Center;

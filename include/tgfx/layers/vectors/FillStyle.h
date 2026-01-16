@@ -83,17 +83,17 @@ class FillStyle : public VectorElement {
   void setFillRule(PathFillType value);
 
   /**
-   * Returns the draw position of the fill relative to the layer's children. The default value is
-   * DrawPosition::BelowChildren.
+   * Returns the placement of the fill relative to the layer's children. The default value is
+   * LayerPlacement::Background.
    */
-  DrawPosition drawPosition() const {
-    return _drawPosition;
+  LayerPlacement placement() const {
+    return _placement;
   }
 
   /**
-   * Sets the draw position of the fill relative to the layer's children.
+   * Sets the placement of the fill relative to the layer's children.
    */
-  void setDrawPosition(DrawPosition value);
+  void setPlacement(LayerPlacement value);
 
  protected:
   Type type() const override {
@@ -111,7 +111,7 @@ class FillStyle : public VectorElement {
   float _alpha = 1.0f;
   BlendMode _blendMode = BlendMode::SrcOver;
   PathFillType _fillRule = PathFillType::Winding;
-  DrawPosition _drawPosition = DrawPosition::BelowChildren;
+  LayerPlacement _placement = LayerPlacement::Background;
 };
 
 }  // namespace tgfx
