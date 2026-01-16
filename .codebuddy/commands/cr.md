@@ -102,6 +102,7 @@ gh pr view {pr_number} --comments
 
 ### 在线模式
 
+**并行获取**以下信息（三个独立 API 调用，并行可显著减少等待时间）：
 ```bash
 PR_AUTHOR=$(gh pr view {pr_number} --json author -q '.author.login')
 gh pr diff {pr_number}
