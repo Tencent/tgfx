@@ -479,6 +479,7 @@ TGFX_TEST(VectorLayerTest, RepeaterTransform) {
 
   auto repeater = std::make_shared<Repeater>();
   repeater->setCopies(8);
+  repeater->setPosition(Point::Zero());
   repeater->setRotation(45.0f);
   repeater->setAnchorPoint({0, 0});
   repeater->setStartAlpha(1.0f);
@@ -986,6 +987,7 @@ TGFX_TEST(VectorLayerTest, ComplexComposition) {
 
   auto repeater = std::make_shared<Repeater>();
   repeater->setCopies(12);
+  repeater->setPosition(Point::Zero());
   repeater->setRotation(30.0f);
   repeater->setAnchorPoint({0, 0});
 

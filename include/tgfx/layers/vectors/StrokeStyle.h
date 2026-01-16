@@ -186,7 +186,7 @@ class StrokeStyle : public VectorElement {
   std::shared_ptr<ColorSource> _colorSource = nullptr;
   float _alpha = 1.0f;
   BlendMode _blendMode = BlendMode::SrcOver;
-  Stroke _stroke = Stroke(1.0f);
+  Stroke _stroke = Stroke(2.0f);
   std::vector<float> _dashes = {};
   float _dashOffset = 0.0f;
   StrokeAlign _strokeAlign = StrokeAlign::Center;
