@@ -25,7 +25,6 @@
 #include "compositing3d/Context3DCompositor.h"
 #include "compositing3d/Layer3DContext.h"
 #include "core/MCState.h"
-#include "core/Matrix2D.h"
 #include "core/Matrix3DUtils.h"
 #include "core/filters/Transform3DImageFilter.h"
 #include "core/images/TextureImage.h"
@@ -914,15 +913,18 @@ Point Layer::globalToLocal(const Point& globalPoint) const {
   // Therefore, the 4x4 matrix can be simplified to a 3x3 matrix.
   float values[16] = {};
   globalMatrix.getColumnMajor(values);
-  auto matrix2D = Matrix2D::MakeAll(values[0], values[1], values[3], values[4], values[5],
-                                    values[7], values[12], values[13], values[15]);
-  Matrix2D inversedMatrix;
-  if (!matrix2D.invert(&inversedMatrix)) {
+  // Convert from column-major (Matrix3D) to row-major (Matrix)
+  auto matrix = Matrix::MakeAll(values[0], values[4], values[12],
+                                values[1], values[5], values[13],
+                                values[3], values[7], values[15]);
+  Matrix inversedMatrix;
+  if (!matrix.invert(&inversedMatrix)) {
     DEBUG_ASSERT(false);
     return Point::Make(0, 0);
   }
-  auto result = inversedMatrix.mapVec2({globalPoint.x, globalPoint.y});
-  return {result.x, result.y};
+  Point result = globalPoint;
+  inversedMatrix.mapPoints(&result, 1);
+  return result;
 }
 
 Point Layer::localToGlobal(const Point& localPoint) const {

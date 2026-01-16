@@ -20,6 +20,7 @@
 
 #include <cstring>
 #include "tgfx/core/Rect.h"
+#include "tgfx/core/Vec.h"
 
 namespace tgfx {
 
@@ -998,6 +999,17 @@ class Matrix {
   bool invertNonIdentity(Matrix* inverse) const;
 
   bool getMinMaxScaleFactors(float results[2]) const;
+
+  /**
+   * Maps a 2D homogeneous coordinate (x, y, w) using this matrix.
+   * The result is NOT perspective-divided; i.e., the w component may not be 1.
+   * To get the final 2D point, divide x' and y' by w'.
+   * @param x  x-coordinate of the input point
+   * @param y  y-coordinate of the input point
+   * @param w  w-coordinate of the input point (typically 1 for points, 0 for vectors)
+   * @return   the mapped homogeneous coordinate (x', y', w')
+   */
+  Vec3 mapHomogeneous(float x, float y, float w) const;
 
   friend class Matrix3D;
 };
