@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/DisplayList.h"
+#include "tgfx/layers/SolidLayer.h"
 #include "tgfx/layers/VectorLayer.h"
 #include "tgfx/layers/vectors/Ellipse.h"
 #include "tgfx/layers/vectors/FillStyle.h"
@@ -145,7 +146,7 @@ TGFX_TEST(VectorLayerTest, BasicShapes) {
 }
 
 /**
- * Test TrimPath: both Simultaneously and Individually modes.
+ * Test TrimPath: both Separate and Continuous modes.
  * TrimPath should affect the innermost shapes before styles are applied.
  */
 TGFX_TEST(VectorLayerTest, TrimPath) {
@@ -159,7 +160,7 @@ TGFX_TEST(VectorLayerTest, TrimPath) {
   auto displayList = std::make_unique<DisplayList>();
   auto vectorLayer = VectorLayer::Make();
 
-  // Group 1: TrimPath Simultaneously (each shape trimmed independently with same params)
+  // Group 1: TrimPath Separate (each shape trimmed separately with same params)
   auto group1 = std::make_shared<VectorGroup>();
   group1->setPosition({100, 154});
 
@@ -173,12 +174,12 @@ TGFX_TEST(VectorLayerTest, TrimPath) {
   auto trim1 = std::make_shared<TrimPath>();
   trim1->setStart(0.0f);
   trim1->setEnd(0.5f);
-  trim1->setTrimType(TrimPathType::Simultaneously);
+  trim1->setTrimType(TrimPathType::Separate);
 
   auto stroke1 = MakeStrokeStyle(Color::Red(), 8.0f);
   group1->setElements({rect1, ellipse1, trim1, stroke1});
 
-  // Group 2: TrimPath Individually (all shapes combined into one path, trimmed sequentially)
+  // Group 2: TrimPath Continuous (all shapes combined into one path, trimmed as one)
   auto group2 = std::make_shared<VectorGroup>();
   group2->setPosition({360, 154});
 
@@ -192,7 +193,7 @@ TGFX_TEST(VectorLayerTest, TrimPath) {
   auto trim2 = std::make_shared<TrimPath>();
   trim2->setStart(0.25f);
   trim2->setEnd(0.75f);
-  trim2->setTrimType(TrimPathType::Individually);
+  trim2->setTrimType(TrimPathType::Continuous);
 
   auto stroke2 = MakeStrokeStyle(Color::Blue(), 8.0f);
   group2->setElements({rect2, ellipse2, trim2, stroke2});
@@ -833,7 +834,7 @@ TGFX_TEST(VectorLayerTest, TrimPathOffset) {
   auto trim3b = std::make_shared<TrimPath>();
   trim3b->setStart(0.2f);
   trim3b->setEnd(1.0f);
-  trim3b->setTrimType(TrimPathType::Individually);
+  trim3b->setTrimType(TrimPathType::Continuous);
 
   auto stroke3 = MakeStrokeStyle(Color::Green(), 12.0f);
 
@@ -930,7 +931,7 @@ TGFX_TEST(VectorLayerTest, TrimPathReversedWrapAround) {
 
   group3->setElements({rect3, trim3, stroke3});
 
-  // Group 4: Reversed trim Individually mode with multiple shapes
+  // Group 4: Reversed trim Continuous mode with multiple shapes
   // Tests that reversed trim works correctly when trimming multiple shapes as one
   auto group4 = std::make_shared<VectorGroup>();
   group4->setPosition({448, 80});
@@ -946,7 +947,7 @@ TGFX_TEST(VectorLayerTest, TrimPathReversedWrapAround) {
   auto trim4 = std::make_shared<TrimPath>();
   trim4->setStart(0.7f);
   trim4->setEnd(0.3f);
-  trim4->setTrimType(TrimPathType::Individually);
+  trim4->setTrimType(TrimPathType::Continuous);
 
   auto stroke4 = MakeStrokeStyle(Color::FromRGBA(255, 128, 0, 255), 8.0f);
 
@@ -3260,7 +3261,7 @@ TGFX_TEST(VectorLayerTest, TextPathWithTrimPath) {
 
   // Group 1: TextPath then TrimPath
   // Text is first laid out along the path (glyphs positioned on curve),
-  // then TrimPath trims each glyph shape (Simultaneously mode)
+  // then TrimPath trims each glyph shape (Separate mode)
   auto group1 = std::make_shared<VectorGroup>();
   group1->setPosition({28, 110});
 
@@ -3275,7 +3276,7 @@ TGFX_TEST(VectorLayerTest, TextPathWithTrimPath) {
   auto trim1 = std::make_shared<TrimPath>();
   trim1->setStart(0.0f);
   trim1->setEnd(0.95f);
-  trim1->setTrimType(TrimPathType::Simultaneously);
+  trim1->setTrimType(TrimPathType::Separate);
 
   auto fill1 = MakeFillStyle(Color::Blue());
   group1->setElements({textSpan1, textPath1, trim1, fill1});
@@ -3294,7 +3295,7 @@ TGFX_TEST(VectorLayerTest, TextPathWithTrimPath) {
   auto trim2 = std::make_shared<TrimPath>();
   trim2->setStart(0.05f);
   trim2->setEnd(1.0f);
-  trim2->setTrimType(TrimPathType::Simultaneously);
+  trim2->setTrimType(TrimPathType::Separate);
 
   auto textPath2 = std::make_shared<TextPath>();
   textPath2->setPath(curvePath);
@@ -4073,6 +4074,102 @@ TGFX_TEST(VectorLayerTest, StrokeAlign) {
   displayList->render(surface.get());
 
   EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/StrokeAlign"));
+}
+
+/**
+ * Test LayerPlacement: FillStyle and StrokeStyle can be placed in front of or behind children.
+ */
+TGFX_TEST(VectorLayerTest, LayerPlacement) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto displayList = std::make_unique<DisplayList>();
+  auto container = Layer::Make();
+
+  // Test 1: Fill with Background (default) - child layer should be on top
+  auto vectorLayer1 = VectorLayer::Make();
+  auto rect1 = std::make_shared<Rectangle>();
+  rect1->setSize({80, 80});
+  rect1->setCenter({40, 40});
+  auto fill1 = MakeFillStyle(Color::Red());
+  // fill1->placement() is Background by default
+  vectorLayer1->setContents({rect1, fill1});
+
+  // Add a child layer on top
+  auto childLayer1 = SolidLayer::Make();
+  childLayer1->setColor(Color::Blue());
+  childLayer1->setWidth(40);
+  childLayer1->setHeight(40);
+  childLayer1->setPosition({20, 20});
+  vectorLayer1->addChild(childLayer1);
+
+  // Test 2: Fill with Foreground - fill should be on top of child layer
+  auto vectorLayer2 = VectorLayer::Make();
+  vectorLayer2->setPosition({120, 0});
+  auto rect2 = std::make_shared<Rectangle>();
+  rect2->setSize({80, 80});
+  rect2->setCenter({40, 40});
+  auto fill2 = MakeFillStyle(Color::Red());
+  fill2->setPlacement(LayerPlacement::Foreground);
+  vectorLayer2->setContents({rect2, fill2});
+
+  auto childLayer2 = SolidLayer::Make();
+  childLayer2->setColor(Color::Blue());
+  childLayer2->setWidth(40);
+  childLayer2->setHeight(40);
+  childLayer2->setPosition({20, 20});
+  vectorLayer2->addChild(childLayer2);
+
+  // Test 3: Stroke with Background (default)
+  auto vectorLayer3 = VectorLayer::Make();
+  vectorLayer3->setPosition({240, 0});
+  auto rect3 = std::make_shared<Rectangle>();
+  rect3->setSize({60, 60});
+  rect3->setCenter({40, 40});
+  auto stroke3 = MakeStrokeStyle(Color::Green(), 20);
+  // stroke3->placement() is Background by default
+  vectorLayer3->setContents({rect3, stroke3});
+
+  auto childLayer3 = SolidLayer::Make();
+  childLayer3->setColor(Color::Blue());
+  childLayer3->setWidth(50);
+  childLayer3->setHeight(50);
+  childLayer3->setPosition({15, 15});
+  vectorLayer3->addChild(childLayer3);
+
+  // Test 4: Stroke with Foreground - stroke should be on top of child layer
+  auto vectorLayer4 = VectorLayer::Make();
+  vectorLayer4->setPosition({360, 0});
+  auto rect4 = std::make_shared<Rectangle>();
+  rect4->setSize({60, 60});
+  rect4->setCenter({40, 40});
+  auto stroke4 = MakeStrokeStyle(Color::Green(), 20);
+  stroke4->setPlacement(LayerPlacement::Foreground);
+  vectorLayer4->setContents({rect4, stroke4});
+
+  auto childLayer4 = SolidLayer::Make();
+  childLayer4->setColor(Color::Blue());
+  childLayer4->setWidth(50);
+  childLayer4->setHeight(50);
+  childLayer4->setPosition({15, 15});
+  vectorLayer4->addChild(childLayer4);
+
+  container->setChildren({vectorLayer1, vectorLayer2, vectorLayer3, vectorLayer4});
+  displayList->root()->addChild(container);
+
+  // Get tight bounds and create surface with 50px padding on all sides
+  auto bounds = container->getBounds(nullptr, true);
+  container->setMatrix(Matrix::MakeTrans(50 - bounds.left, 50 - bounds.top));
+  auto width = static_cast<int>(std::ceil(bounds.width() + 100));
+  auto height = static_cast<int>(std::ceil(bounds.height() + 100));
+
+  auto surface = Surface::Make(context, width, height);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+  displayList->render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/LayerPlacement"));
 }
 
 }  // namespace tgfx

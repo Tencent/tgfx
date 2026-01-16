@@ -20,6 +20,7 @@
 
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Shape.h"
+#include "tgfx/core/Size.h"
 #include "tgfx/layers/vectors/VectorElement.h"
 
 namespace tgfx {
@@ -46,14 +47,14 @@ class Rectangle : public VectorElement {
   /**
    * Returns the size of the rectangle.
    */
-  const Point& size() const {
+  const Size& size() const {
     return _size;
   }
 
   /**
    * Sets the size of the rectangle.
    */
-  void setSize(const Point& value);
+  void setSize(const Size& value);
 
   /**
    * Returns the corner roundness. A value of 0 means sharp corners.
@@ -88,7 +89,7 @@ class Rectangle : public VectorElement {
 
  private:
   Point _center = Point::Zero();
-  Point _size = Point::Zero();
+  Size _size = {};
   float _roundness = 0.0f;
   bool _reversed = false;
   std::shared_ptr<Shape> _cachedShape = nullptr;

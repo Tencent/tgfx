@@ -22,6 +22,7 @@
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/core/Stroke.h"
+#include "tgfx/layers/LayerPaint.h"
 #include "tgfx/layers/StrokeAlign.h"
 #include "tgfx/layers/vectors/ColorSource.h"
 #include "tgfx/layers/vectors/VectorElement.h"
@@ -157,6 +158,19 @@ class StrokeStyle : public VectorElement {
    */
   void setStrokeAlign(StrokeAlign value);
 
+  /**
+   * Returns the placement of the stroke relative to the layer's children. The default value is
+   * LayerPlacement::Background.
+   */
+  LayerPlacement placement() const {
+    return _placement;
+  }
+
+  /**
+   * Sets the placement of the stroke relative to the layer's children.
+   */
+  void setPlacement(LayerPlacement value);
+
  protected:
   Type type() const override {
     return Type::StrokeStyle;
@@ -176,6 +190,7 @@ class StrokeStyle : public VectorElement {
   std::vector<float> _dashes = {};
   float _dashOffset = 0.0f;
   StrokeAlign _strokeAlign = StrokeAlign::Center;
+  LayerPlacement _placement = LayerPlacement::Background;
   std::shared_ptr<PathEffect> _cachedDashEffect = nullptr;
 };
 

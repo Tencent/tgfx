@@ -20,6 +20,7 @@
 
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/PathTypes.h"
+#include "tgfx/layers/LayerPaint.h"
 #include "tgfx/layers/vectors/ColorSource.h"
 #include "tgfx/layers/vectors/VectorElement.h"
 
@@ -81,6 +82,19 @@ class FillStyle : public VectorElement {
    */
   void setFillRule(PathFillType value);
 
+  /**
+   * Returns the placement of the fill relative to the layer's children. The default value is
+   * LayerPlacement::Background.
+   */
+  LayerPlacement placement() const {
+    return _placement;
+  }
+
+  /**
+   * Sets the placement of the fill relative to the layer's children.
+   */
+  void setPlacement(LayerPlacement value);
+
  protected:
   Type type() const override {
     return Type::FillStyle;
@@ -97,6 +111,7 @@ class FillStyle : public VectorElement {
   float _alpha = 1.0f;
   BlendMode _blendMode = BlendMode::SrcOver;
   PathFillType _fillRule = PathFillType::Winding;
+  LayerPlacement _placement = LayerPlacement::Background;
 };
 
 }  // namespace tgfx

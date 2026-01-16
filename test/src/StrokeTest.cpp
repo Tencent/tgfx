@@ -24,7 +24,6 @@
 #include "tgfx/layers/ShapeStyle.h"
 #include "tgfx/svg/SVGPathParser.h"
 #include "utils/TestUtils.h"
-#include "utils/TextShaper.h"
 
 namespace tgfx {
 TGFX_TEST(StrokeTest, DrawPathByHairlinePaint) {
@@ -189,6 +188,29 @@ TGFX_TEST(StrokeTest, ExtremelyThinStrokePath) {
   canvas->drawPath(*path, paint);
 
   EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/ExtremelyThinStrokePath"));
+}
+
+TGFX_TEST(StrokeTest, ExtremelyThinStrokePathIdentityMatrix) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 800, 400);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::Black());
+
+  Path path;
+  path.addOval(Rect::MakeXYWH(50, 50, 300, 300));
+
+  Paint paint;
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStrokeWidth(0.5f);
+  paint.setColor(Color::FromRGBA(255, 255, 0, 255));
+
+  canvas->drawPath(path, paint);
+  canvas->translate(400, 0);
+  canvas->drawPath(path, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "StrokeTest/ExtremelyThinStrokePathIdentityMatrix"));
 }
 
 TGFX_TEST(StrokeTest, ExtremelyThinStrokeLayer) {

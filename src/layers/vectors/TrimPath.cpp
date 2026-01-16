@@ -56,7 +56,7 @@ void TrimPath::setTrimType(TrimPathType value) {
   invalidateContent();
 }
 
-static void ApplyTrimIndividually(std::vector<Geometry*>& geometries, float start, float end) {
+static void ApplyTrimContinuous(std::vector<Geometry*>& geometries, float start, float end) {
   // Determine if reversed (end < start)
   bool reversed = end < start;
   if (reversed) {
@@ -177,13 +177,13 @@ void TrimPath::apply(VectorContext* context) {
   auto start = _start + offset;
   auto end = _end + offset;
 
-  if (_trimType == TrimPathType::Simultaneously) {
+  if (_trimType == TrimPathType::Separate) {
     auto trimEffect = PathEffect::MakeTrim(start, end);
     for (auto* geometry : geometries) {
       geometry->shape = Shape::ApplyEffect(geometry->shape, trimEffect);
     }
   } else {
-    ApplyTrimIndividually(geometries, start, end);
+    ApplyTrimContinuous(geometries, start, end);
   }
 }
 

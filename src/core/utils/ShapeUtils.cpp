@@ -38,19 +38,22 @@ float ShapeUtils::CalculateAlphaReduceFactorIfHairline(std::shared_ptr<Shape> sh
   }
 
   std::shared_ptr<StrokeShape> strokeShape = nullptr;
-  auto matrix = Matrix::I();
+  float scale = 1.f;
+
   if (shape->type() == Shape::Type::Matrix) {
     auto matrixShape = std::static_pointer_cast<MatrixShape>(shape);
     if (matrixShape->shape->type() == Shape::Type::Stroke) {
       strokeShape = std::static_pointer_cast<StrokeShape>(matrixShape->shape);
-      matrix = matrixShape->matrix;
+      scale = matrixShape->matrix.getMaxScale();
     }
   } else if (shape->type() == Shape::Type::Stroke) {
     strokeShape = std::static_pointer_cast<StrokeShape>(shape);
   }
-  if (!strokeShape) {
+
+  if (!strokeShape || strokeShape->stroke.width <= 0.f) {
     return 1.f;
   }
-  return GetHairlineAlphaFactor(strokeShape->stroke, matrix);
+  return std::min(strokeShape->stroke.width * scale, 1.f);
 }
+
 }  // namespace tgfx
