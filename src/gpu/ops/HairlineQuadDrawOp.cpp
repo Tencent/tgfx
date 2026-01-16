@@ -72,7 +72,7 @@ void HairlineQuadDrawOp::onDraw(RenderPass* renderPass) {
   auto gpuVertexBuffer = vertexBuffer->gpuBuffer();
   auto gpuIndexBuffer = indexBuffer->gpuBuffer();
   DEBUG_ASSERT(gpuVertexBuffer != nullptr && gpuIndexBuffer != nullptr);
-  renderPass->setVertexBuffer(gpuVertexBuffer, 0);
+  renderPass->setVertexBuffer(0, gpuVertexBuffer);
   renderPass->setIndexBuffer(gpuIndexBuffer, IndexFormat::UInt32);
   auto indexCount = static_cast<uint32_t>(indexBuffer->size() / sizeof(uint32_t));
   renderPass->drawIndexed(PrimitiveType::Triangles, 0, indexCount);
