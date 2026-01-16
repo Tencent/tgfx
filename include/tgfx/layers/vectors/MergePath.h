@@ -18,10 +18,35 @@
 
 #pragma once
 
-#include "tgfx/core/Path.h"
 #include "tgfx/layers/vectors/VectorElement.h"
 
 namespace tgfx {
+
+/**
+ * Defines the operation used to merge multiple paths.
+ */
+enum class MergePathOp {
+  /**
+   * Appends paths together without any boolean operation.
+   */
+  Append,
+  /**
+   * Union (inclusive-or) the paths together.
+   */
+  Union,
+  /**
+   * Subtract subsequent paths from the first path.
+   */
+  Difference,
+  /**
+   * Intersect the paths together.
+   */
+  Intersect,
+  /**
+   * Exclusive-or the paths together.
+   */
+  XOR
+};
 
 /**
  * MergePath merges multiple paths in the same group into one.
@@ -33,14 +58,14 @@ class MergePath : public VectorElement {
   /**
    * Returns the operation used to merge paths.
    */
-  PathOp pathOp() const {
-    return _pathOp;
+  MergePathOp mode() const {
+    return _mode;
   }
 
   /**
    * Sets the operation used to merge paths.
    */
-  void setPathOp(PathOp value);
+  void setMode(MergePathOp value);
 
  protected:
   Type type() const override {
@@ -50,7 +75,7 @@ class MergePath : public VectorElement {
   void apply(VectorContext* context) override;
 
  private:
-  PathOp _pathOp = PathOp::Append;
+  MergePathOp _mode = MergePathOp::Append;
 };
 
 }  // namespace tgfx

@@ -163,11 +163,11 @@ class Repeater : public VectorElement {
  private:
   Matrix getMatrix(float progress) const;
 
-  float _copies = 1.0f;
+  float _copies = 3.0f;
   float _offset = 0.0f;
   RepeaterOrder _order = RepeaterOrder::BelowOriginal;
   Point _anchorPoint = Point::Zero();
-  Point _position = Point::Zero();
+  Point _position = {100.0f, 100.0f};
   float _rotation = 0.0f;
   Point _scale = {1.0f, 1.0f};
   float _startAlpha = 1.0f;
