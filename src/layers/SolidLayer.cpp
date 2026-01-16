@@ -1,6 +1,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 //
-//  Tencent is pleased to support the open source community by making libpag available.
+//  Tencent is pleased to support the open source community by making tgfx available.
 //
 //  Copyright (C) 2024 Tencent. All rights reserved.
 //
@@ -75,10 +75,7 @@ void SolidLayer::onUpdateContent(LayerRecorder* recorder) {
   }
   RRect rRect = {};
   rRect.setRectXY(Rect::MakeLTRB(0, 0, _width, _height), _radiusX, _radiusY);
-  Paint paint = {};
-  paint.setColor(_color);
-  auto canvas = recorder->getCanvas();
-  canvas->drawRRect(rRect, paint);
+  recorder->addRRect(rRect, LayerPaint(_color));
 }
 
 }  // namespace tgfx

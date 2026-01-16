@@ -19,6 +19,8 @@
 #pragma once
 
 #include <memory>
+#include <optional>
+#include <unordered_set>
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Matrix.h"
@@ -30,13 +32,16 @@
 
 namespace tgfx {
 class LayerContent;
-class RasterizedContent;
+class SubtreeCache;
 class DisplayList;
 class DrawArgs;
 class RegionTransformer;
 class RootLayer;
+class ContourContext;
 struct LayerStyleSource;
+struct MaskData;
 class BackgroundContext;
+enum class DrawMode;
 
 /**
  * The base class for all layers that can be placed on the display list. The layer class includes
@@ -121,15 +126,31 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   /**
    * Sets the blend mode of the layer.
+   * Note: Layers inside a 3D Rendering Context (see preserve3D()) always use SrcOver blend mode
+   * regardless of this setting.
    */
   void setBlendMode(BlendMode value);
 
   /**
+   * Returns true if the layer allows its background to pass through to sublayers. Note that layers
+   * with non-SrcOver blend modes, filters, or 3D transforms will ignore this setting and prevent
+   * background pass-through. The default value is true.
+   */
+  bool passThroughBackground() const {
+    return bitFields.passThroughBackground;
+  }
+
+  /**
+   * Sets whether the layer passes through its background to sublayers.
+   * Note: Layers that can start or extend a 3D Rendering Context (see preserve3D()) always disable
+   * pass-through background regardless of this setting.
+   */
+  void setPassThroughBackground(bool value);
+
+  /**
    * Returns the position of the layer relative to the local coordinates of the parent layer.
    */
-  Point position() const {
-    return {_matrix.getTranslateX(), _matrix.getTranslateY()};
-  }
+  Point position() const;
 
   /**
    * Sets the position of the layer.
@@ -138,15 +159,62 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   /**
    * Returns the transformation matrix applied to the layer.
+   * If the matrix set via the setMatrix3D interface contains 3D transformations or projection
+   * transformations, this interface will return the identity matrix; you need to use the matrix3D
+   * interface to obtain the actual matrix. Otherwise, it will return the equivalent simplified
+   * affine transformation matrix.
    */
-  const Matrix& matrix() const {
-    return _matrix;
-  }
+  Matrix matrix() const;
 
   /**
    * Sets the transformation matrix applied to the layer.
    */
   void setMatrix(const Matrix& value);
+
+  /**
+   * Returns the 3D transformation matrix applied to the layer.
+   */
+  Matrix3D matrix3D() const {
+    return _matrix3D;
+  }
+
+  /**
+   * Sets the 3D transformation matrix applied to the layer.
+   */
+  void setMatrix3D(const Matrix3D& value);
+
+  /**
+   * Returns whether the layer preserves the 3D state of its content and child layers. The default
+   * value is false.
+   *
+   * When false, content and child layers are projected onto the layer's local space. Child layers
+   * are drawn in the order they were added, so later-added opaque layers completely cover earlier
+   * ones.
+   *
+   * When true, 3D rendering is enabled. If the parent layer has preserve3D disabled, this layer
+   * establishes a new 3D Rendering Context. If the parent also has preserve3D enabled, this layer
+   * inherits and extends the parent's context.
+   *
+   * Within a 3D Rendering Context, all child layers share the coordinate space of the context
+   * root's parent (or the DisplayList if no parent exists). Depth occlusion is applied based on
+   * actual 3D positions: opaque pixels closer to the observer occlude those farther away at the
+   * same xy coordinates.
+   *
+   * Note: preserve3D falls back to false behavior when any of the following conditions are met:
+   * 1. Layer styles is not empty.
+   * 2. Filters is not empty.
+   * 3. Mask is not empty.
+   * These features require projecting child layers into the current layer's local coordinate
+   * system, which is incompatible with 3D context preservation.
+   */
+  bool preserve3D() const {
+    return _preserve3D;
+  }
+
+  /**
+   * Sets whether the layer preserves the 3D state of its content and child layers.
+   */
+  void setPreserve3D(bool value);
 
   /**
    * Returns whether the layer is visible. The default value is true.
@@ -159,41 +227,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
    * Sets the visibility of the layer.
    */
   void setVisible(bool value);
-
-  /**
-   * Indicates whether the layer is cached as a bitmap before compositing. If true, the layer is
-   * rendered as a bitmap in its local coordinate space and then composited with other content. Any
-   * filters in the filters property are rasterized and included in the bitmap, but the current
-   * alpha of the layer is not. If false, the layer is composited directly into the destination
-   * whenever possible. The layer may still be rasterized before compositing if certain features
-   * (like filters) require it. This caching can improve performance for layers with complex
-   * content. The default value is false.
-   */
-  bool shouldRasterize() const {
-    return bitFields.shouldRasterize;
-  }
-
-  /**
-   * Sets whether the layer should be rasterized.
-   */
-  void setShouldRasterize(bool value);
-
-  /**
-   * The scale factor used to rasterize the content, relative to the layer’s coordinate space. When
-   * shouldRasterize is true, this property determines how much to scale the rasterized content.
-   * A value of 1.0 means the layer is rasterized at its current size. Values greater than 1.0
-   * enlarge the content, while values less than 1.0 shrink it. If set to an invalid value (less
-   * than or equal to 0), the layer is rasterized at its drawn size, which may cause the cache to be
-   * invalidated frequently if the drawn scale changes often. The default value is 0.0.
-   */
-  float rasterizationScale() const {
-    return _rasterizationScale;
-  }
-
-  /**
-   * Sets the scale at which to rasterize content.
-   */
-  void setRasterizationScale(float value);
 
   /**
    * Returns true if the layer is allowed to perform edge antialiasing. This means the edges of
@@ -222,6 +255,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   /**
    * Sets whether the layer is allowed to be composited as a separate group from their parent.
+   * Note: Layers inside a 3D Rendering Context (see preserve3D()) always apply alpha individually
+   * to each element regardless of this setting.
    */
   void setAllowsGroupOpacity(bool value);
 
@@ -238,8 +273,16 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   /**
    * Sets the list of layer styles applied to the layer.
+   * Note: Background-dependent layer styles (e.g., BackgroundBlurStyle) have the following
+   * limitations:
+   * 1. Layers that start a 3D Rendering Context (see preserve3D()) disable background styles for
+   *    the entire subtree rooted at that layer. The 3D Rendering Context uses a different rendering
+   *    strategy that has not yet fully adapted background layer drawing.
+   * 2. Layers with a 3D or projection transformation disable background styles for all descendant
+   *    layers (excluding the layer itself), because descendants cannot correctly obtain the
+   *    background.
    */
-  void setLayerStyles(std::vector<std::shared_ptr<LayerStyle>> value);
+  void setLayerStyles(const std::vector<std::shared_ptr<LayerStyle>>& value);
 
   /**
    * Whether to exclude child effects in the layer style. If true, child layer
@@ -269,7 +312,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
   /**
    * Sets the list of filters applied to the layer.
    */
-  void setFilters(std::vector<std::shared_ptr<LayerFilter>> value);
+  void setFilters(const std::vector<std::shared_ptr<LayerFilter>>& value);
 
   /**
    * Returns the layer used as a mask for the calling layer. For masking to work (allowing scaling
@@ -429,6 +472,16 @@ class Layer : public std::enable_shared_from_this<Layer> {
   bool setChildIndex(std::shared_ptr<Layer> child, int index);
 
   /**
+   * Replaces all children of this layer with the specified list of layers. This method efficiently
+   * handles the transition by only detaching removed children and attaching newly added ones,
+   * while preserving existing children that remain in the list. Uses LIS algorithm to minimize
+   * dirty area during reordering. Duplicate layers will only be added once (first occurrence is
+   * kept). Invalid layers (nullptr, circular references, root layers) are silently skipped.
+   * @param children The new list of child layers.
+   */
+  void setChildren(const std::vector<std::shared_ptr<Layer>>& children);
+
+  /**
    * Replaces the specified child layer of the calling layer with a different layer.
    * @param oldChild The layer to be replaced.
    * @param newChild The layer with which to replace oldLayer.
@@ -494,6 +547,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
    * Draws the layer and all its children onto the given canvas. You can specify the alpha and blend
    * mode to control how the layer is drawn. Note: The layer is drawn in its local space without
    * applying its own matrix, alpha, blend mode, visible, scrollRect, or mask.
+   * Note: Using a Canvas without a Surface may cause incorrect blending when passThroughBackground
+   * is enabled.
    * @param canvas The canvas to draw the layer on.
    * @param alpha The alpha transparency value used for drawing the layer and its children.
    * @param blendMode The blend mode used to composite the layer with the existing content on the
@@ -542,7 +597,9 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   void invalidate();
 
-  Rect getBoundsInternal(const Matrix& coordinateMatrix, bool computeTightBounds);
+  Rect getBoundsInternal(const Matrix3D& coordinateMatrix, bool computeTightBounds);
+
+  Rect computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBounds);
 
   void onAttachToRoot(RootLayer* rootLayer);
 
@@ -552,22 +609,19 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   bool doContains(const Layer* child) const;
 
-  Matrix getGlobalMatrix() const;
+  Matrix3D getGlobalMatrix() const;
 
-  Matrix getMatrixWithScrollRect() const;
+  Matrix3D getMatrixWithScrollRect() const;
 
   LayerContent* getContent();
 
   std::shared_ptr<ImageFilter> getImageFilter(float contentScale);
 
-  RasterizedContent* getRasterizedCache(const DrawArgs& args, const Matrix& renderMatrix);
+  virtual bool drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
+                         const Matrix3D* transform3D = nullptr);
 
-  std::shared_ptr<Image> getRasterizedImage(const DrawArgs& args, float contentScale,
-                                            Matrix* drawingMatrix);
-
-  void drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
-
-  void drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
+  void drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
+                     const Matrix3D* transform3D, const std::shared_ptr<MaskFilter>& maskFilter);
 
   void drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha);
 
@@ -575,42 +629,111 @@ class Layer : public std::enable_shared_from_this<Layer> {
                     const LayerStyleSource* layerStyleSource = nullptr,
                     const Layer* stopChild = nullptr);
 
+  bool drawContour(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
+                   const Matrix3D* transform3D = nullptr);
+
+  bool drawContourInternal(const DrawArgs& args, Canvas* canvas, const Matrix3D* transform3D,
+                           bool contentOnly);
+
   bool drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
                     const Layer* stopChild = nullptr);
 
+  using LayerDrawFunc = bool (Layer::*)(const DrawArgs&, Canvas*, float, BlendMode,
+                                        const Matrix3D*);
+
+  void drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, LayerDrawFunc drawFunc,
+                               float alpha, BlendMode blendMode);
+
+  std::optional<DrawArgs> createChildArgs(const DrawArgs& args, Canvas* canvas, Layer* child,
+                                          bool skipBackground);
+
+  bool drawChild(const DrawArgs& childArgs, Canvas* canvas, Layer* child, float alpha,
+                 LayerDrawFunc drawFunc);
+
   float drawBackgroundLayers(const DrawArgs& args, Canvas* canvas);
 
-  std::unique_ptr<LayerStyleSource> getLayerStyleSource(const DrawArgs& args, const Matrix& matrix);
+  std::unique_ptr<LayerStyleSource> getLayerStyleSource(const DrawArgs& args, const Matrix& matrix,
+                                                        bool excludeContour = false);
 
   std::shared_ptr<Image> getBackgroundImage(const DrawArgs& args, float contentScale,
                                             Point* offset);
 
+  /**
+   * Gets the background image of the minimum axis-aligned bounding box after drawing the layer
+   * subtree with the current layer as the root node
+   */
+  std::shared_ptr<Image> getBoundsBackgroundImage(const DrawArgs& args, float contentScale,
+                                                  Point* offset);
+
+  void drawBackgroundImage(const DrawArgs& args, Canvas& canvas);
+
   void drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
                        const LayerStyleSource* source, LayerStylePosition position);
 
+  void drawBackgroundLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
+                                 const Matrix3D& transform3D);
+
   bool getLayersUnderPointInternal(float x, float y, std::vector<std::shared_ptr<Layer>>* results);
 
-  std::shared_ptr<MaskFilter> getMaskFilter(const DrawArgs& args, float scale);
+  bool prepareMask(const DrawArgs& args, Canvas* canvas, std::shared_ptr<MaskFilter>* maskFilter);
 
-  Matrix getRelativeMatrix(const Layer* targetCoordinateSpace) const;
+  MaskData getMaskData(const DrawArgs& args, float scale,
+                       const std::optional<Rect>& layerClipBounds);
+
+  std::shared_ptr<Picture> getMaskPicture(const DrawArgs& args, bool isContourMode, float scale,
+                                          const Matrix& affineRelativeMatrix);
+
+  std::shared_ptr<Image> getContentContourImage(const DrawArgs& args, float contentScale,
+                                                Point* offset, bool* contourMatchesContent);
+
+  Matrix3D getRelativeMatrix(const Layer* targetCoordinateSpace) const;
 
   bool hasValidMask() const;
 
-  void updateRenderBounds(const Matrix& renderMatrix = {},
-                          std::shared_ptr<RegionTransformer> transformer = nullptr,
+  void updateRenderBounds(std::shared_ptr<RegionTransformer> transformer = nullptr,
                           bool forceDirty = false);
 
-  void checkBackgroundStyles(const Matrix& renderMatrix);
+  void checkBackgroundStyles(std::shared_ptr<RegionTransformer> transformer);
 
-  void updateBackgroundBounds(const Matrix& renderMatrix);
+  void updateBackgroundBounds(float contentScale);
 
-  void propagateBackgroundStyleOutset();
+  void propagateLayerState();
 
   bool hasBackgroundStyle();
 
-  std::shared_ptr<BackgroundContext> createBackgroundContext(Context* context, const Rect& drawRect,
-                                                             const Matrix& viewMatrix,
-                                                             bool fullLayer = false) const;
+  std::shared_ptr<BackgroundContext> createBackgroundContext(
+      Context* context, const Rect& drawRect, const Matrix& viewMatrix, bool fullLayer = false,
+      std::shared_ptr<ColorSpace> colorSpace = nullptr) const;
+
+  bool shouldPassThroughBackground(BlendMode blendMode, const Matrix3D* transform3D) const;
+
+  bool canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode, const Matrix3D* transform3D);
+
+  SubtreeCache* getValidSubtreeCache(const DrawArgs& args, int longEdge, const Rect& layerBounds);
+
+  std::shared_ptr<Image> createSubtreeCacheImage(const DrawArgs& args, float contentScale,
+                                                 const Rect& scaledBounds, Matrix* drawingMatrix);
+
+  bool drawWithSubtreeCache(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
+                            const Matrix3D* transform3D,
+                            const std::shared_ptr<MaskFilter>& maskFilter);
+
+  std::shared_ptr<Image> getContentImage(const DrawArgs& args, const Matrix& contentMatrix,
+                                         const std::optional<Rect>& clipBounds,
+                                         Matrix* imageMatrix);
+
+  std::shared_ptr<Image> getPassThroughContentImage(const DrawArgs& args, Canvas* canvas,
+                                                    const std::optional<Rect>& clipBounds,
+                                                    Matrix* imageMatrix);
+
+  std::optional<Rect> computeContentBounds(const std::optional<Rect>& clipBounds,
+                                           bool excludeEffects);
+
+  bool canPreserve3D() const;
+
+  void invalidateSubtree();
+
+  void updateStaticSubtreeFlags();
 
   struct {
     bool dirtyContent : 1;        // layer's content needs updating
@@ -618,16 +741,21 @@ class Layer : public std::enable_shared_from_this<Layer> {
     bool dirtyDescendents : 1;    // a descendant layer needs redrawing
     bool dirtyTransform : 1;      // the layer and its children need redrawing
     bool visible : 1;
-    bool shouldRasterize : 1;
     bool allowsEdgeAntialiasing : 1;
     bool allowsGroupOpacity : 1;
     bool excludeChildEffectsInLayerStyle : 1;
+    bool passThroughBackground : 1;
+    bool hasBlendMode : 1;
+    bool matrix3DIsAffine : 1;  // Whether the matrix3D is equivalent to a 2D affine matrix
+    bool staticSubtree : 1;  // Whether the subtree (content, children, filters, styles) is static.
     uint8_t blendMode : 5;
     uint8_t maskType : 2;
   } bitFields = {};
   std::string _name;
   float _alpha = 1.0f;
-  Matrix _matrix = {};
+  // The actual transformation matrix that determines the geometric position of the layer
+  Matrix3D _matrix3D = {};
+  bool _preserve3D = false;
   std::shared_ptr<Layer> _mask = nullptr;
   Layer* maskOwner = nullptr;
   std::unique_ptr<Rect> _scrollRect = nullptr;
@@ -636,11 +764,11 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::vector<std::shared_ptr<Layer>> _children = {};
   std::vector<std::shared_ptr<LayerFilter>> _filters = {};
   std::vector<std::shared_ptr<LayerStyle>> _layerStyles = {};
-  float _rasterizationScale = 0.0f;
-  std::unique_ptr<RasterizedContent> rasterizedContent;
+  std::unique_ptr<SubtreeCache> subtreeCache;
   std::shared_ptr<LayerContent> layerContent = nullptr;
-  Rect renderBounds = {};         // in global coordinates
-  Rect* contentBounds = nullptr;  //  in global coordinates
+  Rect renderBounds = {};                       // in global coordinates
+  Rect* contentBounds = nullptr;                //  in global coordinates
+  std::unique_ptr<Rect> localBounds = nullptr;  // in local coordinates
 
   // if > 0, means the layer or any of its descendants has a background style
   float maxBackgroundOutset = 0.f;

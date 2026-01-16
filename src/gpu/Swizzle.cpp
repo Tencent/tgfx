@@ -23,7 +23,7 @@ namespace tgfx {
 // next int.
 static const int k1KeyValue = 4;
 
-static float ComponentIdxToFloat(const Color& color, int idx) {
+static float ComponentIdxToFloat(const PMColor& color, int idx) {
   if (idx <= 3) {
     return color[idx];
   }
@@ -33,7 +33,31 @@ static float ComponentIdxToFloat(const Color& color, int idx) {
   return -1.0f;
 }
 
-Color Swizzle::applyTo(const Color& color) const {
+Swizzle Swizzle::ForRead(PixelFormat pixelFormat) {
+  switch (pixelFormat) {
+    case PixelFormat::ALPHA_8:
+      return RRRR();
+    case PixelFormat::GRAY_8:
+      return RRRA();
+    case PixelFormat::RG_88:
+      return RGRG();
+    default:
+      break;
+  }
+  return RGBA();
+}
+
+Swizzle Swizzle::ForWrite(PixelFormat pixelFormat) {
+  switch (pixelFormat) {
+    case PixelFormat::ALPHA_8:
+      return AAAA();
+    default:
+      break;
+  }
+  return RGBA();
+}
+
+PMColor Swizzle::applyTo(const PMColor& color) const {
   int idx;
   uint32_t k = key;
   // Index of the input color that should be mapped to output r.

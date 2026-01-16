@@ -19,6 +19,10 @@
 #include "WebPathRasterizer.h"
 #include <emscripten/val.h>
 #include "ReadPixelsFromCanvasImage.h"
+#include "core/utils/ColorSpaceHelper.h"
+#include "core/utils/ScalePixelsAlpha.h"
+#include "core/utils/ShapeUtils.h"
+#include "tgfx/core/Buffer.h"
 
 using namespace emscripten;
 
@@ -57,6 +61,7 @@ static void Iterator(PathVerb verb, const Point points[4], void* info) {
 }
 
 bool WebPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
+                                     std::shared_ptr<ColorSpace> dstColorSpace,
                                      void* dstPixels) const {
   if (dstPixels == nullptr) {
     return false;
@@ -75,13 +80,24 @@ bool WebPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, s
   if (!PathRasterizerClass.as<bool>()) {
     return false;
   }
-  auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes);
+  auto dstInfo =
+      ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes, dstColorSpace);
   auto targetInfo = dstInfo.makeIntersect(0, 0, width(), height());
   auto imageData = PathRasterizerClass.call<val>("readPixels", targetInfo.width(),
                                                  targetInfo.height(), path2D, path.getFillType());
   if (!imageData.as<bool>()) {
     return false;
   }
-  return ReadPixelsFromCanvasImage(imageData, targetInfo, dstPixels);
+  auto result = ReadPixelsFromCanvasImage(imageData, targetInfo, dstPixels);
+  if (!result) {
+    return false;
+  }
+  auto alphaScale = ShapeUtils::CalculateAlphaReduceFactorIfHairline(shape);
+  ScalePixelsAlpha(targetInfo, dstPixels, alphaScale);
+  if (NeedConvertColorSpace(colorSpace(), dstColorSpace)) {
+    ConvertColorSpaceInPlace(width(), height(), colorType, alphaType, dstRowBytes, colorSpace(),
+                             dstColorSpace, dstPixels);
+  }
+  return true;
 }
 }  // namespace tgfx

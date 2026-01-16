@@ -19,13 +19,17 @@
 #include "gpu/ResourceCache.h"
 #include <unordered_map>
 #include "core/utils/Log.h"
-#include "gpu/Resource.h"
+#include "gpu/resources/Resource.h"
 
 namespace tgfx {
 static constexpr size_t MAX_EXPIRATION_FRAMES = 1000000;  // About 4.5 hours at 60 FPS
 static constexpr size_t SCRATCH_EXPIRATION_FRAMES = 2;
 
 ResourceCache::ResourceCache(Context* context) : context(context) {
+}
+
+ResourceCache::~ResourceCache() {
+  releaseAll();
 }
 
 bool ResourceCache::empty() const {
@@ -96,31 +100,33 @@ void ResourceCache::purgeResourcesByLRU(bool scratchResourceOnly,
                                         const std::function<bool(Resource*)>& satisfied) {
   auto item = purgeableResources.begin();
   while (item != purgeableResources.end()) {
-    auto* resource = *item;
+    auto resource = *item;
     if (satisfied(resource)) {
       break;
     }
-    if (!scratchResourceOnly || !resource->hasExternalReferences()) {
-      item = purgeableResources.erase(item);
-      purgeableBytes -= resource->memoryUsage();
-      removeResource(resource);
-    } else {
+    if (scratchResourceOnly && resource->hasExternalReferences()) {
       item++;
+      continue;
     }
+    // Expired UniqueKey resources with ScratchKey are downgraded to scratch resources.
+    if (!scratchResourceOnly && resource->hasExternalReferences() &&
+        !resource->scratchKey.empty()) {
+      removeUniqueKey(resource);
+      resource->lastUsedTime = currentFrameTime;
+      // Move to the end of the list to maintain LRU order.
+      item = purgeableResources.erase(item);
+      AddToList(purgeableResources, resource);
+      continue;
+    }
+    item = purgeableResources.erase(item);
+    purgeableBytes -= resource->memoryUsage();
+    removeResource(resource);
   }
 }
 
 void ResourceCache::processUnreferencedResources() {
-  std::vector<Resource*> needToPurge = {};
-  for (auto& resource : nonpurgeableResources) {
-    if (resource->isPurgeable()) {
-      needToPurge.push_back(resource);
-    }
-  }
-  if (needToPurge.empty()) {
-    return;
-  }
-  for (auto& resource : needToPurge) {
+  while (auto resource = static_cast<Resource*>(returnQueue->dequeue())) {
+    DEBUG_ASSERT(resource->isPurgeable());
     RemoveFromList(nonpurgeableResources, resource);
     if (!resource->scratchKey.empty() || resource->hasExternalReferences()) {
       AddToList(purgeableResources, resource);
@@ -132,15 +138,17 @@ void ResourceCache::processUnreferencedResources() {
   }
 }
 
-void ResourceCache::releaseAll(bool releaseGPU) {
+void ResourceCache::releaseAll() {
   for (auto& resource : nonpurgeableResources) {
-    resource->release(releaseGPU);
+    // Note that we don't delete the resource here, because it may still be referenced externally.
+    resource->context = nullptr;
   }
   nonpurgeableResources.clear();
   for (auto& resource : purgeableResources) {
-    resource->release(releaseGPU);
+    delete resource;
   }
   purgeableResources.clear();
+  returnQueue = ReturnQueue::Make();
   scratchKeyMap.clear();
   uniqueKeyMap.clear();
   purgeableBytes = 0;
@@ -209,10 +217,6 @@ void ResourceCache::RemoveFromList(std::list<Resource*>& list, Resource* resourc
   resource->cachedList = nullptr;
 }
 
-bool ResourceCache::InList(const std::list<Resource*>& list, tgfx::Resource* resource) {
-  return resource->cachedList == &list;
-}
-
 void ResourceCache::changeUniqueKey(Resource* resource, const UniqueKey& uniqueKey) {
   auto result = uniqueKeyMap.find(uniqueKey);
   if (result != uniqueKeyMap.end()) {
@@ -238,21 +242,24 @@ std::shared_ptr<Resource> ResourceCache::addResource(Resource* resource,
     scratchKeyMap[resource->scratchKey].push_back(resource);
   }
   totalBytes += resource->memoryUsage();
-  auto result = std::shared_ptr<Resource>(resource);
-  // Add a strong reference to the resource itself, preventing it from being deleted by external
-  // references.
-  result->reference = result;
   AddToList(nonpurgeableResources, resource);
-  return result;
+  auto reference = std::static_pointer_cast<Resource>(returnQueue->makeShared(resource));
+  reference->weakThis = reference;
+  return reference;
 }
 
 std::shared_ptr<Resource> ResourceCache::refResource(Resource* resource) {
-  if (InList(purgeableResources, resource)) {
-    RemoveFromList(purgeableResources, resource);
-    purgeableBytes -= resource->memoryUsage();
-    AddToList(nonpurgeableResources, resource);
+  if (auto reference = resource->weakThis.lock()) {
+    return reference;
   }
-  return resource->reference;
+  processUnreferencedResources();
+  DEBUG_ASSERT(resource->cachedList == &purgeableResources);
+  RemoveFromList(purgeableResources, resource);
+  purgeableBytes -= resource->memoryUsage();
+  AddToList(nonpurgeableResources, resource);
+  auto reference = std::static_pointer_cast<Resource>(returnQueue->makeShared(resource));
+  reference->weakThis = reference;
+  return reference;
 }
 
 void ResourceCache::removeResource(Resource* resource) {
@@ -270,6 +277,6 @@ void ResourceCache::removeResource(Resource* resource) {
     }
   }
   totalBytes -= resource->memoryUsage();
-  resource->release(true);
+  delete resource;
 }
 }  // namespace tgfx

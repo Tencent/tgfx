@@ -45,7 +45,8 @@
         "targets": [
           "webp",
           "webpdemux",
-          "sharpyuv"
+          "sharpyuv",
+          "libwebpmux"
         ]
       }
     },
@@ -54,7 +55,8 @@
       "cmake": {
         "targets": [
           "webp",
-          "webpdemux"
+          "webpdemux",
+          "libwebpmux"
         ],
         "arguments": [
           "-DWEBP_BUILD_WEBP_JS=ON"
@@ -248,15 +250,6 @@
         "arguments": [
           "-DFLATBUFFERS_BUILD_FLATLIB=ON",
           "-DFLATBUFFERS_BUILD_CPP17=ON"
-        ]
-      }
-    },
-    {
-      "name": "inspector",
-      "dir": "../inspector",
-      "cmake": {
-        "targets": [
-          "inspector"
         ]
       }
     },

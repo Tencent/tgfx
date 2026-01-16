@@ -18,6 +18,8 @@
 
 #include "tgfx/layers/TextLayer.h"
 #include "core/utils/Log.h"
+#include "tgfx/core/TextBlob.h"
+#include "tgfx/core/TextBlobBuilder.h"
 #include "tgfx/core/UTF.h"
 
 namespace tgfx {
@@ -211,15 +213,12 @@ void TextLayer::onUpdateContent(LayerRecorder* recorder) {
     return;
   }
 
-  // 6. Calculate the final glyphs and positions for rendering
-  std::vector<GlyphRun> glyphRunList;
-  buildGlyphRunList(finalGlyphs, positions, glyphRunList);
-
-  auto textBlob = TextBlob::MakeFrom(std::move(glyphRunList));
-  Paint paint = {};
-  paint.setColor(_textColor);
-  auto canvas = recorder->getCanvas();
-  canvas->drawTextBlob(textBlob, 0, 0, paint);
+  // 6. Build TextBlob using TextBlobBuilder
+  auto textBlob = buildTextBlob(finalGlyphs, positions);
+  if (textBlob == nullptr) {
+    return;
+  }
+  recorder->addTextBlob(std::move(textBlob), LayerPaint(_textColor));
 }
 
 std::string TextLayer::PreprocessNewLines(const std::string& text) {
@@ -451,34 +450,49 @@ void TextLayer::resolveTextAlignment(const std::vector<std::shared_ptr<GlyphLine
   }
 }
 
-void TextLayer::buildGlyphRunList(const std::vector<std::shared_ptr<GlyphInfo>>& finalGlyphs,
-                                  const std::vector<Point>& positions,
-                                  std::vector<GlyphRun>& glyphRunList) const {
-  std::unordered_map<uint32_t, GlyphRun> glyphRunMap = {};
+std::shared_ptr<TextBlob> TextLayer::buildTextBlob(
+    const std::vector<std::shared_ptr<GlyphInfo>>& finalGlyphs,
+    const std::vector<Point>& positions) const {
+  if (finalGlyphs.empty()) {
+    return nullptr;
+  }
+
+  // Group glyphs by typeface
+  std::unordered_map<uint32_t, std::vector<size_t>> typefaceToIndices;
   for (size_t i = 0; i < finalGlyphs.size(); ++i) {
     const auto& glyphInfo = finalGlyphs[i];
     if (glyphInfo == nullptr) {
       continue;
     }
-
     const auto& typeface = glyphInfo->getTypeface();
     if (typeface == nullptr) {
       continue;
     }
+    typefaceToIndices[typeface->uniqueID()].push_back(i);
+  }
 
-    auto typefaceID = typeface->uniqueID();
-    if (glyphRunMap.find(typefaceID) == glyphRunMap.end()) {
-      auto font = _font;
-      font.setTypeface(typeface);
-      glyphRunMap[typefaceID] = GlyphRun(font, {}, {});
+  if (typefaceToIndices.empty()) {
+    return nullptr;
+  }
+
+  TextBlobBuilder builder;
+  for (const auto& [typefaceID, indices] : typefaceToIndices) {
+    if (indices.empty()) {
+      continue;
     }
-    auto& fontGlyphRun = glyphRunMap[typefaceID];
-    fontGlyphRun.glyphs.emplace_back(glyphInfo->getGlyphID());
-    fontGlyphRun.positions.push_back(positions[i]);
+    auto typeface = finalGlyphs[indices[0]]->getTypeface();
+    auto font = _font;
+    font.setTypeface(typeface);
+
+    const auto& buffer = builder.allocRunPos(font, indices.size());
+    auto* pointPositions = reinterpret_cast<Point*>(buffer.positions);
+    for (size_t i = 0; i < indices.size(); i++) {
+      auto idx = indices[i];
+      buffer.glyphs[i] = finalGlyphs[idx]->getGlyphID();
+      pointPositions[i] = positions[idx];
+    }
   }
 
-  for (const auto& fontGlyphRun : glyphRunMap) {
-    glyphRunList.emplace_back(fontGlyphRun.second);
-  }
+  return builder.build();
 }
 }  // namespace tgfx

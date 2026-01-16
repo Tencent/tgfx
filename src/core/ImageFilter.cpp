@@ -26,14 +26,14 @@
 #include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
-Rect ImageFilter::filterBounds(const Rect& rect) const {
-  Rect dstBounds = {};
-  applyCropRect(rect, &dstBounds);
-  return dstBounds;
+Rect ImageFilter::filterBounds(const Rect& rect, MapDirection mapDirection) const {
+  auto result = onFilterBounds(rect, mapDirection);
+  result.roundOut();
+  return result;
 }
 
-Rect ImageFilter::onFilterBounds(const Rect& srcRect) const {
-  return srcRect;
+Rect ImageFilter::onFilterBounds(const Rect& rect, MapDirection) const {
+  return rect;
 }
 
 std::shared_ptr<TextureProxy> ImageFilter::lockTextureProxy(std::shared_ptr<Image> source,
@@ -48,7 +48,7 @@ std::shared_ptr<TextureProxy> ImageFilter::lockTextureProxy(std::shared_ptr<Imag
 
   auto textureScaleX = scaledBounds.width() / renderBounds.width();
   auto textureScaleY = scaledBounds.height() / renderBounds.height();
-  auto renderTarget = RenderTargetProxy::MakeFallback(
+  auto renderTarget = RenderTargetProxy::Make(
       args.context, static_cast<int>(scaledBounds.width()), static_cast<int>(scaledBounds.height()),
       source->isAlphaOnly(), 1, args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
   if (renderTarget == nullptr) {
@@ -69,7 +69,7 @@ std::shared_ptr<TextureProxy> ImageFilter::lockTextureProxy(std::shared_ptr<Imag
 }
 
 bool ImageFilter::applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* clipBounds) const {
-  *dstRect = onFilterBounds(srcRect);
+  *dstRect = onFilterBounds(srcRect, MapDirection::Forward);
   if (clipBounds) {
     if (!dstRect->intersect(*clipBounds)) {
       return false;
@@ -105,9 +105,12 @@ PlacementPtr<FragmentProcessor> ImageFilter::makeFPFromTextureProxy(
     fpMatrix.preConcat(*uvMatrix);
   }
   SamplingArgs samplingArgs = {TileMode::Decal, TileMode::Decal, sampling, constraint};
+  auto allocator = args.context->drawingAllocator();
   if (dstBounds.contains(clipBounds)) {
-    return TextureEffect::Make(std::move(textureProxy), samplingArgs, &fpMatrix, isAlphaOnly);
+    return TextureEffect::Make(allocator, std::move(textureProxy), samplingArgs, &fpMatrix,
+                               isAlphaOnly);
   }
-  return TiledTextureEffect::Make(std::move(textureProxy), samplingArgs, &fpMatrix, isAlphaOnly);
+  return TiledTextureEffect::Make(allocator, std::move(textureProxy), samplingArgs, &fpMatrix,
+                                  isAlphaOnly);
 }
 }  // namespace tgfx

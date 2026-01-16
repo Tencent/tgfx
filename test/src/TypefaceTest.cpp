@@ -161,19 +161,13 @@ TGFX_TEST(TypefaceTest, CustomImageTypeface) {
   auto surface = Surface::Make(context, 400, 200);
   auto canvas = surface->getCanvas();
 
-  auto paint = Paint();
-  paint.setColor(Color::Red());
-
-  float scaleFactor = 1.0f;
-  canvas->scale(scaleFactor, scaleFactor);
-
   Font font(std::move(typeface), 0.25);
   std::vector<GlyphID> glyphIDs2 = {1, 2, 3};
   std::vector<Point> positions2 = {};
   positions2.push_back(Point::Make(150.0f, 0.0f));
   positions2.push_back(Point::Make(215.0f, 0.0f));
   positions2.push_back(Point::Make(280.0f, 0.0f));
-  canvas->drawGlyphs(glyphIDs2.data(), positions2.data(), glyphIDs2.size(), font, paint);
+  canvas->drawGlyphs(glyphIDs2.data(), positions2.data(), glyphIDs2.size(), font, {});
 
   EXPECT_TRUE(Baseline::Compare(surface, "TypefaceTest/CustomImageTypeface"));
 }

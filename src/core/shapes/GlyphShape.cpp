@@ -17,6 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GlyphShape.h"
+#include "core/utils/MathExtra.h"
+#include "core/utils/UniqueID.h"
+#include "gpu/resources/ResourceKey.h"
 
 namespace tgfx {
 std::shared_ptr<Shape> Shape::MakeFrom(Font font, GlyphID glyphID) {
@@ -32,15 +35,45 @@ std::shared_ptr<Shape> Shape::MakeFrom(Font font, GlyphID glyphID) {
 GlyphShape::GlyphShape(Font font, GlyphID glyphID) : font(std::move(font)), glyphID(glyphID) {
 }
 
-Path GlyphShape::getPath() const {
-  Path path = {};
-  if (!font.getPath(glyphID, &path)) {
+UniqueKey GlyphShape::getUniqueKey() const {
+  static const auto GlyphShapeType = UniqueID::Next();
+  auto typeface = font.getTypeface();
+  if (typeface == nullptr) {
     return {};
+  }
+  // Key components: type, typefaceID, fontSize, fauxBold, fauxItalic, glyphID
+  BytesKey bytesKey(5);
+  bytesKey.write(GlyphShapeType);
+  bytesKey.write(typeface->uniqueID());
+  bytesKey.write(font.getSize());
+  bytesKey.write(static_cast<uint32_t>(font.isFauxBold()) << 1 |
+                 static_cast<uint32_t>(font.isFauxItalic()));
+  bytesKey.write(static_cast<uint32_t>(glyphID));
+  static const auto GlyphShapeDomain = UniqueKey::Make();
+  return UniqueKey::Append(GlyphShapeDomain, bytesKey.data(), bytesKey.size());
+}
+
+Path GlyphShape::onGetPath(float resolutionScale) const {
+  if (FloatNearlyZero(resolutionScale)) {
+    return {};
+  }
+  Path path = {};
+  if (FloatNearlyEqual(resolutionScale, 1.0f)) {
+    if (!font.getPath(glyphID, &path)) {
+      return {};
+    }
+  } else {
+    auto scaledFont = font.makeWithSize(font.getSize() * resolutionScale);
+    if (!scaledFont.getPath(glyphID, &path)) {
+      return {};
+    }
+    auto inverseMatrix = Matrix::MakeScale(1.f / resolutionScale, 1.f / resolutionScale);
+    path.transform(inverseMatrix);
   }
   return path;
 }
 
-Rect GlyphShape::getBounds() const {
+Rect GlyphShape::onGetBounds() const {
   return font.getBounds(glyphID);
 }
 }  // namespace tgfx

@@ -62,8 +62,8 @@ class ImageUserScalerContext final : public UserScalerContext {
                           static_cast<float>(record->image->height()));
   }
 
-  bool readPixels(GlyphID glyphID, bool, const Stroke*, const ImageInfo& dstInfo,
-                  void* dstPixels) const override {
+  bool readPixels(GlyphID glyphID, bool, const Stroke*, const ImageInfo& dstInfo, void* dstPixels,
+                  const Point&) const override {
     if (dstInfo.isEmpty() || dstPixels == nullptr) {
       return false;
     }
@@ -72,6 +72,10 @@ class ImageUserScalerContext final : public UserScalerContext {
       return false;
     }
     return record->image->readPixels(dstInfo, dstPixels);
+  }
+
+  float getBackingSize() const override {
+    return 1.f;
   }
 
  private:

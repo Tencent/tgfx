@@ -26,11 +26,11 @@ std::shared_ptr<Shape> Shape::MakeFrom(std::shared_ptr<PathProvider> pathProvide
   return std::make_shared<ProviderShape>(std::move(pathProvider));
 }
 
-Rect ProviderShape::getBounds() const {
+Rect ProviderShape::onGetBounds() const {
   return provider->getBounds();
 }
 
-Path ProviderShape::getPath() const {
+Path ProviderShape::onGetPath(float /*resolutionScale*/) const {
   return provider->getPath();
 }
 }  // namespace tgfx

@@ -116,6 +116,7 @@ struct SVGPresentationAttributes {
   SVGProperty<SVGNumberType, false> StopOpacity;
   SVGProperty<SVGColor, false> FloodColor;
   SVGProperty<SVGNumberType, false> FloodOpacity;
+  SVGProperty<SVGStringType, false> ID;
   SVGProperty<SVGColor, false> LightingColor;
 };
 }  // namespace tgfx

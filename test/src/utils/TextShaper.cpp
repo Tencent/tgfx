@@ -55,7 +55,7 @@ std::shared_ptr<hb_face_t> CreateHBFace(const std::shared_ptr<Typeface>& typefac
     if (stream->read(buffer->data(), size) != size) {
       return nullptr;
     }
-    auto* wrapper = new PtrWrapper<Buffer>(buffer);
+    auto wrapper = new PtrWrapper<Buffer>(buffer);
     auto blob = std::shared_ptr<hb_blob_t>(
         hb_blob_create(static_cast<const char*>(buffer->data()),
                        static_cast<unsigned int>(buffer->size()), HB_MEMORY_MODE_READONLY,
@@ -142,9 +142,9 @@ class HBLockedFontCache {
 };
 
 static HBLockedFontCache GetHBFontCache() {
-  static auto* HBFontCacheMutex = new std::mutex();
-  static auto* HBFontLRU = new std::list<uint32_t>();
-  static auto* HBFontCache = new std::map<uint32_t, std::shared_ptr<hb_font_t>>();
+  static auto HBFontCacheMutex = new std::mutex();
+  static auto HBFontLRU = new std::list<uint32_t>();
+  static auto HBFontCache = new std::map<uint32_t, std::shared_ptr<hb_font_t>>();
   return {HBFontLRU, HBFontCache, HBFontCacheMutex};
 }
 
@@ -178,7 +178,7 @@ static std::vector<std::tuple<uint32_t, uint32_t, uint32_t>> ShapeText(
   hb_buffer_guess_segment_properties(hbBuffer.get());
   hb_shape(hbFont.get(), hbBuffer.get(), nullptr, 0);
   unsigned count = 0;
-  auto* infos = hb_buffer_get_glyph_infos(hbBuffer.get(), &count);
+  auto infos = hb_buffer_get_glyph_infos(hbBuffer.get(), &count);
   std::vector<std::tuple<uint32_t, uint32_t, uint32_t>> result;
   for (unsigned i = 0; i < count; ++i) {
     auto length = (i + 1 == count ? text.length() : infos[i + 1].cluster) - infos[i].cluster;

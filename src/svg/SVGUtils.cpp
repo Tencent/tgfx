@@ -133,10 +133,7 @@ std::string ToSVGBlendMode(BlendMode mode) {
   auto index = static_cast<size_t>(mode);
   DEBUG_ASSERT(index < blendModeCount);
   const auto& blendStr = blendModeMap[index];
-  if (blendStr.empty()) {
-    return "";
-  }
-  return "mix-blend-mode:" + blendStr;
+  return blendStr;
 }
 
 std::string FloatToString(float value) {
@@ -172,7 +169,7 @@ std::shared_ptr<Data> Base64Decode(const std::string& encodedString) {
     outLength--;
   }
 
-  auto* out = static_cast<unsigned char*>(malloc(outLength));
+  auto out = static_cast<unsigned char*>(malloc(outLength));
   auto outData = Data::MakeAdopted(out, outLength, Data::FreeProc);
 
   for (size_t i = 0, j = 0; i < inLength;) {
@@ -284,13 +281,31 @@ std::shared_ptr<Data> AsDataUri(const std::shared_ptr<Data>& encodedData) {
   size_t prefixLength = strlen(prefix);
   size_t base64Size = ((encodedData->size() + 2) / 3) * 4 + 1;  // +1 for char* terminator
   auto bufferSize = prefixLength + base64Size;
-  auto* dest = static_cast<char*>(malloc(bufferSize));
+  auto dest = static_cast<char*>(malloc(bufferSize));
   memcpy(dest, prefix, prefixLength);
   Base64Encode(encodedData->bytes(), encodedData->size(), dest + prefixLength);
   dest[bufferSize - 1] = '\0';
 
   auto dataUri = Data::MakeAdopted(dest, bufferSize, Data::FreeProc);
   return dataUri;
+}
+
+std::shared_ptr<Image> ConvertImageColorSpace(const std::shared_ptr<Image>& image, Context* context,
+                                              const std::shared_ptr<ColorSpace>& targetColorSpace,
+                                              const std::shared_ptr<ColorSpace>& assignColorSpace) {
+  auto tempColorSpace = assignColorSpace ? assignColorSpace : targetColorSpace;
+  if (tempColorSpace == nullptr) {
+    return image;
+  }
+  auto surface =
+      Surface::Make(context, image->width(), image->height(), false, 1, false, 0, targetColorSpace);
+  auto canvas = surface->getCanvas();
+  canvas->drawImage(image);
+  Bitmap bitmap{image->width(), image->height(), false, true, tempColorSpace};
+  auto pixels = bitmap.lockPixels();
+  surface->readPixels(bitmap.info().makeColorSpace(targetColorSpace), pixels);
+  bitmap.unlockPixels();
+  return Image::MakeFrom(bitmap);
 }
 
 namespace {

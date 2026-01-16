@@ -25,17 +25,17 @@
 namespace tgfx {
 class OpsRenderTask : public RenderTask {
  public:
-  OpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy, PlacementArray<Op>&& ops,
-                std::optional<Color> clearColor)
-      : renderTargetProxy(std::move(renderTargetProxy)), ops(std::move(ops)),
-        clearColor(clearColor) {
+  OpsRenderTask(BlockAllocator* allocator, std::shared_ptr<RenderTargetProxy> renderTargetProxy,
+                PlacementArray<DrawOp>&& drawOps, std::optional<PMColor> clearColor)
+      : RenderTask(allocator), renderTargetProxy(std::move(renderTargetProxy)),
+        drawOps(std::move(drawOps)), clearColor(clearColor) {
   }
 
   void execute(CommandEncoder* encoder) override;
 
  private:
   std::shared_ptr<RenderTargetProxy> renderTargetProxy = nullptr;
-  PlacementArray<Op> ops = {};
-  std::optional<Color> clearColor = std::nullopt;
+  PlacementArray<DrawOp> drawOps = {};
+  std::optional<PMColor> clearColor = std::nullopt;
 };
 }  // namespace tgfx

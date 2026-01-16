@@ -44,7 +44,7 @@ size_t ImageInfo::GetBytesPerPixel(ColorType colorType) {
 }
 
 ImageInfo ImageInfo::Make(int width, int height, ColorType colorType, AlphaType alphaType,
-                          size_t rowBytes) {
+                          size_t rowBytes, std::shared_ptr<ColorSpace> colorSpace) {
   static ImageInfo emptyInfo = {};
   if (colorType == ColorType::Unknown || alphaType == AlphaType::Unknown ||
       !IsValidSize(width, height)) {
@@ -60,10 +60,11 @@ ImageInfo ImageInfo::Make(int width, int height, ColorType colorType, AlphaType 
   }
   if (colorType == ColorType::ALPHA_8) {
     alphaType = AlphaType::Premultiplied;
+    colorSpace = nullptr;
   } else if (colorType == ColorType::RGB_565) {
     alphaType = AlphaType::Opaque;
   }
-  return {width, height, colorType, alphaType, rowBytes};
+  return {width, height, colorType, alphaType, rowBytes, std::move(colorSpace)};
 }
 
 size_t ImageInfo::bytesPerPixel() const {
@@ -107,4 +108,11 @@ void* ImageInfo::computeOffset(void* pixels, int x, int y) const {
   auto offset = static_cast<size_t>(y) * _rowBytes + static_cast<size_t>(x) * bytesPerPixel();
   return reinterpret_cast<uint8_t*>(pixels) + offset;
 }
+
+bool operator==(const ImageInfo& a, const ImageInfo& b) {
+  return a._width == b._width && a._height == b._height && a._colorType == b._colorType &&
+         a._alphaType == b._alphaType && a._rowBytes == b._rowBytes &&
+         ColorSpace::Equals(a._colorSpace.get(), b._colorSpace.get());
+}
+
 }  // namespace tgfx

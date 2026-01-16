@@ -26,6 +26,7 @@
 #include "tgfx/core/Picture.h"
 #include "tgfx/core/SamplingOptions.h"
 #include "tgfx/core/Shape.h"
+#include "tgfx/core/SrcRectConstraint.h"
 #include "tgfx/core/TextBlob.h"
 #include "tgfx/svg/SVGExporter.h"
 
@@ -34,22 +35,6 @@ class Surface;
 class DrawContext;
 class MCState;
 class CanvasState;
-
-/**
- * SrcRectConstraint controls the behavior at the edge of source rect, provided to drawImageRect()
- * when there is any filtering. If Strict is set, then extra code is used to ensure it never samples
- * outside the src-rect. Strict disables the use of mipmaps.
-*/
-enum class SrcRectConstraint {
-  /**
-   * sample only inside bounds; slower
-   */
-  Strict,
-  /**
-   * sample outside bounds; faster
-   */
-  Fast,
-};
 
 /**
  * Canvas provides an interface for drawing, including how the drawing is clipped and transformed.
@@ -213,12 +198,14 @@ class Canvas {
   /**
    * Fills the current clip with the specified color, using BlendMode::Src. This replaces all pixels
    * within the clip with the specified color.
+   * @param color The sRGB color used for clearing. Values may exceed 0-1.
    */
   void clear(const Color& color = Color::Transparent());
 
   /**
    * Fills the current clip with the specified color. The color is blended with the destination
    * pixels using the specified blend mode.
+   * @param color The sRGB color used for drawing. Values may exceed 0-1.
    */
   void drawColor(const Color& color, BlendMode blendMode = BlendMode::SrcOver);
 
@@ -237,7 +224,7 @@ class Canvas {
    * @param y0  the y-coordinate of the start point.
    * @param x1  the x-coordinate of the end point.
    * @param y1  the y-coordinate of the end point.
-   * @param paint  stroke, blend, color, and so on, used to draw.
+   * @param paint  the paint to use for stroke, blend, color, etc.
    */
   void drawLine(float x0, float y0, float x1, float y1, const Paint& paint);
 
@@ -246,7 +233,7 @@ class Canvas {
    * Paint::style is always treated as PaintStyle::Stroke.
    * @param p0  the start point.
    * @param p1  the end point.
-   * @param paint  stroke, blend, color, and so on, used to draw.
+   * @param paint  the paint to use for stroke, blend, color, etc.
    */
   void drawLine(const Point& p0, const Point& p1, const Paint& paint) {
     drawLine(p0.x, p0.y, p1.x, p1.y, paint);
@@ -290,7 +277,7 @@ class Canvas {
    * @param rect bounds of the round rectangle to draw
    * @param radiusX axis length on x-axis of the rounded corners.
    * @param radiusY axis length on y-axis of the rounded corners.
-   * @param paint stroke, blend, color, and so on, used to draw.
+   * @param paint the paint to use for stroke, blend, color, etc.
    */
   void drawRoundRect(const Rect& rect, float radiusX, float radiusY, const Paint& paint);
 
@@ -446,7 +433,8 @@ class Canvas {
    * @param atlas The image containing the sprites.
    * @param matrix The matrix transformations for the sprites in the atlas.
    * @param tex The rectangle locations of the sprites in the atlas.
-   * @param colors An array of colors for each sprite; can be nullptr.
+   * @param colors An array of sRGB colors for each sprite. Values may exceed the 0-1 range, and the
+   * array can be nullptr.
    * @param count The number of sprites to draw.
    * @param sampling The sampling options used to sample the atlas image.
    * @param paint The paint used for blending, alpha, etc.
@@ -458,32 +446,31 @@ class Canvas {
  private:
   DrawContext* drawContext = nullptr;
   Surface* surface = nullptr;
-  bool optimizeMemoryForLayer = false;
   std::unique_ptr<MCState> mcState;
   std::stack<std::unique_ptr<CanvasState>> stateStack;
 
-  explicit Canvas(DrawContext* drawContext, Surface* surface = nullptr,
-                  bool optimizeMemoryForLayer = false);
-  void drawPath(const Path& path, const MCState& state, const Fill& fill,
-                const Stroke* stroke) const;
-  void drawImage(std::shared_ptr<Image> image, const Fill& fill, const SamplingOptions& sampling,
+  explicit Canvas(DrawContext* drawContext, Surface* surface = nullptr);
+  void drawPath(const Path& path, const MCState& state, const Brush& brush,
+                const Stroke* stroke = nullptr) const;
+  void drawImage(std::shared_ptr<Image> image, const Brush& brush, const SamplingOptions& sampling,
                  const Matrix* dstMatrix);
   void drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
-                     const SamplingOptions& sampling, const Fill& fill,
+                     const SamplingOptions& sampling, const Brush& brush,
                      SrcRectConstraint constraint = SrcRectConstraint::Fast);
-  void drawLayer(std::shared_ptr<Picture> picture, const MCState& state, const Fill& fill,
+  void drawLayer(std::shared_ptr<Picture> picture, const MCState& state, const Brush& brush,
                  std::shared_ptr<ImageFilter> imageFilter = nullptr);
-  void drawFill(const MCState& state, const Fill& fill) const;
+  void drawFill(const MCState& state, const Brush& brush) const;
   void resetStateStack();
 
   friend class Surface;
   friend class Picture;
-  friend class Recorder;
+  friend class PictureRecorder;
   friend class SVGExporter;
   friend class PDFDocumentImpl;
   friend class PDFShader;
   friend class PDFExportContext;
   friend class PDFFont;
+  friend class ContourContext;
 };
 
 /**

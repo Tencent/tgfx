@@ -18,9 +18,13 @@
 
 #pragma once
 
-#include "core/utils/LazyBounds.h"
-#include "gpu/ResourceKey.h"
+#include <atomic>
+#include "gpu/resources/ResourceKey.h"
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wfloat-conversion"
+#pragma clang diagnostic ignored "-Wimplicit-int-conversion"
 #include "pathkit.h"
+#pragma clang diagnostic pop
 
 namespace tgfx {
 class Path;
@@ -39,11 +43,13 @@ class PathRef {
   explicit PathRef(const pk::SkPath& path) : path(path) {
   }
 
+  ~PathRef();
+
   Rect getBounds();
 
  private:
   LazyUniqueKey uniqueKey = {};
-  LazyBounds bounds = {};
+  std::atomic<Rect*> bounds = {nullptr};
   pk::SkPath path = {};
 
   friend bool operator==(const Path& a, const Path& b);

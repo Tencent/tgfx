@@ -18,34 +18,30 @@
 
 #pragma once
 
-#include "gpu/Resource.h"
-#include "gpu/UniformBuffer.h"
+#include <list>
+#include "gpu/UniformData.h"
 #include "tgfx/core/BytesKey.h"
+#include "tgfx/gpu/RenderPipeline.h"
 
 namespace tgfx {
-/**
- * The base class for GPU programs.
- */
-class Program : public Resource {
+class Program {
  public:
-  size_t memoryUsage() const override {
-    return 0;
+  explicit Program(std::shared_ptr<RenderPipeline> pipeline,
+                   std::unique_ptr<UniformData> vertexUniformData,
+                   std::unique_ptr<UniformData> fragmentUniformData);
+
+  std::shared_ptr<RenderPipeline> getPipeline() const {
+    return pipeline;
   }
 
-  UniformBuffer* uniformBuffer() const {
-    return _uniformBuffer.get();
-  }
-
- protected:
-  std::unique_ptr<UniformBuffer> _uniformBuffer = nullptr;
-
-  explicit Program(std::unique_ptr<UniformBuffer> uniformBuffer)
-      : _uniformBuffer(std::move(uniformBuffer)) {
-  }
+  UniformData* getUniformData(ShaderStage stage) const;
 
  private:
   BytesKey programKey = {};
   std::list<Program*>::iterator cachedPosition;
+  std::shared_ptr<RenderPipeline> pipeline = nullptr;
+  std::unique_ptr<UniformData> vertexUniformData = nullptr;
+  std::unique_ptr<UniformData> fragmentUniformData = nullptr;
 
   friend class GlobalCache;
 };

@@ -17,13 +17,17 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "CornerPinEffect.h"
+#include <string>
+#include "core/utils/UniqueID.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
-static const char CORNER_PIN_VERTEX_SHADER[] = R"(
-        #version 100
-        attribute vec2 aPosition;
-        attribute vec3 aTextureCoord;
-        varying vec3 vertexColor;
+static constexpr size_t CORNER_PIN_VERTEX_SIZE = 20 * sizeof(float);
+
+static constexpr char CORNER_PIN_VERTEX_SHADER[] = R"(
+        in vec2 aPosition;
+        in vec3 aTextureCoord;
+        out vec3 vertexColor;
         void main() {
             vec3 position = vec3(aPosition, 1);
             gl_Position = vec4(position.xy, 0, 1);
@@ -31,25 +35,34 @@ static const char CORNER_PIN_VERTEX_SHADER[] = R"(
         }
     )";
 
-static const char CORNER_PIN_FRAGMENT_SHADER[] = R"(
-        #version 100
+static constexpr char CORNER_PIN_FRAGMENT_SHADER[] = R"(
         precision mediump float;
-        varying vec3 vertexColor;
+        in vec3 vertexColor;
         uniform sampler2D sTexture;
+        out vec4 tgfx_FragColor;
         void main() {
-            gl_FragColor = texture2D(sTexture, vertexColor.xy / vertexColor.z);
+            tgfx_FragColor = texture(sTexture, vertexColor.xy / vertexColor.z);
         }
     )";
 
-std::shared_ptr<CornerPinEffect> CornerPinEffect::Make(const Point& upperLeft,
+static std::string GetFinalShaderCode(const char* codeSnippet, bool isDesktop) {
+  if (isDesktop) {
+    return std::string("#version 150\n\n") + codeSnippet;
+  }
+  return std::string("#version 300 es\n\n") + codeSnippet;
+}
+
+std::shared_ptr<CornerPinEffect> CornerPinEffect::Make(EffectCache* cache, const Point& upperLeft,
                                                        const Point& upperRight,
                                                        const Point& lowerRight,
                                                        const Point& lowerLeft) {
-  return std::make_shared<CornerPinEffect>(upperLeft, upperRight, lowerRight, lowerLeft);
+  return std::make_shared<CornerPinEffect>(cache, upperLeft, upperRight, lowerRight, lowerLeft);
 }
 
-CornerPinEffect::CornerPinEffect(const Point& upperLeft, const Point& upperRight,
-                                 const Point& lowerRight, const Point& lowerLeft) {
+CornerPinEffect::CornerPinEffect(EffectCache* cache, const Point& upperLeft,
+                                 const Point& upperRight, const Point& lowerRight,
+                                 const Point& lowerLeft)
+    : cache(cache) {
   cornerPoints[0] = lowerLeft;
   cornerPoints[1] = lowerRight;
   cornerPoints[2] = upperLeft;
@@ -57,7 +70,11 @@ CornerPinEffect::CornerPinEffect(const Point& upperLeft, const Point& upperRight
   calculateVertexQs();
 }
 
-Rect CornerPinEffect::filterBounds(const Rect&) const {
+Rect CornerPinEffect::filterBounds(const Rect&, MapDirection mapDirection) const {
+  if (mapDirection == MapDirection::Reverse) {
+    const auto largeSize = static_cast<float>(1 << 29);
+    return Rect::MakeLTRB(-largeSize, -largeSize, largeSize, largeSize);
+  }
   auto& lowerLeft = cornerPoints[0];
   auto& lowerRight = cornerPoints[1];
   auto& upperLeft = cornerPoints[2];
@@ -69,109 +86,112 @@ Rect CornerPinEffect::filterBounds(const Rect&) const {
   return Rect::MakeLTRB(left, top, right, bottom);
 }
 
-std::unique_ptr<RuntimeProgram> CornerPinEffect::onCreateProgram(Context* context) const {
-  auto gl = GLFunctions::Get(context);
-  // Clear the previously generated GLError, causing the subsequent CheckGLError to return an
-  // incorrect result.
-  ClearGLError(gl);
-  auto filterProgram =
-      FilterProgram::Make(context, CORNER_PIN_VERTEX_SHADER, CORNER_PIN_FRAGMENT_SHADER);
-  if (filterProgram == nullptr) {
+std::shared_ptr<RenderPipeline> CornerPinEffect::createPipeline(GPU* gpu) const {
+  auto info = gpu->info();
+  auto isDesktop = info->version.find("OpenGL ES") == std::string::npos;
+  ShaderModuleDescriptor vertexModule = {};
+  vertexModule.code = GetFinalShaderCode(CORNER_PIN_VERTEX_SHADER, isDesktop);
+  vertexModule.stage = ShaderStage::Vertex;
+  auto vertexShader = gpu->createShaderModule(vertexModule);
+  if (vertexShader == nullptr) {
     return nullptr;
   }
-
-  auto program = filterProgram->program;
-  auto uniforms = std::make_unique<CornerPinUniforms>();
-  uniforms->positionHandle = gl->getAttribLocation(program, "aPosition");
-  uniforms->textureCoordHandle = gl->getAttribLocation(program, "aTextureCoord");
-  filterProgram->uniforms = std::move(uniforms);
-  if (!CheckGLError(gl)) {
+  ShaderModuleDescriptor fragmentModule = {};
+  fragmentModule.code = GetFinalShaderCode(CORNER_PIN_FRAGMENT_SHADER, isDesktop);
+  fragmentModule.stage = ShaderStage::Fragment;
+  auto fragmentShader = gpu->createShaderModule(fragmentModule);
+  if (fragmentShader == nullptr) {
     return nullptr;
   }
-  return filterProgram;
+  RenderPipelineDescriptor descriptor = {};
+  descriptor.vertex = VertexDescriptor(
+      {{"aPosition", VertexFormat::Float2}, {"aTextureCoord", VertexFormat::Float3}});
+  descriptor.vertex.module = vertexShader;
+  descriptor.fragment.module = fragmentShader;
+  descriptor.fragment.colorAttachments.push_back({});
+  BindingEntry textureBinding = {"sTexture", 0};
+  descriptor.layout.textureSamplers.push_back(textureBinding);
+  return gpu->createRenderPipeline(descriptor);
 }
 
-bool CornerPinEffect::onDraw(const RuntimeProgram* program,
-                             const std::vector<BackendTexture>& inputTextures,
-                             const BackendRenderTarget& target, const Point& offset) const {
-  auto context = program->getContext();
-  auto gl = tgfx::GLFunctions::Get(context);
-  // Clear the previously generated GLError
-  ClearGLError(gl);
-  auto filterProgram = static_cast<const FilterProgram*>(program);
-  auto uniforms = static_cast<const CornerPinUniforms*>(filterProgram->uniforms.get());
-  auto needsMSAA = sampleCount() > 1;
-  if (needsMSAA && context->caps()->multisampleDisableSupport) {
-    gl->enable(GL_MULTISAMPLE);
+bool CornerPinEffect::onDraw(CommandEncoder* encoder,
+                             const std::vector<std::shared_ptr<Texture>>& inputTextures,
+                             std::shared_ptr<Texture> outputTexture, const Point& offset) const {
+  auto gpu = encoder->gpu();
+  static const uint32_t CornerPinEffectType = UniqueID::Next();
+  auto pipeline = cache->findPipeline(CornerPinEffectType);
+  if (pipeline == nullptr) {
+    pipeline = createPipeline(gpu);
+    if (pipeline == nullptr) {
+      return false;
+    }
+    cache->addPipeline(CornerPinEffectType, pipeline);
   }
-  gl->useProgram(filterProgram->program);
-  gl->disable(GL_SCISSOR_TEST);
-  gl->enable(GL_BLEND);
-  gl->blendEquation(GL_FUNC_ADD);
-  gl->blendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-  GLFrameBufferInfo frameBuffer = {};
-  target.getGLFramebufferInfo(&frameBuffer);
-  gl->bindFramebuffer(GL_FRAMEBUFFER, frameBuffer.id);
-  gl->viewport(0, 0, target.width(), target.height());
-  GLTextureInfo glInfo = {};
-  inputTextures[0].getGLTextureInfo(&glInfo);
-  gl->activeTexture(GL_TEXTURE0);
-  gl->bindTexture(glInfo.target, glInfo.id);
-  auto vertices = computeVertices(inputTextures[0], target, offset);
-  if (filterProgram->vertexArray > 0) {
-    gl->bindVertexArray(filterProgram->vertexArray);
-  }
-  gl->bindBuffer(GL_ARRAY_BUFFER, filterProgram->vertexBuffer);
-  gl->bufferData(GL_ARRAY_BUFFER, static_cast<long>(vertices.size() * sizeof(float)),
-                 vertices.data(), GL_STREAM_DRAW);
-  gl->vertexAttribPointer(static_cast<unsigned>(uniforms->positionHandle), 2, GL_FLOAT, GL_FALSE,
-                          5 * sizeof(float), static_cast<void*>(0));
-  gl->enableVertexAttribArray(static_cast<unsigned>(uniforms->positionHandle));
 
-  gl->vertexAttribPointer(static_cast<unsigned>(uniforms->textureCoordHandle), 3, GL_FLOAT,
-                          GL_FALSE, 5 * sizeof(float), reinterpret_cast<void*>(2 * sizeof(float)));
-  gl->enableVertexAttribArray(static_cast<unsigned>(uniforms->textureCoordHandle));
-  gl->bindBuffer(GL_ARRAY_BUFFER, 0);
-  gl->drawArrays(GL_TRIANGLE_STRIP, 0, 4);
-  if (filterProgram->vertexArray > 0) {
-    gl->bindVertexArray(0);
+  // Ideally, this MSAA texture should be cached and reused to avoid impacting performance.
+  // However, since CornerPinEffect is only used for testing, we create it each time for simplicity.
+  TextureDescriptor textureDesc(outputTexture->width(), outputTexture->height(),
+                                outputTexture->format(), false, 4, TextureUsage::RENDER_ATTACHMENT);
+  auto renderTexture = gpu->createTexture(textureDesc);
+  if (renderTexture == nullptr) {
+    return false;
   }
-  if (needsMSAA && context->caps()->multisampleDisableSupport) {
-    gl->disable(GL_MULTISAMPLE);
+  RenderPassDescriptor renderPassDesc(renderTexture, LoadAction::Clear, StoreAction::Store,
+                                      PMColor::Transparent(), outputTexture);
+  auto renderPass = encoder->beginRenderPass(renderPassDesc);
+  if (renderPass == nullptr) {
+    return false;
   }
-  return CheckGLError(gl);
+  renderPass->setPipeline(std::move(pipeline));
+  auto vertexBuffer = gpu->createBuffer(CORNER_PIN_VERTEX_SIZE, GPUBufferUsage::VERTEX);
+  if (vertexBuffer == nullptr) {
+    return false;
+  }
+  auto vertices = static_cast<float*>(vertexBuffer->map());
+  if (vertices == nullptr) {
+    return false;
+  }
+  auto& inputTexture = inputTextures[0];
+  collectVertices(inputTexture.get(), outputTexture.get(), offset, vertices);
+  vertexBuffer->unmap();
+  renderPass->setVertexBuffer(vertexBuffer);
+  SamplerDescriptor samplerDesc(AddressMode::ClampToEdge, AddressMode::ClampToEdge,
+                                FilterMode::Linear, FilterMode::Linear, MipmapMode::None);
+  auto sampler = gpu->createSampler(samplerDesc);
+  renderPass->setTexture(0, inputTexture, sampler);
+  renderPass->draw(PrimitiveType::TriangleStrip, 0, 4);
+  renderPass->end();
+  return true;
 }
 
-static Point ToGLVertexPoint(const Point& point, const BackendRenderTarget& target) {
-  return {2.0f * point.x / static_cast<float>(target.width()) - 1.0f,
-          2.0f * point.y / static_cast<float>(target.height()) - 1.0f};
+static Point ToGLVertexPoint(const Point& point, const Texture* target) {
+  return {2.0f * point.x / static_cast<float>(target->width()) - 1.0f,
+          2.0f * point.y / static_cast<float>(target->height()) - 1.0f};
 }
 
-static Point ToGLTexturePoint(const Point& point, const BackendTexture& source) {
-  return {point.x / static_cast<float>(source.width()),
-          point.y / static_cast<float>(source.height())};
+static Point ToGLTexturePoint(const Point& point, const Texture* source) {
+  return {point.x / static_cast<float>(source->width()),
+          point.y / static_cast<float>(source->height())};
 }
 
-std::vector<float> CornerPinEffect::computeVertices(const BackendTexture& source,
-                                                    const BackendRenderTarget& target,
-                                                    const Point& offset) const {
-  std::vector<float> vertices = {};
-  auto textureWidth = static_cast<float>(source.width());
-  auto textureHeight = static_cast<float>(source.height());
+void CornerPinEffect::collectVertices(const Texture* source, const Texture* target,
+                                      const Point& offset, float* vertices) const {
+  size_t index = 0;
+  auto textureWidth = static_cast<float>(source->width());
+  auto textureHeight = static_cast<float>(source->height());
   Point texturePoints[4] = {{0.0f, textureHeight},
                             {textureWidth, textureHeight},
                             {0.0f, 0.0f},
                             {textureWidth, 0.0f}};
   for (size_t i = 0; i < 4; i++) {
     auto vertexPoint = ToGLVertexPoint(cornerPoints[i] + offset, target);
-    vertices.push_back(vertexPoint.x);
-    vertices.push_back(vertexPoint.y);
+    vertices[index++] = vertexPoint.x;
+    vertices[index++] = vertexPoint.y;
     auto texturePoint = ToGLTexturePoint(texturePoints[i], source);
-    vertices.push_back(texturePoint.x * vertexQs[i]);
-    vertices.push_back(texturePoint.y * vertexQs[i]);
-    vertices.push_back(vertexQs[i]);
+    vertices[index++] = texturePoint.x * vertexQs[i];
+    vertices[index++] = texturePoint.y * vertexQs[i];
+    vertices[index++] = vertexQs[i];
   }
-  return vertices;
 }
 
 static float calculateDistance(const Point& intersection, const Point& vertexPoint) {

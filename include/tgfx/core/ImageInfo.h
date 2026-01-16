@@ -23,6 +23,7 @@
 #include <cstddef>
 #include <cstring>
 #include "tgfx/core/AlphaType.h"
+#include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/ColorType.h"
 
 namespace tgfx {
@@ -41,7 +42,8 @@ class ImageInfo {
    * combination is supported. Returns an empty ImageInfo if validating fails.
    */
   static ImageInfo Make(int width, int height, ColorType colorType,
-                        AlphaType alphaType = AlphaType::Premultiplied, size_t rowBytes = 0);
+                        AlphaType alphaType = AlphaType::Premultiplied, size_t rowBytes = 0,
+                        std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   static size_t GetBytesPerPixel(ColorType colorType);
 
@@ -127,11 +129,18 @@ class ImageInfo {
   size_t bytesPerPixel() const;
 
   /**
+   * Returns ColorSpace of this ImageInfo.
+   */
+  const std::shared_ptr<ColorSpace>& colorSpace() const {
+    return _colorSpace;
+  }
+
+  /**
    * Creates a new ImageInfo with dimensions set to width and height, and keep other properties the
    * same.
    */
   ImageInfo makeWH(int newWidth, int newHeight) const {
-    return Make(newWidth, newHeight, _colorType, _alphaType, _rowBytes);
+    return Make(newWidth, newHeight, _colorType, _alphaType, _rowBytes, _colorSpace);
   }
 
   /**
@@ -145,7 +154,7 @@ class ImageInfo {
    * Creates a new ImageInfo with alphaType set to newAlphaType, and keep other properties the same.
    */
   ImageInfo makeAlphaType(AlphaType newAlphaType) const {
-    return Make(_width, _height, _colorType, newAlphaType, _rowBytes);
+    return Make(_width, _height, _colorType, newAlphaType, _rowBytes, _colorSpace);
   }
 
   /**
@@ -153,7 +162,14 @@ class ImageInfo {
    * other properties the same.
    */
   ImageInfo makeColorType(ColorType newColorType, size_t newRowBytes = 0) const {
-    return Make(_width, _height, newColorType, _alphaType, newRowBytes);
+    return Make(_width, _height, newColorType, _alphaType, newRowBytes, _colorSpace);
+  }
+
+  /**
+   * Creates ImageInfo with ColorSpace set ot newColorSpace and keep other properties the same.
+   */
+  ImageInfo makeColorSpace(std::shared_ptr<ColorSpace> newColorSpace) const {
+    return Make(_width, _height, _colorType, _alphaType, _rowBytes, std::move(newColorSpace));
   }
 
   /**
@@ -173,9 +189,7 @@ class ImageInfo {
   /**
    * Returns true if a is equivalent to b.
    */
-  friend bool operator==(const ImageInfo& a, const ImageInfo& b) {
-    return memcmp(&a, &b, sizeof(ImageInfo)) == 0;
-  }
+  friend bool operator==(const ImageInfo& a, const ImageInfo& b);
 
   /**
    * Returns true if a is not equivalent to b.
@@ -185,9 +199,10 @@ class ImageInfo {
   }
 
  private:
-  ImageInfo(int width, int height, ColorType colorType, AlphaType alphaType, size_t rowBytes)
+  ImageInfo(int width, int height, ColorType colorType, AlphaType alphaType, size_t rowBytes,
+            std::shared_ptr<ColorSpace> colorSpace)
       : _width(width), _height(height), _colorType(colorType), _alphaType(alphaType),
-        _rowBytes(rowBytes) {
+        _rowBytes(rowBytes), _colorSpace(std::move(colorSpace)) {
   }
 
   int _width = 0;
@@ -195,5 +210,6 @@ class ImageInfo {
   ColorType _colorType = ColorType::Unknown;
   AlphaType _alphaType = AlphaType::Unknown;
   size_t _rowBytes = 0;
+  std::shared_ptr<ColorSpace> _colorSpace = nullptr;
 };
 }  // namespace tgfx

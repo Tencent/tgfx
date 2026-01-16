@@ -22,42 +22,36 @@
 #include "tgfx/core/TileMode.h"
 
 namespace tgfx {
-/**
- * Represents the tile modes used to access a texture.
- */
 class SamplerState {
  public:
-  enum class WrapMode {
-    Clamp,
-    Repeat,
-    MirrorRepeat,
-    ClampToBorder,
-  };
-
   SamplerState() = default;
 
-  explicit SamplerState(TileMode tileMode);
-
-  SamplerState(TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling);
-
-  SamplerState(WrapMode wrapModeX, WrapMode wrapModeY, FilterMode filterMode = FilterMode::Linear,
-               MipmapMode mipmapMode = MipmapMode::None)
-      : wrapModeX(wrapModeX), wrapModeY(wrapModeY), filterMode(filterMode), mipmapMode(mipmapMode) {
-  }
-
   explicit SamplerState(const SamplingOptions& sampling)
-      : filterMode(sampling.filterMode), mipmapMode(sampling.mipmapMode) {
+      : minFilterMode(sampling.minFilterMode), magFilterMode(sampling.magFilterMode),
+        mipmapMode(sampling.mipmapMode) {
   }
 
-  bool mipmapped() const {
-    return mipmapMode != MipmapMode::None;
+  SamplerState(TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling)
+      : tileModeX(tileModeX), tileModeY(tileModeY), minFilterMode(sampling.minFilterMode),
+        magFilterMode(sampling.magFilterMode), mipmapMode(sampling.mipmapMode) {
   }
 
-  friend bool operator==(const SamplerState& a, const SamplerState& b);
+  SamplerState(TileMode tileModeX, TileMode tileModeY, FilterMode filterMode = FilterMode::Linear,
+               MipmapMode mipmapMode = MipmapMode::None)
+      : tileModeX(tileModeX), tileModeY(tileModeY), minFilterMode(filterMode),
+        magFilterMode(filterMode), mipmapMode(mipmapMode) {
+  }
 
-  WrapMode wrapModeX = WrapMode::Clamp;
-  WrapMode wrapModeY = WrapMode::Clamp;
-  FilterMode filterMode = FilterMode::Linear;
+  SamplerState(TileMode tileModeX, TileMode tileModeY, FilterMode minFilterMode,
+               FilterMode magFilterMode, MipmapMode mipmapMode = MipmapMode::None)
+      : tileModeX(tileModeX), tileModeY(tileModeY), minFilterMode(minFilterMode),
+        magFilterMode(magFilterMode), mipmapMode(mipmapMode) {
+  }
+
+  TileMode tileModeX = TileMode::Clamp;
+  TileMode tileModeY = TileMode::Clamp;
+  FilterMode minFilterMode = FilterMode::Linear;
+  FilterMode magFilterMode = FilterMode::Linear;
   MipmapMode mipmapMode = MipmapMode::None;
 };
 }  // namespace tgfx

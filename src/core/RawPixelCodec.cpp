@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RawPixelCodec.h"
-#include "gpu/TextureView.h"
+#include "gpu/resources/TextureView.h"
 
 namespace tgfx {
 std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(const ImageInfo& info,
@@ -44,6 +44,10 @@ class RawPixelData : public ImageBuffer {
 
   bool isAlphaOnly() const override {
     return info.isAlphaOnly();
+  }
+
+  const std::shared_ptr<ColorSpace>& colorSpace() const override {
+    return info.colorSpace();
   }
 
  protected:

@@ -45,7 +45,7 @@ Atlas::Atlas(ProxyProvider* proxyProvider, PixelFormat pixelFormat, int width, i
 }
 
 bool Atlas::addToAtlas(const AtlasCell& cell, AtlasToken nextFlushToken,
-                       AtlasLocator& atlasLocator) {
+                       AtlasLocator* atlasLocator) {
   for (size_t pageIndex = 0; pageIndex < pages.size(); ++pageIndex) {
     if (addToPage(cell, pageIndex, atlasLocator)) {
       return true;
@@ -58,8 +58,7 @@ bool Atlas::addToAtlas(const AtlasCell& cell, AtlasToken nextFlushToken,
       DEBUG_ASSERT(plot != nullptr);
       if (plot->lastUseToken() < nextFlushToken) {
         evictionPlot(plot);
-        if (plot->addRect(cell.width(), cell.height(), atlasLocator)) {
-          cellLocators[cell.key()] = {cell.matrix(), atlasLocator};
+        if (plot->addRect(cell.width, cell.height, atlasLocator)) {
           return true;
         }
         return false;
@@ -73,12 +72,11 @@ bool Atlas::addToAtlas(const AtlasCell& cell, AtlasToken nextFlushToken,
   return true;
 }
 
-bool Atlas::addToPage(const AtlasCell& cell, size_t pageIndex, AtlasLocator& atlasLocator) {
+bool Atlas::addToPage(const AtlasCell& cell, size_t pageIndex, AtlasLocator* atlasLocator) {
   auto& page = pages[pageIndex];
   auto& plotList = page.plotList;
   for (auto& plot : plotList) {
-    if (plot->addRect(cell.width(), cell.height(), atlasLocator)) {
-      cellLocators[cell.key()] = {cell.matrix(), atlasLocator};
+    if (plot->addRect(cell.width, cell.height, atlasLocator)) {
       return true;
     }
   }
@@ -108,10 +106,10 @@ bool Atlas::activateNewPage() {
       HardwareBufferAllocate(textureWidth, textureHeight, pixelFormat == PixelFormat::ALPHA_8);
   if (hardwareBuffer != nullptr) {
     proxy = proxyProvider->createTextureProxy(hardwareBuffer);
+    HardwareBufferRelease(hardwareBuffer);
   }
   if (proxy == nullptr) {
-    proxy = proxyProvider->createTextureProxy(UniqueKey::Make(), textureWidth, textureHeight,
-                                              pixelFormat);
+    proxy = proxyProvider->createTextureProxy({}, textureWidth, textureHeight, pixelFormat);
   }
   if (proxy == nullptr) {
     return false;
@@ -120,20 +118,17 @@ bool Atlas::activateNewPage() {
   return true;
 }
 
-bool Atlas::getCellLocator(const BytesKey& cellKey, AtlasCellLocator& cellLocator) const {
-  auto it = cellLocators.find(cellKey);
-  if (it == cellLocators.end()) {
+bool Atlas::hasCell(const PlotLocator& plotLocator) const {
+  if (!plotLocator.isValid()) {
     return false;
   }
-  cellLocator = it->second;
-  const auto& atlasLocator = cellLocator.atlasLocator;
-  auto page = atlasLocator.pageIndex();
-  auto plot = atlasLocator.plotIndex();
+  auto page = plotLocator.pageIndex();
+  auto plot = plotLocator.plotIndex();
   if (page >= pages.size() || plot >= numPlots) {
     return false;
   }
   auto plotGeneration = pages[page].plotArray[plot]->genID();
-  auto locatorGeneration = atlasLocator.genID();
+  auto locatorGeneration = plotLocator.genID();
   return plotGeneration == locatorGeneration;
 }
 
@@ -159,35 +154,18 @@ void Atlas::makeMRU(Plot* plot, uint32_t pageIndex) {
 }
 
 void Atlas::evictionPlot(Plot* plot) {
-  auto pageIndex = plot->pageIndex();
-  auto generation = plot->genID();
-  auto plotIndex = plot->plotIndex();
-  for (const auto& [key, cellLocator] : cellLocators) {
-    auto& locator = cellLocator.atlasLocator;
-    if (locator.pageIndex() == pageIndex && locator.plotIndex() == plotIndex &&
-        locator.genID() == generation) {
-      expiredKeys.insert(key);
-    }
-  }
   plot->resetRects();
 }
 
 void Atlas::deactivateLastPage() {
   DEBUG_ASSERT(!pages.empty());
-  auto pageIndex = pages.size() - 1;
   pages.pop_back();
   textureProxies.pop_back();
-  for (const auto& [key, cellLocator] : cellLocators) {
-    if (cellLocator.atlasLocator.pageIndex() == pageIndex) {
-      expiredKeys.insert(key);
-    }
-  }
 }
 
 void Atlas::compact(AtlasToken startTokenForNextFlush) {
   if (pages.empty()) {
     previousFlushToken = startTokenForNextFlush;
-    cellLocators.clear();
     return;
   }
 
@@ -266,37 +244,19 @@ void Atlas::compact(AtlasToken startTokenForNextFlush) {
   previousFlushToken = startTokenForNextFlush;
 }
 
-void Atlas::removeExpiredKeys() {
-  constexpr size_t kMaxKeys = 20000;
-  if (cellLocators.size() < kMaxKeys || expiredKeys.empty()) {
-    return;
-  }
-  for (auto it = cellLocators.begin(); it != cellLocators.end();) {
-    if (expiredKeys.find(it->first) != expiredKeys.end()) {
-      it = cellLocators.erase(it);
-    } else {
-      ++it;
-    }
-  }
-  expiredKeys.clear();
-}
-
 AtlasConfig::AtlasConfig(int maxTextureSize) {
-  RGBADimensions.set(std::min(MaxTextureSize, maxTextureSize),
-                     std::min(MaxTextureSize, maxTextureSize));
+  A8Dimensions.set(std::min(MaxAtlasSize, maxTextureSize), std::min(MaxAtlasSize, maxTextureSize));
 }
 
 ISize AtlasConfig::atlasDimensions(MaskFormat maskFormat) const {
   if (maskFormat == MaskFormat::A8) {
-    return RGBADimensions;
+    return A8Dimensions;
   }
-  return {RGBADimensions.width, RGBADimensions.height / 2};
+  return {A8Dimensions.width, A8Dimensions.height / 2};
 }
 
-ISize AtlasConfig::plotDimensions(MaskFormat maskFormat) const {
-  auto atlasDimensions = this->atlasDimensions(maskFormat);
-  auto plotWidth = atlasDimensions.width >= MaxTextureSize ? 512 : 256;
-  auto plotHeight = atlasDimensions.height >= MaxTextureSize ? 512 : 256;
-  return {plotWidth, plotHeight};
+ISize AtlasConfig::PlotDimensions() {
+  static ISize dimensions{PlotSize, PlotSize};
+  return dimensions;
 }
 }  // namespace tgfx

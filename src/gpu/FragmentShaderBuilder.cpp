@@ -24,14 +24,19 @@ FragmentShaderBuilder::FragmentShaderBuilder(ProgramBuilder* program) : ShaderBu
 }
 
 void FragmentShaderBuilder::declareCustomOutputColor() {
-  outputs.emplace_back(CustomColorOutputName(), SLType::Float4, ShaderVar::TypeModifier::Out);
+  auto typeModifier = ShaderVar::TypeModifier::Out;
+  if (features & PrivateFeature::FramebufferFetch) {
+    typeModifier = ShaderVar::TypeModifier::InOut;
+  }
+
+  outputs.emplace_back(CUSTOM_COLOR_OUTPUT_NAME, SLType::Float4, typeModifier);
 }
 
-void FragmentShaderBuilder::onBeforeChildProcEmitCode(const FragmentProcessor* child) {
+void FragmentShaderBuilder::onBeforeChildProcEmitCode(const FragmentProcessor* child) const {
   programBuilder->currentProcessors.push_back(child);
 }
 
-void FragmentShaderBuilder::onAfterChildProcEmitCode() {
+void FragmentShaderBuilder::onAfterChildProcEmitCode() const {
   programBuilder->currentProcessors.pop_back();
 }
 }  // namespace tgfx

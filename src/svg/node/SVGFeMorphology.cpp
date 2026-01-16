@@ -39,8 +39,8 @@ std::shared_ptr<ImageFilter> SVGFeMorphology::onMakeImageFilter(const SVGRenderC
 template <>
 bool SVGAttributeParser::parse<SVGFeMorphology::Operator>(SVGFeMorphology::Operator* op) {
   static constexpr std::tuple<const char*, SVGFeMorphology::Operator> gMap[] = {
-      {"dilate", SVGFeMorphology::Operator::kDilate},
-      {"erode", SVGFeMorphology::Operator::kErode},
+      {"dilate", SVGFeMorphology::Operator::Dilate},
+      {"erode", SVGFeMorphology::Operator::Erode},
   };
 
   return this->parseEnumMap(gMap, op) && this->parseEOSToken();

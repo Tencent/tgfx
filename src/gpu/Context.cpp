@@ -17,91 +17,124 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/Context.h"
-#include "GPU.h"
 #include "core/AtlasManager.h"
-#include "core/utils/BlockBuffer.h"
+#include "core/AtlasStrikeCache.h"
+#include "core/utils/BlockAllocator.h"
 #include "core/utils/Log.h"
 #include "core/utils/SlidingWindowTracker.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ResourceCache.h"
+#include "gpu/ShaderCaps.h"
 #include "tgfx/core/Clock.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
+
 Context::Context(Device* device, GPU* gpu) : _device(device), _gpu(gpu) {
-  // We set the maxBlockSize to 2MB because allocating blocks that are too large can cause memory
-  // fragmentation and slow down allocation. It may also increase the application's memory usage due
-  // to pre-allocation optimizations on some platforms.
-  _drawingBuffer = new BlockBuffer(1 << 14, 1 << 21);  // 16kb, 2MB
+  _shaderCaps = new ShaderCaps(gpu);
   _globalCache = new GlobalCache(this);
   _resourceCache = new ResourceCache(this);
   _drawingManager = new DrawingManager(this);
   _proxyProvider = new ProxyProvider(this);
-  _maxValueTracker = new SlidingWindowTracker(10);
   _atlasManager = new AtlasManager(this);
+  _atlasStrikeCache = new AtlasStrikeCache();
 }
 
 Context::~Context() {
-  // The Device owner must call releaseAll() before deleting this Context, otherwise, GPU resources
-  // may leak.
-  DEBUG_ASSERT(_resourceCache->empty());
-  delete _globalCache;
-  delete _resourceCache;
-  delete _drawingManager;
-  delete _proxyProvider;
-  delete _drawingBuffer;
   delete _atlasManager;
-  delete _maxValueTracker;
+  delete _drawingManager;
+  delete _globalCache;
+  delete _proxyProvider;
+  delete _resourceCache;
+  delete _shaderCaps;
+  delete _atlasStrikeCache;
 }
 
 Backend Context::backend() const {
-  return _gpu->backend();
+  return _gpu->info()->backend;
 }
 
-const Caps* Context::caps() const {
-  return _gpu->caps();
+BlockAllocator* Context::drawingAllocator() const {
+  return _drawingManager->drawingAllocator();
 }
 
 bool Context::wait(const BackendSemaphore& waitSemaphore) {
-  auto semaphore = Semaphore::Wrap(this, waitSemaphore);
+  auto semaphore = gpu()->importBackendSemaphore(waitSemaphore);
   if (semaphore == nullptr) {
     return false;
   }
-  _drawingManager->addSemaphoreWaitTask(std::move(semaphore));
+  gpu()->queue()->waitSemaphore(std::move(semaphore));
   return true;
 }
 
-bool Context::flush(BackendSemaphore* signalSemaphore) {
-  _resourceCache->processUnreferencedResources();
+std::unique_ptr<Recording> Context::flush(BackendSemaphore* signalSemaphore) {
   _atlasManager->preFlush();
-  commandBuffer = _drawingManager->flush(signalSemaphore);
-  if (commandBuffer == nullptr) {
-    return false;
+  auto drawingBuffer = _drawingManager->flush();
+  if (drawingBuffer == nullptr) {
+    return nullptr;
+  }
+  if (signalSemaphore != nullptr) {
+    auto semaphore = gpu()->queue()->insertSemaphore();
+    if (semaphore != nullptr) {
+      *signalSemaphore = gpu()->stealBackendSemaphore(std::move(semaphore));
+    }
   }
   _atlasManager->postFlush();
   _proxyProvider->purgeExpiredProxies();
-  _resourceCache->advanceFrameAndPurge();
-  _maxValueTracker->addValue(_drawingBuffer->size());
-  _drawingBuffer->clear(_maxValueTracker->getMaxValue());
-  return true;
+  pendingDrawingBuffers.push_back(drawingBuffer);
+  return std::unique_ptr<Recording>(
+      new Recording(uniqueID(), drawingBuffer->uniqueID(), drawingBuffer->generation()));
 }
 
-bool Context::submit(bool syncCpu) {
-  if (commandBuffer == nullptr) {
-    return false;
+std::shared_ptr<DrawingBuffer> Context::getDrawingBuffer(const Recording* recording) const {
+  if (recording == nullptr) {
+    return nullptr;
   }
+  if (recording->contextID != uniqueID()) {
+    LOGE(
+        "Context::getDrawingBuffer() Recording was created by a different Context and cannot be "
+        "submitted.");
+    return nullptr;
+  }
+  for (const auto& drawingBuffer : pendingDrawingBuffers) {
+    if (drawingBuffer->uniqueID() == recording->drawingBufferID &&
+        drawingBuffer->generation() == recording->generation) {
+      return drawingBuffer;
+    }
+  }
+  return nullptr;
+}
+
+void Context::submit(std::unique_ptr<Recording> recording, bool syncCpu) {
+  _resourceCache->processUnreferencedResources();
   auto queue = gpu()->queue();
-  queue->submit(std::move(commandBuffer));
+  auto targetBuffer = getDrawingBuffer(recording.get());
+  if (targetBuffer != nullptr) {
+    while (!pendingDrawingBuffers.empty()) {
+      auto drawingBuffer = pendingDrawingBuffers.front();
+      auto commandBuffer = drawingBuffer->encode();
+      _resourceCache->advanceFrameAndPurge();
+      queue->submit(std::move(commandBuffer));
+      pendingDrawingBuffers.pop_front();
+      if (drawingBuffer == targetBuffer) {
+        break;
+      }
+    }
+  }
   if (syncCpu) {
     queue->waitUntilCompleted();
   }
-  return true;
 }
 
-void Context::flushAndSubmit(bool syncCpu) {
-  flush();
-  submit(syncCpu);
+bool Context::flushAndSubmit(bool syncCpu) {
+  auto recording = flush();
+  bool hasRecording = recording != nullptr;
+  if (recording || syncCpu) {
+    submit(std::move(recording), syncCpu);
+  }
+  return hasRecording;
 }
 
 size_t Context::memoryUsage() const {
@@ -134,12 +167,5 @@ void Context::purgeResourcesNotUsedSince(std::chrono::steady_clock::time_point p
 
 bool Context::purgeResourcesUntilMemoryTo(size_t bytesLimit) {
   return _resourceCache->purgeUntilMemoryTo(bytesLimit);
-}
-
-void Context::releaseAll(bool releaseGPU) {
-  _drawingManager->releaseAll();
-  _atlasManager->releaseAll();
-  _globalCache->releaseAll();
-  _resourceCache->releaseAll(releaseGPU);
 }
 }  // namespace tgfx

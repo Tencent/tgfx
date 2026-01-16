@@ -21,6 +21,7 @@
 #include <include/core/SkRect.h>
 #include <memory>
 #include "core/PathRef.h"
+#include "core/utils/AtomicCache.h"
 #include "core/utils/MathExtra.h"
 
 namespace tgfx {
@@ -86,6 +87,9 @@ PathFillType Path::getFillType() const {
 }
 
 void Path::setFillType(PathFillType fillType) {
+  if (getFillType() == fillType) {
+    return;
+  }
   SkPathFillType type;
   switch (fillType) {
     case PathFillType::EvenOdd:
@@ -328,7 +332,7 @@ void Path::arcTo(float rx, float ry, float xAxisRotate, PathArcSize largeArc, bo
                         float_is_integer(rx) && float_is_integer(ry) &&
                         float_is_integer(endPoint.x) && float_is_integer(endPoint.y);
 
-  auto* path = &(writableRef()->path);
+  auto path = &(writableRef()->path);
   for (int i = 0; i < static_cast<int>(segments); ++i) {
     auto endTheta = startTheta + thetaWidth;
     auto sinEndTheta = SinSnapToZero(endTheta);
@@ -483,11 +487,12 @@ void Path::addRRect(const RRect& rRect, bool reversed, unsigned int startIndex) 
 void Path::addPath(const Path& src, PathOp op) {
   auto& path = writableRef()->path;
   const auto& newPath = src.pathRef->path;
-  if (op == PathOp::Append) {
+  if (op == PathOp::Append || op == PathOp::Extend) {
     if (path.isEmpty()) {
       path = newPath;
     } else {
-      path.addPath(newPath);
+      auto mode = op == PathOp::Extend ? SkPath::kExtend_AddPathMode : SkPath::kAppend_AddPathMode;
+      path.addPath(newPath, mode);
     }
     return;
   }
@@ -524,10 +529,28 @@ void Path::transform(const Matrix& matrix) {
   writableRef()->path.transform(skMatrix);
 }
 
+void Path::transform3D(const Matrix3D& matrix) {
+  if (matrix.isIdentity()) {
+    return;
+  }
+  float values[16] = {};
+  matrix.getColumnMajor(values);
+  SkMatrix skMatrix = {};
+  // All vertices inside the Path have an initial z-coordinate of 0, so the third column of the 4x4
+  // matrix does not affect the final transformation result and can be ignored. Additionally, since
+  // we do not care about the final projected z-axis coordinate, the third row can also be ignored.
+  // Therefore, the 4x4 matrix can be simplified to a 3x3 matrix.
+  skMatrix.setAll(values[0], values[4], values[12], values[1], values[5], values[13], values[3],
+                  values[7], values[15]);
+  writableRef()->path.transform(skMatrix);
+}
+
 void Path::reverse() {
   auto& path = writableRef()->path;
+  auto fillType = path.getFillType();
   SkPath tempPath;
   tempPath.reverseAddPath(path);
+  tempPath.setFillType(fillType);
   path = tempPath;
 }
 
@@ -575,7 +598,7 @@ PathRef* Path::writableRef() {
   } else {
     // There only one reference to this PathRef, so we can safely reset the uniqueKey and bounds.
     pathRef->uniqueKey.reset();
-    pathRef->bounds.reset();
+    AtomicCacheReset(pathRef->bounds);
   }
   return pathRef.get();
 }

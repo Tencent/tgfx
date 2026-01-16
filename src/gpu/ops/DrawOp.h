@@ -18,27 +18,27 @@
 
 #pragma once
 
-#include "Op.h"
 #include "gpu/AAType.h"
 #include "gpu/ProgramInfo.h"
-#include "gpu/RenderPass.h"
+#include "tgfx/gpu/RenderPass.h"
 
 namespace tgfx {
-class DrawOp : public Op {
+class DrawOp {
  public:
-  PlacementPtr<ProgramInfo> createProgramInfo(RenderTarget* renderTarget,
-                                              PlacementPtr<GeometryProcessor> geometryProcessor);
+  enum class Type { RectDrawOp, RRectDrawOp, ShapeDrawOp, AtlasTextOp, Quads3DDrawOp };
 
-  const Rect& scissorRect() const {
-    return _scissorRect;
-  }
+  virtual ~DrawOp() = default;
 
-  void setScissorRect(Rect scissorRect) {
-    _scissorRect = scissorRect;
+  void setScissorRect(const Rect& rect) {
+    scissorRect = rect;
   }
 
   void setBlendMode(BlendMode mode) {
     blendMode = mode;
+  }
+
+  void setCullMode(CullMode mode) {
+    cullMode = mode;
   }
 
   void setXferProcessor(PlacementPtr<XferProcessor> processor) {
@@ -57,17 +57,25 @@ class DrawOp : public Op {
     return !coverages.empty();
   }
 
+  void execute(RenderPass* renderPass, RenderTarget* renderTarget);
+
  protected:
+  BlockAllocator* allocator = nullptr;
   AAType aaType = AAType::None;
-
-  explicit DrawOp(AAType aaType) : aaType(aaType) {
-  }
-
- private:
-  Rect _scissorRect = {};
+  Rect scissorRect = {};
   std::vector<PlacementPtr<FragmentProcessor>> colors = {};
   std::vector<PlacementPtr<FragmentProcessor>> coverages = {};
   PlacementPtr<XferProcessor> xferProcessor = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
+  CullMode cullMode = CullMode::None;
+
+  DrawOp(BlockAllocator* allocator, AAType aaType) : allocator(allocator), aaType(aaType) {
+  }
+
+  virtual PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) = 0;
+
+  virtual void onDraw(RenderPass* renderPass) = 0;
+
+  virtual Type type() = 0;
 };
 }  // namespace tgfx

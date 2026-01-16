@@ -23,11 +23,11 @@
 #include "gpu/FragmentShaderBuilder.h"
 #include "gpu/SamplerState.h"
 #include "gpu/SamplingArgs.h"
-#include "gpu/TextureView.h"
-#include "gpu/UniformBuffer.h"
+#include "gpu/UniformData.h"
 #include "gpu/UniformHandler.h"
 #include "gpu/processors/Processor.h"
 #include "gpu/proxies/TextureProxy.h"
+#include "gpu/resources/TextureView.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Image.h"
 
@@ -79,8 +79,9 @@ class FragmentProcessor : public Processor {
   /**
    * Creates a fragment processor that will draw the given Shader with the given options.
    */
-  static PlacementPtr<FragmentProcessor> Make(std::shared_ptr<Shader> shader, const FPArgs& args,
-                                              const Matrix* uvMatrix = nullptr);
+  static PlacementPtr<FragmentProcessor> Make(
+      std::shared_ptr<Shader> shader, const FPArgs& args, const Matrix* uvMatrix = nullptr,
+      const std::shared_ptr<ColorSpace>& dstColorSpace = nullptr);
 
   /**
    *  In many instances (e.g., Shader::asFragmentProcessor() implementations) it is desirable to
@@ -91,14 +92,14 @@ class FragmentProcessor : public Processor {
    *  parent's input alpha. The passed in FP will not receive an input color.
    */
   static PlacementPtr<FragmentProcessor> MulChildByInputAlpha(
-      BlockBuffer* buffer, PlacementPtr<FragmentProcessor> child);
+      BlockAllocator* allocator, PlacementPtr<FragmentProcessor> child);
 
   /**
    * Returns the input color, modulated by the child's alpha. The passed in FP will not receive an
    * input color.
    * @param inverted false: output = input * child.a; true: output = input * (1 - child.a)
    */
-  static PlacementPtr<FragmentProcessor> MulInputByChildAlpha(BlockBuffer* buffer,
+  static PlacementPtr<FragmentProcessor> MulInputByChildAlpha(BlockAllocator* allocator,
                                                               PlacementPtr<FragmentProcessor> child,
                                                               bool inverted = false);
 
@@ -107,7 +108,7 @@ class FragmentProcessor : public Processor {
    * This is equivalent to running them in series (`g`, then `f`). This is not the same as
    * transfer-mode composition; there is no blending step.
    */
-  static PlacementPtr<FragmentProcessor> Compose(BlockBuffer* buffer,
+  static PlacementPtr<FragmentProcessor> Compose(BlockAllocator* allocator,
                                                  PlacementPtr<FragmentProcessor> f,
                                                  PlacementPtr<FragmentProcessor> g);
 
@@ -115,7 +116,7 @@ class FragmentProcessor : public Processor {
     return onCountTextureSamplers();
   }
 
-  GPUTexture* textureAt(size_t i) const {
+  std::shared_ptr<Texture> textureAt(size_t i) const {
     return onTextureAt(i);
   }
 
@@ -235,8 +236,8 @@ class FragmentProcessor : public Processor {
      */
     const TransformedCoordVars* transformedCoords;
     /**
-     * Contains one entry for each GPUTexture of the Processor. These can be passed to the
-     * builder to emit texture reads in the generated code.
+     * Contains one entry for each Texture of the Processor. These can be passed to the builder to
+     * emit texture reads in the generated code.
      */
     const TextureSamplers* textureSamplers;
     const std::function<std::string(std::string_view)> coordFunc;
@@ -249,7 +250,7 @@ class FragmentProcessor : public Processor {
    */
   virtual void emitCode(EmitArgs& args) const = 0;
 
-  void setData(UniformBuffer* uniformBuffer) const;
+  void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const;
 
   /**
    * Emit the child with the default input color (solid white)
@@ -311,7 +312,7 @@ class FragmentProcessor : public Processor {
     coordTransforms.push_back(transform);
   }
 
-  virtual void onSetData(UniformBuffer*) const {
+  virtual void onSetData(UniformData*, UniformData*) const {
   }
 
  private:
@@ -322,7 +323,7 @@ class FragmentProcessor : public Processor {
     return 0;
   }
 
-  virtual GPUTexture* onTextureAt(size_t) const {
+  virtual std::shared_ptr<Texture> onTextureAt(size_t) const {
     return nullptr;
   }
 

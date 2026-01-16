@@ -19,8 +19,8 @@
 #include "PathUserTypeface.h"
 #include "UserScalerContext.h"
 #include "core/PathRasterizer.h"
-#include "core/utils/ApplyStrokeToBounds.h"
 #include "core/utils/FauxBoldScale.h"
+#include "core/utils/StrokeUtils.h"
 #include "tgfx/core/Shape.h"
 
 namespace tgfx {
@@ -100,7 +100,7 @@ class PathUserScalerContext final : public UserScalerContext {
   }
 
   bool readPixels(GlyphID glyphID, bool fauxBold, const Stroke* stroke, const ImageInfo& dstInfo,
-                  void* dstPixels) const override {
+                  void* dstPixels, const Point&) const override {
     if (dstInfo.isEmpty() || dstPixels == nullptr || dstInfo.colorType() != ColorType::ALPHA_8) {
       return false;
     }

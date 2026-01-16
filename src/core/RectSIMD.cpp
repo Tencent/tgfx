@@ -25,8 +25,11 @@
 // Generates code for each enabled target by re-including this source file.
 #include "hwy/foreach_target.h"  // IWYU pragma: keep
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wgnu-zero-variadic-macro-arguments"
 // Must come after foreach_target.h to avoid redefinition errors.
 #include "hwy/highway.h"
+#pragma clang diagnostic pop
 
 HWY_BEFORE_NAMESPACE();
 namespace tgfx {

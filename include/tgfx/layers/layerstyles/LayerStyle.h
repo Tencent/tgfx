@@ -28,11 +28,11 @@ namespace tgfx {
  */
 enum class LayerStylePosition {
   /**
-   * The layerStyle is drawn below the layer content.
+   * The layerStyle is drawn above the layer content.
    */
   Above,
   /**
-   * The layerStyle is drawn above the layer content.
+   * The layerStyle is drawn below the layer content.
    */
   Below
 };
@@ -104,13 +104,15 @@ class LayerStyle : public LayerProperty {
   /**
    * Applies the layer style to the scaled image of the layer content and draws it on the canvas.
    * @param canvas The canvas to draw the layer style on.
-   * @param content The scaled layer content to apply the layer style to.
+   * @param contour The scaled contour (shape) of the content, which may not match the RGBA data of
+   * the content and only represents the shape information. Note: contour and layer contour are not
+   * necessarily the same.
    * @param contentScale The scale factor of the layer content relative to its original size.
    * Some layer styles have size-related parameters that must be adjusted with this scale factor.
    * @param alpha The alpha transparency value used for drawing the layer style.
    */
-  void draw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale, float alpha) {
-    onDraw(canvas, std::move(content), contentScale, alpha, _blendMode);
+  void draw(Canvas* canvas, std::shared_ptr<Image> contour, float contentScale, float alpha) {
+    onDraw(canvas, std::move(contour), contentScale, alpha, _blendMode);
   }
 
   /**
@@ -125,7 +127,9 @@ class LayerStyle : public LayerProperty {
    * Applies the layer style with the layer contour to the scaled image of the layer content and
    * draws it on the canvas.
    * @param canvas The canvas to draw the layer style on.
-   * @param content The scaled layer content to apply the layer style to.
+   * @param contour The scaled contour (shape) of the content, which may not match the RGBA data of
+   * the content and only represents the shape information. Note: contour and layer contour are not
+   * necessarily the same.
    * @param contentScale The scale factor of the layer content relative to its original size.
    * Some layer styles have size-related parameters that must be adjusted with this scale factor.
    * @param extraSource  The scaled extra source to apply the layer style to. The source may be
@@ -133,10 +137,10 @@ class LayerStyle : public LayerProperty {
    * @param extraSourceOffset The offset of the extra image relative to the layer content.
    * @param alpha The alpha transparency value used for drawing the layer style.
    */
-  void drawWithExtraSource(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
+  void drawWithExtraSource(Canvas* canvas, std::shared_ptr<Image> contour, float contentScale,
                            std::shared_ptr<Image> extraSource, const Point& extraSourceOffset,
                            float alpha) {
-    onDrawWithExtraSource(canvas, std::move(content), contentScale, std::move(extraSource),
+    onDrawWithExtraSource(canvas, std::move(contour), contentScale, std::move(extraSource),
                           extraSourceOffset, alpha, _blendMode);
   }
 
@@ -144,14 +148,16 @@ class LayerStyle : public LayerProperty {
   /**
    * Applies the layer style to the scaled image of the layer content and draws it on the canvas.
    * @param canvas The canvas to draw the layer style on.
-   * @param content The scaled layer content to apply the layer style to.
+   * @param contour The scaled contour (shape) of the content, which may not match the RGBA data of
+   * the content and only represents the shape information. Note: contour and layer contour are not
+   * necessarily the same.
    * @param contentScale The scale factor of the layer content relative to its original size.
    * Some layer styles have size-related parameters that must be adjusted with this scale factor.
    * @param alpha The alpha transparency value used for drawing the layer style.
    * @param blendMode The blend mode used to composite the layer style with the existing content on
    * the canvas.
    */
-  virtual void onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
+  virtual void onDraw(Canvas* canvas, std::shared_ptr<Image> contour, float contentScale,
                       float alpha, BlendMode blendMode) = 0;
 
   /**
@@ -159,7 +165,9 @@ class LayerStyle : public LayerProperty {
    * it on the canvas.
    * The default implementation calls onDraw with the layer content only.
    * @param canvas The canvas to draw the layer style on.
-   * @param content The scaled layer content to apply the layer style to.
+   * @param contour The scaled contour (shape) of the content, which may not match the RGBA data of
+   * the content and only represents the shape information. Note: contour and layer contour are not
+   * necessarily the same.
    * @param contentScale The scale factor of the layer content relative to its original size.
    * Some layer styles have size-related parameters that must be adjusted with this scale factor.
    * @param extraSource  The scaled layer extra source to apply the layer style to.The source may be
@@ -167,7 +175,7 @@ class LayerStyle : public LayerProperty {
    * @param extraSourceOffset The offset of the extra source relative to the layer content.
    * @param alpha The alpha transparency value used for drawing the layer style.
    */
-  virtual void onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Image> content,
+  virtual void onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Image> contour,
                                      float contentScale, std::shared_ptr<Image> extraSource,
                                      const Point& extraSourceOffset, float alpha,
                                      BlendMode blendMode);

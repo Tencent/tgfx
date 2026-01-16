@@ -83,6 +83,6 @@ class QGLDevice : public GLDevice {
 
   friend class GLDevice;
   friend class QGLWindow;
-  friend class GPUTexture;
+  friend class Texture;
 };
 }  // namespace tgfx

@@ -19,42 +19,32 @@
 #pragma once
 
 #include "tgfx/gpu/RuntimeEffect.h"
-#include "utils/FilterProgram.h"
+#include "utils/EffectCache.h"
 
 namespace tgfx {
-class CornerPinUniforms : public Uniforms {
- public:
-  int positionHandle = -1;
-  int textureCoordHandle = -1;
-};
-
 class CornerPinEffect : public RuntimeEffect {
  public:
-  static std::shared_ptr<CornerPinEffect> Make(const Point& upperLeft, const Point& upperRight,
-                                               const Point& lowerRight, const Point& lowerLeft);
+  static std::shared_ptr<CornerPinEffect> Make(EffectCache* cache, const Point& upperLeft,
+                                               const Point& upperRight, const Point& lowerRight,
+                                               const Point& lowerLeft);
 
-  DEFINE_RUNTIME_EFFECT_PROGRAM_ID
+  Rect filterBounds(const Rect& srcRect, MapDirection) const override;
 
-  int sampleCount() const override {
-    return 4;
-  }
-
-  Rect filterBounds(const Rect&) const override;
-
-  std::unique_ptr<RuntimeProgram> onCreateProgram(Context* context) const override;
-
-  bool onDraw(const RuntimeProgram* program, const std::vector<BackendTexture>& inputTextures,
-              const BackendRenderTarget& target, const Point& offset) const override;
+  bool onDraw(CommandEncoder* encoder, const std::vector<std::shared_ptr<Texture>>& inputTextures,
+              std::shared_ptr<Texture> outputTexture, const Point& offset) const override;
 
  private:
+  EffectCache* cache = nullptr;
   Point cornerPoints[4] = {};
   float vertexQs[4] = {1.0f};
 
-  CornerPinEffect(const Point& upperLeft, const Point& upperRight, const Point& lowerRight,
-                  const Point& lowerLeft);
+  CornerPinEffect(EffectCache* cache, const Point& upperLeft, const Point& upperRight,
+                  const Point& lowerRight, const Point& lowerLeft);
 
-  std::vector<float> computeVertices(const BackendTexture& source,
-                                     const BackendRenderTarget& target, const Point& offset) const;
+  std::shared_ptr<RenderPipeline> createPipeline(GPU* gpu) const;
+
+  void collectVertices(const Texture* source, const Texture* target, const Point& offset,
+                       float* vertices) const;
 
   void calculateVertexQs();
 };

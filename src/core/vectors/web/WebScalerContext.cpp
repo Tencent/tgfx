@@ -19,8 +19,8 @@
 #include "WebScalerContext.h"
 #include "ReadPixelsFromCanvasImage.h"
 #include "WebTypeface.h"
-#include "core/utils/ApplyStrokeToBounds.h"
 #include "core/utils/Log.h"
+#include "core/utils/StrokeUtils.h"
 #include "platform/web/WebImageBuffer.h"
 
 using namespace emscripten;
@@ -70,7 +70,7 @@ Rect WebScalerContext::getImageTransform(GlyphID glyphID, bool fauxBold, const S
 }
 
 bool WebScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
-                                  const ImageInfo& dstInfo, void* dstPixels) const {
+                                  const ImageInfo& dstInfo, void* dstPixels, const Point&) const {
   if (dstInfo.isEmpty() || dstPixels == nullptr) {
     return false;
   }

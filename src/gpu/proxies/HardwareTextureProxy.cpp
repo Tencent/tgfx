@@ -32,7 +32,7 @@ HardwareTextureProxy::~HardwareTextureProxy() {
 std::shared_ptr<TextureView> HardwareTextureProxy::getTextureView() const {
   if (resource == nullptr) {
     resource = TextureView::MakeFrom(context, hardwareBuffer);
-    if (resource == nullptr && !uniqueKey.empty()) {
+    if (resource != nullptr && !uniqueKey.empty()) {
       resource->assignUniqueKey(uniqueKey);
     }
   }

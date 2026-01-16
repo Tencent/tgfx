@@ -16,8 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "FTTypeface.h"
+#if defined(__ANDROID__) || defined(ANDROID)
+#include "platform/android/GlyphRenderer.h"
+#include "tgfx/platform/android/JNIEnvironment.h"
+#endif
 #include "FTLibrary.h"
+#include "FTTypeface.h"
 #include "core/AdvancedTypefaceInfo.h"
 #include "core/utils/FontTableTag.h"
 #include "tgfx/core/Stream.h"
@@ -29,6 +33,7 @@
 #include "FTScalerContext.h"
 #include "SystemFont.h"
 #include "core/utils/UniqueID.h"
+#include "tgfx/core/UTF.h"
 
 namespace tgfx {
 std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string& fontFamily,
@@ -100,6 +105,17 @@ std::shared_ptr<FTTypeface> FTTypeface::Make(FTFontData data) {
 
 FTTypeface::FTTypeface(FTFontData data, FT_Face face)
     : _uniqueID(UniqueID::Next()), data(std::move(data)), face(std::move(face)) {
+  _hasColor = FT_HAS_COLOR(this->face);
+  _hasOutlines = FT_IS_SCALABLE(this->face);
+#if defined(__ANDROID__) || defined(ANDROID)
+  if (hasColor() && hasOutlines() && GlyphRenderer::IsAvailable()) {
+    JNIEnvironment environment;
+    auto env = environment.current();
+    if (env != nullptr) {
+      typeface = GlyphRenderer::CreateTypeface(env, this->data.path);
+    }
+  }
+#endif
 }
 
 FTTypeface::~FTTypeface() {
@@ -131,22 +147,12 @@ int FTTypeface::unitsPerEmInternal() const {
   auto upem = face->units_per_EM;
   // At least some versions of FreeType set face->units_per_EM to 0 for bitmap only fonts.
   if (upem == 0) {
-    auto* ttHeader = static_cast<TT_Header*>(FT_Get_Sfnt_Table(face, FT_SFNT_HEAD));
+    auto ttHeader = static_cast<TT_Header*>(FT_Get_Sfnt_Table(face, FT_SFNT_HEAD));
     if (ttHeader) {
       upem = ttHeader->Units_Per_EM;
     }
   }
   return upem;
-}
-
-bool FTTypeface::hasColor() const {
-  std::lock_guard<std::mutex> autoLock(locker);
-  return FT_HAS_COLOR(face);
-}
-
-bool FTTypeface::hasOutlines() const {
-  std::lock_guard<std::mutex> autoLock(locker);
-  return FT_IS_SCALABLE(face);
 }
 
 GlyphID FTTypeface::getGlyphID(Unichar unichar) const {
@@ -179,23 +185,6 @@ std::shared_ptr<Data> FTTypeface::copyTableData(FontTableTag tag) const {
   }
   return Data::MakeAdopted(tableData, tableLength);
 }
-
-#ifdef TGFX_USE_GLYPH_TO_UNICODE
-std::vector<Unichar> FTTypeface::getGlyphToUnicodeMap() const {
-  auto numGlyphs = static_cast<size_t>(face->num_glyphs);
-  std::vector<Unichar> returnMap(numGlyphs, 0);
-
-  FT_UInt glyphIndex = 0;
-  auto charCode = FT_Get_First_Char(face, &glyphIndex);
-  while (glyphIndex) {
-    if (0 == returnMap[glyphIndex]) {
-      returnMap[glyphIndex] = static_cast<Unichar>(charCode);
-    }
-    charCode = FT_Get_Next_Char(face, charCode, &glyphIndex);
-  }
-  return returnMap;
-}
-#endif
 
 #ifdef TGFX_USE_ADVANCED_TYPEFACE_PROPERTY
 namespace {
@@ -286,6 +275,29 @@ AdvancedTypefaceInfo FTTypeface::getAdvancedInfo() const {
         advancedProperty.style | AdvancedTypefaceInfo::StyleFlags::Italic);
   }
   return advancedProperty;
+}
+#endif
+
+#ifdef TGFX_USE_GLYPH_TO_UNICODE
+std::vector<Unichar> FTTypeface::onCreateGlyphToUnicodeMap() const {
+  auto numGlyphs = static_cast<size_t>(face->num_glyphs);
+  std::vector<Unichar> returnMap(numGlyphs, 0);
+
+  FT_UInt glyphIndex = 0;
+  auto charCode = FT_Get_First_Char(face, &glyphIndex);
+  while (glyphIndex) {
+    if (0 == returnMap[glyphIndex]) {
+      returnMap[glyphIndex] = static_cast<Unichar>(charCode);
+    }
+    charCode = FT_Get_Next_Char(face, charCode, &glyphIndex);
+  }
+  return returnMap;
+}
+
+std::string FTTypeface::getGlyphUTF8(GlyphID glyphID) const {
+  auto& map = getGlyphToUnicodeMap();
+  Unichar unichar = glyphID < map.size() ? map[glyphID] : 0;
+  return UTF::ToUTF8(unichar);
 }
 #endif
 

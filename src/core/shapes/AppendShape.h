@@ -29,16 +29,16 @@ class AppendShape : public UniqueKeyShape {
   static std::shared_ptr<Shape> MakeFrom(std::shared_ptr<Shape> first,
                                          std::shared_ptr<Shape> second);
 
-  bool isInverseFillType() const override;
+  PathFillType fillType() const override;
 
-  Rect getBounds() const override;
-
-  Path getPath() const override;
+  Rect onGetBounds() const override;
 
  protected:
   Type type() const override {
     return Type::Append;
   }
+
+  Path onGetPath(float resolutionScale) const override;
 
  private:
   std::vector<std::shared_ptr<Shape>> shapes = {};

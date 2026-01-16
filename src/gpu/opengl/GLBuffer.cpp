@@ -17,27 +17,101 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLBuffer.h"
-#include "GLGPU.h"
-#include "GLUtil.h"
+#include "gpu/opengl/GLGPU.h"
+#include "gpu/opengl/GLUtil.h"
 
 namespace tgfx {
-unsigned GLBuffer::target() const {
-  if (_usage & GPUBufferUsage::VERTEX) {
+GLBuffer::GLBuffer(std::shared_ptr<GLInterface> interface, unsigned bufferID, size_t size,
+                   uint32_t usage)
+    : GPUBuffer(size, usage), _interface(std::move(interface)), _bufferID(bufferID) {
+}
+
+unsigned GLBuffer::GetTarget(uint32_t usage) {
+  if (usage & GPUBufferUsage::READBACK) {
+    return GL_PIXEL_PACK_BUFFER;
+  }
+  if (usage & GPUBufferUsage::VERTEX) {
     return GL_ARRAY_BUFFER;
   }
-  if (_usage & GPUBufferUsage::INDEX) {
+  if (usage & GPUBufferUsage::INDEX) {
     return GL_ELEMENT_ARRAY_BUFFER;
   }
-  LOGE("GLBuffer::target() invalid buffer usage!");
+  if (usage & GPUBufferUsage::UNIFORM) {
+    return GL_UNIFORM_BUFFER;
+  }
   return 0;
 }
 
-void GLBuffer::release(GPU* gpu) {
+bool GLBuffer::isReady() const {
+  if (readbackFence == nullptr) {
+    return true;
+  }
+  auto gl = _interface->functions();
+#if defined(__EMSCRIPTEN__)
+  auto result = gl->clientWaitSync(readbackFence, 0, 0, 0);
+#else
+  auto result = gl->clientWaitSync(readbackFence, 0, 0);
+#endif
+  return result == GL_ALREADY_SIGNALED || result == GL_CONDITION_SATISFIED;
+}
+
+void* GLBuffer::map(size_t offset, size_t size) {
+  if (size == 0) {
+    LOGE("GLBuffer::map() size cannot be 0!");
+    return nullptr;
+  }
+  if (size == GPU_BUFFER_WHOLE_SIZE) {
+    size = _size - offset;
+  }
+  if (offset + size > _size) {
+    LOGE("GLBuffer::map() range out of bounds!");
+    return nullptr;
+  }
+
+  auto gl = _interface->functions();
+  if (gl->mapBufferRange == nullptr) {
+    return nullptr;
+  }
+  // Avoid using GL_MAP_UNSYNCHRONIZED_BIT with READBACK buffers to ensure the GPU has finished
+  // writing before reading.
+  unsigned access = _usage & GPUBufferUsage::READBACK
+                        ? GL_MAP_READ_BIT
+                        : GL_MAP_WRITE_BIT | GL_MAP_UNSYNCHRONIZED_BIT;
+  auto target = GetTarget(_usage);
+  DEBUG_ASSERT(target != 0);
+  gl->bindBuffer(target, _bufferID);
+  return gl->mapBufferRange(target, static_cast<GLintptr>(offset), static_cast<GLsizeiptr>(size),
+                            access);
+}
+
+void GLBuffer::unmap() {
+  auto gl = _interface->functions();
+  if (gl->mapBufferRange != nullptr) {
+    auto target = GetTarget(_usage);
+    DEBUG_ASSERT(target != 0);
+    gl->bindBuffer(target, _bufferID);
+    gl->unmapBuffer(target);
+  }
+}
+
+void GLBuffer::insertReadbackFence() {
+  auto gl = _interface->functions();
+  if (readbackFence != nullptr) {
+    gl->deleteSync(readbackFence);
+  }
+  readbackFence = gl->fenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+}
+
+void GLBuffer::onRelease(GLGPU* gpu) {
   DEBUG_ASSERT(gpu != nullptr);
+  auto gl = gpu->functions();
   if (_bufferID > 0) {
-    auto gl = static_cast<const GLGPU*>(gpu)->functions();
     gl->deleteBuffers(1, &_bufferID);
     _bufferID = 0;
+  }
+  if (readbackFence != nullptr) {
+    gl->deleteSync(readbackFence);
+    readbackFence = nullptr;
   }
 }
 }  // namespace tgfx

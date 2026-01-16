@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/layerstyles/InnerShadowStyle.h"
-#include "layers/OpaqueThreshold.h"
 
 namespace tgfx {
 
@@ -83,21 +82,18 @@ Rect InnerShadowStyle::filterBounds(const Rect& srcRect, float contentScale) {
   return filter->filterBounds(srcRect);
 }
 
-void InnerShadowStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
+void InnerShadowStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> contour, float contentScale,
                               float alpha, BlendMode blendMode) {
   // create opaque image
-  auto opaqueFilter = ImageFilter::ColorFilter(ColorFilter::AlphaThreshold(OPAQUE_THRESHOLD));
-  auto opaqueImage = content->makeWithFilter(opaqueFilter);
-
   auto filter = getShadowFilter(contentScale);
   if (!filter) {
     return;
   }
-  opaqueImage = opaqueImage->makeWithFilter(filter);
+  contour = contour->makeWithFilter(filter);
   Paint paint = {};
   paint.setBlendMode(blendMode);
   paint.setAlpha(alpha);
-  canvas->drawImage(opaqueImage, &paint);
+  canvas->drawImage(contour, &paint);
 }
 
 std::shared_ptr<ImageFilter> InnerShadowStyle::getShadowFilter(float scale) {

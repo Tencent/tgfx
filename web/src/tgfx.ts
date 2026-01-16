@@ -16,11 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-import {getCanvas2D, releaseCanvas2D, isCanvas} from './utils/canvas';
+import {getCanvas2D, isCanvas, releaseCanvas2D} from './utils/canvas';
 import {BitmapImage} from './core/bitmap-image';
 import {isInstanceOf} from './utils/type-utils';
 
-import type {EmscriptenGL, TGFX} from './types';
+import {EmscriptenGL, TGFX, WindowColorSpace} from './types';
 import type {wx} from './wechat/interfaces';
 
 declare const wx: wx;
@@ -99,6 +99,28 @@ export const uploadToTexture = (
         gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
         gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, renderSource);
         gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    }
+};
+
+export const setColorSpace = (
+    GL: EmscriptenGL,
+    colorSpace: WindowColorSpace
+) => {
+    if (colorSpace === WindowColorSpace.Others) {
+        return false;
+    }
+    const gl = GL.currentContext?.GLctx as WebGLRenderingContext;
+    if ('drawingBufferColorSpace' in gl) {
+        if (colorSpace === WindowColorSpace.None || colorSpace === WindowColorSpace.SRGB) {
+            gl.drawingBufferColorSpace = "srgb";
+        } else {
+            gl.drawingBufferColorSpace = "display-p3";
+        }
+        return true;
+    } else if (colorSpace === WindowColorSpace.DisplayP3) {
+        return false;
+    } else {
+        return true;
     }
 };
 

@@ -18,30 +18,32 @@
 
 #pragma once
 
-#include "core/GlyphRunList.h"
 #include "core/shapes/UniqueKeyShape.h"
+#include "tgfx/core/TextBlob.h"
 
 namespace tgfx {
 /**
- * Shape that contains a GlyphRunList.
+ * Shape that contains a TextBlob.
  */
 class TextShape : public UniqueKeyShape {
  public:
-  explicit TextShape(std::shared_ptr<GlyphRunList> glyphRunList, float scale)
-      : glyphRunList(std::move(glyphRunList)), scale(scale) {
+  explicit TextShape(std::shared_ptr<TextBlob> textBlob) : textBlob(std::move(textBlob)) {
   }
 
-  Rect getBounds() const override;
+  PathFillType fillType() const override {
+    return PathFillType::Winding;
+  }
 
-  Path getPath() const override;
+  Rect onGetBounds() const override;
 
  protected:
   Type type() const override {
     return Type::Text;
   }
 
+  Path onGetPath(float resolutionScale) const override;
+
  private:
-  std::shared_ptr<GlyphRunList> glyphRunList = nullptr;
-  float scale = 1.0f;
+  std::shared_ptr<TextBlob> textBlob = nullptr;
 };
 }  // namespace tgfx

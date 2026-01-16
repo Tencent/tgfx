@@ -53,6 +53,10 @@ class WebImageBuffer : public ImageBuffer {
     return false;
   }
 
+  const std::shared_ptr<ColorSpace>& colorSpace() const override {
+    return ColorSpace::SRGB();
+  }
+
  protected:
   std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) const override;
 

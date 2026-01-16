@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "tgfx/core/Matrix.h"
 #include "tgfx/core/Shape.h"
 
 namespace tgfx {
@@ -33,16 +34,12 @@ class PathShape : public Shape {
     return true;
   }
 
-  bool isInverseFillType() const override {
-    return path.isInverseFillType();
+  PathFillType fillType() const override {
+    return path.getFillType();
   }
 
-  Rect getBounds() const override {
+  Rect onGetBounds() const override {
     return path.getBounds();
-  }
-
-  Path getPath() const override {
-    return path;
   }
 
   Path path = {};
@@ -53,5 +50,9 @@ class PathShape : public Shape {
   }
 
   UniqueKey getUniqueKey() const override;
+
+  Path onGetPath(float /*resolutionScale*/) const override {
+    return path;
+  }
 };
 }  // namespace tgfx

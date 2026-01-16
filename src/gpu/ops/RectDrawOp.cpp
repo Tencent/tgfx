@@ -17,10 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RectDrawOp.h"
+#include "core/utils/ColorHelper.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/Quad.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
+#include "gpu/processors/RoundStrokeRectGeometryProcessor.h"
+#include "inspect/InspectorMark.h"
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
@@ -30,10 +33,12 @@ PlacementPtr<RectDrawOp> RectDrawOp::Make(Context* context,
   if (provider == nullptr) {
     return nullptr;
   }
-  auto drawOp = context->drawingBuffer()->make<RectDrawOp>(provider.get());
-  if (provider->aaType() == AAType::Coverage || provider->rectCount() > 1) {
-    drawOp->indexBufferProxy =
-        context->globalCache()->getRectIndexBuffer(provider->aaType() == AAType::Coverage);
+  auto allocator = context->drawingAllocator();
+  auto drawOp = allocator->make<RectDrawOp>(allocator, provider.get());
+  CAPUTRE_RECT_MESH(drawOp.get(), provider.get());
+  if (provider->aaType() == AAType::Coverage || provider->rectCount() > 1 || provider->lineJoin()) {
+    drawOp->indexBufferProxy = context->globalCache()->getRectIndexBuffer(
+        provider->aaType() == AAType::Coverage, provider->lineJoin());
   }
   if (provider->rectCount() <= 1) {
     // If we only have one rect, it is not worth the async task overhead.
@@ -44,21 +49,57 @@ PlacementPtr<RectDrawOp> RectDrawOp::Make(Context* context,
   return drawOp;
 }
 
-RectDrawOp::RectDrawOp(RectsVertexProvider* provider)
-    : DrawOp(provider->aaType()), rectCount(provider->rectCount()) {
+RectDrawOp::RectDrawOp(BlockAllocator* allocator, RectsVertexProvider* provider)
+    : DrawOp(allocator, provider->aaType()), rectCount(provider->rectCount()),
+      lineJoin(provider->lineJoin()) {
   if (!provider->hasUVCoord()) {
     auto matrix = provider->firstMatrix();
     matrix.invert(&matrix);
     uvMatrix = matrix;
   }
   if (!provider->hasColor()) {
-    commonColor = provider->firstColor();
+    commonColor = ToPMColor(provider->firstColor(), provider->dstColorSpace());
   }
   hasSubset = provider->hasSubset();
 }
 
-void RectDrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
-  std::shared_ptr<IndexBuffer> indexBuffer = nullptr;
+PlacementPtr<GeometryProcessor> RectDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {
+  ATTRIBUTE_NAME("rectCount", static_cast<int>(rectCount));
+  ATTRIBUTE_NAME("commonColor", commonColor);
+  ATTRIBUTE_NAME("uvMatrix", uvMatrix);
+  ATTRIBUTE_NAME("hasSubset", hasSubset);
+  ATTRIBUTE_NAME("hasStroke", lineJoin.has_value());
+  if (lineJoin == LineJoin::Round) {
+    return RoundStrokeRectGeometryProcessor::Make(allocator, aaType, commonColor, uvMatrix);
+  }
+  return QuadPerEdgeAAGeometryProcessor::Make(allocator, renderTarget->width(),
+                                              renderTarget->height(), aaType, commonColor, uvMatrix,
+                                              hasSubset);
+}
+
+static uint16_t GetNumIndicesPerQuad(AAType aaType, const std::optional<LineJoin>& lineJoin) {
+  const auto isAA = aaType == AAType::Coverage;
+  if (!lineJoin) {
+    return isAA ? RectDrawOp::IndicesPerAAQuad : RectDrawOp::IndicesPerNonAAQuad;
+  }
+
+  switch (*lineJoin) {
+    case LineJoin::Miter:
+      return isAA ? RectDrawOp::IndicesPerAAMiterStrokeRect
+                  : RectDrawOp::IndicesPerNonAAMiterStrokeRect;
+    case LineJoin::Round:
+      return isAA ? RectDrawOp::IndicesPerAARoundStrokeRect
+                  : RectDrawOp::IndicesPerNonAARoundStrokeRect;
+    case LineJoin::Bevel:
+      return isAA ? RectDrawOp::IndicesPerAABevelStrokeRect
+                  : RectDrawOp::IndicesPerNonAABevelStrokeRect;
+    default:
+      return 0;
+  }
+}
+
+void RectDrawOp::onDraw(RenderPass* renderPass) {
+  std::shared_ptr<BufferResource> indexBuffer = nullptr;
   if (indexBufferProxy) {
     indexBuffer = indexBufferProxy->getBuffer();
     if (indexBuffer == nullptr) {
@@ -69,16 +110,10 @@ void RectDrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
   if (vertexBuffer == nullptr) {
     return;
   }
-  auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
-  auto gp = QuadPerEdgeAAGeometryProcessor::Make(drawingBuffer, renderTarget->width(),
-                                                 renderTarget->height(), aaType, commonColor,
-                                                 uvMatrix, hasSubset);
-  auto programInfo = createProgramInfo(renderTarget, std::move(gp));
-  renderPass->bindProgramAndScissorClip(programInfo.get(), scissorRect());
-  renderPass->bindBuffers(indexBuffer ? indexBuffer->gpuBuffer() : nullptr,
-                          vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
+  renderPass->setVertexBuffer(vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
+  renderPass->setIndexBuffer(indexBuffer ? indexBuffer->gpuBuffer() : nullptr);
   if (indexBuffer != nullptr) {
-    auto numIndicesPerQuad = aaType == AAType::Coverage ? IndicesPerAAQuad : IndicesPerNonAAQuad;
+    const auto numIndicesPerQuad = GetNumIndicesPerQuad(aaType, lineJoin);
     renderPass->drawIndexed(PrimitiveType::Triangles, 0, rectCount * numIndicesPerQuad);
   } else {
     renderPass->draw(PrimitiveType::TriangleStrip, 0, 4);

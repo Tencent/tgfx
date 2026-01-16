@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "WebImageBuffer.h"
-#include "gpu/TextureView.h"
 #include "gpu/opengl/GLTexture.h"
+#include "gpu/resources/TextureView.h"
 #include "tgfx/core/ImageCodec.h"
 
 using namespace emscripten;
@@ -60,7 +60,7 @@ std::shared_ptr<TextureView> WebImageBuffer::onMakeTexture(Context* context, boo
   if (textureView == nullptr) {
     return nullptr;
   }
-  auto glTexture = static_cast<const GLTexture*>(textureView->getTexture());
+  auto glTexture = std::static_pointer_cast<GLTexture>(textureView->getTexture());
   val::module_property("tgfx").call<void>("uploadToTexture", emscripten::val::module_property("GL"),
                                           getImage(), glTexture->textureID(), false);
   return textureView;

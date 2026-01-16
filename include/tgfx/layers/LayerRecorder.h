@@ -18,55 +18,92 @@
 
 #pragma once
 
-#include <array>
-#include "tgfx/core/Canvas.h"
-#include "tgfx/core/Recorder.h"
+#include <memory>
+#include "tgfx/core/Path.h"
+#include "tgfx/core/RRect.h"
+#include "tgfx/core/Shape.h"
+#include "tgfx/core/TextBlob.h"
+#include "tgfx/layers/LayerPaint.h"
 
 namespace tgfx {
 class LayerContent;
+class GeometryContent;
 
 /**
- * Defines the different types of content that can be recorded in a layer.
- */
-enum class LayerContentType {
-  /**
-   * The default content of a layer, rendered beneath the layer’s children but above any layerStyles
-   * positioned with LayerStylePosition::Below.
-   */
-  Default,
-
-  /**
-   * The foreground content of a layer, rendered above the layer’s children and all layerStyles.
-   * This content also serves as part of the input source for layer styles. This content type is
-   * optional.
-   */
-  Foreground,
-
-  /**
-   * The contour content of a layer, typically used for LayerMaskType::Contour masks or layerStyles
-   * that require LayerStyleExtraSourceType::Contour. This content type is optional. If not
-   * provided, the default and foreground content will be used as the contour instead.
-   */
-  Contour
-};
-
-/**
- * LayerRecorder is a utility class that records drawing commands as layer content.
+ * LayerRecorder records geometries and their paints as layer content.  Geometries with invisible
+ * paints are still included as part of the layer's contour, but they will not be rendered.
  */
 class LayerRecorder {
  public:
+  LayerRecorder();
+  ~LayerRecorder();
+
   /**
-   * Returns a Canvas for recording drawing commands. The content type determines where the recorded
-   * commands will be stored:
-   * - Default: The commands will be stored in the default content of the layer.
-   * - Foreground: The commands will be stored in the foreground content of the layer.
-   * - Contour: The commands will be stored in the contour content of the layer.
-   * If the content type is not specified, it defaults to ContentType::Default.
+   * Adds a rectangle with the specified paint.
+   * @param rect The rectangle shape.
+   * @param paint The paint style for the rectangle.
    */
-  Canvas* getCanvas(LayerContentType contentType = LayerContentType::Default);
+  void addRect(const Rect& rect, const LayerPaint& paint);
+
+  /**
+   * Adds a rounded rectangle with the specified paint.
+   * @param rRect The rounded rectangle shape.
+   * @param paint The paint style for the rounded rectangle.
+   */
+  void addRRect(const RRect& rRect, const LayerPaint& paint);
+
+  /**
+   * Adds a path with the specified paint.
+   * @param path The path shape.
+   * @param paint The paint style for the path.
+   */
+  void addPath(const Path& path, const LayerPaint& paint);
+
+  /**
+   * Adds a shape with the specified paint.
+   * @param shape The shape object.
+   * @param paint The paint style for the shape.
+   */
+  void addShape(std::shared_ptr<Shape> shape, const LayerPaint& paint);
+
+  /**
+   * Adds a text blob with the specified paint.
+   * @param textBlob The text blob.
+   * @param paint The paint style for the text.
+   * @param x The x offset of the text blob.
+   * @param y The y offset of the text blob.
+   */
+  void addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerPaint& paint, float x = 0,
+                   float y = 0);
+
+  /**
+   * Adds a text blob with the specified paint and transformation matrix.
+   * @param textBlob The text blob.
+   * @param paint The paint style for the text.
+   * @param matrix The transformation matrix to apply to the text.
+   */
+  void addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerPaint& paint,
+                   const Matrix& matrix);
 
  private:
-  std::array<std::unique_ptr<Recorder>, 3> recorders = {};
+  enum class PendingType {
+    None,
+    Rect,
+    RRect,
+    Shape,
+  };
+
+  std::vector<std::unique_ptr<GeometryContent>> contents;
+  std::vector<std::unique_ptr<GeometryContent>> foregrounds;
+
+  PendingType pendingType = PendingType::None;
+  LayerPaint pendingPaint = {};
+  std::vector<Rect> pendingRects = {};
+  std::vector<RRect> pendingRRects = {};
+  std::shared_ptr<Shape> pendingShape = nullptr;
+
+  bool canAppend(PendingType type, const LayerPaint& paint) const;
+  void flushPending(PendingType newType = PendingType::None, const LayerPaint& newPaint = {});
 
   std::unique_ptr<LayerContent> finishRecording();
 

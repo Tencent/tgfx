@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "gpu/TextureView.h"
+#include "gpu/resources/TextureView.h"
 #include "tgfx/core/ImageBuffer.h"
 #include "tgfx/platform/HardwareBuffer.h"
 
@@ -36,13 +36,15 @@ class PixelBuffer : public ImageBuffer {
    * current platform. Otherwise, a CPU-backed PixelBuffer is returned.
    */
   static std::shared_ptr<PixelBuffer> Make(int width, int height, bool alphaOnly = false,
-                                           bool tryHardware = true);
+                                           bool tryHardware = true,
+                                           std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
    * Creates a PixelBuffer from the specified hardware buffer. Returns nullptr if the hardwareBuffer
    * is invalid or the current platform has no hardware buffer support.
    */
-  static std::shared_ptr<PixelBuffer> MakeFrom(HardwareBufferRef hardwareBuffer);
+  static std::shared_ptr<PixelBuffer> MakeFrom(HardwareBufferRef hardwareBuffer,
+                                               std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   int width() const override {
     return _info.width();
@@ -54,6 +56,10 @@ class PixelBuffer : public ImageBuffer {
 
   bool isAlphaOnly() const override {
     return _info.isAlphaOnly();
+  }
+
+  const std::shared_ptr<ColorSpace>& colorSpace() const override {
+    return _info.colorSpace();
   }
 
   /**

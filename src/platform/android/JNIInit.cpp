@@ -17,9 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "JNIInit.h"
+#include "GlyphRenderer.h"
 #include "HandlerThread.h"
 #include "NativeCodec.h"
 #include "platform/android/SurfaceTexture.h"
+#include "tgfx/platform/android/AndroidBitmap.h"
 
 namespace tgfx {
 void JNIInit::Run() {
@@ -36,6 +38,8 @@ void JNIInit::Run() {
   NativeCodec::JNIInit(env);
   HandlerThread::JNIInit(env);
   SurfaceTexture::JNIInit(env);
+  AndroidBitmap::JNIInit(env);
+  GlyphRenderer::JNIInit(env);
   env->ExceptionClear();
 }
 }  // namespace tgfx

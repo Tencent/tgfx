@@ -9,41 +9,32 @@
 
 ## Introduction
 
-TGFX (Tencent Graphics) is a lightweight 2D graphics library for rendering text, shapes, and images. 
-It offers high-performance APIs compatible with various GPU hardware and software platforms, including
-iOS, Android, macOS, Windows, Linux, OpenHarmony, and the Web. Initially developed as the default 
-graphics engine for the [PAG](https://pag.io) project starting from version 4.0, TGFX aims to be a 
-compelling alternative to the Skia graphics library while maintaining a much smaller binary size.
+TGFX (Tencent Graphics) is a lightweight 2D graphics library designed for modern GPUs. It delivers high-performance, feature-rich
+rendering of text, images, and vector graphics on all major platforms, including iOS, Android, macOS, Windows, Linux, OpenHarmony, 
+and the Web. Initially developed as the default graphics engine for the [PAG](https://pag.io) project starting from version 4.0, 
+TGFX aims to be a compelling alternative to the Skia graphics library while maintaining a much smaller binary size.
 Over time, it has found its way into many other products, such as [Hippy](https://github.com/Tencent/Hippy), [Tencent Docs](https://docs.qq.com) 
 and various video-editing apps.
 
 ## Platform Support
 
-- iOS 9.0 or later
-- Android 4.4 or later
-- macOS 10.15 or later
-- Windows 7.0 or later
-- Chrome 69.0 or later (Web)
-- Safari 11.3 or later (Web)
+- iOS 9.0+
+- Android 5.0+
+- HarmonyOS 5.0+
+- macOS 10.15+
+- Windows 7.0+
+- Linux (No specific version requirement)
+- Chrome 69.0+ (Web)
+- Safari 11.3+ (Web)
 
-## Backing Renderers
+## Rendering Backends
 
-|   Vector Backend    | GPU Backend | Target Platforms |   Status    |
-|:-------------------:|:-----------:|:----------------:|:-----------:|
-|      FreeType       |   OpenGL    |       All        |  complete   |
-|    CoreGraphics     |   OpenGL    |    iOS, macOS    |  complete   |
-| Canvas2D / FreeType |    WebGL    |       Web        |  complete   |
-|    CoreGraphics     |    Metal    |    iOS, macOS    | in progress |
-|      FreeType       |   Vulkan    |  Android, Linux  | in progress |
-| Canvas2D / FreeType |   WebGPU    |       Web        | in progress |
-
-
-## Branch Management
-
-- The `main` branch is our active development branch, containing the latest features and bug fixes.
-- The branches under `release/` are our stable milestone branches, which are fully tested. We 
-  periodically create a `release/{version}` branch from the `main` branch. Once a `release/{version}` 
-  branch is created, only high-priority fixes are checked into it.
+- OpenGL 3.2+ (Desktop)
+- OpenGL ES 3.0+
+- WebGL 2.0+
+- Metal 1.1+ (in progress)
+- Vulkan 1.1+ (in progress)
+- WebGPU (in progress)
 
 ## Build Prerequisites
 
@@ -55,7 +46,7 @@ TGFX uses **C++17** features. Here are the minimum tools needed to build TGFX on
 - NodeJS 14.14.0+
 - Ninja 1.9.0+
 - CMake 3.13.0+
-- QT 5.13.0+
+- QT 6.2.0+
 - NDK 20+ (**20.1.5948944 recommended**)
 - Emscripten 3.1.58+ 
 
@@ -64,6 +55,13 @@ Please note the following additional notices:
 
 - Ensure you have installed the **[Desktop development with C++]** and **[Universal Windows Platform development]** components for VS2019.
 - It is **highly recommended** to use the **latest version of CMake**. Many older versions of CMake may have various bugs across different platforms.
+
+## Branch Management
+
+- The `main` branch is our active development branch, containing the latest features and bug fixes.
+- The branches under `release/` are our stable milestone branches, which are fully tested. We
+  periodically create a `release/{version}` branch from the `main` branch. Once a `release/{version}`
+  branch is created, only high-priority fixes are checked into it.
 
 ## Dependencies
 
@@ -374,6 +372,31 @@ the `third_party/out/` directory.
 Finally, connect your OpenHarmony device or start the simulator, then build and run the `hello2d`
 target in DevEco. You're all set!
 
+
+## Vcpkg Integration
+
+TGFX provides official vcpkg port files for easy integration into projects using vcpkg dependency management. Due to maintenance costs, we haven't merged into the official vcpkg repository yet, but this may be considered in the future. Currently, you can use TGFX through manual vcpkg port configuration.
+
+### Quick Start
+
+1. Visit the [TGFX releases page](https://github.com/Tencent/tgfx/releases) and download the vcpkg port files for your target version
+2. Copy the `tgfx/` directory to your vcpkg installation's `ports/` directory  
+3. Run `vcpkg install tgfx` to install
+
+### Using Specific Commit
+
+If you need a specific commit version of TGFX, you can use the provided script in the root directory to generate the port configuration:
+
+```bash
+node update_vcpkg <commit-hash>
+```
+
+Example:
+```bash
+node update_vcpkg 6095b909b1109d4910991a034405f4ae30d6786f
+```
+
+The script will automatically download the source code, calculate the SHA512 hash, and update the `vcpkg/ports/tgfx/portfile.cmake` file.
 
 ## Build Library
 

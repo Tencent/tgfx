@@ -40,6 +40,7 @@ class MatrixColorFilter : public ColorFilter {
   bool isEqual(const ColorFilter* colorFilter) const override;
 
  private:
-  PlacementPtr<FragmentProcessor> asFragmentProcessor(Context* context) const override;
+  PlacementPtr<FragmentProcessor> asFragmentProcessor(
+      Context* context, const std::shared_ptr<ColorSpace>& dstColorSpace) const override;
 };
 }  // namespace tgfx

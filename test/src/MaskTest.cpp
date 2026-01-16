@@ -45,7 +45,7 @@ TGFX_TEST(PathRasterizerTest, Rasterize) {
   ASSERT_TRUE(surface != nullptr);
   auto canvas = surface->getCanvas();
   canvas->drawImage(image);
-  Bitmap bitmap(rasterizer->width(), rasterizer->height(), true, false);
+  Bitmap bitmap(rasterizer->width(), rasterizer->height(), true, false, surface->colorSpace());
   ASSERT_FALSE(bitmap.isEmpty());
   Pixmap pixmap(bitmap);
   pixmap.clear();

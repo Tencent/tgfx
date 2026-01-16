@@ -19,7 +19,11 @@
 #include "CGPathRasterizer.h"
 #include <CoreGraphics/CGBitmapContext.h>
 #include "core/PixelBuffer.h"
+#include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/GammaCorrection.h"
+#include "core/utils/MathExtra.h"
+#include "core/utils/ScalePixelsAlpha.h"
+#include "core/utils/ShapeUtils.h"
 #include "platform/apple/BitmapContextUtil.h"
 #include "tgfx/core/PathTypes.h"
 
@@ -88,7 +92,7 @@ static CGImageRef CreateCGImage(const Path& path, void* pixels, const ImageInfo&
   CGContextTranslateCTM(cgContext, -left, -top);
   DrawPath(path, cgContext, info, antiAlias);
   CGContextFlush(cgContext);
-  auto* p = static_cast<uint8_t*>(pixels);
+  auto p = static_cast<uint8_t*>(pixels);
   auto stride = info.rowBytes();
   for (int y = 0; y < info.height(); ++y) {
     for (int x = 0; x < info.width(); ++x) {
@@ -114,6 +118,7 @@ std::shared_ptr<PathRasterizer> PathRasterizer::MakeFrom(int width, int height,
 }
 
 bool CGPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
+                                    std::shared_ptr<ColorSpace> dstColorSpace,
                                     void* dstPixels) const {
   if (dstPixels == nullptr) {
     return false;
@@ -122,7 +127,8 @@ bool CGPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, si
   if (path.isEmpty()) {
     return false;
   }
-  auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes);
+  auto dstInfo =
+      ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes, dstColorSpace);
   auto targetInfo = dstInfo.makeIntersect(0, 0, width(), height());
   auto cgContext = CreateBitmapContext(targetInfo, dstPixels);
   if (cgContext == nullptr) {
@@ -140,8 +146,8 @@ bool CGPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, si
   if (!bounds.intersect(clipBounds)) {
     return false;
   }
-  auto width = static_cast<int>(ceilf(bounds.width()));
-  auto height = static_cast<int>(ceilf(bounds.height()));
+  auto width = FloatCeilToInt(bounds.width());
+  auto height = FloatCeilToInt(bounds.height());
   auto tempBuffer = PixelBuffer::Make(width, height, true, false);
   if (tempBuffer == nullptr) {
     CGContextRelease(cgContext);
@@ -164,6 +170,12 @@ bool CGPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, si
   CGContextDrawImage(cgContext, rect, image);
   CGContextRelease(cgContext);
   CGImageRelease(image);
+  auto alphaScale = ShapeUtils::CalculateAlphaReduceFactorIfHairline(shape);
+  ScalePixelsAlpha(targetInfo, dstPixels, alphaScale);
+  if (NeedConvertColorSpace(colorSpace(), dstColorSpace)) {
+    ConvertColorSpaceInPlace(ImageGenerator::width(), ImageGenerator::height(), colorType,
+                             alphaType, dstRowBytes, colorSpace(), dstColorSpace, dstPixels);
+  }
   return true;
 }
 

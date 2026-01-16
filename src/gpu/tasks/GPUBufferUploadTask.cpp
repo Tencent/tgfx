@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GPUBufferUploadTask.h"
-#include "gpu/GPU.h"
-#include "gpu/IndexBuffer.h"
-#include "gpu/VertexBuffer.h"
+#include "gpu/resources/BufferResource.h"
+#include "inspect/InspectorMark.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 GPUBufferUploadTask::GPUBufferUploadTask(std::shared_ptr<ResourceProxy> proxy,
@@ -29,6 +29,8 @@ GPUBufferUploadTask::GPUBufferUploadTask(std::shared_ptr<ResourceProxy> proxy,
 }
 
 std::shared_ptr<Resource> GPUBufferUploadTask::onMakeResource(Context* context) {
+  TASK_MARK(tgfx::inspect::OpTaskType::GpuUploadTask);
+  ATTRIBUTE_ENUM(bufferType, tgfx::inspect::CustomEnumType::BufferType);
   if (source == nullptr) {
     return nullptr;
   }
@@ -44,16 +46,9 @@ std::shared_ptr<Resource> GPUBufferUploadTask::onMakeResource(Context* context) 
     LOGE("GPUBufferUploadTask::onMakeResource() Failed to create buffer!");
     return nullptr;
   }
-  if (!gpu->queue()->writeBuffer(gpuBuffer.get(), 0, data->data(), data->size())) {
-    gpuBuffer->release(gpu);
-    LOGE("GPUBufferUploadTask::onMakeResource() Failed to write buffer!");
-    return nullptr;
-  }
+  gpu->queue()->writeBuffer(gpuBuffer, 0, data->data(), data->size());
   // Free the data source immediately to reduce memory pressure.
   source = nullptr;
-  if (bufferType == BufferType::Index) {
-    return Resource::AddToCache(context, new IndexBuffer(std::move(gpuBuffer)));
-  }
-  return Resource::AddToCache(context, new VertexBuffer(std::move(gpuBuffer)));
+  return BufferResource::Wrap(context, std::move(gpuBuffer));
 }
 }  // namespace tgfx

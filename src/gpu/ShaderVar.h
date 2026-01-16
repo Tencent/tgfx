@@ -21,22 +21,13 @@
 #include <utility>
 #include <vector>
 #include "SLType.h"
-#include "gpu/Attribute.h"
 #include "gpu/Uniform.h"
+#include "tgfx/gpu/Attribute.h"
 
 namespace tgfx {
-enum class ShaderStage { Vertex, Fragment };
-
 class ShaderVar {
  public:
-  enum class TypeModifier {
-    None,
-    Attribute,
-    Varying,
-    FlatVarying,
-    Uniform,
-    Out,
-  };
+  enum class TypeModifier { None, Attribute, Varying, FlatVarying, Uniform, Out, InOut };
 
   ShaderVar() = default;
 

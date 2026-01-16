@@ -7,17 +7,17 @@
     "common": [
       {
         "url": "${PAG_GROUP}/vendor_tools.git",
-        "commit": "c1c78c1217f0b67d2142a736140472f62e280fd1",
+        "commit": "0f4264d14ce6c8d1185d27dc9e2e6ee758a8bbcb",
         "dir": "third_party/vendor_tools"
       },
       {
         "url": "${PAG_GROUP}/pathkit.git",
-        "commit": "1fce60d56f9c08d25d3868b5006dd2c9b52e9201",
+        "commit": "c2a24f3828b5895c7b5e65e11fe3d341fad7c983",
         "dir": "third_party/pathkit"
       },
       {
         "url": "${PAG_GROUP}/skcms.git",
-        "commit": "2d0ea94be31ed31438c3c7a57752a601ba83ff2c",
+        "commit": "0a4e501a0e61d62dc38a0157e4355a58f5b01b81",
         "dir": "third_party/skcms"
       },
       {
@@ -81,9 +81,9 @@
         "dir": "third_party/highway"
       },
       {
-        "url": "https://github.com/kerukuro/digestpp.git",
-        "commit": "9a1afa1459fa71ab544775f1b1c0a6298978d9fd",
-        "dir": "third_party/digestpp"
+        "url": "https://github.com/lz4/lz4.git",
+        "commit": "cacca37747572717ceb1f156eb9840644205ca4f",
+        "dir": "third_party/lz4"
       }
     ]
   },

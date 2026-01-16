@@ -56,6 +56,11 @@ class ImageReader {
   int height() const;
 
   /**
+   * Returns the ColorSpace of generated image buffers.
+   */
+  const std::shared_ptr<ColorSpace>& colorSpace() const;
+
+  /**
    * Acquires the next ImageBuffer from the ImageReader after a new image frame has been rendered
    * into the associated video source. Note that the previously returned image buffers will
    * immediately expire after the newly created ImageBuffer is drawn.

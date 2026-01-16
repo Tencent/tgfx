@@ -21,8 +21,8 @@
 #include <optional>
 #include "DrawOp.h"
 #include "gpu/RRectsVertexProvider.h"
-#include "gpu/proxies/IndexBufferProxy.h"
-#include "gpu/proxies/VertexBufferProxyView.h"
+#include "gpu/proxies/GPUBufferProxy.h"
+#include "gpu/proxies/VertexBufferView.h"
 
 namespace tgfx {
 class RRectDrawOp : public DrawOp {
@@ -50,18 +50,28 @@ class RRectDrawOp : public DrawOp {
                                         PlacementPtr<RRectsVertexProvider> provider,
                                         uint32_t renderFlags);
 
-  void execute(RenderPass* renderPass, RenderTarget* renderTarget) override;
+ protected:
+  PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
+
+  void onDraw(RenderPass* renderPass) override;
+
+  Type type() override {
+    return Type::RRectDrawOp;
+  }
+
+  bool hasCoverage() const override {
+    return true;
+  }
 
  private:
   size_t rectCount = 0;
-  bool useScale = false;
   bool hasStroke = false;
-  std::optional<Color> commonColor = std::nullopt;
-  std::shared_ptr<IndexBufferProxy> indexBufferProxy = nullptr;
-  std::shared_ptr<VertexBufferProxyView> vertexBufferProxyView = nullptr;
+  std::optional<PMColor> commonColor = std::nullopt;
+  std::shared_ptr<GPUBufferProxy> indexBufferProxy = nullptr;
+  std::shared_ptr<VertexBufferView> vertexBufferProxyView = nullptr;
 
-  explicit RRectDrawOp(RRectsVertexProvider* provider);
+  RRectDrawOp(BlockAllocator* allocator, RRectsVertexProvider* provider);
 
-  friend class BlockBuffer;
+  friend class BlockAllocator;
 };
 }  // namespace tgfx

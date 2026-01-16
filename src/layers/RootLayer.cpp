@@ -20,6 +20,7 @@
 #include <limits>
 #include "core/utils/DecomposeRects.h"
 #include "core/utils/Log.h"
+#include "layers/DrawArgs.h"
 
 namespace tgfx {
 static float UnionArea(const Rect& rect1, const Rect& rect2) {
@@ -90,6 +91,9 @@ bool RootLayer::invalidateBackground(const Rect& drawRect, LayerStyle* layerStyl
   for (size_t i = 0; i < dirtySize; i++) {
     auto background = dirtyRects[i];
     if (background.intersect(drawRect)) {
+      if (layerStyle == nullptr) {
+        return true;
+      }
       background = layerStyle->filterBackground(background, contentScale);
       if (background.intersect(drawRect)) {
         dirtyBackgrounds.push_back(background);
@@ -109,6 +113,23 @@ std::vector<Rect> RootLayer::updateDirtyRegions() {
   dirtyAreas.clear();
   DecomposeRects(dirtyRects.data(), dirtyRects.size());
   return std::move(dirtyRects);
+}
+
+bool RootLayer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
+                          const Matrix3D* transform3D) {
+  auto color = _backgroundColor;
+  color.alpha = color.alpha * alpha;
+  canvas->drawColor(color, blendMode);
+  return Layer::drawLayer(args, canvas, alpha, blendMode, transform3D);
+}
+
+bool RootLayer::setBackgroundColor(const Color& color) {
+  if (_backgroundColor == color) {
+    return false;
+  }
+  _backgroundColor = color;
+  invalidateContent();
+  return true;
 }
 
 }  // namespace tgfx

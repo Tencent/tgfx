@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,80 +18,47 @@
 
 #pragma once
 
-#include "core/utils/LazyBounds.h"
-#include "tgfx/core/GlyphRun.h"
-#include "tgfx/core/Stroke.h"
+#include "core/GlyphRun.h"
 
 namespace tgfx {
-class TextBlob;
 
-/**
- * GlyphRunList contains a list of glyph runs that can be drawn together. All glyph runs in a list
- * share the same font type, whether they have color, outlines, or neither.
- */
+class TextBlob;
+struct RunRecord;
+
+// A lightweight list class for iterating over GlyphRuns without allocating a vector.
 class GlyphRunList {
  public:
-  /**
-   * Unwraps a TextBlob into a list of GlyphRunList objects. Returns nullptr if the TextBlob is
-   * nullptr.
-   */
-  static const std::vector<std::shared_ptr<GlyphRunList>>* Unwrap(const TextBlob* textBlob);
+  class Iterator {
+   public:
+    Iterator(const RunRecord* record, size_t remaining) : current(record), remaining(remaining) {
+    }
 
-  /**
-   * Constructs a GlyphRunList using a single glyph run.
-   */
-  explicit GlyphRunList(GlyphRun glyphRun);
+    GlyphRun operator*() const;
 
-  /**
-   * Constructs a GlyphRunList using a list of glyph runs. All glyph runs in the list must share the
-   * same font type, whether they have color, outlines, or neither.
-   */
-  explicit GlyphRunList(std::vector<GlyphRun> glyphRuns);
+    Iterator& operator++();
 
-  /**
-   * Returns true if the GlyphRunList has color.
-   */
-  bool hasColor() const {
-    return _glyphRuns[0].font.hasColor();
+    bool operator!=(const Iterator& other) const {
+      return remaining != other.remaining;
+    }
+
+   private:
+    const RunRecord* current = nullptr;
+    size_t remaining = 0;
+  };
+
+  explicit GlyphRunList(const TextBlob* blob) : blob(blob) {
   }
 
-  /**
-   * Returns true if the GlyphRunList has outlines.
-   */
-  bool hasOutlines() const {
-    return _glyphRuns[0].font.hasOutlines();
+  Iterator begin() const;
+
+  Iterator end() const {
+    return Iterator(nullptr, 0);
   }
 
-  /**
-   * Returns the glyph runs in the text blob.
-   */
-  const std::vector<GlyphRun>& glyphRuns() const {
-    return _glyphRuns;
-  }
-
-  /**
-   * Computes glyph bounds using the font bounds and each glyph's position
-   */
-  Rect getBounds() const;
-
-  /**
-   * Returns the tight bounding box of the glyphs in this run. If a matrix is provided, the bounds
-   * will be transformed accordingly. Compared to getBounds, this method is more accurate but also
-   * more computationally expensive.
-   */
-  Rect getTightBounds(const Matrix* matrix = nullptr) const;
-
-  /**
-   * Creates a Path for the glyphs in this run. If a matrix is provided, the path will be transformed
-   * accordingly. Returns true if the path was successfully created. Otherwise,
-   * returns false and leaves the path unchanged.
-   */
-  bool getPath(Path* path, const Matrix* matrix = nullptr) const;
+  bool empty() const;
 
  private:
-  std::vector<GlyphRun> _glyphRuns = {};
-  LazyBounds bounds = {};
-
-  Rect computeConservativeBounds() const;
+  const TextBlob* blob = nullptr;
 };
+
 }  // namespace tgfx

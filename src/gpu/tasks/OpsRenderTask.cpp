@@ -17,22 +17,29 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "OpsRenderTask.h"
-#include "gpu/RenderPass.h"
 #include "gpu/proxies/RenderTargetProxy.h"
+#include "inspect/InspectorMark.h"
+#include "tgfx/gpu/RenderPass.h"
 
 namespace tgfx {
 void OpsRenderTask::execute(CommandEncoder* encoder) {
+  TASK_MARK(tgfx::inspect::OpTaskType::OpsRenderTask);
   auto renderTarget = renderTargetProxy->getRenderTarget();
   if (renderTarget == nullptr) {
     LOGE("OpsRenderTask::execute() Render target is null!");
     return;
   }
-  auto renderPass = encoder->beginRenderPass(renderTarget, clearColor, true);
+  auto loadOp = clearColor.has_value() ? LoadAction::Clear : LoadAction::Load;
+  auto resolveTexture =
+      renderTarget->sampleCount() > 1 ? renderTarget->getSampleTexture() : nullptr;
+  RenderPassDescriptor descriptor(renderTarget->getRenderTexture(), loadOp, StoreAction::Store,
+                                  clearColor.value_or(PMColor::Transparent()), resolveTexture);
+  auto renderPass = encoder->beginRenderPass(descriptor);
   if (renderPass == nullptr) {
     LOGE("OpsRenderTask::execute() Failed to initialize the render pass!");
     return;
   }
-  for (auto& op : ops) {
+  for (auto& op : drawOps) {
     op->execute(renderPass.get(), renderTarget.get());
     // Release the Op immediately after execution to maximize GPU resource reuse.
     op = nullptr;

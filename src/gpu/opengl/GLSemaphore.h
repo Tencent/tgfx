@@ -18,13 +18,14 @@
 
 #pragma once
 
-#include "gpu/Semaphore.h"
+#include "gpu/opengl/GLResource.h"
+#include "tgfx/gpu/Semaphore.h"
 
 namespace tgfx {
 /**
- * Types for interacting with OpenGL semaphore object.
+ * GLSemaphore is a wrapper class for an OpenGL sync object.
  */
-class GLSemaphore : public Semaphore {
+class GLSemaphore : public Semaphore, public GLResource {
  public:
   explicit GLSemaphore(void* glSync) : _glSync(glSync) {
   }
@@ -36,9 +37,11 @@ class GLSemaphore : public Semaphore {
   BackendSemaphore getBackendSemaphore() const override;
 
  protected:
-  void onReleaseGPU() override;
+  void onRelease(GLGPU* gpu) override;
 
  private:
   void* _glSync = nullptr;
+
+  friend class GLGPU;
 };
 }  // namespace tgfx

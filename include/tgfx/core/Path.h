@@ -19,6 +19,7 @@
 #pragma once
 
 #include "tgfx/core/Matrix.h"
+#include "tgfx/core/Matrix3D.h"
 #include "tgfx/core/PathTypes.h"
 #include "tgfx/core/RRect.h"
 
@@ -324,6 +325,11 @@ class Path {
    * Applies matrix to this Path, this transforms verb array, Point array, and weight.
    */
   void transform(const Matrix& matrix);
+
+  /**
+   * Applies a 3D matrix to this Path, transforming the verb array, point array, and weights.
+   */
+  void transform3D(const Matrix3D& matrix);
 
   /**
    * Reveres this path from back to front.

@@ -20,26 +20,122 @@
 #include "core/utils/USE.h"
 
 namespace tgfx {
-PixelFormat GLSizeFormatToPixelFormat(unsigned sizeFormat) {
-  switch (sizeFormat) {
-    case GL_BGRA:
-    case GL_BGRA8:
-      return PixelFormat::BGRA_8888;
-    case GL_R8:
-    case GL_RED:
-    case GL_ALPHA8:
-    case GL_ALPHA:
-      return PixelFormat::ALPHA_8;
-    case GL_LUMINANCE8:
-    case GL_LUMINANCE:
-      return PixelFormat::GRAY_8;
-    case GL_RG8:
-    case GL_RG:
-      return PixelFormat::RG_88;
-    default:
-      break;
+
+unsigned ToGLBlendFactor(BlendFactor blendFactor) {
+  switch (blendFactor) {
+    case BlendFactor::Zero:
+      return GL_ZERO;
+    case BlendFactor::One:
+      return GL_ONE;
+    case BlendFactor::Src:
+      return GL_SRC_COLOR;
+    case BlendFactor::OneMinusSrc:
+      return GL_ONE_MINUS_SRC_COLOR;
+    case BlendFactor::Dst:
+      return GL_DST_COLOR;
+    case BlendFactor::OneMinusDst:
+      return GL_ONE_MINUS_DST_COLOR;
+    case BlendFactor::SrcAlpha:
+      return GL_SRC_ALPHA;
+    case BlendFactor::OneMinusSrcAlpha:
+      return GL_ONE_MINUS_SRC_ALPHA;
+    case BlendFactor::DstAlpha:
+      return GL_DST_ALPHA;
+    case BlendFactor::OneMinusDstAlpha:
+      return GL_ONE_MINUS_DST_ALPHA;
+    case BlendFactor::Src1:
+      return GL_SRC1_COLOR;
+    case BlendFactor::OneMinusSrc1:
+      return GL_ONE_MINUS_SRC1_COLOR;
+    case BlendFactor::Src1Alpha:
+      return GL_SRC1_ALPHA;
+    case BlendFactor::OneMinusSrc1Alpha:
+      return GL_ONE_MINUS_SRC1_ALPHA;
   }
-  return PixelFormat::RGBA_8888;
+  return GL_ZERO;
+}
+
+unsigned ToGLBlendOperation(BlendOperation blendOperation) {
+  switch (blendOperation) {
+    case BlendOperation::Add:
+      return GL_FUNC_ADD;
+    case BlendOperation::Subtract:
+      return GL_FUNC_SUBTRACT;
+    case BlendOperation::ReverseSubtract:
+      return GL_FUNC_REVERSE_SUBTRACT;
+    case BlendOperation::Min:
+      return GL_MIN;
+    case BlendOperation::Max:
+      return GL_MAX;
+  }
+  return GL_FUNC_ADD;
+}
+
+unsigned ToGLCompareFunction(CompareFunction compare) {
+  switch (compare) {
+    case CompareFunction::Never:
+      return GL_NEVER;
+    case CompareFunction::Less:
+      return GL_LESS;
+    case CompareFunction::Equal:
+      return GL_EQUAL;
+    case CompareFunction::LessEqual:
+      return GL_LEQUAL;
+    case CompareFunction::Greater:
+      return GL_GREATER;
+    case CompareFunction::NotEqual:
+      return GL_NOTEQUAL;
+    case CompareFunction::GreaterEqual:
+      return GL_GEQUAL;
+    case CompareFunction::Always:
+      return GL_ALWAYS;
+  }
+  return GL_ALWAYS;
+}
+
+unsigned ToGLFrontFace(FrontFace frontFace) {
+  switch (frontFace) {
+    case FrontFace::CW:
+      return GL_CW;
+    case FrontFace::CCW:
+      return GL_CCW;
+  }
+  return GL_CCW;
+}
+
+unsigned ToGLCullMode(CullMode mode) {
+  switch (mode) {
+    case CullMode::None:
+      DEBUG_ASSERT(false);
+      return GL_BACK;
+    case CullMode::Front:
+      return GL_FRONT;
+    case CullMode::Back:
+      return GL_BACK;
+  }
+  return GL_BACK;
+}
+
+unsigned ToGLStencilOperation(StencilOperation stencilOp) {
+  switch (stencilOp) {
+    case StencilOperation::Keep:
+      return GL_KEEP;
+    case StencilOperation::Zero:
+      return GL_ZERO;
+    case StencilOperation::Replace:
+      return GL_REPLACE;
+    case StencilOperation::Invert:
+      return GL_INVERT;
+    case StencilOperation::IncrementClamp:
+      return GL_INCR;
+    case StencilOperation::DecrementClamp:
+      return GL_DECR;
+    case StencilOperation::IncrementWrap:
+      return GL_INCR_WRAP;
+    case StencilOperation::DecrementWrap:
+      return GL_DECR_WRAP;
+  }
+  return GL_KEEP;
 }
 
 unsigned PixelFormatToGLSizeFormat(PixelFormat pixelFormat) {
@@ -87,53 +183,6 @@ GLVersion GetGLVersion(const char* versionString) {
     return {major, minor};
   }
   return {};
-}
-
-unsigned CreateGLProgram(const GLFunctions* gl, const std::string& vertex,
-                         const std::string& fragment) {
-  auto vertexShader = LoadGLShader(gl, GL_VERTEX_SHADER, vertex);
-  if (vertexShader == 0) {
-    return 0;
-  }
-  auto fragmentShader = LoadGLShader(gl, GL_FRAGMENT_SHADER, fragment);
-  if (fragmentShader == 0) {
-    return 0;
-  }
-  auto programHandle = gl->createProgram();
-  gl->attachShader(programHandle, vertexShader);
-  gl->attachShader(programHandle, fragmentShader);
-  gl->linkProgram(programHandle);
-  int success;
-  gl->getProgramiv(programHandle, GL_LINK_STATUS, &success);
-  if (!success) {
-    char infoLog[512];
-    gl->getProgramInfoLog(programHandle, 512, nullptr, infoLog);
-    gl->deleteProgram(programHandle);
-    programHandle = 0;
-    LOGE("CreateGLProgram failed:%s", infoLog);
-  }
-  gl->deleteShader(vertexShader);
-  gl->deleteShader(fragmentShader);
-  return programHandle;
-}
-
-unsigned LoadGLShader(const GLFunctions* gl, unsigned shaderType, const std::string& source) {
-  auto shader = gl->createShader(shaderType);
-  const char* files[] = {source.c_str()};
-  gl->shaderSource(shader, 1, files, nullptr);
-  gl->compileShader(shader);
-#if defined(DEBUG) || !defined(TGFX_BUILD_FOR_WEB)
-  int success;
-  gl->getShaderiv(shader, GL_COMPILE_STATUS, &success);
-  if (!success) {
-    char infoLog[512];
-    gl->getShaderInfoLog(shader, 512, nullptr, infoLog);
-    LOGE("Could not compile shader: %d %s", shaderType, infoLog);
-    gl->deleteShader(shader);
-    shader = 0;
-  }
-#endif
-  return shader;
 }
 
 void ClearGLError(const GLFunctions* gl) {
