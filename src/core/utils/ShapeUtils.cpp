@@ -19,7 +19,6 @@
 #include "ShapeUtils.h"
 #include "core/shapes/MatrixShape.h"
 #include "core/shapes/StrokeShape.h"
-#include "core/utils/StrokeUtils.h"
 #include "tgfx/core/Shape.h"
 
 namespace tgfx {
@@ -49,10 +48,10 @@ float ShapeUtils::CalculateAlphaReduceFactorIfHairline(std::shared_ptr<Shape> sh
     strokeShape = std::static_pointer_cast<StrokeShape>(shape);
   }
 
-  if (!strokeShape || IsHairlineStroke(strokeShape->stroke)) {
+  if (!strokeShape || strokeShape->stroke.width <= 0.f) {
     return 1.f;
   }
-  return std::clamp(strokeShape->stroke.width * scale, 0.f, 1.f);
+  return std::min(strokeShape->stroke.width * scale, 1.f);
 }
 
 }  // namespace tgfx
