@@ -98,14 +98,15 @@ class TextPath : public VectorElement {
   void setLastMargin(float value);
 
   /**
-   * Returns whether characters are perpendicular to the path (rotated to follow the tangent).
+   * Returns whether characters stand perpendicular to the path. When true, characters rotate to
+   * follow the path direction. When false, characters remain upright regardless of path direction.
    */
   bool perpendicularToPath() const {
     return _perpendicularToPath;
   }
 
   /**
-   * Sets whether characters are perpendicular to the path.
+   * Sets whether characters stand perpendicular to the path.
    */
   void setPerpendicularToPath(bool value);
 

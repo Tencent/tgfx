@@ -55,7 +55,7 @@ class Painter {
   std::shared_ptr<Shader> shader = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
   float alpha = 1.0f;
-  DrawPosition drawPosition = DrawPosition::BelowChildren;
+  LayerPlacement placement = LayerPlacement::Background;
   std::vector<Geometry*> geometries = {};
 };
 

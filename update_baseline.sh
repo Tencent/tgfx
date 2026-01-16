@@ -16,7 +16,7 @@
   CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
   CURRENT_COMMIT=$(git rev-parse HEAD)
   STASH_LIST_BEFORE=$(git stash list)
-  git stash push --quiet
+  git stash push --include-untracked --quiet
   STASH_LIST_AFTER=$(git stash list)
   git switch main --quiet
 
